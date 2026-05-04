@@ -13,6 +13,7 @@ extension SessionCockpitTimelineSection {
     )
     .padding()
     .frame(width: 960)
+    .harnessPreviewSceneAppearance()
   }
 
   static var signalSquishPreview: some View {
@@ -26,6 +27,7 @@ extension SessionCockpitTimelineSection {
     )
     .padding()
     .frame(width: 960)
+    .harnessPreviewSceneAppearance()
   }
 }
 
@@ -61,4 +63,5 @@ extension SessionCockpitTimelineSection {
   )
   .padding()
   .frame(width: 960)
+  .harnessPreviewSceneAppearance()
 }

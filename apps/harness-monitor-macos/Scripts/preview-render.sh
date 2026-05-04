@@ -5,8 +5,12 @@
 # render failure, after one DerivedData-intermediates reset retry.
 #
 # Usage:
+#   preview-render.sh --list
 #   preview-render.sh --id <EntryID>
-#   preview-render.sh --file <path> --index <N>
+#   preview-render.sh --file <path> --index <N> [--out <png-path>]
+#                     [--theme auto|light|dark]
+#                     [--text-size 0-6|xs|small|medium|default|large|xl|largest]
+#                     [--time-zone local|utc|<IANA-zone>]
 #
 # Environment:
 #   PREVIEW_TIMEOUT_SECONDS  render timeout (default 240)
@@ -32,7 +36,6 @@ require() {
   }
 }
 
-require xcode-cli
 require jq
 
 normalize_entry_file() {
@@ -72,12 +75,82 @@ xcode_project_file() {
   printf '%s%s\n' "$XCODE_PROJECT_PATH_PREFIX" "$app_relative"
 }
 
+resolve_output_path() {
+  local candidate="$1"
+
+  if [[ "$candidate" != *.png ]]; then
+    candidate="${candidate}.png"
+  fi
+
+  if [[ "$candidate" != /* ]]; then
+    candidate="$(pwd)/$candidate"
+  fi
+
+  printf '%s\n' "$candidate"
+}
+
+resolve_text_size_index() {
+  local raw
+  raw="$(printf '%s' "$1" | /usr/bin/tr '[:upper:]' '[:lower:]')"
+
+  case "$raw" in
+    0|xs|extra-small|extra_small)
+      printf '0\n'
+      ;;
+    1|small|sm)
+      printf '1\n'
+      ;;
+    2|medium|md)
+      printf '2\n'
+      ;;
+    3|default|normal)
+      printf '3\n'
+      ;;
+    4|large|lg)
+      printf '4\n'
+      ;;
+    5|xl|extra-large|extra_large)
+      printf '5\n'
+      ;;
+    6|largest|xxl)
+      printf '6\n'
+      ;;
+    *)
+      echo "error: unsupported text size '$1' (use 0-6, xs, small, medium, default, large, xl, or largest)" >&2
+      exit 2
+      ;;
+  esac
+}
+
+print_manifest_entries() {
+  [[ -f "$MANIFEST" ]] || { echo "error: manifest not found at $MANIFEST" >&2; exit 1; }
+  jq -r '.entries[] | [.id, (.index | tostring), .file, .description] | @tsv' "$MANIFEST" \
+    | /usr/bin/awk -F '\t' '
+      BEGIN {
+        printf "%-38s %-5s %-72s %s\n", "ID", "IDX", "FILE", "DESCRIPTION"
+      }
+      {
+        printf "%-38s %-5s %-72s %s\n", $1, $2, $3, $4
+      }
+    '
+}
+
+list_entries=0
 entry_id=""
 entry_file=""
 entry_index=""
+output_path=""
+theme_mode=""
+text_size_index=""
+time_zone_mode=""
+custom_time_zone=""
 
 while (( $# > 0 )); do
   case "$1" in
+    --list)
+      list_entries=1
+      shift
+      ;;
     --id)
       entry_id="${2:?--id requires value}"
       shift 2
@@ -90,8 +163,41 @@ while (( $# > 0 )); do
       entry_index="${2:?--index requires value}"
       shift 2
       ;;
+    --out)
+      output_path="${2:?--out requires value}"
+      shift 2
+      ;;
+    --theme)
+      theme_mode="${2:?--theme requires value}"
+      case "$theme_mode" in
+        auto|light|dark)
+          ;;
+        *)
+          echo "error: unsupported theme '$theme_mode' (use auto, light, or dark)" >&2
+          exit 2
+          ;;
+      esac
+      shift 2
+      ;;
+    --text-size)
+      text_size_index="$(resolve_text_size_index "${2:?--text-size requires value}")"
+      shift 2
+      ;;
+    --time-zone)
+      case "${2:?--time-zone requires value}" in
+        local|utc)
+          time_zone_mode="$2"
+          custom_time_zone=""
+          ;;
+        *)
+          time_zone_mode="custom"
+          custom_time_zone="$2"
+          ;;
+      esac
+      shift 2
+      ;;
     -h|--help)
-      sed -n '3,18p' "$0"
+      sed -n '3,22p' "$0"
       exit 0
       ;;
     *)
@@ -100,6 +206,13 @@ while (( $# > 0 )); do
       ;;
   esac
 done
+
+if (( list_entries )); then
+  print_manifest_entries
+  exit 0
+fi
+
+require xcode-cli
 
 if [[ -n "$entry_id" ]]; then
   [[ -f "$MANIFEST" ]] || { echo "error: manifest not found at $MANIFEST" >&2; exit 1; }
@@ -120,9 +233,16 @@ fi
 entry_file="$(normalize_entry_file "$entry_file")"
 entry_id="${entry_id:-$(basename "$entry_file" .swift)@${entry_index:-0}}"
 
-mkdir -p "$OUT_DIR"
-png_path="$OUT_DIR/$entry_id.png"
-meta_path="$OUT_DIR/$entry_id.json"
+if [[ -n "$output_path" ]]; then
+  png_path="$(resolve_output_path "$output_path")"
+  meta_path="${png_path%.png}.json"
+else
+  mkdir -p "$OUT_DIR"
+  png_path="$OUT_DIR/$entry_id.png"
+  meta_path="$OUT_DIR/$entry_id.json"
+fi
+stderr_path="${png_path%.png}.stderr"
+mkdir -p "$(dirname "$png_path")"
 
 run_once() {
   local attempt="$1"
@@ -131,11 +251,16 @@ run_once() {
   local duration
   local rc=0
   local classification="unknown"
-  local stderr_file="$OUT_DIR/$entry_id.stderr"
+  local stderr_file="$stderr_path"
   local xcode_entry_file
+  local -a preview_env=("XCODE_BUILD_SERVER_SCHEME=HarnessMonitorUIPreviews")
+  [[ -n "$theme_mode" ]] && preview_env+=("HARNESS_MONITOR_THEME_MODE_OVERRIDE=$theme_mode")
+  [[ -n "$text_size_index" ]] && preview_env+=("HARNESS_MONITOR_TEXT_SIZE_OVERRIDE=$text_size_index")
+  [[ -n "$time_zone_mode" ]] && preview_env+=("HARNESS_MONITOR_TIME_ZONE_MODE_OVERRIDE=$time_zone_mode")
+  [[ -n "$custom_time_zone" ]] && preview_env+=("HARNESS_MONITOR_CUSTOM_TIME_ZONE_OVERRIDE=$custom_time_zone")
   xcode_entry_file="$(xcode_project_file "$entry_file")"
   started=$(date +%s)
-  if (cd "$PROJECT_DIR" && XCODE_BUILD_SERVER_SCHEME=HarnessMonitorUIPreviews xcode-cli --timeout "$CALL_TIMEOUT_MS" preview "$xcode_entry_file" \
+  if (cd "$PROJECT_DIR" && env "${preview_env[@]}" xcode-cli --timeout "$CALL_TIMEOUT_MS" preview "$xcode_entry_file" \
       --index "$entry_index" \
       --render-timeout "$TIMEOUT" \
       --out "$png_path") \
@@ -163,7 +288,25 @@ run_once() {
     --argjson rc "$rc" \
     --argjson duration "$duration" \
     --argjson attempt "$attempt" \
-    '{id:$id, file:$file, index:$index, classification:$classification, rc:$rc, duration_seconds:$duration, attempt:$attempt}' \
+    --arg output_png "$png_path" \
+    --arg theme_mode "$theme_mode" \
+    --arg text_size_index "$text_size_index" \
+    --arg time_zone_mode "$time_zone_mode" \
+    --arg custom_time_zone "$custom_time_zone" \
+    '{
+      id:$id,
+      file:$file,
+      index:$index,
+      classification:$classification,
+      rc:$rc,
+      duration_seconds:$duration,
+      attempt:$attempt,
+      output_png:$output_png,
+      theme_mode:(if $theme_mode == "" then null else $theme_mode end),
+      text_size_index:(if $text_size_index == "" then null else ($text_size_index | tonumber) end),
+      time_zone_mode:(if $time_zone_mode == "" then null else $time_zone_mode end),
+      custom_time_zone:(if $custom_time_zone == "" then null else $custom_time_zone end)
+    }' \
     > "$meta_path"
   return $rc
 }

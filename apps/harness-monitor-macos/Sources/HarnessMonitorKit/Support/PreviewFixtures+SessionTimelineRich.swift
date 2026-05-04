@@ -15,7 +15,7 @@ private struct RichSessionTimelineEntrySpec {
   let id: String
   let recordedAt: String
   let kind: String
-  let agentID: String
+  let agentID: String?
   let taskID: String?
   let summary: String
   let payload: JSONValue
@@ -101,6 +101,16 @@ extension PreviewFixtures {
         )),
       sessionTimelineEntry(
         .init(
+          id: "preview-agent-joined",
+          recordedAt: "2026-05-03T21:15:12Z",
+          kind: "agent_joined",
+          agentID: nil,
+          taskID: nil,
+          summary: "gemini-20260504124323411402000 joined as Leader (gemini)",
+          payload: .object(["role": .string("leader")])
+        )),
+      sessionTimelineEntry(
+        .init(
           id: "preview-liveness-2",
           recordedAt: "2026-05-03T21:02:03Z",
           kind: "liveness_synced",
@@ -118,6 +128,16 @@ extension PreviewFixtures {
           taskID: nil,
           summary: "Liveness sync: 0 disconnected, 1 idled",
           payload: .object(["status": .string("synced")])
+        )),
+      sessionTimelineEntry(
+        .init(
+          id: "preview-observe-snapshot",
+          recordedAt: "2026-05-03T21:03:34Z",
+          kind: "observe_snapshot",
+          agentID: nil,
+          taskID: nil,
+          summary: "Observe scan: 0 open, 0 active workers, 0 muted codes",
+          payload: .object(["scope": .string("timeline")])
         )),
       sessionTimelineEntry(
         .init(

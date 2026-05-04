@@ -34,6 +34,7 @@ extension SessionTimelineTableView {
     private var cancellables = Set<AnyCancellable>()
     var measurementTask: Task<Void, Never>?
     private var measurementGeneration: Int = 0
+    private var fontScale: CGFloat = 1.0
 
     init(
       viewport: SessionTimelineViewportModel,
@@ -79,7 +80,8 @@ extension SessionTimelineTableView {
       actionHandler: any DecisionActionHandler,
       scrollCommand: SessionTimelineScrollCommand?,
       scrollView: NSScrollView,
-      columnWidth: CGFloat
+      columnWidth: CGFloat,
+      fontScale: CGFloat
     ) {
       guard let tableView else {
         return
@@ -90,13 +92,15 @@ extension SessionTimelineTableView {
         visibleContentWidth: scrollView.contentSize.width
       )
       self.actionHandler = actionHandler
+      let fontScaleChanged = abs(self.fontScale - fontScale) > 0.001
+      self.fontScale = fontScale
       let previousAnchor = currentVisibleAnchor()
       let nextSnapshot = SessionTimelineTableSnapshot(rows: rows)
-      let rowsChanged = rowSnapshot != nextSnapshot
+      let rowsChanged = rowSnapshot != nextSnapshot || fontScaleChanged
       if rowsChanged {
         let nextIDs = Set(rows.map(\.id))
         let priorIDs = Set(self.rows.map(\.id))
-        let willReuseAny = !nextIDs.isDisjoint(with: priorIDs)
+        let willReuseAny = !fontScaleChanged && !nextIDs.isDisjoint(with: priorIDs)
         let rowCount = rows.count
         let reuseAny = willReuseAny
         let colWidth = Int(resolvedColumnWidth)
@@ -200,7 +204,7 @@ extension SessionTimelineTableView {
           owner: self
         ) as? SessionTimelineTableCellView
         ?? SessionTimelineTableCellView()
-      cell.update(row: rows[row], actionHandler: actionHandler)
+      cell.update(row: rows[row], actionHandler: actionHandler, fontScale: fontScale)
       return cell
     }
 

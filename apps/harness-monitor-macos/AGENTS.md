@@ -149,8 +149,11 @@ Rules:
 CLI verification:
 
 ```bash
-mise run preview:render -- --id ContentView       # render one curated view
-mise run preview:smoke                            # render every entry in Previews.json
+mise run preview:list
+mise run preview:render -- --id ContentView
+mise run preview:render -- --id SessionCockpitTimelineSignalSquish --theme dark --text-size default
+mise run preview:render -- --file Sources/HarnessMonitorUIPreviewable/Views/SessionCockpitTimelineSection+Previews.swift --index 0 --out tmp/previews/timeline-squish.png
+mise run preview:smoke
 ```
 
 Both scripts require `xcode-cli` (`npm install -g xcode-cli`), `jq`, and an Xcode tab open on this project. Output lands in `tmp/previews/`.

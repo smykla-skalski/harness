@@ -32,8 +32,16 @@ final class SessionTimelineTableCellView: NSTableCellView {
     fatalError("init(coder:) has not been implemented")
   }
 
-  func update(row: SessionTimelineRow, actionHandler: any DecisionActionHandler) {
-    hostingView.rootView = SessionTimelineHostedRow(row: row, actionHandler: actionHandler)
+  func update(
+    row: SessionTimelineRow,
+    actionHandler: any DecisionActionHandler,
+    fontScale: CGFloat
+  ) {
+    hostingView.rootView = SessionTimelineHostedRow(
+      row: row,
+      actionHandler: actionHandler,
+      fontScale: fontScale
+    )
   }
 
   @MainActor private static let sizingHost = NSHostingView(
@@ -41,14 +49,19 @@ final class SessionTimelineTableCellView: NSTableCellView {
   )
 
   @MainActor
-  static func measuredHeight(for row: SessionTimelineRow, columnWidth: CGFloat) -> CGFloat {
+  static func measuredHeight(
+    for row: SessionTimelineRow,
+    columnWidth: CGFloat,
+    fontScale: CGFloat = 1.0
+  ) -> CGFloat {
     guard columnWidth > 1 else {
       return SessionTimelineTableMetrics.estimatedHeight(for: row)
     }
     return autoreleasepool {
       sizingHost.rootView = SessionTimelineHostedRow(
         row: row,
-        actionHandler: NullDecisionActionHandler()
+        actionHandler: NullDecisionActionHandler(),
+        fontScale: fontScale
       )
       sizingHost.frame = NSRect(x: 0, y: 0, width: columnWidth, height: 2_000)
       sizingHost.layoutSubtreeIfNeeded()
@@ -62,28 +75,32 @@ final class SessionTimelineTableCellView: NSTableCellView {
 private struct SessionTimelineHostedRow: View {
   let row: SessionTimelineRow?
   let actionHandler: any DecisionActionHandler
+  let fontScale: CGFloat
 
   static var empty: Self {
-    Self(row: nil, actionHandler: NullDecisionActionHandler())
+    Self(row: nil, actionHandler: NullDecisionActionHandler(), fontScale: 1.0)
   }
 
   var body: some View {
-    if let row {
-      ZStack(alignment: .topLeading) {
-        Rectangle()
-          .fill(HarnessMonitorTheme.controlBorder.opacity(0.55))
-          .frame(width: 2)
-          .offset(x: SessionTimelineLayout.railLineOffset - 1)
-          .accessibilityHidden(true)
+    Group {
+      if let row {
+        ZStack(alignment: .topLeading) {
+          Rectangle()
+            .fill(HarnessMonitorTheme.controlBorder.opacity(0.55))
+            .frame(width: 2)
+            .offset(x: SessionTimelineLayout.railLineOffset - 1)
+            .accessibilityHidden(true)
 
-        SessionTimelineNodeCluster(row: row, actionHandler: actionHandler)
-          .padding(.trailing, HarnessMonitorTheme.spacingXS)
-          .padding(.bottom, HarnessMonitorTheme.itemSpacing)
+          SessionTimelineNodeCluster(row: row, actionHandler: actionHandler)
+            .padding(.trailing, HarnessMonitorTheme.spacingXS)
+            .padding(.bottom, SessionTimelineTableMetrics.rowBottomPadding(for: row))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
+      } else {
+        Color.clear.frame(height: SessionTimelineTableMetrics.estimatedBaseRowHeight)
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .fixedSize(horizontal: false, vertical: true)
-    } else {
-      Color.clear.frame(height: SessionTimelineTableMetrics.estimatedBaseRowHeight)
     }
+    .environment(\.fontScale, fontScale)
   }
 }

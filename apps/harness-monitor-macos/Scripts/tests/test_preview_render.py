@@ -24,6 +24,7 @@ class PreviewRenderScriptTests(unittest.TestCase):
         *,
         use_repo_root_relative: bool = False,
         use_absolute_path: bool = False,
+        extra_args: list[str] | None = None,
     ) -> tuple[subprocess.CompletedProcess[str], str]:
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_root = Path(tmp_dir)
@@ -48,7 +49,13 @@ class PreviewRenderScriptTests(unittest.TestCase):
                 fake_bin / "xcode-cli",
                 f"""#!/bin/bash
 set -euo pipefail
-printf 'scheme=%s\\nargs=%s\\n' "${{XCODE_BUILD_SERVER_SCHEME:-}}" "$*" > "{tool_log}"
+printf 'scheme=%s\\ntheme=%s\\ntext_size=%s\\ntime_zone=%s\\ncustom_time_zone=%s\\nargs=%s\\n' \
+  "${{XCODE_BUILD_SERVER_SCHEME:-}}" \
+  "${{HARNESS_MONITOR_THEME_MODE_OVERRIDE:-}}" \
+  "${{HARNESS_MONITOR_TEXT_SIZE_OVERRIDE:-}}" \
+  "${{HARNESS_MONITOR_TIME_ZONE_MODE_OVERRIDE:-}}" \
+  "${{HARNESS_MONITOR_CUSTOM_TIME_ZONE_OVERRIDE:-}}" \
+  "$*" > "{tool_log}"
 out=""
 args=("$@")
 for ((i=0; i<${{#args[@]}}; i++)); do
@@ -86,12 +93,17 @@ printf '{}\n'
             elif use_absolute_path:
                 file_arg = str(target_file)
 
+            args = ["bash", str(script_path), "--file", file_arg, "--index", "0"]
+            if extra_args:
+                args.extend(extra_args)
+
             completed = subprocess.run(
-                ["bash", str(script_path), "--file", file_arg, "--index", "0"],
+                args,
                 check=False,
                 capture_output=True,
                 text=True,
                 env=env,
+                cwd=repo_root,
             )
             log = tool_log.read_text() if tool_log.exists() else ""
             return completed, log
@@ -121,6 +133,26 @@ printf '{}\n'
             "preview apps/HarnessMonitor/Project/Sources/HarnessMonitorUIPreviewable/Views/Decisions/DecisionsSidebar.swift",
             log,
         )
+
+    def test_passes_preview_environment_overrides(self) -> None:
+        completed, log = self.run_script(
+            extra_args=["--theme", "light", "--text-size", "largest", "--time-zone", "utc"]
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("theme=light", log)
+        self.assertIn("text_size=6", log)
+        self.assertIn("time_zone=utc", log)
+        self.assertIn("custom_time_zone=", log)
+
+    def test_supports_custom_output_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            output_path = Path(tmp_dir) / "preview-artifacts" / "signal-squish.png"
+            completed, log = self.run_script(extra_args=["--out", str(output_path)])
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertEqual(completed.stdout.strip(), str(output_path))
+            self.assertIn(f"--out {output_path}", log)
 
 
 if __name__ == "__main__":

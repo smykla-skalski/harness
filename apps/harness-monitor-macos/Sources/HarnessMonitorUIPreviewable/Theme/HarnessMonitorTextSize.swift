@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 // MARK: - Scale levels
@@ -151,5 +152,73 @@ extension View {
 
   public func harnessNativeFormContainer() -> some View {
     modifier(HarnessMonitorFormContainerModifier())
+  }
+
+  func harnessPreviewSceneAppearance(
+    themeMode: HarnessMonitorThemeMode = .dark,
+    textSizeIndex: Int = HarnessMonitorTextSize.defaultIndex,
+    dateTimeConfiguration: HarnessMonitorDateTimeConfiguration = .default
+  ) -> some View {
+    modifier(
+      HarnessMonitorPreviewSceneAppearanceModifier(
+        defaultThemeMode: themeMode,
+        defaultTextSizeIndex: textSizeIndex,
+        defaultDateTimeConfiguration: dateTimeConfiguration
+      )
+    )
+  }
+}
+
+private enum HarnessMonitorPreviewSceneOverrides {
+  static let themeModeKey = "HARNESS_MONITOR_THEME_MODE_OVERRIDE"
+}
+
+private struct HarnessMonitorPreviewSceneAppearanceModifier: ViewModifier {
+  let defaultThemeMode: HarnessMonitorThemeMode
+  let defaultTextSizeIndex: Int
+  let defaultDateTimeConfiguration: HarnessMonitorDateTimeConfiguration
+
+  private var environment: [String: String] {
+    ProcessInfo.processInfo.environment
+  }
+
+  private var resolvedThemeMode: HarnessMonitorThemeMode {
+    HarnessMonitorThemeMode(
+      rawValue: environment[HarnessMonitorPreviewSceneOverrides.themeModeKey] ?? ""
+    ) ?? defaultThemeMode
+  }
+
+  private var resolvedTextSizeIndex: Int {
+    HarnessMonitorTextSize.uiTestOverrideIndex(
+      from: environment[HarnessMonitorTextSize.uiTestOverrideKey]
+    ) ?? HarnessMonitorTextSize.normalizedIndex(defaultTextSizeIndex)
+  }
+
+  private var resolvedDateTimeConfiguration: HarnessMonitorDateTimeConfiguration {
+    HarnessMonitorDateTimeConfiguration(
+      timeZoneModeRawValue: environment[
+        HarnessMonitorDateTimeConfiguration.uiTestTimeZoneModeOverrideKey
+      ] ?? defaultDateTimeConfiguration.timeZoneModeRawValue,
+      customTimeZoneIdentifier: environment[
+        HarnessMonitorDateTimeConfiguration.uiTestCustomTimeZoneOverrideKey
+      ] ?? defaultDateTimeConfiguration.customTimeZoneIdentifier
+    )
+  }
+
+  func body(content: Content) -> some View {
+    content
+      .environment(\.harnessTextSizeIndex, resolvedTextSizeIndex)
+      .environment(\.fontScale, HarnessMonitorTextSize.scale(at: resolvedTextSizeIndex))
+      .environment(
+        \.harnessNativeFormControlFont,
+        HarnessMonitorTextSize.nativeFormControlFont(at: resolvedTextSizeIndex)
+      )
+      .environment(
+        \.harnessNativeFormControlSize,
+        HarnessMonitorTextSize.controlSize(at: resolvedTextSizeIndex)
+      )
+      .environment(\.harnessDateTimeConfiguration, resolvedDateTimeConfiguration)
+      .preferredColorScheme(resolvedThemeMode.colorScheme)
+      .tint(HarnessMonitorTheme.accent)
   }
 }
