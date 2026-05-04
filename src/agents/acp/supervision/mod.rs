@@ -19,6 +19,7 @@
 use std::process::Child;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::thread;
 use std::time::Duration;
@@ -118,6 +119,16 @@ impl WatchdogState {
     }
 }
 
+/// Sink for watchdog state transitions surfaced to the conversation timeline.
+///
+/// The supervisor calls `emit_state` from synchronous contexts whenever the
+/// observable watchdog state changes; implementations must be non-blocking
+/// (e.g. `mpsc::Sender::try_send`) so they cannot stall the supervisor.
+pub trait WatchdogEventEmitter: Send + Sync {
+    /// Emit a state transition for downstream timeline consumers.
+    fn emit_state(&self, from: WatchdogState, to: WatchdogState, reason: Option<&str>);
+}
+
 /// Supervisor for an ACP session.
 ///
 /// Tracks process group, watchdog state, in-flight agent-to-daemon calls, and
@@ -133,6 +144,10 @@ pub struct AcpSessionSupervisor {
     last_event_at: Mutex<Instant>,
     last_client_call_at: Mutex<Option<String>>,
     watchdog_notify: Notify,
+    /// One-shot emitter slot. `OnceLock` is wait-free on the emit hot path
+    /// and panic-free on attach contention; the prior `Mutex<Option<Arc>>`
+    /// would have crashed the supervisor on a poisoned lock.
+    event_emitter: OnceLock<Arc<dyn WatchdogEventEmitter>>,
 }
 
 impl AcpSessionSupervisor {
@@ -158,6 +173,21 @@ impl AcpSessionSupervisor {
             last_event_at: Mutex::new(Instant::now()),
             last_client_call_at: Mutex::new(None),
             watchdog_notify: Notify::new(),
+            event_emitter: OnceLock::new(),
+        }
+    }
+
+    /// Attach a sink that receives watchdog state transitions.
+    ///
+    /// One-shot: the first call wins; subsequent calls are silently ignored.
+    /// `spawn_receive_loop` calls this exactly once per supervisor.
+    pub fn attach_event_emitter(&self, emitter: Arc<dyn WatchdogEventEmitter>) {
+        let _ = self.event_emitter.set(emitter);
+    }
+
+    fn emit_transition(&self, from: WatchdogState, to: WatchdogState, reason: Option<&str>) {
+        if let Some(emitter) = self.event_emitter.get() {
+            emitter.emit_state(from, to, reason);
         }
     }
 
@@ -201,18 +231,38 @@ impl AcpSessionSupervisor {
     }
 
     fn update_watchdog_state(&self) {
-        let current = self.watchdog_state();
-        if current == WatchdogState::Fired || current == WatchdogState::Done {
-            return;
+        // compare_exchange loop so concurrent enter/exit calls cannot interleave
+        // a load+store window and produce duplicate or wrong-from emits. Only
+        // the thread that wins the swap emits the transition.
+        loop {
+            let current_u64 = self.state.load(Ordering::SeqCst);
+            let current = u64_to_state(current_u64);
+            if current == WatchdogState::Fired || current == WatchdogState::Done {
+                return;
+            }
+            let in_flight = self.in_flight_calls.load(Ordering::SeqCst);
+            let pending = self.pending_requests.load(Ordering::SeqCst);
+            let new_state = if in_flight == 0 && pending > 0 {
+                WatchdogState::Active
+            } else {
+                WatchdogState::Paused
+            };
+            if new_state == current {
+                return;
+            }
+            match self.state.compare_exchange(
+                current_u64,
+                state_to_u64(new_state),
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                Ok(_) => {
+                    self.emit_transition(current, new_state, None);
+                    return;
+                }
+                Err(_) => continue,
+            }
         }
-        let in_flight = self.in_flight_calls.load(Ordering::SeqCst);
-        let pending = self.pending_requests.load(Ordering::SeqCst);
-        let new_state = if in_flight == 0 && pending > 0 {
-            WatchdogState::Active
-        } else {
-            WatchdogState::Paused
-        };
-        self.state.store(state_to_u64(new_state), Ordering::SeqCst);
     }
 
     /// Current watchdog state.
@@ -308,15 +358,25 @@ impl AcpSessionSupervisor {
 
     /// Mark watchdog as fired.
     pub fn mark_watchdog_fired(&self) {
-        self.state
-            .store(state_to_u64(WatchdogState::Fired), Ordering::SeqCst);
+        let previous = self
+            .state
+            .swap(state_to_u64(WatchdogState::Fired), Ordering::SeqCst);
+        let from = u64_to_state(previous);
+        if from != WatchdogState::Fired {
+            self.emit_transition(from, WatchdogState::Fired, Some("watchdog timeout"));
+        }
     }
 
     /// Mark session as done.
     pub fn mark_done(&self) {
-        self.state
-            .store(state_to_u64(WatchdogState::Done), Ordering::SeqCst);
+        let previous = self
+            .state
+            .swap(state_to_u64(WatchdogState::Done), Ordering::SeqCst);
+        let from = u64_to_state(previous);
         self.watchdog_notify.notify_one();
+        if from != WatchdogState::Done {
+            self.emit_transition(from, WatchdogState::Done, Some("session complete"));
+        }
     }
 
     /// Begin shutdown. Sets flag and returns whether this was the first call.
