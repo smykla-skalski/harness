@@ -8,7 +8,6 @@ extension WorkspaceWindowCreatePane {
     } trailing: {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
         codexConfigurationCard
-        codexLaunchCard
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -223,32 +222,6 @@ extension WorkspaceWindowCreatePane {
     }
   }
 
-  private var codexLaunchCard: some View {
-    AgentsCreateSectionCard {
-      HStack(alignment: .center, spacing: HarnessMonitorTheme.sectionSpacing) {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-          Text("Ready to launch")
-            .scaledFont(.headline)
-          Text("Start a Codex thread from this window with the selected mode and model.")
-            .scaledFont(.subheadline)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-        Spacer(minLength: HarnessMonitorTheme.spacingLG)
-        HarnessMonitorActionButton(
-          title: "Start Codex",
-          variant: .prominent,
-          accessibilityIdentifier: HarnessMonitorAccessibility.workspaceCodexSubmitButton,
-          fillsWidth: false
-        ) {
-          startAction()
-        }
-        .keyboardShortcut(.defaultAction)
-        .disabled(!canStartCodex)
-      }
-    }
-  }
-
   var resolvedCreateSessionID: String? {
     viewModel.selection.sessionID ?? viewModel.createSessionID ?? store.selectedSessionID
   }
@@ -261,9 +234,43 @@ extension WorkspaceWindowCreatePane {
     viewModel.codexPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
-  private var canStartCodex: Bool {
+  var canStartCodex: Bool {
     createPaneSessionActionUnavailableNote == nil
       && !viewModel.isSubmitting
       && !trimmedCodexPrompt.isEmpty
+  }
+
+  var terminalLaunchSummaryChipText: String {
+    guard let option = selectedCapabilityOption else {
+      return "Choose a provider"
+    }
+    let normalizedSelection = option.normalizedSelection(for: viewModel.selectedLaunchSelection)
+    let choice = option.transportChoice(for: normalizedSelection)
+    let transport = choice.id.isAcp ? "Project Access" : "Terminal"
+    let role = viewModel.selectedRole.title
+    var fragments = [option.title, transport, role]
+    let runtime = normalizedSelection.preferredRuntime
+    if let modelID = viewModel.selectedTerminalModelByRuntime[runtime] {
+      let catalog = viewModel.availableRuntimeModels.first { $0.runtime == runtime.rawValue }
+      let modelName =
+        catalog?.models.first { $0.id == modelID }?.displayName ?? modelID
+      fragments.append(modelName)
+    }
+    return fragments.joined(separator: " · ")
+  }
+
+  var codexLaunchSummaryChipText: String {
+    var fragments: [String] = ["Codex", viewModel.codexMode.title]
+    if let modelID = viewModel.selectedCodexModel,
+      let catalog = codexRuntimeCatalog
+    {
+      let modelName =
+        catalog.models.first { $0.id == modelID }?.displayName ?? modelID
+      fragments.append(modelName)
+    }
+    if let effort = viewModel.selectedCodexEffort {
+      fragments.append("Effort \(effort.capitalized)")
+    }
+    return fragments.joined(separator: " · ")
   }
 }

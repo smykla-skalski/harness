@@ -146,11 +146,82 @@ struct WorkspaceWindowCreatePane: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      launchFloorBar
+    }
     .accessibilityElement(children: .contain)
   }
 }
 
 extension WorkspaceWindowCreatePane {
+  var launchFloorBar: some View {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
+      Text(launchSummaryChipText)
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .lineLimit(1)
+        .truncationMode(.middle)
+        .accessibilityLabel("Launch summary: \(launchSummaryChipText)")
+      Spacer(minLength: HarnessMonitorTheme.spacingMD)
+      HarnessMonitorActionButton(
+        title: "Start \(launchActionTitle)",
+        variant: .prominent,
+        accessibilityIdentifier: launchButtonAccessibilityIdentifier,
+        fillsWidth: false
+      ) {
+        startAction()
+      }
+      .keyboardShortcut(.defaultAction)
+      .disabled(!canStartCurrentMode)
+    }
+    .padding(.horizontal, HarnessMonitorTheme.spacingLG)
+    .padding(.vertical, HarnessMonitorTheme.spacingMD)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(.ultraThinMaterial)
+    .overlay(alignment: .top) {
+      Rectangle()
+        .fill(HarnessMonitorTheme.controlBorder.opacity(0.4))
+        .frame(height: 1)
+    }
+    .accessibilityElement(children: .contain)
+  }
+
+  var launchActionTitle: String {
+    switch viewModel.createMode {
+    case .terminal:
+      selectedAgentLaunchTitle
+    case .codex:
+      "Codex"
+    }
+  }
+
+  var launchButtonAccessibilityIdentifier: String {
+    switch viewModel.createMode {
+    case .terminal:
+      HarnessMonitorAccessibility.agentTuiStartButton
+    case .codex:
+      HarnessMonitorAccessibility.workspaceCodexSubmitButton
+    }
+  }
+
+  var canStartCurrentMode: Bool {
+    switch viewModel.createMode {
+    case .terminal:
+      canStartTerminal
+    case .codex:
+      canStartCodex
+    }
+  }
+
+  var launchSummaryChipText: String {
+    switch viewModel.createMode {
+    case .terminal:
+      terminalLaunchSummaryChipText
+    case .codex:
+      codexLaunchSummaryChipText
+    }
+  }
+
   private var createPaneHeader: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Text(viewModel.createMode.headerTitle)
