@@ -72,17 +72,17 @@ fn denied_commands_contain_replacement() {
             .expect("command should parse")
             .unwrap_or_else(|| panic!("command should be blocked: {cmd:?}"));
         for substring in *expected {
-            assert!(reason.contains(substring), "case {cmd:?}: expected {substring:?}");
+            assert!(
+                reason.contains(substring),
+                "case {cmd:?}: expected {substring:?}"
+            );
         }
     }
 }
 
 #[test]
 fn allowed_commands_pass_through() {
-    let cases = [
-        "mise run check",
-        "curl 'https://example.com?a=1&b=2'",
-    ];
+    let cases = ["mise run check", "curl 'https://example.com?a=1&b=2'"];
     for cmd in cases {
         assert!(
             manual_command_denial_reason(cmd)
@@ -106,8 +106,7 @@ fn rejects_unsupported_command_shapes() {
         ),
     ];
     for (cmd, expected_error) in cases {
-        let error = manual_command_denial_reason(cmd)
-            .expect_err("unsupported shape should fail");
+        let error = manual_command_denial_reason(cmd).expect_err("unsupported shape should fail");
         assert!(error.contains(expected_error), "case {cmd:?}");
     }
 }

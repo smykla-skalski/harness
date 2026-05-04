@@ -6,6 +6,8 @@ use std::process::{Child, Command};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use tokio::time::advance;
+
 use nix::sys::signal::{Signal, killpg};
 use nix::unistd::Pid;
 
@@ -41,8 +43,8 @@ fn wait_for_file_marker(path: &Path, marker: &str) {
     panic!("expected marker '{marker}' in {}", path.display());
 }
 
-#[test]
-fn supervisor_starts_paused() {
+#[tokio::test(start_paused = true)]
+async fn supervisor_starts_paused() {
     let child = spawn_sleep_child();
     let supervisor = AcpSessionSupervisor::new(&child, SupervisionConfig::default());
     assert_eq!(supervisor.watchdog_state(), WatchdogState::Paused);
@@ -53,8 +55,8 @@ fn supervisor_starts_paused() {
     let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);
 }
 
-#[test]
-fn pending_request_guard_activates_watchdog() {
+#[tokio::test(start_paused = true)]
+async fn pending_request_guard_activates_watchdog() {
     let child = spawn_sleep_child();
     let supervisor = AcpSessionSupervisor::new(&child, SupervisionConfig::default());
 
@@ -74,8 +76,8 @@ fn pending_request_guard_activates_watchdog() {
     let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);
 }
 
-#[test]
-fn client_call_guard_pauses_watchdog() {
+#[tokio::test(start_paused = true)]
+async fn client_call_guard_pauses_watchdog() {
     let child = spawn_sleep_child();
     let supervisor = AcpSessionSupervisor::new(&child, SupervisionConfig::default());
     let _pending = supervisor.enter_pending_request();
@@ -97,8 +99,8 @@ fn client_call_guard_pauses_watchdog() {
     let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);
 }
 
-#[test]
-fn watchdog_does_not_fire_while_paused() {
+#[tokio::test(start_paused = true)]
+async fn watchdog_does_not_fire_while_paused() {
     let mut config = SupervisionConfig::default();
     config.watchdog_timeout = Duration::from_millis(10);
 
@@ -107,7 +109,7 @@ fn watchdog_does_not_fire_while_paused() {
 
     let _pending = supervisor.enter_pending_request();
     let _guard = supervisor.enter_client_call();
-    std::thread::sleep(Duration::from_millis(50));
+    advance(Duration::from_millis(50)).await;
 
     assert!(!supervisor.should_fire_watchdog());
     assert_eq!(supervisor.watchdog_state(), WatchdogState::Paused);
@@ -116,15 +118,15 @@ fn watchdog_does_not_fire_while_paused() {
     let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);
 }
 
-#[test]
-fn idle_supervisor_does_not_fire_watchdog() {
+#[tokio::test(start_paused = true)]
+async fn idle_supervisor_does_not_fire_watchdog() {
     let mut config = SupervisionConfig::default();
     config.watchdog_timeout = Duration::from_millis(10);
 
     let child = spawn_sleep_child();
     let supervisor = AcpSessionSupervisor::new(&child, config);
 
-    std::thread::sleep(Duration::from_millis(50));
+    advance(Duration::from_millis(50)).await;
 
     assert!(
         !supervisor.should_fire_watchdog(),
@@ -136,8 +138,8 @@ fn idle_supervisor_does_not_fire_watchdog() {
     let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);
 }
 
-#[test]
-fn watchdog_fires_after_timeout() {
+#[tokio::test(start_paused = true)]
+async fn watchdog_fires_after_timeout() {
     let mut config = SupervisionConfig::default();
     config.watchdog_timeout = Duration::from_millis(10);
 
@@ -145,7 +147,7 @@ fn watchdog_fires_after_timeout() {
     let supervisor = AcpSessionSupervisor::new(&child, config);
     let _pending = supervisor.enter_pending_request();
 
-    std::thread::sleep(Duration::from_millis(50));
+    advance(Duration::from_millis(50)).await;
 
     assert!(supervisor.should_fire_watchdog());
     supervisor.mark_watchdog_fired();
@@ -155,7 +157,7 @@ fn watchdog_fires_after_timeout() {
     let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn watchdog_loop_returns_watchdog_fired_after_timeout() {
     let mut config = SupervisionConfig::default();
     config.watchdog_timeout = Duration::from_millis(10);
@@ -172,7 +174,7 @@ async fn watchdog_loop_returns_watchdog_fired_after_timeout() {
     let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn watchdog_loop_does_not_fire_for_idle_agent() {
     let mut config = SupervisionConfig::default();
     config.watchdog_timeout = Duration::from_millis(20);
@@ -199,7 +201,7 @@ async fn watchdog_loop_does_not_fire_for_idle_agent() {
     let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn watchdog_loop_returns_none_when_session_is_done() {
     let mut config = SupervisionConfig::default();
     config.watchdog_timeout = Duration::from_mins(1);
@@ -221,15 +223,15 @@ async fn watchdog_loop_returns_none_when_session_is_done() {
     let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);
 }
 
-#[test]
-fn record_event_resets_watchdog() {
+#[tokio::test(start_paused = true)]
+async fn record_event_resets_watchdog() {
     let mut config = SupervisionConfig::default();
     config.watchdog_timeout = Duration::from_millis(100);
 
     let child = spawn_sleep_child();
     let supervisor = AcpSessionSupervisor::new(&child, config);
 
-    std::thread::sleep(Duration::from_millis(60));
+    advance(Duration::from_millis(60)).await;
     assert!(supervisor.elapsed_since_last_event() >= Duration::from_millis(50));
 
     supervisor.record_event();
@@ -303,8 +305,8 @@ fn watchdog_state_as_str() {
     assert_eq!(WatchdogState::Done.as_str(), "done");
 }
 
-#[test]
-fn begin_shutdown_returns_true_once() {
+#[tokio::test(start_paused = true)]
+async fn begin_shutdown_returns_true_once() {
     let child = spawn_sleep_child();
     let supervisor = AcpSessionSupervisor::new(&child, SupervisionConfig::default());
 

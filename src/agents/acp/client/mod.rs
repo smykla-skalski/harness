@@ -32,126 +32,40 @@
 //!   response carries `RequestPermissionOutcome::Cancelled`. Agent stops
 //!   the turn.
 
+mod error;
+mod helpers;
 mod permission_gate;
 mod terminal;
 
+pub use error::*;
+
 use std::collections::BTreeSet;
-use std::error::Error;
-use std::fmt;
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::path::PathBuf;
 
 use agent_client_protocol::schema::{
     CreateTerminalRequest, CreateTerminalResponse, KillTerminalRequest, KillTerminalResponse,
     ReadTextFileRequest, ReadTextFileResponse, ReleaseTerminalRequest, ReleaseTerminalResponse,
-    RequestPermissionRequest, RequestPermissionResponse, TerminalId, TerminalOutputRequest,
+    RequestPermissionRequest, RequestPermissionResponse, TerminalOutputRequest,
     TerminalOutputResponse, WaitForTerminalExitRequest, WaitForTerminalExitResponse,
     WriteTextFileRequest, WriteTextFileResponse,
 };
-use tokio::runtime::{Builder, Handle, RuntimeFlavor};
 use tokio::sync::mpsc::error::TrySendError;
 use tokio::sync::oneshot;
-use tokio::task::block_in_place;
-use tokio::time::timeout;
 
 use crate::agents::acp::supervision::MAX_TERMINALS_PER_SESSION;
 use crate::agents::policy::{DeniedBinaries, WriteDecision, WriteSurfaceContext, evaluate_write};
 
 use super::permission::{
-    PermissionBridgeResult, PermissionMode, is_allow_outcome, record_terminal_decision,
-    record_write_decision, recording_permission_gateway, stdin_permission_gateway,
+    PermissionMode, is_allow_outcome, record_terminal_decision, record_write_decision,
+    recording_permission_gateway, stdin_permission_gateway,
+};
+use helpers::{
+    ensure_permission_bridge_wait_runtime_supported, is_path_within,
+    wait_permission_bridge_response,
 };
 use permission_gate::{terminal_permission_request, write_permission_request};
 use terminal::TerminalManager;
-
-/// JSON-RPC error code: write denied by policy.
-pub const WRITE_DENIED: i32 = -32001;
-
-/// JSON-RPC error code: denied binary.
-pub const BINARY_DENIED: i32 = -32002;
-
-/// JSON-RPC error code: terminal creation denied.
-pub const TERMINAL_DENIED: i32 = -32003;
-
-/// JSON-RPC error code: terminal not found.
-pub const TERMINAL_NOT_FOUND: i32 = -32004;
-
-/// JSON-RPC error code: read denied.
-pub const READ_DENIED: i32 = -32005;
-
-/// JSON-RPC error code: permission timeout.
-pub const PERMISSION_TIMEOUT: i32 = -32006;
-
-/// JSON-RPC error code: permission bridge concurrency cap reached.
-pub const PERMISSION_CAP_REACHED: i32 = -32007;
-
-/// JSON-RPC error code: permission wait requires a blocking thread.
-pub const PERMISSION_RUNTIME_UNSUPPORTED: i32 = -32008;
-
-/// JSON-RPC error code: daemon shutdown in progress.
-pub const DAEMON_SHUTDOWN: i32 = -32099;
-
-/// Result type for client handler operations.
-pub type ClientResult<T> = Result<T, ClientError>;
-
-/// Error returned by client handlers.
-#[derive(Debug, Clone)]
-pub struct ClientError {
-    /// JSON-RPC error code.
-    pub code: i32,
-    /// Human-readable error message.
-    pub message: String,
-}
-
-impl ClientError {
-    #[must_use]
-    pub fn new(code: i32, message: impl Into<String>) -> Self {
-        Self {
-            code,
-            message: message.into(),
-        }
-    }
-
-    #[must_use]
-    pub fn write_denied(reason: impl Into<String>) -> Self {
-        Self::new(WRITE_DENIED, reason)
-    }
-
-    #[must_use]
-    pub fn binary_denied(binary: &str) -> Self {
-        Self::new(
-            BINARY_DENIED,
-            format!("denied binary '{binary}': use harness commands instead"),
-        )
-    }
-
-    #[must_use]
-    pub fn terminal_denied(reason: impl Into<String>) -> Self {
-        Self::new(TERMINAL_DENIED, reason)
-    }
-
-    #[must_use]
-    pub fn terminal_not_found(terminal_id: &TerminalId) -> Self {
-        Self::new(
-            TERMINAL_NOT_FOUND,
-            format!("terminal '{terminal_id}' not found"),
-        )
-    }
-
-    #[must_use]
-    pub fn read_denied(reason: impl Into<String>) -> Self {
-        Self::new(READ_DENIED, reason)
-    }
-}
-
-impl fmt::Display for ClientError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[{}] {}", self.code, self.message)
-    }
-}
-
-impl Error for ClientError {}
 
 /// ACP client handler state.
 pub struct HarnessAcpClient {
@@ -345,9 +259,7 @@ impl HarnessAcpClient {
         &self,
         request: &CreateTerminalRequest,
     ) -> ClientResult<CreateTerminalResponse> {
-        let validation = self
-            .terminals
-            .validate_create_request(request, &self.denied_binaries);
+        let validation = TerminalManager::validate_create_request(request, &self.denied_binaries);
         if let Err(error) = validation {
             if let PermissionMode::Recording { log_path } = &self.permission_mode {
                 record_terminal_decision(log_path, request, Err(&error));
@@ -478,91 +390,6 @@ impl HarnessAcpClient {
             ))
         }
     }
-}
-
-impl ClientError {
-    pub(super) fn is_permission_gateway_error(&self) -> bool {
-        matches!(
-            self.code,
-            PERMISSION_TIMEOUT
-                | DAEMON_SHUTDOWN
-                | PERMISSION_CAP_REACHED
-                | PERMISSION_RUNTIME_UNSUPPORTED
-        )
-    }
-}
-
-fn ensure_permission_bridge_wait_runtime_supported() -> ClientResult<()> {
-    let Ok(current) = Handle::try_current() else {
-        return Ok(());
-    };
-    if matches!(current.runtime_flavor(), RuntimeFlavor::CurrentThread) {
-        return Err(ClientError::new(
-            PERMISSION_RUNTIME_UNSUPPORTED,
-            "daemon bridge permission waits must run on a blocking thread outside tokio current-thread runtimes",
-        ));
-    }
-    Ok(())
-}
-
-// Raw synchronous waits are supported outside Tokio and on Tokio multi-thread
-// runtimes. Current-thread runtimes must move the whole client call to
-// spawn_blocking so the bridge worker is never starved by the waiter.
-fn wait_permission_bridge_response(
-    deadline: Duration,
-    response_rx: oneshot::Receiver<PermissionBridgeResult>,
-) -> ClientResult<RequestPermissionResponse> {
-    let future = async move {
-        match timeout(deadline, response_rx).await {
-            Ok(Ok(Ok(response))) => Ok(response),
-            Ok(Ok(Err(error))) => Err(ClientError::new(error.code, error.message)),
-            Ok(Err(_)) => Err(ClientError::new(
-                DAEMON_SHUTDOWN,
-                "permission bridge disconnected",
-            )),
-            Err(_) => Err(ClientError::new(
-                PERMISSION_TIMEOUT,
-                "permission response timed out",
-            )),
-        }
-    };
-
-    match Handle::try_current() {
-        Ok(current) => match current.runtime_flavor() {
-            RuntimeFlavor::MultiThread => block_in_place(|| current.block_on(future)),
-            RuntimeFlavor::CurrentThread => Err(ClientError::new(
-                PERMISSION_RUNTIME_UNSUPPORTED,
-                "daemon bridge permission waits must run on a blocking thread outside tokio current-thread runtimes",
-            )),
-            _ => current.block_on(future),
-        },
-        Err(_) => Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|error| {
-                ClientError::new(
-                    PERMISSION_TIMEOUT,
-                    format!("build permission wait runtime: {error}"),
-                )
-            })?
-            .block_on(future),
-    }
-}
-
-/// Check if a path is within a directory.
-fn is_path_within(base: &Path, path: &Path) -> bool {
-    let Ok(canonical_base) = base.canonicalize() else {
-        return false;
-    };
-    let Ok(canonical_path) = path.canonicalize() else {
-        if let Some(parent) = path.parent()
-            && let Ok(canonical_parent) = parent.canonicalize()
-        {
-            return canonical_parent.starts_with(&canonical_base);
-        }
-        return false;
-    };
-    canonical_path.starts_with(&canonical_base)
 }
 
 #[cfg(test)]

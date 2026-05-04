@@ -415,9 +415,7 @@ async fn delete_stale_agents(
         return Ok(());
     }
 
-    let mut delete_query = QueryBuilder::<Sqlite>::new(
-        "DELETE FROM agents WHERE session_id = ",
-    );
+    let mut delete_query = QueryBuilder::<Sqlite>::new("DELETE FROM agents WHERE session_id = ");
     delete_query.push_bind(session_id);
     delete_query.push(" AND agent_id NOT IN (");
     {

@@ -227,7 +227,7 @@ impl TerminalManager {
         request: &CreateTerminalRequest,
         denied_binaries: &DeniedBinaries,
     ) -> ClientResult<CreateTerminalResponse> {
-        self.validate_create_request(request, denied_binaries)?;
+        Self::validate_create_request(request, denied_binaries)?;
 
         let terminal_id = self.reserve_slot()?;
 
@@ -253,7 +253,6 @@ impl TerminalManager {
     }
 
     pub(super) fn validate_create_request(
-        &self,
         request: &CreateTerminalRequest,
         denied_binaries: &DeniedBinaries,
     ) -> ClientResult<()> {
@@ -448,12 +447,9 @@ impl TerminalManager {
                 *counter += 1;
                 format!("terminal-{}", *counter)
             };
-            match terminals.entry(terminal_id.clone()) {
-                Entry::Occupied(_) => continue,
-                entry => {
-                    entry.or_insert_with(|| TerminalSlot::Reserved);
-                    return Ok(terminal_id);
-                }
+            if let Entry::Vacant(entry) = terminals.entry(terminal_id.clone()) {
+                entry.insert(TerminalSlot::Reserved);
+                return Ok(terminal_id);
             }
         }
     }

@@ -334,7 +334,10 @@ fn migrate_v11_to_v12_quarantines_blank_tui_marker_ids() {
     .expect("blank marker should be quarantined");
 
     assert_eq!(migrated["schema_version"], json!(12));
-    assert_eq!(migrated["agents"]["agent-1"]["capabilities"], json!(["review"]));
+    assert_eq!(
+        migrated["agents"]["agent-1"]["capabilities"],
+        json!(["review"])
+    );
     assert!(
         migrated["agents"]["agent-1"]
             .get("managed_agent")
@@ -357,7 +360,10 @@ fn migrate_v11_to_v12_quarantines_conflicting_tui_marker_ids() {
     .expect("conflicting markers should be quarantined");
 
     assert_eq!(migrated["schema_version"], json!(12));
-    assert_eq!(migrated["agents"]["agent-1"]["capabilities"], json!(["review"]));
+    assert_eq!(
+        migrated["agents"]["agent-1"]["capabilities"],
+        json!(["review"])
+    );
     assert!(
         migrated["agents"]["agent-1"]
             .get("managed_agent")

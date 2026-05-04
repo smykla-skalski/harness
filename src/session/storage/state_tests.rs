@@ -283,7 +283,10 @@ fn load_state_migrates_v11_conflicting_tui_markers_without_bricking_good_rows() 
     good_object.insert("name".into(), json!("codex reviewer"));
     good_object.insert("runtime".into(), json!("codex"));
     good_object.insert("role".into(), json!("worker"));
-    good_object.insert("capabilities".into(), json!(["review", "agent-tui:tty-good"]));
+    good_object.insert(
+        "capabilities".into(),
+        json!(["review", "agent-tui:tty-good"]),
+    );
     agents.insert("codex-reviewer".into(), good_agent);
 
     let bad_agent = agents

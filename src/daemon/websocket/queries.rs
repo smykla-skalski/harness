@@ -1,13 +1,14 @@
-use std::cmp::Reverse;
 use std::sync::{Arc, Mutex};
 
 use tokio::sync::broadcast;
 
 use crate::agents::acp::probe::probe_acp_agents_cached;
-use crate::daemon::http::{AsyncDaemonDbSlot, DaemonHttpState, require_async_db};
+use crate::daemon::http::{
+    AsyncDaemonDbSlot, DaemonHttpState, acp_inspect_response, managed_agent_list_response,
+    managed_agent_snapshot, require_async_db,
+};
 use crate::daemon::protocol::{
-    ManagedAgentListResponse, ManagedAgentSnapshot, StreamEvent, TimelineWindowRequest, WsRequest,
-    WsResponse, ws_methods,
+    StreamEvent, TimelineWindowRequest, WsRequest, WsResponse, ws_methods,
 };
 use crate::daemon::service;
 
@@ -208,38 +209,7 @@ fn dispatch_session_managed_agents_query(
         return error_response(&request.id, "MISSING_PARAM", "missing session_id");
     };
 
-    let mut agents: Vec<_> = match state.agent_tui_manager.list(&session_id) {
-        Ok(response) => response
-            .tuis
-            .into_iter()
-            .map(ManagedAgentSnapshot::Terminal)
-            .collect(),
-        Err(error) => {
-            return dispatch_query_result::<ManagedAgentListResponse>(&request.id, Err(error));
-        }
-    };
-    let codex_agents = match state.codex_controller.list_runs(&session_id) {
-        Ok(response) => response.runs.into_iter().map(ManagedAgentSnapshot::Codex),
-        Err(error) => {
-            return dispatch_query_result::<ManagedAgentListResponse>(&request.id, Err(error));
-        }
-    };
-    agents.extend(codex_agents);
-    let acp_agents = match state.acp_agent_manager.list(&session_id) {
-        Ok(response) => response.into_iter().map(ManagedAgentSnapshot::Acp),
-        Err(error) => {
-            return dispatch_query_result::<ManagedAgentListResponse>(&request.id, Err(error));
-        }
-    };
-    agents.extend(acp_agents);
-    agents.sort_by_key(|agent| {
-        (
-            Reverse(agent.updated_at().to_string()),
-            agent.session_id().to_string(),
-            agent.agent_id().to_string(),
-        )
-    });
-    dispatch_query_result(&request.id, Ok(ManagedAgentListResponse { agents }))
+    dispatch_query_result(&request.id, managed_agent_list_response(state, &session_id))
 }
 
 fn dispatch_managed_agent_detail_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
@@ -247,26 +217,14 @@ fn dispatch_managed_agent_detail_query(request: &WsRequest, state: &DaemonHttpSt
         return error_response(&request.id, "MISSING_PARAM", "missing agent_id");
     };
 
-    if let Ok(snapshot) = state.agent_tui_manager.get(&agent_id) {
-        return dispatch_query_result(&request.id, Ok(ManagedAgentSnapshot::Terminal(snapshot)));
-    }
-    if let Ok(snapshot) = state.codex_controller.run(&agent_id) {
-        return dispatch_query_result(&request.id, Ok(ManagedAgentSnapshot::Codex(snapshot)));
-    }
-    dispatch_query_result(
-        &request.id,
-        state
-            .acp_agent_manager
-            .get(&agent_id)
-            .map(ManagedAgentSnapshot::Acp),
-    )
+    dispatch_query_result(&request.id, managed_agent_snapshot(state, &agent_id))
 }
 
 fn dispatch_acp_inspect_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     let session_id = extract_string_param(&request.params, "session_id");
     dispatch_query_result(
         &request.id,
-        state.acp_agent_manager.inspect(session_id.as_deref()),
+        acp_inspect_response(state, session_id.as_deref()),
     )
 }
 

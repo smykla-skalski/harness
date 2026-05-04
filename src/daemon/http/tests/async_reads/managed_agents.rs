@@ -6,7 +6,7 @@ use super::*;
 use crate::daemon::agent_tui::{
     AgentTuiSize, AgentTuiSnapshot, AgentTuiStatus, TerminalScreenSnapshot,
 };
-use crate::daemon::http::managed_agents::{get_managed_agent, get_managed_agents};
+use crate::daemon::http::managed_agents::reads::{get_managed_agent, get_managed_agents};
 use crate::daemon::protocol::{CodexRunMode, CodexRunSnapshot, CodexRunStatus};
 
 #[tokio::test]

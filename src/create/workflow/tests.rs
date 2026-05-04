@@ -162,7 +162,8 @@ fn can_request_gate_bypass_denies() {
 #[test]
 fn can_request_prewrite_gate_in_prewrite_review() {
     let state = make_state(CreatePhase::PrewriteReview, ApprovalMode::Interactive);
-    can_request_gate(&state, ReviewGate::Prewrite).expect("prewrite gate allowed in prewrite review");
+    can_request_gate(&state, ReviewGate::Prewrite)
+        .expect("prewrite gate allowed in prewrite review");
 }
 
 #[test]
