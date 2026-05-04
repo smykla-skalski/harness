@@ -85,6 +85,7 @@ pub(super) async fn test_websocket_state_with_empty_async_db(db_path: &Path) -> 
             async_db_slot,
             false,
         ),
+        managed_agent_mutation_locks: crate::daemon::http::ManagedAgentMutationLocks::default(),
     }
 }
 
@@ -127,6 +128,7 @@ pub(super) fn test_websocket_state_with_sync_db_only(db_path: &Path) -> DaemonHt
         codex_controller: CodexControllerHandle::new(sender.clone(), db_slot.clone(), false),
         acp_agent_manager: AcpAgentManagerHandle::new(sender.clone(), db_slot.clone()),
         agent_tui_manager: AgentTuiManagerHandle::new(sender, db_slot, false),
+        managed_agent_mutation_locks: crate::daemon::http::ManagedAgentMutationLocks::default(),
     }
 }
 

@@ -1,8 +1,10 @@
+use std::sync::{Arc, Mutex, MutexGuard};
+
 use serde_json::json;
 
 use crate::daemon::agent_acp::{AcpAgentStartRequest, AcpPermissionDecision};
 use crate::daemon::bridge::reconfigure_bridge;
-use crate::daemon::db::ensure_shared_db;
+use crate::daemon::db::{DaemonDb, ensure_shared_db};
 use crate::daemon::http::{
     DaemonHttpState, adopt_session, adoption_error_status_and_body, ensure_acp_agent,
     ensure_codex_agent, ensure_terminal_agent, record_adopt_in_db,
@@ -18,7 +20,7 @@ use crate::daemon::protocol::{
 };
 use crate::daemon::service;
 use crate::daemon::voice::{append_audio_chunk, append_transcript, finish_session, start_session};
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::sandbox;
 use crate::workspace::adopter::AdoptionOutcome;
 
@@ -27,6 +29,8 @@ use super::mutations::{cli_error_response, dispatch_query_result};
 use super::params::{extract_session_id, extract_string_param};
 
 mod managed_agents;
+#[cfg(test)]
+mod tests;
 mod voice;
 
 pub(crate) use self::managed_agents::{
@@ -123,12 +127,13 @@ async fn dispatch_session_adopt_success(
     state: &DaemonHttpState,
     outcome: AdoptionOutcome,
 ) -> WsResponse {
-    record_adopt_in_db(state, &outcome).await;
+    if let Err(error) = record_adopt_in_db(state, &outcome).await {
+        return cli_error_response(&request.id, &error);
+    }
     if let Some(async_db) = state.async_db.get() {
         service::broadcast_sessions_updated_async(&state.sender, Some(async_db.as_ref())).await;
-    } else if let Ok(db) = ensure_shared_db(&state.db) {
-        let db_guard = db.lock().expect("db lock");
-        service::broadcast_sessions_updated(&state.sender, Some(&db_guard));
+    } else if let Err(error) = broadcast_sessions_updated_sync(state) {
+        return cli_error_response(&request.id, &error);
     }
     dispatch_query_result(
         &request.id,
@@ -161,13 +166,12 @@ pub(crate) async fn dispatch_session_delete(
             Err(error) => return cli_error_response(&request.id, &error),
         }
     } else {
-        match ensure_shared_db(&state.db).and_then(|db| {
-            service::delete_session_direct(&session_id, Some(&db.lock().expect("db lock")))
+        match with_shared_db(state, |db| {
+            service::delete_session_direct(&session_id, Some(db))
         }) {
             Ok(deleted) => {
-                if deleted && let Ok(db) = ensure_shared_db(&state.db) {
-                    let db_guard = db.lock().expect("db lock");
-                    service::broadcast_sessions_updated(&state.sender, Some(&db_guard));
+                if deleted && let Err(error) = broadcast_sessions_updated_sync(state) {
+                    return cli_error_response(&request.id, &error);
                 }
                 deleted
             }
@@ -214,16 +218,15 @@ pub(crate) async fn dispatch_session_archive(
     let result = if let Some(async_db) = state.async_db.get() {
         service::archive_session_async(&session_id, &body, async_db.as_ref()).await
     } else {
-        ensure_shared_db(&state.db).and_then(|db| {
-            service::archive_session(&session_id, &body, Some(&db.lock().expect("db lock")))
+        with_shared_db(state, |db| {
+            service::archive_session(&session_id, &body, Some(db))
         })
     };
     if result.is_ok() {
         if let Some(async_db) = state.async_db.get() {
             service::broadcast_sessions_updated_async(&state.sender, Some(async_db.as_ref())).await;
-        } else if let Ok(db) = ensure_shared_db(&state.db) {
-            let db_guard = db.lock().expect("db lock");
-            service::broadcast_sessions_updated(&state.sender, Some(&db_guard));
+        } else if let Err(error) = broadcast_sessions_updated_sync(state) {
+            return cli_error_response(&request.id, &error);
         }
     }
     dispatch_query_result(&request.id, result)
@@ -252,14 +255,16 @@ pub(crate) async fn dispatch_session_join(
             .await
             .map(|state| SessionMutationResponse { state })
     } else {
-        ensure_shared_db(&state.db).and_then(|db| {
-            service::join_session_direct(&session_id, &body, Some(&db.lock().expect("db lock")))
+        with_shared_db(state, |db| {
+            service::join_session_direct(&session_id, &body, Some(db))
                 .map(|state| SessionMutationResponse { state })
         })
     };
 
-    if result.is_ok() {
-        broadcast_session_snapshot(state, &session_id).await;
+    if result.is_ok()
+        && let Err(error) = broadcast_session_snapshot(state, &session_id).await
+    {
+        return cli_error_response(&request.id, &error);
     }
     dispatch_query_result(&request.id, result)
 }
@@ -288,13 +293,18 @@ pub(crate) async fn dispatch_session_runtime_session(
             .await
             .map(|registered| AgentRuntimeSessionRegistrationResponse { registered })
     } else {
-        let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+        let db_guard = match sync_db_guard(state) {
+            Ok(db_guard) => db_guard,
+            Err(error) => return cli_error_response(&request.id, &error),
+        };
         service::register_agent_runtime_session_direct(&session_id, &body, db_guard.as_deref())
             .map(|registered| AgentRuntimeSessionRegistrationResponse { registered })
     };
 
-    if result.as_ref().is_ok_and(|response| response.registered) {
-        broadcast_session_snapshot(state, &session_id).await;
+    if result.as_ref().is_ok_and(|response| response.registered)
+        && let Err(error) = broadcast_session_snapshot(state, &session_id).await
+    {
+        return cli_error_response(&request.id, &error);
     }
     dispatch_query_result(&request.id, result)
 }
@@ -322,14 +332,16 @@ pub(crate) async fn dispatch_session_title(
             .await
             .map(|state| SessionMutationResponse { state })
     } else {
-        ensure_shared_db(&state.db).and_then(|db| {
-            service::update_session_title_direct(&session_id, &body, &db.lock().expect("db lock"))
+        with_shared_db(state, |db| {
+            service::update_session_title_direct(&session_id, &body, db)
                 .map(|state| SessionMutationResponse { state })
         })
     };
 
-    if result.is_ok() {
-        broadcast_session_snapshot(state, &session_id).await;
+    if result.is_ok()
+        && let Err(error) = broadcast_session_snapshot(state, &session_id).await
+    {
+        return cli_error_response(&request.id, &error);
     }
     dispatch_query_result(&request.id, result)
 }
@@ -355,13 +367,15 @@ pub(crate) async fn dispatch_session_leave(
     let result = if let Some(async_db) = state.async_db.get() {
         service::leave_session_async(&session_id, &body, async_db.as_ref()).await
     } else {
-        ensure_shared_db(&state.db).and_then(|db| {
-            service::leave_session(&session_id, &body, Some(&db.lock().expect("db lock")))
+        with_shared_db(state, |db| {
+            service::leave_session(&session_id, &body, Some(db))
         })
     };
 
-    if result.is_ok() {
-        broadcast_session_snapshot(state, &session_id).await;
+    if result.is_ok()
+        && let Err(error) = broadcast_session_snapshot(state, &session_id).await
+    {
+        return cli_error_response(&request.id, &error);
     }
     dispatch_query_result(&request.id, result)
 }
@@ -387,13 +401,18 @@ pub(crate) async fn dispatch_signal_ack(
     let result = if let Some(async_db) = state.async_db.get() {
         service::record_signal_ack_direct_async(&session_id, &body, async_db.as_ref()).await
     } else {
-        let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+        let db_guard = match sync_db_guard(state) {
+            Ok(db_guard) => db_guard,
+            Err(error) => return cli_error_response(&request.id, &error),
+        };
         service::record_signal_ack_direct(&session_id, &body, db_guard.as_deref())
     };
 
     match result {
         Ok(()) => {
-            broadcast_session_snapshot(state, &session_id).await;
+            if let Err(error) = broadcast_session_snapshot(state, &session_id).await {
+                return cli_error_response(&request.id, &error);
+            }
             dispatch_query_result(&request.id, Ok::<_, CliError>(json!({ "ok": true })))
         }
         Err(error) => cli_error_response(&request.id, &error),
@@ -407,14 +426,19 @@ async fn dispatch_managed_agent_response(
 ) -> WsResponse {
     match result {
         Ok(snapshot) => {
-            broadcast_session_snapshot(state, snapshot.session_id()).await;
+            if let Err(error) = broadcast_session_snapshot(state, snapshot.session_id()).await {
+                return cli_error_response(&request.id, &error);
+            }
             dispatch_query_result(&request.id, Ok::<_, CliError>(snapshot))
         }
         Err(error) => cli_error_response(&request.id, &error),
     }
 }
 
-async fn broadcast_session_snapshot(state: &DaemonHttpState, session_id: &str) {
+async fn broadcast_session_snapshot(
+    state: &DaemonHttpState,
+    session_id: &str,
+) -> Result<(), CliError> {
     if let Some(async_db) = state.async_db.get() {
         service::broadcast_session_snapshot_async(
             &state.sender,
@@ -422,8 +446,35 @@ async fn broadcast_session_snapshot(state: &DaemonHttpState, session_id: &str) {
             Some(async_db.as_ref()),
         )
         .await;
-        return;
+        return Ok(());
     }
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    let db_guard = sync_db_guard(state)?;
     service::broadcast_session_snapshot(&state.sender, session_id, db_guard.as_deref());
+    Ok(())
+}
+
+fn lock_db(db: &Arc<Mutex<DaemonDb>>) -> Result<MutexGuard<'_, DaemonDb>, CliError> {
+    db.lock().map_err(|error| {
+        CliErrorKind::workflow_io(format!("daemon database lock poisoned: {error}")).into()
+    })
+}
+
+fn sync_db_guard(state: &DaemonHttpState) -> Result<Option<MutexGuard<'_, DaemonDb>>, CliError> {
+    state.db.get().map(lock_db).transpose()
+}
+
+fn with_shared_db<T>(
+    state: &DaemonHttpState,
+    action: impl FnOnce(&DaemonDb) -> Result<T, CliError>,
+) -> Result<T, CliError> {
+    let db = ensure_shared_db(&state.db)?;
+    let db_guard = lock_db(&db)?;
+    action(&db_guard)
+}
+
+fn broadcast_sessions_updated_sync(state: &DaemonHttpState) -> Result<(), CliError> {
+    with_shared_db(state, |db| {
+        service::broadcast_sessions_updated(&state.sender, Some(db));
+        Ok(())
+    })
 }

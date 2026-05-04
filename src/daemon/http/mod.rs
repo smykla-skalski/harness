@@ -1,5 +1,6 @@
+use std::collections::BTreeMap;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
 use std::time::Instant;
 
 use axum::Router;
@@ -11,7 +12,7 @@ use axum::response::Response;
 use tokio::net::TcpListener;
 #[cfg(test)]
 use tokio::runtime::{Handle, RuntimeFlavor};
-use tokio::sync::{broadcast, watch};
+use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard, broadcast, watch};
 #[cfg(test)]
 use tokio::task::block_in_place;
 use tracing::Instrument as _;
@@ -153,6 +154,76 @@ pub struct DaemonHttpState {
     pub codex_controller: CodexControllerHandle,
     pub agent_tui_manager: AgentTuiManagerHandle,
     pub acp_agent_manager: AcpAgentManagerHandle,
+    pub managed_agent_mutation_locks: ManagedAgentMutationLocks,
+}
+
+type ManagedAgentMutationKey = (String, String);
+type ManagedAgentMutationLane = Arc<AsyncMutex<()>>;
+type ManagedAgentMutationMap = BTreeMap<ManagedAgentMutationKey, ManagedAgentMutationLane>;
+type ManagedAgentMutationMapGuard<'a> = MutexGuard<'a, ManagedAgentMutationMap>;
+
+#[derive(Clone, Default)]
+pub struct ManagedAgentMutationLocks {
+    inner: Arc<Mutex<ManagedAgentMutationMap>>,
+}
+
+impl ManagedAgentMutationLocks {
+    pub async fn lock(&self, session_id: &str, agent_id: &str) -> ManagedAgentMutationGuard {
+        let key = (session_id.to_string(), agent_id.to_string());
+        let lock = {
+            let mut inner = mutation_lock_map(&self.inner);
+            inner
+                .entry(key.clone())
+                .or_insert_with(|| Arc::new(AsyncMutex::new(())))
+                .clone()
+        };
+        let guard = lock.clone().lock_owned().await;
+        ManagedAgentMutationGuard {
+            key,
+            lock,
+            locks: self.clone(),
+            guard: Some(guard),
+        }
+    }
+}
+
+#[must_use]
+pub struct ManagedAgentMutationGuard {
+    key: (String, String),
+    lock: Arc<AsyncMutex<()>>,
+    locks: ManagedAgentMutationLocks,
+    guard: Option<OwnedMutexGuard<()>>,
+}
+
+impl Drop for ManagedAgentMutationGuard {
+    fn drop(&mut self) {
+        let Some(guard) = self.guard.take() else {
+            return;
+        };
+        drop(guard);
+        let mut inner = mutation_lock_map(&self.locks.inner);
+        // Drop idle keys so the map reflects live contention instead of history.
+        if Arc::strong_count(&self.lock) == 2 {
+            inner.remove(&self.key);
+        }
+    }
+}
+
+fn mutation_lock_map(mutex: &Mutex<ManagedAgentMutationMap>) -> ManagedAgentMutationMapGuard<'_> {
+    mutex
+        .lock()
+        .unwrap_or_else(recover_poisoned_mutation_lock_map)
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn recover_poisoned_mutation_lock_map(
+    error: PoisonError<ManagedAgentMutationMapGuard<'_>>,
+) -> ManagedAgentMutationMapGuard<'_> {
+    tracing::warn!(%error, "recovering poisoned managed-agent mutation map");
+    error.into_inner()
 }
 
 /// Serve the daemon's HTTP API.

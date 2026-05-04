@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Instant;
 
 use axum::Json;
@@ -6,10 +7,10 @@ use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 
-use crate::daemon::db::ensure_shared_db;
+use crate::daemon::db::{DaemonDb, ensure_shared_db};
 use crate::daemon::protocol::{AdoptSessionRequest, SessionMutationResponse};
 use crate::daemon::service;
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::sandbox;
 use crate::workspace::adopter::{AdoptionError, AdoptionOutcome, SessionAdopter};
 use crate::workspace::harness_data_root;
@@ -65,7 +66,15 @@ pub(super) async fn post_session_adopt(
 
     match result {
         Ok(outcome) => {
-            record_adopt_in_db(&state, &outcome).await;
+            if let Err(error) = record_adopt_in_db(&state, &outcome).await {
+                return timed_json(
+                    "POST",
+                    http_paths::SESSIONS_ADOPT,
+                    &request_id,
+                    start,
+                    Err::<SessionMutationResponse, _>(error),
+                );
+            }
             timed_json(
                 "POST",
                 http_paths::SESSIONS_ADOPT,
@@ -86,23 +95,22 @@ pub(crate) fn adopt_session(session_root: &Path) -> Result<AdoptionOutcome, Adop
     SessionAdopter::register(probed, &data_root_sessions)
 }
 
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-)]
-pub(crate) async fn record_adopt_in_db(state: &DaemonHttpState, outcome: &AdoptionOutcome) {
+pub(crate) async fn record_adopt_in_db(
+    state: &DaemonHttpState,
+    outcome: &AdoptionOutcome,
+) -> Result<(), CliError> {
     if let Some(async_db) = state.async_db.get() {
-        if let Err(error) = service::adopt_session_record_async(outcome, async_db.as_ref()).await {
-            tracing::warn!(%error, "adopt: failed to write session to async db");
-        }
-        return;
+        return service::adopt_session_record_async(outcome, async_db.as_ref()).await;
     }
-    if let Ok(db) = ensure_shared_db(&state.db) {
-        let db_guard = db.lock().expect("db lock");
-        if let Err(error) = service::adopt_session_record(outcome, &db_guard) {
-            tracing::warn!(%error, "adopt: failed to write session to sync db");
-        }
-    }
+    let db = ensure_shared_db(&state.db)?;
+    let db_guard = lock_db(&db)?;
+    service::adopt_session_record(outcome, &db_guard)
+}
+
+fn lock_db(db: &Arc<Mutex<DaemonDb>>) -> Result<MutexGuard<'_, DaemonDb>, CliError> {
+    db.lock().map_err(|error| {
+        CliErrorKind::workflow_io(format!("daemon database lock poisoned: {error}")).into()
+    })
 }
 
 fn adoption_error_response(error: &AdoptionError) -> Response {
