@@ -80,9 +80,7 @@ struct SessionTimelineFilterControls: View {
     ViewThatFits(in: .horizontal) {
       HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingXS) {
         searchField
-        scopeMenu
-        moreFiltersButton
-        clearFiltersButton
+        searchAccessoryRow
       }
 
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
@@ -99,11 +97,23 @@ struct SessionTimelineFilterControls: View {
     }
   }
 
+  private var searchAccessoryRow: some View {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingXS) {
+      scopeMenu
+      moreFiltersButton
+      clearFiltersButton
+    }
+    .fixedSize(horizontal: true, vertical: false)
+  }
+
   private var searchField: some View {
-    TextField("Find in timeline", text: $filters.query)
-      .harnessNativeTextField()
+    TextField("Search timeline", text: $filters.query)
+      .textFieldStyle(.roundedBorder)
+      .harnessNativeFormControl()
       .accessibilityLabel("Search timeline")
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterSearch)
+      .frame(maxWidth: .infinity)
+      .layoutPriority(1)
   }
 
   private var scopeMenu: some View {
