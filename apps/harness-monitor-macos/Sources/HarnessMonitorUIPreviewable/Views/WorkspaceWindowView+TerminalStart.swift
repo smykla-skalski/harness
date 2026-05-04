@@ -26,6 +26,7 @@ extension WorkspaceWindowView {
       catalogDefault: catalog?.default ?? ""
     )
     let effort = viewModel.selectedTerminalEffortByRuntime[selectedRuntime]
+    let providerLabel = selectedAgentLaunchTitle
     guard
       let startedTui = await store.startAgentTuiSnapshot(
         runtime: selectedRuntime,
@@ -44,6 +45,11 @@ extension WorkspaceWindowView {
       )
     else {
       return
+    }
+    let undoStore = store
+    let startedTuiID = startedTui.tuiId
+    store.toast.enqueueUndoable("Started \(providerLabel) in Terminal") {
+      _ = await undoStore.stopAgentTui(tuiID: startedTuiID)
     }
     resetTerminalCreateForm(startedTui: startedTui)
   }

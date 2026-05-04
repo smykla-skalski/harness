@@ -4,6 +4,7 @@ public struct ActionFeedback: Identifiable, Equatable, Hashable, Sendable {
   public enum Severity: Sendable, Hashable {
     case success
     case failure
+    case undoable
   }
 
   public let id: UUID

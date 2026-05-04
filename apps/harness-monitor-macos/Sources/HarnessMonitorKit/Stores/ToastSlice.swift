@@ -22,10 +22,12 @@ public final class ToastSlice {
   public var maxVisible: Int = 3
   public var successDismissDelay: Duration = .seconds(4)
   public var failureDismissDelay: Duration = .seconds(8)
+  public var undoableDismissDelay: Duration = .seconds(5)
   public var dedupeWindow: Duration = .seconds(2)
 
   @ObservationIgnored private var dismissTasks: [UUID: Task<Void, Never>] = [:]
   @ObservationIgnored private var targetInstants: [UUID: ContinuousClock.Instant] = [:]
+  @ObservationIgnored private var pendingUndoActions: [UUID: @MainActor () async -> Void] = [:]
   @ObservationIgnored private var pauseObservationTask: Task<Void, Never>?
   @ObservationIgnored private var resumeObservationTask: Task<Void, Never>?
   @ObservationIgnored private let clock: any ContinuousClockSource
@@ -88,6 +90,36 @@ public final class ToastSlice {
   }
 
   @discardableResult
+  public func enqueueUndoable(
+    _ message: String,
+    accessibilityIdentifier: String? = nil,
+    undo: @escaping @MainActor () async -> Void
+  ) -> UUID {
+    let id = present(
+      message: message,
+      severity: .undoable,
+      accessibilityIdentifier: accessibilityIdentifier,
+      rollupDuplicates: false
+    )
+    pendingUndoActions[id] = undo
+    return id
+  }
+
+  public func invokeUndo(id: UUID) {
+    guard let action = pendingUndoActions.removeValue(forKey: id) else {
+      return
+    }
+    dismiss(id: id)
+    Task { @MainActor in
+      await action()
+    }
+  }
+
+  public func hasUndoAction(id: UUID) -> Bool {
+    pendingUndoActions[id] != nil
+  }
+
+  @discardableResult
   public func present(
     message: String,
     severity: ActionFeedback.Severity,
@@ -137,6 +169,7 @@ public final class ToastSlice {
     dismissTasks[id]?.cancel()
     dismissTasks.removeValue(forKey: id)
     targetInstants.removeValue(forKey: id)
+    pendingUndoActions.removeValue(forKey: id)
     activeFeedback.removeAll { $0.id == id }
   }
 
@@ -146,6 +179,7 @@ public final class ToastSlice {
     }
     dismissTasks.removeAll()
     targetInstants.removeAll()
+    pendingUndoActions.removeAll()
     activeFeedback.removeAll()
   }
 
@@ -271,6 +305,7 @@ public final class ToastSlice {
     switch severity {
     case .success: successDismissDelay
     case .failure: failureDismissDelay
+    case .undoable: undoableDismissDelay
     }
   }
 
@@ -279,6 +314,7 @@ public final class ToastSlice {
     switch feedback.severity {
     case .success: prefix = "Success."
     case .failure: prefix = "Action failed."
+    case .undoable: prefix = "Started."
     }
     let repetitionNotice =
       if feedback.repeatCount > 1 {
