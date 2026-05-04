@@ -119,14 +119,25 @@ pub(crate) async fn dispatch(
     span.record("duration_ms", display(duration_ms));
     span.record("is_error", display(is_error));
     span.record("request.failed", display(is_error));
-    tracing::event!(
-        ws_activity_log_level(),
-        method = %request.method,
-        request_id = %request.id,
-        duration_ms,
-        is_error,
-        "ws dispatch"
-    );
+    if let Some(error) = response.error.as_ref() {
+        tracing::warn!(
+            method = %request.method,
+            request_id = %request.id,
+            duration_ms,
+            error.code = %error.code,
+            error.message = %error.message,
+            "ws dispatch failed"
+        );
+    } else {
+        tracing::event!(
+            ws_activity_log_level(),
+            method = %request.method,
+            request_id = %request.id,
+            duration_ms,
+            is_error,
+            "ws dispatch"
+        );
+    }
     response
 }
 
