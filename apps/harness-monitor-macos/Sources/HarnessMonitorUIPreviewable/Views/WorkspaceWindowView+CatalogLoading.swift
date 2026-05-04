@@ -1,3 +1,4 @@
+import Foundation
 import HarnessMonitorKit
 
 extension WorkspaceWindowView {
@@ -102,9 +103,12 @@ extension WorkspaceWindowView {
       sandboxed: store.daemonStatus?.manifest?.sandboxed == true,
       acpHostBridgeReady: store.hostBridgeCapabilityState(for: "acp") == .ready
     )
+
+    let resolvedSelection = resolveSelectionApplyingAcpDefaultIfFresh(options: options)
+
     let normalizedSelection = Self.normalizedLaunchSelection(
       options: options,
-      selection: viewModel.selectedLaunchSelection,
+      selection: resolvedSelection,
       fallbackRuntime: viewModel.runtime
     )
     if viewModel.selectedLaunchSelection != normalizedSelection {
@@ -114,5 +118,37 @@ extension WorkspaceWindowView {
     if viewModel.runtime != preferredRuntime {
       viewModel.runtime = preferredRuntime
     }
+  }
+
+  @MainActor
+  private func resolveSelectionApplyingAcpDefaultIfFresh(
+    options: [AgentCapabilityOption]
+  ) -> AgentLaunchSelection {
+    if viewModel.didApplyLaunchSelectionAutoDefault {
+      return viewModel.selectedLaunchSelection
+    }
+
+    let hasStoredSnapshot = LaunchPresetDefaults.read() != nil
+    let hasStoredPreferredSelection =
+      UserDefaults.standard.string(
+        forKey: HarnessMonitorAgentLaunchDefaults.preferredSelectionKey
+      ) != nil
+    if hasStoredSnapshot || hasStoredPreferredSelection {
+      viewModel.didApplyLaunchSelectionAutoDefault = true
+      return viewModel.selectedLaunchSelection
+    }
+
+    guard
+      let acpEnabledOption = options.first(where: { option in
+        option.transportChoices.contains { $0.id.isAcp && option.isEnabled($0) }
+      }),
+      let acpChoice = acpEnabledOption.transportChoices.first(where: {
+        $0.id.isAcp && acpEnabledOption.isEnabled($0)
+      })
+    else {
+      return viewModel.selectedLaunchSelection
+    }
+    viewModel.didApplyLaunchSelectionAutoDefault = true
+    return acpChoice.id
   }
 }
