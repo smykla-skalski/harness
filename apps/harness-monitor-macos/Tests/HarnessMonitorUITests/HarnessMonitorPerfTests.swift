@@ -152,10 +152,7 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
       identifier: "harness.inspector.session-card"
     )
 
-    waitForScenarioCompletion(
-      app: launched,
-      scenario: "launch-dashboard"
-    )
+    waitForScenarioCompletion(app: launched, scenario: "launch-dashboard")
 
     XCTAssertTrue(boardRoot.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
@@ -197,10 +194,7 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
       XCTAssertFalse(sessionHeaderCard.exists)
     }
 
-    waitForScenarioCompletion(
-      app: launched,
-      scenario: "select-session-cockpit"
-    )
+    waitForScenarioCompletion(app: launched, scenario: "select-session-cockpit")
 
     XCTAssertTrue(sessionHeaderCard.waitForExistence(timeout: Self.uiTimeout))
     assertAuditBuildState(in: launched, scenario: "select-session-cockpit")
@@ -216,10 +210,7 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     let decisionRow = element(in: launched, identifier: Accessibility.decisionRow(decisionID))
     let legacyModal = element(in: launched, identifier: Accessibility.acpPermissionModal)
 
-    waitForScenarioCompletion(
-      app: launched,
-      scenario: "permission-modal"
-    )
+    waitForScenarioCompletion(app: launched, scenario: "permission-modal")
 
     XCTAssertTrue(window.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(
@@ -418,22 +409,11 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
 
   private func expectedPreviewScenario(for scenario: String) -> String {
     switch scenario {
-    case "launch-dashboard", "select-session-cockpit":
-      "dashboard-landing"
-    case "permission-modal":
-      "cockpit"
-    case "refresh-and-search", "sidebar-overflow-search":
-      "overflow"
-    case "timeline-burst":
-      "cockpit"
-    case "toast-overlay-churn":
-      "cockpit"
-    case "offline-cached-open":
-      "offline-cached"
-    case "settings-backdrop-cycle", "settings-background-cycle":
-      "dashboard"
-    default:
-      "dashboard"
+    case "launch-dashboard", "select-session-cockpit": "dashboard-landing"
+    case "permission-modal", "timeline-burst", "toast-overlay-churn": "cockpit"
+    case "refresh-and-search", "sidebar-overflow-search": "overflow"
+    case "offline-cached-open": "offline-cached"
+    default: "dashboard"
     }
   }
 }
