@@ -56,6 +56,12 @@ extension WorkspaceWindowView {
     viewModel.inputText = ""
     viewModel.selectedPersona = nil
     viewModel.selectedRole = .worker
+    // The just-returned snapshot is authoritative; flip the freshness gate and rebuild
+    // the cached displayState now so the sidebar's "Open Sessions" row and the detail
+    // pane both pick up the new tui on the same render pass instead of flashing
+    // "no longer available" until the next streaming refresh.
+    viewModel.hasFreshManagedAgentTuis = true
+    refreshDisplayState()
     viewModel.selection = .terminal(
       sessionID: startedTui.sessionId,
       terminalID: startedTui.tuiId
