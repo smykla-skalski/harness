@@ -15,7 +15,7 @@ extension WorkspaceWindowCreatePane {
     // scroll views made wheel and trackpad scrolling feel jumpy in the outer pane.
     TextField(placeholder, text: text, axis: .vertical)
       .scaledFont(.body)
-      .harnessNativeFormControl()
+      .harnessNativeTextField()
       .lineLimit(multilineEditorLineLimit(for: minHeight))
       .frame(minHeight: minHeight, alignment: .topLeading)
       .focused(focusedFieldBinding, equals: field)

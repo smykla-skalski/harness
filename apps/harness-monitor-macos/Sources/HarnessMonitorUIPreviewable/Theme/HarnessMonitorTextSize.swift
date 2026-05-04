@@ -129,6 +129,20 @@ private struct HarnessMonitorNativeFormControlModifier: ViewModifier {
   }
 }
 
+private struct HarnessMonitorNativeTextFieldModifier: ViewModifier {
+  @Environment(\.harnessNativeFormControlFont)
+  private var font
+  @Environment(\.harnessNativeFormControlSize)
+  private var controlSize
+
+  func body(content: Content) -> some View {
+    content
+      .font(font)
+      .controlSize(controlSize)
+      .textFieldStyle(.roundedBorder)
+  }
+}
+
 private struct HarnessMonitorFormContainerModifier: ViewModifier {
   @Environment(\.fontScale)
   private var scale
@@ -148,6 +162,10 @@ extension View {
 
   public func harnessNativeFormControl() -> some View {
     modifier(HarnessMonitorNativeFormControlModifier())
+  }
+
+  public func harnessNativeTextField() -> some View {
+    modifier(HarnessMonitorNativeTextFieldModifier())
   }
 
   public func harnessNativeFormContainer() -> some View {
