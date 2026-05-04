@@ -151,10 +151,10 @@ public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Over
 
   public var body: some View {
     Group {
-      if readableWidth {
+      if readableWidth || constrainContentWidth {
         GeometryReader { geometry in
           let available = max(geometry.size.width - (horizontalPadding * 2), 0)
-          scrollBody(contentWidth: min(available, Self.readableMaxWidth))
+          scrollBody(contentWidth: resolvedContentWidth(availableWidth: available))
         }
       } else {
         scrollBody()
@@ -199,6 +199,13 @@ public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Over
       listIdentifier: scrollSurfaceIdentifier,
       listLabel: scrollSurfaceLabel
     )
+  }
+
+  private func resolvedContentWidth(availableWidth: CGFloat) -> CGFloat {
+    if readableWidth {
+      return min(availableWidth, Self.readableMaxWidth)
+    }
+    return availableWidth
   }
 }
 

@@ -60,6 +60,10 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.action.create-task.title-field"
     )
     #expect(HarnessMonitorAccessibility.createTaskButton == "harness.action.create-task.submit")
+    #expect(
+      HarnessMonitorAccessibility.sessionAgentCreateOpenButton
+        == "harness.session.agents.create-agent.open"
+    )
     #expect(HarnessMonitorAccessibility.assignTaskButton == "harness.action.task.assign")
     #expect(
       HarnessMonitorAccessibility.updateTaskQueuePolicyButton
@@ -117,6 +121,10 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(
       HarnessMonitorAccessibility.sessionAgentListState
         == "harness.session.agents.state"
+    )
+    #expect(
+      HarnessMonitorAccessibility.sessionAgentListHeader
+        == "harness.session.agents.header"
     )
     #expect(HarnessMonitorAccessibility.observeScanButton == "observeScanButton")
     #expect(HarnessMonitorAccessibility.observeDoctorButton == "observeDoctorButton")

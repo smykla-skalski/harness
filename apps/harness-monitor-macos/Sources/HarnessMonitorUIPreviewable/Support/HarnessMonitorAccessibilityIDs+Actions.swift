@@ -3,6 +3,7 @@ extension HarnessMonitorAccessibility {
   public static let createTaskSheetDismiss = "harness.action.create-task.dismiss"
   public static let createTaskTitleField = "harness.action.create-task.title-field"
   public static let createTaskButton = "harness.action.create-task.submit"
+  public static let sessionAgentCreateOpenButton = "harness.session.agents.create-agent.open"
   public static let sessionTaskCreateOpenButton = "harness.session.tasks.create-task.open"
 
   public static let taskActionsSheet = "harness.action.task-actions.sheet"

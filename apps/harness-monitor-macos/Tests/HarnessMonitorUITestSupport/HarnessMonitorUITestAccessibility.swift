@@ -336,6 +336,8 @@ enum HarnessMonitorUITestAccessibility {
     "harness.session.task.\(slug(taskID))"
   }
 
+  static let sessionAgentListHeader = "harness.session.agents.header"
+  static let sessionAgentListHeaderFrame = "\(sessionAgentListHeader).frame"
   static let sessionTaskListHeader = "harness.session.tasks.header"
   static let sessionTaskListHeaderFrame = "\(sessionTaskListHeader).frame"
   static let sessionTaskListState = "harness.session.tasks.state"

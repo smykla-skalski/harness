@@ -10,6 +10,8 @@ struct SessionAgentListSection: View {
   let isSessionReadOnly: Bool
   let openAgent: (String) -> Void
   let tuiStatusByAgent: [String: AgentTuiStatus]
+  @Environment(\.openWindow)
+  private var openWindow
 
   private var agentStateMarkerText: String {
     let agentIDs = agents.map(\.agentId).joined(separator: ",")
@@ -23,9 +25,19 @@ struct SessionAgentListSection: View {
         identifier: HarnessMonitorAccessibility.sessionAgentListState,
         text: agentStateMarkerText
       )
-      Text("Agents")
-        .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
-        .accessibilityAddTraits(.isHeader)
+      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.itemSpacing) {
+        Text("Agents")
+          .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
+          .accessibilityAddTraits(.isHeader)
+        Spacer()
+        newAgentButton
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .accessibilityTestProbe(
+        HarnessMonitorAccessibility.sessionAgentListHeader,
+        label: "Agents"
+      )
+      .accessibilityFrameMarker(HarnessMonitorAccessibility.sessionAgentListHeaderFrame)
       if agents.isEmpty {
         if sessionStatus == .awaitingLeader {
           HStack(spacing: 0) {
@@ -60,6 +72,22 @@ struct SessionAgentListSection: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .topLeading)
+  }
+
+  private var newAgentButton: some View {
+    HarnessMonitorActionButton(
+      title: "New Agent",
+      variant: .bordered,
+      accessibilityIdentifier: HarnessMonitorAccessibility.sessionAgentCreateOpenButton
+    ) {
+      openNewAgent()
+    }
+    .help("Open workspace and create a new agent")
+  }
+
+  private func openNewAgent() {
+    store.requestWorkspaceCreateEntryPoint(.agent)
+    openWindow(id: HarnessMonitorWindowID.workspace)
   }
 }
 
