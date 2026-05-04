@@ -31,6 +31,13 @@ extension HarnessMonitorStore {
     }
   }
 
+  /// Returns the cached per-agent timeline slice. Partition is rebuilt only on
+  /// `timeline` writes; reads here are O(1) dictionary lookups, not a full
+  /// timeline scan.
+  public func timeline(forAgent agentID: String) -> [TimelineEntry] {
+    selection.agentTimelinesById[agentID] ?? []
+  }
+
   public var timelineWindow: TimelineWindowResponse? {
     get { selection.timelineWindow }
     set {
