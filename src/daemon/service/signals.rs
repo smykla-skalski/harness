@@ -3,12 +3,13 @@ use super::{
     ACTIVE_SIGNAL_ACK_POLL_INTERVAL, ACTIVE_SIGNAL_ACK_TIMEOUT, AckResult, AgentRegistration,
     AgentTuiManagerHandle, CliError, CliErrorKind, Instant, ManagedTuiWake, Path, PathBuf,
     SessionDetail, SessionState, SignalAck, SignalCoords, SignalSendRequest,
-    acknowledged_signal_record, agents_runtime, build_log_entry, build_signal_ack,
-    effective_project_dir, index, pending_signal_record, project_dir_for_db_session,
-    record_signal_ack, refresh_signal_index_for_db, session_detail, session_detail_from_daemon_db,
-    session_not_found, session_service, state, thread, utc_now,
+    acknowledged_signal_record, agents_runtime, broadcast_session_snapshot, build_log_entry,
+    build_signal_ack, effective_project_dir, index, pending_signal_record,
+    project_dir_for_db_session, record_signal_ack, refresh_signal_index_for_db, session_detail,
+    session_detail_from_daemon_db, session_not_found, session_service, state, thread, utc_now,
 };
 use crate::daemon::agent_acp::AcpWakePrompt;
+use tokio::sync::broadcast;
 
 /// Send a signal through the shared session service.
 ///
@@ -135,10 +136,9 @@ pub(crate) fn attempt_active_signal_delivery(
         return false;
     };
 
-    let Some(woke_tui) = handled_active_signal_wake_result(
-        coords,
-        wake_tui_for_signal(&managed_tui, coords.signal),
-    ) else {
+    let Some(woke_tui) =
+        handled_active_signal_wake_result(coords, wake_tui_for_signal(&managed_tui, coords.signal))
+    else {
         return false;
     };
 
@@ -214,13 +214,14 @@ pub(crate) fn record_active_signal_ack(
     db: Option<&super::db::DaemonDb>,
     ack: &SignalAck,
 ) -> bool {
-    let result = record_signal_ack(
+    let result = record_signal_ack_and_broadcast(
         coords.session_id,
         coords.agent_id,
         &coords.signal.signal_id,
         ack.result,
         coords.project_dir,
         db,
+        None,
     );
     match result {
         Ok(()) => true,
@@ -229,6 +230,22 @@ pub(crate) fn record_active_signal_ack(
             false
         }
     }
+}
+
+pub(crate) fn record_signal_ack_and_broadcast(
+    session_id: &str,
+    agent_id: &str,
+    signal_id: &str,
+    result: AckResult,
+    project_dir: &Path,
+    db: Option<&super::db::DaemonDb>,
+    sender: Option<&broadcast::Sender<super::StreamEvent>>,
+) -> Result<(), CliError> {
+    record_signal_ack(session_id, agent_id, signal_id, result, project_dir, db)?;
+    if let Some(sender) = sender {
+        broadcast_session_snapshot(sender, session_id, db);
+    }
+    Ok(())
 }
 
 pub(crate) fn build_active_signal_prompt(signal: &agents_runtime::signal::Signal) -> String {
@@ -293,10 +310,7 @@ pub(crate) fn active_signal_delivery_timeout_message(
     clippy::cognitive_complexity,
     reason = "structured tracing macro expansion inflates this simple logging helper"
 )]
-pub(crate) fn warn_active_signal_wake_failure(
-    coords: &SignalCoords<'_>,
-    error: &CliError,
-) {
+pub(crate) fn warn_active_signal_wake_failure(coords: &SignalCoords<'_>, error: &CliError) {
     tracing::warn!(
         %error,
         session_id = coords.session_id,
@@ -310,10 +324,7 @@ pub(crate) fn warn_active_signal_wake_failure(
     clippy::cognitive_complexity,
     reason = "structured tracing macro expansion inflates this simple logging helper"
 )]
-pub(crate) fn warn_active_signal_ack_wait_failure(
-    coords: &SignalCoords<'_>,
-    error: &CliError,
-) {
+pub(crate) fn warn_active_signal_ack_wait_failure(coords: &SignalCoords<'_>, error: &CliError) {
     tracing::warn!(
         %error,
         session_id = coords.session_id,
@@ -327,10 +338,7 @@ pub(crate) fn warn_active_signal_ack_wait_failure(
     clippy::cognitive_complexity,
     reason = "structured tracing macro expansion inflates this simple logging helper"
 )]
-pub(crate) fn warn_active_signal_ack_record_failure(
-    coords: &SignalCoords<'_>,
-    error: &CliError,
-) {
+pub(crate) fn warn_active_signal_ack_record_failure(coords: &SignalCoords<'_>, error: &CliError) {
     tracing::warn!(
         %error,
         session_id = coords.session_id,
@@ -408,6 +416,7 @@ pub(crate) fn try_wake_started_workers(
                     runtime,
                     AcpWakePrompt {
                         acp_id: acp_id.to_string(),
+                        orchestration_session_id: session_id.to_string(),
                         protocol_session_id: record.signal_session_id.clone(),
                         project_dir: project_dir.to_path_buf(),
                         prompt: build_active_signal_prompt(&record.signal),
@@ -422,7 +431,6 @@ pub(crate) fn try_wake_started_workers(
         }
     }
 }
-
 
 pub(crate) fn agent_tui_id_for_registration(agent: &AgentRegistration) -> Option<&str> {
     agent.capabilities.iter().find_map(|capability| {

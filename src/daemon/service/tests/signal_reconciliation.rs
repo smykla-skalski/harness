@@ -186,6 +186,124 @@ fn task_start_ack_db_direct_starts_work_only_after_delivery() {
 }
 
 #[test]
+fn record_signal_ack_and_broadcast_refreshes_session_stream_after_delivery() {
+    with_temp_project(|project| {
+        let (sender, mut receiver) = broadcast::channel(8);
+        let (db, state) = setup_db_only_session(project);
+        let leader_id = state.leader_id.clone().expect("leader id");
+        let worker_session_id = "db-task-broadcast-worker";
+        let worker_id = join_db_codex_worker(&db, &state, project, worker_session_id);
+
+        let created = create_task(
+            &state.session_id,
+            &TaskCreateRequest {
+                actor: leader_id.clone(),
+                title: "Broadcast after delivery".into(),
+                context: None,
+                severity: crate::session::types::TaskSeverity::Medium,
+                suggested_fix: None,
+            },
+            Some(&db),
+        )
+        .expect("create task");
+        let task_id = created.tasks[0].task_id.clone();
+
+        let dropped = drop_task(
+            &state.session_id,
+            &task_id,
+            &TaskDropRequest {
+                actor: leader_id,
+                target: super::super::protocol::TaskDropTarget::Agent {
+                    agent_id: worker_id.clone(),
+                },
+                queue_policy: crate::session::types::TaskQueuePolicy::Locked,
+            },
+            Some(&db),
+            crate::daemon::service::WakeDispatch::none(),
+        )
+        .expect("drop task");
+
+        let signal = dropped
+            .signals
+            .iter()
+            .find(|signal| signal.agent_id == worker_id)
+            .expect("task signal");
+        let signal_id = signal.signal.signal_id.clone();
+        let runtime = runtime::runtime_for_name(&signal.runtime).expect("task runtime");
+        let signal_dir = runtime.signal_dir(project, worker_session_id);
+        let _pending_signal = require_pending_signal_path(&signal_dir, &signal_id);
+        runtime::signal::acknowledge_signal(
+            &signal_dir,
+            &SignalAck {
+                signal_id: signal_id.clone(),
+                acknowledged_at: utc_now(),
+                result: AckResult::Accepted,
+                agent: worker_session_id.to_string(),
+                session_id: state.session_id.clone(),
+                details: None,
+            },
+        )
+        .expect("write signal ack");
+
+        super::super::record_signal_ack_and_broadcast(
+            &state.session_id,
+            &worker_id,
+            &signal_id,
+            AckResult::Accepted,
+            project,
+            Some(&db),
+            Some(&sender),
+        )
+        .expect("record signal ack and broadcast");
+
+        let events: Vec<_> = std::iter::from_fn(|| receiver.try_recv().ok()).collect();
+        assert!(
+            events.iter().any(|event| event.event == "sessions_updated"),
+            "expected sessions_updated event"
+        );
+
+        let updated = events
+            .iter()
+            .find(|event| event.event == "session_updated")
+            .expect("session_updated event");
+        let updated_payload: crate::daemon::protocol::SessionUpdatedPayload =
+            serde_json::from_value(updated.payload.clone()).expect("deserialize updated payload");
+        let updated_task = updated_payload
+            .detail
+            .tasks
+            .iter()
+            .find(|task| task.task_id == task_id)
+            .expect("updated task");
+        assert_eq!(
+            updated_task.status,
+            crate::session::types::TaskStatus::InProgress
+        );
+
+        let extensions = events
+            .iter()
+            .find(|event| event.event == "session_extensions")
+            .expect("session_extensions event");
+        let extensions_payload: crate::daemon::protocol::SessionExtensionsPayload =
+            serde_json::from_value(extensions.payload.clone())
+                .expect("deserialize extensions payload");
+        let delivered_signal = extensions_payload
+            .signals
+            .expect("signals")
+            .into_iter()
+            .find(|signal| signal.signal.signal_id == signal_id)
+            .expect("delivered signal");
+        assert_eq!(delivered_signal.status, SessionSignalStatus::Delivered);
+        assert_eq!(
+            delivered_signal
+                .acknowledgment
+                .expect("delivered acknowledgment")
+                .result,
+            AckResult::Accepted
+        );
+    });
+}
+
+#[test]
 fn session_detail_core_db_direct_reopens_expired_pending_delivery() {
     with_temp_project(|project| {
         let (db, state) = setup_db_only_session(project);

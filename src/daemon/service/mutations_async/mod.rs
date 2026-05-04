@@ -172,6 +172,7 @@ async fn try_wake_started_workers_async(
                     runtime,
                     AcpWakePrompt {
                         acp_id: acp_id.to_string(),
+                        orchestration_session_id: session_id.to_string(),
                         protocol_session_id: record.signal_session_id.clone(),
                         project_dir: project_dir.to_path_buf(),
                         prompt: build_active_signal_prompt(&record.signal),
@@ -257,8 +258,15 @@ async fn persist_task_signal_effects(
             &task_drop_effect_signal_records(session_id, effects),
         )
         .await?;
-    try_wake_started_workers_async(resolved, effects, session_id, &project_dir, async_db, dispatch)
-        .await;
+    try_wake_started_workers_async(
+        resolved,
+        effects,
+        session_id,
+        &project_dir,
+        async_db,
+        dispatch,
+    )
+    .await;
     bump_session(async_db, session_id).await
 }
 

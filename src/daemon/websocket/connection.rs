@@ -54,11 +54,7 @@ pub async fn ws_upgrade_handler(
     if let Err(response) = http::require_auth(&headers, &state) {
         return *response;
     }
-    let request_id = headers
-        .get("x-request-id")
-        .and_then(|value| value.to_str().ok())
-        .unwrap_or("")
-        .to_string();
+    let request_id = http::extract_request_id(&headers);
     let connection_span = websocket_connection_span(&request_id);
     let baggage = apply_parent_context_from_headers(&connection_span, &headers);
     if let Some(trace_id) = connection_span.in_scope(current_trace_id) {

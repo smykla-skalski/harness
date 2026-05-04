@@ -51,7 +51,7 @@ pub(crate) use managed_agents::{
     ensure_terminal_agent, managed_agent_list_response, managed_agent_snapshot,
     resolve_acp_inspect_session_scope,
 };
-pub(crate) use response::error_status_and_body;
+pub(crate) use response::{error_status_and_body, extract_request_id};
 pub(crate) use sessions_adopt::{
     adopt_session, adoption_error_status_and_body, record_adopt_in_db,
 };

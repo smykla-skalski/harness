@@ -4,6 +4,8 @@ use crate::agents::acp::probe::{
     replace_probe_cache_for_tests,
 };
 use std::time::Duration;
+#[cfg(unix)]
+use std::{fs::Permissions, os::unix::fs::PermissionsExt};
 
 #[test]
 fn diagnostics_report_includes_workspace_and_recent_events() {
@@ -191,6 +193,49 @@ fn diagnostics_report_merges_live_bridge_state() {
                 host_bridge.capabilities.contains_key("codex"),
                 "diagnostics should include the codex capability from the live bridge"
             );
+        },
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn diagnostics_report_skips_unreadable_manifest() {
+    let tmp = tempdir().expect("tempdir");
+    let home = tempdir().expect("tempdir");
+    temp_env::with_vars(
+        [
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            ),
+            ("HOME", Some(home.path().to_str().expect("utf8 path"))),
+            ("HARNESS_DAEMON_DATA_HOME", None),
+            ("HARNESS_APP_GROUP_ID", None),
+        ],
+        || {
+            let manifest = DaemonManifest {
+                version: "20.6.0".into(),
+                pid: 42,
+                endpoint: "http://127.0.0.1:9999".into(),
+                started_at: "2026-05-04T12:00:00Z".into(),
+                token_path: state::auth_token_path().display().to_string(),
+                sandboxed: false,
+                host_bridge: super::state::HostBridgeManifest::default(),
+                revision: 0,
+                updated_at: String::new(),
+                binary_stamp: None,
+            };
+            state::write_manifest(&manifest).expect("manifest");
+            let manifest_path = state::manifest_path();
+            fs::set_permissions(&manifest_path, Permissions::from_mode(0o000))
+                .expect("chmod unreadable");
+
+            let report = diagnostics_report(None).expect("diagnostics");
+            assert!(report.manifest.is_none());
+            assert!(report.health.is_none());
+
+            fs::set_permissions(&manifest_path, Permissions::from_mode(0o600))
+                .expect("restore permissions");
         },
     );
 }

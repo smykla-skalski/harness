@@ -80,6 +80,39 @@ pub(crate) async fn health_response_async(
     })
 }
 
+fn diagnostics_manifest_load_is_ignorable(error: &CliError) -> bool {
+    if error.code() != "IO001" {
+        return false;
+    }
+    let message = error.message().to_ascii_lowercase();
+    let manifest_path = state::manifest_path()
+        .display()
+        .to_string()
+        .to_ascii_lowercase();
+    message.contains(&format!("read {manifest_path}:"))
+        && (message.contains("operation not permitted") || message.contains("permission denied"))
+}
+
+fn diagnostics_manifest() -> Result<Option<DaemonManifest>, CliError> {
+    match state::load_manifest() {
+        Ok(manifest) => Ok(manifest.map(|mut manifest| {
+            if let Ok(live_bridge) = bridge::host_bridge_manifest_with_discovery() {
+                manifest.host_bridge = live_bridge;
+            }
+            manifest
+        })),
+        Err(error) if diagnostics_manifest_load_is_ignorable(&error) => {
+            tracing::warn!(
+                error = %error,
+                path = %state::manifest_path().display(),
+                "diagnostics skipping unreadable daemon manifest"
+            );
+            Ok(None)
+        }
+        Err(error) => Err(error),
+    }
+}
+
 /// Build a richer diagnostics report for the daemon preferences screen.
 ///
 /// # Errors
@@ -87,12 +120,7 @@ pub(crate) async fn health_response_async(
 pub fn diagnostics_report(
     db: Option<&super::db::DaemonDb>,
 ) -> Result<DaemonDiagnosticsReport, CliError> {
-    let manifest = state::load_manifest()?.map(|mut m| {
-        if let Ok(live_bridge) = bridge::host_bridge_manifest_with_discovery() {
-            m.host_bridge = live_bridge;
-        }
-        m
-    });
+    let manifest = diagnostics_manifest()?;
     let health = manifest
         .as_ref()
         .map(|manifest| health_response(manifest, db))
@@ -125,12 +153,7 @@ pub(crate) async fn diagnostics_report_async(
             "async daemon database pool is required for async diagnostics reads",
         ))
     })?;
-    let manifest = state::load_manifest()?.map(|mut m| {
-        if let Ok(live_bridge) = bridge::host_bridge_manifest_with_discovery() {
-            m.host_bridge = live_bridge;
-        }
-        m
-    });
+    let manifest = diagnostics_manifest()?;
     let health = if let Some(manifest) = manifest.as_ref() {
         Some(health_response_async(manifest, Some(async_db)).await?)
     } else {

@@ -235,9 +235,9 @@ mod sessions;
 mod signals;
 mod signals_async;
 mod signals_async_send;
-mod wake_route;
 mod status;
 mod sync_support;
+mod wake_route;
 
 pub use adopt::adopt_session_record;
 pub(crate) use adopt::adopt_session_record_async;
@@ -281,14 +281,15 @@ pub use sessions::{
     list_projects, list_sessions, session_detail, session_detail_core, session_extensions,
     session_timeline,
 };
+pub(crate) use signals::record_signal_ack_and_broadcast;
 pub(crate) use signals::try_wake_started_workers;
-pub use wake_route::WakeDispatch;
-pub(crate) use wake_route::{WakeEventLevel, record_wake_event};
 pub use signals::{cancel_signal, send_signal};
 pub use status::{
     diagnostics_report, get_log_level, health_response, record_telemetry, request_shutdown,
     set_log_level, status_report,
 };
+pub use wake_route::WakeDispatch;
+pub(crate) use wake_route::{WakeEventLevel, record_wake_event};
 
 pub(crate) use observe_async::{observe_session_async, run_daemon_observe_task_async};
 pub(crate) use observe_loop::*;
