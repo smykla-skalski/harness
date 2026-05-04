@@ -61,6 +61,16 @@ private struct HarnessMonitorFeedbackToastRow: View {
           }
           .accessibilityLabel("Repeated \(feedback.repeatCount) times")
       }
+      if feedback.severity == .undoable, toast.hasUndoAction(id: feedback.id) {
+        Button("Undo") {
+          toast.invokeUndo(id: feedback.id)
+        }
+        .scaledFont(.system(.footnote, design: .rounded, weight: .semibold))
+        .buttonStyle(.borderless)
+        .foregroundStyle(HarnessMonitorTheme.accent)
+        .accessibilityLabel("Undo")
+        .accessibilityIdentifier(HarnessMonitorAccessibility.actionToastUndoButton)
+      }
       Button {
         toast.dismiss(id: feedback.id)
       } label: {
@@ -91,6 +101,7 @@ private struct HarnessMonitorFeedbackToastRow: View {
     switch feedback.severity {
     case .success: HarnessMonitorTheme.success
     case .failure: HarnessMonitorTheme.danger
+    case .undoable: HarnessMonitorTheme.accent
     }
   }
 }

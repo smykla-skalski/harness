@@ -133,6 +133,11 @@ extension WorkspaceWindowView {
           viewModel.codexPrompt = ""
           viewModel.codexContext = ""
           viewModel.selection = .codex(sessionID: startedRun.sessionId, runID: startedRun.runId)
+          let undoStore = store
+          let runID = startedRun.runId
+          store.toast.enqueueUndoable("Started Codex run") {
+            _ = await undoStore.interruptCodexRun(runID: runID)
+          }
         } else {
           viewModel.codexStartResult = "nil"
         }

@@ -37,6 +37,8 @@ extension WorkspaceWindowView {
           "success"
         case .failure:
           "failure"
+        case .undoable:
+          "undoable"
         }
       let message = feedback.message.replacingOccurrences(of: ",", with: ";")
       return "toast=\(severity):\(message)"
