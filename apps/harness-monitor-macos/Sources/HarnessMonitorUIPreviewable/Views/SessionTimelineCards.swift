@@ -287,6 +287,14 @@ extension VerticalAlignment {
   )
 }
 
+struct SessionTimelineMarkerBoundsKey: PreferenceKey {
+  static var defaultValue: Anchor<CGRect>? { nil }
+
+  static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+    value = nextValue() ?? value
+  }
+}
+
 struct SessionTimelineRailBackground: View {
   var body: some View {
     GeometryReader { proxy in
@@ -297,6 +305,38 @@ struct SessionTimelineRailBackground: View {
           x: SessionTimelineLayout.railLineOffset - 1,
           y: HarnessMonitorTheme.spacingSM
         )
+    }
+    .accessibilityHidden(true)
+    .allowsHitTesting(false)
+  }
+}
+
+struct SessionTimelineConnectorOverlay: View {
+  let markerAnchor: Anchor<CGRect>?
+  let showsConnectorAbove: Bool
+  let showsConnectorBelow: Bool
+
+  var body: some View {
+    GeometryReader { proxy in
+      if let markerAnchor, showsConnectorAbove || showsConnectorBelow {
+        let rect = proxy[markerAnchor]
+        let x = rect.midX
+        let centerY = rect.midY
+        Path { path in
+          if showsConnectorAbove {
+            path.move(to: CGPoint(x: x, y: 0))
+            path.addLine(to: CGPoint(x: x, y: centerY))
+          }
+          if showsConnectorBelow {
+            path.move(to: CGPoint(x: x, y: centerY))
+            path.addLine(to: CGPoint(x: x, y: proxy.size.height))
+          }
+        }
+        .stroke(
+          HarnessMonitorTheme.controlBorder.opacity(0.55),
+          style: StrokeStyle(lineWidth: 2)
+        )
+      }
     }
     .accessibilityHidden(true)
     .allowsHitTesting(false)
@@ -323,6 +363,7 @@ private struct SessionTimelineDot: View {
     }
     .frame(width: SessionTimelineLayout.railWidth, alignment: .center)
     .shadow(color: tint.opacity(0.4), radius: 8)
+    .anchorPreference(key: SessionTimelineMarkerBoundsKey.self, value: .bounds) { $0 }
     .accessibilityHidden(true)
   }
 }

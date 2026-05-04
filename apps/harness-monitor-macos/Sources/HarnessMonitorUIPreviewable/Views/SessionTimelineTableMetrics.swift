@@ -46,6 +46,16 @@ enum SessionTimelineTableMetrics {
     return HarnessMonitorTheme.itemSpacing
   }
 
+  static func connectorVisibility(
+    rowIndex: Int,
+    rowCount: Int
+  ) -> (showsConnectorAbove: Bool, showsConnectorBelow: Bool) {
+    guard rowCount > 0, rowIndex >= 0, rowIndex < rowCount else {
+      return (false, false)
+    }
+    return (rowIndex > 0, rowIndex + 1 < rowCount)
+  }
+
   static func shouldStickToLatestOnRowsChange(
     visibleMinY: CGFloat,
     firstVisibleRowIndex: Int?

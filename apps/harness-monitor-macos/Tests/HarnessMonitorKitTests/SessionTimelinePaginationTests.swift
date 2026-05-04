@@ -120,6 +120,23 @@ struct SessionTimelineNavigationTests {
     )
   }
 
+  @Test("Connector visibility omits rail stubs for the first and last rows")
+  func connectorVisibilityOmitsRailStubsForTheFirstAndLastRows() {
+    let only = SessionTimelineTableMetrics.connectorVisibility(rowIndex: 0, rowCount: 1)
+    let first = SessionTimelineTableMetrics.connectorVisibility(rowIndex: 0, rowCount: 3)
+    let middle = SessionTimelineTableMetrics.connectorVisibility(rowIndex: 1, rowCount: 3)
+    let last = SessionTimelineTableMetrics.connectorVisibility(rowIndex: 2, rowCount: 3)
+
+    #expect(only.showsConnectorAbove == false)
+    #expect(only.showsConnectorBelow == false)
+    #expect(first.showsConnectorAbove == false)
+    #expect(first.showsConnectorBelow)
+    #expect(middle.showsConnectorAbove)
+    #expect(middle.showsConnectorBelow)
+    #expect(last.showsConnectorAbove)
+    #expect(last.showsConnectorBelow == false)
+  }
+
   @Test("Pinned latest timeline keeps prepended rows visible without shifting viewport")
   @MainActor
   func pinnedLatestTimelineKeepsPrependedRowsVisibleWithoutShiftingViewport() async {

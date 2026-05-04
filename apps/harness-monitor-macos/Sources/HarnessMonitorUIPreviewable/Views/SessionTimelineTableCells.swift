@@ -35,12 +35,16 @@ final class SessionTimelineTableCellView: NSTableCellView {
   func update(
     row: SessionTimelineRow,
     actionHandler: any DecisionActionHandler,
-    fontScale: CGFloat
+    fontScale: CGFloat,
+    showsConnectorAbove: Bool,
+    showsConnectorBelow: Bool
   ) {
     hostingView.rootView = SessionTimelineHostedRow(
       row: row,
       actionHandler: actionHandler,
-      fontScale: fontScale
+      fontScale: fontScale,
+      showsConnectorAbove: showsConnectorAbove,
+      showsConnectorBelow: showsConnectorBelow
     )
   }
 
@@ -76,6 +80,22 @@ private struct SessionTimelineHostedRow: View {
   let row: SessionTimelineRow?
   let actionHandler: any DecisionActionHandler
   let fontScale: CGFloat
+  let showsConnectorAbove: Bool
+  let showsConnectorBelow: Bool
+
+  init(
+    row: SessionTimelineRow?,
+    actionHandler: any DecisionActionHandler,
+    fontScale: CGFloat,
+    showsConnectorAbove: Bool = true,
+    showsConnectorBelow: Bool = true
+  ) {
+    self.row = row
+    self.actionHandler = actionHandler
+    self.fontScale = fontScale
+    self.showsConnectorAbove = showsConnectorAbove
+    self.showsConnectorBelow = showsConnectorBelow
+  }
 
   static var empty: Self {
     Self(row: nil, actionHandler: NullDecisionActionHandler(), fontScale: 1.0)
@@ -84,17 +104,16 @@ private struct SessionTimelineHostedRow: View {
   var body: some View {
     Group {
       if let row {
-        ZStack(alignment: .topLeading) {
-          Rectangle()
-            .fill(HarnessMonitorTheme.controlBorder.opacity(0.55))
-            .frame(width: 2)
-            .offset(x: SessionTimelineLayout.railLineOffset - 1)
-            .accessibilityHidden(true)
-
-          SessionTimelineNodeCluster(row: row, actionHandler: actionHandler)
-            .padding(.trailing, HarnessMonitorTheme.spacingXS)
-            .padding(.bottom, SessionTimelineTableMetrics.rowBottomPadding(for: row))
-        }
+        SessionTimelineNodeCluster(row: row, actionHandler: actionHandler)
+          .padding(.trailing, HarnessMonitorTheme.spacingXS)
+          .padding(.bottom, SessionTimelineTableMetrics.rowBottomPadding(for: row))
+          .overlayPreferenceValue(SessionTimelineMarkerBoundsKey.self) { markerAnchor in
+            SessionTimelineConnectorOverlay(
+              markerAnchor: markerAnchor,
+              showsConnectorAbove: showsConnectorAbove,
+              showsConnectorBelow: showsConnectorBelow
+            )
+          }
         .frame(maxWidth: .infinity, alignment: .leading)
         .fixedSize(horizontal: false, vertical: true)
       } else {
