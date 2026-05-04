@@ -323,8 +323,14 @@ extension DaemonController {
       HarnessMonitorLogger.lifecycle.notice(
         "Managed daemon version mismatch; refreshing launch agent and waiting for replacement daemon"
       )
-      try refreshManagedLaunchAgent(currentStamp: currentStamp)
-      state.refreshedManagedLaunchAgentDuringWarmUp = true
+      switch try refreshManagedLaunchAgent(currentStamp: currentStamp) {
+      case .refreshed:
+        state.refreshedManagedLaunchAgentDuringWarmUp = true
+      case .skippedSiblingOwnsLane, .skippedNotManagedDaemon:
+        // Leave the flag false so we re-evaluate next tick; the sibling
+        // owner is the one expected to bring a matching daemon up.
+        break
+      }
     }
     signalManagedRecoveryProcessIfNeeded(manifest: manifest, state: &state)
 
