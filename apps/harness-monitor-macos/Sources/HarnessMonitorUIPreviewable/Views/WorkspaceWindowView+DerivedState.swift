@@ -30,6 +30,13 @@ extension WorkspaceWindowView {
     {
       return selectedTui
     }
+    // Fall back to the live store list before checking the cached displayState - the
+    // displayState filters out active tuis until `hasFreshManagedAgentTuis` flips true,
+    // so a just-spawned tui that is already in `store.selectedAgentTuis` would otherwise
+    // be invisible and the pane would render "no longer available" until the next refresh.
+    if let storeTui = store.selectedAgentTuis.first(where: { $0.tuiId == selectedTuiID }) {
+      return storeTui
+    }
     return displayState.sortedAgentTuis.first { $0.tuiId == selectedTuiID }
   }
 
