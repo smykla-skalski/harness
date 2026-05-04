@@ -4,11 +4,6 @@ import HarnessMonitorKit
 import OSLog
 import SwiftUI
 
-private struct CachedRowHeight {
-  let width: CGFloat
-  let height: CGFloat
-}
-
 extension SessionTimelineTableView {
   // Coordinator pushes viewport state into `viewport` via methods only; it
   // never reads viewport properties from inside `updateNSView` or any path
@@ -19,37 +14,26 @@ extension SessionTimelineTableView {
     weak var viewport: SessionTimelineViewportModel?
     var scrollBoundaryChanged: SessionTimelineScrollBoundaryHandler
 
-    private var rowHeightCache: [String: CachedRowHeight] = [:]
+    var rowHeightCache: [String: CachedRowHeight] = [:]
     private var lastColumnWidth: CGFloat = 0
-    private var rows: [SessionTimelineRow] = []
-    private var rowIndexByID: [String: Int] = [:]
+    var rows: [SessionTimelineRow] = []
+    var rowIndexByID: [String: Int] = [:]
     private var rowSnapshot = SessionTimelineTableSnapshot.empty
     private var actionHandler: any DecisionActionHandler = NullDecisionActionHandler()
-    private weak var tableView: NSTableView?
-    private weak var scrollView: NSScrollView?
+    weak var tableView: NSTableView?
+    weak var scrollView: NSScrollView?
     private var lastScrollCommand: SessionTimelineScrollCommand?
-    private var pendingScrollCommand: SessionTimelineScrollCommand?
-    private var lastViewportStats: SessionTimelineTableViewportStats?
-    private var lastBoundaryState = SessionTimelineScrollBoundaryState(
+    var pendingScrollCommand: SessionTimelineScrollCommand?
+    var lastViewportStats: SessionTimelineTableViewportStats?
+    var lastBoundaryState = SessionTimelineScrollBoundaryState(
       visibleMinY: .greatestFiniteMagnitude,
       visibleMaxY: 0,
       contentHeight: .greatestFiniteMagnitude
     )
     private var pendingPublish = false
     private var cancellables = Set<AnyCancellable>()
-    private var measurementTask: Task<Void, Never>?
+    var measurementTask: Task<Void, Never>?
     private var measurementGeneration: Int = 0
-    // Wall-clock budget for one synchronous measurement chunk. Each row's
-    // SwiftUI hosting layout is variable cost (5-30ms+ depending on row
-    // shape), so a fixed row count silently breaks the 100ms session-switch
-    // budget on heavy variants. Yielding once a chunk has spent this many
-    // milliseconds keeps the main-thread block bounded by clock time.
-    private static let measurementChunkBudgetMs: Double = 12.0
-    private static let signposter = OSSignposter(
-      subsystem: "io.harnessmonitor",
-      category: "perf"
-    )
-    private static let widthEqualityTolerance: CGFloat = 0.5
 
     init(
       viewport: SessionTimelineViewportModel,
@@ -63,7 +47,7 @@ extension SessionTimelineTableView {
       guard let task = measurementTask else { return }
       Self.signposter.emitEvent(
         "session_timeline.measurement.cancelled",
-        "generation=\(measurementGeneration, privacy: .public) reason=\(reason, privacy: .public)"
+        "generation=\(self.measurementGeneration, privacy: .public) reason=\(reason, privacy: .public)"
       )
       task.cancel()
       measurementTask = nil
@@ -113,10 +97,13 @@ extension SessionTimelineTableView {
         let nextIDs = Set(rows.map(\.id))
         let priorIDs = Set(self.rows.map(\.id))
         let willReuseAny = !nextIDs.isDisjoint(with: priorIDs)
+        let rowCount = rows.count
+        let reuseAny = willReuseAny
+        let colWidth = Int(resolvedColumnWidth)
         let updateInterval = Self.signposter.beginInterval(
           "session_timeline.update_rows_changed",
           id: Self.signposter.makeSignpostID(),
-          "row_count=\(rows.count, privacy: .public) reused_any=\(willReuseAny ? "true" : "false", privacy: .public) width=\(Int(resolvedColumnWidth), privacy: .public)"
+          "n=\(rowCount, privacy: .public) r=\(reuseAny, privacy: .public) w=\(colWidth, privacy: .public)"
         )
         defer {
           Self.signposter.endInterval("session_timeline.update_rows_changed", updateInterval)
@@ -283,77 +270,22 @@ extension SessionTimelineTableView {
       self.measurementGeneration &+= 1
       let generation = self.measurementGeneration
       let totalOutstanding = outstanding.count
+      let cw = Int(columnWidth)
       Self.signposter.emitEvent(
         "session_timeline.measurement.scheduled",
-        "generation=\(generation, privacy: .public) outstanding=\(totalOutstanding, privacy: .public) width=\(Int(columnWidth), privacy: .public)"
+        "g=\(generation, privacy: .public) c=\(totalOutstanding, privacy: .public) w=\(cw, privacy: .public)"
       )
       let task = Task { @MainActor [weak self] in
         guard let self else { return }
-        var cursor = 0
-        while cursor < outstanding.count {
-          if Task.isCancelled { return }
-          let chunkInterval = Self.signposter.beginInterval(
-            "session_timeline.measurement.chunk",
-            id: Self.signposter.makeSignpostID(),
-            "generation=\(generation, privacy: .public) cursor=\(cursor, privacy: .public)"
-          )
-          var changedIndexes = IndexSet()
-          var measuredInChunk = 0
-          autoreleasepool {
-            let chunkStart = ContinuousClock.now
-            while cursor < outstanding.count {
-              let rowIndex = outstanding[cursor]
-              cursor += 1
-              guard self.rows.indices.contains(rowIndex),
-                self.rows[rowIndex].id == snapshot[rowIndex].id
-              else { continue }
-              let row = snapshot[rowIndex]
-              if let cached = self.rowHeightCache[row.id],
-                abs(cached.width - columnWidth) < Self.widthEqualityTolerance
-              {
-                continue
-              }
-              let height = SessionTimelineTableCellView.measuredHeight(
-                for: row,
-                columnWidth: columnWidth
-              )
-              self.rowHeightCache[row.id] = CachedRowHeight(
-                width: columnWidth,
-                height: height
-              )
-              changedIndexes.insert(rowIndex)
-              measuredInChunk += 1
-              let elapsedMs = Self.elapsedMilliseconds(since: chunkStart)
-              if elapsedMs >= Self.measurementChunkBudgetMs {
-                break
-              }
-            }
-          }
-          if !changedIndexes.isEmpty {
-            self.tableView?.noteHeightOfRows(withIndexesChanged: changedIndexes)
-          }
-          Self.signposter.endInterval(
-            "session_timeline.measurement.chunk",
-            chunkInterval,
-            "measured=\(measuredInChunk, privacy: .public) remaining=\(outstanding.count - cursor, privacy: .public)"
-          )
-          await Task.yield()
-        }
-        if !Task.isCancelled {
-          Self.signposter.emitEvent(
-            "session_timeline.measurement.completed",
-            "generation=\(generation, privacy: .public) measured=\(totalOutstanding, privacy: .public)"
-          )
-          self.measurementTask = nil
-        }
+        await self.runMeasurementTask(
+          outstanding: outstanding,
+          snapshot: snapshot,
+          columnWidth: columnWidth,
+          generation: generation,
+          totalOutstanding: totalOutstanding
+        )
       }
       measurementTask = task
-    }
-
-    private static func elapsedMilliseconds(since start: ContinuousClock.Instant) -> Double {
-      let duration = start.duration(to: ContinuousClock.now)
-      let (seconds, attoseconds) = duration.components
-      return Double(seconds) * 1_000.0 + Double(attoseconds) / 1_000_000_000_000_000.0
     }
 
     private func visibleRowIndexRange() -> Range<Int>? {
@@ -388,142 +320,5 @@ extension SessionTimelineTableView {
       return indexes
     }
 
-    private func performPendingScrollCommand() -> Bool {
-      guard let command = pendingScrollCommand else {
-        return false
-      }
-      if scrollToTarget(command.targetID) {
-        pendingScrollCommand = nil
-        return true
-      }
-      return false
-    }
-
-    @discardableResult
-    private func scrollToTarget(_ rowID: String) -> Bool {
-      guard
-        let tableView,
-        let scrollView,
-        let index = rowIndexByID[rowID]
-      else {
-        return false
-      }
-      tableView.layoutSubtreeIfNeeded()
-      let rowRect = tableView.rect(ofRow: index)
-      let y = clampedScrollY(rowRect.minY, scrollView: scrollView)
-      scrollView.contentView.scroll(to: NSPoint(x: 0, y: y))
-      scrollView.reflectScrolledClipView(scrollView.contentView)
-      return true
-    }
-
-    private func restore(anchor: SessionTimelineTableAnchor?) {
-      guard let anchor,
-        let tableView,
-        let scrollView,
-        let index = rowIndexByID[anchor.rowID]
-      else {
-        return
-      }
-      let rowRect = tableView.rect(ofRow: index)
-      let y = SessionTimelineTableMetrics.restoredScrollY(
-        rowMinY: rowRect.minY,
-        anchorOffsetY: anchor.offsetY,
-        contentHeight: tableView.bounds.height,
-        viewportHeight: scrollView.contentSize.height
-      )
-      scrollView.contentView.scroll(to: NSPoint(x: 0, y: y))
-      scrollView.reflectScrolledClipView(scrollView.contentView)
-    }
-
-    private func clampedScrollY(_ y: CGFloat, scrollView: NSScrollView) -> CGFloat {
-      guard let tableView else {
-        return 0
-      }
-      return SessionTimelineTableMetrics.clampedScrollY(
-        y,
-        contentHeight: tableView.bounds.height,
-        viewportHeight: scrollView.contentSize.height
-      )
-    }
-
-    private func invalidateVisibleRowHeights() {
-      guard let tableView, let scrollView else { return }
-      let visibleRows = tableView.rows(in: scrollView.contentView.bounds)
-      guard visibleRows.location != NSNotFound, visibleRows.length > 0 else { return }
-      let rowRange = visibleRows.location..<(visibleRows.location + visibleRows.length)
-      // Evict cached heights for visible rows so heightOfRow falls back to
-      // estimate; the background measurement pass will replace them with
-      // current-width values.
-      for row in rowRange where rows.indices.contains(row) {
-        rowHeightCache.removeValue(forKey: rows[row].id)
-      }
-      tableView.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: rowRange))
-    }
-
-    private func currentVisibleAnchor() -> SessionTimelineTableAnchor? {
-      guard let tableView, let scrollView else {
-        return nil
-      }
-      let visibleRect = scrollView.contentView.bounds
-      guard visibleRect.height > 0, visibleRect.width > 0 else {
-        return nil
-      }
-      let visibleRows = tableView.rows(in: visibleRect)
-      guard visibleRows.location != NSNotFound,
-        rows.indices.contains(visibleRows.location)
-      else {
-        return nil
-      }
-      let rowRect = tableView.rect(ofRow: visibleRows.location)
-      return SessionTimelineTableAnchor(
-        rowID: rows[visibleRows.location].id,
-        offsetY: visibleRect.minY - rowRect.minY
-      )
-    }
-
-    private func publishViewportState() {
-      guard let tableView, let scrollView else {
-        return
-      }
-      let visibleRect = scrollView.contentView.bounds
-      guard visibleRect.height > 0, visibleRect.width > 0 else {
-        return
-      }
-      let visibleRows = tableView.rows(in: visibleRect)
-      let visibleRowCount = max(0, visibleRows.length)
-      let stats = SessionTimelineTableViewportStats(
-        visibleRowCount: visibleRowCount,
-        renderedRowCount: visibleRowCount,
-        anchorRowID: anchorRowID(for: visibleRows)
-      )
-      if lastViewportStats != stats {
-        lastViewportStats = stats
-        viewport?.recordViewportStats(stats)
-      }
-
-      let boundaryState = SessionTimelineScrollBoundaryState(
-        visibleMinY: visibleRect.minY,
-        visibleMaxY: visibleRect.maxY,
-        contentHeight: tableView.bounds.height
-      )
-      if boundaryState.enteredTopEdge(from: lastBoundaryState)
-        || boundaryState.enteredBottomEdge(from: lastBoundaryState)
-      {
-        let oldValue = lastBoundaryState
-        lastBoundaryState = boundaryState
-        scrollBoundaryChanged(oldValue, boundaryState)
-      } else if boundaryState != lastBoundaryState {
-        lastBoundaryState = boundaryState
-      }
-    }
-
-    private func anchorRowID(for visibleRows: NSRange) -> String? {
-      guard visibleRows.location != NSNotFound,
-        rows.indices.contains(visibleRows.location)
-      else {
-        return nil
-      }
-      return rows[visibleRows.location].id
-    }
   }
 }

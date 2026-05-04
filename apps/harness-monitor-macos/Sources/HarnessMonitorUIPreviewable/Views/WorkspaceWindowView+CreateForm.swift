@@ -22,8 +22,7 @@ extension WorkspaceWindowView {
     )
   }
 
-  @ViewBuilder
-  var createPaneTopChrome: some View {
+  @ViewBuilder var createPaneTopChrome: some View {
     if showsCreatePaneTopChrome {
       VStack(spacing: 0) {
         if let message = createPaneSessionActionUnavailableNote {

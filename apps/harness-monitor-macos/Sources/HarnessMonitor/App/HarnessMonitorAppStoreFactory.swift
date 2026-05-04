@@ -119,6 +119,11 @@ enum HarnessMonitorAppStoreFactory {
       )
     }
 
+    let previewOverrides = PreviewSeedOverrides(
+      hostBridgeOverride: previewHostBridgeOverride,
+      actionDelay: previewActionDelay,
+      codexStartBehavior: previewCodexStartBehavior
+    )
     switch HarnessMonitorLaunchMode(environment: environment) {
     case .live:
       let ownership = DaemonOwnership(environment: environment)
@@ -133,26 +138,21 @@ enum HarnessMonitorAppStoreFactory {
       )
     case .preview:
       if let supervisorSeedScenario {
-        return HarnessMonitorStore(
-          daemonController: PreviewDaemonController(
-            mode: supervisorSeedScenario.mode,
-            environment: environment,
-            hostBridgeOverride: previewHostBridgeOverride,
-            actionDelay: previewActionDelay,
-            codexStartBehavior: previewCodexStartBehavior
-          ),
-          voiceCapture: previewVoiceCapture(environment: environment),
+        return Self.makeSeededPreviewStore(
+          scenario: supervisorSeedScenario,
+          environment: environment,
+          overrides: previewOverrides,
           modelContainer: modelContainer,
           persistenceError: persistenceError
         )
       }
-        return HarnessMonitorStore(
-          daemonController: PreviewDaemonController(
-            previewFixtureSetRawValue: environment.values["HARNESS_MONITOR_PREVIEW_FIXTURE_SET"],
-            environment: environment,
-            hostBridgeOverride: previewHostBridgeOverride,
-            actionDelay: previewActionDelay,
-            codexStartBehavior: previewCodexStartBehavior
+      return HarnessMonitorStore(
+        daemonController: PreviewDaemonController(
+          previewFixtureSetRawValue: environment.values["HARNESS_MONITOR_PREVIEW_FIXTURE_SET"],
+          environment: environment,
+          hostBridgeOverride: previewHostBridgeOverride,
+          actionDelay: previewActionDelay,
+          codexStartBehavior: previewCodexStartBehavior
         ),
         voiceCapture: previewVoiceCapture(environment: environment),
         modelContainer: modelContainer,
@@ -160,32 +160,54 @@ enum HarnessMonitorAppStoreFactory {
       )
     case .empty:
       if let supervisorSeedScenario {
-        return HarnessMonitorStore(
-          daemonController: PreviewDaemonController(
-            mode: supervisorSeedScenario.mode,
-            environment: environment,
-            hostBridgeOverride: previewHostBridgeOverride,
-            actionDelay: previewActionDelay,
-            codexStartBehavior: previewCodexStartBehavior
-          ),
-          voiceCapture: previewVoiceCapture(environment: environment),
+        return Self.makeSeededPreviewStore(
+          scenario: supervisorSeedScenario,
+          environment: environment,
+          overrides: previewOverrides,
           modelContainer: modelContainer,
           persistenceError: persistenceError
         )
       }
-        return HarnessMonitorStore(
-          daemonController: PreviewDaemonController(
-            mode: .empty,
-            environment: environment,
-            hostBridgeOverride: previewHostBridgeOverride,
-            actionDelay: previewActionDelay,
-            codexStartBehavior: previewCodexStartBehavior
+      return HarnessMonitorStore(
+        daemonController: PreviewDaemonController(
+          mode: .empty,
+          environment: environment,
+          hostBridgeOverride: previewHostBridgeOverride,
+          actionDelay: previewActionDelay,
+          codexStartBehavior: previewCodexStartBehavior
         ),
         voiceCapture: previewVoiceCapture(environment: environment),
         modelContainer: modelContainer,
         persistenceError: persistenceError
       )
     }
+  }
+
+  private struct PreviewSeedOverrides {
+    let hostBridgeOverride: PreviewHostBridgeOverride?
+    let actionDelay: Duration?
+    let codexStartBehavior: PreviewCodexStartBehavior
+  }
+
+  private static func makeSeededPreviewStore(
+    scenario: SupervisorSeedScenario,
+    environment: HarnessMonitorEnvironment,
+    overrides: PreviewSeedOverrides,
+    modelContainer: ModelContainer?,
+    persistenceError: String?
+  ) -> HarnessMonitorStore {
+    HarnessMonitorStore(
+      daemonController: PreviewDaemonController(
+        mode: scenario.mode,
+        environment: environment,
+        hostBridgeOverride: overrides.hostBridgeOverride,
+        actionDelay: overrides.actionDelay,
+        codexStartBehavior: overrides.codexStartBehavior
+      ),
+      voiceCapture: previewVoiceCapture(environment: environment),
+      modelContainer: modelContainer,
+      persistenceError: persistenceError
+    )
   }
 
   private static func previewActionDelay(

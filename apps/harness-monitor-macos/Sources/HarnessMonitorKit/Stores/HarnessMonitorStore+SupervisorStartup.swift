@@ -81,16 +81,8 @@ extension HarnessMonitorStore {
     }
 
     let relayTask = Task { @MainActor [weak self] in
-      guard let self else {
-        return
-      }
-      await self.refreshSupervisorDecisionSurfaces(decisions: decisionStore)
-      for await _ in decisionStore.events {
-        guard !Task.isCancelled else {
-          return
-        }
-        await self.refreshSupervisorDecisionSurfaces(decisions: decisionStore)
-      }
+      guard let self else { return }
+      await self.runDecisionRelayTask(decisions: decisionStore)
     }
 
     let stack = SupervisorStack(
@@ -109,6 +101,14 @@ extension HarnessMonitorStore {
     auditRetention?.startBackgroundCompaction()
 
     HarnessMonitorLogger.supervisorTrace("supervisor.started")
+  }
+
+  private func runDecisionRelayTask(decisions: DecisionStore) async {
+    await refreshSupervisorDecisionSurfaces(decisions: decisions)
+    for await _ in decisions.events {
+      guard !Task.isCancelled else { return }
+      await refreshSupervisorDecisionSurfaces(decisions: decisions)
+    }
   }
 
   private func refreshSupervisorDecisionSurfaces(decisions: DecisionStore) async {
