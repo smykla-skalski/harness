@@ -11,6 +11,7 @@ use crate::daemon::protocol::{ManagedAgentSnapshot, http_paths};
 use super::super::DaemonHttpState;
 use super::super::auth::require_auth;
 use super::super::response::{extract_request_id, timed_json};
+use super::ensure_acp_enabled;
 
 pub(super) async fn post_acp_agent_start(
     Path(session_id): Path<String>,
@@ -23,10 +24,12 @@ pub(super) async fn post_acp_agent_start(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = state
-        .acp_agent_manager
-        .start(&session_id, &request)
-        .map(ManagedAgentSnapshot::Acp);
+    let result = ensure_acp_enabled().and_then(|()| {
+        state
+            .acp_agent_manager
+            .start(&session_id, &request)
+            .map(ManagedAgentSnapshot::Acp)
+    });
     timed_json(
         "POST",
         http_paths::SESSION_MANAGED_AGENTS_ACP,

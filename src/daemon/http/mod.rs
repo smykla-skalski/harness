@@ -47,8 +47,9 @@ mod voice;
 
 pub(crate) use auth::require_auth;
 pub(crate) use managed_agents::{
-    acp_inspect_response, ensure_acp_agent, ensure_codex_agent, ensure_terminal_agent,
-    managed_agent_list_response, managed_agent_snapshot,
+    acp_inspect_response, ensure_acp_agent, ensure_acp_enabled, ensure_codex_agent,
+    ensure_terminal_agent, managed_agent_list_response, managed_agent_snapshot,
+    resolve_acp_inspect_session_scope,
 };
 pub(crate) use response::error_status_and_body;
 pub(crate) use sessions_adopt::{

@@ -11,7 +11,7 @@ use crate::errors::{CliError, CliErrorKind};
 use super::super::DaemonHttpState;
 use super::super::auth::require_auth;
 use super::super::response::{extract_request_id, timed_json};
-use super::ensure_acp_agent;
+use super::{ensure_acp_agent, ensure_acp_enabled};
 
 #[derive(Debug, Deserialize)]
 pub(super) struct DeleteAcpAgentQuery {
@@ -30,6 +30,7 @@ pub(super) async fn delete_acp_agent(
         return *response;
     }
     let result = (|| -> Result<ManagedAgentSnapshot, CliError> {
+        ensure_acp_enabled()?;
         ensure_acp_agent(&state, &agent_id)?;
         if let Some(required) = &query.require_session_id {
             let snapshot = state.acp_agent_manager.get(&agent_id)?;
