@@ -18,9 +18,9 @@ actor ManagedLaunchAgentDeferredRefreshState {
 }
 
 extension DaemonController {
-  func managedLaunchAgentRefreshNeededForBundledHelperChange()
-    throws -> ManagedLaunchAgentBundleStamp?
-  {
+  func managedLaunchAgentRefreshNeededForBundledHelperChange(
+    state: inout WarmUpLoopState
+  ) throws -> ManagedLaunchAgentBundleStamp? {
     guard ownership == .managed else {
       return nil
     }
@@ -40,7 +40,10 @@ extension DaemonController {
       return nil
     }
 
-    switch currentManagedLaunchAgentOwnership() {
+    // F6: read ownership from the captured snapshot rather than
+    // re-loading the marker. Recapture only when we ourselves mutate
+    // ownership so the next predicate call sees the new ground truth.
+    switch state.ownerSnapshot.ownership {
     case .ownedByLiveSibling:
       // A sibling Monitor instance is currently the launch-agent owner.
       // Defer the refresh decision to that owner so two Monitor processes
@@ -51,6 +54,7 @@ extension DaemonController {
       // Marker survived a previous instance's hard exit. Reclaim it now
       // so subsequent calls don't keep treating the dead PID as live.
       clearManagedLaunchAgentOwner()
+      state.ownerSnapshot = currentOwnerSnapshot()
     case .unowned, .ownedBySelf:
       break
     }
@@ -191,13 +195,15 @@ extension DaemonController {
     else {
       return nil
     }
-    switch currentManagedLaunchAgentOwnership() {
+    // F6: same snapshot-driven decision as the synchronous helper.
+    switch state.ownerSnapshot.ownership {
     case .ownedByLiveSibling:
       // Same hermetic rule as the synchronous helper: never queue a
       // deferred refresh while a sibling Monitor owns the launch agent.
       return nil
     case .staleOwnership:
       clearManagedLaunchAgentOwner()
+      state.ownerSnapshot = currentOwnerSnapshot()
     case .unowned, .ownedBySelf:
       break
     }
@@ -239,6 +245,9 @@ extension DaemonController {
     case .refreshed:
       state.pendingBundleStampRefresh = nil
       state.refreshedManagedLaunchAgentDuringWarmUp = true
+      // F6: refresh wrote a fresh marker for self; recapture the
+      // snapshot so the next predicate call sees `.ownedBySelf`.
+      state.ownerSnapshot = currentOwnerSnapshot()
       return true
     case .skippedSiblingOwnsLane, .skippedNotManagedDaemon, .skippedLockContended:
       // A sibling Monitor owns the lane (or this is not a managed

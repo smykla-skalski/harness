@@ -4,16 +4,14 @@ extension DaemonController {
   public func awaitManifestWarmUp(
     timeout: Duration
   ) async throws -> any HarnessMonitorClientProtocol {
-    let pendingBundleStampRefresh =
-      try managedLaunchAgentRefreshNeededForBundledHelperChange()
+    var state = WarmUpLoopState(ownerSnapshot: currentOwnerSnapshot())
+    state.pendingBundleStampRefresh =
+      try managedLaunchAgentRefreshNeededForBundledHelperChange(state: &state)
     let timeoutDesc = String(describing: timeout)
     HarnessMonitorLogger.lifecycle.trace(
       "Waiting up to \(timeoutDesc, privacy: .public) for daemon manifest warm-up"
     )
     let deadline = ContinuousClock.now + timeout
-    var state = WarmUpLoopState(
-      pendingBundleStampRefresh: pendingBundleStampRefresh
-    )
     var backoff = warmUpBackoff.makeIterator()
     while ContinuousClock.now < deadline {
       let outcome = try await warmUpIteration(state: &state)
@@ -57,6 +55,9 @@ extension DaemonController {
     var signaledManagedRecoveryManifestSignature: String?
     var lastLoggedManifestSignature: String?
     var lastLoggedRetryErrorDescription: String?
+    /// Captured ownership for the warm-up entry; recaptured at every
+    /// site that mutates ownership. See `OwnerSnapshot`.
+    var ownerSnapshot: OwnerSnapshot
   }
 
   struct WarmUpIterationOutcome {
@@ -326,6 +327,7 @@ extension DaemonController {
       switch try refreshManagedLaunchAgent(currentStamp: currentStamp) {
       case .refreshed:
         state.refreshedManagedLaunchAgentDuringWarmUp = true
+        state.ownerSnapshot = currentOwnerSnapshot()
       case .skippedSiblingOwnsLane, .skippedNotManagedDaemon, .skippedLockContended:
         // Leave the flag false so we re-evaluate next tick; the
         // sibling owner is the one expected to bring a matching

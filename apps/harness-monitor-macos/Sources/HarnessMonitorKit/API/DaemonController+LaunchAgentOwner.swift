@@ -75,6 +75,25 @@ public typealias ProcessLivenessProbe = @Sendable (Int32) -> ProcessLiveness
 /// current value and gets classified as `.staleOwnership`.
 public typealias BootSessionUUIDProbe = @Sendable () -> String?
 
+/// Captured ownership read used as an impureim-sandwich payload:
+/// gather the impure marker read once at the warm-up entry, then
+/// thread the immutable snapshot through pure decision callers so
+/// the predicate that decides "should we refresh" sees the same
+/// ownership state the refresh itself would observe absent any
+/// sibling-mid-flight write. The flock-protected refresh function
+/// re-reads ownership inside its critical section regardless; the
+/// snapshot's job is temporal coherence within a single warm-up
+/// entry, not concurrent atomicity.
+public struct OwnerSnapshot: Equatable, Sendable {
+  public let owner: ManagedLaunchAgentOwner?
+  public let ownership: ManagedLaunchAgentOwnership
+
+  public init(owner: ManagedLaunchAgentOwner?, ownership: ManagedLaunchAgentOwnership) {
+    self.owner = owner
+    self.ownership = ownership
+  }
+}
+
 extension HarnessMonitorPaths {
   public static func managedLaunchAgentOwnerURL(
     using environment: HarnessMonitorEnvironment = .current
@@ -252,5 +271,20 @@ extension DaemonController {
       liveness: processLiveness,
       currentBootSessionUUID: bootSessionUUID()
     )
+  }
+
+  /// Capture the current ownership read once and bundle it with the
+  /// raw owner record as a value type. Callers thread the snapshot
+  /// through pure helpers so a single warm-up entry sees a coherent
+  /// ownership across multiple predicate calls.
+  func currentOwnerSnapshot() -> OwnerSnapshot {
+    let owner = loadManagedLaunchAgentOwner()
+    let ownership = Self.decideManagedLaunchAgentOwnership(
+      owner: owner,
+      selfPid: getpid(),
+      liveness: processLiveness,
+      currentBootSessionUUID: bootSessionUUID()
+    )
+    return OwnerSnapshot(owner: owner, ownership: ownership)
   }
 }
