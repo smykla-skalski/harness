@@ -290,6 +290,13 @@ public enum HarnessMonitorPaths {
       .appendingPathComponent("managed-launch-agent-bundle-stamp.json")
   }
 
+  public static func managedLaunchAgentLockURL(
+    using environment: HarnessMonitorEnvironment = .current
+  ) -> URL {
+    Self.daemonRoot(using: environment)
+      .appendingPathComponent("managed-launch-agent.lock")
+  }
+
   public static func thumbnailCacheRoot(
     using environment: HarnessMonitorEnvironment = .current
   ) -> URL {

@@ -128,7 +128,7 @@ public struct DaemonController: DaemonControlling {
       switch try refreshManagedLaunchAgent(currentStamp: currentStamp) {
       case .refreshed:
         return true
-      case .skippedSiblingOwnsLane, .skippedNotManagedDaemon:
+      case .skippedSiblingOwnsLane, .skippedNotManagedDaemon, .skippedLockContended:
         return false
       }
     } catch {
