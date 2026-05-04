@@ -336,12 +336,10 @@ private let monitorTestEnv: [String: EnvironmentVariable] = [
     "HARNESS_DAEMON_DATA_HOME": .environmentVariable(value: "/tmp/harness-monitor-tests", isEnabled: true)
 ]
 
-private let externalDaemonRunEnv: [String: EnvironmentVariable] = [
-    "HARNESS_OTEL_EXPORT": .environmentVariable(value: "1", isEnabled: true),
-    "OTEL_EXPORTER_OTLP_ENDPOINT": .environmentVariable(value: "http://127.0.0.1:4317", isEnabled: true),
+private let externalDaemonRunEnv: [String: EnvironmentVariable] = monitorRunEnv.merging([
     "HARNESS_MONITOR_EXTERNAL_DAEMON": .environmentVariable(value: "1", isEnabled: true),
     "HARNESS_BOOTSTRAP_TIMEOUT_SECONDS": .environmentVariable(value: "60", isEnabled: true)
-]
+]) { _, new in new }
 
 private let monitorScheme: Scheme = .scheme(
     name: "HarnessMonitor",
