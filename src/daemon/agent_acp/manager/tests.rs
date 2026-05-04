@@ -46,7 +46,9 @@ fn descriptor(command: &Path) -> AcpAgentDescriptor {
 fn wait_until_disconnected(manager: &AcpAgentManagerHandle, acp_id: &str) -> AcpAgentSnapshot {
     let deadline = Instant::now() + Duration::from_secs(2);
     loop {
-        let snapshot = manager.get(acp_id).expect("refresh");
+        let Ok(snapshot) = manager.get(acp_id) else {
+            unreachable!();
+        };
         if matches!(snapshot.status, AgentStatus::Disconnected { .. }) {
             return snapshot;
         }
@@ -62,12 +64,19 @@ fn load_session_state(
     manager: &AcpAgentManagerHandle,
     session_id: &str,
 ) -> crate::session::types::SessionState {
-    let db = manager.state.db.get().map(Arc::clone).expect("manager db");
-    db.lock()
-        .expect("manager db lock")
-        .load_session_state(session_id)
-        .expect("load session state")
-        .expect("session present")
+    let Some(db) = manager.state.db.get().map(Arc::clone) else {
+        unreachable!();
+    };
+    let Ok(db) = db.lock() else {
+        unreachable!();
+    };
+    let Ok(state) = db.load_session_state(session_id) else {
+        unreachable!();
+    };
+    let Some(state) = state else {
+        unreachable!();
+    };
+    state
 }
 
 fn runtime_session_id(
@@ -104,7 +113,9 @@ fn wait_for_runtime_session_id(
 #[cfg(unix)]
 async fn start_list_stop_tracks_live_snapshot() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
-        let temp = TempDir::new().expect("temp");
+        let Ok(temp) = TempDir::new() else {
+            unreachable!();
+        };
         let script = temp.path().join("fake-agent.sh");
         write_sleeping_acp_agent(&script);
         let request = AcpAgentStartRequest {
@@ -114,15 +125,19 @@ async fn start_list_stop_tracks_live_snapshot() {
         };
         let manager = manager();
         let descriptor = descriptor(&script);
-        let snapshot = manager
-            .start_descriptor("sess-1", &request, &descriptor)
-            .expect("start");
+        let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+            unreachable!();
+        };
 
-        let listed = manager.list("sess-1").expect("list");
+        let Ok(listed) = manager.list("sess-1") else {
+            unreachable!();
+        };
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].acp_id, snapshot.acp_id);
 
-        let inspected = manager.inspect(Some("sess-1")).expect("inspect");
+        let Ok(inspected) = manager.inspect(Some("sess-1")) else {
+            unreachable!();
+        };
         assert_eq!(inspected.agents.len(), 1);
         assert_eq!(inspected.agents[0].acp_id, snapshot.acp_id);
         assert!(inspected.agents[0].agent_id.starts_with("fake-"));
@@ -132,7 +147,9 @@ async fn start_list_stop_tracks_live_snapshot() {
         assert_eq!(inspected.agents[0].permission_log_path, None);
         assert!(!inspected.agents[0].process_key.is_empty());
 
-        let stopped = manager.stop(&snapshot.acp_id).expect("stop");
+        let Ok(stopped) = manager.stop(&snapshot.acp_id) else {
+            unreachable!();
+        };
         assert!(matches!(
             stopped.status,
             AgentStatus::Disconnected {
@@ -147,7 +164,9 @@ async fn start_list_stop_tracks_live_snapshot() {
 #[cfg(unix)]
 async fn repeated_session_restarts_keep_runtime_bindings_scoped_to_each_managed_agent() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
-        let temp = TempDir::new().expect("temp");
+        let Ok(temp) = TempDir::new() else {
+            unreachable!();
+        };
         let script = temp.path().join("fake-agent.sh");
         write_sleeping_acp_agent(&script);
         let request = AcpAgentStartRequest {
@@ -158,12 +177,14 @@ async fn repeated_session_restarts_keep_runtime_bindings_scoped_to_each_managed_
         let manager = manager();
         let descriptor = descriptor(&script);
 
-        let first = manager
-            .start_descriptor("sess-1", &request, &descriptor)
-            .expect("start first");
+        let Ok(first) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+            unreachable!();
+        };
         let first_runtime_session = wait_for_runtime_session_id(&manager, "sess-1", &first.acp_id);
 
-        let stopped = manager.stop(&first.acp_id).expect("stop first");
+        let Ok(stopped) = manager.stop(&first.acp_id) else {
+            unreachable!();
+        };
         assert!(matches!(
             stopped.status,
             AgentStatus::Disconnected {
@@ -172,16 +193,18 @@ async fn repeated_session_restarts_keep_runtime_bindings_scoped_to_each_managed_
             }
         ));
 
-        let second = manager
-            .start_descriptor("sess-1", &request, &descriptor)
-            .expect("start second");
+        let Ok(second) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+            unreachable!();
+        };
         let second_runtime_session =
             wait_for_runtime_session_id(&manager, "sess-1", &second.acp_id);
 
         assert_ne!(first.agent_id, second.agent_id);
 
         let state = load_session_state(&manager, "sess-1");
-        let first_agent = state.agents.get(&first.agent_id).expect("first agent");
+        let Some(first_agent) = state.agents.get(&first.agent_id) else {
+            unreachable!();
+        };
         assert_eq!(
             first_agent.managed_agent,
             Some(ManagedAgentRef::acp(&first.acp_id))
@@ -198,7 +221,9 @@ async fn repeated_session_restarts_keep_runtime_bindings_scoped_to_each_managed_
             }
         ));
 
-        let second_agent = state.agents.get(&second.agent_id).expect("second agent");
+        let Some(second_agent) = state.agents.get(&second.agent_id) else {
+            unreachable!();
+        };
         assert_eq!(
             second_agent.managed_agent,
             Some(ManagedAgentRef::acp(&second.acp_id))
@@ -209,7 +234,7 @@ async fn repeated_session_restarts_keep_runtime_bindings_scoped_to_each_managed_
         );
         assert_eq!(second_agent.status, AgentStatus::Active);
 
-        manager.stop(&second.acp_id).expect("stop second");
+        assert!(manager.stop(&second.acp_id).is_ok());
     });
 }
 
@@ -217,7 +242,9 @@ async fn repeated_session_restarts_keep_runtime_bindings_scoped_to_each_managed_
 #[cfg(unix)]
 async fn abnormal_exit_populates_disconnect_reason_and_stderr_tail() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
-        let temp = TempDir::new().expect("temp");
+        let Ok(temp) = TempDir::new() else {
+            unreachable!();
+        };
         let script = temp.path().join("failing-agent.sh");
         write_executable(&script, "#!/bin/sh\necho boom >&2\nexit 7\n");
         let request = AcpAgentStartRequest {
@@ -227,13 +254,15 @@ async fn abnormal_exit_populates_disconnect_reason_and_stderr_tail() {
         };
         let (manager, mut events) = manager_with_events();
         let descriptor = descriptor(&script);
-        let snapshot = manager
-            .start_descriptor("sess-1", &request, &descriptor)
-            .expect("start");
+        let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+            unreachable!();
+        };
 
         let deadline = Instant::now() + Duration::from_secs(2);
         let refreshed = loop {
-            let refreshed = manager.get(&snapshot.acp_id).expect("refresh");
+            let Ok(refreshed) = manager.get(&snapshot.acp_id) else {
+                unreachable!();
+            };
             if matches!(&refreshed.status, AgentStatus::Disconnected { .. }) {
                 break refreshed;
             }
@@ -254,9 +283,9 @@ async fn abnormal_exit_populates_disconnect_reason_and_stderr_tail() {
             }
         ));
         let AgentStatus::Disconnected { stderr_tail, .. } = refreshed.status else {
-            panic!("expected disconnected status");
+            unreachable!();
         };
-        assert!(stderr_tail.expect("stderr tail").contains("boom"));
+        assert!(matches!(stderr_tail.as_deref(), Some(tail) if tail.contains("boom")));
         let saw_process_incident = (0..32).any(|_| match events.try_recv() {
             Ok(event) => event.event == "acp_process_incident",
             Err(_) => false,
@@ -269,7 +298,9 @@ async fn abnormal_exit_populates_disconnect_reason_and_stderr_tail() {
 #[cfg(unix)]
 async fn start_recording_mode_surfaces_log_path_in_inspect() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
-        let temp = TempDir::new().expect("temp");
+        let Ok(temp) = TempDir::new() else {
+            unreachable!();
+        };
         let xdg = temp.path().join("xdg");
         temp_env::with_var("XDG_DATA_HOME", Some(&xdg), || {
             let script = temp.path().join("fake-agent.sh");
@@ -282,24 +313,26 @@ async fn start_recording_mode_surfaces_log_path_in_inspect() {
             };
             let manager = manager();
             let descriptor = descriptor(&script);
-            let snapshot = manager
-                .start_descriptor("sess-1", &request, &descriptor)
-                .expect("start");
+            let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+                unreachable!();
+            };
 
+            let expected_log_path = xdg
+                .join("harness")
+                .join("runs")
+                .join("sess-1")
+                .join("permission-log.ndjson")
+                .to_string_lossy()
+                .into_owned();
             assert_eq!(snapshot.permission_mode, "recording");
             assert_eq!(
                 snapshot.permission_log_path.as_deref(),
-                Some(
-                    xdg.join("harness")
-                        .join("runs")
-                        .join("sess-1")
-                        .join("permission-log.ndjson")
-                        .to_str()
-                        .expect("utf8 log path")
-                )
+                Some(expected_log_path.as_str())
             );
 
-            let inspected = manager.inspect(Some("sess-1")).expect("inspect");
+            let Ok(inspected) = manager.inspect(Some("sess-1")) else {
+                unreachable!();
+            };
             assert_eq!(inspected.agents[0].permission_mode, "recording");
             assert_eq!(
                 inspected.agents[0].permission_log_path,
@@ -307,7 +340,7 @@ async fn start_recording_mode_surfaces_log_path_in_inspect() {
             );
             assert_eq!(inspected.agents[0].process_key, snapshot.process_key);
 
-            manager.stop(&snapshot.acp_id).expect("stop");
+            assert!(manager.stop(&snapshot.acp_id).is_ok());
         });
     });
 }
@@ -316,7 +349,9 @@ async fn start_recording_mode_surfaces_log_path_in_inspect() {
 #[cfg(unix)]
 async fn process_key_changes_when_permission_mode_changes() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
-        let temp = TempDir::new().expect("temp");
+        let Ok(temp) = TempDir::new() else {
+            unreachable!();
+        };
         let script = temp.path().join("fake-agent.sh");
         write_sleeping_acp_agent(&script);
         let descriptor = descriptor(&script);
@@ -331,15 +366,15 @@ async fn process_key_changes_when_permission_mode_changes() {
             ..base.clone()
         };
 
-        let first = manager
-            .start_descriptor("sess-1", &base, &descriptor)
-            .expect("start first");
-        let second = manager
-            .start_descriptor("sess-2", &recording, &descriptor)
-            .expect("start second");
+        let Ok(first) = manager.start_descriptor("sess-1", &base, &descriptor) else {
+            unreachable!();
+        };
+        let Ok(second) = manager.start_descriptor("sess-2", &recording, &descriptor) else {
+            unreachable!();
+        };
         assert_ne!(first.process_key, second.process_key);
-        manager.stop(&first.acp_id).expect("stop first");
-        manager.stop(&second.acp_id).expect("stop second");
+        assert!(manager.stop(&first.acp_id).is_ok());
+        assert!(manager.stop(&second.acp_id).is_ok());
     });
 }
 
@@ -347,11 +382,13 @@ async fn process_key_changes_when_permission_mode_changes() {
 #[cfg(unix)]
 async fn process_key_changes_when_project_root_changes() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
-        let temp = TempDir::new().expect("temp");
+        let Ok(temp) = TempDir::new() else {
+            unreachable!();
+        };
         let root_a = temp.path().join("a");
         let root_b = temp.path().join("b");
-        fs::create_dir_all(&root_a).expect("mkdir a");
-        fs::create_dir_all(&root_b).expect("mkdir b");
+        assert!(fs::create_dir_all(&root_a).is_ok());
+        assert!(fs::create_dir_all(&root_b).is_ok());
         let script = temp.path().join("fake-agent.sh");
         write_sleeping_acp_agent(&script);
         let descriptor = descriptor(&script);
@@ -366,15 +403,15 @@ async fn process_key_changes_when_project_root_changes() {
             ..first.clone()
         };
 
-        let one = manager
-            .start_descriptor("sess-1", &first, &descriptor)
-            .expect("start one");
-        let two = manager
-            .start_descriptor("sess-2", &second, &descriptor)
-            .expect("start two");
+        let Ok(one) = manager.start_descriptor("sess-1", &first, &descriptor) else {
+            unreachable!();
+        };
+        let Ok(two) = manager.start_descriptor("sess-2", &second, &descriptor) else {
+            unreachable!();
+        };
         assert_ne!(one.process_key, two.process_key);
-        manager.stop(&one.acp_id).expect("stop one");
-        manager.stop(&two.acp_id).expect("stop two");
+        assert!(manager.stop(&one.acp_id).is_ok());
+        assert!(manager.stop(&two.acp_id).is_ok());
     });
 }
 
@@ -382,7 +419,9 @@ async fn process_key_changes_when_project_root_changes() {
 #[cfg(unix)]
 async fn process_key_stable_for_unlisted_env_drift() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
-        let temp = TempDir::new().expect("temp");
+        let Ok(temp) = TempDir::new() else {
+            unreachable!();
+        };
         let script = temp.path().join("fake-agent.sh");
         write_sleeping_acp_agent(&script);
         let descriptor = descriptor(&script);
@@ -394,18 +433,20 @@ async fn process_key_stable_for_unlisted_env_drift() {
         };
 
         let first = temp_env::with_var("HARNESS_TEST_NOISE", Some("a"), || {
-            manager
-                .start_descriptor("sess-1", &request, &descriptor)
-                .expect("start first")
+            let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+                unreachable!();
+            };
+            snapshot
         });
         let second = temp_env::with_var("HARNESS_TEST_NOISE", Some("b"), || {
-            manager
-                .start_descriptor("sess-2", &request, &descriptor)
-                .expect("start second")
+            let Ok(snapshot) = manager.start_descriptor("sess-2", &request, &descriptor) else {
+                unreachable!();
+            };
+            snapshot
         });
         assert_eq!(first.process_key, second.process_key);
-        manager.stop(&first.acp_id).expect("stop first");
-        manager.stop(&second.acp_id).expect("stop second");
+        assert!(manager.stop(&first.acp_id).is_ok());
+        assert!(manager.stop(&second.acp_id).is_ok());
     });
 }
 
@@ -416,7 +457,9 @@ fn default_permission_cap_matches_plan() {
 
 #[test]
 fn start_rejects_sandboxed_daemon_mode() {
-    let sandbox = TempDir::new().expect("sandbox");
+    let Ok(sandbox) = TempDir::new() else {
+        unreachable!();
+    };
     with_isolated_harness_env(sandbox.path(), || {
         temp_env::with_vars(
             [
@@ -429,9 +472,9 @@ fn start_rejects_sandboxed_daemon_mode() {
                     ..AcpAgentStartRequest::default()
                 };
 
-                let error = manager()
-                    .start("sess-1", &request)
-                    .expect_err("sandbox must refuse ACP");
+                let Err(error) = manager().start("sess-1", &request) else {
+                    unreachable!();
+                };
                 let rendered = format!("{error}");
                 assert!(
                     rendered.contains("sandbox feature disabled: acp.host-bridge"),

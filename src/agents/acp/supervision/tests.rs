@@ -13,6 +13,13 @@ use nix::unistd::Pid;
 
 use super::*;
 
+fn ok<T, E: std::fmt::Debug>(result: Result<T, E>, context: &str) -> T {
+    match result {
+        Ok(value) => value,
+        Err(error) => unreachable!("{context}: {error:?}"),
+    }
+}
+
 fn spawn_sleep_child() -> Child {
     #[cfg(unix)]
     {
@@ -20,27 +27,29 @@ fn spawn_sleep_child() -> Child {
         let mut cmd = Command::new("sleep");
         cmd.arg("60");
         cmd.process_group(0);
-        cmd.spawn().expect("spawn sleep")
+        ok(cmd.spawn(), "spawn sleep")
     }
     #[cfg(not(unix))]
     {
-        Command::new("timeout")
-            .args(["/t", "60"])
-            .spawn()
-            .expect("spawn timeout")
+        ok(
+            Command::new("timeout").args(["/t", "60"]).spawn(),
+            "spawn timeout",
+        )
     }
 }
 
 #[cfg(unix)]
 fn wait_for_file_marker(path: &Path, marker: &str) {
     let deadline = Instant::now() + Duration::from_secs(1);
+    let mut found = false;
     while Instant::now() < deadline {
         if fs::read_to_string(path).is_ok_and(|content| content.contains(marker)) {
-            return;
+            found = true;
+            break;
         }
         std::thread::sleep(Duration::from_millis(10));
     }
-    panic!("expected marker '{marker}' in {}", path.display());
+    assert!(found, "expected marker '{marker}' in {}", path.display());
 }
 
 #[tokio::test(start_paused = true)]
@@ -191,10 +200,13 @@ async fn watchdog_loop_does_not_fire_for_idle_agent() {
         "watchdog must keep idle agents alive indefinitely"
     );
     supervisor.mark_done();
-    let reason = tokio::time::timeout(Duration::from_millis(100), task)
-        .await
-        .expect("watchdog should wake on done")
-        .expect("watchdog task should not panic");
+    let reason = ok(
+        ok(
+            tokio::time::timeout(Duration::from_millis(100), task).await,
+            "watchdog should wake on done",
+        ),
+        "watchdog task should not panic",
+    );
     assert_eq!(reason, None);
 
     #[cfg(unix)]
@@ -212,10 +224,13 @@ async fn watchdog_loop_returns_none_when_session_is_done() {
 
     supervisor.mark_done();
 
-    let reason = tokio::time::timeout(Duration::from_millis(100), task)
-        .await
-        .expect("watchdog should wake after done")
-        .expect("watchdog task should not panic");
+    let reason = ok(
+        ok(
+            tokio::time::timeout(Duration::from_millis(100), task).await,
+            "watchdog should wake after done",
+        ),
+        "watchdog task should not panic",
+    );
     assert_eq!(reason, None);
     assert_eq!(supervisor.watchdog_state(), WatchdogState::Done);
 
@@ -258,7 +273,7 @@ fn kill_process_group_terminates_child() {
 
     kill_process_group(pgid, &mut child);
 
-    let status = child.try_wait().expect("try_wait after kill");
+    let status = ok(child.try_wait(), "try_wait after kill");
     assert!(status.is_some(), "child should be dead");
 }
 
@@ -267,7 +282,7 @@ fn kill_process_group_terminates_child() {
 fn kill_process_group_escalates_when_child_traps_sigterm() {
     use std::os::unix::process::{CommandExt, ExitStatusExt};
 
-    let temp = tempfile::tempdir().expect("tempdir");
+    let temp = ok(tempfile::tempdir(), "tempdir");
     let log_path = temp.path().join("signal.log");
     let mut command = Command::new("sh");
     command
@@ -278,14 +293,16 @@ fn kill_process_group_escalates_when_child_traps_sigterm() {
         )
         .env("HARNESS_TEST_SIGNAL_LOG", &log_path);
     command.process_group(0);
-    let mut child = command.spawn().expect("spawn trap child");
+    let mut child = ok(command.spawn(), "spawn trap child");
     wait_for_file_marker(&log_path, "ready");
 
     let pgid = child.id().cast_signed();
     kill_process_group(pgid, &mut child);
 
-    let status = child.try_wait().expect("try_wait after kill");
-    let status = status.expect("child should be dead");
+    let status = ok(child.try_wait(), "try_wait after kill");
+    let Some(status) = status else {
+        unreachable!("child should be dead");
+    };
     assert_eq!(status.signal(), Some(Signal::SIGKILL as i32));
     wait_for_file_marker(&log_path, "term");
 }

@@ -32,7 +32,9 @@ fn descriptor(command: &Path) -> AcpAgentDescriptor {
 fn wait_until_disconnected(manager: &AcpAgentManagerHandle, acp_id: &str) -> AcpAgentSnapshot {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
     loop {
-        let snapshot = manager.get(acp_id).expect("refresh");
+        let Ok(snapshot) = manager.get(acp_id) else {
+            unreachable!("refresh");
+        };
         if matches!(snapshot.status, AgentStatus::Disconnected { .. }) {
             return snapshot;
         }
@@ -48,7 +50,9 @@ fn wait_until_disconnected(manager: &AcpAgentManagerHandle, acp_id: &str) -> Acp
 #[cfg(unix)]
 async fn shutdown_all_drains_live_sessions_and_blocks_new_starts() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
-        let temp = TempDir::new().expect("temp");
+        let Ok(temp) = TempDir::new() else {
+            unreachable!("temp");
+        };
         let script = temp.path().join("fake-agent.sh");
         write_sleeping_acp_agent(&script);
         let request = AcpAgentStartRequest {
@@ -58,11 +62,13 @@ async fn shutdown_all_drains_live_sessions_and_blocks_new_starts() {
         };
         let manager = manager();
         let descriptor = descriptor(&script);
-        let snapshot = manager
-            .start_descriptor("sess-1", &request, &descriptor)
-            .expect("start");
+        let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+            unreachable!("start");
+        };
 
-        manager.shutdown_all().expect("shutdown all");
+        let Ok(()) = manager.shutdown_all() else {
+            unreachable!("shutdown all");
+        };
         let disconnected = wait_until_disconnected(&manager, &snapshot.acp_id);
         assert!(matches!(
             disconnected.status,
@@ -72,9 +78,9 @@ async fn shutdown_all_drains_live_sessions_and_blocks_new_starts() {
             }
         ));
 
-        let restart_error = manager
-            .start_descriptor("sess-2", &request, &descriptor)
-            .expect_err("shutdown should block new ACP starts");
+        let Err(restart_error) = manager.start_descriptor("sess-2", &request, &descriptor) else {
+            unreachable!("shutdown should block new ACP starts");
+        };
         assert!(
             restart_error.to_string().contains("shutting down"),
             "unexpected restart error: {restart_error}"

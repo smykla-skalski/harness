@@ -105,15 +105,16 @@ fn stream_event(event: &str) -> StreamEvent {
 
 #[test]
 fn bridge_resync_incident_event_uses_expected_kind_and_scope() {
-    let event = bridge_resync_incident_event(&AcpBridgeResyncIncidentPayload {
+    let Some(event) = bridge_resync_incident_event(&AcpBridgeResyncIncidentPayload {
         kind: "protocol_desync".to_string(),
         bridge_epoch: "epoch-1".to_string(),
         continuity: 7,
         next_seq: 11,
         truncated: true,
         affected_logical_session_ids: vec!["sess-1".to_string()],
-    })
-    .expect("incident event");
+    }) else {
+        unreachable!("incident event");
+    };
 
     assert_eq!(event.event, "acp_bridge_resync_incident");
     assert_eq!(event.session_id, None);
@@ -134,7 +135,9 @@ fn bridge_resync_incident_events_fan_out_by_session() {
         truncated: false,
         affected_logical_session_ids: vec!["sess-a".to_string(), "sess-b".to_string()],
     };
-    let events = bridge_resync_incident_events(&payload).expect("events");
+    let Some(events) = bridge_resync_incident_events(&payload) else {
+        unreachable!("events");
+    };
     assert_eq!(events.len(), 2);
     assert_eq!(events[0].session_id.as_deref(), Some("sess-a"));
     assert_eq!(events[1].session_id.as_deref(), Some("sess-b"));
@@ -219,15 +222,16 @@ fn count_live_bridge_snapshots_uses_agent_status_not_watchdog_state() {
         issue_message: None,
     };
 
-    let live = count_live_bridge_snapshots(inspect, |acp_id| match acp_id {
+    let Ok(live) = count_live_bridge_snapshots(inspect, |acp_id| match acp_id {
         "acp-idle" => Ok(acp_snapshot("acp-idle", AgentStatus::Idle)),
         "acp-disconnected" => Ok(acp_snapshot(
             "acp-disconnected",
             AgentStatus::disconnected(DisconnectReason::SessionStopped),
         )),
-        unexpected => panic!("unexpected ACP id {unexpected}"),
-    })
-    .expect("count live bridge snapshots");
+        unexpected => unreachable!("unexpected ACP id {unexpected}"),
+    }) else {
+        unreachable!("count live bridge snapshots");
+    };
 
     assert_eq!(live, 1);
 }
@@ -241,10 +245,11 @@ fn count_live_bridge_snapshots_fails_closed_on_snapshot_errors() {
         available: true,
         issue_message: None,
     };
-    let error = count_live_bridge_snapshots(inspect, |_| {
+    let Err(error) = count_live_bridge_snapshots(inspect, |_| {
         Err(CliErrorKind::workflow_io("snapshot unavailable").into())
-    })
-    .expect_err("snapshot errors must block force-less disable");
+    }) else {
+        unreachable!("snapshot errors must block force-less disable");
+    };
 
     assert!(error.to_string().contains("snapshot unavailable"));
 }
@@ -326,7 +331,9 @@ fn pool_key_mismatch_incident_events_fan_out_by_session() {
         observed_process_keys: vec!["pk-a".to_string(), "pk-b".to_string()],
         affected_logical_session_ids: vec!["sess-1".to_string(), "sess-2".to_string()],
     };
-    let events = pool_key_mismatch_incident_events(&payload).expect("events");
+    let Some(events) = pool_key_mismatch_incident_events(&payload) else {
+        unreachable!("events");
+    };
     assert_eq!(events.len(), 2);
     assert_eq!(events[0].event, "acp_process_incident");
     assert_eq!(events[0].session_id.as_deref(), Some("sess-1"));
@@ -366,7 +373,9 @@ fn pool_key_mismatch_dedupe_emits_only_on_change() {
         );
     }
 
-    let first = rx.try_recv().expect("first incident");
+    let Ok(first) = rx.try_recv() else {
+        unreachable!("first incident");
+    };
     assert_eq!(first.event, "acp_process_incident");
     assert!(
         rx.try_recv().is_err(),
@@ -386,7 +395,9 @@ fn pool_key_mismatch_state_is_cleared_for_non_mismatch_keys() {
         session_id,
         vec!["pk-a".to_string(), "pk-b".to_string()],
     );
-    let _ = rx.try_recv().expect("mismatch incident");
+    let Ok(_) = rx.try_recv() else {
+        unreachable!("mismatch incident");
+    };
     assert!(seen.contains_key(session_id));
 
     maybe_emit_pool_key_mismatch_incident(&sender, &mut seen, session_id, vec!["pk-a".to_string()]);

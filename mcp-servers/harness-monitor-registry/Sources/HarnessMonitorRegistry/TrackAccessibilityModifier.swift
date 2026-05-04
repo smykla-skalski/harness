@@ -171,7 +171,7 @@ private struct TrackAccessibilityProbe: NSViewRepresentable {
   }
 }
 
-private final class TrackAccessibilityNSView: NSView {
+final class TrackAccessibilityNSView: NSView {
   private let registrationOwnerID = UUID()
   private var trackedElementID = ""
   private var kind: RegistryElementKind = .other
@@ -184,6 +184,7 @@ private final class TrackAccessibilityNSView: NSView {
   private var semanticActionSink: (any RegistrySemanticActionSink)?
   private var registry: AccessibilityRegistry?
   private var claimTask: Task<Void, Never>?
+  private var deferredPublishTask: Task<Void, Never>?
   private var publishTask: Task<Void, Never>?
   private var observedWindow: NSWindow?
   // nonisolated(unsafe) so the nonisolated deinit can read it without the
@@ -195,6 +196,7 @@ private final class TrackAccessibilityNSView: NSView {
   // libdispatch BUG off-main.
   private nonisolated(unsafe) var windowObservers: [NSObjectProtocol] = []
   private var lastPublishedElement: RegistryElement?
+  var accessibilityFrameProviderOverride: ((TrackAccessibilityNSView) -> NSRect)?
 
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
@@ -215,6 +217,7 @@ private final class TrackAccessibilityNSView: NSView {
     // thread-safe; the registry-side unregister already happens via
     // `dismantleNSView` (which SwiftUI runs on the MainActor) and via
     // `viewDidMoveToWindow(nil)`, so there is no MainActor-only step left.
+    deferredPublishTask?.cancel()
     windowObservers.forEach(NotificationCenter.default.removeObserver)
   }
 
@@ -260,10 +263,12 @@ private final class TrackAccessibilityNSView: NSView {
     self.registry = registry
     claimTrackedElement()
     beginObserving(window: window)
-    publishCurrentElement()
+    schedulePublishCurrentElement()
   }
 
   func unregister() {
+    deferredPublishTask?.cancel()
+    deferredPublishTask = nil
     publishTask?.cancel()
     publishTask = nil
     let claimTask = self.claimTask
@@ -293,7 +298,7 @@ private final class TrackAccessibilityNSView: NSView {
       return
     }
     beginObserving(window: window)
-    publishCurrentElement()
+    schedulePublishCurrentElement()
   }
 
   override func viewDidMoveToSuperview() {
@@ -303,12 +308,12 @@ private final class TrackAccessibilityNSView: NSView {
       unregister()
       return
     }
-    publishCurrentElement()
+    schedulePublishCurrentElement()
   }
 
   override func layout() {
     super.layout()
-    publishCurrentElement()
+    schedulePublishCurrentElement()
   }
 
   private func beginObserving(window: NSWindow?) {
@@ -330,7 +335,7 @@ private final class TrackAccessibilityNSView: NSView {
         // Hop explicitly: `MainActor.assumeIsolated` would trap if the
         // block ever fires off-main on macOS 26.
         Task { @MainActor [weak self] in
-          self?.publishCurrentElement()
+          self?.schedulePublishCurrentElement()
         }
       },
       center.addObserver(
@@ -341,7 +346,7 @@ private final class TrackAccessibilityNSView: NSView {
         // Hop explicitly: `MainActor.assumeIsolated` would trap if the
         // block ever fires off-main on macOS 26.
         Task { @MainActor [weak self] in
-          self?.publishCurrentElement()
+          self?.schedulePublishCurrentElement()
         }
       },
       center.addObserver(
@@ -352,7 +357,7 @@ private final class TrackAccessibilityNSView: NSView {
         // Hop explicitly: `MainActor.assumeIsolated` would trap if the
         // block ever fires off-main on macOS 26.
         Task { @MainActor [weak self] in
-          self?.publishCurrentElement()
+          self?.schedulePublishCurrentElement()
         }
       },
       center.addObserver(
@@ -363,7 +368,7 @@ private final class TrackAccessibilityNSView: NSView {
         // Hop explicitly: `MainActor.assumeIsolated` would trap if the
         // block ever fires off-main on macOS 26.
         Task { @MainActor [weak self] in
-          self?.publishCurrentElement()
+          self?.schedulePublishCurrentElement()
         }
       },
     ]
@@ -395,13 +400,38 @@ private final class TrackAccessibilityNSView: NSView {
     }
   }
 
+  private func schedulePublishCurrentElement() {
+    deferredPublishTask?.cancel()
+    guard registry != nil, !trackedElementID.isEmpty else {
+      return
+    }
+    // `accessibilityFrame()` re-enters SwiftUI accessibility/layout work for
+    // representable-backed views. Never query it synchronously from
+    // updateNSView/layout/view-move callbacks or the registry probe can form an
+    // AttributeGraph cycle inside the current view-update phase.
+    deferredPublishTask = Task { @MainActor [weak self] in
+      guard let self, !Task.isCancelled else {
+        return
+      }
+      self.deferredPublishTask = nil
+      self.publishCurrentElement()
+    }
+  }
+
+  private func currentAccessibilityFrame() -> NSRect {
+    if let accessibilityFrameProviderOverride {
+      return accessibilityFrameProviderOverride(self)
+    }
+    return accessibilityFrame()
+  }
+
   private func publishCurrentElement() {
     guard let registry, !trackedElementID.isEmpty else {
       return
     }
     // Use the AppKit accessibility frame so manual registrations line up with
     // the same screen-space coordinates harvested from NSAccessibility.
-    let frame = accessibilityFrame()
+    let frame = currentAccessibilityFrame()
     guard frame.isNull == false, frame.isInfinite == false, frame.isEmpty == false else {
       guard lastPublishedElement != nil else {
         return

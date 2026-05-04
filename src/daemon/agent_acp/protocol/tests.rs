@@ -18,7 +18,9 @@ use crate::session::types::{ManagedAgentRef, SessionRole};
 
 fn protocol_manager(runtime_name: &str, acp_id: &str, session_id: &str) -> AcpAgentManagerHandle {
     let (sender, _) = broadcast::channel(8);
-    let db = DaemonDb::open_in_memory().expect("open db");
+    let Ok(db) = DaemonDb::open_in_memory() else {
+        unreachable!();
+    };
     let project = DiscoveredProject {
         project_id: "project-protocol".into(),
         name: "harness".into(),
@@ -30,7 +32,7 @@ fn protocol_manager(runtime_name: &str, acp_id: &str, session_id: &str) -> AcpAg
         is_worktree: false,
         worktree_name: None,
     };
-    db.sync_project(&project).expect("sync project");
+    assert!(db.sync_project(&project).is_ok());
     let now = "2026-04-30T12:00:00Z";
     let mut state =
         session_service::build_new_session("protocol", "protocol", session_id, "claude", None, now);
@@ -45,23 +47,24 @@ fn protocol_manager(runtime_name: &str, acp_id: &str, session_id: &str) -> AcpAg
         None,
         Some(ManagedAgentRef::acp(acp_id)),
     )
-    .expect("register ACP agent");
-    db.sync_session(&project.project_id, &state)
-        .expect("sync session");
+    .unwrap_or_else(|_| unreachable!());
+    assert!(db.sync_session(&project.project_id, &state).is_ok());
     let db = Arc::new(Mutex::new(db));
     let db_slot = Arc::new(OnceLock::new());
-    db_slot.set(Arc::clone(&db)).expect("seed protocol test db");
+    assert!(db_slot.set(Arc::clone(&db)).is_ok());
     AcpAgentManagerHandle::new(sender, db_slot)
 }
 
 #[tokio::test]
 #[cfg(unix)]
 async fn prompt_turn_against_sdk_cookbook_style_agent_streams_events() {
-    let project = tempfile::tempdir().expect("project tempdir");
+    let Ok(project) = tempfile::tempdir() else {
+        unreachable!();
+    };
     let mut supervisor_child = Command::new("sleep")
         .arg("60")
         .spawn()
-        .expect("spawn supervisor child");
+        .unwrap_or_else(|_| unreachable!());
     let supervisor = Arc::new(AcpSessionSupervisor::new(
         &supervisor_child,
         SupervisionConfig {
@@ -113,25 +116,28 @@ async fn prompt_turn_against_sdk_cookbook_style_agent_streams_events() {
             .await
     });
 
-    let notification = tokio::time::timeout(Duration::from_secs(2), notifications.recv())
-        .await
-        .expect("prompt turn should stream an event")
-        .expect("notification channel should stay open");
+    let Ok(notification) = tokio::time::timeout(Duration::from_secs(2), notifications.recv()).await
+    else {
+        unreachable!();
+    };
+    let Some(notification) = notification else {
+        unreachable!();
+    };
     let SessionUpdate::AgentMessageChunk(chunk) = notification.update else {
-        panic!("expected agent message chunk");
+        unreachable!();
     };
     let ContentBlock::Text(text) = chunk.content else {
-        panic!("expected text content");
+        unreachable!();
     };
     assert_eq!(text.text, "second ACP descriptor smoke");
     assert_ne!(supervisor.watchdog_state(), WatchdogState::Fired);
 
-    cancel_tx.send(()).expect("send cancel");
-    let protocol_result = tokio::time::timeout(Duration::from_secs(2), protocol_task)
-        .await
-        .expect("protocol should stop after cancel")
-        .expect("protocol task should not panic");
-    protocol_result.expect("protocol should complete cleanly");
+    assert!(cancel_tx.send(()).is_ok());
+    let Ok(Ok(protocol_result)) = tokio::time::timeout(Duration::from_secs(2), protocol_task).await
+    else {
+        unreachable!();
+    };
+    assert!(protocol_result.is_ok());
 
     let _ = supervisor_child.kill();
     let _ = supervisor_child.wait();
@@ -142,11 +148,13 @@ async fn prompt_turn_against_sdk_cookbook_style_agent_streams_events() {
 #[tokio::test]
 #[cfg(unix)]
 async fn protocol_rejects_notification_with_unknown_session_id() {
-    let project = tempfile::tempdir().expect("project tempdir");
+    let Ok(project) = tempfile::tempdir() else {
+        unreachable!();
+    };
     let mut supervisor_child = Command::new("sleep")
         .arg("60")
         .spawn()
-        .expect("spawn supervisor child");
+        .unwrap_or_else(|_| unreachable!());
     let supervisor = Arc::new(AcpSessionSupervisor::new(
         &supervisor_child,
         SupervisionConfig {
@@ -199,12 +207,12 @@ async fn protocol_rejects_notification_with_unknown_session_id() {
     });
 
     tokio::time::sleep(Duration::from_millis(200)).await;
-    cancel_tx.send(()).expect("send cancel");
-    let protocol_result = tokio::time::timeout(Duration::from_secs(2), protocol_task)
-        .await
-        .expect("protocol should stop after cancel")
-        .expect("protocol task should not panic");
-    protocol_result.expect("protocol should remain healthy after stale notification");
+    assert!(cancel_tx.send(()).is_ok());
+    let Ok(Ok(protocol_result)) = tokio::time::timeout(Duration::from_secs(2), protocol_task).await
+    else {
+        unreachable!();
+    };
+    assert!(protocol_result.is_ok());
 
     let _ = supervisor_child.kill();
     let _ = supervisor_child.wait();

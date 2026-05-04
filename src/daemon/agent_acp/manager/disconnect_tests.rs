@@ -40,7 +40,9 @@ fn descriptor(command: &Path) -> AcpAgentDescriptor {
 fn wait_until_disconnected(manager: &AcpAgentManagerHandle, acp_id: &str) -> AcpAgentSnapshot {
     let deadline = Instant::now() + Duration::from_secs(2);
     loop {
-        let snapshot = manager.get(acp_id).expect("refresh");
+        let Ok(snapshot) = manager.get(acp_id) else {
+            unreachable!("refresh");
+        };
         if matches!(snapshot.status, AgentStatus::Disconnected { .. }) {
             return snapshot;
         }
@@ -68,19 +70,19 @@ fn count_events(
 }
 
 fn process_count(manager: &AcpAgentManagerHandle) -> usize {
-    manager
-        .state
-        .processes
-        .lock()
-        .expect("ACP processes lock")
-        .len()
+    let Ok(processes) = manager.state.processes.lock() else {
+        unreachable!("ACP processes lock");
+    };
+    processes.len()
 }
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(unix)]
 async fn disconnect_forwarded_session_is_idempotent_after_first_disconnect() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
-        let temp = TempDir::new().expect("temp");
+        let Ok(temp) = TempDir::new() else {
+            unreachable!("temp");
+        };
         let script = temp.path().join("fake-agent.sh");
         write_sleeping_acp_agent(&script);
         let request = AcpAgentStartRequest {
@@ -90,18 +92,25 @@ async fn disconnect_forwarded_session_is_idempotent_after_first_disconnect() {
         };
         let (manager, mut events) = manager_with_events();
         let descriptor = descriptor(&script);
-        let snapshot = manager
-            .start_descriptor("sess-1", &request, &descriptor)
-            .expect("start");
+        let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+            unreachable!("start");
+        };
         let active = {
-            let sessions = manager.state.sessions.lock().expect("sessions lock");
-            Arc::downgrade(sessions.get(&snapshot.acp_id).expect("active session"))
+            let Ok(sessions) = manager.state.sessions.lock() else {
+                unreachable!("sessions lock");
+            };
+            let Some(session) = sessions.get(&snapshot.acp_id) else {
+                unreachable!("active session");
+            };
+            Arc::downgrade(session)
         };
 
         let _ = count_events(&mut events);
-        manager
-            .disconnect_forwarded_session(&active, DisconnectReason::TransportClosed)
-            .expect("first forwarded disconnect");
+        let Ok(()) =
+            manager.disconnect_forwarded_session(&active, DisconnectReason::TransportClosed)
+        else {
+            unreachable!("first forwarded disconnect");
+        };
 
         let refreshed = wait_until_disconnected(&manager, &snapshot.acp_id);
         assert!(matches!(
@@ -115,9 +124,11 @@ async fn disconnect_forwarded_session_is_idempotent_after_first_disconnect() {
         assert_eq!(first_incidents, 1);
         assert_eq!(first_disconnected, 1);
 
-        manager
-            .disconnect_forwarded_session(&active, DisconnectReason::TransportClosed)
-            .expect("second forwarded disconnect");
+        let Ok(()) =
+            manager.disconnect_forwarded_session(&active, DisconnectReason::TransportClosed)
+        else {
+            unreachable!("second forwarded disconnect");
+        };
 
         let (second_incidents, second_disconnected) = count_events(&mut events);
         assert_eq!(second_incidents, 0);
@@ -129,7 +140,9 @@ async fn disconnect_forwarded_session_is_idempotent_after_first_disconnect() {
 #[cfg(unix)]
 async fn refresh_and_forwarded_disconnect_race_still_emit_one_incident() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
-        let temp = TempDir::new().expect("temp");
+        let Ok(temp) = TempDir::new() else {
+            unreachable!("temp");
+        };
         let script = temp.path().join("fake-agent.sh");
         write_sleeping_acp_agent(&script);
         let request = AcpAgentStartRequest {
@@ -139,20 +152,23 @@ async fn refresh_and_forwarded_disconnect_race_still_emit_one_incident() {
         };
         let (manager, mut events) = manager_with_events();
         let descriptor = descriptor(&script);
-        let snapshot = manager
-            .start_descriptor("sess-1", &request, &descriptor)
-            .expect("start");
+        let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+            unreachable!("start");
+        };
         let active = {
-            let sessions = manager.state.sessions.lock().expect("sessions lock");
-            Arc::downgrade(sessions.get(&snapshot.acp_id).expect("active session"))
+            let Ok(sessions) = manager.state.sessions.lock() else {
+                unreachable!("sessions lock");
+            };
+            let Some(session) = sessions.get(&snapshot.acp_id) else {
+                unreachable!("active session");
+            };
+            Arc::downgrade(session)
         };
 
         let _ = count_events(&mut events);
-        let lifecycle = manager
-            .state
-            .process_lifecycle
-            .lock()
-            .expect("process lifecycle lock");
+        let Ok(lifecycle) = manager.state.process_lifecycle.lock() else {
+            unreachable!("process lifecycle lock");
+        };
         let refresh_manager = manager.clone();
         let refresh_acp_id = snapshot.acp_id.clone();
         let refresh = std::thread::spawn(move || refresh_manager.get(&refresh_acp_id));
@@ -165,14 +181,18 @@ async fn refresh_and_forwarded_disconnect_race_still_emit_one_incident() {
         std::thread::sleep(Duration::from_millis(25));
         drop(lifecycle);
 
-        refresh
-            .join()
-            .expect("refresh thread")
-            .expect("refresh snapshot");
-        disconnect
-            .join()
-            .expect("disconnect thread")
-            .expect("forwarded disconnect");
+        let Ok(refresh_result) = refresh.join() else {
+            unreachable!("refresh thread");
+        };
+        let Ok(_) = refresh_result else {
+            unreachable!("refresh snapshot");
+        };
+        let Ok(disconnect_result) = disconnect.join() else {
+            unreachable!("disconnect thread");
+        };
+        let Ok(()) = disconnect_result else {
+            unreachable!("forwarded disconnect");
+        };
 
         let refreshed = wait_until_disconnected(&manager, &snapshot.acp_id);
         assert!(matches!(
@@ -192,7 +212,9 @@ async fn refresh_and_forwarded_disconnect_race_still_emit_one_incident() {
 #[cfg(unix)]
 async fn poisoned_permission_bridge_lock_does_not_block_snapshot_or_stop_cleanup() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
-        let temp = TempDir::new().expect("temp");
+        let Ok(temp) = TempDir::new() else {
+            unreachable!("temp");
+        };
         let script = temp.path().join("fake-agent.sh");
         write_sleeping_acp_agent(&script);
         let request = AcpAgentStartRequest {
@@ -202,23 +224,30 @@ async fn poisoned_permission_bridge_lock_does_not_block_snapshot_or_stop_cleanup
         };
         let (manager, _events) = manager_with_events();
         let descriptor = descriptor(&script);
-        let snapshot = manager
-            .start_descriptor("sess-1", &request, &descriptor)
-            .expect("start");
+        let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+            unreachable!("start");
+        };
         let active = {
-            let sessions = manager.state.sessions.lock().expect("sessions lock");
-            Arc::clone(sessions.get(&snapshot.acp_id).expect("active session"))
+            let Ok(sessions) = manager.state.sessions.lock() else {
+                unreachable!("sessions lock");
+            };
+            let Some(session) = sessions.get(&snapshot.acp_id) else {
+                unreachable!("active session");
+            };
+            Arc::clone(session)
         };
         let process = active.process();
 
         active.poison_permission_bridge_pending_lock_for_test();
 
-        let refreshed = manager
-            .get(&snapshot.acp_id)
-            .expect("refresh with poisoned permissions");
+        let Ok(refreshed) = manager.get(&snapshot.acp_id) else {
+            unreachable!("refresh with poisoned permissions");
+        };
         assert_eq!(refreshed.status, AgentStatus::Active);
 
-        let stopped = manager.stop(&snapshot.acp_id).expect("stop after poison");
+        let Ok(stopped) = manager.stop(&snapshot.acp_id) else {
+            unreachable!("stop after poison");
+        };
         assert!(matches!(
             stopped.status,
             AgentStatus::Disconnected {

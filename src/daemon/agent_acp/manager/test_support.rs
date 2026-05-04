@@ -15,6 +15,33 @@ use crate::session::types::{
     SessionStatus,
 };
 
+#[track_caller]
+pub(super) fn assert_ok<T, E>(result: Result<T, E>, context: &str) -> T {
+    assert!(result.is_ok(), "{context}");
+    let Ok(value) = result else {
+        unreachable!("{context}");
+    };
+    value
+}
+
+#[track_caller]
+pub(super) fn assert_err<T, E>(result: Result<T, E>, context: &str) -> E {
+    assert!(result.is_err(), "{context}");
+    let Err(error) = result else {
+        unreachable!("{context}");
+    };
+    error
+}
+
+#[track_caller]
+pub(super) fn assert_some<T>(value: Option<T>, context: &str) -> T {
+    assert!(value.is_some(), "{context}");
+    let Some(value) = value else {
+        unreachable!("{context}");
+    };
+    value
+}
+
 pub(super) fn seeded_manager() -> AcpAgentManagerHandle {
     let (sender, _) = broadcast::channel(16);
     seeded_manager_with_sender(sender)
@@ -29,27 +56,29 @@ pub(super) fn seeded_manager_with_events()
 fn seeded_manager_with_sender(sender: broadcast::Sender<StreamEvent>) -> AcpAgentManagerHandle {
     let db = Arc::new(Mutex::new(seed_daemon_db()));
     let db_cell = Arc::new(OnceLock::new());
-    db_cell.set(Arc::clone(&db)).expect("seed ACP manager db");
+    assert!(db_cell.set(Arc::clone(&db)).is_ok(), "seed ACP manager db");
     AcpAgentManagerHandle::new(sender, db_cell)
 }
 
 fn seed_daemon_db() -> DaemonDb {
-    let db = DaemonDb::open_in_memory().expect("open db");
+    let db = assert_ok(DaemonDb::open_in_memory(), "open db");
     populate_daemon_db(&db);
     db
 }
 
 pub(super) fn seed_daemon_db_at(path: &Path) {
-    let db = DaemonDb::open(path).expect("open db");
+    let db = assert_ok(DaemonDb::open(path), "open db");
     populate_daemon_db(&db);
 }
 
 fn populate_daemon_db(db: &DaemonDb) {
     let project = sample_project();
-    db.sync_project(&project).expect("sync project");
+    assert_ok(db.sync_project(&project), "sync project");
     for session_id in ["sess-1", "sess-2", "sess-3", "sess-4"] {
-        db.sync_session(&project.project_id, &sample_session_state(session_id))
-            .expect("sync session");
+        assert_ok(
+            db.sync_session(&project.project_id, &sample_session_state(session_id)),
+            "sync session",
+        );
     }
 }
 
@@ -121,10 +150,10 @@ fn sample_session_state(session_id: &str) -> SessionState {
 pub(super) fn write_executable(path: &Path, body: &str) {
     use std::os::unix::fs::PermissionsExt;
 
-    fs::write(path, body).expect("write script");
-    let mut permissions = fs::metadata(path).expect("metadata").permissions();
+    assert_ok(fs::write(path, body), "write script");
+    let mut permissions = assert_ok(fs::metadata(path), "metadata").permissions();
     permissions.set_mode(0o755);
-    fs::set_permissions(path, permissions).expect("chmod script");
+    assert_ok(fs::set_permissions(path, permissions), "chmod script");
 }
 
 #[cfg(unix)]
