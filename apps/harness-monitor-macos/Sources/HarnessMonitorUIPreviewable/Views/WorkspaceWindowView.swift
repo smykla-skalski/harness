@@ -374,8 +374,37 @@ public struct WorkspaceWindowView: View {
 
     return
       applyDismissAllVisibleDialog(to: content)
+      .navigationTitle(workspaceNavigationTitle(for: viewModel.selection))
+      .navigationSubtitle(workspaceNavigationSubtitle(for: viewModel.selection))
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSheet)
+  }
+
+  private func workspaceNavigationTitle(for selection: WorkspaceSelection) -> String {
+    switch selection {
+    case .create:
+      "New"
+    case .decisions, .decision:
+      "Decisions"
+    case .terminal, .codex:
+      "Session"
+    case .agent(_, let agentID):
+      store.selectedSession?.agents.first(where: { $0.agentId == agentID })?.name ?? "Agent"
+    case .task(_, let taskID):
+      store.selectedSession?.tasks.first(where: { $0.taskId == taskID })?.title ?? "Task"
+    }
+  }
+
+  private func workspaceNavigationSubtitle(for selection: WorkspaceSelection) -> String {
+    switch selection {
+    case .agent(_, let agentID):
+      if let agent = store.selectedSession?.agents.first(where: { $0.agentId == agentID }) {
+        return "\(runtimeDisplayLabel(agent.runtime)) · \(agent.role.title)"
+      }
+      return ""
+    default:
+      return ""
+    }
   }
 
   // currentResetSuppression is computed locally instead of routed through a
