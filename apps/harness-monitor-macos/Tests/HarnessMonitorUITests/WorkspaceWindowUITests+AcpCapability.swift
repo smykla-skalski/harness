@@ -130,12 +130,13 @@ extension WorkspaceWindowUITests {
     let app = launchInCockpitPreview(
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START": "1"]
     )
+    let workspaceWindow = element(in: app, identifier: Accessibility.workspaceWindow)
 
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
-        self.element(in: app, identifier: Accessibility.workspaceWindow).exists
-          && self.element(
-            in: app,
+        workspaceWindow.exists
+          && self.descendantElement(
+            in: workspaceWindow,
             identifier: Accessibility.decisionRow("acp-permission:preview-acp-permission-1")
           ).exists
       },
@@ -153,44 +154,99 @@ extension WorkspaceWindowUITests {
       additionalEnvironment: [
         "HARNESS_MONITOR_PREVIEW_ACP_PENDING": "1",
         "HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START": "1",
+        "AppleKeyboardUIMode": "2",
       ]
     )
+    let workspaceWindow = element(in: app, identifier: Accessibility.workspaceWindow)
 
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
-        self.element(in: app, identifier: Accessibility.workspaceWindow).exists
+        workspaceWindow.exists
       },
       "Permission prompt on start should immediately open the Workspace window"
     )
 
     let acpDecisionID = "acp-permission:preview-acp-permission-1"
-    let decisionRow = button(in: app, identifier: Accessibility.decisionRow(acpDecisionID))
+    let decisionRow = descendantButton(
+      in: workspaceWindow,
+      identifier: Accessibility.decisionRow(acpDecisionID)
+    )
     XCTAssertTrue(
       waitForElement(decisionRow, timeout: Self.uiTimeout),
       "ACP permission route should preselect the decision row in Workspace"
     )
-    tapButton(in: app, identifier: Accessibility.decisionRow(acpDecisionID))
 
-    let acpPanel = element(in: app, identifier: Accessibility.decisionAcpPanel)
+    let acpPanel = descendantElement(
+      in: workspaceWindow,
+      identifier: Accessibility.decisionAcpPanel
+    )
     XCTAssertTrue(
       waitForElement(acpPanel, timeout: Self.actionTimeout),
-      "Selecting the ACP decision row should open the ACP decision panel"
+      "ACP permission route should open the ACP decision panel without another row click"
     )
 
-    let terminalToggle = element(
-      in: app,
-      identifier: Accessibility.decisionAcpRequest("preview-request-terminal")
+    let focusState = element(in: app, identifier: Accessibility.decisionPrimaryActionFocusState)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        let text =
+          (focusState.value as? String)
+          ?? (!focusState.label.isEmpty ? focusState.label : String(describing: focusState.value))
+        return text.contains("decision=\(acpDecisionID)") && text.contains("focused=true")
+      },
+      "ACP permission route should focus the decision's primary action"
     )
+
+    let terminalToggleIdentifier = Accessibility.decisionAcpRequest("preview-request-terminal")
+    let terminalToggleFrame = descendantFrameElement(
+      in: workspaceWindow,
+      identifier: "\(terminalToggleIdentifier).frame"
+    )
+    XCTAssertTrue(
+      waitForElement(terminalToggleFrame, timeout: Self.actionTimeout),
+      "ACP decision panel should expose the terminal request frame marker"
+    )
+    var previousTerminalY = terminalToggleFrame.frame.minY
+    var terminalVisible = hasVisibleFrameMarker(in: app, identifier: terminalToggleIdentifier)
+    for _ in 0..<3 where !terminalVisible {
+      app.typeKey(.pageDown, modifierFlags: [])
+      let scrolled = waitUntil(timeout: Self.actionTimeout) {
+        terminalToggleFrame.frame.minY < previousTerminalY - 12
+      }
+      previousTerminalY = terminalToggleFrame.frame.minY
+      terminalVisible = hasVisibleFrameMarker(in: app, identifier: terminalToggleIdentifier)
+      if !scrolled && !terminalVisible {
+        break
+      }
+    }
+    XCTAssertTrue(
+      terminalVisible,
+      """
+      Page Down should scroll the decision detail until the ACP request checkbox is visible.
+      terminalFrame=\(terminalToggleFrame.frame)
+      """
+    )
+
+    let terminalToggle = workspaceWindow
+      .descendants(matching: .checkBox)
+      .matching(identifier: terminalToggleIdentifier)
+      .firstMatch
     XCTAssertTrue(
       waitForElement(terminalToggle, timeout: Self.actionTimeout),
       "ACP decision panel should render the request toggle list"
     )
-    tapElement(
-      in: app,
-      identifier: Accessibility.decisionAcpRequest("preview-request-terminal")
+    XCTAssertTrue(
+      tapElementReliably(in: app, element: terminalToggle),
+      """
+      ACP request checkbox should be tappable in the Decisions panel.
+      exists=\(terminalToggle.exists)
+      hittable=\(terminalToggle.isHittable)
+      frame=\(terminalToggle.frame)
+      label=\(terminalToggle.label)
+      value=\(String(describing: terminalToggle.value))
+      """
     )
-    let decisionSelectionSummary = element(
-      in: app,
+    let decisionSelectionSummary = descendantElement(
+      in: workspaceWindow,
       identifier: Accessibility.decisionAcpSelectionSummary
     )
     XCTAssertTrue(
@@ -201,7 +257,9 @@ extension WorkspaceWindowUITests {
       """
       The Decisions panel should reflect the updated ACP selection \
       (summaryLabel=\(decisionSelectionSummary.label), \
-      toggleValue=\(String(describing: terminalToggle.value)))
+      toggleLabel=\(terminalToggle.label), \
+      toggleValue=\(String(describing: terminalToggle.value)), \
+      toggleHittable=\(terminalToggle.isHittable))
       """
     )
 
@@ -218,24 +276,31 @@ extension WorkspaceWindowUITests {
         "HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START": "1",
       ]
     )
+    let workspaceWindow = element(in: app, identifier: Accessibility.workspaceWindow)
 
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
-        self.element(in: app, identifier: Accessibility.workspaceWindow).exists
+        workspaceWindow.exists
       },
       "Permission prompt on start should immediately open the Workspace window"
     )
 
     let acpDecisionID = "acp-permission:preview-acp-permission-1"
-    let decisionRow = button(in: app, identifier: Accessibility.decisionRow(acpDecisionID))
+    let decisionRow = descendantButton(
+      in: workspaceWindow,
+      identifier: Accessibility.decisionRow(acpDecisionID)
+    )
     XCTAssertTrue(
       waitForElement(decisionRow, timeout: Self.uiTimeout),
       "ACP permission route should preselect the decision row in Workspace"
     )
-    tapButton(in: app, identifier: Accessibility.decisionRow(acpDecisionID))
+    XCTAssertTrue(
+      tapElementReliably(in: app, element: decisionRow),
+      "ACP decision row should be tappable inside the Workspace window"
+    )
 
-    let approveButton = button(
-      in: app,
+    let approveButton = descendantButton(
+      in: workspaceWindow,
       identifier: Accessibility.decisionAction("approve-selected")
     )
     XCTAssertTrue(
@@ -248,13 +313,19 @@ extension WorkspaceWindowUITests {
 
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
-        !self.element(in: app, identifier: Accessibility.decisionRow(acpDecisionID)).exists
-          && !self.element(in: app, identifier: Accessibility.decisionAcpPanel).exists
+        !self.descendantElement(
+          in: workspaceWindow,
+          identifier: Accessibility.decisionRow(acpDecisionID)
+        ).exists
+          && !self.descendantElement(
+            in: workspaceWindow,
+            identifier: Accessibility.decisionAcpPanel
+          ).exists
       },
       """
       Command-Return should approve the selected ACP requests from the Workspace decisions desk.
-      rowExists=\(self.element(in: app, identifier: Accessibility.decisionRow(acpDecisionID)).exists)
-      panelExists=\(self.element(in: app, identifier: Accessibility.decisionAcpPanel).exists)
+      rowExists=\(self.descendantElement(in: workspaceWindow, identifier: Accessibility.decisionRow(acpDecisionID)).exists)
+      panelExists=\(self.descendantElement(in: workspaceWindow, identifier: Accessibility.decisionAcpPanel).exists)
       """
     )
   }

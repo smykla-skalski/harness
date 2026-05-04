@@ -64,6 +64,7 @@ extension HarnessMonitorUITestCase {
     }
     let effectiveArtifactsDirectory =
       shouldSeedArtifactsDirectory ? seededArtifactsDirectory.path : previousArtifactsDirectory!
+    let testName = name
     app.launchEnvironment[Self.artifactsDirectoryKey] = effectiveArtifactsDirectory
     if registerPerTestCleanup {
       addTeardownBlock { @MainActor in
@@ -73,6 +74,14 @@ extension HarnessMonitorUITestCase {
     if shouldSeedArtifactsDirectory {
       addTeardownBlock { @MainActor in
         unsetenv(Self.artifactsDirectoryKey)
+      }
+    }
+    if registerPerTestCleanup {
+      addTeardownBlock { @MainActor in
+        guard Self.hasRecordedFailure(for: testName) else {
+          return
+        }
+        Self.preserveIsolatedDataHome(at: root)
       }
     }
     return root
@@ -146,5 +155,29 @@ extension HarnessMonitorUITestCase {
 
   static func cleanupIsolatedDataHome(at root: URL) {
     try? FileManager.default.removeItem(at: root)
+  }
+
+  private static func preserveIsolatedDataHome(at root: URL) {
+    let artifactsDirectory = root.appendingPathComponent("ui-test-artifacts", isDirectory: true)
+    guard FileManager.default.fileExists(atPath: artifactsDirectory.path) else {
+      return
+    }
+
+    let destination =
+      preservedDiagnosticsDirectoryURL()
+      .appendingPathComponent("\(root.lastPathComponent)-ui-test-artifacts", isDirectory: true)
+
+    do {
+      try FileManager.default.createDirectory(
+        at: destination.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+      )
+      if FileManager.default.fileExists(atPath: destination.path) {
+        try FileManager.default.removeItem(at: destination)
+      }
+      try FileManager.default.copyItem(at: artifactsDirectory, to: destination)
+    } catch {
+      return
+    }
   }
 }

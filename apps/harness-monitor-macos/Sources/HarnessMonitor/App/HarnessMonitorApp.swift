@@ -133,7 +133,6 @@ struct HarnessMonitorApp: App {
   @ViewBuilder private var mainWindowSceneContent: some View {
     if rendersLiveSceneContent {
       mainWindowContent
-        .acpPermissionPresentation(store: store)
         .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
         .modifier(HarnessMonitorMainWindowLauncherBinder())
     } else {

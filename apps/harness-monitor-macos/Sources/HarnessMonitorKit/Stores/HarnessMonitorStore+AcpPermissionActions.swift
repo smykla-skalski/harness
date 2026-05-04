@@ -72,8 +72,20 @@ extension HarnessMonitorStore {
     else {
       return
     }
+    let previousSelectedCount = state.selectedRequestIDs.count
     state.setSelected(isSelected, for: requestID)
     acpPermissionResolutionStateByDecisionID[decisionID] = state
+    HarnessMonitorUITestTrace.record(
+      component: "acp.permission-selection",
+      event: "request-selection-changed",
+      details: [
+        "decision_id": decisionID,
+        "request_id": requestID,
+        "is_selected": String(isSelected),
+        "previous_selected_count": String(previousSelectedCount),
+        "selected_count": String(state.selectedRequestIDs.count),
+      ]
+    )
   }
 
   public func clearAcpPermissionResolutionState() {

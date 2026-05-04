@@ -12,6 +12,12 @@ private final class HarnessMonitorUITestFailureTracker: @unchecked Sendable {
     lock.unlock()
   }
 
+  func hasFailure(_ testName: String) -> Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    return failedTests.contains(testName)
+  }
+
   func takeFailure(for testName: String) -> Bool {
     lock.lock()
     defer { lock.unlock() }
@@ -252,6 +258,10 @@ class HarnessMonitorUITestCase: XCTestCase {
     terminateAndWait(cachedLaunch.app)
     cleanupIsolatedDataHome(at: cachedLaunch.dataHomeRoot)
     Self.cachedLaunch = nil
+  }
+
+  static func hasRecordedFailure(for testName: String) -> Bool {
+    failureTracker.hasFailure(testName)
   }
 }
 

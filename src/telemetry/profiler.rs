@@ -274,8 +274,8 @@ mod tests {
     fn daemon_profiler_settings_use_daemon_labels() {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
         let url = format!("http://{}", listener.local_addr().expect("addr"));
-        let settings =
-            daemon_profiler_settings(RuntimeService::Daemon, &export(Some(&url))).expect("settings");
+        let settings = daemon_profiler_settings(RuntimeService::Daemon, &export(Some(&url)))
+            .expect("settings");
 
         assert_eq!(settings.url, url);
         assert_eq!(settings.application_name, "harness-daemon");

@@ -28,8 +28,17 @@ extension HarnessMonitorUITestCase {
   }
 
   func mainWindow(in app: XCUIApplication) -> XCUIElement {
-    let mainWindow = app.windows.matching(identifier: "main").firstMatch
-    return mainWindow.exists ? mainWindow : app.windows.firstMatch
+    if let mainWindowIdentifier = windowIdentifier(
+      in: app,
+      containingDescendantIdentifier: HarnessMonitorUITestAccessibility.appChromeRoot
+    ) {
+      return app.windows.matching(identifier: mainWindowIdentifier).firstMatch
+    }
+
+    let mainIdentifierWindow = app.windows.matching(
+      NSPredicate(format: "identifier BEGINSWITH %@", "main-")
+    ).firstMatch
+    return mainIdentifierWindow.exists ? mainIdentifierWindow : app.windows.firstMatch
   }
 
   func appChromeRoot(in app: XCUIApplication) -> XCUIElement {
@@ -41,24 +50,38 @@ extension HarnessMonitorUITestCase {
   func window(in app: XCUIApplication, containing element: XCUIElement) -> XCUIElement {
     let windows = app.windows
     let searchCount = min(windows.count, Self.maxWindowSearchCount)
-    var bestMatch: XCUIElement?
+    let identifier = element.identifier.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    if !identifier.isEmpty {
+      if let windowIdentifier = windowIdentifier(
+        in: app,
+        containingDescendantIdentifier: identifier
+      ) {
+        return app.windows.matching(identifier: windowIdentifier).firstMatch
+      }
+    }
+
+    var bestWindowIdentifier: String?
+    var bestWindowArea = CGFloat.greatestFiniteMagnitude
     for index in 0..<searchCount {
       let candidate = windows.element(boundBy: index)
       guard candidate.exists, candidate.frame.contains(element.frame) else {
         continue
       }
-      guard let currentBest = bestMatch else {
-        bestMatch = candidate
+
+      let candidateIdentifier = candidate.identifier.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !candidateIdentifier.isEmpty else {
         continue
       }
-      if candidate.frame.width * candidate.frame.height
-        < currentBest.frame.width * currentBest.frame.height
-      {
-        bestMatch = candidate
+
+      let candidateArea = candidate.frame.width * candidate.frame.height
+      if candidateArea < bestWindowArea {
+        bestWindowArea = candidateArea
+        bestWindowIdentifier = candidateIdentifier
       }
     }
-    if let bestMatch {
-      return bestMatch
+    if let bestWindowIdentifier {
+      return app.windows.matching(identifier: bestWindowIdentifier).firstMatch
     }
 
     let primaryWindow = mainWindow(in: app)
@@ -67,6 +90,42 @@ extension HarnessMonitorUITestCase {
     }
 
     return app.windows.firstMatch
+  }
+
+  private func windowIdentifier(
+    in app: XCUIApplication,
+    containingDescendantIdentifier identifier: String
+  ) -> String? {
+    let windows = app.windows
+    let searchCount = min(windows.count, Self.maxWindowSearchCount)
+    var bestWindowIdentifier: String?
+    var bestWindowArea = CGFloat.greatestFiniteMagnitude
+
+    for index in 0..<searchCount {
+      let candidate = windows.element(boundBy: index)
+      guard candidate.exists else {
+        continue
+      }
+      let descendantMatch = candidate.descendants(matching: .any)
+        .matching(identifier: identifier)
+        .firstMatch
+      guard descendantMatch.exists else {
+        continue
+      }
+
+      let candidateIdentifier = candidate.identifier.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !candidateIdentifier.isEmpty else {
+        continue
+      }
+
+      let candidateArea = candidate.frame.width * candidate.frame.height
+      if candidateArea < bestWindowArea {
+        bestWindowArea = candidateArea
+        bestWindowIdentifier = candidateIdentifier
+      }
+    }
+
+    return bestWindowIdentifier
   }
 
   func element(in app: XCUIApplication, identifier: String) -> XCUIElement {

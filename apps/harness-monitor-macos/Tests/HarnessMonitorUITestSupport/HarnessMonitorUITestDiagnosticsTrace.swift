@@ -72,11 +72,15 @@ func diagnosticsTraceFileURL(for artifactsDirectoryKey: String) -> URL? {
     .appendingPathComponent("ui-trace.jsonl")
 }
 
+func preservedDiagnosticsDirectoryURL() -> URL {
+  FileManager.default.temporaryDirectory
+    .appendingPathComponent("HarnessMonitorUITestPreservedArtifacts", isDirectory: true)
+}
+
 func preservedDiagnosticsTraceFileURL() -> URL {
   let bundleIdentifier = (Bundle.main.bundleIdentifier ?? "harnessmonitor-uitests")
     .replacingOccurrences(of: ".", with: "-")
-  return FileManager.default.temporaryDirectory
-    .appendingPathComponent("HarnessMonitorUITestPreservedArtifacts", isDirectory: true)
+  return preservedDiagnosticsDirectoryURL()
     .appendingPathComponent(
       "\(bundleIdentifier)-\(ProcessInfo.processInfo.processIdentifier)-ui-trace.jsonl"
     )
@@ -88,9 +92,7 @@ func appTraceFileURL(for artifactsDirectoryKey: String) -> URL? {
 }
 
 func preservedAppTraceFileURLs() -> [URL] {
-  let preservedDirectory =
-    FileManager.default.temporaryDirectory
-    .appendingPathComponent("HarnessMonitorUITestPreservedArtifacts", isDirectory: true)
+  let preservedDirectory = preservedDiagnosticsDirectoryURL()
   guard
     let fileURLs = try? FileManager.default.contentsOfDirectory(
       at: preservedDirectory,
