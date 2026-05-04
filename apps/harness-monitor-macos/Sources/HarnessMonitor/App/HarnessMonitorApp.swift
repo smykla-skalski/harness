@@ -67,8 +67,12 @@ struct HarnessMonitorApp: App {
     defersInitialMainWindowUntilBootstrap =
       configuration.defersInitialMainWindowUntilBootstrap
     mainWindowDefaultSize = configuration.mainWindowDefaultSize
+    // UNUserNotificationCenter.current() asserts inside the Xcode preview shell
+    // (ad-hoc signed copy at /private/tmp/...) and aborts the agent before the
+    // canvas ever mounts. Use the stub controller for any non-live launch.
+    let useStubNotificationController = isTestRun || configuration.launchMode != .live
     let notificationController =
-      isTestRun
+      useStubNotificationController
       ? HarnessMonitorUserNotificationController.preview(
         environment: configuration.environment
       )
