@@ -166,6 +166,12 @@ struct AgentDetailSection: View {
         .scaledFont(.system(.title3, design: .rounded, weight: .bold))
       Text("\(runtimeDisplayLabel(agent.runtime)) • \(agent.role.title)")
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      if acpRuntimeState != nil {
+        Text("ACP runtime connected via stdio. Sends prompts and streams replies.")
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .fixedSize(horizontal: false, vertical: true)
+      }
       InspectorFactGrid(facts: facts)
       InspectorSection(title: "Runtime Capabilities") {
         InspectorFactGrid(
