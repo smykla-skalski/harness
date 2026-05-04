@@ -13,6 +13,13 @@ struct SessionCockpitTimelineSection: View {
   private var dateTimeConfiguration
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
+  @AppStorage(SessionTimelineFilterDefaults.persistenceModeKey)
+  private var filterPersistenceModeRawValue =
+    SessionTimelineFilterDefaults.defaultPersistenceMode.rawValue
+  @AppStorage(SessionTimelineFilterDefaults.appStateKey)
+  private var appStoredFilterStateRawValue = ""
+  @SceneStorage(SessionTimelineFilterDefaults.sceneRegistryKey)
+  private var sceneStoredFilterRegistryRawValue = ""
   @State private var scrollCommand: SessionTimelineScrollCommand?
   @State private var scrollCommandGeneration = 0
   @State private var pendingNavigationAfterLoad: SessionTimelinePendingNavigation?
@@ -20,6 +27,7 @@ struct SessionCockpitTimelineSection: View {
   @State private var cachedPresentation = SessionTimelineSectionPresentation.empty
   @State private var cachedPresentationInput = SessionTimelinePresentationInput.empty
   @State private var viewport = SessionTimelineViewportModel()
+  @State private var filters = SessionTimelineFilterState()
 
   var body: some View {
     let input = presentationInput
@@ -34,6 +42,15 @@ struct SessionCockpitTimelineSection: View {
     // body-update budget intact because rebuild only fires on input change.
     .task(id: input) {
       rebuildPresentationIfNeeded(for: input)
+    }
+    .task(id: filterHydrationInput) {
+      hydrateFilters(for: filterHydrationInput)
+    }
+    .onChange(of: filters) { _, newValue in
+      persistFilters(newValue)
+    }
+    .onChange(of: filterPersistenceModeRawValue) { _, _ in
+      persistFilters(filters)
     }
   }
 
@@ -54,9 +71,23 @@ struct SessionCockpitTimelineSection: View {
       firstDecisionID: decisions.first?.id,
       lastDecisionID: decisions.last?.id,
       isTimelineLoading: isTimelineLoading,
+      filterSignature: filters.signature,
       reduceMotion: reduceMotion,
       dateTimeConfiguration: dateTimeConfiguration
     )
+  }
+
+  private var filterHydrationInput: SessionTimelineFilterHydrationInput {
+    SessionTimelineFilterHydrationInput(
+      sessionID: sessionID,
+      appStateRawValue: appStoredFilterStateRawValue,
+      sceneRegistryRawValue: sceneStoredFilterRegistryRawValue
+    )
+  }
+
+  private var filterPersistenceMode: SessionTimelineFilterPersistenceMode {
+    SessionTimelineFilterPersistenceMode(rawValue: filterPersistenceModeRawValue)
+      ?? SessionTimelineFilterDefaults.defaultPersistenceMode
   }
 
   @MainActor
@@ -72,6 +103,7 @@ struct SessionCockpitTimelineSection: View {
       timeline: timeline,
       timelineWindow: timelineWindow,
       decisions: decisions,
+      filters: filters,
       isTimelineLoading: isTimelineLoading,
       reduceMotion: reduceMotion,
       dateTimeConfiguration: dateTimeConfiguration
@@ -86,7 +118,8 @@ struct SessionCockpitTimelineSection: View {
     viewport.updatePresentationCounts(
       windowStart: cachedPresentation.navigation.windowStart,
       loaded: cachedPresentation.navigation.loadedCount,
-      total: cachedPresentation.navigation.totalCount
+      total: cachedPresentation.navigation.totalCount,
+      filteredMatchCount: cachedPresentation.filterMatchCountForVisibilityStats
     )
     viewport.recordInitialViewport(
       estimatedVisibleEvents: min(
@@ -169,6 +202,12 @@ struct SessionCockpitTimelineSection: View {
         )
       }
 
+      SessionTimelineFilterControls(
+        filters: $filters,
+        inventory: presentation.filterSnapshot.inventory,
+        summary: presentation.filterSnapshot.summary
+      )
+
       timelineScrollContent(for: presentation)
     }
     .padding(HarnessMonitorTheme.spacingLG)
@@ -190,7 +229,9 @@ struct SessionCockpitTimelineSection: View {
     for presentation: SessionTimelineSectionPresentation
   ) -> some View {
     Group {
-      if presentation.rows.isEmpty {
+      if presentation.showsFilteredEmptyState {
+        SessionTimelineFilteredEmptyState(filters: $filters)
+      } else if presentation.rows.isEmpty {
         SessionTimelinePlaceholderScrollView(
           presentation: presentation,
           actionHandler: actionHandler,
@@ -409,8 +450,56 @@ extension SessionCockpitTimelineSection {
       requestOlderWindowIfNeeded(presentation)
     }
   }
+
+  @MainActor
+  private func hydrateFilters(for input: SessionTimelineFilterHydrationInput) {
+    let nextFilters = SessionTimelineFilterPersistenceResolver.hydrate(
+      mode: filterPersistenceMode,
+      input: input
+    )
+    if filters != nextFilters {
+      filters = nextFilters
+    }
+  }
+
+  @MainActor
+  private func persistFilters(_ state: SessionTimelineFilterState) {
+    let persisted = SessionTimelineFilterPersistenceResolver.persist(
+      mode: filterPersistenceMode,
+      state: state,
+      sessionID: sessionID,
+      appStateRawValue: appStoredFilterStateRawValue,
+      sceneRegistryRawValue: sceneStoredFilterRegistryRawValue
+    )
+    if appStoredFilterStateRawValue != persisted.appStateRawValue {
+      appStoredFilterStateRawValue = persisted.appStateRawValue
+    }
+    if sceneStoredFilterRegistryRawValue != persisted.sceneRegistryRawValue {
+      sceneStoredFilterRegistryRawValue = persisted.sceneRegistryRawValue
+    }
+  }
 }
 
 #Preview("Timeline") {
   SessionCockpitTimelineSection.richPreview
+}
+
+private struct SessionTimelineFilteredEmptyState: View {
+  @Binding var filters: SessionTimelineFilterState
+
+  var body: some View {
+    VStack(spacing: HarnessMonitorTheme.spacingSM) {
+      Image(systemName: "line.3.horizontal.decrease.circle")
+        .font(.title2)
+        .foregroundStyle(.secondary)
+      Text("No timeline items match these filters")
+        .scaledFont(.body.weight(.semibold))
+      Button("Clear filters") {
+        filters.clear()
+      }
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .padding(HarnessMonitorTheme.spacingLG)
+  }
 }

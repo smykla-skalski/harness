@@ -305,6 +305,7 @@ struct SessionCockpitTimelineSectionTests {
       timeline: timeline,
       timelineWindow: nil,
       decisions: [],
+      filters: .init(),
       isTimelineLoading: isTimelineLoading,
       reduceMotion: false,
       dateTimeConfiguration: .default
@@ -332,6 +333,7 @@ struct SessionCockpitTimelineSectionTests {
       firstDecisionID: nil,
       lastDecisionID: nil,
       isTimelineLoading: isTimelineLoading,
+      filterSignature: "",
       reduceMotion: false,
       dateTimeConfiguration: .default
     )

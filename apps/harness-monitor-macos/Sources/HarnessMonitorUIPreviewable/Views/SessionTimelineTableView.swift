@@ -8,6 +8,26 @@ struct SessionTimelineTableViewportStats: Equatable, Sendable {
   let anchorRowID: String?
   let firstVisibleEventOffset: Int?
   let lastVisibleEventOffset: Int?
+  let firstVisibleMatchOffset: Int?
+  let lastVisibleMatchOffset: Int?
+
+  init(
+    visibleRowCount: Int,
+    renderedRowCount: Int,
+    anchorRowID: String?,
+    firstVisibleEventOffset: Int? = nil,
+    lastVisibleEventOffset: Int? = nil,
+    firstVisibleMatchOffset: Int? = nil,
+    lastVisibleMatchOffset: Int? = nil
+  ) {
+    self.visibleRowCount = visibleRowCount
+    self.renderedRowCount = renderedRowCount
+    self.anchorRowID = anchorRowID
+    self.firstVisibleEventOffset = firstVisibleEventOffset
+    self.lastVisibleEventOffset = lastVisibleEventOffset
+    self.firstVisibleMatchOffset = firstVisibleMatchOffset
+    self.lastVisibleMatchOffset = lastVisibleMatchOffset
+  }
 
   static func initial(estimatedVisibleEvents: Int) -> Self {
     let count = max(estimatedVisibleEvents, 0)
@@ -16,7 +36,9 @@ struct SessionTimelineTableViewportStats: Equatable, Sendable {
       renderedRowCount: count,
       anchorRowID: nil,
       firstVisibleEventOffset: count == 0 ? nil : 0,
-      lastVisibleEventOffset: count == 0 ? nil : count - 1
+      lastVisibleEventOffset: count == 0 ? nil : count - 1,
+      firstVisibleMatchOffset: count == 0 ? nil : 0,
+      lastVisibleMatchOffset: count == 0 ? nil : count - 1
     )
   }
 }

@@ -24,6 +24,9 @@ struct SessionTimelineNodeBuilder {
     decisions: [String: SessionTimelineDecisionSnapshot]
   ) -> SessionTimelineNode {
     let linkedDecision = Self.explicitDecisionID(in: entry.payload).flatMap { decisions[$0] }
+    let toolCallMetadata = entry.toolCallTimelineEntryMetadata()
+    let agentID = entry.agentId ?? toolCallMetadata?.agentID ?? toolCallMetadata?.acpAgentID
+    let taskID = entry.taskId ?? linkedDecision?.taskID
     let timestamp = SessionTimelineTimestampParser.parse(entry.recordedAt) ?? .distantPast
     return SessionTimelineNode(
       identity: .entry(entry.entryId),
@@ -31,10 +34,22 @@ struct SessionTimelineNodeBuilder {
       timestamp: timestamp,
       rawTimestamp: entry.recordedAt,
       sourceLabel: entry.kind,
+      entryKind: entry.kind,
       title: entry.summary,
       detail: entryDetail(for: entry),
+      agentID: agentID,
+      taskID: taskID,
       eventTone: SessionTimelineTone.eventTone(for: entry),
-      decision: linkedDecision
+      decision: linkedDecision,
+      semanticProperties: Self.semanticProperties(
+        for: entry,
+        linkedDecision: linkedDecision,
+        toolCallMetadata: toolCallMetadata,
+        agentID: agentID,
+        taskID: taskID
+      ),
+      rawPayloadKeys: Self.payloadPropertyKeys(in: entry.payload),
+      toolCallMetadata: toolCallMetadata
     )
   }
 
@@ -47,10 +62,15 @@ struct SessionTimelineNodeBuilder {
       timestamp: decision.createdAt,
       rawTimestamp: nil,
       sourceLabel: decision.ruleID,
+      entryKind: nil,
       title: decision.summary,
       detail: decisionDetail(for: decision),
+      agentID: decision.agentID,
+      taskID: decision.taskID,
       eventTone: nil,
-      decision: decision
+      decision: decision,
+      semanticProperties: semanticProperties(for: decision),
+      rawPayloadKeys: []
     )
   }
 
@@ -98,6 +118,92 @@ struct SessionTimelineNodeBuilder {
       }
     }
     return nil
+  }
+
+  private static func semanticProperties(
+    for entry: TimelineEntry,
+    linkedDecision: SessionTimelineDecisionSnapshot?,
+    toolCallMetadata: ToolCallTimelineEntryMetadata?,
+    agentID: String?,
+    taskID: String?
+  ) -> Set<SessionTimelineSemanticProperty> {
+    var properties: Set<SessionTimelineSemanticProperty> = []
+    if linkedDecision != nil {
+      properties.insert(.linkedDecision)
+    }
+    if toolCallMetadata != nil {
+      properties.insert(.toolCall)
+    }
+    if agentID != nil {
+      properties.insert(.agent)
+    }
+    if taskID != nil {
+      properties.insert(.task)
+    }
+    if let toolCallMetadata, !toolCallMetadata.capabilityTags.isEmpty {
+      properties.insert(.capabilityTags)
+    }
+    if let stopReason = toolCallMetadata?.stopReason,
+      !stopReason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    {
+      properties.insert(.stopReason)
+    }
+    if linkedDecision?.actions.isEmpty == false {
+      properties.insert(.decisionAction)
+    }
+    return properties
+  }
+
+  private static func semanticProperties(
+    for decision: SessionTimelineDecisionSnapshot
+  ) -> Set<SessionTimelineSemanticProperty> {
+    var properties: Set<SessionTimelineSemanticProperty> = []
+    if decision.agentID != nil {
+      properties.insert(.agent)
+    }
+    if decision.taskID != nil {
+      properties.insert(.task)
+    }
+    if !decision.actions.isEmpty {
+      properties.insert(.decisionAction)
+    }
+    return properties
+  }
+
+  private static func payloadPropertyKeys(in payload: JSONValue) -> Set<String> {
+    flattenPayloadKeys(in: payload, prefix: nil)
+  }
+
+  private static func flattenPayloadKeys(
+    in payload: JSONValue,
+    prefix: String?
+  ) -> Set<String> {
+    switch payload {
+    case .object(let object):
+      var keys: Set<String> = []
+      for key in object.keys.sorted() {
+        let path = prefix.map { "\($0).\(key)" } ?? key
+        keys.insert(path)
+        if let nestedValue = object[key] {
+          keys.formUnion(flattenPayloadKeys(in: nestedValue, prefix: path))
+        }
+      }
+      return keys
+    case .array(let values):
+      var keys: Set<String> = []
+      if let prefix {
+        keys.insert(prefix)
+      }
+      for value in values {
+        keys.formUnion(flattenPayloadKeys(in: value, prefix: prefix))
+      }
+      return keys
+    case .bool, .null, .number, .string:
+      if let prefix {
+        return [prefix]
+      }
+      return []
+    }
   }
 
   private static func sortsBefore(_ lhs: SessionTimelineNode, _ rhs: SessionTimelineNode) -> Bool {

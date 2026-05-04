@@ -375,7 +375,12 @@ struct SessionTimelineNavigationTests {
     tableView.layoutSubtreeIfNeeded()
     scrollView.layoutSubtreeIfNeeded()
 
-    viewport.updatePresentationCounts(windowStart: 47, loaded: rows.count, total: 321)
+    viewport.updatePresentationCounts(
+      windowStart: 47,
+      loaded: rows.count,
+      total: 321,
+      filteredMatchCount: nil
+    )
     coordinator.publishViewportState()
 
     let topVisibleRows = tableView.rows(in: scrollView.contentView.bounds)
