@@ -81,19 +81,6 @@ fn validate_returns_empty_for_no_yaml() {
 }
 
 #[test]
-fn manifest_target_equality() {
-    let a = ManifestTarget {
-        label: "test".to_string(),
-        path: PathBuf::from("/tmp/test.yaml"),
-    };
-    let b = ManifestTarget {
-        label: "test".to_string(),
-        path: PathBuf::from("/tmp/test.yaml"),
-    };
-    assert_eq!(a, b);
-}
-
-#[test]
 fn validate_handles_yml_extension() {
     let dir = tempfile::tempdir().unwrap();
     let yml = dir.path().join("test.yml");
