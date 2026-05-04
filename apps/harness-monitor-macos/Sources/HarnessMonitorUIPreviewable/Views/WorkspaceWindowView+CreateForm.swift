@@ -309,10 +309,20 @@ extension WorkspaceWindowCreatePane {
     @ViewBuilder leading: () -> Leading,
     @ViewBuilder trailing: () -> Trailing
   ) -> some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
-      leading()
-        .frame(maxWidth: leadingMaxWidth, alignment: .leading)
-      trailing()
+    let leadingView = leading()
+    let trailingView = trailing()
+    ViewThatFits(in: .horizontal) {
+      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingXL) {
+        leadingView
+          .frame(maxWidth: leadingMaxWidth, alignment: .leading)
+        trailingView
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
+        leadingView
+          .frame(maxWidth: leadingMaxWidth, alignment: .leading)
+        trailingView
+      }
     }
   }
 
