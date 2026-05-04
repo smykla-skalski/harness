@@ -16,8 +16,12 @@ use crate::session::types::{
 };
 
 #[track_caller]
-pub(super) fn assert_ok<T, E>(result: Result<T, E>, context: &str) -> T {
-    assert!(result.is_ok(), "{context}");
+pub(super) fn assert_ok<T, E: std::fmt::Debug>(result: Result<T, E>, context: &str) -> T {
+    assert!(
+        result.is_ok(),
+        "{context}: unexpected Err({:?})",
+        result.as_ref().err()
+    );
     let Ok(value) = result else {
         unreachable!("{context}");
     };
@@ -25,8 +29,15 @@ pub(super) fn assert_ok<T, E>(result: Result<T, E>, context: &str) -> T {
 }
 
 #[track_caller]
-pub(super) fn assert_err<T, E>(result: Result<T, E>, context: &str) -> E {
-    assert!(result.is_err(), "{context}");
+pub(super) fn assert_err<T: std::fmt::Debug, E: std::fmt::Debug>(
+    result: Result<T, E>,
+    context: &str,
+) -> E {
+    assert!(
+        result.is_err(),
+        "{context}: unexpected Ok({:?})",
+        result.as_ref().ok()
+    );
     let Err(error) = result else {
         unreachable!("{context}");
     };
@@ -34,8 +45,8 @@ pub(super) fn assert_err<T, E>(result: Result<T, E>, context: &str) -> E {
 }
 
 #[track_caller]
-pub(super) fn assert_some<T>(value: Option<T>, context: &str) -> T {
-    assert!(value.is_some(), "{context}");
+pub(super) fn assert_some<T: std::fmt::Debug>(value: Option<T>, context: &str) -> T {
+    assert!(value.is_some(), "{context}: unexpected None");
     let Some(value) = value else {
         unreachable!("{context}");
     };

@@ -40,24 +40,35 @@ fn permission_request_for_session(
     )
 }
 
-fn unwrap_ok<T, E>(result: Result<T, E>, context: &str) -> T {
-    assert!(result.is_ok(), "{context}");
+#[track_caller]
+fn unwrap_ok<T, E: std::fmt::Debug>(result: Result<T, E>, context: &str) -> T {
+    assert!(
+        result.is_ok(),
+        "{context}: unexpected Err({:?})",
+        result.as_ref().err()
+    );
     let Ok(value) = result else {
         unreachable!("{context}");
     };
     value
 }
 
+#[track_caller]
 fn unwrap_some<T>(value: Option<T>, context: &str) -> T {
-    assert!(value.is_some(), "{context}");
+    assert!(value.is_some(), "{context}: unexpected None");
     let Some(value) = value else {
         unreachable!("{context}");
     };
     value
 }
 
-fn unwrap_err<T, E>(result: Result<T, E>, context: &str) -> E {
-    assert!(result.is_err(), "{context}");
+#[track_caller]
+fn unwrap_err<T: std::fmt::Debug, E: std::fmt::Debug>(result: Result<T, E>, context: &str) -> E {
+    assert!(
+        result.is_err(),
+        "{context}: unexpected Ok({:?})",
+        result.as_ref().ok()
+    );
     let Err(error) = result else {
         unreachable!("{context}");
     };

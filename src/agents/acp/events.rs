@@ -211,10 +211,10 @@ mod tests {
         assert_eq!(event.session_id, "sess1");
         assert_eq!(event.sequence, 0);
 
-        assert!(matches!(
-            &event.kind,
-            ConversationEventKind::AssistantText { content } if content == "Hello, world!"
-        ));
+        let ConversationEventKind::AssistantText { content } = &event.kind else {
+            unreachable!("expected AssistantText, got {:?}", event.kind);
+        };
+        assert_eq!(content, "Hello, world!");
     }
 
     #[test]
@@ -231,17 +231,18 @@ mod tests {
         let event = &events[0];
         assert_eq!(event.sequence, 10);
 
-        assert!(matches!(
-            &event.kind,
-            ConversationEventKind::ToolInvocation {
-                tool_name,
-                invocation_id,
-                input,
-                ..
-            } if tool_name == "Read file"
-                && invocation_id.as_deref() == Some("tc-1")
-                && input["path"] == "/foo/bar"
-        ));
+        let ConversationEventKind::ToolInvocation {
+            tool_name,
+            invocation_id,
+            input,
+            ..
+        } = &event.kind
+        else {
+            unreachable!("expected ToolInvocation, got {:?}", event.kind);
+        };
+        assert_eq!(tool_name, "Read file");
+        assert_eq!(invocation_id.as_deref(), Some("tc-1"));
+        assert_eq!(input["path"], "/foo/bar");
     }
 
     #[test]
@@ -259,17 +260,18 @@ mod tests {
         let (events, _) = materialise_batch(&[raw], "copilot", "sess1", 0);
 
         assert_eq!(events.len(), 1);
-        assert!(matches!(
-            &events[0].kind,
-            ConversationEventKind::ToolResult {
-                is_error,
-                output,
-                invocation_id,
-                ..
-            } if !is_error
-                && invocation_id.as_deref() == Some("tc-1")
-                && output["content"] == "file contents"
-        ));
+        let ConversationEventKind::ToolResult {
+            is_error,
+            output,
+            invocation_id,
+            ..
+        } = &events[0].kind
+        else {
+            unreachable!("expected ToolResult, got {:?}", events[0].kind);
+        };
+        assert!(!is_error);
+        assert_eq!(invocation_id.as_deref(), Some("tc-1"));
+        assert_eq!(output["content"], "file contents");
     }
 
     #[test]
@@ -286,10 +288,10 @@ mod tests {
         let (events, _) = materialise_batch(&[raw], "copilot", "sess1", 0);
 
         assert_eq!(events.len(), 1);
-        assert!(matches!(
-            &events[0].kind,
-            ConversationEventKind::ToolResult { is_error, .. } if *is_error
-        ));
+        let ConversationEventKind::ToolResult { is_error, .. } = &events[0].kind else {
+            unreachable!("expected ToolResult, got {:?}", events[0].kind);
+        };
+        assert!(*is_error);
     }
 
     #[test]
