@@ -44,7 +44,6 @@ extension WorkspaceWindowCreatePane {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
         terminalDetailsCard
         terminalConfigurationCard(option: option)
-        terminalSizeCard
       }
     } else {
       AgentsCreateSectionCard {
@@ -226,6 +225,22 @@ extension WorkspaceWindowCreatePane {
 
         DisclosureGroup {
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+            if !formModel.selectedLaunchSelection.isAcp {
+              VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+                terminalSizeStepper(
+                  title: "Rows",
+                  value: $formModel.rows,
+                  range: TerminalViewportSizing.rowRange
+                )
+                terminalSizeStepper(
+                  title: "Columns",
+                  value: $formModel.cols,
+                  range: TerminalViewportSizing.colRange,
+                  step: 10
+                )
+              }
+            }
+
             AgentsCreateFieldBlock(
               title: "Project directory override",
               help: nil
@@ -259,29 +274,6 @@ extension WorkspaceWindowCreatePane {
           Text("Advanced overrides")
             .scaledFont(.caption.bold())
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        }
-      }
-    }
-  }
-
-  private var terminalSizeCard: some View {
-    @Bindable var formModel = viewModel
-    return AgentsCreateSectionCard {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-        AgentsCreateSectionHeading(title: "Terminal size")
-
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-          terminalSizeStepper(
-            title: "Rows",
-            value: $formModel.rows,
-            range: TerminalViewportSizing.rowRange
-          )
-          terminalSizeStepper(
-            title: "Columns",
-            value: $formModel.cols,
-            range: TerminalViewportSizing.colRange,
-            step: 10
-          )
         }
       }
     }
