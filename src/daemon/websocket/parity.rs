@@ -426,12 +426,28 @@ async fn dispatch_managed_agent_response(
 ) -> WsResponse {
     match result {
         Ok(snapshot) => {
+            tracing::info!(
+                method = %request.method,
+                request_id = %request.id,
+                kind = %managed_agent_snapshot_kind(&snapshot),
+                runtime_id = %snapshot.agent_id(),
+                session_id = %snapshot.session_id(),
+                "managed agent dispatch returning snapshot"
+            );
             if let Err(error) = broadcast_session_snapshot(state, snapshot.session_id()).await {
                 return cli_error_response(&request.id, &error);
             }
             dispatch_query_result(&request.id, Ok::<_, CliError>(snapshot))
         }
         Err(error) => cli_error_response(&request.id, &error),
+    }
+}
+
+const fn managed_agent_snapshot_kind(snapshot: &ManagedAgentSnapshot) -> &'static str {
+    match snapshot {
+        ManagedAgentSnapshot::Terminal(_) => "terminal",
+        ManagedAgentSnapshot::Codex(_) => "codex",
+        ManagedAgentSnapshot::Acp(_) => "acp",
     }
 }
 
