@@ -71,6 +71,43 @@ extension WorkspaceWindowCreatePane {
         terminalConfigPillRow(option: option, context: context)
         terminalTransportNotice(option: option, choice: context.choice)
         terminalCustomModelField(context: context)
+        terminalAdvancedOverrides
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var terminalAdvancedOverrides: some View {
+    @Bindable var formModel = viewModel
+    WholeRowDisclosure(label: "Advanced overrides") {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+        AgentsCreateFieldBlock(
+          title: "Project directory override",
+          help: nil
+        ) {
+          TextField("Optional project directory override", text: $formModel.projectDir)
+            .harnessNativeTextField()
+            .harnessMCPTextField(
+              HarnessMonitorAccessibility.agentTuiProjectDirField,
+              label: "Project directory override",
+              value: formModel.projectDir
+            )
+            .harnessPreservePrimaryContentFocus()
+        }
+
+        AgentsCreateFieldBlock(
+          title: "Command override",
+          help: "One argument per line. The first line is the executable."
+        ) {
+          multilineEditor(
+            placeholder:
+              "Optional argv override (one argument per line; first line is the executable)",
+            text: $formModel.argvOverride,
+            field: .argv,
+            minHeight: 100,
+            accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiArgvField
+          )
+        }
       }
     }
   }
@@ -237,38 +274,6 @@ extension WorkspaceWindowCreatePane {
             minHeight: 84,
             accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiPromptField
           )
-        }
-
-        WholeRowDisclosure(label: "Advanced overrides") {
-          VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-            AgentsCreateFieldBlock(
-              title: "Project directory override",
-              help: nil
-            ) {
-              TextField("Optional project directory override", text: $formModel.projectDir)
-                .harnessNativeTextField()
-                .harnessMCPTextField(
-                  HarnessMonitorAccessibility.agentTuiProjectDirField,
-                  label: "Project directory override",
-                  value: formModel.projectDir
-                )
-                .harnessPreservePrimaryContentFocus()
-            }
-
-            AgentsCreateFieldBlock(
-              title: "Command override",
-              help: "One argument per line. The first line is the executable."
-            ) {
-              multilineEditor(
-                placeholder:
-                  "Optional argv override (one argument per line; first line is the executable)",
-                text: $formModel.argvOverride,
-                field: .argv,
-                minHeight: 100,
-                accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiArgvField
-              )
-            }
-          }
         }
       }
     }
