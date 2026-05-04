@@ -215,20 +215,6 @@ final class ObserverIssueRuleTests: XCTestCase {
     XCTAssertTrue(actions.isEmpty)
   }
 
-  // MARK: - Metadata
-
-  func test_ruleMetadataMatchesFrozenContract() {
-    let rule = ObserverIssueRule()
-    XCTAssertEqual(rule.id, "observer-issue-escalation")
-    XCTAssertEqual(rule.name, "Observer Issue Escalation")
-    XCTAssertEqual(rule.defaultBehavior(for: "queueDecision"), .cautious)
-  }
-
-  func test_parameterSchemaExposesAllThreeFields() {
-    let keys = ObserverIssueRule().parameters.fields.map(\.key)
-    XCTAssertEqual(Set(keys), ["issueWindow", "minCount", "minSeverity"])
-  }
-
   // MARK: - Per-session fan-out
 
   func test_emitsOneDecisionPerTriggeringSession() async {

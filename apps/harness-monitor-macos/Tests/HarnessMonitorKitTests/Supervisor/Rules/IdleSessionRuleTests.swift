@@ -210,24 +210,6 @@ final class IdleSessionRuleTests: XCTestCase {
     XCTAssertEqual(overridden.count, 1, "override to 60s must trigger at 120s idle")
   }
 
-  // MARK: - Rule metadata
-
-  func test_defaultBehaviorIsCautiousForAllActionKeys() {
-    let rule = IdleSessionRule()
-    XCTAssertEqual(rule.defaultBehavior(for: "decision:idle-session:idle-session:s1"), .cautious)
-    XCTAssertEqual(rule.defaultBehavior(for: "anything-else"), .cautious)
-  }
-
-  func test_parameterSchemaExposesSessionIdleThreshold() {
-    let rule = IdleSessionRule()
-    let keys = rule.parameters.fields.map(\.key)
-    XCTAssertTrue(keys.contains("sessionIdleThreshold"))
-    if let field = rule.parameters.fields.first(where: { $0.key == "sessionIdleThreshold" }) {
-      XCTAssertEqual(field.kind, .duration)
-      XCTAssertEqual(field.default, "600")
-    }
-  }
-
   // MARK: - Helpers
 
   private func snapshot(

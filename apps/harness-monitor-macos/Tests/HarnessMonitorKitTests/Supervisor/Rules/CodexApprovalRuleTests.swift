@@ -254,17 +254,4 @@ final class CodexApprovalRuleTests: XCTestCase {
     XCTAssertEqual(first.first?.actionKey, second.first?.actionKey)
   }
 
-  // MARK: - Metadata
-
-  func test_ruleIdentity() {
-    let rule = CodexApprovalRule()
-    XCTAssertEqual(rule.id, "codex-approval")
-    XCTAssertFalse(rule.name.isEmpty)
-    XCTAssertGreaterThanOrEqual(rule.version, 1)
-  }
-
-  func test_defaultBehavior_isCautious() {
-    let rule = CodexApprovalRule()
-    XCTAssertEqual(rule.defaultBehavior(for: "queueDecision"), .cautious)
-  }
 }

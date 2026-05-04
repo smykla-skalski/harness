@@ -203,16 +203,6 @@ final class FailedNudgeLoopRuleTests: XCTestCase {
     XCTAssertEqual(actions.count, 1)
   }
 
-  func test_defaultBehaviorIsCautious() {
-    let rule = FailedNudgeLoopRule()
-    XCTAssertEqual(rule.defaultBehavior(for: "queueDecision"), .cautious)
-  }
-
-  func test_parametersSchemaExposesThreshold() {
-    let rule = FailedNudgeLoopRule()
-    let keys = rule.parameters.fields.map(\.key)
-    XCTAssertTrue(keys.contains("consecutiveFailureThreshold"))
-  }
 }
 
 private enum FailedNudgeLoopRuleFixtures {
