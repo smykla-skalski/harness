@@ -5,7 +5,7 @@ private struct RichSessionTimelineDecisionSpec {
   let severity: DecisionSeverity
   let ruleID: String
   let agentID: String
-  let taskID: String
+  let taskID: String?
   let summary: String
   let createdAt: Date
   let actionsJSON: String
@@ -88,107 +88,187 @@ extension PreviewFixtures {
   }
 
   public static var signalSquishTimeline: [TimelineEntry] {
+    let liveBorderScenario = [
+      RichSessionTimelineEntrySpec(
+        id: "preview-live-liveness-disconnected",
+        recordedAt: "2026-05-04T13:43:46Z",
+        kind: "liveness_synced",
+        agentID: nil,
+        taskID: nil,
+        summary: "Liveness sync: 1 disconnected, 0 idled",
+        payload: .object(["status": .string("synced")])
+      ),
+      RichSessionTimelineEntrySpec(
+        id: "preview-live-liveness-idled",
+        recordedAt: "2026-05-04T13:30:29Z",
+        kind: "liveness_synced",
+        agentID: nil,
+        taskID: nil,
+        summary: "Liveness sync: 0 disconnected, 1 idled",
+        payload: .object(["status": .string("synced")])
+      ),
+      RichSessionTimelineEntrySpec(
+        id: "preview-live-liveness-disconnected-and-idled",
+        recordedAt: "2026-05-04T13:17:32Z",
+        kind: "liveness_synced",
+        agentID: nil,
+        taskID: nil,
+        summary: "Liveness sync: 1 disconnected, 1 idled",
+        payload: .object(["status": .string("synced")])
+      ),
+      RichSessionTimelineEntrySpec(
+        id: "preview-live-signal-ack-gemini-expired",
+        recordedAt: "2026-05-04T13:17:32Z",
+        kind: "signal_acknowledged",
+        agentID: "gemini-20260504124513402981000",
+        taskID: nil,
+        summary:
+          "sig-20260504124537520229000 acknowledged by gemini-20260504124513402981000: Expired",
+        payload: .object(["result": .string("expired")])
+      ),
+      RichSessionTimelineEntrySpec(
+        id: "preview-live-signal-sent-request-action",
+        recordedAt: "2026-05-04T12:45:37Z",
+        kind: "signal_sent",
+        agentID: "harness-app",
+        taskID: nil,
+        summary:
+          "sig-20260504124537520229000 sent to gemini-20260504124513402981000: request_action",
+        payload: .object(["command": .string("request_action")])
+      ),
+      RichSessionTimelineEntrySpec(
+        id: "preview-live-agent-joined-worker",
+        recordedAt: "2026-05-04T12:45:13Z",
+        kind: "agent_joined",
+        agentID: nil,
+        taskID: nil,
+        summary: "gemini-20260504124513402981000 joined as Worker (gemini)",
+        payload: .object(["role": .string("worker")])
+      ),
+      RichSessionTimelineEntrySpec(
+        id: "preview-live-liveness-post-join",
+        recordedAt: "2026-05-04T12:45:13Z",
+        kind: "liveness_synced",
+        agentID: nil,
+        taskID: nil,
+        summary: "Liveness sync: 0 disconnected, 1 idled",
+        payload: .object(["status": .string("synced")])
+      ),
+    ]
+
+    let historicalTail = [
+      RichSessionTimelineEntrySpec(
+        id: "preview-liveness-1",
+        recordedAt: "2026-05-03T21:28:11Z",
+        kind: "liveness_synced",
+        agentID: "harness-app",
+        taskID: nil,
+        summary: "Liveness sync: 1 disconnected, 0 idled",
+        payload: .object(["status": .string("synced")])
+      ),
+      RichSessionTimelineEntrySpec(
+        id: "preview-agent-joined",
+        recordedAt: "2026-05-03T21:15:12Z",
+        kind: "agent_joined",
+        agentID: nil,
+        taskID: nil,
+        summary: "gemini-20260504124323411402000 joined as Leader (gemini)",
+        payload: .object(["role": .string("leader")])
+      ),
+      RichSessionTimelineEntrySpec(
+        id: "preview-liveness-2",
+        recordedAt: "2026-05-03T21:02:03Z",
+        kind: "liveness_synced",
+        agentID: "harness-app",
+        taskID: nil,
+        summary: "Liveness sync: 0 disconnected, 1 idled",
+        payload: .object(["status": .string("synced")])
+      ),
+      RichSessionTimelineEntrySpec(
+        id: "preview-liveness-3",
+        recordedAt: "2026-05-03T21:02:03Z",
+        kind: "liveness_synced",
+        agentID: "harness-app",
+        taskID: nil,
+        summary: "Liveness sync: 0 disconnected, 1 idled",
+        payload: .object(["status": .string("synced")])
+      ),
+      RichSessionTimelineEntrySpec(
+        id: "preview-observe-snapshot",
+        recordedAt: "2026-05-03T21:03:34Z",
+        kind: "observe_snapshot",
+        agentID: nil,
+        taskID: nil,
+        summary: "Observe scan: 0 open, 0 active workers, 0 muted codes",
+        payload: .object(["scope": .string("timeline")])
+      ),
+      RichSessionTimelineEntrySpec(
+        id: "preview-signal-ack-copilot-expired",
+        recordedAt: "2026-05-03T21:00:24Z",
+        kind: "signal_acknowledged",
+        agentID: "copilot-20260503203910393668000",
+        taskID: nil,
+        summary:
+          "sig-20260503204520733172000 acknowledged by copilot-20260503203910393668000: Expired",
+        payload: .object(["result": .string("expired")])
+      ),
+      RichSessionTimelineEntrySpec(
+        id: "preview-liveness-4",
+        recordedAt: "2026-05-03T20:56:36Z",
+        kind: "liveness_synced",
+        agentID: "harness-app",
+        taskID: nil,
+        summary: "Liveness sync: 0 disconnected, 1 idled",
+        payload: .object(["status": .string("synced")])
+      ),
+      RichSessionTimelineEntrySpec(
+        id: "preview-signal-ack-gemini-expired-1",
+        recordedAt: "2026-05-03T20:55:00Z",
+        kind: "signal_acknowledged",
+        agentID: "gemini-20260503201702585333000",
+        taskID: nil,
+        summary:
+          "sig-20260503203959657678000 acknowledged by gemini-20260503201702585333000: Expired",
+        payload: .object(["result": .string("expired")])
+      ),
+      RichSessionTimelineEntrySpec(
+        id: "preview-signal-ack-gemini-expired-2",
+        recordedAt: "2026-05-03T20:55:00Z",
+        kind: "signal_acknowledged",
+        agentID: "gemini-20260503201702585333000",
+        taskID: nil,
+        summary:
+          "sig-20260503203959723499000 acknowledged by gemini-20260503201702585333000: Expired",
+        payload: .object(["result": .string("expired")])
+      ),
+      RichSessionTimelineEntrySpec(
+        id: "preview-liveness-5",
+        recordedAt: "2026-05-03T20:50:00Z",
+        kind: "liveness_synced",
+        agentID: "harness-app",
+        taskID: nil,
+        summary: "Liveness sync: 1 disconnected, 0 idled",
+        payload: .object(["status": .string("synced")])
+      ),
+    ]
+
+    return (liveBorderScenario + historicalTail).map(sessionTimelineEntry)
+      + Array(pagedTimeline.prefix(11))
+  }
+
+  public static var signalSquishTimelineDecisions: [Decision] {
     [
-      sessionTimelineEntry(
+      sessionTimelineDecision(
         .init(
-          id: "preview-liveness-1",
-          recordedAt: "2026-05-03T21:28:11Z",
-          kind: "liveness_synced",
-          agentID: "harness-app",
+          id: "idle-session:nod8ccog",
+          severity: .warn,
+          ruleID: "idle-session",
+          agentID: "gemini-20260504124513402981000",
           taskID: nil,
-          summary: "Liveness sync: 1 disconnected, 0 idled",
-          payload: .object(["status": .string("synced")])
-        )),
-      sessionTimelineEntry(
-        .init(
-          id: "preview-agent-joined",
-          recordedAt: "2026-05-03T21:15:12Z",
-          kind: "agent_joined",
-          agentID: nil,
-          taskID: nil,
-          summary: "gemini-20260504124323411402000 joined as Leader (gemini)",
-          payload: .object(["role": .string("leader")])
-        )),
-      sessionTimelineEntry(
-        .init(
-          id: "preview-liveness-2",
-          recordedAt: "2026-05-03T21:02:03Z",
-          kind: "liveness_synced",
-          agentID: "harness-app",
-          taskID: nil,
-          summary: "Liveness sync: 0 disconnected, 1 idled",
-          payload: .object(["status": .string("synced")])
-        )),
-      sessionTimelineEntry(
-        .init(
-          id: "preview-liveness-3",
-          recordedAt: "2026-05-03T21:02:03Z",
-          kind: "liveness_synced",
-          agentID: "harness-app",
-          taskID: nil,
-          summary: "Liveness sync: 0 disconnected, 1 idled",
-          payload: .object(["status": .string("synced")])
-        )),
-      sessionTimelineEntry(
-        .init(
-          id: "preview-observe-snapshot",
-          recordedAt: "2026-05-03T21:03:34Z",
-          kind: "observe_snapshot",
-          agentID: nil,
-          taskID: nil,
-          summary: "Observe scan: 0 open, 0 active workers, 0 muted codes",
-          payload: .object(["scope": .string("timeline")])
-        )),
-      sessionTimelineEntry(
-        .init(
-          id: "preview-signal-ack-copilot-expired",
-          recordedAt: "2026-05-03T21:00:24Z",
-          kind: "signal_acknowledged",
-          agentID: "copilot-20260503203910393668000",
-          taskID: nil,
-          summary: "sig-20260503204520733172000 acknowledged by copilot-20260503203910393668000: Expired",
-          payload: .object(["result": .string("expired")])
-        )),
-      sessionTimelineEntry(
-        .init(
-          id: "preview-liveness-4",
-          recordedAt: "2026-05-03T20:56:36Z",
-          kind: "liveness_synced",
-          agentID: "harness-app",
-          taskID: nil,
-          summary: "Liveness sync: 0 disconnected, 1 idled",
-          payload: .object(["status": .string("synced")])
-        )),
-      sessionTimelineEntry(
-        .init(
-          id: "preview-signal-ack-gemini-expired-1",
-          recordedAt: "2026-05-03T20:55:00Z",
-          kind: "signal_acknowledged",
-          agentID: "gemini-20260503201702585333000",
-          taskID: nil,
-          summary: "sig-20260503203959657678000 acknowledged by gemini-20260503201702585333000: Expired",
-          payload: .object(["result": .string("expired")])
-        )),
-      sessionTimelineEntry(
-        .init(
-          id: "preview-signal-ack-gemini-expired-2",
-          recordedAt: "2026-05-03T20:55:00Z",
-          kind: "signal_acknowledged",
-          agentID: "gemini-20260503201702585333000",
-          taskID: nil,
-          summary: "sig-20260503203959723499000 acknowledged by gemini-20260503201702585333000: Expired",
-          payload: .object(["result": .string("expired")])
-        )),
-      sessionTimelineEntry(
-        .init(
-          id: "preview-liveness-5",
-          recordedAt: "2026-05-03T20:50:00Z",
-          kind: "liveness_synced",
-          agentID: "harness-app",
-          taskID: nil,
-          summary: "Liveness sync: 1 disconnected, 0 idled",
-          payload: .object(["status": .string("synced")])
-        )),
+          summary: "Session nod8ccog has had no activity for over 600s.",
+          createdAt: previewDate("2026-05-04T13:17:42Z"),
+          actionsJSON: idleSessionActionsJSON
+        ))
     ]
   }
 
@@ -253,11 +333,11 @@ extension PreviewFixtures {
   public static var signalSquishTimelineWindow: TimelineWindowResponse {
     let entries = signalSquishTimeline
     return TimelineWindowResponse(
-      revision: 9,
-      totalCount: 95,
+      revision: 10,
+      totalCount: entries.count,
       windowStart: 0,
       windowEnd: entries.count,
-      hasOlder: true,
+      hasOlder: false,
       hasNewer: false,
       oldestCursor: entries.last.map {
         TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
@@ -330,7 +410,28 @@ extension PreviewFixtures {
       }
     ]
     """#
-
+  private static let idleSessionActionsJSON = #"""
+    [
+      {
+        "id": "idle-session.nudge.gemini-20260504124513402981000",
+        "title": "Send check-in nudge",
+        "kind": "nudge",
+        "payloadJSON": "{\"agentID\":\"gemini-20260504124513402981000\",\"input\":\"Quick check-in from Harness Monitor supervisor for idle session nod8ccog.\"}"
+      },
+      {
+        "id": "idle-session.close.nod8ccog",
+        "title": "Close session",
+        "kind": "custom",
+        "payloadJSON": "{\"mode\":\"closeSession\",\"sessionID\":\"nod8ccog\"}"
+      },
+      {
+        "id": "dismiss-idle-session",
+        "title": "Dismiss",
+        "kind": "dismiss",
+        "payloadJSON": "{}"
+      }
+    ]
+    """#
   private static func sessionTimelineDecision(_ spec: RichSessionTimelineDecisionSpec) -> Decision {
     let decision = Decision(
       id: spec.id,
@@ -358,5 +459,13 @@ extension PreviewFixtures {
       summary: spec.summary,
       payload: spec.payload
     )
+  }
+
+  private static func previewDate(_ value: String) -> Date {
+    let formatter = ISO8601DateFormatter()
+    guard let date = formatter.date(from: value) else {
+      preconditionFailure("Invalid preview fixture date: \(value)")
+    }
+    return date
   }
 }

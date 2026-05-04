@@ -12,6 +12,27 @@ struct SessionTimelineTableSnapshot: Equatable {
   private init(rowSnapshots: [SessionTimelineTableRowSnapshot]) {
     rows = rowSnapshots
   }
+
+  func heightCacheInvalidationIDs(
+    comparedTo previous: Self,
+    fontScaleChanged: Bool
+  ) -> Set<String> {
+    guard !rows.isEmpty else { return [] }
+    if fontScaleChanged {
+      return Set(rows.map(\.id))
+    }
+    let previousRowsByID = previous.rowSnapshotsByID
+    return Set(rows.compactMap { rowSnapshot in
+      guard let previousRow = previousRowsByID[rowSnapshot.id] else {
+        return nil
+      }
+      return previousRow == rowSnapshot ? nil : rowSnapshot.id
+    })
+  }
+
+  private var rowSnapshotsByID: [String: SessionTimelineTableRowSnapshot] {
+    Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0) })
+  }
 }
 
 struct SessionTimelineTableRowSnapshot: Equatable {

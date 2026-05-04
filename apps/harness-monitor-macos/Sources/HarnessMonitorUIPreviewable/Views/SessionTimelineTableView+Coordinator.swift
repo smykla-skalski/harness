@@ -15,7 +15,7 @@ extension SessionTimelineTableView {
     var scrollBoundaryChanged: SessionTimelineScrollBoundaryHandler
 
     var rowHeightCache: [String: CachedRowHeight] = [:]
-    private var lastColumnWidth: CGFloat = 0
+    var lastColumnWidth: CGFloat = 0
     var rows: [SessionTimelineRow] = []
     var rowIndexByID: [String: Int] = [:]
     private var rowSnapshot = SessionTimelineTableSnapshot.empty
@@ -34,7 +34,7 @@ extension SessionTimelineTableView {
     private var cancellables = Set<AnyCancellable>()
     var measurementTask: Task<Void, Never>?
     private var measurementGeneration: Int = 0
-    private var fontScale: CGFloat = 1.0
+    var fontScale: CGFloat = 1.0
 
     init(
       viewport: SessionTimelineViewportModel,
@@ -97,6 +97,10 @@ extension SessionTimelineTableView {
       let wasPinnedToLatest = isPinnedToLatestViewport()
       let previousAnchor = wasPinnedToLatest ? nil : currentVisibleAnchor()
       let nextSnapshot = SessionTimelineTableSnapshot(rows: rows)
+      let invalidatedHeightIDs = nextSnapshot.heightCacheInvalidationIDs(
+        comparedTo: rowSnapshot,
+        fontScaleChanged: fontScaleChanged
+      )
       let rowsChanged = rowSnapshot != nextSnapshot || fontScaleChanged
       if rowsChanged {
         let nextIDs = Set(rows.map(\.id))
@@ -116,25 +120,29 @@ extension SessionTimelineTableView {
 
         cancelMeasurement(reason: "rows_changed")
 
-        // Snapshot heights from currently-displayed rows whose IDs survive,
-        // tagged with the width those measurements were taken at. Skip the
-        // walk entirely when no IDs carry over (typical session swap), since
-        // tableView.rect(ofRow:) drives AppKit layout work for each call.
-        if willReuseAny {
-          for rowIndex in 0..<tableView.numberOfRows {
+        // Snapshot heights from currently visible rows whose IDs survive and
+        // whose content is unchanged. Preserve provisional heights as
+        // provisional so the incremental pass can still replace them with real
+        // measurements; only measured cache entries suppress remeasurement.
+        if willReuseAny, let visibleRange = visibleRowIndexRange() {
+          for rowIndex in visibleRange {
             guard self.rows.indices.contains(rowIndex) else { continue }
             let rowID = self.rows[rowIndex].id
             guard nextIDs.contains(rowID) else { continue }
+            guard !invalidatedHeightIDs.contains(rowID) else { continue }
             rowHeightCache[rowID] = CachedRowHeight(
               width: lastColumnWidth,
-              height: tableView.rect(ofRow: rowIndex).height
+              height: tableView.rect(ofRow: rowIndex).height,
+              isMeasured: rowHeightCache[rowID]?.isMeasured ?? false
             )
           }
         }
 
-        // Drop cached heights for IDs that are not in the next rows array so
-        // the cache stays bounded across many session swaps.
-        rowHeightCache = rowHeightCache.filter { nextIDs.contains($0.key) }
+        // Drop cached heights for IDs that are not in the next rows array and
+        // for surviving rows that need remeasurement.
+        rowHeightCache = rowHeightCache.filter {
+          nextIDs.contains($0.key) && !invalidatedHeightIDs.contains($0.key)
+        }
 
         self.rows = rows
         rowIndexByID = Dictionary(
@@ -168,7 +176,10 @@ extension SessionTimelineTableView {
       let didPerformScrollCommand = performPendingScrollCommand()
       let hasUnfulfilledScrollCommand = pendingScrollCommand != nil
       if !didPerformScrollCommand && rowsChanged {
-        if wasPinnedToLatest && !hasUnfulfilledScrollCommand {
+        if !hasUnfulfilledScrollCommand && normalizePinnedLatestViewportIfNeeded() {
+          boundsDidChange()
+        } else if wasPinnedToLatest && !hasUnfulfilledScrollCommand {
+          normalizePinnedLatestViewportIfNeeded()
           boundsDidChange()
         } else {
           restore(anchor: previousAnchor)
@@ -186,7 +197,7 @@ extension SessionTimelineTableView {
       }
       let rowData = rows[row]
       if let cached = rowHeightCache[rowData.id],
-        abs(cached.width - lastColumnWidth) < Self.widthEqualityTolerance
+        cached.matches(width: lastColumnWidth, tolerance: Self.widthEqualityTolerance)
       {
         return cached.height
       }
@@ -256,7 +267,7 @@ extension SessionTimelineTableView {
       }
     }
 
-    private func scheduleIncrementalMeasurement(columnWidth: CGFloat) {
+    func scheduleIncrementalMeasurement(columnWidth: CGFloat) {
       guard columnWidth > 1, !rows.isEmpty else {
         return
       }
@@ -272,7 +283,7 @@ extension SessionTimelineTableView {
         guard snapshot.indices.contains(index) else { return false }
         let id = snapshot[index].id
         guard let cached = rowHeightCache[id] else { return true }
-        return abs(cached.width - columnWidth) >= Self.widthEqualityTolerance
+        return cached.requiresMeasurement(for: columnWidth, tolerance: Self.widthEqualityTolerance)
       }
       guard !outstanding.isEmpty else {
         return

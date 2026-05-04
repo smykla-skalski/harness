@@ -21,7 +21,7 @@ extension SessionCockpitTimelineSection {
       sessionID: PreviewFixtures.summary.sessionId,
       timeline: PreviewFixtures.signalSquishTimeline,
       timelineWindow: PreviewFixtures.signalSquishTimelineWindow,
-      decisions: [],
+      decisions: PreviewFixtures.signalSquishTimelineDecisions,
       isTimelineLoading: false,
       store: HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded)
     )

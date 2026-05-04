@@ -5,6 +5,15 @@ import OSLog
 struct CachedRowHeight {
   let width: CGFloat
   let height: CGFloat
+  let isMeasured: Bool
+
+  func matches(width: CGFloat, tolerance: CGFloat) -> Bool {
+    abs(self.width - width) < tolerance
+  }
+
+  func requiresMeasurement(for width: CGFloat, tolerance: CGFloat) -> Bool {
+    !matches(width: width, tolerance: tolerance) || !isMeasured
+  }
 }
 
 enum SessionTimelineTableMeasurementMode: Equatable {
@@ -69,17 +78,19 @@ extension SessionTimelineTableView.Coordinator {
           else { continue }
           let row = snapshot[rowIndex]
           if let cached = self.rowHeightCache[row.id],
-            abs(cached.width - columnWidth) < Self.widthEqualityTolerance
+            !cached.requiresMeasurement(for: columnWidth, tolerance: Self.widthEqualityTolerance)
           {
             continue
           }
           let height = SessionTimelineTableCellView.measuredHeight(
             for: row,
-            columnWidth: columnWidth
+            columnWidth: columnWidth,
+            fontScale: fontScale
           )
           self.rowHeightCache[row.id] = CachedRowHeight(
             width: columnWidth,
-            height: height
+            height: height,
+            isMeasured: true
           )
           changedIndexes.insert(rowIndex)
           measuredInChunk += 1
@@ -90,7 +101,7 @@ extension SessionTimelineTableView.Coordinator {
         }
       }
       if !changedIndexes.isEmpty {
-        self.tableView?.noteHeightOfRows(withIndexesChanged: changedIndexes)
+        applyMeasuredHeights(changedIndexes)
       }
       let remaining = outstanding.count - cursor
       Self.signposter.endInterval(
@@ -124,30 +135,86 @@ extension SessionTimelineTableView.Coordinator {
         else { continue }
         let row = snapshot[rowIndex]
         if let cached = self.rowHeightCache[row.id],
-          abs(cached.width - columnWidth) < Self.widthEqualityTolerance
+          !cached.requiresMeasurement(for: columnWidth, tolerance: Self.widthEqualityTolerance)
         {
           continue
         }
         let height = SessionTimelineTableCellView.measuredHeight(
           for: row,
-          columnWidth: columnWidth
+          columnWidth: columnWidth,
+          fontScale: fontScale
         )
         self.rowHeightCache[row.id] = CachedRowHeight(
           width: columnWidth,
-          height: height
+          height: height,
+          isMeasured: true
         )
         changedIndexes.insert(rowIndex)
       }
     }
     if !changedIndexes.isEmpty {
-      self.tableView?.noteHeightOfRows(withIndexesChanged: changedIndexes)
-      self.tableView?.layoutSubtreeIfNeeded()
-      self.scrollView?.layoutSubtreeIfNeeded()
+      applyMeasuredHeights(changedIndexes)
     }
     Self.signposter.emitEvent(
       "session_timeline.measurement.completed",
       "g=\(generation, privacy: .public) m=\(totalOutstanding, privacy: .public)"
     )
     self.measurementTask = nil
+  }
+
+  private func applyMeasuredHeights(_ changedIndexes: IndexSet) {
+    guard !changedIndexes.isEmpty else { return }
+    tableView?.noteHeightOfRows(withIndexesChanged: changedIndexes)
+    guard changedIndexesAffectVisibleRows(changedIndexes) else {
+      return
+    }
+    // When async measurement lands for rows already on screen, force AppKit to
+    // relayout that visible geometry immediately so reused hosting views do not
+    // keep painting against the old estimated row bounds until a later scroll.
+    tableView?.layoutSubtreeIfNeeded()
+    scrollView?.layoutSubtreeIfNeeded()
+    _ = normalizePinnedLatestViewportIfNeeded()
+  }
+
+  private func changedIndexesAffectVisibleRows(_ changedIndexes: IndexSet) -> Bool {
+    guard
+      let tableView,
+      let scrollView
+    else {
+      return false
+    }
+    let visibleRows = tableView.rows(in: scrollView.contentView.bounds)
+    guard visibleRows.location != NSNotFound, visibleRows.length > 0 else {
+      return false
+    }
+    let visibleIndexes = IndexSet(
+      integersIn: visibleRows.location..<(visibleRows.location + visibleRows.length)
+    )
+    return !changedIndexes.intersection(visibleIndexes).isEmpty
+  }
+
+  func visibleRowsNeedMeasurement(columnWidth: CGFloat) -> Bool {
+    guard
+      let tableView,
+      let scrollView,
+      columnWidth > 1
+    else {
+      return false
+    }
+    let visibleRows = tableView.rows(in: scrollView.contentView.bounds)
+    guard visibleRows.location != NSNotFound, visibleRows.length > 0 else {
+      return false
+    }
+    let rowRange = visibleRows.location..<(visibleRows.location + visibleRows.length)
+    for rowIndex in rowRange where rows.indices.contains(rowIndex) {
+      let rowID = rows[rowIndex].id
+      if rowHeightCache[rowID]?.requiresMeasurement(
+        for: columnWidth,
+        tolerance: Self.widthEqualityTolerance
+      ) ?? true {
+        return true
+      }
+    }
+    return false
   }
 }

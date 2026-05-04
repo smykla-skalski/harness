@@ -97,8 +97,8 @@ private struct SessionTimelineNodeRow: View {
       .padding(.horizontal, HarnessMonitorTheme.cardPadding)
       .padding(.vertical, HarnessMonitorTheme.spacingSM)
       .background(SessionTimelineCardBackground(tint: cardTint))
-      .alignmentGuide(.sessionTimelineMarkerCenter) { _ in
-        SessionTimelineLayout.singleLineMarkerCenterY
+      .alignmentGuide(.sessionTimelineMarkerCenter) { dimensions in
+        dimensions[.sessionTimelineFirstLineCenter]
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -150,6 +150,9 @@ private struct SessionTimelineNodeRow: View {
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             .lineLimit(1)
         }
+        .alignmentGuide(.sessionTimelineFirstLineCenter) { dimensions in
+          dimensions[VerticalAlignment.center]
+        }
         if let detail = node.detail {
           Text(detail)
             .scaledFont(.callout)
@@ -175,6 +178,9 @@ private struct SessionTimelineNodeRow: View {
           .lineLimit(1)
         Spacer(minLength: HarnessMonitorTheme.spacingSM)
         rightBadges
+      }
+      .alignmentGuide(.sessionTimelineFirstLineCenter) { dimensions in
+        dimensions[VerticalAlignment.center]
       }
 
       Text(node.title)
@@ -255,7 +261,6 @@ enum SessionTimelineLayout {
   static let railWidth: CGFloat = 14
   static let markerDiameter: CGFloat = 19
   static let markerCoreDiameter: CGFloat = 11
-  static let singleLineMarkerCenterY = HarnessMonitorTheme.spacingSM + (markerDiameter / 2)
   static let railLineOffset =
     timeColumnWidth + HarnessMonitorTheme.itemSpacing + (railWidth / 2)
 }
@@ -269,6 +274,16 @@ extension VerticalAlignment {
 
   fileprivate static let sessionTimelineMarkerCenter = VerticalAlignment(
     SessionTimelineMarkerCenter.self
+  )
+
+  fileprivate enum SessionTimelineFirstLineCenter: AlignmentID {
+    static func defaultValue(in context: ViewDimensions) -> CGFloat {
+      context[VerticalAlignment.center]
+    }
+  }
+
+  fileprivate static let sessionTimelineFirstLineCenter = VerticalAlignment(
+    SessionTimelineFirstLineCenter.self
   )
 }
 
@@ -315,12 +330,16 @@ private struct SessionTimelineDot: View {
 private struct SessionTimelineCardBackground: View {
   let tint: Color
 
-  var body: some View {
+  private var shape: RoundedRectangle {
     RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+  }
+
+  var body: some View {
+    shape
       .fill(tint.opacity(0.08))
       .overlay {
-        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-          .stroke(tint.opacity(0.35), lineWidth: 1)
+        shape
+          .strokeBorder(tint.opacity(0.35), lineWidth: 1)
       }
   }
 }
