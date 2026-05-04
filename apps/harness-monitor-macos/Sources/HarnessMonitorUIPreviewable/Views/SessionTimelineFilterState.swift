@@ -33,11 +33,11 @@ enum SessionTimelineSearchScope: String, CaseIterable, Identifiable, Sendable {
   var label: String {
     switch self {
     case .all:
-      "Everything"
+      "All fields"
     case .summary:
       "Summary"
     case .source:
-      "Source"
+      "Event type"
     case .agent:
       "Agent"
     case .task:
@@ -50,7 +50,7 @@ enum SessionTimelineSearchScope: String, CaseIterable, Identifiable, Sendable {
   var systemImage: String {
     switch self {
     case .all:
-      "line.3.horizontal.decrease.circle"
+      "text.magnifyingglass"
     case .summary:
       "text.alignleft"
     case .source:
@@ -193,6 +193,57 @@ struct SessionTimelineFilterState: Equatable, Sendable {
 
   mutating func toggleRawPayloadKey(_ rawValue: String) {
     Self.toggleMembership(of: rawValue, in: &rawPayloadKeys)
+  }
+
+  var activeAdvancedFilterCount: Int {
+    eventTypes.count
+      + agents.count
+      + tasks.count
+      + decisionSeverities.count
+      + semanticProperties.count
+      + rawPayloadKeys.count
+  }
+
+  func removingTones() -> Self {
+    var copy = self
+    copy.tones = []
+    return copy
+  }
+
+  func removingEventTypes() -> Self {
+    var copy = self
+    copy.eventTypes = []
+    return copy
+  }
+
+  func removingAgents() -> Self {
+    var copy = self
+    copy.agents = []
+    return copy
+  }
+
+  func removingTasks() -> Self {
+    var copy = self
+    copy.tasks = []
+    return copy
+  }
+
+  func removingDecisionSeverities() -> Self {
+    var copy = self
+    copy.decisionSeverities = []
+    return copy
+  }
+
+  func removingSemanticProperties() -> Self {
+    var copy = self
+    copy.semanticProperties = []
+    return copy
+  }
+
+  func removingRawPayloadKeys() -> Self {
+    var copy = self
+    copy.rawPayloadKeys = []
+    return copy
   }
 
   func encodedString() -> String? {

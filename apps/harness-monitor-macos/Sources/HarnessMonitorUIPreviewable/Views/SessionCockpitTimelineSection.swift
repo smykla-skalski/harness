@@ -194,6 +194,7 @@ struct SessionCockpitTimelineSection: View {
         SessionTimelineNavigationControls(
           navigation: presentation.navigation,
           presentation: presentation,
+          filterSummary: presentation.filterSnapshot.summary,
           scrollCommandTargetID: scrollCommand?.targetID,
           viewport: viewport,
           performAction: { action in

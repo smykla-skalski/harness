@@ -145,6 +145,86 @@ struct SessionTimelineFilterTests {
     #expect(snapshot.summary.statusText == "6 filters • 1 match in 3 loaded items")
   }
 
+  @Test("Filter inventory counts respect the other active facets")
+  @MainActor
+  func filterInventoryCountsRespectOtherActiveFacets() {
+    let betaWarning = SessionTimelineNode(
+      identity: .entry("entry-beta-warning"),
+      kind: .event,
+      timestamp: Date(timeIntervalSince1970: 1_900_000_011),
+      rawTimestamp: nil,
+      sourceLabel: "task_checkpoint",
+      entryKind: "task_checkpoint",
+      title: "Beta warning",
+      detail: nil,
+      agentID: "beta",
+      taskID: "task-1",
+      eventTone: .warning,
+      decision: nil,
+      semanticProperties: [.agent],
+      rawPayloadKeys: []
+    )
+    let betaCritical = SessionTimelineNode(
+      identity: .entry("entry-beta-critical"),
+      kind: .event,
+      timestamp: Date(timeIntervalSince1970: 1_900_000_012),
+      rawTimestamp: nil,
+      sourceLabel: "tool_result_error",
+      entryKind: "tool_result_error",
+      title: "Beta critical",
+      detail: nil,
+      agentID: "beta",
+      taskID: "task-2",
+      eventTone: .critical,
+      decision: nil,
+      semanticProperties: [.agent],
+      rawPayloadKeys: []
+    )
+    let alphaWarning = SessionTimelineNode(
+      identity: .entry("entry-alpha-warning"),
+      kind: .event,
+      timestamp: Date(timeIntervalSince1970: 1_900_000_013),
+      rawTimestamp: nil,
+      sourceLabel: "task_checkpoint",
+      entryKind: "task_checkpoint",
+      title: "Alpha warning",
+      detail: nil,
+      agentID: "alpha",
+      taskID: "task-3",
+      eventTone: .warning,
+      decision: nil,
+      semanticProperties: [.agent],
+      rawPayloadKeys: []
+    )
+
+    let filters = SessionTimelineFilterState(
+      query: "",
+      searchScope: .all,
+      tones: [.warning],
+      eventTypes: [],
+      agents: ["beta"],
+      tasks: [],
+      decisionSeverities: [],
+      semanticProperties: [],
+      rawPayloadKeys: []
+    )
+    let snapshot = SessionTimelineFilterSnapshot(
+      nodes: [betaWarning, betaCritical, alphaWarning],
+      filters: filters,
+      configuration: .default
+    )
+
+    #expect(snapshot.filteredNodeCount == 1)
+    #expect(snapshot.inventory.count(for: .warning) == 1)
+    #expect(snapshot.inventory.count(for: .critical) == 1)
+    #expect(
+      snapshot.inventory.eventTypes.first(where: { $0.id == "task_checkpoint" })?.count == 1
+    )
+    #expect(
+      snapshot.inventory.eventTypes.first(where: { $0.id == "tool_result_error" })?.count == 0
+    )
+  }
+
   @Test("Visibility stats switch to filtered match wording")
   func visibilityStatsSwitchToFilteredMatchWording() {
     let stats = SessionTimelineVisibilityStats(

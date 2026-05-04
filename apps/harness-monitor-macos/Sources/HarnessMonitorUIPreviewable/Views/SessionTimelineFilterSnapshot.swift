@@ -166,7 +166,7 @@ struct SessionTimelineFilterSnapshot: Equatable, Sendable {
     )
   }
 
-  private static func matches(
+  fileprivate static func matches(
     node: SessionTimelineNode,
     filters: SessionTimelineFilterState
   ) -> Bool {
@@ -226,6 +226,18 @@ struct SessionTimelineFilterSnapshot: Equatable, Sendable {
 
 private extension SessionTimelineFilterInventory {
   init(nodes: [SessionTimelineNode], filters: SessionTimelineFilterState) {
+    let availableTones = Set(nodes.compactMap(\.eventTone))
+    let availableEventTypes = Set(nodes.compactMap(\.entryKind))
+    let availableAgents = Set(nodes.compactMap(\.agentID))
+    let availableTasks = Set(nodes.compactMap(\.taskID))
+    let availableSeverities = Set(nodes.compactMap { $0.decision?.severity.rawValue })
+    let availableSemanticProperties = nodes.reduce(into: Set<SessionTimelineSemanticProperty>()) {
+      $0.formUnion($1.semanticProperties)
+    }
+    let availableRawKeys = nodes.reduce(into: Set<String>()) {
+      $0.formUnion($1.rawPayloadKeys)
+    }
+
     var toneCounts: [SessionTimelineTone: Int] = [:]
     var eventTypeCounts: [String: Int] = [:]
     var agentCounts: [String: Int] = [:]
@@ -234,48 +246,86 @@ private extension SessionTimelineFilterInventory {
     var semanticPropertyCounts: [SessionTimelineSemanticProperty: Int] = [:]
     var rawKeyCounts: [String: Int] = [:]
 
-    for node in nodes {
+    let toneNodes = Self.nodes(nodes, matching: filters.removingTones())
+    let eventTypeNodes = Self.nodes(nodes, matching: filters.removingEventTypes())
+    let agentNodes = Self.nodes(nodes, matching: filters.removingAgents())
+    let taskNodes = Self.nodes(nodes, matching: filters.removingTasks())
+    let severityNodes = Self.nodes(nodes, matching: filters.removingDecisionSeverities())
+    let semanticNodes = Self.nodes(nodes, matching: filters.removingSemanticProperties())
+    let rawKeyNodes = Self.nodes(nodes, matching: filters.removingRawPayloadKeys())
+
+    for node in toneNodes {
       if let eventTone = node.eventTone {
         toneCounts[eventTone, default: 0] += 1
       }
+    }
+    for node in eventTypeNodes {
       if let entryKind = node.entryKind {
         eventTypeCounts[entryKind, default: 0] += 1
       }
+    }
+    for node in agentNodes {
       if let agentID = node.agentID {
         agentCounts[agentID, default: 0] += 1
       }
+    }
+    for node in taskNodes {
       if let taskID = node.taskID {
         taskCounts[taskID, default: 0] += 1
       }
+    }
+    for node in severityNodes {
       if let severity = node.decision?.severity {
         severityCounts[severity.rawValue, default: 0] += 1
       }
+    }
+    for node in semanticNodes {
       for property in node.semanticProperties {
         semanticPropertyCounts[property, default: 0] += 1
       }
+    }
+    for node in rawKeyNodes {
       for rawKey in node.rawPayloadKeys {
         rawKeyCounts[rawKey, default: 0] += 1
       }
     }
 
+    for tone in availableTones.union(filters.tones) {
+      toneCounts[tone] = toneCounts[tone] ?? 0
+    }
+
     self.toneCounts = toneCounts
     eventTypes = Self.options(
       counts: eventTypeCounts,
+      available: availableEventTypes,
       selected: filters.eventTypes,
       label: Self.humanizedEventType
     )
-    agents = Self.options(counts: agentCounts, selected: filters.agents, label: { $0 })
-    tasks = Self.options(counts: taskCounts, selected: filters.tasks, label: { $0 })
+    agents = Self.options(
+      counts: agentCounts,
+      available: availableAgents,
+      selected: filters.agents,
+      label: { $0 }
+    )
+    tasks = Self.options(
+      counts: taskCounts,
+      available: availableTasks,
+      selected: filters.tasks,
+      label: { $0 }
+    )
     decisionSeverities = Self.severityOptions(
       counts: severityCounts,
+      available: availableSeverities,
       selected: filters.decisionSeverities
     )
     semanticProperties = Self.semanticPropertyOptions(
       counts: semanticPropertyCounts,
+      available: availableSemanticProperties,
       selected: filters.semanticProperties
     )
     rawPayloadKeys = Self.options(
       counts: rawKeyCounts,
+      available: availableRawKeys,
       selected: filters.rawPayloadKeys,
       label: { $0 }
     )
@@ -283,11 +333,12 @@ private extension SessionTimelineFilterInventory {
 
   static func options(
     counts: [String: Int],
+    available: Set<String>,
     selected: Set<String>,
     label: (String) -> String
   ) -> [SessionTimelineFacetOption] {
     var merged = counts
-    for value in selected {
+    for value in available.union(selected) {
       merged[value] = merged[value] ?? 0
     }
     return merged
@@ -299,10 +350,11 @@ private extension SessionTimelineFilterInventory {
 
   static func severityOptions(
     counts: [String: Int],
+    available: Set<String>,
     selected: Set<String>
   ) -> [SessionTimelineFacetOption] {
     var merged = counts
-    for value in selected {
+    for value in available.union(selected) {
       merged[value] = merged[value] ?? 0
     }
     return DecisionSeverity.sidebarOrdering.compactMap { severity in
@@ -319,9 +371,10 @@ private extension SessionTimelineFilterInventory {
 
   static func semanticPropertyOptions(
     counts: [SessionTimelineSemanticProperty: Int],
+    available: Set<SessionTimelineSemanticProperty>,
     selected: Set<SessionTimelineSemanticProperty>
   ) -> [SessionTimelineFacetOption] {
-    let merged = Set(counts.keys).union(selected)
+    let merged = available.union(selected)
     return SessionTimelineSemanticProperty.allCases.compactMap { property in
       guard merged.contains(property) else {
         return nil
@@ -350,6 +403,15 @@ private extension SessionTimelineFilterInventory {
         segment.prefix(1).uppercased() + segment.dropFirst().lowercased()
       }
       .joined(separator: " ")
+  }
+
+  static func nodes(
+    _ sourceNodes: [SessionTimelineNode],
+    matching filters: SessionTimelineFilterState
+  ) -> [SessionTimelineNode] {
+    sourceNodes.filter { node in
+      SessionTimelineFilterSnapshot.matches(node: node, filters: filters)
+    }
   }
 }
 
