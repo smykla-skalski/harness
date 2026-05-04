@@ -27,13 +27,13 @@ struct AcpRuntimeStatusStrip: View {
     return observedAt.addingTimeInterval(TimeInterval(remaining) / 1000)
   }
 
-  private var subtitle: String {
+  private var detailLabel: String {
     switch presentation {
     case .full:
       if let projectDir = runtimeState.projectDir, projectDir.isEmpty == false {
         abbreviateHomePath(projectDir)
       } else {
-        "ACP runtime active"
+        "Runtime telemetry available"
       }
     case .compact:
       "Runtime telemetry"
@@ -59,16 +59,18 @@ struct AcpRuntimeStatusStrip: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-        Text("ACP runtime")
-          .scaledFont(.caption.bold())
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        Text(subtitle)
-          .scaledFont(.caption)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .lineLimit(1)
-      }
+    VStack(
+      alignment: .leading,
+      spacing: presentation == .full ? HarnessMonitorTheme.spacingSM : HarnessMonitorTheme.spacingXS
+    ) {
+      Text("ACP runtime")
+        .scaledFont(.caption.bold())
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      Text(detailLabel)
+        .scaledFont(presentation == .full ? .caption.monospaced() : .caption)
+        .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
+        .lineLimit(1)
+        .truncationMode(.middle)
       ViewThatFits(in: .horizontal) {
         HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
           statusChips
@@ -82,11 +84,11 @@ struct AcpRuntimeStatusStrip: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
       RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .fill(HarnessMonitorTheme.accent.opacity(presentation == .full ? 0.12 : 0.08))
+        .fill(HarnessMonitorTheme.ink.opacity(presentation == .full ? 0.05 : 0.04))
     )
     .overlay {
       RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .stroke(HarnessMonitorTheme.accent.opacity(0.25), lineWidth: 1)
+        .stroke(HarnessMonitorTheme.controlBorder.opacity(0.55), lineWidth: 1)
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(
@@ -356,11 +358,11 @@ private struct AcpRuntimeChip: View {
     .harnessPillPadding()
     .background(
       Capsule(style: .continuous)
-        .fill(tint.opacity(0.12))
+        .fill(tint.opacity(0.08))
     )
     .overlay {
       Capsule(style: .continuous)
-        .stroke(tint.opacity(0.25), lineWidth: 1)
+        .stroke(tint.opacity(0.18), lineWidth: 1)
     }
     .accessibilityElement(children: .combine)
     .accessibilityLabel(accessibilityLabel)
