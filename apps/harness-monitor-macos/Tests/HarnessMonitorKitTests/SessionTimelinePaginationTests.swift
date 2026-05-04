@@ -103,6 +103,60 @@ struct SessionTimelineNavigationTests {
     )
   }
 
+  @Test("Table row measurement uses visible clip width when scrollers shrink content")
+  func tableRowMeasurementUsesVisibleClipWidthWhenScrollersShrinkContent() {
+    #expect(
+      SessionTimelineTableMetrics.resolvedColumnWidth(
+        proposedWidth: 960,
+        visibleContentWidth: 945
+      ) == 945
+    )
+    #expect(
+      SessionTimelineTableMetrics.resolvedColumnWidth(
+        proposedWidth: 960,
+        visibleContentWidth: 0
+      ) == 960
+    )
+  }
+
+  @Test("Signal timeline rows prefer compact layout while liveness rows stay wide")
+  func signalTimelineRowsPreferCompactLayoutWhileLivenessRowsStayWide() {
+    let signalRow = SessionTimelineRow.rows(
+      for: SessionTimelineNodeBuilder(
+        sessionID: "session-1",
+        entries: [
+          makeTimelineEntry(
+            kind: "signal_acknowledged",
+            agentID: "copilot-20260503203910393668000",
+            summary: "sig-20260503204520733172000 acknowledged by copilot-20260503203910393668000: Expired"
+          )
+        ],
+        decisions: []
+      )
+      .build(),
+      configuration: .default
+    )[0]
+
+    let livenessRow = SessionTimelineRow.rows(
+      for: SessionTimelineNodeBuilder(
+        sessionID: "session-1",
+        entries: [
+          makeTimelineEntry(
+            kind: "liveness_synced",
+            agentID: "harness-app",
+            summary: "Liveness sync: 0 disconnected, 1 idled"
+          )
+        ],
+        decisions: []
+      )
+      .build(),
+      configuration: .default
+    )[0]
+
+    #expect(SessionTimelineTableMetrics.prefersCompactLayout(for: signalRow))
+    #expect(!SessionTimelineTableMetrics.prefersCompactLayout(for: livenessRow))
+  }
+
   @Test("Table scroll restoration preserves anchor offset after rows insert above")
   func tableScrollRestorationPreservesAnchorOffsetAfterRowsInsertAbove() {
     let restoredY = SessionTimelineTableMetrics.restoredScrollY(

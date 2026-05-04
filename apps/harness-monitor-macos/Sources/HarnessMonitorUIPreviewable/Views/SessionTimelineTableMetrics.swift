@@ -9,6 +9,24 @@ enum SessionTimelineTableMetrics {
   private static let singleLineActionHeight: CGFloat = 42
   private static let wrappedActionHeight: CGFloat = 78
 
+  static func prefersCompactLayout(for row: SessionTimelineRow) -> Bool {
+    row.node.sourceLabel.hasPrefix("signal_")
+  }
+
+  static func resolvedColumnWidth(
+    proposedWidth: CGFloat,
+    visibleContentWidth: CGFloat
+  ) -> CGFloat {
+    let safeProposedWidth = max(proposedWidth, 0)
+    guard visibleContentWidth > 1 else {
+      return safeProposedWidth
+    }
+    guard safeProposedWidth > 1 else {
+      return visibleContentWidth
+    }
+    return min(safeProposedWidth, visibleContentWidth)
+  }
+
   static func estimatedHeight(for row: SessionTimelineRow) -> CGFloat {
     var height = estimatedBaseRowHeight
     if row.dayDividerLabel != nil {
