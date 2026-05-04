@@ -326,9 +326,10 @@ extension DaemonController {
       switch try refreshManagedLaunchAgent(currentStamp: currentStamp) {
       case .refreshed:
         state.refreshedManagedLaunchAgentDuringWarmUp = true
-      case .skippedSiblingOwnsLane, .skippedNotManagedDaemon:
-        // Leave the flag false so we re-evaluate next tick; the sibling
-        // owner is the one expected to bring a matching daemon up.
+      case .skippedSiblingOwnsLane, .skippedNotManagedDaemon, .skippedLockContended:
+        // Leave the flag false so we re-evaluate next tick; the
+        // sibling owner is the one expected to bring a matching
+        // daemon up, or the lock will free.
         break
       }
     }

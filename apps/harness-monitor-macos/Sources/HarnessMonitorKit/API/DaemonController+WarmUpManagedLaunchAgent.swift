@@ -67,38 +67,59 @@ extension DaemonController {
       // operate on an external daemon lane regardless of caller.
       return .skippedNotManagedDaemon
     }
-    switch currentManagedLaunchAgentOwnership() {
-    case .ownedByLiveSibling(let owner):
-      HarnessMonitorLogger.lifecycle.warning(
-        """
-        Refusing managed launch-agent refresh: another live Monitor instance \
-        owns io.harnessmonitor.daemon. \
-        sibling_pid=\(owner.pid, privacy: .public) \
-        sibling_executable=\(owner.executablePath, privacy: .public) \
-        registered_at=\(owner.registeredAt.timeIntervalSince1970, privacy: .public). \
-        Set HARNESS_MONITOR_RUNTIME_PROFILE on this build to claim a \
-        separate lane.
-        """
-      )
-      return .skippedSiblingOwnsLane(owner)
-    case .staleOwnership:
-      // Owner record survived a hard exit; reclaim before refreshing
-      // so the next register writes an authoritative marker.
+
+    let outcome = try withManagedLaunchAgentLock {
+      () throws -> ManagedLaunchAgentRefreshDecision in
+      // Re-decide ownership under the lock so the marker we read is
+      // serialized against any sibling Monitor's mid-flight refresh.
+      switch currentManagedLaunchAgentOwnership() {
+      case .ownedByLiveSibling(let owner):
+        HarnessMonitorLogger.lifecycle.warning(
+          """
+          Refusing managed launch-agent refresh: another live Monitor instance \
+          owns io.harnessmonitor.daemon. \
+          sibling_pid=\(owner.pid, privacy: .public) \
+          sibling_executable=\(owner.executablePath, privacy: .public) \
+          registered_at=\(owner.registeredAt.timeIntervalSince1970, privacy: .public). \
+          Set HARNESS_MONITOR_RUNTIME_PROFILE on this build to claim a \
+          separate lane.
+          """
+        )
+        return .skippedSiblingOwnsLane(owner)
+      case .staleOwnership:
+        // Owner record survived a hard exit; reclaim before
+        // refreshing so the next register writes an authoritative
+        // marker.
+        clearManagedLaunchAgentOwner()
+      case .unowned, .ownedBySelf:
+        break
+      }
+
+      let stampURL = HarnessMonitorPaths.managedLaunchAgentBundleStampURL(using: environment)
+      try launchAgentManager.unregister()
+      clearManagedLaunchAgentBundleStamp(at: stampURL)
       clearManagedLaunchAgentOwner()
-    case .unowned, .ownedBySelf:
-      break
+      try launchAgentManager.register()
+      if launchAgentManager.registrationState() == .enabled {
+        try persistManagedLaunchAgentBundleStamp(currentStamp, to: stampURL)
+        try persistCurrentManagedLaunchAgentOwner()
+      }
+      return .refreshed
     }
 
-    let stampURL = HarnessMonitorPaths.managedLaunchAgentBundleStampURL(using: environment)
-    try launchAgentManager.unregister()
-    clearManagedLaunchAgentBundleStamp(at: stampURL)
-    clearManagedLaunchAgentOwner()
-    try launchAgentManager.register()
-    if launchAgentManager.registrationState() == .enabled {
-      try persistManagedLaunchAgentBundleStamp(currentStamp, to: stampURL)
-      try persistCurrentManagedLaunchAgentOwner()
+    switch outcome {
+    case .acquired(let decision):
+      return decision
+    case .contended:
+      HarnessMonitorLogger.lifecycle.warning(
+        """
+        Skipping managed launch-agent refresh: another Monitor process is \
+        currently holding the daemon-root lock. Will retry on next warm-up \
+        entry.
+        """
+      )
+      return .skippedLockContended
     }
-    return .refreshed
   }
 
   func queueDeferredManagedLaunchAgentRefresh(_ stamp: ManagedLaunchAgentBundleStamp) async {
@@ -219,10 +240,11 @@ extension DaemonController {
       state.pendingBundleStampRefresh = nil
       state.refreshedManagedLaunchAgentDuringWarmUp = true
       return true
-    case .skippedSiblingOwnsLane, .skippedNotManagedDaemon:
+    case .skippedSiblingOwnsLane, .skippedNotManagedDaemon, .skippedLockContended:
       // A sibling Monitor owns the lane (or this is not a managed
-      // daemon). Leave the pending stamp queued so the next warm-up
-      // tick can re-evaluate without us claiming we refreshed.
+      // daemon, or the daemon-root lock is currently held). Leave
+      // the pending stamp queued so the next warm-up tick can
+      // re-evaluate without us claiming we refreshed.
       return false
     }
   }

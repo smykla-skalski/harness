@@ -40,6 +40,11 @@ public enum ManagedLaunchAgentRefreshDecision: Equatable, Sendable {
   case refreshed
   case skippedSiblingOwnsLane(ManagedLaunchAgentOwner)
   case skippedNotManagedDaemon
+  /// Another Monitor process holds the daemon-root lock. We don't
+  /// know which sibling, only that the lane is mid-transaction.
+  /// Caller should leave its pending state queued and re-evaluate
+  /// on the next warm-up entry.
+  case skippedLockContended
 }
 
 public typealias ProcessLivenessProbe = @Sendable (Int32) -> ProcessLiveness
