@@ -38,30 +38,6 @@ fn production_network_lifecycle() {
 }
 
 #[test]
-#[ignore] // needs Docker daemon
-fn production_bollard_run_detached_returns_id() {
-    contract_run_detached_returns_id(&production_bollard_runtime());
-}
-
-#[test]
-#[ignore]
-fn production_bollard_is_running_reflects_state() {
-    contract_is_running_reflects_state(&production_bollard_runtime());
-}
-
-#[test]
-#[ignore]
-fn production_bollard_remove_is_idempotent() {
-    contract_remove_is_idempotent(&production_bollard_runtime());
-}
-
-#[test]
-#[ignore]
-fn production_bollard_network_lifecycle() {
-    contract_network_lifecycle(&production_bollard_runtime());
-}
-
-#[test]
 #[ignore] // needs Docker daemon and network pull access
 fn production_bollard_run_detached_pulls_missing_image() {
     const IMAGE: &str = "docker.io/library/busybox:1.36.1";
