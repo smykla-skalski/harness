@@ -231,8 +231,8 @@ struct Phase5ViewProfilingTests {
       height: 1_024
     )
     render(
-      SessionCockpitTimelineSection(
-        sessionID: PreviewFixtures.summary.sessionId,
+      MonitorTimelineSection(
+        host: .session(PreviewFixtures.summary.sessionId),
         timeline: PreviewFixtures.timeline,
         timelineWindow: .fallbackMetadata(for: PreviewFixtures.timeline),
         decisions: [],
@@ -252,7 +252,7 @@ struct Phase5ViewProfilingTests {
       ) != nil
         && viewBodySpanAttributes(
           in: collector.traceCollector,
-          viewName: "SessionCockpitTimelineSection"
+          viewName: "MonitorTimelineSection"
         ) != nil
     }
 
@@ -265,7 +265,7 @@ struct Phase5ViewProfilingTests {
     #expect(
       viewBodySpanAttributes(
         in: collector.traceCollector,
-        viewName: "SessionCockpitTimelineSection"
+        viewName: "MonitorTimelineSection"
       ) != nil
     )
   }

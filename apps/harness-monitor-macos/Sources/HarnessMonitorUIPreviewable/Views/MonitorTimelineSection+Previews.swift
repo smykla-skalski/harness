@@ -1,10 +1,10 @@
 import HarnessMonitorKit
 import SwiftUI
 
-extension SessionCockpitTimelineSection {
+extension MonitorTimelineSection {
   static var richPreview: some View {
-    SessionCockpitTimelineSection(
-      sessionID: PreviewFixtures.summary.sessionId,
+    MonitorTimelineSection(
+      host: .session(PreviewFixtures.summary.sessionId),
       timeline: PreviewFixtures.richSessionTimeline,
       timelineWindow: PreviewFixtures.richSessionTimelineWindow,
       decisions: PreviewFixtures.richSessionTimelineDecisions,
@@ -17,8 +17,8 @@ extension SessionCockpitTimelineSection {
   }
 
   static var signalSquishPreview: some View {
-    SessionCockpitTimelineSection(
-      sessionID: PreviewFixtures.summary.sessionId,
+    MonitorTimelineSection(
+      host: .session(PreviewFixtures.summary.sessionId),
       timeline: PreviewFixtures.signalSquishTimeline,
       timelineWindow: PreviewFixtures.signalSquishTimelineWindow,
       decisions: PreviewFixtures.signalSquishTimelineDecisions,
@@ -32,12 +32,12 @@ extension SessionCockpitTimelineSection {
 }
 
 #Preview("Timeline Signal Squish") {
-  SessionCockpitTimelineSection.signalSquishPreview
+  MonitorTimelineSection.signalSquishPreview
 }
 
 #Preview("Timeline Cursor") {
-  SessionCockpitTimelineSection(
-    sessionID: PreviewFixtures.summary.sessionId,
+  MonitorTimelineSection(
+    host: .session(PreviewFixtures.summary.sessionId),
     timeline: Array(PreviewFixtures.pagedTimeline.prefix(18)),
     timelineWindow: TimelineWindowResponse(
       revision: 1,
