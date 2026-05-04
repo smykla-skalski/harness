@@ -104,6 +104,7 @@ async fn start_test_daemon(db: Option<DaemonDb>) -> TestDaemon {
         codex_controller,
         acp_agent_manager: AcpAgentManagerHandle::new(sender.clone(), db_slot.clone()),
         agent_tui_manager,
+        managed_agent_mutation_locks: harness::daemon::http::ManagedAgentMutationLocks::default(),
     };
 
     tokio::spawn(async move {
