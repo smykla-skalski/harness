@@ -13,6 +13,8 @@ struct AgentDetailSection: View {
   @State private var signalMessage = ""
   @State private var signalActionHint = ""
   @State private var selectedRole: SessionRole = .worker
+  @State private var transcriptAnnouncer = MonitorTimelineLiveRegionThrottle()
+  @State private var lastAnnouncedTimelineEntryId: String?
 
   init(
     store: HarnessMonitorStore,
@@ -396,7 +398,13 @@ struct AgentDetailSection: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .task(id: agent.agentId) { hydrateDraft() }
+    .task(id: agent.agentId) {
+      hydrateDraft()
+      lastAnnouncedTimelineEntryId = agentTimelineEntries.last?.entryId
+    }
+    .onChange(of: agentTimelineEntries.last?.entryId) { _, newID in
+      announceLatestTimelineEntryIfNeeded(newID: newID)
+    }
     .accessibilityTestProbe(
       HarnessMonitorAccessibility.workspaceDetailCard,
       label: agent.name,
@@ -415,6 +423,14 @@ struct AgentDetailSection: View {
 
   static func draftActionHintKey(agentID: String) -> String {
     "harness.workspace.agentDraft.\(agentID).actionHint"
+  }
+
+  private func announceLatestTimelineEntryIfNeeded(newID: String?) {
+    guard let newID, newID != lastAnnouncedTimelineEntryId else { return }
+    lastAnnouncedTimelineEntryId = newID
+    guard let entry = agentTimelineEntries.last(where: { $0.entryId == newID }) else { return }
+    let priority = MonitorTimelineLiveRegion.priority(for: entry.kind)
+    transcriptAnnouncer.announceIfAllowed(entry.summary, priority: priority)
   }
 
   private func hydrateDraft() {
