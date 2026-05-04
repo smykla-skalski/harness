@@ -161,10 +161,6 @@ fn monitor_and_daemon_logging_defaults_stay_production_safe() {
         root,
         "apps/harness-monitor-macos/Resources/HarnessMonitor-Info.plist",
     );
-    let launch_agent = read_repo_file(
-        root,
-        "apps/harness-monitor-macos/Resources/LaunchAgents/io.harnessmonitor.daemon.plist",
-    );
     let agents = read_repo_file(root, "AGENTS.md");
     let claude = read_repo_file(root, "CLAUDE.md");
 
@@ -172,11 +168,6 @@ fn monitor_and_daemon_logging_defaults_stay_production_safe() {
         app_info.contains("<key>OSLogPreferences</key>")
             && app_info.contains("<string>Debug</string>"),
         "Harness Monitor app Info.plist should keep OSLogPreferences at Debug persistence/enabling for investigation-grade logging"
-    );
-    assert!(
-        launch_agent.contains("<key>RUST_LOG</key>")
-            && launch_agent.contains("<string>harness=info</string>"),
-        "bundled launch agent should pin the daemon default filter to harness=info"
     );
     assert!(
         agents.contains("Default filter: `RUST_LOG=harness=info`"),

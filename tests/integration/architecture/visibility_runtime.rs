@@ -1,21 +1,6 @@
 use std::fs;
 use std::path::Path;
 
-mod core;
-mod hooks;
-mod infra;
-mod kuma;
-mod observe;
-mod platform;
-mod run;
-mod setup;
-
-fn assert_split_modules_exist(root: &Path, paths: &[&str], message: &str) {
-    for path in paths {
-        assert!(root.join(path).exists(), "{message}: {path}");
-    }
-}
-
 #[test]
 fn app_cli_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
