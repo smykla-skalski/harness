@@ -149,6 +149,12 @@ actor RecordingDaemonController: DaemonControlling {
     return "removed"
   }
 
+  func repairLaunchAgentRegistration() async throws -> String {
+    launchAgentInstalled = true
+    lastEventMessage = "launch agent re-registered"
+    return "launch agent re-registered"
+  }
+
   func recordedRegisterLaunchAgentCallCount() async -> Int {
     registerLaunchAgentCallCount
   }

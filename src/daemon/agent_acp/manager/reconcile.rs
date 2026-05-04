@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{AcpAgentInspectResponse, AcpAgentManagerHandle, AcpAgentSnapshot};
 use crate::errors::CliError;
+use crate::workspace::utc_now;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AcpAgentReconcileResponse {
@@ -40,7 +41,7 @@ impl AcpAgentManagerHandle {
         Ok(AcpAgentReconcileResponse {
             inspect: AcpAgentInspectResponse {
                 agents: inspect_agents,
-                daemon_perceived_now: Some(crate::workspace::utc_now()),
+                daemon_perceived_now: Some(utc_now()),
                 available: true,
                 issue_message: None,
             },

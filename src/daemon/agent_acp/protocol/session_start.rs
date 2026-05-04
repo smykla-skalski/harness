@@ -8,6 +8,10 @@ use super::session_guard::{RouteTarget, SessionRouteGuard};
 use super::{AcpAgentManagerHandle, AcpSessionSupervisor, send_initialize, send_new_session};
 use crate::errors::CliError;
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "ACP initialize+bind needs all of these on one call site to keep the route-registration ordering invariant explicit"
+)]
 pub(super) async fn initialize_and_bind_runtime_session(
     manager: &AcpAgentManagerHandle,
     supervisor: &Arc<AcpSessionSupervisor>,

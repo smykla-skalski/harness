@@ -272,6 +272,19 @@ extension HarnessMonitorStore {
     }
   }
 
+  public func repairLaunchAgent() async {
+    isDaemonActionInFlight = true
+    defer { isDaemonActionInFlight = false }
+
+    do {
+      let outcome = try await daemonController.repairLaunchAgentRegistration()
+      await refreshDaemonStatus()
+      presentSuccessFeedback("Repair launch agent: \(outcome)")
+    } catch {
+      presentFailureFeedback(error.localizedDescription)
+    }
+  }
+
   public func refreshDaemonStatus() async {
     do {
       daemonStatus = try await daemonController.daemonStatus()

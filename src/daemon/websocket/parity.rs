@@ -419,6 +419,10 @@ pub(crate) async fn dispatch_signal_ack(
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 async fn dispatch_managed_agent_response(
     request: &WsRequest,
     state: &DaemonHttpState,

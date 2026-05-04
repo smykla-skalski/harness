@@ -57,6 +57,10 @@ pub fn spawn_notification_batcher(
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "select! + per-session ring drains in one loop; split would obscure the back-pressure invariant"
+)]
 async fn notification_batch_loop(
     mut notification_rx: mpsc::Receiver<RoutedSessionNotification>,
     event_tx: mpsc::Sender<EventBatch>,

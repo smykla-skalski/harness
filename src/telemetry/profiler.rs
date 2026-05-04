@@ -93,6 +93,10 @@ impl DaemonProfiler {
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 fn daemon_profiler_settings(
     service: RuntimeService,
     export: &ResolvedTelemetryConfig,
@@ -140,8 +144,7 @@ fn pyroscope_endpoint_reachable(url: &str, timeout: Duration) -> bool {
 // Extract the `host:port` slice from a `scheme://host[:port][/path]` URL,
 // defaulting the port from the scheme when none is supplied.
 fn parse_authority(url: &str) -> Option<String> {
-    let after_scheme = url.split_once("://").map(|(scheme, rest)| (scheme, rest))?;
-    let (scheme, rest) = after_scheme;
+    let (scheme, rest) = url.split_once("://")?;
     let authority = rest.split(['/', '?', '#']).next().unwrap_or(rest);
     if authority.is_empty() {
         return None;

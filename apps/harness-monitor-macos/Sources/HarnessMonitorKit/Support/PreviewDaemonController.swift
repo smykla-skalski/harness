@@ -177,6 +177,11 @@ public actor PreviewDaemonController: DaemonControlling {
     return "removed"
   }
 
+  public func repairLaunchAgentRegistration() async throws -> String {
+    isLaunchAgentInstalled = true
+    return "launch agent re-registered"
+  }
+
   private func makeClient() -> PreviewHarnessClient {
     PreviewHarnessClient(
       fixtures: fixtures,

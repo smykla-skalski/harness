@@ -58,6 +58,11 @@ actor ManagedWarmUpRecoveryDaemonController: DaemonControlling {
     return "launch agent removed"
   }
 
+  func repairLaunchAgentRegistration() async throws -> String {
+    operations.append("repair")
+    return "launch agent re-registered"
+  }
+
   func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState {
     operations.append("register")
     return .enabled
@@ -157,6 +162,11 @@ actor ManagedDaemonVersionRecoveryDaemonController: DaemonControlling {
     return "launch agent removed"
   }
 
+  func repairLaunchAgentRegistration() async throws -> String {
+    operations.append("repair")
+    return "launch agent re-registered"
+  }
+
   func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState {
     operations.append("register")
     return .enabled
@@ -253,6 +263,11 @@ actor ManagedLaunchAgentRefreshThrottleDaemonController: DaemonControlling {
     return "launch agent removed"
   }
 
+  func repairLaunchAgentRegistration() async throws -> String {
+    operations.append("repair")
+    return "launch agent re-registered"
+  }
+
   func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState {
     operations.append("register")
     return .enabled
@@ -346,6 +361,11 @@ actor ManagedWarmUpLateBootstrapDaemonController: DaemonControlling {
   func removeLaunchAgent() async throws -> String {
     operations.append("remove")
     return "launch agent removed"
+  }
+
+  func repairLaunchAgentRegistration() async throws -> String {
+    operations.append("repair")
+    return "launch agent re-registered"
   }
 
   func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState {

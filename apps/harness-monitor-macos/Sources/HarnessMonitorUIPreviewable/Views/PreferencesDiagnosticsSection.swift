@@ -69,6 +69,7 @@ public struct PreferencesDiagnosticsSnapshot {
 public struct PreferencesDiagnosticsSection: View {
   public let snapshot: PreferencesDiagnosticsSnapshot
   public let revealPermissionLog: (String, String?) -> RevealAcpPermissionLogResult
+  public let repairLaunchAgent: (() async -> Void)?
   @State private var permissionLogErrorsByRunID: [String: String] = [:]
   @State private var permissionLogRevealStatusesByRunID: [String: String] = [:]
 
@@ -76,10 +77,12 @@ public struct PreferencesDiagnosticsSection: View {
     snapshot: PreferencesDiagnosticsSnapshot,
     revealPermissionLog: @escaping (String, String?) -> RevealAcpPermissionLogResult = { _, _ in
       .unavailable
-    }
+    },
+    repairLaunchAgent: (() async -> Void)? = nil
   ) {
     self.snapshot = snapshot
     self.revealPermissionLog = revealPermissionLog
+    self.repairLaunchAgent = repairLaunchAgent
   }
 
   public var body: some View {
@@ -94,7 +97,8 @@ public struct PreferencesDiagnosticsSection: View {
         externalSessionCount: snapshot.externalSessionCount,
         lastExternalSessionAttachOutcome: snapshot.lastExternalSessionAttachOutcome,
         lastExternalSessionAttachSucceeded: snapshot.lastExternalSessionAttachSucceeded,
-        lastEvent: snapshot.lastEvent
+        lastEvent: snapshot.lastEvent,
+        repairLaunchAgent: repairLaunchAgent
       )
       PreferencesAcpPermissionLogSection(
         runs: snapshot.acpPermissionLogRuns,

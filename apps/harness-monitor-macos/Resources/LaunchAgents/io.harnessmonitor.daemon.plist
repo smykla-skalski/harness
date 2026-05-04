@@ -18,7 +18,12 @@
 		<string>1</string>
 	</dict>
 	<key>KeepAlive</key>
-	<true/>
+	<dict>
+		<key>SuccessfulExit</key>
+		<false/>
+		<key>Crashed</key>
+		<true/>
+	</dict>
 	<key>Label</key>
 	<string>io.harnessmonitor.daemon</string>
 	<key>LimitLoadToSessionType</key>
@@ -37,5 +42,9 @@
 	</array>
 	<key>RunAtLoad</key>
 	<true/>
+	<key>StandardOutPath</key>
+	<string>~/Library/Logs/io.harnessmonitor.daemon.stdout.log</string>
+	<key>StandardErrorPath</key>
+	<string>~/Library/Logs/io.harnessmonitor.daemon.stderr.log</string>
 </dict>
 </plist>

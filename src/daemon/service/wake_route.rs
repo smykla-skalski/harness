@@ -1,4 +1,4 @@
-// TRIPWIRE TODO (council debate, axes 1+2):
+// TRIPWIRE TODO:
 //   - If a third `ManagedAgentKind` lands, prefer extending the kind enum +
 //     a third arm here over adding a fourth `WakeRoute` variant.
 //   - If this file ever passes ~350 lines or grows non-routing logic, fold it
@@ -12,7 +12,73 @@ use std::fmt;
 
 use super::signals::agent_tui_id_for_registration;
 use super::{AcpAgentManagerHandle, AgentRegistration, AgentTuiManagerHandle, session_service};
+use crate::daemon::state::append_event_best_effort;
 use crate::session::types::{ManagedAgentKind, ManagedAgentRef};
+
+/// Severity of a single ACP wake-decision telemetry record.
+#[derive(Clone, Copy)]
+pub(crate) enum WakeEventLevel {
+    Info,
+    Warn,
+    Error,
+}
+
+impl WakeEventLevel {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Info => "info",
+            Self::Warn => "warn",
+            Self::Error => "error",
+        }
+    }
+}
+
+/// Single source-of-truth for ACP wake-decision telemetry. Fans the same
+/// payload into both observation pipelines so the line operators grep in
+/// `events.jsonl` matches what `tracing` emits for unified-log queries:
+///
+///   - `tracing::{info,warn,error}!` at `target = "harness::wake"` with a
+///     structured `kind` field and the rendered `acp_wake.<kind> k=v ...`
+///     message.
+///   - `append_event_best_effort(level, message)` to `events.jsonl` so the
+///     diagnostics surface and any downstream regex consumer see the same
+///     string.
+///
+/// Co-locating formatting here keeps the seven wake call sites from drifting
+/// against each other, and reduces a future migration (typed
+/// `DaemonAuditEvent::AcpWake { kind, fields }` enum) to a one-file change.
+///
+/// TRIPWIRE: if a second programmatic consumer parses these strings
+/// (per-reason metrics, alerting, dashboards), promote `DaemonAuditEvent`
+/// to a typed enum so the schema is enforced by the compiler instead of
+/// by greppers.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+pub(crate) fn record_wake_event(
+    level: WakeEventLevel,
+    kind: &'static str,
+    fields: &[(&'static str, &dyn fmt::Display)],
+) {
+    use std::fmt::Write as _;
+    let mut message = format!("acp_wake.{kind}");
+    for (key, value) in fields {
+        let _ = write!(message, " {key}={value}");
+    }
+    match level {
+        WakeEventLevel::Info => {
+            tracing::info!(target: "harness::wake", kind, %message);
+        }
+        WakeEventLevel::Warn => {
+            tracing::warn!(target: "harness::wake", kind, %message);
+        }
+        WakeEventLevel::Error => {
+            tracing::error!(target: "harness::wake", kind, %message);
+        }
+    }
+    append_event_best_effort(level.as_str(), &message);
+}
 
 /// Bundle of managed-agent transport handles. Threading `WakeDispatch`
 /// through mutation entry points keeps the call signatures stable when a
@@ -156,10 +222,6 @@ fn acp_route<'a>(
     }
 }
 
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-)]
 pub(crate) fn log_wake_attempt(
     session_id: &str,
     record: &session_service::TaskStartSignalRecord,
@@ -170,14 +232,17 @@ pub(crate) fn log_wake_attempt(
         WakeRoute::Acp { acp_id, .. } => ("acp", (*acp_id).into()),
         WakeRoute::None { reason } => ("none", reason.to_string().into()),
     };
-    tracing::info!(
-        session_id,
-        agent_id = %record.agent_id,
-        runtime = %record.runtime,
-        signal_id = %record.signal.signal_id,
-        managed_kind,
-        route_target = %route_target,
-        "wake attempt"
+    record_wake_event(
+        WakeEventLevel::Info,
+        "attempt",
+        &[
+            ("managed_kind", &managed_kind),
+            ("route_target", &route_target),
+            ("session_id", &session_id),
+            ("agent_id", &record.agent_id),
+            ("runtime", &record.runtime),
+            ("signal_id", &record.signal.signal_id),
+        ],
     );
 }
 

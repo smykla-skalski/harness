@@ -74,7 +74,8 @@ public struct PreferencesView: View {
                 return .unavailable
               }
               return store.revealAcpPermissionLogInFinder(runID: runID, rawPath: path)
-            }
+            },
+            repairLaunchAgent: { await store.repairLaunchAgent() }
           )
         }
       }

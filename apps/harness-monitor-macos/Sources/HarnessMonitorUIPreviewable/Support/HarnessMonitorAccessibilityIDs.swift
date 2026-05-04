@@ -82,6 +82,8 @@ public enum HarnessMonitorAccessibility {
   public static let preferencesMCPRegistryHostToggle =
     "harness.preferences.mcp.registry-host"
   public static let preferencesMCPStatus = "harness.preferences.mcp.status"
+  public static let preferencesLaunchAgentRepairButton =
+    "harness.preferences.diagnostics.launch-agent.repair"
   public static let preferencesVoiceSection = "harness.preferences.voice"
   public static let preferencesVoiceLocaleField = "harness.preferences.voice.locale-field"
   public static let preferencesVoiceLocalePicker = "harness.preferences.voice.locale-picker"
