@@ -229,6 +229,105 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testCockpitNewAgentButtonSharesAgentsHeaderRow() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "cockpit"]
+    )
+    let sessionRow = previewSessionTrigger(in: app)
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
+    tapPreviewSession(in: app)
+
+    let headerCardFrame = frameElement(
+      in: app, identifier: Accessibility.sessionHeaderCardFrame)
+    let agentsHeaderFrame = frameElement(
+      in: app, identifier: Accessibility.sessionAgentListHeaderFrame)
+    let createAgentButton = button(in: app, identifier: Accessibility.sessionAgentCreateOpenButton)
+    let createAgentButtonFrame = frameElement(
+      in: app, identifier: "\(Accessibility.sessionAgentCreateOpenButton).frame")
+
+    XCTAssertTrue(waitForElement(headerCardFrame, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(agentsHeaderFrame, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(createAgentButton, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(createAgentButtonFrame, timeout: Self.actionTimeout))
+
+    XCTAssertGreaterThan(
+      createAgentButtonFrame.frame.minY,
+      headerCardFrame.frame.maxY,
+      "New Agent should render in the agents section instead of the cockpit header"
+    )
+    XCTAssertEqual(
+      createAgentButtonFrame.frame.maxX,
+      agentsHeaderFrame.frame.maxX,
+      accuracy: 12,
+      "New Agent should align with the trailing edge of the agents header row"
+    )
+    XCTAssertEqual(
+      createAgentButtonFrame.frame.midY,
+      agentsHeaderFrame.frame.midY,
+      accuracy: 18,
+      "New Agent should share the agents header row"
+    )
+  }
+
+  func testCockpitSectionsStayWithinContentColumn() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "cockpit"]
+    )
+    let sessionRow = previewSessionTrigger(in: app)
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
+    tapPreviewSession(in: app)
+
+    let contentRoot = frameElement(in: app, identifier: Accessibility.contentRootFrame)
+    let headerCardFrame = frameElement(
+      in: app, identifier: Accessibility.sessionHeaderCardFrame)
+    let tasksHeaderFrame = frameElement(
+      in: app, identifier: Accessibility.sessionTaskListHeaderFrame)
+    let agentsHeaderFrame = frameElement(
+      in: app, identifier: Accessibility.sessionAgentListHeaderFrame)
+    let createTaskButtonFrame = frameElement(
+      in: app, identifier: "\(Accessibility.sessionTaskCreateOpenButton).frame")
+    let createAgentButtonFrame = frameElement(
+      in: app, identifier: "\(Accessibility.sessionAgentCreateOpenButton).frame")
+
+    XCTAssertTrue(waitForElement(contentRoot, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(headerCardFrame, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(tasksHeaderFrame, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(agentsHeaderFrame, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(createTaskButtonFrame, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(createAgentButtonFrame, timeout: Self.actionTimeout))
+
+    assertFillsColumn(
+      child: headerCardFrame,
+      in: contentRoot,
+      expectedHorizontalInset: 24,
+      tolerance: 8
+    )
+
+    let trailingLimit = contentRoot.frame.maxX - 24
+    XCTAssertLessThanOrEqual(
+      tasksHeaderFrame.frame.maxX,
+      trailingLimit + 8,
+      "Tasks header should stay within the cockpit content column"
+    )
+    XCTAssertLessThanOrEqual(
+      agentsHeaderFrame.frame.maxX,
+      trailingLimit + 8,
+      "Agents header should stay within the cockpit content column"
+    )
+    XCTAssertLessThanOrEqual(
+      createTaskButtonFrame.frame.maxX,
+      trailingLimit + 8,
+      "New Task should stay within the cockpit content column"
+    )
+    XCTAssertLessThanOrEqual(
+      createAgentButtonFrame.frame.maxX,
+      trailingLimit + 8,
+      "New Agent should stay within the cockpit content column"
+    )
+  }
+
   func testCockpitSessionStatusCornerFollowsContentScroll() throws {
     let app = launch(
       mode: "preview",

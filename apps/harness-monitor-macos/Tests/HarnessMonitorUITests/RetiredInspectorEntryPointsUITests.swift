@@ -29,6 +29,7 @@ final class RetiredInspectorEntryPointsUITests: HarnessMonitorUITestCase {
 
     verifySignalDetailSheet(in: app)
     verifyCreateTaskSheet(in: app)
+    verifyNewAgentWorkspaceEntryPoint(in: app)
     verifyLeaderTransferSheet(in: app)
     verifyDecisionsObserverFocus(in: app)
     openWorkspaceWindow(in: app)
@@ -109,6 +110,31 @@ extension RetiredInspectorEntryPointsUITests {
       waitUntil(timeout: Self.actionTimeout) { !sheet.exists },
       "Create task sheet should dismiss after the Cmd+T entry point as well"
     )
+  }
+
+  fileprivate func verifyNewAgentWorkspaceEntryPoint(in app: XCUIApplication) {
+    let ready = waitForButtonReady(in: app, identifier: Accessibility.sessionAgentCreateOpenButton)
+    XCTAssertTrue(
+      ready,
+      "New Agent should become tap-ready in cockpit preview"
+    )
+    tapButton(in: app, identifier: Accessibility.sessionAgentCreateOpenButton)
+
+    let workspaceWindow = element(in: app, identifier: Accessibility.workspaceWindow)
+    let createPane = element(in: app, identifier: Accessibility.agentTuiLaunchPane)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        workspaceWindow.exists && createPane.exists
+      },
+      "New Agent should open the workspace window on the New Agent pane"
+    )
+
+    app.typeKey("w", modifierFlags: .command)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) { !workspaceWindow.exists },
+      "Workspace window should close on Cmd+W after the New Agent entry point"
+    )
+    app.activate()
   }
 
   fileprivate func verifyLeaderTransferSheet(in app: XCUIApplication) {

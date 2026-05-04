@@ -123,6 +123,8 @@ public enum HarnessMonitorAccessibility {
   public static let windowMenuMainItem = "harness.menu.window.main"
   public static let sessionHeaderCard = "harness.session.header"
   public static let sessionHeaderCardFrame = "\(sessionHeaderCard).frame"
+  public static let sessionAgentListHeader = "harness.session.agents.header"
+  public static let sessionAgentListHeaderFrame = "\(sessionAgentListHeader).frame"
   public static let sessionTaskListHeader = "harness.session.tasks.header"
   public static let sessionTaskListHeaderFrame = "\(sessionTaskListHeader).frame"
   public static let sessionHeaderLeaderActivity = "harness.session.header.leader-activity"
