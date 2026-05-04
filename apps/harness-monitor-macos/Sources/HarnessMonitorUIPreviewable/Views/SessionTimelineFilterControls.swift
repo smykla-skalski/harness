@@ -20,41 +20,50 @@ struct SessionTimelineFilterControls: View {
 
   private var quickTones: [SessionTimelineTone] {
     SessionTimelineTone.allCases.filter { tone in
-      inventory.count(for: tone) > 0 || filters.tones.contains(tone)
+      inventory.toneCounts.keys.contains(tone) || filters.tones.contains(tone)
     }
   }
 
-  private var filterButtonTitle: String {
-    if filters.isEmpty {
-      return "More filters"
+  private var activeFacetChips: [SessionTimelineActiveFilterChip] {
+    var chips: [SessionTimelineActiveFilterChip] = []
+    for option in inventory.eventTypes where filters.eventTypes.contains(option.id) {
+      chips.append(.eventType(option))
     }
-    return "More filters (\(filters.activeFilterCount))"
+    for option in inventory.agents where filters.agents.contains(option.id) {
+      chips.append(.agent(option))
+    }
+    for option in inventory.tasks where filters.tasks.contains(option.id) {
+      chips.append(.task(option))
+    }
+    for option in inventory.decisionSeverities where filters.decisionSeverities.contains(option.id) {
+      chips.append(.decisionSeverity(option))
+    }
+    for option in inventory.semanticProperties {
+      guard
+        filters.semanticProperties.contains(
+          SessionTimelineSemanticProperty(rawValue: option.id) ?? .toolCall
+        )
+      else {
+        continue
+      }
+      chips.append(.semanticProperty(option))
+    }
+    for option in inventory.rawPayloadKeys where filters.rawPayloadKeys.contains(option.id) {
+      chips.append(.rawField(option))
+    }
+    return chips
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingXS) {
-        TextField("Search timeline", text: $filters.query)
-          .textFieldStyle(.roundedBorder)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterSearch)
-
-        scopeMenu
-        moreFiltersButton
-
-        if !filters.isEmpty {
-          clearFiltersButton
-        }
-      }
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+      searchControls
 
       if !quickTones.isEmpty {
-        toneChips
+        toneChipsSection
       }
 
-      if !summary.statusText.isEmpty {
-        Text(summary.statusText)
-          .scaledFont(.caption.monospaced())
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .accessibilityLabel(summary.accessibilityText)
+      if !activeFacetChips.isEmpty {
+        activeFiltersSection
       }
     }
     .accessibilityElement(children: .contain)
@@ -67,6 +76,22 @@ struct SessionTimelineFilterControls: View {
     }
   }
 
+  private var searchControls: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      sectionLabel("Search timeline")
+      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingXS) {
+        TextField("Find in timeline", text: $filters.query)
+          .textFieldStyle(.roundedBorder)
+          .accessibilityLabel("Search timeline")
+          .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterSearch)
+
+        scopeMenu
+        moreFiltersButton
+        clearFiltersButton
+      }
+    }
+  }
+
   private var scopeMenu: some View {
     Menu {
       Picker("Search scope", selection: $filters.searchScope) {
@@ -76,25 +101,26 @@ struct SessionTimelineFilterControls: View {
         }
       }
     } label: {
-      Image(systemName: filters.searchScope.systemImage)
-        .imageScale(.medium)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      Label(filters.searchScope.label, systemImage: filters.searchScope.systemImage)
+        .labelStyle(.titleAndIcon)
     }
-    .menuStyle(.borderlessButton)
-    .menuIndicator(.hidden)
-    .fixedSize()
-    .accessibilityLabel("Timeline search scope — \(filters.searchScope.label)")
+    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+    .accessibilityLabel("Search scope — \(filters.searchScope.label)")
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterScopeMenu)
   }
 
   private var moreFiltersButton: some View {
-    Button(filterButtonTitle, systemImage: filters.isEmpty
-      ? "line.3.horizontal.decrease.circle"
-      : "line.3.horizontal.decrease.circle.fill")
+    Button("Filters", systemImage: filters.activeAdvancedFilterCount > 0
+      ? "line.3.horizontal.decrease.circle.fill"
+      : "line.3.horizontal.decrease.circle")
     {
       showsAdvancedFilters = true
     }
-    .harnessActionButtonStyle(variant: .bordered, tint: filters.isEmpty ? .secondary : nil)
+    .harnessActionButtonStyle(
+      variant: .bordered,
+      tint: filters.activeAdvancedFilterCount > 0 ? nil : .secondary
+    )
     .controlSize(HarnessMonitorControlMetrics.compactControlSize)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterMoreButton)
     .popover(isPresented: $showsAdvancedFilters, arrowEdge: .top) {
@@ -108,16 +134,22 @@ struct SessionTimelineFilterControls: View {
     }
     .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
     .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+    .disabled(filters.isEmpty)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterClearButton)
   }
 
-  private var toneChips: some View {
-    ScrollView(.horizontal, showsIndicators: false) {
-      HStack(spacing: HarnessMonitorTheme.spacingXS) {
+  private var toneChipsSection: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      sectionLabel("Event level")
+      HarnessMonitorWrapLayout(
+        spacing: HarnessMonitorTheme.spacingXS,
+        lineSpacing: HarnessMonitorTheme.spacingXS
+      ) {
         Button("All levels") {
           filters.clearTones()
         }
-        .harnessFilterChipButtonStyle(isSelected: filters.tones.isEmpty)
+        .harnessFilterChipButtonStyle(isSelected: false)
+        .accessibilityValue(filters.tones.isEmpty ? "current default" : "clears level filters")
 
         ForEach(quickTones, id: \.rawValue) { tone in
           Button {
@@ -135,10 +167,104 @@ struct SessionTimelineFilterControls: View {
           .accessibilityValue(filters.tones.contains(tone) ? "selected" : "not selected")
         }
       }
-      .fixedSize(horizontal: true, vertical: false)
-      .padding(.vertical, 1)
     }
-    .scrollClipDisabled()
+  }
+
+  private var activeFiltersSection: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      sectionLabel("Active filters")
+      HarnessMonitorWrapLayout(
+        spacing: HarnessMonitorTheme.spacingXS,
+        lineSpacing: HarnessMonitorTheme.spacingXS
+      ) {
+        ForEach(activeFacetChips) { chip in
+          Button {
+            chip.remove(from: &filters)
+          } label: {
+            HStack(spacing: 6) {
+              Text(chip.label)
+                .lineLimit(1)
+                .truncationMode(.tail)
+              Image(systemName: "xmark.circle.fill")
+                .imageScale(.small)
+            }
+            .scaledFont(.caption.weight(.semibold))
+          }
+          .harnessFilterChipButtonStyle(isSelected: true)
+          .accessibilityLabel("Remove filter \(chip.label)")
+        }
+      }
+    }
+  }
+
+  private func sectionLabel(_ title: String) -> some View {
+    Text(title)
+      .scaledFont(.caption.weight(.semibold))
+      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+  }
+}
+
+private enum SessionTimelineActiveFilterChip: Identifiable {
+  case eventType(SessionTimelineFacetOption)
+  case agent(SessionTimelineFacetOption)
+  case task(SessionTimelineFacetOption)
+  case decisionSeverity(SessionTimelineFacetOption)
+  case semanticProperty(SessionTimelineFacetOption)
+  case rawField(SessionTimelineFacetOption)
+
+  var id: String {
+    switch self {
+    case .eventType(let option):
+      "type:\(option.id)"
+    case .agent(let option):
+      "agent:\(option.id)"
+    case .task(let option):
+      "task:\(option.id)"
+    case .decisionSeverity(let option):
+      "severity:\(option.id)"
+    case .semanticProperty(let option):
+      "semantic:\(option.id)"
+    case .rawField(let option):
+      "field:\(option.id)"
+    }
+  }
+
+  var label: String {
+    switch self {
+    case .eventType(let option):
+      "Type: \(option.label)"
+    case .agent(let option):
+      "Agent: \(option.label)"
+    case .task(let option):
+      "Task: \(option.label)"
+    case .decisionSeverity(let option):
+      "Decision: \(option.label)"
+    case .semanticProperty(let option):
+      "Data: \(option.label)"
+    case .rawField(let option):
+      "Field: \(option.label)"
+    }
+  }
+
+  func remove(from filters: inout SessionTimelineFilterState) {
+    switch self {
+    case .eventType(let option):
+      filters.toggleEventType(option.id)
+    case .agent(let option):
+      filters.toggleAgent(option.id)
+    case .task(let option):
+      filters.toggleTask(option.id)
+    case .decisionSeverity(let option):
+      if let severity = DecisionSeverity(rawValue: option.id) {
+        filters.toggleDecisionSeverity(severity)
+      }
+    case .semanticProperty(let option):
+      if let property = SessionTimelineSemanticProperty(rawValue: option.id) {
+        filters.toggleSemanticProperty(property)
+      }
+    case .rawField(let option):
+      filters.toggleRawPayloadKey(option.id)
+    }
   }
 }
 
@@ -149,6 +275,14 @@ private struct SessionTimelineAdvancedFiltersPopover: View {
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+          Text("Filters")
+            .scaledFont(.headline)
+            .accessibilityAddTraits(.isHeader)
+          Text("Narrow the timeline with event details and related data.")
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        }
         toneSection
         eventTypeSection
         agentSection
@@ -165,10 +299,10 @@ private struct SessionTimelineAdvancedFiltersPopover: View {
 
   @ViewBuilder private var toneSection: some View {
     let options = SessionTimelineTone.allCases.filter { tone in
-      inventory.count(for: tone) > 0 || filters.tones.contains(tone)
+      inventory.toneCounts.keys.contains(tone) || filters.tones.contains(tone)
     }
     if !options.isEmpty {
-      facetSection(title: "Levels") {
+      facetSection(title: "Event level") {
         LazyVGrid(columns: facetColumns, alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
           ForEach(options, id: \.rawValue) { tone in
             facetChip(
@@ -187,7 +321,7 @@ private struct SessionTimelineAdvancedFiltersPopover: View {
   @ViewBuilder private var eventTypeSection: some View {
     if !inventory.eventTypes.isEmpty {
       stringFacetSection(
-        title: "Event types",
+        title: "Event type",
         options: inventory.eventTypes,
         selected: filters.eventTypes,
         toggle: { filters.toggleEventType($0) }
@@ -198,7 +332,7 @@ private struct SessionTimelineAdvancedFiltersPopover: View {
   @ViewBuilder private var agentSection: some View {
     if !inventory.agents.isEmpty {
       stringFacetSection(
-        title: "Agents / sources",
+        title: "Agent",
         options: inventory.agents,
         selected: filters.agents,
         toggle: { filters.toggleAgent($0) }
@@ -209,7 +343,7 @@ private struct SessionTimelineAdvancedFiltersPopover: View {
   @ViewBuilder private var taskSection: some View {
     if !inventory.tasks.isEmpty {
       stringFacetSection(
-        title: "Tasks",
+        title: "Task",
         options: inventory.tasks,
         selected: filters.tasks,
         toggle: { filters.toggleTask($0) }
@@ -239,7 +373,7 @@ private struct SessionTimelineAdvancedFiltersPopover: View {
 
   @ViewBuilder private var semanticPropertiesSection: some View {
     if !inventory.semanticProperties.isEmpty {
-      facetSection(title: "Semantic properties") {
+      facetSection(title: "Related data") {
         LazyVGrid(columns: facetColumns, alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
           ForEach(inventory.semanticProperties) { option in
             facetChip(
@@ -263,7 +397,7 @@ private struct SessionTimelineAdvancedFiltersPopover: View {
   @ViewBuilder private var rawPayloadKeysSection: some View {
     if !inventory.rawPayloadKeys.isEmpty {
       stringFacetSection(
-        title: "Raw payload keys",
+        title: "Raw fields",
         options: inventory.rawPayloadKeys,
         selected: filters.rawPayloadKeys,
         toggle: { filters.toggleRawPayloadKey($0) }

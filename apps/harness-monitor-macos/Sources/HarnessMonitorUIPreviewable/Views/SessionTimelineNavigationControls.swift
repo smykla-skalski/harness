@@ -112,6 +112,7 @@ struct SessionTimelineWindowNavigation: Equatable, Sendable {
 struct SessionTimelineNavigationControls: View {
   let navigation: SessionTimelineWindowNavigation
   let presentation: SessionTimelineSectionPresentation
+  let filterSummary: SessionTimelineFilterSummary
   let scrollCommandTargetID: String?
   let viewport: SessionTimelineViewportModel
   let performAction: (SessionTimelineWindowAction) -> Void
@@ -143,12 +144,13 @@ struct SessionTimelineNavigationControls: View {
     canNewer: Bool,
     visibilityStats: SessionTimelineVisibilityStats
   ) -> some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
+    let detail = navigationDetail(for: visibilityStats)
+    return HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
       HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
         statusLabel
-        if !visibilityStats.statusText.isEmpty {
+        if let detail {
           statusSeparator
-          visibleStatusLabel(visibilityStats)
+          navigationDetailLabel(detail)
         }
       }
       Spacer(minLength: 0)
@@ -161,16 +163,19 @@ struct SessionTimelineNavigationControls: View {
     canNewer: Bool,
     visibilityStats: SessionTimelineVisibilityStats
   ) -> some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+    let detail = navigationDetail(for: visibilityStats)
+    return VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
       statusLabel
-      visibleStatusLabel(visibilityStats)
+      if let detail {
+        navigationDetailLabel(detail)
+      }
       buttons(canOlder: canOlder, canNewer: canNewer)
     }
   }
 
   private var statusLabel: some View {
     Text(navigation.statusText)
-      .scaledFont(.caption.monospaced())
+      .scaledFont(.caption.weight(.medium))
       .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineNavigationStatus)
   }
@@ -183,16 +188,52 @@ struct SessionTimelineNavigationControls: View {
   }
 
   @ViewBuilder
-  private func visibleStatusLabel(
-    _ visibilityStats: SessionTimelineVisibilityStats
-  ) -> some View {
-    if !visibilityStats.statusText.isEmpty {
-      Text(visibilityStats.statusText)
-        .scaledFont(.caption2.monospaced())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .accessibilityLabel(visibilityStats.accessibilityStatusText)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineVisibleStatus)
+  private func navigationDetailLabel(_ detail: NavigationDetail) -> some View {
+    Text(detail.text)
+      .scaledFont(.caption2)
+      .monospacedDigit()
+      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      .accessibilityLabel(detail.accessibilityText)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineVisibleStatus)
+  }
+
+  private func navigationDetail(
+    for visibilityStats: SessionTimelineVisibilityStats
+  ) -> NavigationDetail? {
+    if filterSummary.isFiltered {
+      let filterLabel =
+        filterSummary.activeFilterCount == 1
+        ? "1 filter"
+        : "\(filterSummary.activeFilterCount) filters"
+      let filterAccessibilityLabel =
+        filterSummary.activeFilterCount == 1
+        ? "1 filter active"
+        : "\(filterSummary.activeFilterCount) filters active"
+
+      if !visibilityStats.statusText.isEmpty {
+        return NavigationDetail(
+          text: "\(visibilityStats.statusText) • \(filterLabel)",
+          accessibilityText:
+            "\(visibilityStats.accessibilityStatusText), \(filterAccessibilityLabel)"
+        )
+      }
+
+      if !filterSummary.statusText.isEmpty {
+        return NavigationDetail(
+          text: filterSummary.statusText,
+          accessibilityText: filterSummary.accessibilityText
+        )
+      }
+      return nil
     }
+
+    guard !visibilityStats.statusText.isEmpty else {
+      return nil
+    }
+    return NavigationDetail(
+      text: visibilityStats.statusText,
+      accessibilityText: visibilityStats.accessibilityStatusText
+    )
   }
 
   private func buttons(canOlder: Bool, canNewer: Bool) -> some View {
@@ -238,4 +279,9 @@ struct SessionTimelineNavigationControls: View {
     .disabled(!isEnabled)
     .accessibilityIdentifier(identifier)
   }
+}
+
+private struct NavigationDetail {
+  let text: String
+  let accessibilityText: String
 }
