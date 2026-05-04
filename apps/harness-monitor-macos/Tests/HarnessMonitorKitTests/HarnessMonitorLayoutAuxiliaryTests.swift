@@ -2,6 +2,7 @@ import AppKit
 import CoreGraphics
 import CoreText
 import Foundation
+import SwiftUI
 import Testing
 
 @testable import HarnessMonitorKit
@@ -20,28 +21,6 @@ struct HarnessMonitorAdaptiveGridLayoutCacheTests {
     #expect(HarnessMonitorAdaptiveGridLayout.normalizedCacheWidth(720.0) == 720)
     #expect(HarnessMonitorAdaptiveGridLayout.normalizedCacheWidth(723.0) == 720)
     #expect(HarnessMonitorAdaptiveGridLayout.normalizedCacheWidth(724.0) == 724)
-  }
-
-  @Test("Cache only invalidates when the subview count changes")
-  func cacheOnlyInvalidatesWhenSubviewCountChanges() {
-    #expect(
-      HarnessMonitorAdaptiveGridLayout.shouldInvalidateCache(
-        cachedSubviewCount: 4,
-        newSubviewCount: 4
-      ) == false
-    )
-    #expect(
-      HarnessMonitorAdaptiveGridLayout.shouldInvalidateCache(
-        cachedSubviewCount: 4,
-        newSubviewCount: 5
-      ) == true
-    )
-    #expect(
-      HarnessMonitorAdaptiveGridLayout.shouldInvalidateCache(
-        cachedSubviewCount: nil,
-        newSubviewCount: 5
-      ) == true
-    )
   }
 }
 
@@ -107,6 +86,66 @@ struct AdaptiveGridLayoutMeasurementKeyTests {
 
     #expect(left == right)
     #expect(right.width == 640)
+  }
+}
+
+@MainActor
+@Suite("Adaptive grid layout dynamic height updates")
+struct HarnessMonitorAdaptiveGridLayoutDynamicHeightTests {
+  @Test("Stable child count still refreshes the grid height when a card grows")
+  func stableChildCountStillRefreshesGridHeightWhenCardGrows() {
+    let model = AdaptiveGridHeightProbeModel()
+    let host = NSHostingView(
+      rootView: AdaptiveGridHeightProbeHarness(model: model)
+    )
+    host.frame = CGRect(x: 0, y: 0, width: 480, height: 240)
+    host.layoutSubtreeIfNeeded()
+
+    let initialHeight = host.fittingSize.height
+
+    model.middleHeight = 180
+    RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+    host.invalidateIntrinsicContentSize()
+    host.layoutSubtreeIfNeeded()
+
+    let updatedHeight = host.fittingSize.height
+
+    #expect(abs(initialHeight - 40) < 0.5)
+    #expect(abs(updatedHeight - 180) < 0.5)
+    #expect(updatedHeight > initialHeight + 100)
+  }
+}
+
+@MainActor
+private final class AdaptiveGridHeightProbeModel: ObservableObject {
+  @Published var middleHeight: CGFloat = 40
+}
+
+private struct AdaptiveGridHeightProbeHarness: View {
+  @ObservedObject var model: AdaptiveGridHeightProbeModel
+
+  var body: some View {
+    HarnessMonitorAdaptiveGridLayout(
+      minimumColumnWidth: 120,
+      maximumColumns: 3,
+      spacing: 16
+    ) {
+      AdaptiveGridHeightProbeTile(height: 40)
+      AdaptiveGridHeightProbeTile(height: model.middleHeight)
+      AdaptiveGridHeightProbeTile(height: 40)
+    }
+    .frame(width: 480, alignment: .leading)
+  }
+}
+
+private struct AdaptiveGridHeightProbeTile: View {
+  let height: CGFloat
+
+  var body: some View {
+    RoundedRectangle(cornerRadius: 8, style: .continuous)
+      .fill(Color.accentColor)
+      .frame(maxWidth: .infinity)
+      .frame(height: height)
   }
 }
 

@@ -66,30 +66,16 @@ public struct HarnessMonitorAdaptiveGridLayout: Layout {
     return (width / cacheWidthQuantum).rounded(.down) * cacheWidthQuantum
   }
 
-  static func shouldInvalidateCache(
-    cachedSubviewCount: Int?,
-    newSubviewCount: Int
-  ) -> Bool {
-    guard let cachedSubviewCount else {
-      return true
-    }
-    return cachedSubviewCount != newSubviewCount
-  }
-
   public func makeCache(subviews _: Subviews) -> Cache {
     Cache()
   }
 
-  public func updateCache(_ cache: inout Cache, subviews: Subviews) {
-    let cachedSubviewCount = cache.measurementKey?.subviewCount
-    guard
-      Self.shouldInvalidateCache(
-        cachedSubviewCount: cachedSubviewCount,
-        newSubviewCount: subviews.count
-      )
-    else {
-      return
-    }
+  public func updateCache(_ cache: inout Cache, subviews _: Subviews) {
+    // SwiftUI calls updateCache when the layout subtree changes. Reset the
+    // cached row measurement for every subview update so stable grids whose
+    // children grow or shrink in place (for example Tasks / Agents / Signals
+    // above the cockpit timeline) recalculate their total height immediately
+    // instead of waiting for a width change to invalidate the cache.
     cache = Cache()
   }
 
