@@ -14,6 +14,7 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   private let launchMode = HarnessMonitorLaunchMode(
     environment: HarnessMonitorAppDelegate.launchEnvironment()
   )
+  private let standardErrorWarningCapture = HarnessMonitorStandardErrorWarningCapture()
   private let mcpStartupController = HarnessMonitorMCPStartupController()
   private var signalSources: [DispatchSourceSignal] = []
   private var terminationTask: Task<Void, Never>?
@@ -21,6 +22,12 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
 
   override init() {
     super.init()
+    // dup2(STDERR) breaks the Xcode preview/playground IPC pipe, which crashes the
+    // preview agent with `BUG IN CLIENT OF LIBDISPATCH` once SwiftUI hands off to
+    // NSPreviewTargetWindow. Restrict capture to real shipping launches.
+    if launchMode == .live && !isTestHarnessRun {
+      standardErrorWarningCapture.start()
+    }
     installSignalHandlers()
     let environment = Self.launchEnvironment()
     let keepsAnimations = environment["HARNESS_MONITOR_KEEP_ANIMATIONS"] == "1"
