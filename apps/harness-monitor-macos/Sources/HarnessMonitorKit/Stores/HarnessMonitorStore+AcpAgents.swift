@@ -102,6 +102,11 @@ extension HarnessMonitorStore {
       return snapshot
     } catch let apiError as HarnessMonitorAPIError {
       let firstFailureRecordedAt = Date.now
+      if apiError.acpServiceError != nil {
+        clearHostBridgeIssue(for: "acp")
+        presentFailureFeedback(apiError.localizedDescription)
+        return nil
+      }
       switch await recoverAcpStartAfterBridgeFailure(
         using: action.client,
         sessionID: action.sessionID,
@@ -270,6 +275,11 @@ extension HarnessMonitorStore {
       }
       return .succeeded(snapshot)
     } catch let retryError as HarnessMonitorAPIError {
+      if retryError.acpServiceError != nil {
+        clearHostBridgeIssue(for: "acp")
+        presentFailureFeedback(retryError.localizedDescription)
+        return .failed
+      }
       if case .server(let retryCode, _) = retryError, retryCode == 501 || retryCode == 503 {
         markHostBridgeIssue(
           for: "acp",

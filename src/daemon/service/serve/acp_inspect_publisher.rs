@@ -233,6 +233,7 @@ mod tests {
                 inspect_snapshot("sess-1", "acp-2", "agent-2"),
                 inspect_snapshot("sess-2", "acp-3", "agent-3"),
             ],
+            daemon_perceived_now: None,
             available: true,
             issue_message: None,
         };

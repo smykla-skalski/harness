@@ -413,4 +413,118 @@ struct WorkspaceAcpSessionContextTests {
     #expect(store.hostBridgeCapabilityState(for: "acp") == .ready)
     #expect(store.currentFailureFeedbackMessage == nil)
   }
+
+  @Test("Store ACP start surfaces ACP disabled errors without bridge recovery")
+  func storeAcpStartSurfacesAcpDisabledErrorsWithoutBridgeRecovery() async {
+    let client = RecordingHarnessClient()
+    client.configureAcpStartError(
+      HarnessMonitorAPIError.server(
+        code: 503,
+        message: #"{"error":{"code":"ACP_DISABLED","message":"ACP disabled by feature flag","details":[]}}"#
+      )
+    )
+    let store = await makeBootstrappedStore(client: client)
+    store.toast.dismissAll()
+    store.selectedSessionID = nil
+    store.hostBridgeCapabilityIssues["acp"] = .unavailable
+    store.daemonStatus = sandboxedStatus(
+      hostBridge: HostBridgeManifest(
+        running: true,
+        socketPath: "/tmp/bridge.sock",
+        capabilities: [:]
+      )
+    )
+
+    let started = await store.startAcpAgent(
+      agentID: "copilot",
+      role: .worker,
+      capabilities: ["fs.read", "terminal.spawn"],
+      name: "Copilot Reviewer",
+      prompt: "Review the latest ACP wiring.",
+      projectDir: "/tmp/ui-acp",
+      persona: "reviewer",
+      sessionID: PreviewFixtures.summary.sessionId
+    )
+
+    #expect(started == nil)
+    #expect(
+      client.recordedCalls()
+        == [
+          .startAcpAgent(
+            sessionID: PreviewFixtures.summary.sessionId,
+            agentID: "copilot",
+            role: .worker,
+            fallbackRole: nil,
+            capabilities: ["fs.read", "terminal.spawn"],
+            name: "Copilot Reviewer",
+            prompt: "Review the latest ACP wiring.",
+            projectDir: "/tmp/ui-acp",
+            persona: "reviewer",
+            recordPermissions: false
+          )
+        ]
+    )
+    #expect(store.hostBridgeCapabilityIssues["acp"] == nil)
+    #expect(
+      store.currentFailureFeedbackMessage
+        == "ACP isn't available in this daemon session. Enable ACP and try again."
+    )
+  }
+
+  @Test("Store ACP start surfaces session-scope errors without bridge recovery")
+  func storeAcpStartSurfacesSessionScopeErrorsWithoutBridgeRecovery() async {
+    let client = RecordingHarnessClient()
+    client.configureAcpStartError(
+      HarnessMonitorAPIError.server(
+        code: 403,
+        message: #"{"error":{"code":"SESSION_SCOPE_DENIED","message":"session scope denied","details":[]}}"#
+      )
+    )
+    let store = await makeBootstrappedStore(client: client)
+    store.toast.dismissAll()
+    store.selectedSessionID = nil
+    store.hostBridgeCapabilityIssues["acp"] = .unavailable
+    store.daemonStatus = sandboxedStatus(
+      hostBridge: HostBridgeManifest(
+        running: true,
+        socketPath: "/tmp/bridge.sock",
+        capabilities: [:]
+      )
+    )
+
+    let started = await store.startAcpAgent(
+      agentID: "copilot",
+      role: .worker,
+      capabilities: ["fs.read", "terminal.spawn"],
+      name: "Copilot Reviewer",
+      prompt: "Review the latest ACP wiring.",
+      projectDir: "/tmp/ui-acp",
+      persona: "reviewer",
+      sessionID: PreviewFixtures.summary.sessionId
+    )
+
+    #expect(started == nil)
+    #expect(
+      client.recordedCalls()
+        == [
+          .startAcpAgent(
+            sessionID: PreviewFixtures.summary.sessionId,
+            agentID: "copilot",
+            role: .worker,
+            fallbackRole: nil,
+            capabilities: ["fs.read", "terminal.spawn"],
+            name: "Copilot Reviewer",
+            prompt: "Review the latest ACP wiring.",
+            projectDir: "/tmp/ui-acp",
+            persona: "reviewer",
+            recordPermissions: false
+          )
+        ]
+    )
+    #expect(store.hostBridgeCapabilityIssues["acp"] == nil)
+    #expect(
+      store.currentFailureFeedbackMessage
+        == "ACP access is limited to the active session. Switch to the matching session and try again."
+    )
+  }
 }

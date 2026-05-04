@@ -51,6 +51,7 @@ mod test_support;
 pub(in crate::daemon::agent_acp) use process_fault::process_fault_policy_enabled;
 pub(in crate::daemon::agent_acp) use process_pool::process_pooling_disabled;
 pub use reconcile::AcpAgentReconcileResponse;
+pub use session_access::AcpWakePrompt;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AcpAgentStartRequest {
@@ -141,6 +142,8 @@ pub struct AcpAgentInspectSnapshot {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AcpAgentInspectResponse {
     pub agents: Vec<AcpAgentInspectSnapshot>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub daemon_perceived_now: Option<String>,
     #[serde(default = "default_acp_inspect_available")]
     pub available: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -168,6 +171,13 @@ pub(in crate::daemon::agent_acp) struct AcpAgentManagerState {
     pub(in crate::daemon::agent_acp) process_key_failures: Mutex<BTreeMap<String, u32>>,
     pub(in crate::daemon::agent_acp) process_key_backoff_until: Mutex<BTreeMap<String, Instant>>,
     pub(in crate::daemon::agent_acp) quarantined_process_keys: Mutex<BTreeSet<String>>,
+    /// In-flight wake guard keyed by `(acp_id, signal_id)`.
+    ///
+    /// Each entry corresponds to a live `acp-wake-<acp_id>` thread issuing a
+    /// `session/prompt`. `dispatch_wake_prompt` skips spawning when the key is
+    /// already present so a signal storm against one ACP session cannot fan
+    /// out unbounded threads. The thread removes its own entry on exit.
+    pub(in crate::daemon::agent_acp) wake_in_flight: Mutex<BTreeSet<(String, String)>>,
 }
 
 impl AcpAgentManagerHandle {
@@ -202,6 +212,7 @@ impl AcpAgentManagerHandle {
                 process_key_failures: Mutex::new(BTreeMap::new()),
                 process_key_backoff_until: Mutex::new(BTreeMap::new()),
                 quarantined_process_keys: Mutex::new(BTreeSet::new()),
+                wake_in_flight: Mutex::new(BTreeSet::new()),
             }),
         }
     }
@@ -310,6 +321,7 @@ impl AcpAgentManagerHandle {
         });
         Ok(AcpAgentInspectResponse {
             agents,
+            daemon_perceived_now: Some(utc_now()),
             available: true,
             issue_message: None,
         })

@@ -126,21 +126,25 @@ public struct AcpAgentStartRequest: Codable, Equatable, Sendable {
 
 public struct AcpAgentInspectResponse: Codable, Equatable, Sendable {
   public let agents: [AcpAgentInspectSnapshot]
+  public let daemonPerceivedNow: String?
   public let available: Bool
   public let issueMessage: String?
 
   public init(
     agents: [AcpAgentInspectSnapshot],
+    daemonPerceivedNow: String? = nil,
     available: Bool = true,
     issueMessage: String? = nil
   ) {
     self.agents = agents
+    self.daemonPerceivedNow = daemonPerceivedNow
     self.available = available
     self.issueMessage = issueMessage
   }
 
   private enum CodingKeys: String, CodingKey {
     case agents
+    case daemonPerceivedNow
     case available
     case issueMessage
   }
@@ -148,9 +152,32 @@ public struct AcpAgentInspectResponse: Codable, Equatable, Sendable {
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     agents = try container.decode([AcpAgentInspectSnapshot].self, forKey: .agents)
+    daemonPerceivedNow = try container.decodeIfPresent(String.self, forKey: .daemonPerceivedNow)
     available = try container.decodeIfPresent(Bool.self, forKey: .available) ?? true
     issueMessage = try container.decodeIfPresent(String.self, forKey: .issueMessage)
   }
+
+  public var daemonPerceivedNowDate: Date? {
+    guard let daemonPerceivedNow else {
+      return nil
+    }
+    return Self.daemonPerceivedNowFormatterFracSeconds.date(from: daemonPerceivedNow)
+      ?? Self.daemonPerceivedNowFormatter.date(from: daemonPerceivedNow)
+  }
+
+  nonisolated(unsafe) private static let daemonPerceivedNowFormatterFracSeconds:
+    ISO8601DateFormatter =
+      {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+      }()
+
+  nonisolated(unsafe) private static let daemonPerceivedNowFormatter: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime]
+    return formatter
+  }()
 }
 
 public struct AcpAgentInspectSnapshot: Codable, Equatable, Identifiable, Sendable {

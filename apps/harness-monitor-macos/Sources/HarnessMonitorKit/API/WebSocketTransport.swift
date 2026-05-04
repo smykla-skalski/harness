@@ -263,7 +263,7 @@ extension WebSocketTransport {
       )
       return
     }
-    deliverPushFrame(
+    await deliverPushFrame(
       event: event,
       recordedAt: recordedAt,
       sessionId: sessionId,
