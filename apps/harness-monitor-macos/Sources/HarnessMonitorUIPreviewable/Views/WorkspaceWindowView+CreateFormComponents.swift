@@ -123,17 +123,18 @@ struct AgentsCreateProviderRow: View {
   }
 
   private var accessibilityRowLabel: String {
-    "\(option.title), \(option.availabilityState.compactTitle), capabilities: \(capabilitySummary)"
+    let subtitle: String
+    if let projectAccessStatusText {
+      subtitle = "\(primarySubtitle) \(projectAccessStatusText)"
+    } else {
+      subtitle = primarySubtitle
+    }
+    return
+      "\(option.title), \(option.availabilityState.compactTitle), \(subtitle), capabilities: \(capabilitySummary)"
   }
 
-  private var subtitle: String {
-    if currentChoice.id.isAcp {
-      return "Starts via ACP."
-    }
-    if let projectAccessStatusText {
-      return "Starts in Terminal. \(projectAccessStatusText)"
-    }
-    return "Starts in Terminal."
+  private var primarySubtitle: String {
+    currentChoice.id.isAcp ? "Starts via ACP" : "Starts in Terminal"
   }
 
   private var projectAccessStatusText: String? {
@@ -143,19 +144,19 @@ struct AgentsCreateProviderRow: View {
 
     switch option.availabilityState {
     case .projectAccessAvailable:
-      return "ACP is also available."
+      return "ACP is also available"
     case .checkingAccess:
-      return "ACP is still being checked."
+      return "ACP is still being checked"
     case .setupRequired:
-      return "ACP needs CLI setup."
+      return "ACP needs CLI setup"
     case .bridgeAccessRequired:
-      return "ACP needs bridge setup."
+      return "ACP needs bridge setup"
     case .terminalOnly:
-      return "ACP isn't available for this provider yet."
+      return "ACP isn't available for this provider yet"
     case .unavailable:
       return
         option.projectAccessGuidanceText
-        ?? "ACP isn't available for this provider yet."
+        ?? "ACP isn't available for this provider yet"
     }
   }
 
@@ -181,10 +182,19 @@ struct AgentsCreateProviderRow: View {
                     .accessibilityHidden(true)
                 }
               }
-              Text(subtitle)
-                .scaledFont(.caption)
-                .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-                .fixedSize(horizontal: false, vertical: true)
+              VStack(alignment: .leading, spacing: 2) {
+                Text(primarySubtitle)
+                  .scaledFont(.caption)
+                  .lineLimit(1)
+                  .allowsTightening(true)
+                if let projectAccessStatusText {
+                  Text(projectAccessStatusText)
+                    .scaledFont(.caption)
+                    .lineLimit(1)
+                    .allowsTightening(true)
+                }
+              }
+              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             }
 
             Spacer(minLength: HarnessMonitorTheme.spacingSM)
@@ -248,7 +258,7 @@ struct AgentsCreateProviderStatusBadge: View {
 
   var body: some View {
     Label(title, systemImage: systemImage)
-      .scaledFont(.caption.weight(.semibold))
+      .scaledFont(.caption.weight(.semibold), maxScale: 1)
       .lineLimit(1)
       .allowsTightening(true)
       .fixedSize(horizontal: true, vertical: false)

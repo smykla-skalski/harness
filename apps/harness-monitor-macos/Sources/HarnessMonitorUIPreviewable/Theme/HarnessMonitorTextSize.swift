@@ -116,6 +116,17 @@ private struct ScaledFontModifier: ViewModifier {
   }
 }
 
+private struct ClampedScaledFontModifier: ViewModifier {
+  let font: Font
+  let maxScale: CGFloat
+  @Environment(\.fontScale)
+  private var scale
+
+  func body(content: Content) -> some View {
+    content.font(HarnessMonitorTextSize.scaledFont(font, by: min(scale, maxScale)))
+  }
+}
+
 private struct HarnessMonitorNativeFormControlModifier: ViewModifier {
   @Environment(\.harnessNativeFormControlFont)
   private var font
@@ -168,6 +179,10 @@ private struct HarnessMonitorFormContainerModifier: ViewModifier {
 extension View {
   public func scaledFont(_ font: Font) -> some View {
     modifier(ScaledFontModifier(font: font))
+  }
+
+  public func scaledFont(_ font: Font, maxScale: CGFloat) -> some View {
+    modifier(ClampedScaledFontModifier(font: font, maxScale: maxScale))
   }
 
   public func harnessNativeFormControl() -> some View {
