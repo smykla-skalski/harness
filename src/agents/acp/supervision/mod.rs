@@ -119,14 +119,31 @@ impl WatchdogState {
     }
 }
 
-/// Sink for watchdog state transitions surfaced to the conversation timeline.
+/// Sink for synthetic supervisor-side events surfaced to the conversation
+/// timeline (watchdog state, permission gates, wake-prompt context acks).
 ///
-/// The supervisor calls `emit_state` from synchronous contexts whenever the
-/// observable watchdog state changes; implementations must be non-blocking
-/// (e.g. `mpsc::Sender::try_send`) so they cannot stall the supervisor.
+/// The supervisor and ACP wake-accept path call these emit methods from
+/// synchronous contexts; implementations must be non-blocking (e.g.
+/// `mpsc::Sender::try_send`) so they cannot stall the producer. Methods
+/// other than `emit_state` default to no-op so test doubles that only care
+/// about watchdog can ignore them.
 pub trait WatchdogEventEmitter: Send + Sync {
-    /// Emit a state transition for downstream timeline consumers.
+    /// Emit a watchdog state transition for downstream timeline consumers.
     fn emit_state(&self, from: WatchdogState, to: WatchdogState, reason: Option<&str>);
+
+    /// Emit a permission-prompt event surfaced by the ACP client gate.
+    /// Default no-op so non-ACP impls (test doubles) need not provide one.
+    fn emit_permission_asked(
+        &self,
+        _tool: String,
+        _scope: String,
+        _request_id: Option<String>,
+    ) {
+    }
+
+    /// Emit a wake-prompt context ack surfaced by the ACP wake-accept path.
+    /// Default no-op so non-ACP impls (test doubles) need not provide one.
+    fn emit_context_injected(&self, _actor: String, _summary: Option<String>) {}
 }
 
 /// Supervisor for an ACP session.
@@ -202,6 +219,15 @@ impl AcpSessionSupervisor {
         if let Some(emitter) = self.event_emitter.get() {
             emitter.emit_state(from, to, reason);
         }
+    }
+
+    /// Borrow the attached event emitter so external producers (e.g. the
+    /// wake-accept path emitting `ContextInjected`) can publish synthetic
+    /// events on the same per-session channel the supervisor uses for
+    /// watchdog transitions. Returns `None` if no emitter is attached.
+    #[must_use]
+    pub fn event_emitter(&self) -> Option<&Arc<dyn WatchdogEventEmitter>> {
+        self.event_emitter.get()
     }
 
     /// Record an event from the agent (resets watchdog timer).

@@ -208,6 +208,14 @@ fn run_wake_prompt(
                 &agent_id,
                 &acp_id,
             ) {
+                if let Some(emitter) = session.event_emitter() {
+                    emitter.emit_context_injected(
+                        "acp".to_string(),
+                        Some(format!(
+                            "wake prompt accepted (signal {signal_id})"
+                        )),
+                    );
+                }
                 sync_wake_accept_to_daemon(
                     manager,
                     &orchestration_session_id,

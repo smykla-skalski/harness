@@ -10,7 +10,7 @@ public enum MonitorTimelineLiveRegionPriority {
 public enum MonitorTimelineLiveRegion {
   public static func priority(for kind: String) -> MonitorTimelineLiveRegionPriority {
     switch kind {
-    case "tool_result", "tool_result_error":
+    case "tool_result", "tool_result_error", "agent_context_injected":
       .polite
     case "agent_watchdog_state",
       "agent_session_marker",

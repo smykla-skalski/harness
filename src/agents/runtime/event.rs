@@ -77,6 +77,16 @@ pub enum ConversationEventKind {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         request_id: Option<String>,
     },
+    /// Wake-prompt context acknowledged by the agent. Emitted from the wake-
+    /// accept path in `daemon::agent_acp::manager::session_access` once the
+    /// agent's `session/prompt` ack lands, so the timeline shows that the
+    /// dispatched context was received instead of leaving the operator to
+    /// infer it from the daemon log.
+    ContextInjected {
+        actor: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        summary: Option<String>,
+    },
     // NOTE: `HookFired` was previously defined here but stays removed.
     // Hooks in this codebase live in `src/hooks/runtime/mod.rs` and run
     // CLI-side around shell tool calls; there is no agent-side ACP path

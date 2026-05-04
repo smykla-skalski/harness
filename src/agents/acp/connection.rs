@@ -159,6 +159,18 @@ impl SupervisorEventSink {
         );
     }
 
+    /// Emit a synthetic `ContextInjected` event into the per-session channel.
+    ///
+    /// Producer site: `daemon::agent_acp::manager::session_access::record_wake_accept`
+    /// calls this once the wake-prompt ack lands, so the timeline shows that
+    /// the dispatched context was received. Never terminal.
+    pub fn emit_context_injected(&self, actor: String, summary: Option<String>) {
+        self.emit(
+            ConversationEventKind::ContextInjected { actor, summary },
+            false,
+        );
+    }
+
     fn emit(&self, kind: ConversationEventKind, terminal: bool) {
         let sequence = self.sequence.fetch_add(1, Ordering::SeqCst);
         let event = ConversationEvent {
@@ -199,6 +211,14 @@ impl WatchdogEventEmitter for SupervisorEventSink {
             },
             terminal,
         );
+    }
+
+    fn emit_permission_asked(&self, tool: String, scope: String, request_id: Option<String>) {
+        SupervisorEventSink::emit_permission_asked(self, tool, scope, request_id);
+    }
+
+    fn emit_context_injected(&self, actor: String, summary: Option<String>) {
+        SupervisorEventSink::emit_context_injected(self, actor, summary);
     }
 }
 

@@ -90,6 +90,12 @@ impl ActiveAcpProcess {
         recover_lock(&self.logical_acp_ids, "ACP process logical session lock").len()
     }
 
+    pub(in crate::daemon::agent_acp) fn event_emitter(
+        &self,
+    ) -> Option<Arc<dyn crate::agents::acp::supervision::WatchdogEventEmitter>> {
+        self.supervisor.event_emitter().map(Arc::clone)
+    }
+
     pub(super) fn refresh_disconnect_reason(&self) -> Option<DisconnectReason> {
         if let Some(reason) =
             recover_lock(&self.disconnect_reason, "ACP process disconnect lock").clone()
