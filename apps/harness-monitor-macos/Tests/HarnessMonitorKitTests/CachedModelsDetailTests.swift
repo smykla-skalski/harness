@@ -15,116 +15,66 @@ struct CachedModelsDetailTests {
 
   @Test("SessionSignalRecord round-trips through CachedSignalRecord")
   func signalRecordRoundTrip() throws {
-    let signal = Signal(
-      signalId: "sig-1",
-      version: 1,
-      createdAt: "2026-03-28T10:00:00Z",
-      expiresAt: "2026-03-28T11:00:00Z",
-      sourceAgent: "agent-1",
-      command: "review",
-      priority: .high,
-      payload: SignalPayload(
-        message: "Please review",
-        actionHint: "code-review",
-        relatedFiles: ["src/main.rs"],
-        metadata: .object(["scope": .string("full")])
+    let original = SessionSignalRecord(
+      runtime: "claude", agentId: "agent-1", sessionId: "sess-1", status: .delivered,
+      signal: Signal(
+        signalId: "sig-1", version: 1, createdAt: "2026-03-28T10:00:00Z",
+        expiresAt: "2026-03-28T11:00:00Z", sourceAgent: "agent-1", command: "review",
+        priority: .high,
+        payload: SignalPayload(
+          message: "Please review", actionHint: "code-review",
+          relatedFiles: ["src/main.rs"], metadata: .object(["scope": .string("full")])
+        ),
+        delivery: DeliveryConfig(maxRetries: 3, retryCount: 0, idempotencyKey: "key-1")
       ),
-      delivery: DeliveryConfig(
-        maxRetries: 3,
-        retryCount: 0,
-        idempotencyKey: "key-1"
+      acknowledgment: SignalAck(
+        signalId: "sig-1", acknowledgedAt: "2026-03-28T10:05:00Z",
+        result: .accepted, agent: "agent-2", sessionId: "sess-1", details: "On it"
       )
     )
-
-    let ack = SignalAck(
-      signalId: "sig-1",
-      acknowledgedAt: "2026-03-28T10:05:00Z",
-      result: .accepted,
-      agent: "agent-2",
-      sessionId: "sess-1",
-      details: "On it"
+    try assertSwiftDataRoundTrip(
+      original,
+      cache: { $0.toCachedSignalRecord() },
+      restore: { $0.toSessionSignalRecord() },
+      container: container
     )
-
-    let original = SessionSignalRecord(
-      runtime: "claude",
-      agentId: "agent-1",
-      sessionId: "sess-1",
-      status: .delivered,
-      signal: signal,
-      acknowledgment: ack
-    )
-
-    let cached = original.toCachedSignalRecord()
-    container.mainContext.insert(cached)
-    try container.mainContext.save()
-
-    let descriptor = FetchDescriptor<CachedSignalRecord>()
-    let fetched = try container.mainContext.fetch(descriptor)
-    #expect(fetched.count == 1)
-
-    let restored = fetched[0].toSessionSignalRecord()
-    #expect(restored == original)
   }
 
   @Test("ObserverSummary round-trips through CachedObserver")
   func observerSummaryRoundTrip() throws {
     let original = ObserverSummary(
-      observeId: "obs-1",
-      lastScanTime: "2026-03-28T14:00:00Z",
-      openIssueCount: 2,
-      resolvedIssueCount: 5,
-      mutedCodeCount: 1,
+      observeId: "obs-1", lastScanTime: "2026-03-28T14:00:00Z",
+      openIssueCount: 2, resolvedIssueCount: 5, mutedCodeCount: 1,
       activeWorkerCount: 1,
       openIssues: [
         ObserverIssueSummary(
-          issueId: "iss-1",
-          code: "E001",
-          summary: "Missing error handling",
-          severity: "high",
-          category: "data_integrity",
-          fingerprint: "abc123",
-          firstSeenLine: 42,
-          lastSeenLine: 42,
-          occurrenceCount: 1,
-          fixSafety: "safe",
-          evidenceExcerpt: "unwrap without guard"
+          issueId: "iss-1", code: "E001", summary: "Missing error handling",
+          severity: "high", category: "data_integrity", fingerprint: "abc123",
+          firstSeenLine: 42, lastSeenLine: 42, occurrenceCount: 1,
+          fixSafety: "safe", evidenceExcerpt: "unwrap without guard"
         )
       ],
-      mutedCodes: ["W003"],
-      activeWorkers: nil,
-      agentSessions: nil
+      mutedCodes: ["W003"], activeWorkers: nil, agentSessions: nil
     )
-
-    let cached = original.toCachedObserver()
-    container.mainContext.insert(cached)
-    try container.mainContext.save()
-
-    let descriptor = FetchDescriptor<CachedObserver>()
-    let fetched = try container.mainContext.fetch(descriptor)
-    #expect(fetched.count == 1)
-
-    let restored = fetched[0].toObserverSummary()
-    #expect(restored == original)
+    try assertSwiftDataRoundTrip(
+      original,
+      cache: { $0.toCachedObserver() },
+      restore: { $0.toObserverSummary() },
+      container: container
+    )
   }
 
   @Test("AgentToolActivitySummary round-trips")
   func agentActivityRoundTrip() throws {
     let original = AgentToolActivitySummary(
-      agentId: "agent-1",
-      runtime: "claude",
-      toolInvocationCount: 42,
-      toolResultCount: 40,
-      toolErrorCount: 2,
-      latestToolName: "Read",
-      latestEventAt: "2026-03-28T14:00:00Z",
-      recentTools: ["Read", "Write", "Bash"],
+      agentId: "agent-1", runtime: "claude", toolInvocationCount: 42,
+      toolResultCount: 40, toolErrorCount: 2, latestToolName: "Read",
+      latestEventAt: "2026-03-28T14:00:00Z", recentTools: ["Read", "Write", "Bash"],
       pendingUserPrompt: AgentPendingUserPrompt(
-        toolName: "AskUserQuestion",
-        waitingSince: "2026-03-28T14:00:00Z",
+        toolName: "AskUserQuestion", waitingSince: "2026-03-28T14:00:00Z",
         questions: [
           AgentPendingUserPromptQuestion(
-            question: "Approve the file write?",
-            header: "Approval",
+            question: "Approve the file write?", header: "Approval",
             options: [
               AgentPendingUserPromptOption(label: "Allow", description: "Proceed"),
               AgentPendingUserPromptOption(label: "Deny", description: "Stop"),
@@ -133,17 +83,12 @@ struct CachedModelsDetailTests {
         ]
       )
     )
-
-    let cached = original.toCachedAgentActivity()
-    container.mainContext.insert(cached)
-    try container.mainContext.save()
-
-    let descriptor = FetchDescriptor<CachedAgentActivity>()
-    let fetched = try container.mainContext.fetch(descriptor)
-    #expect(fetched.count == 1)
-
-    let restored = fetched[0].toAgentToolActivitySummary()
-    #expect(restored == original)
+    try assertSwiftDataRoundTrip(
+      original,
+      cache: { $0.toCachedAgentActivity() },
+      restore: { $0.toAgentToolActivitySummary() },
+      container: container
+    )
   }
 
   @Test("CachedAgentActivity restores legacy pending prompt payloads")
@@ -158,14 +103,9 @@ struct CachedModelsDetailTests {
       }
       """
     let cached = CachedAgentActivity(
-      agentId: "agent-1",
-      runtime: "claude",
-      toolInvocationCount: 2,
-      toolResultCount: 1,
-      toolErrorCount: 0,
-      latestToolName: "ask_user",
-      latestEventAt: "2026-03-28T14:00:00Z",
-      recentToolsData: Data(payload.utf8)
+      agentId: "agent-1", runtime: "claude", toolInvocationCount: 2,
+      toolResultCount: 1, toolErrorCount: 0, latestToolName: "ask_user",
+      latestEventAt: "2026-03-28T14:00:00Z", recentToolsData: Data(payload.utf8)
     )
     container.mainContext.insert(cached)
     try container.mainContext.save()
@@ -183,12 +123,8 @@ struct CachedModelsDetailTests {
   @Test("CachedAgentActivity restores legacy recent-tools payloads")
   func agentActivityLegacyRecentToolsPayload() throws {
     let cached = CachedAgentActivity(
-      agentId: "agent-1",
-      runtime: "claude",
-      toolInvocationCount: 2,
-      toolResultCount: 1,
-      toolErrorCount: 0,
-      latestToolName: "Read",
+      agentId: "agent-1", runtime: "claude", toolInvocationCount: 2,
+      toolResultCount: 1, toolErrorCount: 0, latestToolName: "Read",
       latestEventAt: "2026-03-28T14:00:00Z",
       recentToolsData: try Codecs.encoder.encode(["Read", "Write"])
     )
@@ -207,32 +143,21 @@ struct CachedModelsDetailTests {
   @Test("CachedProject update-in-place preserves identity")
   func projectUpdateInPlace() throws {
     let summary = ProjectSummary(
-      projectId: "proj-1",
-      name: "harness",
-      projectDir: "/tmp/harness",
-      contextRoot: "/data/harness",
-      activeSessionCount: 1,
-      totalSessionCount: 2
+      projectId: "proj-1", name: "harness", projectDir: "/tmp/harness",
+      contextRoot: "/data/harness", activeSessionCount: 1, totalSessionCount: 2
     )
-
     let cached = summary.toCachedProject()
     container.mainContext.insert(cached)
     try container.mainContext.save()
 
     let updated = ProjectSummary(
-      projectId: "proj-1",
-      name: "harness-v2",
-      projectDir: "/tmp/harness",
-      contextRoot: "/data/harness",
-      activeSessionCount: 5,
-      totalSessionCount: 10
+      projectId: "proj-1", name: "harness-v2", projectDir: "/tmp/harness",
+      contextRoot: "/data/harness", activeSessionCount: 5, totalSessionCount: 10
     )
-
     cached.update(from: updated)
     try container.mainContext.save()
 
-    let descriptor = FetchDescriptor<CachedProject>()
-    let fetched = try container.mainContext.fetch(descriptor)
+    let fetched = try container.mainContext.fetch(FetchDescriptor<CachedProject>())
     #expect(fetched.count == 1)
     #expect(fetched[0].toProjectSummary() == updated)
   }
@@ -240,94 +165,50 @@ struct CachedModelsDetailTests {
   @Test("CachedSession update-in-place preserves relationships")
   func sessionUpdateInPlace() throws {
     let metrics = SessionMetrics(
-      agentCount: 1,
-      activeAgentCount: 1,
-      openTaskCount: 0,
-      inProgressTaskCount: 0,
-      blockedTaskCount: 0,
-      completedTaskCount: 0
+      agentCount: 1, activeAgentCount: 1, openTaskCount: 0,
+      inProgressTaskCount: 0, blockedTaskCount: 0, completedTaskCount: 0
     )
-
     let original = SessionSummary(
-      projectId: "proj-1",
-      projectName: "harness",
-      projectDir: nil,
-      contextRoot: "/data",
-      sessionId: "sess-1",
-      title: "session alpha",
-      context: "Original context",
-      status: .active,
-      createdAt: "2026-03-28T10:00:00Z",
-      updatedAt: "2026-03-28T10:00:00Z",
-      lastActivityAt: nil,
-      leaderId: nil,
-      observeId: nil,
-      pendingLeaderTransfer: nil,
+      projectId: "proj-1", projectName: "harness", projectDir: nil,
+      contextRoot: "/data", sessionId: "sess-1", title: "session alpha",
+      context: "Original context", status: .active,
+      createdAt: "2026-03-28T10:00:00Z", updatedAt: "2026-03-28T10:00:00Z",
+      lastActivityAt: nil, leaderId: nil, observeId: nil, pendingLeaderTransfer: nil,
       metrics: metrics
     )
-
     let cached = original.toCachedSession()
     container.mainContext.insert(cached)
 
-    let agent = AgentRegistration(
-      agentId: "agent-1",
-      name: "Claude",
-      runtime: "claude",
-      role: .leader,
-      capabilities: ["general"],
-      joinedAt: "2026-03-28T10:00:00Z",
-      updatedAt: "2026-03-28T10:00:00Z",
-      status: .active,
-      agentSessionId: nil,
-      lastActivityAt: nil,
-      currentTaskId: nil,
+    let cachedAgent = AgentRegistration(
+      agentId: "agent-1", name: "Claude", runtime: "claude", role: .leader,
+      capabilities: ["general"], joinedAt: "2026-03-28T10:00:00Z",
+      updatedAt: "2026-03-28T10:00:00Z", status: .active, agentSessionId: nil,
+      lastActivityAt: nil, currentTaskId: nil,
       runtimeCapabilities: RuntimeCapabilities(
-        runtime: "claude",
-        supportsNativeTranscript: false,
-        supportsSignalDelivery: false,
-        supportsContextInjection: false,
-        typicalSignalLatencySeconds: 0,
-        hookPoints: []
+        runtime: "claude", supportsNativeTranscript: false, supportsSignalDelivery: false,
+        supportsContextInjection: false, typicalSignalLatencySeconds: 0, hookPoints: []
       ),
       persona: nil
-    )
-
-    let cachedAgent = agent.toCachedAgent()
+    ).toCachedAgent()
     cached.agents.append(cachedAgent)
     try container.mainContext.save()
 
-    let updatedMetrics = SessionMetrics(
-      agentCount: 2,
-      activeAgentCount: 2,
-      openTaskCount: 1,
-      inProgressTaskCount: 0,
-      blockedTaskCount: 0,
-      completedTaskCount: 0
-    )
-
     let updatedSummary = SessionSummary(
-      projectId: "proj-1",
-      projectName: "harness",
-      projectDir: nil,
-      contextRoot: "/data",
-      sessionId: "sess-1",
-      title: "session alpha updated",
-      context: "Updated context",
-      status: .active,
-      createdAt: "2026-03-28T10:00:00Z",
-      updatedAt: "2026-03-28T15:00:00Z",
-      lastActivityAt: "2026-03-28T15:00:00Z",
-      leaderId: "agent-1",
-      observeId: nil,
+      projectId: "proj-1", projectName: "harness", projectDir: nil,
+      contextRoot: "/data", sessionId: "sess-1", title: "session alpha updated",
+      context: "Updated context", status: .active,
+      createdAt: "2026-03-28T10:00:00Z", updatedAt: "2026-03-28T15:00:00Z",
+      lastActivityAt: "2026-03-28T15:00:00Z", leaderId: "agent-1", observeId: nil,
       pendingLeaderTransfer: nil,
-      metrics: updatedMetrics
+      metrics: SessionMetrics(
+        agentCount: 2, activeAgentCount: 2, openTaskCount: 1,
+        inProgressTaskCount: 0, blockedTaskCount: 0, completedTaskCount: 0
+      )
     )
-
     cached.update(from: updatedSummary)
     try container.mainContext.save()
 
-    let descriptor = FetchDescriptor<CachedSession>()
-    let fetched = try container.mainContext.fetch(descriptor)
+    let fetched = try container.mainContext.fetch(FetchDescriptor<CachedSession>())
     #expect(fetched.count == 1)
     #expect(fetched[0].toSessionSummary() == updatedSummary)
     #expect(fetched[0].agents.count == 1)
