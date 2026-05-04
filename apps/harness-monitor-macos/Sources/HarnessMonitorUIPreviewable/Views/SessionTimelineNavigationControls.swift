@@ -74,9 +74,9 @@ struct SessionTimelineWindowNavigation: Equatable, Sendable {
       return isLoading ? "Loading latest activity" : "No timeline events"
     }
     if windowStart == 0 && !hasNewer {
-      return "Latest \(visibleWindowEnd) of \(totalCount)"
+      return "Latest events"
     }
-    return "Showing \(visibleWindowStart + 1)-\(visibleWindowEnd) of \(totalCount)"
+    return "Earlier events"
   }
 
   private var visibleWindowStart: Int {
@@ -144,8 +144,13 @@ struct SessionTimelineNavigationControls: View {
     visibilityStats: SessionTimelineVisibilityStats
   ) -> some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
-      statusLabel
-      visibleStatusLabel(visibilityStats)
+      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+        statusLabel
+        if !visibilityStats.statusText.isEmpty {
+          statusSeparator
+          visibleStatusLabel(visibilityStats)
+        }
+      }
       Spacer(minLength: 0)
       buttons(canOlder: canOlder, canNewer: canNewer)
     }
@@ -170,6 +175,13 @@ struct SessionTimelineNavigationControls: View {
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineNavigationStatus)
   }
 
+  private var statusSeparator: some View {
+    Circle()
+      .fill(HarnessMonitorTheme.secondaryInk.opacity(0.7))
+      .frame(width: 4, height: 4)
+      .accessibilityHidden(true)
+  }
+
   @ViewBuilder
   private func visibleStatusLabel(
     _ visibilityStats: SessionTimelineVisibilityStats
@@ -178,6 +190,7 @@ struct SessionTimelineNavigationControls: View {
       Text(visibilityStats.statusText)
         .scaledFont(.caption2.monospaced())
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .accessibilityLabel(visibilityStats.accessibilityStatusText)
         .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineVisibleStatus)
     }
   }

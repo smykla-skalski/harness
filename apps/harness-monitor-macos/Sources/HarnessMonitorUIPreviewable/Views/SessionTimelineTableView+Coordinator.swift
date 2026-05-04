@@ -17,6 +17,7 @@ extension SessionTimelineTableView {
     var rowHeightCache: [String: CachedRowHeight] = [:]
     var lastColumnWidth: CGFloat = 0
     var rows: [SessionTimelineRow] = []
+    var eventOffsetsByRow: [Int?] = []
     var rowIndexByID: [String: Int] = [:]
     private var rowSnapshot = SessionTimelineTableSnapshot.empty
     private var actionHandler: any DecisionActionHandler = NullDecisionActionHandler()
@@ -145,6 +146,7 @@ extension SessionTimelineTableView {
         }
 
         self.rows = rows
+        eventOffsetsByRow = eventOffsets(for: rows)
         rowIndexByID = Dictionary(
           uniqueKeysWithValues: rows.enumerated().map { index, row in
             (row.id, index)

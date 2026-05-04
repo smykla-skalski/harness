@@ -142,10 +142,13 @@ extension SessionTimelineTableView.Coordinator {
     }
     let visibleRows = tableView.rows(in: visibleRect)
     let visibleRowCount = max(0, visibleRows.length)
+    let visibleEventOffsets = visibleEventOffsets(for: visibleRows)
     let stats = SessionTimelineTableViewportStats(
       visibleRowCount: visibleRowCount,
       renderedRowCount: visibleRowCount,
-      anchorRowID: anchorRowID(for: visibleRows)
+      anchorRowID: anchorRowID(for: visibleRows),
+      firstVisibleEventOffset: visibleEventOffsets?.lowerBound,
+      lastVisibleEventOffset: visibleEventOffsets?.upperBound
     )
     if lastViewportStats != stats {
       lastViewportStats = stats
@@ -178,5 +181,39 @@ extension SessionTimelineTableView.Coordinator {
       return nil
     }
     return rows[visibleRows.location].id
+  }
+
+  func eventOffsets(for rows: [SessionTimelineRow]) -> [Int?] {
+    var nextOffset = 0
+    return rows.map { row in
+      guard case .entry = row.node.identity else {
+        return nil
+      }
+      defer { nextOffset += 1 }
+      return nextOffset
+    }
+  }
+
+  func visibleEventOffsets(for visibleRows: NSRange) -> ClosedRange<Int>? {
+    guard visibleRows.location != NSNotFound, visibleRows.length > 0 else {
+      return nil
+    }
+    let upperBound = min(visibleRows.location + visibleRows.length, eventOffsetsByRow.count)
+    guard visibleRows.location < upperBound else {
+      return nil
+    }
+    var firstVisibleEventOffset: Int?
+    var lastVisibleEventOffset: Int?
+    for rowIndex in visibleRows.location..<upperBound {
+      guard let eventOffset = eventOffsetsByRow[rowIndex] else {
+        continue
+      }
+      firstVisibleEventOffset = firstVisibleEventOffset ?? eventOffset
+      lastVisibleEventOffset = eventOffset
+    }
+    guard let firstVisibleEventOffset, let lastVisibleEventOffset else {
+      return nil
+    }
+    return firstVisibleEventOffset...lastVisibleEventOffset
   }
 }

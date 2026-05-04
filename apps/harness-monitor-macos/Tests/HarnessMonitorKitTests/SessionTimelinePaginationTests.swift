@@ -38,7 +38,7 @@ struct SessionTimelineNavigationTests {
       isLoading: false
     )
 
-    #expect(navigation.statusText == "Showing 7-12 of 32")
+    #expect(navigation.statusText == "Earlier events")
     #expect(
       navigation.request(for: .older)
         == TimelineWindowRequest(scope: .summary, limit: 24, before: oldestCursor)
@@ -60,7 +60,7 @@ struct SessionTimelineNavigationTests {
       isLoading: false
     )
 
-    #expect(navigation.statusText == "Latest 4 of 4")
+    #expect(navigation.statusText == "Latest events")
     #expect(navigation.request(for: .older) == nil)
     #expect(navigation.request(for: .newer) == nil)
     #expect(navigation.request(for: .latest) == .latest(limit: 24))
@@ -244,6 +244,7 @@ struct SessionTimelineNavigationTests {
   }
 
   @Test("Provisional cached row heights still require real measurement")
+  @MainActor
   func provisionalCachedRowHeightsStillRequireRealMeasurement() {
     let provisional = CachedRowHeight(width: 945, height: 120, isMeasured: false)
     let measured = CachedRowHeight(width: 945, height: 120, isMeasured: true)
@@ -324,6 +325,82 @@ struct SessionTimelineNavigationTests {
     coordinator.publishViewportState()
 
     #expect(coordinator.measurementTask != nil)
+  }
+
+  @Test("Viewport visibility stats track the visible event range while scrolling")
+  @MainActor
+  func viewportVisibilityStatsTrackVisibleEventRangeWhileScrolling() {
+    let viewport = SessionTimelineViewportModel()
+    let coordinator = SessionTimelineTableView.Coordinator(
+      viewport: viewport,
+      scrollBoundaryChanged: { _, _ in }
+    )
+    defer { coordinator.cancelMeasurement(reason: "test") }
+
+    let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 945, height: 320))
+    scrollView.drawsBackground = false
+    scrollView.hasVerticalScroller = true
+    scrollView.autohidesScrollers = false
+
+    let tableView = NSTableView(frame: scrollView.bounds)
+    tableView.headerView = nil
+    tableView.backgroundColor = .clear
+    tableView.intercellSpacing = .zero
+    tableView.usesAutomaticRowHeights = false
+
+    let column = NSTableColumn(identifier: SessionTimelineTableCellView.columnIdentifier)
+    column.width = 945
+    tableView.addTableColumn(column)
+    tableView.delegate = coordinator
+    tableView.dataSource = coordinator
+    scrollView.documentView = tableView
+    scrollView.contentView.postsBoundsChangedNotifications = true
+    coordinator.configure(tableView: tableView, scrollView: scrollView)
+
+    let rows = (0..<24).map { index in
+      makeCustomTimelineRow(
+        id: "timeline-entry-visible-\(index)",
+        title: "Visible row \(index)"
+      )
+    }
+    coordinator.update(
+      rows: rows,
+      actionHandler: NullDecisionActionHandler(),
+      scrollCommand: nil,
+      scrollView: scrollView,
+      columnWidth: 945,
+      fontScale: 1
+    )
+    coordinator.cancelMeasurement(reason: "test")
+    tableView.layoutSubtreeIfNeeded()
+    scrollView.layoutSubtreeIfNeeded()
+
+    viewport.updatePresentationCounts(windowStart: 47, loaded: rows.count, total: 321)
+    coordinator.publishViewportState()
+
+    let topVisibleRows = tableView.rows(in: scrollView.contentView.bounds)
+    let topStart = 47 + topVisibleRows.location + 1
+    let topEnd = 47 + topVisibleRows.location + topVisibleRows.length
+    #expect(viewport.visibilityStats.firstVisibleEventNumber == topStart)
+    #expect(viewport.visibilityStats.lastVisibleEventNumber == topEnd)
+    #expect(viewport.visibilityStats.statusText == "Showing \(topStart)-\(topEnd) of 321")
+
+    let targetRowRect = tableView.rect(ofRow: 8)
+    scrollView.contentView.scroll(to: NSPoint(x: 0, y: targetRowRect.minY))
+    scrollView.reflectScrolledClipView(scrollView.contentView)
+    tableView.layoutSubtreeIfNeeded()
+    scrollView.layoutSubtreeIfNeeded()
+    coordinator.publishViewportState()
+
+    let scrolledVisibleRows = tableView.rows(in: scrollView.contentView.bounds)
+    let scrolledStart = 47 + scrolledVisibleRows.location + 1
+    let scrolledEnd = 47 + scrolledVisibleRows.location + scrolledVisibleRows.length
+    #expect(viewport.visibilityStats.firstVisibleEventNumber == scrolledStart)
+    #expect(viewport.visibilityStats.lastVisibleEventNumber == scrolledEnd)
+    #expect(
+      viewport.visibilityStats.statusText
+        == "Showing \(scrolledStart)-\(scrolledEnd) of 321"
+    )
   }
 
   @Test("Height cache invalidates changed carry-over rows and font scale changes")
@@ -865,16 +942,19 @@ struct SessionTimelineNavigationTests {
     #expect(pending.isSatisfied(sessionID: "sess-pagination", navigation: latestNavigation))
   }
 
-  @Test("Visibility status shows loaded event counts only")
-  func visibilityStatusShowsLoadedEventCountsOnly() {
+  @Test("Visibility status shows the current visible event range")
+  func visibilityStatusShowsTheCurrentVisibleEventRange() {
     let stats = SessionTimelineVisibilityStats(
       visibleRowCount: 6,
       renderedRowCount: 15,
       loadedEventCount: 24,
-      totalEventCount: 80
+      totalEventCount: 321,
+      firstVisibleEventNumber: 48,
+      lastVisibleEventNumber: 56
     )
 
-    #expect(stats.statusText == "Loaded events 24/80")
+    #expect(stats.statusText == "Showing 48-56 of 321")
+    #expect(stats.accessibilityStatusText == "Showing events 48 to 56 of 321")
   }
 
   @Test("Timeline content identity changes only across sessions")
