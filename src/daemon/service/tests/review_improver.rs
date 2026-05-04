@@ -232,7 +232,7 @@ fn submit_for_review_file_path_emits_spawn_reviewer_to_leader_runtime_session() 
                 agent_id: worker_id.clone(),
             },
             None,
-            None,
+            crate::daemon::service::WakeDispatch::none(),
         )
         .expect("assign task");
         update_task(
@@ -244,7 +244,7 @@ fn submit_for_review_file_path_emits_spawn_reviewer_to_leader_runtime_session() 
                 note: None,
             },
             None,
-            None,
+            crate::daemon::service::WakeDispatch::none(),
         )
         .expect("move task in_progress");
 

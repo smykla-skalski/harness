@@ -1,13 +1,96 @@
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::thread;
 
 use super::service;
 use super::{
     AcpAgentManagerHandle, AcpAgentSnapshot, AcpPermissionBatch, AcpPermissionDecision,
     ActiveAcpSession,
 };
+use crate::agents::runtime::AgentRuntime;
+use crate::agents::runtime::signal::{AckResult, SignalAck, acknowledge_signal};
 use crate::errors::{CliError, CliErrorKind};
+use crate::workspace::utc_now;
+
+/// Wake-prompt invocation context. Bundles the protocol coordinates and the
+/// signal-side identity needed to synthesise an `Accept` ack on success.
+#[derive(Debug)]
+pub struct AcpWakePrompt {
+    pub acp_id: String,
+    pub protocol_session_id: String,
+    pub project_dir: PathBuf,
+    pub prompt: String,
+    pub signal_id: String,
+    pub agent_id: String,
+}
 
 impl AcpAgentManagerHandle {
+    /// Best-effort wake an ACP-managed agent by issuing an active
+    /// `session/prompt` over the protocol channel.
+    ///
+    /// The prompt call is potentially long-running (the agent may stream tool
+    /// calls before the response settles) so it is dispatched on a dedicated
+    /// OS thread rather than blocking the caller. On success the runtime ack
+    /// file is written so the file-poll fallback consumer (and the daemon
+    /// reconciler) sees the signal as `Accept`-ed; this closes the wake loop
+    /// the file-only path used to leave open. Failures are logged at `warn!`;
+    /// the pending signal record stays on disk so the agent still picks the
+    /// task up on its next file scan.
+    ///
+    /// Back-pressure: an in-flight guard keyed by `(acp_id, signal_id)` keeps
+    /// a single live wake per signal even under a storm of `task.drop` calls.
+    /// Coalesced wakes return immediately at `info!`. The agent will still
+    /// see the file signal on its next poll.
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+    )]
+    pub fn dispatch_wake_prompt(
+        &self,
+        runtime: &'static dyn AgentRuntime,
+        prompt: AcpWakePrompt,
+    ) {
+        let session = match self.session(&prompt.acp_id) {
+            Ok(session) => session,
+            Err(error) => {
+                tracing::warn!(%error, acp_id = %prompt.acp_id, "ACP wake skipped: session not active");
+                return;
+            }
+        };
+        if !self.try_reserve_wake(&prompt.acp_id, &prompt.signal_id) {
+            tracing::info!(
+                acp_id = %prompt.acp_id,
+                signal_id = %prompt.signal_id,
+                "ACP wake coalesced: in-flight wake already issuing session/prompt"
+            );
+            return;
+        }
+        let manager = self.clone();
+        let thread_name = format!("acp-wake-{}", prompt.acp_id);
+        if let Err(error) = thread::Builder::new()
+            .name(thread_name)
+            .spawn(move || run_wake_prompt(&manager, runtime, &session, prompt))
+        {
+            tracing::error!(%error, "failed to spawn ACP wake thread");
+        }
+    }
+
+    fn try_reserve_wake(&self, acp_id: &str, signal_id: &str) -> bool {
+        let mut guard = match self.state.wake_in_flight.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        guard.insert((acp_id.to_string(), signal_id.to_string()))
+    }
+
+    fn release_wake(&self, acp_id: &str, signal_id: &str) {
+        let mut guard = match self.state.wake_in_flight.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        guard.remove(&(acp_id.to_string(), signal_id.to_string()));
+    }
+
     /// Resolve a pending ACP permission batch and return the updated snapshot.
     ///
     /// # Errors
@@ -73,5 +156,88 @@ impl AcpAgentManagerHandle {
             .filter(|session| session.session_id() == session_id)
             .cloned()
             .collect())
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn run_wake_prompt(
+    manager: &AcpAgentManagerHandle,
+    runtime: &'static dyn AgentRuntime,
+    session: &Arc<ActiveAcpSession>,
+    prompt: AcpWakePrompt,
+) {
+    let AcpWakePrompt {
+        acp_id,
+        protocol_session_id,
+        project_dir,
+        prompt: prompt_text,
+        signal_id,
+        agent_id,
+    } = prompt;
+    let result = session.prompt_protocol_session(
+        &acp_id,
+        &protocol_session_id,
+        project_dir.clone(),
+        prompt_text,
+    );
+    match result {
+        Ok(returned_session_id) => {
+            tracing::info!(
+                acp_id = %acp_id,
+                protocol_session_id = %returned_session_id,
+                signal_id = %signal_id,
+                "ACP wake prompt dispatched"
+            );
+            record_wake_accept(
+                runtime,
+                &project_dir,
+                &protocol_session_id,
+                &signal_id,
+                &agent_id,
+                &acp_id,
+            );
+        }
+        Err(error) => tracing::warn!(
+            %error,
+            acp_id = %acp_id,
+            protocol_session_id = %protocol_session_id,
+            signal_id = %signal_id,
+            "ACP wake prompt failed"
+        ),
+    }
+    manager.release_wake(&acp_id, &signal_id);
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn record_wake_accept(
+    runtime: &'static dyn AgentRuntime,
+    project_dir: &Path,
+    protocol_session_id: &str,
+    signal_id: &str,
+    agent_id: &str,
+    acp_id: &str,
+) {
+    let signal_dir = runtime.signal_dir(project_dir, protocol_session_id);
+    let ack = SignalAck {
+        signal_id: signal_id.to_string(),
+        acknowledged_at: utc_now(),
+        result: AckResult::Accepted,
+        agent: agent_id.to_string(),
+        session_id: protocol_session_id.to_string(),
+        details: Some("acp wake prompt acknowledged via session/prompt".into()),
+    };
+    if let Err(error) = acknowledge_signal(&signal_dir, &ack) {
+        tracing::warn!(
+            %error,
+            acp_id,
+            signal_id,
+            "ACP wake ack write failed; reconciler will pick up via file fallback"
+        );
     }
 }

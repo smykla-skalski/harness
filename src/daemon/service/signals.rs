@@ -1,13 +1,14 @@
+use super::wake_route::{WakeDispatch, WakeRoute, log_wake_attempt, wake_route_for_registration};
 use super::{
-    ACTIVE_SIGNAL_ACK_POLL_INTERVAL, ACTIVE_SIGNAL_ACK_TIMEOUT, AckResult, ActiveSignalDelivery,
-    AgentRegistration, AgentTuiManagerHandle, CliError, CliErrorKind, Instant, ManagedTuiWake,
-    Path, PathBuf, SessionDetail, SessionState, SignalAck, SignalSendRequest,
+    ACTIVE_SIGNAL_ACK_POLL_INTERVAL, ACTIVE_SIGNAL_ACK_TIMEOUT, AckResult, AgentRegistration,
+    AgentTuiManagerHandle, CliError, CliErrorKind, Instant, ManagedTuiWake, Path, PathBuf,
+    SessionDetail, SessionState, SignalAck, SignalCoords, SignalSendRequest,
     acknowledged_signal_record, agents_runtime, build_log_entry, build_signal_ack,
     effective_project_dir, index, pending_signal_record, project_dir_for_db_session,
     record_signal_ack, refresh_signal_index_for_db, session_detail, session_detail_from_daemon_db,
     session_not_found, session_service, state, thread, utc_now,
 };
-use crate::session::types::ManagedAgentKind;
+use crate::daemon::agent_acp::AcpWakePrompt;
 
 /// Send a signal through the shared session service.
 ///
@@ -73,15 +74,15 @@ pub fn send_signal(
             None,
         ))?;
         let actively_delivered = attempt_active_signal_delivery(
-            &ActiveSignalDelivery {
+            &SignalCoords {
                 session_id,
                 agent_id: &request.agent_id,
                 signal: &signal,
                 runtime,
                 project_dir: &project_dir,
                 signal_session_id,
-                db: Some(db),
             },
+            Some(db),
             managed_tui_wake(target_tui_id.as_deref(), agent_tui_manager),
         );
         if !actively_delivered {
@@ -126,7 +127,8 @@ pub(crate) fn managed_tui_wake<'a>(
 }
 
 pub(crate) fn attempt_active_signal_delivery(
-    delivery: &ActiveSignalDelivery<'_>,
+    coords: &SignalCoords<'_>,
+    db: Option<&super::db::DaemonDb>,
     managed_tui: Option<ManagedTuiWake<'_>>,
 ) -> bool {
     let Some(managed_tui) = managed_tui else {
@@ -134,14 +136,14 @@ pub(crate) fn attempt_active_signal_delivery(
     };
 
     let Some(woke_tui) = handled_active_signal_wake_result(
-        delivery,
-        wake_tui_for_signal(&managed_tui, delivery.signal),
+        coords,
+        wake_tui_for_signal(&managed_tui, coords.signal),
     ) else {
         return false;
     };
 
     if woke_tui {
-        return process_active_signal_ack(delivery);
+        return process_active_signal_ack(coords, db);
     }
     false
 }
@@ -155,71 +157,75 @@ pub(crate) fn wake_tui_for_signal(
 }
 
 pub(crate) fn handled_active_signal_wake_result(
-    delivery: &ActiveSignalDelivery<'_>,
+    coords: &SignalCoords<'_>,
     wake_result: Result<bool, CliError>,
 ) -> Option<bool> {
     match wake_result {
         Ok(woke_tui) => Some(woke_tui),
         Err(error) => {
-            warn_active_signal_wake_failure(delivery, &error);
+            warn_active_signal_wake_failure(coords, &error);
             None
         }
     }
 }
 
-pub(crate) fn process_active_signal_ack(delivery: &ActiveSignalDelivery<'_>) -> bool {
+pub(crate) fn process_active_signal_ack(
+    coords: &SignalCoords<'_>,
+    db: Option<&super::db::DaemonDb>,
+) -> bool {
     let Some(ack) = handled_active_signal_ack_wait_result(
-        delivery,
+        coords,
         wait_for_signal_ack(
-            delivery.runtime,
-            delivery.project_dir,
-            delivery.signal_session_id,
-            &delivery.signal.signal_id,
+            coords.runtime,
+            coords.project_dir,
+            coords.signal_session_id,
+            &coords.signal.signal_id,
         ),
     ) else {
         return false;
     };
 
-    record_active_signal_ack(delivery, &ack)
+    record_active_signal_ack(coords, db, &ack)
 }
 
 pub(crate) fn handled_active_signal_ack_wait_result(
-    delivery: &ActiveSignalDelivery<'_>,
+    coords: &SignalCoords<'_>,
     ack_result: Result<Option<SignalAck>, CliError>,
 ) -> Option<SignalAck> {
     match ack_result {
         Ok(Some(ack)) => Some(ack),
         Ok(None) => {
             warn_active_signal_delivery_timeout(
-                delivery.session_id,
-                delivery.agent_id,
-                &delivery.signal.signal_id,
+                coords.session_id,
+                coords.agent_id,
+                &coords.signal.signal_id,
             );
             None
         }
         Err(error) => {
-            warn_active_signal_ack_wait_failure(delivery, &error);
+            warn_active_signal_ack_wait_failure(coords, &error);
             None
         }
     }
 }
 
 pub(crate) fn record_active_signal_ack(
-    delivery: &ActiveSignalDelivery<'_>,
+    coords: &SignalCoords<'_>,
+    db: Option<&super::db::DaemonDb>,
     ack: &SignalAck,
 ) -> bool {
     let result = record_signal_ack(
-        delivery.session_id,
-        delivery.agent_id,
-        &delivery.signal.signal_id,
+        coords.session_id,
+        coords.agent_id,
+        &coords.signal.signal_id,
         ack.result,
-        delivery.project_dir,
-        delivery.db,
+        coords.project_dir,
+        db,
     );
     match result {
         Ok(()) => true,
         Err(error) => {
-            warn_active_signal_ack_record_failure(delivery, &error);
+            warn_active_signal_ack_record_failure(coords, &error);
             false
         }
     }
@@ -288,14 +294,14 @@ pub(crate) fn active_signal_delivery_timeout_message(
     reason = "structured tracing macro expansion inflates this simple logging helper"
 )]
 pub(crate) fn warn_active_signal_wake_failure(
-    delivery: &ActiveSignalDelivery<'_>,
+    coords: &SignalCoords<'_>,
     error: &CliError,
 ) {
     tracing::warn!(
         %error,
-        session_id = delivery.session_id,
-        agent_id = delivery.agent_id,
-        signal_id = %delivery.signal.signal_id,
+        session_id = coords.session_id,
+        agent_id = coords.agent_id,
+        signal_id = %coords.signal.signal_id,
         "failed to wake managed TUI for active signal delivery"
     );
 }
@@ -305,14 +311,14 @@ pub(crate) fn warn_active_signal_wake_failure(
     reason = "structured tracing macro expansion inflates this simple logging helper"
 )]
 pub(crate) fn warn_active_signal_ack_wait_failure(
-    delivery: &ActiveSignalDelivery<'_>,
+    coords: &SignalCoords<'_>,
     error: &CliError,
 ) {
     tracing::warn!(
         %error,
-        session_id = delivery.session_id,
-        agent_id = delivery.agent_id,
-        signal_id = %delivery.signal.signal_id,
+        session_id = coords.session_id,
+        agent_id = coords.agent_id,
+        signal_id = %coords.signal.signal_id,
         "failed while waiting for active signal acknowledgment"
     );
 }
@@ -322,14 +328,14 @@ pub(crate) fn warn_active_signal_ack_wait_failure(
     reason = "structured tracing macro expansion inflates this simple logging helper"
 )]
 pub(crate) fn warn_active_signal_ack_record_failure(
-    delivery: &ActiveSignalDelivery<'_>,
+    coords: &SignalCoords<'_>,
     error: &CliError,
 ) {
     tracing::warn!(
         %error,
-        session_id = delivery.session_id,
-        agent_id = delivery.agent_id,
-        signal_id = %delivery.signal.signal_id,
+        session_id = coords.session_id,
+        agent_id = coords.agent_id,
+        signal_id = %coords.signal.signal_id,
         "failed to record actively delivered signal acknowledgment"
     );
 }
@@ -369,7 +375,7 @@ pub(crate) fn try_wake_started_workers(
     session_id: &str,
     project_dir: &Path,
     db: Option<&super::db::DaemonDb>,
-    agent_tui_manager: Option<&AgentTuiManagerHandle>,
+    dispatch: WakeDispatch<'_>,
 ) {
     for effect in effects {
         let session_service::TaskDropEffect::Started(record) = effect else {
@@ -380,36 +386,43 @@ pub(crate) fn try_wake_started_workers(
             continue;
         };
         let registration = state.agents.get(&record.agent_id);
-        let tui_id = registration.and_then(agent_tui_id_for_registration);
-        let managed_kind = managed_kind_label(registration);
-        tracing::info!(session_id, agent_id = %record.agent_id, runtime = %record.runtime, signal_id = %record.signal.signal_id, managed_kind, tui_id = tui_id.unwrap_or("<none>"), tui_manager = agent_tui_manager.is_some(), "wake attempt");
-        if agent_tui_manager.is_none() || tui_id.is_none() {
-            tracing::warn!(session_id, agent_id = %record.agent_id, signal_id = %record.signal.signal_id, managed_kind, "wake skipped: no TUI route - ACP/non-TUI agents not actively woken on task drop, signal is file-only");
-            continue;
+        let route = wake_route_for_registration(registration, dispatch);
+        log_wake_attempt(session_id, record.as_ref(), &route);
+        match route {
+            WakeRoute::Tui { tui_id, manager } => {
+                let _ = attempt_active_signal_delivery(
+                    &SignalCoords {
+                        session_id,
+                        agent_id: &record.agent_id,
+                        signal: &record.signal,
+                        runtime,
+                        project_dir,
+                        signal_session_id: &record.signal_session_id,
+                    },
+                    db,
+                    Some(ManagedTuiWake { tui_id, manager }),
+                );
+            }
+            WakeRoute::Acp { acp_id, manager } => {
+                manager.dispatch_wake_prompt(
+                    runtime,
+                    AcpWakePrompt {
+                        acp_id: acp_id.to_string(),
+                        protocol_session_id: record.signal_session_id.clone(),
+                        project_dir: project_dir.to_path_buf(),
+                        prompt: build_active_signal_prompt(&record.signal),
+                        signal_id: record.signal.signal_id.clone(),
+                        agent_id: record.agent_id.clone(),
+                    },
+                );
+            }
+            WakeRoute::None { reason } => {
+                tracing::warn!(session_id, agent_id = %record.agent_id, signal_id = %record.signal.signal_id, reason = %reason, "wake skipped: signal stays file-only");
+            }
         }
-        let _ = attempt_active_signal_delivery(
-            &ActiveSignalDelivery {
-                session_id,
-                agent_id: &record.agent_id,
-                signal: &record.signal,
-                runtime,
-                project_dir,
-                signal_session_id: &record.signal_session_id,
-                db,
-            },
-            managed_tui_wake(tui_id, agent_tui_manager),
-        );
     }
 }
 
-fn managed_kind_label(registration: Option<&AgentRegistration>) -> &'static str {
-    registration
-        .and_then(|reg| reg.managed_agent.as_ref())
-        .map_or("none", |managed| match managed.kind {
-            ManagedAgentKind::Tui => "tui",
-            ManagedAgentKind::Acp => "acp",
-        })
-}
 
 pub(crate) fn agent_tui_id_for_registration(agent: &AgentRegistration) -> Option<&str> {
     agent.capabilities.iter().find_map(|capability| {

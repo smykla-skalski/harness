@@ -80,7 +80,7 @@ fn task_start_ack_db_direct_starts_work_only_after_delivery() {
                 queue_policy: crate::session::types::TaskQueuePolicy::Locked,
             },
             Some(&db),
-            None,
+            crate::daemon::service::WakeDispatch::none(),
         )
         .expect("drop task");
 
@@ -218,7 +218,7 @@ fn session_detail_core_db_direct_reopens_expired_pending_delivery() {
                 queue_policy: crate::session::types::TaskQueuePolicy::Locked,
             },
             Some(&db),
-            None,
+            crate::daemon::service::WakeDispatch::none(),
         )
         .expect("drop task");
 

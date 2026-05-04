@@ -144,7 +144,7 @@ fn v10_task_columns_track_every_review_mutation_on_async_path() {
                     agent_id: worker_id.clone(),
                 },
                 &async_db,
-                None,
+                crate::daemon::service::WakeDispatch::none(),
             )
             .await
             .expect("assign");
@@ -157,7 +157,7 @@ fn v10_task_columns_track_every_review_mutation_on_async_path() {
                     note: None,
                 },
                 &async_db,
-                None,
+                crate::daemon::service::WakeDispatch::none(),
             )
             .await
             .expect("in_progress");

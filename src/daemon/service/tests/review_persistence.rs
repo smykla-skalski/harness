@@ -119,7 +119,7 @@ async fn set_up_review_persistence_fixture(
             agent_id: worker_id.clone(),
         },
         &async_db,
-        None,
+        crate::daemon::service::WakeDispatch::none(),
     )
     .await
     .expect("assign task");
@@ -132,7 +132,7 @@ async fn set_up_review_persistence_fixture(
             note: None,
         },
         &async_db,
-        None,
+        crate::daemon::service::WakeDispatch::none(),
     )
     .await
     .expect("move task in_progress");

@@ -4,16 +4,17 @@ use crate::daemon::index::ResolvedSession;
 use tokio::time::{Instant as TokioInstant, sleep};
 
 use super::signals::{
-    agent_tui_id_for_registration, handled_active_signal_ack_wait_result,
-    handled_active_signal_wake_result, managed_tui_wake, wake_tui_for_signal,
-    warn_active_signal_ack_record_failure,
+    build_active_signal_prompt, handled_active_signal_ack_wait_result,
+    handled_active_signal_wake_result, wake_tui_for_signal, warn_active_signal_ack_record_failure,
 };
+use super::wake_route::{WakeDispatch, WakeRoute, log_wake_attempt, wake_route_for_registration};
 use super::{
-    ACTIVE_SIGNAL_ACK_POLL_INTERVAL, ACTIVE_SIGNAL_ACK_TIMEOUT, ActiveSignalDelivery,
-    AgentTuiManagerHandle, CliError, Path, SessionTransition, SignalAckRequest, build_log_entry,
-    effective_project_dir, session_not_found, session_service, snapshot,
-    sync_file_state_for_resolved, task_drop_effect_signal_records, write_task_start_signals,
+    ACTIVE_SIGNAL_ACK_POLL_INTERVAL, ACTIVE_SIGNAL_ACK_TIMEOUT, CliError, ManagedTuiWake, Path,
+    SessionTransition, SignalAckRequest, SignalCoords, build_log_entry, effective_project_dir,
+    session_not_found, session_service, snapshot, sync_file_state_for_resolved,
+    task_drop_effect_signal_records, write_task_start_signals,
 };
+use crate::daemon::agent_acp::AcpWakePrompt;
 
 mod agents;
 mod sessions;
@@ -141,7 +142,7 @@ async fn try_wake_started_workers_async(
     session_id: &str,
     project_dir: &Path,
     async_db: &super::db::AsyncDaemonDb,
-    agent_tui_manager: Option<&AgentTuiManagerHandle>,
+    dispatch: WakeDispatch<'_>,
 ) {
     for effect in effects {
         let session_service::TaskDropEffect::Started(record) = effect else {
@@ -152,82 +153,85 @@ async fn try_wake_started_workers_async(
             continue;
         };
         let registration = resolved.state.agents.get(&record.agent_id);
-        let tui_id = registration.and_then(agent_tui_id_for_registration);
-        let managed_kind = registration
-            .and_then(|reg| reg.managed_agent.as_ref())
-            .map_or("none", |managed| match managed.kind {
-                crate::session::types::ManagedAgentKind::Tui => "tui",
-                crate::session::types::ManagedAgentKind::Acp => "acp",
-            });
-        tracing::info!(session_id, agent_id = %record.agent_id, runtime = %record.runtime, signal_id = %record.signal.signal_id, managed_kind, tui_id = tui_id.unwrap_or("<none>"), tui_manager = agent_tui_manager.is_some(), "wake attempt (async)");
-        if agent_tui_manager.is_none() || tui_id.is_none() {
-            tracing::warn!(session_id, agent_id = %record.agent_id, signal_id = %record.signal.signal_id, managed_kind, "wake skipped (async): no TUI route - ACP/non-TUI agents not actively woken on task drop, signal is file-only");
-            continue;
-        }
-        let Some(managed_tui) = managed_tui_wake(tui_id, agent_tui_manager) else {
-            continue;
-        };
-        let Some(woke_tui) = handled_active_signal_wake_result(
-            &ActiveSignalDelivery {
-                session_id,
-                agent_id: &record.agent_id,
-                signal: &record.signal,
-                runtime,
-                project_dir,
-                signal_session_id: &record.signal_session_id,
-                db: None,
-            },
-            wake_tui_for_signal(&managed_tui, &record.signal),
-        ) else {
-            continue;
-        };
-        if !woke_tui {
-            continue;
-        }
-
-        let ack_result = wait_for_task_start_ack_async(
-            runtime,
-            project_dir,
-            &record.signal_session_id,
-            &record.signal.signal_id,
-        )
-        .await;
-        let Some(ack) = handled_active_signal_ack_wait_result(
-            &ActiveSignalDelivery {
-                session_id,
-                agent_id: &record.agent_id,
-                signal: &record.signal,
-                runtime,
-                project_dir,
-                signal_session_id: &record.signal_session_id,
-                db: None,
-            },
-            ack_result,
-        ) else {
-            continue;
-        };
-        let ack_request = SignalAckRequest {
-            agent_id: record.agent_id.clone(),
-            signal_id: record.signal.signal_id.clone(),
-            result: ack.result,
-            project_dir: project_dir.display().to_string(),
-        };
-        if let Err(error) =
-            super::record_signal_ack_direct_async(session_id, &ack_request, async_db).await
-        {
-            warn_active_signal_ack_record_failure(
-                &ActiveSignalDelivery {
-                    session_id,
-                    agent_id: &record.agent_id,
-                    signal: &record.signal,
+        let route = wake_route_for_registration(registration, dispatch);
+        log_wake_attempt(session_id, record.as_ref(), &route);
+        match route {
+            WakeRoute::Tui { tui_id, manager } => {
+                wake_tui_async(
                     runtime,
+                    record,
+                    session_id,
                     project_dir,
-                    signal_session_id: &record.signal_session_id,
-                    db: None,
-                },
-                &error,
-            );
+                    async_db,
+                    ManagedTuiWake { tui_id, manager },
+                )
+                .await;
+            }
+            WakeRoute::Acp { acp_id, manager } => {
+                manager.dispatch_wake_prompt(
+                    runtime,
+                    AcpWakePrompt {
+                        acp_id: acp_id.to_string(),
+                        protocol_session_id: record.signal_session_id.clone(),
+                        project_dir: project_dir.to_path_buf(),
+                        prompt: build_active_signal_prompt(&record.signal),
+                        signal_id: record.signal.signal_id.clone(),
+                        agent_id: record.agent_id.clone(),
+                    },
+                );
+            }
+            WakeRoute::None { reason } => {
+                tracing::warn!(session_id, agent_id = %record.agent_id, signal_id = %record.signal.signal_id, reason = %reason, "wake skipped (async): signal stays file-only");
+            }
         }
+    }
+}
+
+async fn wake_tui_async(
+    runtime: &dyn AgentRuntime,
+    record: &session_service::TaskStartSignalRecord,
+    session_id: &str,
+    project_dir: &Path,
+    async_db: &super::db::AsyncDaemonDb,
+    managed_tui: ManagedTuiWake<'_>,
+) {
+    let coords = SignalCoords {
+        session_id,
+        agent_id: &record.agent_id,
+        signal: &record.signal,
+        runtime,
+        project_dir,
+        signal_session_id: &record.signal_session_id,
+    };
+    let Some(woke_tui) = handled_active_signal_wake_result(
+        &coords,
+        wake_tui_for_signal(&managed_tui, &record.signal),
+    ) else {
+        return;
+    };
+    if !woke_tui {
+        return;
+    }
+    let ack_result = wait_for_task_start_ack_async(
+        runtime,
+        project_dir,
+        &record.signal_session_id,
+        &record.signal.signal_id,
+    )
+    .await;
+    let Some(ack) = handled_active_signal_ack_wait_result(&coords, ack_result) else {
+        return;
+    };
+    let ack_request = SignalAckRequest {
+        agent_id: record.agent_id.clone(),
+        signal_id: record.signal.signal_id.clone(),
+        result: ack.result,
+        project_dir: project_dir.display().to_string(),
+    };
+    if let Err(error) =
+        super::record_signal_ack_direct_async(session_id, &ack_request, async_db).await
+    {
+        warn_active_signal_ack_record_failure(&coords, &error);
     }
 }
 
@@ -238,7 +242,7 @@ async fn persist_task_signal_effects(
     actor_id: &str,
     effects: &[session_service::TaskDropEffect],
     extra_transition: Option<SessionTransition>,
-    agent_tui_manager: Option<&AgentTuiManagerHandle>,
+    dispatch: WakeDispatch<'_>,
 ) -> Result<(), CliError> {
     let project_dir = effective_project_dir(resolved).to_path_buf();
     sync_file_state_for_resolved(resolved)?;
@@ -253,15 +257,8 @@ async fn persist_task_signal_effects(
             &task_drop_effect_signal_records(session_id, effects),
         )
         .await?;
-    try_wake_started_workers_async(
-        resolved,
-        effects,
-        session_id,
-        &project_dir,
-        async_db,
-        agent_tui_manager,
-    )
-    .await;
+    try_wake_started_workers_async(resolved, effects, session_id, &project_dir, async_db, dispatch)
+        .await;
     bump_session(async_db, session_id).await
 }
 

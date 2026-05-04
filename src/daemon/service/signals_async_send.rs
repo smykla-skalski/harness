@@ -14,11 +14,10 @@ use super::signals_async::{
     runtime_for_agent,
 };
 use super::{
-    ACTIVE_SIGNAL_ACK_POLL_INTERVAL, ACTIVE_SIGNAL_ACK_TIMEOUT, ActiveSignalDelivery,
-    AgentTuiManagerHandle, CliError, ManagedTuiWake, SessionDetail, SessionLogEntry,
-    SignalAckRequest, SignalSendRequest, build_log_entry, effective_project_dir,
-    pending_signal_record, session_detail_from_async_daemon_db, session_service,
-    sync_file_state_from_async_db, utc_now,
+    ACTIVE_SIGNAL_ACK_POLL_INTERVAL, ACTIVE_SIGNAL_ACK_TIMEOUT, AgentTuiManagerHandle, CliError,
+    ManagedTuiWake, SessionDetail, SessionLogEntry, SignalAckRequest, SignalCoords,
+    SignalSendRequest, build_log_entry, effective_project_dir, pending_signal_record,
+    session_detail_from_async_daemon_db, session_service, sync_file_state_from_async_db, utc_now,
 };
 
 struct PreparedAsyncSignalDelivery {
@@ -40,15 +39,14 @@ struct AsyncActiveSignalDelivery<'a> {
 }
 
 impl AsyncActiveSignalDelivery<'_> {
-    fn active_signal_delivery(&self) -> ActiveSignalDelivery<'_> {
-        ActiveSignalDelivery {
+    fn coords(&self) -> SignalCoords<'_> {
+        SignalCoords {
             session_id: self.session_id,
             agent_id: self.agent_id,
             signal: self.signal,
             runtime: self.runtime,
             project_dir: self.project_dir,
             signal_session_id: self.signal_session_id,
-            db: None,
         }
     }
 }
@@ -174,9 +172,9 @@ async fn attempt_active_signal_delivery_async(
         return Ok(false);
     };
     let woke_tui = {
-        let wake_delivery = delivery.active_signal_delivery();
+        let wake_coords = delivery.coords();
         let Some(woke_tui) = handled_active_signal_wake_result(
-            &wake_delivery,
+            &wake_coords,
             wake_tui_for_signal(&managed_tui, delivery.signal),
         ) else {
             return Ok(false);
@@ -195,8 +193,8 @@ async fn attempt_active_signal_delivery_async(
     )
     .await;
     let ack = {
-        let ack_delivery = delivery.active_signal_delivery();
-        let Some(ack) = handled_active_signal_ack_wait_result(&ack_delivery, ack_result) else {
+        let ack_coords = delivery.coords();
+        let Some(ack) = handled_active_signal_ack_wait_result(&ack_coords, ack_result) else {
             return Ok(false);
         };
         ack
@@ -216,8 +214,8 @@ async fn attempt_active_signal_delivery_async(
     match result {
         Ok(()) => Ok(true),
         Err(error) => {
-            let record_delivery = delivery.active_signal_delivery();
-            warn_active_signal_ack_record_failure(&record_delivery, &error);
+            let record_coords = delivery.coords();
+            warn_active_signal_ack_record_failure(&record_coords, &error);
             Ok(false)
         }
     }
