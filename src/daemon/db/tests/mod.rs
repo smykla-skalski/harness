@@ -8,9 +8,9 @@ mod support;
 #[allow(unused_imports)]
 use support::*;
 
+mod agent_upserts;
 mod async_pool;
 mod async_reads;
-mod agent_upserts;
 mod conversation;
 mod mutations;
 mod performance;

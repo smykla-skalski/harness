@@ -19,7 +19,7 @@ fn process_fault_policy_env_toggle_parsing() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(unix)]
 async fn repeated_process_faults_quarantine_process_key() {
-    temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
+    temp_env::async_with_vars([(feature_flags::ACP_ENV, Some("1"))], async {
         let temp = TempDir::new().expect("temp");
         let script = temp.path().join("failing-agent.sh");
         write_executable(&script, "#!/bin/sh\nexit 7\n");
@@ -60,7 +60,7 @@ async fn repeated_process_faults_quarantine_process_key() {
                     saw_quarantine_applied = true;
                 }
             }
-            std::thread::sleep(Duration::from_millis(1100));
+            tokio::time::advance(Duration::from_millis(1100)).await;
         }
         assert!(saw_backoff_applied, "expected backoff-applied incident");
         assert!(
@@ -75,13 +75,14 @@ async fn repeated_process_faults_quarantine_process_key() {
             format!("{error}").contains("quarantined"),
             "unexpected error: {error}"
         );
-    });
+    })
+    .await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(unix)]
 async fn recent_process_fault_applies_backoff_before_next_start() {
-    temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
+    temp_env::async_with_vars([(feature_flags::ACP_ENV, Some("1"))], async {
         let temp = TempDir::new().expect("temp");
         let script = temp.path().join("failing-agent.sh");
         write_executable(&script, "#!/bin/sh\nexit 7\n");
@@ -106,23 +107,24 @@ async fn recent_process_fault_applies_backoff_before_next_start() {
             "unexpected error: {error}"
         );
 
-        std::thread::sleep(Duration::from_millis(1100));
+        tokio::time::advance(Duration::from_millis(1100)).await;
         let restarted = manager
             .start_descriptor("sess-3", &request, &descriptor)
             .expect("start after backoff window");
         let _ = wait_until_disconnected(&manager, &restarted.acp_id);
-    });
+    })
+    .await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(unix)]
 async fn process_fault_policy_disabled_skips_backoff_and_quarantine_enforcement() {
-    temp_env::with_vars(
+    temp_env::async_with_vars(
         [
             (feature_flags::ACP_ENV, Some("1")),
             ("HARNESS_ACP_PROCESS_FAULT_POLICY", Some("0")),
         ],
-        || {
+        async {
             let temp = TempDir::new().expect("temp");
             let script = temp.path().join("failing-agent.sh");
             write_executable(&script, "#!/bin/sh\nexit 7\n");
@@ -144,5 +146,6 @@ async fn process_fault_policy_disabled_skips_backoff_and_quarantine_enforcement(
                 .expect("start second without backoff block");
             let _ = wait_until_disconnected(&manager, &second.acp_id);
         },
-    );
+    )
+    .await;
 }

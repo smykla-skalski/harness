@@ -18,7 +18,10 @@ fn find_session_in_temp_dir() {
     fs::write(&session_file, "{}\n").unwrap();
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
-        assert_eq!(find_session("abc123", None).expect("find session"), session_file);
+        assert_eq!(
+            find_session("abc123", None).expect("find session"),
+            session_file
+        );
     });
 }
 

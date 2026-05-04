@@ -439,9 +439,8 @@ fn delete_stale_agents(
     }
 
     let placeholders = repeat_n("?", agents.len()).collect::<Vec<_>>().join(", ");
-    let sql = format!(
-        "DELETE FROM agents WHERE session_id = ?1 AND agent_id NOT IN ({placeholders})"
-    );
+    let sql =
+        format!("DELETE FROM agents WHERE session_id = ?1 AND agent_id NOT IN ({placeholders})");
     let agent_ids = agents.keys().map(String::as_str).collect::<Vec<_>>();
     let mut params = Vec::with_capacity(agent_ids.len() + 1);
     params.push(session_id);

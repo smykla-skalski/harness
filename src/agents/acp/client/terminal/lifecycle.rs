@@ -1,6 +1,7 @@
+use std::sync::Arc;
 use std::thread;
 use std::thread::JoinHandle;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use agent_client_protocol::schema::TerminalExitStatus;
 use nix::sys::signal::{Signal, killpg};
@@ -17,7 +18,7 @@ use crate::agents::acp::client::{ClientError, ClientResult};
 
 pub(super) fn spawn_exit_monitor(
     child: SharedTerminalChild,
-    signal: std::sync::Arc<TerminalWaitSignal>,
+    signal: Arc<TerminalWaitSignal>,
 ) -> JoinHandle<()> {
     thread::spawn(move || {
         loop {
@@ -76,7 +77,7 @@ pub(super) fn wait_for_terminal_exit_state(
                 return Ok(exit_status);
             }
             (
-                std::sync::Arc::clone(&state.signal),
+                Arc::clone(&state.signal),
                 state
                     .wall_clock_limit
                     .saturating_sub(state.spawned_at.elapsed()),
@@ -145,7 +146,7 @@ fn wait_for_terminal_exit_signal(state: &TerminalState, timeout: Duration) -> bo
 }
 
 fn wait_for_reader_close(signal: &TerminalWaitSignal, timeout: Duration) -> bool {
-    let start = std::time::Instant::now();
+    let start = Instant::now();
     let mut snapshot = signal.snapshot();
     while !snapshot.reader_closed && start.elapsed() < timeout {
         let remaining = timeout.saturating_sub(start.elapsed());

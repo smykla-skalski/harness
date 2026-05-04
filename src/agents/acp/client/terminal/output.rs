@@ -2,7 +2,7 @@ use std::io::{ErrorKind, Read as StdRead};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use super::{TerminalOutputState, TerminalWaitSignal};
 
@@ -46,7 +46,7 @@ pub(super) fn append_with_limit(output: &Mutex<TerminalOutputState>, data: &[u8]
 }
 
 pub(super) fn wait_for_output_drain(signal: &TerminalWaitSignal, timeout: Duration) {
-    let start = std::time::Instant::now();
+    let start = Instant::now();
     let mut snapshot = signal.snapshot();
     while start.elapsed() < timeout {
         if snapshot.reader_closed {

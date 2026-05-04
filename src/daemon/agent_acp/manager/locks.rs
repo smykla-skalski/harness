@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::Instant;
+use tokio::time::Instant;
 
 use super::{AcpAgentManagerHandle, ActiveAcpProcess, ActiveAcpSession, DaemonDb};
 use crate::errors::{CliError, CliErrorKind};

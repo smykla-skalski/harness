@@ -33,14 +33,32 @@ fn parse_create_begin() {
 fn create_subcommands_reject_legacy_skill_flag() {
     let cases: &[&[&str]] = &[
         &[
-            "harness", "create", "begin", "--skill", "suite:create",
-            "--repo-root", "/repo", "--feature", "mesh-traffic",
-            "--mode", "interactive", "--suite-dir", "/suites/mesh",
-            "--suite-name", "mesh-suite",
+            "harness",
+            "create",
+            "begin",
+            "--skill",
+            "suite:create",
+            "--repo-root",
+            "/repo",
+            "--feature",
+            "mesh-traffic",
+            "--mode",
+            "interactive",
+            "--suite-dir",
+            "/suites/mesh",
+            "--suite-name",
+            "mesh-suite",
         ],
         &[
-            "harness", "create", "approval-begin", "--skill", "suite:create",
-            "--mode", "interactive", "--suite-dir", "/suites/mesh",
+            "harness",
+            "create",
+            "approval-begin",
+            "--skill",
+            "suite:create",
+            "--mode",
+            "interactive",
+            "--suite-dir",
+            "/suites/mesh",
         ],
         &["harness", "create", "reset", "--skill", "suite:create"],
     ];
@@ -87,4 +105,3 @@ fn parse_create_reset() {
         }
     ));
 }
-

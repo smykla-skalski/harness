@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::env;
 use std::sync::Arc;
-use std::time::Instant;
+use tokio::time::Instant;
 
 use super::{AcpAgentManagerHandle, AcpAgentSnapshot, ActiveAcpSession, PROCESS_KEY_BACKOFF};
 use crate::agents::kind::DisconnectReason;
