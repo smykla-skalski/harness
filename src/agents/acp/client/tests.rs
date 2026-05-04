@@ -303,6 +303,89 @@ fn recording_permission_request_never_blocks_or_approves() {
 }
 
 #[test]
+fn handle_request_permission_emits_permission_asked_event() {
+    use std::sync::Arc;
+
+    use crate::agents::acp::connection::SupervisorEventSink;
+    use crate::agents::runtime::event::ConversationEventKind;
+
+    let (temp, _) = setup_client();
+    let log_path = temp.path().join("perm.log");
+    let (event_tx, mut event_rx) = tokio::sync::mpsc::channel(8);
+    let sink = Arc::new(SupervisorEventSink::new(
+        event_tx,
+        "agent-fixture".to_string(),
+        "session-fixture".to_string(),
+    ));
+    let client = HarnessAcpClient::new(
+        temp.path().to_path_buf(),
+        temp.path().to_path_buf(),
+        None,
+        BTreeSet::new(),
+        PermissionMode::Recording {
+            log_path: log_path.clone(),
+        },
+    )
+    .with_event_sink(Arc::clone(&sink));
+
+    let tool_call = ToolCallUpdate::new(
+        "fs.write_text_file:/tmp/foo.txt",
+        ToolCallUpdateFields::new(),
+    );
+    let request = RequestPermissionRequest::new(
+        "session-fixture",
+        tool_call,
+        standard_permission_options(),
+    );
+
+    let _ = ok(
+        client.handle_request_permission(&request),
+        "recording mode permission",
+    );
+
+    let batch = event_rx
+        .try_recv()
+        .expect("permission_asked batch must be admitted");
+    assert_eq!(batch.events.len(), 1);
+    assert_eq!(batch.session_id, "session-fixture");
+    assert_eq!(batch.raw_count, 0, "synthetic batch must mark raw_count 0");
+
+    let kind = &batch.events[0].kind;
+    let ConversationEventKind::PermissionAsked { tool, scope, .. } = kind else {
+        panic!("expected PermissionAsked variant, got {kind:?}");
+    };
+    assert_eq!(tool, "fs.write_text_file");
+    assert_eq!(scope, "/tmp/foo.txt");
+}
+
+#[test]
+fn handle_request_permission_with_no_sink_emits_nothing() {
+    let (temp, _) = setup_client();
+    let log_path = temp.path().join("perm.log");
+    let client = HarnessAcpClient::new(
+        temp.path().to_path_buf(),
+        temp.path().to_path_buf(),
+        None,
+        BTreeSet::new(),
+        PermissionMode::Recording { log_path },
+    );
+
+    let tool_call =
+        ToolCallUpdate::new("opaque-no-colon-id", ToolCallUpdateFields::new());
+    let request = RequestPermissionRequest::new(
+        "session-fixture",
+        tool_call,
+        standard_permission_options(),
+    );
+
+    let _ = ok(
+        client.handle_request_permission(&request),
+        "recording mode permission",
+    );
+    // No sink attached -> no panic, no emit; the test passes if we got here.
+}
+
+#[test]
 fn error_codes_are_distinct() {
     let codes = [
         WRITE_DENIED,

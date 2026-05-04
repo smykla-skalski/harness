@@ -67,6 +67,23 @@ pub enum ConversationEventKind {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         reason: Option<String>,
     },
+    /// Permission prompt surfaced to the user by the ACP client gate. Emitted
+    /// from `HarnessAcpClient::handle_request_permission` so the timeline
+    /// shows the moment the agent asked, regardless of how the user later
+    /// decides.
+    PermissionAsked {
+        tool: String,
+        scope: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        request_id: Option<String>,
+    },
+    // NOTE: `HookFired` was previously defined here but stays removed.
+    // Hooks in this codebase live in `src/hooks/runtime/mod.rs` and run
+    // CLI-side around shell tool calls; there is no agent-side ACP path
+    // that fires a hook on behalf of the model. Reintroduce only when an
+    // agent-side hook surface lands with a real producer per the UI shape
+    // rule in `apps/harness-monitor-macos/CLAUDE.md` ("no UI surface
+    // ships without its real producer").
     /// Catch-all for runtime-specific events.
     Other { label: String, data: Value },
 }

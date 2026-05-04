@@ -42,6 +42,7 @@ pub use error::*;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use agent_client_protocol::schema::{
     CreateTerminalRequest, CreateTerminalResponse, KillTerminalRequest, KillTerminalResponse,
@@ -53,6 +54,7 @@ use agent_client_protocol::schema::{
 use tokio::sync::mpsc::error::TrySendError;
 use tokio::sync::oneshot;
 
+use crate::agents::acp::connection::SupervisorEventSink;
 use crate::agents::acp::supervision::MAX_TERMINALS_PER_SESSION;
 use crate::agents::policy::{DeniedBinaries, WriteDecision, WriteSurfaceContext, evaluate_write};
 
@@ -81,6 +83,11 @@ pub struct HarnessAcpClient {
     permission_mode: PermissionMode,
     /// Terminal manager.
     terminals: TerminalManager,
+    /// Per-session synthetic-event sink. When attached, the client emits a
+    /// `PermissionAsked` event each time `handle_request_permission` runs, so
+    /// the timeline can show that the agent surfaced a prompt to the user
+    /// even before the user decides.
+    event_sink: Option<Arc<SupervisorEventSink>>,
 }
 
 impl HarnessAcpClient {
@@ -100,7 +107,17 @@ impl HarnessAcpClient {
             denied_binaries: DeniedBinaries::new(denied_binaries),
             permission_mode,
             terminals: TerminalManager::new(MAX_TERMINALS_PER_SESSION),
+            event_sink: None,
         }
+    }
+
+    /// Attach a per-session event sink so `handle_request_permission` can
+    /// emit a `PermissionAsked` synthetic event into the same channel that
+    /// carries agent-emitted notifications.
+    #[must_use]
+    pub fn with_event_sink(mut self, sink: Arc<SupervisorEventSink>) -> Self {
+        self.event_sink = Some(sink);
+        self
     }
 
     /// Handle `fs/read_text_file`.
@@ -341,6 +358,7 @@ impl HarnessAcpClient {
         &self,
         request: &RequestPermissionRequest,
     ) -> ClientResult<RequestPermissionResponse> {
+        self.emit_permission_asked(request);
         match &self.permission_mode {
             PermissionMode::Stdin => stdin_permission_gateway(request).map_err(|e| {
                 ClientError::new(PERMISSION_TIMEOUT, format!("stdin permission failed: {e}"))
@@ -369,6 +387,25 @@ impl HarnessAcpClient {
                 wait_permission_bridge_response(*deadline, response_rx)
             }
         }
+    }
+
+    /// Emit a `PermissionAsked` synthetic event if a sink is attached.
+    ///
+    /// Splits the ACP `tool_call_id` ("fs.write_text_file:/path/foo") into
+    /// `tool` ("fs.write_text_file") and `scope` ("/path/foo") so the timeline
+    /// can render both the action class and the resource without re-parsing
+    /// downstream. Falls back to the whole id as `tool` with empty scope when
+    /// the id has no `:` separator.
+    fn emit_permission_asked(&self, request: &RequestPermissionRequest) {
+        let Some(sink) = self.event_sink.as_ref() else {
+            return;
+        };
+        let tool_call_id = request.tool_call.tool_call_id.0.to_string();
+        let (tool, scope) = match tool_call_id.split_once(':') {
+            Some((kind, rest)) => (kind.to_string(), rest.to_string()),
+            None => (tool_call_id, String::new()),
+        };
+        sink.emit_permission_asked(tool, scope, None);
     }
 
     pub(super) fn require_permission(

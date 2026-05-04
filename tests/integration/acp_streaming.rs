@@ -108,6 +108,8 @@ fn event_kind(kind: &ConversationEventKind) -> &'static str {
         ConversationEventKind::FileModification { .. } => "file_modification",
         ConversationEventKind::SessionMarker { .. } => "session_marker",
         ConversationEventKind::SignalReceived { .. } => "signal_received",
+        ConversationEventKind::WatchdogState { .. } => "watchdog_state",
+        ConversationEventKind::PermissionAsked { .. } => "permission_asked",
         ConversationEventKind::Other { .. } => "other",
     }
 }

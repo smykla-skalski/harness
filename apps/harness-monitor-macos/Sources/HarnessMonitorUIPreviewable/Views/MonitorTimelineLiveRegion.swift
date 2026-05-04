@@ -14,7 +14,8 @@ public enum MonitorTimelineLiveRegion {
       .polite
     case "agent_watchdog_state",
       "agent_session_marker",
-      "agent_error":
+      "agent_error",
+      "agent_permission_asked":
       .assertive
     default:
       .silent
