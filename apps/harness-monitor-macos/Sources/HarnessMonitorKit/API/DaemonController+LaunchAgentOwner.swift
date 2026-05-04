@@ -2,25 +2,45 @@ import Darwin
 import Foundation
 
 public struct ManagedLaunchAgentOwner: Codable, Equatable, Sendable {
-  public static let currentVersion = 1
+  /// `1` is the legacy schema (pid + executablePath + registeredAt).
+  /// `2` adds `bootSessionUUID` so owner records cannot survive a
+  /// reboot under matching pid+exec coincidence. Decoding tolerates
+  /// the absent field, so a v1 marker on disk loads with
+  /// `bootSessionUUID == nil` (and the decision function then
+  /// classifies it as cross-boot-stale once F1 lands in production).
+  public static let currentVersion = 2
 
   public let version: Int
   public let pid: Int32
   public let executablePath: String
   public let registeredAt: Date
+  public let bootSessionUUID: String?
 
-  public init(pid: Int32, executablePath: String, registeredAt: Date) {
-    self.version = Self.currentVersion
+  public init(
+    pid: Int32,
+    executablePath: String,
+    registeredAt: Date,
+    bootSessionUUID: String? = nil
+  ) {
+    self.version = bootSessionUUID == nil ? 1 : Self.currentVersion
     self.pid = pid
     self.executablePath = executablePath
     self.registeredAt = registeredAt
+    self.bootSessionUUID = bootSessionUUID
   }
 
-  public init(version: Int, pid: Int32, executablePath: String, registeredAt: Date) {
+  public init(
+    version: Int,
+    pid: Int32,
+    executablePath: String,
+    registeredAt: Date,
+    bootSessionUUID: String? = nil
+  ) {
     self.version = version
     self.pid = pid
     self.executablePath = executablePath
     self.registeredAt = registeredAt
+    self.bootSessionUUID = bootSessionUUID
   }
 }
 
@@ -49,6 +69,12 @@ public enum ManagedLaunchAgentRefreshDecision: Equatable, Sendable {
 
 public typealias ProcessLivenessProbe = @Sendable (Int32) -> ProcessLiveness
 
+/// Returns the current boot's session UUID (`kern.bootsessionuuid`)
+/// or `nil` if the syscall fails. The UUID changes on every boot,
+/// so an owner marker that survives a reboot will not match the
+/// current value and gets classified as `.staleOwnership`.
+public typealias BootSessionUUIDProbe = @Sendable () -> String?
+
 extension HarnessMonitorPaths {
   public static func managedLaunchAgentOwnerURL(
     using environment: HarnessMonitorEnvironment = .current
@@ -62,16 +88,37 @@ extension DaemonController {
   /// Pure decision over an ownership snapshot. Loads no IO; performs no
   /// syscall. The four-case sum lets callers reclaim a stale lane
   /// (`.staleOwnership`) without conflating it with `.unowned`.
+  ///
+  /// The `currentBootSessionUUID` argument carries the current
+  /// `kern.bootsessionuuid`. When supplied, the decision rejects any
+  /// owner whose recorded `bootSessionUUID` does not match (or is
+  /// absent — a v1 schema marker that survived a reboot we cannot
+  /// distinguish from the current one). A `nil` value means the
+  /// caller could not read the sysctl, so the boot-axis check is
+  /// skipped and the existing pid/exec corroboration carries the
+  /// load.
   static func decideManagedLaunchAgentOwnership(
     owner: ManagedLaunchAgentOwner?,
     selfPid: Int32,
-    liveness: (Int32) -> ProcessLiveness
+    liveness: (Int32) -> ProcessLiveness,
+    currentBootSessionUUID: String? = nil
   ) -> ManagedLaunchAgentOwnership {
     guard let owner else {
       return .unowned
     }
     if owner.pid == selfPid {
       return .ownedBySelf
+    }
+    if let currentBootSessionUUID {
+      guard let ownerBootSessionUUID = owner.bootSessionUUID else {
+        // v1 marker (no boot UUID) seen by a v2-aware reader; we
+        // cannot prove it was written this boot, so reclaim it
+        // rather than trust a stranger's pid.
+        return .staleOwnership(owner)
+      }
+      if ownerBootSessionUUID != currentBootSessionUUID {
+        return .staleOwnership(owner)
+      }
     }
     switch liveness(owner.pid) {
     case .dead:
@@ -118,6 +165,28 @@ extension DaemonController {
     return .alive(executablePath: nil)
   }
 
+  /// Default boot-session-UUID probe via `sysctlbyname`. Returns
+  /// `nil` if the syscall fails or returns an empty buffer; callers
+  /// then fall through to the pid/exec corroboration without
+  /// rejecting on the boot axis.
+  public static let defaultBootSessionUUID: BootSessionUUIDProbe = {
+    var size = 0
+    if sysctlbyname("kern.bootsessionuuid", nil, &size, nil, 0) != 0 {
+      return nil
+    }
+    guard size > 0 else { return nil }
+    var buffer = [CChar](repeating: 0, count: size)
+    if sysctlbyname("kern.bootsessionuuid", &buffer, &size, nil, 0) != 0 {
+      return nil
+    }
+    let bytes: [UInt8] = buffer.prefix(size).map { UInt8(bitPattern: $0) }
+    let raw = String(bytes: bytes, encoding: .utf8)?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .trimmingCharacters(in: CharacterSet(charactersIn: "\0"))
+    guard let raw, raw.isEmpty == false else { return nil }
+    return raw
+  }
+
   func loadManagedLaunchAgentOwner() -> ManagedLaunchAgentOwner? {
     let url = HarnessMonitorPaths.managedLaunchAgentOwnerURL(using: environment)
     guard let data = FileManager.default.contents(atPath: url.path) else {
@@ -144,7 +213,8 @@ extension DaemonController {
     let owner = ManagedLaunchAgentOwner(
       pid: getpid(),
       executablePath: executablePath,
-      registeredAt: Date()
+      registeredAt: Date(),
+      bootSessionUUID: bootSessionUUID()
     )
     try FileManager.default.createDirectory(
       at: url.deletingLastPathComponent(),
@@ -179,7 +249,8 @@ extension DaemonController {
     Self.decideManagedLaunchAgentOwnership(
       owner: loadManagedLaunchAgentOwner(),
       selfPid: getpid(),
-      liveness: processLiveness
+      liveness: processLiveness,
+      currentBootSessionUUID: bootSessionUUID()
     )
   }
 }
