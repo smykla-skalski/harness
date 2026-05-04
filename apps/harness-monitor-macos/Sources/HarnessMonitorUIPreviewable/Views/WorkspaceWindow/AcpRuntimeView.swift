@@ -2,6 +2,7 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct AcpRuntimeView: View {
+  let store: HarnessMonitorStore
   let runtimeState: AcpAgentRuntimeState
   let inspectStatus: AcpRuntimeInspectStatus
   let presentation: AcpRuntimePresentation
@@ -9,6 +10,7 @@ struct AcpRuntimeView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
       AcpRuntimeStatusStrip(
+        store: store,
         runtimeState: runtimeState,
         inspectStatus: inspectStatus,
         presentation: presentation

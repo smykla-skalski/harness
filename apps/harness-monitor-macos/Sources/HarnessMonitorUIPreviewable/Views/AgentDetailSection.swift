@@ -354,6 +354,7 @@ struct AgentDetailSection: View {
     inspectStatus: AcpRuntimeInspectStatus
   ) -> some View {
     AcpRuntimeView(
+      store: store,
       runtimeState: runtimeState,
       inspectStatus: inspectStatus,
       presentation: runtimePresentation

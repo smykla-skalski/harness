@@ -108,6 +108,7 @@ public final class HarnessMonitorStore {
   var selectedAcpInspectState: AcpInspectSample? {
     didSet {
       guard oldValue != selectedAcpInspectState else { return }
+      reconcileAcpRuntimeClock()
     }
   }
   public var selectedAcpInspectAgents: [AcpAgentInspectSnapshot] {
@@ -116,6 +117,7 @@ public final class HarnessMonitorStore {
   public var selectedAcpInspectObservedAt: Date? {
     selectedAcpInspectState?.sampledAt
   }
+  public var acpRuntimeClockTick = Date.now
   var selectedAcpInspectSyncEntries: [AcpRuntimeIdentity: AcpInspectSyncEntry] = [:]
   public var liveToolCallAnnouncementRowIDs: Set<String> = []
   public var toolCallTimelineOverflowNotice: ToolCallTimelineOverflowNotice?
@@ -199,6 +201,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var sessionSecondaryHydrationTask: Task<Void, Never>?
   @ObservationIgnored var sessionSecondaryHydrationTaskToken: UInt64 = 0
   @ObservationIgnored var acpInspectRecoveryTask: Task<Void, Never>?
+  @ObservationIgnored var acpRuntimeClockTask: Task<Void, Never>?
   var selectionTask: Task<Void, Never>?
   var codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:]
   @ObservationIgnored var locallyRemovedSessionIDs: Set<String> = []

@@ -120,7 +120,9 @@ public struct AcpAgentSnapshot: Codable, Equatable, Identifiable, Sendable {
   public let disconnectReason: AgentDisconnectReason?
   public let stderrTail: String?
 
-  public var id: String { acpId }
+  /// Stable UI identity. `acpId` stays runtime-scoped so restarted ACP processes replace the same
+  /// row instead of looking like a removal plus insertion.
+  public var id: String { agentId }
   public var isRestartable: Bool { disconnectReason?.isRestartable ?? false }
 
   public init(

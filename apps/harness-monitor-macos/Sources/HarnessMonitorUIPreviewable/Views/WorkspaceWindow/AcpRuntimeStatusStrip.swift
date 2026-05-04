@@ -8,6 +8,9 @@ enum AcpRuntimePresentation: Equatable {
 }
 
 struct AcpRuntimeStatusStrip: View {
+  /// Observe the clock tick here so the 1 Hz invalidation stays scoped to the strip instead of the
+  /// wider agent detail hierarchy.
+  let store: HarnessMonitorStore
   let runtimeState: AcpAgentRuntimeState
   let inspectStatus: AcpRuntimeInspectStatus
   let presentation: AcpRuntimePresentation
@@ -162,7 +165,7 @@ struct AcpRuntimeStatusStrip: View {
     )
 
     if let promptDeadlineDate {
-      AcpRuntimeDeadlineChip(deadline: promptDeadlineDate)
+      AcpRuntimeDeadlineChip(deadline: promptDeadlineDate, now: store.acpRuntimeClockTick)
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.agentRuntimeDeadline(runtimeState.agentId)
         )
@@ -365,41 +368,50 @@ private struct AcpRuntimeChip: View {
   }
 }
 
-private struct AcpRuntimeDeadlineChip: View {
-  let deadline: Date
+struct AcpRuntimeDeadlinePresentation: Equatable {
+  let countdownLabel: String
+  let accessibilityLabel: String
+  let isUrgent: Bool
 
-  var body: some View {
-    TimelineView(.periodic(from: .now, by: 1)) { context in
-      if remainingSeconds(now: context.date) > 0 {
-        AcpRuntimeChip(
-          title: "Prompt deadline",
-          value: countdownLabel(now: context.date),
-          systemImage: "timer",
-          tint: remainingSeconds(now: context.date) <= 10
-            ? HarnessMonitorTheme.caution : HarnessMonitorTheme.accent,
-          accessibilityLabel: "Prompt deadline",
-          accessibilityValue: accessibilityCountdownLabel(now: context.date)
-        )
-      }
+  static func presentation(deadline: Date, now: Date) -> Self? {
+    let remaining = max(0, Int(deadline.timeIntervalSince(now).rounded(.down)))
+    guard remaining > 0 else {
+      return nil
     }
-  }
-
-  private func countdownLabel(now: Date) -> String {
-    let remaining = remainingSeconds(now: now)
     let minutes = remaining / 60
     let seconds = remaining % 60
-    return "\(minutes):" + String(format: "%02d", seconds)
+    let countdownLabel = "\(minutes):" + String(format: "%02d", seconds)
+    let accessibilityLabel =
+      if remaining == 1 {
+        "1 second remaining"
+      } else {
+        "\(remaining) seconds remaining"
+      }
+    return Self(
+      countdownLabel: countdownLabel,
+      accessibilityLabel: accessibilityLabel,
+      isUrgent: remaining <= 10
+    )
   }
+}
 
-  private func remainingSeconds(now: Date) -> Int {
-    max(0, Int(deadline.timeIntervalSince(now).rounded(.down)))
-  }
+private struct AcpRuntimeDeadlineChip: View {
+  let deadline: Date
+  let now: Date
 
-  private func accessibilityCountdownLabel(now: Date) -> String {
-    let remaining = remainingSeconds(now: now)
-    if remaining == 1 {
-      return "1 second remaining"
+  var body: some View {
+    if let presentation = AcpRuntimeDeadlinePresentation.presentation(
+      deadline: deadline,
+      now: now
+    ) {
+      AcpRuntimeChip(
+        title: "Prompt deadline",
+        value: presentation.countdownLabel,
+        systemImage: "timer",
+        tint: presentation.isUrgent ? HarnessMonitorTheme.caution : HarnessMonitorTheme.accent,
+        accessibilityLabel: "Prompt deadline",
+        accessibilityValue: presentation.accessibilityLabel
+      )
     }
-    return "\(remaining) seconds remaining"
   }
 }

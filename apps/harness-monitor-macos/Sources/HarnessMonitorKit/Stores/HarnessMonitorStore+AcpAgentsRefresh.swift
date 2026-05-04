@@ -168,7 +168,7 @@ extension HarnessMonitorStore {
     }
   }
 
-  func reconcileAcpPermissionDecisions() {
+  func reconcileAcpPermissionDecisions(extraStaleDecisionIDs: Set<String> = []) {
     let previousPayloads = acpPermissionPayloadsByDecisionID
     var nextPayloads: [String: AcpPermissionDecisionPayload] = [:]
     var nextResolutionState: [String: BatchResolutionState] = [:]
@@ -217,7 +217,10 @@ extension HarnessMonitorStore {
         ?? shutdownPayload.defaultResolutionState
     }
 
-    let staleDecisionIDs = Set(previousPayloads.keys).subtracting(nextPayloads.keys)
+    let staleDecisionIDs =
+      Set(previousPayloads.keys)
+      .subtracting(nextPayloads.keys)
+      .union(extraStaleDecisionIDs)
     acpPermissionPayloadsByDecisionID = nextPayloads
     acpPermissionResolutionStateByDecisionID = nextResolutionState
     scheduleAcpPermissionDecisionSync(staleDecisionIDs: staleDecisionIDs)
