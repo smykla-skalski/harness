@@ -132,8 +132,8 @@ async fn separate_logical_sessions_never_coalesce_permission_batches() {
     assert_eq!(batches_b[0].acp_id, "acp-2");
     assert_eq!(batches_b[0].session_id, "sess-2");
     assert_ne!(batches_a[0].batch_id, batches_b[0].batch_id);
-    assert_eq!(batches_a[0].requests[0].session_id, "acp-session-a");
-    assert_eq!(batches_b[0].requests[0].session_id, "acp-session-b");
+    assert_eq!(batches_a[0].requests[0].session_id, "sess-1");
+    assert_eq!(batches_b[0].requests[0].session_id, "sess-2");
     assert!(
         batches_a[0].requests[0]
             .request_id
@@ -165,6 +165,39 @@ async fn separate_logical_sessions_never_coalesce_permission_batches() {
     assert_eq!(seen_sessions, ["sess-1", "sess-2"]);
     let _ = bridge_a.resolve_batch(&batches_a[0].batch_id, &AcpPermissionDecision::ApproveAll);
     let _ = bridge_b.resolve_batch(&batches_b[0].batch_id, &AcpPermissionDecision::ApproveAll);
+    let _ = unwrap_ok(
+        recv_permission_result(rx_a).await,
+        "rx_a should be approved",
+    );
+    let _ = unwrap_ok(
+        recv_permission_result(rx_b).await,
+        "rx_b should be approved",
+    );
+}
+
+#[tokio::test]
+async fn coalesced_batches_normalize_request_sessions_to_logical_session() {
+    let (sender, _) = broadcast::channel(8);
+    let bridge = PermissionBridgeHandle::spawn("acp-1".into(), "sess-1".into(), sender);
+    let (req_a, rx_a) = permission_request_for_session("tool-a", "acp-session-a");
+    let (req_b, rx_b) = permission_request_for_session("tool-b", "acp-session-b");
+
+    unwrap_ok(bridge.tx.send(req_a).await, "send a");
+    unwrap_ok(bridge.tx.send(req_b).await, "send b");
+    tokio::time::sleep(Duration::from_millis(20)).await;
+
+    let batches = bridge.pending_batches();
+    assert_eq!(batches.len(), 1);
+    assert_eq!(batches[0].session_id, "sess-1");
+    assert_eq!(batches[0].requests.len(), 2);
+    assert!(
+        batches[0]
+            .requests
+            .iter()
+            .all(|request| request.session_id == "sess-1")
+    );
+
+    let _ = bridge.resolve_batch(&batches[0].batch_id, &AcpPermissionDecision::ApproveAll);
     let _ = unwrap_ok(
         recv_permission_result(rx_a).await,
         "rx_a should be approved",

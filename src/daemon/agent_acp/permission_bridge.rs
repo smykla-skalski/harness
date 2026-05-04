@@ -363,7 +363,11 @@ fn enqueue_batch_locked(
         let tool_call = serde_json::to_value(&request.request.tool_call).unwrap_or(Value::Null);
         items.push(AcpPermissionItem {
             request_id: request_id.clone(),
-            session_id: request.request.session_id.to_string(),
+            // The Monitor routes and persists ACP decisions by the logical
+            // Harness session that owns this bridge, not the protocol runtime's
+            // per-connection ACP session UUID. Normalize request ownership here
+            // so batch metadata and item metadata stay aligned.
+            session_id: state.session_id.clone(),
             tool_call,
             options: request.request.options.clone(),
         });
