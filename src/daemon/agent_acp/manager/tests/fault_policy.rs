@@ -60,7 +60,7 @@ async fn repeated_process_faults_quarantine_process_key() {
                     saw_quarantine_applied = true;
                 }
             }
-            tokio::time::advance(Duration::from_millis(1100)).await;
+            tokio::time::sleep(Duration::from_millis(1100)).await;
         }
         assert!(saw_backoff_applied, "expected backoff-applied incident");
         assert!(
@@ -107,7 +107,7 @@ async fn recent_process_fault_applies_backoff_before_next_start() {
             "unexpected error: {error}"
         );
 
-        tokio::time::advance(Duration::from_millis(1100)).await;
+        tokio::time::sleep(Duration::from_millis(1100)).await;
         let restarted = manager
             .start_descriptor("sess-3", &request, &descriptor)
             .expect("start after backoff window");
