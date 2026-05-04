@@ -131,6 +131,10 @@ async fn wait_for_task_start_ack_async(
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 async fn try_wake_started_workers_async(
     resolved: &ResolvedSession,
     effects: &[session_service::TaskDropEffect],
@@ -139,22 +143,28 @@ async fn try_wake_started_workers_async(
     async_db: &super::db::AsyncDaemonDb,
     agent_tui_manager: Option<&AgentTuiManagerHandle>,
 ) {
-    let Some(manager) = agent_tui_manager else {
-        return;
-    };
     for effect in effects {
         let session_service::TaskDropEffect::Started(record) = effect else {
             continue;
         };
         let Some(runtime) = runtime_for_name(&record.runtime) else {
+            tracing::warn!(session_id, agent_id = %record.agent_id, runtime = %record.runtime, signal_id = %record.signal.signal_id, "task wake skipped (async): unknown runtime");
             continue;
         };
-        let tui_id = resolved
-            .state
-            .agents
-            .get(&record.agent_id)
-            .and_then(agent_tui_id_for_registration);
-        let Some(managed_tui) = managed_tui_wake(tui_id, Some(manager)) else {
+        let registration = resolved.state.agents.get(&record.agent_id);
+        let tui_id = registration.and_then(agent_tui_id_for_registration);
+        let managed_kind = registration
+            .and_then(|reg| reg.managed_agent.as_ref())
+            .map_or("none", |managed| match managed.kind {
+                crate::session::types::ManagedAgentKind::Tui => "tui",
+                crate::session::types::ManagedAgentKind::Acp => "acp",
+            });
+        tracing::info!(session_id, agent_id = %record.agent_id, runtime = %record.runtime, signal_id = %record.signal.signal_id, managed_kind, tui_id = tui_id.unwrap_or("<none>"), tui_manager = agent_tui_manager.is_some(), "wake attempt (async)");
+        if agent_tui_manager.is_none() || tui_id.is_none() {
+            tracing::warn!(session_id, agent_id = %record.agent_id, signal_id = %record.signal.signal_id, managed_kind, "wake skipped (async): no TUI route - ACP/non-TUI agents not actively woken on task drop, signal is file-only");
+            continue;
+        }
+        let Some(managed_tui) = managed_tui_wake(tui_id, agent_tui_manager) else {
             continue;
         };
         let Some(woke_tui) = handled_active_signal_wake_result(

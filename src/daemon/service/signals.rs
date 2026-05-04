@@ -7,6 +7,7 @@ use super::{
     record_signal_ack, refresh_signal_index_for_db, session_detail, session_detail_from_daemon_db,
     session_not_found, session_service, state, thread, utc_now,
 };
+use crate::session::types::ManagedAgentKind;
 
 /// Send a signal through the shared session service.
 ///
@@ -358,6 +359,10 @@ pub(crate) fn log_active_signal_delivery_timeout(
 /// than on its next signal-dir scan. Failures are logged and ignored: the
 /// pending signal record was already merged by the caller, so the worker will
 /// still pick the signal up via its periodic poll.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 pub(crate) fn try_wake_started_workers(
     state: &SessionState,
     effects: &[session_service::TaskDropEffect],
@@ -366,20 +371,22 @@ pub(crate) fn try_wake_started_workers(
     db: Option<&super::db::DaemonDb>,
     agent_tui_manager: Option<&AgentTuiManagerHandle>,
 ) {
-    let Some(manager) = agent_tui_manager else {
-        return;
-    };
     for effect in effects {
         let session_service::TaskDropEffect::Started(record) = effect else {
             continue;
         };
         let Some(runtime) = agents_runtime::runtime_for_name(&record.runtime) else {
+            tracing::warn!(session_id, agent_id = %record.agent_id, runtime = %record.runtime, signal_id = %record.signal.signal_id, "task wake skipped: unknown runtime");
             continue;
         };
-        let tui_id = state
-            .agents
-            .get(&record.agent_id)
-            .and_then(agent_tui_id_for_registration);
+        let registration = state.agents.get(&record.agent_id);
+        let tui_id = registration.and_then(agent_tui_id_for_registration);
+        let managed_kind = managed_kind_label(registration);
+        tracing::info!(session_id, agent_id = %record.agent_id, runtime = %record.runtime, signal_id = %record.signal.signal_id, managed_kind, tui_id = tui_id.unwrap_or("<none>"), tui_manager = agent_tui_manager.is_some(), "wake attempt");
+        if agent_tui_manager.is_none() || tui_id.is_none() {
+            tracing::warn!(session_id, agent_id = %record.agent_id, signal_id = %record.signal.signal_id, managed_kind, "wake skipped: no TUI route - ACP/non-TUI agents not actively woken on task drop, signal is file-only");
+            continue;
+        }
         let _ = attempt_active_signal_delivery(
             &ActiveSignalDelivery {
                 session_id,
@@ -390,9 +397,18 @@ pub(crate) fn try_wake_started_workers(
                 signal_session_id: &record.signal_session_id,
                 db,
             },
-            managed_tui_wake(tui_id, Some(manager)),
+            managed_tui_wake(tui_id, agent_tui_manager),
         );
     }
+}
+
+fn managed_kind_label(registration: Option<&AgentRegistration>) -> &'static str {
+    registration
+        .and_then(|reg| reg.managed_agent.as_ref())
+        .map_or("none", |managed| match managed.kind {
+            ManagedAgentKind::Tui => "tui",
+            ManagedAgentKind::Acp => "acp",
+        })
 }
 
 pub(crate) fn agent_tui_id_for_registration(agent: &AgentRegistration) -> Option<&str> {
