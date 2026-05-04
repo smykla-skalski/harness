@@ -1,13 +1,18 @@
 use super::*;
 
 #[test]
-fn parse_daemon_stop() {
-    let cli = Cli::try_parse_from(["harness", "daemon", "stop"]).unwrap();
-    match cli.command {
-        Command::Daemon {
-            command: DaemonCommand::Stop(args),
-        } => assert!(!args.json),
-        _ => panic!("expected daemon stop command"),
+fn parse_daemon_stop_json_flag() {
+    for (argv, expected_json) in [
+        (vec!["harness", "daemon", "stop"], false),
+        (vec!["harness", "daemon", "stop", "--json"], true),
+    ] {
+        let cli = Cli::try_parse_from(argv).unwrap();
+        match cli.command {
+            Command::Daemon {
+                command: DaemonCommand::Stop(args),
+            } => assert_eq!(args.json, expected_json),
+            _ => panic!("expected daemon stop command"),
+        }
     }
 }
 
@@ -28,35 +33,18 @@ fn parse_daemon_dev() {
 }
 
 #[test]
-fn parse_daemon_stop_json() {
-    let cli = Cli::try_parse_from(["harness", "daemon", "stop", "--json"]).unwrap();
-    match cli.command {
-        Command::Daemon {
-            command: DaemonCommand::Stop(args),
-        } => assert!(args.json),
-        _ => panic!("expected daemon stop command"),
-    }
-}
-
-#[test]
-fn parse_daemon_restart() {
-    let cli = Cli::try_parse_from(["harness", "daemon", "restart"]).unwrap();
-    match cli.command {
-        Command::Daemon {
-            command: DaemonCommand::Restart(args),
-        } => assert!(!args.json),
-        _ => panic!("expected daemon restart command"),
-    }
-}
-
-#[test]
-fn parse_daemon_restart_json() {
-    let cli = Cli::try_parse_from(["harness", "daemon", "restart", "--json"]).unwrap();
-    match cli.command {
-        Command::Daemon {
-            command: DaemonCommand::Restart(args),
-        } => assert!(args.json),
-        _ => panic!("expected daemon restart command"),
+fn parse_daemon_restart_json_flag() {
+    for (argv, expected_json) in [
+        (vec!["harness", "daemon", "restart"], false),
+        (vec!["harness", "daemon", "restart", "--json"], true),
+    ] {
+        let cli = Cli::try_parse_from(argv).unwrap();
+        match cli.command {
+            Command::Daemon {
+                command: DaemonCommand::Restart(args),
+            } => assert_eq!(args.json, expected_json),
+            _ => panic!("expected daemon restart command"),
+        }
     }
 }
 
