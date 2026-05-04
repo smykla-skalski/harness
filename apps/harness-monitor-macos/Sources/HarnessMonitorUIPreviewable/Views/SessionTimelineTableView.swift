@@ -40,6 +40,8 @@ struct SessionTimelineTableView: NSViewRepresentable {
   let actionHandler: any DecisionActionHandler
   let viewport: SessionTimelineViewportModel
   let scrollBoundaryChanged: SessionTimelineScrollBoundaryHandler
+  @Environment(\.fontScale)
+  private var fontScale
 
   func makeCoordinator() -> Coordinator {
     Coordinator(
@@ -91,7 +93,8 @@ struct SessionTimelineTableView: NSViewRepresentable {
       actionHandler: actionHandler,
       scrollCommand: scrollCommand,
       scrollView: scrollView,
-      columnWidth: columnWidth
+      columnWidth: columnWidth,
+      fontScale: fontScale
     )
   }
 

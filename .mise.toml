@@ -342,8 +342,12 @@ depends = ["monitor:tools:build:perf"]
 run = "apps/harness-monitor-macos/Scripts/run-instruments-audit-from-ref.sh"
 
 [tasks."preview:render"]
-description = "Render one SwiftUI preview via xcode-cli (args: --id <EntryID> or --file <path> [--index N])"
+description = "Render one SwiftUI preview via xcode-cli (args: --id/--file, --theme, --text-size, --time-zone, --out)"
 run = "apps/harness-monitor-macos/Scripts/preview-render.sh"
+
+[tasks."preview:list"]
+description = "List the curated SwiftUI preview ids, files, indexes, and descriptions"
+run = "apps/harness-monitor-macos/Scripts/preview-render.sh --list"
 
 [tasks."preview:smoke"]
 description = "Render every entry in apps/harness-monitor-macos/Previews.json; fails on any timeout/crash"

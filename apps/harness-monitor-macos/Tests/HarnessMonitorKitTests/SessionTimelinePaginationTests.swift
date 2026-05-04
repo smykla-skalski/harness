@@ -207,6 +207,96 @@ struct SessionTimelineNavigationTests {
     #expect(signalHeight >= SessionTimelineTableMetrics.minimumCardHeight(for: signalRow))
   }
 
+  @Test("Agentless single-line wide rows do not reserve empty action spacing")
+  @MainActor
+  func agentlessSingleLineWideRowsDoNotReserveEmptyActionSpacing() {
+    let rows = SessionTimelineRow.rows(
+      for: SessionTimelineNodeBuilder(
+        sessionID: "session-1",
+        entries: [
+          TimelineEntry(
+            entryId: "observe-snapshot",
+            recordedAt: "2026-05-03T21:03:34Z",
+            kind: "observe_snapshot",
+            sessionId: "session-1",
+            agentId: nil,
+            taskId: nil,
+            summary: "Observe scan: 0 open, 0 active workers, 0 muted codes",
+            payload: .object([:])
+          ),
+          TimelineEntry(
+            entryId: "liveness-synced",
+            recordedAt: "2026-05-03T21:28:11Z",
+            kind: "liveness_synced",
+            sessionId: "session-1",
+            agentId: "harness-app",
+            taskId: nil,
+            summary: "Liveness sync: 1 disconnected, 0 idled",
+            payload: .object([:])
+          ),
+        ],
+        decisions: []
+      )
+      .build(),
+      configuration: .default
+    )
+
+    let observeRow = try! #require(rows.first { $0.node.sourceLabel == "observe_snapshot" })
+    let livenessRow = try! #require(rows.first { $0.node.sourceLabel == "liveness_synced" })
+
+    #expect(observeRow.node.detail == nil)
+    #expect(observeRow.node.actions.isEmpty)
+
+    let observeHeight = SessionTimelineTableCellView.measuredHeight(
+      for: observeRow,
+      columnWidth: 945
+    )
+    let livenessHeight = SessionTimelineTableCellView.measuredHeight(
+      for: livenessRow,
+      columnWidth: 945
+    )
+
+    #expect(observeHeight < livenessHeight)
+  }
+
+  @Test("Timeline row measurement responds to font scale changes")
+  @MainActor
+  func timelineRowMeasurementRespondsToFontScaleChanges() {
+    let row = SessionTimelineRow.rows(
+      for: SessionTimelineNodeBuilder(
+        sessionID: "session-1",
+        entries: [
+          TimelineEntry(
+            entryId: "agent-joined",
+            recordedAt: "2026-05-03T21:15:12Z",
+            kind: "agent_joined",
+            sessionId: "session-1",
+            agentId: nil,
+            taskId: nil,
+            summary: "gemini-20260504124323411402000 joined as Leader (gemini)",
+            payload: .object([:])
+          )
+        ],
+        decisions: []
+      )
+      .build(),
+      configuration: .default
+    )[0]
+
+    let defaultHeight = SessionTimelineTableCellView.measuredHeight(
+      for: row,
+      columnWidth: 945,
+      fontScale: 1.0
+    )
+    let enlargedHeight = SessionTimelineTableCellView.measuredHeight(
+      for: row,
+      columnWidth: 945,
+      fontScale: 1.3
+    )
+
+    #expect(enlargedHeight > defaultHeight)
+  }
+
   @Test("Table scroll restoration preserves anchor offset after rows insert above")
   func tableScrollRestorationPreservesAnchorOffsetAfterRowsInsertAbove() {
     let restoredY = SessionTimelineTableMetrics.restoredScrollY(

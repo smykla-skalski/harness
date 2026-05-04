@@ -4,7 +4,8 @@ import CoreGraphics
 // offset preservation stay in AppKit instead of feeding per-row geometry back into SwiftUI.
 enum SessionTimelineTableMetrics {
   static let estimatedBaseRowHeight: CGFloat = 92
-  private static let minimumWideCardHeight: CGFloat = 68
+  private static let minimumSimpleWideCardHeight: CGFloat = 40
+  private static let minimumDetailedWideCardHeight: CGFloat = 60
   private static let minimumCompactCardHeight: CGFloat = 96
   private static let dayDividerHeight: CGFloat = 30
   private static let detailHeight: CGFloat = 20
@@ -30,7 +31,25 @@ enum SessionTimelineTableMetrics {
   }
 
   static func minimumCardHeight(for row: SessionTimelineRow) -> CGFloat {
-    prefersCompactLayout(for: row) ? minimumCompactCardHeight : minimumWideCardHeight
+    if prefersCompactLayout(for: row) {
+      return minimumCompactCardHeight
+    }
+    if usesSimpleWideLayout(for: row) {
+      return minimumSimpleWideCardHeight
+    }
+    return minimumDetailedWideCardHeight
+  }
+
+  static func rowBottomPadding(for row: SessionTimelineRow) -> CGFloat {
+    usesSimpleWideLayout(for: row)
+      ? HarnessMonitorTheme.spacingXS
+      : HarnessMonitorTheme.itemSpacing
+  }
+
+  static func usesSimpleWideLayout(for row: SessionTimelineRow) -> Bool {
+    !prefersCompactLayout(for: row)
+      && row.node.detail == nil
+      && row.node.actions.isEmpty
   }
 
   static func estimatedHeight(for row: SessionTimelineRow) -> CGFloat {

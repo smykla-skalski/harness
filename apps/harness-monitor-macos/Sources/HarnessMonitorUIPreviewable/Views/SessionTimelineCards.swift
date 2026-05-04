@@ -71,6 +71,10 @@ private struct SessionTimelineNodeRow: View {
     row.node
   }
 
+  private var usesSimpleWideLayout: Bool {
+    SessionTimelineTableMetrics.usesSimpleWideLayout(for: row)
+  }
+
   var body: some View {
     HStack(alignment: .sessionTimelineMarkerCenter, spacing: HarnessMonitorTheme.itemSpacing) {
       Text(row.timestampLabel)
@@ -85,16 +89,13 @@ private struct SessionTimelineNodeRow: View {
 
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
         cardContent
-        SessionTimelineActionButtons(actions: node.actions, handler: actionHandler)
+        if !node.actions.isEmpty {
+          SessionTimelineActionButtons(actions: node.actions, handler: actionHandler)
+        }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.horizontal, HarnessMonitorTheme.cardPadding)
       .padding(.vertical, HarnessMonitorTheme.spacingSM)
-      .frame(
-        maxWidth: .infinity,
-        minHeight: SessionTimelineTableMetrics.minimumCardHeight(for: row),
-        alignment: .topLeading
-      )
       .background(SessionTimelineCardBackground(tint: cardTint))
       .alignmentGuide(.sessionTimelineMarkerCenter) { _ in
         SessionTimelineLayout.singleLineMarkerCenterY
@@ -131,7 +132,10 @@ private struct SessionTimelineNodeRow: View {
   // deterministic branch is enough.
 
   private var wideContent: some View {
-    HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
+    HStack(
+      alignment: usesSimpleWideLayout ? .center : .top,
+      spacing: HarnessMonitorTheme.spacingMD
+    ) {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
         HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
           if node.kind != .event {
