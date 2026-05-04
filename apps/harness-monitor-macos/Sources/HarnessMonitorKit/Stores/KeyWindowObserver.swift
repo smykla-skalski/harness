@@ -81,7 +81,14 @@ public final class KeyWindowObserver {
 
   @ObservationIgnored private weak var application: (any KeyWindowObservableApplication)?
   @ObservationIgnored private let notificationCenter: NotificationCenter
-  @ObservationIgnored private var notificationTokens: [NSObjectProtocol] = []
+  // nonisolated(unsafe) so deinit (which can fire off the MainActor when ARC
+  // releases on com.apple.SwiftUI.DisplayLink) can read the array without
+  // tripping the libdispatch queue assertion that `MainActor.assumeIsolated`
+  // would. Mutations happen on the MainActor (see `beginObserving`); the
+  // deinit only reads after the last write, so concurrent access is not
+  // possible.
+  @ObservationIgnored
+  private nonisolated(unsafe) var notificationTokens: [NSObjectProtocol] = []
 
   public init(
     application: any KeyWindowObservableApplication = NSApplication.shared,
@@ -95,9 +102,11 @@ public final class KeyWindowObserver {
   }
 
   deinit {
-    MainActor.assumeIsolated {
-      notificationTokens.forEach(notificationCenter.removeObserver)
-    }
+    // ARC may release this object on any thread (notably
+    // com.apple.SwiftUI.DisplayLink), and `MainActor.assumeIsolated` traps
+    // off-main with a libdispatch BUG. NotificationCenter.removeObserver is
+    // documented thread-safe so the cleanup is safe wherever deinit fires.
+    notificationTokens.forEach(notificationCenter.removeObserver)
   }
 
   public func refresh() {
