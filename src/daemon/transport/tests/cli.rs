@@ -21,6 +21,8 @@ fn daemon_dev_args_defaults_to_harness_monitor_app_group() {
     assert_eq!(parsed.args.host, "127.0.0.1");
     assert_eq!(parsed.args.port, 0);
     assert!(parsed.args.codex_ws_url.is_none());
+    assert!(!parsed.args.enable_acp);
+    assert!(!parsed.args.disable_acp);
 }
 
 #[test]
@@ -35,6 +37,7 @@ fn daemon_dev_args_accepts_overrides() {
         "com.example.group",
         "--codex-ws-url",
         "ws://127.0.0.1:7777",
+        "--enable-acp",
     ])
     .unwrap();
     assert_eq!(parsed.args.host, "0.0.0.0");
@@ -44,6 +47,8 @@ fn daemon_dev_args_accepts_overrides() {
         parsed.args.codex_ws_url.as_deref(),
         Some("ws://127.0.0.1:7777")
     );
+    assert!(parsed.args.enable_acp);
+    assert!(!parsed.args.disable_acp);
 }
 
 #[test]
@@ -73,6 +78,8 @@ fn daemon_dev_spawn_plan_forwards_host_and_port_to_serve() {
         port: 8123,
         app_group_id: HARNESS_MONITOR_APP_GROUP_ID.to_string(),
         codex_ws_url: None,
+        enable_acp: false,
+        disable_acp: false,
     };
     temp_env::with_var("HARNESS_APP_GROUP_ID", Some("com.user.preset"), || {
         let plan = dev.spawn_plan();
@@ -97,6 +104,8 @@ fn daemon_dev_spawn_plan_includes_codex_ws_url() {
         port: 0,
         app_group_id: HARNESS_MONITOR_APP_GROUP_ID.to_string(),
         codex_ws_url: Some("ws://127.0.0.1:7777".to_string()),
+        enable_acp: false,
+        disable_acp: false,
     };
     temp_env::with_var("HARNESS_APP_GROUP_ID", Some("com.user.preset"), || {
         let plan = dev.spawn_plan();
@@ -112,6 +121,8 @@ fn daemon_dev_spawn_plan_skips_blank_codex_ws_url() {
         port: 0,
         app_group_id: HARNESS_MONITOR_APP_GROUP_ID.to_string(),
         codex_ws_url: Some("   ".to_string()),
+        enable_acp: false,
+        disable_acp: false,
     };
     temp_env::with_var("HARNESS_APP_GROUP_ID", Some("com.user.preset"), || {
         let plan = dev.spawn_plan();
@@ -127,6 +138,8 @@ fn daemon_dev_spawn_plan_defaults_app_group_when_env_unset() {
             port: 0,
             app_group_id: "com.example.custom".to_string(),
             codex_ws_url: None,
+            enable_acp: false,
+            disable_acp: false,
         };
         let plan = dev.spawn_plan();
         assert!(plan.set_env.contains(&(
@@ -148,6 +161,8 @@ fn daemon_dev_spawn_plan_defaults_app_group_when_env_blank() {
             port: 0,
             app_group_id: "com.example.custom".to_string(),
             codex_ws_url: None,
+            enable_acp: false,
+            disable_acp: false,
         };
         let plan = dev.spawn_plan();
         assert!(plan.set_env.contains(&(
@@ -169,6 +184,8 @@ fn daemon_dev_spawn_plan_preserves_existing_app_group_env() {
             port: 0,
             app_group_id: "com.example.custom".to_string(),
             codex_ws_url: None,
+            enable_acp: false,
+            disable_acp: false,
         };
         let plan = dev.spawn_plan();
         assert!(
@@ -188,6 +205,8 @@ fn daemon_dev_spawn_plan_always_clears_sandbox_env_for_child() {
         port: 0,
         app_group_id: HARNESS_MONITOR_APP_GROUP_ID.to_string(),
         codex_ws_url: None,
+        enable_acp: false,
+        disable_acp: false,
     };
     temp_env::with_var("HARNESS_APP_GROUP_ID", Some("com.user.preset"), || {
         let plan = dev.spawn_plan();
@@ -199,12 +218,28 @@ fn daemon_dev_spawn_plan_always_clears_sandbox_env_for_child() {
 fn daemon_serve_args_default_is_unsandboxed() {
     let parsed = DaemonServeArgsTestHarness::try_parse_from(["test"]).unwrap();
     assert!(!parsed.args.sandboxed);
+    assert!(!parsed.args.enable_acp);
+    assert!(!parsed.args.disable_acp);
 }
 
 #[test]
 fn daemon_serve_args_accepts_sandboxed_flag() {
     let parsed = DaemonServeArgsTestHarness::try_parse_from(["test", "--sandboxed"]).unwrap();
     assert!(parsed.args.sandboxed);
+}
+
+#[test]
+fn daemon_serve_args_accept_enable_acp_flag() {
+    let parsed = DaemonServeArgsTestHarness::try_parse_from(["test", "--enable-acp"]).unwrap();
+    assert!(parsed.args.enable_acp);
+    assert_eq!(parsed.args.acp_enabled_override(), Some(true));
+}
+
+#[test]
+fn daemon_serve_args_accept_disable_acp_flag() {
+    let parsed = DaemonServeArgsTestHarness::try_parse_from(["test", "--disable-acp"]).unwrap();
+    assert!(parsed.args.disable_acp);
+    assert_eq!(parsed.args.acp_enabled_override(), Some(false));
 }
 
 #[test]
@@ -222,5 +257,37 @@ fn daemon_serve_args_ignores_env_when_unset() {
         let parsed = DaemonServeArgsTestHarness::try_parse_from(["test"]).unwrap();
         let effective = parsed.args.sandboxed || super::super::super::service::sandboxed_from_env();
         assert!(!effective);
+    });
+}
+
+#[test]
+fn daemon_dev_spawn_plan_forwards_enable_acp_flag() {
+    let dev = DaemonDevArgs {
+        host: "127.0.0.1".to_string(),
+        port: 0,
+        app_group_id: HARNESS_MONITOR_APP_GROUP_ID.to_string(),
+        codex_ws_url: None,
+        enable_acp: true,
+        disable_acp: false,
+    };
+    temp_env::with_var("HARNESS_APP_GROUP_ID", Some("com.user.preset"), || {
+        let plan = dev.spawn_plan();
+        assert!(plan.args.contains(&"--enable-acp".to_string()));
+    });
+}
+
+#[test]
+fn daemon_dev_spawn_plan_forwards_disable_acp_flag() {
+    let dev = DaemonDevArgs {
+        host: "127.0.0.1".to_string(),
+        port: 0,
+        app_group_id: HARNESS_MONITOR_APP_GROUP_ID.to_string(),
+        codex_ws_url: None,
+        enable_acp: false,
+        disable_acp: true,
+    };
+    temp_env::with_var("HARNESS_APP_GROUP_ID", Some("com.user.preset"), || {
+        let plan = dev.spawn_plan();
+        assert!(plan.args.contains(&"--disable-acp".to_string()));
     });
 }

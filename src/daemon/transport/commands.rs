@@ -8,6 +8,7 @@ use tokio::runtime::Runtime;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
+use crate::feature_flags;
 use crate::workspace::normalized_env_value;
 
 use super::super::launchd;
@@ -135,10 +136,18 @@ pub struct DaemonServeArgs {
     /// loopback endpoint.
     #[arg(long, value_name = "URL")]
     pub codex_ws_url: Option<String>,
+    /// Enable ACP managed-agent routes for this daemon process.
+    #[arg(long, conflicts_with = "disable_acp")]
+    pub enable_acp: bool,
+    /// Disable ACP managed-agent routes for this daemon process without
+    /// mutating the caller's `HARNESS_FEATURE_ACP` shell environment.
+    #[arg(long, conflicts_with = "enable_acp")]
+    pub disable_acp: bool,
 }
 
 impl Execute for DaemonServeArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let _acp_override = feature_flags::scoped_acp_enabled_override(self.acp_enabled_override());
         let runtime = Runtime::new().map_err(|error| {
             CliError::from(CliErrorKind::workflow_io(format!(
                 "create daemon tokio runtime: {error}"
@@ -165,6 +174,19 @@ impl Execute for DaemonServeArgs {
     }
 }
 
+impl DaemonServeArgs {
+    #[must_use]
+    pub(super) const fn acp_enabled_override(&self) -> Option<bool> {
+        if self.enable_acp {
+            Some(true)
+        } else if self.disable_acp {
+            Some(false)
+        } else {
+            None
+        }
+    }
+}
+
 /// Default macOS app group identifier for the sandboxed Harness Monitor app.
 /// The unsandboxed dev daemon writes its manifest into this group's container
 /// so the sandboxed `SwiftUI` app can read it without extra env plumbing.
@@ -188,6 +210,12 @@ pub struct DaemonDevArgs {
     /// which is the whole point of dev mode (no codex bridge required).
     #[arg(long, value_name = "URL")]
     pub codex_ws_url: Option<String>,
+    /// Enable ACP managed-agent routes for the spawned dev daemon.
+    #[arg(long, conflicts_with = "disable_acp")]
+    pub enable_acp: bool,
+    /// Disable ACP managed-agent routes for the spawned dev daemon.
+    #[arg(long, conflicts_with = "enable_acp")]
+    pub disable_acp: bool,
 }
 
 /// Describes how `harness daemon dev` should spawn the inner `daemon serve`
@@ -227,6 +255,13 @@ impl DaemonDevArgs {
             args.push("--codex-ws-url".to_string());
             args.push(url.to_string());
         }
+        if let Some(acp_enabled) = self.acp_enabled_override() {
+            args.push(if acp_enabled {
+                "--enable-acp".to_string()
+            } else {
+                "--disable-acp".to_string()
+            });
+        }
 
         let mut set_env = Vec::new();
         let mut log_effective_app_group = None;
@@ -246,6 +281,19 @@ impl DaemonDevArgs {
             set_env,
             unset_env: vec!["HARNESS_SANDBOXED".to_string()],
             log_effective_app_group,
+        }
+    }
+}
+
+impl DaemonDevArgs {
+    #[must_use]
+    pub(super) const fn acp_enabled_override(&self) -> Option<bool> {
+        if self.enable_acp {
+            Some(true)
+        } else if self.disable_acp {
+            Some(false)
+        } else {
+            None
         }
     }
 }
