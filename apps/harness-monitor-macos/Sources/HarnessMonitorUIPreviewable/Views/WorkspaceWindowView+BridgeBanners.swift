@@ -6,7 +6,7 @@ extension WorkspaceWindowView {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Label(agentTuiBridgeTitle, systemImage: "exclamationmark.triangle")
         .scaledFont(.headline)
-        .foregroundStyle(.orange)
+        .foregroundStyle(HarnessMonitorTheme.caution)
       Text(agentTuiBridgeMessage)
         .scaledFont(.subheadline)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -25,8 +25,10 @@ extension WorkspaceWindowView {
         accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiCopyCommandButton
       )
     }
-    .padding(HarnessMonitorTheme.spacingMD)
-    .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+    .padding(.vertical, HarnessMonitorTheme.spacingSM)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .modifier(ChromeBannerSurfaceModifier(tint: HarnessMonitorTheme.caution))
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiRecoveryBanner)
   }
@@ -80,7 +82,7 @@ extension WorkspaceWindowView {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Label(codexBridgeTitle, systemImage: "exclamationmark.triangle")
         .scaledFont(.headline)
-        .foregroundStyle(.orange)
+        .foregroundStyle(HarnessMonitorTheme.caution)
       Text(codexBridgeMessage)
         .scaledFont(.subheadline)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -99,8 +101,10 @@ extension WorkspaceWindowView {
         accessibilityIdentifier: HarnessMonitorAccessibility.workspaceCodexCopyCommandButton
       )
     }
-    .padding(HarnessMonitorTheme.spacingMD)
-    .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+    .padding(.vertical, HarnessMonitorTheme.spacingSM)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .modifier(ChromeBannerSurfaceModifier(tint: HarnessMonitorTheme.caution))
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceCodexRecoveryBanner)
   }
@@ -157,7 +161,7 @@ extension WorkspaceWindowView {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Label(acpBridgeTitle, systemImage: "exclamationmark.triangle")
         .scaledFont(.headline)
-        .foregroundStyle(.orange)
+        .foregroundStyle(HarnessMonitorTheme.caution)
       Text(acpBridgeMessage)
         .scaledFont(.subheadline)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -176,8 +180,10 @@ extension WorkspaceWindowView {
         accessibilityIdentifier: HarnessMonitorAccessibility.workspaceAcpCopyCommandButton
       )
     }
-    .padding(HarnessMonitorTheme.spacingMD)
-    .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+    .padding(.vertical, HarnessMonitorTheme.spacingSM)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .modifier(ChromeBannerSurfaceModifier(tint: HarnessMonitorTheme.caution))
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceAcpRecoveryBanner)
   }

@@ -221,40 +221,23 @@ public struct WorkspaceWindowView: View {
     decisionInspectorVisible
   }
 
-  private var primaryContentSelectionSignature: String {
-    switch viewModel.selection {
-    case .create:
-      "create"
-    case .decisions(let sessionID):
-      "decisions:\(sessionID ?? "nil")"
-    case .decision(let sessionID, let decisionID):
-      "decision:\(sessionID ?? "nil"):\(decisionID)"
-    case .terminal(let sessionID, let terminalID):
-      "terminal:\(sessionID ?? "nil"):\(terminalID)"
-    case .codex(let sessionID, let runID):
-      "codex:\(sessionID ?? "nil"):\(runID)"
-    case .agent(let sessionID, let agentID):
-      "agent:\(sessionID ?? "nil"):\(agentID)"
-    case .task(let sessionID, let taskID):
-      "task:\(sessionID ?? "nil"):\(taskID)"
-    }
-  }
-
+  // Only re-arm the primary-content reset when the workspace first becomes
+  // ready or when the window activation state changes. Re-running it for every
+  // in-workspace selection hop churns the hidden FocusBridge responder path and
+  // recreates the workspace AttributeGraph warning flood.
   private var workspacePrimaryContentFocusResetToken: String {
     [
       String(hasCompletedInitialWorkspacePreparation),
       String(isStartupFocusParticipationEnabled),
-      primaryContentSelectionSignature,
-      currentPrimaryContentFocusTarget.rawValue,
       keyWindowObserver?.snapshot.routingToken ?? "key=untracked",
     ].joined(separator: "|")
   }
 
-  private var isWorkspaceKeyWindow: Bool {
+  var isWorkspaceKeyWindow: Bool {
     keyWindowObserver?.isKey(windowID: HarnessMonitorWindowID.workspace) ?? true
   }
 
-  private var currentResetSuppression: PrimaryContentResetSuppression {
+  var currentResetSuppression: PrimaryContentResetSuppression {
     PrimaryContentResetSuppression(
       preservesPrimaryContentFocus: preservesPrimaryContentFocus,
       hasFocusedEditorField: stateFocusedField != nil,

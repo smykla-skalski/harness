@@ -11,19 +11,95 @@ extension WorkspaceWindowView {
       primaryContentFocusScope: currentPrimaryContentFocusScope,
       primaryContentPagingResponderRequest: currentPrimaryContentPagingRequest,
       prefersPrimaryContentFocus: currentPrimaryContentFocusTarget == .create,
-      startAction: { startTui() },
-      acpUnavailableBanner: acpUnavailableBanner,
-      agentTuiUnavailableBanner: agentTuiUnavailableBanner,
-      codexUnavailableBanner: codexUnavailableBanner
+      primaryContentFocusParticipationEnabled:
+        currentPrimaryContentFocusTarget == .create
+        && isWorkspaceKeyWindow
+        && focusedField == nil
+        && store.presentedSheet == nil
+        && store.pendingConfirmation == nil
+        && !showsDismissAllVisibleConfirmation,
+      startAction: { startTui() }
     )
+  }
+
+  @ViewBuilder
+  var createPaneTopChrome: some View {
+    if showsCreatePaneTopChrome {
+      VStack(spacing: 0) {
+        if let message = createPaneSessionActionUnavailableNote {
+          createPaneSessionActionBanner(message: message)
+          createPaneChromeDivider()
+        }
+        if viewModel.createMode == .terminal {
+          if viewModel.selectedLaunchSelection.isAcp {
+            if store.acpUnavailable {
+              acpUnavailableBanner
+              createPaneChromeDivider()
+            }
+          } else if store.agentTuiUnavailable {
+            agentTuiUnavailableBanner
+            createPaneChromeDivider()
+          }
+        }
+        if viewModel.createMode == .codex, store.codexUnavailable {
+          codexUnavailableBanner
+          createPaneChromeDivider()
+        }
+      }
+      .background(Color(nsColor: .windowBackgroundColor))
+    }
+  }
+
+  private var showsCreatePaneTopChrome: Bool {
+    if createPaneSessionActionUnavailableNote != nil {
+      return true
+    }
+    if viewModel.createMode == .terminal {
+      if viewModel.selectedLaunchSelection.isAcp {
+        return store.acpUnavailable
+      }
+      return store.agentTuiUnavailable
+    }
+    return store.codexUnavailable
+  }
+
+  private var createPaneSessionActionTitle: String {
+    resolvedCreateSessionID == nil ? "Select a session first" : "Session actions unavailable"
+  }
+
+  private func createPaneSessionActionBanner(message: String) -> some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      Label(createPaneSessionActionTitle, systemImage: "info.circle")
+        .scaledFont(.headline)
+        .foregroundStyle(HarnessMonitorTheme.caution)
+      Text(message)
+        .scaledFont(.subheadline)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      if resolvedCreateSessionID == nil {
+        Button("New Session") {
+          store.presentedSheet = .newSession
+        }
+        .harnessActionButtonStyle(variant: .prominent, tint: nil)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiNewSessionButton)
+      }
+    }
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+    .padding(.vertical, HarnessMonitorTheme.spacingSM)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .modifier(ChromeBannerSurfaceModifier(tint: HarnessMonitorTheme.caution))
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSessionActionBanner)
+  }
+
+  private func createPaneChromeDivider() -> some View {
+    Rectangle()
+      .fill(HarnessMonitorTheme.caution.opacity(0.35))
+      .frame(height: 1)
+      .accessibilityHidden(true)
   }
 }
 
-struct WorkspaceWindowCreatePane<
-  AcpUnavailableBanner: View,
-  AgentTuiBanner: View,
-  CodexBanner: View
->: View {
+struct WorkspaceWindowCreatePane: View {
   typealias ViewModel = WorkspaceWindowView.ViewModel
   typealias DisplayState = WorkspaceWindowView.AgentTuiDisplayState
   typealias Field = WorkspaceWindowView.Field
@@ -35,12 +111,14 @@ struct WorkspaceWindowCreatePane<
   let primaryContentFocusScope: Namespace.ID?
   let primaryContentPagingResponderRequest: Int
   let prefersPrimaryContentFocus: Bool
+  let primaryContentFocusParticipationEnabled: Bool
   let startAction: () -> Void
-  let acpUnavailableBanner: AcpUnavailableBanner
-  let agentTuiUnavailableBanner: AgentTuiBanner
-  let codexUnavailableBanner: CodexBanner
 
   var body: some View {
+    let activePrimaryContentFocusScope =
+      primaryContentFocusParticipationEnabled ? primaryContentFocusScope : nil
+    let activePrimaryContentPagingRequest =
+      primaryContentFocusParticipationEnabled ? primaryContentPagingResponderRequest : 0
     HarnessMonitorColumnScrollView(
       horizontalPadding: HarnessMonitorTheme.spacingLG,
       verticalPadding: HarnessMonitorTheme.spacingLG,
@@ -49,15 +127,16 @@ struct WorkspaceWindowCreatePane<
       topScrollEdgeEffect: .soft,
       scrollSurfaceIdentifier: HarnessMonitorAccessibility.agentTuiLaunchPane,
       scrollSurfaceLabel: "New agent pane",
-      primaryFocusScope: primaryContentFocusScope,
-      prefersDefaultFocus: prefersPrimaryContentFocus,
-      pagingResponderRequest: primaryContentPagingResponderRequest
+      primaryFocusScope: activePrimaryContentFocusScope,
+      prefersDefaultFocus:
+        prefersPrimaryContentFocus && primaryContentFocusParticipationEnabled,
+      pagingResponderRequest: activePrimaryContentPagingRequest,
+      pagingResponderEnabled: primaryContentFocusParticipationEnabled
     ) {
       // Keep MCP-tracked controls instantiated even while this pane scrolls.
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
         createPaneHeader
         createModeCard
-        createPaneBanners
 
         switch viewModel.createMode {
         case .terminal:
@@ -166,47 +245,4 @@ extension WorkspaceWindowCreatePane {
     return selectedChoice.id.isAcp ? "Project Access" : "Terminal"
   }
 
-  @ViewBuilder private var createPaneBanners: some View {
-    if let message = createPaneSessionActionUnavailableNote {
-      sessionActionUnavailableBanner(message: message)
-    }
-    if viewModel.createMode == .terminal {
-      if viewModel.selectedLaunchSelection.isAcp {
-        if store.acpUnavailable {
-          acpUnavailableBanner
-        }
-      } else if store.agentTuiUnavailable {
-        agentTuiUnavailableBanner
-      }
-    }
-    if viewModel.createMode == .codex && store.codexUnavailable {
-      codexUnavailableBanner
-    }
-  }
-
-  private var createPaneSessionActionTitle: String {
-    resolvedCreateSessionID == nil ? "Select a session first" : "Session actions unavailable"
-  }
-
-  private func sessionActionUnavailableBanner(message: String) -> some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Label(createPaneSessionActionTitle, systemImage: "info.circle")
-        .scaledFont(.headline)
-        .foregroundStyle(HarnessMonitorTheme.caution)
-      Text(message)
-        .scaledFont(.subheadline)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      if resolvedCreateSessionID == nil {
-        Button("New Session") {
-          store.presentedSheet = .newSession
-        }
-        .harnessActionButtonStyle(variant: .prominent, tint: nil)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiNewSessionButton)
-      }
-    }
-    .padding(HarnessMonitorTheme.spacingMD)
-    .modifier(ChromeBannerSurfaceModifier(tint: HarnessMonitorTheme.caution))
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSessionActionBanner)
-  }
 }
