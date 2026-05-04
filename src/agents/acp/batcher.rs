@@ -67,9 +67,12 @@ async fn notification_batch_loop(
     let mut sessions = BTreeMap::<String, SessionBatchState>::new();
 
     loop {
-        let flush_timeout = next_flush_timeout(&sessions, &ring_config);
+        let result = match next_flush_timeout(&sessions, &ring_config) {
+            Some(remaining) => timeout(remaining, notification_rx.recv()).await,
+            None => Ok(notification_rx.recv().await),
+        };
 
-        match timeout(flush_timeout, notification_rx.recv()).await {
+        match result {
             Ok(Some(routed)) => {
                 push_notification(
                     routed,
@@ -89,10 +92,13 @@ async fn notification_batch_loop(
     flush_all(&mut sessions, &event_tx, &agent_name).await;
 }
 
+// Returns `None` when no session has buffered updates so the loop can park on
+// `recv()` indefinitely instead of waking every `max_duration` (5 ms by
+// default) and shredding the runtime with timer polls.
 fn next_flush_timeout(
     sessions: &BTreeMap<String, SessionBatchState>,
     ring_config: &RingConfig,
-) -> Duration {
+) -> Option<Duration> {
     sessions
         .values()
         .filter(|state| !state.ring.is_empty())
@@ -103,7 +109,6 @@ fn next_flush_timeout(
                 .map(|elapsed| ring_config.max_duration.saturating_sub(elapsed))
         })
         .min()
-        .unwrap_or(ring_config.max_duration)
 }
 
 async fn flush_all(
@@ -262,6 +267,52 @@ mod tests {
             })
             .collect::<Vec<_>>();
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn next_flush_timeout_is_none_when_no_sessions() {
+        let sessions = BTreeMap::new();
+        let cfg = RingConfig::default();
+        assert!(next_flush_timeout(&sessions, &cfg).is_none());
+    }
+
+    #[test]
+    fn next_flush_timeout_is_none_when_all_rings_empty() {
+        let cfg = RingConfig::default();
+        let mut sessions = BTreeMap::new();
+        sessions.insert(
+            "s".to_string(),
+            SessionBatchState {
+                acp_id: "a".to_string(),
+                ring: SessionRing::new(cfg.clone()),
+                sequence: 0,
+            },
+        );
+        assert!(next_flush_timeout(&sessions, &cfg).is_none());
+    }
+
+    #[test]
+    fn next_flush_timeout_is_some_when_ring_has_data() {
+        let cfg = RingConfig {
+            max_updates: 32,
+            max_bytes: 64 * 1024,
+            max_duration: Duration::from_secs(1),
+        };
+        let mut state = SessionBatchState {
+            acp_id: "a".to_string(),
+            ring: SessionRing::new(cfg.clone()),
+            sequence: 0,
+        };
+        state.ring.push(SessionNotification::new(
+            SessionId::new("acp-session-1"),
+            SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::Text(
+                TextContent::new("hi"),
+            ))),
+        ));
+        let mut sessions = BTreeMap::new();
+        sessions.insert("s".to_string(), state);
+        let remaining = next_flush_timeout(&sessions, &cfg).expect("some remaining");
+        assert!(remaining <= cfg.max_duration);
     }
 
     fn routed(
