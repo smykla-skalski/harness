@@ -1,6 +1,8 @@
 use temp_env::with_vars;
 use tempfile::tempdir;
 
+use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
+
 use super::super::super::{db::DaemonDb, index};
 use super::super::{
     TimelinePayloadScope, checkpoint_entry, conversation_entry, log_entry_timeline_entry,
@@ -127,4 +129,58 @@ fn session_timeline_merges_log_checkpoint_signal_and_observer_entries() {
             assert_eq!(entries[6].kind, "task_created");
         },
     );
+}
+
+#[test]
+fn conversation_entry_emits_assistant_text_rows() {
+    let event = ConversationEvent {
+        timestamp: Some("2026-03-28T14:05:50Z".into()),
+        sequence: 3,
+        kind: ConversationEventKind::AssistantText {
+            content: "  Here is the latest status.  ".into(),
+        },
+        agent: "codex-worker".into(),
+        session_id: "sess-conversation".into(),
+    };
+
+    let entry = conversation_entry(
+        "sess-conversation",
+        "codex-worker",
+        "codex",
+        &event,
+        TimelinePayloadScope::Full,
+    )
+    .expect("conversation entry converts")
+    .expect("assistant text emitted");
+
+    assert_eq!(entry.kind, "assistant_text");
+    assert_eq!(entry.summary, "Here is the latest status.");
+    assert_eq!(entry.payload["event"]["type"], "assistant_text");
+}
+
+#[test]
+fn conversation_entry_emits_user_prompt_rows() {
+    let event = ConversationEvent {
+        timestamp: Some("2026-03-28T14:05:10Z".into()),
+        sequence: 1,
+        kind: ConversationEventKind::UserPrompt {
+            content: "Ship the transcript fix".into(),
+        },
+        agent: "codex-worker".into(),
+        session_id: "sess-conversation".into(),
+    };
+
+    let entry = conversation_entry(
+        "sess-conversation",
+        "codex-worker",
+        "codex",
+        &event,
+        TimelinePayloadScope::Full,
+    )
+    .expect("conversation entry converts")
+    .expect("user prompt emitted");
+
+    assert_eq!(entry.kind, "user_prompt");
+    assert_eq!(entry.summary, "Ship the transcript fix");
+    assert_eq!(entry.payload["event"]["type"], "user_prompt");
 }

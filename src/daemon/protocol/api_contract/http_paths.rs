@@ -61,6 +61,7 @@ pub const MANAGED_AGENT_ACP_PERMISSION: &str =
     "/v1/managed-agents/{agent_id}/permission-batches/{batch_id}";
 pub const MANAGED_AGENT_DELETE: &str = "/v1/managed-agents/{agent_id}";
 pub const MANAGED_AGENTS_ACP_INSPECT: &str = "/v1/managed-agents/acp/inspect";
+pub const MANAGED_AGENTS_ACP_TRANSCRIPT: &str = "/v1/managed-agents/acp/transcript";
 pub const SESSION_SIGNAL_SEND: &str = "/v1/sessions/{session_id}/signal";
 pub const SESSION_SIGNAL_CANCEL: &str = "/v1/sessions/{session_id}/signal-cancel";
 pub const SESSION_SIGNAL_ACK: &str = "/v1/sessions/{session_id}/signal-ack";

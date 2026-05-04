@@ -153,6 +153,12 @@ actor PreviewHarnessClientState {
     timelinesBySessionID[sessionID] ?? fallbackTimeline
   }
 
+  func acpTranscript(sessionID: String) -> AcpTranscriptResponse {
+    AcpTranscriptResponse(
+      entries: timeline(for: sessionID).filter(\.isAcpTranscriptEntry)
+    )
+  }
+
   func codexRuns(sessionID: String) -> [CodexRunSnapshot] {
     codexRunsBySessionID[sessionID] ?? []
   }

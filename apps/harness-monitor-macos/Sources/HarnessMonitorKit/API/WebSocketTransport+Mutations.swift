@@ -390,6 +390,14 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func acpTranscript(sessionID: String) async throws -> AcpTranscriptResponse {
+    let value = try await rpc(
+      method: .managedAgentAcpTranscript,
+      params: .object(["session_id": .string(sessionID)])
+    )
+    return try decode(value)
+  }
+
   public func configuration() async throws -> MonitorConfiguration {
     if let cached = cachedConfiguration {
       return cached

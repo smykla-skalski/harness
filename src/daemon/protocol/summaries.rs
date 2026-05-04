@@ -295,6 +295,11 @@ pub struct TimelineWindowResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AcpTranscriptResponse {
+    pub entries: Vec<TimelineEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReadyEventPayload {
     pub ok: bool,
 }

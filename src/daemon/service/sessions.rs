@@ -6,6 +6,7 @@ use super::{
     reconcile_expired_pending_signals_for_async_db, reconcile_expired_pending_signals_for_db,
     session_not_found, snapshot, timeline,
 };
+use crate::daemon::protocol::AcpTranscriptResponse;
 use crate::session::service::ResolvedRuntimeSessionAgent;
 
 mod liveness;
@@ -252,6 +253,30 @@ pub(crate) async fn session_timeline_window_async(
         .load_session_timeline_window(session_id, request)
         .await?
         .ok_or_else(|| session_not_found(session_id))
+}
+
+/// Load ACP transcript history for a session from the canonical async daemon DB.
+///
+/// # Errors
+/// Returns [`CliError`] when the session cannot be resolved or transcript rows
+/// cannot be loaded.
+pub(crate) async fn session_acp_transcript_async(
+    session_id: &str,
+    async_db: Option<&super::db::AsyncDaemonDb>,
+) -> Result<AcpTranscriptResponse, CliError> {
+    let async_db = async_db.ok_or_else(|| {
+        CliError::new(CliErrorKind::usage_error(
+            "async daemon database pool is required for async ACP transcript reads",
+        ))
+    })?;
+    async_db
+        .resolve_session(session_id)
+        .await?
+        .ok_or_else(|| session_not_found(session_id))?;
+    reconcile_expired_pending_signals_for_async_db(session_id, async_db).await?;
+    Ok(AcpTranscriptResponse {
+        entries: async_db.load_session_acp_transcript_entries(session_id).await?,
+    })
 }
 
 /// Load a merged session timeline.

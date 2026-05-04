@@ -6,10 +6,14 @@ use std::process::{Child, Command};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use tokio::sync::mpsc;
 use tokio::time::advance;
 
 use nix::sys::signal::{Signal, killpg};
 use nix::unistd::Pid;
+
+use crate::agents::acp::connection::SupervisorEventSink;
+use crate::agents::runtime::event::ConversationEventKind;
 
 use super::*;
 

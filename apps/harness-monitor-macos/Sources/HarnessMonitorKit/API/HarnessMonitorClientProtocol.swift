@@ -176,6 +176,7 @@ public protocol HarnessMonitorClientProtocol: Sendable {
   func runtimeProbeResults() async throws -> AcpRuntimeProbeResponse
   func acpAgentDescriptors() async throws -> [AcpAgentDescriptor]
   func acpInspect(sessionID: String?) async throws -> AcpAgentInspectResponse
+  func acpTranscript(sessionID: String) async throws -> AcpTranscriptResponse
   func codexRuns(sessionID: String) async throws -> CodexRunListResponse
   func codexRun(runID: String) async throws -> CodexRunSnapshot
   func startCodexRun(
@@ -377,6 +378,10 @@ extension HarnessMonitorClientProtocol {
 
   public func acpInspect(sessionID _: String?) async throws -> AcpAgentInspectResponse {
     AcpAgentInspectResponse(agents: [])
+  }
+
+  public func acpTranscript(sessionID _: String) async throws -> AcpTranscriptResponse {
+    AcpTranscriptResponse(entries: [])
   }
 
   public func configuration() async throws -> MonitorConfiguration {

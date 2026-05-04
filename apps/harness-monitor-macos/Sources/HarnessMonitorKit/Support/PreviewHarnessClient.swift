@@ -222,6 +222,10 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     await state.acpInspect(sessionID: sessionID)
   }
 
+  public func acpTranscript(sessionID: String) async throws -> AcpTranscriptResponse {
+    await state.acpTranscript(sessionID: sessionID)
+  }
+
   public func resolveCodexApproval(
     runID: String,
     approvalID: String,

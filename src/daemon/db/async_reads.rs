@@ -42,6 +42,27 @@ const TIMELINE_ENTRIES_RANGE_SQL: &str = "SELECT
  WHERE session_id = ?1
  ORDER BY sort_recorded_at DESC, sort_tiebreaker DESC
  LIMIT ?2 OFFSET ?3";
+const ACP_TRANSCRIPT_ENTRIES_SQL: &str = "SELECT
+    session_id,
+    entry_id,
+    source_kind,
+    source_key,
+    recorded_at,
+    kind,
+    agent_id,
+    task_id,
+    summary,
+    payload_json,
+    sort_recorded_at,
+    sort_tiebreaker
+ FROM session_timeline_entries
+ WHERE session_id = ?1
+   AND (
+     COALESCE(json_extract(payload_json, '$.runtime'), '') = 'acp'
+     OR json_type(payload_json, '$.acp_timeline_identity') IS NOT NULL
+     OR json_type(payload_json, '$.tool_call_timeline') IS NOT NULL
+   )
+ ORDER BY sort_recorded_at DESC, sort_tiebreaker DESC";
 const TIMELINE_CURSOR_AT_OFFSET_SQL: &str = "SELECT
     recorded_at,
     entry_id
@@ -107,6 +128,29 @@ impl AsyncDaemonDb {
             entries: Some(entries),
             unchanged: false,
         }))
+    }
+
+    /// Load all ACP transcript entries for a session from the canonical async
+    /// timeline ledger.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or payload parse failures.
+    pub(crate) async fn load_session_acp_transcript_entries(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<TimelineEntry>, CliError> {
+        let rows = query_as::<_, AsyncStoredTimelineEntryRow>(ACP_TRANSCRIPT_ENTRIES_SQL)
+            .bind(session_id)
+            .fetch_all(self.pool())
+            .await
+            .map_err(|error| db_error(format!("query async ACP transcript entries: {error}")))?;
+
+        rows.into_iter()
+            .map(|row| {
+                row.into_stored_entry()
+                    .into_timeline_entry(daemon_timeline::TimelinePayloadScope::Full)
+            })
+            .collect()
     }
 
     async fn load_session_timeline_state(

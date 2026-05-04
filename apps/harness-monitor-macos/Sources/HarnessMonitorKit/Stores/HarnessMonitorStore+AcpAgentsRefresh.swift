@@ -117,13 +117,59 @@ extension HarnessMonitorStore {
     }
   }
 
+  func refreshAcpTranscript(
+    using client: any HarnessMonitorClientProtocol,
+    sessionID: String
+  ) async -> Bool {
+    do {
+      let measuredTranscript = try await Self.measureOperation {
+        try await client.acpTranscript(sessionID: sessionID)
+      }
+      recordRequestSuccess()
+      clearHostBridgeIssue(for: "acp")
+      guard selectedSessionID == sessionID else {
+        return true
+      }
+      replaceAcpTranscriptHistory(measuredTranscript.value, sessionID: sessionID)
+      return true
+    } catch {
+      guard selectedSessionID == sessionID else {
+        return false
+      }
+      if let apiError = error as? HarnessMonitorAPIError,
+        apiError.acpServiceError != nil
+      {
+        clearHostBridgeIssue(for: "acp")
+        HarnessMonitorLogger.store.info(
+          "managed ACP transcript unavailable: \(apiError.localizedDescription, privacy: .public)"
+        )
+        return false
+      }
+      if let apiError = error as? HarnessMonitorAPIError,
+        case .server(let code, _) = apiError,
+        code == 501 || code == 503
+      {
+        self.markHostBridgeIssue(for: "acp", statusCode: code)
+        HarnessMonitorLogger.store.info(
+          "managed ACP transcript unavailable: \(self.acpHostBridgeFailureMessage(), privacy: .public)"
+        )
+        return false
+      }
+      HarnessMonitorLogger.store.warning(
+        "managed ACP transcript refresh failed: \(error.localizedDescription, privacy: .public)"
+      )
+      return false
+    }
+  }
+
   func recoverSelectedAcpAgentsAfterReconnect(
     using client: any HarnessMonitorClientProtocol,
     sessionID: String
   ) async {
     async let refreshedAgents = refreshAcpAgents(using: client, sessionID: sessionID)
     async let refreshedInspect = refreshAcpInspect(using: client, sessionID: sessionID)
-    _ = await (refreshedAgents, refreshedInspect)
+    async let refreshedTranscript = refreshAcpTranscript(using: client, sessionID: sessionID)
+    _ = await (refreshedAgents, refreshedInspect, refreshedTranscript)
   }
 
   private func shouldAutoPresentHydratedAcpPermissions() -> Bool {

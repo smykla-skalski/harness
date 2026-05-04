@@ -44,6 +44,8 @@ extension HarnessMonitorStore {
       ),
       into: selectedAcpAgents
     )
+    reattributeAcpTranscriptEntries(using: selectedAcpAgents)
+    reattributeAcpTimelineEntries(using: selectedAcpAgents)
     reconcileAcpInspectSnapshot(with: snapshot)
     reconcileAcpInspectSyncState(
       sessionID: snapshot.sessionId,
@@ -81,6 +83,8 @@ extension HarnessMonitorStore {
         }
       )
     standaloneAcpPermissionBatches.removeAll { $0.sessionId == payload.sessionId }
+    reattributeAcpTranscriptEntries(using: selectedAcpAgents)
+    reattributeAcpTimelineEntries(using: selectedAcpAgents)
     if let inspect = payload.inspect {
       replaceAcpInspect(
         inspect,
@@ -164,6 +168,7 @@ extension HarnessMonitorStore {
     guard !entries.isEmpty else {
       return
     }
+    applyAcpTranscriptEntries(entries)
     applyAcpTimelineEntries(entries)
   }
 
@@ -252,6 +257,9 @@ extension HarnessMonitorStore {
 
   func resetSelectedAcpAgents() {
     selectedAcpAgents = []
+    selectedAcpTranscriptHistoryEntries = []
+    selectedAcpTranscriptLiveEntries = []
+    selectedAcpTranscriptEntries = []
     selectedAcpInspectState = nil
     selectedAcpInspectSyncEntries = [:]
     cancelAcpInspectRecovery()

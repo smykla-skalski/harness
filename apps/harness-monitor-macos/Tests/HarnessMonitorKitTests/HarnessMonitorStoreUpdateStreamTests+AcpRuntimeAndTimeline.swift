@@ -407,4 +407,79 @@ extension HarnessMonitorStoreUpdateStreamTests {
     #expect(jsonString(from: toolCallTimeline["agent_id"]) == "copilot")
     #expect(jsonString(from: toolCallTimeline["agent_display_name"]) == "copilot")
   }
+
+  @Test("ACP assistant text push appends transcript rows for the selected session agent")
+  func acpAssistantTextPushAppendsTranscriptRows() async throws {
+    let client = RecordingHarnessClient()
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-acp-transcript",
+        context: "ACP transcript",
+        status: .active,
+        leaderId: "leader-acp",
+        observeId: nil,
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
+    let detail = makeSessionDetail(
+      summary: summary,
+      workerID: "worker-acp",
+      workerName: "Worker ACP"
+    )
+    client.configureSessions(
+      summaries: [summary],
+      detailsByID: [summary.sessionId: detail],
+      timelinesBySessionID: [summary.sessionId: []]
+    )
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client)
+    )
+
+    await store.bootstrap()
+    await store.selectSession(summary.sessionId)
+    store.applyAcpAgent(
+      makeAcpSnapshot(
+        acpID: "acp-1",
+        sessionID: summary.sessionId,
+        agentID: "worker-acp",
+        displayName: "Worker ACP",
+        pendingBatches: []
+      )
+    )
+    store.applySessionPushEvent(
+      DaemonPushEvent(
+        recordedAt: "2026-04-28T00:00:30Z",
+        sessionId: summary.sessionId,
+        kind: .acpEvents(
+          AcpEventBatchPayload(
+            acpId: "acp-1",
+            sessionId: summary.sessionId,
+            rawCount: 1,
+            events: [
+              AcpConversationEvent(
+                timestamp: "2026-04-28T00:00:20Z",
+                sequence: 9,
+                kind: .object([
+                  "type": .string("assistant_text"),
+                  "content": .string("  Transcript line from ACP.  "),
+                ]),
+                agent: "copilot",
+                sessionId: summary.sessionId
+              )
+            ]
+          )
+        )
+      )
+    )
+
+    let entry = try #require(store.timeline.first)
+    #expect(entry.kind == "assistant_text")
+    #expect(entry.summary == "Transcript line from ACP.")
+    #expect(entry.agentId == "worker-acp")
+    #expect(store.timeline(forAgent: "worker-acp").map(\.entryId) == [entry.entryId])
+
+    store.stopAllStreams()
+  }
 }

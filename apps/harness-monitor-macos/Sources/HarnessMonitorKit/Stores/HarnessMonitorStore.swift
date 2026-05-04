@@ -92,6 +92,25 @@ public final class HarnessMonitorStore {
       rebuildAcpDecisionAttentionCache()
     }
   }
+  @ObservationIgnored var selectedAcpTranscriptHistoryEntries: [TimelineEntry] = [] {
+    didSet {
+      guard oldValue != selectedAcpTranscriptHistoryEntries else { return }
+      rebuildSelectedAcpTranscriptEntries()
+    }
+  }
+  @ObservationIgnored var selectedAcpTranscriptLiveEntries: [TimelineEntry] = [] {
+    didSet {
+      guard oldValue != selectedAcpTranscriptLiveEntries else { return }
+      rebuildSelectedAcpTranscriptEntries()
+    }
+  }
+  @ObservationIgnored var selectedAcpTranscriptEntries: [TimelineEntry] = [] {
+    didSet {
+      guard oldValue != selectedAcpTranscriptEntries else { return }
+      rebuildAcpTranscriptPartition()
+    }
+  }
+  var acpTranscriptByAgentID: [String: [TimelineEntry]] = [:]
   /// Derived ACP attention for the currently selected session only.
   ///
   /// Freshness contract:

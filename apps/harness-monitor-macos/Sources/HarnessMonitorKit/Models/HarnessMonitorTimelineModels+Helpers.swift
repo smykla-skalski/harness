@@ -75,7 +75,112 @@ public struct ToolCallTimelineEntryMetadata: Equatable, Sendable {
   }
 }
 
+public struct AcpTimelineIdentityMetadata: Equatable, Sendable {
+  public let acpAgentID: String
+  public let agentID: String?
+  public let agentDisplayName: String?
+  public let sequence: UInt64?
+
+  public init(
+    acpAgentID: String,
+    agentID: String?,
+    agentDisplayName: String?,
+    sequence: UInt64?
+  ) {
+    self.acpAgentID = acpAgentID
+    self.agentID = agentID
+    self.agentDisplayName = agentDisplayName
+    self.sequence = sequence
+  }
+}
+
 extension TimelineEntry {
+  public var isAcpTranscriptEntry: Bool {
+    if acpTimelineIdentityMetadata() != nil {
+      return true
+    }
+    if toolCallTimelineEntryMetadata()?.acpAgentID != nil {
+      return true
+    }
+    guard case .object(let payload) = payload else {
+      return false
+    }
+    return payload.stringValue(for: "runtime") == "acp"
+  }
+
+  public func acpTimelineIdentityMetadata() -> AcpTimelineIdentityMetadata? {
+    if let payloadMetadata = acpTimelinePayloadMetadata(),
+      let acpAgentID = payloadMetadata.stringValue(for: "acp_agent_id")
+    {
+      return AcpTimelineIdentityMetadata(
+        acpAgentID: acpAgentID,
+        agentID: payloadMetadata.stringValue(for: "agent_id") ?? agentId,
+        agentDisplayName: payloadMetadata.stringValue(for: "agent_display_name"),
+        sequence: payloadMetadata.uint64Value(for: "sequence")
+      )
+    }
+
+    guard let metadata = toolCallTimelineEntryMetadata(),
+      let acpAgentID = metadata.acpAgentID
+    else {
+      return nil
+    }
+    return AcpTimelineIdentityMetadata(
+      acpAgentID: acpAgentID,
+      agentID: metadata.agentID,
+      agentDisplayName: metadata.agentDisplayName,
+      sequence: metadata.sequence
+    )
+  }
+
+  public func reattributedAcpTimelineEntry(
+    agentID: String,
+    displayName: String
+  ) -> TimelineEntry {
+    let updatedEntryID =
+      if let sequence = acpTimelineIdentityMetadata()?.sequence {
+        "acp-\(agentID)-\(kind)-\(sequence)"
+      } else {
+        entryId
+      }
+
+    guard case .object(var payloadObject) = payload else {
+      return TimelineEntry(
+        entryId: updatedEntryID,
+        recordedAt: recordedAt,
+        kind: kind,
+        sessionId: sessionId,
+        agentId: agentID,
+        taskId: taskId,
+        summary: summary,
+        payload: payload
+      )
+    }
+
+    if case .object(var payloadMetadata)? = payloadObject["acp_timeline_identity"] {
+      payloadMetadata["agent_id"] = .string(agentID)
+      payloadMetadata["agent_display_name"] = .string(displayName)
+      payloadObject["acp_timeline_identity"] = .object(payloadMetadata)
+    }
+
+    if case .object(var toolCallMetadata)? = payloadObject["tool_call_timeline"] {
+      toolCallMetadata["agent_id"] = .string(agentID)
+      toolCallMetadata["agent_display_name"] = .string(displayName)
+      payloadObject["tool_call_timeline"] = .object(toolCallMetadata)
+    }
+
+    return TimelineEntry(
+      entryId: updatedEntryID,
+      recordedAt: recordedAt,
+      kind: kind,
+      sessionId: sessionId,
+      agentId: agentID,
+      taskId: taskId,
+      summary: reattributedAcpTimelineSummary(displayName: displayName),
+      payload: .object(payloadObject)
+    )
+  }
+
   public func toolCallTimelineEntryMetadata() -> ToolCallTimelineEntryMetadata? {
     let payloadMetadata = toolCallTimelinePayloadMetadata()
     let event = toolCallTimelineEventPayload()
@@ -128,6 +233,79 @@ extension TimelineEntry {
     return metadata
   }
 
+  private func acpTimelinePayloadMetadata() -> [String: JSONValue]? {
+    guard case .object(let payload) = payload,
+      case .object(let metadata)? = payload["acp_timeline_identity"]
+    else {
+      return nil
+    }
+    return metadata
+  }
+
+  private func acpConversationEventPayload() -> [String: JSONValue]? {
+    guard case .object(let payload) = payload,
+      case .object(let event)? = payload["event"]
+    else {
+      return nil
+    }
+    return event
+  }
+
+  private func reattributedAcpTimelineSummary(displayName: String) -> String {
+    guard let event = acpConversationEventPayload() else {
+      return summary
+    }
+
+    switch kind {
+    case "user_prompt":
+      return Self.transcriptSummary(from: event["content"], fallback: "Prompt submitted")
+    case "assistant_text":
+      return Self.transcriptSummary(from: event["content"], fallback: "Assistant response")
+    case "agent_error":
+      return "\(displayName) error: \(event.stringValue(for: "message") ?? "Unknown error")"
+    case "signal_received":
+      let signalID = event.stringValue(for: "signal_id") ?? "signal"
+      let command = event.stringValue(for: "command") ?? "unknown"
+      return "\(displayName) picked up \(signalID) (\(command))"
+    case "agent_state_change":
+      let from = event.stringValue(for: "from") ?? "unknown"
+      let to = event.stringValue(for: "to") ?? "unknown"
+      return "\(displayName) state changed \(from) -> \(to)"
+    case "file_modification":
+      let operation = event.stringValue(for: "operation") ?? "modified"
+      let path = event.stringValue(for: "path") ?? "file"
+      return "\(displayName) \(operation) \(path)"
+    case "agent_session_marker":
+      let marker = event.stringValue(for: "marker") ?? "session"
+      return "\(displayName) marked \(marker)"
+    case "agent_watchdog_state":
+      let from = event.stringValue(for: "from") ?? "unknown"
+      let to = event.stringValue(for: "to") ?? "unknown"
+      return "\(displayName) watchdog \(from) -> \(to)"
+    case "agent_permission_asked":
+      let tool = event.stringValue(for: "tool") ?? "tool"
+      let scope = event.stringValue(for: "scope") ?? ""
+      if scope.isEmpty {
+        return "\(displayName) asked for permission on \(tool)"
+      }
+      return "\(displayName) asked for permission on \(tool) (\(scope))"
+    case "tool_invocation":
+      let toolName = event.stringValue(for: "tool_name") ?? "Tool"
+      return "\(displayName) invoked \(toolName)"
+    case "tool_result_error":
+      let toolName = event.stringValue(for: "tool_name") ?? "Tool"
+      return "\(displayName) received an error from \(toolName)"
+    case "tool_result":
+      let toolName = event.stringValue(for: "tool_name") ?? "Tool"
+      if event.boolValue(for: "is_error") == true {
+        return "\(displayName) received an error from \(toolName)"
+      }
+      return "\(displayName) received a result from \(toolName)"
+    default:
+      return summary
+    }
+  }
+
   private func toolCallTimelineEventPayload() -> [String: JSONValue]? {
     let canonicalKinds = ["tool_invocation", "tool_result", "tool_result_error"]
     guard canonicalKinds.contains(kind) || kind == "conversation_event",
@@ -168,6 +346,17 @@ extension TimelineEntry {
     default:
       return nil
     }
+  }
+
+  private static func transcriptSummary(
+    from value: JSONValue?,
+    fallback: String
+  ) -> String {
+    guard case .string(let content)? = value else {
+      return fallback
+    }
+    let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? fallback : trimmed
   }
 }
 

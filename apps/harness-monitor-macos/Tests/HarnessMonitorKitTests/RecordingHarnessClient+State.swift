@@ -77,6 +77,28 @@ extension RecordingHarnessClient {
     lock.withLock { acpInspectCallCountsBySessionID[acpInspectResponseKey(sessionID), default: 0] }
   }
 
+  func configuredAcpTranscriptResponse(for sessionID: String) -> AcpTranscriptResponse? {
+    lock.withLock { acpTranscriptResponsesBySessionID[sessionID] }
+  }
+
+  func configuredAcpTranscriptDelay(for sessionID: String) -> Duration? {
+    lock.withLock { acpTranscriptDelaysBySessionID[sessionID] }
+  }
+
+  func configuredAcpTranscriptError(for sessionID: String) -> (any Error)? {
+    lock.withLock { acpTranscriptErrorsBySessionID[sessionID] }
+  }
+
+  func recordAcpTranscriptCall(for sessionID: String) {
+    lock.withLock {
+      acpTranscriptCallCountsBySessionID[sessionID, default: 0] += 1
+    }
+  }
+
+  func acpTranscriptCallCount(for sessionID: String) -> Int {
+    lock.withLock { acpTranscriptCallCountsBySessionID[sessionID, default: 0] }
+  }
+
   func configuredAgentTuis(for sessionID: String) -> [AgentTuiSnapshot] {
     lock.withLock { agentTuisBySessionID[sessionID] ?? [] }
   }

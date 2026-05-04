@@ -41,6 +41,79 @@ extension HarnessMonitorStoreSelectionFlowTests {
     #expect(store.subscribedSessionIDs == Set([summary.sessionId]))
   }
 
+  @Test("Reconnect refreshes ACP transcript history for the selected session")
+  func reconnectRefreshesAcpTranscriptHistory() async throws {
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-reconnect-acp-transcript",
+        context: "Reconnect ACP transcript lane",
+        status: .active,
+        leaderId: "leader-reconnect-acp",
+        observeId: "observe-reconnect-acp",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 2
+      )
+    )
+    let detail = makeSessionDetail(
+      summary: summary,
+      workerID: "worker-reconnect-acp",
+      workerName: "Worker Reconnect ACP"
+    )
+    let staleTranscript = TimelineEntry(
+      entryId: "acp-transcript-row",
+      recordedAt: "2026-04-28T00:00:20Z",
+      kind: "assistant_message",
+      sessionId: summary.sessionId,
+      agentId: "worker-reconnect-acp",
+      taskId: nil,
+      summary: "Stale ACP transcript row",
+      payload: .object(["runtime": .string("acp")])
+    )
+    let refreshedTranscript = TimelineEntry(
+      entryId: "acp-transcript-row",
+      recordedAt: "2026-04-28T00:00:30Z",
+      kind: "assistant_message",
+      sessionId: summary.sessionId,
+      agentId: "worker-reconnect-acp",
+      taskId: nil,
+      summary: "Refreshed ACP transcript row",
+      payload: .object(["runtime": .string("acp")])
+    )
+    let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
+      summaries: [summary],
+      detailsByID: [summary.sessionId: detail],
+      detail: detail
+    )
+    client.configureAcpTranscriptResponse(
+      AcpTranscriptResponse(entries: [staleTranscript]),
+      for: summary.sessionId
+    )
+    let store = await makeBootstrappedStore(client: client)
+
+    await store.selectSession(summary.sessionId)
+    try await Task.sleep(for: .milliseconds(50))
+    #expect(
+      store.acpTranscript(forAgent: "worker-reconnect-acp").map(\.summary)
+        == ["Stale ACP transcript row"]
+    )
+
+    client.configureAcpTranscriptResponse(
+      AcpTranscriptResponse(entries: [refreshedTranscript]),
+      for: summary.sessionId
+    )
+
+    await store.reconnect()
+    try await Task.sleep(for: .milliseconds(50))
+
+    #expect(
+      store.acpTranscript(forAgent: "worker-reconnect-acp").map(\.summary)
+        == ["Refreshed ACP transcript row"]
+    )
+    #expect(client.readCallCount(.acpTranscript(summary.sessionId)) >= 2)
+  }
+
   @Test("Reconnect-ready events refresh push-only global and session state")
   func reconnectReadyEventsRefreshPushOnlyGlobalAndSessionState() async throws {
     let client = RecordingHarnessClient()

@@ -56,6 +56,7 @@ pub const MANAGED_AGENT_RESOLVE_CODEX_APPROVAL: &str = "managed_agent.resolve_co
 pub const MANAGED_AGENT_RESOLVE_ACP_PERMISSION: &str = "managed_agent.resolve_acp_permission";
 pub const MANAGED_AGENT_STOP_ACP: &str = "managed_agent.stop_acp";
 pub const MANAGED_AGENTS_ACP_INSPECT: &str = "managed_agent.acp_inspect";
+pub const MANAGED_AGENTS_ACP_TRANSCRIPT: &str = "managed_agent.acp_transcript";
 pub const SIGNAL_SEND: &str = "signal.send";
 pub const SIGNAL_CANCEL: &str = "signal.cancel";
 pub const SIGNAL_ACK: &str = "signal.ack";

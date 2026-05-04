@@ -355,6 +355,37 @@ extension RecordingHarnessClient {
     lock.withLock { acpInspectError = error }
   }
 
+  func configureAcpTranscriptResponse(
+    _ response: AcpTranscriptResponse,
+    for sessionID: String
+  ) {
+    lock.withLock {
+      acpTranscriptResponsesBySessionID[sessionID] = response
+    }
+  }
+
+  func configureAcpTranscriptDelay(
+    _ delay: Duration?,
+    for sessionID: String
+  ) {
+    lock.withLock {
+      acpTranscriptDelaysBySessionID[sessionID] = delay
+    }
+  }
+
+  func configureAcpTranscriptError(
+    _ error: (any Error)?,
+    for sessionID: String
+  ) {
+    lock.withLock {
+      if let error {
+        acpTranscriptErrorsBySessionID[sessionID] = error
+      } else {
+        acpTranscriptErrorsBySessionID.removeValue(forKey: sessionID)
+      }
+    }
+  }
+
   func configureAcpStartErrors(_ errors: [any Error]) {
     lock.withLock {
       queuedAcpStartErrors = errors

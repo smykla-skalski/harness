@@ -38,6 +38,10 @@ extension HarnessMonitorStore {
     selection.agentTimelinesById[agentID] ?? []
   }
 
+  public func acpTranscript(forAgent agentID: String) -> [TimelineEntry] {
+    acpTranscriptByAgentID[agentID] ?? []
+  }
+
   public var timelineWindow: TimelineWindowResponse? {
     get { selection.timelineWindow }
     set {

@@ -80,6 +80,70 @@ extension HarnessMonitorStoreSelectionFlowTests {
     await selectionTask.value
   }
 
+  @Test("Selecting a session hydrates ACP transcript history independently from the cockpit timeline")
+  func selectingSessionHydratesAcpTranscriptHistoryIndependently() async throws {
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-secondary-acp-transcript",
+        context: "ACP transcript hydration lane",
+        status: .active,
+        leaderId: "leader-acp-secondary",
+        observeId: "observe-acp-secondary",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 2
+      )
+    )
+    let detail = makeSessionDetail(
+      summary: summary,
+      workerID: "worker-acp-secondary",
+      workerName: "Worker ACP Secondary"
+    )
+    let cockpitTimeline = makeTimelineEntries(
+      sessionID: summary.sessionId,
+      agentID: "worker-acp-secondary",
+      summary: "Cockpit timeline row"
+    )
+    let transcriptEntry = TimelineEntry(
+      entryId: "acp-transcript-secondary",
+      recordedAt: "2026-04-28T00:00:20Z",
+      kind: "assistant_message",
+      sessionId: summary.sessionId,
+      agentId: "worker-acp-secondary",
+      taskId: nil,
+      summary: "Dedicated ACP transcript row",
+      payload: .object(["runtime": .string("acp")])
+    )
+    let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
+      summaries: [summary],
+      detailsByID: [summary.sessionId: detail],
+      timelinesBySessionID: [summary.sessionId: cockpitTimeline],
+      detail: detail
+    )
+    client.configureAcpTranscriptResponse(
+      AcpTranscriptResponse(entries: [transcriptEntry]),
+      for: summary.sessionId
+    )
+    client.configureAcpTranscriptDelay(.milliseconds(250), for: summary.sessionId)
+    let store = await makeBootstrappedStore(client: client)
+
+    await store.selectSession(summary.sessionId)
+    try await Task.sleep(for: .milliseconds(80))
+
+    #expect(store.timeline.map(\.summary) == ["Cockpit timeline row"])
+    #expect(store.acpTranscript(forAgent: "worker-acp-secondary").isEmpty)
+
+    try await Task.sleep(for: .milliseconds(260))
+
+    #expect(store.timeline.map(\.summary) == ["Cockpit timeline row"])
+    #expect(
+      store.acpTranscript(forAgent: "worker-acp-secondary").map(\.summary)
+        == ["Dedicated ACP transcript row"]
+    )
+    #expect(client.readCallCount(.acpTranscript(summary.sessionId)) == 1)
+  }
+
   @Test("Selecting a new session replaces subscribed session IDs")
   func selectingNewSessionReplacesSubscribedSessionIDs() async {
     let firstSummary = makeSession(

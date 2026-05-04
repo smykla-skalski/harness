@@ -1,15 +1,16 @@
 use axum::Router;
 use axum::routing::{delete, get, post};
 
-use crate::daemon::protocol::http_paths;
+use crate::daemon::protocol::{AcpTranscriptResponse, http_paths};
 use crate::errors::{CliError, CliErrorKind};
 use crate::feature_flags::acp_enabled_from_env;
 
-use super::DaemonHttpState;
+use super::{DaemonHttpState, require_async_db};
 
 mod acp_delete;
 mod acp_inspect;
 mod acp_start;
+mod acp_transcript;
 mod attach;
 mod lookup;
 mod mutations;
@@ -87,6 +88,10 @@ pub(super) fn managed_agent_routes() -> Router<DaemonHttpState> {
             http_paths::MANAGED_AGENTS_ACP_INSPECT,
             get(acp_inspect::get_acp_inspect),
         )
+        .route(
+            http_paths::MANAGED_AGENTS_ACP_TRANSCRIPT,
+            get(acp_transcript::get_acp_transcript),
+        )
 }
 
 // Cross-transport ACP policy lives here. HTTP and websocket wrappers still own
@@ -112,6 +117,14 @@ pub(crate) fn resolve_acp_inspect_session_scope<'a>(
         .into());
     }
     Ok(session_id.or(require_session_id))
+}
+
+pub(crate) async fn acp_transcript_response(
+    state: &DaemonHttpState,
+    session_id: &str,
+) -> Result<AcpTranscriptResponse, CliError> {
+    let async_db = require_async_db(state, "ACP transcript")?;
+    crate::daemon::service::session_acp_transcript_async(session_id, Some(async_db)).await
 }
 
 #[cfg(test)]

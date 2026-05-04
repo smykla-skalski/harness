@@ -4,12 +4,12 @@ use tokio::sync::broadcast;
 
 use crate::agents::acp::probe::probe_acp_agents_cached;
 use crate::daemon::http::{
-    AsyncDaemonDbSlot, DaemonHttpState, acp_inspect_response, ensure_acp_enabled,
-    managed_agent_list_response, managed_agent_snapshot, require_async_db,
+    AsyncDaemonDbSlot, DaemonHttpState, acp_inspect_response, acp_transcript_response,
+    ensure_acp_enabled, managed_agent_list_response, managed_agent_snapshot, require_async_db,
     resolve_acp_inspect_session_scope,
 };
 use crate::daemon::protocol::{
-    StreamEvent, TimelineWindowRequest, WsRequest, WsResponse, ws_methods,
+    AcpTranscriptResponse, StreamEvent, TimelineWindowRequest, WsRequest, WsResponse, ws_methods,
 };
 use crate::daemon::service;
 
@@ -85,6 +85,9 @@ async fn dispatch_session_read_query(
             Some(dispatch_managed_agent_detail_query(request, state))
         }
         ws_methods::MANAGED_AGENTS_ACP_INSPECT => Some(dispatch_acp_inspect_query(request, state)),
+        ws_methods::MANAGED_AGENTS_ACP_TRANSCRIPT => {
+            Some(dispatch_acp_transcript_query(request, state).await)
+        }
         _ => None,
     }
 }
@@ -234,6 +237,24 @@ fn dispatch_acp_inspect_query(request: &WsRequest, state: &DaemonHttpState) -> W
             acp_inspect_response(state, effective)
         }),
     )
+}
+
+async fn dispatch_acp_transcript_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    let session_id = extract_string_param(&request.params, "session_id");
+    let require_session_id = extract_string_param(&request.params, "require_session_id");
+    let effective_session_id = match resolve_acp_inspect_session_scope(
+        session_id.as_deref(),
+        require_session_id.as_deref(),
+    ) {
+        Ok(Some(session_id)) => session_id.to_string(),
+        Ok(None) => return error_response(&request.id, "MISSING_PARAM", "missing session_id"),
+        Err(error) => return dispatch_query_result::<AcpTranscriptResponse>(&request.id, Err(error)),
+    };
+    let result = match ensure_acp_enabled() {
+        Ok(()) => acp_transcript_response(state, &effective_session_id).await,
+        Err(error) => Err(error),
+    };
+    dispatch_query_result(&request.id, result)
 }
 
 async fn dispatch_health_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
