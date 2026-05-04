@@ -187,6 +187,16 @@ When debugging regressions, especially Harness Monitor macOS/UI work:
 7. Keep each iteration single-cause and targeted: one hypothesis, one instrumentation or code change, one narrow rerun. Do not bundle speculative fixes.
 8. Keep task state honest. Close or reset stale `in_progress` work when the scope shifts so the todo list reflects reality.
 
+## Working session efficiency
+
+Token-burn lessons from real sessions. Apply to every Harness Monitor crash or regression triage:
+
+1. **Read `MEMORY.md` first.** Scan the index for the symptom family (e.g. `DisplayLink`, `deinit`, `MainActor`, `dispatch_assert`) before spawning an Explore subagent or running broad `grep` / `git log -G` sweeps. Past entries often name the exact file, fix pattern, and follow-ups.
+2. **Match the crash artifact before reading it.** A `.ips` in `~/Library/Logs/DiagnosticReports/` is only relevant if its timestamp, signal, and faulting frame line up with the screenshot the user pasted. Reading an unrelated abort report wastes a full context window.
+3. **Don't spawn an Explore subagent for "what's wrong" questions.** Use it only for "where is X defined" or "list call sites of Y". For diagnosis, pull the file the user pointed at and trace from there.
+4. **Pick the deinit-isolation fix in this order on Swift 6.2 + macOS 26:** (a) `nonisolated(unsafe)` on the storage + thread-safe inline cleanup in deinit; (b) move the MainActor-only step into `dismantleNSView`. Do not try `isolated deinit` (SE-0371) first — the project does not enable that upcoming feature, and editor/format passes can revert the syntax silently.
+5. **Build with the right scheme when the working tree has parallel-agent Rust WIP.** The default `HarnessMonitor` scheme runs the `Build harness daemon (parallel)` script phase and fails on dirty Rust. For Swift-only verification, use `HarnessMonitor (External Daemon)` — it skips that phase. The `HarnessMonitor` scheme is required only when validating the shipping managed-daemon path.
+
 ## Grafana dashboards
 
 All dashboards in `resources/observability/grafana/dashboards/` use Grafana 12+ responsive auto-grid layout. When creating or modifying dashboards:
@@ -203,3 +213,4 @@ All dashboards in `resources/observability/grafana/dashboards/` use Grafana 12+ 
 - `guard-bash` denies direct use of `kubectl`, `kumactl`, `helm`, `docker`, `k3d` - all cluster access must go through harness commands (see `rules.rs:26`)
 - `VersionedJsonRepository` saves atomically via tmp-file rename - don't read state files by path while a save is in progress, use the repository's `load()` method
 - If using XcodeBuildMCP for `apps/harness-monitor-macos` work in a shared checkout, go through `mise run monitor:agent:*` or `apps/harness-monitor-macos/Scripts/agent-xcode-env.sh ...` instead of raw `xcodebuildmcp` / plain `monitor:*` wrappers so agent Xcode state stays isolated from the developer's local Xcode.
+- **Never wrap `deinit` cleanup in `MainActor.assumeIsolated { ... }`** on a `@MainActor` class (or `NSView` / `NSObject` subclass that's MainActor in the SDK overlay) under Swift 6 strict concurrency on macOS 26. ARC routinely drops the last reference on `com.apple.SwiftUI.DisplayLink` (notably during dashboard ↔ cockpit transitions or any SwiftUI view-tree rebuild), and `assumeIsolated` traps with `BUG IN CLIENT OF LIBDISPATCH: Block was expected to execute on queue [com.apple.main-thread]`. Confirmed crashes in `KeyWindowObserver.deinit`, `WindowCommandScopeTrackingNSView.deinit`, and an earlier `HarnessMonitorStore.deinit`. Required pattern: mark the storage `nonisolated(unsafe) var` so the nonisolated deinit can read it without the non-Sendable error, inline only thread-safe cleanup (`NotificationCenter.removeObserver(_:)` and `IOPMAssertionRelease` are documented thread-safe; treat `NSEvent.removeMonitor` as MainActor-only), and move any MainActor-only step (e.g. clearing routing state on a `@MainActor @Observable`) into the NSViewRepresentable's static `dismantleNSView(_:coordinator:)`, which SwiftUI guarantees runs on the MainActor when the representable is removed. Do not reach for `isolated deinit` (SE-0371) — the upcoming feature is not enabled in this project.
