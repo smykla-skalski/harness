@@ -148,7 +148,12 @@ public final class KeyWindowObserver {
         object: nil,
         queue: .main
       ) { [weak self] _ in
-        MainActor.assumeIsolated {
+        // Hop to MainActor explicitly. Even with `queue: .main` the
+        // notification block can fire off-main in edge cases on macOS 26
+        // (notably when the system delivers it synchronously during a
+        // tear-down on a worker thread), and `MainActor.assumeIsolated`
+        // would trap with a libdispatch BUG instead of recovering.
+        Task { @MainActor [weak self] in
           self?.refresh()
         }
       }

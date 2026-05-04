@@ -97,7 +97,11 @@ private final class WindowCommandScopeTrackingNSView: NSView {
         object: window,
         queue: .main
       ) { [weak self] _ in
-        MainActor.assumeIsolated {
+        // Hop explicitly. `MainActor.assumeIsolated` would trap if the
+        // block ever fires off-main, which has been observed on macOS 26
+        // when the system posts synchronously from a worker thread during
+        // window teardown.
+        Task { @MainActor [weak self] in
           self?.activate(window: window)
         }
       },
@@ -106,7 +110,7 @@ private final class WindowCommandScopeTrackingNSView: NSView {
         object: window,
         queue: .main
       ) { [weak self] _ in
-        MainActor.assumeIsolated {
+        Task { @MainActor [weak self] in
           self?.clear(window: window)
         }
       },

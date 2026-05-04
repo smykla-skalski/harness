@@ -43,8 +43,22 @@ final class WindowTrackingNSView: NSView {
   private let syncController: WindowRegistrySyncController
   private let elementSyncController: WindowElementRegistrySyncController
   private let clock = ContinuousClock()
-  private var observations: [NSObjectProtocol] = []
+  // nonisolated(unsafe) so the nonisolated deinit can read the array and
+  // remove observers without `MainActor.assumeIsolated`. Mutations all
+  // happen on the MainActor (`startTracking` / `stopTracking`); the deinit
+  // only reads after the last write.
+  private nonisolated(unsafe) var observations: [NSObjectProtocol] = []
   private var lastDidUpdateElementRefreshAt: ContinuousClock.Instant?
+
+  deinit {
+    // Thread-safe inline cleanup. ARC may release this NSView on any
+    // thread (notably com.apple.SwiftUI.DisplayLink) and
+    // `MainActor.assumeIsolated` would trap with a libdispatch BUG off-main.
+    // NotificationCenter.removeObserver is documented thread-safe;
+    // syncController/elementSyncController stop happens via
+    // `viewDidMoveToWindow(nil)` on the MainActor.
+    observations.forEach(NotificationCenter.default.removeObserver)
+  }
 
   init(registry: AccessibilityRegistry) {
     syncController = WindowRegistrySyncController(registry: registry)
@@ -91,7 +105,9 @@ final class WindowTrackingNSView: NSView {
         queue: .main
       ) { [weak self, weak window] notification in
         let isDidUpdate = notification.name == NSWindow.didUpdateNotification
-        MainActor.assumeIsolated {
+        // Hop explicitly: `MainActor.assumeIsolated` would trap if the
+        // block ever fires off-main on macOS 26.
+        Task { @MainActor [weak self, weak window] in
           guard let self, let window else { return }
           let includeElements = !isDidUpdate || self.shouldRefreshElementsOnDidUpdate()
           self.sync(

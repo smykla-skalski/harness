@@ -186,7 +186,14 @@ private final class TrackAccessibilityNSView: NSView {
   private var claimTask: Task<Void, Never>?
   private var publishTask: Task<Void, Never>?
   private var observedWindow: NSWindow?
-  private var windowObservers: [NSObjectProtocol] = []
+  // nonisolated(unsafe) so the nonisolated deinit can read it without the
+  // non-Sendable error. Mutations all happen on the MainActor (see
+  // `beginObserving`); the deinit only reads after the last write, so
+  // concurrent access is not possible. ARC may release this NSView on any
+  // thread (notably com.apple.SwiftUI.DisplayLink during cockpit / view
+  // tree transitions) and `MainActor.assumeIsolated` would trap with a
+  // libdispatch BUG off-main.
+  private nonisolated(unsafe) var windowObservers: [NSObjectProtocol] = []
   private var lastPublishedElement: RegistryElement?
 
   override init(frame frameRect: NSRect) {
@@ -201,9 +208,14 @@ private final class TrackAccessibilityNSView: NSView {
   }
 
   deinit {
-    MainActor.assumeIsolated {
-      tearDownWindowObservation()
-    }
+    // Thread-safe inline cleanup only. ARC may release this NSView on any
+    // thread (notably com.apple.SwiftUI.DisplayLink), so we cannot wrap
+    // cleanup in `MainActor.assumeIsolated` — that traps with a libdispatch
+    // BUG off-main. NotificationCenter.removeObserver is documented
+    // thread-safe; the registry-side unregister already happens via
+    // `dismantleNSView` (which SwiftUI runs on the MainActor) and via
+    // `viewDidMoveToWindow(nil)`, so there is no MainActor-only step left.
+    windowObservers.forEach(NotificationCenter.default.removeObserver)
   }
 
   func configure(
@@ -315,7 +327,9 @@ private final class TrackAccessibilityNSView: NSView {
         object: window,
         queue: .main
       ) { [weak self] _ in
-        MainActor.assumeIsolated {
+        // Hop explicitly: `MainActor.assumeIsolated` would trap if the
+        // block ever fires off-main on macOS 26.
+        Task { @MainActor [weak self] in
           self?.publishCurrentElement()
         }
       },
@@ -324,7 +338,9 @@ private final class TrackAccessibilityNSView: NSView {
         object: window,
         queue: .main
       ) { [weak self] _ in
-        MainActor.assumeIsolated {
+        // Hop explicitly: `MainActor.assumeIsolated` would trap if the
+        // block ever fires off-main on macOS 26.
+        Task { @MainActor [weak self] in
           self?.publishCurrentElement()
         }
       },
@@ -333,7 +349,9 @@ private final class TrackAccessibilityNSView: NSView {
         object: window,
         queue: .main
       ) { [weak self] _ in
-        MainActor.assumeIsolated {
+        // Hop explicitly: `MainActor.assumeIsolated` would trap if the
+        // block ever fires off-main on macOS 26.
+        Task { @MainActor [weak self] in
           self?.publishCurrentElement()
         }
       },
@@ -342,7 +360,9 @@ private final class TrackAccessibilityNSView: NSView {
         object: window,
         queue: .main
       ) { [weak self] _ in
-        MainActor.assumeIsolated {
+        // Hop explicitly: `MainActor.assumeIsolated` would trap if the
+        // block ever fires off-main on macOS 26.
+        Task { @MainActor [weak self] in
           self?.publishCurrentElement()
         }
       },
