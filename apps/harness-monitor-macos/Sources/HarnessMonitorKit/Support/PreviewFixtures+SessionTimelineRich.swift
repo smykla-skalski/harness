@@ -87,6 +87,91 @@ extension PreviewFixtures {
     ] + Array(pagedTimeline.prefix(12))
   }
 
+  public static var signalSquishTimeline: [TimelineEntry] {
+    [
+      sessionTimelineEntry(
+        .init(
+          id: "preview-liveness-1",
+          recordedAt: "2026-05-03T20:02:00Z",
+          kind: "liveness_synced",
+          agentID: "harness-app",
+          taskID: nil,
+          summary: "Liveness sync: 0 disconnected, 1 idled",
+          payload: .object(["status": .string("synced")])
+        )),
+      sessionTimelineEntry(
+        .init(
+          id: "preview-signal-ack-copilot-expired",
+          recordedAt: "2026-05-03T20:00:24Z",
+          kind: "signal_acknowledged",
+          agentID: "copilot-20260503203910393668000",
+          taskID: nil,
+          summary: "sig-20260503204520733172000 acknowledged by copilot-20260503203910393668000: Expired",
+          payload: .object(["result": .string("expired")])
+        )),
+      sessionTimelineEntry(
+        .init(
+          id: "preview-liveness-2",
+          recordedAt: "2026-05-03T19:56:36Z",
+          kind: "liveness_synced",
+          agentID: "harness-app",
+          taskID: nil,
+          summary: "Liveness sync: 0 disconnected, 1 idled",
+          payload: .object(["status": .string("synced")])
+        )),
+      sessionTimelineEntry(
+        .init(
+          id: "preview-signal-ack-gemini-expired-1",
+          recordedAt: "2026-05-03T19:55:00Z",
+          kind: "signal_acknowledged",
+          agentID: "gemini-20260503201702585333000",
+          taskID: nil,
+          summary: "sig-20260503203959657678000 acknowledged by gemini-20260503201702585333000: Expired",
+          payload: .object(["result": .string("expired")])
+        )),
+      sessionTimelineEntry(
+        .init(
+          id: "preview-signal-ack-gemini-expired-2",
+          recordedAt: "2026-05-03T19:54:59Z",
+          kind: "signal_acknowledged",
+          agentID: "gemini-20260503201702585333000",
+          taskID: nil,
+          summary: "sig-20260503203959723499000 acknowledged by gemini-20260503201702585333000: Expired",
+          payload: .object(["result": .string("expired")])
+        )),
+      sessionTimelineEntry(
+        .init(
+          id: "preview-liveness-3",
+          recordedAt: "2026-05-03T19:50:00Z",
+          kind: "liveness_synced",
+          agentID: "harness-app",
+          taskID: nil,
+          summary: "Liveness sync: 1 disconnected, 0 idled",
+          payload: .object(["status": .string("synced")])
+        )),
+      sessionTimelineEntry(
+        .init(
+          id: "preview-signal-sent-copilot",
+          recordedAt: "2026-05-03T19:40:26Z",
+          kind: "signal_sent",
+          agentID: "harness-app",
+          taskID: nil,
+          summary: "sig-20260503204520733172000 sent to copilot-20260503203910393668000: request_action",
+          payload: .object(["command": .string("request_action")])
+        )),
+      sessionTimelineEntry(
+        .init(
+          id: "preview-liveness-4",
+          recordedAt: "2026-05-03T19:40:20Z",
+          kind: "liveness_synced",
+          agentID: "harness-app",
+          taskID: nil,
+          summary: "Liveness sync: 0 disconnected, 1 idled",
+          payload: .object(["status": .string("synced")])
+        )),
+    ]
+  }
+
   public static var richSessionTimelineDecisions: [Decision] {
     [
       sessionTimelineDecision(
@@ -130,6 +215,26 @@ extension PreviewFixtures {
     return TimelineWindowResponse(
       revision: 7,
       totalCount: 48,
+      windowStart: 0,
+      windowEnd: entries.count,
+      hasOlder: true,
+      hasNewer: false,
+      oldestCursor: entries.last.map {
+        TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
+      },
+      newestCursor: entries.first.map {
+        TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
+      },
+      entries: nil,
+      unchanged: false
+    )
+  }
+
+  public static var signalSquishTimelineWindow: TimelineWindowResponse {
+    let entries = signalSquishTimeline
+    return TimelineWindowResponse(
+      revision: 9,
+      totalCount: 95,
       windowStart: 0,
       windowEnd: entries.count,
       hasOlder: true,

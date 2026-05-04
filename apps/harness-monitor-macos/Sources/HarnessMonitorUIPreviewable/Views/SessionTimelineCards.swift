@@ -106,9 +106,15 @@ private struct SessionTimelineNodeRow: View {
   }
 
   private var cardContent: some View {
-    ViewThatFits(in: .horizontal) {
-      wideContent
-      compactContent
+    Group {
+      if SessionTimelineTableMetrics.prefersCompactLayout(for: row) {
+        compactContent
+      } else {
+        ViewThatFits(in: .horizontal) {
+          wideContent
+          compactContent
+        }
+      }
     }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(row.accessibilityLabel)

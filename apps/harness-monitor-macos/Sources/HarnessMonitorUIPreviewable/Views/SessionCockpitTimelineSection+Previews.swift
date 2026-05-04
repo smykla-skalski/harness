@@ -14,6 +14,23 @@ extension SessionCockpitTimelineSection {
     .padding()
     .frame(width: 960)
   }
+
+  static var signalSquishPreview: some View {
+    SessionCockpitTimelineSection(
+      sessionID: PreviewFixtures.summary.sessionId,
+      timeline: PreviewFixtures.signalSquishTimeline,
+      timelineWindow: PreviewFixtures.signalSquishTimelineWindow,
+      decisions: [],
+      isTimelineLoading: false,
+      store: HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded)
+    )
+    .padding()
+    .frame(width: 960)
+  }
+}
+
+#Preview("Timeline Signal Squish") {
+  SessionCockpitTimelineSection.signalSquishPreview
 }
 
 #Preview("Timeline Cursor") {

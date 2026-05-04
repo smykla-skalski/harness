@@ -72,6 +72,11 @@ extension SessionTimelineTableView {
       guard let tableView else {
         return
       }
+      scrollView.layoutSubtreeIfNeeded()
+      let resolvedColumnWidth = SessionTimelineTableMetrics.resolvedColumnWidth(
+        proposedWidth: columnWidth,
+        visibleContentWidth: scrollView.contentSize.width
+      )
       self.actionHandler = actionHandler
       let previousAnchor = currentVisibleAnchor()
       let nextSnapshot = SessionTimelineTableSnapshot(rows: rows)
@@ -83,17 +88,18 @@ extension SessionTimelineTableView {
           rowHeightCache[rowID] = tableView.rect(ofRow: rowIndex).height
         }
 
-        // Pre-measure at the SwiftUI-provided column width (from GeometryReader).
-        // This is always valid — GeometryReader gives the real layout width before
-        // updateNSView runs, unlike scrollView.contentView.bounds which is zero
-        // until AppKit completes its first layout pass.
-        if columnWidth > 1 {
-          lastPreMeasuredWidth = columnWidth
+        // Measure with the scroll view's clip width, not the outer SwiftUI width.
+        // The always-visible vertical scroller shrinks the real proposal enough to
+        // flip ViewThatFits into compact mode for long signal rows; if measurement
+        // uses the larger width, AppKit caches a short row that clips the source
+        // label and detail once rendered.
+        if resolvedColumnWidth > 1 {
+          lastPreMeasuredWidth = resolvedColumnWidth
           autoreleasepool {
             for row in rows where rowHeightCache[row.id] == nil {
               rowHeightCache[row.id] = SessionTimelineTableCellView.measuredHeight(
                 for: row,
-                columnWidth: columnWidth
+                columnWidth: resolvedColumnWidth
               )
             }
           }
@@ -109,7 +115,7 @@ extension SessionTimelineTableView {
         tableView.reloadData()
         tableView.layoutSubtreeIfNeeded()
       }
-      resizeColumn(in: scrollView, columnWidth: columnWidth)
+      resizeColumn(in: scrollView, columnWidth: resolvedColumnWidth)
 
       if scrollCommand != lastScrollCommand {
         pendingScrollCommand = scrollCommand
