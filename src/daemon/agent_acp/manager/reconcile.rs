@@ -40,6 +40,7 @@ impl AcpAgentManagerHandle {
         Ok(AcpAgentReconcileResponse {
             inspect: AcpAgentInspectResponse {
                 agents: inspect_agents,
+                daemon_perceived_now: Some(crate::workspace::utc_now()),
                 available: true,
                 issue_message: None,
             },

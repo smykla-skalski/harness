@@ -162,6 +162,33 @@ extension HarnessMonitorStoreUpdateStreamTests {
     #expect(store.acpRuntimeClockTask == nil)
   }
 
+  @Test("ACP runtime clock uses daemon heartbeat when inspect responses carry one")
+  func acpRuntimeClockUsesDaemonHeartbeatWhenAvailable() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-clock"
+
+    store.replaceAcpInspect(
+      AcpAgentInspectResponse(
+        agents: [
+          makeAcpInspectSnapshot(
+            acpID: "acp-1",
+            sessionID: "sess-acp-clock",
+            agentID: "worker",
+            displayName: "Worker",
+            promptDeadlineRemainingMs: 5_000
+          )
+        ],
+        daemonPerceivedNow: "1970-01-01T00:03:20Z"
+      ),
+      sessionID: "sess-acp-clock",
+      sampledAt: Date(timeIntervalSince1970: 100)
+    )
+
+    #expect(store.selectedAcpInspectObservedAt == Date(timeIntervalSince1970: 200))
+    #expect(store.currentAcpRuntimeClockNow(at: Date(timeIntervalSince1970: 120))
+      == Date(timeIntervalSince1970: 220))
+  }
+
   @Test("ACP reconcile can hydrate inspect telemetry inline")
   func acpReconcileHydratesInlineInspectTelemetry() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())

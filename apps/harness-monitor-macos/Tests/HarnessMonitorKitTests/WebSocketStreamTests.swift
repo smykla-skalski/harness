@@ -30,7 +30,7 @@ extension WebSocketTransport {
   }
 }
 
-@Suite("WebSocket stream handling")
+@Suite("WebSocket stream handling", .serialized)
 struct WebSocketStreamTests {
   private static let testEndpoint: URL = {
     guard let url = URL(string: "http://127.0.0.1:8080") else {
@@ -40,13 +40,15 @@ struct WebSocketStreamTests {
   }()
 
   private func makeTransport(
-    endpoint: URL = Self.testEndpoint
+    endpoint: URL = Self.testEndpoint,
+    session: URLSession? = nil
   ) -> WebSocketTransport {
     WebSocketTransport(
       connection: HarnessMonitorConnection(
         endpoint: endpoint,
         token: "test-token"
-      )
+      ),
+      session: session ?? .shared
     )
   }
 
@@ -118,6 +120,44 @@ struct WebSocketStreamTests {
     } else {
       Issue.record("expected unknown session push event after malformed frame")
     }
+  }
+
+  @Test("Malformed push frames post daemon telemetry")
+  func malformedPushFramesPostDaemonTelemetry() async throws {
+    WebSocketTelemetryURLProtocol.reset()
+    WebSocketTelemetryURLProtocol.configure(
+      path: "/v1/daemon/telemetry",
+      status: 200,
+      body: #"{"recorded_at":"2026-05-04T15:00:00Z"}"#
+    )
+
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [WebSocketTelemetryURLProtocol.self]
+    let session = URLSession(configuration: configuration)
+    let transport = makeTransport(session: session)
+
+    let malformedFrame = WsFrame(
+      id: nil,
+      result: nil,
+      error: nil,
+      batchIndex: nil,
+      batchCount: nil,
+      event: "session_updated",
+      recordedAt: "2026-04-13T17:30:00Z",
+      sessionId: nil,
+      payload: .object([:]),
+      seq: 1,
+      chunkId: nil,
+      chunkIndex: nil,
+      chunkCount: nil,
+      chunkBase64: nil
+    )
+    try await transport.handleFrame(malformedFrame)
+
+    let telemetryBody = try await awaitWebSocketTelemetryBody()
+    #expect(telemetryBody.contains(#""kind":"decode_failure""#))
+    #expect(telemetryBody.contains(#""source":"swift.websocket.push""#))
+    #expect(telemetryBody.contains("session_updated"))
   }
 
   @Test("Reconnect ready events reach active global and session streams")
@@ -274,6 +314,102 @@ struct WebSocketStreamTests {
   private func isoTimestamp(_ secondOffset: Int) -> String {
     String(format: "2026-04-28T00:00:%02dZ", secondOffset % 60)
   }
+}
+
+private final class WebSocketTelemetryURLProtocol: URLProtocol, @unchecked Sendable {
+  private static let lock = NSLock()
+  nonisolated(unsafe) private static var responseByPath: [String: (status: Int, body: String)] = [:]
+  nonisolated(unsafe) private static var telemetryBody: String?
+
+  static var lastTelemetryBody: String? { lock.withLock { telemetryBody } }
+
+  static func reset() {
+    lock.withLock {
+      responseByPath = [:]
+      telemetryBody = nil
+    }
+  }
+
+  static func configure(path: String, status: Int, body: String) {
+    lock.withLock {
+      responseByPath[path] = (status, body)
+    }
+  }
+
+  override static func canInit(with request: URLRequest) -> Bool { true }
+  override static func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+  override func startLoading() {
+    guard let url = request.url else {
+      client?.urlProtocol(self, didFailWithError: URLError(.badURL))
+      return
+    }
+
+    let responsePlan = Self.lock.withLock { () -> (status: Int, body: String) in
+      if url.path == "/v1/daemon/telemetry" {
+        Self.telemetryBody = requestBodyString(from: request)
+      }
+      return Self.responseByPath[url.path] ?? (404, #"{"error":"not-found"}"#)
+    }
+
+    guard
+      let response = HTTPURLResponse(
+        url: url,
+        statusCode: responsePlan.status,
+        httpVersion: nil,
+        headerFields: ["Content-Type": "application/json"]
+      )
+    else {
+      client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
+      return
+    }
+
+    client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+    client?.urlProtocol(self, didLoad: Data(responsePlan.body.utf8))
+    client?.urlProtocolDidFinishLoading(self)
+  }
+
+  override func stopLoading() {}
+}
+
+private func requestBodyString(from request: URLRequest) -> String? {
+  if let body = request.httpBody {
+    return String(data: body, encoding: .utf8)
+  }
+  guard let stream = request.httpBodyStream else {
+    return nil
+  }
+
+  stream.open()
+  defer { stream.close() }
+
+  var data = Data()
+  var buffer = [UInt8](repeating: 0, count: 4_096)
+  while stream.hasBytesAvailable {
+    let count = stream.read(&buffer, maxLength: buffer.count)
+    if count <= 0 {
+      break
+    }
+    data.append(buffer, count: count)
+  }
+
+  return data.isEmpty ? nil : String(data: data, encoding: .utf8)
+}
+
+private struct AwaitWebSocketTelemetryTimeoutError: Error {}
+
+private func awaitWebSocketTelemetryBody() async throws -> String {
+  let clock = ContinuousClock()
+  let deadline = clock.now + .seconds(1)
+
+  while clock.now < deadline {
+    if let body = WebSocketTelemetryURLProtocol.lastTelemetryBody {
+      return body
+    }
+    try await Task.sleep(for: .milliseconds(10))
+  }
+
+  throw AwaitWebSocketTelemetryTimeoutError()
 }
 
 @Suite("PendingRequestStore behavior")

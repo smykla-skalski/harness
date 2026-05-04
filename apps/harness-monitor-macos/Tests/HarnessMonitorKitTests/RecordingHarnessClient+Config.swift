@@ -351,6 +351,10 @@ extension RecordingHarnessClient {
     }
   }
 
+  func configureAcpInspectError(_ error: (any Error)?) {
+    lock.withLock { acpInspectError = error }
+  }
+
   func configureAcpStartErrors(_ errors: [any Error]) {
     lock.withLock {
       queuedAcpStartErrors = errors
@@ -396,6 +400,10 @@ extension RecordingHarnessClient {
       queuedAcpStartErrors.removeFirst()
       return error
     }
+  }
+
+  func configuredAcpInspectError() -> (any Error)? {
+    lock.withLock { acpInspectError }
   }
 
   func configuredHostBridgeReconfigureError() -> (any Error)? {

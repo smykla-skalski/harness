@@ -65,6 +65,15 @@ extension HarnessMonitorStore {
         return false
       }
       if let apiError = error as? HarnessMonitorAPIError,
+        apiError.acpServiceError != nil
+      {
+        clearHostBridgeIssue(for: "acp")
+        HarnessMonitorLogger.store.info(
+          "managed ACP refresh unavailable: \(apiError.localizedDescription, privacy: .public)"
+        )
+        return false
+      }
+      if let apiError = error as? HarnessMonitorAPIError,
         case .server(let code, _) = apiError,
         code == 501 || code == 503
       {
@@ -156,6 +165,12 @@ extension HarnessMonitorStore {
     } catch {
       guard selectedSessionID == sessionID else {
         return .ignored
+      }
+      if let apiError = error as? HarnessMonitorAPIError,
+        apiError.acpServiceError != nil
+      {
+        clearHostBridgeIssue(for: "acp")
+        return .unavailable(apiError.localizedDescription)
       }
       if let apiError = error as? HarnessMonitorAPIError,
         case .server(let code, _) = apiError,

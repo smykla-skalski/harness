@@ -211,6 +211,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var codexRunsDelaysBySessionID: [String: Duration] = [:]
   var resolvedAcpSnapshotsByAgentID: [String: AcpAgentSnapshot] = [:]
   var acpInspectResponsesBySessionID: [String: [AcpAgentInspectResponse]] = [:]
+  var acpInspectError: (any Error)?
   var agentTuisBySessionID: [String: [AgentTuiSnapshot]] = [:]
   var agentTuisDelaysBySessionID: [String: Duration] = [:]
   var agentTuiInputErrorsByID: [String: any Error] = [:]

@@ -41,13 +41,20 @@ public struct AcpRuntimeIdentity: Equatable, Hashable, Identifiable, Sendable {
 public struct AcpInspectSample: Equatable, Sendable {
   public let sessionID: String
   public let sampledAt: Date
+  public let receivedAt: Date
 
   private let orderedIdentities: [AcpRuntimeIdentity]
   private let snapshotsByIdentity: [AcpRuntimeIdentity: AcpAgentInspectSnapshot]
 
-  public init(sessionID: String, sampledAt: Date, agents: [AcpAgentInspectSnapshot]) {
+  public init(
+    sessionID: String,
+    sampledAt: Date,
+    receivedAt: Date? = nil,
+    agents: [AcpAgentInspectSnapshot]
+  ) {
     self.sessionID = sessionID
     self.sampledAt = sampledAt
+    self.receivedAt = receivedAt ?? sampledAt
 
     var orderedIdentities: [AcpRuntimeIdentity] = []
     var snapshotsByIdentity: [AcpRuntimeIdentity: AcpAgentInspectSnapshot] = [:]
@@ -83,6 +90,7 @@ public struct AcpInspectSample: Equatable, Sendable {
     Self(
       sessionID: sessionID,
       sampledAt: sampledAt,
+      receivedAt: receivedAt,
       agents: orderedIdentities.compactMap { identity in
         guard identities.contains(identity) else {
           return nil
@@ -96,6 +104,7 @@ public struct AcpInspectSample: Equatable, Sendable {
     Self(
       sessionID: sessionID,
       sampledAt: sampledAt,
+      receivedAt: receivedAt,
       agents: orderedIdentities.compactMap { identity in
         guard shouldRemove(identity) == false else {
           return nil

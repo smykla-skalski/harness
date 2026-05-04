@@ -116,9 +116,11 @@ extension HarnessMonitorStore {
       return
     }
     noteAcpSessionActivity(sessionID: sessionID, at: sampledAt)
+    let daemonObservedAt = response.daemonPerceivedNowDate ?? sampledAt
     let nextSample = AcpInspectSample(
       sessionID: sessionID,
-      sampledAt: sampledAt,
+      sampledAt: daemonObservedAt,
+      receivedAt: sampledAt,
       agents: sortedAcpInspectSnapshots(
         response.agents.filter { $0.sessionId == sessionID }
       )

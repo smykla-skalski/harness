@@ -14,6 +14,9 @@ extension RecordingHarnessClient {
 
   func acpInspect(sessionID: String?) async throws -> AcpAgentInspectResponse {
     recordAcpInspectCall(for: sessionID)
+    if let error = configuredAcpInspectError() {
+      throw error
+    }
     if let response = dequeueConfiguredAcpInspectResponse(for: sessionID) {
       return response
     }

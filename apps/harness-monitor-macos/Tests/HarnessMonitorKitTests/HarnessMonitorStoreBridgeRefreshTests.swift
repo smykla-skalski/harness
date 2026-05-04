@@ -317,4 +317,52 @@ struct HarnessMonitorStoreBridgeRefreshTests {
     #expect(store.codexUnavailable == false)
     #expect(store.hostBridgeCapabilityIssues.isEmpty)
   }
+
+  @Test("ACP bridge doctor surfaces ACP disabled errors without stale bridge banners")
+  func acpBridgeDoctorSurfacesAcpDisabledErrorsWithoutStaleBridgeBanners() async {
+    let client = RecordingHarnessClient()
+    client.configureAcpInspectError(
+      HarnessMonitorAPIError.server(
+        code: 503,
+        message: #"{"error":{"code":"ACP_DISABLED","message":"ACP disabled by feature flag","details":[]}}"#
+      )
+    )
+    let store = await makeBootstrappedStore(client: client)
+    store.toast.dismissAll()
+    store.selectedSessionID = PreviewFixtures.summary.sessionId
+    store.hostBridgeCapabilityIssues["acp"] = .unavailable
+    store.daemonStatus = makeSandboxedStatus(hostBridge: HostBridgeManifest())
+
+    await store.runAcpBridgeDoctor()
+
+    #expect(store.hostBridgeCapabilityIssues["acp"] == nil)
+    #expect(
+      store.currentFailureFeedbackMessage
+        == "ACP isn't available in this daemon session. Enable ACP and try again."
+    )
+  }
+
+  @Test("ACP bridge doctor surfaces session-scope errors without stale bridge banners")
+  func acpBridgeDoctorSurfacesSessionScopeErrorsWithoutStaleBridgeBanners() async {
+    let client = RecordingHarnessClient()
+    client.configureAcpInspectError(
+      HarnessMonitorAPIError.server(
+        code: 403,
+        message: #"{"error":{"code":"SESSION_SCOPE_DENIED","message":"session scope denied","details":[]}}"#
+      )
+    )
+    let store = await makeBootstrappedStore(client: client)
+    store.toast.dismissAll()
+    store.selectedSessionID = PreviewFixtures.summary.sessionId
+    store.hostBridgeCapabilityIssues["acp"] = .unavailable
+    store.daemonStatus = makeSandboxedStatus(hostBridge: HostBridgeManifest())
+
+    await store.runAcpBridgeDoctor()
+
+    #expect(store.hostBridgeCapabilityIssues["acp"] == nil)
+    #expect(
+      store.currentFailureFeedbackMessage
+        == "ACP access is limited to the active session. Switch to the matching session and try again."
+    )
+  }
 }

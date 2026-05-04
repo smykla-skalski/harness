@@ -303,6 +303,7 @@ fn log_empty_inspect_with_error(error: &CliError, message: &str) -> AcpAgentInsp
     tracing::warn!(%error, "{message}");
     AcpAgentInspectResponse {
         agents: Vec::new(),
+        daemon_perceived_now: Some(crate::workspace::utc_now()),
         available: false,
         issue_message: Some(message.to_string()),
     }
@@ -319,6 +320,7 @@ fn inspect_for_session(
             .filter(|agent| agent.session_id == session_id)
             .cloned()
             .collect(),
+        daemon_perceived_now: inspect.daemon_perceived_now.clone(),
         available: inspect.available,
         issue_message: inspect.issue_message.clone(),
     }

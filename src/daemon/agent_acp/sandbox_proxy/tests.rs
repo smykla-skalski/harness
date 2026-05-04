@@ -183,6 +183,7 @@ fn reconcile_sessions_uses_known_and_inspect_sets() {
             terminal_count: 0,
             prompt_deadline_remaining_ms: 0,
         }],
+        daemon_perceived_now: None,
         available: true,
         issue_message: None,
     };
@@ -199,6 +200,7 @@ fn distinct_process_keys_for_session_dedupes_and_sorts_keys() {
             inspect_snapshot("sess-1", "pk-a"),
             inspect_snapshot("sess-2", "pk-z"),
         ],
+        daemon_perceived_now: None,
         available: true,
         issue_message: None,
     };
@@ -218,6 +220,7 @@ fn count_live_bridge_snapshots_uses_agent_status_not_watchdog_state() {
     disconnected_inspect.watchdog_state = "active".to_string();
     let inspect = AcpAgentInspectResponse {
         agents: vec![idle_inspect, disconnected_inspect],
+        daemon_perceived_now: None,
         available: true,
         issue_message: None,
     };
@@ -242,6 +245,7 @@ fn count_live_bridge_snapshots_fails_closed_on_snapshot_errors() {
     inspect_snapshot.acp_id = "acp-a".to_string();
     let inspect = AcpAgentInspectResponse {
         agents: vec![inspect_snapshot],
+        daemon_perceived_now: None,
         available: true,
         issue_message: None,
     };
@@ -267,6 +271,7 @@ fn sandbox_proxy_reconcile_batch_replays_full_snapshot_in_one_pass() {
                     inspect_snapshot("sess-live", "pk-live"),
                     inspect_snapshot("sess-other", "pk-other"),
                 ],
+                daemon_perceived_now: None,
                 available: true,
                 issue_message: None,
             },

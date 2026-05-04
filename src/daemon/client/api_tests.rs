@@ -313,6 +313,7 @@ fn runtime_probe_results_gets_probe_endpoint() {
 #[test]
 fn acp_inspect_gets_optional_session_filter() {
     let body = json!({
+        "daemon_perceived_now": "2026-04-28T00:00:05Z",
         "agents": [{
             "acp_id": "agent-acp-1",
             "session_id": "sess-1",
@@ -337,6 +338,10 @@ fn acp_inspect_gets_optional_session_filter() {
         .inspect_acp_managed_agents(Some("sess-1"))
         .expect("acp inspect");
     assert_eq!(response.agents[0].acp_id, "agent-acp-1");
+    assert_eq!(
+        response.daemon_perceived_now.as_deref(),
+        Some("2026-04-28T00:00:05Z")
+    );
     handle.join().expect("server thread");
     assert_eq!(
         captured.lock().expect("captured").path,

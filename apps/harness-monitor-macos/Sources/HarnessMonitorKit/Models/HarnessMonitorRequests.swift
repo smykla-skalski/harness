@@ -273,6 +273,37 @@ public struct HostBridgeReconfigureRequest: Codable, Equatable, Sendable {
   }
 }
 
+public enum DaemonTelemetryKind: String, Codable, Equatable, Sendable {
+  case decodeFailure = "decode_failure"
+}
+
+public struct DaemonTelemetryRequest: Codable, Equatable, Sendable {
+  public let kind: DaemonTelemetryKind
+  public let source: String
+  public let message: String
+  public let sample: String?
+
+  public init(
+    kind: DaemonTelemetryKind,
+    source: String,
+    message: String,
+    sample: String? = nil
+  ) {
+    self.kind = kind
+    self.source = source
+    self.message = message
+    self.sample = sample
+  }
+}
+
+public struct DaemonTelemetryResponse: Codable, Equatable, Sendable {
+  public let recordedAt: String
+
+  public init(recordedAt: String) {
+    self.recordedAt = recordedAt
+  }
+}
+
 public struct ErrorEnvelope: Codable, Equatable, Sendable {
   public struct ErrorDetail: Codable, Equatable, Sendable {
     public let code: String
@@ -281,4 +312,25 @@ public struct ErrorEnvelope: Codable, Equatable, Sendable {
   }
 
   public let error: ErrorDetail
+}
+
+enum DaemonTelemetrySupport {
+  static let path = "/v1/daemon/telemetry"
+  static let requestTimeoutInterval: TimeInterval = 1
+  private static let maxSampleLength = 512
+
+  static func truncatedSample(_ raw: String?) -> String? {
+    guard let raw else {
+      return nil
+    }
+    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard trimmed.isEmpty == false else {
+      return nil
+    }
+    return String(trimmed.prefix(maxSampleLength))
+  }
+
+  static func truncatedSample(_ data: Data) -> String? {
+    truncatedSample(String(data: data, encoding: .utf8))
+  }
 }

@@ -10,6 +10,11 @@ public struct HarnessMonitorConnection: Equatable, Sendable {
   }
 }
 
+public enum AcpServiceError: String, Equatable, Sendable {
+  case disabled = "ACP_DISABLED"
+  case sessionScopeDenied = "SESSION_SCOPE_DENIED"
+}
+
 public enum HarnessMonitorAPIError: Error, LocalizedError, Equatable {
   case invalidEndpoint(String)
   case invalidResponse
@@ -52,7 +57,18 @@ public enum HarnessMonitorAPIError: Error, LocalizedError, Equatable {
     return Self.parsedServerEnvelope(from: message)?.error.code
   }
 
+  public var acpServiceError: AcpServiceError? {
+    guard let code = serverSemanticCode else {
+      return nil
+    }
+    return AcpServiceError(rawValue: code)
+  }
+
   private static func userFacingServerErrorDescription(code: Int, message: String) -> String {
+    if let acpServiceError = acpServiceError(from: message) {
+      return localizedDescription(for: acpServiceError)
+    }
+
     if let flatEnvelope = parsedFlatServerEnvelope(from: message),
       flatEnvelope.error == "sandbox-disabled"
     {
@@ -81,6 +97,15 @@ public enum HarnessMonitorAPIError: Error, LocalizedError, Equatable {
     }
   }
 
+  private static func localizedDescription(for acpServiceError: AcpServiceError) -> String {
+    switch acpServiceError {
+    case .disabled:
+      "ACP isn't available in this daemon session. Enable ACP and try again."
+    case .sessionScopeDenied:
+      "ACP access is limited to the active session. Switch to the matching session and try again."
+    }
+  }
+
   private static func normalizedServerMessage(from message: String) -> String {
     guard let envelope = parsedServerEnvelope(from: message) else {
       return message
@@ -98,6 +123,13 @@ public enum HarnessMonitorAPIError: Error, LocalizedError, Equatable {
       return nil
     }
     return try? JSONDecoder().decode(ParsedServerEnvelope.self, from: data)
+  }
+
+  private static func acpServiceError(from message: String) -> AcpServiceError? {
+    guard let code = parsedServerEnvelope(from: message)?.error.code else {
+      return nil
+    }
+    return AcpServiceError(rawValue: code)
   }
 
   private static func parsedFlatServerEnvelope(from message: String) -> ParsedFlatServerEnvelope? {
