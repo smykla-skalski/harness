@@ -95,6 +95,22 @@ extension SessionTimelineTableView.Coordinator {
     )
   }
 
+  func isPinnedToLatestViewport() -> Bool {
+    guard let tableView, let scrollView else {
+      return false
+    }
+    let visibleRect = scrollView.contentView.bounds
+    guard visibleRect.height > 0, visibleRect.width > 0 else {
+      return false
+    }
+    let visibleRows = tableView.rows(in: visibleRect)
+    let firstVisibleRowIndex = visibleRows.location == NSNotFound ? nil : visibleRows.location
+    return SessionTimelineTableMetrics.shouldStickToLatestOnRowsChange(
+      visibleMinY: visibleRect.minY,
+      firstVisibleRowIndex: firstVisibleRowIndex
+    )
+  }
+
   func publishViewportState() {
     guard let tableView, let scrollView else {
       return

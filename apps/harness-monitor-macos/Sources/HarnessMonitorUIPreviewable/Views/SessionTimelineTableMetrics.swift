@@ -45,6 +45,16 @@ enum SessionTimelineTableMetrics {
     return HarnessMonitorTheme.itemSpacing
   }
 
+  static func shouldStickToLatestOnRowsChange(
+    visibleMinY: CGFloat,
+    firstVisibleRowIndex: Int?
+  ) -> Bool {
+    guard let firstVisibleRowIndex else {
+      return false
+    }
+    return firstVisibleRowIndex == 0 && visibleMinY <= 1
+  }
+
   static func usesSimpleWideLayout(for row: SessionTimelineRow) -> Bool {
     !prefersCompactLayout(for: row)
       && row.node.detail == nil

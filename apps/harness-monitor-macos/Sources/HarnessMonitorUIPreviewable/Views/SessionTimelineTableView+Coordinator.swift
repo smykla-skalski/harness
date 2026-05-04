@@ -94,7 +94,8 @@ extension SessionTimelineTableView {
       self.actionHandler = actionHandler
       let fontScaleChanged = abs(self.fontScale - fontScale) > 0.001
       self.fontScale = fontScale
-      let previousAnchor = currentVisibleAnchor()
+      let wasPinnedToLatest = isPinnedToLatestViewport()
+      let previousAnchor = wasPinnedToLatest ? nil : currentVisibleAnchor()
       let nextSnapshot = SessionTimelineTableSnapshot(rows: rows)
       let rowsChanged = rowSnapshot != nextSnapshot || fontScaleChanged
       if rowsChanged {
@@ -164,8 +165,14 @@ extension SessionTimelineTableView {
         pendingScrollCommand = scrollCommand
         lastScrollCommand = scrollCommand
       }
-      if !performPendingScrollCommand() && rowsChanged {
-        restore(anchor: previousAnchor)
+      let didPerformScrollCommand = performPendingScrollCommand()
+      let hasUnfulfilledScrollCommand = pendingScrollCommand != nil
+      if !didPerformScrollCommand && rowsChanged {
+        if wasPinnedToLatest && !hasUnfulfilledScrollCommand {
+          boundsDidChange()
+        } else {
+          restore(anchor: previousAnchor)
+        }
       }
     }
 
