@@ -51,6 +51,7 @@ mod async_observe;
 mod async_reads;
 mod async_signal_mutations;
 mod async_stream;
+mod decode_failure_telemetry;
 mod session_archive_tests;
 mod shutdown;
 mod task_review;

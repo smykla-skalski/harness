@@ -121,7 +121,7 @@ fn db_round_trip_smoke_covers_public_surface() {
         Some("cached")
     );
 
-    db.append_daemon_event("info", "smoke event")
+    db.append_daemon_event("2026-05-04T15:00:00Z", "info", "smoke event")
         .expect("append daemon event");
     let daemon_events = db.load_recent_daemon_events(5).expect("load daemon events");
     assert_eq!(daemon_events.len(), 1);

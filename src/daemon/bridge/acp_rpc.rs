@@ -51,6 +51,7 @@ pub(super) struct BridgeAcpEventsRequest {
 pub(crate) struct BridgeAcpEventsResponse {
     pub(crate) bridge_epoch: String,
     pub(crate) continuity: u64,
+    pub(crate) daemon_perceived_now: String,
     pub(crate) next_seq: u64,
     pub(crate) truncated: bool,
     pub(crate) requires_resync: bool,

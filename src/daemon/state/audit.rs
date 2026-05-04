@@ -44,13 +44,20 @@ pub fn ensure_auth_token() -> Result<String, CliError> {
 /// # Errors
 /// Returns `CliError` on filesystem failures.
 pub fn append_event(level: &str, message: &str) -> Result<(), CliError> {
-    ensure_daemon_dirs()?;
-    let path = events_path();
-    let event = DaemonAuditEvent {
+    append_event_entry(&DaemonAuditEvent {
         recorded_at: utc_now(),
         level: level.to_string(),
         message: message.to_string(),
-    };
+    })
+}
+
+/// Append a prebuilt daemon-owned audit event.
+///
+/// # Errors
+/// Returns `CliError` on filesystem failures.
+pub fn append_event_entry(event: &DaemonAuditEvent) -> Result<(), CliError> {
+    ensure_daemon_dirs()?;
+    let path = events_path();
     let line = serde_json::to_string(&event).map_err(|error| {
         CliError::from(CliErrorKind::workflow_serialize(format!(
             "serialize daemon audit event: {error}"

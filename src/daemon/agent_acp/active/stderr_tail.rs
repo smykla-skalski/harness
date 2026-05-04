@@ -4,6 +4,8 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Instant;
 
+use crate::run::audit::scrub;
+
 use super::{STDERR_READER_JOIN_GRACE, STDERR_READER_JOIN_POLL, STDERR_TAIL_LIMIT, recover_lock};
 
 #[derive(Clone, Default)]
@@ -37,7 +39,7 @@ impl SharedStderrTail {
         }
     }
 
-    fn append(&self, bytes: &[u8]) {
+    pub(super) fn append(&self, bytes: &[u8]) {
         let mut tail = recover_lock(&self.bytes, "stderr tail lock");
         tail.extend_from_slice(bytes);
         if tail.len() > STDERR_TAIL_LIMIT {
@@ -51,7 +53,7 @@ impl SharedStderrTail {
         if tail.is_empty() {
             None
         } else {
-            Some(String::from_utf8_lossy(&tail).into_owned())
+            Some(scrub(&String::from_utf8_lossy(&tail)))
         }
     }
 }

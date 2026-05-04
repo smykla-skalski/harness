@@ -18,7 +18,8 @@ mod tests;
 
 pub use crate::infra::persistence::flock::FlockGuard;
 pub use audit::{
-    append_event, append_event_best_effort, diagnostics, ensure_auth_token, read_recent_events,
+    append_event, append_event_best_effort, append_event_entry, diagnostics, ensure_auth_token,
+    read_recent_events,
 };
 pub use config::{
     DaemonRuntimeConfig, VALID_LOG_LEVELS, load_persisted_log_level, load_runtime_config,

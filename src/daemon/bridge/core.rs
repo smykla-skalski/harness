@@ -13,6 +13,7 @@ use crate::daemon::agent_tui::{
 };
 use crate::daemon::protocol::StreamEvent;
 use crate::errors::{CliError, CliErrorKind};
+use crate::workspace::utc_now;
 
 use super::types::{BridgeCapability, PersistedBridgeConfig};
 
@@ -279,6 +280,7 @@ impl BridgeReconfigureSpec {
 pub(super) struct BridgeAcpEventsResponse {
     pub(super) bridge_epoch: String,
     pub(super) continuity: u64,
+    pub(super) daemon_perceived_now: String,
     pub(super) next_seq: u64,
     pub(super) truncated: bool,
     pub(super) requires_resync: bool,
@@ -349,6 +351,7 @@ impl BridgeAcpEventBuffer {
         BridgeAcpEventsResponse {
             bridge_epoch: self.bridge_epoch.clone(),
             continuity: self.continuity,
+            daemon_perceived_now: utc_now(),
             next_seq: self.next_seq,
             truncated,
             requires_resync: truncated || epoch_changed || continuity_changed,

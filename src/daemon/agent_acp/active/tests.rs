@@ -65,6 +65,20 @@ fn process_incident_event_maps_prompt_timeout_to_protocol_desync() {
 }
 
 #[test]
+fn shared_stderr_tail_redacts_known_secret_patterns() {
+    let tail = SharedStderrTail::default();
+    tail.append(b"Authorization: Bearer supersecret-token\n");
+    tail.append(b"ADMIN_TOKEN=topsecret-value\n");
+
+    let rendered = tail.as_string().expect("stderr tail");
+
+    assert!(rendered.contains("[REDACTED:BEARER]"));
+    assert!(rendered.contains("[REDACTED:ENV_SECRET]"));
+    assert!(!rendered.contains("supersecret-token"));
+    assert!(!rendered.contains("topsecret-value"));
+}
+
+#[test]
 fn sorted_singleton_returns_one_stable_session_id() {
     assert_eq!(sorted_singleton("sess-2".to_string()), vec!["sess-2"]);
 }

@@ -271,12 +271,17 @@ impl DaemonDb {
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    pub fn append_daemon_event(&self, level: &str, message: &str) -> Result<(), CliError> {
+    pub fn append_daemon_event(
+        &self,
+        recorded_at: &str,
+        level: &str,
+        message: &str,
+    ) -> Result<(), CliError> {
         self.conn
             .execute(
                 "INSERT INTO daemon_events (recorded_at, level, message)
                  VALUES (?1, ?2, ?3)",
-                rusqlite::params![utc_now(), level, message],
+                rusqlite::params![recorded_at, level, message],
             )
             .map_err(|error| db_error(format!("append daemon event: {error}")))?;
         Ok(())

@@ -275,8 +275,8 @@ pub use sessions::{
 pub(crate) use signals::try_wake_started_workers;
 pub use signals::{cancel_signal, send_signal};
 pub use status::{
-    diagnostics_report, get_log_level, health_response, request_shutdown, set_log_level,
-    status_report,
+    diagnostics_report, get_log_level, health_response, record_telemetry, request_shutdown,
+    set_log_level, status_report,
 };
 
 pub(crate) use observe_async::{observe_session_async, run_daemon_observe_task_async};
