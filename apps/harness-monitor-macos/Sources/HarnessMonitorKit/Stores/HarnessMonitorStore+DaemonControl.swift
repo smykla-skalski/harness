@@ -35,15 +35,17 @@ extension HarnessMonitorStore {
     stopManifestWatcher()
     stopAllStreams()
 
+    // The deferred managed-launch-agent refresh used to fire here, which
+    // bounced the daemon every time the app lost focus during a dev
+    // rebuild cycle and caused a WS reconnect storm in any sibling
+    // observer. Refresh now defers to the explicit termination path.
     guard let client else {
-      _ = await daemonController.performDeferredManagedLaunchAgentRefreshIfNeeded()
       connectionState = .idle
       return
     }
 
     self.client = nil
     await client.shutdown()
-    _ = await daemonController.performDeferredManagedLaunchAgentRefreshIfNeeded()
     connectionState = .idle
   }
 
@@ -386,11 +388,15 @@ extension HarnessMonitorStore {
     #endif
     isAppLifecycleSuspended = false
 
-    guard let client else {
-      return
+    if let client {
+      self.client = nil
+      await client.shutdown()
     }
 
-    self.client = nil
-    await client.shutdown()
+    // Run the deferred managed-launch-agent refresh once the live
+    // connection has been torn down so the next launch picks up a
+    // freshly-bundled daemon helper without bouncing the daemon while
+    // the user was still working.
+    _ = await daemonController.performDeferredManagedLaunchAgentRefreshIfNeeded()
   }
 }

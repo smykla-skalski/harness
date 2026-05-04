@@ -44,6 +44,7 @@ public struct DaemonController: DaemonControlling {
   let expectedManagedDaemonVersion: @Sendable () -> String?
   let managedLaunchAgentCurrentBundleStamp: @Sendable () throws -> ManagedLaunchAgentBundleStamp?
   let managedLaunchAgentDeferredRefreshState: ManagedLaunchAgentDeferredRefreshState
+  let processLiveness: ProcessLivenessProbe
 
   public init(
     environment: HarnessMonitorEnvironment = .current,
@@ -89,7 +90,8 @@ public struct DaemonController: DaemonControlling {
       @escaping @Sendable () throws
       -> ManagedLaunchAgentBundleStamp? = {
         try Self.currentManagedLaunchAgentBundleStamp()
-      }
+      },
+    processLiveness: @escaping ProcessLivenessProbe = Self.defaultProcessLiveness
   ) {
     self.environment = environment
     self.transportPreference = transportPreference
@@ -104,6 +106,7 @@ public struct DaemonController: DaemonControlling {
     self.expectedManagedDaemonVersion = expectedManagedDaemonVersion
     self.managedLaunchAgentCurrentBundleStamp = managedLaunchAgentCurrentBundleStamp
     self.managedLaunchAgentDeferredRefreshState = ManagedLaunchAgentDeferredRefreshState()
+    self.processLiveness = processLiveness
   }
 
   public func bootstrapClient() async throws -> any HarnessMonitorClientProtocol {
@@ -122,8 +125,12 @@ public struct DaemonController: DaemonControlling {
       HarnessMonitorLogger.lifecycle.notice(
         "Applying deferred managed daemon helper refresh while startup-critical work is idle"
       )
-      try refreshManagedLaunchAgent(currentStamp: currentStamp)
-      return true
+      switch try refreshManagedLaunchAgent(currentStamp: currentStamp) {
+      case .refreshed:
+        return true
+      case .skippedSiblingOwnsLane, .skippedNotManagedDaemon:
+        return false
+      }
     } catch {
       HarnessMonitorLogger.lifecycle.error(
         "Deferred managed daemon helper refresh failed: \(error.localizedDescription, privacy: .public)"
@@ -210,6 +217,7 @@ public struct DaemonController: DaemonControlling {
     let state = launchAgentManager.registrationState()
     if state == .enabled {
       try persistCurrentManagedLaunchAgentBundleStamp()
+      try persistCurrentManagedLaunchAgentOwner()
     }
     return state
   }
@@ -243,6 +251,7 @@ public struct DaemonController: DaemonControlling {
     if launchAgentManager.registrationState() == .enabled {
       try launchAgentManager.unregister()
       clearManagedLaunchAgentBundleStamp()
+      clearManagedLaunchAgentOwner()
       return "stopped"
     }
 
@@ -300,6 +309,7 @@ public struct DaemonController: DaemonControlling {
     case .enabled, .requiresApproval:
       try launchAgentManager.unregister()
       clearManagedLaunchAgentBundleStamp()
+      clearManagedLaunchAgentOwner()
       return "launch agent removed"
     }
   }
