@@ -3,9 +3,9 @@ use super::*;
 #[test]
 fn session_route_guard_rejects_before_initialization() {
     let guard = SessionRouteGuard::default();
-    let error = guard
-        .ensure_known(&SessionId::new("acp-session-1"))
-        .expect_err("guard should reject before initialization");
+    let Err(error) = guard.ensure_known(&SessionId::new("acp-session-1")) else {
+        unreachable!("guard should reject before initialization");
+    };
     assert_eq!(
         error.reason,
         session_guard::RouteRejectReason::NotInitialized
@@ -22,9 +22,9 @@ fn session_route_guard_rejects_before_initialization() {
 fn session_route_guard_rejects_stale_session_id() {
     let guard = SessionRouteGuard::default();
     guard.start_session(&SessionId::new("acp-session-1"), route_target("sess-1"));
-    let error = guard
-        .ensure_known(&SessionId::new("acp-session-2"))
-        .expect_err("guard should reject unknown session id");
+    let Err(error) = guard.ensure_known(&SessionId::new("acp-session-2")) else {
+        unreachable!("guard should reject unknown session id");
+    };
     assert_eq!(error.reason, session_guard::RouteRejectReason::Unknown);
     assert_eq!(error.client.code, session_guard::ACP_STALE_SESSION_ID);
     assert!(
@@ -39,9 +39,9 @@ fn session_route_guard_accepts_expected_session_id() {
     let guard = SessionRouteGuard::default();
     let session_id = SessionId::new("acp-session-1");
     guard.start_session(&session_id, route_target("sess-1"));
-    let target = guard
-        .ensure_known(&session_id)
-        .expect("guard should accept expected session id");
+    let Ok(target) = guard.ensure_known(&session_id) else {
+        unreachable!("guard should accept expected session id");
+    };
     assert_eq!(target.acp_id, "agent-sess-1");
     assert_eq!(target.session_id, "sess-1");
 }
@@ -52,9 +52,9 @@ fn session_route_guard_rejects_after_session_end() {
     let session_id = SessionId::new("acp-session-1");
     guard.start_session(&session_id, route_target("sess-1"));
     guard.stop_session(&session_id);
-    let error = guard
-        .ensure_known(&session_id)
-        .expect_err("guard should reject removed session id");
+    let Err(error) = guard.ensure_known(&session_id) else {
+        unreachable!("guard should reject removed session id");
+    };
     assert_eq!(error.reason, session_guard::RouteRejectReason::AlreadyEnded);
     assert_eq!(error.client.code, session_guard::ACP_STALE_SESSION_ID);
     assert!(error.client.message.contains("already ended"));
@@ -67,15 +67,21 @@ fn session_route_guard_accepts_multiple_session_ids() {
     guard.start_session(&SessionId::new("acp-session-2"), route_target("sess-2"));
 
     assert_eq!(
-        guard
-            .ensure_known(&SessionId::new("acp-session-1"))
-            .expect("first session"),
+        {
+            let Ok(target) = guard.ensure_known(&SessionId::new("acp-session-1")) else {
+                unreachable!("first session");
+            };
+            target
+        },
         route_target("sess-1")
     );
     assert_eq!(
-        guard
-            .ensure_known(&SessionId::new("acp-session-2"))
-            .expect("second session"),
+        {
+            let Ok(target) = guard.ensure_known(&SessionId::new("acp-session-2")) else {
+                unreachable!("second session");
+            };
+            target
+        },
         route_target("sess-2")
     );
 }
@@ -95,9 +101,12 @@ fn session_route_guard_removes_one_route_without_poisoning_siblings() {
         "removed route should be stale"
     );
     assert_eq!(
-        guard
-            .ensure_known(&second)
-            .expect("sibling route remains active"),
+        {
+            let Ok(target) = guard.ensure_known(&second) else {
+                unreachable!("sibling route remains active");
+            };
+            target
+        },
         route_target("sess-2")
     );
 }
@@ -112,14 +121,17 @@ fn session_route_guard_classifies_ended_route_with_live_sibling() {
 
     guard.stop_session(&first);
 
-    let error = guard
-        .ensure_known(&first)
-        .expect_err("ended route should remain classified");
+    let Err(error) = guard.ensure_known(&first) else {
+        unreachable!("ended route should remain classified");
+    };
     assert_eq!(error.reason, session_guard::RouteRejectReason::AlreadyEnded);
     assert_eq!(
-        guard
-            .ensure_known(&second)
-            .expect("sibling route remains active"),
+        {
+            let Ok(target) = guard.ensure_known(&second) else {
+                unreachable!("sibling route remains active");
+            };
+            target
+        },
         route_target("sess-2")
     );
 }
@@ -134,9 +146,12 @@ fn session_route_guard_reuse_clears_ended_tombstone() {
     guard.start_session(&protocol_session, route_target("sess-2"));
 
     assert_eq!(
-        guard
-            .ensure_known(&protocol_session)
-            .expect("reused route should be live"),
+        {
+            let Ok(target) = guard.ensure_known(&protocol_session) else {
+                unreachable!("reused route should be live");
+            };
+            target
+        },
         route_target("sess-2")
     );
 }
@@ -154,13 +169,13 @@ fn session_route_guard_bounds_ended_tombstones() {
         route_target("sess-live"),
     );
 
-    let expired = guard
-        .ensure_known(&SessionId::new("acp-session-0"))
-        .expect_err("oldest tombstone should expire");
+    let Err(expired) = guard.ensure_known(&SessionId::new("acp-session-0")) else {
+        unreachable!("oldest tombstone should expire");
+    };
     assert_eq!(expired.reason, session_guard::RouteRejectReason::Unknown);
-    let retained = guard
-        .ensure_known(&SessionId::new("acp-session-259"))
-        .expect_err("newest tombstone should remain");
+    let Err(retained) = guard.ensure_known(&SessionId::new("acp-session-259")) else {
+        unreachable!("newest tombstone should remain");
+    };
     assert_eq!(
         retained.reason,
         session_guard::RouteRejectReason::AlreadyEnded
@@ -187,9 +202,9 @@ async fn expired_tombstone_notification_is_dropped_without_protocol_error() {
         )))),
     );
 
-    route_session_notification(&guard, &notification_tx, notification)
-        .await
-        .expect("expired tombstone notification should be benign");
+    let Ok(()) = route_session_notification(&guard, &notification_tx, notification).await else {
+        unreachable!("expired tombstone notification should be benign");
+    };
 
     assert!(notifications.try_recv().is_err());
 }
@@ -204,13 +219,18 @@ fn session_route_guard_removes_route_by_logical_target() {
     guard.start_session(&first, first_target.clone());
     guard.start_session(&second, second_target.clone());
 
-    assert_eq!(
-        guard.stop_target(&first_target).expect("removed ACP id"),
-        first
-    );
+    let Some(stopped_session) = guard.stop_target(&first_target) else {
+        unreachable!("removed ACP id");
+    };
+    assert_eq!(stopped_session, first);
     assert!(guard.ensure_known(&first).is_err());
     assert_eq!(
-        guard.ensure_known(&second).expect("sibling remains"),
+        {
+            let Ok(target) = guard.ensure_known(&second) else {
+                unreachable!("sibling remains");
+            };
+            target
+        },
         second_target
     );
 }

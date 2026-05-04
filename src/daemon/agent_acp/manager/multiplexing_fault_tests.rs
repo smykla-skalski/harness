@@ -7,7 +7,7 @@ use tokio::sync::broadcast;
 use super::*;
 use crate::agents::acp::catalog::{self, AcpAgentDescriptor};
 use crate::daemon::agent_acp::manager::test_support::{
-    seeded_manager_with_events, write_exiting_acp_agent,
+    assert_ok, assert_some, seeded_manager_with_events, write_exiting_acp_agent,
 };
 use crate::feature_flags;
 use crate::session::types::ManagedAgentRef;
@@ -41,7 +41,7 @@ fn descriptor(command: &Path) -> AcpAgentDescriptor {
 #[cfg(unix)]
 async fn process_exit_disconnects_every_reused_logical_session() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
-        let temp = TempDir::new().expect("temp");
+        let temp = assert_ok(TempDir::new(), "create temp dir");
         let script = temp.path().join("failing-agent.sh");
         write_exiting_acp_agent(&script, 0.2, 7);
         let descriptor = descriptor(&script);
@@ -52,12 +52,14 @@ async fn process_exit_disconnects_every_reused_logical_session() {
             ..AcpAgentStartRequest::default()
         };
 
-        let first = manager
-            .start_descriptor("sess-1", &request, &descriptor)
-            .expect("start first");
-        let second = manager
-            .start_descriptor("sess-2", &request, &descriptor)
-            .expect("start second");
+        let first = assert_ok(
+            manager.start_descriptor("sess-1", &request, &descriptor),
+            "start first",
+        );
+        let second = assert_ok(
+            manager.start_descriptor("sess-2", &request, &descriptor),
+            "start second",
+        );
         assert_eq!(first.pid, second.pid);
 
         let disconnected = wait_until_disconnected(&manager, &first.acp_id);
@@ -69,25 +71,27 @@ async fn process_exit_disconnects_every_reused_logical_session() {
             }
         ));
         assert!(
-            manager
-                .get(&second.acp_id)
-                .expect("get sibling")
+            assert_ok(manager.get(&second.acp_id), "get sibling")
                 .status
                 .is_disconnected()
         );
         assert!(matches!(
-            session_managed_agent(&manager, "sess-1", &first.acp_id)
-                .expect("persisted first agent")
-                .status,
+            assert_some(
+                session_managed_agent(&manager, "sess-1", &first.acp_id),
+                "persisted first agent",
+            )
+            .status,
             AgentStatus::Disconnected {
                 reason: DisconnectReason::ProcessExited { .. },
                 ..
             }
         ));
         assert!(matches!(
-            session_managed_agent(&manager, "sess-2", &second.acp_id)
-                .expect("persisted second agent")
-                .status,
+            assert_some(
+                session_managed_agent(&manager, "sess-2", &second.acp_id),
+                "persisted second agent",
+            )
+            .status,
             AgentStatus::Disconnected {
                 reason: DisconnectReason::ProcessExited { .. },
                 ..
@@ -109,7 +113,7 @@ async fn process_exit_disconnects_every_reused_logical_session() {
 #[cfg(unix)]
 async fn process_exit_after_logical_stop_reports_only_remaining_sessions() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
-        let temp = TempDir::new().expect("temp");
+        let temp = assert_ok(TempDir::new(), "create temp dir");
         let script = temp.path().join("failing-agent.sh");
         write_exiting_acp_agent(&script, 0.2, 7);
         let descriptor = descriptor(&script);
@@ -120,13 +124,15 @@ async fn process_exit_after_logical_stop_reports_only_remaining_sessions() {
             ..AcpAgentStartRequest::default()
         };
 
-        let first = manager
-            .start_descriptor("sess-1", &request, &descriptor)
-            .expect("start first");
-        let second = manager
-            .start_descriptor("sess-2", &request, &descriptor)
-            .expect("start second");
-        manager.stop(&first.acp_id).expect("stop first");
+        let first = assert_ok(
+            manager.start_descriptor("sess-1", &request, &descriptor),
+            "start first",
+        );
+        let second = assert_ok(
+            manager.start_descriptor("sess-2", &request, &descriptor),
+            "start second",
+        );
+        assert_ok(manager.stop(&first.acp_id), "stop first");
 
         let disconnected = wait_until_disconnected(&manager, &second.acp_id);
         assert!(matches!(
@@ -147,12 +153,7 @@ async fn process_exit_after_logical_stop_reports_only_remaining_sessions() {
 }
 
 fn process_count(manager: &AcpAgentManagerHandle) -> usize {
-    manager
-        .state
-        .processes
-        .lock()
-        .expect("ACP processes lock")
-        .len()
+    assert_ok(manager.state.processes.lock(), "ACP processes lock").len()
 }
 
 fn session_managed_agent(
@@ -160,12 +161,12 @@ fn session_managed_agent(
     session_id: &str,
     acp_id: &str,
 ) -> Option<crate::session::types::AgentRegistration> {
-    let db = manager.state.db.get().cloned().expect("seeded manager db");
-    let db = db.lock().expect("seeded manager db lock");
-    let state = db
-        .load_session_state(session_id)
-        .expect("load session state")
-        .expect("session present");
+    let db = assert_some(manager.state.db.get().cloned(), "seeded manager db");
+    let db = assert_ok(db.lock(), "seeded manager db lock");
+    let state = assert_some(
+        assert_ok(db.load_session_state(session_id), "load session state"),
+        "session present",
+    );
     state
         .agents
         .values()
@@ -176,7 +177,7 @@ fn session_managed_agent(
 fn wait_until_disconnected(manager: &AcpAgentManagerHandle, acp_id: &str) -> AcpAgentSnapshot {
     let deadline = Instant::now() + Duration::from_secs(2);
     loop {
-        let snapshot = manager.get(acp_id).expect("refresh");
+        let snapshot = assert_ok(manager.get(acp_id), "refresh");
         if snapshot.status.is_disconnected() {
             return snapshot;
         }
@@ -191,10 +192,10 @@ fn wait_until_disconnected(manager: &AcpAgentManagerHandle, acp_id: &str) -> Acp
 fn next_process_incident(
     events: &mut broadcast::Receiver<crate::daemon::protocol::StreamEvent>,
 ) -> crate::daemon::protocol::StreamEvent {
-    next_process_incidents(events, 1)
-        .into_iter()
-        .next()
-        .expect("process incident")
+    assert_some(
+        next_process_incidents(events, 1).into_iter().next(),
+        "process incident",
+    )
 }
 
 fn next_process_incidents(

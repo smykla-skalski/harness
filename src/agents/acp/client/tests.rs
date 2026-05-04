@@ -22,13 +22,33 @@ use super::{
 };
 use crate::agents::acp::permission::{PermissionMode, standard_permission_options};
 
+fn ok<T, E: std::fmt::Debug>(result: Result<T, E>, context: &str) -> T {
+    match result {
+        Ok(value) => value,
+        Err(error) => unreachable!("{context}: {error:?}"),
+    }
+}
+
+fn err<T, E: std::fmt::Debug>(result: Result<T, E>, context: &str) -> E {
+    match result {
+        Err(error) => error,
+        Ok(_) => unreachable!("{context}"),
+    }
+}
+
 pub(super) fn setup_client() -> (TempDir, HarnessAcpClient) {
-    let temp = TempDir::new().expect("create temp dir");
+    let temp = ok(TempDir::new(), "create temp dir");
     let run_dir = temp.path().to_path_buf();
     let working_dir = temp.path().to_path_buf();
 
-    fs::create_dir_all(run_dir.join("artifacts")).expect("create artifacts");
-    fs::create_dir_all(run_dir.join("commands")).expect("create commands");
+    ok(
+        fs::create_dir_all(run_dir.join("artifacts")),
+        "create artifacts",
+    );
+    ok(
+        fs::create_dir_all(run_dir.join("commands")),
+        "create commands",
+    );
 
     let mut denied = BTreeSet::new();
     denied.insert("kubectl".to_string());
@@ -48,13 +68,19 @@ pub(super) fn setup_client() -> (TempDir, HarnessAcpClient) {
 }
 
 pub(super) fn setup_recording_client() -> (TempDir, HarnessAcpClient, PathBuf) {
-    let temp = TempDir::new().expect("create temp dir");
+    let temp = ok(TempDir::new(), "create temp dir");
     let run_dir = temp.path().to_path_buf();
     let working_dir = temp.path().to_path_buf();
     let log_path = run_dir.join("permission-log.ndjson");
 
-    fs::create_dir_all(run_dir.join("artifacts")).expect("create artifacts");
-    fs::create_dir_all(run_dir.join("commands")).expect("create commands");
+    ok(
+        fs::create_dir_all(run_dir.join("artifacts")),
+        "create artifacts",
+    );
+    ok(
+        fs::create_dir_all(run_dir.join("commands")),
+        "create commands",
+    );
 
     let mut denied = BTreeSet::new();
     denied.insert("kubectl".to_string());
@@ -73,10 +99,9 @@ pub(super) fn setup_recording_client() -> (TempDir, HarnessAcpClient, PathBuf) {
 }
 
 pub(super) fn read_log(path: &PathBuf) -> Vec<Value> {
-    fs::read_to_string(path)
-        .expect("permission log")
+    ok(fs::read_to_string(path), "permission log")
         .lines()
-        .map(|line| serde_json::from_str(line).expect("json line"))
+        .map(|line| ok(serde_json::from_str(line), "json line"))
         .collect()
 }
 
@@ -86,10 +111,11 @@ fn write_to_artifacts_allowed() {
     let path = temp.path().join("artifacts/test.txt");
 
     let request = WriteTextFileRequest::new("test-session", &path, "hello");
-    client
-        .handle_write_text_file(&request)
-        .expect("write to artifacts allowed");
-    assert_eq!(fs::read_to_string(&path).unwrap(), "hello");
+    ok(
+        client.handle_write_text_file(&request),
+        "write to artifacts allowed",
+    );
+    assert_eq!(ok(fs::read_to_string(&path), "read written file"), "hello");
 }
 
 #[test]
@@ -98,10 +124,10 @@ fn write_outside_surface_denied() {
     let path = PathBuf::from("/tmp/outside.txt");
 
     let request = WriteTextFileRequest::new("test-session", &path, "hello");
-    let result = client.handle_write_text_file(&request);
-
-    assert!(result.is_err());
-    let err = result.unwrap_err();
+    let err = err(
+        client.handle_write_text_file(&request),
+        "write should be denied",
+    );
     assert_eq!(err.code, WRITE_DENIED);
 }
 
@@ -111,10 +137,10 @@ fn write_denied_binary_rejected() {
     let path = temp.path().join("artifacts/kubectl");
 
     let request = WriteTextFileRequest::new("test-session", &path, "#!/bin/bash");
-    let result = client.handle_write_text_file(&request);
-
-    assert!(result.is_err());
-    let err = result.unwrap_err();
+    let err = err(
+        client.handle_write_text_file(&request),
+        "binary should be denied",
+    );
     assert_eq!(err.code, BINARY_DENIED);
 }
 
@@ -124,16 +150,14 @@ fn recording_write_logs_policy_decision_and_still_writes_when_allowed() {
     let path = temp.path().join("artifacts/test.txt");
     let request = WriteTextFileRequest::new("session-1", &path, "hello");
 
-    client
-        .handle_write_text_file(&request)
-        .expect("write allowed");
+    ok(client.handle_write_text_file(&request), "write allowed");
 
     let records = read_log(&log_path);
     assert_eq!(records.len(), 1);
     assert_eq!(records[0]["operation"], "fs.write_text_file");
     assert_eq!(records[0]["decision"], "allowed");
     assert_eq!(records[0]["wouldAsk"]["path"], path.display().to_string());
-    assert_eq!(fs::read_to_string(path).expect("written file"), "hello");
+    assert_eq!(ok(fs::read_to_string(&path), "written file"), "hello");
 }
 
 #[test]
@@ -142,45 +166,40 @@ fn recording_write_logs_denial_aligned_with_policy() {
     let path = temp.path().join("artifacts/kubectl");
     let request = WriteTextFileRequest::new("session-1", &path, "#!/bin/sh");
 
-    let error = client
-        .handle_write_text_file(&request)
-        .expect_err("denied binary");
+    let error = err(client.handle_write_text_file(&request), "denied binary");
 
     assert_eq!(error.code, BINARY_DENIED);
     let records = read_log(&log_path);
     assert_eq!(records.len(), 1);
     assert_eq!(records[0]["operation"], "fs.write_text_file");
     assert_eq!(records[0]["decision"], "denied");
-    assert!(
-        records[0]["reason"]
-            .as_str()
-            .expect("reason")
-            .contains("kubectl")
-    );
+    assert!(matches!(
+        records[0]["reason"].as_str(),
+        Some(reason) if reason.contains("kubectl")
+    ));
 }
 
 #[test]
 fn recording_write_logs_denial_when_allowed_path_fails_to_write() {
     let (temp, client, log_path) = setup_recording_client();
     let path = temp.path().join("artifacts/existing-dir");
-    fs::create_dir_all(&path).expect("create existing directory");
+    ok(fs::create_dir_all(&path), "create existing directory");
     let request = WriteTextFileRequest::new("session-1", &path, "hello");
 
-    let error = client
-        .handle_write_text_file(&request)
-        .expect_err("cannot write file over directory");
+    let error = err(
+        client.handle_write_text_file(&request),
+        "cannot write file over directory",
+    );
 
     assert_eq!(error.code, WRITE_DENIED);
     let records = read_log(&log_path);
     assert_eq!(records.len(), 1);
     assert_eq!(records[0]["operation"], "fs.write_text_file");
     assert_eq!(records[0]["decision"], "denied");
-    assert!(
-        records[0]["reason"]
-            .as_str()
-            .expect("reason")
-            .contains("failed to write")
-    );
+    assert!(matches!(
+        records[0]["reason"].as_str(),
+        Some(reason) if reason.contains("failed to write")
+    ));
 }
 
 #[test]
@@ -190,13 +209,11 @@ fn read_within_working_dir_allowed() {
     fs::write(&path, "content").unwrap();
 
     let request = ReadTextFileRequest::new("test-session", &path);
-    assert_eq!(
-        client
-            .handle_read_text_file(&request)
-            .expect("read within working dir")
-            .content,
-        "content"
+    let response = ok(
+        client.handle_read_text_file(&request),
+        "read within working dir",
     );
+    assert_eq!(response.content, "content");
 }
 
 #[test]
@@ -208,13 +225,11 @@ fn read_with_line_and_limit() {
     let mut request = ReadTextFileRequest::new("test-session", &path);
     request.line = Some(2);
     request.limit = Some(2);
-    assert_eq!(
-        client
-            .handle_read_text_file(&request)
-            .expect("read with line and limit")
-            .content,
-        "line2\nline3"
+    let response = ok(
+        client.handle_read_text_file(&request),
+        "read with line and limit",
     );
+    assert_eq!(response.content, "line2\nline3");
 }
 
 #[test]
@@ -236,9 +251,10 @@ fn closed_daemon_permission_bridge_returns_shutdown() {
     let request =
         RequestPermissionRequest::new("session-1", tool_call, standard_permission_options());
 
-    let error = client
-        .handle_request_permission(&request)
-        .expect_err("closed bridge should fail");
+    let error = err(
+        client.handle_request_permission(&request),
+        "closed bridge should fail",
+    );
 
     assert_eq!(error.code, DAEMON_SHUTDOWN);
 }
@@ -250,9 +266,10 @@ fn recording_permission_request_never_blocks_or_approves() {
     let request =
         RequestPermissionRequest::new("session-1", tool_call, standard_permission_options());
 
-    let response = client
-        .handle_request_permission(&request)
-        .expect("record permission");
+    let response = ok(
+        client.handle_request_permission(&request),
+        "record permission",
+    );
 
     assert!(matches!(
         response.outcome,

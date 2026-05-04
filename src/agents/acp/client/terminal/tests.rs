@@ -13,6 +13,13 @@ use super::{TerminalLifecycleWait, TerminalManager, TerminalOutputState, Termina
 use crate::agents::acp::client::TERMINAL_DENIED;
 use crate::agents::policy::DeniedBinaries;
 
+fn ok<T, E: std::fmt::Debug>(result: Result<T, E>, context: &str) -> T {
+    match result {
+        Ok(value) => value,
+        Err(error) => unreachable!("{context}: {error:?}"),
+    }
+}
+
 #[test]
 fn append_with_limit_preserves_split_utf8_until_response_conversion() {
     let output = Mutex::new(TerminalOutputState {
@@ -65,13 +72,18 @@ fn terminal_slot_race_reserves_cap_under_concurrency() {
     let mut denied = 0;
     let mut reserved_ids = Vec::new();
     for handle in handles {
-        match handle.join().expect("reservation thread") {
+        let Ok(reservation) = handle.join() else {
+            unreachable!("reservation thread");
+        };
+        match reservation {
             Ok(terminal_id) => {
                 allowed += 1;
                 reserved_ids.push(terminal_id);
             }
-            Err(error) if error.code == TERMINAL_DENIED => denied += 1,
-            Err(error) => panic!("unexpected reservation error: {error}"),
+            Err(error) => {
+                assert_eq!(error.code, TERMINAL_DENIED);
+                denied += 1;
+            }
         }
     }
 
@@ -87,17 +99,18 @@ fn terminal_output_enforces_wall_clock_limit() {
     let manager = TerminalManager::new_with_limits(1, Duration::from_millis(1));
     let create = CreateTerminalRequest::new("session-1", "sh")
         .args(vec!["-c".to_string(), "sleep 2".to_string()]);
-    let terminal_id = manager
-        .handle_create(&create, &DeniedBinaries::new(BTreeSet::new()))
-        .expect("terminal starts")
-        .terminal_id;
+    let terminal_id = ok(
+        manager.handle_create(&create, &DeniedBinaries::new(BTreeSet::new())),
+        "terminal starts",
+    )
+    .terminal_id;
 
     thread::sleep(Duration::from_millis(20));
 
     let output = TerminalOutputRequest::new("session-1", terminal_id);
-    let error = manager
-        .handle_output(&output)
-        .expect_err("expired terminal should be denied");
+    let Err(error) = manager.handle_output(&output) else {
+        unreachable!("expired terminal should be denied");
+    };
     assert_eq!(error.code, TERMINAL_DENIED);
     assert!(error.message.contains("wall-clock"));
 }
@@ -124,7 +137,9 @@ fn wait_for_output_drain_requires_generation_quiescence_or_reader_close() {
 
     let start = Instant::now();
     wait_for_output_drain(&signal, Duration::from_millis(100));
-    writer.join().expect("writer thread");
+    let Ok(()) = writer.join() else {
+        unreachable!("writer thread");
+    };
 
     assert!(
         start.elapsed() >= Duration::from_millis(30),
@@ -147,27 +162,25 @@ fn wait_for_exit_or_error_is_level_triggered_after_pre_wait_exit() {
         start.elapsed() < Duration::from_millis(100),
         "pre-published exit should not wait for the timeout"
     );
-    match outcome {
-        TerminalLifecycleWait::Exit(exit_status) => assert_eq!(exit_status, expected),
-        TerminalLifecycleWait::LifecycleError(error) => {
-            panic!("expected exit status, got lifecycle error: {error}");
-        }
-        TerminalLifecycleWait::TimedOut => panic!("expected exit status, got timeout"),
-    }
+    assert!(matches!(
+        outcome,
+        TerminalLifecycleWait::Exit(ref exit_status) if *exit_status == expected
+    ));
 }
 
 #[test]
 #[cfg(unix)]
 fn terminal_wait_on_same_terminal_does_not_block_output_or_kill() {
     let manager = Arc::new(TerminalManager::new(1));
-    let terminal_id = manager
-        .handle_create(
+    let terminal_id = ok(
+        manager.handle_create(
             &CreateTerminalRequest::new("session-1", "sh")
                 .args(vec!["-c".to_string(), "printf ready; sleep 5".to_string()]),
             &DeniedBinaries::new(BTreeSet::new()),
-        )
-        .expect("terminal starts")
-        .terminal_id;
+        ),
+        "terminal starts",
+    )
+    .terminal_id;
 
     let wait_manager = Arc::clone(&manager);
     let wait_terminal = terminal_id.clone();
@@ -179,12 +192,13 @@ fn terminal_wait_on_same_terminal_does_not_block_output_or_kill() {
     thread::sleep(Duration::from_millis(100));
 
     let output_started = Instant::now();
-    let output = manager
-        .handle_output(&TerminalOutputRequest::new(
+    let output = ok(
+        manager.handle_output(&TerminalOutputRequest::new(
             "session-1",
             terminal_id.clone(),
-        ))
-        .expect("terminal output");
+        )),
+        "terminal output",
+    );
     assert!(
         output_started.elapsed() < Duration::from_secs(1),
         "same-terminal wait must not block output"
@@ -192,22 +206,24 @@ fn terminal_wait_on_same_terminal_does_not_block_output_or_kill() {
     assert!(output.output.contains("ready"), "{output:?}");
 
     let kill_started = Instant::now();
-    manager
-        .handle_kill(&KillTerminalRequest::new("session-1", terminal_id.clone()))
-        .expect("kill terminal");
+    ok(
+        manager.handle_kill(&KillTerminalRequest::new("session-1", terminal_id.clone())),
+        "kill terminal",
+    );
     assert!(
         kill_started.elapsed() < Duration::from_secs(1),
         "same-terminal wait must not block kill"
     );
 
-    wait_thread
-        .join()
-        .expect("wait thread")
-        .expect("wait terminal");
-    manager
-        .handle_release(&agent_client_protocol::schema::ReleaseTerminalRequest::new(
+    let Ok(wait_result) = wait_thread.join() else {
+        unreachable!("wait thread");
+    };
+    ok(wait_result, "wait terminal");
+    ok(
+        manager.handle_release(&agent_client_protocol::schema::ReleaseTerminalRequest::new(
             "session-1",
             terminal_id,
-        ))
-        .expect("release terminal");
+        )),
+        "release terminal",
+    );
 }

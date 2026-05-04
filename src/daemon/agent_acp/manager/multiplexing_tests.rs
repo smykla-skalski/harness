@@ -4,8 +4,8 @@ use std::time::{Duration, Instant};
 use super::*;
 use crate::agents::acp::catalog::{self, AcpAgentDescriptor};
 use crate::daemon::agent_acp::manager::test_support::{
-    seeded_manager, write_cancel_recording_acp_agent, write_exiting_acp_agent,
-    write_prompt_delaying_acp_agent, write_sleeping_acp_agent,
+    assert_err, assert_ok, assert_some, seeded_manager, write_cancel_recording_acp_agent,
+    write_exiting_acp_agent, write_prompt_delaying_acp_agent, write_sleeping_acp_agent,
 };
 use crate::session::types::ManagedAgentRef;
 use tempfile::TempDir;
@@ -38,12 +38,14 @@ async fn identical_process_contract_reuses_one_child_for_multiple_logical_sessio
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
         let (_temp, manager, descriptor, request) = shared_fake_runtime();
 
-        let first = manager
-            .start_descriptor("sess-1", &request, &descriptor)
-            .expect("start first");
-        let second = manager
-            .start_descriptor("sess-2", &request, &descriptor)
-            .expect("start second");
+        let first = assert_ok(
+            manager.start_descriptor("sess-1", &request, &descriptor),
+            "start first",
+        );
+        let second = assert_ok(
+            manager.start_descriptor("sess-2", &request, &descriptor),
+            "start second",
+        );
 
         assert_ne!(first.acp_id, second.acp_id);
         assert_ne!(first.agent_id, second.agent_id);
@@ -66,11 +68,11 @@ async fn identical_process_contract_reuses_one_child_for_multiple_logical_sessio
             session_runtime_session_id(&manager, "sess-2", &second.acp_id).is_some(),
             "reused ACP registration should persist the runtime session id"
         );
-        assert_eq!(manager.list("sess-1").expect("list first").len(), 1);
-        assert_eq!(manager.list("sess-2").expect("list second").len(), 1);
+        assert_eq!(assert_ok(manager.list("sess-1"), "list first").len(), 1);
+        assert_eq!(assert_ok(manager.list("sess-2"), "list second").len(), 1);
 
-        manager.stop(&first.acp_id).expect("stop first");
-        manager.stop(&second.acp_id).expect("stop second");
+        assert_ok(manager.stop(&first.acp_id), "stop first");
+        assert_ok(manager.stop(&second.acp_id), "stop second");
     });
 }
 
@@ -85,19 +87,21 @@ async fn pooling_disable_env_starts_separate_children_for_identical_contracts() 
         || {
             let (_temp, manager, descriptor, request) = shared_fake_runtime();
 
-            let first = manager
-                .start_descriptor("sess-1", &request, &descriptor)
-                .expect("start first");
-            let second = manager
-                .start_descriptor("sess-2", &request, &descriptor)
-                .expect("start second");
+            let first = assert_ok(
+                manager.start_descriptor("sess-1", &request, &descriptor),
+                "start first",
+            );
+            let second = assert_ok(
+                manager.start_descriptor("sess-2", &request, &descriptor),
+                "start second",
+            );
 
             assert_ne!(first.process_key, second.process_key);
             assert_ne!(first.pid, second.pid);
             assert_eq!(process_count(&manager), 2);
 
-            manager.stop(&first.acp_id).expect("stop first");
-            manager.stop(&second.acp_id).expect("stop second");
+            assert_ok(manager.stop(&first.acp_id), "stop first");
+            assert_ok(manager.stop(&second.acp_id), "stop second");
         },
     );
 }
@@ -111,7 +115,7 @@ async fn pooling_disabled_faults_still_backoff_canonical_process_key() {
             ("HARNESS_ACP_DISABLE_POOLING", Some("1")),
         ],
         || {
-            let temp = TempDir::new().expect("temp");
+            let temp = assert_ok(TempDir::new(), "create temp dir");
             let script = temp.path().join("failing-agent.sh");
             write_exiting_acp_agent(&script, 0.0, 7);
             let descriptor = descriptor(&script);
@@ -121,13 +125,15 @@ async fn pooling_disabled_faults_still_backoff_canonical_process_key() {
                 ..AcpAgentStartRequest::default()
             };
             let manager = manager();
-            let first = manager
-                .start_descriptor("sess-1", &request, &descriptor)
-                .expect("start first isolated failing session");
+            let first = assert_ok(
+                manager.start_descriptor("sess-1", &request, &descriptor),
+                "start first isolated failing session",
+            );
             let _ = wait_until_disconnected(&manager, &first.acp_id);
-            let error = manager
-                .start_descriptor("sess-2", &request, &descriptor)
-                .expect_err("canonical process key should be backoff-blocked");
+            let error = assert_err(
+                manager.start_descriptor("sess-2", &request, &descriptor),
+                "canonical process key should be backoff-blocked",
+            );
             assert!(
                 format!("{error}").contains("backoff"),
                 "unexpected error: {error}"
@@ -142,26 +148,28 @@ async fn stopping_one_reused_process_session_keeps_sibling_active() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
         let (_temp, manager, descriptor, request) = shared_fake_runtime();
 
-        let first = manager
-            .start_descriptor("sess-1", &request, &descriptor)
-            .expect("start first");
-        let second = manager
-            .start_descriptor("sess-2", &request, &descriptor)
-            .expect("start second");
+        let first = assert_ok(
+            manager.start_descriptor("sess-1", &request, &descriptor),
+            "start first",
+        );
+        let second = assert_ok(
+            manager.start_descriptor("sess-2", &request, &descriptor),
+            "start second",
+        );
 
-        manager.stop(&first.acp_id).expect("stop first");
-        let sibling = manager.get(&second.acp_id).expect("get sibling");
+        assert_ok(manager.stop(&first.acp_id), "stop first");
+        let sibling = assert_ok(manager.get(&second.acp_id), "get sibling");
         assert_eq!(first.pid, sibling.pid);
         assert_eq!(sibling.status, AgentStatus::Active);
 
-        let stopped_again = manager.stop(&first.acp_id).expect("stop first again");
+        let stopped_again = assert_ok(manager.stop(&first.acp_id), "stop first again");
         assert!(stopped_again.status.is_disconnected());
         assert_eq!(
-            manager.get(&second.acp_id).expect("get sibling").status,
+            assert_ok(manager.get(&second.acp_id), "get sibling").status,
             AgentStatus::Active
         );
 
-        manager.stop(&second.acp_id).expect("stop second");
+        assert_ok(manager.stop(&second.acp_id), "stop second");
         assert_eq!(process_count(&manager), 0);
     });
 }
@@ -170,7 +178,7 @@ async fn stopping_one_reused_process_session_keeps_sibling_active() {
 #[cfg(unix)]
 async fn stopping_reused_session_cancels_only_target_protocol_session() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
-        let temp = TempDir::new().expect("temp");
+        let temp = assert_ok(TempDir::new(), "create temp dir");
         let script = temp.path().join("cancel-agent.sh");
         let cancel_log = temp.path().join("cancel.log");
         write_cancel_recording_acp_agent(&script, &cancel_log);
@@ -182,26 +190,26 @@ async fn stopping_reused_session_cancels_only_target_protocol_session() {
         };
         let manager = manager();
 
-        let first = manager
-            .start_descriptor("sess-1", &request, &descriptor)
-            .expect("start first");
-        let second = manager
-            .start_descriptor("sess-2", &request, &descriptor)
-            .expect("start second");
-        let sibling_before_stop = manager
-            .get(&second.acp_id)
-            .expect("get sibling before stop");
+        let first = assert_ok(
+            manager.start_descriptor("sess-1", &request, &descriptor),
+            "start first",
+        );
+        let second = assert_ok(
+            manager.start_descriptor("sess-2", &request, &descriptor),
+            "start second",
+        );
+        let sibling_before_stop = assert_ok(manager.get(&second.acp_id), "get sibling before stop");
 
-        manager.stop(&first.acp_id).expect("stop first");
+        assert_ok(manager.stop(&first.acp_id), "stop first");
         assert_eq!(
             wait_for_cancelled_sessions(&cancel_log, 1),
             vec!["acp-session-1"]
         );
-        let sibling_after_stop = manager.get(&second.acp_id).expect("get sibling after stop");
+        let sibling_after_stop = assert_ok(manager.get(&second.acp_id), "get sibling after stop");
         assert_sibling_session_state_preserved(&sibling_before_stop, &sibling_after_stop);
         assert_eq!(process_count(&manager), 1);
 
-        manager.stop(&second.acp_id).expect("stop second");
+        assert_ok(manager.stop(&second.acp_id), "stop second");
         assert_eq!(
             wait_for_cancelled_sessions(&cancel_log, 2),
             vec!["acp-session-1", "acp-session-2"]
@@ -213,7 +221,7 @@ async fn stopping_reused_session_cancels_only_target_protocol_session() {
 #[cfg(unix)]
 async fn prompted_reuse_rejects_busy_prompt_without_saturation_spawn() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
-        let temp = TempDir::new().expect("temp");
+        let temp = assert_ok(TempDir::new(), "create temp dir");
         let script = temp.path().join("prompt-agent.sh");
         write_prompt_delaying_acp_agent(&script, 1.0);
         let descriptor = descriptor(&script);
@@ -225,20 +233,17 @@ async fn prompted_reuse_rejects_busy_prompt_without_saturation_spawn() {
         };
         let manager = manager();
 
-        let first = manager
-            .start_descriptor("sess-1", &request, &descriptor)
-            .expect("start first");
-        let second = manager.start_descriptor("sess-2", &request, &descriptor);
-
-        assert!(
-            second
-                .expect_err("busy prompt should reject second start")
-                .to_string()
-                .contains("prompt_busy")
+        let first = assert_ok(
+            manager.start_descriptor("sess-1", &request, &descriptor),
+            "start first",
         );
+        let second = manager.start_descriptor("sess-2", &request, &descriptor);
+        let error = assert_err(second, "busy prompt should reject second start");
+
+        assert!(error.to_string().contains("prompt_busy"));
         assert_eq!(process_count(&manager), 1);
 
-        manager.stop(&first.acp_id).expect("stop first");
+        assert_ok(manager.stop(&first.acp_id), "stop first");
     });
 }
 
@@ -248,20 +253,22 @@ async fn prompted_reuse_attaches_to_idle_shared_process() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
         let (_temp, manager, descriptor, mut request) = shared_fake_runtime();
 
-        let first = manager
-            .start_descriptor("sess-1", &request, &descriptor)
-            .expect("start first");
+        let first = assert_ok(
+            manager.start_descriptor("sess-1", &request, &descriptor),
+            "start first",
+        );
         request.prompt = Some("next".to_string());
-        let second = manager
-            .start_descriptor("sess-2", &request, &descriptor)
-            .expect("start prompted second");
+        let second = assert_ok(
+            manager.start_descriptor("sess-2", &request, &descriptor),
+            "start prompted second",
+        );
 
         assert_eq!(first.process_key, second.process_key);
         assert_eq!(first.pid, second.pid);
         assert_eq!(process_count(&manager), 1);
 
-        manager.stop(&first.acp_id).expect("stop first");
-        manager.stop(&second.acp_id).expect("stop second");
+        assert_ok(manager.stop(&first.acp_id), "stop first");
+        assert_ok(manager.stop(&second.acp_id), "stop second");
     });
 }
 
@@ -272,7 +279,7 @@ fn shared_fake_runtime() -> (
     AcpAgentDescriptor,
     AcpAgentStartRequest,
 ) {
-    let temp = TempDir::new().expect("temp");
+    let temp = assert_ok(TempDir::new(), "create temp dir");
     let script = temp.path().join("fake-agent.sh");
     write_sleeping_acp_agent(&script);
     let descriptor = descriptor(&script);
@@ -285,12 +292,7 @@ fn shared_fake_runtime() -> (
 }
 
 fn process_count(manager: &AcpAgentManagerHandle) -> usize {
-    manager
-        .state
-        .processes
-        .lock()
-        .expect("ACP processes lock")
-        .len()
+    assert_ok(manager.state.processes.lock(), "ACP processes lock").len()
 }
 
 fn session_managed_agent_id(
@@ -314,12 +316,12 @@ fn session_managed_agent(
     session_id: &str,
     acp_id: &str,
 ) -> Option<crate::session::types::AgentRegistration> {
-    let db = manager.state.db.get().cloned().expect("seeded manager db");
-    let db = db.lock().expect("seeded manager db lock");
-    let state = db
-        .load_session_state(session_id)
-        .expect("load session state")
-        .expect("session present");
+    let db = assert_some(manager.state.db.get().cloned(), "seeded manager db");
+    let db = assert_ok(db.lock(), "seeded manager db lock");
+    let state = assert_some(
+        assert_ok(db.load_session_state(session_id), "load session state"),
+        "session present",
+    );
     state
         .agents
         .values()
@@ -365,7 +367,7 @@ fn assert_sibling_session_state_preserved(before: &AcpAgentSnapshot, after: &Acp
 fn wait_until_disconnected(manager: &AcpAgentManagerHandle, acp_id: &str) -> AcpAgentSnapshot {
     let deadline = Instant::now() + Duration::from_secs(2);
     loop {
-        let snapshot = manager.get(acp_id).expect("refresh");
+        let snapshot = assert_ok(manager.get(acp_id), "refresh");
         if snapshot.status.is_disconnected() {
             return snapshot;
         }

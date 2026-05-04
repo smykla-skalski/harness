@@ -30,62 +30,68 @@ fn descriptor(command: &Path) -> AcpAgentDescriptor {
 
 fn poison_sessions_lock(manager: &AcpAgentManagerHandle) {
     let state = std::sync::Arc::clone(&manager.state);
-    let _ = std::thread::spawn(move || {
-        let _guard = state.sessions.lock().expect("sessions lock");
-        panic!("poison ACP sessions lock");
+    let result = std::thread::spawn(move || {
+        let Ok(_guard) = state.sessions.lock() else {
+            unreachable!("sessions lock");
+        };
+        std::panic::panic_any("poison ACP sessions lock");
     })
     .join();
+    assert!(result.is_err(), "poison thread should panic");
 }
 
 fn poison_process_lifecycle_lock(manager: &AcpAgentManagerHandle) {
     let state = std::sync::Arc::clone(&manager.state);
-    let _ = std::thread::spawn(move || {
-        let _guard = state
-            .process_lifecycle
-            .lock()
-            .expect("process lifecycle lock");
-        panic!("poison ACP process lifecycle lock");
+    let result = std::thread::spawn(move || {
+        let Ok(_guard) = state.process_lifecycle.lock() else {
+            unreachable!("process lifecycle lock");
+        };
+        std::panic::panic_any("poison ACP process lifecycle lock");
     })
     .join();
+    assert!(result.is_err(), "poison thread should panic");
 }
 
 fn poison_processes_lock(manager: &AcpAgentManagerHandle) {
     let state = std::sync::Arc::clone(&manager.state);
-    let _ = std::thread::spawn(move || {
-        let _guard = state.processes.lock().expect("processes lock");
-        panic!("poison ACP processes lock");
+    let result = std::thread::spawn(move || {
+        let Ok(_guard) = state.processes.lock() else {
+            unreachable!("processes lock");
+        };
+        std::panic::panic_any("poison ACP processes lock");
     })
     .join();
+    assert!(result.is_err(), "poison thread should panic");
 }
 
 fn poison_process_fault_locks(manager: &AcpAgentManagerHandle) {
     let state = std::sync::Arc::clone(&manager.state);
-    let _ = std::thread::spawn(move || {
-        let _backoff = state
-            .process_key_backoff_until
-            .lock()
-            .expect("process key backoff lock");
-        panic!("poison ACP process key backoff lock");
+    let backoff_result = std::thread::spawn(move || {
+        let Ok(_backoff) = state.process_key_backoff_until.lock() else {
+            unreachable!("process key backoff lock");
+        };
+        std::panic::panic_any("poison ACP process key backoff lock");
     })
     .join();
+    assert!(backoff_result.is_err(), "poison thread should panic");
     let state = std::sync::Arc::clone(&manager.state);
-    let _ = std::thread::spawn(move || {
-        let _failures = state
-            .process_key_failures
-            .lock()
-            .expect("process key failures lock");
-        panic!("poison ACP process key failures lock");
+    let failures_result = std::thread::spawn(move || {
+        let Ok(_failures) = state.process_key_failures.lock() else {
+            unreachable!("process key failures lock");
+        };
+        std::panic::panic_any("poison ACP process key failures lock");
     })
     .join();
+    assert!(failures_result.is_err(), "poison thread should panic");
     let state = std::sync::Arc::clone(&manager.state);
-    let _ = std::thread::spawn(move || {
-        let _quarantine = state
-            .quarantined_process_keys
-            .lock()
-            .expect("quarantined process key lock");
-        panic!("poison ACP quarantined process key lock");
+    let quarantine_result = std::thread::spawn(move || {
+        let Ok(_quarantine) = state.quarantined_process_keys.lock() else {
+            unreachable!("quarantined process key lock");
+        };
+        std::panic::panic_any("poison ACP quarantined process key lock");
     })
     .join();
+    assert!(quarantine_result.is_err(), "poison thread should panic");
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -93,9 +99,9 @@ fn poison_process_fault_locks(manager: &AcpAgentManagerHandle) {
 async fn manager_lock_recovery_returns_structured_errors_for_poisoned_state() {
     let inspect_manager = manager();
     poison_sessions_lock(&inspect_manager);
-    let inspect_error = inspect_manager
-        .inspect(Some("sess-1"))
-        .expect_err("poisoned sessions lock should surface an error");
+    let Err(inspect_error) = inspect_manager.inspect(Some("sess-1")) else {
+        unreachable!("poisoned sessions lock should surface an error");
+    };
     assert!(
         inspect_error
             .to_string()
@@ -104,7 +110,9 @@ async fn manager_lock_recovery_returns_structured_errors_for_poisoned_state() {
     );
 
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
-        let temp = TempDir::new().expect("temp");
+        let Ok(temp) = TempDir::new() else {
+            unreachable!("temp");
+        };
         let script = temp.path().join("fake-agent.sh");
         write_sleeping_acp_agent(&script);
         let request = AcpAgentStartRequest {
@@ -114,13 +122,14 @@ async fn manager_lock_recovery_returns_structured_errors_for_poisoned_state() {
         };
         let lifecycle_manager = manager();
         let descriptor = descriptor(&script);
-        let snapshot = lifecycle_manager
-            .start_descriptor("sess-1", &request, &descriptor)
-            .expect("start");
+        let Ok(snapshot) = lifecycle_manager.start_descriptor("sess-1", &request, &descriptor)
+        else {
+            unreachable!("start");
+        };
         poison_process_lifecycle_lock(&lifecycle_manager);
-        let stop_error = lifecycle_manager
-            .stop(&snapshot.acp_id)
-            .expect_err("poisoned lifecycle lock should surface an error");
+        let Err(stop_error) = lifecycle_manager.stop(&snapshot.acp_id) else {
+            unreachable!("poisoned lifecycle lock should surface an error");
+        };
         assert!(
             stop_error
                 .to_string()
@@ -134,10 +143,9 @@ async fn manager_lock_recovery_returns_structured_errors_for_poisoned_state() {
 fn manager_guard_helpers_return_structured_errors_for_other_poisoned_locks() {
     let process_manager = manager();
     poison_processes_lock(&process_manager);
-    let process_error = process_manager
-        .processes_guard()
-        .err()
-        .expect("poisoned processes lock should surface an error");
+    let Err(process_error) = process_manager.processes_guard() else {
+        unreachable!("poisoned processes lock should surface an error");
+    };
     assert!(
         process_error
             .to_string()
@@ -147,30 +155,27 @@ fn manager_guard_helpers_return_structured_errors_for_other_poisoned_locks() {
 
     let fault_manager = manager();
     poison_process_fault_locks(&fault_manager);
-    let backoff_error = fault_manager
-        .process_key_backoff_until_guard()
-        .err()
-        .expect("poisoned process key backoff lock should surface an error");
+    let Err(backoff_error) = fault_manager.process_key_backoff_until_guard() else {
+        unreachable!("poisoned process key backoff lock should surface an error");
+    };
     assert!(
         backoff_error
             .to_string()
             .contains("ACP process key backoff lock poisoned"),
         "unexpected backoff error: {backoff_error}"
     );
-    let failures_error = fault_manager
-        .process_key_failures_guard()
-        .err()
-        .expect("poisoned process key failures lock should surface an error");
+    let Err(failures_error) = fault_manager.process_key_failures_guard() else {
+        unreachable!("poisoned process key failures lock should surface an error");
+    };
     assert!(
         failures_error
             .to_string()
             .contains("ACP process key failures lock poisoned"),
         "unexpected failures error: {failures_error}"
     );
-    let quarantine_error = fault_manager
-        .quarantined_process_keys_guard()
-        .err()
-        .expect("poisoned quarantined process key lock should surface an error");
+    let Err(quarantine_error) = fault_manager.quarantined_process_keys_guard() else {
+        unreachable!("poisoned quarantined process key lock should surface an error");
+    };
     assert!(
         quarantine_error
             .to_string()

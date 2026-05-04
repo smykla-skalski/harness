@@ -40,13 +40,38 @@ fn permission_request_for_session(
     )
 }
 
+fn unwrap_ok<T, E>(result: Result<T, E>, context: &str) -> T {
+    assert!(result.is_ok(), "{context}");
+    let Ok(value) = result else {
+        unreachable!("{context}");
+    };
+    value
+}
+
+fn unwrap_some<T>(value: Option<T>, context: &str) -> T {
+    assert!(value.is_some(), "{context}");
+    let Some(value) = value else {
+        unreachable!("{context}");
+    };
+    value
+}
+
+fn unwrap_err<T, E>(result: Result<T, E>, context: &str) -> E {
+    assert!(result.is_err(), "{context}");
+    let Err(error) = result else {
+        unreachable!("{context}");
+    };
+    error
+}
+
 async fn recv_permission_result(
     rx: oneshot::Receiver<PermissionBridgeResult>,
 ) -> PermissionBridgeResult {
-    tokio::time::timeout(Duration::from_millis(100), rx)
-        .await
-        .expect("permission response should arrive")
-        .expect("permission response channel should stay open")
+    let result = unwrap_ok(
+        tokio::time::timeout(Duration::from_millis(100), rx).await,
+        "permission response should arrive",
+    );
+    unwrap_ok(result, "permission response channel should stay open")
 }
 
 #[tokio::test]
@@ -56,8 +81,8 @@ async fn coalesces_concurrent_requests_into_one_batch() {
     let (req_a, rx_a) = permission_request("tool-a");
     let (req_b, rx_b) = permission_request("tool-b");
 
-    bridge.tx.send(req_a).await.expect("send a");
-    bridge.tx.send(req_b).await.expect("send b");
+    unwrap_ok(bridge.tx.send(req_a).await, "send a");
+    unwrap_ok(bridge.tx.send(req_b).await, "send b");
     tokio::time::sleep(Duration::from_millis(20)).await;
 
     let batches = bridge.pending_batches();
@@ -65,12 +90,14 @@ async fn coalesces_concurrent_requests_into_one_batch() {
     assert_eq!(batches[0].requests.len(), 2);
     let _ = bridge.resolve_batch(&batches[0].batch_id, &AcpPermissionDecision::ApproveAll);
     assert_eq!(bridge.expiration_task_count(), 0);
-    recv_permission_result(rx_a)
-        .await
-        .expect("rx_a should be approved");
-    recv_permission_result(rx_b)
-        .await
-        .expect("rx_b should be approved");
+    let _ = unwrap_ok(
+        recv_permission_result(rx_a).await,
+        "rx_a should be approved",
+    );
+    let _ = unwrap_ok(
+        recv_permission_result(rx_b).await,
+        "rx_b should be approved",
+    );
 }
 
 #[tokio::test]
@@ -81,8 +108,8 @@ async fn separate_logical_sessions_never_coalesce_permission_batches() {
     let (req_a, rx_a) = permission_request_for_session("tool-a", "acp-session-a");
     let (req_b, rx_b) = permission_request_for_session("tool-b", "acp-session-b");
 
-    bridge_a.tx.send(req_a).await.expect("send a");
-    bridge_b.tx.send(req_b).await.expect("send b");
+    unwrap_ok(bridge_a.tx.send(req_a).await, "send a");
+    unwrap_ok(bridge_b.tx.send(req_b).await, "send b");
     tokio::time::sleep(Duration::from_millis(20)).await;
 
     let batches_a = bridge_a.pending_batches();
@@ -127,12 +154,14 @@ async fn separate_logical_sessions_never_coalesce_permission_batches() {
     assert_eq!(seen_sessions, ["sess-1", "sess-2"]);
     let _ = bridge_a.resolve_batch(&batches_a[0].batch_id, &AcpPermissionDecision::ApproveAll);
     let _ = bridge_b.resolve_batch(&batches_b[0].batch_id, &AcpPermissionDecision::ApproveAll);
-    recv_permission_result(rx_a)
-        .await
-        .expect("rx_a should be approved");
-    recv_permission_result(rx_b)
-        .await
-        .expect("rx_b should be approved");
+    let _ = unwrap_ok(
+        recv_permission_result(rx_a).await,
+        "rx_a should be approved",
+    );
+    let _ = unwrap_ok(
+        recv_permission_result(rx_b).await,
+        "rx_b should be approved",
+    );
 }
 
 #[tokio::test]
@@ -143,18 +172,19 @@ async fn rejects_past_cap() {
 
     for i in 0..9 {
         let (request, rx) = permission_request(&format!("tool-{i}"));
-        bridge.tx.send(request).await.expect("send request");
+        unwrap_ok(bridge.tx.send(request).await, "send request");
         receivers.push(rx);
     }
     tokio::time::sleep(Duration::from_millis(20)).await;
 
     assert_eq!(bridge.pending_permission_count(), DEFAULT_PERMISSION_CAP);
-    let rejected = receivers
-        .pop()
-        .expect("ninth receiver")
-        .await
-        .expect("ninth response channel should stay open")
-        .expect_err("ninth rejected");
+    let rejected = unwrap_err(
+        unwrap_ok(
+            unwrap_some(receivers.pop(), "ninth receiver").await,
+            "ninth response channel should stay open",
+        ),
+        "ninth rejected",
+    );
     assert_eq!(rejected.code, PERMISSION_CAP_REACHED);
     bridge.shutdown_pending();
 }
@@ -166,13 +196,9 @@ async fn queue_depth_counts_requests_waiting_for_coalesce() {
     let (request, _rx) = permission_request("tool-a");
     let (queued_request, _queued_rx) = permission_request("tool-b");
 
-    bridge.tx.send(request).await.expect("send request");
+    unwrap_ok(bridge.tx.send(request).await, "send request");
     tokio::time::sleep(Duration::from_millis(1)).await;
-    bridge
-        .tx
-        .send(queued_request)
-        .await
-        .expect("send queued request");
+    unwrap_ok(bridge.tx.send(queued_request).await, "send queued request");
 
     assert_eq!(bridge.queue_depth(), 1);
     bridge.shutdown_pending();
@@ -184,13 +210,14 @@ async fn shutdown_errors_queued_requests_before_they_become_batches() {
     let bridge = PermissionBridgeHandle::spawn("acp-1".into(), "sess-1".into(), sender);
     let (request, rx) = permission_request("tool-a");
 
-    bridge.tx.send(request).await.expect("send request");
+    unwrap_ok(bridge.tx.send(request).await, "send request");
     bridge.shutdown_pending();
     tokio::task::yield_now().await;
 
-    let error = recv_permission_result(rx)
-        .await
-        .expect_err("queued request should receive daemon shutdown");
+    let error = unwrap_err(
+        recv_permission_result(rx).await,
+        "queued request should receive daemon shutdown",
+    );
     assert_eq!(error.code, DAEMON_SHUTDOWN);
 }
 
@@ -200,13 +227,11 @@ async fn shutdown_errors_pending_requests() {
     let bridge = PermissionBridgeHandle::spawn("acp-1".into(), "sess-1".into(), sender);
     let (request, rx) = permission_request("tool-a");
 
-    bridge.tx.send(request).await.expect("send request");
+    unwrap_ok(bridge.tx.send(request).await, "send request");
     tokio::time::sleep(Duration::from_millis(20)).await;
     bridge.shutdown_pending();
 
-    let error = recv_permission_result(rx)
-        .await
-        .expect_err("shutdown error");
+    let error = unwrap_err(recv_permission_result(rx).await, "shutdown error");
     assert_eq!(error.code, DAEMON_SHUTDOWN);
 }
 
@@ -217,14 +242,15 @@ async fn shutdown_cancels_pending_expiration_tasks_without_timeout() {
     let (mut request, rx) = permission_request("tool-a");
     request.deadline = Duration::from_millis(40);
 
-    bridge.tx.send(request).await.expect("send request");
+    unwrap_ok(bridge.tx.send(request).await, "send request");
     tokio::time::sleep(Duration::from_millis(20)).await;
     bridge.shutdown_pending();
     assert_eq!(bridge.expiration_task_count(), 0);
 
-    let error = recv_permission_result(rx)
-        .await
-        .expect_err("shutdown should fail pending batch");
+    let error = unwrap_err(
+        recv_permission_result(rx).await,
+        "shutdown should fail pending batch",
+    );
     assert_eq!(error.code, DAEMON_SHUTDOWN);
 
     tokio::time::sleep(Duration::from_millis(60)).await;
@@ -251,12 +277,10 @@ async fn timeout_removes_pending_batch_and_broadcasts_removal() {
     let (mut request, rx) = permission_request("tool-a");
     request.deadline = Duration::from_millis(10);
 
-    bridge.tx.send(request).await.expect("send request");
+    unwrap_ok(bridge.tx.send(request).await, "send request");
     tokio::time::sleep(Duration::from_millis(30)).await;
 
-    let error = recv_permission_result(rx)
-        .await
-        .expect_err("permission timeout");
+    let error = unwrap_err(recv_permission_result(rx).await, "permission timeout");
     assert_eq!(error.code, PERMISSION_TIMEOUT);
     assert_eq!(bridge.pending_permission_count(), 0);
     assert_eq!(bridge.expiration_task_count(), 0);
@@ -277,10 +301,8 @@ async fn zero_deadline_timeouts_leave_no_stale_expiration_handles() {
         let (mut request, rx) = permission_request(&format!("tool-{index}"));
         request.deadline = Duration::ZERO;
 
-        bridge.tx.send(request).await.expect("send request");
-        let error = recv_permission_result(rx)
-            .await
-            .expect_err("permission timeout");
+        unwrap_ok(bridge.tx.send(request).await, "send request");
+        let error = unwrap_err(recv_permission_result(rx).await, "permission timeout");
         assert_eq!(error.code, PERMISSION_TIMEOUT);
         assert_eq!(bridge.expiration_task_count(), 0);
     }
@@ -293,23 +315,28 @@ async fn requested_batches_include_absolute_expiration_timestamp() {
     let (mut request, _rx) = permission_request("tool-a");
     request.deadline = Duration::from_secs(45);
 
-    bridge.tx.send(request).await.expect("send request");
+    unwrap_ok(bridge.tx.send(request).await, "send request");
     tokio::time::sleep(Duration::from_millis(20)).await;
 
-    let requested = (0..4)
-        .find_map(|_| receiver.try_recv().ok())
-        .expect("permission request event");
+    let requested = unwrap_some(
+        (0..4).find_map(|_| receiver.try_recv().ok()),
+        "permission request event",
+    );
     assert_eq!(requested.event, "acp_permission_requested");
-    let expires_at = requested
-        .payload
-        .get("expires_at")
-        .and_then(|value| value.as_str())
-        .expect("expires_at should be present");
-    let created_at = requested
-        .payload
-        .get("created_at")
-        .and_then(|value| value.as_str())
-        .expect("created_at should be present");
+    let expires_at = unwrap_some(
+        requested
+            .payload
+            .get("expires_at")
+            .and_then(|value| value.as_str()),
+        "expires_at should be present",
+    );
+    let created_at = unwrap_some(
+        requested
+            .payload
+            .get("created_at")
+            .and_then(|value| value.as_str()),
+        "created_at should be present",
+    );
     assert_ne!(
         expires_at, created_at,
         "absolute deadline should not collapse to the created_at timestamp"
@@ -323,13 +350,14 @@ async fn permission_bridge_cancel_on_drop_rejects_pending_batches_without_timeou
     let (mut request, rx) = permission_request("tool-a");
     request.deadline = Duration::from_millis(40);
 
-    bridge.tx.send(request).await.expect("send request");
+    unwrap_ok(bridge.tx.send(request).await, "send request");
     tokio::time::sleep(Duration::from_millis(20)).await;
     drop(bridge);
 
-    let error = recv_permission_result(rx)
-        .await
-        .expect_err("drop should fail pending batch");
+    let error = unwrap_err(
+        recv_permission_result(rx).await,
+        "drop should fail pending batch",
+    );
     assert_eq!(error.code, DAEMON_SHUTDOWN);
 
     tokio::time::sleep(Duration::from_millis(60)).await;
