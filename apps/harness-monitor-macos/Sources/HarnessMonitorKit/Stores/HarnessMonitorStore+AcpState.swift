@@ -26,6 +26,9 @@ extension HarnessMonitorStore {
       return .droppedSessionMismatch
     }
     noteAcpSessionActivity(sessionID: snapshot.sessionId)
+    let staleRestartDecisionIDs = staleDecisionIDsForRestartedAcpRuntime(
+      replacedBy: snapshot
+    )
 
     let pendingStandaloneBatches = standaloneAcpPermissionBatches.filter {
       $0.acpId == snapshot.acpId
@@ -47,7 +50,7 @@ extension HarnessMonitorStore {
       activeAgents: selectedAcpAgents
     )
     reconcilePresentedAcpPermissionBatch()
-    reconcileAcpPermissionDecisions()
+    reconcileAcpPermissionDecisions(extraStaleDecisionIDs: staleRestartDecisionIDs)
     return AcpAgentApplyOutcome.applied
   }
 
@@ -258,5 +261,34 @@ extension HarnessMonitorStore {
     acpPermissionPayloadsByDecisionID = [:]
     acpPermissionResolutionStateByDecisionID = [:]
     stopAcpPermissionDecisionProcessing()
+  }
+
+  /// `agentId` keeps the visible row stable, while daemon permission batches still arrive under
+  /// the transient runtime `acpId`. When the same agent restarts with a new `acpId`, drop any
+  /// standalone batches from the retired runtime before rebuilding decision state so stale queue
+  /// rows do not outlive the row they belonged to.
+  private func staleDecisionIDsForRestartedAcpRuntime(
+    replacedBy snapshot: AcpAgentSnapshot
+  ) -> Set<String> {
+    guard
+      let previousSnapshot = selectedAcpAgents.first(where: {
+        $0.agentId == snapshot.agentId
+      }),
+      previousSnapshot.acpId != snapshot.acpId
+    else {
+      return []
+    }
+
+    let staleBatches = standaloneAcpPermissionBatches.filter {
+      $0.acpId == previousSnapshot.acpId
+    }
+    guard !staleBatches.isEmpty else {
+      return []
+    }
+
+    standaloneAcpPermissionBatches.removeAll {
+      $0.acpId == previousSnapshot.acpId
+    }
+    return Set(staleBatches.map { acpPermissionDecisionID(for: $0.batchId) })
   }
 }

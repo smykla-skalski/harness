@@ -5,7 +5,7 @@ extension HarnessMonitorStore {
     _ snapshot: AcpAgentSnapshot,
     into snapshots: [AcpAgentSnapshot]
   ) -> [AcpAgentSnapshot] {
-    var result = snapshots.filter { $0.acpId != snapshot.acpId }
+    var result = snapshots.filter { $0.agentId != snapshot.agentId }
     let idx =
       result.firstIndex { existing in acpAgentPrecedes(snapshot, existing) } ?? result.endIndex
     result.insert(snapshot, at: idx)
@@ -22,7 +22,7 @@ extension HarnessMonitorStore {
     if lhs.displayName != rhs.displayName {
       return lhs.displayName.localizedStandardCompare(rhs.displayName) == .orderedAscending
     }
-    return lhs.acpId < rhs.acpId
+    return lhs.agentId < rhs.agentId
   }
 
   func sortedAcpInspectSnapshots(

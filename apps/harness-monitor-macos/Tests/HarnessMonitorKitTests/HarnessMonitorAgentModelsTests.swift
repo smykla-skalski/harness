@@ -242,4 +242,26 @@ struct HarnessMonitorAgentModelsTests {
     #expect(prompt.primaryQuestion?.header == "Approval")
     #expect(prompt.primaryQuestion?.options.map(\.label) == ["Allow", "Deny"])
   }
+
+  @Test("ACP snapshot id uses the stable agent identifier")
+  func acpSnapshotIDUsesAgentIdentifier() {
+    let snapshot = AcpAgentSnapshot(
+      acpId: "acp-runtime-2",
+      sessionId: "session-1",
+      agentId: "worker-codex",
+      displayName: "Worker",
+      status: .active,
+      pid: 42,
+      pgid: 42,
+      projectDir: "/tmp/project",
+      pendingPermissions: 0,
+      permissionQueueDepth: 0,
+      pendingPermissionBatches: [],
+      terminalCount: 0,
+      createdAt: "2026-05-01T00:00:00Z",
+      updatedAt: "2026-05-01T00:00:00Z"
+    )
+
+    #expect(snapshot.id == "worker-codex")
+  }
 }

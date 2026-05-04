@@ -137,7 +137,37 @@ struct AcpRuntimeViewTests {
         == .announce(
           message: "Worker watchdog fired",
           announcement: AcpRuntimeWatchdogAnnouncement(state: "fired", announcedAt: now)
-        )
+      )
+    )
+  }
+
+  @Test("Prompt deadline presentation derives countdown from supplied clock tick")
+  func promptDeadlinePresentationUsesReferenceDate() throws {
+    let deadline = Date(timeIntervalSince1970: 125)
+    let normal = try #require(
+      AcpRuntimeDeadlinePresentation.presentation(
+        deadline: deadline,
+        now: Date(timeIntervalSince1970: 61)
+      )
+    )
+    #expect(normal.countdownLabel == "1:04")
+    #expect(normal.accessibilityLabel == "64 seconds remaining")
+    #expect(normal.isUrgent == false)
+
+    let urgent = try #require(
+      AcpRuntimeDeadlinePresentation.presentation(
+        deadline: deadline,
+        now: Date(timeIntervalSince1970: 116)
+      )
+    )
+    #expect(urgent.countdownLabel == "0:09")
+    #expect(urgent.accessibilityLabel == "9 seconds remaining")
+    #expect(urgent.isUrgent)
+    #expect(
+      AcpRuntimeDeadlinePresentation.presentation(
+        deadline: deadline,
+        now: Date(timeIntervalSince1970: 125)
+      ) == nil
     )
   }
 }
