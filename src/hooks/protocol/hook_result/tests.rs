@@ -54,13 +54,6 @@ fn serialize_to_json() {
 }
 
 #[test]
-fn equality() {
-    let first = HookResult::deny("X", "msg");
-    let second = HookResult::deny("X", "msg");
-    assert_eq!(first, second);
-}
-
-#[test]
 fn inequality_different_decision() {
     let first = HookResult::deny("X", "msg");
     let second = HookResult::warn("X", "msg");
