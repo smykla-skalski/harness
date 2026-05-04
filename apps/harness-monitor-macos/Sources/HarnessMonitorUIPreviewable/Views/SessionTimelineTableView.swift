@@ -96,6 +96,7 @@ struct SessionTimelineTableView: NSViewRepresentable {
   }
 
   static func dismantleNSView(_ scrollView: NSScrollView, coordinator: Coordinator) {
+    coordinator.cancelMeasurement(reason: "dismantle")
     (scrollView.documentView as? NSTableView)?.delegate = nil
     (scrollView.documentView as? NSTableView)?.dataSource = nil
   }

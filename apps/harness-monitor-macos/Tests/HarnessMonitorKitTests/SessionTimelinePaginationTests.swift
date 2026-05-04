@@ -120,6 +120,7 @@ struct SessionTimelineNavigationTests {
   }
 
   @Test("Signal timeline rows prefer compact layout while liveness rows stay wide")
+  @MainActor
   func signalTimelineRowsPreferCompactLayoutWhileLivenessRowsStayWide() {
     let signalRow = SessionTimelineRow.rows(
       for: SessionTimelineNodeBuilder(
@@ -327,6 +328,23 @@ struct SessionTimelineNavigationTests {
         payload: .object([:])
       )
     }
+  }
+
+  private func makeTimelineEntry(
+    kind: String,
+    agentID: String,
+    summary: String
+  ) -> TimelineEntry {
+    TimelineEntry(
+      entryId: "timeline-entry-\(kind)-\(agentID)",
+      recordedAt: "2026-04-14T10:00:00Z",
+      kind: kind,
+      sessionId: "session-1",
+      agentId: agentID,
+      taskId: nil,
+      summary: summary,
+      payload: .object([:])
+    )
   }
 
   private func makeTimelineRows(count: Int) -> [SessionTimelineRow] {
