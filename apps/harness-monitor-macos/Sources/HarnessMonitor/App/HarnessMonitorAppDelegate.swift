@@ -92,7 +92,9 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
       queue: .main
     ) { [weak self] notification in
       let window = notification.object as? NSWindow
-      MainActor.assumeIsolated {
+      // Hop explicitly. `MainActor.assumeIsolated` would trap if the
+      // block ever fires off-main on macOS 26.
+      Task { @MainActor [weak self] in
         self?.configureWindowForUITesting(window)
       }
     }
