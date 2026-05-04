@@ -297,6 +297,21 @@ private func parsedTimestampDate(from value: String) -> Date? {
     ?? spaceSeparatedFormatter.date(from: value)
 }
 
+@MainActor private let relativeUpdatedAtFormatter: RelativeDateTimeFormatter = {
+  let formatter = RelativeDateTimeFormatter()
+  formatter.locale = .autoupdatingCurrent
+  formatter.unitsStyle = .abbreviated
+  return formatter
+}()
+
+@MainActor
+public func formatRelativeUpdatedAt(_ value: String?, reference: Date = .now) -> String {
+  guard let value, let date = parsedTimestampDate(from: value) else {
+    return value ?? "n/a"
+  }
+  return relativeUpdatedAtFormatter.localizedString(for: date, relativeTo: reference)
+}
+
 private let homeDirectory = FileManager.default.homeDirectoryForCurrentUser.path(
   percentEncoded: false)
 
