@@ -179,10 +179,23 @@ impl AcpSessionSupervisor {
 
     /// Attach a sink that receives watchdog state transitions.
     ///
-    /// One-shot: the first call wins; subsequent calls are silently ignored.
-    /// `spawn_receive_loop` calls this exactly once per supervisor.
+    /// One-shot per supervisor lifetime. `spawn_receive_loop` calls this
+    /// exactly once. A second call is a programming error (the supervisor
+    /// would keep emitting to the original sink while the caller assumed the
+    /// new one took effect); we surface it via `debug_assert!` in test/dev
+    /// builds and warn in release. If a future reconnect path needs to
+    /// re-attach, replace `OnceLock` with `ArcSwap` rather than relaxing
+    /// this invariant silently.
     pub fn attach_event_emitter(&self, emitter: Arc<dyn WatchdogEventEmitter>) {
-        let _ = self.event_emitter.set(emitter);
+        if let Err(_existing) = self.event_emitter.set(emitter) {
+            debug_assert!(
+                false,
+                "attach_event_emitter called twice on the same supervisor; this is a programming error",
+            );
+            warn!(
+                "attach_event_emitter called twice; second emitter ignored, supervisor keeps emitting to first sink",
+            );
+        }
     }
 
     fn emit_transition(&self, from: WatchdogState, to: WatchdogState, reason: Option<&str>) {
