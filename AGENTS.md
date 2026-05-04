@@ -33,25 +33,7 @@ Unit tests are in-crate `#[test]` blocks. Integration tests live in `tests/integ
 
 Pre-commit: `cargo fmt --check && cargo clippy --lib && mise run test`
 
-For `apps/harness-monitor-macos`, `HarnessMonitor.xcodeproj` and `HarnessMonitor.xcworkspace` are generated from the Tuist manifests and are not tracked. Regenerate them with `mise run monitor:generate` before opening Xcode or after manifest changes. For custom macOS lanes, prefer the lock-aware wrapper with the generated workspace instead of raw `xcodebuild -project ...`.
-
-Harness Monitor app validation expectations:
-
-- `mise run monitor:build`
-- `mise run monitor:test`
-- `mise run monitor:xcodebuild -- -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination "platform=macOS,arch=$(uname -m),name=My Mac" build CODE_SIGNING_ALLOWED=NO`
-- All xcodebuild invocations must use one of the approved repo-root `-derivedDataPath` values:
-  - `xcode-derived` for quality gates, tests, and general dev builds
-  - `xcode-derived-e2e` for swarm + agents e2e/UI lanes
-  - `xcode-derived-instruments` for the instruments audit pipeline
-- Do not invent additional variant names beyond those approved roots.
-- For macOS Harness Monitor lanes, never use bare `-destination 'platform=macOS'` because it matches both `My Mac` and `Any Mac` and triggers the multiple-matching-destinations warning. On Apple Silicon, even `name=My Mac` is still ambiguous because Xcode exposes both `arm64` and `x86_64`. Use `-destination "platform=macOS,arch=$(uname -m),name=My Mac"` unless a more specific `id=...` selector is required.
-- Hard requirement: do not run the full macOS UI suite by default. Run only the smallest targeted build/test command needed for the current change, such as a single XCTest case, a single XCTest class, or a non-UI build lane.
-- Only run the full macOS app validation lane or the full `HarnessMonitorUITests` suite after the user explicitly asks for the full suite.
-- Targeted `HarnessMonitorUITests` runs must use the isolated `Harness Monitor UI Testing` host (`io.harnessmonitor.app.ui-testing`) instead of the shipping `Harness Monitor.app` bundle so local manual app usage is not interrupted.
-- Keep the `-ApplePersistenceIgnoreState YES` UI-test launch argument in place for the isolated host so macOS window restoration does not make targeted UI runs flaky.
-- The Harness Monitor targets run a strict Swift Quality Gate on every build with warnings-as-errors. Expect style/lint failures such as oversized view bodies and fix the source instead of bypassing the gate.
-- Prefer shared layout and control primitives for Harness Monitor UI density/readability work so button sizing and glass treatment stay consistent across screens.
+For the Harness Monitor macOS app (`apps/harness-monitor-macos`), see that directory's own `AGENTS.md` - it covers the Tuist project layout, exact `xcodebuild` destination rules, derivedData paths, agent profile wrappers, SwiftUI/UX rules, performance measurement, daemon modes, and Swift-specific gotchas (deinit isolation, scheme selection).
 
 ## Agent asset architecture
 
@@ -98,12 +80,16 @@ Repo-policy/manual-task enforcement is owned by the standalone `aff` CLI. Keep t
 - `core_defs.rs` - build info, timestamps, XDG paths, session scope (SHA256-hashed)
 - `rules.rs` - declarative denied-binary lists, make targets, etc.
 - `commands/` - 33 command handlers dispatched from CLI
+- `session/` - multi-agent orchestration: `types.rs` (SessionState, AgentRegistration, WorkItem, SessionRole), `roles.rs` (permission matrix), `storage.rs` (VersionedJsonRepository + JSONL audit log), `service.rs` (12 orchestration functions), `transport.rs` (13 CLI commands), `observe.rs` (cross-agent observation with periodic sweep)
+- `agents/runtime/` - AgentRuntime trait with 6 implementations (claude, codex, gemini, copilot, vibe, opencode), ConversationEvent types, signal protocol (write/read/acknowledge), liveness detection
 
 ### Data directories (XDG)
 
 - `$XDG_DATA_HOME/harness/suites/` - suite library
 - `$XDG_DATA_HOME/harness/runs/` - run directories (`{run_id}/{artifacts,commands,state,manifests,reports}`)
 - `$XDG_DATA_HOME/harness/contexts/{session-hash}/` - session context
+- `$XDG_DATA_HOME/harness/projects/project-{digest}/orchestration/` - multi-agent session state
+- `$XDG_DATA_HOME/harness/projects/project-{digest}/agents/signals/` - file-based agent signaling
 
 ## Code conventions
 
@@ -214,6 +200,4 @@ All dashboards in `resources/observability/grafana/dashboards/` use Grafana 12+ 
 - `tool-guard` denies direct use of `kubectl`, `kumactl`, `helm`, `docker`, `k3d` and routes write/question policy through the same combined pre-tool hook (see `rules.rs:26`)
 - `VersionedJsonRepository` saves atomically via tmp-file rename - don't read state files by path while a save is in progress, use the repository's `load()` method
 - If using XcodeBuildMCP, use the installed XcodeBuildMCP skill before calling XcodeBuildMCP tools. For `apps/harness-monitor-macos` work in a shared checkout, use `mise run monitor:agent:*` or `apps/harness-monitor-macos/Scripts/agent-xcode-env.sh ...` instead of raw `xcodebuildmcp` / plain `monitor:*` wrappers so agent Xcode state stays isolated from the developer's local Xcode.
-- `apps/harness-monitor-macos/HarnessMonitor.xcodeproj` is repo-owned metadata; keep `project.pbxproj`, shared workspace/scheme files, and Swift source membership in sync.
-- **Never wrap `deinit` cleanup in `MainActor.assumeIsolated { ... }`** on a `@MainActor` class (or `NSView` / `NSObject` subclass that's MainActor in the SDK overlay) under Swift 6 strict concurrency on macOS 26. ARC routinely drops the last reference on `com.apple.SwiftUI.DisplayLink` (notably during dashboard ↔ cockpit transitions or any SwiftUI view-tree rebuild), and `assumeIsolated` traps with `BUG IN CLIENT OF LIBDISPATCH: Block was expected to execute on queue [com.apple.main-thread]`. Confirmed crashes in `KeyWindowObserver.deinit`, `WindowCommandScopeTrackingNSView.deinit`, and an earlier `HarnessMonitorStore.deinit`. Required pattern: mark the storage `nonisolated(unsafe) var` so the nonisolated deinit can read it without the non-Sendable error, inline only thread-safe cleanup (`NotificationCenter.removeObserver(_:)` and `IOPMAssertionRelease` are documented thread-safe; treat `NSEvent.removeMonitor` as MainActor-only), and move any MainActor-only step (e.g. clearing routing state on a `@MainActor @Observable`) into the NSViewRepresentable's static `dismantleNSView(_:coordinator:)`, which SwiftUI guarantees runs on the MainActor when the representable is removed. Do not reach for `isolated deinit` (SE-0371) — the upcoming feature is not enabled in this project.
-- For Swift-only verification when the working tree carries dirty Rust changes, build with the `HarnessMonitor (External Daemon)` scheme; the default `HarnessMonitor` scheme runs a `Build harness daemon (parallel)` script phase that fails on broken Rust.
+- For Swift / macOS UI work in `apps/harness-monitor-macos`, see that directory's `AGENTS.md` gotchas (xcodeproj sync, External Daemon scheme, `MainActor.assumeIsolated` deinit trap).
