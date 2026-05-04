@@ -313,6 +313,162 @@ extension WorkspaceWindowCreatePane {
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
+  @ViewBuilder
+  func terminalConfigPillRow(
+    option: AgentCapabilityOption,
+    context: TerminalConfigurationContext
+  ) -> some View {
+    AgentsConfigPillFlow(
+      spacing: HarnessMonitorTheme.spacingSM,
+      lineSpacing: HarnessMonitorTheme.spacingSM
+    ) {
+      if option.transportChoices.count > 1 {
+        terminalTransportPill(option: option, context: context)
+      }
+      if !context.catalogModels.isEmpty {
+        terminalModelPill(context: context)
+      }
+      if !context.effortValues.isEmpty {
+        terminalEffortPill(context: context)
+      }
+      terminalRolePill
+      if showsAcpFallbackRoleMenu {
+        terminalFallbackRolePill
+      }
+      terminalPersonaPill
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private func terminalTransportPill(
+    option: AgentCapabilityOption,
+    context: TerminalConfigurationContext
+  ) -> some View {
+    let label = context.choice.id.isAcp ? "ACP" : "Terminal"
+    return AgentsConfigPill(
+      label: label,
+      state: .set,
+      accessibilityLabel: "Transport"
+    ) {
+      ForEach(option.transportChoices) { transportChoice in
+        Button {
+          context.selection.wrappedValue = transportChoice.id
+        } label: {
+          Text(transportChoice.id.isAcp ? "ACP" : "Terminal")
+        }
+        .disabled(!option.isEnabled(transportChoice))
+      }
+    }
+  }
+
+  private func terminalModelPill(
+    context: TerminalConfigurationContext
+  ) -> some View {
+    let label = selectedTerminalModelMenuTitle(context: context)
+    let isCatalogDefault =
+      context.modelBinding.wrappedValue
+      == (context.catalogModels.first { $0.id == context.modelBinding.wrappedValue }?.id ?? "")
+      && context.catalogModels.contains(where: { $0.id == context.modelBinding.wrappedValue })
+    let state: AgentsConfigPillState =
+      context.modelBinding.wrappedValue == RuntimeCustomModel.tag ? .set
+      : (isCatalogDefault ? .default : .set)
+    return AgentsConfigPill(
+      label: label,
+      state: state,
+      accessibilityLabel: "Model"
+    ) {
+      ForEach(context.catalogModels) { model in
+        Button(model.displayName) {
+          context.modelBinding.wrappedValue = model.id
+        }
+      }
+      Button("Custom...") {
+        context.modelBinding.wrappedValue = RuntimeCustomModel.tag
+      }
+    }
+  }
+
+  private func terminalEffortPill(
+    context: TerminalConfigurationContext
+  ) -> some View {
+    let current = context.effortBinding.wrappedValue
+    let label = current.isEmpty ? "Effort" : "Effort \(current.capitalized)"
+    let defaultEffort = WorkspaceWindowView.defaultEffortLevel(from: context.effortValues)
+    let state: AgentsConfigPillState = current == defaultEffort ? .default : .set
+    return AgentsConfigPill(
+      label: label,
+      state: state,
+      accessibilityLabel: "Effort"
+    ) {
+      ForEach(context.effortValues, id: \.self) { level in
+        Button(level.capitalized) {
+          context.effortBinding.wrappedValue = level
+        }
+      }
+    }
+  }
+
+  private var terminalRolePill: some View {
+    @Bindable var formModel = viewModel
+    let role = formModel.selectedRole
+    let label = "Role: \(role.title)"
+    let state: AgentsConfigPillState = role == .worker ? .default : .set
+    return AgentsConfigPill(
+      label: label,
+      state: state,
+      accessibilityLabel: "Role in session"
+    ) {
+      ForEach(SessionRole.allCases, id: \.self) { option in
+        Button(option.title) {
+          formModel.selectedRole = option
+        }
+      }
+    }
+  }
+
+  private var terminalFallbackRolePill: some View {
+    @Bindable var formModel = viewModel
+    let role = formModel.selectedAcpFallbackRole
+    let label = "Fallback: \(role.title)"
+    let state: AgentsConfigPillState = role == .worker ? .default : .set
+    return AgentsConfigPill(
+      label: label,
+      state: state,
+      accessibilityLabel: "Fallback role"
+    ) {
+      ForEach(SessionRole.allCases.filter { $0 != .leader }, id: \.self) { option in
+        Button(option.title) {
+          formModel.selectedAcpFallbackRole = option
+        }
+      }
+    }
+  }
+
+  private var terminalPersonaPill: some View {
+    @Bindable var formModel = viewModel
+    let selected = formModel.selectedPersona
+    let personaName: String? =
+      selected.flatMap { id in
+        viewModel.availablePersonas.first(where: { $0.identifier == id })?.name
+      }
+    let label = personaName ?? "Persona"
+    let state: AgentsConfigPillState = personaName == nil ? .additive : .set
+    return AgentsConfigPill(
+      label: label,
+      state: state,
+      accessibilityLabel: "Persona"
+    ) {
+      Button("None") {
+        formModel.selectedPersonaID = ""
+      }
+      ForEach(viewModel.availablePersonas, id: \.identifier) { persona in
+        Button(persona.name) {
+          formModel.selectedPersonaID = persona.identifier
+        }
+      }
+    }
+  }
+
   func terminalConfigurationContext(
     for option: AgentCapabilityOption
   ) -> TerminalConfigurationContext {

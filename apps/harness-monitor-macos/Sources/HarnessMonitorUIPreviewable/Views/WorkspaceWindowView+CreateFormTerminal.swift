@@ -61,19 +61,9 @@ extension WorkspaceWindowCreatePane {
     let context = terminalConfigurationContext(for: option)
 
     return AgentsCreateSectionCard {
-      DisclosureGroup {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-          terminalTransportChoicesSection(option: option, context: context)
-          terminalTransportNotice(option: option, choice: context.choice)
-          terminalModelField(context: context)
-          terminalEffortField(context: context)
-          roleAndPersonaSection
-        }
-        .padding(.top, HarnessMonitorTheme.spacingSM)
-      } label: {
-        Text("Configure")
-          .scaledFont(.headline)
-          .accessibilityAddTraits(.isHeader)
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+        terminalConfigPillRow(option: option, context: context)
+        terminalTransportNotice(option: option, choice: context.choice)
       }
     }
   }
