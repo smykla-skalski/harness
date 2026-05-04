@@ -243,6 +243,21 @@ final class SupervisorLifecycleTests: XCTestCase {
   }
 
   @MainActor
+  func test_runSupervisorTickPublishesLiveTickSnapshotToStore() async throws {
+    let store = try await HarnessMonitorStore.fixture(sessions: .twoActiveSessions)
+    await store.startSupervisor()
+    defer { Task { await store.stopSupervisor() } }
+
+    let initialRefreshTick = store.supervisorLiveTickRefreshTick
+
+    await store.runSupervisorTickForTesting()
+
+    let liveTick = await store.supervisorLiveTickSnapshot()
+    XCTAssertGreaterThan(store.supervisorLiveTickRefreshTick, initialRefreshTick)
+    XCTAssertNotNil(liveTick.lastSnapshotID)
+  }
+
+  @MainActor
   func test_seededStuckAgentScenarioQueuesDecisionOnForcedTick() async throws {
     let store = try await HarnessMonitorStore.fixture(sessions: .twoActiveSessions)
     store.seedSupervisorScenarioForTesting(named: "stuck-agent")

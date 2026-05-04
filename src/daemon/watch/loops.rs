@@ -19,6 +19,7 @@ use super::state::{
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, session_id_from_change_scope};
 use crate::daemon::index;
 use crate::daemon::protocol::StreamEvent;
+use crate::daemon::service;
 
 pub(super) const CHANGE_TRACKING_POLL_SQL: &str = "SELECT scope, version, change_seq
      FROM change_tracking
@@ -87,11 +88,29 @@ fn spawn_db_watch_loop(
                 reindex_sessions_from_paths(&db, &paths, &mut resolve_cache);
             }
 
+            reconcile_session_liveness_for_watch(async_db.get(), &db).await;
             let changes =
                 poll_change_tracking_prefer_async(async_db.get(), &db, &mut last_change_seq).await;
             emit_watch_changes(&sender, changes, Some(&db), async_db.get()).await;
         }
     })
+}
+
+async fn reconcile_session_liveness_for_watch(
+    async_db: Option<&Arc<AsyncDaemonDb>>,
+    db: &Arc<Mutex<DaemonDb>>,
+) {
+    let result = if let Some(async_db) = async_db {
+        service::reconcile_active_session_liveness_background_async(Some(async_db.as_ref())).await
+    } else {
+        let Ok(db_guard) = db.lock() else {
+            return;
+        };
+        service::reconcile_active_session_liveness_background(Some(&db_guard))
+    };
+    if let Err(error) = result {
+        tracing::warn!(%error, "failed to refresh session liveness before watch poll");
+    }
 }
 
 fn current_change_sequence(db: &Arc<Mutex<DaemonDb>>) -> i64 {

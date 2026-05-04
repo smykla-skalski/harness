@@ -211,6 +211,7 @@ extension HarnessMonitorStore {
     supervisorOpenDecisions = []
     supervisorSelectedDecisionID = nil
     supervisorPrimaryActionFocusDecisionID = nil
+    resetSupervisorLiveTick()
     supervisorBindings.pendingDecisionsBadgeSync?(0)
     if let controller = supervisorBindings.notificationController {
       await controller.resetBadge()
@@ -251,10 +252,7 @@ extension HarnessMonitorStore {
   }
 
   public func supervisorLiveTickSnapshot() async -> DecisionLiveTickSnapshot {
-    guard let service = supervisorStack?.service else {
-      return .placeholder
-    }
-    return await service.liveTickSnapshot()
+    supervisorLiveTick
   }
 
   public func withSupervisorAutoActionsSuppressed<Result: Sendable>(
@@ -285,6 +283,18 @@ extension HarnessMonitorStore {
       return
     }
     try await stack.decisionStore.insert(draft)
+  }
+
+  func applySupervisorLiveTick(_ snapshot: DecisionLiveTickSnapshot) {
+    guard supervisorLiveTick != snapshot else {
+      return
+    }
+    supervisorLiveTick = snapshot
+    supervisorLiveTickRefreshTick &+= 1
+  }
+
+  func resetSupervisorLiveTick() {
+    applySupervisorLiveTick(.placeholder)
   }
 
   public func isSupervisorBackgroundActivityScheduledForTesting() -> Bool {

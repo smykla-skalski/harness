@@ -138,6 +138,23 @@ struct WorkspaceWindowDecisionReloadTests {
     #expect(store.supervisorSelectedDecisionID == currentDecision.id)
   }
 
+  @Test("Live tick refresh updates runtime without reloading decision data")
+  func liveTickRefreshUpdatesRuntimeWithoutReloadingDecisions() async throws {
+    let seededDecision = makeDecision(id: "decision-live", createdAtOffset: 0)
+    let store = try await HarnessMonitorStore.fixture(sessions: .twoActiveSessions)
+    let view = WorkspaceWindowView(store: store)
+    view.currentDecisionsRuntime.decisions = [seededDecision]
+
+    await store.startSupervisor()
+    await store.runSupervisorTickForTesting()
+    await view.handleSupervisorLiveTickRefresh()
+
+    #expect(view.currentDecisionsRuntime.decisions == [seededDecision])
+    #expect(view.currentDecisionsRuntime.liveTick.lastSnapshotID != nil)
+
+    await store.stopSupervisor()
+  }
+
   private func scope(decisions: [Decision]) -> DecisionWorkspaceScope {
     DecisionWorkspaceScope(
       decisions: decisions,

@@ -185,6 +185,12 @@ public actor SupervisorService {
       tickID: snapshot.id
     )
     recordTickLatency(startedAt: tickStartedAt)
+    if let store {
+      let liveTick = liveTickSnapshot()
+      await MainActor.run {
+        store.applySupervisorLiveTick(liveTick)
+      }
+    }
   }
 
   private struct TickResults {

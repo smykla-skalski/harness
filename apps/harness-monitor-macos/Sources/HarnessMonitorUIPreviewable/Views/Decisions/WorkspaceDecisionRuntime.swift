@@ -27,6 +27,14 @@ final class WorkspaceDecisionRuntime {
 
     decisions = (try? await decisionStore.openDecisions()) ?? []
     auditEvents = Self.loadAuditEvents(from: store.modelContext)
+    await refreshLiveTick(from: store)
+  }
+
+  func refreshLiveTick(from store: HarnessMonitorStore?) async {
+    guard let store else {
+      liveTick = .placeholder
+      return
+    }
     liveTick = await store.supervisorLiveTickSnapshot()
   }
 

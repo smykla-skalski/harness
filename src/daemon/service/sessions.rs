@@ -12,6 +12,10 @@ mod liveness;
 
 #[cfg(test)]
 pub(crate) use liveness::clear_session_liveness_refresh_cache_entry;
+pub(crate) use liveness::{
+    reconcile_active_session_liveness_background,
+    reconcile_active_session_liveness_background_async,
+};
 #[cfg(test)]
 pub(crate) use liveness::stale_session_ids_for_liveness_refresh;
 use liveness::{
