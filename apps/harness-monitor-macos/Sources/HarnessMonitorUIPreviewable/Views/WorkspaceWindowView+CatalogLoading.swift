@@ -93,6 +93,24 @@ extension WorkspaceWindowView {
   }
 
   @MainActor
+  func reloadAgentPickerCatalogsIfPending() async {
+    guard !viewModel.didApplyLaunchSelectionAutoDefault else { return }
+    await loadAgentPickerCatalogs()
+  }
+
+  struct AgentLaunchAvailabilitySignal: Equatable {
+    let sandboxed: Bool
+    let acpIssue: HarnessMonitorStore.HostBridgeCapabilityIssue?
+  }
+
+  var agentLaunchAvailabilitySignal: AgentLaunchAvailabilitySignal {
+    AgentLaunchAvailabilitySignal(
+      sandboxed: store.daemonStatus?.manifest?.sandboxed ?? false,
+      acpIssue: store.hostBridgeCapabilityIssues["acp"]
+    )
+  }
+
+  @MainActor
   private func normalizePreferredLaunchSelection(
     acpAgents: [AcpAgentDescriptor],
     runtimeProbeResults: AcpRuntimeProbeResponse?
@@ -124,6 +142,8 @@ extension WorkspaceWindowView {
   private func resolveSelectionApplyingAcpDefaultIfFresh(
     options: [AgentCapabilityOption]
   ) -> AgentLaunchSelection {
+    defer { viewModel.didEvaluateInitialLaunchAutoDefault = true }
+
     if viewModel.didApplyLaunchSelectionAutoDefault {
       return viewModel.selectedLaunchSelection
     }
@@ -134,6 +154,13 @@ extension WorkspaceWindowView {
         forKey: HarnessMonitorAgentLaunchDefaults.preferredSelectionKey
       ) != nil
     if hasStoredSnapshot || hasStoredPreferredSelection {
+      viewModel.didApplyLaunchSelectionAutoDefault = true
+      return viewModel.selectedLaunchSelection
+    }
+
+    let isSubsequentEvaluation = viewModel.didEvaluateInitialLaunchAutoDefault
+    let formIsVisible = viewModel.selection == .create
+    if isSubsequentEvaluation && formIsVisible {
       viewModel.didApplyLaunchSelectionAutoDefault = true
       return viewModel.selectedLaunchSelection
     }

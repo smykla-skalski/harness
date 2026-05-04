@@ -363,6 +363,7 @@ extension WorkspaceWindowView {
     var hasFreshManagedAgentTuis = false
     var hasFreshManagedCodexRuns = false
     @ObservationIgnored var didApplyLaunchSelectionAutoDefault = false
+    @ObservationIgnored var didEvaluateInitialLaunchAutoDefault = false
     var displayState: AgentTuiDisplayState
     init(
       selection: WorkspaceSelection = .create,
