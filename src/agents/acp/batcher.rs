@@ -15,9 +15,15 @@ use super::ring::{RingConfig, SessionRing};
 use super::supervision::AcpSessionSupervisor;
 
 /// Handle for a notification batcher task.
+///
+/// `event_sender` is a clone of the same channel `events` reads from. Caller
+/// uses it to inject synthetic batches (supervisor watchdog state, permission
+/// asked, etc.) into the same per-session stream, so synthetic events are
+/// ordered alongside real notifications instead of arriving on a side channel.
 pub struct NotificationBatcherHandle {
     pub notifications: mpsc::Sender<RoutedSessionNotification>,
     pub events: mpsc::Receiver<EventBatch>,
+    pub event_sender: mpsc::Sender<EventBatch>,
     pub task: JoinHandle<()>,
 }
 
@@ -43,6 +49,7 @@ pub fn spawn_notification_batcher(
 ) -> NotificationBatcherHandle {
     let (notification_tx, notification_rx) = mpsc::channel(config.channel_buffer);
     let (event_tx, event_rx) = mpsc::channel(config.channel_buffer);
+    let event_sender = event_tx.clone();
     let task = tokio::spawn(notification_batch_loop(
         notification_rx,
         event_tx,
@@ -53,6 +60,7 @@ pub fn spawn_notification_batcher(
     NotificationBatcherHandle {
         notifications: notification_tx,
         events: event_rx,
+        event_sender,
         task,
     }
 }

@@ -24,7 +24,7 @@ use self::runtime_helpers::{report_protocol_result, route_session_notification};
 use self::session_start::initialize_and_bind_runtime_session;
 use crate::agents::acp::batcher::{RoutedSessionNotification, spawn_notification_batcher};
 use crate::agents::acp::client::HarnessAcpClient;
-use crate::agents::acp::connection::{ConnectionConfig, EventBatch};
+use crate::agents::acp::connection::{ConnectionConfig, EventBatch, SupervisorEventSink};
 use crate::agents::acp::permission::PermissionMode;
 use crate::agents::acp::supervision::AcpSessionSupervisor;
 use crate::agents::kind::DisconnectReason;
@@ -93,17 +93,26 @@ pub(super) fn spawn_protocol_task(
     let stdout = ChildStdout::from_std(stdout)?;
 
     let batcher = spawn_notification_batcher(
-        agent_name,
+        agent_name.clone(),
         Arc::clone(supervisor),
         ConnectionConfig::default(),
     );
-    let client = Arc::new(HarnessAcpClient::new(
-        project_dir.clone(),
-        project_dir.clone(),
-        None,
-        managed_cluster_binaries(),
-        permission_mode,
+    let event_sink = Arc::new(SupervisorEventSink::new(
+        batcher.event_sender.clone(),
+        agent_name.clone(),
+        session_id.to_string(),
     ));
+    supervisor.attach_event_emitter(Arc::clone(&event_sink) as _);
+    let client = Arc::new(
+        HarnessAcpClient::new(
+            project_dir.clone(),
+            project_dir.clone(),
+            None,
+            managed_cluster_binaries(),
+            permission_mode,
+        )
+        .with_event_sink(Arc::clone(&event_sink)),
+    );
     let (cancel_tx, cancel_rx) = mpsc::unbounded_channel();
     let (command_tx, command_rx) = mpsc::unbounded_channel();
     let (disconnect_tx, disconnects) = mpsc::channel(1);
