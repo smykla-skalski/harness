@@ -88,9 +88,7 @@ fn write_to_artifacts_allowed() {
     let path = temp.path().join("artifacts/test.txt");
 
     let request = WriteTextFileRequest::new("test-session", &path, "hello");
-    let result = client.handle_write_text_file(&request);
-
-    assert!(result.is_ok());
+    client.handle_write_text_file(&request).expect("write to artifacts allowed");
     assert_eq!(fs::read_to_string(&path).unwrap(), "hello");
 }
 
@@ -192,10 +190,10 @@ fn read_within_working_dir_allowed() {
     fs::write(&path, "content").unwrap();
 
     let request = ReadTextFileRequest::new("test-session", &path);
-    let result = client.handle_read_text_file(&request);
-
-    assert!(result.is_ok());
-    assert_eq!(result.unwrap().content, "content");
+    assert_eq!(
+        client.handle_read_text_file(&request).expect("read within working dir").content,
+        "content"
+    );
 }
 
 #[test]
@@ -207,10 +205,10 @@ fn read_with_line_and_limit() {
     let mut request = ReadTextFileRequest::new("test-session", &path);
     request.line = Some(2);
     request.limit = Some(2);
-    let result = client.handle_read_text_file(&request);
-
-    assert!(result.is_ok());
-    assert_eq!(result.unwrap().content, "line2\nline3");
+    assert_eq!(
+        client.handle_read_text_file(&request).expect("read with line and limit").content,
+        "line2\nline3"
+    );
 }
 
 #[test]

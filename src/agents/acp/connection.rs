@@ -414,8 +414,7 @@ mod tests {
         let notif = SessionNotification::new(SessionId::new("test"), update);
         let json = serde_json::to_string(&notif).expect("serialize");
 
-        let result = parse_notification(&json);
-        assert!(result.is_ok(), "failed to parse: {json}");
+        parse_notification(&json).expect("failed to parse valid notification json");
     }
 
     #[test]
@@ -434,9 +433,7 @@ mod tests {
             working_dir: std::env::current_dir().unwrap(),
         };
 
-        let child = config.spawn();
-        assert!(child.is_ok());
-        let mut child = child.unwrap();
+        let mut child = config.spawn().expect("spawn echo");
         let _ = child.wait();
     }
 

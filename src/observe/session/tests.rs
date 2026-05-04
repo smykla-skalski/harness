@@ -18,9 +18,7 @@ fn find_session_in_temp_dir() {
     fs::write(&session_file, "{}\n").unwrap();
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
-        let result = find_session("abc123", None);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), session_file);
+        assert_eq!(find_session("abc123", None).expect("find session"), session_file);
     });
 }
 
@@ -35,9 +33,7 @@ fn find_session_with_hint() {
     fs::write(project_b.join("sess.jsonl"), "{}\n").unwrap();
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
-        let result = find_session("sess", Some("beta"));
-        assert!(result.is_ok());
-        let path = result.unwrap();
+        let path = find_session("sess", Some("beta")).expect("find session with hint");
         assert!(path.to_string_lossy().contains("beta"));
     });
 }

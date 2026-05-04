@@ -110,13 +110,13 @@ fn full_state_serialization_round_trip() {
 #[test]
 fn can_write_bypass_always_allows() {
     let state = make_state(CreatePhase::Discovery, ApprovalMode::Bypass);
-    assert!(can_write(&state).is_ok());
+    can_write(&state).expect("bypass mode should allow write");
 }
 
 #[test]
 fn can_write_writing_phase_allows() {
     let state = make_state(CreatePhase::Writing, ApprovalMode::Interactive);
-    assert!(can_write(&state).is_ok());
+    can_write(&state).expect("writing phase should allow write");
 }
 
 #[test]
@@ -162,7 +162,7 @@ fn can_request_gate_bypass_denies() {
 #[test]
 fn can_request_prewrite_gate_in_prewrite_review() {
     let state = make_state(CreatePhase::PrewriteReview, ApprovalMode::Interactive);
-    assert!(can_request_gate(&state, ReviewGate::Prewrite).is_ok());
+    can_request_gate(&state, ReviewGate::Prewrite).expect("prewrite gate allowed in prewrite review");
 }
 
 #[test]
@@ -175,7 +175,7 @@ fn can_request_prewrite_gate_wrong_phase() {
 fn can_request_postwrite_gate_after_writing() {
     let mut state = make_state(CreatePhase::Writing, ApprovalMode::Interactive);
     state.draft.suite_tree_written = true;
-    assert!(can_request_gate(&state, ReviewGate::Postwrite).is_ok());
+    can_request_gate(&state, ReviewGate::Postwrite).expect("postwrite gate allowed after writing");
 }
 
 #[test]
@@ -187,7 +187,7 @@ fn can_request_postwrite_gate_without_writes_denies() {
 #[test]
 fn can_request_copy_gate_in_complete() {
     let state = make_state(CreatePhase::Complete, ApprovalMode::Interactive);
-    assert!(can_request_gate(&state, ReviewGate::Copy).is_ok());
+    can_request_gate(&state, ReviewGate::Copy).expect("copy gate allowed in complete phase");
 }
 
 #[test]
@@ -199,13 +199,13 @@ fn can_request_copy_gate_wrong_phase() {
 #[test]
 fn can_stop_bypass_allows() {
     let state = make_state(CreatePhase::Writing, ApprovalMode::Bypass);
-    assert!(can_stop(&state).is_ok());
+    can_stop(&state).expect("bypass mode should allow stop");
 }
 
 #[test]
 fn can_stop_cancelled_allows() {
     let state = make_state(CreatePhase::Cancelled, ApprovalMode::Interactive);
-    assert!(can_stop(&state).is_ok());
+    can_stop(&state).expect("cancelled state should allow stop");
 }
 
 #[test]
