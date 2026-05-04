@@ -18,6 +18,7 @@ use crate::workspace::utc_now;
 #[derive(Debug)]
 pub struct AcpWakePrompt {
     pub acp_id: String,
+    pub orchestration_session_id: String,
     pub protocol_session_id: String,
     pub project_dir: PathBuf,
     pub prompt: String,
@@ -42,11 +43,7 @@ impl AcpAgentManagerHandle {
     /// a single live wake per signal even under a storm of `task.drop` calls.
     /// Coalesced wakes return immediately at `info!`. The agent will still
     /// see the file signal on its next poll.
-    pub fn dispatch_wake_prompt(
-        &self,
-        runtime: &'static dyn AgentRuntime,
-        prompt: AcpWakePrompt,
-    ) {
+    pub fn dispatch_wake_prompt(&self, runtime: &'static dyn AgentRuntime, prompt: AcpWakePrompt) {
         let session = match self.session(&prompt.acp_id) {
             Ok(session) => session,
             Err(error) => {
@@ -67,10 +64,7 @@ impl AcpAgentManagerHandle {
             record_wake_event(
                 WakeEventLevel::Info,
                 "coalesced",
-                &[
-                    ("acp_id", &prompt.acp_id),
-                    ("signal_id", &prompt.signal_id),
-                ],
+                &[("acp_id", &prompt.acp_id), ("signal_id", &prompt.signal_id)],
             );
             return;
         }
@@ -181,6 +175,7 @@ fn run_wake_prompt(
 ) {
     let AcpWakePrompt {
         acp_id,
+        orchestration_session_id,
         protocol_session_id,
         project_dir,
         prompt: prompt_text,
@@ -205,14 +200,23 @@ fn run_wake_prompt(
                     ("agent_id", &agent_id),
                 ],
             );
-            record_wake_accept(
+            if record_wake_accept(
                 runtime,
                 &project_dir,
-                &protocol_session_id,
+                &returned_session_id,
                 &signal_id,
                 &agent_id,
                 &acp_id,
-            );
+            ) {
+                sync_wake_accept_to_daemon(
+                    manager,
+                    &orchestration_session_id,
+                    &agent_id,
+                    &signal_id,
+                    &project_dir,
+                    &acp_id,
+                );
+            }
         }
         Err(error) => {
             record_wake_event(
@@ -237,7 +241,7 @@ fn record_wake_accept(
     signal_id: &str,
     agent_id: &str,
     acp_id: &str,
-) {
+) -> bool {
     let signal_dir = runtime.signal_dir(project_dir, protocol_session_id);
     let ack = SignalAck {
         signal_id: signal_id.to_string(),
@@ -248,25 +252,90 @@ fn record_wake_accept(
         details: Some("acp wake prompt acknowledged via session/prompt".into()),
     };
     match acknowledge_signal(&signal_dir, &ack) {
-        Ok(()) => record_wake_event(
-            WakeEventLevel::Info,
-            "accepted",
-            &[
-                ("acp_id", &acp_id),
-                ("protocol_session_id", &protocol_session_id),
-                ("signal_id", &signal_id),
-                ("agent_id", &agent_id),
-            ],
-        ),
-        Err(error) => record_wake_event(
+        Ok(()) => {
+            record_wake_event(
+                WakeEventLevel::Info,
+                "accepted",
+                &[
+                    ("acp_id", &acp_id),
+                    ("protocol_session_id", &protocol_session_id),
+                    ("signal_id", &signal_id),
+                    ("agent_id", &agent_id),
+                ],
+            );
+            true
+        }
+        Err(error) => {
+            record_wake_event(
+                WakeEventLevel::Warn,
+                "ack_write_failed",
+                &[
+                    ("acp_id", &acp_id),
+                    ("protocol_session_id", &protocol_session_id),
+                    ("signal_id", &signal_id),
+                    ("error", &error),
+                ],
+            );
+            false
+        }
+    }
+}
+
+fn sync_wake_accept_to_daemon(
+    manager: &AcpAgentManagerHandle,
+    orchestration_session_id: &str,
+    agent_id: &str,
+    signal_id: &str,
+    project_dir: &Path,
+    acp_id: &str,
+) {
+    let db = match manager.db() {
+        Ok(db) => db,
+        Err(error) => {
+            record_wake_event(
+                WakeEventLevel::Warn,
+                "ack_sync_skipped",
+                &[
+                    ("acp_id", &acp_id),
+                    ("signal_id", &signal_id),
+                    ("error", &error),
+                ],
+            );
+            return;
+        }
+    };
+    let db = match db.lock() {
+        Ok(guard) => guard,
+        Err(error) => {
+            record_wake_event(
+                WakeEventLevel::Warn,
+                "ack_sync_lock_poisoned",
+                &[
+                    ("acp_id", &acp_id),
+                    ("signal_id", &signal_id),
+                    ("error", &error),
+                ],
+            );
+            error.into_inner()
+        }
+    };
+    if let Err(error) = service::record_signal_ack_and_broadcast(
+        orchestration_session_id,
+        agent_id,
+        signal_id,
+        AckResult::Accepted,
+        project_dir,
+        Some(&db),
+        Some(&manager.state.sender),
+    ) {
+        record_wake_event(
             WakeEventLevel::Warn,
-            "ack_write_failed",
+            "ack_sync_failed",
             &[
                 ("acp_id", &acp_id),
-                ("protocol_session_id", &protocol_session_id),
                 ("signal_id", &signal_id),
                 ("error", &error),
             ],
-        ),
+        );
     }
 }

@@ -4,6 +4,7 @@ use axum::Json;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use tracing::field::display;
+use uuid::Uuid;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::telemetry::record_daemon_http_metrics;
@@ -138,10 +139,12 @@ pub(super) const fn request_activity_log_level() -> tracing::Level {
     crate::DAEMON_ACTIVITY_LOG_LEVEL
 }
 
-pub(super) fn extract_request_id(headers: &HeaderMap) -> String {
+pub(crate) fn extract_request_id(headers: &HeaderMap) -> String {
     headers
         .get("x-request-id")
         .and_then(|value| value.to_str().ok())
-        .unwrap_or("")
-        .to_string()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string)
+        .unwrap_or_else(|| format!("daemon-{}", Uuid::new_v4()))
 }

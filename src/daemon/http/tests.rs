@@ -32,7 +32,7 @@ use super::core::{
     RuntimeSessionResolutionQuery, get_diagnostics, get_health, get_ready,
     get_runtime_session_resolution,
 };
-use super::response::{map_json, request_activity_log_level};
+use super::response::{extract_request_id, map_json, request_activity_log_level};
 use super::runtime_session::post_runtime_session;
 use super::sessions::{
     SessionScopeQuery, get_timeline, post_end_session, post_observe_session, post_session_join,
@@ -201,6 +201,27 @@ async fn map_json_maps_session_scope_denied_to_403() {
 #[test]
 fn request_logging_uses_debug_activity_level() {
     assert_eq!(request_activity_log_level(), tracing::Level::DEBUG);
+}
+
+#[test]
+fn extract_request_id_preserves_supplied_header() {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "x-request-id",
+        "req-123".parse().expect("request id header"),
+    );
+
+    assert_eq!(extract_request_id(&headers), "req-123");
+}
+
+#[test]
+fn extract_request_id_generates_fallback_when_header_missing() {
+    let first = extract_request_id(&HeaderMap::new());
+    let second = extract_request_id(&HeaderMap::new());
+
+    assert!(first.starts_with("daemon-"));
+    assert!(second.starts_with("daemon-"));
+    assert_ne!(first, second);
 }
 
 #[tokio::test]
