@@ -1,0 +1,124 @@
+import Foundation
+import HarnessMonitorKit
+
+struct LaunchPresetSnapshot: Codable, Sendable, Equatable {
+  enum Mode: String, Codable, Sendable {
+    case terminal
+    case codex
+  }
+
+  var mode: Mode
+  var providerStorageKey: String?
+  var role: String?
+  var fallbackRole: String?
+  var personaID: String?
+  var modelByRuntime: [String: String]
+  var customModelByRuntime: [String: String]
+  var effortByRuntime: [String: String]
+  var rows: Int
+  var cols: Int
+  var codexMode: String?
+  var codexModel: String?
+  var customCodexModel: String?
+  var codexEffort: String?
+
+  init(
+    mode: Mode,
+    providerStorageKey: String? = nil,
+    role: String? = nil,
+    fallbackRole: String? = nil,
+    personaID: String? = nil,
+    modelByRuntime: [String: String] = [:],
+    customModelByRuntime: [String: String] = [:],
+    effortByRuntime: [String: String] = [:],
+    rows: Int = 32,
+    cols: Int = 120,
+    codexMode: String? = nil,
+    codexModel: String? = nil,
+    customCodexModel: String? = nil,
+    codexEffort: String? = nil
+  ) {
+    self.mode = mode
+    self.providerStorageKey = providerStorageKey
+    self.role = role
+    self.fallbackRole = fallbackRole
+    self.personaID = personaID
+    self.modelByRuntime = modelByRuntime
+    self.customModelByRuntime = customModelByRuntime
+    self.effortByRuntime = effortByRuntime
+    self.rows = rows
+    self.cols = cols
+    self.codexMode = codexMode
+    self.codexModel = codexModel
+    self.customCodexModel = customCodexModel
+    self.codexEffort = codexEffort
+  }
+}
+
+enum LaunchPresetDefaults {
+  static let storageKey = "harness.monitor.workspace.lastLaunchPreset"
+
+  static func decode(from raw: String?) -> LaunchPresetSnapshot? {
+    guard let raw, let data = raw.data(using: .utf8) else {
+      return nil
+    }
+    return try? JSONDecoder().decode(LaunchPresetSnapshot.self, from: data)
+  }
+
+  static func encode(_ snapshot: LaunchPresetSnapshot) -> String? {
+    guard let data = try? JSONEncoder().encode(snapshot) else {
+      return nil
+    }
+    return String(data: data, encoding: .utf8)
+  }
+
+  @MainActor
+  static func write(_ snapshot: LaunchPresetSnapshot) {
+    guard let raw = encode(snapshot) else { return }
+    UserDefaults.standard.set(raw, forKey: storageKey)
+  }
+
+  @MainActor
+  static func read() -> LaunchPresetSnapshot? {
+    decode(from: UserDefaults.standard.string(forKey: storageKey))
+  }
+
+  @MainActor
+  static func captureAndWrite(
+    viewModel: WorkspaceWindowView.ViewModel,
+    mode: LaunchPresetSnapshot.Mode
+  ) {
+    let modelByRuntime = Dictionary(
+      uniqueKeysWithValues: viewModel.selectedTerminalModelByRuntime.map {
+        ($0.key.rawValue, $0.value)
+      }
+    )
+    let customModelByRuntime = Dictionary(
+      uniqueKeysWithValues: viewModel.customTerminalModelByRuntime.map {
+        ($0.key.rawValue, $0.value)
+      }
+    )
+    let effortByRuntime = Dictionary(
+      uniqueKeysWithValues: viewModel.selectedTerminalEffortByRuntime.map {
+        ($0.key.rawValue, $0.value)
+      }
+    )
+    let snapshot = LaunchPresetSnapshot(
+      mode: mode,
+      providerStorageKey: viewModel.selectedLaunchSelection.storageKey,
+      role: viewModel.selectedRole.rawValue,
+      fallbackRole: viewModel.selectedAcpFallbackRole.rawValue,
+      personaID: viewModel.selectedPersona,
+      modelByRuntime: modelByRuntime,
+      customModelByRuntime: customModelByRuntime,
+      effortByRuntime: effortByRuntime,
+      rows: viewModel.rows,
+      cols: viewModel.cols,
+      codexMode: viewModel.codexMode.rawValue,
+      codexModel: viewModel.selectedCodexModel,
+      customCodexModel: viewModel.customCodexModel,
+      codexEffort: viewModel.selectedCodexEffort
+    )
+    write(snapshot)
+  }
+}

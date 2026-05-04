@@ -79,7 +79,7 @@ struct AcpPermissionModal: View {
 
   @ViewBuilder private var actionRow: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      Button("Defer") {
+      Button("Dismiss") {
         store.presentingAcpPermissionBatch = nil
         store.supervisorSelectedDecisionID = nil
       }
@@ -88,7 +88,7 @@ struct AcpPermissionModal: View {
       .accessibilityIdentifier(HarnessMonitorAccessibility.acpPermissionModalClose)
       Spacer()
       if payload.isRenderable {
-        Button("Review in Workspace") {
+        Button("Open Workspace") {
           store.requestWorkspaceDecisionSelection(decisionID: decisionID)
           store.supervisorSelectedDecisionID = decisionID
           store.requestPrimaryDecisionActionFocus(decisionID: decisionID)

@@ -109,7 +109,7 @@ public struct AcpPermissionAttentionToastView: View {
             .harnessToastDismissGlass()
         }
         .harnessDismissButtonStyle()
-        .accessibilityLabel("Dismiss permission alert")
+        .accessibilityLabel("Dismiss")
         .accessibilityIdentifier(HarnessMonitorAccessibility.acpPermissionToastCloseButton)
 
       }

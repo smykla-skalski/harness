@@ -138,6 +138,7 @@ extension WorkspaceWindowView {
           store.toast.enqueueUndoable("Started Codex run") {
             _ = await undoStore.interruptCodexRun(runID: runID)
           }
+          LaunchPresetDefaults.captureAndWrite(viewModel: viewModel, mode: .codex)
         } else {
           viewModel.codexStartResult = "nil"
         }

@@ -51,6 +51,7 @@ extension WorkspaceWindowView {
     store.toast.enqueueUndoable("Started \(providerLabel) in Terminal") {
       _ = await undoStore.stopAgentTui(tuiID: startedTuiID)
     }
+    LaunchPresetDefaults.captureAndWrite(viewModel: viewModel, mode: .terminal)
     resetTerminalCreateForm(startedTui: startedTui)
   }
 
