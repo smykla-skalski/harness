@@ -79,11 +79,11 @@ struct AcpPermissionModal: View {
 
   @ViewBuilder private var actionRow: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      Button("Close") {
+      Button("Defer") {
         store.presentingAcpPermissionBatch = nil
         store.supervisorSelectedDecisionID = nil
       }
-      .keyboardShortcut(payload.isRenderable ? .cancelAction : .defaultAction)
+      .keyboardShortcut(.cancelAction)
       .disabled(isResolving)
       .accessibilityIdentifier(HarnessMonitorAccessibility.acpPermissionModalClose)
       Spacer()

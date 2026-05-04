@@ -130,10 +130,9 @@ extension WorkspaceWindowUITests {
     let app = launchInCockpitPreview(
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START": "1"]
     )
-    openWorkspaceWindow(in: app)
 
     XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
+      waitUntil(timeout: Self.uiTimeout) {
         self.element(in: app, identifier: Accessibility.workspaceWindow).exists
           && self.element(
             in: app,
@@ -156,10 +155,9 @@ extension WorkspaceWindowUITests {
         "HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START": "1",
       ]
     )
-    openWorkspaceWindow(in: app)
 
     XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
+      waitUntil(timeout: Self.uiTimeout) {
         self.element(in: app, identifier: Accessibility.workspaceWindow).exists
       },
       "Permission prompt on start should immediately open the Workspace window"
@@ -167,17 +165,26 @@ extension WorkspaceWindowUITests {
 
     let acpDecisionID = "acp-permission:preview-acp-permission-1"
     let decisionRow = button(in: app, identifier: Accessibility.decisionRow(acpDecisionID))
-    XCTAssertTrue(waitForElement(decisionRow, timeout: Self.uiTimeout))
+    XCTAssertTrue(
+      waitForElement(decisionRow, timeout: Self.uiTimeout),
+      "ACP permission route should preselect the decision row in Workspace"
+    )
     tapButton(in: app, identifier: Accessibility.decisionRow(acpDecisionID))
 
     let acpPanel = element(in: app, identifier: Accessibility.decisionAcpPanel)
-    XCTAssertTrue(waitForElement(acpPanel, timeout: Self.actionTimeout))
+    XCTAssertTrue(
+      waitForElement(acpPanel, timeout: Self.actionTimeout),
+      "Selecting the ACP decision row should open the ACP decision panel"
+    )
 
     let terminalToggle = element(
       in: app,
       identifier: Accessibility.decisionAcpRequest("preview-request-terminal")
     )
-    XCTAssertTrue(waitForElement(terminalToggle, timeout: Self.actionTimeout))
+    XCTAssertTrue(
+      waitForElement(terminalToggle, timeout: Self.actionTimeout),
+      "ACP decision panel should render the request toggle list"
+    )
     tapElement(
       in: app,
       identifier: Accessibility.decisionAcpRequest("preview-request-terminal")
@@ -201,6 +208,54 @@ extension WorkspaceWindowUITests {
     XCTAssertFalse(
       element(in: app, identifier: Accessibility.acpPermissionModal).exists,
       "ACP decision state should live only in Decisions, without a duplicate modal surface"
+    )
+  }
+
+  func testPermissionPromptCommandReturnApprovesSelectedRequests() throws {
+    let app = launchInCockpitPreview(
+      additionalEnvironment: [
+        "HARNESS_MONITOR_PREVIEW_ACP_PENDING": "1",
+        "HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START": "1",
+      ]
+    )
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.uiTimeout) {
+        self.element(in: app, identifier: Accessibility.workspaceWindow).exists
+      },
+      "Permission prompt on start should immediately open the Workspace window"
+    )
+
+    let acpDecisionID = "acp-permission:preview-acp-permission-1"
+    let decisionRow = button(in: app, identifier: Accessibility.decisionRow(acpDecisionID))
+    XCTAssertTrue(
+      waitForElement(decisionRow, timeout: Self.uiTimeout),
+      "ACP permission route should preselect the decision row in Workspace"
+    )
+    tapButton(in: app, identifier: Accessibility.decisionRow(acpDecisionID))
+
+    let approveButton = button(
+      in: app,
+      identifier: Accessibility.decisionAction("approve-selected")
+    )
+    XCTAssertTrue(
+      waitForElement(approveButton, timeout: Self.actionTimeout),
+      "ACP permission decision should expose the approve-selected action"
+    )
+
+    app.activate()
+    app.typeKey(.return, modifierFlags: .command)
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.uiTimeout) {
+        !self.element(in: app, identifier: Accessibility.decisionRow(acpDecisionID)).exists
+          && !self.element(in: app, identifier: Accessibility.decisionAcpPanel).exists
+      },
+      """
+      Command-Return should approve the selected ACP requests from the Workspace decisions desk.
+      rowExists=\(self.element(in: app, identifier: Accessibility.decisionRow(acpDecisionID)).exists)
+      panelExists=\(self.element(in: app, identifier: Accessibility.decisionAcpPanel).exists)
+      """
     )
   }
 }

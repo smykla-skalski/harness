@@ -57,13 +57,29 @@ extension HarnessMonitorStore {
   }
 
   @discardableResult
-  public func presentSuccessFeedback(_ message: String) -> UUID {
-    toast.presentSuccess(message)
+  public func presentSuccessFeedback(
+    _ message: String,
+    accessibilityIdentifier: String? = nil,
+    rollupDuplicates: Bool = false
+  ) -> UUID {
+    toast.presentSuccess(
+      message,
+      accessibilityIdentifier: accessibilityIdentifier,
+      rollupDuplicates: rollupDuplicates
+    )
   }
 
   @discardableResult
-  public func presentFailureFeedback(_ message: String) -> UUID {
-    toast.presentFailure(message)
+  public func presentFailureFeedback(
+    _ message: String,
+    accessibilityIdentifier: String? = nil,
+    rollupDuplicates: Bool = false
+  ) -> UUID {
+    toast.presentFailure(
+      message,
+      accessibilityIdentifier: accessibilityIdentifier,
+      rollupDuplicates: rollupDuplicates
+    )
   }
 
   public func dismissFeedback(id: UUID) {

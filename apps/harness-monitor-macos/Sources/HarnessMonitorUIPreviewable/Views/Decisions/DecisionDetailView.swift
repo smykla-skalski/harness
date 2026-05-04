@@ -280,7 +280,13 @@ public struct DecisionDetailView: View {
       await viewModel.invoke(action: action)
     }
     .disabled(contextAdapter.isActionDisabled(action.id))
-    if isPrimaryFocusTarget && isProminentActionCandidate(action) {
+    if let shortcut = contextAdapter.keyboardShortcut(
+      for: action,
+      isPrimaryFocusTarget: isPrimaryFocusTarget
+    ) {
+      button
+        .keyboardShortcut(shortcut.key, modifiers: shortcut.modifiers)
+    } else if isPrimaryFocusTarget && isProminentActionCandidate(action) {
       button
         .keyboardShortcut(.defaultAction)
     } else if action.kind == .dismiss {

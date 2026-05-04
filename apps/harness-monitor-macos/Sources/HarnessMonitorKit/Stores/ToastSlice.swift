@@ -50,25 +50,49 @@ public final class ToastSlice {
   // MARK: - Public API
 
   @discardableResult
-  public func presentSuccess(_ message: String) -> UUID {
-    present(message: message, severity: .success)
+  public func presentSuccess(
+    _ message: String,
+    accessibilityIdentifier: String? = nil,
+    rollupDuplicates: Bool = false
+  ) -> UUID {
+    present(
+      message: message,
+      severity: .success,
+      accessibilityIdentifier: accessibilityIdentifier,
+      rollupDuplicates: rollupDuplicates
+    )
   }
 
   @discardableResult
-  public func presentFailure(_ message: String) -> UUID {
-    present(message: message, severity: .failure)
+  public func presentFailure(
+    _ message: String,
+    accessibilityIdentifier: String? = nil,
+    rollupDuplicates: Bool = false
+  ) -> UUID {
+    present(
+      message: message,
+      severity: .failure,
+      accessibilityIdentifier: accessibilityIdentifier,
+      rollupDuplicates: rollupDuplicates
+    )
   }
 
   @discardableResult
   public func present(message: String, severity: ActionFeedback.Severity) -> UUID {
-    present(message: message, severity: severity, accessibilityIdentifier: nil)
+    present(
+      message: message,
+      severity: severity,
+      accessibilityIdentifier: nil,
+      rollupDuplicates: false
+    )
   }
 
   @discardableResult
   public func present(
     message: String,
     severity: ActionFeedback.Severity,
-    accessibilityIdentifier: String?
+    accessibilityIdentifier: String?,
+    rollupDuplicates: Bool = false
   ) -> UUID {
     let now = clock.now
     let window = dedupeWindow
@@ -85,6 +109,9 @@ public final class ToastSlice {
     if let existingIndex {
       let existing = activeFeedback[existingIndex]
       var refreshed = existing
+      if rollupDuplicates {
+        refreshed.repeatCount += 1
+      }
       refreshed.issuedAt = now
       refreshed.pausedRemaining = nil
       activeFeedback[existingIndex] = refreshed
@@ -253,7 +280,13 @@ public final class ToastSlice {
     case .success: prefix = "Success."
     case .failure: prefix = "Action failed."
     }
-    let payload = AttributedString("\(prefix) \(feedback.message)")
+    let repetitionNotice =
+      if feedback.repeatCount > 1 {
+        " Repeated \(feedback.repeatCount) times."
+      } else {
+        ""
+      }
+    let payload = AttributedString("\(prefix) \(feedback.message)\(repetitionNotice)")
     AccessibilityNotification.Announcement(payload).post()
   }
 }

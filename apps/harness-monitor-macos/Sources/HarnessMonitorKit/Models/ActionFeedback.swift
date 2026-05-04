@@ -10,6 +10,7 @@ public struct ActionFeedback: Identifiable, Equatable, Hashable, Sendable {
   public let message: String
   public let severity: Severity
   public let accessibilityIdentifier: String?
+  public var repeatCount: Int
   public var issuedAt: ContinuousClock.Instant
   public var pausedRemaining: Duration?
 
@@ -18,6 +19,7 @@ public struct ActionFeedback: Identifiable, Equatable, Hashable, Sendable {
     message: String,
     severity: Severity,
     accessibilityIdentifier: String? = nil,
+    repeatCount: Int = 1,
     issuedAt: ContinuousClock.Instant,
     pausedRemaining: Duration? = nil
   ) {
@@ -25,6 +27,7 @@ public struct ActionFeedback: Identifiable, Equatable, Hashable, Sendable {
     self.message = message
     self.severity = severity
     self.accessibilityIdentifier = accessibilityIdentifier
+    self.repeatCount = repeatCount
     self.issuedAt = issuedAt
     self.pausedRemaining = pausedRemaining
   }

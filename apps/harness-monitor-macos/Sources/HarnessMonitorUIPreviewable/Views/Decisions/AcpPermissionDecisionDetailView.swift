@@ -31,11 +31,13 @@ private struct InteractiveAcpPermissionDecisionDetailView: View {
     let resolutionState =
       store.acpPermissionResolutionState(for: payload.decisionID)
       ?? payload.defaultResolutionState
+    let isResolving =
+      resolutionState.isSubmitting
+      || store.resolvingAcpPermissionBatchID == payload.rawBatch.batchId
     AcpPermissionDecisionDetailContent(
       payload: payload,
       resolutionState: resolutionState,
-      isResolving: resolutionState.isSubmitting
-        || store.resolvingAcpPermissionBatchID == payload.rawBatch.batchId,
+      isResolving: isResolving,
       lastMessageAt: store.acpPermissionLastSignalAt(sessionID: payload.rawBatch.sessionId)
     ) { requestID, isSelected in
       store.setAcpPermissionRequestSelection(

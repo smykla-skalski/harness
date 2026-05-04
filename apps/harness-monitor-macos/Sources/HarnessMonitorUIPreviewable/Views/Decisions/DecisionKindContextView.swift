@@ -18,6 +18,11 @@ struct DecisionKindContextView: View {
 
 @MainActor
 struct DecisionKindContextAdapter {
+  struct ActionKeyboardShortcut {
+    let key: KeyEquivalent
+    let modifiers: EventModifiers
+  }
+
   enum Kind {
     case generic
     case acpPermission(AcpPermissionDecisionPayload)
@@ -52,6 +57,22 @@ struct DecisionKindContextAdapter {
       return actions
     }
     return payload.suggestedActions()
+  }
+
+  func keyboardShortcut(
+    for action: SuggestedAction,
+    isPrimaryFocusTarget: Bool
+  ) -> ActionKeyboardShortcut? {
+    guard case .acpPermission = kind else {
+      return nil
+    }
+    if isPrimaryFocusTarget {
+      return ActionKeyboardShortcut(key: .return, modifiers: [.command])
+    }
+    if AcpPermissionDecisionActionID.isDenyAction(action.id) {
+      return ActionKeyboardShortcut(key: .delete, modifiers: [.command])
+    }
+    return nil
   }
 
   var prefersSubtlePrimaryAction: Bool {
