@@ -1,6 +1,16 @@
 import HarnessMonitorKit
 import SwiftUI
 
+// Intentional monolith: this view is the agent detail pane's layout root.
+// It concatenates the sections that all key off one agent and share the
+// parent's transport state (awaiting-decision strip, runtime card, identity
+// strip, fact grid, capability columns, hook points, persona / assigned
+// tasks, live transcript, role actions, send update composer).
+// Decompose-on-touch: the next change that adds >20 lines or new @State /
+// @AppStorage to a section extracts that section into a file-private view
+// in the same file (or a sibling file in this directory) before merge.
+// If a section is already large enough to merit its own file at the time
+// of the next touch, prefer the sibling file over more nested types here.
 struct AgentDetailSection: View {
   @Environment(\.openWindow)
   private var openWindow
@@ -49,17 +59,9 @@ struct AgentDetailSection: View {
   private var rolePickerValues: [SessionRole] {
     Self.rolePickerOptions(for: agent.role)
   }
-  private var effectiveSelectedRole: SessionRole {
-    Self.submittedRoleSelection(
-      draftRole: selectedRole,
-      agentRole: agent.role
-    )
-  }
 
-  private var facts: [InspectorFact] {
+  private var overviewFacts: [AgentDetailFact] {
     [
-      .init(title: "Role", value: agent.role.title),
-      .init(title: "Current Task", value: currentTaskTitle),
       .init(title: "Last Activity", value: formatTimestamp(agent.lastActivityAt)),
       .init(
         title: "Pickup Time",
@@ -68,8 +70,52 @@ struct AgentDetailSection: View {
     ]
   }
 
-  private var capabilityBadges: [String] {
+  private var runtimeProfileFacts: [AgentDetailFact] {
+    [
+      .init(
+        title: "Transcript",
+        value: agent.runtimeCapabilities.supportsNativeTranscript ? "Native" : "Ledger"
+      ),
+      .init(
+        title: "Signal Delivery",
+        value: agent.runtimeCapabilities.supportsSignalDelivery ? "Supported" : "Unavailable"
+      ),
+      .init(
+        title: "Context Injection",
+        value: agent.runtimeCapabilities.supportsContextInjection
+          ? "Supported" : "Unavailable"
+      ),
+    ]
+  }
+
+  private var capabilityValues: [String] {
     agent.capabilities.isEmpty ? ["No declared capabilities"] : agent.capabilities
+  }
+
+  private var hookPointValues: [String] {
+    agent.runtimeCapabilities.hookPoints.map(humanizedHookLabel(for:))
+  }
+
+  private var activityFacts: [AgentDetailFact] {
+    guard let activity else {
+      return []
+    }
+    return [
+      .init(
+        title: "Actions",
+        value: "\(activity.toolInvocationCount)"
+      ),
+      .init(
+        title: "Results",
+        value: "\(activity.toolResultCount)"
+      ),
+      .init(
+        title: "Issues",
+        value: "\(activity.toolErrorCount)",
+        tint: activity.toolErrorCount > 0 ? HarnessMonitorTheme.danger : HarnessMonitorTheme.secondaryInk
+      ),
+      .init(title: "Latest Action", value: activity.latestToolName ?? "None"),
+    ]
   }
 
   private var assignedTasks: [WorkItem] {
@@ -86,8 +132,12 @@ struct AgentDetailSection: View {
     return task.title
   }
 
+  private var isSparseState: Bool {
+    agentTimelineEntries.isEmpty && agent.persona == nil && assignedTasks.isEmpty
+  }
+
   private var agentTimelineEntries: [TimelineEntry] {
-    store.timeline.filter { $0.agentId == agent.agentId }
+    store.timeline(forAgent: agent.agentId)
   }
 
   private var pendingDecisionAttention: AcpDecisionAttention? {
@@ -102,39 +152,8 @@ struct AgentDetailSection: View {
     store.acpRuntimeInspectStatus(for: agent.agentId)
   }
 
-  private var trimmedMessage: String {
-    signalMessage.trimmingCharacters(in: .whitespacesAndNewlines)
-  }
-
-  private var trimmedCommand: String {
-    signalCommand.trimmingCharacters(in: .whitespacesAndNewlines)
-  }
-
-  private var sendUpdateDisabledReason: String? {
-    if store.isSessionReadOnly {
-      return "Session is read-only."
-    }
-    if trimmedCommand.isEmpty {
-      return "Pick or type an update type."
-    }
-    if trimmedMessage.isEmpty {
-      return "Type a message to send."
-    }
-    return nil
-  }
-
-  private var removeAgentDisabledReason: String? {
-    if isLeader {
-      return "Transfer leadership before removing the leader."
-    }
-    if !roleActionsAvailable {
-      return "Role actions are unavailable for this session."
-    }
-    return nil
-  }
-
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
       if let pendingDecisionAttention {
         AgentDetailAwaitingDecisionStrip(
           count: pendingDecisionAttention.count,
@@ -161,225 +180,49 @@ struct AgentDetailSection: View {
           value: agent.agentId
         )
       }
-      if let acpRuntimeState, let acpRuntimeInspectStatus {
-        runtimeView(runtimeState: acpRuntimeState, inspectStatus: acpRuntimeInspectStatus)
-      }
-      Text(agent.name)
-        .scaledFont(.system(.title3, design: .rounded, weight: .bold))
-      Text("\(runtimeDisplayLabel(agent.runtime)) • \(agent.role.title)")
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      if acpRuntimeState != nil {
-        Text("ACP runtime connected via stdio. Sends prompts and streams replies.")
-          .scaledFont(.caption)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .fixedSize(horizontal: false, vertical: true)
-      }
-      InspectorFactGrid(facts: facts)
-      InspectorSection(title: "Runtime Capabilities") {
-        InspectorFactGrid(
-          facts: [
-            .init(
-              title: "Transcript",
-              value: agent.runtimeCapabilities.supportsNativeTranscript ? "Native" : "Ledger"
-            ),
-            .init(
-              title: "Signal Delivery",
-              value: agent.runtimeCapabilities.supportsSignalDelivery ? "Supported" : "Unavailable"
-            ),
-            .init(
-              title: "Context Injection",
-              value: agent.runtimeCapabilities.supportsContextInjection
-                ? "Supported" : "Unavailable"
-            ),
-          ]
-        )
-      }
-      InspectorSection(title: "Declared Capabilities") {
-        InspectorBadgeColumn(values: capabilityBadges)
-      }
-      if !agent.runtimeCapabilities.hookPoints.isEmpty {
-        InspectorSection(title: "Hook Points") {
-          InspectorBadgeColumn(
-            values: agent.runtimeCapabilities.hookPoints.map(humanizedHookLabel(for:))
-          )
-        }
-      }
-      if let activity {
-        InspectorSection(title: "Activity Summary") {
-          InspectorFactGrid(
-            facts: [
-              .init(title: "Actions", value: "\(activity.toolInvocationCount)"),
-              .init(title: "Results", value: "\(activity.toolResultCount)"),
-              .init(title: "Issues", value: "\(activity.toolErrorCount)"),
-              .init(title: "Latest Action", value: activity.latestToolName ?? "Unknown"),
-            ]
-          )
-          if !activity.recentTools.isEmpty {
-            Text("Recent Activity")
-              .scaledFont(.caption.bold())
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            Text(activity.recentTools.joined(separator: " · "))
-              .scaledFont(.caption)
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          }
-        }
-      }
-      if agent.persona == nil && assignedTasks.isEmpty {
-        Text("No persona, no assigned tasks.")
-          .scaledFont(.caption)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .accessibilityElement(children: .combine)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailPersona)
-      }
-      if let persona = agent.persona {
-        InspectorSection(title: "Persona") {
-          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-            Text(persona.name)
-              .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-            Text(persona.description)
-              .scaledFont(.subheadline)
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailPersona)
-      }
-      if !assignedTasks.isEmpty {
-        InspectorSection(title: "Assigned Tasks") {
-          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-            ForEach(assignedTasks) { task in
-              VStack(alignment: .leading, spacing: 2) {
-                Text(task.title)
-                  .scaledFont(.system(.subheadline, design: .rounded, weight: .semibold))
-                Text(task.status.title)
-                  .scaledFont(.caption)
-                  .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-              }
-            }
-          }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailAssignedTasks)
-      }
-      InspectorSection(title: "Live transcript") {
-        MonitorTimelineSection(
-          host: .agent(agent.agentId),
-          timeline: agentTimelineEntries,
-          timelineWindow: nil,
-          decisions: [],
-          isTimelineLoading: false,
-          store: store
-        )
-      }
-      .accessibilityElement(children: .contain)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailTimeline)
-      InspectorSection(title: "Role Actions") {
-        if isLeader {
-          Text("Transfer leadership before changing the leader's role.")
-            .scaledFont(.caption)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        } else {
-          Picker("Role", selection: rolePickerSelection) {
-            ForEach(rolePickerValues, id: \.self) { role in
-              Text(role.title).tag(role)
-            }
-          }
-          .harnessNativeFormControl()
-          .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailRolePicker)
-          HarnessInlineActionButton(
-            title: "Change Role",
-            actionID: .changeRole(sessionID: sessionID, agentID: agent.agentId),
-            store: store,
-            variant: .prominent,
-            tint: nil,
-            isExternallyDisabled: !roleActionsAvailable,
-            accessibilityIdentifier: HarnessMonitorAccessibility.workspaceDetailRoleChange,
-            action: {
-              Task { await changeRole() }
-            }
-          )
-        }
-        HarnessInlineActionButton(
-          title: "Remove Agent",
-          actionID: .removeAgent(sessionID: sessionID, agentID: agent.agentId),
-          store: store,
-          variant: .bordered,
-          tint: .red,
-          isExternallyDisabled: isLeader || !roleActionsAvailable,
-          accessibilityIdentifier: HarnessMonitorAccessibility.workspaceDetailRoleRemove,
-          help: removeAgentDisabledReason ?? "",
-          action: { store.requestRemoveAgentConfirmation(agentID: agent.agentId) }
-        )
-        .accessibilityHint(removeAgentDisabledReason ?? "")
-        if let reason = removeAgentDisabledReason {
-          Text(reason)
-            .scaledFont(.caption)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-      }
-      .disabled(!roleActionsAvailable)
+      AgentDetailSummaryBand(
+        store: store,
+        title: agent.name,
+        runtimeLabel: runtimeDisplayLabel(agent.runtime),
+        status: agent.status,
+        roleTitle: agent.role.title,
+        currentTaskTitle: currentTaskTitle,
+        overviewFacts: overviewFacts,
+        runtimeState: acpRuntimeState,
+        inspectStatus: acpRuntimeInspectStatus,
+        runtimePresentation: runtimePresentation
+      )
+      AgentDetailActivityBand(
+        store: store,
+        agentID: agent.agentId,
+        timeline: agentTimelineEntries,
+        runtimeProfileFacts: runtimeProfileFacts,
+        capabilityValues: capabilityValues,
+        hookPointValues: hookPointValues,
+        activityFacts: activityFacts,
+        recentToolValues: activity?.recentTools ?? [],
+        persona: agent.persona,
+        assignedTasks: assignedTasks,
+        prefersWideLayout: runtimePresentation == .full,
+        isSparseState: isSparseState
+      )
+      AgentDetailActionBand(
+        store: store,
+        sessionID: store.selectedSessionID ?? "",
+        agentID: agent.agentId,
+        isLeader: isLeader,
+        roleActionsAvailable: roleActionsAvailable,
+        rolePickerValues: rolePickerValues,
+        rolePickerSelection: rolePickerSelection,
+        selectedSendAction: $selectedSendAction,
+        signalCommand: $signalCommand,
+        signalMessage: $signalMessage,
+        signalActionHint: $signalActionHint,
+        prefersWideLayout: runtimePresentation == .full
+      )
       .task(id: roleStateKey) {
         selectedRole = agent.role
       }
-      InspectorSection(title: "Send Update") {
-        Text("Share a short instruction or context update with this agent.")
-          .scaledFont(.caption)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .fixedSize(horizontal: false, vertical: true)
-        Picker("Update type", selection: $selectedSendAction) {
-          ForEach(SendUpdateAction.allLabeledCases, id: \.self) { action in
-            Text(action.humanLabel).tag(action)
-          }
-        }
-        .harnessNativeFormControl()
-        .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailSignalCommand)
-        if selectedSendAction == .custom {
-          TextField("Update type (custom)", text: $signalCommand)
-            .harnessNativeFormControl()
-            .submitLabel(.send)
-        }
-        TextField("Message", text: $signalMessage, axis: .vertical)
-          .harnessNativeFormControl()
-          .lineLimit(3, reservesSpace: true)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailSignalMessage)
-          .submitLabel(.send)
-        TextField("Optional context", text: $signalActionHint)
-          .harnessNativeFormControl()
-          .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailSignalAction)
-          .submitLabel(.send)
-        HarnessInlineActionButton(
-          title: "Send Update",
-          actionID: .sendSignal(
-            sessionID: store.selectedSessionID ?? "",
-            agentID: agent.agentId
-          ),
-          store: store,
-          variant: .prominent,
-          tint: nil,
-          isExternallyDisabled: sendUpdateDisabledReason != nil,
-          accessibilityIdentifier: HarnessMonitorAccessibility.workspaceDetailSignalSend,
-          action: {
-            Task {
-              await store.sendSignal(
-                agentID: agent.agentId,
-                command: trimmedCommand,
-                message: trimmedMessage,
-                actionHint: signalActionHint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                  ? nil : signalActionHint
-              )
-            }
-          }
-        )
-        .accessibilityHint(sendUpdateDisabledReason ?? "")
-        if let reason = sendUpdateDisabledReason {
-          Text(reason)
-            .scaledFont(.caption)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-      }
-      .disabled(store.isSessionReadOnly)
       .onChange(of: selectedSendAction) { _, newValue in
         if newValue != .custom {
           signalCommand = newValue.rawCommand
@@ -387,14 +230,23 @@ struct AgentDetailSection: View {
           signalCommand = ""
         }
       }
-      .onChange(of: signalCommand) { _, newValue in
-        UserDefaults.standard.set(newValue, forKey: Self.draftCommandKey(agentID: agent.agentId))
+      .task(id: signalCommand) {
+        await Self.debouncePersist(
+          value: signalCommand,
+          key: Self.draftCommandKey(agentID: agent.agentId)
+        )
       }
-      .onChange(of: signalMessage) { _, newValue in
-        UserDefaults.standard.set(newValue, forKey: Self.draftMessageKey(agentID: agent.agentId))
+      .task(id: signalMessage) {
+        await Self.debouncePersist(
+          value: signalMessage,
+          key: Self.draftMessageKey(agentID: agent.agentId)
+        )
       }
-      .onChange(of: signalActionHint) { _, newValue in
-        UserDefaults.standard.set(newValue, forKey: Self.draftActionHintKey(agentID: agent.agentId))
+      .task(id: signalActionHint) {
+        await Self.debouncePersist(
+          value: signalActionHint,
+          key: Self.draftActionHintKey(agentID: agent.agentId)
+        )
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -402,8 +254,8 @@ struct AgentDetailSection: View {
       hydrateDraft()
       lastAnnouncedTimelineEntryId = agentTimelineEntries.last?.entryId
     }
-    .onChange(of: agentTimelineEntries.last?.entryId) { _, newID in
-      announceLatestTimelineEntryIfNeeded(newID: newID)
+    .onChange(of: store.timeline.count) { _, _ in
+      announceLatestTimelineEntryIfNeeded()
     }
     .accessibilityTestProbe(
       HarnessMonitorAccessibility.workspaceDetailCard,
@@ -425,12 +277,21 @@ struct AgentDetailSection: View {
     "harness.workspace.agentDraft.\(agentID).actionHint"
   }
 
-  private func announceLatestTimelineEntryIfNeeded(newID: String?) {
-    guard let newID, newID != lastAnnouncedTimelineEntryId else { return }
-    lastAnnouncedTimelineEntryId = newID
-    guard let entry = agentTimelineEntries.last(where: { $0.entryId == newID }) else { return }
+  private func announceLatestTimelineEntryIfNeeded() {
+    guard let entry = agentTimelineEntries.last else { return }
+    guard entry.entryId != lastAnnouncedTimelineEntryId else { return }
+    lastAnnouncedTimelineEntryId = entry.entryId
     let priority = MonitorTimelineLiveRegion.priority(for: entry.kind)
     transcriptAnnouncer.announceIfAllowed(entry.summary, priority: priority)
+  }
+
+  static func debouncePersist(value: String, key: String) async {
+    do {
+      try await Task.sleep(for: .milliseconds(300))
+    } catch {
+      return
+    }
+    UserDefaults.standard.set(value, forKey: key)
   }
 
   private func hydrateDraft() {
@@ -463,11 +324,6 @@ struct AgentDetailSection: View {
       inspectStatus: inspectStatus,
       presentation: runtimePresentation
     )
-  }
-
-  private func changeRole() async {
-    _ = await store.changeRole(agentID: agent.agentId, role: effectiveSelectedRole)
-    selectedRole = agent.role
   }
 
   private func openPendingDecisions() {
