@@ -134,6 +134,10 @@ rtk mise run monitor:xcodebuild -- \
 - For day-to-day Harness Monitor development, the external daemon path (`harness daemon dev`) is the normal debug lane. Use the managed `HarnessMonitor` scheme when you need to validate the shipping sandboxed path.
 - For performance regressions, use targeted perf tests through `XCODE_ONLY_TESTING=HarnessMonitorUITests/HarnessMonitorPerfTests/... rtk mise run monitor:test` and the deeper Instruments pipeline through `rtk mise run monitor:audit`.
 - For Swift-only verification when the working tree carries dirty Rust changes from parallel agents, build with the `HarnessMonitor (External Daemon)` scheme; the default `HarnessMonitor` scheme runs a `Build harness daemon (parallel)` script phase that fails on broken Rust.
+- When preview and live app disagree, first prove whether they share the same rendering and measurement path. If preview is synchronous or fixture-driven while live is incremental/AppKit-backed, debug the live path first instead of spending cycles polishing preview parity.
+- Before changing spacing, padding, or borders, verify that live row measurement receives the real environment inputs (`fontScale`, current width, cache state) and add a coordinator-level regression for that wiring. A passing leaf measurement helper test is not enough if callers can still pass stale/default values.
+- Separate viewport/container bugs from row-content sizing bugs early. A clipped first row at `Latest` can be a top-edge inset/scroll issue even when lower-row gaps come from bad height measurement; do not mix those hypotheses into one patch loop.
+- When `monitor:agent:test` fails, read the generated `swift-diagnostics`/xcodebuild failure report first and only fall back to raw tee logs if the report is insufficient.
 
 ## Harness Monitor crash patterns to avoid
 
