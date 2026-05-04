@@ -170,13 +170,16 @@ struct SessionTimelineNavigationControls: View {
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineNavigationStatus)
   }
 
+  @ViewBuilder
   private func visibleStatusLabel(
     _ visibilityStats: SessionTimelineVisibilityStats
   ) -> some View {
-    Text(visibilityStats.statusText)
-      .scaledFont(.caption2.monospaced())
-      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineVisibleStatus)
+    if !visibilityStats.statusText.isEmpty {
+      Text(visibilityStats.statusText)
+        .scaledFont(.caption2.monospaced())
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineVisibleStatus)
+    }
   }
 
   private func buttons(canOlder: Bool, canNewer: Bool) -> some View {

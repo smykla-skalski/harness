@@ -25,9 +25,8 @@ struct SessionTimelineVisibilityStats: Equatable, Sendable {
 
   var statusText: String {
     if totalEventCount == 0 {
-      return "Visible rows \(visibleRowCount)"
+      return ""
     }
-    let eventText = "Loaded events \(loadedEventCount)/\(totalEventCount)"
-    return "Visible rows \(visibleRowCount) | \(eventText)"
+    return "Loaded events \(loadedEventCount)/\(totalEventCount)"
   }
 }
