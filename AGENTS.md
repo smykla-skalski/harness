@@ -101,9 +101,9 @@ Repo-policy/manual-task enforcement is owned by the standalone `aff` CLI. Keep t
 
 ### Data directories (XDG)
 
-- `$XDG_DATA_HOME/kuma/suites/` - suite library
-- `$XDG_DATA_HOME/kuma/runs/` - run directories (`{run_id}/{artifacts,commands,state,manifests,reports}`)
-- `$XDG_DATA_HOME/kuma/contexts/{session-hash}/` - session context
+- `$XDG_DATA_HOME/harness/suites/` - suite library
+- `$XDG_DATA_HOME/harness/runs/` - run directories (`{run_id}/{artifacts,commands,state,manifests,reports}`)
+- `$XDG_DATA_HOME/harness/contexts/{session-hash}/` - session context
 
 ## Code conventions
 
