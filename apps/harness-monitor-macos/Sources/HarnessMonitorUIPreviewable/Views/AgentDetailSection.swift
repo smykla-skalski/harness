@@ -8,6 +8,7 @@ struct AgentDetailSection: View {
   let agent: AgentRegistration
   let activity: AgentToolActivitySummary?
   let runtimePresentation: AcpRuntimePresentation
+  @State private var selectedSendAction: SendUpdateAction = .injectContext
   @State private var signalCommand = "inject_context"
   @State private var signalMessage = ""
   @State private var signalActionHint = ""
@@ -97,6 +98,37 @@ struct AgentDetailSection: View {
 
   private var acpRuntimeInspectStatus: AcpRuntimeInspectStatus? {
     store.acpRuntimeInspectStatus(for: agent.agentId)
+  }
+
+  private var trimmedMessage: String {
+    signalMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  private var trimmedCommand: String {
+    signalCommand.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  private var sendUpdateDisabledReason: String? {
+    if store.isSessionReadOnly {
+      return "Session is read-only."
+    }
+    if trimmedCommand.isEmpty {
+      return "Pick or type an update type."
+    }
+    if trimmedMessage.isEmpty {
+      return "Type a message to send."
+    }
+    return nil
+  }
+
+  private var removeAgentDisabledReason: String? {
+    if isLeader {
+      return "Transfer leadership before removing the leader."
+    }
+    if !roleActionsAvailable {
+      return "Role actions are unavailable for this session."
+    }
+    return nil
   }
 
   var body: some View {
@@ -285,9 +317,16 @@ struct AgentDetailSection: View {
           tint: .red,
           isExternallyDisabled: isLeader || !roleActionsAvailable,
           accessibilityIdentifier: HarnessMonitorAccessibility.workspaceDetailRoleRemove,
-          help: isLeader ? "The session leader cannot be removed" : "",
+          help: removeAgentDisabledReason ?? "",
           action: { store.requestRemoveAgentConfirmation(agentID: agent.agentId) }
         )
+        .accessibilityHint(removeAgentDisabledReason ?? "")
+        if let reason = removeAgentDisabledReason {
+          Text(reason)
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .fixedSize(horizontal: false, vertical: true)
+        }
       }
       .disabled(!roleActionsAvailable)
       .task(id: roleStateKey) {
@@ -298,16 +337,24 @@ struct AgentDetailSection: View {
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .fixedSize(horizontal: false, vertical: true)
-        TextField("Update Type", text: $signalCommand)
-          .harnessNativeFormControl()
-          .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailSignalCommand)
-          .submitLabel(.send)
+        Picker("Update type", selection: $selectedSendAction) {
+          ForEach(SendUpdateAction.allLabeledCases, id: \.self) { action in
+            Text(action.humanLabel).tag(action)
+          }
+        }
+        .harnessNativeFormControl()
+        .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailSignalCommand)
+        if selectedSendAction == .custom {
+          TextField("Update type (custom)", text: $signalCommand)
+            .harnessNativeFormControl()
+            .submitLabel(.send)
+        }
         TextField("Message", text: $signalMessage, axis: .vertical)
           .harnessNativeFormControl()
           .lineLimit(3, reservesSpace: true)
           .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailSignalMessage)
           .submitLabel(.send)
-        TextField("Optional Context", text: $signalActionHint)
+        TextField("Optional context", text: $signalActionHint)
           .harnessNativeFormControl()
           .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailSignalAction)
           .submitLabel(.send)
@@ -320,24 +367,36 @@ struct AgentDetailSection: View {
           store: store,
           variant: .prominent,
           tint: nil,
-          isExternallyDisabled:
-            signalCommand.isEmpty || signalMessage.isEmpty
-            || store.isSessionReadOnly,
+          isExternallyDisabled: sendUpdateDisabledReason != nil,
           accessibilityIdentifier: HarnessMonitorAccessibility.workspaceDetailSignalSend,
           action: {
             Task {
               await store.sendSignal(
                 agentID: agent.agentId,
-                command: signalCommand,
-                message: signalMessage,
+                command: trimmedCommand,
+                message: trimmedMessage,
                 actionHint: signalActionHint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                   ? nil : signalActionHint
               )
             }
           }
         )
+        .accessibilityHint(sendUpdateDisabledReason ?? "")
+        if let reason = sendUpdateDisabledReason {
+          Text(reason)
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .fixedSize(horizontal: false, vertical: true)
+        }
       }
       .disabled(store.isSessionReadOnly)
+      .onChange(of: selectedSendAction) { _, newValue in
+        if newValue != .custom {
+          signalCommand = newValue.rawCommand
+        } else if signalCommand == SendUpdateAction.injectContext.rawCommand {
+          signalCommand = ""
+        }
+      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityTestProbe(
