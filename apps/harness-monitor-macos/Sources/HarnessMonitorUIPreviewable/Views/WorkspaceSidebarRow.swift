@@ -31,6 +31,14 @@ struct WorkspaceSidebarRow: View {
         status: snapshot.status,
         relativeUpdatedAt: relativeUpdatedAt
       )
+
+      if HarnessMonitorSidebarFeatureFlags.sparklineEnabled {
+        Spacer(minLength: 4)
+        MonitorSparklineView(
+          samples: [],
+          outcome: snapshot.status == .failed ? .error : .ok
+        )
+      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .overlay(alignment: .trailing) {
