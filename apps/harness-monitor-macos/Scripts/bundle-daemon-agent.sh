@@ -99,7 +99,15 @@ launch_agent_label="$(harness_monitor_runtime_launch_agent_label)"
 app_group_id="$(harness_monitor_runtime_app_group_id)"
 
 /bin/mkdir -p "$helpers_dir" "$launch_agents_dir"
-/bin/cp "$daemon_source" "$daemon_target"
+# `cp -p` preserves the linker-signed cs_mtime alignment from
+# `target/debug/harness` (rustc/lld embeds an ad-hoc CodeDirectory whose
+# cs_mtime is captured at link time). Plain `cp` updates the destination
+# mtime to NOW, which leaves cs_mtime in the embedded signature
+# pointing at link-time — kernel page validation then rejects the
+# launch with "cs_mtime != mtime" (SIGKILL CODESIGNING) before our
+# resign step below has a chance to run, racing against `launchctl
+# kickstart` retries while the daemon is being rebuilt.
+/bin/cp -p "$daemon_source" "$daemon_target"
 /bin/chmod 755 "$daemon_target"
 /usr/bin/xattr -dr com.apple.provenance "$daemon_target" 2>/dev/null || true
 /usr/bin/xattr -dr com.apple.quarantine "$daemon_target" 2>/dev/null || true
@@ -125,16 +133,43 @@ fi
 package_version="$(resolve_package_version)"
 validate_package_version "$package_version" "${MARKETING_VERSION:-}"
 
-if [ "${CODE_SIGNING_ALLOWED:-NO}" = "YES" ] \
-  && [ -n "${EXPANDED_CODE_SIGN_IDENTITY:-}" ] \
-  && [ "${EXPANDED_CODE_SIGN_IDENTITY:-}" != "-" ]; then
+# Resolve a codesign identity. Xcode populates EXPANDED_CODE_SIGN_IDENTITY
+# only when CODE_SIGNING_ALLOWED=YES; the mise `monitor:agent:build` and
+# `monitor:build` lanes pass NO so Xcode skips the embedded-binary sign
+# phase. Without a fallback the helper would carry only the linker
+# ad-hoc signature (TeamIdentifier=not set), which Group Container
+# access denies — daemon would either crash on `cs_mtime != mtime` or
+# exit EX_CONFIG (78) on first sandbox file read. Falling back to the
+# first Apple Development identity from the user's keychain mirrors
+# what Xcode would have picked, gives the helper a Team-ID signature,
+# and keeps the timestamp service out of the build path so EDR-driven
+# DNS races (Falcon, Kandji) cannot stall codesign mid-bundle.
+codesign_identity="${EXPANDED_CODE_SIGN_IDENTITY:-}"
+if [ -z "$codesign_identity" ] || [ "$codesign_identity" = "-" ]; then
+  codesign_identity="$(/usr/bin/security find-identity -v -p codesigning 2>/dev/null \
+    | /usr/bin/awk -F'"' '/Apple Development:/ { print $2; exit }')"
+fi
+
+if [ -n "$codesign_identity" ]; then
+  # Xcode-driven Release lanes provide a real timestamp via env;
+  # local debug lanes opt out so codesign never blocks on the network.
+  timestamp_flag="${HARNESS_DAEMON_CODESIGN_TIMESTAMP:---timestamp=none}"
   /usr/bin/codesign \
     --force \
-    --sign "$EXPANDED_CODE_SIGN_IDENTITY" \
+    --sign "$codesign_identity" \
     --options runtime \
-    --timestamp \
+    "$timestamp_flag" \
     --identifier io.harnessmonitor.daemon \
     --entitlements "$PROJECT_DIR/HarnessMonitorDaemon.entitlements" \
     "$daemon_target"
   /usr/bin/codesign --verify --verbose=2 "$daemon_target"
+else
+  # No usable identity (CI without keychain). Refresh the ad-hoc
+  # signature so cs_mtime aligns with the post-cp file mtime, giving
+  # launchd at least a chance to spawn the helper in degraded mode.
+  /usr/bin/codesign \
+    --force \
+    --sign - \
+    --identifier io.harnessmonitor.daemon \
+    "$daemon_target"
 fi
