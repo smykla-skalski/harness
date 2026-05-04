@@ -13,7 +13,7 @@ extension WorkspaceWindowCreatePane {
 
   private var terminalProviderCard: some View {
     @Bindable var formModel = viewModel
-    return AgentsCreateSectionCard {
+    return AgentsCreateProviderGridCard {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
         AgentsCreateSectionHeading(title: "Provider")
 
