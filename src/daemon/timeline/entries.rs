@@ -127,6 +127,10 @@ pub(crate) fn conversation_entry(
             "agent_permission_asked",
             format!("{agent_id} asked for permission on {tool} ({scope})"),
         ),
+        ConversationEventKind::ContextInjected { actor, .. } => (
+            "agent_context_injected",
+            format!("{agent_id} accepted context from {actor}"),
+        ),
         ConversationEventKind::Other { .. } => return Ok(None),
     };
     let payload = timeline_payload(

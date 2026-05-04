@@ -44,6 +44,12 @@ impl ActiveAcpSession {
         Arc::clone(&self.process)
     }
 
+    pub(in crate::daemon::agent_acp) fn event_emitter(
+        &self,
+    ) -> Option<Arc<dyn crate::agents::acp::supervision::WatchdogEventEmitter>> {
+        self.process.event_emitter()
+    }
+
     pub(in crate::daemon::agent_acp) fn attach_protocol_session(
         &self,
         acp_id: &str,

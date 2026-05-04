@@ -110,6 +110,7 @@ fn event_kind(kind: &ConversationEventKind) -> &'static str {
         ConversationEventKind::SignalReceived { .. } => "signal_received",
         ConversationEventKind::WatchdogState { .. } => "watchdog_state",
         ConversationEventKind::PermissionAsked { .. } => "permission_asked",
+        ConversationEventKind::ContextInjected { .. } => "context_injected",
         ConversationEventKind::Other { .. } => "other",
     }
 }
