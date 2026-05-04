@@ -88,6 +88,7 @@ struct WorkspaceWindowRootView: View {
     if showsWorkspaceContent {
       WorkspaceWindowView(
         store: store,
+        keyWindowObserver: keyWindowObserver,
         navigationBridge: navigationBridge
       )
     } else {
