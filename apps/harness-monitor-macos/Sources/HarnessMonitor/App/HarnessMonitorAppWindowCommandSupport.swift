@@ -28,18 +28,37 @@ private struct WindowCommandScopeTrackingView: NSViewRepresentable {
   func updateNSView(_ nsView: WindowCommandScopeTrackingNSView, context: Context) {
     nsView.configure(scope: scope, routingState: routingState)
   }
+
+  static func dismantleNSView(_ nsView: WindowCommandScopeTrackingNSView, coordinator: ()) {
+    // SwiftUI calls this on the MainActor when the representable is removed
+    // from the view tree, which is the right place to clear the routing
+    // state entry. The NSView's deinit cannot do that step because ARC may
+    // release the view on a non-main thread.
+    nsView.tearDownWindowObservation()
+  }
 }
 
 private final class WindowCommandScopeTrackingNSView: NSView {
   private var scope: WindowNavigationScope?
   private weak var routingState: WindowCommandRoutingState?
   private var observedWindow: NSWindow?
-  private var notificationTokens: [NSObjectProtocol] = []
+  // nonisolated(unsafe) so deinit (which can fire off the MainActor when ARC
+  // releases on com.apple.SwiftUI.DisplayLink during dashboard <-> cockpit
+  // transitions) can read the array without tripping the libdispatch queue
+  // assertion that `MainActor.assumeIsolated` would. Mutations all happen on
+  // the MainActor (see `beginObserving`); the deinit only reads after the
+  // last write, so concurrent access is not possible.
+  private nonisolated(unsafe) var notificationTokens: [NSObjectProtocol] = []
 
   deinit {
-    MainActor.assumeIsolated {
-      tearDownWindowObservation()
-    }
+    // ARC may release this NSView on any thread (notably
+    // com.apple.SwiftUI.DisplayLink during workspace transitions), so we
+    // cannot wrap the cleanup in `MainActor.assumeIsolated`. Removing the
+    // notification observers is thread-safe; the routing-state clear is the
+    // MainActor-only step and runs synchronously when the observed window
+    // closes (`willCloseNotification`) or when SwiftUI tears the
+    // representable down via `dismantleNSView`, so it is fine to skip here.
+    notificationTokens.forEach(NotificationCenter.default.removeObserver)
   }
 
   func configure(
@@ -96,7 +115,7 @@ private final class WindowCommandScopeTrackingNSView: NSView {
     updateRoutingState()
   }
 
-  private func tearDownWindowObservation() {
+  fileprivate func tearDownWindowObservation() {
     if let observedWindow {
       routingState?.clear(windowID: ObjectIdentifier(observedWindow))
     }
