@@ -5,6 +5,9 @@ use super::super::test_support::{
     test_http_state_with_async_db_timeline, test_http_state_with_db,
 };
 use super::*;
+use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
+use crate::daemon::db::DaemonDb;
+use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::WsRequest;
 
 #[tokio::test]
@@ -185,6 +188,34 @@ async fn dispatch_read_query_managed_agent_acp_inspect_uses_require_session_id_a
 }
 
 #[tokio::test]
+async fn dispatch_read_query_managed_agent_acp_transcript_returns_only_acp_rows() {
+    let state = test_http_state_with_async_db_timeline().await;
+    seed_sample_acp_transcript(&state);
+    let request = WsRequest {
+        id: "req-acp-transcript".into(),
+        method: "managed_agent.acp_transcript".into(),
+        params: serde_json::json!({
+            "session_id": "sess-test-1",
+        }),
+        trace_context: None,
+    };
+
+    let response = dispatch_read_query(&request, &state).await;
+
+    assert!(response.error.is_none());
+    let result = response.result.expect("ACP transcript response");
+    let Value::Array(entries) = result["entries"].clone() else {
+        panic!("expected ACP transcript entries array");
+    };
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0]["kind"].as_str(), Some("assistant_text"));
+    assert_eq!(entries[0]["session_id"].as_str(), Some("sess-test-1"));
+    assert_eq!(entries[0]["agent_id"].as_str(), Some("copilot-worker"));
+    assert_eq!(entries[0]["summary"].as_str(), Some("ACP transcript line"));
+    assert_eq!(entries[0]["payload"]["runtime"].as_str(), Some("acp"));
+}
+
+#[tokio::test]
 async fn dispatch_read_query_session_timeline_summary_scope_returns_window_metadata() {
     let state = test_http_state_with_db();
     seed_sample_timeline(&state);
@@ -241,4 +272,24 @@ async fn dispatch_read_query_session_timeline_uses_async_db_when_sync_db_is_unav
     };
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0]["payload"], serde_json::json!({}));
+}
+
+fn seed_sample_acp_transcript(state: &DaemonHttpState) {
+    let db_path = state.db_path.as_ref().expect("db path");
+    let db = DaemonDb::open(db_path).expect("open file db");
+    db.sync_conversation_events(
+        "sess-test-1",
+        "copilot-worker",
+        "acp",
+        &[ConversationEvent {
+            timestamp: Some("2026-04-13T19:03:00Z".into()),
+            sequence: 7,
+            kind: ConversationEventKind::AssistantText {
+                content: "ACP transcript line".into(),
+            },
+            agent: "copilot-worker".into(),
+            session_id: "sess-test-1".into(),
+        }],
+    )
+    .expect("sync ACP conversation events");
 }

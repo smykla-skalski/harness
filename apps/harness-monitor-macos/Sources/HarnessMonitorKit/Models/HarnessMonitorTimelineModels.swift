@@ -275,65 +275,157 @@ extension AcpConversationEvent {
     else {
       return nil
     }
-    let isError = event.boolValue(for: "is_error") ?? false
-    let entryKind: String
+    let identity = Self.timelineIdentity(
+      acpID: acpID,
+      fallbackAgent: agent,
+      toolCallMetadata: toolCallMetadata
+    )
+    let recordedAt = timestamp ?? fallbackRecordedAt
+
     switch type {
-    case "tool_invocation":
-      entryKind = "tool_invocation"
-    case "tool_result", "tool_result_error":
-      entryKind = isError || type == "tool_result_error" ? "tool_result_error" : "tool_result"
+    case "user_prompt":
+      return transcriptTimelineEntry(
+        entryKind: "user_prompt",
+        summary: Self.transcriptSummary(
+          from: event["content"],
+          fallback: "Prompt submitted"
+        ),
+        kind: kind,
+        recordedAt: recordedAt,
+        identity: identity
+      )
+    case "assistant_text":
+      return transcriptTimelineEntry(
+        entryKind: "assistant_text",
+        summary: Self.transcriptSummary(
+          from: event["content"],
+          fallback: "Assistant response"
+        ),
+        kind: kind,
+        recordedAt: recordedAt,
+        identity: identity
+      )
+    case "error":
+      return transcriptTimelineEntry(
+        entryKind: "agent_error",
+        summary:
+          "\(identity.summaryActor) error: \(event.stringValue(for: "message") ?? "Unknown error")",
+        kind: kind,
+        recordedAt: recordedAt,
+        identity: identity
+      )
+    case "signal_received":
+      let signalID = event.stringValue(for: "signal_id") ?? "signal"
+      let command = event.stringValue(for: "command") ?? "unknown"
+      return transcriptTimelineEntry(
+        entryKind: "signal_received",
+        summary: "\(identity.summaryActor) picked up \(signalID) (\(command))",
+        kind: kind,
+        recordedAt: recordedAt,
+        identity: identity
+      )
+    case "state_change":
+      let from = event.stringValue(for: "from") ?? "unknown"
+      let to = event.stringValue(for: "to") ?? "unknown"
+      return transcriptTimelineEntry(
+        entryKind: "agent_state_change",
+        summary: "\(identity.summaryActor) state changed \(from) -> \(to)",
+        kind: kind,
+        recordedAt: recordedAt,
+        identity: identity
+      )
+    case "file_modification":
+      let operation = event.stringValue(for: "operation") ?? "modified"
+      let path = event.stringValue(for: "path") ?? "file"
+      return transcriptTimelineEntry(
+        entryKind: "file_modification",
+        summary: "\(identity.summaryActor) \(operation) \(path)",
+        kind: kind,
+        recordedAt: recordedAt,
+        identity: identity
+      )
+    case "session_marker":
+      let marker = event.stringValue(for: "marker") ?? "session"
+      return transcriptTimelineEntry(
+        entryKind: "agent_session_marker",
+        summary: "\(identity.summaryActor) marked \(marker)",
+        kind: kind,
+        recordedAt: recordedAt,
+        identity: identity
+      )
+    case "watchdog_state":
+      let from = event.stringValue(for: "from") ?? "unknown"
+      let to = event.stringValue(for: "to") ?? "unknown"
+      return transcriptTimelineEntry(
+        entryKind: "agent_watchdog_state",
+        summary: "\(identity.summaryActor) watchdog \(from) -> \(to)",
+        kind: kind,
+        recordedAt: recordedAt,
+        identity: identity
+      )
+    case "permission_asked":
+      let tool = event.stringValue(for: "tool") ?? "tool"
+      let scope = event.stringValue(for: "scope") ?? ""
+      let summary =
+        scope.isEmpty
+        ? "\(identity.summaryActor) asked for permission on \(tool)"
+        : "\(identity.summaryActor) asked for permission on \(tool) (\(scope))"
+      return transcriptTimelineEntry(
+        entryKind: "agent_permission_asked",
+        summary: summary,
+        kind: kind,
+        recordedAt: recordedAt,
+        identity: identity
+      )
+    case "tool_invocation", "tool_result", "tool_result_error":
+      break
     default:
       return nil
     }
 
+    let isError = event.boolValue(for: "is_error") ?? false
+    let entryKind =
+      if type == "tool_invocation" {
+        "tool_invocation"
+      } else if isError || type == "tool_result_error" {
+        "tool_result_error"
+      } else {
+        "tool_result"
+      }
     let toolName = event.stringValue(for: "tool_name") ?? "Tool"
-    let acpAgentId = toolCallMetadata?.acpAgentId ?? acpID
-    let fallbackAgentID = agent.isEmpty ? acpID : agent
-    let agentId =
-      if let metadataAgentID = toolCallMetadata?.agentId,
-        metadataAgentID != acpID || agent.isEmpty
-      {
-        metadataAgentID
-      } else {
-        fallbackAgentID
-      }
-    let summaryActor =
-      if let metadataDisplayName = toolCallMetadata?.displayName,
-        metadataDisplayName != acpID || agent.isEmpty
-      {
-        metadataDisplayName
-      } else {
-        fallbackAgentID
-      }
     let status = Self.toolCallStatus(for: entryKind)
     let summary: String =
       switch entryKind {
       case "tool_invocation":
-        "\(summaryActor) invoked \(toolName)"
+        "\(identity.summaryActor) invoked \(toolName)"
       case "tool_result_error":
-        "\(summaryActor) received an error from \(toolName)"
+        "\(identity.summaryActor) received an error from \(toolName)"
       default:
-        "\(summaryActor) received a result from \(toolName)"
+        "\(identity.summaryActor) received a result from \(toolName)"
       }
 
     return TimelineEntry(
-      entryId: "acp-\(agentId)-\(entryKind)-\(sequence)",
-      recordedAt: timestamp ?? fallbackRecordedAt,
+      entryId: "acp-\(identity.agentId)-\(entryKind)-\(sequence)",
+      recordedAt: recordedAt,
       kind: entryKind,
       sessionId: sessionId,
-      agentId: agentId,
+      agentId: identity.agentId,
       taskId: nil,
       summary: summary,
       payload: .object([
         "runtime": .string("acp"),
         "event": kind,
+        "acp_timeline_identity": Self.acpTimelineIdentityPayload(
+          from: identity,
+          sequence: sequence
+        ),
         "tool_call_timeline": .object([
           "tool_call_id": event["invocation_id"] ?? .null,
           "tool_name": .string(toolName),
           "status": .string(status),
-          "acp_agent_id": .string(acpAgentId),
-          "agent_id": .string(agentId),
-          "agent_display_name": .string(summaryActor),
+          "acp_agent_id": .string(identity.acpAgentId),
+          "agent_id": .string(identity.agentId),
+          "agent_display_name": .string(identity.summaryActor),
           "capability_tags": .array(
             (toolCallMetadata?.capabilityTags ?? []).map(JSONValue.string)
           ),
@@ -353,6 +445,81 @@ extension AcpConversationEvent {
     default:
       "completed"
     }
+  }
+
+  private func transcriptTimelineEntry(
+    entryKind: String,
+    summary: String,
+    kind: JSONValue,
+    recordedAt: String,
+    identity: (acpAgentId: String, agentId: String, summaryActor: String)
+  ) -> TimelineEntry {
+    TimelineEntry(
+      entryId: "acp-\(identity.agentId)-\(entryKind)-\(sequence)",
+      recordedAt: recordedAt,
+      kind: entryKind,
+      sessionId: sessionId,
+      agentId: identity.agentId,
+      taskId: nil,
+      summary: summary,
+      payload: .object([
+        "runtime": .string("acp"),
+        "event": kind,
+        "acp_timeline_identity": Self.acpTimelineIdentityPayload(
+          from: identity,
+          sequence: sequence
+        ),
+      ])
+    )
+  }
+
+  private static func transcriptSummary(
+    from value: JSONValue?,
+    fallback: String
+  ) -> String {
+    guard case .string(let content)? = value else {
+      return fallback
+    }
+    let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? fallback : trimmed
+  }
+
+  private static func timelineIdentity(
+    acpID: String,
+    fallbackAgent: String,
+    toolCallMetadata: AcpToolCallTimelineMetadata?
+  ) -> (acpAgentId: String, agentId: String, summaryActor: String) {
+    let acpAgentId = toolCallMetadata?.acpAgentId ?? acpID
+    let fallbackAgentID = fallbackAgent.isEmpty ? acpID : fallbackAgent
+    let agentId =
+      if let metadataAgentID = toolCallMetadata?.agentId,
+        metadataAgentID != acpID || fallbackAgent.isEmpty
+      {
+        metadataAgentID
+      } else {
+        fallbackAgentID
+      }
+    let summaryActor =
+      if let metadataDisplayName = toolCallMetadata?.displayName,
+        metadataDisplayName != acpID || fallbackAgent.isEmpty
+      {
+        metadataDisplayName
+      } else {
+        fallbackAgentID
+      }
+    return (acpAgentId, agentId, summaryActor)
+  }
+
+  private static func acpTimelineIdentityPayload(
+    from identity: (acpAgentId: String, agentId: String, summaryActor: String),
+    sequence: UInt64
+  ) -> JSONValue {
+    .object([
+      "acp_agent_id": .string(identity.acpAgentId),
+      "agent_id": .string(identity.agentId),
+      "agent_display_name": .string(identity.summaryActor),
+      "sequence": .number(Double(sequence)),
+    ])
   }
 }
 

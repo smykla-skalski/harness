@@ -137,7 +137,7 @@ struct AgentDetailSection: View {
   }
 
   private var agentTimelineEntries: [TimelineEntry] {
-    store.timeline(forAgent: agent.agentId)
+    Self.transcriptEntries(store: store, agent: agent)
   }
 
   private var pendingDecisionAttention: AcpDecisionAttention? {
@@ -150,6 +150,16 @@ struct AgentDetailSection: View {
 
   private var acpRuntimeInspectStatus: AcpRuntimeInspectStatus? {
     store.acpRuntimeInspectStatus(for: agent.agentId)
+  }
+
+  static func transcriptEntries(
+    store: HarnessMonitorStore,
+    agent: AgentRegistration
+  ) -> [TimelineEntry] {
+    if agent.runtimeCapabilities.supportsNativeTranscript {
+      return store.acpTranscript(forAgent: agent.agentId)
+    }
+    return store.timeline(forAgent: agent.agentId)
   }
 
   var body: some View {

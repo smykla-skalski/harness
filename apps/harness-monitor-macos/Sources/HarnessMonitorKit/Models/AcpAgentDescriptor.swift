@@ -180,6 +180,14 @@ public struct AcpAgentInspectResponse: Codable, Equatable, Sendable {
   }()
 }
 
+public struct AcpTranscriptResponse: Codable, Equatable, Sendable {
+  public let entries: [TimelineEntry]
+
+  public init(entries: [TimelineEntry]) {
+    self.entries = entries
+  }
+}
+
 public struct AcpAgentInspectSnapshot: Codable, Equatable, Identifiable, Sendable {
   public let acpId: String
   public let sessionId: String

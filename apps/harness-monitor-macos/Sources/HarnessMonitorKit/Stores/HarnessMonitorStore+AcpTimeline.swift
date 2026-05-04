@@ -114,6 +114,25 @@ extension HarnessMonitorStore {
       ?? acpInspectRecordedAtFormatter.date(from: recordedAt)
   }
 
+  func rebuildAcpTranscriptPartition() {
+    var partition: [String: [TimelineEntry]] = [:]
+    partition.reserveCapacity(selectedAcpTranscriptEntries.count)
+    for entry in selectedAcpTranscriptEntries {
+      guard let agentID = entry.agentId else { continue }
+      partition[agentID, default: []].append(entry)
+    }
+    acpTranscriptByAgentID = partition
+  }
+
+  func rebuildSelectedAcpTranscriptEntries() {
+    replaceSelectedAcpTranscriptIfNeeded(
+      mergedTimelineEntries(
+        selectedAcpTranscriptHistoryEntries,
+        with: selectedAcpTranscriptLiveEntries
+      )
+    )
+  }
+
   nonisolated(unsafe) private static let acpInspectRecordedAtFormatterFracSeconds:
     ISO8601DateFormatter =
       {
@@ -133,21 +152,128 @@ extension HarnessMonitorStore {
       return
     }
     let mergedTimeline = mergedTimelineEntries(timeline, with: entries)
-    guard mergedTimeline != timeline else {
+    replaceSelectedTimelineIfNeeded(mergedTimeline)
+  }
+
+  func applyAcpTranscriptEntries(_ entries: [TimelineEntry]) {
+    guard !entries.isEmpty else {
       return
     }
-    timeline = mergedTimeline
-    timelineWindow = normalizedTimelineWindow(timelineWindow, loadedTimeline: mergedTimeline)
+    replaceSelectedAcpTranscriptLiveIfNeeded(
+      reattributedAcpEntries(
+        mergedTimelineEntries(selectedAcpTranscriptLiveEntries, with: entries),
+        using: selectedAcpAgents
+      )
+    )
+  }
+
+  func replaceAcpTranscriptHistory(
+    _ response: AcpTranscriptResponse,
+    sessionID: String
+  ) {
+    guard sessionID == selectedSessionID else {
+      return
+    }
+    let historyEntries = reattributedAcpEntries(
+      response.entries.filter(\.isAcpTranscriptEntry),
+      using: selectedAcpAgents
+    )
+    let historyEntryIDs = Set(historyEntries.map(\.entryId))
+    replaceSelectedAcpTranscriptHistoryIfNeeded(historyEntries)
+    replaceSelectedAcpTranscriptLiveIfNeeded(
+      selectedAcpTranscriptLiveEntries.filter { !historyEntryIDs.contains($0.entryId) }
+    )
+  }
+
+  func reattributeAcpTimelineEntries(using snapshots: [AcpAgentSnapshot]) {
+    guard !timeline.isEmpty, !snapshots.isEmpty else {
+      return
+    }
+    replaceSelectedTimelineIfNeeded(reattributedAcpEntries(timeline, using: snapshots))
+  }
+
+  func reattributeAcpTranscriptEntries(using snapshots: [AcpAgentSnapshot]) {
+    guard
+      (!selectedAcpTranscriptHistoryEntries.isEmpty || !selectedAcpTranscriptLiveEntries.isEmpty),
+      !snapshots.isEmpty
+    else {
+      return
+    }
+    replaceSelectedAcpTranscriptHistoryIfNeeded(
+      reattributedAcpEntries(selectedAcpTranscriptHistoryEntries, using: snapshots)
+    )
+    replaceSelectedAcpTranscriptLiveIfNeeded(
+      reattributedAcpEntries(selectedAcpTranscriptLiveEntries, using: snapshots)
+    )
+  }
+
+  private func reattributedAcpEntries(
+    _ entries: [TimelineEntry],
+    using snapshots: [AcpAgentSnapshot]
+  ) -> [TimelineEntry] {
+    let identitiesByAcpID = Dictionary(
+      uniqueKeysWithValues: snapshots.map { snapshot in
+        (snapshot.acpId, (agentID: snapshot.agentId, displayName: snapshot.displayName))
+      }
+    )
+    let updatedTimeline = entries.map { entry in
+      guard let metadata = entry.acpTimelineIdentityMetadata(),
+        let identity = identitiesByAcpID[metadata.acpAgentID]
+      else {
+        return entry
+      }
+      guard entry.agentId != identity.agentID
+        || metadata.agentID != identity.agentID
+        || metadata.agentDisplayName != identity.displayName
+      else {
+        return entry
+      }
+      return entry.reattributedAcpTimelineEntry(
+        agentID: identity.agentID,
+        displayName: identity.displayName
+      )
+    }
+
+    return mergedTimelineEntries([], with: updatedTimeline)
+  }
+
+  private func replaceSelectedTimelineIfNeeded(_ updatedTimeline: [TimelineEntry]) {
+    guard updatedTimeline != timeline else {
+      return
+    }
+    timeline = updatedTimeline
+    timelineWindow = normalizedTimelineWindow(timelineWindow, loadedTimeline: updatedTimeline)
     guard let selectedSession else {
       return
     }
     scheduleCacheWrite { service in
       await service.cacheSessionDetail(
         selectedSession,
-        timeline: mergedTimeline,
-        timelineWindow: TimelineWindowResponse.fallbackMetadata(for: mergedTimeline)
+        timeline: updatedTimeline,
+        timelineWindow: TimelineWindowResponse.fallbackMetadata(for: updatedTimeline)
       )
     }
+  }
+
+  private func replaceSelectedAcpTranscriptIfNeeded(_ updatedTimeline: [TimelineEntry]) {
+    guard updatedTimeline != selectedAcpTranscriptEntries else {
+      return
+    }
+    selectedAcpTranscriptEntries = updatedTimeline
+  }
+
+  private func replaceSelectedAcpTranscriptHistoryIfNeeded(_ updatedTimeline: [TimelineEntry]) {
+    guard updatedTimeline != selectedAcpTranscriptHistoryEntries else {
+      return
+    }
+    selectedAcpTranscriptHistoryEntries = updatedTimeline
+  }
+
+  private func replaceSelectedAcpTranscriptLiveIfNeeded(_ updatedTimeline: [TimelineEntry]) {
+    guard updatedTimeline != selectedAcpTranscriptLiveEntries else {
+      return
+    }
+    selectedAcpTranscriptLiveEntries = updatedTimeline
   }
 }
 

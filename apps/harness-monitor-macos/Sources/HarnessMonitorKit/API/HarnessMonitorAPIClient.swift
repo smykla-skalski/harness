@@ -405,6 +405,13 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     return try await get("/v1/runtimes/probe")
   }
 
+  public func acpTranscript(sessionID: String) async throws -> AcpTranscriptResponse {
+    try await get(
+      "/v1/managed-agents/acp/transcript",
+      queryItems: [URLQueryItem(name: "session_id", value: sessionID)]
+    )
+  }
+
   public func configuration() async throws -> MonitorConfiguration {
     try await get("/v1/config")
   }

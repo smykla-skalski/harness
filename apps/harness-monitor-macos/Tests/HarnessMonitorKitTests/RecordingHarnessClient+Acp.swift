@@ -43,6 +43,20 @@ extension RecordingHarnessClient {
     )
   }
 
+  func acpTranscript(sessionID: String) async throws -> AcpTranscriptResponse {
+    recordAcpTranscriptCall(for: sessionID)
+    try await sleepIfNeeded(configuredAcpTranscriptDelay(for: sessionID))
+    if let error = configuredAcpTranscriptError(for: sessionID) {
+      throw error
+    }
+    if let response = configuredAcpTranscriptResponse(for: sessionID) {
+      return response
+    }
+    return AcpTranscriptResponse(
+      entries: (configuredTimeline(for: sessionID) ?? []).filter(\.isAcpTranscriptEntry)
+    )
+  }
+
   func startManagedAcpAgent(
     sessionID: String,
     request: AcpAgentStartRequest

@@ -1,0 +1,155 @@
+use std::time::Instant;
+
+use axum::extract::{Query, State};
+use axum::http::HeaderMap;
+use axum::response::Response;
+use serde::Deserialize;
+
+use crate::daemon::protocol::{AcpTranscriptResponse, http_paths};
+use crate::errors::{CliError, CliErrorKind};
+
+use super::super::DaemonHttpState;
+use super::super::auth::require_auth;
+use super::super::response::{extract_request_id, timed_json};
+use super::{ensure_acp_enabled, resolve_acp_inspect_session_scope};
+
+#[derive(Debug, Deserialize)]
+pub(super) struct AcpTranscriptQuery {
+    session_id: Option<String>,
+    require_session_id: Option<String>,
+}
+
+pub(super) async fn get_acp_transcript(
+    Query(query): Query<AcpTranscriptQuery>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+
+    let result: Result<AcpTranscriptResponse, CliError> = match ensure_acp_enabled().and_then(|()| {
+        resolve_acp_inspect_session_scope(
+            query.session_id.as_deref(),
+            query.require_session_id.as_deref(),
+        )
+        .and_then(|effective| {
+            effective
+                .map(ToString::to_string)
+                .ok_or_else(|| {
+                    CliError::new(CliErrorKind::usage_error(
+                        "session_id or require_session_id is required for ACP transcript reads",
+                    ))
+                })
+        })
+    }) {
+        Ok(session_id) => super::acp_transcript_response(&state, &session_id).await,
+        Err(error) => Err(error),
+    };
+
+    timed_json(
+        "GET",
+        http_paths::MANAGED_AGENTS_ACP_TRANSCRIPT,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{Arc, Mutex, OnceLock};
+
+    use axum::body::to_bytes;
+    use axum::extract::{Query, State};
+    use axum::http::{HeaderMap, StatusCode, header::AUTHORIZATION};
+    use tokio::sync::broadcast;
+
+    use crate::daemon::agent_acp::AcpAgentManagerHandle;
+    use crate::daemon::agent_tui::AgentTuiManagerHandle;
+    use crate::daemon::codex_controller::CodexControllerHandle;
+    use crate::daemon::http::{AsyncDaemonDbSlot, DaemonHttpState};
+    use crate::daemon::protocol::StreamEvent;
+    use crate::daemon::state::DaemonManifest;
+    use crate::daemon::websocket::ReplayBuffer;
+
+    use super::*;
+
+    fn minimal_state() -> DaemonHttpState {
+        let (sender, _) = broadcast::channel::<StreamEvent>(8);
+        let db_slot = Arc::new(OnceLock::new());
+        let manifest: DaemonManifest = serde_json::from_value(serde_json::json!({
+            "version": "0.0.0", "pid": 1, "endpoint": "http://127.0.0.1:0",
+            "started_at": "2026-01-01T00:00:00Z", "token_path": "/tmp/token",
+            "sandboxed": false, "host_bridge": {}, "revision": 0,
+            "updated_at": "", "binary_stamp": null,
+        }))
+        .expect("manifest");
+        DaemonHttpState {
+            token: "token".into(),
+            sender: sender.clone(),
+            manifest,
+            daemon_epoch: "epoch".into(),
+            replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(8))),
+            db: db_slot.clone(),
+            async_db: AsyncDaemonDbSlot::empty(),
+            db_path: None,
+            codex_controller: CodexControllerHandle::new(sender.clone(), db_slot.clone(), false),
+            acp_agent_manager: AcpAgentManagerHandle::new(sender.clone(), db_slot.clone()),
+            agent_tui_manager: AgentTuiManagerHandle::new(sender, db_slot, false),
+            managed_agent_mutation_locks: crate::daemon::http::ManagedAgentMutationLocks::default(),
+        }
+    }
+
+    fn auth_headers() -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, "Bearer token".parse().expect("auth header"));
+        headers
+    }
+
+    async fn response_json(response: axum::response::Response) -> (StatusCode, serde_json::Value) {
+        let status = response.status();
+        let bytes = to_bytes(response.into_body(), 65536).await.expect("body");
+        let json: serde_json::Value = serde_json::from_slice(&bytes).expect("json body");
+        (status, json)
+    }
+
+    #[tokio::test]
+    async fn transcript_returns_scope_denied_when_require_and_session_ids_conflict() {
+        let state = minimal_state();
+        let response = get_acp_transcript(
+            Query(AcpTranscriptQuery {
+                session_id: Some("session-a".into()),
+                require_session_id: Some("session-b".into()),
+            }),
+            auth_headers(),
+            State(state),
+        )
+        .await;
+        let (status, body) = response_json(response).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert_eq!(body["error"]["code"], "SESSION_SCOPE_DENIED");
+    }
+
+    #[tokio::test]
+    async fn transcript_requires_a_scoped_session_id() {
+        let state = minimal_state();
+        let response = get_acp_transcript(
+            Query(AcpTranscriptQuery {
+                session_id: None,
+                require_session_id: None,
+            }),
+            auth_headers(),
+            State(state),
+        )
+        .await;
+        let (status, body) = response_json(response).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert!(
+            body.to_string().contains("session_id"),
+            "expected usage error to mention session_id"
+        );
+    }
+}

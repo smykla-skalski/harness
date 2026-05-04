@@ -172,6 +172,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     case sessionDetail(String)
     case timeline(String)
     case timelineWindow(String)
+    case acpTranscript(String)
   }
 
   let lock = NSLock()
@@ -211,7 +212,9 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var codexRunsDelaysBySessionID: [String: Duration] = [:]
   var resolvedAcpSnapshotsByAgentID: [String: AcpAgentSnapshot] = [:]
   var acpInspectResponsesBySessionID: [String: [AcpAgentInspectResponse]] = [:]
+  var acpTranscriptResponsesBySessionID: [String: AcpTranscriptResponse] = [:]
   var acpInspectError: (any Error)?
+  var acpTranscriptErrorsBySessionID: [String: any Error] = [:]
   var agentTuisBySessionID: [String: [AgentTuiSnapshot]] = [:]
   var agentTuisDelaysBySessionID: [String: Duration] = [:]
   var agentTuiInputErrorsByID: [String: any Error] = [:]
@@ -238,9 +241,11 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var recordedProjectsCallCount = 0
   var recordedSessionsCallCount = 0
   var acpInspectCallCountsBySessionID: [String: Int] = [:]
+  var acpTranscriptCallCountsBySessionID: [String: Int] = [:]
   var sessionDetailCallCountsBySessionID: [String: Int] = [:]
   var timelineCallCountsBySessionID: [String: Int] = [:]
   var timelineWindowCallCountsBySessionID: [String: Int] = [:]
+  var acpTranscriptDelaysBySessionID: [String: Duration] = [:]
 
   var calls: [Call] {
     get { lock.withLock { callsStorage } }

@@ -169,4 +169,80 @@ struct AgentDetailSectionTests {
       ) == "task-ui"
     )
   }
+
+  @Test("Native transcript agents read the dedicated ACP transcript slice")
+  func nativeTranscriptAgentsReadDedicatedTranscriptSlice() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.timeline = makeTimelineEntries(
+      sessionID: "sess-agent-detail",
+      agentID: "agent-native",
+      summary: "Cockpit timeline row"
+    )
+    store.selectedAcpTranscriptHistoryEntries = [
+      TimelineEntry(
+        entryId: "acp-native-row",
+        recordedAt: "2026-04-28T00:00:20Z",
+        kind: "assistant_message",
+        sessionId: "sess-agent-detail",
+        agentId: "agent-native",
+        taskId: nil,
+        summary: "Dedicated ACP transcript row",
+        payload: .object(["runtime": .string("acp")])
+      )
+    ]
+
+    let nativeAgent = AgentRegistration(
+      agentId: "agent-native",
+      name: "Native Agent",
+      runtime: "copilot",
+      role: .worker,
+      capabilities: [],
+      joinedAt: "2026-04-22T09:00:00Z",
+      updatedAt: "2026-04-22T09:00:00Z",
+      status: .active,
+      agentSessionId: nil,
+      lastActivityAt: nil,
+      currentTaskId: nil,
+      runtimeCapabilities: RuntimeCapabilities(
+        runtime: "copilot",
+        supportsNativeTranscript: true,
+        supportsSignalDelivery: true,
+        supportsContextInjection: true,
+        typicalSignalLatencySeconds: 1,
+        hookPoints: []
+      ),
+      persona: nil
+    )
+    let legacyAgent = AgentRegistration(
+      agentId: "agent-native",
+      name: "Legacy Agent",
+      runtime: "claude",
+      role: .worker,
+      capabilities: [],
+      joinedAt: "2026-04-22T09:00:00Z",
+      updatedAt: "2026-04-22T09:00:00Z",
+      status: .active,
+      agentSessionId: nil,
+      lastActivityAt: nil,
+      currentTaskId: nil,
+      runtimeCapabilities: RuntimeCapabilities(
+        runtime: "claude",
+        supportsNativeTranscript: false,
+        supportsSignalDelivery: true,
+        supportsContextInjection: true,
+        typicalSignalLatencySeconds: 1,
+        hookPoints: []
+      ),
+      persona: nil
+    )
+
+    #expect(
+      AgentDetailSection.transcriptEntries(store: store, agent: nativeAgent).map(\.summary)
+        == ["Dedicated ACP transcript row"]
+    )
+    #expect(
+      AgentDetailSection.transcriptEntries(store: store, agent: legacyAgent).map(\.summary)
+        == ["Cockpit timeline row"]
+    )
+  }
 }
