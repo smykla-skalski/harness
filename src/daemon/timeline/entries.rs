@@ -1,3 +1,19 @@
+//! Timeline entry constructors.
+//!
+//! **Sequence-space contract for synthetic producers:** events arriving here
+//! carry a `ConversationEvent::sequence` that is monotonic *within an event
+//! source* (the ACP receive loop, the supervisor sink, etc.) but is NOT
+//! globally unique. Two different sources may emit the same numeric sequence
+//! at the same time. Downstream consumers MUST key on `(entry_kind, sequence)`
+//! never on `sequence` alone. This module enforces the contract structurally
+//! by composing the `entry_id` as `{runtime}-{agent_id}-{entry_kind}-{sequence}`,
+//! so disjoint kind strings make collisions impossible by construction.
+//!
+//! When adding a new synthetic producer (e.g. `PermissionAsked`, `HookFired`,
+//! `ContextInjected`), pick a kind string that is disjoint from every existing
+//! arm in `conversation_entry` and any future arm. Assert that contract in a
+//! mapper-level test before the producer ships.
+
 use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
 use crate::errors::CliError;
 use crate::session::types::{SessionLogEntry, TaskCheckpoint};

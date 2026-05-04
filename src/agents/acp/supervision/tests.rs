@@ -453,7 +453,8 @@ async fn update_watchdog_state_does_not_emit_when_unchanged() {
 #[tokio::test(start_paused = true)]
 async fn supervisor_event_sink_carries_terminal_transition_through_mpsc() {
     use crate::agents::acp::connection::SupervisorEventSink;
-    use crate::agents::runtime::event::ConversationEventKind;
+    use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
+    use crate::daemon::timeline::{TimelinePayloadScope, conversation_entry};
     use tokio::sync::mpsc;
 
     let child = spawn_sleep_child();
@@ -475,6 +476,7 @@ async fn supervisor_event_sink_carries_terminal_transition_through_mpsc() {
     assert_eq!(batch.events.len(), 1);
     let event = &batch.events[0];
     assert_eq!(event.agent, "agent-test");
+    let supervisor_sequence = event.sequence;
     match &event.kind {
         ConversationEventKind::WatchdogState { from, to, reason } => {
             assert_eq!(from, "paused");
@@ -484,6 +486,48 @@ async fn supervisor_event_sink_carries_terminal_transition_through_mpsc() {
         other => panic!("unexpected kind: {other:?}"),
     }
 
+    // Drive the mapper end-to-end: a synthetic supervisor event with
+    // sequence S must produce a watchdog timeline entry, and a transcript
+    // event with the same numeric sequence S must NOT collide with it.
+    let supervisor_entry = conversation_entry(
+        "session-test",
+        "agent-test",
+        "acp",
+        event,
+        TimelinePayloadScope::Full,
+    )
+    .expect("conversation_entry should succeed for WatchdogState")
+    .expect("WatchdogState maps to Some(TimelineEntry)");
+    assert_eq!(
+        supervisor_entry.entry_id,
+        format!("acp-agent-test-agent_watchdog_state-{supervisor_sequence}"),
+        "watchdog entry_id encodes (agent, kind, sequence)",
+    );
+    assert_eq!(supervisor_entry.kind, "agent_watchdog_state");
+
+    let transcript_collision = ConversationEvent {
+        timestamp: Some("2026-05-04T23:00:00Z".to_string()),
+        sequence: supervisor_sequence,
+        kind: ConversationEventKind::AssistantText {
+            content: "hello".to_string(),
+        },
+        agent: "agent-test".to_string(),
+        session_id: "session-test".to_string(),
+    };
+    let transcript_entry = conversation_entry(
+        "session-test",
+        "agent-test",
+        "acp",
+        &transcript_collision,
+        TimelinePayloadScope::Full,
+    )
+    .expect("conversation_entry should succeed for AssistantText")
+    .expect("AssistantText maps to Some(TimelineEntry)");
+    assert_ne!(
+        supervisor_entry.entry_id, transcript_entry.entry_id,
+        "disjoint entry_kind keeps the (kind, sequence) space collision-free even when sequences match",
+    );
+
     #[cfg(unix)]
     let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);
 }
@@ -491,12 +535,13 @@ async fn supervisor_event_sink_carries_terminal_transition_through_mpsc() {
 #[tokio::test(start_paused = true)]
 async fn supervisor_event_sink_drops_silently_when_channel_full() {
     use crate::agents::acp::connection::SupervisorEventSink;
+    use crate::agents::runtime::event::ConversationEventKind;
     use tokio::sync::mpsc;
 
     let child = spawn_sleep_child();
     let supervisor = AcpSessionSupervisor::new(&child, SupervisionConfig::default());
 
-    let (tx, _rx) = mpsc::channel(1);
+    let (tx, mut rx) = mpsc::channel(1);
     let sink = Arc::new(SupervisorEventSink::new(
         tx,
         "agent-test".to_string(),
@@ -510,6 +555,27 @@ async fn supervisor_event_sink_drops_silently_when_channel_full() {
     }
     supervisor.mark_watchdog_fired();
     assert_eq!(supervisor.watchdog_state(), WatchdogState::Fired);
+
+    // Drain the receiver: only the first transition (Paused -> Active) fits.
+    // The Active -> Paused on guard drop and the terminal Paused -> Fired
+    // both hit a full channel and must be dropped without panicking.
+    let mut delivered = Vec::new();
+    while let Ok(batch) = rx.try_recv() {
+        delivered.push(batch);
+    }
+    assert_eq!(
+        delivered.len(),
+        1,
+        "channel buffer of 1 admits exactly one batch; subsequent transitions drop",
+    );
+    assert_eq!(delivered[0].raw_count, 0);
+    match &delivered[0].events[0].kind {
+        ConversationEventKind::WatchdogState { from, to, .. } => {
+            assert_eq!(from, "paused");
+            assert_eq!(to, "active");
+        }
+        other => panic!("unexpected first batch kind: {other:?}"),
+    }
 
     #[cfg(unix)]
     let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);

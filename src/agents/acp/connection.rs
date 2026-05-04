@@ -105,6 +105,14 @@ impl AcpConnectionHandle {
 /// downstream consumers can distinguish synthetic supervisor events from
 /// agent stdout.
 ///
+/// **Channel scope:** the `mpsc::Sender` passed to `new` is the per-session
+/// channel created by `spawn_receive_loop`. There is one sink per session,
+/// one channel per session, so a saturating burst on session A's channel
+/// cannot starve session B's supervisor signal. A dropped Fired/Done batch
+/// here means *this* session's UI lost the terminal transition; the operator
+/// must read the daemon log to detect that case (the `warn!` line names the
+/// session_id explicitly).
+///
 /// **Sequence-space contract:** `SupervisorEventSink::sequence` is a
 /// SEPARATE counter from the receive loop's transcript sequence. Both
 /// counters start at 0 and increment independently. Downstream consumers
