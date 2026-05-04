@@ -31,26 +31,24 @@ require_lldb() {
 resolve_pid_from_process_name() {
   local process_name="$1"
   local -a matches=()
-  while IFS=$'\t' read -r pid command; do
+  local pid=""
+  local command=""
+  while IFS= read -r line; do
+    [[ -n "$line" ]] || continue
+    pid="${line%% *}"
+    command="${line#"$pid"}"
+    command="${command#"${command%%[![:space:]]*}"}"
     [[ -n "$pid" ]] || continue
-    matches+=("$pid"$'\t'"$command")
-  done < <(
-    ps -axo pid=,command= | awk -v needle="$process_name" '
-      {
-        pid = $1
-        $1 = ""
-        sub(/^ +/, "", $0)
-        command = $0
-        if (
-          command == needle ||
-          index(command, "/Contents/MacOS/" needle) > 0 ||
-          command ~ ("/" needle "([[:space:]]|$)")
-        ) {
-          print pid "\t" command
-        }
-      }
-    '
-  )
+    if [[
+      "$command" == "$process_name" ||
+      "$command" == *"/Contents/MacOS/$process_name" ||
+      "$command" == *"/Contents/MacOS/$process_name "* ||
+      "$command" == *"/$process_name" ||
+      "$command" == *"/$process_name "*
+    ]]; then
+      matches+=("$pid"$'\t'"$command")
+    fi
+  done < <(ps -axo pid=,command=)
 
   case "${#matches[@]}" in
     0)
