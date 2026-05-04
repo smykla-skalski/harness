@@ -1,3 +1,6 @@
+use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
+use std::time::Duration;
+
 use pyroscope::PyroscopeError;
 use pyroscope::backend::{BackendConfig, pprof::PprofConfig, pprof_backend};
 use pyroscope::pyroscope::{PyroscopeAgent, PyroscopeAgentBuilder, PyroscopeAgentRunning};
@@ -6,6 +9,7 @@ use tracing::{info, warn};
 use super::config::{ResolvedTelemetryConfig, RuntimeService};
 
 const PYROSCOPE_SAMPLE_RATE_HZ: u32 = 100;
+const PYROSCOPE_REACHABILITY_TIMEOUT: Duration = Duration::from_millis(500);
 
 type RunningAgent = PyroscopeAgent<PyroscopeAgentRunning>;
 
@@ -98,6 +102,14 @@ fn daemon_profiler_settings(
     }
 
     let url = export.pyroscope_url.clone()?;
+    if !pyroscope_endpoint_reachable(&url, PYROSCOPE_REACHABILITY_TIMEOUT) {
+        info!(
+            pyroscope_url = %url,
+            timeout_ms = u64::try_from(PYROSCOPE_REACHABILITY_TIMEOUT.as_millis()).unwrap_or(u64::MAX),
+            "pyroscope endpoint unreachable, skipping daemon profiler"
+        );
+        return None;
+    }
     Some(DaemonProfilerSettings {
         url,
         application_name: service.service_name(),
@@ -106,6 +118,42 @@ fn daemon_profiler_settings(
             ("service_version", env!("CARGO_PKG_VERSION").to_string()),
         ],
     })
+}
+
+// Probes the pyroscope server with a short TCP connect so we don't start the
+// background pusher when the user has OTel configured but no live pyroscope -
+// otherwise the agent floods the daemon log with `Failed to send session`
+// every 10 s and steals CPU from the profiler thread.
+fn pyroscope_endpoint_reachable(url: &str, timeout: Duration) -> bool {
+    let Some(authority) = parse_authority(url) else {
+        return false;
+    };
+    let addrs: Vec<SocketAddr> = match authority.to_socket_addrs() {
+        Ok(iter) => iter.collect(),
+        Err(_) => return false,
+    };
+    addrs
+        .into_iter()
+        .any(|addr| TcpStream::connect_timeout(&addr, timeout).is_ok())
+}
+
+// Extract the `host:port` slice from a `scheme://host[:port][/path]` URL,
+// defaulting the port from the scheme when none is supplied.
+fn parse_authority(url: &str) -> Option<String> {
+    let after_scheme = url.split_once("://").map(|(scheme, rest)| (scheme, rest))?;
+    let (scheme, rest) = after_scheme;
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or(rest);
+    if authority.is_empty() {
+        return None;
+    }
+    if authority.contains(':') {
+        return Some(authority.to_string());
+    }
+    let default_port = match scheme {
+        "https" => 443,
+        _ => 80,
+    };
+    Some(format!("{authority}:{default_port}"))
 }
 
 fn build_running_agent(settings: &DaemonProfilerSettings) -> Result<RunningAgent, PyroscopeError> {
@@ -184,14 +232,52 @@ mod tests {
     }
 
     #[test]
-    fn daemon_profiler_settings_use_daemon_labels() {
-        let settings = daemon_profiler_settings(
-            RuntimeService::Daemon,
-            &export(Some("http://127.0.0.1:4040")),
-        )
-        .expect("settings");
+    fn parse_authority_extracts_host_port_with_path() {
+        assert_eq!(
+            parse_authority("http://127.0.0.1:4040/push"),
+            Some("127.0.0.1:4040".to_string())
+        );
+    }
 
-        assert_eq!(settings.url, "http://127.0.0.1:4040");
+    #[test]
+    fn parse_authority_defaults_port_from_scheme() {
+        assert_eq!(
+            parse_authority("https://pyroscope.example.com/api"),
+            Some("pyroscope.example.com:443".to_string())
+        );
+        assert_eq!(
+            parse_authority("http://pyroscope.example.com"),
+            Some("pyroscope.example.com:80".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_authority_rejects_missing_scheme() {
+        assert_eq!(parse_authority("127.0.0.1:4040"), None);
+    }
+
+    #[test]
+    fn pyroscope_unreachable_endpoint_skips_settings() {
+        // 127.0.0.1:1 is reserved and unbound on practically every host.
+        let unreachable = "http://127.0.0.1:1";
+        assert!(!pyroscope_endpoint_reachable(
+            unreachable,
+            Duration::from_millis(50)
+        ));
+        assert_eq!(
+            daemon_profiler_settings(RuntimeService::Daemon, &export(Some(unreachable))),
+            None
+        );
+    }
+
+    #[test]
+    fn daemon_profiler_settings_use_daemon_labels() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let url = format!("http://{}", listener.local_addr().expect("addr"));
+        let settings =
+            daemon_profiler_settings(RuntimeService::Daemon, &export(Some(&url))).expect("settings");
+
+        assert_eq!(settings.url, url);
         assert_eq!(settings.application_name, "harness-daemon");
         assert_eq!(
             settings.tags,
