@@ -119,3 +119,68 @@ extension View {
     }
   }
 }
+
+struct AgentsConfigPillFlow: Layout {
+  let spacing: CGFloat
+  let lineSpacing: CGFloat
+
+  init(spacing: CGFloat = 8, lineSpacing: CGFloat = 8) {
+    self.spacing = spacing
+    self.lineSpacing = lineSpacing
+  }
+
+  func sizeThatFits(
+    proposal: ProposedViewSize,
+    subviews: Subviews,
+    cache: inout ()
+  ) -> CGSize {
+    let maxWidth = proposal.width ?? .infinity
+    var totalHeight: CGFloat = 0
+    var lineWidth: CGFloat = 0
+    var lineHeight: CGFloat = 0
+    for subview in subviews {
+      let size = subview.sizeThatFits(.unspecified)
+      let nextWidth = lineWidth + size.width + (lineWidth > 0 ? spacing : 0)
+      if nextWidth > maxWidth, lineWidth > 0 {
+        totalHeight += lineHeight + lineSpacing
+        lineWidth = size.width
+        lineHeight = size.height
+      } else {
+        lineWidth = nextWidth
+        lineHeight = max(lineHeight, size.height)
+      }
+    }
+    totalHeight += lineHeight
+    return CGSize(
+      width: maxWidth.isFinite ? maxWidth : lineWidth,
+      height: totalHeight
+    )
+  }
+
+  func placeSubviews(
+    in bounds: CGRect,
+    proposal: ProposedViewSize,
+    subviews: Subviews,
+    cache: inout ()
+  ) {
+    var x = bounds.minX
+    var y = bounds.minY
+    var lineHeight: CGFloat = 0
+    let maxWidth = bounds.width
+    for subview in subviews {
+      let size = subview.sizeThatFits(.unspecified)
+      if x - bounds.minX + size.width > maxWidth, x > bounds.minX {
+        x = bounds.minX
+        y += lineHeight + lineSpacing
+        lineHeight = 0
+      }
+      subview.place(
+        at: CGPoint(x: x, y: y),
+        anchor: .topLeading,
+        proposal: ProposedViewSize(width: size.width, height: size.height)
+      )
+      x += size.width + spacing
+      lineHeight = max(lineHeight, size.height)
+    }
+  }
+}
