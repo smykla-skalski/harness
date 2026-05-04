@@ -96,6 +96,24 @@ pub(crate) fn conversation_entry(
             "agent_session_marker",
             format!("{agent_id} marked {marker}"),
         ),
+        ConversationEventKind::PermissionAsked { tool, scope, .. } => (
+            "agent_permission_asked",
+            format!("{agent_id} asked for permission on {tool} ({scope})"),
+        ),
+        ConversationEventKind::HookFired {
+            name, latency_ms, ..
+        } => (
+            "agent_hook_fired",
+            format!("{agent_id} fired hook {name} after {latency_ms}ms"),
+        ),
+        ConversationEventKind::WatchdogState { from, to, .. } => (
+            "agent_watchdog_state",
+            format!("{agent_id} watchdog {from} -> {to}"),
+        ),
+        ConversationEventKind::ContextInjected { actor, .. } => (
+            "agent_context_injected",
+            format!("{agent_id} accepted context from {actor}"),
+        ),
         ConversationEventKind::UserPrompt { .. }
         | ConversationEventKind::AssistantText { .. }
         | ConversationEventKind::Other { .. } => return Ok(None),
