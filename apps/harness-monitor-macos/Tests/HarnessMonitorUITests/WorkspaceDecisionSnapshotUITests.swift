@@ -12,6 +12,12 @@ final class WorkspaceDecisionSnapshotUITests:
   private static let decisionSeedEnvKey = "HARNESS_MONITOR_SUPERVISOR_SEED_DECISIONS"
   private static let criticalDecisionID = "ui-inspector-critical"
   private static let infoDecisionID = "ui-inspector-info"
+  private static let snoozeDecisionID = "snooze-snapshot-seed"
+  private static let snoozeActionID = "snooze-snapshot-action"
+  private static let previewPermissionKey = "HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"
+  private static let acpDecisionID = "acp-permission:preview-acp-permission-1"
+
+  // MARK: - Default decision snapshots
 
   func testCaptureWorkspaceDecisionDeskOverview() throws {
     let app = launchInCockpitPreview(
@@ -31,10 +37,7 @@ final class WorkspaceDecisionSnapshotUITests:
     let observerPanel = element(in: app, identifier: Accessibility.decisionsObserverPanel)
     XCTAssertTrue(waitForElement(observerPanel, timeout: Self.actionTimeout))
 
-    saveWindowSnapshot(
-      workspaceWindow,
-      named: "workspace-decision-desk-overview"
-    )
+    saveWindowSnapshot(workspaceWindow, named: "workspace-decision-desk-overview")
   }
 
   func testCaptureWorkspaceDecisionDetailWithInspector() throws {
@@ -42,7 +45,7 @@ final class WorkspaceDecisionSnapshotUITests:
       mode: "empty",
       additionalEnvironment: [
         Self.uiTestsKey: "1",
-        Self.decisionSeedEnvKey: makeSeededDecisionsPayload(),
+        Self.decisionSeedEnvKey: makeDefaultDecisionsPayload(),
       ]
     )
 
@@ -84,24 +87,89 @@ final class WorkspaceDecisionSnapshotUITests:
       "Decision inspector should be visible for the detail snapshot"
     )
 
-    saveWindowSnapshot(
-      workspaceWindow,
-      named: "workspace-decision-detail-inspector"
-    )
+    saveWindowSnapshot(workspaceWindow, named: "workspace-decision-detail-inspector")
   }
+
+  // MARK: - ACP permission snapshot
+
+  func testCaptureWorkspaceWindowForAcpPermissionPrompt() throws {
+    let app = launchInCockpitPreview(
+      additionalEnvironment: [
+        Self.uiTestsKey: "1",
+        Self.previewPermissionKey: "1",
+      ]
+    )
+    openWorkspaceWindow(in: app)
+
+    let workspaceWindow = element(in: app, identifier: Accessibility.workspaceWindow)
+    XCTAssertTrue(
+      waitForElement(workspaceWindow, timeout: Self.actionTimeout),
+      "ACP permission prompts should route directly into the workspace window"
+    )
+    XCTAssertTrue(
+      waitForElement(
+        element(in: app, identifier: Accessibility.decisionRow(Self.acpDecisionID)),
+        timeout: Self.actionTimeout
+      ),
+      "ACP permission decision should be visible in the workspace window before snapshot capture"
+    )
+    XCTAssertFalse(
+      element(in: app, identifier: Accessibility.acpPermissionModal).exists,
+      "ACP permission flow should not show a separate modal surface"
+    )
+
+    saveWindowSnapshot(workspaceWindow, named: "workspace-decision-acp-permission-window")
+  }
+
+  // MARK: - Snooze dialog snapshot
+
+  func testCaptureWorkspaceWindowWithSnoozeDialogSnapshot() throws {
+    let app = launch(
+      mode: "empty",
+      additionalEnvironment: [
+        Self.uiTestsKey: "1",
+        Self.decisionSeedEnvKey: makeSnoozeDecisionPayload(),
+      ]
+    )
+
+    tapButton(in: app, identifier: Accessibility.workspaceToolbarButton)
+
+    let workspaceWindow = element(in: app, identifier: Accessibility.workspaceWindow)
+    XCTAssertTrue(
+      waitForElement(workspaceWindow, timeout: Self.uiTimeout),
+      "Workspace window should open after tapping workspace toolbar button"
+    )
+
+    tapButton(in: app, identifier: Accessibility.decisionRow(Self.snoozeDecisionID))
+
+    let snoozeTrigger = button(
+      in: app,
+      identifier: Accessibility.decisionAction(Self.snoozeActionID)
+    )
+    XCTAssertTrue(waitForElement(snoozeTrigger, timeout: Self.actionTimeout))
+    tapButton(in: app, identifier: Accessibility.decisionAction(Self.snoozeActionID))
+
+    let oneHourOption = button(in: app, title: "1 hour")
+    XCTAssertTrue(
+      waitForElement(oneHourOption, timeout: Self.actionTimeout),
+      "Snooze confirmation dialog should expose duration options"
+    )
+
+    saveWindowSnapshot(workspaceWindow, named: "workspace-decision-snooze-dialog")
+  }
+
+  // MARK: - Helpers
 
   private func saveWindowSnapshot(_ window: XCUIElement, named name: String) {
     guard window.exists else {
       XCTFail("Cannot capture preview snapshot for \(name): target window does not exist.")
       return
     }
-
     let screenshot = window.screenshot()
     let artifactsDirectory =
       diagnosticsArtifactsDirectory(for: Self.artifactsDirectoryKey)
       ?? URL(fileURLWithPath: "/tmp/harness-monitor-design-snapshots", isDirectory: true)
     let outputURL = artifactsDirectory.appendingPathComponent("\(name).png")
-
     do {
       try FileManager.default.createDirectory(
         at: artifactsDirectory,
@@ -113,7 +181,7 @@ final class WorkspaceDecisionSnapshotUITests:
     }
   }
 
-  private func makeSeededDecisionsPayload() -> String {
+  private func makeDefaultDecisionsPayload() -> String {
     let info: [String: Any] = [
       "id": Self.infoDecisionID,
       "severity": "info",
@@ -131,6 +199,25 @@ final class WorkspaceDecisionSnapshotUITests:
       "suggestedActionsJSON": "[]",
     ]
     return serializeJSONObject(["decisions": [critical, info]])
+  }
+
+  private func makeSnoozeDecisionPayload() -> String {
+    let decision: [String: Any] = [
+      "id": Self.snoozeDecisionID,
+      "severity": "warn",
+      "ruleID": "stuck-agent",
+      "summary": "Snooze snapshot seed",
+      "contextJSON": "{\"agentID\":\"agent-snapshot\"}",
+      "suggestedActionsJSON": serializeJSONObject([
+        [
+          "id": Self.snoozeActionID,
+          "title": "Snooze",
+          "kind": "snooze",
+          "payloadJSON": "{\"duration\":3600}",
+        ]
+      ]),
+    ]
+    return serializeJSONObject(["decisions": [decision]])
   }
 
   private func serializeJSONObject(_ object: Any) -> String {
