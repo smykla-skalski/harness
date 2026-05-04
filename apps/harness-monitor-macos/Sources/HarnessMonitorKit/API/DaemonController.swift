@@ -45,6 +45,7 @@ public struct DaemonController: DaemonControlling {
   let managedLaunchAgentCurrentBundleStamp: @Sendable () throws -> ManagedLaunchAgentBundleStamp?
   let managedLaunchAgentDeferredRefreshState: ManagedLaunchAgentDeferredRefreshState
   let processLiveness: ProcessLivenessProbe
+  let bootSessionUUID: BootSessionUUIDProbe
 
   public init(
     environment: HarnessMonitorEnvironment = .current,
@@ -91,7 +92,8 @@ public struct DaemonController: DaemonControlling {
       -> ManagedLaunchAgentBundleStamp? = {
         try Self.currentManagedLaunchAgentBundleStamp()
       },
-    processLiveness: @escaping ProcessLivenessProbe = Self.defaultProcessLiveness
+    processLiveness: @escaping ProcessLivenessProbe = Self.defaultProcessLiveness,
+    bootSessionUUID: @escaping BootSessionUUIDProbe = Self.defaultBootSessionUUID
   ) {
     self.environment = environment
     self.transportPreference = transportPreference
@@ -107,6 +109,7 @@ public struct DaemonController: DaemonControlling {
     self.managedLaunchAgentCurrentBundleStamp = managedLaunchAgentCurrentBundleStamp
     self.managedLaunchAgentDeferredRefreshState = ManagedLaunchAgentDeferredRefreshState()
     self.processLiveness = processLiveness
+    self.bootSessionUUID = bootSessionUUID
   }
 
   public func bootstrapClient() async throws -> any HarnessMonitorClientProtocol {
