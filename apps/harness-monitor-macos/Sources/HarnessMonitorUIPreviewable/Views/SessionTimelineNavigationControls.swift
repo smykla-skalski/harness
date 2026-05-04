@@ -146,12 +146,8 @@ struct SessionTimelineNavigationControls: View {
   ) -> some View {
     let detail = navigationDetail(for: visibilityStats)
     return HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
-      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
-        statusLabel
-        if let detail {
-          statusSeparator
-          navigationDetailLabel(detail)
-        }
+      if let detail {
+        navigationDetailLabel(detail)
       }
       Spacer(minLength: 0)
       buttons(canOlder: canOlder, canNewer: canNewer)
@@ -164,12 +160,25 @@ struct SessionTimelineNavigationControls: View {
     visibilityStats: SessionTimelineVisibilityStats
   ) -> some View {
     let detail = navigationDetail(for: visibilityStats)
-    return VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+    return VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      buttons(canOlder: canOlder, canNewer: canNewer)
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+        statusLabel
+        if let detail {
+          navigationDetailLabel(detail)
+        }
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func statusRow(detail: NavigationDetail?) -> some View {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
       statusLabel
       if let detail {
+        statusSeparator
         navigationDetailLabel(detail)
       }
-      buttons(canOlder: canOlder, canNewer: canNewer)
     }
   }
 

@@ -190,6 +190,14 @@ struct SessionCockpitTimelineSection: View {
 
   private func timelineSurface(for presentation: SessionTimelineSectionPresentation) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
+      SessionTimelineFilterControls(
+        filters: $filters,
+        inventory: presentation.filterSnapshot.inventory,
+        summary: presentation.filterSnapshot.summary
+      )
+
+      timelineScrollContent(for: presentation)
+
       if presentation.navigation.showsNavigation {
         SessionTimelineNavigationControls(
           navigation: presentation.navigation,
@@ -202,14 +210,6 @@ struct SessionCockpitTimelineSection: View {
           }
         )
       }
-
-      SessionTimelineFilterControls(
-        filters: $filters,
-        inventory: presentation.filterSnapshot.inventory,
-        summary: presentation.filterSnapshot.summary
-      )
-
-      timelineScrollContent(for: presentation)
     }
     .padding(HarnessMonitorTheme.spacingLG)
     .background {
@@ -257,7 +257,7 @@ struct SessionCockpitTimelineSection: View {
         }
       }
     }
-    .frame(height: presentation.viewportHeight)
+    .frame(height: presentation.scrollViewportHeight)
   }
 }
 

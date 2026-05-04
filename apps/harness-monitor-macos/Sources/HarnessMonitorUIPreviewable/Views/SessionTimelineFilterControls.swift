@@ -55,7 +55,7 @@ struct SessionTimelineFilterControls: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       searchControls
 
       if !quickTones.isEmpty {
@@ -77,27 +77,25 @@ struct SessionTimelineFilterControls: View {
   }
 
   private var searchControls: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      sectionLabel("Search timeline")
-      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingXS) {
-        TextField("Find in timeline", text: $filters.query)
-          .textFieldStyle(.roundedBorder)
-          .accessibilityLabel("Search timeline")
-          .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterSearch)
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingXS) {
+      TextField("Find in timeline", text: $filters.query)
+        .textFieldStyle(.roundedBorder)
+        .accessibilityLabel("Search timeline")
+        .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterSearch)
 
-        scopeMenu
-        moreFiltersButton
-        clearFiltersButton
-      }
+      scopeMenu
+      moreFiltersButton
+      clearFiltersButton
     }
   }
 
   private var scopeMenu: some View {
     Menu {
-      Picker("Search scope", selection: $filters.searchScope) {
-        ForEach(SessionTimelineSearchScope.allCases) { scope in
-          Label(scope.label, systemImage: scope.systemImage)
-            .tag(scope)
+      ForEach(SessionTimelineSearchScope.allCases) { scope in
+        Button {
+          filters.searchScope = scope
+        } label: {
+          scopeMenuItem(scope)
         }
       }
     } label: {
@@ -108,6 +106,13 @@ struct SessionTimelineFilterControls: View {
     .controlSize(HarnessMonitorControlMetrics.compactControlSize)
     .accessibilityLabel("Search scope — \(filters.searchScope.label)")
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterScopeMenu)
+  }
+
+  private func scopeMenuItem(_ scope: SessionTimelineSearchScope) -> some View {
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      Image(systemName: filters.searchScope == scope ? "checkmark" : scope.systemImage)
+      Text(scope.label)
+    }
   }
 
   private var moreFiltersButton: some View {
@@ -139,33 +144,32 @@ struct SessionTimelineFilterControls: View {
   }
 
   private var toneChipsSection: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      sectionLabel("Event level")
-      HarnessMonitorWrapLayout(
-        spacing: HarnessMonitorTheme.spacingXS,
-        lineSpacing: HarnessMonitorTheme.spacingXS
-      ) {
-        Button("All levels") {
-          filters.clearTones()
-        }
-        .harnessFilterChipButtonStyle(isSelected: false)
-        .accessibilityValue(filters.tones.isEmpty ? "current default" : "clears level filters")
+    HarnessMonitorWrapLayout(
+      spacing: HarnessMonitorTheme.spacingXS,
+      lineSpacing: HarnessMonitorTheme.spacingXS
+    ) {
+      Button("All levels") {
+        filters.clearTones()
+      }
+      .harnessFilterChipButtonStyle(isSelected: false)
+      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+      .accessibilityValue(filters.tones.isEmpty ? "current default" : "clears level filters")
 
-        ForEach(quickTones, id: \.rawValue) { tone in
-          Button {
-            filters.toggleTone(tone)
-          } label: {
-            HStack(spacing: 6) {
-              Text(tone.label)
-              Text("\(inventory.count(for: tone))")
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-            }
-            .scaledFont(.caption.weight(.semibold))
+      ForEach(quickTones, id: \.rawValue) { tone in
+        Button {
+          filters.toggleTone(tone)
+        } label: {
+          HStack(spacing: 6) {
+            Text(tone.label)
+            Text("\(inventory.count(for: tone))")
+              .monospacedDigit()
+              .foregroundStyle(.secondary)
           }
-          .harnessFilterChipButtonStyle(isSelected: filters.tones.contains(tone))
-          .accessibilityValue(filters.tones.contains(tone) ? "selected" : "not selected")
+          .scaledFont(.caption.weight(.semibold))
         }
+        .harnessFilterChipButtonStyle(isSelected: filters.tones.contains(tone))
+        .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+        .accessibilityValue(filters.tones.contains(tone) ? "selected" : "not selected")
       }
     }
   }
@@ -191,6 +195,7 @@ struct SessionTimelineFilterControls: View {
             .scaledFont(.caption.weight(.semibold))
           }
           .harnessFilterChipButtonStyle(isSelected: true)
+          .controlSize(HarnessMonitorControlMetrics.compactControlSize)
           .accessibilityLabel("Remove filter \(chip.label)")
         }
       }
@@ -449,6 +454,7 @@ private struct SessionTimelineAdvancedFiltersPopover: View {
       .scaledFont(.caption.weight(.semibold))
     }
     .harnessFilterChipButtonStyle(isSelected: isSelected)
+    .controlSize(HarnessMonitorControlMetrics.compactControlSize)
     .accessibilityValue(isSelected ? "selected" : "not selected")
   }
 
