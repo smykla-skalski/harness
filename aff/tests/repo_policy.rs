@@ -51,48 +51,65 @@ fn session_start_cli_uses_custom_ancestor_policy_file() {
 }
 
 #[test]
-fn denies_raw_cargo_with_task_replacement() {
-    let reason = manual_command_denial_reason("cargo test --lib cli::tests")
-        .expect("command should parse")
-        .expect("raw cargo should be blocked");
-    assert!(reason.contains("mise run cargo:local -- test --lib cli::tests"));
-}
-
-#[test]
-fn denies_harness_setup_bootstrap_with_task_replacement() {
-    let reason = manual_command_denial_reason("harness setup bootstrap --agents codex")
-        .expect("command should parse")
-        .expect("raw setup bootstrap should be blocked");
-    assert!(reason.contains("mise run setup:bootstrap -- --agents codex"));
-}
-
-#[test]
-fn denies_shell_wrapped_command_and_preserves_env_prefix() {
-    let reason = manual_command_denial_reason(
-        "rtk env XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests bash -lc 'mise run monitor:test'",
-    )
-    .expect("command should parse")
-    .expect("shell-wrapped mise command should be blocked");
-    assert!(reason.contains("XCODE_ONLY_TESTING="));
-    assert!(reason.contains("mise run monitor:test"));
-}
-
-#[test]
-fn allows_existing_mise_commands() {
-    assert!(
-        manual_command_denial_reason("mise run check")
+fn denied_commands_contain_replacement() {
+    let cases: &[(&str, &[&str])] = &[
+        (
+            "cargo test --lib cli::tests",
+            &["mise run cargo:local -- test --lib cli::tests"],
+        ),
+        (
+            "harness setup bootstrap --agents codex",
+            &["mise run setup:bootstrap -- --agents codex"],
+        ),
+        (
+            "rtk env XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests \
+             bash -lc 'mise run monitor:test'",
+            &["XCODE_ONLY_TESTING=", "mise run monitor:test"],
+        ),
+    ];
+    for (cmd, expected) in cases {
+        let reason = manual_command_denial_reason(cmd)
             .expect("command should parse")
-            .is_none()
-    );
+            .unwrap_or_else(|| panic!("command should be blocked: {cmd:?}"));
+        for substring in *expected {
+            assert!(reason.contains(substring), "case {cmd:?}: expected {substring:?}");
+        }
+    }
 }
 
 #[test]
-fn allows_quoted_urls_with_ampersands() {
-    assert!(
-        manual_command_denial_reason("curl 'https://example.com?a=1&b=2'")
-            .expect("command should parse")
-            .is_none()
-    );
+fn allowed_commands_pass_through() {
+    let cases = [
+        "mise run check",
+        "curl 'https://example.com?a=1&b=2'",
+    ];
+    for cmd in cases {
+        assert!(
+            manual_command_denial_reason(cmd)
+                .expect("command should parse")
+                .is_none(),
+            "case {cmd:?} should be allowed"
+        );
+    }
+}
+
+#[test]
+fn rejects_unsupported_command_shapes() {
+    let cases: &[(&str, &str)] = &[
+        (
+            "bash -lc 'mise run check&&mise run test -- test:unit'",
+            "unsupported wrapped shell command shape",
+        ),
+        (
+            "cargo test&&cargo check",
+            "unsupported top-level command shape",
+        ),
+    ];
+    for (cmd, expected_error) in cases {
+        let error = manual_command_denial_reason(cmd)
+            .expect_err("unsupported shape should fail");
+        assert!(error.contains(expected_error), "case {cmd:?}");
+    }
 }
 
 #[test]
