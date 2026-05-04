@@ -42,6 +42,7 @@ enum AgentsConfigPillState {
 
 struct AgentsConfigPill<MenuContent: View>: View {
   let label: String
+  let value: String?
   let state: AgentsConfigPillState
   let accessibilityLabel: String
   let accessibilityIdentifier: String?
@@ -49,12 +50,14 @@ struct AgentsConfigPill<MenuContent: View>: View {
 
   init(
     label: String,
+    value: String? = nil,
     state: AgentsConfigPillState,
     accessibilityLabel: String,
     accessibilityIdentifier: String? = nil,
     @ViewBuilder menuContent: @escaping () -> MenuContent
   ) {
     self.label = label
+    self.value = value
     self.state = state
     self.accessibilityLabel = accessibilityLabel
     self.accessibilityIdentifier = accessibilityIdentifier
@@ -67,11 +70,13 @@ struct AgentsConfigPill<MenuContent: View>: View {
     } label: {
       pillBody
     }
-    .menuStyle(.borderlessButton)
+    .menuStyle(.button)
     .menuIndicator(.hidden)
+    .buttonStyle(AgentsConfigPillButtonStyle(state: state))
     .fixedSize(horizontal: true, vertical: false)
     .accessibilityLabel(accessibilityLabel)
-    .accessibilityValue(state.accessibilityValue)
+    .accessibilityValue(value ?? state.accessibilityValue)
+    .accessibilityHint(state.accessibilityValue)
     .applyAgentsConfigPillIdentifier(accessibilityIdentifier)
   }
 
@@ -91,21 +96,33 @@ struct AgentsConfigPill<MenuContent: View>: View {
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .accessibilityHidden(true)
     }
-    .foregroundStyle(HarnessMonitorTheme.ink)
-    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-    .padding(.vertical, HarnessMonitorTheme.spacingXS)
-    .background(
-      RoundedRectangle(cornerRadius: 14, style: .continuous)
-        .fill(HarnessMonitorTheme.ink.opacity(state.fillOpacity))
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: 14, style: .continuous)
-        .stroke(
-          HarnessMonitorTheme.controlBorder.opacity(state.strokeOpacity),
-          lineWidth: 1
-        )
-    )
-    .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+  }
+}
+
+private struct AgentsConfigPillButtonStyle: ButtonStyle {
+  let state: AgentsConfigPillState
+
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .foregroundStyle(HarnessMonitorTheme.ink)
+      .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+      .padding(.vertical, HarnessMonitorTheme.spacingXS)
+      .background(
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+          .fill(
+            HarnessMonitorTheme.ink.opacity(
+              state.fillOpacity + (configuration.isPressed ? 0.06 : 0)
+            )
+          )
+      )
+      .overlay(
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+          .stroke(
+            HarnessMonitorTheme.controlBorder.opacity(state.strokeOpacity),
+            lineWidth: 1
+          )
+      )
+      .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
   }
 }
 

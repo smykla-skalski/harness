@@ -347,6 +347,7 @@ extension WorkspaceWindowCreatePane {
     let label = context.choice.id.isAcp ? "ACP" : "Terminal"
     return AgentsConfigPill(
       label: label,
+      value: label,
       state: .set,
       accessibilityLabel: "Transport"
     ) {
@@ -365,15 +366,15 @@ extension WorkspaceWindowCreatePane {
     context: TerminalConfigurationContext
   ) -> some View {
     let label = selectedTerminalModelMenuTitle(context: context)
-    let isCatalogDefault =
-      context.modelBinding.wrappedValue
-      == (context.catalogModels.first { $0.id == context.modelBinding.wrappedValue }?.id ?? "")
-      && context.catalogModels.contains(where: { $0.id == context.modelBinding.wrappedValue })
+    let isCatalogDefault = context.catalogModels.contains(where: {
+      $0.id == context.modelBinding.wrappedValue
+    })
     let state: AgentsConfigPillState =
       context.modelBinding.wrappedValue == RuntimeCustomModel.tag ? .set
       : (isCatalogDefault ? .default : .set)
     return AgentsConfigPill(
       label: label,
+      value: label,
       state: state,
       accessibilityLabel: "Model"
     ) {
@@ -392,11 +393,13 @@ extension WorkspaceWindowCreatePane {
     context: TerminalConfigurationContext
   ) -> some View {
     let current = context.effortBinding.wrappedValue
-    let label = current.isEmpty ? "Effort" : "Effort \(current.capitalized)"
+    let valueText = current.isEmpty ? "Default" : current.capitalized
+    let label = "Effort \(valueText)"
     let defaultEffort = WorkspaceWindowView.defaultEffortLevel(from: context.effortValues)
     let state: AgentsConfigPillState = current == defaultEffort ? .default : .set
     return AgentsConfigPill(
       label: label,
+      value: valueText,
       state: state,
       accessibilityLabel: "Effort"
     ) {
@@ -415,6 +418,7 @@ extension WorkspaceWindowCreatePane {
     let state: AgentsConfigPillState = role == .worker ? .default : .set
     return AgentsConfigPill(
       label: label,
+      value: role.title,
       state: state,
       accessibilityLabel: "Role in session"
     ) {
@@ -433,6 +437,7 @@ extension WorkspaceWindowCreatePane {
     let state: AgentsConfigPillState = role == .worker ? .default : .set
     return AgentsConfigPill(
       label: label,
+      value: role.title,
       state: state,
       accessibilityLabel: "Fallback role"
     ) {
@@ -455,6 +460,7 @@ extension WorkspaceWindowCreatePane {
     let state: AgentsConfigPillState = personaName == nil ? .additive : .set
     return AgentsConfigPill(
       label: label,
+      value: personaName ?? "None",
       state: state,
       accessibilityLabel: "Persona"
     ) {
