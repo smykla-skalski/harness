@@ -44,17 +44,17 @@ extension WorkspaceWindowCreatePane {
     case .projectAccessAvailable:
       return nil
     case .checkingAccess:
-      return "Project access is still being checked."
+      return "ACP is still being checked."
     case .setupRequired:
-      return "Project access requires CLI setup. Copy install instructions below."
+      return "ACP requires CLI setup. Copy install instructions below."
     case .bridgeAccessRequired:
-      return "Project access requires bridge setup. Open setup details below."
+      return "ACP requires bridge setup. Open setup details below."
     case .terminalOnly:
-      return "Project access isn't available for this provider yet."
+      return "ACP isn't available for this provider yet."
     case .unavailable:
       return
         option.projectAccessGuidanceText
-        ?? "Project access isn't available for this provider yet."
+        ?? "ACP isn't available for this provider yet."
     }
   }
 
@@ -63,18 +63,18 @@ extension WorkspaceWindowCreatePane {
     choice: AgentCapabilityTransportChoice
   ) -> String {
     if choice.id.isAcp {
-      return "Starts with project access available."
+      return "Starts via ACP."
     }
 
     switch option.availabilityState {
     case .projectAccessAvailable:
-      return "Opens in Terminal. Project access is also available."
+      return "Opens in Terminal. ACP is also available."
     case .checkingAccess:
-      return "Opens in Terminal while project access is checked."
+      return "Opens in Terminal while ACP is checked."
     case .setupRequired:
-      return "Opens in Terminal. Set up project access when you're ready."
+      return "Opens in Terminal. Set up ACP when you're ready."
     case .bridgeAccessRequired:
-      return "Opens in Terminal. Turn on bridge access to use project access."
+      return "Opens in Terminal. Turn on bridge access to use ACP."
     case .terminalOnly:
       return "Opens in Terminal."
     case .unavailable:
@@ -100,7 +100,7 @@ extension WorkspaceWindowCreatePane {
     if option.transportChoices.count > 1 {
       AgentsCreateFieldBlock(
         title: "Start with",
-        help: "Choose whether this provider opens in Terminal or joins with project access."
+        help: "Choose whether this provider opens in Terminal or joins via ACP."
       ) {
         HStack(spacing: HarnessMonitorTheme.spacingSM) {
           ForEach(option.transportChoices) { transportChoice in
