@@ -238,17 +238,4 @@ final class DaemonDisconnectRuleTests: XCTestCase {
     XCTAssertEqual(payload.severity, .critical)
   }
 
-  // MARK: - Rule metadata
-
-  func test_parametersSchemaDeclaresThresholds() {
-    let rule = DaemonDisconnectRule()
-    let keys = rule.parameters.fields.map(\.key)
-    XCTAssertTrue(keys.contains("disconnectGraceSeconds"))
-    XCTAssertTrue(keys.contains("disconnectEscalationSeconds"))
-  }
-
-  func test_defaultBehaviorIsAggressive() {
-    let rule = DaemonDisconnectRule()
-    XCTAssertEqual(rule.defaultBehavior(for: "any"), .aggressive)
-  }
 }

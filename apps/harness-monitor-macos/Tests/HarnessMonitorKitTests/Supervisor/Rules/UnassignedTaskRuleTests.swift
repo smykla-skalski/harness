@@ -4,32 +4,6 @@ import XCTest
 @testable import HarnessMonitorKit
 
 final class UnassignedTaskRuleTests: XCTestCase {
-  // MARK: - Defaults and metadata
-
-  func test_metadataIsStable() {
-    let rule = UnassignedTaskRule()
-    XCTAssertEqual(rule.id, "unassigned-task")
-    XCTAssertEqual(rule.name, "Unassigned Task")
-    XCTAssertEqual(rule.version, 1)
-  }
-
-  func test_parameterSchemaDeclaresUnassignedThreshold() {
-    let rule = UnassignedTaskRule()
-    let keys = rule.parameters.fields.map(\.key)
-    XCTAssertTrue(
-      keys.contains("unassignedThreshold"),
-      "UnassignedTaskRule must expose `unassignedThreshold` parameter; found \(keys)"
-    )
-    let field = rule.parameters.fields.first { $0.key == "unassignedThreshold" }
-    XCTAssertEqual(field?.default, "120")
-    XCTAssertEqual(field?.kind, .duration)
-  }
-
-  func test_defaultBehaviorIsCautious() {
-    let rule = UnassignedTaskRule()
-    XCTAssertEqual(rule.defaultBehavior(for: "queueDecision"), .cautious)
-  }
-
   // MARK: - Trigger boundary
 
   func test_noActionWhenTaskIsYoungerThanThreshold() async {

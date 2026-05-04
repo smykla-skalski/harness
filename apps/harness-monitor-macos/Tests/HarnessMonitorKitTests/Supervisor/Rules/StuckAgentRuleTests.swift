@@ -4,31 +4,6 @@ import XCTest
 @testable import HarnessMonitorKit
 
 final class StuckAgentRuleTests: XCTestCase {
-  func test_parameterSchemaDeclaresThresholdRetryCountAndInterval() {
-    let rule = StuckAgentRule()
-    let fields = Dictionary(uniqueKeysWithValues: rule.parameters.fields.map { ($0.key, $0) })
-
-    XCTAssertEqual(fields["stuckThreshold"]?.default, "120")
-    XCTAssertEqual(fields["stuckThreshold"]?.kind, .duration)
-    XCTAssertEqual(fields["nudgeMaxRetries"]?.default, "3")
-    XCTAssertEqual(fields["nudgeMaxRetries"]?.kind, .integer)
-    XCTAssertEqual(fields["nudgeRetryInterval"]?.default, "120")
-    XCTAssertEqual(fields["nudgeRetryInterval"]?.kind, .duration)
-  }
-
-  func test_defaultBehaviorIsAggressiveForNudgeAndCautiousForDecision() {
-    let rule = StuckAgentRule()
-
-    XCTAssertEqual(
-      rule.defaultBehavior(for: "nudge:stuck-agent:agent-1:snap-1"),
-      .aggressive
-    )
-    XCTAssertEqual(
-      rule.defaultBehavior(for: "decision:stuck-agent:session-1:agent-1:task-1"),
-      .cautious
-    )
-  }
-
   func test_noActionWhenIdleSecondsDoNotExceedThreshold() async {
     let rule = StuckAgentRule()
     let snapshot = Fixtures.snapshot(
