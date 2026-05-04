@@ -42,9 +42,8 @@ extension WorkspaceWindowCreatePane {
   @ViewBuilder private var terminalConfigurationColumn: some View {
     if let option = selectedCapabilityOption {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
-        terminalConfigurationCard(option: option)
-        terminalLaunchCard
         terminalDetailsCard
+        terminalConfigurationCard(option: option)
         terminalSizeCard
       }
     } else {
@@ -63,13 +62,26 @@ extension WorkspaceWindowCreatePane {
     let context = terminalConfigurationContext(for: option)
 
     return AgentsCreateSectionCard {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-        AgentsCreateSectionHeading(title: "Configuration")
-        terminalTransportChoicesSection(option: option, context: context)
-        terminalTransportNotice(option: option, choice: context.choice)
-        terminalModelField(context: context)
-        terminalEffortField(context: context)
-        roleAndPersonaSection
+      DisclosureGroup {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+          terminalTransportChoicesSection(option: option, context: context)
+          terminalTransportNotice(option: option, choice: context.choice)
+          terminalModelField(context: context)
+          terminalEffortField(context: context)
+          roleAndPersonaSection
+        }
+        .padding(.top, HarnessMonitorTheme.spacingSM)
+      } label: {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+          Text("Configure")
+            .scaledFont(.headline)
+            .accessibilityAddTraits(.isHeader)
+          Text(terminalLaunchSummaryChipText)
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .lineLimit(1)
+            .truncationMode(.middle)
+        }
       }
     }
   }
@@ -280,43 +292,6 @@ extension WorkspaceWindowCreatePane {
         }
       }
     }
-  }
-
-  private var terminalLaunchCard: some View {
-    AgentsCreateSectionCard {
-      HStack(alignment: .center, spacing: HarnessMonitorTheme.sectionSpacing) {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-          Text("Ready to launch")
-            .scaledFont(.headline)
-          Text(terminalLaunchCalloutText)
-            .scaledFont(.subheadline)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-        Spacer(minLength: HarnessMonitorTheme.spacingLG)
-        HarnessMonitorActionButton(
-          title: "Start \(selectedAgentLaunchTitle)",
-          variant: .prominent,
-          accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiStartButton,
-          fillsWidth: false
-        ) {
-          startAction()
-        }
-        .keyboardShortcut(.defaultAction)
-        .disabled(!canStartTerminal)
-      }
-    }
-  }
-
-  private var terminalLaunchCalloutText: String {
-    var message = "Launches as \(viewModel.selectedRole.title)."
-
-    if showsAcpFallbackRoleMenu {
-      message +=
-        " If a leader is already active, it joins as \(viewModel.selectedAcpFallbackRole.title)."
-    }
-
-    return message
   }
 
 }
