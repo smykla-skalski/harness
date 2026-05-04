@@ -139,7 +139,17 @@ private struct HarnessMonitorNativeTextFieldModifier: ViewModifier {
     content
       .font(font)
       .controlSize(controlSize)
-      .textFieldStyle(.roundedBorder)
+      .textFieldStyle(.plain)
+      .padding(.horizontal, 10)
+      .padding(.vertical, 8)
+      .background(
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+          .fill(HarnessMonitorTheme.ink.opacity(0.10))
+      )
+      .overlay(
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+          .stroke(HarnessMonitorTheme.controlBorder.opacity(0.7), lineWidth: 1)
+      )
   }
 }
 
