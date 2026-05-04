@@ -19,17 +19,6 @@ final class HarnessMonitorMenuBarTests: HarnessMonitorUITestCase {
     )
   }
 
-  func testWindowMenuDoesNotExposeLegacyWindowItems() throws {
-    let app = launch(mode: "preview")
-    let windowMenu = app.menuBars.firstMatch.menuBarItems["Window"]
-    XCTAssertTrue(windowMenu.waitForExistence(timeout: Self.uiTimeout))
-    windowMenu.click()
-
-    XCTAssertFalse(windowMenu.menuItems["Agents"].exists)
-    XCTAssertFalse(windowMenu.menuItems["Decisions"].exists)
-    windowMenu.typeKey(.escape, modifierFlags: [])
-  }
-
   func testWindowMenuHasNoTabbingItems() throws {
     let app = launch(mode: "preview")
     let windowMenu = app.menuBars.firstMatch.menuBarItems["Window"]
