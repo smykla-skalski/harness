@@ -208,7 +208,7 @@ extension WorkspaceWindowCreatePane {
 
       if context.modelBinding.wrappedValue == RuntimeCustomModel.tag {
         TextField("Provider-specific model id", text: context.customModelBinding)
-          .harnessNativeFormControl()
+          .harnessNativeTextField()
           .harnessMCPTextField(
             HarnessMonitorAccessibility.workspaceCustomModelField,
             label: "Provider-specific model id",

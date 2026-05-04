@@ -201,7 +201,7 @@ extension WorkspaceWindowCreatePane {
           help: nil
         ) {
           TextField("Optional display name", text: $formModel.name)
-            .harnessNativeFormControl()
+            .harnessNativeTextField()
             .focused(focusedFieldBinding, equals: .name)
             .harnessMCPTextField(
               HarnessMonitorAccessibility.agentTuiNameField,
@@ -231,7 +231,7 @@ extension WorkspaceWindowCreatePane {
               help: nil
             ) {
               TextField("Optional project directory override", text: $formModel.projectDir)
-                .harnessNativeFormControl()
+                .harnessNativeTextField()
                 .harnessMCPTextField(
                   HarnessMonitorAccessibility.agentTuiProjectDirField,
                   label: "Project directory override",
