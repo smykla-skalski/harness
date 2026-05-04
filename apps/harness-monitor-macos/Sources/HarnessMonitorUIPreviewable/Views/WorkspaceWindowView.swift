@@ -335,6 +335,9 @@ public struct WorkspaceWindowView: View {
       .onChange(of: viewModel.selection) { oldValue, newValue in
         handleViewSelectionChange(from: oldValue, to: newValue, viewModel: viewModel)
       }
+      .onChange(of: agentLaunchAvailabilitySignal) { _, _ in
+        Task { await reloadAgentPickerCatalogsIfPending() }
+      }
       .onDisappear {
         hasCompletedInitialWorkspacePreparation = false
         handleWindowDisappear()
