@@ -77,16 +77,9 @@ extension WorkspaceWindowCreatePane {
         }
         .padding(.top, HarnessMonitorTheme.spacingSM)
       } label: {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-          Text("Configure")
-            .scaledFont(.headline)
-            .accessibilityAddTraits(.isHeader)
-          Text(codexLaunchSummaryChipText)
-            .scaledFont(.caption)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .lineLimit(1)
-            .truncationMode(.middle)
-        }
+        Text("Configure")
+          .scaledFont(.headline)
+          .accessibilityAddTraits(.isHeader)
       }
     }
   }

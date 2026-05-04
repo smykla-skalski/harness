@@ -309,7 +309,6 @@ extension WorkspaceWindowCreatePane {
         step: step
       )
       .harnessNativeFormControl()
-      .accessibilityLabel(title)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
