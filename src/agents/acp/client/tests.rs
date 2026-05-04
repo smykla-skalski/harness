@@ -22,17 +22,29 @@ use super::{
 };
 use crate::agents::acp::permission::{PermissionMode, standard_permission_options};
 
+#[track_caller]
 fn ok<T, E: std::fmt::Debug>(result: Result<T, E>, context: &str) -> T {
+    assert!(
+        result.is_ok(),
+        "{context}: unexpected Err({:?})",
+        result.as_ref().err()
+    );
     match result {
         Ok(value) => value,
         Err(error) => unreachable!("{context}: {error:?}"),
     }
 }
 
-fn err<T, E: std::fmt::Debug>(result: Result<T, E>, context: &str) -> E {
+#[track_caller]
+fn err<T: std::fmt::Debug, E: std::fmt::Debug>(result: Result<T, E>, context: &str) -> E {
+    assert!(
+        result.is_err(),
+        "{context}: unexpected Ok({:?})",
+        result.as_ref().ok()
+    );
     match result {
         Err(error) => error,
-        Ok(_) => unreachable!("{context}"),
+        Ok(value) => unreachable!("{context}: unexpected Ok({value:?})"),
     }
 }
 
@@ -173,10 +185,11 @@ fn recording_write_logs_denial_aligned_with_policy() {
     assert_eq!(records.len(), 1);
     assert_eq!(records[0]["operation"], "fs.write_text_file");
     assert_eq!(records[0]["decision"], "denied");
-    assert!(matches!(
-        records[0]["reason"].as_str(),
-        Some(reason) if reason.contains("kubectl")
-    ));
+    let reason_value = &records[0]["reason"];
+    let Some(reason) = reason_value.as_str() else {
+        unreachable!("recorded denial reason should be a string, got {reason_value:?}");
+    };
+    assert!(reason.contains("kubectl"), "unexpected reason: {reason}");
 }
 
 #[test]
@@ -196,10 +209,14 @@ fn recording_write_logs_denial_when_allowed_path_fails_to_write() {
     assert_eq!(records.len(), 1);
     assert_eq!(records[0]["operation"], "fs.write_text_file");
     assert_eq!(records[0]["decision"], "denied");
-    assert!(matches!(
-        records[0]["reason"].as_str(),
-        Some(reason) if reason.contains("failed to write")
-    ));
+    let reason_value = &records[0]["reason"];
+    let Some(reason) = reason_value.as_str() else {
+        unreachable!("write failure reason should be a string, got {reason_value:?}");
+    };
+    assert!(
+        reason.contains("failed to write"),
+        "unexpected reason: {reason}"
+    );
 }
 
 #[test]
@@ -271,11 +288,13 @@ fn recording_permission_request_never_blocks_or_approves() {
         "record permission",
     );
 
-    assert!(matches!(
-        response.outcome,
-        RequestPermissionOutcome::Selected(ref selected)
-            if selected.option_id.0.as_ref() == "reject_once"
-    ));
+    let outcome = response.outcome;
+    let RequestPermissionOutcome::Selected(selected) = outcome else {
+        unreachable!(
+            "recording permission mode should always return a selected outcome, got {outcome:?}"
+        );
+    };
+    assert_eq!(selected.option_id.0.as_ref(), "reject_once");
     let records = read_log(&log_path);
     assert_eq!(records.len(), 1);
     assert_eq!(records[0]["operation"], "session.request_permission");

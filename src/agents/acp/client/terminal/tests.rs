@@ -13,7 +13,13 @@ use super::{TerminalLifecycleWait, TerminalManager, TerminalOutputState, Termina
 use crate::agents::acp::client::TERMINAL_DENIED;
 use crate::agents::policy::DeniedBinaries;
 
+#[track_caller]
 fn ok<T, E: std::fmt::Debug>(result: Result<T, E>, context: &str) -> T {
+    assert!(
+        result.is_ok(),
+        "{context}: unexpected Err({:?})",
+        result.as_ref().err()
+    );
     match result {
         Ok(value) => value,
         Err(error) => unreachable!("{context}: {error:?}"),
@@ -162,10 +168,15 @@ fn wait_for_exit_or_error_is_level_triggered_after_pre_wait_exit() {
         start.elapsed() < Duration::from_millis(100),
         "pre-published exit should not wait for the timeout"
     );
-    assert!(matches!(
-        outcome,
-        TerminalLifecycleWait::Exit(ref exit_status) if *exit_status == expected
-    ));
+    match outcome {
+        TerminalLifecycleWait::Exit(exit_status) => assert_eq!(exit_status, expected),
+        TerminalLifecycleWait::LifecycleError(error) => {
+            unreachable!("expected exit status, got lifecycle error: {error}")
+        }
+        TerminalLifecycleWait::TimedOut => {
+            unreachable!("expected exit status, got timeout")
+        }
+    }
 }
 
 #[test]

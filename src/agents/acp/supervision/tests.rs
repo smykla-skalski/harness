@@ -13,7 +13,13 @@ use nix::unistd::Pid;
 
 use super::*;
 
+#[track_caller]
 fn ok<T, E: std::fmt::Debug>(result: Result<T, E>, context: &str) -> T {
+    assert!(
+        result.is_ok(),
+        "{context}: unexpected Err({:?})",
+        result.as_ref().err()
+    );
     match result {
         Ok(value) => value,
         Err(error) => unreachable!("{context}: {error:?}"),
@@ -192,9 +198,7 @@ async fn watchdog_loop_does_not_fire_for_idle_agent() {
     let supervisor = Arc::new(AcpSessionSupervisor::new(&child, config));
     let task = tokio::spawn(watchdog_loop(Arc::clone(&supervisor)));
 
-    let timed_out = tokio::time::timeout(Duration::from_millis(100), &mut Box::pin(async {})).await;
-    assert!(timed_out.is_ok());
-    tokio::time::sleep(Duration::from_millis(80)).await;
+    advance(Duration::from_millis(100)).await;
     assert!(
         !task.is_finished(),
         "watchdog must keep idle agents alive indefinitely"
