@@ -257,7 +257,7 @@ private struct SessionTimelineBadgeStrip: View {
 }
 
 enum SessionTimelineLayout {
-  static let timeColumnWidth: CGFloat = 92
+  static let timeColumnWidth: CGFloat = 78
   static let railWidth: CGFloat = 14
   static let markerDiameter: CGFloat = 19
   static let markerCoreDiameter: CGFloat = 11

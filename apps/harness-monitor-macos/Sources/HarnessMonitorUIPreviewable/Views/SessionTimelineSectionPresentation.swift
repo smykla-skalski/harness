@@ -6,6 +6,8 @@ struct SessionTimelineSectionPresentation {
   static let rowHeightEstimate: CGFloat = 74
   private static let minimumViewportHeight: CGFloat = 260
   private static let maximumViewportHeight: CGFloat = 470
+  private static let minimumScrollViewportHeight: CGFloat = 180
+  private static let navigationFooterHeight: CGFloat = 36
 
   let navigation: SessionTimelineWindowNavigation
   let filterSnapshot: SessionTimelineFilterSnapshot
@@ -120,6 +122,15 @@ struct SessionTimelineSectionPresentation {
 
   var fallbackVisibleRowCount: Int {
     min(max(rows.count + placeholderCount, 0), Self.maximumVisibleRows)
+  }
+
+  var scrollViewportHeight: CGFloat {
+    guard navigation.showsNavigation else {
+      return viewportHeight
+    }
+    let reservedFooterHeight =
+      Self.navigationFooterHeight + HarnessMonitorTheme.spacingLG
+    return max(Self.minimumScrollViewportHeight, viewportHeight - reservedFooterHeight)
   }
 
   func canScrollOlder(from targetID: String?) -> Bool {
