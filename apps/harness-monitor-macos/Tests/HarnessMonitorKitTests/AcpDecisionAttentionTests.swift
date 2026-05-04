@@ -99,6 +99,135 @@ struct AcpDecisionAttentionTests {
     #expect(events.first?.toastMessage == "Permission requested by Worker Codex. Workspace window.")
   }
 
+  @Test("ACP attention cache refreshes when selected ACP agents are replaced directly")
+  @MainActor
+  func refreshesAttentionCacheWhenSelectedAgentsChange() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-attention"
+    store.selectedAcpAgents = [
+      makeWorkerSnapshot(
+        acpID: "acp-1",
+        sessionID: "sess-acp-attention",
+        pendingBatches: [
+          makeAcpPermissionBatch(
+            batchID: "batch-1",
+            acpID: "acp-1",
+            sessionID: "sess-acp-attention",
+            createdAt: "2026-04-28T00:00:01Z"
+          )
+        ]
+      )
+    ]
+
+    #expect(store.acpDecisionAttention(for: "worker-codex")?.oldestBatchID == "batch-1")
+    #expect(store.acpPermissionAttentionEvents.map(\.batchID) == ["batch-1"])
+
+    store.selectedAcpAgents = [
+      makeWorkerSnapshot(
+        acpID: "acp-1",
+        sessionID: "sess-acp-attention",
+        pendingBatches: []
+      )
+    ]
+
+    #expect(store.acpDecisionAttention(for: "worker-codex") == nil)
+    #expect(store.acpPermissionAttentionEvents.isEmpty)
+  }
+
+  @Test("ACP attention events sort by oldest pending batch across agents")
+  @MainActor
+  func sortsAttentionEventsAcrossAgentsByDaemonOrdering() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-attention"
+    store.selectedAcpAgents = [
+      makeWorkerSnapshot(
+        acpID: "acp-1",
+        sessionID: "sess-acp-attention",
+        agentID: "worker-z",
+        displayName: "Worker Z",
+        pendingBatches: [
+          makeAcpPermissionBatch(
+            batchID: "batch-2",
+            acpID: "acp-1",
+            sessionID: "sess-acp-attention",
+            createdAt: "2026-04-28T00:00:02Z"
+          )
+        ]
+      ),
+      makeWorkerSnapshot(
+        acpID: "acp-2",
+        sessionID: "sess-acp-attention",
+        agentID: "worker-b",
+        displayName: "Worker B",
+        pendingBatches: [
+          makeAcpPermissionBatch(
+            batchID: "batch-9",
+            acpID: "acp-2",
+            sessionID: "sess-acp-attention",
+            createdAt: "2026-04-28T00:00:01Z"
+          )
+        ]
+      ),
+      makeWorkerSnapshot(
+        acpID: "acp-3",
+        sessionID: "sess-acp-attention",
+        agentID: "worker-a",
+        displayName: "Worker A",
+        pendingBatches: [
+          makeAcpPermissionBatch(
+            batchID: "batch-1",
+            acpID: "acp-3",
+            sessionID: "sess-acp-attention",
+            createdAt: "2026-04-28T00:00:01Z"
+          )
+        ]
+      ),
+    ]
+
+    #expect(store.acpPermissionAttentionEvents.map(\.batchID) == ["batch-1", "batch-9", "batch-2"])
+    #expect(
+      store.acpPermissionAttentionEvents.map(\.decisionID) == [
+        "acp-permission:batch-1",
+        "acp-permission:batch-9",
+        "acp-permission:batch-2",
+      ])
+  }
+
+  @Test("ACP attention uses batch ID to break same-timestamp ties within one agent")
+  @MainActor
+  func breaksSameTimestampTiesWithinOneAgent() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-attention"
+    store.selectedAcpAgents = [
+      makeWorkerSnapshot(
+        acpID: "acp-1",
+        sessionID: "sess-acp-attention",
+        pendingBatches: [
+          makeAcpPermissionBatch(
+            batchID: "batch-9",
+            acpID: "acp-1",
+            sessionID: "sess-acp-attention",
+            createdAt: "2026-04-28T00:00:01Z"
+          ),
+          makeAcpPermissionBatch(
+            batchID: "batch-1",
+            acpID: "acp-1",
+            sessionID: "sess-acp-attention",
+            createdAt: "2026-04-28T00:00:01Z"
+          ),
+        ]
+      )
+    ]
+
+    let attention = store.acpDecisionAttention(for: "worker-codex")
+
+    #expect(attention?.count == 2)
+    #expect(attention?.oldestBatchID == "batch-1")
+    #expect(attention?.oldestDecisionID == "acp-permission:batch-1")
+    #expect(store.acpPermissionAttentionEvents.map(\.batchID) == ["batch-1"])
+    #expect(store.acpPermissionAttentionEvents.map(\.decisionID) == ["acp-permission:batch-1"])
+  }
+
   @Test("ACP attention always routes pending batches to a matching ACP decision")
   @MainActor
   func routesPendingAttentionWithoutGenericSupervisorRows() {
@@ -128,13 +257,15 @@ struct AcpDecisionAttentionTests {
   private func makeWorkerSnapshot(
     acpID: String,
     sessionID: String,
+    agentID: String = "worker-codex",
+    displayName: String = "Worker Codex",
     pendingBatches: [AcpPermissionBatch]
   ) -> AcpAgentSnapshot {
     AcpAgentSnapshot(
       acpId: acpID,
       sessionId: sessionID,
-      agentId: "worker-codex",
-      displayName: "Worker Codex",
+      agentId: agentID,
+      displayName: displayName,
       status: .active,
       pid: 12_345,
       pgid: 12_345,

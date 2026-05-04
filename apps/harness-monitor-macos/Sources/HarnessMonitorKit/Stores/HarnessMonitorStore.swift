@@ -87,8 +87,24 @@ public final class HarnessMonitorStore {
   public var selectedAcpAgents: [AcpAgentSnapshot] = [] {
     didSet {
       guard oldValue != selectedAcpAgents else { return }
+      rebuildAcpDecisionAttentionCache()
     }
   }
+  /// Derived ACP attention for the currently selected session only.
+  ///
+  /// Freshness contract:
+  /// - This cache is rebuilt only when `selectedAcpAgents` changes, so it cannot outlive the
+  ///   store's selected-session ACP snapshot.
+  /// - No background cache or independent invalidation path exists; replacing `selectedAcpAgents`
+  ///   is the only way the attention model changes.
+  ///
+  /// Ordering contract:
+  /// - `oldestBatchID` is selected by daemon-authored `(createdAt, batchId)` ordering to make the
+  ///   oldest pending ACP batch deterministic when batches arrive in unstable array order.
+  public internal(set) var acpDecisionAttentionSnapshot = AcpDecisionAttentionSnapshot(
+    byAgentID: [:]
+  )
+  public internal(set) var acpPermissionAttentionEvents: [AcpPermissionAttentionEvent] = []
   var selectedAcpInspectState: AcpInspectSample? {
     didSet {
       guard oldValue != selectedAcpInspectState else { return }
@@ -115,8 +131,14 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var acpPermissionPendingTimeoutDecisionIDs: Set<String> = []
   @ObservationIgnored var acpPermissionPendingShutdownDecisionIDs: Set<String> = []
   @ObservationIgnored var acpPermissionTerminalOutcomesByID: [String: DecisionOutcome] = [:]
+  @ObservationIgnored var acpPermissionAuditEncoder = JSONEncoder()
+  @ObservationIgnored var acpPermissionOutcomeDecoder = JSONDecoder()
   @ObservationIgnored var acpPermissionDecisionSyncTask: Task<Void, Never>?
   @ObservationIgnored var acpPermissionDecisionSyncGeneration: UInt64 = 0
+  @ObservationIgnored var acpPermissionDeadlineResolutionTasks: [String: Task<Void, Never>] = [:]
+  @ObservationIgnored var acpDeadlineResolutionTokens: [String: UInt64] = [:]
+  @ObservationIgnored var acpPermissionShutdownResolutionTasks: [String: Task<Void, Never>] = [:]
+  @ObservationIgnored var acpShutdownResolutionTokens: [String: UInt64] = [:]
   public var showConfirmation: Bool {
     get { pendingConfirmation != nil }
     set { if !newValue { cancelConfirmation() } }
