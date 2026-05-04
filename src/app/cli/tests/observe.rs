@@ -70,38 +70,24 @@ fn reject_legacy_observe_scan_doctor_action() {
 }
 
 #[test]
-fn parse_top_level_session_start() {
-    let cli =
-        Cli::try_parse_from(["harness", "session-start", "--project-dir", "/tmp/project"]).unwrap();
-    match cli.command {
-        Command::SessionStart(SessionStartArgs { project_dir }) => {
-            assert_eq!(project_dir.as_deref(), Some("/tmp/project"));
+fn top_level_lifecycle_commands_accept_project_dir() {
+    fn extract(cmd: Command) -> Option<String> {
+        match cmd {
+            Command::SessionStart(SessionStartArgs { project_dir }) => project_dir,
+            Command::SessionStop(SessionStopArgs { project_dir }) => project_dir,
+            Command::PreCompact(PreCompactArgs { project_dir }) => project_dir,
+            _ => panic!("expected lifecycle command"),
         }
-        _ => panic!("expected top-level SessionStart command"),
     }
-}
-
-#[test]
-fn parse_top_level_session_stop() {
-    let cli =
-        Cli::try_parse_from(["harness", "session-stop", "--project-dir", "/tmp/project"]).unwrap();
-    match cli.command {
-        Command::SessionStop(SessionStopArgs { project_dir }) => {
-            assert_eq!(project_dir.as_deref(), Some("/tmp/project"));
-        }
-        _ => panic!("expected top-level SessionStop command"),
-    }
-}
-
-#[test]
-fn parse_top_level_pre_compact() {
-    let cli =
-        Cli::try_parse_from(["harness", "pre-compact", "--project-dir", "/tmp/project"]).unwrap();
-    match cli.command {
-        Command::PreCompact(PreCompactArgs { project_dir }) => {
-            assert_eq!(project_dir.as_deref(), Some("/tmp/project"));
-        }
-        _ => panic!("expected top-level PreCompact command"),
+    for subcmd in ["session-start", "session-stop", "pre-compact"] {
+        let cli =
+            Cli::try_parse_from(["harness", subcmd, "--project-dir", "/tmp/project"]).unwrap();
+        let project_dir = extract(cli.command);
+        assert_eq!(
+            project_dir.as_deref(),
+            Some("/tmp/project"),
+            "subcmd: {subcmd}"
+        );
     }
 }
 
