@@ -4,6 +4,7 @@ use std::sync::Arc;
 use agent_client_protocol::schema::SessionId;
 use agent_client_protocol::{Agent, ConnectionTo, Error as AcpError, Result as AcpResult};
 
+use super::session_guard::{RouteTarget, SessionRouteGuard};
 use super::{AcpAgentManagerHandle, AcpSessionSupervisor, send_initialize, send_new_session};
 use crate::errors::CliError;
 
@@ -15,9 +16,27 @@ pub(super) async fn initialize_and_bind_runtime_session(
     session_id: &str,
     acp_id: &str,
     runtime_name: &str,
+    session_guard: &SessionRouteGuard,
 ) -> AcpResult<SessionId> {
     let acp_session_id = initialize_runtime_session(supervisor, connection, project_dir).await?;
-    bind_runtime_session(manager, session_id, acp_id, runtime_name, &acp_session_id).await?;
+    // Register the route the moment we know the runtime's session_id - the runtime
+    // can fire `session/update` notifications immediately after `new_session` returns,
+    // so any gap before `bind_runtime_session` finishes would silently drop them with
+    // `routing_not_initialized` (e.g. gemini's available_commands_update arrives while
+    // the orchestration bind is still in flight).
+    session_guard.start_session(
+        &acp_session_id,
+        RouteTarget {
+            acp_id: acp_id.to_string(),
+            session_id: session_id.to_string(),
+        },
+    );
+    if let Err(error) =
+        bind_runtime_session(manager, session_id, acp_id, runtime_name, &acp_session_id).await
+    {
+        session_guard.stop_session(&acp_session_id);
+        return Err(error);
+    }
     Ok(acp_session_id)
 }
 
