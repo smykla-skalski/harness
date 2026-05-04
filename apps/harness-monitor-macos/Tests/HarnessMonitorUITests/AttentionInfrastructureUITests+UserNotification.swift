@@ -42,6 +42,7 @@ final class AttentionInfrastructureUITestsUserNotification:
       waitForElement(openDecisionsButton, timeout: Self.uiTimeout),
       "Foreground ACP toast should expose an Open Workspace button before capture"
     )
+    XCTAssertEqual(openDecisionsButton.label, "Open Workspace")
 
     recordDiagnosticsSnapshot(in: app, named: "acp-permission-toast")
   }
@@ -120,6 +121,7 @@ final class AttentionInfrastructureUITestsUserNotification:
       waitForElement(openDecisionsButton, timeout: Self.uiTimeout),
       "Foreground ACP toast should expose an Open Workspace button"
     )
+    XCTAssertEqual(openDecisionsButton.label, "Open Workspace")
 
     let toastState = element(in: app, identifier: Accessibility.acpPermissionToastState)
     assertToastStateMarkers(toastState)
@@ -182,6 +184,7 @@ final class AttentionInfrastructureUITestsUserNotification:
       waitForElement(closeButton, timeout: Self.actionTimeout),
       "Foreground ACP toast should expose a dismiss button"
     )
+    XCTAssertEqual(closeButton.label, "Dismiss")
     let preTapButtonState = renderToastButtonState(
       app: app,
       actionFrameMarker: actionFrameMarker,

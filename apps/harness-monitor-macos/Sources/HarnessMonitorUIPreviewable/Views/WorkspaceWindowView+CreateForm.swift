@@ -150,6 +150,9 @@ struct WorkspaceWindowCreatePane: View {
       launchFloorBar
     }
     .accessibilityElement(children: .contain)
+    .onAppear {
+      applySavedLaunchPresetIfFresh()
+    }
   }
 }
 
@@ -301,6 +304,73 @@ extension WorkspaceWindowCreatePane {
       label: "Create"
     )
     .accessibilityLabel("Create")
+  }
+
+  func recordCurrentLaunchPreset(mode: LaunchPresetSnapshot.Mode) {
+    LaunchPresetDefaults.captureAndWrite(viewModel: viewModel, mode: mode)
+  }
+
+  func applySavedLaunchPresetIfFresh() {
+    guard
+      viewModel.prompt.isEmpty,
+      viewModel.codexPrompt.isEmpty,
+      viewModel.name.isEmpty,
+      viewModel.argvOverride.isEmpty,
+      viewModel.projectDir.isEmpty
+    else {
+      return
+    }
+    guard let snapshot = LaunchPresetDefaults.read() else { return }
+    if let providerKey = snapshot.providerStorageKey,
+      let parsed = AgentLaunchSelection(storageKey: providerKey)
+    {
+      viewModel.selectedLaunchSelection = parsed
+      viewModel.runtime = parsed.preferredRuntime
+    }
+    if let role = snapshot.role.flatMap(SessionRole.init(rawValue:)) {
+      viewModel.selectedRole = role
+    }
+    if let fallback = snapshot.fallbackRole.flatMap(SessionRole.init(rawValue:)) {
+      viewModel.selectedAcpFallbackRole = fallback
+    }
+    if let personaID = snapshot.personaID, !personaID.isEmpty {
+      viewModel.selectedPersona = personaID
+    }
+    var restoredModels: [AgentTuiRuntime: String] = [:]
+    for (rawKey, value) in snapshot.modelByRuntime {
+      if let runtime = AgentTuiRuntime(rawValue: rawKey) {
+        restoredModels[runtime] = value
+      }
+    }
+    if !restoredModels.isEmpty {
+      viewModel.selectedTerminalModelByRuntime = restoredModels
+    }
+    var restoredCustom: [AgentTuiRuntime: String] = [:]
+    for (rawKey, value) in snapshot.customModelByRuntime {
+      if let runtime = AgentTuiRuntime(rawValue: rawKey) {
+        restoredCustom[runtime] = value
+      }
+    }
+    if !restoredCustom.isEmpty {
+      viewModel.customTerminalModelByRuntime = restoredCustom
+    }
+    var restoredEffort: [AgentTuiRuntime: String] = [:]
+    for (rawKey, value) in snapshot.effortByRuntime {
+      if let runtime = AgentTuiRuntime(rawValue: rawKey) {
+        restoredEffort[runtime] = value
+      }
+    }
+    if !restoredEffort.isEmpty {
+      viewModel.selectedTerminalEffortByRuntime = restoredEffort
+    }
+    viewModel.rows = snapshot.rows
+    viewModel.cols = snapshot.cols
+    if let codexMode = snapshot.codexMode.flatMap(CodexRunMode.init(rawValue:)) {
+      viewModel.codexMode = codexMode
+    }
+    viewModel.selectedCodexModel = snapshot.codexModel
+    viewModel.customCodexModel = snapshot.customCodexModel
+    viewModel.selectedCodexEffort = snapshot.codexEffort
   }
 
   @ViewBuilder

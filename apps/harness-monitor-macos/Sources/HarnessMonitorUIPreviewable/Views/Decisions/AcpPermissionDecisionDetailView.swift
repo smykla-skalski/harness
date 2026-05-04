@@ -58,7 +58,7 @@ private struct AcpPermissionDecisionDetailContent: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-      Text("Agent permission request")
+      Text("Agent permission required")
         .scaledFont(.caption.bold())
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       Text("Review the requested actions and choose what to allow before the agent continues.")
