@@ -249,6 +249,9 @@ struct AgentsCreateProviderStatusBadge: View {
   var body: some View {
     Label(title, systemImage: systemImage)
       .scaledFont(.caption.weight(.semibold))
+      .lineLimit(1)
+      .allowsTightening(true)
+      .fixedSize(horizontal: true, vertical: false)
       .harnessPillPadding()
       .harnessContentPill(tint: tint)
   }
