@@ -57,6 +57,13 @@ pub(crate) fn conversation_entry(
     };
 
     let (entry_kind, summary) = match &event.kind {
+        ConversationEventKind::UserPrompt { content } => {
+            ("user_prompt", transcript_summary(content, "Prompt submitted"))
+        }
+        ConversationEventKind::AssistantText { content } => (
+            "assistant_text",
+            transcript_summary(content, "Assistant response"),
+        ),
         ConversationEventKind::ToolInvocation { tool_name, .. } => {
             ("tool_invocation", format!("{agent_id} invoked {tool_name}"))
         }
@@ -96,27 +103,11 @@ pub(crate) fn conversation_entry(
             "agent_session_marker",
             format!("{agent_id} marked {marker}"),
         ),
-        ConversationEventKind::PermissionAsked { tool, scope, .. } => (
-            "agent_permission_asked",
-            format!("{agent_id} asked for permission on {tool} ({scope})"),
-        ),
-        ConversationEventKind::HookFired {
-            name, latency_ms, ..
-        } => (
-            "agent_hook_fired",
-            format!("{agent_id} fired hook {name} after {latency_ms}ms"),
-        ),
         ConversationEventKind::WatchdogState { from, to, .. } => (
             "agent_watchdog_state",
             format!("{agent_id} watchdog {from} -> {to}"),
         ),
-        ConversationEventKind::ContextInjected { actor, .. } => (
-            "agent_context_injected",
-            format!("{agent_id} accepted context from {actor}"),
-        ),
-        ConversationEventKind::UserPrompt { .. }
-        | ConversationEventKind::AssistantText { .. }
-        | ConversationEventKind::Other { .. } => return Ok(None),
+        ConversationEventKind::Other { .. } => return Ok(None),
     };
     let payload = timeline_payload(
         &serde_json::json!({
@@ -137,4 +128,13 @@ pub(crate) fn conversation_entry(
         summary,
         payload,
     }))
+}
+
+fn transcript_summary(content: &str, fallback: &str) -> String {
+    let trimmed = content.trim();
+    if trimmed.is_empty() {
+        fallback.to_string()
+    } else {
+        trimmed.to_string()
+    }
 }

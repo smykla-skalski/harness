@@ -60,31 +60,12 @@ pub enum ConversationEventKind {
     SessionMarker { marker: String },
     /// Signal received and processed by the agent.
     SignalReceived { signal_id: String, command: String },
-    /// Permission prompt surfaced to the user before a tool can run.
-    PermissionAsked {
-        tool: String,
-        scope: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        request_id: Option<String>,
-    },
-    /// Pre/post tool hook fired with measured latency.
-    HookFired {
-        name: String,
-        latency_ms: u64,
-        supports_context: bool,
-    },
-    /// Watchdog state transition (Active / Paused / Fired).
+    /// Watchdog state transition emitted by the ACP supervisor.
     WatchdogState {
         from: String,
         to: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         reason: Option<String>,
-    },
-    /// Context injection acknowledged by the agent.
-    ContextInjected {
-        actor: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        summary: Option<String>,
     },
     /// Catch-all for runtime-specific events.
     Other { label: String, data: Value },
