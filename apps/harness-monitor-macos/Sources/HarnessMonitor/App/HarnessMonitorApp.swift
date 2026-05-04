@@ -115,15 +115,33 @@ struct HarnessMonitorApp: App {
     workspaceWindowScene
   }
 
+  // The Xcode preview shell injects the canvas view directly into an
+  // NSPreviewTargetWindow; mounting the live root content from the App's
+  // WindowGroups also lights up `.trackWindow`, SwiftData-backed children,
+  // and notification observers, all of which dispatch main-actor work that
+  // the preview agent reaps off-main and crashes with `BUG IN CLIENT OF
+  // LIBDISPATCH`. Render an inert placeholder for any non-live launch.
+  private var rendersLiveSceneContent: Bool {
+    launchMode == .live
+  }
+
   private var allowsWindowRestoration: Bool {
     launchMode == .live && !isTestRun
   }
 
-  private var mainWindowScene: some Scene {
-    WindowGroup("Harness Monitor", id: HarnessMonitorWindowID.main) {
+  @ViewBuilder private var mainWindowSceneContent: some View {
+    if rendersLiveSceneContent {
       mainWindowContent
         .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
         .modifier(HarnessMonitorMainWindowLauncherBinder())
+    } else {
+      Color.clear.accessibilityHidden(true)
+    }
+  }
+
+  private var mainWindowScene: some Scene {
+    WindowGroup("Harness Monitor", id: HarnessMonitorWindowID.main) {
+      mainWindowSceneContent
     }
     .windowToolbarStyle(.unified)
     .defaultSize(width: mainWindowDefaultSize.width, height: mainWindowDefaultSize.height)
@@ -156,8 +174,8 @@ struct HarnessMonitorApp: App {
     }
   }
 
-  private var settingsWindowScene: some Scene {
-    Window("Settings", id: HarnessMonitorWindowID.preferences) {
+  @ViewBuilder private var settingsSceneContent: some View {
+    if rendersLiveSceneContent {
       HarnessMonitorSettingsRootView(
         store: store,
         notifications: notificationController,
@@ -169,14 +187,22 @@ struct HarnessMonitorApp: App {
       )
       .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
       .modifier(HarnessMonitorMainWindowLauncherBinder())
+    } else {
+      Color.clear.accessibilityHidden(true)
+    }
+  }
+
+  private var settingsWindowScene: some Scene {
+    Window("Settings", id: HarnessMonitorWindowID.preferences) {
+      settingsSceneContent
     }
     .windowStyle(.titleBar)
     .defaultSize(width: 860, height: 620)
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
   }
 
-  private var workspaceWindowScene: some Scene {
-    Window("Workspace", id: HarnessMonitorWindowID.workspace) {
+  @ViewBuilder private var workspaceSceneContent: some View {
+    if rendersLiveSceneContent {
       WorkspaceWindowRootView(
         store: store,
         keyWindowObserver: keyWindowObserver,
@@ -189,6 +215,14 @@ struct HarnessMonitorApp: App {
       )
       .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
       .modifier(HarnessMonitorMainWindowLauncherBinder())
+    } else {
+      Color.clear.accessibilityHidden(true)
+    }
+  }
+
+  private var workspaceWindowScene: some Scene {
+    Window("Workspace", id: HarnessMonitorWindowID.workspace) {
+      workspaceSceneContent
     }
     .windowStyle(.titleBar)
     .windowToolbarStyle(.unified)
