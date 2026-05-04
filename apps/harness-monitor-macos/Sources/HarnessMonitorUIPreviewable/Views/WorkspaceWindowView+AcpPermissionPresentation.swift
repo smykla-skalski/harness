@@ -2,7 +2,7 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension View {
-  func acpPermissionPresentation(store: HarnessMonitorStore) -> some View {
+  public func acpPermissionPresentation(store: HarnessMonitorStore) -> some View {
     modifier(AcpPermissionPresentationModifier(store: store))
   }
 }

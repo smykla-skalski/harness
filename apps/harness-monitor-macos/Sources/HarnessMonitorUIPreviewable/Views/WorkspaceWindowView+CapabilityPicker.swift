@@ -3,12 +3,12 @@ import SwiftUI
 
 extension WorkspaceWindowView {
   var selectedAgentLaunchTitle: String {
-    switch viewModel.selectedLaunchSelection {
-    case .tui(let runtime):
-      runtime.title
-    case .acp(let id):
-      viewModel.availableAcpAgents.first { $0.id == id }?.displayName ?? "Agent"
-    }
+    let options = agentCapabilityOptions
+    let selection = viewModel.selectedLaunchSelection
+    let match =
+      options.first(where: { $0.transportChoices.contains(where: { $0.id == selection }) })
+      ?? options.first
+    return match?.title ?? "Agent"
   }
 
   var agentCapabilityOptions: [AgentCapabilityOption] {
