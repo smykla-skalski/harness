@@ -98,8 +98,8 @@ struct SessionCockpitView: View {
             agentSection
             signalSection
           }
-          SessionCockpitTimelineSection(
-            sessionID: detail.session.sessionId,
+          MonitorTimelineSection(
+            host: .session(detail.session.sessionId),
             timeline: timeline,
             timelineWindow: timelineWindow,
             decisions: store.supervisorOpenDecisions,

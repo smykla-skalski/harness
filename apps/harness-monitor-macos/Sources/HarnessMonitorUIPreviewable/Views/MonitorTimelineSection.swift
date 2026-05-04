@@ -1,13 +1,15 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct SessionCockpitTimelineSection: View {
-  let sessionID: String
+struct MonitorTimelineSection: View {
+  let host: MonitorTimelineHost
   let timeline: [TimelineEntry]
   let timelineWindow: TimelineWindowResponse?
   let decisions: [Decision]
   let isTimelineLoading: Bool
   let store: HarnessMonitorStore
+
+  var sessionID: String { host.id }
 
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
@@ -33,7 +35,7 @@ struct SessionCockpitTimelineSection: View {
 
   var body: some View {
     let input = presentationInput
-    ViewBodySignposter.measure("SessionCockpitTimelineSection") {
+    ViewBodySignposter.measure("MonitorTimelineSection") {
       content(for: cachedPresentation)
     }
     // .task(id:) hops state writes off the view-update phase. Synchronous
@@ -265,7 +267,7 @@ struct SessionCockpitTimelineSection: View {
   }
 }
 
-extension SessionCockpitTimelineSection {
+extension MonitorTimelineSection {
   // navigationAnchorID is read only from non-body code paths (async Tasks
   // and onChange/onAppear closures). Reading viewport.visibleAnchorID here
   // therefore does NOT register a SwiftUI body dependency on the model and
@@ -486,7 +488,7 @@ extension SessionCockpitTimelineSection {
 }
 
 #Preview("Timeline") {
-  SessionCockpitTimelineSection.richPreview
+  MonitorTimelineSection.richPreview
 }
 
 private struct SessionTimelineFilteredEmptyState: View {

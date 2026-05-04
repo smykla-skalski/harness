@@ -5,8 +5,8 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 @MainActor
-@Suite("Session cockpit timeline section")
-struct SessionCockpitTimelineSectionTests {
+@Suite("Monitor timeline section")
+struct MonitorTimelineSectionTests {
   @Test("Node builder merges streams with deterministic ordering")
   func nodeBuilderMergesStreamsWithDeterministicOrdering() {
     let timestamp = Date(timeIntervalSince1970: 1_775_000_000)
