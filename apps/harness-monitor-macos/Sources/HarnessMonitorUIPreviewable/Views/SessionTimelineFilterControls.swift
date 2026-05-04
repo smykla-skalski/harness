@@ -77,16 +77,33 @@ struct SessionTimelineFilterControls: View {
   }
 
   private var searchControls: some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingXS) {
-      TextField("Find in timeline", text: $filters.query)
-        .textFieldStyle(.roundedBorder)
-        .accessibilityLabel("Search timeline")
-        .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterSearch)
+    ViewThatFits(in: .horizontal) {
+      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingXS) {
+        searchField
+        scopeMenu
+        moreFiltersButton
+        clearFiltersButton
+      }
 
-      scopeMenu
-      moreFiltersButton
-      clearFiltersButton
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+        searchField
+        HarnessMonitorWrapLayout(
+          spacing: HarnessMonitorTheme.spacingXS,
+          lineSpacing: HarnessMonitorTheme.spacingXS
+        ) {
+          scopeMenu
+          moreFiltersButton
+          clearFiltersButton
+        }
+      }
     }
+  }
+
+  private var searchField: some View {
+    TextField("Find in timeline", text: $filters.query)
+      .harnessNativeTextField()
+      .accessibilityLabel("Search timeline")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterSearch)
   }
 
   private var scopeMenu: some View {
@@ -103,7 +120,7 @@ struct SessionTimelineFilterControls: View {
         .labelStyle(.titleAndIcon)
     }
     .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-    .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+    .harnessNativeFormControl()
     .accessibilityLabel("Search scope — \(filters.searchScope.label)")
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterScopeMenu)
   }
@@ -126,7 +143,7 @@ struct SessionTimelineFilterControls: View {
       variant: .bordered,
       tint: filters.activeAdvancedFilterCount > 0 ? nil : .secondary
     )
-    .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+    .harnessNativeFormControl()
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterMoreButton)
     .popover(isPresented: $showsAdvancedFilters, arrowEdge: .top) {
       SessionTimelineAdvancedFiltersPopover(filters: $filters, inventory: inventory)
@@ -138,7 +155,7 @@ struct SessionTimelineFilterControls: View {
       filters.clear()
     }
     .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-    .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+    .harnessNativeFormControl()
     .disabled(filters.isEmpty)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterClearButton)
   }
@@ -152,7 +169,7 @@ struct SessionTimelineFilterControls: View {
         filters.clearTones()
       }
       .harnessFilterChipButtonStyle(isSelected: false)
-      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+      .harnessNativeFormControl()
       .accessibilityValue(filters.tones.isEmpty ? "current default" : "clears level filters")
 
       ForEach(quickTones, id: \.rawValue) { tone in
@@ -168,7 +185,7 @@ struct SessionTimelineFilterControls: View {
           .scaledFont(.caption.weight(.semibold))
         }
         .harnessFilterChipButtonStyle(isSelected: filters.tones.contains(tone))
-        .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+        .harnessNativeFormControl()
         .accessibilityValue(filters.tones.contains(tone) ? "selected" : "not selected")
       }
     }
@@ -195,7 +212,7 @@ struct SessionTimelineFilterControls: View {
             .scaledFont(.caption.weight(.semibold))
           }
           .harnessFilterChipButtonStyle(isSelected: true)
-          .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+          .harnessNativeFormControl()
           .accessibilityLabel("Remove filter \(chip.label)")
         }
       }
@@ -276,6 +293,8 @@ private enum SessionTimelineActiveFilterChip: Identifiable {
 private struct SessionTimelineAdvancedFiltersPopover: View {
   @Binding var filters: SessionTimelineFilterState
   let inventory: SessionTimelineFilterInventory
+  @Environment(\.fontScale)
+  private var fontScale
 
   var body: some View {
     ScrollView {
@@ -299,7 +318,17 @@ private struct SessionTimelineAdvancedFiltersPopover: View {
       .padding(HarnessMonitorTheme.spacingLG)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .frame(minWidth: 360, idealWidth: 400, maxWidth: 440, minHeight: 280, idealHeight: 420)
+    .frame(
+      minWidth: 360 * popoverScale,
+      idealWidth: 400 * popoverScale,
+      maxWidth: 460 * popoverScale,
+      minHeight: 280 * popoverScale,
+      idealHeight: 420 * popoverScale
+    )
+  }
+
+  private var popoverScale: CGFloat {
+    max(1, min(fontScale, 1.2))
   }
 
   @ViewBuilder private var toneSection: some View {
@@ -411,7 +440,12 @@ private struct SessionTimelineAdvancedFiltersPopover: View {
   }
 
   private var facetColumns: [GridItem] {
-    [GridItem(.adaptive(minimum: 140, maximum: 220), spacing: HarnessMonitorTheme.spacingXS)]
+    [
+      GridItem(
+        .adaptive(minimum: 140 * popoverScale, maximum: 220 * popoverScale),
+        spacing: HarnessMonitorTheme.spacingXS
+      )
+    ]
   }
 
   private func stringFacetSection(
@@ -454,7 +488,7 @@ private struct SessionTimelineAdvancedFiltersPopover: View {
       .scaledFont(.caption.weight(.semibold))
     }
     .harnessFilterChipButtonStyle(isSelected: isSelected)
-    .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+    .harnessNativeFormControl()
     .accessibilityValue(isSelected ? "selected" : "not selected")
   }
 

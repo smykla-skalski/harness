@@ -19,6 +19,7 @@ struct SessionTimelinePresentationInput: Equatable {
   let isTimelineLoading: Bool
   let filterSignature: String
   let reduceMotion: Bool
+  let textSizeIndex: Int
   let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
 
   static var empty: Self {
@@ -40,6 +41,7 @@ struct SessionTimelinePresentationInput: Equatable {
       isTimelineLoading: false,
       filterSignature: "",
       reduceMotion: false,
+      textSizeIndex: HarnessMonitorTextSize.defaultIndex,
       dateTimeConfiguration: .default
     )
   }

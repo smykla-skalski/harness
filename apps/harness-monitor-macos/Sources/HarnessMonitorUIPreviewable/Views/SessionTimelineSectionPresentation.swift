@@ -6,8 +6,6 @@ struct SessionTimelineSectionPresentation {
   static let rowHeightEstimate: CGFloat = 74
   private static let minimumViewportHeight: CGFloat = 260
   private static let maximumViewportHeight: CGFloat = 470
-  private static let minimumScrollViewportHeight: CGFloat = 180
-  private static let navigationFooterHeight: CGFloat = 36
 
   let navigation: SessionTimelineWindowNavigation
   let filterSnapshot: SessionTimelineFilterSnapshot
@@ -16,6 +14,7 @@ struct SessionTimelineSectionPresentation {
   let shouldAnimatePlaceholders: Bool
   let viewportHeight: CGFloat
   let scrollNodeIDs: [String]
+  private let textSizeIndex: Int
 
   private init(
     navigation: SessionTimelineWindowNavigation,
@@ -24,7 +23,8 @@ struct SessionTimelineSectionPresentation {
     placeholderCount: Int,
     shouldAnimatePlaceholders: Bool,
     viewportHeight: CGFloat,
-    scrollNodeIDs: [String]
+    scrollNodeIDs: [String],
+    textSizeIndex: Int
   ) {
     self.navigation = navigation
     self.filterSnapshot = filterSnapshot
@@ -33,6 +33,7 @@ struct SessionTimelineSectionPresentation {
     self.shouldAnimatePlaceholders = shouldAnimatePlaceholders
     self.viewportHeight = viewportHeight
     self.scrollNodeIDs = scrollNodeIDs
+    self.textSizeIndex = textSizeIndex
   }
 
   static var empty: Self {
@@ -47,7 +48,8 @@ struct SessionTimelineSectionPresentation {
       placeholderCount: 0,
       shouldAnimatePlaceholders: false,
       viewportHeight: minimumViewportHeight,
-      scrollNodeIDs: []
+      scrollNodeIDs: [],
+      textSizeIndex: HarnessMonitorTextSize.defaultIndex
     )
   }
 
@@ -60,6 +62,7 @@ struct SessionTimelineSectionPresentation {
     filters: SessionTimelineFilterState,
     isTimelineLoading: Bool,
     reduceMotion: Bool,
+    textSizeIndex: Int,
     dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
   ) {
     let navigation = SessionTimelineWindowNavigation(
@@ -98,7 +101,8 @@ struct SessionTimelineSectionPresentation {
     self.placeholderCount = placeholderCount
     self.shouldAnimatePlaceholders = shouldAnimatePlaceholders
     self.viewportHeight = viewportHeight
-    scrollNodeIDs = filterSnapshot.nodes.map(\.id)
+    self.scrollNodeIDs = filterSnapshot.nodes.map(\.id)
+    self.textSizeIndex = textSizeIndex
   }
 
   var showsEmptyState: Bool {
@@ -129,8 +133,8 @@ struct SessionTimelineSectionPresentation {
       return viewportHeight
     }
     let reservedFooterHeight =
-      Self.navigationFooterHeight + HarnessMonitorTheme.spacingLG
-    return max(Self.minimumScrollViewportHeight, viewportHeight - reservedFooterHeight)
+      Self.navigationFooterHeight(for: textSizeIndex) + HarnessMonitorTheme.spacingLG
+    return max(Self.minimumScrollViewportHeight(for: textSizeIndex), viewportHeight - reservedFooterHeight)
   }
 
   func canScrollOlder(from targetID: String?) -> Bool {
@@ -177,5 +181,39 @@ struct SessionTimelineSectionPresentation {
       return nil
     }
     return scrollNodeIDs.firstIndex(of: targetID)
+  }
+
+  private static func navigationFooterHeight(for textSizeIndex: Int) -> CGFloat {
+    switch HarnessMonitorTextSize.controlSize(at: textSizeIndex) {
+    case .small:
+      36
+    case .regular:
+      44
+    case .large:
+      72
+    case .extraLarge:
+      84
+    case .mini:
+      36
+    @unknown default:
+      44
+    }
+  }
+
+  private static func minimumScrollViewportHeight(for textSizeIndex: Int) -> CGFloat {
+    switch HarnessMonitorTextSize.controlSize(at: textSizeIndex) {
+    case .small:
+      180
+    case .regular:
+      192
+    case .large:
+      208
+    case .extraLarge:
+      220
+    case .mini:
+      180
+    @unknown default:
+      192
+    }
   }
 }

@@ -240,6 +240,30 @@ struct SessionCockpitTimelineSectionTests {
     )
   }
 
+  @Test("Footer viewport budget scales with larger text sizes")
+  func footerViewportBudgetScalesWithLargerTextSizes() {
+    let timeline = (0..<6).map { index in
+      makeTimelineEntry(
+        entryID: "entry-\(index)",
+        summary: "Visible timeline row \(index)"
+      )
+    }
+    let defaultPresentation = makePresentation(
+      sessionID: "session-1",
+      timeline: timeline,
+      isTimelineLoading: false,
+      textSizeIndex: HarnessMonitorTextSize.defaultIndex
+    )
+    let largePresentation = makePresentation(
+      sessionID: "session-1",
+      timeline: timeline,
+      isTimelineLoading: false,
+      textSizeIndex: HarnessMonitorTextSize.scales.count - 1
+    )
+
+    #expect(largePresentation.scrollViewportHeight < defaultPresentation.scrollViewportHeight)
+  }
+
   private func makeTimelineEntry(
     entryID: String = "entry-1",
     recordedAt: String = "2026-04-30T12:00:00Z",
@@ -298,7 +322,8 @@ struct SessionCockpitTimelineSectionTests {
   private func makePresentation(
     sessionID: String,
     timeline: [TimelineEntry],
-    isTimelineLoading: Bool
+    isTimelineLoading: Bool,
+    textSizeIndex: Int = HarnessMonitorTextSize.defaultIndex
   ) -> SessionTimelineSectionPresentation {
     SessionTimelineSectionPresentation(
       sessionID: sessionID,
@@ -308,6 +333,7 @@ struct SessionCockpitTimelineSectionTests {
       filters: .init(),
       isTimelineLoading: isTimelineLoading,
       reduceMotion: false,
+      textSizeIndex: textSizeIndex,
       dateTimeConfiguration: .default
     )
   }
@@ -335,6 +361,7 @@ struct SessionCockpitTimelineSectionTests {
       isTimelineLoading: isTimelineLoading,
       filterSignature: "",
       reduceMotion: false,
+      textSizeIndex: HarnessMonitorTextSize.defaultIndex,
       dateTimeConfiguration: .default
     )
   }
