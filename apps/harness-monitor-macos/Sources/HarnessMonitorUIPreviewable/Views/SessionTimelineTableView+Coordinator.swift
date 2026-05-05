@@ -5,6 +5,12 @@ import OSLog
 import SwiftUI
 
 extension SessionTimelineTableView {
+  struct UpdateRequest {
+    let scrollView: NSScrollView
+    let columnWidth: CGFloat
+    let fontScale: CGFloat
+  }
+
   // Coordinator pushes viewport state into `viewport` via methods only; it
   // never reads viewport properties from inside `updateNSView` or any path
   // SwiftUI's observation tracker can see. Reading would re-introduce the
@@ -80,21 +86,19 @@ extension SessionTimelineTableView {
       rows: [SessionTimelineRow],
       actionHandler: any DecisionActionHandler,
       scrollCommand: SessionTimelineScrollCommand?,
-      scrollView: NSScrollView,
-      columnWidth: CGFloat,
-      fontScale: CGFloat
+      request: UpdateRequest
     ) {
-      guard let tableView else {
+      guard tableView != nil else {
         return
       }
-      scrollView.layoutSubtreeIfNeeded()
+      request.scrollView.layoutSubtreeIfNeeded()
       let resolvedColumnWidth = SessionTimelineTableMetrics.resolvedColumnWidth(
-        proposedWidth: columnWidth,
-        visibleContentWidth: scrollView.contentSize.width
+        proposedWidth: request.columnWidth,
+        visibleContentWidth: request.scrollView.contentSize.width
       )
       self.actionHandler = actionHandler
-      let fontScaleChanged = abs(self.fontScale - fontScale) > 0.001
-      self.fontScale = fontScale
+      let fontScaleChanged = abs(self.fontScale - request.fontScale) > 0.001
+      self.fontScale = request.fontScale
       let wasPinnedToLatest = isPinnedToLatestViewport()
       let previousAnchor = wasPinnedToLatest ? nil : currentVisibleAnchor()
       let nextSnapshot = SessionTimelineTableSnapshot(rows: rows)
@@ -104,72 +108,15 @@ extension SessionTimelineTableView {
       )
       let rowsChanged = rowSnapshot != nextSnapshot || fontScaleChanged
       if rowsChanged {
-        let nextIDs = Set(rows.map(\.id))
-        let priorIDs = Set(self.rows.map(\.id))
-        let willReuseAny = !fontScaleChanged && !nextIDs.isDisjoint(with: priorIDs)
-        let rowCount = rows.count
-        let reuseAny = willReuseAny
-        let colWidth = Int(resolvedColumnWidth)
-        let updateInterval = Self.signposter.beginInterval(
-          "session_timeline.update_rows_changed",
-          id: Self.signposter.makeSignpostID(),
-          "n=\(rowCount, privacy: .public) r=\(reuseAny, privacy: .public) w=\(colWidth, privacy: .public)"
+        applyRowChanges(
+          rows: rows,
+          nextSnapshot: nextSnapshot,
+          invalidatedHeightIDs: invalidatedHeightIDs,
+          resolvedColumnWidth: resolvedColumnWidth,
+          fontScaleChanged: fontScaleChanged
         )
-        defer {
-          Self.signposter.endInterval("session_timeline.update_rows_changed", updateInterval)
-        }
-
-        cancelMeasurement(reason: "rows_changed")
-
-        // Snapshot heights from currently visible rows whose IDs survive and
-        // whose content is unchanged. Preserve provisional heights as
-        // provisional so the incremental pass can still replace them with real
-        // measurements; only measured cache entries suppress remeasurement.
-        if willReuseAny, let visibleRange = visibleRowIndexRange() {
-          for rowIndex in visibleRange {
-            guard self.rows.indices.contains(rowIndex) else { continue }
-            let rowID = self.rows[rowIndex].id
-            guard nextIDs.contains(rowID) else { continue }
-            guard !invalidatedHeightIDs.contains(rowID) else { continue }
-            rowHeightCache[rowID] = CachedRowHeight(
-              width: lastColumnWidth,
-              height: tableView.rect(ofRow: rowIndex).height,
-              isMeasured: rowHeightCache[rowID]?.isMeasured ?? false
-            )
-          }
-        }
-
-        // Drop cached heights for IDs that are not in the next rows array and
-        // for surviving rows that need remeasurement.
-        rowHeightCache = rowHeightCache.filter {
-          nextIDs.contains($0.key) && !invalidatedHeightIDs.contains($0.key)
-        }
-
-        self.rows = rows
-        eventOffsetsByRow = eventOffsets(for: rows)
-        rowIndexByID = Dictionary(
-          uniqueKeysWithValues: rows.enumerated().map { index, row in
-            (row.id, index)
-          }
-        )
-        rowSnapshot = nextSnapshot
-        tableView.reloadData()
-        tableView.layoutSubtreeIfNeeded()
-
-        // Defer per-row SwiftUI hosting-view measurement off the main thread
-        // hop. Rows that miss the cache (or carry an entry tagged with a
-        // different column width) return estimatedHeight from heightOfRow for
-        // the first frame, which keeps session switch cost bounded by the
-        // estimate-fan-out (microseconds per row) instead of the full hosting-
-        // view layout cost (single-digit-to-tens-of-ms per row, multi-second
-        // on large timelines). The background pass measures visible rows
-        // first, then below-viewport, then above-viewport, calling
-        // noteHeightOfRows per chunk so layout converges without blocking.
-        if resolvedColumnWidth > 1 {
-          scheduleIncrementalMeasurement(columnWidth: resolvedColumnWidth)
-        }
       }
-      resizeColumn(in: scrollView, columnWidth: resolvedColumnWidth)
+      resizeColumn(in: request.scrollView, columnWidth: resolvedColumnWidth)
 
       if scrollCommand != lastScrollCommand {
         pendingScrollCommand = scrollCommand
@@ -178,15 +125,114 @@ extension SessionTimelineTableView {
       let didPerformScrollCommand = performPendingScrollCommand()
       let hasUnfulfilledScrollCommand = pendingScrollCommand != nil
       if !didPerformScrollCommand && rowsChanged {
-        if !hasUnfulfilledScrollCommand && normalizePinnedLatestViewportIfNeeded() {
-          boundsDidChange()
-        } else if wasPinnedToLatest && !hasUnfulfilledScrollCommand {
-          normalizePinnedLatestViewportIfNeeded()
-          boundsDidChange()
-        } else {
-          restore(anchor: previousAnchor)
-        }
+        restoreViewportAfterRowChange(
+          hasUnfulfilledScrollCommand: hasUnfulfilledScrollCommand,
+          wasPinnedToLatest: wasPinnedToLatest,
+          previousAnchor: previousAnchor
+        )
       }
+    }
+
+    private func applyRowChanges(
+      rows: [SessionTimelineRow],
+      nextSnapshot: SessionTimelineTableSnapshot,
+      invalidatedHeightIDs: Set<String>,
+      resolvedColumnWidth: CGFloat,
+      fontScaleChanged: Bool
+    ) {
+      guard let tableView else {
+        return
+      }
+      let nextIDs = Set(rows.map(\.id))
+      let priorIDs = Set(self.rows.map(\.id))
+      let willReuseAny = !fontScaleChanged && !nextIDs.isDisjoint(with: priorIDs)
+      let updateInterval = beginRowChangeInterval(
+        rowCount: rows.count,
+        willReuseAny: willReuseAny,
+        resolvedColumnWidth: resolvedColumnWidth
+      )
+      defer {
+        Self.signposter.endInterval("session_timeline.update_rows_changed", updateInterval)
+      }
+
+      cancelMeasurement(reason: "rows_changed")
+      reuseVisibleHeightsIfNeeded(
+        willReuseAny: willReuseAny,
+        nextIDs: nextIDs,
+        invalidatedHeightIDs: invalidatedHeightIDs,
+        tableView: tableView
+      )
+      rowHeightCache = rowHeightCache.filter {
+        nextIDs.contains($0.key) && !invalidatedHeightIDs.contains($0.key)
+      }
+
+      self.rows = rows
+      eventOffsetsByRow = eventOffsets(for: rows)
+      rowIndexByID = Dictionary(
+        uniqueKeysWithValues: rows.enumerated().map { index, row in
+          (row.id, index)
+        }
+      )
+      rowSnapshot = nextSnapshot
+      tableView.reloadData()
+      tableView.layoutSubtreeIfNeeded()
+
+      if resolvedColumnWidth > 1 {
+        scheduleIncrementalMeasurement(columnWidth: resolvedColumnWidth)
+      }
+    }
+
+    private func beginRowChangeInterval(
+      rowCount: Int,
+      willReuseAny: Bool,
+      resolvedColumnWidth: CGFloat
+    ) -> OSSignpostIntervalState {
+      let colWidth = Int(resolvedColumnWidth)
+      return Self.signposter.beginInterval(
+        "session_timeline.update_rows_changed",
+        id: Self.signposter.makeSignpostID(),
+        "n=\(rowCount, privacy: .public) r=\(willReuseAny, privacy: .public) w=\(colWidth, privacy: .public)"
+      )
+    }
+
+    private func reuseVisibleHeightsIfNeeded(
+      willReuseAny: Bool,
+      nextIDs: Set<String>,
+      invalidatedHeightIDs: Set<String>,
+      tableView: NSTableView
+    ) {
+      guard willReuseAny, let visibleRange = visibleRowIndexRange() else {
+        return
+      }
+      for rowIndex in visibleRange {
+        guard self.rows.indices.contains(rowIndex) else { continue }
+        let rowID = self.rows[rowIndex].id
+        guard nextIDs.contains(rowID), !invalidatedHeightIDs.contains(rowID) else {
+          continue
+        }
+        rowHeightCache[rowID] = CachedRowHeight(
+          width: lastColumnWidth,
+          height: tableView.rect(ofRow: rowIndex).height,
+          isMeasured: rowHeightCache[rowID]?.isMeasured ?? false
+        )
+      }
+    }
+
+    private func restoreViewportAfterRowChange(
+      hasUnfulfilledScrollCommand: Bool,
+      wasPinnedToLatest: Bool,
+      previousAnchor: SessionTimelineTableAnchor?
+    ) {
+      if !hasUnfulfilledScrollCommand && normalizePinnedLatestViewportIfNeeded() {
+        boundsDidChange()
+        return
+      }
+      if wasPinnedToLatest && !hasUnfulfilledScrollCommand {
+        normalizePinnedLatestViewportIfNeeded()
+        boundsDidChange()
+        return
+      }
+      restore(anchor: previousAnchor)
     }
 
     func numberOfRows(in _: NSTableView) -> Int {

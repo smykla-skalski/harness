@@ -104,22 +104,26 @@ private struct SessionTimelineHostedRow: View {
   var body: some View {
     Group {
       if let row {
-        SessionTimelineNodeCluster(row: row, actionHandler: actionHandler)
-          .padding(.trailing, HarnessMonitorTheme.spacingXS)
-          .padding(.bottom, SessionTimelineTableMetrics.rowBottomPadding(for: row))
-          .overlayPreferenceValue(SessionTimelineMarkerBoundsKey.self) { markerAnchor in
-            SessionTimelineConnectorOverlay(
-              markerAnchor: markerAnchor,
-              showsConnectorAbove: showsConnectorAbove,
-              showsConnectorBelow: showsConnectorBelow
-            )
-          }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .fixedSize(horizontal: false, vertical: true)
+        populatedRow(row)
       } else {
         Color.clear.frame(height: SessionTimelineTableMetrics.estimatedBaseRowHeight)
       }
     }
     .environment(\.fontScale, fontScale)
+  }
+
+  private func populatedRow(_ row: SessionTimelineRow) -> some View {
+    SessionTimelineNodeCluster(row: row, actionHandler: actionHandler)
+      .padding(.trailing, HarnessMonitorTheme.spacingXS)
+      .padding(.bottom, SessionTimelineTableMetrics.rowBottomPadding(for: row))
+      .overlayPreferenceValue(SessionTimelineMarkerBoundsKey.self) { markerAnchor in
+        SessionTimelineConnectorOverlay(
+          markerAnchor: markerAnchor,
+          showsConnectorAbove: showsConnectorAbove,
+          showsConnectorBelow: showsConnectorBelow
+        )
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .fixedSize(horizontal: false, vertical: true)
   }
 }

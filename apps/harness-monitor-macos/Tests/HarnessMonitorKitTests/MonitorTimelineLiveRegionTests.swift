@@ -87,12 +87,14 @@ struct MonitorTimelineLiveRegionThrottleTests {
   func assertiveBypassesThrottle() {
     let throttle = MonitorTimelineLiveRegionThrottle()
     let start = ContinuousClock.now
+    let urgentAt50 = start.advanced(by: .milliseconds(50))
+    let urgentAt100 = start.advanced(by: .milliseconds(100))
 
     throttle.announceIfAllowed("polite", priority: .polite, now: start)
     let politeInstant = throttle.lastPoliteInstant
 
-    throttle.announceIfAllowed("urgent", priority: .assertive, now: start.advanced(by: .milliseconds(50)))
-    throttle.announceIfAllowed("urgent2", priority: .assertive, now: start.advanced(by: .milliseconds(100)))
+    throttle.announceIfAllowed("urgent", priority: .assertive, now: urgentAt50)
+    throttle.announceIfAllowed("urgent2", priority: .assertive, now: urgentAt100)
 
     #expect(throttle.lastPoliteInstant == politeInstant)
   }
@@ -108,12 +110,14 @@ struct MonitorTimelineLiveRegionThrottleTests {
   func droppedPoliteDoesNotBumpCooldown() {
     let throttle = MonitorTimelineLiveRegionThrottle()
     let start = ContinuousClock.now
+    let secondAnnouncementAt = start.advanced(by: .milliseconds(200))
+    let thirdAnnouncementAt = start.advanced(by: .milliseconds(800))
 
     throttle.announceIfAllowed("first", priority: .polite, now: start)
     let firstInstant = throttle.lastPoliteInstant
 
-    throttle.announceIfAllowed("second", priority: .polite, now: start.advanced(by: .milliseconds(200)))
-    throttle.announceIfAllowed("third", priority: .polite, now: start.advanced(by: .milliseconds(800)))
+    throttle.announceIfAllowed("second", priority: .polite, now: secondAnnouncementAt)
+    throttle.announceIfAllowed("third", priority: .polite, now: thirdAnnouncementAt)
 
     #expect(throttle.lastPoliteInstant == firstInstant)
   }

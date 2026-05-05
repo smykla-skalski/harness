@@ -70,7 +70,8 @@ struct HarnessMonitorStoreAgentTimelinePartitionTests {
       for agentID in agentIDs {
         let cached = store.timeline(forAgent: agentID).map(\.entryId)
         let reference = timeline.filter { $0.agentId == agentID }.map(\.entryId)
-        #expect(cached == reference, "trial \(trial) agent \(agentID): cache must equal linear scan")
+        let mismatchMessage = "trial \(trial) agent \(agentID): cache must equal linear scan"
+        #expect(cached == reference, mismatchMessage)
       }
 
       let unknown = store.timeline(forAgent: "agent-not-present")

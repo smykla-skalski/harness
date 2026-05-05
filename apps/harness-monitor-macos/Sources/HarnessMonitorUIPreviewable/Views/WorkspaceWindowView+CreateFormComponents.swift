@@ -129,8 +129,12 @@ struct AgentsCreateProviderRow: View {
     } else {
       subtitle = primarySubtitle
     }
-    return
-      "\(option.title), \(option.availabilityState.compactTitle), \(subtitle), capabilities: \(capabilitySummary)"
+    return [
+      option.title,
+      option.availabilityState.compactTitle,
+      subtitle,
+      "capabilities: \(capabilitySummary)",
+    ].joined(separator: ", ")
   }
 
   private var primarySubtitle: String {

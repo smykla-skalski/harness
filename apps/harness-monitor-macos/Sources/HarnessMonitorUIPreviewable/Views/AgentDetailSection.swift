@@ -100,6 +100,10 @@ struct AgentDetailSection: View {
     guard let activity else {
       return []
     }
+    let issueTint =
+      activity.toolErrorCount > 0
+      ? HarnessMonitorTheme.danger
+      : HarnessMonitorTheme.secondaryInk
     return [
       .init(
         title: "Actions",
@@ -112,7 +116,7 @@ struct AgentDetailSection: View {
       .init(
         title: "Issues",
         value: "\(activity.toolErrorCount)",
-        tint: activity.toolErrorCount > 0 ? HarnessMonitorTheme.danger : HarnessMonitorTheme.secondaryInk
+        tint: issueTint
       ),
       .init(title: "Latest Action", value: activity.latestToolName ?? "None"),
     ]
@@ -368,8 +372,9 @@ struct AgentDetailSection: View {
     default:
       trigger = "on \(hook.name)"
     }
-    let contextSuffix = hook.supportsContextInjection
-      ? " (with context injection)" : " (no context)"
+    let contextMode =
+      hook.supportsContextInjection ? "with context injection" : "no context"
+    let contextSuffix = " (\(contextMode))"
     return "Runs \(hook.typicalLatencySeconds)s \(trigger)\(contextSuffix)"
   }
 

@@ -3,7 +3,7 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
-final class WorkspaceWindowKeyboardParityUITests:
+class WorkspaceWindowKeyboardParityUITests:
   HarnessMonitorUITestCase, WorkspaceWindowUITestSupporting
 {
   override nonisolated class var reuseLaunchedApp: Bool { true }

@@ -80,7 +80,7 @@ extension HarnessMonitorStoreSelectionFlowTests {
     await selectionTask.value
   }
 
-  @Test("Selecting a session hydrates ACP transcript history independently from the cockpit timeline")
+  @Test("Selecting a session hydrates ACP transcript history independently")
   func selectingSessionHydratesAcpTranscriptHistoryIndependently() async throws {
     let summary = makeSession(
       .init(

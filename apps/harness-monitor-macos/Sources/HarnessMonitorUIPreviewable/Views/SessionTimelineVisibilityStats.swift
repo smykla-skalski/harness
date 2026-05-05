@@ -112,8 +112,11 @@ struct SessionTimelineVisibilityStats: Equatable, Sendable {
       if firstVisibleMatchNumber == lastVisibleMatchNumber {
         return "Showing matching timeline item \(firstVisibleMatchNumber) of \(filteredMatchCount)"
       }
-      return
-        "Showing matching timeline items \(firstVisibleMatchNumber) to \(lastVisibleMatchNumber) of \(filteredMatchCount)"
+      return [
+        "Showing matching timeline items",
+        "\(firstVisibleMatchNumber) to \(lastVisibleMatchNumber)",
+        "of \(filteredMatchCount)",
+      ].joined(separator: " ")
     }
     guard totalEventCount > 0, let firstVisibleEventNumber else {
       return ""
@@ -124,7 +127,8 @@ struct SessionTimelineVisibilityStats: Equatable, Sendable {
     if firstVisibleEventNumber == lastVisibleEventNumber {
       return "Showing event \(firstVisibleEventNumber) of \(totalEventCount)"
     }
-    return "Showing events \(firstVisibleEventNumber) to \(lastVisibleEventNumber) of \(totalEventCount)"
+    let visibleEventRange = "\(firstVisibleEventNumber) to \(lastVisibleEventNumber)"
+    return "Showing events \(visibleEventRange) of \(totalEventCount)"
   }
 
   private static func clampedVisibleEventNumber(

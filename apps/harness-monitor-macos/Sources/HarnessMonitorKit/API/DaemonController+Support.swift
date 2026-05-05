@@ -143,7 +143,7 @@ public struct ManagedLaunchAgentBundleStamp: Codable, Equatable, Sendable {
   let launchAgentPlistDeviceIdentifier: UInt64?
   let launchAgentPlistInode: UInt64?
   let launchAgentPlistFileSize: UInt64?
-  let launchAgentPlistModificationTimeIntervalSince1970: Double?
+  let launchAgentPlistModifiedAtSeconds: Double?
 
   public init(
     helperPath: String,
@@ -155,7 +155,7 @@ public struct ManagedLaunchAgentBundleStamp: Codable, Equatable, Sendable {
     launchAgentPlistDeviceIdentifier: UInt64? = nil,
     launchAgentPlistInode: UInt64? = nil,
     launchAgentPlistFileSize: UInt64? = nil,
-    launchAgentPlistModificationTimeIntervalSince1970: Double? = nil
+    launchAgentPlistModifiedAtSeconds: Double? = nil
   ) {
     self.helperPath = helperPath
     self.deviceIdentifier = deviceIdentifier
@@ -166,8 +166,7 @@ public struct ManagedLaunchAgentBundleStamp: Codable, Equatable, Sendable {
     self.launchAgentPlistDeviceIdentifier = launchAgentPlistDeviceIdentifier
     self.launchAgentPlistInode = launchAgentPlistInode
     self.launchAgentPlistFileSize = launchAgentPlistFileSize
-    self.launchAgentPlistModificationTimeIntervalSince1970 =
-      launchAgentPlistModificationTimeIntervalSince1970
+    self.launchAgentPlistModifiedAtSeconds = launchAgentPlistModifiedAtSeconds
   }
 
   init(helperURL: URL, launchAgentPlistURL: URL? = nil) throws {
@@ -188,8 +187,7 @@ public struct ManagedLaunchAgentBundleStamp: Codable, Equatable, Sendable {
       launchAgentPlistDeviceIdentifier: launchAgentMetadata?.deviceIdentifier,
       launchAgentPlistInode: launchAgentMetadata?.inode,
       launchAgentPlistFileSize: launchAgentMetadata?.fileSize,
-      launchAgentPlistModificationTimeIntervalSince1970:
-        launchAgentMetadata?.modificationTimeIntervalSince1970
+      launchAgentPlistModifiedAtSeconds: launchAgentMetadata?.modificationTimeIntervalSince1970
     )
   }
 
@@ -204,19 +202,21 @@ public struct ManagedLaunchAgentBundleStamp: Codable, Equatable, Sendable {
       && modificationTimeIntervalSince1970 == stamp.modificationTimeIntervalSince1970
   }
 
+  private struct FileMetadata: Sendable {
+    let deviceIdentifier: UInt64
+    let inode: UInt64
+    let fileSize: UInt64
+    let modificationTimeIntervalSince1970: Double
+  }
+
   private static func fileMetadata(
     at url: URL
-  ) -> (
-    deviceIdentifier: UInt64,
-    inode: UInt64,
-    fileSize: UInt64,
-    modificationTimeIntervalSince1970: Double
-  )? {
+  ) -> FileMetadata? {
     var fileStatus = stat()
     guard url.path.withCString({ stat($0, &fileStatus) }) == 0 else {
       return nil
     }
-    return (
+    return FileMetadata(
       deviceIdentifier: UInt64(fileStatus.st_dev),
       inode: UInt64(fileStatus.st_ino),
       fileSize: UInt64(fileStatus.st_size),

@@ -16,7 +16,12 @@ struct WorkspaceSidebarRow: View {
   }
 
   private var accessibilityLabelText: String {
-    "\(title), \(runtimeDisplayLabel(brandSymbol?.rawValue ?? snapshot.runtime)), \(snapshot.status.title), updated \(relativeUpdatedAt)"
+    [
+      title,
+      runtimeDisplayLabel(brandSymbol?.rawValue ?? snapshot.runtime),
+      snapshot.status.title,
+      "updated \(relativeUpdatedAt)",
+    ].joined(separator: ", ")
   }
 
   var body: some View {

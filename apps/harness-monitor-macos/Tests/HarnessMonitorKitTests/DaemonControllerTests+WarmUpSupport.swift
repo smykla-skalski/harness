@@ -12,7 +12,7 @@ struct ManagedLaunchAgentBundleStampFixture: Codable {
   let launchAgentPlistDeviceIdentifier: UInt64?
   let launchAgentPlistInode: UInt64?
   let launchAgentPlistFileSize: UInt64?
-  let launchAgentPlistModificationTimeIntervalSince1970: Double?
+  let launchAgentPlistMtimeSince1970: Double?
 
   init(
     helperPath: String,
@@ -24,7 +24,7 @@ struct ManagedLaunchAgentBundleStampFixture: Codable {
     launchAgentPlistDeviceIdentifier: UInt64? = nil,
     launchAgentPlistInode: UInt64? = nil,
     launchAgentPlistFileSize: UInt64? = nil,
-    launchAgentPlistModificationTimeIntervalSince1970: Double? = nil
+    launchAgentPlistMtimeSince1970: Double? = nil
   ) {
     self.helperPath = helperPath
     self.deviceIdentifier = deviceIdentifier
@@ -35,8 +35,7 @@ struct ManagedLaunchAgentBundleStampFixture: Codable {
     self.launchAgentPlistDeviceIdentifier = launchAgentPlistDeviceIdentifier
     self.launchAgentPlistInode = launchAgentPlistInode
     self.launchAgentPlistFileSize = launchAgentPlistFileSize
-    self.launchAgentPlistModificationTimeIntervalSince1970 =
-      launchAgentPlistModificationTimeIntervalSince1970
+    self.launchAgentPlistMtimeSince1970 = launchAgentPlistMtimeSince1970
   }
 }
 
@@ -52,8 +51,7 @@ extension ManagedLaunchAgentBundleStampFixture {
       launchAgentPlistDeviceIdentifier: launchAgentPlistDeviceIdentifier,
       launchAgentPlistInode: launchAgentPlistInode,
       launchAgentPlistFileSize: launchAgentPlistFileSize,
-      launchAgentPlistModificationTimeIntervalSince1970:
-        launchAgentPlistModificationTimeIntervalSince1970
+      launchAgentPlistModificationTimeIntervalSince1970: launchAgentPlistMtimeSince1970
     )
   }
 }

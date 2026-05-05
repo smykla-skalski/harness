@@ -158,13 +158,20 @@ private func makeTelemetryClient() -> HarnessMonitorAPIClient {
   )
 }
 
+private struct APIErrorResponsePlan {
+  let status: Int
+  let body: String
+  let contentType: String
+}
+
 private final class APIErrorTelemetryURLProtocol: URLProtocol, @unchecked Sendable {
   private static let lock = NSLock()
-  nonisolated(unsafe) private static var responseByPath: [String: (
-    status: Int,
-    body: String,
-    contentType: String
-  )] = [:]
+  private static let notFoundResponse = APIErrorResponsePlan(
+    status: 404,
+    body: #"{"error":"not-found"}"#,
+    contentType: "application/json"
+  )
+  nonisolated(unsafe) private static var responseByPath: [String: APIErrorResponsePlan] = [:]
   nonisolated(unsafe) private static var telemetryBody: String?
 
   static var lastTelemetryBody: String? { lock.withLock { telemetryBody } }
@@ -183,7 +190,11 @@ private final class APIErrorTelemetryURLProtocol: URLProtocol, @unchecked Sendab
     contentType: String = "application/json"
   ) {
     lock.withLock {
-      responseByPath[path] = (status, body, contentType)
+      responseByPath[path] = APIErrorResponsePlan(
+        status: status,
+        body: body,
+        contentType: contentType
+      )
     }
   }
 
@@ -196,11 +207,11 @@ private final class APIErrorTelemetryURLProtocol: URLProtocol, @unchecked Sendab
       return
     }
 
-    let responsePlan = Self.lock.withLock { () -> (status: Int, body: String, contentType: String) in
+    let responsePlan = Self.lock.withLock { () -> APIErrorResponsePlan in
       if url.path == "/v1/daemon/telemetry" {
         Self.telemetryBody = requestBodyString(from: request)
       }
-      return Self.responseByPath[url.path] ?? (404, #"{"error":"not-found"}"#, "application/json")
+      return Self.responseByPath[url.path] ?? Self.notFoundResponse
     }
 
     guard

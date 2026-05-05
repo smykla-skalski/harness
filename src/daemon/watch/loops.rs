@@ -20,6 +20,7 @@ use crate::daemon::db::{AsyncDaemonDb, DaemonDb, session_id_from_change_scope};
 use crate::daemon::index;
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::service;
+use crate::errors::CliError;
 
 pub(super) const CHANGE_TRACKING_POLL_SQL: &str = "SELECT scope, version, change_seq
      FROM change_tracking
@@ -100,17 +101,35 @@ async fn reconcile_session_liveness_for_watch(
     async_db: Option<&Arc<AsyncDaemonDb>>,
     db: &Arc<Mutex<DaemonDb>>,
 ) {
-    let result = if let Some(async_db) = async_db {
-        service::reconcile_active_session_liveness_background_async(Some(async_db.as_ref())).await
-    } else {
-        let Ok(db_guard) = db.lock() else {
-            return;
-        };
-        service::reconcile_active_session_liveness_background(Some(&db_guard))
+    let Err(error) = reconcile_session_liveness_result(async_db, db).await else {
+        return;
     };
-    if let Err(error) = result {
-        tracing::warn!(%error, "failed to refresh session liveness before watch poll");
+
+    log_session_liveness_refresh_error(&error);
+}
+
+async fn reconcile_session_liveness_result(
+    async_db: Option<&Arc<AsyncDaemonDb>>,
+    db: &Arc<Mutex<DaemonDb>>,
+) -> Result<(), CliError> {
+    if let Some(async_db) = async_db {
+        return service::reconcile_active_session_liveness_background_async(Some(async_db.as_ref()))
+            .await;
     }
+
+    let Ok(db_guard) = db.lock() else {
+        return Ok(());
+    };
+
+    service::reconcile_active_session_liveness_background(Some(&db_guard))
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_session_liveness_refresh_error(error: &CliError) {
+    tracing::warn!(%error, "failed to refresh session liveness before watch poll");
 }
 
 fn current_change_sequence(db: &Arc<Mutex<DaemonDb>>) -> i64 {

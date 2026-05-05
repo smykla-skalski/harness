@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use tokio::task::JoinHandle;
 
+use crate::agents::acp::supervision::WatchdogEventEmitter;
 use crate::agents::kind::DisconnectReason;
 use crate::daemon::agent_acp::manager::{AcpAgentInspectSnapshot, AcpAgentSnapshot};
 use crate::daemon::agent_acp::permission_bridge::{
@@ -46,7 +47,7 @@ impl ActiveAcpSession {
 
     pub(in crate::daemon::agent_acp) fn event_emitter(
         &self,
-    ) -> Option<Arc<dyn crate::agents::acp::supervision::WatchdogEventEmitter>> {
+    ) -> Option<Arc<dyn WatchdogEventEmitter>> {
         self.process.event_emitter()
     }
 

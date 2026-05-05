@@ -7,7 +7,9 @@ use std::time::{Duration, Instant};
 
 use tokio::task::JoinHandle;
 
-use crate::agents::acp::supervision::{AcpSessionSupervisor, kill_process_group};
+use crate::agents::acp::supervision::{
+    AcpSessionSupervisor, WatchdogEventEmitter, kill_process_group,
+};
 use crate::agents::kind::DisconnectReason;
 
 use super::SharedStderrTail;
@@ -92,7 +94,7 @@ impl ActiveAcpProcess {
 
     pub(in crate::daemon::agent_acp) fn event_emitter(
         &self,
-    ) -> Option<Arc<dyn crate::agents::acp::supervision::WatchdogEventEmitter>> {
+    ) -> Option<Arc<dyn WatchdogEventEmitter>> {
         self.supervisor.event_emitter().map(Arc::clone)
     }
 

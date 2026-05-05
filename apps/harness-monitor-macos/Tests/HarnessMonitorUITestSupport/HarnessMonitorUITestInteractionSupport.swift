@@ -1,129 +1,6 @@
 import XCTest
 
 extension HarnessMonitorUITestCase {
-  func tapPreviewSession(in app: XCUIApplication) {
-    tapSession(in: app, identifier: HarnessMonitorUITestAccessibility.previewSessionRow)
-  }
-
-  func tapSession(in app: XCUIApplication, identifier: String) {
-    let sessionRow = sessionTrigger(in: app, identifier: identifier)
-    recordDiagnosticsTrace(
-      event: "tap-session.begin",
-      app: app,
-      details: ["identifier": identifier]
-    )
-    let exists = waitForElement(sessionRow, timeout: Self.fastActionTimeout)
-    if !exists {
-      recordDiagnosticsTrace(
-        event: "tap-session.timeout",
-        app: app,
-        details: ["identifier": identifier]
-      )
-    }
-    XCTAssertTrue(
-      exists,
-      """
-      Expected session row \(identifier)
-      trace=\(diagnosticsTracePath() ?? "unavailable")
-      """
-    )
-    guard !sessionRowIsSelected(sessionRow) else { return }
-    if sessionRow.isHittable {
-      sessionRow.tap()
-      recordDiagnosticsTrace(
-        event: "tap-session.hittable",
-        app: app,
-        details: ["identifier": identifier]
-      )
-      return
-    }
-    if let coordinate = centerCoordinate(in: app, for: sessionRow) {
-      coordinate.tap()
-      recordDiagnosticsTrace(
-        event: "tap-session.coordinate",
-        app: app,
-        details: ["identifier": identifier]
-      )
-      return
-    }
-    recordDiagnosticsTrace(
-      event: "tap-session.failed",
-      app: app,
-      details: ["identifier": identifier]
-    )
-    XCTFail("Failed to tap session row \(identifier)")
-  }
-
-  func terminateIfRunning(_ app: XCUIApplication) {
-    HarnessMonitorUITestCase.terminateAndWait(app)
-  }
-
-  func tapButton(in app: XCUIApplication, identifier: String) {
-    let deadline = Date.now.addingTimeInterval(Self.fastActionTimeout)
-
-    while Date.now < deadline {
-      if app.state != .runningForeground {
-        app.activate()
-      }
-
-      let button = button(in: app, identifier: identifier)
-      if waitForElement(button, timeout: Self.fastPollInterval) {
-        if tapButtonElementReliably(in: app, element: button) {
-          return
-        }
-        if clickVisibleFrameMarker(in: app, identifier: identifier) {
-          return
-        }
-      }
-
-      let genericTarget = element(in: app, identifier: identifier)
-      if waitForElement(genericTarget, timeout: Self.fastPollInterval) {
-        if tapButtonElementReliably(in: app, element: genericTarget) {
-          return
-        }
-        if clickVisibleFrameMarker(in: app, identifier: identifier) {
-          return
-        }
-      }
-
-      if clickVisibleFrameMarker(in: app, identifier: identifier) {
-        return
-      }
-
-      RunLoop.current.run(until: Date.now.addingTimeInterval(Self.fastPollInterval))
-    }
-
-    XCTFail("Failed to tap button \(identifier)")
-  }
-
-  func waitForButtonReady(
-    in app: XCUIApplication,
-    identifier: String,
-    timeout: TimeInterval = HarnessMonitorUITestCase.actionTimeout
-  ) -> Bool {
-    let deadline = Date.now.addingTimeInterval(timeout)
-
-    while Date.now < deadline {
-      if app.state != .runningForeground {
-        app.activate()
-      }
-
-      let buttonTarget = button(in: app, identifier: identifier)
-      if buttonTargetIsReady(in: app, element: buttonTarget, identifier: identifier) {
-        return true
-      }
-
-      let genericTarget = element(in: app, identifier: identifier)
-      if buttonTargetIsReady(in: app, element: genericTarget, identifier: identifier) {
-        return true
-      }
-
-      RunLoop.current.run(until: Date.now.addingTimeInterval(Self.fastPollInterval))
-    }
-
-    return false
-  }
-
   func tapButton(in app: XCUIApplication, title: String) {
     let deadline = Date.now.addingTimeInterval(Self.fastActionTimeout)
 
@@ -183,22 +60,24 @@ extension HarnessMonitorUITestCase {
   ) {
     let container = element(in: app, identifier: containerIdentifier)
     let scrollTarget: XCUIElement
-    if
-      let scrollTargetIdentifier,
-      container.exists
-    {
+    if let scrollTargetIdentifier, container.exists {
       let containerWindow = window(in: app, containing: container)
-      let identifiedScrollTarget = containerWindow
+      let identifiedScrollTargets =
+        containerWindow
         .descendants(matching: .scrollView)
         .matching(identifier: scrollTargetIdentifier)
-        .firstMatch
-      scrollTarget =
-        identifiedScrollTarget.exists
-        ? identifiedScrollTarget
-        : revealScrollTarget(in: app, container: container)
+      let identifiedScrollTarget = identifiedScrollTargets.firstMatch
+      if identifiedScrollTarget.exists {
+        scrollTarget = identifiedScrollTarget
+      } else {
+        scrollTarget = revealScrollTarget(in: app, container: container)
+      }
     } else {
-      scrollTarget =
-        container.exists ? revealScrollTarget(in: app, container: container) : mainWindow(in: app)
+      if container.exists {
+        scrollTarget = revealScrollTarget(in: app, container: container)
+      } else {
+        scrollTarget = mainWindow(in: app)
+      }
     }
     let deadline = Date.now.addingTimeInterval(Self.actionTimeout)
 
@@ -215,26 +94,11 @@ extension HarnessMonitorUITestCase {
         container.exists
         ? descendantFrameElement(in: container, identifier: "\(identifier).frame")
         : element(in: app, identifier: "\(identifier).frame")
-      if frameMarker.exists, !frameMarker.frame.isEmpty {
-        let containingWindow = window(in: app, containing: frameMarker)
-        let viewportFrame = scrollTarget.frame.intersection(containingWindow.frame)
-        let visibleFrame = viewportFrame.intersection(frameMarker.frame)
-        let minimumVisibleHeight = min(24, max(frameMarker.frame.height / 2, 1))
-        if !visibleFrame.isNull, !visibleFrame.isEmpty, visibleFrame.height >= minimumVisibleHeight
-        {
-          return
-        }
-
-        if frameMarker.frame.midY < viewportFrame.minY {
-          if !dragElementWithinWindow(in: app, element: scrollTarget, deltaY: 120) {
-            dragDown(in: app, element: scrollTarget, distanceRatio: 0.18)
-          }
-        } else {
-          if !dragElementWithinWindow(in: app, element: scrollTarget, deltaY: -120) {
-            dragUp(in: app, element: scrollTarget, distanceRatio: 0.18)
-          }
-        }
-        RunLoop.current.run(until: Date.now.addingTimeInterval(Self.fastPollInterval))
+      if handleRevealFrameMarker(
+        frameMarker,
+        in: app,
+        scrollTarget: scrollTarget
+      ) {
         continue
       }
 
@@ -288,36 +152,6 @@ extension HarnessMonitorUITestCase {
     }
 
     XCTFail("Failed to resolve drag origin for \(element)")
-  }
-
-  func waitUntil(
-    timeout: TimeInterval = HarnessMonitorUITestCase.actionTimeout,
-    pollInterval: TimeInterval = HarnessMonitorUITestCase.fastPollInterval,
-    condition: @escaping () -> Bool
-  ) -> Bool {
-    if condition() {
-      return true
-    }
-
-    let deadline = Date.now.addingTimeInterval(timeout)
-    while Date.now < deadline {
-      let remaining = deadline.timeIntervalSinceNow
-      let nextPollInterval = min(pollInterval, max(remaining, 0.01))
-      RunLoop.current.run(until: Date.now.addingTimeInterval(nextPollInterval))
-
-      if condition() {
-        return true
-      }
-    }
-
-    return condition()
-  }
-
-  func waitForElement(
-    _ element: XCUIElement,
-    timeout: TimeInterval = HarnessMonitorUITestCase.actionTimeout
-  ) -> Bool {
-    element.exists || element.waitForExistence(timeout: timeout)
   }
 
   @discardableResult
@@ -517,6 +351,36 @@ extension HarnessMonitorUITestCase {
       )
     )
     start.press(forDuration: 0.01, thenDragTo: end)
+    return true
+  }
+
+  private func handleRevealFrameMarker(
+    _ frameMarker: XCUIElement,
+    in app: XCUIApplication,
+    scrollTarget: XCUIElement
+  ) -> Bool {
+    guard frameMarker.exists, !frameMarker.frame.isEmpty else {
+      return false
+    }
+
+    let containingWindow = window(in: app, containing: frameMarker)
+    let viewportFrame = scrollTarget.frame.intersection(containingWindow.frame)
+    let visibleFrame = viewportFrame.intersection(frameMarker.frame)
+    let minimumVisibleHeight = min(24, max(frameMarker.frame.height / 2, 1))
+    if !visibleFrame.isNull, !visibleFrame.isEmpty, visibleFrame.height >= minimumVisibleHeight {
+      return true
+    }
+
+    if frameMarker.frame.midY < viewportFrame.minY {
+      if !dragElementWithinWindow(in: app, element: scrollTarget, deltaY: 120) {
+        dragDown(in: app, element: scrollTarget, distanceRatio: 0.18)
+      }
+    } else {
+      if !dragElementWithinWindow(in: app, element: scrollTarget, deltaY: -120) {
+        dragUp(in: app, element: scrollTarget, distanceRatio: 0.18)
+      }
+    }
+    RunLoop.current.run(until: Date.now.addingTimeInterval(Self.fastPollInterval))
     return true
   }
 

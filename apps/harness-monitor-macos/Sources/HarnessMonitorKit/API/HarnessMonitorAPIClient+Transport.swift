@@ -18,13 +18,6 @@ struct AnyEncodable: Encodable {
   }
 }
 
-struct FlatErrorEnvelope: Decodable {
-  let error: String
-  let feature: String?
-  let endpoint: String?
-  let hint: String?
-}
-
 extension HarnessMonitorAPIClient {
   func get<Response: Decodable>(_ path: String) async throws -> Response {
     var request = try makeRequest(path: path)
@@ -177,123 +170,162 @@ extension HarnessMonitorAPIClient {
   func stream(_ path: String) -> DaemonPushEventStream {
     AsyncThrowingStream { continuation in
       let task = Task {
-        do {
-          let baseRequest = try makeRequest(path: path)
-          let method = baseRequest.httpMethod ?? "GET"
-          #if HARNESS_FEATURE_OTEL
-            let span = HarnessMonitorTelemetry.shared.startSpan(
-              name: "daemon.http.stream",
-              kind: .client,
-              attributes: [
-                "transport.kind": .string("http"),
-                "http.request.method": .string(method),
-                "url.path": .string(path),
-                "stream.kind": .string("sse"),
-              ]
-            )
-            defer { span.end() }
-          #endif
-
-          var request = baseRequest
-          #if HARNESS_FEATURE_OTEL
-            let requestID = HarnessMonitorTelemetry.shared.decorate(
-              &request,
-              spanContext: span.context
-            )
-            span.setAttribute(key: "harness.request_id", value: requestID)
-          #endif
-
-          let start = ContinuousClock.now
-          let (bytes, response) = try await session.bytes(for: request)
-          let durationMs = harnessMonitorDurationMilliseconds(start.duration(to: .now))
-          guard let httpResponse = response as? HTTPURLResponse,
-            (200..<300).contains(httpResponse.statusCode)
-          else {
-            let error = HarnessMonitorAPIError.invalidResponse
-            #if HARNESS_FEATURE_OTEL
-              span.status = .error(description: error.localizedDescription)
-              HarnessMonitorTelemetry.shared.recordError(error, on: span)
-              HarnessMonitorTelemetry.shared.recordHTTPRequest(
-                method: method,
-                path: path,
-                statusCode: (response as? HTTPURLResponse)?.statusCode,
-                durationMs: durationMs,
-                failed: true
-              )
-            #else
-              _ = durationMs
-            #endif
-            throw error
-          }
-
-          #if HARNESS_FEATURE_OTEL
-            span.setAttribute(key: "http.response.status_code", value: httpResponse.statusCode)
-            HarnessMonitorTelemetry.shared.recordHTTPRequest(
-              method: method,
-              path: path,
-              statusCode: httpResponse.statusCode,
-              durationMs: durationMs,
-              failed: false
-            )
-          #else
-            _ = durationMs
-            _ = method
-          #endif
-
-          var parser = ServerSentEventParser()
-          for try await line in bytes.lines {
-            if let frame = parser.push(line: line) {
-              do {
-                let event = try decoder.decode(
-                  StreamEvent.self,
-                  from: Data(frame.data.utf8)
-                )
-                continuation.yield(try DaemonPushEvent(streamEvent: event))
-              } catch {
-                enqueueDecodeFailureTelemetry(
-                  source: "swift.http.stream",
-                  message: "SSE frame for \(path) decode failed: \(String(reflecting: error))",
-                  sample: DaemonTelemetrySupport.truncatedSample(frame.data)
-                )
-                HarnessMonitorLogger.api.warning(
-                  """
-                  Dropping malformed SSE frame for \(path, privacy: .public): \
-                  \(error.localizedDescription, privacy: .public)
-                  """
-                )
-              }
-            }
-          }
-
-          if let frame = parser.finish() {
-            do {
-              let event = try decoder.decode(StreamEvent.self, from: Data(frame.data.utf8))
-              continuation.yield(try DaemonPushEvent(streamEvent: event))
-            } catch {
-              enqueueDecodeFailureTelemetry(
-                source: "swift.http.stream",
-                message: "Final SSE frame for \(path) decode failed: \(String(reflecting: error))",
-                sample: DaemonTelemetrySupport.truncatedSample(frame.data)
-              )
-              HarnessMonitorLogger.api.warning(
-                """
-                Dropping malformed trailing SSE frame for \(path, privacy: .public): \
-                \(error.localizedDescription, privacy: .public)
-                """
-              )
-            }
-          }
-
-          continuation.finish()
-        } catch {
-          continuation.finish(throwing: error)
-        }
+        await runStreamTask(path: path, continuation: continuation)
       }
 
       continuation.onTermination = { _ in
         task.cancel()
       }
     }
+  }
+
+  private func runStreamTask(
+    path: String,
+    continuation: AsyncThrowingStream<DaemonPushEvent, Error>.Continuation
+  ) async {
+    do {
+      let streamContext = try await openEventStream(path: path)
+      try await consumeEventStream(
+        streamContext.bytes,
+        path: path,
+        continuation: continuation
+      )
+      continuation.finish()
+    } catch {
+      continuation.finish(throwing: error)
+    }
+  }
+
+  private struct EventStreamContext {
+    let bytes: URLSession.AsyncBytes
+  }
+
+  private func openEventStream(path: String) async throws -> EventStreamContext {
+    let baseRequest = try makeRequest(path: path)
+    let method = baseRequest.httpMethod ?? "GET"
+    #if HARNESS_FEATURE_OTEL
+      let span = HarnessMonitorTelemetry.shared.startSpan(
+        name: "daemon.http.stream",
+        kind: .client,
+        attributes: [
+          "transport.kind": .string("http"),
+          "http.request.method": .string(method),
+          "url.path": .string(path),
+          "stream.kind": .string("sse"),
+        ]
+      )
+      defer { span.end() }
+    #endif
+
+    var request = baseRequest
+    #if HARNESS_FEATURE_OTEL
+      let requestID = HarnessMonitorTelemetry.shared.decorate(
+        &request,
+        spanContext: span.context
+      )
+      span.setAttribute(key: "harness.request_id", value: requestID)
+    #endif
+
+    let start = ContinuousClock.now
+    let (bytes, response) = try await session.bytes(for: request)
+    let durationMs = harnessMonitorDurationMilliseconds(start.duration(to: .now))
+    guard let httpResponse = response as? HTTPURLResponse,
+      (200..<300).contains(httpResponse.statusCode)
+    else {
+      let error = HarnessMonitorAPIError.invalidResponse
+      #if HARNESS_FEATURE_OTEL
+        span.status = .error(description: error.localizedDescription)
+        HarnessMonitorTelemetry.shared.recordError(error, on: span)
+        HarnessMonitorTelemetry.shared.recordHTTPRequest(
+          method: method,
+          path: path,
+          statusCode: (response as? HTTPURLResponse)?.statusCode,
+          durationMs: durationMs,
+          failed: true
+        )
+      #else
+        _ = durationMs
+      #endif
+      throw error
+    }
+
+    #if HARNESS_FEATURE_OTEL
+      span.setAttribute(key: "http.response.status_code", value: httpResponse.statusCode)
+      HarnessMonitorTelemetry.shared.recordHTTPRequest(
+        method: method,
+        path: path,
+        statusCode: httpResponse.statusCode,
+        durationMs: durationMs,
+        failed: false
+      )
+    #else
+      _ = durationMs
+      _ = method
+    #endif
+
+    return EventStreamContext(bytes: bytes)
+  }
+
+  private func consumeEventStream(
+    _ bytes: URLSession.AsyncBytes,
+    path: String,
+    continuation: AsyncThrowingStream<DaemonPushEvent, Error>.Continuation
+  ) async throws {
+    var parser = ServerSentEventParser()
+    for try await line in bytes.lines {
+      if let frame = parser.push(line: line) {
+        try yieldStreamFrame(frame.data, path: path, continuation: continuation)
+      }
+    }
+
+    if let frame = parser.finish() {
+      try yieldStreamFrame(
+        frame.data,
+        path: path,
+        continuation: continuation,
+        isTrailingFrame: true
+      )
+    }
+  }
+
+  private func yieldStreamFrame(
+    _ data: String,
+    path: String,
+    continuation: AsyncThrowingStream<DaemonPushEvent, Error>.Continuation,
+    isTrailingFrame: Bool = false
+  ) throws {
+    do {
+      let event = try decoder.decode(StreamEvent.self, from: Data(data.utf8))
+      continuation.yield(try DaemonPushEvent(streamEvent: event))
+    } catch {
+      logMalformedStreamFrame(
+        data,
+        path: path,
+        error: error,
+        isTrailingFrame: isTrailingFrame
+      )
+    }
+  }
+
+  private func logMalformedStreamFrame(
+    _ data: String,
+    path: String,
+    error: Error,
+    isTrailingFrame: Bool
+  ) {
+    let frameLabel = isTrailingFrame ? "Final SSE frame" : "SSE frame"
+    enqueueDecodeFailureTelemetry(
+      source: "swift.http.stream",
+      message: "\(frameLabel) for \(path) decode failed: \(String(reflecting: error))",
+      sample: DaemonTelemetrySupport.truncatedSample(data)
+    )
+    let droppedLabel = isTrailingFrame ? "trailing SSE frame" : "SSE frame"
+    HarnessMonitorLogger.api.warning(
+      """
+      Dropping malformed \(droppedLabel, privacy: .public) for \(path, privacy: .public): \
+      \(error.localizedDescription, privacy: .public)
+      """
+    )
   }
 
   func makeRequest(
@@ -319,94 +351,6 @@ extension HarnessMonitorAPIClient {
     request.setValue("Bearer \(connection.token)", forHTTPHeaderField: "Authorization")
     request.setValue("application/json", forHTTPHeaderField: "Accept")
     return request
-  }
-
-  static func decodeError(statusCode: Int, data: Data) -> HarnessMonitorAPIError {
-    let decoder = JSONDecoder()
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
-
-    if let envelope = try? decoder.decode(ErrorEnvelope.self, from: data) {
-      let rawMessage = String(data: data, encoding: .utf8) ?? envelope.error.message
-      return .server(code: statusCode, message: rawMessage)
-    }
-
-    if let envelope = try? decoder.decode(FlatErrorEnvelope.self, from: data) {
-      var parts = [envelope.error]
-      if let feature = envelope.feature, !feature.isEmpty {
-        parts.append(feature)
-      }
-      if let endpoint = envelope.endpoint, !endpoint.isEmpty {
-        parts.append(endpoint)
-      }
-      if let hint = envelope.hint, !hint.isEmpty {
-        parts.append(hint)
-      }
-      return .server(code: statusCode, message: parts.joined(separator: " - "))
-    }
-
-    let message = String(data: data, encoding: .utf8) ?? "Unknown daemon error"
-    return .server(code: statusCode, message: message)
-  }
-
-  func decodeError(statusCode: Int, data: Data) -> HarnessMonitorAPIError {
-    Self.decodeError(statusCode: statusCode, data: data)
-  }
-
-  func enqueueDecodeFailureTelemetry(
-    source: String,
-    message: String,
-    sample: String?
-  ) {
-    let telemetryRequest = DaemonTelemetryRequest(
-      kind: .decodeFailure,
-      source: source,
-      message: message,
-      sample: sample
-    )
-    do {
-      var request = try makeRequest(path: DaemonTelemetrySupport.path)
-      request.httpMethod = "POST"
-      request.timeoutInterval = DaemonTelemetrySupport.requestTimeoutInterval
-      request.httpBody = try encoder.encode(AnyEncodable(telemetryRequest))
-      request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-      let session = self.session
-      Task.detached(priority: .utility) {
-        await Self.sendDecodeFailureTelemetry(request: request, session: session)
-      }
-    } catch {
-      HarnessMonitorLogger.api.warning(
-        """
-        Failed to record decode-failure telemetry: \
-        \(error.localizedDescription, privacy: .public)
-        """
-      )
-    }
-  }
-
-  private static func sendDecodeFailureTelemetry(
-    request: URLRequest,
-    session: URLSession
-  ) async {
-    do {
-      let (_, response) = try await session.data(for: request)
-      if let httpResponse = response as? HTTPURLResponse,
-        !(200..<300).contains(httpResponse.statusCode)
-      {
-        HarnessMonitorLogger.api.warning(
-          """
-          Decode-failure telemetry was rejected: \
-          \(httpResponse.statusCode, privacy: .public)
-          """
-        )
-      }
-    } catch {
-      HarnessMonitorLogger.api.warning(
-        """
-        Failed to record decode-failure telemetry: \
-        \(error.localizedDescription, privacy: .public)
-        """
-      )
-    }
   }
 
 }

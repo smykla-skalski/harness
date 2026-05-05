@@ -205,8 +205,11 @@ struct ConnectionToolbarBadge: View {
         "Connection: \(metrics.transportKind.shortTitle), transport latency \(latency) milliseconds"
     }
     if let requestLatency = metrics.requestLatencyMs {
-      return
-        "Connection: \(metrics.transportKind.shortTitle), transport latency unavailable, last request latency \(requestLatency) milliseconds"
+      return [
+        "Connection: \(metrics.transportKind.shortTitle)",
+        "transport latency unavailable,",
+        "last request latency \(requestLatency) milliseconds",
+      ].joined(separator: " ")
     }
     return "Connection: \(metrics.transportKind.title)"
   }
@@ -409,17 +412,4 @@ private struct SparklineGeometry {
     guard sampleCount > 1 else { return 0 }
     return size.width / Double(sampleCount - 1)
   }
-}
-
-#Preview("Transport badges") {
-  HStack(spacing: HarnessMonitorTheme.sectionSpacing) {
-    TransportBadge(kind: .webSocket)
-    TransportBadge(kind: .httpSSE)
-    LatencyBadge(latencyMs: 24)
-    LatencyBadge(latencyMs: 200)
-    LatencyBadge(latencyMs: nil)
-    ActivityPulse(isActive: true)
-    ActivityPulse(isActive: false)
-  }
-  .padding()
 }

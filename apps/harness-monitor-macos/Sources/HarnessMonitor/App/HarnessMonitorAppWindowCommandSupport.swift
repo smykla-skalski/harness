@@ -48,7 +48,7 @@ private final class WindowCommandScopeTrackingNSView: NSView {
   // assertion that `MainActor.assumeIsolated` would. Mutations all happen on
   // the MainActor (see `beginObserving`); the deinit only reads after the
   // last write, so concurrent access is not possible.
-  private nonisolated(unsafe) var notificationTokens: [NSObjectProtocol] = []
+  nonisolated(unsafe) private var notificationTokens: [NSObjectProtocol] = []
 
   deinit {
     // ARC may release this NSView on any thread (notably

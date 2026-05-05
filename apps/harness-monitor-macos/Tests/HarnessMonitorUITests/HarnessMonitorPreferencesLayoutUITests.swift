@@ -3,7 +3,7 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
-final class HarnessMonitorPreferencesLayoutUITests: HarnessMonitorUITestCase {
+class HarnessMonitorPreferencesLayoutUITests: HarnessMonitorUITestCase {
   override nonisolated class var reuseLaunchedApp: Bool { true }
 
   func testPreferencesOverviewUsesGroupedFormRowsAndCompactActionButtons() throws {

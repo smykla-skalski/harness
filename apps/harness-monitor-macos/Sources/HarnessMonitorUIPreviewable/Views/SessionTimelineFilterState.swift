@@ -343,8 +343,11 @@ struct SessionTimelineStoredFilterRegistry: Equatable, Sendable {
     else {
       return .init()
     }
+    let statesBySessionID = storage.statesBySessionID.mapValues(
+      SessionTimelineFilterState.init(storage:)
+    )
     return Self(
-      statesBySessionID: storage.statesBySessionID.mapValues(SessionTimelineFilterState.init(storage:))
+      statesBySessionID: statesBySessionID
     )
   }
 }

@@ -9,19 +9,6 @@ public struct WorkspaceWindowView: View {
     scope: .summary
   )
 
-  struct DismissBatchSnapshot: Equatable {
-    let ids: [String]
-    let count: Int
-    let filterSignature: String
-    let scopeDescription: String
-    let capturedAt: Date
-  }
-
-  struct ReopenBatchState: Equatable {
-    let ids: [String]
-    let expiresAt: Date
-  }
-
   let store: HarnessMonitorStore
   let keyWindowObserver: KeyWindowObserver?
   let navigationBridge: WorkspaceWindowNavigationBridge
@@ -45,9 +32,9 @@ public struct WorkspaceWindowView: View {
   )
   @State private var decisionDetailTab: DecisionDetailTab = .context
   @State private var dismissAllVisibleDraft = ""
-  @State private var pendingDismissBatch: DismissBatchSnapshot?
+  @State private var pendingDismissBatch: WorkspaceDecisionDismissBatchSnapshot?
   @State private var showDismissAllVisibleConfirmation = false
-  @State private var reopenBatch: ReopenBatchState?
+  @State private var reopenBatch: WorkspaceDecisionReopenBatchState?
   @State private var decisionInspectorVisible = false
   @State private var decisionInspectorPreferredVisibility = false
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
@@ -198,7 +185,7 @@ public struct WorkspaceWindowView: View {
     $dismissAllVisibleDraft
   }
 
-  var currentPendingDismissBatch: DismissBatchSnapshot? {
+  var currentPendingDismissBatch: WorkspaceDecisionDismissBatchSnapshot? {
     get { pendingDismissBatch }
     nonmutating set { pendingDismissBatch = newValue }
   }
@@ -212,7 +199,7 @@ public struct WorkspaceWindowView: View {
     $showDismissAllVisibleConfirmation
   }
 
-  var currentReopenBatch: ReopenBatchState? {
+  var currentReopenBatch: WorkspaceDecisionReopenBatchState? {
     get { reopenBatch }
     nonmutating set { reopenBatch = newValue }
   }
@@ -381,52 +368,6 @@ public struct WorkspaceWindowView: View {
           restoreSidebarVisibility(using: binding)
         }
       }
-  }
-
-  private func restoreSidebarVisibility(
-    using binding: Binding<NavigationSplitViewVisibility>
-  ) {
-    guard binding.wrappedValue == .detailOnly else {
-      return
-    }
-    binding.wrappedValue = .all
-    // Capture the workspace contentView synchronously before the async hop so
-    // the notification targets this window even if key focus shifts in 50ms.
-    // asyncAfter(0.05) gives SwiftUI a full rendering cycle to commit the
-    // column-visibility change before VoiceOver re-scans the AX tree.
-    let contentView = NSApp.keyWindow?.contentView
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-      if let contentView {
-        NSAccessibility.post(element: contentView, notification: .layoutChanged)
-      }
-    }
-  }
-
-  private func workspaceNavigationTitle(for selection: WorkspaceSelection) -> String {
-    switch selection {
-    case .create:
-      "New"
-    case .decisions, .decision:
-      "Decisions"
-    case .terminal, .codex:
-      "Session"
-    case .agent(_, let agentID):
-      store.selectedSession?.agents.first(where: { $0.agentId == agentID })?.name ?? "Agent"
-    case .task(_, let taskID):
-      store.selectedSession?.tasks.first(where: { $0.taskId == taskID })?.title ?? "Task"
-    }
-  }
-
-  private func workspaceNavigationSubtitle(for selection: WorkspaceSelection) -> String {
-    switch selection {
-    case .agent(_, let agentID):
-      if let agent = store.selectedSession?.agents.first(where: { $0.agentId == agentID }) {
-        return "\(runtimeDisplayLabel(agent.runtime)) · \(agent.role.title)"
-      }
-      return ""
-    default:
-      return ""
-    }
   }
 
   // currentResetSuppression is computed locally instead of routed through a

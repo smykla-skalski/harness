@@ -95,22 +95,37 @@ fn diagnostics_manifest_load_is_ignorable(error: &CliError) -> bool {
 
 fn diagnostics_manifest() -> Result<Option<DaemonManifest>, CliError> {
     match state::load_manifest() {
-        Ok(manifest) => Ok(manifest.map(|mut manifest| {
-            if let Ok(live_bridge) = bridge::host_bridge_manifest_with_discovery() {
-                manifest.host_bridge = live_bridge;
-            }
-            manifest
-        })),
-        Err(error) if diagnostics_manifest_load_is_ignorable(&error) => {
-            tracing::warn!(
-                error = %error,
-                path = %state::manifest_path().display(),
-                "diagnostics skipping unreadable daemon manifest"
-            );
-            Ok(None)
-        }
-        Err(error) => Err(error),
+        Ok(manifest) => Ok(manifest.map(enrich_diagnostics_manifest)),
+        Err(error) => handle_diagnostics_manifest_error(error),
     }
+}
+
+fn enrich_diagnostics_manifest(mut manifest: DaemonManifest) -> DaemonManifest {
+    if let Ok(live_bridge) = bridge::host_bridge_manifest_with_discovery() {
+        manifest.host_bridge = live_bridge;
+    }
+    manifest
+}
+
+fn handle_diagnostics_manifest_error(error: CliError) -> Result<Option<DaemonManifest>, CliError> {
+    if !diagnostics_manifest_load_is_ignorable(&error) {
+        return Err(error);
+    }
+
+    log_ignored_diagnostics_manifest_error(&error);
+    Ok(None)
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_ignored_diagnostics_manifest_error(error: &CliError) {
+    tracing::warn!(
+        error = %error,
+        path = %state::manifest_path().display(),
+        "diagnostics skipping unreadable daemon manifest"
+    );
 }
 
 /// Build a richer diagnostics report for the daemon preferences screen.

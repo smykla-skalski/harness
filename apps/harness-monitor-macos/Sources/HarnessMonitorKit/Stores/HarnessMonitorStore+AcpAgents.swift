@@ -228,6 +228,30 @@ extension HarnessMonitorStore {
     return recovery
   }
 
+  private func preparedAcpRetryClient(
+    using client: any HarnessMonitorClientProtocol,
+    hostBridge: HostBridgeManifest
+  ) async -> (any HarnessMonitorClientProtocol)? {
+    guard hostBridge.capabilities["acp"]?.healthy != true else {
+      return client
+    }
+    switch await mutateHostBridgeCapability(
+      using: client,
+      capability: "acp",
+      enabled: true,
+      force: false,
+      announceFeedback: false
+    ) {
+    case .success:
+      return self.client ?? client
+    case .requiresForce(let message):
+      presentFailureFeedback(message)
+      return nil
+    case .failed:
+      return nil
+    }
+  }
+
   private func retryAcpStartIfRunningHostBridge(
     using client: any HarnessMonitorClientProtocol,
     sessionID: String,
@@ -238,23 +262,12 @@ extension HarnessMonitorStore {
     guard hostBridge.running else {
       return nil
     }
-    var effectiveClient: any HarnessMonitorClientProtocol = client
-    if hostBridge.capabilities["acp"]?.healthy != true {
-      switch await mutateHostBridgeCapability(
-        using: client,
-        capability: "acp",
-        enabled: true,
-        force: false,
-        announceFeedback: false
-      ) {
-      case .success:
-        effectiveClient = self.client ?? client
-      case .requiresForce(let message):
-        presentFailureFeedback(message)
-        return .failed
-      case .failed:
-        return .failed
-      }
+    let effectiveClient = await preparedAcpRetryClient(
+      using: client,
+      hostBridge: hostBridge
+    )
+    guard let effectiveClient else {
+      return .failed
     }
     if retryContext.recordsIncidentRetry {
       noteAcpBridgeRetryAttempt(

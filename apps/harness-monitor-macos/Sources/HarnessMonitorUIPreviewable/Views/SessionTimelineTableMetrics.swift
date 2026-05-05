@@ -41,9 +41,8 @@ enum SessionTimelineTableMetrics {
     return minimumDetailedWideCardHeight
   }
 
-  static func rowBottomPadding(for row: SessionTimelineRow) -> CGFloat {
-    let _ = row
-    return HarnessMonitorTheme.itemSpacing
+  static func rowBottomPadding(for _: SessionTimelineRow) -> CGFloat {
+    HarnessMonitorTheme.itemSpacing
   }
 
   static func connectorVisibility(

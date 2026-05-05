@@ -1,6 +1,15 @@
 import Foundation
 import XCTest
 
+private struct CoordinateResolutionContext {
+  let source: String
+  let origin: String
+  let containingWindow: XCUIElement
+  let targetFrame: CGRect
+  let visibleFrame: CGRect
+  let targetPoint: CGPoint
+}
+
 extension HarnessMonitorUITestCase {
   func centerCoordinate(
     in app: XCUIApplication,
@@ -89,12 +98,14 @@ extension HarnessMonitorUITestCase {
     recordCoordinateResolution(
       in: app,
       element: frameMarker,
-      source: "frame-marker-center",
-      origin: "window",
-      containingWindow: containingWindow,
-      targetFrame: targetFrame,
-      visibleFrame: visibleFrame,
-      targetPoint: targetPoint
+      context: CoordinateResolutionContext(
+        source: "frame-marker-center",
+        origin: "window",
+        containingWindow: containingWindow,
+        targetFrame: targetFrame,
+        visibleFrame: visibleFrame,
+        targetPoint: targetPoint
+      )
     )
     let origin = containingWindow.coordinate(withNormalizedOffset: .zero)
     return origin.withOffset(
@@ -129,12 +140,14 @@ extension HarnessMonitorUITestCase {
     recordCoordinateResolution(
       in: app,
       element: element,
-      source: "window-clamped-center",
-      origin: "window",
-      containingWindow: containingWindow,
-      targetFrame: targetFrame,
-      visibleFrame: visibleFrame,
-      targetPoint: targetPoint
+      context: CoordinateResolutionContext(
+        source: "window-clamped-center",
+        origin: "window",
+        containingWindow: containingWindow,
+        targetFrame: targetFrame,
+        visibleFrame: visibleFrame,
+        targetPoint: targetPoint
+      )
     )
     let origin = containingWindow.coordinate(withNormalizedOffset: .zero)
     return origin.withOffset(
@@ -201,28 +214,23 @@ extension HarnessMonitorUITestCase {
   private func recordCoordinateResolution(
     in app: XCUIApplication,
     element: XCUIElement,
-    source: String,
-    origin: String,
-    containingWindow: XCUIElement,
-    targetFrame: CGRect,
-    visibleFrame: CGRect,
-    targetPoint: CGPoint
+    context: CoordinateResolutionContext
   ) {
     var details: [String: String] = [
-      "source": source,
-      "origin": origin,
+      "source": context.source,
+      "origin": context.origin,
       "element_identifier": element.identifier,
       "element_label": element.label,
       "element_type": String(describing: element.elementType),
       "element_frame": frameSummary(element.frame),
-      "target_frame": frameSummary(targetFrame),
-      "visible_frame": frameSummary(visibleFrame),
-      "target_point": pointSummary(targetPoint),
-      "window_identifier": containingWindow.identifier,
-      "window_frame": frameSummary(containingWindow.frame),
+      "target_frame": frameSummary(context.targetFrame),
+      "visible_frame": frameSummary(context.visibleFrame),
+      "target_point": pointSummary(context.targetPoint),
+      "window_identifier": context.containingWindow.identifier,
+      "window_frame": frameSummary(context.containingWindow.frame),
     ]
-    if !containingWindow.label.isEmpty {
-      details["window_label"] = containingWindow.label
+    if !context.containingWindow.label.isEmpty {
+      details["window_label"] = context.containingWindow.label
     }
     recordDiagnosticsTrace(
       component: "ui-tap",

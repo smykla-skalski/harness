@@ -18,8 +18,8 @@ import SwiftUI
 
 @MainActor
 private func agentDetailPreview(agentID: String, store: HarnessMonitorStore) -> some View {
-  let agent = (store.selectedSession?.agents ?? PreviewFixtures.detail.agents)
-    .first(where: { $0.agentId == agentID }) ?? PreviewFixtures.detail.agents[0]
+  let agents = store.selectedSession?.agents ?? PreviewFixtures.detail.agents
+  let agent = agents.first(where: { $0.agentId == agentID }) ?? PreviewFixtures.detail.agents[0]
   let activity = store.selectedSession?.agentActivity.first(where: { $0.agentId == agentID })
 
   return AgentDetailSection(

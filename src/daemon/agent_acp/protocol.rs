@@ -99,7 +99,7 @@ pub(super) fn spawn_protocol_task(
     );
     let event_sink = Arc::new(SupervisorEventSink::new(
         batcher.event_sender.clone(),
-        agent_name.clone(),
+        agent_name,
         session_id.to_string(),
     ));
     supervisor.attach_event_emitter(Arc::clone(&event_sink) as _);

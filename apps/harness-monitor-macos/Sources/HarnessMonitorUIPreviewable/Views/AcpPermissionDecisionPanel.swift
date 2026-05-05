@@ -35,29 +35,8 @@ struct AcpPermissionDecisionPanel: View {
         ScrollView {
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
             ForEach(batch.requests) { request in
-              Toggle(
-                isOn: selectionBinding(for: request.id)
-              ) {
-                VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-                  Text(request.title)
-                    .scaledFont(.body.weight(.medium))
-                  Text(request.detail)
-                    .scaledFont(.caption)
-                    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-                    .lineLimit(3)
-                  Text(request.breadcrumb)
-                    .scaledFont(.caption2)
-                    .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
-                    .lineLimit(1)
-                }
-               }
-               .toggleStyle(.checkbox)
-               .disabled(isResolving || onSelectionChanged == nil)
-               .accessibilityIdentifier(requestAccessibilityID(request.id))
-               .accessibilityFrameMarker("\(requestAccessibilityID(request.id)).frame")
-               .accessibilityLabel(request.title)
-               .accessibilityHint(accessibilityHint(for: request))
-             }
+              requestToggle(for: request)
+            }
           }
         }
         .frame(maxHeight: 220)
@@ -82,6 +61,37 @@ struct AcpPermissionDecisionPanel: View {
       .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
       .filter { !$0.isEmpty }
       .joined(separator: ". ")
+  }
+
+  private func requestToggle(
+    for request: AcpPermissionDecisionPayload.RenderableBatch.Request
+  ) -> some View {
+    Toggle(isOn: selectionBinding(for: request.id)) {
+      requestDescription(for: request)
+    }
+    .toggleStyle(.checkbox)
+    .disabled(isResolving || onSelectionChanged == nil)
+    .accessibilityIdentifier(requestAccessibilityID(request.id))
+    .accessibilityFrameMarker("\(requestAccessibilityID(request.id)).frame")
+    .accessibilityLabel(request.title)
+    .accessibilityHint(accessibilityHint(for: request))
+  }
+
+  private func requestDescription(
+    for request: AcpPermissionDecisionPayload.RenderableBatch.Request
+  ) -> some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      Text(request.title)
+        .scaledFont(.body.weight(.medium))
+      Text(request.detail)
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .lineLimit(3)
+      Text(request.breadcrumb)
+        .scaledFont(.caption2)
+        .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
+        .lineLimit(1)
+    }
   }
 }
 

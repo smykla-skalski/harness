@@ -22,12 +22,15 @@ struct SessionTimelineTableSnapshot: Equatable {
       return Set(rows.map(\.id))
     }
     let previousRowsByID = previous.rowSnapshotsByID
-    return Set(rows.compactMap { rowSnapshot in
-      guard let previousRow = previousRowsByID[rowSnapshot.id] else {
+    let changedRowIDs: [String] = rows.compactMap { rowSnapshot in
+      guard let previousRow = previousRowsByID[rowSnapshot.id],
+        previousRow != rowSnapshot
+      else {
         return nil
       }
-      return previousRow == rowSnapshot ? nil : rowSnapshot.id
-    })
+      return rowSnapshot.id
+    }
+    return Set(changedRowIDs)
   }
 
   private var rowSnapshotsByID: [String: SessionTimelineTableRowSnapshot] {

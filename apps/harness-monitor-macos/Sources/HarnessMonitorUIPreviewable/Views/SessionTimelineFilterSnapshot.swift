@@ -65,7 +65,10 @@ struct SessionTimelineFilterSummary: Equatable, Sendable {
     loadedItemCount: 0,
     statusText: "",
     accessibilityText: "",
-    accessibilityState: "query=none;scope=all;tones=all;types=all;agents=all;tasks=all;severities=all;semantic=all;keys=all;matches=0"
+    accessibilityState: Self.accessibilityStateDescription(
+      filters: SessionTimelineFilterState(),
+      matchCount: 0
+    )
   )
 
   init(
@@ -81,9 +84,21 @@ struct SessionTimelineFilterSummary: Equatable, Sendable {
     self.matchCount = clampedMatchCount
     self.loadedItemCount = clampedLoadedCount
     if isFiltered {
-      let filterLabel = activeFilterCount == 1 ? "1 filter" : "\(activeFilterCount) filters"
-      let matchLabel = clampedMatchCount == 1 ? "1 match" : "\(clampedMatchCount) matches"
-      let loadedLabel = clampedLoadedCount == 1 ? "1 loaded item" : "\(clampedLoadedCount) loaded items"
+      let filterLabel = Self.countLabel(
+        activeFilterCount,
+        singular: "filter",
+        plural: "filters"
+      )
+      let matchLabel = Self.countLabel(
+        clampedMatchCount,
+        singular: "match",
+        plural: "matches"
+      )
+      let loadedLabel = Self.countLabel(
+        clampedLoadedCount,
+        singular: "loaded item",
+        plural: "loaded items"
+      )
       statusText = "\(filterLabel) • \(matchLabel) in \(loadedLabel)"
       accessibilityText =
         "\(filterLabel) active, \(matchLabel) in \(loadedLabel)"
@@ -91,7 +106,25 @@ struct SessionTimelineFilterSummary: Equatable, Sendable {
       statusText = ""
       accessibilityText = ""
     }
-    accessibilityState = [
+    accessibilityState = Self.accessibilityStateDescription(
+      filters: filters,
+      matchCount: clampedMatchCount
+    )
+  }
+
+  private static func countLabel(
+    _ count: Int,
+    singular: String,
+    plural: String
+  ) -> String {
+    count == 1 ? "1 \(singular)" : "\(count) \(plural)"
+  }
+
+  private static func accessibilityStateDescription(
+    filters: SessionTimelineFilterState,
+    matchCount: Int
+  ) -> String {
+    [
       "query=\(filters.trimmedQuery.isEmpty ? "none" : filters.trimmedQuery)",
       "scope=\(filters.searchScope.rawValue)",
       "tones=\(Self.stateValue(filters.tones.map(\.rawValue)))",
@@ -101,7 +134,7 @@ struct SessionTimelineFilterSummary: Equatable, Sendable {
       "severities=\(Self.stateValue(filters.decisionSeverities))",
       "semantic=\(Self.stateValue(filters.semanticProperties.map(\.rawValue)))",
       "keys=\(Self.stateValue(filters.rawPayloadKeys))",
-      "matches=\(clampedMatchCount)",
+      "matches=\(matchCount)",
     ]
     .joined(separator: ";")
   }
@@ -166,327 +199,43 @@ struct SessionTimelineFilterSnapshot: Equatable, Sendable {
     )
   }
 
-  fileprivate static func matches(
+  static func matches(
     node: SessionTimelineNode,
     filters: SessionTimelineFilterState
   ) -> Bool {
-    if !filters.tones.isEmpty {
-      guard let eventTone = node.eventTone, filters.tones.contains(eventTone) else {
-        return false
-      }
-    }
-
-    if !filters.eventTypes.isEmpty {
-      guard let entryKind = node.entryKind, filters.eventTypes.contains(entryKind) else {
-        return false
-      }
-    }
-
-    if !filters.agents.isEmpty {
-      guard let agentID = node.agentID, filters.agents.contains(agentID) else {
-        return false
-      }
-    }
-
-    if !filters.tasks.isEmpty {
-      guard let taskID = node.taskID, filters.tasks.contains(taskID) else {
-        return false
-      }
-    }
-
-    if !filters.decisionSeverities.isEmpty {
-      guard
-        let severity = node.decision?.severity.rawValue,
-        filters.decisionSeverities.contains(severity)
-      else {
-        return false
-      }
-    }
-
-    if !filters.semanticProperties.isEmpty,
-      node.semanticProperties.isDisjoint(with: filters.semanticProperties)
-    {
+    guard matches(filters.tones, value: node.eventTone) else {
       return false
     }
-
-    if !filters.rawPayloadKeys.isEmpty,
-      node.rawPayloadKeys.isDisjoint(with: filters.rawPayloadKeys)
-    {
+    guard matches(filters.eventTypes, value: node.entryKind) else {
       return false
     }
-
+    guard matches(filters.agents, value: node.agentID) else {
+      return false
+    }
+    guard matches(filters.tasks, value: node.taskID) else {
+      return false
+    }
+    guard matches(filters.decisionSeverities, value: node.decision?.severity.rawValue) else {
+      return false
+    }
+    guard matchesAny(filters.semanticProperties, values: node.semanticProperties) else {
+      return false
+    }
+    guard matchesAny(filters.rawPayloadKeys, values: node.rawPayloadKeys) else {
+      return false
+    }
     let trimmedQuery = filters.trimmedQuery
     if !trimmedQuery.isEmpty {
       return node.matches(query: trimmedQuery, scope: filters.searchScope)
     }
-
     return true
   }
-}
 
-private extension SessionTimelineFilterInventory {
-  init(nodes: [SessionTimelineNode], filters: SessionTimelineFilterState) {
-    let availableTones = Set(nodes.compactMap(\.eventTone))
-    let availableEventTypes = Set(nodes.compactMap(\.entryKind))
-    let availableAgents = Set(nodes.compactMap(\.agentID))
-    let availableTasks = Set(nodes.compactMap(\.taskID))
-    let availableSeverities = Set(nodes.compactMap { $0.decision?.severity.rawValue })
-    let availableSemanticProperties = nodes.reduce(into: Set<SessionTimelineSemanticProperty>()) {
-      $0.formUnion($1.semanticProperties)
-    }
-    let availableRawKeys = nodes.reduce(into: Set<String>()) {
-      $0.formUnion($1.rawPayloadKeys)
-    }
-
-    var toneCounts: [SessionTimelineTone: Int] = [:]
-    var eventTypeCounts: [String: Int] = [:]
-    var agentCounts: [String: Int] = [:]
-    var taskCounts: [String: Int] = [:]
-    var severityCounts: [String: Int] = [:]
-    var semanticPropertyCounts: [SessionTimelineSemanticProperty: Int] = [:]
-    var rawKeyCounts: [String: Int] = [:]
-
-    let toneNodes = Self.nodes(nodes, matching: filters.removingTones())
-    let eventTypeNodes = Self.nodes(nodes, matching: filters.removingEventTypes())
-    let agentNodes = Self.nodes(nodes, matching: filters.removingAgents())
-    let taskNodes = Self.nodes(nodes, matching: filters.removingTasks())
-    let severityNodes = Self.nodes(nodes, matching: filters.removingDecisionSeverities())
-    let semanticNodes = Self.nodes(nodes, matching: filters.removingSemanticProperties())
-    let rawKeyNodes = Self.nodes(nodes, matching: filters.removingRawPayloadKeys())
-
-    for node in toneNodes {
-      if let eventTone = node.eventTone {
-        toneCounts[eventTone, default: 0] += 1
-      }
-    }
-    for node in eventTypeNodes {
-      if let entryKind = node.entryKind {
-        eventTypeCounts[entryKind, default: 0] += 1
-      }
-    }
-    for node in agentNodes {
-      if let agentID = node.agentID {
-        agentCounts[agentID, default: 0] += 1
-      }
-    }
-    for node in taskNodes {
-      if let taskID = node.taskID {
-        taskCounts[taskID, default: 0] += 1
-      }
-    }
-    for node in severityNodes {
-      if let severity = node.decision?.severity {
-        severityCounts[severity.rawValue, default: 0] += 1
-      }
-    }
-    for node in semanticNodes {
-      for property in node.semanticProperties {
-        semanticPropertyCounts[property, default: 0] += 1
-      }
-    }
-    for node in rawKeyNodes {
-      for rawKey in node.rawPayloadKeys {
-        rawKeyCounts[rawKey, default: 0] += 1
-      }
-    }
-
-    for tone in availableTones.union(filters.tones) {
-      toneCounts[tone] = toneCounts[tone] ?? 0
-    }
-
-    self.toneCounts = toneCounts
-    eventTypes = Self.options(
-      counts: eventTypeCounts,
-      available: availableEventTypes,
-      selected: filters.eventTypes,
-      label: Self.humanizedEventType
-    )
-    agents = Self.options(
-      counts: agentCounts,
-      available: availableAgents,
-      selected: filters.agents,
-      label: { $0 }
-    )
-    tasks = Self.options(
-      counts: taskCounts,
-      available: availableTasks,
-      selected: filters.tasks,
-      label: { $0 }
-    )
-    decisionSeverities = Self.severityOptions(
-      counts: severityCounts,
-      available: availableSeverities,
-      selected: filters.decisionSeverities
-    )
-    semanticProperties = Self.semanticPropertyOptions(
-      counts: semanticPropertyCounts,
-      available: availableSemanticProperties,
-      selected: filters.semanticProperties
-    )
-    rawPayloadKeys = Self.options(
-      counts: rawKeyCounts,
-      available: availableRawKeys,
-      selected: filters.rawPayloadKeys,
-      label: { $0 }
-    )
+  private static func matches<T: Hashable>(_ selected: Set<T>, value: T?) -> Bool {
+    selected.isEmpty || value.map(selected.contains) == true
   }
 
-  static func options(
-    counts: [String: Int],
-    available: Set<String>,
-    selected: Set<String>,
-    label: (String) -> String
-  ) -> [SessionTimelineFacetOption] {
-    var merged = counts
-    for value in available.union(selected) {
-      merged[value] = merged[value] ?? 0
-    }
-    return merged
-      .map { key, count in
-        SessionTimelineFacetOption(id: key, label: label(key), count: count)
-      }
-      .sorted(by: facetOrdering)
-  }
-
-  static func severityOptions(
-    counts: [String: Int],
-    available: Set<String>,
-    selected: Set<String>
-  ) -> [SessionTimelineFacetOption] {
-    var merged = counts
-    for value in available.union(selected) {
-      merged[value] = merged[value] ?? 0
-    }
-    return DecisionSeverity.sidebarOrdering.compactMap { severity in
-      guard let count = merged[severity.rawValue] else {
-        return nil
-      }
-      return SessionTimelineFacetOption(
-        id: severity.rawValue,
-        label: severity.chipLabel,
-        count: count
-      )
-    }
-  }
-
-  static func semanticPropertyOptions(
-    counts: [SessionTimelineSemanticProperty: Int],
-    available: Set<SessionTimelineSemanticProperty>,
-    selected: Set<SessionTimelineSemanticProperty>
-  ) -> [SessionTimelineFacetOption] {
-    let merged = available.union(selected)
-    return SessionTimelineSemanticProperty.allCases.compactMap { property in
-      guard merged.contains(property) else {
-        return nil
-      }
-      return SessionTimelineFacetOption(
-        id: property.rawValue,
-        label: property.label,
-        count: counts[property] ?? 0
-      )
-    }
-  }
-
-  static func facetOrdering(_ lhs: SessionTimelineFacetOption, _ rhs: SessionTimelineFacetOption)
-    -> Bool
-  {
-    if lhs.count != rhs.count {
-      return lhs.count > rhs.count
-    }
-    return lhs.label.localizedStandardCompare(rhs.label) == .orderedAscending
-  }
-
-  static func humanizedEventType(_ rawValue: String) -> String {
-    rawValue
-      .split(whereSeparator: { $0 == "_" || $0 == "-" })
-      .map { segment in
-        segment.prefix(1).uppercased() + segment.dropFirst().lowercased()
-      }
-      .joined(separator: " ")
-  }
-
-  static func nodes(
-    _ sourceNodes: [SessionTimelineNode],
-    matching filters: SessionTimelineFilterState
-  ) -> [SessionTimelineNode] {
-    sourceNodes.filter { node in
-      SessionTimelineFilterSnapshot.matches(node: node, filters: filters)
-    }
-  }
-}
-
-private extension SessionTimelineNode {
-  func matches(query trimmedQuery: String, scope: SessionTimelineSearchScope) -> Bool {
-    let needles = searchTokens(for: scope)
-    return needles.contains { token in
-      token.range(of: trimmedQuery, options: .caseInsensitive) != nil
-    }
-  }
-
-  func searchTokens(for scope: SessionTimelineSearchScope) -> [String] {
-    switch scope {
-    case .all:
-      summaryTokens + sourceTokens + agentTokens + taskTokens + propertyTokens
-    case .summary:
-      summaryTokens
-    case .source:
-      sourceTokens
-    case .agent:
-      agentTokens
-    case .task:
-      taskTokens
-    case .properties:
-      propertyTokens
-    }
-  }
-
-  private var summaryTokens: [String] {
-    [title, detail, decision?.summary].compactMap { value in
-      guard let value, !value.isEmpty else {
-        return nil
-      }
-      return value
-    }
-  }
-
-  private var sourceTokens: [String] {
-    [sourceLabel, entryKind].compactMap { value in
-      guard let value, !value.isEmpty else {
-        return nil
-      }
-      return value
-    }
-  }
-
-  private var agentTokens: [String] {
-    [agentID, toolCallMetadata?.agentID, toolCallMetadata?.acpAgentID, toolCallMetadata?.agentDisplayName]
-      .compactMap { value in
-        guard let value, !value.isEmpty else {
-          return nil
-        }
-        return value
-      }
-  }
-
-  private var taskTokens: [String] {
-    [taskID].compactMap { value in
-      guard let value, !value.isEmpty else {
-        return nil
-      }
-      return value
-    }
-  }
-
-  private var propertyTokens: [String] {
-    var tokens = rawPayloadKeys.sorted()
-    tokens += semanticProperties.map(\.label)
-    if let toolName = toolCallMetadata?.toolName, !toolName.isEmpty {
-      tokens.append(toolName)
-    }
-    if let stopReason = toolCallMetadata?.stopReason, !stopReason.isEmpty {
-      tokens.append(stopReason)
-    }
-    tokens += toolCallMetadata?.capabilityTags ?? []
-    return tokens
+  private static func matchesAny<T: Hashable>(_ selected: Set<T>, values: Set<T>) -> Bool {
+    selected.isEmpty || !values.isDisjoint(with: selected)
   }
 }

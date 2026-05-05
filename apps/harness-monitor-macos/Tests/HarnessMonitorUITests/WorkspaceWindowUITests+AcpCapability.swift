@@ -171,29 +171,11 @@ extension WorkspaceWindowUITests {
       in: workspaceWindow,
       identifier: Accessibility.decisionRow(acpDecisionID)
     )
-    XCTAssertTrue(
-      waitForElement(decisionRow, timeout: Self.uiTimeout),
-      "ACP permission route should preselect the decision row in Workspace"
-    )
-
-    let acpPanel = descendantElement(
-      in: workspaceWindow,
-      identifier: Accessibility.decisionAcpPanel
-    )
-    XCTAssertTrue(
-      waitForElement(acpPanel, timeout: Self.actionTimeout),
-      "ACP permission route should open the ACP decision panel without another row click"
-    )
-
-    let focusState = element(in: app, identifier: Accessibility.decisionPrimaryActionFocusState)
-    XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
-        let text =
-          (focusState.value as? String)
-          ?? (!focusState.label.isEmpty ? focusState.label : String(describing: focusState.value))
-        return text.contains("decision=\(acpDecisionID)") && text.contains("focused=true")
-      },
-      "ACP permission route should focus the decision's primary action"
+    assertDecisionRouteSelection(
+      in: app,
+      workspaceWindow: workspaceWindow,
+      decisionID: acpDecisionID,
+      decisionRow: decisionRow
     )
 
     let terminalToggleIdentifier = Accessibility.decisionAcpRequest("preview-request-terminal")
@@ -205,19 +187,11 @@ extension WorkspaceWindowUITests {
       waitForElement(terminalToggleFrame, timeout: Self.actionTimeout),
       "ACP decision panel should expose the terminal request frame marker"
     )
-    var previousTerminalY = terminalToggleFrame.frame.minY
-    var terminalVisible = hasVisibleFrameMarker(in: app, identifier: terminalToggleIdentifier)
-    for _ in 0..<3 where !terminalVisible {
-      app.typeKey(.pageDown, modifierFlags: [])
-      let scrolled = waitUntil(timeout: Self.actionTimeout) {
-        terminalToggleFrame.frame.minY < previousTerminalY - 12
-      }
-      previousTerminalY = terminalToggleFrame.frame.minY
-      terminalVisible = hasVisibleFrameMarker(in: app, identifier: terminalToggleIdentifier)
-      if !scrolled && !terminalVisible {
-        break
-      }
-    }
+    let terminalVisible = scrollDecisionPanelUntilRequestVisible(
+      in: app,
+      terminalToggleFrame: terminalToggleFrame,
+      terminalToggleIdentifier: terminalToggleIdentifier
+    )
     XCTAssertTrue(
       terminalVisible,
       """
@@ -226,10 +200,9 @@ extension WorkspaceWindowUITests {
       """
     )
 
-    let terminalToggle = workspaceWindow
-      .descendants(matching: .checkBox)
-      .matching(identifier: terminalToggleIdentifier)
-      .firstMatch
+    let terminalToggles = workspaceWindow.descendants(matching: .checkBox)
+    let terminalToggleQuery = terminalToggles.matching(identifier: terminalToggleIdentifier)
+    let terminalToggle = terminalToggleQuery.firstMatch
     XCTAssertTrue(
       waitForElement(terminalToggle, timeout: Self.actionTimeout),
       "ACP decision panel should render the request toggle list"
@@ -249,18 +222,9 @@ extension WorkspaceWindowUITests {
       in: workspaceWindow,
       identifier: Accessibility.decisionAcpSelectionSummary
     )
-    XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
-        decisionSelectionSummary.exists
-          && decisionSelectionSummary.label.contains("1 of 2 selected")
-      },
-      """
-      The Decisions panel should reflect the updated ACP selection \
-      (summaryLabel=\(decisionSelectionSummary.label), \
-      toggleLabel=\(terminalToggle.label), \
-      toggleValue=\(String(describing: terminalToggle.value)), \
-      toggleHittable=\(terminalToggle.isHittable))
-      """
+    assertDecisionSelectionSummary(
+      decisionSelectionSummary,
+      terminalToggle: terminalToggle
     )
 
     XCTAssertFalse(
@@ -310,6 +274,14 @@ extension WorkspaceWindowUITests {
 
     app.activate()
     app.typeKey(.return, modifierFlags: .command)
+    let decisionRowExists = self.descendantElement(
+      in: workspaceWindow,
+      identifier: Accessibility.decisionRow(acpDecisionID)
+    ).exists
+    let acpPanelExists = self.descendantElement(
+      in: workspaceWindow,
+      identifier: Accessibility.decisionAcpPanel
+    ).exists
 
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
@@ -324,8 +296,84 @@ extension WorkspaceWindowUITests {
       },
       """
       Command-Return should approve the selected ACP requests from the Workspace decisions desk.
-      rowExists=\(self.descendantElement(in: workspaceWindow, identifier: Accessibility.decisionRow(acpDecisionID)).exists)
-      panelExists=\(self.descendantElement(in: workspaceWindow, identifier: Accessibility.decisionAcpPanel).exists)
+      rowExists=\(decisionRowExists)
+      panelExists=\(acpPanelExists)
+      """
+    )
+  }
+
+  private func assertDecisionRouteSelection(
+    in app: XCUIApplication,
+    workspaceWindow: XCUIElement,
+    decisionID: String,
+    decisionRow: XCUIElement
+  ) {
+    XCTAssertTrue(
+      waitForElement(decisionRow, timeout: Self.uiTimeout),
+      "ACP permission route should preselect the decision row in Workspace"
+    )
+
+    let acpPanel = descendantElement(
+      in: workspaceWindow,
+      identifier: Accessibility.decisionAcpPanel
+    )
+    XCTAssertTrue(
+      waitForElement(acpPanel, timeout: Self.actionTimeout),
+      "ACP permission route should open the ACP decision panel without another row click"
+    )
+
+    let focusState = element(in: app, identifier: Accessibility.decisionPrimaryActionFocusState)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        let focusValue = String(describing: focusState.value)
+        let focusText =
+          (focusState.value as? String)
+          ?? (!focusState.label.isEmpty ? focusState.label : focusValue)
+        return focusText.contains("decision=\(decisionID)") && focusText.contains("focused=true")
+      },
+      "ACP permission route should focus the decision's primary action"
+    )
+  }
+
+  private func scrollDecisionPanelUntilRequestVisible(
+    in app: XCUIApplication,
+    terminalToggleFrame: XCUIElement,
+    terminalToggleIdentifier: String
+  ) -> Bool {
+    var previousTerminalY = terminalToggleFrame.frame.minY
+    var terminalVisible = hasVisibleFrameMarker(in: app, identifier: terminalToggleIdentifier)
+
+    for _ in 0..<3 where !terminalVisible {
+      app.typeKey(.pageDown, modifierFlags: [])
+      let scrolled = waitUntil(timeout: Self.actionTimeout) {
+        terminalToggleFrame.frame.minY < previousTerminalY - 12
+      }
+      previousTerminalY = terminalToggleFrame.frame.minY
+      terminalVisible = hasVisibleFrameMarker(in: app, identifier: terminalToggleIdentifier)
+      if !scrolled && !terminalVisible {
+        break
+      }
+    }
+
+    return terminalVisible
+  }
+
+  private func assertDecisionSelectionSummary(
+    _ decisionSelectionSummary: XCUIElement,
+    terminalToggle: XCUIElement
+  ) {
+    let toggleValue = String(describing: terminalToggle.value)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        decisionSelectionSummary.exists
+          && decisionSelectionSummary.label.contains("1 of 2 selected")
+      },
+      """
+      The Decisions panel should reflect the updated ACP selection \
+      (summaryLabel=\(decisionSelectionSummary.label), \
+      toggleLabel=\(terminalToggle.label), \
+      toggleValue=\(toggleValue), \
+      toggleHittable=\(terminalToggle.isHittable))
       """
     )
   }

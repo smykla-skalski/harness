@@ -190,7 +190,7 @@ extension SessionTimelineTableView.Coordinator {
     let visibleIndexes = IndexSet(
       integersIn: visibleRows.location..<(visibleRows.location + visibleRows.length)
     )
-    return !changedIndexes.intersection(visibleIndexes).isEmpty
+    return !visibleIndexes.isDisjoint(with: changedIndexes)
   }
 
   func visibleRowsNeedMeasurement(columnWidth: CGFloat) -> Bool {

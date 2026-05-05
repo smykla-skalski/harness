@@ -87,8 +87,7 @@ public final class KeyWindowObserver {
   // would. Mutations happen on the MainActor (see `beginObserving`); the
   // deinit only reads after the last write, so concurrent access is not
   // possible.
-  @ObservationIgnored
-  private nonisolated(unsafe) var notificationTokens: [NSObjectProtocol] = []
+  @ObservationIgnored nonisolated(unsafe) private var notificationTokens: [NSObjectProtocol] = []
 
   public init(
     application: any KeyWindowObservableApplication = NSApplication.shared,
