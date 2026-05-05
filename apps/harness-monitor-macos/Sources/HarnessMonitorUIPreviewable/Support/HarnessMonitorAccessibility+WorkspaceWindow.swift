@@ -30,6 +30,14 @@ extension HarnessMonitorAccessibility {
     "harness.workspace.detail.awaiting-decision.open.\(slug(agentID))"
   }
 
+  public static func agentDetailApproveDecisionButton(_ agentID: String) -> String {
+    "harness.workspace.detail.awaiting-decision.approve.\(slug(agentID))"
+  }
+
+  public static func agentDetailDenyDecisionButton(_ agentID: String) -> String {
+    "harness.workspace.detail.awaiting-decision.deny.\(slug(agentID))"
+  }
+
   public static func agentRuntimeStrip(_ agentID: String) -> String {
     "harness.workspace.detail.runtime.strip.\(slug(agentID))"
   }
