@@ -54,6 +54,112 @@ extension WorkspaceWindowUITests {
     )
   }
 
+  func testAgentDetailColumnsStayScrollableInsideWorkspaceChrome() throws {
+    let app = launchInCockpitPreview(
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_ACP_PENDING": "1"]
+    )
+    openWorkspaceWindow(in: app)
+    let agentID = "worker-codex"
+
+    let agentRow = element(
+      in: app,
+      identifier: Accessibility.agentTuiExternalTab(agentID)
+    )
+    XCTAssertTrue(waitForElement(agentRow, timeout: Self.uiTimeout))
+
+    let workspaceWindow = window(in: app, containing: agentRow)
+    let rowTopInset = agentRow.frame.minY - workspaceWindow.frame.minY
+    let sidebarDiagnostics = """
+      workspaceWindow: \(workspaceWindow.frame)
+      agentRow: \(agentRow.frame)
+      rowTopInset: \(rowTopInset)
+      """
+    XCTAssertGreaterThan(
+      rowTopInset,
+      64,
+      "Agent sidebar rows should not slide under the native window controls.\n\(sidebarDiagnostics)"
+    )
+
+    let state = element(in: app, identifier: Accessibility.agentTuiState)
+    XCTAssertTrue(
+      waitForElement(state, timeout: Self.actionTimeout),
+      "Workspace state marker should publish before the worker row is tapped"
+    )
+    let agentSelectionMarker = "selection=agent:\(agentID)"
+    let agentRowIdentifier = Accessibility.agentTuiExternalTab(agentID)
+    let selectionFlipped = waitUntil(timeout: Self.actionTimeout) {
+      state.label.contains(agentSelectionMarker)
+    }
+    if !selectionFlipped {
+      tapViaCoordinate(in: app, element: agentRow)
+      if !waitUntil(timeout: Self.actionTimeout, condition: {
+        state.label.contains(agentSelectionMarker)
+      }) {
+        _ = clickVisibleFrameMarker(in: app, identifier: agentRowIdentifier)
+      }
+    }
+    XCTAssertTrue(
+      waitUntil(timeout: Self.uiTimeout) {
+        state.label.contains(agentSelectionMarker)
+      },
+      """
+      Tapping the worker row should switch the workspace selection to the agent route.
+      state=\(state.label)
+      \(sidebarDiagnostics)
+      """
+    )
+
+    let detailScroll = element(in: app, identifier: Accessibility.workspaceDetailScrollView)
+    let detailCardFrame = frameElement(
+      in: app,
+      identifier: "\(Accessibility.workspaceDetailCard).frame"
+    )
+    XCTAssertTrue(
+      waitForElement(detailScroll, timeout: Self.uiTimeout),
+      """
+      Agent detail scroll view should appear after the agent route is selected.
+      state=\(state.label)
+      """
+    )
+    XCTAssertTrue(
+      waitForElement(detailCardFrame, timeout: Self.uiTimeout),
+      """
+      Agent detail card frame marker should appear inside the detail scroll viewport.
+      state=\(state.label)
+      detailScroll=\(detailScroll.frame)
+      """
+    )
+
+    let detailDiagnostics = """
+      workspaceWindow: \(workspaceWindow.frame)
+      detailScroll: \(detailScroll.frame)
+      detailCard: \(detailCardFrame.frame)
+      state: \(state.label)
+      """
+    XCTAssertGreaterThan(detailScroll.frame.height, 120, detailDiagnostics)
+    XCTAssertLessThanOrEqual(
+      detailScroll.frame.maxY,
+      workspaceWindow.frame.maxY + 1,
+      "Agent detail scroll view should be bounded by the workspace window.\n\(detailDiagnostics)"
+    )
+
+    XCTAssertGreaterThanOrEqual(
+      detailScroll.frame.minY,
+      workspaceWindow.frame.minY - 1,
+      "Agent detail scroll view should not start above the workspace window.\n\(detailDiagnostics)"
+    )
+
+    let roleActionsID = Accessibility.agentDetailRoleActionsDisclosure(agentID)
+    let roleActions = element(in: app, identifier: roleActionsID)
+    XCTAssertTrue(
+      waitForElement(roleActions, timeout: Self.actionTimeout),
+      """
+      Role actions disclosure should exist inside the agent detail scroll content.
+      \(detailDiagnostics)
+      """
+    )
+  }
+
   func testDecisionDeskUsesNativeSearchFieldAndToolbarFilterMenu() throws {
     let app = launchInCockpitPreview(
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_ACP_PENDING": "1"]

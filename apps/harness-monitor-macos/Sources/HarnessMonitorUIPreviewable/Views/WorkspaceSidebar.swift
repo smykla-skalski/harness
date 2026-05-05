@@ -34,6 +34,7 @@ struct WorkspaceSidebar: View {
   @AppStorage(WorkspaceDecisionFilterDefaults.searchScopeKey)
   private var decisionSearchScopeRaw = DecisionsSidebarSearchScope.summary.rawValue
   @State private var hasHydratedPersistedDecisionFilters = false
+  @State private var workspaceSearchQuery = ""
   @State private var searchFocusDispatcher = HarnessSidebarSearchFocusDispatcher()
   @State private var searchPresentationState = SidebarSearchPresentationState()
   @Environment(\.fontScale)
@@ -55,6 +56,17 @@ struct WorkspaceSidebar: View {
       get: { decisionFilters.query },
       set: { updateDecisionFilters(query: $0) }
     )
+  }
+
+  private var workspaceSearchText: Binding<String> {
+    Binding(
+      get: { workspaceSearchQuery },
+      set: { workspaceSearchQuery = $0 }
+    )
+  }
+
+  private var sidebarSearchText: Binding<String> {
+    showsDecisionSearchChrome ? decisionSearchText : workspaceSearchText
   }
 
   private var decisionSearchScope: Binding<DecisionsSidebarSearchScope> {
@@ -95,13 +107,104 @@ struct WorkspaceSidebar: View {
     selection.isDecisionRoute
   }
 
+  private var sidebarSearchPrompt: Text {
+    Text(showsDecisionSearchChrome ? "Search decisions" : "Search workspace")
+  }
+
+  private var normalizedWorkspaceSearchQuery: String {
+    workspaceSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+  }
+
+  private var filteredExternalAgents: [AgentRegistration] {
+    externalAgents.filter { agent in
+      matchesWorkspaceSearch([
+        agent.name,
+        agent.agentId,
+        agent.role.title,
+        runtimeDisplayLabel(agent.runtime),
+        agent.currentTaskId,
+      ])
+    }
+  }
+
+  private var filteredActiveTuis: [AgentTuiSnapshot] {
+    activeTuis.filter { tui in
+      matchesWorkspaceSearch([
+        sessionTitlesByID[tui.tuiId],
+        tui.tuiId,
+        tui.runtime,
+        tui.status.title,
+      ])
+    }
+  }
+
+  private var filteredInactiveTuis: [AgentTuiSnapshot] {
+    inactiveTuis.filter { tui in
+      matchesWorkspaceSearch([
+        sessionTitlesByID[tui.tuiId],
+        tui.tuiId,
+        tui.runtime,
+        tui.status.title,
+      ])
+    }
+  }
+
+  private var filteredActiveCodexRuns: [CodexRunSnapshot] {
+    activeCodexRuns.filter { run in
+      matchesWorkspaceSearch([
+        codexTitlesByID[run.runId],
+        run.runId,
+        run.status.title,
+        run.mode.title,
+      ])
+    }
+  }
+
+  private var filteredInactiveCodexRuns: [CodexRunSnapshot] {
+    inactiveCodexRuns.filter { run in
+      matchesWorkspaceSearch([
+        codexTitlesByID[run.runId],
+        run.runId,
+        run.status.title,
+        run.mode.title,
+      ])
+    }
+  }
+
+  private var filteredTasks: [WorkItem] {
+    tasks.filter { task in
+      matchesWorkspaceSearch([
+        task.title,
+        task.taskId,
+        task.severity.title,
+        task.status.title,
+        task.assignedTo,
+      ])
+    }
+  }
+
+  private var createRowMatchesWorkspaceSearch: Bool {
+    matchesWorkspaceSearch(["Create", "New agent", "New terminal", "Codex run"])
+  }
+
+  private func matchesWorkspaceSearch(_ values: [String?]) -> Bool {
+    let query = normalizedWorkspaceSearchQuery
+    guard !query.isEmpty else {
+      return true
+    }
+    return values.contains { value in
+      guard let value else { return false }
+      return value.localizedCaseInsensitiveContains(query)
+    }
+  }
+
   private func handleSearchFocusRequest() {
     _ = searchPresentationState.requestPresentation(canPresent: true)
   }
 
   private func applyPendingSearchPresentationIfNeeded() {
     _ = searchPresentationState.applyPendingPresentationIfNeeded(
-      canPresent: isStartupFocusParticipationEnabled && showsDecisionSearchChrome
+      canPresent: isStartupFocusParticipationEnabled
     )
   }
 
@@ -117,7 +220,7 @@ struct WorkspaceSidebar: View {
       .focusedSceneValue(
         \.harnessSidebarSearchFocusAction,
         HarnessSidebarSearchFocus(
-          isAvailable: isStartupFocusParticipationEnabled && showsDecisionSearchChrome,
+          isAvailable: isStartupFocusParticipationEnabled,
           menuLabel: showsDecisionSearchChrome ? .findInDecisions : .findGeneric,
           dispatcher: searchFocusDispatcher
         )
@@ -143,43 +246,50 @@ struct WorkspaceSidebar: View {
   }
 
   @ViewBuilder private var searchableSidebarList: some View {
-    if isStartupFocusParticipationEnabled, showsDecisionSearchChrome {
-      sidebarList
-        .searchable(
-          text: decisionSearchText,
-          isPresented: searchPresentation,
-          placement: .sidebar,
-          prompt: Text("Search decisions")
-        )
+    let searchableList = sidebarList
+      .listStyle(.sidebar)
+      .scrollEdgeEffectStyle(.soft, for: .top)
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      .searchable(
+        text: sidebarSearchText,
+        isPresented: searchPresentation,
+        placement: .sidebar,
+        prompt: sidebarSearchPrompt
+      )
+
+    if showsDecisionSearchChrome {
+      searchableList
         .searchScopes(decisionSearchScope, activation: .onSearchPresentation) {
           ForEach(DecisionsSidebarSearchScope.allCases) { scope in
             Text(scope.label).tag(scope)
           }
         }
     } else {
-      sidebarList
+      searchableList
     }
   }
 
   private var sidebarList: some View {
     List(selection: selectionBinding) {
-      HStack(spacing: HarnessMonitorTheme.spacingSM) {
-        Image(systemName: "plus.rectangle")
-          .accessibilityHidden(true)
-        Text("Create")
-          .scaledFont(.body)
-          .lineLimit(2)
-          .fixedSize(horizontal: false, vertical: true)
+      if createRowMatchesWorkspaceSearch {
+        HStack(spacing: HarnessMonitorTheme.spacingSM) {
+          Image(systemName: "plus.rectangle")
+            .accessibilityHidden(true)
+          Text("Create")
+            .scaledFont(.body)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, rowPadding)
+        .tag(WorkspaceSelection.create)
+        .accessibilityElement(children: .combine)
+        .harnessMCPTab(
+          HarnessMonitorAccessibility.agentTuiCreateTab,
+          label: "Create",
+          pressAction: { selection = .create }
+        )
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.vertical, rowPadding)
-      .tag(WorkspaceSelection.create)
-      .accessibilityElement(children: .combine)
-      .harnessMCPTab(
-        HarnessMonitorAccessibility.agentTuiCreateTab,
-        label: "Create",
-        pressAction: { selection = .create }
-      )
 
       WorkspaceSidebarDecisionSection(
         selection: $selection,
@@ -192,9 +302,9 @@ struct WorkspaceSidebar: View {
         lastMessageAt: lastAcpMessageAt(for:)
       )
 
-      if !externalAgents.isEmpty {
+      if !filteredExternalAgents.isEmpty {
         Section("Connected Agents") {
-          ForEach(externalAgents) { agent in
+          ForEach(filteredExternalAgents) { agent in
             externalAgentRow(agent)
               .tag(WorkspaceSelection.agent(sessionID: currentSessionID, agentID: agent.agentId))
               .harnessMCPTab(
@@ -211,9 +321,9 @@ struct WorkspaceSidebar: View {
         }
       }
 
-      if !activeTuis.isEmpty {
+      if !filteredActiveTuis.isEmpty {
         Section("Open Sessions") {
-          ForEach(activeTuis) { tui in
+          ForEach(filteredActiveTuis) { tui in
             WorkspaceSidebarRow(
               snapshot: tui,
               title: sessionTitlesByID[tui.tuiId] ?? "Session"
@@ -231,9 +341,9 @@ struct WorkspaceSidebar: View {
         }
       }
 
-      if !inactiveTuis.isEmpty {
+      if !filteredInactiveTuis.isEmpty {
         Section("Past Sessions") {
-          ForEach(inactiveTuis) { tui in
+          ForEach(filteredInactiveTuis) { tui in
             WorkspaceSidebarRow(
               snapshot: tui,
               title: sessionTitlesByID[tui.tuiId] ?? "Session"
@@ -251,9 +361,9 @@ struct WorkspaceSidebar: View {
         }
       }
 
-      if !activeCodexRuns.isEmpty {
+      if !filteredActiveCodexRuns.isEmpty {
         Section("Open Runs") {
-          ForEach(activeCodexRuns) { run in
+          ForEach(filteredActiveCodexRuns) { run in
             CodexRunSidebarRow(
               snapshot: run,
               title: codexTitlesByID[run.runId] ?? "Run"
@@ -271,9 +381,9 @@ struct WorkspaceSidebar: View {
         }
       }
 
-      if !inactiveCodexRuns.isEmpty {
+      if !filteredInactiveCodexRuns.isEmpty {
         Section("Past Runs") {
-          ForEach(inactiveCodexRuns) { run in
+          ForEach(filteredInactiveCodexRuns) { run in
             CodexRunSidebarRow(
               snapshot: run,
               title: codexTitlesByID[run.runId] ?? "Run"
@@ -291,9 +401,9 @@ struct WorkspaceSidebar: View {
         }
       }
 
-      if !tasks.isEmpty {
+      if !filteredTasks.isEmpty {
         Section("Tasks") {
-          ForEach(tasks, id: \.taskId) { task in
+          ForEach(filteredTasks, id: \.taskId) { task in
             HStack(spacing: HarnessMonitorTheme.spacingSM) {
               Image(systemName: "checklist")
                 .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -325,6 +435,7 @@ struct WorkspaceSidebar: View {
       }
     }
     .listStyle(.sidebar)
+    .workspaceBottomScrollContentMargin()
     .overlay {
       WorkspaceSidebarDecisionFilterStateMarker(
         filters: decisionFilters,

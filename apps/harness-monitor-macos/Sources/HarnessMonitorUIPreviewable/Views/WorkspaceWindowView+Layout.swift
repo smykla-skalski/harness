@@ -67,7 +67,6 @@ extension WorkspaceWindowView {
         ideal: WorkspaceChromeMetrics.sidebarIdealWidth,
         max: WorkspaceChromeMetrics.sidebarMaxWidth
       )
-      .toolbarBaselineFrame(.sidebar)
     } detail: {
       detailSplitViewContent(decisionScope: decisionScope)
     }

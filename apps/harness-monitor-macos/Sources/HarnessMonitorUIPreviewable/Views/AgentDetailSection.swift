@@ -165,7 +165,13 @@ struct AgentDetailSection: View {
         compactBody
       }
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .frame(
+      minWidth: 0,
+      maxWidth: .infinity,
+      minHeight: 0,
+      maxHeight: .infinity,
+      alignment: .topLeading
+    )
     .task(id: roleStateKey) {
       selectedRole = agent.role
     }

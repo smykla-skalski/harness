@@ -228,7 +228,7 @@ public struct WorkspaceWindowView: View {
       .navigationTitle(workspaceNavigationTitle(for: viewModel.selection))
       .navigationSubtitle(workspaceNavigationSubtitle(for: viewModel.selection))
       .accessibilityElement(children: .contain)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiSheet)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceWindow)
   }
 
   private func configuredWorkspaceContent<Content: View>(
@@ -237,8 +237,8 @@ public struct WorkspaceWindowView: View {
     viewModel: ViewModel
   ) -> some View {
     splitView
-      // Workspace is workbench-shaped (sidebar drives detail); main window uses .prominentDetail.
-      .navigationSplitViewStyle(.balanced)
+      .navigationSplitViewStyle(.prominentDetail)
+      .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
       .toolbar {
         agentTuiNavigationToolbarItems
         sessionToolbarItems
@@ -254,9 +254,7 @@ public struct WorkspaceWindowView: View {
           )
         }
       }
-      .toolbarBaselineOverlay()
-      .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
-      .containerBackground(.windowBackground, for: .window)
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
       .task {
         await prepareWorkspace()
       }
