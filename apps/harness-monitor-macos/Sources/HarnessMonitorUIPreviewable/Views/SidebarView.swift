@@ -103,7 +103,7 @@ private struct SidebarCreateMenu: View {
   private func openNewAgent() {
     store.requestWorkspaceCreateEntryPoint(
       .agent,
-      sessionID: store.selectedSession?.session.sessionId ?? store.selectedSessionSummary?.sessionId
+      sessionID: store.selectedSession?.session.sessionId
     )
     openWindow(id: HarnessMonitorWindowID.workspace)
   }

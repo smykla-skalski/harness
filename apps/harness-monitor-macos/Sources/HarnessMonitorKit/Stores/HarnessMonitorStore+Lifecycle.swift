@@ -267,13 +267,6 @@ extension HarnessMonitorStore {
   ) async {
     guard isCurrentSessionLoad(requestID, sessionID: sessionID) else { return }
 
-    // Background hydration: log silently. The fallback to cached/index data
-    // below is the user-visible recovery; we do not surface a toast for an
-    // automatic load the user did not explicitly invoke.
-    let err = error.localizedDescription
-    HarnessMonitorLogger.store.warning(
-      "session detail hydration failed for \(sessionID, privacy: .public): \(err, privacy: .public)"
-    )
     withUISyncBatch {
       isExtensionsLoading = false
       isTimelineLoading = false
@@ -281,6 +274,10 @@ extension HarnessMonitorStore {
     cancelTimelineLoadingGate()
 
     if shouldTreatMissingSessionLoadAsLocalRemoval(error) {
+      let err = error.localizedDescription
+      HarnessMonitorLogger.store.info(
+        "session detail hydration pruned stale session \(sessionID, privacy: .public): \(err, privacy: .public)"
+      )
       let localSnapshot = applyLocalSessionRemoval(sessionID: sessionID)
       await pruneRemovedSessionFromCache(
         sessions: localSnapshot.sessions,
@@ -288,6 +285,14 @@ extension HarnessMonitorStore {
       )
       return
     }
+
+    // Background hydration: log silently. The fallback to cached/index data
+    // below is the user-visible recovery; we do not surface a toast for an
+    // automatic load the user did not explicitly invoke.
+    let err = error.localizedDescription
+    HarnessMonitorLogger.store.warning(
+      "session detail hydration failed for \(sessionID, privacy: .public): \(err, privacy: .public)"
+    )
 
     guard selectedSession?.session.sessionId != sessionID else { return }
 

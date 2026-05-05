@@ -46,7 +46,11 @@ extension HarnessMonitorStore {
 
   private func preferredWorkspaceCreateSessionID() -> String? {
     normalizedWorkspaceSessionID(selectedSession?.session.sessionId)
-      ?? normalizedWorkspaceSessionID(selectedSessionSummary?.sessionId)
+      ?? (
+        isShowingCachedCatalog
+          ? nil
+          : normalizedWorkspaceSessionID(selectedSessionSummary?.sessionId)
+      )
   }
 
   public func requestWorkspaceDecisionSelection(
