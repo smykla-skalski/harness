@@ -144,6 +144,144 @@ extension HarnessMonitorStoreSelectionFlowTests {
     #expect(client.readCallCount(.acpTranscript(summary.sessionId)) == 1)
   }
 
+  @Test("Selecting a session keeps managed native-runtime ACP transcript history")
+  func selectingSessionKeepsManagedNativeRuntimeAcpTranscriptHistory() async throws {
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-secondary-acp-native-transcript",
+        context: "Managed native transcript hydration lane",
+        status: .active,
+        leaderId: "leader-acp-native",
+        observeId: "observe-acp-native",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 2
+      )
+    )
+    let detail = makeSessionDetail(
+      summary: summary,
+      workerID: "worker-acp-native",
+      workerName: "Worker ACP Native"
+    )
+    let cockpitTimeline = makeTimelineEntries(
+      sessionID: summary.sessionId,
+      agentID: "worker-acp-native",
+      summary: "Cockpit timeline row"
+    )
+    let transcriptEntry = TimelineEntry(
+      entryId: "gemini-worker-acp-native-assistant_text-7",
+      recordedAt: "2026-04-28T00:00:20Z",
+      kind: "assistant_text",
+      sessionId: summary.sessionId,
+      agentId: "worker-acp-native",
+      taskId: nil,
+      summary: "Dedicated Gemini transcript row",
+      payload: .object([
+        "runtime": .string("gemini"),
+        "event": .object([
+          "type": .string("assistant_text"),
+          "content": .string("Dedicated Gemini transcript row"),
+        ]),
+      ])
+    )
+    let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
+      summaries: [summary],
+      detailsByID: [summary.sessionId: detail],
+      timelinesBySessionID: [summary.sessionId: cockpitTimeline],
+      detail: detail
+    )
+    client.configureAcpTranscriptResponse(
+      AcpTranscriptResponse(entries: [transcriptEntry]),
+      for: summary.sessionId
+    )
+    client.configureAcpTranscriptDelay(.milliseconds(250), for: summary.sessionId)
+    let store = await makeBootstrappedStore(client: client)
+
+    await store.selectSession(summary.sessionId)
+    try await Task.sleep(for: .milliseconds(80))
+
+    #expect(store.timeline.map(\.summary) == ["Cockpit timeline row"])
+    #expect(store.acpTranscript(forAgent: "worker-acp-native").isEmpty)
+
+    try await Task.sleep(for: .milliseconds(260))
+
+    #expect(store.timeline.map(\.summary) == ["Cockpit timeline row"])
+    #expect(
+      store.acpTranscript(forAgent: "worker-acp-native").map(\.summary)
+        == ["Dedicated Gemini transcript row"]
+    )
+    #expect(client.readCallCount(.acpTranscript(summary.sessionId)) == 1)
+  }
+
+  @Test("Recording client derives managed native ACP transcript fallback from timeline")
+  func recordingClientDerivesManagedNativeAcpTranscriptFallbackFromTimeline() async throws {
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-recording-client-acp-native",
+        context: "Recording client ACP transcript lane",
+        status: .active,
+        leaderId: "leader-recording-native",
+        observeId: "observe-recording-native",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 2
+      )
+    )
+    let detail = makeSessionDetail(
+      summary: summary,
+      workerID: "worker-recording-native",
+      workerName: "Worker Recording Native"
+    )
+    let cockpitRow = TimelineEntry(
+      entryId: "cockpit-row",
+      recordedAt: "2026-04-28T00:00:10Z",
+      kind: "task_started",
+      sessionId: summary.sessionId,
+      agentId: "worker-recording-native",
+      taskId: nil,
+      summary: "Cockpit timeline row",
+      payload: .object([:])
+    )
+    let transcriptRow = TimelineEntry(
+      entryId: "gemini-worker-recording-native-assistant_text-8",
+      recordedAt: "2026-04-28T00:00:20Z",
+      kind: "assistant_text",
+      sessionId: summary.sessionId,
+      agentId: "worker-recording-native",
+      taskId: nil,
+      summary: "Managed native transcript row",
+      payload: .object([
+        "runtime": .string("gemini"),
+        "event": .object([
+          "type": .string("assistant_text"),
+          "content": .string("Managed native transcript row"),
+        ]),
+      ])
+    )
+    let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
+      summaries: [summary],
+      detailsByID: [summary.sessionId: detail],
+      timelinesBySessionID: [summary.sessionId: [cockpitRow, transcriptRow]],
+      detail: detail
+    )
+    client.configureResolvedAcpSnapshot(
+      makeAcpSnapshot(
+        acpID: "acp-recording-native",
+        sessionID: summary.sessionId,
+        agentID: "worker-recording-native",
+        displayName: "Worker Recording Native",
+        pendingBatches: []
+      ),
+      for: "worker-recording-native"
+    )
+
+    let response = try await client.acpTranscript(sessionID: summary.sessionId)
+
+    #expect(response.entries.map(\.summary) == ["Managed native transcript row"])
+  }
+
   @Test("Selecting a new session replaces subscribed session IDs")
   func selectingNewSessionReplacesSubscribedSessionIDs() async {
     let firstSummary = makeSession(

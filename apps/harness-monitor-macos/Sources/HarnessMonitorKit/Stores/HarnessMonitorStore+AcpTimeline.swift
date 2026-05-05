@@ -175,7 +175,7 @@ extension HarnessMonitorStore {
       return
     }
     let historyEntries = reattributedAcpEntries(
-      response.entries.filter(\.isAcpTranscriptEntry),
+      response.entries.filter(\.isAcpTranscriptResponseEntry),
       using: selectedAcpAgents
     )
     let historyEntryIDs = Set(historyEntries.map(\.entryId))
