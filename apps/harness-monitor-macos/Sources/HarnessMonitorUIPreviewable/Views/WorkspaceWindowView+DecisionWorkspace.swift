@@ -66,10 +66,24 @@ extension WorkspaceWindowView {
       await store.selectSession(sessionID)
     } else if let sessionID = newValue.sessionID {
       viewModel.createSessionID = sessionID
-    } else if case .create = newValue, let previousSessionID = oldValue.sessionID {
-      viewModel.createSessionID = previousSessionID
-      if store.selectedSessionID == nil {
-        await store.selectSession(previousSessionID)
+    } else if case .create = newValue {
+      let requestedCreateSessionID = Self.normalizedCreateSessionAnchor(
+        viewModel.pendingCreateSessionID
+      )
+      let selectedSessionID = Self.normalizedCreateSessionAnchor(store.selectedSessionID)
+      let previousSessionID = Self.normalizedCreateSessionAnchor(oldValue.sessionID)
+      let existingCreateSessionID = Self.normalizedCreateSessionAnchor(viewModel.createSessionID)
+      let resolvedCreateSessionID =
+        requestedCreateSessionID
+        ?? selectedSessionID
+        ?? previousSessionID
+        ?? existingCreateSessionID
+      viewModel.pendingCreateSessionID = nil
+      viewModel.createSessionID = resolvedCreateSessionID
+      if let requestedCreateSessionID, requestedCreateSessionID != selectedSessionID {
+        await store.selectSession(requestedCreateSessionID)
+      } else if store.selectedSessionID == nil, let resolvedCreateSessionID {
+        await store.selectSession(resolvedCreateSessionID)
       }
     }
 

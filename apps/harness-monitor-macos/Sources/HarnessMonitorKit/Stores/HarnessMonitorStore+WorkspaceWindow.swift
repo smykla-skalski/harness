@@ -5,30 +5,43 @@ extension HarnessMonitorStore {
     public let selection: WorkspaceSelection
     public let resetDecisionFilters: Bool
     public let createEntryPoint: WorkspaceCreateEntryPoint?
+    public let createSessionID: String?
 
     public init(
       selection: WorkspaceSelection,
       resetDecisionFilters: Bool,
-      createEntryPoint: WorkspaceCreateEntryPoint?
+      createEntryPoint: WorkspaceCreateEntryPoint?,
+      createSessionID: String?
     ) {
       self.selection = selection
       self.resetDecisionFilters = resetDecisionFilters
       self.createEntryPoint = createEntryPoint
+      self.createSessionID = createSessionID
     }
   }
 
   public func requestWorkspaceSelection(
     _ selection: WorkspaceSelection,
     resetDecisionFilters: Bool = false,
-    createEntryPoint: WorkspaceCreateEntryPoint? = nil
+    createEntryPoint: WorkspaceCreateEntryPoint? = nil,
+    createSessionID: String? = nil
   ) {
     pendingWorkspaceSelection = selection
     pendingWorkspaceDecisionFilterReset = resetDecisionFilters
     pendingWorkspaceCreateEntryPoint = createEntryPoint
+    pendingWorkspaceCreateSessionID = normalizedWorkspaceSessionID(createSessionID)
   }
 
-  public func requestWorkspaceCreateEntryPoint(_ entryPoint: WorkspaceCreateEntryPoint) {
-    requestWorkspaceSelection(.create, createEntryPoint: entryPoint)
+  public func requestWorkspaceCreateEntryPoint(
+    _ entryPoint: WorkspaceCreateEntryPoint,
+    sessionID: String? = nil
+  ) {
+    requestWorkspaceSelection(
+      .create,
+      createEntryPoint: entryPoint,
+      createSessionID: normalizedWorkspaceSessionID(sessionID)
+        ?? normalizedWorkspaceSessionID(selectedSessionID)
+    )
   }
 
   public func requestWorkspaceDecisionSelection(
@@ -52,16 +65,19 @@ extension HarnessMonitorStore {
     guard let selection = pendingWorkspaceSelection else {
       pendingWorkspaceDecisionFilterReset = false
       pendingWorkspaceCreateEntryPoint = nil
+      pendingWorkspaceCreateSessionID = nil
       return nil
     }
     pendingWorkspaceSelection = nil
     let request = PendingWorkspaceSelectionRequest(
       selection: selection,
       resetDecisionFilters: pendingWorkspaceDecisionFilterReset,
-      createEntryPoint: pendingWorkspaceCreateEntryPoint
+      createEntryPoint: pendingWorkspaceCreateEntryPoint,
+      createSessionID: pendingWorkspaceCreateSessionID
     )
     pendingWorkspaceDecisionFilterReset = false
     pendingWorkspaceCreateEntryPoint = nil
+    pendingWorkspaceCreateSessionID = nil
     return request
   }
 

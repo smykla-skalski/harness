@@ -53,6 +53,7 @@ public final class HarnessMonitorStore {
     didSet {
       guard oldValue != acpBridgeHTTPIncident else { return }
       scheduleUISync([.contentChrome])
+  var pendingWorkspaceCreateSessionID: String?
     }
   }
   public var mcpStatus = HarnessMonitorMCPStatusSnapshot(

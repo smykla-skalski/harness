@@ -34,16 +34,31 @@ struct WorkspaceSelectionStoreTests {
     #expect(store.consumePendingWorkspaceSelectionRequest() == nil)
   }
 
-  @Test("Create-agent workspace requests carry the create entry point")
+  @Test("Create-agent workspace requests carry the create entry point and selected session")
   func createAgentRequestCarriesEntryPoint() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-alpha"
     store.requestWorkspaceCreateEntryPoint(.agent)
 
     let request = store.consumePendingWorkspaceSelectionRequest()
 
     #expect(request?.selection == .create)
     #expect(request?.createEntryPoint == .agent)
+    #expect(request?.createSessionID == "sess-alpha")
     #expect(store.consumePendingWorkspaceSelectionRequest() == nil)
+  }
+
+  @Test("Explicit create-agent workspace requests override the selected session")
+  func createAgentRequestUsesExplicitSessionOverride() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-alpha"
+    store.requestWorkspaceCreateEntryPoint(.agent, sessionID: "sess-beta")
+
+    let request = store.consumePendingWorkspaceSelectionRequest()
+
+    #expect(request?.selection == .create)
+    #expect(request?.createEntryPoint == .agent)
+    #expect(request?.createSessionID == "sess-beta")
   }
 
   @Test("Multiple pending requests keep the latest value")

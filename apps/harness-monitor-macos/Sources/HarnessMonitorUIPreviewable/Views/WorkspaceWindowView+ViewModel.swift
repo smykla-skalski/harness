@@ -321,6 +321,7 @@ extension WorkspaceWindowView {
     var isSubmitting = false
     var selection: WorkspaceSelection = .create
     var createSessionID: String?
+    var pendingCreateSessionID: String?
     var wrapLines = false
     var selectedPersona: String?
     var selectedPersonaID: String {

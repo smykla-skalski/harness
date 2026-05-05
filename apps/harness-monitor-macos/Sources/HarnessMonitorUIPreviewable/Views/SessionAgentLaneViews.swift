@@ -86,7 +86,7 @@ struct SessionAgentListSection: View {
   }
 
   private func openNewAgent() {
-    store.requestWorkspaceCreateEntryPoint(.agent)
+    store.requestWorkspaceCreateEntryPoint(.agent, sessionID: sessionID)
     openWindow(id: HarnessMonitorWindowID.workspace)
   }
 }

@@ -148,6 +148,18 @@ struct WorkspaceAcpSessionContextTests {
     )
   }
 
+  @Test("Create resolver prefers the selected session over an unknown cached anchor")
+  func resolvedCreateSessionIDPrefersKnownSelectedSession() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.sessionIndex.sessions = [makeSummary(sessionID: "nod8ccog")]
+    store.selectedSessionID = "nod8ccog"
+    let view = WorkspaceWindowView(store: store)
+    view.viewModel.selection = .create
+    view.viewModel.createSessionID = "sess1234"
+
+    #expect(view.resolvedCreateSessionID == "nod8ccog")
+  }
+
   @Test("Store ACP start reseats anchored session detail")
   func storeAcpStartReseatsAnchoredSessionDetail() async {
     let client = RecordingHarnessClient()
@@ -315,4 +327,35 @@ struct WorkspaceAcpSessionContextTests {
     #expect(store.currentFailureFeedbackMessage == nil)
   }
 
+}
+
+private func makeSummary(sessionID: String) -> SessionSummary {
+  SessionSummary(
+    projectId: "project-\(sessionID)",
+    projectName: "harness",
+    projectDir: "/Users/example/Projects/harness",
+    contextRoot: "/Users/example/Library/Application Support/harness/sessions/harness",
+    sessionId: sessionID,
+    worktreePath: "/Users/example/Projects/harness-\(sessionID)",
+    sharedPath: "/Users/example/Projects/harness-\(sessionID)/shared",
+    originPath: "/Users/example/Projects/harness",
+    branchRef: "harness/\(sessionID)",
+    title: "Session \(sessionID)",
+    context: "Workspace ACP session fixture",
+    status: .active,
+    createdAt: "2026-03-28T14:05:00Z",
+    updatedAt: "2026-03-28T14:18:00Z",
+    lastActivityAt: "2026-03-28T14:18:00Z",
+    leaderId: "leader-\(sessionID)",
+    observeId: "observe-\(sessionID)",
+    pendingLeaderTransfer: nil,
+    metrics: SessionMetrics(
+      agentCount: 1,
+      activeAgentCount: 1,
+      openTaskCount: 0,
+      inProgressTaskCount: 0,
+      blockedTaskCount: 0,
+      completedTaskCount: 0
+    ),
+  )
 }
