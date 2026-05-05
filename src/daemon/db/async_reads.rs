@@ -43,26 +43,37 @@ const TIMELINE_ENTRIES_RANGE_SQL: &str = "SELECT
  ORDER BY sort_recorded_at DESC, sort_tiebreaker DESC
  LIMIT ?2 OFFSET ?3";
 const ACP_TRANSCRIPT_ENTRIES_SQL: &str = "SELECT
-    session_id,
-    entry_id,
-    source_kind,
-    source_key,
-    recorded_at,
-    kind,
-    agent_id,
-    task_id,
-    summary,
-    payload_json,
-    sort_recorded_at,
-    sort_tiebreaker
- FROM session_timeline_entries
- WHERE session_id = ?1
+    entries.session_id,
+    entries.entry_id,
+    entries.source_kind,
+    entries.source_key,
+    entries.recorded_at,
+    entries.kind,
+    entries.agent_id,
+    entries.task_id,
+    entries.summary,
+    entries.payload_json,
+    entries.sort_recorded_at,
+    entries.sort_tiebreaker
+ FROM session_timeline_entries AS entries
+ WHERE entries.session_id = ?1
    AND (
-     COALESCE(json_extract(payload_json, '$.runtime'), '') = 'acp'
-     OR json_type(payload_json, '$.acp_timeline_identity') IS NOT NULL
-     OR json_type(payload_json, '$.tool_call_timeline') IS NOT NULL
+     (
+       entries.source_kind = 'conversation'
+       AND entries.agent_id IS NOT NULL
+       AND EXISTS(
+         SELECT 1
+         FROM agents
+         WHERE agents.session_id = entries.session_id
+           AND agents.agent_id = entries.agent_id
+           AND agents.managed_agent_kind = 'acp'
+       )
+     )
+     OR COALESCE(json_extract(entries.payload_json, '$.runtime'), '') = 'acp'
+     OR json_type(entries.payload_json, '$.acp_timeline_identity') IS NOT NULL
+     OR json_type(entries.payload_json, '$.tool_call_timeline') IS NOT NULL
    )
- ORDER BY sort_recorded_at DESC, sort_tiebreaker DESC";
+ ORDER BY entries.sort_recorded_at DESC, entries.sort_tiebreaker DESC";
 const TIMELINE_CURSOR_AT_OFFSET_SQL: &str = "SELECT
     recorded_at,
     entry_id

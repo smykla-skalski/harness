@@ -210,9 +210,9 @@ async fn dispatch_read_query_managed_agent_acp_transcript_returns_only_acp_rows(
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0]["kind"].as_str(), Some("assistant_text"));
     assert_eq!(entries[0]["session_id"].as_str(), Some("sess-test-1"));
-    assert_eq!(entries[0]["agent_id"].as_str(), Some("copilot-worker"));
+    assert_eq!(entries[0]["agent_id"].as_str(), Some("codex-worker"));
     assert_eq!(entries[0]["summary"].as_str(), Some("ACP transcript line"));
-    assert_eq!(entries[0]["payload"]["runtime"].as_str(), Some("acp"));
+    assert_eq!(entries[0]["payload"]["runtime"].as_str(), Some("gemini"));
 }
 
 #[tokio::test]
@@ -277,17 +277,29 @@ async fn dispatch_read_query_session_timeline_uses_async_db_when_sync_db_is_unav
 fn seed_sample_acp_transcript(state: &DaemonHttpState) {
     let db_path = state.db_path.as_ref().expect("db path");
     let db = DaemonDb::open(db_path).expect("open file db");
+    let mut session = db
+        .load_session_state("sess-test-1")
+        .expect("load sample session")
+        .expect("sample session present");
+    let agent = session
+        .agents
+        .get_mut("codex-worker")
+        .expect("sample codex worker present");
+    agent.runtime = "gemini".into();
+    agent.managed_agent = Some(crate::session::types::ManagedAgentRef::acp("acp-agent-1"));
+    db.save_session_state("project-abc123", &session)
+        .expect("save managed ACP session");
     db.sync_conversation_events(
         "sess-test-1",
-        "copilot-worker",
-        "acp",
+        "codex-worker",
+        "gemini",
         &[ConversationEvent {
             timestamp: Some("2026-04-13T19:03:00Z".into()),
             sequence: 7,
             kind: ConversationEventKind::AssistantText {
                 content: "ACP transcript line".into(),
             },
-            agent: "copilot-worker".into(),
+            agent: "codex-worker".into(),
             session_id: "sess-test-1".into(),
         }],
     )

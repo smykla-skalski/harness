@@ -8,10 +8,12 @@ use tokio::sync::broadcast;
 
 use super::*;
 use crate::agents::acp::catalog::{self, AcpAgentDescriptor};
+use crate::agents::runtime::runtime_for;
 use crate::daemon::agent_acp::manager::test_support::{
     seeded_manager, seeded_manager_with_events, write_executable, write_sleeping_acp_agent,
 };
 use crate::daemon::agent_acp::permission_bridge::DEFAULT_PERMISSION_CAP;
+use crate::hooks::adapters::HookAgent;
 use crate::session::types::ManagedAgentRef;
 
 fn manager() -> AcpAgentManagerHandle {
@@ -26,8 +28,12 @@ fn manager_with_events() -> (
 }
 
 fn descriptor(command: &Path) -> AcpAgentDescriptor {
+    descriptor_with_id(command, "fake")
+}
+
+fn descriptor_with_id(command: &Path, id: &str) -> AcpAgentDescriptor {
     AcpAgentDescriptor {
-        id: "fake".to_string(),
+        id: id.to_string(),
         display_name: "Fake ACP".to_string(),
         capabilities: Vec::new(),
         launch_command: command.display().to_string(),
@@ -104,6 +110,25 @@ fn wait_for_runtime_session_id(
         assert!(
             Instant::now() < deadline,
             "timed out waiting for ACP runtime session binding"
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+fn wait_for_runtime_session_id_value(
+    manager: &AcpAgentManagerHandle,
+    session_id: &str,
+    acp_id: &str,
+    expected: &str,
+) {
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        if runtime_session_id(manager, session_id, acp_id).as_deref() == Some(expected) {
+            return;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "timed out waiting for ACP runtime session binding to update to {expected}"
         );
         std::thread::sleep(Duration::from_millis(50));
     }
@@ -235,6 +260,47 @@ async fn repeated_session_restarts_keep_runtime_bindings_scoped_to_each_managed_
         assert_eq!(second_agent.status, AgentStatus::Active);
 
         assert!(manager.stop(&second.acp_id).is_ok());
+    });
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[cfg(unix)]
+async fn wake_prompt_rebinds_runtime_session_when_prompt_opens_new_protocol_session() {
+    temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
+        let Ok(temp) = TempDir::new() else {
+            unreachable!();
+        };
+        let script = temp.path().join("gemini-agent.sh");
+        write_sleeping_acp_agent(&script);
+        let request = AcpAgentStartRequest {
+            agent: "gemini".to_string(),
+            project_dir: Some(temp.path().display().to_string()),
+            ..AcpAgentStartRequest::default()
+        };
+        let manager = manager();
+        let descriptor = descriptor_with_id(&script, "gemini");
+        let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+            unreachable!();
+        };
+        let initial_runtime_session =
+            wait_for_runtime_session_id(&manager, "sess-1", &snapshot.acp_id);
+        assert_eq!(initial_runtime_session, "acp-session-1");
+
+        manager.dispatch_wake_prompt(
+            runtime_for(HookAgent::Gemini),
+            AcpWakePrompt {
+                acp_id: snapshot.acp_id.clone(),
+                orchestration_session_id: "sess-1".into(),
+                protocol_session_id: initial_runtime_session,
+                project_dir: temp.path().to_path_buf(),
+                prompt: "tell me how are you".into(),
+                signal_id: "sig-test-1".into(),
+                agent_id: snapshot.agent_id.clone(),
+            },
+        );
+
+        wait_for_runtime_session_id_value(&manager, "sess-1", &snapshot.acp_id, "acp-session-2");
+        assert!(manager.stop(&snapshot.acp_id).is_ok());
     });
 }
 

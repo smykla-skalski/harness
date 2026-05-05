@@ -21,8 +21,8 @@ use crate::daemon::protocol::StreamEvent;
 use crate::errors::{CliError, CliErrorKind};
 
 use super::active::{
-    ActiveAcpProcess, ActiveAcpSession, ActiveAcpTasks, SharedStderrTail, spawn_event_forwarder,
-    spawn_protocol_disconnect_forwarder, spawn_watchdog_forwarder,
+    ActiveAcpProcess, ActiveAcpSession, ActiveAcpTasks, LiveEventPersistence, SharedStderrTail,
+    spawn_event_forwarder, spawn_protocol_disconnect_forwarder, spawn_watchdog_forwarder,
 };
 use super::manager::{
     AcpAgentManagerHandle, AcpAgentSnapshot, AcpAgentStartRequest, AcpOrchestrationRegistration,
@@ -120,7 +120,15 @@ impl AcpAgentManagerHandle {
             &mut child,
             &protocol,
         )?;
-        let event_task = spawn_event_forwarder(self.sender(), protocol.events);
+        let event_task = spawn_event_forwarder(
+            self.sender(),
+            protocol.events,
+            self.live_event_persistence(
+                input.session_id,
+                &registration.agent_id,
+                &input.descriptor.id,
+            ),
+        );
         if protocol.start.send(()).is_err() {
             protocol.protocol.abort();
             protocol.batcher.abort();
@@ -358,6 +366,19 @@ impl AcpAgentManagerHandle {
 
     pub(super) fn sender(&self) -> broadcast::Sender<StreamEvent> {
         self.state.sender.clone()
+    }
+
+    fn live_event_persistence(
+        &self,
+        session_id: &str,
+        agent_id: &str,
+        runtime: &str,
+    ) -> Option<LiveEventPersistence> {
+        self.state
+            .db
+            .get()
+            .cloned()
+            .map(|db| LiveEventPersistence::new(db, session_id, agent_id, runtime))
     }
 
     #[expect(

@@ -200,6 +200,15 @@ fn run_wake_prompt(
                     ("agent_id", &agent_id),
                 ],
             );
+            sync_returned_runtime_session(
+                manager,
+                runtime.name(),
+                &orchestration_session_id,
+                &acp_id,
+                &protocol_session_id,
+                &returned_session_id,
+                &signal_id,
+            );
             if record_wake_accept(
                 runtime,
                 &project_dir,
@@ -211,9 +220,7 @@ fn run_wake_prompt(
                 if let Some(emitter) = session.event_emitter() {
                     emitter.emit_context_injected(
                         "acp".to_string(),
-                        Some(format!(
-                            "wake prompt accepted (signal {signal_id})"
-                        )),
+                        Some(format!("wake prompt accepted (signal {signal_id})")),
                     );
                 }
                 sync_wake_accept_to_daemon(
@@ -240,6 +247,40 @@ fn run_wake_prompt(
         }
     }
     manager.release_wake(&acp_id, &signal_id);
+}
+
+fn sync_returned_runtime_session(
+    manager: &AcpAgentManagerHandle,
+    runtime_name: &str,
+    orchestration_session_id: &str,
+    acp_id: &str,
+    requested_session_id: &str,
+    returned_session_id: &str,
+    signal_id: &str,
+) {
+    if requested_session_id == returned_session_id {
+        return;
+    }
+    match manager.bind_orchestration_runtime_session(
+        orchestration_session_id,
+        acp_id,
+        runtime_name,
+        returned_session_id,
+    ) {
+        Ok(true) | Ok(false) => {}
+        Err(error) => record_wake_event(
+            WakeEventLevel::Warn,
+            "runtime_bind_failed",
+            &[
+                ("acp_id", &acp_id),
+                ("signal_id", &signal_id),
+                ("runtime_name", &runtime_name),
+                ("requested_session_id", &requested_session_id),
+                ("returned_session_id", &returned_session_id),
+                ("error", &error),
+            ],
+        ),
+    }
 }
 
 fn record_wake_accept(

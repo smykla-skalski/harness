@@ -211,6 +211,55 @@ async fn list_session_summaries_repairs_legacy_active_rows() {
     );
 }
 
+#[tokio::test]
+async fn load_session_acp_transcript_entries_includes_managed_native_runtime_rows() {
+    let tmp = tempdir().expect("tempdir");
+    let db_path = tmp.path().join("harness.db");
+    let sync_db = DaemonDb::open(&db_path).expect("open sync daemon db");
+    let project = sample_project();
+    sync_db.sync_project(&project).expect("sync project");
+    let mut state = sample_session_state();
+    let agent = state
+        .agents
+        .get_mut("claude-leader")
+        .expect("sample leader present");
+    agent.runtime = "gemini".into();
+    agent.managed_agent = Some(crate::session::types::ManagedAgentRef::acp("acp-agent-1"));
+    sync_db
+        .save_session_state(&project.project_id, &state)
+        .expect("save managed ACP session");
+    sync_db
+        .sync_conversation_events(
+            &state.session_id,
+            "claude-leader",
+            "gemini",
+            &[ConversationEvent {
+                timestamp: Some("2026-04-13T19:03:00Z".into()),
+                sequence: 7,
+                kind: ConversationEventKind::AssistantText {
+                    content: "Gemini transcript line".into(),
+                },
+                agent: "claude-leader".into(),
+                session_id: state.session_id.clone(),
+            }],
+        )
+        .expect("sync managed Gemini conversation events");
+    drop(sync_db);
+
+    let async_db = AsyncDaemonDb::connect(&db_path)
+        .await
+        .expect("open async daemon db");
+    let entries = async_db
+        .load_session_acp_transcript_entries(&state.session_id)
+        .await
+        .expect("load managed ACP transcript entries");
+
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].kind, "assistant_text");
+    assert_eq!(entries[0].agent_id.as_deref(), Some("claude-leader"));
+    assert_eq!(entries[0].payload["runtime"], json!("gemini"));
+}
+
 fn sample_tool_result_event() -> crate::agents::runtime::event::ConversationEvent {
     let mut event = sample_conversation_event(1, "ignored");
     event.kind = ConversationEventKind::ToolResult {
