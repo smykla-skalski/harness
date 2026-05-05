@@ -63,6 +63,22 @@ struct WorkspaceSelectionStoreTests {
     #expect(request?.createSessionID == nil)
   }
 
+  @Test("Create-agent workspace requests ignore cached selected session summaries")
+  func createAgentRequestIgnoresCachedSelectedSessionSummary() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.sessionIndex.sessions = [makeSummary(sessionID: "sess-alpha")]
+    store.selectedSessionID = "sess-alpha"
+    store.isShowingCachedCatalog = true
+
+    store.requestWorkspaceCreateEntryPoint(.agent)
+
+    let request = store.consumePendingWorkspaceSelectionRequest()
+
+    #expect(request?.selection == .create)
+    #expect(request?.createEntryPoint == .agent)
+    #expect(request?.createSessionID == nil)
+  }
+
   @Test("Explicit create-agent workspace requests override the selected session")
   func createAgentRequestUsesExplicitSessionOverride() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
