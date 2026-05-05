@@ -82,24 +82,70 @@ final class NewSessionSheetRenderingTests {
     )
   }
 
-  @Test("agent launch defaults fall back to Copilot terminal when persisted selection is malformed")
+  @Test("agent launch defaults fall back to first provider when persisted selection is malformed")
   func agentLaunchDefaultsFallBackOnMalformedPersistedSelection() {
     let defaults = UserDefaults(suiteName: #function)!
     defaults.removePersistentDomain(forName: #function)
     defaults.set("managed:", forKey: HarnessMonitorAgentLaunchDefaults.preferredSelectionKey)
 
     #expect(
-      HarnessMonitorAgentLaunchDefaults.preferredSelection(userDefaults: defaults) == .tui(.copilot)
+      HarnessMonitorAgentLaunchDefaults.preferredSelection(userDefaults: defaults)
+        == .tui(.codex)
     )
   }
 
-  @Test("agent launch defaults fall back to Copilot terminal when no preference is stored")
+  @Test("agent launch defaults fall back to first provider when no preference is stored")
   func agentLaunchDefaultsFallBackWhenPreferenceMissing() {
     let defaults = UserDefaults(suiteName: #function)!
     defaults.removePersistentDomain(forName: #function)
 
     #expect(
+      HarnessMonitorAgentLaunchDefaults.preferredSelection(userDefaults: defaults)
+        == .tui(.codex)
+    )
+  }
+
+  @Test("agent launch defaults migrate legacy Copilot terminal to first provider once")
+  func agentLaunchDefaultsMigrateLegacyCopilotTerminalDefaultOnce() {
+    let defaults = UserDefaults(suiteName: #function)!
+    defaults.removePersistentDomain(forName: #function)
+    defaults.set(
+      AgentLaunchSelection.tui(.copilot).storageKey,
+      forKey: HarnessMonitorAgentLaunchDefaults.preferredSelectionKey
+    )
+
+    #expect(
+      HarnessMonitorAgentLaunchDefaults.preferredSelection(userDefaults: defaults)
+        == .tui(.codex)
+    )
+    #expect(
+      !HarnessMonitorAgentLaunchDefaults.hasExplicitPreferredSelection(userDefaults: defaults))
+
+    HarnessMonitorAgentLaunchDefaults.persist(.tui(.copilot), userDefaults: defaults)
+
+    #expect(
       HarnessMonitorAgentLaunchDefaults.preferredSelection(userDefaults: defaults) == .tui(.copilot)
     )
+    #expect(HarnessMonitorAgentLaunchDefaults.hasExplicitPreferredSelection(userDefaults: defaults))
+  }
+
+  @Test("launch presets ignore legacy Copilot terminal provider while preserving other fields")
+  func launchPresetsIgnoreLegacyCopilotTerminalProvider() throws {
+    let defaults = UserDefaults(suiteName: #function)!
+    defaults.removePersistentDomain(forName: #function)
+    let snapshot = LaunchPresetSnapshot(
+      mode: .terminal,
+      providerStorageKey: AgentLaunchSelection.tui(.copilot).storageKey,
+      rows: 40,
+      cols: 100
+    )
+    defaults.set(LaunchPresetDefaults.encode(snapshot), forKey: LaunchPresetDefaults.storageKey)
+
+    let restored = try #require(LaunchPresetDefaults.read(userDefaults: defaults))
+
+    #expect(restored.providerStorageKey == nil)
+    #expect(restored.rows == 40)
+    #expect(restored.cols == 100)
+    #expect(!LaunchPresetDefaults.blocksInitialAcpDefault(restored))
   }
 }

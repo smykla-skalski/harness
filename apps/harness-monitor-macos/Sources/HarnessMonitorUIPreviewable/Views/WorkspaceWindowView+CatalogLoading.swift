@@ -122,7 +122,7 @@ extension WorkspaceWindowView {
       acpHostBridgeReady: store.hostBridgeCapabilityState(for: "acp") == .ready
     )
 
-    let resolvedSelection = resolveSelectionApplyingAcpDefaultIfFresh(options: options)
+    let resolvedSelection = resolveInitialLaunchSelectionIfFresh(options: options)
 
     let normalizedSelection = Self.normalizedLaunchSelection(
       options: options,
@@ -139,7 +139,7 @@ extension WorkspaceWindowView {
   }
 
   @MainActor
-  private func resolveSelectionApplyingAcpDefaultIfFresh(
+  private func resolveInitialLaunchSelectionIfFresh(
     options: [AgentCapabilityOption]
   ) -> AgentLaunchSelection {
     defer { viewModel.didEvaluateInitialLaunchAutoDefault = true }
@@ -148,11 +148,12 @@ extension WorkspaceWindowView {
       return viewModel.selectedLaunchSelection
     }
 
-    let hasStoredSnapshot = LaunchPresetDefaults.read() != nil
+    let hasStoredSnapshot =
+      LaunchPresetDefaults.read().map {
+        LaunchPresetDefaults.blocksInitialAcpDefault($0)
+      } ?? false
     let hasStoredPreferredSelection =
-      UserDefaults.standard.string(
-        forKey: HarnessMonitorAgentLaunchDefaults.preferredSelectionKey
-      ) != nil
+      HarnessMonitorAgentLaunchDefaults.hasExplicitPreferredSelection()
     if hasStoredSnapshot || hasStoredPreferredSelection {
       viewModel.didApplyLaunchSelectionAutoDefault = true
       return viewModel.selectedLaunchSelection
@@ -165,17 +166,8 @@ extension WorkspaceWindowView {
       return viewModel.selectedLaunchSelection
     }
 
-    guard
-      let acpEnabledOption = options.first(where: { option in
-        option.transportChoices.contains { $0.id.isAcp && option.isEnabled($0) }
-      }),
-      let acpChoice = acpEnabledOption.transportChoices.first(where: {
-        $0.id.isAcp && acpEnabledOption.isEnabled($0)
-      })
-    else {
-      return viewModel.selectedLaunchSelection
-    }
+    let firstProviderSelection = Self.firstProviderLaunchSelection(options: options)
     viewModel.didApplyLaunchSelectionAutoDefault = true
-    return acpChoice.id
+    return firstProviderSelection
   }
 }

@@ -79,8 +79,27 @@ enum LaunchPresetDefaults {
   }
 
   @MainActor
-  static func read() -> LaunchPresetSnapshot? {
-    decode(from: UserDefaults.standard.string(forKey: storageKey))
+  static func read(userDefaults: UserDefaults = .standard) -> LaunchPresetSnapshot? {
+    guard var snapshot = decode(from: userDefaults.string(forKey: storageKey)) else {
+      return nil
+    }
+    if HarnessMonitorAgentLaunchDefaults.isImplicitLegacyTerminalCopilot(
+      snapshot.providerStorageKey,
+      userDefaults: userDefaults
+    ) {
+      snapshot.providerStorageKey = nil
+    }
+    return snapshot
+  }
+
+  @MainActor
+  static func blocksInitialAcpDefault(_ snapshot: LaunchPresetSnapshot) -> Bool {
+    switch snapshot.mode {
+    case .codex:
+      true
+    case .terminal:
+      snapshot.providerStorageKey != nil
+    }
   }
 
   @MainActor
@@ -88,6 +107,7 @@ enum LaunchPresetDefaults {
     viewModel: WorkspaceWindowView.ViewModel,
     mode: LaunchPresetSnapshot.Mode
   ) {
+    HarnessMonitorAgentLaunchDefaults.noteExplicitSelection(viewModel.selectedLaunchSelection)
     let modelByRuntime = Dictionary(
       uniqueKeysWithValues: viewModel.selectedTerminalModelByRuntime.map {
         ($0.key.rawValue, $0.value)

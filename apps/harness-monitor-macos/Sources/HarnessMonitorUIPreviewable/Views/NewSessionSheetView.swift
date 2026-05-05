@@ -205,7 +205,13 @@ struct NewSessionSheetView: View {
   }
 
   var preferredLaunchSelectionBinding: Binding<AgentLaunchSelection> {
-    $selectedLaunchSelection
+    Binding(
+      get: { selectedLaunchSelection },
+      set: { newValue in
+        selectedLaunchSelection = newValue
+        HarnessMonitorAgentLaunchDefaults.persist(newValue)
+      }
+    )
   }
 
   func fieldBlock<Content: View>(
