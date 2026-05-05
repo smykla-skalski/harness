@@ -101,11 +101,7 @@ struct AgentDetailComposerRegion: View {
   @Binding var signalActionHint: String
 
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Text("Send Update")
-        .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-        .foregroundStyle(HarnessMonitorTheme.ink)
-        .accessibilityAddTraits(.isHeader)
+    VStack(spacing: 0) {
       AgentDetailSendUpdateSection(
         store: store,
         sessionID: sessionID,
@@ -115,16 +111,18 @@ struct AgentDetailComposerRegion: View {
         signalMessage: $signalMessage,
         signalActionHint: $signalActionHint
       )
+      .padding(.horizontal, HarnessMonitorTheme.spacingLG)
+      .padding(.vertical, HarnessMonitorTheme.spacingSM)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.horizontal, HarnessMonitorTheme.spacingLG)
-    .padding(.vertical, HarnessMonitorTheme.spacingMD)
     .harnessPanelGlass()
     .overlay(alignment: .top) {
       Rectangle()
-        .fill(HarnessMonitorTheme.controlBorder.opacity(0.7))
+        .fill(HarnessMonitorTheme.controlBorder.opacity(0.55))
         .frame(height: 1)
     }
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel("Send update composer")
     .accessibilityIdentifier(
       HarnessMonitorAccessibility.agentDetailComposerInset(agentID)
     )
