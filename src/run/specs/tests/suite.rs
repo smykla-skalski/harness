@@ -153,19 +153,7 @@ fn test_load_documented_example_suite() {
         "/../kumahq/kuma/.claude/worktrees/kuma-claude-plugins/.claude/skills/suite/new/examples/example-motb-core-suite.md"
     ));
     if !path.exists() {
-        let alt = Path::new(
-            "/Users/bart.smykla@konghq.com/Projects/github.com/kumahq/kuma/.claude/worktrees/kuma-claude-plugins/.claude/skills/suite/new/examples/example-motb-core-suite.md",
-        );
-        if !alt.exists() {
-            eprintln!("Skipping: example suite file not found");
-            return;
-        }
-        let suite = SuiteSpec::from_markdown(alt).unwrap();
-        assert_eq!(suite.frontmatter.suite_id, "motb-core");
-        assert_eq!(
-            suite.frontmatter.groups,
-            vec!["groups/g01-crud.md", "groups/g02-validation.md"]
-        );
+        eprintln!("Skipping: example suite file not found");
         return;
     }
     let suite = SuiteSpec::from_markdown(path).unwrap();
@@ -248,14 +236,15 @@ groups:\n\
 
 #[test]
 fn test_load_documented_example_group() {
-    let alt = Path::new(
-        "/Users/bart.smykla@konghq.com/Projects/github.com/kumahq/kuma/.claude/worktrees/kuma-claude-plugins/.claude/skills/suite/new/examples/example-motb-core-group.md",
-    );
-    if !alt.exists() {
+    let path = Path::new(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../kumahq/kuma/.claude/worktrees/kuma-claude-plugins/.claude/skills/suite/new/examples/example-motb-core-group.md"
+    ));
+    if !path.exists() {
         eprintln!("Skipping: example group file not found");
         return;
     }
-    let group = GroupSpec::from_markdown(alt).unwrap();
+    let group = GroupSpec::from_markdown(path).unwrap();
     assert_eq!(group.frontmatter.group_id, "g01");
     assert_eq!(
         group
