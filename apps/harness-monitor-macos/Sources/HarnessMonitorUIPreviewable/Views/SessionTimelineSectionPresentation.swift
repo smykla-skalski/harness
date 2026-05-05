@@ -59,6 +59,7 @@ struct SessionTimelineSectionPresentation {
     timeline: [TimelineEntry],
     timelineWindow: TimelineWindowResponse?,
     decisions: [Decision],
+    signals: [SessionSignalRecord],
     filters: SessionTimelineFilterState,
     isTimelineLoading: Bool,
     reduceMotion: Bool,
@@ -70,10 +71,18 @@ struct SessionTimelineSectionPresentation {
       timelineWindow: timelineWindow,
       isLoading: isTimelineLoading
     )
+    var signalsByID = [String: SessionSignalRecord]()
+    for record in signals { signalsByID[record.signal.signalId] = record }
+    let context = TimelineFeatureContext(
+      now: .now,
+      signalsByID: signalsByID,
+      sessionID: sessionID
+    )
     let sourceNodes = SessionTimelineNodeBuilder(
       sessionID: sessionID,
       entries: timeline,
-      decisions: decisions
+      decisions: decisions,
+      context: context
     )
     .build()
     let filterSnapshot = SessionTimelineFilterSnapshot(

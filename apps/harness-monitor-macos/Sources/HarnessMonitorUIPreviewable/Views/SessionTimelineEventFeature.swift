@@ -11,7 +11,7 @@ protocol TimelineEventFeature: Sendable {
   func prefersCompactLayout(for node: SessionTimelineNode) -> Bool?
   func voiceOverLabel(for node: SessionTimelineNode, ctx: TimelineFeatureContext) -> String?
   func filterPreset() -> TimelineFilterPreset?
-  func statusBadge(for node: SessionTimelineNode, ctx: TimelineFeatureContext) -> SessionTimelineStatusBadge?
+  func statusBadgeLabel(for node: SessionTimelineNode, ctx: TimelineFeatureContext) -> String?
 }
 
 extension TimelineEventFeature {
@@ -23,7 +23,7 @@ extension TimelineEventFeature {
   func prefersCompactLayout(for node: SessionTimelineNode) -> Bool? { nil }
   func voiceOverLabel(for node: SessionTimelineNode, ctx: TimelineFeatureContext) -> String? { nil }
   func filterPreset() -> TimelineFilterPreset? { nil }
-  func statusBadge(for node: SessionTimelineNode, ctx: TimelineFeatureContext) -> SessionTimelineStatusBadge? { nil }
+  func statusBadgeLabel(for node: SessionTimelineNode, ctx: TimelineFeatureContext) -> String? { nil }
 }
 
 struct TimelineFilterPreset: Equatable, Sendable {
@@ -34,6 +34,7 @@ struct TimelineFilterPreset: Equatable, Sendable {
 enum SessionTimelineEventFeatureRegistry {
   // Ordered: first match wins. Add new features before the catch-all decision feature.
   static let features: [any TimelineEventFeature] = [
+    SignalTimelineEventFeature(),
     DecisionEventFeature(),
   ]
 

@@ -25,6 +25,7 @@ struct AgentTranscriptRows: View {
       timeline: timeline,
       timelineWindow: nil,
       decisions: [],
+      signals: [],
       filters: SessionTimelineFilterState(),
       isTimelineLoading: false,
       reduceMotion: reduceMotion,

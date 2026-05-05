@@ -101,7 +101,7 @@ struct MonitorTimelineSignalIDTests {
       payload: .object(["signal_id": .string("abc-123"), "command": .string("inject_context")])
     )
     let nodes = SessionTimelineNodeBuilder(sessionID: "s1", entries: [entry], decisions: []).build()
-    #expect(nodes.first?.signalID == "abc-123")
+    #expect(nodes.first?.tapTarget == .signal(id: "abc-123"))
   }
 
   @Test("signal_acknowledged top-level signal_id is extracted")
@@ -111,7 +111,7 @@ struct MonitorTimelineSignalIDTests {
       payload: .object(["signal_id": .string("xyz-456"), "result": .string("Accepted")])
     )
     let nodes = SessionTimelineNodeBuilder(sessionID: "s1", entries: [entry], decisions: []).build()
-    #expect(nodes.first?.signalID == "xyz-456")
+    #expect(nodes.first?.tapTarget == .signal(id: "xyz-456"))
   }
 
   @Test("signal_received nested event.signal_id is extracted")
@@ -124,17 +124,17 @@ struct MonitorTimelineSignalIDTests {
       ])
     )
     let nodes = SessionTimelineNodeBuilder(sessionID: "s1", entries: [entry], decisions: []).build()
-    #expect(nodes.first?.signalID == "def-789")
+    #expect(nodes.first?.tapTarget == .signal(id: "def-789"))
   }
 
-  @Test("non-signal entry has nil signalID")
-  func nonSignalEntryHasNilID() {
+  @Test("non-signal entry has nil tapTarget")
+  func nonSignalEntryHasNilTapTarget() {
     let entry = makeEntry(
       id: "e4", kind: "tool_result",
       payload: .object(["signal_id": .string("should-be-ignored")])
     )
     let nodes = SessionTimelineNodeBuilder(sessionID: "s1", entries: [entry], decisions: []).build()
-    #expect(nodes.first?.signalID == nil)
+    #expect(nodes.first?.tapTarget == nil)
   }
 }
 

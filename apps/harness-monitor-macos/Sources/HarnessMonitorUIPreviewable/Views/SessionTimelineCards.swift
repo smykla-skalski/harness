@@ -115,16 +115,20 @@ private struct SessionTimelineNodeRow: View {
       } label: {
         Label("Copy Summary", systemImage: "doc.on.doc")
       }
-      if let signalID = node.signalID {
+      if !node.contextMenuItems.isEmpty {
         Divider()
-        Button("Inspect", systemImage: "info.circle") { onSignalTap?(signalID) }
-        Button("Copy Signal ID", systemImage: "doc.on.doc") {
-          HarnessMonitorClipboard.copy(signalID)
+        ForEach(node.contextMenuItems, id: \.label) { item in
+          Button(item.label, systemImage: item.systemImage) {
+            switch item.action {
+            case .openSignal(let id): onSignalTap?(id)
+            case .copyText(let text): HarnessMonitorClipboard.copy(text)
+            }
+          }
         }
       }
     }
     .onTapGesture {
-      if let signalID = node.signalID { onSignalTap?(signalID) }
+      if case .signal(let id) = node.tapTarget { onSignalTap?(id) }
     }
   }
 
@@ -245,9 +249,9 @@ private struct SessionTimelineNodeRow: View {
     for node: SessionTimelineNode
   ) -> [SessionTimelineStatusBadge] {
     var badges: [SessionTimelineStatusBadge] = []
-    if let entryKind = node.entryKind, entryKind.hasPrefix("signal_") {
+    if let label = node.statusBadgeLabel {
       let tint = node.eventTone?.color ?? HarnessMonitorTheme.secondaryInk
-      badges.append(SessionTimelineStatusBadge(label: signalStatusLabel(for: node.title), tint: tint))
+      badges.append(SessionTimelineStatusBadge(label: label, tint: tint))
     } else if let eventTone = node.eventTone {
       badges.append(SessionTimelineStatusBadge(label: eventTone.badgeLabel, tint: eventTone.color))
     }
@@ -260,16 +264,6 @@ private struct SessionTimelineNodeRow: View {
       )
     }
     return badges
-  }
-
-  private static func signalStatusLabel(for summary: String) -> String {
-    let lower = summary.lowercased()
-    if lower.contains("accepted") || lower.contains("delivered") { return "DELIVERED" }
-    if lower.contains("rejected") { return "REJECTED" }
-    if lower.contains("deferred") { return "DEFERRED" }
-    if lower.contains("expired") { return "EXPIRED" }
-    if lower.contains("picked up") || lower.contains("received") { return "RECEIVED" }
-    return "SENT"
   }
 }
 

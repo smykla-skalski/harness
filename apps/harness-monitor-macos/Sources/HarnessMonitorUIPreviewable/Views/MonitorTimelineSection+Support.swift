@@ -16,6 +16,7 @@ struct SessionTimelinePresentationInput: Equatable {
   let decisionCount: Int
   let firstDecisionID: String?
   let lastDecisionID: String?
+  let signalCount: Int
   let isTimelineLoading: Bool
   let filterSignature: String
   let reduceMotion: Bool
@@ -38,6 +39,7 @@ struct SessionTimelinePresentationInput: Equatable {
       decisionCount: 0,
       firstDecisionID: nil,
       lastDecisionID: nil,
+      signalCount: 0,
       isTimelineLoading: false,
       filterSignature: "",
       reduceMotion: false,
