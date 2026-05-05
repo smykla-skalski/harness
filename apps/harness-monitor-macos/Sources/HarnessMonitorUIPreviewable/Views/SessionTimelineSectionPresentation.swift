@@ -75,8 +75,7 @@ struct SessionTimelineSectionPresentation {
     for record in signals { signalsByID[record.signal.signalId] = record }
     let context = TimelineFeatureContext(
       now: .now,
-      signalsByID: signalsByID,
-      sessionID: sessionID
+      signalsByID: signalsByID
     )
     let sourceNodes = SessionTimelineNodeBuilder(
       sessionID: sessionID,
