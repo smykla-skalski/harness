@@ -58,6 +58,17 @@ struct AcpRuntimeStatusStrip: View {
     ].joined(separator: " ")
   }
 
+  private var edgeAccentTint: Color? {
+    AcpRuntimeStatusEdgeAccent.tint(
+      for: AcpRuntimeStatusEdgeAccent.classify(
+        watchdogDisplayState: runtimeState.watchdogDisplayState,
+        pendingPermissions: runtimeState.pendingPermissions,
+        promptDeadline: promptDeadlineDate,
+        now: store.acpRuntimeClockTick
+      )
+    )
+  }
+
   var body: some View {
     VStack(
       alignment: .leading,
@@ -86,9 +97,19 @@ struct AcpRuntimeStatusStrip: View {
       RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
         .fill(HarnessMonitorTheme.ink.opacity(presentation == .full ? 0.05 : 0.04))
     )
+    .overlay(alignment: .leading) {
+      if let edgeAccentTint {
+        RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+          .fill(edgeAccentTint)
+          .frame(width: 3)
+          .padding(.vertical, HarnessMonitorTheme.spacingXS)
+          .padding(.leading, 1)
+          .accessibilityHidden(true)
+      }
+    }
     .overlay {
       RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .stroke(HarnessMonitorTheme.controlBorder.opacity(0.55), lineWidth: 1)
+        .stroke(HarnessMonitorTheme.controlBorder.opacity(0.6), lineWidth: 1)
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(
@@ -414,6 +435,53 @@ private struct AcpRuntimeDeadlineChip: View {
         accessibilityLabel: "Prompt deadline",
         accessibilityValue: presentation.accessibilityLabel
       )
+    }
+  }
+}
+
+public enum AcpRuntimeStatusEdgeAccent: Equatable {
+  case fired
+  case stalling
+  case awaitingPermission
+  case deadlineApproaching
+
+  static let deadlineApproachWindowSeconds: TimeInterval = 30
+
+  public static func classify(
+    watchdogDisplayState: String,
+    pendingPermissions: Int,
+    promptDeadline: Date?,
+    now: Date
+  ) -> Self? {
+    let normalized = watchdogDisplayState
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .lowercased()
+    if normalized == "fired" || normalized == "expired" {
+      return .fired
+    }
+    if normalized == "stalling" || normalized == "warning" {
+      return .stalling
+    }
+    if pendingPermissions > 0 {
+      return .awaitingPermission
+    }
+    if let promptDeadline {
+      let remaining = promptDeadline.timeIntervalSince(now)
+      if remaining > 0, remaining <= deadlineApproachWindowSeconds {
+        return .deadlineApproaching
+      }
+    }
+    return nil
+  }
+
+  public static func tint(for accent: Self?) -> Color? {
+    switch accent {
+    case .fired:
+      HarnessMonitorTheme.danger
+    case .stalling, .awaitingPermission, .deadlineApproaching:
+      HarnessMonitorTheme.caution
+    case .none:
+      nil
     }
   }
 }

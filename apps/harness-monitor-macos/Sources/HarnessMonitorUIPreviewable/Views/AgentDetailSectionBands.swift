@@ -214,19 +214,13 @@ struct AgentDetailActionBand: View {
 
 private struct AgentDetailPanel<Content: View>: View {
   let title: String?
-  let fillOpacity: Double
-  let strokeOpacity: Double
   private let content: Content
 
   init(
     title: String? = nil,
-    fillOpacity: Double = 0.028,
-    strokeOpacity: Double = 0.06,
     @ViewBuilder content: () -> Content
   ) {
     self.title = title
-    self.fillOpacity = fillOpacity
-    self.strokeOpacity = strokeOpacity
     self.content = content()
   }
 
@@ -240,14 +234,7 @@ private struct AgentDetailPanel<Content: View>: View {
       }
       content
     }
-    .padding(HarnessMonitorTheme.spacingMD)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .agentDetailSurface(
-      tint: HarnessMonitorTheme.ink,
-      fillOpacity: fillOpacity,
-      strokeOpacity: strokeOpacity,
-      cornerRadius: HarnessMonitorTheme.cornerRadiusMD
-    )
   }
 }
 
@@ -347,21 +334,3 @@ private struct AgentDetailOperationalSummary: View {
   }
 }
 
-extension View {
-  func agentDetailSurface(
-    tint: Color,
-    fillOpacity: Double,
-    strokeOpacity: Double,
-    cornerRadius: CGFloat
-  ) -> some View {
-    self
-      .background {
-        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-          .fill(tint.opacity(fillOpacity))
-      }
-      .overlay {
-        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-          .strokeBorder(tint.opacity(strokeOpacity), lineWidth: 1)
-      }
-  }
-}
