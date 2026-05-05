@@ -32,14 +32,18 @@ extension WorkspaceWindowView {
       paneContent(decisionScope: decisionScope)
         .overlay { workspaceStateMarkerOverlay() }
     } else {
-      ScrollView {
+      HarnessMonitorColumnScrollView(
+        horizontalPadding: HarnessMonitorTheme.spacingLG,
+        verticalPadding: HarnessMonitorTheme.spacingLG,
+        constrainContentWidth: false,
+        readableWidth: false,
+        topScrollEdgeEffect: .soft,
+        bottomScrollContentMargin: WorkspaceChromeMetrics.scrollContentBottomChromeMargin,
+        scrollSurfaceIdentifier: HarnessMonitorAccessibility.workspaceDetailScrollView,
+        scrollSurfaceLabel: "Workspace detail"
+      ) {
         paneContent(decisionScope: decisionScope)
-          .padding(HarnessMonitorTheme.spacingLG)
       }
-      .harnessPrimaryContentScrollSurface(
-        listIdentifier: HarnessMonitorAccessibility.workspaceDetailScrollView,
-        listLabel: "Workspace detail"
-      )
       .overlay { workspaceStateMarkerOverlay() }
     }
   }

@@ -6,17 +6,22 @@ public enum HarnessMonitorColumnTopScrollEdgeEffect {
   case hard
 }
 
-public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Overlay: View>: View {
+public struct HarnessMonitorColumnScrollView<
+  Content: View, Underlay: View, Overlay: View, BottomInset: View
+>: View {
   public let horizontalPadding: CGFloat
   public let verticalPadding: CGFloat
   public let constrainContentWidth: Bool
   public let readableWidth: Bool
   public let topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect
+  public let bottomScrollContentMargin: CGFloat
+  public let bottomInsetSpacing: CGFloat
   public let scrollSurfaceIdentifier: String?
   public let scrollSurfaceLabel: String?
   private let content: Content
   private let underlay: Underlay?
   private let overlay: Overlay?
+  private let bottomInset: BottomInset?
 
   /// HIG readable content width for body text (~70 characters at body size).
   private static var readableMaxWidth: CGFloat { 680 }
@@ -27,8 +32,37 @@ public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Over
     constrainContentWidth: Bool,
     readableWidth: Bool,
     topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect,
+    bottomScrollContentMargin: CGFloat = 0,
     scrollSurfaceIdentifier: String? = nil,
     scrollSurfaceLabel: String? = nil,
+    @ViewBuilder content: () -> Content
+  ) where Underlay == EmptyView, Overlay == EmptyView, BottomInset == EmptyView {
+    self.horizontalPadding = horizontalPadding
+    self.verticalPadding = verticalPadding
+    self.constrainContentWidth = constrainContentWidth
+    self.readableWidth = readableWidth
+    self.topScrollEdgeEffect = topScrollEdgeEffect
+    self.bottomScrollContentMargin = bottomScrollContentMargin
+    bottomInsetSpacing = 0
+    self.scrollSurfaceIdentifier = scrollSurfaceIdentifier
+    self.scrollSurfaceLabel = scrollSurfaceLabel
+    self.content = content()
+    underlay = nil
+    overlay = nil
+    bottomInset = nil
+  }
+
+  public init(
+    horizontalPadding: CGFloat,
+    verticalPadding: CGFloat,
+    constrainContentWidth: Bool,
+    readableWidth: Bool,
+    topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect,
+    bottomScrollContentMargin: CGFloat = 0,
+    bottomInsetSpacing: CGFloat = 0,
+    scrollSurfaceIdentifier: String? = nil,
+    scrollSurfaceLabel: String? = nil,
+    @ViewBuilder bottomInset: () -> BottomInset,
     @ViewBuilder content: () -> Content
   ) where Underlay == EmptyView, Overlay == EmptyView {
     self.horizontalPadding = horizontalPadding
@@ -36,11 +70,14 @@ public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Over
     self.constrainContentWidth = constrainContentWidth
     self.readableWidth = readableWidth
     self.topScrollEdgeEffect = topScrollEdgeEffect
+    self.bottomScrollContentMargin = bottomScrollContentMargin
+    self.bottomInsetSpacing = bottomInsetSpacing
     self.scrollSurfaceIdentifier = scrollSurfaceIdentifier
     self.scrollSurfaceLabel = scrollSurfaceLabel
     self.content = content()
     underlay = nil
     overlay = nil
+    self.bottomInset = bottomInset()
   }
 
   public init(
@@ -49,21 +86,25 @@ public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Over
     constrainContentWidth: Bool,
     readableWidth: Bool,
     topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect,
+    bottomScrollContentMargin: CGFloat = 0,
     scrollSurfaceIdentifier: String? = nil,
     scrollSurfaceLabel: String? = nil,
     @ViewBuilder underlay: () -> Underlay,
     @ViewBuilder content: () -> Content
-  ) where Overlay == EmptyView {
+  ) where Overlay == EmptyView, BottomInset == EmptyView {
     self.horizontalPadding = horizontalPadding
     self.verticalPadding = verticalPadding
     self.constrainContentWidth = constrainContentWidth
     self.readableWidth = readableWidth
     self.topScrollEdgeEffect = topScrollEdgeEffect
+    self.bottomScrollContentMargin = bottomScrollContentMargin
+    bottomInsetSpacing = 0
     self.scrollSurfaceIdentifier = scrollSurfaceIdentifier
     self.scrollSurfaceLabel = scrollSurfaceLabel
     self.content = content()
     self.underlay = underlay()
     overlay = nil
+    bottomInset = nil
   }
 
   public init(
@@ -72,21 +113,25 @@ public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Over
     constrainContentWidth: Bool,
     readableWidth: Bool,
     topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect,
+    bottomScrollContentMargin: CGFloat = 0,
     scrollSurfaceIdentifier: String? = nil,
     scrollSurfaceLabel: String? = nil,
     @ViewBuilder overlay: () -> Overlay,
     @ViewBuilder content: () -> Content
-  ) where Underlay == EmptyView {
+  ) where Underlay == EmptyView, BottomInset == EmptyView {
     self.horizontalPadding = horizontalPadding
     self.verticalPadding = verticalPadding
     self.constrainContentWidth = constrainContentWidth
     self.readableWidth = readableWidth
     self.topScrollEdgeEffect = topScrollEdgeEffect
+    self.bottomScrollContentMargin = bottomScrollContentMargin
+    bottomInsetSpacing = 0
     self.scrollSurfaceIdentifier = scrollSurfaceIdentifier
     self.scrollSurfaceLabel = scrollSurfaceLabel
     self.content = content()
     underlay = nil
     self.overlay = overlay()
+    bottomInset = nil
   }
 
   public init(
@@ -95,22 +140,26 @@ public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Over
     constrainContentWidth: Bool,
     readableWidth: Bool,
     topScrollEdgeEffect: HarnessMonitorColumnTopScrollEdgeEffect,
+    bottomScrollContentMargin: CGFloat = 0,
     scrollSurfaceIdentifier: String? = nil,
     scrollSurfaceLabel: String? = nil,
     @ViewBuilder underlay: () -> Underlay,
     @ViewBuilder overlay: () -> Overlay,
     @ViewBuilder content: () -> Content
-  ) {
+  ) where BottomInset == EmptyView {
     self.horizontalPadding = horizontalPadding
     self.verticalPadding = verticalPadding
     self.constrainContentWidth = constrainContentWidth
     self.readableWidth = readableWidth
     self.topScrollEdgeEffect = topScrollEdgeEffect
+    self.bottomScrollContentMargin = bottomScrollContentMargin
+    bottomInsetSpacing = 0
     self.scrollSurfaceIdentifier = scrollSurfaceIdentifier
     self.scrollSurfaceLabel = scrollSurfaceLabel
     self.content = content()
     self.underlay = underlay()
     self.overlay = overlay()
+    bottomInset = nil
   }
 
   public var body: some View {
@@ -154,11 +203,13 @@ public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Over
       .frame(maxWidth: .infinity, alignment: .topLeading)
     }
     .scrollClipDisabled(underlay != nil)
+    .contentMargins(.bottom, bottomScrollContentMargin, for: .scrollContent)
     .modifier(TopScrollEdgeEffectModifier(effect: topScrollEdgeEffect))
     .harnessPrimaryContentScrollSurface(
       listIdentifier: scrollSurfaceIdentifier,
       listLabel: scrollSurfaceLabel
     )
+    .modifier(BottomScrollInsetModifier(spacing: bottomInsetSpacing, inset: bottomInset))
   }
 
   private func resolvedContentWidth(availableWidth: CGFloat) -> CGFloat {
@@ -166,6 +217,22 @@ public struct HarnessMonitorColumnScrollView<Content: View, Underlay: View, Over
       return min(availableWidth, Self.readableMaxWidth)
     }
     return availableWidth
+  }
+}
+
+private struct BottomScrollInsetModifier<Inset: View>: ViewModifier {
+  let spacing: CGFloat
+  let inset: Inset?
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if let inset {
+      content.safeAreaInset(edge: .bottom, spacing: spacing) {
+        inset
+      }
+    } else {
+      content
+    }
   }
 }
 

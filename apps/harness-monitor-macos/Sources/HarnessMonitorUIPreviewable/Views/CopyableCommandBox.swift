@@ -12,7 +12,7 @@ struct CopyableCommandBox: View {
   private var copyIconSize: CGFloat = 16
 
   var body: some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+    HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
       Text(command)
         .scaledFont(.body.monospaced())
         .textSelection(.enabled)
