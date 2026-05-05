@@ -173,7 +173,7 @@ async fn try_wake_started_workers_async(
                     AcpWakePrompt {
                         acp_id: acp_id.to_string(),
                         orchestration_session_id: session_id.to_string(),
-                        protocol_session_id: record.signal_session_id.clone(),
+                        signal_session_id: record.signal_session_id.clone(),
                         project_dir: project_dir.to_path_buf(),
                         prompt: build_active_signal_prompt(&record.signal),
                         signal_id: record.signal.signal_id.clone(),
