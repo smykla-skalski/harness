@@ -99,27 +99,27 @@ struct AgentDetailActivityBand: View {
   }
 
   private var runtimeProfilePane: some View {
-    AgentDetailInsetGroup(title: "Runtime profile") {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-        AgentDetailFactSummaryGrid(
-          facts: runtimeProfileFacts,
-          maximumColumns: prefersWideLayout ? 3 : 2
-        )
-        if !activityFacts.isEmpty || !recentToolValues.isEmpty {
-          AgentDetailMetadataSection(
-            title: "Recent activity",
-            values: recentToolValues,
-            summaryFacts: activityFacts,
-            inlineValues: true
-          )
-        }
-        AgentDetailReferenceDisclosure(
-          agentID: agentID,
-          capabilityValues: capabilityValues,
-          hookPoints: hookPoints
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+      AgentDetailFactInlineRow(
+        title: "Runtime profile",
+        facts: runtimeProfileFacts
+      )
+      if !activityFacts.isEmpty || !recentToolValues.isEmpty {
+        AgentDetailFactInlineRow(
+          title: "Recent activity",
+          facts: activityFacts,
+          trailingDescription: recentToolValues.isEmpty
+            ? nil
+            : "Recent: " + recentToolValues.joined(separator: " · ")
         )
       }
+      AgentDetailReferenceDisclosure(
+        agentID: agentID,
+        capabilityValues: capabilityValues,
+        hookPoints: hookPoints
+      )
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   private var assignmentPane: some View {
@@ -353,112 +353,6 @@ private struct AgentDetailSummaryHeader: View {
     case .removed:
       "minus.circle.fill"
     }
-  }
-}
-
-private struct AgentDetailHeaderFactStrip: View {
-  let facts: [AgentDetailFact]
-
-  private var visibleFacts: [AgentDetailFact] {
-    facts.filter { !$0.isHiddenZero }
-  }
-
-  var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingMD) {
-      ForEach(Array(visibleFacts.enumerated()), id: \.element.id) { index, fact in
-        if index > 0 {
-          Text("·")
-            .scaledFont(.caption)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk.opacity(0.6))
-            .accessibilityHidden(true)
-        }
-        HStack(spacing: HarnessMonitorTheme.spacingXS) {
-          Text(fact.title)
-            .scaledFont(.caption)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          Text(fact.value)
-            .scaledFont(.caption.bold())
-            .foregroundStyle(fact.tint ?? HarnessMonitorTheme.ink)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(fact.title)
-        .accessibilityValue(fact.value)
-      }
-      Spacer(minLength: 0)
-    }
-    .fixedSize(horizontal: false, vertical: true)
-  }
-}
-
-struct AgentDetailRestingRuntimeLine: View {
-  let lastActivity: String
-
-  var body: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingXS) {
-      Image(systemName: "antenna.radiowaves.left.and.right")
-        .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .accessibilityHidden(true)
-      Text("Stdout signals only — last seen \(lastActivity)")
-        .scaledFont(.caption)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .fixedSize(horizontal: false, vertical: true)
-      Spacer(minLength: 0)
-    }
-    .accessibilityElement(children: .combine)
-    .accessibilityLabel("Runtime")
-    .accessibilityValue("Stdout signals only, last seen \(lastActivity)")
-  }
-}
-
-struct AgentDetailReferenceDisclosure: View {
-  let agentID: String
-  let capabilityValues: [String]
-  let hookPoints: [HookIntegrationDescriptor]
-
-  @State private var isExpanded: Bool = true
-
-  private var disclosureLabel: String {
-    let capabilityCount = capabilityValues.count
-    let hookCount = hookPoints.count
-    let capabilityWord = capabilityCount == 1 ? "capability" : "capabilities"
-    if hookCount > 0 {
-      let hookWord = hookCount == 1 ? "hook point" : "hook points"
-      return "Capabilities and hooks "
-        + "(\(capabilityCount) \(capabilityWord), \(hookCount) \(hookWord))"
-    }
-    return "Capabilities and hooks (\(capabilityCount) \(capabilityWord))"
-  }
-
-  var body: some View {
-    DisclosureGroup(isExpanded: $isExpanded) {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-        AgentDetailMetadataSection(
-          title: "Declared capabilities",
-          values: capabilityValues
-        )
-        if !hookPoints.isEmpty {
-          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-            AgentDetailSubsectionTitle(title: "Hook points")
-            AgentDetailHookPointsGrid(hookPoints: hookPoints)
-          }
-        }
-      }
-      .padding(.top, HarnessMonitorTheme.spacingSM)
-    } label: {
-      HStack(spacing: HarnessMonitorTheme.spacingXS) {
-        Image(systemName: "info.circle")
-          .scaledFont(.caption.weight(.semibold))
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .accessibilityHidden(true)
-        Text(disclosureLabel)
-          .scaledFont(.caption.bold())
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      }
-    }
-    .accessibilityIdentifier(
-      HarnessMonitorAccessibility.agentDetailReferenceDisclosure(agentID)
-    )
   }
 }
 

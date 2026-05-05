@@ -13,7 +13,7 @@ import SwiftUI
 // of the next touch, prefer the sibling file over more nested types here.
 struct AgentDetailSection: View {
   @Environment(\.openWindow)
-  private var openWindow
+  var openWindow
   let store: HarnessMonitorStore
   let agent: AgentRegistration
   let activity: AgentToolActivitySummary?
@@ -157,16 +157,6 @@ struct AgentDetailSection: View {
     store.acpRuntimeInspectStatus(for: agent.agentId)
   }
 
-  static func transcriptEntries(
-    store: HarnessMonitorStore,
-    agent: AgentRegistration
-  ) -> [TimelineEntry] {
-    if agent.runtimeCapabilities.supportsNativeTranscript {
-      return store.acpTranscript(forAgent: agent.agentId)
-    }
-    return store.timeline(forAgent: agent.agentId)
-  }
-
   var body: some View {
     Group {
       if runtimePresentation == .full {
@@ -175,7 +165,7 @@ struct AgentDetailSection: View {
         compactBody
       }
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .task(id: roleStateKey) {
       selectedRole = agent.role
     }
@@ -383,15 +373,6 @@ struct AgentDetailSection: View {
     transcriptAnnouncer.announceIfAllowed(entry.summary, priority: priority)
   }
 
-  static func debouncePersist(value: String, key: String) async {
-    do {
-      try await Task.sleep(for: .milliseconds(300))
-    } catch {
-      return
-    }
-    UserDefaults.standard.set(value, forKey: key)
-  }
-
   private func hydrateDraft() {
     let defaults = UserDefaults.standard
     let savedCommand = defaults.string(forKey: Self.draftCommandKey(agentID: agent.agentId)) ?? ""
@@ -424,80 +405,8 @@ struct AgentDetailSection: View {
     )
   }
 
-  private func dispatchPendingDecision(
-    attention: AcpDecisionAttention,
-    actionID: String
-  ) {
-    let decisionID = attention.oldestDecisionID
-    Task {
-      _ = await store.submitAcpPermissionDecisionAction(
-        decisionID: decisionID,
-        actionID: actionID
-      )
-    }
-  }
-
-  private func openPendingDecisions() {
-    let oldestOpenDecisionID = store.supervisorOpenDecisions
-      .filter { $0.agentID == agent.agentId }
-      .min {
-        if $0.createdAt != $1.createdAt {
-          return $0.createdAt < $1.createdAt
-        }
-        return $0.id < $1.id
-      }?.id
-
-    if let decisionID = oldestOpenDecisionID ?? store.selectOldestDecision(for: agent.agentId) {
-      store.requestWorkspaceDecisionSelection(decisionID: decisionID)
-      store.supervisorSelectedDecisionID = decisionID
-      store.requestPrimaryDecisionActionFocus(decisionID: decisionID)
-    }
-    openWindow(id: HarnessMonitorWindowID.workspace)
-  }
-
-  static func humanizedHookLabel(for hook: HookIntegrationDescriptor) -> String {
-    let trigger: String
-    switch hook.name {
-    case "BeforeTool":
-      trigger = "before each tool call"
-    case "AfterTool":
-      trigger = "after each tool call"
-    case "BeforePrompt":
-      trigger = "before each prompt"
-    case "AfterPrompt":
-      trigger = "after each prompt"
-    default:
-      trigger = "on \(hook.name)"
-    }
-    let contextMode =
-      hook.supportsContextInjection ? "with context injection" : "no context"
-    let contextSuffix = " (\(contextMode))"
-    return "Runs \(hook.typicalLatencySeconds)s \(trigger)\(contextSuffix)"
-  }
-
-  private func humanizedHookLabel(for hook: HookIntegrationDescriptor) -> String {
+  func humanizedHookLabel(for hook: HookIntegrationDescriptor) -> String {
     Self.humanizedHookLabel(for: hook)
   }
-
 }
 
-private struct AgentDetailCardProbeModifier: ViewModifier {
-  let name: String
-  let agentID: String
-
-  func body(content: Content) -> some View {
-    content
-      .accessibilityTestProbe(
-        HarnessMonitorAccessibility.workspaceDetailCard,
-        label: name,
-        value: agentID
-      )
-      .accessibilityFrameMarker("\(HarnessMonitorAccessibility.workspaceDetailCard).frame")
-  }
-}
-
-private extension View {
-  func agentDetailCardProbe(name: String, agentID: String) -> some View {
-    modifier(AgentDetailCardProbeModifier(name: name, agentID: agentID))
-  }
-}
