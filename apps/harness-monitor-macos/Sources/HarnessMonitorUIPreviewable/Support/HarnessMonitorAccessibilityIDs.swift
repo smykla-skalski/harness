@@ -140,6 +140,9 @@ public enum HarnessMonitorAccessibility {
   public static let actionToastFrame = "harness.action-toast.frame"
   public static let actionToastCloseButton = "harness.action-toast.close"
   public static let actionToastUndoButton = "harness.action-toast.undo"
+  public static let actionToastPrimaryButton = "harness.action-toast.primary"
+  public static let actionToastDetailsButton = "harness.action-toast.details"
+  public static let actionToastCommandCopyButton = "harness.action-toast.command.copy"
   public static let sessionTimelinePagination = "harness.session.timeline.pagination"
   public static let sessionTimelinePageSizePicker =
     "harness.session.timeline.pagination.page-size"

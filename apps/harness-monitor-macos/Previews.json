@@ -150,13 +150,13 @@
       "id": "DaemonRecoveryToast",
       "description": "External daemon stale manifest recovery toast",
       "file": "Sources/HarnessMonitorUIPreviewable/Views/HarnessMonitorFeedbackToastView+Previews.swift",
-      "index": 0,
-      "crop": {
-        "top": 88,
-        "left": 360,
-        "width": 1120,
-        "height": 190
-      }
+      "index": 0
+    },
+    {
+      "id": "DaemonRecoveryToastExpanded",
+      "description": "External daemon stale manifest recovery toast with restart details expanded",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/HarnessMonitorFeedbackToastView+Previews.swift",
+      "index": 1
     },
     {
       "id": "WorkspaceDecisionDeskCrowded",
