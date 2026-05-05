@@ -3,12 +3,16 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 
 use harness_testkit::with_isolated_harness_env;
+use serde_json::json;
 use tempfile::TempDir;
 use tokio::sync::broadcast;
 
 use super::*;
 use crate::agents::acp::catalog::{self, AcpAgentDescriptor};
 use crate::agents::runtime::runtime_for;
+use crate::agents::runtime::signal::{
+    AckResult, DeliveryConfig, Signal, SignalPayload, SignalPriority, read_pending_signals,
+};
 use crate::daemon::agent_acp::manager::test_support::{
     seeded_manager, seeded_manager_with_events, write_executable, write_sleeping_acp_agent,
 };
@@ -131,6 +135,97 @@ fn wait_for_runtime_session_id_value(
             "timed out waiting for ACP runtime session binding to update to {expected}"
         );
         std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+fn wait_for_signal_ack(
+    runtime: &'static dyn crate::agents::runtime::AgentRuntime,
+    project_dir: &Path,
+    signal_session_id: &str,
+    signal_id: &str,
+) -> crate::agents::runtime::signal::SignalAck {
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        let Ok(acks) = runtime.read_acknowledgments(project_dir, signal_session_id) else {
+            unreachable!();
+        };
+        if let Some(ack) = acks.into_iter().find(|ack| ack.signal_id == signal_id) {
+            return ack;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "timed out waiting for signal ack {signal_id} in {signal_session_id}"
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+fn assert_no_signal_ack_within(
+    runtime: &'static dyn crate::agents::runtime::AgentRuntime,
+    project_dir: &Path,
+    signal_session_id: &str,
+    signal_id: &str,
+    duration: Duration,
+) {
+    let deadline = Instant::now() + duration;
+    loop {
+        let Ok(acks) = runtime.read_acknowledgments(project_dir, signal_session_id) else {
+            unreachable!();
+        };
+        assert!(
+            acks.into_iter().all(|ack| ack.signal_id != signal_id),
+            "unexpected signal ack {signal_id} in {signal_session_id}"
+        );
+        if Instant::now() >= deadline {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(25));
+    }
+}
+
+fn repoint_project_dir(manager: &AcpAgentManagerHandle, project_dir: &Path) {
+    let Some(db) = manager.state.db.get().map(Arc::clone) else {
+        unreachable!();
+    };
+    let Ok(db) = db.lock() else {
+        unreachable!();
+    };
+    let project = crate::daemon::index::DiscoveredProject {
+        project_id: "project-abc123".into(),
+        name: "harness".into(),
+        project_dir: Some(project_dir.to_path_buf()),
+        repository_root: Some(project_dir.to_path_buf()),
+        checkout_id: "checkout-abc123".into(),
+        checkout_name: "Repository".into(),
+        context_root: project_dir.to_path_buf(),
+        is_worktree: false,
+        worktree_name: None,
+    };
+    let Ok(()) = db.sync_project(&project) else {
+        unreachable!();
+    };
+}
+
+fn sample_signal(signal_id: &str) -> Signal {
+    Signal {
+        signal_id: signal_id.to_string(),
+        version: 1,
+        created_at: "2026-05-05T07:00:00Z".into(),
+        expires_at: "2026-05-05T08:00:00Z".into(),
+        source_agent: "claude-leader".into(),
+        command: "task.start".into(),
+        priority: SignalPriority::Normal,
+        payload: SignalPayload {
+            message: "Start work on task task-1: investigate".into(),
+            action_hint: Some("task:task-1".into()),
+            related_files: Vec::new(),
+            metadata: json!({}),
+        },
+        delivery: DeliveryConfig {
+            max_retries: 3,
+            retry_count: 0,
+            idempotency_key: Some(format!("sess-1:gemini:{signal_id}")),
+        },
     }
 }
 
@@ -278,6 +373,7 @@ async fn wake_prompt_rebinds_runtime_session_when_prompt_opens_new_protocol_sess
             ..AcpAgentStartRequest::default()
         };
         let manager = manager();
+        repoint_project_dir(&manager, temp.path());
         let descriptor = descriptor_with_id(&script, "gemini");
         let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
             unreachable!();
@@ -291,7 +387,7 @@ async fn wake_prompt_rebinds_runtime_session_when_prompt_opens_new_protocol_sess
             AcpWakePrompt {
                 acp_id: snapshot.acp_id.clone(),
                 orchestration_session_id: "sess-1".into(),
-                protocol_session_id: initial_runtime_session,
+                signal_session_id: initial_runtime_session,
                 project_dir: temp.path().to_path_buf(),
                 prompt: "tell me how are you".into(),
                 signal_id: "sig-test-1".into(),
@@ -300,6 +396,132 @@ async fn wake_prompt_rebinds_runtime_session_when_prompt_opens_new_protocol_sess
         );
 
         wait_for_runtime_session_id_value(&manager, "sess-1", &snapshot.acp_id, "acp-session-2");
+        assert!(manager.stop(&snapshot.acp_id).is_ok());
+    });
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[cfg(unix)]
+async fn wake_prompt_acknowledges_signal_in_original_signal_session_dir() {
+    temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
+        let Ok(temp) = TempDir::new() else {
+            unreachable!();
+        };
+        let script = temp.path().join("gemini-agent.sh");
+        write_sleeping_acp_agent(&script);
+        let request = AcpAgentStartRequest {
+            agent: "gemini".to_string(),
+            project_dir: Some(temp.path().display().to_string()),
+            ..AcpAgentStartRequest::default()
+        };
+        let manager = manager();
+        repoint_project_dir(&manager, temp.path());
+        let descriptor = descriptor_with_id(&script, "gemini");
+        let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+            unreachable!();
+        };
+        let runtime = runtime_for(HookAgent::Gemini);
+        let signal_session_id = wait_for_runtime_session_id(&manager, "sess-1", &snapshot.acp_id);
+        let signal = sample_signal("sig-ack-success");
+        let Ok(_path) = runtime.write_signal(temp.path(), &signal_session_id, &signal) else {
+            unreachable!();
+        };
+
+        manager.dispatch_wake_prompt(
+            runtime,
+            AcpWakePrompt {
+                acp_id: snapshot.acp_id.clone(),
+                orchestration_session_id: "sess-1".into(),
+                signal_session_id: signal_session_id.clone(),
+                project_dir: temp.path().to_path_buf(),
+                prompt: "please wake up".into(),
+                signal_id: signal.signal_id.clone(),
+                agent_id: snapshot.agent_id.clone(),
+            },
+        );
+
+        wait_for_runtime_session_id_value(&manager, "sess-1", &snapshot.acp_id, "acp-session-2");
+        let ack = wait_for_signal_ack(runtime, temp.path(), &signal_session_id, &signal.signal_id);
+        assert_eq!(ack.result, AckResult::Accepted);
+        assert_eq!(ack.session_id, "sess-1");
+        assert_eq!(ack.agent, signal_session_id);
+
+        let signal_dir = runtime.signal_dir(temp.path(), &signal_session_id);
+        let Ok(pending) = read_pending_signals(&signal_dir) else {
+            unreachable!();
+        };
+        assert!(pending.is_empty(), "pending signal should have been acknowledged");
+        assert!(manager.stop(&snapshot.acp_id).is_ok());
+    });
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[cfg(unix)]
+async fn wake_prompt_skips_ack_when_runtime_rebind_fails() {
+    temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
+        let Ok(temp) = TempDir::new() else {
+            unreachable!();
+        };
+        let script = temp.path().join("gemini-agent.sh");
+        write_sleeping_acp_agent(&script);
+        let request = AcpAgentStartRequest {
+            agent: "gemini".to_string(),
+            project_dir: Some(temp.path().display().to_string()),
+            ..AcpAgentStartRequest::default()
+        };
+        let manager = manager();
+        repoint_project_dir(&manager, temp.path());
+        let descriptor = descriptor_with_id(&script, "gemini");
+        let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+            unreachable!();
+        };
+        let runtime = runtime_for(HookAgent::Gemini);
+        let signal_session_id = wait_for_runtime_session_id(&manager, "sess-1", &snapshot.acp_id);
+        let signal = sample_signal("sig-ack-skipped");
+        let Ok(_path) = runtime.write_signal(temp.path(), &signal_session_id, &signal) else {
+            unreachable!();
+        };
+
+        manager.dispatch_wake_prompt(
+            runtime,
+            AcpWakePrompt {
+                acp_id: snapshot.acp_id.clone(),
+                orchestration_session_id: "missing-session".into(),
+                signal_session_id: signal_session_id.clone(),
+                project_dir: temp.path().to_path_buf(),
+                prompt: "please wake up".into(),
+                signal_id: signal.signal_id.clone(),
+                agent_id: snapshot.agent_id.clone(),
+            },
+        );
+
+        assert_no_signal_ack_within(
+            runtime,
+            temp.path(),
+            &signal_session_id,
+            &signal.signal_id,
+            Duration::from_millis(400),
+        );
+        assert_no_signal_ack_within(
+            runtime,
+            temp.path(),
+            "acp-session-2",
+            &signal.signal_id,
+            Duration::from_millis(400),
+        );
+
+        let signal_dir = runtime.signal_dir(temp.path(), &signal_session_id);
+        let Ok(pending) = read_pending_signals(&signal_dir) else {
+            unreachable!();
+        };
+        assert!(
+            pending.iter().any(|pending| pending.signal_id == signal.signal_id),
+            "pending signal should remain file-backed when runtime rebind fails"
+        );
+        assert_eq!(
+            runtime_session_id(&manager, "sess-1", &snapshot.acp_id).as_deref(),
+            Some(signal_session_id.as_str())
+        );
         assert!(manager.stop(&snapshot.acp_id).is_ok());
     });
 }
