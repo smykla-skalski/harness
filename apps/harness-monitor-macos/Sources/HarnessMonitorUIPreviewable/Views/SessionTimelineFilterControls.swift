@@ -325,25 +325,36 @@ private struct SessionTimelineSearchFieldChromeModifier: ViewModifier {
 
   @Environment(\.harnessNativeFormControlSize)
   private var controlSize
-  @Environment(\.accessibilityReduceTransparency)
-  private var reduceTransparency
+  @Environment(\.fontScale)
+  private var fontScale
   @Environment(\.colorSchemeContrast)
   private var colorSchemeContrast
 
-  private var minimumHeight: CGFloat {
+  private var controlHeight: CGFloat {
+    if usesExpandedZoomMetrics {
+      switch controlSize {
+      case .mini, .small, .regular, .large:
+        return 28
+      case .extraLarge:
+        return 32
+      @unknown default:
+        return 28
+      }
+    }
+
     switch controlSize {
     case .mini:
-      22
+      return 18
     case .small:
-      28
+      return 20.5
     case .regular:
-      34
+      return 24
     case .large:
-      40
+      return 28
     case .extraLarge:
-      46
+      return 32
     @unknown default:
-      34
+      return 24
     }
   }
 
@@ -354,31 +365,41 @@ private struct SessionTimelineSearchFieldChromeModifier: ViewModifier {
     case .regular:
       12
     case .large, .extraLarge:
-      14
+      12
     @unknown default:
       12
     }
   }
 
   private var cornerRadius: CGFloat {
+    if usesCapsuleCorners {
+      return controlHeight / 2
+    }
+
     switch controlSize {
     case .mini:
-      7
-    case .small:
-      9
-    case .regular, .large, .extraLarge:
-      999
+      return 7
+    case .small, .large, .extraLarge:
+      return 9
+    case .regular:
+      return 10
     @unknown default:
-      999
+      return 10
     }
   }
 
+  private var usesCapsuleCorners: Bool {
+    usesExpandedZoomMetrics
+  }
+
+  private var usesExpandedZoomMetrics: Bool {
+    fontScale >= HarnessMonitorTextSize.scale(at: 6)
+      || controlSize == .large
+      || controlSize == .extraLarge
+  }
+
   private var fillOpacity: Double {
-    if reduceTransparency {
-      colorSchemeContrast == .increased ? 0.26 : 0.18
-    } else {
-      colorSchemeContrast == .increased ? 0.16 : 0.10
-    }
+    colorSchemeContrast == .increased ? 0.18 : 0.13
   }
 
   private var strokeOpacity: Double {
@@ -398,13 +419,10 @@ private struct SessionTimelineSearchFieldChromeModifier: ViewModifier {
 
     content
       .padding(.horizontal, horizontalPadding)
-      .frame(minHeight: minimumHeight)
+      .frame(height: controlHeight, alignment: .center)
+      .clipped()
       .background {
-        if reduceTransparency {
-          shape.fill(HarnessMonitorTheme.ink.opacity(fillOpacity))
-        } else {
-          shape.fill(.regularMaterial)
-        }
+        shape.fill(HarnessMonitorTheme.ink.opacity(fillOpacity))
       }
       .overlay {
         shape.strokeBorder(

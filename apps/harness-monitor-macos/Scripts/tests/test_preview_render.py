@@ -45,6 +45,7 @@ class PreviewRenderScriptTests(unittest.TestCase):
             target_file.write_text("import SwiftUI\n")
 
             tool_log = temp_root / "xcode-cli.log"
+            override_file = app_root / "tmp" / "previews" / "HarnessMonitorPreviewOverrides.json"
             write_executable(
                 fake_bin / "xcode-cli",
                 f"""#!/bin/bash
@@ -56,6 +57,14 @@ printf 'scheme=%s\\ntheme=%s\\ntext_size=%s\\ntime_zone=%s\\ncustom_time_zone=%s
   "${{HARNESS_MONITOR_TIME_ZONE_MODE_OVERRIDE:-}}" \
   "${{HARNESS_MONITOR_CUSTOM_TIME_ZONE_OVERRIDE:-}}" \
   "$*" > "{tool_log}"
+if [[ "$*" == *" build"* ]]; then
+  exit 0
+fi
+if [[ -f "{override_file}" ]]; then
+  printf 'override_file=present\\n' >> "{tool_log}"
+else
+  printf 'override_file=missing\\n' >> "{tool_log}"
+fi
 out=""
 args=("$@")
 for ((i=0; i<${{#args[@]}}; i++)); do
@@ -106,6 +115,10 @@ printf '{}\n'
                 cwd=repo_root,
             )
             log = tool_log.read_text() if tool_log.exists() else ""
+            if override_file.exists():
+                log += "override_file_after=present\n"
+            else:
+                log += "override_file_after=missing\n"
             return completed, log
 
     def test_accepts_repo_root_relative_file_path(self) -> None:
@@ -113,7 +126,7 @@ printf '{}\n'
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn(
-            "scheme=HarnessMonitorUIPreviews",
+            "scheme=HarnessMonitorUIPreviewable",
             log,
         )
         self.assertIn(
@@ -126,7 +139,7 @@ printf '{}\n'
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn(
-            "scheme=HarnessMonitorUIPreviews",
+            "scheme=HarnessMonitorUIPreviewable",
             log,
         )
         self.assertIn(
@@ -144,6 +157,8 @@ printf '{}\n'
         self.assertIn("text_size=6", log)
         self.assertIn("time_zone=utc", log)
         self.assertIn("custom_time_zone=", log)
+        self.assertIn("override_file=present", log)
+        self.assertIn("override_file_after=missing", log)
 
     def test_supports_custom_output_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

@@ -23,6 +23,10 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$PROJECT_DIR/../.." && pwd)"
 MANIFEST="$PROJECT_DIR/Previews.json"
 OUT_DIR="$PROJECT_DIR/tmp/previews"
+PREVIEW_OVERRIDE_FILE="$OUT_DIR/HarnessMonitorPreviewOverrides.json"
+PREVIEW_OVERRIDE_FALLBACK_FILE="/tmp/HarnessMonitorPreviewOverrides.json"
+PREVIEW_OVERRIDE_LOCK_DIR="$OUT_DIR/.HarnessMonitorPreviewOverrides.lock"
+PREVIEW_XCODE_SCHEME="${HARNESS_MONITOR_PREVIEW_XCODE_SCHEME:-HarnessMonitorUIPreviewable}"
 TIMEOUT="${PREVIEW_TIMEOUT_SECONDS:-240}"
 CALL_TIMEOUT_MS="${PREVIEW_CALL_TIMEOUT_MS:-$(((TIMEOUT * 1000) + 30000))}"
 XCODE_PROJECT_PATH_PREFIX="apps/HarnessMonitor/Project/"
@@ -120,6 +124,62 @@ resolve_text_size_index() {
       exit 2
       ;;
   esac
+}
+
+preview_override_needed() {
+  [[ -n "$theme_mode" || -n "$text_size_index" || -n "$time_zone_mode" || -n "$custom_time_zone" ]]
+}
+
+cleanup_preview_override_file() {
+  [[ ! -f "$PREVIEW_OVERRIDE_FILE" ]] || rm -f "$PREVIEW_OVERRIDE_FILE"
+  [[ ! -f "$PREVIEW_OVERRIDE_FALLBACK_FILE" ]] || rm -f "$PREVIEW_OVERRIDE_FALLBACK_FILE"
+}
+
+acquire_preview_override_lock() {
+  mkdir -p "$OUT_DIR"
+  local deadline
+  deadline=$((SECONDS + TIMEOUT))
+  until mkdir "$PREVIEW_OVERRIDE_LOCK_DIR" 2>/dev/null; do
+    if (( SECONDS >= deadline )); then
+      echo "error: timed out waiting for preview override lock at $PREVIEW_OVERRIDE_LOCK_DIR" >&2
+      exit 1
+    fi
+    sleep 1
+  done
+}
+
+release_preview_override_lock() {
+  [[ -d "$PREVIEW_OVERRIDE_LOCK_DIR" ]] || return 0
+  rmdir "$PREVIEW_OVERRIDE_LOCK_DIR" 2>/dev/null || true
+}
+
+cleanup_preview_override_state() {
+  cleanup_preview_override_file
+  release_preview_override_lock
+}
+
+write_preview_override_file() {
+  cleanup_preview_override_file
+  preview_override_needed || return 0
+
+  local generated_at
+  generated_at="$(date +%s)"
+  mkdir -p "$OUT_DIR"
+  jq -n \
+    --arg theme_mode "$theme_mode" \
+    --arg text_size_index "$text_size_index" \
+    --arg time_zone_mode "$time_zone_mode" \
+    --arg custom_time_zone "$custom_time_zone" \
+    --argjson generated_at "$generated_at" \
+    '{
+      theme_mode:(if $theme_mode == "" then null else $theme_mode end),
+      text_size_index:(if $text_size_index == "" then null else ($text_size_index | tonumber) end),
+      time_zone_mode:(if $time_zone_mode == "" then null else $time_zone_mode end),
+      custom_time_zone:(if $custom_time_zone == "" then null else $custom_time_zone end),
+      generated_at:$generated_at
+    }' \
+    > "$PREVIEW_OVERRIDE_FILE"
+  cp "$PREVIEW_OVERRIDE_FILE" "$PREVIEW_OVERRIDE_FALLBACK_FILE"
 }
 
 print_manifest_entries() {
@@ -243,6 +303,12 @@ else
 fi
 stderr_path="${png_path%.png}.stderr"
 mkdir -p "$(dirname "$png_path")"
+trap cleanup_preview_override_state EXIT
+acquire_preview_override_lock
+write_preview_override_file
+if preview_override_needed; then
+  sleep 0.2
+fi
 
 run_once() {
   local attempt="$1"
@@ -253,17 +319,19 @@ run_once() {
   local classification="unknown"
   local stderr_file="$stderr_path"
   local xcode_entry_file
-  local -a preview_env=("XCODE_BUILD_SERVER_SCHEME=HarnessMonitorUIPreviews")
+  local -a preview_env=("XCODE_BUILD_SERVER_SCHEME=$PREVIEW_XCODE_SCHEME")
   [[ -n "$theme_mode" ]] && preview_env+=("HARNESS_MONITOR_THEME_MODE_OVERRIDE=$theme_mode")
   [[ -n "$text_size_index" ]] && preview_env+=("HARNESS_MONITOR_TEXT_SIZE_OVERRIDE=$text_size_index")
   [[ -n "$time_zone_mode" ]] && preview_env+=("HARNESS_MONITOR_TIME_ZONE_MODE_OVERRIDE=$time_zone_mode")
   [[ -n "$custom_time_zone" ]] && preview_env+=("HARNESS_MONITOR_CUSTOM_TIME_ZONE_OVERRIDE=$custom_time_zone")
   xcode_entry_file="$(xcode_project_file "$entry_file")"
   started=$(date +%s)
-  if (cd "$PROJECT_DIR" && env "${preview_env[@]}" xcode-cli --timeout "$CALL_TIMEOUT_MS" preview "$xcode_entry_file" \
-      --index "$entry_index" \
-      --render-timeout "$TIMEOUT" \
-      --out "$png_path") \
+  if (cd "$PROJECT_DIR" \
+      && env "${preview_env[@]}" xcode-cli --timeout "$CALL_TIMEOUT_MS" build \
+      && env "${preview_env[@]}" xcode-cli --timeout "$CALL_TIMEOUT_MS" preview "$xcode_entry_file" \
+        --index "$entry_index" \
+        --render-timeout "$TIMEOUT" \
+        --out "$png_path") \
       > "$stderr_file" 2>&1; then
     rc=0
   else
