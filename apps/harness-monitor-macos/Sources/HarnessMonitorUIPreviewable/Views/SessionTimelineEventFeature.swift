@@ -2,6 +2,8 @@ import HarnessMonitorKit
 
 // Live region priority for signal-adjacent features is handled in
 // MonitorTimelineLiveRegion.priority(for:summary:). Add cases there when adding a new feature family.
+// The split exists because live-region priority depends on raw entry kind + summary at announcement
+// time, before node enrichment; the feature protocol operates after the node is built.
 protocol TimelineEventFeature: Sendable {
   static var id: String { get }
   func handles(entry: TimelineEntry) -> Bool
