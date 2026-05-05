@@ -79,3 +79,75 @@ struct SidebarFooterStatusStripStateTests {
     #expect(state.stateMarkerValue == "bridge=running, mcp=hidden")
   }
 }
+
+@Suite("SidebarFooterGlassTintBlend")
+struct SidebarFooterGlassTintBlendTests {
+  @Test("Hidden footer services keep a uniform connection tint")
+  func hiddenFooterServicesKeepUniformConnectionTint() {
+    let state = SidebarFooterStatusStripState(
+      daemonOwnership: .external,
+      bridgeRunning: false,
+      mcpStatus: HarnessMonitorMCPStatusSnapshot(
+        runtimeState: .disabled,
+        recoveryStatus: nil
+      ),
+      isMCPRegistryHostEnabled: false
+    )
+    let blend = SidebarFooterGlassTintBlend(state: state)
+
+    #expect(!blend.hasTrailingTint)
+    #expect(
+      blend.stops == [
+        SidebarFooterGlassTintStop(role: .connection, location: 0),
+        SidebarFooterGlassTintStop(role: .connection, location: 1),
+      ]
+    )
+  }
+
+  @Test("Managed bridge and MCP feed their token tones into the trailing blend")
+  func managedBridgeAndMCPFeedTokenTonesIntoTrailingBlend() {
+    let state = SidebarFooterStatusStripState(
+      daemonOwnership: .managed,
+      bridgeRunning: true,
+      mcpStatus: HarnessMonitorMCPStatusSnapshot(
+        runtimeState: .disabled,
+        recoveryStatus: nil
+      ),
+      isMCPRegistryHostEnabled: true
+    )
+    let blend = SidebarFooterGlassTintBlend(state: state)
+
+    #expect(blend.hasTrailingTint)
+    #expect(
+      blend.stops == [
+        SidebarFooterGlassTintStop(role: .connection, location: 0),
+        SidebarFooterGlassTintStop(role: .connection, location: 0.38),
+        SidebarFooterGlassTintStop(role: .token(.success), location: 0.66),
+        SidebarFooterGlassTintStop(role: .token(.muted), location: 1),
+      ]
+    )
+  }
+
+  @Test("Single visible footer token colors the trailing edge")
+  func singleVisibleFooterTokenColorsTrailingEdge() {
+    let state = SidebarFooterStatusStripState(
+      daemonOwnership: .external,
+      bridgeRunning: false,
+      mcpStatus: HarnessMonitorMCPStatusSnapshot(
+        runtimeState: .healthy(socketPath: "/tmp/harness-mcp.sock"),
+        recoveryStatus: nil
+      ),
+      isMCPRegistryHostEnabled: true
+    )
+    let blend = SidebarFooterGlassTintBlend(state: state)
+
+    #expect(blend.hasTrailingTint)
+    #expect(
+      blend.stops == [
+        SidebarFooterGlassTintStop(role: .connection, location: 0),
+        SidebarFooterGlassTintStop(role: .connection, location: 0.44),
+        SidebarFooterGlassTintStop(role: .token(.success), location: 1),
+      ]
+    )
+  }
+}

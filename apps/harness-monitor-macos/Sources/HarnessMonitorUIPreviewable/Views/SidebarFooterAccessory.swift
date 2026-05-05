@@ -15,6 +15,73 @@ enum SidebarFooterStatusTone: Equatable {
   }
 }
 
+enum SidebarFooterGlassTintStopRole: Equatable {
+  case connection
+  case token(SidebarFooterStatusTone)
+
+  func color(connectionTint: Color) -> Color {
+    switch self {
+    case .connection:
+      connectionTint
+    case .token(let tone):
+      tone.color
+    }
+  }
+}
+
+struct SidebarFooterGlassTintStop: Equatable {
+  let role: SidebarFooterGlassTintStopRole
+  let location: Double
+}
+
+struct SidebarFooterGlassTintBlend: Equatable {
+  let stops: [SidebarFooterGlassTintStop]
+
+  init(state: SidebarFooterStatusStripState) {
+    let tokenRoles = [state.bridge?.tone, state.mcp?.tone].compactMap(\.self).map {
+      SidebarFooterGlassTintStopRole.token($0)
+    }
+
+    switch tokenRoles.count {
+    case 0:
+      stops = [
+        SidebarFooterGlassTintStop(role: .connection, location: 0),
+        SidebarFooterGlassTintStop(role: .connection, location: 1),
+      ]
+    case 1:
+      stops = [
+        SidebarFooterGlassTintStop(role: .connection, location: 0),
+        SidebarFooterGlassTintStop(role: .connection, location: 0.44),
+        SidebarFooterGlassTintStop(role: tokenRoles[0], location: 1),
+      ]
+    default:
+      stops = [
+        SidebarFooterGlassTintStop(role: .connection, location: 0),
+        SidebarFooterGlassTintStop(role: .connection, location: 0.38),
+        SidebarFooterGlassTintStop(role: tokenRoles[0], location: 0.66),
+        SidebarFooterGlassTintStop(role: tokenRoles[1], location: 1),
+      ]
+    }
+  }
+
+  var hasTrailingTint: Bool {
+    stops.count > 2
+  }
+
+  func gradient(connectionTint: Color) -> LinearGradient {
+    LinearGradient(
+      stops: stops.map {
+        Gradient.Stop(
+          color: $0.role.color(connectionTint: connectionTint),
+          location: $0.location
+        )
+      },
+      startPoint: .leading,
+      endPoint: .trailing
+    )
+  }
+}
+
 struct SidebarFooterStatusToken: Equatable {
   let label: String
   let tone: SidebarFooterStatusTone
@@ -101,6 +168,7 @@ struct SidebarFooterStatusStripState: Equatable {
 }
 
 public struct SidebarFooterAccessory: View {
+  private static let glassCornerRadius = HarnessMonitorTheme.cornerRadiusMD
   public let metrics: ConnectionMetrics
   public let daemonOwnership: DaemonOwnership
   public let bridgeRunning: Bool
@@ -121,7 +189,7 @@ public struct SidebarFooterAccessory: View {
     self.isMCPRegistryHostEnabled = isMCPRegistryHostEnabled
   }
 
-  private var tint: Color {
+  private var connectionTint: Color {
     metrics.latencyTint
   }
 
@@ -132,6 +200,10 @@ public struct SidebarFooterAccessory: View {
       mcpStatus: mcpStatus,
       isMCPRegistryHostEnabled: isMCPRegistryHostEnabled
     )
+  }
+
+  private var backgroundTintBlend: SidebarFooterGlassTintBlend {
+    SidebarFooterGlassTintBlend(state: statusStripState)
   }
 
   public var body: some View {
@@ -145,9 +217,16 @@ public struct SidebarFooterAccessory: View {
     }
     .padding(.vertical, HarnessMonitorTheme.itemSpacing)
     .padding(.horizontal, HarnessMonitorTheme.itemSpacing)
+    .background {
+      SidebarFooterGlassTintWash(
+        connectionTint: connectionTint,
+        blend: backgroundTintBlend,
+        cornerRadius: Self.glassCornerRadius
+      )
+    }
     .harnessFloatingControlGlass(
-      cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
-      tint: tint
+      cornerRadius: Self.glassCornerRadius,
+      tint: connectionTint
     )
     .padding(HarnessMonitorTheme.itemSpacing)
     .accessibilityElement(children: .contain)
@@ -155,20 +234,46 @@ public struct SidebarFooterAccessory: View {
   }
 }
 
+private struct SidebarFooterGlassTintWash: View {
+  let connectionTint: Color
+  let blend: SidebarFooterGlassTintBlend
+  let cornerRadius: CGFloat
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
+
+  private var fillOpacity: Double {
+    if reduceTransparency {
+      return colorSchemeContrast == .increased ? 0.3 : 0.24
+    }
+    return colorSchemeContrast == .increased ? 0.24 : 0.18
+  }
+
+  @ViewBuilder
+  var body: some View {
+    if blend.hasTrailingTint {
+      RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        .fill(blend.gradient(connectionTint: connectionTint).opacity(fillOpacity))
+        .accessibilityHidden(true)
+        .allowsHitTesting(false)
+    }
+  }
+}
+
 private struct SidebarFooterStatusStrip: View {
   let state: SidebarFooterStatusStripState
-
-  private static let separatorSize: CGFloat = 4
+  private static let separatorSpacing: CGFloat = 3
 
   var body: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingXS) {
+    HStack(alignment: .firstTextBaseline, spacing: Self.separatorSpacing) {
       if let bridge = state.bridge {
         SidebarFooterStatusWord(token: bridge)
       }
       if state.showsSeparator {
-        Circle()
-          .fill(HarnessMonitorTheme.secondaryInk.opacity(0.45))
-          .frame(width: Self.separatorSize, height: Self.separatorSize)
+        Text(verbatim: "·")
+          .scaledFont(.system(.caption2, design: .rounded, weight: .semibold))
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk.opacity(0.55))
           .accessibilityHidden(true)
       }
       if let mcp = state.mcp {
@@ -195,51 +300,124 @@ private struct SidebarFooterStatusWord: View {
   }
 }
 
-#Preview("Sidebar Footer - Managed Unavailable") {
+#Preview("Sidebar Footer Variants") {
   let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .dashboardLoaded)
 
-  SidebarFooterAccessory(
-    metrics: store.connectionMetrics,
-    daemonOwnership: .managed,
-    bridgeRunning: false,
-    mcpStatus: HarnessMonitorMCPStatusSnapshot(
-      runtimeState: .disabled,
-      recoveryStatus: nil
-    ),
-    isMCPRegistryHostEnabled: true
-  )
-  .padding(20)
-  .frame(width: 280)
+  VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+    SidebarFooterPreviewVariant(
+      title: "Managed unavailable",
+      accessory: SidebarFooterAccessory(
+        metrics: store.connectionMetrics,
+        daemonOwnership: .managed,
+        bridgeRunning: false,
+        mcpStatus: HarnessMonitorMCPStatusSnapshot(
+          runtimeState: .disabled,
+          recoveryStatus: nil
+        ),
+        isMCPRegistryHostEnabled: true
+      )
+    )
+    SidebarFooterPreviewVariant(
+      title: "Healthy services",
+      accessory: SidebarFooterAccessory(
+        metrics: store.connectionMetrics,
+        daemonOwnership: .managed,
+        bridgeRunning: true,
+        mcpStatus: HarnessMonitorMCPStatusSnapshot(
+          runtimeState: .healthy(socketPath: "/tmp/harness-mcp.sock"),
+          recoveryStatus: nil
+        ),
+        isMCPRegistryHostEnabled: true
+      )
+    )
+    SidebarFooterPreviewVariant(
+      title: "Mixed tint blend",
+      accessory: SidebarFooterAccessory(
+        metrics: store.connectionMetrics,
+        daemonOwnership: .managed,
+        bridgeRunning: true,
+        mcpStatus: HarnessMonitorMCPStatusSnapshot(
+          runtimeState: .disabled,
+          recoveryStatus: nil
+        ),
+        isMCPRegistryHostEnabled: true
+      )
+    )
+    SidebarFooterPreviewVariant(
+      title: "Mixed tint blend — WS degraded",
+      accessory: SidebarFooterAccessory(
+        metrics: sidebarFooterPreviewConnectionMetrics(latencyMs: 320, messagesPerSecond: 4.1),
+        daemonOwnership: .managed,
+        bridgeRunning: true,
+        mcpStatus: HarnessMonitorMCPStatusSnapshot(
+          runtimeState: .disabled,
+          recoveryStatus: nil
+        ),
+        isMCPRegistryHostEnabled: true
+      )
+    )
+    SidebarFooterPreviewVariant(
+      title: "Mixed tint blend — WS poor",
+      accessory: SidebarFooterAccessory(
+        metrics: sidebarFooterPreviewConnectionMetrics(latencyMs: 820, messagesPerSecond: 1.8),
+        daemonOwnership: .managed,
+        bridgeRunning: true,
+        mcpStatus: HarnessMonitorMCPStatusSnapshot(
+          runtimeState: .disabled,
+          recoveryStatus: nil
+        ),
+        isMCPRegistryHostEnabled: true
+      )
+    )
+    SidebarFooterPreviewVariant(
+      title: "Connection only",
+      accessory: SidebarFooterAccessory(
+        metrics: .initial,
+        daemonOwnership: .external,
+        bridgeRunning: false,
+        mcpStatus: HarnessMonitorMCPStatusSnapshot(
+          runtimeState: .disabled,
+          recoveryStatus: nil
+        ),
+        isMCPRegistryHostEnabled: false
+      )
+    )
+  }
+  .padding(24)
+  .frame(width: 360)
 }
 
-#Preview("Sidebar Footer - Healthy Services") {
-  let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .dashboardLoaded)
+private struct SidebarFooterPreviewVariant: View {
+  let title: String
+  let accessory: SidebarFooterAccessory
 
-  SidebarFooterAccessory(
-    metrics: store.connectionMetrics,
-    daemonOwnership: .managed,
-    bridgeRunning: true,
-    mcpStatus: HarnessMonitorMCPStatusSnapshot(
-      runtimeState: .healthy(socketPath: "/tmp/harness-mcp.sock"),
-      recoveryStatus: nil
-    ),
-    isMCPRegistryHostEnabled: true
-  )
-  .padding(20)
-  .frame(width: 280)
+  var body: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      Text(title)
+        .scaledFont(.system(.caption, design: .rounded, weight: .semibold))
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      accessory
+        .frame(width: 280)
+    }
+  }
 }
 
-#Preview("Sidebar Footer - Connection Only") {
-  SidebarFooterAccessory(
-    metrics: .initial,
-    daemonOwnership: .external,
-    bridgeRunning: false,
-    mcpStatus: HarnessMonitorMCPStatusSnapshot(
-      runtimeState: .disabled,
-      recoveryStatus: nil
-    ),
-    isMCPRegistryHostEnabled: false
+private func sidebarFooterPreviewConnectionMetrics(
+  latencyMs: Int,
+  messagesPerSecond: Double
+) -> ConnectionMetrics {
+  ConnectionMetrics(
+    transportKind: .webSocket,
+    latencyMs: latencyMs,
+    averageLatencyMs: latencyMs + 4,
+    messagesReceived: 64,
+    messagesSent: 64,
+    messagesPerSecond: messagesPerSecond,
+    connectedSince: .now.addingTimeInterval(-900),
+    lastMessageAt: .now,
+    reconnectAttempt: 0,
+    reconnectCount: 0,
+    isFallback: false,
+    fallbackReason: nil
   )
-  .padding(20)
-  .frame(width: 280)
 }
