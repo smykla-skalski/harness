@@ -324,7 +324,10 @@ struct AgentDetailSection: View {
     guard let entry = agentTimelineEntries.last else { return }
     guard entry.entryId != lastAnnouncedTimelineEntryId else { return }
     lastAnnouncedTimelineEntryId = entry.entryId
-    let priority = MonitorTimelineLiveRegion.priority(for: entry.kind)
+    let priority = MonitorTimelineLiveRegion.priority(
+      for: entry.kind,
+      summary: entry.summary
+    )
     transcriptAnnouncer.announceIfAllowed(entry.summary, priority: priority)
   }
 
