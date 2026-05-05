@@ -23,7 +23,7 @@ struct HarnessMonitorStoreExternalDaemonTests {
     #expect(store.currentFailureFeedbackMessage == nil)
   }
 
-  @Test("External bootstrap reports external offline error with manifest path")
+  @Test("External bootstrap reports short external offline error")
   func externalBootstrapReportsExternalOfflineError() async {
     let manifestPath = "/tmp/harness/daemon/manifest.json"
     let daemon = RecordingDaemonController(
@@ -40,8 +40,7 @@ struct HarnessMonitorStoreExternalDaemonTests {
       Issue.record("Expected offline connection state, got \(store.connectionState)")
       return
     }
-    #expect(message.contains("harness daemon dev"))
-    #expect(message.contains(manifestPath))
+    #expect(message == "Background helper is not running. Start it to load live sessions.")
   }
 
   @Test("Managed bootstrap still gates on launch agent registration state")
@@ -78,8 +77,8 @@ struct HarnessMonitorStoreExternalDaemonTests {
       Issue.record("Expected offline connection state, got \(store.connectionState)")
       return
     }
-    // Non-DaemonControlError falls back to the generic guidance message.
-    #expect(message.contains("harness daemon dev"))
+    // Non-DaemonControlError falls back to the generic recovery guidance message.
+    #expect(message.contains("Background helper unavailable"))
   }
 
   @Test("Ownership init reads HARNESS_MONITOR_EXTERNAL_DAEMON")
@@ -111,26 +110,25 @@ struct HarnessMonitorStoreExternalDaemonTests {
     #endif
   }
 
-  @Test("External daemon offline error mentions the harness daemon dev command")
-  func externalDaemonOfflineErrorMessageMentionsDevCommand() {
+  @Test("External daemon offline error uses short user-facing copy")
+  func externalDaemonOfflineErrorMessageUsesShortCopy() {
     let error = DaemonControlError.externalDaemonOffline(manifestPath: "/tmp/x")
     let description = error.errorDescription ?? ""
-    #expect(description.contains("harness daemon dev"))
-    #expect(description.contains("/tmp/x"))
+    #expect(description == "Background helper is not running. Start it to load live sessions.")
+    #expect(!description.contains("/tmp/x"))
   }
 
-  @Test("Stale manifest error message is distinct and mentions the path")
+  @Test("Stale manifest error message uses short user-facing copy")
   func staleManifestErrorHasDistinctWording() {
     let error = DaemonControlError.externalDaemonManifestStale(
       manifestPath: "/tmp/y/manifest.json"
     )
     let description = error.errorDescription ?? ""
-    #expect(description.contains("Stale manifest"))
-    #expect(description.contains("/tmp/y/manifest.json"))
-    #expect(description.contains("harness daemon dev"))
+    #expect(description == "Background helper stopped unexpectedly. Restart it to reconnect.")
+    #expect(!description.contains("/tmp/y/manifest.json"))
   }
 
-  @Test("External bootstrap surfaces stale manifest error when warm-up throws it")
+  @Test("External bootstrap surfaces stale manifest recovery when warm-up throws it")
   func externalBootstrapSurfacesStaleManifestError() async {
     let daemon = RecordingDaemonController(
       warmUpError: DaemonControlError.externalDaemonManifestStale(
@@ -148,8 +146,7 @@ struct HarnessMonitorStoreExternalDaemonTests {
       Issue.record("Expected offline connection state, got \(store.connectionState)")
       return
     }
-    #expect(message.contains("Stale manifest"))
-    #expect(message.contains("/tmp/stale/manifest.json"))
+    #expect(message == "Background helper stopped. Restart it to reconnect.")
   }
 
   @Test("External bootstrap warns when SMAppService launch agent is still registered")

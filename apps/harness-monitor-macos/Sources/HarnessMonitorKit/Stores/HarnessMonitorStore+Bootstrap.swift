@@ -161,13 +161,21 @@ extension HarnessMonitorStore {
         await connect(using: client)
       }
     } catch {
-      let message =
-        (error as? DaemonControlError)?.errorDescription
-        ?? "External daemon not running. Start it with `\(daemonCommand)` in a terminal."
-      markConnectionOffline(message)
-      presentFailureFeedback(message)
+      let recovery = externalDaemonRecoveryFeedback(
+        for: error,
+        daemonCommand: daemonCommand
+      )
+      markConnectionOffline(recovery.offlineMessage)
+      toast.presentWarning(
+        recovery.message,
+        title: recovery.title,
+        details: recovery.details,
+        primaryAction: recovery.primaryAction,
+        rollupDuplicates: true
+      )
       await restorePersistedSessionState()
       startManifestWatcher()
     }
   }
+
 }
