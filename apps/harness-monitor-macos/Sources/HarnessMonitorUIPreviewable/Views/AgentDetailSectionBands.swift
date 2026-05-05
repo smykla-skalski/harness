@@ -21,7 +21,8 @@ struct AgentDetailSummaryBand: View {
           runtimeLabel: runtimeLabel,
           status: status,
           roleTitle: roleTitle,
-          currentTaskTitle: currentTaskTitle
+          currentTaskTitle: currentTaskTitle,
+          overviewFacts: overviewFacts
         )
         if let runtimeState, let inspectStatus {
           AcpRuntimeView(
@@ -30,11 +31,15 @@ struct AgentDetailSummaryBand: View {
             inspectStatus: inspectStatus,
             presentation: runtimePresentation
           )
+        } else {
+          AgentDetailRestingRuntimeLine(lastActivity: lastActivityFactValue)
         }
-        Divider()
-        AgentDetailFactSummaryGrid(facts: overviewFacts, maximumColumns: 3)
       }
     }
+  }
+
+  private var lastActivityFactValue: String {
+    overviewFacts.first(where: { $0.title == "Last Activity" })?.value ?? "unknown"
   }
 }
 
@@ -102,28 +107,14 @@ struct AgentDetailActivityBand: View {
           AgentDetailMetadataSection(
             title: "Recent activity",
             values: recentToolValues,
-            summaryFacts: activityFacts
+            summaryFacts: activityFacts,
+            inlineValues: true
           )
         }
-        DisclosureGroup("Capabilities & hooks") {
-          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-            AgentDetailMetadataSection(
-              title: "Declared capabilities",
-              values: capabilityValues
-            )
-            if !hookPoints.isEmpty {
-              VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-                AgentDetailSubsectionTitle(title: "Hook points")
-                AgentDetailHookPointsGrid(hookPoints: hookPoints)
-              }
-            }
-          }
-          .padding(.top, HarnessMonitorTheme.spacingSM)
-        }
-        .scaledFont(.caption.bold())
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .accessibilityIdentifier(
-          HarnessMonitorAccessibility.agentDetailReferenceDisclosure(agentID)
+        AgentDetailReferenceDisclosure(
+          agentID: agentID,
+          capabilityValues: capabilityValues,
+          hookPoints: hookPoints
         )
       }
     }
@@ -275,6 +266,7 @@ private struct AgentDetailSummaryHeader: View {
   let status: AgentStatus
   let roleTitle: String
   let currentTaskTitle: String
+  let overviewFacts: [AgentDetailFact]
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
@@ -297,6 +289,10 @@ private struct AgentDetailSummaryHeader: View {
         Text(currentTaskTitle)
           .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
           .fixedSize(horizontal: false, vertical: true)
+      }
+
+      if !overviewFacts.isEmpty {
+        AgentDetailHeaderFactStrip(facts: overviewFacts)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -352,6 +348,109 @@ private struct AgentDetailSummaryHeader: View {
     case .removed:
       "minus.circle.fill"
     }
+  }
+}
+
+private struct AgentDetailHeaderFactStrip: View {
+  let facts: [AgentDetailFact]
+
+  private var visibleFacts: [AgentDetailFact] {
+    facts.filter { !$0.isHiddenZero }
+  }
+
+  var body: some View {
+    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingMD) {
+      ForEach(Array(visibleFacts.enumerated()), id: \.element.id) { index, fact in
+        if index > 0 {
+          Text("·")
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk.opacity(0.6))
+            .accessibilityHidden(true)
+        }
+        HStack(spacing: HarnessMonitorTheme.spacingXS) {
+          Text(fact.title)
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          Text(fact.value)
+            .scaledFont(.caption.bold())
+            .foregroundStyle(fact.tint ?? HarnessMonitorTheme.ink)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(fact.title)
+        .accessibilityValue(fact.value)
+      }
+      Spacer(minLength: 0)
+    }
+    .fixedSize(horizontal: false, vertical: true)
+  }
+}
+
+struct AgentDetailRestingRuntimeLine: View {
+  let lastActivity: String
+
+  var body: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingXS) {
+      Image(systemName: "antenna.radiowaves.left.and.right")
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .accessibilityHidden(true)
+      Text("Stdout signals only — last seen \(lastActivity)")
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .fixedSize(horizontal: false, vertical: true)
+      Spacer(minLength: 0)
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("Runtime")
+    .accessibilityValue("Stdout signals only, last seen \(lastActivity)")
+  }
+}
+
+struct AgentDetailReferenceDisclosure: View {
+  let agentID: String
+  let capabilityValues: [String]
+  let hookPoints: [HookIntegrationDescriptor]
+
+  @State private var isExpanded: Bool = true
+
+  private var disclosureLabel: String {
+    let capabilityCount = capabilityValues.count
+    let hookCount = hookPoints.count
+    if hookCount > 0 {
+      return "Capabilities & hooks (\(capabilityCount) capabilities, \(hookCount) hook points)"
+    }
+    return "Capabilities & hooks (\(capabilityCount))"
+  }
+
+  var body: some View {
+    DisclosureGroup(isExpanded: $isExpanded) {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+        AgentDetailMetadataSection(
+          title: "Declared capabilities",
+          values: capabilityValues
+        )
+        if !hookPoints.isEmpty {
+          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+            AgentDetailSubsectionTitle(title: "Hook points")
+            AgentDetailHookPointsGrid(hookPoints: hookPoints)
+          }
+        }
+      }
+      .padding(.top, HarnessMonitorTheme.spacingSM)
+    } label: {
+      HStack(spacing: HarnessMonitorTheme.spacingXS) {
+        Image(systemName: "info.circle")
+          .scaledFont(.caption.weight(.semibold))
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .accessibilityHidden(true)
+        Text(disclosureLabel)
+          .scaledFont(.caption.bold())
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      }
+    }
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.agentDetailReferenceDisclosure(agentID)
+    )
   }
 }
 

@@ -51,9 +51,14 @@ struct AgentDetailRoleActionsRegion: View {
   let rolePickerValues: [SessionRole]
 
   @Binding var rolePickerSelection: SessionRole
+  @State private var isExpanded: Bool = false
+
+  private var roleActionsLabel: String {
+    isLeader ? "Role actions (leader fixed)" : "Role actions"
+  }
 
   var body: some View {
-    DisclosureGroup("Role actions") {
+    DisclosureGroup(isExpanded: $isExpanded) {
       AgentDetailRoleActionsSection(
         store: store,
         sessionID: sessionID,
@@ -64,9 +69,17 @@ struct AgentDetailRoleActionsRegion: View {
         rolePickerSelection: $rolePickerSelection
       )
       .padding(.top, HarnessMonitorTheme.spacingSM)
+    } label: {
+      HStack(spacing: HarnessMonitorTheme.spacingXS) {
+        Image(systemName: "wrench.adjustable")
+          .scaledFont(.caption.weight(.semibold))
+          .foregroundStyle(HarnessMonitorTheme.caution)
+          .accessibilityHidden(true)
+        Text(roleActionsLabel)
+          .scaledFont(.caption.bold())
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      }
     }
-    .scaledFont(.caption.bold())
-    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityIdentifier(
       HarnessMonitorAccessibility.agentDetailRoleActionsDisclosure(agentID)
@@ -86,7 +99,10 @@ struct AgentDetailComposerRegion: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      AgentDetailSubsectionTitle(title: "Send update")
+      Text("Send update")
+        .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
+        .foregroundStyle(HarnessMonitorTheme.ink)
+        .accessibilityAddTraits(.isHeader)
       AgentDetailSendUpdateSection(
         store: store,
         sessionID: sessionID,
@@ -103,7 +119,7 @@ struct AgentDetailComposerRegion: View {
     .harnessPanelGlass()
     .overlay(alignment: .top) {
       Rectangle()
-        .fill(HarnessMonitorTheme.controlBorder.opacity(0.4))
+        .fill(HarnessMonitorTheme.controlBorder.opacity(0.7))
         .frame(height: 1)
     }
     .accessibilityIdentifier(
