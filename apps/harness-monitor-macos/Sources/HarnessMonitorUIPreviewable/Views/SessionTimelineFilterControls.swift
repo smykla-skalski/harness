@@ -6,6 +6,8 @@ struct SessionTimelineFilterControls: View {
   private let inventory: SessionTimelineFilterInventory
   private let summary: SessionTimelineFilterSummary
 
+  @Environment(\.fontScale)
+  private var fontScale
   @State private var showsAdvancedFilters = false
 
   init(
@@ -91,6 +93,12 @@ struct SessionTimelineFilterControls: View {
         searchField
         searchAccessoryRow
       }
+      .frame(
+        minWidth: SessionTimelineFilterControlLayout.horizontalMinimumWidth(
+          fontScale: fontScale
+        ),
+        alignment: .leading
+      )
 
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
         searchField
@@ -116,11 +124,7 @@ struct SessionTimelineFilterControls: View {
   }
 
   private var searchField: some View {
-    TextField("Search timeline", text: $filters.query)
-      .textFieldStyle(.roundedBorder)
-      .harnessNativeFormControl()
-      .accessibilityLabel("Search timeline")
-      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterSearch)
+    SessionTimelineSearchField(query: $filters.query)
       .frame(maxWidth: .infinity)
       .layoutPriority(1)
   }
@@ -266,5 +270,149 @@ struct SessionTimelineFilterControls: View {
       return false
     }
     return filters.semanticProperties.contains(property)
+  }
+}
+
+private struct SessionTimelineSearchField: View {
+  @Binding var query: String
+  @FocusState private var isFocused: Bool
+
+  var body: some View {
+    HStack(alignment: .center, spacing: 7) {
+      Image(systemName: "magnifyingglass")
+        .imageScale(.small)
+        .foregroundStyle(.secondary)
+        .accessibilityHidden(true)
+
+      TextField("Search timeline", text: $query)
+        .textFieldStyle(.plain)
+        .harnessNativeFormControl()
+        .focused($isFocused)
+        .accessibilityLabel("Search timeline")
+        .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterSearch)
+        .layoutPriority(1)
+
+      if !query.isEmpty {
+        Button {
+          query = ""
+        } label: {
+          Image(systemName: "xmark.circle.fill")
+            .imageScale(.small)
+            .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel("Clear timeline search")
+      }
+    }
+    .modifier(SessionTimelineSearchFieldChromeModifier(isFocused: isFocused))
+    .contentShape(Rectangle())
+    .onTapGesture {
+      isFocused = true
+    }
+  }
+}
+
+enum SessionTimelineFilterControlLayout {
+  static let readableHorizontalSearchWidth: CGFloat = 560
+
+  static func horizontalMinimumWidth(fontScale: CGFloat) -> CGFloat {
+    readableHorizontalSearchWidth * max(1, min(fontScale, 1.3))
+  }
+}
+
+private struct SessionTimelineSearchFieldChromeModifier: ViewModifier {
+  let isFocused: Bool
+
+  @Environment(\.harnessNativeFormControlSize)
+  private var controlSize
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
+
+  private var minimumHeight: CGFloat {
+    switch controlSize {
+    case .mini:
+      22
+    case .small:
+      28
+    case .regular:
+      34
+    case .large:
+      40
+    case .extraLarge:
+      46
+    @unknown default:
+      34
+    }
+  }
+
+  private var horizontalPadding: CGFloat {
+    switch controlSize {
+    case .mini, .small:
+      10
+    case .regular:
+      12
+    case .large, .extraLarge:
+      14
+    @unknown default:
+      12
+    }
+  }
+
+  private var cornerRadius: CGFloat {
+    switch controlSize {
+    case .mini:
+      7
+    case .small:
+      9
+    case .regular, .large, .extraLarge:
+      999
+    @unknown default:
+      999
+    }
+  }
+
+  private var fillOpacity: Double {
+    if reduceTransparency {
+      colorSchemeContrast == .increased ? 0.26 : 0.18
+    } else {
+      colorSchemeContrast == .increased ? 0.16 : 0.10
+    }
+  }
+
+  private var strokeOpacity: Double {
+    colorSchemeContrast == .increased ? 0.46 : 0.30
+  }
+
+  private var strokeWidth: CGFloat {
+    colorSchemeContrast == .increased ? 1.5 : 1
+  }
+
+  private var focusedStrokeWidth: CGFloat {
+    colorSchemeContrast == .increased ? 2 : 1.5
+  }
+
+  func body(content: Content) -> some View {
+    let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
+    content
+      .padding(.horizontal, horizontalPadding)
+      .frame(minHeight: minimumHeight)
+      .background {
+        if reduceTransparency {
+          shape.fill(HarnessMonitorTheme.ink.opacity(fillOpacity))
+        } else {
+          shape.fill(.regularMaterial)
+        }
+      }
+      .overlay {
+        shape.strokeBorder(
+          isFocused
+            ? HarnessMonitorTheme.accent.opacity(0.82)
+            : HarnessMonitorTheme.controlBorder.opacity(strokeOpacity),
+          lineWidth: isFocused ? focusedStrokeWidth : strokeWidth
+        )
+      }
   }
 }
