@@ -186,8 +186,7 @@ struct MonitorTimelineSignalVOActionTests {
     )
     let context = TimelineFeatureContext(
       now: Date(timeIntervalSince1970: 0),
-      signalsByID: [signalID: record],
-      sessionID: "session-1"
+      signalsByID: [signalID: record]
     )
     let nodes = SessionTimelineNodeBuilder(
       sessionID: "session-1",
@@ -238,8 +237,7 @@ struct MonitorTimelineSignalVOActionTests {
     )
     let context = TimelineFeatureContext(
       now: Date(timeIntervalSince1970: 0),
-      signalsByID: [signalID: record],
-      sessionID: "session-1"
+      signalsByID: [signalID: record]
     )
     let nodes = SessionTimelineNodeBuilder(
       sessionID: "session-1",
@@ -286,8 +284,7 @@ struct MonitorTimelineSignalVOActionTests {
     )
     let context = TimelineFeatureContext(
       now: Date(timeIntervalSince1970: 0),
-      signalsByID: [signalID: record],
-      sessionID: "session-1"
+      signalsByID: [signalID: record]
     )
     let nodes = SessionTimelineNodeBuilder(
       sessionID: "session-1",

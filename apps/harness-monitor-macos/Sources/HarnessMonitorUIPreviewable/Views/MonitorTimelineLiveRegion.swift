@@ -26,6 +26,10 @@ public enum MonitorTimelineLiveRegion {
     case "signal_sent", "signal_received":
       return .polite
     case "signal_acknowledged":
+      // Assertive gate uses rejected/expired/deferred only. The feature tone vocabulary
+      // (SignalTimelineEventFeature.acknowledgedOutcome) is intentionally wider — it also
+      // maps fail/denied to .critical. That difference is by design: display tone is
+      // finer-grained than live-region urgency. Keep in sync when adding new outcome keywords.
       let lower = summary.lowercased()
       if lower.contains("rejected") || lower.contains("expired") || lower.contains("deferred") {
         return .assertive
