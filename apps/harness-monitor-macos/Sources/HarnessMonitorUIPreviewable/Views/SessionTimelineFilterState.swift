@@ -105,6 +105,10 @@ enum SessionTimelineFilterDefaults {
 }
 
 struct SessionTimelineFilterState: Equatable, Sendable {
+  static let signalEventKinds: Set<String> = [
+    "signal_sent", "signal_received", "signal_acknowledged",
+  ]
+
   var query: String = ""
   var searchScope: SessionTimelineSearchScope = .all
   var tones: Set<SessionTimelineTone> = []
@@ -169,6 +173,18 @@ struct SessionTimelineFilterState: Equatable, Sendable {
 
   mutating func toggleTone(_ tone: SessionTimelineTone) {
     Self.toggleMembership(of: tone, in: &tones)
+  }
+
+  var signalPresetActive: Bool {
+    Self.signalEventKinds.isSubset(of: eventTypes)
+  }
+
+  mutating func toggleSignalPreset() {
+    if signalPresetActive {
+      eventTypes.subtract(Self.signalEventKinds)
+    } else {
+      eventTypes.formUnion(Self.signalEventKinds)
+    }
   }
 
   mutating func toggleEventType(_ rawValue: String) {

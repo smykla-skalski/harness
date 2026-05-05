@@ -272,3 +272,11 @@ extension SessionTimelineFilterInventory {
     }
   }
 }
+
+extension SessionTimelineFilterInventory {
+  var signalCount: Int {
+    eventTypes
+      .filter { SessionTimelineFilterState.signalEventKinds.contains($0.id) }
+      .reduce(0) { $0 + $1.count }
+  }
+}
