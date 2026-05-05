@@ -22,9 +22,9 @@ use crate::session::types::{
 };
 
 use super::DaemonHttpState;
-use super::response::map_json;
+use super::super::response::map_json;
 
-pub(super) async fn response_body(
+pub(in crate::daemon::http) async fn response_body(
     result: Result<Value, crate::errors::CliError>,
 ) -> (StatusCode, Value) {
     let response = map_json(result);
@@ -34,7 +34,9 @@ pub(super) async fn response_body(
     (status, json)
 }
 
-pub(super) async fn response_json(response: axum::response::Response) -> (StatusCode, Value) {
+pub(in crate::daemon::http) async fn response_json(
+    response: axum::response::Response,
+) -> (StatusCode, Value) {
     let status = response.status();
     let bytes = to_bytes(response.into_body(), 4 * 1024 * 1024)
         .await
@@ -43,7 +45,7 @@ pub(super) async fn response_json(response: axum::response::Response) -> (Status
     (status, json)
 }
 
-pub(super) fn auth_headers() -> HeaderMap {
+pub(in crate::daemon::http) fn auth_headers() -> HeaderMap {
     let mut headers = HeaderMap::new();
     headers.insert(
         AUTHORIZATION,
@@ -52,7 +54,7 @@ pub(super) fn auth_headers() -> HeaderMap {
     headers
 }
 
-pub(super) fn test_http_state_with_db() -> DaemonHttpState {
+pub(in crate::daemon::http) fn test_http_state_with_db() -> DaemonHttpState {
     let (sender, _) = broadcast::channel(8);
     let db_slot = Arc::new(OnceLock::new());
     let async_db = Arc::new(OnceLock::new());
@@ -102,7 +104,9 @@ pub(super) fn test_http_state_with_db() -> DaemonHttpState {
     }
 }
 
-pub(super) fn test_http_state_with_sync_db_only(db_path: &std::path::Path) -> DaemonHttpState {
+pub(in crate::daemon::http) fn test_http_state_with_sync_db_only(
+    db_path: &std::path::Path,
+) -> DaemonHttpState {
     let (sender, _) = broadcast::channel(8);
     let db_slot = Arc::new(OnceLock::new());
     let async_db = Arc::new(OnceLock::new());
@@ -137,7 +141,7 @@ pub(super) fn test_http_state_with_sync_db_only(db_path: &std::path::Path) -> Da
     }
 }
 
-pub(super) fn sample_project() -> DiscoveredProject {
+pub(in crate::daemon::http) fn sample_project() -> DiscoveredProject {
     DiscoveredProject {
         project_id: "project-abc123".into(),
         name: "harness".into(),
@@ -151,7 +155,7 @@ pub(super) fn sample_project() -> DiscoveredProject {
     }
 }
 
-pub(super) fn sample_session_state() -> SessionState {
+pub(in crate::daemon::http) fn sample_session_state() -> SessionState {
     let now = chrono::Utc::now().to_rfc3339();
     let mut agents = BTreeMap::new();
     agents.insert(
@@ -202,7 +206,7 @@ pub(super) fn sample_session_state() -> SessionState {
     }
 }
 
-pub(super) fn sample_tool_result_event() -> ConversationEvent {
+pub(in crate::daemon::http) fn sample_tool_result_event() -> ConversationEvent {
     ConversationEvent {
         timestamp: Some("2026-04-13T19:02:00Z".into()),
         sequence: 1,

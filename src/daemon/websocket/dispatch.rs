@@ -244,6 +244,7 @@ async fn dispatch_read_method(request: &WsRequest, state: &DaemonHttpState) -> O
             | ws_methods::SESSION_MANAGED_AGENTS
             | ws_methods::MANAGED_AGENT_DETAIL
             | ws_methods::MANAGED_AGENTS_ACP_INSPECT
+            | ws_methods::MANAGED_AGENTS_ACP_TRANSCRIPT
     ) {
         Some(dispatch_read_query(request, state).await)
     } else {

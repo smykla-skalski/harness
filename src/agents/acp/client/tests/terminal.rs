@@ -11,7 +11,7 @@ use agent_client_protocol::schema::{
 
 use crate::agents::acp::client::TERMINAL_DENIED;
 
-use super::{read_log, setup_client, setup_recording_client};
+use super::{read_log, setup_client, setup_client_with_terminal_cap, setup_recording_client};
 
 #[test]
 fn terminal_denied_binary_rejected() {
@@ -142,17 +142,18 @@ fn terminal_wait_then_output_returns_exit_status_and_output() {
 fn terminal_wait_on_one_terminal_does_not_block_output_for_another() {
     let (_temp, client) = setup_client();
     let client = Arc::new(client);
+    let shell = if cfg!(unix) { "/bin/sh" } else { "sh" };
 
     let slow = client
         .handle_create_terminal(
-            &CreateTerminalRequest::new("test-session", "sh")
+            &CreateTerminalRequest::new("test-session", shell)
                 .args(vec!["-c".to_string(), "sleep 2".to_string()]),
         )
         .expect("create slow terminal")
         .terminal_id;
     let quick = client
         .handle_create_terminal(
-            &CreateTerminalRequest::new("test-session", "sh")
+            &CreateTerminalRequest::new("test-session", shell)
                 .args(vec!["-c".to_string(), "printf quick".to_string()]),
         )
         .expect("create quick terminal")
@@ -258,19 +259,23 @@ fn terminal_release_kills_background_child_that_ignores_sigterm() {
 
 #[test]
 fn terminal_cap_enforced() {
-    let (_temp, client) = setup_client();
+    let (_temp, client) = setup_client_with_terminal_cap(1);
 
-    for i in 0..16 {
-        let request = CreateTerminalRequest::new("test-session", "echo").args(vec![format!("{i}")]);
-        let result = client.handle_create_terminal(&request);
-        assert!(result.is_ok(), "terminal {i} should succeed");
-    }
+    let request = CreateTerminalRequest::new("test-session", "echo").args(vec!["1".to_string()]);
+    let terminal = client
+        .handle_create_terminal(&request)
+        .expect("first terminal should succeed")
+        .terminal_id;
 
-    let request = CreateTerminalRequest::new("test-session", "echo").args(vec!["17".to_string()]);
+    let request = CreateTerminalRequest::new("test-session", "echo").args(vec!["2".to_string()]);
     let result = client.handle_create_terminal(&request);
 
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert_eq!(err.code, TERMINAL_DENIED);
     assert!(err.message.contains("cap"));
+
+    client
+        .handle_release_terminal(&ReleaseTerminalRequest::new("test-session", terminal))
+        .expect("release terminal");
 }
