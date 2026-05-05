@@ -2,6 +2,11 @@ import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
+enum SessionTimelineSignalPayload: Equatable, Sendable {
+  case cancel(signalID: String, agentID: String)
+  case resend(record: SessionSignalRecord)
+}
+
 struct SessionTimelineAction: Identifiable, Equatable, Sendable {
   let decisionID: String
   let id: String
@@ -9,6 +14,48 @@ struct SessionTimelineAction: Identifiable, Equatable, Sendable {
   let kind: SuggestedAction.Kind
   let payloadJSON: String
   let isPrimary: Bool
+  let signalPayload: SessionTimelineSignalPayload?
+
+  init(
+    decisionID: String,
+    id: String,
+    title: String,
+    kind: SuggestedAction.Kind,
+    payloadJSON: String,
+    isPrimary: Bool
+  ) {
+    self.decisionID = decisionID
+    self.id = id
+    self.title = title
+    self.kind = kind
+    self.payloadJSON = payloadJSON
+    self.isPrimary = isPrimary
+    self.signalPayload = nil
+  }
+
+  static func cancelSignal(signalID: String, agentID: String) -> Self {
+    Self(
+      decisionID: "",
+      id: "cancel-\(signalID)",
+      title: "Cancel",
+      kind: .dismiss,
+      payloadJSON: "{}",
+      isPrimary: false,
+      signalPayload: .cancel(signalID: signalID, agentID: agentID)
+    )
+  }
+
+  static func resendSignal(_ record: SessionSignalRecord) -> Self {
+    Self(
+      decisionID: "",
+      id: "resend-\(record.signal.signalId)",
+      title: "Resend",
+      kind: .dismiss,
+      payloadJSON: "{}",
+      isPrimary: true,
+      signalPayload: .resend(record: record)
+    )
+  }
 
   var accessibilityIdentifier: String {
     HarnessMonitorAccessibility.sessionTimelineActionButton(
@@ -18,11 +65,20 @@ struct SessionTimelineAction: Identifiable, Equatable, Sendable {
   }
 
   var role: ButtonRole? {
-    kind == .dismiss ? .destructive : nil
+    signalPayload != nil ? nil : (kind == .dismiss ? .destructive : nil)
   }
 
   @MainActor
   func perform(using handler: any DecisionActionHandler) async {
+    if let sp = signalPayload {
+      switch sp {
+      case .cancel(let signalID, let agentID):
+        await handler.cancelSignal(signalID: signalID, agentID: agentID)
+      case .resend(let record):
+        await handler.resendSignal(record)
+      }
+      return
+    }
     switch kind {
     case .snooze:
       await handler.snooze(decisionID: decisionID, duration: snoozeDuration)
@@ -34,6 +90,24 @@ struct SessionTimelineAction: Identifiable, Equatable, Sendable {
         outcome: DecisionOutcome(chosenActionID: id, note: nil)
       )
     }
+  }
+
+  private init(
+    decisionID: String,
+    id: String,
+    title: String,
+    kind: SuggestedAction.Kind,
+    payloadJSON: String,
+    isPrimary: Bool,
+    signalPayload: SessionTimelineSignalPayload?
+  ) {
+    self.decisionID = decisionID
+    self.id = id
+    self.title = title
+    self.kind = kind
+    self.payloadJSON = payloadJSON
+    self.isPrimary = isPrimary
+    self.signalPayload = signalPayload
   }
 
   private var snoozeDuration: TimeInterval {

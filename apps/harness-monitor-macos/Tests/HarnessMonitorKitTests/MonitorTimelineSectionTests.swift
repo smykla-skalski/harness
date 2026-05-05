@@ -416,6 +416,9 @@ private final class RecordingTimelineDecisionActionHandler: DecisionActionHandle
   func dismiss(decisionID: String) async {
     dismissed.append(decisionID)
   }
+
+  func cancelSignal(signalID: String, agentID: String) async {}
+  func resendSignal(_ record: SessionSignalRecord) async {}
 }
 
 private struct TimelineFilterControlsLayoutProbe: View {
