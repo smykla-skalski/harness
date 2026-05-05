@@ -21,6 +21,7 @@ public final class ToastSlice {
   }
   public var maxVisible: Int = 3
   public var successDismissDelay: Duration = .seconds(4)
+  public var warningDismissDelay: Duration = .seconds(12)
   public var failureDismissDelay: Duration = .seconds(8)
   public var undoableDismissDelay: Duration = .seconds(5)
   public var dedupeWindow: Duration = .seconds(2)
@@ -54,12 +55,18 @@ public final class ToastSlice {
   @discardableResult
   public func presentSuccess(
     _ message: String,
+    title: String? = nil,
+    details: ActionFeedbackDetails? = nil,
+    primaryAction: ActionFeedbackAction? = nil,
     accessibilityIdentifier: String? = nil,
     rollupDuplicates: Bool = false
   ) -> UUID {
     present(
+      title: title,
       message: message,
       severity: .success,
+      details: details,
+      primaryAction: primaryAction,
       accessibilityIdentifier: accessibilityIdentifier,
       rollupDuplicates: rollupDuplicates
     )
@@ -68,12 +75,38 @@ public final class ToastSlice {
   @discardableResult
   public func presentFailure(
     _ message: String,
+    title: String? = nil,
+    details: ActionFeedbackDetails? = nil,
+    primaryAction: ActionFeedbackAction? = nil,
     accessibilityIdentifier: String? = nil,
     rollupDuplicates: Bool = false
   ) -> UUID {
     present(
+      title: title,
       message: message,
       severity: .failure,
+      details: details,
+      primaryAction: primaryAction,
+      accessibilityIdentifier: accessibilityIdentifier,
+      rollupDuplicates: rollupDuplicates
+    )
+  }
+
+  @discardableResult
+  public func presentWarning(
+    _ message: String,
+    title: String? = nil,
+    details: ActionFeedbackDetails? = nil,
+    primaryAction: ActionFeedbackAction? = nil,
+    accessibilityIdentifier: String? = nil,
+    rollupDuplicates: Bool = false
+  ) -> UUID {
+    present(
+      title: title,
+      message: message,
+      severity: .warning,
+      details: details,
+      primaryAction: primaryAction,
       accessibilityIdentifier: accessibilityIdentifier,
       rollupDuplicates: rollupDuplicates
     )
@@ -82,8 +115,11 @@ public final class ToastSlice {
   @discardableResult
   public func present(message: String, severity: ActionFeedback.Severity) -> UUID {
     present(
+      title: nil,
       message: message,
       severity: severity,
+      details: nil,
+      primaryAction: nil,
       accessibilityIdentifier: nil,
       rollupDuplicates: false
     )
@@ -121,8 +157,11 @@ public final class ToastSlice {
 
   @discardableResult
   public func present(
+    title: String? = nil,
     message: String,
     severity: ActionFeedback.Severity,
+    details: ActionFeedbackDetails? = nil,
+    primaryAction: ActionFeedbackAction? = nil,
     accessibilityIdentifier: String?,
     rollupDuplicates: Bool = false
   ) -> UUID {
@@ -130,7 +169,10 @@ public final class ToastSlice {
     let window = dedupeWindow
     let existingIndex = activeFeedback.firstIndex { feedback -> Bool in
       guard feedback.severity == severity,
+        feedback.title == title,
         feedback.message == message,
+        feedback.details == details,
+        feedback.primaryAction == primaryAction,
         feedback.accessibilityIdentifier == accessibilityIdentifier
       else {
         return false
@@ -153,8 +195,11 @@ public final class ToastSlice {
     }
 
     let feedback = ActionFeedback(
+      title: title,
       message: message,
       severity: severity,
+      details: details,
+      primaryAction: primaryAction,
       accessibilityIdentifier: accessibilityIdentifier,
       issuedAt: now
     )
@@ -304,6 +349,7 @@ public final class ToastSlice {
   private func dismissDelay(for severity: ActionFeedback.Severity) -> Duration {
     switch severity {
     case .success: successDismissDelay
+    case .warning: warningDismissDelay
     case .failure: failureDismissDelay
     case .undoable: undoableDismissDelay
     }
@@ -313,6 +359,7 @@ public final class ToastSlice {
     let prefix: String
     switch feedback.severity {
     case .success: prefix = "Success."
+    case .warning: prefix = "Warning."
     case .failure: prefix = "Action failed."
     case .undoable: prefix = "Started."
     }
@@ -322,7 +369,7 @@ public final class ToastSlice {
       } else {
         ""
       }
-    let payload = AttributedString("\(prefix) \(feedback.message)\(repetitionNotice)")
+    let payload = AttributedString("\(prefix) \(feedback.announcementText)\(repetitionNotice)")
     AccessibilityNotification.Announcement(payload).post()
   }
 }
