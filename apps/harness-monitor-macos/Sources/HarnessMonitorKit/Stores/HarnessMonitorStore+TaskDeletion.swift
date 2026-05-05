@@ -9,14 +9,11 @@ extension HarnessMonitorStore {
   ) {
     let actionName = "Delete task"
     guard prepareSessionAction(named: actionName, sessionID: sessionID) != nil else { return }
-    guard let actorID = actionActor(for: "harness-app", actionName: actionName) else {
-      return
-    }
     pendingConfirmation = .deleteTask(
       sessionID: sessionID,
       taskID: taskID,
       taskTitle: taskTitle,
-      actorID: actorID,
+      actorID: controlPlaneActionActor(for: "harness-app"),
       noteCount: taskUserNoteCount(taskID: taskID, sessionID: sessionID)
     )
   }
@@ -32,6 +29,7 @@ extension HarnessMonitorStore {
     guard let action = prepareSessionAction(named: actionName, sessionID: sessionID) else {
       return false
     }
+    let actorID = controlPlaneActionActor(for: actorID)
     let didDelete = await mutateSelectedSession(
       actionName: actionName,
       actionID: ActionID.deleteTask(sessionID: sessionID, taskID: taskID).key,
@@ -55,8 +53,9 @@ extension HarnessMonitorStore {
       requiresPurge: expectedNoteCount > 0
     )
     if !didDeleteNotes, expectedNoteCount > 0 {
+      let noteNoun = expectedNoteCount == 1 ? "note" : "notes"
       presentFailureFeedback(
-        "Task deleted, but \(expectedNoteCount) local workspace \(expectedNoteCount == 1 ? "note could not be" : "notes could not be") removed."
+        "Task deleted, but \(expectedNoteCount) local workspace \(noteNoun) could not be removed."
       )
     }
     return true
@@ -97,7 +96,9 @@ extension HarnessMonitorStore {
       return !requiresPurge
     }
     do {
-      let notes = try modelContext.fetch(taskUserNoteDescriptor(taskID: taskID, sessionID: sessionID))
+      let notes = try modelContext.fetch(
+        taskUserNoteDescriptor(taskID: taskID, sessionID: sessionID)
+      )
       guard !notes.isEmpty else {
         return true
       }

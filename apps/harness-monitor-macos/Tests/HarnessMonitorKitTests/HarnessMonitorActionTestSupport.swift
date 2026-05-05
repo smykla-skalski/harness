@@ -70,6 +70,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       severity: TaskSeverity,
       actor: String
     )
+    case deleteTask(sessionID: String, taskID: String, actor: String)
     case dropTask(
       sessionID: String,
       taskID: String,
