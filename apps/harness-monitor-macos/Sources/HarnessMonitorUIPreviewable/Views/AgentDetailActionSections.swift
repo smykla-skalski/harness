@@ -118,6 +118,32 @@ struct AgentDetailSendUpdateSection: View {
     return trimmed.isEmpty ? nil : trimmed
   }
 
+  private var promptDeadlineDate: Date? {
+    guard
+      let runtimeState = store.acpRuntimeState(for: agentID),
+      let observedAt = runtimeState.promptDeadlineAnchorAt,
+      let remaining = runtimeState.promptDeadlineRemainingMs
+    else {
+      return nil
+    }
+    return observedAt.addingTimeInterval(TimeInterval(remaining) / 1000)
+  }
+
+  private var deadlinePresentation: AcpRuntimeDeadlinePresentation? {
+    guard let promptDeadlineDate else { return nil }
+    return AcpRuntimeDeadlinePresentation.presentation(
+      deadline: promptDeadlineDate,
+      now: store.acpRuntimeClockTick
+    )
+  }
+
+  private var sendButtonTitle: String {
+    if let deadlinePresentation, deadlinePresentation.isUrgent {
+      return "Send · \(deadlinePresentation.countdownLabel)"
+    }
+    return "Send Update"
+  }
+
   var body: some View {
     if store.isSessionReadOnly {
       AgentDetailEmptyState(
@@ -170,8 +196,16 @@ struct AgentDetailSendUpdateSection: View {
           .submitLabel(.send)
         }
         VStack(alignment: .trailing, spacing: HarnessMonitorTheme.spacingSM) {
+          if let deadlinePresentation, !deadlinePresentation.isUrgent {
+            Text("Deadline \(deadlinePresentation.countdownLabel)")
+              .scaledFont(.caption)
+              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+              .accessibilityLabel("Prompt deadline")
+              .accessibilityValue(deadlinePresentation.accessibilityLabel)
+              .frame(maxWidth: .infinity, alignment: .trailing)
+          }
           HarnessInlineActionButton(
-            title: "Send Update",
+            title: sendButtonTitle,
             actionID: .sendSignal(sessionID: sessionID, agentID: agentID),
             store: store,
             variant: .prominent,
