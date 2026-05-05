@@ -231,7 +231,22 @@ struct AgentDetailEmptyState: View {
   let title: String
   let systemImage: String
   let description: String
+  let nextStep: String?
   let tint: Color
+
+  init(
+    title: String,
+    systemImage: String,
+    description: String,
+    nextStep: String? = nil,
+    tint: Color
+  ) {
+    self.title = title
+    self.systemImage = systemImage
+    self.description = description
+    self.nextStep = nextStep
+    self.tint = tint
+  }
 
   var body: some View {
     HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
@@ -247,6 +262,13 @@ struct AgentDetailEmptyState: View {
           .scaledFont(.footnote)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .fixedSize(horizontal: false, vertical: true)
+        if let nextStep {
+          Text(nextStep)
+            .scaledFont(.footnote.weight(.semibold))
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, HarnessMonitorTheme.spacingXS)
+        }
       }
       Spacer(minLength: 0)
     }
@@ -265,6 +287,7 @@ struct AgentDetailAssignmentSection: View {
         title: "No assignment yet",
         systemImage: "person.2.slash",
         description: "This agent does not currently carry a persona or a task assignment.",
+        nextStep: "Send an update below or assign a task from the workspace board.",
         tint: HarnessMonitorTheme.secondaryInk
       )
       .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailPersona)

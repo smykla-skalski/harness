@@ -40,6 +40,7 @@ struct AgentTranscriptRows: View {
         title: "No transcript yet",
         systemImage: "text.line.first.and.arrowtriangle.forward",
         description: "The agent has not streamed any recent transcript events.",
+        nextStep: "Send the agent an update below to start the conversation.",
         tint: HarnessMonitorTheme.secondaryInk
       )
     } else {
