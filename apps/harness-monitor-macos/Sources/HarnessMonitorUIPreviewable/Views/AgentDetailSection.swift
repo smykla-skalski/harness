@@ -168,131 +168,42 @@ struct AgentDetailSection: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
-      if let pendingDecisionAttention {
-        AgentDetailAwaitingDecisionStrip(
-          payload: store.acpPermissionDecisionPayload(
-            for: pendingDecisionAttention.oldestDecisionID
-          ),
-          count: pendingDecisionAttention.count,
-          isResolving:
-            store.resolvingAcpPermissionBatchID == pendingDecisionAttention.oldestBatchID,
-          approveButtonAccessibilityIdentifier:
-            HarnessMonitorAccessibility
-            .agentDetailApproveDecisionButton(agent.agentId),
-          denyButtonAccessibilityIdentifier:
-            HarnessMonitorAccessibility
-            .agentDetailDenyDecisionButton(agent.agentId),
-          viewAllButtonAccessibilityIdentifier:
-            HarnessMonitorAccessibility
-            .agentDetailOpenDecisionsButton(agent.agentId),
-          onApprove: {
-            dispatchPendingDecision(
-              attention: pendingDecisionAttention,
-              actionID: AcpPermissionDecisionActionID.approveActionID(
-                forRequestCount: pendingDecisionAttention.count
-              )
-            )
-          },
-          onDeny: {
-            dispatchPendingDecision(
-              attention: pendingDecisionAttention,
-              actionID: AcpPermissionDecisionActionID.denyActionID(
-                forRequestCount: pendingDecisionAttention.count
-              )
-            )
-          },
-          onViewAll: {
-            openPendingDecisions()
-          }
-        )
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(
-          HarnessMonitorAccessibility.agentDetailAwaitingDecisionStrip(agent.agentId)
-        )
-        .accessibilityTestProbe(
-          HarnessMonitorAccessibility.agentDetailAwaitingDecisionStrip(agent.agentId),
-          label: "Awaiting decision",
-          value:
-            "count=\(pendingDecisionAttention.count) batch=\(pendingDecisionAttention.oldestBatchID)"
-        )
-        .accessibilityTestProbe(
-          HarnessMonitorAccessibility.workspaceDetailAwaitingDecisionState,
-          label:
-            "count=\(pendingDecisionAttention.count) batch=\(pendingDecisionAttention.oldestBatchID)",
-          value: agent.agentId
-        )
-      }
-      AgentDetailSummaryBand(
-        store: store,
-        title: agent.name,
-        runtimeLabel: runtimeDisplayLabel(agent.runtime),
-        status: agent.status,
-        roleTitle: agent.role.title,
-        currentTaskTitle: currentTaskTitle,
-        overviewFacts: overviewFacts,
-        runtimeState: acpRuntimeState,
-        inspectStatus: acpRuntimeInspectStatus,
-        runtimePresentation: runtimePresentation
-      )
-      AgentDetailActivityBand(
-        store: store,
-        agentID: agent.agentId,
-        timeline: agentTimelineEntries,
-        runtimeProfileFacts: runtimeProfileFacts,
-        capabilityValues: capabilityValues,
-        hookPoints: hookPoints,
-        activityFacts: activityFacts,
-        recentToolValues: activity?.recentTools ?? [],
-        persona: agent.persona,
-        assignedTasks: assignedTasks,
-        prefersWideLayout: runtimePresentation == .full,
-        isSparseState: isSparseState
-      )
-      AgentDetailActionBand(
-        store: store,
-        sessionID: store.selectedSessionID ?? "",
-        agentID: agent.agentId,
-        isLeader: isLeader,
-        roleActionsAvailable: roleActionsAvailable,
-        rolePickerValues: rolePickerValues,
-        rolePickerSelection: rolePickerSelection,
-        selectedSendAction: $selectedSendAction,
-        signalCommand: $signalCommand,
-        signalMessage: $signalMessage,
-        signalActionHint: $signalActionHint,
-        prefersWideLayout: runtimePresentation == .full
-      )
-      .task(id: roleStateKey) {
-        selectedRole = agent.role
-      }
-      .onChange(of: selectedSendAction) { _, newValue in
-        if newValue != .custom {
-          signalCommand = newValue.rawCommand
-        } else if signalCommand == SendUpdateAction.injectContext.rawCommand {
-          signalCommand = ""
-        }
-      }
-      .task(id: signalCommand) {
-        await Self.debouncePersist(
-          value: signalCommand,
-          key: Self.draftCommandKey(agentID: agent.agentId)
-        )
-      }
-      .task(id: signalMessage) {
-        await Self.debouncePersist(
-          value: signalMessage,
-          key: Self.draftMessageKey(agentID: agent.agentId)
-        )
-      }
-      .task(id: signalActionHint) {
-        await Self.debouncePersist(
-          value: signalActionHint,
-          key: Self.draftActionHintKey(agentID: agent.agentId)
-        )
+    Group {
+      if runtimePresentation == .full {
+        fullPaneBody
+      } else {
+        compactBody
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+    .task(id: roleStateKey) {
+      selectedRole = agent.role
+    }
+    .onChange(of: selectedSendAction) { _, newValue in
+      if newValue != .custom {
+        signalCommand = newValue.rawCommand
+      } else if signalCommand == SendUpdateAction.injectContext.rawCommand {
+        signalCommand = ""
+      }
+    }
+    .task(id: signalCommand) {
+      await Self.debouncePersist(
+        value: signalCommand,
+        key: Self.draftCommandKey(agentID: agent.agentId)
+      )
+    }
+    .task(id: signalMessage) {
+      await Self.debouncePersist(
+        value: signalMessage,
+        key: Self.draftMessageKey(agentID: agent.agentId)
+      )
+    }
+    .task(id: signalActionHint) {
+      await Self.debouncePersist(
+        value: signalActionHint,
+        key: Self.draftActionHintKey(agentID: agent.agentId)
+      )
+    }
     .task(id: agent.agentId) {
       hydrateDraft()
       lastAnnouncedTimelineEntryId = agentTimelineEntries.last?.entryId
@@ -306,6 +217,190 @@ struct AgentDetailSection: View {
       value: agent.agentId
     )
     .accessibilityFrameMarker("\(HarnessMonitorAccessibility.workspaceDetailCard).frame")
+  }
+
+  @ViewBuilder
+  private var fullPaneBody: some View {
+    ScrollView {
+      contentColumn(pinsComposer: true)
+        .padding(HarnessMonitorTheme.spacingLG)
+    }
+    .harnessPrimaryContentScrollSurface(
+      listIdentifier: HarnessMonitorAccessibility.workspaceDetailScrollView,
+      listLabel: "Workspace detail"
+    )
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      composerInset
+    }
+  }
+
+  @ViewBuilder
+  private var compactBody: some View {
+    contentColumn(pinsComposer: false)
+  }
+
+  @ViewBuilder
+  private func contentColumn(pinsComposer: Bool) -> some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
+      awaitingDecisionStripView
+      summaryBandView
+      activityBandView
+      if pinsComposer {
+        roleActionsOnlyBandView
+      } else {
+        actionBandView
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var awaitingDecisionStripView: some View {
+    if let pendingDecisionAttention {
+      AgentDetailAwaitingDecisionStrip(
+        payload: store.acpPermissionDecisionPayload(
+          for: pendingDecisionAttention.oldestDecisionID
+        ),
+        count: pendingDecisionAttention.count,
+        isResolving:
+          store.resolvingAcpPermissionBatchID == pendingDecisionAttention.oldestBatchID,
+        approveButtonAccessibilityIdentifier:
+          HarnessMonitorAccessibility
+          .agentDetailApproveDecisionButton(agent.agentId),
+        denyButtonAccessibilityIdentifier:
+          HarnessMonitorAccessibility
+          .agentDetailDenyDecisionButton(agent.agentId),
+        viewAllButtonAccessibilityIdentifier:
+          HarnessMonitorAccessibility
+          .agentDetailOpenDecisionsButton(agent.agentId),
+        onApprove: {
+          dispatchPendingDecision(
+            attention: pendingDecisionAttention,
+            actionID: AcpPermissionDecisionActionID.approveActionID(
+              forRequestCount: pendingDecisionAttention.count
+            )
+          )
+        },
+        onDeny: {
+          dispatchPendingDecision(
+            attention: pendingDecisionAttention,
+            actionID: AcpPermissionDecisionActionID.denyActionID(
+              forRequestCount: pendingDecisionAttention.count
+            )
+          )
+        },
+        onViewAll: {
+          openPendingDecisions()
+        }
+      )
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.agentDetailAwaitingDecisionStrip(agent.agentId)
+      )
+      .accessibilityTestProbe(
+        HarnessMonitorAccessibility.agentDetailAwaitingDecisionStrip(agent.agentId),
+        label: "Awaiting decision",
+        value:
+          "count=\(pendingDecisionAttention.count) batch=\(pendingDecisionAttention.oldestBatchID)"
+      )
+      .accessibilityTestProbe(
+        HarnessMonitorAccessibility.workspaceDetailAwaitingDecisionState,
+        label:
+          "count=\(pendingDecisionAttention.count) batch=\(pendingDecisionAttention.oldestBatchID)",
+        value: agent.agentId
+      )
+    }
+  }
+
+  private var summaryBandView: some View {
+    AgentDetailSummaryBand(
+      store: store,
+      title: agent.name,
+      runtimeLabel: runtimeDisplayLabel(agent.runtime),
+      status: agent.status,
+      roleTitle: agent.role.title,
+      currentTaskTitle: currentTaskTitle,
+      overviewFacts: overviewFacts,
+      runtimeState: acpRuntimeState,
+      inspectStatus: acpRuntimeInspectStatus,
+      runtimePresentation: runtimePresentation
+    )
+  }
+
+  private var activityBandView: some View {
+    AgentDetailActivityBand(
+      store: store,
+      agentID: agent.agentId,
+      timeline: agentTimelineEntries,
+      runtimeProfileFacts: runtimeProfileFacts,
+      capabilityValues: capabilityValues,
+      hookPoints: hookPoints,
+      activityFacts: activityFacts,
+      recentToolValues: activity?.recentTools ?? [],
+      persona: agent.persona,
+      assignedTasks: assignedTasks,
+      prefersWideLayout: runtimePresentation == .full,
+      isSparseState: isSparseState
+    )
+  }
+
+  private var actionBandView: some View {
+    AgentDetailActionBand(
+      store: store,
+      sessionID: store.selectedSessionID ?? "",
+      agentID: agent.agentId,
+      isLeader: isLeader,
+      roleActionsAvailable: roleActionsAvailable,
+      rolePickerValues: rolePickerValues,
+      rolePickerSelection: rolePickerSelection,
+      selectedSendAction: $selectedSendAction,
+      signalCommand: $signalCommand,
+      signalMessage: $signalMessage,
+      signalActionHint: $signalActionHint,
+      prefersWideLayout: runtimePresentation == .full
+    )
+  }
+
+  private var roleActionsOnlyBandView: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      AgentDetailSubsectionTitle(title: "Role actions")
+      AgentDetailRoleActionsSection(
+        store: store,
+        sessionID: store.selectedSessionID ?? "",
+        agentID: agent.agentId,
+        isLeader: isLeader,
+        roleActionsAvailable: roleActionsAvailable,
+        rolePickerValues: rolePickerValues,
+        rolePickerSelection: rolePickerSelection
+      )
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private var composerInset: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      AgentDetailSubsectionTitle(title: "Send update")
+      AgentDetailSendUpdateSection(
+        store: store,
+        sessionID: store.selectedSessionID ?? "",
+        agentID: agent.agentId,
+        selectedSendAction: $selectedSendAction,
+        signalCommand: $signalCommand,
+        signalMessage: $signalMessage,
+        signalActionHint: $signalActionHint
+      )
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.horizontal, HarnessMonitorTheme.spacingLG)
+    .padding(.vertical, HarnessMonitorTheme.spacingMD)
+    .harnessPanelGlass()
+    .overlay(alignment: .top) {
+      Rectangle()
+        .fill(HarnessMonitorTheme.controlBorder.opacity(0.4))
+        .frame(height: 1)
+    }
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.agentDetailComposerInset(agent.agentId)
+    )
   }
 
   static func draftCommandKey(agentID: String) -> String {

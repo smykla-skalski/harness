@@ -65,4 +65,8 @@ extension HarnessMonitorAccessibility {
   public static func agentDetailReferenceDisclosure(_ agentID: String) -> String {
     "harness.workspace.detail.reference.disclosure.\(slug(agentID))"
   }
+
+  public static func agentDetailComposerInset(_ agentID: String) -> String {
+    "harness.workspace.detail.composer-inset.\(slug(agentID))"
+  }
 }
