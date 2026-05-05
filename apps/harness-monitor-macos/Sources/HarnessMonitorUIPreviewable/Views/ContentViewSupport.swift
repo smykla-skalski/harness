@@ -77,8 +77,7 @@ public struct ContentDetailColumn: View {
       canNavigateForward: false,
       canCreateTask: false,
       isRefreshing: store.contentUI.toolbar.isRefreshing,
-      sleepPreventionEnabled: store.contentUI.toolbar.sleepPreventionEnabled,
-      mcpStatus: store.contentUI.toolbar.mcpStatus
+      sleepPreventionEnabled: store.contentUI.toolbar.sleepPreventionEnabled
     )
   }
 

@@ -207,14 +207,13 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.preferences.mcp.registry-host"
     )
     #expect(HarnessMonitorAccessibility.preferencesMCPStatus == "harness.preferences.mcp.status")
-    #expect(HarnessMonitorAccessibility.mcpToolbarStatus == "harness.toolbar.mcp.status")
     #expect(HarnessMonitorAccessibility.mcpBanner == "harness.content.mcp.banner")
 
     let contentToolbar = try sourceFile(named: "ContentToolbarItems.swift")
     let contentChrome = try sourceFile(named: "ContentChromeSupport.swift")
     let preferencesMCP = try sourceFile(named: "PreferencesMCPSection.swift")
 
-    #expect(contentToolbar.contains("mcpToolbarStatus"))
+    #expect(!contentToolbar.contains("mcpToolbarStatus"))
     #expect(contentChrome.contains("MCPStatusBanner(status: mcpStatus)"))
     #expect(preferencesMCP.contains("preferencesMCPStatus"))
   }

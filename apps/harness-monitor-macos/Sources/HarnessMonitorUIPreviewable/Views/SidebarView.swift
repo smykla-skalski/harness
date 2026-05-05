@@ -274,23 +274,20 @@ enum SidebarFilterVisibilityPolicy {
   }
 }
 
-struct SidebarFooterMetricsBridge: View {
+struct SidebarFooterAccessoryBridge: View {
   let sidebarUI: HarnessMonitorStore.SidebarUISlice
-
-  private var summary: SidebarFooterSummary {
-    SidebarFooterSummary(
-      projectCount: sidebarUI.projectCount,
-      worktreeCount: sidebarUI.worktreeCount,
-      sessionCount: sidebarUI.sessionCount,
-      openWorkCount: sidebarUI.openWorkCount,
-      blockedCount: sidebarUI.blockedCount
-    )
-  }
+  let daemonOwnership: DaemonOwnership
+  let bridgeRunning: Bool
+  let mcpStatus: HarnessMonitorMCPStatusSnapshot
+  let isMCPRegistryHostEnabled: Bool
 
   var body: some View {
     SidebarFooterAccessory(
       metrics: sidebarUI.connectionMetrics,
-      summary: summary
+      daemonOwnership: daemonOwnership,
+      bridgeRunning: bridgeRunning,
+      mcpStatus: mcpStatus,
+      isMCPRegistryHostEnabled: isMCPRegistryHostEnabled
     )
   }
 }

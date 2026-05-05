@@ -190,7 +190,6 @@ extension HarnessMonitorStore {
     assign(canNavigateForward, to: \.canNavigateForward, on: contentUI.toolbar)
     assign(isRefreshing, to: \.isRefreshing, on: contentUI.toolbar)
     assign(sleepPreventionEnabled, to: \.sleepPreventionEnabled, on: contentUI.toolbar)
-    assign(mcpStatus, to: \.mcpStatus, on: contentUI.toolbar)
   }
 
   private func syncContentChromeUI() {

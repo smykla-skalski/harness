@@ -16,7 +16,6 @@ enum HarnessMonitorUITestAccessibility {
   static let navigateForwardButton = "harness.toolbar.navigate-forward"
   static let refreshButton = "harness.toolbar.refresh"
   static let sleepPreventionButton = "harness.toolbar.sleep-prevention"
-  static let mcpToolbarStatus = "harness.toolbar.mcp.status"
   static let mcpBanner = "harness.content.mcp.banner"
   static let workspaceToolbarButton = "harness.toolbar.workspace"
   static let workspaceToolbarButtonState = "harness.toolbar.workspace.state"

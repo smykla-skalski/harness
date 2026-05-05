@@ -392,10 +392,6 @@ extension HarnessMonitorStore {
     public var canNavigateForward = false
     public var isRefreshing = false
     public var sleepPreventionEnabled = false
-    public var mcpStatus = HarnessMonitorMCPStatusSnapshot(
-      runtimeState: .disabled,
-      recoveryStatus: nil
-    )
 
     public init() {}
   }
