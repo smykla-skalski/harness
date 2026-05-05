@@ -226,6 +226,39 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn acp_start_route_rejects_missing_session_before_spawn() {
+        temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
+            let (base_url, server) =
+                spawn_managed_agent_server(super::super::tests::test_http_state_with_db()).await;
+            let response = reqwest::Client::new()
+                .post(format!(
+                    "{base_url}/v1/sessions/nod8ccog/managed-agents/acp"
+                ))
+                .bearer_auth("token")
+                .json(&json!({
+                    "agent": "copilot",
+                    "role": "worker",
+                    "capabilities": [],
+                    "record_permissions": false
+                }))
+                .send()
+                .await
+                .expect("send request");
+            let (status, body) = response_json(response).await;
+            stop_server(server).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST);
+            assert_eq!(body["error"]["code"], "KSRCLI090");
+            assert!(
+                body["error"]["message"]
+                    .as_str()
+                    .is_some_and(|message| message.contains("session 'nod8ccog' not found")),
+                "unexpected error body: {body}"
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
     async fn acp_inspect_route_returns_acp_disabled_when_feature_flag_off() {
         temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("0"))], async {
             let (base_url, server) = spawn_managed_agent_server(minimal_state()).await;

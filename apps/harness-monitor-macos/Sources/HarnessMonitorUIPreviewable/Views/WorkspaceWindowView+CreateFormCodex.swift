@@ -216,27 +216,11 @@ extension WorkspaceWindowCreatePane {
   }
 
   var resolvedCreateSessionID: String? {
-    let selectionSessionID = WorkspaceWindowView.normalizedCreateSessionAnchor(
-      viewModel.selection.sessionID
-    )
-    let createSessionID = WorkspaceWindowView.normalizedCreateSessionAnchor(
-      viewModel.createSessionID
-    )
-    let selectedSessionID = WorkspaceWindowView.normalizedCreateSessionAnchor(
-      store.selectedSessionID
-    )
-
-    if let selectionSessionID,
-      store.sessionIndex.sessionSummary(for: selectionSessionID) != nil
-    {
-      return selectionSessionID
-    }
-    if let createSessionID,
-      store.sessionIndex.sessionSummary(for: createSessionID) != nil
-    {
-      return createSessionID
-    }
-    return selectedSessionID ?? createSessionID ?? selectionSessionID
+    WorkspaceWindowView.resolvedCreateSessionAnchor(
+      selection: viewModel.selection,
+      createSessionID: viewModel.createSessionID,
+      selectedSessionID: store.selectedSessionID
+    ) { store.sessionIndex.sessionSummary(for: $0) }
   }
 
   var createPaneSessionActionUnavailableNote: String? {

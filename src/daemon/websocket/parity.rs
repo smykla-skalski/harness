@@ -223,6 +223,7 @@ pub(crate) async fn dispatch_session_archive(
         })
     };
     if result.is_ok() {
+        stop_archived_session_acp_agents(state, &session_id);
         if let Some(async_db) = state.async_db.get() {
             service::broadcast_sessions_updated_async(&state.sender, Some(async_db.as_ref())).await;
         } else if let Err(error) = broadcast_sessions_updated_sync(state) {
@@ -230,6 +231,25 @@ pub(crate) async fn dispatch_session_archive(
         }
     }
     dispatch_query_result(&request.id, result)
+}
+
+fn stop_archived_session_acp_agents(state: &DaemonHttpState, session_id: &str) {
+    let result = state.acp_agent_manager.stop_session_acp_agents(session_id);
+    if let Err(error) = result {
+        log_archive_acp_stop_failure(&error, session_id);
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_archive_acp_stop_failure(error: &CliError, session_id: &str) {
+    tracing::warn!(
+        %error,
+        %session_id,
+        "failed to stop ACP agents after session archive"
+    );
 }
 
 pub(crate) async fn dispatch_session_join(

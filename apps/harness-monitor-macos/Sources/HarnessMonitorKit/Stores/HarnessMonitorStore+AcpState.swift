@@ -13,6 +13,9 @@ public enum AcpAgentApplyOutcome: Equatable, Sendable {
 extension HarnessMonitorStore {
   @discardableResult
   func applyAcpAgent(_ snapshot: AcpAgentSnapshot) -> AcpAgentApplyOutcome {
+    guard !shouldIgnoreLocallyRemovedSession(snapshot.sessionId) else {
+      return .droppedSessionMismatch
+    }
     guard snapshot.sessionId == selectedSessionID else {
       HarnessMonitorLogger.store.warning(
         """

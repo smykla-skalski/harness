@@ -3,21 +3,11 @@ import SwiftUI
 
 extension WorkspaceWindowView {
   var resolvedCreateSessionID: String? {
-    let selectionSessionID = Self.normalizedCreateSessionAnchor(viewModel.selection.sessionID)
-    let createSessionID = Self.normalizedCreateSessionAnchor(viewModel.createSessionID)
-    let selectedSessionID = Self.normalizedCreateSessionAnchor(store.selectedSessionID)
-
-    if let selectionSessionID,
-      store.sessionIndex.sessionSummary(for: selectionSessionID) != nil
-    {
-      return selectionSessionID
-    }
-    if let createSessionID,
-      store.sessionIndex.sessionSummary(for: createSessionID) != nil
-    {
-      return createSessionID
-    }
-    return selectedSessionID ?? createSessionID ?? selectionSessionID
+    Self.resolvedCreateSessionAnchor(
+      selection: viewModel.selection,
+      createSessionID: viewModel.createSessionID,
+      selectedSessionID: store.selectedSessionID
+    ) { store.sessionIndex.sessionSummary(for: $0) }
   }
 
   var createPaneSessionActionUnavailableNote: String? {

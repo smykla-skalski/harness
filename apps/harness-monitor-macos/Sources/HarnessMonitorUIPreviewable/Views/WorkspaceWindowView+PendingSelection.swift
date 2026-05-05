@@ -72,6 +72,42 @@ extension WorkspaceWindowView {
     return trimmed.isEmpty ? nil : trimmed
   }
 
+  static func resolvedCreateSessionAnchor(
+    selection: WorkspaceSelection,
+    createSessionID: String?,
+    selectedSessionID: String?,
+    sessionSummary: (String) -> SessionSummary?
+  ) -> String? {
+    if let selectedSessionID = normalizedCreateSessionAnchor(selectedSessionID) {
+      return selectedSessionID
+    }
+    let selectionSessionID = knownCreateSessionAnchor(
+      selection.sessionID,
+      sessionSummary: sessionSummary
+    )
+    let createSessionID = knownCreateSessionAnchor(
+      createSessionID,
+      sessionSummary: sessionSummary
+    )
+    return createSessionID ?? selectionSessionID
+  }
+
+  static func knownCreateSessionAnchor(
+    _ sessionID: String?,
+    sessionSummary: (String) -> SessionSummary?
+  ) -> String? {
+    guard let sessionID = normalizedCreateSessionAnchor(sessionID),
+      sessionSummary(sessionID) != nil
+    else {
+      return nil
+    }
+    return sessionID
+  }
+
+  func knownCreateSessionAnchor(_ sessionID: String?) -> String? {
+    Self.knownCreateSessionAnchor(sessionID) { store.sessionIndex.sessionSummary(for: $0) }
+  }
+
   private func applyWorkspaceCreateEntryPoint(
     _ entryPoint: WorkspaceCreateEntryPoint,
     createSessionID: String? = nil
