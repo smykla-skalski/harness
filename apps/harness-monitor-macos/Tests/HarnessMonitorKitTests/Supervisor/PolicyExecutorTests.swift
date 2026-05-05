@@ -237,6 +237,7 @@ final class PolicyExecutorTests: XCTestCase {
     let outcome = await exec.execute(
       .assignTask(
         .init(
+          sessionID: "s1",
           taskID: "t1",
           agentID: "a1",
           ruleID: "unassigned",
@@ -246,7 +247,7 @@ final class PolicyExecutorTests: XCTestCase {
       )
     )
 
-    XCTAssertEqual(api.assignCalls, [.init(taskID: "t1", agentID: "a1")])
+    XCTAssertEqual(api.assignCalls, [.init(sessionID: "s1", taskID: "t1", agentID: "a1")])
     guard case .executed = outcome else {
       XCTFail("expected executed")
       return
@@ -262,6 +263,7 @@ final class PolicyExecutorTests: XCTestCase {
     let outcome = await exec.execute(
       .dropTask(
         .init(
+          sessionID: "s2",
           taskID: "t2",
           reason: "stale",
           ruleID: "r1",
@@ -271,11 +273,38 @@ final class PolicyExecutorTests: XCTestCase {
       )
     )
 
-    XCTAssertEqual(api.dropCalls, [.init(taskID: "t2", reason: "stale")])
+    XCTAssertEqual(api.dropCalls, [.init(sessionID: "s2", taskID: "t2", reason: "stale")])
     guard case .executed = outcome else {
       XCTFail("expected executed")
       return
     }
+  }
+
+  func testDispatchAuditFailureBlocksSideEffect() async throws {
+    let api = FakeAPIClient()
+    let exec = PolicyExecutor(
+      api: api,
+      decisions: try DecisionStore.makeInMemory(),
+      audit: FailingAuditWriter()
+    )
+
+    let outcome = await exec.execute(
+      .nudgeAgent(
+        .init(
+          agentID: "a1",
+          prompt: "x",
+          ruleID: "r1",
+          snapshotID: "s1",
+          snapshotHash: "hash-1"
+        )
+      )
+    )
+
+    guard case .failed = outcome else {
+      XCTFail("expected audit failure, got \(outcome)")
+      return
+    }
+    XCTAssertTrue(api.nudgeCalls.isEmpty)
   }
 
   func testDedupExpiresAfterCooldown() async throws {

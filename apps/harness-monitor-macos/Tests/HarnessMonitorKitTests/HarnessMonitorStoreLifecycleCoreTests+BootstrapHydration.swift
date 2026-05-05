@@ -127,7 +127,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(backgroundDetailScopes.last! == nil)
     #expect(
       client.recordedTimelineWindowRequests(for: backgroundSummary.sessionId).last
-        == .latest(limit: 10)
+        == .latest(limit: HarnessMonitorStore.initialSelectedTimelineWindowLimit)
     )
   }
 

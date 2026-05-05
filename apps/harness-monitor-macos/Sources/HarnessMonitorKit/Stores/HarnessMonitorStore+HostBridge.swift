@@ -118,7 +118,10 @@ extension HarnessMonitorStore {
     return issues
   }
 
-  public func hostBridgeStartCommand(for capability: String) -> String {
+  public func hostBridgeStartCommand(
+    for capability: String,
+    environment: HarnessMonitorEnvironment = .current
+  ) -> String {
     let hostBridge = daemonStatus?.manifest?.hostBridge ?? HostBridgeManifest()
     let baseCommand: String
     if hostBridge.running {
@@ -126,7 +129,7 @@ extension HarnessMonitorStore {
     } else {
       baseCommand = "harness bridge start"
     }
-    return HarnessMonitorPaths.shellCommand(baseCommand)
+    return HarnessMonitorPaths.shellCommand(baseCommand, using: environment)
   }
 
   public func clearHostBridgeIssue(for capability: String) {

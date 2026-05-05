@@ -8,6 +8,7 @@ struct SessionsCanonicalPayload: Codable {
 struct SessionCanonicalPayload: Codable {
   let id: String
   let title: String?
+  let statusRaw: String
   let agents: [AgentCanonicalPayload]
   let tasks: [TaskSnapshot]
   let observerIssues: [ObserverIssueSnapshot]
@@ -16,6 +17,7 @@ struct SessionCanonicalPayload: Codable {
   init(session: SessionSnapshot) {
     id = session.id
     title = session.title
+    statusRaw = session.statusRaw
     agents = session.agents.map(AgentCanonicalPayload.init(agent:))
     tasks = session.tasks
     observerIssues = session.observerIssues

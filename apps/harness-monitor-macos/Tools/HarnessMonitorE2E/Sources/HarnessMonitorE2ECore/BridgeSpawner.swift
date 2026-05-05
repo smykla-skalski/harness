@@ -66,6 +66,7 @@ public enum BridgeSpawner {
       "bridge", "start",
       "--capability", "codex",
       "--capability", "agent-tui",
+      "--capability", "acp",
       "--codex-port", String(port),
       "--codex-path", codexBinary.path,
     ]

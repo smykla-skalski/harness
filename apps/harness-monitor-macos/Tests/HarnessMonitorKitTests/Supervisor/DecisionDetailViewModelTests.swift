@@ -379,4 +379,12 @@ final class RecordingDecisionActionHandler: DecisionActionHandler, @unchecked Se
   func dismiss(decisionID: String) async {
     dismissCalls.append(decisionID)
   }
+
+  func cancelSignal(signalID: String, agentID: String) async {
+    _ = (signalID, agentID)
+  }
+
+  func resendSignal(_ record: SessionSignalRecord) async {
+    _ = record
+  }
 }

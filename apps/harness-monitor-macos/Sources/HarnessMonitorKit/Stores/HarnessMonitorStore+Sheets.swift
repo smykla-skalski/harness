@@ -97,9 +97,10 @@ extension HarnessMonitorStore {
 
   public func presentSendSignalSheetForSelectedSessionLeader() {
     guard let detail = selectedSession else { return }
-    let leaderID = detail.session.leaderId.flatMap { id in
-      detail.agents.contains(where: { $0.agentId == id }) ? id : nil
-    } ?? detail.agents.first?.agentId
+    let leaderID =
+      detail.session.leaderId.flatMap { id in
+        detail.agents.contains(where: { $0.agentId == id }) ? id : nil
+      } ?? detail.agents.first?.agentId
     guard let agentID = leaderID else { return }
     presentSendSignalSheet(agentID: agentID)
   }

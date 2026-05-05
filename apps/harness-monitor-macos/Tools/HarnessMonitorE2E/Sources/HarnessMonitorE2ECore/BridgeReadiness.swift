@@ -1,7 +1,7 @@
 import Foundation
 
 public enum BridgeReadiness {
-  public static let requiredCapabilities = ["codex", "agent-tui"]
+  public static let requiredCapabilities = ["codex", "agent-tui", "acp"]
 
   /// Mirror of the python helper: bridge is ready iff `running` is true and every required capability reports `healthy=true`.
   public static func isReady(

@@ -40,8 +40,13 @@ extension HarnessMonitorStore {
       .create,
       createEntryPoint: entryPoint,
       createSessionID: normalizedWorkspaceSessionID(sessionID)
-        ?? normalizedWorkspaceSessionID(selectedSessionID)
+        ?? preferredWorkspaceCreateSessionID()
     )
+  }
+
+  private func preferredWorkspaceCreateSessionID() -> String? {
+    normalizedWorkspaceSessionID(selectedSession?.session.sessionId)
+      ?? normalizedWorkspaceSessionID(selectedSessionSummary?.sessionId)
   }
 
   public func requestWorkspaceDecisionSelection(

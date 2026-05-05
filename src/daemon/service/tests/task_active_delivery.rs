@@ -122,6 +122,7 @@ fn drop_task_async_actively_delivers_to_idle_tui_agent() {
                             agent_id: worker_id.clone(),
                         },
                         queue_policy: crate::session::types::TaskQueuePolicy::Locked,
+                        reason: None,
                     },
                     &async_db,
                     crate::daemon::service::WakeDispatch::new(Some(&manager), None),

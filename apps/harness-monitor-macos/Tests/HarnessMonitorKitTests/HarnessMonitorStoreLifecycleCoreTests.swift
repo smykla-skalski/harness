@@ -199,6 +199,29 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     #expect(client.sessionDetailScopes(for: PreviewFixtures.summary.sessionId) == [nil])
   }
 
+  @Test("Missing selected session detail prunes the stale session locally")
+  func missingSelectedSessionDetailPrunesStaleSessionLocally() async {
+    let client = RecordingHarnessClient()
+    client.configureSessionDetailError(
+      HarnessMonitorAPIError.server(
+        code: 400,
+        message:
+          "session not active: session '\(PreviewFixtures.summary.sessionId)' not found"
+      ),
+      for: PreviewFixtures.summary.sessionId
+    )
+    let store = await makeBootstrappedStore(client: client)
+
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    #expect(store.selectedSessionID == nil)
+    #expect(store.selectedSession == nil)
+    #expect(store.selectedSessionSummary == nil)
+    #expect(store.sessions.isEmpty)
+    #expect(store.contentUI.session.selectedSessionSummary == nil)
+    #expect(store.contentUI.sessionDetail.presentedSessionDetail == nil)
+  }
+
   @Test("Session selection prefers summary timeline scope on websocket transport")
   func sessionSelectionPrefersSummaryTimelineScopeOnWebsocketTransport() async {
     let client = RecordingHarnessClient()

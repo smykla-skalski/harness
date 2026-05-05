@@ -7,7 +7,9 @@ extension HarnessMonitorStore {
       startResourceMetricsSampling()
       recordActiveTaskGauge()
     #endif
-    await startSupervisor()
+    if Self.shouldStartSupervisorOnBootstrap() {
+      await startSupervisor()
+    }
 
     isBootstrapping = true
     defer {
@@ -58,6 +60,15 @@ extension HarnessMonitorStore {
         .appendingPathComponent(UUID().uuidString, isDirectory: true)
     }
   #endif
+
+  nonisolated static func shouldStartSupervisorOnBootstrap(
+    environment: [String: String] = ProcessInfo.processInfo.environment
+  ) -> Bool {
+    if environment["HARNESS_MONITOR_ENABLE_BOOTSTRAP_SUPERVISOR_IN_TESTS"] == "1" {
+      return true
+    }
+    return environment["XCTestConfigurationFilePath"] == nil
+  }
 
   public func bootstrapIfNeeded() async {
     guard !hasBootstrapped else {

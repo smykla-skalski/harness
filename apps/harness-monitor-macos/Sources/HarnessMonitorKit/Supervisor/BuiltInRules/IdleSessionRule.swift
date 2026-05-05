@@ -44,9 +44,9 @@ public struct IdleSessionRule: PolicyRule {
     snapshot: SessionsSnapshot,
     context: PolicyContext
   ) async -> [PolicyAction] {
-    let threshold = context.parameters.seconds(
-      Self.thresholdKey,
-      default: Self.defaultThresholdSeconds
+    let threshold = max(
+      0,
+      context.parameters.seconds(Self.thresholdKey, default: Self.defaultThresholdSeconds)
     )
 
     return snapshot.sessions.compactMap { session in
@@ -61,7 +61,10 @@ public struct IdleSessionRule: PolicyRule {
     now: Date,
     thresholdSeconds: Int
   ) -> PolicyAction? {
-    guard session.timelineDensityLastMinute == 0, !session.agents.isEmpty else {
+    guard session.statusRaw == "active",
+      session.timelineDensityLastMinute == 0,
+      !session.agents.isEmpty
+    else {
       return nil
     }
     guard isIdle(session: session, now: now, thresholdSeconds: thresholdSeconds) else {

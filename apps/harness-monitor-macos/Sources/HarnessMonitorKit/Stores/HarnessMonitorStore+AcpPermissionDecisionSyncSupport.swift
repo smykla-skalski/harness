@@ -11,9 +11,13 @@ extension HarnessMonitorStore {
     _ operation: @escaping @MainActor (HarnessMonitorStore) async -> Void
   ) -> Task<Void, Never> {
     Task { @MainActor [weak self] in
-      // Give immediate invalidation/reset paths one turn to cancel before this
+      // Give immediate invalidation/reset paths a cancellable turn before this
       // task touches the decision store or writes audit rows.
-      await Task.yield()
+      do {
+        try await Task.sleep(for: .milliseconds(1))
+      } catch {
+        return
+      }
       guard !Task.isCancelled, let self else {
         return
       }

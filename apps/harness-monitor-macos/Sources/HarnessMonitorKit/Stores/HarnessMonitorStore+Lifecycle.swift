@@ -280,6 +280,15 @@ extension HarnessMonitorStore {
     }
     cancelTimelineLoadingGate()
 
+    if shouldTreatMissingSessionLoadAsLocalRemoval(error) {
+      let localSnapshot = applyLocalSessionRemoval(sessionID: sessionID)
+      await pruneRemovedSessionFromCache(
+        sessions: localSnapshot.sessions,
+        projects: localSnapshot.projects
+      )
+      return
+    }
+
     guard selectedSession?.session.sessionId != sessionID else { return }
 
     if let cached = await loadCachedSessionDetail(sessionID: sessionID) {
@@ -310,6 +319,26 @@ extension HarnessMonitorStore {
         isShowingCachedCatalog = persistedSessionCount > 0 || !sessions.isEmpty
       }
     }
+  }
+
+  private func shouldTreatMissingSessionLoadAsLocalRemoval(
+    _ error: any Error
+  ) -> Bool {
+    guard let apiError = error as? HarnessMonitorAPIError,
+      case .server(let code, _) = apiError,
+      (400...404).contains(code)
+    else {
+      return false
+    }
+
+    let message = (apiError.serverMessage ?? error.localizedDescription).lowercased()
+    if apiError.serverSemanticCode?.lowercased() == "session_not_active" {
+      return message.contains("not found")
+    }
+
+    return message.contains("session not active")
+      && message.contains("session")
+      && message.contains("not found")
   }
 
   func applySessionIndexSnapshot(

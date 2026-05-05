@@ -199,9 +199,8 @@ extension HarnessMonitorStore {
     sessions: [SessionSummary]
   ) async {
     await Task.yield()
-    while let sessionLoadTask = sessionLoadTask {
-      await sessionLoadTask.value
-      guard !Task.isCancelled, connectionState == .online else { return }
+    guard await waitForSessionLoadBeforeHydration() else {
+      return
     }
 
     let prioritySessions = await resolveHydrationPrioritySessions(from: sessions)
@@ -223,6 +222,27 @@ extension HarnessMonitorStore {
     if !batch.isEmpty {
       await cacheSessionDetails(batch, markViewed: false)
     }
+  }
+
+  private func waitForSessionLoadBeforeHydration() async -> Bool {
+    let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+    while sessionLoadTask != nil {
+      guard !Task.isCancelled, connectionState == .online else {
+        return false
+      }
+      guard ContinuousClock.now < deadline else {
+        HarnessMonitorLogger.store.warning(
+          "Persisted snapshot hydration skipped; foreground session load did not finish"
+        )
+        return false
+      }
+      do {
+        try await Task.sleep(for: .milliseconds(10))
+      } catch {
+        return false
+      }
+    }
+    return true
   }
 
   private func resolveHydrationPrioritySessions(

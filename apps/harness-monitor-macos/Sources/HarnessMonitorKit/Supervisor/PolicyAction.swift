@@ -17,9 +17,11 @@ public enum PolicyAction: Sendable, Codable, Hashable {
     case .nudgeAgent(let payload):
       return "nudge:\(payload.ruleID):\(payload.agentID):\(payload.snapshotHash)"
     case .assignTask(let payload):
-      return "assign:\(payload.ruleID):\(payload.taskID):\(payload.snapshotHash)"
+      return
+        "assign:\(payload.ruleID):\(payload.sessionKey):\(payload.taskID):\(payload.snapshotHash)"
     case .dropTask(let payload):
-      return "drop:\(payload.ruleID):\(payload.taskID):\(payload.snapshotHash)"
+      return
+        "drop:\(payload.ruleID):\(payload.sessionKey):\(payload.taskID):\(payload.snapshotHash)"
     case .queueDecision(let payload):
       return "decision:\(payload.ruleID):\(payload.id)"
     case .notifyOnly(let payload):
@@ -54,6 +56,7 @@ public enum PolicyAction: Sendable, Codable, Hashable {
   }
 
   public struct AssignPayload: Codable, Sendable, Hashable {
+    public let sessionID: String?
     public let taskID: String
     public let agentID: String
     public let ruleID: String
@@ -61,21 +64,26 @@ public enum PolicyAction: Sendable, Codable, Hashable {
     public let snapshotHash: String
 
     public init(
+      sessionID: String? = nil,
       taskID: String,
       agentID: String,
       ruleID: String,
       snapshotID: String,
       snapshotHash: String
     ) {
+      self.sessionID = sessionID
       self.taskID = taskID
       self.agentID = agentID
       self.ruleID = ruleID
       self.snapshotID = snapshotID
       self.snapshotHash = snapshotHash
     }
+
+    fileprivate var sessionKey: String { sessionID ?? "_" }
   }
 
   public struct DropPayload: Codable, Sendable, Hashable {
+    public let sessionID: String?
     public let taskID: String
     public let reason: String
     public let ruleID: String
@@ -83,18 +91,22 @@ public enum PolicyAction: Sendable, Codable, Hashable {
     public let snapshotHash: String
 
     public init(
+      sessionID: String? = nil,
       taskID: String,
       reason: String,
       ruleID: String,
       snapshotID: String,
       snapshotHash: String
     ) {
+      self.sessionID = sessionID
       self.taskID = taskID
       self.reason = reason
       self.ruleID = ruleID
       self.snapshotID = snapshotID
       self.snapshotHash = snapshotHash
     }
+
+    fileprivate var sessionKey: String { sessionID ?? "_" }
   }
 
   public struct DecisionPayload: Codable, Sendable, Hashable {

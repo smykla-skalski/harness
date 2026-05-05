@@ -146,6 +146,10 @@ extension WorkspaceWindowView {
       return viewModel.selectedLaunchSelection
     }
 
+    if Self.previewCreatePreset() != nil {
+      return viewModel.selectedLaunchSelection
+    }
+
     if let storedProviderID = HarnessMonitorAgentLaunchDefaults.preferredProviderID() {
       return Self.defaultLaunchSelection(
         providerID: storedProviderID,

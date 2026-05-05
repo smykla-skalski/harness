@@ -1,6 +1,14 @@
 import HarnessMonitorKit
 import SwiftUI
 
+struct AgentDetailComposerHeightPreferenceKey: PreferenceKey {
+  static let defaultValue: CGFloat = 0
+
+  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+    value = max(value, nextValue())
+  }
+}
+
 struct AgentDetailAwaitingDecisionRegion: View {
   let agentID: String
   let attention: AcpDecisionAttention
@@ -115,11 +123,13 @@ struct AgentDetailComposerRegion: View {
       .padding(.vertical, HarnessMonitorTheme.spacingSM)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .harnessPanelGlass()
-    .overlay(alignment: .top) {
-      Rectangle()
-        .fill(HarnessMonitorTheme.controlBorder.opacity(0.55))
-        .frame(height: 1)
+    .background {
+      GeometryReader { proxy in
+        Color.clear.preference(
+          key: AgentDetailComposerHeightPreferenceKey.self,
+          value: proxy.size.height
+        )
+      }
     }
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Send update composer")

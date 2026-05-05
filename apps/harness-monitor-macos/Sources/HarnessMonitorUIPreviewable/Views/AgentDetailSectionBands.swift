@@ -377,4 +377,3 @@ private struct AgentDetailOperationalSummary: View {
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 }
-

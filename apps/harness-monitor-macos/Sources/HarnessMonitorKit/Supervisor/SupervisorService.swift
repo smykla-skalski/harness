@@ -9,14 +9,15 @@ public actor SupervisorService {
   private static let quarantineErrorThreshold = 5
   private static let quarantineWindowTicks = 10
   static let recentActionWindow: TimeInterval = 60
-  let store: HarnessMonitorStore?
+  weak var store: HarnessMonitorStore?
   let registry: PolicyRegistry
   private let executor: PolicyExecutor
-  private let clock: any SupervisorClock
-  private let interval: TimeInterval
+  let clock: any SupervisorClock
+  let interval: TimeInterval
+  private let ruleEvaluationTimeout: Duration
 
-  private var tickTask: Task<Void, Never>?
-  private var running = false, tickInProgress = false
+  var tickTask: Task<Void, Never>?
+  var running = false, tickInProgress = false
   private var tickWaiters: [CheckedContinuation<Void, Never>] = []
   var autoActionSuppressionDepth = 0
   var quietHoursWindow: SupervisorQuietHoursWindow?
@@ -39,35 +40,15 @@ public actor SupervisorService {
     registry: PolicyRegistry,
     executor: PolicyExecutor,
     clock: Any?,
-    interval: TimeInterval
+    interval: TimeInterval,
+    ruleEvaluationTimeout: Duration = .seconds(5)
   ) {
     self.store = store
     self.registry = registry
     self.executor = executor
     self.clock = (clock as? any SupervisorClock) ?? WallClock()
     self.interval = interval
-  }
-
-  public func start() async {
-    guard !running else { return }
-    running = true
-    HarnessMonitorLogger.supervisorTrace(
-      "supervisor.start interval=\(self.interval)"
-    )
-    tickTask = Task { [weak self] in
-      guard let self else { return }
-      await self.runLoop()
-    }
-  }
-
-  public func stop() async {
-    guard running else { return }
-    running = false
-    tickTask?.cancel()
-    await awaitCurrentTick()
-    _ = await tickTask?.value
-    tickTask = nil
-    HarnessMonitorLogger.supervisorTrace("supervisor.stop")
+    self.ruleEvaluationTimeout = ruleEvaluationTimeout
   }
 
   public func runOneTick() async { await runTickSerialized() }
@@ -107,19 +88,7 @@ public actor SupervisorService {
 
   public func injectFailure(forRuleID ruleID: String) { injectedFailures.insert(ruleID) }
 
-  private func runLoop() async {
-    while running && !Task.isCancelled {
-      await runTickSerialized()
-      guard running && !Task.isCancelled else { return }
-      do {
-        try await clock.sleep(for: Self.sleepDuration(for: interval))
-      } catch {
-        return
-      }
-    }
-  }
-
-  private func runTickSerialized() async {
+  func runTickSerialized() async {
     guard !tickInProgress else {
       await awaitCurrentTick()
       return
@@ -136,14 +105,6 @@ public actor SupervisorService {
     for waiter in waiters {
       waiter.resume()
     }
-  }
-
-  private static func sleepDuration(for interval: TimeInterval) -> Duration {
-    guard interval.isFinite, interval > 0 else {
-      return .milliseconds(1)
-    }
-    let milliseconds = min(Double(Int64.max), (interval * 1_000).rounded(.up))
-    return .milliseconds(Int64(max(1.0, milliseconds)))
   }
 
   private func tickBody() async {
@@ -166,7 +127,7 @@ public actor SupervisorService {
     for observer in observers {
       await observer.willTick(snapshot)
     }
-    let history = await historyWindow()
+    let history = await historyWindow(ruleIDs: rules.map(\.id))
     let results = await evaluateRules(
       rules,
       snapshot: snapshot,
@@ -211,11 +172,15 @@ public actor SupervisorService {
     let quarantinedSnapshot = quarantined
     let armedSnapshot = injectedFailures
 
-    return await withTaskGroup(of: RuleEvaluation.self) { group in
+    let timeout = ruleEvaluationTimeout
+    return await withTaskGroup(of: (Int, SupervisorRuleEvaluation).self) { group in
+      var scheduledRuleIDs: [String] = []
       for rule in rules where !quarantinedSnapshot.contains(rule.id) {
         guard await registry.isEnabled(ruleID: rule.id) else {
           continue
         }
+        let index = scheduledRuleIDs.count
+        scheduledRuleIDs.append(rule.id)
         let armed = armedSnapshot.contains(rule.id)
         let context = await makeContext(
           forRuleID: rule.id,
@@ -223,11 +188,24 @@ public actor SupervisorService {
           history: history
         )
         group.addTask { [context] in
-          await Self.runRule(rule, snapshot: snapshot, context: context, armed: armed)
+          (
+            index,
+            await Self.runRule(
+              rule,
+              snapshot: snapshot,
+              context: context,
+              armed: armed,
+              timeout: timeout
+            )
+          )
         }
       }
+      var evaluations = [SupervisorRuleEvaluation?](repeating: nil, count: scheduledRuleIDs.count)
+      for await (index, evaluation) in group {
+        evaluations[index] = evaluation
+      }
       var results = TickResults()
-      for await evaluation in group {
+      for evaluation in evaluations.compactMap(\.self) {
         if evaluation.failed {
           results.failedRuleIDs.insert(evaluation.ruleID)
         }
@@ -242,27 +220,43 @@ public actor SupervisorService {
     }
   }
 
-  private struct RuleEvaluation {
-    let ruleID: String
-    let rule: any PolicyRule
-    let actions: [PolicyAction]
-    let failed: Bool
-  }
-
   private static func runRule(
     _ rule: any PolicyRule,
     snapshot: SessionsSnapshot,
     context: PolicyContext,
-    armed: Bool
-  ) async -> RuleEvaluation {
+    armed: Bool,
+    timeout: Duration
+  ) async -> SupervisorRuleEvaluation {
     if armed {
       HarnessMonitorLogger.supervisorWarning(
         "supervisor.rule.failed rule=\(rule.id)"
       )
-      return RuleEvaluation(ruleID: rule.id, rule: rule, actions: [], failed: true)
+      return SupervisorRuleEvaluation(ruleID: rule.id, rule: rule, actions: [], failed: true)
     }
-    let actions = await rule.evaluate(snapshot: snapshot, context: context)
-    return RuleEvaluation(ruleID: rule.id, rule: rule, actions: actions, failed: false)
+    let gate = SupervisorOneShotGate<SupervisorRuleEvaluation>()
+    let evaluationTask = Task {
+      let actions = await rule.evaluate(snapshot: snapshot, context: context)
+      await gate.finish(
+        SupervisorRuleEvaluation(ruleID: rule.id, rule: rule, actions: actions, failed: false)
+      )
+    }
+    let timeoutTask = Task {
+      do {
+        try await Task.sleep(for: timeout)
+      } catch {
+        return
+      }
+      evaluationTask.cancel()
+      HarnessMonitorLogger.supervisorWarning(
+        "supervisor.rule.timeout rule=\(rule.id)"
+      )
+      await gate.finish(
+        SupervisorRuleEvaluation(ruleID: rule.id, rule: rule, actions: [], failed: true)
+      )
+    }
+    let evaluation = await gate.wait()
+    timeoutTask.cancel()
+    return evaluation
   }
 
   private func advanceFailureWindow(with failedRuleIDs: Set<String>) {
@@ -320,8 +314,10 @@ public actor SupervisorService {
     }
     for ruleID in quarantined where wasQuarantinedThisTick(ruleID) {
       let decision = Self.makeQuarantineDecision(for: ruleID)
-      _ = await dispatch(.queueDecision(decision), tickID: tickID, observers: observers)
-      dispatchedQuarantineDecisions.insert(ruleID)
+      let outcome = await dispatch(.queueDecision(decision), tickID: tickID, observers: observers)
+      if outcome.recordsFiredAction {
+        dispatchedQuarantineDecisions.insert(ruleID)
+      }
     }
   }
 

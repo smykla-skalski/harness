@@ -95,7 +95,7 @@ public struct SessionsSnapshot: Sendable, Hashable {
         [:]
       }
 
-    return summaries.compactMap { summary -> SessionSnapshot? in
+    return summaries.map { summary -> SessionSnapshot in
       let detailSource: (detail: SessionDetail, timeline: [TimelineEntry])
       if let selectedDetail, selectedSessionID == summary.sessionId {
         detailSource = (selectedDetail, selectedTimeline)
@@ -103,9 +103,9 @@ public struct SessionsSnapshot: Sendable, Hashable {
         detailSource = (cached.detail, cached.timeline)
       } else {
         HarnessMonitorLogger.supervisorDebug(
-          "supervisor.snapshot skipping unhydrated session \(summary.sessionId)"
+          "supervisor.snapshot summary_only session=\(summary.sessionId)"
         )
-        return nil
+        return SessionSnapshot.summaryOnly(summary: summary)
       }
 
       let sessionRuns =
@@ -143,6 +143,7 @@ public struct SessionsSnapshot: Sendable, Hashable {
 public struct SessionSnapshot: Sendable, Hashable, Codable {
   public let id: String
   public let title: String?
+  public let statusRaw: String
   public let agents: [AgentSnapshot]
   public let tasks: [TaskSnapshot]
   public let timelineDensityLastMinute: Int
@@ -152,6 +153,7 @@ public struct SessionSnapshot: Sendable, Hashable, Codable {
   public init(
     id: String,
     title: String?,
+    statusRaw: String = "active",
     agents: [AgentSnapshot],
     tasks: [TaskSnapshot],
     timelineDensityLastMinute: Int,
@@ -160,6 +162,7 @@ public struct SessionSnapshot: Sendable, Hashable, Codable {
   ) {
     self.id = id
     self.title = title
+    self.statusRaw = statusRaw
     self.agents = agents
     self.tasks = tasks
     self.timelineDensityLastMinute = timelineDensityLastMinute
@@ -191,6 +194,7 @@ public struct SessionSnapshot: Sendable, Hashable, Codable {
     return Self(
       id: summary.sessionId,
       title: summary.title,
+      statusRaw: summary.status.rawValue,
       agents: agents,
       tasks: tasks,
       timelineDensityLastMinute: timelineDensityLastMinute,

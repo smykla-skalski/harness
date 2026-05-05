@@ -189,6 +189,7 @@ fn post_task_drop_queue_policy_update_and_status_use_async_db_when_sync_db_is_un
                                 agent_id: worker_id.clone(),
                             },
                             queue_policy: TaskQueuePolicy::Locked,
+                            reason: None,
                         }),
                     )
                     .await;
@@ -219,6 +220,7 @@ fn post_task_drop_queue_policy_update_and_status_use_async_db_when_sync_db_is_un
                                 agent_id: worker_id.clone(),
                             },
                             queue_policy: TaskQueuePolicy::Locked,
+                            reason: None,
                         }),
                     )
                     .await;

@@ -8,8 +8,8 @@ final class PolicyActionContractTests: XCTestCase {
       makeActions().map(\.actionKey),
       [
         "nudge:rule-1:agent-1:snapshot-hash",
-        "assign:rule-1:task-1:snapshot-hash",
-        "drop:rule-1:task-2:snapshot-hash",
+        "assign:rule-1:session-1:task-1:snapshot-hash",
+        "drop:rule-1:session-1:task-2:snapshot-hash",
         "decision:rule-1:decision-1",
         "notify:rule-1:snapshot-hash",
         "log:rule-1:log-1",
@@ -38,6 +38,7 @@ final class PolicyActionContractTests: XCTestCase {
       ),
       .assignTask(
         .init(
+          sessionID: "session-1",
           taskID: "task-1",
           agentID: "agent-1",
           ruleID: "rule-1",
@@ -47,6 +48,7 @@ final class PolicyActionContractTests: XCTestCase {
       ),
       .dropTask(
         .init(
+          sessionID: "session-1",
           taskID: "task-2",
           reason: "stale",
           ruleID: "rule-1",

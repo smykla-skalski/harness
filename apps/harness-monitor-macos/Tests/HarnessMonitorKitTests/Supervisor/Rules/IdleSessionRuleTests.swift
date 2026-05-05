@@ -108,6 +108,23 @@ final class IdleSessionRuleTests: XCTestCase {
     XCTAssertTrue(actions.isEmpty)
   }
 
+  func test_doesNotTrigger_forInactiveSession() async {
+    let rule = IdleSessionRule()
+    let now = Date.fixed
+    let snapshot = snapshot(
+      sessions: [
+        session(
+          id: "s1",
+          statusRaw: "ended",
+          agents: [agent(id: "a1", lastActivityAt: now.addingTimeInterval(-3_600))],
+          timelineDensityLastMinute: 0
+        )
+      ]
+    )
+    let actions = await rule.evaluate(snapshot: snapshot, context: context(now: now))
+    XCTAssertTrue(actions.isEmpty)
+  }
+
   // MARK: - Suggested actions
 
   func test_queueDecisionCarriesCheckInAndCloseActions() async throws {
@@ -232,12 +249,14 @@ final class IdleSessionRuleTests: XCTestCase {
 
   private func session(
     id: String,
+    statusRaw: String = "active",
     agents: [AgentSnapshot],
     timelineDensityLastMinute: Int
   ) -> SessionSnapshot {
     SessionSnapshot(
       id: id,
       title: nil,
+      statusRaw: statusRaw,
       agents: agents,
       tasks: [],
       timelineDensityLastMinute: timelineDensityLastMinute,

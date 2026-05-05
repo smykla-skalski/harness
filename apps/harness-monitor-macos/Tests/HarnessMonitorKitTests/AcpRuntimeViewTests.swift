@@ -12,6 +12,7 @@ struct AcpRuntimeViewTests {
   func sceneStorageKeyUsesStableAgentIdentifier() {
     let key = AcpRuntimeDisclosure.sceneStorageKey(
       sessionID: "sess-harness/main",
+      acpID: "acp-1",
       agentID: "Worker/1"
     )
 
@@ -19,6 +20,7 @@ struct AcpRuntimeViewTests {
       key
         == AcpRuntimeDisclosure.sceneStorageKey(
           sessionID: "sess-harness/main",
+          acpID: "acp-1",
           agentID: "Worker/1"
         )
     )
@@ -26,9 +28,26 @@ struct AcpRuntimeViewTests {
       key
         != AcpRuntimeDisclosure.sceneStorageKey(
           sessionID: "sess-harness/main",
+          acpID: "acp-1",
           agentID: "Worker_2f1"
         )
     )
+  }
+
+  @Test("Scene storage key keeps restarted ACP runtimes isolated")
+  func sceneStorageKeyIncludesAcpRuntimeIdentifier() {
+    let first = AcpRuntimeDisclosure.sceneStorageKey(
+      sessionID: "sess-harness/main",
+      acpID: "acp-1",
+      agentID: "Worker/1"
+    )
+    let restarted = AcpRuntimeDisclosure.sceneStorageKey(
+      sessionID: "sess-harness/main",
+      acpID: "acp-2",
+      agentID: "Worker/1"
+    )
+
+    #expect(first != restarted)
   }
 
   @Test("Runtime identity id keeps session, ACP, and agent components lossless")

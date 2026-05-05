@@ -109,6 +109,10 @@ public enum HarnessMonitorPreviewStoreFactory {
       codexStartBehavior: codexStartBehavior
     )
     store.bookmarkedSessionIds = configuration.bookmarkedSessionIDs
+    seedForcedHostBridgeIssues(
+      store: store,
+      environment: environment
+    )
     store.sessionFilter = configuration.sessionFilter
     store.selectedSessionID = configuration.selectedSessionID
     store.selectedSession = configuration.selectedDetail
@@ -204,6 +208,18 @@ public enum HarnessMonitorPreviewStoreFactory {
       return
     }
     store.markHostBridgeIssue(for: "acp", statusCode: 503)
+  }
+
+  private static func seedForcedHostBridgeIssues(
+    store: HarnessMonitorStore,
+    environment: HarnessMonitorEnvironment
+  ) {
+    let forcedIssues = HarnessMonitorStore.parseForcedBridgeIssues(from: environment.values)
+    guard !forcedIssues.isEmpty else {
+      return
+    }
+    store.hostBridgeCapabilityIssues.merge(forcedIssues) { _, newValue in newValue }
+    store.forcedHostBridgeCapabilities.formUnion(forcedIssues.keys)
   }
 
   private static func previewStatusReport(

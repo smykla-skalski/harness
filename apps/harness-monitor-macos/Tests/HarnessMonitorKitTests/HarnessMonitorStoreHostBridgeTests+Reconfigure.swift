@@ -238,9 +238,10 @@ extension HarnessMonitorStoreHostBridgeTests {
     let result = await store.setHostBridgeCapability("agent-tui", enabled: true)
 
     #expect(result == .failed)
-    #expect(
-      store.currentFailureFeedbackMessage?.contains("Restart `harness daemon dev` and try again.")
-        == true)
+    let failureMessage = store.currentFailureFeedbackMessage ?? ""
+    #expect(failureMessage.contains("Restart `"))
+    #expect(failureMessage.contains("harness daemon dev"))
+    #expect(failureMessage.contains("and try again."))
     #expect(await daemon.recordedOperations() == ["warm-up"])
   }
 
@@ -267,7 +268,12 @@ extension HarnessMonitorStoreHostBridgeTests {
       store.currentFailureFeedbackMessage
         == "The shared host bridge is not running. Start it and try again.")
     #expect(store.hostBridgeCapabilityState(for: "agent-tui") == .unavailable)
-    #expect(store.hostBridgeStartCommand(for: "agent-tui") == "harness bridge start")
+    #expect(
+      store.hostBridgeStartCommand(
+        for: "agent-tui",
+        environment: hostBridgeCommandTestEnvironment
+      ) == "harness bridge start"
+    )
     #expect(store.daemonStatus?.manifest?.hostBridge.running == false)
   }
 

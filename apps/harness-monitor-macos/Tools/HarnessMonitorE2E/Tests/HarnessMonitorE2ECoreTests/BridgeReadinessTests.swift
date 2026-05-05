@@ -7,7 +7,8 @@ final class BridgeReadinessTests: XCTestCase {
     let json = """
       { "running": true, "capabilities": {
           "codex": { "healthy": true },
-          "agent-tui": { "healthy": true }
+          "agent-tui": { "healthy": true },
+          "acp": { "healthy": true }
       } }
       """
     XCTAssertTrue(BridgeReadiness.isReady(fromJSON: Data(json.utf8)))
@@ -17,7 +18,8 @@ final class BridgeReadinessTests: XCTestCase {
     let json = """
       { "running": true, "capabilities": {
           "codex": { "healthy": true },
-          "agent-tui": { "healthy": false }
+          "agent-tui": { "healthy": false },
+          "acp": { "healthy": true }
       } }
       """
     XCTAssertFalse(BridgeReadiness.isReady(fromJSON: Data(json.utf8)))
@@ -29,7 +31,10 @@ final class BridgeReadinessTests: XCTestCase {
 
   func testNotReadyWhenCapabilityMissing() {
     let json = """
-      { "running": true, "capabilities": { "codex": { "healthy": true } } }
+      { "running": true, "capabilities": {
+          "codex": { "healthy": true },
+          "agent-tui": { "healthy": true }
+      } }
       """
     XCTAssertFalse(BridgeReadiness.isReady(fromJSON: Data(json.utf8)))
   }

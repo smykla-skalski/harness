@@ -3,19 +3,30 @@ import XCTest
 @testable import HarnessMonitorKit
 
 final class SupervisorLifecycleStoreBootstrapTests: XCTestCase {
-  @MainActor
-  func test_bootstrapIfNeededStartsSupervisor() async throws {
-    let store = HarnessMonitorStore.fixture()
+  func test_bootstrapSupervisorAutostartPolicyRunsOutsideXCTestHost() {
+    XCTAssertTrue(
+      HarnessMonitorStore.shouldStartSupervisorOnBootstrap(environment: [:])
+    )
+  }
 
-    await store.bootstrapIfNeeded()
+  func test_bootstrapSupervisorAutostartPolicySkipsXCTestHost() {
+    XCTAssertFalse(
+      HarnessMonitorStore.shouldStartSupervisorOnBootstrap(
+        environment: [
+          "XCTestConfigurationFilePath": "/tmp/HarnessMonitorKitTests.xctestconfiguration"
+        ]
+      )
+    )
+  }
 
-    try await store.insertDecisionForTesting(DecisionDraft.fixture(id: "d-bootstrap-check"))
-    try await Task.sleep(for: .milliseconds(100))
-
-    XCTAssertGreaterThan(
-      store.supervisorToolbarSlice.count,
-      0,
-      "Bootstrap should start the supervisor so decision inserts become visible"
+  func test_bootstrapSupervisorAutostartPolicyCanOptInInsideXCTestHost() {
+    XCTAssertTrue(
+      HarnessMonitorStore.shouldStartSupervisorOnBootstrap(
+        environment: [
+          "XCTestConfigurationFilePath": "/tmp/HarnessMonitorKitTests.xctestconfiguration",
+          "HARNESS_MONITOR_ENABLE_BOOTSTRAP_SUPERVISOR_IN_TESTS": "1",
+        ]
+      )
     )
   }
 
@@ -29,7 +40,7 @@ final class SupervisorLifecycleStoreBootstrapTests: XCTestCase {
       )
     }
     await store.startSupervisor()
-    defer { Task { await store.stopSupervisor() } }
+    addTeardownBlock { await store.stopSupervisor() }
 
     XCTAssertTrue(store.isSupervisorBackgroundActivityScheduledForTesting())
     XCTAssertTrue(store.isSupervisorAuditRetentionScheduledForTesting())

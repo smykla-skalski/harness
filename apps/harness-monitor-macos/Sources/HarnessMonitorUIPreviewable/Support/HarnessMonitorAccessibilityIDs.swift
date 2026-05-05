@@ -174,6 +174,7 @@ public enum HarnessMonitorAccessibility {
   public static let workspaceCreateTab = agentTuiCreateTab
   public static let workspaceCreateModePicker = agentTuiCreateModePicker
   public static let workspaceRuntimePicker = agentTuiRuntimePicker
+  public static let workspaceTransportPicker = "harness.window.workspace.transport"
   public static let workspaceRolePicker = agentTuiRolePicker
   public static let workspaceFallbackRolePicker = agentTuiFallbackRolePicker
   public static let workspaceNameField = agentTuiNameField

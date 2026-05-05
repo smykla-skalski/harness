@@ -26,6 +26,7 @@ struct AcpRuntimeDisclosure: View {
       wrappedValue: false,
       Self.sceneStorageKey(
         sessionID: runtimeState.sessionId,
+        acpID: runtimeState.acpId,
         agentID: runtimeState.agentId
       )
     )
@@ -62,8 +63,13 @@ struct AcpRuntimeDisclosure: View {
     )
   }
 
-  static func sceneStorageKey(sessionID: String, agentID: String) -> String {
-    "harness.workspace.runtime-disclosure.\(storageKeyComponent(sessionID)).\(storageKeyComponent(agentID))"
+  static func sceneStorageKey(sessionID: String, acpID: String, agentID: String) -> String {
+    [
+      "harness.workspace.runtime-disclosure",
+      storageKeyComponent(sessionID),
+      storageKeyComponent(acpID),
+      storageKeyComponent(agentID),
+    ].joined(separator: ".")
   }
 
   @ViewBuilder private var detailContent: some View {

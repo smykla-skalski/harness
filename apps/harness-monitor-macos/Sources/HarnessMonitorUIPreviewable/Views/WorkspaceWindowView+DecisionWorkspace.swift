@@ -61,31 +61,7 @@ extension WorkspaceWindowView {
     from oldValue: WorkspaceSelection,
     to newValue: WorkspaceSelection
   ) async {
-    if let sessionID = newValue.sessionID, sessionID != store.selectedSessionID {
-      viewModel.createSessionID = sessionID
-      await store.selectSession(sessionID)
-    } else if let sessionID = newValue.sessionID {
-      viewModel.createSessionID = sessionID
-    } else if case .create = newValue {
-      let requestedCreateSessionID = Self.normalizedCreateSessionAnchor(
-        viewModel.pendingCreateSessionID
-      )
-      let selectedSessionID = Self.normalizedCreateSessionAnchor(store.selectedSessionID)
-      let previousSessionID = Self.normalizedCreateSessionAnchor(oldValue.sessionID)
-      let existingCreateSessionID = Self.normalizedCreateSessionAnchor(viewModel.createSessionID)
-      let resolvedCreateSessionID =
-        requestedCreateSessionID
-        ?? selectedSessionID
-        ?? previousSessionID
-        ?? existingCreateSessionID
-      viewModel.pendingCreateSessionID = nil
-      viewModel.createSessionID = resolvedCreateSessionID
-      if let requestedCreateSessionID, requestedCreateSessionID != selectedSessionID {
-        await store.selectSession(requestedCreateSessionID)
-      } else if store.selectedSessionID == nil, let resolvedCreateSessionID {
-        await store.selectSession(resolvedCreateSessionID)
-      }
-    }
+    await synchronizeSelectionSession(from: oldValue, to: newValue)
 
     if !oldValue.isDecisionRoute, newValue.isDecisionRoute {
       restoreDecisionInspectorForDecisionRoute()
@@ -105,6 +81,44 @@ extension WorkspaceWindowView {
       store.supervisorSelectedDecisionID = nil
     case .decisions:
       store.supervisorSelectedDecisionID = nil
+    }
+  }
+
+  func synchronizeSelectionSession(
+    from oldValue: WorkspaceSelection,
+    to newValue: WorkspaceSelection
+  ) async {
+    if let sessionID = newValue.sessionID {
+      viewModel.createSessionID = sessionID
+      if sessionID != store.selectedSessionID {
+        await store.selectSession(sessionID)
+      }
+      return
+    }
+
+    guard case .create = newValue else {
+      return
+    }
+
+    await synchronizeCreateSelectionSession(previousSelection: oldValue)
+  }
+
+  func synchronizeCreateSelectionSession(
+    previousSelection: WorkspaceSelection
+  ) async {
+    let requestedSessionID = Self.normalizedCreateSessionAnchor(viewModel.pendingCreateSessionID)
+    let selectedSessionID = Self.normalizedCreateSessionAnchor(store.selectedSessionID)
+    let previousSessionID = Self.normalizedCreateSessionAnchor(previousSelection.sessionID)
+    let existingSessionID = Self.normalizedCreateSessionAnchor(viewModel.createSessionID)
+    let resolvedSessionID =
+      requestedSessionID ?? selectedSessionID ?? previousSessionID ?? existingSessionID
+    viewModel.pendingCreateSessionID = nil
+    viewModel.createSessionID = resolvedSessionID
+
+    if let requestedSessionID, requestedSessionID != selectedSessionID {
+      await store.selectSession(requestedSessionID)
+    } else if store.selectedSessionID == nil, let resolvedSessionID {
+      await store.selectSession(resolvedSessionID)
     }
   }
 

@@ -6,14 +6,14 @@ import Foundation
 /// provided by tests; the real `HarnessMonitorAPIClient` conforms via an extension.
 public protocol SupervisorAPIClient: Sendable {
   func nudgeAgent(agentID: String, input: String) async throws
-  func assignTask(taskID: String, agentID: String) async throws
-  func dropTask(taskID: String, reason: String) async throws
+  func assignTask(sessionID: String?, taskID: String, agentID: String) async throws
+  func dropTask(sessionID: String?, taskID: String, reason: String) async throws
   func postNotification(
     ruleID: String,
     severity: DecisionSeverity,
     summary: String,
     decisionID: String?
-  ) async
+  ) async throws
 }
 
 /// One persisted record written to the supervisor audit trail.
@@ -48,7 +48,7 @@ public struct SupervisorAuditRecord: Sendable {
 /// Receives `SupervisorAuditRecord`s in the order they are produced. Used by `PolicyExecutor`
 /// to record `actionDispatched` / `actionExecuted` / `actionFailed` events.
 public protocol SupervisorAuditWriter: Sendable {
-  func append(_ record: SupervisorAuditRecord) async
+  func append(_ record: SupervisorAuditRecord) async throws
 }
 
 // MARK: - PolicyExecutor
@@ -64,6 +64,7 @@ public actor PolicyExecutor {
 
   /// Keys of actions dispatched within the current cooldown window, mapped to the timestamp.
   private var recentKeys: [String: Date] = [:]
+  private var pendingDecisionNotifications: Set<String> = []
 
   public init(
     api: any SupervisorAPIClient,
@@ -99,7 +100,15 @@ public actor PolicyExecutor {
       tickID: tickID ?? action.auditTickID,
       createdAt: dispatchedAt
     )
-    await audit.append(dispatchRecord)
+    do {
+      try await audit.append(dispatchRecord)
+    } catch {
+      let sanitizedError = redactSupervisorErrorMessage(error.localizedDescription)
+      HarnessMonitorLogger.supervisorWarning(
+        "action audit dispatch failed key=\(key) error=\(sanitizedError)"
+      )
+      return .failed(actionKey: key, error: sanitizedError)
+    }
     recentKeys[key] = dispatchedAt
 
     do {
@@ -111,10 +120,12 @@ public actor PolicyExecutor {
         tickID: tickID ?? action.auditTickID,
         createdAt: clock.now()
       )
-      await audit.append(executedRecord)
+      await appendPostActionAudit(executedRecord, actionKey: key)
       return .executed(actionKey: key)
     } catch {
-      recentKeys.removeValue(forKey: key)
+      if !(error is DeferredSupervisorNotificationError) {
+        recentKeys.removeValue(forKey: key)
+      }
       let sanitizedError = redactSupervisorErrorMessage(error.localizedDescription)
       HarnessMonitorLogger.supervisorWarning(
         "action failed key=\(key) error=\(sanitizedError)"
@@ -126,7 +137,7 @@ public actor PolicyExecutor {
         tickID: tickID ?? action.auditTickID,
         createdAt: clock.now()
       )
-      await audit.append(failedRecord)
+      await appendPostActionAudit(failedRecord, actionKey: key)
       return .failed(actionKey: key, error: sanitizedError)
     }
   }
@@ -139,7 +150,14 @@ public actor PolicyExecutor {
       tickID: tickID,
       createdAt: clock.now()
     )
-    await audit.append(record)
+    do {
+      try await audit.append(record)
+    } catch {
+      let sanitizedError = redactSupervisorErrorMessage(error.localizedDescription)
+      HarnessMonitorLogger.supervisorWarning(
+        "suppressed action audit failed key=\(action.actionKey) error=\(sanitizedError)"
+      )
+    }
   }
 
   // MARK: - Private helpers
@@ -147,6 +165,20 @@ public actor PolicyExecutor {
   private func pruneExpiredKeys(at now: Date) {
     let cutoff = now.addingTimeInterval(-cooldown)
     recentKeys = recentKeys.filter { $0.value > cutoff }
+  }
+
+  private func appendPostActionAudit(
+    _ record: SupervisorAuditRecord,
+    actionKey: String
+  ) async {
+    do {
+      try await audit.append(record)
+    } catch {
+      let sanitizedError = redactSupervisorErrorMessage(error.localizedDescription)
+      HarnessMonitorLogger.supervisorWarning(
+        "post action audit failed key=\(actionKey) error=\(sanitizedError)"
+      )
+    }
   }
 
   private func auditRecord(
@@ -173,10 +205,18 @@ public actor PolicyExecutor {
       try await api.nudgeAgent(agentID: payload.agentID, input: payload.prompt)
 
     case .assignTask(let payload):
-      try await api.assignTask(taskID: payload.taskID, agentID: payload.agentID)
+      try await api.assignTask(
+        sessionID: payload.sessionID,
+        taskID: payload.taskID,
+        agentID: payload.agentID
+      )
 
     case .dropTask(let payload):
-      try await api.dropTask(taskID: payload.taskID, reason: payload.reason)
+      try await api.dropTask(
+        sessionID: payload.sessionID,
+        taskID: payload.taskID,
+        reason: payload.reason
+      )
 
     case .queueDecision(let payload):
       let draft = DecisionDraft(
@@ -191,22 +231,40 @@ public actor PolicyExecutor {
         suggestedActionsJSON: payload.suggestedActionsJSON
       )
       let result = try await decisions.upsertOpen(draft)
-      if result == .inserted || result == .reopened {
-        await api.postNotification(
-          ruleID: payload.ruleID,
-          severity: payload.severity,
-          summary: payload.summary,
-          decisionID: payload.id
-        )
+      // The durable attention item is the open decision. OS notification retry is
+      // best-effort in-process state, deliberately cooldown-throttled by the action
+      // key so transient delivery failure retries without repeatedly notifying
+      // stable open decisions.
+      let shouldNotify =
+        result == .inserted
+        || result == .reopened
+        || pendingDecisionNotifications.contains(payload.id)
+      if shouldNotify {
+        do {
+          try await api.postNotification(
+            ruleID: payload.ruleID,
+            severity: payload.severity,
+            summary: payload.summary,
+            decisionID: payload.id
+          )
+          pendingDecisionNotifications.remove(payload.id)
+        } catch {
+          pendingDecisionNotifications.insert(payload.id)
+          throw DeferredSupervisorNotificationError(underlying: error)
+        }
       }
 
     case .notifyOnly(let payload):
-      await api.postNotification(
-        ruleID: payload.ruleID,
-        severity: payload.severity,
-        summary: payload.summary,
-        decisionID: nil
-      )
+      do {
+        try await api.postNotification(
+          ruleID: payload.ruleID,
+          severity: payload.severity,
+          summary: payload.summary,
+          decisionID: nil
+        )
+      } catch {
+        throw DeferredSupervisorNotificationError(underlying: error)
+      }
 
     case .logEvent(let payload):
       HarnessMonitorLogger.supervisorTrace("logEvent: \(payload.message)")
@@ -252,6 +310,14 @@ public actor PolicyExecutor {
   }
 }
 
+private struct DeferredSupervisorNotificationError: LocalizedError {
+  let underlying: Error
+
+  var errorDescription: String? {
+    underlying.localizedDescription
+  }
+}
+
 // MARK: - Fixture
 
 extension PolicyExecutor {
@@ -270,14 +336,14 @@ extension PolicyExecutor {
 
 private struct NoOpSupervisorAPIClient: SupervisorAPIClient {
   func nudgeAgent(agentID: String, input: String) async throws {}
-  func assignTask(taskID: String, agentID: String) async throws {}
-  func dropTask(taskID: String, reason: String) async throws {}
+  func assignTask(sessionID: String?, taskID: String, agentID: String) async throws {}
+  func dropTask(sessionID: String?, taskID: String, reason: String) async throws {}
   func postNotification(
     ruleID: String,
     severity: DecisionSeverity,
     summary: String,
     decisionID: String?
-  ) async {
+  ) async throws {
     _ = (ruleID, severity, summary, decisionID)
   }
 }

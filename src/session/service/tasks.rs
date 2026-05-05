@@ -149,6 +149,7 @@ pub fn drop_task(
                 actor: actor_id.to_string(),
                 target: target.clone(),
                 queue_policy,
+                reason: None,
             },
         )?;
         return Ok(());

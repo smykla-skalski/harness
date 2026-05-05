@@ -49,7 +49,7 @@ extension WorkspaceWindowUITests {
       probe.exists,
       "Doctor probe should stay hidden until diagnostics disclosure is expanded"
     )
-    tapButton(in: app, title: "Copilot")
+    selectWorkspaceCapability(in: app, identifier: "copilot", title: "Copilot")
     tapElement(
       in: app,
       identifier: Accessibility.newSessionDiagnosticsToggle("copilot")
@@ -76,7 +76,7 @@ extension WorkspaceWindowUITests {
       "Missing ACP binary should fall back to the TUI-backed form state"
     )
 
-    tapButton(in: app, title: "Copilot")
+    selectWorkspaceCapability(in: app, identifier: "copilot", title: "Copilot")
 
     let installButton = button(
       in: app,

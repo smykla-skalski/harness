@@ -139,8 +139,25 @@ struct HarnessMonitorSessionModelsTests {
 
     #expect(object["actor"] as? String == "leader-claude")
     #expect(object["queue_policy"] as? String == "reassign_when_free")
+    #expect(object["reason"] == nil)
     #expect(target["target_type"] as? String == "agent")
     #expect(target["agent_id"] as? String == "worker-codex")
+  }
+
+  @Test("Task drop request encodes optional reason")
+  func taskDropRequestEncodesReasonWhenPresent() throws {
+    let request = TaskDropRequest(
+      actor: "harness-supervisor",
+      target: .agent(agentId: "worker-codex"),
+      reason: "policy escalation"
+    )
+
+    let data = try encoder.encode(request)
+    let object = try #require(
+      JSONSerialization.jsonObject(with: data) as? [String: Any]
+    )
+
+    #expect(object["reason"] as? String == "policy escalation")
   }
 
   @Test("Session detail decoding accepts daemon task payloads with omitted defaults")

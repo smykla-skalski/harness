@@ -2,13 +2,10 @@ import Foundation
 import SwiftData
 
 extension HarnessMonitorStore {
-  private func awaitOutstandingDirectPersistenceConflicts() async {
-    if let pendingCacheWriteTask {
-      await pendingCacheWriteTask.value
-    }
-    if let sessionSnapshotHydrationTask {
-      await sessionSnapshotHydrationTask.value
-    }
+  private func cancelSupersededPersistenceWork() {
+    cancelPendingCacheWrite()
+    sessionSnapshotHydrationTask?.cancel()
+    sessionSnapshotHydrationTask = nil
   }
 
   func cacheSessionList(
@@ -28,7 +25,7 @@ extension HarnessMonitorStore {
     markViewed: Bool = true
   ) async {
     guard let cacheService, persistenceError == nil else { return }
-    await awaitOutstandingDirectPersistenceConflicts()
+    cancelSupersededPersistenceWork()
     let result = await cacheService.cacheSessionDetail(
       detail,
       timeline: timeline,
@@ -44,7 +41,6 @@ extension HarnessMonitorStore {
   ) async {
     guard let cacheService, persistenceError == nil else { return }
     guard !entries.isEmpty else { return }
-    await awaitOutstandingDirectPersistenceConflicts()
     let result = await cacheService.cacheSessionDetails(entries, markViewed: markViewed)
     await applyPersistedCacheWriteResult(result)
   }
@@ -80,8 +76,7 @@ extension HarnessMonitorStore {
     projects: [ProjectSummary]
   ) async {
     guard let cacheService, persistenceError == nil else { return }
-    cancelPendingCacheWrite()
-    await awaitOutstandingDirectPersistenceConflicts()
+    cancelSupersededPersistenceWork()
     let result = await cacheService.cacheSessionList(sessions, projects: projects)
     await applyPersistedCacheWriteResult(result)
   }

@@ -128,6 +128,7 @@ struct AgentCapabilityOption: Identifiable, Equatable {
 
   var showsInstallCTA: Bool {
     guard let acpChoice, !isEnabled(acpChoice) else { return false }
+    guard !requiresBridgeAccess else { return false }
     guard !sandboxed || !acpHostBridgeReady else { return false }
     return probe?.binaryPresent == false
   }
@@ -146,14 +147,14 @@ struct AgentCapabilityOption: Identifiable, Equatable {
   }
 
   var availabilityState: AgentCapabilityAvailabilityState {
+    if requiresBridgeAccess {
+      return .bridgeAccessRequired
+    }
     if showsInstallCTA {
       return .setupRequired
     }
     if hasPendingAcpProbe {
       return .checkingAccess
-    }
-    if requiresBridgeAccess {
-      return .bridgeAccessRequired
     }
     if let acpChoice, isEnabled(acpChoice) {
       return .projectAccessAvailable

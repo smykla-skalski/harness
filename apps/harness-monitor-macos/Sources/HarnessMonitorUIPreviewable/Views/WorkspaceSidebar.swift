@@ -34,7 +34,7 @@ struct WorkspaceSidebar: View {
   @AppStorage(WorkspaceDecisionFilterDefaults.searchScopeKey)
   private var decisionSearchScopeRaw = DecisionsSidebarSearchScope.summary.rawValue
   @State private var hasHydratedPersistedDecisionFilters = false
-  @State var workspaceSearchQuery = ""
+  @State private var workspaceSearchQuery = ""
   @State private var searchFocusDispatcher = HarnessSidebarSearchFocusDispatcher()
   @State private var searchPresentationState = SidebarSearchPresentationState()
   @Environment(\.fontScale)
@@ -63,6 +63,10 @@ struct WorkspaceSidebar: View {
       get: { workspaceSearchQuery },
       set: { workspaceSearchQuery = $0 }
     )
+  }
+
+  var normalizedWorkspaceSearchQuery: String {
+    workspaceSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
   }
 
   private var sidebarSearchText: Binding<String> {
@@ -159,7 +163,8 @@ struct WorkspaceSidebar: View {
   }
 
   @ViewBuilder private var searchableSidebarList: some View {
-    let searchableList = sidebarList
+    let searchableList =
+      sidebarList
       .listStyle(.sidebar)
       .scrollEdgeEffectStyle(.soft, for: .top)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

@@ -209,28 +209,27 @@ struct AgentDetailSection: View {
     }
   }
 
-  @ViewBuilder
-  private var fullPaneBody: some View {
+  @ViewBuilder private var fullPaneBody: some View {
     HarnessMonitorColumnScrollView(
       horizontalPadding: HarnessMonitorTheme.spacingLG,
       verticalPadding: HarnessMonitorTheme.spacingLG,
       constrainContentWidth: false,
       readableWidth: false,
       topScrollEdgeEffect: .soft,
-      bottomScrollContentMargin: WorkspaceChromeMetrics.scrollContentBottomChromeMargin,
+      bottomScrollContentMargin: 0,
       scrollSurfaceIdentifier: HarnessMonitorAccessibility.workspaceDetailScrollView,
       scrollSurfaceLabel: "Workspace detail",
       bottomInset: {
         composerInset
+      },
+      content: {
+        contentColumn(pinsComposer: true)
+          .agentDetailCardProbe(name: agent.name, agentID: agent.agentId)
       }
-    ) {
-      contentColumn(pinsComposer: true)
-        .agentDetailCardProbe(name: agent.name, agentID: agent.agentId)
-    }
+    )
   }
 
-  @ViewBuilder
-  private var compactBody: some View {
+  @ViewBuilder private var compactBody: some View {
     contentColumn(pinsComposer: false)
       .agentDetailCardProbe(name: agent.name, agentID: agent.agentId)
   }
@@ -249,8 +248,7 @@ struct AgentDetailSection: View {
     }
   }
 
-  @ViewBuilder
-  private var awaitingDecisionStripView: some View {
+  @ViewBuilder private var awaitingDecisionStripView: some View {
     if let pendingDecisionAttention {
       AgentDetailAwaitingDecisionRegion(
         agentID: agent.agentId,
@@ -415,4 +413,3 @@ struct AgentDetailSection: View {
     Self.humanizedHookLabel(for: hook)
   }
 }
-

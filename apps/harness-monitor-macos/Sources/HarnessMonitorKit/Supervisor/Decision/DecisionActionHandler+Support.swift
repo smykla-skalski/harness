@@ -8,6 +8,7 @@ struct CodexApprovalSuggestedActionPayload: Decodable {
 }
 
 struct TaskActionPayload: Decodable {
+  let sessionID: String?
   let taskID: String
   let agentID: String
 }
@@ -68,6 +69,8 @@ enum StoreDecisionActionError: LocalizedError {
   case invalidCodexPayload
   case missingTargetMetadata(String)
   case daemonUnavailable
+  case notificationUnavailable
+  case notificationDeliveryFailed
   case daemonLogUnavailable
   case sessionActionFailed(String)
   case daemonRejected(any Error)
@@ -87,6 +90,10 @@ enum StoreDecisionActionError: LocalizedError {
       "Cannot run action: missing target metadata (\(field))."
     case .daemonUnavailable:
       "Cannot run action: daemon unavailable."
+    case .notificationUnavailable:
+      "Cannot run action: notification controller unavailable."
+    case .notificationDeliveryFailed:
+      "Cannot run action: notification delivery failed."
     case .daemonLogUnavailable:
       "Cannot run action: daemon log is unavailable."
     case .sessionActionFailed(let sessionID):

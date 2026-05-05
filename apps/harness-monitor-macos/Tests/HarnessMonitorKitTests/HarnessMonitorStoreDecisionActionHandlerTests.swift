@@ -8,6 +8,7 @@ final class HarnessMonitorStoreDecisionActionHandlerTests: XCTestCase {
     let client = RecordingHarnessClient()
     let store = await selectedActionStore(client: client)
     await store.startSupervisor()
+    addTeardownBlock { await store.stopSupervisor() }
     let decisionID = "decision-assign-malformed"
     try await store.insertDecisionForTesting(
       DecisionDraft.fixture(
@@ -50,6 +51,7 @@ final class HarnessMonitorStoreDecisionActionHandlerTests: XCTestCase {
     )
     let store = await selectedActionStore(client: client)
     await store.startSupervisor()
+    addTeardownBlock { await store.stopSupervisor() }
     let decisionID = "decision-nudge-rejected"
     try await store.insertDecisionForTesting(
       DecisionDraft.fixture(
@@ -104,6 +106,7 @@ final class HarnessMonitorStoreDecisionActionHandlerTests: XCTestCase {
     )
     let store = await selectedActionStore(client: client)
     await store.startSupervisor()
+    addTeardownBlock { await store.stopSupervisor() }
     let decisionID = "decision-nudge-acp"
     try await store.insertDecisionForTesting(
       DecisionDraft.fixture(

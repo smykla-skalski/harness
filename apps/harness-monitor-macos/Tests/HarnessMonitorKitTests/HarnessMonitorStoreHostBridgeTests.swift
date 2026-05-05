@@ -1,7 +1,13 @@
-import Darwin
+import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
+
+let hostBridgeCommandTestEnvironment = HarnessMonitorEnvironment(
+  values: [:],
+  homeDirectory: URL(fileURLWithPath: "/tmp/harness-monitor-host-bridge-tests"),
+  bundleURL: nil
+)
 
 @MainActor
 @Suite("Harness Monitor host bridge state")
@@ -34,7 +40,12 @@ struct HarnessMonitorStoreHostBridgeTests {
     store.hostBridgeCapabilityIssues["agent-tui"] = .excluded
 
     #expect(store.hostBridgeCapabilityState(for: "agent-tui") == .unavailable)
-    #expect(store.hostBridgeStartCommand(for: "agent-tui") == "harness bridge start")
+    #expect(
+      store.hostBridgeStartCommand(
+        for: "agent-tui",
+        environment: hostBridgeCommandTestEnvironment
+      ) == "harness bridge start"
+    )
   }
 
   @Test("Host bridge start command narrows to missing capability when running bridge excludes it")
@@ -55,28 +66,42 @@ struct HarnessMonitorStoreHostBridgeTests {
     )
 
     #expect(
-      store.hostBridgeStartCommand(for: "codex") == "harness bridge reconfigure --enable codex")
+      store.hostBridgeStartCommand(
+        for: "codex",
+        environment: hostBridgeCommandTestEnvironment
+      ) == "harness bridge reconfigure --enable codex"
+    )
   }
 
   @Test("Host bridge start command falls back to bridge start when the bridge is absent")
   func hostBridgeStartCommandFallsBackToStartWhenBridgeIsAbsent() async {
     let store = await makeBootstrappedStore()
 
-    #expect(store.hostBridgeStartCommand(for: "codex") == "harness bridge start")
-    #expect(store.hostBridgeStartCommand(for: "agent-tui") == "harness bridge start")
+    #expect(
+      store.hostBridgeStartCommand(
+        for: "codex",
+        environment: hostBridgeCommandTestEnvironment
+      ) == "harness bridge start"
+    )
+    #expect(
+      store.hostBridgeStartCommand(
+        for: "agent-tui",
+        environment: hostBridgeCommandTestEnvironment
+      ) == "harness bridge start"
+    )
   }
 
   @Test("Host bridge command inherits the current runtime profile env prefix")
   func hostBridgeCommandInheritsRuntimeProfilePrefix() async {
-    setenv(HarnessMonitorRuntimeProfile.environmentKey, "dev-profile", 1)
-    setenv(HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey, "/tmp/harness-profile-home", 1)
-    setenv(HarnessMonitorRuntimeProfile.codexWSPortEnvironmentKey, "31337", 1)
-    defer {
-      unsetenv(HarnessMonitorRuntimeProfile.environmentKey)
-      unsetenv(HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey)
-      unsetenv(HarnessMonitorRuntimeProfile.codexWSPortEnvironmentKey)
-    }
-
+    let environment = HarnessMonitorEnvironment(
+      values: [
+        HarnessMonitorRuntimeProfile.environmentKey: "dev-profile",
+        HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: "/tmp/harness-profile-home",
+        HarnessMonitorRuntimeProfile.codexWSPortEnvironmentKey: "31337",
+      ],
+      homeDirectory: URL(fileURLWithPath: "/tmp/harness-monitor-host-bridge-tests"),
+      bundleURL: nil
+    )
     let store = await makeBootstrappedStore()
     let expectedCommand = """
       HARNESS_MONITOR_RUNTIME_PROFILE='dev-profile' \
@@ -85,16 +110,22 @@ struct HarnessMonitorStoreHostBridgeTests {
       """
 
     #expect(
-      store.hostBridgeStartCommand(for: "codex")
+      store.hostBridgeStartCommand(for: "codex", environment: environment)
         == expectedCommand
     )
   }
 
-  @Test("Preview store inherits forced bridge issues from process environment")
-  func previewStoreInheritsForcedBridgeIssuesFromEnvironment() async {
-    setenv("HARNESS_MONITOR_FORCE_BRIDGE_ISSUES", "agent-tui,codex", 1)
-    defer { unsetenv("HARNESS_MONITOR_FORCE_BRIDGE_ISSUES") }
-    let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded)
+  @Test("Preview store inherits forced bridge issues from supplied environment")
+  func previewStoreInheritsForcedBridgeIssuesFromSuppliedEnvironment() async {
+    let environment = HarnessMonitorEnvironment(
+      values: ["HARNESS_MONITOR_FORCE_BRIDGE_ISSUES": "agent-tui,codex"],
+      homeDirectory: URL(fileURLWithPath: "/tmp/harness-monitor-host-bridge-tests"),
+      bundleURL: nil
+    )
+    let store = HarnessMonitorPreviewStoreFactory.makeStore(
+      for: .cockpitLoaded,
+      environment: environment
+    )
     #expect(store.hostBridgeCapabilityIssues["agent-tui"] == .excluded)
     #expect(store.hostBridgeCapabilityIssues["codex"] == .excluded)
   }
@@ -146,8 +177,11 @@ struct HarnessMonitorStoreHostBridgeTests {
 
     #expect(store.hostBridgeCapabilityState(for: "agent-tui") == .excluded)
     #expect(
-      store.hostBridgeStartCommand(for: "agent-tui")
-        == "harness bridge reconfigure --enable agent-tui")
+      store.hostBridgeStartCommand(
+        for: "agent-tui",
+        environment: hostBridgeCommandTestEnvironment
+      ) == "harness bridge reconfigure --enable agent-tui"
+    )
   }
 
 }

@@ -215,6 +215,51 @@ final class ObserverIssueRuleTests: XCTestCase {
     XCTAssertTrue(actions.isEmpty)
   }
 
+  func test_decisionIDIsStableAcrossSnapshotHashChanges() async {
+    let rule = ObserverIssueRule()
+    let issues = [
+      makeIssue(id: "i1", code: "obs.warn", severity: "warn", firstSeenOffset: -10),
+      makeIssue(id: "i2", code: "obs.warn", severity: "warn", firstSeenOffset: -20),
+      makeIssue(id: "i3", code: "obs.warn", severity: "warn", firstSeenOffset: -30),
+    ]
+    var first = makeSnapshot(sessionID: "s1", issues: issues)
+    var second = makeSnapshot(sessionID: "s1", issues: issues)
+    first = SessionsSnapshot(
+      id: first.id,
+      createdAt: first.createdAt,
+      hash: "hash-a",
+      sessions: first.sessions,
+      connection: first.connection
+    )
+    second = SessionsSnapshot(
+      id: second.id,
+      createdAt: second.createdAt,
+      hash: "hash-b",
+      sessions: second.sessions,
+      connection: second.connection
+    )
+
+    let firstAction = await rule.evaluate(snapshot: first, context: makeContext(parameters: [:]))
+    let secondAction = await rule.evaluate(snapshot: second, context: makeContext(parameters: [:]))
+
+    XCTAssertEqual(firstAction.first?.actionKey, secondAction.first?.actionKey)
+  }
+
+  func test_minCountOverrideIsClampedToOne() async {
+    let rule = ObserverIssueRule()
+    let snapshot = makeSnapshot(
+      sessionID: "s1",
+      issues: [makeIssue(id: "i1", code: "obs.warn", severity: "warn", firstSeenOffset: -10)]
+    )
+
+    let actions = await rule.evaluate(
+      snapshot: snapshot,
+      context: makeContext(parameters: ["minCount": "0"])
+    )
+
+    XCTAssertEqual(actions.count, 1)
+  }
+
   // MARK: - Per-session fan-out
 
   func test_emitsOneDecisionPerTriggeringSession() async {

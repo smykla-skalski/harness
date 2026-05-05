@@ -116,7 +116,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     severity: DecisionSeverity,
     summary: String,
     decisionID: String
-  ) async {
+  ) async -> Bool {
     await deliverSupervisorNotification(
       severity: severity,
       successMessage: "Scheduled supervisor decision \(decisionID).",
@@ -134,7 +134,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     severity: DecisionSeverity,
     summary: String,
     ruleID: String
-  ) async {
+  ) async -> Bool {
     await deliverSupervisorNotification(
       severity: severity,
       successMessage: "Scheduled supervisor notice for \(ruleID).",
@@ -153,12 +153,12 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     successMessage: String,
     failureMessage: String,
     makeRequest: () async throws -> UNNotificationRequest
-  ) async {
+  ) async -> Bool {
     await performNotificationOperation {
       let preferences = SupervisorNotificationPreferences.load()
       guard preferences.allowsAnyDelivery(for: severity) else {
         lastResult = "Supervisor notification suppressed by preferences."
-        return
+        return false
       }
       do {
         registerCategories()
@@ -166,10 +166,12 @@ public final class HarnessMonitorUserNotificationController: NSObject,
         try await centerBox.base.add(request)
         lastResult = successMessage
         await refreshStatus()
+        return true
       } catch {
         lastResult = "\(failureMessage): \(error.localizedDescription)"
+        return false
       }
-    }
+    } ?? false
   }
 
   public func applyPreset(_ preset: HarnessMonitorNotificationPreset) {
@@ -397,12 +399,14 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     registeredCategoryCount = HarnessMonitorNotificationRequestFactory.categories().count
   }
 
-  private func performNotificationOperation(_ operation: @MainActor () async -> Void) async {
+  private func performNotificationOperation<Result>(
+    _ operation: @MainActor () async -> Result
+  ) async -> Result? {
     guard !isWorking else {
-      return
+      return nil
     }
     isWorking = true
     defer { isWorking = false }
-    await operation()
+    return await operation()
   }
 }
