@@ -353,6 +353,7 @@ extension WorkspaceWindowView {
     var navigationBackStack: [WorkspaceSelection] = []
     var navigationForwardStack: [WorkspaceSelection] = []
     var suppressHistoryRecording = false
+    var suppressNextSelectionChangeHandling = false
     var windowNavigation = WindowNavigationState()
     @ObservationIgnored var lastMeasuredViewportPoints: CGSize?
     @ObservationIgnored var lastMeasuredViewportTerminalSize: AgentTuiSize?

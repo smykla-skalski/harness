@@ -5,25 +5,52 @@ enum WorkspaceSelectionDefaults {
   static let selectionKey = "HarnessMonitor.Workspace.selection"
 
   private static let uiTestsEnvironmentKey = "HARNESS_MONITOR_UI_TESTS"
+  private enum StorageScope {
+    case live
+    case processScoped(String)
 
-  private static var defaults: UserDefaults {
-    UserDefaults.standard
-  }
-
-  private static var scopedSelectionKey: String {
-    guard ProcessInfo.processInfo.environment[uiTestsEnvironmentKey] == "1" else {
-      return selectionKey
+    func selectionKey(baseKey: String, processID: Int32) -> String {
+      switch self {
+      case .live:
+        baseKey
+      case .processScoped(let label):
+        "\(baseKey).\(label).\(processID)"
+      }
     }
-    return "\(selectionKey).ui.\(ProcessInfo.processInfo.processIdentifier)"
   }
 
-  static func hasStoredSelection() -> Bool {
-    defaults.data(forKey: scopedSelectionKey) != nil
+  private static func scopedSelectionKey(
+    environment: [String: String] = ProcessInfo.processInfo.environment,
+    processID: Int32 = ProcessInfo.processInfo.processIdentifier
+  ) -> String {
+    storageScope(environment: environment).selectionKey(baseKey: selectionKey, processID: processID)
   }
 
-  static func read() -> WorkspaceSelection? {
+  private static func storageScope(
+    environment: [String: String] = ProcessInfo.processInfo.environment
+  ) -> StorageScope {
+    if environment[uiTestsEnvironmentKey] == "1" {
+      return .processScoped("ui")
+    }
+    if HarnessMonitorLaunchMode(environment: environment) != .live {
+      return .processScoped("preview")
+    }
+    return .live
+  }
+
+  static func hasStoredSelection(
+    environment: [String: String] = ProcessInfo.processInfo.environment,
+    defaults: UserDefaults = .standard
+  ) -> Bool {
+    defaults.data(forKey: scopedSelectionKey(environment: environment)) != nil
+  }
+
+  static func read(
+    environment: [String: String] = ProcessInfo.processInfo.environment,
+    defaults: UserDefaults = .standard
+  ) -> WorkspaceSelection? {
     guard
-      let data = defaults.data(forKey: scopedSelectionKey),
+      let data = defaults.data(forKey: scopedSelectionKey(environment: environment)),
       let storedSelection = try? JSONDecoder().decode(StoredWorkspaceSelection.self, from: data)
     else {
       return nil
@@ -31,17 +58,24 @@ enum WorkspaceSelectionDefaults {
     return storedSelection.workspaceSelection
   }
 
-  static func write(_ selection: WorkspaceSelection) {
+  static func write(
+    _ selection: WorkspaceSelection,
+    environment: [String: String] = ProcessInfo.processInfo.environment,
+    defaults: UserDefaults = .standard
+  ) {
     guard
       let data = try? JSONEncoder().encode(StoredWorkspaceSelection(workspaceSelection: selection))
     else {
       return
     }
-    defaults.set(data, forKey: scopedSelectionKey)
+    defaults.set(data, forKey: scopedSelectionKey(environment: environment))
   }
 
-  static func clear() {
-    defaults.removeObject(forKey: scopedSelectionKey)
+  static func clear(
+    environment: [String: String] = ProcessInfo.processInfo.environment,
+    defaults: UserDefaults = .standard
+  ) {
+    defaults.removeObject(forKey: scopedSelectionKey(environment: environment))
   }
 }
 
