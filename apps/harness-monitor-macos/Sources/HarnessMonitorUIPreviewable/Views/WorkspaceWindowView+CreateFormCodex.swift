@@ -174,7 +174,6 @@ extension WorkspaceWindowCreatePane {
             label: "Provider-specific model id",
             value: customModelBinding.wrappedValue
           )
-          .harnessPreservePrimaryContentFocus()
       }
     }
   }

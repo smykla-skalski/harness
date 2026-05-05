@@ -6,6 +6,17 @@ extension WorkspaceWindowCreatePane {
     selectedCapabilityOption?.title ?? "Agent"
   }
 
+  var persistedLaunchSelectionBinding: Binding<AgentLaunchSelection> {
+    @Bindable var formModel = viewModel
+    return Binding(
+      get: { formModel.selectedLaunchSelection },
+      set: { newValue in
+        formModel.selectedLaunchSelection = newValue
+        HarnessMonitorAgentLaunchDefaults.persist(newValue)
+      }
+    )
+  }
+
   var agentCapabilityOptions: [AgentCapabilityOption] {
     WorkspaceWindowView.agentCapabilityOptions(
       acpAgents: viewModel.availableAcpAgents,
@@ -214,7 +225,6 @@ extension WorkspaceWindowCreatePane {
             label: "Provider-specific model id",
             value: context.customModelBinding.wrappedValue
           )
-          .harnessPreservePrimaryContentFocus()
       }
     }
   }
@@ -356,7 +366,7 @@ extension WorkspaceWindowCreatePane {
     return TerminalConfigurationContext(
       choice: choice,
       normalizedSelection: normalizedSelection,
-      selection: $formModel.selectedLaunchSelection,
+      selection: persistedLaunchSelectionBinding,
       catalogModels: catalog?.models ?? [],
       modelBinding: modelBinding,
       customModelBinding: customModelBinding,

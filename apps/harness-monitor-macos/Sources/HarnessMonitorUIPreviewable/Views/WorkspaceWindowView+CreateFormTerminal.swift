@@ -27,7 +27,7 @@ extension WorkspaceWindowCreatePane {
           ForEach(agentCapabilityOptions) { option in
             AgentsCreateProviderRow(
               option: option,
-              selection: $formModel.selectedLaunchSelection
+              selection: persistedLaunchSelectionBinding
             )
           }
         }
@@ -80,7 +80,6 @@ extension WorkspaceWindowCreatePane {
               label: "Display name",
               value: formModel.name
             )
-            .harnessPreservePrimaryContentFocus()
         }
 
         AgentsCreateFieldBlock(
@@ -120,7 +119,6 @@ extension WorkspaceWindowCreatePane {
               label: "Project directory override",
               value: formModel.projectDir
             )
-            .harnessPreservePrimaryContentFocus()
         }
 
         AgentsCreateFieldBlock(
@@ -154,7 +152,6 @@ extension WorkspaceWindowCreatePane {
             label: "Provider-specific model id",
             value: context.customModelBinding.wrappedValue
           )
-          .harnessPreservePrimaryContentFocus()
       }
     }
   }

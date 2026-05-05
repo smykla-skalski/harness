@@ -56,11 +56,7 @@ extension WorkspaceWindowView {
       .scaledFont(.system(.body, design: .monospaced))
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       .padding(HarnessMonitorTheme.spacingMD)
-      .harnessPrimaryContentFocusTarget(
-        focusScope: currentPrimaryContentFocusTarget == .liveViewport
-          ? currentPrimaryContentFocusScope : nil,
-        prefersDefaultFocus: currentPrimaryContentFocusTarget == .liveViewport,
-        pagingResponderRequest: currentPrimaryContentPagingRequest,
+      .harnessPrimaryContentScrollSurface(
         listIdentifier: HarnessMonitorAccessibility.agentTuiViewport,
         listLabel: "Terminal viewport"
       )
@@ -152,8 +148,7 @@ extension WorkspaceWindowView {
           minHeight: 72,
           accessibilityIdentifier: HarnessMonitorAccessibility.agentTuiInputField,
           accessibilityLabel: Self.pendingPromptInputAccessibilityLabel(pendingPrompt),
-          accessibilityHint: Self.pendingPromptInputAccessibilityHint(pendingPrompt),
-          onCommandReturn: { sendInput(to: tui) }
+          accessibilityHint: Self.pendingPromptInputAccessibilityHint(pendingPrompt)
         )
         HarnessMonitorActionButton(
           title: "Send",
@@ -162,6 +157,7 @@ extension WorkspaceWindowView {
         ) {
           sendInput(to: tui)
         }
+        .keyboardShortcut(.return, modifiers: [.command])
         .disabled(!canSend)
         .accessibilityLabel(Self.pendingPromptSendAccessibilityLabel(pendingPrompt))
         .accessibilityHint(Self.pendingPromptSendAccessibilityHint(pendingPrompt))
@@ -324,8 +320,7 @@ extension WorkspaceWindowView {
     minHeight: CGFloat,
     accessibilityIdentifier: String,
     accessibilityLabel: String? = nil,
-    accessibilityHint: String? = nil,
-    onCommandReturn: (() -> Void)? = nil
+    accessibilityHint: String? = nil
   ) -> some View {
     ZStack(alignment: .topLeading) {
       RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -346,18 +341,9 @@ extension WorkspaceWindowView {
         .padding(.horizontal, HarnessMonitorTheme.spacingSM)
         .padding(.vertical, HarnessMonitorTheme.spacingXS)
         .focused(focusedFieldBinding, equals: field)
-        .harnessPreservePrimaryContentFocus()
         .accessibilityLabel(accessibilityLabel ?? placeholder)
         .accessibilityHint(accessibilityHint ?? "")
         .accessibilityIdentifier(accessibilityIdentifier)
-        .background {
-          if let onCommandReturn {
-            CommandReturnKeyMonitor(
-              isEnabled: focusedField == field,
-              action: onCommandReturn
-            )
-          }
-        }
     }
     .frame(minHeight: minHeight)
     .overlay {

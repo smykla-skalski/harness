@@ -11,10 +11,6 @@ struct SessionCockpitView: View {
   let isSessionReadOnly: Bool
   let isTimelineLoading: Bool
   let isExtensionsLoading: Bool
-  let primaryContentFocusScope: Namespace.ID?
-  let primaryContentPagingResponderRequest: Int
-  let prefersPrimaryContentFocus: Bool
-  let primaryContentPagingResponderEnabled: Bool
   @Environment(\.openWindow)
   private var openWindow
 
@@ -27,11 +23,7 @@ struct SessionCockpitView: View {
     isSessionStatusStale: Bool,
     isSessionReadOnly: Bool,
     isTimelineLoading: Bool,
-    isExtensionsLoading: Bool,
-    primaryContentFocusScope: Namespace.ID? = nil,
-    primaryContentPagingResponderRequest: Int = 0,
-    prefersPrimaryContentFocus: Bool = false,
-    primaryContentPagingResponderEnabled: Bool = false
+    isExtensionsLoading: Bool
   ) {
     self.store = store
     self.detail = detail
@@ -42,10 +34,6 @@ struct SessionCockpitView: View {
     self.isSessionReadOnly = isSessionReadOnly
     self.isTimelineLoading = isTimelineLoading
     self.isExtensionsLoading = isExtensionsLoading
-    self.primaryContentFocusScope = primaryContentFocusScope
-    self.primaryContentPagingResponderRequest = primaryContentPagingResponderRequest
-    self.prefersPrimaryContentFocus = prefersPrimaryContentFocus
-    self.primaryContentPagingResponderEnabled = primaryContentPagingResponderEnabled
   }
 
   private func openAgent(_ agentID: String) {
@@ -72,11 +60,7 @@ struct SessionCockpitView: View {
         readableWidth: false,
         topScrollEdgeEffect: .soft,
         scrollSurfaceIdentifier: HarnessMonitorAccessibility.sessionCockpitScrollView,
-        scrollSurfaceLabel: "Session cockpit scroll view",
-        primaryFocusScope: primaryContentFocusScope,
-        prefersDefaultFocus: prefersPrimaryContentFocus,
-        pagingResponderRequest: primaryContentPagingResponderRequest,
-        pagingResponderEnabled: primaryContentPagingResponderEnabled
+        scrollSurfaceLabel: "Session cockpit scroll view"
       ) {
         VStack(alignment: .leading, spacing: 16) {
           SessionCockpitHeaderCard(

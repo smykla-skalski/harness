@@ -9,43 +9,9 @@ private struct FocusRingCornerProbe {
 }
 
 @MainActor
-final class HarnessMonitorFocusRingUITests: HarnessMonitorUITestCase {
-
-  func testSidebarSearchFieldFocusRingAppearsImmediatelyOnFirstClick() throws {
-    let app = launch(mode: "preview")
-
-    let searchField = editableField(in: app, identifier: "harness.sidebar.search")
-    XCTAssertTrue(searchField.waitForExistence(timeout: Self.actionTimeout))
-
-    if fieldHasFocusRingPixels(searchField, in: app) {
-      tapPreviewSession(in: app)
-      XCTAssertTrue(
-        waitUntil(timeout: 1, pollInterval: 0.02) {
-          !self.fieldHasFocusRingPixels(searchField, in: app)
-        },
-        "Search field unexpectedly remained focused before the click-latency check"
-      )
-    }
-
-    if searchField.isHittable {
-      searchField.tap()
-    } else if let coordinate = centerCoordinate(in: app, for: searchField) {
-      coordinate.tap()
-    } else {
-      XCTFail("Failed to tap sidebar search field")
-    }
-
-    let focusRingAppearedQuickly = waitUntil(timeout: 0.12, pollInterval: 0.01) {
-      self.fieldHasFocusRingPixels(searchField, in: app)
-    }
-
-    attachWindowScreenshot(in: app, named: "focus-ring-sidebar-search-click")
-    XCTAssertTrue(
-      focusRingAppearedQuickly,
-      "Sidebar search field focus ring did not appear within 120ms of the first click"
-    )
-  }
-
+final class HarnessMonitorFocusRingUITests:
+  HarnessMonitorUITestCase, WorkspaceWindowUITestSupporting
+{
   /// Verify the focus ring around a sidebar session card follows the
   /// rounded rectangle shape of the card rather than being a plain
   /// rectangle.
@@ -102,38 +68,27 @@ final class HarnessMonitorFocusRingUITests: HarnessMonitorUITestCase {
     assertFocusRingCornersAreRounded(sessionRow, in: app)
   }
 
-  // MARK: - Helpers
+  func testWorkspaceCreateDetailPaneDoesNotDrawFocusRing() throws {
+    let app = launchInCockpitPreview(
+      additionalEnvironment: [
+        "AppleKeyboardUIMode": "2"
+      ]
+    )
 
-  private func fieldHasFocusRingPixels(
-    _ field: XCUIElement,
-    in app: XCUIApplication
-  ) -> Bool {
-    let screenshot = field.screenshot()
-    guard
-      let cgImage = screenshot.image.cgImage(
-        forProposedRect: nil,
-        context: nil,
-        hints: nil
-      )
-    else { return false }
+    openWorkspaceWindow(in: app)
+    let launchPane = element(in: app, identifier: Accessibility.agentTuiLaunchPane)
+    XCTAssertTrue(waitForElement(launchPane, timeout: Self.actionTimeout))
 
-    let probes: [(Int, Int)] = [
-      (2, max(cgImage.height / 2, 2)),
-      (max(cgImage.width / 2, 2), 2),
-      (max(cgImage.width - 3, 2), max(cgImage.height / 2, 2)),
-      (max(cgImage.width / 2, 2), max(cgImage.height - 3, 2)),
-    ]
+    RunLoop.current.run(until: Date.now.addingTimeInterval(0.3))
+    attachWindowScreenshot(in: app, named: "focus-ring-workspace-create-detail")
 
-    for (probeX, probeY) in probes
-    where probeX > 0 && probeY > 0 && probeX < cgImage.width && probeY < cgImage.height {
-      let color = pixelColor(in: cgImage, x: probeX, y: probeY)
-      if color.blue > 0.4 && color.blue > color.red * 1.3 {
-        return true
-      }
-    }
-
-    return false
+    XCTAssertFalse(
+      elementPerimeterHasFocusRingPixels(launchPane, in: app),
+      "Workspace create detail pane should not draw a blue focus ring around the scroll surface"
+    )
   }
+
+  // MARK: - Helpers
 
   /// Returns true if the area around the session row contains the
   /// characteristic blue focus ring color.
@@ -246,6 +201,74 @@ final class HarnessMonitorFocusRingUITests: HarnessMonitorUITestCase {
           + "b=\(String(format: "%.2f", color.blue)))"
       )
     }
+  }
+
+  private func elementPerimeterHasFocusRingPixels(
+    _ element: XCUIElement,
+    in app: XCUIApplication
+  ) -> Bool {
+    let window = window(in: app, containing: element)
+    let screenshot = window.screenshot()
+    guard
+      let cgImage = screenshot.image.cgImage(
+        forProposedRect: nil,
+        context: nil,
+        hints: nil
+      )
+    else { return false }
+
+    let scale = CGFloat(cgImage.width) / window.frame.width
+    let frame = element.frame.offsetBy(dx: -window.frame.minX, dy: -window.frame.minY)
+    let horizontalXs = [
+      frame.minX - 2,
+      frame.minX + 2,
+      frame.maxX - 2,
+      frame.maxX + 2,
+    ]
+    let horizontalYs = [
+      frame.minY + 24,
+      frame.midY,
+      frame.maxY - 24,
+    ]
+    let verticalXs = [
+      frame.minX + 24,
+      frame.midX,
+      frame.maxX - 24,
+    ]
+    let verticalYs = [
+      frame.minY - 2,
+      frame.minY + 2,
+      frame.maxY - 2,
+      frame.maxY + 2,
+    ]
+
+    for x in horizontalXs {
+      for y in horizontalYs where sampleIsFocusRingBlue(x: x, y: y, scale: scale, image: cgImage) {
+        return true
+      }
+    }
+    for x in verticalXs {
+      for y in verticalYs where sampleIsFocusRingBlue(x: x, y: y, scale: scale, image: cgImage) {
+        return true
+      }
+    }
+    return false
+  }
+
+  private func sampleIsFocusRingBlue(
+    x: CGFloat,
+    y: CGFloat,
+    scale: CGFloat,
+    image: CGImage
+  ) -> Bool {
+    let pixelX = Int(x * scale)
+    let pixelY = Int(y * scale)
+    guard pixelX > 0, pixelY > 0,
+      pixelX < image.width, pixelY < image.height
+    else { return false }
+
+    let color = pixelColor(in: image, x: pixelX, y: pixelY)
+    return color.blue > 0.4 && color.blue > color.red * 1.3
   }
 
   /// Read a single pixel's color from a CGImage.

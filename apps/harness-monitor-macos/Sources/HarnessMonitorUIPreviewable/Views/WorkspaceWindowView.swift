@@ -1,4 +1,3 @@
-import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
@@ -12,9 +11,6 @@ public struct WorkspaceWindowView: View {
   let store: HarnessMonitorStore
   let keyWindowObserver: KeyWindowObserver?
   let navigationBridge: WorkspaceWindowNavigationBridge
-  @Environment(\.resetFocus)
-  private var resetFocus
-  @State private var preservesPrimaryContentFocus = false
   @State private var sidebarVisibilityExpander = HarnessSidebarVisibilityExpander()
   @Environment(\.openWindow)
   var openWindow
@@ -38,20 +34,11 @@ public struct WorkspaceWindowView: View {
   @State private var decisionInspectorVisible = false
   @State private var decisionInspectorPreferredVisibility = false
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
-  @State private var primaryContentPagingResponderRequest = 0
   @AppStorage(HarnessMonitorAgentTuiDefaults.submitSendsEnterKey)
   var submitSendsEnter = HarnessMonitorAgentTuiDefaults.submitSendsEnterDefault
   @Environment(\.fontScale)
   private var stateFontScale
-  @Namespace private var primaryContentFocusScope
   @FocusState private var stateFocusedField: Field?
-
-  enum PrimaryContentFocusTarget: String {
-    case create
-    case decisionDetail
-    case liveViewport
-    case genericDetail
-  }
 
   @MainActor
   public init(
@@ -139,14 +126,6 @@ public struct WorkspaceWindowView: View {
     nonmutating set { isStartupFocusParticipationEnabled = newValue }
   }
 
-  var currentPrimaryContentPagingRequest: Int {
-    primaryContentPagingResponderRequest
-  }
-
-  var currentPrimaryContentFocusScope: Namespace.ID? {
-    primaryContentFocusScope
-  }
-
   var columnVisibilityBinding: Binding<NavigationSplitViewVisibility> {
     $columnVisibility
   }
@@ -208,30 +187,8 @@ public struct WorkspaceWindowView: View {
     decisionInspectorVisible
   }
 
-  // Only re-arm the primary-content reset when the workspace first becomes
-  // ready or when the window activation state changes. Re-running it for every
-  // in-workspace selection hop churns the hidden FocusBridge responder path and
-  // recreates the workspace AttributeGraph warning flood.
-  private var workspacePrimaryContentFocusResetToken: String {
-    [
-      String(hasCompletedInitialWorkspacePreparation),
-      String(isStartupFocusParticipationEnabled),
-      keyWindowObserver?.snapshot.routingToken ?? "key=untracked",
-    ].joined(separator: "|")
-  }
-
   var isWorkspaceKeyWindow: Bool {
     keyWindowObserver?.isKey(windowID: HarnessMonitorWindowID.workspace) ?? true
-  }
-
-  var currentResetSuppression: PrimaryContentResetSuppression {
-    PrimaryContentResetSuppression(
-      preservesPrimaryContentFocus: preservesPrimaryContentFocus,
-      hasFocusedEditorField: stateFocusedField != nil,
-      hasPresentedSheet: store.presentedSheet != nil,
-      hasPendingConfirmation: store.pendingConfirmation != nil,
-      hasDismissConfirmation: showDismissAllVisibleConfirmation
-    )
   }
 
   func toggleDecisionInspector() {
@@ -280,7 +237,6 @@ public struct WorkspaceWindowView: View {
     viewModel: ViewModel
   ) -> some View {
     splitView
-      .focusScope(primaryContentFocusScope)
       // Workspace is workbench-shaped (sidebar drives detail); main window uses .prominentDetail.
       .navigationSplitViewStyle(.balanced)
       .toolbar {
@@ -303,9 +259,6 @@ public struct WorkspaceWindowView: View {
       .containerBackground(.windowBackground, for: .window)
       .task {
         await prepareWorkspace()
-      }
-      .task(id: workspacePrimaryContentFocusResetToken) {
-        await resetPrimaryContentFocusIfNeeded()
       }
       .onChange(of: store.pendingWorkspaceSelection) { _, _ in
         consumePendingWorkspaceSelection()
@@ -351,12 +304,6 @@ public struct WorkspaceWindowView: View {
         handleWindowDisappear()
         sidebarVisibilityExpander.handler = nil
       }
-      .onPreferenceChange(HarnessPreservePrimaryContentFocusPreference.self) { newValue in
-        Task { @MainActor in
-          guard preservesPrimaryContentFocus != newValue else { return }
-          preservesPrimaryContentFocus = newValue
-        }
-      }
       .acpPermissionPresentation(store: store)
       .focusedSceneValue(
         \.harnessSidebarVisibilityRequest,
@@ -368,34 +315,5 @@ public struct WorkspaceWindowView: View {
           restoreSidebarVisibility(using: binding)
         }
       }
-  }
-
-  // currentResetSuppression is computed locally instead of routed through a
-  // FocusedValue: focus state is nil during startup and when the window is
-  // not key, and a self-published FocusedValue here would create an
-  // AttributeGraph cycle (publisher and subscriber on the same view fires
-  // SwiftUI's "FocusedValue update tried to update multiple times per frame"
-  // fault). isWorkspaceKeyWindow already gates the not-key case.
-  @MainActor
-  private func resetPrimaryContentFocusIfNeeded() async {
-    guard
-      hasCompletedInitialWorkspacePreparation,
-      isStartupFocusParticipationEnabled,
-      isWorkspaceKeyWindow,
-      !currentResetSuppression.isSuppressed
-    else {
-      return
-    }
-    await Task.yield()
-    guard
-      hasCompletedInitialWorkspacePreparation,
-      isStartupFocusParticipationEnabled,
-      isWorkspaceKeyWindow,
-      !currentResetSuppression.isSuppressed
-    else {
-      return
-    }
-    resetFocus(in: primaryContentFocusScope)
-    primaryContentPagingResponderRequest += 1
   }
 }

@@ -28,7 +28,6 @@ extension WorkspaceWindowCreatePane {
         value: text.wrappedValue,
         hint: accessibilityHint ?? ""
       )
-      .harnessPreservePrimaryContentFocus()
   }
 
   private func multilineEditorLineLimit(for minHeight: CGFloat) -> ClosedRange<Int> {

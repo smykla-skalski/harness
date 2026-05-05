@@ -155,7 +155,7 @@ extension HarnessMonitorUITestCase {
   }
 
   @discardableResult
-  private func tapButtonElementReliably(in app: XCUIApplication, element: XCUIElement) -> Bool {
+  func tapButtonElementReliably(in app: XCUIApplication, element: XCUIElement) -> Bool {
     if element.isHittable {
       element.click()
       return true
@@ -169,7 +169,7 @@ extension HarnessMonitorUITestCase {
     return false
   }
 
-  private func buttonTargetIsReady(
+  func buttonTargetIsReady(
     in app: XCUIApplication,
     element: XCUIElement,
     identifier: String

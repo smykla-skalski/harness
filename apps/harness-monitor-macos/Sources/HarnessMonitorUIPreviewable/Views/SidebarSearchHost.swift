@@ -110,7 +110,6 @@ struct SidebarSearchHost: View {
           dispatcher: searchFocusDispatcher
         )
       )
-      .harnessPreservePrimaryContentFocus(searchPresentationState.isPresented)
       .task {
         searchFocusDispatcher.handler = {
           _ = searchPresentationState.requestPresentation(canPresent: true)

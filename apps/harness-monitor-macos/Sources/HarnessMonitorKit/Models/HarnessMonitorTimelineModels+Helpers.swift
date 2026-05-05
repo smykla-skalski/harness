@@ -1,45 +1,5 @@
 import Foundation
 
-public struct ToolCallTimelineEntryMetadata: Equatable, Sendable {
-  public let rowID: String
-  public let phaseID: String
-  public let toolCallID: String
-  public let toolName: String
-  public let status: String
-  public let acpAgentID: String?
-  public let agentID: String?
-  public let agentDisplayName: String?
-  public let capabilityTags: [String]
-  public let sequence: UInt64?
-  public let stopReason: String?
-
-  public init(
-    rowID: String,
-    phaseID: String,
-    toolCallID: String,
-    toolName: String,
-    status: String,
-    acpAgentID: String?,
-    agentID: String?,
-    agentDisplayName: String?,
-    capabilityTags: [String],
-    sequence: UInt64?,
-    stopReason: String?
-  ) {
-    self.rowID = rowID
-    self.phaseID = phaseID
-    self.toolCallID = toolCallID
-    self.toolName = toolName
-    self.status = status
-    self.acpAgentID = acpAgentID
-    self.agentID = agentID
-    self.agentDisplayName = agentDisplayName
-    self.capabilityTags = capabilityTags
-    self.sequence = sequence
-    self.stopReason = stopReason
-  }
-}
-
 extension TimelineEntry {
   private static let managedAcpTranscriptResponseKinds: Set<String> = [
     "user_prompt",
@@ -153,16 +113,15 @@ extension TimelineEntry {
       )
     }
 
-    if case .object(var payloadMetadata)? = payloadObject["acp_timeline_identity"] {
-      payloadMetadata["agent_id"] = .string(agentID)
-      payloadMetadata["agent_display_name"] = .string(displayName)
-      payloadObject["acp_timeline_identity"] = .object(payloadMetadata)
+    if case .object(var metadata)? = payloadObject["acp_timeline_identity"] {
+      metadata["agent_id"] = .string(agentID)
+      metadata["agent_display_name"] = .string(displayName)
+      payloadObject["acp_timeline_identity"] = .object(metadata)
     }
-
-    if case .object(var toolCallMetadata)? = payloadObject["tool_call_timeline"] {
-      toolCallMetadata["agent_id"] = .string(agentID)
-      toolCallMetadata["agent_display_name"] = .string(displayName)
-      payloadObject["tool_call_timeline"] = .object(toolCallMetadata)
+    if case .object(var metadata)? = payloadObject["tool_call_timeline"] {
+      metadata["agent_id"] = .string(agentID)
+      metadata["agent_display_name"] = .string(displayName)
+      payloadObject["tool_call_timeline"] = .object(metadata)
     }
 
     return TimelineEntry(
@@ -251,12 +210,15 @@ extension TimelineEntry {
     guard let event = acpConversationEventPayload() else {
       return summary
     }
-    if let transcriptSummary = Self.reattributedTranscriptSummary(
+    if let transcriptSummary = Self.reattributedTranscriptSummary(kind: kind, event: event) {
+      return transcriptSummary
+    }
+    if let agentSummary = Self.reattributedAgentEventSummary(
       kind: kind,
       displayName: displayName,
       event: event
     ) {
-      return transcriptSummary
+      return agentSummary
     }
     if let toolSummary = Self.reattributedToolSummary(
       kind: kind,
@@ -270,20 +232,15 @@ extension TimelineEntry {
 
   private static func reattributedTranscriptSummary(
     kind: String,
-    displayName: String,
     event: [String: JSONValue]
   ) -> String? {
     switch kind {
     case "user_prompt":
-      return transcriptSummary(from: event["content"], fallback: "Prompt submitted")
+      return Self.transcriptSummary(from: event["content"], fallback: "Prompt submitted")
     case "assistant_text":
-      return transcriptSummary(from: event["content"], fallback: "Assistant response")
+      return Self.transcriptSummary(from: event["content"], fallback: "Assistant response")
     default:
-      return reattributedAgentEventSummary(
-        kind: kind,
-        displayName: displayName,
-        event: event
-      )
+      return nil
     }
   }
 
@@ -300,72 +257,24 @@ extension TimelineEntry {
       let command = event.stringValue(for: "command") ?? "unknown"
       return "\(displayName) picked up \(signalID) (\(command))"
     case "agent_state_change":
-      return reattributedStateChangeSummary(prefix: displayName, event: event)
+      let from = event.stringValue(for: "from") ?? "unknown"
+      let to = event.stringValue(for: "to") ?? "unknown"
+      return "\(displayName) state changed \(from) -> \(to)"
     case "file_modification":
-      return reattributedFileModificationSummary(prefix: displayName, event: event)
+      let operation = event.stringValue(for: "operation") ?? "modified"
+      let path = event.stringValue(for: "path") ?? "file"
+      return "\(displayName) \(operation) \(path)"
     case "agent_session_marker":
-      let marker = event.stringValue(for: "marker") ?? "session"
-      return "\(displayName) marked \(marker)"
+      return "\(displayName) marked \(event.stringValue(for: "marker") ?? "session")"
     case "agent_watchdog_state":
-      return reattributedWatchdogSummary(prefix: displayName, event: event)
+      return Self.reattributedWatchdogSummary(displayName: displayName, event: event)
     case "agent_permission_asked":
-      return reattributedPermissionSummary(prefix: displayName, event: event)
+      return Self.reattributedPermissionSummary(displayName: displayName, event: event)
     case "agent_context_injected":
-      return reattributedContextSummary(prefix: displayName, event: event)
+      return Self.reattributedContextSummary(displayName: displayName, event: event)
     default:
       return nil
     }
-  }
-
-  private static func reattributedStateChangeSummary(
-    prefix: String,
-    event: [String: JSONValue]
-  ) -> String {
-    let from = event.stringValue(for: "from") ?? "unknown"
-    let to = event.stringValue(for: "to") ?? "unknown"
-    return "\(prefix) state changed \(from) -> \(to)"
-  }
-
-  private static func reattributedFileModificationSummary(
-    prefix: String,
-    event: [String: JSONValue]
-  ) -> String {
-    let operation = event.stringValue(for: "operation") ?? "modified"
-    let path = event.stringValue(for: "path") ?? "file"
-    return "\(prefix) \(operation) \(path)"
-  }
-
-  private static func reattributedWatchdogSummary(
-    prefix: String,
-    event: [String: JSONValue]
-  ) -> String {
-    let from = event.stringValue(for: "from") ?? "unknown"
-    let to = event.stringValue(for: "to") ?? "unknown"
-    return "\(prefix) watchdog \(from) -> \(to)"
-  }
-
-  private static func reattributedPermissionSummary(
-    prefix: String,
-    event: [String: JSONValue]
-  ) -> String {
-    let tool = event.stringValue(for: "tool") ?? "tool"
-    let scope = event.stringValue(for: "scope") ?? ""
-    guard !scope.isEmpty else {
-      return "\(prefix) asked for permission on \(tool)"
-    }
-    return "\(prefix) asked for permission on \(tool) (\(scope))"
-  }
-
-  private static func reattributedContextSummary(
-    prefix: String,
-    event: [String: JSONValue]
-  ) -> String {
-    let actor = event.stringValue(for: "actor") ?? "system"
-    let detail = event.stringValue(for: "summary") ?? ""
-    guard !detail.isEmpty else {
-      return "\(prefix) received context from \(actor)"
-    }
-    return "\(prefix) received context from \(actor): \(detail)"
   }
 
   private static func reattributedToolSummary(
@@ -373,19 +282,62 @@ extension TimelineEntry {
     displayName: String,
     event: [String: JSONValue]
   ) -> String? {
-    let toolName = event.stringValue(for: "tool_name") ?? "Tool"
     switch kind {
     case "tool_invocation":
-      return "\(displayName) invoked \(toolName)"
+      return "\(displayName) invoked \(event.stringValue(for: "tool_name") ?? "Tool")"
     case "tool_result_error":
+      let toolName = event.stringValue(for: "tool_name") ?? "Tool"
       return "\(displayName) received an error from \(toolName)"
     case "tool_result":
+      let toolName = event.stringValue(for: "tool_name") ?? "Tool"
       return event.boolValue(for: "is_error") == true
         ? "\(displayName) received an error from \(toolName)"
         : "\(displayName) received a result from \(toolName)"
     default:
       return nil
     }
+  }
+
+  private static func reattributedWatchdogSummary(
+    displayName: String,
+    event: [String: JSONValue]
+  ) -> String {
+    let from = event.stringValue(for: "from") ?? "unknown"
+    let to = event.stringValue(for: "to") ?? "unknown"
+    let base = "\(displayName) watchdog \(from) -> \(to)"
+    guard
+      let reason = event.stringValue(for: "reason")?.trimmingCharacters(
+        in: .whitespacesAndNewlines
+      ),
+      !reason.isEmpty
+    else {
+      return base
+    }
+    return "\(base) (\(reason))"
+  }
+
+  private static func reattributedPermissionSummary(
+    displayName: String,
+    event: [String: JSONValue]
+  ) -> String {
+    let tool = event.stringValue(for: "tool") ?? "tool"
+    let scope = event.stringValue(for: "scope") ?? ""
+    guard !scope.isEmpty else {
+      return "\(displayName) asked for permission on \(tool)"
+    }
+    return "\(displayName) asked for permission on \(tool) (\(scope))"
+  }
+
+  private static func reattributedContextSummary(
+    displayName: String,
+    event: [String: JSONValue]
+  ) -> String {
+    let actor = event.stringValue(for: "actor") ?? "system"
+    let detail = event.stringValue(for: "summary") ?? ""
+    guard !detail.isEmpty else {
+      return "\(displayName) received context from \(actor)"
+    }
+    return "\(displayName) received context from \(actor): \(detail)"
   }
 
   private func toolCallTimelineEventPayload() -> [String: JSONValue]? {
@@ -440,4 +392,5 @@ extension TimelineEntry {
     let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? fallback : trimmed
   }
+
 }

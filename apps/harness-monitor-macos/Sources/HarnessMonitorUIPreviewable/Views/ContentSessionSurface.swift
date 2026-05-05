@@ -14,18 +14,9 @@ struct SessionContentState {
   let isExtensionsLoading: Bool
 }
 
-public enum SessionContentPrimaryFocusTarget: String {
-  case dashboard
-  case cockpit
-  case loading
-}
-
 struct SessionContentContainer: View {
   let store: HarnessMonitorStore
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
-  let primaryContentFocusScope: Namespace.ID?
-  let primaryContentPagingResponderRequest: Int
-  let primaryContentFocusTarget: SessionContentPrimaryFocusTarget
   let state: SessionContentState
 
   private var mode: SessionContentMode {
@@ -39,20 +30,13 @@ struct SessionContentContainer: View {
   }
 
   var body: some View {
-    // Keep paging wired to the active detail surface without stealing the
-    // visible keyboard focus away from the sidebar selection.
-    let isPagingResponderEnabled = primaryContentFocusTarget == mode.focusTarget
     ZStack(alignment: .topLeading) {
       switch mode {
       case .dashboard:
         SessionsBoardView(
           store: store,
           sessionCatalog: store.sessionIndex.catalog,
-          dashboardUI: dashboardUI,
-          primaryContentFocusScope: primaryContentFocusScope,
-          primaryContentPagingResponderRequest: primaryContentPagingResponderRequest,
-          prefersPrimaryContentFocus: false,
-          primaryContentPagingResponderEnabled: isPagingResponderEnabled
+          dashboardUI: dashboardUI
         )
       case .cockpit(let cockpitDetail):
         SessionCockpitView(
@@ -64,20 +48,10 @@ struct SessionContentContainer: View {
           isSessionStatusStale: state.isSessionStatusStale,
           isSessionReadOnly: state.isSessionReadOnly,
           isTimelineLoading: state.isTimelineLoading,
-          isExtensionsLoading: state.isExtensionsLoading,
-          primaryContentFocusScope: primaryContentFocusScope,
-          primaryContentPagingResponderRequest: primaryContentPagingResponderRequest,
-          prefersPrimaryContentFocus: false,
-          primaryContentPagingResponderEnabled: isPagingResponderEnabled
+          isExtensionsLoading: state.isExtensionsLoading
         )
       case .loading(let summary):
-        SessionCockpitLoadingSurface(
-          summary: summary,
-          primaryContentFocusScope: primaryContentFocusScope,
-          primaryContentPagingResponderRequest: primaryContentPagingResponderRequest,
-          prefersPrimaryContentFocus: false,
-          primaryContentPagingResponderEnabled: isPagingResponderEnabled
-        )
+        SessionCockpitLoadingSurface(summary: summary)
       }
     }
   }
@@ -88,25 +62,10 @@ private enum SessionContentMode {
   case dashboard
   case cockpit(SessionDetail)
   case loading(SessionSummary)
-
-  var focusTarget: SessionContentPrimaryFocusTarget {
-    switch self {
-    case .dashboard:
-      .dashboard
-    case .cockpit:
-      .cockpit
-    case .loading:
-      .loading
-    }
-  }
 }
 
 private struct SessionCockpitLoadingSurface: View {
   let summary: SessionSummary
-  let primaryContentFocusScope: Namespace.ID?
-  let primaryContentPagingResponderRequest: Int
-  let prefersPrimaryContentFocus: Bool
-  let primaryContentPagingResponderEnabled: Bool
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
@@ -122,12 +81,7 @@ private struct SessionCockpitLoadingSurface: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .accessibilityElement(children: .combine)
     .accessibilityLabel("Loading \(summary.displayTitle)")
-    .harnessPrimaryContentFocusTarget(
-      focusScope: primaryContentFocusScope,
-      prefersDefaultFocus: prefersPrimaryContentFocus,
-      pagingResponderRequest: primaryContentPagingResponderRequest,
-      pagingResponderEnabled: primaryContentPagingResponderEnabled
-    )
+    .harnessPrimaryContentScrollSurface()
   }
 }
 
@@ -137,9 +91,6 @@ private struct SessionCockpitLoadingSurface: View {
   SessionContentContainer(
     store: store,
     dashboardUI: store.contentUI.dashboard,
-    primaryContentFocusScope: nil,
-    primaryContentPagingResponderRequest: 0,
-    primaryContentFocusTarget: .dashboard,
     state: .init(
       detail: nil,
       summary: nil,
@@ -162,9 +113,6 @@ private struct SessionCockpitLoadingSurface: View {
   SessionContentContainer(
     store: store,
     dashboardUI: store.contentUI.dashboard,
-    primaryContentFocusScope: nil,
-    primaryContentPagingResponderRequest: 0,
-    primaryContentFocusTarget: .cockpit,
     state: .init(
       detail: store.selectedSession,
       summary: store.selectedSessionSummary,
