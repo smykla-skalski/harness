@@ -105,7 +105,8 @@ private func workspaceWindowAgentDetailPreview(
     sessionID: store.selectedSessionID,
     agentID: agentID
   )
-  return view
+  return
+    view
     .frame(width: width, height: height)
     .padding()
 }
@@ -117,6 +118,7 @@ private func workspaceWindowAcpLeaderPreview(
 ) -> some View {
   let store = AgentTuiPreviewSupport.makeStore(tuis: [], bridgeState: .ready)
   let view = WorkspaceWindowView(store: store)
+  view.viewModel.selection = .create
   view.viewModel.createMode = .terminal
   view.viewModel.selectedLaunchSelection = .acp("copilot")
   view.viewModel.runtime = .copilot
