@@ -68,9 +68,9 @@ struct SessionTimelineNodeBuilder {
       let patch = feature.patch(for: entry)
       node.tapTarget = patch.tapTarget
       node.eventTone = feature.tone(for: entry) ?? node.eventTone
-      node.voiceOverLabelOverride = feature.voiceOverLabel(for: node, ctx: context)
-      node.contextMenuItems = feature.contextMenuItems(for: node, ctx: context)
       node.actions = feature.actions(for: node, ctx: context)
+      node.contextMenuItems = feature.contextMenuItems(for: node, ctx: context)
+      node.voiceOverLabelOverride = feature.voiceOverLabel(for: node, ctx: context)
       node.prefersCompactLayout = feature.prefersCompactLayout(for: node)
       node.statusBadgeLabel = feature.statusBadgeLabel(for: node, ctx: context)
     }

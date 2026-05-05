@@ -87,12 +87,6 @@
       "index": 2
     },
     {
-      "id": "SessionCockpitActivitySections",
-      "description": "Session activity + signals panels",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionCockpitActivitySections.swift",
-      "index": 0
-    },
-    {
       "id": "SessionAgentLaneViews",
       "description": "Agent lane with tasks + drop zones",
       "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionAgentLaneViews.swift",

@@ -49,13 +49,6 @@ struct SignalTimelineEventFeature: TimelineEventFeature {
 
   func prefersCompactLayout(for _: SessionTimelineNode) -> Bool? { true }
 
-  func filterPreset() -> TimelineFilterPreset? {
-    TimelineFilterPreset(
-      id: "signals",
-      kinds: ["signal_sent", "signal_received", "signal_acknowledged"]
-    )
-  }
-
   func actions(
     for node: SessionTimelineNode,
     ctx: TimelineFeatureContext
