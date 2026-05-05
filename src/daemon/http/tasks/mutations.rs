@@ -236,10 +236,29 @@ async fn task_delete_response(
     request: &TaskDeleteRequest,
 ) -> Result<SessionDetail, CliError> {
     if let Some(async_db) = state.async_db.get() {
-        return service::delete_task_async(session_id, task_id, request, async_db.as_ref()).await;
+        return service::delete_task_async(
+            session_id,
+            task_id,
+            request,
+            async_db.as_ref(),
+            service::WakeDispatch::new(
+                Some(&state.agent_tui_manager),
+                Some(&state.acp_agent_manager),
+            ),
+        )
+        .await;
     }
     let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-    service::delete_task(session_id, task_id, request, db_guard.as_deref())
+    service::delete_task(
+        session_id,
+        task_id,
+        request,
+        db_guard.as_deref(),
+        service::WakeDispatch::new(
+            Some(&state.agent_tui_manager),
+            Some(&state.acp_agent_manager),
+        ),
+    )
 }
 
 async fn task_drop_response(

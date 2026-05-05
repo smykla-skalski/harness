@@ -309,6 +309,9 @@ mod tests {
 
         assert_eq!(kind, "task_deleted");
         assert_eq!(task_id.as_deref(), Some("task-7"));
-        assert_eq!(summary, "task-7 deleted from InProgress: trim archived notes");
+        assert_eq!(
+            summary,
+            "task-7 deleted from InProgress: trim archived notes"
+        );
     }
 }

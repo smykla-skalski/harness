@@ -104,6 +104,7 @@ mod session_helpers;
 mod session_state;
 mod signal_support;
 mod signals;
+mod task_delete;
 mod task_queue;
 mod task_state;
 mod tasks;
@@ -163,6 +164,8 @@ pub(crate) use session_helpers::*;
 pub(crate) use session_state::*;
 #[allow(unused_imports)]
 pub(crate) use signal_support::*;
+#[allow(unused_imports)]
+pub(crate) use task_delete::*;
 #[allow(unused_imports)]
 pub(crate) use task_queue::*;
 #[allow(unused_imports)]

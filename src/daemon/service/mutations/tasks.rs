@@ -1,8 +1,8 @@
 use super::super::wake_route::WakeDispatch;
 use super::super::{
-    CliError, SessionDetail, TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest,
-    TaskDeleteRequest, TaskDropRequest, TaskQueuePolicyRequest, TaskSource, TaskUpdateRequest,
-    append_task_drop_effect_logs, build_log_entry, effective_project_dir, index,
+    CliError, CliErrorKind, SessionDetail, TaskAssignRequest, TaskCheckpointRequest,
+    TaskCreateRequest, TaskDeleteRequest, TaskDropRequest, TaskQueuePolicyRequest, TaskSource,
+    TaskUpdateRequest, append_task_drop_effect_logs, build_log_entry, effective_project_dir, index,
     project_dir_for_db_session, session_detail, session_detail_from_daemon_db, session_not_found,
     session_service, task_drop_effect_signal_records, try_wake_started_workers, utc_now,
     write_task_start_signals,
@@ -62,21 +62,50 @@ pub fn delete_task(
     task_id: &str,
     request: &TaskDeleteRequest,
     db: Option<&super::super::db::DaemonDb>,
+    dispatch: WakeDispatch<'_>,
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db
         && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
     {
-        let deleted = session_service::apply_delete_task(&mut state, task_id, &request.actor, &utc_now())?;
+        let now = utc_now();
+        let rollback_state = state.clone();
+        let deleted =
+            session_service::apply_delete_task(&mut state, task_id, &request.actor, &now)?;
+        let effects =
+            session_service::apply_advance_queued_tasks(&mut state, &request.actor, &now)?;
+        let project_dir = project_dir_for_db_session(db, session_id)?;
         let project_id = db
             .project_id_for_session(session_id)?
             .ok_or_else(|| session_not_found(session_id))?;
         db.save_session_state(&project_id, &state)?;
-        db.append_log_entry(&build_log_entry(
+        let delete_log = build_log_entry(
             session_id,
             session_service::log_task_deleted(task_id, &deleted.title, deleted.previous_status),
             Some(&request.actor),
             None,
-        ))?;
+        );
+        if let Err(error) = db.append_log_entry(&delete_log) {
+            if let Err(restore_error) = db.save_session_state(&project_id, &rollback_state) {
+                return Err(CliError::from(CliErrorKind::workflow_io(format!(
+                    "task delete audit append failed and rollback could not be restored: {restore_error}; original error: {error}"
+                ))));
+            }
+            return Err(error);
+        }
+        write_task_start_signals(&project_dir, &effects)?;
+        append_task_drop_effect_logs(db, session_id, &request.actor, &effects)?;
+        db.merge_signal_records(
+            session_id,
+            &task_drop_effect_signal_records(session_id, &effects),
+        )?;
+        try_wake_started_workers(
+            &state,
+            &effects,
+            session_id,
+            &project_dir,
+            Some(db),
+            dispatch,
+        );
         db.bump_change(session_id)?;
         db.bump_change("global")?;
         return session_detail_from_daemon_db(session_id, db);

@@ -82,13 +82,32 @@ pub(super) async fn dispatch_task_delete(
         state,
         |session_id, task_id, params, db| {
             let body: TaskDeleteRequest = serde_json::from_value(params)?;
-            service::delete_task(&session_id, &task_id, &body, db).map_err(Into::into)
+            service::delete_task(
+                &session_id,
+                &task_id,
+                &body,
+                db,
+                service::WakeDispatch::new(
+                    Some(&state.agent_tui_manager),
+                    Some(&state.acp_agent_manager),
+                ),
+            )
+            .map_err(Into::into)
         },
         |session_id, task_id, params, async_db| async move {
             let body: TaskDeleteRequest = serde_json::from_value(params)?;
-            service::delete_task_async(&session_id, &task_id, &body, &async_db)
-                .await
-                .map_err(Into::into)
+            service::delete_task_async(
+                &session_id,
+                &task_id,
+                &body,
+                &async_db,
+                service::WakeDispatch::new(
+                    Some(&state.agent_tui_manager),
+                    Some(&state.acp_agent_manager),
+                ),
+            )
+            .await
+            .map_err(Into::into)
         },
     )
     .await
