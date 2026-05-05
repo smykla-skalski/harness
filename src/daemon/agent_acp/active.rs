@@ -3,11 +3,12 @@ use std::time::Duration;
 
 use serde::Serialize;
 use tokio::sync::{broadcast, mpsc};
-use tokio::task::JoinHandle;
+use tokio::task::{JoinHandle, spawn_blocking};
 
 use crate::agents::acp::connection::EventBatch;
 use crate::agents::acp::supervision::{AcpSessionSupervisor, watchdog_loop};
 use crate::agents::kind::DisconnectReason;
+use crate::agents::runtime::event::ConversationEvent;
 use crate::daemon::db::DaemonDb;
 use crate::daemon::protocol::StreamEvent;
 use crate::errors::CliError;
@@ -80,15 +81,12 @@ impl LiveEventPersistence {
         }
     }
 
-    fn persist(
-        &self,
-        events: Vec<crate::agents::runtime::event::ConversationEvent>,
-    ) -> Result<(), CliError> {
+    fn persist(&self, events: &[ConversationEvent]) -> Result<(), CliError> {
         recover_lock(&self.db, "acp-live-events").append_conversation_events(
             &self.session_id,
             &self.agent_id,
             &self.runtime,
-            &events,
+            events,
         )
     }
 }
@@ -113,12 +111,10 @@ pub(super) fn spawn_event_forwarder(
                 session_id: Some(batch.session_id),
                 payload,
             });
-            if let Some(persistence) = persistence.as_ref().cloned() {
+            if let Some(persistence) = persistence.clone() {
                 let persist_session_id = persistence.session_id.clone();
                 let persist_agent_id = persistence.agent_id.clone();
-                match tokio::task::spawn_blocking(move || persistence.persist(persisted_events))
-                    .await
-                {
+                match spawn_blocking(move || persistence.persist(&persisted_events)).await {
                     Ok(Ok(())) => {}
                     Ok(Err(error)) => tracing::warn!(
                         session_id = persist_session_id,

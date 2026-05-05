@@ -6,6 +6,20 @@ use super::super::{
     db::AsyncDaemonDb, session_service, sync_file_state_from_async_db, utc_now,
 };
 use super::{append_log, bump_session, persist_task_signal_effects, resolved_session_for_mutation};
+use crate::session::types::{SessionState, TaskStatus};
+
+struct DeleteRollback<'a> {
+    project_id: &'a str,
+    state: &'a SessionState,
+}
+
+struct DeleteTaskMutation {
+    rollback_project_id: String,
+    rollback_state: SessionState,
+    deleted_title: String,
+    deleted_previous_status: TaskStatus,
+    effects: Vec<session_service::TaskDropEffect>,
+}
 
 /// Create a task through the canonical async daemon DB.
 ///
@@ -53,53 +67,21 @@ pub(crate) async fn delete_task_async(
     async_db: &AsyncDaemonDb,
     dispatch: WakeDispatch<'_>,
 ) -> Result<SessionDetail, CliError> {
-    let rollback = resolved_session_for_mutation(async_db, session_id).await?;
-    let rollback_state = rollback.state.clone();
-    let rollback_project_id = rollback.project.project_id.clone();
-    let now = utc_now();
-    let (deleted, effects) = async_db
-        .update_session_state_immediate(session_id, |state| {
-            let deleted = session_service::apply_delete_task(state, task_id, &request.actor, &now)?;
-            let effects = session_service::apply_advance_queued_tasks(state, &request.actor, &now)?;
-            Ok((deleted, effects))
-        })
+    let mutation =
+        prepare_delete_task_mutation(async_db, session_id, task_id, &request.actor).await?;
+    let rollback = DeleteRollback {
+        project_id: &mutation.rollback_project_id,
+        state: &mutation.rollback_state,
+    };
+    persist_delete_audit_or_rollback(async_db, session_id, task_id, request, &mutation, &rollback)
         .await?;
-    if let Err(error) = sync_file_state_from_async_db(async_db, session_id).await {
-        restore_delete_rollback(
-            async_db,
-            session_id,
-            &rollback_project_id,
-            &rollback_state,
-            &error,
-        )
-        .await?;
-        return Err(error);
-    }
-    if let Err(error) = append_log(
-        async_db,
-        session_id,
-        session_service::log_task_deleted(task_id, &deleted.title, deleted.previous_status),
-        &request.actor,
-    )
-    .await
-    {
-        restore_delete_rollback(
-            async_db,
-            session_id,
-            &rollback_project_id,
-            &rollback_state,
-            &error,
-        )
-        .await?;
-        return Err(error);
-    }
     let resolved = resolved_session_for_mutation(async_db, session_id).await?;
     persist_task_signal_effects(
         async_db,
         &resolved,
         session_id,
         &request.actor,
-        &effects,
+        &mutation.effects,
         None,
         dispatch,
     )
@@ -107,20 +89,93 @@ pub(crate) async fn delete_task_async(
     session_detail_from_async_daemon_db(session_id, async_db).await
 }
 
+async fn prepare_delete_task_mutation(
+    async_db: &AsyncDaemonDb,
+    session_id: &str,
+    task_id: &str,
+    actor_id: &str,
+) -> Result<DeleteTaskMutation, CliError> {
+    let rollback = resolved_session_for_mutation(async_db, session_id).await?;
+    let now = utc_now();
+    let (deleted, effects) = async_db
+        .update_session_state_immediate(session_id, |state| {
+            let deleted = session_service::apply_delete_task(state, task_id, actor_id, &now)?;
+            let effects = session_service::apply_advance_queued_tasks(state, actor_id, &now)?;
+            Ok((deleted, effects))
+        })
+        .await?;
+    Ok(DeleteTaskMutation {
+        rollback_project_id: rollback.project.project_id,
+        rollback_state: rollback.state,
+        deleted_title: deleted.title,
+        deleted_previous_status: deleted.previous_status,
+        effects,
+    })
+}
+
+async fn persist_delete_audit_or_rollback(
+    async_db: &AsyncDaemonDb,
+    session_id: &str,
+    task_id: &str,
+    request: &TaskDeleteRequest,
+    mutation: &DeleteTaskMutation,
+    rollback: &DeleteRollback<'_>,
+) -> Result<(), CliError> {
+    rollback_delete_step(
+        sync_file_state_from_async_db(async_db, session_id).await,
+        async_db,
+        session_id,
+        rollback,
+    )
+    .await?;
+    rollback_delete_step(
+        append_log(
+            async_db,
+            session_id,
+            session_service::log_task_deleted(
+                task_id,
+                &mutation.deleted_title,
+                mutation.deleted_previous_status,
+            ),
+            &request.actor,
+        )
+        .await,
+        async_db,
+        session_id,
+        rollback,
+    )
+    .await
+}
+
+async fn rollback_delete_step<T>(
+    step: Result<T, CliError>,
+    async_db: &AsyncDaemonDb,
+    session_id: &str,
+    rollback: &DeleteRollback<'_>,
+) -> Result<T, CliError> {
+    match step {
+        Ok(value) => Ok(value),
+        Err(error) => {
+            restore_delete_rollback(async_db, session_id, rollback, &error).await?;
+            Err(error)
+        }
+    }
+}
+
 async fn restore_delete_rollback(
     async_db: &AsyncDaemonDb,
     session_id: &str,
-    project_id: &str,
-    rollback_state: &crate::session::types::SessionState,
+    rollback: &DeleteRollback<'_>,
     original_error: &CliError,
 ) -> Result<(), CliError> {
-    async_db.save_session_state(project_id, rollback_state).await.map_err(
-        |restore_error| {
+    async_db
+        .save_session_state(rollback.project_id, rollback.state)
+        .await
+        .map_err(|restore_error| {
             CliError::from(CliErrorKind::workflow_io(format!(
                 "task delete rollback save failed for session '{session_id}': {restore_error}; original error: {original_error}"
             )))
-        },
-    )?;
+        })?;
     sync_file_state_from_async_db(async_db, session_id)
         .await
         .map_err(|restore_error| {
