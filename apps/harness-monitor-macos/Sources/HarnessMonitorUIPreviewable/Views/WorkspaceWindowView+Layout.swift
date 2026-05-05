@@ -77,8 +77,10 @@ extension WorkspaceWindowView {
   func detailSplitViewContent(
     decisionScope: DecisionWorkspaceScope
   ) -> some View {
+    let detailIdentity = scrollContainerIdentity
     HStack(spacing: 0) {
       detailColumnContent(decisionScope: decisionScope)
+        .id(detailIdentity)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
       if viewModel.selection.isDecisionRoute, isDecisionInspectorVisible {

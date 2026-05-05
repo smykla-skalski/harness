@@ -92,6 +92,7 @@ struct WorkspaceWindowCreatePane: View {
   typealias ViewModel = WorkspaceWindowView.ViewModel
   typealias DisplayState = WorkspaceWindowView.AgentTuiDisplayState
   typealias Field = WorkspaceWindowView.Field
+  private static let topAnchorID = "workspace-create-pane-top"
 
   let store: HarnessMonitorStore
   let viewModel: ViewModel
@@ -100,34 +101,44 @@ struct WorkspaceWindowCreatePane: View {
   let startAction: () -> Void
 
   var body: some View {
-    HarnessMonitorColumnScrollView(
-      horizontalPadding: HarnessMonitorTheme.spacingLG,
-      verticalPadding: HarnessMonitorTheme.spacingLG,
-      constrainContentWidth: false,
-      readableWidth: false,
-      topScrollEdgeEffect: .soft,
-      scrollSurfaceIdentifier: HarnessMonitorAccessibility.agentTuiLaunchPane,
-      scrollSurfaceLabel: "New agent pane"
-    ) {
-      // Keep MCP-tracked controls instantiated even while this pane scrolls.
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
-        createPaneHeader
+    ScrollViewReader { scrollProxy in
+      HarnessMonitorColumnScrollView(
+        horizontalPadding: HarnessMonitorTheme.spacingLG,
+        verticalPadding: HarnessMonitorTheme.spacingLG,
+        constrainContentWidth: false,
+        readableWidth: false,
+        topScrollEdgeEffect: .soft,
+        scrollSurfaceIdentifier: HarnessMonitorAccessibility.agentTuiLaunchPane,
+        scrollSurfaceLabel: "New agent pane"
+      ) {
+        // Keep MCP-tracked controls instantiated even while this pane scrolls.
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
+          Color.clear
+            .frame(height: 0)
+            .accessibilityHidden(true)
+            .id(Self.topAnchorID)
+          createPaneHeader
 
-        switch viewModel.createMode {
-        case .terminal:
-          terminalCreateContent
-        case .codex:
-          codexCreateContent
+          switch viewModel.createMode {
+          case .terminal:
+            terminalCreateContent
+          case .codex:
+            codexCreateContent
+          }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-    }
-    .safeAreaInset(edge: .bottom, spacing: 0) {
-      launchFloorBar
-    }
-    .accessibilityElement(children: .contain)
-    .onAppear {
-      applySavedLaunchPresetIfFresh()
+      .safeAreaInset(edge: .bottom, spacing: 0) {
+        launchFloorBar
+      }
+      .accessibilityElement(children: .contain)
+      .onAppear {
+        applySavedLaunchPresetIfFresh()
+      }
+      .task(id: viewModel.selection) {
+        await Task.yield()
+        scrollProxy.scrollTo(Self.topAnchorID, anchor: .top)
+      }
     }
   }
 }

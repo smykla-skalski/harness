@@ -37,9 +37,78 @@ final class RetiredInspectorEntryPointsUITests: HarnessMonitorUITestCase {
     verifyReviewPanelReachable(in: app)
     verifyTaskActionsSheet(in: app)
   }
+
+  func testNewAgentEntryPointKeepsCreatePaneAtTop() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "cockpit"]
+    )
+
+    let sessionRow = previewSessionTrigger(in: app)
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
+    tapPreviewSession(in: app)
+
+    let ready = waitForButtonReady(in: app, identifier: Accessibility.sessionAgentCreateOpenButton)
+    XCTAssertTrue(ready, "New Agent should become tap-ready in cockpit preview")
+    tapButton(in: app, identifier: Accessibility.sessionAgentCreateOpenButton)
+
+    let workspaceWindow = element(in: app, identifier: Accessibility.workspaceWindow)
+    let createPane = element(in: app, identifier: Accessibility.agentTuiLaunchPane)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        workspaceWindow.exists && createPane.exists
+      },
+      "New Agent should open the workspace window on the New Agent pane"
+    )
+
+    let createModePicker = element(in: app, identifier: Accessibility.agentTuiCreateModePicker)
+    let providerList = element(in: app, identifier: Accessibility.agentTuiRuntimePicker)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        createModePicker.exists && providerList.exists
+      },
+      "New Agent pane should expose its header controls and provider list"
+    )
+
+    recordDiagnosticsTrace(
+      event: "new-agent.create-pane.geometry",
+      app: app,
+      details: [
+        "workspace_window": workspaceFrameSummary(workspaceWindow.frame),
+        "create_pane": workspaceFrameSummary(createPane.frame),
+        "create_mode_picker": workspaceFrameSummary(createModePicker.frame),
+        "provider_list": workspaceFrameSummary(providerList.frame),
+      ]
+    )
+
+    let visiblePaneFrame = createPane.frame.intersection(workspaceWindow.frame)
+    let visiblePickerFrame = createModePicker.frame.intersection(visiblePaneFrame)
+    XCTAssertFalse(visiblePickerFrame.isNull, "New Agent header controls should intersect the pane")
+    XCTAssertGreaterThan(
+      visiblePickerFrame.height,
+      min(createModePicker.frame.height, 18),
+      "New Agent header controls should be visibly inside the create pane"
+    )
+    XCTAssertGreaterThan(
+      providerList.frame.minY,
+      createModePicker.frame.maxY,
+      "Provider list should render below the New Agent header, not above it from a stale scroll offset"
+    )
+  }
 }
 
 extension RetiredInspectorEntryPointsUITests {
+  fileprivate func workspaceFrameSummary(_ frame: CGRect) -> String {
+    guard !frame.isNull else { return "null" }
+    return String(
+      format: "x=%.1f y=%.1f w=%.1f h=%.1f",
+      frame.origin.x,
+      frame.origin.y,
+      frame.size.width,
+      frame.size.height
+    )
+  }
+
   fileprivate func verifySignalDetailSheet(in app: XCUIApplication) {
     let signalCard = button(in: app, identifier: Accessibility.previewSignalCard)
     if !signalCard.waitForExistence(timeout: 1.5) {
