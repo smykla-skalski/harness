@@ -1,5 +1,8 @@
 import HarnessMonitorKit
 
+// LIVE REGION: when adding a new signal kind, also add a case to
+// MonitorTimelineLiveRegion.priority(for:summary:) — that function runs before node
+// enrichment and is outside this protocol.
 struct SignalTimelineEventFeature: TimelineEventFeature {
   static let id = "signal"
 
@@ -19,13 +22,7 @@ struct SignalTimelineEventFeature: TimelineEventFeature {
     case "signal_sent", "signal_received":
       return .info
     case "signal_acknowledged":
-      let value = entry.summary.lowercased()
-      if value.contains("rejected") || value.contains("fail") || value.contains("denied") {
-        return .critical
-      }
-      if value.contains("expired") || value.contains("deferred") { return .warning }
-      if value.contains("accepted") || value.contains("delivered") { return .success }
-      return .info
+      return acknowledgedOutcome(from: entry.summary).tone
     default:
       return .info
     }
@@ -93,21 +90,27 @@ struct SignalTimelineEventFeature: TimelineEventFeature {
     return statusVerb(for: node)
   }
 
-  // Dispatches on entry.kind (node.sourceLabel) as primary discriminator.
-  // For signal_acknowledged the daemon encodes the outcome (Accepted/Rejected/Deferred/Expired)
-  // only in the human-readable summary; the payload carries signal_id but not a structured
-  // result field. The title scan is therefore the only available discriminator for that case.
+  // Dispatches on node.sourceLabel (entry.kind) as primary discriminator.
+  // For signal_acknowledged the daemon encodes the outcome only in the human-readable
+  // summary; acknowledgedOutcome(_:) is the single parse site for that case.
   private func statusVerb(for node: SessionTimelineNode) -> String {
     switch node.sourceLabel {
     case "signal_sent": return "Sent"
     case "signal_received": return "Received"
-    default:
-      let lower = node.title.lowercased()
-      if lower.contains("accepted") || lower.contains("delivered") { return "Delivered" }
-      if lower.contains("rejected") { return "Rejected" }
-      if lower.contains("deferred") { return "Deferred" }
-      if lower.contains("expired") { return "Expired" }
-      return "Acknowledged"
+    default: return acknowledgedOutcome(from: node.title).verb
     }
+  }
+
+  // Single parse site for signal_acknowledged outcome vocabulary.
+  // Both tone(for:) and statusVerb(for:) delegate here so the keyword list stays in sync.
+  private func acknowledgedOutcome(from summary: String) -> (tone: SessionTimelineTone, verb: String) {
+    let lower = summary.lowercased()
+    if lower.contains("rejected") || lower.contains("fail") || lower.contains("denied") {
+      return (.critical, "Rejected")
+    }
+    if lower.contains("deferred") { return (.warning, "Deferred") }
+    if lower.contains("expired") { return (.warning, "Expired") }
+    if lower.contains("accepted") || lower.contains("delivered") { return (.success, "Delivered") }
+    return (.info, "Acknowledged")
   }
 }
