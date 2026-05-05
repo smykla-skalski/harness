@@ -82,11 +82,18 @@ struct AgentDetailMetadataSection: View {
   let title: String
   let values: [String]
   let summaryFacts: [AgentDetailFact]
+  let inlineValues: Bool
 
-  init(title: String, values: [String], summaryFacts: [AgentDetailFact] = []) {
+  init(
+    title: String,
+    values: [String],
+    summaryFacts: [AgentDetailFact] = [],
+    inlineValues: Bool = false
+  ) {
     self.title = title
     self.values = values
     self.summaryFacts = summaryFacts
+    self.inlineValues = inlineValues
   }
 
   var body: some View {
@@ -96,7 +103,17 @@ struct AgentDetailMetadataSection: View {
         AgentDetailFactSummaryGrid(facts: summaryFacts)
       }
       if !values.isEmpty {
-        AgentDetailMetadataList(values: values)
+        if inlineValues {
+          Text(values.joined(separator: " · "))
+            .scaledFont(.subheadline)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityLabel("Recent tools")
+            .accessibilityValue(values.joined(separator: ", "))
+        } else {
+          AgentDetailMetadataList(values: values)
+        }
       }
     }
   }

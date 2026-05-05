@@ -39,6 +39,9 @@ struct AgentDetailAwaitingDecisionStrip: View {
     if isResolving {
       return "Submitting decision..."
     }
+    if payload != nil && payload?.isRenderable != true {
+      return "Request details unavailable here — review in Decisions to inspect and act."
+    }
     if count > 1 {
       if topRequestTitle != nil {
         return count == 2 ? "+1 more pending" : "+\(count - 1) more pending"
