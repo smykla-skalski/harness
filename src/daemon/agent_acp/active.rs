@@ -8,7 +8,9 @@ use tokio::task::JoinHandle;
 use crate::agents::acp::connection::EventBatch;
 use crate::agents::acp::supervision::{AcpSessionSupervisor, watchdog_loop};
 use crate::agents::kind::DisconnectReason;
+use crate::daemon::db::DaemonDb;
 use crate::daemon::protocol::StreamEvent;
+use crate::errors::CliError;
 use crate::session::types::AgentStatus;
 use crate::workspace::utc_now;
 
@@ -55,12 +57,50 @@ fn recover_lock<'a, T>(mutex: &'a Mutex<T>, label: &str) -> MutexGuard<'a, T> {
         })
 }
 
+#[derive(Clone)]
+pub(super) struct LiveEventPersistence {
+    db: Arc<Mutex<DaemonDb>>,
+    session_id: String,
+    agent_id: String,
+    runtime: String,
+}
+
+impl LiveEventPersistence {
+    pub(super) fn new(
+        db: Arc<Mutex<DaemonDb>>,
+        session_id: &str,
+        agent_id: &str,
+        runtime: &str,
+    ) -> Self {
+        Self {
+            db,
+            session_id: session_id.to_string(),
+            agent_id: agent_id.to_string(),
+            runtime: runtime.to_string(),
+        }
+    }
+
+    fn persist(
+        &self,
+        events: Vec<crate::agents::runtime::event::ConversationEvent>,
+    ) -> Result<(), CliError> {
+        recover_lock(&self.db, "acp-live-events").append_conversation_events(
+            &self.session_id,
+            &self.agent_id,
+            &self.runtime,
+            &events,
+        )
+    }
+}
+
 pub(super) fn spawn_event_forwarder(
     sender: broadcast::Sender<StreamEvent>,
     mut events: mpsc::Receiver<EventBatch>,
+    persistence: Option<LiveEventPersistence>,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
         while let Some(batch) = events.recv().await {
+            let persisted_events = batch.events.clone();
             let payload = serde_json::json!({
                 "acp_id": batch.acp_id,
                 "session_id": batch.session_id,
@@ -73,6 +113,27 @@ pub(super) fn spawn_event_forwarder(
                 session_id: Some(batch.session_id),
                 payload,
             });
+            if let Some(persistence) = persistence.as_ref().cloned() {
+                let persist_session_id = persistence.session_id.clone();
+                let persist_agent_id = persistence.agent_id.clone();
+                match tokio::task::spawn_blocking(move || persistence.persist(persisted_events))
+                    .await
+                {
+                    Ok(Ok(())) => {}
+                    Ok(Err(error)) => tracing::warn!(
+                        session_id = persist_session_id,
+                        agent_id = persist_agent_id,
+                        %error,
+                        "failed to persist live ACP events"
+                    ),
+                    Err(error) => tracing::warn!(
+                        session_id = persist_session_id,
+                        agent_id = persist_agent_id,
+                        %error,
+                        "failed to join live ACP event persistence task"
+                    ),
+                }
+            }
         }
     })
 }

@@ -2,7 +2,8 @@ use super::{
     CliError, Connection, ConversationEvent, DaemonDb, OptionalExtension,
     PreparedAgentTranscriptResync, PreparedConversationEventImport, SessionState, daemon_index,
     daemon_protocol, daemon_snapshot, daemon_timeline, db_error, extract_transition_kind,
-    i64_from_u64, replace_session_timeline_entries_for_prefix, stored_timeline_entry, utc_now,
+    i64_from_u64, replace_session_timeline_entries_for_prefix, stored_timeline_entry,
+    upsert_session_timeline_entry, utc_now,
 };
 
 impl DaemonDb {
@@ -125,6 +126,109 @@ impl DaemonDb {
         transaction
             .commit()
             .map_err(|error| db_error(format!("commit conversation event sync: {error}")))?;
+        Ok(())
+    }
+
+    /// Append live conversation events for an agent without replacing existing
+    /// transcript history.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or timeline conversion failures.
+    pub fn append_conversation_events(
+        &self,
+        session_id: &str,
+        agent_id: &str,
+        runtime: &str,
+        events: &[ConversationEvent],
+    ) -> Result<(), CliError> {
+        if events.is_empty() {
+            return Ok(());
+        }
+
+        let mut timeline_rows = Vec::new();
+        for event in events {
+            if let Some(entry) = daemon_timeline::conversation_entry(
+                session_id,
+                agent_id,
+                runtime,
+                event,
+                daemon_timeline::TimelinePayloadScope::Full,
+            )? {
+                timeline_rows.push(stored_timeline_entry(
+                    "conversation",
+                    format!("conversation:{agent_id}:{}", event.sequence),
+                    &entry,
+                )?);
+            }
+        }
+
+        let transaction = self
+            .conn
+            .unchecked_transaction()
+            .map_err(|error| db_error(format!("begin live conversation append: {error}")))?;
+        let mut changed = false;
+
+        {
+            let mut statement = transaction
+                .prepare(
+                    "INSERT INTO conversation_events
+                        (session_id, agent_id, runtime, timestamp, sequence, kind, event_json)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                     ON CONFLICT(session_id, agent_id, sequence) DO UPDATE SET
+                         runtime = excluded.runtime,
+                         timestamp = excluded.timestamp,
+                         kind = excluded.kind,
+                         event_json = excluded.event_json",
+                )
+                .map_err(|error| db_error(format!("prepare live conversation upsert: {error}")))?;
+
+            for event in events {
+                let kind_json = serde_json::to_string(&event.kind).unwrap_or_default();
+                let json = serde_json::to_string(event).unwrap_or_default();
+                if conversation_event_json(&transaction, session_id, agent_id, event.sequence)?
+                    .as_deref()
+                    == Some(json.as_str())
+                {
+                    continue;
+                }
+                statement
+                    .execute(rusqlite::params![
+                        session_id,
+                        agent_id,
+                        runtime,
+                        event.timestamp,
+                        i64_from_u64(event.sequence),
+                        extract_transition_kind(&kind_json),
+                        json,
+                    ])
+                    .map_err(|error| {
+                        db_error(format!("upsert live conversation event: {error}"))
+                    })?;
+                changed = true;
+            }
+        }
+
+        for entry in &timeline_rows {
+            upsert_session_timeline_entry(&transaction, entry)?;
+        }
+
+        transaction
+            .commit()
+            .map_err(|error| db_error(format!("commit live conversation append: {error}")))?;
+
+        if !changed {
+            return Ok(());
+        }
+
+        let merged_events = self.load_conversation_events(session_id, agent_id)?;
+        let activity = daemon_snapshot::agent_activity_summary_from_events(
+            agent_id,
+            runtime,
+            None,
+            &merged_events,
+        );
+        self.upsert_agent_activity(session_id, &activity)?;
+        self.bump_change(session_id)?;
         Ok(())
     }
 
@@ -390,6 +494,25 @@ fn upsert_agent_activity(
     )
     .map_err(|error| db_error(format!("upsert activity: {error}")))?;
     Ok(())
+}
+
+fn conversation_event_json(
+    conn: &Connection,
+    session_id: &str,
+    agent_id: &str,
+    sequence: u64,
+) -> Result<Option<String>, CliError> {
+    conn.query_row(
+        "SELECT event_json
+         FROM conversation_events
+         WHERE session_id = ?1
+           AND agent_id = ?2
+           AND sequence = ?3",
+        rusqlite::params![session_id, agent_id, i64_from_u64(sequence)],
+        |row| row.get::<_, String>(0),
+    )
+    .optional()
+    .map_err(|error| db_error(format!("load existing conversation event: {error}")))
 }
 
 fn replace_session_conversation_state(
