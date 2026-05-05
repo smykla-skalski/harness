@@ -44,7 +44,7 @@ struct AgentDetailActivityBand: View {
   let timeline: [TimelineEntry]
   let runtimeProfileFacts: [AgentDetailFact]
   let capabilityValues: [String]
-  let hookPointValues: [String]
+  let hookPoints: [HookIntegrationDescriptor]
   let activityFacts: [AgentDetailFact]
   let recentToolValues: [String]
   let persona: AgentPersona?
@@ -98,16 +98,6 @@ struct AgentDetailActivityBand: View {
           facts: runtimeProfileFacts,
           maximumColumns: prefersWideLayout ? 3 : 2
         )
-        AgentDetailMetadataSection(
-          title: "Declared capabilities",
-          values: capabilityValues
-        )
-        if !hookPointValues.isEmpty {
-          AgentDetailMetadataSection(
-            title: "Hook points",
-            values: hookPointValues
-          )
-        }
         if !activityFacts.isEmpty || !recentToolValues.isEmpty {
           AgentDetailMetadataSection(
             title: "Recent activity",
@@ -115,6 +105,26 @@ struct AgentDetailActivityBand: View {
             summaryFacts: activityFacts
           )
         }
+        DisclosureGroup("Capabilities & hooks") {
+          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+            AgentDetailMetadataSection(
+              title: "Declared capabilities",
+              values: capabilityValues
+            )
+            if !hookPoints.isEmpty {
+              VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+                AgentDetailSubsectionTitle(title: "Hook points")
+                AgentDetailHookPointsGrid(hookPoints: hookPoints)
+              }
+            }
+          }
+          .padding(.top, HarnessMonitorTheme.spacingSM)
+        }
+        .scaledFont(.caption.bold())
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.agentDetailReferenceDisclosure(agentID)
+        )
       }
     }
   }

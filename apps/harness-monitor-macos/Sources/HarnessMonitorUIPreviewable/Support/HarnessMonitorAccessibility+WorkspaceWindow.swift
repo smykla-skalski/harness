@@ -61,4 +61,8 @@ extension HarnessMonitorAccessibility {
   public static func agentRuntimeDisclosureContent(_ agentID: String) -> String {
     "harness.workspace.detail.runtime.disclosure-content.\(slug(agentID))"
   }
+
+  public static func agentDetailReferenceDisclosure(_ agentID: String) -> String {
+    "harness.workspace.detail.reference.disclosure.\(slug(agentID))"
+  }
 }
