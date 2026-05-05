@@ -1,4 +1,5 @@
 use super::*;
+use crate::daemon::service::observe_async::{ObserveWatchState, process_incremental_observe};
 
 #[test]
 fn observe_session_with_db_persists_tasks_without_touching_state_file() {
@@ -290,6 +291,76 @@ fn observe_session_async_creates_tasks_without_sync_db() {
             crate::session::types::TaskSource::Observe
         );
     });
+}
+
+#[test]
+fn incremental_observe_skips_change_bump_when_snapshot_is_unchanged() {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("runtime");
+    with_temp_project(|project| {
+        let state = start_active_file_session(
+            "observe async quiet loop",
+            "",
+            project,
+            Some("claude"),
+            Some("observe-async-quiet"),
+        )
+        .expect("start session");
+
+        runtime.block_on(async {
+            let async_db = setup_async_db_with_session(project, &state.session_id).await;
+            let mut cycle = ObserveWatchState::default();
+            let mut resolved = async_db
+                .resolve_session(&state.session_id)
+                .await
+                .expect("resolve session")
+                .expect("session should exist");
+
+            process_incremental_observe(
+                async_db.as_ref(),
+                &mut resolved,
+                None,
+                project,
+                &mut cycle,
+            )
+            .await
+            .expect("initial observe pass");
+            let after_initial = latest_change_sequence(async_db.as_ref()).await;
+
+            let mut resolved = async_db
+                .resolve_session(&state.session_id)
+                .await
+                .expect("resolve session")
+                .expect("session should exist");
+            process_incremental_observe(
+                async_db.as_ref(),
+                &mut resolved,
+                None,
+                project,
+                &mut cycle,
+            )
+            .await
+            .expect("stable observe pass");
+
+            assert_eq!(
+                latest_change_sequence(async_db.as_ref()).await,
+                after_initial
+            );
+        });
+    });
+}
+
+async fn latest_change_sequence(async_db: &crate::daemon::db::AsyncDaemonDb) -> i64 {
+    async_db
+        .load_change_tracking_since(0)
+        .await
+        .expect("load change tracking")
+        .into_iter()
+        .map(|(_, change_seq)| change_seq)
+        .max()
+        .unwrap_or(0)
 }
 
 #[test]

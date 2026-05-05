@@ -16,7 +16,7 @@ use crate::session::observe::{should_observe, should_tick_liveness};
 const SWEEP_CYCLE_COUNT: u64 = 100;
 
 #[derive(Default)]
-struct ObserveWatchState {
+pub(super) struct ObserveWatchState {
     realtime_seen: HashSet<String>,
     total_issues: usize,
     cycle_count: u64,
@@ -125,7 +125,7 @@ async fn resolve_observable_session(
     }
 }
 
-async fn process_incremental_observe(
+pub(super) async fn process_incremental_observe(
     async_db: &AsyncDaemonDb,
     resolved: &mut ResolvedSession,
     actor_id: Option<&str>,
