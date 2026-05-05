@@ -68,7 +68,15 @@ public struct WorkspaceWindowView: View {
       let createEntryPoint = initialWorkspaceRequest?.createEntryPoint
     {
       Self.applyWorkspaceCreateEntryPoint(createEntryPoint, to: initialViewModel)
+      let normalizedCreateSessionID = Self.normalizedCreateSessionAnchor(
+        initialWorkspaceRequest?.createSessionID
+      )
+      initialViewModel.pendingCreateSessionID = normalizedCreateSessionID
+      if let normalizedCreateSessionID {
+        initialViewModel.createSessionID = normalizedCreateSessionID
+      }
     }
+    Self.applyPreviewCreatePresetIfNeeded(to: initialViewModel)
     _stateViewModel = State(
       wrappedValue: initialViewModel
     )

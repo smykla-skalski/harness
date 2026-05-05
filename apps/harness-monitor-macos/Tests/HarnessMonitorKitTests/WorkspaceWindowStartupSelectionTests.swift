@@ -48,11 +48,41 @@ struct WorkspaceWindowStartupSelectionTests {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     let view = WorkspaceWindowView(store: store)
 
-    store.requestWorkspaceCreateEntryPoint(.agent)
+    store.requestWorkspaceCreateEntryPoint(.agent, sessionID: "sess-current")
     await view.resolveInitialWorkspaceSelection()
 
     #expect(view.viewModel.selection == .create)
     #expect(view.viewModel.createMode == .terminal)
+    #expect(view.viewModel.createSessionID == "sess-current")
+  }
+
+  @Test("Preview create preset seeds ACP leader state")
+  func previewCreatePresetSeedsAcpLeaderState() {
+    let preset = WorkspaceWindowView.previewCreatePreset(
+      environment: [WorkspacePreviewCreatePreset.environmentKey: "acp-leader-copilot"]
+    )
+    let viewModel = WorkspaceWindowView.ViewModel(selection: .create)
+
+    #expect(preset == .acpLeaderCopilot)
+    if let preset {
+      WorkspaceWindowView.applyPreviewCreatePreset(preset, to: viewModel)
+    }
+
+    #expect(viewModel.createMode == .terminal)
+    #expect(viewModel.selectedLaunchSelection == .acp("copilot"))
+    #expect(viewModel.runtime == .copilot)
+    #expect(viewModel.selectedRole == .leader)
+    #expect(viewModel.selectedAcpFallbackRole == .observer)
+  }
+
+  @Test("Preview create preset blocks saved launch preset restore")
+  func previewCreatePresetBlocksSavedLaunchPresetRestore() {
+    #expect(
+      !WorkspaceWindowView.shouldRestoreSavedLaunchPreset(
+        environment: [WorkspacePreviewCreatePreset.environmentKey: "acp-leader-copilot"]
+      )
+    )
+    #expect(WorkspaceWindowView.shouldRestoreSavedLaunchPreset(environment: [:]))
   }
 
   @Test("Stale supervisor-selected decisions do not hijack manual workspace open")
@@ -61,6 +91,22 @@ struct WorkspaceWindowStartupSelectionTests {
     let decision = makeDecision(id: "decision-startup-3", sessionID: "sess-startup-3")
     store.supervisorOpenDecisions = [decision]
     store.supervisorSelectedDecisionID = decision.id
+
+    let view = WorkspaceWindowView(store: store)
+    await view.resolveInitialWorkspaceSelection()
+
+    #expect(view.viewModel.selection == .create)
+  }
+
+  @Test("Stored workspace routes with unknown sessions are ignored once sessions are loaded")
+  func storedWorkspaceRouteWithUnknownSessionIsIgnored() async {
+    WorkspaceSelectionDefaults.write(
+      .agent(sessionID: "sess1234", agentID: "agent-stored")
+    )
+    defer { WorkspaceSelectionDefaults.clear() }
+
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.sessionIndex.sessions = [makeSummary(sessionID: "nod8ccog")]
 
     let view = WorkspaceWindowView(store: store)
     await view.resolveInitialWorkspaceSelection()
@@ -82,5 +128,36 @@ struct WorkspaceWindowStartupSelectionTests {
     )
     decision.createdAt = .distantPast
     return decision
+  }
+
+  private func makeSummary(sessionID: String) -> SessionSummary {
+    SessionSummary(
+      projectId: "project-\(sessionID)",
+      projectName: "harness",
+      projectDir: "/Users/example/Projects/harness",
+      contextRoot: "/Users/example/Library/Application Support/harness/sessions/harness",
+      sessionId: sessionID,
+      worktreePath: "/Users/example/Projects/harness-\(sessionID)",
+      sharedPath: "/Users/example/Projects/harness-\(sessionID)/shared",
+      originPath: "/Users/example/Projects/harness",
+      branchRef: "harness/\(sessionID)",
+      title: "Session \(sessionID)",
+      context: "Workspace startup routing fixture",
+      status: .active,
+      createdAt: "2026-03-28T14:05:00Z",
+      updatedAt: "2026-03-28T14:18:00Z",
+      lastActivityAt: "2026-03-28T14:18:00Z",
+      leaderId: "leader-\(sessionID)",
+      observeId: "observe-\(sessionID)",
+      pendingLeaderTransfer: nil,
+      metrics: SessionMetrics(
+        agentCount: 1,
+        activeAgentCount: 1,
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        completedTaskCount: 0
+      ),
+    )
   }
 }

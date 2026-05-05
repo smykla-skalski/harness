@@ -26,6 +26,9 @@ extension WorkspaceWindowView {
     guard let selection = WorkspaceSelectionDefaults.read() else {
       return nil
     }
+    guard restoredSessionContextIsUsable(selection, store: store) else {
+      return nil
+    }
 
     switch selection {
     case .create, .decisions, .decision, .agent, .task:
@@ -49,5 +52,18 @@ extension WorkspaceWindowView {
       }
       return .codex(sessionID: run.sessionId, runID: runID)
     }
+  }
+
+  private static func restoredSessionContextIsUsable(
+    _ selection: WorkspaceSelection,
+    store: HarnessMonitorStore
+  ) -> Bool {
+    guard !store.sessionIndex.sessions.isEmpty else {
+      return true
+    }
+    guard let sessionID = Self.normalizedCreateSessionAnchor(selection.sessionID) else {
+      return true
+    }
+    return store.sessionIndex.sessionSummary(for: sessionID) != nil
   }
 }
