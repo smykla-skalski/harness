@@ -225,7 +225,6 @@ struct HarnessMonitorApp: App {
     Window("Workspace", id: HarnessMonitorWindowID.workspace) {
       workspaceSceneContent
     }
-    .windowStyle(.titleBar)
     .windowToolbarStyle(.unified)
     .defaultSize(width: 1_140, height: 700)
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
