@@ -43,6 +43,7 @@ final class HarnessMonitorStoreDecisionActionHandlerTests: XCTestCase {
 
   func test_nudgeSuggestedActionResolvesOnlyAfterDaemonActionSuccess() async throws {
     let client = RecordingHarnessClient()
+    client.recordAgentTui(client.agentTuiFixture(tuiID: "agent-1"))
     client.agentTuiInputErrorsByID["agent-1"] = HarnessMonitorAPIError.server(
       code: 500,
       message: "rejected"
@@ -80,6 +81,111 @@ final class HarnessMonitorStoreDecisionActionHandlerTests: XCTestCase {
     let decision = try XCTUnwrap(fetchedDecision)
     XCTAssertEqual(decision.statusRaw, "open")
     XCTAssertTrue((store.currentFailureFeedbackMessage ?? "").contains("daemon"))
+    XCTAssertTrue(
+      client.recordedCalls().contains { call in
+        guard case .sendAgentTuiInput(let tuiID, _) = call else { return false }
+        return tuiID == "agent-1"
+      }
+    )
+  }
+
+  func test_nudgeSuggestedActionRoutesAcpAgentsThroughSignals() async throws {
+    let client = RecordingHarnessClient()
+    let sessionID = PreviewFixtures.summary.sessionId
+    client.configureResolvedAcpSnapshot(
+      makeAcpSnapshot(
+        acpID: "acp-1",
+        sessionID: sessionID,
+        agentID: "agent-acp",
+        displayName: "Gemini",
+        pendingBatches: []
+      ),
+      for: "agent-acp"
+    )
+    let store = await selectedActionStore(client: client)
+    await store.startSupervisor()
+    let decisionID = "decision-nudge-acp"
+    try await store.insertDecisionForTesting(
+      DecisionDraft.fixture(
+        id: decisionID,
+        severity: .needsUser,
+        ruleID: "stuck-agent",
+        sessionID: sessionID,
+        agentID: "agent-acp",
+        contextJSON: #"{"agentID":"agent-acp"}"#,
+        suggestedActionsJSON: encodedActions([
+          SuggestedAction(
+            id: "nudge",
+            title: "Nudge",
+            kind: .nudge,
+            payloadJSON: #"{"agentID":"agent-acp","input":"check in"}"#
+          )
+        ])
+      )
+    )
+
+    let handler = store.supervisorDecisionActionHandler()
+    await handler.resolve(
+      decisionID: decisionID,
+      outcome: DecisionOutcome(chosenActionID: "nudge", note: nil)
+    )
+
+    let decisionStore = try XCTUnwrap(store.supervisorDecisionStore)
+    let fetchedDecision = try await decisionStore.decision(id: decisionID)
+    let decision = try XCTUnwrap(fetchedDecision)
+    XCTAssertEqual(decision.statusRaw, "resolved")
+    XCTAssertTrue(
+      client.recordedCalls().contains(
+        .sendSignal(
+          sessionID: sessionID,
+          agentID: "agent-acp",
+          command: "request_action",
+          actor: "harness-supervisor"
+        )
+      )
+    )
+    XCTAssertFalse(
+      client.recordedCalls().contains { call in
+        guard case .sendAgentTuiInput(let tuiID, _) = call else { return false }
+        return tuiID == "agent-acp"
+      }
+    )
+  }
+
+  func test_storeSupervisorApiRoutesAcpNudgesThroughSignals() async throws {
+    let client = RecordingHarnessClient()
+    let sessionID = PreviewFixtures.summary.sessionId
+    client.configureResolvedAcpSnapshot(
+      makeAcpSnapshot(
+        acpID: "acp-1",
+        sessionID: sessionID,
+        agentID: "agent-acp",
+        displayName: "Gemini",
+        pendingBatches: []
+      ),
+      for: "agent-acp"
+    )
+    let store = await selectedActionStore(client: client)
+    let api = StoreAPIClient(store: store)
+
+    try await api.nudgeAgent(agentID: "agent-acp", input: "check in")
+
+    XCTAssertTrue(
+      client.recordedCalls().contains(
+        .sendSignal(
+          sessionID: sessionID,
+          agentID: "agent-acp",
+          command: "request_action",
+          actor: "harness-supervisor"
+        )
+      )
+    )
+    XCTAssertFalse(
+      client.recordedCalls().contains { call in
+        guard case .sendAgentTuiInput(let tuiID, _) = call else { return false }
+        return tuiID == "agent-acp"
+      }
+    )
   }
 
   private func encodedActions(_ actions: [SuggestedAction]) -> String {

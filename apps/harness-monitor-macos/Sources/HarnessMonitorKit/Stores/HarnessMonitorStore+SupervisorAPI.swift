@@ -16,8 +16,11 @@ struct StoreAPIClient: SupervisorAPIClient {
     guard let client = await MainActor.run(body: { store.client }) else {
       throw StoreDecisionActionError.daemonUnavailable
     }
-    let request = AgentTuiInputRequest(input: .text(input))
-    _ = try await client.sendManagedAgentInput(agentID: agentID, request: request)
+    try await SupervisorManagedAgentNudgeDispatcher.dispatch(
+      agentID: agentID,
+      input: input,
+      client: client
+    )
   }
 
   func assignTask(taskID: String, agentID: String) async throws {
