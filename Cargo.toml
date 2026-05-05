@@ -22,7 +22,7 @@ include = [
 ]
 
 [dependencies]
-bollard = "0.20.2"
+bollard = "0.21.0"
 bytes = "1.10.1"
 clap = { version = "4.6.0", features = ["derive", "env"] }
 compose_spec = "0.3.0"
