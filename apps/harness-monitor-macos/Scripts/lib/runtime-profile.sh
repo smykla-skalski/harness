@@ -549,6 +549,8 @@ harness_monitor_write_workspace_settings() {
 	<string>CustomLocation</string>
 	<key>DerivedDataCustomLocation</key>
 	<string>${derived_data_path}</string>
+	<key>IDESourceControlEnabled</key>
+	<false/>
 	<key>IDEWorkspaceSharedSettings_AutocreateContextsIfNeeded</key>
 	<false/>
 </dict>
