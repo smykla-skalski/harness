@@ -160,6 +160,60 @@ struct HarnessMonitorStoreConfirmationTests {
     #expect(store.currentSuccessFeedbackMessage == "End session")
   }
 
+  @Test("Awaiting-leader task deletion uses the control-plane actor")
+  func awaitingLeaderTaskDeletionUsesControlPlaneActor() async {
+    let client = actorlessActionClient()
+    let store = await actorlessActionStore(client: client)
+
+    let created = await store.createTask(
+      title: "Delete before any actor joins",
+      context: "Task deletion should not wait for an active session actor.",
+      severity: .medium
+    )
+
+    #expect(created)
+
+    store.requestDeleteTaskConfirmation(
+      sessionID: PreviewFixtures.emptyCockpitSummary.sessionId,
+      taskID: "task-created",
+      taskTitle: "Delete before any actor joins"
+    )
+
+    #expect(
+      store.pendingConfirmation
+        == .deleteTask(
+          sessionID: PreviewFixtures.emptyCockpitSummary.sessionId,
+          taskID: "task-created",
+          taskTitle: "Delete before any actor joins",
+          actorID: "harness-app",
+          noteCount: 0
+        )
+    )
+
+    await store.confirmPendingAction()
+
+    #expect(store.pendingConfirmation == nil)
+    #expect(store.selectedSession?.tasks.isEmpty == true)
+    #expect(store.currentSuccessFeedbackMessage == "Delete task")
+    #expect(
+      client.recordedCalls()
+        == [
+          .createTask(
+            sessionID: PreviewFixtures.emptyCockpitSummary.sessionId,
+            title: "Delete before any actor joins",
+            context: "Task deletion should not wait for an active session actor.",
+            severity: .medium,
+            actor: "harness-app"
+          ),
+          .deleteTask(
+            sessionID: PreviewFixtures.emptyCockpitSummary.sessionId,
+            taskID: "task-created",
+            actor: "harness-app"
+          ),
+        ]
+    )
+  }
+
   @Test("Default task actions keep the control-plane actor")
   func defaultTaskActionsKeepTheControlPlaneActor() async {
     let client = RecordingHarnessClient()

@@ -40,6 +40,26 @@ extension RecordingHarnessClient {
     return detail
   }
 
+  func deleteTask(
+    sessionID: String,
+    taskID: String,
+    request: TaskDeleteRequest
+  ) async throws -> SessionDetail {
+    try await sleepIfNeeded(configuredMutationDelay())
+    calls.append(.deleteTask(sessionID: sessionID, taskID: taskID, actor: request.actor))
+
+    let tasks = detail.tasks.filter { $0.taskId != taskID }
+    detail = SessionDetail(
+      session: detail.session.replacing(tasks: tasks, agents: detail.agents),
+      agents: detail.agents,
+      tasks: tasks,
+      signals: detail.signals,
+      observer: detail.observer,
+      agentActivity: detail.agentActivity
+    )
+    return detail
+  }
+
   func assignTask(
     sessionID: String,
     taskID: String,
