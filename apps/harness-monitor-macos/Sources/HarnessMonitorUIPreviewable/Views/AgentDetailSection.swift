@@ -92,8 +92,8 @@ struct AgentDetailSection: View {
     agent.capabilities.isEmpty ? ["No declared capabilities"] : agent.capabilities
   }
 
-  private var hookPointValues: [String] {
-    agent.runtimeCapabilities.hookPoints.map(humanizedHookLabel(for:))
+  private var hookPoints: [HookIntegrationDescriptor] {
+    agent.runtimeCapabilities.hookPoints
   }
 
   private var activityFacts: [AgentDetailFact] {
@@ -116,7 +116,8 @@ struct AgentDetailSection: View {
       .init(
         title: "Issues",
         value: "\(activity.toolErrorCount)",
-        tint: issueTint
+        tint: issueTint,
+        hidesWhenZero: true
       ),
       .init(title: "Latest Action", value: activity.latestToolName ?? "None"),
     ]
@@ -240,7 +241,7 @@ struct AgentDetailSection: View {
         timeline: agentTimelineEntries,
         runtimeProfileFacts: runtimeProfileFacts,
         capabilityValues: capabilityValues,
-        hookPointValues: hookPointValues,
+        hookPoints: hookPoints,
         activityFacts: activityFacts,
         recentToolValues: activity?.recentTools ?? [],
         persona: agent.persona,

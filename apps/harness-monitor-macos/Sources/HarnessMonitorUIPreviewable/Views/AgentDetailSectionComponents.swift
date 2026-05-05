@@ -5,13 +5,24 @@ struct AgentDetailFact: Identifiable {
   let title: String
   let value: String
   let tint: Color?
+  let hidesWhenZero: Bool
 
   var id: String { title }
 
-  init(title: String, value: String, tint: Color? = nil) {
+  init(
+    title: String,
+    value: String,
+    tint: Color? = nil,
+    hidesWhenZero: Bool = false
+  ) {
     self.title = title
     self.value = value
     self.tint = tint
+    self.hidesWhenZero = hidesWhenZero
+  }
+
+  var isHiddenZero: Bool {
+    hidesWhenZero && value.trimmingCharacters(in: .whitespacesAndNewlines) == "0"
   }
 }
 
@@ -24,13 +35,17 @@ struct AgentDetailFactSummaryGrid: View {
     self.maximumColumns = maximumColumns
   }
 
+  private var visibleFacts: [AgentDetailFact] {
+    facts.filter { !$0.isHiddenZero }
+  }
+
   var body: some View {
     HarnessMonitorAdaptiveGridLayout(
       minimumColumnWidth: 160,
       maximumColumns: maximumColumns,
       spacing: HarnessMonitorTheme.spacingSM
     ) {
-      ForEach(facts) { fact in
+      ForEach(visibleFacts) { fact in
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
           Text(fact.title)
             .scaledFont(.caption.bold())
@@ -91,27 +106,93 @@ struct AgentDetailMetadataList: View {
   let values: [String]
 
   var body: some View {
-    VStack(spacing: 0) {
-      ForEach(Array(values.enumerated()), id: \.offset) { index, value in
-        HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
-          Circle()
-            .fill(HarnessMonitorTheme.tertiaryInk)
-            .frame(width: 6, height: 6)
-            .padding(.top, 6)
-          Text(value)
-            .scaledFont(.subheadline)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-        .padding(.vertical, HarnessMonitorTheme.spacingSM)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        if index < values.count - 1 {
-          Divider()
-        }
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      ForEach(Array(values.enumerated()), id: \.offset) { _, value in
+        Text(value)
+          .scaledFont(.subheadline)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .fixedSize(horizontal: false, vertical: true)
+          .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+  }
+}
+
+struct AgentDetailHookPointsGrid: View {
+  let hookPoints: [HookIntegrationDescriptor]
+
+  private static let columnHeaderTrigger = "Trigger"
+  private static let columnHeaderLatency = "Latency"
+  private static let columnHeaderContext = "Context"
+
+  var body: some View {
+    if hookPoints.isEmpty {
+      EmptyView()
+    } else {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+        headerRow
+        ForEach(hookPoints) { hook in
+          row(for: hook)
+        }
+      }
+      .accessibilityElement(children: .contain)
+      .accessibilityLabel("Hook points")
+    }
+  }
+
+  private var headerRow: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      cell(Self.columnHeaderTrigger, weight: .semibold, isHeader: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      cell(Self.columnHeaderLatency, weight: .semibold, isHeader: true)
+        .frame(width: 64, alignment: .trailing)
+      cell(Self.columnHeaderContext, weight: .semibold, isHeader: true)
+        .frame(width: 80, alignment: .trailing)
+    }
+    .accessibilityHidden(true)
+  }
+
+  private func row(for hook: HookIntegrationDescriptor) -> some View {
+    let trigger = Self.humanizedTrigger(for: hook)
+    let latency = "\(hook.typicalLatencySeconds)s"
+    let context = hook.supportsContextInjection ? "On" : "Off"
+    return HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      cell(trigger, weight: .regular, isHeader: false)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      cell(latency, weight: .medium, isHeader: false)
+        .frame(width: 64, alignment: .trailing)
+      cell(context, weight: .medium, isHeader: false)
+        .frame(width: 80, alignment: .trailing)
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel(trigger)
+    .accessibilityValue("\(latency), context \(context)")
+  }
+
+  private func cell(_ text: String, weight: Font.Weight, isHeader: Bool) -> some View {
+    Text(text)
+      .scaledFont(.caption.weight(weight))
+      .foregroundStyle(
+        isHeader ? HarnessMonitorTheme.secondaryInk : HarnessMonitorTheme.ink
+      )
+      .lineLimit(1)
+      .truncationMode(.tail)
+  }
+
+  nonisolated static func humanizedTrigger(for hook: HookIntegrationDescriptor) -> String {
+    switch hook.name {
+    case "BeforeTool":
+      "Before each tool call"
+    case "AfterTool":
+      "After each tool call"
+    case "BeforePrompt":
+      "Before each prompt"
+    case "AfterPrompt":
+      "After each prompt"
+    default:
+      hook.name
+    }
   }
 }
 
