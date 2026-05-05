@@ -95,9 +95,9 @@ extension SessionTimelineTone {
     case .success:
       "Success"
     case .warning:
-      "Warn"
+      "Warning"
     case .critical:
-      "Danger"
+      "Critical"
     }
   }
 }
@@ -121,11 +121,11 @@ extension DecisionSeverity {
     case .info:
       "Info"
     case .warn:
-      "Warn"
+      "Warning"
     case .needsUser:
       "Needs User"
     case .critical:
-      "Danger"
+      "Critical"
     }
   }
 }

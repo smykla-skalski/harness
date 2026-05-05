@@ -149,6 +149,7 @@ struct SessionCockpitHeaderCard: View {
     }
     .harnessActionButtonStyle(variant: .bordered)
     .help(sendSignalHelp)
+    .accessibilityHint(sendSignalHelp)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sendSignalButton)
     .disabled(!areSessionActionsAvailable || signalTargetAgentID == nil)
   }
