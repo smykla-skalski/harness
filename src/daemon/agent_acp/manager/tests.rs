@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use harness_testkit::with_isolated_harness_env;
@@ -82,6 +83,20 @@ fn load_session_state(
         unreachable!();
     };
     state
+}
+
+fn archive_session_state(manager: &AcpAgentManagerHandle, session_id: &str) {
+    let mut state = load_session_state(manager, session_id);
+    state.archived_at = Some("2026-05-05T19:15:30Z".into());
+    let Some(db) = manager.state.db.get().map(Arc::clone) else {
+        unreachable!();
+    };
+    let Ok(db) = db.lock() else {
+        unreachable!();
+    };
+    let Ok(()) = db.sync_session("project-abc123", &state) else {
+        unreachable!();
+    };
 }
 
 fn runtime_session_id(
@@ -328,6 +343,47 @@ async fn abnormal_exit_populates_disconnect_reason_and_stderr_tail() {
             Err(_) => false,
         });
         assert!(saw_process_incident, "expected acp_process_incident event");
+    });
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[cfg(unix)]
+async fn stop_session_acp_agents_disconnects_archived_session_agents() {
+    temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
+        let Ok(temp) = TempDir::new() else {
+            unreachable!();
+        };
+        let script = temp.path().join("fake-agent.sh");
+        write_sleeping_acp_agent(&script);
+        let request = AcpAgentStartRequest {
+            agent: "fake".to_string(),
+            project_dir: Some(temp.path().display().to_string()),
+            ..AcpAgentStartRequest::default()
+        };
+        let manager = manager();
+        let descriptor = descriptor(&script);
+        let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+            unreachable!();
+        };
+        archive_session_state(&manager, "sess-1");
+
+        let Ok(stopped) = manager.stop_session_acp_agents("sess-1") else {
+            unreachable!();
+        };
+
+        assert_eq!(stopped.len(), 1);
+        assert_eq!(stopped[0].acp_id, snapshot.acp_id);
+        assert!(matches!(
+            stopped[0].status,
+            AgentStatus::Disconnected {
+                reason: DisconnectReason::SessionStopped,
+                ..
+            }
+        ));
+        let Ok(listed) = manager.list("sess-1") else {
+            unreachable!();
+        };
+        assert!(listed.is_empty());
     });
 }
 

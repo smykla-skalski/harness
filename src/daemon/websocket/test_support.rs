@@ -43,6 +43,16 @@ pub(super) fn seed_sample_session(state: &DaemonHttpState) {
     persist_sample_session(&db);
 }
 
+pub(super) fn archive_sample_session(state: &DaemonHttpState) {
+    let db = state.db.get().expect("db slot").clone();
+    let db = db.lock().expect("db lock");
+    persist_sample_session(&db);
+    let mut session = sample_session_state();
+    session.archived_at = Some("2026-05-05T19:15:30Z".into());
+    db.save_session_state("project-abc123", &session)
+        .expect("archive sample session");
+}
+
 pub(super) fn seed_sample_agent_tui(state: &DaemonHttpState, tui_id: &str, updated_at: &str) {
     let db = state.db.get().expect("db slot").clone();
     let db = db.lock().expect("db lock");

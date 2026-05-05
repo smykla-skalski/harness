@@ -79,6 +79,12 @@ pub(crate) async fn dispatch_managed_agent_start_acp(
             );
         }
     };
+    if let Err(error) = state
+        .acp_agent_manager
+        .ensure_session_accepts_acp_start(&session_id)
+    {
+        return error_response(&request.id, error.code(), &error.message());
+    }
     let result = with_managed_agent_lock(state, &session_id, &body.agent, || {
         state
             .acp_agent_manager

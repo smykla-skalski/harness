@@ -24,12 +24,18 @@ pub(super) async fn post_acp_agent_start(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = ensure_acp_enabled().and_then(|()| {
-        state
-            .acp_agent_manager
-            .start(&session_id, &request)
-            .map(ManagedAgentSnapshot::Acp)
-    });
+    let result = ensure_acp_enabled()
+        .and_then(|()| {
+            state
+                .acp_agent_manager
+                .ensure_session_accepts_acp_start(&session_id)
+        })
+        .and_then(|()| {
+            state
+                .acp_agent_manager
+                .start(&session_id, &request)
+                .map(ManagedAgentSnapshot::Acp)
+        });
     timed_json(
         "POST",
         http_paths::SESSION_MANAGED_AGENTS_ACP,

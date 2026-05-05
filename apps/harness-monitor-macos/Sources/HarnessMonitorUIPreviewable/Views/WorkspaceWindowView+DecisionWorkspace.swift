@@ -111,7 +111,7 @@ extension WorkspaceWindowView {
     previousSelection: WorkspaceSelection
   ) async {
     let requestedSessionID = knownCreateSessionAnchor(viewModel.pendingCreateSessionID)
-    let selectedSessionID = knownCreateSessionAnchor(store.selectedSessionID)
+    let selectedSessionID = Self.normalizedCreateSessionAnchor(store.selectedSessionID)
     let previousSessionID = knownCreateSessionAnchor(previousSelection.sessionID)
     let existingSessionID = knownCreateSessionAnchor(viewModel.createSessionID)
     let resolvedSessionID =

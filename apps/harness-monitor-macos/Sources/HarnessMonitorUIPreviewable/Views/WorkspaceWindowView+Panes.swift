@@ -83,7 +83,7 @@ extension WorkspaceWindowView {
           let acpAgentIDs = store.selectedAcpAgents
             .map { "agentId=\($0.agentId)/acpId=\($0.acpId)" }
             .joined(separator: ",")
-          HarnessMonitorLogger.store.warning(
+          HarnessMonitorLogger.store.debug(
             """
             agent detail pane miss \
             requestedAgentID=\(agentID, privacy: .public) \

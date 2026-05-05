@@ -63,7 +63,8 @@ async fn sync_session_title_reports_poisoned_db_lock_as_ws_error() {
 
 #[tokio::test]
 async fn parity_concurrent_mutation_serializes_acp_start_by_session_and_agent() {
-    let state = super::super::test_support::test_ws_state();
+    let state = super::super::test_support::test_http_state_with_db();
+    super::super::test_support::seed_sample_session(&state);
     let mutation_guard = state
         .managed_agent_mutation_locks
         .lock("sess-test-1", "acp-worker")
@@ -97,6 +98,61 @@ async fn parity_concurrent_mutation_serializes_acp_start_by_session_and_agent() 
         response.result.is_some() || response.error.is_some(),
         "ACP start should complete with a websocket response once unblocked",
     );
+}
+
+#[tokio::test]
+async fn dispatch_managed_agent_start_acp_rejects_missing_session_before_spawn() {
+    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
+        let state = super::super::test_support::test_http_state_with_db();
+        let request = WsRequest {
+            id: "req-start-stale-acp".into(),
+            method: "managed_agent.start_acp".into(),
+            params: json!({
+                "session_id": "nod8ccog",
+                "agent": "copilot",
+            }),
+            trace_context: None,
+        };
+
+        let response = dispatch_managed_agent_start_acp(&request, &state).await;
+
+        let error = response.error.expect("missing-session error");
+        assert_eq!(error.code, "KSRCLI090");
+        assert!(
+            error.message.contains("session 'nod8ccog' not found"),
+            "unexpected error message: {}",
+            error.message
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn dispatch_managed_agent_start_acp_rejects_archived_session_before_spawn() {
+    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
+        let state = super::super::test_support::test_http_state_with_db();
+        super::super::test_support::archive_sample_session(&state);
+        let request = WsRequest {
+            id: "req-start-archived-acp".into(),
+            method: "managed_agent.start_acp".into(),
+            params: json!({
+                "session_id": "sess-test-1",
+                "agent": "copilot",
+            }),
+            trace_context: None,
+        };
+
+        let response = dispatch_managed_agent_start_acp(&request, &state).await;
+
+        let error = response.error.expect("archived-session error");
+        assert_eq!(error.code, "KSRCLI090");
+        assert!(
+            error.message.contains("session 'sess-test-1' not found"),
+            "unexpected error message: {}",
+            error.message
+        );
+    })
+    .await;
 }
 
 #[tokio::test]

@@ -27,6 +27,32 @@ pub struct AcpWakePrompt {
 }
 
 impl AcpAgentManagerHandle {
+    pub(crate) fn ensure_session_accepts_acp_start(
+        &self,
+        session_id: &str,
+    ) -> Result<(), CliError> {
+        let db = self.db()?;
+        let db = Self::daemon_db_guard(&db)?;
+        if db.load_session_state_for_mutation(session_id)?.is_some()
+            && db.session_accepts_managed_agent_start(session_id)?
+        {
+            return Ok(());
+        }
+        Err(service::session_not_found(session_id))
+    }
+
+    pub(crate) fn stop_session_acp_agents(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<AcpAgentSnapshot>, CliError> {
+        let sessions = self.list(session_id)?;
+        let mut stopped = Vec::with_capacity(sessions.len());
+        for session in sessions {
+            stopped.push(self.stop(&session.acp_id)?);
+        }
+        Ok(stopped)
+    }
+
     /// Best-effort wake an ACP-managed agent by issuing an active
     /// `session/prompt` over the protocol channel.
     ///

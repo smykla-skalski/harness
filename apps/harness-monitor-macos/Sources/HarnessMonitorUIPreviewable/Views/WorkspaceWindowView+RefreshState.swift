@@ -6,6 +6,7 @@ extension WorkspaceWindowView {
     let selectedAgentTuiID: String?
     let codexRuns: [CodexRunRefreshSignature]
     let selectedCodexRunID: String?
+    let selectedSessionID: String?
     let session: SessionRefreshSignature?
   }
 
@@ -95,6 +96,7 @@ extension WorkspaceWindowView {
       selectedAgentTuiID: store.selectedAgentTui?.tuiId,
       codexRuns: store.selectedCodexRuns.map(CodexRunRefreshSignature.init),
       selectedCodexRunID: store.selectedCodexRun?.runId,
+      selectedSessionID: store.selectedSessionID,
       session: store.selectedSession.map(SessionRefreshSignature.init)
     )
   }

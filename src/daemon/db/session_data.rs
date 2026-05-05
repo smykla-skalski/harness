@@ -218,6 +218,25 @@ impl DaemonDb {
         Ok(())
     }
 
+    /// Return whether a session can accept new managed agents.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub fn session_accepts_managed_agent_start(&self, session_id: &str) -> Result<bool, CliError> {
+        let result = self.conn.query_row(
+            "SELECT is_active, archived_at FROM sessions WHERE session_id = ?1",
+            [session_id],
+            |row| Ok((row.get::<_, i32>(0)?, row.get::<_, Option<String>>(1)?)),
+        );
+        match result {
+            Ok((is_active, archived_at)) => Ok(is_active != 0 && archived_at.is_none()),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
+            Err(error) => Err(db_error(format!(
+                "session_accepts_managed_agent_start: {error}"
+            ))),
+        }
+    }
+
     /// Return the `state_version` for a session, or `None` if the session
     /// does not exist in the database.
     ///
