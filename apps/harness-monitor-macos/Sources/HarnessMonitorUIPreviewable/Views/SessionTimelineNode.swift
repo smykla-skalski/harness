@@ -24,10 +24,6 @@ enum SessionTimelineTone: String, CaseIterable, Equatable, Sendable {
     if let status = entry.toolCallTimelineEntryMetadata()?.status {
       return tone(for: status)
     }
-    // signal_* rows carry status in their summary text, not in the kind string.
-    if entry.kind.hasPrefix("signal_") {
-      return tone(for: entry.summary)
-    }
     return tone(for: entry.kind)
   }
 
@@ -110,8 +106,8 @@ struct SessionTimelineNode: Identifiable, Equatable, Sendable {
   let semanticProperties: Set<SessionTimelineSemanticProperty>
   let rawPayloadKeys: Set<String>
   let toolCallMetadata: ToolCallTimelineEntryMetadata?
-  let signalID: String?
   var tapTarget: TimelineTapTarget? = nil
+  var statusBadgeLabel: String? = nil
   var voiceOverLabelOverride: String? = nil
   var contextMenuItems: [TimelineContextMenuItem] = []
   var prefersCompactLayout: Bool? = nil
@@ -132,8 +128,7 @@ struct SessionTimelineNode: Identifiable, Equatable, Sendable {
     decision: SessionTimelineDecisionSnapshot?,
     semanticProperties: Set<SessionTimelineSemanticProperty> = [],
     rawPayloadKeys: Set<String> = [],
-    toolCallMetadata: ToolCallTimelineEntryMetadata? = nil,
-    signalID: String? = nil
+    toolCallMetadata: ToolCallTimelineEntryMetadata? = nil
   ) {
     self.identity = identity
     self.kind = kind
@@ -150,7 +145,6 @@ struct SessionTimelineNode: Identifiable, Equatable, Sendable {
     self.semanticProperties = semanticProperties
     self.rawPayloadKeys = rawPayloadKeys
     self.toolCallMetadata = toolCallMetadata
-    self.signalID = signalID
     self.actions = decision?.actions ?? []
   }
 

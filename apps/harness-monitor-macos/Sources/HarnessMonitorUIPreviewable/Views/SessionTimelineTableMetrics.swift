@@ -14,7 +14,7 @@ enum SessionTimelineTableMetrics {
   private static let wrappedActionHeight: CGFloat = 78
 
   static func prefersCompactLayout(for row: SessionTimelineRow) -> Bool {
-    row.node.prefersCompactLayout ?? row.node.sourceLabel.hasPrefix("signal_")
+    row.node.prefersCompactLayout ?? false
   }
 
   static func resolvedColumnWidth(

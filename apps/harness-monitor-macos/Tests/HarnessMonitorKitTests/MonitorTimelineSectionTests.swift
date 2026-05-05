@@ -361,6 +361,7 @@ struct MonitorTimelineSectionTests {
       timeline: timeline,
       timelineWindow: nil,
       decisions: [],
+      signals: [],
       filters: .init(),
       isTimelineLoading: isTimelineLoading,
       reduceMotion: false,

@@ -5,7 +5,19 @@ struct SessionTimelineNodeBuilder {
   let sessionID: String
   let entries: [TimelineEntry]
   let decisions: [Decision]
-  let context: TimelineFeatureContext = .empty
+  let context: TimelineFeatureContext
+
+  init(
+    sessionID: String,
+    entries: [TimelineEntry],
+    decisions: [Decision],
+    context: TimelineFeatureContext = .empty
+  ) {
+    self.sessionID = sessionID
+    self.entries = entries
+    self.decisions = decisions
+    self.context = context
+  }
 
   /// Authoritative decision links are only `decisionID`, `decisionId`, or `decision_id`
   /// at the event payload top level or directly under `supervisor`. Nodes sort newest first,
@@ -50,9 +62,7 @@ struct SessionTimelineNodeBuilder {
         taskID: taskID
       ),
       rawPayloadKeys: Self.payloadPropertyKeys(in: entry.payload),
-      toolCallMetadata: toolCallMetadata,
-      signalID: entry.kind.hasPrefix("signal_")
-        ? Self.extractSignalID(from: entry.payload) : nil
+      toolCallMetadata: toolCallMetadata
     )
     if let feature = SessionTimelineEventFeatureRegistry.firstMatch(for: entry) {
       let patch = feature.patch(for: entry)
@@ -62,6 +72,7 @@ struct SessionTimelineNodeBuilder {
       node.contextMenuItems = feature.contextMenuItems(for: node, ctx: context)
       node.actions = feature.actions(for: node, ctx: context)
       node.prefersCompactLayout = feature.prefersCompactLayout(for: node)
+      node.statusBadgeLabel = feature.statusBadgeLabel(for: node, ctx: context)
     }
     return node
   }
