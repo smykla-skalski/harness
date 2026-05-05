@@ -30,24 +30,23 @@ pub(super) async fn get_acp_transcript(
         return *response;
     }
 
-    let result: Result<AcpTranscriptResponse, CliError> = match ensure_acp_enabled().and_then(|()| {
-        resolve_acp_inspect_session_scope(
-            query.session_id.as_deref(),
-            query.require_session_id.as_deref(),
-        )
-        .and_then(|effective| {
-            effective
-                .map(ToString::to_string)
-                .ok_or_else(|| {
+    let result: Result<AcpTranscriptResponse, CliError> =
+        match ensure_acp_enabled().and_then(|()| {
+            resolve_acp_inspect_session_scope(
+                query.session_id.as_deref(),
+                query.require_session_id.as_deref(),
+            )
+            .and_then(|effective| {
+                effective.map(ToString::to_string).ok_or_else(|| {
                     CliError::new(CliErrorKind::usage_error(
                         "session_id or require_session_id is required for ACP transcript reads",
                     ))
                 })
-        })
-    }) {
-        Ok(session_id) => super::acp_transcript_response(&state, &session_id).await,
-        Err(error) => Err(error),
-    };
+            })
+        }) {
+            Ok(session_id) => super::acp_transcript_response(&state, &session_id).await,
+            Err(error) => Err(error),
+        };
 
     timed_json(
         "GET",

@@ -21,8 +21,8 @@ use crate::session::types::{
     AgentRegistration, AgentStatus, SessionMetrics, SessionRole, SessionState, SessionStatus,
 };
 
-use super::DaemonHttpState;
 use super::super::response::map_json;
+use super::DaemonHttpState;
 
 pub(in crate::daemon::http) async fn response_body(
     result: Result<Value, crate::errors::CliError>,

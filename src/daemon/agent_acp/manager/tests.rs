@@ -450,7 +450,10 @@ async fn wake_prompt_acknowledges_signal_in_original_signal_session_dir() {
         let Ok(pending) = read_pending_signals(&signal_dir) else {
             unreachable!();
         };
-        assert!(pending.is_empty(), "pending signal should have been acknowledged");
+        assert!(
+            pending.is_empty(),
+            "pending signal should have been acknowledged"
+        );
         assert!(manager.stop(&snapshot.acp_id).is_ok());
     });
 }
@@ -515,7 +518,9 @@ async fn wake_prompt_skips_ack_when_runtime_rebind_fails() {
             unreachable!();
         };
         assert!(
-            pending.iter().any(|pending| pending.signal_id == signal.signal_id),
+            pending
+                .iter()
+                .any(|pending| pending.signal_id == signal.signal_id),
             "pending signal should remain file-backed when runtime rebind fails"
         );
         assert_eq!(

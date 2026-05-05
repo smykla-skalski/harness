@@ -1,9 +1,9 @@
-use axum::extract::{Query, State};
-use axum::http::{HeaderMap, StatusCode};
-use serde_json::Value;
 use crate::daemon::protocol::{ObserveSessionRequest, SessionEndRequest};
 use crate::errors::CliErrorKind;
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
+use axum::extract::{Query, State};
+use axum::http::{HeaderMap, StatusCode};
+use serde_json::Value;
 
 use super::DaemonHttpState;
 use super::agents::{post_remove_agent, post_role_change, post_transfer_leader};
