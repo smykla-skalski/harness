@@ -27,13 +27,15 @@ struct AgentDetailRoleActionsSection: View {
         title: "Role actions unavailable",
         systemImage: "lock.slash",
         description: disabledReason,
+        nextStep: "Switch to a session that supports leadership changes.",
         tint: HarnessMonitorTheme.caution
       )
     } else if isLeader {
       AgentDetailEmptyState(
         title: "Leader role is fixed",
         systemImage: "crown",
-        description: disabledReason,
+        description: "The leader role cannot be changed while this agent leads the session.",
+        nextStep: "Transfer leadership to another agent before removing this one.",
         tint: HarnessMonitorTheme.warmAccent
       )
     } else {
@@ -122,6 +124,7 @@ struct AgentDetailSendUpdateSection: View {
         title: "Updates unavailable",
         systemImage: "lock.fill",
         description: "This session is read-only, so messages cannot be sent to the agent.",
+        nextStep: "Open a writable session to nudge this agent.",
         tint: HarnessMonitorTheme.secondaryInk
       )
     } else {
