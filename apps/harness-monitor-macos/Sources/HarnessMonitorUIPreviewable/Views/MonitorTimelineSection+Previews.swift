@@ -16,7 +16,9 @@ extension MonitorTimelineSection {
     .harnessPreviewSceneAppearance()
   }
 
-  static var signalSquishPreview: some View {
+  static func signalSquishPreview(
+    textSizeIndex: Int = HarnessMonitorTextSize.defaultIndex
+  ) -> some View {
     MonitorTimelineSection(
       host: .session(PreviewFixtures.summary.sessionId),
       timeline: PreviewFixtures.signalSquishTimeline,
@@ -27,12 +29,12 @@ extension MonitorTimelineSection {
     )
     .padding()
     .frame(width: 960)
-    .harnessPreviewSceneAppearance()
+    .harnessPreviewSceneAppearance(textSizeIndex: textSizeIndex)
   }
 }
 
 #Preview("Timeline Signal Squish") {
-  MonitorTimelineSection.signalSquishPreview
+  MonitorTimelineSection.signalSquishPreview()
 }
 
 #Preview("Timeline Cursor") {
@@ -64,4 +66,8 @@ extension MonitorTimelineSection {
   .padding()
   .frame(width: 960)
   .harnessPreviewSceneAppearance()
+}
+
+#Preview("Timeline Signal Squish Largest") {
+  MonitorTimelineSection.signalSquishPreview(textSizeIndex: 6)
 }

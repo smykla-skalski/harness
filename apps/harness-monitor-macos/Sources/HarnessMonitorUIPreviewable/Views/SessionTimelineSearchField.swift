@@ -61,12 +61,12 @@ private struct SessionTimelineSearchFieldChromeModifier: ViewModifier {
   private var controlHeight: CGFloat {
     if usesExpandedZoomMetrics {
       switch controlSize {
-      case .mini, .small, .regular, .large:
-        25
-      case .extraLarge:
-        29
+      case .mini, .small, .regular:
+        24
+      case .large, .extraLarge:
+        28
       @unknown default:
-        25
+        24
       }
     } else {
       switch controlSize {
@@ -103,16 +103,7 @@ private struct SessionTimelineSearchFieldChromeModifier: ViewModifier {
     if usesCapsuleCorners {
       controlHeight / 2
     } else {
-      switch controlSize {
-      case .mini:
-        7
-      case .small, .large, .extraLarge:
-        9
-      case .regular:
-        10
-      @unknown default:
-        10
-      }
+      controlHeight * 0.22
     }
   }
 

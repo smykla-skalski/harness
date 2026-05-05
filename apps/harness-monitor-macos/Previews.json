@@ -81,6 +81,12 @@
       "index": 1
     },
     {
+      "id": "SessionCockpitTimelineSignalSquishLargest",
+      "description": "Session timeline signal squish surface at largest text size",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/MonitorTimelineSection+Previews.swift",
+      "index": 2
+    },
+    {
       "id": "SessionCockpitActivitySections",
       "description": "Session activity + signals panels",
       "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionCockpitActivitySections.swift",
