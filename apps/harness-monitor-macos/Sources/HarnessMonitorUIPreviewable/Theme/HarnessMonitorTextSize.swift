@@ -214,37 +214,116 @@ extension View {
 
 private enum HarnessMonitorPreviewSceneOverrides {
   static let themeModeKey = "HARNESS_MONITOR_THEME_MODE_OVERRIDE"
+  static let overrideFileName = "HarnessMonitorPreviewOverrides.json"
+  static let overrideMaximumAge: TimeInterval = 15 * 60
+  static let overridePollIntervalNanoseconds: UInt64 = 100_000_000
+
+  static var overrideFileURL: URL {
+    URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("tmp")
+      .appendingPathComponent("previews")
+      .appendingPathComponent(overrideFileName)
+  }
+
+  static var fallbackOverrideFileURL: URL {
+    URL(fileURLWithPath: "/tmp")
+      .appendingPathComponent(overrideFileName)
+  }
+
+  static var overrideFileURLs: [URL] {
+    [overrideFileURL, fallbackOverrideFileURL]
+  }
+}
+
+private struct HarnessMonitorPreviewOverrideFile: Decodable, Equatable {
+  let themeMode: String?
+  let textSizeIndex: Int?
+  let timeZoneMode: String?
+  let customTimeZone: String?
+  let generatedAt: TimeInterval?
+
+  enum CodingKeys: String, CodingKey {
+    case themeMode = "theme_mode"
+    case textSizeIndex = "text_size_index"
+    case timeZoneMode = "time_zone_mode"
+    case customTimeZone = "custom_time_zone"
+    case generatedAt = "generated_at"
+  }
+
+  static func load() -> Self? {
+    for url in HarnessMonitorPreviewSceneOverrides.overrideFileURLs {
+      guard let data = try? Data(contentsOf: url),
+        let override = try? JSONDecoder().decode(Self.self, from: data),
+        !override.isExpired
+      else {
+        continue
+      }
+      return override
+    }
+    return nil
+  }
+
+  private var isExpired: Bool {
+    guard let generatedAt else {
+      return false
+    }
+    return Date().timeIntervalSince1970 - generatedAt
+      > HarnessMonitorPreviewSceneOverrides.overrideMaximumAge
+  }
 }
 
 private struct HarnessMonitorPreviewSceneAppearanceModifier: ViewModifier {
   let defaultThemeMode: HarnessMonitorThemeMode
   let defaultTextSizeIndex: Int
   let defaultDateTimeConfiguration: HarnessMonitorDateTimeConfiguration
+  @State private var fileOverride = HarnessMonitorPreviewOverrideFile.load()
 
   private var environment: [String: String] {
     ProcessInfo.processInfo.environment
   }
 
+  private var overrideThemeModeRawValue: String? {
+    environment[HarnessMonitorPreviewSceneOverrides.themeModeKey]
+      ?? fileOverride?.themeMode
+  }
+
+  private var overrideTextSizeIndexRawValue: String? {
+    environment[HarnessMonitorTextSize.uiTestOverrideKey]
+      ?? fileOverride?.textSizeIndex.map(String.init)
+  }
+
+  private var overrideTimeZoneModeRawValue: String? {
+    environment[HarnessMonitorDateTimeConfiguration.uiTestTimeZoneModeOverrideKey]
+      ?? fileOverride?.timeZoneMode
+  }
+
+  private var overrideCustomTimeZoneIdentifier: String? {
+    environment[HarnessMonitorDateTimeConfiguration.uiTestCustomTimeZoneOverrideKey]
+      ?? fileOverride?.customTimeZone
+  }
+
   private var resolvedThemeMode: HarnessMonitorThemeMode {
     HarnessMonitorThemeMode(
-      rawValue: environment[HarnessMonitorPreviewSceneOverrides.themeModeKey] ?? ""
+      rawValue: overrideThemeModeRawValue ?? ""
     ) ?? defaultThemeMode
   }
 
   private var resolvedTextSizeIndex: Int {
     HarnessMonitorTextSize.uiTestOverrideIndex(
-      from: environment[HarnessMonitorTextSize.uiTestOverrideKey]
+      from: overrideTextSizeIndexRawValue
     ) ?? HarnessMonitorTextSize.normalizedIndex(defaultTextSizeIndex)
   }
 
   private var resolvedDateTimeConfiguration: HarnessMonitorDateTimeConfiguration {
     HarnessMonitorDateTimeConfiguration(
-      timeZoneModeRawValue: environment[
-        HarnessMonitorDateTimeConfiguration.uiTestTimeZoneModeOverrideKey
-      ] ?? defaultDateTimeConfiguration.timeZoneModeRawValue,
-      customTimeZoneIdentifier: environment[
-        HarnessMonitorDateTimeConfiguration.uiTestCustomTimeZoneOverrideKey
-      ] ?? defaultDateTimeConfiguration.customTimeZoneIdentifier
+      timeZoneModeRawValue: overrideTimeZoneModeRawValue
+        ?? defaultDateTimeConfiguration.timeZoneModeRawValue,
+      customTimeZoneIdentifier: overrideCustomTimeZoneIdentifier
+        ?? defaultDateTimeConfiguration.customTimeZoneIdentifier
     )
   }
 
@@ -263,5 +342,21 @@ private struct HarnessMonitorPreviewSceneAppearanceModifier: ViewModifier {
       .environment(\.harnessDateTimeConfiguration, resolvedDateTimeConfiguration)
       .preferredColorScheme(resolvedThemeMode.colorScheme)
       .tint(HarnessMonitorTheme.accent)
+      .task {
+        await refreshFileOverrideLoop()
+      }
+  }
+
+  @MainActor
+  private func refreshFileOverrideLoop() async {
+    while !Task.isCancelled {
+      let nextOverride = HarnessMonitorPreviewOverrideFile.load()
+      if fileOverride != nextOverride {
+        fileOverride = nextOverride
+      }
+      try? await Task.sleep(
+        nanoseconds: HarnessMonitorPreviewSceneOverrides.overridePollIntervalNanoseconds
+      )
+    }
   }
 }
