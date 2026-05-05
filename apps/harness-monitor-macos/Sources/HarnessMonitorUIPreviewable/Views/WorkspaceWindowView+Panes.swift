@@ -28,6 +28,9 @@ extension WorkspaceWindowView {
     } else if viewModel.selection.isDecisionRoute {
       paneContent(decisionScope: decisionScope)
         .overlay { workspaceStateMarkerOverlay() }
+    } else if case .agent = viewModel.selection {
+      paneContent(decisionScope: decisionScope)
+        .overlay { workspaceStateMarkerOverlay() }
     } else {
       ScrollView {
         paneContent(decisionScope: decisionScope)
