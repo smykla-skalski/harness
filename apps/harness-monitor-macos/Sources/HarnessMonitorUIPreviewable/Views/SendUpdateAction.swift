@@ -22,5 +22,5 @@ enum SendUpdateAction: Hashable {
     }
   }
 
-  static let allLabeledCases: [SendUpdateAction] = [.injectContext, .custom]
+  static let allLabeledCases: [Self] = [.injectContext, .custom]
 }

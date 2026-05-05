@@ -266,7 +266,11 @@ extension WebSocketTransport {
       sample: sample
     )
     do {
-      guard let url = URL(string: DaemonTelemetrySupport.path, relativeTo: connection.endpoint) else {
+      let url = URL(
+        string: DaemonTelemetrySupport.path,
+        relativeTo: connection.endpoint
+      )
+      guard let url else {
         throw HarnessMonitorAPIError.invalidEndpoint(connection.endpoint.absoluteString)
       }
       var request = URLRequest(url: url)

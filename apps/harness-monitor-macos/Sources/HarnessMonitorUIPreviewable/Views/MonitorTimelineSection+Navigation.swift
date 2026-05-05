@@ -1,0 +1,246 @@
+import HarnessMonitorKit
+import SwiftUI
+
+extension MonitorTimelineSection {
+  // navigationAnchorID is read only from non-body code paths (async Tasks
+  // and onChange/onAppear closures). Reading viewport.visibleAnchorID here
+  // therefore does NOT register a SwiftUI body dependency on the model and
+  // does not re-introduce the per-scroll re-eval loop.
+  var navigationAnchorID: String? {
+    timelineNavigationAnchorID
+  }
+
+  func requestLatestWindowIfNeeded(_ presentation: SessionTimelineSectionPresentation) {
+    guard !presentation.hasLatestWindow else { return }
+    requestLatestWindow()
+  }
+
+  func requestLatestWindow() {
+    Task { await loadWindow(.latest(limit: SessionTimelineWindowNavigation.defaultLimit)) }
+  }
+
+  func requestOlderWindowIfNeeded(_ presentation: SessionTimelineSectionPresentation) {
+    requestWindowIfNeeded(for: .older, presentation: presentation)
+  }
+
+  func requestNewerWindowIfNeeded(_ presentation: SessionTimelineSectionPresentation) {
+    requestWindowIfNeeded(for: .newer, presentation: presentation)
+  }
+
+  func requestWindowIfNeeded(
+    for action: SessionTimelineWindowAction,
+    presentation: SessionTimelineSectionPresentation
+  ) {
+    guard !isTimelineLoading, let request = presentation.navigation.request(for: action) else {
+      return
+    }
+    Task { await loadWindow(request) }
+  }
+
+  func performNavigationAction(
+    _ action: SessionTimelineWindowAction,
+    presentation: SessionTimelineSectionPresentation
+  ) {
+    Task {
+      switch action {
+      case .older:
+        if await loadWindowBeforeNavigationIfNeeded(.older, presentation: presentation) {
+          return
+        }
+        cancelPendingNavigation()
+        await scroll(to: nextTarget(for: .older, presentation: presentation))
+      case .latest:
+        if !presentation.hasLatestWindow || presentation.navigation.hasNewer {
+          let request = TimelineWindowRequest.latest(
+            limit: SessionTimelineWindowNavigation.defaultLimit
+          )
+          markPendingNavigation(.latest, request: request)
+          await loadWindow(request)
+          return
+        }
+        cancelPendingNavigation()
+        await scroll(to: nextTarget(for: .latest, presentation: presentation))
+      case .newer:
+        if await loadWindowBeforeNavigationIfNeeded(.newer, presentation: presentation) {
+          return
+        }
+        cancelPendingNavigation()
+        await scroll(to: nextTarget(for: .newer, presentation: presentation))
+      }
+    }
+  }
+
+  func loadWindowBeforeNavigationIfNeeded(
+    _ action: SessionTimelineWindowAction,
+    presentation: SessionTimelineSectionPresentation
+  ) async -> Bool {
+    let shouldLoad =
+      switch action {
+      case .older:
+        presentation.shouldLoadOlderBeforeStepping(from: navigationAnchorID)
+      case .latest:
+        false
+      case .newer:
+        presentation.nextNewerNodeID(from: navigationAnchorID) == nil
+          && presentation.navigation.hasNewer
+      }
+    guard shouldLoad, let request = presentation.navigation.request(for: action) else {
+      return false
+    }
+    markPendingNavigation(action, request: request)
+    await loadWindow(request)
+    return true
+  }
+
+  @MainActor
+  func markPendingNavigation(
+    _ action: SessionTimelineWindowAction,
+    request: TimelineWindowRequest
+  ) {
+    currentPendingNavigationGeneration += 1
+    currentPendingNavigation = SessionTimelinePendingNavigation(
+      action: action,
+      request: request,
+      sessionID: sessionID,
+      generation: currentPendingNavigationGeneration
+    )
+  }
+
+  @MainActor
+  func cancelPendingNavigation() {
+    currentPendingNavigation = nil
+  }
+
+  @MainActor
+  func completePendingNavigationIfNeeded(
+    _ presentation: SessionTimelineSectionPresentation
+  ) {
+    guard let pending = currentPendingNavigation,
+      pending.isSatisfied(sessionID: sessionID, navigation: presentation.navigation),
+      !presentation.scrollNodeIDs.isEmpty
+    else {
+      return
+    }
+    currentPendingNavigation = nil
+    issueScroll(to: nextTarget(for: pending.action, presentation: presentation))
+  }
+
+  func nextTarget(
+    for action: SessionTimelineWindowAction,
+    presentation: SessionTimelineSectionPresentation
+  ) -> String? {
+    switch action {
+    case .older:
+      presentation.nextOlderNodeID(from: navigationAnchorID) ?? presentation.scrollNodeIDs.last
+    case .latest:
+      presentation.scrollNodeIDs.first
+    case .newer:
+      presentation.nextNewerNodeID(from: navigationAnchorID) ?? presentation.scrollNodeIDs.first
+    }
+  }
+
+  func scroll(to targetID: String?) async {
+    guard let targetID else { return }
+    await MainActor.run { issueScroll(to: targetID) }
+  }
+
+  func reconcileTimelineAnchor(with ids: [String]) {
+    guard !ids.isEmpty else {
+      timelineViewport.setAnchorID(nil)
+      currentTimelineScrollCommand = nil
+      return
+    }
+    guard let anchorID = navigationAnchorID else {
+      timelineViewport.setAnchorID(ids.first)
+      issueScrollCommand(ids.first)
+      return
+    }
+    if !ids.contains(anchorID) {
+      timelineViewport.setAnchorID(ids.first)
+      issueScrollCommand(ids.first)
+    }
+  }
+
+  @MainActor
+  func issueScroll(to targetID: String?) {
+    timelineViewport.setAnchorID(targetID)
+    issueScrollCommand(targetID)
+  }
+
+  func issueScrollCommand(_ targetID: String?) {
+    guard let targetID else {
+      currentTimelineScrollCommand = nil
+      return
+    }
+    currentTimelineScrollCommandGeneration += 1
+    currentTimelineScrollCommand = SessionTimelineScrollCommand(
+      targetID: targetID,
+      generation: currentTimelineScrollCommandGeneration
+    )
+  }
+
+  func handleScrollBoundaryChange(
+    from oldValue: SessionTimelineScrollBoundaryState,
+    to newValue: SessionTimelineScrollBoundaryState,
+    presentation: SessionTimelineSectionPresentation
+  ) {
+    if newValue.enteredTopEdge(from: oldValue) {
+      requestNewerWindowIfNeeded(presentation)
+    }
+    if newValue.enteredBottomEdge(from: oldValue) {
+      requestOlderWindowIfNeeded(presentation)
+    }
+  }
+
+  @MainActor
+  func hydrateFilters(for input: SessionTimelineFilterHydrationInput) {
+    let nextFilters = SessionTimelineFilterPersistenceResolver.hydrate(
+      mode: currentFilterPersistenceMode,
+      input: input
+    )
+    if currentFilters != nextFilters {
+      currentFilters = nextFilters
+    }
+  }
+
+  @MainActor
+  func persistFilters(_ state: SessionTimelineFilterState) {
+    let persisted = SessionTimelineFilterPersistenceResolver.persist(
+      mode: currentFilterPersistenceMode,
+      state: state,
+      sessionID: sessionID,
+      appStateRawValue: currentAppStoredFilterStateRawValue,
+      sceneRegistryRawValue: currentSceneStoredFilterRegistryRawValue
+    )
+    if currentAppStoredFilterStateRawValue != persisted.appStateRawValue {
+      currentAppStoredFilterStateRawValue = persisted.appStateRawValue
+    }
+    if currentSceneStoredFilterRegistryRawValue != persisted.sceneRegistryRawValue {
+      currentSceneStoredFilterRegistryRawValue = persisted.sceneRegistryRawValue
+    }
+  }
+}
+
+#Preview("Timeline") {
+  MonitorTimelineSection.richPreview
+}
+
+struct SessionTimelineFilteredEmptyState: View {
+  @Binding var filters: SessionTimelineFilterState
+
+  var body: some View {
+    VStack(spacing: HarnessMonitorTheme.spacingSM) {
+      Image(systemName: "line.3.horizontal.decrease.circle")
+        .font(.title2)
+        .foregroundStyle(.secondary)
+      Text("No timeline items match these filters")
+        .scaledFont(.body.weight(.semibold))
+      Button("Clear filters") {
+        filters.clear()
+      }
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .padding(HarnessMonitorTheme.spacingLG)
+  }
+}

@@ -328,13 +328,14 @@ public struct PreferencesGeneralSection: View {
         }
         .harnessNativeFormControl()
         .accessibilityIdentifier(
-          HarnessMonitorAccessibility.preferencesTimelineFilterPersistencePicker
+          HarnessMonitorAccessibility.preferencesTimelinePersistencePicker
         )
       } header: {
         Text("Timeline")
       } footer: {
         Text(
-          "Controls whether Session cockpit timeline filters reset each time, restore per window and session, or reopen app-wide."
+          "Controls whether Session cockpit timeline filters reset each time, "
+            + "restore per window and session, or reopen app-wide."
         )
       }
 

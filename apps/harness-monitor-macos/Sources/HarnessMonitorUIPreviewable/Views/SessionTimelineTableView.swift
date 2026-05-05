@@ -115,9 +115,11 @@ struct SessionTimelineTableView: NSViewRepresentable {
       rows: rows,
       actionHandler: actionHandler,
       scrollCommand: scrollCommand,
-      scrollView: scrollView,
-      columnWidth: columnWidth,
-      fontScale: fontScale
+      request: .init(
+        scrollView: scrollView,
+        columnWidth: columnWidth,
+        fontScale: fontScale
+      )
     )
   }
 

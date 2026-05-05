@@ -184,7 +184,7 @@ extension WorkspaceWindowCreatePane {
     .padding(.horizontal, HarnessMonitorTheme.spacingLG)
     .padding(.vertical, HarnessMonitorTheme.spacingMD)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(.ultraThinMaterial)
+    .harnessPanelGlass()
     .overlay(alignment: .top) {
       Rectangle()
         .fill(HarnessMonitorTheme.controlBorder.opacity(0.4))
@@ -330,18 +330,29 @@ extension WorkspaceWindowCreatePane {
 
   func applySavedLaunchPresetIfFresh() {
     guard let snapshot = LaunchPresetDefaults.read() else { return }
+    restoreCreateMode(from: snapshot)
+    guard canRestoreSavedLaunchPreset else {
+      return
+    }
+    restoreTerminalLaunchPreset(from: snapshot)
+    restoreCodexLaunchPreset(from: snapshot)
+  }
+
+  private var canRestoreSavedLaunchPreset: Bool {
+    viewModel.prompt.isEmpty
+      && viewModel.codexPrompt.isEmpty
+      && viewModel.name.isEmpty
+      && viewModel.argvOverride.isEmpty
+      && viewModel.projectDir.isEmpty
+  }
+
+  private func restoreCreateMode(from snapshot: LaunchPresetSnapshot) {
     if let restoredMode = AgentTuiCreateMode(rawValue: snapshot.mode.rawValue) {
       viewModel.createMode = restoredMode
     }
-    guard
-      viewModel.prompt.isEmpty,
-      viewModel.codexPrompt.isEmpty,
-      viewModel.name.isEmpty,
-      viewModel.argvOverride.isEmpty,
-      viewModel.projectDir.isEmpty
-    else {
-      return
-    }
+  }
+
+  private func restoreTerminalLaunchPreset(from snapshot: LaunchPresetSnapshot) {
     if let providerKey = snapshot.providerStorageKey,
       let parsed = AgentLaunchSelection(storageKey: providerKey)
     {
@@ -357,35 +368,23 @@ extension WorkspaceWindowCreatePane {
     if let personaID = snapshot.personaID, !personaID.isEmpty {
       viewModel.selectedPersona = personaID
     }
-    var restoredModels: [AgentTuiRuntime: String] = [:]
-    for (rawKey, value) in snapshot.modelByRuntime {
-      if let runtime = AgentTuiRuntime(rawValue: rawKey) {
-        restoredModels[runtime] = value
-      }
-    }
-    if !restoredModels.isEmpty {
-      viewModel.selectedTerminalModelByRuntime = restoredModels
-    }
-    var restoredCustom: [AgentTuiRuntime: String] = [:]
-    for (rawKey, value) in snapshot.customModelByRuntime {
-      if let runtime = AgentTuiRuntime(rawValue: rawKey) {
-        restoredCustom[runtime] = value
-      }
-    }
-    if !restoredCustom.isEmpty {
-      viewModel.customTerminalModelByRuntime = restoredCustom
-    }
-    var restoredEffort: [AgentTuiRuntime: String] = [:]
-    for (rawKey, value) in snapshot.effortByRuntime {
-      if let runtime = AgentTuiRuntime(rawValue: rawKey) {
-        restoredEffort[runtime] = value
-      }
-    }
-    if !restoredEffort.isEmpty {
-      viewModel.selectedTerminalEffortByRuntime = restoredEffort
-    }
+    applyRestoredRuntimeSelection(
+      snapshot.modelByRuntime,
+      to: \.selectedTerminalModelByRuntime
+    )
+    applyRestoredRuntimeSelection(
+      snapshot.customModelByRuntime,
+      to: \.customTerminalModelByRuntime
+    )
+    applyRestoredRuntimeSelection(
+      snapshot.effortByRuntime,
+      to: \.selectedTerminalEffortByRuntime
+    )
     viewModel.rows = snapshot.rows
     viewModel.cols = snapshot.cols
+  }
+
+  private func restoreCodexLaunchPreset(from snapshot: LaunchPresetSnapshot) {
     if let codexMode = snapshot.codexMode.flatMap(CodexRunMode.init(rawValue:)) {
       viewModel.codexMode = codexMode
     }
@@ -394,29 +393,18 @@ extension WorkspaceWindowCreatePane {
     viewModel.selectedCodexEffort = snapshot.codexEffort
   }
 
-  @ViewBuilder
-  func createPaneColumns<Leading: View, Trailing: View>(
-    leadingMaxWidth: CGFloat? = nil,
-    hstackMinWidth: CGFloat = 720,
-    @ViewBuilder leading: () -> Leading,
-    @ViewBuilder trailing: () -> Trailing
-  ) -> some View {
-    let leadingView = leading()
-    let trailingView = trailing()
-    ViewThatFits(in: .horizontal) {
-      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingXL) {
-        leadingView
-          .frame(maxWidth: leadingMaxWidth, alignment: .leading)
-        trailingView
-          .frame(maxWidth: .infinity, alignment: .leading)
+  private func applyRestoredRuntimeSelection(
+    _ valuesByRuntime: [String: String],
+    to keyPath: ReferenceWritableKeyPath<ViewModel, [AgentTuiRuntime: String]>
+  ) {
+    let restoredValues = valuesByRuntime.reduce(into: [AgentTuiRuntime: String]()) { result, pair in
+      guard let runtime = AgentTuiRuntime(rawValue: pair.key) else {
+        return
       }
-      .frame(minWidth: hstackMinWidth)
-
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
-        leadingView
-          .frame(maxWidth: .infinity, alignment: .leading)
-        trailingView
-      }
+      result[runtime] = pair.value
+    }
+    if !restoredValues.isEmpty {
+      viewModel[keyPath: keyPath] = restoredValues
     }
   }
 

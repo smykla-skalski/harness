@@ -2,6 +2,7 @@ use axum::Router;
 use axum::routing::{delete, get, post};
 
 use crate::daemon::protocol::{AcpTranscriptResponse, http_paths};
+use crate::daemon::service::session_acp_transcript_async;
 use crate::errors::{CliError, CliErrorKind};
 use crate::feature_flags::acp_enabled_from_env;
 
@@ -124,7 +125,7 @@ pub(crate) async fn acp_transcript_response(
     session_id: &str,
 ) -> Result<AcpTranscriptResponse, CliError> {
     let async_db = require_async_db(state, "ACP transcript")?;
-    crate::daemon::service::session_acp_transcript_async(session_id, Some(async_db)).await
+    session_acp_transcript_async(session_id, Some(async_db)).await
 }
 
 #[cfg(test)]

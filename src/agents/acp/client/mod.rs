@@ -391,8 +391,8 @@ impl HarnessAcpClient {
 
     /// Emit a `PermissionAsked` synthetic event if a sink is attached.
     ///
-    /// Splits the ACP `tool_call_id` ("fs.write_text_file:/path/foo") into
-    /// `tool` ("fs.write_text_file") and `scope` ("/path/foo") so the timeline
+    /// Splits the ACP `tool_call_id` ("`fs.write_text_file:/path/foo`") into
+    /// `tool` ("`fs.write_text_file`") and `scope` ("`/path/foo`") so the timeline
     /// can render both the action class and the resource without re-parsing
     /// downstream. Falls back to the whole id as `tool` with empty scope when
     /// the id has no `:` separator.

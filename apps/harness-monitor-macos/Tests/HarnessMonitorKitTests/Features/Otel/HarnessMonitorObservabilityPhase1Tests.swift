@@ -3,7 +3,7 @@ import XCTest
 
 @testable import HarnessMonitorKit
 
-final class HarnessMonitorObservabilityPhase1Tests: XCTestCase {
+class HarnessMonitorObservabilityPhase1Tests: XCTestCase {
 
   private static var _server: GRPCCollectorServer!
   private static var _temporaryHome: URL!
@@ -13,8 +13,12 @@ final class HarnessMonitorObservabilityPhase1Tests: XCTestCase {
 
   override class func setUp() {
     super.setUp()
-    _server = try! GRPCCollectorServer()
-    (_temporaryHome, _environment) = try! makeTestEnvironment(collector: _server)
+    do {
+      _server = try GRPCCollectorServer()
+      (_temporaryHome, _environment) = try makeTestEnvironment(collector: _server)
+    } catch {
+      fatalError("Failed to initialize observability phase 1 fixtures: \(error)")
+    }
   }
 
   override class func tearDown() {

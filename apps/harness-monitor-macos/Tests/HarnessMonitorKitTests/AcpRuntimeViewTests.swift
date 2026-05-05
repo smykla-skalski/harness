@@ -136,8 +136,11 @@ struct AcpRuntimeViewTests {
       effect
         == .announce(
           message: "Worker watchdog fired",
-          announcement: AcpRuntimeWatchdogAnnouncement(state: "fired", announcedAt: now)
-      )
+          announcement: AcpRuntimeWatchdogAnnouncement(
+            state: "fired",
+            announcedAt: now
+          )
+        )
     )
   }
 

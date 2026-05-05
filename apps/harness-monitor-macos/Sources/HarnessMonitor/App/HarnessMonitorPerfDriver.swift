@@ -196,7 +196,7 @@ enum HarnessMonitorPerfDriver {
         ]
       )
       HarnessMonitorLogger.store.error(
-        "Permission-modal perf scenario failed to route ACP decision \(decisionID, privacy: .public) into Workspace"
+        "ACP decision \(decisionID, privacy: .public) failed to route into Workspace"
       )
       await settle(.milliseconds(1_000))
       return .failed("route-timeout")
@@ -220,16 +220,21 @@ enum HarnessMonitorPerfDriver {
   ) async -> Bool {
     let clock = ContinuousClock()
     let deadline = clock.now.advanced(by: routeTimeout)
-    while
-      store.supervisorSelectedDecisionID != decisionID
-        || store.supervisorOpenDecisions.contains(where: { $0.id == decisionID }) == false
-    {
+    while shouldWaitForRoutedWorkspaceDecision(decisionID: decisionID, store: store) {
       guard clock.now < deadline else {
         return false
       }
       try? await Task.sleep(for: shortDelay)
     }
     return true
+  }
+
+  private static func shouldWaitForRoutedWorkspaceDecision(
+    decisionID: String,
+    store: HarnessMonitorStore
+  ) -> Bool {
+    let hasOpenDecision = store.supervisorOpenDecisions.contains { $0.id == decisionID }
+    return store.supervisorSelectedDecisionID != decisionID || !hasOpenDecision
   }
 
   private static func openAppearanceSettings(openWindow: OpenWindowAction) async {

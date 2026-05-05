@@ -18,8 +18,8 @@ public struct MonitorTimelineHost: Hashable, Sendable {
     self.id = id
   }
 
-  public static func session(_ sessionID: String) -> MonitorTimelineHost {
-    MonitorTimelineHost(kind: .session, id: sessionID)
+  public static func session(_ sessionID: String) -> Self {
+    Self(kind: .session, id: sessionID)
   }
 
   public var storageKey: String {

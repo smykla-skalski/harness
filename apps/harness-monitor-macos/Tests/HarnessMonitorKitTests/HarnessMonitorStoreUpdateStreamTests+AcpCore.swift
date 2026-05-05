@@ -410,4 +410,3 @@ func jsonNumber(from value: JSONValue?) -> UInt64? {
   }
   return UInt64(number)
 }
-

@@ -21,21 +21,22 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::thread;
 use std::time::Duration;
 
 use tokio::time::Instant;
 
-use nix::sys::signal::{Signal, killpg};
-use nix::unistd::Pid;
 use tokio::sync::Notify;
 use tokio::time::sleep;
-use tracing::{debug, info, warn};
+use tracing::warn;
 
 use crate::agents::kind::DisconnectReason;
 use crate::workspace::utc_now;
 
-use super::client::DAEMON_SHUTDOWN;
+mod guards;
+mod shutdown;
+
+pub use guards::{ClientCallGuard, PendingRequestGuard};
+pub use shutdown::{DaemonShutdownError, kill_process_group};
 
 /// Default timeout for the `session/initialize` call.
 pub const DEFAULT_INITIALIZE_TIMEOUT: Duration = Duration::from_secs(30);
@@ -204,15 +205,23 @@ impl AcpSessionSupervisor {
     /// re-attach, replace `OnceLock` with `ArcSwap` rather than relaxing
     /// this invariant silently.
     pub fn attach_event_emitter(&self, emitter: Arc<dyn WatchdogEventEmitter>) {
-        if let Err(_existing) = self.event_emitter.set(emitter) {
-            debug_assert!(
-                false,
-                "attach_event_emitter called twice on the same supervisor; this is a programming error",
-            );
-            warn!(
-                "attach_event_emitter called twice; second emitter ignored, supervisor keeps emitting to first sink",
-            );
+        if self.event_emitter.set(emitter).is_err() {
+            Self::warn_duplicate_event_emitter_attach();
         }
+    }
+
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+    )]
+    fn warn_duplicate_event_emitter_attach() {
+        debug_assert!(
+            false,
+            "attach_event_emitter called twice on the same supervisor; this is a programming error",
+        );
+        warn!(
+            "attach_event_emitter called twice; second emitter ignored, supervisor keeps emitting to first sink",
+        );
     }
 
     fn emit_transition(&self, from: WatchdogState, to: WatchdogState, reason: Option<&str>) {
@@ -289,17 +298,18 @@ impl AcpSessionSupervisor {
             if new_state == current {
                 return;
             }
-            match self.state.compare_exchange(
+            if self
+                .state
+                .compare_exchange(
                 current_u64,
                 state_to_u64(new_state),
                 Ordering::SeqCst,
                 Ordering::SeqCst,
-            ) {
-                Ok(_) => {
-                    self.emit_transition(current, new_state, None);
-                    return;
-                }
-                Err(_) => continue,
+                )
+                .is_ok()
+            {
+                self.emit_transition(current, new_state, None);
+                return;
             }
         }
     }
@@ -436,29 +446,6 @@ impl AcpSessionSupervisor {
     }
 }
 
-/// RAII guard that pauses the watchdog while a client call is in flight.
-pub struct ClientCallGuard<'a> {
-    supervisor: &'a AcpSessionSupervisor,
-}
-
-impl Drop for ClientCallGuard<'_> {
-    fn drop(&mut self) {
-        self.supervisor.exit_client_call();
-    }
-}
-
-/// RAII guard that activates the watchdog while a daemon-issued request is
-/// awaiting an agent response. Drop releases the slot.
-pub struct PendingRequestGuard<'a> {
-    supervisor: &'a AcpSessionSupervisor,
-}
-
-impl Drop for PendingRequestGuard<'_> {
-    fn drop(&mut self) {
-        self.supervisor.exit_pending_request();
-    }
-}
-
 fn state_to_u64(state: WatchdogState) -> u64 {
     match state {
         WatchdogState::Active => 0,
@@ -475,52 +462,6 @@ fn u64_to_state(val: u64) -> WatchdogState {
         2 => WatchdogState::Fired,
         _ => WatchdogState::Done,
     }
-}
-
-/// Kill a process group: SIGTERM, wait grace period, then SIGKILL if needed.
-///
-/// This is a blocking function that sleeps for `SIGTERM_GRACE_PERIOD`. Call it
-/// from a dedicated thread or `spawn_blocking`, not directly from an async task.
-#[cfg(unix)]
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-)]
-pub fn kill_process_group(pgid: i32, child: &mut Child) {
-    info!(pgid, "sending SIGTERM to process group");
-    if let Err(e) = killpg(Pid::from_raw(pgid), Signal::SIGTERM) {
-        warn!(pgid, error = %e, "SIGTERM to process group failed");
-    }
-
-    thread::sleep(SIGTERM_GRACE_PERIOD);
-
-    match child.try_wait() {
-        Ok(Some(status)) => {
-            debug!(pgid, ?status, "process exited after SIGTERM");
-        }
-        Ok(None) => {
-            warn!(
-                pgid,
-                "process did not exit within grace period; sending SIGKILL"
-            );
-            if let Err(e) = killpg(Pid::from_raw(pgid), Signal::SIGKILL) {
-                warn!(pgid, error = %e, "SIGKILL to process group failed");
-            }
-            let _ = child.wait();
-        }
-        Err(e) => {
-            warn!(pgid, error = %e, "failed to check process status; sending SIGKILL");
-            if let Err(e) = killpg(Pid::from_raw(pgid), Signal::SIGKILL) {
-                warn!(pgid, error = %e, "SIGKILL to process group failed");
-            }
-            let _ = child.wait();
-        }
-    }
-}
-
-#[cfg(not(unix))]
-pub fn kill_process_group(_pgid: i32, child: &mut Child) {
-    let _ = child.kill();
 }
 
 /// Async watchdog loop. Returns the reason for firing or `None` if cancelled.
@@ -567,29 +508,6 @@ pub async fn watchdog_loop(supervisor: Arc<AcpSessionSupervisor>) -> Option<Disc
             );
             return Some(DisconnectReason::WatchdogFired);
         }
-    }
-}
-
-/// JSON-RPC error response for daemon shutdown.
-#[derive(Debug, Clone)]
-pub struct DaemonShutdownError {
-    pub code: i32,
-    pub message: String,
-}
-
-impl DaemonShutdownError {
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            code: DAEMON_SHUTDOWN,
-            message: "daemon shutdown in progress".to_string(),
-        }
-    }
-}
-
-impl Default for DaemonShutdownError {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

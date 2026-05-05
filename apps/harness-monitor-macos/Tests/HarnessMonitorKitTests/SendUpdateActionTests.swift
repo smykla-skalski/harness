@@ -12,7 +12,7 @@ struct SendUpdateActionTests {
 
   @Test("Custom raw command is empty so the user must type one")
   func customRawCommandIsEmpty() {
-    #expect(SendUpdateAction.custom.rawCommand == "")
+    #expect(SendUpdateAction.custom.rawCommand.isEmpty)
   }
 
   @Test("Human labels are user-facing strings, not enum case names")

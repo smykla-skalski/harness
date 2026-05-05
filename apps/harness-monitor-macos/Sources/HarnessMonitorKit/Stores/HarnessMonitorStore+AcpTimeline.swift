@@ -194,7 +194,8 @@ extension HarnessMonitorStore {
 
   func reattributeAcpTranscriptEntries(using snapshots: [AcpAgentSnapshot]) {
     guard
-      (!selectedAcpTranscriptHistoryEntries.isEmpty || !selectedAcpTranscriptLiveEntries.isEmpty),
+      !selectedAcpTranscriptHistoryEntries.isEmpty
+        || !selectedAcpTranscriptLiveEntries.isEmpty,
       !snapshots.isEmpty
     else {
       return
@@ -222,9 +223,11 @@ extension HarnessMonitorStore {
       else {
         return entry
       }
-      guard entry.agentId != identity.agentID
+      let identityChanged =
+        entry.agentId != identity.agentID
         || metadata.agentID != identity.agentID
         || metadata.agentDisplayName != identity.displayName
+      guard identityChanged
       else {
         return entry
       }

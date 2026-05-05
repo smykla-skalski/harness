@@ -20,7 +20,7 @@ extension WorkspaceWindowView {
       return
     }
 
-    currentPendingDismissBatch = DismissBatchSnapshot(
+    currentPendingDismissBatch = WorkspaceDecisionDismissBatchSnapshot(
       ids: ids,
       count: ids.count,
       filterSignature: decisionWorkspaceScope.visibleSnapshot.signature,
@@ -52,7 +52,7 @@ extension WorkspaceWindowView {
     for id in snapshot.ids {
       await decisionActionHandler.dismiss(decisionID: id)
     }
-    currentReopenBatch = ReopenBatchState(
+    currentReopenBatch = WorkspaceDecisionReopenBatchState(
       ids: snapshot.ids,
       expiresAt: Date().addingTimeInterval(15)
     )
@@ -61,7 +61,7 @@ extension WorkspaceWindowView {
     await refreshDecisionWorkspaceAfterMutation()
   }
 
-  func reopenDismissedBatch(_ batch: ReopenBatchState) async {
+  func reopenDismissedBatch(_ batch: WorkspaceDecisionReopenBatchState) async {
     guard Date() <= batch.expiresAt else {
       store.presentFailureFeedback("Recovery window expired.")
       currentReopenBatch = nil

@@ -145,6 +145,8 @@ pub(crate) fn extract_request_id(headers: &HeaderMap) -> String {
         .and_then(|value| value.to_str().ok())
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .map(ToString::to_string)
-        .unwrap_or_else(|| format!("daemon-{}", Uuid::new_v4()))
+        .map_or_else(
+            || format!("daemon-{}", Uuid::new_v4()),
+            ToString::to_string,
+        )
 }

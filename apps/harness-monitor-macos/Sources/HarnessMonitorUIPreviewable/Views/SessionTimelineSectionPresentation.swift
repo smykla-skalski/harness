@@ -134,7 +134,9 @@ struct SessionTimelineSectionPresentation {
     }
     let reservedFooterHeight =
       Self.navigationFooterHeight(for: textSizeIndex) + HarnessMonitorTheme.spacingLG
-    return max(Self.minimumScrollViewportHeight(for: textSizeIndex), viewportHeight - reservedFooterHeight)
+    let minimumViewportHeight = Self.minimumScrollViewportHeight(for: textSizeIndex)
+    let availableViewportHeight = viewportHeight - reservedFooterHeight
+    return max(minimumViewportHeight, availableViewportHeight)
   }
 
   func canScrollOlder(from targetID: String?) -> Bool {

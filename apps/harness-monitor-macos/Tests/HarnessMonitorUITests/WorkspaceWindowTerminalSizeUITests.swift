@@ -3,7 +3,7 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
-final class WorkspaceWindowTerminalSizeUITests:
+class WorkspaceWindowTerminalSizeUITests:
   HarnessMonitorUITestCase,
   WorkspaceWindowUITestSupporting
 {

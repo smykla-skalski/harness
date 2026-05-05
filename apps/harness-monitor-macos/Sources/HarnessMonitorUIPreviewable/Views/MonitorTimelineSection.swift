@@ -265,248 +265,51 @@ struct MonitorTimelineSection: View {
     }
     .frame(height: presentation.scrollViewportHeight)
   }
-}
 
-extension MonitorTimelineSection {
-  // navigationAnchorID is read only from non-body code paths (async Tasks
-  // and onChange/onAppear closures). Reading viewport.visibleAnchorID here
-  // therefore does NOT register a SwiftUI body dependency on the model and
-  // does not re-introduce the per-scroll re-eval loop.
-  private var navigationAnchorID: String? {
+  var timelineNavigationAnchorID: String? {
     viewport.visibleAnchorID ?? scrollCommand?.targetID
   }
 
-  private func requestLatestWindowIfNeeded(_ presentation: SessionTimelineSectionPresentation) {
-    guard !presentation.hasLatestWindow else { return }
-    requestLatestWindow()
+  var currentTimelineScrollCommand: SessionTimelineScrollCommand? {
+    get { scrollCommand }
+    nonmutating set { scrollCommand = newValue }
   }
 
-  private func requestLatestWindow() {
-    Task { await loadWindow(.latest(limit: SessionTimelineWindowNavigation.defaultLimit)) }
+  var currentTimelineScrollCommandGeneration: Int {
+    get { scrollCommandGeneration }
+    nonmutating set { scrollCommandGeneration = newValue }
   }
 
-  private func requestOlderWindowIfNeeded(_ presentation: SessionTimelineSectionPresentation) {
-    requestWindowIfNeeded(for: .older, presentation: presentation)
+  var currentPendingNavigation: SessionTimelinePendingNavigation? {
+    get { pendingNavigationAfterLoad }
+    nonmutating set { pendingNavigationAfterLoad = newValue }
   }
 
-  private func requestNewerWindowIfNeeded(_ presentation: SessionTimelineSectionPresentation) {
-    requestWindowIfNeeded(for: .newer, presentation: presentation)
+  var currentPendingNavigationGeneration: Int {
+    get { pendingNavigationGeneration }
+    nonmutating set { pendingNavigationGeneration = newValue }
   }
 
-  private func requestWindowIfNeeded(
-    for action: SessionTimelineWindowAction,
-    presentation: SessionTimelineSectionPresentation
-  ) {
-    guard !isTimelineLoading, let request = presentation.navigation.request(for: action) else {
-      return
-    }
-    Task { await loadWindow(request) }
+  var timelineViewport: SessionTimelineViewportModel {
+    viewport
   }
 
-  private func performNavigationAction(
-    _ action: SessionTimelineWindowAction,
-    presentation: SessionTimelineSectionPresentation
-  ) {
-    Task {
-      switch action {
-      case .older:
-        if await loadWindowBeforeNavigationIfNeeded(.older, presentation: presentation) {
-          return
-        }
-        cancelPendingNavigation()
-        await scroll(to: nextTarget(for: .older, presentation: presentation))
-      case .latest:
-        if !presentation.hasLatestWindow || presentation.navigation.hasNewer {
-          let request = TimelineWindowRequest.latest(
-            limit: SessionTimelineWindowNavigation.defaultLimit
-          )
-          markPendingNavigation(.latest, request: request)
-          await loadWindow(request)
-          return
-        }
-        cancelPendingNavigation()
-        await scroll(to: nextTarget(for: .latest, presentation: presentation))
-      case .newer:
-        if await loadWindowBeforeNavigationIfNeeded(.newer, presentation: presentation) {
-          return
-        }
-        cancelPendingNavigation()
-        await scroll(to: nextTarget(for: .newer, presentation: presentation))
-      }
-    }
+  var currentFilterPersistenceMode: SessionTimelineFilterPersistenceMode {
+    filterPersistenceMode
   }
 
-  private func loadWindowBeforeNavigationIfNeeded(
-    _ action: SessionTimelineWindowAction,
-    presentation: SessionTimelineSectionPresentation
-  ) async -> Bool {
-    let shouldLoad =
-      switch action {
-      case .older:
-        presentation.shouldLoadOlderBeforeStepping(from: navigationAnchorID)
-      case .latest:
-        false
-      case .newer:
-        presentation.nextNewerNodeID(from: navigationAnchorID) == nil
-          && presentation.navigation.hasNewer
-      }
-    guard shouldLoad, let request = presentation.navigation.request(for: action) else {
-      return false
-    }
-    markPendingNavigation(action, request: request)
-    await loadWindow(request)
-    return true
+  var currentFilters: SessionTimelineFilterState {
+    get { filters }
+    nonmutating set { filters = newValue }
   }
 
-  @MainActor
-  private func markPendingNavigation(
-    _ action: SessionTimelineWindowAction,
-    request: TimelineWindowRequest
-  ) {
-    pendingNavigationGeneration += 1
-    pendingNavigationAfterLoad = SessionTimelinePendingNavigation(
-      action: action,
-      request: request,
-      sessionID: sessionID,
-      generation: pendingNavigationGeneration
-    )
+  var currentAppStoredFilterStateRawValue: String {
+    get { appStoredFilterStateRawValue }
+    nonmutating set { appStoredFilterStateRawValue = newValue }
   }
 
-  @MainActor
-  private func cancelPendingNavigation() {
-    pendingNavigationAfterLoad = nil
-  }
-
-  @MainActor
-  private func completePendingNavigationIfNeeded(
-    _ presentation: SessionTimelineSectionPresentation
-  ) {
-    guard let pending = pendingNavigationAfterLoad,
-      pending.isSatisfied(sessionID: sessionID, navigation: presentation.navigation),
-      !presentation.scrollNodeIDs.isEmpty
-    else {
-      return
-    }
-    pendingNavigationAfterLoad = nil
-    issueScroll(to: nextTarget(for: pending.action, presentation: presentation))
-  }
-
-  private func nextTarget(
-    for action: SessionTimelineWindowAction,
-    presentation: SessionTimelineSectionPresentation
-  ) -> String? {
-    switch action {
-    case .older:
-      presentation.nextOlderNodeID(from: navigationAnchorID) ?? presentation.scrollNodeIDs.last
-    case .latest:
-      presentation.scrollNodeIDs.first
-    case .newer:
-      presentation.nextNewerNodeID(from: navigationAnchorID) ?? presentation.scrollNodeIDs.first
-    }
-  }
-
-  private func scroll(to targetID: String?) async {
-    guard let targetID else { return }
-    await MainActor.run { issueScroll(to: targetID) }
-  }
-
-  private func reconcileTimelineAnchor(with ids: [String]) {
-    guard !ids.isEmpty else {
-      viewport.setAnchorID(nil)
-      scrollCommand = nil
-      return
-    }
-    guard let anchorID = navigationAnchorID else {
-      viewport.setAnchorID(ids.first)
-      issueScrollCommand(ids.first)
-      return
-    }
-    if !ids.contains(anchorID) {
-      viewport.setAnchorID(ids.first)
-      issueScrollCommand(ids.first)
-    }
-  }
-
-  @MainActor
-  private func issueScroll(to targetID: String?) {
-    viewport.setAnchorID(targetID)
-    issueScrollCommand(targetID)
-  }
-
-  private func issueScrollCommand(_ targetID: String?) {
-    guard let targetID else {
-      scrollCommand = nil
-      return
-    }
-    scrollCommandGeneration += 1
-    scrollCommand = SessionTimelineScrollCommand(
-      targetID: targetID,
-      generation: scrollCommandGeneration
-    )
-  }
-
-  private func handleScrollBoundaryChange(
-    from oldValue: SessionTimelineScrollBoundaryState,
-    to newValue: SessionTimelineScrollBoundaryState,
-    presentation: SessionTimelineSectionPresentation
-  ) {
-    if newValue.enteredTopEdge(from: oldValue) {
-      requestNewerWindowIfNeeded(presentation)
-    }
-    if newValue.enteredBottomEdge(from: oldValue) {
-      requestOlderWindowIfNeeded(presentation)
-    }
-  }
-
-  @MainActor
-  private func hydrateFilters(for input: SessionTimelineFilterHydrationInput) {
-    let nextFilters = SessionTimelineFilterPersistenceResolver.hydrate(
-      mode: filterPersistenceMode,
-      input: input
-    )
-    if filters != nextFilters {
-      filters = nextFilters
-    }
-  }
-
-  @MainActor
-  private func persistFilters(_ state: SessionTimelineFilterState) {
-    let persisted = SessionTimelineFilterPersistenceResolver.persist(
-      mode: filterPersistenceMode,
-      state: state,
-      sessionID: sessionID,
-      appStateRawValue: appStoredFilterStateRawValue,
-      sceneRegistryRawValue: sceneStoredFilterRegistryRawValue
-    )
-    if appStoredFilterStateRawValue != persisted.appStateRawValue {
-      appStoredFilterStateRawValue = persisted.appStateRawValue
-    }
-    if sceneStoredFilterRegistryRawValue != persisted.sceneRegistryRawValue {
-      sceneStoredFilterRegistryRawValue = persisted.sceneRegistryRawValue
-    }
-  }
-}
-
-#Preview("Timeline") {
-  MonitorTimelineSection.richPreview
-}
-
-private struct SessionTimelineFilteredEmptyState: View {
-  @Binding var filters: SessionTimelineFilterState
-
-  var body: some View {
-    VStack(spacing: HarnessMonitorTheme.spacingSM) {
-      Image(systemName: "line.3.horizontal.decrease.circle")
-        .font(.title2)
-        .foregroundStyle(.secondary)
-      Text("No timeline items match these filters")
-        .scaledFont(.body.weight(.semibold))
-      Button("Clear filters") {
-        filters.clear()
-      }
-      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-    }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .padding(HarnessMonitorTheme.spacingLG)
+  var currentSceneStoredFilterRegistryRawValue: String {
+    get { sceneStoredFilterRegistryRawValue }
+    nonmutating set { sceneStoredFilterRegistryRawValue = newValue }
   }
 }

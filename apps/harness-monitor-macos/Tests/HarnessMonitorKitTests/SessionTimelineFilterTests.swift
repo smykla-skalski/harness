@@ -10,18 +10,20 @@ struct SessionTimelineFilterTests {
   func nodeBuilderExtractsSemanticPropertiesAndRawPayloadKeys() {
     let decision = makeDecision(
       id: "decision-1",
-      severity: .critical,
-      sessionID: "session-1",
-      agentID: "alpha",
-      taskID: "task-1",
-      actions: [
-        SuggestedAction(
-          id: "dismiss-decision-1",
-          title: "Dismiss",
-          kind: .dismiss,
-          payloadJSON: "{}"
-        )
-      ]
+      fixture: .init(
+        severity: .critical,
+        sessionID: "session-1",
+        agentID: "alpha",
+        taskID: "task-1",
+        actions: [
+          SuggestedAction(
+            id: "dismiss-decision-1",
+            title: "Dismiss",
+            kind: .dismiss,
+            payloadJSON: "{}"
+          )
+        ]
+      )
     )
     let entry = TimelineEntry(
       entryId: "entry-1",
@@ -221,7 +223,8 @@ struct SessionTimelineFilterTests {
       snapshot.inventory.eventTypes.first(where: { $0.id == "task_checkpoint" })?.count == 1
     )
     #expect(
-      snapshot.inventory.eventTypes.first(where: { $0.id == "tool_result_error" })?.count == 0
+      (snapshot.inventory.eventTypes.first(where: { $0.id == "tool_result_error" })?.count ?? 0)
+        .isZero
     )
   }
 
@@ -384,55 +387,4 @@ struct SessionTimelineFilterTests {
     #expect(ephemeralPersisted.appStateRawValue == appRawValue)
     #expect(ephemeralPersisted.sceneRegistryRawValue == sceneRawValue)
   }
-}
-
-private extension SessionTimelineFilterState {
-  init(
-    query: String,
-    searchScope: SessionTimelineSearchScope,
-    tones: Set<SessionTimelineTone>,
-    eventTypes: Set<String>,
-    agents: Set<String>,
-    tasks: Set<String>,
-    decisionSeverities: Set<String>,
-    semanticProperties: Set<SessionTimelineSemanticProperty>,
-    rawPayloadKeys: Set<String>
-  ) {
-    self.init()
-    self.query = query
-    self.searchScope = searchScope
-    self.tones = tones
-    self.eventTypes = eventTypes
-    self.agents = agents
-    self.tasks = tasks
-    self.decisionSeverities = decisionSeverities
-    self.semanticProperties = semanticProperties
-    self.rawPayloadKeys = rawPayloadKeys
-  }
-}
-
-private func makeDecision(
-  id: String,
-  severity: DecisionSeverity,
-  sessionID: String,
-  agentID: String?,
-  taskID: String?,
-  actions: [SuggestedAction]
-) -> Decision {
-  let encodedActions =
-    (try? JSONEncoder().encode(actions))
-    .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
-  let decision = Decision(
-    id: id,
-    severity: severity,
-    ruleID: "policy.rule",
-    sessionID: sessionID,
-    agentID: agentID,
-    taskID: taskID,
-    summary: "Decision \(id)",
-    contextJSON: "{}",
-    suggestedActionsJSON: encodedActions
-  )
-  decision.createdAt = Date(timeIntervalSince1970: 1_900_000_010)
-  return decision
 }

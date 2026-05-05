@@ -1,9 +1,9 @@
 import XCTest
 
 @testable import HarnessMonitor
+@testable import HarnessMonitorKit
 import HarnessMonitorRegistry
 import HarnessMonitorUIPreviewable
-@testable import HarnessMonitorKit
 
 @MainActor
 final class HarnessMonitorMCPWindowCommandRegistrarTests: XCTestCase {

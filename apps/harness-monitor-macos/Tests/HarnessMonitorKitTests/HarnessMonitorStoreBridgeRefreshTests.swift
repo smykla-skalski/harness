@@ -321,10 +321,12 @@ struct HarnessMonitorStoreBridgeRefreshTests {
   @Test("ACP bridge doctor surfaces ACP disabled errors without stale bridge banners")
   func acpBridgeDoctorSurfacesAcpDisabledErrorsWithoutStaleBridgeBanners() async {
     let client = RecordingHarnessClient()
+    let acpDisabledPayload =
+      #"{"error":{"code":"ACP_DISABLED","message":"ACP disabled by feature flag","details":[]}}"#
     client.configureAcpInspectError(
       HarnessMonitorAPIError.server(
         code: 503,
-        message: #"{"error":{"code":"ACP_DISABLED","message":"ACP disabled by feature flag","details":[]}}"#
+        message: acpDisabledPayload
       )
     )
     let store = await makeBootstrappedStore(client: client)
@@ -345,10 +347,12 @@ struct HarnessMonitorStoreBridgeRefreshTests {
   @Test("ACP bridge doctor surfaces session-scope errors without stale bridge banners")
   func acpBridgeDoctorSurfacesSessionScopeErrorsWithoutStaleBridgeBanners() async {
     let client = RecordingHarnessClient()
+    let sessionScopeDeniedPayload =
+      #"{"error":{"code":"SESSION_SCOPE_DENIED","message":"session scope denied","details":[]}}"#
     client.configureAcpInspectError(
       HarnessMonitorAPIError.server(
         code: 403,
-        message: #"{"error":{"code":"SESSION_SCOPE_DENIED","message":"session scope denied","details":[]}}"#
+        message: sessionScopeDeniedPayload
       )
     )
     let store = await makeBootstrappedStore(client: client)
