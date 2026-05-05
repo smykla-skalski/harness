@@ -251,6 +251,9 @@ struct MonitorTimelineSection: View {
             rows: presentation.rows,
             scrollCommand: scrollCommand,
             actionHandler: actionHandler,
+            onSignalTap: { [store] signalID in
+              store.presentedSheet = .signalDetail(signalID: signalID)
+            },
             viewport: viewport,
             scrollBoundaryChanged: { oldValue, newValue in
               handleScrollBoundaryChange(

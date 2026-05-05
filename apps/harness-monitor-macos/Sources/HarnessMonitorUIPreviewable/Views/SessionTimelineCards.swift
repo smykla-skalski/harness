@@ -7,13 +7,15 @@ struct SessionTimelineCards: View {
   let shimmerPhase: CGFloat
   let showsShimmer: Bool
   let actionHandler: any DecisionActionHandler
+  let onSignalTap: ((String) -> Void)?
 
   var body: some View {
     LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
       ForEach(rows) { row in
         SessionTimelineNodeCluster(
           row: row,
-          actionHandler: actionHandler
+          actionHandler: actionHandler,
+          onSignalTap: onSignalTap
         )
       }
 
@@ -38,6 +40,7 @@ struct SessionTimelineCards: View {
 struct SessionTimelineNodeCluster: View {
   let row: SessionTimelineRow
   let actionHandler: any DecisionActionHandler
+  let onSignalTap: ((String) -> Void)?
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
@@ -46,7 +49,8 @@ struct SessionTimelineNodeCluster: View {
       }
       SessionTimelineNodeRow(
         row: row,
-        actionHandler: actionHandler
+        actionHandler: actionHandler,
+        onSignalTap: onSignalTap
       )
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -56,14 +60,17 @@ struct SessionTimelineNodeCluster: View {
 private struct SessionTimelineNodeRow: View {
   let row: SessionTimelineRow
   let actionHandler: any DecisionActionHandler
+  let onSignalTap: ((String) -> Void)?
   private let statusBadges: [SessionTimelineStatusBadge]
 
   init(
     row: SessionTimelineRow,
-    actionHandler: any DecisionActionHandler
+    actionHandler: any DecisionActionHandler,
+    onSignalTap: ((String) -> Void)? = nil
   ) {
     self.row = row
     self.actionHandler = actionHandler
+    self.onSignalTap = onSignalTap
     statusBadges = Self.makeStatusBadges(for: row.node)
   }
 
@@ -108,6 +115,16 @@ private struct SessionTimelineNodeRow: View {
       } label: {
         Label("Copy Summary", systemImage: "doc.on.doc")
       }
+      if let signalID = node.signalID {
+        Divider()
+        Button("Inspect", systemImage: "info.circle") { onSignalTap?(signalID) }
+        Button("Copy Signal ID", systemImage: "doc.on.doc") {
+          HarnessMonitorClipboard.copy(signalID)
+        }
+      }
+    }
+    .onTapGesture {
+      if let signalID = node.signalID { onSignalTap?(signalID) }
     }
   }
 

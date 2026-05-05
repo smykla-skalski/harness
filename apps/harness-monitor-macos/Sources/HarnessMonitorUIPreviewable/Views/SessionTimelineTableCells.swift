@@ -35,6 +35,7 @@ final class SessionTimelineTableCellView: NSTableCellView {
   func update(
     row: SessionTimelineRow,
     actionHandler: any DecisionActionHandler,
+    onSignalTap: ((String) -> Void)?,
     fontScale: CGFloat,
     showsConnectorAbove: Bool,
     showsConnectorBelow: Bool
@@ -42,6 +43,7 @@ final class SessionTimelineTableCellView: NSTableCellView {
     hostingView.rootView = SessionTimelineHostedRow(
       row: row,
       actionHandler: actionHandler,
+      onSignalTap: onSignalTap,
       fontScale: fontScale,
       showsConnectorAbove: showsConnectorAbove,
       showsConnectorBelow: showsConnectorBelow
@@ -79,6 +81,7 @@ final class SessionTimelineTableCellView: NSTableCellView {
 private struct SessionTimelineHostedRow: View {
   let row: SessionTimelineRow?
   let actionHandler: any DecisionActionHandler
+  let onSignalTap: ((String) -> Void)?
   let fontScale: CGFloat
   let showsConnectorAbove: Bool
   let showsConnectorBelow: Bool
@@ -86,12 +89,14 @@ private struct SessionTimelineHostedRow: View {
   init(
     row: SessionTimelineRow?,
     actionHandler: any DecisionActionHandler,
+    onSignalTap: ((String) -> Void)? = nil,
     fontScale: CGFloat,
     showsConnectorAbove: Bool = true,
     showsConnectorBelow: Bool = true
   ) {
     self.row = row
     self.actionHandler = actionHandler
+    self.onSignalTap = onSignalTap
     self.fontScale = fontScale
     self.showsConnectorAbove = showsConnectorAbove
     self.showsConnectorBelow = showsConnectorBelow
@@ -113,7 +118,7 @@ private struct SessionTimelineHostedRow: View {
   }
 
   private func populatedRow(_ row: SessionTimelineRow) -> some View {
-    SessionTimelineNodeCluster(row: row, actionHandler: actionHandler)
+    SessionTimelineNodeCluster(row: row, actionHandler: actionHandler, onSignalTap: onSignalTap)
       .padding(.trailing, HarnessMonitorTheme.spacingXS)
       .padding(.bottom, SessionTimelineTableMetrics.rowBottomPadding(for: row))
       .overlayPreferenceValue(SessionTimelineMarkerBoundsKey.self) { markerAnchor in

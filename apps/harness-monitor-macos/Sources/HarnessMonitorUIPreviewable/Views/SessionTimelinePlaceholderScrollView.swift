@@ -14,7 +14,8 @@ struct SessionTimelinePlaceholderScrollView: View {
           placeholderCount: presentation.placeholderCount,
           shimmerPhase: SessionTimelinePlaceholderShimmer.restingPhase,
           showsShimmer: presentation.shouldAnimatePlaceholders,
-          actionHandler: actionHandler
+          actionHandler: actionHandler,
+          onSignalTap: nil
         )
       }
       .id(contentIdentity)

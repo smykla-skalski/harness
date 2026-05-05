@@ -27,6 +27,7 @@ extension SessionTimelineTableView {
     var rowIndexByID: [String: Int] = [:]
     private var rowSnapshot = SessionTimelineTableSnapshot.empty
     private var actionHandler: any DecisionActionHandler = NullDecisionActionHandler()
+    private var onSignalTap: ((String) -> Void)?
     weak var tableView: NSTableView?
     weak var scrollView: NSScrollView?
     private var lastScrollCommand: SessionTimelineScrollCommand?
@@ -85,6 +86,7 @@ extension SessionTimelineTableView {
     func update(
       rows: [SessionTimelineRow],
       actionHandler: any DecisionActionHandler,
+      onSignalTap: ((String) -> Void)?,
       scrollCommand: SessionTimelineScrollCommand?,
       request: UpdateRequest
     ) {
@@ -97,6 +99,7 @@ extension SessionTimelineTableView {
         visibleContentWidth: request.scrollView.contentSize.width
       )
       self.actionHandler = actionHandler
+      self.onSignalTap = onSignalTap
       let fontScaleChanged = abs(self.fontScale - request.fontScale) > 0.001
       self.fontScale = request.fontScale
       let wasPinnedToLatest = isPinnedToLatestViewport()
@@ -277,6 +280,7 @@ extension SessionTimelineTableView {
       cell.update(
         row: rows[row],
         actionHandler: actionHandler,
+        onSignalTap: onSignalTap,
         fontScale: fontScale,
         showsConnectorAbove: connectorVisibility.showsConnectorAbove,
         showsConnectorBelow: connectorVisibility.showsConnectorBelow

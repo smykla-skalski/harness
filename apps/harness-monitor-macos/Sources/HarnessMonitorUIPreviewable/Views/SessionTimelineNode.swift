@@ -110,6 +110,7 @@ struct SessionTimelineNode: Identifiable, Equatable, Sendable {
   let semanticProperties: Set<SessionTimelineSemanticProperty>
   let rawPayloadKeys: Set<String>
   let toolCallMetadata: ToolCallTimelineEntryMetadata?
+  let signalID: String?
 
   init(
     identity: Identity,
@@ -126,7 +127,8 @@ struct SessionTimelineNode: Identifiable, Equatable, Sendable {
     decision: SessionTimelineDecisionSnapshot?,
     semanticProperties: Set<SessionTimelineSemanticProperty> = [],
     rawPayloadKeys: Set<String> = [],
-    toolCallMetadata: ToolCallTimelineEntryMetadata? = nil
+    toolCallMetadata: ToolCallTimelineEntryMetadata? = nil,
+    signalID: String? = nil
   ) {
     self.identity = identity
     self.kind = kind
@@ -143,6 +145,7 @@ struct SessionTimelineNode: Identifiable, Equatable, Sendable {
     self.semanticProperties = semanticProperties
     self.rawPayloadKeys = rawPayloadKeys
     self.toolCallMetadata = toolCallMetadata
+    self.signalID = signalID
   }
 
   var id: String {

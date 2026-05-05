@@ -171,6 +171,7 @@ struct SessionTimelineNavigationTests {
     coordinator.update(
       rows: initialRows,
       actionHandler: NullDecisionActionHandler(),
+      onSignalTap: nil,
       scrollCommand: nil,
       request: .init(
         scrollView: scrollView,
@@ -207,6 +208,7 @@ struct SessionTimelineNavigationTests {
     coordinator.update(
       rows: updatedRows,
       actionHandler: NullDecisionActionHandler(),
+      onSignalTap: nil,
       scrollCommand: nil,
       request: .init(
         scrollView: scrollView,
@@ -307,6 +309,7 @@ struct SessionTimelineNavigationTests {
     coordinator.update(
       rows: initialRows,
       actionHandler: NullDecisionActionHandler(),
+      onSignalTap: nil,
       scrollCommand: nil,
       request: .init(
         scrollView: scrollView,
