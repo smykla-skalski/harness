@@ -8,16 +8,6 @@ extension WorkspaceWindowView {
       viewModel: viewModel,
       displayState: displayState,
       focusedFieldBinding: focusedFieldBinding,
-      primaryContentFocusScope: currentPrimaryContentFocusScope,
-      primaryContentPagingResponderRequest: currentPrimaryContentPagingRequest,
-      prefersPrimaryContentFocus: currentPrimaryContentFocusTarget == .create,
-      primaryContentFocusParticipationEnabled:
-        currentPrimaryContentFocusTarget == .create
-        && isWorkspaceKeyWindow
-        && focusedField == nil
-        && store.presentedSheet == nil
-        && store.pendingConfirmation == nil
-        && !showsDismissAllVisibleConfirmation,
       startAction: { startTui() }
     )
   }
@@ -107,17 +97,9 @@ struct WorkspaceWindowCreatePane: View {
   let viewModel: ViewModel
   let displayState: DisplayState
   let focusedFieldBinding: FocusState<Field?>.Binding
-  let primaryContentFocusScope: Namespace.ID?
-  let primaryContentPagingResponderRequest: Int
-  let prefersPrimaryContentFocus: Bool
-  let primaryContentFocusParticipationEnabled: Bool
   let startAction: () -> Void
 
   var body: some View {
-    let activePrimaryContentFocusScope =
-      primaryContentFocusParticipationEnabled ? primaryContentFocusScope : nil
-    let activePrimaryContentPagingRequest =
-      primaryContentFocusParticipationEnabled ? primaryContentPagingResponderRequest : 0
     HarnessMonitorColumnScrollView(
       horizontalPadding: HarnessMonitorTheme.spacingLG,
       verticalPadding: HarnessMonitorTheme.spacingLG,
@@ -125,12 +107,7 @@ struct WorkspaceWindowCreatePane: View {
       readableWidth: false,
       topScrollEdgeEffect: .soft,
       scrollSurfaceIdentifier: HarnessMonitorAccessibility.agentTuiLaunchPane,
-      scrollSurfaceLabel: "New agent pane",
-      primaryFocusScope: activePrimaryContentFocusScope,
-      prefersDefaultFocus:
-        prefersPrimaryContentFocus && primaryContentFocusParticipationEnabled,
-      pagingResponderRequest: activePrimaryContentPagingRequest,
-      pagingResponderEnabled: primaryContentFocusParticipationEnabled
+      scrollSurfaceLabel: "New agent pane"
     ) {
       // Keep MCP-tracked controls instantiated even while this pane scrolls.
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
@@ -353,7 +330,8 @@ extension WorkspaceWindowCreatePane {
   }
 
   private func restoreTerminalLaunchPreset(from snapshot: LaunchPresetSnapshot) {
-    if let providerKey = snapshot.providerStorageKey,
+    if !HarnessMonitorAgentLaunchDefaults.hasExplicitPreferredSelection(),
+      let providerKey = snapshot.providerStorageKey,
       let parsed = AgentLaunchSelection(storageKey: providerKey)
     {
       viewModel.selectedLaunchSelection = parsed

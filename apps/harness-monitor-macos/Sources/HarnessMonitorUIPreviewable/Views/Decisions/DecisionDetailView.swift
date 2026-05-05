@@ -37,19 +37,13 @@ public struct DecisionDetailView: View {
   private let decisionScope: DecisionWorkspaceScope?
   private let primaryActionFocusDecisionID: String?
   private let primaryActionFocusRequestTick: Int
-  private let primaryContentFocusScope: Namespace.ID?
-  private let primaryContentPagingResponderRequest: Int
-  private let prefersPrimaryContentFocus: Bool
 
   public init(
     selectedTab: Binding<DecisionDetailTab> = .constant(.context),
     observer: ObserverSummary? = nil,
     decisionScope: DecisionWorkspaceScope? = nil,
     primaryActionFocusDecisionID: String? = nil,
-    primaryActionFocusRequestTick: Int = 0,
-    primaryContentFocusScope: Namespace.ID? = nil,
-    primaryContentPagingResponderRequest: Int = 0,
-    prefersPrimaryContentFocus: Bool = false
+    primaryActionFocusRequestTick: Int = 0
   ) {
     viewModel = nil
     store = nil
@@ -58,9 +52,6 @@ public struct DecisionDetailView: View {
     self.decisionScope = decisionScope
     self.primaryActionFocusDecisionID = primaryActionFocusDecisionID
     self.primaryActionFocusRequestTick = primaryActionFocusRequestTick
-    self.primaryContentFocusScope = primaryContentFocusScope
-    self.primaryContentPagingResponderRequest = primaryContentPagingResponderRequest
-    self.prefersPrimaryContentFocus = prefersPrimaryContentFocus
     _selectedTab = selectedTab
   }
 
@@ -72,10 +63,7 @@ public struct DecisionDetailView: View {
     observer: ObserverSummary? = nil,
     decisionScope: DecisionWorkspaceScope? = nil,
     primaryActionFocusDecisionID: String? = nil,
-    primaryActionFocusRequestTick: Int = 0,
-    primaryContentFocusScope: Namespace.ID? = nil,
-    primaryContentPagingResponderRequest: Int = 0,
-    prefersPrimaryContentFocus: Bool = false
+    primaryActionFocusRequestTick: Int = 0
   ) {
     self.viewModel = viewModel
     self.store = store
@@ -84,9 +72,6 @@ public struct DecisionDetailView: View {
     self.decisionScope = decisionScope
     self.primaryActionFocusDecisionID = primaryActionFocusDecisionID
     self.primaryActionFocusRequestTick = primaryActionFocusRequestTick
-    self.primaryContentFocusScope = primaryContentFocusScope
-    self.primaryContentPagingResponderRequest = primaryContentPagingResponderRequest
-    self.prefersPrimaryContentFocus = prefersPrimaryContentFocus
     _selectedTab = selectedTab
   }
 
@@ -99,10 +84,7 @@ public struct DecisionDetailView: View {
     observer: ObserverSummary? = nil,
     decisionScope: DecisionWorkspaceScope? = nil,
     primaryActionFocusDecisionID: String? = nil,
-    primaryActionFocusRequestTick: Int = 0,
-    primaryContentFocusScope: Namespace.ID? = nil,
-    primaryContentPagingResponderRequest: Int = 0,
-    prefersPrimaryContentFocus: Bool = false
+    primaryActionFocusRequestTick: Int = 0
   ) {
     self.init(
       viewModel: DecisionDetailViewModel(decision: decision, handler: handler),
@@ -112,10 +94,7 @@ public struct DecisionDetailView: View {
       observer: observer,
       decisionScope: decisionScope,
       primaryActionFocusDecisionID: primaryActionFocusDecisionID,
-      primaryActionFocusRequestTick: primaryActionFocusRequestTick,
-      primaryContentFocusScope: primaryContentFocusScope,
-      primaryContentPagingResponderRequest: primaryContentPagingResponderRequest,
-      prefersPrimaryContentFocus: prefersPrimaryContentFocus
+      primaryActionFocusRequestTick: primaryActionFocusRequestTick
     )
   }
 
@@ -212,10 +191,7 @@ public struct DecisionDetailView: View {
       .padding(HarnessMonitorTheme.spacingLG)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .harnessPrimaryContentFocusTarget(
-      focusScope: primaryContentFocusScope,
-      prefersDefaultFocus: prefersPrimaryContentFocus,
-      pagingResponderRequest: primaryContentPagingResponderRequest,
+    .harnessPrimaryContentScrollSurface(
       listIdentifier: HarnessMonitorAccessibility.decisionDetailScrollView,
       listLabel: "Decision detail"
     )
@@ -228,10 +204,7 @@ public struct DecisionDetailView: View {
           .padding(HarnessMonitorTheme.spacingLG)
           .frame(maxWidth: .infinity, alignment: .leading)
       }
-      .harnessPrimaryContentFocusTarget(
-        focusScope: primaryContentFocusScope,
-        prefersDefaultFocus: prefersPrimaryContentFocus,
-        pagingResponderRequest: primaryContentPagingResponderRequest,
+      .harnessPrimaryContentScrollSurface(
         listIdentifier: HarnessMonitorAccessibility.decisionDetailScrollView,
         listLabel: "Decision detail"
       )

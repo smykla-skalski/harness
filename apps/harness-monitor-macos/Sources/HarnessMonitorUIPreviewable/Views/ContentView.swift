@@ -16,10 +16,8 @@ public struct ContentView<CornerContent: View>: View {
   let contentDashboard: HarnessMonitorStore.ContentDashboardSlice
   private let toast: ToastSlice
   let auditBuildState: AuditBuildDisplayState?
-  @State private var primaryContentPagingResponderRequest = 0
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @State private var isStartupFocusParticipationEnabled = HarnessMonitorUITestEnvironment.isEnabled
-  @Namespace private var primaryContentFocusScope
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
 
   private var appChromeAccessibilityValue: String {
@@ -51,16 +49,6 @@ public struct ContentView<CornerContent: View>: View {
 
   private var currentSurfaceLabel: String {
     contentSessionDetail.presentedSessionDetail == nil ? "dashboard" : "cockpit"
-  }
-
-  private var currentSessionContentPrimaryFocusTarget: SessionContentPrimaryFocusTarget {
-    if contentSessionDetail.presentedSessionDetail != nil {
-      return .cockpit
-    }
-    if contentSession.selectedSessionSummary != nil {
-      return .loading
-    }
-    return .dashboard
   }
 
   private var columnVisibilityProfilingLabel: String {
@@ -118,7 +106,6 @@ public struct ContentView<CornerContent: View>: View {
     } detail: {
       detailColumn
     }
-    .focusScope(primaryContentFocusScope)
     .navigationSplitViewStyle(.prominentDetail)
     .toolbarBackgroundVisibility(contentWindowToolbarBackgroundVisibility, for: .windowToolbar)
     .toolbar {
@@ -244,9 +231,6 @@ public struct ContentView<CornerContent: View>: View {
       contentSession: contentSession,
       contentSessionDetail: contentSessionDetail,
       dashboardUI: contentDashboard,
-      primaryContentFocusScope: primaryContentFocusScope,
-      primaryContentPagingResponderRequest: primaryContentPagingResponderRequest,
-      primaryContentFocusTarget: currentSessionContentPrimaryFocusTarget,
       toolbarGlassReproConfiguration: toolbarGlassReproConfiguration
     )
   }

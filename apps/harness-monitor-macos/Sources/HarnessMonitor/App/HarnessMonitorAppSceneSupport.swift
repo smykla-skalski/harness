@@ -45,11 +45,6 @@ struct HarnessMonitorWindowRootView: View {
       .writingToolsBehavior(.disabled)
       .frame(minWidth: 900, minHeight: 600)
       .modifier(
-        OptionalInstantFocusRingModifier(
-          isEnabled: toolbarGlassReproConfiguration.usesInstantFocusRing
-        )
-      )
-      .modifier(
         HarnessMonitorSceneAppearanceModifier(
           themeMode: $themeMode,
           appliesPreferredColorScheme: !toolbarGlassReproConfiguration.disablesPreferredColorScheme
@@ -294,7 +289,6 @@ struct HarnessMonitorSettingsRootView: View {
         backgroundImage: backgroundImage
       )
     )
-    .instantFocusRing()
     .modifier(
       HarnessMonitorSceneAppearanceModifier(
         themeMode: $themeMode,

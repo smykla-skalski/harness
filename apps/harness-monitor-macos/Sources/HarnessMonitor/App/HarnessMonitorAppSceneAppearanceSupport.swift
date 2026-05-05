@@ -16,19 +16,6 @@ struct HarnessMonitorUITestAnimationModifier: ViewModifier {
   }
 }
 
-struct OptionalInstantFocusRingModifier: ViewModifier {
-  let isEnabled: Bool
-
-  @ViewBuilder
-  func body(content: Content) -> some View {
-    if isEnabled {
-      content.instantFocusRing()
-    } else {
-      content
-    }
-  }
-}
-
 struct HarnessMonitorSceneAppearanceModifier: ViewModifier {
   @Binding var themeMode: HarnessMonitorThemeMode
   let appliesPreferredColorScheme: Bool

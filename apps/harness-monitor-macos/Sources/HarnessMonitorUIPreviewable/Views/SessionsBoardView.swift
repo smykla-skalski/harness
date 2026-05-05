@@ -4,26 +4,14 @@ import SwiftUI
 struct SessionsBoardView: View {
   let store: HarnessMonitorStore
   let sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
-  let primaryContentFocusScope: Namespace.ID?
-  let primaryContentPagingResponderRequest: Int
-  let prefersPrimaryContentFocus: Bool
-  let primaryContentPagingResponderEnabled: Bool
 
   init(
     store: HarnessMonitorStore,
     sessionCatalog: HarnessMonitorStore.SessionCatalogSlice,
-    dashboardUI: HarnessMonitorStore.ContentDashboardSlice,
-    primaryContentFocusScope: Namespace.ID? = nil,
-    primaryContentPagingResponderRequest: Int = 0,
-    prefersPrimaryContentFocus: Bool = false,
-    primaryContentPagingResponderEnabled: Bool = false
+    dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   ) {
     self.store = store
     self.sessionCatalog = sessionCatalog
-    self.primaryContentFocusScope = primaryContentFocusScope
-    self.primaryContentPagingResponderRequest = primaryContentPagingResponderRequest
-    self.prefersPrimaryContentFocus = prefersPrimaryContentFocus
-    self.primaryContentPagingResponderEnabled = primaryContentPagingResponderEnabled
   }
 
   var body: some View {
@@ -34,11 +22,7 @@ struct SessionsBoardView: View {
       readableWidth: false,
       topScrollEdgeEffect: .soft,
       scrollSurfaceIdentifier: HarnessMonitorAccessibility.sessionsBoardScrollView,
-      scrollSurfaceLabel: "Sessions board",
-      primaryFocusScope: primaryContentFocusScope,
-      prefersDefaultFocus: prefersPrimaryContentFocus,
-      pagingResponderRequest: primaryContentPagingResponderRequest,
-      pagingResponderEnabled: primaryContentPagingResponderEnabled
+      scrollSurfaceLabel: "Sessions board"
     ) {
       VStack(alignment: .leading, spacing: 24) {
         SessionsBoardRecentSessionsSection(

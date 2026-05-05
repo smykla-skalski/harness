@@ -122,7 +122,6 @@ struct WorkspaceSidebar: View {
           dispatcher: searchFocusDispatcher
         )
       )
-      .harnessPreservePrimaryContentFocus(searchPresentationState.isPresented)
       .task {
         searchFocusDispatcher.handler = { handleSearchFocusRequest() }
       }

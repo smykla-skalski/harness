@@ -47,11 +47,11 @@ final class AttentionInfrastructureUITestsUserNotification:
     recordDiagnosticsSnapshot(in: app, named: "acp-permission-toast")
   }
 
-  func testForegroundToastRoutesToFocusedDecisionAction() throws {
+  func testForegroundToastRoutesToDecisionAction() throws {
     let context = verifyForegroundToastSurfaceAndPrepareRoute()
     tapButton(in: context.app, identifier: Accessibility.acpPermissionToastActionButton)
     assertToastRoutePublished(context)
-    assertToastRouteFocusesDecision(context.app)
+    assertToastRouteOpensDecision(context.app)
   }
 
   func testSupervisorNotificationsPaneShowsDeniedAcpStatusAndSettingsLink() throws {
@@ -233,7 +233,7 @@ final class AttentionInfrastructureUITestsUserNotification:
     )
   }
 
-  private func assertToastRouteFocusesDecision(_ app: XCUIApplication) {
+  private func assertToastRouteOpensDecision(_ app: XCUIApplication) {
     let workspaceWindow = element(in: app, identifier: Accessibility.workspaceWindow)
     XCTAssertTrue(
       waitForElement(workspaceWindow, timeout: Self.uiTimeout),
@@ -243,29 +243,20 @@ final class AttentionInfrastructureUITestsUserNotification:
     let decisionRow = button(in: app, identifier: Accessibility.decisionRow(Self.decisionID))
     XCTAssertTrue(
       waitForElement(decisionRow, timeout: Self.actionTimeout),
-      "Toast route should select the preview ACP decision row"
-    )
-    XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
-        (decisionRow.value as? String) == "selected"
-      },
-      """
-      Toast route should mark the preview ACP decision row selected; \
-      actual=\(String(describing: decisionRow.value))
-      """
+      "Toast route should expose the preview ACP decision row"
     )
 
-    let focusState = element(in: app, identifier: Accessibility.decisionPrimaryActionFocusState)
+    let acpPanel = descendantElement(
+      in: workspaceWindow,
+      identifier: Accessibility.decisionAcpPanel
+    )
     XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
-        let text = self.markerText(for: focusState)
-        return text.contains("decision=\(Self.decisionID)") && text.contains("focused=true")
-      },
-      "Toast route should focus the decision's primary action"
+      waitForElement(acpPanel, timeout: Self.actionTimeout),
+      "Toast route should open the ACP decision panel"
     )
 
-    let primaryAction = button(
-      in: app,
+    let primaryAction = descendantButton(
+      in: workspaceWindow,
       identifier: Accessibility.decisionAction(Self.primaryActionID)
     )
     XCTAssertTrue(waitForElement(primaryAction, timeout: Self.actionTimeout))

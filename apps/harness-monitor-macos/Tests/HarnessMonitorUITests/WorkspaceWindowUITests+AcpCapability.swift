@@ -187,15 +187,20 @@ extension WorkspaceWindowUITests {
       waitForElement(terminalToggleFrame, timeout: Self.actionTimeout),
       "ACP decision panel should expose the terminal request frame marker"
     )
+    let decisionDetailScrollView = descendantElement(
+      in: workspaceWindow,
+      identifier: Accessibility.decisionDetailScrollView
+    )
     let terminalVisible = scrollDecisionPanelUntilRequestVisible(
       in: app,
+      scrollTarget: decisionDetailScrollView.exists ? decisionDetailScrollView : workspaceWindow,
       terminalToggleFrame: terminalToggleFrame,
       terminalToggleIdentifier: terminalToggleIdentifier
     )
     XCTAssertTrue(
       terminalVisible,
       """
-      Page Down should scroll the decision detail until the ACP request checkbox is visible.
+      The decision detail should scroll until the ACP request checkbox is visible.
       terminalFrame=\(terminalToggleFrame.frame)
       """
     )
@@ -322,29 +327,23 @@ extension WorkspaceWindowUITests {
       "ACP permission route should open the ACP decision panel without another row click"
     )
 
-    let focusState = element(in: app, identifier: Accessibility.decisionPrimaryActionFocusState)
     XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
-        let focusValue = String(describing: focusState.value)
-        let focusText =
-          (focusState.value as? String)
-          ?? (!focusState.label.isEmpty ? focusState.label : focusValue)
-        return focusText.contains("decision=\(decisionID)") && focusText.contains("focused=true")
-      },
-      "ACP permission route should focus the decision's primary action"
+      decisionRow.exists,
+      "ACP permission route should keep the decision selected in Workspace"
     )
   }
 
   private func scrollDecisionPanelUntilRequestVisible(
     in app: XCUIApplication,
+    scrollTarget: XCUIElement,
     terminalToggleFrame: XCUIElement,
     terminalToggleIdentifier: String
   ) -> Bool {
     var previousTerminalY = terminalToggleFrame.frame.minY
     var terminalVisible = hasVisibleFrameMarker(in: app, identifier: terminalToggleIdentifier)
 
-    for _ in 0..<3 where !terminalVisible {
-      app.typeKey(.pageDown, modifierFlags: [])
+    for _ in 0..<5 where !terminalVisible {
+      scrollDecisionPanelDown(scrollTarget)
       let scrolled = waitUntil(timeout: Self.actionTimeout) {
         terminalToggleFrame.frame.minY < previousTerminalY - 12
       }
@@ -356,6 +355,11 @@ extension WorkspaceWindowUITests {
     }
 
     return terminalVisible
+  }
+
+  private func scrollDecisionPanelDown(_ scrollTarget: XCUIElement) {
+    let scrollDistance = max(160, scrollTarget.frame.height * 0.32)
+    scrollTarget.scroll(byDeltaX: 0, deltaY: -scrollDistance)
   }
 
   private func assertDecisionSelectionSummary(

@@ -68,11 +68,6 @@ struct WorkspaceWindowRootView: View {
       )
       .harnessMonitorMCPWindowCommands(registrar: mcpWindowCommandRegistrar)
       .modifier(
-        OptionalInstantFocusRingModifier(
-          isEnabled: toolbarGlassReproConfiguration.usesInstantFocusRing
-        )
-      )
-      .modifier(
         HarnessMonitorSceneAppearanceModifier(
           themeMode: $themeMode,
           appliesPreferredColorScheme: true

@@ -37,10 +37,7 @@ extension WorkspaceWindowView {
       observer: sessionObserver,
       decisionScope: decisionScope,
       primaryActionFocusDecisionID: store.supervisorPrimaryActionFocusDecisionID,
-      primaryActionFocusRequestTick: store.supervisorPrimaryActionFocusRequestTick,
-      primaryContentFocusScope: currentPrimaryContentFocusScope,
-      primaryContentPagingResponderRequest: currentPrimaryContentPagingRequest,
-      prefersPrimaryContentFocus: currentPrimaryContentFocusTarget == .decisionDetail
+      primaryActionFocusRequestTick: store.supervisorPrimaryActionFocusRequestTick
     )
   }
 
@@ -55,10 +52,7 @@ extension WorkspaceWindowView {
         selectedTab: decisionDetailTabBinding,
         observer: sessionObserver,
         primaryActionFocusDecisionID: store.supervisorPrimaryActionFocusDecisionID,
-        primaryActionFocusRequestTick: store.supervisorPrimaryActionFocusRequestTick,
-        primaryContentFocusScope: currentPrimaryContentFocusScope,
-        primaryContentPagingResponderRequest: currentPrimaryContentPagingRequest,
-        prefersPrimaryContentFocus: currentPrimaryContentFocusTarget == .decisionDetail
+        primaryActionFocusRequestTick: store.supervisorPrimaryActionFocusRequestTick
       )
     } else {
       ContentUnavailableView(

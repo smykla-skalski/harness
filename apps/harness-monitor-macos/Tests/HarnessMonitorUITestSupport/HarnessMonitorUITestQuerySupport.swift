@@ -2,7 +2,7 @@ import XCTest
 
 extension HarnessMonitorUITestCase {
   private static var maxWindowSearchCount: Int { 4 }
-  private static var maxToolbarButtonSearchCount: Int { 12 }
+  static var maxToolbarButtonSearchCount: Int { 12 }
 
   func previewSessionTrigger(in app: XCUIApplication) -> XCUIElement {
     sessionTrigger(in: app, identifier: HarnessMonitorUITestAccessibility.previewSessionRow)

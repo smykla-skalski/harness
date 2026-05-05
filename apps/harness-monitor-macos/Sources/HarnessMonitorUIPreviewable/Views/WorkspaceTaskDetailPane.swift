@@ -182,7 +182,6 @@ struct WorkspaceTaskUserNotesSection: View {
         TextField("Add a note", text: $newNoteText)
           .harnessNativeFormControl()
           .focused($isNoteFieldFocused)
-          .harnessPreservePrimaryContentFocus()
           .submitLabel(.done)
           .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceTaskNoteField)
           .onSubmit { submitNote() }

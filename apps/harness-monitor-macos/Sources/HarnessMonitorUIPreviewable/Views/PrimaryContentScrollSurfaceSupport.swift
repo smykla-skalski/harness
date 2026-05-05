@@ -1,83 +1,14 @@
-import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
-// PreferenceKey instead of FocusedValue: every Workspace render had multiple
-// .focusedSceneValue(\.harnessPreservePrimaryContentFocus, ...) publishers
-// active at once (sidebar, create form, terminal, task detail pane, codex
-// pane). SwiftUI cannot uniquely resolve same-key scene publishers in one
-// frame and emits "FocusedValue update tried to update multiple times per
-// frame" + AttributeGraph cycles every frame. PreferenceKey reduces the
-// contributions deterministically and bubbles a single value up to
-// WorkspaceWindowView, which reads it via .onPreferenceChange instead of
-// @FocusedValue.
-struct HarnessPreservePrimaryContentFocusPreference: PreferenceKey {
-  static let defaultValue: Bool = false
-
-  static func reduce(value: inout Bool, nextValue: () -> Bool) {
-    value = value || nextValue()
-  }
-}
-
-struct PrimaryContentResetSuppression: Equatable {
-  let preservesPrimaryContentFocus: Bool
-  let hasFocusedEditorField: Bool
-  let hasPresentedSheet: Bool
-  let hasPendingConfirmation: Bool
-  let hasDismissConfirmation: Bool
-
-  init(
-    preservesPrimaryContentFocus: Bool,
-    hasFocusedEditorField: Bool = false,
-    hasPresentedSheet: Bool,
-    hasPendingConfirmation: Bool,
-    hasDismissConfirmation: Bool = false
-  ) {
-    self.preservesPrimaryContentFocus = preservesPrimaryContentFocus
-    self.hasFocusedEditorField = hasFocusedEditorField
-    self.hasPresentedSheet = hasPresentedSheet
-    self.hasPendingConfirmation = hasPendingConfirmation
-    self.hasDismissConfirmation = hasDismissConfirmation
-  }
-
-  var isSuppressed: Bool {
-    if preservesPrimaryContentFocus { return true }
-    if hasFocusedEditorField { return true }
-    if hasPresentedSheet { return true }
-    if hasPendingConfirmation { return true }
-    return hasDismissConfirmation
-  }
-}
-
 extension View {
   @ViewBuilder
-  func harnessPrimaryContentFocusTarget(
-    focusScope: Namespace.ID? = nil,
-    prefersDefaultFocus: Bool = false,
-    pagingResponderRequest: Int = 0,
-    pagingResponderEnabled: Bool? = nil,
+  func harnessPrimaryContentScrollSurface(
     listIdentifier: String? = nil,
     listLabel: String? = nil
   ) -> some View {
-    let isPagingResponderEnabled = pagingResponderEnabled ?? prefersDefaultFocus
-    let targetView = self.harnessPrimaryContentPagingResponder(
-      request: pagingResponderRequest,
-      isEnabled: isPagingResponderEnabled
-    )
-    if let focusScope {
-      let focusedTarget =
-        targetView
-        .focusable()
-        .prefersDefaultFocus(prefersDefaultFocus, in: focusScope)
-      if let listIdentifier {
-        focusedTarget.harnessMCPList(
-          listIdentifier,
-          label: listLabel ?? listIdentifier
-        )
-      } else {
-        focusedTarget
-      }
-    } else if let listIdentifier {
+    let targetView = self
+    if let listIdentifier {
       targetView.harnessMCPList(
         listIdentifier,
         label: listLabel ?? listIdentifier
@@ -85,37 +16,5 @@ extension View {
     } else {
       targetView
     }
-  }
-
-  func harnessPreservePrimaryContentFocus(_ isPreserved: Bool = true) -> some View {
-    preference(key: HarnessPreservePrimaryContentFocusPreference.self, value: isPreserved)
-  }
-
-  func harnessPrimaryContentPagingResponder(
-    request: Int,
-    isEnabled: Bool = true
-  ) -> some View {
-    background(
-      PrimaryContentPagingResponderBridge(
-        request: request,
-        isEnabled: isEnabled
-      )
-    )
-  }
-}
-
-private struct PrimaryContentPagingResponderBridge: NSViewRepresentable {
-  let request: Int
-  let isEnabled: Bool
-
-  func makeNSView(context _: Context) -> PrimaryContentPagingResponderBridgeView {
-    let view = PrimaryContentPagingResponderBridgeView()
-    view.alphaValue = 0
-    view.setAccessibilityHidden(true)
-    return view
-  }
-
-  func updateNSView(_ nsView: PrimaryContentPagingResponderBridgeView, context _: Context) {
-    nsView.update(request: request, isEnabled: isEnabled)
   }
 }
