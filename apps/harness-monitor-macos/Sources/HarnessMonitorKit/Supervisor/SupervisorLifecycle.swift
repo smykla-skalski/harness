@@ -1,14 +1,13 @@
 import Foundation
 
-/// Bridges the supervisor tick loop to macOS background-activity scheduling.
+/// Bridges the supervisor process lifetime to macOS background-activity scheduling.
 ///
-/// `startBackgroundActivity` arms an `NSBackgroundActivityScheduler` that fires the
-/// supervisor tick at the configured interval when no Monitor window is open.
-/// The scheduler is skipped entirely when the "Run in background" preference is disabled.
+/// `SupervisorService` owns the policy tick loop. `startBackgroundActivity` only arms an
+/// `NSBackgroundActivityScheduler` so macOS knows Monitor has lightweight background work when
+/// the "Run in background" preference is enabled.
 ///
-/// `onTick` is invoked each time the scheduler fires (or when `forceTick()` is called in
-/// tests). The caller (`HarnessMonitorStore+Supervisor`) sets this to
-/// `await supervisorService.runOneTick()`.
+/// `onTick` remains an optional test hook for this wrapper. Production startup does not wire it
+/// to `SupervisorService`, which keeps policy ticks single-owned by the service loop.
 public final class SupervisorLifecycle: @unchecked Sendable {
   // MARK: - State
 
@@ -18,10 +17,8 @@ public final class SupervisorLifecycle: @unchecked Sendable {
   /// `stopBackgroundActivity` and let this property reflect the result.
   public private(set) var isBackgroundActivityScheduled: Bool = false
 
-  /// Called each time the scheduler fires. Tests can also call `forceTick()` to drive this
-  /// synchronously without waiting for the real scheduler.
-  ///
-  /// Set before calling `startBackgroundActivity`.
+  /// Optional callback for tests and diagnostics. Production supervisor startup leaves this unset
+  /// so background scheduling cannot create a second policy tick source.
   public var onTick: (@Sendable () async -> Void)?
 
   private var scheduler: NSBackgroundActivityScheduler?

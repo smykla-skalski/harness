@@ -92,4 +92,15 @@ struct HarnessMonitorLaunchModeTests {
       )
     )
   }
+
+  @Test("Background supervisor keeps the live connection active while hidden")
+  func backgroundSupervisorKeepsHiddenAppLiveConnectionActive() {
+    #expect(
+      HarnessMonitorAppVisibilityPolicy.shouldSuspendLiveConnection(
+        appIsHidden: true,
+        hasVisibleNonMiniaturizedWindows: false,
+        keepsLiveConnectionInBackground: true
+      ) == false
+    )
+  }
 }

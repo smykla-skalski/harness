@@ -7,8 +7,8 @@ import Foundation
 /// `.critical` severity so the user can intervene.
 ///
 /// Duplicate suppression uses `PolicyContext.recentActionKeys`. The decision id is stable per
-/// disconnect episode (anchored to `connection.lastMessageAt` when present, otherwise to
-/// `snapshot.createdAt`) so tick N+1 produces the same `actionKey` and the executor dedupes it.
+/// disconnect episode: it anchors to `connection.disconnectedSince`, then `connection.lastMessageAt`,
+/// then `snapshot.createdAt` for synthetic tests.
 public struct DaemonDisconnectRule: PolicyRule {
   public let id = "daemon-disconnect"
   public let name = "Daemon Disconnect"
@@ -54,7 +54,10 @@ public struct DaemonDisconnectRule: PolicyRule {
       context.parameters.seconds(Self.escalationKey, default: Self.defaultEscalationSeconds)
     )
 
-    let anchor = snapshot.connection.lastMessageAt ?? snapshot.createdAt
+    let anchor =
+      snapshot.connection.disconnectedSince
+      ?? snapshot.connection.lastMessageAt
+      ?? snapshot.createdAt
     let elapsed = context.now.timeIntervalSince(anchor)
 
     if elapsed <= Double(grace) {

@@ -131,9 +131,11 @@ extension HarnessMonitorStore {
 
   func applyGlobalPushEvent(_ event: DaemonPushEvent) {
     if applyManagedAgentPushEvent(event) {
+      scheduleSupervisorTick(reason: "global-managed-agent")
       return
     }
 
+    var shouldTickSupervisor = false
     switch event.kind {
     case .ready:
       break
@@ -143,13 +145,16 @@ extension HarnessMonitorStore {
         sessions: payload.sessions
       )
       refreshSelectedSessionIfSummaryChanged(sessions: payload.sessions)
+      shouldTickSupervisor = true
     case .sessionUpdated(let payload):
       guard let sessionID = event.sessionId else {
         return
       }
       handleGlobalSessionUpdate(sessionID: sessionID, payload: payload)
+      shouldTickSupervisor = true
     case .sessionExtensions(let payload):
       applySessionExtensions(payload)
+      shouldTickSupervisor = true
     case .logLevelChanged(let response):
       daemonLogLevel = response.level
     case .codexRunUpdated, .codexApprovalRequested, .agentTuiUpdated, .acpAgentUpdated,
@@ -158,6 +163,9 @@ extension HarnessMonitorStore {
       break
     case .unknown:
       break
+    }
+    if shouldTickSupervisor {
+      scheduleSupervisorTick(reason: "global-session")
     }
   }
 
@@ -216,20 +224,27 @@ extension HarnessMonitorStore {
 
   func applySessionPushEvent(_ event: DaemonPushEvent) {
     if applyManagedAgentPushEvent(event) {
+      scheduleSupervisorTick(reason: "session-managed-agent")
       return
     }
 
+    var shouldTickSupervisor = false
     switch event.kind {
     case .ready, .sessionsUpdated, .logLevelChanged, .unknown:
       break
     case .sessionUpdated(let payload):
       handleSelectedSessionPushUpdate(event: event, payload: payload)
+      shouldTickSupervisor = true
     case .sessionExtensions(let payload):
       applySessionExtensions(payload)
+      shouldTickSupervisor = true
     case .codexRunUpdated, .codexApprovalRequested, .agentTuiUpdated, .acpAgentUpdated,
       .acpInspect, .acpAgentsReconciled, .acpProcessIncident, .acpBridgeResyncIncident,
       .acpEvents, .acpPermissionBatch, .acpPermissionBatchRemoved:
       break
+    }
+    if shouldTickSupervisor {
+      scheduleSupervisorTick(reason: "session-update")
     }
   }
 

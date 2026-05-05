@@ -177,8 +177,12 @@ public struct SessionSnapshot: Sendable, Hashable, Codable {
   ) -> Self {
     let agents = detail.agents.map { AgentSnapshot.from(registration: $0, now: now) }
     let tasks = detail.tasks.map(TaskSnapshot.from(workItem:))
+    let observerLastScanTime =
+      detail.observer.flatMap { SessionsSnapshotDateParser.parse($0.lastScanTime) }
     let observerIssues =
-      detail.observer?.openIssues?.map(ObserverIssueSnapshot.from(summary:)) ?? []
+      detail.observer?.openIssues?.map {
+        ObserverIssueSnapshot.from(summary: $0, firstSeen: observerLastScanTime)
+      } ?? []
     let timelineDensityLastMinute = timeline.reduce(into: 0) { count, entry in
       guard let timestamp = SessionsSnapshotDateParser.parse(entry.recordedAt) else { return }
       guard timestamp <= now, now.timeIntervalSince(timestamp) < 60 else { return }
@@ -291,12 +295,12 @@ public struct ObserverIssueSnapshot: Sendable, Hashable, Codable {
     self.count = count
   }
 
-  fileprivate static func from(summary: ObserverIssueSummary) -> Self {
+  fileprivate static func from(summary: ObserverIssueSummary, firstSeen: Date?) -> Self {
     Self(
       id: summary.issueId,
       severityRaw: summary.severity,
       code: summary.code,
-      firstSeen: nil,
+      firstSeen: firstSeen,
       count: summary.occurrenceCount ?? 0
     )
   }
@@ -327,11 +331,18 @@ public struct CodexApprovalSnapshot: Sendable, Hashable, Codable {
 public struct ConnectionSnapshot: Sendable, Hashable, Codable {
   public let kind: String
   public let lastMessageAt: Date?
+  public let disconnectedSince: Date?
   public let reconnectAttempt: Int
 
-  public init(kind: String, lastMessageAt: Date?, reconnectAttempt: Int) {
+  public init(
+    kind: String,
+    lastMessageAt: Date?,
+    disconnectedSince: Date? = nil,
+    reconnectAttempt: Int
+  ) {
     self.kind = kind
     self.lastMessageAt = lastMessageAt
+    self.disconnectedSince = disconnectedSince
     self.reconnectAttempt = reconnectAttempt
   }
 
@@ -342,7 +353,9 @@ public struct ConnectionSnapshot: Sendable, Hashable, Codable {
   ) -> Self {
     let kind: String
     switch state {
-    case .idle, .connecting, .offline:
+    case .idle:
+      kind = "idle"
+    case .connecting, .offline:
       kind = "disconnected"
     case .online:
       switch transport {
@@ -355,6 +368,7 @@ public struct ConnectionSnapshot: Sendable, Hashable, Codable {
     return Self(
       kind: kind,
       lastMessageAt: metrics.lastMessageAt,
+      disconnectedSince: kind == "disconnected" ? metrics.disconnectedSince : nil,
       reconnectAttempt: metrics.reconnectAttempt
     )
   }

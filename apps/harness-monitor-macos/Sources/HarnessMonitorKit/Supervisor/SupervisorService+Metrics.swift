@@ -1,8 +1,8 @@
 import Foundation
 
 extension SupervisorService {
-  func recordTickLatency(startedAt: Date) {
-    tickLatencySamplesMs.append(Date().timeIntervalSince(startedAt) * 1_000)
+  func recordTickLatency(startedAt: Date, endedAt: Date) {
+    tickLatencySamplesMs.append(max(0, endedAt.timeIntervalSince(startedAt) * 1_000))
     if tickLatencySamplesMs.count > 32 {
       tickLatencySamplesMs.removeFirst(tickLatencySamplesMs.count - 32)
     }

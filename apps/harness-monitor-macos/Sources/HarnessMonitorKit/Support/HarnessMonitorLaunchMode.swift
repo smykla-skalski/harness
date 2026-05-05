@@ -33,8 +33,12 @@ public enum HarnessMonitorLaunchMode: String, Equatable, Sendable {
 public enum HarnessMonitorAppVisibilityPolicy {
   public static func shouldSuspendLiveConnection(
     appIsHidden: Bool,
-    hasVisibleNonMiniaturizedWindows: Bool
+    hasVisibleNonMiniaturizedWindows: Bool,
+    keepsLiveConnectionInBackground: Bool = false
   ) -> Bool {
-    appIsHidden || hasVisibleNonMiniaturizedWindows == false
+    guard !keepsLiveConnectionInBackground else {
+      return false
+    }
+    return appIsHidden || hasVisibleNonMiniaturizedWindows == false
   }
 }

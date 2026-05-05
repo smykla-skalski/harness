@@ -59,6 +59,10 @@ private enum SupervisorStartTaskKey {
   nonisolated(unsafe) static var key: UInt8 = 0
 }
 
+private enum SupervisorTickTriggerKey {
+  nonisolated(unsafe) static var key: UInt8 = 0
+}
+
 private enum SupervisorNullActionHandlerKey {
   nonisolated(unsafe) static var key: UInt8 = 0
 }
@@ -106,6 +110,22 @@ extension HarnessMonitorStore {
         .OBJC_ASSOCIATION_RETAIN_NONATOMIC
       )
     }
+  }
+
+  var supervisorTickTrigger: SupervisorTickTrigger {
+    if let existing = objc_getAssociatedObject(self, &SupervisorTickTriggerKey.key)
+      as? SupervisorTickTrigger
+    {
+      return existing
+    }
+    let created = SupervisorTickTrigger()
+    objc_setAssociatedObject(
+      self,
+      &SupervisorTickTriggerKey.key,
+      created,
+      .OBJC_ASSOCIATION_RETAIN_NONATOMIC
+    )
+    return created
   }
 
   fileprivate var cachedNullActionHandler: NullDecisionActionHandler? {
@@ -196,6 +216,9 @@ extension HarnessMonitorStore {
   }
 
   public func stopSupervisor() async {
+    if supervisorStack == nil, let startTask = supervisorStartTask {
+      await startTask.value
+    }
     guard let stack = supervisorStack else {
       HarnessMonitorLogger.supervisorTrace("supervisor.stop skipped — not running")
       return
@@ -204,6 +227,7 @@ extension HarnessMonitorStore {
     supervisorStack = nil
 
     stack.relayTask.cancel()
+    supervisorTickTrigger.cancel()
     stack.lifecycle.stopBackgroundActivity()
     stack.auditRetention?.stopBackgroundCompaction()
     await stack.service.stop()
@@ -274,8 +298,52 @@ extension HarnessMonitorStore {
     await stack.service.runOneTick()
   }
 
+  func scheduleSupervisorTick(reason: String) {
+    guard supervisorStack != nil else {
+      return
+    }
+    let trigger = supervisorTickTrigger
+    trigger.pending = true
+    trigger.requestCount &+= 1
+    trigger.latestReason = reason
+    guard trigger.task == nil else {
+      return
+    }
+    trigger.task = Task { @MainActor [weak self, weak trigger] in
+      defer {
+        if let trigger {
+          let pendingReason = trigger.latestReason
+          let shouldRearm = trigger.pending && !Task.isCancelled
+          trigger.task = nil
+          if shouldRearm, let self {
+            self.scheduleSupervisorTick(reason: pendingReason ?? reason)
+          }
+        }
+      }
+      while trigger?.pending == true {
+        let tickReason = trigger?.latestReason ?? reason
+        trigger?.pending = false
+        trigger?.latestReason = nil
+        await Task.yield()
+        guard !Task.isCancelled, let self else {
+          return
+        }
+        if let trigger {
+          trigger.drainCount &+= 1
+        }
+        HarnessMonitorLogger.supervisorTrace("supervisor.tick.requested reason=\(tickReason)")
+        await self.runSupervisorTickNow()
+      }
+    }
+  }
+
   public func runSupervisorTickForTesting() async {
     await runSupervisorTickNow()
+  }
+
+  public func supervisorScheduledTickCountsForTesting() -> (requests: Int, drains: Int) {
+    let trigger = supervisorTickTrigger
+    return (trigger.requestCount, trigger.drainCount)
   }
 
   public func insertDecisionForTesting(_ draft: DecisionDraft) async throws {
@@ -303,6 +371,10 @@ extension HarnessMonitorStore {
 
   public func isSupervisorAuditRetentionScheduledForTesting() -> Bool {
     supervisorStack?.auditRetention?.isBackgroundActivityScheduled ?? false
+  }
+
+  public func forceSupervisorBackgroundActivityTickForTesting() async {
+    await supervisorStack?.lifecycle.forceTick()
   }
 
   public func isSupervisorAutoActionSuppressedForTesting(at date: Date) async -> Bool {

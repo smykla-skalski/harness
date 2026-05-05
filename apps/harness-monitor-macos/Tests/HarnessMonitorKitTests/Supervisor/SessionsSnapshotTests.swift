@@ -39,6 +39,21 @@ final class SessionsSnapshotTests: XCTestCase {
     XCTAssertEqual(snapshot.connection.reconnectAttempt, 2)
   }
 
+  func test_connectionSnapshotKeepsDisconnectedSinceWhenNoMessageHasArrived() async throws {
+    let store = HarnessMonitorStore.fixture()
+    store.connectionState = .offline("daemon down")
+    store.connectionMetrics.disconnectedSince = .fixed
+
+    let snapshot = await SessionsSnapshot.build(
+      from: store,
+      now: Date.fixed.addingTimeInterval(120)
+    )
+
+    XCTAssertEqual(snapshot.connection.kind, "disconnected")
+    XCTAssertEqual(snapshot.connection.lastMessageAt, nil)
+    XCTAssertEqual(snapshot.connection.disconnectedSince, .fixed)
+  }
+
   func test_nonSelectedSessionHydratesFromCachedDetail() async throws {
     let store = try await HarnessMonitorStore.fixture(sessions: .twoActiveSessions)
     let snapshot = await SessionsSnapshot.build(from: store, now: .fixed)
@@ -48,7 +63,7 @@ final class SessionsSnapshotTests: XCTestCase {
     XCTAssertEqual(session.timelineDensityLastMinute, 1)
     let issue = try XCTUnwrap(session.observerIssues.first)
     XCTAssertEqual(issue.code, "POL-001")
-    XCTAssertNotEqual(issue.firstSeen, Date(timeIntervalSince1970: 0))
+    XCTAssertEqual(issue.firstSeen, Date.fixed.addingTimeInterval(-5))
   }
 
   func test_selectedSessionIncludesPendingCodexApprovals() async throws {

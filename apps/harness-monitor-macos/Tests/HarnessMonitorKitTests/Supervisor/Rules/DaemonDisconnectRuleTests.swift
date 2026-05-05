@@ -8,6 +8,7 @@ final class DaemonDisconnectRuleTests: XCTestCase {
   private func makeSnapshot(
     kind: String,
     lastMessageAt: Date?,
+    disconnectedSince: Date? = nil,
     createdAt: Date = .fixed
   ) -> SessionsSnapshot {
     SessionsSnapshot(
@@ -18,6 +19,7 @@ final class DaemonDisconnectRuleTests: XCTestCase {
       connection: ConnectionSnapshot(
         kind: kind,
         lastMessageAt: lastMessageAt,
+        disconnectedSince: disconnectedSince,
         reconnectAttempt: 0
       )
     )
@@ -64,6 +66,23 @@ final class DaemonDisconnectRuleTests: XCTestCase {
     let actions = await rule.evaluate(snapshot: snapshot, context: context)
 
     XCTAssertTrue(actions.isEmpty)
+  }
+
+  func test_disconnectedSinceTakesPrecedenceOverOlderLastMessage() async {
+    let rule = DaemonDisconnectRule()
+    let disconnectedSince = Date.fixed
+    let now = disconnectedSince.addingTimeInterval(10)
+    let snapshot = makeSnapshot(
+      kind: "disconnected",
+      lastMessageAt: disconnectedSince.addingTimeInterval(-3_600),
+      disconnectedSince: disconnectedSince,
+      createdAt: now
+    )
+    let context = makeContext(now: now)
+
+    let actions = await rule.evaluate(snapshot: snapshot, context: context)
+
+    XCTAssertTrue(actions.isEmpty, "disconnect age must start when disconnection begins")
   }
 
   // MARK: - Notify after grace
@@ -236,6 +255,44 @@ final class DaemonDisconnectRuleTests: XCTestCase {
       return
     }
     XCTAssertEqual(payload.severity, .critical)
+  }
+
+  func test_disconnectedWithNilLastMessageUsesDisconnectedSinceAcrossTicks() async {
+    let rule = DaemonDisconnectRule()
+    let disconnectedSince = Date.fixed
+    let firstTick = disconnectedSince.addingTimeInterval(70)
+    let secondTick = disconnectedSince.addingTimeInterval(95)
+
+    let firstSnapshot = makeSnapshot(
+      kind: "disconnected",
+      lastMessageAt: nil,
+      disconnectedSince: disconnectedSince,
+      createdAt: firstTick
+    )
+    let secondSnapshot = makeSnapshot(
+      kind: "disconnected",
+      lastMessageAt: nil,
+      disconnectedSince: disconnectedSince,
+      createdAt: secondTick
+    )
+
+    let firstActions = await rule.evaluate(
+      snapshot: firstSnapshot,
+      context: makeContext(now: firstTick)
+    )
+    let secondActions = await rule.evaluate(
+      snapshot: secondSnapshot,
+      context: makeContext(now: secondTick)
+    )
+
+    guard
+      case .queueDecision(let first) = firstActions.first,
+      case .queueDecision(let second) = secondActions.first
+    else {
+      XCTFail("expected both ticks to emit queueDecision")
+      return
+    }
+    XCTAssertEqual(first.id, second.id)
   }
 
 }

@@ -87,6 +87,7 @@ extension HarnessMonitorStore {
     } else {
       stopSessionStream()
     }
+    scheduleSupervisorTick(reason: "connect-live")
   }
 
   private func performPreviewConnectRefresh(
