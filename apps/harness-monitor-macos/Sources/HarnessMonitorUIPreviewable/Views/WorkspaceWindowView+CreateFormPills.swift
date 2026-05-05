@@ -7,7 +7,10 @@ extension WorkspaceWindowCreatePane {
     option: AgentCapabilityOption,
     context: TerminalConfigurationContext
   ) -> some View {
-    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+    AgentsConfigPillFlow(
+      spacing: HarnessMonitorTheme.spacingSM,
+      lineSpacing: HarnessMonitorTheme.spacingSM
+    ) {
       if option.transportChoices.count > 1 {
         terminalTransportPill(option: option, context: context)
       }
@@ -22,7 +25,6 @@ extension WorkspaceWindowCreatePane {
         terminalFallbackRolePill
       }
       terminalPersonaPill
-      Spacer(minLength: 0)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
