@@ -84,6 +84,9 @@ struct AgentDetailRoleActionsRegion: View {
     .accessibilityIdentifier(
       HarnessMonitorAccessibility.agentDetailRoleActionsDisclosure(agentID)
     )
+    .accessibilityFrameMarker(
+      "\(HarnessMonitorAccessibility.agentDetailRoleActionsDisclosure(agentID)).frame"
+    )
   }
 }
 
@@ -99,7 +102,7 @@ struct AgentDetailComposerRegion: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Text("Send update")
+      Text("Send Update")
         .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
         .foregroundStyle(HarnessMonitorTheme.ink)
         .accessibilityAddTraits(.isHeader)
