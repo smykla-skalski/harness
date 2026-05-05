@@ -3,32 +3,38 @@ import HarnessMonitorKit
 protocol TimelineEventFeature: Sendable {
   static var id: String { get }
   func handles(entry: TimelineEntry) -> Bool
-  func patch(for entry: TimelineEntry) -> TimelineEntryMetadataPatch
+  func tapTarget(for entry: TimelineEntry) -> TimelineTapTarget?
   func tone(for entry: TimelineEntry) -> SessionTimelineTone?
-  func liveRegionPriority(for entry: TimelineEntry) -> MonitorTimelineLiveRegionPriority?
-  func actions(for node: SessionTimelineNode, ctx: TimelineFeatureContext) -> [SessionTimelineAction]
-  func contextMenuItems(for node: SessionTimelineNode, ctx: TimelineFeatureContext) -> [TimelineContextMenuItem]
+  func actions(
+    for node: SessionTimelineNode,
+    ctx: TimelineFeatureContext
+  ) -> [SessionTimelineAction]
+  func contextMenuItems(
+    for node: SessionTimelineNode,
+    ctx: TimelineFeatureContext
+  ) -> [TimelineContextMenuItem]
   func prefersCompactLayout(for node: SessionTimelineNode) -> Bool?
   func voiceOverLabel(for node: SessionTimelineNode, ctx: TimelineFeatureContext) -> String?
-  func filterPreset() -> TimelineFilterPreset?
   func statusBadgeLabel(for node: SessionTimelineNode, ctx: TimelineFeatureContext) -> String?
 }
 
 extension TimelineEventFeature {
-  func patch(for entry: TimelineEntry) -> TimelineEntryMetadataPatch { .empty }
+  func tapTarget(for entry: TimelineEntry) -> TimelineTapTarget? { nil }
   func tone(for entry: TimelineEntry) -> SessionTimelineTone? { nil }
-  func liveRegionPriority(for entry: TimelineEntry) -> MonitorTimelineLiveRegionPriority? { nil }
-  func actions(for node: SessionTimelineNode, ctx: TimelineFeatureContext) -> [SessionTimelineAction] { [] }
-  func contextMenuItems(for node: SessionTimelineNode, ctx: TimelineFeatureContext) -> [TimelineContextMenuItem] { [] }
+  func actions(
+    for node: SessionTimelineNode,
+    ctx: TimelineFeatureContext
+  ) -> [SessionTimelineAction] { [] }
+  func contextMenuItems(
+    for node: SessionTimelineNode,
+    ctx: TimelineFeatureContext
+  ) -> [TimelineContextMenuItem] { [] }
   func prefersCompactLayout(for node: SessionTimelineNode) -> Bool? { nil }
   func voiceOverLabel(for node: SessionTimelineNode, ctx: TimelineFeatureContext) -> String? { nil }
-  func filterPreset() -> TimelineFilterPreset? { nil }
-  func statusBadgeLabel(for node: SessionTimelineNode, ctx: TimelineFeatureContext) -> String? { nil }
-}
-
-struct TimelineFilterPreset: Equatable, Sendable {
-  let id: String
-  let kinds: Set<String>
+  func statusBadgeLabel(
+    for node: SessionTimelineNode,
+    ctx: TimelineFeatureContext
+  ) -> String? { nil }
 }
 
 enum SessionTimelineEventFeatureRegistry {

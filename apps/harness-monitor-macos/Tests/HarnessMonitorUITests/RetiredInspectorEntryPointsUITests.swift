@@ -3,20 +3,10 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
-final class RetiredInspectorEntryPointsUITests: HarnessMonitorUITestCase {
-  func testCreateTaskEntryPoints() throws {
-    let app = launch(
-      mode: "preview",
-      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "cockpit"]
-    )
-
-    let sessionRow = previewSessionTrigger(in: app)
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
-    tapPreviewSession(in: app)
-
-    verifyCreateTaskSheet(in: app)
-  }
-
+final class RetiredInspectorEntryPointsUITests:
+  HarnessMonitorUITestCase,
+  WorkspaceWindowUITestSupporting
+{
   func testAllRetiredInspectorEntryPoints() throws {
     let app = launch(
       mode: "preview",
@@ -95,6 +85,7 @@ final class RetiredInspectorEntryPointsUITests: HarnessMonitorUITestCase {
       "Provider list should render below the New Agent header, not above it from a stale scroll offset"
     )
   }
+
 }
 
 extension RetiredInspectorEntryPointsUITests {

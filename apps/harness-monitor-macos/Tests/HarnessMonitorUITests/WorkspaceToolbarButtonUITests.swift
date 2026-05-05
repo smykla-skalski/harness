@@ -93,7 +93,7 @@ final class WorkspaceToolbarButtonUITests:
     )
   }
 
-  func testToolbarOpenClearsPersistedDecisionSeverityFilters() throws {
+  func testToolbarReopenPreservesLastDecisionRouteAndFilters() throws {
     let app = launch(
       mode: "empty",
       additionalEnvironment: [
@@ -167,11 +167,12 @@ final class WorkspaceToolbarButtonUITests:
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
         workspaceWindow.exists
-          && filterState.label.contains("severities=all")
-          && decisionRow.exists
+          && filterState.label.contains("severities=critical")
+          && !decisionRow.exists
+          && decisionDesk.exists
       },
       """
-      Reopening from the toolbar should clear persisted severity filters so the pending decision is visible.
+      Reopening from the toolbar should restore the last decision route instead of forcing a fresh reset.
       filter='\(filterState.label)' desk='\(decisionDesk.label)' rowExists=\(decisionRow.exists)
       """
     )

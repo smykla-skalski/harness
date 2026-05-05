@@ -18,14 +18,28 @@ extension WorkspaceWindowView {
     return true
   }
 
-  func resolveInitialWorkspaceSelection() {
-    _ = consumePendingWorkspaceSelection()
+  func resolveInitialWorkspaceSelection() async {
+    if consumePendingWorkspaceSelection() {
+      await Task.yield()
+      WorkspaceSelectionDefaults.write(viewModel.selection)
+      return
+    }
+    await handleSelectionChange(from: .create, to: viewModel.selection)
+    WorkspaceSelectionDefaults.write(viewModel.selection)
+    updateNavigationState()
   }
 
-  private func applyWorkspaceCreateEntryPoint(_ entryPoint: WorkspaceCreateEntryPoint) {
+  static func applyWorkspaceCreateEntryPoint(
+    _ entryPoint: WorkspaceCreateEntryPoint,
+    to viewModel: ViewModel
+  ) {
     switch entryPoint {
     case .agent:
       viewModel.createMode = .terminal
     }
+  }
+
+  private func applyWorkspaceCreateEntryPoint(_ entryPoint: WorkspaceCreateEntryPoint) {
+    Self.applyWorkspaceCreateEntryPoint(entryPoint, to: viewModel)
   }
 }

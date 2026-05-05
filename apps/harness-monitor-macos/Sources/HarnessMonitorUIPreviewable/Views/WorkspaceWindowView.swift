@@ -49,18 +49,28 @@ public struct WorkspaceWindowView: View {
     self.store = store
     self.keyWindowObserver = keyWindowObserver
     self.navigationBridge = navigationBridge
+    let initialWorkspaceRequest = store.consumePendingWorkspaceSelectionRequest()
+    if initialWorkspaceRequest?.resetDecisionFilters == true {
+      WorkspaceDecisionFilterDefaults.reset()
+    }
     let initialDisplayState = AgentTuiDisplayState(initialWindowStore: store)
-    let initialSelection = Self.initialSelection(
+    let initialSelection = Self.initialWindowSelection(
+      store: store,
       displayState: initialDisplayState,
-      selectedTerminalID: store.selectedAgentTui?.tuiId,
-      selectedCodexRunID: store.selectedCodexRun?.runId
+      pendingRequest: initialWorkspaceRequest
     )
+    let initialViewModel = ViewModel(
+      selection: initialSelection,
+      displayState: initialDisplayState,
+      createSessionID: store.selectedSessionID
+    )
+    if case .create = initialSelection,
+      let createEntryPoint = initialWorkspaceRequest?.createEntryPoint
+    {
+      Self.applyWorkspaceCreateEntryPoint(createEntryPoint, to: initialViewModel)
+    }
     _stateViewModel = State(
-      wrappedValue: ViewModel(
-        selection: initialSelection,
-        displayState: initialDisplayState,
-        createSessionID: store.selectedSessionID
-      )
+      wrappedValue: initialViewModel
     )
     _decisionWorkspaceSnapshotState = State(
       initialValue: DecisionWorkspaceScope(
@@ -218,7 +228,7 @@ public struct WorkspaceWindowView: View {
       selection: $viewModel.selection
     )
     let content = configuredWorkspaceContent(
-      splitView,
+      pendingSelectionAwareContent(splitView),
       decisionScope: decisionScope,
       viewModel: viewModel
     )
@@ -258,8 +268,8 @@ public struct WorkspaceWindowView: View {
       .task {
         await prepareWorkspace()
       }
-      .onChange(of: store.pendingWorkspaceSelection) { _, _ in
-        consumePendingWorkspaceSelection()
+      .task(id: store.pendingWorkspaceSelection) {
+        _ = consumePendingWorkspaceSelection()
       }
       .onChange(of: workspaceRefreshState) { _, _ in
         guard hasCompletedInitialWorkspacePreparation else {
@@ -313,5 +323,16 @@ public struct WorkspaceWindowView: View {
           restoreSidebarVisibility(using: binding)
         }
       }
+  }
+
+  @ViewBuilder
+  private func pendingSelectionAwareContent<Content: View>(
+    _ splitView: Content
+  ) -> some View {
+    if store.pendingWorkspaceSelection != nil {
+      WorkspaceWindowOpeningView()
+    } else {
+      splitView
+    }
   }
 }

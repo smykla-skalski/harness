@@ -26,6 +26,10 @@ extension WorkspaceWindowView {
     viewModel: ViewModel
   ) {
     if oldValue != newValue {
+      WorkspaceSelectionDefaults.write(newValue)
+    }
+
+    if oldValue != newValue {
       cancelPendingViewportResize()
       Task {
         await flushPendingKeySequenceIfNeeded()
