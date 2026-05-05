@@ -1,29 +1,9 @@
-use std::collections::BTreeMap;
-use std::env::temp_dir;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex, OnceLock};
-
-use axum::body::to_bytes;
 use axum::extract::{Query, State};
-use axum::http::{HeaderMap, StatusCode, header::AUTHORIZATION};
+use axum::http::{HeaderMap, StatusCode};
 use serde_json::Value;
-use tokio::sync::broadcast;
-use uuid::Uuid;
-
-use crate::agents::runtime::RuntimeCapabilities;
-use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
-use crate::daemon::agent_acp::AcpAgentManagerHandle;
-use crate::daemon::agent_tui::AgentTuiManagerHandle;
-use crate::daemon::codex_controller::CodexControllerHandle;
-use crate::daemon::db::DaemonDb;
-use crate::daemon::index::DiscoveredProject;
 use crate::daemon::protocol::{ObserveSessionRequest, SessionEndRequest};
-use crate::daemon::state::DaemonManifest;
 use crate::errors::CliErrorKind;
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
-use crate::session::types::{
-    AgentRegistration, AgentStatus, SessionMetrics, SessionRole, SessionState, SessionStatus,
-};
 
 use super::DaemonHttpState;
 use super::agents::{post_remove_agent, post_role_change, post_transfer_leader};
@@ -32,7 +12,7 @@ use super::core::{
     RuntimeSessionResolutionQuery, get_diagnostics, get_health, get_ready,
     get_runtime_session_resolution,
 };
-use super::response::{extract_request_id, map_json, request_activity_log_level};
+use super::response::{extract_request_id, request_activity_log_level};
 use super::runtime_session::post_runtime_session;
 use super::sessions::{
     SessionScopeQuery, get_timeline, post_end_session, post_observe_session, post_session_join,
@@ -58,7 +38,7 @@ mod support;
 mod task_review;
 mod telemetry;
 
-pub(super) use support::*;
+pub(in crate::daemon::http) use support::*;
 
 #[tokio::test]
 async fn map_json_maps_codex_unavailable_to_503() {

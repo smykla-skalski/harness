@@ -29,7 +29,11 @@ In addition to the canonical version surfaces listed in `AGENTS.md`, Claude-spec
 - `.claude/plugins/suite/.claude-plugin/plugin.json` - bump only when plugin content changes (prompts, tools, SKILL.md, agent config); harness-only changes do not require a plugin version bump; `src/bootstrap.rs` reads this file for plugin-cache sync
 - `.claude/plugins/harness/.claude-plugin/plugin.json` - bump only when harness plugin content changes (SKILL.md, agent config, references); harness-only changes do not require a plugin version bump
 
-When working on `main`, make the approved bump in the same change. In a worktree or feature branch, defer the approved bump to `main` after merge to avoid conflicts.
+Never bump versions without explicit user approval. Changes to shipped `harness` or `aff` logic that mean the local binary must be reinstalled require a version bump once that approval exists. When working on `main`, make the approved bump in the same change. In a worktree or feature branch, defer the approved bump to `main` after merge to avoid conflicts.
+
+## Logging addenda
+
+Diagnostic output uses `tracing` macros. Default filter: `RUST_LOG=harness=info`.
 
 ## Working session efficiency
 

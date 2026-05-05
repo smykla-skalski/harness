@@ -49,6 +49,10 @@ fn err<T: std::fmt::Debug, E: std::fmt::Debug>(result: Result<T, E>, context: &s
 }
 
 pub(super) fn setup_client() -> (TempDir, HarnessAcpClient) {
+    setup_client_with_terminal_cap(super::MAX_TERMINALS_PER_SESSION)
+}
+
+pub(super) fn setup_client_with_terminal_cap(terminal_cap: usize) -> (TempDir, HarnessAcpClient) {
     let temp = ok(TempDir::new(), "create temp dir");
     let run_dir = temp.path().to_path_buf();
     let working_dir = temp.path().to_path_buf();
@@ -66,7 +70,7 @@ pub(super) fn setup_client() -> (TempDir, HarnessAcpClient) {
     denied.insert("kubectl".to_string());
     denied.insert("kumactl".to_string());
 
-    let client = HarnessAcpClient::new(
+    let client = HarnessAcpClient::new_with_terminal_cap(
         working_dir,
         run_dir.clone(),
         None,
@@ -74,6 +78,7 @@ pub(super) fn setup_client() -> (TempDir, HarnessAcpClient) {
         PermissionMode::Recording {
             log_path: run_dir.join("permission-log.ndjson"),
         },
+        terminal_cap,
     );
 
     (temp, client)

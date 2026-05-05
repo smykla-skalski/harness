@@ -100,13 +100,32 @@ impl HarnessAcpClient {
         denied_binaries: BTreeSet<String>,
         permission_mode: PermissionMode,
     ) -> Self {
+        Self::new_with_terminal_cap(
+            working_dir,
+            run_dir,
+            suite_dir,
+            denied_binaries,
+            permission_mode,
+            MAX_TERMINALS_PER_SESSION,
+        )
+    }
+
+    #[must_use]
+    fn new_with_terminal_cap(
+        working_dir: PathBuf,
+        run_dir: PathBuf,
+        suite_dir: Option<PathBuf>,
+        denied_binaries: BTreeSet<String>,
+        permission_mode: PermissionMode,
+        terminal_cap: usize,
+    ) -> Self {
         Self {
             working_dir,
             run_dir,
             suite_dir,
             denied_binaries: DeniedBinaries::new(denied_binaries),
             permission_mode,
-            terminals: TerminalManager::new(MAX_TERMINALS_PER_SESSION),
+            terminals: TerminalManager::new(terminal_cap),
             event_sink: None,
         }
     }

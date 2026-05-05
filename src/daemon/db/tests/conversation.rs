@@ -1,8 +1,17 @@
 use super::*;
 
+fn seed_conversation_session(db: &DaemonDb) {
+    let project = sample_project();
+    db.sync_project(&project).expect("sync project");
+    let state = sample_session_state();
+    db.sync_session(&project.project_id, &state)
+        .expect("sync session");
+}
+
 #[test]
 fn sync_conversation_events_replaces_existing_rows() {
     let db = DaemonDb::open_in_memory().expect("open db");
+    seed_conversation_session(&db);
     let first = vec![
         sample_conversation_event(1, "first"),
         sample_conversation_event(2, "second"),
@@ -130,6 +139,7 @@ fn sync_conversation_events_only_bumps_revision_when_visible_rows_change() {
 #[test]
 fn clear_session_conversation_events_removes_rows_for_removed_agents() {
     let db = DaemonDb::open_in_memory().expect("open db");
+    seed_conversation_session(&db);
     db.sync_conversation_events(
         "sess-test-1",
         "claude-leader",
