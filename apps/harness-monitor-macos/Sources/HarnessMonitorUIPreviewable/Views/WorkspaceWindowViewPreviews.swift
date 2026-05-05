@@ -71,6 +71,14 @@ import SwiftUI
   workspaceWindowAcpLeaderPreview()
 }
 
+#Preview("Workspace - Agent Detail Pane") {
+  workspaceWindowAgentDetailPreview(agentID: "worker-codex")
+}
+
+#Preview("Workspace - Agent Detail Leader") {
+  workspaceWindowAgentDetailPreview(agentID: "leader-claude")
+}
+
 @MainActor
 private func workspaceWindowPreview(
   width: CGFloat = 980,
@@ -78,6 +86,26 @@ private func workspaceWindowPreview(
   store: HarnessMonitorStore
 ) -> some View {
   WorkspaceWindowView(store: store)
+    .frame(width: width, height: height)
+    .padding()
+}
+
+@MainActor
+private func workspaceWindowAgentDetailPreview(
+  agentID: String,
+  width: CGFloat = 1_180,
+  height: CGFloat = 820
+) -> some View {
+  let store = AgentTuiPreviewSupport.makeStore(
+    tuis: AgentTuiPreviewSupport.runningSingle,
+    selectedTuiID: AgentTuiPreviewSupport.runningSingle.first?.tuiId
+  )
+  let view = WorkspaceWindowView(store: store)
+  view.viewModel.selection = .agent(
+    sessionID: store.selectedSessionID,
+    agentID: agentID
+  )
+  return view
     .frame(width: width, height: height)
     .padding()
 }
