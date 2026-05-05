@@ -32,7 +32,6 @@ extension WorkspaceWindowCreatePane {
           }
         }
         .onChange(of: formModel.selectedLaunchSelection) { _, newValue in
-          formModel.didApplyLaunchSelectionAutoDefault = true
           let preferredRuntime = newValue.preferredRuntime
           if formModel.runtime != preferredRuntime {
             formModel.runtime = preferredRuntime

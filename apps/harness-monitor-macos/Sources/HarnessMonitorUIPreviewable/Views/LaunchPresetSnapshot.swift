@@ -53,6 +53,12 @@ struct LaunchPresetSnapshot: Codable, Sendable, Equatable {
     self.customCodexModel = customCodexModel
     self.codexEffort = codexEffort
   }
+
+  var providerID: String? {
+    providerStorageKey
+      .flatMap(AgentLaunchSelection.init(storageKey:))
+      .map(HarnessMonitorAgentLaunchDefaults.providerID(for:))
+  }
 }
 
 enum LaunchPresetDefaults {

@@ -2,6 +2,7 @@ import Foundation
 
 enum HarnessMonitorAgentLaunchDefaults {
   static let preferredSelectionKey = "harness.agent-launch.preferred-selection"
+  static let preferredProviderKey = "harness.agent-launch.preferred-provider"
   static let legacyTerminalCopilotExplicitKey =
     "harness.agent-launch.legacy-terminal-copilot-explicit"
   static let startupFallbackSelection = AgentLaunchSelection.tui(.codex)
@@ -34,6 +35,35 @@ enum HarnessMonitorAgentLaunchDefaults {
     return !isImplicitLegacyTerminalCopilot(storedValue, userDefaults: userDefaults)
   }
 
+  static func preferredProviderID(
+    userDefaults: UserDefaults = .standard
+  ) -> String? {
+    if let storedProvider = userDefaults.string(forKey: preferredProviderKey),
+      !storedProvider.isEmpty
+    {
+      return storedProvider
+    }
+    guard hasExplicitPreferredSelection(userDefaults: userDefaults) else {
+      return nil
+    }
+    return providerID(for: preferredSelection(userDefaults: userDefaults))
+  }
+
+  static func hasExplicitPreferredProvider(
+    userDefaults: UserDefaults = .standard
+  ) -> Bool {
+    preferredProviderID(userDefaults: userDefaults) != nil
+  }
+
+  static func providerID(for selection: AgentLaunchSelection) -> String {
+    switch selection {
+    case .tui(let runtime):
+      runtime.rawValue
+    case .acp(let id):
+      id
+    }
+  }
+
   static func isImplicitLegacyTerminalCopilot(
     _ storageKey: String?,
     userDefaults: UserDefaults = .standard
@@ -49,6 +79,7 @@ enum HarnessMonitorAgentLaunchDefaults {
     userDefaults: UserDefaults = .standard
   ) {
     userDefaults.set(selection.storageKey, forKey: preferredSelectionKey)
+    userDefaults.set(providerID(for: selection), forKey: preferredProviderKey)
     noteExplicitSelection(selection, userDefaults: userDefaults)
   }
 

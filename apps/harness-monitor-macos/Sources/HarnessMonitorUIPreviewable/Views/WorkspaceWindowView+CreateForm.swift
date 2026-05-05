@@ -330,12 +330,17 @@ extension WorkspaceWindowCreatePane {
   }
 
   private func restoreTerminalLaunchPreset(from snapshot: LaunchPresetSnapshot) {
-    if !HarnessMonitorAgentLaunchDefaults.hasExplicitPreferredSelection(),
+    if !HarnessMonitorAgentLaunchDefaults.hasExplicitPreferredProvider(),
       let providerKey = snapshot.providerStorageKey,
       let parsed = AgentLaunchSelection(storageKey: providerKey)
     {
-      viewModel.selectedLaunchSelection = parsed
-      viewModel.runtime = parsed.preferredRuntime
+      let defaultSelection = WorkspaceWindowView.defaultLaunchSelection(
+        providerID: HarnessMonitorAgentLaunchDefaults.providerID(for: parsed),
+        options: agentCapabilityOptions,
+        fallback: parsed
+      )
+      viewModel.selectedLaunchSelection = defaultSelection
+      viewModel.runtime = defaultSelection.preferredRuntime
     }
     if let role = snapshot.role.flatMap(SessionRole.init(rawValue:)) {
       viewModel.selectedRole = role

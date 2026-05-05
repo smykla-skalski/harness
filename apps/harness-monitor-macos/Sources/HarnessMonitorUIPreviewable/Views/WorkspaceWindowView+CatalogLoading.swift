@@ -94,7 +94,7 @@ extension WorkspaceWindowView {
 
   @MainActor
   func reloadAgentPickerCatalogsIfPending() async {
-    guard !viewModel.didApplyLaunchSelectionAutoDefault else { return }
+    guard !viewModel.didPickLaunchSelectionManually else { return }
     await loadAgentPickerCatalogs()
   }
 
@@ -142,32 +142,31 @@ extension WorkspaceWindowView {
   private func resolveInitialLaunchSelectionIfFresh(
     options: [AgentCapabilityOption]
   ) -> AgentLaunchSelection {
-    defer { viewModel.didEvaluateInitialLaunchAutoDefault = true }
-
-    if viewModel.didApplyLaunchSelectionAutoDefault {
+    if viewModel.didPickLaunchSelectionManually {
       return viewModel.selectedLaunchSelection
     }
 
-    let hasStoredSnapshot =
-      LaunchPresetDefaults.read().map {
-        LaunchPresetDefaults.blocksInitialAcpDefault($0)
-      } ?? false
-    let hasStoredPreferredSelection =
-      HarnessMonitorAgentLaunchDefaults.hasExplicitPreferredSelection()
-    if hasStoredSnapshot || hasStoredPreferredSelection {
-      viewModel.didApplyLaunchSelectionAutoDefault = true
-      return viewModel.selectedLaunchSelection
+    if let storedProviderID = HarnessMonitorAgentLaunchDefaults.preferredProviderID() {
+      return Self.defaultLaunchSelection(
+        providerID: storedProviderID,
+        options: options,
+        fallback: viewModel.selectedLaunchSelection
+      )
     }
 
-    let isSubsequentEvaluation = viewModel.didEvaluateInitialLaunchAutoDefault
-    let formIsVisible = viewModel.selection == .create
-    if isSubsequentEvaluation && formIsVisible {
-      viewModel.didApplyLaunchSelectionAutoDefault = true
-      return viewModel.selectedLaunchSelection
+    if let snapshot = LaunchPresetDefaults.read(),
+      LaunchPresetDefaults.blocksInitialAcpDefault(snapshot)
+    {
+      guard let providerID = snapshot.providerID else {
+        return viewModel.selectedLaunchSelection
+      }
+      return Self.defaultLaunchSelection(
+        providerID: providerID,
+        options: options,
+        fallback: viewModel.selectedLaunchSelection
+      )
     }
 
-    let firstProviderSelection = Self.firstProviderLaunchSelection(options: options)
-    viewModel.didApplyLaunchSelectionAutoDefault = true
-    return firstProviderSelection
+    return Self.firstProviderLaunchSelection(options: options)
   }
 }

@@ -102,6 +102,19 @@ extension WorkspaceWindowView {
     return firstOption.normalizedSelection(for: firstChoice.id)
   }
 
+  static func defaultLaunchSelection(
+    providerID: String,
+    options: [AgentCapabilityOption],
+    fallback: AgentLaunchSelection
+  ) -> AgentLaunchSelection {
+    guard let option = options.first(where: { $0.id == providerID }),
+      let firstChoice = option.transportChoices.first
+    else {
+      return fallback
+    }
+    return option.normalizedSelection(for: firstChoice.id)
+  }
+
   static func transportChoices(
     runtime: AgentTuiRuntime,
     descriptor: AcpAgentDescriptor?

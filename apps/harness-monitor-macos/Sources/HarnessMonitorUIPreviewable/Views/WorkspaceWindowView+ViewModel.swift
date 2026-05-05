@@ -362,8 +362,7 @@ extension WorkspaceWindowView {
     var keySequenceBuffer = KeySequenceBuffer()
     var hasFreshManagedAgentTuis = false
     var hasFreshManagedCodexRuns = false
-    @ObservationIgnored var didApplyLaunchSelectionAutoDefault = false
-    @ObservationIgnored var didEvaluateInitialLaunchAutoDefault = false
+    @ObservationIgnored var didPickLaunchSelectionManually = false
     var displayState: AgentTuiDisplayState
     init(
       selection: WorkspaceSelection = .create,
