@@ -51,7 +51,7 @@ extension ManagedLaunchAgentBundleStampFixture {
       launchAgentPlistDeviceIdentifier: launchAgentPlistDeviceIdentifier,
       launchAgentPlistInode: launchAgentPlistInode,
       launchAgentPlistFileSize: launchAgentPlistFileSize,
-      launchAgentPlistModificationTimeIntervalSince1970: launchAgentPlistMtimeSince1970
+      launchAgentPlistModifiedAtSeconds: launchAgentPlistMtimeSince1970
     )
   }
 }

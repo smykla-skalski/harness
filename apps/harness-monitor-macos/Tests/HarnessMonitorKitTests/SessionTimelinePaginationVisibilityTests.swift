@@ -48,9 +48,11 @@ struct SessionTimelineNavigationVisibilityTests {
       rows: rows,
       actionHandler: NullDecisionActionHandler(),
       scrollCommand: nil,
-      scrollView: scrollView,
-      columnWidth: 945,
-      fontScale: 1
+      request: .init(
+        scrollView: scrollView,
+        columnWidth: 945,
+        fontScale: 1
+      )
     )
     coordinator.cancelMeasurement(reason: "test")
     tableView.layoutSubtreeIfNeeded()

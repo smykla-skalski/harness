@@ -158,7 +158,7 @@ struct DaemonControllerManagedLaunchAgentWarmUpTests {
       launchAgentPlistDeviceIdentifier: 99,
       launchAgentPlistInode: 256,
       launchAgentPlistFileSize: 2_048,
-      launchAgentPlistModificationTimeIntervalSince1970: 1_714_500_000
+      launchAgentPlistMtimeSince1970: 1_714_500_000
     )
     let stalePersistedStamp = ManagedLaunchAgentBundleStampFixture(
       helperPath: managedLaunchAgentHelperPathFixture,
@@ -170,7 +170,7 @@ struct DaemonControllerManagedLaunchAgentWarmUpTests {
       launchAgentPlistDeviceIdentifier: 99,
       launchAgentPlistInode: 256,
       launchAgentPlistFileSize: 1_024,
-      launchAgentPlistModificationTimeIntervalSince1970: 1_713_500_000
+      launchAgentPlistMtimeSince1970: 1_713_500_000
     )
     let liveEndpoint = "http://127.0.0.1:65531"
 

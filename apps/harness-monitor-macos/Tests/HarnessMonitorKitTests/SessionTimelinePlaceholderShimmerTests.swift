@@ -1,6 +1,7 @@
+import Foundation
 import Testing
 
-@testable import HarnessMonitorKit
+@testable import HarnessMonitorUIPreviewable
 
 @Suite("SessionTimeline placeholder shimmer")
 struct SessionTimelinePlaceholderShimmerTests {
