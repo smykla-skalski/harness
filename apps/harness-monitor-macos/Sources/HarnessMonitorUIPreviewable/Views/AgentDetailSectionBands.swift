@@ -58,10 +58,12 @@ struct AgentDetailActivityBand: View {
   let isSparseState: Bool
 
   var body: some View {
-    AgentDetailPanel(title: "Activity") {
+    AgentDetailPanel(title: timeline.isEmpty ? nil : "Activity") {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-          AgentDetailSubsectionTitle(title: "Recent transcript")
+          if !timeline.isEmpty {
+            AgentDetailSubsectionTitle(title: "Recent transcript")
+          }
           AgentTranscriptRows(
             agentID: agentID,
             timeline: timeline,
@@ -271,8 +273,10 @@ private struct AgentDetailSummaryHeader: View {
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Text(title)
-        .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
+        .scaledFont(.system(.title2, design: .rounded, weight: .bold))
+        .foregroundStyle(HarnessMonitorTheme.ink)
         .accessibilityAddTraits(.isHeader)
+        .frame(maxWidth: .infinity, alignment: .leading)
 
       HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingMD) {
         statusChip
@@ -286,6 +290,7 @@ private struct AgentDetailSummaryHeader: View {
         Text("Current Task")
           .scaledFont(.caption.bold())
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .accessibilityAddTraits(.isHeader)
         Text(currentTaskTitle)
           .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
           .fixedSize(horizontal: false, vertical: true)
@@ -416,10 +421,13 @@ struct AgentDetailReferenceDisclosure: View {
   private var disclosureLabel: String {
     let capabilityCount = capabilityValues.count
     let hookCount = hookPoints.count
+    let capabilityWord = capabilityCount == 1 ? "capability" : "capabilities"
     if hookCount > 0 {
-      return "Capabilities & hooks (\(capabilityCount) capabilities, \(hookCount) hook points)"
+      let hookWord = hookCount == 1 ? "hook point" : "hook points"
+      return "Capabilities and hooks "
+        + "(\(capabilityCount) \(capabilityWord), \(hookCount) \(hookWord))"
     }
-    return "Capabilities & hooks (\(capabilityCount))"
+    return "Capabilities and hooks (\(capabilityCount) \(capabilityWord))"
   }
 
   var body: some View {

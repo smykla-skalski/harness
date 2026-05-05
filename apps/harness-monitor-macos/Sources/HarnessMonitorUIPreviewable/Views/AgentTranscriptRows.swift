@@ -39,22 +39,19 @@ struct AgentTranscriptRows: View {
       AgentDetailEmptyState(
         title: "No transcript yet",
         systemImage: "text.line.first.and.arrowtriangle.forward",
-        description: "The agent has not streamed any recent transcript events.",
-        nextStep: "Send the agent an update below to start the conversation.",
+        description: "Send an update below to start the conversation.",
         tint: HarnessMonitorTheme.secondaryInk
       )
     } else {
-      ScrollView {
-        SessionTimelineCards(
-          rows: presentation.rows,
-          placeholderCount: 0,
-          shimmerPhase: 0,
-          showsShimmer: false,
-          actionHandler: store.supervisorDecisionActionHandler()
-        )
-        .padding(HarnessMonitorTheme.spacingSM)
-      }
-      .frame(height: min(presentation.viewportHeight, 320))
+      SessionTimelineCards(
+        rows: presentation.rows,
+        placeholderCount: 0,
+        shimmerPhase: 0,
+        showsShimmer: false,
+        actionHandler: store.supervisorDecisionActionHandler()
+      )
+      .padding(HarnessMonitorTheme.spacingSM)
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
   }
 }
