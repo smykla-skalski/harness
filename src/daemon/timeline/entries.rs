@@ -132,6 +132,9 @@ pub(crate) fn conversation_entry(
             "agent_context_injected",
             format!("{agent_id} accepted context from {actor}"),
         ),
+        ConversationEventKind::Other { label, data } if label == "thought" => {
+            ("agent_thought", other_text_summary(data, "Agent thought"))
+        }
         ConversationEventKind::Other { .. } => return Ok(None),
     };
     let payload = timeline_payload(
@@ -162,6 +165,13 @@ fn transcript_summary(content: &str, fallback: &str) -> String {
     } else {
         trimmed.to_string()
     }
+}
+
+fn other_text_summary(data: &serde_json::Value, fallback: &str) -> String {
+    data.as_str().map_or_else(
+        || fallback.to_string(),
+        |content| transcript_summary(content, fallback),
+    )
 }
 
 fn watchdog_summary(agent_id: &str, from: &str, to: &str, reason: Option<&str>) -> String {

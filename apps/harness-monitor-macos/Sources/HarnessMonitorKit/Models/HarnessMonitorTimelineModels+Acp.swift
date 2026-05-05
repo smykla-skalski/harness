@@ -176,6 +176,14 @@ extension AcpConversationEvent {
         "assistant_text",
         transcriptSummary(from: event["content"], fallback: "Assistant response")
       )
+    case "other":
+      guard event.stringValue(for: "label") == "thought" else {
+        return nil
+      }
+      return (
+        "agent_thought",
+        transcriptSummary(from: event["data"], fallback: "Agent thought")
+      )
     default:
       return agentTranscriptDescriptor(for: type, event: event, identity: identity)
     }

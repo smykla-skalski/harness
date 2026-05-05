@@ -262,6 +262,82 @@ extension HarnessMonitorStoreUpdateStreamTests {
     store.stopAllStreams()
   }
 
+  @Test("ACP thought push appends transcript rows for the selected session agent")
+  func acpThoughtPushAppendsTranscriptRows() async throws {
+    let client = RecordingHarnessClient()
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-acp-thought",
+        context: "ACP thought transcript",
+        status: .active,
+        leaderId: "leader-acp",
+        observeId: nil,
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
+    let detail = makeSessionDetail(
+      summary: summary,
+      workerID: "worker-acp",
+      workerName: "Worker ACP"
+    )
+    client.configureSessions(
+      summaries: [summary],
+      detailsByID: [summary.sessionId: detail],
+      timelinesBySessionID: [summary.sessionId: []]
+    )
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client)
+    )
+
+    await store.bootstrap()
+    await store.selectSession(summary.sessionId)
+    store.applyAcpAgent(
+      makeAcpSnapshot(
+        acpID: "acp-1",
+        sessionID: summary.sessionId,
+        agentID: "worker-acp",
+        displayName: "Worker ACP",
+        pendingBatches: []
+      )
+    )
+    store.applySessionPushEvent(
+      DaemonPushEvent(
+        recordedAt: "2026-04-28T00:00:30Z",
+        sessionId: summary.sessionId,
+        kind: .acpEvents(
+          AcpEventBatchPayload(
+            acpId: "acp-1",
+            sessionId: summary.sessionId,
+            rawCount: 1,
+            events: [
+              AcpConversationEvent(
+                timestamp: "2026-04-28T00:00:20Z",
+                sequence: 10,
+                kind: .object([
+                  "type": .string("other"),
+                  "label": .string("thought"),
+                  "data": .string("  Assessing relevant skills.  "),
+                ]),
+                agent: "copilot",
+                sessionId: summary.sessionId
+              )
+            ]
+          )
+        )
+      )
+    )
+
+    let entry = try #require(store.timeline.first)
+    #expect(entry.kind == "agent_thought")
+    #expect(entry.summary == "Assessing relevant skills.")
+    #expect(entry.agentId == "worker-acp")
+    #expect(store.timeline(forAgent: "worker-acp").map(\.entryId) == [entry.entryId])
+
+    store.stopAllStreams()
+  }
+
   @Test("ACP synthetic transcript rows attach to the selected agent via ACP identity")
   func acpSyntheticTranscriptRowsAttachToSelectedAgent() throws {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())

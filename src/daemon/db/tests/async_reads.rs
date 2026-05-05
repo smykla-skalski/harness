@@ -233,15 +233,27 @@ async fn load_session_acp_transcript_entries_includes_managed_native_runtime_row
             &state.session_id,
             "claude-leader",
             "gemini",
-            &[ConversationEvent {
-                timestamp: Some("2026-04-13T19:03:00Z".into()),
-                sequence: 7,
-                kind: ConversationEventKind::AssistantText {
-                    content: "Gemini transcript line".into(),
+            &[
+                ConversationEvent {
+                    timestamp: Some("2026-04-13T19:03:00Z".into()),
+                    sequence: 7,
+                    kind: ConversationEventKind::AssistantText {
+                        content: "Gemini transcript line".into(),
+                    },
+                    agent: "claude-leader".into(),
+                    session_id: state.session_id.clone(),
                 },
-                agent: "claude-leader".into(),
-                session_id: state.session_id.clone(),
-            }],
+                ConversationEvent {
+                    timestamp: Some("2026-04-13T19:04:00Z".into()),
+                    sequence: 8,
+                    kind: ConversationEventKind::Other {
+                        label: "thought".into(),
+                        data: json!("  Assessing relevant skills.  "),
+                    },
+                    agent: "claude-leader".into(),
+                    session_id: state.session_id.clone(),
+                },
+            ],
         )
         .expect("sync managed Gemini conversation events");
     drop(sync_db);
@@ -254,8 +266,12 @@ async fn load_session_acp_transcript_entries_includes_managed_native_runtime_row
         .await
         .expect("load managed ACP transcript entries");
 
-    assert_eq!(entries.len(), 1);
-    assert_eq!(entries[0].kind, "assistant_text");
+    assert_eq!(entries.len(), 2);
+    assert_eq!(entries[0].kind, "agent_thought");
+    assert_eq!(entries[0].summary, "Assessing relevant skills.");
+    assert_eq!(entries[0].payload["event"]["type"], json!("other"));
+    assert_eq!(entries[0].payload["event"]["label"], json!("thought"));
+    assert_eq!(entries[1].kind, "assistant_text");
     assert_eq!(entries[0].agent_id.as_deref(), Some("claude-leader"));
     assert_eq!(entries[0].payload["runtime"], json!("gemini"));
 }
