@@ -268,6 +268,107 @@ struct AgentCapabilityPickerTests {
     #expect(WorkspaceWindowView.firstProviderLaunchSelection(options: options) == .tui(.codex))
   }
 
+  @Test("stored provider id defaults to ACP when that provider supports ACP")
+  func storedProviderDefaultsToAcpWhenAvailable() {
+    let options = WorkspaceWindowView.agentCapabilityOptions(
+      acpAgents: [
+        descriptor(id: "gemini", displayName: "Gemini CLI")
+      ],
+      runtimeProbeResults: AcpRuntimeProbeResponse(
+        probes: [
+          AcpRuntimeProbe(
+            agentId: "gemini",
+            displayName: "Gemini CLI",
+            binaryPresent: true,
+            authState: .ready
+          )
+        ],
+        checkedAt: "2026-04-28T22:20:00Z"
+      )
+    )
+
+    #expect(
+      WorkspaceWindowView.defaultLaunchSelection(
+        providerID: "gemini",
+        options: options,
+        fallback: .tui(.codex)
+      ) == .acp("gemini")
+    )
+  }
+
+  @Test("stored provider id falls back to TUI when ACP is unavailable")
+  func storedProviderFallsBackToTuiWhenAcpUnavailable() {
+    let options = WorkspaceWindowView.agentCapabilityOptions(
+      acpAgents: [
+        descriptor(id: "gemini", displayName: "Gemini CLI")
+      ],
+      runtimeProbeResults: AcpRuntimeProbeResponse(
+        probes: [
+          AcpRuntimeProbe(
+            agentId: "gemini",
+            displayName: "Gemini CLI",
+            binaryPresent: false,
+            authState: .unavailable
+          )
+        ],
+        checkedAt: "2026-04-28T22:25:00Z"
+      )
+    )
+
+    #expect(
+      WorkspaceWindowView.defaultLaunchSelection(
+        providerID: "gemini",
+        options: options,
+        fallback: .tui(.codex)
+      ) == .tui(.gemini)
+    )
+  }
+
+  @Test("stored provider id defaults to ACP after sandbox bridge becomes ready")
+  func storedProviderDefaultsToAcpAfterBridgeBecomesReady() {
+    let descriptors = [
+      descriptor(id: "gemini", displayName: "Gemini CLI")
+    ]
+    let probes = AcpRuntimeProbeResponse(
+      probes: [
+        AcpRuntimeProbe(
+          agentId: "gemini",
+          displayName: "Gemini CLI",
+          binaryPresent: true,
+          authState: .ready
+        )
+      ],
+      checkedAt: "2026-04-28T22:30:00Z"
+    )
+    let waitingOptions = WorkspaceWindowView.agentCapabilityOptions(
+      acpAgents: descriptors,
+      runtimeProbeResults: probes,
+      sandboxed: true,
+      acpHostBridgeReady: false
+    )
+    let readyOptions = WorkspaceWindowView.agentCapabilityOptions(
+      acpAgents: descriptors,
+      runtimeProbeResults: probes,
+      sandboxed: true,
+      acpHostBridgeReady: true
+    )
+
+    #expect(
+      WorkspaceWindowView.defaultLaunchSelection(
+        providerID: "gemini",
+        options: waitingOptions,
+        fallback: .tui(.codex)
+      ) == .tui(.gemini)
+    )
+    #expect(
+      WorkspaceWindowView.defaultLaunchSelection(
+        providerID: "gemini",
+        options: readyOptions,
+        fallback: .tui(.gemini)
+      ) == .acp("gemini")
+    )
+  }
+
   private func descriptor(id: String, displayName: String) -> AcpAgentDescriptor {
     AcpAgentDescriptor(
       id: id,

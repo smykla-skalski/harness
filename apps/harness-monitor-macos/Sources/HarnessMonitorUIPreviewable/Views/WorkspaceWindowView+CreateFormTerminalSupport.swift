@@ -11,6 +11,7 @@ extension WorkspaceWindowCreatePane {
     return Binding(
       get: { formModel.selectedLaunchSelection },
       set: { newValue in
+        formModel.didPickLaunchSelectionManually = true
         formModel.selectedLaunchSelection = newValue
         HarnessMonitorAgentLaunchDefaults.persist(newValue)
       }

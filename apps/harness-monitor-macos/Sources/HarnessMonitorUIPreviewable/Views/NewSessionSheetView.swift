@@ -19,6 +19,7 @@ struct NewSessionSheetView: View {
   @State private var runtimeProbeResults: AcpRuntimeProbeResponse?
   @State private var selectedLaunchSelection =
     HarnessMonitorAgentLaunchDefaults.preferredSelection()
+  @State private var didPickLaunchSelectionManually = false
   @State private var showImporter = false
   @FocusState private var focusedField: Field?
 
@@ -208,6 +209,7 @@ struct NewSessionSheetView: View {
     Binding(
       get: { selectedLaunchSelection },
       set: { newValue in
+        didPickLaunchSelectionManually = true
         selectedLaunchSelection = newValue
         HarnessMonitorAgentLaunchDefaults.persist(newValue)
       }
@@ -367,10 +369,28 @@ struct NewSessionSheetView: View {
   }
 
   private func normalizePreferredSelection() {
-    selectedLaunchSelection = WorkspaceWindowView.normalizedLaunchSelection(
-      options: agentCapabilityOptions,
-      selection: selectedLaunchSelection,
-      fallbackRuntime: selectedLaunchSelection.preferredRuntime
+    let options = agentCapabilityOptions
+    if didPickLaunchSelectionManually {
+      selectedLaunchSelection = WorkspaceWindowView.normalizedLaunchSelection(
+        options: options,
+        selection: selectedLaunchSelection,
+        fallbackRuntime: selectedLaunchSelection.preferredRuntime
+      )
+      return
+    }
+
+    if let preferredProviderID = HarnessMonitorAgentLaunchDefaults.preferredProviderID() {
+      selectedLaunchSelection = WorkspaceWindowView.defaultLaunchSelection(
+        providerID: preferredProviderID,
+        options: options,
+        fallback: selectedLaunchSelection
+      )
+      return
+    }
+
+    selectedLaunchSelection = WorkspaceWindowView.firstProviderLaunchSelection(
+      options: options,
+      fallback: selectedLaunchSelection
     )
   }
 }

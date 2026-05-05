@@ -80,6 +80,23 @@ final class NewSessionSheetRenderingTests {
     #expect(
       HarnessMonitorAgentLaunchDefaults.preferredSelection(userDefaults: defaults) == selection
     )
+    #expect(
+      HarnessMonitorAgentLaunchDefaults.preferredProviderID(userDefaults: defaults) == "copilot")
+  }
+
+  @Test("agent launch defaults keep provider separate from selected transport")
+  func agentLaunchDefaultsKeepProviderSeparateFromSelectedTransport() {
+    let defaults = UserDefaults(suiteName: #function)!
+    defaults.removePersistentDomain(forName: #function)
+
+    HarnessMonitorAgentLaunchDefaults.persist(.tui(.gemini), userDefaults: defaults)
+
+    #expect(
+      HarnessMonitorAgentLaunchDefaults.preferredSelection(userDefaults: defaults)
+        == .tui(.gemini)
+    )
+    #expect(
+      HarnessMonitorAgentLaunchDefaults.preferredProviderID(userDefaults: defaults) == "gemini")
   }
 
   @Test("agent launch defaults fall back to first provider when persisted selection is malformed")
@@ -127,6 +144,8 @@ final class NewSessionSheetRenderingTests {
       HarnessMonitorAgentLaunchDefaults.preferredSelection(userDefaults: defaults) == .tui(.copilot)
     )
     #expect(HarnessMonitorAgentLaunchDefaults.hasExplicitPreferredSelection(userDefaults: defaults))
+    #expect(
+      HarnessMonitorAgentLaunchDefaults.preferredProviderID(userDefaults: defaults) == "copilot")
   }
 
   @Test("launch presets ignore legacy Copilot terminal provider while preserving other fields")
