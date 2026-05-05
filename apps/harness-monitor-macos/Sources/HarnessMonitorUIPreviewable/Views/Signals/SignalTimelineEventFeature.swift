@@ -79,7 +79,7 @@ struct SignalTimelineEventFeature: TimelineEventFeature {
     guard case .signal(let signalID) = node.tapTarget else { return nil }
     let status =
       ctx.signalsByID[signalID]?.effectiveStatus(now: ctx.now).title
-      ?? statusVerb(from: node.title)
+      ?? statusVerb(for: node)
     return ["Signal \(status)", node.title, node.actionAvailabilityLabel]
       .joined(separator: ", ")
   }
@@ -93,16 +93,22 @@ struct SignalTimelineEventFeature: TimelineEventFeature {
     {
       return record.effectiveStatus(now: ctx.now).title
     }
-    return statusVerb(from: node.title)
+    return statusVerb(for: node)
   }
 
-  private func statusVerb(from title: String) -> String {
-    let lower = title.lowercased()
-    if lower.contains("accepted") || lower.contains("delivered") { return "Delivered" }
-    if lower.contains("rejected") { return "Rejected" }
-    if lower.contains("deferred") { return "Deferred" }
-    if lower.contains("expired") { return "Expired" }
-    if lower.contains("picked up") || lower.contains("received") { return "Received" }
-    return "Sent"
+  // Dispatches on entry.kind (node.sourceLabel) as primary discriminator.
+  // For signal_acknowledged the outcome variant is read from the summary only as a fallback.
+  private func statusVerb(for node: SessionTimelineNode) -> String {
+    switch node.sourceLabel {
+    case "signal_sent": return "Sent"
+    case "signal_received": return "Received"
+    default:
+      let lower = node.title.lowercased()
+      if lower.contains("accepted") || lower.contains("delivered") { return "Delivered" }
+      if lower.contains("rejected") { return "Rejected" }
+      if lower.contains("deferred") { return "Deferred" }
+      if lower.contains("expired") { return "Expired" }
+      return "Acknowledged"
+    }
   }
 }
