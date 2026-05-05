@@ -19,6 +19,30 @@ run = "./scripts/clean-stale-state.sh"
 description = "Quit Harness Monitor and stop live daemon work while resetting stale shared dev state"
 run = "HARNESS_STALE_CLEANUP_ALLOW_LIVE_RESET=1 ./scripts/clean-stale-state.sh"
 
+[tasks."monitor:gc:profiles"]
+description = "Run xcode-derived/profiles/agent-* prune once (HARNESS_MONITOR_PROFILE_TTL_SECONDS, _DRY_RUN, _PRESERVE_GLOB)"
+run = "./scripts/prune-xcode-derived-profiles.sh"
+
+[tasks."monitor:gc:profiles:install"]
+description = "Install + load the LaunchAgent that prunes xcode-derived/profiles every HARNESS_MONITOR_PROFILE_PRUNE_INTERVAL_SECONDS (default 7200=2h)"
+run = "./scripts/manage-prune-launch-agent.sh install"
+
+[tasks."monitor:gc:profiles:uninstall"]
+description = "Bootout + delete the prune-xcode-derived-profiles LaunchAgent plist"
+run = "./scripts/manage-prune-launch-agent.sh uninstall"
+
+[tasks."monitor:gc:profiles:reinstall"]
+description = "Reinstall the prune LaunchAgent (run after changing HARNESS_MONITOR_PROFILE_PRUNE_INTERVAL_SECONDS to apply the new schedule)"
+run = "./scripts/manage-prune-launch-agent.sh reinstall"
+
+[tasks."monitor:gc:profiles:status"]
+description = "Show the prune LaunchAgent state, configured interval, and last stdout"
+run = "./scripts/manage-prune-launch-agent.sh status"
+
+[tasks."monitor:gc:profiles:show-plist"]
+description = "Print the rendered prune LaunchAgent plist without installing it"
+run = "./scripts/manage-prune-launch-agent.sh show-plist"
+
 [tasks."version:show"]
 description = "Print the canonical harness package version"
 run = "./scripts/version.sh show"
