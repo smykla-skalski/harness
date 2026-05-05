@@ -21,6 +21,7 @@ extension HarnessMonitorStore {
     set {
       let oldValue = connection.connectionState
       connection.connectionState = newValue
+      updateDisconnectedSince(from: oldValue, to: newValue)
       guard oldValue != newValue else {
         return
       }
@@ -177,24 +178,6 @@ extension HarnessMonitorStore {
   private static let maxLatencySamples = 12
   private static let trafficWindow: TimeInterval = 30
 
-  struct MeasuredOperation<Value: Sendable>: Sendable {
-    let value: Value
-    let latencyMs: Int
-  }
-
-  nonisolated static func measureOperation<Value: Sendable>(
-    _ operation: @escaping @Sendable () async throws -> Value
-  ) async throws -> MeasuredOperation<Value> {
-    let startedAt = ContinuousClock.now
-    let value = try await operation()
-    let duration = startedAt.duration(to: ContinuousClock.now)
-    return MeasuredOperation(
-      value: value,
-      latencyMs: max(0, Int(duration.components.seconds * 1_000))
-        + Int(duration.components.attoseconds / 1_000_000_000_000_000)
-    )
-  }
-
   func resetConnectionMetrics(for transport: TransportKind) {
     guard maintainsLiveDaemonObservation else {
       return
@@ -203,6 +186,9 @@ extension HarnessMonitorStore {
     connectionMetrics = .initial
     connectionMetrics.transportKind = transport
     connectionMetrics.isFallback = transport == .httpSSE
+    if connectionState.isSupervisorDisconnectedState {
+      connectionMetrics.disconnectedSince = .now
+    }
     transportLatencySamplesMs.removeAll(keepingCapacity: true)
     requestLatencySamplesMs.removeAll(keepingCapacity: true)
     trafficSampleTimes.removeAll(keepingCapacity: true)
@@ -216,6 +202,7 @@ extension HarnessMonitorStore {
       return
     }
     connectionMetrics.connectedSince = recordedAt
+    connectionMetrics.disconnectedSince = nil
   }
 
   func markConnectionOffline(_ message: String) {
@@ -229,6 +216,24 @@ extension HarnessMonitorStore {
     connectionMetrics.lastMessageAt = nil
     connectionMetrics.messagesPerSecond = 0
     connectionMetrics.reconnectAttempt = 0
+    scheduleSupervisorTick(reason: "connection-offline")
+  }
+
+  private func updateDisconnectedSince(
+    from oldValue: ConnectionState,
+    to newValue: ConnectionState
+  ) {
+    guard newValue.isSupervisorDisconnectedState else {
+      connection.connectionMetrics.disconnectedSince = nil
+      return
+    }
+    guard
+      !oldValue.isSupervisorDisconnectedState
+        || connection.connectionMetrics.disconnectedSince == nil
+    else {
+      return
+    }
+    connection.connectionMetrics.disconnectedSince = .now
   }
 
   func recordRequestSuccess(

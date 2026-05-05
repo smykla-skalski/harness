@@ -61,6 +61,155 @@ final class SupervisorServiceTests: XCTestCase {
     XCTAssertEqual(executions.first?.action.actionKey, evaluations.first?.actions[0].actionKey)
   }
 
+  func test_singleTickToleratesDuplicateActionKeysFromRule() async throws {
+    let clock = TestClock()
+    let registry = PolicyRegistry()
+    await registry.register(DuplicateActionKeyRule())
+    let observer = SpyObserver()
+    await registry.registerObserver(observer)
+    let service = SupervisorService(
+      store: nil,
+      registry: registry,
+      executor: try PolicyExecutor.fixture(),
+      clock: clock,
+      interval: 10
+    )
+
+    await service.runOneTick()
+    await service.runOneTick()
+
+    let executions = await observer.executions
+    let contexts = await observer.evaluations
+    XCTAssertEqual(executions.count, 4)
+    let skippedDuplicateCount = executions.map(\.outcome).filter { outcome in
+      if case .skippedDuplicate = outcome { return true }
+      return false
+    }.count
+    XCTAssertEqual(skippedDuplicateCount, 3)
+    XCTAssertEqual(contexts.count, 2)
+    XCTAssertTrue(
+      contexts[1].actions.allSatisfy {
+        $0.actionKey == "log:test.duplicate-action-key:duplicate-action"
+      }
+    )
+  }
+
+  func test_startRunsImmediateTickBeforeFirstSleep() async throws {
+    let clock = TestClock()
+    let registry = PolicyRegistry()
+    await registry.register(NoopRule(id: "test.noop"))
+    let observer = SpyObserver()
+    await registry.registerObserver(observer)
+    let service = SupervisorService(
+      store: nil,
+      registry: registry,
+      executor: try PolicyExecutor.fixture(),
+      clock: clock,
+      interval: 10
+    )
+
+    await service.start()
+    defer { Task { await service.stop() } }
+
+    let deadline = Date().addingTimeInterval(2)
+    while await observer.snapshots.isEmpty && Date() < deadline {
+      try? await Task.sleep(nanoseconds: 5_000_000)
+    }
+
+    let snapshots = await observer.snapshots
+    XCTAssertEqual(
+      snapshots.count,
+      1,
+      "start should run one policy tick before the first sleep"
+    )
+    XCTAssertEqual(
+      clock.pendingSleepCount,
+      1,
+      "run loop should sleep only after the immediate tick"
+    )
+  }
+
+  func test_disconnectedSnapshotWithoutStoreKeepsStableAnchorAcrossTicks() async throws {
+    let clock = TestClock()
+    let registry = PolicyRegistry()
+    await registry.register(NoopRule(id: "test.noop"))
+    let observer = SpyObserver()
+    await registry.registerObserver(observer)
+    let service = SupervisorService(
+      store: nil,
+      registry: registry,
+      executor: try PolicyExecutor.fixture(),
+      clock: clock,
+      interval: 10
+    )
+
+    await service.runOneTick()
+    await clock.advance(by: .seconds(120))
+    await service.runOneTick()
+
+    let snapshots = await observer.snapshots
+    XCTAssertEqual(snapshots.count, 2)
+    XCTAssertEqual(snapshots[0].connection.disconnectedSince, .fixed)
+    XCTAssertEqual(snapshots[1].connection.disconnectedSince, .fixed)
+  }
+
+  @MainActor
+  func test_disconnectedSnapshotFallbackFollowsMovingLastMessageAndClearsOnReconnect()
+    async throws
+  {
+    let clock = TestClock()
+    let store = try await HarnessMonitorStore.fixture(sessions: .twoActiveSessions)
+    let registry = PolicyRegistry()
+    await registry.register(NoopRule(id: "test.noop"))
+    let observer = SpyObserver()
+    await registry.registerObserver(observer)
+    let service = SupervisorService(
+      store: store,
+      registry: registry,
+      executor: try PolicyExecutor.fixture(),
+      clock: clock,
+      interval: 10
+    )
+
+    store.connectionState = .offline("first disconnect")
+    var metrics = store.connectionMetrics
+    metrics.disconnectedSince = nil
+    metrics.lastMessageAt = Date.fixed.addingTimeInterval(-30)
+    store.connectionMetrics = metrics
+    await service.runOneTick()
+
+    metrics.lastMessageAt = Date.fixed.addingTimeInterval(-5)
+    store.connectionMetrics = metrics
+    await service.runOneTick()
+
+    store.connectionState = .online
+    await service.runOneTick()
+
+    clock.setNow(Date.fixed.addingTimeInterval(300))
+    store.connectionState = .offline("second disconnect")
+    metrics.disconnectedSince = nil
+    metrics.lastMessageAt = nil
+    store.connectionMetrics = metrics
+    await service.runOneTick()
+
+    let snapshots = await observer.snapshots
+    XCTAssertEqual(snapshots.count, 4)
+    XCTAssertEqual(
+      snapshots[0].connection.disconnectedSince,
+      Date.fixed.addingTimeInterval(-30)
+    )
+    XCTAssertEqual(
+      snapshots[1].connection.disconnectedSince,
+      Date.fixed.addingTimeInterval(-5)
+    )
+    XCTAssertEqual(snapshots[2].connection.kind, "ws")
+    XCTAssertNil(snapshots[2].connection.disconnectedSince)
+    XCTAssertEqual(
+      snapshots[3].connection.disconnectedSince,
+      Date.fixed.addingTimeInterval(300)
+    )
+  }
+
   func test_disabledRuleOverrideSkipsEvaluation() async throws {
     let clock = TestClock()
     let registry = PolicyRegistry()
@@ -195,208 +344,4 @@ final class SupervisorServiceTests: XCTestCase {
     )
   }
 
-  func test_quietHoursSuppressAutomaticSideEffectsButKeepDecisions() async throws {
-    let clock = TestClock()
-    let registry = PolicyRegistry()
-    await registry.register(AutoActionRule())
-    let observer = SpyObserver()
-    await registry.registerObserver(observer)
-    let executor = try PolicyExecutor.fixture()
-    let service = SupervisorService(
-      store: nil,
-      registry: registry,
-      executor: executor,
-      clock: clock,
-      interval: 10
-    )
-    await service.setQuietHoursWindow(SupervisorQuietHoursWindow(startMinutes: 0, endMinutes: 0))
-
-    await service.runOneTick()
-
-    let evaluations = await observer.evaluations
-    XCTAssertEqual(evaluations.count, 1)
-    XCTAssertEqual(evaluations.first?.actions.count, 2)
-
-    let executions = await observer.executions
-    XCTAssertEqual(executions.count, 1, "quiet hours should suppress the automatic side effect")
-    guard case .queueDecision(let payload) = executions.first?.action else {
-      return XCTFail("quiet hours should still allow decision queueing")
-    }
-    XCTAssertEqual(payload.id, "decision-auto-action")
-  }
-
-  func test_cautiousDefaultBehaviorOverrideSuppressesAutomaticSideEffects() async throws {
-    let clock = TestClock()
-    let registry = PolicyRegistry()
-    await registry.register(AutoActionRule())
-    await registry.applyOverrides([
-      PolicyConfigOverride(
-        ruleID: "test.auto-action",
-        enabled: true,
-        defaultBehavior: .cautious,
-        parameters: [:]
-      )
-    ])
-    let observer = SpyObserver()
-    await registry.registerObserver(observer)
-    let executor = try PolicyExecutor.fixture()
-    let service = SupervisorService(
-      store: nil,
-      registry: registry,
-      executor: executor,
-      clock: clock,
-      interval: 10
-    )
-
-    await service.runOneTick()
-
-    let executions = await observer.executions
-    XCTAssertEqual(executions.count, 1, "cautious override should suppress automatic side effects")
-    guard case .queueDecision(let payload) = executions.first?.action else {
-      return XCTFail("cautious override should still allow decision queueing")
-    }
-    XCTAssertEqual(payload.id, "decision-auto-action")
-  }
-
-  func test_quietHoursSuppressionDoesNotRecordAutomaticActionAsFired() async throws {
-    let clock = TestClock()
-    let registry = PolicyRegistry()
-    await registry.register(AutoOnlyRule())
-    let audit = InMemoryAuditWriter()
-    let executor = PolicyExecutor(
-      api: FakeAPIClient(),
-      decisions: try DecisionStore.makeInMemory(),
-      audit: audit
-    )
-    let observer = SpyObserver()
-    await registry.registerObserver(observer)
-    let service = SupervisorService(
-      store: nil,
-      registry: registry,
-      executor: executor,
-      clock: clock,
-      interval: 10
-    )
-    await service.setQuietHoursWindow(SupervisorQuietHoursWindow(startMinutes: 0, endMinutes: 0))
-
-    await service.runOneTick()
-    await service.runOneTick()
-    let suppressedExecutions = await observer.executions
-    XCTAssertTrue(suppressedExecutions.isEmpty)
-    let events = await audit.snapshot()
-    let suppressedEvents = events.filter { $0.kind == "actionSuppressed" }
-    XCTAssertEqual(suppressedEvents.count, 1)
-
-    await service.setQuietHoursWindow(nil)
-    await service.runOneTick()
-
-    let executions = await observer.executions
-    XCTAssertEqual(executions.count, 1)
-    guard case .nudgeAgent = executions.first?.action else {
-      return XCTFail("automatic nudge should dispatch immediately after quiet hours end")
-    }
-  }
-
-  func test_observerConfigSuggestionsAreDispatched() async throws {
-    let registry = PolicyRegistry()
-    let observer = SpyObserver()
-    await registry.registerObserver(SuggestionObserver())
-    await registry.registerObserver(observer)
-    let service = SupervisorService(
-      store: nil,
-      registry: registry,
-      executor: try PolicyExecutor.fixture(),
-      clock: TestClock(),
-      interval: 10
-    )
-
-    await service.runOneTick()
-
-    let executions = await observer.executions
-    XCTAssertEqual(executions.count, 1)
-    guard case .suggestConfigChange(let payload) = executions.first?.action else {
-      return XCTFail("observer suggestion should dispatch as suggestConfigChange")
-    }
-    XCTAssertEqual(payload.id, "suggestion-1")
-  }
-
-  func test_overlappingTicksCoalesceBehindInFlightTick() async throws {
-    let registry = PolicyRegistry()
-    let gate = RuleGate()
-    await registry.register(SlowRule(gate: gate))
-    let observer = SpyObserver()
-    await registry.registerObserver(observer)
-    let service = SupervisorService(
-      store: nil,
-      registry: registry,
-      executor: try PolicyExecutor.fixture(),
-      clock: TestClock(),
-      interval: 10
-    )
-
-    let firstTick = Task { await service.runOneTick() }
-    let deadline = Date().addingTimeInterval(2)
-    while await gate.waitCount == 0 && Date() < deadline {
-      try? await Task.sleep(nanoseconds: 5_000_000)
-    }
-    let waitCount = await gate.waitCount
-    XCTAssertEqual(waitCount, 1)
-
-    let secondTick = Task { await service.runOneTick() }
-    await gate.release()
-    _ = await firstTick.value
-    _ = await secondTick.value
-
-    let evaluations = await observer.evaluations
-    XCTAssertEqual(evaluations.count, 1, "second tick should await the in-flight tick")
-  }
-
-  func test_stopDrainsInFlightTick() async throws {
-    let clock = TestClock()
-    let registry = PolicyRegistry()
-    let gate = RuleGate()
-    let slow = SlowRule(gate: gate)
-    await registry.register(slow)
-    let observer = SpyObserver()
-    await registry.registerObserver(observer)
-    let executor = try PolicyExecutor.fixture()
-    let service = SupervisorService(
-      store: nil,
-      registry: registry,
-      executor: executor,
-      clock: clock,
-      interval: 5
-    )
-
-    await service.start()
-    let sleepDeadline = Date().addingTimeInterval(2)
-    while clock.pendingSleepCount == 0 && Date() < sleepDeadline {
-      try? await Task.sleep(nanoseconds: 5_000_000)
-    }
-    XCTAssertEqual(
-      clock.pendingSleepCount,
-      1,
-      "run loop should register its initial sleep before the test advances the manual clock"
-    )
-    await clock.advance(by: .seconds(5))
-    // Poll until the slow rule is blocked inside gate.wait(), confirming the tick body is
-    // in flight after the clock resumes the registered sleep. Polling replaces a fixed sleep
-    // which is flaky on loaded machines.
-    let deadline = Date().addingTimeInterval(2)
-    while await gate.waitCount == 0 && Date() < deadline {
-      try? await Task.sleep(nanoseconds: 5_000_000)
-    }
-    let waitCount = await gate.waitCount
-    XCTAssertEqual(waitCount, 1, "slow rule should be waiting before stop")
-    let isReleased = await gate.released
-    XCTAssertFalse(isReleased, "slow rule should be blocked before stop")
-
-    let stopSignal = Task { await service.stop() }
-    // Unblock the gate. Stop must drain the in-flight tick before returning.
-    await gate.release()
-    _ = await stopSignal.value
-
-    let evaluations = await observer.evaluations
-    XCTAssertEqual(evaluations.count, 1, "the in-flight tick must finish before stop returns")
-  }
 }

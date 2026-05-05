@@ -53,10 +53,12 @@ public actor DecisionStore {
   private let eventsContinuation: AsyncStream<DecisionEvent>.Continuation
 
   private let container: ModelContainer
+  nonisolated private let now: @Sendable () -> Date
   private let readContextLock = Mutex(())
 
-  public init(container: ModelContainer) {
+  public init(container: ModelContainer, now: @escaping @Sendable () -> Date = { Date() }) {
     self.container = container
+    self.now = now
     (events, eventsContinuation) = AsyncStream<DecisionEvent>.makeStream(
       bufferingPolicy: .bufferingNewest(64)
     )
@@ -64,14 +66,16 @@ public actor DecisionStore {
 
   /// In-memory container scoped to the supervisor entity trio. Used by tests and ephemeral
   /// previews; production callers pass the shared `HarnessMonitorSchemaV7` container.
-  public static func makeInMemory() throws -> DecisionStore {
+  public static func makeInMemory(
+    now: @escaping @Sendable () -> Date = { Date() }
+  ) throws -> DecisionStore {
     let container = try ModelContainer(
       for: Decision.self,
       SupervisorEvent.self,
       PolicyConfigRow.self,
       configurations: ModelConfiguration(isStoredInMemoryOnly: true)
     )
-    return DecisionStore(container: container)
+    return DecisionStore(container: container, now: now)
   }
 
   deinit {
@@ -83,6 +87,7 @@ public actor DecisionStore {
       if try fetchDecision(id: draft.id, context: context) != nil {
         return false
       }
+      let createdAt = now()
       let model = Decision(
         id: draft.id,
         severity: draft.severity,
@@ -92,7 +97,8 @@ public actor DecisionStore {
         taskID: draft.taskID,
         summary: draft.summary,
         contextJSON: draft.contextJSON,
-        suggestedActionsJSON: draft.suggestedActionsJSON
+        suggestedActionsJSON: draft.suggestedActionsJSON,
+        createdAt: createdAt
       )
       context.insert(model)
       return true
@@ -108,12 +114,17 @@ public actor DecisionStore {
         guard !hasTerminalResolutionOutcome(decision) else {
           return .unchanged
         }
+        guard decision.statusRaw != Status.resolved else {
+          return .unchanged
+        }
+        let now = now()
         return apply(
           draft,
           to: decision,
-          reopen: shouldReopen(decision, now: Date())
+          reopen: shouldReopen(decision, now: now)
         )
       }
+      let createdAt = now()
       let model = Decision(
         id: draft.id,
         severity: draft.severity,
@@ -123,7 +134,8 @@ public actor DecisionStore {
         taskID: draft.taskID,
         summary: draft.summary,
         contextJSON: draft.contextJSON,
-        suggestedActionsJSON: draft.suggestedActionsJSON
+        suggestedActionsJSON: draft.suggestedActionsJSON,
+        createdAt: createdAt
       )
       context.insert(model)
       return .inserted
@@ -145,7 +157,7 @@ public actor DecisionStore {
         sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
       )
       let rows = try context.fetch(descriptor)
-      let now = Date()
+      let now = now()
       return rows.filter { isOpen($0, now: now) }
     }
   }
@@ -199,7 +211,7 @@ public actor DecisionStore {
   }
 
   public func expire(beforeAge: TimeInterval) async throws -> Int {
-    let cutoff = Date().addingTimeInterval(-beforeAge)
+    let cutoff = now().addingTimeInterval(-beforeAge)
     let ids = try withMutationContext { context in
       let descriptor = FetchDescriptor<Decision>(
         predicate: #Predicate<Decision> { $0.createdAt < cutoff }
@@ -262,6 +274,9 @@ public actor DecisionStore {
   }
 
   nonisolated private func shouldReopen(_ decision: Decision, now: Date) -> Bool {
+    if decision.statusRaw == Status.dismissed {
+      return true
+    }
     guard decision.statusRaw == Status.snoozed else {
       return false
     }
@@ -367,49 +382,5 @@ public actor DecisionStore {
       try context.save()
     }
     return result
-  }
-}
-
-public struct DecisionDraft: Sendable, Hashable {
-  public let id: String
-  public let severity: DecisionSeverity
-  public let ruleID: String
-  public let sessionID: String?
-  public let agentID: String?
-  public let taskID: String?
-  public let summary: String
-  public let contextJSON: String
-  public let suggestedActionsJSON: String
-
-  public init(
-    id: String,
-    severity: DecisionSeverity,
-    ruleID: String,
-    sessionID: String?,
-    agentID: String?,
-    taskID: String?,
-    summary: String,
-    contextJSON: String,
-    suggestedActionsJSON: String
-  ) {
-    self.id = id
-    self.severity = severity
-    self.ruleID = ruleID
-    self.sessionID = sessionID
-    self.agentID = agentID
-    self.taskID = taskID
-    self.summary = summary
-    self.contextJSON = contextJSON
-    self.suggestedActionsJSON = suggestedActionsJSON
-  }
-}
-
-public struct DecisionOutcome: Codable, Sendable, Hashable {
-  public let chosenActionID: String?
-  public let note: String?
-
-  public init(chosenActionID: String?, note: String?) {
-    self.chosenActionID = chosenActionID
-    self.note = note
   }
 }

@@ -59,6 +59,7 @@ public actor PolicyExecutor {
   private let api: any SupervisorAPIClient
   private let decisions: DecisionStore
   private let audit: any SupervisorAuditWriter
+  private let clock: any SupervisorClock
   private let cooldown: TimeInterval
 
   /// Keys of actions dispatched within the current cooldown window, mapped to the timestamp.
@@ -68,11 +69,13 @@ public actor PolicyExecutor {
     api: any SupervisorAPIClient,
     decisions: DecisionStore,
     audit: any SupervisorAuditWriter,
+    clock: Any? = nil,
     cooldown: TimeInterval = 60
   ) {
     self.api = api
     self.decisions = decisions
     self.audit = audit
+    self.clock = (clock as? any SupervisorClock) ?? WallClock()
     self.cooldown = cooldown
   }
 
@@ -82,7 +85,8 @@ public actor PolicyExecutor {
   /// `actionExecuted` or `actionFailed` is written after the action completes.
   public func execute(_ action: PolicyAction, tickID: String? = nil) async -> PolicyOutcome {
     let key = action.actionKey
-    pruneExpiredKeys()
+    let dispatchedAt = clock.now()
+    pruneExpiredKeys(at: dispatchedAt)
 
     if recentKeys[key] != nil {
       return .skippedDuplicate(actionKey: key)
@@ -92,10 +96,11 @@ public actor PolicyExecutor {
       id: UUID().uuidString,
       kind: "actionDispatched",
       action: action,
-      tickID: tickID ?? action.auditTickID
+      tickID: tickID ?? action.auditTickID,
+      createdAt: dispatchedAt
     )
     await audit.append(dispatchRecord)
-    recentKeys[key] = Date()
+    recentKeys[key] = dispatchedAt
 
     do {
       try await dispatch(action)
@@ -103,11 +108,13 @@ public actor PolicyExecutor {
         id: UUID().uuidString,
         kind: "actionExecuted",
         action: action,
-        tickID: tickID ?? action.auditTickID
+        tickID: tickID ?? action.auditTickID,
+        createdAt: clock.now()
       )
       await audit.append(executedRecord)
       return .executed(actionKey: key)
     } catch {
+      recentKeys.removeValue(forKey: key)
       let sanitizedError = redactSupervisorErrorMessage(error.localizedDescription)
       HarnessMonitorLogger.supervisorWarning(
         "action failed key=\(key) error=\(sanitizedError)"
@@ -116,7 +123,8 @@ public actor PolicyExecutor {
         id: UUID().uuidString,
         kind: "actionFailed",
         action: action,
-        tickID: tickID ?? action.auditTickID
+        tickID: tickID ?? action.auditTickID,
+        createdAt: clock.now()
       )
       await audit.append(failedRecord)
       return .failed(actionKey: key, error: sanitizedError)
@@ -128,15 +136,16 @@ public actor PolicyExecutor {
       id: UUID().uuidString,
       kind: "actionSuppressed",
       action: action,
-      tickID: tickID
+      tickID: tickID,
+      createdAt: clock.now()
     )
     await audit.append(record)
   }
 
   // MARK: - Private helpers
 
-  private func pruneExpiredKeys() {
-    let cutoff = Date().addingTimeInterval(-cooldown)
+  private func pruneExpiredKeys(at now: Date) {
+    let cutoff = now.addingTimeInterval(-cooldown)
     recentKeys = recentKeys.filter { $0.value > cutoff }
   }
 
@@ -144,7 +153,8 @@ public actor PolicyExecutor {
     id: String,
     kind: String,
     action: PolicyAction,
-    tickID: String
+    tickID: String,
+    createdAt: Date
   ) -> SupervisorAuditRecord {
     SupervisorAuditRecord(
       id: id,
@@ -152,7 +162,8 @@ public actor PolicyExecutor {
       kind: kind,
       ruleID: ruleID(for: action),
       severity: severity(for: action),
-      payloadJSON: actionPayloadJSON(action)
+      payloadJSON: actionPayloadJSON(action),
+      createdAt: createdAt
     )
   }
 

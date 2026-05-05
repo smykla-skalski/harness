@@ -29,7 +29,8 @@ public final class SupervisorEvent {
     kind: String,
     ruleID: String?,
     severity: DecisionSeverity?,
-    payloadJSON: String
+    payloadJSON: String,
+    createdAt: Date = Date()
   ) {
     self.id = id
     self.tickID = tickID
@@ -37,6 +38,6 @@ public final class SupervisorEvent {
     self.ruleID = ruleID
     self.severityRaw = severity?.rawValue
     self.payloadJSON = payloadJSON
-    self.createdAt = Date()
+    self.createdAt = createdAt
   }
 }

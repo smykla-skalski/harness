@@ -131,13 +131,8 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
       _ = sender
       return true
     }
-    let storedValue =
-      UserDefaults.standard.object(
-        forKey: SupervisorPreferencesDefaults.runInBackgroundKey
-      ) as? Bool
-    let runInBackground = storedValue ?? SupervisorPreferencesDefaults.runInBackgroundDefault
     _ = sender
-    return !runInBackground
+    return !supervisorRunInBackgroundEnabled
   }
 
   func applicationDidResignActive(_ notification: Notification) {
@@ -282,8 +277,17 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
       appIsHidden: NSApplication.shared.isHidden,
       hasVisibleNonMiniaturizedWindows: NSApplication.shared.windows.contains { window in
         window.isVisible && !window.isMiniaturized
-      }
+      },
+      keepsLiveConnectionInBackground: supervisorRunInBackgroundEnabled
     )
+  }
+
+  private var supervisorRunInBackgroundEnabled: Bool {
+    let storedValue =
+      UserDefaults.standard.object(
+        forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+      ) as? Bool
+    return storedValue ?? SupervisorPreferencesDefaults.runInBackgroundDefault
   }
 
   private static func launchEnvironment() -> [String: String] {

@@ -89,6 +89,7 @@ public struct ConnectionMetrics: Equatable, Sendable {
   public var messagesSent: Int
   public var messagesPerSecond: Double
   public var connectedSince: Date?
+  public var disconnectedSince: Date?
   public var lastMessageAt: Date?
   public var reconnectAttempt: Int
   public var reconnectCount: Int
@@ -105,6 +106,7 @@ public struct ConnectionMetrics: Equatable, Sendable {
     messagesSent: Int,
     messagesPerSecond: Double,
     connectedSince: Date?,
+    disconnectedSince: Date? = nil,
     lastMessageAt: Date?,
     reconnectAttempt: Int,
     reconnectCount: Int,
@@ -120,6 +122,7 @@ public struct ConnectionMetrics: Equatable, Sendable {
     self.messagesSent = messagesSent
     self.messagesPerSecond = messagesPerSecond
     self.connectedSince = connectedSince
+    self.disconnectedSince = disconnectedSince
     self.lastMessageAt = lastMessageAt
     self.reconnectAttempt = reconnectAttempt
     self.reconnectCount = reconnectCount

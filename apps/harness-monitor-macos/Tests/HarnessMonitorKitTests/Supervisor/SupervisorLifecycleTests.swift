@@ -298,6 +298,31 @@ final class SupervisorLifecycleTests: XCTestCase {
   }
 
   @MainActor
+  func test_backgroundLifecycleDoesNotDriveProductionPolicyTicks() async throws {
+    let store = try await HarnessMonitorStore.fixture(sessions: .twoActiveSessions)
+    UserDefaults.standard.set(true, forKey: SupervisorPreferencesDefaults.runInBackgroundKey)
+    defer {
+      UserDefaults.standard.removeObject(
+        forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+      )
+    }
+    await store.startSupervisor()
+    defer { Task { await store.stopSupervisor() } }
+
+    await store.runSupervisorTickForTesting()
+    let refreshTick = store.supervisorLiveTickRefreshTick
+
+    await store.forceSupervisorBackgroundActivityTickForTesting()
+    try await Task.sleep(for: .milliseconds(50))
+
+    XCTAssertEqual(
+      store.supervisorLiveTickRefreshTick,
+      refreshTick,
+      "background lifecycle must not be wired as a second production policy tick source"
+    )
+  }
+
+  @MainActor
   func test_toolbarSliceReflectsInsertedDecision() async throws {
     let store = HarnessMonitorStore.fixture()
     await store.startSupervisor()

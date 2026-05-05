@@ -35,7 +35,8 @@ actor SwiftDataSupervisorAuditWriter: SupervisorAuditWriter {
           kind: record.kind,
           ruleID: record.ruleID,
           severity: record.severity,
-          payloadJSON: record.payloadJSON
+          payloadJSON: record.payloadJSON,
+          createdAt: record.createdAt
         )
       )
       try context.save()

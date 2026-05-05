@@ -13,6 +13,16 @@ final class DecisionStoreTests: XCTestCase {
     XCTAssertEqual(open.first?.statusRaw, "open")
   }
 
+  func test_insertUsesInjectedClockForCreatedAt() async throws {
+    let clock = TestClock()
+    let store = try DecisionStore.makeInMemory(now: { clock.now() })
+
+    try await store.insert(.fixture(id: "d-clock"))
+
+    let decision = try await store.decision(id: "d-clock")
+    XCTAssertEqual(decision?.createdAt, .fixed)
+  }
+
   func test_insertIsIdempotentOnDuplicateID() async throws {
     let store = try DecisionStore.makeInMemory()
     try await store.insert(.fixture(id: "d1", summary: "first"))
@@ -49,6 +59,21 @@ final class DecisionStoreTests: XCTestCase {
     try await store.snooze(id: "d1", until: Date().addingTimeInterval(-1))
     let open = try await store.openDecisions()
     XCTAssertEqual(open.count, 1)
+  }
+
+  func test_openDecisionsUsesInjectedClockForSnoozeExpiry() async throws {
+    let clock = TestClock()
+    let store = try DecisionStore.makeInMemory(now: { clock.now() })
+    try await store.insert(.fixture(id: "d-clock-snooze"))
+    try await store.snooze(id: "d-clock-snooze", until: Date.fixed.addingTimeInterval(10))
+
+    let openBeforeExpiry = try await store.openDecisions()
+    XCTAssertTrue(openBeforeExpiry.isEmpty)
+
+    await clock.advance(by: .seconds(11))
+
+    let open = try await store.openDecisions()
+    XCTAssertEqual(open.map(\.id), ["d-clock-snooze"])
   }
 
   func test_resolveMovesOutOfOpen() async throws {
@@ -130,18 +155,62 @@ final class DecisionStoreTests: XCTestCase {
     XCTAssertTrue(open.isEmpty)
   }
 
-  func test_upsertOpenDoesNotReopenDismissedDecision() async throws {
+  func test_upsertOpenReopensDismissedDecision() async throws {
     let store = try DecisionStore.makeInMemory()
     try await store.insert(.fixture(id: "d1", summary: "original"))
     try await store.dismiss(id: "d1")
 
     let result = try await store.upsertOpen(.fixture(id: "d1", summary: "tick-fired-late"))
 
-    XCTAssertNotEqual(result, .reopened)
+    XCTAssertEqual(result, .reopened)
     let decision = try await store.decision(id: "d1")
-    XCTAssertEqual(decision?.statusRaw, "dismissed")
+    XCTAssertEqual(decision?.statusRaw, "open")
+    XCTAssertEqual(decision?.summary, "tick-fired-late")
     let open = try await store.openDecisions()
-    XCTAssertTrue(open.isEmpty)
+    XCTAssertEqual(open.map(\.id), ["d1"])
+  }
+
+  func test_upsertOpenStateTransitionMatrix() async throws {
+    let clock = TestClock()
+    let store = try DecisionStore.makeInMemory(now: { clock.now() })
+    try await store.insert(.fixture(id: "dismissed", summary: "original-dismissed"))
+    try await store.insert(.fixture(id: "resolved", summary: "original-resolved"))
+    try await store.insert(.fixture(id: "terminal", summary: "original-terminal"))
+    try await store.insert(.fixture(id: "future-snooze", summary: "original-future"))
+    try await store.insert(.fixture(id: "expired-snooze", summary: "original-expired"))
+    try await store.dismiss(id: "dismissed")
+    try await store.resolve(
+      id: "resolved",
+      outcome: DecisionOutcome(chosenActionID: "ack", note: nil)
+    )
+    try await store.resolveTerminal(
+      id: "terminal",
+      outcome: DecisionOutcome(chosenActionID: nil, note: "daemon_shutdown")
+    )
+    try await store.snooze(id: "future-snooze", until: Date.fixed.addingTimeInterval(3_600))
+    try await store.snooze(id: "expired-snooze", until: Date.fixed.addingTimeInterval(-1))
+
+    let dismissed = try await store.upsertOpen(.fixture(id: "dismissed", summary: "updated"))
+    let resolved = try await store.upsertOpen(.fixture(id: "resolved", summary: "updated"))
+    let terminal = try await store.upsertOpen(.fixture(id: "terminal", summary: "updated"))
+    let future = try await store.upsertOpen(.fixture(id: "future-snooze", summary: "updated"))
+    let expired = try await store.upsertOpen(.fixture(id: "expired-snooze", summary: "updated"))
+
+    XCTAssertEqual(dismissed, .reopened)
+    XCTAssertEqual(resolved, .unchanged)
+    XCTAssertEqual(terminal, .unchanged)
+    XCTAssertEqual(future, .updated)
+    XCTAssertEqual(expired, .reopened)
+    let dismissedDecision = try await store.decision(id: "dismissed")
+    let resolvedDecision = try await store.decision(id: "resolved")
+    let terminalDecision = try await store.decision(id: "terminal")
+    let futureSnoozeDecision = try await store.decision(id: "future-snooze")
+    let expiredSnoozeDecision = try await store.decision(id: "expired-snooze")
+    XCTAssertEqual(dismissedDecision?.statusRaw, "open")
+    XCTAssertEqual(resolvedDecision?.summary, "original-resolved")
+    XCTAssertEqual(terminalDecision?.summary, "original-terminal")
+    XCTAssertEqual(futureSnoozeDecision?.statusRaw, "snoozed")
+    XCTAssertEqual(expiredSnoozeDecision?.statusRaw, "open")
   }
 
   func test_dismissMovesOutOfOpen() async throws {

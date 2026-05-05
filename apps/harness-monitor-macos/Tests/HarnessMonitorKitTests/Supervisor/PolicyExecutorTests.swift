@@ -59,6 +59,28 @@ final class PolicyExecutorTests: XCTestCase {
     XCTAssertLessThanOrEqual(events[0].createdAt, events[1].createdAt)
   }
 
+  func testAuditEventsUseInjectedClock() async throws {
+    let api = FakeAPIClient()
+    let clock = TestClock()
+    let store = try DecisionStore.makeInMemory(now: { clock.now() })
+    let audit = InMemoryAuditWriter()
+    let exec = PolicyExecutor(api: api, decisions: store, audit: audit, clock: clock)
+
+    _ = await exec.execute(
+      .logEvent(
+        .init(
+          id: "l-clock",
+          ruleID: "r-clock",
+          snapshotID: "s-clock",
+          message: "clocked"
+        )
+      )
+    )
+
+    let events = await audit.snapshot()
+    XCTAssertEqual(events.map(\.createdAt), [.fixed, .fixed])
+  }
+
   func testDuplicateActionKeyIsSkipped() async throws {
     let api = FakeAPIClient()
     let store = try DecisionStore.makeInMemory()
@@ -170,6 +192,42 @@ final class PolicyExecutorTests: XCTestCase {
     XCTAssertEqual(events.map(\.kind), ["actionDispatched", "actionFailed"])
   }
 
+  func testFailedActionCanRetryImmediately() async throws {
+    let api = FakeAPIClient()
+    api.nudgeFailure = HarnessMonitorAPIError.server(code: 500, message: "boom")
+    let store = try DecisionStore.makeInMemory()
+    let audit = InMemoryAuditWriter()
+    let exec = PolicyExecutor(api: api, decisions: store, audit: audit)
+    let action = PolicyAction.nudgeAgent(
+      .init(
+        agentID: "a1",
+        prompt: "x",
+        ruleID: "r1",
+        snapshotID: "s1",
+        snapshotHash: "hash-1"
+      )
+    )
+
+    let failed = await exec.execute(action)
+    api.nudgeFailure = nil
+    let retried = await exec.execute(action)
+
+    guard case .failed = failed else {
+      XCTFail("first call should fail, got \(failed)")
+      return
+    }
+    guard case .executed = retried else {
+      XCTFail("retry should execute, got \(retried)")
+      return
+    }
+    XCTAssertEqual(api.nudgeCalls, [.init(agentID: "a1", input: "x")])
+    let events = await audit.snapshot()
+    XCTAssertEqual(
+      events.map(\.kind),
+      ["actionDispatched", "actionFailed", "actionDispatched", "actionExecuted"]
+    )
+  }
+
   func testAssignTaskRoutesToAPI() async throws {
     let api = FakeAPIClient()
     let store = try DecisionStore.makeInMemory()
@@ -222,13 +280,15 @@ final class PolicyExecutorTests: XCTestCase {
 
   func testDedupExpiresAfterCooldown() async throws {
     let api = FakeAPIClient()
-    let store = try DecisionStore.makeInMemory()
+    let clock = TestClock()
+    let store = try DecisionStore.makeInMemory(now: { clock.now() })
     let audit = InMemoryAuditWriter()
     let exec = PolicyExecutor(
       api: api,
       decisions: store,
       audit: audit,
-      cooldown: 0.05
+      clock: clock,
+      cooldown: 60
     )
 
     _ = await exec.execute(
@@ -242,7 +302,7 @@ final class PolicyExecutorTests: XCTestCase {
         )
       )
     )
-    try await Task.sleep(nanoseconds: 80_000_000)
+    await clock.advance(by: .seconds(61))
     let second = await exec.execute(
       .nudgeAgent(
         .init(

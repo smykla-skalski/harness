@@ -44,7 +44,8 @@ public final class Decision {
     taskID: String?,
     summary: String,
     contextJSON: String,
-    suggestedActionsJSON: String
+    suggestedActionsJSON: String,
+    createdAt: Date = Date()
   ) {
     self.id = id
     self.severityRaw = severity.rawValue
@@ -55,7 +56,7 @@ public final class Decision {
     self.summary = summary
     self.contextJSON = contextJSON
     self.suggestedActionsJSON = suggestedActionsJSON
-    self.createdAt = Date()
+    self.createdAt = createdAt
     self.snoozedUntil = nil
     self.statusRaw = "open"
     self.resolutionJSON = nil

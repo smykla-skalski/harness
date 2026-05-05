@@ -12,12 +12,13 @@ extension HarnessMonitorStore {
 
     HarnessMonitorLogger.supervisorTrace("supervisor.start")
 
+    let supervisorClock = WallClock()
     let decisionStore: DecisionStore
     if let container = modelContext?.container {
-      decisionStore = DecisionStore(container: container)
+      decisionStore = DecisionStore(container: container, now: { supervisorClock.now() })
     } else {
       do {
-        decisionStore = try DecisionStore.makeInMemory()
+        decisionStore = try DecisionStore.makeInMemory(now: { supervisorClock.now() })
       } catch {
         HarnessMonitorLogger.supervisorError(
           "supervisor.start failed to create DecisionStore: \(error.localizedDescription)"
@@ -44,14 +45,15 @@ extension HarnessMonitorStore {
     let executor = PolicyExecutor(
       api: apiClient,
       decisions: decisionStore,
-      audit: auditWriter
+      audit: auditWriter,
+      clock: supervisorClock
     )
 
     let service = SupervisorService(
       store: self,
       registry: registry,
       executor: executor,
-      clock: nil,
+      clock: supervisorClock,
       interval: SupervisorPreferencesDefaults.defaultIntervalSeconds
     )
     await service.setQuietHoursWindow(SupervisorPreferencesDefaults.quietHoursWindow())
@@ -60,9 +62,6 @@ extension HarnessMonitorStore {
       interval: SupervisorPreferencesDefaults.defaultIntervalSeconds,
       tolerance: SupervisorPreferencesDefaults.schedulerTolerance
     )
-    lifecycle.onTick = { [weak service] in
-      await service?.runOneTick()
-    }
 
     do {
       try await seedSupervisorDecisionsIfNeeded(decisionStore)

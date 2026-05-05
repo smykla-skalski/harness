@@ -233,12 +233,28 @@ extension HarnessMonitorStore {
     let selectedSessionID = selectedSessionID
     let selectedSessionNeedsHydration =
       selectedSessionID != nil && (selectedSession == nil || isShowingCachedData)
-    return sessions.filter {
-      if $0.sessionId == selectedSessionID {
-        return selectedSessionNeedsHydration
+
+    var seen = Set<String>()
+    var ordered: [SessionSummary] = []
+    func append(_ summary: SessionSummary) {
+      guard seen.insert(summary.sessionId).inserted else {
+        return
       }
-      return recentIDs.contains($0.sessionId)
+      ordered.append(summary)
     }
+
+    for summary in sessions where summary.sessionId == selectedSessionID {
+      if selectedSessionNeedsHydration {
+        append(summary)
+      }
+    }
+    for summary in sessions where recentIDs.contains(summary.sessionId) {
+      append(summary)
+    }
+    for summary in sessions {
+      append(summary)
+    }
+    return ordered
   }
 
   private func fetchAndApplyHydrationSnapshot(

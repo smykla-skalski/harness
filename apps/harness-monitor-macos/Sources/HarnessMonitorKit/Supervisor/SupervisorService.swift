@@ -8,8 +8,9 @@ import SwiftData
 public actor SupervisorService {
   private static let quarantineErrorThreshold = 5
   private static let quarantineWindowTicks = 10
+  static let recentActionWindow: TimeInterval = 60
   let store: HarnessMonitorStore?
-  private let registry: PolicyRegistry
+  let registry: PolicyRegistry
   private let executor: PolicyExecutor
   private let clock: any SupervisorClock
   private let interval: TimeInterval
@@ -17,19 +18,21 @@ public actor SupervisorService {
   private var tickTask: Task<Void, Never>?
   private var running = false, tickInProgress = false
   private var tickWaiters: [CheckedContinuation<Void, Never>] = []
-  private var autoActionsSuppressed = false
-  private var quietHoursWindow: SupervisorQuietHoursWindow?
+  var autoActionSuppressionDepth = 0
+  var quietHoursWindow: SupervisorQuietHoursWindow?
 
   private var ruleFailureWindow: [[String: Bool]] = []
   private var quarantined: Set<String> = []
   private var injectedFailures: Set<String> = []
   private var dispatchedQuarantineDecisions: Set<String> = []
-  private var ruleLastFiredAt: [String: Date] = [:]
-  private var ruleRecentActionKeys: [String: Set<String>] = [:]
-  private var ruleRecentSuppressedActionKeys: [String: Set<String>] = [:]
+  var ruleLastFiredAt: [String: Date] = [:]
+  var ruleRecentActionKeys: [String: [String: Date]] = [:]
+  var ruleRecentSuppressedActionKeys: [String: [String: Date]] = [:]
   var tickLatencySamplesMs: [Double] = []
   private var lastSnapshotID: String?
   private var lastObserverCount = 0
+  var fallbackDisconnectedSince: Date?
+  var fallbackLastMessageAt: Date?
 
   public init(
     store: HarnessMonitorStore?,
@@ -72,8 +75,8 @@ public actor SupervisorService {
   public func suppressAutoActions<Result>(
     during operation: @Sendable () async throws -> Result
   ) async rethrows -> Result {
-    autoActionsSuppressed = true
-    defer { autoActionsSuppressed = false }
+    autoActionSuppressionDepth += 1
+    defer { autoActionSuppressionDepth = max(0, autoActionSuppressionDepth - 1) }
     return try await operation()
   }
 
@@ -106,13 +109,13 @@ public actor SupervisorService {
 
   private func runLoop() async {
     while running && !Task.isCancelled {
+      await runTickSerialized()
+      guard running && !Task.isCancelled else { return }
       do {
         try await clock.sleep(for: Self.sleepDuration(for: interval))
       } catch {
         return
       }
-      guard running && !Task.isCancelled else { return }
-      await runTickSerialized()
     }
   }
 
@@ -144,7 +147,7 @@ public actor SupervisorService {
   }
 
   private func tickBody() async {
-    let tickStartedAt = Date()
+    let tickStartedAt = clock.now()
     #if HARNESS_FEATURE_OTEL
       let tracer = SupervisorTelemetry.tracer()
       let span = tracer.spanBuilder(spanName: SupervisorTelemetry.tickSpanName).startSpan()
@@ -184,7 +187,7 @@ public actor SupervisorService {
       history: history,
       tickID: snapshot.id
     )
-    recordTickLatency(startedAt: tickStartedAt)
+    recordTickLatency(startedAt: tickStartedAt, endedAt: clock.now())
     if let store {
       let liveTick = liveTickSnapshot()
       await MainActor.run {
@@ -299,22 +302,25 @@ public actor SupervisorService {
           for: entry.rule,
           actionKey: action.actionKey
         )
-        if shouldSuppress(action, behavior: behavior, at: clock.now()) {
+        let actionNow = clock.now()
+        if shouldSuppress(action, behavior: behavior, at: actionNow) {
           HarnessMonitorLogger.supervisorTrace(
             "supervisor.action.suppressed key=\(action.actionKey)"
           )
           await executor.recordSuppressed(action, tickID: tickID)
-          recordSuppressedAction(forRuleID: entry.rule.id, action: action)
+          recordSuppressedAction(forRuleID: entry.rule.id, action: action, suppressedAt: actionNow)
           continue
         }
-        await dispatch(action, tickID: tickID, observers: observers)
-        dispatchedActions.append(action)
+        let outcome = await dispatch(action, tickID: tickID, observers: observers)
+        if outcome.recordsFiredAction {
+          dispatchedActions.append(action)
+        }
       }
       recordFiredActions(forRuleID: entry.rule.id, actions: dispatchedActions, firedAt: firedAt)
     }
     for ruleID in quarantined where wasQuarantinedThisTick(ruleID) {
       let decision = Self.makeQuarantineDecision(for: ruleID)
-      await dispatch(.queueDecision(decision), tickID: tickID, observers: observers)
+      _ = await dispatch(.queueDecision(decision), tickID: tickID, observers: observers)
       dispatchedQuarantineDecisions.insert(ruleID)
     }
   }
@@ -327,7 +333,7 @@ public actor SupervisorService {
     for observer in observers {
       let suggestions = await observer.proposeConfigSuggestion(history: history)
       for suggestion in suggestions {
-        await dispatch(.suggestConfigChange(suggestion), tickID: tickID, observers: observers)
+        _ = await dispatch(.suggestConfigChange(suggestion), tickID: tickID, observers: observers)
       }
     }
   }
@@ -340,80 +346,12 @@ public actor SupervisorService {
     _ action: PolicyAction,
     tickID: String,
     observers: [any PolicyObserver]
-  ) async {
+  ) async -> PolicyOutcome {
     let outcome = await executor.execute(action, tickID: tickID)
     for observer in observers {
       await observer.didExecute(action: action, outcome: outcome)
     }
-  }
-
-  private func buildSnapshot(now: Date) async -> SessionsSnapshot {
-    if let store {
-      return await SessionsSnapshot.build(from: store, now: now)
-    }
-    return SessionsSnapshot(
-      id: UUID().uuidString,
-      createdAt: now,
-      hash: "",
-      sessions: [],
-      connection: ConnectionSnapshot(kind: "disconnected", lastMessageAt: nil, reconnectAttempt: 0)
-    )
-  }
-
-  private func shouldSuppress(
-    _ action: PolicyAction,
-    behavior: RuleDefaultBehavior,
-    at now: Date
-  ) -> Bool {
-    guard action.isAutomaticSideEffect else {
-      return false
-    }
-    return behavior == .cautious || suppressionActive(at: now)
-  }
-
-  private func suppressionActive(at now: Date) -> Bool {
-    if autoActionsSuppressed {
-      return true
-    }
-    return quietHoursWindow?.contains(now) == true
-  }
-
-  private func makeContext(
-    forRuleID ruleID: String,
-    now: Date,
-    history: PolicyHistoryWindow
-  ) async -> PolicyContext {
-    PolicyContext(
-      now: now,
-      lastFiredAt: ruleLastFiredAt[ruleID],
-      recentActionKeys: recentActionKeys(forRuleID: ruleID, at: now),
-      parameters: await registry.parameters(forRule: ruleID),
-      history: history
-    )
-  }
-
-  private func recentActionKeys(forRuleID ruleID: String, at now: Date) -> Set<String> {
-    var actionKeys = ruleRecentActionKeys[ruleID] ?? []
-    if suppressionActive(at: now) {
-      actionKeys.formUnion(ruleRecentSuppressedActionKeys[ruleID] ?? [])
-    }
-    return actionKeys
-  }
-
-  private func recordSuppressedAction(forRuleID ruleID: String, action: PolicyAction) {
-    ruleRecentSuppressedActionKeys[ruleID, default: []].insert(action.actionKey)
-  }
-
-  private func recordFiredActions(
-    forRuleID ruleID: String,
-    actions: [PolicyAction],
-    firedAt: Date
-  ) {
-    guard !actions.isEmpty else {
-      return
-    }
-    ruleRecentActionKeys[ruleID] = Set(actions.map(\.actionKey))
-    ruleLastFiredAt[ruleID] = firedAt
+    return outcome
   }
 
 }

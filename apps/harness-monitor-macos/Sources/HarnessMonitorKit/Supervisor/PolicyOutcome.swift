@@ -9,3 +9,14 @@ public enum PolicyOutcome: Sendable, Hashable {
   case failed(actionKey: String, error: String)
   case quarantined(ruleID: String, reason: String)
 }
+
+extension PolicyOutcome {
+  var recordsFiredAction: Bool {
+    switch self {
+    case .dispatched, .executed, .quarantined:
+      true
+    case .failed, .skippedDuplicate:
+      false
+    }
+  }
+}

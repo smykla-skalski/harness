@@ -78,6 +78,34 @@ struct ContextRecordingRule: PolicyRule {
   }
 }
 
+struct DuplicateActionKeyRule: PolicyRule {
+  let id: String = "test.duplicate-action-key"
+  let name: String = "Duplicate Action Key"
+  let version: Int = 1
+  let parameters = PolicyParameterSchema(fields: [])
+
+  func defaultBehavior(for actionKey: String) -> RuleDefaultBehavior {
+    _ = actionKey
+    return .cautious
+  }
+
+  func evaluate(
+    snapshot: SessionsSnapshot,
+    context: PolicyContext
+  ) async -> [PolicyAction] {
+    _ = context
+    let action = PolicyAction.logEvent(
+      .init(
+        id: "duplicate-action",
+        ruleID: id,
+        snapshotID: snapshot.id,
+        message: "duplicate-action-key"
+      )
+    )
+    return [action, action]
+  }
+}
+
 actor ContextRecorder {
   private var contexts: [PolicyContext] = []
 
