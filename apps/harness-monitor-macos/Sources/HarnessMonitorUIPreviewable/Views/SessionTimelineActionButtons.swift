@@ -26,22 +26,30 @@ struct SessionTimelineActionButtons: View {
         }
       }
       .accessibilityElement(children: .contain)
-      .accessibilityLabel("Decision actions")
+      .accessibilityLabel(groupAccessibilityLabel)
     }
   }
 
+  private var groupAccessibilityLabel: String {
+    actions.first?.signalPayload != nil ? "Signal actions" : "Decision actions"
+  }
+
   private func tint(for action: SessionTimelineAction) -> Color? {
+    if action.signalPayload != nil {
+      return action.isPrimary ? HarnessMonitorTheme.accent : nil
+    }
     switch action.kind {
     case .dismiss:
-      HarnessMonitorTheme.danger
+      return HarnessMonitorTheme.danger
     case .snooze:
-      HarnessMonitorTheme.caution
+      return HarnessMonitorTheme.caution
     default:
-      action.isPrimary ? HarnessMonitorTheme.accent : nil
+      return action.isPrimary ? HarnessMonitorTheme.accent : nil
     }
   }
 
   private func actionAccessibilityLabel(_ action: SessionTimelineAction) -> String {
-    "\(action.title), decision \(action.decisionID)"
+    if action.signalPayload != nil { return action.title }
+    return "\(action.title), decision \(action.decisionID)"
   }
 }

@@ -56,6 +56,23 @@ struct SignalTimelineEventFeature: TimelineEventFeature {
     )
   }
 
+  func actions(
+    for node: SessionTimelineNode,
+    ctx: TimelineFeatureContext
+  ) -> [SessionTimelineAction] {
+    guard case .signal(let signalID) = node.tapTarget,
+      let record = ctx.signalsByID[signalID]
+    else { return [] }
+    switch record.effectiveStatus(now: ctx.now) {
+    case .pending:
+      return [.cancelSignal(signalID: signalID, agentID: record.agentId)]
+    case .expired:
+      return [.resendSignal(record)]
+    default:
+      return []
+    }
+  }
+
   func contextMenuItems(
     for node: SessionTimelineNode,
     ctx: TimelineFeatureContext

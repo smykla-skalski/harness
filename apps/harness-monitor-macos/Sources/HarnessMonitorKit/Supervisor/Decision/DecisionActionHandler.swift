@@ -7,6 +7,8 @@ public protocol DecisionActionHandler: AnyObject {
   func resolve(decisionID: String, outcome: DecisionOutcome) async
   func snooze(decisionID: String, duration: TimeInterval) async
   func dismiss(decisionID: String) async
+  func cancelSignal(signalID: String, agentID: String) async
+  func resendSignal(_ record: SessionSignalRecord) async
 }
 
 /// No-op handler used by previews and Phase 1 callers that have no live store wired up.
@@ -25,11 +27,14 @@ public final class NullDecisionActionHandler: DecisionActionHandler {
   public func dismiss(decisionID: String) async {
     _ = decisionID
   }
+
+  public func cancelSignal(signalID: String, agentID: String) async {}
+  public func resendSignal(_ record: SessionSignalRecord) async {}
 }
 
 @MainActor
 public final class StoreDecisionActionHandler: DecisionActionHandler {
-  private let store: HarnessMonitorStore
+  let store: HarnessMonitorStore
   private let decisions: DecisionStore
 
   public init(store: HarnessMonitorStore, decisions: DecisionStore) {
