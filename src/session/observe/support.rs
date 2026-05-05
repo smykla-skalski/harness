@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::observe::types::{Issue, IssueCode, IssueSeverity, OpenIssue};
+use crate::observe::types::{Issue, IssueCode, IssueSeverity, ObserverState, OpenIssue};
 use crate::observe::{is_observer_conflict, load_observer_state, save_observer_state};
 use crate::session::service::{self, TaskSpec};
 use crate::session::types::{SessionState, TaskSeverity, TaskSource};
@@ -103,7 +103,7 @@ pub(crate) fn persist_observer_snapshot(
     state: &SessionState,
     project_dir: &Path,
     issues: &[Issue],
-) -> Result<(), CliError> {
+) -> Result<bool, CliError> {
     let Some(observe_id) = state.observe_id.as_deref() else {
         return Err(CliError::from(CliErrorKind::session_parse_error(format!(
             "session '{}' is missing observe_id for observe snapshot persistence",
@@ -115,7 +115,7 @@ pub(crate) fn persist_observer_snapshot(
     for _attempt in 0..3 {
         let mut observer_state =
             load_observer_state(&project_context_root, observe_id, &state.session_id)?;
-        let now = utc_now();
+        let previous_state = observer_state.clone();
         let to_line = issues
             .iter()
             .map(|issue| issue.line.saturating_add(1))
@@ -123,7 +123,6 @@ pub(crate) fn persist_observer_snapshot(
             .unwrap_or(observer_state.cursor);
 
         observer_state.cursor = to_line;
-        observer_state.last_scan_time.clone_from(&now);
         if observer_state.project_hint.is_none() && !state.project_name.is_empty() {
             observer_state.project_hint = Some(state.project_name.clone());
         }
@@ -149,8 +148,14 @@ pub(crate) fn persist_observer_snapshot(
                 .collect();
         }
 
+        if !observer_snapshot_needs_write(&previous_state, &observer_state) {
+            return Ok(false);
+        }
+
+        let now = utc_now();
+        observer_state.last_scan_time = now;
         match save_observer_state(&project_context_root, observe_id, &observer_state) {
-            Ok(_) => return Ok(()),
+            Ok(_) => return Ok(true),
             Err(error) if is_observer_conflict(&error) => {}
             Err(error) => return Err(error),
         }
@@ -159,6 +164,15 @@ pub(crate) fn persist_observer_snapshot(
     Err(CliError::from(CliErrorKind::session_parse_error(
         "observer state changed repeatedly during observe persistence; retry the action",
     )))
+}
+
+#[must_use]
+fn observer_snapshot_needs_write(previous: &ObserverState, next: &ObserverState) -> bool {
+    previous.last_scan_time.is_empty()
+        || previous.cursor != next.cursor
+        || previous.project_hint != next.project_hint
+        || previous.open_issues != next.open_issues
+        || previous.baseline_issue_ids != next.baseline_issue_ids
 }
 
 fn open_issue_from_issue(issue: &Issue) -> OpenIssue {

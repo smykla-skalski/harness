@@ -1,11 +1,13 @@
 use crate::hooks::adapters::HookAgent;
+use crate::observe::load_observer_state;
 use crate::observe::types::IssueCode;
 use crate::session::service;
 use crate::session::types::{SessionRole, TaskSeverity};
+use crate::workspace::project_context_dir;
 
 use super::once::execute_session_observe;
 use super::scan::scan_all_agents;
-use super::support::create_work_items_for_issues;
+use super::support::{create_work_items_for_issues, persist_observer_snapshot};
 use super::test_support::{
     infrastructure_issue, start_active_session, with_temp_project, write_agent_log,
     write_agent_log_lines,
@@ -251,5 +253,25 @@ fn observe_deduplicates_existing_issue_id_even_when_title_changes() {
             tasks[0].observe_issue_id.as_deref(),
             Some(issue.id.as_str())
         );
+    });
+}
+
+#[test]
+fn observer_snapshot_skips_repeated_empty_scans() {
+    with_temp_project(|project| {
+        let state = start_active_session(project, "sess-empty-snapshot", "observe empty");
+        let observe_id = state.observe_id.as_deref().expect("observe id");
+
+        let first_written =
+            persist_observer_snapshot(&state, project, &[]).expect("persist initial scan");
+        let second_written =
+            persist_observer_snapshot(&state, project, &[]).expect("skip unchanged scan");
+        let observer =
+            load_observer_state(&project_context_dir(project), observe_id, &state.session_id)
+                .expect("load observer state");
+
+        assert!(first_written);
+        assert!(!second_written);
+        assert_eq!(observer.state_version, 1);
     });
 }
