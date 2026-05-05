@@ -85,6 +85,9 @@ private final class SessionTimelineRowFormatter {
   }
 
   func accessibilityLabel(for node: SessionTimelineNode) -> String {
+    if let override = node.voiceOverLabelOverride {
+      return override
+    }
     if let entryKind = node.entryKind, entryKind.hasPrefix("signal_") {
       return signalAccessibilityLabel(for: node)
     }

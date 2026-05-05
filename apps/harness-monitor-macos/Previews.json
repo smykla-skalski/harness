@@ -65,19 +65,19 @@
     {
       "id": "SessionCockpitTimelineSection",
       "description": "Session timeline with paged events",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionCockpitTimelineSection.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/MonitorTimelineSection.swift",
       "index": 0
     },
     {
       "id": "SessionCockpitTimelineSignalSquish",
       "description": "Session timeline signal squish regression surface with one-line and multiline rows",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionCockpitTimelineSection+Previews.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/MonitorTimelineSection+Previews.swift",
       "index": 0
     },
     {
       "id": "SessionCockpitTimelineCursor",
       "description": "Session timeline pagination and scroll cursor surface",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/SessionCockpitTimelineSection+Previews.swift",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/MonitorTimelineSection+Previews.swift",
       "index": 1
     },
     {

@@ -5,6 +5,7 @@ struct SessionTimelineNodeBuilder {
   let sessionID: String
   let entries: [TimelineEntry]
   let decisions: [Decision]
+  let context: TimelineFeatureContext = .empty
 
   /// Authoritative decision links are only `decisionID`, `decisionId`, or `decision_id`
   /// at the event payload top level or directly under `supervisor`. Nodes sort newest first,
@@ -28,7 +29,7 @@ struct SessionTimelineNodeBuilder {
     let agentID = entry.agentId ?? toolCallMetadata?.agentID ?? toolCallMetadata?.acpAgentID
     let taskID = entry.taskId ?? linkedDecision?.taskID
     let timestamp = SessionTimelineTimestampParser.parse(entry.recordedAt) ?? .distantPast
-    return SessionTimelineNode(
+    var node = SessionTimelineNode(
       identity: .entry(entry.entryId),
       kind: linkedDecision == nil ? .event : .linkedDecision,
       timestamp: timestamp,
@@ -53,6 +54,16 @@ struct SessionTimelineNodeBuilder {
       signalID: entry.kind.hasPrefix("signal_")
         ? Self.extractSignalID(from: entry.payload) : nil
     )
+    if let feature = SessionTimelineEventFeatureRegistry.firstMatch(for: entry) {
+      let patch = feature.patch(for: entry)
+      node.tapTarget = patch.tapTarget
+      node.eventTone = feature.tone(for: entry) ?? node.eventTone
+      node.voiceOverLabelOverride = feature.voiceOverLabel(for: node, ctx: context)
+      node.contextMenuItems = feature.contextMenuItems(for: node, ctx: context)
+      node.actions = feature.actions(for: node, ctx: context)
+      node.prefersCompactLayout = feature.prefersCompactLayout(for: node)
+    }
+    return node
   }
 
   private static func decisionNode(
