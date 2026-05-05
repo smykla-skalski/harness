@@ -273,7 +273,7 @@ private struct AgentDetailSummaryHeader: View {
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Text(title)
-        .scaledFont(.system(.title2, design: .rounded, weight: .bold))
+        .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
         .foregroundStyle(HarnessMonitorTheme.ink)
         .accessibilityAddTraits(.isHeader)
         .frame(maxWidth: .infinity, alignment: .leading)

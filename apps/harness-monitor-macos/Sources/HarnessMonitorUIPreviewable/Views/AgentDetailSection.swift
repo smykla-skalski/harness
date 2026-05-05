@@ -175,7 +175,7 @@ struct AgentDetailSection: View {
         compactBody
       }
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     .task(id: roleStateKey) {
       selectedRole = agent.role
     }
@@ -211,32 +211,32 @@ struct AgentDetailSection: View {
     .onChange(of: store.timeline.count) { _, _ in
       announceLatestTimelineEntryIfNeeded()
     }
-    .accessibilityTestProbe(
-      HarnessMonitorAccessibility.workspaceDetailCard,
-      label: agent.name,
-      value: agent.agentId
-    )
-    .accessibilityFrameMarker("\(HarnessMonitorAccessibility.workspaceDetailCard).frame")
   }
 
   @ViewBuilder
   private var fullPaneBody: some View {
-    ScrollView {
+    HarnessMonitorColumnScrollView(
+      horizontalPadding: HarnessMonitorTheme.spacingLG,
+      verticalPadding: HarnessMonitorTheme.spacingXL,
+      constrainContentWidth: false,
+      readableWidth: false,
+      topScrollEdgeEffect: .soft,
+      bottomScrollContentMargin: WorkspaceChromeMetrics.scrollContentBottomChromeMargin,
+      scrollSurfaceIdentifier: HarnessMonitorAccessibility.workspaceDetailScrollView,
+      scrollSurfaceLabel: "Workspace detail",
+      bottomInset: {
+        composerInset
+      }
+    ) {
       contentColumn(pinsComposer: true)
-        .padding(HarnessMonitorTheme.spacingLG)
-    }
-    .harnessPrimaryContentScrollSurface(
-      listIdentifier: HarnessMonitorAccessibility.workspaceDetailScrollView,
-      listLabel: "Workspace detail"
-    )
-    .safeAreaInset(edge: .bottom, spacing: 0) {
-      composerInset
+        .agentDetailCardProbe(name: agent.name, agentID: agent.agentId)
     }
   }
 
   @ViewBuilder
   private var compactBody: some View {
     contentColumn(pinsComposer: false)
+      .agentDetailCardProbe(name: agent.name, agentID: agent.agentId)
   }
 
   @ViewBuilder
@@ -479,4 +479,25 @@ struct AgentDetailSection: View {
     Self.humanizedHookLabel(for: hook)
   }
 
+}
+
+private struct AgentDetailCardProbeModifier: ViewModifier {
+  let name: String
+  let agentID: String
+
+  func body(content: Content) -> some View {
+    content
+      .accessibilityTestProbe(
+        HarnessMonitorAccessibility.workspaceDetailCard,
+        label: name,
+        value: agentID
+      )
+      .accessibilityFrameMarker("\(HarnessMonitorAccessibility.workspaceDetailCard).frame")
+  }
+}
+
+private extension View {
+  func agentDetailCardProbe(name: String, agentID: String) -> some View {
+    modifier(AgentDetailCardProbeModifier(name: name, agentID: agentID))
+  }
 }
