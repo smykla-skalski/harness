@@ -59,12 +59,16 @@ struct SessionTimelineFilterControls: View {
       : "line.3.horizontal.decrease.circle"
   }
 
+  private var showsSignalPreset: Bool {
+    inventory.signalCount > 0 || filters.signalPresetActive
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       searchControls
 
-      if !quickTones.isEmpty {
-        toneChipsSection
+      if showsSignalPreset || !quickTones.isEmpty {
+        presetAndToneChipsSection
       }
 
       if !activeFacetChips.isEmpty {
@@ -172,33 +176,53 @@ struct SessionTimelineFilterControls: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterClearButton)
   }
 
-  private var toneChipsSection: some View {
+  private var presetAndToneChipsSection: some View {
     HarnessMonitorWrapLayout(
       spacing: HarnessMonitorTheme.spacingXS,
       lineSpacing: HarnessMonitorTheme.spacingXS
     ) {
-      Button("All levels") {
-        filters.clearTones()
-      }
-      .harnessFilterChipButtonStyle(isSelected: false)
-      .harnessNativeFormControl()
-      .accessibilityValue(filters.tones.isEmpty ? "current default" : "clears level filters")
-
-      ForEach(quickTones, id: \.rawValue) { tone in
+      if showsSignalPreset {
         Button {
-          filters.toggleTone(tone)
+          filters.toggleSignalPreset()
         } label: {
           HStack(spacing: 6) {
-            Text(tone.label)
-            Text("\(inventory.count(for: tone))")
+            Text("Signals")
+            Text("\(inventory.signalCount)")
               .monospacedDigit()
               .foregroundStyle(.secondary)
           }
           .scaledFont(.caption.weight(.semibold))
         }
-        .harnessFilterChipButtonStyle(isSelected: filters.tones.contains(tone))
+        .harnessFilterChipButtonStyle(isSelected: filters.signalPresetActive)
         .harnessNativeFormControl()
-        .accessibilityValue(filters.tones.contains(tone) ? "selected" : "not selected")
+        .accessibilityValue(filters.signalPresetActive ? "selected" : "not selected")
+        .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterSignalsPreset)
+      }
+
+      if !quickTones.isEmpty {
+        Button("All levels") {
+          filters.clearTones()
+        }
+        .harnessFilterChipButtonStyle(isSelected: false)
+        .harnessNativeFormControl()
+        .accessibilityValue(filters.tones.isEmpty ? "current default" : "clears level filters")
+
+        ForEach(quickTones, id: \.rawValue) { tone in
+          Button {
+            filters.toggleTone(tone)
+          } label: {
+            HStack(spacing: 6) {
+              Text(tone.label)
+              Text("\(inventory.count(for: tone))")
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+            }
+            .scaledFont(.caption.weight(.semibold))
+          }
+          .harnessFilterChipButtonStyle(isSelected: filters.tones.contains(tone))
+          .harnessNativeFormControl()
+          .accessibilityValue(filters.tones.contains(tone) ? "selected" : "not selected")
+        }
       }
     }
   }

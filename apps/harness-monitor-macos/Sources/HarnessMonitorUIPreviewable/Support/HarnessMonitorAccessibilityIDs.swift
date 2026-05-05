@@ -37,7 +37,6 @@ public enum HarnessMonitorAccessibility {
   public static let sidebarFocusPicker = "harness.sidebar.picker.focus"
   public static let sidebarFooter = "harness.sidebar.footer"
   public static let sidebarFooterState = "harness.sidebar.footer.state"
-  public static let sidebarFooterMetricsFrame = "harness.sidebar.footer.metrics.frame"
 
   public static func sidebarFilterChip(_ filter: String) -> String {
     "harness.sidebar.filter-chip.\(slug(filter))"
@@ -117,7 +116,6 @@ public enum HarnessMonitorAccessibility {
   public static let refreshButton = "harness.toolbar.refresh"
   public static let daemonPreferencesButton = "harness.toolbar.preferences"
   public static let sleepPreventionButton = "harness.toolbar.sleep-prevention"
-  public static let mcpToolbarStatus = "harness.toolbar.mcp.status"
   public static let mcpBanner = "harness.content.mcp.banner"
   public static let windowMenuWorkspaceItem = "harness.menu.window.workspace"
   public static let windowMenuMainItem = "harness.menu.window.main"
@@ -162,6 +160,8 @@ public enum HarnessMonitorAccessibility {
   public static let sessionTimelineFilterMoreButton = "harness.session.timeline.filters.more"
   public static let sessionTimelineFilterClearButton = "harness.session.timeline.filters.clear"
   public static let sessionTimelineFilterState = "harness.session.timeline.filters.state"
+  public static let sessionTimelineFilterSignalsPreset =
+    "harness.session.timeline.filters.signals-preset"
   public static let sessionTimelineOlderButton = "harness.session.timeline.navigation.older"
   public static let sessionTimelineLatestButton = "harness.session.timeline.navigation.latest"
   public static let sessionTimelineNewerButton = "harness.session.timeline.navigation.newer"
