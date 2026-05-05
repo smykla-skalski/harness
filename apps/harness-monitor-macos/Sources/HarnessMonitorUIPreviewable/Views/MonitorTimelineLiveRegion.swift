@@ -23,6 +23,14 @@ public enum MonitorTimelineLiveRegion {
       return .polite
     case "agent_session_marker", "agent_error", "agent_permission_asked":
       return .assertive
+    case "signal_sent", "signal_received":
+      return .polite
+    case "signal_acknowledged":
+      let lower = summary.lowercased()
+      if lower.contains("rejected") || lower.contains("expired") || lower.contains("deferred") {
+        return .assertive
+      }
+      return .polite
     default:
       return .silent
     }

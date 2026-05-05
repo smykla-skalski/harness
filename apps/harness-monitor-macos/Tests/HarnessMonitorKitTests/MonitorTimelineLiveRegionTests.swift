@@ -64,6 +64,40 @@ struct MonitorTimelineLiveRegionPriorityTests {
     )
   }
 
+  @Test("Signal sent and received are polite")
+  func signalSentAndReceivedArePolite() {
+    #expect(MonitorTimelineLiveRegion.priority(for: "signal_sent") == .polite)
+    #expect(MonitorTimelineLiveRegion.priority(for: "signal_received") == .polite)
+  }
+
+  @Test("Signal acknowledged is polite on acceptance and assertive on rejection variants")
+  func signalAcknowledgedPriorityDispatchesOnSummary() {
+    #expect(
+      MonitorTimelineLiveRegion.priority(
+        for: "signal_acknowledged",
+        summary: "sig-abc delivered to codex-worker: Accepted"
+      ) == .polite
+    )
+    #expect(
+      MonitorTimelineLiveRegion.priority(
+        for: "signal_acknowledged",
+        summary: "sig-abc rejected from codex-worker: Rejected"
+      ) == .assertive
+    )
+    #expect(
+      MonitorTimelineLiveRegion.priority(
+        for: "signal_acknowledged",
+        summary: "sig-abc deferred by codex-worker: Deferred"
+      ) == .assertive
+    )
+    #expect(
+      MonitorTimelineLiveRegion.priority(
+        for: "signal_acknowledged",
+        summary: "sig-abc expired without acknowledgement: Expired"
+      ) == .assertive
+    )
+  }
+
   @Test("Kinds without a Rust producer default to silent")
   func unproducedKindsAreSilent() {
     #expect(MonitorTimelineLiveRegion.priority(for: "agent_hook_fired") == .silent)
