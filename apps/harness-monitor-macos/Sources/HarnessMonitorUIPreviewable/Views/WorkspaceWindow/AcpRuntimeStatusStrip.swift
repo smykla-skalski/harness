@@ -174,18 +174,19 @@ struct AcpRuntimeStatusStrip: View {
       HarnessMonitorAccessibility.agentRuntimeWatchdog(runtimeState.agentId)
     )
 
-    AcpRuntimeChip(
-      title: "Pending permissions",
-      value: runtimeState.pendingPermissions.formatted(),
-      systemImage: "person.badge.key",
-      tint: runtimeState.pendingPermissions > 0
-        ? HarnessMonitorTheme.caution : HarnessMonitorTheme.secondaryInk,
-      accessibilityLabel: "Pending permissions",
-      accessibilityValue: runtimeState.pendingPermissions.formatted()
-    )
-    .accessibilityIdentifier(
-      HarnessMonitorAccessibility.agentRuntimePendingPermissions(runtimeState.agentId)
-    )
+    if runtimeState.pendingPermissions > 0 {
+      AcpRuntimeChip(
+        title: "Pending permissions",
+        value: runtimeState.pendingPermissions.formatted(),
+        systemImage: "person.badge.key",
+        tint: HarnessMonitorTheme.caution,
+        accessibilityLabel: "Pending permissions",
+        accessibilityValue: runtimeState.pendingPermissions.formatted()
+      )
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.agentRuntimePendingPermissions(runtimeState.agentId)
+      )
+    }
 
     if let promptDeadlineDate {
       AcpRuntimeDeadlineChip(deadline: promptDeadlineDate, now: store.acpRuntimeClockTick)
