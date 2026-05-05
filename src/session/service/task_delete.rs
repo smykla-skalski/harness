@@ -1,7 +1,7 @@
 use super::{
     AgentStatus, CliError, SessionAction, SessionState, TaskQueuePolicy, TaskStatus,
-    clear_agent_current_task, ensure_task_not_deleted, refresh_session, require_active,
-    require_permission, task_not_found, touch_agent,
+    clear_agent_current_task, ensure_task_not_deleted, refresh_session, require_permission,
+    require_task_creation_state, task_not_found, touch_agent,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -16,7 +16,7 @@ pub(crate) fn apply_delete_task(
     actor_id: &str,
     now: &str,
 ) -> Result<DeletedTaskInfo, CliError> {
-    require_active(state)?;
+    require_task_creation_state(state)?;
     require_permission(state, actor_id, SessionAction::DeleteTask)?;
 
     let task = state

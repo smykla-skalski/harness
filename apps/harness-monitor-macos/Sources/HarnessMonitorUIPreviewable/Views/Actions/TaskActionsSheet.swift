@@ -104,7 +104,7 @@ struct TaskActionsSheet: View {
   @ViewBuilder
   private func form(for task: WorkItem) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-      if let banner = store.selectedSessionActionBannerMessage {
+      if let banner = store.selectedSessionActionUnavailableMessage {
         Text(banner)
           .scaledFont(.system(.footnote, design: .rounded, weight: .medium))
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
