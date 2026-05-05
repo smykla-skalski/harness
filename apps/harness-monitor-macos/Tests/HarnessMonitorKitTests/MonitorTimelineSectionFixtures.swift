@@ -59,6 +59,7 @@ enum MonitorTimelineSectionFixtures {
     ISO8601DateFormatter().string(from: date)
   }
 
+  @MainActor
   static func makePresentation(
     sessionID: String,
     timeline: [TimelineEntry],
@@ -99,6 +100,7 @@ enum MonitorTimelineSectionFixtures {
       decisionCount: 0,
       firstDecisionID: nil,
       lastDecisionID: nil,
+      signalCount: 0,
       isTimelineLoading: isTimelineLoading,
       filterSignature: "",
       reduceMotion: false,

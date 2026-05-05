@@ -88,9 +88,7 @@ struct SessionCockpitHeaderCard: View {
         HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
           HStack(spacing: HarnessMonitorTheme.itemSpacing) {
             observeButton
-            if signalTargetAgentID != nil {
-              sendSignalButton
-            }
+            sendSignalButton
             if detail.agents.count > 1 {
               transferLeadershipButton
             }
@@ -134,6 +132,15 @@ struct SessionCockpitHeaderCard: View {
     )
   }
 
+  private var sendSignalHelp: String {
+    guard signalTargetAgentID != nil else {
+      return "No agents available to receive a signal"
+    }
+    return unavailableActionHelp.isEmpty
+      ? "Send a signal to the session leader (⌘⇧S)"
+      : unavailableActionHelp
+  }
+
   private var sendSignalButton: some View {
     Button("Send Signal") {
       if let agentID = signalTargetAgentID {
@@ -141,9 +148,9 @@ struct SessionCockpitHeaderCard: View {
       }
     }
     .harnessActionButtonStyle(variant: .bordered)
-    .help("Send a signal to the session leader (⌘⇧S)")
+    .help(sendSignalHelp)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sendSignalButton)
-    .disabled(!areSessionActionsAvailable)
+    .disabled(!areSessionActionsAvailable || signalTargetAgentID == nil)
   }
 
   private var transferLeadershipButton: some View {

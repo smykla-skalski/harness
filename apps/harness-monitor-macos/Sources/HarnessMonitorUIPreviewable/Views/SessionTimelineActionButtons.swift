@@ -4,6 +4,7 @@ import SwiftUI
 struct SessionTimelineActionButtons: View {
   let actions: [SessionTimelineAction]
   let handler: any DecisionActionHandler
+  @State private var confirmingCancelAction: SessionTimelineAction?
 
   var body: some View {
     if !actions.isEmpty {
@@ -12,21 +13,48 @@ struct SessionTimelineActionButtons: View {
         lineSpacing: HarnessMonitorTheme.spacingSM
       ) {
         ForEach(actions) { action in
-          HarnessMonitorAsyncActionButton(
-            title: action.title,
-            tint: tint(for: action),
-            variant: action.isPrimary ? .prominent : .bordered,
-            role: action.role,
-            isLoading: false,
-            accessibilityIdentifier: action.accessibilityIdentifier
-          ) {
-            await action.perform(using: handler)
+          if case .cancel = action.signalPayload {
+            HarnessMonitorActionButton(
+              title: action.title,
+              tint: tint(for: action),
+              variant: .bordered,
+              accessibilityIdentifier: action.accessibilityIdentifier
+            ) {
+              confirmingCancelAction = action
+            }
+            .accessibilityLabel(actionAccessibilityLabel(action))
+          } else {
+            HarnessMonitorAsyncActionButton(
+              title: action.title,
+              tint: tint(for: action),
+              variant: action.isPrimary ? .prominent : .bordered,
+              role: action.role,
+              isLoading: false,
+              accessibilityIdentifier: action.accessibilityIdentifier
+            ) {
+              await action.perform(using: handler)
+            }
+            .accessibilityLabel(actionAccessibilityLabel(action))
           }
-          .accessibilityLabel(actionAccessibilityLabel(action))
         }
       }
       .accessibilityElement(children: .contain)
       .accessibilityLabel(groupAccessibilityLabel)
+      .confirmationDialog(
+        "Cancel signal?",
+        isPresented: Binding(
+          get: { confirmingCancelAction != nil },
+          set: { if !$0 { confirmingCancelAction = nil } }
+        ),
+        presenting: confirmingCancelAction
+      ) { action in
+        Button("Cancel Signal", role: .destructive) {
+          Task { await action.perform(using: handler) }
+        }
+        Button("Keep", role: .cancel) {}
+      } message: { _ in
+        Text("The signal will not be delivered.")
+      }
     }
   }
 
@@ -49,7 +77,10 @@ struct SessionTimelineActionButtons: View {
   }
 
   private func actionAccessibilityLabel(_ action: SessionTimelineAction) -> String {
-    if action.signalPayload != nil { return action.title }
-    return "\(action.title), decision \(action.decisionID)"
+    switch action.signalPayload {
+    case .cancel: return "Cancel signal"
+    case .resend: return "Resend signal"
+    case nil: return "\(action.title), decision \(action.decisionID)"
+    }
   }
 }

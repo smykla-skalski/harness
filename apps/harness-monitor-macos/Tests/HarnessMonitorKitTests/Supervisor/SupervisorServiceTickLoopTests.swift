@@ -79,6 +79,64 @@ final class SupervisorServiceTickLoopTests: XCTestCase {
     XCTAssertEqual(payload.id, "suggestion-1")
   }
 
+  func test_ruleEvaluationOrderFollowsRegistryOrderNotCompletionOrder() async throws {
+    let registry = PolicyRegistry()
+    let gate = RuleGate()
+    await registry.register(SlowEmitRule(gate: gate))
+    await registry.register(EmitOnceRule())
+    let observer = SpyObserver()
+    await registry.registerObserver(observer)
+    let service = SupervisorService(
+      store: nil,
+      registry: registry,
+      executor: try PolicyExecutor.fixture(),
+      clock: TestClock(),
+      interval: 10
+    )
+
+    let tick = Task { await service.runOneTick() }
+    let deadline = Date().addingTimeInterval(2)
+    while await gate.waitCount == 0 && Date() < deadline {
+      try? await Task.sleep(nanoseconds: 5_000_000)
+    }
+    await gate.release()
+    _ = await tick.value
+
+    let evaluations = await observer.evaluations
+    XCTAssertEqual(evaluations.map(\.ruleID), [SlowEmitRule.ruleID, EmitOnceRule.ruleID])
+    let executions = await observer.executions
+    XCTAssertEqual(executions.first?.action.actionKey, "log:test.slow-emit:slow-emit")
+    let secondKey = executions.dropFirst().first?.action.actionKey ?? ""
+    XCTAssertTrue(secondKey.hasPrefix("log:test.emit-once:emit-"))
+  }
+
+  func test_ruleTimeoutDoesNotBlockHealthyRules() async throws {
+    let registry = PolicyRegistry()
+    let gate = RuleGate()
+    await registry.register(SlowRule(gate: gate))
+    await registry.register(EmitOnceRule())
+    let observer = SpyObserver()
+    await registry.registerObserver(observer)
+    let service = SupervisorService(
+      store: nil,
+      registry: registry,
+      executor: try PolicyExecutor.fixture(),
+      clock: TestClock(),
+      interval: 10,
+      ruleEvaluationTimeout: .milliseconds(10)
+    )
+
+    await service.runOneTick()
+    await gate.release()
+
+    let evaluations = await observer.evaluations
+    XCTAssertEqual(evaluations.map(\.ruleID), [SlowRule.ruleID, EmitOnceRule.ruleID])
+    XCTAssertEqual(evaluations[0].actions.count, 0)
+    XCTAssertEqual(evaluations[1].actions.count, 1)
+    let quarantined = await service.quarantinedRuleIDs()
+    XCTAssertTrue(quarantined.isEmpty)
+  }
+
   func test_overlappingTicksCoalesceBehindInFlightTick() async throws {
     let registry = PolicyRegistry()
     let gate = RuleGate()
