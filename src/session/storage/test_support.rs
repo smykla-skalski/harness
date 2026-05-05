@@ -70,6 +70,7 @@ pub(super) fn sample_state(session_id: &str) -> SessionState {
                 review_round: 0,
                 arbitration: None,
                 suggested_persona: None,
+                deleted_at: None,
             },
         )]),
         leader_id: Some("claude-leader".into()),

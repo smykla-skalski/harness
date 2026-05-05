@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use super::super::{
     AgentStatus, AwaitingReview, CliError, CliErrorKind, SessionAction, SessionState, TaskStatus,
-    clear_agent_current_task, refresh_session, require_active, require_permission, task_not_found,
-    task_status_label, touch_agent,
+    clear_agent_current_task, ensure_task_not_deleted, refresh_session, require_active,
+    require_permission, task_not_found, task_status_label, touch_agent,
 };
 use crate::session::types::{
     Review, ReviewClaim, ReviewConsensus, ReviewPoint, ReviewVerdict, ReviewerEntry, WorkItem,
@@ -36,6 +36,7 @@ pub(crate) fn apply_submit_for_review(
         .tasks
         .get(task_id)
         .ok_or_else(|| task_not_found(task_id))?;
+    ensure_task_not_deleted(task_id, task)?;
 
     if task.status != TaskStatus::InProgress {
         return Err(CliErrorKind::session_agent_conflict(format!(
@@ -125,6 +126,7 @@ pub(crate) fn apply_claim_review(
         .tasks
         .get(task_id)
         .ok_or_else(|| task_not_found(task_id))?;
+    ensure_task_not_deleted(task_id, task)?;
 
     if !matches!(
         task.status,
@@ -200,6 +202,7 @@ pub(crate) fn validate_submit_review(
         .tasks
         .get(task_id)
         .ok_or_else(|| task_not_found(task_id))?;
+    ensure_task_not_deleted(task_id, task)?;
 
     if task.status != TaskStatus::InReview {
         return Err(CliErrorKind::session_agent_conflict(format!(

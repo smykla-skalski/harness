@@ -10,7 +10,7 @@ mod mutations;
 mod review;
 
 pub(super) use mutations::{
-    post_task_assign, post_task_checkpoint, post_task_create, post_task_drop,
+    post_task_assign, post_task_checkpoint, post_task_create, post_task_delete, post_task_drop,
     post_task_queue_policy, post_task_update,
 };
 pub(super) use review::{
@@ -21,6 +21,7 @@ pub(super) use review::{
 pub(super) fn task_routes() -> Router<DaemonHttpState> {
     Router::new()
         .route(http_paths::SESSION_TASK_CREATE, post(post_task_create))
+        .route(http_paths::SESSION_TASK_DELETE, post(post_task_delete))
         .route(http_paths::SESSION_TASK_ASSIGN, post(post_task_assign))
         .route(http_paths::SESSION_TASK_DROP, post(post_task_drop))
         .route(

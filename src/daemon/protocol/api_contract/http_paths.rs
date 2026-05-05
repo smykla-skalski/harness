@@ -24,6 +24,7 @@ pub const SESSION_ARCHIVE: &str = "/v1/sessions/{session_id}/archive";
 pub const SESSION_LEAVE: &str = "/v1/sessions/{session_id}/leave";
 pub const SESSION_OBSERVE: &str = "/v1/sessions/{session_id}/observe";
 pub const SESSION_TASK_CREATE: &str = "/v1/sessions/{session_id}/task";
+pub const SESSION_TASK_DELETE: &str = "/v1/sessions/{session_id}/tasks/{task_id}";
 pub const SESSION_TASK_ASSIGN: &str = "/v1/sessions/{session_id}/tasks/{task_id}/assign";
 pub const SESSION_TASK_DROP: &str = "/v1/sessions/{session_id}/tasks/{task_id}/drop";
 pub const SESSION_TASK_QUEUE_POLICY: &str =

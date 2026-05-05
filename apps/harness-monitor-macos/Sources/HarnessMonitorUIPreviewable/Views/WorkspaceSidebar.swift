@@ -34,7 +34,7 @@ struct WorkspaceSidebar: View {
   @AppStorage(WorkspaceDecisionFilterDefaults.searchScopeKey)
   private var decisionSearchScopeRaw = DecisionsSidebarSearchScope.summary.rawValue
   @State private var hasHydratedPersistedDecisionFilters = false
-  @State private var workspaceSearchQuery = ""
+  @State var workspaceSearchQuery = ""
   @State private var searchFocusDispatcher = HarnessSidebarSearchFocusDispatcher()
   @State private var searchPresentationState = SidebarSearchPresentationState()
   @Environment(\.fontScale)
@@ -87,19 +87,19 @@ struct WorkspaceSidebar: View {
     decisionScope.totalCount > 0 || !decisionFilters.severities.isEmpty
   }
 
-  private var activeTuis: [AgentTuiSnapshot] {
+  var activeTuis: [AgentTuiSnapshot] {
     agentTuis.filter { $0.status.isActive }
   }
 
-  private var inactiveTuis: [AgentTuiSnapshot] {
+  var inactiveTuis: [AgentTuiSnapshot] {
     agentTuis.filter { !$0.status.isActive }
   }
 
-  private var activeCodexRuns: [CodexRunSnapshot] {
+  var activeCodexRuns: [CodexRunSnapshot] {
     codexRuns.filter { $0.status.isActive }
   }
 
-  private var inactiveCodexRuns: [CodexRunSnapshot] {
+  var inactiveCodexRuns: [CodexRunSnapshot] {
     codexRuns.filter { !$0.status.isActive }
   }
 
@@ -109,93 +109,6 @@ struct WorkspaceSidebar: View {
 
   private var sidebarSearchPrompt: Text {
     Text(showsDecisionSearchChrome ? "Search decisions" : "Search workspace")
-  }
-
-  private var normalizedWorkspaceSearchQuery: String {
-    workspaceSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-  }
-
-  private var filteredExternalAgents: [AgentRegistration] {
-    externalAgents.filter { agent in
-      matchesWorkspaceSearch([
-        agent.name,
-        agent.agentId,
-        agent.role.title,
-        runtimeDisplayLabel(agent.runtime),
-        agent.currentTaskId,
-      ])
-    }
-  }
-
-  private var filteredActiveTuis: [AgentTuiSnapshot] {
-    activeTuis.filter { tui in
-      matchesWorkspaceSearch([
-        sessionTitlesByID[tui.tuiId],
-        tui.tuiId,
-        tui.runtime,
-        tui.status.title,
-      ])
-    }
-  }
-
-  private var filteredInactiveTuis: [AgentTuiSnapshot] {
-    inactiveTuis.filter { tui in
-      matchesWorkspaceSearch([
-        sessionTitlesByID[tui.tuiId],
-        tui.tuiId,
-        tui.runtime,
-        tui.status.title,
-      ])
-    }
-  }
-
-  private var filteredActiveCodexRuns: [CodexRunSnapshot] {
-    activeCodexRuns.filter { run in
-      matchesWorkspaceSearch([
-        codexTitlesByID[run.runId],
-        run.runId,
-        run.status.title,
-        run.mode.title,
-      ])
-    }
-  }
-
-  private var filteredInactiveCodexRuns: [CodexRunSnapshot] {
-    inactiveCodexRuns.filter { run in
-      matchesWorkspaceSearch([
-        codexTitlesByID[run.runId],
-        run.runId,
-        run.status.title,
-        run.mode.title,
-      ])
-    }
-  }
-
-  private var filteredTasks: [WorkItem] {
-    tasks.filter { task in
-      matchesWorkspaceSearch([
-        task.title,
-        task.taskId,
-        task.severity.title,
-        task.status.title,
-        task.assignedTo,
-      ])
-    }
-  }
-
-  private var createRowMatchesWorkspaceSearch: Bool {
-    matchesWorkspaceSearch(["Create", "New agent", "New terminal", "Codex run"])
-  }
-
-  private func matchesWorkspaceSearch(_ values: [String?]) -> Bool {
-    let query = normalizedWorkspaceSearchQuery
-    guard !query.isEmpty else {
-      return true
-    }
-    return values.contains { value in
-      guard let value else { return false }
-      return value.localizedCaseInsensitiveContains(query)
-    }
   }
 
   private func handleSearchFocusRequest() {
@@ -361,78 +274,16 @@ struct WorkspaceSidebar: View {
         }
       }
 
-      if !filteredActiveCodexRuns.isEmpty {
-        Section("Open Runs") {
-          ForEach(filteredActiveCodexRuns) { run in
-            CodexRunSidebarRow(
-              snapshot: run,
-              title: codexTitlesByID[run.runId] ?? "Run"
-            )
-            .padding(.vertical, rowPadding)
-            .tag(WorkspaceSelection.codex(sessionID: run.sessionId, runID: run.runId))
-            .harnessMCPTab(
-              HarnessMonitorAccessibility.agentTuiTab(run.runId),
-              label: codexTitlesByID[run.runId] ?? "Run",
-              pressAction: {
-                selection = .codex(sessionID: run.sessionId, runID: run.runId)
-              }
-            )
-          }
-        }
-      }
-
-      if !filteredInactiveCodexRuns.isEmpty {
-        Section("Past Runs") {
-          ForEach(filteredInactiveCodexRuns) { run in
-            CodexRunSidebarRow(
-              snapshot: run,
-              title: codexTitlesByID[run.runId] ?? "Run"
-            )
-            .padding(.vertical, rowPadding)
-            .tag(WorkspaceSelection.codex(sessionID: run.sessionId, runID: run.runId))
-            .harnessMCPTab(
-              HarnessMonitorAccessibility.agentTuiTab(run.runId),
-              label: codexTitlesByID[run.runId] ?? "Run",
-              pressAction: {
-                selection = .codex(sessionID: run.sessionId, runID: run.runId)
-              }
-            )
-          }
-        }
-      }
-
-      if !filteredTasks.isEmpty {
-        Section("Tasks") {
-          ForEach(filteredTasks, id: \.taskId) { task in
-            HStack(spacing: HarnessMonitorTheme.spacingSM) {
-              Image(systemName: "checklist")
-                .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-              VStack(alignment: .leading, spacing: 2) {
-                Text(task.title)
-                  .scaledFont(.body)
-                  .lineLimit(2)
-                Text("\(task.severity.title) • \(task.status.title)")
-                  .scaledFont(.caption)
-                  .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-              }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, rowPadding)
-            .tag(WorkspaceSelection.task(sessionID: currentSessionID, taskID: task.taskId))
-            .harnessMCPRow(
-              HarnessMonitorAccessibility.workspaceTaskTab(task.taskId),
-              label: task.title,
-              value: "\(task.severity.title) • \(task.status.title)",
-              pressAction: {
-                selection = .task(
-                  sessionID: currentSessionID,
-                  taskID: task.taskId
-                )
-              }
-            )
-          }
-        }
-      }
+      WorkspaceSidebarRunAndTaskSections(
+        store: store,
+        selection: $selection,
+        rowPadding: rowPadding,
+        currentSessionID: currentSessionID,
+        codexTitlesByID: codexTitlesByID,
+        activeCodexRuns: filteredActiveCodexRuns,
+        inactiveCodexRuns: filteredInactiveCodexRuns,
+        tasks: filteredTasks
+      )
     }
     .listStyle(.sidebar)
     .workspaceBottomScrollContentMargin()

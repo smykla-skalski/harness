@@ -1,10 +1,10 @@
 use super::{
     CliError, CliErrorKind, DaemonClient, Path, TaskCheckpoint, TaskQueuePolicy, TaskSeverity,
     TaskSource, TaskSpec, TaskStatus, WorkItem, append_task_drop_effect_logs,
-    apply_advance_queued_tasks, apply_assign_task, apply_create_task, apply_drop_task,
-    apply_record_checkpoint, apply_update_task, apply_update_task_queue_policy,
+    apply_advance_queued_tasks, apply_assign_task, apply_create_task, apply_delete_task,
+    apply_drop_task, apply_record_checkpoint, apply_update_task, apply_update_task_queue_policy,
     ensure_valid_progress, generate_checkpoint_id, load_state_or_err, log_checkpoint_recorded,
-    log_task_assigned, log_task_created, log_task_status_changed, protocol,
+    log_task_assigned, log_task_created, log_task_deleted, log_task_status_changed, protocol,
     reconcile_expired_pending_signals, refresh_session, sort_session_tasks, started_task_signals,
     storage, utc_now, write_prepared_task_start_signals,
 };
@@ -219,10 +219,56 @@ pub fn list_tasks(
     let mut items: Vec<WorkItem> = state
         .tasks
         .into_values()
+        .filter(|task| !task.is_deleted())
         .filter(|task| status_filter.is_none_or(|status| task.status == status))
         .collect();
     sort_session_tasks(&mut items);
     Ok(items)
+}
+
+/// Delete a work item from active task views while preserving history.
+///
+/// # Errors
+/// Returns `CliError` if the caller lacks permission or the task is not found.
+pub fn delete_task(
+    session_id: &str,
+    task_id: &str,
+    actor_id: &str,
+    project_dir: &Path,
+) -> Result<(), CliError> {
+    if let Some(client) = DaemonClient::try_connect() {
+        let _ = client.delete_task(
+            session_id,
+            task_id,
+            &protocol::TaskDeleteRequest {
+                actor: actor_id.to_string(),
+            },
+        )?;
+        return Ok(());
+    }
+
+    let now = utc_now();
+    let mut deleted = None;
+    let layout = storage::layout_from_project_dir(project_dir, session_id)?;
+
+    storage::update_state(&layout, |state| {
+        deleted = Some(apply_delete_task(state, task_id, actor_id, &now)?);
+        Ok(())
+    })?;
+
+    let deleted = deleted.ok_or_else(|| {
+        CliError::from(CliErrorKind::workflow_io(
+            "task deletion did not persist state".to_string(),
+        ))
+    })?;
+    storage::append_log_entry(
+        &layout,
+        log_task_deleted(task_id, &deleted.title, deleted.previous_status),
+        Some(actor_id),
+        None,
+    )?;
+
+    Ok(())
 }
 
 /// Update a work item's status.

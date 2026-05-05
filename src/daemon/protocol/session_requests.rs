@@ -36,6 +36,11 @@ pub struct TaskCreateRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskDeleteRequest {
+    pub actor: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskAssignRequest {
     pub actor: String,
     pub agent_id: String,

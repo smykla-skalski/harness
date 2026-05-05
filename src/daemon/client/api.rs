@@ -10,8 +10,8 @@ use crate::daemon::protocol::{
     SessionLeaveRequest, SessionMutationResponse, SessionStartRequest, SessionSummary,
     SessionTitleRequest, SignalAckRequest, SignalCancelRequest, SignalSendRequest,
     TaskArbitrateRequest, TaskAssignRequest, TaskCheckpointRequest, TaskClaimReviewRequest,
-    TaskCreateRequest, TaskDropRequest, TaskRespondReviewRequest, TaskSubmitForReviewRequest,
-    TaskSubmitReviewRequest, TaskUpdateRequest,
+    TaskCreateRequest, TaskDeleteRequest, TaskDropRequest, TaskRespondReviewRequest,
+    TaskSubmitForReviewRequest, TaskSubmitReviewRequest, TaskUpdateRequest,
 };
 use crate::errors::CliError;
 use crate::session::service::{ImproverApplyOutcome, ResolvedRuntimeSessionAgent};
@@ -164,6 +164,15 @@ impl DaemonClient {
         request: &TaskCreateRequest,
     ) -> Result<SessionDetail, CliError> {
         self.post(&format!("/v1/sessions/{session_id}/task"), request)
+    }
+
+    pub fn delete_task(
+        &self,
+        session_id: &str,
+        task_id: &str,
+        request: &TaskDeleteRequest,
+    ) -> Result<SessionDetail, CliError> {
+        self.post(&format!("/v1/sessions/{session_id}/tasks/{task_id}"), request)
     }
 
     pub fn assign_task(

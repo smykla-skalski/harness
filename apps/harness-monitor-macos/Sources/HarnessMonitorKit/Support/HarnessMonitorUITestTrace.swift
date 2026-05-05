@@ -112,6 +112,8 @@ extension HarnessMonitorStore.PendingConfirmation {
       "end-session"
     case .removeSession:
       "remove-session"
+    case .deleteTask:
+      "delete-task"
     case .removeAgent:
       "remove-agent"
     case .interruptCodexRun:

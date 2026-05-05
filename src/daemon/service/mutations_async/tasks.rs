@@ -1,9 +1,9 @@
 use super::super::wake_route::WakeDispatch;
 use super::super::{CliError, session_detail_from_async_daemon_db};
 use super::super::{
-    SessionDetail, TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
-    TaskQueuePolicyRequest, TaskSource, TaskUpdateRequest, db::AsyncDaemonDb, session_service,
-    sync_file_state_from_async_db, utc_now,
+    SessionDetail, TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDeleteRequest,
+    TaskDropRequest, TaskQueuePolicyRequest, TaskSource, TaskUpdateRequest, db::AsyncDaemonDb,
+    session_service, sync_file_state_from_async_db, utc_now,
 };
 use super::{append_log, bump_session, persist_task_signal_effects, resolved_session_for_mutation};
 
@@ -35,6 +35,34 @@ pub(crate) async fn create_task_async(
         async_db,
         session_id,
         session_service::log_task_created(&spec, &item),
+        &request.actor,
+    )
+    .await?;
+    bump_session(async_db, session_id).await?;
+    session_detail_from_async_daemon_db(session_id, async_db).await
+}
+
+/// Delete a task from active task views while preserving timeline history.
+///
+/// # Errors
+/// Returns `CliError` when the session cannot be resolved or task deletion fails.
+pub(crate) async fn delete_task_async(
+    session_id: &str,
+    task_id: &str,
+    request: &TaskDeleteRequest,
+    async_db: &AsyncDaemonDb,
+) -> Result<SessionDetail, CliError> {
+    let now = utc_now();
+    let deleted = async_db
+        .update_session_state_immediate(session_id, |state| {
+            session_service::apply_delete_task(state, task_id, &request.actor, &now)
+        })
+        .await?;
+    sync_file_state_from_async_db(async_db, session_id).await?;
+    append_log(
+        async_db,
+        session_id,
+        session_service::log_task_deleted(task_id, &deleted.title, deleted.previous_status),
         &request.actor,
     )
     .await?;

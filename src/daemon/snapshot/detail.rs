@@ -44,7 +44,7 @@ fn build_session_detail(
     let mut agents = visible_session_agents(&resolved.state);
     sort_session_agents(&mut agents);
 
-    let mut tasks: Vec<_> = resolved.state.tasks.values().cloned().collect();
+    let mut tasks = visible_session_tasks(&resolved.state);
     sort_session_tasks(&mut tasks);
 
     let signals = load_signals_for_resolved(resolved, db)?;
@@ -74,7 +74,7 @@ pub fn build_session_detail_core(resolved: &ResolvedSession) -> SessionDetail {
     let mut agents = visible_session_agents(&resolved.state);
     sort_session_agents(&mut agents);
 
-    let mut tasks: Vec<_> = resolved.state.tasks.values().cloned().collect();
+    let mut tasks = visible_session_tasks(&resolved.state);
     sort_session_tasks(&mut tasks);
 
     SessionDetail {
@@ -94,6 +94,15 @@ fn visible_session_agents(state: &SessionState) -> Vec<AgentRegistration> {
         .filter(|agent| agent.status.is_alive())
         .cloned()
         .map(normalize_protocol_agent_status)
+        .collect()
+}
+
+fn visible_session_tasks(state: &SessionState) -> Vec<crate::session::types::WorkItem> {
+    state
+        .tasks
+        .values()
+        .filter(|task| !task.is_deleted())
+        .cloned()
         .collect()
 }
 

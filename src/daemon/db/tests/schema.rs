@@ -331,7 +331,7 @@ fn migrates_v10_schema_adds_managed_agent_identity_columns_without_backfilling_r
     }
 
     let db = DaemonDb::open(&path).expect("open migrated db");
-    assert_eq!(db.schema_version().expect("version"), "11");
+    assert_eq!(db.schema_version().expect("version"), SCHEMA_VERSION);
 
     let columns = agent_columns(&db.conn);
     assert!(columns.iter().any(|column| column == "managed_agent_kind"));

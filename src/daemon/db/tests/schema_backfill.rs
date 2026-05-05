@@ -316,7 +316,7 @@ fn sync_session_backfills_managed_agent_identity_after_v10_schema_migration() {
     };
 
     let db = DaemonDb::open(&path).expect("open migrated db");
-    assert_eq!(db.schema_version().expect("version"), "11");
+    assert_eq!(db.schema_version().expect("version"), SCHEMA_VERSION);
     assert_eq!(
         session_agent_identity_rows(&db.conn, &session_id),
         vec![

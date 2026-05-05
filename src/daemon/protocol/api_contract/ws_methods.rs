@@ -27,6 +27,7 @@ pub const SESSION_ARCHIVE: &str = "session.archive";
 pub const SESSION_LEAVE: &str = "session.leave";
 pub const SESSION_OBSERVE: &str = "session.observe";
 pub const TASK_CREATE: &str = "task.create";
+pub const TASK_DELETE: &str = "task.delete";
 pub const TASK_ASSIGN: &str = "task.assign";
 pub const TASK_DROP: &str = "task.drop";
 pub const TASK_QUEUE_POLICY: &str = "task.queue_policy";

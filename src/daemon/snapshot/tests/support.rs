@@ -167,6 +167,7 @@ pub(super) fn sample_work_item(
         review_round: 0,
         arbitration: None,
         suggested_persona: None,
+        deleted_at: None,
     }
 }
 

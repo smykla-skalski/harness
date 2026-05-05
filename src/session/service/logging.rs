@@ -85,6 +85,18 @@ pub(crate) fn log_task_assigned(task_id: &str, agent_id: &str) -> SessionTransit
     }
 }
 
+pub(crate) fn log_task_deleted(
+    task_id: &str,
+    title: &str,
+    previous_status: TaskStatus,
+) -> SessionTransition {
+    SessionTransition::TaskDeleted {
+        task_id: task_id.to_string(),
+        title: title.to_string(),
+        previous_status,
+    }
+}
+
 pub(crate) fn log_task_queued(task_id: &str, agent_id: &str) -> SessionTransition {
     SessionTransition::TaskQueued {
         task_id: task_id.to_string(),

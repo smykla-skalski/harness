@@ -1,7 +1,7 @@
 use super::super::wake_route::WakeDispatch;
 use super::super::{
     CliError, SessionDetail, TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest,
-    TaskDropRequest, TaskQueuePolicyRequest, TaskSource, TaskUpdateRequest,
+    TaskDeleteRequest, TaskDropRequest, TaskQueuePolicyRequest, TaskSource, TaskUpdateRequest,
     append_task_drop_effect_logs, build_log_entry, effective_project_dir, index,
     project_dir_for_db_session, session_detail, session_detail_from_daemon_db, session_not_found,
     session_service, task_drop_effect_signal_records, try_wake_started_workers, utc_now,
@@ -50,6 +50,41 @@ pub fn create_task(
     let project_dir = effective_project_dir(&resolved);
     let _ =
         session_service::create_task_with_source(session_id, &spec, &request.actor, project_dir)?;
+    session_detail(session_id, db)
+}
+
+/// Delete a task from active task views while preserving timeline history.
+///
+/// # Errors
+/// Returns `CliError` when the session cannot be resolved or task deletion fails.
+pub fn delete_task(
+    session_id: &str,
+    task_id: &str,
+    request: &TaskDeleteRequest,
+    db: Option<&super::super::db::DaemonDb>,
+) -> Result<SessionDetail, CliError> {
+    if let Some(db) = db
+        && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
+    {
+        let deleted = session_service::apply_delete_task(&mut state, task_id, &request.actor, &utc_now())?;
+        let project_id = db
+            .project_id_for_session(session_id)?
+            .ok_or_else(|| session_not_found(session_id))?;
+        db.save_session_state(&project_id, &state)?;
+        db.append_log_entry(&build_log_entry(
+            session_id,
+            session_service::log_task_deleted(task_id, &deleted.title, deleted.previous_status),
+            Some(&request.actor),
+            None,
+        ))?;
+        db.bump_change(session_id)?;
+        db.bump_change("global")?;
+        return session_detail_from_daemon_db(session_id, db);
+    }
+
+    let resolved = index::resolve_session(session_id)?;
+    let project_dir = effective_project_dir(&resolved);
+    session_service::delete_task(session_id, task_id, &request.actor, project_dir)?;
     session_detail(session_id, db)
 }
 

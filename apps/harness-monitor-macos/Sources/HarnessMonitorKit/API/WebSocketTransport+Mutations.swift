@@ -36,6 +36,19 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func deleteTask(
+    sessionID: String,
+    taskID: String,
+    request: TaskDeleteRequest
+  ) async throws -> SessionDetail {
+    let params = try encodeParams(
+      request,
+      extra: ["session_id": .string(sessionID), "task_id": .string(taskID)]
+    )
+    let value = try await rpc(method: .taskDelete, params: params)
+    return try decode(value)
+  }
+
   public func updateTaskQueuePolicy(
     sessionID: String,
     taskID: String,

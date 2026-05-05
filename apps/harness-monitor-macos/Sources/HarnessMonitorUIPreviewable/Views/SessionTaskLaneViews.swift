@@ -186,6 +186,17 @@ struct SessionTaskSummaryCard: View {
       } label: {
         Label("Copy Task ID", systemImage: "doc.on.doc")
       }
+      Divider()
+      Button(role: .destructive) {
+        store.requestDeleteTaskConfirmation(
+          sessionID: sessionID,
+          taskID: task.taskId,
+          taskTitle: task.title
+        )
+      } label: {
+        Label("Delete Task...", systemImage: "trash")
+      }
+      .disabled(!store.areSelectedSessionActionsAvailable)
     }
     .accessibilityValue(taskCardAccessibilityValue ?? "")
     .accessibilityFrameMarker("\(HarnessMonitorAccessibility.sessionTaskCard(task.taskId)).frame")

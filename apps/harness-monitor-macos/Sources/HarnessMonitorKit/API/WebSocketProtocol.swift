@@ -79,6 +79,7 @@ enum WebSocketRPCMethod: String, CaseIterable, Equatable, Sendable {
   case sessionManagedAgents = "session.managed_agents"
   case managedAgentDetail = "managed_agent.detail"
   case taskCreate = "task.create"
+  case taskDelete = "task.delete"
   case taskAssign = "task.assign"
   case taskDrop = "task.drop"
   case taskQueuePolicy = "task.queue_policy"

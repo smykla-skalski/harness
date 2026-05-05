@@ -64,6 +64,9 @@ public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
     switch shellUI.pendingConfirmation {
     case .endSession: "End Session?"
     case .removeSession: "Remove Session?"
+    case .deleteTask(_, _, _, _, let noteCount) where noteCount > 0:
+      "Delete Task and \(noteCount) \(noteCount == 1 ? "Note" : "Notes")?"
+    case .deleteTask: "Delete Task?"
     case .removeAgent: "Remove Agent?"
     case .interruptCodexRun: "Interrupt Whole Run?"
     case nil: ""
@@ -76,6 +79,8 @@ public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
       "End Session Now"
     case .removeSession:
       "Remove Session Now"
+    case .deleteTask:
+      "Delete Task Now"
     case .removeAgent:
       "Remove Agent Now"
     case .interruptCodexRun:
@@ -99,6 +104,19 @@ public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
       If the underlying session is still running, Monitor will stop showing it. Restoring \
       it requires a manual database operation.
       """
+    case .deleteTask(_, _, let taskTitle, _, let noteCount):
+      if noteCount > 0 {
+        """
+        This deletes \(store.confirmationTaskSubject(taskTitle: taskTitle)) from active task views. \
+        Existing task history stays on the timeline as a deletion event. \(noteCount) local \
+        workspace \(noteCount == 1 ? "note will" : "notes will") be deleted with it.
+        """
+      } else {
+        """
+        This deletes \(store.confirmationTaskSubject(taskTitle: taskTitle)) from active task views. \
+        Existing task history stays on the timeline as a deletion event.
+        """
+      }
     case .removeAgent(let sessionID, let agentID, _):
       """
       This removes \(store.confirmationAgentSubject(sessionID: sessionID, agentID: agentID)) \

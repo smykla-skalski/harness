@@ -58,6 +58,10 @@ pub struct WorkItem {
     /// Persona hint to bias routing when assigning to a worker.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub suggested_persona: Option<String>,
+    /// Tombstone timestamp for tasks deleted from active session views while
+    /// preserving their historical identity and timeline.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deleted_at: Option<String>,
 }
 
 fn is_default_value<T>(value: &T) -> bool
@@ -91,6 +95,13 @@ pub enum TaskStatus {
     InReview,
     Done,
     Blocked,
+}
+
+impl WorkItem {
+    #[must_use]
+    pub const fn is_deleted(&self) -> bool {
+        self.deleted_at.is_some()
+    }
 }
 
 /// Whether a queued task can move to another free worker before its selected

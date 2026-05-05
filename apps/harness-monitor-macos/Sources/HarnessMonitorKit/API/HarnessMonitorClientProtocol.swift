@@ -54,6 +54,11 @@ public protocol HarnessMonitorClientProtocol: Sendable {
     taskID: String,
     request: TaskDropRequest
   ) async throws -> SessionDetail
+  func deleteTask(
+    sessionID: String,
+    taskID: String,
+    request: TaskDeleteRequest
+  ) async throws -> SessionDetail
   func updateTaskQueuePolicy(
     sessionID: String,
     taskID: String,
@@ -249,13 +254,6 @@ extension HarnessMonitorClientProtocol {
     sessionRoot _: URL
   ) async throws -> SessionSummary {
     throw HarnessMonitorAPIError.server(code: 501, message: "Session adoption unavailable.")
-  }
-
-  public func archiveSession(
-    sessionID _: String,
-    request _: SessionArchiveRequest
-  ) async throws -> SessionArchiveResponse {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Session removal unavailable.")
   }
 
   public func submitTaskForReview(
