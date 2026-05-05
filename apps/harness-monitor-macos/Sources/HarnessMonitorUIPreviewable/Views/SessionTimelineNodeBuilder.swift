@@ -65,8 +65,7 @@ struct SessionTimelineNodeBuilder {
       toolCallMetadata: toolCallMetadata
     )
     if let feature = SessionTimelineEventFeatureRegistry.firstMatch(for: entry) {
-      let patch = feature.patch(for: entry)
-      node.tapTarget = patch.tapTarget
+      node.tapTarget = feature.tapTarget(for: entry)
       node.eventTone = feature.tone(for: entry) ?? node.eventTone
       node.actions = feature.actions(for: node, ctx: context)
       node.contextMenuItems = feature.contextMenuItems(for: node, ctx: context)

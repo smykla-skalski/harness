@@ -11,7 +11,7 @@ extension WorkspaceWindowView {
     await Task.yield()
     await loadAgentPickerCatalogs()
     await reloadDecisions()
-    resolveInitialWorkspaceSelection()
+    await resolveInitialWorkspaceSelection()
     await Task.yield()
     guard !Task.isCancelled else {
       return

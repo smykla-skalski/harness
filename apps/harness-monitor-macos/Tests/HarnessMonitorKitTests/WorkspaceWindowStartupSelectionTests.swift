@@ -7,7 +7,7 @@ import Testing
 @MainActor
 struct WorkspaceWindowStartupSelectionTests {
   @Test("Pending workspace selection wins over a stale supervisor-selected decision")
-  func pendingWorkspaceSelectionWins() {
+  func pendingWorkspaceSelectionWins() async {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     let decision = makeDecision(id: "decision-startup-1", sessionID: "sess-startup-1")
     store.supervisorOpenDecisions = [decision]
@@ -15,14 +15,14 @@ struct WorkspaceWindowStartupSelectionTests {
     store.requestWorkspaceSelection(.decisions(sessionID: decision.sessionID))
 
     let view = WorkspaceWindowView(store: store)
-    view.resolveInitialWorkspaceSelection()
+    await view.resolveInitialWorkspaceSelection()
 
     #expect(view.viewModel.selection == .decisions(sessionID: decision.sessionID))
     #expect(store.consumePendingWorkspaceSelection() == nil)
   }
 
   @Test("Explicit decision requests still restore on startup")
-  func explicitDecisionRequestRestoresOnStartup() {
+  func explicitDecisionRequestRestoresOnStartup() async {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     let decision = makeDecision(id: "decision-startup-2", sessionID: "sess-startup-2")
     store.supervisorOpenDecisions = [decision]
@@ -30,7 +30,7 @@ struct WorkspaceWindowStartupSelectionTests {
     store.requestWorkspaceDecisionSelection(decisionID: decision.id)
 
     let view = WorkspaceWindowView(store: store)
-    view.resolveInitialWorkspaceSelection()
+    await view.resolveInitialWorkspaceSelection()
 
     #expect(
       view.viewModel.selection
@@ -38,15 +38,32 @@ struct WorkspaceWindowStartupSelectionTests {
     )
   }
 
+  @Test("Pending create entry points override a stored workspace route on reopen")
+  func pendingCreateEntryPointOverridesStoredRoute() async {
+    WorkspaceSelectionDefaults.write(
+      .decision(sessionID: "sess-stored", decisionID: "decision-stored")
+    )
+    defer { WorkspaceSelectionDefaults.clear() }
+
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    let view = WorkspaceWindowView(store: store)
+
+    store.requestWorkspaceCreateEntryPoint(.agent)
+    await view.resolveInitialWorkspaceSelection()
+
+    #expect(view.viewModel.selection == .create)
+    #expect(view.viewModel.createMode == .terminal)
+  }
+
   @Test("Stale supervisor-selected decisions do not hijack manual workspace open")
-  func staleSupervisorSelectedDecisionDoesNotHijackManualOpen() {
+  func staleSupervisorSelectedDecisionDoesNotHijackManualOpen() async {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     let decision = makeDecision(id: "decision-startup-3", sessionID: "sess-startup-3")
     store.supervisorOpenDecisions = [decision]
     store.supervisorSelectedDecisionID = decision.id
 
     let view = WorkspaceWindowView(store: store)
-    view.resolveInitialWorkspaceSelection()
+    await view.resolveInitialWorkspaceSelection()
 
     #expect(view.viewModel.selection == .create)
   }

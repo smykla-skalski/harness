@@ -7,45 +7,50 @@ import Testing
 @MainActor
 @Suite("Monitor timeline signal tone")
 struct MonitorTimelineSignalToneTests {
-  @Test("Signal tone dispatches on summary text not kind string")
-  func signalToneDispatchesOnSummaryText() {
+  // Signal tone dispatch lives on SignalTimelineEventFeature.tone(for:) which reads
+  // entry.summary, not entry.kind. SessionTimelineTone.eventTone reads entry.kind and
+  // returns .info for all signal_* kinds; the feature overrides it in the builder.
+  private let feature = SignalTimelineEventFeature()
+
+  @Test("Signal feature tone dispatches on summary text not kind string")
+  func signalFeatureToneDispatchesOnSummaryText() {
     #expect(
-      SessionTimelineTone.eventTone(
+      feature.tone(
         for: makeEntry(
           kind: "signal_acknowledged",
           summary: "sig-abc delivered to codex-worker: Accepted"
         )) == .success
     )
     #expect(
-      SessionTimelineTone.eventTone(
+      feature.tone(
         for: makeEntry(
           kind: "signal_acknowledged",
           summary: "sig-abc rejected from codex-worker: Rejected"
         )) == .critical
     )
     #expect(
-      SessionTimelineTone.eventTone(
+      feature.tone(
         for: makeEntry(
           kind: "signal_acknowledged",
           summary: "sig-abc deferred by codex-worker: Deferred"
         )) == .warning
     )
     #expect(
-      SessionTimelineTone.eventTone(
+      feature.tone(
         for: makeEntry(
           kind: "signal_acknowledged",
           summary: "sig-abc expired without acknowledgement: Expired"
         )) == .warning
     )
     #expect(
-      SessionTimelineTone.eventTone(
+      feature.tone(
         for: makeEntry(
           kind: "signal_sent",
           summary: "codex-worker sent signal sig-abc: inject_context"
         )) == .info
     )
     #expect(
-      SessionTimelineTone.eventTone(
+      feature.tone(
         for: makeEntry(
           kind: "signal_received",
           summary: "codex-worker picked up sig-abc: inject_context"

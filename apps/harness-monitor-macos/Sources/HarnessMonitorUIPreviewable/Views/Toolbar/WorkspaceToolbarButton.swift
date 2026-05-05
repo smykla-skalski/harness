@@ -38,7 +38,7 @@ public struct WorkspaceToolbarButton: View {
   }
 
   private func openWorkspace(focusesDecisions: Bool) {
-    if focusesDecisions {
+    if focusesDecisions && !WorkspaceSelectionDefaults.hasStoredSelection() {
       store.requestWorkspaceSelection(
         .decisions(sessionID: store.selectedSessionID),
         resetDecisionFilters: true
@@ -52,8 +52,8 @@ public struct WorkspaceToolbarButton: View {
       return "Open workspace"
     }
     return
-      "Open workspace and review \(count.formatted()) "
-      + "item\(count == 1 ? "" : "s") needing attention"
+      "Open workspace (\(count.formatted()) "
+      + "item\(count == 1 ? "needs" : "need") attention)"
   }
 
   @ViewBuilder

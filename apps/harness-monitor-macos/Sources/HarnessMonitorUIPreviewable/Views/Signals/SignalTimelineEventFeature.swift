@@ -7,11 +7,11 @@ struct SignalTimelineEventFeature: TimelineEventFeature {
     entry.kind.hasPrefix("signal_")
   }
 
-  func patch(for entry: TimelineEntry) -> TimelineEntryMetadataPatch {
+  func tapTarget(for entry: TimelineEntry) -> TimelineTapTarget? {
     guard let signalID = SessionTimelineNodeBuilder.extractSignalID(from: entry.payload) else {
-      return .empty
+      return nil
     }
-    return TimelineEntryMetadataPatch(tapTarget: .signal(id: signalID))
+    return .signal(id: signalID)
   }
 
   func tone(for entry: TimelineEntry) -> SessionTimelineTone? {
@@ -32,19 +32,6 @@ struct SignalTimelineEventFeature: TimelineEventFeature {
       return .success
     }
     return .info
-  }
-
-  func liveRegionPriority(for entry: TimelineEntry) -> MonitorTimelineLiveRegionPriority? {
-    switch entry.kind {
-    case "signal_sent", "signal_received":
-      return .polite
-    case "signal_acknowledged":
-      let lower = entry.summary.lowercased()
-      return lower.contains("rejected") || lower.contains("expired") || lower.contains("deferred")
-        ? .assertive : .polite
-    default:
-      return nil
-    }
   }
 
   func prefersCompactLayout(for _: SessionTimelineNode) -> Bool? { true }

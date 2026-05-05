@@ -1,7 +1,8 @@
 import Foundation
+import XCTest
+
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
-import XCTest
 
 final class SessionTimelineEventFeatureRegistryTests: XCTestCase {
   func testDecisionFeatureHandlesLinkedDecisionEntry() {
@@ -29,6 +30,19 @@ final class SessionTimelineEventFeatureRegistryTests: XCTestCase {
   func testRegistryReturnsNilForNullPayload() {
     let entry = makeEntry(payload: .null)
     XCTAssertNil(SessionTimelineEventFeatureRegistry.firstMatch(for: entry))
+  }
+
+  func testSignalBeatsDecisionWhenBothCouldMatch() {
+    // signal_acknowledged with a decisionID in payload — signal feature is first in registry
+    let entry = makeEntry(
+      kind: "signal_acknowledged",
+      payload: .object(["signal_id": .string("sig-1"), "decisionID": .string("d1")])
+    )
+    let feature = SessionTimelineEventFeatureRegistry.firstMatch(for: entry)
+    XCTAssertTrue(
+      feature is SignalTimelineEventFeature,
+      "signal feature must win over decision feature when both predicates match"
+    )
   }
 
   func testDecisionFeatureActionsEmptyWhenNoDecision() {
