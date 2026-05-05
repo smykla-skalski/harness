@@ -172,7 +172,10 @@ impl DaemonClient {
         task_id: &str,
         request: &TaskDeleteRequest,
     ) -> Result<SessionDetail, CliError> {
-        self.post(&format!("/v1/sessions/{session_id}/tasks/{task_id}"), request)
+        self.post(
+            &format!("/v1/sessions/{session_id}/tasks/{task_id}"),
+            request,
+        )
     }
 
     pub fn assign_task(

@@ -3,9 +3,14 @@ use super::*;
 #[test]
 fn delete_task_tombstones_hides_and_logs_it() {
     with_temp_project(|project| {
-        let state =
-            start_active_session("delete task", "", project, Some("claude"), Some("task-delete"))
-                .expect("start");
+        let state = start_active_session(
+            "delete task",
+            "",
+            project,
+            Some("claude"),
+            Some("task-delete"),
+        )
+        .expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("delete-worker"))], || {
             join_session(
@@ -75,5 +80,88 @@ fn delete_task_tombstones_hides_and_logs_it() {
                 && title == "remove stale task"
                 && *previous_status == TaskStatus::Open
         ));
+    });
+}
+
+#[test]
+fn delete_task_advances_queued_work_for_freed_worker() {
+    with_temp_project(|project| {
+        let state = start_active_session(
+            "delete task queue",
+            "",
+            project,
+            Some("claude"),
+            Some("delete-task-queue"),
+        )
+        .expect("start");
+        let leader_id = state.leader_id.expect("leader id");
+        let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("queue-worker"))], || {
+            join_session(
+                "delete-task-queue",
+                SessionRole::Worker,
+                "codex",
+                &[],
+                None,
+                project,
+                None,
+            )
+            .expect("join")
+        });
+        let worker_id = joined
+            .agents
+            .keys()
+            .find(|id| id.starts_with("codex-"))
+            .expect("worker id")
+            .clone();
+
+        let active = create_task(
+            "delete-task-queue",
+            "active task",
+            Some("worker starts here"),
+            TaskSeverity::High,
+            &leader_id,
+            project,
+        )
+        .expect("active task");
+        assign_task(
+            "delete-task-queue",
+            &active.task_id,
+            &worker_id,
+            &leader_id,
+            project,
+        )
+        .expect("assign active");
+
+        let queued = create_task(
+            "delete-task-queue",
+            "queued task",
+            Some("should start after delete"),
+            TaskSeverity::Medium,
+            &leader_id,
+            project,
+        )
+        .expect("queued task");
+        assign_task(
+            "delete-task-queue",
+            &queued.task_id,
+            &worker_id,
+            &leader_id,
+            project,
+        )
+        .expect("queue task");
+
+        delete_task("delete-task-queue", &active.task_id, &leader_id, project).expect("delete");
+
+        let state = session_status("delete-task-queue", project).expect("status");
+        let worker = state.agents.get(&worker_id).expect("worker");
+        assert_eq!(
+            worker.current_task_id.as_deref(),
+            Some(queued.task_id.as_str())
+        );
+
+        let queued_task = state.tasks.get(&queued.task_id).expect("queued task state");
+        assert_eq!(queued_task.status, TaskStatus::Open);
+        assert_eq!(queued_task.assigned_to.as_deref(), Some(worker_id.as_str()));
+        assert!(queued_task.queued_at.is_none());
     });
 }

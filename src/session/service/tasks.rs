@@ -249,10 +249,15 @@ pub fn delete_task(
 
     let now = utc_now();
     let mut deleted = None;
+    let mut effects = Vec::new();
+    let mut rollback_state = None;
     let layout = storage::layout_from_project_dir(project_dir, session_id)?;
 
     storage::update_state(&layout, |state| {
+        rollback_state = Some(state.clone());
         deleted = Some(apply_delete_task(state, task_id, actor_id, &now)?);
+        effects = apply_advance_queued_tasks(state, actor_id, &now)?;
+        refresh_session(state, &now);
         Ok(())
     })?;
 
@@ -261,12 +266,25 @@ pub fn delete_task(
             "task deletion did not persist state".to_string(),
         ))
     })?;
-    storage::append_log_entry(
-        &layout,
-        log_task_deleted(task_id, &deleted.title, deleted.previous_status),
-        Some(actor_id),
-        None,
-    )?;
+    let delete_transition = log_task_deleted(task_id, &deleted.title, deleted.previous_status);
+    if let Err(error) = storage::append_log_entry(&layout, delete_transition, Some(actor_id), None)
+    {
+        let rollback = rollback_state.ok_or_else(|| {
+            CliError::from(CliErrorKind::workflow_io(
+                "task delete rollback state missing".to_string(),
+            ))
+        })?;
+        if let Err(restore_error) = storage::save_state(&layout, &rollback) {
+            return Err(CliError::from(CliErrorKind::workflow_io(format!(
+                "task delete audit append failed and rollback could not be restored: {restore_error}; original error: {error}"
+            ))));
+        }
+        return Err(error);
+    }
+
+    let start_signals = started_task_signals(&effects);
+    write_prepared_task_start_signals(project_dir, &start_signals)?;
+    append_task_drop_effect_logs(project_dir, session_id, actor_id, &effects)?;
 
     Ok(())
 }

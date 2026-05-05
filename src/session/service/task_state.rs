@@ -1,7 +1,7 @@
 use crate::session::types::{ARBITRATION_BLOCKED_REASON, AgentRegistration};
 
 use super::{
-    AgentStatus, CliError, CliErrorKind, DeliveryConfig, Duration, SessionAction, SessionState, Signal,
+    CliError, CliErrorKind, DeliveryConfig, Duration, SessionAction, SessionState, Signal,
     SignalPayload, SignalPriority, TaskCheckpoint, TaskCheckpointSummary, TaskDropEffect, TaskNote,
     TaskQueuePolicy, TaskSpec, TaskStatus, Utc, Value, WorkItem, agent_status_label,
     apply_drop_task_on_agent, clear_agent_current_task, free_worker_ids, generate_checkpoint_id,
@@ -56,12 +56,6 @@ pub(crate) fn apply_create_task(
     Ok(item)
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct DeletedTaskInfo {
-    pub(crate) title: String,
-    pub(crate) previous_status: TaskStatus,
-}
-
 /// Assign a task to an agent.
 ///
 /// Assignment is the canonical Locked drop: it delegates to
@@ -88,70 +82,6 @@ pub(crate) fn apply_assign_task(
         actor_id,
         now,
     )
-}
-
-pub(crate) fn apply_delete_task(
-    state: &mut SessionState,
-    task_id: &str,
-    actor_id: &str,
-    now: &str,
-) -> Result<DeletedTaskInfo, CliError> {
-    require_active(state)?;
-    require_permission(state, actor_id, SessionAction::DeleteTask)?;
-
-    let task = state
-        .tasks
-        .get(task_id)
-        .ok_or_else(|| task_not_found(task_id))?;
-    ensure_task_not_deleted(task_id, task)?;
-
-    let deleted = DeletedTaskInfo {
-        title: task.title.clone(),
-        previous_status: task.status,
-    };
-    let assigned_to = task.assigned_to.clone();
-    let submitter_agent_id = task
-        .awaiting_review
-        .as_ref()
-        .map(|awaiting| awaiting.submitter_agent_id.clone());
-
-    if let Some(assigned_to) = assigned_to.as_deref() {
-        clear_agent_current_task(state, assigned_to, task_id, now);
-        if let Some(agent) = state.agents.get_mut(assigned_to) {
-            agent.updated_at = now.to_string();
-            agent.last_activity_at = Some(now.to_string());
-        }
-    }
-
-    if let Some(submitter_agent_id) = submitter_agent_id
-        && let Some(agent) = state.agents.get_mut(&submitter_agent_id)
-        && agent.status == AgentStatus::AwaitingReview
-    {
-        agent.status = AgentStatus::Idle;
-        agent.current_task_id = None;
-        agent.updated_at = now.to_string();
-        agent.last_activity_at = Some(now.to_string());
-    }
-
-    let task = state
-        .tasks
-        .get_mut(task_id)
-        .ok_or_else(|| task_not_found(task_id))?;
-    task.deleted_at = Some(now.to_string());
-    task.status = TaskStatus::Done;
-    task.assigned_to = None;
-    task.queue_policy = TaskQueuePolicy::Locked;
-    task.queued_at = None;
-    task.awaiting_review = None;
-    task.review_claim = None;
-    task.consensus = None;
-    task.blocked_reason = None;
-    task.completed_at = None;
-    task.updated_at = now.to_string();
-
-    touch_agent(state, actor_id, now);
-    refresh_session(state, now);
-    Ok(deleted)
 }
 
 /// Drop a task onto an extensible session target. The first target action is
@@ -294,10 +224,9 @@ pub(crate) fn reject_generic_mutation_on_review_state(
 
 pub(crate) fn ensure_task_not_deleted(task_id: &str, task: &WorkItem) -> Result<(), CliError> {
     if task.is_deleted() {
-        return Err(CliErrorKind::session_agent_conflict(format!(
-            "task '{task_id}' was deleted"
-        ))
-        .into());
+        return Err(
+            CliErrorKind::session_agent_conflict(format!("task '{task_id}' was deleted")).into(),
+        );
     }
     Ok(())
 }
