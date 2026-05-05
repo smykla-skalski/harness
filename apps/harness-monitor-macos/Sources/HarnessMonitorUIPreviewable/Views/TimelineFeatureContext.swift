@@ -6,5 +6,5 @@ struct TimelineFeatureContext: Sendable {
   let signalsByID: [String: SessionSignalRecord]
   let sessionID: String
 
-  static let empty = TimelineFeatureContext(now: .distantPast, signalsByID: [:], sessionID: "")
+  static let empty = Self(now: .distantPast, signalsByID: [:], sessionID: "")
 }

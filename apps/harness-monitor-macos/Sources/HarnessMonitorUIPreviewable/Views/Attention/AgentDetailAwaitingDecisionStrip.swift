@@ -96,8 +96,7 @@ struct AgentDetailAwaitingDecisionStrip: View {
     }
   }
 
-  @ViewBuilder
-  private var actionsRow: some View {
+  @ViewBuilder private var actionsRow: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
       if canActInline {
         Button(approveLabel, action: onApprove)

@@ -113,25 +113,26 @@ struct WorkspaceWindowCreatePane: View {
         scrollSurfaceLabel: "New agent pane",
         bottomInset: {
           launchFloorBar
-        }
-      ) {
-        // Keep MCP-tracked controls instantiated even while this pane scrolls.
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
-          Color.clear
-            .frame(height: 0)
-            .accessibilityHidden(true)
-            .id(Self.topAnchorID)
-          createPaneHeader
+        },
+        content: {
+          // Keep MCP-tracked controls instantiated even while this pane scrolls.
+          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
+            Color.clear
+              .frame(height: 0)
+              .accessibilityHidden(true)
+              .id(Self.topAnchorID)
+            createPaneHeader
 
-          switch viewModel.createMode {
-          case .terminal:
-            terminalCreateContent
-          case .codex:
-            codexCreateContent
+            switch viewModel.createMode {
+            case .terminal:
+              terminalCreateContent
+            case .codex:
+              codexCreateContent
+            }
           }
+          .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-      }
+      )
       .accessibilityElement(children: .contain)
       .onAppear {
         applySavedLaunchPresetIfFresh()

@@ -37,16 +37,14 @@ final class SessionTimelineTableCellView: NSTableCellView {
     actionHandler: any DecisionActionHandler,
     onSignalTap: ((String) -> Void)?,
     fontScale: CGFloat,
-    showsConnectorAbove: Bool,
-    showsConnectorBelow: Bool
+    connectorVisibility: SessionTimelineConnectorVisibility
   ) {
     hostingView.rootView = SessionTimelineHostedRow(
       row: row,
       actionHandler: actionHandler,
       onSignalTap: onSignalTap,
       fontScale: fontScale,
-      showsConnectorAbove: showsConnectorAbove,
-      showsConnectorBelow: showsConnectorBelow
+      connectorVisibility: connectorVisibility
     )
   }
 
@@ -83,23 +81,20 @@ private struct SessionTimelineHostedRow: View {
   let actionHandler: any DecisionActionHandler
   let onSignalTap: ((String) -> Void)?
   let fontScale: CGFloat
-  let showsConnectorAbove: Bool
-  let showsConnectorBelow: Bool
+  let connectorVisibility: SessionTimelineConnectorVisibility
 
   init(
     row: SessionTimelineRow?,
     actionHandler: any DecisionActionHandler,
     onSignalTap: ((String) -> Void)? = nil,
     fontScale: CGFloat,
-    showsConnectorAbove: Bool = true,
-    showsConnectorBelow: Bool = true
+    connectorVisibility: SessionTimelineConnectorVisibility = .all
   ) {
     self.row = row
     self.actionHandler = actionHandler
     self.onSignalTap = onSignalTap
     self.fontScale = fontScale
-    self.showsConnectorAbove = showsConnectorAbove
-    self.showsConnectorBelow = showsConnectorBelow
+    self.connectorVisibility = connectorVisibility
   }
 
   static var empty: Self {
@@ -124,8 +119,8 @@ private struct SessionTimelineHostedRow: View {
       .overlayPreferenceValue(SessionTimelineMarkerBoundsKey.self) { markerAnchor in
         SessionTimelineConnectorOverlay(
           markerAnchor: markerAnchor,
-          showsConnectorAbove: showsConnectorAbove,
-          showsConnectorBelow: showsConnectorBelow
+          showsConnectorAbove: connectorVisibility.showsConnectorAbove,
+          showsConnectorBelow: connectorVisibility.showsConnectorBelow
         )
       }
       .frame(maxWidth: .infinity, alignment: .leading)

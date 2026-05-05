@@ -1,22 +1,26 @@
 import HarnessMonitorKit
 import Testing
 
-@Suite struct AcpPermissionDecisionActionIDCountTests {
-  @Test func approveSingleRequestPicksApprove() {
+@Suite
+struct AcpPermissionDecisionActionIDCountTests {
+  @Test
+  func approveSingleRequestPicksApprove() {
     #expect(
       AcpPermissionDecisionActionID.approveActionID(forRequestCount: 1)
         == AcpPermissionDecisionActionID.approve
     )
   }
 
-  @Test func approveEmptyBatchStillPicksApprove() {
+  @Test
+  func approveEmptyBatchStillPicksApprove() {
     #expect(
       AcpPermissionDecisionActionID.approveActionID(forRequestCount: 0)
         == AcpPermissionDecisionActionID.approve
     )
   }
 
-  @Test func approveMultiRequestPicksApproveAll() {
+  @Test
+  func approveMultiRequestPicksApproveAll() {
     #expect(
       AcpPermissionDecisionActionID.approveActionID(forRequestCount: 2)
         == AcpPermissionDecisionActionID.approveAll
@@ -27,21 +31,24 @@ import Testing
     )
   }
 
-  @Test func denySingleRequestPicksDeny() {
+  @Test
+  func denySingleRequestPicksDeny() {
     #expect(
       AcpPermissionDecisionActionID.denyActionID(forRequestCount: 1)
         == AcpPermissionDecisionActionID.deny
     )
   }
 
-  @Test func denyEmptyBatchStillPicksDeny() {
+  @Test
+  func denyEmptyBatchStillPicksDeny() {
     #expect(
       AcpPermissionDecisionActionID.denyActionID(forRequestCount: 0)
         == AcpPermissionDecisionActionID.deny
     )
   }
 
-  @Test func denyMultiRequestPicksDenyAll() {
+  @Test
+  func denyMultiRequestPicksDenyAll() {
     #expect(
       AcpPermissionDecisionActionID.denyActionID(forRequestCount: 2)
         == AcpPermissionDecisionActionID.denyAll
