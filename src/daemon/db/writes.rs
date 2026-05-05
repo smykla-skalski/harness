@@ -471,12 +471,12 @@ fn replace_tasks(
                 task_id, session_id, title, context, severity, status,
                 assigned_to, created_at, updated_at, created_by,
                 suggested_fix, source, blocked_reason, completed_at,
-                notes_json, checkpoint_summary_json,
+                notes_json, checkpoint_summary_json, deleted_at,
                 awaiting_review_queued_at, awaiting_review_submitter_agent_id,
                 awaiting_review_required_consensus, review_round,
                 review_claim_json, consensus_json, arbitration_json, suggested_persona
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16,
-                ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
+                ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25)",
         )
         .map_err(|error| db_error(format!("prepare task insert: {error}")))?;
 
@@ -500,6 +500,7 @@ fn replace_tasks(
                 task.completed_at,
                 row.notes_json,
                 row.checkpoint_summary_json,
+                task.deleted_at,
                 row.awaiting_queued_at,
                 row.awaiting_submitter,
                 row.awaiting_required_consensus,

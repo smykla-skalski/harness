@@ -1,7 +1,7 @@
 use super::{
     CliError, CliErrorKind, START_TASK_SIGNAL_COMMAND, SessionRole, SessionState, TaskDropEffect,
     TaskQueuePolicy, TaskStartSignalRecord, TaskStatus, WorkItem, apply_advance_queued_tasks,
-    build_signal, clear_agent_current_task, refresh_session,
+    build_signal, clear_agent_current_task, ensure_task_not_deleted, refresh_session,
     reject_generic_mutation_on_review_state, require_active_worker_target_agent, task_not_found,
     task_status_label, touch_agent,
 };
@@ -37,6 +37,7 @@ pub(crate) fn apply_drop_task_on_agent(
         .tasks
         .get(task_id)
         .ok_or_else(|| task_not_found(task_id))?;
+    ensure_task_not_deleted(task_id, task)?;
     reject_generic_mutation_on_review_state(task_id, task, "reassigned via drop")?;
 
     let previous_assignee = state
@@ -85,6 +86,7 @@ pub(crate) fn queue_task_for_agent(
         .tasks
         .get_mut(task_id)
         .ok_or_else(|| task_not_found(task_id))?;
+    ensure_task_not_deleted(task_id, task)?;
     reject_generic_mutation_on_review_state(task_id, task, "queued")?;
     if task.status != TaskStatus::Open {
         return Err(CliErrorKind::session_agent_conflict(format!(
@@ -120,6 +122,7 @@ pub(crate) fn start_task_for_agent(
         .tasks
         .get(task_id)
         .ok_or_else(|| task_not_found(task_id))?;
+    ensure_task_not_deleted(task_id, task)?;
     reject_generic_mutation_on_review_state(task_id, task, "started")?;
 
     let previous_assignee = state
@@ -171,6 +174,7 @@ pub(crate) fn build_task_start_signal_record(
         .tasks
         .get(task_id)
         .ok_or_else(|| task_not_found(task_id))?;
+    ensure_task_not_deleted(task_id, task)?;
     let agent = state.agents.get(agent_id).ok_or_else(|| {
         CliError::from(CliErrorKind::session_agent_conflict(format!(
             "agent '{agent_id}' not found"
@@ -227,7 +231,8 @@ pub(crate) fn start_next_locked_task_for_worker(
         .tasks
         .values()
         .filter(|task| {
-            task.status == TaskStatus::Open
+            !task.is_deleted()
+                && task.status == TaskStatus::Open
                 && task.assigned_to.as_deref() == Some(worker_id)
                 && task.queued_at.is_some()
         })

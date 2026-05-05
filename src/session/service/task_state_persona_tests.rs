@@ -92,12 +92,13 @@ fn queued_task(task_id: &str, suggested: Option<&str>) -> WorkItem {
         awaiting_review: None,
         review_claim: None,
         consensus: None,
-        review_history: Vec::new(),
-        review_round: 0,
-        arbitration: None,
-        suggested_persona: suggested.map(str::to_string),
+            review_history: Vec::new(),
+            review_round: 0,
+            arbitration: None,
+            suggested_persona: suggested.map(str::to_string),
+            deleted_at: None,
+        }
     }
-}
 
 #[test]
 fn queue_advance_picks_persona_matching_worker_over_alphabetical_order() {

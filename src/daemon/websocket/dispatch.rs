@@ -2,9 +2,9 @@ use self::mutation_handlers::{
     dispatch_agent_change_role, dispatch_agent_remove, dispatch_improver_apply,
     dispatch_leader_transfer, dispatch_session_end, dispatch_session_observe,
     dispatch_signal_cancel, dispatch_signal_send, dispatch_task_arbitrate, dispatch_task_assign,
-    dispatch_task_checkpoint, dispatch_task_claim_review, dispatch_task_create, dispatch_task_drop,
-    dispatch_task_queue_policy, dispatch_task_respond_review, dispatch_task_submit_for_review,
-    dispatch_task_submit_review, dispatch_task_update,
+    dispatch_task_checkpoint, dispatch_task_claim_review, dispatch_task_create, dispatch_task_delete,
+    dispatch_task_drop, dispatch_task_queue_policy, dispatch_task_respond_review,
+    dispatch_task_submit_for_review, dispatch_task_submit_review, dispatch_task_update,
 };
 use super::connection::ConnectionState;
 use super::frames::{
@@ -307,6 +307,7 @@ async fn dispatch_task_work_mutation(
 ) -> Option<WsResponse> {
     match request.method.as_str() {
         ws_methods::TASK_CREATE => Some(dispatch_task_create(request, state).await),
+        ws_methods::TASK_DELETE => Some(dispatch_task_delete(request, state).await),
         ws_methods::TASK_ASSIGN => Some(dispatch_task_assign(request, state).await),
         ws_methods::TASK_CHECKPOINT => Some(dispatch_task_checkpoint(request, state).await),
         _ => None,

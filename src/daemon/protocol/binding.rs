@@ -6,7 +6,8 @@ use super::{
     AgentRemoveRequest, CodexRunRequest, ImproverApplyRequest, LeaderTransferRequest,
     ObserveSessionRequest, RoleChangeRequest, SessionArchiveRequest, SessionEndRequest,
     SignalCancelRequest, SignalSendRequest, TaskArbitrateRequest, TaskAssignRequest,
-    TaskCheckpointRequest, TaskClaimReviewRequest, TaskCreateRequest, TaskDropRequest,
+    TaskCheckpointRequest, TaskClaimReviewRequest, TaskCreateRequest, TaskDeleteRequest,
+    TaskDropRequest,
     TaskQueuePolicyRequest, TaskRespondReviewRequest, TaskSubmitForReviewRequest,
     TaskSubmitReviewRequest, TaskUpdateRequest, VoiceAudioChunkRequest, VoiceSessionFinishRequest,
     VoiceSessionStartRequest, VoiceTranscriptUpdateRequest,
@@ -69,6 +70,12 @@ impl ControlPlaneActorRequest for LeaderTransferRequest {
 }
 
 impl ControlPlaneActorRequest for TaskCreateRequest {
+    fn bind_control_plane_actor(&mut self) {
+        bind_required_control_plane_actor(&mut self.actor);
+    }
+}
+
+impl ControlPlaneActorRequest for TaskDeleteRequest {
     fn bind_control_plane_actor(&mut self) {
         bind_required_control_plane_actor(&mut self.actor);
     }

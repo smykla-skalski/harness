@@ -52,6 +52,11 @@ pub(super) fn transition_summary(
         SessionTransition::TaskAssigned { task_id, agent_id } => {
             task_assigned_summary(task_id, agent_id)
         }
+        SessionTransition::TaskDeleted {
+            task_id,
+            title,
+            previous_status,
+        } => task_deleted_summary(task_id, title, *previous_status),
         SessionTransition::TaskQueued { task_id, agent_id } => {
             task_queued_summary(task_id, agent_id)
         }
@@ -196,6 +201,18 @@ fn task_assigned_summary(task_id: &str, agent_id: &str) -> (&'static str, Option
     )
 }
 
+fn task_deleted_summary(
+    task_id: &str,
+    title: &str,
+    previous_status: TaskStatus,
+) -> (&'static str, Option<String>, String) {
+    (
+        "task_deleted",
+        Some(task_id.to_string()),
+        format!("{task_id} deleted from {previous_status:?}: {title}"),
+    )
+}
+
 fn task_queued_summary(task_id: &str, agent_id: &str) -> (&'static str, Option<String>, String) {
     (
         "task_queued",
@@ -274,5 +291,24 @@ fn signal_ack_verb(result: AckResult) -> &'static str {
     match result {
         AckResult::Accepted => "delivered to",
         AckResult::Rejected | AckResult::Deferred | AckResult::Expired => "acknowledged by",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::transition_summary;
+    use crate::session::types::{SessionTransition, TaskStatus};
+
+    #[test]
+    fn task_deleted_transition_maps_to_task_deleted_summary() {
+        let (kind, task_id, summary) = transition_summary(&SessionTransition::TaskDeleted {
+            task_id: "task-7".to_string(),
+            title: "trim archived notes".to_string(),
+            previous_status: TaskStatus::InProgress,
+        });
+
+        assert_eq!(kind, "task_deleted");
+        assert_eq!(task_id.as_deref(), Some("task-7"));
+        assert_eq!(summary, "task-7 deleted from InProgress: trim archived notes");
     }
 }

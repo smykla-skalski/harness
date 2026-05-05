@@ -153,6 +153,7 @@ pub(super) fn sample_session_state() -> SessionState {
             review_round: 0,
             arbitration: None,
             suggested_persona: None,
+            deleted_at: None,
         },
     );
 

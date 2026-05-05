@@ -169,6 +169,7 @@ pub(crate) fn performance_session_state(
             review_round: 0,
             arbitration: None,
             suggested_persona: None,
+            deleted_at: None,
         },
     );
 

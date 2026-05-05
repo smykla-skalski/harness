@@ -6,8 +6,8 @@ use axum::http::HeaderMap;
 use axum::response::Response;
 
 use crate::daemon::protocol::{
-    SessionDetail, TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
-    TaskQueuePolicyRequest, TaskUpdateRequest, http_paths,
+    SessionDetail, TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDeleteRequest,
+    TaskDropRequest, TaskQueuePolicyRequest, TaskUpdateRequest, http_paths,
 };
 use crate::daemon::service;
 use crate::errors::CliError;
@@ -59,6 +59,30 @@ pub(in crate::daemon::http) async fn post_task_assign(
     timed_json(
         "POST",
         http_paths::SESSION_TASK_ASSIGN,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+pub(in crate::daemon::http) async fn post_task_delete(
+    Path((session_id, task_id)): Path<(String, String)>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(mut request): Json<TaskDeleteRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
+        return *response;
+    }
+    let result = task_delete_response(&state, &session_id, &task_id, &request).await;
+    if result.is_ok() {
+        broadcast_task_snapshot(&state, &session_id).await;
+    }
+    timed_json(
+        "POST",
+        http_paths::SESSION_TASK_DELETE,
         &request_id,
         start,
         result,
@@ -203,6 +227,19 @@ async fn task_assign_response(
             Some(&state.acp_agent_manager),
         ),
     )
+}
+
+async fn task_delete_response(
+    state: &DaemonHttpState,
+    session_id: &str,
+    task_id: &str,
+    request: &TaskDeleteRequest,
+) -> Result<SessionDetail, CliError> {
+    if let Some(async_db) = state.async_db.get() {
+        return service::delete_task_async(session_id, task_id, request, async_db.as_ref()).await;
+    }
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    service::delete_task(session_id, task_id, request, db_guard.as_deref())
 }
 
 async fn task_drop_response(

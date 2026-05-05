@@ -2,6 +2,7 @@ import Foundation
 
 public enum ActionID: Hashable, Sendable {
   case createTask(sessionID: String)
+  case deleteTask(sessionID: String, taskID: String)
   case assignTask(sessionID: String, taskID: String)
   case dropTask(sessionID: String, taskID: String)
   case updateTaskStatus(sessionID: String, taskID: String)
@@ -26,6 +27,8 @@ public enum ActionID: Hashable, Sendable {
     switch self {
     case .createTask(let sessionID):
       return "\(sessionID)/createTask"
+    case .deleteTask(let sessionID, let taskID):
+      return "\(sessionID)/deleteTask/\(taskID)"
     case .assignTask(let sessionID, let taskID):
       return "\(sessionID)/assignTask/\(taskID)"
     case .dropTask(let sessionID, let taskID):

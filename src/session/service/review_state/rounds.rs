@@ -1,8 +1,9 @@
 use std::collections::BTreeSet;
 
 use super::super::{
-    AgentStatus, CliError, CliErrorKind, SessionAction, SessionState, TaskStatus, refresh_session,
-    require_active, require_permission, task_not_found, task_status_label, touch_agent,
+    AgentStatus, CliError, CliErrorKind, SessionAction, SessionState, TaskStatus,
+    ensure_task_not_deleted, refresh_session, require_active, require_permission, task_not_found,
+    task_status_label, touch_agent,
 };
 use crate::session::types::{
     ARBITRATION_BLOCKED_REASON, ArbitrationOutcome, ReviewPointState, ReviewVerdict, WorkItem,
@@ -24,6 +25,7 @@ pub(crate) fn apply_respond_review(
         .tasks
         .get(task_id)
         .ok_or_else(|| task_not_found(task_id))?;
+    ensure_task_not_deleted(task_id, task)?;
 
     if task.status != TaskStatus::InReview {
         return Err(CliErrorKind::session_agent_conflict(format!(
@@ -206,6 +208,7 @@ pub(crate) fn apply_arbitrate(
         .tasks
         .get(task_id)
         .ok_or_else(|| task_not_found(task_id))?;
+    ensure_task_not_deleted(task_id, task)?;
     if task.review_round < ARBITRATION_ROUND_GATE {
         return Err(CliErrorKind::session_agent_conflict(format!(
             "task '{task_id}' is at review_round {} but arbitration requires {ARBITRATION_ROUND_GATE} rounds",

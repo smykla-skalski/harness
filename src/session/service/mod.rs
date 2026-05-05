@@ -131,7 +131,7 @@ pub use signals::{
     resolve_session_agent_for_runtime_session, send_signal,
 };
 pub use tasks::{
-    assign_task, create_task, create_task_with_source, drop_task, list_tasks,
+    assign_task, create_task, create_task_with_source, delete_task, drop_task, list_tasks,
     record_task_checkpoint, update_task, update_task_queue_policy,
 };
 

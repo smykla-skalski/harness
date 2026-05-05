@@ -11,6 +11,7 @@ pub enum SessionAction {
     AssignRole,
     TransferLeader,
     CreateTask,
+    DeleteTask,
     AssignTask,
     UpdateTaskStatus,
     SendSignal,
@@ -31,6 +32,7 @@ const ALL_ACTIONS: &[SessionAction] = &[
     SessionAction::AssignRole,
     SessionAction::TransferLeader,
     SessionAction::CreateTask,
+    SessionAction::DeleteTask,
     SessionAction::AssignTask,
     SessionAction::UpdateTaskStatus,
     SessionAction::SendSignal,
@@ -134,6 +136,14 @@ mod tests {
         assert!(!is_permitted(
             SessionRole::Observer,
             SessionAction::AssignTask
+        ));
+    }
+
+    #[test]
+    fn observer_cannot_delete_tasks() {
+        assert!(!is_permitted(
+            SessionRole::Observer,
+            SessionAction::DeleteTask
         ));
     }
 

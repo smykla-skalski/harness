@@ -100,6 +100,7 @@ mod tests {
             review_round: 0,
             arbitration: None,
             suggested_persona: suggested.map(str::to_string),
+            deleted_at: None,
         }
     }
 

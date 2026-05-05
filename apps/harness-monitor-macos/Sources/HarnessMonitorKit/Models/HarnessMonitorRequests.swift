@@ -96,6 +96,14 @@ public struct TaskDropRequest: Codable, Equatable, Sendable {
   }
 }
 
+public struct TaskDeleteRequest: Codable, Equatable, Sendable {
+  public let actor: String
+
+  public init(actor: String) {
+    self.actor = actor
+  }
+}
+
 public struct TaskQueuePolicyRequest: Codable, Equatable, Sendable {
   public let actor: String
   public let queuePolicy: TaskQueuePolicy

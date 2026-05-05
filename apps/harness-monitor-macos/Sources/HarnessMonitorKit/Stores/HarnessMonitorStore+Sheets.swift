@@ -38,6 +38,10 @@ extension HarnessMonitorStore {
     return confirmationSubject(agentName, fallback: "this agent")
   }
 
+  public func confirmationTaskSubject(taskTitle: String) -> String {
+    confirmationSubject(taskTitle, fallback: "this task")
+  }
+
   private func confirmationSubject(_ value: String?, fallback: String) -> String {
     guard let value else {
       return fallback
@@ -168,6 +172,13 @@ extension HarnessMonitorStore {
         details: ["session_id": sessionID]
       )
       _ = await removeSession(sessionID: sessionID, actorID: actorID)
+    case .deleteTask(let sessionID, let taskID, _, let actorID, let noteCount):
+      _ = await deleteTask(
+        sessionID: sessionID,
+        taskID: taskID,
+        actorID: actorID,
+        expectedNoteCount: noteCount
+      )
     case .removeAgent(let sessionID, let agentID, let actorID):
       _ = await removeAgent(sessionID: sessionID, agentID: agentID, actorID: actorID)
     case .interruptCodexRun(let sessionID, let runID, _):

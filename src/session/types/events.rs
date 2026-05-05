@@ -117,6 +117,11 @@ pub enum SessionTransition {
         task_id: String,
         agent_id: String,
     },
+    TaskDeleted {
+        task_id: String,
+        title: String,
+        previous_status: TaskStatus,
+    },
     TaskQueued {
         task_id: String,
         agent_id: String,

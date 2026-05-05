@@ -463,6 +463,7 @@ async fn replace_tasks(
             .bind(task.completed_at.as_deref())
             .bind(&row.notes_json)
             .bind(row.checkpoint_summary_json.as_deref())
+            .bind(task.deleted_at.as_deref())
             .bind(row.awaiting_queued_at.as_deref())
             .bind(row.awaiting_submitter.as_deref())
             .bind(row.awaiting_required_consensus)
