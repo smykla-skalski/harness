@@ -144,13 +144,17 @@ async fn process_incremental_observe(
         .into_iter()
         .filter(|issue| cycle.realtime_seen.insert(issue.fingerprint.clone()))
         .collect::<Vec<_>>();
-    session_observe::persist_observer_snapshot(&resolved.state, project_dir, &new_issues)?;
+    let offsets_changed = tail_offsets_changed(&offsets_before, &cycle.tail_states);
+    let snapshot_written =
+        session_observe::persist_observer_snapshot(&resolved.state, project_dir, &new_issues)?;
     if !new_issues.is_empty() {
         cycle.total_issues += new_issues.len();
         apply_issue_tasks_to_async_db(async_db, resolved, actor_id, &new_issues).await?;
     }
-    async_db.bump_change(&resolved.state.session_id).await?;
-    Ok(tail_offsets_changed(&offsets_before, &cycle.tail_states))
+    if offsets_changed || snapshot_written {
+        async_db.bump_change(&resolved.state.session_id).await?;
+    }
+    Ok(offsets_changed)
 }
 
 async fn sync_runtime_transcripts_if_changed(

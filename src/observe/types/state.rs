@@ -39,7 +39,7 @@ pub enum AttemptResult {
 }
 
 /// An open issue tracked across observer cycles.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OpenIssue {
     pub issue_id: String,
     pub code: IssueCode,
@@ -55,7 +55,7 @@ pub struct OpenIssue {
 }
 
 /// A fix attempt record.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IssueAttempt {
     pub issue_id: String,
     pub attempt: u32,
@@ -63,7 +63,7 @@ pub struct IssueAttempt {
 }
 
 /// Durable observer state persisted between cycles.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ObserverState {
     pub schema_version: u32,
     #[serde(default)]
@@ -86,7 +86,7 @@ pub struct ObserverState {
 }
 
 /// Tracks per-agent cursor and metadata in multi-agent observation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AgentObserveRecord {
     pub agent_id: String,
     pub runtime: String,
@@ -99,7 +99,7 @@ pub struct AgentObserveRecord {
 }
 
 /// A currently running fix worker tracked in observer state.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ActiveWorker {
     pub issue_id: String,
     pub target_file: String,
