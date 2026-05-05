@@ -3,8 +3,8 @@ use sqlx::{Sqlite, Transaction, query};
 use super::{
     AsyncDaemonDb, CliError, ConversationEvent, PreparedConversationEventImport,
     StoredTimelineEntry, daemon_index, daemon_protocol, daemon_timeline, db_error,
-    extract_transition_kind, i64_from_u64, prepare_agent_conversation_imports_and_activity,
-    stored_timeline_entry, utc_now,
+    extract_conversation_event_kind, i64_from_u64,
+    prepare_agent_conversation_imports_and_activity, stored_timeline_entry, utc_now,
 };
 
 const DELETE_SESSION_ACTIVITY_SQL: &str = "DELETE FROM agent_activity_cache WHERE session_id = ?1";
@@ -241,7 +241,7 @@ async fn insert_conversation_event(
         .bind(runtime)
         .bind(event.timestamp.as_deref())
         .bind(i64_from_u64(event.sequence))
-        .bind(extract_transition_kind(&kind_json))
+        .bind(extract_conversation_event_kind(&kind_json))
         .bind(event_json)
         .execute(transaction.as_mut())
         .await

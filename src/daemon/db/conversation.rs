@@ -1,9 +1,9 @@
 use super::{
     CliError, Connection, ConversationEvent, DaemonDb, OptionalExtension,
     PreparedAgentTranscriptResync, PreparedConversationEventImport, SessionState, daemon_index,
-    daemon_protocol, daemon_snapshot, daemon_timeline, db_error, extract_transition_kind,
-    i64_from_u64, replace_session_timeline_entries_for_prefix, stored_timeline_entry,
-    upsert_session_timeline_entry, utc_now,
+    daemon_protocol, daemon_snapshot, daemon_timeline, db_error,
+    extract_conversation_event_kind, i64_from_u64, replace_session_timeline_entries_for_prefix,
+    stored_timeline_entry, upsert_session_timeline_entry, utc_now,
 };
 
 impl DaemonDb {
@@ -99,7 +99,7 @@ impl DaemonDb {
 
             for event in events {
                 let kind_json = serde_json::to_string(&event.kind).unwrap_or_default();
-                let kind = extract_transition_kind(&kind_json);
+                let kind = extract_conversation_event_kind(&kind_json);
                 let json = serde_json::to_string(event).unwrap_or_default();
                 statement
                     .execute(rusqlite::params![
@@ -198,7 +198,7 @@ impl DaemonDb {
                         runtime,
                         event.timestamp,
                         i64_from_u64(event.sequence),
-                        extract_transition_kind(&kind_json),
+                        extract_conversation_event_kind(&kind_json),
                         json,
                     ])
                     .map_err(|error| {
@@ -548,7 +548,7 @@ fn replace_session_conversation_state(
                     prepared.runtime,
                     event.timestamp,
                     i64_from_u64(event.sequence),
-                    extract_transition_kind(&kind_json),
+                    extract_conversation_event_kind(&kind_json),
                     json,
                 ])
                 .map_err(|error| db_error(format!("insert conversation import event: {error}")))?;

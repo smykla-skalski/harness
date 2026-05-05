@@ -159,6 +159,7 @@ async fn supervisor_event_sink_carries_terminal_transition_through_mpsc() {
     let (tx, mut rx) = mpsc::channel(8);
     let sink = Arc::new(SupervisorEventSink::new(
         tx,
+        "acp-test".to_string(),
         "agent-test".to_string(),
         "session-test".to_string(),
     ));
@@ -167,6 +168,7 @@ async fn supervisor_event_sink_carries_terminal_transition_through_mpsc() {
     supervisor.mark_watchdog_fired();
 
     let batch = rx.recv().await.expect("supervisor event batch");
+    assert_eq!(batch.acp_id, "acp-test");
     assert_eq!(batch.session_id, "session-test");
     assert_eq!(batch.raw_count, 0, "synthetic supervisor batch");
     assert_eq!(batch.events.len(), 1);
@@ -237,6 +239,7 @@ async fn supervisor_event_sink_drops_silently_when_channel_full() {
     let (tx, mut rx) = mpsc::channel(1);
     let sink = Arc::new(SupervisorEventSink::new(
         tx,
+        "acp-test".to_string(),
         "agent-test".to_string(),
         "session-test".to_string(),
     ));
@@ -273,13 +276,19 @@ async fn supervisor_event_sink_drops_silently_when_channel_full() {
 #[test]
 fn supervisor_event_sink_emits_context_injected_with_actor_and_summary() {
     let (tx, mut rx) = mpsc::channel(8);
-    let sink = SupervisorEventSink::new(tx, "agent-test".to_string(), "session-test".to_string());
+    let sink = SupervisorEventSink::new(
+        tx,
+        "acp-test".to_string(),
+        "agent-test".to_string(),
+        "session-test".to_string(),
+    );
 
     sink.emit_context_injected("acp".to_string(), Some("wake prompt accepted".into()));
 
     let batch = rx
         .try_recv()
         .expect("context_injected batch must be admitted");
+    assert_eq!(batch.acp_id, "acp-test");
     assert_eq!(batch.events.len(), 1);
     assert_eq!(batch.session_id, "session-test");
     assert_eq!(batch.raw_count, 0);
@@ -295,13 +304,19 @@ fn supervisor_event_sink_emits_context_injected_with_actor_and_summary() {
 #[test]
 fn supervisor_event_sink_emits_context_injected_without_summary() {
     let (tx, mut rx) = mpsc::channel(8);
-    let sink = SupervisorEventSink::new(tx, "agent-test".to_string(), "session-test".to_string());
+    let sink = SupervisorEventSink::new(
+        tx,
+        "acp-test".to_string(),
+        "agent-test".to_string(),
+        "session-test".to_string(),
+    );
 
     sink.emit_context_injected("acp".to_string(), None);
 
     let batch = rx
         .try_recv()
         .expect("context_injected batch must be admitted");
+    assert_eq!(batch.acp_id, "acp-test");
     match &batch.events[0].kind {
         ConversationEventKind::ContextInjected { actor, summary } => {
             assert_eq!(actor, "acp");

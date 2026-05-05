@@ -55,3 +55,15 @@ fn extract_transition_kind_parses_unit_variant() {
     let json = r#""SessionEnded""#;
     assert_eq!(extract_transition_kind(json), "SessionEnded");
 }
+
+#[test]
+fn extract_conversation_event_kind_parses_tagged_type_field() {
+    let json = r#"{"type":"permission_asked","tool":"rg","scope":""}"#;
+    assert_eq!(extract_conversation_event_kind(json), "permission_asked");
+}
+
+#[test]
+fn extract_conversation_event_kind_parses_string_variant() {
+    let json = r#""assistant_text""#;
+    assert_eq!(extract_conversation_event_kind(json), "assistant_text");
+}

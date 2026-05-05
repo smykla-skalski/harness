@@ -129,6 +129,7 @@ pub fn spawn_receive_loop(
 
     let supervisor_sink = Arc::new(SupervisorEventSink::new(
         tx.clone(),
+        session_id.clone(),
         agent_name.clone(),
         session_id.clone(),
     ));
