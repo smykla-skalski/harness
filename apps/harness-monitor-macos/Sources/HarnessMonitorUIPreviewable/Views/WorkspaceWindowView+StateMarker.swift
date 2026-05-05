@@ -35,6 +35,8 @@ extension WorkspaceWindowView {
         switch feedback.severity {
         case .success:
           "success"
+        case .warning:
+          "warning"
         case .failure:
           "failure"
         case .undoable:
