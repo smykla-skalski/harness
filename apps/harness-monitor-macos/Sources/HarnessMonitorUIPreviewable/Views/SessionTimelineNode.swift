@@ -105,12 +105,17 @@ struct SessionTimelineNode: Identifiable, Equatable, Sendable {
   let detail: String?
   let agentID: String?
   let taskID: String?
-  let eventTone: SessionTimelineTone?
+  var eventTone: SessionTimelineTone?
   let decision: SessionTimelineDecisionSnapshot?
   let semanticProperties: Set<SessionTimelineSemanticProperty>
   let rawPayloadKeys: Set<String>
   let toolCallMetadata: ToolCallTimelineEntryMetadata?
   let signalID: String?
+  var tapTarget: TimelineTapTarget? = nil
+  var voiceOverLabelOverride: String? = nil
+  var contextMenuItems: [TimelineContextMenuItem] = []
+  var prefersCompactLayout: Bool? = nil
+  var actions: [SessionTimelineAction] = []
 
   init(
     identity: Identity,
@@ -146,6 +151,7 @@ struct SessionTimelineNode: Identifiable, Equatable, Sendable {
     self.rawPayloadKeys = rawPayloadKeys
     self.toolCallMetadata = toolCallMetadata
     self.signalID = signalID
+    self.actions = decision?.actions ?? []
   }
 
   var id: String {
@@ -155,10 +161,6 @@ struct SessionTimelineNode: Identifiable, Equatable, Sendable {
     case .decision(let decisionID):
       "decision:\(decisionID)"
     }
-  }
-
-  var actions: [SessionTimelineAction] {
-    decision?.actions ?? []
   }
 
   var accessibilityIdentifier: String {
