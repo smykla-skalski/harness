@@ -1,5 +1,7 @@
 import HarnessMonitorKit
 
+// Live region priority for signal-adjacent features is handled in
+// MonitorTimelineLiveRegion.priority(for:summary:). Add cases there when adding a new feature family.
 protocol TimelineEventFeature: Sendable {
   static var id: String { get }
   func handles(entry: TimelineEntry) -> Bool
