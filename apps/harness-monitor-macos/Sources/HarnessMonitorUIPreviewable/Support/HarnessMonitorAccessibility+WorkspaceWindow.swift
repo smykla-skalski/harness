@@ -7,6 +7,8 @@ extension HarnessMonitorAccessibility {
   public static let workspaceDetailSignalMessage = "harness.workspace.detail.signal-message"
   public static let workspaceDetailSignalAction = "harness.workspace.detail.signal-action"
   public static let workspaceDetailSignalSend = "harness.workspace.detail.signal-send"
+  public static let workspaceDetailSignalDisclosure = "harness.workspace.detail.signal-disclosure"
+  public static let workspaceDetailSignalStatus = "harness.workspace.detail.signal-status"
   public static let workspaceDetailPersona = "harness.workspace.detail.persona"
   public static let workspaceDetailAssignedTasks = "harness.workspace.detail.assigned-tasks"
   public static let workspaceDetailTimeline = "harness.workspace.detail.timeline"

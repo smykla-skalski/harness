@@ -43,6 +43,14 @@ struct AgentDetailSectionTests {
       HarnessMonitorAccessibility.workspaceDetailRoleRemove
         == "harness.workspace.detail.role-remove"
     )
+    #expect(
+      HarnessMonitorAccessibility.workspaceDetailSignalDisclosure
+        == "harness.workspace.detail.signal-disclosure"
+    )
+    #expect(
+      HarnessMonitorAccessibility.workspaceDetailSignalStatus
+        == "harness.workspace.detail.signal-status"
+    )
   }
 
   @Test("Section accepts an agent + activity and conforms to View")
@@ -110,6 +118,60 @@ struct AgentDetailSectionTests {
         draftRole: .reviewer,
         agentRole: .worker
       ) == .reviewer
+    )
+  }
+
+  @Test("Send update composer expands advanced options for custom type or saved context")
+  func sendUpdateComposerExpandsAdvancedOptionsWhenNeeded() {
+    #expect(
+      AgentDetailSendUpdateSection.prefersExpandedAdvancedOptions(
+        selectedSendAction: .custom,
+        actionHint: ""
+      )
+    )
+    #expect(
+      AgentDetailSendUpdateSection.prefersExpandedAdvancedOptions(
+        selectedSendAction: .injectContext,
+        actionHint: "Keep the scope narrow."
+      )
+    )
+    #expect(
+      !AgentDetailSendUpdateSection.prefersExpandedAdvancedOptions(
+        selectedSendAction: .injectContext,
+        actionHint: "   "
+      )
+    )
+  }
+
+  @Test("Send update composer status copy covers read-only and missing draft content")
+  func sendUpdateComposerStatusCopy() {
+    #expect(
+      AgentDetailSendUpdateSection.statusMessage(
+        isSessionReadOnly: true,
+        trimmedCommand: SendUpdateAction.injectContext.rawCommand,
+        trimmedMessage: "Follow up"
+      ) == "Read-only session — open a writable session to send updates."
+    )
+    #expect(
+      AgentDetailSendUpdateSection.statusMessage(
+        isSessionReadOnly: false,
+        trimmedCommand: "",
+        trimmedMessage: "Follow up"
+      ) == "Pick or type an update type."
+    )
+    #expect(
+      AgentDetailSendUpdateSection.statusMessage(
+        isSessionReadOnly: false,
+        trimmedCommand: SendUpdateAction.injectContext.rawCommand,
+        trimmedMessage: ""
+      ) == "Type a message to send."
+    )
+    #expect(
+      AgentDetailSendUpdateSection.statusMessage(
+        isSessionReadOnly: false,
+        trimmedCommand: SendUpdateAction.injectContext.rawCommand,
+        trimmedMessage: "Follow up"
+      ) == nil
     )
   }
 

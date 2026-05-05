@@ -947,6 +947,7 @@ shift
                 {
                     "PATH": f"{fake_bin}:/usr/bin:/bin",
                     "BASH_ENV": "/dev/null",
+                    "HARNESS_SKIP_STALE_CHECK": "1",
                     "RTK_BIN": str(fake_bin / "rtk"),
                     "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
                     "TMPDIR": str(temp_root),
@@ -994,17 +995,34 @@ shift
                 swift_file_list.parent
                 / "BrokenWarning.dia"
             )
+            recursive_only_log = logs_root / "Nested" / "Z-recursive.xcactivitylog"
+            recursive_only_file_list = temp_root / "recursive-only.SwiftFileList"
+            recursive_only_dia = (
+                derived_data_path
+                / "Build"
+                / "Intermediates.noindex"
+                / "RecursiveOnly"
+                / "Poison.dia"
+            )
 
             logs_root.mkdir(parents=True)
             swift_file_list.parent.mkdir(parents=True, exist_ok=True)
+            recursive_only_log.parent.mkdir(parents=True)
+            recursive_only_dia.parent.mkdir(parents=True)
             swift_file_list.write_text(
                 "/Users/x/Sources/RulesPane.swift\n/Users/x/Sources/SidebarView.swift\n"
             )
+            recursive_only_file_list.write_text("/Users/x/Sources/RecursiveOnly.swift\n")
             diagnostics_file.write_text(
                 "DIAG\n"
                 "/Users/x/Tests/BrokenWarningTests.swift\n"
                 "no-usage\n"
                 "result of call to function returning 'HarnessMonitorAPIError' is unused\n"
+            )
+            recursive_only_dia.write_text(
+                "DIAG\n"
+                "/Users/x/Tests/RecursiveOnlyTests.swift\n"
+                "recursive-only-diagnostic\n"
             )
 
             empty_log = logs_root / "Z-empty.xcactivitylog"
@@ -1019,6 +1037,13 @@ shift
                 )
             os.utime(activity_log, (1, 1))
             os.utime(empty_log, (2, 2))
+            with gzip.open(recursive_only_log, "wt", encoding="utf-8") as handle:
+                handle.write(
+                    "builtin-Swift-Compilation -- "
+                    "/Applications/Xcode.app/Contents/Developer/usr/bin/swiftc "
+                    f"@{recursive_only_file_list} -DDEBUG\n"
+                )
+            os.utime(recursive_only_log, (3, 3))
 
             write_executable(
                 fake_bin / "rtk",
@@ -1053,6 +1078,7 @@ shift
                 {
                     "PATH": f"{fake_bin}:/usr/bin:/bin",
                     "BASH_ENV": "/dev/null",
+                    "HARNESS_SKIP_STALE_CHECK": "1",
                     "RTK_BIN": str(fake_bin / "rtk"),
                     "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
                     "TMPDIR": str(temp_root),
@@ -1075,7 +1101,7 @@ shift
                 env=env,
             )
 
-            self.assertEqual(completed.returncode, 65)
+            self.assertEqual(completed.returncode, 65, completed.stdout + completed.stderr)
             self.assertIn(
                 "swift-compile-context: latest non-empty activity log:",
                 completed.stderr,
@@ -1100,6 +1126,8 @@ shift
                 completed.stderr,
             )
             self.assertNotIn(str(empty_log), completed.stderr)
+            self.assertNotIn(str(recursive_only_log), completed.stderr)
+            self.assertNotIn("RecursiveOnly", completed.stderr)
 
 
 if __name__ == "__main__":

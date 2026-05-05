@@ -315,23 +315,30 @@ emit_failure_report_footer() {
 }
 
 latest_nonempty_activity_log() {
-  local logs_root latest_entry
+  local logs_root latest_path latest_epoch log_path log_epoch
   logs_root="$derive_data_path/Logs/Build"
   if [[ ! -d "$logs_root" ]]; then
     return 1
   fi
 
-  latest_entry="$(
-    /usr/bin/find "$logs_root" -type f -name '*.xcactivitylog' -size +0c \
-      -exec /usr/bin/stat -f '%m %N' {} + 2>/dev/null \
-      | /usr/bin/sort -n \
-      | /usr/bin/tail -1
-  )"
-  if [[ -z "$latest_entry" ]]; then
+  latest_path=""
+  latest_epoch=0
+  shopt -s nullglob
+  for log_path in "$logs_root"/*.xcactivitylog; do
+    [[ -s "$log_path" ]] || continue
+    log_epoch="$(/usr/bin/stat -f '%m' "$log_path" 2>/dev/null || printf '0')"
+    if (( log_epoch >= latest_epoch )); then
+      latest_epoch="$log_epoch"
+      latest_path="$log_path"
+    fi
+  done
+  shopt -u nullglob
+
+  if [[ -z "$latest_path" ]]; then
     return 1
   fi
 
-  printf '%s\n' "${latest_entry#* }"
+  printf '%s\n' "$latest_path"
 }
 
 latest_swift_file_list_from_activity_log() {
@@ -423,12 +430,7 @@ emit_swift_dia_diagnostics() {
   fi
 
   files_file="$(mktemp "${TMPDIR:-/tmp}/harness-xcodebuild-dia.XXXXXX")"
-  /usr/bin/find "$diagnostics_root" -type f -name '*.dia' -size +0c \
-    -exec /usr/bin/stat -f '%m %N' {} + 2>/dev/null \
-    | /usr/bin/awk -v min_epoch="$min_epoch" '$1 >= min_epoch { print }' \
-    | /usr/bin/sort -n \
-    | /usr/bin/tail -80 \
-    | /usr/bin/sed 's/^[0-9][0-9]* //' > "$files_file"
+  collect_recent_swift_dia_paths "$diagnostics_root" "$min_epoch" > "$files_file"
 
   emitted=0
   while IFS= read -r diagnostics_file; do
@@ -476,6 +478,35 @@ emit_swift_dia_diagnostics() {
     fi
   done < "$files_file"
   /bin/rm -f "$files_file"
+}
+
+collect_recent_swift_dia_paths() {
+  local diagnostics_root="$1"
+  local min_epoch="$2"
+  local candidate epoch
+  local -a candidates=()
+
+  shopt -s nullglob
+  candidates=(
+    "$diagnostics_root"/*.build/*/*.build/Objects-normal/*/*.dia
+    "$diagnostics_root"/*.build/*/*.build/Objects-normal/*/*/*.dia
+  )
+  shopt -u nullglob
+
+  if (( ${#candidates[@]} == 0 )); then
+    return 0
+  fi
+
+  for candidate in "${candidates[@]}"; do
+    [[ -s "$candidate" ]] || continue
+    epoch="$(/usr/bin/stat -f '%m' "$candidate" 2>/dev/null || printf '0')"
+    if (( epoch >= min_epoch )); then
+      printf '%s %s\n' "$epoch" "$candidate"
+    fi
+  done \
+    | /usr/bin/sort -n \
+    | /usr/bin/tail -80 \
+    | /usr/bin/sed 's/^[0-9][0-9]* //'
 }
 
 raw_log_has_compiler_diagnostics() {
