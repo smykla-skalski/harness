@@ -272,17 +272,13 @@ private struct AgentDetailSummaryHeader: View {
         .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
 
-      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-        Label(status.title, systemImage: statusSymbol)
-          .scaledFont(.caption.weight(.semibold))
-          .foregroundStyle(agentStatusColor(for: status))
-
-        Text("\(runtimeLabel) • \(roleTitle)")
-          .scaledFont(.system(.subheadline, design: .rounded, weight: .medium))
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .fixedSize(horizontal: false, vertical: true)
+      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingMD) {
+        statusChip
+        runtimeChip
+        roleChip
+        Spacer(minLength: 0)
       }
-      .accessibilityElement(children: .combine)
+      .fixedSize(horizontal: false, vertical: true)
 
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
         Text("Current Task")
@@ -294,6 +290,43 @@ private struct AgentDetailSummaryHeader: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private var statusChip: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingXS) {
+      Image(systemName: statusSymbol)
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(agentStatusColor(for: status))
+        .accessibilityHidden(true)
+      Text(status.title)
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(agentStatusColor(for: status))
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("Status")
+    .accessibilityValue(status.title)
+  }
+
+  private var runtimeChip: some View {
+    Text(runtimeLabel)
+      .scaledFont(.system(.subheadline, design: .rounded, weight: .medium))
+      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      .lineLimit(1)
+      .truncationMode(.tail)
+      .accessibilityElement(children: .ignore)
+      .accessibilityLabel("Runtime")
+      .accessibilityValue(runtimeLabel)
+  }
+
+  private var roleChip: some View {
+    Text(roleTitle)
+      .scaledFont(.system(.subheadline, design: .rounded, weight: .medium))
+      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      .lineLimit(1)
+      .truncationMode(.tail)
+      .accessibilityElement(children: .ignore)
+      .accessibilityLabel("Role")
+      .accessibilityValue(roleTitle)
   }
 
   private var statusSymbol: String {
