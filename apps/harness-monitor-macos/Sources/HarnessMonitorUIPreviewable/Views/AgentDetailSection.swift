@@ -361,8 +361,7 @@ struct AgentDetailSection: View {
   }
 
   private var roleActionsOnlyBandView: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      AgentDetailSubsectionTitle(title: "Role actions")
+    DisclosureGroup("Role actions") {
       AgentDetailRoleActionsSection(
         store: store,
         sessionID: store.selectedSessionID ?? "",
@@ -372,8 +371,14 @@ struct AgentDetailSection: View {
         rolePickerValues: rolePickerValues,
         rolePickerSelection: rolePickerSelection
       )
+      .padding(.top, HarnessMonitorTheme.spacingSM)
     }
+    .scaledFont(.caption.bold())
+    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.agentDetailRoleActionsDisclosure(agent.agentId)
+    )
   }
 
   private var composerInset: some View {
