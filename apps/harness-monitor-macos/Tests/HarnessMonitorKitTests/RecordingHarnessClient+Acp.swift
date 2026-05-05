@@ -52,8 +52,11 @@ extension RecordingHarnessClient {
     if let response = configuredAcpTranscriptResponse(for: sessionID) {
       return response
     }
+    let managedAgentIDs = Set(configuredAcpSnapshots(for: sessionID).map(\.agentId))
     return AcpTranscriptResponse(
-      entries: (configuredTimeline(for: sessionID) ?? []).filter(\.isAcpTranscriptEntry)
+      entries: (configuredTimeline(for: sessionID) ?? []).filter {
+        $0.matchesDerivedAcpTranscriptHistory(managedAgentIDs: managedAgentIDs)
+      }
     )
   }
 

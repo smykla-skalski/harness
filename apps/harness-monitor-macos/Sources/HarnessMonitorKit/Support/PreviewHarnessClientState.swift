@@ -154,9 +154,12 @@ actor PreviewHarnessClientState {
   }
 
   func acpTranscript(sessionID: String) -> AcpTranscriptResponse {
-    AcpTranscriptResponse(
-      entries: timeline(for: sessionID).filter(\.isAcpTranscriptEntry)
-    )
+    let managedAgentIDs = Set((acpAgentsBySessionID[sessionID] ?? []).map(\.agentId))
+    let entries = timeline(for: sessionID).filter {
+      $0.matchesDerivedAcpTranscriptHistory(managedAgentIDs: managedAgentIDs)
+    }
+    let response = AcpTranscriptResponse(entries: entries)
+    return response
   }
 
   func codexRuns(sessionID: String) -> [CodexRunSnapshot] {

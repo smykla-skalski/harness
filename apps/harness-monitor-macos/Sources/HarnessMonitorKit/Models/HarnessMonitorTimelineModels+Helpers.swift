@@ -41,6 +41,22 @@ public struct ToolCallTimelineEntryMetadata: Equatable, Sendable {
 }
 
 extension TimelineEntry {
+  private static let managedAcpTranscriptResponseKinds: Set<String> = [
+    "user_prompt",
+    "assistant_text",
+    "tool_invocation",
+    "tool_result",
+    "tool_result_error",
+    "agent_error",
+    "signal_received",
+    "agent_state_change",
+    "file_modification",
+    "agent_session_marker",
+    "agent_watchdog_state",
+    "agent_permission_asked",
+    "agent_context_injected",
+  ]
+
   public var isAcpTranscriptEntry: Bool {
     if acpTimelineIdentityMetadata() != nil {
       return true
@@ -52,6 +68,40 @@ extension TimelineEntry {
       return false
     }
     return payload.stringValue(for: "runtime") == "acp"
+  }
+
+  var isManagedRuntimeTranscriptEntry: Bool {
+    guard Self.managedAcpTranscriptResponseKinds.contains(kind) else {
+      return false
+    }
+    guard case .object(let payload) = payload else {
+      return false
+    }
+    guard payload.stringValue(for: "runtime")?.isEmpty == false else {
+      return false
+    }
+    guard case .object = payload["event"] else {
+      return false
+    }
+    return true
+  }
+
+  var isAcpTranscriptResponseEntry: Bool {
+    isAcpTranscriptEntry || isManagedRuntimeTranscriptEntry
+  }
+
+  func matchesDerivedAcpTranscriptHistory(managedAgentIDs: Set<String>) -> Bool {
+    if isAcpTranscriptEntry {
+      return true
+    }
+    guard
+      isManagedRuntimeTranscriptEntry,
+      let agentId,
+      managedAgentIDs.contains(agentId)
+    else {
+      return false
+    }
+    return true
   }
 
   public func acpTimelineIdentityMetadata() -> AcpTimelineIdentityMetadata? {
