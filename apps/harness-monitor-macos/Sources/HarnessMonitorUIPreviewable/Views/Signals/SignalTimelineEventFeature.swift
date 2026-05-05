@@ -1,8 +1,9 @@
 import HarnessMonitorKit
 
 // LIVE REGION: when adding a new signal kind, also add a case to
-// MonitorTimelineLiveRegion.priority(for:summary:) — that function runs before node
-// enrichment and is outside this protocol.
+// MonitorTimelineLiveRegion.priority(for:summary:). See SessionTimelineEventFeature.swift
+// for design rationale; note that live-region urgency vocabulary intentionally differs from
+// the tone/verb vocabulary in acknowledgedOutcome below.
 struct SignalTimelineEventFeature: TimelineEventFeature {
   static let id = "signal"
 
@@ -90,19 +91,29 @@ struct SignalTimelineEventFeature: TimelineEventFeature {
     return statusVerb(for: node)
   }
 
-  // Dispatches on node.sourceLabel (entry.kind) as primary discriminator.
-  // For signal_acknowledged the daemon encodes the outcome only in the human-readable
-  // summary; acknowledgedOutcome(_:) is the single parse site for that case.
+  // Dispatches on node.sourceLabel (entry.kind). For signal_acknowledged the daemon
+  // encodes the outcome only in the summary; acknowledgedOutcome(_:) is the single parse
+  // site. The default branch is a true fallback for unknown future signal kinds — add an
+  // explicit case here when introducing a new kind rather than relying on that fallback.
   private func statusVerb(for node: SessionTimelineNode) -> String {
     switch node.sourceLabel {
     case "signal_sent": return "Sent"
     case "signal_received": return "Received"
-    default: return acknowledgedOutcome(from: node.title).verb
+    case "signal_acknowledged": return acknowledgedOutcome(from: node.title).verb
+    default: return "Acknowledged"
     }
   }
 
-  // Single parse site for signal_acknowledged outcome vocabulary.
-  // Both tone(for:) and statusVerb(for:) delegate here so the keyword list stays in sync.
+  // Single parse site for signal_acknowledged outcome vocabulary. Both tone(for:) and
+  // statusVerb(for:) delegate here so the keyword list stays in sync. Both callers pass
+  // the entry summary string: tone passes entry.summary directly; statusVerb passes
+  // node.title, which the builder sets to entry.summary (see entryNode(for:) in
+  // SessionTimelineNodeBuilder — title is a let field, never mutated after construction).
+  //
+  // Vocabulary is intentionally wider than MonitorTimelineLiveRegion's assertive gate
+  // (rejected/expired/deferred only): fail and denied also map to .critical here because
+  // display tone is finer-grained than live-region urgency. When adding a new outcome
+  // keyword here, evaluate whether it also warrants assertive live-region priority.
   private func acknowledgedOutcome(from summary: String) -> (tone: SessionTimelineTone, verb: String) {
     let lower = summary.lowercased()
     if lower.contains("rejected") || lower.contains("fail") || lower.contains("denied") {
