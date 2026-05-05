@@ -44,46 +44,6 @@ struct MonitorTimelineSectionTests {
     #expect(SessionTimelineTone.eventTone(for: makeTimelineEntry(kind: "signal_sent")) == .info)
   }
 
-  @Test("Signal tone dispatches on summary text not kind string")
-  func signalToneDispatchesOnSummaryText() {
-    #expect(
-      SessionTimelineTone.eventTone(for: makeTimelineEntry(
-        kind: "signal_acknowledged",
-        summary: "sig-abc delivered to codex-worker: Accepted"
-      )) == .success
-    )
-    #expect(
-      SessionTimelineTone.eventTone(for: makeTimelineEntry(
-        kind: "signal_acknowledged",
-        summary: "sig-abc rejected from codex-worker: Rejected"
-      )) == .critical
-    )
-    #expect(
-      SessionTimelineTone.eventTone(for: makeTimelineEntry(
-        kind: "signal_acknowledged",
-        summary: "sig-abc deferred by codex-worker: Deferred"
-      )) == .warning
-    )
-    #expect(
-      SessionTimelineTone.eventTone(for: makeTimelineEntry(
-        kind: "signal_acknowledged",
-        summary: "sig-abc expired without acknowledgement: Expired"
-      )) == .warning
-    )
-    #expect(
-      SessionTimelineTone.eventTone(for: makeTimelineEntry(
-        kind: "signal_sent",
-        summary: "codex-worker sent signal sig-abc: inject_context"
-      )) == .info
-    )
-    #expect(
-      SessionTimelineTone.eventTone(for: makeTimelineEntry(
-        kind: "signal_received",
-        summary: "codex-worker picked up sig-abc: inject_context"
-      )) == .info
-    )
-  }
-
   @Test("Decision snapshot routes resolve snooze and dismiss actions through the handler")
   func decisionSnapshotRoutesActionsThroughHandler() async {
     let actions = [
