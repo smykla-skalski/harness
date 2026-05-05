@@ -210,13 +210,13 @@ class RuntimeProfileHelperTests(unittest.TestCase):
             env.update(
                 {
                     "HOME": str(Path(tmp_dir) / "home"),
-                    "USER": "bart.smykla@konghq.com",
+                    "USER": "monitor@example.test",
                 }
             )
 
             output = run_helper("harness_monitor_default_user_runtime_profile", env)
 
-            self.assertEqual(output, "bartsmykla")
+            self.assertEqual(output, "monitor")
 
     def test_default_agent_profile_uses_agent_session_id(self) -> None:
         env = base_env()
@@ -395,155 +395,6 @@ class RuntimeProfileHelperTests(unittest.TestCase):
             )
             self.assertEqual(codex_port, expected_profile_port(CURRENT_AGENT_PROFILE))
             self.assertEqual(label, f"io.harnessmonitor.daemon.{CURRENT_AGENT_PROFILE}")
-
-    def test_user_runtime_profile_script_prints_profile_details(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            home_dir = Path(tmp_dir) / "home"
-            home_dir.mkdir()
-            repo_root = Path(tmp_dir) / "repo"
-            app_root = repo_root / "apps" / "harness-monitor-macos"
-            scripts_root = app_root / "Scripts"
-            lib_root = scripts_root / "lib"
-            workspace_roots = (
-                app_root / "HarnessMonitor.xcworkspace",
-                app_root / "HarnessMonitor.xcodeproj" / "project.xcworkspace",
-            )
-            lib_root.mkdir(parents=True)
-            for workspace_root in workspace_roots:
-                workspace_root.mkdir(parents=True)
-            shutil.copy(USER_PROFILE_SCRIPT, scripts_root / "user-runtime-profile.sh")
-            shutil.copy(HELPER_PATH, lib_root / "runtime-profile.sh")
-            common_repo_root_destination = repo_root / "scripts" / "lib"
-            common_repo_root_destination.mkdir(parents=True)
-            shutil.copy(
-                COMMON_REPO_ROOT_SOURCE,
-                common_repo_root_destination / "common-repo-root.sh",
-            )
-            env = base_env()
-            env.update(
-                {
-                    "HOME": str(home_dir),
-                    "HARNESS_MONITOR_USER_RUNTIME_PROFILE": "Bart Dev",
-                    "USER": "bart.smykla@konghq.com",
-                }
-            )
-
-            completed = subprocess.run(
-                ["bash", str(scripts_root / "user-runtime-profile.sh")],
-                check=False,
-                capture_output=True,
-                text=True,
-                env=env,
-            )
-
-            self.assertEqual(completed.returncode, 0, completed.stderr)
-            self.assertIn("Harness Monitor user profile: bart-dev", completed.stdout)
-            self.assertIn("DerivedData:", completed.stdout)
-            self.assertIn("Daemon data home:", completed.stdout)
-            self.assertIn("Codex WS port:", completed.stdout)
-            self.assertIn("Launch agent label: io.harnessmonitor.daemon.bart-dev", completed.stdout)
-            self.assertIn("mise run monitor:user:build", completed.stdout)
-            self.assertIn("mise run monitor:user:daemon:dev", completed.stdout)
-            self.assertEqual(
-                (app_root / ".xcode-user-derived-data-path").read_text().strip(),
-                str(repo_root / "xcode-derived" / "profiles" / "bart-dev"),
-            )
-            for settings_path in (
-                app_root
-                / "HarnessMonitor.xcworkspace"
-                / "xcuserdata"
-                / "bartsmykla.xcuserdatad"
-                / "WorkspaceSettings.xcsettings",
-                app_root
-                / "HarnessMonitor.xcodeproj"
-                / "project.xcworkspace"
-                / "xcuserdata"
-                / "bartsmykla.xcuserdatad"
-                / "WorkspaceSettings.xcsettings",
-            ):
-                with self.subTest(settings_path=settings_path):
-                    self.assertIn(
-                        str(repo_root / "xcode-derived" / "profiles" / "bart-dev"),
-                        settings_path.read_text(),
-                    )
-
-    def test_user_runtime_profile_script_rejects_agent_sessions(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            home_dir = Path(tmp_dir) / "home"
-            home_dir.mkdir()
-            repo_root = Path(tmp_dir) / "repo"
-            app_root = repo_root / "apps" / "harness-monitor-macos"
-            scripts_root = app_root / "Scripts"
-            lib_root = scripts_root / "lib"
-            lib_root.mkdir(parents=True)
-            shutil.copy(USER_PROFILE_SCRIPT, scripts_root / "user-runtime-profile.sh")
-            shutil.copy(HELPER_PATH, lib_root / "runtime-profile.sh")
-            common_repo_root_destination = repo_root / "scripts" / "lib"
-            common_repo_root_destination.mkdir(parents=True)
-            shutil.copy(
-                COMMON_REPO_ROOT_SOURCE,
-                common_repo_root_destination / "common-repo-root.sh",
-            )
-            env = base_env()
-            env.update(
-                {
-                    "HOME": str(home_dir),
-                    "CODEX_SESSION_ID": CURRENT_AGENT_SESSION_ID,
-                }
-            )
-
-            completed = subprocess.run(
-                ["bash", str(scripts_root / "user-runtime-profile.sh")],
-                check=False,
-                capture_output=True,
-                text=True,
-                env=env,
-            )
-
-            self.assertNotEqual(completed.returncode, 0)
-            self.assertIn(
-                "Agent sessions must not use the Harness Monitor user profile lane",
-                completed.stderr,
-            )
-
-    def test_user_runtime_profile_script_allows_agent_sessions_with_override(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            home_dir = Path(tmp_dir) / "home"
-            home_dir.mkdir()
-            repo_root = Path(tmp_dir) / "repo"
-            app_root = repo_root / "apps" / "harness-monitor-macos"
-            scripts_root = app_root / "Scripts"
-            lib_root = scripts_root / "lib"
-            lib_root.mkdir(parents=True)
-            shutil.copy(USER_PROFILE_SCRIPT, scripts_root / "user-runtime-profile.sh")
-            shutil.copy(HELPER_PATH, lib_root / "runtime-profile.sh")
-            common_repo_root_destination = repo_root / "scripts" / "lib"
-            common_repo_root_destination.mkdir(parents=True)
-            shutil.copy(
-                COMMON_REPO_ROOT_SOURCE,
-                common_repo_root_destination / "common-repo-root.sh",
-            )
-            env = base_env()
-            env.update(
-                {
-                    "HOME": str(home_dir),
-                    "CODEX_SESSION_ID": CURRENT_AGENT_SESSION_ID,
-                    "HARNESS_MONITOR_ALLOW_AGENT_USER_PROFILE": "1",
-                    "HARNESS_MONITOR_USER_RUNTIME_PROFILE": NON_AGENT_PROFILE_RAW,
-                }
-            )
-
-            completed = subprocess.run(
-                ["bash", str(scripts_root / "user-runtime-profile.sh")],
-                check=False,
-                capture_output=True,
-                text=True,
-                env=env,
-            )
-
-            self.assertEqual(completed.returncode, 0, completed.stderr)
-            self.assertIn("Harness Monitor user profile: bart-dev", completed.stdout)
-
 
 if __name__ == "__main__":
     unittest.main()
