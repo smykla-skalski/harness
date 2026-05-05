@@ -63,7 +63,6 @@ public enum DaemonControlError: Error, LocalizedError, Equatable {
   case commandFailed(String)
 
   public var errorDescription: String? {
-    let daemonCommand = HarnessMonitorPaths.shellCommand("harness daemon dev")
     switch self {
     case .harnessBinaryNotFound:
       return "Unable to locate the bundled harness daemon helper."
@@ -80,12 +79,10 @@ public enum DaemonControlError: Error, LocalizedError, Equatable {
       return "The harness daemon is offline. Start the daemon to load live sessions."
     case .daemonDidNotStart:
       return "The harness daemon did not become healthy before the timeout."
-    case .externalDaemonOffline(let manifestPath):
-      return "External daemon not running. Start it in a terminal: `\(daemonCommand)`. "
-        + "Manifest expected at \(manifestPath)."
-    case .externalDaemonManifestStale(let manifestPath):
-      return "Stale manifest detected at \(manifestPath). The external daemon exited "
-        + "without cleanup. Restart it with `\(daemonCommand)` in a terminal."
+    case .externalDaemonOffline:
+      return "Background helper is not running. Start it to load live sessions."
+    case .externalDaemonManifestStale:
+      return "Background helper stopped unexpectedly. Restart it to reconnect."
     case .commandFailed(let message):
       return message
     }
