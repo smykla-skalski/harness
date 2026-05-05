@@ -56,9 +56,7 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     tapPreviewSession(in: app)
 
     let tasks = app.staticTexts["Tasks"]
-    let signals = app.staticTexts["Signals"]
     XCTAssertTrue(tasks.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(signals.waitForExistence(timeout: Self.actionTimeout))
 
     let observeSummaryButton = app.buttons
       .matching(identifier: Accessibility.observeSummaryButton)
@@ -67,7 +65,6 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     tapButton(in: app, identifier: Accessibility.observeSummaryButton)
 
     XCTAssertTrue(tasks.exists)
-    XCTAssertTrue(signals.exists)
   }
 
   func testEmptyCockpitShowsSharedEmptyStateRowsAcrossAllSections() throws {
@@ -78,17 +75,14 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
 
     let tasksEmpty = element(in: app, identifier: Accessibility.sessionEmptyState("tasks"))
     let agentsEmpty = element(in: app, identifier: Accessibility.sessionEmptyState("agents"))
-    let signalsEmpty = element(in: app, identifier: Accessibility.sessionEmptyState("signals"))
     let timelineEmpty = element(in: app, identifier: Accessibility.sessionEmptyState("timeline"))
 
     XCTAssertTrue(tasksEmpty.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(agentsEmpty.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(signalsEmpty.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(timelineEmpty.waitForExistence(timeout: Self.actionTimeout))
 
     XCTAssertEqual(tasksEmpty.label, "No tasks right now")
     XCTAssertEqual(agentsEmpty.label, "No agents yet. Join a leader to activate this session.")
-    XCTAssertEqual(signalsEmpty.label, "No signals right now")
     XCTAssertEqual(timelineEmpty.label, "No activity right now")
     XCTAssertFalse(element(in: app, identifier: Accessibility.sessionTimelinePagination).exists)
   }

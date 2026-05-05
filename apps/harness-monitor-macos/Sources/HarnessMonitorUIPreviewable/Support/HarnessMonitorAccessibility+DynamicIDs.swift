@@ -89,10 +89,6 @@ extension HarnessMonitorAccessibility {
     "\(sessionAgentCard(agentID)).persona"
   }
 
-  public static func sessionSignalCard(_ signalID: String) -> String {
-    "harness.session.signal.\(slug(signalID))"
-  }
-
   public static func sessionEmptyState(_ section: String) -> String {
     "harness.session.empty-state.\(slug(section))"
   }

@@ -13,7 +13,6 @@ struct SessionCockpitEmptyStateRow: View {
   enum Section: String, Sendable {
     case tasks
     case agents
-    case signals
     case timeline
 
     var message: String {
@@ -22,8 +21,6 @@ struct SessionCockpitEmptyStateRow: View {
         "No tasks right now"
       case .agents:
         "No agents right now"
-      case .signals:
-        "No signals right now"
       case .timeline:
         "No activity right now"
       }
