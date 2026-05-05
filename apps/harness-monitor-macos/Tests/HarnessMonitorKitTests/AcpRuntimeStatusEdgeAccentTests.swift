@@ -3,10 +3,12 @@ import Testing
 
 @testable import HarnessMonitorUIPreviewable
 
-@Suite struct AcpRuntimeStatusEdgeAccentTests {
+@Suite
+struct AcpRuntimeStatusEdgeAccentTests {
   private let now = Date(timeIntervalSince1970: 1_700_000_000)
 
-  @Test func firedWatchdogClassifiesAsFired() {
+  @Test
+  func firedWatchdogClassifiesAsFired() {
     #expect(
       AcpRuntimeStatusEdgeAccent.classify(
         watchdogDisplayState: "fired",
@@ -17,7 +19,8 @@ import Testing
     )
   }
 
-  @Test func expiredWatchdogClassifiesAsFired() {
+  @Test
+  func expiredWatchdogClassifiesAsFired() {
     #expect(
       AcpRuntimeStatusEdgeAccent.classify(
         watchdogDisplayState: "EXPIRED",
@@ -28,7 +31,8 @@ import Testing
     )
   }
 
-  @Test func stallingWatchdogClassifiesAsStalling() {
+  @Test
+  func stallingWatchdogClassifiesAsStalling() {
     #expect(
       AcpRuntimeStatusEdgeAccent.classify(
         watchdogDisplayState: "  Stalling  ",
@@ -39,7 +43,8 @@ import Testing
     )
   }
 
-  @Test func warningWatchdogClassifiesAsStalling() {
+  @Test
+  func warningWatchdogClassifiesAsStalling() {
     #expect(
       AcpRuntimeStatusEdgeAccent.classify(
         watchdogDisplayState: "warning",
@@ -50,7 +55,8 @@ import Testing
     )
   }
 
-  @Test func pendingPermissionPicksAwaitingPermission() {
+  @Test
+  func pendingPermissionPicksAwaitingPermission() {
     #expect(
       AcpRuntimeStatusEdgeAccent.classify(
         watchdogDisplayState: "active",
@@ -61,7 +67,8 @@ import Testing
     )
   }
 
-  @Test func deadlineWithin30sPicksDeadlineApproaching() {
+  @Test
+  func deadlineWithin30sPicksDeadlineApproaching() {
     let deadline = now.addingTimeInterval(15)
     #expect(
       AcpRuntimeStatusEdgeAccent.classify(
@@ -73,7 +80,8 @@ import Testing
     )
   }
 
-  @Test func deadlineBeyond30sIsClear() {
+  @Test
+  func deadlineBeyond30sIsClear() {
     let deadline = now.addingTimeInterval(60)
     #expect(
       AcpRuntimeStatusEdgeAccent.classify(
@@ -85,7 +93,8 @@ import Testing
     )
   }
 
-  @Test func expiredDeadlineDoesNotTrigger() {
+  @Test
+  func expiredDeadlineDoesNotTrigger() {
     let deadline = now.addingTimeInterval(-5)
     #expect(
       AcpRuntimeStatusEdgeAccent.classify(
@@ -97,7 +106,8 @@ import Testing
     )
   }
 
-  @Test func firedBeatsPendingPermissions() {
+  @Test
+  func firedBeatsPendingPermissions() {
     #expect(
       AcpRuntimeStatusEdgeAccent.classify(
         watchdogDisplayState: "fired",
@@ -108,7 +118,8 @@ import Testing
     )
   }
 
-  @Test func stallingBeatsPendingPermissions() {
+  @Test
+  func stallingBeatsPendingPermissions() {
     #expect(
       AcpRuntimeStatusEdgeAccent.classify(
         watchdogDisplayState: "stalling",
@@ -119,7 +130,8 @@ import Testing
     )
   }
 
-  @Test func calmStateClassifiesAsNil() {
+  @Test
+  func calmStateClassifiesAsNil() {
     #expect(
       AcpRuntimeStatusEdgeAccent.classify(
         watchdogDisplayState: "active",
@@ -130,25 +142,30 @@ import Testing
     )
   }
 
-  @Test func tintNoneReturnsNil() {
+  @Test
+  func tintNoneReturnsNil() {
     #expect(AcpRuntimeStatusEdgeAccent.tint(for: nil) == nil)
   }
 
-  @Test func tintFiredReturnsDanger() {
+  @Test
+  func tintFiredReturnsDanger() {
     #expect(AcpRuntimeStatusEdgeAccent.tint(for: .fired) == HarnessMonitorTheme.danger)
   }
 
-  @Test func tintStallingReturnsCaution() {
+  @Test
+  func tintStallingReturnsCaution() {
     #expect(AcpRuntimeStatusEdgeAccent.tint(for: .stalling) == HarnessMonitorTheme.caution)
   }
 
-  @Test func tintAwaitingPermissionReturnsCaution() {
+  @Test
+  func tintAwaitingPermissionReturnsCaution() {
     #expect(
       AcpRuntimeStatusEdgeAccent.tint(for: .awaitingPermission) == HarnessMonitorTheme.caution
     )
   }
 
-  @Test func tintDeadlineApproachingReturnsCaution() {
+  @Test
+  func tintDeadlineApproachingReturnsCaution() {
     #expect(
       AcpRuntimeStatusEdgeAccent.tint(for: .deadlineApproaching) == HarnessMonitorTheme.caution
     )

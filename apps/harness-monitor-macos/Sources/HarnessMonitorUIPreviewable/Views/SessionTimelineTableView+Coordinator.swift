@@ -282,8 +282,7 @@ extension SessionTimelineTableView {
         actionHandler: actionHandler,
         onSignalTap: onSignalTap,
         fontScale: fontScale,
-        showsConnectorAbove: connectorVisibility.showsConnectorAbove,
-        showsConnectorBelow: connectorVisibility.showsConnectorBelow
+        connectorVisibility: connectorVisibility
       )
       return cell
     }

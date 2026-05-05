@@ -106,11 +106,11 @@ struct SessionTimelineNode: Identifiable, Equatable, Sendable {
   let semanticProperties: Set<SessionTimelineSemanticProperty>
   let rawPayloadKeys: Set<String>
   let toolCallMetadata: ToolCallTimelineEntryMetadata?
-  var tapTarget: TimelineTapTarget? = nil
-  var statusBadgeLabel: String? = nil
-  var voiceOverLabelOverride: String? = nil
+  var tapTarget: TimelineTapTarget?
+  var statusBadgeLabel: String?
+  var voiceOverLabelOverride: String?
   var contextMenuItems: [TimelineContextMenuItem] = []
-  var prefersCompactLayout: Bool? = nil
+  var prefersCompactLayout: Bool?
   var actions: [SessionTimelineAction] = []
 
   init(
@@ -162,13 +162,17 @@ struct SessionTimelineNode: Identifiable, Equatable, Sendable {
   }
 
   var actionAvailabilityLabel: String {
-    switch actions.count {
-    case 0:
-      "No actions"
-    case 1:
-      "1 action"
-    default:
-      "\(actions.count) actions"
+    if actions.isEmpty { return "No actions available" }
+    let signalLabels = actions.compactMap { action -> String? in
+      switch action.signalPayload {
+      case .cancel: return "Cancel available"
+      case .resend: return "Resend available"
+      case nil: return nil
+      }
     }
+    if !signalLabels.isEmpty {
+      return signalLabels.joined(separator: ", ")
+    }
+    return actions.count == 1 ? "1 action available" : "\(actions.count) actions available"
   }
 }

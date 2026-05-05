@@ -5,7 +5,7 @@ import Testing
 
 @MainActor
 @Suite("Harness Monitor external daemon recovery toasts")
-struct HarnessMonitorStoreExternalDaemonRecoveryToastTests {
+struct ExternalDaemonRecoveryToastTests {
   @Test("External offline recovery toast keeps command and path in details")
   func externalOfflineRecoveryToastKeepsDiagnosticsInDetails() async throws {
     let manifestPath = "/tmp/harness/daemon/manifest.json"

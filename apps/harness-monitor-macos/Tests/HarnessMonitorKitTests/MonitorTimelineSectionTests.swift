@@ -12,13 +12,19 @@ struct MonitorTimelineSectionTests {
   @Test("Node builder merges streams with deterministic ordering")
   func nodeBuilderMergesStreamsWithDeterministicOrdering() {
     let timestamp = Date(timeIntervalSince1970: 1_775_000_000)
-    let recordedAt = isoString(timestamp)
-    let decision = makeDecision(id: "decision-a", createdAt: timestamp)
+    let recordedAt = MonitorTimelineSectionFixtures.isoString(timestamp)
+    let decision = MonitorTimelineSectionFixtures.makeDecision(
+      id: "decision-a",
+      createdAt: timestamp
+    )
     let nodes = SessionTimelineNodeBuilder(
       sessionID: "session-1",
       entries: [
-        makeTimelineEntry(entryID: "event-a", recordedAt: recordedAt),
-        makeTimelineEntry(
+        MonitorTimelineSectionFixtures.makeTimelineEntry(
+          entryID: "event-a",
+          recordedAt: recordedAt
+        ),
+        MonitorTimelineSectionFixtures.makeTimelineEntry(
           entryID: "linked-a",
           recordedAt: recordedAt,
           payload: .object(["decisionID": .string(decision.id)])
@@ -35,15 +41,25 @@ struct MonitorTimelineSectionTests {
   @Test("Tone mapping classifies event severity")
   func toneMappingClassifiesEventSeverity() {
     #expect(
-      SessionTimelineTone.eventTone(for: makeTimelineEntry(kind: "task_completed")) == .success
+      SessionTimelineTone.eventTone(
+        for: MonitorTimelineSectionFixtures.makeTimelineEntry(kind: "task_completed")
+      ) == .success
     )
     #expect(
-      SessionTimelineTone.eventTone(for: makeTimelineEntry(kind: "retry_warning")) == .warning
+      SessionTimelineTone.eventTone(
+        for: MonitorTimelineSectionFixtures.makeTimelineEntry(kind: "retry_warning")
+      ) == .warning
     )
     #expect(
-      SessionTimelineTone.eventTone(for: makeTimelineEntry(kind: "tool_failed")) == .critical
+      SessionTimelineTone.eventTone(
+        for: MonitorTimelineSectionFixtures.makeTimelineEntry(kind: "tool_failed")
+      ) == .critical
     )
-    #expect(SessionTimelineTone.eventTone(for: makeTimelineEntry(kind: "signal_sent")) == .info)
+    #expect(
+      SessionTimelineTone.eventTone(
+        for: MonitorTimelineSectionFixtures.makeTimelineEntry(kind: "signal_sent")
+      ) == .info
+    )
   }
 
   @Test("Decision snapshot routes resolve snooze and dismiss actions through the handler")
@@ -58,7 +74,10 @@ struct MonitorTimelineSectionTests {
       ),
       SuggestedAction(id: "dismiss", title: "Dismiss", kind: .dismiss, payloadJSON: "{}"),
     ]
-    let decision = makeDecision(id: "decision-actions", suggestedActionsJSON: encoded(actions))
+    let decision = MonitorTimelineSectionFixtures.makeDecision(
+      id: "decision-actions",
+      suggestedActionsJSON: MonitorTimelineSectionFixtures.encoded(actions)
+    )
     let snapshot = SessionTimelineDecisionSnapshot(decision: decision)
     let handler = RecordingTimelineDecisionActionHandler()
 
@@ -77,15 +96,15 @@ struct MonitorTimelineSectionTests {
 
   @Test("Entries link to decisions only through explicit payload decision ids")
   func entriesLinkToDecisionsOnlyThroughExplicitPayloadDecisionIDs() {
-    let decision = makeDecision(id: "decision-explicit")
+    let decision = MonitorTimelineSectionFixtures.makeDecision(id: "decision-explicit")
     let nodes = SessionTimelineNodeBuilder(
       sessionID: "session-1",
       entries: [
-        makeTimelineEntry(
+        MonitorTimelineSectionFixtures.makeTimelineEntry(
           entryID: "top-level",
           payload: .object(["decisionID": .string(decision.id)])
         ),
-        makeTimelineEntry(
+        MonitorTimelineSectionFixtures.makeTimelineEntry(
           entryID: "supervisor",
           payload: .object(["supervisor": .object(["decision_id": .string(decision.id)])])
         ),
@@ -101,7 +120,7 @@ struct MonitorTimelineSectionTests {
 
   @Test("Builder does not infer decision links from summary task agent or rule context")
   func builderDoesNotInferDecisionLinksFromHeuristics() {
-    let decision = makeDecision(
+    let decision = MonitorTimelineSectionFixtures.makeDecision(
       id: "decision-heuristic",
       ruleID: "rule.heuristic",
       agentID: "agent-1",
@@ -110,7 +129,7 @@ struct MonitorTimelineSectionTests {
     let nodes = SessionTimelineNodeBuilder(
       sessionID: "session-1",
       entries: [
-        makeTimelineEntry(
+        MonitorTimelineSectionFixtures.makeTimelineEntry(
           entryID: "plain-event",
           agentID: "agent-1",
           taskID: "task-1",
@@ -130,24 +149,27 @@ struct MonitorTimelineSectionTests {
   @Test("Retention keeps the last rendered rows during a same-session transient empty refresh")
   func retentionKeepsLastRenderedRowsDuringTransientEmptyRefresh() {
     let previousTimeline = [
-      makeTimelineEntry(entryID: "entry-visible", summary: "Visible timeline row")
+      MonitorTimelineSectionFixtures.makeTimelineEntry(
+        entryID: "entry-visible",
+        summary: "Visible timeline row"
+      )
     ]
-    let previousPresentation = makePresentation(
+    let previousPresentation = MonitorTimelineSectionFixtures.makePresentation(
       sessionID: "session-1",
       timeline: previousTimeline,
       isTimelineLoading: false
     )
-    let previousInput = makeInput(
+    let previousInput = MonitorTimelineSectionFixtures.makeInput(
       sessionID: "session-1",
       timeline: previousTimeline,
       isTimelineLoading: false
     )
-    let nextPresentation = makePresentation(
+    let nextPresentation = MonitorTimelineSectionFixtures.makePresentation(
       sessionID: "session-1",
       timeline: [],
       isTimelineLoading: false
     )
-    let nextInput = makeInput(
+    let nextInput = MonitorTimelineSectionFixtures.makeInput(
       sessionID: "session-1",
       timeline: [],
       isTimelineLoading: false
@@ -176,24 +198,27 @@ struct MonitorTimelineSectionTests {
   @Test("Retention does not pin stale rows once the selected session changes")
   func retentionDoesNotPinRowsAcrossSessionSwitches() {
     let previousTimeline = [
-      makeTimelineEntry(entryID: "entry-visible", summary: "Visible timeline row")
+      MonitorTimelineSectionFixtures.makeTimelineEntry(
+        entryID: "entry-visible",
+        summary: "Visible timeline row"
+      )
     ]
-    let previousPresentation = makePresentation(
+    let previousPresentation = MonitorTimelineSectionFixtures.makePresentation(
       sessionID: "session-1",
       timeline: previousTimeline,
       isTimelineLoading: false
     )
-    let previousInput = makeInput(
+    let previousInput = MonitorTimelineSectionFixtures.makeInput(
       sessionID: "session-1",
       timeline: previousTimeline,
       isTimelineLoading: false
     )
-    let nextPresentation = makePresentation(
+    let nextPresentation = MonitorTimelineSectionFixtures.makePresentation(
       sessionID: "session-2",
       timeline: [],
       isTimelineLoading: false
     )
-    let nextInput = makeInput(
+    let nextInput = MonitorTimelineSectionFixtures.makeInput(
       sessionID: "session-2",
       timeline: [],
       isTimelineLoading: false
@@ -211,22 +236,22 @@ struct MonitorTimelineSectionTests {
 
   @Test("Retention does not fabricate rows when the previous presentation was already empty")
   func retentionDoesNotFabricateRowsWithoutPreviousContent() {
-    let previousPresentation = makePresentation(
+    let previousPresentation = MonitorTimelineSectionFixtures.makePresentation(
       sessionID: "session-1",
       timeline: [],
       isTimelineLoading: false
     )
-    let previousInput = makeInput(
+    let previousInput = MonitorTimelineSectionFixtures.makeInput(
       sessionID: "session-1",
       timeline: [],
       isTimelineLoading: false
     )
-    let nextPresentation = makePresentation(
+    let nextPresentation = MonitorTimelineSectionFixtures.makePresentation(
       sessionID: "session-1",
       timeline: [],
       isTimelineLoading: true
     )
-    let nextInput = makeInput(
+    let nextInput = MonitorTimelineSectionFixtures.makeInput(
       sessionID: "session-1",
       timeline: [],
       isTimelineLoading: true
@@ -245,18 +270,18 @@ struct MonitorTimelineSectionTests {
   @Test("Footer viewport budget scales with larger text sizes")
   func footerViewportBudgetScalesWithLargerTextSizes() {
     let timeline = (0..<6).map { index in
-      makeTimelineEntry(
+      MonitorTimelineSectionFixtures.makeTimelineEntry(
         entryID: "entry-\(index)",
         summary: "Visible timeline row \(index)"
       )
     }
-    let defaultPresentation = makePresentation(
+    let defaultPresentation = MonitorTimelineSectionFixtures.makePresentation(
       sessionID: "session-1",
       timeline: timeline,
       isTimelineLoading: false,
       textSizeIndex: HarnessMonitorTextSize.defaultIndex
     )
-    let largePresentation = makePresentation(
+    let largePresentation = MonitorTimelineSectionFixtures.makePresentation(
       sessionID: "session-1",
       timeline: timeline,
       isTimelineLoading: false,
@@ -293,109 +318,6 @@ struct MonitorTimelineSectionTests {
     host.frame = CGRect(x: 0, y: 0, width: width, height: 200)
     host.layoutSubtreeIfNeeded()
     return host.fittingSize.height
-  }
-
-  private func makeTimelineEntry(
-    entryID: String = "entry-1",
-    recordedAt: String = "2026-04-30T12:00:00Z",
-    kind: String = "signal_sent",
-    agentID: String? = "agent-1",
-    taskID: String? = nil,
-    summary: String = "Timeline event",
-    payload: JSONValue = .object([:])
-  ) -> TimelineEntry {
-    TimelineEntry(
-      entryId: entryID,
-      recordedAt: recordedAt,
-      kind: kind,
-      sessionId: "session-1",
-      agentId: agentID,
-      taskId: taskID,
-      summary: summary,
-      payload: payload
-    )
-  }
-
-  private func makeDecision(
-    id: String,
-    severity: DecisionSeverity = .warn,
-    ruleID: String = "rule.timeline",
-    sessionID: String? = "session-1",
-    agentID: String? = nil,
-    taskID: String? = nil,
-    createdAt: Date = Date(timeIntervalSince1970: 1_775_000_000),
-    suggestedActionsJSON: String = "[]"
-  ) -> Decision {
-    let decision = Decision(
-      id: id,
-      severity: severity,
-      ruleID: ruleID,
-      sessionID: sessionID,
-      agentID: agentID,
-      taskID: taskID,
-      summary: "Decision \(id)",
-      contextJSON: "{}",
-      suggestedActionsJSON: suggestedActionsJSON
-    )
-    decision.createdAt = createdAt
-    return decision
-  }
-
-  private func encoded(_ actions: [SuggestedAction]) -> String {
-    let data = try? JSONEncoder().encode(actions)
-    return data.flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
-  }
-
-  private func isoString(_ date: Date) -> String {
-    ISO8601DateFormatter().string(from: date)
-  }
-
-  private func makePresentation(
-    sessionID: String,
-    timeline: [TimelineEntry],
-    isTimelineLoading: Bool,
-    textSizeIndex: Int = HarnessMonitorTextSize.defaultIndex
-  ) -> SessionTimelineSectionPresentation {
-    SessionTimelineSectionPresentation(
-      sessionID: sessionID,
-      timeline: timeline,
-      timelineWindow: nil,
-      decisions: [],
-      signals: [],
-      filters: .init(),
-      isTimelineLoading: isTimelineLoading,
-      reduceMotion: false,
-      textSizeIndex: textSizeIndex,
-      dateTimeConfiguration: .default
-    )
-  }
-
-  private func makeInput(
-    sessionID: String,
-    timeline: [TimelineEntry],
-    isTimelineLoading: Bool
-  ) -> SessionTimelinePresentationInput {
-    SessionTimelinePresentationInput(
-      sessionID: sessionID,
-      timelineCount: timeline.count,
-      firstTimelineEntryID: timeline.first?.entryId,
-      firstTimelineRecordedAt: timeline.first?.recordedAt,
-      lastTimelineEntryID: timeline.last?.entryId,
-      lastTimelineRecordedAt: timeline.last?.recordedAt,
-      timelineWindowRevision: nil,
-      timelineWindowStart: nil,
-      timelineWindowEnd: nil,
-      timelineWindowHasOlder: false,
-      timelineWindowHasNewer: false,
-      decisionCount: 0,
-      firstDecisionID: nil,
-      lastDecisionID: nil,
-      isTimelineLoading: isTimelineLoading,
-      filterSignature: "",
-      reduceMotion: false,
-      textSizeIndex: HarnessMonitorTextSize.defaultIndex,
-      dateTimeConfiguration: .default
-    )
   }
 }
 

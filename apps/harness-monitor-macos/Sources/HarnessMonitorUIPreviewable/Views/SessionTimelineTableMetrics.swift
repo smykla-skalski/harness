@@ -1,5 +1,12 @@
 import CoreGraphics
 
+struct SessionTimelineConnectorVisibility {
+  let showsConnectorAbove: Bool
+  let showsConnectorBelow: Bool
+
+  static let all = Self(showsConnectorAbove: true, showsConnectorBelow: true)
+}
+
 // NSTableView owns the hot scroll path here: row reuse, visible ranges, and content
 // offset preservation stay in AppKit instead of feeding per-row geometry back into SwiftUI.
 enum SessionTimelineTableMetrics {
@@ -48,11 +55,14 @@ enum SessionTimelineTableMetrics {
   static func connectorVisibility(
     rowIndex: Int,
     rowCount: Int
-  ) -> (showsConnectorAbove: Bool, showsConnectorBelow: Bool) {
+  ) -> SessionTimelineConnectorVisibility {
     guard rowCount > 0, rowIndex >= 0, rowIndex < rowCount else {
-      return (false, false)
+      return .init(showsConnectorAbove: false, showsConnectorBelow: false)
     }
-    return (rowIndex > 0, rowIndex + 1 < rowCount)
+    return .init(
+      showsConnectorAbove: rowIndex > 0,
+      showsConnectorBelow: rowIndex + 1 < rowCount
+    )
   }
 
   static func shouldStickToLatestOnRowsChange(

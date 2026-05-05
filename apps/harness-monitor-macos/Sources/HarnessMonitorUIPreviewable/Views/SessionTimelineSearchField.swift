@@ -155,8 +155,7 @@ private struct SessionTimelineSearchFieldChromeModifier: ViewModifier {
       }
   }
 
-  @ViewBuilder
-  private var controlFill: some View {
+  @ViewBuilder private var controlFill: some View {
     let fill = HarnessMonitorTheme.ink.opacity(fillOpacity)
     if usesCapsuleCorners {
       Capsule(style: .continuous)
@@ -167,8 +166,7 @@ private struct SessionTimelineSearchFieldChromeModifier: ViewModifier {
     }
   }
 
-  @ViewBuilder
-  private var controlStroke: some View {
+  @ViewBuilder private var controlStroke: some View {
     let stroke =
       isFocused
       ? HarnessMonitorTheme.accent.opacity(0.82)
