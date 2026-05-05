@@ -249,7 +249,10 @@ fn background_liveness_refresh_updates_async_summary_without_explicit_read() {
                 .find(|summary| summary.session_id == state.session_id)
                 .expect("summary before background refresh");
             assert_eq!(summary_before.status, SessionStatus::Active);
-            assert_eq!(summary_before.leader_id.as_deref(), state.leader_id.as_deref());
+            assert_eq!(
+                summary_before.leader_id.as_deref(),
+                state.leader_id.as_deref()
+            );
             assert_eq!(summary_before.metrics.agent_count, 1);
             assert_eq!(summary_before.metrics.active_agent_count, 1);
 

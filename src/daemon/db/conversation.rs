@@ -1,9 +1,9 @@
 use super::{
     CliError, Connection, ConversationEvent, DaemonDb, OptionalExtension,
     PreparedAgentTranscriptResync, PreparedConversationEventImport, SessionState, daemon_index,
-    daemon_protocol, daemon_snapshot, daemon_timeline, db_error,
-    extract_conversation_event_kind, i64_from_u64, replace_session_timeline_entries_for_prefix,
-    stored_timeline_entry, upsert_session_timeline_entry, utc_now,
+    daemon_protocol, daemon_snapshot, daemon_timeline, db_error, extract_conversation_event_kind,
+    i64_from_u64, replace_session_timeline_entries_for_prefix, stored_timeline_entry,
+    upsert_session_timeline_entry, utc_now,
 };
 
 impl DaemonDb {

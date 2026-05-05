@@ -248,7 +248,9 @@ async fn dispatch_acp_transcript_query(request: &WsRequest, state: &DaemonHttpSt
     ) {
         Ok(Some(session_id)) => session_id.to_string(),
         Ok(None) => return error_response(&request.id, "MISSING_PARAM", "missing session_id"),
-        Err(error) => return dispatch_query_result::<AcpTranscriptResponse>(&request.id, Err(error)),
+        Err(error) => {
+            return dispatch_query_result::<AcpTranscriptResponse>(&request.id, Err(error));
+        }
     };
     let result = match ensure_acp_enabled() {
         Ok(()) => acp_transcript_response(state, &effective_session_id).await,

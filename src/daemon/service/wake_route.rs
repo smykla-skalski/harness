@@ -199,7 +199,10 @@ fn tui_route<'a>(
     registration: &'a AgentRegistration,
     agent_tui_manager: Option<&'a AgentTuiManagerHandle>,
 ) -> WakeRoute<'a> {
-    match (agent_tui_id_for_registration(registration), agent_tui_manager) {
+    match (
+        agent_tui_id_for_registration(registration),
+        agent_tui_manager,
+    ) {
         (Some(tui_id), Some(manager)) => WakeRoute::Tui { tui_id, manager },
         (None, _) => WakeRoute::None {
             reason: NoneReason::MissingTuiCapability,
@@ -323,10 +326,7 @@ mod tests {
         let route = wake_route_for_registration(Some(&reg), WakeDispatch::new(Some(&tui), None));
         match route {
             WakeRoute::Tui { tui_id, .. } => assert_eq!(tui_id, "tui-9"),
-            other => panic!(
-                "expected Tui route, got {:?}",
-                managed_kind_label(&other)
-            ),
+            other => panic!("expected Tui route, got {:?}", managed_kind_label(&other)),
         }
     }
 
@@ -355,10 +355,7 @@ mod tests {
         let route = wake_route_for_registration(Some(&reg), WakeDispatch::new(None, Some(&acp)));
         match route {
             WakeRoute::Acp { acp_id, .. } => assert_eq!(acp_id, "acp-7"),
-            other => panic!(
-                "expected Acp route, got {:?}",
-                managed_kind_label(&other)
-            ),
+            other => panic!("expected Acp route, got {:?}", managed_kind_label(&other)),
         }
     }
 
@@ -371,8 +368,14 @@ mod tests {
 
     #[test]
     fn none_reason_display_is_stable() {
-        assert_eq!(format!("{}", NoneReason::Unregistered), "agent not registered");
-        assert_eq!(format!("{}", NoneReason::Unmanaged), "agent not daemon-managed");
+        assert_eq!(
+            format!("{}", NoneReason::Unregistered),
+            "agent not registered"
+        );
+        assert_eq!(
+            format!("{}", NoneReason::Unmanaged),
+            "agent not daemon-managed"
+        );
         assert_eq!(
             format!("{}", NoneReason::MissingTuiCapability),
             "tui-managed agent missing agent-tui capability"
@@ -392,10 +395,8 @@ mod tests {
         let reg = registration(vec![], Some(ManagedAgentRef::acp("acp-7")));
         let tui = tui_handle();
         let acp = acp_handle();
-        let route = wake_route_for_registration(
-            Some(&reg),
-            WakeDispatch::new(Some(&tui), Some(&acp)),
-        );
+        let route =
+            wake_route_for_registration(Some(&reg), WakeDispatch::new(Some(&tui), Some(&acp)));
         assert!(matches!(route, WakeRoute::Acp { .. }));
         let _ = ManagedAgentKind::Tui;
     }

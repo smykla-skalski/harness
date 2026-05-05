@@ -113,8 +113,10 @@ async fn reconcile_session_liveness_result(
     db: &Arc<Mutex<DaemonDb>>,
 ) -> Result<(), CliError> {
     if let Some(async_db) = async_db {
-        return service::reconcile_active_session_liveness_background_async(Some(async_db.as_ref()))
-            .await;
+        return service::reconcile_active_session_liveness_background_async(Some(
+            async_db.as_ref(),
+        ))
+        .await;
     }
 
     let Ok(db_guard) = db.lock() else {

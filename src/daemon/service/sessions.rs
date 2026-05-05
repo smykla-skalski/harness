@@ -13,12 +13,12 @@ mod liveness;
 
 #[cfg(test)]
 pub(crate) use liveness::clear_session_liveness_refresh_cache_entry;
+#[cfg(test)]
+pub(crate) use liveness::stale_session_ids_for_liveness_refresh;
 pub(crate) use liveness::{
     reconcile_active_session_liveness_background,
     reconcile_active_session_liveness_background_async,
 };
-#[cfg(test)]
-pub(crate) use liveness::stale_session_ids_for_liveness_refresh;
 use liveness::{
     reconcile_active_session_liveness_for_reads, reconcile_active_session_liveness_for_reads_async,
     reconcile_session_liveness_for_read, reconcile_session_liveness_for_read_async,
@@ -275,7 +275,9 @@ pub(crate) async fn session_acp_transcript_async(
         .ok_or_else(|| session_not_found(session_id))?;
     reconcile_expired_pending_signals_for_async_db(session_id, async_db).await?;
     Ok(AcpTranscriptResponse {
-        entries: async_db.load_session_acp_transcript_entries(session_id).await?,
+        entries: async_db
+            .load_session_acp_transcript_entries(session_id)
+            .await?,
     })
 }
 

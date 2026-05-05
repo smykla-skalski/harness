@@ -9,7 +9,7 @@ use nix::unistd::Pid;
 use tokio::time::advance;
 
 use super::super::{
-    AcpSessionSupervisor, DaemonShutdownError, DEFAULT_PROMPT_TIMEOUT, SupervisionConfig,
+    AcpSessionSupervisor, DEFAULT_PROMPT_TIMEOUT, DaemonShutdownError, SupervisionConfig,
     WatchdogState, kill_process_group, watchdog_loop,
 };
 use super::support::{ok, spawn_sleep_child, wait_for_file_marker};
@@ -138,7 +138,10 @@ async fn watchdog_loop_returns_watchdog_fired_after_timeout() {
     let _pending = supervisor.enter_pending_request();
 
     let reason = watchdog_loop(Arc::clone(&supervisor)).await;
-    assert_eq!(reason, Some(crate::agents::kind::DisconnectReason::WatchdogFired));
+    assert_eq!(
+        reason,
+        Some(crate::agents::kind::DisconnectReason::WatchdogFired)
+    );
     assert_eq!(supervisor.watchdog_state(), WatchdogState::Fired);
 
     #[cfg(unix)]
