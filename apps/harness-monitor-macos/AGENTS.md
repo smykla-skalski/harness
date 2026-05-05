@@ -41,6 +41,38 @@ Validation expectations (run from repo root):
 - Prefer shared layout and control primitives for Harness Monitor UI density/readability work so button sizing and glass treatment stay consistent across screens.
 - Liquid Glass (macOS 26): NavigationSplitView sidebar gets automatic Liquid Glass treatment. Use `.backgroundExtensionEffect()` on content columns so detail content extends behind the glass sidebar. Don't paint opaque backgrounds on the sidebar - use translucent tints so the system glass shows through. Use `.glassEffect(.regular.tint(color), in: shape)` for floating controls (tint takes `Color`, not `LinearGradient`). Never stack glass on glass. Glass belongs on the navigation/control layer, not on content. SwiftUI materials (`.ultraThinMaterial` etc.) blur behind the window, not sibling views. `GlassEffectContainer` groups glass elements with shared sampling; `spacing` controls morph threshold.
 
+### Fast test iteration
+
+`XCODE_ONLY_TESTING` accepts comma-separated selectors. Batch focused reruns into one call instead of chaining N invocations - each call costs two xcodebuild cold starts plus a tuist graph parse:
+
+```bash
+XCODE_ONLY_TESTING='HarnessMonitorKitTests/A/test1(),HarnessMonitorKitTests/A/test2()' \
+  CLAUDE_SESSION_ID=<uuid> mise run monitor:agent:test
+```
+
+`Scripts/test-swift.sh` defaults to skipping `build-for-testing` when the existing `.xctestrun` is fresher than every Swift source, project descriptor, SPM lockfile, and the cross-project `mcp-servers/` tree. Break-glass: set `HARNESS_MONITOR_FORCE_BUILD_FOR_TESTING=1` to always rebuild (use after .xcconfig edits, environment switches, or external package updates outside the scoped freshness roots).
+
+### DerivedData profile pruning
+
+Each agent session writes `xcode-derived/profiles/agent-<sanitized-uuid>/` (~2 GB Debug build). Profiles accumulate forever because the UUID changes per session. The repo ships a LaunchAgent + helper script (`scripts/manage-prune-launch-agent.sh`) that runs `scripts/prune-xcode-derived-profiles.sh` on a schedule.
+
+```bash
+mise run monitor:gc:profiles:install     # render template + load (default 7200s = 2h)
+mise run monitor:gc:profiles:status      # state + interval + recent stdout
+mise run monitor:gc:profiles              # one-shot prune, no schedule (HARNESS_MONITOR_PROFILE_DRY_RUN=1 for preview)
+mise run monitor:gc:profiles:uninstall   # bootout + delete plist
+mise run monitor:gc:profiles:reinstall   # apply a new interval after changing it
+```
+
+Change interval:
+
+```bash
+HARNESS_MONITOR_PROFILE_PRUNE_INTERVAL_SECONDS=14400 \
+  mise run monitor:gc:profiles:reinstall   # 4h cadence
+```
+
+The prune is conservative by design: only `agent-*` profiles are touched, the active profile (resolved from `HARNESS_MONITOR_RUNTIME_PROFILE` / `*_SESSION_ID`) is always preserved, and the staleness threshold defaults to the schedule interval (override via `HARNESS_MONITOR_PROFILE_TTL_SECONDS`). Logs land in `tmp/prune-xcode-derived-profiles.{out,err}.log`. The plist source is `scripts/launchd/io.harnessmonitor.prune-xcode-derived-profiles.plist.template`.
+
 ## Debugging discipline
 
 For Harness Monitor macOS and UI regressions:

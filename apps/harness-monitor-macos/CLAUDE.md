@@ -14,6 +14,45 @@ HARNESS_CHECK_AUTOCLEAN=1 CLAUDE_SESSION_ID=<uuid> rtk mise run monitor:agent:te
 
 `monitor:agent:test` auto-passes `-workspace HarnessMonitor.xcworkspace`, which resolves cross-project SPM dependencies (e.g. `HarnessMonitorRegistry` in `mcp-servers/`). `monitor:agent:xcodebuild` does not add `-workspace` - pass it yourself when using that task. If a Swift error persists after fixing a source file, a stale `.dia` from the prior failed build is the cause; delete it and rebuild: `xcode-derived/profiles/<profile>/Build/Intermediates.noindex/HarnessMonitor.build/Debug/<Target>.build/Objects-normal/arm64/<File>.dia`.
 
+## Fast test reruns (chained selectors)
+
+`XCODE_ONLY_TESTING` accepts comma-separated selectors. Batch focused reruns into ONE call instead of chaining N invocations - each call costs two xcodebuild cold starts plus a tuist graph parse, none of which amortize when the source tree is unchanged:
+
+```bash
+XCODE_ONLY_TESTING='HarnessMonitorKitTests/WorkspaceSelectionStoreTests/createAgentRequestCarriesEntryPoint(),HarnessMonitorKitTests/WorkspaceSelectionStoreTests/createAgentRequestIgnoresStaleSelectedSessionID()' \
+  CLAUDE_SESSION_ID=<uuid> rtk mise run monitor:agent:test
+```
+
+`test-swift.sh` defaults to skipping `build-for-testing` when the existing `.xctestrun` is fresher than every Swift source, project descriptor, SPM lockfile, and the cross-project `mcp-servers/` tree. Break-glass: set `HARNESS_MONITOR_FORCE_BUILD_FOR_TESTING=1` to always rebuild (use after tooling changes that the freshness scope does not capture, e.g. .xcconfig edits, environment switches, or external package updates outside the scoped roots).
+
+## DerivedData profile pruning
+
+Each agent session writes `xcode-derived/profiles/agent-<sanitized-uuid>/` (~2 GB Debug build). Profiles accumulate forever because the UUID changes per session. The repo ships a LaunchAgent that runs `scripts/prune-xcode-derived-profiles.sh` on a schedule.
+
+```bash
+mise run monitor:gc:profiles:install     # render template + load (default 7200s = 2h)
+mise run monitor:gc:profiles:status      # state + interval + recent stdout
+mise run monitor:gc:profiles:run-now     # one-shot prune (HARNESS_MONITOR_PROFILE_DRY_RUN=1 for preview)
+mise run monitor:gc:profiles:uninstall   # bootout + delete plist
+mise run monitor:gc:profiles:reinstall   # apply a new interval
+```
+
+Change interval:
+
+```bash
+HARNESS_MONITOR_PROFILE_PRUNE_INTERVAL_SECONDS=14400 \
+  mise run monitor:gc:profiles:reinstall   # 4h
+```
+
+The prune is conservative by design:
+- only `agent-*` profiles are touched (named user/owner profiles are untouched)
+- the active profile (resolved from `HARNESS_MONITOR_RUNTIME_PROFILE` / `*_SESSION_ID`) is always preserved
+- staleness threshold defaults to the schedule interval; override with `HARNESS_MONITOR_PROFILE_TTL_SECONDS`
+- `HARNESS_MONITOR_PROFILE_PRESERVE_GLOB` keeps additional profiles by name pattern
+- one-shot dry-run via `HARNESS_MONITOR_PROFILE_DRY_RUN=1`
+
+Logs land in `tmp/prune-xcode-derived-profiles.{out,err}.log`. The plist source is `scripts/launchd/io.harnessmonitor.prune-xcode-derived-profiles.plist.template`; rendered into `~/Library/LaunchAgents/io.harnessmonitor.prune-xcode-derived-profiles.plist` on install.
+
 ## UI shape rules
 
 Two rules guard against the most common forms of structural drift in this app's view layer:

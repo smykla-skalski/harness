@@ -12,6 +12,8 @@ source "$ROOT/Scripts/lib/xcodebuild-destination.sh"
 source "$ROOT/Scripts/lib/rtk-shell.sh"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/runtime-profile.sh
 source "$ROOT/Scripts/lib/runtime-profile.sh"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/build-for-testing-reuse.sh
+source "$ROOT/Scripts/lib/build-for-testing-reuse.sh"
 STALE_CHECK_SCRIPT="$CHECKOUT_ROOT/scripts/check-no-stale-state.sh"
 DESTINATION="$(harness_monitor_xcodebuild_destination)"
 DERIVED_DATA_PATH="$(harness_monitor_runtime_derived_data_path "$COMMON_REPO_ROOT" "xcode-derived")"
@@ -21,6 +23,7 @@ XCODE_ONLY_TESTING="${XCODE_ONLY_TESTING:-}"
 BUILD_FOR_TESTING_SCRIPT="${BUILD_FOR_TESTING_SCRIPT:-$ROOT/Scripts/build-for-testing.sh}"
 TEST_RETRY_ITERATIONS="${HARNESS_MONITOR_TEST_RETRY_ITERATIONS:-0}"
 TEST_LOCK_WAIT_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS:-15}"
+REUSED_EXISTING_BUILD=0
 
 export XCODEBUILD_DERIVED_DATA_PATH="$DERIVED_DATA_PATH"
 harness_monitor_apply_runtime_profile_environment
@@ -137,6 +140,11 @@ filter_monitor_test_console_output() {
 }
 
 run_build_for_testing() {
+  if should_reuse_existing_build_for_testing; then
+    REUSED_EXISTING_BUILD=1
+    return 0
+  fi
+
   local build_log_path
   local -a focused_env=()
   while IFS= read -r -d '' entry; do
@@ -352,7 +360,9 @@ trap 'cleanup_script_descendants 129' HUP
 
 run_build_for_testing
 
-clear_gatekeeper_metadata
+if (( REUSED_EXISTING_BUILD == 0 )); then
+  clear_gatekeeper_metadata
+fi
 
 BASE_TEST_ARGS=(
   -workspace "$ROOT/HarnessMonitor.xcworkspace" \

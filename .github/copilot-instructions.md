@@ -65,6 +65,11 @@ XCODE_ONLY_TESTING=HarnessMonitorUITests/HarnessMonitorUITests/testToolbarOpensS
 COPILOT_SESSION_ID=<uuid> XCODE_ONLY_TESTING=HarnessMonitorKitTests/PolicyGapRuleTests \
   rtk mise run monitor:agent:test
 
+# Batch many focused selectors into one call - chaining N calls forces N
+# build-for-testing cold starts. Comma-separated selectors are supported.
+COPILOT_SESSION_ID=<uuid> XCODE_ONLY_TESTING='HarnessMonitorKitTests/A/test1(),HarnessMonitorKitTests/A/test2()' \
+  rtk mise run monitor:agent:test
+
 COPILOT_SESSION_ID=<uuid> rtk mise run monitor:agent:build
 
 rtk mise run monitor:xcodebuild -- \
@@ -79,6 +84,17 @@ rtk mise run monitor:xcodebuild -- \
 - Do not run the full `HarnessMonitorUITests` suite by default. Prefer `XCODE_ONLY_TESTING` with the smallest possible selector.
 - In shared-checkout or agent-driven work, use `monitor:agent:*`. The isolated profile is derived from agent session env vars such as `COPILOT_SESSION_ID`.
 - For custom macOS lanes, never use bare `-destination 'platform=macOS'`; use `platform=macOS,arch=$(uname -m),name=My Mac`.
+- `monitor:agent:test` defaults to skipping `build-for-testing` when the existing `.xctestrun` is fresher than every Swift source, project descriptor, SPM lockfile, and the cross-project `mcp-servers/` tree. Break-glass: set `HARNESS_MONITOR_FORCE_BUILD_FOR_TESTING=1` to always rebuild (use after .xcconfig edits, environment switches, or external package updates outside the scoped freshness roots).
+- Each agent session writes `xcode-derived/profiles/agent-<sanitized-uuid>/` (~2 GB Debug build). Install the periodic prune LaunchAgent so old profiles do not accumulate:
+  ```bash
+  rtk mise run monitor:gc:profiles:install     # default 7200s = 2h cadence
+  rtk mise run monitor:gc:profiles:status      # state + interval + recent stdout
+  rtk mise run monitor:gc:profiles              # one-shot prune (HARNESS_MONITOR_PROFILE_DRY_RUN=1 to preview)
+  rtk mise run monitor:gc:profiles:uninstall   # bootout + delete plist
+  HARNESS_MONITOR_PROFILE_PRUNE_INTERVAL_SECONDS=14400 \
+    rtk mise run monitor:gc:profiles:reinstall # change cadence to 4h
+  ```
+  The active profile (resolved from `HARNESS_MONITOR_RUNTIME_PROFILE` / `*_SESSION_ID`) is always preserved; only `agent-*` profiles older than the staleness threshold are removed. Logs land in `tmp/prune-xcode-derived-profiles.{out,err}.log`.
 
 ## High-level architecture
 
