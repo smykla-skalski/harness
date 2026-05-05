@@ -287,23 +287,23 @@ private struct HarnessMonitorPreviewSceneAppearanceModifier: ViewModifier {
   }
 
   private var overrideThemeModeRawValue: String? {
-    environment[HarnessMonitorPreviewSceneOverrides.themeModeKey]
-      ?? fileOverride?.themeMode
+    fileOverride?.themeMode
+      ?? environment[HarnessMonitorPreviewSceneOverrides.themeModeKey]
   }
 
   private var overrideTextSizeIndexRawValue: String? {
-    environment[HarnessMonitorTextSize.uiTestOverrideKey]
-      ?? fileOverride?.textSizeIndex.map(String.init)
+    fileOverride?.textSizeIndex.map(String.init)
+      ?? environment[HarnessMonitorTextSize.uiTestOverrideKey]
   }
 
   private var overrideTimeZoneModeRawValue: String? {
-    environment[HarnessMonitorDateTimeConfiguration.uiTestTimeZoneModeOverrideKey]
-      ?? fileOverride?.timeZoneMode
+    fileOverride?.timeZoneMode
+      ?? environment[HarnessMonitorDateTimeConfiguration.uiTestTimeZoneModeOverrideKey]
   }
 
   private var overrideCustomTimeZoneIdentifier: String? {
-    environment[HarnessMonitorDateTimeConfiguration.uiTestCustomTimeZoneOverrideKey]
-      ?? fileOverride?.customTimeZone
+    fileOverride?.customTimeZone
+      ?? environment[HarnessMonitorDateTimeConfiguration.uiTestCustomTimeZoneOverrideKey]
   }
 
   private var resolvedThemeMode: HarnessMonitorThemeMode {
