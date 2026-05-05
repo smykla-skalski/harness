@@ -186,7 +186,9 @@ struct AgentDetailSendUpdateSection: View {
               }
             }
           )
-          .accessibilityHint(disabledReason ?? "")
+          .accessibilityLabel(
+            disabledReason.map { "Send Update, \($0)" } ?? "Send Update"
+          )
           if let disabledReason {
             Text(disabledReason)
               .scaledFont(.caption)
