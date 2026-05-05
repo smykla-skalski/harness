@@ -48,7 +48,8 @@ struct AgentTranscriptRows: View {
         placeholderCount: 0,
         shimmerPhase: 0,
         showsShimmer: false,
-        actionHandler: store.supervisorDecisionActionHandler()
+        actionHandler: store.supervisorDecisionActionHandler(),
+        onSignalTap: nil
       )
       .padding(HarnessMonitorTheme.spacingSM)
       .frame(maxWidth: .infinity, alignment: .leading)

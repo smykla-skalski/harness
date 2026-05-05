@@ -61,6 +61,7 @@ struct SessionTimelineTableView: NSViewRepresentable {
   let rows: [SessionTimelineRow]
   let scrollCommand: SessionTimelineScrollCommand?
   let actionHandler: any DecisionActionHandler
+  let onSignalTap: ((String) -> Void)?
   let viewport: SessionTimelineViewportModel
   let scrollBoundaryChanged: SessionTimelineScrollBoundaryHandler
   @Environment(\.fontScale)
@@ -114,6 +115,7 @@ struct SessionTimelineTableView: NSViewRepresentable {
     context.coordinator.update(
       rows: rows,
       actionHandler: actionHandler,
+      onSignalTap: onSignalTap,
       scrollCommand: scrollCommand,
       request: .init(
         scrollView: scrollView,

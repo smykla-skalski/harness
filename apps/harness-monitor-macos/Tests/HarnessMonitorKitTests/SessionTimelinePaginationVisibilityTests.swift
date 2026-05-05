@@ -47,6 +47,7 @@ struct SessionTimelineNavigationVisibilityTests {
     coordinator.update(
       rows: rows,
       actionHandler: NullDecisionActionHandler(),
+      onSignalTap: nil,
       scrollCommand: nil,
       request: .init(
         scrollView: scrollView,

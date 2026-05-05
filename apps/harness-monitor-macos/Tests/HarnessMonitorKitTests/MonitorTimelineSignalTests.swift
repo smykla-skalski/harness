@@ -91,10 +91,58 @@ struct MonitorTimelineSignalVOLabelTests {
   }
 }
 
+@MainActor
+@Suite("Signal ID extraction")
+struct MonitorTimelineSignalIDTests {
+  @Test("signal_sent top-level signal_id is extracted")
+  func signalSentExtractsTopLevelID() {
+    let entry = makeEntry(
+      id: "e1", kind: "signal_sent",
+      payload: .object(["signal_id": .string("abc-123"), "command": .string("inject_context")])
+    )
+    let nodes = SessionTimelineNodeBuilder(sessionID: "s1", entries: [entry], decisions: []).build()
+    #expect(nodes.first?.signalID == "abc-123")
+  }
+
+  @Test("signal_acknowledged top-level signal_id is extracted")
+  func signalAcknowledgedExtractsTopLevelID() {
+    let entry = makeEntry(
+      id: "e2", kind: "signal_acknowledged",
+      payload: .object(["signal_id": .string("xyz-456"), "result": .string("Accepted")])
+    )
+    let nodes = SessionTimelineNodeBuilder(sessionID: "s1", entries: [entry], decisions: []).build()
+    #expect(nodes.first?.signalID == "xyz-456")
+  }
+
+  @Test("signal_received nested event.signal_id is extracted")
+  func signalReceivedExtractsNestedID() {
+    let entry = makeEntry(
+      id: "e3", kind: "signal_received",
+      payload: .object([
+        "runtime": .string("codex"),
+        "event": .object(["type": .string("signal_received"), "signal_id": .string("def-789")]),
+      ])
+    )
+    let nodes = SessionTimelineNodeBuilder(sessionID: "s1", entries: [entry], decisions: []).build()
+    #expect(nodes.first?.signalID == "def-789")
+  }
+
+  @Test("non-signal entry has nil signalID")
+  func nonSignalEntryHasNilID() {
+    let entry = makeEntry(
+      id: "e4", kind: "tool_result",
+      payload: .object(["signal_id": .string("should-be-ignored")])
+    )
+    let nodes = SessionTimelineNodeBuilder(sessionID: "s1", entries: [entry], decisions: []).build()
+    #expect(nodes.first?.signalID == nil)
+  }
+}
+
 private func makeEntry(
   id: String = "entry-1",
   kind: String,
-  summary: String = "Timeline event"
+  summary: String = "Timeline event",
+  payload: JSONValue = .object([:])
 ) -> TimelineEntry {
   TimelineEntry(
     entryId: id,
@@ -104,6 +152,6 @@ private func makeEntry(
     agentId: nil,
     taskId: nil,
     summary: summary,
-    payload: .object([:])
+    payload: payload
   )
 }

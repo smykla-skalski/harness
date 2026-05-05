@@ -49,7 +49,9 @@ struct SessionTimelineNodeBuilder {
         taskID: taskID
       ),
       rawPayloadKeys: Self.payloadPropertyKeys(in: entry.payload),
-      toolCallMetadata: toolCallMetadata
+      toolCallMetadata: toolCallMetadata,
+      signalID: entry.kind.hasPrefix("signal_")
+        ? Self.extractSignalID(from: entry.payload) : nil
     )
   }
 
@@ -168,6 +170,17 @@ struct SessionTimelineNodeBuilder {
       properties.insert(.decisionAction)
     }
     return properties
+  }
+
+  // signal_sent / signal_acknowledged: signal_id at payload top level.
+  // signal_received: signal_id under payload["event"].
+  static func extractSignalID(from payload: JSONValue) -> String? {
+    guard case .object(let object) = payload else { return nil }
+    if case .string(let id)? = object["signal_id"], !id.isEmpty { return id }
+    guard case .object(let event)? = object["event"],
+      case .string(let id)? = event["signal_id"], !id.isEmpty
+    else { return nil }
+    return id
   }
 
   private static func payloadPropertyKeys(in payload: JSONValue) -> Set<String> {
