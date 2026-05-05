@@ -158,22 +158,14 @@ struct ContentWindowToolbarModelTests {
       canNavigateForward: false,
       canCreateTask: false,
       isRefreshing: false,
-      sleepPreventionEnabled: true,
-      mcpStatus: HarnessMonitorMCPStatusSnapshot(
-        runtimeState: .disabled,
-        recoveryStatus: nil
-      )
+      sleepPreventionEnabled: true
     )
     let disabled = ContentWindowToolbarModel(
       canNavigateBack: false,
       canNavigateForward: false,
       canCreateTask: false,
       isRefreshing: false,
-      sleepPreventionEnabled: false,
-      mcpStatus: HarnessMonitorMCPStatusSnapshot(
-        runtimeState: .disabled,
-        recoveryStatus: nil
-      )
+      sleepPreventionEnabled: false
     )
 
     #expect(enabled.sleepPreventionTitle == "Allow Sleep")

@@ -21,27 +21,25 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     )
   }
 
-  func testDashboardUsesSidebarFooterSummaryInsteadOfMetricCards() throws {
+  func testDashboardUsesSidebarFooterStatusStripInsteadOfMetricCards() throws {
     let app = launch(
       mode: "preview",
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard"]
     )
-    let boardRoot = element(in: app, identifier: Accessibility.sessionsBoardRoot)
     let sidebarFooterState = element(in: app, identifier: Accessibility.sidebarFooterState)
     let boardMetricElements = app.descendants(matching: .any).matching(
       NSPredicate(format: "identifier BEGINSWITH %@", "harness.board.metric.")
     )
 
-    XCTAssertTrue(boardRoot.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(sidebarFooterState.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertEqual(
       sidebarFooterState.label,
-      "projects=1, sessions=1, openWork=2, blocked=1"
+      "bridge=stopped, mcp=unavailable"
     )
     XCTAssertEqual(
       boardMetricElements.count,
       0,
-      "Expected dashboard summary metrics to render only in the sidebar footer"
+      "Expected dashboard summary metrics to be removed from the dashboard board cards"
     )
   }
 

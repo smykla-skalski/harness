@@ -61,7 +61,7 @@ public final class HarnessMonitorStore {
   ) {
     didSet {
       guard oldValue != mcpStatus else { return }
-      scheduleUISync([.contentToolbar, .contentChrome])
+      scheduleUISync([.contentChrome])
     }
   }
   @ObservationIgnored var mcpFeedbackState = MCPStatusFeedbackState()

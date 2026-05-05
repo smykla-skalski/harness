@@ -1,61 +1,147 @@
 import HarnessMonitorKit
 import SwiftUI
 
-public struct SidebarFooterSummary: Equatable {
-  public var projectCount: Int
-  public var worktreeCount: Int
-  public var sessionCount: Int
-  public var openWorkCount: Int
-  public var blockedCount: Int
+enum SidebarFooterStatusTone: Equatable {
+  case success
+  case muted
 
-  public init(
-    projectCount: Int = 0,
-    worktreeCount: Int = 0,
-    sessionCount: Int = 0,
-    openWorkCount: Int = 0,
-    blockedCount: Int = 0
+  var color: Color {
+    switch self {
+    case .success:
+      HarnessMonitorTheme.success
+    case .muted:
+      HarnessMonitorTheme.secondaryInk
+    }
+  }
+}
+
+struct SidebarFooterStatusToken: Equatable {
+  let label: String
+  let tone: SidebarFooterStatusTone
+  let accessibilityValue: String
+  let help: String
+}
+
+struct SidebarFooterStatusStripState: Equatable {
+  let bridge: SidebarFooterStatusToken?
+  let mcp: SidebarFooterStatusToken?
+
+  init(
+    daemonOwnership: DaemonOwnership,
+    bridgeRunning: Bool,
+    mcpStatus: HarnessMonitorMCPStatusSnapshot,
+    isMCPRegistryHostEnabled: Bool
   ) {
-    self.projectCount = projectCount
-    self.worktreeCount = worktreeCount
-    self.sessionCount = sessionCount
-    self.openWorkCount = openWorkCount
-    self.blockedCount = blockedCount
+    if daemonOwnership == .managed {
+      bridge = SidebarFooterStatusToken(
+        label: "BRIDGE",
+        tone: bridgeRunning ? .success : .muted,
+        accessibilityValue: bridgeRunning ? "Host bridge running" : "Host bridge stopped",
+        help: bridgeRunning ? "Built-in host bridge running." : "Built-in host bridge not running."
+      )
+    } else {
+      bridge = nil
+    }
+
+    if isMCPRegistryHostEnabled {
+      let isMCPReady: Bool
+      if case .healthy = mcpStatus.runtimeState {
+        isMCPReady = true
+      } else {
+        isMCPReady = false
+      }
+      mcp = SidebarFooterStatusToken(
+        label: "MCP",
+        tone: isMCPReady ? .success : .muted,
+        accessibilityValue: isMCPReady ? "MCP ready" : "MCP unavailable",
+        help: mcpStatus.detail
+      )
+    } else {
+      mcp = nil
+    }
   }
 
-  public var accessibilityValue: String {
-    var parts = [
-      "projects=\(projectCount)",
-      "sessions=\(sessionCount)",
-      "openWork=\(openWorkCount)",
-      "blocked=\(blockedCount)",
-    ]
-    if worktreeCount > 0 {
-      parts.insert("worktrees=\(worktreeCount)", at: 1)
+  var hasVisibleTokens: Bool {
+    bridge != nil || mcp != nil
+  }
+
+  var showsSeparator: Bool {
+    bridge != nil && mcp != nil
+  }
+
+  var stateMarkerValue: String {
+    "bridge=\(bridgeState), mcp=\(mcpState)"
+  }
+
+  var accessibilityValue: String {
+    let parts = [bridge?.accessibilityValue, mcp?.accessibilityValue].compactMap(\.self)
+    if parts.isEmpty {
+      return "No footer service indicators visible"
     }
     return parts.joined(separator: ", ")
+  }
+
+  var helpText: String {
+    [bridge?.help, mcp?.help].compactMap(\.self).joined(separator: "\n")
+  }
+
+  private var bridgeState: String {
+    guard let bridge else {
+      return "hidden"
+    }
+    return bridge.tone == .success ? "running" : "stopped"
+  }
+
+  private var mcpState: String {
+    guard let mcp else {
+      return "hidden"
+    }
+    return mcp.tone == .success ? "ready" : "unavailable"
   }
 }
 
 public struct SidebarFooterAccessory: View {
   public let metrics: ConnectionMetrics
-  public let summary: SidebarFooterSummary
+  public let daemonOwnership: DaemonOwnership
+  public let bridgeRunning: Bool
+  public let mcpStatus: HarnessMonitorMCPStatusSnapshot
+  public let isMCPRegistryHostEnabled: Bool
 
-  public init(metrics: ConnectionMetrics, summary: SidebarFooterSummary = .init()) {
+  public init(
+    metrics: ConnectionMetrics,
+    daemonOwnership: DaemonOwnership,
+    bridgeRunning: Bool,
+    mcpStatus: HarnessMonitorMCPStatusSnapshot,
+    isMCPRegistryHostEnabled: Bool
+  ) {
     self.metrics = metrics
-    self.summary = summary
+    self.daemonOwnership = daemonOwnership
+    self.bridgeRunning = bridgeRunning
+    self.mcpStatus = mcpStatus
+    self.isMCPRegistryHostEnabled = isMCPRegistryHostEnabled
   }
 
   private var tint: Color {
     metrics.latencyTint
   }
 
+  private var statusStripState: SidebarFooterStatusStripState {
+    SidebarFooterStatusStripState(
+      daemonOwnership: daemonOwnership,
+      bridgeRunning: bridgeRunning,
+      mcpStatus: mcpStatus,
+      isMCPRegistryHostEnabled: isMCPRegistryHostEnabled
+    )
+  }
+
   public var body: some View {
     HStack(spacing: HarnessMonitorTheme.itemSpacing) {
       ConnectionToolbarBadge(metrics: metrics)
 
-      Spacer(minLength: 0)
-
-      SidebarFooterMetricsRow(summary: summary)
+      if statusStripState.hasVisibleTokens {
+        Spacer(minLength: 0)
+        SidebarFooterStatusStrip(state: statusStripState)
+      }
     }
     .padding(.vertical, HarnessMonitorTheme.itemSpacing)
     .padding(.horizontal, HarnessMonitorTheme.itemSpacing)
@@ -66,117 +152,93 @@ public struct SidebarFooterAccessory: View {
     .padding(HarnessMonitorTheme.itemSpacing)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarFooter)
-    .overlay {
-      AccessibilityTextMarker(
-        identifier: HarnessMonitorAccessibility.sidebarFooterState,
-        text: summary.accessibilityValue
-      )
-    }
   }
 }
 
-private struct SidebarFooterMetricsRow: View {
-  let summary: SidebarFooterSummary
-  private static let spacing: CGFloat = 6
+private struct SidebarFooterStatusStrip: View {
+  let state: SidebarFooterStatusStripState
 
-  private var metrics: [SidebarFooterMetric] {
-    var result = [
-      SidebarFooterMetric(kind: .projects, value: summary.projectCount),
-      SidebarFooterMetric(kind: .sessions, value: summary.sessionCount),
-      SidebarFooterMetric(kind: .openWork, value: summary.openWorkCount),
-      SidebarFooterMetric(kind: .blocked, value: summary.blockedCount),
-    ]
-    if summary.worktreeCount > 0 {
-      result.insert(SidebarFooterMetric(kind: .worktrees, value: summary.worktreeCount), at: 1)
-    }
-    return result
-  }
-
-  var body: some View {
-    HStack(spacing: Self.spacing) {
-      ForEach(metrics, id: \.kind.rawValue) { metric in
-        SidebarFooterMetricToken(metric: metric)
-      }
-    }
-    .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarFooterMetricsFrame)
-  }
-}
-
-private struct SidebarFooterMetric: Equatable {
-  let kind: SidebarFooterMetricKind
-  let value: Int
-}
-
-enum SidebarFooterMetricKind: String, CaseIterable {
-  case projects
-  case worktrees
-  case sessions
-  case openWork
-  case blocked
-
-  var symbolName: String {
-    switch self {
-    case .projects: "folder.fill"
-    case .worktrees: "square.3.layers.3d.down.right"
-    case .sessions: "rectangle.stack.fill"
-    case .openWork: "checklist"
-    case .blocked: "exclamationmark.triangle.fill"
-    }
-  }
-
-  var title: String {
-    switch self {
-    case .projects: "Projects"
-    case .worktrees: "Worktrees"
-    case .sessions: "Sessions"
-    case .openWork: "Open Work"
-    case .blocked: "Blocked"
-    }
-  }
-}
-
-private struct SidebarFooterMetricToken: View {
-  let metric: SidebarFooterMetric
-  private static let tokenColor = HarnessMonitorTheme.ink.opacity(0.7)
+  private static let separatorSize: CGFloat = 4
 
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.spacingXS) {
-      Image(systemName: metric.kind.symbolName)
-        .font(.caption.weight(.bold))
-        .foregroundStyle(Self.tokenColor)
-        .accessibilityHidden(true)
-
-      Text("\(metric.value)")
-        .font(.system(.subheadline, design: .rounded, weight: .bold).monospacedDigit())
-        .foregroundStyle(Self.tokenColor)
-        .contentTransition(.numericText())
+      if let bridge = state.bridge {
+        SidebarFooterStatusWord(token: bridge)
+      }
+      if state.showsSeparator {
+        Circle()
+          .fill(HarnessMonitorTheme.secondaryInk.opacity(0.45))
+          .frame(width: Self.separatorSize, height: Self.separatorSize)
+          .accessibilityHidden(true)
+      }
+      if let mcp = state.mcp {
+        SidebarFooterStatusWord(token: mcp)
+      }
     }
-    .fixedSize(horizontal: true, vertical: false)
-    .help(metric.kind.title)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("Footer services")
+    .accessibilityValue(state.accessibilityValue)
+    .help(state.helpText)
   }
 }
 
-#Preview("Sidebar Footer - Live") {
+private struct SidebarFooterStatusWord: View {
+  let token: SidebarFooterStatusToken
+
+  var body: some View {
+    Text(token.label)
+      .scaledFont(.system(.caption, design: .rounded, weight: .semibold))
+      .foregroundStyle(token.tone.color)
+      .lineLimit(1)
+      .fixedSize(horizontal: true, vertical: false)
+      .accessibilityHidden(true)
+  }
+}
+
+#Preview("Sidebar Footer - Managed Unavailable") {
   let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .dashboardLoaded)
 
   SidebarFooterAccessory(
     metrics: store.connectionMetrics,
-    summary: SidebarFooterSummary(
-      projectCount: store.sidebarUI.projectCount,
-      worktreeCount: store.sidebarUI.worktreeCount,
-      sessionCount: store.sidebarUI.sessionCount,
-      openWorkCount: store.sidebarUI.openWorkCount,
-      blockedCount: store.sidebarUI.blockedCount
-    )
+    daemonOwnership: .managed,
+    bridgeRunning: false,
+    mcpStatus: HarnessMonitorMCPStatusSnapshot(
+      runtimeState: .disabled,
+      recoveryStatus: nil
+    ),
+    isMCPRegistryHostEnabled: true
   )
   .padding(20)
   .frame(width: 280)
 }
 
-#Preview("Sidebar Footer - Disconnected") {
+#Preview("Sidebar Footer - Healthy Services") {
+  let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .dashboardLoaded)
+
+  SidebarFooterAccessory(
+    metrics: store.connectionMetrics,
+    daemonOwnership: .managed,
+    bridgeRunning: true,
+    mcpStatus: HarnessMonitorMCPStatusSnapshot(
+      runtimeState: .healthy(socketPath: "/tmp/harness-mcp.sock"),
+      recoveryStatus: nil
+    ),
+    isMCPRegistryHostEnabled: true
+  )
+  .padding(20)
+  .frame(width: 280)
+}
+
+#Preview("Sidebar Footer - Connection Only") {
   SidebarFooterAccessory(
     metrics: .initial,
-    summary: SidebarFooterSummary()
+    daemonOwnership: .external,
+    bridgeRunning: false,
+    mcpStatus: HarnessMonitorMCPStatusSnapshot(
+      runtimeState: .disabled,
+      recoveryStatus: nil
+    ),
+    isMCPRegistryHostEnabled: false
   )
   .padding(20)
   .frame(width: 280)

@@ -37,7 +37,7 @@ struct HarnessMonitorMCPHealthSurfacingTests {
     )
   }
 
-  @Test("Store syncs MCP status into toolbar chrome diagnostics and feedback")
+  @Test("Store syncs MCP status into chrome diagnostics and feedback")
   func storeSyncsMCPStatusIntoVisibleSlices() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.toast.dedupeWindow = .zero
@@ -56,7 +56,6 @@ struct HarnessMonitorMCPHealthSurfacingTests {
     store.updateMCPStatus(degraded)
 
     #expect(store.mcpStatus == degraded)
-    #expect(store.contentUI.toolbar.mcpStatus == degraded)
     #expect(store.contentUI.chrome.mcpStatus == degraded)
     #expect(
       store.toast.activeFeedback.first?.message
@@ -73,7 +72,6 @@ struct HarnessMonitorMCPHealthSurfacingTests {
     #expect(healthy.detail.contains("This status covers the in-app registry host."))
     store.updateMCPStatus(healthy)
 
-    #expect(store.contentUI.toolbar.mcpStatus == healthy)
     #expect(store.contentUI.chrome.mcpStatus == healthy)
     #expect(
       store.toast.activeFeedback.first?.message
