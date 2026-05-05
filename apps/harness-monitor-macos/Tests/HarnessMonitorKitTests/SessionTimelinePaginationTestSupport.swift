@@ -6,7 +6,7 @@ import Testing
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
-private func makeTimelineEntries(
+func makeTimelineEntries(
   count: Int,
   startingAt startIndex: Int = 0
 ) -> [TimelineEntry] {
@@ -25,7 +25,7 @@ private func makeTimelineEntries(
   }
 }
 
-private func makeTimelineEntry(
+func makeTimelineEntry(
   kind: String,
   agentID: String,
   summary: String
@@ -42,7 +42,7 @@ private func makeTimelineEntry(
   )
 }
 
-private func makeTimelineRows(count: Int) -> [SessionTimelineRow] {
+func makeTimelineRows(count: Int) -> [SessionTimelineRow] {
   (0..<count).map { index in
     let node = SessionTimelineNode(
       identity: .entry("timeline-entry-\(index)"),
@@ -65,7 +65,7 @@ private func makeTimelineRows(count: Int) -> [SessionTimelineRow] {
   }
 }
 
-private func makeWindow(
+func makeWindow(
   entries: [TimelineEntry],
   windowStart: Int,
   windowEnd: Int,
@@ -90,7 +90,7 @@ private func makeWindow(
   )
 }
 
-private func makeCustomTimelineRow(
+func makeCustomTimelineRow(
   id: String,
   title: String,
   detail: String? = nil

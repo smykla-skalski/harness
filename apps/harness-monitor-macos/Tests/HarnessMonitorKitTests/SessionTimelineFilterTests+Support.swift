@@ -1,9 +1,10 @@
 import Foundation
 
 @testable import HarnessMonitorKit
+@testable import HarnessMonitorUIPreviewable
 
 extension SessionTimelineFilterState {
-  fileprivate init(
+  init(
     query: String,
     searchScope: SessionTimelineSearchScope,
     tones: Set<SessionTimelineTone>,
@@ -27,7 +28,7 @@ extension SessionTimelineFilterState {
   }
 }
 
-private struct SessionTimelineDecisionFixture {
+struct SessionTimelineDecisionFixture {
   var severity: DecisionSeverity = .warn
   var sessionID: String = "session-1"
   var agentID: String?
@@ -35,7 +36,7 @@ private struct SessionTimelineDecisionFixture {
   var actions: [SuggestedAction] = []
 }
 
-private func makeDecision(
+func makeDecision(
   id: String,
   fixture: SessionTimelineDecisionFixture = .init()
 ) -> Decision {

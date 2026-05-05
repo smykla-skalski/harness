@@ -59,6 +59,7 @@ extension HarnessMonitorUITestAccessibility {
   static let workspaceCodexRecoveryBanner = "harness.window.workspace.codex.recovery-banner"
   static let workspaceCodexEnableBridgeButton = "harness.window.workspace.codex.enable-bridge"
   static let workspaceCodexCopyCommandButton = "harness.window.workspace.codex.copy-command"
+  static let workspaceDetailCard = "harness.workspace.detail-card"
   static let workspaceTaskCard = "harness.workspace.task.card"
   static let workspaceTaskNoteField = "harness.workspace.task.note-field"
   static let workspaceTaskNoteAddButton = "harness.workspace.task.note-add"
@@ -141,6 +142,10 @@ extension HarnessMonitorUITestAccessibility {
 
   static func agentRuntimeDisclosureContent(_ agentID: String) -> String {
     "harness.workspace.detail.runtime.disclosure-content.\(slug(agentID))"
+  }
+
+  static func agentDetailRoleActionsDisclosure(_ agentID: String) -> String {
+    "harness.workspace.detail.role-actions.disclosure.\(slug(agentID))"
   }
 
   static func agentTuiKeyButton(_ key: String) -> String {

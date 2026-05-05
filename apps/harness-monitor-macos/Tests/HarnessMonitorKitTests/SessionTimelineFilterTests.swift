@@ -219,13 +219,12 @@ struct SessionTimelineFilterTests {
     #expect(snapshot.filteredNodeCount == 1)
     #expect(snapshot.inventory.count(for: .warning) == 1)
     #expect(snapshot.inventory.count(for: .critical) == 1)
+    let toolResultErrorCount =
+      snapshot.inventory.eventTypes.first { $0.id == "tool_result_error" }?.count ?? 0
     #expect(
       snapshot.inventory.eventTypes.first(where: { $0.id == "task_checkpoint" })?.count == 1
     )
-    #expect(
-      (snapshot.inventory.eventTypes.first(where: { $0.id == "tool_result_error" })?.count ?? 0)
-        .isZero
-    )
+    #expect(toolResultErrorCount == 0)
   }
 
   @Test("Visibility stats switch to filtered match wording")

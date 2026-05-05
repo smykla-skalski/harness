@@ -60,9 +60,11 @@ struct SessionTimelineNavigationScrollTests {
       rows: [row],
       actionHandler: NullDecisionActionHandler(),
       scrollCommand: nil,
-      scrollView: scrollView,
-      columnWidth: 945,
-      fontScale: 1.3
+      request: .init(
+        scrollView: scrollView,
+        columnWidth: 945,
+        fontScale: 1.3
+      )
     )
     coordinator.cancelMeasurement(reason: "test")
     coordinator.rowHeightCache.removeAll()
@@ -153,9 +155,11 @@ struct SessionTimelineNavigationScrollTests {
       rows: initialRows,
       actionHandler: NullDecisionActionHandler(),
       scrollCommand: nil,
-      scrollView: scrollView,
-      columnWidth: 945,
-      fontScale: 1
+      request: .init(
+        scrollView: scrollView,
+        columnWidth: 945,
+        fontScale: 1
+      )
     )
     coordinator.cancelMeasurement(reason: "test")
     tableView.layoutSubtreeIfNeeded()
@@ -189,9 +193,11 @@ struct SessionTimelineNavigationScrollTests {
       rows: updatedRows,
       actionHandler: NullDecisionActionHandler(),
       scrollCommand: nil,
-      scrollView: scrollView,
-      columnWidth: 945,
-      fontScale: 1
+      request: .init(
+        scrollView: scrollView,
+        columnWidth: 945,
+        fontScale: 1
+      )
     )
     coordinator.cancelMeasurement(reason: "test")
     tableView.layoutSubtreeIfNeeded()
