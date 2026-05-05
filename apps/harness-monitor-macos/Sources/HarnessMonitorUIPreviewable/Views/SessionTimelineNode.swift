@@ -24,6 +24,10 @@ enum SessionTimelineTone: String, CaseIterable, Equatable, Sendable {
     if let status = entry.toolCallTimelineEntryMetadata()?.status {
       return tone(for: status)
     }
+    // signal_* rows carry status in their summary text, not in the kind string.
+    if entry.kind.hasPrefix("signal_") {
+      return tone(for: entry.summary)
+    }
     return tone(for: entry.kind)
   }
 
@@ -35,12 +39,12 @@ enum SessionTimelineTone: String, CaseIterable, Equatable, Sendable {
       return .critical
     }
     if value.contains("warn") || value.contains("blocked") || value.contains("stale")
-      || value.contains("retry")
+      || value.contains("retry") || value.contains("expired") || value.contains("deferred")
     {
       return .warning
     }
     if value.contains("success") || value.contains("complete") || value.contains("accepted")
-      || value.contains("approved")
+      || value.contains("approved") || value.contains("delivered")
     {
       return .success
     }
