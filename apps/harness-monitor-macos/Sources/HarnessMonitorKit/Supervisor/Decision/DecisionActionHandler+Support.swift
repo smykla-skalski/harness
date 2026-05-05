@@ -98,3 +98,35 @@ enum StoreDecisionActionError: LocalizedError {
     }
   }
 }
+
+enum SupervisorManagedAgentNudgeDispatcher {
+  private static let supervisorActor = "harness-supervisor"
+  private static let signalCommand = "request_action"
+
+  static func dispatch(
+    agentID: String,
+    input: String,
+    client: any HarnessMonitorClientProtocol
+  ) async throws {
+    let snapshot = try await client.managedAgent(agentID: agentID)
+    if snapshot.terminal != nil {
+      _ = try await client.sendManagedAgentInput(
+        agentID: agentID,
+        request: AgentTuiInputRequest(input: .text(input))
+      )
+      return
+    }
+
+    // ACP/Codex nudges must use session signals; managed_agent.input is terminal-only.
+    _ = try await client.sendSignal(
+      sessionID: snapshot.sessionId,
+      request: SignalSendRequest(
+        actor: supervisorActor,
+        agentId: agentID,
+        command: signalCommand,
+        message: input,
+        actionHint: nil
+      )
+    )
+  }
+}

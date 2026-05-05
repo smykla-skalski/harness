@@ -154,9 +154,10 @@ public final class StoreDecisionActionHandler: DecisionActionHandler {
     }
     let input = resolveNudgeInput(from: action)
     do {
-      _ = try await client.sendManagedAgentInput(
+      try await SupervisorManagedAgentNudgeDispatcher.dispatch(
         agentID: agentID,
-        request: AgentTuiInputRequest(input: .text(input))
+        input: input,
+        client: client
       )
     } catch {
       throw StoreDecisionActionError.daemonRejected(error)
