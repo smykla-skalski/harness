@@ -217,7 +217,7 @@ struct AgentDetailSection: View {
   private var fullPaneBody: some View {
     HarnessMonitorColumnScrollView(
       horizontalPadding: HarnessMonitorTheme.spacingLG,
-      verticalPadding: HarnessMonitorTheme.spacingXL,
+      verticalPadding: HarnessMonitorTheme.spacingLG,
       constrainContentWidth: false,
       readableWidth: false,
       topScrollEdgeEffect: .soft,
