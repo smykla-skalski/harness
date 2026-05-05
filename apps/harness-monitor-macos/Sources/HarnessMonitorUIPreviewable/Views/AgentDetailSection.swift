@@ -170,13 +170,41 @@ struct AgentDetailSection: View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
       if let pendingDecisionAttention {
         AgentDetailAwaitingDecisionStrip(
+          payload: store.acpPermissionDecisionPayload(
+            for: pendingDecisionAttention.oldestDecisionID
+          ),
           count: pendingDecisionAttention.count,
-          buttonAccessibilityIdentifier:
+          isResolving:
+            store.resolvingAcpPermissionBatchID == pendingDecisionAttention.oldestBatchID,
+          approveButtonAccessibilityIdentifier:
             HarnessMonitorAccessibility
-            .agentDetailOpenDecisionsButton(agent.agentId)
-        ) {
-          openPendingDecisions()
-        }
+            .agentDetailApproveDecisionButton(agent.agentId),
+          denyButtonAccessibilityIdentifier:
+            HarnessMonitorAccessibility
+            .agentDetailDenyDecisionButton(agent.agentId),
+          viewAllButtonAccessibilityIdentifier:
+            HarnessMonitorAccessibility
+            .agentDetailOpenDecisionsButton(agent.agentId),
+          onApprove: {
+            dispatchPendingDecision(
+              attention: pendingDecisionAttention,
+              actionID: AcpPermissionDecisionActionID.approveActionID(
+                forRequestCount: pendingDecisionAttention.count
+              )
+            )
+          },
+          onDeny: {
+            dispatchPendingDecision(
+              attention: pendingDecisionAttention,
+              actionID: AcpPermissionDecisionActionID.denyActionID(
+                forRequestCount: pendingDecisionAttention.count
+              )
+            )
+          },
+          onViewAll: {
+            openPendingDecisions()
+          }
+        )
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.agentDetailAwaitingDecisionStrip(agent.agentId)
@@ -338,6 +366,19 @@ struct AgentDetailSection: View {
       inspectStatus: inspectStatus,
       presentation: runtimePresentation
     )
+  }
+
+  private func dispatchPendingDecision(
+    attention: AcpDecisionAttention,
+    actionID: String
+  ) {
+    let decisionID = attention.oldestDecisionID
+    Task {
+      _ = await store.submitAcpPermissionDecisionAction(
+        decisionID: decisionID,
+        actionID: actionID
+      )
+    }
   }
 
   private func openPendingDecisions() {

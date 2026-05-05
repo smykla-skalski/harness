@@ -26,6 +26,14 @@ public enum AcpPermissionDecisionActionID {
   public static func isDenyAction(_ actionID: String) -> Bool {
     actionID == deny || actionID == denyAll
   }
+
+  public static func approveActionID(forRequestCount count: Int) -> String {
+    count > 1 ? approveAll : approve
+  }
+
+  public static func denyActionID(forRequestCount count: Int) -> String {
+    count > 1 ? denyAll : deny
+  }
 }
 
 public enum AcpPermissionDecisionActionError: LocalizedError, Equatable, Sendable {
