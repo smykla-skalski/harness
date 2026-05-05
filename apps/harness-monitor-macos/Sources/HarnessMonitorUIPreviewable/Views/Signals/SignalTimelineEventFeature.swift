@@ -15,23 +15,20 @@ struct SignalTimelineEventFeature: TimelineEventFeature {
   }
 
   func tone(for entry: TimelineEntry) -> SessionTimelineTone? {
-    let value = entry.summary.lowercased()
-    if value.contains("critical") || value.contains("error") || value.contains("fail")
-      || value.contains("denied") || value.contains("rejected")
-    {
-      return .critical
+    switch entry.kind {
+    case "signal_sent", "signal_received":
+      return .info
+    case "signal_acknowledged":
+      let value = entry.summary.lowercased()
+      if value.contains("rejected") || value.contains("fail") || value.contains("denied") {
+        return .critical
+      }
+      if value.contains("expired") || value.contains("deferred") { return .warning }
+      if value.contains("accepted") || value.contains("delivered") { return .success }
+      return .info
+    default:
+      return .info
     }
-    if value.contains("warn") || value.contains("blocked") || value.contains("stale")
-      || value.contains("retry") || value.contains("expired") || value.contains("deferred")
-    {
-      return .warning
-    }
-    if value.contains("success") || value.contains("complete") || value.contains("accepted")
-      || value.contains("approved") || value.contains("delivered")
-    {
-      return .success
-    }
-    return .info
   }
 
   func prefersCompactLayout(for _: SessionTimelineNode) -> Bool? { true }
@@ -97,7 +94,9 @@ struct SignalTimelineEventFeature: TimelineEventFeature {
   }
 
   // Dispatches on entry.kind (node.sourceLabel) as primary discriminator.
-  // For signal_acknowledged the outcome variant is read from the summary only as a fallback.
+  // For signal_acknowledged the daemon encodes the outcome (Accepted/Rejected/Deferred/Expired)
+  // only in the human-readable summary; the payload carries signal_id but not a structured
+  // result field. The title scan is therefore the only available discriminator for that case.
   private func statusVerb(for node: SessionTimelineNode) -> String {
     switch node.sourceLabel {
     case "signal_sent": return "Sent"
