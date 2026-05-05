@@ -21,6 +21,18 @@
       "index": 0
     },
     {
+      "id": "WorkspaceWindowAgentDetailPane",
+      "description": "Workspace window with agent detail pane selected (worker-codex) - sticky composer, role disclosure, cockpit chrome, full overhaul applied",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/WorkspaceWindowViewPreviews.swift",
+      "index": 8
+    },
+    {
+      "id": "WorkspaceWindowAgentDetailLeader",
+      "description": "Workspace window with agent detail pane selected (leader-claude) - leader role locked, sticky composer, cockpit chrome",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/WorkspaceWindowViewPreviews.swift",
+      "index": 9
+    },
+    {
       "id": "WorkspaceWindowOpeningLight",
       "description": "Workspace opening shell before live content mounts in light appearance",
       "file": "Sources/HarnessMonitorUIPreviewable/Views/WorkspaceWindowOpeningView.swift",
@@ -133,6 +145,18 @@
       "description": "ACP permission attention toast overlay",
       "file": "Sources/HarnessMonitorUIPreviewable/Views/Attention/AcpPermissionAttentionToastView.swift",
       "index": 0
+    },
+    {
+      "id": "DaemonRecoveryToast",
+      "description": "External daemon stale manifest recovery toast",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/HarnessMonitorFeedbackToastView+Previews.swift",
+      "index": 0,
+      "crop": {
+        "top": 88,
+        "left": 360,
+        "width": 1120,
+        "height": 190
+      }
     },
     {
       "id": "WorkspaceDecisionDeskCrowded",
