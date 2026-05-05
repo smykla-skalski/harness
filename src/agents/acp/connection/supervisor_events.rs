@@ -34,6 +34,7 @@ use super::EventBatch;
 /// impossible by construction.
 pub struct SupervisorEventSink {
     tx: mpsc::Sender<EventBatch>,
+    acp_id: String,
     agent_name: String,
     session_id: String,
     /// Synthetic-event sequence space, disjoint from the receive loop's
@@ -44,9 +45,15 @@ pub struct SupervisorEventSink {
 impl SupervisorEventSink {
     /// Build a sink bound to the supplied event channel and identity.
     #[must_use]
-    pub fn new(tx: mpsc::Sender<EventBatch>, agent_name: String, session_id: String) -> Self {
+    pub fn new(
+        tx: mpsc::Sender<EventBatch>,
+        acp_id: String,
+        agent_name: String,
+        session_id: String,
+    ) -> Self {
         Self {
             tx,
+            acp_id,
             agent_name,
             session_id,
             sequence: AtomicU64::new(0),
@@ -97,7 +104,7 @@ impl SupervisorEventSink {
         };
 
         EventBatch {
-            acp_id: self.session_id.clone(),
+            acp_id: self.acp_id.clone(),
             session_id: self.session_id.clone(),
             events: vec![event],
             raw_count: 0,
@@ -114,11 +121,7 @@ impl SupervisorEventSink {
         clippy::cognitive_complexity,
         reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
     )]
-    fn log_dropped_batch(
-        &self,
-        err: &mpsc::error::TrySendError<EventBatch>,
-        terminal: bool,
-    ) {
+    fn log_dropped_batch(&self, err: &mpsc::error::TrySendError<EventBatch>, terminal: bool) {
         if terminal {
             warn!(
                 error = %err,

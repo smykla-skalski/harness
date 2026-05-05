@@ -261,4 +261,52 @@ extension HarnessMonitorStoreUpdateStreamTests {
 
     store.stopAllStreams()
   }
+
+  @Test("ACP synthetic transcript rows attach to the selected agent via ACP identity")
+  func acpSyntheticTranscriptRowsAttachToSelectedAgent() throws {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-acp-synthetic"
+    store.applyAcpAgent(
+      makeAcpSnapshot(
+        acpID: "acp-1",
+        sessionID: "sess-acp-synthetic",
+        agentID: "worker-acp",
+        displayName: "Worker ACP",
+        pendingBatches: []
+      )
+    )
+
+    store.applySessionPushEvent(
+      DaemonPushEvent(
+        recordedAt: "2026-04-28T00:00:30Z",
+        sessionId: "sess-acp-synthetic",
+        kind: .acpEvents(
+          AcpEventBatchPayload(
+            acpId: "acp-1",
+            sessionId: "sess-acp-synthetic",
+            rawCount: 1,
+            events: [
+              AcpConversationEvent(
+                timestamp: "2026-04-28T00:00:20Z",
+                sequence: 9,
+                kind: .object([
+                  "type": .string("watchdog_state"),
+                  "from": .string("paused"),
+                  "to": .string("active"),
+                  "reason": .string("session/prompt"),
+                ]),
+                agent: "Gemini Worker",
+                sessionId: "sess-acp-synthetic"
+              )
+            ]
+          )
+        )
+      )
+    )
+
+    let entry = try #require(store.acpTranscript(forAgent: "worker-acp").first)
+    #expect(entry.kind == "agent_watchdog_state")
+    #expect(entry.agentId == "worker-acp")
+    #expect(entry.summary == "Worker ACP watchdog paused -> active (session/prompt)")
+  }
 }

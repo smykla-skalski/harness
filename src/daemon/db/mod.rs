@@ -265,6 +265,23 @@ pub(crate) fn extract_transition_kind(json: &str) -> String {
         .unwrap_or_default()
 }
 
+/// Extract the discriminant from a serialized `ConversationEventKind` JSON
+/// string. Returns the tagged `type` field (for example `assistant_text` or
+/// `permission_asked`) for indexing.
+pub(crate) fn extract_conversation_event_kind(json: &str) -> String {
+    serde_json::from_str::<serde_json::Value>(json)
+        .ok()
+        .and_then(|value| {
+            value
+                .as_object()
+                .and_then(|object| object.get("type"))
+                .and_then(serde_json::Value::as_str)
+                .map(String::from)
+                .or_else(|| value.as_str().map(String::from))
+        })
+        .unwrap_or_default()
+}
+
 pub(crate) fn db_error(detail: impl Into<Cow<'static, str>>) -> CliError {
     CliError::from(CliErrorKind::workflow_io(detail))
 }

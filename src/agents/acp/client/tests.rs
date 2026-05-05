@@ -319,6 +319,7 @@ fn handle_request_permission_emits_permission_asked_event() {
     let (event_tx, mut event_rx) = tokio::sync::mpsc::channel(8);
     let sink = Arc::new(SupervisorEventSink::new(
         event_tx,
+        "acp-fixture".to_string(),
         "agent-fixture".to_string(),
         "session-fixture".to_string(),
     ));
@@ -337,11 +338,8 @@ fn handle_request_permission_emits_permission_asked_event() {
         "fs.write_text_file:/tmp/foo.txt",
         ToolCallUpdateFields::new(),
     );
-    let request = RequestPermissionRequest::new(
-        "session-fixture",
-        tool_call,
-        standard_permission_options(),
-    );
+    let request =
+        RequestPermissionRequest::new("session-fixture", tool_call, standard_permission_options());
 
     let _ = ok(
         client.handle_request_permission(&request),
@@ -351,6 +349,7 @@ fn handle_request_permission_emits_permission_asked_event() {
     let batch = event_rx
         .try_recv()
         .expect("permission_asked batch must be admitted");
+    assert_eq!(batch.acp_id, "acp-fixture");
     assert_eq!(batch.events.len(), 1);
     assert_eq!(batch.session_id, "session-fixture");
     assert_eq!(batch.raw_count, 0, "synthetic batch must mark raw_count 0");
@@ -375,13 +374,9 @@ fn handle_request_permission_with_no_sink_emits_nothing() {
         PermissionMode::Recording { log_path },
     );
 
-    let tool_call =
-        ToolCallUpdate::new("opaque-no-colon-id", ToolCallUpdateFields::new());
-    let request = RequestPermissionRequest::new(
-        "session-fixture",
-        tool_call,
-        standard_permission_options(),
-    );
+    let tool_call = ToolCallUpdate::new("opaque-no-colon-id", ToolCallUpdateFields::new());
+    let request =
+        RequestPermissionRequest::new("session-fixture", tool_call, standard_permission_options());
 
     let _ = ok(
         client.handle_request_permission(&request),
