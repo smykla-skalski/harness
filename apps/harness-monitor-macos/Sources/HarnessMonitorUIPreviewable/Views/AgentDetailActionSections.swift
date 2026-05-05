@@ -213,13 +213,30 @@ struct AgentDetailSendUpdateSection: View {
             isExternallyDisabled: disabledReason != nil,
             accessibilityIdentifier: HarnessMonitorAccessibility.workspaceDetailSignalSend,
             action: {
+              let dispatchedCommand = trimmedCommand
+              let dispatchedMessage = trimmedMessage
+              let dispatchedActionHint = trimmedActionHint
               Task {
-                await store.sendSignal(
+                let success = await store.sendSignal(
                   agentID: agentID,
-                  command: trimmedCommand,
-                  message: trimmedMessage,
-                  actionHint: trimmedActionHint
+                  command: dispatchedCommand,
+                  message: dispatchedMessage,
+                  actionHint: dispatchedActionHint
                 )
+                if success {
+                  let agentName = store
+                    .selectedSession?
+                    .agents
+                    .first(where: { $0.agentId == agentID })?
+                    .name ?? agentID
+                  let preview = dispatchedMessage.isEmpty
+                    ? dispatchedCommand
+                    : dispatchedMessage
+                  let truncated = preview.count > 80
+                    ? String(preview.prefix(80)) + "…"
+                    : preview
+                  store.presentSuccessFeedback("Update sent to \(agentName) — \(truncated)")
+                }
               }
             }
           )

@@ -206,8 +206,10 @@ struct AcpRuntimeStatusStrip: View {
       lastWatchdogAnnouncement = nil
     case .seed(let announcement):
       lastWatchdogAnnouncement = announcement
-    case .announce(let message, let announcement):
-      AccessibilityNotification.Announcement(message).post()
+    case .announce(_, let announcement):
+      // Watchdog announcements flow through the timeline live-region so the
+      // 10-second polite throttle applies. The strip seeds last-state for
+      // its own debounce but does not post a second NSAccessibility event.
       lastWatchdogAnnouncement = announcement
     }
   }
