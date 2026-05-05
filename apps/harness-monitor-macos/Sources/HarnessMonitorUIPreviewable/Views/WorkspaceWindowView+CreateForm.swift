@@ -108,8 +108,12 @@ struct WorkspaceWindowCreatePane: View {
         constrainContentWidth: false,
         readableWidth: false,
         topScrollEdgeEffect: .soft,
+        bottomScrollContentMargin: WorkspaceChromeMetrics.scrollContentBottomChromeMargin,
         scrollSurfaceIdentifier: HarnessMonitorAccessibility.agentTuiLaunchPane,
-        scrollSurfaceLabel: "New agent pane"
+        scrollSurfaceLabel: "New agent pane",
+        bottomInset: {
+          launchFloorBar
+        }
       ) {
         // Keep MCP-tracked controls instantiated even while this pane scrolls.
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL) {
@@ -127,9 +131,6 @@ struct WorkspaceWindowCreatePane: View {
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-      }
-      .safeAreaInset(edge: .bottom, spacing: 0) {
-        launchFloorBar
       }
       .accessibilityElement(children: .contain)
       .onAppear {

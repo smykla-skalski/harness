@@ -20,4 +20,16 @@ enum WorkspaceChromeMetrics {
   static let sidebarIdealWidth: CGFloat = 280
   static let sidebarMaxWidth: CGFloat = 400
   static let decisionInspectorWidth: CGFloat = 260
+  static let scrollContentBottomChromeMargin: CGFloat = 28
+}
+
+extension View {
+  func workspaceBottomScrollContentMargin() -> some View {
+    self
+      .contentMargins(
+        .bottom,
+        WorkspaceChromeMetrics.scrollContentBottomChromeMargin,
+        for: .scrollContent
+      )
+  }
 }
