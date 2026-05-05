@@ -27,31 +27,41 @@ extension WorkspaceWindowView {
       return nil
     }
     guard restoredSessionContextIsUsable(selection, store: store) else {
+      WorkspaceSelectionDefaults.clear()
       return nil
     }
 
+    let restoredSelection: WorkspaceSelection?
     switch selection {
     case .create, .decisions, .decision, .agent, .task:
-      return selection
+      restoredSelection = selection
     case .terminal(_, let terminalID):
       guard
         let terminal =
           displayState.sortedAgentTuis.first(where: { $0.tuiId == terminalID })
           ?? store.selectedAgentTuis.first(where: { $0.tuiId == terminalID && !$0.status.isActive })
       else {
-        return nil
+        restoredSelection = nil
+        break
       }
-      return .terminal(sessionID: terminal.sessionId, terminalID: terminalID)
+      restoredSelection = .terminal(sessionID: terminal.sessionId, terminalID: terminalID)
     case .codex(_, let runID):
       guard
         let run =
           displayState.sortedCodexRuns.first(where: { $0.runId == runID })
           ?? store.selectedCodexRuns.first(where: { $0.runId == runID && !$0.status.isActive })
       else {
-        return nil
+        restoredSelection = nil
+        break
       }
-      return .codex(sessionID: run.sessionId, runID: runID)
+      restoredSelection = .codex(sessionID: run.sessionId, runID: runID)
     }
+
+    guard let restoredSelection else {
+      WorkspaceSelectionDefaults.clear()
+      return nil
+    }
+    return restoredSelection
   }
 
   private static func restoredSessionContextIsUsable(

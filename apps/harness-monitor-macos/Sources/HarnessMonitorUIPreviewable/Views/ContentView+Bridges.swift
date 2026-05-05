@@ -258,10 +258,25 @@ struct ContentSceneRestorationBridge: View {
   @State private var hasObservedConnectionAttempt = false
   @State private var hasRequestedSceneRestorationSelection = false
 
+  static func allowsPersistentSceneRestoration(
+    environment: [String: String] = ProcessInfo.processInfo.environment
+  ) -> Bool {
+    HarnessMonitorLaunchMode(environment: environment) == .live
+  }
+
+  private var allowsPersistentSceneRestoration: Bool {
+    Self.allowsPersistentSceneRestoration()
+  }
+
   var body: some View {
     Color.clear
       .allowsHitTesting(false)
       .onAppear {
+        guard allowsPersistentSceneRestoration else {
+          restoredSessionID = nil
+          markRestorationResolved()
+          return
+        }
         if connectionState != .idle {
           hasObservedConnectionAttempt = true
         }
@@ -271,6 +286,13 @@ struct ContentSceneRestorationBridge: View {
         resolveRestorationIfNeeded(from: newID)
       }
       .onChange(of: selection.selectedSessionID) { _, newID in
+        guard allowsPersistentSceneRestoration else {
+          restoredSessionID = nil
+          if newID != nil {
+            markRestorationResolved()
+          }
+          return
+        }
         if restoredSessionID != newID {
           restoredSessionID = newID
         }
@@ -290,6 +312,11 @@ struct ContentSceneRestorationBridge: View {
   }
 
   private func resolveRestorationIfNeeded(from restoredSessionID: String?) {
+    guard allowsPersistentSceneRestoration else {
+      self.restoredSessionID = nil
+      markRestorationResolved()
+      return
+    }
     guard !hasResolvedSceneRestoration else {
       return
     }

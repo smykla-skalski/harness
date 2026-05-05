@@ -25,6 +25,10 @@ extension WorkspaceWindowView {
     to newValue: WorkspaceSelection,
     viewModel: ViewModel
   ) {
+    if viewModel.suppressNextSelectionChangeHandling {
+      viewModel.suppressNextSelectionChangeHandling = false
+      return
+    }
     if oldValue != newValue {
       WorkspaceSelectionDefaults.write(newValue)
     }
@@ -106,10 +110,10 @@ extension WorkspaceWindowView {
   func synchronizeCreateSelectionSession(
     previousSelection: WorkspaceSelection
   ) async {
-    let requestedSessionID = Self.normalizedCreateSessionAnchor(viewModel.pendingCreateSessionID)
-    let selectedSessionID = Self.normalizedCreateSessionAnchor(store.selectedSessionID)
-    let previousSessionID = Self.normalizedCreateSessionAnchor(previousSelection.sessionID)
-    let existingSessionID = Self.normalizedCreateSessionAnchor(viewModel.createSessionID)
+    let requestedSessionID = knownCreateSessionAnchor(viewModel.pendingCreateSessionID)
+    let selectedSessionID = knownCreateSessionAnchor(store.selectedSessionID)
+    let previousSessionID = knownCreateSessionAnchor(previousSelection.sessionID)
+    let existingSessionID = knownCreateSessionAnchor(viewModel.createSessionID)
     let resolvedSessionID =
       requestedSessionID ?? selectedSessionID ?? previousSessionID ?? existingSessionID
     viewModel.pendingCreateSessionID = nil

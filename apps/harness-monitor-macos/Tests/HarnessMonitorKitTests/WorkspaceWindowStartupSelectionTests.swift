@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
@@ -112,6 +113,85 @@ struct WorkspaceWindowStartupSelectionTests {
     await view.resolveInitialWorkspaceSelection()
 
     #expect(view.viewModel.selection == .create)
+    #expect(WorkspaceSelectionDefaults.read() == .create)
+  }
+
+  @Test("Stored workspace agent routes are repaired after live data invalidates them")
+  func storedWorkspaceAgentRouteRepairsAfterRefresh() async {
+    WorkspaceSelectionDefaults.write(
+      .agent(sessionID: "sess1234", agentID: "worker-codex")
+    )
+    defer { WorkspaceSelectionDefaults.clear() }
+
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    let restoredView = WorkspaceWindowView(store: store)
+    await restoredView.resolveInitialWorkspaceSelection()
+
+    #expect(
+      restoredView.viewModel.selection == .agent(sessionID: "sess1234", agentID: "worker-codex")
+    )
+
+    let liveSummary = makeSummary(sessionID: "zqykayai")
+    store.sessionIndex.sessions = [liveSummary]
+    store.selectedSessionID = liveSummary.sessionId
+    store.selectedSession = SessionDetail(
+      session: liveSummary,
+      agents: [],
+      tasks: [],
+      signals: [],
+      observer: nil,
+      agentActivity: []
+    )
+
+    restoredView.refreshWorkspaceAfterDataChange()
+    await Task.yield()
+
+    #expect(restoredView.viewModel.selection == .create)
+    #expect(WorkspaceSelectionDefaults.read() == .create)
+  }
+
+  @Test("Preview launch mode uses a separate workspace selection defaults key")
+  func previewLaunchModeUsesSeparateWorkspaceSelectionDefaultsKey() {
+    let suiteName = "WorkspaceSelectionDefaultsTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer {
+      defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    let selection = WorkspaceSelection.agent(sessionID: "sess1234", agentID: "worker-codex")
+
+    WorkspaceSelectionDefaults.write(
+      selection,
+      environment: [HarnessMonitorLaunchMode.environmentKey: "preview"],
+      defaults: defaults
+    )
+
+    #expect(
+      WorkspaceSelectionDefaults.read(
+        environment: [HarnessMonitorLaunchMode.environmentKey: "preview"],
+        defaults: defaults
+      ) == selection
+    )
+    #expect(
+      WorkspaceSelectionDefaults.read(
+        environment: [HarnessMonitorLaunchMode.environmentKey: "live"],
+        defaults: defaults
+      ) == nil
+    )
+  }
+
+  @Test("Scene restoration is disabled outside live launch mode")
+  func sceneRestorationIsDisabledOutsideLiveLaunchMode() {
+    #expect(
+      ContentSceneRestorationBridge.allowsPersistentSceneRestoration(
+        environment: [HarnessMonitorLaunchMode.environmentKey: "live"]
+      )
+    )
+    #expect(
+      !ContentSceneRestorationBridge.allowsPersistentSceneRestoration(
+        environment: [HarnessMonitorLaunchMode.environmentKey: "preview"]
+      )
+    )
   }
 
   private func makeDecision(id: String, sessionID: String) -> Decision {
