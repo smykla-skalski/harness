@@ -52,6 +52,8 @@ pub struct TaskDropRequest {
     pub target: TaskDropTarget,
     #[serde(default)]
     pub queue_policy: TaskQueuePolicy,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

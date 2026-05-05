@@ -84,15 +84,18 @@ public struct TaskDropRequest: Codable, Equatable, Sendable {
   public let actor: String
   public let target: TaskDropTarget
   public let queuePolicy: TaskQueuePolicy
+  public let reason: String?
 
   public init(
     actor: String,
     target: TaskDropTarget,
-    queuePolicy: TaskQueuePolicy = .locked
+    queuePolicy: TaskQueuePolicy = .locked,
+    reason: String? = nil
   ) {
     self.actor = actor
     self.target = target
     self.queuePolicy = queuePolicy
+    self.reason = reason
   }
 }
 

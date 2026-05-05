@@ -141,7 +141,11 @@ extension HarnessMonitorStoreCodexTests {
     #expect(store.contentUI.chrome.acpBridgeBanner == nil)
     #expect(store.hostBridgeCapabilityState(for: "codex") == .unavailable)
     #expect(
-      store.hostBridgeStartCommand(for: "codex") == "harness bridge reconfigure --enable codex")
+      store.hostBridgeStartCommand(
+        for: "codex",
+        environment: hostBridgeCommandTestEnvironment
+      ) == "harness bridge reconfigure --enable codex"
+    )
     #expect(store.currentFailureFeedbackMessage?.contains("codex-unavailable") == true)
   }
 

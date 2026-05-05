@@ -138,6 +138,31 @@ struct SlowRule: PolicyRule {
   }
 }
 
+struct SlowEmitRule: PolicyRule {
+  static let ruleID = "test.slow-emit"
+  let id: String = ruleID
+  let name: String = "Slow Emit"
+  let version: Int = 1
+  let parameters = PolicyParameterSchema(fields: [])
+
+  let gate: RuleGate
+
+  func defaultBehavior(for actionKey: String) -> RuleDefaultBehavior { .cautious }
+
+  func evaluate(
+    snapshot: SessionsSnapshot,
+    context: PolicyContext
+  ) async -> [PolicyAction] {
+    _ = context
+    await gate.wait()
+    return [
+      .logEvent(
+        .init(id: "slow-emit", ruleID: id, snapshotID: snapshot.id, message: "slow")
+      )
+    ]
+  }
+}
+
 struct AutoActionRule: PolicyRule {
   let id: String = "test.auto-action"
   let name: String = "Auto Action"

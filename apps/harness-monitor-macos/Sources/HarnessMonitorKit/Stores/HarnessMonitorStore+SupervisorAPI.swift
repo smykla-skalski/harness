@@ -23,11 +23,11 @@ struct StoreAPIClient: SupervisorAPIClient {
     )
   }
 
-  func assignTask(taskID: String, agentID: String) async throws {
+  func assignTask(sessionID: String?, taskID: String, agentID: String) async throws {
     guard let client = await MainActor.run(body: { store.client }) else {
       throw StoreDecisionActionError.daemonUnavailable
     }
-    guard let location = await resolveTaskLocation(taskID: taskID) else {
+    guard let location = await resolveTaskLocation(taskID: taskID, sessionID: sessionID) else {
       throw StoreDecisionActionError.missingTargetMetadata("taskID")
     }
     _ = try await client.assignTask(
@@ -37,11 +37,11 @@ struct StoreAPIClient: SupervisorAPIClient {
     )
   }
 
-  func dropTask(taskID: String, reason: String) async throws {
+  func dropTask(sessionID: String?, taskID: String, reason: String) async throws {
     guard let client = await MainActor.run(body: { store.client }) else {
       throw StoreDecisionActionError.daemonUnavailable
     }
-    guard let location = await resolveTaskLocation(taskID: taskID) else {
+    guard let location = await resolveTaskLocation(taskID: taskID, sessionID: sessionID) else {
       throw StoreDecisionActionError.missingTargetMetadata("taskID")
     }
     guard let assignedAgentID = location.assignedAgentID else {
@@ -54,7 +54,8 @@ struct StoreAPIClient: SupervisorAPIClient {
       request: TaskDropRequest(
         actor: "harness-supervisor",
         target: .agent(agentId: assignedAgentID),
-        queuePolicy: .locked
+        queuePolicy: .locked,
+        reason: reason
       )
     )
   }
@@ -64,31 +65,36 @@ struct StoreAPIClient: SupervisorAPIClient {
     severity: DecisionSeverity,
     summary: String,
     decisionID: String?
-  ) async {
-    await MainActor.run {
-      guard let controller = store.supervisorBindings.notificationController else {
-        return
+  ) async throws {
+    guard
+      let controller = await MainActor.run(
+        body: { store.supervisorBindings.notificationController }
+      )
+    else {
+      throw StoreDecisionActionError.notificationUnavailable
+    }
+    let delivered =
+      if let decisionID {
+        await controller.deliverSupervisorDecision(
+          severity: severity,
+          summary: summary,
+          decisionID: decisionID
+        )
+      } else {
+        await controller.deliverSupervisorNotice(
+          severity: severity,
+          summary: summary,
+          ruleID: ruleID
+        )
       }
-      Task { @MainActor in
-        if let decisionID {
-          await controller.deliverSupervisorDecision(
-            severity: severity,
-            summary: summary,
-            decisionID: decisionID
-          )
-        } else {
-          await controller.deliverSupervisorNotice(
-            severity: severity,
-            summary: summary,
-            ruleID: ruleID
-          )
-        }
-      }
+    guard delivered else {
+      throw StoreDecisionActionError.notificationDeliveryFailed
     }
   }
 
-  private func resolveTaskLocation(taskID: String) async -> TaskLocation? {
+  private func resolveTaskLocation(taskID: String, sessionID: String?) async -> TaskLocation? {
     if let selectedSession = await MainActor.run(body: { store.selectedSession }),
+      sessionID == nil || selectedSession.session.sessionId == sessionID,
       let task = selectedSession.tasks.first(where: { $0.taskId == taskID })
     {
       return TaskLocation(
@@ -97,13 +103,14 @@ struct StoreAPIClient: SupervisorAPIClient {
       )
     }
 
-    let (sessionIDs, cacheService) = await MainActor.run {
+    let (indexedSessionIDs, cacheService) = await MainActor.run {
       (store.sessionIndex.sessions.map(\.sessionId), store.cacheService)
     }
     guard let cacheService else {
       return nil
     }
 
+    let sessionIDs = sessionID.map { [$0] } ?? indexedSessionIDs
     let cachedSessions = await cacheService.loadSessionDetails(sessionIDs: sessionIDs)
     for sessionID in sessionIDs {
       guard let detail = cachedSessions[sessionID]?.detail else {

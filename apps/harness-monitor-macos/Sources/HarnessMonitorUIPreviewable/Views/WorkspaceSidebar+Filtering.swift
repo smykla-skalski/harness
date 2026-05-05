@@ -1,10 +1,7 @@
+import Foundation
 import HarnessMonitorKit
 
 extension WorkspaceSidebar {
-  var normalizedWorkspaceSearchQuery: String {
-    workspaceSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-  }
-
   var filteredExternalAgents: [AgentRegistration] {
     externalAgents.filter { agent in
       matchesWorkspaceSearch([

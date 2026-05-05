@@ -9,12 +9,23 @@ public struct FailedNudgeLoopRule: PolicyRule {
   public let version = 1
   public let parameters = PolicyParameterSchema(fields: [
     .init(
-      key: "consecutiveFailureThreshold",
+      key: Self.thresholdKey,
       label: "Consecutive failure threshold",
       kind: .integer,
-      default: "3"
-    )
+      default: String(Self.defaultFailureThreshold)
+    ),
+    .init(
+      key: Self.windowKey,
+      label: "Failure window",
+      kind: .duration,
+      default: String(Self.defaultFailureWindowSeconds)
+    ),
   ])
+
+  public static let thresholdKey = "consecutiveFailureThreshold"
+  public static let windowKey = "failureWindowSeconds"
+  public static let defaultFailureThreshold = 3
+  public static let defaultFailureWindowSeconds = 3_600
 
   public init() {}
 
@@ -27,19 +38,33 @@ public struct FailedNudgeLoopRule: PolicyRule {
     snapshot: SessionsSnapshot,
     context: PolicyContext
   ) async -> [PolicyAction] {
-    let threshold = context.parameters.int("consecutiveFailureThreshold", default: 3)
-    return streaks(from: context.history.recentEvents)
-      .filter { $0.count >= threshold }
-      .compactMap { streak in
-        action(for: streak, snapshotID: snapshot.id, context: context)
-      }
+    let threshold = max(
+      1,
+      context.parameters.int(Self.thresholdKey, default: Self.defaultFailureThreshold)
+    )
+    let windowSeconds = max(
+      0,
+      context.parameters.seconds(Self.windowKey, default: Self.defaultFailureWindowSeconds)
+    )
+    return streaks(
+      from: context.history.recentEvents,
+      since: context.now.addingTimeInterval(-TimeInterval(windowSeconds))
+    )
+    .filter { $0.count >= threshold }
+    .compactMap { streak in
+      action(for: streak, snapshotID: snapshot.id, context: context)
+    }
   }
 
-  private func streaks(from events: [SupervisorEventSummary]) -> [FailureStreak] {
+  private func streaks(
+    from events: [SupervisorEventSummary],
+    since windowStart: Date
+  ) -> [FailureStreak] {
     var streaks: [String: FailureStreak] = [:]
 
     for event in events.sorted(by: { $0.createdAt < $1.createdAt }) {
-      guard event.ruleID == "stuck-agent",
+      guard event.createdAt >= windowStart,
+        event.ruleID == "stuck-agent",
         let agentID = agentID(from: event.actionKey ?? event.id)
       else {
         continue

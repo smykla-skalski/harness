@@ -74,4 +74,49 @@ final class SessionsSnapshotTests: XCTestCase {
     XCTAssertEqual(session.pendingCodexApprovals.first?.id, "approval-alpha")
     XCTAssertEqual(session.pendingCodexApprovals.first?.title, "Approve command")
   }
+
+  func test_unhydratedSessionStillAppearsAsSummaryOnlySnapshot() async throws {
+    let store = HarnessMonitorStore.fixture()
+    let summary = makeSummary(sessionID: "sess-paused", status: .paused)
+    store.sessionIndex.replaceSnapshot(projects: [], sessions: [summary])
+
+    let snapshot = await SessionsSnapshot.build(from: store, now: .fixed)
+
+    let session = try XCTUnwrap(snapshot.sessions.first)
+    XCTAssertEqual(session.id, "sess-paused")
+    XCTAssertEqual(session.statusRaw, "paused")
+    XCTAssertTrue(session.agents.isEmpty)
+    XCTAssertTrue(session.tasks.isEmpty)
+  }
+
+  private func makeSummary(sessionID: String, status: SessionStatus) -> SessionSummary {
+    SessionSummary(
+      projectId: "project-fixture",
+      projectName: "fixture",
+      projectDir: nil,
+      contextRoot: "",
+      sessionId: sessionID,
+      worktreePath: "",
+      sharedPath: "",
+      originPath: "",
+      branchRef: "",
+      title: "Summary only",
+      context: "fixture",
+      status: status,
+      createdAt: "2026-05-05T00:00:00Z",
+      updatedAt: "2026-05-05T00:00:00Z",
+      lastActivityAt: "2026-05-05T00:00:00Z",
+      leaderId: nil,
+      observeId: nil,
+      pendingLeaderTransfer: nil,
+      metrics: .init(
+        agentCount: 0,
+        activeAgentCount: 0,
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        completedTaskCount: 0
+      )
+    )
+  }
 }

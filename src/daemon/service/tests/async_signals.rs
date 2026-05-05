@@ -357,6 +357,7 @@ fn session_detail_core_async_reopens_expired_pending_delivery_without_sync_handl
                                 agent_id: worker_id.clone(),
                             },
                             queue_policy: crate::session::types::TaskQueuePolicy::Locked,
+                            reason: None,
                         },
                         &async_db,
                         crate::daemon::service::WakeDispatch::none(),

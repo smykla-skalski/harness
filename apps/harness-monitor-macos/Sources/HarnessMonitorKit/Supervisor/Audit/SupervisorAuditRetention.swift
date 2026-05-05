@@ -148,7 +148,11 @@ public final class SupervisorAuditRetention: @unchecked Sendable {
       in: context,
       makeDescriptor: {
         FetchDescriptor<Decision>(
-          predicate: #Predicate<Decision> { $0.createdAt < cutoff },
+          predicate: #Predicate<Decision> {
+            $0.createdAt < cutoff
+              && $0.statusRaw != "open"
+              && $0.statusRaw != "snoozed"
+          },
           sortBy: [
             SortDescriptor(\.createdAt, order: .forward),
             SortDescriptor(\.id, order: .forward),

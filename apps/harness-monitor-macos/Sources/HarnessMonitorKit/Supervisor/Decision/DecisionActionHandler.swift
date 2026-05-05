@@ -178,13 +178,17 @@ public final class StoreDecisionActionHandler: DecisionActionHandler {
     guard let client = await MainActor.run(body: { store.client }) else {
       throw StoreDecisionActionError.daemonUnavailable
     }
-    guard
-      let sessionID = try await resolveSessionIDForTask(
+    let sessionID: String?
+    if let payloadSessionID = payload.sessionID {
+      sessionID = payloadSessionID
+    } else {
+      sessionID = try await resolveSessionIDForTask(
         payload.taskID,
         decision: decision,
         store: store
       )
-    else {
+    }
+    guard let sessionID else {
       throw StoreDecisionActionError.missingTargetMetadata("sessionID")
     }
     do {
@@ -210,7 +214,7 @@ public final class StoreDecisionActionHandler: DecisionActionHandler {
     guard
       let location = try await resolveTaskLocation(
         payload.taskID,
-        decision: decision,
+        sessionIDHint: payload.sessionID ?? decision.sessionID,
         store: store
       )
     else {
@@ -322,7 +326,11 @@ public final class StoreDecisionActionHandler: DecisionActionHandler {
     decision: DecisionActionSnapshot,
     store: HarnessMonitorStore
   ) async throws -> String? {
-    if let location = try await resolveTaskLocation(taskID, decision: decision, store: store) {
+    if let location = try await resolveTaskLocation(
+      taskID,
+      sessionIDHint: decision.sessionID,
+      store: store
+    ) {
       return location.sessionID
     }
     return decision.sessionID
@@ -330,10 +338,11 @@ public final class StoreDecisionActionHandler: DecisionActionHandler {
 
   private static func resolveTaskLocation(
     _ taskID: String,
-    decision: DecisionActionSnapshot,
+    sessionIDHint: String?,
     store: HarnessMonitorStore
   ) async throws -> TaskLocation? {
     if let selectedSession = await MainActor.run(body: { store.selectedSession }),
+      sessionIDHint == nil || selectedSession.session.sessionId == sessionIDHint,
       let task = selectedSession.tasks.first(where: { $0.taskId == taskID })
     {
       return TaskLocation(
@@ -342,7 +351,6 @@ public final class StoreDecisionActionHandler: DecisionActionHandler {
       )
     }
 
-    let sessionIDHint = decision.sessionID
     let (sessionIDs, cacheService) = await MainActor.run {
       (store.sessionIndex.sessions.map(\.sessionId), store.cacheService)
     }

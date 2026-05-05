@@ -14,6 +14,11 @@ public final class HarnessMonitorStore {
   public let toast: ToastSlice
   @ObservationIgnored public let supervisorToolbarSlice: SupervisorToolbarSlice
   public let bookmarkStore: BookmarkStore?
+  @ObservationIgnored var supervisorStack: SupervisorStack?
+  @ObservationIgnored var supervisorBindings = SupervisorBindings()
+  @ObservationIgnored var supervisorStartTask: Task<Void, Never>?
+  @ObservationIgnored let supervisorTickTrigger = SupervisorTickTrigger()
+  @ObservationIgnored var cachedNullActionHandler: NullDecisionActionHandler?
 
   public var openFolderRequest = 0
   public var attachSessionRequest = 0
@@ -48,12 +53,12 @@ public final class HarnessMonitorStore {
   public var pendingWorkspaceSelection: WorkspaceSelection?
   var pendingWorkspaceDecisionFilterReset = false
   var pendingWorkspaceCreateEntryPoint: WorkspaceCreateEntryPoint?
+  var pendingWorkspaceCreateSessionID: String?
   public var hostBridgeCapabilityIssues: [String: HostBridgeCapabilityIssue] = [:]
   public var acpBridgeHTTPIncident: AcpBridgeHTTPIncident? {
     didSet {
       guard oldValue != acpBridgeHTTPIncident else { return }
       scheduleUISync([.contentChrome])
-  var pendingWorkspaceCreateSessionID: String?
     }
   }
   public var mcpStatus = HarnessMonitorMCPStatusSnapshot(

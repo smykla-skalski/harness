@@ -202,4 +202,65 @@ final class SupervisorServiceTickLoopTests: XCTestCase {
     let evaluations = await observer.evaluations
     XCTAssertEqual(evaluations.count, 1, "the in-flight tick must finish before stop returns")
   }
+
+  func test_stopReturnsAfterRuleTimeoutWithoutGateRelease() async throws {
+    let registry = PolicyRegistry()
+    let gate = RuleGate()
+    await registry.register(SlowRule(gate: gate))
+    let observer = SpyObserver()
+    await registry.registerObserver(observer)
+    let service = SupervisorService(
+      store: nil,
+      registry: registry,
+      executor: try PolicyExecutor.fixture(),
+      clock: TestClock(),
+      interval: 10,
+      ruleEvaluationTimeout: .milliseconds(10)
+    )
+
+    await service.start()
+    let deadline = Date().addingTimeInterval(2)
+    while await gate.waitCount == 0 && Date() < deadline {
+      try? await Task.sleep(nanoseconds: 5_000_000)
+    }
+    let waitCount = await gate.waitCount
+    XCTAssertEqual(waitCount, 1)
+
+    let stopped = expectation(description: "stop returns after rule timeout")
+    Task {
+      await service.stop()
+      stopped.fulfill()
+    }
+    await fulfillment(of: [stopped], timeout: 1)
+
+    let isReleased = await gate.released
+    XCTAssertFalse(isReleased)
+    let evaluations = await observer.evaluations
+    XCTAssertEqual(evaluations.map(\.ruleID), [SlowRule.ruleID])
+  }
+
+  func test_stopIsIdempotentAfterTimeoutDrainedTick() async throws {
+    let registry = PolicyRegistry()
+    let gate = RuleGate()
+    await registry.register(SlowRule(gate: gate))
+    let service = SupervisorService(
+      store: nil,
+      registry: registry,
+      executor: try PolicyExecutor.fixture(),
+      clock: TestClock(),
+      interval: 10,
+      ruleEvaluationTimeout: .milliseconds(10)
+    )
+
+    await service.start()
+    let deadline = Date().addingTimeInterval(2)
+    while await gate.waitCount == 0 && Date() < deadline {
+      try? await Task.sleep(nanoseconds: 5_000_000)
+    }
+    await service.stop()
+    await service.stop()
+
+    let liveTick = await service.liveTickSnapshot()
+    XCTAssertNotNil(liveTick.lastSnapshotID)
+  }
 }

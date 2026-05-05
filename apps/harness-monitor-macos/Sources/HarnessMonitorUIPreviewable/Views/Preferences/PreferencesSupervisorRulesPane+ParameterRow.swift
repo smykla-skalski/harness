@@ -114,7 +114,11 @@ struct SupervisorRuleParameterRow: View {
           ?? Int(field.default) ?? 0
       },
       set: { value in
-        viewModel.setRuleParameterValue(String(value), for: field.key, ruleID: ruleID)
+        viewModel.setRuleParameterValue(
+          String(normalizedNumericValue(value)),
+          for: field.key,
+          ruleID: ruleID
+        )
         onCommit()
       }
     )
@@ -158,16 +162,17 @@ struct SupervisorRuleParameterRow: View {
       nextValue = overflowed ? Int.min : candidate
     }
 
-    let clampedValue: Int
+    editableIntBinding.wrappedValue = normalizedNumericValue(nextValue)
+    onCommit()
+  }
+
+  private func normalizedNumericValue(_ value: Int) -> Int {
     switch field.kind {
     case .duration:
-      clampedValue = max(0, nextValue)
+      max(0, value)
     case .integer, .boolean, .string:
-      clampedValue = nextValue
+      value
     }
-
-    editableIntBinding.wrappedValue = clampedValue
-    onCommit()
   }
 
   private static func boolValue(from value: String) -> Bool {

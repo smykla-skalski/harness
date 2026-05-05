@@ -34,9 +34,10 @@ struct WorkspaceSelectionStoreTests {
     #expect(store.consumePendingWorkspaceSelectionRequest() == nil)
   }
 
-  @Test("Create-agent workspace requests carry the create entry point and selected session")
+  @Test("Create-agent workspace requests carry a selected live session summary")
   func createAgentRequestCarriesEntryPoint() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.sessionIndex.sessions = [makeSummary(sessionID: "sess-alpha")]
     store.selectedSessionID = "sess-alpha"
     store.requestWorkspaceCreateEntryPoint(.agent)
 
@@ -46,6 +47,20 @@ struct WorkspaceSelectionStoreTests {
     #expect(request?.createEntryPoint == .agent)
     #expect(request?.createSessionID == "sess-alpha")
     #expect(store.consumePendingWorkspaceSelectionRequest() == nil)
+  }
+
+  @Test("Create-agent workspace requests ignore stale selected session IDs without live context")
+  func createAgentRequestIgnoresStaleSelectedSessionID() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-alpha"
+
+    store.requestWorkspaceCreateEntryPoint(.agent)
+
+    let request = store.consumePendingWorkspaceSelectionRequest()
+
+    #expect(request?.selection == .create)
+    #expect(request?.createEntryPoint == .agent)
+    #expect(request?.createSessionID == nil)
   }
 
   @Test("Explicit create-agent workspace requests override the selected session")
@@ -109,5 +124,36 @@ struct WorkspaceSelectionStoreTests {
     #expect(WorkspaceSelection.agent(sessionID: nil, agentID: "agent-delta").codexRunID == nil)
     #expect(WorkspaceSelection.task(sessionID: nil, taskID: "task-1").terminalID == nil)
     #expect(WorkspaceSelection.task(sessionID: nil, taskID: "task-1").codexRunID == nil)
+  }
+
+  private func makeSummary(sessionID: String) -> SessionSummary {
+    SessionSummary(
+      projectId: "project-\(sessionID)",
+      projectName: "harness",
+      projectDir: "/Users/example/Projects/harness",
+      contextRoot: "/Users/example/Library/Application Support/harness/sessions/harness",
+      sessionId: sessionID,
+      worktreePath: "/Users/example/Projects/harness-\(sessionID)",
+      sharedPath: "/Users/example/Projects/harness-\(sessionID)/shared",
+      originPath: "/Users/example/Projects/harness",
+      branchRef: "harness/\(sessionID)",
+      title: "Session \(sessionID)",
+      context: "Workspace selection fixture",
+      status: .active,
+      createdAt: "2026-03-28T14:05:00Z",
+      updatedAt: "2026-03-28T14:18:00Z",
+      lastActivityAt: "2026-03-28T14:18:00Z",
+      leaderId: "leader-\(sessionID)",
+      observeId: "observe-\(sessionID)",
+      pendingLeaderTransfer: nil,
+      metrics: SessionMetrics(
+        agentCount: 1,
+        activeAgentCount: 1,
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        completedTaskCount: 0
+      ),
+    )
   }
 }

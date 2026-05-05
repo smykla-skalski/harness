@@ -36,9 +36,9 @@ public struct UnassignedTaskRule: PolicyRule {
     snapshot: SessionsSnapshot,
     context: PolicyContext
   ) async -> [PolicyAction] {
-    let threshold = context.parameters.seconds(
-      Self.thresholdKey,
-      default: Self.defaultThresholdSeconds
+    let threshold = max(
+      0,
+      context.parameters.seconds(Self.thresholdKey, default: Self.defaultThresholdSeconds)
     )
     return snapshot.sessions.flatMap { session in
       actions(for: session, snapshot: snapshot, context: context, thresholdSeconds: threshold)
@@ -90,7 +90,11 @@ public struct UnassignedTaskRule: PolicyRule {
         thresholdSeconds: input.thresholdSeconds,
         snapshotID: input.snapshotID
       ),
-      suggestedActionsJSON: suggestedActionsJSON(taskID: task.id, agents: input.activeAgents)
+      suggestedActionsJSON: suggestedActionsJSON(
+        sessionID: sessionID,
+        taskID: task.id,
+        agents: input.activeAgents
+      )
     )
     let action = PolicyAction.queueDecision(payload)
     guard !context.recentActionKeys.contains(action.actionKey) else { return nil }
@@ -118,13 +122,19 @@ public struct UnassignedTaskRule: PolicyRule {
     return string
   }
 
-  private func suggestedActionsJSON(taskID: String, agents: [AgentSnapshot]) -> String {
+  private func suggestedActionsJSON(
+    sessionID: String,
+    taskID: String,
+    agents: [AgentSnapshot]
+  ) -> String {
     let actions = agents.map { agent in
       SuggestedAction(
         id: "assign-\(taskID)-\(agent.id)",
         title: "Assign to \(agent.id)",
         kind: .assignTask,
-        payloadJSON: encode(UnassignedTaskActionPayload(agentID: agent.id, taskID: taskID))
+        payloadJSON: encode(
+          UnassignedTaskActionPayload(sessionID: sessionID, agentID: agent.id, taskID: taskID)
+        )
       )
     }
     return encode(actions, fallback: "[]")
@@ -148,6 +158,7 @@ private struct ActionInput {
 }
 
 private struct UnassignedTaskActionPayload: Encodable {
+  let sessionID: String
   let agentID: String
   let taskID: String
 }

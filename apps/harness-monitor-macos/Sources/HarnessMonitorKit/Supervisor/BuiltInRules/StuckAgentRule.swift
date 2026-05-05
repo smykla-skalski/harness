@@ -144,6 +144,7 @@ public struct StuckAgentRule: PolicyRule {
       .compactMap { agent -> MatchedAgentTask? in
         guard
           let taskID = agent.currentTaskID,
+          agent.statusRaw == "active",
           let idleSeconds = agent.idleSeconds,
           idleSeconds > thresholdSeconds,
           let task = tasksByID[taskID],
@@ -163,7 +164,7 @@ public struct StuckAgentRule: PolicyRule {
     let attempts =
       events
       .filter {
-        ($0.kind == "actionDispatched" || $0.kind == "actionSuppressed") && $0.ruleID == id
+        $0.kind == "actionDispatched" && $0.ruleID == id
       }
       .filter { event in
         guard let lastActivityAt else { return true }

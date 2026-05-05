@@ -99,6 +99,7 @@ final class HarnessMonitorStoreAcpDecisionLifecycleTests: XCTestCase {
     XCTAssertNil(store.supervisorDecisionStore)
 
     await store.startSupervisor()
+    addTeardownBlock { await store.stopSupervisor() }
     await settleObservation()
     try? await Task.sleep(for: .milliseconds(150))
 
@@ -200,6 +201,26 @@ final class HarnessMonitorStoreAcpDecisionLifecycleTests: XCTestCase {
     await store.bootstrap()
     await store.selectSession(PreviewFixtures.summary.sessionId)
     store.stopAllStreams(resetSubscriptions: false)
+    try disableSupervisorPolicies(in: store.modelContext)
+    await store.startSupervisor()
+    addTeardownBlock { await store.stopSupervisor() }
     return store
+  }
+
+  private func disableSupervisorPolicies(in modelContext: ModelContext?) throws {
+    guard let modelContext else {
+      return
+    }
+    for rule in HarnessMonitorSupervisorRuleCatalog.makeRules() {
+      modelContext.insert(
+        PolicyConfigRow(
+          ruleID: rule.id,
+          enabled: false,
+          defaultBehavior: RuleDefaultBehavior.cautious.rawValue,
+          parametersJSON: "{}"
+        )
+      )
+    }
+    try modelContext.save()
   }
 }

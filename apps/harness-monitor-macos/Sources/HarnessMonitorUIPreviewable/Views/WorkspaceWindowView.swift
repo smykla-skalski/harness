@@ -33,6 +33,7 @@ public struct WorkspaceWindowView: View {
   @State private var reopenBatch: WorkspaceDecisionReopenBatchState?
   @State private var decisionInspectorVisible = false
   @State private var decisionInspectorPreferredVisibility = false
+  @State private var agentDetailComposerBackdropHeight: CGFloat = 0
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @AppStorage(HarnessMonitorAgentTuiDefaults.submitSendsEnterKey)
   var submitSendsEnter = HarnessMonitorAgentTuiDefaults.submitSendsEnterDefault
@@ -257,6 +258,9 @@ public struct WorkspaceWindowView: View {
     splitView
       .navigationSplitViewStyle(.prominentDetail)
       .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
+      .background(alignment: .bottom) {
+        agentDetailComposerBackdrop
+      }
       .toolbar {
         agentTuiNavigationToolbarItems
         sessionToolbarItems
@@ -315,6 +319,9 @@ public struct WorkspaceWindowView: View {
       .onChange(of: agentLaunchAvailabilitySignal) { _, _ in
         Task { await reloadAgentPickerCatalogsIfPending() }
       }
+      .onPreferenceChange(AgentDetailComposerHeightPreferenceKey.self) { newHeight in
+        agentDetailComposerBackdropHeight = newHeight
+      }
       .onDisappear {
         hasCompletedInitialWorkspacePreparation = false
         handleWindowDisappear()
@@ -331,6 +338,28 @@ public struct WorkspaceWindowView: View {
           restoreSidebarVisibility(using: binding)
         }
       }
+  }
+
+  @ViewBuilder private var agentDetailComposerBackdrop: some View {
+    if case .agent = viewModel.selection, agentDetailComposerBackdropHeight > 0 {
+      Color.clear
+        .frame(maxWidth: .infinity)
+        .frame(height: agentDetailComposerBackdropHeight + 2)
+        .harnessPanelGlass()
+        .mask {
+          LinearGradient(
+            stops: [
+              .init(color: .clear, location: 0),
+              .init(color: .black, location: 0.12),
+              .init(color: .black, location: 1),
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+          )
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
   }
 
   @ViewBuilder

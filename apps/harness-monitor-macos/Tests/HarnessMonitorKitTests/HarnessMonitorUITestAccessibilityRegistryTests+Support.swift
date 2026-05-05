@@ -18,6 +18,23 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     return try String(contentsOf: fileURL, encoding: .utf8)
   }
 
+  func uiTestSupportFile(named name: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent(
+        "apps/harness-monitor-macos/Tests/HarnessMonitorUITestSupport"
+      )
+      .appendingPathComponent(name)
+    return try String(contentsOf: fileURL, encoding: .utf8)
+  }
+
   func waitUntil(
     timeout: Duration = .seconds(1),
     interval: Duration = .milliseconds(10),

@@ -24,7 +24,7 @@ actor SwiftDataSupervisorAuditWriter: SupervisorAuditWriter {
     self.container = container
   }
 
-  func append(_ record: SupervisorAuditRecord) async {
+  func append(_ record: SupervisorAuditRecord) async throws {
     do {
       let context = ModelContext(container)
       context.autosaveEnabled = false
@@ -44,12 +44,13 @@ actor SwiftDataSupervisorAuditWriter: SupervisorAuditWriter {
       HarnessMonitorLogger.supervisorWarning(
         "supervisor.audit_append_failed error=\(String(describing: error))"
       )
+      throw error
     }
   }
 }
 
 struct NoOpSupervisorAuditWriter: SupervisorAuditWriter {
-  func append(_ record: SupervisorAuditRecord) async {
+  func append(_ record: SupervisorAuditRecord) async throws {
     _ = record
   }
 }

@@ -203,6 +203,36 @@ final class FailedNudgeLoopRuleTests: XCTestCase {
     XCTAssertEqual(actions.count, 1)
   }
 
+  func test_ignoresFailuresOutsideConfiguredWindow() async {
+    let rule = FailedNudgeLoopRule()
+    let snapshot = FailedNudgeLoopRuleFixtures.snapshot()
+    let context = FailedNudgeLoopRuleFixtures.context(
+      events: FailedNudgeLoopRuleFixtures.failures(
+        agentID: "agent-a",
+        count: 3,
+        startingAt: Date.fixed.timeIntervalSince1970 - 7_200
+      ),
+      parameters: ["failureWindowSeconds": "60"]
+    )
+
+    let actions = await rule.evaluate(snapshot: snapshot, context: context)
+
+    XCTAssertTrue(actions.isEmpty)
+  }
+
+  func test_failureThresholdIsClampedToOne() async {
+    let rule = FailedNudgeLoopRule()
+    let snapshot = FailedNudgeLoopRuleFixtures.snapshot()
+    let context = FailedNudgeLoopRuleFixtures.context(
+      events: FailedNudgeLoopRuleFixtures.failures(agentID: "agent-a", count: 1),
+      parameters: ["consecutiveFailureThreshold": "0"]
+    )
+
+    let actions = await rule.evaluate(snapshot: snapshot, context: context)
+
+    XCTAssertEqual(actions.count, 1)
+  }
+
 }
 
 private enum FailedNudgeLoopRuleFixtures {

@@ -7,7 +7,7 @@ extension SupervisorLifecycleTests {
   func testSetSupervisorQuietHoursWindowUpdatesRuntimeSuppression() async {
     let store = HarnessMonitorStore.fixture()
     await store.startSupervisor()
-    defer { Task { await store.stopSupervisor() } }
+    addTeardownBlock { await store.stopSupervisor() }
 
     await store.applySupervisorQuietHoursWindowForTesting(
       SupervisorQuietHoursWindow(startMinutes: 0, endMinutes: 0)

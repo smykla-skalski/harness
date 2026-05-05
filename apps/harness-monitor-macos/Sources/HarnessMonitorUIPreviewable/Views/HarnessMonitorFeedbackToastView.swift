@@ -20,12 +20,12 @@ public struct HarnessMonitorFeedbackToastView: View {
             toast: toast,
             detailsInitiallyExpanded: detailsInitiallyExpanded
           )
-            .transition(
-              .asymmetric(
-                insertion: .move(edge: .top).combined(with: .opacity),
-                removal: .opacity.combined(with: .scale(scale: 0.95))
-              )
+          .transition(
+            .asymmetric(
+              insertion: .move(edge: .top).combined(with: .opacity),
+              removal: .opacity.combined(with: .scale(scale: 0.95))
             )
+          )
         }
       }
     }
@@ -125,8 +125,7 @@ private struct HarnessMonitorFeedbackToastRow: View {
     )
   }
 
-  @ViewBuilder
-  private var backgroundGlyph: some View {
+  @ViewBuilder private var backgroundGlyph: some View {
     if feedback.severity == .warning {
       Image(systemName: iconName)
         .font(.system(size: backgroundGlyphSize, weight: .black, design: .rounded))
@@ -159,8 +158,7 @@ private struct HarnessMonitorFeedbackToastRow: View {
     .accessibilityLabel(feedback.announcementText)
   }
 
-  @ViewBuilder
-  private var titleAndMessage: some View {
+  @ViewBuilder private var titleAndMessage: some View {
     if let title = feedback.title {
       VStack(alignment: .leading, spacing: 2) {
         HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
@@ -186,8 +184,7 @@ private struct HarnessMonitorFeedbackToastRow: View {
     }
   }
 
-  @ViewBuilder
-  private var repeatBadge: some View {
+  @ViewBuilder private var repeatBadge: some View {
     if feedback.repeatCount > 1 {
       Text("\(feedback.repeatCount)")
         .scaledFont(.caption.weight(.semibold))
@@ -212,11 +209,13 @@ private struct HarnessMonitorFeedbackToastRow: View {
         Button {
           perform(action)
         } label: {
-          Label(copiedPrimaryAction ? action.successAnnouncement : action.title,
-                systemImage: copiedPrimaryAction ? "checkmark" : action.systemImage)
-            .labelStyle(.titleAndIcon)
-            .lineLimit(1)
-            .scaledFont(.system(.caption, design: .rounded, weight: .semibold))
+          Label(
+            copiedPrimaryAction ? action.successAnnouncement : action.title,
+            systemImage: copiedPrimaryAction ? "checkmark" : action.systemImage
+          )
+          .labelStyle(.titleAndIcon)
+          .lineLimit(1)
+          .scaledFont(.system(.caption, design: .rounded, weight: .semibold))
         }
         .harnessFlatActionButtonStyle(tint: tintColor)
         .accessibilityIdentifier(HarnessMonitorAccessibility.actionToastPrimaryButton)
@@ -226,11 +225,13 @@ private struct HarnessMonitorFeedbackToastRow: View {
         Button {
           showsDetails.toggle()
         } label: {
-          Label(detailsDisclosureTitle(details),
-                systemImage: showsDetails ? "chevron.up" : "chevron.down")
-            .labelStyle(.titleAndIcon)
-            .lineLimit(1)
-            .scaledFont(.system(.caption, design: .rounded, weight: .semibold))
+          Label(
+            detailsDisclosureTitle(details),
+            systemImage: showsDetails ? "chevron.up" : "chevron.down"
+          )
+          .labelStyle(.titleAndIcon)
+          .lineLimit(1)
+          .scaledFont(.system(.caption, design: .rounded, weight: .semibold))
         }
         .harnessFlatActionButtonStyle(tint: HarnessMonitorTheme.secondaryInk)
         .accessibilityIdentifier(HarnessMonitorAccessibility.actionToastDetailsButton)

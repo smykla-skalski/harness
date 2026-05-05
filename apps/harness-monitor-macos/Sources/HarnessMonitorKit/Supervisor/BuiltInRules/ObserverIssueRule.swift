@@ -44,7 +44,7 @@ public struct ObserverIssueRule: PolicyRule {
     guard issues.count >= minCount(in: context) else { return nil }
 
     let payload = PolicyAction.DecisionPayload(
-      id: "observer-issue-\(session.id)-\(snapshot.hash)",
+      id: "\(id):\(session.id)",
       severity: maxSeverity(in: issues),
       ruleID: id,
       sessionID: session.id,
@@ -74,11 +74,11 @@ public struct ObserverIssueRule: PolicyRule {
   }
 
   private func issueWindow(in context: PolicyContext) -> Int {
-    context.parameters.seconds("issueWindow", default: 300)
+    max(0, context.parameters.seconds("issueWindow", default: 300))
   }
 
   private func minCount(in context: PolicyContext) -> Int {
-    context.parameters.int("minCount", default: 3)
+    max(1, context.parameters.int("minCount", default: 3))
   }
 
   private func minSeverity(in context: PolicyContext) -> DecisionSeverity {

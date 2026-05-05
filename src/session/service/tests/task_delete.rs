@@ -177,18 +177,19 @@ fn observer_can_delete_task_in_leaderless_degraded_session() {
             Some("degraded-observer-delete"),
         )
         .expect("start");
-        let joined = temp_env::with_var("CODEX_SESSION_ID", Some("degraded-delete-observer"), || {
-            join_session(
-                "degraded-observer-delete",
-                SessionRole::Observer,
-                "codex",
-                &["triage".into()],
-                Some("observer"),
-                project,
-                None,
-            )
-        })
-        .expect("join observer");
+        let joined =
+            temp_env::with_var("CODEX_SESSION_ID", Some("degraded-delete-observer"), || {
+                join_session(
+                    "degraded-observer-delete",
+                    SessionRole::Observer,
+                    "codex",
+                    &["triage".into()],
+                    Some("observer"),
+                    project,
+                    None,
+                )
+            })
+            .expect("join observer");
         let observer_id = joined
             .agents
             .values()
@@ -221,15 +222,22 @@ fn observer_can_delete_task_in_leaderless_degraded_session() {
         )
         .expect("create task");
 
-        delete_task("degraded-observer-delete", &task.task_id, &observer_id, project)
-            .expect("observer deletes task");
+        delete_task(
+            "degraded-observer-delete",
+            &task.task_id,
+            &observer_id,
+            project,
+        )
+        .expect("observer deletes task");
 
         let state = session_status("degraded-observer-delete", project).expect("status");
         assert_eq!(state.status, SessionStatus::LeaderlessDegraded);
         let deleted = state.tasks.get(&task.task_id).expect("deleted task");
         assert!(deleted.is_deleted());
-        assert!(list_tasks("degraded-observer-delete", None, project)
-            .expect("visible tasks")
-            .is_empty());
+        assert!(
+            list_tasks("degraded-observer-delete", None, project)
+                .expect("visible tasks")
+                .is_empty()
+        );
     });
 }

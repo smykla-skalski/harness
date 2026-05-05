@@ -19,7 +19,7 @@ actor InMemoryAuditWriter: SupervisorAuditWriter {
 
   private var events: [RecordedEvent] = []
 
-  func append(_ record: SupervisorAuditRecord) async {
+  func append(_ record: SupervisorAuditRecord) async throws {
     events.append(
       RecordedEvent(
         id: record.id,

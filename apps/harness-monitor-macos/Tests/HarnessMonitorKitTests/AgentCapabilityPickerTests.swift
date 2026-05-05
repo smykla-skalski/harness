@@ -155,6 +155,31 @@ struct AgentCapabilityPickerTests {
     #expect(copilot.isEnabled(copilot.transportChoice(for: .tui(.copilot))))
   }
 
+  @Test("sandboxed monitor shows bridge access before local install setup")
+  func sandboxedMonitorPrioritizesBridgeAccessOverInstallCTA() throws {
+    let options = WorkspaceWindowView.agentCapabilityOptions(
+      acpAgents: [descriptor(id: "copilot", displayName: "GitHub Copilot")],
+      runtimeProbeResults: AcpRuntimeProbeResponse(
+        probes: [
+          AcpRuntimeProbe(
+            agentId: "copilot",
+            displayName: "GitHub Copilot",
+            binaryPresent: false,
+            authState: .unavailable
+          )
+        ],
+        checkedAt: "2026-04-28T22:02:00Z"
+      ),
+      sandboxed: true,
+      acpHostBridgeReady: false
+    )
+
+    let copilot = try #require(options.first { $0.id == AgentTuiRuntime.copilot.rawValue })
+    #expect(copilot.statusText == "Bridge access required")
+    #expect(!copilot.showsInstallCTA)
+    #expect(copilot.doctorProbeText == "Setup check: copilot --version · Bridge access required")
+  }
+
   @Test(
     "sandboxed monitor keeps ACP transport enabled via host bridge even when local probe is missing"
   )

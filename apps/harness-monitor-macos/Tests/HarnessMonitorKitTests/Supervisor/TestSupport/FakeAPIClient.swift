@@ -15,11 +15,13 @@ final class FakeAPIClient: @unchecked Sendable, SupervisorAPIClient {
   }
 
   struct AssignCall: Equatable, Sendable {
+    let sessionID: String?
     let taskID: String
     let agentID: String
   }
 
   struct DropCall: Equatable, Sendable {
+    let sessionID: String?
     let taskID: String
     let reason: String
   }
@@ -51,6 +53,7 @@ final class FakeAPIClient: @unchecked Sendable, SupervisorAPIClient {
 
   /// When non-nil, the next `nudgeAgent` call throws this error instead of recording.
   var nudgeFailure: Error?
+  var notificationFailure: Error?
 
   var nudgeCalls: [NudgeCall] { queue.sync { _nudgeCalls } }
   var assignCalls: [AssignCall] { queue.sync { _assignCalls } }
@@ -62,12 +65,16 @@ final class FakeAPIClient: @unchecked Sendable, SupervisorAPIClient {
     queue.sync { _nudgeCalls.append(.init(agentID: agentID, input: input)) }
   }
 
-  func assignTask(taskID: String, agentID: String) async throws {
-    queue.sync { _assignCalls.append(.init(taskID: taskID, agentID: agentID)) }
+  func assignTask(sessionID: String?, taskID: String, agentID: String) async throws {
+    queue.sync {
+      _assignCalls.append(.init(sessionID: sessionID, taskID: taskID, agentID: agentID))
+    }
   }
 
-  func dropTask(taskID: String, reason: String) async throws {
-    queue.sync { _dropCalls.append(.init(taskID: taskID, reason: reason)) }
+  func dropTask(sessionID: String?, taskID: String, reason: String) async throws {
+    queue.sync {
+      _dropCalls.append(.init(sessionID: sessionID, taskID: taskID, reason: reason))
+    }
   }
 
   func postNotification(
@@ -75,7 +82,8 @@ final class FakeAPIClient: @unchecked Sendable, SupervisorAPIClient {
     severity: DecisionSeverity,
     summary: String,
     decisionID: String?
-  ) async {
+  ) async throws {
+    if let failure = notificationFailure { throw failure }
     queue.sync {
       _notifyCalls.append(
         .init(ruleID: ruleID, severity: severity, summary: summary, decisionID: decisionID)

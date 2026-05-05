@@ -114,7 +114,9 @@ struct SignalTimelineEventFeature: TimelineEventFeature {
   // (rejected/expired/deferred only): fail and denied also map to .critical here because
   // display tone is finer-grained than live-region urgency. When adding a new outcome
   // keyword here, evaluate whether it also warrants assertive live-region priority.
-  private func acknowledgedOutcome(from summary: String) -> (tone: SessionTimelineTone, verb: String) {
+  private func acknowledgedOutcome(
+    from summary: String
+  ) -> (tone: SessionTimelineTone, verb: String) {
     let lower = summary.lowercased()
     if lower.contains("rejected") || lower.contains("fail") || lower.contains("denied") {
       return (.critical, "Rejected")

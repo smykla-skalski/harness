@@ -41,7 +41,7 @@ final class SupervisorAuditRetentionTests: XCTestCase {
     XCTAssertEqual(try fetchEventIDs(container).sorted(), ["boundary", "recent"])
   }
 
-  func test_compactOlderThan_deletesStaleDecisionsAlongsideEvents() async throws {
+  func test_compactOlderThan_deletesOnlyTerminalStaleDecisionsAlongsideEvents() async throws {
     let container = try makeContainer()
     let now = Date.fixed
     let retention: TimeInterval = 24 * 60 * 60
@@ -53,6 +53,7 @@ final class SupervisorAuditRetentionTests: XCTestCase {
     try insertDecision(
       id: "stale-decision",
       createdAt: now.addingTimeInterval(-retention - 1),
+      statusRaw: "resolved",
       into: container
     )
     try insertDecision(
@@ -68,6 +69,30 @@ final class SupervisorAuditRetentionTests: XCTestCase {
     XCTAssertEqual(result.deletedDecisions, 1)
     XCTAssertEqual(try fetchDecisionIDs(container), ["fresh-decision"])
     XCTAssertTrue(try fetchEventIDs(container).isEmpty)
+  }
+
+  func test_compactOlderThan_preservesOpenAndSnoozedStaleDecisions() async throws {
+    let container = try makeContainer()
+    let now = Date.fixed
+    let retention: TimeInterval = 24 * 60 * 60
+    try insertDecision(
+      id: "stale-open",
+      createdAt: now.addingTimeInterval(-retention - 1),
+      statusRaw: "open",
+      into: container
+    )
+    try insertDecision(
+      id: "stale-snoozed",
+      createdAt: now.addingTimeInterval(-retention - 1),
+      statusRaw: "snoozed",
+      into: container
+    )
+
+    let retention1 = SupervisorAuditRetention(container: container, clock: { now })
+    let result = try await retention1.compactOlderThan(retention)
+
+    XCTAssertEqual(result.deletedDecisions, 0)
+    XCTAssertEqual(try fetchDecisionIDs(container), ["stale-open", "stale-snoozed"])
   }
 
   func test_forceCompactionUsesDefaultRetentionWindow() async throws {
@@ -167,7 +192,12 @@ final class SupervisorAuditRetentionTests: XCTestCase {
     try context.save()
   }
 
-  private func insertDecision(id: String, createdAt: Date, into container: ModelContainer) throws {
+  private func insertDecision(
+    id: String,
+    createdAt: Date,
+    statusRaw: String = "open",
+    into container: ModelContainer
+  ) throws {
     let context = container.mainContext
     let decision = Decision(
       id: id,
@@ -181,6 +211,7 @@ final class SupervisorAuditRetentionTests: XCTestCase {
       suggestedActionsJSON: "[]"
     )
     decision.createdAt = createdAt
+    decision.statusRaw = statusRaw
     context.insert(decision)
     try context.save()
   }
@@ -192,6 +223,6 @@ final class SupervisorAuditRetentionTests: XCTestCase {
 
   private func fetchDecisionIDs(_ container: ModelContainer) throws -> [String] {
     let context = container.mainContext
-    return try context.fetch(FetchDescriptor<Decision>()).map(\.id)
+    return try context.fetch(FetchDescriptor<Decision>()).map(\.id).sorted()
   }
 }

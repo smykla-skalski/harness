@@ -123,6 +123,48 @@ final class StuckAgentRuleTests: XCTestCase {
     XCTAssertTrue(actions.isEmpty)
   }
 
+  func test_suppressedNudgesDoNotCountAsRetries() async {
+    let rule = StuckAgentRule()
+    let now = Date.fixed
+    let snapshot = stuckSnapshot(idleSeconds: 300)
+    let actions = await rule.evaluate(
+      snapshot: snapshot,
+      context: context(
+        now: now,
+        history: [
+          event(
+            actionKey: "nudge:stuck-agent:agent-1:hash-1",
+            kind: "actionSuppressed",
+            createdAt: now.addingTimeInterval(-500)
+          ),
+          event(
+            actionKey: "nudge:stuck-agent:agent-1:hash-2",
+            kind: "actionSuppressed",
+            createdAt: now.addingTimeInterval(-300)
+          ),
+          event(
+            actionKey: "nudge:stuck-agent:agent-1:hash-3",
+            kind: "actionSuppressed",
+            createdAt: now.addingTimeInterval(-150)
+          ),
+        ]
+      )
+    )
+
+    XCTAssertEqual(actions.count, 1)
+    guard case .nudgeAgent = actions.first else {
+      return XCTFail("suppressed nudges must not force escalation")
+    }
+  }
+
+  func test_noActionWhenAgentIsNotActive() async {
+    let rule = StuckAgentRule()
+    let snapshot = stuckSnapshot(idleSeconds: 300, agentStatusRaw: "idle")
+    let actions = await rule.evaluate(snapshot: snapshot, context: context())
+
+    XCTAssertTrue(actions.isEmpty)
+  }
+
   func test_escalatesToDecisionAfterMaxRetries() async throws {
     let rule = StuckAgentRule()
     let now = Date.fixed
@@ -262,7 +304,8 @@ final class StuckAgentRuleTests: XCTestCase {
 
   private func stuckSnapshot(
     idleSeconds: Int?,
-    lastActivityAt: Date? = nil
+    lastActivityAt: Date? = nil,
+    agentStatusRaw: String = "active"
   ) -> SessionsSnapshot {
     Fixtures.snapshot(
       id: "snap-1",
@@ -273,7 +316,7 @@ final class StuckAgentRuleTests: XCTestCase {
           agents: [
             Fixtures.agent(
               id: "agent-1",
-              statusRaw: "active",
+              statusRaw: agentStatusRaw,
               lastActivityAt: lastActivityAt,
               idleSeconds: idleSeconds,
               currentTaskID: "task-1"
