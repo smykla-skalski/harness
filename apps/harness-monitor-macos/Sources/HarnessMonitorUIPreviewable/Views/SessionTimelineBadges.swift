@@ -91,13 +91,13 @@ extension SessionTimelineTone {
   var badgeLabel: String {
     switch self {
     case .info:
-      "INFO"
+      "Info"
     case .success:
-      "SUCCESS"
+      "Success"
     case .warning:
-      "WARN"
+      "Warn"
     case .critical:
-      "DANGER"
+      "Danger"
     }
   }
 }
@@ -119,13 +119,13 @@ extension DecisionSeverity {
   var badgeLabel: String {
     switch self {
     case .info:
-      "INFO"
+      "Info"
     case .warn:
-      "WARN"
+      "Warn"
     case .needsUser:
-      "NEEDS USER"
+      "Needs User"
     case .critical:
-      "DANGER"
+      "Danger"
     }
   }
 }

@@ -276,6 +276,7 @@ private struct SessionTimelineBadgeStrip: View {
         SessionTimelineBadge(label: badge.label, tint: badge.tint, style: .prominent)
       }
     }
+    .textCase(.uppercase)
     .fixedSize(horizontal: true, vertical: false)
   }
 }

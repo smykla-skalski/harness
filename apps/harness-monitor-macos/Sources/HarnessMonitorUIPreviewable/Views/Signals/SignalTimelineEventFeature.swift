@@ -97,7 +97,8 @@ struct SignalTimelineEventFeature: TimelineEventFeature {
     ctx: TimelineFeatureContext
   ) -> String? {
     guard case .signal(let signalID) = node.tapTarget else { return nil }
-    let status = ctx.signalsByID[signalID]?.effectiveStatus(now: ctx.now).title
+    let status =
+      ctx.signalsByID[signalID]?.effectiveStatus(now: ctx.now).title
       ?? statusVerb(from: node.title)
     return ["Signal \(status)", node.title, node.actionAvailabilityLabel]
       .joined(separator: ", ")
@@ -110,9 +111,9 @@ struct SignalTimelineEventFeature: TimelineEventFeature {
     if case .signal(let signalID) = node.tapTarget,
       let record = ctx.signalsByID[signalID]
     {
-      return record.effectiveStatus(now: ctx.now).title.uppercased()
+      return record.effectiveStatus(now: ctx.now).title
     }
-    return statusVerb(from: node.title).uppercased()
+    return statusVerb(from: node.title)
   }
 
   private func statusVerb(from title: String) -> String {
