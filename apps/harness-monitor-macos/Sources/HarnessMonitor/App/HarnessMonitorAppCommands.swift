@@ -57,6 +57,11 @@ struct HarnessMonitorAppCommands: Commands {
       }
       .keyboardShortcut("t", modifiers: .command)
       .disabled(!displayState.hasSelectedSession || displayState.isSessionReadOnly)
+      Button("Send Signal") {
+        store.presentSendSignalSheetForSelectedSessionLeader()
+      }
+      .keyboardShortcut("s", modifiers: [.command, .shift])
+      .disabled(!displayState.hasSelectedSession || displayState.isSessionReadOnly)
     }
     CommandGroup(after: .textEditing) {
       let menuLabel = sidebarSearchFocus?.menuLabel ?? .findGeneric

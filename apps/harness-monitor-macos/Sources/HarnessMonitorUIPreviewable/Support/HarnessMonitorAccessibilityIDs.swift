@@ -127,6 +127,7 @@ public enum HarnessMonitorAccessibility {
   public static let sessionTaskListHeaderFrame = "\(sessionTaskListHeader).frame"
   public static let sessionHeaderLeaderActivity = "harness.session.header.leader-activity"
   public static let observeSessionButton = "harness.session.action.observe"
+  public static let sendSignalButton = "harness.session.action.send-signal"
   public static let endSessionButton = "harness.session.action.end"
   public static let pendingLeaderTransferCard = "harness.session.pending-transfer"
   public static let connectionBadge = "harness.toolbar.connection-badge"
