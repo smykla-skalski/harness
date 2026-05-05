@@ -75,12 +75,11 @@ struct SessionCockpitView: View {
           }
           HarnessMonitorAdaptiveGridLayout(
             minimumColumnWidth: 340,
-            maximumColumns: 3,
+            maximumColumns: 2,
             spacing: 16
           ) {
             taskSection
             agentSection
-            signalSection
           }
           MonitorTimelineSection(
             host: .session(detail.session.sessionId),
@@ -125,14 +124,6 @@ struct SessionCockpitView: View {
     )
   }
 
-  private var signalSection: some View {
-    SessionCockpitSignalsSection(
-      store: store,
-      signals: detail.signals,
-      isExtensionsLoading: isExtensionsLoading,
-      isSessionReadOnly: isSessionReadOnly
-    )
-  }
 }
 
 #Preview("Cockpit") {
