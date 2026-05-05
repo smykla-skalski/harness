@@ -58,6 +58,8 @@ private struct HarnessMonitorFlatActionButtonStyle: ButtonStyle {
   private var horizontalPadding = 10.0
   @ScaledMetric(relativeTo: .caption)
   private var verticalPadding = 4.0
+  @ScaledMetric(relativeTo: .caption)
+  private var minHeight = 26.0
 
   let tint: Color
   @Environment(\.isEnabled)
@@ -89,6 +91,7 @@ private struct HarnessMonitorFlatActionButtonStyle: ButtonStyle {
       .foregroundStyle(HarnessMonitorTheme.ink.opacity(isEnabled ? 0.98 : 0.55))
       .padding(.horizontal, horizontalPadding)
       .padding(.vertical, verticalPadding)
+      .frame(minHeight: minHeight)
       .background {
         shape.fill(tint.opacity(fillOpacity))
       }
