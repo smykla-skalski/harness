@@ -195,7 +195,14 @@ struct AgentDetailSendUpdateSection: View {
           .accessibilityLabel("Optional context")
           .submitLabel(.send)
         }
-        VStack(alignment: .trailing, spacing: HarnessMonitorTheme.spacingSM) {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+          Text(disabledReason ?? " ")
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .opacity(disabledReason == nil ? 0 : 1)
+            .accessibilityHidden(disabledReason == nil)
           if let deadlinePresentation, !deadlinePresentation.isUrgent {
             Text("Deadline \(deadlinePresentation.countdownLabel)")
               .scaledFont(.caption)
@@ -242,13 +249,7 @@ struct AgentDetailSendUpdateSection: View {
           )
           .accessibilityLabel("Send Update")
           .accessibilityValue(disabledReason ?? "")
-          if let disabledReason {
-            Text(disabledReason)
-              .scaledFont(.caption)
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-              .fixedSize(horizontal: false, vertical: true)
-              .frame(maxWidth: .infinity, alignment: .leading)
-          }
+          .frame(maxWidth: .infinity, alignment: .trailing)
         }
       }
     }
