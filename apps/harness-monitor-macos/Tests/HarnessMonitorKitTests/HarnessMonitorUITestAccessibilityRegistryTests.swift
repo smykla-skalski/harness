@@ -334,11 +334,12 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
   func workspaceAgentDetailPaneDelegatesScrollToAgentDetailSection() throws {
     let panes = try sourceFile(named: "WorkspaceWindowView+Panes.swift")
     let section = try sourceFile(named: "AgentDetailSection.swift")
+    let regions = try sourceFile(named: "AgentDetailSection+Regions.swift")
 
     #expect(panes.contains("} else if case .agent = viewModel.selection {"))
     #expect(section.contains(".safeAreaInset(edge: .bottom, spacing: 0) {"))
     #expect(section.contains("composerInset"))
-    #expect(section.contains("AgentDetailSendUpdateSection"))
+    #expect(regions.contains("AgentDetailSendUpdateSection"))
   }
 
   @Test("Agent detail role actions identifier matches collapsed disclosure")
@@ -351,10 +352,10 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
 
   @Test("Role actions render behind a disclosure in full agent pane")
   func roleActionsRenderBehindDisclosureInFullAgentPane() throws {
-    let section = try sourceFile(named: "AgentDetailSection.swift")
+    let regions = try sourceFile(named: "AgentDetailSection+Regions.swift")
 
-    #expect(section.contains("DisclosureGroup(\"Role actions\")"))
-    #expect(section.contains("agentDetailRoleActionsDisclosure"))
+    #expect(regions.contains("DisclosureGroup(\"Role actions\")"))
+    #expect(regions.contains("agentDetailRoleActionsDisclosure"))
   }
 
   @Test("Slug normalises delimiters and casing")

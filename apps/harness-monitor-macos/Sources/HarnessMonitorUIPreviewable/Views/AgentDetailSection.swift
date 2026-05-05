@@ -256,22 +256,14 @@ struct AgentDetailSection: View {
   @ViewBuilder
   private var awaitingDecisionStripView: some View {
     if let pendingDecisionAttention {
-      AgentDetailAwaitingDecisionStrip(
+      AgentDetailAwaitingDecisionRegion(
+        agentID: agent.agentId,
+        attention: pendingDecisionAttention,
         payload: store.acpPermissionDecisionPayload(
           for: pendingDecisionAttention.oldestDecisionID
         ),
-        count: pendingDecisionAttention.count,
         isResolving:
           store.resolvingAcpPermissionBatchID == pendingDecisionAttention.oldestBatchID,
-        approveButtonAccessibilityIdentifier:
-          HarnessMonitorAccessibility
-          .agentDetailApproveDecisionButton(agent.agentId),
-        denyButtonAccessibilityIdentifier:
-          HarnessMonitorAccessibility
-          .agentDetailDenyDecisionButton(agent.agentId),
-        viewAllButtonAccessibilityIdentifier:
-          HarnessMonitorAccessibility
-          .agentDetailOpenDecisionsButton(agent.agentId),
         onApprove: {
           dispatchPendingDecision(
             attention: pendingDecisionAttention,
@@ -291,22 +283,6 @@ struct AgentDetailSection: View {
         onViewAll: {
           openPendingDecisions()
         }
-      )
-      .accessibilityElement(children: .contain)
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.agentDetailAwaitingDecisionStrip(agent.agentId)
-      )
-      .accessibilityTestProbe(
-        HarnessMonitorAccessibility.agentDetailAwaitingDecisionStrip(agent.agentId),
-        label: "Awaiting decision",
-        value:
-          "count=\(pendingDecisionAttention.count) batch=\(pendingDecisionAttention.oldestBatchID)"
-      )
-      .accessibilityTestProbe(
-        HarnessMonitorAccessibility.workspaceDetailAwaitingDecisionState,
-        label:
-          "count=\(pendingDecisionAttention.count) batch=\(pendingDecisionAttention.oldestBatchID)",
-        value: agent.agentId
       )
     }
   }
@@ -361,50 +337,26 @@ struct AgentDetailSection: View {
   }
 
   private var roleActionsOnlyBandView: some View {
-    DisclosureGroup("Role actions") {
-      AgentDetailRoleActionsSection(
-        store: store,
-        sessionID: store.selectedSessionID ?? "",
-        agentID: agent.agentId,
-        isLeader: isLeader,
-        roleActionsAvailable: roleActionsAvailable,
-        rolePickerValues: rolePickerValues,
-        rolePickerSelection: rolePickerSelection
-      )
-      .padding(.top, HarnessMonitorTheme.spacingSM)
-    }
-    .scaledFont(.caption.bold())
-    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .accessibilityIdentifier(
-      HarnessMonitorAccessibility.agentDetailRoleActionsDisclosure(agent.agentId)
+    AgentDetailRoleActionsRegion(
+      store: store,
+      sessionID: store.selectedSessionID ?? "",
+      agentID: agent.agentId,
+      isLeader: isLeader,
+      roleActionsAvailable: roleActionsAvailable,
+      rolePickerValues: rolePickerValues,
+      rolePickerSelection: rolePickerSelection
     )
   }
 
   private var composerInset: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      AgentDetailSubsectionTitle(title: "Send update")
-      AgentDetailSendUpdateSection(
-        store: store,
-        sessionID: store.selectedSessionID ?? "",
-        agentID: agent.agentId,
-        selectedSendAction: $selectedSendAction,
-        signalCommand: $signalCommand,
-        signalMessage: $signalMessage,
-        signalActionHint: $signalActionHint
-      )
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.horizontal, HarnessMonitorTheme.spacingLG)
-    .padding(.vertical, HarnessMonitorTheme.spacingMD)
-    .harnessPanelGlass()
-    .overlay(alignment: .top) {
-      Rectangle()
-        .fill(HarnessMonitorTheme.controlBorder.opacity(0.4))
-        .frame(height: 1)
-    }
-    .accessibilityIdentifier(
-      HarnessMonitorAccessibility.agentDetailComposerInset(agent.agentId)
+    AgentDetailComposerRegion(
+      store: store,
+      sessionID: store.selectedSessionID ?? "",
+      agentID: agent.agentId,
+      selectedSendAction: $selectedSendAction,
+      signalCommand: $signalCommand,
+      signalMessage: $signalMessage,
+      signalActionHint: $signalActionHint
     )
   }
 
