@@ -141,6 +141,82 @@ struct WebSocketProtocolAcpTests {
     #expect(timelineObject["status"] == .string("completed"))
   }
 
+  @Test("Daemon push event decodes ACP transcript rows")
+  func daemonPushEventDecodesAcpTranscriptRows() throws {
+    let json = """
+      {
+        "event": "acp_events",
+        "session_id": "session-1",
+        "recorded_at": "2026-05-05T00:00:30Z",
+        "payload": {
+          "acp_id": "acp-1",
+          "session_id": "session-1",
+          "raw_count": 3,
+          "events": [
+            {
+              "timestamp": "2026-05-05T00:00:00Z",
+              "sequence": 1,
+              "agent": "copilot",
+              "session_id": "session-1",
+              "kind": {
+                "type": "watchdog_state",
+                "from": "active",
+                "to": "paused",
+                "reason": "client_idle"
+              }
+            },
+            {
+              "timestamp": "2026-05-05T00:00:01Z",
+              "sequence": 2,
+              "agent": "copilot",
+              "session_id": "session-1",
+              "kind": {
+                "type": "permission_asked",
+                "tool": "write_file",
+                "scope": "src/lib.rs",
+                "request_id": "req-1"
+              }
+            },
+            {
+              "timestamp": "2026-05-05T00:00:02Z",
+              "sequence": 3,
+              "agent": "copilot",
+              "session_id": "session-1",
+              "kind": {
+                "type": "context_injected",
+                "actor": "acp",
+                "summary": "wake prompt accepted (signal sig-1)"
+              }
+            }
+          ]
+        }
+      }
+      """
+    let streamEvent = try decoder.decode(StreamEvent.self, from: Data(json.utf8))
+    let event = try DaemonPushEvent(streamEvent: streamEvent)
+    guard case .acpEvents(let payload) = event.kind else {
+      Issue.record("Expected ACP events, got \(event.kind)")
+      return
+    }
+    let entries = payload.timelineEntries(fallbackRecordedAt: event.recordedAt)
+    #expect(
+      entries.map(\.kind) == [
+        "agent_watchdog_state",
+        "agent_permission_asked",
+        "agent_context_injected",
+      ]
+    )
+    #expect(entries[0].summary == "copilot watchdog active -> paused")
+    #expect(entries[1].summary == "copilot asked for permission on write_file (src/lib.rs)")
+    #expect(
+      entries[2].summary
+        == "copilot received context from acp: wake prompt accepted (signal sig-1)"
+    )
+    #expect(entries[0].entryId == "acp-copilot-agent_watchdog_state-1")
+    #expect(entries[1].entryId == "acp-copilot-agent_permission_asked-2")
+    #expect(entries[2].entryId == "acp-copilot-agent_context_injected-3")
+  }
+
   @Test("Daemon push event decodes ACP inspect snapshots")
   func daemonPushEventDecodesAcpInspectSnapshots() throws {
     let json = """

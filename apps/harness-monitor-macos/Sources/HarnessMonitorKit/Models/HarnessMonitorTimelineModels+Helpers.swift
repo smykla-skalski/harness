@@ -289,6 +289,13 @@ extension TimelineEntry {
         return "\(displayName) asked for permission on \(tool)"
       }
       return "\(displayName) asked for permission on \(tool) (\(scope))"
+    case "agent_context_injected":
+      let actor = event.stringValue(for: "actor") ?? "system"
+      let detail = event.stringValue(for: "summary") ?? ""
+      if detail.isEmpty {
+        return "\(displayName) received context from \(actor)"
+      }
+      return "\(displayName) received context from \(actor): \(detail)"
     case "tool_invocation":
       let toolName = event.stringValue(for: "tool_name") ?? "Tool"
       return "\(displayName) invoked \(toolName)"

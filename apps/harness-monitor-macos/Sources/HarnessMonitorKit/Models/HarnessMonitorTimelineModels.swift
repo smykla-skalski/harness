@@ -377,6 +377,20 @@ extension AcpConversationEvent {
         recordedAt: recordedAt,
         identity: identity
       )
+    case "context_injected":
+      let actor = event.stringValue(for: "actor") ?? "system"
+      let detail = event.stringValue(for: "summary") ?? ""
+      let summary =
+        detail.isEmpty
+        ? "\(identity.summaryActor) received context from \(actor)"
+        : "\(identity.summaryActor) received context from \(actor): \(detail)"
+      return transcriptTimelineEntry(
+        entryKind: "agent_context_injected",
+        summary: summary,
+        kind: kind,
+        recordedAt: recordedAt,
+        identity: identity
+      )
     case "tool_invocation", "tool_result", "tool_result_error":
       break
     default:
