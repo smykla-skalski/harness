@@ -228,7 +228,10 @@ private struct SessionTimelineNodeRow: View {
     for node: SessionTimelineNode
   ) -> [SessionTimelineStatusBadge] {
     var badges: [SessionTimelineStatusBadge] = []
-    if let eventTone = node.eventTone {
+    if let entryKind = node.entryKind, entryKind.hasPrefix("signal_") {
+      let tint = node.eventTone?.color ?? HarnessMonitorTheme.secondaryInk
+      badges.append(SessionTimelineStatusBadge(label: signalStatusLabel(for: node.title), tint: tint))
+    } else if let eventTone = node.eventTone {
       badges.append(SessionTimelineStatusBadge(label: eventTone.badgeLabel, tint: eventTone.color))
     }
     if let decision = node.decision {
@@ -240,6 +243,16 @@ private struct SessionTimelineNodeRow: View {
       )
     }
     return badges
+  }
+
+  private static func signalStatusLabel(for summary: String) -> String {
+    let lower = summary.lowercased()
+    if lower.contains("accepted") || lower.contains("delivered") { return "DELIVERED" }
+    if lower.contains("rejected") { return "REJECTED" }
+    if lower.contains("deferred") { return "DEFERRED" }
+    if lower.contains("expired") { return "EXPIRED" }
+    if lower.contains("picked up") || lower.contains("received") { return "RECEIVED" }
+    return "SENT"
   }
 }
 
