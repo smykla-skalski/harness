@@ -262,6 +262,17 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(createFormPills.contains("AgentsConfigPillFlow("))
   }
 
+  @Test("Workspace create pane resets scroll position when selected")
+  func workspaceCreatePaneResetsScrollPositionWhenSelected() throws {
+    let createForm = try sourceFile(named: "WorkspaceWindowView+CreateForm.swift")
+    let workspaceLayout = try sourceFile(named: "WorkspaceWindowView+Layout.swift")
+
+    #expect(createForm.contains("ScrollViewReader"))
+    #expect(createForm.contains("scrollProxy.scrollTo(Self.topAnchorID, anchor: .top)"))
+    #expect(workspaceLayout.contains(".id(detailIdentity)"))
+    #expect(workspaceLayout.contains("let detailIdentity = scrollContainerIdentity"))
+  }
+
   @Test("Sidebar session rows stay MCP-selectable")
   func sidebarSessionRowsStayMCPSelectable() throws {
     let sidebarSections = try sourceFile(named: "SidebarView+Sections.swift")
@@ -328,6 +339,22 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(section.contains(".safeAreaInset(edge: .bottom, spacing: 0) {"))
     #expect(section.contains("composerInset"))
     #expect(section.contains("AgentDetailSendUpdateSection"))
+  }
+
+  @Test("Agent detail role actions identifier matches collapsed disclosure")
+  func agentDetailRoleActionsDisclosureIdentifierMirrors() {
+    #expect(
+      HarnessMonitorAccessibility.agentDetailRoleActionsDisclosure("worker-codex")
+        == "harness.workspace.detail.role-actions.disclosure.worker-codex"
+    )
+  }
+
+  @Test("Role actions render behind a disclosure in full agent pane")
+  func roleActionsRenderBehindDisclosureInFullAgentPane() throws {
+    let section = try sourceFile(named: "AgentDetailSection.swift")
+
+    #expect(section.contains("DisclosureGroup(\"Role actions\")"))
+    #expect(section.contains("agentDetailRoleActionsDisclosure"))
   }
 
   @Test("Slug normalises delimiters and casing")
