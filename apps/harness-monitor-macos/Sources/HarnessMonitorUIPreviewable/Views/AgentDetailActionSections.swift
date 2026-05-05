@@ -202,6 +202,7 @@ struct AgentDetailSendUpdateSection: View {
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
             .opacity(disabledReason == nil ? 0 : 1)
+            .animation(.default, value: disabledReason)
             .accessibilityHidden(disabledReason == nil)
           if let deadlinePresentation, !deadlinePresentation.isUrgent {
             Text("Deadline \(deadlinePresentation.countdownLabel)")
