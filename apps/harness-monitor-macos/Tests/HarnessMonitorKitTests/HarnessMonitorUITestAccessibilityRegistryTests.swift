@@ -255,6 +255,13 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     )
   }
 
+  @Test("Workspace create pane config pills use wrapping flow layout")
+  func workspaceCreatePaneConfigPillsUseWrappingFlowLayout() throws {
+    let createFormPills = try sourceFile(named: "WorkspaceWindowView+CreateFormPills.swift")
+
+    #expect(createFormPills.contains("AgentsConfigPillFlow("))
+  }
+
   @Test("Sidebar session rows stay MCP-selectable")
   func sidebarSessionRowsStayMCPSelectable() throws {
     let sidebarSections = try sourceFile(named: "SidebarView+Sections.swift")
