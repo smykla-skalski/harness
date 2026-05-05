@@ -383,7 +383,7 @@ async fn send_initialize(
     connection: &ConnectionTo<Agent>,
     initialize_timeout: Duration,
 ) -> AcpResult<()> {
-    let _guard = supervisor.enter_pending_request();
+    let _guard = supervisor.enter_pending_request_with_reason(Some("session/initialize"));
     timeout(
         initialize_timeout,
         connection
@@ -400,7 +400,7 @@ async fn send_new_session(
     connection: &ConnectionTo<Agent>,
     project_dir: PathBuf,
 ) -> AcpResult<SessionId> {
-    let _guard = supervisor.enter_pending_request();
+    let _guard = supervisor.enter_pending_request_with_reason(Some("session/new"));
     let response = connection
         .send_request(NewSessionRequest::new(project_dir))
         .block_task()
@@ -416,7 +416,7 @@ async fn send_prompt_or_cancel(
     prompt_timeout: Duration,
     prompt: String,
 ) -> AcpResult<bool> {
-    let _guard = supervisor.enter_pending_request();
+    let _guard = supervisor.enter_pending_request_with_reason(Some("session/prompt"));
     let request = PromptRequest::new(
         session_id.clone(),
         vec![ContentBlock::Text(TextContent::new(prompt))],

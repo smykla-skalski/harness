@@ -10,9 +10,7 @@ use crate::agents::acp::connection::SupervisorEventSink;
 use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
 use crate::daemon::timeline::{TimelinePayloadScope, conversation_entry};
 
-use super::super::{
-    AcpSessionSupervisor, SupervisionConfig, WatchdogEventEmitter, WatchdogState,
-};
+use super::super::{AcpSessionSupervisor, SupervisionConfig, WatchdogEventEmitter, WatchdogState};
 use super::support::spawn_sleep_child;
 
 #[derive(Default)]
@@ -28,10 +26,11 @@ impl RecordingEmitter {
 
 impl WatchdogEventEmitter for RecordingEmitter {
     fn emit_state(&self, from: WatchdogState, to: WatchdogState, reason: Option<&str>) {
-        self.transitions
-            .lock()
-            .expect("recording lock")
-            .push((from, to, reason.map(str::to_string)));
+        self.transitions.lock().expect("recording lock").push((
+            from,
+            to,
+            reason.map(str::to_string),
+        ));
     }
 }
 
@@ -49,11 +48,37 @@ async fn pending_request_guard_emits_paused_to_active() {
     assert_eq!(supervisor.watchdog_state(), WatchdogState::Paused);
 
     let snapshot = emitter.snapshot();
-    assert_eq!(snapshot.len(), 2, "expected paused->active and active->paused");
+    assert_eq!(
+        snapshot.len(),
+        2,
+        "expected paused->active and active->paused"
+    );
     assert_eq!(snapshot[0].0, WatchdogState::Paused);
     assert_eq!(snapshot[0].1, WatchdogState::Active);
     assert_eq!(snapshot[1].0, WatchdogState::Active);
     assert_eq!(snapshot[1].1, WatchdogState::Paused);
+
+    #[cfg(unix)]
+    let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);
+}
+
+#[tokio::test(start_paused = true)]
+async fn pending_request_guard_emits_reason() {
+    let child = spawn_sleep_child();
+    let supervisor = AcpSessionSupervisor::new(&child, SupervisionConfig::default());
+    let emitter = Arc::new(RecordingEmitter::default());
+    supervisor.attach_event_emitter(emitter.clone());
+
+    {
+        let _pending = supervisor.enter_pending_request_with_reason(Some("session/new"));
+        assert_eq!(supervisor.watchdog_state(), WatchdogState::Active);
+    }
+    assert_eq!(supervisor.watchdog_state(), WatchdogState::Paused);
+
+    let snapshot = emitter.snapshot();
+    assert_eq!(snapshot.len(), 2);
+    assert_eq!(snapshot[0].2.as_deref(), Some("session/new"));
+    assert_eq!(snapshot[1].2.as_deref(), Some("session/new"));
 
     #[cfg(unix)]
     let _ = killpg(Pid::from_raw(supervisor.pgid()), Signal::SIGKILL);
@@ -172,6 +197,10 @@ async fn supervisor_event_sink_carries_terminal_transition_through_mpsc() {
         "watchdog entry_id encodes (agent, kind, sequence)",
     );
     assert_eq!(supervisor_entry.kind, "agent_watchdog_state");
+    assert_eq!(
+        supervisor_entry.summary,
+        "agent-test watchdog paused -> fired (watchdog timeout)"
+    );
 
     let transcript_collision = ConversationEvent {
         timestamp: Some("2026-05-04T23:00:00Z".to_string()),
@@ -244,11 +273,7 @@ async fn supervisor_event_sink_drops_silently_when_channel_full() {
 #[test]
 fn supervisor_event_sink_emits_context_injected_with_actor_and_summary() {
     let (tx, mut rx) = mpsc::channel(8);
-    let sink = SupervisorEventSink::new(
-        tx,
-        "agent-test".to_string(),
-        "session-test".to_string(),
-    );
+    let sink = SupervisorEventSink::new(tx, "agent-test".to_string(), "session-test".to_string());
 
     sink.emit_context_injected("acp".to_string(), Some("wake prompt accepted".into()));
 
@@ -270,11 +295,7 @@ fn supervisor_event_sink_emits_context_injected_with_actor_and_summary() {
 #[test]
 fn supervisor_event_sink_emits_context_injected_without_summary() {
     let (tx, mut rx) = mpsc::channel(8);
-    let sink = SupervisorEventSink::new(
-        tx,
-        "agent-test".to_string(),
-        "session-test".to_string(),
-    );
+    let sink = SupervisorEventSink::new(tx, "agent-test".to_string(), "session-test".to_string());
 
     sink.emit_context_injected("acp".to_string(), None);
 
