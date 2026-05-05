@@ -9,7 +9,7 @@ extension HarnessMonitorStore {
   ) {
     let actionName = "Delete task"
     guard prepareSessionAction(named: actionName, sessionID: sessionID) != nil else { return }
-    guard let actorID = leaderActionActor(for: "harness-app", actionName: actionName) else {
+    guard let actorID = actionActor(for: "harness-app", actionName: actionName) else {
       return
     }
     pendingConfirmation = .deleteTask(

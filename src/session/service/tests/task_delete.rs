@@ -165,3 +165,71 @@ fn delete_task_advances_queued_work_for_freed_worker() {
         assert!(queued_task.queued_at.is_none());
     });
 }
+
+#[test]
+fn observer_can_delete_task_in_leaderless_degraded_session() {
+    with_temp_project(|project| {
+        start_active_session(
+            "degraded observer delete",
+            "",
+            project,
+            Some("claude"),
+            Some("degraded-observer-delete"),
+        )
+        .expect("start");
+        let joined = temp_env::with_var("CODEX_SESSION_ID", Some("degraded-delete-observer"), || {
+            join_session(
+                "degraded-observer-delete",
+                SessionRole::Observer,
+                "codex",
+                &["triage".into()],
+                Some("observer"),
+                project,
+                None,
+            )
+        })
+        .expect("join observer");
+        let observer_id = joined
+            .agents
+            .values()
+            .find(|agent| agent.role == SessionRole::Observer)
+            .expect("observer")
+            .agent_id
+            .clone();
+
+        let layout =
+            storage::layout_from_project_dir(project, "degraded-observer-delete").expect("layout");
+        storage::update_state(&layout, |state| {
+            let previous_leader = state.leader_id.take().expect("leader");
+            state.status = SessionStatus::LeaderlessDegraded;
+            let leader = state
+                .agents
+                .get_mut(&previous_leader)
+                .expect("leader registration");
+            leader.status = AgentStatus::disconnected_unknown();
+            Ok(())
+        })
+        .expect("degrade session");
+
+        let task = create_task(
+            "degraded-observer-delete",
+            "remove degraded finding",
+            Some("observer should still manage task controls"),
+            TaskSeverity::High,
+            &observer_id,
+            project,
+        )
+        .expect("create task");
+
+        delete_task("degraded-observer-delete", &task.task_id, &observer_id, project)
+            .expect("observer deletes task");
+
+        let state = session_status("degraded-observer-delete", project).expect("status");
+        assert_eq!(state.status, SessionStatus::LeaderlessDegraded);
+        let deleted = state.tasks.get(&task.task_id).expect("deleted task");
+        assert!(deleted.is_deleted());
+        assert!(list_tasks("degraded-observer-delete", None, project)
+            .expect("visible tasks")
+            .is_empty());
+    });
+}

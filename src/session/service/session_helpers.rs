@@ -180,7 +180,9 @@ pub(crate) fn require_permission(
         ))
         .into());
     }
-    if !is_permitted(agent.role, action) {
+    if !is_permitted(agent.role, action)
+        && !allows_leaderless_task_delete(state, agent.role, action)
+    {
         return Err(CliErrorKind::session_permission_denied(format!(
             "{:?} cannot {:?} in session '{}'",
             agent.role, action, state.session_id
@@ -188,6 +190,17 @@ pub(crate) fn require_permission(
         .into());
     }
     Ok(())
+}
+
+fn allows_leaderless_task_delete(
+    state: &SessionState,
+    role: SessionRole,
+    action: SessionAction,
+) -> bool {
+    state.leader_id.is_none()
+        && state.status.allows_task_creation()
+        && action == SessionAction::DeleteTask
+        && is_permitted(role, SessionAction::CreateTask)
 }
 
 pub(crate) fn build_leave_signal_record(
