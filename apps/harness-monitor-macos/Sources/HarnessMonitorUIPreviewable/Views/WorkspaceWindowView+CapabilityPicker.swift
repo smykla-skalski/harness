@@ -90,6 +90,18 @@ extension WorkspaceWindowView {
     return selection
   }
 
+  static func firstProviderLaunchSelection(
+    options: [AgentCapabilityOption],
+    fallback: AgentLaunchSelection = HarnessMonitorAgentLaunchDefaults.startupFallbackSelection
+  ) -> AgentLaunchSelection {
+    guard let firstOption = options.first,
+      let firstChoice = firstOption.transportChoices.first
+    else {
+      return fallback
+    }
+    return firstOption.normalizedSelection(for: firstChoice.id)
+  }
+
   static func transportChoices(
     runtime: AgentTuiRuntime,
     descriptor: AcpAgentDescriptor?

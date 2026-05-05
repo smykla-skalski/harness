@@ -21,7 +21,7 @@ struct AgentCapabilityPickerTests {
     #expect(Set(options.map(\.id)).count == options.count)
 
     let gemini = try #require(options.first { $0.id == AgentTuiRuntime.gemini.rawValue })
-    #expect(gemini.transportChoices.map(\.id) == [.tui(.gemini), .acp("gemini")])
+    #expect(gemini.transportChoices.map(\.id) == [.acp("gemini"), .tui(.gemini)])
 
     let custom = try #require(options.first { $0.id == "custom-agent" })
     #expect(custom.transportChoices.map(\.id) == [.acp("custom-agent")])
@@ -85,11 +85,11 @@ struct AgentCapabilityPickerTests {
       acpHostBridgeReady: true
     )
 
-    #expect(option.statusText == "Checking")
+    #expect(option.statusText == "Checking access")
     #expect(option.hasPendingAcpProbe)
     #expect(!option.isEnabled(option.transportChoice(for: .acp("gemini"))))
     #expect(option.normalizedSelection(for: .acp("gemini")) == .tui(.gemini))
-    #expect(option.doctorProbeText == "Doctor probe: gemini --version · Probe pending")
+    #expect(option.doctorProbeText == "Setup check: gemini --version · Checking access")
   }
 
   @Test("missing ACP binary disables only ACP transport when terminal transport exists")
@@ -122,12 +122,12 @@ struct AgentCapabilityPickerTests {
     )
 
     #expect(option.isEnabled)
-    #expect(option.statusText == "Install required")
+    #expect(option.statusText == "Setup required")
     #expect(option.isEnabled(option.transportChoice(for: .tui(.gemini))))
     #expect(!option.isEnabled(option.transportChoice(for: .acp("gemini"))))
     #expect(option.showsInstallCTA)
     #expect(option.installActionTitle == "Copy install instructions")
-    #expect(option.doctorProbeText == "Doctor probe: gemini --version · Missing")
+    #expect(option.doctorProbeText == "Setup check: gemini --version · Setup required")
   }
 
   @Test("sandboxed monitor disables ACP transport even when binary exists")
@@ -205,7 +205,7 @@ struct AgentCapabilityPickerTests {
       acpHostBridgeReady: true
     )
 
-    #expect(option.accessibilityLabel == "GitHub Copilot, install required")
+    #expect(option.accessibilityLabel == "GitHub Copilot, setup required")
     #expect(
       option.transportChoices[0].capabilityLabels
         == ["filesystem read", "filesystem write", "terminal spawn"]
@@ -237,6 +237,35 @@ struct AgentCapabilityPickerTests {
     )
 
     #expect(normalizedSelection == .tui(.gemini))
+  }
+
+  @Test("first launch selection uses the first rendered provider row")
+  func firstLaunchSelectionUsesFirstRenderedProviderRow() {
+    let options = WorkspaceWindowView.agentCapabilityOptions(
+      acpAgents: [
+        descriptor(id: "copilot", displayName: "GitHub Copilot"),
+        descriptor(id: "gemini", displayName: "Gemini CLI"),
+      ],
+      runtimeProbeResults: AcpRuntimeProbeResponse(
+        probes: [
+          AcpRuntimeProbe(
+            agentId: "copilot",
+            displayName: "GitHub Copilot",
+            binaryPresent: true,
+            authState: .ready
+          ),
+          AcpRuntimeProbe(
+            agentId: "gemini",
+            displayName: "Gemini CLI",
+            binaryPresent: true,
+            authState: .ready
+          ),
+        ],
+        checkedAt: "2026-04-28T22:15:00Z"
+      )
+    )
+
+    #expect(WorkspaceWindowView.firstProviderLaunchSelection(options: options) == .tui(.codex))
   }
 
   private func descriptor(id: String, displayName: String) -> AcpAgentDescriptor {
