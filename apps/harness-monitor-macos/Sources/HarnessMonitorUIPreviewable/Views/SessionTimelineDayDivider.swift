@@ -85,6 +85,9 @@ private final class SessionTimelineRowFormatter {
   }
 
   func accessibilityLabel(for node: SessionTimelineNode) -> String {
+    if let entryKind = node.entryKind, entryKind.hasPrefix("signal_") {
+      return signalAccessibilityLabel(for: node)
+    }
     var parts = [
       node.kind.label,
       timestampLabel(for: node),
@@ -102,6 +105,26 @@ private final class SessionTimelineRowFormatter {
     }
     parts.append(node.actionAvailabilityLabel)
     return parts.joined(separator: ", ")
+  }
+
+  private func signalAccessibilityLabel(for node: SessionTimelineNode) -> String {
+    let statusVerb = Self.signalStatusVerb(from: node.title)
+    return [
+      "Signal \(statusVerb)",
+      timestampLabel(for: node),
+      node.title,
+      node.actionAvailabilityLabel,
+    ].joined(separator: ", ")
+  }
+
+  private static func signalStatusVerb(from title: String) -> String {
+    let lower = title.lowercased()
+    if lower.contains("accepted") || lower.contains("delivered") { return "delivered" }
+    if lower.contains("rejected") { return "rejected" }
+    if lower.contains("deferred") { return "deferred" }
+    if lower.contains("expired") { return "expired" }
+    if lower.contains("picked up") || lower.contains("received") { return "received" }
+    return "sent"
   }
 
   private func isParsedTimestamp(_ node: SessionTimelineNode) -> Bool {
