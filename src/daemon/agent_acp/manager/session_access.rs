@@ -19,7 +19,7 @@ use crate::workspace::utc_now;
 pub struct AcpWakePrompt {
     pub acp_id: String,
     pub orchestration_session_id: String,
-    pub protocol_session_id: String,
+    pub signal_session_id: String,
     pub project_dir: PathBuf,
     pub prompt: String,
     pub signal_id: String,
@@ -176,7 +176,7 @@ fn run_wake_prompt(
     let AcpWakePrompt {
         acp_id,
         orchestration_session_id,
-        protocol_session_id,
+        signal_session_id,
         project_dir,
         prompt: prompt_text,
         signal_id,
@@ -184,7 +184,7 @@ fn run_wake_prompt(
     } = prompt;
     let result = session.prompt_protocol_session(
         &acp_id,
-        &protocol_session_id,
+        &signal_session_id,
         project_dir.clone(),
         prompt_text,
     );
@@ -200,19 +200,23 @@ fn run_wake_prompt(
                     ("agent_id", &agent_id),
                 ],
             );
-            sync_returned_runtime_session(
+            if !sync_returned_runtime_session(
                 manager,
                 runtime.name(),
                 &orchestration_session_id,
                 &acp_id,
-                &protocol_session_id,
+                &signal_session_id,
                 &returned_session_id,
                 &signal_id,
-            );
+            ) {
+                manager.release_wake(&acp_id, &signal_id);
+                return;
+            }
             if record_wake_accept(
                 runtime,
                 &project_dir,
-                &returned_session_id,
+                &orchestration_session_id,
+                &signal_session_id,
                 &signal_id,
                 &agent_id,
                 &acp_id,
@@ -239,7 +243,7 @@ fn run_wake_prompt(
                 "failed",
                 &[
                     ("acp_id", &acp_id),
-                    ("protocol_session_id", &protocol_session_id),
+                    ("signal_session_id", &signal_session_id),
                     ("signal_id", &signal_id),
                     ("error", &error),
                 ],
@@ -257,9 +261,9 @@ fn sync_returned_runtime_session(
     requested_session_id: &str,
     returned_session_id: &str,
     signal_id: &str,
-) {
+) -> bool {
     if requested_session_id == returned_session_id {
-        return;
+        return true;
     }
     match manager.bind_orchestration_runtime_session(
         orchestration_session_id,
@@ -267,37 +271,56 @@ fn sync_returned_runtime_session(
         runtime_name,
         returned_session_id,
     ) {
-        Ok(true) | Ok(false) => {}
-        Err(error) => record_wake_event(
-            WakeEventLevel::Warn,
-            "runtime_bind_failed",
-            &[
-                ("acp_id", &acp_id),
-                ("signal_id", &signal_id),
-                ("runtime_name", &runtime_name),
-                ("requested_session_id", &requested_session_id),
-                ("returned_session_id", &returned_session_id),
-                ("error", &error),
-            ],
-        ),
+        Ok(true) => true,
+        Ok(false) => {
+            record_wake_event(
+                WakeEventLevel::Warn,
+                "runtime_bind_skipped",
+                &[
+                    ("acp_id", &acp_id),
+                    ("signal_id", &signal_id),
+                    ("runtime_name", &runtime_name),
+                    ("requested_session_id", &requested_session_id),
+                    ("returned_session_id", &returned_session_id),
+                    ("reason", &"session_or_agent_missing"),
+                ],
+            );
+            false
+        }
+        Err(error) => {
+            record_wake_event(
+                WakeEventLevel::Warn,
+                "runtime_bind_failed",
+                &[
+                    ("acp_id", &acp_id),
+                    ("signal_id", &signal_id),
+                    ("runtime_name", &runtime_name),
+                    ("requested_session_id", &requested_session_id),
+                    ("returned_session_id", &returned_session_id),
+                    ("error", &error),
+                ],
+            );
+            false
+        }
     }
 }
 
 fn record_wake_accept(
     runtime: &'static dyn AgentRuntime,
     project_dir: &Path,
-    protocol_session_id: &str,
+    orchestration_session_id: &str,
+    signal_session_id: &str,
     signal_id: &str,
     agent_id: &str,
     acp_id: &str,
 ) -> bool {
-    let signal_dir = runtime.signal_dir(project_dir, protocol_session_id);
+    let signal_dir = runtime.signal_dir(project_dir, signal_session_id);
     let ack = SignalAck {
         signal_id: signal_id.to_string(),
         acknowledged_at: utc_now(),
         result: AckResult::Accepted,
-        agent: agent_id.to_string(),
-        session_id: protocol_session_id.to_string(),
+        agent: signal_session_id.to_string(),
+        session_id: orchestration_session_id.to_string(),
         details: Some("acp wake prompt acknowledged via session/prompt".into()),
     };
     match acknowledge_signal(&signal_dir, &ack) {
@@ -307,7 +330,8 @@ fn record_wake_accept(
                 "accepted",
                 &[
                     ("acp_id", &acp_id),
-                    ("protocol_session_id", &protocol_session_id),
+                    ("orchestration_session_id", &orchestration_session_id),
+                    ("signal_session_id", &signal_session_id),
                     ("signal_id", &signal_id),
                     ("agent_id", &agent_id),
                 ],
@@ -320,7 +344,8 @@ fn record_wake_accept(
                 "ack_write_failed",
                 &[
                     ("acp_id", &acp_id),
-                    ("protocol_session_id", &protocol_session_id),
+                    ("orchestration_session_id", &orchestration_session_id),
+                    ("signal_session_id", &signal_session_id),
                     ("signal_id", &signal_id),
                     ("error", &error),
                 ],
