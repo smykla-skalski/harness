@@ -223,7 +223,7 @@ async fn attach_protocol_session(
     project_dir: PathBuf,
 ) -> ProtocolCommandResult<SessionId> {
     let response = {
-        let _guard = supervisor.enter_pending_request();
+        let _guard = supervisor.enter_pending_request_with_reason(Some("session/new"));
         connection
             .send_request(NewSessionRequest::new(project_dir))
             .block_task()
@@ -311,7 +311,7 @@ async fn send_prompt(
     prompt_timeout: Duration,
     prompt: String,
 ) -> AcpResult<()> {
-    let _guard = supervisor.enter_pending_request();
+    let _guard = supervisor.enter_pending_request_with_reason(Some("session/prompt"));
     let request = PromptRequest::new(
         session_id,
         vec![ContentBlock::Text(TextContent::new(prompt))],

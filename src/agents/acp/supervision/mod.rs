@@ -134,13 +134,7 @@ pub trait WatchdogEventEmitter: Send + Sync {
 
     /// Emit a permission-prompt event surfaced by the ACP client gate.
     /// Default no-op so non-ACP impls (test doubles) need not provide one.
-    fn emit_permission_asked(
-        &self,
-        _tool: String,
-        _scope: String,
-        _request_id: Option<String>,
-    ) {
-    }
+    fn emit_permission_asked(&self, _tool: String, _scope: String, _request_id: Option<String>) {}
 
     /// Emit a wake-prompt context ack surfaced by the ACP wake-accept path.
     /// Default no-op so non-ACP impls (test doubles) need not provide one.
@@ -254,31 +248,46 @@ impl AcpSessionSupervisor {
     /// # Panics
     /// Panics if the last-client-call mutex is poisoned.
     pub fn enter_client_call(&self) -> ClientCallGuard<'_> {
+        self.enter_client_call_with_reason(None)
+    }
+
+    /// Acquire a client-call guard with a timeline reason. While held, the
+    /// watchdog is paused.
+    ///
+    /// # Panics
+    /// Panics if the last-client-call mutex is poisoned.
+    pub fn enter_client_call_with_reason(
+        &self,
+        reason: Option<&'static str>,
+    ) -> ClientCallGuard<'_> {
         *self
             .last_client_call_at
             .lock()
             .expect("last client call lock") = Some(utc_now());
         self.in_flight_calls.fetch_add(1, Ordering::SeqCst);
-        self.update_watchdog_state();
-        ClientCallGuard { supervisor: self }
+        self.update_watchdog_state(reason);
+        ClientCallGuard {
+            supervisor: self,
+            reason,
+        }
     }
 
     #[expect(
         clippy::cognitive_complexity,
         reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
     )]
-    fn exit_client_call(&self) {
+    fn exit_client_call(&self, reason: Option<&'static str>) {
         let result = self
             .in_flight_calls
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1));
         if result.is_err() {
             warn!("exit_client_call without matching enter; counter already at 0");
         }
-        self.update_watchdog_state();
+        self.update_watchdog_state(reason);
         self.watchdog_notify.notify_one();
     }
 
-    fn update_watchdog_state(&self) {
+    fn update_watchdog_state(&self, reason: Option<&str>) {
         // compare_exchange loop so concurrent enter/exit calls cannot interleave
         // a load+store window and produce duplicate or wrong-from emits. Only
         // the thread that wins the swap emits the transition.
@@ -301,14 +310,14 @@ impl AcpSessionSupervisor {
             if self
                 .state
                 .compare_exchange(
-                current_u64,
-                state_to_u64(new_state),
-                Ordering::SeqCst,
-                Ordering::SeqCst,
+                    current_u64,
+                    state_to_u64(new_state),
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
                 )
                 .is_ok()
             {
-                self.emit_transition(current, new_state, None);
+                self.emit_transition(current, new_state, reason);
                 return;
             }
         }
@@ -340,25 +349,39 @@ impl AcpSessionSupervisor {
     /// # Panics
     /// Panics if the last-event mutex is poisoned.
     pub fn enter_pending_request(&self) -> PendingRequestGuard<'_> {
+        self.enter_pending_request_with_reason(None)
+    }
+
+    /// Acquire a pending-request guard with a timeline reason.
+    ///
+    /// # Panics
+    /// Panics if the last-event mutex is poisoned.
+    pub fn enter_pending_request_with_reason(
+        &self,
+        reason: Option<&'static str>,
+    ) -> PendingRequestGuard<'_> {
         *self.last_event_at.lock().unwrap() = Instant::now();
         self.pending_requests.fetch_add(1, Ordering::SeqCst);
-        self.update_watchdog_state();
+        self.update_watchdog_state(reason);
         self.watchdog_notify.notify_one();
-        PendingRequestGuard { supervisor: self }
+        PendingRequestGuard {
+            supervisor: self,
+            reason,
+        }
     }
 
     #[expect(
         clippy::cognitive_complexity,
         reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
     )]
-    fn exit_pending_request(&self) {
+    fn exit_pending_request(&self, reason: Option<&'static str>) {
         let result = self
             .pending_requests
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1));
         if result.is_err() {
             warn!("exit_pending_request without matching enter; counter already at 0");
         }
-        self.update_watchdog_state();
+        self.update_watchdog_state(reason);
         self.watchdog_notify.notify_one();
     }
 

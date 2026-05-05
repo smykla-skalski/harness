@@ -206,7 +206,7 @@ struct WebSocketProtocolAcpTests {
         "agent_context_injected",
       ]
     )
-    #expect(entries[0].summary == "copilot watchdog active -> paused")
+    #expect(entries[0].summary == "copilot watchdog active -> paused (client_idle)")
     #expect(entries[1].summary == "copilot asked for permission on write_file (src/lib.rs)")
     #expect(
       entries[2].summary

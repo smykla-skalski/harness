@@ -244,7 +244,16 @@ extension AcpConversationEvent {
   private static func watchdogSummary(prefix: String, event: [String: JSONValue]) -> String {
     let from = event.stringValue(for: "from") ?? "unknown"
     let to = event.stringValue(for: "to") ?? "unknown"
-    return "\(prefix) watchdog \(from) -> \(to)"
+    let base = "\(prefix) watchdog \(from) -> \(to)"
+    guard
+      let reason = event.stringValue(for: "reason")?.trimmingCharacters(
+        in: .whitespacesAndNewlines
+      ),
+      !reason.isEmpty
+    else {
+      return base
+    }
+    return "\(base) (\(reason))"
   }
 
   private static func permissionSummary(prefix: String, event: [String: JSONValue]) -> String {

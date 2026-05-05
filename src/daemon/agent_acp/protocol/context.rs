@@ -39,7 +39,7 @@ impl ProtocolContext {
     ) -> ClientResult<<ReadTextFileRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
         let _target = self.session_guard.ensure_known(&request.session_id)?;
-        with_client_call(&self.supervisor, || {
+        with_client_call(&self.supervisor, "client/read_text_file", || {
             self.client.handle_read_text_file(request)
         })
     }
@@ -54,6 +54,7 @@ impl ProtocolContext {
             self.supervisor,
             self.client,
             "join write_text_file",
+            "client/write_text_file",
             move |client| client.handle_write_text_file(&request),
         )
         .await
@@ -69,6 +70,7 @@ impl ProtocolContext {
             self.supervisor,
             self.client,
             "join create_terminal",
+            "client/create_terminal",
             move |client| client.handle_create_terminal(&request),
         )
         .await
@@ -80,7 +82,7 @@ impl ProtocolContext {
     ) -> ClientResult<<TerminalOutputRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
         let _target = self.session_guard.ensure_known(&request.session_id)?;
-        with_client_call(&self.supervisor, || {
+        with_client_call(&self.supervisor, "client/terminal_output", || {
             self.client.handle_terminal_output(request)
         })
     }
@@ -91,7 +93,7 @@ impl ProtocolContext {
     ) -> ClientResult<<ReleaseTerminalRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
         let _target = self.session_guard.ensure_known(&request.session_id)?;
-        with_client_call(&self.supervisor, || {
+        with_client_call(&self.supervisor, "client/release_terminal", || {
             self.client.handle_release_terminal(request)
         })
     }
@@ -102,7 +104,7 @@ impl ProtocolContext {
     ) -> ClientResult<<WaitForTerminalExitRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
         let _target = self.session_guard.ensure_known(&request.session_id)?;
-        with_client_call(&self.supervisor, || {
+        with_client_call(&self.supervisor, "client/wait_for_terminal_exit", || {
             self.client.handle_wait_for_terminal_exit(request)
         })
     }
@@ -113,7 +115,7 @@ impl ProtocolContext {
     ) -> ClientResult<<KillTerminalRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
         let _target = self.session_guard.ensure_known(&request.session_id)?;
-        with_client_call(&self.supervisor, || {
+        with_client_call(&self.supervisor, "client/kill_terminal", || {
             self.client.handle_kill_terminal(request)
         })
     }
@@ -128,6 +130,7 @@ impl ProtocolContext {
             self.supervisor,
             self.client,
             "join permission bridge",
+            "client/request_permission",
             move |client| client.handle_request_permission(&request),
         )
         .await
@@ -164,9 +167,10 @@ pub(super) fn client_error_to_acp(error: ClientError) -> AcpError {
 
 fn with_client_call<T>(
     supervisor: &AcpSessionSupervisor,
+    reason: &'static str,
     work: impl FnOnce() -> ClientResult<T>,
 ) -> ClientResult<T> {
-    let _guard = supervisor.enter_client_call();
+    let _guard = supervisor.enter_client_call_with_reason(Some(reason));
     work()
 }
 
@@ -174,12 +178,13 @@ async fn spawn_blocking_client_call<T>(
     supervisor: Arc<AcpSessionSupervisor>,
     client: Arc<HarnessAcpClient>,
     join_label: &'static str,
+    reason: &'static str,
     work: impl FnOnce(&HarnessAcpClient) -> ClientResult<T> + Send + 'static,
 ) -> ClientResult<T>
 where
     T: Send + 'static,
 {
-    spawn_blocking(move || with_client_call(&supervisor, || work(client.as_ref())))
+    spawn_blocking(move || with_client_call(&supervisor, reason, || work(client.as_ref())))
         .await
         .map_err(|error| ClientError::new(-32603, format!("{join_label}: {error}")))?
 }
