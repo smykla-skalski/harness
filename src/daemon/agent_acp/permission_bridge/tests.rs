@@ -88,7 +88,11 @@ async fn recv_permission_result(
 #[tokio::test]
 async fn coalesces_concurrent_requests_into_one_batch() {
     let (sender, _) = broadcast::channel(8);
-    let bridge = PermissionBridgeHandle::spawn("acp-1".into(), "sess-1".into(), sender);
+    let bridge = PermissionBridgeHandle::spawn(
+        "acp-1".into(),
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+        sender,
+    );
     let (req_a, rx_a) = permission_request("tool-a");
     let (req_b, rx_b) = permission_request("tool-b");
 
@@ -114,8 +118,16 @@ async fn coalesces_concurrent_requests_into_one_batch() {
 #[tokio::test]
 async fn separate_logical_sessions_never_coalesce_permission_batches() {
     let (sender, mut events) = broadcast::channel(8);
-    let bridge_a = PermissionBridgeHandle::spawn("acp-1".into(), "sess-1".into(), sender.clone());
-    let bridge_b = PermissionBridgeHandle::spawn("acp-2".into(), "sess-2".into(), sender);
+    let bridge_a = PermissionBridgeHandle::spawn(
+        "acp-1".into(),
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+        sender.clone(),
+    );
+    let bridge_b = PermissionBridgeHandle::spawn(
+        "acp-2".into(),
+        "00b4a39f-719e-5418-abe8-eb3ab6ea614d".into(),
+        sender,
+    );
     let (req_a, rx_a) = permission_request_for_session("tool-a", "acp-session-a");
     let (req_b, rx_b) = permission_request_for_session("tool-b", "acp-session-b");
 
@@ -128,12 +140,24 @@ async fn separate_logical_sessions_never_coalesce_permission_batches() {
     assert_eq!(batches_a.len(), 1);
     assert_eq!(batches_b.len(), 1);
     assert_eq!(batches_a[0].acp_id, "acp-1");
-    assert_eq!(batches_a[0].session_id, "sess-1");
+    assert_eq!(
+        batches_a[0].session_id,
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"
+    );
     assert_eq!(batches_b[0].acp_id, "acp-2");
-    assert_eq!(batches_b[0].session_id, "sess-2");
+    assert_eq!(
+        batches_b[0].session_id,
+        "00b4a39f-719e-5418-abe8-eb3ab6ea614d"
+    );
     assert_ne!(batches_a[0].batch_id, batches_b[0].batch_id);
-    assert_eq!(batches_a[0].requests[0].session_id, "sess-1");
-    assert_eq!(batches_b[0].requests[0].session_id, "sess-2");
+    assert_eq!(
+        batches_a[0].requests[0].session_id,
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"
+    );
+    assert_eq!(
+        batches_b[0].requests[0].session_id,
+        "00b4a39f-719e-5418-abe8-eb3ab6ea614d"
+    );
     assert!(
         batches_a[0].requests[0]
             .request_id
@@ -162,7 +186,13 @@ async fn separate_logical_sessions_never_coalesce_permission_batches() {
     );
 
     let seen_sessions = permission_requested_sessions(&mut events);
-    assert_eq!(seen_sessions, ["sess-1", "sess-2"]);
+    assert_eq!(
+        seen_sessions,
+        [
+            "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"
+        ]
+    );
     let _ = bridge_a.resolve_batch(&batches_a[0].batch_id, &AcpPermissionDecision::ApproveAll);
     let _ = bridge_b.resolve_batch(&batches_b[0].batch_id, &AcpPermissionDecision::ApproveAll);
     let _ = unwrap_ok(
@@ -178,7 +208,11 @@ async fn separate_logical_sessions_never_coalesce_permission_batches() {
 #[tokio::test]
 async fn coalesced_batches_normalize_request_sessions_to_logical_session() {
     let (sender, _) = broadcast::channel(8);
-    let bridge = PermissionBridgeHandle::spawn("acp-1".into(), "sess-1".into(), sender);
+    let bridge = PermissionBridgeHandle::spawn(
+        "acp-1".into(),
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+        sender,
+    );
     let (req_a, rx_a) = permission_request_for_session("tool-a", "acp-session-a");
     let (req_b, rx_b) = permission_request_for_session("tool-b", "acp-session-b");
 
@@ -188,13 +222,16 @@ async fn coalesced_batches_normalize_request_sessions_to_logical_session() {
 
     let batches = bridge.pending_batches();
     assert_eq!(batches.len(), 1);
-    assert_eq!(batches[0].session_id, "sess-1");
+    assert_eq!(
+        batches[0].session_id,
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"
+    );
     assert_eq!(batches[0].requests.len(), 2);
     assert!(
         batches[0]
             .requests
             .iter()
-            .all(|request| request.session_id == "sess-1")
+            .all(|request| request.session_id == "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
     );
 
     let _ = bridge.resolve_batch(&batches[0].batch_id, &AcpPermissionDecision::ApproveAll);
@@ -211,7 +248,11 @@ async fn coalesced_batches_normalize_request_sessions_to_logical_session() {
 #[tokio::test]
 async fn rejects_past_cap() {
     let (sender, _) = broadcast::channel(8);
-    let bridge = PermissionBridgeHandle::spawn("acp-1".into(), "sess-1".into(), sender);
+    let bridge = PermissionBridgeHandle::spawn(
+        "acp-1".into(),
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+        sender,
+    );
     let mut receivers = Vec::new();
 
     for i in 0..9 {
@@ -236,7 +277,11 @@ async fn rejects_past_cap() {
 #[tokio::test]
 async fn queue_depth_counts_requests_waiting_for_coalesce() {
     let (sender, _) = broadcast::channel(8);
-    let bridge = PermissionBridgeHandle::spawn("acp-1".into(), "sess-1".into(), sender);
+    let bridge = PermissionBridgeHandle::spawn(
+        "acp-1".into(),
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+        sender,
+    );
     let (request, _rx) = permission_request("tool-a");
     let (queued_request, _queued_rx) = permission_request("tool-b");
 
@@ -251,7 +296,11 @@ async fn queue_depth_counts_requests_waiting_for_coalesce() {
 #[tokio::test]
 async fn shutdown_errors_queued_requests_before_they_become_batches() {
     let (sender, _) = broadcast::channel(8);
-    let bridge = PermissionBridgeHandle::spawn("acp-1".into(), "sess-1".into(), sender);
+    let bridge = PermissionBridgeHandle::spawn(
+        "acp-1".into(),
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+        sender,
+    );
     let (request, rx) = permission_request("tool-a");
 
     unwrap_ok(bridge.tx.send(request).await, "send request");
@@ -268,7 +317,11 @@ async fn shutdown_errors_queued_requests_before_they_become_batches() {
 #[tokio::test]
 async fn shutdown_errors_pending_requests() {
     let (sender, _) = broadcast::channel(8);
-    let bridge = PermissionBridgeHandle::spawn("acp-1".into(), "sess-1".into(), sender);
+    let bridge = PermissionBridgeHandle::spawn(
+        "acp-1".into(),
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+        sender,
+    );
     let (request, rx) = permission_request("tool-a");
 
     unwrap_ok(bridge.tx.send(request).await, "send request");
@@ -282,7 +335,11 @@ async fn shutdown_errors_pending_requests() {
 #[tokio::test]
 async fn shutdown_cancels_pending_expiration_tasks_without_timeout() {
     let (sender, mut receiver) = broadcast::channel(8);
-    let bridge = PermissionBridgeHandle::spawn("acp-1".into(), "sess-1".into(), sender);
+    let bridge = PermissionBridgeHandle::spawn(
+        "acp-1".into(),
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+        sender,
+    );
     let (mut request, rx) = permission_request("tool-a");
     request.deadline = Duration::from_millis(40);
 
@@ -317,7 +374,11 @@ async fn shutdown_cancels_pending_expiration_tasks_without_timeout() {
 #[tokio::test]
 async fn timeout_removes_pending_batch_and_broadcasts_removal() {
     let (sender, mut receiver) = broadcast::channel(8);
-    let bridge = PermissionBridgeHandle::spawn("acp-1".into(), "sess-1".into(), sender);
+    let bridge = PermissionBridgeHandle::spawn(
+        "acp-1".into(),
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+        sender,
+    );
     let (mut request, rx) = permission_request("tool-a");
     request.deadline = Duration::from_millis(10);
 
@@ -339,7 +400,11 @@ async fn timeout_removes_pending_batch_and_broadcasts_removal() {
 #[tokio::test]
 async fn zero_deadline_timeouts_leave_no_stale_expiration_handles() {
     let (sender, _) = broadcast::channel(8);
-    let bridge = PermissionBridgeHandle::spawn("acp-1".into(), "sess-1".into(), sender);
+    let bridge = PermissionBridgeHandle::spawn(
+        "acp-1".into(),
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+        sender,
+    );
 
     for index in 0..8 {
         let (mut request, rx) = permission_request(&format!("tool-{index}"));
@@ -355,7 +420,11 @@ async fn zero_deadline_timeouts_leave_no_stale_expiration_handles() {
 #[tokio::test]
 async fn requested_batches_include_absolute_expiration_timestamp() {
     let (sender, mut receiver) = broadcast::channel(8);
-    let bridge = PermissionBridgeHandle::spawn("acp-1".into(), "sess-1".into(), sender);
+    let bridge = PermissionBridgeHandle::spawn(
+        "acp-1".into(),
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+        sender,
+    );
     let (mut request, _rx) = permission_request("tool-a");
     request.deadline = Duration::from_secs(45);
 
@@ -390,7 +459,11 @@ async fn requested_batches_include_absolute_expiration_timestamp() {
 #[tokio::test]
 async fn permission_bridge_cancel_on_drop_rejects_pending_batches_without_timeout() {
     let (sender, mut receiver) = broadcast::channel(8);
-    let bridge = PermissionBridgeHandle::spawn("acp-1".into(), "sess-1".into(), sender);
+    let bridge = PermissionBridgeHandle::spawn(
+        "acp-1".into(),
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+        sender,
+    );
     let (mut request, rx) = permission_request("tool-a");
     request.deadline = Duration::from_millis(40);
 

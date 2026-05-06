@@ -147,7 +147,7 @@ fn session_observe_execute_routes_actorful_one_shot_via_daemon_client() {
             "daemon observe context",
             "",
             &project,
-            Some("sess-observe-daemon"),
+            Some("53760875-91e8-5c4e-afce-ac4dcf1390a5"),
             None,
         )
         .expect("start session");
@@ -188,7 +188,9 @@ fn session_observe_execute_routes_actorful_one_shot_via_daemon_client() {
                             );
                             continue;
                         }
-                        if request.starts_with("GET /v1/sessions/sess-observe-daemon ") {
+                        if request
+                            .starts_with("GET /v1/sessions/53760875-91e8-5c4e-afce-ac4dcf1390a5 ")
+                        {
                             write_http_response(
                                 &mut stream,
                                 "200 OK",
@@ -201,7 +203,9 @@ fn session_observe_execute_routes_actorful_one_shot_via_daemon_client() {
                                 .push(request);
                             continue;
                         }
-                        if request.starts_with("POST /v1/sessions/sess-observe-daemon/observe ") {
+                        if request.starts_with(
+                            "POST /v1/sessions/53760875-91e8-5c4e-afce-ac4dcf1390a5/observe ",
+                        ) {
                             write_http_response(
                                 &mut stream,
                                 "200 OK",
@@ -225,7 +229,7 @@ fn session_observe_execute_routes_actorful_one_shot_via_daemon_client() {
         });
 
         let exit = SessionObserveArgs {
-            session_id: "sess-observe-daemon".into(),
+            session_id: "53760875-91e8-5c4e-afce-ac4dcf1390a5".into(),
             poll_interval: 0,
             json: true,
             actor: Some("observer-1".into()),
@@ -242,7 +246,10 @@ fn session_observe_execute_routes_actorful_one_shot_via_daemon_client() {
         let requests = requests.lock().expect("request capture");
         let observe_request = requests
             .iter()
-            .find(|request| request.starts_with("POST /v1/sessions/sess-observe-daemon/observe "))
+            .find(|request| {
+                request
+                    .starts_with("POST /v1/sessions/53760875-91e8-5c4e-afce-ac4dcf1390a5/observe ")
+            })
             .expect("captured observe request");
         assert!(
             observe_request.contains("\"actor\":\"observer-1\""),

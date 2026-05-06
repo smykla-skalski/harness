@@ -5,8 +5,11 @@ use super::*;
 #[test]
 fn session_socket_path_layout() {
     let root = PathBuf::from("/g/sock");
-    let path = session_socket(&root, "abc12345", "agent");
-    assert_eq!(path, PathBuf::from("/g/sock/abc12345-agent.sock"));
+    let path = session_socket(&root, "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed", "agent");
+    assert_eq!(path.parent(), Some(root.as_path()));
+    let file_name = path.file_name().and_then(|name| name.to_str()).unwrap();
+    assert!(file_name.ends_with("-agent.sock"));
+    assert_eq!(file_name.len(), "0000000000-agent.sock".len());
 }
 
 #[test]
@@ -23,7 +26,11 @@ fn path_fits_sun_path_limit_with_long_home() {
         .join("Group Containers")
         .join("Q498EB36N4.io.harnessmonitor")
         .join("sock");
-    let path = session_socket(&root, "abc12345", "mcp-registry");
+    let path = session_socket(
+        &root,
+        "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed",
+        "mcp-registry",
+    );
     let bytes = path.to_string_lossy().len();
     assert!(
         bytes < 104,

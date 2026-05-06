@@ -228,22 +228,42 @@ mod tests {
         let mut events = handle.events;
         handle
             .notifications
-            .send(routed("acp-1", "sess-1", "acp-session-1", "one"))
+            .send(routed(
+                "acp-1",
+                "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                "acp-session-1",
+                "one",
+            ))
             .await
             .expect("send first notification");
         handle
             .notifications
-            .send(routed("acp-2", "sess-2", "acp-session-2", "two"))
+            .send(routed(
+                "acp-2",
+                "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+                "acp-session-2",
+                "two",
+            ))
             .await
             .expect("send second notification");
         handle
             .notifications
-            .send(routed("acp-1", "sess-1", "acp-session-1", "three"))
+            .send(routed(
+                "acp-1",
+                "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                "acp-session-1",
+                "three",
+            ))
             .await
             .expect("send third notification");
         handle
             .notifications
-            .send(routed("acp-2", "sess-2", "acp-session-2", "four"))
+            .send(routed(
+                "acp-2",
+                "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+                "acp-session-2",
+                "four",
+            ))
             .await
             .expect("send fourth notification");
 
@@ -251,11 +271,11 @@ mod tests {
         let second = events.recv().await.expect("second batch");
         assert_eq!(
             (first.acp_id.as_str(), first.session_id.as_str()),
-            ("acp-1", "sess-1")
+            ("acp-1", "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
         );
         assert_eq!(
             (second.acp_id.as_str(), second.session_id.as_str()),
-            ("acp-2", "sess-2")
+            ("acp-2", "00b4a39f-719e-5418-abe8-eb3ab6ea614d")
         );
         assert_eq!(first.raw_count, 2);
         assert_eq!(second.raw_count, 2);

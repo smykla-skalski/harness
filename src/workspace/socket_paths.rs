@@ -1,4 +1,4 @@
-//! Short, flat unix-socket path namespace keyed by session id.
+//! Short, flat unix-socket path namespace keyed by session id hash.
 //!
 //! # Migration scope (Task 11 audit)
 //!
@@ -27,6 +27,7 @@
 
 use std::path::{Path, PathBuf};
 
+use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -45,7 +46,9 @@ pub fn validate_purpose(purpose: &str) -> Result<(), SocketPathError> {
     Ok(())
 }
 
-/// Returns the flat `<root>/<session_id>-<purpose>.sock` path.
+const SESSION_SOCKET_KEY_HEX_LEN: usize = 10;
+
+/// Returns the flat `<root>/<session-key>-<purpose>.sock` path.
 ///
 /// The path must fit within the `sun_path` budget (104 bytes on macOS/Linux).
 /// The module test `path_fits_sun_path_limit_with_long_home` is the early
@@ -54,7 +57,12 @@ pub fn validate_purpose(purpose: &str) -> Result<(), SocketPathError> {
 /// purpose must be shortened or the socket root relocated.
 #[must_use]
 pub fn session_socket(root: &Path, session_id: &str, purpose: &str) -> PathBuf {
-    root.join(format!("{session_id}-{purpose}.sock"))
+    root.join(format!("{}-{purpose}.sock", session_socket_key(session_id)))
+}
+
+fn session_socket_key(session_id: &str) -> String {
+    let digest = Sha256::digest(session_id.as_bytes());
+    hex::encode(&digest[..SESSION_SOCKET_KEY_HEX_LEN / 2])
 }
 
 /// Preferred socket root given the data root. On macOS, places sockets at the

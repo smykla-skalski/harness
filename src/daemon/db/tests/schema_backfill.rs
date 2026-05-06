@@ -349,7 +349,10 @@ fn open_repairs_latest_session_state_agent_wire_aliases() {
         .pointer("/agents/claude-leader")
         .expect("repaired agent");
     assert_eq!(agent["session_agent_id"], "claude-leader");
-    assert_eq!(agent["runtime_session_id"], "claude-session-1");
+    assert_eq!(
+        agent["runtime_session_id"],
+        "2a35c8f7-e812-5024-aed6-9f3b6318847e"
+    );
     assert!(agent.get("agent_id").is_none());
     assert!(agent.get("agent_session_id").is_none());
 

@@ -99,7 +99,8 @@ fn poison_process_fault_locks(manager: &AcpAgentManagerHandle) {
 async fn manager_lock_recovery_returns_structured_errors_for_poisoned_state() {
     let inspect_manager = manager();
     poison_sessions_lock(&inspect_manager);
-    let Err(inspect_error) = inspect_manager.inspect(Some("sess-1")) else {
+    let Err(inspect_error) = inspect_manager.inspect(Some("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"))
+    else {
         unreachable!("poisoned sessions lock should surface an error");
     };
     assert!(
@@ -122,8 +123,11 @@ async fn manager_lock_recovery_returns_structured_errors_for_poisoned_state() {
         };
         let lifecycle_manager = manager();
         let descriptor = descriptor(&script);
-        let Ok(snapshot) = lifecycle_manager.start_descriptor("sess-1", &request, &descriptor)
-        else {
+        let Ok(snapshot) = lifecycle_manager.start_descriptor(
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            &request,
+            &descriptor,
+        ) else {
             unreachable!("start");
         };
         poison_process_lifecycle_lock(&lifecycle_manager);

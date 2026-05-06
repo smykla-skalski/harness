@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn drop_task_to_same_agent_after_assign_starts_instead_of_self_queueing() {
     with_temp_project(|project| {
-        let session_id = "drop-self-target";
+        let session_id = "00000000-0000-4002-8000-00000000000f";
         let state = start_active_session("test", "", project, Some("claude"), Some(session_id))
             .expect("start");
         let leader_id = state.leader_id.expect("leader id");
@@ -36,7 +36,8 @@ fn drop_task_to_same_agent_after_assign_starts_instead_of_self_queueing() {
         )
         .expect("task");
 
-        assign_task(session_id, &task.task_id, &worker_id, &leader_id, project).expect("assign");
+        assign_task(session_id, &task.task_id, &worker_id, &leader_id, project)
+            .expect("00000000-0000-4002-8000-000000000005");
 
         drop_task(
             session_id,

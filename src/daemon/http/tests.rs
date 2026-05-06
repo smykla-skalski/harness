@@ -107,7 +107,7 @@ async fn http_round_trip_smoke_covers_public_surface() {
         db.save_session_state(&project.project_id, &sample_session_state())
             .expect("save session state");
         db.sync_conversation_events(
-            "sess-test-1",
+            "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
             "codex-worker",
             "codex",
             &[sample_tool_result_event()],
@@ -122,7 +122,7 @@ async fn http_round_trip_smoke_covers_public_surface() {
     assert_eq!(diagnostics.status(), StatusCode::OK);
 
     let timeline = get_timeline(
-        axum::extract::Path("sess-test-1".to_owned()),
+        axum::extract::Path("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".to_owned()),
         Query(SessionScopeQuery::with_scope("summary")),
         auth_headers(),
         State(state.clone()),
@@ -272,7 +272,7 @@ async fn get_timeline_summary_scope_returns_window_metadata() {
         db.save_session_state(&project.project_id, &sample_session_state())
             .expect("save session state");
         db.sync_conversation_events(
-            "sess-test-1",
+            "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
             "codex-worker",
             "codex",
             &[sample_tool_result_event()],
@@ -281,7 +281,7 @@ async fn get_timeline_summary_scope_returns_window_metadata() {
     }
 
     let response = get_timeline(
-        axum::extract::Path("sess-test-1".to_owned()),
+        axum::extract::Path("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".to_owned()),
         Query(SessionScopeQuery::with_scope("summary")),
         auth_headers(),
         State(state),

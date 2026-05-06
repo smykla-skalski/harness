@@ -16,7 +16,7 @@ async fn get_managed_agents_merges_terminal_and_codex_snapshots_when_sync_db_is_
     async_db
         .save_codex_run(&CodexRunSnapshot {
             run_id: "codex-run-3".into(),
-            session_id: "sess-test-1".into(),
+            session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
             project_dir: "/tmp/harness".into(),
             thread_id: Some("thread-3".into()),
             turn_id: Some("turn-3".into()),
@@ -37,7 +37,7 @@ async fn get_managed_agents_merges_terminal_and_codex_snapshots_when_sync_db_is_
     async_db
         .save_agent_tui(&AgentTuiSnapshot {
             tui_id: "agent-tui-3".into(),
-            session_id: "sess-test-1".into(),
+            session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
             agent_id: "codex-worker".into(),
             runtime: "codex".into(),
             status: AgentTuiStatus::Running,
@@ -62,7 +62,7 @@ async fn get_managed_agents_merges_terminal_and_codex_snapshots_when_sync_db_is_
         .expect("seed agent tui");
 
     let response = get_managed_agents(
-        axum::extract::Path("sess-test-1".to_owned()),
+        axum::extract::Path("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".to_owned()),
         auth_headers(),
         State(state),
     )
@@ -93,7 +93,7 @@ async fn get_managed_agent_wraps_codex_run_when_sync_db_is_unavailable() {
     async_db
         .save_codex_run(&CodexRunSnapshot {
             run_id: "codex-run-4".into(),
-            session_id: "sess-test-1".into(),
+            session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
             project_dir: "/tmp/harness".into(),
             thread_id: Some("thread-4".into()),
             turn_id: Some("turn-4".into()),
@@ -133,7 +133,7 @@ async fn get_managed_agents_uses_async_db_when_sync_db_is_unavailable_for_termin
     async_db
         .save_agent_tui(&AgentTuiSnapshot {
             tui_id: "agent-tui-5".into(),
-            session_id: "sess-test-1".into(),
+            session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
             agent_id: "codex-worker".into(),
             runtime: "codex".into(),
             status: AgentTuiStatus::Running,
@@ -158,7 +158,7 @@ async fn get_managed_agents_uses_async_db_when_sync_db_is_unavailable_for_termin
         .expect("seed agent tui");
 
     let response = get_managed_agents(
-        axum::extract::Path("sess-test-1".to_owned()),
+        axum::extract::Path("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".to_owned()),
         auth_headers(),
         State(state),
     )
@@ -184,7 +184,7 @@ async fn get_managed_agents_marks_orphaned_running_terminal_snapshots_inactive()
     async_db
         .save_agent_tui(&AgentTuiSnapshot {
             tui_id: "agent-tui-orphaned".into(),
-            session_id: "sess-test-1".into(),
+            session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
             agent_id: String::new(),
             runtime: "codex".into(),
             status: AgentTuiStatus::Running,
@@ -209,7 +209,7 @@ async fn get_managed_agents_marks_orphaned_running_terminal_snapshots_inactive()
         .expect("seed orphaned agent tui");
 
     let response = get_managed_agents(
-        axum::extract::Path("sess-test-1".to_owned()),
+        axum::extract::Path("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".to_owned()),
         auth_headers(),
         State(state),
     )
@@ -243,7 +243,7 @@ async fn get_managed_agent_wraps_terminal_tui_when_sync_db_is_unavailable() {
     async_db
         .save_agent_tui(&AgentTuiSnapshot {
             tui_id: "agent-tui-6".into(),
-            session_id: "sess-test-1".into(),
+            session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
             agent_id: "codex-worker".into(),
             runtime: "codex".into(),
             status: AgentTuiStatus::Stopped,

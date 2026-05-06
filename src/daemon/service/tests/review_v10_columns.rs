@@ -31,7 +31,7 @@ fn v10_task_columns_track_every_review_mutation_on_async_path() {
             let state = start_direct_session_async(
                 &async_db,
                 project,
-                "v10-col-track",
+                "915a83ca-dc2d-56ae-b215-da5aa70a022d",
                 "v10 column tracker",
                 "review column mirror coverage",
                 None,

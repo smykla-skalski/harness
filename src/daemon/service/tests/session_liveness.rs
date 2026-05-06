@@ -9,7 +9,7 @@ fn list_sessions_reads_cached_liveness_state_within_ttl() {
         let fixture = setup_session_with_worker_logs(
             project,
             "daemon cached liveness summaries",
-            "daemon-cached-liveness-summaries",
+            "d43a3183-eee5-5ca4-8a7a-1c52cfe43839",
         );
         let db = setup_db_with_session(project, &fixture.state.session_id);
         clear_session_liveness_refresh_cache_entry(&fixture.state.session_id);
@@ -45,7 +45,7 @@ fn list_sessions_skips_liveness_disk_probe_when_db_session_has_no_live_agents() 
         let fixture = setup_session_with_worker_logs(
             project,
             "daemon dead-session summaries",
-            "daemon-dead-session-summaries",
+            "30ffa13f-e939-5012-acf8-2cd29b1843b5",
         );
         let stale = (chrono::Utc::now() - chrono::Duration::seconds(1_200)).to_rfc3339();
         let layout =
@@ -91,7 +91,7 @@ fn list_sessions_reconciles_orphaned_active_session_without_state_file() {
         let fixture = setup_session_with_worker_logs(
             project,
             "daemon orphaned liveness summaries",
-            "daemon-orphaned-liveness-summaries",
+            "eddfddfc-1f15-595e-8bf5-da249a790b38",
         );
         let stale = (chrono::Utc::now() - chrono::Duration::seconds(1_200)).to_rfc3339();
         let mut stale_state = fixture.state.clone();
@@ -146,7 +146,7 @@ fn session_detail_async_reconciles_orphaned_active_session_without_state_file() 
         let fixture = setup_session_with_worker_logs(
             project,
             "daemon async orphaned liveness detail",
-            "daemon-async-orphaned-liveness-detail",
+            "6bf4cb7c-8872-507e-833e-cc3451deea36",
         );
         let stale = (chrono::Utc::now() - chrono::Duration::seconds(1_200)).to_rfc3339();
         let mut stale_state = fixture.state.clone();
@@ -210,7 +210,7 @@ fn background_liveness_refresh_updates_async_summary_without_explicit_read() {
             "",
             project,
             Some("claude"),
-            Some("daemon-background-liveness-refresh"),
+            Some("dd3d7e14-fbea-5adb-9c79-787edaf06b42"),
         )
         .expect("start active session");
         let leader_id = state.leader_id.clone().expect("leader id");
@@ -315,22 +315,28 @@ fn stale_session_ids_for_liveness_refresh_skips_recent_sessions() {
 
     let first = stale_session_ids_for_liveness_refresh(
         &mut cache,
-        BTreeSet::from([String::from("sess-1")]),
+        BTreeSet::from([String::from("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")]),
         now,
     );
-    assert_eq!(first, vec![String::from("sess-1")]);
+    assert_eq!(
+        first,
+        vec![String::from("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")]
+    );
 
     let second = stale_session_ids_for_liveness_refresh(
         &mut cache,
-        BTreeSet::from([String::from("sess-1")]),
+        BTreeSet::from([String::from("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")]),
         now + Duration::from_secs(1),
     );
     assert!(second.is_empty(), "recent sessions should be skipped");
 
     let third = stale_session_ids_for_liveness_refresh(
         &mut cache,
-        BTreeSet::from([String::from("sess-1")]),
+        BTreeSet::from([String::from("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")]),
         now + SESSION_LIVENESS_REFRESH_TTL + Duration::from_secs(1),
     );
-    assert_eq!(third, vec![String::from("sess-1")]);
+    assert_eq!(
+        third,
+        vec![String::from("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")]
+    );
 }

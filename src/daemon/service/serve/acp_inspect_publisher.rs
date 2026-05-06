@@ -205,18 +205,27 @@ mod tests {
 
     #[test]
     fn acp_inspect_trigger_uses_session_scoped_acp_events() {
-        let event = stream_event("acp_events", Some("sess-1"));
-        assert_eq!(acp_inspect_trigger_session_id(&event), Some("sess-1"));
+        let event = stream_event("acp_events", Some("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"));
+        assert_eq!(
+            acp_inspect_trigger_session_id(&event),
+            Some("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
+        );
     }
 
     #[test]
     fn acp_inspect_trigger_ignores_non_acp_or_self_push_events() {
         assert_eq!(
-            acp_inspect_trigger_session_id(&stream_event("session_updated", Some("sess-1"))),
+            acp_inspect_trigger_session_id(&stream_event(
+                "session_updated",
+                Some("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
+            )),
             None
         );
         assert_eq!(
-            acp_inspect_trigger_session_id(&stream_event("acp_inspect", Some("sess-1"))),
+            acp_inspect_trigger_session_id(&stream_event(
+                "acp_inspect",
+                Some("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
+            )),
             None
         );
         assert_eq!(
@@ -229,9 +238,9 @@ mod tests {
     fn catchup_session_ids_deduplicate_sessions() {
         let response = AcpAgentInspectResponse {
             agents: vec![
-                inspect_snapshot("sess-1", "acp-1", "agent-1"),
-                inspect_snapshot("sess-1", "acp-2", "agent-2"),
-                inspect_snapshot("sess-2", "acp-3", "agent-3"),
+                inspect_snapshot("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "acp-1", "agent-1"),
+                inspect_snapshot("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "acp-2", "agent-2"),
+                inspect_snapshot("00b4a39f-719e-5418-abe8-eb3ab6ea614d", "acp-3", "agent-3"),
             ],
             daemon_perceived_now: None,
             available: true,
@@ -246,7 +255,10 @@ mod tests {
 
         assert_eq!(
             sessions,
-            std::collections::BTreeSet::from(["sess-1".to_string(), "sess-2".to_string(),])
+            std::collections::BTreeSet::from([
+                "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".to_string(),
+                "00b4a39f-719e-5418-abe8-eb3ab6ea614d".to_string(),
+            ])
         );
     }
 

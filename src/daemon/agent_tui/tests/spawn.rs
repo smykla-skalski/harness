@@ -174,7 +174,7 @@ fn skill_directory_flags_copilot_returns_plugin_dir() {
 #[test]
 fn skill_directory_flags_missing_dir_returns_empty() {
     let tmp = tempfile::tempdir().expect("tempdir");
-    let project = tmp.path().join("nonexistent");
+    let project = tmp.path().join("418cf829-6691-5fc0-92b1-8e5013efa2cb");
     let flags = skill_directory_flags("claude", &project);
     assert!(flags.is_empty());
 }
@@ -183,7 +183,7 @@ fn skill_directory_flags_missing_dir_returns_empty() {
 fn build_auto_join_prompt_includes_markers() {
     let prompt = build_auto_join_prompt(
         "codex",
-        "sess-123",
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc23",
         SessionRole::Worker,
         None,
         &[],
@@ -191,7 +191,10 @@ fn build_auto_join_prompt_includes_markers() {
         None,
         None,
     );
-    assert!(prompt.contains("sess-123"), "should contain session id");
+    assert!(
+        prompt.contains("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc23"),
+        "should contain session id"
+    );
     assert!(
         prompt.contains("agent-tui"),
         "should contain agent-tui capability"
@@ -201,7 +204,7 @@ fn build_auto_join_prompt_includes_markers() {
         "should contain marker capability"
     );
     assert!(
-        prompt.starts_with("$harness:harness session join sess-123"),
+        prompt.starts_with("$harness:harness session join eadbcb3e-6ef7-53d2-ad56-0347cb7189fc23"),
         "codex should use the plugin:skill prefix: {prompt}"
     );
     assert!(prompt.contains("worker"), "should contain role");
@@ -212,7 +215,7 @@ fn build_auto_join_prompt_includes_markers() {
 fn build_auto_join_prompt_preserves_user_capabilities() {
     let prompt = build_auto_join_prompt(
         "claude",
-        "sess-456",
+        "fbbde0b1-87ab-53c2-b7f0-9b9a3ecccb4956",
         SessionRole::Observer,
         None,
         &["custom-cap".to_string(), "another".to_string()],

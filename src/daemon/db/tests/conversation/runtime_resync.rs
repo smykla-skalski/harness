@@ -239,7 +239,7 @@ fn append_conversation_events_merges_live_batches_without_replacing_history() {
             content: "first response".into(),
         },
         agent: "claude-leader".into(),
-        session_id: "sess-test-1".into(),
+        session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
     };
     let second = ConversationEvent {
         timestamp: Some("2026-04-03T12:00:02Z".into()),
@@ -248,25 +248,43 @@ fn append_conversation_events_merges_live_batches_without_replacing_history() {
             content: "second response".into(),
         },
         agent: "claude-leader".into(),
-        session_id: "sess-test-1".into(),
+        session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
     };
 
-    db.append_conversation_events("sess-test-1", "claude-leader", "gemini", &[first.clone()])
-        .expect("append first live batch");
-    db.append_conversation_events("sess-test-1", "claude-leader", "gemini", &[first])
-        .expect("reappend identical live batch");
-    db.append_conversation_events("sess-test-1", "claude-leader", "gemini", &[second])
-        .expect("append second live batch");
+    db.append_conversation_events(
+        "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
+        "claude-leader",
+        "gemini",
+        &[first.clone()],
+    )
+    .expect("append first live batch");
+    db.append_conversation_events(
+        "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
+        "claude-leader",
+        "gemini",
+        &[first],
+    )
+    .expect("reappend identical live batch");
+    db.append_conversation_events(
+        "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
+        "claude-leader",
+        "gemini",
+        &[second],
+    )
+    .expect("append second live batch");
 
     let loaded = db
-        .load_conversation_events("sess-test-1", "claude-leader")
+        .load_conversation_events("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4", "claude-leader")
         .expect("load appended events");
     assert_eq!(loaded.len(), 2);
     assert_eq!(loaded[0].sequence, 1);
     assert_eq!(loaded[1].sequence, 2);
 
     let timeline = db
-        .load_session_timeline_window("sess-test-1", &TimelineWindowRequest::default())
+        .load_session_timeline_window(
+            "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
+            &TimelineWindowRequest::default(),
+        )
         .expect("load timeline window")
         .expect("timeline window present");
     assert_eq!(timeline.total_count, 2);

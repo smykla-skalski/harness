@@ -15,12 +15,17 @@ use super::state::WatchChanges;
 #[test]
 fn poll_change_tracking_accepts_raw_session_scope() {
     let db = DaemonDb::open_in_memory().expect("open db");
-    db.bump_change("watch-sess").expect("bump change");
+    db.bump_change("ae60b5c5-37cf-5a50-a816-8f454bb9e92e")
+        .expect("bump change");
 
     let mut last_change_seq = 0;
     let changes = poll_change_tracking(&db, &mut last_change_seq);
 
-    assert!(changes.session_ids.contains("watch-sess"));
+    assert!(
+        changes
+            .session_ids
+            .contains("ae60b5c5-37cf-5a50-a816-8f454bb9e92e")
+    );
     assert_eq!(last_change_seq, 1);
 }
 
@@ -72,7 +77,7 @@ fn emit_watch_changes_releases_db_lock_before_extensions() {
     emit_watch_changes_with(
         WatchChanges {
             sessions_updated: true,
-            session_ids: BTreeSet::from([String::from("watch-sess")]),
+            session_ids: BTreeSet::from([String::from("ae60b5c5-37cf-5a50-a816-8f454bb9e92e")]),
         },
         Some(&db),
         |db_ref| {
@@ -84,12 +89,12 @@ fn emit_watch_changes_releases_db_lock_before_extensions() {
         },
         |session_id, db_ref| {
             session_updated_core = true;
-            assert_eq!(session_id, "watch-sess");
+            assert_eq!(session_id, "ae60b5c5-37cf-5a50-a816-8f454bb9e92e");
             assert!(db_ref.is_some(), "core updates should receive the DB view");
         },
         |session_id, db_ref| {
             session_extensions = true;
-            assert_eq!(session_id, "watch-sess");
+            assert_eq!(session_id, "ae60b5c5-37cf-5a50-a816-8f454bb9e92e");
             assert!(
                 db_ref.is_none(),
                 "extensions should run after releasing the DB lock"
@@ -126,9 +131,9 @@ async fn emit_watch_changes_prefers_async_broadcast_builders() {
     let state = build_new_session(
         "watch async snapshot",
         "",
-        "watch-sess",
+        "ae60b5c5-37cf-5a50-a816-8f454bb9e92e",
         "claude",
-        Some("watch-session"),
+        Some("ae60b5c5-37cf-5a50-a816-8f454bb9e92eion"),
         "2026-04-15T00:00:00Z",
     );
     db.sync_session(&project.project_id, &state)
@@ -146,7 +151,7 @@ async fn emit_watch_changes_prefers_async_broadcast_builders() {
         &sender,
         WatchChanges {
             sessions_updated: true,
-            session_ids: BTreeSet::from([String::from("watch-sess")]),
+            session_ids: BTreeSet::from([String::from("ae60b5c5-37cf-5a50-a816-8f454bb9e92e")]),
         },
         None,
         Some(&async_db),

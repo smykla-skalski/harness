@@ -24,7 +24,7 @@ fn drop_task_async_actively_delivers_to_idle_tui_agent() {
                 let manager =
                     AgentTuiManagerHandle::new_with_async_db(sender, db_slot, async_db_slot, false);
 
-                let session_id = "daemon-async-active-drop";
+                let session_id = "4f2f2a50-142c-583c-a0b5-e0d671b61e40";
                 let state = start_direct_session_async(
                     &async_db,
                     project,

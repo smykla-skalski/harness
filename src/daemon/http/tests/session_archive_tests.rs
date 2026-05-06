@@ -18,7 +18,7 @@ fn post_session_archive_uses_async_db_and_hides_session_from_later_reads() {
     with_isolated_harness_env(sandbox.path(), || {
         temp_env::with_var(
             "CLAUDE_SESSION_ID",
-            Some("http-async-archive-leader"),
+            Some("5cfa2b94-965b-5d88-bb28-79b08663f71e-leader"),
             || {
                 let project_dir = sandbox.path().join("project");
                 init_git_project(&project_dir);
@@ -27,7 +27,7 @@ fn post_session_archive_uses_async_db_and_hides_session_from_later_reads() {
                 runtime.block_on(async {
                     let db_path = sandbox.path().join("daemon.sqlite");
                     let state = test_http_state_with_empty_async_db(&db_path).await;
-                    let session_id = "http-async-archive";
+                    let session_id = "5cfa2b94-965b-5d88-bb28-79b08663f71e";
                     let _ = start_async_http_session(state.clone(), &project_dir, session_id).await;
 
                     let archived = post_session_archive(

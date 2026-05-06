@@ -172,7 +172,7 @@ fn record_hook_event_registers_late_managed_runtime_session() {
             "late gemini runtime session id",
             "",
             project,
-            Some("sess-gemini-late"),
+            Some("bc9852b3-c89f-5cb2-a896-e59adffc8316"),
         )
         .expect("start session");
         let session_id = started.session_id;
@@ -215,7 +215,9 @@ fn record_hook_event_registers_late_managed_runtime_session() {
             agent: Some(AgentContext {
                 agent_id: None,
                 agent_type: Some("gemini".into()),
-                prompt: Some("/harness:harness session join sess-gemini-late".into()),
+                prompt: Some(
+                    "/harness:harness session join bc9852b3-c89f-5cb2-a896-e59adffc8316".into(),
+                ),
                 response: Some("stop".into()),
             }),
             skill: SkillContext::inactive(),
@@ -266,7 +268,7 @@ fn record_hook_event_session_end_disconnects_managed_agent() {
             "managed session end cleanup",
             "",
             project,
-            Some("sess-managed-end"),
+            Some("2325f772-e3ff-5180-9210-795508785d7d"),
         )
         .expect("start session");
         let session_id = started.session_id;

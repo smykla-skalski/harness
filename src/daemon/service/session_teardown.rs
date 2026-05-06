@@ -63,7 +63,7 @@ mod tests {
         SessionState {
             schema_version: crate::session::types::CURRENT_VERSION,
             state_version: 0,
-            session_id: "abc12345".into(),
+            session_id: "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed".into(),
             project_name: "demo".into(),
             worktree_path: PathBuf::new(),
             shared_path: PathBuf::new(),
@@ -90,12 +90,12 @@ mod tests {
 
     #[test]
     fn build_layout_uses_external_origin_when_set() {
-        let origin = PathBuf::from("/tmp/external/demo/abc12345");
+        let origin = PathBuf::from("/tmp/external/demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
         let state = state_with_external_origin(origin);
         let layout = build_layout(&state);
         assert_eq!(layout.sessions_root, PathBuf::from("/tmp/external"));
         assert_eq!(layout.project_name, "demo");
-        assert_eq!(layout.session_id, "abc12345");
+        assert_eq!(layout.session_id, "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
     }
 
     #[test]
@@ -104,7 +104,7 @@ mod tests {
         state.external_origin = None;
         let layout = build_layout(&state);
         assert_eq!(layout.project_name, "demo");
-        assert_eq!(layout.session_id, "abc12345");
+        assert_eq!(layout.session_id, "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
         // sessions_root is the daemon data root's sessions dir; we just care it
         // ends with "sessions".
         assert_eq!(

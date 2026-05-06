@@ -24,7 +24,7 @@ fn snapshot_round_trip_smoke_covers_public_surface() {
         )],
         || {
             let context_root = tmp.path().join("harness/projects/project-alpha");
-            let session_id = "sess-round-trip";
+            let session_id = "b5f69752-76b7-5e74-b38f-ab709a833e60";
             seed_snapshot_fixture(&context_root, session_id);
 
             let projects = project_summaries().expect("project summaries");
@@ -97,7 +97,7 @@ fn session_detail_includes_signals_observer_and_cache() {
         )],
         || {
             let context_root = tmp.path().join("harness/projects/project-alpha");
-            let session_id = "sess-merge";
+            let session_id = "7d8914ed-1073-56a6-85c1-0582a49cf5ce";
             seed_snapshot_fixture(&context_root, session_id);
 
             let detail = session_detail(session_id).expect("detail");
@@ -199,7 +199,7 @@ fn snapshot_summary_and_detail_preserve_adoption_metadata() {
         )],
         || {
             let context_root = tmp.path().join("harness/projects/project-adopted");
-            let session_id = "sess-adopted";
+            let session_id = "7b0bd761-6a0b-5a7f-9147-69a5cc647f67";
             let state_path = context_root
                 .join("orchestration")
                 .join("sessions")
@@ -270,7 +270,7 @@ fn session_summaries_default_visibility_includes_awaiting_leader_active_and_lead
             "awaiting snapshot",
             "",
             &project_dir,
-            Some("snap-awaiting"),
+            Some("156471e8-c265-5312-8945-5d5ef789bcc8"),
         )
         .expect("start awaiting session");
 
@@ -278,7 +278,7 @@ fn session_summaries_default_visibility_includes_awaiting_leader_active_and_lead
             "active snapshot",
             "",
             &project_dir,
-            Some("snap-active"),
+            Some("db0f4f1a-3c08-5dfd-ac2f-3aa42ec8b019"),
         )
         .expect("start active seed");
         let active = temp_env::with_var("CLAUDE_SESSION_ID", Some("leader-active"), || {
@@ -298,7 +298,7 @@ fn session_summaries_default_visibility_includes_awaiting_leader_active_and_lead
             "degraded snapshot",
             "",
             &project_dir,
-            Some("snap-degraded"),
+            Some("b946e7d9-00f5-5f30-a1c6-1c240c5cb2ea"),
         )
         .expect("start degraded seed");
         let degraded = temp_env::with_var("CLAUDE_SESSION_ID", Some("leader-degraded"), || {
@@ -328,9 +328,13 @@ fn session_summaries_default_visibility_includes_awaiting_leader_active_and_lead
         })
         .expect("degrade session");
 
-        let ended =
-            session_service::start_session("ended snapshot", "", &project_dir, Some("snap-ended"))
-                .expect("start ended seed");
+        let ended = session_service::start_session(
+            "ended snapshot",
+            "",
+            &project_dir,
+            Some("cb529bee-9b4e-57a9-a905-423db769e015"),
+        )
+        .expect("start ended seed");
         let ended = temp_env::with_var("CLAUDE_SESSION_ID", Some("leader-ended"), || {
             session_service::join_session(
                 &ended.session_id,

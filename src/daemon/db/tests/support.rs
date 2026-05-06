@@ -2,8 +2,9 @@ use super::*;
 
 mod extended_fixtures;
 pub(super) use extended_fixtures::{
-    agent_columns, median_runtime_budget_ms, sample_conversation_event, sample_resolved_session,
-    seeded_performance_db, session_agent_identity_rows, simulate_pre_v11_agents_table,
+    agent_columns, median_runtime_budget_ms, performance_session_id, sample_conversation_event,
+    sample_resolved_session, seeded_performance_db, session_agent_identity_rows,
+    simulate_pre_v11_agents_table,
 };
 
 pub(super) fn sample_signal_record(expires_at: &str) -> SessionSignalRecord {
@@ -13,7 +14,7 @@ pub(super) fn sample_signal_record(expires_at: &str) -> SessionSignalRecord {
     SessionSignalRecord {
         runtime: "claude".into(),
         agent_id: "claude-leader".into(),
-        session_id: "sess-test-1".into(),
+        session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
         status: SessionSignalStatus::Pending,
         signal: Signal {
             signal_id: "sig-test-1".into(),
@@ -115,7 +116,7 @@ pub(super) fn sample_session_state() -> SessionState {
             joined_at: "2026-04-03T12:00:00Z".into(),
             updated_at: "2026-04-03T12:05:00Z".into(),
             status: AgentStatus::Active,
-            agent_session_id: Some("claude-session-1".into()),
+            agent_session_id: Some("2a35c8f7-e812-5024-aed6-9f3b6318847e".into()),
             managed_agent: None,
             last_activity_at: Some("2026-04-03T12:05:00Z".into()),
             current_task_id: None,
@@ -160,7 +161,7 @@ pub(super) fn sample_session_state() -> SessionState {
     SessionState {
         schema_version: 3,
         state_version: 1,
-        session_id: "sess-test-1".into(),
+        session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
         project_name: String::new(),
         worktree_path: PathBuf::new(),
         shared_path: PathBuf::new(),
@@ -255,7 +256,7 @@ pub(super) fn sample_session_state_with_managed_agents() -> SessionState {
             joined_at: "2026-04-03T12:04:00Z".into(),
             updated_at: "2026-04-03T12:07:00Z".into(),
             status: AgentStatus::Idle,
-            agent_session_id: Some("copilot-session-1".into()),
+            agent_session_id: Some("93595910-aac3-58cb-aadf-5101d4ce534b".into()),
             managed_agent: None,
             last_activity_at: Some("2026-04-03T12:07:00Z".into()),
             current_task_id: None,
@@ -270,7 +271,7 @@ pub(super) fn sample_session_state_with_managed_agents() -> SessionState {
 pub(super) fn sample_codex_run(run_id: &str, updated_at: &str) -> CodexRunSnapshot {
     CodexRunSnapshot {
         run_id: run_id.into(),
-        session_id: "sess-test-1".into(),
+        session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
         project_dir: "/tmp/harness".into(),
         thread_id: Some("thread-1".into()),
         turn_id: Some("turn-1".into()),
@@ -291,7 +292,7 @@ pub(super) fn sample_codex_run(run_id: &str, updated_at: &str) -> CodexRunSnapsh
 pub(super) fn sample_agent_tui(tui_id: &str, updated_at: &str) -> AgentTuiSnapshot {
     AgentTuiSnapshot {
         tui_id: tui_id.into(),
-        session_id: "sess-test-1".into(),
+        session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
         agent_id: "claude-leader".into(),
         runtime: "copilot".into(),
         status: AgentTuiStatus::Running,

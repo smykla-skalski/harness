@@ -3,6 +3,7 @@ use super::{
     daemon_protocol, db_error, project_context_dir, project_context_id, usize_from_i64,
 };
 use crate::session::service::canonicalize_persisted_session_state;
+use crate::session::storage;
 use crate::workspace::utc_now;
 
 impl DaemonDb {
@@ -205,6 +206,9 @@ impl DaemonDb {
 
         let mut summaries = Vec::new();
         for row in all_rows {
+            if !storage::is_valid_session_id(&row.session_id) {
+                continue;
+            }
             summaries.push(row.into_summary(self)?);
         }
         Ok(summaries)
@@ -244,6 +248,9 @@ impl DaemonDb {
         for (project_id, json) in all_rows {
             let mut state: SessionState = serde_json::from_str(&json)
                 .map_err(|error| db_error(format!("parse session state: {error}")))?;
+            if !storage::is_valid_session_id(&state.session_id) {
+                continue;
+            }
             if canonicalize_persisted_session_state(&mut state, &utc_now()) {
                 self.sync_session(&project_id, &state)?;
             }
@@ -261,6 +268,7 @@ impl DaemonDb {
         &self,
         session_id: &str,
     ) -> Result<Option<daemon_index::ResolvedSession>, CliError> {
+        storage::validate_session_id(session_id)?;
         let result = self.conn.query_row(
             "SELECT s.state_json, p.project_id, p.name, p.project_dir, p.repository_root,
                     p.checkout_id, p.checkout_name, p.context_root, p.is_worktree, p.worktree_name

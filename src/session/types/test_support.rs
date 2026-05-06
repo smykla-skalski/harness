@@ -52,7 +52,7 @@ pub(super) fn session_state(
     SessionState {
         schema_version: CURRENT_VERSION,
         state_version: 1,
-        session_id: "sess-1".into(),
+        session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
         project_name: String::new(),
         worktree_path: PathBuf::new(),
         shared_path: PathBuf::new(),

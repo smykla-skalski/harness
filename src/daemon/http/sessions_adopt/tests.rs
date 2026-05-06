@@ -49,11 +49,15 @@ fn returns_200_on_valid_session() {
         // data root so external_origin stays None.
         let data_root = tmp.path().join("harness");
         let sessions_dir = data_root.join("sessions");
-        let session_dir = sessions_dir.join("demo/abc12345");
+        let session_dir = sessions_dir.join("demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
         let origin = tmp.path().join("src/demo");
         fs::create_dir_all(&session_dir).unwrap();
         fs::create_dir_all(&origin).unwrap();
-        write_valid_session(&session_dir, "abc12345", origin.to_str().unwrap());
+        write_valid_session(
+            &session_dir,
+            "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed",
+            origin.to_str().unwrap(),
+        );
 
         let state = test_http_state_with_db();
         let runtime = tokio::runtime::Runtime::new().expect("runtime");
@@ -70,7 +74,10 @@ fn returns_200_on_valid_session() {
 
             let (status, body) = response_json(response).await;
             assert_eq!(status, StatusCode::OK);
-            assert_eq!(body["state"]["session_id"].as_str(), Some("abc12345"));
+            assert_eq!(
+                body["state"]["session_id"].as_str(),
+                Some("72026b9c-9f8f-5a76-a6cf-a05cbb5741ed")
+            );
         });
     });
 }
@@ -83,11 +90,15 @@ fn returns_200_on_valid_session_when_sandboxed_without_bookmark() {
         temp_env::with_var("HARNESS_SANDBOXED", Some("1"), || {
             let data_root = tmp.path().join("harness");
             let sessions_dir = data_root.join("sessions");
-            let session_dir = sessions_dir.join("demo/abc12345");
+            let session_dir = sessions_dir.join("demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
             let origin = tmp.path().join("src/demo");
             fs::create_dir_all(&session_dir).unwrap();
             fs::create_dir_all(&origin).unwrap();
-            write_valid_session(&session_dir, "abc12345", origin.to_str().unwrap());
+            write_valid_session(
+                &session_dir,
+                "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed",
+                origin.to_str().unwrap(),
+            );
 
             let state = test_http_state_with_db();
             let runtime = tokio::runtime::Runtime::new().expect("runtime");
@@ -104,7 +115,10 @@ fn returns_200_on_valid_session_when_sandboxed_without_bookmark() {
 
                 let (status, body) = response_json(response).await;
                 assert_eq!(status, StatusCode::OK);
-                assert_eq!(body["state"]["session_id"].as_str(), Some("abc12345"));
+                assert_eq!(
+                    body["state"]["session_id"].as_str(),
+                    Some("72026b9c-9f8f-5a76-a6cf-a05cbb5741ed")
+                );
             });
         });
     });
@@ -120,13 +134,17 @@ fn returns_200_on_valid_session_when_sandboxed_with_bookmark() {
             let data_root = tmp.path().join("harness");
             let bookmarks_path = tmp.path().join("sandbox/bookmarks.json");
             let sessions_dir = data_root.join("sessions");
-            let session_dir = sessions_dir.join("demo/abc12345");
+            let session_dir = sessions_dir.join("demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
             let origin = tmp.path().join("src/demo");
             fs::create_dir_all(&session_dir).unwrap();
             fs::create_dir_all(&origin).unwrap();
-            write_valid_session(&session_dir, "abc12345", origin.to_str().unwrap());
+            write_valid_session(
+                &session_dir,
+                "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed",
+                origin.to_str().unwrap(),
+            );
 
-            let bookmark_id = "B-session-abc12345";
+            let bookmark_id = "B-session-72026b9c-9f8f-5a76-a6cf-a05cbb5741ed";
             write_bookmarks_store(
                 &bookmarks_path,
                 vec![Record {
@@ -158,7 +176,10 @@ fn returns_200_on_valid_session_when_sandboxed_with_bookmark() {
 
                 let (status, body) = response_json(response).await;
                 assert_eq!(status, StatusCode::OK);
-                assert_eq!(body["state"]["session_id"].as_str(), Some("abc12345"));
+                assert_eq!(
+                    body["state"]["session_id"].as_str(),
+                    Some("72026b9c-9f8f-5a76-a6cf-a05cbb5741ed")
+                );
             });
         });
     });
@@ -170,11 +191,15 @@ fn returns_409_on_duplicate() {
 
     harness_testkit::with_isolated_harness_env(tmp.path(), || {
         let sessions_dir = tmp.path().join("harness/sessions");
-        let session_dir = sessions_dir.join("demo/abc12345");
+        let session_dir = sessions_dir.join("demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
         let origin = tmp.path().join("src/demo");
         fs::create_dir_all(&session_dir).unwrap();
         fs::create_dir_all(&origin).unwrap();
-        write_valid_session(&session_dir, "abc12345", origin.to_str().unwrap());
+        write_valid_session(
+            &session_dir,
+            "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed",
+            origin.to_str().unwrap(),
+        );
 
         let state = test_http_state_with_db();
         let runtime = tokio::runtime::Runtime::new().expect("runtime");
@@ -205,7 +230,10 @@ fn returns_409_on_duplicate() {
             let (status, body) = response_json(second).await;
             assert_eq!(status, StatusCode::CONFLICT);
             assert_eq!(body["error"].as_str(), Some("already-attached"));
-            assert_eq!(body["session_id"].as_str(), Some("abc12345"));
+            assert_eq!(
+                body["session_id"].as_str(),
+                Some("72026b9c-9f8f-5a76-a6cf-a05cbb5741ed")
+            );
         });
     });
 }
@@ -214,7 +242,7 @@ fn returns_409_on_duplicate() {
 fn returns_422_on_layout_violation() {
     let tmp = TempDir::new().unwrap();
     // Session directory exists but is missing workspace/ — probe will fail.
-    let session_dir = tmp.path().join("demo/abc12345");
+    let session_dir = tmp.path().join("demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
     fs::create_dir_all(&session_dir).unwrap();
 
     harness_testkit::with_isolated_harness_env(tmp.path(), || {

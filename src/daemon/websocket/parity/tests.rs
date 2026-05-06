@@ -43,7 +43,7 @@ async fn sync_session_title_reports_poisoned_db_lock_as_ws_error() {
             id: "req-poisoned-db".into(),
             method: "session.title".into(),
             params: json!({
-                "session_id": "sess-test-1",
+                "session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
                 "title": "renamed session",
             }),
             trace_context: None,
@@ -67,15 +67,15 @@ async fn parity_concurrent_mutation_serializes_acp_start_by_session_and_agent() 
     super::super::test_support::seed_sample_session(&state);
     let mutation_guard = state
         .managed_agent_mutation_locks
-        .lock("sess-test-1", "acp-worker")
+        .lock("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4", "copilot")
         .await;
 
     let request = WsRequest {
         id: "req-start-acp".into(),
         method: "managed_agent.start_acp".into(),
         params: json!({
-            "session_id": "sess-test-1",
-            "agent": "acp-worker",
+            "session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
+            "descriptor_id": "copilot",
         }),
         trace_context: None,
     };
@@ -118,7 +118,7 @@ async fn dispatch_managed_agent_start_acp_rejects_missing_session_before_spawn()
                 id: "req-start-stale-acp".into(),
                 method: "managed_agent.start_acp".into(),
                 params: json!({
-                    "session_id": "nod8ccog",
+                    "session_id": "11111111-1111-4111-8111-111111111111",
                     "descriptor_id": "copilot",
                 }),
                 trace_context: None,
@@ -131,7 +131,7 @@ async fn dispatch_managed_agent_start_acp_rejects_missing_session_before_spawn()
             assert!(
                 error
                     .message
-                    .contains("harness session 'nod8ccog' not found"),
+                    .contains("harness session '11111111-1111-4111-8111-111111111111' not found"),
                 "unexpected error message: {}",
                 error.message
             );
@@ -159,7 +159,7 @@ async fn dispatch_managed_agent_start_acp_rejects_archived_session_before_spawn(
                 id: "req-start-archived-acp".into(),
                 method: "managed_agent.start_acp".into(),
                 params: json!({
-                    "session_id": "sess-test-1",
+                    "session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
                     "descriptor_id": "copilot",
                 }),
                 trace_context: None,
@@ -172,7 +172,7 @@ async fn dispatch_managed_agent_start_acp_rejects_archived_session_before_spawn(
             assert!(
                 error
                     .message
-                    .contains("harness session 'sess-test-1' not found"),
+                    .contains("harness session 'f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4' not found"),
                 "unexpected error message: {}",
                 error.message
             );
@@ -233,13 +233,13 @@ fn session_adopt_reports_poisoned_db_lock_as_ws_error() {
     with_isolated_harness_env(temp.path(), || {
         let data_root = temp.path().join("harness");
         let sessions_dir = data_root.join("sessions");
-        let session_dir = sessions_dir.join("demo/abc12345");
+        let session_dir = sessions_dir.join("demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
         let origin = temp.path().join("src/demo");
         fs::create_dir_all(&session_dir).expect("create session dir");
         fs::create_dir_all(&origin).expect("create origin dir");
         write_valid_session(
             &session_dir,
-            "abc12345",
+            "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed",
             origin.to_str().expect("origin path utf8"),
         );
 

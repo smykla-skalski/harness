@@ -13,7 +13,7 @@ fn serve_helpers_round_trip_smoke_covers_public_surface() {
             "",
             project,
             Some("claude"),
-            Some("daemon-serve-helpers"),
+            Some("df12548d-bd4b-5674-ad49-953214cd7e89"),
         )
         .expect("start session");
 
@@ -99,7 +99,7 @@ fn session_import_required_skips_matching_db_versions() {
             "",
             project,
             Some("claude"),
-            Some("daemon-version-skip"),
+            Some("093b0b2f-e691-5236-81b7-feb9281326af"),
         )
         .expect("start session");
 
@@ -132,7 +132,7 @@ fn session_import_required_detects_newer_file_versions() {
             "",
             project,
             Some("claude"),
-            Some("daemon-version-refresh"),
+            Some("70f70c8d-3b30-5ca7-82cd-4982b32128f2"),
         )
         .expect("start session");
         let leader_id = state.leader_id.clone().expect("leader id");

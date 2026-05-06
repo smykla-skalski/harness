@@ -21,6 +21,7 @@ use super::{
 };
 use crate::errors::CliErrorKind;
 use crate::session::service::{agent_status_db_label, canonicalize_persisted_session_state};
+use crate::session::storage;
 use crate::session::types::ManagedAgentKind;
 
 const LOAD_SESSION_FOR_MUTATION_SQL: &str =
@@ -299,6 +300,7 @@ async fn sync_session_in_transaction(
     let now = utc_now();
     let mut canonical_state = state.clone();
     canonicalize_persisted_session_state(&mut canonical_state, &now);
+    storage::validate_session_id(&canonical_state.session_id)?;
     let state_json = serde_json::to_string(&canonical_state)
         .map_err(|error| db_error(format!("serialize async session state: {error}")))?;
     let metrics_json = serde_json::to_string(&canonical_state.metrics)

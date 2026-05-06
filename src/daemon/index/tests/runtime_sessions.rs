@@ -5,6 +5,8 @@ use crate::session::service as session_service;
 use crate::session::storage;
 use crate::session::types::SessionRole;
 
+const LEGACY_KEY_SESSION_ID: &str = "00000000-0000-4001-8000-000000000003";
+
 #[test]
 fn resolve_session_id_uses_legacy_session_key_only_for_unbound_agents() {
     let tmp = tempdir().expect("tempdir");
@@ -17,7 +19,7 @@ fn resolve_session_id_uses_legacy_session_key_only_for_unbound_agents() {
                 "ctx",
                 "title",
                 &project_dir,
-                Some("legacy-session"),
+                Some(LEGACY_KEY_SESSION_ID),
             )
             .expect("start session");
             session_service::join_session(
@@ -40,7 +42,7 @@ fn resolve_session_id_uses_legacy_session_key_only_for_unbound_agents() {
             ],
             || {
                 session_service::join_session(
-                    "legacy-session",
+                    LEGACY_KEY_SESSION_ID,
                     SessionRole::Worker,
                     "codex",
                     &[],
@@ -53,7 +55,7 @@ fn resolve_session_id_uses_legacy_session_key_only_for_unbound_agents() {
         );
 
         let project = discovered_project_for_checkout(&project_dir);
-        let worker_id = load_session_state(&project, "legacy-session")
+        let worker_id = load_session_state(&project, LEGACY_KEY_SESSION_ID)
             .expect("load state")
             .expect("state")
             .agents
@@ -63,12 +65,12 @@ fn resolve_session_id_uses_legacy_session_key_only_for_unbound_agents() {
             .expect("worker id");
 
         let legacy_match =
-            resolve_session_id_for_runtime_session(&project, "codex", "legacy-session")
+            resolve_session_id_for_runtime_session(&project, "codex", LEGACY_KEY_SESSION_ID)
                 .expect("legacy runtime session");
-        assert_eq!(legacy_match.as_deref(), Some("legacy-session"));
+        assert_eq!(legacy_match.as_deref(), Some(LEGACY_KEY_SESSION_ID));
 
         let layout =
-            storage::layout_from_project_dir(&project_dir, "legacy-session").expect("layout");
+            storage::layout_from_project_dir(&project_dir, LEGACY_KEY_SESSION_ID).expect("layout");
         storage::update_state(&layout, |state| {
             let worker = state.agents.get_mut(&worker_id).expect("worker");
             worker.agent_session_id = Some("runtime-worker-1".into());
@@ -77,13 +79,13 @@ fn resolve_session_id_uses_legacy_session_key_only_for_unbound_agents() {
         .expect("bind worker runtime session");
 
         let bound_match =
-            resolve_session_id_for_runtime_session(&project, "codex", "legacy-session")
+            resolve_session_id_for_runtime_session(&project, "codex", LEGACY_KEY_SESSION_ID)
                 .expect("bound lookup");
         assert!(bound_match.is_none());
 
         let explicit_match =
             resolve_session_id_for_runtime_session(&project, "codex", "runtime-worker-1")
                 .expect("explicit lookup");
-        assert_eq!(explicit_match.as_deref(), Some("legacy-session"));
+        assert_eq!(explicit_match.as_deref(), Some(LEGACY_KEY_SESSION_ID));
     });
 }

@@ -342,7 +342,7 @@ fn bollard_compose_orchestrator_down_project_is_idempotent() {
     let orchestrator = BollardComposeOrchestrator::new(Arc::new(FakeContainerRuntime::new()));
 
     let result = orchestrator
-        .down_project("nonexistent-contract-test-project")
+        .down_project("418cf829-6691-5fc0-92b1-8e5013efa2cb-contract-test-project")
         .expect("expected idempotent down_project");
 
     assert_eq!(result.returncode, 0);
@@ -369,7 +369,8 @@ mod contracts {
     }
 
     fn contract_down_project_is_idempotent(orchestrator: &dyn ComposeOrchestrator) {
-        let result = orchestrator.down_project("nonexistent-contract-test-project");
+        let result =
+            orchestrator.down_project("418cf829-6691-5fc0-92b1-8e5013efa2cb-contract-test-project");
         assert!(
             result.is_ok(),
             "down_project on missing project should not fail"

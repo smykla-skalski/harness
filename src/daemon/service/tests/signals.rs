@@ -8,14 +8,18 @@ fn send_signal_returns_detail_with_pending_signal() {
             "",
             project,
             Some("claude"),
-            Some("daemon-signal"),
+            Some("8b1089af-be01-53f4-8d02-31b8c0033e45"),
         )
         .expect("start session");
         let leader_id = state.leader_id.expect("leader id");
-        let joined =
-            temp_env::with_vars([("CODEX_SESSION_ID", Some("daemon-signal-worker"))], || {
+        let joined = temp_env::with_vars(
+            [(
+                "CODEX_SESSION_ID",
+                Some("8b1089af-be01-53f4-8d02-31b8c0033e45-worker"),
+            )],
+            || {
                 session_service::join_session(
-                    "daemon-signal",
+                    "8b1089af-be01-53f4-8d02-31b8c0033e45",
                     SessionRole::Worker,
                     "codex",
                     &[],
@@ -24,7 +28,8 @@ fn send_signal_returns_detail_with_pending_signal() {
                     None,
                 )
                 .expect("join worker")
-            });
+            },
+        );
         let worker_id = joined
             .agents
             .keys()
@@ -33,7 +38,7 @@ fn send_signal_returns_detail_with_pending_signal() {
             .clone();
 
         let detail = send_signal(
-            "daemon-signal",
+            "8b1089af-be01-53f4-8d02-31b8c0033e45",
             &SignalSendRequest {
                 actor: leader_id,
                 agent_id: worker_id.clone(),
@@ -46,7 +51,10 @@ fn send_signal_returns_detail_with_pending_signal() {
         )
         .expect("send signal");
 
-        assert_eq!(detail.session.session_id, "daemon-signal");
+        assert_eq!(
+            detail.session.session_id,
+            "8b1089af-be01-53f4-8d02-31b8c0033e45"
+        );
         assert_eq!(detail.signals.len(), 1);
         assert_eq!(detail.signals[0].agent_id, worker_id);
         assert_eq!(detail.signals[0].status, SessionSignalStatus::Pending);
@@ -78,14 +86,14 @@ fn send_signal_db_direct_actively_delivers_to_idle_tui_agent() {
             start_direct_session(
                 &db_guard,
                 project,
-                "daemon-active-signal",
+                "dc764a1c-596d-5029-8225-b01591cf182f",
                 "daemon active signal",
                 "wake idle tui",
                 None,
             );
         }
 
-        let worker_session_id = "daemon-active-signal-worker";
+        let worker_session_id = "dc764a1c-596d-5029-8225-b01591cf182f-worker";
         let signal_dir = runtime::runtime_for_name("codex")
             .expect("codex runtime")
             .signal_dir(project, worker_session_id);
@@ -93,13 +101,13 @@ fn send_signal_db_direct_actively_delivers_to_idle_tui_agent() {
             project,
             &signal_dir,
             worker_session_id,
-            "daemon-active-signal",
+            "dc764a1c-596d-5029-8225-b01591cf182f",
             IdleSignalScriptBehavior::AckOnWake,
         );
 
         let snapshot = manager
             .start(
-                "daemon-active-signal",
+                "dc764a1c-596d-5029-8225-b01591cf182f",
                 &AgentTuiStartRequest {
                     runtime: "codex".into(),
                     role: SessionRole::Worker,
@@ -126,7 +134,7 @@ fn send_signal_db_direct_actively_delivers_to_idle_tui_agent() {
         let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some(worker_session_id))], || {
             let db_guard = db.lock().expect("db lock");
             join_session_direct(
-                "daemon-active-signal",
+                "dc764a1c-596d-5029-8225-b01591cf182f",
                 &SessionJoinRequest {
                     runtime: "codex".into(),
                     role: SessionRole::Worker,
@@ -154,7 +162,7 @@ fn send_signal_db_direct_actively_delivers_to_idle_tui_agent() {
         let detail = {
             let db_guard = db.lock().expect("db lock");
             send_signal(
-                "daemon-active-signal",
+                "dc764a1c-596d-5029-8225-b01591cf182f",
                 &SignalSendRequest {
                     actor: joined.leader_id.expect("leader id"),
                     agent_id: worker_id.clone(),
@@ -200,14 +208,14 @@ fn send_signal_db_direct_warns_when_idle_tui_ack_times_out() {
             start_direct_session(
                 &db_guard,
                 project,
-                "daemon-timed-signal",
+                "2ef2ac8f-20ee-57a8-bef3-eb0fb4b40890",
                 "daemon timed signal",
                 "warn when idle tui ignores wake",
                 None,
             );
         }
 
-        let worker_session_id = "daemon-timed-signal-worker";
+        let worker_session_id = "2ef2ac8f-20ee-57a8-bef3-eb0fb4b40890-worker";
         let signal_dir = runtime::runtime_for_name("codex")
             .expect("codex runtime")
             .signal_dir(project, worker_session_id);
@@ -215,13 +223,13 @@ fn send_signal_db_direct_warns_when_idle_tui_ack_times_out() {
             project,
             &signal_dir,
             worker_session_id,
-            "daemon-timed-signal",
+            "2ef2ac8f-20ee-57a8-bef3-eb0fb4b40890",
             IdleSignalScriptBehavior::IgnoreWake,
         );
 
         let snapshot = manager
             .start(
-                "daemon-timed-signal",
+                "2ef2ac8f-20ee-57a8-bef3-eb0fb4b40890",
                 &AgentTuiStartRequest {
                     runtime: "codex".into(),
                     role: SessionRole::Worker,
@@ -247,7 +255,7 @@ fn send_signal_db_direct_warns_when_idle_tui_ack_times_out() {
         let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some(worker_session_id))], || {
             let db_guard = db.lock().expect("db lock");
             join_session_direct(
-                "daemon-timed-signal",
+                "2ef2ac8f-20ee-57a8-bef3-eb0fb4b40890",
                 &SessionJoinRequest {
                     runtime: "codex".into(),
                     role: SessionRole::Worker,
@@ -275,7 +283,7 @@ fn send_signal_db_direct_warns_when_idle_tui_ack_times_out() {
         let detail = {
             let db_guard = db.lock().expect("db lock");
             send_signal(
-                "daemon-timed-signal",
+                "2ef2ac8f-20ee-57a8-bef3-eb0fb4b40890",
                 &SignalSendRequest {
                     actor: joined.leader_id.expect("leader id"),
                     agent_id: worker_id.clone(),
@@ -302,7 +310,9 @@ fn send_signal_db_direct_warns_when_idle_tui_ack_times_out() {
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].level, "warn");
         assert!(
-            events[0].message.contains("daemon-timed-signal")
+            events[0]
+                .message
+                .contains("2ef2ac8f-20ee-57a8-bef3-eb0fb4b40890")
                 && events[0].message.contains(&worker_id),
             "warning should mention session and agent: {}",
             events[0].message
@@ -318,14 +328,18 @@ fn cancel_signal_flips_status_to_rejected_and_logs_entry() {
             "",
             project,
             Some("claude"),
-            Some("daemon-cancel"),
+            Some("eccf92b5-8577-5608-94be-68766112be15"),
         )
         .expect("start session");
         let leader_id = state.leader_id.expect("leader id");
-        let joined =
-            temp_env::with_vars([("CODEX_SESSION_ID", Some("daemon-cancel-worker"))], || {
+        let joined = temp_env::with_vars(
+            [(
+                "CODEX_SESSION_ID",
+                Some("eccf92b5-8577-5608-94be-68766112be15-worker"),
+            )],
+            || {
                 session_service::join_session(
-                    "daemon-cancel",
+                    "eccf92b5-8577-5608-94be-68766112be15",
                     SessionRole::Worker,
                     "codex",
                     &[],
@@ -334,7 +348,8 @@ fn cancel_signal_flips_status_to_rejected_and_logs_entry() {
                     None,
                 )
                 .expect("join worker")
-            });
+            },
+        );
         let worker_id = joined
             .agents
             .keys()
@@ -343,7 +358,7 @@ fn cancel_signal_flips_status_to_rejected_and_logs_entry() {
             .clone();
 
         let sent = send_signal(
-            "daemon-cancel",
+            "eccf92b5-8577-5608-94be-68766112be15",
             &SignalSendRequest {
                 actor: leader_id.clone(),
                 agent_id: worker_id.clone(),
@@ -358,7 +373,7 @@ fn cancel_signal_flips_status_to_rejected_and_logs_entry() {
         let signal_id = sent.signals[0].signal.signal_id.clone();
 
         let detail = cancel_signal(
-            "daemon-cancel",
+            "eccf92b5-8577-5608-94be-68766112be15",
             &super::super::protocol::SignalCancelRequest {
                 actor: leader_id,
                 agent_id: worker_id,
@@ -379,8 +394,11 @@ fn cancel_signal_flips_status_to_rejected_and_logs_entry() {
             Some(crate::agents::runtime::signal::AckResult::Rejected)
         );
 
-        let layout = crate::session::storage::layout_from_project_dir(project, "daemon-cancel")
-            .expect("layout");
+        let layout = crate::session::storage::layout_from_project_dir(
+            project,
+            "eccf92b5-8577-5608-94be-68766112be15",
+        )
+        .expect("layout");
         let log_entries = crate::session::storage::load_log_entries(&layout).expect("log");
         assert!(log_entries.into_iter().any(|entry| matches!(
             entry.transition,
@@ -401,15 +419,18 @@ fn cancel_signal_errors_when_signal_not_pending() {
             "",
             project,
             Some("claude"),
-            Some("daemon-cancel-missing"),
+            Some("58c003cf-1218-5920-9ef9-06e464c7d34d"),
         )
         .expect("start session");
         let leader_id = state.leader_id.expect("leader id");
         let joined = temp_env::with_vars(
-            [("CODEX_SESSION_ID", Some("daemon-cancel-missing-worker"))],
+            [(
+                "CODEX_SESSION_ID",
+                Some("58c003cf-1218-5920-9ef9-06e464c7d34d-worker"),
+            )],
             || {
                 session_service::join_session(
-                    "daemon-cancel-missing",
+                    "58c003cf-1218-5920-9ef9-06e464c7d34d",
                     SessionRole::Worker,
                     "codex",
                     &[],
@@ -428,11 +449,11 @@ fn cancel_signal_errors_when_signal_not_pending() {
             .clone();
 
         let result = cancel_signal(
-            "daemon-cancel-missing",
+            "58c003cf-1218-5920-9ef9-06e464c7d34d",
             &super::super::protocol::SignalCancelRequest {
                 actor: leader_id,
                 agent_id: worker_id,
-                signal_id: "nonexistent-signal".into(),
+                signal_id: "418cf829-6691-5fc0-92b1-8e5013efa2cb-signal".into(),
             },
             None,
         );

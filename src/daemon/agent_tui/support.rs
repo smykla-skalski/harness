@@ -198,7 +198,14 @@ mod tests {
 
     #[test]
     fn agent_id_for_tui_prefers_managed_agent_ref() {
-        let mut state = build_new_session("test", "test", "sess-1", "claude", None, "now");
+        let mut state = build_new_session(
+            "test",
+            "test",
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            "claude",
+            None,
+            "now",
+        );
         state.agents.insert(
             "agent-1".into(),
             sample_agent("agent-1", Vec::new(), Some(ManagedAgentRef::tui("tui-1"))),
@@ -211,7 +218,14 @@ mod tests {
 
     #[test]
     fn agent_id_for_tui_falls_back_to_legacy_marker_capability() {
-        let mut state = build_new_session("test", "test", "sess-1", "claude", None, "now");
+        let mut state = build_new_session(
+            "test",
+            "test",
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            "claude",
+            None,
+            "now",
+        );
         state.agents.insert(
             "agent-1".into(),
             sample_agent("agent-1", vec!["agent-tui:tui-1".into()], None),

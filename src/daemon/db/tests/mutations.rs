@@ -51,7 +51,9 @@ fn project_id_for_session_returns_correct_id() {
 #[test]
 fn project_id_for_session_returns_none_for_missing() {
     let db = DaemonDb::open_in_memory().expect("open db");
-    let found = db.project_id_for_session("nonexistent").expect("lookup");
+    let found = db
+        .project_id_for_session("418cf829-6691-5fc0-92b1-8e5013efa2cb")
+        .expect("lookup");
     assert!(found.is_none());
 }
 
@@ -82,7 +84,7 @@ fn ensure_project_for_dir_matches_context_root() {
 #[test]
 fn ensure_project_for_dir_returns_error_for_unknown() {
     let db = DaemonDb::open_in_memory().expect("open db");
-    let result = db.ensure_project_for_dir("/nonexistent/path");
+    let result = db.ensure_project_for_dir("/418cf829-6691-5fc0-92b1-8e5013efa2cb/path");
     assert!(result.is_err());
 }
 
@@ -99,7 +101,7 @@ fn load_session_state_for_mutation_returns_mutable_state() {
         .load_session_state_for_mutation(&state.session_id)
         .expect("load")
         .expect("present");
-    assert_eq!(loaded.session_id, "sess-test-1");
+    assert_eq!(loaded.session_id, "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4");
     assert_eq!(loaded.agents.len(), 1);
     assert_eq!(loaded.tasks.len(), 1);
 }
@@ -108,7 +110,7 @@ fn load_session_state_for_mutation_returns_mutable_state() {
 fn load_session_state_for_mutation_returns_none_for_missing() {
     let db = DaemonDb::open_in_memory().expect("open db");
     let loaded = db
-        .load_session_state_for_mutation("nonexistent")
+        .load_session_state_for_mutation("418cf829-6691-5fc0-92b1-8e5013efa2cb")
         .expect("load");
     assert!(loaded.is_none());
 }
@@ -149,7 +151,7 @@ fn create_session_record_inserts_active_session() {
         .load_session_state(&state.session_id)
         .expect("load")
         .expect("present");
-    assert_eq!(loaded.session_id, "sess-test-1");
+    assert_eq!(loaded.session_id, "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4");
 
     let is_active: i32 = db
         .conn

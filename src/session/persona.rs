@@ -101,7 +101,7 @@ mod tests {
 
     #[test]
     fn resolve_unknown_returns_none() {
-        assert!(resolve("nonexistent").is_none());
+        assert!(resolve("418cf829-6691-5fc0-92b1-8e5013efa2cb").is_none());
     }
 
     #[test]

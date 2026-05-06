@@ -260,7 +260,9 @@ fn filter_progress_docker_buildkit_layer() {
 
 #[test]
 fn docker_rm_by_label_returns_empty_for_no_matches() {
-    if let Ok(names) = docker_rm_by_label("io.harness.test.nonexistent=true") {
+    if let Ok(names) =
+        docker_rm_by_label("io.harness.test.418cf829-6691-5fc0-92b1-8e5013efa2cb=true")
+    {
         assert!(names.is_empty());
     }
 }
@@ -293,7 +295,7 @@ fn wait_for_http_succeeds_on_mock_server() {
 #[test]
 fn kumactl_run_injects_cp_addr() {
     let result = kumactl_run(
-        Path::new("/nonexistent/kumactl"),
+        Path::new("/418cf829-6691-5fc0-92b1-8e5013efa2cb/kumactl"),
         "http://localhost:5681",
         &["version"],
         &[0],

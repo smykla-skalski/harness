@@ -8,13 +8,13 @@ fn sync_liveness_keeps_interactive_agent_idle_after_ten_quiet_minutes() {
             "",
             project,
             Some("claude"),
-            Some("sync-interactive-idle"),
+            Some("00000000-0000-4002-8000-000000000030"),
         )
         .expect("start");
 
         temp_env::with_var("CODEX_SESSION_ID", Some("interactive-worker"), || {
             join_session(
-                "sync-interactive-idle",
+                "00000000-0000-4002-8000-000000000030",
                 SessionRole::Worker,
                 "codex",
                 &[],
@@ -25,15 +25,22 @@ fn sync_liveness_keeps_interactive_agent_idle_after_ten_quiet_minutes() {
             .expect("join worker");
         });
 
-        let state = session_status("sync-interactive-idle", project).expect("status");
+        let state =
+            session_status("00000000-0000-4002-8000-000000000030", project).expect("status");
         let worker_id = find_agent_by_runtime(&state, "codex").agent_id.clone();
-        age_agent_activity(project, "sync-interactive-idle", &worker_id, 600);
+        age_agent_activity(
+            project,
+            "00000000-0000-4002-8000-000000000030",
+            &worker_id,
+            600,
+        );
 
         let log_path = write_agent_log_file(project, "codex", "interactive-worker");
         set_log_mtime_seconds_ago(&log_path, 600);
         write_agent_log_file(project, "claude", "test-service");
 
-        let result = sync_agent_liveness("sync-interactive-idle", project).expect("sync");
+        let result =
+            sync_agent_liveness("00000000-0000-4002-8000-000000000030", project).expect("sync");
 
         assert!(
             result.disconnected.is_empty(),
@@ -41,7 +48,8 @@ fn sync_liveness_keeps_interactive_agent_idle_after_ten_quiet_minutes() {
         );
         assert_eq!(result.idled, vec![worker_id.clone()]);
 
-        let updated = session_status("sync-interactive-idle", project).expect("updated");
+        let updated =
+            session_status("00000000-0000-4002-8000-000000000030", project).expect("updated");
         assert_eq!(
             updated.agents.get(&worker_id).expect("worker").status,
             AgentStatus::Idle
@@ -57,13 +65,13 @@ fn sync_liveness_prefers_recent_state_activity_over_stale_runtime_log() {
             "",
             project,
             Some("claude"),
-            Some("sync-state-activity"),
+            Some("00000000-0000-4002-8000-000000000036"),
         )
         .expect("start");
 
         temp_env::with_var("CODEX_SESSION_ID", Some("state-activity-worker"), || {
             join_session(
-                "sync-state-activity",
+                "00000000-0000-4002-8000-000000000036",
                 SessionRole::Worker,
                 "codex",
                 &[],
@@ -74,7 +82,8 @@ fn sync_liveness_prefers_recent_state_activity_over_stale_runtime_log() {
             .expect("join worker");
         });
 
-        let state = session_status("sync-state-activity", project).expect("status");
+        let state =
+            session_status("00000000-0000-4002-8000-000000000036", project).expect("status");
         let worker_id = find_agent_by_runtime(&state, "codex").agent_id.clone();
 
         let log_path = write_agent_log_file(project, "codex", "state-activity-worker");
@@ -83,7 +92,8 @@ fn sync_liveness_prefers_recent_state_activity_over_stale_runtime_log() {
 
         let fresh = utc_now();
         let layout =
-            storage::layout_from_project_dir(project, "sync-state-activity").expect("layout");
+            storage::layout_from_project_dir(project, "00000000-0000-4002-8000-000000000036")
+                .expect("layout");
         storage::update_state(&layout, |state| {
             let worker = state.agents.get_mut(&worker_id).expect("worker");
             worker.last_activity_at = Some(fresh.clone());
@@ -93,7 +103,8 @@ fn sync_liveness_prefers_recent_state_activity_over_stale_runtime_log() {
         })
         .expect("refresh worker state activity");
 
-        let result = sync_agent_liveness("sync-state-activity", project).expect("sync");
+        let result =
+            sync_agent_liveness("00000000-0000-4002-8000-000000000036", project).expect("sync");
 
         assert!(
             result.disconnected.is_empty(),
@@ -101,7 +112,8 @@ fn sync_liveness_prefers_recent_state_activity_over_stale_runtime_log() {
         );
         assert!(result.idled.is_empty());
 
-        let updated = session_status("sync-state-activity", project).expect("updated");
+        let updated =
+            session_status("00000000-0000-4002-8000-000000000036", project).expect("updated");
         assert_eq!(
             updated.agents.get(&worker_id).expect("worker").status,
             AgentStatus::Active
@@ -117,14 +129,14 @@ fn sync_liveness_keeps_pending_signal_available_for_stale_agent() {
             "",
             project,
             Some("claude"),
-            Some("sync-pending-signal"),
+            Some("00000000-0000-4002-8000-000000000034"),
         )
         .expect("start");
         let leader_id = state.leader_id.expect("leader");
 
         temp_env::with_var("CODEX_SESSION_ID", Some("pending-signal-worker"), || {
             join_session(
-                "sync-pending-signal",
+                "00000000-0000-4002-8000-000000000034",
                 SessionRole::Worker,
                 "codex",
                 &[],
@@ -135,18 +147,24 @@ fn sync_liveness_keeps_pending_signal_available_for_stale_agent() {
             .expect("join worker");
         });
 
-        let state = session_status("sync-pending-signal", project).expect("status");
+        let state =
+            session_status("00000000-0000-4002-8000-000000000034", project).expect("status");
         let worker = find_agent_by_runtime(&state, "codex");
         let worker_id = worker.agent_id.clone();
         let worker_session_id = worker.agent_session_id.clone().expect("worker session id");
-        age_agent_activity(project, "sync-pending-signal", &worker_id, 1_200);
+        age_agent_activity(
+            project,
+            "00000000-0000-4002-8000-000000000034",
+            &worker_id,
+            1_200,
+        );
 
         let log_path = write_agent_log_file(project, "codex", &worker_session_id);
         set_log_mtime_seconds_ago(&log_path, 1_200);
         write_agent_log_file(project, "claude", "test-service");
 
         send_signal(
-            "sync-pending-signal",
+            "00000000-0000-4002-8000-000000000034",
             &worker_id,
             "inject_context",
             "queued instructions",
@@ -165,7 +183,8 @@ fn sync_liveness_keeps_pending_signal_available_for_stale_agent() {
             1
         );
 
-        let result = sync_agent_liveness("sync-pending-signal", project).expect("sync");
+        let result =
+            sync_agent_liveness("00000000-0000-4002-8000-000000000034", project).expect("sync");
 
         assert!(
             result.disconnected.is_empty(),
@@ -180,7 +199,8 @@ fn sync_liveness_keeps_pending_signal_available_for_stale_agent() {
             "sync must not expire undelivered signals"
         );
 
-        let updated = session_status("sync-pending-signal", project).expect("updated");
+        let updated =
+            session_status("00000000-0000-4002-8000-000000000034", project).expect("updated");
         assert_eq!(
             updated.agents.get(&worker_id).expect("worker").status,
             AgentStatus::Idle
@@ -191,12 +211,18 @@ fn sync_liveness_keeps_pending_signal_available_for_stale_agent() {
 #[test]
 fn sync_liveness_skips_disconnect_for_acp_managed_gemini_agents() {
     with_temp_project(|project| {
-        start_active_session("test", "", project, Some("claude"), Some("sync-acp-gemini"))
-            .expect("start");
+        start_active_session(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-00000000002f"),
+        )
+        .expect("start");
 
         temp_env::with_var("GEMINI_SESSION_ID", Some("native-gemini-worker"), || {
             join_session(
-                "sync-acp-gemini",
+                "00000000-0000-4002-8000-00000000002f",
                 SessionRole::Worker,
                 "gemini",
                 &[],
@@ -207,9 +233,12 @@ fn sync_liveness_skips_disconnect_for_acp_managed_gemini_agents() {
             .expect("join worker");
         });
 
-        let state = session_status("sync-acp-gemini", project).expect("status");
+        let state =
+            session_status("00000000-0000-4002-8000-00000000002f", project).expect("status");
         let worker_id = find_agent_by_runtime(&state, "gemini").agent_id.clone();
-        let layout = storage::layout_from_project_dir(project, "sync-acp-gemini").expect("layout");
+        let layout =
+            storage::layout_from_project_dir(project, "00000000-0000-4002-8000-00000000002f")
+                .expect("layout");
         storage::update_state(&layout, |state| {
             let worker = state.agents.get_mut(&worker_id).expect("worker");
             worker.managed_agent =
@@ -218,10 +247,16 @@ fn sync_liveness_skips_disconnect_for_acp_managed_gemini_agents() {
             Ok(())
         })
         .expect("bind acp worker");
-        age_agent_activity(project, "sync-acp-gemini", &worker_id, 1_200);
+        age_agent_activity(
+            project,
+            "00000000-0000-4002-8000-00000000002f",
+            &worker_id,
+            1_200,
+        );
         write_agent_log_file(project, "claude", "test-service");
 
-        let result = sync_agent_liveness("sync-acp-gemini", project).expect("sync");
+        let result =
+            sync_agent_liveness("00000000-0000-4002-8000-00000000002f", project).expect("sync");
 
         assert!(
             result.disconnected.is_empty(),
@@ -229,7 +264,8 @@ fn sync_liveness_skips_disconnect_for_acp_managed_gemini_agents() {
         );
         assert!(result.idled.is_empty());
 
-        let updated = session_status("sync-acp-gemini", project).expect("updated");
+        let updated =
+            session_status("00000000-0000-4002-8000-00000000002f", project).expect("updated");
         assert_eq!(
             updated.agents.get(&worker_id).expect("worker").status,
             AgentStatus::Active

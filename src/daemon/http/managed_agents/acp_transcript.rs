@@ -147,7 +147,7 @@ mod tests {
             }
             let response = get_acp_transcript(
                 Query(AcpTranscriptQuery {
-                    session_id: Some("sess-test-1".into()),
+                    session_id: Some("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into()),
                 }),
                 auth_headers(),
                 State(state),

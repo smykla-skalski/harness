@@ -48,7 +48,7 @@ fn acknowledge_moves_signal() {
         acknowledged_at: "2026-03-28T12:00:03Z".into(),
         result: AckResult::Accepted,
         agent: "codex".into(),
-        session_id: "sess-1".into(),
+        session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
         details: None,
     };
     acknowledge_signal(&signal_dir, &ack).unwrap();
@@ -73,7 +73,7 @@ fn read_acknowledgments_ignores_acknowledged_signal_payloads() {
         acknowledged_at: "2026-03-28T12:00:03Z".into(),
         result: AckResult::Accepted,
         agent: "codex".into(),
-        session_id: "sess-1".into(),
+        session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
         details: None,
     };
     acknowledge_signal(&signal_dir, &ack).unwrap();
@@ -129,7 +129,12 @@ fn cleanup_pending_signals_moves_to_acknowledged() {
     let signal_dir = tmp.path().join("signals");
     write_signal_file(&signal_dir, &sample_signal()).unwrap();
 
-    cleanup_pending_signals(&signal_dir, "dead-agent", "sess-1").unwrap();
+    cleanup_pending_signals(
+        &signal_dir,
+        "dead-agent",
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+    )
+    .unwrap();
 
     assert!(read_pending_signals(&signal_dir).unwrap().is_empty());
     let acks = read_acknowledgments(&signal_dir).unwrap();
@@ -176,7 +181,7 @@ fn acknowledge_signal_surfaces_rename_failures() {
         acknowledged_at: "2026-03-28T12:00:03Z".into(),
         result: AckResult::Accepted,
         agent: "codex".into(),
-        session_id: "sess-1".into(),
+        session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
         details: None,
     };
 
@@ -215,7 +220,7 @@ fn acknowledge_signal_rejects_unsafe_signal_id() {
         acknowledged_at: "2026-03-28T12:00:03Z".into(),
         result: AckResult::Accepted,
         agent: "codex".into(),
-        session_id: "sess-1".into(),
+        session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
         details: None,
     };
 

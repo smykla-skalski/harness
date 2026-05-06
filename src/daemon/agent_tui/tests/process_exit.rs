@@ -35,7 +35,7 @@ fn final_tui_snapshot_disconnects_registered_agent_and_broadcasts_session_refres
     let mut state = session_service::build_new_session(
         "disconnect test",
         "managed tui exit",
-        "sess-tui-exit",
+        "3fab77f7-0bbd-50ab-aee2-d584f0bd024d",
         "claude",
         None,
         &utc_now(),
@@ -101,7 +101,7 @@ fn final_tui_snapshot_disconnects_registered_agent_and_broadcasts_session_refres
 
     let db_guard = db_slot.get().expect("db slot").lock().expect("db lock");
     let refreshed_state = db_guard
-        .load_session_state("sess-tui-exit")
+        .load_session_state("3fab77f7-0bbd-50ab-aee2-d584f0bd024d")
         .expect("load session")
         .expect("session present");
     let worker = refreshed_state
@@ -118,7 +118,8 @@ fn final_tui_snapshot_disconnects_registered_agent_and_broadcasts_session_refres
         .iter()
         .any(|event| event.event == "sessions_updated");
     let saw_session_updated = follow_up_events.iter().any(|event| {
-        event.event == "session_updated" && event.session_id.as_deref() == Some("sess-tui-exit")
+        event.event == "session_updated"
+            && event.session_id.as_deref() == Some("3fab77f7-0bbd-50ab-aee2-d584f0bd024d")
     });
     assert!(saw_sessions_updated, "expected global session refresh");
     assert!(saw_session_updated, "expected scoped session refresh");
@@ -147,7 +148,7 @@ fn live_refresh_disconnects_joined_agent_when_child_process_exits() {
         let state = session_service::build_new_session(
             "child exit test",
             "managed tui child exit",
-            "sess-tui-child-exit",
+            "4efbea5a-8396-599c-bf47-7bb8872f6612",
             "claude",
             None,
             &utc_now(),
@@ -164,7 +165,7 @@ fn live_refresh_disconnects_joined_agent_when_child_process_exits() {
 
         let snapshot = manager
             .start(
-                "sess-tui-child-exit",
+                "4efbea5a-8396-599c-bf47-7bb8872f6612",
                 &crate::daemon::agent_tui::AgentTuiStartRequest {
                     runtime: "codex".into(),
                     role: SessionRole::Worker,
@@ -193,7 +194,7 @@ fn live_refresh_disconnects_joined_agent_when_child_process_exits() {
             let db_arc = db_slot.get().expect("db slot");
             let db_guard = db_arc.lock().expect("db lock");
             let mut state = db_guard
-                .load_session_state("sess-tui-child-exit")
+                .load_session_state("4efbea5a-8396-599c-bf47-7bb8872f6612")
                 .expect("load state")
                 .expect("state present");
             state.agents.insert(
@@ -207,7 +208,7 @@ fn live_refresh_disconnects_joined_agent_when_child_process_exits() {
                     joined_at: "2026-04-22T09:00:00Z".into(),
                     updated_at: "2026-04-22T09:00:00Z".into(),
                     status: crate::session::types::AgentStatus::Active,
-                    agent_session_id: Some("joined-worker-session".into()),
+                    agent_session_id: Some("joined-008d974f-c6a9-53e5-a62e-d331367c449a".into()),
                     managed_agent: None,
                     last_activity_at: Some("2026-04-22T09:00:00Z".into()),
                     current_task_id: None,
@@ -236,7 +237,7 @@ fn live_refresh_disconnects_joined_agent_when_child_process_exits() {
             let db_arc = db_slot.get().expect("db slot");
             let db_guard = db_arc.lock().expect("db lock");
             let session_state = db_guard
-                .load_session_state("sess-tui-child-exit")
+                .load_session_state("4efbea5a-8396-599c-bf47-7bb8872f6612")
                 .expect("load state")
                 .expect("state present");
             session_state

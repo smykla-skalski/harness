@@ -14,6 +14,13 @@ pub(crate) fn performance_project(index: usize) -> DiscoveredProject {
     }
 }
 
+pub(crate) fn performance_session_id(project_index: usize, session_index: usize) -> String {
+    format!(
+        "10000000-0000-4000-8000-{token:012x}",
+        token = project_index * 1_000_000 + session_index
+    )
+}
+
 pub(crate) fn sample_conversation_event(sequence: u64, content: &str) -> ConversationEvent {
     ConversationEvent {
         timestamp: Some(format!("2026-04-03T12:00:{sequence:02}Z")),
@@ -22,7 +29,7 @@ pub(crate) fn sample_conversation_event(sequence: u64, content: &str) -> Convers
             content: content.to_string(),
         },
         agent: "claude-leader".into(),
-        session_id: "sess-test-1".into(),
+        session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
     }
 }
 
@@ -105,7 +112,7 @@ pub(crate) fn performance_session_state(
     };
 
     let token = project_index * 100 + session_index;
-    let session_id = format!("sess-{project_index}-{session_index}");
+    let session_id = performance_session_id(project_index, session_index);
     let leader_id = format!("leader-{project_index}-{session_index}");
     let task_id = format!("task-{project_index}-{session_index}");
     let timestamp = format!(

@@ -19,19 +19,23 @@ fn write_valid_session(root: &Path, sid: &str, origin: &str) {
 #[test]
 fn probe_accepts_valid_b_layout() {
     let tmp = TempDir::new().unwrap();
-    let session = tmp.path().join("kuma/abc12345");
+    let session = tmp.path().join("kuma/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
     fs::create_dir_all(&session).unwrap();
-    write_valid_session(&session, "abc12345", "/Users/me/src/kuma");
+    write_valid_session(
+        &session,
+        "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed",
+        "/Users/me/src/kuma",
+    );
 
     let probed = SessionAdopter::probe(&session).expect("probe ok");
-    assert_eq!(probed.session_id(), "abc12345");
+    assert_eq!(probed.session_id(), "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
     assert_eq!(probed.project_name(), "demo");
 }
 
 #[test]
 fn probe_rejects_missing_state_json() {
     let tmp = TempDir::new().unwrap();
-    let session = tmp.path().join("kuma/abc12345");
+    let session = tmp.path().join("kuma/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
     fs::create_dir_all(&session).unwrap();
     let err = SessionAdopter::probe(&session).expect_err("layout violation");
     assert!(matches!(err, AdoptionError::LayoutViolation { .. }));
@@ -40,9 +44,9 @@ fn probe_rejects_missing_state_json() {
 #[test]
 fn probe_rejects_missing_workspace() {
     let tmp = TempDir::new().unwrap();
-    let session = tmp.path().join("kuma/abc12345");
+    let session = tmp.path().join("kuma/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
     fs::create_dir_all(&session).unwrap();
-    write_valid_session(&session, "abc12345", "/o");
+    write_valid_session(&session, "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed", "/o");
     fs::remove_dir_all(session.join("workspace")).unwrap();
 
     let err = SessionAdopter::probe(&session).expect_err("layout violation");
@@ -52,9 +56,9 @@ fn probe_rejects_missing_workspace() {
 #[test]
 fn probe_rejects_origin_mismatch() {
     let tmp = TempDir::new().unwrap();
-    let session = tmp.path().join("kuma/abc12345");
+    let session = tmp.path().join("kuma/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
     fs::create_dir_all(&session).unwrap();
-    write_valid_session(&session, "abc12345", "/a");
+    write_valid_session(&session, "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed", "/a");
     fs::write(session.join(".origin"), "/b").unwrap();
 
     let err = SessionAdopter::probe(&session).expect_err("origin mismatch");
@@ -64,14 +68,14 @@ fn probe_rejects_origin_mismatch() {
 #[test]
 fn probe_rejects_schema_mismatch() {
     let tmp = TempDir::new().unwrap();
-    let session = tmp.path().join("kuma/abc12345");
+    let session = tmp.path().join("kuma/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
     fs::create_dir_all(&session).unwrap();
     fs::create_dir_all(session.join("workspace")).unwrap();
     fs::create_dir_all(session.join("memory")).unwrap();
     fs::write(session.join(".origin"), "/o").unwrap();
     fs::write(
         session.join("state.json"),
-        "{\"schema_version\":7,\"session_id\":\"abc12345\",\"project_name\":\"demo\",\"origin_path\":\"/o\",\"status\":\"active\",\"context\":\"c\",\"created_at\":\"2026-04-20T00:00:00Z\",\"updated_at\":\"2026-04-20T00:00:00Z\"}",
+        "{\"schema_version\":7,\"session_id\":\"72026b9c-9f8f-5a76-a6cf-a05cbb5741ed\",\"project_name\":\"demo\",\"origin_path\":\"/o\",\"status\":\"active\",\"context\":\"c\",\"created_at\":\"2026-04-20T00:00:00Z\",\"updated_at\":\"2026-04-20T00:00:00Z\"}",
     ).unwrap();
     let err = SessionAdopter::probe(&session).expect_err("schema");
     assert!(matches!(
@@ -86,11 +90,17 @@ fn probe_rejects_schema_mismatch() {
 #[test]
 fn register_persists_state_and_flags_external() {
     let tmp = TempDir::new().unwrap();
-    let session = tmp.path().join("external-root/demo/abc12345");
+    let session = tmp
+        .path()
+        .join("external-root/demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
     fs::create_dir_all(&session).unwrap();
     let origin = tmp.path().join("src/demo");
     fs::create_dir_all(&origin).unwrap();
-    write_valid_session(&session, "abc12345", origin.to_str().unwrap());
+    write_valid_session(
+        &session,
+        "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed",
+        origin.to_str().unwrap(),
+    );
 
     let probed = SessionAdopter::probe(&session).expect("probe");
     // data_root_sessions is some unrelated path so the session is "external"
@@ -99,7 +109,10 @@ fn register_persists_state_and_flags_external() {
 
     let outcome = SessionAdopter::register(probed, &data_root_sessions).expect("register");
     assert_eq!(outcome.external_origin.as_deref(), Some(session.as_path()));
-    assert_eq!(outcome.state.session_id, "abc12345");
+    assert_eq!(
+        outcome.state.session_id,
+        "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed"
+    );
     assert!(outcome.state.external_origin.is_some());
     assert!(outcome.state.adopted_at.is_some());
 
@@ -113,11 +126,15 @@ fn register_persists_state_and_flags_external() {
 fn register_internal_session_has_no_external_origin() {
     let tmp = TempDir::new().unwrap();
     let sessions_root = tmp.path().join("harness-data/sessions");
-    let session = sessions_root.join("demo/zxc98765");
+    let session = sessions_root.join("demo/a6c4c896-3bc9-5198-af58-f590463c652b");
     fs::create_dir_all(&session).unwrap();
     let origin = tmp.path().join("src/demo");
     fs::create_dir_all(&origin).unwrap();
-    write_valid_session(&session, "zxc98765", origin.to_str().unwrap());
+    write_valid_session(
+        &session,
+        "a6c4c896-3bc9-5198-af58-f590463c652b",
+        origin.to_str().unwrap(),
+    );
 
     let probed = SessionAdopter::probe(&session).expect("probe");
     let outcome = SessionAdopter::register(probed, &sessions_root).expect("register");

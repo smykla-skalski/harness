@@ -17,7 +17,7 @@ pub struct SessionLayout {
     /// Project directory name, usually the canonical checkout basename or
     /// `basename-<4hex>` after collision resolution.
     pub project_name: String,
-    /// Eight-character lowercase alphanumeric session id.
+    /// Harness session id. Generated and explicit ids must be lowercase UUIDs.
     pub session_id: String,
 }
 

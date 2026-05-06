@@ -16,7 +16,7 @@ fn remove_agent_async_direct_sends_abort_signal() {
                 let state = start_direct_session_async(
                     &async_db,
                     project,
-                    "daemon-async-remove",
+                    "b008af80-54bd-5d3d-aef2-a6cd524b8684",
                     "async remove session",
                     "async remove",
                     None,
@@ -24,7 +24,7 @@ fn remove_agent_async_direct_sends_abort_signal() {
                 .await;
                 let leader_id = state.leader_id.clone().expect("leader id");
                 let joined = join_session_direct_async(
-                    "daemon-async-remove",
+                    "b008af80-54bd-5d3d-aef2-a6cd524b8684",
                     &crate::daemon::protocol::SessionJoinRequest {
                         runtime: "codex".into(),
                         role: SessionRole::Worker,
@@ -46,7 +46,7 @@ fn remove_agent_async_direct_sends_abort_signal() {
                     .clone();
 
                 let detail = remove_agent_async(
-                    "daemon-async-remove",
+                    "b008af80-54bd-5d3d-aef2-a6cd524b8684",
                     &worker_id,
                     &AgentRemoveRequest { actor: leader_id },
                     &async_db,
@@ -86,7 +86,7 @@ fn end_session_async_direct_marks_inactive() {
                 let state = start_direct_session_async(
                     &async_db,
                     project,
-                    "daemon-async-end",
+                    "19bd7483-41f5-53fa-8391-c65b30390c1d",
                     "async end session",
                     "async end",
                     None,
@@ -94,7 +94,7 @@ fn end_session_async_direct_marks_inactive() {
                 .await;
                 let leader_id = state.leader_id.clone().expect("leader id");
                 let joined = join_session_direct_async(
-                    "daemon-async-end",
+                    "19bd7483-41f5-53fa-8391-c65b30390c1d",
                     &crate::daemon::protocol::SessionJoinRequest {
                         runtime: "codex".into(),
                         role: SessionRole::Worker,
@@ -116,7 +116,7 @@ fn end_session_async_direct_marks_inactive() {
                     .clone();
 
                 let detail = end_session_async(
-                    "daemon-async-end",
+                    "19bd7483-41f5-53fa-8391-c65b30390c1d",
                     &SessionEndRequest { actor: leader_id },
                     &async_db,
                 )
@@ -153,11 +153,12 @@ fn start_session_direct_async_creates_in_sqlite() {
                 .await
                 .expect("open async daemon db");
 
+            let session_id = "00000000-0000-4000-8000-000000000501";
             let state = start_session_direct_async(
                 &crate::daemon::protocol::SessionStartRequest {
                     title: "async direct start session".into(),
                     context: "async direct start".into(),
-                    session_id: Some("daemon-async-start-1".into()),
+                    session_id: Some(session_id.into()),
                     project_dir: project.to_string_lossy().into(),
                     policy_preset: None,
                     base_ref: None,
@@ -174,7 +175,7 @@ fn start_session_direct_async_creates_in_sqlite() {
             assert_eq!(state.metrics.agent_count, 0);
 
             let resolved = async_db
-                .resolve_session("daemon-async-start-1")
+                .resolve_session(session_id)
                 .await
                 .expect("resolve")
                 .expect("present");
@@ -204,11 +205,12 @@ fn join_session_direct_async_adds_agent() {
                     .await
                     .expect("open async daemon db");
 
+                let session_id = "00000000-0000-4000-8000-000000000502";
                 start_session_direct_async(
                     &crate::daemon::protocol::SessionStartRequest {
                         title: "async join test session".into(),
                         context: "async join test".into(),
-                        session_id: Some("daemon-async-join-1".into()),
+                        session_id: Some(session_id.into()),
                         project_dir: project.to_string_lossy().into(),
                         policy_preset: None,
                         base_ref: None,
@@ -219,7 +221,7 @@ fn join_session_direct_async_adds_agent() {
                 .expect("start session");
 
                 let joined = join_session_direct_async(
-                    "daemon-async-join-1",
+                    session_id,
                     &crate::daemon::protocol::SessionJoinRequest {
                         runtime: "codex".into(),
                         role: SessionRole::Worker,
@@ -239,7 +241,7 @@ fn join_session_direct_async_adds_agent() {
                 assert_eq!(joined.agents.len(), 1);
 
                 let resolved = async_db
-                    .resolve_session("daemon-async-join-1")
+                    .resolve_session(session_id)
                     .await
                     .expect("resolve")
                     .expect("present");

@@ -60,8 +60,14 @@ fn post_observe_session_uses_async_db_when_sync_db_is_unavailable() {
     with_isolated_harness_env(sandbox.path(), || {
         temp_env::with_vars(
             [
-                ("CLAUDE_SESSION_ID", Some("http-async-observe-leader")),
-                ("CODEX_SESSION_ID", Some("http-async-observe-worker")),
+                (
+                    "CLAUDE_SESSION_ID",
+                    Some("c666e0cf-8bc8-5d83-aad9-c79c1bc0763c-leader"),
+                ),
+                (
+                    "CODEX_SESSION_ID",
+                    Some("c666e0cf-8bc8-5d83-aad9-c79c1bc0763c-worker"),
+                ),
             ],
             || {
                 let runtime = tokio::runtime::Runtime::new().expect("runtime");
@@ -71,18 +77,21 @@ fn post_observe_session_uses_async_db_when_sync_db_is_unavailable() {
 
                     let db_path = sandbox.path().join("daemon.sqlite");
                     let state = test_http_state_with_empty_async_db(&db_path).await;
-                    let _ =
-                        start_async_http_session(state.clone(), &project_dir, "http-async-observe")
-                            .await;
+                    let _ = start_async_http_session(
+                        state.clone(),
+                        &project_dir,
+                        "c666e0cf-8bc8-5d83-aad9-c79c1bc0763c",
+                    )
+                    .await;
                     let async_db = state.async_db.get().expect("async db");
                     let resolved = async_db
-                        .resolve_session("http-async-observe")
+                        .resolve_session("c666e0cf-8bc8-5d83-aad9-c79c1bc0763c")
                         .await
                         .expect("resolve session")
                         .expect("session present");
                     let leader_id = resolved.state.leader_id.clone().expect("leader id");
                     let joined = join_session_direct_async(
-                        "http-async-observe",
+                        "c666e0cf-8bc8-5d83-aad9-c79c1bc0763c",
                         &SessionJoinRequest {
                             runtime: "codex".into(),
                             role: SessionRole::Worker,
@@ -115,7 +124,7 @@ fn post_observe_session_uses_async_db_when_sync_db_is_unavailable() {
                     );
 
                     let response = post_observe_session(
-                        Path("http-async-observe".to_string()),
+                        Path("c666e0cf-8bc8-5d83-aad9-c79c1bc0763c".to_string()),
                         auth_headers(),
                         State(state.clone()),
                         Some(Json(ObserveSessionRequest {
@@ -139,8 +148,14 @@ fn post_observe_session_uses_sync_db_without_mutating_state_file() {
     with_isolated_harness_env(sandbox.path(), || {
         temp_env::with_vars(
             [
-                ("CLAUDE_SESSION_ID", Some("http-sync-observe-leader")),
-                ("CODEX_SESSION_ID", Some("http-sync-observe-worker")),
+                (
+                    "CLAUDE_SESSION_ID",
+                    Some("96c38ae6-d8e5-5a66-8772-c4d140908d28-leader"),
+                ),
+                (
+                    "CODEX_SESSION_ID",
+                    Some("96c38ae6-d8e5-5a66-8772-c4d140908d28-worker"),
+                ),
             ],
             || {
                 let project_dir = sandbox.path().join("project");
@@ -150,7 +165,7 @@ fn post_observe_session_uses_sync_db_without_mutating_state_file() {
                     "http sync observe test",
                     "",
                     &project_dir,
-                    Some("http-sync-observe"),
+                    Some("96c38ae6-d8e5-5a66-8772-c4d140908d28"),
                 )
                 .expect("start session");
                 let active = session_service::join_session(
@@ -195,8 +210,8 @@ fn post_observe_session_uses_sync_db_without_mutating_state_file() {
 
                 let db_path = sandbox.path().join("daemon-sync.sqlite");
                 let http_state = test_http_state_with_sync_db_only(&db_path);
-                let resolved =
-                    index::resolve_session("http-sync-observe").expect("resolve session");
+                let resolved = index::resolve_session("96c38ae6-d8e5-5a66-8772-c4d140908d28")
+                    .expect("resolve session");
                 {
                     let db = http_state
                         .db
@@ -212,7 +227,7 @@ fn post_observe_session_uses_sync_db_without_mutating_state_file() {
                 let runtime = tokio::runtime::Runtime::new().expect("runtime");
                 runtime.block_on(async {
                     let response = post_observe_session(
-                        Path("http-sync-observe".to_string()),
+                        Path("96c38ae6-d8e5-5a66-8772-c4d140908d28".to_string()),
                         auth_headers(),
                         State(http_state.clone()),
                         Some(Json(ObserveSessionRequest {
@@ -226,9 +241,11 @@ fn post_observe_session_uses_sync_db_without_mutating_state_file() {
                     assert_eq!(body["tasks"].as_array().map(Vec::len), Some(1));
                 });
 
-                let layout =
-                    session_storage::layout_from_project_dir(&project_dir, "http-sync-observe")
-                        .expect("layout");
+                let layout = session_storage::layout_from_project_dir(
+                    &project_dir,
+                    "96c38ae6-d8e5-5a66-8772-c4d140908d28",
+                )
+                .expect("layout");
                 let file_state = session_storage::load_state(&layout)
                     .expect("load state")
                     .expect("file state");
@@ -241,12 +258,12 @@ fn post_observe_session_uses_sync_db_without_mutating_state_file() {
                     .lock()
                     .expect("db lock");
                 let db_state = db
-                    .load_session_state("http-sync-observe")
+                    .load_session_state("96c38ae6-d8e5-5a66-8772-c4d140908d28")
                     .expect("load db state")
                     .expect("db state");
                 assert_eq!(db_state.tasks.len(), 1);
                 assert_eq!(
-                    db.load_conversation_events("http-sync-observe", &worker_id)
+                    db.load_conversation_events("96c38ae6-d8e5-5a66-8772-c4d140908d28", &worker_id)
                         .expect("load worker transcript")
                         .len(),
                     1

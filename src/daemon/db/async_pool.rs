@@ -10,6 +10,7 @@ use super::{
     usize_from_i64,
 };
 use crate::session::service::canonicalize_persisted_session_state;
+use crate::session::storage;
 use crate::telemetry::{record_daemon_db_health_counts, record_daemon_db_pool_state};
 use crate::workspace::utc_now;
 
@@ -300,6 +301,9 @@ impl AsyncDaemonDb {
 
                 let mut summaries = Vec::new();
                 for row in rows {
+                    if !storage::is_valid_session_id(&row.session_id) {
+                        continue;
+                    }
                     summaries.push(row.into_summary(self).await?);
                 }
                 Ok(summaries)
@@ -316,6 +320,7 @@ impl AsyncDaemonDb {
         &self,
         session_id: &str,
     ) -> Result<Option<daemon_index::ResolvedSession>, CliError> {
+        storage::validate_session_id(session_id)?;
         trace_async_db_operation("resolve_session", "read", Some(&self.path), || async {
             record_daemon_db_pool_state(
                 "async",

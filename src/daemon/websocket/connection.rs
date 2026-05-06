@@ -310,14 +310,16 @@ mod tests {
         let session_event = StreamEvent {
             event: "session_updated".into(),
             recorded_at: "2026-03-29T12:00:00Z".into(),
-            session_id: Some("sess-1".into()),
+            session_id: Some("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into()),
             payload: json!({}),
         };
 
         assert!(!state.should_relay(&global_event));
         assert!(!state.should_relay(&session_event));
 
-        state.session_subscriptions.insert("sess-1".into());
+        state
+            .session_subscriptions
+            .insert("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into());
         assert!(!state.should_relay(&global_event));
         assert!(state.should_relay(&session_event));
 
@@ -341,7 +343,7 @@ mod tests {
             .send(StreamEvent {
                 event: "session_updated".into(),
                 recorded_at: "2026-04-13T19:00:00Z".into(),
-                session_id: Some("sess-test-1".into()),
+                session_id: Some("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into()),
                 payload: json!({}),
             })
             .expect("send first event");
@@ -349,7 +351,7 @@ mod tests {
             .send(StreamEvent {
                 event: "session_updated".into(),
                 recorded_at: "2026-04-13T19:00:01Z".into(),
-                session_id: Some("sess-test-1".into()),
+                session_id: Some("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into()),
                 payload: json!({}),
             })
             .expect("send second event");
@@ -376,7 +378,7 @@ mod tests {
             .lock()
             .expect("connection lock")
             .session_subscriptions
-            .insert("sess-test-1".into());
+            .insert("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into());
 
         let (sender, _) = broadcast::channel::<StreamEvent>(1);
         let mut receiver = sender.subscribe();
@@ -406,7 +408,10 @@ mod tests {
             serde_json::from_str(text).expect("deserialize websocket push frame");
 
         assert_eq!(push.event, "session_updated");
-        assert_eq!(push.session_id.as_deref(), Some("sess-test-1"));
+        assert_eq!(
+            push.session_id.as_deref(),
+            Some("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4")
+        );
     }
 
     #[test]

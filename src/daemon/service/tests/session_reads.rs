@@ -27,7 +27,7 @@ fn session_detail_promotes_live_worker_and_hides_dead_leader() {
         let fixture = setup_session_with_worker_logs(
             project,
             "daemon leaderless detail",
-            "daemon-leaderless-detail",
+            "213d9b3b-955d-584d-9faa-c3cdd541c914",
         );
         set_log_mtime_seconds_ago(&fixture.leader_log, 1_200);
         age_leader_state_activity(project, &fixture.state.session_id, 1_200);
@@ -61,7 +61,7 @@ fn list_sessions_db_promotes_live_worker_and_excludes_dead_members() {
         let fixture = setup_session_with_worker_logs(
             project,
             "daemon leaderless summaries",
-            "daemon-leaderless-summaries",
+            "476ccd0e-4dbc-57ce-8d7a-6f1f34b8069a",
         );
         set_log_mtime_seconds_ago(&fixture.leader_log, 1_200);
         age_leader_state_activity(project, &fixture.state.session_id, 1_200);
@@ -106,7 +106,7 @@ fn archived_sessions_are_hidden_from_sync_db_summary_detail_and_timeline_reads()
         let fixture = setup_session_with_worker_logs(
             project,
             "daemon archived sync reads",
-            "daemon-archived-sync-reads",
+            "d985d715-5ef0-50c0-b73b-00a48f5a66ed",
         );
         archive_session_state(project, &fixture.state.session_id);
 
@@ -143,7 +143,7 @@ fn list_sessions_async_promotes_live_worker_and_excludes_dead_members() {
         let fixture = setup_session_with_worker_logs(
             project,
             "daemon async leaderless summaries",
-            "daemon-async-leaderless-summaries",
+            "4be98c5f-701a-59aa-86d2-53ef6fa646c4",
         );
         set_log_mtime_seconds_ago(&fixture.leader_log, 1_200);
         age_leader_state_activity(project, &fixture.state.session_id, 1_200);
@@ -196,7 +196,7 @@ fn archived_sessions_are_hidden_from_async_db_summary_detail_and_timeline_reads(
         let fixture = setup_session_with_worker_logs(
             project,
             "daemon archived async reads",
-            "daemon-archived-async-reads",
+            "11cf3459-8cf7-54fc-9663-92608a899d2f",
         );
         archive_session_state(project, &fixture.state.session_id);
 
@@ -257,7 +257,7 @@ fn db_session_reads_preserve_adoption_metadata() {
         let fixture = setup_session_with_worker_logs(
             project,
             "daemon adopted metadata db",
-            "daemon-adopted-metadata-db",
+            "331b9776-49be-5c76-b6bf-7e17e3e65949",
         );
         set_adoption_metadata(project, &fixture.state.session_id);
 
@@ -291,7 +291,7 @@ fn async_session_reads_preserve_adoption_metadata() {
         let fixture = setup_session_with_worker_logs(
             project,
             "daemon adopted metadata async",
-            "daemon-adopted-metadata-async",
+            "cd396ce1-f2c7-562e-8b2f-e396794710f1",
         );
         set_adoption_metadata(project, &fixture.state.session_id);
 
@@ -333,7 +333,7 @@ fn resolve_runtime_session_agent_async_returns_match_for_live_worker() {
         let fixture = setup_session_with_worker_logs(
             project,
             "daemon async runtime session resolve",
-            "daemon-async-runtime-session-resolve",
+            "9b5a80e8-79fe-580a-ab18-3b9abaca3cc0",
         );
         let orchestration_session_id = fixture.state.session_id;
         let status = session_service::session_status(&orchestration_session_id, project)
@@ -398,7 +398,7 @@ fn session_detail_async_promotes_live_worker_and_hides_dead_leader() {
         let fixture = setup_session_with_worker_logs(
             project,
             "daemon async leaderless detail",
-            "daemon-async-leaderless-detail",
+            "1b36bd95-9a11-54a5-aa3a-1713016b6079",
         );
         set_log_mtime_seconds_ago(&fixture.leader_log, 1_200);
         age_leader_state_activity(project, &fixture.state.session_id, 1_200);

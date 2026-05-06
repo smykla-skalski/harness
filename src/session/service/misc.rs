@@ -1,6 +1,7 @@
 use super::{
     AgentRegistration, AgentStatus, BTreeMap, CliError, CliErrorKind, TaskStatus, Utc, WorkItem,
 };
+use crate::workspace::ids;
 
 pub(crate) fn task_not_found(task_id: &str) -> CliError {
     CliErrorKind::session_not_active(format!("task '{task_id}' not found")).into()
@@ -61,7 +62,7 @@ pub(crate) fn task_status_label(status: TaskStatus) -> &'static str {
 }
 
 pub(crate) fn generate_session_id() -> String {
-    format!("sess-{}", Utc::now().format("%Y%m%d%H%M%S%f"))
+    ids::new_session_id()
 }
 
 pub(crate) fn next_available_agent_id(

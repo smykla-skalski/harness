@@ -83,7 +83,7 @@ fn coordination_checks_only_fire_with_agent_context() {
 fn stalled_agent_fires_when_no_tool_uses() {
     let mut state = make_state();
     state.agent_id = Some("codex-stall".into());
-    state.orchestration_session_id = Some("sess-1".into());
+    state.orchestration_session_id = Some("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into());
     // Simulate being past line 50 with empty tool use window
     let issues = check_text_for_issues(
         60,
@@ -115,7 +115,7 @@ fn stalled_agent_does_not_fire_before_line_50() {
 fn cross_agent_file_conflict_detected() {
     let mut state = make_state();
     state.agent_id = Some("codex-1".into());
-    state.orchestration_session_id = Some("sess-1".into());
+    state.orchestration_session_id = Some("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into());
     let editors = state
         .cross_agent_editors
         .entry("src/main.rs".into())

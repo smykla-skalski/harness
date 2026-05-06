@@ -97,11 +97,12 @@ mod tests {
             project_name: "demo".into(),
             project_dir: Some("/origin".into()),
             context_root: "/origin".into(),
-            worktree_path: "/data/sessions/demo/abc12345/workspace".into(),
-            shared_path: "/data/sessions/demo/abc12345/memory".into(),
+            worktree_path: "/data/sessions/demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed/workspace"
+                .into(),
+            shared_path: "/data/sessions/demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed/memory".into(),
             origin_path: "/origin".into(),
-            branch_ref: "harness/abc12345".into(),
-            session_id: "abc12345".into(),
+            branch_ref: "harness/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed".into(),
+            session_id: "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed".into(),
             title: "t".into(),
             context: "c".into(),
             status: SessionStatus::Active,
@@ -120,14 +121,17 @@ mod tests {
     #[test]
     fn summary_to_session_state_forwards_workspace_fields() {
         let state = summary_to_session_state(&summary_fixture());
-        assert_eq!(state.branch_ref, "harness/abc12345");
+        assert_eq!(
+            state.branch_ref,
+            "harness/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed"
+        );
         assert_eq!(
             state.worktree_path,
-            PathBuf::from("/data/sessions/demo/abc12345/workspace")
+            PathBuf::from("/data/sessions/demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed/workspace")
         );
         assert_eq!(
             state.shared_path,
-            PathBuf::from("/data/sessions/demo/abc12345/memory")
+            PathBuf::from("/data/sessions/demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed/memory")
         );
         assert_eq!(state.origin_path, PathBuf::from("/origin"));
     }
@@ -158,14 +162,17 @@ mod tests {
             agent_activity: Vec::new(),
         };
         let state = detail_to_session_state(&detail);
-        assert_eq!(state.branch_ref, "harness/abc12345");
+        assert_eq!(
+            state.branch_ref,
+            "harness/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed"
+        );
         assert_eq!(
             state.worktree_path,
-            PathBuf::from("/data/sessions/demo/abc12345/workspace")
+            PathBuf::from("/data/sessions/demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed/workspace")
         );
         assert_eq!(
             state.shared_path,
-            PathBuf::from("/data/sessions/demo/abc12345/memory")
+            PathBuf::from("/data/sessions/demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed/memory")
         );
         assert_eq!(state.origin_path, PathBuf::from("/origin"));
     }

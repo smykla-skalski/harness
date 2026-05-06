@@ -235,7 +235,7 @@ mod tests {
                         .await;
                 let response = reqwest::Client::new()
                     .post(format!(
-                        "{base_url}/v1/sessions/nod8ccog/managed-agents/acp"
+                        "{base_url}/v1/sessions/11111111-1111-4111-8111-111111111111/managed-agents/acp"
                     ))
                     .bearer_auth("token")
                     .json(&json!({
@@ -253,7 +253,7 @@ mod tests {
                 assert_eq!(body["error"]["code"], "KSRCLI090");
                 assert!(
                     body["error"]["message"].as_str().is_some_and(|message| {
-                        message.contains("harness session 'nod8ccog' not found")
+                        message.contains("harness session '11111111-1111-4111-8111-111111111111' not found")
                     }),
                     "unexpected error body: {body}"
                 );

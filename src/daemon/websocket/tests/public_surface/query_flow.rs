@@ -17,7 +17,7 @@ async fn websocket_round_trip_smoke_covers_public_surface() {
         id: "req-smoke".into(),
         method: "session.timeline".into(),
         params: serde_json::json!({
-            "session_id": "sess-test-1",
+            "session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
             "scope": "summary",
         }),
         trace_context: None,
@@ -65,7 +65,7 @@ async fn websocket_async_detail_query_succeeds_without_sync_db() {
     let request = WsRequest {
         id: "req-detail-async".into(),
         method: "session.detail".into(),
-        params: serde_json::json!({ "session_id": "sess-test-1" }),
+        params: serde_json::json!({ "session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4" }),
         trace_context: None,
     };
 
@@ -77,7 +77,7 @@ async fn websocket_async_detail_query_succeeds_without_sync_db() {
             .result
             .as_ref()
             .and_then(|result| result["session"]["session_id"].as_str()),
-        Some("sess-test-1")
+        Some("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4")
     );
 }
 
@@ -110,7 +110,7 @@ async fn session_subscribe_broadcasts_async_snapshot_without_sync_db() {
     let request = WsRequest {
         id: "req-session-subscribe".into(),
         method: "session.subscribe".into(),
-        params: serde_json::json!({ "session_id": "sess-test-1" }),
+        params: serde_json::json!({ "session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4" }),
         trace_context: None,
     };
 

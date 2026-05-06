@@ -9,29 +9,35 @@ fn observe_session_with_db_persists_tasks_without_touching_state_file() {
             "",
             project,
             Some("claude"),
-            Some("daemon-observe-db"),
+            Some("1adf20f5-0049-5515-9fc3-d3866bcf7e7c"),
         )
         .expect("start session");
         let leader_id = state.leader_id.clone().expect("leader id");
 
-        temp_env::with_vars([("CODEX_SESSION_ID", Some("worker-session"))], || {
-            session_service::join_session(
-                &state.session_id,
-                SessionRole::Worker,
-                "codex",
-                &[],
-                None,
-                project,
-                None,
-            )
-            .expect("join codex worker");
-        });
+        temp_env::with_vars(
+            [(
+                "CODEX_SESSION_ID",
+                Some("008d974f-c6a9-53e5-a62e-d331367c449a"),
+            )],
+            || {
+                session_service::join_session(
+                    &state.session_id,
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                    None,
+                )
+                .expect("join codex worker");
+            },
+        );
 
         append_project_ledger_entry(project);
         write_agent_log(
             project,
             HookAgent::Codex,
-            "worker-session",
+            "008d974f-c6a9-53e5-a62e-d331367c449a",
             "This is a harness infrastructure issue - the KDS port wasn't forwarded",
         );
         let db = setup_db_with_session(project, &state.session_id);
@@ -86,29 +92,35 @@ fn observe_session_with_actor_creates_tasks() {
             "",
             project,
             Some("claude"),
-            Some("daemon-observe"),
+            Some("0ce71dde-c741-5d11-855d-f1aa573f620e"),
         )
         .expect("start session");
         let leader_id = state.leader_id.clone().expect("leader id");
 
-        temp_env::with_vars([("CODEX_SESSION_ID", Some("worker-session"))], || {
-            session_service::join_session(
-                &state.session_id,
-                SessionRole::Worker,
-                "codex",
-                &[],
-                None,
-                project,
-                None,
-            )
-            .expect("join codex worker");
-        });
+        temp_env::with_vars(
+            [(
+                "CODEX_SESSION_ID",
+                Some("008d974f-c6a9-53e5-a62e-d331367c449a"),
+            )],
+            || {
+                session_service::join_session(
+                    &state.session_id,
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                    None,
+                )
+                .expect("join codex worker");
+            },
+        );
 
         append_project_ledger_entry(project);
         write_agent_log(
             project,
             HookAgent::Codex,
-            "worker-session",
+            "008d974f-c6a9-53e5-a62e-d331367c449a",
             "This is a harness infrastructure issue - the KDS port wasn't forwarded",
         );
 
@@ -153,7 +165,7 @@ fn observe_session_restarts_running_loop_when_actor_changes() {
             "",
             project,
             Some("claude"),
-            Some("daemon-observe-restart"),
+            Some("1ee32bb6-dc81-5187-82f0-98051c23cfe6"),
         )
         .expect("start session");
         let leader_id = state.leader_id.clone().expect("leader id");
@@ -239,7 +251,7 @@ fn observe_session_async_creates_tasks_without_sync_db() {
             "",
             project,
             Some("claude"),
-            Some("observe-async-leader"),
+            Some("85a54651-60e2-5595-8a58-fdc4debe56ab"),
         )
         .expect("start session");
         let leader_id = state.leader_id.clone().expect("leader id");
@@ -305,7 +317,7 @@ fn incremental_observe_skips_change_bump_when_snapshot_is_unchanged() {
             "",
             project,
             Some("claude"),
-            Some("observe-async-quiet"),
+            Some("83db93bd-b78e-5118-a61c-a4a58c6f4535"),
         )
         .expect("start session");
 

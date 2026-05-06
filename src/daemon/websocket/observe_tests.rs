@@ -73,8 +73,14 @@ fn websocket_async_session_observe_mutation_succeeds_without_sync_db() {
     with_isolated_harness_env(sandbox.path(), || {
         temp_env::with_vars(
             [
-                ("CLAUDE_SESSION_ID", Some("ws-async-observe-leader")),
-                ("CODEX_SESSION_ID", Some("ws-async-observe-worker")),
+                (
+                    "CLAUDE_SESSION_ID",
+                    Some("1be2f920-d9e6-5440-b86b-9568f32052a3-leader"),
+                ),
+                (
+                    "CODEX_SESSION_ID",
+                    Some("1be2f920-d9e6-5440-b86b-9568f32052a3-worker"),
+                ),
             ],
             || {
                 let runtime = tokio::runtime::Runtime::new().expect("runtime");
@@ -84,18 +90,27 @@ fn websocket_async_session_observe_mutation_succeeds_without_sync_db() {
 
                     let db_path = sandbox.path().join("daemon.sqlite");
                     let state = test_websocket_state_with_empty_async_db(&db_path).await;
-                    start_async_session(&state, &project_dir, "ws-async-observe").await;
-                    let leader_id = leader_id_for_session(&state, "ws-async-observe").await;
+                    start_async_session(
+                        &state,
+                        &project_dir,
+                        "1be2f920-d9e6-5440-b86b-9568f32052a3",
+                    )
+                    .await;
+                    let leader_id =
+                        leader_id_for_session(&state, "1be2f920-d9e6-5440-b86b-9568f32052a3").await;
                     let worker_id = join_async_worker(
                         &state,
-                        "ws-async-observe",
+                        "1be2f920-d9e6-5440-b86b-9568f32052a3",
                         &project_dir,
                         "Async Observe Worker",
                     )
                     .await;
-                    let worker_session_id =
-                        agent_runtime_session_id_for_agent(&state, "ws-async-observe", &worker_id)
-                            .await;
+                    let worker_session_id = agent_runtime_session_id_for_agent(
+                        &state,
+                        "1be2f920-d9e6-5440-b86b-9568f32052a3",
+                        &worker_id,
+                    )
+                    .await;
                     append_project_ledger_entry(&project_dir);
                     write_agent_log(
                         &project_dir,
@@ -109,7 +124,7 @@ fn websocket_async_session_observe_mutation_succeeds_without_sync_db() {
                         id: "req-session-observe-async".into(),
                         method: "session.observe".into(),
                         params: serde_json::json!({
-                            "session_id": "ws-async-observe",
+                            "session_id": "1be2f920-d9e6-5440-b86b-9568f32052a3",
                             "actor": leader_id.clone()
                         }),
                         trace_context: None,
@@ -138,8 +153,14 @@ fn websocket_sync_session_observe_mutation_uses_db_without_mutating_state_file()
     with_isolated_harness_env(sandbox.path(), || {
         temp_env::with_vars(
             [
-                ("CLAUDE_SESSION_ID", Some("ws-sync-observe-leader")),
-                ("CODEX_SESSION_ID", Some("ws-sync-observe-worker")),
+                (
+                    "CLAUDE_SESSION_ID",
+                    Some("77056a68-6fc8-55cc-ad5a-a076bc3c100e-leader"),
+                ),
+                (
+                    "CODEX_SESSION_ID",
+                    Some("77056a68-6fc8-55cc-ad5a-a076bc3c100e-worker"),
+                ),
             ],
             || {
                 let project_dir = sandbox.path().join("project");
@@ -149,7 +170,7 @@ fn websocket_sync_session_observe_mutation_uses_db_without_mutating_state_file()
                     "ws sync observe test",
                     "",
                     &project_dir,
-                    Some("ws-sync-observe"),
+                    Some("77056a68-6fc8-55cc-ad5a-a076bc3c100e"),
                 )
                 .expect("start session");
                 let active = session_service::join_session(
@@ -194,14 +215,14 @@ fn websocket_sync_session_observe_mutation_uses_db_without_mutating_state_file()
 
                 let db_path = sandbox.path().join("daemon-sync.sqlite");
                 let state = test_websocket_state_with_sync_db_only(&db_path);
-                seed_sync_file_backed_session(&state, "ws-sync-observe");
+                seed_sync_file_backed_session(&state, "77056a68-6fc8-55cc-ad5a-a076bc3c100e");
 
                 let connection = Arc::new(Mutex::new(ConnectionState::new()));
                 let request = WsRequest {
                     id: "req-session-observe-sync".into(),
                     method: "session.observe".into(),
                     params: serde_json::json!({
-                        "session_id": "ws-sync-observe",
+                        "session_id": "77056a68-6fc8-55cc-ad5a-a076bc3c100e",
                         "actor": leader_id
                     }),
                     trace_context: None,
@@ -222,9 +243,11 @@ fn websocket_sync_session_observe_mutation_uses_db_without_mutating_state_file()
                     );
                 });
 
-                let layout =
-                    session_storage::layout_from_project_dir(&project_dir, "ws-sync-observe")
-                        .expect("layout");
+                let layout = session_storage::layout_from_project_dir(
+                    &project_dir,
+                    "77056a68-6fc8-55cc-ad5a-a076bc3c100e",
+                )
+                .expect("layout");
                 let file_state = session_storage::load_state(&layout)
                     .expect("load state")
                     .expect("file state");
@@ -232,12 +255,12 @@ fn websocket_sync_session_observe_mutation_uses_db_without_mutating_state_file()
 
                 let db = state.db.get().expect("db slot").lock().expect("db lock");
                 let db_state = db
-                    .load_session_state("ws-sync-observe")
+                    .load_session_state("77056a68-6fc8-55cc-ad5a-a076bc3c100e")
                     .expect("load db state")
                     .expect("db state");
                 assert_eq!(db_state.tasks.len(), 1);
                 assert_eq!(
-                    db.load_conversation_events("ws-sync-observe", &worker_id)
+                    db.load_conversation_events("77056a68-6fc8-55cc-ad5a-a076bc3c100e", &worker_id)
                         .expect("load worker transcript")
                         .len(),
                     1

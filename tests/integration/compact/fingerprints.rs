@@ -17,7 +17,10 @@ fn file_fingerprint_from_existing_file() {
 
 #[test]
 fn file_fingerprint_from_missing_file() {
-    let fp = FileFingerprint::from_path("missing", Path::new("/nonexistent/path.txt"));
+    let fp = FileFingerprint::from_path(
+        "missing",
+        Path::new("/418cf829-6691-5fc0-92b1-8e5013efa2cb/path.txt"),
+    );
     assert!(!fp.exists);
     assert!(fp.size.is_none());
     assert!(fp.sha256.is_none());

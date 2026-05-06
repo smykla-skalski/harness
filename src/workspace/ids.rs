@@ -1,47 +1,36 @@
-//! 8-character lowercase alphanumeric session id.
+//! UUID-backed harness session ids.
 
-use rand::RngExt as _;
 use thiserror::Error;
+use uuid::Uuid;
 
-pub const SESSION_ID_LEN: usize = 8;
-const ALPHABET: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
+pub const SESSION_ID_LEN: usize = 36;
 
 #[derive(Debug, Error)]
 pub enum IdError {
-    #[error("session id must be {SESSION_ID_LEN} lowercase alphanumeric characters: {0:?}")]
+    #[error("session id must be a lowercase UUID: {0:?}")]
     Invalid(String),
 }
 
-/// Generate a fresh 8-character lowercase alphanumeric session id.
-///
-/// Drawn from a 36-character alphabet (`0-9a-z`). Uses the thread-local
-/// CSPRNG so values are not predictable across processes. At 36^8 ≈ 2.8 ×
-/// 10^12 keys the birthday bound reaches ~50 % at roughly 1.7 million
-/// concurrent ids — plenty of headroom for the sessions namespace.
+/// Generate a fresh lowercase UUID v4 session id.
 #[must_use]
 pub fn new_session_id() -> String {
-    let mut rng = rand::rng();
-    (0..SESSION_ID_LEN)
-        .map(|_| {
-            let idx = rng.random_range(0..ALPHABET.len());
-            ALPHABET[idx] as char
-        })
-        .collect()
+    Uuid::new_v4().to_string()
 }
 
 /// # Errors
-/// Returns `IdError::Invalid` when the id is not exactly 8 lowercase alphanumeric characters.
+/// Returns `IdError::Invalid` when the id is not a canonical lowercase UUID.
 pub fn validate(id: &str) -> Result<(), IdError> {
-    if id.len() != SESSION_ID_LEN {
-        return Err(IdError::Invalid(id.to_string()));
-    }
-    if !id
-        .chars()
-        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
-    {
-        return Err(IdError::Invalid(id.to_string()));
-    }
-    Ok(())
+    is_canonical_lowercase_uuid(id)
+        .then_some(())
+        .ok_or_else(|| IdError::Invalid(id.to_string()))
+}
+
+fn is_canonical_lowercase_uuid(id: &str) -> bool {
+    id.len() == SESSION_ID_LEN
+        && id.bytes().enumerate().all(|(idx, byte)| match idx {
+            8 | 13 | 18 | 23 => byte == b'-',
+            _ => byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte),
+        })
 }
 
 #[cfg(test)]

@@ -293,7 +293,10 @@ fn session_state_identity_accessors_expose_typed_ids() {
     );
     let state = session_state(agents, BTreeMap::new());
 
-    assert_eq!(state.harness_session_id(), HarnessSessionId::from("sess-1"));
+    assert_eq!(
+        state.harness_session_id(),
+        HarnessSessionId::from("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
+    );
     assert_eq!(
         state.leader_session_agent_id(),
         Some(SessionAgentId::from("leader"))
@@ -336,11 +339,17 @@ fn session_state_identity_helpers_resolve_managed_and_runtime_links() {
         Some(SessionAgentId::from("worker-1"))
     );
     assert_eq!(
-        state.find_session_agent_id_by_runtime_session("claude", &RuntimeSessionId::from("sess-1")),
+        state.find_session_agent_id_by_runtime_session(
+            "claude",
+            &RuntimeSessionId::from("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
+        ),
         Some(SessionAgentId::from("leader"))
     );
     assert_eq!(
-        state.find_session_agent_id_by_runtime_session("codex", &RuntimeSessionId::from("sess-1")),
+        state.find_session_agent_id_by_runtime_session(
+            "codex",
+            &RuntimeSessionId::from("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
+        ),
         None
     );
 }

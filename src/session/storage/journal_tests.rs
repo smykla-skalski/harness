@@ -17,7 +17,7 @@ fn layout(tmp: &std::path::Path, session_id: &str) -> SessionLayout {
 #[test]
 fn append_and_load_log_entries() {
     let tmp = tempfile::tempdir().expect("tempdir");
-    let layout = layout(tmp.path(), "sess-1");
+    let layout = layout(tmp.path(), "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc");
     fs_err::create_dir_all(layout.session_root()).expect("create session dir");
 
     append_log_entry(
@@ -46,7 +46,7 @@ fn append_and_load_log_entries() {
 #[test]
 fn checkpoint_round_trip_is_append_only() {
     let tmp = tempfile::tempdir().expect("tempdir");
-    let layout = layout(tmp.path(), "sess-1");
+    let layout = layout(tmp.path(), "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc");
     fs_err::create_dir_all(layout.session_root()).expect("create session dir");
 
     let checkpoint = TaskCheckpoint {

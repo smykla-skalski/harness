@@ -18,7 +18,7 @@ use crate::session::types::{
     SessionStatus, TaskQueuePolicy, TaskSeverity, TaskSource, TaskStatus, WorkItem,
 };
 
-pub(super) const OBSERVE_ID: &str = "observe-sess-merge";
+pub(super) const OBSERVE_ID: &str = "observe-7d8914ed-1073-56a6-85c1-0582a49cf5ce";
 const RUNTIME_SESSION_ID: &str = "codex-session-1";
 
 pub(super) fn write_json(path: &Path, value: &impl serde::Serialize) {

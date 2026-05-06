@@ -92,7 +92,11 @@ async fn disconnect_forwarded_session_is_idempotent_after_first_disconnect() {
         };
         let (manager, mut events) = manager_with_events();
         let descriptor = descriptor(&script);
-        let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+        let Ok(snapshot) = manager.start_descriptor(
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            &request,
+            &descriptor,
+        ) else {
             unreachable!("start");
         };
         let active = {
@@ -152,7 +156,11 @@ async fn refresh_and_forwarded_disconnect_race_still_emit_one_incident() {
         };
         let (manager, mut events) = manager_with_events();
         let descriptor = descriptor(&script);
-        let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+        let Ok(snapshot) = manager.start_descriptor(
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            &request,
+            &descriptor,
+        ) else {
             unreachable!("start");
         };
         let active = {
@@ -224,7 +232,11 @@ async fn poisoned_permission_bridge_lock_does_not_block_snapshot_or_stop_cleanup
         };
         let (manager, _events) = manager_with_events();
         let descriptor = descriptor(&script);
-        let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+        let Ok(snapshot) = manager.start_descriptor(
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            &request,
+            &descriptor,
+        ) else {
             unreachable!("start");
         };
         let active = {

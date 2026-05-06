@@ -103,7 +103,11 @@ async fn prompt_turn_against_sdk_cookbook_style_agent_streams_events() {
     let (_command_tx, command_rx) = mpsc::unbounded_channel();
     let project_dir = project.path().to_path_buf();
     let protocol_supervisor = Arc::clone(&supervisor);
-    let manager = protocol_manager("fake", "agent-acp-1", "harness-sess-1");
+    let manager = protocol_manager(
+        "fake",
+        "agent-acp-1",
+        "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e",
+    );
 
     let protocol_task = tokio::spawn(async move {
         Client
@@ -125,7 +129,7 @@ async fn prompt_turn_against_sdk_cookbook_style_agent_streams_events() {
                     project_dir,
                     prompt: Some("smoke the second descriptor".to_string()),
                     acp_id: "agent-acp-1".to_string(),
-                    session_id: "harness-sess-1".to_string(),
+                    session_id: "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e".to_string(),
                     runtime_name: "fake".to_string(),
                     supervisor: protocol_supervisor,
                     initial_prompt_lease: None,
@@ -192,7 +196,11 @@ async fn protocol_rejects_notification_with_unknown_session_id() {
     let (_command_tx, command_rx) = mpsc::unbounded_channel();
     let project_dir = project.path().to_path_buf();
     let protocol_supervisor = Arc::clone(&supervisor);
-    let manager = protocol_manager("fake", "agent-acp-1", "harness-sess-1");
+    let manager = protocol_manager(
+        "fake",
+        "agent-acp-1",
+        "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e",
+    );
 
     let protocol_task = tokio::spawn(async move {
         Client
@@ -214,7 +222,7 @@ async fn protocol_rejects_notification_with_unknown_session_id() {
                     project_dir,
                     prompt: Some("trigger stale session".to_string()),
                     acp_id: "agent-acp-1".to_string(),
-                    session_id: "harness-sess-1".to_string(),
+                    session_id: "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e".to_string(),
                     runtime_name: "fake".to_string(),
                     supervisor: protocol_supervisor,
                     initial_prompt_lease: None,

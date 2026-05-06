@@ -111,7 +111,7 @@ fn record_creates_artifact_even_when_binary_not_found() {
         label: Some("missing".into()),
         gid: None,
         cluster: None,
-        command: vec!["nonexistent-binary-xyz-12345".into()],
+        command: vec!["418cf829-6691-5fc0-92b1-8e5013efa2cb-binary-xyz-12345".into()],
         run_dir: args,
     })
     .execute();

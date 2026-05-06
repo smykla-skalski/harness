@@ -193,7 +193,8 @@ fn shell_blocks_ignores_yaml() {
 
 #[test]
 fn load_returns_none_for_missing_file() {
-    let result = PreparedSuiteArtifact::load(Path::new("/nonexistent/path.json"));
+    let result =
+        PreparedSuiteArtifact::load(Path::new("/418cf829-6691-5fc0-92b1-8e5013efa2cb/path.json"));
     assert!(result.is_ok());
     assert!(result.unwrap().is_none());
 }

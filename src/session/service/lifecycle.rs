@@ -9,8 +9,8 @@ use super::{
     log_role_changed, log_session_ended, log_session_started, prepare_end_session_leave_signals,
     prepare_remove_agent_leave_signal, protocol, refresh_session, release_agent_tasks,
     require_active, require_removable_agent, resolve_join_role, resolve_registered_runtime,
-    resolve_session_project_dir, slice, storage, utc_now, validate_policy_preset,
-    write_prepared_leave_signals,
+    resolve_session_project_dir, slice, storage, utc_now, validate_explicit_session_id,
+    validate_policy_preset, write_prepared_leave_signals,
 };
 
 /// Start a new leaderless orchestration session.
@@ -38,6 +38,7 @@ pub fn start_session_with_policy(
     policy_preset: Option<&str>,
 ) -> Result<SessionState, CliError> {
     validate_policy_preset(policy_preset)?;
+    validate_explicit_session_id(session_id)?;
 
     if let Some(client) = DaemonClient::try_connect() {
         return client.start_session(&protocol::SessionStartRequest {

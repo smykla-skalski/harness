@@ -3,10 +3,28 @@ use super::*;
 #[test]
 fn list_sessions_returns_all_when_requested() {
     with_temp_project(|project| {
-        let first = start_active_session("goal1", "", project, Some("claude"), Some("ls1"))
-            .expect("start one");
-        start_active_session("goal2", "", project, Some("codex"), Some("ls2")).expect("start two");
-        end_session("ls1", first.leader_id.as_deref().expect("leader"), project).expect("end");
+        let first = start_active_session(
+            "goal1",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-00000000001a"),
+        )
+        .expect("start one");
+        start_active_session(
+            "goal2",
+            "",
+            project,
+            Some("codex"),
+            Some("00000000-0000-4002-8000-00000000003f"),
+        )
+        .expect("start two");
+        end_session(
+            "00000000-0000-4002-8000-00000000001a",
+            first.leader_id.as_deref().expect("leader"),
+            project,
+        )
+        .expect("end");
 
         let active_only = list_sessions(project, false).expect("active list");
         let all_sessions = list_sessions(project, true).expect("all list");
@@ -18,13 +36,19 @@ fn list_sessions_returns_all_when_requested() {
 #[test]
 fn list_sessions_default_visibility_includes_awaiting_leader_active_and_leaderless_degraded() {
     with_temp_project(|project| {
-        start_session("goal-awaiting", "", project, Some("ls-awaiting")).expect("start awaiting");
+        start_session(
+            "goal-awaiting",
+            "",
+            project,
+            Some("00000000-0000-4002-8000-000000000019"),
+        )
+        .expect("start awaiting");
         start_active_session(
             "goal-active",
             "",
             project,
             Some("claude"),
-            Some("ls-active"),
+            Some("00000000-0000-4002-8000-00000000003e"),
         )
         .expect("start active");
         let degraded = start_active_session(
@@ -32,12 +56,13 @@ fn list_sessions_default_visibility_includes_awaiting_leader_active_and_leaderle
             "",
             project,
             Some("claude"),
-            Some("ls-degraded"),
+            Some("00000000-0000-4002-8000-000000000042"),
         )
         .expect("start degraded");
         let degraded_leader = degraded.leader_id.expect("degraded leader");
         let degraded_layout =
-            storage::layout_from_project_dir(project, "ls-degraded").expect("degraded layout");
+            storage::layout_from_project_dir(project, "00000000-0000-4002-8000-000000000042")
+                .expect("degraded layout");
         storage::update_state(&degraded_layout, |state| {
             state.status = SessionStatus::LeaderlessDegraded;
             state.leader_id = None;
@@ -50,11 +75,16 @@ fn list_sessions_default_visibility_includes_awaiting_leader_active_and_leaderle
         })
         .expect("degrade session");
 
-        let ended =
-            start_active_session("goal-ended", "", project, Some("claude"), Some("ls-ended"))
-                .expect("start ended");
+        let ended = start_active_session(
+            "goal-ended",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-000000000043"),
+        )
+        .expect("start ended");
         end_session(
-            "ls-ended",
+            "00000000-0000-4002-8000-000000000043",
             ended.leader_id.as_deref().expect("leader"),
             project,
         )
@@ -65,31 +95,69 @@ fn list_sessions_default_visibility_includes_awaiting_leader_active_and_leaderle
             .into_iter()
             .map(|state| state.session_id)
             .collect::<Vec<_>>();
-        assert!(visible_ids.iter().any(|id| id == "ls-awaiting"));
-        assert!(visible_ids.iter().any(|id| id == "ls-active"));
-        assert!(visible_ids.iter().any(|id| id == "ls-degraded"));
-        assert!(!visible_ids.iter().any(|id| id == "ls-ended"));
+        assert!(
+            visible_ids
+                .iter()
+                .any(|id| id == "00000000-0000-4002-8000-000000000019")
+        );
+        assert!(
+            visible_ids
+                .iter()
+                .any(|id| id == "00000000-0000-4002-8000-00000000003e")
+        );
+        assert!(
+            visible_ids
+                .iter()
+                .any(|id| id == "00000000-0000-4002-8000-000000000042")
+        );
+        assert!(
+            !visible_ids
+                .iter()
+                .any(|id| id == "00000000-0000-4002-8000-000000000043")
+        );
 
         let all_ids = list_sessions(project, true)
             .expect("all list")
             .into_iter()
             .map(|state| state.session_id)
             .collect::<Vec<_>>();
-        assert!(all_ids.iter().any(|id| id == "ls-awaiting"));
-        assert!(all_ids.iter().any(|id| id == "ls-active"));
-        assert!(all_ids.iter().any(|id| id == "ls-degraded"));
-        assert!(all_ids.iter().any(|id| id == "ls-ended"));
+        assert!(
+            all_ids
+                .iter()
+                .any(|id| id == "00000000-0000-4002-8000-000000000019")
+        );
+        assert!(
+            all_ids
+                .iter()
+                .any(|id| id == "00000000-0000-4002-8000-00000000003e")
+        );
+        assert!(
+            all_ids
+                .iter()
+                .any(|id| id == "00000000-0000-4002-8000-000000000042")
+        );
+        assert!(
+            all_ids
+                .iter()
+                .any(|id| id == "00000000-0000-4002-8000-000000000043")
+        );
     });
 }
 
 #[test]
 fn checkpoint_record_updates_task_summary_and_log() {
     with_temp_project(|project| {
-        let state =
-            start_active_session("test", "", project, Some("claude"), Some("s5")).expect("start");
+        let state = start_active_session(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-000000000025"),
+        )
+        .expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let task = create_task(
-            "s5",
+            "00000000-0000-4002-8000-000000000025",
             "watch daemon",
             None,
             TaskSeverity::Medium,
@@ -99,7 +167,7 @@ fn checkpoint_record_updates_task_summary_and_log() {
         .expect("task");
 
         let checkpoint = record_task_checkpoint(
-            "s5",
+            "00000000-0000-4002-8000-000000000025",
             &task.task_id,
             &leader_id,
             "watcher attached",
@@ -108,7 +176,8 @@ fn checkpoint_record_updates_task_summary_and_log() {
         )
         .expect("checkpoint");
 
-        let updated = session_status("s5", project).expect("status");
+        let updated =
+            session_status("00000000-0000-4002-8000-000000000025", project).expect("status");
         let stored_task = updated.tasks.get(&task.task_id).expect("stored task");
         assert_eq!(
             stored_task
@@ -119,7 +188,9 @@ fn checkpoint_record_updates_task_summary_and_log() {
             35
         );
 
-        let layout = storage::layout_from_project_dir(project, "s5").expect("layout");
+        let layout =
+            storage::layout_from_project_dir(project, "00000000-0000-4002-8000-000000000025")
+                .expect("layout");
         let checkpoints =
             storage::load_task_checkpoints(&layout, &task.task_id).expect("checkpoints");
         assert_eq!(checkpoints.len(), 1);
@@ -130,11 +201,25 @@ fn checkpoint_record_updates_task_summary_and_log() {
 #[test]
 fn send_signal_lists_pending_signal_for_target_agent() {
     with_temp_project(|project| {
-        let state =
-            start_active_session("test", "", project, Some("claude"), Some("s6")).expect("start");
+        let state = start_active_session(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-000000000027"),
+        )
+        .expect("start");
         let leader_id = state.leader_id.expect("leader id");
-        let joined = join_session("s6", SessionRole::Worker, "codex", &[], None, project, None)
-            .expect("join");
+        let joined = join_session(
+            "00000000-0000-4002-8000-000000000027",
+            SessionRole::Worker,
+            "codex",
+            &[],
+            None,
+            project,
+            None,
+        )
+        .expect("join");
         let worker_id = joined
             .agents
             .keys()
@@ -143,7 +228,7 @@ fn send_signal_lists_pending_signal_for_target_agent() {
             .clone();
 
         send_signal(
-            "s6",
+            "00000000-0000-4002-8000-000000000027",
             &worker_id,
             "inject_context",
             "new task queued",
@@ -153,7 +238,12 @@ fn send_signal_lists_pending_signal_for_target_agent() {
         )
         .expect("signal");
 
-        let signals = list_signals("s6", Some(&worker_id), project).expect("signals");
+        let signals = list_signals(
+            "00000000-0000-4002-8000-000000000027",
+            Some(&worker_id),
+            project,
+        )
+        .expect("signals");
         assert_eq!(signals.len(), 1);
         assert_eq!(signals[0].status, SessionSignalStatus::Pending);
         assert_eq!(signals[0].runtime, "codex");
@@ -164,13 +254,18 @@ fn send_signal_lists_pending_signal_for_target_agent() {
 #[test]
 fn list_signals_filters_shared_runtime_session_history() {
     with_temp_project(|project| {
-        let session_one =
-            start_active_session("test", "", project, Some("claude"), Some("s6-alpha"))
-                .expect("start alpha");
+        let session_one = start_active_session(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-000000000026"),
+        )
+        .expect("start alpha");
         let leader_one = session_one.leader_id.expect("alpha leader id");
         let joined_one = temp_env::with_vars([("CODEX_SESSION_ID", Some("codex-shared"))], || {
             join_session(
-                "s6-alpha",
+                "00000000-0000-4002-8000-000000000026",
                 SessionRole::Worker,
                 "codex",
                 &[],
@@ -187,13 +282,18 @@ fn list_signals_filters_shared_runtime_session_history() {
             .expect("alpha worker id")
             .clone();
 
-        let session_two =
-            start_active_session("test", "", project, Some("claude"), Some("s6-beta"))
-                .expect("start beta");
+        let session_two = start_active_session(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-000000000040"),
+        )
+        .expect("start beta");
         let leader_two = session_two.leader_id.expect("beta leader id");
         let joined_two = temp_env::with_vars([("CODEX_SESSION_ID", Some("codex-shared"))], || {
             join_session(
-                "s6-beta",
+                "00000000-0000-4002-8000-000000000040",
                 SessionRole::Worker,
                 "codex",
                 &[],
@@ -211,7 +311,7 @@ fn list_signals_filters_shared_runtime_session_history() {
             .clone();
 
         send_signal(
-            "s6-alpha",
+            "00000000-0000-4002-8000-000000000026",
             &worker_one,
             "inject_context",
             "alpha task queued",
@@ -221,7 +321,7 @@ fn list_signals_filters_shared_runtime_session_history() {
         )
         .expect("alpha signal");
         send_signal(
-            "s6-beta",
+            "00000000-0000-4002-8000-000000000040",
             &worker_two,
             "inject_context",
             "beta task queued",
@@ -231,10 +331,18 @@ fn list_signals_filters_shared_runtime_session_history() {
         )
         .expect("beta signal");
 
-        let alpha_signals =
-            list_signals("s6-alpha", Some(&worker_one), project).expect("alpha signals");
-        let beta_signals =
-            list_signals("s6-beta", Some(&worker_two), project).expect("beta signals");
+        let alpha_signals = list_signals(
+            "00000000-0000-4002-8000-000000000026",
+            Some(&worker_one),
+            project,
+        )
+        .expect("alpha signals");
+        let beta_signals = list_signals(
+            "00000000-0000-4002-8000-000000000040",
+            Some(&worker_two),
+            project,
+        )
+        .expect("beta signals");
 
         assert_eq!(alpha_signals.len(), 1);
         assert_eq!(alpha_signals[0].signal.payload.message, "alpha task queued");
@@ -246,9 +354,24 @@ fn list_signals_filters_shared_runtime_session_history() {
 #[test]
 fn send_signal_denies_worker_actor() {
     with_temp_project(|project| {
-        start_active_session("test", "", project, Some("claude"), Some("s7")).expect("start");
-        let joined = join_session("s7", SessionRole::Worker, "codex", &[], None, project, None)
-            .expect("join");
+        start_active_session(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-000000000028"),
+        )
+        .expect("start");
+        let joined = join_session(
+            "00000000-0000-4002-8000-000000000028",
+            SessionRole::Worker,
+            "codex",
+            &[],
+            None,
+            project,
+            None,
+        )
+        .expect("join");
         let worker_id = joined
             .agents
             .keys()
@@ -257,7 +380,7 @@ fn send_signal_denies_worker_actor() {
             .clone();
 
         let error = send_signal(
-            "s7",
+            "00000000-0000-4002-8000-000000000028",
             &worker_id,
             "inject_context",
             "workers should not send signals",

@@ -367,7 +367,7 @@ mod tests {
             connection_state.global_subscription = true;
             connection_state
                 .session_subscriptions
-                .insert("sess-test-1".into());
+                .insert("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into());
         }
 
         let events = recovery_events_for_connection(&connection, &state).await;
@@ -379,7 +379,7 @@ mod tests {
         assert!(
             events.iter().any(|event| {
                 event.event == "session_updated"
-                    && event.session_id.as_deref() == Some("sess-test-1")
+                    && event.session_id.as_deref() == Some("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4")
             }),
             "expected session_updated recovery event"
         );

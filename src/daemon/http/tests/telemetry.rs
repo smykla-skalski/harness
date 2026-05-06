@@ -114,7 +114,10 @@ async fn trace_http_request_projects_baggage_attributes_onto_server_span() {
         for (header, value) in &headers {
             request = request.header(header, value);
         }
-        request = request.header("baggage", "session.id=sess-123,project.id=proj-456");
+        request = request.header(
+            "baggage",
+            "session.id=eadbcb3e-6ef7-53d2-ad56-0347cb7189fc23,project.id=proj-456",
+        );
         let response = request.send().await.expect("send request");
         assert_eq!(response.status(), reqwest::StatusCode::OK);
     }
@@ -128,7 +131,7 @@ async fn trace_http_request_projects_baggage_attributes_onto_server_span() {
 
     assert_eq!(
         span_string_attribute(request_span, "session.id").as_deref(),
-        Some("sess-123")
+        Some("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc23")
     );
     assert_eq!(
         span_string_attribute(request_span, "project.id").as_deref(),

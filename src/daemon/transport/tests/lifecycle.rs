@@ -302,8 +302,11 @@ fn restart_manual_path_stops_then_spawns_replacement() {
 
 #[test]
 fn spawn_daemon_refuses_in_sandbox_mode() {
-    let error = spawn_daemon(true, Path::new("/nonexistent/harness"))
-        .expect_err("sandbox mode must refuse spawn");
+    let error = spawn_daemon(
+        true,
+        Path::new("/418cf829-6691-5fc0-92b1-8e5013efa2cb/harness"),
+    )
+    .expect_err("sandbox mode must refuse spawn");
     assert_eq!(error.code(), "SANDBOX001");
     assert!(error.to_string().contains("daemon-spawn"));
 }

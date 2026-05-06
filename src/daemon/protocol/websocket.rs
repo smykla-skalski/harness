@@ -99,7 +99,7 @@ mod tests {
         let request = WsRequest {
             id: "req-1".to_string(),
             method: "session.detail".to_string(),
-            params: json!({ "session_id": "sess-1" }),
+            params: json!({ "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc" }),
             trace_context: Some(BTreeMap::from([(
                 "traceparent".to_string(),
                 "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01".to_string(),

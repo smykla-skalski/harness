@@ -24,7 +24,7 @@ fn stub_session_detail_json() -> serde_json::Value {
             "shared_path": "/shared",
             "origin_path": "/origin",
             "branch_ref": "harness/abc",
-            "session_id": "sess-1",
+            "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
             "title": "t",
             "context": "c",
             "status": "active",
@@ -138,14 +138,17 @@ fn submit_task_for_review_posts_expected_path_and_body() {
         suggested_persona: Some("code-reviewer".into()),
     };
     let detail = client
-        .submit_task_for_review("sess-1", "task-9", &request)
+        .submit_task_for_review("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "task-9", &request)
         .expect("submit_task_for_review");
-    assert_eq!(detail.session.session_id, "sess-1");
+    assert_eq!(
+        detail.session.session_id,
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"
+    );
     handle.join().expect("server thread");
     let captured = captured.lock().expect("captured");
     assert_eq!(
         captured.path,
-        "/v1/sessions/sess-1/tasks/task-9/submit-for-review"
+        "/v1/sessions/eadbcb3e-6ef7-53d2-ad56-0347cb7189fc/tasks/task-9/submit-for-review"
     );
     assert!(captured.body.contains("\"actor\":\"worker-1\""));
     assert!(captured.body.contains("\"summary\":\"ready\""));
@@ -165,13 +168,13 @@ fn claim_task_review_posts_expected_path_and_body() {
         actor: "rev-1".into(),
     };
     client
-        .claim_task_review("sess-1", "task-9", &request)
+        .claim_task_review("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "task-9", &request)
         .expect("claim_task_review");
     handle.join().expect("server thread");
     let captured = captured.lock().expect("captured");
     assert_eq!(
         captured.path,
-        "/v1/sessions/sess-1/tasks/task-9/claim-review"
+        "/v1/sessions/eadbcb3e-6ef7-53d2-ad56-0347cb7189fc/tasks/task-9/claim-review"
     );
     assert!(captured.body.contains("\"actor\":\"rev-1\""));
 }
@@ -193,13 +196,13 @@ fn submit_task_review_posts_expected_path_and_body() {
         }],
     };
     client
-        .submit_task_review("sess-1", "task-9", &request)
+        .submit_task_review("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "task-9", &request)
         .expect("submit_task_review");
     handle.join().expect("server thread");
     let captured = captured.lock().expect("captured");
     assert_eq!(
         captured.path,
-        "/v1/sessions/sess-1/tasks/task-9/submit-review"
+        "/v1/sessions/eadbcb3e-6ef7-53d2-ad56-0347cb7189fc/tasks/task-9/submit-review"
     );
     assert!(captured.body.contains("\"verdict\":\"request_changes\""));
     assert!(captured.body.contains("\"point_id\":\"p1\""));
@@ -217,13 +220,13 @@ fn respond_task_review_posts_expected_path_and_body() {
         note: Some("partial".into()),
     };
     client
-        .respond_task_review("sess-1", "task-9", &request)
+        .respond_task_review("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "task-9", &request)
         .expect("respond_task_review");
     handle.join().expect("server thread");
     let captured = captured.lock().expect("captured");
     assert_eq!(
         captured.path,
-        "/v1/sessions/sess-1/tasks/task-9/respond-review"
+        "/v1/sessions/eadbcb3e-6ef7-53d2-ad56-0347cb7189fc/tasks/task-9/respond-review"
     );
     assert!(captured.body.contains("\"agreed\":[\"p1\"]"));
     assert!(captured.body.contains("\"disputed\":[\"p2\"]"));
@@ -241,11 +244,14 @@ fn arbitrate_task_posts_expected_path_and_body() {
         summary: "shipping".into(),
     };
     client
-        .arbitrate_task("sess-1", "task-9", &request)
+        .arbitrate_task("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "task-9", &request)
         .expect("arbitrate_task");
     handle.join().expect("server thread");
     let captured = captured.lock().expect("captured");
-    assert_eq!(captured.path, "/v1/sessions/sess-1/tasks/task-9/arbitrate");
+    assert_eq!(
+        captured.path,
+        "/v1/sessions/eadbcb3e-6ef7-53d2-ad56-0347cb7189fc/tasks/task-9/arbitrate"
+    );
     assert!(captured.body.contains("\"verdict\":\"approve\""));
     assert!(captured.body.contains("\"summary\":\"shipping\""));
 }
@@ -273,13 +279,16 @@ fn improver_apply_posts_expected_path_and_returns_outcome() {
         dry_run: false,
     };
     let outcome = client
-        .improver_apply("sess-1", &request)
+        .improver_apply("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", &request)
         .expect("improver_apply");
     assert!(outcome.applied);
     assert_eq!(outcome.before_sha256.len(), 64);
     handle.join().expect("server thread");
     let captured = captured.lock().expect("captured");
-    assert_eq!(captured.path, "/v1/sessions/sess-1/improver/apply");
+    assert_eq!(
+        captured.path,
+        "/v1/sessions/eadbcb3e-6ef7-53d2-ad56-0347cb7189fc/improver/apply"
+    );
     assert!(captured.body.contains("\"issue_id\":\"issue-1\""));
     assert!(captured.body.contains("\"target\":\"skill\""));
     assert!(captured.body.contains("\"rel_path\":\"demo/SKILL.md\""));
@@ -317,12 +326,12 @@ fn acp_inspect_gets_optional_session_filter() {
         "agents": [{
             "managed_agent_id": "agent-acp-1",
             "managed_agent_family": "acp",
-            "session_id": "sess-1",
+            "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
             "session_agent_id": "copilot",
             "display_name": "GitHub Copilot",
             "pid": 42,
             "pgid": 42,
-            "process_key": "sess-1:copilot",
+            "process_key": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc:copilot",
             "uptime_ms": 10,
             "last_update_at": "2026-04-28T00:00:00Z",
             "last_client_call_at": null,
@@ -336,7 +345,7 @@ fn acp_inspect_gets_optional_session_filter() {
     let (endpoint, captured, handle) = spawn_get_mock("200 OK", body);
     let client = client_with(endpoint);
     let response = client
-        .inspect_acp_managed_agents(Some("sess-1"))
+        .inspect_acp_managed_agents(Some("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"))
         .expect("acp inspect");
     assert_eq!(response.agents[0].acp_id, "agent-acp-1");
     assert_eq!(
@@ -346,6 +355,6 @@ fn acp_inspect_gets_optional_session_filter() {
     handle.join().expect("server thread");
     assert_eq!(
         captured.lock().expect("captured").path,
-        "/v1/managed-agents/acp/inspect?session_id=sess-1"
+        "/v1/managed-agents/acp/inspect?session_id=eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"
     );
 }

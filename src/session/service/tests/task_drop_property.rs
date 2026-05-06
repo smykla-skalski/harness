@@ -30,7 +30,7 @@ enum ExpectedOutcome {
 
 fn run_case(prev: PrevAssignee, target: TargetBusyState, expected: ExpectedOutcome) {
     with_temp_project(|project| {
-        let session_id = "drop-prop";
+        let session_id = "00000000-0000-4002-8000-00000000000c";
         let leader_state =
             start_active_session("test", "", project, Some("claude"), Some(session_id))
                 .expect("start");

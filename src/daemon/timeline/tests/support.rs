@@ -19,7 +19,7 @@ use crate::session::types::{
     TaskStatus, WorkItem,
 };
 
-const OBSERVE_ID: &str = "observe-sess-merge";
+const OBSERVE_ID: &str = "observe-7d8914ed-1073-56a6-85c1-0582a49cf5ce";
 const PROJECT_ROOT: &str = "harness/projects/project-alpha";
 const RUNTIME_SESSION_ID: &str = "codex-session-1";
 const SIGNAL_ID: &str = "sig-acked";
@@ -118,7 +118,11 @@ pub(super) fn write_copilot_ledger_fixture(context_root: &Path, session_id: &str
         .join("state.json");
     write_json(
         &state_path,
-        &sample_state_for_runtime(session_id, "copilot", "copilot-session-1"),
+        &sample_state_for_runtime(
+            session_id,
+            "copilot",
+            "93595910-aac3-58cb-aadf-5101d4ce534b",
+        ),
     );
 
     let ledger_path = context_root.join("agents/ledger/events.jsonl");
@@ -128,7 +132,7 @@ pub(super) fn write_copilot_ledger_fixture(context_root: &Path, session_id: &str
             "sequence": 1,
             "recorded_at": "2026-03-28T14:04:45Z",
             "agent": "copilot",
-            "session_id": "copilot-session-1",
+            "session_id": "93595910-aac3-58cb-aadf-5101d4ce534b",
             "skill": "suite",
             "event": "before_tool_use",
             "hook": "tool-guard",
@@ -153,7 +157,7 @@ pub(super) fn write_copilot_ledger_fixture(context_root: &Path, session_id: &str
             "sequence": 2,
             "recorded_at": "2026-03-28T14:04:46Z",
             "agent": "copilot",
-            "session_id": "copilot-session-1",
+            "session_id": "93595910-aac3-58cb-aadf-5101d4ce534b",
             "skill": "suite",
             "event": "after_tool_use",
             "hook": "tool-result",

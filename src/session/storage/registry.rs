@@ -70,7 +70,11 @@ pub(crate) fn load_active_registry_for_layout(layout: &SessionLayout) -> ActiveR
 }
 
 fn load_registry_at(path: &Path) -> ActiveRegistry {
-    read_json_typed::<ActiveRegistry>(path).unwrap_or_default()
+    let mut registry = read_json_typed::<ActiveRegistry>(path).unwrap_or_default();
+    registry
+        .sessions
+        .retain(|session_id, _| files::is_valid_session_id(session_id));
+    registry
 }
 
 /// Load the active-session registry for a project directory.

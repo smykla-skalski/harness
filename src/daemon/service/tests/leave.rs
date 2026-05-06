@@ -47,7 +47,7 @@ fn leave_session_async_direct_marks_leaderless_degraded_without_successor() {
             let state = start_direct_session_async(
                 &async_db,
                 project,
-                "daemon-async-leave",
+                "86a03d3a-baba-5dd0-b3d6-c1c945f4f31d",
                 "async leave session",
                 "async leave",
                 None,
@@ -56,7 +56,7 @@ fn leave_session_async_direct_marks_leaderless_degraded_without_successor() {
             let leader_id = state.leader_id.clone().expect("leader id");
 
             let detail = leave_session_async(
-                "daemon-async-leave",
+                "86a03d3a-baba-5dd0-b3d6-c1c945f4f31d",
                 &SessionLeaveRequest {
                     agent_id: leader_id.clone(),
                 },
@@ -69,7 +69,7 @@ fn leave_session_async_direct_marks_leaderless_degraded_without_successor() {
             assert!(detail.session.leader_id.is_none());
 
             let resolved = async_db
-                .resolve_session("daemon-async-leave")
+                .resolve_session("86a03d3a-baba-5dd0-b3d6-c1c945f4f31d")
                 .await
                 .expect("resolve session")
                 .expect("state present");

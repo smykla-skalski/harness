@@ -13,7 +13,7 @@ fn validated_layout_succeeds_for_existing_dir() {
 
 #[test]
 fn validated_layout_fails_for_missing_dir() {
-    let layout = RunLayout::new("/nonexistent/path", "vanished");
+    let layout = RunLayout::new("/418cf829-6691-5fc0-92b1-8e5013efa2cb/path", "vanished");
     let result = ValidatedRunLayout::new(layout);
     assert!(result.is_err());
     let error = result.unwrap_err();

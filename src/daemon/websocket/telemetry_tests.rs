@@ -38,7 +38,7 @@ fn websocket_dispatch_uses_trace_context_parent_and_rpc_name() {
                 WsRequest {
                     id: "req-trace-context".into(),
                     method: "session.detail".into(),
-                    params: serde_json::json!({ "session_id": "sess-test-1" }),
+                    params: serde_json::json!({ "session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4" }),
                     trace_context: Some(crate::telemetry::current_trace_headers()),
                 }
             };
@@ -113,12 +113,12 @@ fn websocket_dispatch_projects_baggage_attributes_onto_rpc_and_db_spans() {
                 let mut trace_context = crate::telemetry::current_trace_headers();
                 trace_context.insert(
                     "baggage".into(),
-                    "session.id=sess-test-1,project.id=proj-test-9".into(),
+                    "session.id=f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4,project.id=proj-test-9".into(),
                 );
                 WsRequest {
                     id: "req-baggage-context".into(),
                     method: "session.detail".into(),
-                    params: serde_json::json!({ "session_id": "sess-test-1" }),
+                    params: serde_json::json!({ "session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4" }),
                     trace_context: Some(trace_context),
                 }
             };
@@ -132,7 +132,7 @@ fn websocket_dispatch_projects_baggage_attributes_onto_rpc_and_db_spans() {
             if let Some(rpc_span) = exported_span(&spans, "session.detail") {
                 assert_eq!(
                     span_string_attribute(rpc_span, "session.id").as_deref(),
-                    Some("sess-test-1")
+                    Some("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4")
                 );
                 assert_eq!(
                     span_string_attribute(rpc_span, "project.id").as_deref(),
@@ -142,7 +142,7 @@ fn websocket_dispatch_projects_baggage_attributes_onto_rpc_and_db_spans() {
             if let Some(db_span) = exported_span(&spans, "daemon.db.async.resolve_session") {
                 assert_eq!(
                     span_string_attribute(db_span, "session.id").as_deref(),
-                    Some("sess-test-1")
+                    Some("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4")
                 );
                 assert_eq!(
                     span_string_attribute(db_span, "project.id").as_deref(),

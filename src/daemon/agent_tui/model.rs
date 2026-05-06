@@ -453,11 +453,11 @@ mod model_selection_tests {
     #[test]
     fn launch_profile_rejects_unknown_model_for_runtime() {
         let mut request = base_request("claude");
-        request.model = Some("nonexistent-model".into());
+        request.model = Some("418cf829-6691-5fc0-92b1-8e5013efa2cb-model".into());
         let error = request.launch_profile().expect_err("should reject");
         let message = error.to_string();
         assert!(
-            message.contains("nonexistent-model"),
+            message.contains("418cf829-6691-5fc0-92b1-8e5013efa2cb-model"),
             "error should mention requested model: {message}"
         );
         assert!(

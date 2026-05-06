@@ -49,6 +49,7 @@ impl DaemonDb {
     /// # Errors
     /// Returns [`CliError`] on SQL or parse failures.
     pub fn load_session_state(&self, session_id: &str) -> Result<Option<SessionState>, CliError> {
+        crate::session::storage::validate_session_id(session_id)?;
         let result = self.conn.query_row(
             "SELECT project_id, state_json FROM sessions WHERE session_id = ?1",
             [session_id],
@@ -156,6 +157,7 @@ impl DaemonDb {
         &self,
         session_id: &str,
     ) -> Result<Option<SessionState>, CliError> {
+        crate::session::storage::validate_session_id(session_id)?;
         self.refresh_session_state_for_mutation(session_id)?;
         self.load_session_state(session_id)
     }

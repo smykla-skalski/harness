@@ -7,7 +7,7 @@ fn join_session_direct_rejects_leader_role() {
         start_direct_session(
             &db,
             project,
-            "leader-join-denied",
+            "08c192e1-b46a-54aa-bc0b-472ec6909d86",
             "leader join denied",
             "daemon joins cannot claim leader",
             None,
@@ -15,7 +15,7 @@ fn join_session_direct_rejects_leader_role() {
         let error = join_direct_codex(
             &db,
             project,
-            "leader-join-denied",
+            "08c192e1-b46a-54aa-bc0b-472ec6909d86",
             "leader-join-worker",
             SessionRole::Leader,
             None,

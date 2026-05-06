@@ -110,7 +110,7 @@ fn session_mutation_response_contains_state() {
         "state": {
             "schema_version": 3,
             "state_version": 1,
-            "session_id": "sess-1",
+            "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
             "context": "test",
             "status": "active",
             "created_at": "2024-01-01T00:00:00Z",
@@ -128,7 +128,10 @@ fn session_mutation_response_contains_state() {
         }
     });
     let response: SessionMutationResponse = serde_json::from_value(json).expect("deserialize");
-    assert_eq!(response.state.session_id, "sess-1");
+    assert_eq!(
+        response.state.session_id,
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"
+    );
 }
 
 #[test]

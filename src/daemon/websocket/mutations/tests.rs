@@ -12,14 +12,14 @@ fn dispatch_mutation_rebinds_client_actor() {
         id: "req-1".into(),
         method: "session.end".into(),
         params: json!({
-            "session_id": "sess-1",
+            "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
             "actor": "spoofed-leader",
         }),
         trace_context: None,
     };
 
     let response = dispatch_mutation(&request, &state, |session_id, params, _db| {
-        assert_eq!(session_id, "sess-1");
+        assert_eq!(session_id, "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc");
         assert_eq!(params["actor"], CONTROL_PLANE_ACTOR_ID);
         Err(MutationError {
             code: "EXPECTED".into(),
@@ -42,7 +42,7 @@ async fn dispatch_mutation_prefer_async_rebinds_client_actor() {
         id: "req-async-1".into(),
         method: "session.end".into(),
         params: json!({
-            "session_id": "sess-test-1",
+            "session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
             "actor": "spoofed-leader",
         }),
         trace_context: None,
@@ -55,7 +55,7 @@ async fn dispatch_mutation_prefer_async_rebinds_client_actor() {
             unreachable!("sync handler should not be used without async db")
         },
         |session_id, params, _async_db| async move {
-            assert_eq!(session_id, "sess-test-1");
+            assert_eq!(session_id, "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4");
             assert_eq!(params["actor"], CONTROL_PLANE_ACTOR_ID);
             Err(MutationError {
                 code: "EXPECTED".into(),
@@ -80,7 +80,7 @@ fn dispatch_mutation_with_agent_accepts_session_agent_id_alias() {
         id: "req-agent-alias".into(),
         method: "agent.change_role".into(),
         params: json!({
-            "session_id": "sess-1",
+            "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
             "session_agent_id": "worker-1",
             "actor": "spoofed-leader",
         }),
@@ -89,7 +89,7 @@ fn dispatch_mutation_with_agent_accepts_session_agent_id_alias() {
 
     let response =
         dispatch_mutation_with_agent(&request, &state, |session_id, agent_id, params, _db| {
-            assert_eq!(session_id, "sess-1");
+            assert_eq!(session_id, "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc");
             assert_eq!(agent_id, "worker-1");
             assert_eq!(params["actor"], CONTROL_PLANE_ACTOR_ID);
             Err(MutationError {
@@ -113,7 +113,7 @@ fn dispatch_mutation_with_agent_rejects_managed_agent_id_alias() {
         id: "req-agent-wrong-id".into(),
         method: "agent.change_role".into(),
         params: json!({
-            "session_id": "sess-1",
+            "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
             "managed_agent_id": "tui-1",
             "actor": "spoofed-leader",
         }),

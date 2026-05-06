@@ -14,6 +14,9 @@ mod adopted_external;
 mod repair_context_root;
 mod runtime_sessions;
 
+const SHARED_SESSION_ID: &str = "00000000-0000-4001-8000-000000000001";
+const ALPHA_SESSION_ID: &str = "00000000-0000-4001-8000-000000000002";
+
 fn write_text(path: &Path, contents: &str) {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).expect("create parent");
@@ -71,35 +74,45 @@ fn index_round_trip_smoke_covers_public_surface() {
         let project_dir = tmp.path().join("project-alpha");
         init_git_repo(&project_dir);
 
-        let active = temp_env::with_var("CLAUDE_SESSION_ID", Some("leader-session"), || {
-            let state = session_service::start_session(
-                "Mission control",
-                "Keep daemon index queries healthy",
-                &project_dir,
-                Some("shared-session"),
-            )
-            .expect("start session");
-            session_service::join_session(
-                &state.session_id,
-                SessionRole::Leader,
-                "claude",
-                &[],
-                None,
-                &project_dir,
-                None,
-            )
-            .expect("join leader")
-        });
+        let active = temp_env::with_var(
+            "CLAUDE_SESSION_ID",
+            Some("77d13b08-1651-541b-a3fc-26cab59e0aea"),
+            || {
+                let state = session_service::start_session(
+                    "Mission control",
+                    "Keep daemon index queries healthy",
+                    &project_dir,
+                    Some(SHARED_SESSION_ID),
+                )
+                .expect("start session");
+                session_service::join_session(
+                    &state.session_id,
+                    SessionRole::Leader,
+                    "claude",
+                    &[],
+                    None,
+                    &project_dir,
+                    None,
+                )
+                .expect("join leader")
+            },
+        );
         let leader_id = active.leader_id.expect("leader id");
 
         temp_env::with_vars(
             [
-                ("CLAUDE_SESSION_ID", Some("leader-session")),
-                ("CODEX_SESSION_ID", Some("worker-session")),
+                (
+                    "CLAUDE_SESSION_ID",
+                    Some("77d13b08-1651-541b-a3fc-26cab59e0aea"),
+                ),
+                (
+                    "CODEX_SESSION_ID",
+                    Some("008d974f-c6a9-53e5-a62e-d331367c449a"),
+                ),
             ],
             || {
                 session_service::join_session(
-                    "shared-session",
+                    SHARED_SESSION_ID,
                     SessionRole::Worker,
                     "codex",
                     &[],
@@ -112,7 +125,7 @@ fn index_round_trip_smoke_covers_public_surface() {
         );
 
         let project = discovered_project_for_checkout(&project_dir);
-        let worker_agent_id = load_session_state(&project, "shared-session")
+        let worker_agent_id = load_session_state(&project, SHARED_SESSION_ID)
             .expect("load joined state")
             .expect("joined state exists")
             .agents
@@ -121,7 +134,7 @@ fn index_round_trip_smoke_covers_public_surface() {
             .cloned()
             .expect("worker agent id");
         let task = session_service::create_task(
-            "shared-session",
+            SHARED_SESSION_ID,
             "Split daemon index",
             Some("exercise public index helpers"),
             crate::session::types::TaskSeverity::High,
@@ -130,7 +143,7 @@ fn index_round_trip_smoke_covers_public_surface() {
         )
         .expect("create task");
         session_service::assign_task(
-            "shared-session",
+            SHARED_SESSION_ID,
             &task.task_id,
             &worker_agent_id,
             &leader_id,
@@ -138,7 +151,7 @@ fn index_round_trip_smoke_covers_public_surface() {
         )
         .expect("assign task");
         let checkpoint = session_service::record_task_checkpoint(
-            "shared-session",
+            SHARED_SESSION_ID,
             &task.task_id,
             &worker_agent_id,
             "smoke checkpoint",
@@ -147,25 +160,35 @@ fn index_round_trip_smoke_covers_public_surface() {
         )
         .expect("record checkpoint");
 
-        write_codex_transcript(&project.context_root, "worker-session");
+        write_codex_transcript(
+            &project.context_root,
+            "008d974f-c6a9-53e5-a62e-d331367c449a",
+        );
 
         let discovered_projects = discover_projects().expect("discover projects");
         let active_sessions = discover_sessions(false).expect("discover active sessions");
         let per_project_sessions = discover_sessions_for(std::slice::from_ref(&project), true)
             .expect("discover project sessions");
-        let resolved = resolve_session("shared-session").expect("resolve session");
-        let loaded_state = load_session_state(&project, "shared-session")
+        let resolved = resolve_session(SHARED_SESSION_ID).expect("resolve session");
+        let loaded_state = load_session_state(&project, SHARED_SESSION_ID)
             .expect("load state")
             .expect("state exists");
-        let log_entries = load_log_entries(&project, "shared-session").expect("load log");
-        let checkpoints = load_task_checkpoints(&project, "shared-session", &task.task_id)
+        let log_entries = load_log_entries(&project, SHARED_SESSION_ID).expect("load log");
+        let checkpoints = load_task_checkpoints(&project, SHARED_SESSION_ID, &task.task_id)
             .expect("load checkpoints");
-        let conversation_events =
-            load_conversation_events(&project, "codex", "worker-session", &worker_agent_id)
-                .expect("load conversation events");
-        let runtime_session =
-            resolve_session_id_for_runtime_session(&project, "codex", "worker-session")
-                .expect("resolve runtime session");
+        let conversation_events = load_conversation_events(
+            &project,
+            "codex",
+            "008d974f-c6a9-53e5-a62e-d331367c449a",
+            &worker_agent_id,
+        )
+        .expect("load conversation events");
+        let runtime_session = resolve_session_id_for_runtime_session(
+            &project,
+            "codex",
+            "008d974f-c6a9-53e5-a62e-d331367c449a",
+        )
+        .expect("resolve runtime session");
 
         assert_eq!(projects_root(), tmp.path().join("harness/projects"));
         assert_eq!(fast_counts(), (1, 0, 1));
@@ -183,22 +206,27 @@ fn index_round_trip_smoke_covers_public_surface() {
             project.context_root.join("agents").join("signals")
         );
         assert_eq!(
-            agent_transcript_path(&project.context_root, "codex", "worker-session"),
+            agent_transcript_path(
+                &project.context_root,
+                "codex",
+                "008d974f-c6a9-53e5-a62e-d331367c449a"
+            ),
             project
                 .context_root
                 .join("agents")
                 .join("sessions")
                 .join("codex")
-                .join("worker-session")
+                .join("008d974f-c6a9-53e5-a62e-d331367c449a")
                 .join("raw.jsonl")
         );
+        let observe_id = format!("observe-{SHARED_SESSION_ID}");
         assert_eq!(
-            observe_snapshot_path(&project.context_root, "observe-shared-session"),
+            observe_snapshot_path(&project.context_root, &observe_id),
             project
                 .context_root
                 .join("agents")
                 .join("observe")
-                .join("observe-shared-session")
+                .join(&observe_id)
                 .join("snapshot.json")
         );
         assert!(
@@ -208,13 +236,13 @@ fn index_round_trip_smoke_covers_public_surface() {
         );
         assert_eq!(active_sessions.len(), 1);
         assert_eq!(per_project_sessions.len(), 1);
-        assert_eq!(resolved.state.session_id, "shared-session");
-        assert_eq!(loaded_state.session_id, "shared-session");
+        assert_eq!(resolved.state.session_id, SHARED_SESSION_ID);
+        assert_eq!(loaded_state.session_id, SHARED_SESSION_ID);
         assert!(!log_entries.is_empty());
         assert_eq!(checkpoints.len(), 1);
         assert_eq!(checkpoints[0].checkpoint_id, checkpoint.checkpoint_id);
         assert_eq!(conversation_events.len(), 2);
-        assert_eq!(runtime_session, Some("shared-session".to_string()));
+        assert_eq!(runtime_session, Some(SHARED_SESSION_ID.to_string()));
         assert!(matches!(
             conversation_events[0].kind,
             crate::agents::runtime::event::ConversationEventKind::ToolInvocation {
@@ -347,7 +375,7 @@ fn load_conversation_events_falls_back_to_ledger_for_copilot() {
             "sequence": 1,
             "recorded_at": "2026-03-29T10:00:00Z",
             "agent": "copilot",
-            "session_id": "copilot-session-1",
+            "session_id": "93595910-aac3-58cb-aadf-5101d4ce534b",
             "skill": "suite",
             "event": "before_tool_use",
             "hook": "tool-guard",
@@ -367,7 +395,7 @@ fn load_conversation_events_falls_back_to_ledger_for_copilot() {
             "sequence": 2,
             "recorded_at": "2026-03-29T10:00:02Z",
             "agent": "copilot",
-            "session_id": "copilot-session-1",
+            "session_id": "93595910-aac3-58cb-aadf-5101d4ce534b",
             "skill": "suite",
             "event": "after_tool_use",
             "hook": "tool-result",
@@ -404,14 +432,18 @@ fn load_conversation_events_falls_back_to_ledger_for_copilot() {
         worktree_name: None,
     };
 
-    let events =
-        load_conversation_events(&project, "copilot", "copilot-session-1", "copilot-worker")
-            .expect("events");
+    let events = load_conversation_events(
+        &project,
+        "copilot",
+        "93595910-aac3-58cb-aadf-5101d4ce534b",
+        "copilot-worker",
+    )
+    .expect("events");
 
     assert_eq!(events.len(), 2);
     assert_eq!(events[0].sequence, 1);
     assert_eq!(events[0].agent, "copilot-worker");
-    assert_eq!(events[0].session_id, "copilot-session-1");
+    assert_eq!(events[0].session_id, "93595910-aac3-58cb-aadf-5101d4ce534b");
     assert!(matches!(
         events[0].kind,
         crate::agents::runtime::event::ConversationEventKind::ToolInvocation {
@@ -458,7 +490,7 @@ fn resolve_session_id_scopes_to_project_bucket_under_new_layout() {
         let project_dir = tmp.path().join("workspace").join("alpha");
         harness_testkit::init_git_repo_with_seed(&project_dir);
 
-        let session_id = "alphasid";
+        let session_id = ALPHA_SESSION_ID;
         temp_env::with_var("CODEX_SESSION_ID", Some("runtime-leader-codex"), || {
             let state =
                 session_service::start_session("ctx", "title", &project_dir, Some(session_id))

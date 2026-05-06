@@ -33,7 +33,7 @@ fn sandboxed_stop_without_bridge_falls_back_to_local_cleanup() {
     let session_state = session_service::build_new_session(
         "stop test",
         "stop test",
-        "sess-stop-test",
+        "65b1e884-aced-5040-a647-c1b3cda701c4",
         "claude",
         None,
         &utc_now(),
@@ -44,7 +44,7 @@ fn sandboxed_stop_without_bridge_falls_back_to_local_cleanup() {
 
     let snapshot = AgentTuiSnapshot {
         tui_id: "agent-tui-test-stop".into(),
-        session_id: "sess-stop-test".into(),
+        session_id: "65b1e884-aced-5040-a647-c1b3cda701c4".into(),
         agent_id: "agent-stop-test".into(),
         runtime: "codex".into(),
         status: AgentTuiStatus::Running,
@@ -119,7 +119,7 @@ fn sandboxed_start_without_bridge_does_not_join_agent() {
     let state = session_service::build_new_session(
         "managed tui test",
         "managed tui",
-        "sess-tui-manager",
+        "f7db1185-850b-5f7d-8679-169d0d7cd520",
         "claude",
         None,
         &utc_now(),
@@ -142,7 +142,7 @@ fn sandboxed_start_without_bridge_does_not_join_agent() {
         || {
             let error = manager
                 .start(
-                    "sess-tui-manager",
+                    "f7db1185-850b-5f7d-8679-169d0d7cd520",
                     &AgentTuiStartRequest {
                         runtime: "copilot".into(),
                         role: SessionRole::Worker,
@@ -168,7 +168,7 @@ fn sandboxed_start_without_bridge_does_not_join_agent() {
 
     let db_guard = db_slot.get().expect("db slot").lock().expect("db lock");
     let state = db_guard
-        .load_session_state("sess-tui-manager")
+        .load_session_state("f7db1185-850b-5f7d-8679-169d0d7cd520")
         .expect("load state")
         .expect("state present");
     assert!(state.agents.values().all(|agent| {

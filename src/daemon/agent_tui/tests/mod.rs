@@ -47,7 +47,7 @@ fn manager_starts_registers_steers_and_stops_tui() {
         let state = session_service::build_new_session(
             "managed tui test",
             "managed tui",
-            "sess-tui-manager",
+            "f7db1185-850b-5f7d-8679-169d0d7cd520",
             "claude",
             None,
             &utc_now(),
@@ -63,7 +63,7 @@ fn manager_starts_registers_steers_and_stops_tui() {
         let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), false);
         let snapshot = manager
             .start(
-                "sess-tui-manager",
+                "f7db1185-850b-5f7d-8679-169d0d7cd520",
                 &AgentTuiStartRequest {
                     runtime: "codex".into(),
                     role: SessionRole::Worker,
@@ -97,7 +97,7 @@ fn manager_starts_registers_steers_and_stops_tui() {
         assert_eq!(started_event.event, "agent_tui_started");
         assert_eq!(
             started_event.session_id.as_deref(),
-            Some("sess-tui-manager")
+            Some("f7db1185-850b-5f7d-8679-169d0d7cd520")
         );
         manager
             .signal_ready(&snapshot.tui_id)
@@ -111,7 +111,7 @@ fn manager_starts_registers_steers_and_stops_tui() {
         {
             let db_guard = db_slot.get().expect("db slot").lock().expect("db lock");
             let state = db_guard
-                .load_session_state("sess-tui-manager")
+                .load_session_state("f7db1185-850b-5f7d-8679-169d0d7cd520")
                 .expect("load state")
                 .expect("state present");
             let has_tui_agent = state.agents.values().any(|agent| {

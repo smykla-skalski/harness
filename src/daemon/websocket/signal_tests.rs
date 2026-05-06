@@ -17,8 +17,14 @@ fn websocket_async_signal_send_mutation_succeeds_without_sync_db() {
     with_isolated_harness_env(sandbox.path(), || {
         temp_env::with_vars(
             [
-                ("CLAUDE_SESSION_ID", Some("ws-async-signal-send-leader")),
-                ("CODEX_SESSION_ID", Some("ws-async-signal-send-worker")),
+                (
+                    "CLAUDE_SESSION_ID",
+                    Some("5d3369db-b411-5092-b71a-a7f48139860a-leader"),
+                ),
+                (
+                    "CODEX_SESSION_ID",
+                    Some("5d3369db-b411-5092-b71a-a7f48139860a-worker"),
+                ),
             ],
             || {
                 let runtime = tokio::runtime::Runtime::new().expect("runtime");
@@ -28,21 +34,27 @@ fn websocket_async_signal_send_mutation_succeeds_without_sync_db() {
 
                     let db_path = sandbox.path().join("daemon.sqlite");
                     let state = test_websocket_state_with_empty_async_db(&db_path).await;
-                    start_async_session(&state, &project_dir, "ws-async-signal-send").await;
+                    start_async_session(
+                        &state,
+                        &project_dir,
+                        "5d3369db-b411-5092-b71a-a7f48139860a",
+                    )
+                    .await;
                     let worker_id = join_async_worker(
                         &state,
-                        "ws-async-signal-send",
+                        "5d3369db-b411-5092-b71a-a7f48139860a",
                         &project_dir,
                         "Async Signal Worker",
                     )
                     .await;
-                    let leader_id = leader_id_for_session(&state, "ws-async-signal-send").await;
+                    let leader_id =
+                        leader_id_for_session(&state, "5d3369db-b411-5092-b71a-a7f48139860a").await;
                     let connection = Arc::new(Mutex::new(ConnectionState::new()));
                     let request = WsRequest {
                         id: "req-signal-send-async".into(),
                         method: "signal.send".into(),
                         params: serde_json::json!({
-                            "session_id": "ws-async-signal-send",
+                            "session_id": "5d3369db-b411-5092-b71a-a7f48139860a",
                             "actor": leader_id,
                             "agent_id": worker_id.clone(),
                             "command": "inject_context",

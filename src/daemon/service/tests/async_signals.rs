@@ -57,7 +57,7 @@ fn send_signal_async_returns_detail_with_pending_signal_without_sync_handle() {
                 let state = start_direct_session_async(
                     &async_db,
                     project,
-                    "daemon-async-signal-send",
+                    "fc16aebb-a4ae-5ad8-bbcb-20b551fef128",
                     "async signal send",
                     "async signal send",
                     None,
@@ -65,7 +65,7 @@ fn send_signal_async_returns_detail_with_pending_signal_without_sync_handle() {
                 .await;
                 let leader_id = state.leader_id.clone().expect("leader id");
                 let joined = join_session_direct_async(
-                    "daemon-async-signal-send",
+                    "fc16aebb-a4ae-5ad8-bbcb-20b551fef128",
                     &crate::daemon::protocol::SessionJoinRequest {
                         runtime: "codex".into(),
                         role: SessionRole::Worker,
@@ -87,7 +87,7 @@ fn send_signal_async_returns_detail_with_pending_signal_without_sync_handle() {
                     .clone();
 
                 let detail = send_signal_async(
-                    "daemon-async-signal-send",
+                    "fc16aebb-a4ae-5ad8-bbcb-20b551fef128",
                     &SignalSendRequest {
                         actor: leader_id,
                         agent_id: worker_id.clone(),
@@ -101,7 +101,10 @@ fn send_signal_async_returns_detail_with_pending_signal_without_sync_handle() {
                 .await
                 .expect("send signal async");
 
-                assert_eq!(detail.session.session_id, "daemon-async-signal-send");
+                assert_eq!(
+                    detail.session.session_id,
+                    "fc16aebb-a4ae-5ad8-bbcb-20b551fef128"
+                );
                 assert_eq!(detail.signals.len(), 1);
                 assert_eq!(detail.signals[0].agent_id, worker_id);
                 assert_eq!(detail.signals[0].status, SessionSignalStatus::Pending);
@@ -130,7 +133,7 @@ fn cancel_signal_async_updates_async_db_without_sync_handle() {
                     let state = start_direct_session_async(
                         &async_db,
                         project,
-                        "daemon-async-signal-cancel",
+                        "f1f1ed04-ef4c-5e83-a73a-5bfa43de5d56",
                         "async signal cancel",
                         "async signal cancel",
                         None,
@@ -138,7 +141,7 @@ fn cancel_signal_async_updates_async_db_without_sync_handle() {
                     .await;
                     let leader_id = state.leader_id.clone().expect("leader id");
                     let joined = join_session_direct_async(
-                        "daemon-async-signal-cancel",
+                        "f1f1ed04-ef4c-5e83-a73a-5bfa43de5d56",
                         &crate::daemon::protocol::SessionJoinRequest {
                             runtime: "codex".into(),
                             role: SessionRole::Worker,
@@ -161,7 +164,7 @@ fn cancel_signal_async_updates_async_db_without_sync_handle() {
 
                     let signal_id = seed_pending_signal(
                         &async_db,
-                        "daemon-async-signal-cancel",
+                        "f1f1ed04-ef4c-5e83-a73a-5bfa43de5d56",
                         &leader_id,
                         &worker_id,
                         project,
@@ -170,7 +173,7 @@ fn cancel_signal_async_updates_async_db_without_sync_handle() {
                     .await;
 
                     let detail = cancel_signal_async(
-                        "daemon-async-signal-cancel",
+                        "f1f1ed04-ef4c-5e83-a73a-5bfa43de5d56",
                         &SignalCancelRequest {
                             actor: leader_id,
                             agent_id: worker_id.clone(),
@@ -214,7 +217,7 @@ fn record_signal_ack_direct_async_updates_signal_index_without_sync_handle() {
                 let state = start_direct_session_async(
                     &async_db,
                     project,
-                    "daemon-async-signal-ack",
+                    "0c783d46-1016-57d7-9097-10730e9553bf",
                     "async signal ack",
                     "async signal ack",
                     None,
@@ -222,7 +225,7 @@ fn record_signal_ack_direct_async_updates_signal_index_without_sync_handle() {
                 .await;
                 let leader_id = state.leader_id.clone().expect("leader id");
                 let joined = join_session_direct_async(
-                    "daemon-async-signal-ack",
+                    "0c783d46-1016-57d7-9097-10730e9553bf",
                     &crate::daemon::protocol::SessionJoinRequest {
                         runtime: "codex".into(),
                         role: SessionRole::Worker,
@@ -245,7 +248,7 @@ fn record_signal_ack_direct_async_updates_signal_index_without_sync_handle() {
 
                 let signal_id = seed_pending_signal(
                     &async_db,
-                    "daemon-async-signal-ack",
+                    "0c783d46-1016-57d7-9097-10730e9553bf",
                     &leader_id,
                     &worker_id,
                     project,
@@ -254,7 +257,7 @@ fn record_signal_ack_direct_async_updates_signal_index_without_sync_handle() {
                 .await;
 
                 record_signal_ack_direct_async(
-                    "daemon-async-signal-ack",
+                    "0c783d46-1016-57d7-9097-10730e9553bf",
                     &SignalAckRequest {
                         agent_id: worker_id.clone(),
                         signal_id: signal_id.clone(),
@@ -266,9 +269,10 @@ fn record_signal_ack_direct_async_updates_signal_index_without_sync_handle() {
                 .await
                 .expect("record ack via async db");
 
-                let detail = session_detail_async("daemon-async-signal-ack", Some(&async_db))
-                    .await
-                    .expect("load async detail");
+                let detail =
+                    session_detail_async("0c783d46-1016-57d7-9097-10730e9553bf", Some(&async_db))
+                        .await
+                        .expect("load async detail");
                 let signal = detail
                     .signals
                     .into_iter()
@@ -304,7 +308,7 @@ fn session_detail_core_async_reopens_expired_pending_delivery_without_sync_handl
                     let state = start_direct_session_async(
                         &async_db,
                         project,
-                        "daemon-async-signal-expired",
+                        "6a74589a-e06a-5cac-9fed-c7ca7954d3c8",
                         "async signal expired",
                         "async signal expired",
                         None,
@@ -312,7 +316,7 @@ fn session_detail_core_async_reopens_expired_pending_delivery_without_sync_handl
                     .await;
                     let leader_id = state.leader_id.clone().expect("leader id");
                     let joined = join_session_direct_async(
-                        "daemon-async-signal-expired",
+                        "6a74589a-e06a-5cac-9fed-c7ca7954d3c8",
                         &crate::daemon::protocol::SessionJoinRequest {
                             runtime: "codex".into(),
                             role: SessionRole::Worker,
@@ -334,7 +338,7 @@ fn session_detail_core_async_reopens_expired_pending_delivery_without_sync_handl
                         .clone();
 
                     let created = create_task_async(
-                        "daemon-async-signal-expired",
+                        "6a74589a-e06a-5cac-9fed-c7ca7954d3c8",
                         &TaskCreateRequest {
                             actor: leader_id.clone(),
                             title: "Expire before delivery".into(),
@@ -349,7 +353,7 @@ fn session_detail_core_async_reopens_expired_pending_delivery_without_sync_handl
                     let task_id = created.tasks[0].task_id.clone();
 
                     let dropped = drop_task_async(
-                        "daemon-async-signal-expired",
+                        "6a74589a-e06a-5cac-9fed-c7ca7954d3c8",
                         &task_id,
                         &TaskDropRequest {
                             actor: leader_id,
@@ -387,7 +391,7 @@ fn session_detail_core_async_reopens_expired_pending_delivery_without_sync_handl
                     )
                     .expect("rewrite expired signal");
                     let resolved = async_db
-                        .resolve_session("daemon-async-signal-expired")
+                        .resolve_session("6a74589a-e06a-5cac-9fed-c7ca7954d3c8")
                         .await
                         .expect("resolve session")
                         .expect("session present");
@@ -397,14 +401,16 @@ fn session_detail_core_async_reopens_expired_pending_delivery_without_sync_handl
                     )
                     .expect("load signals");
                     async_db
-                        .sync_signal_index("daemon-async-signal-expired", &signals)
+                        .sync_signal_index("6a74589a-e06a-5cac-9fed-c7ca7954d3c8", &signals)
                         .await
                         .expect("refresh signal index");
 
-                    let core =
-                        session_detail_core_async("daemon-async-signal-expired", Some(&async_db))
-                            .await
-                            .expect("core detail");
+                    let core = session_detail_core_async(
+                        "6a74589a-e06a-5cac-9fed-c7ca7954d3c8",
+                        Some(&async_db),
+                    )
+                    .await
+                    .expect("core detail");
                     let reopened_task = core
                         .tasks
                         .iter()
@@ -422,10 +428,12 @@ fn session_detail_core_async_reopens_expired_pending_delivery_without_sync_handl
                         .expect("worker");
                     assert!(worker.current_task_id.is_none());
 
-                    let extensions =
-                        session_extensions_async("daemon-async-signal-expired", Some(&async_db))
-                            .await
-                            .expect("session extensions");
+                    let extensions = session_extensions_async(
+                        "6a74589a-e06a-5cac-9fed-c7ca7954d3c8",
+                        Some(&async_db),
+                    )
+                    .await
+                    .expect("session extensions");
                     let signal = extensions
                         .signals
                         .expect("signals")

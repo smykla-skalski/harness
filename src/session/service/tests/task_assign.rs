@@ -3,12 +3,18 @@ use super::*;
 #[test]
 fn assign_task_keeps_task_open_until_worker_starts() {
     with_temp_project(|project| {
-        let state = start_active_session("test", "", project, Some("claude"), Some("assign-open"))
-            .expect("start");
+        let state = start_active_session(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-000000000003"),
+        )
+        .expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("assign-worker"))], || {
             join_session(
-                "assign-open",
+                "00000000-0000-4002-8000-000000000003",
                 SessionRole::Worker,
                 "codex",
                 &[],
@@ -25,7 +31,7 @@ fn assign_task_keeps_task_open_until_worker_starts() {
             .expect("worker id")
             .clone();
         let task = create_task(
-            "assign-open",
+            "00000000-0000-4002-8000-000000000003",
             "observer follow-up",
             Some("wait for the worker to actually start"),
             TaskSeverity::Medium,
@@ -35,15 +41,16 @@ fn assign_task_keeps_task_open_until_worker_starts() {
         .expect("task");
 
         assign_task(
-            "assign-open",
+            "00000000-0000-4002-8000-000000000003",
             &task.task_id,
             &worker_id,
             &leader_id,
             project,
         )
-        .expect("assign");
+        .expect("00000000-0000-4002-8000-000000000005");
 
-        let state = session_status("assign-open", project).expect("status");
+        let state =
+            session_status("00000000-0000-4002-8000-000000000003", project).expect("status");
         let task = state.tasks.get(&task.task_id).expect("task");
         assert_eq!(task.status, TaskStatus::Open);
         assert_eq!(task.assigned_to.as_deref(), Some(worker_id.as_str()));
@@ -54,7 +61,12 @@ fn assign_task_keeps_task_open_until_worker_starts() {
             Some(task.task_id.as_str()),
             "current_task_id is locked on this task while the start signal is in flight"
         );
-        let signals = list_signals("assign-open", Some(&worker_id), project).expect("signals");
+        let signals = list_signals(
+            "00000000-0000-4002-8000-000000000003",
+            Some(&worker_id),
+            project,
+        )
+        .expect("signals");
         let start_signal = signals
             .iter()
             .find(|record| record.signal.command == START_TASK_SIGNAL_COMMAND)

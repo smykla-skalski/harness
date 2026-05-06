@@ -17,9 +17,10 @@ mod test_support;
 
 pub use files::layout_from_project_dir;
 pub(crate) use files::{
-    layout_candidates_from_context_root, layout_candidates_from_project_dir,
+    is_valid_session_id, layout_candidates_from_context_root, layout_candidates_from_project_dir,
     list_known_session_ids, list_known_session_ids_from_context_root,
 };
+pub(crate) use files::{validate_new_session_id, validate_session_id};
 pub(crate) use journal::{
     append_log_entry, append_task_checkpoint, load_log_entries, load_task_checkpoints,
 };

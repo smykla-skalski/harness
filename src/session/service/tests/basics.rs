@@ -15,7 +15,13 @@ fn start_creates_leaderless_session() {
 #[test]
 fn join_adds_agent() {
     with_temp_project(|project| {
-        let state = start_session("test", "", project, Some("s1")).expect("start");
+        let state = start_session(
+            "test",
+            "",
+            project,
+            Some("00000000-0000-4000-8000-000000000001"),
+        )
+        .expect("start");
         let state = join_session(
             &state.session_id,
             SessionRole::Worker,
@@ -41,7 +47,7 @@ fn archived_session_is_hidden_from_local_queries_even_with_include_all() {
             "",
             project,
             Some("claude"),
-            Some("archived-local"),
+            Some("00000000-0000-4002-8000-000000000002"),
         )
         .expect("start");
         let layout = crate::session::storage::layout_from_project_dir(project, &state.session_id)
@@ -76,7 +82,7 @@ fn join_session_downgrades_requested_leader_to_explicit_fallback_role() {
             "",
             project,
             Some("claude"),
-            Some("join-fallback-core"),
+            Some("00000000-0000-4002-8000-000000000013"),
             Some("swarm-default"),
         )
         .expect("start");
@@ -84,7 +90,7 @@ fn join_session_downgrades_requested_leader_to_explicit_fallback_role() {
 
         let joined = temp_env::with_var("CODEX_SESSION_ID", Some("fallback-candidate"), || {
             join_session_with_fallback(
-                "join-fallback-core",
+                "00000000-0000-4002-8000-000000000013",
                 SessionRole::Leader,
                 Some(SessionRole::Improver),
                 "codex",
@@ -114,11 +120,13 @@ fn join_session_recovers_leaderless_degraded_session_with_manual_leader_join() {
             "",
             project,
             Some("claude"),
-            Some("recover-manual"),
+            Some("00000000-0000-4002-8000-00000000001f"),
             Some("swarm-default"),
         )
         .expect("start");
-        let layout = storage::layout_from_project_dir(project, "recover-manual").expect("layout");
+        let layout =
+            storage::layout_from_project_dir(project, "00000000-0000-4002-8000-00000000001f")
+                .expect("layout");
         storage::update_state(&layout, |state| {
             let previous_leader = state.leader_id.take().expect("leader");
             state.status = SessionStatus::LeaderlessDegraded;
@@ -133,7 +141,7 @@ fn join_session_recovers_leaderless_degraded_session_with_manual_leader_join() {
 
         let joined = temp_env::with_var("CODEX_SESSION_ID", Some("manual-recovery"), || {
             join_session_with_fallback(
-                "recover-manual",
+                "00000000-0000-4002-8000-00000000001f",
                 SessionRole::Leader,
                 None,
                 "codex",
@@ -163,14 +171,18 @@ fn build_recovery_tui_request_accepts_awaiting_leader_and_leaderless_degraded_se
             "awaiting recovery",
             "",
             project,
-            Some("recover-awaiting"),
+            Some("00000000-0000-4002-8000-00000000001e"),
             Some("swarm-default"),
         )
         .expect("start leaderless session");
 
-        let awaiting =
-            build_recovery_tui_request("recover-awaiting", "swarm-default", "codex", project)
-                .expect("awaiting leader should accept recovery");
+        let awaiting = build_recovery_tui_request(
+            "00000000-0000-4002-8000-00000000001e",
+            "swarm-default",
+            "codex",
+            project,
+        )
+        .expect("awaiting leader should accept recovery");
         assert_eq!(awaiting.runtime, "codex");
         assert_eq!(awaiting.role, SessionRole::Leader);
 
@@ -179,12 +191,14 @@ fn build_recovery_tui_request_accepts_awaiting_leader_and_leaderless_degraded_se
             "",
             project,
             Some("claude"),
-            Some("recover-degraded"),
+            Some("00000000-0000-4002-8000-00000000003c"),
             Some("swarm-default"),
         )
         .expect("start active session");
         let degraded_leader = degraded.leader_id.expect("leader");
-        let layout = storage::layout_from_project_dir(project, "recover-degraded").expect("layout");
+        let layout =
+            storage::layout_from_project_dir(project, "00000000-0000-4002-8000-00000000003c")
+                .expect("layout");
         storage::update_state(&layout, |state| {
             state.status = SessionStatus::LeaderlessDegraded;
             state.leader_id = None;
@@ -197,9 +211,13 @@ fn build_recovery_tui_request_accepts_awaiting_leader_and_leaderless_degraded_se
         })
         .expect("degrade session");
 
-        let degraded_request =
-            build_recovery_tui_request("recover-degraded", "swarm-default", "claude", project)
-                .expect("leaderless degraded should accept recovery");
+        let degraded_request = build_recovery_tui_request(
+            "00000000-0000-4002-8000-00000000003c",
+            "swarm-default",
+            "claude",
+            project,
+        )
+        .expect("leaderless degraded should accept recovery");
         assert_eq!(degraded_request.runtime, "claude");
         assert_eq!(degraded_request.role, SessionRole::Leader);
     });
@@ -213,13 +231,17 @@ fn build_recovery_tui_request_rejects_active_and_ended_sessions() {
             "",
             project,
             Some("claude"),
-            Some("recover-active"),
+            Some("00000000-0000-4002-8000-00000000001d"),
             Some("swarm-default"),
         )
         .expect("start active session");
-        let active_error =
-            build_recovery_tui_request("recover-active", "swarm-default", "codex", project)
-                .expect_err("active sessions must reject managed recovery");
+        let active_error = build_recovery_tui_request(
+            "00000000-0000-4002-8000-00000000001d",
+            "swarm-default",
+            "codex",
+            project,
+        )
+        .expect_err("active sessions must reject managed recovery");
         assert!(active_error.to_string().contains(
             "leader recovery is only valid for awaiting_leader or leaderless_degraded sessions"
         ));
@@ -230,9 +252,13 @@ fn build_recovery_tui_request_rejects_active_and_ended_sessions() {
             project,
         )
         .expect("end session");
-        let ended_error =
-            build_recovery_tui_request("recover-active", "swarm-default", "codex", project)
-                .expect_err("ended sessions must reject managed recovery");
+        let ended_error = build_recovery_tui_request(
+            "00000000-0000-4002-8000-00000000001d",
+            "swarm-default",
+            "codex",
+            project,
+        )
+        .expect_err("ended sessions must reject managed recovery");
         assert!(ended_error.to_string().contains(
             "leader recovery is only valid for awaiting_leader or leaderless_degraded sessions"
         ));
@@ -242,28 +268,30 @@ fn build_recovery_tui_request_rejects_active_and_ended_sessions() {
 #[test]
 fn start_session_rejects_duplicate_session_id() {
     with_temp_project(|project| {
-        start_session("goal1", "", project, Some("dup")).expect("first");
-        let error = start_session("goal2", "", project, Some("dup")).expect_err("dup");
+        let session_id = "00000000-0000-4000-8000-000000000002";
+        start_session("goal1", "", project, Some(session_id)).expect("first");
+        let error = start_session("goal2", "", project, Some(session_id)).expect_err("dup");
 
         assert_eq!(error.code(), "KSRCLI092");
         assert_eq!(
-            session_status("dup", project).expect("status").context,
+            session_status(session_id, project).expect("status").context,
             "goal1"
         );
     });
 }
 
 #[test]
-fn start_session_rejects_unsafe_session_id() {
+fn start_session_rejects_non_uuid_explicit_session_id() {
     with_temp_project(|project| {
-        let tmp_root = project.parent().expect("parent");
-        let escape_dir = tmp_root.join("unsafe-session");
-        let unsafe_id = escape_dir.to_string_lossy().into_owned();
+        let error = start_session("goal", "", project, Some("not-a-uuid")).expect_err("id");
 
-        let error = start_session("goal", "", project, Some(&unsafe_id)).expect_err("id");
-
-        assert_eq!(error.code(), "KSRCLI059");
-        assert!(!escape_dir.join("state.json").exists());
+        assert_eq!(error.code(), "WORKFLOW_PARSE");
+        assert!(
+            error
+                .to_string()
+                .contains("session id must be a lowercase UUID"),
+            "unexpected error: {error}"
+        );
     });
 }
 
@@ -301,13 +329,19 @@ fn auto_generated_session_ids_are_unique() {
 #[test]
 fn join_same_runtime_keeps_distinct_agents() {
     with_temp_project(|project| {
-        start_active_session("test", "", project, Some("claude"), Some("join-unique"))
-            .expect("start");
+        start_active_session(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-000000000015"),
+        )
+        .expect("start");
 
         let (first, second) =
             temp_env::with_vars([("CODEX_SESSION_ID", Some("codex-worker"))], || {
                 let first = join_session(
-                    "join-unique",
+                    "00000000-0000-4002-8000-000000000015",
                     SessionRole::Worker,
                     "codex",
                     &[],
@@ -317,7 +351,7 @@ fn join_same_runtime_keeps_distinct_agents() {
                 )
                 .expect("first");
                 let second = join_session(
-                    "join-unique",
+                    "00000000-0000-4002-8000-000000000015",
                     SessionRole::Reviewer,
                     "codex",
                     &[],
@@ -343,11 +377,18 @@ fn join_same_runtime_keeps_distinct_agents() {
 #[test]
 fn join_records_runtime_session_id_when_available() {
     with_temp_project(|project| {
-        start_active_session("test", "", project, Some("claude"), Some("join-runtime")).unwrap();
+        start_active_session(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-000000000014"),
+        )
+        .unwrap();
 
         let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("codex-worker"))], || {
             join_session(
-                "join-runtime",
+                "00000000-0000-4002-8000-000000000014",
                 SessionRole::Worker,
                 "codex",
                 &[],
@@ -373,8 +414,14 @@ fn join_records_runtime_session_id_when_available() {
 #[test]
 fn end_session_requires_leader() {
     with_temp_project(|project| {
-        let state =
-            start_active_session("test", "", project, Some("claude"), Some("s2")).expect("start");
+        let state = start_active_session(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-000000000022"),
+        )
+        .expect("start");
         let joined = join_session(
             &state.session_id,
             SessionRole::Worker,
@@ -399,8 +446,13 @@ fn end_session_requires_leader() {
 #[test]
 fn control_plane_can_end_non_ended_sessions() {
     with_temp_project(|project| {
-        let awaiting = start_session("awaiting end", "", project, Some("end-awaiting"))
-            .expect("start awaiting session");
+        let awaiting = start_session(
+            "awaiting end",
+            "",
+            project,
+            Some("00000000-0000-4002-8000-000000000010"),
+        )
+        .expect("start awaiting session");
         end_session(&awaiting.session_id, CONTROL_PLANE_ACTOR_ID, project)
             .expect("end awaiting leader session");
         assert_eq!(
@@ -415,7 +467,7 @@ fn control_plane_can_end_non_ended_sessions() {
             "",
             project,
             Some("claude"),
-            Some("end-paused"),
+            Some("00000000-0000-4002-8000-00000000003d"),
         )
         .expect("start paused session");
         let paused_layout =
@@ -439,7 +491,7 @@ fn control_plane_can_end_non_ended_sessions() {
             "",
             project,
             Some("claude"),
-            Some("end-degraded"),
+            Some("00000000-0000-4002-8000-000000000041"),
         )
         .expect("start degraded session");
         let previous_leader = degraded.leader_id.clone().expect("leader");
@@ -470,12 +522,18 @@ fn control_plane_can_end_non_ended_sessions() {
 #[test]
 fn task_lifecycle() {
     with_temp_project(|project| {
-        let state =
-            start_active_session("test", "", project, Some("claude"), Some("s3")).expect("start");
+        let state = start_active_session(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-000000000023"),
+        )
+        .expect("start");
         let leader_id = state.leader_id.expect("leader id");
 
         let item = create_task(
-            "s3",
+            "00000000-0000-4002-8000-000000000023",
             "fix bug",
             Some("details"),
             TaskSeverity::High,
@@ -485,11 +543,12 @@ fn task_lifecycle() {
         .expect("task");
         assert_eq!(item.status, TaskStatus::Open);
 
-        let tasks = list_tasks("s3", None, project).expect("list");
+        let tasks =
+            list_tasks("00000000-0000-4002-8000-000000000023", None, project).expect("list");
         assert_eq!(tasks.len(), 1);
 
         update_task(
-            "s3",
+            "00000000-0000-4002-8000-000000000023",
             &item.task_id,
             TaskStatus::Done,
             Some("fixed"),
@@ -498,7 +557,12 @@ fn task_lifecycle() {
         )
         .expect("update");
 
-        let tasks = list_tasks("s3", Some(TaskStatus::Done), project).expect("done");
+        let tasks = list_tasks(
+            "00000000-0000-4002-8000-000000000023",
+            Some(TaskStatus::Done),
+            project,
+        )
+        .expect("done");
         assert_eq!(tasks.len(), 1);
         assert_eq!(tasks[0].notes.len(), 1);
         assert!(tasks[0].completed_at.is_some());

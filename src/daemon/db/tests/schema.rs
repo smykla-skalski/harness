@@ -243,7 +243,7 @@ fn migrates_v6_schema_to_timeline_ledger() {
                     status, leader_id, observe_id, created_at, updated_at, last_activity_at,
                     archived_at, pending_leader_transfer, metrics_json, state_json, is_active
                 ) VALUES (
-                    'sess-test-1', 'project-1', 3, 1, 'title', 'context',
+                    'f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4', 'project-1', 3, 1, 'title', 'context',
                     'active', 'claude-leader', NULL, '2026-04-14T10:00:00Z',
                     '2026-04-14T10:00:00Z', NULL, NULL, NULL, '{}', '{}', 1
                 );",
@@ -259,7 +259,7 @@ fn migrates_v6_schema_to_timeline_ledger() {
         .query_row(
             "SELECT revision, entry_count
                  FROM session_timeline_state
-                 WHERE session_id = 'sess-test-1'",
+                 WHERE session_id = 'f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4'",
             [],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
@@ -338,7 +338,7 @@ fn migrates_v10_schema_adds_managed_agent_identity_columns_without_backfilling_r
     assert!(columns.iter().any(|column| column == "managed_agent_id"));
 
     assert_eq!(
-        session_agent_identity_rows(&db.conn, "sess-test-1"),
+        session_agent_identity_rows(&db.conn, "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4"),
         vec![
             ("acp-worker".into(), None, None),
             ("claude-leader".into(), None, None),
@@ -353,13 +353,16 @@ fn migrates_v10_schema_adds_managed_agent_identity_columns_without_backfilling_r
             "SELECT name, runtime, agent_session_id
              FROM agents
              WHERE session_id = ?1 AND agent_id = ?2",
-            rusqlite::params!["sess-test-1", "claude-leader"],
+            rusqlite::params!["f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4", "claude-leader"],
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )
         .expect("load migrated agent row");
     assert_eq!(name, "Claude Leader");
     assert_eq!(runtime, "claude");
-    assert_eq!(session_key.as_deref(), Some("claude-session-1"));
+    assert_eq!(
+        session_key.as_deref(),
+        Some("2a35c8f7-e812-5024-aed6-9f3b6318847e")
+    );
 }
 
 #[test]
@@ -455,7 +458,7 @@ fn open_migrates_v2_db_and_deduplicates_event_indexes() {
                     (session_id, agent_id, runtime, timestamp, sequence, kind, event_json)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             rusqlite::params![
-                "sess-test-1",
+                "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
                 "claude-leader",
                 "claude",
                 event.timestamp.clone(),

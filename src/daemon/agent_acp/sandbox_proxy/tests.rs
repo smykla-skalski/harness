@@ -62,7 +62,7 @@ fn dedupe_incident_replays_drops_identical_process_incidents() {
     let repeated = StreamEvent {
         event: "acp_process_incident".to_string(),
         recorded_at: "2026-04-29T00:00:00Z".to_string(),
-        session_id: Some("sess-1".to_string()),
+        session_id: Some("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".to_string()),
         payload: serde_json::json!({
             "kind": "process_exit",
             "process_key": "pk",
@@ -80,7 +80,7 @@ fn dedupe_incident_replays_drops_identical_resync_incidents() {
     let repeated = StreamEvent {
         event: "acp_bridge_resync_incident".to_string(),
         recorded_at: "2026-04-29T00:00:00Z".to_string(),
-        session_id: Some("sess-1".to_string()),
+        session_id: Some("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".to_string()),
         payload: serde_json::json!({
             "kind": "protocol_desync",
             "bridge_epoch": "epoch-1",
@@ -98,7 +98,7 @@ fn stream_event(event: &str) -> StreamEvent {
     StreamEvent {
         event: event.to_string(),
         recorded_at: "2026-04-29T00:00:00Z".to_string(),
-        session_id: Some("sess-1".to_string()),
+        session_id: Some("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".to_string()),
         payload: serde_json::json!({}),
     }
 }
@@ -111,7 +111,7 @@ fn bridge_resync_incident_event_uses_expected_kind_and_scope() {
         continuity: 7,
         next_seq: 11,
         truncated: true,
-        affected_logical_session_ids: vec!["sess-1".to_string()],
+        affected_logical_session_ids: vec!["eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".to_string()],
     }) else {
         unreachable!("incident event");
     };
@@ -121,7 +121,7 @@ fn bridge_resync_incident_event_uses_expected_kind_and_scope() {
     assert_eq!(event.payload["kind"], "protocol_desync");
     assert_eq!(
         event.payload["affected_logical_session_ids"],
-        serde_json::json!(["sess-1"])
+        serde_json::json!(["eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"])
     );
 }
 
@@ -133,13 +133,19 @@ fn bridge_resync_incident_events_fan_out_by_session() {
         continuity: 7,
         next_seq: 11,
         truncated: false,
-        affected_logical_session_ids: vec!["sess-a".to_string(), "sess-b".to_string()],
+        affected_logical_session_ids: vec![
+            "0c3be78e-656d-52d3-b4c3-03ba64d373ac".to_string(),
+            "sess-b".to_string(),
+        ],
     };
     let Some(events) = bridge_resync_incident_events(&payload) else {
         unreachable!("events");
     };
     assert_eq!(events.len(), 2);
-    assert_eq!(events[0].session_id.as_deref(), Some("sess-a"));
+    assert_eq!(
+        events[0].session_id.as_deref(),
+        Some("0c3be78e-656d-52d3-b4c3-03ba64d373ac")
+    );
     assert_eq!(events[1].session_id.as_deref(), Some("sess-b"));
 }
 
@@ -195,27 +201,28 @@ fn reconcile_sessions_uses_known_and_inspect_sets() {
 fn distinct_process_keys_for_session_dedupes_and_sorts_keys() {
     let inspect = AcpAgentInspectResponse {
         agents: vec![
-            inspect_snapshot("sess-1", "pk-b"),
-            inspect_snapshot("sess-1", "pk-a"),
-            inspect_snapshot("sess-1", "pk-a"),
-            inspect_snapshot("sess-2", "pk-z"),
+            inspect_snapshot("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "pk-b"),
+            inspect_snapshot("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "pk-a"),
+            inspect_snapshot("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "pk-a"),
+            inspect_snapshot("00b4a39f-719e-5418-abe8-eb3ab6ea614d", "pk-z"),
         ],
         daemon_perceived_now: None,
         available: true,
         issue_message: None,
     };
     assert_eq!(
-        distinct_process_keys_for_session(&inspect, "sess-1"),
+        distinct_process_keys_for_session(&inspect, "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"),
         vec!["pk-a".to_string(), "pk-b".to_string()]
     );
 }
 
 #[test]
 fn count_live_bridge_snapshots_uses_agent_status_not_watchdog_state() {
-    let mut idle_inspect = inspect_snapshot("sess-1", "pk-idle");
+    let mut idle_inspect = inspect_snapshot("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "pk-idle");
     idle_inspect.acp_id = "acp-idle".to_string();
     idle_inspect.watchdog_state = "paused".to_string();
-    let mut disconnected_inspect = inspect_snapshot("sess-1", "pk-disconnected");
+    let mut disconnected_inspect =
+        inspect_snapshot("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "pk-disconnected");
     disconnected_inspect.acp_id = "acp-disconnected".to_string();
     disconnected_inspect.watchdog_state = "active".to_string();
     let inspect = AcpAgentInspectResponse {
@@ -241,7 +248,7 @@ fn count_live_bridge_snapshots_uses_agent_status_not_watchdog_state() {
 
 #[test]
 fn count_live_bridge_snapshots_fails_closed_on_snapshot_errors() {
-    let mut inspect_snapshot = inspect_snapshot("sess-1", "pk-a");
+    let mut inspect_snapshot = inspect_snapshot("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "pk-a");
     inspect_snapshot.acp_id = "acp-a".to_string();
     let inspect = AcpAgentInspectResponse {
         agents: vec![inspect_snapshot],
@@ -334,15 +341,24 @@ fn pool_key_mismatch_incident_events_fan_out_by_session() {
     let payload = AcpPoolKeyMismatchIncidentPayload {
         kind: "pool_key_mismatch".to_string(),
         observed_process_keys: vec!["pk-a".to_string(), "pk-b".to_string()],
-        affected_logical_session_ids: vec!["sess-1".to_string(), "sess-2".to_string()],
+        affected_logical_session_ids: vec![
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".to_string(),
+            "00b4a39f-719e-5418-abe8-eb3ab6ea614d".to_string(),
+        ],
     };
     let Some(events) = pool_key_mismatch_incident_events(&payload) else {
         unreachable!("events");
     };
     assert_eq!(events.len(), 2);
     assert_eq!(events[0].event, "acp_process_incident");
-    assert_eq!(events[0].session_id.as_deref(), Some("sess-1"));
-    assert_eq!(events[1].session_id.as_deref(), Some("sess-2"));
+    assert_eq!(
+        events[0].session_id.as_deref(),
+        Some("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
+    );
+    assert_eq!(
+        events[1].session_id.as_deref(),
+        Some("00b4a39f-719e-5418-abe8-eb3ab6ea614d")
+    );
     assert_eq!(events[0].payload["kind"], "pool_key_mismatch");
 }
 
@@ -350,7 +366,7 @@ fn pool_key_mismatch_incident_events_fan_out_by_session() {
 fn pool_key_mismatch_dedupe_emits_only_on_change() {
     let (sender, mut rx) = tokio::sync::broadcast::channel::<StreamEvent>(16);
     let mut seen = BTreeMap::<String, Vec<String>>::new();
-    let session_id = "sess-1".to_string();
+    let session_id = "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".to_string();
     let process_keys = vec!["pk-a".to_string(), "pk-b".to_string()];
 
     let changed = seen.get(&session_id) != Some(&process_keys);
@@ -392,7 +408,7 @@ fn pool_key_mismatch_dedupe_emits_only_on_change() {
 fn pool_key_mismatch_state_is_cleared_for_non_mismatch_keys() {
     let (sender, mut rx) = tokio::sync::broadcast::channel::<StreamEvent>(16);
     let mut seen = BTreeMap::<String, Vec<String>>::new();
-    let session_id = "sess-1";
+    let session_id = "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc";
 
     maybe_emit_pool_key_mismatch_incident(
         &sender,
@@ -433,7 +449,7 @@ fn inspect_snapshot(session_id: &str, process_key: &str) -> AcpAgentInspectSnaps
 }
 
 fn acp_snapshot(acp_id: &str, status: AgentStatus) -> AcpAgentSnapshot {
-    acp_snapshot_for_session(acp_id, "sess-1", "pk", status)
+    acp_snapshot_for_session(acp_id, "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "pk", status)
 }
 
 fn acp_snapshot_for_session(
@@ -470,7 +486,7 @@ fn bridge_resync_incident_payload_uses_protocol_desync_kind() {
         9,
         12,
         true,
-        vec!["sess-1".to_string()],
+        vec!["eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".to_string()],
     );
     assert_eq!(payload.kind, "protocol_desync");
     assert_eq!(payload.bridge_epoch, "epoch-1");
