@@ -18,8 +18,8 @@ use super::connection::ConnectionState;
 use super::frames::error_response;
 use super::mutations::{dispatch_query, dispatch_query_result};
 use super::params::{
-    extract_cursor_param, extract_i64_param, extract_session_id, extract_string_param,
-    extract_u64_param,
+    extract_cursor_param, extract_i64_param, extract_managed_agent_id, extract_session_id,
+    extract_string_param, extract_u64_param,
 };
 
 pub(crate) async fn dispatch_read_query(
@@ -217,8 +217,12 @@ fn dispatch_session_managed_agents_query(
 }
 
 fn dispatch_managed_agent_detail_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
-    let Some(agent_id) = extract_string_param(&request.params, "agent_id") else {
-        return error_response(&request.id, "MISSING_PARAM", "missing agent_id");
+    let Some(agent_id) = extract_managed_agent_id(&request.params) else {
+        return error_response(
+            &request.id,
+            "MISSING_PARAM",
+            "missing managed_agent_id",
+        );
     };
 
     dispatch_query_result(&request.id, managed_agent_snapshot(state, &agent_id))
@@ -247,7 +251,13 @@ async fn dispatch_acp_transcript_query(request: &WsRequest, state: &DaemonHttpSt
         require_session_id.as_deref(),
     ) {
         Ok(Some(session_id)) => session_id.to_string(),
-        Ok(None) => return error_response(&request.id, "MISSING_PARAM", "missing session_id"),
+        Ok(None) => {
+            return error_response(
+                &request.id,
+                "MISSING_PARAM",
+                "missing session_id or require_session_id",
+            );
+        }
         Err(error) => {
             return dispatch_query_result::<AcpTranscriptResponse>(&request.id, Err(error));
         }

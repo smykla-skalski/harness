@@ -21,7 +21,7 @@ extension WebSocketTransport {
   public func acpInspect(sessionID: String?) async throws -> AcpAgentInspectResponse {
     var params: [String: JSONValue] = [:]
     if let sessionID {
-      params["session_id"] = .string(sessionID)
+      params.merge(sessionScopeParams(sessionID: sessionID)) { _, newValue in newValue }
     }
     let value = try await rpc(method: .managedAgentAcpInspect, params: .object(params))
     return try decode(value)
@@ -30,7 +30,7 @@ extension WebSocketTransport {
   public func acpTranscript(sessionID: String) async throws -> AcpTranscriptResponse {
     let value = try await rpc(
       method: .managedAgentAcpTranscript,
-      params: .object(["session_id": .string(sessionID)])
+      params: .object(sessionScopeParams(sessionID: sessionID))
     )
     return try decode(value)
   }

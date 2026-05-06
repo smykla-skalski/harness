@@ -252,7 +252,7 @@ pub fn resolve_session_agent_for_runtime_session(
             if runtime_session_matches_agent(&state.session_id, agent, runtime_session_id) {
                 matches.push(ResolvedRuntimeSessionAgent {
                     orchestration_session_id: state.session_id.clone(),
-                    agent_id: agent_id.clone(),
+                    session_agent_id: agent_id.clone(),
                 });
             }
         }

@@ -269,6 +269,41 @@ struct HarnessMonitorStoreActionTests {
     #expect(store.currentSuccessFeedbackMessage == "Remove agent")
   }
 
+  @Test("Typed session-agent client helpers preserve the session-agent identity class")
+  func typedSessionAgentClientHelpersPreserveIdentityClass() async throws {
+    let client = RecordingHarnessClient()
+    let sessionID = HarnessSessionID(rawValue: PreviewFixtures.summary.sessionId)
+    let sessionAgentID = SessionAgentID(rawValue: PreviewFixtures.agents[1].agentId)
+
+    _ = try await client.changeRole(
+      sessionID: sessionID,
+      sessionAgentID: sessionAgentID,
+      request: RoleChangeRequest(actor: "leader-claude", role: .reviewer)
+    )
+    _ = try await client.removeAgent(
+      sessionID: sessionID,
+      sessionAgentID: sessionAgentID,
+      request: AgentRemoveRequest(actor: "leader-claude")
+    )
+
+    #expect(
+      client.recordedCalls()
+        == [
+          .changeRole(
+            sessionID: sessionID.rawValue,
+            agentID: sessionAgentID.rawValue,
+            role: .reviewer,
+            actor: "leader-claude"
+          ),
+          .removeAgent(
+            sessionID: sessionID.rawValue,
+            agentID: sessionAgentID.rawValue,
+            actor: "leader-claude"
+          ),
+        ]
+    )
+  }
+
   @Test("Observe selected session tracks the last action")
   func observeSelectedSessionTracksLastAction() async {
     let client = RecordingHarnessClient()

@@ -363,7 +363,7 @@ fn resolve_runtime_session_agent_async_returns_match_for_live_worker() {
             .expect("live worker should resolve");
 
             assert_eq!(resolved.orchestration_session_id, orchestration_session_id);
-            assert_eq!(resolved.agent_id, worker_agent_id);
+            assert_eq!(resolved.session_agent_id, worker_agent_id);
 
             let missing = resolve_runtime_session_agent_async(
                 "codex",

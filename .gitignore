@@ -6,6 +6,7 @@
 /xcode-derived/
 /xcode-derived-e2e/
 /xcode-derived-instruments/
+/xcode-derived-*/
 
 # Local scratch
 /tmp/

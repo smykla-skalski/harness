@@ -57,7 +57,7 @@ fn session_service_round_trip_smoke_covers_public_surface() {
             .expect("resolve")
             .expect("session mapping");
         assert_eq!(resolved.orchestration_session_id, session_id);
-        assert_eq!(resolved.agent_id, worker_id);
+        assert_eq!(resolved.session_agent_id, worker_id);
 
         let task = create_task_with_source(
             session_id,

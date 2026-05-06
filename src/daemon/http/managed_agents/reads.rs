@@ -32,7 +32,7 @@ pub(crate) async fn get_managed_agents(
 }
 
 pub(crate) async fn get_managed_agent(
-    Path(agent_id): Path<String>,
+    Path(managed_agent_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
@@ -46,6 +46,6 @@ pub(crate) async fn get_managed_agent(
         http_paths::MANAGED_AGENT_DETAIL,
         &request_id,
         start,
-        managed_agent_snapshot(&state, &agent_id),
+        managed_agent_snapshot(&state, &managed_agent_id),
     )
 }

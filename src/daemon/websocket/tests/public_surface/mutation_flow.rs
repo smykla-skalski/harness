@@ -319,7 +319,7 @@ fn websocket_managed_agent_input_errors_include_http_status_metadata() {
             id: "req-managed-agent-input-missing".into(),
             method: ws_methods::MANAGED_AGENT_INPUT.into(),
             params: serde_json::json!({
-                "agent_id": "missing-agent",
+                "managed_agent_id": "missing-agent",
                 "input": {
                     "type": "text",
                     "text": "hello"
@@ -352,7 +352,7 @@ fn websocket_managed_agent_sequence_errors_include_http_status_metadata() {
             id: "req-managed-agent-sequence-missing".into(),
             method: ws_methods::MANAGED_AGENT_INPUT.into(),
             params: serde_json::json!({
-                "agent_id": "missing-agent",
+                "managed_agent_id": "missing-agent",
                 "sequence": {
                     "steps": [
                         {

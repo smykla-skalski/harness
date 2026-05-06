@@ -258,8 +258,11 @@ public enum HarnessMonitorPreviewStoreFactory {
     AcpAgentSnapshot(
       acpId: pendingBatch.acpId,
       sessionId: sessionID,
-      agentId: "worker-codex",
-      displayName: "worker-codex",
+      agentId: PreviewHarnessClientState.previewAcpSessionAgentID(
+        descriptorID: PreviewHarnessClientState.previewSeededAcpDescriptorID,
+        managedAgentID: pendingBatch.acpId
+      ),
+      displayName: PreviewHarnessClientState.previewSeededAcpDisplayName,
       status: .active,
       pid: 41_001,
       pgid: 41_001,

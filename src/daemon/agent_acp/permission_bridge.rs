@@ -26,6 +26,7 @@ pub(crate) const DEFAULT_PERMISSION_CAP: usize = 8;
 const BRIDGE_CHANNEL_BUFFER: usize = 64;
 
 mod runtime;
+mod wire;
 use runtime::{PermissionBridgeRuntime, spawn_batch_expiration};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -36,7 +37,7 @@ pub struct AcpPermissionItem {
     pub options: Vec<PermissionOption>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AcpPermissionBatch {
     pub batch_id: String,
     pub acp_id: String,

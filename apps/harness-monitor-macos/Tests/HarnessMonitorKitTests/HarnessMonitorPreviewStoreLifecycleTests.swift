@@ -232,10 +232,10 @@ struct HarnessMonitorPreviewStoreLifecycleTests {
     let inspect = try await client.acpInspect(sessionID: PreviewFixtures.summary.sessionId)
     let inspectedAgent = try #require(inspect.agents.first)
 
-    #expect(acpAgent.agentId == "worker-codex")
+    #expect(acpAgent.agentId.hasPrefix("preview-session-agent-copilot-"))
     #expect(acpAgent.pendingPermissions == 2)
     #expect(acpAgent.pendingPermissionBatches.map(\.batchId) == ["preview-acp-permission-1"])
-    #expect(inspectedAgent.agentId == "worker-codex")
+    #expect(inspectedAgent.agentId.hasPrefix("preview-session-agent-copilot-"))
     #expect(inspectedAgent.promptDeadlineRemainingMs == 95_000)
   }
 
@@ -258,13 +258,25 @@ struct HarnessMonitorPreviewStoreLifecycleTests {
     )
 
     let detail = try await client.sessionDetail(id: sessionID, scope: nil)
-    let agent = try #require(detail.agents.first { $0.agentId == "copilot" })
+    let agent = try #require(detail.agents.first { $0.runtime == "copilot" })
 
+    #expect(agent.agentId.hasPrefix("preview-session-agent-copilot-"))
+    #expect(agent.agentId != "copilot")
     #expect(agent.name == "GitHub Copilot")
+    #expect(agent.runtime == "copilot")
     #expect(agent.role == .observer)
     #expect(agent.status == .active)
+    #expect(agent.managedAgent?.kind == .acp)
+    #expect(agent.managedAgentID?.hasPrefix("preview-managed-agent-") == true)
+    #expect(agent.managedAgentID != agent.sessionAgentID)
+    #expect(agent.runtimeSessionID?.hasPrefix("preview-runtime-session-") == true)
+    #expect(agent.runtimeSessionID != agent.sessionAgentID)
     #expect(detail.session.leaderId == PreviewFixtures.summary.leaderId)
     #expect(detail.session.metrics.agentCount == detail.agents.count)
+
+    await #expect(throws: HarnessMonitorAPIError.self) {
+      _ = try await client.managedAgent(agentID: agent.sessionAgentID)
+    }
   }
 
   @Test("Preview bootstrap refresh keeps ACP managed agents on selected session")
@@ -289,11 +301,112 @@ struct HarnessMonitorPreviewStoreLifecycleTests {
     try? await Task.sleep(for: .milliseconds(50))
 
     #expect(store.selectedSessionID == PreviewFixtures.summary.sessionId)
-    #expect(store.selectedAcpAgents.map(\.agentId) == ["worker-codex"])
-    #expect(store.selectedAcpInspectAgents.map(\.agentId) == ["worker-codex"])
+    #expect(store.selectedAcpAgents.allSatisfy { $0.agentId.hasPrefix("preview-session-agent-copilot-") })
+    #expect(store.selectedAcpInspectAgents.allSatisfy { $0.agentId.hasPrefix("preview-session-agent-copilot-") })
     #expect(store.selectedAcpInspectObservedAt != nil)
-    #expect(store.acpDecisionAttention(for: "worker-codex")?.count == 2)
+    #expect(store.acpDecisionAttention(for: store.selectedAcpAgents.first?.agentId ?? "")?.count == 2)
     #expect(store.presentingAcpPermissionBatch == nil)
+  }
+
+  @Test("Preview ACP identity crosswalk keeps descriptor session managed and runtime ids distinct")
+  func previewAcpIdentityCrosswalkKeepsIdentityDomainsDistinct() async throws {
+    let client = PreviewHarnessClient(
+      fixtures: .populated,
+      isLaunchAgentInstalled: true
+    )
+    let sessionID = PreviewFixtures.summary.sessionId
+    _ = try await client.startManagedAcpAgent(
+      sessionID: sessionID,
+      request: AcpAgentStartRequest(
+        agent: "copilot",
+        role: .leader,
+        fallbackRole: .observer,
+        capabilities: ["acp"]
+      )
+    )
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client)
+    )
+    store.acpAgentDescriptorsByID["copilot"] = AcpAgentDescriptor(
+      id: "copilot",
+      displayName: "GitHub Copilot",
+      capabilities: ["acp"],
+      launchCommand: "copilot",
+      launchArgs: [],
+      envPassthrough: [],
+      modelCatalog: nil,
+      installHint: nil,
+      doctorProbe: AcpDoctorProbe(command: "copilot", args: ["doctor"])
+    )
+
+    await store.bootstrap()
+    await store.selectSession(sessionID)
+
+    let detail = try await client.sessionDetail(id: sessionID, scope: nil)
+    let agent = try #require(detail.agents.first { $0.runtime == "copilot" })
+    let linkage = try #require(
+      store.acpIdentityCrosswalk().agentLinkage(
+        forSessionAgentIdentity: agent.sessionAgentIdentity
+      )
+    )
+
+    #expect(linkage.descriptorIdentity == Optional(AcpDescriptorID(rawValue: "copilot")))
+    #expect(linkage.sessionAgentIdentity == agent.sessionAgentIdentity)
+    #expect(linkage.sessionAgentIdentity?.rawValue != linkage.descriptorIdentity?.rawValue)
+    #expect(
+      store.acpIdentityCrosswalk().agentLinkage(
+        forSessionAgentIdentity: SessionAgentID(rawValue: "copilot")
+      ) == nil
+    )
+    #expect(
+      store.acpIdentityCrosswalk().agentLinkage(
+        forSessionAgentIdentity: SessionAgentID(rawValue: linkage.managedAgentIdentity.rawValue)
+      ) == nil
+    )
+    #expect(
+      store.acpIdentityCrosswalk().agentLinkage(
+        forRuntimeSessionIdentity: RuntimeSessionID(rawValue: agent.agentId)
+      ) == nil
+    )
+    #expect(linkage.managedAgentIdentity.rawValue.hasPrefix("preview-managed-agent-"))
+    #expect(linkage.managedAgentIdentity.rawValue != linkage.sessionAgentIdentity?.rawValue)
+    #expect(linkage.runtimeSessionIdentity?.rawValue.hasPrefix("preview-runtime-session-") == true)
+    #expect(linkage.runtimeSessionIdentity?.rawValue != linkage.sessionAgentIdentity?.rawValue)
+    #expect(
+      store.acpAgentSnapshot(
+        for: SessionAgentID(rawValue: linkage.managedAgentIdentity.rawValue)
+      ) == nil
+    )
+    #expect(
+      store.managedAgentNudgeTarget(
+        forSessionAgentIdentity: SessionAgentID(rawValue: linkage.managedAgentIdentity.rawValue)
+      ) == nil
+    )
+
+    let metadata = store.acpToolCallTimelineMetadata(
+      for: AcpEventBatchPayload(
+        acpId: linkage.managedAgentIdentity.rawValue,
+        sessionId: sessionID,
+        rawCount: 1,
+        events: [
+          AcpConversationEvent(
+            timestamp: "2026-05-06T00:00:00Z",
+            sequence: 1,
+            kind: .object([
+              "type": .string("tool_invocation"),
+              "tool_name": .string("Read"),
+              "invocation_id": .string("call-1"),
+            ]),
+            agent: agent.agentId,
+            sessionId: sessionID
+          )
+        ]
+      )
+    )
+    #expect(metadata.managedAgentID == linkage.managedAgentIdentity.rawValue)
+    #expect(metadata.sessionAgentID == agent.agentId)
+    #expect(metadata.displayName == "GitHub Copilot")
+    #expect(metadata.capabilityTags == ["acp"])
   }
 
   @Test("Preview store factory seeds ACP bridge outage state when preview bridge is down")

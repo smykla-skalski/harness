@@ -278,6 +278,8 @@ struct WebSocketStreamTests {
   ) -> JSONValue {
     .object([
       "acpId": .string(acpID),
+      "managedAgentId": .string(acpID),
+      "managedAgentFamily": .string("acp"),
       "sessionId": .string(sessionID),
       "rawCount": .number(Double(rawCount)),
       "events": .array(

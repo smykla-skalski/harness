@@ -117,38 +117,75 @@ mod tests {
 
     #[tokio::test]
     async fn transcript_returns_scope_denied_when_require_and_session_ids_conflict() {
-        let state = minimal_state();
-        let response = get_acp_transcript(
-            Query(AcpTranscriptQuery {
-                session_id: Some("session-a".into()),
-                require_session_id: Some("session-b".into()),
-            }),
-            auth_headers(),
-            State(state),
-        )
+        temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
+            let state = minimal_state();
+            let response = get_acp_transcript(
+                Query(AcpTranscriptQuery {
+                    session_id: Some("session-a".into()),
+                    require_session_id: Some("session-b".into()),
+                }),
+                auth_headers(),
+                State(state),
+            )
+            .await;
+            let (status, body) = response_json(response).await;
+            assert_eq!(status, StatusCode::FORBIDDEN);
+            assert_eq!(body["error"]["code"], "SESSION_SCOPE_DENIED");
+        })
         .await;
-        let (status, body) = response_json(response).await;
-        assert_eq!(status, StatusCode::FORBIDDEN);
-        assert_eq!(body["error"]["code"], "SESSION_SCOPE_DENIED");
     }
 
     #[tokio::test]
     async fn transcript_requires_a_scoped_session_id() {
-        let state = minimal_state();
-        let response = get_acp_transcript(
-            Query(AcpTranscriptQuery {
-                session_id: None,
-                require_session_id: None,
-            }),
-            auth_headers(),
-            State(state),
-        )
+        temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
+            let state = minimal_state();
+            let response = get_acp_transcript(
+                Query(AcpTranscriptQuery {
+                    session_id: None,
+                    require_session_id: None,
+                }),
+                auth_headers(),
+                State(state),
+            )
+            .await;
+            let (status, body) = response_json(response).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST);
+            assert!(
+                body.to_string().contains("session_id"),
+                "expected usage error to mention session_id"
+            );
+        })
         .await;
-        let (status, body) = response_json(response).await;
-        assert_eq!(status, StatusCode::BAD_REQUEST);
-        assert!(
-            body.to_string().contains("session_id"),
-            "expected usage error to mention session_id"
-        );
+    }
+
+    #[tokio::test]
+    async fn transcript_uses_session_id_scope() {
+        temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
+            let state = crate::daemon::http::tests::test_http_state_with_db();
+            let db = state.db.get().expect("db slot").clone();
+            {
+                let db = db.lock().expect("db lock");
+                let project = crate::daemon::http::tests::sample_project();
+                db.sync_project(&project).expect("sync project");
+                db.save_session_state(
+                    &project.project_id,
+                    &crate::daemon::http::tests::sample_session_state(),
+                )
+                .expect("save session state");
+            }
+            let response = get_acp_transcript(
+                Query(AcpTranscriptQuery {
+                    session_id: Some("sess-test-1".into()),
+                    require_session_id: None,
+                }),
+                auth_headers(),
+                State(state),
+            )
+            .await;
+            let (status, body) = response_json(response).await;
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(body["entries"].as_array().map(Vec::len), Some(0));
+        })
+        .await;
     }
 }

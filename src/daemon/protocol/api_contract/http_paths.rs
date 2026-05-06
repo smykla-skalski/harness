@@ -41,26 +41,27 @@ pub const SESSION_TASK_RESPOND_REVIEW: &str =
     "/v1/sessions/{session_id}/tasks/{task_id}/respond-review";
 pub const SESSION_TASK_ARBITRATE: &str = "/v1/sessions/{session_id}/tasks/{task_id}/arbitrate";
 pub const SESSION_IMPROVER_APPLY: &str = "/v1/sessions/{session_id}/improver/apply";
-pub const SESSION_AGENT_ROLE: &str = "/v1/sessions/{session_id}/agents/{agent_id}/role";
-pub const SESSION_AGENT_REMOVE: &str = "/v1/sessions/{session_id}/agents/{agent_id}/remove";
+pub const SESSION_AGENT_ROLE: &str = "/v1/sessions/{session_id}/agents/{session_agent_id}/role";
+pub const SESSION_AGENT_REMOVE: &str = "/v1/sessions/{session_id}/agents/{session_agent_id}/remove";
 pub const SESSION_LEADER_TRANSFER: &str = "/v1/sessions/{session_id}/leader";
 pub const SESSION_MANAGED_AGENTS: &str = "/v1/sessions/{session_id}/managed-agents";
 pub const SESSION_MANAGED_AGENTS_TERMINAL: &str =
     "/v1/sessions/{session_id}/managed-agents/terminal";
 pub const SESSION_MANAGED_AGENTS_CODEX: &str = "/v1/sessions/{session_id}/managed-agents/codex";
 pub const SESSION_MANAGED_AGENTS_ACP: &str = "/v1/sessions/{session_id}/managed-agents/acp";
-pub const MANAGED_AGENT_DETAIL: &str = "/v1/managed-agents/{agent_id}";
-pub const MANAGED_AGENT_INPUT: &str = "/v1/managed-agents/{agent_id}/input";
-pub const MANAGED_AGENT_RESIZE: &str = "/v1/managed-agents/{agent_id}/resize";
-pub const MANAGED_AGENT_STOP: &str = "/v1/managed-agents/{agent_id}/stop";
-pub const MANAGED_AGENT_READY: &str = "/v1/managed-agents/{agent_id}/ready";
-pub const MANAGED_AGENT_ATTACH: &str = "/v1/managed-agents/{agent_id}/attach";
-pub const MANAGED_AGENT_STEER: &str = "/v1/managed-agents/{agent_id}/steer";
-pub const MANAGED_AGENT_INTERRUPT: &str = "/v1/managed-agents/{agent_id}/interrupt";
-pub const MANAGED_AGENT_APPROVAL: &str = "/v1/managed-agents/{agent_id}/approvals/{approval_id}";
+pub const MANAGED_AGENT_DETAIL: &str = "/v1/managed-agents/{managed_agent_id}";
+pub const MANAGED_AGENT_INPUT: &str = "/v1/managed-agents/{managed_agent_id}/input";
+pub const MANAGED_AGENT_RESIZE: &str = "/v1/managed-agents/{managed_agent_id}/resize";
+pub const MANAGED_AGENT_STOP: &str = "/v1/managed-agents/{managed_agent_id}/stop";
+pub const MANAGED_AGENT_READY: &str = "/v1/managed-agents/{managed_agent_id}/ready";
+pub const MANAGED_AGENT_ATTACH: &str = "/v1/managed-agents/{managed_agent_id}/attach";
+pub const MANAGED_AGENT_STEER: &str = "/v1/managed-agents/{managed_agent_id}/steer";
+pub const MANAGED_AGENT_INTERRUPT: &str = "/v1/managed-agents/{managed_agent_id}/interrupt";
+pub const MANAGED_AGENT_APPROVAL: &str =
+    "/v1/managed-agents/{managed_agent_id}/approvals/{approval_id}";
 pub const MANAGED_AGENT_ACP_PERMISSION: &str =
-    "/v1/managed-agents/{agent_id}/permission-batches/{batch_id}";
-pub const MANAGED_AGENT_DELETE: &str = "/v1/managed-agents/{agent_id}";
+    "/v1/managed-agents/{managed_agent_id}/permission-batches/{batch_id}";
+pub const MANAGED_AGENT_DELETE: &str = "/v1/managed-agents/{managed_agent_id}";
 pub const MANAGED_AGENTS_ACP_INSPECT: &str = "/v1/managed-agents/acp/inspect";
 pub const MANAGED_AGENTS_ACP_TRANSCRIPT: &str = "/v1/managed-agents/acp/transcript";
 pub const SESSION_SIGNAL_SEND: &str = "/v1/sessions/{session_id}/signal";

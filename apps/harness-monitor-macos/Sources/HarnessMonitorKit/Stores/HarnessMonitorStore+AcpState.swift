@@ -22,8 +22,8 @@ extension HarnessMonitorStore {
         applyAcpAgent dropped snapshot for inactive session \
         snapshotSession=\(snapshot.sessionId, privacy: .public) \
         selectedSession=\(self.selectedSessionID ?? "<nil>", privacy: .public) \
-        agent=\(snapshot.agentId, privacy: .public) \
-        acp=\(snapshot.acpId, privacy: .public)
+        sessionAgent=\(snapshot.sessionAgentID, privacy: .public) \
+        managedAgent=\(snapshot.managedAgentID, privacy: .public)
         """
       )
       return .droppedSessionMismatch
@@ -285,22 +285,22 @@ extension HarnessMonitorStore {
   ) -> Set<String> {
     guard
       let previousSnapshot = selectedAcpAgents.first(where: {
-        $0.agentId == snapshot.agentId
+        $0.sessionAgentID == snapshot.sessionAgentID
       }),
-      previousSnapshot.acpId != snapshot.acpId
+      previousSnapshot.managedAgentID != snapshot.managedAgentID
     else {
       return []
     }
 
     let staleBatches = standaloneAcpPermissionBatches.filter {
-      $0.acpId == previousSnapshot.acpId
+      $0.acpId == previousSnapshot.managedAgentID
     }
     guard !staleBatches.isEmpty else {
       return []
     }
 
     standaloneAcpPermissionBatches.removeAll {
-      $0.acpId == previousSnapshot.acpId
+      $0.acpId == previousSnapshot.managedAgentID
     }
     return Set(staleBatches.map { acpPermissionDecisionID(for: $0.batchId) })
   }

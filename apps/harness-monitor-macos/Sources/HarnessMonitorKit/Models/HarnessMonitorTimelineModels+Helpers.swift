@@ -50,14 +50,14 @@ extension TimelineEntry {
     isAcpTranscriptEntry || isManagedRuntimeTranscriptEntry
   }
 
-  func matchesDerivedAcpTranscriptHistory(managedAgentIDs: Set<String>) -> Bool {
+  func matchesDerivedAcpTranscriptHistory(sessionAgentIDs: Set<String>) -> Bool {
     if isAcpTranscriptEntry {
       return true
     }
     guard
       isManagedRuntimeTranscriptEntry,
       let agentId,
-      managedAgentIDs.contains(agentId)
+      sessionAgentIDs.contains(agentId)
     else {
       return false
     }
@@ -90,36 +90,36 @@ extension TimelineEntry {
   }
 
   public func reattributedAcpTimelineEntry(
-    agentID: String,
+    sessionAgentID: String,
     displayName: String
   ) -> TimelineEntry {
     let updatedEntryID =
       if let sequence = acpTimelineIdentityMetadata()?.sequence {
-        "acp-\(agentID)-\(kind)-\(sequence)"
+        "acp-\(sessionAgentID)-\(kind)-\(sequence)"
       } else {
         entryId
       }
 
     guard case .object(var payloadObject) = payload else {
-      return TimelineEntry(
-        entryId: updatedEntryID,
-        recordedAt: recordedAt,
-        kind: kind,
-        sessionId: sessionId,
-        agentId: agentID,
-        taskId: taskId,
-        summary: summary,
-        payload: payload
-      )
-    }
+        return TimelineEntry(
+          entryId: updatedEntryID,
+          recordedAt: recordedAt,
+          kind: kind,
+          sessionId: sessionId,
+          agentId: sessionAgentID,
+          taskId: taskId,
+          summary: summary,
+          payload: payload
+        )
+      }
 
     if case .object(var metadata)? = payloadObject["acp_timeline_identity"] {
-      metadata["agent_id"] = .string(agentID)
+      metadata["agent_id"] = .string(sessionAgentID)
       metadata["agent_display_name"] = .string(displayName)
       payloadObject["acp_timeline_identity"] = .object(metadata)
     }
     if case .object(var metadata)? = payloadObject["tool_call_timeline"] {
-      metadata["agent_id"] = .string(agentID)
+      metadata["agent_id"] = .string(sessionAgentID)
       metadata["agent_display_name"] = .string(displayName)
       payloadObject["tool_call_timeline"] = .object(metadata)
     }
@@ -129,7 +129,7 @@ extension TimelineEntry {
       recordedAt: recordedAt,
       kind: kind,
       sessionId: sessionId,
-      agentId: agentID,
+      agentId: sessionAgentID,
       taskId: taskId,
       summary: reattributedAcpTimelineSummary(displayName: displayName),
       payload: .object(payloadObject)

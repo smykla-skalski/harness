@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    ARBITRATION_BLOCKED_REASON, AgentRegistration, AgentStatus, PendingLeaderTransfer,
-    SessionPolicy, TaskStatus, WorkItem,
+    ARBITRATION_BLOCKED_REASON, AgentRegistration, AgentStatus, HarnessSessionId, ManagedAgentRef,
+    PendingLeaderTransfer, RuntimeSessionId, SessionAgentId, SessionPolicy, TaskStatus, WorkItem,
 };
 
 /// Current schema version for session state files.
@@ -82,6 +82,54 @@ pub struct SessionState {
     /// Cached counts for fast daemon and UI list rendering.
     #[serde(default)]
     pub metrics: SessionMetrics,
+}
+
+impl SessionState {
+    #[must_use]
+    pub fn harness_session_id(&self) -> HarnessSessionId {
+        HarnessSessionId::from(self.session_id.as_str())
+    }
+
+    #[must_use]
+    pub fn leader_session_agent_id(&self) -> Option<SessionAgentId> {
+        self.leader_id.as_deref().map(SessionAgentId::from)
+    }
+
+    #[must_use]
+    pub fn agent(&self, agent_id: &SessionAgentId) -> Option<&AgentRegistration> {
+        self.agents.get(agent_id.as_str())
+    }
+
+    pub fn agent_mut(&mut self, agent_id: &SessionAgentId) -> Option<&mut AgentRegistration> {
+        self.agents.get_mut(agent_id.as_str())
+    }
+
+    #[must_use]
+    pub fn find_session_agent_id_by_managed_agent(
+        &self,
+        managed_agent: &ManagedAgentRef,
+    ) -> Option<SessionAgentId> {
+        self.agents
+            .values()
+            .find(|agent| agent.matches_managed_agent(managed_agent))
+            .map(AgentRegistration::session_agent_id)
+    }
+
+    #[must_use]
+    pub fn find_session_agent_id_by_runtime_session(
+        &self,
+        runtime_name: &str,
+        runtime_session_id: &RuntimeSessionId,
+    ) -> Option<SessionAgentId> {
+        self.agents
+            .values()
+            .find(|agent| {
+                agent.runtime == runtime_name
+                    && agent
+                        .matches_runtime_session_id(self.session_id.as_str(), runtime_session_id)
+            })
+            .map(AgentRegistration::session_agent_id)
+    }
 }
 
 /// Session lifecycle status.

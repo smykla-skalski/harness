@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::errors::{CliError, CliErrorKind};
-use crate::session::types::SessionState;
+use crate::session::types::{ManagedAgentRef, SessionState};
 use crate::workspace::project_context_dir;
 
 pub(super) type Shared<T> = Arc<Mutex<T>>;
@@ -82,10 +82,13 @@ pub(super) async fn resolve_tui_project_async(
     })
 }
 
-pub(super) fn agent_id_for_tui(
-    state: &SessionState,
-    marker_capability: &str,
-) -> Result<String, CliError> {
+pub(super) fn agent_id_for_tui(state: &SessionState, tui_id: &str) -> Result<String, CliError> {
+    let managed_agent = ManagedAgentRef::tui(tui_id);
+    if let Some(agent_id) = state.find_session_agent_id_by_managed_agent(&managed_agent) {
+        return Ok(agent_id.to_string());
+    }
+
+    let marker_capability = format!("agent-tui:{tui_id}");
     state
         .agents
         .values()
@@ -93,12 +96,12 @@ pub(super) fn agent_id_for_tui(
             agent
                 .capabilities
                 .iter()
-                .any(|capability| capability == marker_capability)
+                .any(|capability| capability == &marker_capability)
         })
         .map(|agent| agent.agent_id.clone())
         .ok_or_else(|| {
             CliErrorKind::workflow_io(format!(
-                "joined agent missing TUI marker capability '{marker_capability}'"
+                "joined agent missing managed-agent ref or legacy TUI marker '{marker_capability}'"
             ))
             .into()
         })
@@ -161,4 +164,61 @@ pub(super) fn persist_transcript(
 
     *persisted_len = transcript.len();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::agent_id_for_tui;
+    use crate::agents::runtime::RuntimeCapabilities;
+    use crate::session::service::build_new_session;
+    use crate::session::types::{AgentRegistration, AgentStatus, ManagedAgentRef, SessionRole};
+
+    fn sample_agent(
+        agent_id: &str,
+        capabilities: Vec<String>,
+        managed_agent: Option<ManagedAgentRef>,
+    ) -> AgentRegistration {
+        AgentRegistration {
+            agent_id: agent_id.into(),
+            name: "Worker".into(),
+            runtime: "claude".into(),
+            role: SessionRole::Worker,
+            capabilities,
+            joined_at: "2026-05-06T00:00:00Z".into(),
+            updated_at: "2026-05-06T00:00:00Z".into(),
+            status: AgentStatus::Active,
+            agent_session_id: None,
+            managed_agent,
+            last_activity_at: None,
+            current_task_id: None,
+            runtime_capabilities: RuntimeCapabilities::default(),
+            persona: None,
+        }
+    }
+
+    #[test]
+    fn agent_id_for_tui_prefers_managed_agent_ref() {
+        let mut state = build_new_session("test", "test", "sess-1", "claude", None, "now");
+        state.agents.insert(
+            "agent-1".into(),
+            sample_agent("agent-1", Vec::new(), Some(ManagedAgentRef::tui("tui-1"))),
+        );
+
+        let agent_id = agent_id_for_tui(&state, "tui-1").expect("resolve agent id");
+
+        assert_eq!(agent_id, "agent-1");
+    }
+
+    #[test]
+    fn agent_id_for_tui_falls_back_to_legacy_marker_capability() {
+        let mut state = build_new_session("test", "test", "sess-1", "claude", None, "now");
+        state.agents.insert(
+            "agent-1".into(),
+            sample_agent("agent-1", vec!["agent-tui:tui-1".into()], None),
+        );
+
+        let agent_id = agent_id_for_tui(&state, "tui-1").expect("resolve legacy agent id");
+
+        assert_eq!(agent_id, "agent-1");
+    }
 }

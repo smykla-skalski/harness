@@ -341,4 +341,26 @@ mod tests {
         })
         .await;
     }
+
+    #[test]
+    fn acp_scope_accepts_matching_session_scope() {
+        let resolved =
+            resolve_acp_inspect_session_scope(Some("session-a"), Some("session-a"))
+                .expect("resolve scope");
+
+        assert_eq!(resolved, Some("session-a"));
+    }
+
+    #[test]
+    fn acp_scope_rejects_conflicting_session_scope() {
+        let error =
+            resolve_acp_inspect_session_scope(Some("session-a"), Some("session-b"))
+                .expect_err("conflicting aliases should fail");
+
+        assert!(
+            error.message().contains("require_session_id"),
+            "unexpected error: {}",
+            error.message()
+        );
+    }
 }

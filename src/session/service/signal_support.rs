@@ -5,6 +5,7 @@ use super::{
     read_acknowledged_signals, read_acknowledgments, read_pending_signals,
     record_signal_acknowledgment, runtime, signal_matches_session, utc_now, write_signal_ack,
 };
+use crate::session::types::RuntimeSessionId;
 
 pub(crate) fn reconcile_expired_pending_signals(
     session_id: &str,
@@ -135,24 +136,23 @@ pub(crate) fn signal_dirs_for_agent_in_context_root(
     agent_session_id: Option<&str>,
     context_root: &Path,
 ) -> Vec<(String, PathBuf)> {
-    runtime::signal_session_keys(orchestration_session_id, agent_session_id)
-        .into_iter()
-        .map(|signal_session_id| {
-            let signal_dir = signal_dir_in_context_root(runtime, context_root, &signal_session_id);
-            (signal_session_id, signal_dir)
-        })
-        .collect()
+    crate::session::types::crosswalk::legacy_compatible_signal_session_keys(
+        orchestration_session_id,
+        agent_session_id,
+    )
+    .into_iter()
+    .map(|signal_session_id| {
+        let signal_dir = signal_dir_in_context_root(runtime, context_root, &signal_session_id);
+        (signal_session_id, signal_dir)
+    })
+    .collect()
 }
 
 pub(crate) fn agent_runtime_session_id<'a>(
     orchestration_session_id: &'a str,
     agent: &'a AgentRegistration,
 ) -> &'a str {
-    agent
-        .agent_session_id
-        .as_deref()
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or(orchestration_session_id)
+    agent.runtime_session_key(orchestration_session_id)
 }
 
 pub(crate) fn runtime_session_matches_agent(
@@ -160,7 +160,10 @@ pub(crate) fn runtime_session_matches_agent(
     agent: &AgentRegistration,
     runtime_session_id: &str,
 ) -> bool {
-    agent_runtime_session_id(orchestration_session_id, agent) == runtime_session_id
+    agent.matches_runtime_session_id(
+        orchestration_session_id,
+        &RuntimeSessionId::from(runtime_session_id),
+    )
 }
 
 pub(crate) fn load_signal_record_for_agent(

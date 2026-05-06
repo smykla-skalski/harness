@@ -65,10 +65,13 @@ extension RecordingHarnessClient {
     if let response = configuredAcpTranscriptResponse(for: sessionID) {
       return response
     }
-    let managedAgentIDs = Set(configuredAcpSnapshots(for: sessionID).map(\.agentId))
+    guard detail.session.sessionId == sessionID || configuredTimeline(for: sessionID) != nil else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "ACP transcript unavailable.")
+    }
+    let sessionAgentIDs = Set(configuredAcpSnapshots(for: sessionID).map(\.sessionAgentID))
     return AcpTranscriptResponse(
       entries: (configuredTimeline(for: sessionID) ?? []).filter {
-        $0.matchesDerivedAcpTranscriptHistory(managedAgentIDs: managedAgentIDs)
+        $0.matchesDerivedAcpTranscriptHistory(sessionAgentIDs: sessionAgentIDs)
       }
     )
   }
@@ -107,10 +110,14 @@ extension RecordingHarnessClient {
       } else {
         request.agent.capitalized
       }
+    let managedAgentID = "acp-\(startedCount)"
     let snapshot = makeAcpSnapshot(
-      acpID: "acp-\(startedCount)",
+      acpID: managedAgentID,
       sessionID: sessionID,
-      agentID: request.agent,
+      agentID: recordingAcpSessionAgentID(
+        descriptorID: request.agent,
+        managedAgentID: managedAgentID
+      ),
       displayName: request.name ?? defaultDisplayName,
       pendingBatches: []
     )
@@ -130,9 +137,11 @@ extension RecordingHarnessClient {
     snapshot: AcpAgentSnapshot
   ) {
     lock.withLock {
+      let sessionAgentID = snapshot.sessionAgentID
       let assignedRole = resolvedRoleForStartedAgent(
         sessionID: sessionID,
-        request: request
+        request: request,
+        sessionAgentID: sessionAgentID
       )
       let currentDetail = sessionDetailsByID[sessionID] ?? detailStorage
       let registration = startedAgentRegistration(
@@ -149,7 +158,9 @@ extension RecordingHarnessClient {
       )
       let updatedDetail = SessionDetail(
         session: updatedSummary,
-        agents: currentDetail.agents.filter { $0.agentId != request.agent } + [registration],
+        agents: currentDetail.agents.filter {
+          $0.managedAgentID != snapshot.managedAgentID
+        } + [registration],
         tasks: currentDetail.tasks,
         signals: currentDetail.signals,
         observer: currentDetail.observer,
@@ -166,13 +177,13 @@ extension RecordingHarnessClient {
         sessionSummariesStorage = summaries
       }
       resolvedAcpSnapshotsByAgentID[snapshot.acpId] = snapshot
-      resolvedAcpSnapshotsByAgentID[snapshot.agentId] = snapshot
     }
   }
 
   private func resolvedRoleForStartedAgent(
     sessionID: String,
-    request: AcpAgentStartRequest
+    request: AcpAgentStartRequest,
+    sessionAgentID: String
   ) -> SessionRole {
     if request.role == .leader,
       let fallbackRole = request.fallbackRole,
@@ -180,7 +191,7 @@ extension RecordingHarnessClient {
         sessionDetailsByID[sessionID]
         ?? (detailStorage.session.sessionId == sessionID ? detailStorage : nil),
       existingSession.session.leaderId != nil,
-      existingSession.session.leaderId != request.agent
+      existingSession.session.leaderId != sessionAgentID
     {
       return fallbackRole
     }
@@ -202,7 +213,7 @@ extension RecordingHarnessClient {
       hookPoints: []
     )
     return AgentRegistration(
-      agentId: request.agent,
+      agentId: snapshot.sessionAgentID,
       name: displayName,
       runtime: request.agent,
       role: assignedRole,
@@ -210,12 +221,24 @@ extension RecordingHarnessClient {
       joinedAt: snapshot.createdAt,
       updatedAt: snapshot.updatedAt,
       status: snapshot.status,
-      agentSessionId: nil,
+      agentSessionId: recordingAcpRuntimeSessionID(for: snapshot),
+      managedAgent: ManagedAgentRef(kind: .acp, id: snapshot.managedAgentID),
       lastActivityAt: snapshot.updatedAt,
       currentTaskId: nil,
       runtimeCapabilities: runtimeCapabilities,
       persona: nil
     )
+  }
+
+  private func recordingAcpRuntimeSessionID(for snapshot: AcpAgentSnapshot) -> String {
+    "recording-runtime-session-\(snapshot.managedAgentID)"
+  }
+
+  private func recordingAcpSessionAgentID(
+    descriptorID: String,
+    managedAgentID: String
+  ) -> String {
+    "recording-session-agent-\(descriptorID)-\(managedAgentID)"
   }
 
   private func updatedSummaryForStartedAgent(
@@ -224,7 +247,9 @@ extension RecordingHarnessClient {
     snapshot: AcpAgentSnapshot,
     currentDetail: SessionDetail
   ) -> SessionSummary {
-    let alreadyPresent = currentDetail.agents.contains { $0.agentId == request.agent }
+    let alreadyPresent = currentDetail.agents.contains {
+      $0.managedAgentID == snapshot.managedAgentID || $0.agentId == snapshot.sessionAgentID
+    }
     return SessionSummary(
       projectId: currentDetail.session.projectId,
       projectName: currentDetail.session.projectName,
@@ -241,7 +266,7 @@ extension RecordingHarnessClient {
       createdAt: currentDetail.session.createdAt,
       updatedAt: snapshot.updatedAt,
       lastActivityAt: snapshot.updatedAt,
-      leaderId: assignedRole == .leader ? request.agent : currentDetail.session.leaderId,
+      leaderId: assignedRole == .leader ? snapshot.sessionAgentID : currentDetail.session.leaderId,
       observeId: currentDetail.session.observeId,
       pendingLeaderTransfer: currentDetail.session.pendingLeaderTransfer,
       metrics: SessionMetrics(

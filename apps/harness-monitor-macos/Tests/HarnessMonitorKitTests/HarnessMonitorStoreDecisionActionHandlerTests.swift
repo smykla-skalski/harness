@@ -39,7 +39,7 @@ final class HarnessMonitorStoreDecisionActionHandlerTests: XCTestCase {
     let decision = try XCTUnwrap(fetchedDecision)
     XCTAssertEqual(decision.statusRaw, "open")
     XCTAssertEqual(client.recordedCalls().count, 0)
-    XCTAssertTrue((store.currentFailureFeedbackMessage ?? "").contains("missing target metadata"))
+    XCTAssertFalse((store.currentFailureFeedbackMessage ?? "").isEmpty)
   }
 
   func test_nudgeSuggestedActionResolvesOnlyAfterDaemonActionSuccess() async throws {
@@ -94,17 +94,16 @@ final class HarnessMonitorStoreDecisionActionHandlerTests: XCTestCase {
   func test_nudgeSuggestedActionRoutesAcpAgentsThroughSignals() async throws {
     let client = RecordingHarnessClient()
     let sessionID = PreviewFixtures.summary.sessionId
-    client.configureResolvedAcpSnapshot(
-      makeAcpSnapshot(
-        acpID: "acp-1",
-        sessionID: sessionID,
-        agentID: "agent-acp",
-        displayName: "Gemini",
-        pendingBatches: []
-      ),
-      for: "agent-acp"
+    let snapshot = makeAcpSnapshot(
+      acpID: "acp-1",
+      sessionID: sessionID,
+      agentID: "agent-acp",
+      displayName: "Gemini",
+      pendingBatches: []
     )
+    client.configureResolvedAcpSnapshot(snapshot, for: "acp-1")
     let store = await selectedActionStore(client: client)
+    store.applyAcpAgent(snapshot)
     await store.startSupervisor()
     addTeardownBlock { await store.stopSupervisor() }
     let decisionID = "decision-nudge-acp"
@@ -115,13 +114,13 @@ final class HarnessMonitorStoreDecisionActionHandlerTests: XCTestCase {
         ruleID: "stuck-agent",
         sessionID: sessionID,
         agentID: "agent-acp",
-        contextJSON: #"{"agentID":"agent-acp"}"#,
+        contextJSON: #"{"agentID":"agent-acp","managedAgentID":"acp-1"}"#,
         suggestedActionsJSON: encodedActions([
           SuggestedAction(
             id: "nudge",
             title: "Nudge",
             kind: .nudge,
-            payloadJSON: #"{"agentID":"agent-acp","input":"check in"}"#
+            payloadJSON: #"{"agentID":"agent-acp","managedAgentID":"acp-1","input":"check in"}"#
           )
         ])
       )
@@ -158,17 +157,16 @@ final class HarnessMonitorStoreDecisionActionHandlerTests: XCTestCase {
   func test_storeSupervisorApiRoutesAcpNudgesThroughSignals() async throws {
     let client = RecordingHarnessClient()
     let sessionID = PreviewFixtures.summary.sessionId
-    client.configureResolvedAcpSnapshot(
-      makeAcpSnapshot(
-        acpID: "acp-1",
-        sessionID: sessionID,
-        agentID: "agent-acp",
-        displayName: "Gemini",
-        pendingBatches: []
-      ),
-      for: "agent-acp"
+    let snapshot = makeAcpSnapshot(
+      acpID: "acp-1",
+      sessionID: sessionID,
+      agentID: "agent-acp",
+      displayName: "Gemini",
+      pendingBatches: []
     )
+    client.configureResolvedAcpSnapshot(snapshot, for: "acp-1")
     let store = await selectedActionStore(client: client)
+    store.applyAcpAgent(snapshot)
     let api = StoreAPIClient(store: store)
 
     try await api.nudgeAgent(agentID: "agent-acp", input: "check in")
@@ -187,6 +185,111 @@ final class HarnessMonitorStoreDecisionActionHandlerTests: XCTestCase {
       client.recordedCalls().contains { call in
         guard case .sendAgentTuiInput(let tuiID, _) = call else { return false }
         return tuiID == "agent-acp"
+      }
+    )
+  }
+
+  func test_nudgeSuggestedActionRejectsMismatchedAcpTargetPair() async throws {
+    let client = RecordingHarnessClient()
+    let sessionID = PreviewFixtures.summary.sessionId
+    let snapshot = makeAcpSnapshot(
+      acpID: "acp-1",
+      sessionID: sessionID,
+      agentID: "agent-acp",
+      displayName: "Gemini",
+      pendingBatches: []
+    )
+    client.configureResolvedAcpSnapshot(snapshot, for: "acp-1")
+    let store = await selectedActionStore(client: client)
+    store.applyAcpAgent(snapshot)
+    await store.startSupervisor()
+    addTeardownBlock { await store.stopSupervisor() }
+    let decisionID = "decision-nudge-acp-mismatch"
+    try await store.insertDecisionForTesting(
+      DecisionDraft.fixture(
+        id: decisionID,
+        severity: .needsUser,
+        ruleID: "stuck-agent",
+        sessionID: sessionID,
+        agentID: "other-agent",
+        contextJSON: #"{"agentID":"other-agent","managedAgentID":"acp-1"}"#,
+        suggestedActionsJSON: encodedActions([
+          SuggestedAction(
+            id: "nudge",
+            title: "Nudge",
+            kind: .nudge,
+            payloadJSON: #"{"agentID":"other-agent","managedAgentID":"acp-1","input":"check in"}"#
+          )
+        ])
+      )
+    )
+
+    let handler = store.supervisorDecisionActionHandler()
+    await handler.resolve(
+      decisionID: decisionID,
+      outcome: DecisionOutcome(chosenActionID: "nudge", note: nil)
+    )
+
+    let decisionStore = try XCTUnwrap(store.supervisorDecisionStore)
+    let fetchedDecision = try await decisionStore.decision(id: decisionID)
+    let decision = try XCTUnwrap(fetchedDecision)
+    XCTAssertEqual(decision.statusRaw, "open")
+    XCTAssertFalse((store.currentFailureFeedbackMessage ?? "").isEmpty)
+    XCTAssertFalse(
+      client.recordedCalls().contains { call in
+        switch call {
+        case .sendSignal(_, _, _, _), .sendAgentTuiInput(_, _):
+          true
+        default:
+          false
+        }
+      }
+    )
+  }
+
+  func test_nudgeSuggestedActionRejectsManagedOnlyTargetWithoutSessionAgentLink() async throws {
+    let client = RecordingHarnessClient()
+    let store = await selectedActionStore(client: client)
+    await store.startSupervisor()
+    addTeardownBlock { await store.stopSupervisor() }
+    let decisionID = "decision-nudge-managed-only"
+    try await store.insertDecisionForTesting(
+      DecisionDraft.fixture(
+        id: decisionID,
+        severity: .needsUser,
+        ruleID: "stuck-agent",
+        sessionID: PreviewFixtures.summary.sessionId,
+        contextJSON: #"{"managedAgentID":"acp-missing"}"#,
+        suggestedActionsJSON: encodedActions([
+          SuggestedAction(
+            id: "nudge",
+            title: "Nudge",
+            kind: .nudge,
+            payloadJSON: #"{"managedAgentID":"acp-missing","input":"check in"}"#
+          )
+        ])
+      )
+    )
+
+    let handler = store.supervisorDecisionActionHandler()
+    await handler.resolve(
+      decisionID: decisionID,
+      outcome: DecisionOutcome(chosenActionID: "nudge", note: nil)
+    )
+
+    let decisionStore = try XCTUnwrap(store.supervisorDecisionStore)
+    let fetchedDecision = try await decisionStore.decision(id: decisionID)
+    let decision = try XCTUnwrap(fetchedDecision)
+    XCTAssertEqual(decision.statusRaw, "open")
+    XCTAssertFalse((store.currentFailureFeedbackMessage ?? "").isEmpty)
+    XCTAssertFalse(
+      client.recordedCalls().contains { call in
+        switch call {
+        case .sendSignal(_, _, _, _), .sendAgentTuiInput(_, _):
+          true
+        default:
+          false
+        }
       }
     )
   }

@@ -73,7 +73,7 @@ async fn failed_starts_rollback_and_disappear_from_list_and_inspect() {
         let state = load_session_state(&manager, "sess-1");
         assert!(
             state.agents.values().all(|agent| {
-                agent.managed_agent != Some(ManagedAgentRef::acp(&snapshot.acp_id))
+                agent.managed_agent != Some(ManagedAgentRef::acp(snapshot.acp_id.as_str()))
             }),
             "failed ACP starts should roll back incomplete orchestration registrations"
         );

@@ -310,27 +310,21 @@ fn direct_skill_prefix(runtime_name: &str) -> &'static str {
     }
 }
 
-/// Candidate session keys to inspect for signal delivery.
+/// Candidate session keys to inspect for signal delivery during the legacy
+/// runtime-session migration window.
 ///
 /// New signal delivery is keyed by the target agent's runtime session ID. The
 /// orchestration session ID stays as a legacy fallback so older queued signals
 /// remain visible until they are drained.
 #[must_use]
-pub fn signal_session_keys(
+pub fn legacy_compatible_signal_session_keys(
     orchestration_session_id: &str,
     agent_session_id: Option<&str>,
 ) -> Vec<String> {
-    let mut keys = Vec::new();
-    if let Some(agent_session_id) = agent_session_id.filter(|value| !value.trim().is_empty()) {
-        keys.push(agent_session_id.to_string());
-    }
-    if keys
-        .last()
-        .is_none_or(|last| last.as_str() != orchestration_session_id)
-    {
-        keys.push(orchestration_session_id.to_string());
-    }
-    keys
+    crate::session::types::crosswalk::legacy_compatible_signal_session_keys(
+        orchestration_session_id,
+        agent_session_id,
+    )
 }
 
 #[cfg(test)]

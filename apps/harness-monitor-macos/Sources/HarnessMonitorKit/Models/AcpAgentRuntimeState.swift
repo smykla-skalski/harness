@@ -31,6 +31,9 @@ public struct AcpRuntimeIdentity: Equatable, Hashable, Identifiable, Sendable {
     "runtime.\(Self.idComponent(sessionID)).\(Self.idComponent(acpID)).\(Self.idComponent(agentID))"
   }
 
+  public var managedAgentID: String { acpID }
+  public var sessionAgentID: String { agentID }
+
   private static func idComponent(_ value: String) -> String {
     Data(value.utf8).map { byte in
       String(format: "%02x", byte)
@@ -195,6 +198,14 @@ public struct AcpAgentRuntimeState: Equatable, Identifiable, Sendable {
     identity.acpID
   }
 
+  public var managedAgentID: String {
+    identity.managedAgentID
+  }
+
+  public var sessionAgentID: String {
+    identity.sessionAgentID
+  }
+
   public var agentName: String {
     inspect?.displayName ?? snapshot?.displayName ?? agentId
   }
@@ -259,5 +270,39 @@ public struct AcpAgentRuntimeState: Equatable, Identifiable, Sendable {
 
   public var hasInspect: Bool {
     inspect != nil
+  }
+}
+
+extension AcpRuntimeIdentity {
+  public var sessionIdentity: HarnessSessionID {
+    HarnessSessionID(rawValue: sessionID)
+  }
+
+  public var managedAgentIdentity: ManagedAgentID {
+    ManagedAgentID(rawValue: managedAgentID)
+  }
+
+  public var sessionAgentIdentity: SessionAgentID {
+    SessionAgentID(rawValue: sessionAgentID)
+  }
+}
+
+extension AcpInspectSample {
+  public var sessionIdentity: HarnessSessionID {
+    HarnessSessionID(rawValue: sessionID)
+  }
+}
+
+extension AcpAgentRuntimeState {
+  public var sessionIdentity: HarnessSessionID {
+    HarnessSessionID(rawValue: sessionId)
+  }
+
+  public var managedAgentIdentity: ManagedAgentID {
+    ManagedAgentID(rawValue: managedAgentID)
+  }
+
+  public var sessionAgentIdentity: SessionAgentID {
+    SessionAgentID(rawValue: sessionAgentID)
   }
 }

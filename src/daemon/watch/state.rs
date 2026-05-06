@@ -95,11 +95,18 @@ impl PendingWatchPaths {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(super) enum RuntimeSessionResolveKind {
+    Runtime,
+    Signal,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(super) struct RuntimeSessionTarget {
     pub(super) context_root: PathBuf,
     pub(super) runtime_name: String,
     pub(super) runtime_session_id: String,
+    pub(super) resolve_kind: RuntimeSessionResolveKind,
 }
 
 #[derive(Debug, Default)]

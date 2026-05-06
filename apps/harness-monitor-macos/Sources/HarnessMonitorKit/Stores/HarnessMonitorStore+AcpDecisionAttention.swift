@@ -35,12 +35,12 @@ extension HarnessMonitorStore {
       guard let summary = acpDecisionAttentionSummary(for: snapshot) else {
         continue
       }
-      byAgentID[snapshot.agentId] = summary.attention
+      byAgentID[snapshot.sessionAgentID] = summary.attention
       events.append(
         AcpPermissionAttentionEvent(
           batchID: summary.attention.oldestBatchID,
           decisionID: summary.attention.oldestDecisionID,
-          agentID: snapshot.agentId,
+          agentID: snapshot.sessionAgentID,
           agentName: snapshot.displayName,
           requestCount: summary.attention.count,
           createdAt: summary.createdAt

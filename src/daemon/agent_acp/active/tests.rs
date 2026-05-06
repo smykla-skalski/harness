@@ -171,6 +171,9 @@ async fn spawn_event_forwarder_persists_live_acp_batches_to_db() {
 
     let event = receiver.recv().await.expect("receive broadcast event");
     assert_eq!(event.event, "acp_events");
+    assert_eq!(event.payload["acp_id"], "acp-1");
+    assert_eq!(event.payload["managed_agent_id"], "acp-1");
+    assert_eq!(event.payload["managed_agent_family"], "acp");
     task.await.expect("join event forwarder");
 
     let db = db.lock().expect("db lock");

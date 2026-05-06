@@ -150,6 +150,11 @@ pub(crate) fn compute_agent_transition(
     if agent.status == AgentStatus::AwaitingReview {
         return None;
     }
+    if agent.managed_agent.as_ref().is_some_and(|managed_agent| {
+        managed_agent.kind == crate::session::types::ManagedAgentKind::Acp
+    }) {
+        return None;
+    }
 
     let effective_activity = most_recent_activity([
         record.last_activity.as_deref(),

@@ -195,14 +195,14 @@ impl AgentTuiManagerHandle {
     }
 
     fn try_resolve_agent_id(&self, snapshot: &mut AgentTuiSnapshot) {
-        let marker = format!("agent-tui:{}", snapshot.tui_id);
         let session_id = snapshot.session_id.clone();
-        let async_marker = marker.clone();
+        let tui_id = snapshot.tui_id.clone();
+        let async_tui_id = tui_id.clone();
         if let Some(result) = self.run_with_async_db(|async_db| async move {
             Ok(async_db
                 .resolve_session(&session_id)
                 .await?
-                .and_then(|resolved| agent_id_for_tui(&resolved.state, &async_marker).ok()))
+                .and_then(|resolved| agent_id_for_tui(&resolved.state, &async_tui_id).ok()))
         }) {
             if let Ok(Some(agent_id)) = result {
                 snapshot.agent_id = agent_id;
@@ -218,7 +218,7 @@ impl AgentTuiManagerHandle {
         let Ok(Some(state)) = db_guard.load_session_state(&snapshot.session_id) else {
             return;
         };
-        if let Ok(agent_id) = agent_id_for_tui(&state, &marker) {
+        if let Ok(agent_id) = agent_id_for_tui(&state, &tui_id) {
             snapshot.agent_id = agent_id;
         }
     }

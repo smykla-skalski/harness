@@ -1,5 +1,5 @@
 use crate::agents::kind::{DisconnectReason, RuntimeKind};
-use crate::session::types::ManagedAgentRef;
+use crate::session::types::{ManagedAgentId, ManagedAgentRef, RuntimeSessionId, SessionAgentId};
 
 use super::{
     AgentRegistration, AgentStatus, CURRENT_VERSION, CliError, CliErrorKind,
@@ -62,12 +62,8 @@ pub(crate) fn build_new_session_with_policy(
 pub(crate) fn find_agent_by_managed_agent(
     state: &SessionState,
     managed_agent: &ManagedAgentRef,
-) -> Option<String> {
-    state
-        .agents
-        .values()
-        .find(|agent| agent.managed_agent.as_ref() == Some(managed_agent))
-        .map(|agent| agent.agent_id.clone())
+) -> Option<SessionAgentId> {
+    state.find_session_agent_id_by_managed_agent(managed_agent)
 }
 
 fn managed_agent_from_capabilities(capabilities: &[String]) -> Option<ManagedAgentRef> {
@@ -78,7 +74,7 @@ fn managed_agent_from_capabilities(capabilities: &[String]) -> Option<ManagedAge
     if tui_id.is_empty() {
         return None;
     }
-    Some(ManagedAgentRef::tui(tui_id))
+    Some(ManagedAgentRef::tui(ManagedAgentId::from(tui_id)))
 }
 
 /// Register a new agent into an existing session state. Returns the assigned
@@ -117,14 +113,15 @@ pub(crate) fn apply_join_session(
         .as_ref()
         .and_then(|managed_agent| find_agent_by_managed_agent(state, managed_agent))
     {
-        return Ok(existing_id);
+        return Ok(existing_id.to_string());
     }
 
-    let agent_id = next_available_agent_id(runtime_name, &state.agents);
+    let agent_id = SessionAgentId::from(next_available_agent_id(runtime_name, &state.agents));
+    let agent_id_key = agent_id.to_string();
     state.agents.insert(
-        agent_id.clone(),
+        agent_id_key.clone(),
         AgentRegistration {
-            agent_id: agent_id.clone(),
+            agent_id: agent_id_key.clone(),
             name: display_name.to_string(),
             runtime: RuntimeKind::from(runtime_name),
             role,
@@ -141,11 +138,11 @@ pub(crate) fn apply_join_session(
         },
     );
     if role == SessionRole::Leader && state.leader_id.is_none() {
-        state.leader_id = Some(agent_id.clone());
+        state.leader_id = Some(agent_id_key.clone());
         state.status = SessionStatus::Active;
     }
     refresh_session(state, now);
-    Ok(agent_id)
+    Ok(agent_id_key)
 }
 
 pub(crate) fn apply_register_agent_runtime_session(
@@ -155,13 +152,13 @@ pub(crate) fn apply_register_agent_runtime_session(
     agent_session_id: &str,
     now: &str,
 ) -> Result<bool, CliError> {
+    let runtime_session_id = RuntimeSessionId::from(agent_session_id);
     let Some(agent_id) = find_agent_by_managed_agent(state, managed_agent) else {
         return Ok(false);
     };
     let current_agent_session_id = {
         let agent = state
-            .agents
-            .get(&agent_id)
+            .agent(&agent_id)
             .expect("managed-agent lookup resolved agent");
         if agent.runtime != runtime_name {
             return Err(CliErrorKind::session_agent_conflict(format!(
@@ -170,17 +167,16 @@ pub(crate) fn apply_register_agent_runtime_session(
             ))
             .into());
         }
-        agent.agent_session_id.clone()
+        agent.runtime_session_id()
     };
-    if current_agent_session_id.as_deref() == Some(agent_session_id) {
+    if current_agent_session_id.as_ref() == Some(&runtime_session_id) {
         return Ok(false);
     }
-    touch_agent(state, &agent_id, now);
+    touch_agent(state, agent_id.as_str(), now);
     let agent = state
-        .agents
-        .get_mut(&agent_id)
+        .agent_mut(&agent_id)
         .expect("managed-agent lookup resolved mutable agent");
-    agent.agent_session_id = Some(agent_session_id.to_string());
+    agent.agent_session_id = Some(runtime_session_id.into_inner());
     Ok(true)
 }
 

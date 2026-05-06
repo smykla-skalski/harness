@@ -128,6 +128,36 @@ extension ToolCallTimelineViewTests {
     #expect(rows.map(\.id) == ["session-1::acp-a::call-10", "session-1::acp-a::call-2"])
   }
 
+  @Test("Store ACP timeline metadata keeps managed fallback explicit when no session agent is known")
+  func storeTimelineMetadataKeepsManagedFallbackExplicit() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    let metadata = store.acpToolCallTimelineMetadata(
+      for: AcpEventBatchPayload(
+        acpId: "acp-a",
+        sessionId: "session-1",
+        rawCount: 1,
+        events: [
+          AcpConversationEvent(
+            timestamp: "2026-04-28T00:00:01Z",
+            sequence: 1,
+            kind: .object([
+              "type": .string("tool_invocation"),
+              "tool_name": .string("Read"),
+              "invocation_id": .string("call-a-1"),
+            ]),
+            agent: "",
+            sessionId: "session-1"
+          )
+        ]
+      )
+    )
+
+    #expect(metadata.managedAgentID == "acp-a")
+    #expect(metadata.sessionAgentID == "managed:acp-a")
+    #expect(metadata.sessionAgentID != "acp-a")
+    #expect(metadata.displayName == "ACP agent acp-a")
+  }
+
   private func makeEnrichedAcpEntries(
     acpID: String,
     agentID: String,
@@ -143,8 +173,8 @@ extension ToolCallTimelineViewTests {
     ).timelineEntries(
       fallbackRecordedAt: "2026-04-28T00:00:10Z",
       toolCallMetadata: AcpToolCallTimelineMetadata(
-        acpAgentId: acpID,
-        agentId: agentID,
+        managedAgentID: acpID,
+        sessionAgentID: agentID,
         displayName: displayName,
         capabilityTags: capabilityTags
       )

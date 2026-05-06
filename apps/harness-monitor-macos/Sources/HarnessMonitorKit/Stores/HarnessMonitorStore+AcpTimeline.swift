@@ -8,16 +8,24 @@ extension HarnessMonitorStore {
   func acpToolCallTimelineMetadata(
     for payload: AcpEventBatchPayload
   ) -> AcpToolCallTimelineMetadata {
-    let snapshot = selectedAcpAgents.first { $0.acpId == payload.acpId }
-    let fallbackAgentID = payload.events.lazy.map(\.agent).first { !$0.isEmpty } ?? payload.acpId
-    let descriptorID = snapshot?.agentId ?? fallbackAgentID
-    let descriptor = acpAgentDescriptorsByID[descriptorID]
+    let crosswalk = acpIdentityCrosswalk()
+    let linkage = crosswalk.agentLinkage(
+      forManagedAgentIdentity: payload.managedAgentIdentity
+    )
+    let fallbackSessionAgentIdentity = payload.events.lazy.compactMap(\.sessionAgentIdentity).first
+    let fallbackSessionAgentID =
+      fallbackSessionAgentIdentity?.rawValue
+      ?? linkage?.explicitSessionAgentLookupKey
+      ?? AcpAgentIdentityCrosswalk.explicitSessionAgentFallbackKey(
+        for: payload.managedAgentIdentity
+      )
     return AcpToolCallTimelineMetadata(
-      acpAgentId: payload.acpId,
-      agentId: snapshot?.agentId ?? descriptor?.id ?? fallbackAgentID,
-      displayName: snapshot?.displayName ?? descriptor?.displayName ?? snapshot?.agentId
-        ?? fallbackAgentID,
-      capabilityTags: descriptor?.capabilities ?? []
+      managedAgentID: linkage?.managedAgentIdentity.rawValue ?? payload.managedAgentIdentity.rawValue,
+      sessionAgentID: linkage?.sessionAgentIdentity?.rawValue ?? fallbackSessionAgentID,
+      displayName: linkage?.explicitDisplayName
+        ?? fallbackSessionAgentIdentity?.rawValue
+        ?? AcpAgentIdentityCrosswalk.unresolvedDisplayName(for: payload.managedAgentIdentity),
+      capabilityTags: linkage?.capabilityTags ?? []
     )
   }
 
@@ -214,7 +222,10 @@ extension HarnessMonitorStore {
   ) -> [TimelineEntry] {
     let identitiesByAcpID = Dictionary(
       uniqueKeysWithValues: snapshots.map { snapshot in
-        (snapshot.acpId, (agentID: snapshot.agentId, displayName: snapshot.displayName))
+        (
+          snapshot.managedAgentID,
+          (sessionAgentID: snapshot.sessionAgentID, displayName: snapshot.displayName)
+        )
       }
     )
     let updatedTimeline = entries.map { entry in
@@ -224,15 +235,15 @@ extension HarnessMonitorStore {
         return entry
       }
       let identityChanged =
-        entry.agentId != identity.agentID
-        || metadata.agentID != identity.agentID
+        entry.agentId != identity.sessionAgentID
+        || metadata.sessionAgentID != identity.sessionAgentID
         || metadata.agentDisplayName != identity.displayName
       guard identityChanged
       else {
         return entry
       }
       return entry.reattributedAcpTimelineEntry(
-        agentID: identity.agentID,
+        sessionAgentID: identity.sessionAgentID,
         displayName: identity.displayName
       )
     }

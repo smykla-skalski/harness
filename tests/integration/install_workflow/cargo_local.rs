@@ -155,7 +155,10 @@ fn cargo_local_script_isolates_sccache_server_socket() {
         socket.contains("/harness-sccache"),
         "unexpected socket path: {socket}"
     );
-    assert!(socket.ends_with(".sock"), "unexpected socket path: {socket}");
+    assert!(
+        socket.ends_with(".sock"),
+        "unexpected socket path: {socket}"
+    );
     assert!(
         socket.len() < 104,
         "sccache Unix socket path should stay below macOS sockaddr_un limits: {socket}"

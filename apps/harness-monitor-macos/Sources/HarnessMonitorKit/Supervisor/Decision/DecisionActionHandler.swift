@@ -151,7 +151,8 @@ public final class StoreDecisionActionHandler: DecisionActionHandler {
     decision: DecisionActionSnapshot,
     store: HarnessMonitorStore
   ) async throws {
-    guard let agentID = resolveAgentID(from: action, decision: decision) else {
+    guard let target = await resolveNudgeTarget(from: action, decision: decision, store: store) else
+    {
       throw StoreDecisionActionError.missingTargetMetadata("agentID")
     }
     guard let client = await MainActor.run(body: { store.client }) else {
@@ -160,7 +161,8 @@ public final class StoreDecisionActionHandler: DecisionActionHandler {
     let input = resolveNudgeInput(from: action)
     do {
       try await SupervisorManagedAgentNudgeDispatcher.dispatch(
-        agentID: agentID,
+        managedAgentID: target.managedAgentID,
+        signalAgentID: target.signalAgentID,
         input: input,
         client: client
       )
@@ -273,25 +275,76 @@ public final class StoreDecisionActionHandler: DecisionActionHandler {
     }
   }
 
-  private static func resolveAgentID(
+  private static func resolveNudgeTarget(
     from action: SuggestedAction,
-    decision: DecisionActionSnapshot
-  ) -> String? {
-    if let payload = try? JSONDecoder().decode(
+    decision: DecisionActionSnapshot,
+    store: HarnessMonitorStore
+  ) async -> ManagedAgentNudgeTarget? {
+    let payload = try? JSONDecoder().decode(
       NudgeActionPayload.self,
       from: Data(action.payloadJSON.utf8)
-    ),
-      let agentID = payload.agentID?.trimmingCharacters(in: .whitespacesAndNewlines),
-      !agentID.isEmpty
-    {
-      return agentID
+    )
+    let context = DecisionContextEnvelope(decision.contextJSON)
+    let sessionAgentIdentity =
+      normalizedSessionAgentIdentity(payload?.agentID)
+      ?? normalizedSessionAgentIdentity(context?.agentID)
+      ?? normalizedSessionAgentIdentity(decision.agentID)
+    let managedAgentIdentity =
+      normalizedManagedAgentIdentity(payload?.managedAgentID)
+      ?? normalizedManagedAgentIdentity(context?.managedAgentID)
+    switch (sessionAgentIdentity, managedAgentIdentity) {
+    case let (.some(sessionAgentIdentity), .some(managedAgentIdentity)):
+      if let target = await MainActor.run(body: {
+        store.managedAgentNudgeTarget(
+          forManagedAgentIdentity: managedAgentIdentity
+        )
+      }),
+        target.signalAgentID == sessionAgentIdentity.rawValue
+      {
+        return target
+      }
+      if let target = await MainActor.run(body: {
+        store.managedAgentNudgeTarget(
+          forSessionAgentIdentity: sessionAgentIdentity
+        )
+      }),
+        target.managedAgentID == managedAgentIdentity.rawValue
+      {
+        return target
+      }
+      return nil
+    case let (.some(sessionAgentIdentity), .none):
+      return await MainActor.run(body: {
+        store.managedAgentNudgeTarget(forSessionAgentIdentity: sessionAgentIdentity)
+      })
+    case let (.none, .some(managedAgentIdentity)):
+      return await MainActor.run(body: {
+        store.managedAgentNudgeTarget(forManagedAgentIdentity: managedAgentIdentity)
+      })
+    case (.none, .none):
+      return nil
     }
-    if let context = DecisionContextEnvelope(decision.contextJSON),
-      let agentID = context.agentID
-    {
-      return agentID
+  }
+
+  private static func normalizedSessionAgentIdentity(_ value: String?) -> SessionAgentID? {
+    guard let value = normalizedIdentityValue(value) else {
+      return nil
     }
-    return decision.agentID
+    return SessionAgentID(rawValue: value)
+  }
+
+  private static func normalizedManagedAgentIdentity(_ value: String?) -> ManagedAgentID? {
+    guard let value = normalizedIdentityValue(value) else {
+      return nil
+    }
+    return ManagedAgentID(rawValue: value)
+  }
+
+  private static func normalizedIdentityValue(_ value: String?) -> String? {
+    guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
+      return nil
+    }
+    return value
   }
 
   private static func resolveNudgeInput(from action: SuggestedAction) -> String {

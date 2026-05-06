@@ -10,7 +10,7 @@
 use std::borrow::Cow;
 use std::fmt;
 
-use super::signals::agent_tui_id_for_registration;
+use super::signals::managed_tui_id_for_registration;
 use super::{AcpAgentManagerHandle, AgentRegistration, AgentTuiManagerHandle, session_service};
 use crate::daemon::state::append_event_best_effort;
 use crate::session::types::{ManagedAgentKind, ManagedAgentRef};
@@ -140,9 +140,9 @@ pub(crate) enum NoneReason {
     /// Agent registration exists but does not carry a `managed_agent` ref;
     /// the daemon has no transport handle to reach it.
     Unmanaged,
-    /// Tui-managed registration is missing the `agent-tui:<id>` capability
-    /// that the wake selector uses to find the live TUI.
-    MissingTuiCapability,
+    /// Tui-managed registration is missing the managed-agent identity needed
+    /// to target the live TUI.
+    MissingTuiIdentity,
     /// Tui-managed agent but the daemon has no `AgentTuiManager` handle in
     /// the current dispatch context.
     NoTuiManager,
@@ -156,7 +156,7 @@ impl fmt::Display for NoneReason {
         formatter.write_str(match self {
             Self::Unregistered => "agent not registered",
             Self::Unmanaged => "agent not daemon-managed",
-            Self::MissingTuiCapability => "tui-managed agent missing agent-tui capability",
+            Self::MissingTuiIdentity => "tui-managed agent missing managed-agent identity",
             Self::NoTuiManager => "tui-managed agent but no AgentTuiManager available",
             Self::NoAcpManager => "acp-managed agent but no AcpAgentManager available",
         })
@@ -165,7 +165,7 @@ impl fmt::Display for NoneReason {
 
 /// Pick the correct wake transport for an agent registration.
 ///
-/// `Tui` route requires both an `agent-tui:<id>` capability and a live
+/// `Tui` route requires a TUI-kind `managed_agent` identity and a live
 /// `AgentTuiManager`. `Acp` route requires the registration's `managed_agent`
 /// to be `Acp`-kind and a live `AcpAgentManager`. Anything else falls through
 /// to `None` with a descriptive reason so callers can log why an active wake
@@ -200,12 +200,12 @@ fn tui_route<'a>(
     agent_tui_manager: Option<&'a AgentTuiManagerHandle>,
 ) -> WakeRoute<'a> {
     match (
-        agent_tui_id_for_registration(registration),
+        managed_tui_id_for_registration(registration),
         agent_tui_manager,
     ) {
         (Some(tui_id), Some(manager)) => WakeRoute::Tui { tui_id, manager },
         (None, _) => WakeRoute::None {
-            reason: NoneReason::MissingTuiCapability,
+            reason: NoneReason::MissingTuiIdentity,
         },
         (_, None) => WakeRoute::None {
             reason: NoneReason::NoTuiManager,
@@ -254,6 +254,9 @@ mod tests {
     use super::{NoneReason, WakeDispatch, WakeRoute, wake_route_for_registration};
     use crate::agents::kind::{AcpAgentId, RuntimeKind};
     use crate::agents::runtime::RuntimeCapabilities;
+    use crate::daemon::service::signals::{
+        legacy_compatible_tui_id_for_signal_delivery, managed_tui_id_for_registration,
+    };
     use crate::session::types::{
         AgentRegistration, AgentStatus, ManagedAgentKind, ManagedAgentRef, SessionRole,
     };
@@ -317,33 +320,58 @@ mod tests {
     }
 
     #[test]
-    fn returns_tui_for_tui_managed_with_capability_and_handle() {
-        let reg = registration(
-            vec!["agent-tui:tui-9".into()],
-            Some(ManagedAgentRef::tui("managed-tui-id")),
+    fn wake_route_ignores_legacy_tui_capability_without_managed_ref() {
+        let reg = registration(vec!["agent-tui:legacy-tui".into()], None);
+
+        assert_eq!(managed_tui_id_for_registration(&reg), None);
+        assert_eq!(
+            legacy_compatible_tui_id_for_signal_delivery(&reg),
+            Some("legacy-tui")
         );
+
+        let route = wake_route_for_registration(Some(&reg), WakeDispatch::none());
+        assert_none_reason(&route, NoneReason::Unmanaged);
+    }
+
+    #[test]
+    fn returns_tui_for_tui_managed_with_handle() {
+        let reg = registration(vec![], Some(ManagedAgentRef::tui("managed-tui-id")));
         let tui = tui_handle();
         let route = wake_route_for_registration(Some(&reg), WakeDispatch::new(Some(&tui), None));
         match route {
-            WakeRoute::Tui { tui_id, .. } => assert_eq!(tui_id, "tui-9"),
+            WakeRoute::Tui { tui_id, .. } => assert_eq!(tui_id, "managed-tui-id"),
             other => panic!("expected Tui route, got {:?}", managed_kind_label(&other)),
         }
     }
 
     #[test]
-    fn returns_none_when_tui_managed_lacks_capability() {
-        let reg = registration(vec![], Some(ManagedAgentRef::tui("managed-tui-id")));
+    fn signal_delivery_prefers_managed_tui_identity_over_legacy_capability_tag() {
+        let reg = registration(
+            vec!["agent-tui:legacy-tui".into()],
+            Some(ManagedAgentRef::tui("managed-tui-id")),
+        );
+
+        assert_eq!(
+            managed_tui_id_for_registration(&reg),
+            Some("managed-tui-id")
+        );
+        assert_eq!(
+            legacy_compatible_tui_id_for_signal_delivery(&reg),
+            Some("managed-tui-id")
+        );
+    }
+
+    #[test]
+    fn returns_none_when_tui_managed_identity_is_empty() {
+        let reg = registration(vec![], Some(ManagedAgentRef::tui("")));
         let tui = tui_handle();
         let route = wake_route_for_registration(Some(&reg), WakeDispatch::new(Some(&tui), None));
-        assert_none_reason(&route, NoneReason::MissingTuiCapability);
+        assert_none_reason(&route, NoneReason::MissingTuiIdentity);
     }
 
     #[test]
     fn returns_none_when_tui_managed_without_handle() {
-        let reg = registration(
-            vec!["agent-tui:tui-9".into()],
-            Some(ManagedAgentRef::tui("managed-tui-id")),
-        );
+        let reg = registration(vec![], Some(ManagedAgentRef::tui("managed-tui-id")));
         let route = wake_route_for_registration(Some(&reg), WakeDispatch::none());
         assert_none_reason(&route, NoneReason::NoTuiManager);
     }
@@ -377,8 +405,8 @@ mod tests {
             "agent not daemon-managed"
         );
         assert_eq!(
-            format!("{}", NoneReason::MissingTuiCapability),
-            "tui-managed agent missing agent-tui capability"
+            format!("{}", NoneReason::MissingTuiIdentity),
+            "tui-managed agent missing managed-agent identity"
         );
         assert_eq!(
             format!("{}", NoneReason::NoTuiManager),

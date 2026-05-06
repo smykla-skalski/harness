@@ -256,8 +256,8 @@ pub fn register_agent_runtime_session_direct(
         let registered = session_service::apply_register_agent_runtime_session(
             &mut state,
             &request.runtime,
-            &ManagedAgentRef::tui(&request.tui_id),
-            &request.agent_session_id,
+            &ManagedAgentRef::tui(request.tui_id.as_str()),
+            &request.runtime_session_id,
             &now,
         )?;
         if !registered {
@@ -276,7 +276,7 @@ pub fn register_agent_runtime_session_direct(
         session_id,
         &request.runtime,
         &request.tui_id,
-        &request.agent_session_id,
+        &request.runtime_session_id,
         Path::new(&request.project_dir),
     )
 }
@@ -292,8 +292,8 @@ pub(crate) async fn register_agent_runtime_session_direct_async(
             session_service::apply_register_agent_runtime_session(
                 state,
                 &request.runtime,
-                &ManagedAgentRef::tui(&request.tui_id),
-                &request.agent_session_id,
+                &ManagedAgentRef::tui(request.tui_id.as_str()),
+                &request.runtime_session_id,
                 &now,
             )
         })

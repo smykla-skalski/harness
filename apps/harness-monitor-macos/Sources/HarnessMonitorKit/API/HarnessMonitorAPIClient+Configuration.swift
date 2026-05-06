@@ -20,10 +20,17 @@ extension HarnessMonitorAPIClient {
     return try await get("/v1/runtimes/probe")
   }
 
+  public func acpInspect(sessionID: String?) async throws -> AcpAgentInspectResponse {
+    try await get(
+      "/v1/managed-agents/acp/inspect",
+      queryItems: sessionScopeQueryItems(sessionID: sessionID)
+    )
+  }
+
   public func acpTranscript(sessionID: String) async throws -> AcpTranscriptResponse {
     try await get(
       "/v1/managed-agents/acp/transcript",
-      queryItems: [URLQueryItem(name: "session_id", value: sessionID)]
+      queryItems: sessionScopeQueryItems(sessionID: sessionID)
     )
   }
 
@@ -37,5 +44,14 @@ extension HarnessMonitorAPIClient {
 
   public func setLogLevel(_ level: String) async throws -> LogLevelResponse {
     try await put("/v1/daemon/log-level", body: SetLogLevelRequest(level: level))
+  }
+
+  private func sessionScopeQueryItems(sessionID: String?) -> [URLQueryItem] {
+    guard let sessionID else {
+      return []
+    }
+    return [
+      URLQueryItem(name: "session_id", value: sessionID),
+    ]
   }
 }

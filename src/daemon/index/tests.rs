@@ -12,6 +12,7 @@ use crate::workspace::{canonical_checkout_root, project_context_dir};
 
 mod adopted_external;
 mod repair_context_root;
+mod runtime_sessions;
 
 fn write_text(path: &Path, contents: &str) {
     if let Some(parent) = path.parent() {

@@ -5,7 +5,7 @@ import SwiftUI
 
 struct HarnessMonitorMenuBarSnapshot: Equatable {
   static let statusItemTitle = "Harness Monitor"
-  static let statusItemSystemImage = "checklist"
+  static let statusItemImageName = "HarnessMonitorMenuBarLighthouse"
   static let openMonitorLabel = "Open Monitor"
   static let openWorkspaceLabel = "Open Workspace"
   static let openSettingsLabel = "Settings..."
@@ -111,29 +111,15 @@ struct HarnessMonitorMenuBarExtraLabel: View {
   let store: HarnessMonitorStore
 
   var body: some View {
-    Label(
-      HarnessMonitorMenuBarSnapshot.statusItemTitle,
-      systemImage: statusItemSystemImage
-    )
+    Label {
+      Text(verbatim: HarnessMonitorMenuBarSnapshot.statusItemTitle)
+    } icon: {
+      Image(HarnessMonitorMenuBarSnapshot.statusItemImageName)
+        .renderingMode(.template)
+    }
     .accessibilityIdentifier(HarnessMonitorAccessibility.menuBarExtra)
     .accessibilityLabel(HarnessMonitorMenuBarSnapshot.statusItemTitle)
     .accessibilityValue(accessibilityValue)
-  }
-
-  private var statusItemSystemImage: String {
-    if !store.supervisorOpenDecisions.isEmpty {
-      return "exclamationmark.triangle.fill"
-    }
-    switch store.connectionState {
-    case .online:
-      return "checkmark.circle"
-    case .connecting:
-      return "arrow.triangle.2.circlepath"
-    case .offline:
-      return "xmark.circle"
-    case .idle:
-      return HarnessMonitorMenuBarSnapshot.statusItemSystemImage
-    }
   }
 
   private var accessibilityValue: String {

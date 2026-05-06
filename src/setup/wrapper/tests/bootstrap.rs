@@ -315,6 +315,39 @@ fn write_agent_bootstrap_skips_gemini_hook_config_when_requested() {
 }
 
 #[test]
+fn write_agent_bootstrap_removes_existing_gemini_hook_config_when_skipped() {
+    let dir = tempfile::tempdir().unwrap();
+    let settings_path = dir.path().join(".gemini").join("settings.json");
+    fs::create_dir_all(settings_path.parent().unwrap()).unwrap();
+    fs::write(
+        &settings_path,
+        r#"{"hooks":{"BeforeTool":[{"matcher":".*"}]}}"#,
+    )
+    .unwrap();
+
+    let written = write_agent_bootstrap(
+        dir.path(),
+        HookAgent::Gemini,
+        true,
+        &[HookAgent::Gemini],
+        legacy_flags(),
+    )
+    .unwrap();
+
+    let command_path = dir
+        .path()
+        .join(".gemini")
+        .join("commands")
+        .join("harness")
+        .join("harness.toml");
+
+    assert!(!written.contains(&settings_path));
+    assert!(!settings_path.exists());
+    assert!(written.contains(&command_path));
+    assert!(command_path.is_file());
+}
+
+#[test]
 fn write_agent_bootstrap_skips_copilot_hook_config_when_requested() {
     let dir = tempfile::tempdir().unwrap();
     let written = write_agent_bootstrap(

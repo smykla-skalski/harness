@@ -45,7 +45,7 @@ async fn start_descriptor_lazily_opens_canonical_db_for_orchestration_registrati
                 .expect("registered ACP agent");
             assert_eq!(
                 agent.managed_agent,
-                Some(ManagedAgentRef::acp(&snapshot.acp_id))
+                Some(ManagedAgentRef::acp(snapshot.acp_id.as_str()))
             );
             assert_eq!(agent.status, AgentStatus::Active);
 

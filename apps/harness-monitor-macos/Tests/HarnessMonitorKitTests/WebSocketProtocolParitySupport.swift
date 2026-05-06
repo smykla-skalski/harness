@@ -51,6 +51,50 @@ extension WebSocketProtocolParityTests {
     )
   }
 
+  func makeQueryRPCTransport(probe: RPCProbe) -> WebSocketTransport {
+    let codexSnapshot = sampleCodexSnapshot()
+
+    return WebSocketTransport(
+      connection: HarnessMonitorConnection(endpoint: Self.testEndpoint, token: "test-token"),
+      session: session,
+      rpcSender: { method, params, _ in
+        await probe.record(method: method, params: params)
+        switch method {
+        case .sessionManagedAgents:
+          return try Self.jsonValue(
+            ManagedAgentListResponse(agents: [.codex(codexSnapshot)])
+          )
+        case .managedAgentDetail:
+          return try Self.jsonValue(ManagedAgentSnapshot.codex(codexSnapshot))
+        case .managedAgentAcpInspect:
+          return try Self.jsonValue(AcpAgentInspectResponse(agents: []))
+        case .managedAgentAcpTranscript:
+          return try Self.jsonValue(AcpTranscriptResponse(entries: []))
+        default:
+          Issue.record("Unexpected RPC method \(method.rawValue)")
+          throw HarnessMonitorAPIError.server(code: 500, message: "unexpected method")
+        }
+      }
+    )
+  }
+
+  func makeSessionAgentMutationRPCTransport(probe: RPCProbe) -> WebSocketTransport {
+    WebSocketTransport(
+      connection: HarnessMonitorConnection(endpoint: Self.testEndpoint, token: "test-token"),
+      session: session,
+      rpcSender: { method, params, _ in
+        await probe.record(method: method, params: params)
+        switch method {
+        case .agentChangeRole, .agentRemove:
+          return try Self.jsonValue(PreviewFixtures.detail)
+        default:
+          Issue.record("Unexpected RPC method \(method.rawValue)")
+          throw HarnessMonitorAPIError.server(code: 500, message: "unexpected method")
+        }
+      }
+    )
+  }
+
   func exerciseParityMutations(
     transport: WebSocketTransport,
     terminalSnapshot: AgentTuiSnapshot,
@@ -103,9 +147,15 @@ extension WebSocketProtocolParityTests {
     #expect(
       objectValue(calls[2].params, key: "session_id") == .string(PreviewFixtures.summary.sessionId)
     )
-    #expect(objectValue(calls[3].params, key: "agent_id") == .string(terminalSnapshot.tuiId))
+    #expect(
+      objectValue(calls[3].params, key: "managed_agent_id") == .string(terminalSnapshot.tuiId)
+    )
+    #expect(objectValue(calls[3].params, key: "agent_id") == nil)
     #expect(objectValue(calls[3].params, key: "sequence") != nil)
-    #expect(objectValue(calls[7].params, key: "agent_id") == .string(codexSnapshot.runId))
+    #expect(
+      objectValue(calls[7].params, key: "managed_agent_id") == .string(codexSnapshot.runId)
+    )
+    #expect(objectValue(calls[7].params, key: "agent_id") == nil)
     #expect(
       objectValue(calls[10].params, key: "session_id")
         == .string(PreviewFixtures.summary.sessionId)
@@ -119,6 +169,58 @@ extension WebSocketProtocolParityTests {
     #expect(objectValue(calls[18].params, key: "summary") == .string("Consensus reached"))
     #expect(objectValue(calls[19].params, key: "issue_id") == .string("issue-1"))
     #expect(objectValue(calls[19].params, key: "dry_run") == .bool(true))
+  }
+
+  func exerciseParityQueries(transport: WebSocketTransport) async throws {
+    _ = try await transport.managedAgents(sessionID: PreviewFixtures.summary.sessionId)
+    _ = try await transport.managedAgent(agentID: "codex-run-1")
+    _ = try await transport.acpInspect(sessionID: PreviewFixtures.summary.sessionId)
+    _ = try await transport.acpTranscript(sessionID: PreviewFixtures.summary.sessionId)
+  }
+
+  func assertExpectedQueryParameters(_ calls: [RPCProbe.Call]) {
+    #expect(
+      calls.map(\.method)
+        == [
+          .sessionManagedAgents,
+          .managedAgentDetail,
+          .managedAgentAcpInspect,
+          .managedAgentAcpTranscript,
+        ]
+    )
+    #expect(
+      objectValue(calls[0].params, key: "session_id") == .string(PreviewFixtures.summary.sessionId)
+    )
+    #expect(objectValue(calls[1].params, key: "managed_agent_id") == .string("codex-run-1"))
+    #expect(
+      objectValue(calls[2].params, key: "session_id") == .string(PreviewFixtures.summary.sessionId)
+    )
+    #expect(
+      objectValue(calls[3].params, key: "session_id") == .string(PreviewFixtures.summary.sessionId)
+    )
+  }
+
+  func exerciseSessionAgentMutations(transport: WebSocketTransport) async throws {
+    _ = try await transport.changeRole(
+      sessionID: PreviewFixtures.summary.sessionId,
+      agentID: "worker-1",
+      request: RoleChangeRequest(actor: "leader-1", role: .reviewer)
+    )
+    _ = try await transport.removeAgent(
+      sessionID: PreviewFixtures.summary.sessionId,
+      agentID: "worker-1",
+      request: AgentRemoveRequest(actor: "leader-1")
+    )
+  }
+
+  func assertExpectedSessionAgentMutationParameters(_ calls: [RPCProbe.Call]) {
+    #expect(calls.map(\.method) == [.agentChangeRole, .agentRemove])
+    for call in calls {
+      #expect(
+        objectValue(call.params, key: "session_id") == .string(PreviewFixtures.summary.sessionId)
+      )
+      #expect(objectValue(call.params, key: "session_agent_id") == .string("worker-1"))
+    }
   }
 
   func sampleTerminalSnapshot(status: AgentTuiStatus = .running) -> AgentTuiSnapshot {

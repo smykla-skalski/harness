@@ -1,8 +1,31 @@
+//! Identity glossary for session/orchestration and daemon-managed agents.
+//!
+//! - `HarnessSessionId` (`session_id`) identifies the orchestration session.
+//! - `SessionAgentId` (`agent_id` internally, canonical wire
+//!   `session_agent_id`) identifies one agent inside that orchestration
+//!   session.
+//! - `ManagedAgentId` (`ManagedAgentRef.id`) identifies one live daemon-managed
+//!   instance such as an ACP runtime or terminal TUI.
+//! - `RuntimeSessionId` (`agent_session_id` internally, canonical wire
+//!   `runtime_session_id`) identifies the native runtime/log/signal session used
+//!   by the managed instance.
+//! - `AgentDescriptorId` names a launch/catalog target, not a live instance.
+//! - UI-only row/disclosure identity must not be reused as any transport
+//!   identity.
+//!
+//! Codex is currently managed-only: it belongs to a `HarnessSessionId` and uses
+//! its managed run id as the control-plane identity, but it does not currently
+//! participate in the session-agent registration model and therefore has no
+//! `SessionAgentId`.
+
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize, de};
 
 use crate::agents::kind::{DisconnectReason, RuntimeKind};
+
+use super::identity::{AgentDescriptorId, ManagedAgentId, RuntimeSessionId, SessionAgentId};
 use crate::agents::runtime::RuntimeCapabilities;
+mod wire;
 
 /// Stable reference to a daemon-managed agent instance that owns this session registration.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -13,21 +36,27 @@ pub struct ManagedAgentRef {
 
 impl ManagedAgentRef {
     #[must_use]
-    pub fn new(kind: ManagedAgentKind, id: impl Into<String>) -> Self {
+    pub fn new(kind: ManagedAgentKind, id: impl Into<ManagedAgentId>) -> Self {
+        let id = id.into();
         Self {
             kind,
-            id: id.into(),
+            id: id.into_inner(),
         }
     }
 
     #[must_use]
-    pub fn tui(id: impl Into<String>) -> Self {
+    pub fn tui(id: impl Into<ManagedAgentId>) -> Self {
         Self::new(ManagedAgentKind::Tui, id)
     }
 
     #[must_use]
-    pub fn acp(id: impl Into<String>) -> Self {
+    pub fn acp(id: impl Into<ManagedAgentId>) -> Self {
         Self::new(ManagedAgentKind::Acp, id)
+    }
+
+    #[must_use]
+    pub fn managed_agent_id(&self) -> ManagedAgentId {
+        ManagedAgentId::from(self.id.as_str())
     }
 }
 
@@ -40,7 +69,8 @@ pub enum ManagedAgentKind {
 }
 
 /// An agent registered in a multi-agent session.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(try_from = "wire::AgentRegistrationWire")]
 pub struct AgentRegistration {
     pub agent_id: String,
     /// Human-readable display name.
@@ -79,6 +109,70 @@ pub struct AgentRegistration {
     /// Optional persona assigned at agent join time.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub persona: Option<AgentPersona>,
+}
+
+impl AgentRegistration {
+    #[must_use]
+    pub fn session_agent_id(&self) -> SessionAgentId {
+        SessionAgentId::from(self.agent_id.as_str())
+    }
+
+    #[must_use]
+    pub fn runtime_session_id(&self) -> Option<RuntimeSessionId> {
+        super::crosswalk::normalized_runtime_session_id(self.agent_session_id.as_deref())
+    }
+
+    #[must_use]
+    pub fn managed_agent_id(&self) -> Option<ManagedAgentId> {
+        self.managed_agent
+            .as_ref()
+            .map(ManagedAgentRef::managed_agent_id)
+    }
+
+    #[must_use]
+    pub fn matches_managed_agent(&self, managed_agent: &ManagedAgentRef) -> bool {
+        self.managed_agent.as_ref() == Some(managed_agent)
+    }
+
+    #[must_use]
+    pub fn runtime_session_key<'a>(&'a self, orchestration_session_id: &'a str) -> &'a str {
+        super::crosswalk::effective_runtime_session_key(
+            orchestration_session_id,
+            self.agent_session_id.as_deref(),
+        )
+    }
+
+    #[must_use]
+    pub fn legacy_compatible_signal_session_keys(
+        &self,
+        orchestration_session_id: &str,
+    ) -> Vec<String> {
+        super::crosswalk::legacy_compatible_signal_session_keys(
+            orchestration_session_id,
+            self.agent_session_id.as_deref(),
+        )
+    }
+
+    #[must_use]
+    pub fn matches_runtime_session_id(
+        &self,
+        orchestration_session_id: &str,
+        runtime_session_id: &RuntimeSessionId,
+    ) -> bool {
+        super::crosswalk::matches_runtime_session_id(
+            orchestration_session_id,
+            self.agent_session_id.as_deref(),
+            runtime_session_id,
+        )
+    }
+
+    #[must_use]
+    pub fn agent_descriptor_id(&self) -> Option<AgentDescriptorId> {
+        match &self.runtime {
+            RuntimeKind::Acp(id) => Some(AgentDescriptorId::from(id)),
+            RuntimeKind::Tui(_) => None,
+        }
+    }
 }
 
 /// A pending leadership transfer initiated by a non-leader actor.
