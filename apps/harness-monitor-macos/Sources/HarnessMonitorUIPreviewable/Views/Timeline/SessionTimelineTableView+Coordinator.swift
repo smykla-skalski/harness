@@ -213,10 +213,17 @@ extension SessionTimelineTableView {
         guard nextIDs.contains(rowID), !invalidatedHeightIDs.contains(rowID) else {
           continue
         }
+        guard let cached = rowHeightCache[rowID] else {
+          continue
+        }
+        guard cached.isMeasured else {
+          rowHeightCache.removeValue(forKey: rowID)
+          continue
+        }
         rowHeightCache[rowID] = CachedRowHeight(
           width: lastColumnWidth,
           height: tableView.rect(ofRow: rowIndex).height,
-          isMeasured: rowHeightCache[rowID]?.isMeasured ?? false
+          isMeasured: true
         )
       }
     }
@@ -307,25 +314,22 @@ extension SessionTimelineTableView {
 
     private func resizeColumn(in scrollView: NSScrollView, columnWidth: CGFloat) {
       guard let tableView, let column = tableView.tableColumns.first else { return }
-      guard columnWidth > 1, column.width != columnWidth else { return }
+      guard columnWidth > 1 else { return }
       let isFirstRealWidth = lastColumnWidth <= 1
       let widthChanged =
         !isFirstRealWidth && abs(columnWidth - lastColumnWidth) > Self.widthEqualityTolerance
-      let needsFullRefresh = isFirstRealWidth || widthChanged
-      lastColumnWidth = columnWidth
-      column.width = columnWidth
-      if needsFullRefresh {
-        // Width-tagged cache lookups will treat any prior entries as stale and
-        // fall back to estimate, so no explicit cache flush is required - the
-        // background measurement pass overwrites entries with the new width.
-        cancelMeasurement(reason: widthChanged ? "width_changed" : "first_real_width")
-        tableView.noteHeightOfRows(withIndexesChanged: IndexSet(0..<rows.count))
-        scheduleIncrementalMeasurement(columnWidth: columnWidth)
-      } else {
-        // Same width but column reapplied (e.g., row reload). Visible rows are
-        // sufficient to refresh layout.
-        invalidateVisibleRowHeights()
+      if column.width != columnWidth {
+        column.width = columnWidth
       }
+      guard isFirstRealWidth || widthChanged else { return }
+      lastColumnWidth = columnWidth
+      // Keep the previous measurement bucket for sub-tolerance width replays.
+      // Reapplying the column width alone is enough for layout; evicting
+      // visible heights here would make the whole viewport fall back to
+      // estimated row heights until async measurement catches up.
+      cancelMeasurement(reason: widthChanged ? "width_changed" : "first_real_width")
+      tableView.noteHeightOfRows(withIndexesChanged: IndexSet(0..<rows.count))
+      scheduleIncrementalMeasurement(columnWidth: columnWidth)
     }
 
     func scheduleIncrementalMeasurement(columnWidth: CGFloat) {
