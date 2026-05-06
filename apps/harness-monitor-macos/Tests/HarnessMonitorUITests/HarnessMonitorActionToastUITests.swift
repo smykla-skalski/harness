@@ -81,6 +81,43 @@ final class HarnessMonitorActionToastUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testSwipeRightPastThresholdDismissesToast() throws {
+    let app = launchWithSeededToasts(["Observe session"])
+
+    let toast = element(in: app, identifier: Accessibility.actionToast)
+    XCTAssertTrue(toast.waitForExistence(timeout: Self.actionTimeout))
+
+    dragToast(in: app, horizontalOffset: 120)
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) { !toast.exists },
+      "Dragging a toast more than the dismiss threshold should remove it"
+    )
+  }
+
+  func testSwipeRightBelowThresholdSnapsBackAndKeepsToastVisible() throws {
+    let app = launchWithSeededToasts(["Observe session"])
+
+    let toast = element(in: app, identifier: Accessibility.actionToast)
+    let toastFrame = frameElement(in: app, identifier: Accessibility.actionToastFrame)
+    XCTAssertTrue(toast.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(toastFrame.waitForExistence(timeout: Self.actionTimeout))
+    let initialFrame = toastFrame.frame
+
+    dragToast(in: app, horizontalOffset: 40)
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) { toast.exists },
+      "Dragging a toast less than the dismiss threshold should keep it visible"
+    )
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        abs(toastFrame.frame.minX - initialFrame.minX) < 6
+      },
+      "A short swipe should snap the toast back to its original position"
+    )
+  }
+
   func testEscDismissesToast() throws {
     let app = launchWithSeededToasts(["Observe session", "Create task"])
 
@@ -200,6 +237,18 @@ extension HarnessMonitorActionToastUITests {
   fileprivate func toastRowQuery(in app: XCUIApplication) -> XCUIElementQuery {
     app.descendants(matching: .button)
       .matching(identifier: Accessibility.actionToastCloseButton)
+  }
+
+  fileprivate func dragToast(in app: XCUIApplication, horizontalOffset: CGFloat) {
+    let toastFrame = frameElement(in: app, identifier: Accessibility.actionToastFrame)
+    XCTAssertTrue(toastFrame.waitForExistence(timeout: Self.actionTimeout))
+    guard let start = centerCoordinate(in: app, for: toastFrame) else {
+      XCTFail("Cannot resolve toast drag coordinate")
+      return
+    }
+
+    let end = start.withOffset(CGVector(dx: horizontalOffset, dy: 0))
+    start.press(forDuration: 0.01, thenDragTo: end)
   }
 
   fileprivate func triggerObserve(in app: XCUIApplication) {

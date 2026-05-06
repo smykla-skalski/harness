@@ -119,6 +119,19 @@ private struct HarnessMonitorFilterChipStyle: ViewModifier {
   }
 }
 
+private struct HarnessMonitorToastDismissLabelStyle: ViewModifier {
+  @ScaledMetric(relativeTo: .caption)
+  private var dismissButtonSize = 24.0
+
+  func body(content: Content) -> some View {
+    content
+      .scaledFont(.system(.caption, design: .rounded, weight: .bold))
+      .frame(width: dismissButtonSize, height: dismissButtonSize)
+      .contentShape(.circle)
+      .harnessToastDismissGlass()
+  }
+}
+
 private struct HarnessMonitorSystemButtonChromeModifier: ViewModifier {
   let style: HarnessMonitorSystemButtonChromeStyle
   let tint: Color?
@@ -236,6 +249,10 @@ extension View {
 
   public func harnessDismissButtonStyle() -> some View {
     modifier(HarnessMonitorSystemButtonChromeModifier(style: .borderless, tint: nil))
+  }
+
+  public func harnessToastDismissButtonLabelStyle() -> some View {
+    modifier(HarnessMonitorToastDismissLabelStyle())
   }
 
   public func harnessGlassButtonStyle() -> some View {

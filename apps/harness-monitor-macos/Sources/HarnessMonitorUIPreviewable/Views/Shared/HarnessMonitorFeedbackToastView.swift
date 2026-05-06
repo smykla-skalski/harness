@@ -68,10 +68,14 @@ private struct HarnessMonitorFeedbackToastDetailRow: View {
 private struct HarnessMonitorFeedbackToastRow: View {
   let feedback: ActionFeedback
   let toast: ToastSlice
+  @Environment(\.accessibilityReduceMotion)
+  private var reduceMotion
   @State private var showsDetails: Bool
   @State private var copiedPrimaryAction = false
-  @ScaledMetric(relativeTo: .callout)
-  private var dismissButtonSize: CGFloat = 28
+  @State private var dragOffset: CGFloat = 0
+  @State private var isDragging = false
+  private let dismissThreshold: CGFloat = 80
+  private let minimumDragDistance: CGFloat = 10
 
   init(feedback: ActionFeedback, toast: ToastSlice, detailsInitiallyExpanded: Bool) {
     self.feedback = feedback
@@ -87,11 +91,8 @@ private struct HarnessMonitorFeedbackToastRow: View {
           toast.dismiss(id: feedback.id)
         } label: {
           Image(systemName: "xmark")
-            .scaledFont(.system(.footnote, design: .rounded, weight: .bold))
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .frame(width: dismissButtonSize, height: dismissButtonSize)
-            .contentShape(.circle)
-            .harnessToastDismissGlass()
+            .harnessToastDismissButtonLabelStyle()
         }
         .harnessDismissButtonStyle()
         .accessibilityLabel("Dismiss feedback")
@@ -113,9 +114,14 @@ private struct HarnessMonitorFeedbackToastRow: View {
       cornerRadius: HarnessMonitorTheme.cornerRadiusLG,
       tint: tintColor
     )
-    .accessibilityIdentifier(
-      feedback.accessibilityIdentifier ?? HarnessMonitorAccessibility.actionToast
-    )
+    .contentShape(toastShape)
+    .offset(x: swipeOffset)
+    .opacity(swipeOpacity)
+    .highPriorityGesture(dismissDragGesture, including: .gesture)
+    .animation(rowAnimation, value: dragOffset)
+    .overlay {
+      customFeedbackMarker
+    }
   }
 
   private var toastShape: some Shape {
@@ -146,6 +152,45 @@ private struct HarnessMonitorFeedbackToastRow: View {
     showsDetails ? 42 : 62
   }
 
+  @ViewBuilder private var customFeedbackMarker: some View {
+    if let accessibilityIdentifier = feedback.accessibilityIdentifier {
+      AccessibilityTextMarker(
+        identifier: accessibilityIdentifier,
+        text: feedback.announcementText
+      )
+    }
+  }
+
+  private var swipeOffset: CGFloat {
+    max(0, dragOffset)
+  }
+
+  private var swipeOpacity: Double {
+    1 - (0.7 * Double(dragProgress))
+  }
+
+  private var dragProgress: CGFloat {
+    min(swipeOffset / dismissThreshold, 1)
+  }
+
+  private var dragTrackingAnimation: Animation {
+    reduceMotion ? .linear(duration: 0.01) : .interactiveSpring()
+  }
+
+  private var snapBackAnimation: Animation {
+    reduceMotion ? .linear(duration: 0.01) : .spring(duration: 0.25, bounce: 0.18)
+  }
+
+  private var rowAnimation: Animation {
+    isDragging ? dragTrackingAnimation : snapBackAnimation
+  }
+
+  private var dismissDragGesture: some Gesture {
+    DragGesture(minimumDistance: minimumDragDistance)
+      .onChanged(handleDragChanged)
+      .onEnded(handleDragEnded)
+  }
+
   private var content: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       titleAndMessage
@@ -156,6 +201,9 @@ private struct HarnessMonitorFeedbackToastRow: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityElement(children: .contain)
     .accessibilityLabel(feedback.announcementText)
+    .accessibilityAction(named: "Dismiss") {
+      toast.dismiss(id: feedback.id)
+    }
   }
 
   @ViewBuilder private var titleAndMessage: some View {
@@ -275,6 +323,35 @@ private struct HarnessMonitorFeedbackToastRow: View {
     feedback.primaryAction != nil
       || feedback.details != nil
       || (feedback.severity == .undoable && toast.hasUndoAction(id: feedback.id))
+  }
+
+  private func handleDragChanged(_ value: DragGesture.Value) {
+    let nextOffset = max(0, value.translation.width)
+    guard nextOffset > 0 || isDragging else {
+      return
+    }
+    if !isDragging {
+      isDragging = true
+      toast.pauseTimers()
+    }
+    dragOffset = nextOffset
+  }
+
+  private func handleDragEnded(_ value: DragGesture.Value) {
+    guard isDragging else {
+      return
+    }
+
+    if max(0, value.translation.width) >= dismissThreshold {
+      isDragging = false
+      toast.dismiss(id: feedback.id)
+      toast.resumeTimers()
+      return
+    }
+
+    isDragging = false
+    dragOffset = 0
+    toast.resumeTimers()
   }
 
   private func perform(_ action: ActionFeedbackAction) {

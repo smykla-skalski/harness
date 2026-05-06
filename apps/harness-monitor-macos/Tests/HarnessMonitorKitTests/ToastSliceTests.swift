@@ -208,6 +208,32 @@ struct ToastSliceTests {
     #expect(slice.activeFeedback.count == 1)
   }
 
+  @Test("Dismissing a paused toast before resume does not leave stale dismiss tasks")
+  func dismissPausedToastBeforeResumeDoesNotLeakTasks() async {
+    let clock = ManualClock()
+    let slice = ToastSlice(clock: clock)
+    slice.successDismissDelay = .seconds(4)
+    slice.failureDismissDelay = .seconds(8)
+
+    let dismissedID = slice.presentSuccess("dismiss me")
+    clock.advance(by: .seconds(1))
+    _ = slice.presentFailure("keep me")
+    clock.advance(by: .seconds(1))
+
+    slice.pauseTimers()
+    slice.dismiss(id: dismissedID)
+    slice.resumeTimers()
+
+    #expect(slice.activeFeedback.map(\.message) == ["keep me"])
+    #expect(slice.pendingDismissCount == 1)
+
+    clock.advance(by: .seconds(7))
+    await slice.flushPendingDismissals()
+
+    #expect(slice.activeFeedback.isEmpty)
+    #expect(slice.pendingDismissCount == 0)
+  }
+
   @Test("Each toast has a unique UUID even for identical messages outside the dedupe window")
   func uniqueUUIDsOutsideDedupeWindow() async {
     let clock = ManualClock()

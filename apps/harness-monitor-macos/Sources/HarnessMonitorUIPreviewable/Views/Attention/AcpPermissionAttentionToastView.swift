@@ -29,9 +29,6 @@ public struct AcpPermissionAttentionToastView: View {
   @Environment(\.acpToastDismiss)
   private var dismiss
 
-  @ScaledMetric(relativeTo: .callout)
-  private var dismissButtonSize: CGFloat = 28
-
   private var requestSummary: String {
     if attention.requestCount == 1 {
       return "1 permission request is waiting."
@@ -102,11 +99,8 @@ public struct AcpPermissionAttentionToastView: View {
           dismiss()
         } label: {
           Image(systemName: "xmark")
-            .scaledFont(.system(.footnote, design: .rounded, weight: .bold))
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .frame(width: dismissButtonSize, height: dismissButtonSize)
-            .contentShape(.circle)
-            .harnessToastDismissGlass()
+            .harnessToastDismissButtonLabelStyle()
         }
         .harnessDismissButtonStyle()
         .accessibilityLabel("Dismiss")
