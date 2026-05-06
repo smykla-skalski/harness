@@ -1,5 +1,20 @@
 import Foundation
 
+private func decodeRequiredNonEmptyString<Key: CodingKey>(
+  _ container: KeyedDecodingContainer<Key>,
+  forKey key: Key
+) throws -> String {
+  let value = try container.decode(String.self, forKey: key)
+  guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+    throw DecodingError.dataCorruptedError(
+      forKey: key,
+      in: container,
+      debugDescription: "\(key.stringValue) must not be empty"
+    )
+  }
+  return value
+}
+
 public struct AcpAgentDescriptor: Codable, Equatable, Identifiable, Sendable {
   public let id: String
   public let displayName: String
@@ -125,8 +140,6 @@ public struct AcpAgentStartRequest: Codable, Equatable, Sendable {
 
   private enum CodingKeys: String, CodingKey {
     case descriptorId
-    case agent
-    case agentId
     case role
     case fallbackRole
     case capabilities
@@ -139,11 +152,7 @@ public struct AcpAgentStartRequest: Codable, Equatable, Sendable {
 
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    agent =
-      try container.decodeIfPresent(String.self, forKey: .descriptorId)
-      ?? container.decodeIfPresent(String.self, forKey: .agent)
-      ?? container.decodeIfPresent(String.self, forKey: .agentId)
-      ?? ""
+    agent = try decodeRequiredNonEmptyString(container, forKey: .descriptorId)
     role = try container.decodeIfPresent(SessionRole.self, forKey: .role) ?? .worker
     fallbackRole = try container.decodeIfPresent(SessionRole.self, forKey: .fallbackRole)
     capabilities = try container.decodeIfPresent([String].self, forKey: .capabilities) ?? []
@@ -151,13 +160,13 @@ public struct AcpAgentStartRequest: Codable, Equatable, Sendable {
     prompt = try container.decodeIfPresent(String.self, forKey: .prompt)
     projectDir = try container.decodeIfPresent(String.self, forKey: .projectDir)
     persona = try container.decodeIfPresent(String.self, forKey: .persona)
-    recordPermissions = try container.decodeIfPresent(Bool.self, forKey: .recordPermissions) ?? false
+    recordPermissions =
+      try container.decodeIfPresent(Bool.self, forKey: .recordPermissions) ?? false
   }
 
   public func encode(to encoder: any Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
     try container.encode(agent, forKey: .descriptorId)
-    try container.encode(agent, forKey: .agent)
     try container.encode(role, forKey: .role)
     try container.encodeIfPresent(fallbackRole, forKey: .fallbackRole)
     try container.encode(capabilities, forKey: .capabilities)
@@ -292,10 +301,9 @@ public struct AcpAgentInspectSnapshot: Codable, Equatable, Identifiable, Sendabl
   }
 
   private enum CodingKeys: String, CodingKey {
-    case acpId
     case managedAgentId
+    case managedAgentFamily
     case sessionId
-    case agentId
     case sessionAgentId
     case displayName
     case pid
@@ -314,6 +322,7 @@ public struct AcpAgentInspectSnapshot: Codable, Equatable, Identifiable, Sendabl
 
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
+    try requireAcpManagedAgentFamily(container, forKey: .managedAgentFamily)
     acpId = try container.decode(String.self, forKey: .managedAgentId)
     sessionId = try container.decode(String.self, forKey: .sessionId)
     agentId = try container.decode(String.self, forKey: .sessionAgentId)
@@ -341,10 +350,9 @@ public struct AcpAgentInspectSnapshot: Codable, Equatable, Identifiable, Sendabl
 
   public func encode(to encoder: any Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
-    try container.encode(acpId, forKey: .acpId)
     try container.encode(acpId, forKey: .managedAgentId)
+    try container.encode("acp", forKey: .managedAgentFamily)
     try container.encode(sessionId, forKey: .sessionId)
-    try container.encode(agentId, forKey: .agentId)
     try container.encode(agentId, forKey: .sessionAgentId)
     try container.encode(displayName, forKey: .displayName)
     try container.encode(pid, forKey: .pid)

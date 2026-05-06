@@ -165,7 +165,8 @@ struct HarnessMonitorStoreExternalSessionTests {
 
     #expect(snapshot.acpPermissionLogRuns.map(\.sessionID) == ["sess-shared", "sess-shared"])
     #expect(snapshot.acpPermissionLogRuns.map(\.id) == ["acp-worker-1", "acp-worker-2"])
-    #expect(Set(snapshot.acpPermissionLogRuns.map(\.id)).count == snapshot.acpPermissionLogRuns.count)
+    #expect(
+      Set(snapshot.acpPermissionLogRuns.map(\.id)).count == snapshot.acpPermissionLogRuns.count)
   }
 
   @Test("Importing an external session folder presents the attach sheet")

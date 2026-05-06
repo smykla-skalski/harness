@@ -101,17 +101,17 @@ extension TimelineEntry {
       }
 
     guard case .object(var payloadObject) = payload else {
-        return TimelineEntry(
-          entryId: updatedEntryID,
-          recordedAt: recordedAt,
-          kind: kind,
-          sessionId: sessionId,
-          agentId: sessionAgentID,
-          taskId: taskId,
-          summary: summary,
-          payload: payload
-        )
-      }
+      return TimelineEntry(
+        entryId: updatedEntryID,
+        recordedAt: recordedAt,
+        kind: kind,
+        sessionId: sessionId,
+        agentId: sessionAgentID,
+        taskId: taskId,
+        summary: summary,
+        payload: payload
+      )
+    }
 
     if case .object(var metadata)? = payloadObject["acp_timeline_identity"] {
       metadata["agent_id"] = .string(sessionAgentID)

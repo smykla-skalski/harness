@@ -1,24 +1,25 @@
-use serde::Serialize;
+use serde::de::Error as DeError;
+use serde::{Deserialize, Deserializer, Serialize};
 
 use super::{AcpAgentInspectSnapshot, AcpAgentSnapshot};
+use crate::daemon::agent_acp::AcpPermissionBatch;
+use crate::session::types::{AgentStatus, ManagedAgentKind};
 
 #[derive(Serialize)]
 struct AcpAgentSnapshotWire<'a> {
-    acp_id: &'a str,
     managed_agent_id: &'a str,
-    managed_agent_family: crate::session::types::ManagedAgentKind,
+    managed_agent_family: ManagedAgentKind,
     session_id: &'a str,
-    agent_id: &'a str,
     session_agent_id: &'a str,
     display_name: &'a str,
-    status: &'a crate::session::types::AgentStatus,
+    status: &'a AgentStatus,
     pid: u32,
     pgid: i32,
     project_dir: &'a str,
     process_key: &'a str,
     pending_permissions: usize,
     permission_queue_depth: usize,
-    pending_permission_batches: &'a [crate::daemon::agent_acp::AcpPermissionBatch],
+    pending_permission_batches: &'a [AcpPermissionBatch],
     #[serde(skip_serializing_if = "str::is_empty")]
     permission_mode: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -30,11 +31,9 @@ struct AcpAgentSnapshotWire<'a> {
 
 #[derive(Serialize)]
 struct AcpAgentInspectSnapshotWire<'a> {
-    acp_id: &'a str,
     managed_agent_id: &'a str,
-    managed_agent_family: crate::session::types::ManagedAgentKind,
+    managed_agent_family: ManagedAgentKind,
     session_id: &'a str,
-    agent_id: &'a str,
     session_agent_id: &'a str,
     display_name: &'a str,
     pid: u32,
@@ -56,17 +55,68 @@ struct AcpAgentInspectSnapshotWire<'a> {
     prompt_deadline_remaining_ms: u64,
 }
 
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+struct AcpAgentSnapshotDecode {
+    managed_agent_id: String,
+    managed_agent_family: ManagedAgentKind,
+    session_id: String,
+    session_agent_id: String,
+    display_name: String,
+    status: AgentStatus,
+    pid: u32,
+    pgid: i32,
+    project_dir: String,
+    process_key: String,
+    pending_permissions: usize,
+    permission_queue_depth: usize,
+    pending_permission_batches: Vec<AcpPermissionBatch>,
+    #[serde(default)]
+    permission_mode: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    permission_log_path: Option<String>,
+    terminal_count: usize,
+    created_at: String,
+    updated_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+struct AcpAgentInspectSnapshotDecode {
+    managed_agent_id: String,
+    managed_agent_family: ManagedAgentKind,
+    session_id: String,
+    session_agent_id: String,
+    display_name: String,
+    pid: u32,
+    pgid: i32,
+    #[serde(default)]
+    process_key: String,
+    uptime_ms: u64,
+    last_update_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    last_client_call_at: Option<String>,
+    watchdog_state: String,
+    #[serde(default)]
+    permission_mode: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    permission_log_path: Option<String>,
+    pending_permissions: usize,
+    #[serde(default)]
+    permission_queue_depth: usize,
+    terminal_count: usize,
+    prompt_deadline_remaining_ms: u64,
+}
+
 impl Serialize for AcpAgentSnapshot {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
         AcpAgentSnapshotWire {
-            acp_id: &self.acp_id,
             managed_agent_id: &self.acp_id,
-            managed_agent_family: crate::session::types::ManagedAgentKind::Acp,
+            managed_agent_family: ManagedAgentKind::Acp,
             session_id: &self.session_id,
-            agent_id: &self.agent_id,
             session_agent_id: &self.agent_id,
             display_name: &self.display_name,
             status: &self.status,
@@ -87,17 +137,44 @@ impl Serialize for AcpAgentSnapshot {
     }
 }
 
+impl<'de> Deserialize<'de> for AcpAgentSnapshot {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let decoded = AcpAgentSnapshotDecode::deserialize(deserializer)?;
+        validate_acp_family::<D::Error>(decoded.managed_agent_family)?;
+        Ok(Self {
+            acp_id: decoded.managed_agent_id,
+            session_id: decoded.session_id,
+            agent_id: decoded.session_agent_id,
+            display_name: decoded.display_name,
+            status: decoded.status,
+            pid: decoded.pid,
+            pgid: decoded.pgid,
+            project_dir: decoded.project_dir,
+            process_key: decoded.process_key,
+            pending_permissions: decoded.pending_permissions,
+            permission_queue_depth: decoded.permission_queue_depth,
+            pending_permission_batches: decoded.pending_permission_batches,
+            permission_mode: decoded.permission_mode,
+            permission_log_path: decoded.permission_log_path,
+            terminal_count: decoded.terminal_count,
+            created_at: decoded.created_at,
+            updated_at: decoded.updated_at,
+        })
+    }
+}
+
 impl Serialize for AcpAgentInspectSnapshot {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
         AcpAgentInspectSnapshotWire {
-            acp_id: &self.acp_id,
             managed_agent_id: &self.acp_id,
-            managed_agent_family: crate::session::types::ManagedAgentKind::Acp,
+            managed_agent_family: ManagedAgentKind::Acp,
             session_id: &self.session_id,
-            agent_id: &self.agent_id,
             session_agent_id: &self.agent_id,
             display_name: &self.display_name,
             pid: self.pid,
@@ -115,6 +192,47 @@ impl Serialize for AcpAgentInspectSnapshot {
             prompt_deadline_remaining_ms: self.prompt_deadline_remaining_ms,
         }
         .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for AcpAgentInspectSnapshot {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let decoded = AcpAgentInspectSnapshotDecode::deserialize(deserializer)?;
+        validate_acp_family::<D::Error>(decoded.managed_agent_family)?;
+        Ok(Self {
+            acp_id: decoded.managed_agent_id,
+            session_id: decoded.session_id,
+            agent_id: decoded.session_agent_id,
+            display_name: decoded.display_name,
+            pid: decoded.pid,
+            pgid: decoded.pgid,
+            process_key: decoded.process_key,
+            uptime_ms: decoded.uptime_ms,
+            last_update_at: decoded.last_update_at,
+            last_client_call_at: decoded.last_client_call_at,
+            watchdog_state: decoded.watchdog_state,
+            permission_mode: decoded.permission_mode,
+            permission_log_path: decoded.permission_log_path,
+            pending_permissions: decoded.pending_permissions,
+            permission_queue_depth: decoded.permission_queue_depth,
+            terminal_count: decoded.terminal_count,
+            prompt_deadline_remaining_ms: decoded.prompt_deadline_remaining_ms,
+        })
+    }
+}
+
+fn validate_acp_family<E>(managed_agent_family: ManagedAgentKind) -> Result<(), E>
+where
+    E: DeError,
+{
+    match managed_agent_family {
+        ManagedAgentKind::Acp => Ok(()),
+        other @ ManagedAgentKind::Tui => Err(E::custom(format!(
+            "managed_agent_family must be 'acp', got '{other:?}'"
+        ))),
     }
 }
 
@@ -148,6 +266,8 @@ mod tests {
         assert_eq!(value["managed_agent_id"], "acp-1");
         assert_eq!(value["managed_agent_family"], "acp");
         assert_eq!(value["session_agent_id"], "worker-1");
+        assert!(value.get("acp_id").is_none());
+        assert!(value.get("agent_id").is_none());
     }
 
     #[test]
@@ -176,5 +296,114 @@ mod tests {
         assert_eq!(value["managed_agent_id"], "acp-1");
         assert_eq!(value["managed_agent_family"], "acp");
         assert_eq!(value["session_agent_id"], "worker-1");
+        assert!(value.get("acp_id").is_none());
+        assert!(value.get("agent_id").is_none());
+    }
+
+    #[test]
+    fn acp_agent_snapshot_deserializes_canonical_identity_fields() {
+        let snapshot: AcpAgentSnapshot = serde_json::from_value(serde_json::json!({
+            "managed_agent_id": "acp-1",
+            "managed_agent_family": "acp",
+            "session_id": "sess-1",
+            "session_agent_id": "worker-1",
+            "display_name": "Copilot",
+            "status": "active",
+            "pid": 42,
+            "pgid": 42,
+            "project_dir": "/tmp/project",
+            "process_key": "proc-1",
+            "pending_permissions": 0,
+            "permission_queue_depth": 0,
+            "pending_permission_batches": [],
+            "terminal_count": 0,
+            "created_at": "2026-05-06T00:00:00Z",
+            "updated_at": "2026-05-06T00:00:01Z",
+        }))
+        .expect("decode snapshot");
+
+        assert_eq!(snapshot.acp_id, "acp-1");
+        assert_eq!(snapshot.agent_id, "worker-1");
+    }
+
+    #[test]
+    fn acp_agent_inspect_snapshot_deserializes_canonical_identity_fields() {
+        let snapshot: AcpAgentInspectSnapshot = serde_json::from_value(serde_json::json!({
+            "managed_agent_id": "acp-1",
+            "managed_agent_family": "acp",
+            "session_id": "sess-1",
+            "session_agent_id": "worker-1",
+            "display_name": "Copilot",
+            "pid": 42,
+            "pgid": 42,
+            "uptime_ms": 1_000,
+            "last_update_at": "2026-05-06T00:00:01Z",
+            "last_client_call_at": null,
+            "watchdog_state": "healthy",
+            "pending_permissions": 0,
+            "permission_queue_depth": 0,
+            "terminal_count": 0,
+            "prompt_deadline_remaining_ms": 10_000,
+        }))
+        .expect("decode inspect snapshot");
+
+        assert_eq!(snapshot.acp_id, "acp-1");
+        assert_eq!(snapshot.agent_id, "worker-1");
+    }
+
+    #[test]
+    fn acp_agent_snapshot_rejects_missing_managed_agent_family() {
+        let error = serde_json::from_value::<AcpAgentSnapshot>(serde_json::json!({
+            "managed_agent_id": "acp-1",
+            "session_id": "sess-1",
+            "session_agent_id": "worker-1",
+            "display_name": "Copilot",
+            "status": "active",
+            "pid": 42,
+            "pgid": 42,
+            "project_dir": "/tmp/project",
+            "process_key": "proc-1",
+            "pending_permissions": 0,
+            "permission_queue_depth": 0,
+            "pending_permission_batches": [],
+            "terminal_count": 0,
+            "created_at": "2026-05-06T00:00:00Z",
+            "updated_at": "2026-05-06T00:00:01Z",
+        }))
+        .expect_err("missing family should fail");
+
+        assert!(
+            error.to_string().contains("managed_agent_family"),
+            "expected managed_agent_family error, got {error}"
+        );
+    }
+
+    #[test]
+    fn acp_agent_inspect_snapshot_rejects_non_acp_family() {
+        let error = serde_json::from_value::<AcpAgentInspectSnapshot>(serde_json::json!({
+            "managed_agent_id": "acp-1",
+            "managed_agent_family": "tui",
+            "session_id": "sess-1",
+            "session_agent_id": "worker-1",
+            "display_name": "Copilot",
+            "pid": 42,
+            "pgid": 42,
+            "uptime_ms": 1_000,
+            "last_update_at": "2026-05-06T00:00:01Z",
+            "last_client_call_at": null,
+            "watchdog_state": "healthy",
+            "pending_permissions": 0,
+            "permission_queue_depth": 0,
+            "terminal_count": 0,
+            "prompt_deadline_remaining_ms": 10_000,
+        }))
+        .expect_err("wrong family should fail");
+
+        assert!(
+            error
+                .to_string()
+                .contains("managed_agent_family must be 'acp'"),
+            "expected acp family error, got {error}"
+        );
     }
 }

@@ -2,7 +2,7 @@ use fs_err as fs;
 use serde_json::{Value, json, to_value};
 
 use crate::infra::io::{read_json_typed, write_json_pretty};
-use crate::session::types::{AgentStatus, CURRENT_VERSION};
+use crate::session::types::{AgentStatus, CURRENT_VERSION, ManagedAgentKind};
 use crate::workspace::layout::SessionLayout;
 
 use super::state_store::{create_state, load_state};
@@ -107,6 +107,102 @@ fn load_state_migrates_v3_state_and_persists_current_schema() {
     assert_eq!(
         persisted["policy"]["degraded_recovery"]["preset_id"],
         json!("swarm-default")
+    );
+}
+
+#[test]
+fn load_state_migrates_v13_legacy_agent_identity_fields_to_canonical_schema() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let session_id = "sess-v13-identities";
+    let layout = test_layout(tmp.path(), session_id);
+    fs::create_dir_all(layout.session_root()).expect("create session dir");
+
+    let mut state = legacy_state_value(session_id, 13);
+    let agent = state["agents"]["claude-leader"]
+        .as_object_mut()
+        .expect("agent object");
+    let session_agent_id = agent
+        .remove("session_agent_id")
+        .expect("canonical session_agent_id");
+    agent.insert("agent_id".into(), session_agent_id);
+    agent.insert("agent_session_id".into(), json!("runtime-claude-leader"));
+    agent.insert(
+        "managed_agent".into(),
+        json!({
+            "kind": "acp",
+            "id": "acp-claude-leader",
+        }),
+    );
+    write_json_pretty(&layout.state_file(), &state).expect("write v13 state");
+
+    let loaded = load_state(&layout).expect("load").expect("state");
+    let agent = loaded.agents.get("claude-leader").expect("agent");
+    assert_eq!(loaded.schema_version, CURRENT_VERSION);
+    assert_eq!(agent.agent_id, "claude-leader");
+    assert_eq!(
+        agent.agent_session_id.as_deref(),
+        Some("runtime-claude-leader")
+    );
+    assert!(matches!(
+        agent.managed_agent.as_ref(),
+        Some(managed_agent)
+            if managed_agent.kind == ManagedAgentKind::Acp
+                && managed_agent.id == "acp-claude-leader"
+    ));
+
+    let persisted: Value = read_json_typed(&layout.state_file()).expect("read migrated");
+    assert_eq!(persisted["schema_version"], json!(CURRENT_VERSION));
+    assert_eq!(
+        persisted["agents"]["claude-leader"]["session_agent_id"],
+        json!("claude-leader")
+    );
+    assert_eq!(
+        persisted["agents"]["claude-leader"]["runtime_session_id"],
+        json!("runtime-claude-leader")
+    );
+    assert_eq!(
+        persisted["agents"]["claude-leader"]["managed_agent_id"],
+        json!("acp-claude-leader")
+    );
+    assert_eq!(
+        persisted["agents"]["claude-leader"]["managed_agent_family"],
+        json!("acp")
+    );
+    assert!(
+        persisted["agents"]["claude-leader"]
+            .get("agent_id")
+            .is_none_or(serde_json::Value::is_null)
+    );
+    assert!(
+        persisted["agents"]["claude-leader"]
+            .get("agent_session_id")
+            .is_none_or(serde_json::Value::is_null)
+    );
+    assert!(
+        persisted["agents"]["claude-leader"]
+            .get("managed_agent")
+            .is_none_or(serde_json::Value::is_null)
+    );
+}
+
+#[test]
+fn load_state_rejects_v13_malformed_managed_agent_identity() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let session_id = "sess-v13-bad-managed-agent";
+    let layout = test_layout(tmp.path(), session_id);
+    fs::create_dir_all(layout.session_root()).expect("create session dir");
+
+    let mut state = legacy_state_value(session_id, 13);
+    let agent = state["agents"]["claude-leader"]
+        .as_object_mut()
+        .expect("agent object");
+    agent.insert("managed_agent".into(), json!("acp-claude-leader"));
+    write_json_pretty(&layout.state_file(), &state).expect("write v13 state");
+
+    let error = load_state(&layout).expect_err("invalid managed_agent should fail");
+    assert!(
+        error.to_string().contains("invalid managed_agent object"),
+        "expected managed_agent object error, got {error}"
     );
 }
 

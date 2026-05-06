@@ -205,9 +205,10 @@ extension PreviewHarnessClientState {
       request: request,
       assignedRole: assignedRole
     )
-    let updatedAgents = currentDetail.agents.filter {
-      $0.managedAgentID != snapshot.managedAgentID
-    } + [registration]
+    let updatedAgents =
+      currentDetail.agents.filter {
+        $0.managedAgentID != snapshot.managedAgentID
+      } + [registration]
     let updatedSummary = SessionSummary(
       projectId: currentDetail.session.projectId,
       projectName: currentDetail.session.projectName,

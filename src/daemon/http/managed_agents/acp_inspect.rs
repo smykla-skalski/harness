@@ -12,16 +12,12 @@ use crate::errors::CliError;
 use super::super::DaemonHttpState;
 use super::super::auth::require_auth;
 use super::super::response::{extract_request_id, timed_json};
-use super::{ensure_acp_enabled, resolve_acp_inspect_session_scope};
+use super::ensure_acp_enabled;
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(super) struct AcpInspectQuery {
     session_id: Option<String>,
-    /// When provided, asserts the caller's session scope. If `session_id` is
-    /// also present and differs, returns `SESSION_SCOPE_DENIED`. When
-    /// `session_id` is absent, acts as an implicit scope filter identical to
-    /// providing `session_id`.
-    require_session_id: Option<String>,
 }
 
 pub(super) async fn get_acp_inspect(
@@ -34,13 +30,8 @@ pub(super) async fn get_acp_inspect(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result: Result<AcpAgentInspectResponse, CliError> = ensure_acp_enabled().and_then(|()| {
-        let effective = resolve_acp_inspect_session_scope(
-            query.session_id.as_deref(),
-            query.require_session_id.as_deref(),
-        )?;
-        super::acp_inspect_response(&state, effective)
-    });
+    let result: Result<AcpAgentInspectResponse, CliError> = ensure_acp_enabled()
+        .and_then(|()| super::acp_inspect_response(&state, query.session_id.as_deref()));
     timed_json(
         "GET",
         http_paths::MANAGED_AGENTS_ACP_INSPECT,
@@ -109,53 +100,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn inspect_returns_scope_denied_when_require_and_session_ids_conflict() {
-        temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
-            let state = minimal_state();
-            let response = get_acp_inspect(
-                Query(AcpInspectQuery {
-                    session_id: Some("session-a".into()),
-                    require_session_id: Some("session-b".into()),
-                }),
-                auth_headers(),
-                State(state),
-            )
-            .await;
-            let (status, body) = response_json(response).await;
-            assert_eq!(status, StatusCode::FORBIDDEN);
-            assert_eq!(body["error"]["code"], "SESSION_SCOPE_DENIED");
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn inspect_uses_require_session_id_as_filter_when_session_id_absent() {
-        temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
-            let state = minimal_state();
-            let response = get_acp_inspect(
-                Query(AcpInspectQuery {
-                    session_id: None,
-                    require_session_id: Some("session-a".into()),
-                }),
-                auth_headers(),
-                State(state),
-            )
-            .await;
-            let (status, body) = response_json(response).await;
-            assert_eq!(status, StatusCode::OK);
-            assert_eq!(body["agents"].as_array().map(Vec::len), Some(0));
-        })
-        .await;
-    }
-
-    #[tokio::test]
     async fn inspect_uses_session_id_scope() {
         temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
             let state = minimal_state();
             let response = get_acp_inspect(
                 Query(AcpInspectQuery {
                     session_id: Some("session-a".into()),
-                    require_session_id: None,
                 }),
                 auth_headers(),
                 State(state),

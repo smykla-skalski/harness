@@ -6,6 +6,7 @@ use super::{
     record_signal_acknowledgment, runtime, signal_matches_session, utc_now, write_signal_ack,
 };
 use crate::session::types::RuntimeSessionId;
+use crate::session::types::crosswalk::effective_runtime_session_key;
 
 pub(crate) fn reconcile_expired_pending_signals(
     session_id: &str,
@@ -136,11 +137,8 @@ pub(crate) fn signal_dirs_for_agent_in_context_root(
     agent_session_id: Option<&str>,
     context_root: &Path,
 ) -> Vec<(String, PathBuf)> {
-    let signal_session_id = crate::session::types::crosswalk::effective_runtime_session_key(
-        orchestration_session_id,
-        agent_session_id,
-    )
-    .to_string();
+    let signal_session_id =
+        effective_runtime_session_key(orchestration_session_id, agent_session_id).to_string();
     let signal_dir = signal_dir_in_context_root(runtime, context_root, &signal_session_id);
     vec![(signal_session_id, signal_dir)]
 }

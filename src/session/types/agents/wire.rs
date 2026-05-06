@@ -1,12 +1,15 @@
 use serde::{Deserialize, Serialize};
 
+use super::super::identity::AgentDescriptorId;
 use super::AgentRegistration;
+use crate::agents::kind::RuntimeKind;
+use crate::agents::runtime::RuntimeCapabilities;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(super) struct AgentRegistrationWire {
     session_agent_id: String,
     name: String,
-    runtime: crate::agents::kind::RuntimeKind,
+    runtime: RuntimeKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     descriptor_id: Option<String>,
     role: super::SessionRole,
@@ -18,8 +21,6 @@ pub(super) struct AgentRegistrationWire {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     runtime_session_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    managed_agent: Option<super::ManagedAgentRef>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     managed_agent_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     managed_agent_family: Option<super::ManagedAgentKind>,
@@ -28,7 +29,7 @@ pub(super) struct AgentRegistrationWire {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     current_task_id: Option<String>,
     #[serde(default)]
-    runtime_capabilities: crate::agents::runtime::RuntimeCapabilities,
+    runtime_capabilities: RuntimeCapabilities,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     persona: Option<super::AgentPersona>,
 }
@@ -40,14 +41,13 @@ impl From<&AgentRegistration> for AgentRegistrationWire {
             session_agent_id: value.agent_id.clone(),
             name: value.name.clone(),
             runtime: value.runtime.clone(),
-            descriptor_id: descriptor_id.map(|id| id.into_inner()),
+            descriptor_id: descriptor_id.map(AgentDescriptorId::into_inner),
             role: value.role,
             capabilities: value.capabilities.clone(),
             joined_at: value.joined_at.clone(),
             updated_at: value.updated_at.clone(),
             status: value.status.clone(),
             runtime_session_id: value.agent_session_id.clone(),
-            managed_agent: value.managed_agent.clone(),
             managed_agent_id: value
                 .managed_agent
                 .as_ref()
@@ -74,11 +74,7 @@ impl TryFrom<AgentRegistrationWire> for AgentRegistration {
     type Error = String;
 
     fn try_from(value: AgentRegistrationWire) -> Result<Self, Self::Error> {
-        let managed_agent = compatible_managed_agent(
-            value.managed_agent,
-            value.managed_agent_id,
-            value.managed_agent_family,
-        )?;
+        let managed_agent = managed_agent_ref(value.managed_agent_id, value.managed_agent_family)?;
         Ok(AgentRegistration {
             agent_id: value.session_agent_id,
             name: value.name,
@@ -98,24 +94,13 @@ impl TryFrom<AgentRegistrationWire> for AgentRegistration {
     }
 }
 
-fn compatible_managed_agent(
-    managed_agent: Option<super::ManagedAgentRef>,
+fn managed_agent_ref(
     managed_agent_id: Option<String>,
     managed_agent_family: Option<super::ManagedAgentKind>,
 ) -> Result<Option<super::ManagedAgentRef>, String> {
-    match (managed_agent, managed_agent_id, managed_agent_family) {
-        (Some(managed_agent), Some(id), Some(kind)) => {
-            if managed_agent.id != id || managed_agent.kind != kind {
-                return Err(
-                    "managed_agent does not match managed_agent_id/managed_agent_family"
-                        .to_string(),
-                );
-            }
-            Ok(Some(managed_agent))
-        }
-        (Some(managed_agent), None, None) => Ok(Some(managed_agent)),
-        (None, Some(id), Some(kind)) => Ok(Some(super::ManagedAgentRef::new(kind, id))),
-        (None, None, None) => Ok(None),
+    match (managed_agent_id, managed_agent_family) {
+        (Some(id), Some(kind)) => Ok(Some(super::ManagedAgentRef::new(kind, id))),
+        (None, None) => Ok(None),
         _ => Err("managed_agent_id and managed_agent_family must be provided together".to_string()),
     }
 }

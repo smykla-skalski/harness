@@ -204,7 +204,6 @@ public struct AcpEventBatchPayload: Codable, Equatable, Sendable {
   }
 
   private enum CodingKeys: String, CodingKey {
-    case acpId
     case managedAgentId
     case managedAgentFamily
     case sessionId
@@ -214,6 +213,7 @@ public struct AcpEventBatchPayload: Codable, Equatable, Sendable {
 
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
+    try requireAcpManagedAgentFamily(container, forKey: .managedAgentFamily)
     acpId = try container.decode(String.self, forKey: .managedAgentId)
     sessionId = try container.decode(String.self, forKey: .sessionId)
     rawCount = try container.decode(Int.self, forKey: .rawCount)
@@ -222,7 +222,6 @@ public struct AcpEventBatchPayload: Codable, Equatable, Sendable {
 
   public func encode(to encoder: any Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
-    try container.encode(acpId, forKey: .acpId)
     try container.encode(acpId, forKey: .managedAgentId)
     try container.encode("acp", forKey: .managedAgentFamily)
     try container.encode(sessionId, forKey: .sessionId)

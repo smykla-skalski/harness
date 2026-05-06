@@ -105,21 +105,6 @@ pub(crate) fn ensure_acp_enabled() -> Result<(), CliError> {
     }
 }
 
-pub(crate) fn resolve_acp_inspect_session_scope<'a>(
-    session_id: Option<&'a str>,
-    require_session_id: Option<&'a str>,
-) -> Result<Option<&'a str>, CliError> {
-    if let (Some(required), Some(explicit)) = (require_session_id, session_id)
-        && required != explicit
-    {
-        return Err(CliErrorKind::session_scope_denied(
-            "require_session_id does not match session_id",
-        )
-        .into());
-    }
-    Ok(session_id.or(require_session_id))
-}
-
 pub(crate) async fn acp_transcript_response(
     state: &DaemonHttpState,
     session_id: &str,
@@ -178,6 +163,12 @@ mod tests {
         let status = response.status();
         let json: serde_json::Value = response.json().await.expect("json body");
         (status, json)
+    }
+
+    async fn response_text(response: reqwest::Response) -> (StatusCode, String) {
+        let status = response.status();
+        let body = response.text().await.expect("text body");
+        (status, body)
     }
 
     async fn stop_server(server: tokio::task::JoinHandle<()>) {
@@ -239,10 +230,9 @@ mod tests {
                 ("CLAUDE_SESSION_ID", Some("http-acp-missing-session")),
             ],
             async {
-                let (base_url, server) = spawn_managed_agent_server(
-                    super::super::tests::test_http_state_with_db(),
-                )
-                .await;
+                let (base_url, server) =
+                    spawn_managed_agent_server(super::super::tests::test_http_state_with_db())
+                        .await;
                 let response = reqwest::Client::new()
                     .post(format!(
                         "{base_url}/v1/sessions/nod8ccog/managed-agents/acp"
@@ -262,11 +252,9 @@ mod tests {
                 assert_eq!(status, StatusCode::BAD_REQUEST);
                 assert_eq!(body["error"]["code"], "KSRCLI090");
                 assert!(
-                    body["error"]["message"]
-                        .as_str()
-                        .is_some_and(|message| {
-                            message.contains("harness session 'nod8ccog' not found")
-                        }),
+                    body["error"]["message"].as_str().is_some_and(|message| {
+                        message.contains("harness session 'nod8ccog' not found")
+                    }),
                     "unexpected error body: {body}"
                 );
             },
@@ -293,12 +281,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn acp_inspect_route_rejects_legacy_require_session_id_query_param() {
+        temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
+            let (base_url, server) = spawn_managed_agent_server(minimal_state()).await;
+            let response = reqwest::Client::new()
+                .get(format!(
+                    "{base_url}/v1/managed-agents/acp/inspect?require_session_id=test-session"
+                ))
+                .bearer_auth("token")
+                .send()
+                .await
+                .expect("send request");
+            let (status, body) = response_text(response).await;
+            stop_server(server).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST);
+            assert!(
+                body.contains("require_session_id"),
+                "unexpected rejection body: {body}"
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
     async fn acp_delete_route_returns_acp_disabled_when_feature_flag_off() {
         temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("0"))], async {
             let (base_url, server) = spawn_managed_agent_server(minimal_state()).await;
             let response = reqwest::Client::new()
                 .delete(format!(
-                    "{base_url}/v1/managed-agents/acp-session?require_session_id=test-session"
+                    "{base_url}/v1/managed-agents/acp-session?session_id=test-session"
                 ))
                 .bearer_auth("token")
                 .send()
@@ -308,6 +319,52 @@ mod tests {
             stop_server(server).await;
             assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
             assert_eq!(body["error"]["code"], "ACP_DISABLED");
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn acp_delete_route_rejects_legacy_require_session_id_query_param() {
+        temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
+            let (base_url, server) = spawn_managed_agent_server(minimal_state()).await;
+            let response = reqwest::Client::new()
+                .delete(format!(
+                    "{base_url}/v1/managed-agents/acp-session?require_session_id=test-session"
+                ))
+                .bearer_auth("token")
+                .send()
+                .await
+                .expect("send request");
+            let (status, body) = response_text(response).await;
+            stop_server(server).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST);
+            assert!(
+                body.contains("require_session_id"),
+                "unexpected rejection body: {body}"
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn acp_transcript_route_rejects_legacy_require_session_id_query_param() {
+        temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
+            let (base_url, server) = spawn_managed_agent_server(minimal_state()).await;
+            let response = reqwest::Client::new()
+                .get(format!(
+                    "{base_url}/v1/managed-agents/acp/transcript?require_session_id=test-session"
+                ))
+                .bearer_auth("token")
+                .send()
+                .await
+                .expect("send request");
+            let (status, body) = response_text(response).await;
+            stop_server(server).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST);
+            assert!(
+                body.contains("require_session_id"),
+                "unexpected rejection body: {body}"
+            );
         })
         .await;
     }
@@ -356,27 +413,5 @@ mod tests {
             assert_eq!(body["error"]["code"], "DAEMON_AUTH");
         })
         .await;
-    }
-
-    #[test]
-    fn acp_scope_accepts_matching_session_scope() {
-        let resolved =
-            resolve_acp_inspect_session_scope(Some("session-a"), Some("session-a"))
-                .expect("resolve scope");
-
-        assert_eq!(resolved, Some("session-a"));
-    }
-
-    #[test]
-    fn acp_scope_rejects_conflicting_session_scope() {
-        let error =
-            resolve_acp_inspect_session_scope(Some("session-a"), Some("session-b"))
-                .expect_err("conflicting aliases should fail");
-
-        assert!(
-            error.message().contains("require_session_id"),
-            "unexpected error: {}",
-            error.message()
-        );
     }
 }

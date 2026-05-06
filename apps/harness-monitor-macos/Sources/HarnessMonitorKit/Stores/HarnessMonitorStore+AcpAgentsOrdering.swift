@@ -116,10 +116,8 @@ extension HarnessMonitorStore {
     self.selectedAcpInspectState = selectedAcpInspectState.filtered(
       removingMatching: { identity in
         identity != incomingIdentity
-          && (
-            identity.managedAgentID == snapshot.managedAgentID
-              || identity.sessionAgentID == snapshot.sessionAgentID
-          )
+          && (identity.managedAgentID == snapshot.managedAgentID
+            || identity.sessionAgentID == snapshot.sessionAgentID)
       }
     )
   }

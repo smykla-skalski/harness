@@ -50,6 +50,15 @@ private enum AcpAgentIdentityLookupResult {
 }
 
 struct AcpAgentIdentityCrosswalk {
+  private struct BuildInputs {
+    let selectedSessionIdentity: HarnessSessionID?
+    let descriptorLinkagesByIdentity: [AcpDescriptorID: AcpDescriptorIdentityLinkage]
+    let registrationsByManagedAgentIdentity: [ManagedAgentID: AgentRegistration]
+    let registrationsBySessionAgentIdentity: [SessionAgentID: [AgentRegistration]]
+    let snapshotsByManagedAgentIdentity: [ManagedAgentID: AcpAgentSnapshot]
+    let inspectByManagedAgentIdentity: [ManagedAgentID: AcpAgentInspectSnapshot]
+  }
+
   private let descriptorLinkagesByIdentity: [AcpDescriptorID: AcpDescriptorIdentityLinkage]
   private let linkagesByManagedAgentIdentity: [ManagedAgentID: AcpAgentIdentityLinkage]
   private let linkagesBySessionAgentIdentity: [SessionAgentID: AcpAgentIdentityLookupResult]
@@ -68,15 +77,8 @@ struct AcpAgentIdentityCrosswalk {
       }
     )
 
-    let registrationsByManagedAgentIdentity: [ManagedAgentID: AgentRegistration] = Dictionary(
-      uniqueKeysWithValues: sessionRegistrations.compactMap { registration in
-        guard registration.managedAgent?.kind == .acp,
-          let managedAgentIdentity = registration.managedAgentIdentity
-        else {
-          return nil
-        }
-        return (managedAgentIdentity, registration)
-      }
+    let registrationsByManagedAgentIdentity = Self.registrationsByManagedAgentIdentity(
+      from: sessionRegistrations
     )
     let registrationsBySessionAgentIdentity = Dictionary(
       grouping: sessionRegistrations,
@@ -89,65 +91,16 @@ struct AcpAgentIdentityCrosswalk {
       uniqueKeysWithValues: (inspectSample?.agents ?? []).map { ($0.managedAgentIdentity, $0) }
     )
 
-    let managedAgentIdentities = Set(snapshotsByManagedAgentIdentity.keys)
-      .union(inspectByManagedAgentIdentity.keys)
-      .union(registrationsByManagedAgentIdentity.keys)
-
-    var linkagesByManagedAgentIdentity: [ManagedAgentID: AcpAgentIdentityLinkage] = [:]
-    linkagesByManagedAgentIdentity.reserveCapacity(managedAgentIdentities.count)
-
-    for managedAgentIdentity in managedAgentIdentities {
-      let snapshot = snapshotsByManagedAgentIdentity[managedAgentIdentity]
-      let inspect = Self.compatibleInspect(
-        inspectByManagedAgentIdentity[managedAgentIdentity],
-        for: snapshot
-      )
-      let preferredSessionAgentIdentity =
-        snapshot?.sessionAgentIdentity
-        ?? inspect?.sessionAgentIdentity
-      let registration = Self.compatibleRegistration(
-        managedAgentIdentity: managedAgentIdentity,
-        preferredSessionAgentIdentity: preferredSessionAgentIdentity,
+    let linkagesByManagedAgentIdentity = Self.buildLinkages(
+      inputs: BuildInputs(
+        selectedSessionIdentity: selectedSessionIdentity,
+        descriptorLinkagesByIdentity: descriptorLinkagesByIdentity,
         registrationsByManagedAgentIdentity: registrationsByManagedAgentIdentity,
         registrationsBySessionAgentIdentity: registrationsBySessionAgentIdentity,
-        descriptorLinkagesByIdentity: descriptorLinkagesByIdentity
+        snapshotsByManagedAgentIdentity: snapshotsByManagedAgentIdentity,
+        inspectByManagedAgentIdentity: inspectByManagedAgentIdentity
       )
-      let sessionIdentity =
-        snapshot?.sessionIdentity
-        ?? inspect?.sessionIdentity
-        ?? selectedSessionIdentity
-      guard let sessionIdentity else {
-        continue
-      }
-      let sessionAgentIdentity = preferredSessionAgentIdentity ?? registration?.sessionAgentIdentity
-      let descriptorLinkage =
-        registration.flatMap { registration in
-          descriptorLinkagesByIdentity[AcpDescriptorID(rawValue: registration.runtime)]
-        }
-        ?? sessionAgentIdentity.flatMap { sessionAgentIdentity in
-          descriptorLinkagesByIdentity[AcpDescriptorID(rawValue: sessionAgentIdentity.rawValue)]
-        }
-      let displayName =
-        snapshot?.displayName
-        ?? inspect?.displayName
-        ?? registration?.name
-        ?? descriptorLinkage?.displayName
-        ?? Self.unresolvedDisplayName(for: managedAgentIdentity)
-
-      linkagesByManagedAgentIdentity[managedAgentIdentity] = AcpAgentIdentityLinkage(
-        sessionIdentity: sessionIdentity,
-        descriptorIdentity: descriptorLinkage?.descriptorIdentity,
-        sessionAgentIdentity: sessionAgentIdentity,
-        managedAgentIdentity: managedAgentIdentity,
-        runtimeSessionIdentity: registration?.runtimeSessionIdentity,
-        displayName: displayName,
-        capabilityTags: descriptorLinkage?.capabilityTags ?? registration?.capabilities ?? [],
-        snapshot: snapshot,
-        inspect: inspect,
-        registration: registration,
-        descriptor: descriptorLinkage?.descriptor
-      )
-    }
+    )
 
     self.descriptorLinkagesByIdentity = descriptorLinkagesByIdentity
     self.linkagesByManagedAgentIdentity = linkagesByManagedAgentIdentity
@@ -199,6 +152,88 @@ struct AcpAgentIdentityCrosswalk {
     for managedAgentIdentity: ManagedAgentID
   ) -> String {
     "ACP agent \(managedAgentIdentity.rawValue)"
+  }
+
+  private static func registrationsByManagedAgentIdentity(
+    from sessionRegistrations: [AgentRegistration]
+  ) -> [ManagedAgentID: AgentRegistration] {
+    Dictionary(
+      uniqueKeysWithValues: sessionRegistrations.compactMap { registration in
+        guard registration.managedAgent?.kind == .acp,
+          let managedAgentIdentity = registration.managedAgentIdentity
+        else {
+          return nil
+        }
+        return (managedAgentIdentity, registration)
+      }
+    )
+  }
+
+  private static func buildLinkages(
+    inputs: BuildInputs
+  ) -> [ManagedAgentID: AcpAgentIdentityLinkage] {
+    let managedAgentIdentities = Set(inputs.snapshotsByManagedAgentIdentity.keys)
+      .union(inputs.inspectByManagedAgentIdentity.keys)
+      .union(inputs.registrationsByManagedAgentIdentity.keys)
+
+    var linkagesByManagedAgentIdentity: [ManagedAgentID: AcpAgentIdentityLinkage] = [:]
+    linkagesByManagedAgentIdentity.reserveCapacity(managedAgentIdentities.count)
+
+    for managedAgentIdentity in managedAgentIdentities {
+      let snapshot = inputs.snapshotsByManagedAgentIdentity[managedAgentIdentity]
+      let inspect = compatibleInspect(
+        inputs.inspectByManagedAgentIdentity[managedAgentIdentity],
+        for: snapshot
+      )
+      let preferredSessionAgentIdentity =
+        snapshot?.sessionAgentIdentity
+        ?? inspect?.sessionAgentIdentity
+      let registration = compatibleRegistration(
+        managedAgentIdentity: managedAgentIdentity,
+        preferredSessionAgentIdentity: preferredSessionAgentIdentity,
+        registrationsByManagedAgentIdentity: inputs.registrationsByManagedAgentIdentity,
+        registrationsBySessionAgentIdentity: inputs.registrationsBySessionAgentIdentity,
+        descriptorLinkagesByIdentity: inputs.descriptorLinkagesByIdentity
+      )
+      let sessionIdentity =
+        snapshot?.sessionIdentity
+        ?? inspect?.sessionIdentity
+        ?? inputs.selectedSessionIdentity
+      guard let sessionIdentity else {
+        continue
+      }
+      let sessionAgentIdentity = preferredSessionAgentIdentity ?? registration?.sessionAgentIdentity
+      let descriptorLinkage =
+        registration.flatMap { registration in
+          inputs.descriptorLinkagesByIdentity[AcpDescriptorID(rawValue: registration.runtime)]
+        }
+        ?? sessionAgentIdentity.flatMap { sessionAgentIdentity in
+          inputs.descriptorLinkagesByIdentity[
+            AcpDescriptorID(rawValue: sessionAgentIdentity.rawValue)]
+        }
+      let displayName =
+        snapshot?.displayName
+        ?? inspect?.displayName
+        ?? registration?.name
+        ?? descriptorLinkage?.displayName
+        ?? unresolvedDisplayName(for: managedAgentIdentity)
+
+      linkagesByManagedAgentIdentity[managedAgentIdentity] = AcpAgentIdentityLinkage(
+        sessionIdentity: sessionIdentity,
+        descriptorIdentity: descriptorLinkage?.descriptorIdentity,
+        sessionAgentIdentity: sessionAgentIdentity,
+        managedAgentIdentity: managedAgentIdentity,
+        runtimeSessionIdentity: registration?.runtimeSessionIdentity,
+        displayName: displayName,
+        capabilityTags: descriptorLinkage?.capabilityTags ?? registration?.capabilities ?? [],
+        snapshot: snapshot,
+        inspect: inspect,
+        registration: registration,
+        descriptor: descriptorLinkage?.descriptor
+      )
+    }
+
+    return linkagesByManagedAgentIdentity
   }
 
   private static func compatibleInspect(

@@ -132,9 +132,11 @@ fn resolve_runtime_session_errors_when_endpoint_is_missing() {
     let outcome = client
         .resolve_runtime_session("codex", "sess-worker-a")
         .expect_err("missing resolver endpoint should fail");
-    assert!(outcome
-        .to_string()
-        .contains("daemon does not support /v1/runtime-sessions/resolve"));
+    assert!(
+        outcome
+            .to_string()
+            .contains("daemon does not support /v1/runtime-sessions/resolve")
+    );
     server.join().expect("server");
 }
 

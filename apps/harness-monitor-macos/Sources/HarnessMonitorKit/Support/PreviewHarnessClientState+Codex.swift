@@ -1,6 +1,46 @@
 import Foundation
 
 extension PreviewHarnessClientState {
+  func codexRuns(sessionID: String) -> [CodexRunSnapshot] {
+    codexRunsBySessionID[sessionID] ?? []
+  }
+
+  func codexRun(runID: String) -> CodexRunSnapshot? {
+    codexRunsBySessionID.values
+      .flatMap(\.self)
+      .first { run in
+        run.runId == runID
+      }
+  }
+
+  func startCodexRun(
+    sessionID: String,
+    request: CodexRunRequest
+  ) -> CodexRunSnapshot {
+    nextCodexRunSequence += 1
+    let run = CodexRunSnapshot(
+      runId: "preview-codex-run-\(nextCodexRunSequence)",
+      sessionId: sessionID,
+      projectDir: fallbackDetail?.session.projectDir ?? "/Users/example/Projects/harness",
+      threadId: request.resumeThreadId,
+      turnId: nil,
+      mode: request.mode,
+      status: .queued,
+      prompt: request.prompt,
+      latestSummary: request.actor.map { "Queued by \($0)" } ?? "Queued by preview",
+      finalMessage: nil,
+      error: nil,
+      pendingApprovals: [],
+      createdAt: Self.mutationTimestamp,
+      updatedAt: Self.mutationTimestamp
+    )
+    var runs = codexRunsBySessionID[sessionID] ?? []
+    runs.removeAll { $0.runId == run.runId }
+    runs.insert(run, at: 0)
+    codexRunsBySessionID[sessionID] = runs
+    return run
+  }
+
   func resolveCodexApproval(
     runID: String,
     approvalID: String,

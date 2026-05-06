@@ -35,10 +35,6 @@ pub(super) fn load_signals_for_resolved(
 ///
 /// # Errors
 /// Returns [`CliError`] on filesystem read failures.
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "signal snapshot assembly merges pending, acknowledged, and ack-result lanes in one pass"
-)]
 pub fn load_signals_for(
     project: &DiscoveredProject,
     state: &SessionState,
@@ -53,9 +49,11 @@ pub fn load_signals_for(
             .join(agent.runtime.runtime_name())
             .join(&signal_session_id);
         for signal in read_pending_signals(&signal_dir)? {
-            signals_by_id
-                .entry(signal.signal_id.clone())
-                .or_insert((signal, false, signal_session_id.clone()));
+            signals_by_id.entry(signal.signal_id.clone()).or_insert((
+                signal,
+                false,
+                signal_session_id.clone(),
+            ));
         }
         for signal in read_acknowledged_signals(&signal_dir)? {
             signals_by_id.insert(

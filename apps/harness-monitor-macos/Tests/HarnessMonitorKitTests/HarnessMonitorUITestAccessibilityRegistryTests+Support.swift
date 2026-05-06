@@ -77,8 +77,8 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
   }
 }
 
-private extension Array {
-  var only: Element? {
+extension Array {
+  fileprivate var only: Element? {
     count == 1 ? first : nil
   }
 }

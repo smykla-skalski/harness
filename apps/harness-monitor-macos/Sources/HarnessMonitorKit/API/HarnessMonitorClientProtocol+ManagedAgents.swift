@@ -1,30 +1,6 @@
 import Foundation
 
 extension HarnessMonitorClientProtocol {
-  public func changeRole(
-    sessionID: HarnessSessionID,
-    sessionAgentID: SessionAgentID,
-    request: RoleChangeRequest
-  ) async throws -> SessionDetail {
-    try await changeRole(
-      sessionID: sessionID.rawValue,
-      agentID: sessionAgentID.rawValue,
-      request: request
-    )
-  }
-
-  public func removeAgent(
-    sessionID: HarnessSessionID,
-    sessionAgentID: SessionAgentID,
-    request: AgentRemoveRequest
-  ) async throws -> SessionDetail {
-    try await removeAgent(
-      sessionID: sessionID.rawValue,
-      agentID: sessionAgentID.rawValue,
-      request: request
-    )
-  }
-
   public func managedAgents(sessionID: HarnessSessionID) async throws -> ManagedAgentListResponse {
     try await managedAgents(sessionID: sessionID.rawValue)
   }
@@ -83,7 +59,9 @@ extension HarnessMonitorClientProtocol {
     try await steerManagedCodexAgent(agentID: agentID.rawValue, request: request)
   }
 
-  public func interruptManagedCodexAgent(agentID: ManagedAgentID) async throws -> ManagedAgentSnapshot {
+  public func interruptManagedCodexAgent(agentID: ManagedAgentID) async throws
+    -> ManagedAgentSnapshot
+  {
     try await interruptManagedCodexAgent(agentID: agentID.rawValue)
   }
 

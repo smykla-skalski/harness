@@ -33,8 +33,7 @@ pub(crate) fn load_state_or_err(
 ) -> Result<SessionState, CliError> {
     let layout = storage::layout_from_project_dir(project_dir, session_id)?;
     storage::load_state(&layout)?.ok_or_else(|| {
-        CliErrorKind::session_not_active(format!("harness session '{session_id}' not found"))
-            .into()
+        CliErrorKind::session_not_active(format!("harness session '{session_id}' not found")).into()
     })
 }
 

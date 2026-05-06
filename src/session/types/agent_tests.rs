@@ -265,6 +265,7 @@ fn agent_registration_identity_accessors_classify_descriptor_runtime_ids() {
     assert_eq!(json["managed_agent_id"], "acp-1");
     assert_eq!(json["managed_agent_family"], "acp");
     assert_eq!(json["descriptor_id"], "mystery-acp");
+    assert!(json.get("managed_agent").is_none());
     assert!(json.get("agent_id").is_none());
     assert!(json.get("agent_session_id").is_none());
 }

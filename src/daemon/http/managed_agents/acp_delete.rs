@@ -14,8 +14,9 @@ use super::super::response::{extract_request_id, timed_json};
 use super::{ensure_acp_agent, ensure_acp_enabled};
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(super) struct DeleteAcpAgentQuery {
-    pub(super) require_session_id: Option<String>,
+    pub(super) session_id: Option<String>,
 }
 
 pub(super) async fn delete_acp_agent(
@@ -32,7 +33,7 @@ pub(super) async fn delete_acp_agent(
     let result = (|| -> Result<ManagedAgentSnapshot, CliError> {
         ensure_acp_enabled()?;
         ensure_acp_agent(&state, &agent_id)?;
-        if let Some(required) = &query.require_session_id {
+        if let Some(required) = &query.session_id {
             let snapshot = state.acp_agent_manager.get(&agent_id)?;
             if &snapshot.session_id != required {
                 return Err(CliErrorKind::session_scope_denied(format!(
