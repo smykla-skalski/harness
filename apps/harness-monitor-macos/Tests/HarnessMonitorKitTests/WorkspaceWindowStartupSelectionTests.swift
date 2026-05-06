@@ -57,6 +57,28 @@ struct WorkspaceWindowStartupSelectionTests {
     #expect(view.viewModel.createSessionID == "sess-current")
   }
 
+  @Test("Workspace init keeps pending create requests for mounted state")
+  func initKeepsPendingCreateRequestForMountedState() async {
+    WorkspaceSelectionDefaults.write(
+      .agent(sessionID: "sess-stored", agentID: "agent-stored")
+    )
+    defer { WorkspaceSelectionDefaults.clear() }
+
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.requestWorkspaceCreateEntryPoint(.agent, sessionID: "sess-current")
+
+    let view = WorkspaceWindowView(store: store)
+
+    #expect(store.pendingWorkspaceSelection == .create)
+
+    await view.resolveInitialWorkspaceSelection()
+
+    #expect(store.pendingWorkspaceSelection == nil)
+    #expect(view.viewModel.selection == .create)
+    #expect(view.viewModel.createMode == .terminal)
+    #expect(view.viewModel.createSessionID == "sess-current")
+  }
+
   @Test("Preview create preset seeds ACP leader state")
   func previewCreatePresetSeedsAcpLeaderState() {
     let preset = WorkspaceWindowView.previewCreatePreset(

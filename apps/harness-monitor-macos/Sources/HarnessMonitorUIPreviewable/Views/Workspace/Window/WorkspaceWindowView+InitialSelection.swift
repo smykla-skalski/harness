@@ -4,10 +4,10 @@ extension WorkspaceWindowView {
   static func initialWindowSelection(
     store: HarnessMonitorStore,
     displayState: AgentTuiDisplayState,
-    pendingRequest: HarnessMonitorStore.PendingWorkspaceSelectionRequest?
+    pendingSelection: WorkspaceSelection?
   ) -> WorkspaceSelection {
-    if let pendingRequest {
-      return pendingRequest.selection
+    if let pendingSelection {
+      return pendingSelection
     }
     if let restoredSelection = restoredInitialSelection(store: store, displayState: displayState) {
       return restoredSelection
