@@ -329,7 +329,7 @@ struct WorkspaceAcpSessionContextTests {
 
 }
 
-private func makeSummary(sessionID: String) -> SessionSummary {
+func makeSummary(sessionID: String) -> SessionSummary {
   SessionSummary(
     projectId: "project-\(sessionID)",
     projectName: "harness",
