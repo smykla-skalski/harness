@@ -69,7 +69,11 @@ pub(crate) async fn dispatch_managed_agent_start_acp(
     let Some(session_id) = extract_session_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing session_id");
     };
-    let body: AcpAgentStartRequest = match serde_json::from_value(request.params.clone()) {
+    let mut params = request.params.clone();
+    if let Some(params) = params.as_object_mut() {
+        params.remove("session_id");
+    }
+    let body: AcpAgentStartRequest = match serde_json::from_value(params) {
         Ok(body) => body,
         Err(error) => {
             return error_response(

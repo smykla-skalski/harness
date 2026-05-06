@@ -115,17 +115,20 @@ fn accessibility_list_elements_args_include_optional_filters() {
 
 #[test]
 fn accessibility_get_element_args_preserve_identifier() {
-    let args = get_element_args("harness.sidebar.new-session");
+    let args = get_element_args("harness.sidebar.a3c901ec-c08e-5e74-a877-3802a9410c55ion");
     assert_eq!(
         as_strings(&args),
-        vec!["get-element", "harness.sidebar.new-session"],
+        vec![
+            "get-element",
+            "harness.sidebar.a3c901ec-c08e-5e74-a877-3802a9410c55ion"
+        ],
     );
 }
 
 #[test]
 fn accessibility_perform_action_args_include_window_and_action() {
     let args = perform_action_args(
-        "harness.sidebar.new-session",
+        "harness.sidebar.a3c901ec-c08e-5e74-a877-3802a9410c55ion",
         Some(42),
         AccessibilityAction::Press,
     );
@@ -137,7 +140,7 @@ fn accessibility_perform_action_args_include_window_and_action() {
             "42",
             "--action",
             "press",
-            "harness.sidebar.new-session",
+            "harness.sidebar.a3c901ec-c08e-5e74-a877-3802a9410c55ion",
         ],
     );
 }

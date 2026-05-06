@@ -16,29 +16,39 @@ fn sync_conversation_events_replaces_existing_rows() {
         sample_conversation_event(1, "first"),
         sample_conversation_event(2, "second"),
     ];
-    db.sync_conversation_events("sess-test-1", "claude-leader", "claude", &first)
-        .expect("first sync");
+    db.sync_conversation_events(
+        "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
+        "claude-leader",
+        "claude",
+        &first,
+    )
+    .expect("first sync");
 
     let replacement = vec![
         sample_conversation_event(1, "updated"),
         sample_conversation_event(3, "third"),
     ];
-    db.sync_conversation_events("sess-test-1", "claude-leader", "claude", &replacement)
-        .expect("replacement sync");
+    db.sync_conversation_events(
+        "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
+        "claude-leader",
+        "claude",
+        &replacement,
+    )
+    .expect("replacement sync");
 
     let count: i64 = db
         .conn
         .query_row(
             "SELECT COUNT(*) FROM conversation_events
                  WHERE session_id = ?1 AND agent_id = ?2",
-            ["sess-test-1", "claude-leader"],
+            ["f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4", "claude-leader"],
             |row| row.get(0),
         )
         .expect("count conversation events");
     assert_eq!(count, 2);
 
     let loaded = db
-        .load_conversation_events("sess-test-1", "claude-leader")
+        .load_conversation_events("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4", "claude-leader")
         .expect("load events");
     assert_eq!(loaded.len(), 2);
     assert_eq!(loaded[0].sequence, 1);
@@ -48,14 +58,19 @@ fn sync_conversation_events_replaces_existing_rows() {
         other => panic!("unexpected event kind: {other:?}"),
     }
 
-    db.sync_conversation_events("sess-test-1", "claude-leader", "claude", &[])
-        .expect("clear events");
+    db.sync_conversation_events(
+        "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
+        "claude-leader",
+        "claude",
+        &[],
+    )
+    .expect("clear events");
     let cleared_count: i64 = db
         .conn
         .query_row(
             "SELECT COUNT(*) FROM conversation_events
                  WHERE session_id = ?1 AND agent_id = ?2",
-            ["sess-test-1", "claude-leader"],
+            ["f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4", "claude-leader"],
             |row| row.get(0),
         )
         .expect("count cleared conversation events");
@@ -141,7 +156,7 @@ fn clear_session_conversation_events_removes_rows_for_removed_agents() {
     let db = DaemonDb::open_in_memory().expect("open db");
     seed_conversation_session(&db);
     db.sync_conversation_events(
-        "sess-test-1",
+        "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
         "claude-leader",
         "claude",
         &[sample_conversation_event(1, "leader")],
@@ -152,13 +167,18 @@ fn clear_session_conversation_events_removes_rows_for_removed_agents() {
         agent: "codex-worker".into(),
         ..sample_conversation_event(1, "worker")
     }];
-    db.sync_conversation_events("sess-test-1", "codex-worker", "codex", &other_agent_events)
-        .expect("sync worker events");
+    db.sync_conversation_events(
+        "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
+        "codex-worker",
+        "codex",
+        &other_agent_events,
+    )
+    .expect("sync worker events");
 
-    clear_session_conversation_events(db.connection(), "sess-test-1")
+    clear_session_conversation_events(db.connection(), "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4")
         .expect("clear session events");
     db.sync_conversation_events(
-        "sess-test-1",
+        "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
         "claude-leader",
         "claude",
         &[sample_conversation_event(1, "leader")],
@@ -169,7 +189,7 @@ fn clear_session_conversation_events_removes_rows_for_removed_agents() {
         .conn
         .query_row(
             "SELECT COUNT(*) FROM conversation_events WHERE session_id = ?1",
-            ["sess-test-1"],
+            ["f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4"],
             |row| row.get(0),
         )
         .expect("count session conversation events");
@@ -180,7 +200,7 @@ fn clear_session_conversation_events_removes_rows_for_removed_agents() {
         .query_row(
             "SELECT COUNT(*) FROM conversation_events
                  WHERE session_id = ?1 AND agent_id = ?2",
-            ["sess-test-1", "codex-worker"],
+            ["f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4", "codex-worker"],
             |row| row.get(0),
         )
         .expect("count worker conversation events");
@@ -275,7 +295,7 @@ fn prepare_agent_conversation_imports_and_activity_loads_each_agent_once() {
             (
                 "claude-leader".to_string(),
                 "claude".to_string(),
-                "claude-session-1".to_string(),
+                "2a35c8f7-e812-5024-aed6-9f3b6318847e".to_string(),
             ),
             (
                 "codex-worker".to_string(),

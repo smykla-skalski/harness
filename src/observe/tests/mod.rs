@@ -80,7 +80,7 @@ fn resolve_from_no_match() {
         tmp.path(),
         &[r#"{"message":{"role":"user","content":"hello"}}"#],
     );
-    let result = scan::resolve_from(&path, "nonexistent phrase");
+    let result = scan::resolve_from(&path, "418cf829-6691-5fc0-92b1-8e5013efa2cb phrase");
     assert!(result.is_err());
 }
 

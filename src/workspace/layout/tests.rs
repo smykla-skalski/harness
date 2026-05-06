@@ -1,11 +1,13 @@
 use super::*;
 use std::path::PathBuf;
 
+const SESSION_ID: &str = "00000000-0000-4000-8000-000000000201";
+
 fn fixture() -> SessionLayout {
     SessionLayout {
         sessions_root: PathBuf::from("/data/sessions"),
         project_name: "kuma".into(),
-        session_id: "abc12345".into(),
+        session_id: SESSION_ID.into(),
     }
 }
 
@@ -13,7 +15,7 @@ fn fixture() -> SessionLayout {
 fn session_root_composes_correctly() {
     assert_eq!(
         fixture().session_root(),
-        PathBuf::from("/data/sessions/kuma/abc12345")
+        PathBuf::from(format!("/data/sessions/kuma/{SESSION_ID}"))
     );
 }
 
@@ -21,7 +23,7 @@ fn session_root_composes_correctly() {
 fn workspace_subdir() {
     assert_eq!(
         fixture().workspace(),
-        PathBuf::from("/data/sessions/kuma/abc12345/workspace")
+        PathBuf::from(format!("/data/sessions/kuma/{SESSION_ID}/workspace"))
     );
 }
 
@@ -29,7 +31,7 @@ fn workspace_subdir() {
 fn memory_subdir() {
     assert_eq!(
         fixture().memory(),
-        PathBuf::from("/data/sessions/kuma/abc12345/memory")
+        PathBuf::from(format!("/data/sessions/kuma/{SESSION_ID}/memory"))
     );
 }
 
@@ -37,13 +39,13 @@ fn memory_subdir() {
 fn state_file_sibling() {
     assert_eq!(
         fixture().state_file(),
-        PathBuf::from("/data/sessions/kuma/abc12345/state.json")
+        PathBuf::from(format!("/data/sessions/kuma/{SESSION_ID}/state.json"))
     );
 }
 
 #[test]
 fn branch_ref_flat() {
-    assert_eq!(fixture().branch_ref(), "harness/abc12345");
+    assert_eq!(fixture().branch_ref(), format!("harness/{SESSION_ID}"));
 }
 
 #[test]
@@ -66,7 +68,7 @@ fn project_dir_composes() {
 fn log_file_sibling() {
     assert_eq!(
         fixture().log_file(),
-        PathBuf::from("/data/sessions/kuma/abc12345/log.jsonl")
+        PathBuf::from(format!("/data/sessions/kuma/{SESSION_ID}/log.jsonl"))
     );
 }
 
@@ -74,11 +76,11 @@ fn log_file_sibling() {
 fn tasks_and_locks_subdirs() {
     assert_eq!(
         fixture().tasks_dir(),
-        PathBuf::from("/data/sessions/kuma/abc12345/tasks")
+        PathBuf::from(format!("/data/sessions/kuma/{SESSION_ID}/tasks"))
     );
     assert_eq!(
         fixture().locks_dir(),
-        PathBuf::from("/data/sessions/kuma/abc12345/.locks")
+        PathBuf::from(format!("/data/sessions/kuma/{SESSION_ID}/.locks"))
     );
 }
 
@@ -86,7 +88,7 @@ fn tasks_and_locks_subdirs() {
 fn origin_marker_in_session_root() {
     assert_eq!(
         fixture().origin_marker(),
-        PathBuf::from("/data/sessions/kuma/abc12345/.origin"),
+        PathBuf::from(format!("/data/sessions/kuma/{SESSION_ID}/.origin")),
     );
 }
 

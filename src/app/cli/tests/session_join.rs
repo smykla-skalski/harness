@@ -11,7 +11,7 @@ fn parse_session_join() {
         "harness",
         "session",
         "join",
-        "sess-123",
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc23",
         "--role",
         "worker",
         "--runtime",
@@ -24,7 +24,7 @@ fn parse_session_join() {
         Command::Session {
             command: crate::session::transport::SessionCommand::Join(args),
         } => {
-            assert_eq!(args.session_id, "sess-123");
+            assert_eq!(args.session_id, "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc23");
             assert_eq!(args.role, crate::session::types::SessionRole::Worker);
             assert_eq!(args.capabilities, Some("general,testing".into()));
         }
@@ -38,7 +38,7 @@ fn parse_session_join_with_fallback_role() {
         "harness",
         "session",
         "join",
-        "sess-123",
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc23",
         "--role",
         "leader",
         "--fallback-role",
@@ -51,7 +51,7 @@ fn parse_session_join_with_fallback_role() {
         Command::Session {
             command: crate::session::transport::SessionCommand::Join(args),
         } => {
-            assert_eq!(args.session_id, "sess-123");
+            assert_eq!(args.session_id, "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc23");
             assert_eq!(args.role, crate::session::types::SessionRole::Leader);
             assert_eq!(
                 args.fallback_role,

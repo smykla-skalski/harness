@@ -4,7 +4,7 @@ use super::*;
 fn reconcile_imports_new_session() {
     let db = DaemonDb::open_in_memory().expect("open db");
     let project = sample_project();
-    let resolved = sample_resolved_session(&project, "new-sess", 1);
+    let resolved = sample_resolved_session(&project, "a3c901ec-c08e-5e74-a877-3802a9410c55", 1);
 
     let result = db
         .reconcile_sessions(&[project], &[resolved])
@@ -14,7 +14,7 @@ fn reconcile_imports_new_session() {
     assert_eq!(result.sessions_skipped, 0);
 
     let loaded = db
-        .load_session_state("new-sess")
+        .load_session_state("a3c901ec-c08e-5e74-a877-3802a9410c55")
         .expect("load")
         .expect("present");
     assert_eq!(loaded.state_version, 1);
@@ -46,7 +46,7 @@ fn reconcile_skips_session_with_equal_db_version() {
     assert_eq!(result.sessions_skipped, 1);
 
     let loaded = db
-        .load_session_state("sess-test-1")
+        .load_session_state("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4")
         .expect("load")
         .expect("present");
     assert_eq!(loaded.context, "daemon version");
@@ -78,7 +78,7 @@ fn reconcile_skips_session_with_higher_db_version() {
     assert_eq!(result.sessions_skipped, 1);
 
     let loaded = db
-        .load_session_state("sess-test-1")
+        .load_session_state("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4")
         .expect("load")
         .expect("present");
     assert_eq!(loaded.context, "daemon mutated");
@@ -111,7 +111,7 @@ fn reconcile_imports_session_with_higher_file_version() {
     assert_eq!(result.sessions_skipped, 0);
 
     let loaded = db
-        .load_session_state("sess-test-1")
+        .load_session_state("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4")
         .expect("load")
         .expect("present");
     assert_eq!(loaded.context, "updated file");
@@ -125,23 +125,23 @@ fn reconcile_preserves_daemon_only_sessions() {
     db.sync_project(&project).expect("sync project");
 
     let mut daemon_session = sample_session_state();
-    daemon_session.session_id = "daemon-only".into();
+    daemon_session.session_id = "34320f82-1f15-597f-8885-b098eafe1e7a".into();
     daemon_session.state_version = 3;
     daemon_session.context = "daemon created".into();
     db.sync_session(&project.project_id, &daemon_session)
         .expect("sync daemon session");
 
-    // Reconcile with a file that has a DIFFERENT session (not daemon-only)
-    let file_session = sample_resolved_session(&project, "file-only", 1);
+    // Reconcile with a file that has a DIFFERENT session (not 34320f82-1f15-597f-8885-b098eafe1e7a)
+    let file_session = sample_resolved_session(&project, "418cf829-6691-5fc0-92b1-8e5013efa2cb", 1);
 
     let result = db
         .reconcile_sessions(&[project], &[file_session])
         .expect("reconcile");
     assert_eq!(result.sessions_imported, 1);
 
-    // daemon-only session must still exist
+    // 34320f82-1f15-597f-8885-b098eafe1e7a session must still exist
     let loaded = db
-        .load_session_state("daemon-only")
+        .load_session_state("34320f82-1f15-597f-8885-b098eafe1e7a")
         .expect("load")
         .expect("present");
     assert_eq!(loaded.context, "daemon created");
@@ -150,7 +150,9 @@ fn reconcile_preserves_daemon_only_sessions() {
 #[test]
 fn session_state_version_returns_none_when_missing() {
     let db = DaemonDb::open_in_memory().expect("open db");
-    let version = db.session_state_version("nonexistent").expect("query");
+    let version = db
+        .session_state_version("418cf829-6691-5fc0-92b1-8e5013efa2cb")
+        .expect("query");
     assert_eq!(version, None);
 }
 

@@ -34,13 +34,14 @@ fn list_session_summaries_full_meets_performance_budget() {
 #[test]
 fn resolve_session_meets_performance_budget() {
     let db = seeded_performance_db(16, 8);
+    let session_id = performance_session_id(7, 5);
 
     median_runtime_budget_ms("resolve_session", 31, 10, || {
         let resolved = db
-            .resolve_session("sess-7-5")
+            .resolve_session(&session_id)
             .expect("resolve session")
             .expect("session present");
-        assert_eq!(resolved.state.session_id, "sess-7-5");
+        assert_eq!(resolved.state.session_id, session_id);
     });
 }
 

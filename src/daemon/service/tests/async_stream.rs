@@ -8,7 +8,7 @@ fn global_stream_initial_events_async_include_current_session_index() {
             "",
             project,
             Some("claude"),
-            Some("daemon-async-stream-initial-index"),
+            Some("f2557b73-5008-517a-ba2e-3541b7663fe2"),
         )
         .expect("start session");
 
@@ -53,7 +53,7 @@ fn session_stream_initial_events_async_include_current_session_snapshot() {
             "",
             project,
             Some("claude"),
-            Some("daemon-async-stream-initial-session"),
+            Some("ea5c6cc6-4f61-5ccf-a7f3-b6499661aa0c"),
         )
         .expect("start session");
 

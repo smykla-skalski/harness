@@ -181,13 +181,13 @@ pub(in crate::daemon::http) fn sample_session_state() -> SessionState {
     SessionState {
         schema_version: 3,
         state_version: 1,
-        session_id: "sess-test-1".into(),
+        session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
         project_name: String::new(),
         worktree_path: PathBuf::new(),
         shared_path: PathBuf::new(),
         origin_path: PathBuf::new(),
         branch_ref: String::new(),
-        title: "sess-test-1".into(),
+        title: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
         context: "http timeline scope fixture".into(),
         status: SessionStatus::Active,
         policy: Default::default(),
@@ -221,6 +221,6 @@ pub(in crate::daemon::http) fn sample_tool_result_event() -> ConversationEvent {
             duration_ms: Some(125),
         },
         agent: "codex-worker".into(),
-        session_id: "sess-test-1".into(),
+        session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
     }
 }

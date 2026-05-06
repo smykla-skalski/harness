@@ -8,7 +8,7 @@ fn sessions_updated_event_includes_projects_and_sessions() {
             "",
             project,
             Some("claude"),
-            Some("daemon-stream-index"),
+            Some("9cd5e0ca-d2e9-5bfd-8527-5c71fe48dda9"),
         )
         .expect("start session");
 
@@ -32,7 +32,7 @@ fn global_stream_initial_events_include_current_session_index() {
             "",
             project,
             Some("claude"),
-            Some("daemon-stream-initial-index"),
+            Some("e7754a60-e588-586c-b23e-7b7a6497a538"),
         )
         .expect("start session");
 
@@ -63,7 +63,7 @@ fn session_stream_initial_events_include_current_session_snapshot() {
             "",
             project,
             Some("claude"),
-            Some("daemon-stream-initial-session"),
+            Some("5663c0f6-9871-571c-b3a2-b1ad8322f001"),
         )
         .expect("start session");
 
@@ -97,7 +97,7 @@ fn session_updated_event_includes_detail_without_timeline() {
             "",
             project,
             Some("claude"),
-            Some("daemon-stream-session"),
+            Some("7b2e2729-7a46-5026-aaa7-0f024292ebfa"),
         )
         .expect("start session");
         let leader_id = state.leader_id.expect("leader id");

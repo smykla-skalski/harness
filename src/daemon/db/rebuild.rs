@@ -156,7 +156,7 @@ mod tests {
                 "INSERT INTO sessions (\
                     session_id, project_id, schema_version, state_version, context, \
                     status, created_at, updated_at, state_json\
-                ) VALUES ('sess-1','proj-1',10,1,'ctx','active','2026-04-20T00:00:00Z','2026-04-20T00:00:00Z','{}')",
+                ) VALUES ('eadbcb3e-6ef7-53d2-ad56-0347cb7189fc','proj-1',10,1,'ctx','active','2026-04-20T00:00:00Z','2026-04-20T00:00:00Z','{}')",
                 [],
             )
             .expect("seed session");
@@ -187,18 +187,22 @@ mod tests {
         seed_session(&db);
 
         let first = vec![review_fixture("r1", 1, ReviewVerdict::Approve)];
-        db.rebuild_task_reviews("sess-1", "task-1", &first)
+        db.rebuild_task_reviews("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "task-1", &first)
             .expect("rebuild once");
-        assert_eq!(db.count_task_reviews("sess-1", "task-1").expect("count"), 1);
+        assert_eq!(
+            db.count_task_reviews("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "task-1")
+                .expect("count"),
+            1
+        );
 
         let second = vec![
             review_fixture("r1", 1, ReviewVerdict::Approve),
             review_fixture("r2", 2, ReviewVerdict::RequestChanges),
         ];
-        db.rebuild_task_reviews("sess-1", "task-1", &second)
+        db.rebuild_task_reviews("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "task-1", &second)
             .expect("rebuild twice");
         let summaries = db
-            .list_task_review_summaries("sess-1", "task-1")
+            .list_task_review_summaries("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "task-1")
             .expect("list");
         assert_eq!(
             summaries,
@@ -214,15 +218,23 @@ mod tests {
         let db = DaemonDb::open_in_memory().expect("open db");
         seed_session(&db);
         db.rebuild_task_reviews(
-            "sess-1",
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
             "task-1",
             &[review_fixture("r1", 1, ReviewVerdict::Approve)],
         )
         .expect("seed rebuild");
-        assert_eq!(db.count_task_reviews("sess-1", "task-1").expect("count"), 1);
-        db.rebuild_task_reviews("sess-1", "task-1", &[])
+        assert_eq!(
+            db.count_task_reviews("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "task-1")
+                .expect("count"),
+            1
+        );
+        db.rebuild_task_reviews("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "task-1", &[])
             .expect("clear rebuild");
-        assert_eq!(db.count_task_reviews("sess-1", "task-1").expect("count"), 0);
+        assert_eq!(
+            db.count_task_reviews("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "task-1")
+                .expect("count"),
+            0
+        );
     }
 
     #[test]
@@ -230,27 +242,29 @@ mod tests {
         let db = DaemonDb::open_in_memory().expect("open db");
         seed_session(&db);
         db.rebuild_task_reviews(
-            "sess-1",
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
             "task-a",
             &[review_fixture("ra", 1, ReviewVerdict::Approve)],
         )
         .expect("rebuild task a");
         db.rebuild_task_reviews(
-            "sess-1",
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
             "task-b",
             &[review_fixture("rb", 1, ReviewVerdict::RequestChanges)],
         )
         .expect("rebuild task b");
 
         // Clearing task-b must leave task-a intact.
-        db.rebuild_task_reviews("sess-1", "task-b", &[])
+        db.rebuild_task_reviews("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "task-b", &[])
             .expect("clear task b");
         assert_eq!(
-            db.count_task_reviews("sess-1", "task-a").expect("count a"),
+            db.count_task_reviews("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "task-a")
+                .expect("count a"),
             1
         );
         assert_eq!(
-            db.count_task_reviews("sess-1", "task-b").expect("count b"),
+            db.count_task_reviews("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "task-b")
+                .expect("count b"),
             0
         );
     }

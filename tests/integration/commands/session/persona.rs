@@ -45,7 +45,7 @@ fn join_session_with_unknown_persona_stores_none() {
             &[],
             None,
             &project,
-            Some("nonexistent-persona"),
+            Some("418cf829-6691-5fc0-92b1-8e5013efa2cb-persona"),
         )
         .unwrap();
 

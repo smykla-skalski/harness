@@ -460,12 +460,12 @@ mod tests {
     async fn event_batch_structure() {
         let batch = EventBatch {
             acp_id: "acp-1".to_string(),
-            session_id: "sess-1".to_string(),
+            session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".to_string(),
             events: vec![],
             raw_count: 5,
         };
         assert_eq!(batch.acp_id, "acp-1");
-        assert_eq!(batch.session_id, "sess-1");
+        assert_eq!(batch.session_id, "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc");
         assert_eq!(batch.raw_count, 5);
         assert!(batch.events.is_empty());
     }

@@ -105,7 +105,10 @@ mod tests {
                     "HARNESS_HOST_HOME",
                     Some(host_home.path().to_str().expect("host home")),
                 ),
-                ("HOME", Some("/nonexistent-harness-home")),
+                (
+                    "HOME",
+                    Some("/418cf829-6691-5fc0-92b1-8e5013efa2cb-harness-home"),
+                ),
                 ("PATH", Some("/usr/bin:/bin")),
             ],
             || {

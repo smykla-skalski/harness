@@ -101,7 +101,7 @@ fn pending_filter_works() {
 
 #[test]
 fn load_returns_none_when_no_file() {
-    let path = Path::new("/nonexistent/latest.json");
+    let path = Path::new("/418cf829-6691-5fc0-92b1-8e5013efa2cb/latest.json");
     assert!(read_handoff_from(path).is_none());
 }
 

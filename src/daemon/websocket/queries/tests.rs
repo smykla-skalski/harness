@@ -82,7 +82,7 @@ async fn dispatch_read_query_session_managed_agents_returns_merged_response() {
     let request = WsRequest {
         id: "req-managed-agents".into(),
         method: "session.managed_agents".into(),
-        params: serde_json::json!({ "session_id": "sess-test-1" }),
+        params: serde_json::json!({ "session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4" }),
         trace_context: None,
     };
 
@@ -125,7 +125,7 @@ async fn dispatch_read_query_managed_agent_detail_returns_coded_snapshot() {
     assert_eq!(result["snapshot"]["run_id"].as_str(), Some("run-2"));
     assert_eq!(
         result["snapshot"]["session_id"].as_str(),
-        Some("sess-test-1")
+        Some("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4")
     );
 }
 
@@ -192,7 +192,7 @@ async fn dispatch_read_query_managed_agent_acp_inspect_uses_session_id_scope() {
             id: "req-acp-inspect-alias".into(),
             method: "managed_agent.acp_inspect".into(),
             params: serde_json::json!({
-                "session_id": "sess-test-1",
+                "session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
             }),
             trace_context: None,
         };
@@ -213,7 +213,7 @@ async fn dispatch_read_query_managed_agent_acp_inspect_rejects_legacy_require_se
         id: "req-acp-inspect-legacy-scope".into(),
         method: "managed_agent.acp_inspect".into(),
         params: serde_json::json!({
-            "require_session_id": "sess-test-1",
+            "require_session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
         }),
         trace_context: None,
     };
@@ -237,7 +237,7 @@ async fn dispatch_read_query_managed_agent_acp_transcript_returns_only_acp_rows(
             id: "req-acp-transcript".into(),
             method: "managed_agent.acp_transcript".into(),
             params: serde_json::json!({
-                "session_id": "sess-test-1",
+                "session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
             }),
             trace_context: None,
         };
@@ -251,7 +251,10 @@ async fn dispatch_read_query_managed_agent_acp_transcript_returns_only_acp_rows(
         };
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0]["kind"].as_str(), Some("assistant_text"));
-        assert_eq!(entries[0]["session_id"].as_str(), Some("sess-test-1"));
+        assert_eq!(
+            entries[0]["session_id"].as_str(),
+            Some("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4")
+        );
         assert_eq!(entries[0]["agent_id"].as_str(), Some("codex-worker"));
         assert_eq!(entries[0]["summary"].as_str(), Some("ACP transcript line"));
         assert_eq!(entries[0]["payload"]["runtime"].as_str(), Some("gemini"));
@@ -268,7 +271,7 @@ async fn dispatch_read_query_managed_agent_acp_transcript_uses_session_id_scope(
             id: "req-acp-transcript-alias".into(),
             method: "managed_agent.acp_transcript".into(),
             params: serde_json::json!({
-                "session_id": "sess-test-1",
+                "session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
             }),
             trace_context: None,
         };
@@ -292,7 +295,7 @@ async fn dispatch_read_query_managed_agent_acp_transcript_rejects_legacy_require
         id: "req-acp-transcript-legacy-scope".into(),
         method: "managed_agent.acp_transcript".into(),
         params: serde_json::json!({
-            "require_session_id": "sess-test-1",
+            "require_session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
         }),
         trace_context: None,
     };
@@ -315,7 +318,7 @@ async fn dispatch_read_query_session_timeline_summary_scope_returns_window_metad
         id: "req-timeline-summary".into(),
         method: "session.timeline".into(),
         params: serde_json::json!({
-            "session_id": "sess-test-1",
+            "session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
             "scope": "summary",
         }),
         trace_context: None,
@@ -347,7 +350,7 @@ async fn dispatch_read_query_session_timeline_uses_async_db_when_sync_db_is_unav
         id: "req-timeline-async".into(),
         method: "session.timeline".into(),
         params: serde_json::json!({
-            "session_id": "sess-test-1",
+            "session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
             "scope": "summary",
         }),
         trace_context: None,
@@ -370,7 +373,7 @@ fn seed_sample_acp_transcript(state: &DaemonHttpState) {
     let db_path = state.db_path.as_ref().expect("db path");
     let db = DaemonDb::open(db_path).expect("open file db");
     let mut session = db
-        .load_session_state("sess-test-1")
+        .load_session_state("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4")
         .expect("load sample session")
         .expect("sample session present");
     let agent = session
@@ -382,7 +385,7 @@ fn seed_sample_acp_transcript(state: &DaemonHttpState) {
     db.save_session_state("project-abc123", &session)
         .expect("save managed ACP session");
     db.sync_conversation_events(
-        "sess-test-1",
+        "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
         "codex-worker",
         "gemini",
         &[ConversationEvent {
@@ -392,7 +395,7 @@ fn seed_sample_acp_transcript(state: &DaemonHttpState) {
                 content: "ACP transcript line".into(),
             },
             agent: "codex-worker".into(),
-            session_id: "sess-test-1".into(),
+            session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
         }],
     )
     .expect("sync ACP conversation events");

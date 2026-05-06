@@ -226,7 +226,7 @@ fn bridge_start_holds_exclusive_bridge_lock_while_serving() {
     std::fs::create_dir_all(&host_home).expect("create host home");
     let daemon_data_home = tmp.path().to_str().expect("utf8").to_string();
     // Redirect host home to the tempdir so the macOS group-container candidate
-    // in discovery points inside the tempdir (nonexistent) and adoption cannot
+    // in discovery points inside the tempdir (418cf829-6691-5fc0-92b1-8e5013efa2cb) and adoption cannot
     // be fooled by a real Monitor daemon running on the developer machine.
     let host_home = host_home.to_str().expect("utf8 host home").to_string();
 

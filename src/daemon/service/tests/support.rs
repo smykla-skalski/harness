@@ -20,12 +20,16 @@ pub(super) fn install_test_observe_async_db(async_db: Arc<crate::daemon::db::Asy
 pub(super) fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
     let tmp = tempdir().expect("tempdir");
     with_isolated_harness_env(tmp.path(), || {
-        temp_env::with_var("CLAUDE_SESSION_ID", Some("leader-session"), || {
-            let project = tmp.path().join("project");
-            fs::create_dir_all(&project).expect("create project dir");
-            init_git_with_seed_commit(&project);
-            test_fn(&project);
-        });
+        temp_env::with_var(
+            "CLAUDE_SESSION_ID",
+            Some("77d13b08-1651-541b-a3fc-26cab59e0aea"),
+            || {
+                let project = tmp.path().join("project");
+                fs::create_dir_all(&project).expect("create project dir");
+                init_git_with_seed_commit(&project);
+                test_fn(&project);
+            },
+        );
     });
 }
 
@@ -312,7 +316,7 @@ pub(super) fn setup_db_only_session(
     let state = build_new_session(
         "db-only test",
         "",
-        "db-only-sess",
+        "3aa215bd-08be-52bc-a4ab-612370a72cac",
         "claude",
         Some("test-session"),
         &utc_now(),

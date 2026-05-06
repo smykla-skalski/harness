@@ -58,7 +58,7 @@ fn start_session_direct_without_db_forwards_policy_preset_to_daemon_client() {
                 let state = crate::session::service::build_new_session_with_policy(
                     "daemon forwarded context",
                     "daemon forwarded title",
-                    "daemon-forwarded-session",
+                    "00000000-0000-4000-8000-000000000101",
                     "leaderless",
                     None,
                     &utc_now(),
@@ -79,7 +79,7 @@ fn start_session_direct_without_db_forwards_policy_preset_to_daemon_client() {
             &crate::daemon::protocol::SessionStartRequest {
                 title: "direct daemon fallback".into(),
                 context: "daemon client fallback".into(),
-                session_id: Some("daemon-client-start".into()),
+                session_id: Some("00000000-0000-4000-8000-000000000102".into()),
                 project_dir: project.to_string_lossy().into_owned(),
                 policy_preset: Some("swarm-default".into()),
                 base_ref: None,
@@ -88,7 +88,7 @@ fn start_session_direct_without_db_forwards_policy_preset_to_daemon_client() {
         )
         .expect("start session through daemon client");
 
-        assert_eq!(state.session_id, "daemon-forwarded-session");
+        assert_eq!(state.session_id, "00000000-0000-4000-8000-000000000101");
 
         server.join().expect("server");
         let request = requests
@@ -120,7 +120,7 @@ fn start_session_direct_creates_worktree() {
         )
         .expect("start session creates worktree");
 
-        assert_eq!(state.session_id.len(), 8, "session id is 8 chars");
+        uuid::Uuid::parse_str(&state.session_id).expect("session id must be UUID");
         assert_eq!(state.branch_ref, format!("harness/{}", state.session_id));
         assert!(
             state.worktree_path.exists(),
@@ -154,7 +154,7 @@ fn start_session_direct_creates_worktree_without_git_identity_config() {
             &crate::daemon::protocol::SessionStartRequest {
                 title: "worktree start".into(),
                 context: "survives missing git identity".into(),
-                session_id: Some("identityless".into()),
+                session_id: Some("00000000-0000-4000-8000-000000000103".into()),
                 project_dir: project.to_string_lossy().into_owned(),
                 policy_preset: None,
                 base_ref: None,
@@ -163,10 +163,37 @@ fn start_session_direct_creates_worktree_without_git_identity_config() {
         )
         .expect("start session creates worktree without git identity config");
 
-        assert_eq!(state.session_id, "identityless");
+        assert_eq!(state.session_id, "00000000-0000-4000-8000-000000000103");
         assert!(
             state.worktree_path.join("README.md").exists(),
             "checked-out README.md must exist"
+        );
+    });
+}
+
+#[test]
+fn start_session_direct_rejects_non_uuid_explicit_session_id() {
+    with_temp_project(|project| {
+        let db = setup_db_with_project(project);
+        let error = start_session_direct(
+            &crate::daemon::protocol::SessionStartRequest {
+                title: "invalid id".into(),
+                context: "reject non-uuid explicit id".into(),
+                session_id: Some("not-a-uuid".into()),
+                project_dir: project.to_string_lossy().into_owned(),
+                policy_preset: None,
+                base_ref: None,
+            },
+            Some(&db),
+        )
+        .expect_err("non-uuid explicit session id should be rejected");
+
+        assert_eq!(error.code(), "WORKFLOW_PARSE");
+        assert!(
+            error
+                .to_string()
+                .contains("session id must be a lowercase UUID"),
+            "unexpected error: {error}"
         );
     });
 }
@@ -202,34 +229,38 @@ fn start_session_direct_rejects_unknown_policy_preset() {
 fn session_start_honors_custom_base_ref() {
     let tmp = tempdir().expect("tempdir");
     with_isolated_harness_env(tmp.path(), || {
-        temp_env::with_var("CLAUDE_SESSION_ID", Some("leader-session"), || {
-            let project = tmp.path().join("project");
-            init_git_with_branches(&project, "experimental");
-            let db = setup_db_with_project(&project);
+        temp_env::with_var(
+            "CLAUDE_SESSION_ID",
+            Some("77d13b08-1651-541b-a3fc-26cab59e0aea"),
+            || {
+                let project = tmp.path().join("project");
+                init_git_with_branches(&project, "experimental");
+                let db = setup_db_with_project(&project);
 
-            let experimental_head = harness_testkit::git_head_sha(&project, "experimental");
+                let experimental_head = harness_testkit::git_head_sha(&project, "experimental");
 
-            let state = start_session_direct(
-                &crate::daemon::protocol::SessionStartRequest {
-                    title: "base_ref test".into(),
-                    context: "honors custom base ref".into(),
-                    session_id: None,
-                    project_dir: project.to_string_lossy().into_owned(),
-                    policy_preset: None,
-                    base_ref: Some("experimental".into()),
-                },
-                Some(&db),
-            )
-            .expect("start session with custom base_ref");
+                let state = start_session_direct(
+                    &crate::daemon::protocol::SessionStartRequest {
+                        title: "base_ref test".into(),
+                        context: "honors custom base ref".into(),
+                        session_id: None,
+                        project_dir: project.to_string_lossy().into_owned(),
+                        policy_preset: None,
+                        base_ref: Some("experimental".into()),
+                    },
+                    Some(&db),
+                )
+                .expect("start session with custom base_ref");
 
-            let worktree_head = harness_testkit::git_head_sha(&project, &state.branch_ref);
+                let worktree_head = harness_testkit::git_head_sha(&project, &state.branch_ref);
 
-            assert_eq!(
-                worktree_head, experimental_head,
-                "worktree HEAD must match experimental tip; branch_ref={}",
-                state.branch_ref
-            );
-        });
+                assert_eq!(
+                    worktree_head, experimental_head,
+                    "worktree HEAD must match experimental tip; branch_ref={}",
+                    state.branch_ref
+                );
+            },
+        );
     });
 }
 

@@ -14,7 +14,7 @@ fn session_timeline_summary_scope_keeps_entries_but_omits_payloads() {
         )],
         || {
             let context_root = context_root(tmp.path());
-            let session_id = "sess-summary";
+            let session_id = "51c709cf-e2d3-53cb-873b-0dfa333c45a6";
             write_standard_timeline_fixture(&context_root, session_id);
 
             let full_entries = session_timeline(session_id).expect("full timeline");

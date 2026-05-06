@@ -28,7 +28,7 @@ fn websocket_async_session_start_mutation_succeeds_without_sync_db() {
                     "title": "async websocket session",
                     "context": "prefer sqlx websocket path",
                     "runtime": "claude",
-                    "session_id": "ws-session-start-async",
+                    "session_id": "5e0972f2-32bf-5b15-9536-8a06bf272286",
                     "project_dir": project_dir.to_string_lossy().into_owned(),
                 }),
                 trace_context: None,
@@ -42,7 +42,7 @@ fn websocket_async_session_start_mutation_succeeds_without_sync_db() {
                     .result
                     .as_ref()
                     .and_then(|result| result["state"]["session_id"].as_str()),
-                Some("ws-session-start-async")
+                Some("5e0972f2-32bf-5b15-9536-8a06bf272286")
             );
             assert_eq!(
                 response

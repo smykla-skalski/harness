@@ -335,7 +335,7 @@ mod tests {
         // live runs stay under budget.
         let parsed = TerminalParse::try_parse_from([
             "terminal",
-            "sess-1",
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
             "--runtime",
             "codex",
             "--model",
@@ -353,7 +353,7 @@ mod tests {
     fn terminal_cli_accepts_allow_custom_model_flag() {
         let parsed = TerminalParse::try_parse_from([
             "terminal",
-            "sess-1",
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
             "--runtime",
             "claude",
             "--model",
@@ -375,23 +375,33 @@ mod tests {
             "--agent",
             "copilot",
             "--session-id",
-            "sess-1",
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
             "--prompt",
             "hello",
             "--record-permissions",
         ])
         .expect("parse");
         assert_eq!(parsed.args.agent, "copilot");
-        assert_eq!(parsed.args.session_id, "sess-1");
+        assert_eq!(
+            parsed.args.session_id,
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"
+        );
         assert_eq!(parsed.args.prompt.as_deref(), Some("hello"));
         assert!(parsed.args.record_permissions);
     }
 
     #[test]
     fn acp_inspect_cli_accepts_optional_session_filter() {
-        let parsed =
-            AcpInspectParse::try_parse_from(["inspect", "--session-id", "sess-1"]).expect("parse");
-        assert_eq!(parsed.args.session_id.as_deref(), Some("sess-1"));
+        let parsed = AcpInspectParse::try_parse_from([
+            "inspect",
+            "--session-id",
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+        ])
+        .expect("parse");
+        assert_eq!(
+            parsed.args.session_id.as_deref(),
+            Some("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
+        );
         let parsed = AcpInspectParse::try_parse_from(["inspect"]).expect("parse");
         assert_eq!(parsed.args.session_id, None);
     }
@@ -400,7 +410,7 @@ mod tests {
     fn codex_cli_parses_effort_and_model_at_lowest_tier() {
         let parsed = CodexParse::try_parse_from([
             "codex",
-            "sess-1",
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
             "--prompt",
             "explore the suite",
             "--model",

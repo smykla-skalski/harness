@@ -35,6 +35,7 @@ fn state_repository(layout: &SessionLayout) -> VersionedJsonRepository<SessionSt
 /// # Errors
 /// Returns `CliError` on I/O or parse failures.
 pub(crate) fn load_state(layout: &SessionLayout) -> Result<Option<SessionState>, CliError> {
+    files::validate_session_id(&layout.session_id)?;
     state_repository(layout).load()
 }
 
@@ -84,6 +85,7 @@ where
     F: FnOnce(&mut SessionState) -> Result<(), CliError>,
 {
     let session_id = layout.session_id.clone();
+    files::validate_session_id(&layout.session_id)?;
     state_repository(layout)
         .update(|state| {
             let Some(mut state) = state else {
@@ -123,6 +125,7 @@ where
     F: FnOnce(&mut SessionState) -> Result<bool, CliError>,
 {
     let session_id = layout.session_id.clone();
+    files::validate_session_id(&layout.session_id)?;
     state_repository(layout)
         .update(|state| {
             let Some(mut state) = state else {

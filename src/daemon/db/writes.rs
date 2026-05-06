@@ -7,6 +7,7 @@ use super::{
     stored_timeline_entry, u64_from_i64, upsert_session_timeline_entry, utc_now,
 };
 use crate::session::service::{agent_status_db_label, canonicalize_persisted_session_state};
+use crate::session::storage;
 use crate::session::types::ManagedAgentKind;
 
 impl DaemonDb {
@@ -67,6 +68,7 @@ impl DaemonDb {
         let now = utc_now();
         let mut canonical_state = state.clone();
         canonicalize_persisted_session_state(&mut canonical_state, &now);
+        storage::validate_session_id(&canonical_state.session_id)?;
 
         let state_json = serde_json::to_string(&canonical_state)
             .map_err(|error| db_error(format!("serialize session state: {error}")))?;

@@ -244,7 +244,7 @@ mod tests {
     fn acp_agent_snapshot_serializes_explicit_identity_fields() {
         let snapshot = AcpAgentSnapshot {
             acp_id: "acp-1".into(),
-            session_id: "sess-1".into(),
+            session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
             agent_id: "worker-1".into(),
             display_name: "Copilot".into(),
             status: crate::session::types::AgentStatus::Active,
@@ -274,7 +274,7 @@ mod tests {
     fn acp_agent_inspect_snapshot_serializes_explicit_identity_fields() {
         let snapshot = AcpAgentInspectSnapshot {
             acp_id: "acp-1".into(),
-            session_id: "sess-1".into(),
+            session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
             agent_id: "worker-1".into(),
             display_name: "Copilot".into(),
             pid: 42,
@@ -305,7 +305,7 @@ mod tests {
         let snapshot: AcpAgentSnapshot = serde_json::from_value(serde_json::json!({
             "managed_agent_id": "acp-1",
             "managed_agent_family": "acp",
-            "session_id": "sess-1",
+            "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
             "session_agent_id": "worker-1",
             "display_name": "Copilot",
             "status": "active",
@@ -331,7 +331,7 @@ mod tests {
         let snapshot: AcpAgentInspectSnapshot = serde_json::from_value(serde_json::json!({
             "managed_agent_id": "acp-1",
             "managed_agent_family": "acp",
-            "session_id": "sess-1",
+            "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
             "session_agent_id": "worker-1",
             "display_name": "Copilot",
             "pid": 42,
@@ -355,7 +355,7 @@ mod tests {
     fn acp_agent_snapshot_rejects_missing_managed_agent_family() {
         let error = serde_json::from_value::<AcpAgentSnapshot>(serde_json::json!({
             "managed_agent_id": "acp-1",
-            "session_id": "sess-1",
+            "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
             "session_agent_id": "worker-1",
             "display_name": "Copilot",
             "status": "active",
@@ -383,7 +383,7 @@ mod tests {
         let error = serde_json::from_value::<AcpAgentInspectSnapshot>(serde_json::json!({
             "managed_agent_id": "acp-1",
             "managed_agent_family": "tui",
-            "session_id": "sess-1",
+            "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
             "session_agent_id": "worker-1",
             "display_name": "Copilot",
             "pid": 42,

@@ -31,14 +31,18 @@ async fn start_descriptor_lazily_opens_canonical_db_for_orchestration_registrati
             let manager = AcpAgentManagerHandle::new(sender, Arc::new(OnceLock::new()));
 
             let snapshot = manager
-                .start_descriptor("sess-1", &request, &descriptor)
+                .start_descriptor(
+                    "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                    &request,
+                    &descriptor,
+                )
                 .expect("start with lazy-opened daemon db");
 
             assert!(
                 manager.state.db.get().is_some(),
                 "manager should cache opened db"
             );
-            let state = super::load_session_state(&manager, "sess-1");
+            let state = super::load_session_state(&manager, "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc");
             let agent = state
                 .agents
                 .get(&snapshot.agent_id)

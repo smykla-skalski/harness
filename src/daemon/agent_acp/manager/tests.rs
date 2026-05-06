@@ -9,7 +9,10 @@ use tokio::sync::broadcast;
 
 use super::*;
 use crate::agents::acp::catalog::{self, AcpAgentDescriptor};
-use crate::agents::runtime::signal::{DeliveryConfig, Signal, SignalPayload, SignalPriority};
+use crate::agents::runtime::signal::read_acknowledgments as read_signal_acknowledgments;
+use crate::agents::runtime::signal::{
+    DeliveryConfig, Signal, SignalPayload, SignalPriority, write_signal_file,
+};
 use crate::daemon::agent_acp::manager::test_support::{
     seeded_manager, seeded_manager_with_events, write_executable, write_sleeping_acp_agent,
 };
@@ -18,6 +21,12 @@ use crate::session::types::ManagedAgentRef;
 
 fn manager() -> AcpAgentManagerHandle {
     seeded_manager()
+}
+
+fn with_acp_test_env(temp: &TempDir, action: impl FnOnce()) {
+    with_isolated_harness_env(temp.path(), || {
+        temp_env::with_var(feature_flags::ACP_ENV, Some("1"), action);
+    });
 }
 
 fn manager_with_events() -> (
@@ -149,14 +158,12 @@ fn wait_for_runtime_session_id_value(
 }
 
 fn wait_for_signal_ack(
-    runtime: &'static dyn crate::agents::runtime::AgentRuntime,
-    project_dir: &Path,
-    signal_session_id: &str,
+    signal_dir: &Path,
     signal_id: &str,
 ) -> crate::agents::runtime::signal::SignalAck {
     let deadline = Instant::now() + Duration::from_secs(2);
     loop {
-        let Ok(acks) = runtime.read_acknowledgments(project_dir, signal_session_id) else {
+        let Ok(acks) = read_signal_acknowledgments(signal_dir) else {
             unreachable!();
         };
         if let Some(ack) = acks.into_iter().find(|ack| ack.signal_id == signal_id) {
@@ -164,33 +171,62 @@ fn wait_for_signal_ack(
         }
         assert!(
             Instant::now() < deadline,
-            "timed out waiting for signal ack {signal_id} in {signal_session_id}"
+            "timed out waiting for signal ack {signal_id} at {}; entries: {}",
+            signal_dir.display(),
+            signal_dir_entries(signal_dir)
         );
         std::thread::sleep(Duration::from_millis(50));
     }
 }
 
-fn assert_no_signal_ack_within(
-    runtime: &'static dyn crate::agents::runtime::AgentRuntime,
-    project_dir: &Path,
-    signal_session_id: &str,
-    signal_id: &str,
-    duration: Duration,
-) {
+fn signal_dir_entries(signal_dir: &Path) -> String {
+    let mut entries = Vec::new();
+    for child in ["pending", "acknowledged"] {
+        let dir = signal_dir.join(child);
+        let read_dir = match fs_err::read_dir(&dir) {
+            Ok(read_dir) => read_dir,
+            Err(error) => {
+                entries.push(format!("{child}=<{:?}>", error.kind()));
+                continue;
+            }
+        };
+        let names = read_dir
+            .filter_map(Result::ok)
+            .filter_map(|entry| entry.file_name().into_string().ok())
+            .collect::<Vec<_>>()
+            .join(",");
+        entries.push(format!("{child}=[{names}]"));
+    }
+    entries.join(" ")
+}
+
+fn assert_no_signal_ack_within(signal_dir: &Path, signal_id: &str, duration: Duration) {
     let deadline = Instant::now() + duration;
     loop {
-        let Ok(acks) = runtime.read_acknowledgments(project_dir, signal_session_id) else {
+        let Ok(acks) = read_signal_acknowledgments(signal_dir) else {
             unreachable!();
         };
         assert!(
             acks.into_iter().all(|ack| ack.signal_id != signal_id),
-            "unexpected signal ack {signal_id} in {signal_session_id}"
+            "unexpected signal ack {signal_id} in {}",
+            signal_dir.display()
         );
         if Instant::now() >= deadline {
             return;
         }
         std::thread::sleep(Duration::from_millis(25));
     }
+}
+
+#[track_caller]
+fn assert_signal_pending(signal_dir: &Path, signal_id: &str) {
+    let pending = signal_dir.join("pending").join(format!("{signal_id}.json"));
+    assert!(
+        pending.is_file(),
+        "expected pending signal {signal_id} at {}; entries: {}",
+        signal_dir.display(),
+        signal_dir_entries(signal_dir)
+    );
 }
 
 fn repoint_project_dir(manager: &AcpAgentManagerHandle, project_dir: &Path) {
@@ -207,7 +243,7 @@ fn repoint_project_dir(manager: &AcpAgentManagerHandle, project_dir: &Path) {
         repository_root: Some(project_dir.to_path_buf()),
         checkout_id: "checkout-abc123".into(),
         checkout_name: "Repository".into(),
-        context_root: project_dir.to_path_buf(),
+        context_root: crate::workspace::project_context_dir(project_dir),
         is_worktree: false,
         worktree_name: None,
     };
@@ -221,7 +257,7 @@ fn sample_signal(signal_id: &str) -> Signal {
         signal_id: signal_id.to_string(),
         version: 1,
         created_at: "2026-05-05T07:00:00Z".into(),
-        expires_at: "2026-05-05T08:00:00Z".into(),
+        expires_at: "2099-05-05T08:00:00Z".into(),
         source_agent: "claude-leader".into(),
         command: "task.start".into(),
         priority: SignalPriority::Normal,
@@ -234,7 +270,9 @@ fn sample_signal(signal_id: &str) -> Signal {
         delivery: DeliveryConfig {
             max_retries: 3,
             retry_count: 0,
-            idempotency_key: Some(format!("sess-1:gemini:{signal_id}")),
+            idempotency_key: Some(format!(
+                "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc:gemini:{signal_id}"
+            )),
         },
     }
 }
@@ -255,17 +293,21 @@ async fn start_list_stop_tracks_live_snapshot() {
         };
         let manager = manager();
         let descriptor = descriptor(&script);
-        let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+        let Ok(snapshot) = manager.start_descriptor(
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            &request,
+            &descriptor,
+        ) else {
             unreachable!();
         };
 
-        let Ok(listed) = manager.list("sess-1") else {
+        let Ok(listed) = manager.list("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc") else {
             unreachable!();
         };
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].acp_id, snapshot.acp_id);
 
-        let Ok(inspected) = manager.inspect(Some("sess-1")) else {
+        let Ok(inspected) = manager.inspect(Some("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")) else {
             unreachable!();
         };
         assert_eq!(inspected.agents.len(), 1);
@@ -306,7 +348,11 @@ async fn abnormal_exit_populates_disconnect_reason_and_stderr_tail() {
         };
         let (manager, mut events) = manager_with_events();
         let descriptor = descriptor(&script);
-        let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+        let Ok(snapshot) = manager.start_descriptor(
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            &request,
+            &descriptor,
+        ) else {
             unreachable!();
         };
 
@@ -362,12 +408,17 @@ async fn stop_session_acp_agents_disconnects_archived_session_agents() {
         };
         let manager = manager();
         let descriptor = descriptor(&script);
-        let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+        let Ok(snapshot) = manager.start_descriptor(
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            &request,
+            &descriptor,
+        ) else {
             unreachable!();
         };
-        archive_session_state(&manager, "sess-1");
+        archive_session_state(&manager, "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc");
 
-        let Ok(stopped) = manager.stop_session_acp_agents("sess-1") else {
+        let Ok(stopped) = manager.stop_session_acp_agents("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
+        else {
             unreachable!();
         };
 
@@ -380,7 +431,7 @@ async fn stop_session_acp_agents_disconnects_archived_session_agents() {
                 ..
             }
         ));
-        let Ok(listed) = manager.list("sess-1") else {
+        let Ok(listed) = manager.list("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc") else {
             unreachable!();
         };
         assert!(listed.is_empty());
@@ -409,7 +460,8 @@ fn start_rejects_sandboxed_daemon_mode() {
                     ..AcpAgentStartRequest::default()
                 };
 
-                let Err(error) = manager().start("sess-1", &request) else {
+                let Err(error) = manager().start("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", &request)
+                else {
                     unreachable!();
                 };
                 let rendered = format!("{error}");

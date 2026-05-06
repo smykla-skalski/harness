@@ -71,7 +71,11 @@ fn preserves_symlinks_on_cross_volume_fallback() {
     let src_dir = tmp.path().join("src");
     let dst_dir = tmp.path().join("dst");
     fs::create_dir_all(&src_dir).unwrap();
-    std::os::unix::fs::symlink("/nonexistent/target", src_dir.join("link")).unwrap();
+    std::os::unix::fs::symlink(
+        "/418cf829-6691-5fc0-92b1-8e5013efa2cb/target",
+        src_dir.join("link"),
+    )
+    .unwrap();
     super::copy_recursive(&src_dir, &dst_dir).unwrap();
     let copied = dst_dir.join("link");
     assert!(
@@ -82,7 +86,7 @@ fn preserves_symlinks_on_cross_volume_fallback() {
     );
     assert_eq!(
         fs::read_link(&copied).unwrap(),
-        std::path::PathBuf::from("/nonexistent/target")
+        std::path::PathBuf::from("/418cf829-6691-5fc0-92b1-8e5013efa2cb/target")
     );
 }
 

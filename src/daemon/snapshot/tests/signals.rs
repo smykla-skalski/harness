@@ -16,8 +16,8 @@ fn load_signals_for_filters_shared_runtime_session_history() {
         || {
             let context_root = tmp.path().join("harness/projects/project-alpha");
             let shared_runtime_session = "codex-shared-session";
-            let session_one = "sess-alpha";
-            let session_two = "sess-beta";
+            let session_one = "0c3be78e-656d-52d3-b4c3-03ba64d373ac";
+            let session_two = "17625cc4-8be6-5f38-b1d6-e2342db78d57";
 
             let alpha_state =
                 sample_state_for_runtime(session_one, "codex", shared_runtime_session);
@@ -33,7 +33,7 @@ fn load_signals_for_filters_shared_runtime_session_history() {
                 &sample_signal_with_idempotency(
                     "sig-alpha",
                     "signal for alpha",
-                    Some("sess-alpha:codex-worker:inject_context"),
+                    Some("0c3be78e-656d-52d3-b4c3-03ba64d373ac:codex-worker:inject_context"),
                 ),
             )
             .expect("write alpha signal");
@@ -42,7 +42,7 @@ fn load_signals_for_filters_shared_runtime_session_history() {
                 &sample_signal_with_idempotency(
                     "sig-beta",
                     "signal for beta",
-                    Some("sess-beta:codex-worker:inject_context"),
+                    Some("17625cc4-8be6-5f38-b1d6-e2342db78d57:codex-worker:inject_context"),
                 ),
             )
             .expect("write beta signal");
@@ -71,8 +71,8 @@ fn session_detail_with_db_refreshes_shared_runtime_signal_index() {
         || {
             let context_root = tmp.path().join("harness/projects/project-alpha");
             let shared_runtime_session = "codex-shared-session";
-            let session_one = "sess-alpha";
-            let session_two = "sess-beta";
+            let session_one = "0c3be78e-656d-52d3-b4c3-03ba64d373ac";
+            let session_two = "17625cc4-8be6-5f38-b1d6-e2342db78d57";
             let alpha_state =
                 sample_state_for_runtime(session_one, "codex", shared_runtime_session);
             let beta_state = sample_state_for_runtime(session_two, "codex", shared_runtime_session);
@@ -89,7 +89,7 @@ fn session_detail_with_db_refreshes_shared_runtime_signal_index() {
                 &sample_signal_with_idempotency(
                     "sig-alpha",
                     "signal for alpha",
-                    Some("sess-alpha:codex-worker:inject_context"),
+                    Some("0c3be78e-656d-52d3-b4c3-03ba64d373ac:codex-worker:inject_context"),
                 ),
             )
             .expect("write alpha signal");
@@ -98,7 +98,7 @@ fn session_detail_with_db_refreshes_shared_runtime_signal_index() {
                 &sample_signal_with_idempotency(
                     "sig-beta",
                     "signal for beta",
-                    Some("sess-beta:codex-worker:inject_context"),
+                    Some("17625cc4-8be6-5f38-b1d6-e2342db78d57:codex-worker:inject_context"),
                 ),
             )
             .expect("write beta signal");
@@ -120,7 +120,9 @@ fn session_detail_with_db_refreshes_shared_runtime_signal_index() {
                         signal: sample_signal_with_idempotency(
                             "sig-alpha",
                             "stale alpha row",
-                            Some("sess-alpha:codex-worker:inject_context"),
+                            Some(
+                                "0c3be78e-656d-52d3-b4c3-03ba64d373ac:codex-worker:inject_context",
+                            ),
                         ),
                         acknowledgment: None,
                     },
@@ -132,7 +134,9 @@ fn session_detail_with_db_refreshes_shared_runtime_signal_index() {
                         signal: sample_signal_with_idempotency(
                             "sig-beta",
                             "misattributed beta row",
-                            Some("sess-beta:codex-worker:inject_context"),
+                            Some(
+                                "17625cc4-8be6-5f38-b1d6-e2342db78d57:codex-worker:inject_context",
+                            ),
                         ),
                         acknowledgment: None,
                     },

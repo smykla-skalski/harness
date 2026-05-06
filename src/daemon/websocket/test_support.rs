@@ -66,7 +66,7 @@ pub(super) fn seed_sample_timeline(state: &DaemonHttpState) {
     let db = db.lock().expect("db lock");
     persist_sample_session(&db);
     db.sync_conversation_events(
-        "sess-test-1",
+        "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
         "codex-worker",
         "codex",
         &[sample_tool_result_event()],
@@ -91,7 +91,7 @@ pub(super) async fn test_http_state_with_async_db_timeline() -> DaemonHttpState 
     persist_sample_session(&sync_db);
     sync_db
         .sync_conversation_events(
-            "sess-test-1",
+            "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
             "codex-worker",
             "codex",
             &[sample_tool_result_event()],
@@ -219,7 +219,7 @@ fn persist_sample_session(db: &DaemonDb) {
 fn sample_agent_tui(tui_id: &str, updated_at: &str) -> AgentTuiSnapshot {
     AgentTuiSnapshot {
         tui_id: tui_id.into(),
-        session_id: "sess-test-1".into(),
+        session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
         agent_id: "codex-worker".into(),
         runtime: "codex".into(),
         status: AgentTuiStatus::Running,
@@ -248,7 +248,7 @@ fn sample_agent_tui(tui_id: &str, updated_at: &str) -> AgentTuiSnapshot {
 fn sample_codex_run(run_id: &str, updated_at: &str) -> CodexRunSnapshot {
     CodexRunSnapshot {
         run_id: run_id.into(),
-        session_id: "sess-test-1".into(),
+        session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
         project_dir: "/tmp/harness".into(),
         thread_id: Some(format!("thread-{run_id}")),
         turn_id: Some(format!("turn-{run_id}")),
@@ -305,13 +305,13 @@ fn sample_session_state() -> SessionState {
     SessionState {
         schema_version: 3,
         state_version: 1,
-        session_id: "sess-test-1".into(),
+        session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
         project_name: String::new(),
         worktree_path: PathBuf::new(),
         shared_path: PathBuf::new(),
         origin_path: PathBuf::new(),
         branch_ref: String::new(),
-        title: "sess-test-1".into(),
+        title: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
         context: "agent tui websocket fixture".into(),
         status: SessionStatus::Active,
         policy: Default::default(),
@@ -345,6 +345,6 @@ fn sample_tool_result_event() -> ConversationEvent {
             duration_ms: Some(125),
         },
         agent: "codex-worker".into(),
-        session_id: "sess-test-1".into(),
+        session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
     }
 }

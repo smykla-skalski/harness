@@ -108,8 +108,14 @@ fn post_cancel_signal_uses_async_db_when_sync_db_is_unavailable() {
     with_isolated_harness_env(sandbox.path(), || {
         temp_env::with_vars(
             [
-                ("CLAUDE_SESSION_ID", Some("http-async-signal-cancel-leader")),
-                ("CODEX_SESSION_ID", Some("http-async-signal-cancel-worker")),
+                (
+                    "CLAUDE_SESSION_ID",
+                    Some("27399e39-2df2-5f88-9a33-de585d6c8e2a-leader"),
+                ),
+                (
+                    "CODEX_SESSION_ID",
+                    Some("27399e39-2df2-5f88-9a33-de585d6c8e2a-worker"),
+                ),
             ],
             || {
                 let project_dir = sandbox.path().join("project");
@@ -122,21 +128,22 @@ fn post_cancel_signal_uses_async_db_when_sync_db_is_unavailable() {
                     let _ = start_async_http_session(
                         state.clone(),
                         &project_dir,
-                        "http-async-signal-cancel",
+                        "27399e39-2df2-5f88-9a33-de585d6c8e2a",
                     )
                     .await;
                     let worker_id = join_http_worker(
                         &state,
-                        "http-async-signal-cancel",
+                        "27399e39-2df2-5f88-9a33-de585d6c8e2a",
                         &project_dir,
                         "Async Signal Worker",
                     )
                     .await;
-                    let leader_id = leader_id_for_session(&state, "http-async-signal-cancel").await;
+                    let leader_id =
+                        leader_id_for_session(&state, "27399e39-2df2-5f88-9a33-de585d6c8e2a").await;
 
                     let signal_id = seed_pending_signal(
                         &state,
-                        "http-async-signal-cancel",
+                        "27399e39-2df2-5f88-9a33-de585d6c8e2a",
                         &leader_id,
                         &worker_id,
                         &project_dir,
@@ -145,7 +152,7 @@ fn post_cancel_signal_uses_async_db_when_sync_db_is_unavailable() {
                     .await;
 
                     let response = post_cancel_signal(
-                        axum::extract::Path("http-async-signal-cancel".to_owned()),
+                        axum::extract::Path("27399e39-2df2-5f88-9a33-de585d6c8e2a".to_owned()),
                         auth_headers(),
                         State(state.clone()),
                         Json(SignalCancelRequest {
@@ -175,8 +182,14 @@ fn post_send_signal_uses_async_db_when_sync_db_is_unavailable() {
     with_isolated_harness_env(sandbox.path(), || {
         temp_env::with_vars(
             [
-                ("CLAUDE_SESSION_ID", Some("http-async-signal-send-leader")),
-                ("CODEX_SESSION_ID", Some("http-async-signal-send-worker")),
+                (
+                    "CLAUDE_SESSION_ID",
+                    Some("42ef1ed5-9334-5e33-9009-51b6e7a0acbe-leader"),
+                ),
+                (
+                    "CODEX_SESSION_ID",
+                    Some("42ef1ed5-9334-5e33-9009-51b6e7a0acbe-worker"),
+                ),
             ],
             || {
                 let project_dir = sandbox.path().join("project");
@@ -189,20 +202,21 @@ fn post_send_signal_uses_async_db_when_sync_db_is_unavailable() {
                     let _ = start_async_http_session(
                         state.clone(),
                         &project_dir,
-                        "http-async-signal-send",
+                        "42ef1ed5-9334-5e33-9009-51b6e7a0acbe",
                     )
                     .await;
                     let worker_id = join_http_worker(
                         &state,
-                        "http-async-signal-send",
+                        "42ef1ed5-9334-5e33-9009-51b6e7a0acbe",
                         &project_dir,
                         "Async Send Worker",
                     )
                     .await;
-                    let leader_id = leader_id_for_session(&state, "http-async-signal-send").await;
+                    let leader_id =
+                        leader_id_for_session(&state, "42ef1ed5-9334-5e33-9009-51b6e7a0acbe").await;
 
                     let response = post_send_signal(
-                        axum::extract::Path("http-async-signal-send".to_owned()),
+                        axum::extract::Path("42ef1ed5-9334-5e33-9009-51b6e7a0acbe".to_owned()),
                         auth_headers(),
                         State(state.clone()),
                         Json(SignalSendRequest {
@@ -239,8 +253,14 @@ fn post_signal_ack_uses_async_db_when_sync_db_is_unavailable() {
     with_isolated_harness_env(sandbox.path(), || {
         temp_env::with_vars(
             [
-                ("CLAUDE_SESSION_ID", Some("http-async-signal-ack-leader")),
-                ("CODEX_SESSION_ID", Some("http-async-signal-ack-worker")),
+                (
+                    "CLAUDE_SESSION_ID",
+                    Some("c7bc45c8-e662-5dc9-af34-8959bac5c8e8-leader"),
+                ),
+                (
+                    "CODEX_SESSION_ID",
+                    Some("c7bc45c8-e662-5dc9-af34-8959bac5c8e8-worker"),
+                ),
             ],
             || {
                 let project_dir = sandbox.path().join("project");
@@ -253,21 +273,22 @@ fn post_signal_ack_uses_async_db_when_sync_db_is_unavailable() {
                     let _ = start_async_http_session(
                         state.clone(),
                         &project_dir,
-                        "http-async-signal-ack",
+                        "c7bc45c8-e662-5dc9-af34-8959bac5c8e8",
                     )
                     .await;
                     let worker_id = join_http_worker(
                         &state,
-                        "http-async-signal-ack",
+                        "c7bc45c8-e662-5dc9-af34-8959bac5c8e8",
                         &project_dir,
                         "Async Ack Worker",
                     )
                     .await;
-                    let leader_id = leader_id_for_session(&state, "http-async-signal-ack").await;
+                    let leader_id =
+                        leader_id_for_session(&state, "c7bc45c8-e662-5dc9-af34-8959bac5c8e8").await;
 
                     let signal_id = seed_pending_signal(
                         &state,
-                        "http-async-signal-ack",
+                        "c7bc45c8-e662-5dc9-af34-8959bac5c8e8",
                         &leader_id,
                         &worker_id,
                         &project_dir,
@@ -276,7 +297,7 @@ fn post_signal_ack_uses_async_db_when_sync_db_is_unavailable() {
                     .await;
 
                     let response = post_signal_ack(
-                        axum::extract::Path("http-async-signal-ack".to_owned()),
+                        axum::extract::Path("c7bc45c8-e662-5dc9-af34-8959bac5c8e8".to_owned()),
                         auth_headers(),
                         State(state.clone()),
                         Json(SignalAckRequest {
@@ -294,7 +315,7 @@ fn post_signal_ack_uses_async_db_when_sync_db_is_unavailable() {
 
                     let async_db = state.async_db.get().expect("async db");
                     let record = async_db
-                        .load_signals("http-async-signal-ack")
+                        .load_signals("c7bc45c8-e662-5dc9-af34-8959bac5c8e8")
                         .await
                         .expect("load signals")
                         .into_iter()

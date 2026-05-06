@@ -22,7 +22,7 @@ fn submit_review_async_concurrent_reviewers_close_quorum_without_lost_state() {
             let state = start_direct_session_async(
                 &async_db,
                 project,
-                "daemon-async-submit-review-quorum",
+                "1b2673b9-af39-5493-a17b-ef8c2bbe86d9",
                 "async submit_review quorum",
                 "async review flow",
                 None,

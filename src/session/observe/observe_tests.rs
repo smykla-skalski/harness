@@ -16,36 +16,48 @@ use super::test_support::{
 #[test]
 fn observe_scans_logs_via_runtime_session_id() {
     with_temp_project(|project| {
-        let state = start_active_session(project, "sess-1", "observe test");
+        let state = start_active_session(
+            project,
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            "observe test",
+        );
 
-        temp_env::with_vars([("CODEX_SESSION_ID", Some("worker-session"))], || {
-            let joined = service::join_session(
-                &state.session_id,
-                SessionRole::Worker,
-                "codex",
-                &[],
-                None,
-                project,
-                None,
-            )
-            .expect("join codex worker");
-            let worker = joined
-                .agents
-                .values()
-                .find(|agent| agent.runtime == "codex")
-                .expect("codex worker should be registered");
-            assert_ne!(worker.agent_id, "worker-session");
-        });
+        temp_env::with_vars(
+            [(
+                "CODEX_SESSION_ID",
+                Some("008d974f-c6a9-53e5-a62e-d331367c449a"),
+            )],
+            || {
+                let joined = service::join_session(
+                    &state.session_id,
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                    None,
+                )
+                .expect("join codex worker");
+                let worker = joined
+                    .agents
+                    .values()
+                    .find(|agent| agent.runtime == "codex")
+                    .expect("codex worker should be registered");
+                assert_ne!(worker.agent_id, "008d974f-c6a9-53e5-a62e-d331367c449a");
+            },
+        );
 
         write_agent_log(
             project,
             HookAgent::Codex,
-            "worker-session",
+            "008d974f-c6a9-53e5-a62e-d331367c449a",
             "This is a harness infrastructure issue - the KDS port wasn't forwarded",
         );
 
-        let state = service::session_status("sess-1", project).expect("load session status");
-        let issues = scan_all_agents(&state, "sess-1", project).expect("scan session logs");
+        let state = service::session_status("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", project)
+            .expect("load session status");
+        let issues = scan_all_agents(&state, "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", project)
+            .expect("scan session logs");
 
         assert!(
             !issues.is_empty(),
@@ -57,7 +69,11 @@ fn observe_scans_logs_via_runtime_session_id() {
 #[test]
 fn observe_scans_logs_via_legacy_session_fallback() {
     with_temp_project(|project| {
-        let state = start_active_session(project, "sess-legacy", "observe test");
+        let state = start_active_session(
+            project,
+            "319dd219-642f-546f-9d99-3554bf39d6d6",
+            "observe test",
+        );
 
         let joined = service::join_session(
             &state.session_id,
@@ -94,14 +110,15 @@ fn observe_scans_logs_via_legacy_session_fallback() {
             "This is a harness infrastructure issue - the KDS port wasn't forwarded",
         );
 
-        let state = service::session_status("sess-legacy", project).expect("load session status");
+        let state = service::session_status("319dd219-642f-546f-9d99-3554bf39d6d6", project)
+            .expect("load session status");
         let worker = state
             .agents
             .get(&worker_id)
             .expect("legacy worker should be present");
         assert!(worker.agent_session_id.is_none());
-        let issues =
-            scan_all_agents(&state, "sess-legacy", project).expect("scan legacy session logs");
+        let issues = scan_all_agents(&state, "319dd219-642f-546f-9d99-3554bf39d6d6", project)
+            .expect("scan legacy session logs");
 
         assert!(
             !issues.is_empty(),
@@ -113,20 +130,25 @@ fn observe_scans_logs_via_legacy_session_fallback() {
 #[test]
 fn observe_without_actor_stays_read_only() {
     with_temp_project(|project| {
-        start_active_session(project, "sess-2", "observe test");
+        start_active_session(
+            project,
+            "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+            "observe test",
+        );
         write_agent_log(
             project,
             HookAgent::Claude,
-            "leader-session",
+            "77d13b08-1651-541b-a3fc-26cab59e0aea",
             "This is a harness infrastructure issue - the KDS port wasn't forwarded",
         );
 
         let exit_code =
-            execute_session_observe("sess-2", project, true, None).expect("observe succeeds");
+            execute_session_observe("00b4a39f-719e-5418-abe8-eb3ab6ea614d", project, true, None)
+                .expect("observe succeeds");
 
         assert_eq!(exit_code, 1);
         assert!(
-            service::list_tasks("sess-2", None, project)
+            service::list_tasks("00b4a39f-719e-5418-abe8-eb3ab6ea614d", None, project)
                 .expect("list tasks")
                 .is_empty(),
             "observe without --actor must not create tasks",
@@ -137,7 +159,11 @@ fn observe_without_actor_stays_read_only() {
 #[test]
 fn observe_scans_canonical_tool_result_tracebacks() {
     with_temp_project(|project| {
-        let state = start_active_session(project, "sess-traceback", "observe test");
+        let state = start_active_session(
+            project,
+            "77edf66e-18db-5bb3-b48f-e4605c940a61",
+            "observe test",
+        );
         let leader_runtime_session_id = state
             .agents
             .values()
@@ -198,17 +224,28 @@ fn observe_scans_canonical_tool_result_tracebacks() {
 #[test]
 fn observe_keeps_distinct_issue_ids_when_titles_match() {
     with_temp_project(|project| {
-        let state = start_active_session(project, "sess-3", "observe test");
+        let state = start_active_session(
+            project,
+            "86454ce7-8ac9-5f4f-ba72-8128a78e3a84",
+            "observe test",
+        );
         let leader_id = state.leader_id.clone().expect("leader id");
         let issues = vec![
             infrastructure_issue("fingerprint-a"),
             infrastructure_issue("fingerprint-b"),
         ];
 
-        create_work_items_for_issues(&issues, "sess-3", &state, project, Some(&leader_id))
-            .expect("create deduplicated tasks");
+        create_work_items_for_issues(
+            &issues,
+            "86454ce7-8ac9-5f4f-ba72-8128a78e3a84",
+            &state,
+            project,
+            Some(&leader_id),
+        )
+        .expect("create deduplicated tasks");
 
-        let tasks = service::list_tasks("sess-3", None, project).expect("list tasks");
+        let tasks = service::list_tasks("86454ce7-8ac9-5f4f-ba72-8128a78e3a84", None, project)
+            .expect("list tasks");
         assert_eq!(tasks.len(), 2);
         assert_eq!(
             tasks[0].severity,
@@ -221,33 +258,39 @@ fn observe_keeps_distinct_issue_ids_when_titles_match() {
 #[test]
 fn observe_deduplicates_existing_issue_id_even_when_title_changes() {
     with_temp_project(|project| {
-        let state = start_active_session(project, "sess-4", "observe test");
+        let state = start_active_session(
+            project,
+            "fbbde0b1-87ab-53c2-b7f0-9b9a3ecccb49",
+            "observe test",
+        );
         let leader_id = state.leader_id.clone().expect("leader id");
         let issue = infrastructure_issue("fingerprint-a");
 
         create_work_items_for_issues(
             std::slice::from_ref(&issue),
-            "sess-4",
+            "fbbde0b1-87ab-53c2-b7f0-9b9a3ecccb49",
             &state,
             project,
             Some(&leader_id),
         )
         .expect("create initial task");
 
-        let reloaded = service::session_status("sess-4", project).expect("reload session");
+        let reloaded = service::session_status("fbbde0b1-87ab-53c2-b7f0-9b9a3ecccb49", project)
+            .expect("reload session");
         let mut updated_issue = issue.clone();
         updated_issue.summary = "Harness infrastructure issue renamed after retry".to_string();
 
         create_work_items_for_issues(
             std::slice::from_ref(&updated_issue),
-            "sess-4",
+            "fbbde0b1-87ab-53c2-b7f0-9b9a3ecccb49",
             &reloaded,
             project,
             Some(&leader_id),
         )
         .expect("skip duplicate issue");
 
-        let tasks = service::list_tasks("sess-4", None, project).expect("list tasks");
+        let tasks = service::list_tasks("fbbde0b1-87ab-53c2-b7f0-9b9a3ecccb49", None, project)
+            .expect("list tasks");
         assert_eq!(tasks.len(), 1);
         assert_eq!(
             tasks[0].observe_issue_id.as_deref(),
@@ -259,7 +302,11 @@ fn observe_deduplicates_existing_issue_id_even_when_title_changes() {
 #[test]
 fn observer_snapshot_skips_repeated_empty_scans() {
     with_temp_project(|project| {
-        let state = start_active_session(project, "sess-empty-snapshot", "observe empty");
+        let state = start_active_session(
+            project,
+            "d6777e46-f714-508d-ac93-5b29e1a7ae02",
+            "observe empty",
+        );
         let observe_id = state.observe_id.as_deref().expect("observe id");
 
         let first_written =

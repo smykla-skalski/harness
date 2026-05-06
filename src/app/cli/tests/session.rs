@@ -14,7 +14,7 @@ fn parse_session_observe_with_actor() {
         "harness",
         "session",
         "observe",
-        "sess-1",
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
         "--poll-interval",
         "5",
         "--json",
@@ -35,7 +35,7 @@ fn parse_session_observe_with_actor() {
                     project_dir,
                 }),
         } => {
-            assert_eq!(session_id, "sess-1");
+            assert_eq!(session_id, "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc");
             assert_eq!(poll_interval, 5);
             assert!(json);
             assert_eq!(actor.as_deref(), Some("claude-leader"));
@@ -99,7 +99,14 @@ fn parse_session_end() {
 #[test]
 fn parse_session_assign() {
     let cli = Cli::try_parse_from([
-        "harness", "session", "assign", "sess-a", "agent-1", "--role", "reviewer", "--actor",
+        "harness",
+        "session",
+        "assign",
+        "0c3be78e-656d-52d3-b4c3-03ba64d373ac",
+        "agent-1",
+        "--role",
+        "reviewer",
+        "--actor",
         "leader-1",
     ])
     .unwrap();
@@ -206,5 +213,14 @@ fn parse_session_list() {
 
 #[test]
 fn parse_session_tui_is_removed() {
-    assert!(Cli::try_parse_from(["harness", "session", "tui", "list", "sess-1"]).is_err());
+    assert!(
+        Cli::try_parse_from([
+            "harness",
+            "session",
+            "tui",
+            "list",
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"
+        ])
+        .is_err()
+    );
 }

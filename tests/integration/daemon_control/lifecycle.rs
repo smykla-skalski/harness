@@ -114,8 +114,8 @@ fn daemon_only_session_status_and_end_work_after_list() {
         &home,
         &xdg,
         project_arg,
-        "daemon-only-session",
-        "daemon-only integration",
+        "34320f82-1f15-597f-8885-b098eafe1e7a-session",
+        "34320f82-1f15-597f-8885-b098eafe1e7a integration",
         "verify daemon-backed session lookup after list",
     );
 
@@ -139,7 +139,7 @@ fn daemon_only_session_status_and_end_work_after_list() {
         &[
             "session",
             "status",
-            "daemon-only-session",
+            "34320f82-1f15-597f-8885-b098eafe1e7a-session",
             "--json",
             "--project-dir",
             project_arg,
@@ -160,7 +160,7 @@ fn daemon_only_session_status_and_end_work_after_list() {
         &[
             "session",
             "end",
-            "daemon-only-session",
+            "34320f82-1f15-597f-8885-b098eafe1e7a-session",
             "--actor",
             "codex-leader",
             "--project-dir",

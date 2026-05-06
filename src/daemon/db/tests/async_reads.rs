@@ -15,7 +15,7 @@ async fn load_session_timeline_window_reads_summary_scope_from_async_ledger() {
         .expect("save session state");
     sync_db
         .sync_conversation_events(
-            "sess-test-1",
+            "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
             "claude-leader",
             "claude",
             &[sample_tool_result_event()],
@@ -28,7 +28,7 @@ async fn load_session_timeline_window_reads_summary_scope_from_async_ledger() {
         .expect("open async daemon db");
     let response = async_db
         .load_session_timeline_window(
-            "sess-test-1",
+            "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
             &TimelineWindowRequest {
                 scope: Some("summary".into()),
                 ..TimelineWindowRequest::default()
@@ -63,7 +63,7 @@ async fn load_session_timeline_window_reports_unchanged_known_revision() {
         .expect("save session state");
     sync_db
         .sync_conversation_events(
-            "sess-test-1",
+            "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
             "claude-leader",
             "claude",
             &[sample_tool_result_event()],
@@ -76,7 +76,7 @@ async fn load_session_timeline_window_reports_unchanged_known_revision() {
         .expect("open async daemon db");
     let response = async_db
         .load_session_timeline_window(
-            "sess-test-1",
+            "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
             &TimelineWindowRequest {
                 known_revision: Some(1),
                 ..TimelineWindowRequest::default()

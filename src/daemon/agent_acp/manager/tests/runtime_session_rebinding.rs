@@ -7,10 +7,10 @@ use super::*;
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(unix)]
 async fn repeated_session_restarts_keep_runtime_bindings_scoped_to_each_managed_agent() {
-    temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
-        let Ok(temp) = TempDir::new() else {
-            unreachable!();
-        };
+    let Ok(temp) = TempDir::new() else {
+        unreachable!();
+    };
+    with_acp_test_env(&temp, || {
         let script = temp.path().join("fake-agent.sh");
         write_sleeping_acp_agent(&script);
         let request = AcpAgentStartRequest {
@@ -21,10 +21,18 @@ async fn repeated_session_restarts_keep_runtime_bindings_scoped_to_each_managed_
         let manager = manager();
         let descriptor = descriptor(&script);
 
-        let Ok(first) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+        let Ok(first) = manager.start_descriptor(
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            &request,
+            &descriptor,
+        ) else {
             unreachable!();
         };
-        let first_runtime_session = wait_for_runtime_session_id(&manager, "sess-1", &first.acp_id);
+        let first_runtime_session = wait_for_runtime_session_id(
+            &manager,
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            &first.acp_id,
+        );
 
         let Ok(stopped) = manager.stop(&first.acp_id) else {
             unreachable!();
@@ -37,15 +45,22 @@ async fn repeated_session_restarts_keep_runtime_bindings_scoped_to_each_managed_
             }
         ));
 
-        let Ok(second) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+        let Ok(second) = manager.start_descriptor(
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            &request,
+            &descriptor,
+        ) else {
             unreachable!();
         };
-        let second_runtime_session =
-            wait_for_runtime_session_id(&manager, "sess-1", &second.acp_id);
+        let second_runtime_session = wait_for_runtime_session_id(
+            &manager,
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            &second.acp_id,
+        );
 
         assert_ne!(first.agent_id, second.agent_id);
 
-        let state = load_session_state(&manager, "sess-1");
+        let state = load_session_state(&manager, "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc");
         let Some(first_agent) = state.agents.get(&first.agent_id) else {
             unreachable!();
         };
@@ -85,10 +100,10 @@ async fn repeated_session_restarts_keep_runtime_bindings_scoped_to_each_managed_
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(unix)]
 async fn wake_prompt_rebinds_runtime_session_when_prompt_opens_new_protocol_session() {
-    temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
-        let Ok(temp) = TempDir::new() else {
-            unreachable!();
-        };
+    let Ok(temp) = TempDir::new() else {
+        unreachable!();
+    };
+    with_acp_test_env(&temp, || {
         let script = temp.path().join("gemini-agent.sh");
         write_sleeping_acp_agent(&script);
         let request = AcpAgentStartRequest {
@@ -99,19 +114,28 @@ async fn wake_prompt_rebinds_runtime_session_when_prompt_opens_new_protocol_sess
         let manager = manager();
         repoint_project_dir(&manager, temp.path());
         let descriptor = descriptor_with_id(&script, "gemini");
-        let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+        let Ok(snapshot) = manager.start_descriptor(
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            &request,
+            &descriptor,
+        ) else {
             unreachable!();
         };
-        let initial_runtime_session =
-            wait_for_runtime_session_id(&manager, "sess-1", &snapshot.acp_id);
+        let runtime = runtime_for(HookAgent::Gemini);
+        let initial_runtime_session = wait_for_runtime_session_id(
+            &manager,
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            &snapshot.acp_id,
+        );
         assert_eq!(initial_runtime_session, "acp-session-1");
 
         manager.dispatch_wake_prompt(
-            runtime_for(HookAgent::Gemini),
+            runtime,
             AcpWakePrompt {
                 acp_id: snapshot.acp_id.clone(),
-                orchestration_session_id: "sess-1".into(),
-                signal_session_id: initial_runtime_session,
+                orchestration_session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+                signal_session_id: initial_runtime_session.clone(),
+                signal_dir: runtime.signal_dir(temp.path(), &initial_runtime_session),
                 project_dir: temp.path().to_path_buf(),
                 prompt: "tell me how are you".into(),
                 signal_id: "sig-test-1".into(),
@@ -119,7 +143,12 @@ async fn wake_prompt_rebinds_runtime_session_when_prompt_opens_new_protocol_sess
             },
         );
 
-        wait_for_runtime_session_id_value(&manager, "sess-1", &snapshot.acp_id, "acp-session-2");
+        wait_for_runtime_session_id_value(
+            &manager,
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            &snapshot.acp_id,
+            "acp-session-2",
+        );
         assert!(manager.stop(&snapshot.acp_id).is_ok());
     });
 }
@@ -127,10 +156,10 @@ async fn wake_prompt_rebinds_runtime_session_when_prompt_opens_new_protocol_sess
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(unix)]
 async fn wake_prompt_acknowledges_signal_in_original_signal_session_dir() {
-    temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
-        let Ok(temp) = TempDir::new() else {
-            unreachable!();
-        };
+    let Ok(temp) = TempDir::new() else {
+        unreachable!();
+    };
+    with_acp_test_env(&temp, || {
         let script = temp.path().join("gemini-agent.sh");
         write_sleeping_acp_agent(&script);
         let request = AcpAgentStartRequest {
@@ -141,22 +170,33 @@ async fn wake_prompt_acknowledges_signal_in_original_signal_session_dir() {
         let manager = manager();
         repoint_project_dir(&manager, temp.path());
         let descriptor = descriptor_with_id(&script, "gemini");
-        let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+        let Ok(snapshot) = manager.start_descriptor(
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            &request,
+            &descriptor,
+        ) else {
             unreachable!();
         };
         let runtime = runtime_for(HookAgent::Gemini);
-        let signal_session_id = wait_for_runtime_session_id(&manager, "sess-1", &snapshot.acp_id);
+        let signal_session_id = wait_for_runtime_session_id(
+            &manager,
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            &snapshot.acp_id,
+        );
         let signal = sample_signal("sig-ack-success");
-        let Ok(_path) = runtime.write_signal(temp.path(), &signal_session_id, &signal) else {
+        let signal_dir = temp.path().join("wake-signals").join(&signal_session_id);
+        let Ok(_) = write_signal_file(&signal_dir, &signal) else {
             unreachable!();
         };
+        assert_signal_pending(&signal_dir, &signal.signal_id);
 
         manager.dispatch_wake_prompt(
             runtime,
             AcpWakePrompt {
                 acp_id: snapshot.acp_id.clone(),
-                orchestration_session_id: "sess-1".into(),
+                orchestration_session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
                 signal_session_id: signal_session_id.clone(),
+                signal_dir: signal_dir.clone(),
                 project_dir: temp.path().to_path_buf(),
                 prompt: "please wake up".into(),
                 signal_id: signal.signal_id.clone(),
@@ -164,13 +204,17 @@ async fn wake_prompt_acknowledges_signal_in_original_signal_session_dir() {
             },
         );
 
-        wait_for_runtime_session_id_value(&manager, "sess-1", &snapshot.acp_id, "acp-session-2");
-        let ack = wait_for_signal_ack(runtime, temp.path(), &signal_session_id, &signal.signal_id);
+        wait_for_runtime_session_id_value(
+            &manager,
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            &snapshot.acp_id,
+            "acp-session-2",
+        );
+        let ack = wait_for_signal_ack(&signal_dir, &signal.signal_id);
         assert_eq!(ack.result, AckResult::Accepted);
-        assert_eq!(ack.session_id, "sess-1");
+        assert_eq!(ack.session_id, "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc");
         assert_eq!(ack.agent, signal_session_id);
 
-        let signal_dir = runtime.signal_dir(temp.path(), &signal_session_id);
         let Ok(pending) = read_pending_signals(&signal_dir) else {
             unreachable!();
         };
@@ -185,10 +229,10 @@ async fn wake_prompt_acknowledges_signal_in_original_signal_session_dir() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(unix)]
 async fn wake_prompt_skips_ack_when_runtime_rebind_fails() {
-    temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
-        let Ok(temp) = TempDir::new() else {
-            unreachable!();
-        };
+    let Ok(temp) = TempDir::new() else {
+        unreachable!();
+    };
+    with_acp_test_env(&temp, || {
         let script = temp.path().join("gemini-agent.sh");
         write_sleeping_acp_agent(&script);
         let request = AcpAgentStartRequest {
@@ -199,22 +243,33 @@ async fn wake_prompt_skips_ack_when_runtime_rebind_fails() {
         let manager = manager();
         repoint_project_dir(&manager, temp.path());
         let descriptor = descriptor_with_id(&script, "gemini");
-        let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+        let Ok(snapshot) = manager.start_descriptor(
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            &request,
+            &descriptor,
+        ) else {
             unreachable!();
         };
         let runtime = runtime_for(HookAgent::Gemini);
-        let signal_session_id = wait_for_runtime_session_id(&manager, "sess-1", &snapshot.acp_id);
+        let signal_session_id = wait_for_runtime_session_id(
+            &manager,
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            &snapshot.acp_id,
+        );
         let signal = sample_signal("sig-ack-skipped");
-        let Ok(_path) = runtime.write_signal(temp.path(), &signal_session_id, &signal) else {
+        let signal_dir = temp.path().join("wake-signals").join(&signal_session_id);
+        let Ok(_) = write_signal_file(&signal_dir, &signal) else {
             unreachable!();
         };
+        assert_signal_pending(&signal_dir, &signal.signal_id);
 
         manager.dispatch_wake_prompt(
             runtime,
             AcpWakePrompt {
                 acp_id: snapshot.acp_id.clone(),
-                orchestration_session_id: "missing-session".into(),
+                orchestration_session_id: "418cf829-6691-5fc0-92b1-8e5013efa2cb".into(),
                 signal_session_id: signal_session_id.clone(),
+                signal_dir: signal_dir.clone(),
                 project_dir: temp.path().to_path_buf(),
                 prompt: "please wake up".into(),
                 signal_id: signal.signal_id.clone(),
@@ -222,22 +277,14 @@ async fn wake_prompt_skips_ack_when_runtime_rebind_fails() {
             },
         );
 
+        assert_no_signal_ack_within(&signal_dir, &signal.signal_id, Duration::from_millis(400));
+        let returned_signal_dir = runtime.signal_dir(temp.path(), "acp-session-2");
         assert_no_signal_ack_within(
-            runtime,
-            temp.path(),
-            &signal_session_id,
-            &signal.signal_id,
-            Duration::from_millis(400),
-        );
-        assert_no_signal_ack_within(
-            runtime,
-            temp.path(),
-            "acp-session-2",
+            &returned_signal_dir,
             &signal.signal_id,
             Duration::from_millis(400),
         );
 
-        let signal_dir = runtime.signal_dir(temp.path(), &signal_session_id);
         let Ok(pending) = read_pending_signals(&signal_dir) else {
             unreachable!();
         };
@@ -248,7 +295,12 @@ async fn wake_prompt_skips_ack_when_runtime_rebind_fails() {
             "pending signal should remain file-backed when runtime rebind fails"
         );
         assert_eq!(
-            runtime_session_id(&manager, "sess-1", &snapshot.acp_id).as_deref(),
+            runtime_session_id(
+                &manager,
+                "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                &snapshot.acp_id
+            )
+            .as_deref(),
             Some(signal_session_id.as_str())
         );
         assert!(manager.stop(&snapshot.acp_id).is_ok());

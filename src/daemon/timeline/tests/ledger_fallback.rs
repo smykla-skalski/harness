@@ -14,7 +14,7 @@ fn session_timeline_uses_ledger_fallback_for_copilot_tool_events() {
         )],
         || {
             let context_root = context_root(tmp.path());
-            let session_id = "sess-copilot";
+            let session_id = "cd8a9518-8e52-51d7-b131-aaae722fdf1c";
             write_copilot_ledger_fixture(&context_root, session_id);
 
             let entries = session_timeline(session_id).expect("timeline");

@@ -19,7 +19,7 @@ fn removes_session_dir_without_state_json() {
 fn idempotent() {
     let tmp = TempDir::new().unwrap();
     let sessions = tmp.path().join("sessions");
-    std::fs::create_dir_all(sessions.join("proj/abc12345")).unwrap();
+    std::fs::create_dir_all(sessions.join("proj/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed")).unwrap();
     cleanup_orphans(&sessions).unwrap();
     cleanup_orphans(&sessions).unwrap();
 }

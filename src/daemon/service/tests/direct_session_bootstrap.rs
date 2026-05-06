@@ -8,7 +8,7 @@ fn create_task_db_direct_bootstraps_file_backed_session() {
             "",
             project,
             Some("claude"),
-            Some("bootstrapped-db-direct"),
+            Some("8ce13fc1-dab5-58ca-a13a-c13d404b5c10"),
         )
         .expect("start session");
         let leader_id = state.leader_id.expect("leader id");

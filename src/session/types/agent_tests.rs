@@ -280,8 +280,14 @@ fn agent_registration_runtime_session_helpers_use_canonical_runtime_key() {
     );
 
     assert_eq!(reg.runtime_session_id(), None);
-    assert_eq!(reg.runtime_session_key("sess-1"), "sess-1");
-    assert!(reg.matches_runtime_session_id("sess-1", &RuntimeSessionId::from("sess-1")));
+    assert_eq!(
+        reg.runtime_session_key("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"),
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"
+    );
+    assert!(reg.matches_runtime_session_id(
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+        &RuntimeSessionId::from("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
+    ));
 
     let mut bound = reg.clone();
     bound.agent_session_id = Some("runtime-1".into());
@@ -290,7 +296,16 @@ fn agent_registration_runtime_session_helpers_use_canonical_runtime_key() {
         bound.runtime_session_id(),
         Some(RuntimeSessionId::from("runtime-1"))
     );
-    assert_eq!(bound.runtime_session_key("sess-1"), "runtime-1");
-    assert!(bound.matches_runtime_session_id("sess-1", &RuntimeSessionId::from("runtime-1")));
-    assert!(!bound.matches_runtime_session_id("sess-1", &RuntimeSessionId::from("sess-1")));
+    assert_eq!(
+        bound.runtime_session_key("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"),
+        "runtime-1"
+    );
+    assert!(bound.matches_runtime_session_id(
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+        &RuntimeSessionId::from("runtime-1")
+    ));
+    assert!(!bound.matches_runtime_session_id(
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+        &RuntimeSessionId::from("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
+    ));
 }

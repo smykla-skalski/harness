@@ -8,7 +8,7 @@ fn create_task_uses_suggested_fix_from_request() {
             "",
             project,
             Some("claude"),
-            Some("daemon-task"),
+            Some("fc357cd0-521b-5108-b0c7-3464d2c6d824"),
         )
         .expect("start session");
         let leader_id = state.leader_id.expect("leader id");
@@ -43,13 +43,13 @@ fn change_role_records_reason_from_request() {
             "",
             project,
             Some("claude"),
-            Some("daemon-role"),
+            Some("75380aa7-8437-5612-9209-0c9cde9a0da3"),
         )
         .expect("start session");
         let leader_id = state.leader_id.expect("leader id");
         let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("role-worker"))], || {
             session_service::join_session(
-                "daemon-role",
+                "75380aa7-8437-5612-9209-0c9cde9a0da3",
                 SessionRole::Worker,
                 "codex",
                 &[],
@@ -68,7 +68,7 @@ fn change_role_records_reason_from_request() {
         append_project_ledger_entry(project);
 
         let _ = change_role(
-            "daemon-role",
+            "75380aa7-8437-5612-9209-0c9cde9a0da3",
             &worker_id,
             &RoleChangeRequest {
                 actor: leader_id,
@@ -79,12 +79,16 @@ fn change_role_records_reason_from_request() {
         )
         .expect("change role");
 
-        let entries = session_service::session_status("daemon-role", project)
-            .expect("status")
-            .tasks;
+        let entries =
+            session_service::session_status("75380aa7-8437-5612-9209-0c9cde9a0da3", project)
+                .expect("status")
+                .tasks;
         assert!(entries.is_empty());
-        let layout = crate::session::storage::layout_from_project_dir(project, "daemon-role")
-            .expect("layout");
+        let layout = crate::session::storage::layout_from_project_dir(
+            project,
+            "75380aa7-8437-5612-9209-0c9cde9a0da3",
+        )
+        .expect("layout");
         let log_entries = crate::session::storage::load_log_entries(&layout).expect("log");
         assert!(log_entries.into_iter().any(|entry| {
             entry.reason.as_deref() == Some("route triage through a reviewer")
@@ -114,7 +118,7 @@ fn create_assign_and_checkpoint_task_async_round_trip() {
                 let state = start_direct_session_async(
                     &async_db,
                     project,
-                    "daemon-async-task",
+                    "952e1996-4e37-5030-be8b-78107d9dc021",
                     "async task mutation",
                     "async task flow",
                     None,
@@ -122,7 +126,7 @@ fn create_assign_and_checkpoint_task_async_round_trip() {
                 .await;
                 let leader_id = state.leader_id.clone().expect("leader id");
                 let joined = join_session_direct_async(
-                    "daemon-async-task",
+                    "952e1996-4e37-5030-be8b-78107d9dc021",
                     &crate::daemon::protocol::SessionJoinRequest {
                         runtime: "codex".into(),
                         role: SessionRole::Worker,
@@ -144,7 +148,7 @@ fn create_assign_and_checkpoint_task_async_round_trip() {
                     .clone();
 
                 let created = create_task_async(
-                    "daemon-async-task",
+                    "952e1996-4e37-5030-be8b-78107d9dc021",
                     &TaskCreateRequest {
                         actor: leader_id.clone(),
                         title: "async task".into(),
@@ -159,7 +163,7 @@ fn create_assign_and_checkpoint_task_async_round_trip() {
                 let task_id = created.tasks[0].task_id.clone();
 
                 let assigned = assign_task_async(
-                    "daemon-async-task",
+                    "952e1996-4e37-5030-be8b-78107d9dc021",
                     &task_id,
                     &TaskAssignRequest {
                         actor: leader_id.clone(),
@@ -176,7 +180,7 @@ fn create_assign_and_checkpoint_task_async_round_trip() {
                 );
 
                 let checkpointed = checkpoint_task_async(
-                    "daemon-async-task",
+                    "952e1996-4e37-5030-be8b-78107d9dc021",
                     &task_id,
                     &TaskCheckpointRequest {
                         actor: leader_id,
@@ -216,7 +220,7 @@ fn async_mutations_sync_file_backed_state() {
                 let state = start_direct_session_async(
                     &async_db,
                     project,
-                    "daemon-async-file-state",
+                    "038ba6b8-d983-5f25-99a0-ed8f9bcd1038",
                     "async file state mutation",
                     "async file state flow",
                     None,
@@ -224,7 +228,7 @@ fn async_mutations_sync_file_backed_state() {
                 .await;
                 let leader_id = state.leader_id.clone().expect("leader id");
                 let joined = join_session_direct_async(
-                    "daemon-async-file-state",
+                    "038ba6b8-d983-5f25-99a0-ed8f9bcd1038",
                     &crate::daemon::protocol::SessionJoinRequest {
                         runtime: "codex".into(),
                         role: SessionRole::Worker,
@@ -246,7 +250,7 @@ fn async_mutations_sync_file_backed_state() {
                     .clone();
 
                 let created = create_task_async(
-                    "daemon-async-file-state",
+                    "038ba6b8-d983-5f25-99a0-ed8f9bcd1038",
                     &TaskCreateRequest {
                         actor: leader_id.clone(),
                         title: "async file state task".into(),
@@ -261,7 +265,7 @@ fn async_mutations_sync_file_backed_state() {
                 let task_id = created.tasks[0].task_id.clone();
 
                 assign_task_async(
-                    "daemon-async-file-state",
+                    "038ba6b8-d983-5f25-99a0-ed8f9bcd1038",
                     &task_id,
                     &TaskAssignRequest {
                         actor: leader_id.clone(),
@@ -275,7 +279,7 @@ fn async_mutations_sync_file_backed_state() {
 
                 let layout = crate::session::storage::layout_from_project_dir(
                     project,
-                    "daemon-async-file-state",
+                    "038ba6b8-d983-5f25-99a0-ed8f9bcd1038",
                 )
                 .expect("layout");
                 let file_state = crate::session::storage::load_state(&layout)
@@ -316,7 +320,7 @@ fn concurrent_create_task_async_preserves_all_tasks_in_db() {
             let state = start_direct_session_async(
                 async_db.as_ref(),
                 project,
-                "daemon-async-task-race",
+                "f56c651c-10b8-5853-a61e-e82f2e811879",
                 "async task race",
                 "async task race flow",
                 None,
@@ -397,7 +401,7 @@ fn change_role_and_transfer_leader_async_update_session_state() {
                 let state = start_direct_session_async(
                     &async_db,
                     project,
-                    "daemon-async-role",
+                    "7ad898e9-f203-567d-90a2-b72d20004931",
                     "async role mutation",
                     "async role flow",
                     None,
@@ -405,7 +409,7 @@ fn change_role_and_transfer_leader_async_update_session_state() {
                 .await;
                 let leader_id = state.leader_id.clone().expect("leader id");
                 let joined = join_session_direct_async(
-                    "daemon-async-role",
+                    "7ad898e9-f203-567d-90a2-b72d20004931",
                     &crate::daemon::protocol::SessionJoinRequest {
                         runtime: "codex".into(),
                         role: SessionRole::Worker,
@@ -427,7 +431,7 @@ fn change_role_and_transfer_leader_async_update_session_state() {
                     .clone();
 
                 let changed = change_role_async(
-                    "daemon-async-role",
+                    "7ad898e9-f203-567d-90a2-b72d20004931",
                     &worker_id,
                     &RoleChangeRequest {
                         actor: leader_id.clone(),
@@ -446,7 +450,7 @@ fn change_role_and_transfer_leader_async_update_session_state() {
                 assert_eq!(role, Some(SessionRole::Reviewer));
 
                 let transferred = transfer_leader_async(
-                    "daemon-async-role",
+                    "7ad898e9-f203-567d-90a2-b72d20004931",
                     &LeaderTransferRequest {
                         actor: leader_id,
                         new_leader_id: worker_id.clone(),

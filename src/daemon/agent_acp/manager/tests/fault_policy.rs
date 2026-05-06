@@ -33,9 +33,13 @@ async fn repeated_process_faults_quarantine_process_key() {
 
         let mut saw_quarantine_applied = false;
         let mut saw_backoff_applied = false;
-        for idx in 1..=3 {
+        for session_id in [
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+        ] {
             let snapshot = manager
-                .start_descriptor(&format!("sess-{idx}"), &request, &descriptor)
+                .start_descriptor(session_id, &request, &descriptor)
                 .expect("start failing session");
             let disconnected = wait_until_disconnected(&manager, &snapshot.acp_id);
             assert!(matches!(
@@ -69,7 +73,11 @@ async fn repeated_process_faults_quarantine_process_key() {
         );
 
         let error = manager
-            .start_descriptor("sess-4", &request, &descriptor)
+            .start_descriptor(
+                "fbbde0b1-87ab-53c2-b7f0-9b9a3ecccb49",
+                &request,
+                &descriptor,
+            )
             .expect_err("quarantined process key should be blocked");
         assert!(
             format!("{error}").contains("quarantined"),
@@ -95,12 +103,20 @@ async fn recent_process_fault_applies_backoff_before_next_start() {
         };
 
         let first = manager
-            .start_descriptor("sess-1", &request, &descriptor)
+            .start_descriptor(
+                "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                &request,
+                &descriptor,
+            )
             .expect("start first failing session");
         let _ = wait_until_disconnected(&manager, &first.acp_id);
 
         let error = manager
-            .start_descriptor("sess-2", &request, &descriptor)
+            .start_descriptor(
+                "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+                &request,
+                &descriptor,
+            )
             .expect_err("immediate restart should be backoff-blocked");
         assert!(
             format!("{error}").contains("backoff"),
@@ -109,7 +125,11 @@ async fn recent_process_fault_applies_backoff_before_next_start() {
 
         tokio::time::sleep(Duration::from_millis(1100)).await;
         let restarted = manager
-            .start_descriptor("sess-3", &request, &descriptor)
+            .start_descriptor(
+                "86454ce7-8ac9-5f4f-ba72-8128a78e3a84",
+                &request,
+                &descriptor,
+            )
             .expect("start after backoff window");
         let _ = wait_until_disconnected(&manager, &restarted.acp_id);
     })
@@ -137,12 +157,20 @@ async fn process_fault_policy_disabled_skips_backoff_and_quarantine_enforcement(
             };
 
             let first = manager
-                .start_descriptor("sess-1", &request, &descriptor)
+                .start_descriptor(
+                    "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                    &request,
+                    &descriptor,
+                )
                 .expect("start first");
             let _ = wait_until_disconnected(&manager, &first.acp_id);
 
             let second = manager
-                .start_descriptor("sess-2", &request, &descriptor)
+                .start_descriptor(
+                    "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+                    &request,
+                    &descriptor,
+                )
                 .expect("start second without backoff block");
             let _ = wait_until_disconnected(&manager, &second.acp_id);
         },

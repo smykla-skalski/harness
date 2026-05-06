@@ -48,7 +48,7 @@ fn find_session_not_found() {
     fs::create_dir_all(&project_dir).unwrap();
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
-        let result = find_session("nonexistent", None);
+        let result = find_session("418cf829-6691-5fc0-92b1-8e5013efa2cb", None);
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert_eq!(err.code(), "KSRCLI080");

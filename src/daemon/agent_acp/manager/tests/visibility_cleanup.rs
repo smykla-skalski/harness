@@ -15,18 +15,25 @@ async fn stopped_agents_disappear_from_list_and_inspect() {
         let manager = manager();
         let descriptor = descriptor(&script);
         let snapshot = manager
-            .start_descriptor("sess-1", &request, &descriptor)
+            .start_descriptor(
+                "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                &request,
+                &descriptor,
+            )
             .expect("start");
 
         manager.stop(&snapshot.acp_id).expect("stop");
 
         assert!(
-            manager.list("sess-1").expect("list after stop").is_empty(),
+            manager
+                .list("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
+                .expect("list after stop")
+                .is_empty(),
             "stopped ACP agents should not remain in managed-agent listings"
         );
         assert!(
             manager
-                .inspect(Some("sess-1"))
+                .inspect(Some("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"))
                 .expect("inspect after stop")
                 .agents
                 .is_empty(),
@@ -50,27 +57,31 @@ async fn failed_starts_rollback_and_disappear_from_list_and_inspect() {
         let manager = manager();
         let descriptor = descriptor(&script);
         let snapshot = manager
-            .start_descriptor("sess-1", &request, &descriptor)
+            .start_descriptor(
+                "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                &request,
+                &descriptor,
+            )
             .expect("start");
 
         let _ = wait_until_disconnected(&manager, &snapshot.acp_id);
 
         assert!(
             manager
-                .list("sess-1")
+                .list("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
                 .expect("list after failure")
                 .is_empty(),
             "failed ACP starts should not stay visible in managed-agent listings"
         );
         assert!(
             manager
-                .inspect(Some("sess-1"))
+                .inspect(Some("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"))
                 .expect("inspect after failure")
                 .agents
                 .is_empty(),
             "failed ACP starts should not stay visible in inspect results"
         );
-        let state = load_session_state(&manager, "sess-1");
+        let state = load_session_state(&manager, "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc");
         assert!(
             state.agents.values().all(|agent| {
                 agent.managed_agent != Some(ManagedAgentRef::acp(snapshot.acp_id.as_str()))

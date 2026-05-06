@@ -8,13 +8,13 @@ fn delete_task_tombstones_hides_and_logs_it() {
             "",
             project,
             Some("claude"),
-            Some("task-delete"),
+            Some("00000000-0000-4002-8000-000000000037"),
         )
         .expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("delete-worker"))], || {
             join_session(
-                "task-delete",
+                "00000000-0000-4002-8000-000000000037",
                 SessionRole::Worker,
                 "codex",
                 &[],
@@ -31,7 +31,7 @@ fn delete_task_tombstones_hides_and_logs_it() {
             .expect("worker id")
             .clone();
         let task = create_task(
-            "task-delete",
+            "00000000-0000-4002-8000-000000000037",
             "remove stale task",
             Some("delete should preserve history but hide the task"),
             TaskSeverity::High,
@@ -41,16 +41,23 @@ fn delete_task_tombstones_hides_and_logs_it() {
         .expect("task");
 
         assign_task(
-            "task-delete",
+            "00000000-0000-4002-8000-000000000037",
             &task.task_id,
             &worker_id,
             &leader_id,
             project,
         )
-        .expect("assign");
-        delete_task("task-delete", &task.task_id, &leader_id, project).expect("delete");
+        .expect("00000000-0000-4002-8000-000000000005");
+        delete_task(
+            "00000000-0000-4002-8000-000000000037",
+            &task.task_id,
+            &leader_id,
+            project,
+        )
+        .expect("delete");
 
-        let state = session_status("task-delete", project).expect("status");
+        let state =
+            session_status("00000000-0000-4002-8000-000000000037", project).expect("status");
         let deleted = state.tasks.get(&task.task_id).expect("deleted task");
         assert!(deleted.is_deleted());
         assert_eq!(deleted.status, TaskStatus::Done);
@@ -61,10 +68,13 @@ fn delete_task_tombstones_hides_and_logs_it() {
         let worker = state.agents.get(&worker_id).expect("worker");
         assert!(worker.current_task_id.is_none());
 
-        let visible = list_tasks("task-delete", None, project).expect("visible tasks");
+        let visible = list_tasks("00000000-0000-4002-8000-000000000037", None, project)
+            .expect("visible tasks");
         assert!(visible.is_empty());
 
-        let layout = storage::layout_from_project_dir(project, "task-delete").expect("layout");
+        let layout =
+            storage::layout_from_project_dir(project, "00000000-0000-4002-8000-000000000037")
+                .expect("layout");
         let entries = storage::load_log_entries(&layout).expect("entries");
         let deleted_entry = entries
             .iter()
@@ -91,13 +101,13 @@ fn delete_task_advances_queued_work_for_freed_worker() {
             "",
             project,
             Some("claude"),
-            Some("delete-task-queue"),
+            Some("00000000-0000-4002-8000-000000000008"),
         )
         .expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("queue-worker"))], || {
             join_session(
-                "delete-task-queue",
+                "00000000-0000-4002-8000-000000000008",
                 SessionRole::Worker,
                 "codex",
                 &[],
@@ -115,7 +125,7 @@ fn delete_task_advances_queued_work_for_freed_worker() {
             .clone();
 
         let active = create_task(
-            "delete-task-queue",
+            "00000000-0000-4002-8000-000000000008",
             "active task",
             Some("worker starts here"),
             TaskSeverity::High,
@@ -124,7 +134,7 @@ fn delete_task_advances_queued_work_for_freed_worker() {
         )
         .expect("active task");
         assign_task(
-            "delete-task-queue",
+            "00000000-0000-4002-8000-000000000008",
             &active.task_id,
             &worker_id,
             &leader_id,
@@ -133,7 +143,7 @@ fn delete_task_advances_queued_work_for_freed_worker() {
         .expect("assign active");
 
         let queued = create_task(
-            "delete-task-queue",
+            "00000000-0000-4002-8000-000000000008",
             "queued task",
             Some("should start after delete"),
             TaskSeverity::Medium,
@@ -142,7 +152,7 @@ fn delete_task_advances_queued_work_for_freed_worker() {
         )
         .expect("queued task");
         assign_task(
-            "delete-task-queue",
+            "00000000-0000-4002-8000-000000000008",
             &queued.task_id,
             &worker_id,
             &leader_id,
@@ -150,9 +160,16 @@ fn delete_task_advances_queued_work_for_freed_worker() {
         )
         .expect("queue task");
 
-        delete_task("delete-task-queue", &active.task_id, &leader_id, project).expect("delete");
+        delete_task(
+            "00000000-0000-4002-8000-000000000008",
+            &active.task_id,
+            &leader_id,
+            project,
+        )
+        .expect("delete");
 
-        let state = session_status("delete-task-queue", project).expect("status");
+        let state =
+            session_status("00000000-0000-4002-8000-000000000008", project).expect("status");
         let worker = state.agents.get(&worker_id).expect("worker");
         assert_eq!(
             worker.current_task_id.as_deref(),
@@ -174,13 +191,13 @@ fn observer_can_delete_task_in_leaderless_degraded_session() {
             "",
             project,
             Some("claude"),
-            Some("degraded-observer-delete"),
+            Some("00000000-0000-4002-8000-000000000006"),
         )
         .expect("start");
         let joined =
             temp_env::with_var("CODEX_SESSION_ID", Some("degraded-delete-observer"), || {
                 join_session(
-                    "degraded-observer-delete",
+                    "00000000-0000-4002-8000-000000000006",
                     SessionRole::Observer,
                     "codex",
                     &["triage".into()],
@@ -199,7 +216,8 @@ fn observer_can_delete_task_in_leaderless_degraded_session() {
             .clone();
 
         let layout =
-            storage::layout_from_project_dir(project, "degraded-observer-delete").expect("layout");
+            storage::layout_from_project_dir(project, "00000000-0000-4002-8000-000000000006")
+                .expect("layout");
         storage::update_state(&layout, |state| {
             let previous_leader = state.leader_id.take().expect("leader");
             state.status = SessionStatus::LeaderlessDegraded;
@@ -213,7 +231,7 @@ fn observer_can_delete_task_in_leaderless_degraded_session() {
         .expect("degrade session");
 
         let task = create_task(
-            "degraded-observer-delete",
+            "00000000-0000-4002-8000-000000000006",
             "remove degraded finding",
             Some("observer should still manage task controls"),
             TaskSeverity::High,
@@ -223,19 +241,20 @@ fn observer_can_delete_task_in_leaderless_degraded_session() {
         .expect("create task");
 
         delete_task(
-            "degraded-observer-delete",
+            "00000000-0000-4002-8000-000000000006",
             &task.task_id,
             &observer_id,
             project,
         )
         .expect("observer deletes task");
 
-        let state = session_status("degraded-observer-delete", project).expect("status");
+        let state =
+            session_status("00000000-0000-4002-8000-000000000006", project).expect("status");
         assert_eq!(state.status, SessionStatus::LeaderlessDegraded);
         let deleted = state.tasks.get(&task.task_id).expect("deleted task");
         assert!(deleted.is_deleted());
         assert!(
-            list_tasks("degraded-observer-delete", None, project)
+            list_tasks("00000000-0000-4002-8000-000000000006", None, project)
                 .expect("visible tasks")
                 .is_empty()
         );

@@ -20,6 +20,7 @@ pub struct AcpWakePrompt {
     pub acp_id: String,
     pub orchestration_session_id: String,
     pub signal_session_id: String,
+    pub signal_dir: PathBuf,
     pub project_dir: PathBuf,
     pub prompt: String,
     pub signal_id: String,
@@ -209,6 +210,7 @@ fn run_wake_prompt(
         acp_id,
         orchestration_session_id,
         signal_session_id,
+        signal_dir,
         project_dir,
         prompt: prompt_text,
         signal_id,
@@ -245,10 +247,9 @@ fn run_wake_prompt(
                 return;
             }
             if record_wake_accept(
-                runtime,
-                &project_dir,
                 &orchestration_session_id,
                 &signal_session_id,
+                &signal_dir,
                 &signal_id,
                 &agent_id,
                 &acp_id,
@@ -338,15 +339,13 @@ fn sync_returned_runtime_session(
 }
 
 fn record_wake_accept(
-    runtime: &'static dyn AgentRuntime,
-    project_dir: &Path,
     orchestration_session_id: &str,
     signal_session_id: &str,
+    signal_dir: &Path,
     signal_id: &str,
     agent_id: &str,
     acp_id: &str,
 ) -> bool {
-    let signal_dir = runtime.signal_dir(project_dir, signal_session_id);
     let ack = SignalAck {
         signal_id: signal_id.to_string(),
         acknowledged_at: utc_now(),
@@ -355,7 +354,7 @@ fn record_wake_accept(
         session_id: orchestration_session_id.to_string(),
         details: Some("acp wake prompt acknowledged via session/prompt".into()),
     };
-    match acknowledge_signal(&signal_dir, &ack) {
+    match acknowledge_signal(signal_dir, &ack) {
         Ok(()) => {
             record_wake_event(
                 WakeEventLevel::Info,

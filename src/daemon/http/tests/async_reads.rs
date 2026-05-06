@@ -34,7 +34,7 @@ async fn build_async_http_state(seed_timeline: bool) -> DaemonHttpState {
         .expect("save session state");
     if seed_timeline {
         db.sync_conversation_events(
-            "sess-test-1",
+            "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
             "codex-worker",
             "codex",
             &[sample_tool_result_event()],

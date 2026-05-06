@@ -30,7 +30,7 @@ fn submit_for_review_async_emits_spawn_reviewer_when_no_reviewer_present() {
                 let state = start_direct_session_async(
                     &async_db,
                     project,
-                    "daemon-async-submit-review",
+                    "a6fe59c9-a161-5983-879d-8211aacf5238",
                     "async submit_for_review spawn",
                     "async review flow",
                     None,
@@ -38,7 +38,7 @@ fn submit_for_review_async_emits_spawn_reviewer_when_no_reviewer_present() {
                 .await;
                 let leader_id = state.leader_id.clone().expect("leader id");
                 let joined = join_session_direct_async(
-                    "daemon-async-submit-review",
+                    "a6fe59c9-a161-5983-879d-8211aacf5238",
                     &crate::daemon::protocol::SessionJoinRequest {
                         runtime: "codex".into(),
                         role: SessionRole::Worker,
@@ -59,7 +59,7 @@ fn submit_for_review_async_emits_spawn_reviewer_when_no_reviewer_present() {
                     .expect("worker id").clone();
 
                 let created = create_task_async(
-                    "daemon-async-submit-review",
+                    "a6fe59c9-a161-5983-879d-8211aacf5238",
                     &TaskCreateRequest {
                         actor: leader_id.clone(),
                         title: "review flow task".into(),
@@ -74,7 +74,7 @@ fn submit_for_review_async_emits_spawn_reviewer_when_no_reviewer_present() {
                 let task_id = created.tasks[0].task_id.clone();
 
                 assign_task_async(
-                    "daemon-async-submit-review",
+                    "a6fe59c9-a161-5983-879d-8211aacf5238",
                     &task_id,
                     &TaskAssignRequest {
                         actor: leader_id.clone(),
@@ -87,7 +87,7 @@ fn submit_for_review_async_emits_spawn_reviewer_when_no_reviewer_present() {
                 .expect("assign task");
 
                 update_task_async(
-                    "daemon-async-submit-review",
+                    "a6fe59c9-a161-5983-879d-8211aacf5238",
                     &task_id,
                     &TaskUpdateRequest {
                         actor: worker_id.clone(),
@@ -101,7 +101,7 @@ fn submit_for_review_async_emits_spawn_reviewer_when_no_reviewer_present() {
                 .expect("move task in_progress");
 
                 submit_for_review_async(
-                    "daemon-async-submit-review",
+                    "a6fe59c9-a161-5983-879d-8211aacf5238",
                     &task_id,
                     &TaskSubmitForReviewRequest {
                         actor: worker_id.clone(),
@@ -114,7 +114,7 @@ fn submit_for_review_async_emits_spawn_reviewer_when_no_reviewer_present() {
                 .expect("submit_for_review async");
 
                 let resolved_after = async_db
-                    .resolve_session("daemon-async-submit-review")
+                    .resolve_session("a6fe59c9-a161-5983-879d-8211aacf5238")
                     .await
                     .expect("resolve")
                     .expect("present");

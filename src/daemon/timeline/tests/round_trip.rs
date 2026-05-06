@@ -20,7 +20,7 @@ fn timeline_round_trip_smoke_covers_public_surface() {
         )],
         || {
             let context_root = context_root(tmp.path());
-            let session_id = "sess-round-trip";
+            let session_id = "b5f69752-76b7-5e74-b38f-ab709a833e60";
             let fixture = write_standard_timeline_fixture(&context_root, session_id);
 
             let file_entries = session_timeline(session_id).expect("timeline");
@@ -98,7 +98,7 @@ fn session_timeline_merges_log_checkpoint_signal_and_observer_entries() {
         )],
         || {
             let context_root = context_root(tmp.path());
-            let session_id = "sess-merge";
+            let session_id = "7d8914ed-1073-56a6-85c1-0582a49cf5ce";
             write_standard_timeline_fixture(&context_root, session_id);
 
             let entries = session_timeline(session_id).expect("timeline");

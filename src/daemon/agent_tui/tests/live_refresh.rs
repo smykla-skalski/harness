@@ -35,7 +35,7 @@ fn manager_publishes_terminal_output_without_manual_refresh() {
         let state = session_service::build_new_session(
             "live refresh tui test",
             "managed tui",
-            "sess-tui-live-refresh",
+            "70debe3e-a4d4-5fe5-ab71-2e076df556ff",
             "claude",
             None,
             &utc_now(),
@@ -51,7 +51,7 @@ fn manager_publishes_terminal_output_without_manual_refresh() {
         let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), false);
         let snapshot = manager
             .start(
-                "sess-tui-live-refresh",
+                "70debe3e-a4d4-5fe5-ab71-2e076df556ff",
                 &crate::daemon::agent_tui::AgentTuiStartRequest {
                     runtime: "codex".into(),
                     role: SessionRole::Worker,
@@ -124,7 +124,7 @@ fn live_refresh_step_skips_persist_when_db_updated_concurrently() {
     let session_state = session_service::build_new_session(
         "live refresh concurrency",
         "managed tui",
-        "sess-live-refresh",
+        "aca3a2b2-3a5a-5cc4-a8b2-e4a5738feecf",
         "claude",
         None,
         &utc_now(),
@@ -134,7 +134,7 @@ fn live_refresh_step_skips_persist_when_db_updated_concurrently() {
 
     let previous = sample_snapshot(
         "concurrent-live-refresh",
-        "sess-live-refresh",
+        "aca3a2b2-3a5a-5cc4-a8b2-e4a5738feecf",
         "agent-live-refresh",
         "codex",
         "2026-04-13T07:00:00Z",
@@ -210,7 +210,7 @@ fn manager_list_prioritizes_leader_tui_over_worker_refresh_order() {
     let mut state = session_service::build_new_session(
         "ordering test",
         "ordering",
-        "sess-tui-ordering",
+        "95cc70dd-ec42-5b72-b578-45cab1e80796",
         "claude",
         None,
         &now,
@@ -221,7 +221,7 @@ fn manager_list_prioritizes_leader_tui_over_worker_refresh_order() {
         "claude",
         SessionRole::Leader,
         &[],
-        Some("claude-leader-session"),
+        Some("claude-77d13b08-1651-541b-a3fc-26cab59e0aea"),
         &now,
         None,
         None,
@@ -239,7 +239,7 @@ fn manager_list_prioritizes_leader_tui_over_worker_refresh_order() {
             joined_at: "2026-04-12T09:00:00Z".into(),
             updated_at: "2026-04-12T09:00:00Z".into(),
             status: crate::session::types::AgentStatus::Active,
-            agent_session_id: Some("codex-worker-session".into()),
+            agent_session_id: Some("codex-008d974f-c6a9-53e5-a62e-d331367c449a".into()),
             managed_agent: None,
             last_activity_at: Some("2026-04-12T09:00:00Z".into()),
             current_task_id: None,
@@ -277,7 +277,7 @@ fn manager_list_prioritizes_leader_tui_over_worker_refresh_order() {
     let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), false);
 
     let listed = manager
-        .list("sess-tui-ordering")
+        .list("95cc70dd-ec42-5b72-b578-45cab1e80796")
         .expect("list tuis")
         .tuis
         .into_iter()

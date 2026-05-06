@@ -16,8 +16,8 @@ fn layout(tmp: &std::path::Path, session_id: &str) -> SessionLayout {
 #[test]
 fn active_registry_round_trip() {
     let tmp = tempfile::tempdir().expect("tempdir");
-    let layout_a = layout(tmp.path(), "sess-a");
-    let layout_b = layout(tmp.path(), "sess-b");
+    let layout_a = layout(tmp.path(), "0c3be78e-656d-52d3-b4c3-03ba64d373ac");
+    let layout_b = layout(tmp.path(), "17625cc4-8be6-5f38-b1d6-e2342db78d57");
 
     // Ensure the project dir exists so the lock file can be created.
     fs_err::create_dir_all(layout_a.project_dir()).expect("create project dir");
@@ -35,13 +35,17 @@ fn active_registry_round_trip() {
         1,
         "expected 1 session after deregister"
     );
-    assert!(registry.sessions.contains_key("sess-b"));
+    assert!(
+        registry
+            .sessions
+            .contains_key("17625cc4-8be6-5f38-b1d6-e2342db78d57")
+    );
 }
 
 #[test]
 fn registry_stored_at_project_dir_active_json() {
     let tmp = tempfile::tempdir().expect("tempdir");
-    let layout = layout(tmp.path(), "abc12345");
+    let layout = layout(tmp.path(), "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
     fs_err::create_dir_all(layout.project_dir()).expect("create project dir");
 
     register_active(&layout).expect("register");
@@ -66,8 +70,8 @@ fn merge_project_origin_preserves_existing_git_identity() {
             repository_root: Some("/repo".to_string()),
             checkout_root: Some("/repo/.claude/worktrees/feature".to_string()),
             adopted_session_roots: std::collections::BTreeMap::from([(
-                "abc12345".to_string(),
-                "/tmp/external/demo/abc12345".to_string(),
+                "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed".to_string(),
+                "/tmp/external/demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed".to_string(),
             )]),
             recorded_at: "2026-04-10T09:00:00Z".to_string(),
         }),
@@ -81,8 +85,8 @@ fn merge_project_origin_preserves_existing_git_identity() {
     assert_eq!(
         merged
             .adopted_session_roots
-            .get("abc12345")
+            .get("72026b9c-9f8f-5a76-a6cf-a05cbb5741ed")
             .map(std::string::String::as_str),
-        Some("/tmp/external/demo/abc12345")
+        Some("/tmp/external/demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed")
     );
 }

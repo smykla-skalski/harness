@@ -16,7 +16,7 @@ fn improver_apply_async_resolves_session_via_async_db_for_dry_run() {
             let db_path = project
                 .parent()
                 .expect("project parent")
-                .join("daemon-improver-async.sqlite");
+                .join("d0200f17-f79b-5478-98d2-05bd1eb7cef1.sqlite");
             let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
                 .await
                 .expect("open async daemon db");
@@ -24,7 +24,7 @@ fn improver_apply_async_resolves_session_via_async_db_for_dry_run() {
             let state = start_direct_session_async(
                 &async_db,
                 project,
-                "daemon-improver-async",
+                "d0200f17-f79b-5478-98d2-05bd1eb7cef1",
                 "async improver apply",
                 "async flow",
                 None,
@@ -96,12 +96,12 @@ fn improver_apply_rejects_worker_and_uses_session_project_dir_for_dry_run() {
             "",
             project,
             Some("claude"),
-            Some("daemon-improver-auth"),
+            Some("8eac1faa-a5f1-5c46-adb9-15ae36267c7a"),
         )
         .expect("start session");
         let worker_joined = temp_env::with_var("CODEX_SESSION_ID", Some("improver-worker"), || {
             session_service::join_session(
-                "daemon-improver-auth",
+                "8eac1faa-a5f1-5c46-adb9-15ae36267c7a",
                 SessionRole::Worker,
                 "codex",
                 &[],
@@ -120,7 +120,7 @@ fn improver_apply_rejects_worker_and_uses_session_project_dir_for_dry_run() {
         let improver_joined =
             temp_env::with_var("CODEX_SESSION_ID", Some("improver-agent"), || {
                 session_service::join_session(
-                    "daemon-improver-auth",
+                    "8eac1faa-a5f1-5c46-adb9-15ae36267c7a",
                     SessionRole::Improver,
                     "codex",
                     &[],
@@ -189,7 +189,7 @@ fn submit_for_review_file_path_emits_spawn_reviewer_to_leader_runtime_session() 
             "",
             project,
             Some("claude"),
-            Some("daemon-file-submit-review"),
+            Some("35c78758-e7ed-52b1-bba1-e0ad3a564f50"),
         )
         .expect("start session");
         let leader_id = state.leader_id.clone().expect("leader id");

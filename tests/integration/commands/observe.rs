@@ -77,7 +77,7 @@ fn observe_args(mode: ObserveMode) -> ObserveArgs {
 fn scan_missing_session_returns_error() {
     let tmp = tempfile::tempdir().unwrap();
     let mut filter = default_filter();
-    filter.project_hint = Some("nonexistent".into());
+    filter.project_hint = Some("418cf829-6691-5fc0-92b1-8e5013efa2cb".into());
 
     let cmd = Command::Observe(Box::new(observe_args(scan_mode(
         "does-not-exist-ever",

@@ -4,12 +4,20 @@ use super::*;
 
 #[test]
 fn parse_session_adopt_minimal() {
-    let cli = Cli::try_parse_from(["harness", "session", "adopt", "/tmp/sessions/kuma/abc12345"])
-        .expect("parse");
+    let cli = Cli::try_parse_from([
+        "harness",
+        "session",
+        "adopt",
+        "/tmp/sessions/kuma/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed",
+    ])
+    .expect("parse");
     match cli.command {
         Command::Session { command } => match command {
             crate::session::transport::SessionCommand::Adopt(args) => {
-                assert_eq!(args.path, PathBuf::from("/tmp/sessions/kuma/abc12345"));
+                assert_eq!(
+                    args.path,
+                    PathBuf::from("/tmp/sessions/kuma/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed")
+                );
                 assert!(args.bookmark_id.is_none());
             }
             other => panic!("unexpected {other:?}"),

@@ -140,7 +140,11 @@ fn adopt_external_b_layout_session() {
         // treated as an internal (non-external) session.
         let project_dir = xdg.join("harness").join("sessions").join("kuma");
         fs::create_dir_all(&project_dir).unwrap();
-        let session_root = write_b_layout_session(&project_dir, "abc12345", &origin);
+        let session_root = write_b_layout_session(
+            &project_dir,
+            "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed",
+            &origin,
+        );
 
         let mut daemon = spawn_daemon_serve(&home, &xdg);
         wait_for_daemon_ready(&home, &xdg);
@@ -150,7 +154,7 @@ fn adopt_external_b_layout_session() {
         assert_eq!(status, 200, "adopt should return 200; body: {body}");
         assert_eq!(
             body["state"]["session_id"].as_str(),
-            Some("abc12345"),
+            Some("72026b9c-9f8f-5a76-a6cf-a05cbb5741ed"),
             "response must carry session_id"
         );
         assert!(
@@ -164,8 +168,9 @@ fn adopt_external_b_layout_session() {
         let sessions = list_sessions(&endpoint, &token);
         let found_in_list = sessions.as_array().is_some_and(|arr| {
             arr.iter().any(|entry| {
-                entry["session_id"].as_str() == Some("abc12345")
-                    || entry["state"]["session_id"].as_str() == Some("abc12345")
+                entry["session_id"].as_str() == Some("72026b9c-9f8f-5a76-a6cf-a05cbb5741ed")
+                    || entry["state"]["session_id"].as_str()
+                        == Some("72026b9c-9f8f-5a76-a6cf-a05cbb5741ed")
             })
         });
         assert!(
@@ -182,7 +187,7 @@ fn adopt_external_b_layout_session() {
         );
         let registry_text = fs::read_to_string(&active_registry).expect("read active registry");
         assert!(
-            registry_text.contains("abc12345"),
+            registry_text.contains("72026b9c-9f8f-5a76-a6cf-a05cbb5741ed"),
             "active registry must contain adopted session id; got: {registry_text}"
         );
 

@@ -85,7 +85,12 @@ pub(super) fn seed_daemon_db_at(path: &Path) {
 fn populate_daemon_db(db: &DaemonDb) {
     let project = sample_project();
     assert_ok(db.sync_project(&project), "sync project");
-    for session_id in ["sess-1", "sess-2", "sess-3", "sess-4"] {
+    for session_id in [
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+        "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+        "86454ce7-8ac9-5f4f-ba72-8128a78e3a84",
+        "fbbde0b1-87ab-53c2-b7f0-9b9a3ecccb49",
+    ] {
         assert_ok(
             db.sync_session(&project.project_id, &sample_session_state(session_id)),
             "sync session",
@@ -120,7 +125,7 @@ fn sample_session_state(session_id: &str) -> SessionState {
             joined_at: "2026-04-03T12:00:00Z".into(),
             updated_at: "2026-04-03T12:05:00Z".into(),
             status: AgentStatus::Active,
-            agent_session_id: Some("claude-session-1".into()),
+            agent_session_id: Some("2a35c8f7-e812-5024-aed6-9f3b6318847e".into()),
             managed_agent: None,
             last_activity_at: Some("2026-04-03T12:05:00Z".into()),
             current_task_id: None,

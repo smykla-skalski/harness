@@ -54,7 +54,7 @@ fn discover_sessions_finds_adopted_external_session_root() {
         let project_dir = tmp.path().join("workspace").join("alpha");
         harness_testkit::init_git_repo_with_seed(&project_dir);
 
-        let session_id = "adopted01";
+        let session_id = "b370bd74-db23-59d3-901e-d53eebc1bd76";
         let session_root = tmp
             .path()
             .join("external-sessions")

@@ -38,7 +38,7 @@ fn join_session_direct_downgrades_leader_role_to_fallback_when_leader_exists() {
         let started = start_direct_session(
             &db,
             project,
-            "leader-join-fallback",
+            "f7e7b244-4118-593a-8cdb-683f067c8a8a",
             "leader join fallback",
             "leader joins downgrade to fallback",
             Some("swarm-default"),
@@ -48,7 +48,7 @@ fn join_session_direct_downgrades_leader_role_to_fallback_when_leader_exists() {
         let joined = join_direct_codex(
             &db,
             project,
-            "leader-join-fallback",
+            "f7e7b244-4118-593a-8cdb-683f067c8a8a",
             "leader-join-improver",
             SessionRole::Leader,
             Some(SessionRole::Improver),
@@ -200,11 +200,12 @@ fn start_session_db_direct_creates_in_sqlite() {
 
         let db = setup_db_with_project(project);
 
+        let session_id = "00000000-0000-4000-8000-000000000601";
         let state = start_session_direct(
             &SessionStartRequest {
                 title: "db-direct start session".into(),
                 context: "db-direct start".into(),
-                session_id: Some("daemon-start-1".into()),
+                session_id: Some(session_id.into()),
                 project_dir: project.to_string_lossy().into(),
                 policy_preset: None,
                 base_ref: None,
@@ -220,7 +221,7 @@ fn start_session_db_direct_creates_in_sqlite() {
         assert_eq!(state.metrics.agent_count, 0);
 
         let db_state = db
-            .load_session_state("daemon-start-1")
+            .load_session_state(session_id)
             .expect("load")
             .expect("present");
         assert_eq!(db_state.context, "db-direct start");
@@ -242,7 +243,7 @@ fn start_session_db_direct_registers_fresh_project_for_discovery() {
             &SessionStartRequest {
                 title: "fresh-project start session".into(),
                 context: "fresh-project start".into(),
-                session_id: Some("daemon-start-fresh".into()),
+                session_id: Some("00000000-0000-4000-8000-000000000602".into()),
                 project_dir: canonical_project.to_string_lossy().into_owned(),
                 policy_preset: None,
                 base_ref: None,
@@ -280,11 +281,12 @@ fn join_session_db_direct_adds_agent() {
 
         let db = setup_db_with_project(project);
 
+        let session_id = "00000000-0000-4000-8000-000000000603";
         start_session_direct(
             &SessionStartRequest {
                 title: "join test session".into(),
                 context: "join test".into(),
-                session_id: Some("daemon-join-1".into()),
+                session_id: Some(session_id.into()),
                 project_dir: project.to_string_lossy().into(),
                 policy_preset: None,
                 base_ref: None,
@@ -294,7 +296,7 @@ fn join_session_db_direct_adds_agent() {
         .expect("start session");
 
         let joined = join_session_direct(
-            "daemon-join-1",
+            session_id,
             &SessionJoinRequest {
                 runtime: "codex".into(),
                 role: SessionRole::Worker,
@@ -313,7 +315,7 @@ fn join_session_db_direct_adds_agent() {
         assert_eq!(joined.agents.len(), 1);
 
         let db_state = db
-            .load_session_state("daemon-join-1")
+            .load_session_state(session_id)
             .expect("load")
             .expect("present");
         assert_eq!(db_state.status, SessionStatus::AwaitingLeader);

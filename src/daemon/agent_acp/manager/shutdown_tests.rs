@@ -62,7 +62,11 @@ async fn shutdown_all_drains_live_sessions_and_blocks_new_starts() {
         };
         let manager = manager();
         let descriptor = descriptor(&script);
-        let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+        let Ok(snapshot) = manager.start_descriptor(
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            &request,
+            &descriptor,
+        ) else {
             unreachable!("start");
         };
 
@@ -78,7 +82,11 @@ async fn shutdown_all_drains_live_sessions_and_blocks_new_starts() {
             }
         ));
 
-        let Err(restart_error) = manager.start_descriptor("sess-2", &request, &descriptor) else {
+        let Err(restart_error) = manager.start_descriptor(
+            "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+            &request,
+            &descriptor,
+        ) else {
             unreachable!("shutdown should block new ACP starts");
         };
         assert!(

@@ -11,7 +11,11 @@ use super::test_support::{
 #[test]
 fn incremental_scan_skips_previously_consumed_log_bytes() {
     with_temp_project(|project| {
-        let state = start_active_session(project, "sess-incremental-1", "observe test");
+        let state = start_active_session(
+            project,
+            "c82c7d6f-29ad-5851-b33c-866f9e06dbbb",
+            "observe test",
+        );
         let leader = state
             .agents
             .values()
@@ -21,18 +25,18 @@ fn incremental_scan_skips_previously_consumed_log_bytes() {
         write_agent_log(
             project,
             HookAgent::Claude,
-            "leader-session",
+            "77d13b08-1651-541b-a3fc-26cab59e0aea",
             "This is a harness infrastructure issue - the KDS port wasn't forwarded",
         );
 
-        let observed =
-            service::session_status("sess-incremental-1", project).expect("load session status");
+        let observed = service::session_status("c82c7d6f-29ad-5851-b33c-866f9e06dbbb", project)
+            .expect("load session status");
         let mut tail_states: HashMap<String, AgentLogTailState> = HashMap::new();
         let mut shared_cross_agent_editors: HashMap<String, HashSet<String>> = HashMap::new();
 
         let first_issues = scan_all_agents_incremental(
             &observed,
-            "sess-incremental-1",
+            "c82c7d6f-29ad-5851-b33c-866f9e06dbbb",
             project,
             &mut tail_states,
             &mut shared_cross_agent_editors,
@@ -46,7 +50,7 @@ fn incremental_scan_skips_previously_consumed_log_bytes() {
 
         let second_issues = scan_all_agents_incremental(
             &observed,
-            "sess-incremental-1",
+            "c82c7d6f-29ad-5851-b33c-866f9e06dbbb",
             project,
             &mut tail_states,
             &mut shared_cross_agent_editors,
@@ -71,7 +75,11 @@ fn incremental_scan_skips_previously_consumed_log_bytes() {
 #[test]
 fn incremental_scan_detects_appended_log_lines() {
     with_temp_project(|project| {
-        let state = start_active_session(project, "sess-incremental-2", "observe test");
+        let state = start_active_session(
+            project,
+            "c27413d3-915d-50e5-8163-ae5abae02ae2",
+            "observe test",
+        );
         let leader = state
             .agents
             .values()
@@ -81,18 +89,18 @@ fn incremental_scan_detects_appended_log_lines() {
         write_agent_log(
             project,
             HookAgent::Claude,
-            "leader-session",
+            "77d13b08-1651-541b-a3fc-26cab59e0aea",
             "This is a harness infrastructure issue - the KDS port wasn't forwarded",
         );
 
-        let observed =
-            service::session_status("sess-incremental-2", project).expect("load session status");
+        let observed = service::session_status("c27413d3-915d-50e5-8163-ae5abae02ae2", project)
+            .expect("load session status");
         let mut tail_states: HashMap<String, AgentLogTailState> = HashMap::new();
         let mut shared_cross_agent_editors: HashMap<String, HashSet<String>> = HashMap::new();
 
         let first_issues = scan_all_agents_incremental(
             &observed,
-            "sess-incremental-2",
+            "c27413d3-915d-50e5-8163-ae5abae02ae2",
             project,
             &mut tail_states,
             &mut shared_cross_agent_editors,
@@ -107,7 +115,7 @@ fn incremental_scan_detects_appended_log_lines() {
         append_agent_log_lines(
             project,
             HookAgent::Claude,
-            "leader-session",
+            "77d13b08-1651-541b-a3fc-26cab59e0aea",
             &[serde_json::json!({
                 "timestamp": "2026-03-28T12:00:01Z",
                 "message": {
@@ -119,7 +127,7 @@ fn incremental_scan_detects_appended_log_lines() {
 
         let second_issues = scan_all_agents_incremental(
             &observed,
-            "sess-incremental-2",
+            "c27413d3-915d-50e5-8163-ae5abae02ae2",
             project,
             &mut tail_states,
             &mut shared_cross_agent_editors,

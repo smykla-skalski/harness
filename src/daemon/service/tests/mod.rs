@@ -63,12 +63,15 @@ fn daemon_service_round_trip_smoke_covers_public_surface() {
             "round trip",
             project,
             Some("claude"),
-            Some("daemon-service-smoke"),
+            Some("fc6850c3-39f4-540b-81ff-48ea18a8207a"),
         )
         .expect("start session");
         let leader_id = state.leader_id.clone().expect("leader id");
         let joined = temp_env::with_vars(
-            [("CODEX_SESSION_ID", Some("daemon-service-smoke-worker"))],
+            [(
+                "CODEX_SESSION_ID",
+                Some("fc6850c3-39f4-540b-81ff-48ea18a8207a-worker"),
+            )],
             || {
                 session_service::join_session(
                     &state.session_id,
@@ -110,7 +113,7 @@ fn daemon_service_round_trip_smoke_covers_public_surface() {
                 agent_id: worker_id.clone(),
                 command: "inject_context".into(),
                 message: "double-check the daemon split".into(),
-                action_hint: Some("task:daemon-service-smoke".into()),
+                action_hint: Some("task:fc6850c3-39f4-540b-81ff-48ea18a8207a".into()),
             },
             None,
             None,

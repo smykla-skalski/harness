@@ -91,43 +91,51 @@ async fn create_http_task(
 fn post_session_title_uses_async_db_when_sync_db_is_unavailable() {
     let sandbox = tempdir().expect("tempdir");
     with_isolated_harness_env(sandbox.path(), || {
-        temp_env::with_var("CLAUDE_SESSION_ID", Some("http-async-title-leader"), || {
-            let project_dir = sandbox.path().join("project");
-            init_git_project(&project_dir);
+        temp_env::with_var(
+            "CLAUDE_SESSION_ID",
+            Some("24fe96af-442d-5bbb-8678-ced4f609e4c8-leader"),
+            || {
+                let project_dir = sandbox.path().join("project");
+                init_git_project(&project_dir);
 
-            let runtime = tokio::runtime::Runtime::new().expect("runtime");
-            runtime.block_on(async {
-                let db_path = sandbox.path().join("daemon.sqlite");
-                let state = test_http_state_with_empty_async_db(&db_path).await;
-                let _ =
-                    start_async_http_session(state.clone(), &project_dir, "http-async-title").await;
+                let runtime = tokio::runtime::Runtime::new().expect("runtime");
+                runtime.block_on(async {
+                    let db_path = sandbox.path().join("daemon.sqlite");
+                    let state = test_http_state_with_empty_async_db(&db_path).await;
+                    let _ = start_async_http_session(
+                        state.clone(),
+                        &project_dir,
+                        "24fe96af-442d-5bbb-8678-ced4f609e4c8",
+                    )
+                    .await;
 
-                let response = post_session_title(
-                    axum::extract::Path("http-async-title".to_owned()),
-                    auth_headers(),
-                    State(state.clone()),
-                    Json(SessionTitleRequest {
-                        title: "retitled through async route".into(),
-                    }),
-                )
-                .await;
+                    let response = post_session_title(
+                        axum::extract::Path("24fe96af-442d-5bbb-8678-ced4f609e4c8".to_owned()),
+                        auth_headers(),
+                        State(state.clone()),
+                        Json(SessionTitleRequest {
+                            title: "retitled through async route".into(),
+                        }),
+                    )
+                    .await;
 
-                let (status, body) = response_json(response).await;
-                assert_eq!(status, StatusCode::OK);
-                assert_eq!(
-                    body["state"]["title"].as_str(),
-                    Some("retitled through async route")
-                );
+                    let (status, body) = response_json(response).await;
+                    assert_eq!(status, StatusCode::OK);
+                    assert_eq!(
+                        body["state"]["title"].as_str(),
+                        Some("retitled through async route")
+                    );
 
-                let async_db = state.async_db.get().expect("async db");
-                let resolved = async_db
-                    .resolve_session("http-async-title")
-                    .await
-                    .expect("resolve session")
-                    .expect("session present");
-                assert_eq!(resolved.state.title, "retitled through async route");
-            });
-        });
+                    let async_db = state.async_db.get().expect("async db");
+                    let resolved = async_db
+                        .resolve_session("24fe96af-442d-5bbb-8678-ced4f609e4c8")
+                        .await
+                        .expect("resolve session")
+                        .expect("session present");
+                    assert_eq!(resolved.state.title, "retitled through async route");
+                });
+            },
+        );
     });
 }
 
@@ -137,8 +145,14 @@ fn post_task_drop_queue_policy_update_and_status_use_async_db_when_sync_db_is_un
     with_isolated_harness_env(sandbox.path(), || {
         temp_env::with_vars(
             [
-                ("CLAUDE_SESSION_ID", Some("http-async-lifecycle-leader")),
-                ("CODEX_SESSION_ID", Some("http-async-lifecycle-worker")),
+                (
+                    "CLAUDE_SESSION_ID",
+                    Some("01ddbe23-63ee-5ac7-9633-8cb9f7ef1122"),
+                ),
+                (
+                    "CODEX_SESSION_ID",
+                    Some("5b67d0b2-829f-5112-b2ef-35861abe7297"),
+                ),
             ],
             || {
                 let project_dir = sandbox.path().join("project");
@@ -151,26 +165,26 @@ fn post_task_drop_queue_policy_update_and_status_use_async_db_when_sync_db_is_un
                     let _ = start_async_http_session(
                         state.clone(),
                         &project_dir,
-                        "http-async-task-lifecycle",
+                        "c768851c-68dd-5b32-aa14-328f195726f0",
                     )
                     .await;
                     let worker_id = join_http_worker(
                         &state,
-                        "http-async-task-lifecycle",
+                        "c768851c-68dd-5b32-aa14-328f195726f0",
                         &project_dir,
                         "Async Lifecycle Worker",
                     )
                     .await;
                     let primary_task = create_http_task(
                         &state,
-                        "http-async-task-lifecycle",
+                        "c768851c-68dd-5b32-aa14-328f195726f0",
                         "primary task",
                         TaskSeverity::High,
                     )
                     .await;
                     let queued_task = create_http_task(
                         &state,
-                        "http-async-task-lifecycle",
+                        "c768851c-68dd-5b32-aa14-328f195726f0",
                         "queued task",
                         TaskSeverity::Medium,
                     )
@@ -178,7 +192,7 @@ fn post_task_drop_queue_policy_update_and_status_use_async_db_when_sync_db_is_un
 
                     let dropped = post_task_drop(
                         axum::extract::Path((
-                            "http-async-task-lifecycle".to_owned(),
+                            "c768851c-68dd-5b32-aa14-328f195726f0".to_owned(),
                             primary_task.clone(),
                         )),
                         auth_headers(),
@@ -209,7 +223,7 @@ fn post_task_drop_queue_policy_update_and_status_use_async_db_when_sync_db_is_un
 
                     let queued = post_task_drop(
                         axum::extract::Path((
-                            "http-async-task-lifecycle".to_owned(),
+                            "c768851c-68dd-5b32-aa14-328f195726f0".to_owned(),
                             queued_task.clone(),
                         )),
                         auth_headers(),
@@ -236,7 +250,7 @@ fn post_task_drop_queue_policy_update_and_status_use_async_db_when_sync_db_is_un
 
                     let updated_policy = post_task_queue_policy(
                         axum::extract::Path((
-                            "http-async-task-lifecycle".to_owned(),
+                            "c768851c-68dd-5b32-aa14-328f195726f0".to_owned(),
                             queued_task.clone(),
                         )),
                         auth_headers(),
@@ -262,7 +276,7 @@ fn post_task_drop_queue_policy_update_and_status_use_async_db_when_sync_db_is_un
 
                     let completed = post_task_update(
                         axum::extract::Path((
-                            "http-async-task-lifecycle".to_owned(),
+                            "c768851c-68dd-5b32-aa14-328f195726f0".to_owned(),
                             primary_task.clone(),
                         )),
                         auth_headers(),
@@ -302,8 +316,14 @@ fn post_remove_agent_and_end_session_use_async_db_when_sync_db_is_unavailable() 
     with_isolated_harness_env(sandbox.path(), || {
         temp_env::with_vars(
             [
-                ("CLAUDE_SESSION_ID", Some("http-async-end-leader")),
-                ("CODEX_SESSION_ID", Some("http-async-end-worker")),
+                (
+                    "CLAUDE_SESSION_ID",
+                    Some("7e9f5567-008d-5b20-a486-2984d0023992"),
+                ),
+                (
+                    "CODEX_SESSION_ID",
+                    Some("66d7aa85-c93d-5802-a797-930fe83dda08"),
+                ),
             ],
             || {
                 let project_dir = sandbox.path().join("project");
@@ -316,12 +336,12 @@ fn post_remove_agent_and_end_session_use_async_db_when_sync_db_is_unavailable() 
                     let _ = start_async_http_session(
                         state.clone(),
                         &project_dir,
-                        "http-async-session-lifecycle",
+                        "54ed18da-5859-53fa-8812-951175de38e9",
                     )
                     .await;
                     let worker_id = join_http_worker(
                         &state,
-                        "http-async-session-lifecycle",
+                        "54ed18da-5859-53fa-8812-951175de38e9",
                         &project_dir,
                         "Async Session Worker",
                     )
@@ -329,7 +349,7 @@ fn post_remove_agent_and_end_session_use_async_db_when_sync_db_is_unavailable() 
 
                     let removed = post_remove_agent(
                         axum::extract::Path((
-                            "http-async-session-lifecycle".to_owned(),
+                            "54ed18da-5859-53fa-8812-951175de38e9".to_owned(),
                             worker_id.clone(),
                         )),
                         auth_headers(),
@@ -353,7 +373,7 @@ fn post_remove_agent_and_end_session_use_async_db_when_sync_db_is_unavailable() 
                     assert_eq!(body["signals"].as_array().map(Vec::len), Some(1));
 
                     let ended = post_end_session(
-                        axum::extract::Path("http-async-session-lifecycle".to_owned()),
+                        axum::extract::Path("54ed18da-5859-53fa-8812-951175de38e9".to_owned()),
                         auth_headers(),
                         State(state.clone()),
                         Json(SessionEndRequest {
@@ -388,7 +408,7 @@ fn post_runtime_session_uses_async_db_when_sync_db_is_unavailable() {
                 runtime.block_on(async {
                     let db_path = sandbox.path().join("daemon.sqlite");
                     let state = test_http_state_with_empty_async_db(&db_path).await;
-                    let session_id = "http-async-runtime-session";
+                    let session_id = "541f7d7a-ea03-563e-854c-8c8497956f6f";
                     let tui_id = "agent-tui-runtime";
                     let _ = start_async_http_session(state.clone(), &project_dir, session_id).await;
 
@@ -466,41 +486,49 @@ fn post_runtime_session_uses_async_db_when_sync_db_is_unavailable() {
 fn delete_session_removes_worktree_and_returns_204() {
     let sandbox = tempdir().expect("tempdir");
     with_isolated_harness_env(sandbox.path(), || {
-        temp_env::with_var("CLAUDE_SESSION_ID", Some("http-delete-leader"), || {
-            let project_dir = sandbox.path().join("project");
-            init_git_project(&project_dir);
+        temp_env::with_var(
+            "CLAUDE_SESSION_ID",
+            Some("079ad5ae-c9ee-525b-8263-b9ec8b02155a"),
+            || {
+                let project_dir = sandbox.path().join("project");
+                init_git_project(&project_dir);
 
-            let runtime = tokio::runtime::Runtime::new().expect("runtime");
-            runtime.block_on(async {
-                let db_path = sandbox.path().join("daemon.sqlite");
-                let state = test_http_state_with_empty_async_db(&db_path).await;
-                let body =
-                    start_async_http_session(state.clone(), &project_dir, "http-delete-sess").await;
-                let worktree_path: std::path::PathBuf = body["state"]["worktree_path"]
-                    .as_str()
-                    .expect("worktree_path in response")
-                    .into();
-                assert!(worktree_path.exists(), "worktree must exist before delete");
+                let runtime = tokio::runtime::Runtime::new().expect("runtime");
+                runtime.block_on(async {
+                    let db_path = sandbox.path().join("daemon.sqlite");
+                    let state = test_http_state_with_empty_async_db(&db_path).await;
+                    let body = start_async_http_session(
+                        state.clone(),
+                        &project_dir,
+                        "a3421878-b3c4-566f-8d47-b103f3334ae1",
+                    )
+                    .await;
+                    let worktree_path: std::path::PathBuf = body["state"]["worktree_path"]
+                        .as_str()
+                        .expect("worktree_path in response")
+                        .into();
+                    assert!(worktree_path.exists(), "worktree must exist before delete");
 
-                let response = delete_session(
-                    axum::extract::Path("http-delete-sess".to_owned()),
-                    auth_headers(),
-                    State(state.clone()),
-                )
-                .await;
-                assert_eq!(response.status(), StatusCode::NO_CONTENT);
-                assert!(
-                    !worktree_path.exists(),
-                    "worktree must be gone after delete"
-                );
+                    let response = delete_session(
+                        axum::extract::Path("a3421878-b3c4-566f-8d47-b103f3334ae1".to_owned()),
+                        auth_headers(),
+                        State(state.clone()),
+                    )
+                    .await;
+                    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+                    assert!(
+                        !worktree_path.exists(),
+                        "worktree must be gone after delete"
+                    );
 
-                let async_db = state.async_db.get().expect("async db");
-                let resolved = async_db
-                    .resolve_session("http-delete-sess")
-                    .await
-                    .expect("query ok");
-                assert!(resolved.is_none(), "session must be deleted from DB");
-            });
-        });
+                    let async_db = state.async_db.get().expect("async db");
+                    let resolved = async_db
+                        .resolve_session("a3421878-b3c4-566f-8d47-b103f3334ae1")
+                        .await
+                        .expect("query ok");
+                    assert!(resolved.is_none(), "session must be deleted from DB");
+                });
+            },
+        );
     });
 }

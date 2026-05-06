@@ -152,7 +152,8 @@ fn submit_review_async_writes_task_reviews_row_without_rebuild() {
         let runtime_tokio = tokio::runtime::Runtime::new().expect("runtime");
         runtime_tokio.block_on(async {
             let fixture =
-                set_up_review_persistence_fixture(project, "daemon-review-persistence").await;
+                set_up_review_persistence_fixture(project, "47d6bbfc-f5ca-5915-b0f9-a4f3687dbd0b")
+                    .await;
             let async_db = crate::daemon::db::AsyncDaemonDb::connect(&fixture.db_path)
                 .await
                 .expect("open async daemon db");
@@ -222,7 +223,8 @@ fn submit_for_review_async_syncs_file_state_immediately() {
         let runtime_tokio = tokio::runtime::Runtime::new().expect("runtime");
         runtime_tokio.block_on(async {
             let fixture =
-                set_up_review_persistence_fixture(project, "daemon-review-file-sync").await;
+                set_up_review_persistence_fixture(project, "fc9dfad5-f0cd-5570-bae6-c83a27be000b")
+                    .await;
             let async_db = crate::daemon::db::AsyncDaemonDb::connect(&fixture.db_path)
                 .await
                 .expect("open async daemon db");
@@ -268,7 +270,8 @@ fn stale_prepared_session_resync_does_not_clobber_async_review_state() {
         let runtime_tokio = tokio::runtime::Runtime::new().expect("runtime");
         runtime_tokio.block_on(async {
             let fixture =
-                set_up_review_persistence_fixture(project, "daemon-review-stale-resync").await;
+                set_up_review_persistence_fixture(project, "59ad3bb5-d688-5ec7-a4f5-6d7387e1f02a")
+                    .await;
             let async_db = crate::daemon::db::AsyncDaemonDb::connect(&fixture.db_path)
                 .await
                 .expect("open async daemon db");

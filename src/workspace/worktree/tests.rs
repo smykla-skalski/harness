@@ -6,6 +6,10 @@ use tempfile::TempDir;
 use super::*;
 use crate::workspace::layout::SessionLayout;
 
+const SESSION_ONE: &str = "00000000-0000-4000-8000-000000000301";
+const SESSION_TWO: &str = "00000000-0000-4000-8000-000000000302";
+const SESSION_THREE: &str = "00000000-0000-4000-8000-000000000303";
+
 fn init_origin_repo(tmp: &std::path::Path) {
     init_git_repo_with_seed(tmp);
 }
@@ -97,7 +101,7 @@ fn creates_worktree_and_branch() {
     let layout = SessionLayout {
         sessions_root: sessions.path().into(),
         project_name: "origin".into(),
-        session_id: "abc12345".into(),
+        session_id: SESSION_ONE.into(),
     };
     std::fs::create_dir_all(layout.project_dir()).unwrap();
     WorktreeController::create(origin.path(), &layout, None).expect("create");
@@ -113,7 +117,7 @@ fn destroy_removes_worktree_and_branch() {
     let layout = SessionLayout {
         sessions_root: sessions.path().into(),
         project_name: "origin".into(),
-        session_id: "ab234567".into(),
+        session_id: SESSION_TWO.into(),
     };
     std::fs::create_dir_all(layout.project_dir()).unwrap();
     WorktreeController::create(origin.path(), &layout, None).unwrap();
@@ -135,7 +139,7 @@ fn rollback_on_memory_create_failure() {
     let layout = SessionLayout {
         sessions_root: sessions.path().into(),
         project_name: "origin".into(),
-        session_id: "cd345678".into(),
+        session_id: SESSION_THREE.into(),
     };
     std::fs::create_dir_all(layout.session_root()).unwrap();
     std::fs::write(layout.memory(), b"blocker").unwrap();

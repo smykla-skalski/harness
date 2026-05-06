@@ -36,7 +36,7 @@ fn refresh_local_snapshot_does_not_rewrite_unchanged_transcript() {
         let state = session_service::build_new_session(
             "transcript refresh test",
             "managed tui",
-            "sess-tui-transcript-refresh",
+            "01f3730a-c37d-5dc8-95aa-074b50e1e0a7",
             "claude",
             None,
             &utc_now(),
@@ -52,7 +52,7 @@ fn refresh_local_snapshot_does_not_rewrite_unchanged_transcript() {
         let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), false);
         let snapshot = manager
             .start(
-                "sess-tui-transcript-refresh",
+                "01f3730a-c37d-5dc8-95aa-074b50e1e0a7",
                 &AgentTuiStartRequest {
                     runtime: "codex".into(),
                     role: SessionRole::Worker,
@@ -172,7 +172,7 @@ fn list_marks_orphaned_running_snapshot_inactive_and_persists_it() {
         let state = session_service::build_new_session(
             "orphaned list test",
             "managed tui",
-            "sess-tui-orphaned-list",
+            "d48931cf-065c-5837-b50e-fb12e921b58e",
             "claude",
             None,
             &utc_now(),
@@ -181,7 +181,7 @@ fn list_marks_orphaned_running_snapshot_inactive_and_persists_it() {
             .expect("sync session");
         let snapshot = sample_snapshot(
             "agent-tui-orphaned-list",
-            "sess-tui-orphaned-list",
+            "d48931cf-065c-5837-b50e-fb12e921b58e",
             "",
             "codex",
             "2026-04-30T13:00:00Z",
@@ -197,7 +197,7 @@ fn list_marks_orphaned_running_snapshot_inactive_and_persists_it() {
         let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), false);
 
         let listed = manager
-            .list("sess-tui-orphaned-list")
+            .list("d48931cf-065c-5837-b50e-fb12e921b58e")
             .expect("list managed tuis");
 
         assert_eq!(listed.tuis.len(), 1);
@@ -241,7 +241,7 @@ fn manager_start_does_not_pre_register() {
         let state = session_service::build_new_session(
             "no prereg test",
             "no prereg",
-            "sess-no-prereg",
+            "82bec68f-742c-53c4-88cd-cd08b0006a03",
             "claude",
             None,
             &utc_now(),
@@ -258,7 +258,7 @@ fn manager_start_does_not_pre_register() {
         let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), false);
         let snapshot = manager
             .start(
-                "sess-no-prereg",
+                "82bec68f-742c-53c4-88cd-cd08b0006a03",
                 &AgentTuiStartRequest {
                     runtime: "codex".into(),
                     role: SessionRole::Worker,
@@ -283,7 +283,7 @@ fn manager_start_does_not_pre_register() {
         {
             let db_guard = db_slot.get().expect("db slot").lock().expect("db lock");
             let loaded = db_guard
-                .load_session_state("sess-no-prereg")
+                .load_session_state("82bec68f-742c-53c4-88cd-cd08b0006a03")
                 .expect("load state")
                 .expect("state present");
             assert_eq!(
@@ -319,7 +319,7 @@ fn manager_auto_join_prompt_in_transcript() {
         let state = session_service::build_new_session(
             "auto-join test",
             "auto-join",
-            "sess-auto-join",
+            "7b0bd761-6a0b-5a7f-9147-69a5cc647f67",
             "claude",
             None,
             &utc_now(),
@@ -335,7 +335,7 @@ fn manager_auto_join_prompt_in_transcript() {
         let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), false);
         let snapshot = manager
             .start(
-                "sess-auto-join",
+                "7b0bd761-6a0b-5a7f-9147-69a5cc647f67",
                 &AgentTuiStartRequest {
                     runtime: "gemini".into(),
                     role: SessionRole::Observer,
@@ -357,7 +357,7 @@ fn manager_auto_join_prompt_in_transcript() {
 
         let prompt = super::super::build_auto_join_prompt(
             "gemini",
-            "sess-auto-join",
+            "7b0bd761-6a0b-5a7f-9147-69a5cc647f67",
             SessionRole::Observer,
             None,
             &["my-cap".to_string()],
@@ -366,7 +366,7 @@ fn manager_auto_join_prompt_in_transcript() {
             None,
         );
         assert!(prompt.contains("/harness:harness session join"));
-        assert!(prompt.contains("sess-auto-join"));
+        assert!(prompt.contains("7b0bd761-6a0b-5a7f-9147-69a5cc647f67"));
         assert!(prompt.contains("observer"));
         assert!(prompt.contains("my-cap"));
         assert_eq!(
@@ -402,7 +402,7 @@ fn manager_start_threads_leader_recovery_prompt_into_process_args() {
         let state = session_service::build_new_session(
             "leader recovery prompt test",
             "recovery prompt",
-            "sess-recovery-prompt",
+            "404057ab-ead5-521f-a588-38b15e51acbf",
             "claude",
             None,
             &utc_now(),
@@ -418,7 +418,7 @@ fn manager_start_threads_leader_recovery_prompt_into_process_args() {
         let manager = AgentTuiManagerHandle::new(sender, Arc::clone(&db_slot), false);
         let snapshot = manager
             .start(
-                "sess-recovery-prompt",
+                "404057ab-ead5-521f-a588-38b15e51acbf",
                 &AgentTuiStartRequest {
                     runtime: "codex".into(),
                     role: SessionRole::Leader,

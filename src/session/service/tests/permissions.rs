@@ -3,11 +3,17 @@ use super::*;
 #[test]
 fn removed_agent_loses_mutation_permissions() {
     with_temp_project(|project| {
-        let state =
-            start_active_session("test", "", project, Some("claude"), Some("perm")).expect("start");
+        let state = start_active_session(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-00000000001c"),
+        )
+        .expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = join_session(
-            "perm",
+            "00000000-0000-4002-8000-00000000001c",
             SessionRole::Worker,
             "codex",
             &[],
@@ -23,7 +29,7 @@ fn removed_agent_loses_mutation_permissions() {
             .expect("worker id")
             .clone();
         let task = create_task(
-            "perm",
+            "00000000-0000-4002-8000-00000000001c",
             "task1",
             None,
             TaskSeverity::Medium,
@@ -32,10 +38,16 @@ fn removed_agent_loses_mutation_permissions() {
         )
         .expect("task");
 
-        remove_agent("perm", &worker_id, &leader_id, project).expect("remove");
+        remove_agent(
+            "00000000-0000-4002-8000-00000000001c",
+            &worker_id,
+            &leader_id,
+            project,
+        )
+        .expect("remove");
 
         let error = update_task(
-            "perm",
+            "00000000-0000-4002-8000-00000000001c",
             &task.task_id,
             TaskStatus::Done,
             None,
@@ -50,11 +62,17 @@ fn removed_agent_loses_mutation_permissions() {
 #[test]
 fn assign_role_rejects_leader_changes() {
     with_temp_project(|project| {
-        let state = start_active_session("test", "", project, Some("claude"), Some("roles"))
-            .expect("start");
+        let state = start_active_session(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-000000000021"),
+        )
+        .expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = join_session(
-            "roles",
+            "00000000-0000-4002-8000-000000000021",
             SessionRole::Worker,
             "codex",
             &[],
@@ -71,7 +89,7 @@ fn assign_role_rejects_leader_changes() {
             .clone();
 
         let error = assign_role(
-            "roles",
+            "00000000-0000-4002-8000-000000000021",
             &worker_id,
             SessionRole::Leader,
             None,
@@ -86,11 +104,17 @@ fn assign_role_rejects_leader_changes() {
 #[test]
 fn assign_task_requires_active_assignee() {
     with_temp_project(|project| {
-        let state = start_active_session("test", "", project, Some("claude"), Some("assign"))
-            .expect("start");
+        let state = start_active_session(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-000000000005"),
+        )
+        .expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = join_session(
-            "assign",
+            "00000000-0000-4002-8000-000000000005",
             SessionRole::Worker,
             "codex",
             &[],
@@ -106,7 +130,7 @@ fn assign_task_requires_active_assignee() {
             .expect("worker id")
             .clone();
         let task = create_task(
-            "assign",
+            "00000000-0000-4002-8000-000000000005",
             "task1",
             None,
             TaskSeverity::Medium,
@@ -115,10 +139,22 @@ fn assign_task_requires_active_assignee() {
         )
         .expect("task");
 
-        remove_agent("assign", &worker_id, &leader_id, project).expect("remove");
+        remove_agent(
+            "00000000-0000-4002-8000-000000000005",
+            &worker_id,
+            &leader_id,
+            project,
+        )
+        .expect("remove");
 
-        let error = assign_task("assign", &task.task_id, &worker_id, &leader_id, project)
-            .expect_err("assign");
+        let error = assign_task(
+            "00000000-0000-4002-8000-000000000005",
+            &task.task_id,
+            &worker_id,
+            &leader_id,
+            project,
+        )
+        .expect_err("00000000-0000-4002-8000-000000000005");
         assert_eq!(error.code(), "KSRCLI092");
     });
 }
@@ -131,7 +167,7 @@ fn improver_cannot_assign_tasks_under_swarm_contract() {
             "",
             project,
             Some("claude"),
-            Some("assign-rules"),
+            Some("00000000-0000-4002-8000-000000000004"),
             Some("swarm-default"),
         )
         .expect("start");
@@ -139,7 +175,7 @@ fn improver_cannot_assign_tasks_under_swarm_contract() {
 
         let joined = temp_env::with_var("CODEX_SESSION_ID", Some("improver"), || {
             join_session(
-                "assign-rules",
+                "00000000-0000-4002-8000-000000000004",
                 SessionRole::Improver,
                 "codex",
                 &[],
@@ -156,7 +192,7 @@ fn improver_cannot_assign_tasks_under_swarm_contract() {
             .expect("improver id")
             .clone();
         let task = create_task(
-            "assign-rules",
+            "00000000-0000-4002-8000-000000000004",
             "task",
             None,
             TaskSeverity::Medium,
@@ -166,7 +202,7 @@ fn improver_cannot_assign_tasks_under_swarm_contract() {
         .expect("task");
 
         let error = assign_task(
-            "assign-rules",
+            "00000000-0000-4002-8000-000000000004",
             &task.task_id,
             &improver_id,
             &improver_id,
@@ -185,14 +221,14 @@ fn leader_cannot_assign_task_to_observer() {
             "",
             project,
             Some("claude"),
-            Some("observer-assignee"),
+            Some("00000000-0000-4002-8000-00000000001b"),
             Some("swarm-default"),
         )
         .expect("start");
         let leader_id = state.leader_id.expect("leader");
         let joined = temp_env::with_var("CODEX_SESSION_ID", Some("observer"), || {
             join_session(
-                "observer-assignee",
+                "00000000-0000-4002-8000-00000000001b",
                 SessionRole::Observer,
                 "codex",
                 &[],
@@ -209,7 +245,7 @@ fn leader_cannot_assign_task_to_observer() {
             .expect("observer id")
             .clone();
         let task = create_task(
-            "observer-assignee",
+            "00000000-0000-4002-8000-00000000001b",
             "task",
             None,
             TaskSeverity::Medium,
@@ -219,7 +255,7 @@ fn leader_cannot_assign_task_to_observer() {
         .expect("task");
 
         let error = assign_task(
-            "observer-assignee",
+            "00000000-0000-4002-8000-00000000001b",
             &task.task_id,
             &observer_id,
             &leader_id,
@@ -233,11 +269,17 @@ fn leader_cannot_assign_task_to_observer() {
 #[test]
 fn transfer_leader_requires_active_target() {
     with_temp_project(|project| {
-        let state = start_active_session("test", "", project, Some("claude"), Some("transfer"))
-            .expect("start");
+        let state = start_active_session(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-00000000003b"),
+        )
+        .expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = join_session(
-            "transfer",
+            "00000000-0000-4002-8000-00000000003b",
             SessionRole::Worker,
             "codex",
             &[],
@@ -253,10 +295,22 @@ fn transfer_leader_requires_active_target() {
             .expect("worker id")
             .clone();
 
-        remove_agent("transfer", &worker_id, &leader_id, project).expect("remove");
+        remove_agent(
+            "00000000-0000-4002-8000-00000000003b",
+            &worker_id,
+            &leader_id,
+            project,
+        )
+        .expect("remove");
 
-        let error = transfer_leader("transfer", &worker_id, None, &leader_id, project)
-            .expect_err("transfer");
+        let error = transfer_leader(
+            "00000000-0000-4002-8000-00000000003b",
+            &worker_id,
+            None,
+            &leader_id,
+            project,
+        )
+        .expect_err("00000000-0000-4002-8000-00000000003b");
         assert_eq!(error.code(), "KSRCLI092");
     });
 }
@@ -269,14 +323,14 @@ fn observer_transfer_leader_creates_pending_request() {
             "",
             project,
             Some("claude"),
-            Some("transfer-pending"),
+            Some("00000000-0000-4002-8000-000000000039"),
         )
         .expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let observer =
             temp_env::with_vars([("CODEX_SESSION_ID", Some("observer-session"))], || {
                 join_session(
-                    "transfer-pending",
+                    "00000000-0000-4002-8000-000000000039",
                     SessionRole::Observer,
                     "codex",
                     &[],
@@ -294,7 +348,7 @@ fn observer_transfer_leader_creates_pending_request() {
             .clone();
 
         transfer_leader(
-            "transfer-pending",
+            "00000000-0000-4002-8000-000000000039",
             &observer_id,
             Some("leader is overloaded"),
             &observer_id,
@@ -302,7 +356,8 @@ fn observer_transfer_leader_creates_pending_request() {
         )
         .expect("request transfer");
 
-        let updated = session_status("transfer-pending", project).expect("status");
+        let updated =
+            session_status("00000000-0000-4002-8000-000000000039", project).expect("status");
         assert_eq!(updated.leader_id.as_deref(), Some(leader_id.as_str()));
         let request = updated
             .pending_leader_transfer
@@ -322,14 +377,14 @@ fn current_leader_confirms_pending_transfer() {
             "",
             project,
             Some("claude"),
-            Some("transfer-confirm"),
+            Some("00000000-0000-4002-8000-000000000038"),
         )
         .expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let observer =
             temp_env::with_vars([("CODEX_SESSION_ID", Some("observer-session"))], || {
                 join_session(
-                    "transfer-confirm",
+                    "00000000-0000-4002-8000-000000000038",
                     SessionRole::Observer,
                     "codex",
                     &[],
@@ -347,7 +402,7 @@ fn current_leader_confirms_pending_transfer() {
             .clone();
 
         transfer_leader(
-            "transfer-confirm",
+            "00000000-0000-4002-8000-000000000038",
             &observer_id,
             Some("codex is ready"),
             &observer_id,
@@ -355,7 +410,7 @@ fn current_leader_confirms_pending_transfer() {
         )
         .expect("request transfer");
         transfer_leader(
-            "transfer-confirm",
+            "00000000-0000-4002-8000-000000000038",
             &observer_id,
             Some("approved"),
             &leader_id,
@@ -363,11 +418,14 @@ fn current_leader_confirms_pending_transfer() {
         )
         .expect("confirm transfer");
 
-        let updated = session_status("transfer-confirm", project).expect("status");
+        let updated =
+            session_status("00000000-0000-4002-8000-000000000038", project).expect("status");
         assert_eq!(updated.leader_id.as_deref(), Some(observer_id.as_str()));
         assert!(updated.pending_leader_transfer.is_none());
 
-        let layout = storage::layout_from_project_dir(project, "transfer-confirm").expect("layout");
+        let layout =
+            storage::layout_from_project_dir(project, "00000000-0000-4002-8000-000000000038")
+                .expect("layout");
         let entries = storage::load_log_entries(&layout).expect("entries");
         assert!(entries.iter().any(|entry| {
             matches!(
@@ -398,14 +456,14 @@ fn observer_transfer_leader_succeeds_when_current_leader_is_unresponsive() {
             "",
             project,
             Some("claude"),
-            Some("transfer-timeout"),
+            Some("00000000-0000-4002-8000-00000000003a"),
         )
         .expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let observer =
             temp_env::with_vars([("CODEX_SESSION_ID", Some("observer-session"))], || {
                 join_session(
-                    "transfer-timeout",
+                    "00000000-0000-4002-8000-00000000003a",
                     SessionRole::Observer,
                     "codex",
                     &[],
@@ -423,7 +481,8 @@ fn observer_transfer_leader_succeeds_when_current_leader_is_unresponsive() {
             .clone();
 
         let layout_timeout =
-            storage::layout_from_project_dir(project, "transfer-timeout").expect("layout");
+            storage::layout_from_project_dir(project, "00000000-0000-4002-8000-00000000003a")
+                .expect("layout");
         storage::update_state(&layout_timeout, |state| {
             let stale = (Utc::now() - Duration::seconds(600)).to_rfc3339();
             let leader = state.agents.get_mut(&leader_id).expect("leader");
@@ -434,7 +493,7 @@ fn observer_transfer_leader_succeeds_when_current_leader_is_unresponsive() {
         .expect("mark stale");
 
         transfer_leader(
-            "transfer-timeout",
+            "00000000-0000-4002-8000-00000000003a",
             &observer_id,
             Some("leader timed out"),
             &observer_id,
@@ -442,7 +501,8 @@ fn observer_transfer_leader_succeeds_when_current_leader_is_unresponsive() {
         )
         .expect("forced transfer");
 
-        let updated = session_status("transfer-timeout", project).expect("status");
+        let updated =
+            session_status("00000000-0000-4002-8000-00000000003a", project).expect("status");
         assert_eq!(updated.leader_id.as_deref(), Some(observer_id.as_str()));
         assert!(updated.pending_leader_transfer.is_none());
     });

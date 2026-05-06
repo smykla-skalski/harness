@@ -29,7 +29,7 @@ fn process_incident_event_maps_process_exit() {
     assert_eq!(event.payload["quarantine_applied"], false);
     assert_eq!(
         event.payload["affected_logical_session_ids"],
-        serde_json::json!(["sess-1"])
+        serde_json::json!(["eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"])
     );
 }
 
@@ -91,7 +91,10 @@ fn shared_stderr_tail_redacts_known_secret_patterns() {
 
 #[test]
 fn sorted_singleton_returns_one_stable_session_id() {
-    assert_eq!(sorted_singleton("sess-2".to_string()), vec!["sess-2"]);
+    assert_eq!(
+        sorted_singleton("00b4a39f-719e-5418-abe8-eb3ab6ea614d".to_string()),
+        vec!["00b4a39f-719e-5418-abe8-eb3ab6ea614d"]
+    );
 }
 
 #[test]
@@ -107,7 +110,7 @@ fn reason_kind_uses_raw_unknown_tag_when_present() {
 fn disconnected_snapshot(reason: DisconnectReason) -> AcpAgentSnapshot {
     AcpAgentSnapshot {
         acp_id: "acp-1".to_string(),
-        session_id: "sess-1".to_string(),
+        session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".to_string(),
         agent_id: "fake".to_string(),
         display_name: "Fake ACP".to_string(),
         status: AgentStatus::Disconnected {
@@ -146,14 +149,14 @@ async fn spawn_event_forwarder_persists_live_acp_batches_to_db() {
         rx,
         Some(LiveEventPersistence::new(
             Arc::clone(&db),
-            "sess-1",
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
             "gemini-worker",
             "gemini",
         )),
     );
     tx.send(EventBatch {
         acp_id: "acp-1".into(),
-        session_id: "sess-1".into(),
+        session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
         raw_count: 1,
         events: vec![ConversationEvent {
             timestamp: Some("2026-04-29T00:00:01Z".into()),
@@ -178,7 +181,7 @@ async fn spawn_event_forwarder_persists_live_acp_batches_to_db() {
 
     let db = db.lock().expect("db lock");
     let events = db
-        .load_conversation_events("sess-1", "gemini-worker")
+        .load_conversation_events("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", "gemini-worker")
         .expect("load persisted conversation events");
     assert_eq!(events.len(), 1);
     let ConversationEventKind::AssistantText { content } = &events[0].kind else {
@@ -226,13 +229,13 @@ fn sample_session_state() -> SessionState {
     SessionState {
         schema_version: crate::session::types::CURRENT_VERSION,
         state_version: 1,
-        session_id: "sess-1".into(),
+        session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
         project_name: String::new(),
         worktree_path: std::path::PathBuf::new(),
         shared_path: std::path::PathBuf::new(),
         origin_path: std::path::PathBuf::new(),
         branch_ref: String::new(),
-        title: "sess-1".into(),
+        title: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
         context: "active ACP test session".into(),
         status: SessionStatus::Active,
         policy: Default::default(),

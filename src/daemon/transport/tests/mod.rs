@@ -76,7 +76,7 @@ fn daemon_transport_round_trip_smoke_covers_public_surface() {
         "test",
         "snapshot",
         "--session",
-        "sess-123",
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc23",
         "--json",
     ])
     .expect("parse snapshot command")
@@ -148,7 +148,7 @@ fn daemon_transport_round_trip_smoke_covers_public_surface() {
     assert!(matches!(doctor, DaemonCommand::Doctor));
     match snapshot {
         DaemonCommand::Snapshot(args) => {
-            assert_eq!(args.session, "sess-123");
+            assert_eq!(args.session, "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc23");
             assert!(args.json);
         }
         other => panic!("expected snapshot command, got {other:?}"),

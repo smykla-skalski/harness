@@ -3,12 +3,18 @@ use super::*;
 #[test]
 fn expired_task_start_signal_reopens_task_and_clears_assignment() {
     with_temp_project(|project| {
-        let state = start_active_session("test", "", project, Some("claude"), Some("drop-expire"))
-            .expect("start");
+        let state = start_active_session(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-00000000000b"),
+        )
+        .expect("start");
         let leader_id = state.leader_id.expect("leader id");
         let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("expire-worker"))], || {
             join_session(
-                "drop-expire",
+                "00000000-0000-4002-8000-00000000000b",
                 SessionRole::Worker,
                 "codex",
                 &[],
@@ -26,7 +32,7 @@ fn expired_task_start_signal_reopens_task_and_clears_assignment() {
             .clone();
         let worker = joined.agents.get(&worker_id).expect("worker");
         let task = create_task(
-            "drop-expire",
+            "00000000-0000-4002-8000-00000000000b",
             "queued",
             None,
             TaskSeverity::Medium,
@@ -36,7 +42,7 @@ fn expired_task_start_signal_reopens_task_and_clears_assignment() {
         .expect("queued");
 
         drop_task(
-            "drop-expire",
+            "00000000-0000-4002-8000-00000000000b",
             &task.task_id,
             &protocol::TaskDropTarget::Agent {
                 agent_id: worker_id.clone(),
@@ -47,8 +53,13 @@ fn expired_task_start_signal_reopens_task_and_clears_assignment() {
         )
         .expect("drop");
 
-        let signal =
-            list_signals("drop-expire", Some(&worker_id), project).expect("signals")[0].clone();
+        let signal = list_signals(
+            "00000000-0000-4002-8000-00000000000b",
+            Some(&worker_id),
+            project,
+        )
+        .expect("signals")[0]
+            .clone();
         let runtime = runtime::runtime_for_name(worker.runtime.runtime_name()).expect("runtime");
         let signal_dir = runtime.signal_dir(
             project,
@@ -70,14 +81,20 @@ fn expired_task_start_signal_reopens_task_and_clears_assignment() {
         )
         .expect("rewrite expired signal");
 
-        let state = session_status("drop-expire", project).expect("status");
+        let state =
+            session_status("00000000-0000-4002-8000-00000000000b", project).expect("status");
         let task = state.tasks.get(&task.task_id).expect("task");
         assert_eq!(task.status, TaskStatus::Open);
         assert!(task.assigned_to.is_none());
         let worker = state.agents.get(&worker_id).expect("worker");
         assert!(worker.current_task_id.is_none());
 
-        let signals = list_signals("drop-expire", Some(&worker_id), project).expect("signals");
+        let signals = list_signals(
+            "00000000-0000-4002-8000-00000000000b",
+            Some(&worker_id),
+            project,
+        )
+        .expect("signals");
         assert_eq!(signals.len(), 1);
         assert_eq!(signals[0].status, SessionSignalStatus::Expired);
         assert_eq!(
@@ -99,13 +116,13 @@ fn collect_expired_pending_signals_resolves_context_root_once_per_pass() {
             "",
             project,
             Some("claude"),
-            Some("signal-root-once"),
+            Some("00000000-0000-4002-8000-00000000002a"),
         )
         .expect("start");
         let joined =
             temp_env::with_vars([("CODEX_SESSION_ID", Some("signal-root-worker"))], || {
                 join_session(
-                    "signal-root-once",
+                    "00000000-0000-4002-8000-00000000002a",
                     SessionRole::Worker,
                     "codex",
                     &[],

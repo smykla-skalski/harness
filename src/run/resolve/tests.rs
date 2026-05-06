@@ -22,7 +22,7 @@ fn resolve_run_directory_with_root_and_id() {
 #[test]
 fn resolve_run_directory_missing_returns_error() {
     let tmp = tempfile::tempdir().unwrap();
-    let missing_root = tmp.path().join("nonexistent");
+    let missing_root = tmp.path().join("418cf829-6691-5fc0-92b1-8e5013efa2cb");
     let err = resolve_run_directory(None, Some("ghost"), Some(missing_root.as_path())).unwrap_err();
     assert_eq!(err.code(), "KSRCLI018");
 }

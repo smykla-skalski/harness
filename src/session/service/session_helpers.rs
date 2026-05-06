@@ -20,6 +20,7 @@ pub(crate) fn create_initial_session(
         .filter(|value| !value.trim().is_empty())
         .map(ToString::to_string)
     {
+        validate_explicit_session_id(Some(&session_id))?;
         let candidate = build_initial_state(context, title, &session_id, now, policy_preset);
         let layout = storage::layout_from_project_dir(project_dir, &session_id)?;
         if !storage::create_state(&layout, &candidate)? {
@@ -44,6 +45,13 @@ pub(crate) fn create_initial_session(
         CliErrorKind::session_agent_conflict("failed to allocate a unique session ID".to_string())
             .into(),
     )
+}
+
+pub(crate) fn validate_explicit_session_id(session_id: Option<&str>) -> Result<(), CliError> {
+    let Some(session_id) = session_id.filter(|value| !value.trim().is_empty()) else {
+        return Ok(());
+    };
+    storage::validate_new_session_id(session_id)
 }
 
 pub(crate) fn require_active(state: &SessionState) -> Result<(), CliError> {

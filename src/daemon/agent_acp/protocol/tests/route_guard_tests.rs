@@ -22,7 +22,10 @@ fn session_route_guard_rejects_before_initialization() {
 #[test]
 fn session_route_guard_rejects_stale_session_id() {
     let guard = SessionRouteGuard::default();
-    guard.start_session(&SessionId::new("acp-session-1"), route_target("sess-1"));
+    guard.start_session(
+        &SessionId::new("acp-session-1"),
+        route_target("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"),
+    );
     let Err(error) = guard.ensure_known(&SessionId::new("acp-session-2")) else {
         unreachable!("guard should reject unknown session id");
     };
@@ -39,19 +42,25 @@ fn session_route_guard_rejects_stale_session_id() {
 fn session_route_guard_accepts_expected_session_id() {
     let guard = SessionRouteGuard::default();
     let session_id = SessionId::new("acp-session-1");
-    guard.start_session(&session_id, route_target("sess-1"));
+    guard.start_session(
+        &session_id,
+        route_target("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"),
+    );
     let Ok(target) = guard.ensure_known(&session_id) else {
         unreachable!("guard should accept expected session id");
     };
-    assert_eq!(target.acp_id, "agent-sess-1");
-    assert_eq!(target.session_id, "sess-1");
+    assert_eq!(target.acp_id, "agent-eadbcb3e-6ef7-53d2-ad56-0347cb7189fc");
+    assert_eq!(target.session_id, "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc");
 }
 
 #[test]
 fn session_route_guard_rejects_after_session_end() {
     let guard = SessionRouteGuard::default();
     let session_id = SessionId::new("acp-session-1");
-    guard.start_session(&session_id, route_target("sess-1"));
+    guard.start_session(
+        &session_id,
+        route_target("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"),
+    );
     guard.stop_session(&session_id);
     let Err(error) = guard.ensure_known(&session_id) else {
         unreachable!("guard should reject removed session id");
@@ -64,8 +73,14 @@ fn session_route_guard_rejects_after_session_end() {
 #[test]
 fn session_route_guard_accepts_multiple_session_ids() {
     let guard = SessionRouteGuard::default();
-    guard.start_session(&SessionId::new("acp-session-1"), route_target("sess-1"));
-    guard.start_session(&SessionId::new("acp-session-2"), route_target("sess-2"));
+    guard.start_session(
+        &SessionId::new("acp-session-1"),
+        route_target("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"),
+    );
+    guard.start_session(
+        &SessionId::new("acp-session-2"),
+        route_target("00b4a39f-719e-5418-abe8-eb3ab6ea614d"),
+    );
 
     assert_eq!(
         {
@@ -74,7 +89,7 @@ fn session_route_guard_accepts_multiple_session_ids() {
             };
             target
         },
-        route_target("sess-1")
+        route_target("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
     );
     assert_eq!(
         {
@@ -83,7 +98,7 @@ fn session_route_guard_accepts_multiple_session_ids() {
             };
             target
         },
-        route_target("sess-2")
+        route_target("00b4a39f-719e-5418-abe8-eb3ab6ea614d")
     );
 }
 
@@ -92,8 +107,11 @@ fn session_route_guard_removes_one_route_without_poisoning_siblings() {
     let guard = SessionRouteGuard::default();
     let first = SessionId::new("acp-session-1");
     let second = SessionId::new("acp-session-2");
-    guard.start_session(&first, route_target("sess-1"));
-    guard.start_session(&second, route_target("sess-2"));
+    guard.start_session(&first, route_target("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"));
+    guard.start_session(
+        &second,
+        route_target("00b4a39f-719e-5418-abe8-eb3ab6ea614d"),
+    );
 
     guard.stop_session(&first);
 
@@ -108,7 +126,7 @@ fn session_route_guard_removes_one_route_without_poisoning_siblings() {
             };
             target
         },
-        route_target("sess-2")
+        route_target("00b4a39f-719e-5418-abe8-eb3ab6ea614d")
     );
 }
 
@@ -117,8 +135,11 @@ fn session_route_guard_classifies_ended_route_with_live_sibling() {
     let guard = SessionRouteGuard::default();
     let first = SessionId::new("acp-session-1");
     let second = SessionId::new("acp-session-2");
-    guard.start_session(&first, route_target("sess-1"));
-    guard.start_session(&second, route_target("sess-2"));
+    guard.start_session(&first, route_target("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"));
+    guard.start_session(
+        &second,
+        route_target("00b4a39f-719e-5418-abe8-eb3ab6ea614d"),
+    );
 
     guard.stop_session(&first);
 
@@ -133,7 +154,7 @@ fn session_route_guard_classifies_ended_route_with_live_sibling() {
             };
             target
         },
-        route_target("sess-2")
+        route_target("00b4a39f-719e-5418-abe8-eb3ab6ea614d")
     );
 }
 
@@ -141,10 +162,16 @@ fn session_route_guard_classifies_ended_route_with_live_sibling() {
 fn session_route_guard_reuse_clears_ended_tombstone() {
     let guard = SessionRouteGuard::default();
     let protocol_session = SessionId::new("acp-session-1");
-    guard.start_session(&protocol_session, route_target("sess-1"));
+    guard.start_session(
+        &protocol_session,
+        route_target("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"),
+    );
     guard.stop_session(&protocol_session);
 
-    guard.start_session(&protocol_session, route_target("sess-2"));
+    guard.start_session(
+        &protocol_session,
+        route_target("00b4a39f-719e-5418-abe8-eb3ab6ea614d"),
+    );
 
     assert_eq!(
         {
@@ -153,7 +180,7 @@ fn session_route_guard_reuse_clears_ended_tombstone() {
             };
             target
         },
-        route_target("sess-2")
+        route_target("00b4a39f-719e-5418-abe8-eb3ab6ea614d")
     );
 }
 
@@ -215,8 +242,8 @@ fn session_route_guard_removes_route_by_logical_target() {
     let guard = SessionRouteGuard::default();
     let first = SessionId::new("acp-session-1");
     let second = SessionId::new("acp-session-2");
-    let first_target = route_target("sess-1");
-    let second_target = route_target("sess-2");
+    let first_target = route_target("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc");
+    let second_target = route_target("00b4a39f-719e-5418-abe8-eb3ab6ea614d");
     guard.start_session(&first, first_target.clone());
     guard.start_session(&second, second_target.clone());
 

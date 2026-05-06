@@ -113,7 +113,7 @@ async fn connect_migrates_legacy_schema_before_opening_pool() {
                 status, leader_id, observe_id, created_at, updated_at, last_activity_at,
                 archived_at, pending_leader_transfer, metrics_json, state_json, is_active
             ) VALUES (
-                'sess-test-1', 'project-1', 3, 1, 'title', 'context',
+                'f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4', 'project-1', 3, 1, 'title', 'context',
                 'active', 'claude-leader', NULL, '2026-04-14T10:00:00Z',
                 '2026-04-14T10:00:00Z', NULL, NULL, NULL, '{}', '{}', 1
             );",

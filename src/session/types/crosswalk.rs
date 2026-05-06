@@ -45,18 +45,21 @@ mod tests {
             Some(RuntimeSessionId::from("runtime-1"))
         );
         assert_eq!(
-            effective_runtime_session_key("sess-1", Some(" runtime-1 ")),
+            effective_runtime_session_key(
+                "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                Some(" runtime-1 ")
+            ),
             "runtime-1"
         );
         assert!(matches_runtime_session_id(
-            "sess-1",
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
             Some("runtime-1"),
             &RuntimeSessionId::from("runtime-1")
         ));
         assert!(!matches_runtime_session_id(
-            "sess-1",
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
             Some("runtime-1"),
-            &RuntimeSessionId::from("sess-1")
+            &RuntimeSessionId::from("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
         ));
     }
 }

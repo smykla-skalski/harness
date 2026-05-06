@@ -87,7 +87,7 @@ mod tests {
     fn managed_agent_snapshot_separates_transport_and_session_agent_ids() {
         let terminal = ManagedAgentSnapshot::Terminal(AgentTuiSnapshot {
             tui_id: "tui-1".into(),
-            session_id: "sess-1".into(),
+            session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
             agent_id: "worker-1".into(),
             runtime: "claude".into(),
             status: AgentTuiStatus::Running,
@@ -115,12 +115,12 @@ mod tests {
         );
         assert_eq!(
             terminal.harness_session_id(),
-            HarnessSessionId::from("sess-1")
+            HarnessSessionId::from("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
         );
 
         let codex = ManagedAgentSnapshot::Codex(CodexRunSnapshot {
             run_id: "run-1".into(),
-            session_id: "sess-1".into(),
+            session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
             project_dir: "/tmp/project".into(),
             thread_id: None,
             turn_id: None,
@@ -138,11 +138,14 @@ mod tests {
         });
         assert_eq!(codex.managed_agent_id(), ManagedAgentId::from("run-1"));
         assert_eq!(codex.session_agent_id(), None);
-        assert_eq!(codex.harness_session_id(), HarnessSessionId::from("sess-1"));
+        assert_eq!(
+            codex.harness_session_id(),
+            HarnessSessionId::from("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
+        );
 
         let acp = ManagedAgentSnapshot::Acp(AcpAgentSnapshot {
             acp_id: "acp-1".into(),
-            session_id: "sess-1".into(),
+            session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
             agent_id: "worker-2".into(),
             display_name: "Copilot".into(),
             status: AgentStatus::Active,
@@ -164,6 +167,9 @@ mod tests {
             acp.session_agent_id(),
             Some(SessionAgentId::from("worker-2"))
         );
-        assert_eq!(acp.harness_session_id(), HarnessSessionId::from("sess-1"));
+        assert_eq!(
+            acp.harness_session_id(),
+            HarnessSessionId::from("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
+        );
     }
 }

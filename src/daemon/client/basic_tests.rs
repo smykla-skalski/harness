@@ -55,7 +55,7 @@ fn resolve_runtime_session_returns_resolved_match() {
                 &mut stream,
                 "200 OK",
                 "application/json",
-                "{\"resolved\":{\"orchestration_session_id\":\"sess-1\",\"session_agent_id\":\"codex-abc\"}}",
+                "{\"resolved\":{\"orchestration_session_id\":\"eadbcb3e-6ef7-53d2-ad56-0347cb7189fc\",\"session_agent_id\":\"codex-abc\"}}",
             );
         })
     };
@@ -70,7 +70,10 @@ fn resolve_runtime_session_returns_resolved_match() {
         .expect("resolve runtime session");
 
     let agent = outcome.expect("resolved runtime session");
-    assert_eq!(agent.orchestration_session_id, "sess-1");
+    assert_eq!(
+        agent.orchestration_session_id,
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"
+    );
     assert_eq!(agent.session_agent_id, "codex-abc");
     let query = captured_query.lock().expect("query").clone();
     assert!(
@@ -222,7 +225,7 @@ fn mutation_timeout_uses_longer_deadline_for_session_start() {
         Duration::from_secs(30)
     );
     assert_eq!(
-        mutation_timeout_for_path("/v1/sessions/sess-123/task"),
+        mutation_timeout_for_path("/v1/sessions/eadbcb3e-6ef7-53d2-ad56-0347cb7189fc23/task"),
         Duration::from_secs(5)
     );
 }

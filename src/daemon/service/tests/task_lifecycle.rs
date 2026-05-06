@@ -20,7 +20,7 @@ fn drop_queue_policy_and_status_async_refresh_session_state() {
                     let state = start_direct_session_async(
                         &async_db,
                         project,
-                        "daemon-async-task-lifecycle",
+                        "52c91a38-b0d5-58ec-9c6b-fe52dae2cbf1",
                         "async task lifecycle",
                         "async task lifecycle flow",
                         None,
@@ -28,7 +28,7 @@ fn drop_queue_policy_and_status_async_refresh_session_state() {
                     .await;
                     let leader_id = state.leader_id.clone().expect("leader id");
                     let joined = join_session_direct_async(
-                        "daemon-async-task-lifecycle",
+                        "52c91a38-b0d5-58ec-9c6b-fe52dae2cbf1",
                         &crate::daemon::protocol::SessionJoinRequest {
                             runtime: "codex".into(),
                             role: SessionRole::Worker,
@@ -50,7 +50,7 @@ fn drop_queue_policy_and_status_async_refresh_session_state() {
                         .clone();
 
                     let first = create_task_async(
-                        "daemon-async-task-lifecycle",
+                        "52c91a38-b0d5-58ec-9c6b-fe52dae2cbf1",
                         &TaskCreateRequest {
                             actor: leader_id.clone(),
                             title: "first async task".into(),
@@ -64,7 +64,7 @@ fn drop_queue_policy_and_status_async_refresh_session_state() {
                     .expect("create first task");
                     let first_task = first.tasks[0].task_id.clone();
                     let second = create_task_async(
-                        "daemon-async-task-lifecycle",
+                        "52c91a38-b0d5-58ec-9c6b-fe52dae2cbf1",
                         &TaskCreateRequest {
                             actor: leader_id.clone(),
                             title: "second async task".into(),
@@ -85,7 +85,7 @@ fn drop_queue_policy_and_status_async_refresh_session_state() {
                         .clone();
 
                     let dropped = drop_task_async(
-                        "daemon-async-task-lifecycle",
+                        "52c91a38-b0d5-58ec-9c6b-fe52dae2cbf1",
                         &first_task,
                         &crate::daemon::protocol::TaskDropRequest {
                             actor: leader_id.clone(),
@@ -111,7 +111,7 @@ fn drop_queue_policy_and_status_async_refresh_session_state() {
                     );
 
                     let _ = drop_task_async(
-                        "daemon-async-task-lifecycle",
+                        "52c91a38-b0d5-58ec-9c6b-fe52dae2cbf1",
                         &second_task,
                         &crate::daemon::protocol::TaskDropRequest {
                             actor: leader_id.clone(),
@@ -128,7 +128,7 @@ fn drop_queue_policy_and_status_async_refresh_session_state() {
                     .expect("queue second task");
 
                     let reprioritized = update_task_queue_policy_async(
-                        "daemon-async-task-lifecycle",
+                        "52c91a38-b0d5-58ec-9c6b-fe52dae2cbf1",
                         &second_task,
                         &crate::daemon::protocol::TaskQueuePolicyRequest {
                             actor: leader_id.clone(),
@@ -150,7 +150,7 @@ fn drop_queue_policy_and_status_async_refresh_session_state() {
                     );
 
                     let completed = update_task_async(
-                        "daemon-async-task-lifecycle",
+                        "52c91a38-b0d5-58ec-9c6b-fe52dae2cbf1",
                         &first_task,
                         &crate::daemon::protocol::TaskUpdateRequest {
                             actor: leader_id,
@@ -172,7 +172,7 @@ fn drop_queue_policy_and_status_async_refresh_session_state() {
                         crate::session::types::TaskStatus::Open
                     );
                     let signals = async_db
-                        .load_signals("daemon-async-task-lifecycle")
+                        .load_signals("52c91a38-b0d5-58ec-9c6b-fe52dae2cbf1")
                         .await
                         .expect("load signals");
                     assert!(

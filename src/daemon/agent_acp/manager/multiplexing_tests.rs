@@ -39,11 +39,19 @@ async fn identical_process_contract_reuses_one_child_for_multiple_logical_sessio
         let (_temp, manager, descriptor, request) = shared_fake_runtime();
 
         let first = assert_ok(
-            manager.start_descriptor("sess-1", &request, &descriptor),
+            manager.start_descriptor(
+                "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                &request,
+                &descriptor,
+            ),
             "start first",
         );
         let second = assert_ok(
-            manager.start_descriptor("sess-2", &request, &descriptor),
+            manager.start_descriptor(
+                "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+                &request,
+                &descriptor,
+            ),
             "start second",
         );
 
@@ -53,23 +61,55 @@ async fn identical_process_contract_reuses_one_child_for_multiple_logical_sessio
         assert_eq!(first.pid, second.pid);
         assert_eq!(first.pgid, second.pgid);
         assert_eq!(
-            session_managed_agent_id(&manager, "sess-1", &first.acp_id),
+            session_managed_agent_id(
+                &manager,
+                "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                &first.acp_id
+            ),
             Some(first.agent_id.clone())
         );
         assert_eq!(
-            session_managed_agent_id(&manager, "sess-2", &second.acp_id),
+            session_managed_agent_id(
+                &manager,
+                "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+                &second.acp_id
+            ),
             Some(second.agent_id.clone())
         );
         assert!(
-            session_runtime_session_id(&manager, "sess-1", &first.acp_id).is_some(),
+            session_runtime_session_id(
+                &manager,
+                "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                &first.acp_id
+            )
+            .is_some(),
             "reused ACP registration should persist the runtime session id"
         );
         assert!(
-            session_runtime_session_id(&manager, "sess-2", &second.acp_id).is_some(),
+            session_runtime_session_id(
+                &manager,
+                "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+                &second.acp_id
+            )
+            .is_some(),
             "reused ACP registration should persist the runtime session id"
         );
-        assert_eq!(assert_ok(manager.list("sess-1"), "list first").len(), 1);
-        assert_eq!(assert_ok(manager.list("sess-2"), "list second").len(), 1);
+        assert_eq!(
+            assert_ok(
+                manager.list("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"),
+                "list first"
+            )
+            .len(),
+            1
+        );
+        assert_eq!(
+            assert_ok(
+                manager.list("00b4a39f-719e-5418-abe8-eb3ab6ea614d"),
+                "list second"
+            )
+            .len(),
+            1
+        );
 
         assert_ok(manager.stop(&first.acp_id), "stop first");
         assert_ok(manager.stop(&second.acp_id), "stop second");
@@ -88,11 +128,19 @@ async fn pooling_disable_env_starts_separate_children_for_identical_contracts() 
             let (_temp, manager, descriptor, request) = shared_fake_runtime();
 
             let first = assert_ok(
-                manager.start_descriptor("sess-1", &request, &descriptor),
+                manager.start_descriptor(
+                    "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                    &request,
+                    &descriptor,
+                ),
                 "start first",
             );
             let second = assert_ok(
-                manager.start_descriptor("sess-2", &request, &descriptor),
+                manager.start_descriptor(
+                    "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+                    &request,
+                    &descriptor,
+                ),
                 "start second",
             );
 
@@ -126,12 +174,20 @@ async fn pooling_disabled_faults_still_backoff_canonical_process_key() {
             };
             let manager = manager();
             let first = assert_ok(
-                manager.start_descriptor("sess-1", &request, &descriptor),
+                manager.start_descriptor(
+                    "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                    &request,
+                    &descriptor,
+                ),
                 "start first isolated failing session",
             );
             let _ = wait_until_disconnected(&manager, &first.acp_id);
             let error = assert_err(
-                manager.start_descriptor("sess-2", &request, &descriptor),
+                manager.start_descriptor(
+                    "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+                    &request,
+                    &descriptor,
+                ),
                 "canonical process key should be backoff-blocked",
             );
             assert!(
@@ -149,11 +205,19 @@ async fn stopping_one_reused_process_session_keeps_sibling_active() {
         let (_temp, manager, descriptor, request) = shared_fake_runtime();
 
         let first = assert_ok(
-            manager.start_descriptor("sess-1", &request, &descriptor),
+            manager.start_descriptor(
+                "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                &request,
+                &descriptor,
+            ),
             "start first",
         );
         let second = assert_ok(
-            manager.start_descriptor("sess-2", &request, &descriptor),
+            manager.start_descriptor(
+                "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+                &request,
+                &descriptor,
+            ),
             "start second",
         );
 
@@ -191,11 +255,19 @@ async fn stopping_reused_session_cancels_only_target_protocol_session() {
         let manager = manager();
 
         let first = assert_ok(
-            manager.start_descriptor("sess-1", &request, &descriptor),
+            manager.start_descriptor(
+                "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                &request,
+                &descriptor,
+            ),
             "start first",
         );
         let second = assert_ok(
-            manager.start_descriptor("sess-2", &request, &descriptor),
+            manager.start_descriptor(
+                "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+                &request,
+                &descriptor,
+            ),
             "start second",
         );
         let sibling_before_stop = assert_ok(manager.get(&second.acp_id), "get sibling before stop");
@@ -234,10 +306,18 @@ async fn prompted_reuse_rejects_busy_prompt_without_saturation_spawn() {
         let manager = manager();
 
         let first = assert_ok(
-            manager.start_descriptor("sess-1", &request, &descriptor),
+            manager.start_descriptor(
+                "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                &request,
+                &descriptor,
+            ),
             "start first",
         );
-        let second = manager.start_descriptor("sess-2", &request, &descriptor);
+        let second = manager.start_descriptor(
+            "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+            &request,
+            &descriptor,
+        );
         let error = assert_err(second, "busy prompt should reject second start");
 
         assert!(error.to_string().contains("prompt_busy"));
@@ -254,12 +334,20 @@ async fn prompted_reuse_attaches_to_idle_shared_process() {
         let (_temp, manager, descriptor, mut request) = shared_fake_runtime();
 
         let first = assert_ok(
-            manager.start_descriptor("sess-1", &request, &descriptor),
+            manager.start_descriptor(
+                "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                &request,
+                &descriptor,
+            ),
             "start first",
         );
         request.prompt = Some("next".to_string());
         let second = assert_ok(
-            manager.start_descriptor("sess-2", &request, &descriptor),
+            manager.start_descriptor(
+                "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+                &request,
+                &descriptor,
+            ),
             "start prompted second",
         );
 

@@ -24,7 +24,10 @@ fn stream_event(event: &str, session_id: &str) -> StreamEvent {
 #[test]
 fn acp_event_buffer_requires_resync_after_epoch_or_continuity_change() {
     let mut buffer = BridgeAcpEventBuffer::new("epoch-a".to_string());
-    buffer.push(stream_event("acp_agent_started", "sess-1"));
+    buffer.push(stream_event(
+        "acp_agent_started",
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+    ));
 
     let initial = buffer.events_since(None, None, None);
     assert_eq!(initial.bridge_epoch, "epoch-a");
@@ -49,14 +52,23 @@ fn acp_event_buffer_requires_resync_after_epoch_or_continuity_change() {
 #[test]
 fn acp_subscribe_resume_includes_daemon_perceived_now_heartbeat() {
     let mut buffer = BridgeAcpEventBuffer::new("epoch-a".to_string());
-    buffer.push(stream_event("acp_agent_started", "sess-1"));
-    buffer.push(stream_event("acp_agent_started", "sess-2"));
+    buffer.push(stream_event(
+        "acp_agent_started",
+        "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+    ));
+    buffer.push(stream_event(
+        "acp_agent_started",
+        "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+    ));
 
     let resumed = buffer.events_since(Some(1), Some("epoch-a"), Some(0));
 
     assert_eq!(resumed.next_seq, 2);
     assert_eq!(resumed.events.len(), 1);
-    assert_eq!(resumed.events[0].payload["session_id"], "sess-2");
+    assert_eq!(
+        resumed.events[0].payload["session_id"],
+        "00b4a39f-719e-5418-abe8-eb3ab6ea614d"
+    );
     assert!(DateTime::parse_from_rfc3339(&resumed.daemon_perceived_now).is_ok());
 }
 
@@ -168,7 +180,7 @@ fn bridge_client_acp_events_since_uses_expected_capability_payload() {
 #[test]
 fn acp_start_request_defaults_pooling_enabled_for_legacy_payloads() {
     let legacy: BridgeAcpStartRequest = serde_json::from_value(serde_json::json!({
-        "session_id": "sess-1",
+        "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
         "request": {
             "agent": "claude",
             "prompt": "hello",
@@ -180,7 +192,7 @@ fn acp_start_request_defaults_pooling_enabled_for_legacy_payloads() {
     assert!(!legacy.disable_pooling);
 
     let isolated: BridgeAcpStartRequest = serde_json::from_value(serde_json::json!({
-        "session_id": "sess-1",
+        "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
         "request": {
             "agent": "claude",
             "prompt": "hello",
@@ -203,12 +215,18 @@ fn bridge_client_acp_methods_use_expected_capability_actions() {
             (
                 "start",
                 serde_json::json!({
-                    "session_id": "sess-1",
+                    "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
                     "disable_pooling": true
                 }),
             ),
-            ("list", serde_json::json!({ "session_id": "sess-1" })),
-            ("inspect", serde_json::json!({ "session_id": "sess-1" })),
+            (
+                "list",
+                serde_json::json!({ "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc" }),
+            ),
+            (
+                "inspect",
+                serde_json::json!({ "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc" }),
+            ),
             ("reconcile", serde_json::json!({})),
             ("get", serde_json::json!({ "acp_id": "acp-1" })),
             ("stop", serde_json::json!({ "acp_id": "acp-1" })),
@@ -258,9 +276,21 @@ fn bridge_client_acp_methods_use_expected_capability_actions() {
         project_dir: Some("/tmp/project".to_string()),
         ..AcpAgentStartRequest::default()
     };
-    assert!(client.acp_start("sess-1", &start_request, true).is_err());
-    assert!(client.acp_list("sess-1").is_err());
-    assert!(client.acp_inspect(Some("sess-1")).is_err());
+    assert!(
+        client
+            .acp_start("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", &start_request, true)
+            .is_err()
+    );
+    assert!(
+        client
+            .acp_list("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
+            .is_err()
+    );
+    assert!(
+        client
+            .acp_inspect(Some("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"))
+            .is_err()
+    );
     assert!(client.acp_reconcile().is_err());
     assert!(client.acp_get("acp-1").is_err());
     assert!(client.acp_stop("acp-1").is_err());

@@ -66,6 +66,7 @@ pub fn discover_sessions_for(
 /// # Errors
 /// Returns `CliError` when the session is missing or ambiguous.
 pub fn resolve_session(session_id: &str) -> Result<ResolvedSession, CliError> {
+    storage::validate_session_id(session_id)?;
     let mut matches: Vec<_> = discover_sessions(true)?
         .into_iter()
         .filter(|session| session.state.session_id == session_id)
@@ -93,6 +94,7 @@ pub fn load_session_state(
     project: &DiscoveredProject,
     session_id: &str,
 ) -> Result<Option<SessionState>, CliError> {
+    storage::validate_session_id(session_id)?;
     if let Some(project_dir) = project.project_dir.as_deref() {
         for layout in storage::layout_candidates_from_project_dir(project_dir, session_id)? {
             if let Some(state) = storage::load_state(&layout)? {
@@ -120,6 +122,7 @@ pub fn load_log_entries(
     project: &DiscoveredProject,
     session_id: &str,
 ) -> Result<Vec<SessionLogEntry>, CliError> {
+    storage::validate_session_id(session_id)?;
     if let Some(project_dir) = project.project_dir.as_deref() {
         for layout in storage::layout_candidates_from_project_dir(project_dir, session_id)? {
             let entries = storage::load_log_entries(&layout)?;
@@ -152,6 +155,7 @@ pub fn load_task_checkpoints(
     session_id: &str,
     task_id: &str,
 ) -> Result<Vec<TaskCheckpoint>, CliError> {
+    storage::validate_session_id(session_id)?;
     if let Some(project_dir) = project.project_dir.as_deref() {
         for layout in storage::layout_candidates_from_project_dir(project_dir, session_id)? {
             let checkpoints = storage::load_task_checkpoints(&layout, task_id)?;
@@ -249,7 +253,11 @@ fn legacy_active_session_ids(context_root: &Path) -> Result<Vec<String>, CliErro
         return Ok(Vec::new());
     }
     let registry = read_json_typed::<storage::ActiveRegistry>(&legacy_path)?;
-    Ok(registry.sessions.into_keys().collect())
+    Ok(registry
+        .sessions
+        .into_keys()
+        .filter(|session_id| storage::is_valid_session_id(session_id))
+        .collect())
 }
 
 fn list_active_session_ids_new_layout() -> Vec<String> {
@@ -268,7 +276,13 @@ fn read_active_registry_at(path: &Path) -> Vec<String> {
         return Vec::new();
     }
     read_json_typed::<storage::ActiveRegistry>(path)
-        .map(|registry| registry.sessions.into_keys().collect())
+        .map(|registry| {
+            registry
+                .sessions
+                .into_keys()
+                .filter(|session_id| storage::is_valid_session_id(session_id))
+                .collect()
+        })
         .unwrap_or_default()
 }
 
@@ -276,6 +290,7 @@ pub(super) fn load_session_state_for_project(
     project: &DiscoveredProject,
     session_id: &str,
 ) -> Result<Option<SessionState>, CliError> {
+    storage::validate_session_id(session_id)?;
     let legacy_path = session_state_path(&project.context_root, session_id);
     if legacy_path.is_file() {
         return read_json_typed(&legacy_path).map(index_visible_session_state);
@@ -303,7 +318,10 @@ fn list_session_ids_legacy(context_root: &Path) -> Result<Vec<String>, CliError>
     {
         let Ok(entry) = entry else { continue };
         if entry.file_type().ok().is_some_and(|kind| kind.is_dir()) {
-            ids.push(entry.file_name().to_string_lossy().to_string());
+            let session_id = entry.file_name().to_string_lossy().to_string();
+            if storage::is_valid_session_id(&session_id) {
+                ids.push(session_id);
+            }
         }
     }
     Ok(ids)
@@ -332,7 +350,10 @@ fn list_session_ids_new_layout() -> Vec<String> {
                 .ok()
                 .is_some_and(|kind| kind.is_dir())
             {
-                ids.push(session_entry.file_name().to_string_lossy().to_string());
+                let session_id = session_entry.file_name().to_string_lossy().to_string();
+                if storage::is_valid_session_id(&session_id) {
+                    ids.push(session_id);
+                }
             }
         }
     }
@@ -343,6 +364,7 @@ fn load_session_state_from_context_root(
     context_root: &Path,
     session_id: &str,
 ) -> Result<Option<SessionState>, CliError> {
+    storage::validate_session_id(session_id)?;
     let legacy_path = session_state_path(context_root, session_id);
     if legacy_path.is_file() {
         return read_json_typed(&legacy_path).map(index_visible_session_state);

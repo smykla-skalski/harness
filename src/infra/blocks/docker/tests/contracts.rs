@@ -30,10 +30,10 @@ fn contract_is_running_reflects_state(runtime: &dyn ContainerRuntime) {
 }
 
 fn contract_remove_is_idempotent(runtime: &dyn ContainerRuntime) {
-    let result = runtime.remove("nonexistent-contract-test");
+    let result = runtime.remove("418cf829-6691-5fc0-92b1-8e5013efa2cb-contract-test");
     assert!(
         result.is_ok(),
-        "removing nonexistent container should not fail"
+        "removing 418cf829-6691-5fc0-92b1-8e5013efa2cb container should not fail"
     );
 }
 

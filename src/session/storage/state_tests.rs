@@ -8,6 +8,17 @@ use crate::workspace::layout::SessionLayout;
 use super::state_store::{create_state, load_state};
 use super::test_support::sample_state;
 
+const STATE_FILE_SESSION_ID: &str = "00000000-0000-4000-8000-000000000001";
+const ROUND_TRIP_SESSION_ID: &str = "00000000-0000-4000-8000-000000000002";
+const V3_SESSION_ID: &str = "00000000-0000-4000-8000-000000000003";
+const V13_IDENTITIES_SESSION_ID: &str = "00000000-0000-4000-8000-000000000004";
+const V13_BAD_MANAGED_AGENT_SESSION_ID: &str = "00000000-0000-4000-8000-000000000005";
+const DEFAULTS_SESSION_ID: &str = "00000000-0000-4000-8000-000000000006";
+const V8_SESSION_ID: &str = "00000000-0000-4000-8000-000000000007";
+const V10_RUNTIME_SESSION_ID: &str = "00000000-0000-4000-8000-000000000008";
+const V11_BLANK_SESSION_ID: &str = "00000000-0000-4000-8000-000000000009";
+const V11_CONFLICT_SESSION_ID: &str = "00000000-0000-4000-8000-00000000000a";
+
 fn test_layout(tmp: &std::path::Path, session_id: &str) -> SessionLayout {
     SessionLayout {
         sessions_root: tmp.join("sessions"),
@@ -28,10 +39,10 @@ fn legacy_state_value(session_id: &str, schema_version: u64) -> Value {
 #[test]
 fn state_file_uses_new_layout() {
     let tmp = tempfile::tempdir().expect("tempdir");
-    let layout = test_layout(tmp.path(), "abc12345");
+    let layout = test_layout(tmp.path(), STATE_FILE_SESSION_ID);
     fs::create_dir_all(layout.session_root()).expect("create session dir");
 
-    let state = sample_state("abc12345");
+    let state = sample_state(STATE_FILE_SESSION_ID);
     assert!(create_state(&layout, &state).expect("create"));
 
     assert!(
@@ -43,20 +54,23 @@ fn state_file_uses_new_layout() {
 #[test]
 fn state_round_trip_via_repository() {
     let tmp = tempfile::tempdir().expect("tempdir");
-    let layout = test_layout(tmp.path(), "sess-1");
+    let layout = test_layout(tmp.path(), ROUND_TRIP_SESSION_ID);
     fs::create_dir_all(layout.session_root()).expect("create session dir");
 
-    let state = sample_state("sess-1");
+    let state = sample_state(ROUND_TRIP_SESSION_ID);
     assert!(create_state(&layout, &state).expect("create"));
     let loaded = load_state(&layout).expect("load").expect("state");
-    assert_eq!(loaded.session_id, "sess-1");
-    assert_eq!(loaded.observe_id.as_deref(), Some("observe-sess-1"));
+    assert_eq!(loaded.session_id, ROUND_TRIP_SESSION_ID);
+    assert_eq!(
+        loaded.observe_id.as_deref(),
+        Some(format!("observe-{ROUND_TRIP_SESSION_ID}").as_str())
+    );
 }
 
 #[test]
 fn load_state_migrates_v3_state_and_persists_current_schema() {
     let tmp = tempfile::tempdir().expect("tempdir");
-    let session_id = "sess-legacy";
+    let session_id = V3_SESSION_ID;
     let layout = test_layout(tmp.path(), session_id);
     fs::create_dir_all(layout.session_root()).expect("create session dir");
 
@@ -113,7 +127,7 @@ fn load_state_migrates_v3_state_and_persists_current_schema() {
 #[test]
 fn load_state_migrates_v13_legacy_agent_identity_fields_to_canonical_schema() {
     let tmp = tempfile::tempdir().expect("tempdir");
-    let session_id = "sess-v13-identities";
+    let session_id = V13_IDENTITIES_SESSION_ID;
     let layout = test_layout(tmp.path(), session_id);
     fs::create_dir_all(layout.session_root()).expect("create session dir");
 
@@ -188,7 +202,7 @@ fn load_state_migrates_v13_legacy_agent_identity_fields_to_canonical_schema() {
 #[test]
 fn load_state_rejects_v13_malformed_managed_agent_identity() {
     let tmp = tempfile::tempdir().expect("tempdir");
-    let session_id = "sess-v13-bad-managed-agent";
+    let session_id = V13_BAD_MANAGED_AGENT_SESSION_ID;
     let layout = test_layout(tmp.path(), session_id);
     fs::create_dir_all(layout.session_root()).expect("create session dir");
 
@@ -208,7 +222,7 @@ fn load_state_rejects_v13_malformed_managed_agent_identity() {
 
 #[test]
 fn state_defaults_external_origin_none() {
-    let state = sample_state("abc12345");
+    let state = sample_state(DEFAULTS_SESSION_ID);
     assert_eq!(state.schema_version, CURRENT_VERSION);
     assert!(state.external_origin.is_none());
     assert!(state.adopted_at.is_none());
@@ -217,14 +231,14 @@ fn state_defaults_external_origin_none() {
 #[test]
 fn load_state_migrates_v8_state_to_v9_passthrough() {
     let tmp = tempfile::tempdir().expect("tempdir");
-    let layout = test_layout(tmp.path(), "sess-v8");
+    let layout = test_layout(tmp.path(), V8_SESSION_ID);
     fs::create_dir_all(layout.session_root()).expect("create session dir");
     write_json_pretty(
         &layout.state_file(),
         &json!({
             "schema_version": 8,
             "state_version": 0,
-            "session_id": "sess-v8",
+            "session_id": V8_SESSION_ID,
             "project_name": "demo",
             "worktree_path": "",
             "shared_path": "",
@@ -291,7 +305,7 @@ fn create_state_rejects_unsafe_session_id() {
 #[test]
 fn load_state_migrates_v10_unknown_runtime_without_bricking() {
     let tmp = tempfile::tempdir().expect("tempdir");
-    let session_id = "sess-v10-runtime";
+    let session_id = V10_RUNTIME_SESSION_ID;
     let layout = test_layout(tmp.path(), session_id);
     fs::create_dir_all(layout.session_root()).expect("create session dir");
 
@@ -331,7 +345,7 @@ fn load_state_migrates_v10_unknown_runtime_without_bricking() {
 #[test]
 fn load_state_migrates_v11_blank_tui_marker_by_quarantining_row() {
     let tmp = tempfile::tempdir().expect("tempdir");
-    let session_id = "sess-v11-blank";
+    let session_id = V11_BLANK_SESSION_ID;
     let layout = test_layout(tmp.path(), session_id);
     fs::create_dir_all(layout.session_root()).expect("create session dir");
 
@@ -364,7 +378,7 @@ fn load_state_migrates_v11_blank_tui_marker_by_quarantining_row() {
 #[test]
 fn load_state_migrates_v11_conflicting_tui_markers_without_bricking_good_rows() {
     let tmp = tempfile::tempdir().expect("tempdir");
-    let session_id = "sess-v11-conflict";
+    let session_id = V11_CONFLICT_SESSION_ID;
     let layout = test_layout(tmp.path(), session_id);
     fs::create_dir_all(layout.session_root()).expect("create session dir");
 
@@ -375,6 +389,7 @@ fn load_state_migrates_v11_conflicting_tui_markers_without_bricking_good_rows() 
         .cloned()
         .expect("template agent");
     let good_object = good_agent.as_object_mut().expect("good agent object");
+    good_object.insert("session_agent_id".into(), json!("codex-reviewer"));
     good_object.insert("agent_id".into(), json!("codex-reviewer"));
     good_object.insert("name".into(), json!("codex reviewer"));
     good_object.insert("runtime".into(), json!("codex"));
@@ -413,7 +428,11 @@ fn load_state_migrates_v11_conflicting_tui_markers_without_bricking_good_rows() 
         json!(["review"])
     );
     assert_eq!(
-        persisted["agents"]["codex-reviewer"]["managed_agent"],
-        json!({ "kind": "tui", "id": "tty-good" })
+        persisted["agents"]["codex-reviewer"]["managed_agent_id"],
+        json!("tty-good")
+    );
+    assert_eq!(
+        persisted["agents"]["codex-reviewer"]["managed_agent_family"],
+        json!("tui")
     );
 }

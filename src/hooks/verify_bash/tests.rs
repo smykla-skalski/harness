@@ -65,7 +65,9 @@ fn has_table_rows_with_too_few() {
 
 #[test]
 fn has_table_rows_missing_file() {
-    assert!(!has_table_rows(Path::new("/nonexistent/path/file.md")));
+    assert!(!has_table_rows(Path::new(
+        "/418cf829-6691-5fc0-92b1-8e5013efa2cb/path/file.md"
+    )));
 }
 
 // -- ready_to_resume --

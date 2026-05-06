@@ -129,40 +129,51 @@ pub(super) async fn start_async_http_session(
 fn post_session_start_uses_async_db_when_sync_db_is_unavailable() {
     let sandbox = tempdir().expect("tempdir");
     with_isolated_harness_env(sandbox.path(), || {
-        temp_env::with_var("CLAUDE_SESSION_ID", Some("http-async-start-leader"), || {
-            let project_dir = sandbox.path().join("project");
-            init_git_project(&project_dir);
+        temp_env::with_var(
+            "CLAUDE_SESSION_ID",
+            Some("31d6dcca-027a-5848-8988-0b21237fa9a7-leader"),
+            || {
+                let project_dir = sandbox.path().join("project");
+                init_git_project(&project_dir);
 
-            let runtime = tokio::runtime::Runtime::new().expect("runtime");
-            runtime.block_on(async {
-                let db_path = sandbox.path().join("daemon.sqlite");
-                let state = test_http_state_with_empty_async_db(&db_path).await;
+                let runtime = tokio::runtime::Runtime::new().expect("runtime");
+                runtime.block_on(async {
+                    let db_path = sandbox.path().join("daemon.sqlite");
+                    let state = test_http_state_with_empty_async_db(&db_path).await;
 
-                let body =
-                    start_async_http_session(state.clone(), &project_dir, "http-async-start").await;
-                assert_eq!(
-                    body["state"]["session_id"].as_str(),
-                    Some("http-async-start")
-                );
-
-                let async_db = state.async_db.get().expect("async db");
-                let resolved = async_db
-                    .resolve_session("http-async-start")
-                    .await
-                    .expect("resolve session")
-                    .expect("session present");
-                assert_eq!(resolved.state.title, "http-async-start title");
-                assert_eq!(
-                    resolved.project.project_dir.as_deref(),
-                    Some(
-                        project_dir
-                            .canonicalize()
-                            .expect("canonical project")
-                            .as_path()
+                    let body = start_async_http_session(
+                        state.clone(),
+                        &project_dir,
+                        "31d6dcca-027a-5848-8988-0b21237fa9a7",
                     )
-                );
-            });
-        });
+                    .await;
+                    assert_eq!(
+                        body["state"]["session_id"].as_str(),
+                        Some("31d6dcca-027a-5848-8988-0b21237fa9a7")
+                    );
+
+                    let async_db = state.async_db.get().expect("async db");
+                    let resolved = async_db
+                        .resolve_session("31d6dcca-027a-5848-8988-0b21237fa9a7")
+                        .await
+                        .expect("resolve session")
+                        .expect("session present");
+                    assert_eq!(
+                        resolved.state.title,
+                        "31d6dcca-027a-5848-8988-0b21237fa9a7 title"
+                    );
+                    assert_eq!(
+                        resolved.project.project_dir.as_deref(),
+                        Some(
+                            project_dir
+                                .canonicalize()
+                                .expect("canonical project")
+                                .as_path()
+                        )
+                    );
+                });
+            },
+        );
     });
 }
 
@@ -172,8 +183,14 @@ fn post_session_join_uses_async_db_when_sync_db_is_unavailable() {
     with_isolated_harness_env(sandbox.path(), || {
         temp_env::with_vars(
             [
-                ("CLAUDE_SESSION_ID", Some("http-async-join-leader")),
-                ("CODEX_SESSION_ID", Some("http-async-join-worker")),
+                (
+                    "CLAUDE_SESSION_ID",
+                    Some("ffee458f-2892-559a-be48-435cea6d8a3f-leader"),
+                ),
+                (
+                    "CODEX_SESSION_ID",
+                    Some("ffee458f-2892-559a-be48-435cea6d8a3f-worker"),
+                ),
             ],
             || {
                 let project_dir = sandbox.path().join("project");
@@ -184,12 +201,15 @@ fn post_session_join_uses_async_db_when_sync_db_is_unavailable() {
                     let db_path = sandbox.path().join("daemon.sqlite");
                     let state = test_http_state_with_empty_async_db(&db_path).await;
 
-                    let _ =
-                        start_async_http_session(state.clone(), &project_dir, "http-async-join")
-                            .await;
+                    let _ = start_async_http_session(
+                        state.clone(),
+                        &project_dir,
+                        "ffee458f-2892-559a-be48-435cea6d8a3f",
+                    )
+                    .await;
 
                     let response = post_session_join(
-                        axum::extract::Path("http-async-join".to_owned()),
+                        axum::extract::Path("ffee458f-2892-559a-be48-435cea6d8a3f".to_owned()),
                         auth_headers(),
                         State(state.clone()),
                         Json(SessionJoinRequest {
@@ -208,7 +228,7 @@ fn post_session_join_uses_async_db_when_sync_db_is_unavailable() {
                     assert_eq!(status, StatusCode::OK);
                     assert_eq!(
                         body["state"]["session_id"].as_str(),
-                        Some("http-async-join")
+                        Some("ffee458f-2892-559a-be48-435cea6d8a3f")
                     );
                     assert_eq!(
                         body["state"]["agents"]
@@ -219,7 +239,7 @@ fn post_session_join_uses_async_db_when_sync_db_is_unavailable() {
 
                     let async_db = state.async_db.get().expect("async db");
                     let resolved = async_db
-                        .resolve_session("http-async-join")
+                        .resolve_session("ffee458f-2892-559a-be48-435cea6d8a3f")
                         .await
                         .expect("resolve session")
                         .expect("session present");

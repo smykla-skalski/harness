@@ -53,11 +53,19 @@ async fn process_exit_disconnects_every_reused_logical_session() {
         };
 
         let first = assert_ok(
-            manager.start_descriptor("sess-1", &request, &descriptor),
+            manager.start_descriptor(
+                "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                &request,
+                &descriptor,
+            ),
             "start first",
         );
         let second = assert_ok(
-            manager.start_descriptor("sess-2", &request, &descriptor),
+            manager.start_descriptor(
+                "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+                &request,
+                &descriptor,
+            ),
             "start second",
         );
         assert_eq!(first.pid, second.pid);
@@ -77,7 +85,11 @@ async fn process_exit_disconnects_every_reused_logical_session() {
         );
         assert!(matches!(
             assert_some(
-                session_managed_agent(&manager, "sess-1", &first.acp_id),
+                session_managed_agent(
+                    &manager,
+                    "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                    &first.acp_id
+                ),
                 "persisted first agent",
             )
             .status,
@@ -88,7 +100,11 @@ async fn process_exit_disconnects_every_reused_logical_session() {
         ));
         assert!(matches!(
             assert_some(
-                session_managed_agent(&manager, "sess-2", &second.acp_id),
+                session_managed_agent(
+                    &manager,
+                    "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+                    &second.acp_id
+                ),
                 "persisted second agent",
             )
             .status,
@@ -99,11 +115,20 @@ async fn process_exit_disconnects_every_reused_logical_session() {
         ));
 
         let incidents = next_process_incidents(&mut events, 2);
-        assert_eq!(incident_session_ids(&incidents), vec!["sess-1", "sess-2"]);
+        assert_eq!(
+            incident_session_ids(&incidents),
+            vec![
+                "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+                "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"
+            ]
+        );
         for incident in incidents {
             assert_eq!(
                 incident.payload["affected_logical_session_ids"],
-                serde_json::json!(["sess-1", "sess-2"])
+                serde_json::json!([
+                    "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+                    "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"
+                ])
             );
         }
     });
@@ -125,11 +150,19 @@ async fn process_exit_after_logical_stop_reports_only_remaining_sessions() {
         };
 
         let first = assert_ok(
-            manager.start_descriptor("sess-1", &request, &descriptor),
+            manager.start_descriptor(
+                "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                &request,
+                &descriptor,
+            ),
             "start first",
         );
         let second = assert_ok(
-            manager.start_descriptor("sess-2", &request, &descriptor),
+            manager.start_descriptor(
+                "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+                &request,
+                &descriptor,
+            ),
             "start second",
         );
         assert_ok(manager.stop(&first.acp_id), "stop first");
@@ -146,7 +179,7 @@ async fn process_exit_after_logical_stop_reports_only_remaining_sessions() {
         let incident = next_process_incident(&mut events);
         assert_eq!(
             incident.payload["affected_logical_session_ids"],
-            serde_json::json!(["sess-2"])
+            serde_json::json!(["00b4a39f-719e-5418-abe8-eb3ab6ea614d"])
         );
         assert_eq!(process_count(&manager), 0);
     });

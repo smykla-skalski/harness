@@ -4,36 +4,44 @@ use super::*;
 fn post_task_create_uses_async_db_when_sync_db_is_unavailable() {
     let sandbox = tempdir().expect("tempdir");
     with_isolated_harness_env(sandbox.path(), || {
-        temp_env::with_var("CLAUDE_SESSION_ID", Some("http-async-task-create"), || {
-            let project_dir = sandbox.path().join("project");
-            init_git_project(&project_dir);
+        temp_env::with_var(
+            "CLAUDE_SESSION_ID",
+            Some("aa60a455-cee0-57b0-b058-7a950b5dd40b-create"),
+            || {
+                let project_dir = sandbox.path().join("project");
+                init_git_project(&project_dir);
 
-            let runtime = tokio::runtime::Runtime::new().expect("runtime");
-            runtime.block_on(async {
-                let db_path = sandbox.path().join("daemon.sqlite");
-                let state = test_http_state_with_empty_async_db(&db_path).await;
-                let _ =
-                    start_async_http_session(state.clone(), &project_dir, "http-async-task").await;
+                let runtime = tokio::runtime::Runtime::new().expect("runtime");
+                runtime.block_on(async {
+                    let db_path = sandbox.path().join("daemon.sqlite");
+                    let state = test_http_state_with_empty_async_db(&db_path).await;
+                    let _ = start_async_http_session(
+                        state.clone(),
+                        &project_dir,
+                        "aa60a455-cee0-57b0-b058-7a950b5dd40b",
+                    )
+                    .await;
 
-                let response = post_task_create(
-                    axum::extract::Path("http-async-task".to_owned()),
-                    auth_headers(),
-                    State(state.clone()),
-                    Json(TaskCreateRequest {
-                        actor: "spoofed".into(),
-                        title: "async http task".into(),
-                        context: Some("create via async route".into()),
-                        severity: crate::session::types::TaskSeverity::High,
-                        suggested_fix: Some("prefer sqlx pool".into()),
-                    }),
-                )
-                .await;
+                    let response = post_task_create(
+                        axum::extract::Path("aa60a455-cee0-57b0-b058-7a950b5dd40b".to_owned()),
+                        auth_headers(),
+                        State(state.clone()),
+                        Json(TaskCreateRequest {
+                            actor: "spoofed".into(),
+                            title: "async http task".into(),
+                            context: Some("create via async route".into()),
+                            severity: crate::session::types::TaskSeverity::High,
+                            suggested_fix: Some("prefer sqlx pool".into()),
+                        }),
+                    )
+                    .await;
 
-                let (status, body) = response_json(response).await;
-                assert_eq!(status, StatusCode::OK);
-                assert_eq!(body["tasks"][0]["title"].as_str(), Some("async http task"));
-            });
-        });
+                    let (status, body) = response_json(response).await;
+                    assert_eq!(status, StatusCode::OK);
+                    assert_eq!(body["tasks"][0]["title"].as_str(), Some("async http task"));
+                });
+            },
+        );
     });
 }
 
@@ -43,8 +51,14 @@ fn post_task_create_allows_observer_in_leaderless_degraded_session() {
     with_isolated_harness_env(sandbox.path(), || {
         temp_env::with_vars(
             [
-                ("CLAUDE_SESSION_ID", Some("http-async-degraded-leader")),
-                ("CODEX_SESSION_ID", Some("http-async-degraded-observer")),
+                (
+                    "CLAUDE_SESSION_ID",
+                    Some("28255b9e-3e0d-5646-b398-3b0e7e5a59ef"),
+                ),
+                (
+                    "CODEX_SESSION_ID",
+                    Some("7f6fe873-44d0-5f9d-8db6-afbafa1dba3f"),
+                ),
             ],
             || {
                 let project_dir = sandbox.path().join("project");
@@ -57,12 +71,12 @@ fn post_task_create_allows_observer_in_leaderless_degraded_session() {
                     let _ = start_async_http_session(
                         state.clone(),
                         &project_dir,
-                        "http-async-degraded-task",
+                        "8e902843-ef09-52ef-902d-44e46e385237",
                     )
                     .await;
 
                     let response = post_session_join(
-                        axum::extract::Path("http-async-degraded-task".to_owned()),
+                        axum::extract::Path("8e902843-ef09-52ef-902d-44e46e385237".to_owned()),
                         auth_headers(),
                         State(state.clone()),
                         Json(SessionJoinRequest {
@@ -81,7 +95,7 @@ fn post_task_create_allows_observer_in_leaderless_degraded_session() {
 
                     let async_db = state.async_db.get().expect("async db");
                     let mut resolved = async_db
-                        .resolve_session("http-async-degraded-task")
+                        .resolve_session("8e902843-ef09-52ef-902d-44e46e385237")
                         .await
                         .expect("resolve session")
                         .expect("session present");
@@ -108,7 +122,7 @@ fn post_task_create_allows_observer_in_leaderless_degraded_session() {
                         .expect("persist degraded session");
 
                     let response = post_task_create(
-                        axum::extract::Path("http-async-degraded-task".to_owned()),
+                        axum::extract::Path("8e902843-ef09-52ef-902d-44e46e385237".to_owned()),
                         auth_headers(),
                         State(state.clone()),
                         Json(TaskCreateRequest {
@@ -139,8 +153,14 @@ fn post_task_assign_uses_async_db_when_sync_db_is_unavailable() {
     with_isolated_harness_env(sandbox.path(), || {
         temp_env::with_vars(
             [
-                ("CLAUDE_SESSION_ID", Some("http-async-task-assign-leader")),
-                ("CODEX_SESSION_ID", Some("http-async-task-assign-worker")),
+                (
+                    "CLAUDE_SESSION_ID",
+                    Some("0dfc1b61-8f17-56d6-b50c-3e7beb1adc50-leader"),
+                ),
+                (
+                    "CODEX_SESSION_ID",
+                    Some("0dfc1b61-8f17-56d6-b50c-3e7beb1adc50-worker"),
+                ),
             ],
             || {
                 let project_dir = sandbox.path().join("project");
@@ -153,11 +173,11 @@ fn post_task_assign_uses_async_db_when_sync_db_is_unavailable() {
                     let _ = start_async_http_session(
                         state.clone(),
                         &project_dir,
-                        "http-async-task-assign",
+                        "0dfc1b61-8f17-56d6-b50c-3e7beb1adc50",
                     )
                     .await;
                     let _ = post_session_join(
-                        axum::extract::Path("http-async-task-assign".to_owned()),
+                        axum::extract::Path("0dfc1b61-8f17-56d6-b50c-3e7beb1adc50".to_owned()),
                         auth_headers(),
                         State(state.clone()),
                         Json(SessionJoinRequest {
@@ -172,7 +192,7 @@ fn post_task_assign_uses_async_db_when_sync_db_is_unavailable() {
                     )
                     .await;
                     let created = post_task_create(
-                        axum::extract::Path("http-async-task-assign".to_owned()),
+                        axum::extract::Path("0dfc1b61-8f17-56d6-b50c-3e7beb1adc50".to_owned()),
                         auth_headers(),
                         State(state.clone()),
                         Json(TaskCreateRequest {
@@ -192,7 +212,7 @@ fn post_task_assign_uses_async_db_when_sync_db_is_unavailable() {
 
                     let async_db = state.async_db.get().expect("async db");
                     let resolved = async_db
-                        .resolve_session("http-async-task-assign")
+                        .resolve_session("0dfc1b61-8f17-56d6-b50c-3e7beb1adc50")
                         .await
                         .expect("resolve session")
                         .expect("session present");
@@ -205,7 +225,10 @@ fn post_task_assign_uses_async_db_when_sync_db_is_unavailable() {
                         .clone();
 
                     let response = post_task_assign(
-                        axum::extract::Path(("http-async-task-assign".to_owned(), task_id)),
+                        axum::extract::Path((
+                            "0dfc1b61-8f17-56d6-b50c-3e7beb1adc50".to_owned(),
+                            task_id,
+                        )),
                         auth_headers(),
                         State(state.clone()),
                         Json(TaskAssignRequest {
@@ -233,7 +256,7 @@ fn post_task_checkpoint_uses_async_db_when_sync_db_is_unavailable() {
     with_isolated_harness_env(sandbox.path(), || {
         temp_env::with_var(
             "CLAUDE_SESSION_ID",
-            Some("http-async-task-checkpoint"),
+            Some("ecc5a03b-3221-5679-9abe-bc2b49efab36"),
             || {
                 let project_dir = sandbox.path().join("project");
                 init_git_project(&project_dir);
@@ -245,11 +268,11 @@ fn post_task_checkpoint_uses_async_db_when_sync_db_is_unavailable() {
                     let _ = start_async_http_session(
                         state.clone(),
                         &project_dir,
-                        "http-async-task-checkpoint",
+                        "ecc5a03b-3221-5679-9abe-bc2b49efab36",
                     )
                     .await;
                     let created = post_task_create(
-                        axum::extract::Path("http-async-task-checkpoint".to_owned()),
+                        axum::extract::Path("ecc5a03b-3221-5679-9abe-bc2b49efab36".to_owned()),
                         auth_headers(),
                         State(state.clone()),
                         Json(TaskCreateRequest {
@@ -269,7 +292,7 @@ fn post_task_checkpoint_uses_async_db_when_sync_db_is_unavailable() {
 
                     let response = post_task_checkpoint(
                         axum::extract::Path((
-                            "http-async-task-checkpoint".to_owned(),
+                            "ecc5a03b-3221-5679-9abe-bc2b49efab36".to_owned(),
                             task_id.clone(),
                         )),
                         auth_headers(),

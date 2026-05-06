@@ -22,11 +22,15 @@ use crate::session::types::{SessionRole, SessionState, SessionTransition};
 fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
     let tmp = tempdir().expect("tempdir");
     with_isolated_harness_env(tmp.path(), || {
-        temp_env::with_var("CLAUDE_SESSION_ID", Some("leader-session"), || {
-            let project = tmp.path().join("project");
-            fs::create_dir_all(&project).expect("create project dir");
-            test_fn(&project);
-        });
+        temp_env::with_var(
+            "CLAUDE_SESSION_ID",
+            Some("77d13b08-1651-541b-a3fc-26cab59e0aea"),
+            || {
+                let project = tmp.path().join("project");
+                fs::create_dir_all(&project).expect("create project dir");
+                test_fn(&project);
+            },
+        );
     });
 }
 
@@ -63,13 +67,20 @@ fn start_active_session(project: &Path, session_id: &str, context: &str) -> Sess
 #[test]
 fn prepare_hook_execution_canonicalizes_relative_cwd_for_signal_pickup() {
     with_temp_project(|project| {
-        let state = start_active_session(project, "hook-runtime-sess", "signal runtime test");
+        let state = start_active_session(
+            project,
+            "9ac572ac-519a-5e3b-8664-4f0ac6d98454",
+            "signal runtime test",
+        );
         let leader_id = state.leader_id.expect("leader id");
         let joined = temp_env::with_vars(
-            [("CODEX_SESSION_ID", Some("runtime-worker-session"))],
+            [(
+                "CODEX_SESSION_ID",
+                Some("runtime-008d974f-c6a9-53e5-a62e-d331367c449a"),
+            )],
             || {
                 session_service::join_session(
-                    "hook-runtime-sess",
+                    "9ac572ac-519a-5e3b-8664-4f0ac6d98454",
                     SessionRole::Worker,
                     "codex",
                     &[],
@@ -88,7 +99,7 @@ fn prepare_hook_execution_canonicalizes_relative_cwd_for_signal_pickup() {
             .clone();
 
         session_service::send_signal(
-            "hook-runtime-sess",
+            "9ac572ac-519a-5e3b-8664-4f0ac6d98454",
             &worker_id,
             "inject_context",
             "runtime path should receive queued context",
@@ -111,7 +122,7 @@ fn prepare_hook_execution_canonicalizes_relative_cwd_for_signal_pickup() {
                 started_at: Instant::now(),
             };
             let raw = br#"{
-                "session_id":"runtime-worker-session",
+                "session_id":"runtime-008d974f-c6a9-53e5-a62e-d331367c449a",
                 "cwd":".",
                 "hook_event_name":"PreToolUse",
                 "tool_name":"Read",
@@ -144,20 +155,30 @@ fn prepare_hook_execution_canonicalizes_relative_cwd_for_signal_pickup() {
 #[test]
 fn collect_signal_context_acknowledges_runtime_target_and_logs_transition() {
     with_temp_project(|project| {
-        let state = start_active_session(project, "hook-sess", "signal hook test");
+        let state = start_active_session(
+            project,
+            "dec9b13a-3611-5df4-bef6-9ff1a9939071",
+            "signal hook test",
+        );
         let leader_id = state.leader_id.expect("leader id");
-        let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("worker-session"))], || {
-            session_service::join_session(
-                "hook-sess",
-                SessionRole::Worker,
-                "codex",
-                &[],
-                None,
-                project,
-                None,
-            )
-            .expect("join worker")
-        });
+        let joined = temp_env::with_vars(
+            [(
+                "CODEX_SESSION_ID",
+                Some("008d974f-c6a9-53e5-a62e-d331367c449a"),
+            )],
+            || {
+                session_service::join_session(
+                    "dec9b13a-3611-5df4-bef6-9ff1a9939071",
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                    None,
+                )
+                .expect("join worker")
+            },
+        );
         let worker_id = joined
             .agents
             .keys()
@@ -166,7 +187,7 @@ fn collect_signal_context_acknowledges_runtime_target_and_logs_transition() {
             .clone();
 
         let signal = session_service::send_signal(
-            "hook-sess",
+            "dec9b13a-3611-5df4-bef6-9ff1a9939071",
             &worker_id,
             "inject_context",
             "follow the queued task",
@@ -179,7 +200,7 @@ fn collect_signal_context_acknowledges_runtime_target_and_logs_transition() {
         let context = NormalizedHookContext {
             event: NormalizedEvent::BeforeToolUse,
             session: SessionContext {
-                session_id: "worker-session".into(),
+                session_id: "008d974f-c6a9-53e5-a62e-d331367c449a".into(),
                 cwd: Some(project.to_path_buf()),
                 transcript_path: None,
             },
@@ -197,8 +218,11 @@ fn collect_signal_context_acknowledges_runtime_target_and_logs_transition() {
         let injected = collect_signal_context(HookAgent::Codex, &context).expect("signal text");
         assert!(injected.contains("follow the queued task"));
 
-        let layout =
-            session_storage::layout_from_project_dir(project, "hook-sess").expect("layout");
+        let layout = session_storage::layout_from_project_dir(
+            project,
+            "dec9b13a-3611-5df4-bef6-9ff1a9939071",
+        )
+        .expect("layout");
         let entries = session_storage::load_log_entries(&layout).expect("entries");
         assert!(entries.into_iter().any(|entry| {
             matches!(
@@ -280,13 +304,20 @@ fn finish_hook_observation_emits_completion_log() {
 #[test]
 fn collect_signal_context_marks_expired_signal_without_injecting_context() {
     with_temp_project(|project| {
-        let state = start_active_session(project, "hook-expired-sess", "expired signal hook test");
+        let state = start_active_session(
+            project,
+            "8376f66e-c41a-5e9d-a960-372529e9702f",
+            "expired signal hook test",
+        );
         let leader_id = state.leader_id.expect("leader id");
         let joined = temp_env::with_vars(
-            [("CODEX_SESSION_ID", Some("expired-worker-session"))],
+            [(
+                "CODEX_SESSION_ID",
+                Some("expired-008d974f-c6a9-53e5-a62e-d331367c449a"),
+            )],
             || {
                 session_service::join_session(
-                    "hook-expired-sess",
+                    "8376f66e-c41a-5e9d-a960-372529e9702f",
                     SessionRole::Worker,
                     "codex",
                     &[],
@@ -305,7 +336,7 @@ fn collect_signal_context_marks_expired_signal_without_injecting_context() {
             .clone();
 
         let signal = session_service::send_signal(
-            "hook-expired-sess",
+            "8376f66e-c41a-5e9d-a960-372529e9702f",
             &worker_id,
             "inject_context",
             "stale context should not be delivered",
@@ -316,7 +347,8 @@ fn collect_signal_context_marks_expired_signal_without_injecting_context() {
         .expect("send signal");
 
         let runtime = runtime::runtime_for_name("codex").expect("codex runtime");
-        let signal_dir = runtime.signal_dir(project, "expired-worker-session");
+        let signal_dir =
+            runtime.signal_dir(project, "expired-008d974f-c6a9-53e5-a62e-d331367c449a");
         let expired_signal = runtime::signal::Signal {
             expires_at: "2000-01-01T00:00:00Z".into(),
             ..signal.signal.clone()
@@ -332,7 +364,7 @@ fn collect_signal_context_marks_expired_signal_without_injecting_context() {
         let context = NormalizedHookContext {
             event: NormalizedEvent::BeforeToolUse,
             session: SessionContext {
-                session_id: "expired-worker-session".into(),
+                session_id: "expired-008d974f-c6a9-53e5-a62e-d331367c449a".into(),
                 cwd: Some(project.to_path_buf()),
                 transcript_path: None,
             },
@@ -354,8 +386,11 @@ fn collect_signal_context_marks_expired_signal_without_injecting_context() {
         assert_eq!(acks.len(), 1);
         assert_eq!(acks[0].result, runtime::signal::AckResult::Expired);
 
-        let layout =
-            session_storage::layout_from_project_dir(project, "hook-expired-sess").expect("layout");
+        let layout = session_storage::layout_from_project_dir(
+            project,
+            "8376f66e-c41a-5e9d-a960-372529e9702f",
+        )
+        .expect("layout");
         let entries = session_storage::load_log_entries(&layout).expect("entries");
         assert!(entries.into_iter().any(|entry| {
             matches!(

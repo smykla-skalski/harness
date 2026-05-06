@@ -18,8 +18,14 @@ fn post_role_change_uses_async_db_when_sync_db_is_unavailable() {
     with_isolated_harness_env(sandbox.path(), || {
         temp_env::with_vars(
             [
-                ("CLAUDE_SESSION_ID", Some("http-async-role-leader")),
-                ("CODEX_SESSION_ID", Some("http-async-role-worker")),
+                (
+                    "CLAUDE_SESSION_ID",
+                    Some("297580b0-f972-5b54-b987-d89f134b18e3-leader"),
+                ),
+                (
+                    "CODEX_SESSION_ID",
+                    Some("297580b0-f972-5b54-b987-d89f134b18e3-worker"),
+                ),
             ],
             || {
                 let project_dir = sandbox.path().join("project");
@@ -29,11 +35,14 @@ fn post_role_change_uses_async_db_when_sync_db_is_unavailable() {
                 runtime.block_on(async {
                     let db_path = sandbox.path().join("daemon.sqlite");
                     let state = test_http_state_with_empty_async_db(&db_path).await;
-                    let _ =
-                        start_async_http_session(state.clone(), &project_dir, "http-async-role")
-                            .await;
+                    let _ = start_async_http_session(
+                        state.clone(),
+                        &project_dir,
+                        "297580b0-f972-5b54-b987-d89f134b18e3",
+                    )
+                    .await;
                     let _ = post_session_join(
-                        axum::extract::Path("http-async-role".to_owned()),
+                        axum::extract::Path("297580b0-f972-5b54-b987-d89f134b18e3".to_owned()),
                         auth_headers(),
                         State(state.clone()),
                         Json(SessionJoinRequest {
@@ -49,7 +58,7 @@ fn post_role_change_uses_async_db_when_sync_db_is_unavailable() {
                     .await;
                     let async_db = state.async_db.get().expect("async db");
                     let resolved = async_db
-                        .resolve_session("http-async-role")
+                        .resolve_session("297580b0-f972-5b54-b987-d89f134b18e3")
                         .await
                         .expect("resolve session")
                         .expect("session present");
@@ -61,7 +70,10 @@ fn post_role_change_uses_async_db_when_sync_db_is_unavailable() {
                         .expect("worker id")
                         .clone();
                     let response = post_role_change(
-                        axum::extract::Path(("http-async-role".to_owned(), worker_id.clone())),
+                        axum::extract::Path((
+                            "297580b0-f972-5b54-b987-d89f134b18e3".to_owned(),
+                            worker_id.clone(),
+                        )),
                         auth_headers(),
                         State(state.clone()),
                         Json(RoleChangeRequest {
@@ -95,8 +107,14 @@ fn post_transfer_leader_uses_async_db_when_sync_db_is_unavailable() {
     with_isolated_harness_env(sandbox.path(), || {
         temp_env::with_vars(
             [
-                ("CLAUDE_SESSION_ID", Some("http-async-transfer-leader")),
-                ("CODEX_SESSION_ID", Some("http-async-transfer-worker")),
+                (
+                    "CLAUDE_SESSION_ID",
+                    Some("3a656f98-ca6a-5b56-81c2-88571ebfafec-leader"),
+                ),
+                (
+                    "CODEX_SESSION_ID",
+                    Some("3a656f98-ca6a-5b56-81c2-88571ebfafec-worker"),
+                ),
             ],
             || {
                 let project_dir = sandbox.path().join("project");
@@ -109,11 +127,11 @@ fn post_transfer_leader_uses_async_db_when_sync_db_is_unavailable() {
                     let _ = start_async_http_session(
                         state.clone(),
                         &project_dir,
-                        "http-async-transfer",
+                        "3a656f98-ca6a-5b56-81c2-88571ebfafec",
                     )
                     .await;
                     let _ = post_session_join(
-                        axum::extract::Path("http-async-transfer".to_owned()),
+                        axum::extract::Path("3a656f98-ca6a-5b56-81c2-88571ebfafec".to_owned()),
                         auth_headers(),
                         State(state.clone()),
                         Json(SessionJoinRequest {
@@ -129,7 +147,7 @@ fn post_transfer_leader_uses_async_db_when_sync_db_is_unavailable() {
                     .await;
                     let async_db = state.async_db.get().expect("async db");
                     let resolved = async_db
-                        .resolve_session("http-async-transfer")
+                        .resolve_session("3a656f98-ca6a-5b56-81c2-88571ebfafec")
                         .await
                         .expect("resolve session")
                         .expect("session present");
@@ -143,7 +161,7 @@ fn post_transfer_leader_uses_async_db_when_sync_db_is_unavailable() {
                     let leader_id = resolved.state.leader_id.clone().expect("leader id");
 
                     let response = post_transfer_leader(
-                        axum::extract::Path("http-async-transfer".to_owned()),
+                        axum::extract::Path("3a656f98-ca6a-5b56-81c2-88571ebfafec".to_owned()),
                         auth_headers(),
                         State(state.clone()),
                         Json(LeaderTransferRequest {

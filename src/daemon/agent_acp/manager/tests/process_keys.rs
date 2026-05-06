@@ -21,14 +21,18 @@ async fn start_recording_mode_surfaces_log_path_in_inspect() {
             };
             let manager = manager();
             let descriptor = descriptor(&script);
-            let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+            let Ok(snapshot) = manager.start_descriptor(
+                "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                &request,
+                &descriptor,
+            ) else {
                 unreachable!();
             };
 
             let expected_log_path = xdg
                 .join("harness")
                 .join("runs")
-                .join("sess-1")
+                .join("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
                 .join("permission-log.ndjson")
                 .to_string_lossy()
                 .into_owned();
@@ -38,7 +42,8 @@ async fn start_recording_mode_surfaces_log_path_in_inspect() {
                 Some(expected_log_path.as_str())
             );
 
-            let Ok(inspected) = manager.inspect(Some("sess-1")) else {
+            let Ok(inspected) = manager.inspect(Some("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"))
+            else {
                 unreachable!();
             };
             assert_eq!(inspected.agents[0].permission_mode, "recording");
@@ -74,10 +79,16 @@ async fn process_key_changes_when_permission_mode_changes() {
             ..base.clone()
         };
 
-        let Ok(first) = manager.start_descriptor("sess-1", &base, &descriptor) else {
+        let Ok(first) =
+            manager.start_descriptor("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", &base, &descriptor)
+        else {
             unreachable!();
         };
-        let Ok(second) = manager.start_descriptor("sess-2", &recording, &descriptor) else {
+        let Ok(second) = manager.start_descriptor(
+            "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+            &recording,
+            &descriptor,
+        ) else {
             unreachable!();
         };
         assert_ne!(first.process_key, second.process_key);
@@ -111,10 +122,14 @@ async fn process_key_changes_when_project_root_changes() {
             ..first.clone()
         };
 
-        let Ok(one) = manager.start_descriptor("sess-1", &first, &descriptor) else {
+        let Ok(one) =
+            manager.start_descriptor("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", &first, &descriptor)
+        else {
             unreachable!();
         };
-        let Ok(two) = manager.start_descriptor("sess-2", &second, &descriptor) else {
+        let Ok(two) =
+            manager.start_descriptor("00b4a39f-719e-5418-abe8-eb3ab6ea614d", &second, &descriptor)
+        else {
             unreachable!();
         };
         assert_ne!(one.process_key, two.process_key);
@@ -141,13 +156,21 @@ async fn process_key_stable_for_unlisted_env_drift() {
         };
 
         let first = temp_env::with_var("HARNESS_TEST_NOISE", Some("a"), || {
-            let Ok(snapshot) = manager.start_descriptor("sess-1", &request, &descriptor) else {
+            let Ok(snapshot) = manager.start_descriptor(
+                "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                &request,
+                &descriptor,
+            ) else {
                 unreachable!();
             };
             snapshot
         });
         let second = temp_env::with_var("HARNESS_TEST_NOISE", Some("b"), || {
-            let Ok(snapshot) = manager.start_descriptor("sess-2", &request, &descriptor) else {
+            let Ok(snapshot) = manager.start_descriptor(
+                "00b4a39f-719e-5418-abe8-eb3ab6ea614d",
+                &request,
+                &descriptor,
+            ) else {
                 unreachable!();
             };
             snapshot

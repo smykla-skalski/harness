@@ -11,7 +11,9 @@ fn signal_write_acknowledge_round_trip() {
             ("CLAUDE_SESSION_ID", Some("signal-test")),
         ],
         || {
-            let signal_dir = tmp.path().join("signals/test-agent/sess-1");
+            let signal_dir = tmp
+                .path()
+                .join("signals/test-agent/eadbcb3e-6ef7-53d2-ad56-0347cb7189fc");
 
             let signal = Signal {
                 signal_id: "sig-integ-001".into(),
@@ -48,7 +50,7 @@ fn signal_write_acknowledge_round_trip() {
                 acknowledged_at: "2026-03-28T12:00:03Z".into(),
                 result: AckResult::Accepted,
                 agent: "claude".into(),
-                session_id: "sess-1".into(),
+                session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
                 details: None,
             };
             harness::agents::runtime::signal::acknowledge_signal(&signal_dir, &ack).unwrap();

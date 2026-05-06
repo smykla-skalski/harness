@@ -34,7 +34,10 @@ async fn get_sessions_uses_async_db_when_sync_db_is_unavailable() {
         panic!("expected session summary array response");
     };
     assert_eq!(sessions.len(), 1);
-    assert_eq!(sessions[0]["session_id"].as_str(), Some("sess-test-1"));
+    assert_eq!(
+        sessions[0]["session_id"].as_str(),
+        Some("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4")
+    );
 }
 
 #[tokio::test]
@@ -42,7 +45,7 @@ async fn get_session_core_uses_async_db_when_sync_db_is_unavailable() {
     let state = test_http_state_with_async_db_only().await;
 
     let response = get_session(
-        axum::extract::Path("sess-test-1".to_owned()),
+        axum::extract::Path("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".to_owned()),
         Query(SessionScopeQuery::with_scope("core")),
         auth_headers(),
         State(state),
@@ -51,7 +54,10 @@ async fn get_session_core_uses_async_db_when_sync_db_is_unavailable() {
 
     let (status, body) = response_json(response).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body["session"]["session_id"].as_str(), Some("sess-test-1"));
+    assert_eq!(
+        body["session"]["session_id"].as_str(),
+        Some("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4")
+    );
     let Value::Array(agents) = body["agents"].clone() else {
         panic!("expected agent array response");
     };
@@ -63,7 +69,7 @@ async fn get_session_full_detail_uses_async_db_when_sync_db_is_unavailable() {
     let state = test_http_state_with_async_db_only().await;
 
     let response = get_session(
-        axum::extract::Path("sess-test-1".to_owned()),
+        axum::extract::Path("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".to_owned()),
         Query(SessionScopeQuery::default()),
         auth_headers(),
         State(state),
@@ -72,7 +78,10 @@ async fn get_session_full_detail_uses_async_db_when_sync_db_is_unavailable() {
 
     let (status, body) = response_json(response).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body["session"]["session_id"].as_str(), Some("sess-test-1"));
+    assert_eq!(
+        body["session"]["session_id"].as_str(),
+        Some("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4")
+    );
 }
 
 #[tokio::test]
@@ -91,7 +100,7 @@ async fn get_timeline_uses_async_db_when_sync_db_is_unavailable() {
     let state = test_http_state_with_async_db_timeline_only().await;
 
     let response = get_timeline(
-        axum::extract::Path("sess-test-1".to_owned()),
+        axum::extract::Path("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".to_owned()),
         Query(SessionScopeQuery::with_scope("summary")),
         auth_headers(),
         State(state),

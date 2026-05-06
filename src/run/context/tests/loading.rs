@@ -106,7 +106,7 @@ fn run_context_from_current_loads_valid_pointer() {
 #[test]
 fn run_context_stale_pointer_returns_none_for_missing_dir() {
     let record = CurrentRunRecord {
-        layout: RunLayout::new("/nonexistent/path", "vanished"),
+        layout: RunLayout::new("/418cf829-6691-5fc0-92b1-8e5013efa2cb/path", "vanished"),
         profile: None,
         repo_root: None,
         suite_dir: None,

@@ -6,7 +6,7 @@ fn websocket_async_task_create_mutation_succeeds_without_sync_db() {
     with_isolated_harness_env(sandbox.path(), || {
         temp_env::with_var(
             "CLAUDE_SESSION_ID",
-            Some("ws-async-task-create-leader"),
+            Some("b03dd87b-ec33-50dc-8df3-b6671d0e3051-leader"),
             || {
                 let runtime = tokio::runtime::Runtime::new().expect("runtime");
                 runtime.block_on(async {
@@ -15,13 +15,18 @@ fn websocket_async_task_create_mutation_succeeds_without_sync_db() {
 
                     let db_path = sandbox.path().join("daemon.sqlite");
                     let state = test_websocket_state_with_empty_async_db(&db_path).await;
-                    start_async_session(&state, &project_dir, "ws-async-task-create").await;
+                    start_async_session(
+                        &state,
+                        &project_dir,
+                        "b03dd87b-ec33-50dc-8df3-b6671d0e3051",
+                    )
+                    .await;
                     let connection = Arc::new(Mutex::new(ConnectionState::new()));
                     let request = WsRequest {
                         id: "req-task-create-async".into(),
                         method: "task.create".into(),
                         params: serde_json::json!({
-                            "session_id": "ws-async-task-create",
+                            "session_id": "b03dd87b-ec33-50dc-8df3-b6671d0e3051",
                             "actor": "spoofed-client",
                             "title": "async websocket task",
                             "context": "prefer sqlx websocket path",
@@ -67,8 +72,14 @@ fn websocket_async_signal_cancel_mutation_succeeds_without_sync_db() {
     with_isolated_harness_env(sandbox.path(), || {
         temp_env::with_vars(
             [
-                ("CLAUDE_SESSION_ID", Some("ws-async-signal-cancel-leader")),
-                ("CODEX_SESSION_ID", Some("ws-async-signal-cancel-worker")),
+                (
+                    "CLAUDE_SESSION_ID",
+                    Some("3c87ca21-37f8-5d6e-8dfd-b7c059d5ec2f-leader"),
+                ),
+                (
+                    "CODEX_SESSION_ID",
+                    Some("3c87ca21-37f8-5d6e-8dfd-b7c059d5ec2f-worker"),
+                ),
             ],
             || {
                 let runtime = tokio::runtime::Runtime::new().expect("runtime");
@@ -78,18 +89,24 @@ fn websocket_async_signal_cancel_mutation_succeeds_without_sync_db() {
 
                     let db_path = sandbox.path().join("daemon.sqlite");
                     let state = test_websocket_state_with_empty_async_db(&db_path).await;
-                    start_async_session(&state, &project_dir, "ws-async-signal-cancel").await;
+                    start_async_session(
+                        &state,
+                        &project_dir,
+                        "3c87ca21-37f8-5d6e-8dfd-b7c059d5ec2f",
+                    )
+                    .await;
                     let worker_id = join_async_worker(
                         &state,
-                        "ws-async-signal-cancel",
+                        "3c87ca21-37f8-5d6e-8dfd-b7c059d5ec2f",
                         &project_dir,
                         "Async WS Signal Worker",
                     )
                     .await;
-                    let leader_id = leader_id_for_session(&state, "ws-async-signal-cancel").await;
+                    let leader_id =
+                        leader_id_for_session(&state, "3c87ca21-37f8-5d6e-8dfd-b7c059d5ec2f").await;
                     let signal_id = seed_pending_signal(
                         &state,
-                        "ws-async-signal-cancel",
+                        "3c87ca21-37f8-5d6e-8dfd-b7c059d5ec2f",
                         &leader_id,
                         &worker_id,
                         &project_dir,
@@ -101,7 +118,7 @@ fn websocket_async_signal_cancel_mutation_succeeds_without_sync_db() {
                         id: "req-signal-cancel-async".into(),
                         method: "signal.cancel".into(),
                         params: serde_json::json!({
-                            "session_id": "ws-async-signal-cancel",
+                            "session_id": "3c87ca21-37f8-5d6e-8dfd-b7c059d5ec2f",
                             "actor": "spoofed-client",
                             "agent_id": worker_id,
                             "signal_id": signal_id.clone()
@@ -115,7 +132,7 @@ fn websocket_async_signal_cancel_mutation_succeeds_without_sync_db() {
                     let async_db = state.async_db.get().expect("async db");
                     assert_eq!(
                         async_db
-                            .load_signals("ws-async-signal-cancel")
+                            .load_signals("3c87ca21-37f8-5d6e-8dfd-b7c059d5ec2f")
                             .await
                             .expect("load signals")
                             .into_iter()
@@ -140,13 +157,13 @@ fn websocket_session_delete_returns_deleted_flag() {
 
             let db_path = sandbox.path().join("daemon.sqlite");
             let state = test_websocket_state_with_empty_async_db(&db_path).await;
-            start_async_session(&state, &project_dir, "ws-delete-session").await;
+            start_async_session(&state, &project_dir, "64fc43e3-b329-5b2e-a721-8882f05224ed").await;
             let connection = Arc::new(Mutex::new(ConnectionState::new()));
             let request = WsRequest {
                 id: "req-session-delete".into(),
                 method: ws_methods::SESSION_DELETE.into(),
                 params: serde_json::json!({
-                    "session_id": "ws-delete-session",
+                    "session_id": "64fc43e3-b329-5b2e-a721-8882f05224ed",
                 }),
                 trace_context: None,
             };
@@ -164,7 +181,7 @@ fn websocket_session_delete_returns_deleted_flag() {
             let async_db = state.async_db.get().expect("async db");
             assert!(
                 async_db
-                    .resolve_session("ws-delete-session")
+                    .resolve_session("64fc43e3-b329-5b2e-a721-8882f05224ed")
                     .await
                     .expect("resolve deleted session")
                     .is_none()
@@ -179,7 +196,7 @@ fn websocket_session_archive_returns_archived_at_and_hides_session() {
     with_isolated_harness_env(sandbox.path(), || {
         temp_env::with_var(
             "CLAUDE_SESSION_ID",
-            Some("ws-archive-session-leader"),
+            Some("3516d468-9b26-5344-accb-fc669db672e5-leader"),
             || {
                 let runtime = tokio::runtime::Runtime::new().expect("runtime");
                 runtime.block_on(async {
@@ -188,7 +205,7 @@ fn websocket_session_archive_returns_archived_at_and_hides_session() {
 
                     let db_path = sandbox.path().join("daemon.sqlite");
                     let state = test_websocket_state_with_empty_async_db(&db_path).await;
-                    let session_id = "ws-archive-session";
+                    let session_id = "3516d468-9b26-5344-accb-fc669db672e5";
                     start_async_session(&state, &project_dir, session_id).await;
                     let connection = Arc::new(Mutex::new(ConnectionState::new()));
                     let request = WsRequest {
@@ -239,8 +256,14 @@ fn websocket_async_signal_ack_mutation_succeeds_without_sync_db() {
     with_isolated_harness_env(sandbox.path(), || {
         temp_env::with_vars(
             [
-                ("CLAUDE_SESSION_ID", Some("ws-async-signal-ack-leader")),
-                ("CODEX_SESSION_ID", Some("ws-async-signal-ack-worker")),
+                (
+                    "CLAUDE_SESSION_ID",
+                    Some("2871f53d-350f-581f-972e-f6d16f5e1526-leader"),
+                ),
+                (
+                    "CODEX_SESSION_ID",
+                    Some("2871f53d-350f-581f-972e-f6d16f5e1526-worker"),
+                ),
             ],
             || {
                 let runtime = tokio::runtime::Runtime::new().expect("runtime");
@@ -250,18 +273,24 @@ fn websocket_async_signal_ack_mutation_succeeds_without_sync_db() {
 
                     let db_path = sandbox.path().join("daemon.sqlite");
                     let state = test_websocket_state_with_empty_async_db(&db_path).await;
-                    start_async_session(&state, &project_dir, "ws-async-signal-ack").await;
+                    start_async_session(
+                        &state,
+                        &project_dir,
+                        "2871f53d-350f-581f-972e-f6d16f5e1526",
+                    )
+                    .await;
                     let worker_id = join_async_worker(
                         &state,
-                        "ws-async-signal-ack",
+                        "2871f53d-350f-581f-972e-f6d16f5e1526",
                         &project_dir,
                         "Async WS Signal Ack Worker",
                     )
                     .await;
-                    let leader_id = leader_id_for_session(&state, "ws-async-signal-ack").await;
+                    let leader_id =
+                        leader_id_for_session(&state, "2871f53d-350f-581f-972e-f6d16f5e1526").await;
                     let signal_id = seed_pending_signal(
                         &state,
-                        "ws-async-signal-ack",
+                        "2871f53d-350f-581f-972e-f6d16f5e1526",
                         &leader_id,
                         &worker_id,
                         &project_dir,
@@ -273,7 +302,7 @@ fn websocket_async_signal_ack_mutation_succeeds_without_sync_db() {
                         id: "req-signal-ack-async".into(),
                         method: ws_methods::SIGNAL_ACK.into(),
                         params: serde_json::json!({
-                            "session_id": "ws-async-signal-ack",
+                            "session_id": "2871f53d-350f-581f-972e-f6d16f5e1526",
                             "agent_id": worker_id,
                             "signal_id": signal_id.clone(),
                             "result": "accepted",
@@ -295,7 +324,7 @@ fn websocket_async_signal_ack_mutation_succeeds_without_sync_db() {
                     let async_db = state.async_db.get().expect("async db");
                     assert_eq!(
                         async_db
-                            .load_signals("ws-async-signal-ack")
+                            .load_signals("2871f53d-350f-581f-972e-f6d16f5e1526")
                             .await
                             .expect("load signals")
                             .into_iter()

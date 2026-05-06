@@ -8,7 +8,7 @@ use super::super::helpers::*;
 
 fn run_dir_args_missing() -> RunDirArgs {
     RunDirArgs {
-        run_dir: Some("/nonexistent/run-dir".into()),
+        run_dir: Some("/418cf829-6691-5fc0-92b1-8e5013efa2cb/run-dir".into()),
         run_id: None,
         run_root: None,
     }

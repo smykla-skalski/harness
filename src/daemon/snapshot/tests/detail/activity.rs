@@ -18,7 +18,7 @@ fn session_detail_applies_shared_agent_and_task_ordering() {
         )],
         || {
             let context_root = tmp.path().join("harness/projects/project-ordering");
-            let session_id = "sess-ordering";
+            let session_id = "1d60726f-61a3-5e01-a807-9210fb4044a6";
             let state_path = context_root
                 .join("orchestration")
                 .join("sessions")
@@ -37,7 +37,7 @@ fn session_detail_applies_shared_agent_and_task_ordering() {
                     joined_at: "2026-03-28T13:58:00Z".into(),
                     updated_at: "2026-03-28T14:06:00Z".into(),
                     status: AgentStatus::Active,
-                    agent_session_id: Some("leader-session".into()),
+                    agent_session_id: Some("77d13b08-1651-541b-a3fc-26cab59e0aea".into()),
                     managed_agent: None,
                     last_activity_at: Some("2026-03-28T14:06:00Z".into()),
                     current_task_id: None,
@@ -120,7 +120,7 @@ fn session_detail_agent_activity_falls_back_to_ledger_for_copilot() {
         )],
         || {
             let context_root = tmp.path().join("harness/projects/project-alpha");
-            let session_id = "sess-copilot";
+            let session_id = "cd8a9518-8e52-51d7-b131-aaae722fdf1c";
             let state_path = context_root
                 .join("orchestration")
                 .join("sessions")
@@ -128,7 +128,11 @@ fn session_detail_agent_activity_falls_back_to_ledger_for_copilot() {
                 .join("state.json");
             write_json(
                 &state_path,
-                &sample_state_for_runtime(session_id, "copilot", "copilot-session-1"),
+                &sample_state_for_runtime(
+                    session_id,
+                    "copilot",
+                    "93595910-aac3-58cb-aadf-5101d4ce534b",
+                ),
             );
 
             let ledger_path = context_root.join("agents/ledger/events.jsonl");
@@ -138,7 +142,7 @@ fn session_detail_agent_activity_falls_back_to_ledger_for_copilot() {
                     "sequence": 1,
                     "recorded_at": "2026-03-28T14:04:45Z",
                     "agent": "copilot",
-                    "session_id": "copilot-session-1",
+                    "session_id": "93595910-aac3-58cb-aadf-5101d4ce534b",
                     "skill": "suite",
                     "event": "before_tool_use",
                     "hook": "tool-guard",
@@ -163,7 +167,7 @@ fn session_detail_agent_activity_falls_back_to_ledger_for_copilot() {
                     "sequence": 2,
                     "recorded_at": "2026-03-28T14:04:46Z",
                     "agent": "copilot",
-                    "session_id": "copilot-session-1",
+                    "session_id": "93595910-aac3-58cb-aadf-5101d4ce534b",
                     "skill": "suite",
                     "event": "after_tool_use",
                     "hook": "tool-result",

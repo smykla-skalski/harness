@@ -12,12 +12,25 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::validate_safe_segment;
 use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use crate::workspace::harness_data_root;
+use crate::workspace::ids;
 use crate::workspace::layout::{SessionLayout, sessions_root as workspace_sessions_root};
 use crate::workspace::project_context_dir;
 
-/// Validate a session id (must not be empty or contain path traversal).
-pub(super) fn validate_session_id(session_id: &str) -> Result<(), CliError> {
-    validate_safe_segment(session_id)
+/// Validate a persisted session directory name.
+pub(crate) fn validate_session_id(session_id: &str) -> Result<(), CliError> {
+    validate_safe_segment(session_id)?;
+    ids::validate(session_id)
+        .map_err(|error| CliErrorKind::workflow_parse(error.to_string()).into())
+}
+
+/// Validate an explicit id requested for a newly-created session.
+pub(crate) fn validate_new_session_id(session_id: &str) -> Result<(), CliError> {
+    validate_session_id(session_id)
+}
+
+#[must_use]
+pub(crate) fn is_valid_session_id(session_id: &str) -> bool {
+    validate_session_id(session_id).is_ok()
 }
 
 /// Path to the state file for a session.
@@ -88,6 +101,9 @@ pub(crate) fn list_session_ids_in_project_dir(project_dir: &Path) -> Result<Vec<
             let name = entry.file_name().into_string().ok()?;
             // Skip hidden files (e.g. .active.json, .origin)
             if name.starts_with('.') {
+                return None;
+            }
+            if !is_valid_session_id(&name) {
                 return None;
             }
             entry

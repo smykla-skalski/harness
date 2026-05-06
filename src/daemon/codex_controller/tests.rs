@@ -25,7 +25,7 @@ fn start_run_rejects_empty_prompt_before_db_lookup() {
     };
 
     let error = controller
-        .start_run("sess-1", &request)
+        .start_run("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", &request)
         .expect_err("empty prompt should be rejected");
     assert!(
         error.to_string().contains("codex prompt cannot be empty"),
@@ -48,7 +48,7 @@ fn start_run_rejects_unknown_model_for_codex() {
     };
 
     let error = controller
-        .start_run("sess-1", &request)
+        .start_run("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", &request)
         .expect_err("invalid model should be rejected");
     let message = error.to_string();
     assert!(
@@ -76,7 +76,7 @@ fn start_run_rejects_unknown_effort_value() {
     };
 
     let error = controller
-        .start_run("sess-1", &request)
+        .start_run("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", &request)
         .expect_err("unknown effort should be rejected");
     let message = error.to_string();
     assert!(message.contains("extreme"), "unexpected error: {message}");
@@ -99,7 +99,7 @@ fn start_run_accepts_custom_model_and_effort_when_opt_in() {
     // Validation passes; the call will later fail at the websocket preflight
     // because no daemon is running, not at catalog validation.
     let error = controller
-        .start_run("sess-1", &request)
+        .start_run("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", &request)
         .expect_err("preflight fails without daemon");
     let message = error.to_string();
     assert!(
@@ -115,13 +115,16 @@ fn start_run_accepts_custom_model_and_effort_when_opt_in() {
 #[test]
 fn preferred_codex_project_dir_uses_session_worktree_when_present() {
     let resolved = preferred_codex_project_dir(
-        Path::new("/tmp/harness/sessions/sess-1/workspace"),
+        Path::new("/tmp/harness/sessions/eadbcb3e-6ef7-53d2-ad56-0347cb7189fc/workspace"),
         Some(Path::new("/tmp/harness/project")),
         Some(Path::new("/tmp/harness/repository")),
         Path::new("/tmp/harness/context"),
     );
 
-    assert_eq!(resolved, "/tmp/harness/sessions/sess-1/workspace");
+    assert_eq!(
+        resolved,
+        "/tmp/harness/sessions/eadbcb3e-6ef7-53d2-ad56-0347cb7189fc/workspace"
+    );
 }
 
 #[test]

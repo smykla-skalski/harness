@@ -59,7 +59,10 @@ pub(super) fn prepare_session(
         })?;
 
     let session_id = match request.session_id.clone() {
-        Some(id) if !id.trim().is_empty() => id,
+        Some(id) if !id.trim().is_empty() => {
+            validate_explicit_session_id(&id)?;
+            id
+        }
         _ => ids::new_session_id(),
     };
     let layout = SessionLayout {
@@ -126,6 +129,10 @@ pub(super) fn prepare_session(
         canonical_origin,
         state,
     })
+}
+
+fn validate_explicit_session_id(session_id: &str) -> Result<(), CliError> {
+    session_storage::validate_new_session_id(session_id)
 }
 
 pub(super) fn rollback_session_artifacts(origin: &Path, layout: &SessionLayout) {

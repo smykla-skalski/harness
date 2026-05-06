@@ -15,7 +15,7 @@ fn parse_session_task_create() {
         "session",
         "task",
         "create",
-        "sess-abc",
+        "0c3be78e-656d-52d3-b4c3-03ba64d373acbc",
         "--title",
         "fix bug",
         "--severity",
@@ -31,7 +31,7 @@ fn parse_session_task_create() {
                     command: crate::session::transport::SessionTaskCommand::Create(args),
                 },
         } => {
-            assert_eq!(args.session_id, "sess-abc");
+            assert_eq!(args.session_id, "0c3be78e-656d-52d3-b4c3-03ba64d373acbc");
             assert_eq!(args.title, "fix bug");
             assert_eq!(args.severity, crate::session::types::TaskSeverity::High);
         }

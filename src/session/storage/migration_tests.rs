@@ -9,7 +9,7 @@ use super::migrations::{
 fn migrate_v1_and_v2_stamp_expected_schema_versions() {
     let v1 = json!({
         "schema_version": 1,
-        "session_id": "sess-1",
+        "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
         "context": "test",
         "status": "active",
         "created_at": "2026-01-01T00:00:00Z",
@@ -22,7 +22,7 @@ fn migrate_v1_and_v2_stamp_expected_schema_versions() {
 
     let v2 = json!({
         "schema_version": 2,
-        "session_id": "sess-1",
+        "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
         "context": "test",
         "status": "active",
         "created_at": "2026-01-01T00:00:00Z",
@@ -39,7 +39,7 @@ fn migrate_v3_to_v4_backfills_title_from_context() {
     let migrated = migrate_v3_to_v4(json!({
         "schema_version": 3,
         "state_version": 2,
-        "session_id": "sess-1",
+        "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
         "context": "session goal",
         "status": "active",
         "created_at": "2026-01-01T00:00:00Z",
@@ -71,7 +71,7 @@ fn migrate_v4_to_v5_stamps_current_schema() {
     let migrated = migrate_v4_to_v5(json!({
         "schema_version": 4,
         "state_version": 2,
-        "session_id": "sess-1",
+        "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
         "title": "session title",
         "context": "session goal",
         "status": "active",
@@ -104,7 +104,7 @@ fn migrate_v5_to_v6_stamps_current_schema() {
     let migrated = migrate_v5_to_v6(json!({
         "schema_version": 5,
         "state_version": 3,
-        "session_id": "sess-1",
+        "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
         "title": "session title",
         "context": "session goal",
         "status": "active",
@@ -137,7 +137,7 @@ fn migrate_v6_to_v7_backfills_swarm_policy() {
     let migrated = migrate_v6_to_v7(json!({
         "schema_version": 6,
         "state_version": 3,
-        "session_id": "sess-1",
+        "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
         "title": "session title",
         "context": "session goal",
         "status": "active",
@@ -186,7 +186,7 @@ fn migrate_v7_to_v8_adds_layout_fields() {
     let migrated = migrate_v7_to_v8(json!({
         "schema_version": 7,
         "state_version": 3,
-        "session_id": "sess-1",
+        "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
         "title": "session title",
         "context": "session goal",
         "status": "active",
@@ -216,7 +216,7 @@ fn migrate_v10_to_v11_tags_runtime_and_disconnect_status() {
     let migrated = migrate_v10_to_v11(json!({
         "schema_version": 10,
         "state_version": 3,
-        "session_id": "sess-1",
+        "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
         "title": "x",
         "context": "y",
         "status": "active",
@@ -473,7 +473,7 @@ fn migrate_v12_to_v13_clears_legacy_end_session_archive_timestamp() {
     let migrated = migrate_v12_to_v13(json!({
         "schema_version": 12,
         "state_version": 3,
-        "session_id": "sess-1",
+        "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
         "title": "session title",
         "context": "session goal",
         "status": "ended",
