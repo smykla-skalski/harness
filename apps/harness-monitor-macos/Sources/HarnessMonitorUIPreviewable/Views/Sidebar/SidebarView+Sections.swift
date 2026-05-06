@@ -7,7 +7,7 @@ struct SidebarSessionListRenderState {
   let projectionGroups: [HarnessMonitorStore.SessionGroup]
   let searchPresentation: HarnessMonitorStore.SessionSearchPresentationState
   let searchVisibleSessionIDs: [String]
-  let selectedSessionIDForAccessibilityMarkers: String?
+  let selectedSessionIDs: Set<String>
   let bookmarkedSessionIDs: Set<String>
   let isPersistenceAvailable: Bool
   let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
@@ -66,6 +66,7 @@ struct SidebarSessionListRenderState {
 struct SidebarSessionListContent: View {
   let store: HarnessMonitorStore
   let renderState: SidebarSessionListRenderState
+  let activateSessionRow: (String) -> Void
   let toggleBookmark: (String, String) -> Void
   let setCheckoutCollapsed: (String, Bool) -> Void
 
@@ -195,15 +196,15 @@ struct SidebarSessionListContent: View {
   @ViewBuilder
   private func sessionRow(_ session: SessionSummary) -> some View {
     let presentation = store.sessionSummaryPresentation(for: session)
-    let isSelected = store.selectedSessionID == session.sessionId
+    let isSelected = renderState.selectedSessionIDs.contains(session.sessionId)
     let isSelectedForUITest =
       HarnessMonitorUITestEnvironment.selectionMarkersEnabled
-      && renderState.selectedSessionIDForAccessibilityMarkers == session.sessionId
+      && isSelected
     let row = sessionRowContent(session, presentation: presentation)
 
     let baseRow =
       row
-      .tag(session.sessionId as String?)
+      .tag(session.sessionId)
       .contentShape(Rectangle())
       .accessibilityAddTraits(.isButton)
       .accessibilityLabel(
@@ -214,7 +215,17 @@ struct SidebarSessionListContent: View {
         HarnessMonitorAccessibility.sessionRow(session.sessionId),
         label: sessionAccessibilityLabel(for: session, presentation: presentation),
         value: isSelected ? "selected" : "not selected",
-        pressAction: { store.selectSessionFromList(session.sessionId) }
+        pressAction: {
+          HarnessMonitorUITestTrace.record(
+            component: "sidebar.session-row",
+            event: "press-action",
+            details: [
+              "session_id": session.sessionId,
+              "selected_session_ids": renderState.selectedSessionIDs.sorted().joined(separator: ","),
+            ]
+          )
+          activateSessionRow(session.sessionId)
+        }
       )
       .harnessUITestValue(
         isSelectedForUITest

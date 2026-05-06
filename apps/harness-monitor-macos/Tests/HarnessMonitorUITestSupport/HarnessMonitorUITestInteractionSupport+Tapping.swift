@@ -6,6 +6,14 @@ extension HarnessMonitorUITestCase {
   }
 
   func tapSession(in app: XCUIApplication, identifier: String) {
+    clickSession(in: app, identifier: identifier)
+  }
+
+  func clickSession(
+    in app: XCUIApplication,
+    identifier: String,
+    allowAlreadySelected: Bool = false
+  ) {
     let sessionRow = sessionTrigger(in: app, identifier: identifier)
     recordDiagnosticsTrace(
       event: "tap-session.begin",
@@ -27,7 +35,7 @@ extension HarnessMonitorUITestCase {
       trace=\(diagnosticsTracePath() ?? "unavailable")
       """
     )
-    guard !sessionRowIsSelected(sessionRow) else { return }
+    guard allowAlreadySelected || !sessionRowIsSelected(sessionRow) else { return }
     if sessionRow.isHittable {
       sessionRow.tap()
       recordDiagnosticsTrace(
@@ -53,6 +61,77 @@ extension HarnessMonitorUITestCase {
     )
     XCTFail("Failed to tap session row \(identifier)")
   }
+
+#if os(macOS)
+  func modifierClickSession(
+    in app: XCUIApplication,
+    identifier: String,
+    modifierFlags: XCUIElement.KeyModifierFlags
+  ) {
+    let sessionRow = sessionTrigger(in: app, identifier: identifier)
+    let elementCenterCoordinate = centerCoordinate(in: app, for: sessionRow)
+    let fallbackCoordinate = preferredTapCoordinate(in: app, for: sessionRow)
+    let exists =
+      waitForElement(sessionRow, timeout: Self.fastActionTimeout)
+      || elementCenterCoordinate != nil
+      || fallbackCoordinate != nil
+    XCTAssertTrue(
+      exists,
+      """
+      Expected session row \(identifier)
+      trace=\(diagnosticsTracePath() ?? "unavailable")
+      """
+    )
+    guard exists else { return }
+
+    if app.state != .runningForeground {
+      app.activate()
+    }
+
+    recordDiagnosticsTrace(
+      event: "tap-session.modifier.begin",
+      app: app,
+      details: [
+        "identifier": identifier,
+        "element_type": "\(sessionRow.elementType.rawValue)",
+        "is_hittable": "\(sessionRow.isHittable)",
+        "modifier_flags": "\(modifierFlags.rawValue)",
+        "coordinate_source": {
+          if elementCenterCoordinate != nil {
+            return "element-center"
+          }
+          if fallbackCoordinate != nil {
+            return "fallback"
+          }
+          return "element-click"
+        }(),
+      ]
+    )
+
+    if let elementCenterCoordinate {
+      XCUIElement.perform(withKeyModifiers: modifierFlags) {
+        elementCenterCoordinate.click()
+      }
+    } else if let fallbackCoordinate {
+      XCUIElement.perform(withKeyModifiers: modifierFlags) {
+        fallbackCoordinate.click()
+      }
+    } else {
+      XCUIElement.perform(withKeyModifiers: modifierFlags) {
+        sessionRow.click()
+      }
+    }
+    RunLoop.current.run(until: Date.now.addingTimeInterval(Self.fastPollInterval))
+    recordDiagnosticsTrace(
+      event: "tap-session.modifier.end",
+      app: app,
+      details: [
+        "identifier": identifier,
+        "value_after": String(describing: sessionRow.value ?? "nil"),
+      ]
+    )
+  }
+#endif
 
   func terminateIfRunning(_ app: XCUIApplication) {
     HarnessMonitorUITestCase.terminateAndWait(app)
