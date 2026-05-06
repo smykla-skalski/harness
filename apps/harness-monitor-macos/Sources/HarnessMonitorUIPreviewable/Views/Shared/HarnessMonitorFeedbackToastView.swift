@@ -2,6 +2,14 @@ import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
+private struct ToastSnapBackSpring {
+  let duration: TimeInterval
+  let bounce: Double
+  let initialVelocity: Double
+
+  static let `default` = Self(duration: 0.25, bounce: 0.18, initialVelocity: 0)
+}
+
 public struct HarnessMonitorFeedbackToastView: View {
   public let toast: ToastSlice
   private let detailsInitiallyExpanded: Bool
@@ -74,6 +82,7 @@ private struct HarnessMonitorFeedbackToastRow: View {
   @State private var copiedPrimaryAction = false
   @State private var dragOffset: CGFloat = 0
   @State private var isDragging = false
+  @State private var snapBackSpring = ToastSnapBackSpring.default
   private let dismissThreshold: CGFloat = 80
   private let minimumDragDistance: CGFloat = 10
 
@@ -178,7 +187,13 @@ private struct HarnessMonitorFeedbackToastRow: View {
   }
 
   private var snapBackAnimation: Animation {
-    reduceMotion ? .linear(duration: 0.01) : .spring(duration: 0.25, bounce: 0.18)
+    reduceMotion
+      ? .linear(duration: 0.01)
+      : .interpolatingSpring(
+        duration: snapBackSpring.duration,
+        bounce: snapBackSpring.bounce,
+        initialVelocity: snapBackSpring.initialVelocity
+      )
   }
 
   private var rowAnimation: Animation {
@@ -349,9 +364,29 @@ private struct HarnessMonitorFeedbackToastRow: View {
       return
     }
 
+    snapBackSpring = springForSnapBack(from: value)
     isDragging = false
     dragOffset = 0
     toast.resumeTimers()
+  }
+
+  private func springForSnapBack(from value: DragGesture.Value) -> ToastSnapBackSpring {
+    let currentOffset = max(0, value.translation.width)
+    let predictedOffset = max(0, value.predictedEndTranslation.width)
+    let predictedCarry = max(0, predictedOffset - currentOffset)
+    let normalizedCarry = min(predictedCarry / dismissThreshold, 1)
+    let velocityMagnitude = abs(value.velocity.width)
+    let normalizedVelocity = min(
+      velocityMagnitude / max(max(currentOffset, dismissThreshold * 0.5) * 18, 1),
+      1
+    )
+    let springiness = max(normalizedCarry, normalizedVelocity)
+
+    return ToastSnapBackSpring(
+      duration: 0.25 - (0.04 * springiness),
+      bounce: 0.18 + (0.18 * springiness),
+      initialVelocity: springiness
+    )
   }
 
   private func perform(_ action: ActionFeedbackAction) {
