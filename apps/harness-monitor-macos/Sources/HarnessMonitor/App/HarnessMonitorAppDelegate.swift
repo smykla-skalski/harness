@@ -45,10 +45,11 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
 
   func applicationWillFinishLaunching(_ notification: Notification) {
     NSWindow.allowsAutomaticWindowTabbing = false
-    guard hidesDockIconForPerfRuns else {
+    if hidesDockIconForPerfRuns {
+      NSApplication.shared.setActivationPolicy(.accessory)
       return
     }
-    NSApplication.shared.setActivationPolicy(.accessory)
+    NSApplication.shared.setActivationPolicy(.regular)
   }
 
   func applicationDidFinishLaunching(_ notification: Notification) {
@@ -127,12 +128,16 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   func applicationShouldTerminateAfterLastWindowClosed(
     _ sender: NSApplication
   ) -> Bool {
-    if isTestHarnessRun {
-      _ = sender
-      return true
-    }
     _ = sender
-    return !supervisorRunInBackgroundEnabled
+    return Self.shouldTerminateAfterLastWindowClosed(
+      isTestHarnessRun: isTestHarnessRun
+    )
+  }
+
+  nonisolated static func shouldTerminateAfterLastWindowClosed(
+    isTestHarnessRun: Bool
+  ) -> Bool {
+    isTestHarnessRun
   }
 
   func applicationDidResignActive(_ notification: Notification) {

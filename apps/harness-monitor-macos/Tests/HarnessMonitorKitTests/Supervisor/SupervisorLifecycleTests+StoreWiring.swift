@@ -12,6 +12,34 @@ extension SupervisorLifecycleTests {
   }
 
   @MainActor
+  func testSupervisorRuntimeStateStartsStopped() {
+    let store = HarnessMonitorStore.fixture()
+
+    XCTAssertEqual(store.supervisorRuntimeState, .stopped)
+  }
+
+  @MainActor
+  func testSupervisorRuntimeStateTracksStartAndStop() async {
+    let store = HarnessMonitorStore.fixture()
+
+    await store.startSupervisor()
+    XCTAssertEqual(store.supervisorRuntimeState, .running)
+
+    await store.stopSupervisor()
+    XCTAssertEqual(store.supervisorRuntimeState, .stopped)
+  }
+
+  @MainActor
+  func testSupervisorCheckNowStartsSupervisorWhenStopped() async {
+    let store = HarnessMonitorStore.fixture()
+
+    await store.requestSupervisorCheckNow()
+    addTeardownBlock { await store.stopSupervisor() }
+
+    XCTAssertEqual(store.supervisorRuntimeState, .running)
+  }
+
+  @MainActor
   func testStartSupervisorHonorsDisabledBackgroundPreference() async throws {
     UserDefaults.standard.set(false, forKey: SupervisorSettingsDefaults.runInBackgroundKey)
     defer {

@@ -113,6 +113,7 @@ struct HarnessMonitorApp: App {
     mainWindowScene
     settingsWindowScene
     workspaceWindowScene
+    menuBarExtraScene
   }
 
   // The Xcode preview shell injects the canvas view directly into an
@@ -124,6 +125,10 @@ struct HarnessMonitorApp: App {
   // needs the full scene tree so XCUITest can exercise the app.
   private var rendersLiveSceneContent: Bool {
     launchMode == .live || isUITesting
+  }
+
+  private var rendersMenuBarExtraContent: Bool {
+    rendersLiveSceneContent
   }
 
   private var allowsWindowRestoration: Bool {
@@ -228,6 +233,15 @@ struct HarnessMonitorApp: App {
     .windowToolbarStyle(.unified)
     .defaultSize(width: 1_140, height: 700)
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
+  }
+
+  private var menuBarExtraScene: some Scene {
+    MenuBarExtra(isInserted: .constant(rendersMenuBarExtraContent)) {
+      HarnessMonitorMenuBarExtraContent(store: store)
+    } label: {
+      HarnessMonitorMenuBarExtraLabel(store: store)
+    }
+    .menuBarExtraStyle(.menu)
   }
 
   @ViewBuilder private var mainWindowContent: some View {

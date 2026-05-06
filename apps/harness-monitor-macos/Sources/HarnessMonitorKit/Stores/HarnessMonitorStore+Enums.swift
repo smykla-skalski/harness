@@ -18,6 +18,13 @@ extension HarnessMonitorStore {
     case offline(String)
   }
 
+  public enum SupervisorRuntimeState: Equatable, Sendable {
+    case stopped
+    case starting
+    case running
+    case stopping
+  }
+
   public enum SessionFilter: String, CaseIterable, Identifiable, Sendable {
     case all
     case active
