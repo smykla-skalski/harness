@@ -17,11 +17,10 @@ STALE_SCAN_LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd
 source "$STALE_SCAN_LIB_DIR/common-repo-root.sh"
 # shellcheck source=scripts/lib/process-state.sh
 source "$STALE_SCAN_LIB_DIR/process-state.sh"
-STALE_SCAN_MONITOR_RUNTIME_PROFILE_LIB="$STALE_SCAN_ROOT/apps/harness-monitor-macos/Scripts/lib/runtime-profile.sh"
-if [[ -f "$STALE_SCAN_MONITOR_RUNTIME_PROFILE_LIB" ]]; then
-  # shellcheck source=apps/harness-monitor-macos/Scripts/lib/runtime-profile.sh
-  source "$STALE_SCAN_MONITOR_RUNTIME_PROFILE_LIB"
-  harness_monitor_apply_runtime_profile_environment
+STALE_SCAN_MONITOR_LANES_LIB="$STALE_SCAN_ROOT/apps/harness-monitor-macos/Scripts/lib/monitor-lanes.sh"
+if [[ -f "$STALE_SCAN_MONITOR_LANES_LIB" ]]; then
+  # shellcheck source=apps/harness-monitor-macos/Scripts/lib/monitor-lanes.sh
+  source "$STALE_SCAN_MONITOR_LANES_LIB"
 fi
 STALE_SCAN_COMMON_REPO_ROOT="${STALE_SCAN_COMMON_REPO_ROOT:-$(resolve_common_repo_root "$STALE_SCAN_ROOT")}"
 
@@ -35,13 +34,18 @@ readonly STALE_SCAN_APPLICATION_SUPPORT_ROOT="$HOME/Library/Application Support/
 # Single cached ps snapshot. Callers may force-refresh between kill cycles.
 _stale_scan_ps_snapshot=""
 
-stale_scan_is_profile_scoped() {
-  [[ -n "${HARNESS_DAEMON_DATA_HOME:-}" || -n "${HARNESS_MONITOR_RUNTIME_PROFILE:-}" ]]
+stale_scan_is_runtime_scoped() {
+  [[ -n "${HARNESS_DAEMON_DATA_HOME:-}" || -n "${HARNESS_MONITOR_RUNTIME_LANE:-}" ]]
 }
 
 stale_scan_daemon_roots() {
   if [[ -n "${HARNESS_DAEMON_DATA_HOME:-}" ]]; then
     printf '%s\n' "$HARNESS_DAEMON_DATA_HOME/harness/daemon"
+    return 0
+  fi
+  if [[ -n "${HARNESS_MONITOR_RUNTIME_LANE:-}" ]] \
+      && declare -F harness_monitor_runtime_daemon_data_home >/dev/null; then
+    printf '%s/harness/daemon\n' "$(harness_monitor_runtime_daemon_data_home "$STALE_SCAN_ROOT")"
     return 0
   fi
 
@@ -78,7 +82,7 @@ stale_scan_matching_pids() {
         if ($0 ~ /(^| )mise run monitor:(xcodebuild|build|lint|audit|audit:from-ref)( |$)/) matched = 1
         if ($0 ~ /(^| )bash (([^ ]*\/)?scripts\/check(\.sh|-scripts\.sh))( |$)/) matched = 1
         if ($0 ~ /(^| )\.\/scripts\/cargo-local\.sh (check|clippy|run --quiet -- setup agents generate --check)( |$)/) matched = 1
-        if ($0 ~ /(^| )(bash )?([^ ]*\/)?apps\/harness-monitor-macos\/Scripts\/(xcodebuild-with-lock|run-quality-gates|run-instruments-audit|run-instruments-audit-from-ref|test-swift|build-for-testing)\.sh( |$)/) matched = 1
+        if ($0 ~ /(^| )(bash )?([^ ]*\/)?apps\/harness-monitor-macos\/Scripts\/(monitor-xcodebuild|run-quality-gates|run-instruments-audit|run-instruments-audit-from-ref|test-swift|build-for-testing)\.sh( |$)/) matched = 1
       }
       if (matched) print pid
     }
@@ -128,7 +132,7 @@ stale_scan_orphan_monitor_wrapper_pids() {
     command_line="$(awk '{ $1=""; $2=""; $3=""; sub(/^ +/, "", $0); print }' <<<"$line")"
 
     [[ "$ppid" == "1" ]] || continue
-    [[ "$command_line" == *"xcodebuild-with-lock.sh"* ]] || continue
+    [[ "$command_line" == *"monitor-xcodebuild.sh"* ]] || continue
 
     derived_data_path="$(stale_scan_monitor_wrapper_derived_data_path "$command_line")"
     if [[ -z "$derived_data_path" ]]; then
@@ -136,8 +140,7 @@ stale_scan_orphan_monitor_wrapper_pids() {
       continue
     fi
 
-    if [[ ! -e "$derived_data_path/.xcodebuild.lock/owner/lease.env" \
-      && ! -e "$derived_data_path/.xcodebuild.lock/waiters/${pid}.env" ]]; then
+    if [[ ! -e "$derived_data_path/.harness-monitor-xcodebuild.lock/owner.env" ]]; then
       echo "$pid"
     fi
   done <<<"$_stale_scan_ps_snapshot"
@@ -210,30 +213,38 @@ stale_scan_process_env_value() {
   printf '%s\n' "$value"
 }
 
-stale_scan_current_runtime_profile() {
-  if ! declare -F harness_monitor_runtime_profile >/dev/null; then
-    return 1
+stale_scan_current_runtime_lane() {
+  if [[ -n "${HARNESS_MONITOR_RUNTIME_LANE:-}" ]]; then
+    if declare -F harness_monitor_sanitize_lane >/dev/null; then
+      harness_monitor_sanitize_lane "$HARNESS_MONITOR_RUNTIME_LANE"
+      return
+    fi
+    printf '%s\n' "$HARNESS_MONITOR_RUNTIME_LANE"
+    return 0
   fi
-  harness_monitor_runtime_profile 2>/dev/null || true
+  if [[ -n "${HARNESS_DAEMON_DATA_HOME:-}" ]] \
+      && declare -F harness_monitor_lane_from_path >/dev/null; then
+    harness_monitor_lane_from_path "$HARNESS_DAEMON_DATA_HOME" || true
+  fi
 }
 
-stale_scan_pid_runtime_profile() {
+stale_scan_pid_runtime_lane() {
   local pid="$1"
-  local profile
+  local lane
 
-  profile="$(stale_scan_process_env_value "$pid" HARNESS_MONITOR_RUNTIME_PROFILE || true)"
-  if [[ -z "$profile" ]] && declare -F harness_monitor_profile_from_path >/dev/null; then
-    profile="$(
-      harness_monitor_profile_from_path \
+  lane="$(stale_scan_process_env_value "$pid" HARNESS_MONITOR_RUNTIME_LANE || true)"
+  if [[ -z "$lane" ]] && declare -F harness_monitor_lane_from_path >/dev/null; then
+    lane="$(
+      harness_monitor_lane_from_path \
         "$(stale_scan_process_env_value "$pid" HARNESS_DAEMON_DATA_HOME || true)" \
         || true
     )"
   fi
-  if declare -F harness_monitor_sanitize_profile >/dev/null; then
-    profile="$(harness_monitor_sanitize_profile "$profile")"
+  if declare -F harness_monitor_sanitize_lane >/dev/null; then
+    lane="$(harness_monitor_sanitize_lane "$lane" || true)"
   fi
-  [[ -n "$profile" ]] || return 1
-  printf '%s\n' "$profile"
+  [[ -n "$lane" ]] || return 1
+  printf '%s\n' "$lane"
 }
 
 stale_scan_pid_harness_lock_paths() {
@@ -255,8 +266,8 @@ stale_scan_pid_holds_harness_lock() {
 
 # Cargo-built harness daemon/bridge processes are only stale "orphans" when
 # they are no longer anchoring a real Harness daemon/bridge root. Live bridges
-# started through `monitor:user:bridge:start` still match the build bucket, but
-# they must survive clean:stale while holding their lock.
+# started through `monitor:bridge:start` still match the build bucket, but they
+# must survive clean:stale while holding their lock.
 stale_scan_orphan_harness_build_pids() {
   local pid
   while read -r pid; do
@@ -269,13 +280,13 @@ stale_scan_orphan_harness_build_pids() {
 }
 
 # Live holders are stale only when they are unscoped. Scope is declared either
-# directly via HARNESS_MONITOR_RUNTIME_PROFILE or indirectly via a profile-shaped
+# directly via HARNESS_MONITOR_RUNTIME_LANE or indirectly via a lane-shaped
 # HARNESS_DAEMON_DATA_HOME.
 stale_scan_live_lock_holder_is_stale() {
   local pid="$1"
-  local profile
-  profile="$(stale_scan_pid_runtime_profile "$pid" || true)"
-  [[ -z "$profile" ]]
+  local lane
+  lane="$(stale_scan_pid_runtime_lane "$pid" || true)"
+  [[ -z "$lane" ]]
 }
 
 stale_scan_root_conflicting_lock_holder_pids() {
@@ -300,20 +311,20 @@ stale_scan_root_has_live_lock_holder() {
 }
 
 # Current lane means "same effective runtime scope as this cleanup/check
-# invocation". Profile-scoped lanes only match the same profile; unscoped lanes
+# invocation". Runtime-scoped lanes only match the same lane; unscoped lanes
 # only match unscoped holders. This lets the safe cleanup preserve the current
-# lane's Codex WS listener without letting unrelated profiled holders mask stale
+# lane's Codex WS listener without letting unrelated scoped holders mask stale
 # shared listeners on the default port.
 stale_scan_pid_in_current_lane() {
   local pid="$1"
-  local current_profile pid_profile
-  current_profile="$(stale_scan_current_runtime_profile || true)"
-  pid_profile="$(stale_scan_pid_runtime_profile "$pid" || true)"
-  if [[ -n "$current_profile" ]]; then
-    [[ "$pid_profile" == "$current_profile" ]]
+  local current_lane pid_lane
+  current_lane="$(stale_scan_current_runtime_lane || true)"
+  pid_lane="$(stale_scan_pid_runtime_lane "$pid" || true)"
+  if [[ -n "$current_lane" ]]; then
+    [[ "$pid_lane" == "$current_lane" ]]
     return
   fi
-  [[ -z "$pid_profile" ]]
+  [[ -z "$pid_lane" ]]
 }
 
 stale_scan_root_has_current_lane_lock_holder() {
@@ -341,25 +352,25 @@ stale_scan_any_root_has_current_lane_lock_holder() {
 
 stale_scan_gate_pid_conflicts_with_current_lane() {
   local pid="$1"
-  local current_profile pid_profile
+  local current_lane pid_lane
 
-  if ! stale_scan_is_profile_scoped; then
+  if ! stale_scan_is_runtime_scoped; then
     return 0
   fi
 
-  current_profile="$(stale_scan_current_runtime_profile)"
-  if [[ -z "$current_profile" ]]; then
+  current_lane="$(stale_scan_current_runtime_lane)"
+  if [[ -z "$current_lane" ]]; then
     return 0
   fi
 
-  pid_profile="$(stale_scan_pid_runtime_profile "$pid" || true)"
-  [[ -z "$pid_profile" || "$pid_profile" == "$current_profile" ]]
+  pid_lane="$(stale_scan_pid_runtime_lane "$pid" || true)"
+  [[ -z "$pid_lane" || "$pid_lane" == "$current_lane" ]]
 }
 
 # Gate-helper pids whose cwd is in the same common-root domain and which are
 # not in the reference_pid's ancestor chain (so we never flag ourselves).
-# Unprofiled maintenance lanes still coordinate across the whole common-root.
-# Profile-scoped lanes only conflict with same-profile helpers (or unscoped
+# Unscoped maintenance lanes still coordinate across the whole common-root.
+# Runtime-scoped lanes only conflict with same-lane helpers (or unscoped
 # helpers that still target shared checkout state). All membership checks use
 # herestrings to avoid `printf | grep -q` SIGPIPE races under pipefail.
 stale_scan_process_in_common_repo_root() {
@@ -413,34 +424,11 @@ stale_scan_lock_process_alive_from_file() {
 
 stale_scan_xcodebuild_lock_has_live_work() {
   local lock_path="$1"
-  local owner_file="$lock_path/owner/lease.env"
-  local runtime_file="$lock_path/owner/runtime.env"
-  local local_hostname owner_hostname runtime_hostname
-
-  local_hostname="$(process_state_hostname)"
-  owner_hostname="$(stale_scan_metadata_value "$owner_file" LOCK_HOSTNAME || true)"
-  runtime_hostname="$(stale_scan_metadata_value "$runtime_file" LOCK_HOSTNAME || true)"
-
-  if [[ -n "$owner_hostname" && "$owner_hostname" != "$local_hostname" ]]; then
-    return 0
-  fi
-  if [[ -n "$runtime_hostname" && "$runtime_hostname" != "$local_hostname" ]]; then
-    return 0
-  fi
-
-  if stale_scan_lock_process_alive_from_file \
-      "$owner_file" \
-      LOCK_PID \
-      LOCK_PROCESS_START \
-      LOCK_COMMAND; then
-    return 0
-  fi
-
-  stale_scan_lock_process_alive_from_file \
-    "$runtime_file" \
-    LOCK_MUTATOR_PID \
-    LOCK_MUTATOR_PROCESS_START \
-    LOCK_MUTATOR_COMMAND
+  local owner_file="$lock_path/owner.env"
+  local owner_pid
+  owner_pid="$(stale_scan_metadata_value "$owner_file" pid || true)"
+  [[ "$owner_pid" =~ ^[0-9]+$ ]] || return 1
+  kill -0 "$owner_pid" 2>/dev/null
 }
 
 # All stale bridge artifacts (.sock, .pid, .lock siblings). Production scans
@@ -450,7 +438,7 @@ stale_scan_tmp_bridge_root() {
 }
 
 stale_scan_tmp_bridge_artifacts() {
-  if stale_scan_is_profile_scoped; then
+  if stale_scan_is_runtime_scoped; then
     return 0
   fi
   local bridge_tmp_root

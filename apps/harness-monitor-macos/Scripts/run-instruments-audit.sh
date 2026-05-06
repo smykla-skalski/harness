@@ -12,7 +12,7 @@ source "$SCRIPT_DIR/lib/xcodebuild-destination.sh"
 source "$SCRIPT_DIR/lib/swift-tool-env.sh"
 sanitize_xcode_only_swift_environment
 
-CANONICAL_XCODEBUILD_RUNNER="$APP_ROOT/Scripts/xcodebuild-with-lock.sh"
+CANONICAL_XCODEBUILD_RUNNER="$APP_ROOT/Scripts/monitor-xcodebuild.sh"
 XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$CANONICAL_XCODEBUILD_RUNNER}"
 PERF_CLI_PACKAGE_DIR="$APP_ROOT/Tools/HarnessMonitorPerf"
 PERF_CLI_BINARY="$PERF_CLI_PACKAGE_DIR/.build/release/harness-monitor-perf"

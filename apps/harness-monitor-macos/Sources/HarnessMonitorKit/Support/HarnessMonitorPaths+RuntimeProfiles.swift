@@ -56,40 +56,28 @@ extension HarnessMonitorPaths {
     return nil
   }
 
-  static func resolvedRuntimeProfile(
+  static func resolvedRuntimeLane(
     using environment: HarnessMonitorEnvironment
   ) -> String? {
-    if let explicitProfile = sanitizeRuntimeProfile(
-      environment.values[HarnessMonitorRuntimeProfile.environmentKey]
+    if let explicitLane = sanitizeRuntimeLane(
+      environment.values[HarnessMonitorRuntimeLane.environmentKey]
     ) {
-      return explicitProfile
+      return explicitLane
     }
 
-    if let inferredFromDataHome = inferRuntimeProfile(
+    if let inferredFromDataHome = inferRuntimeLane(
       fromPath: environment.values[HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey]
     ) {
       return inferredFromDataHome
     }
 
-    if let inferredFromDerivedData = inferRuntimeProfile(
-      fromPath: environment.values["XCODEBUILD_DERIVED_DATA_PATH"]
-    ) {
-      return inferredFromDerivedData
-    }
-
-    if let bundleURL = environment.bundleURL,
-      let inferredFromBundle = inferRuntimeProfile(fromPath: bundleURL.path)
-    {
-      return inferredFromBundle
-    }
-
     return nil
   }
 
-  static func runtimeProfileBaseRoot(
+  static func runtimeLaneBaseRoot(
     using environment: HarnessMonitorEnvironment
   ) -> URL? {
-    guard let profile = resolvedRuntimeProfile(using: environment) else {
+    guard let lane = resolvedRuntimeLane(using: environment) else {
       return nil
     }
 
@@ -102,10 +90,10 @@ extension HarnessMonitorPaths {
     return
       containerRoot
       .appendingPathComponent(
-        HarnessMonitorRuntimeProfile.dataHomeProfilesDirectoryName,
+        HarnessMonitorRuntimeLane.dataHomeLanesDirectoryName,
         isDirectory: true
       )
-      .appendingPathComponent(profile, isDirectory: true)
+      .appendingPathComponent(lane, isDirectory: true)
   }
 
   static func commandEnvironmentEntries(
@@ -117,8 +105,8 @@ extension HarnessMonitorPaths {
       entries.append((HarnessMonitorAppGroup.environmentKey, appGroupIdentifier))
     }
 
-    if let runtimeProfile = resolvedRuntimeProfile(using: environment) {
-      entries.append((HarnessMonitorRuntimeProfile.environmentKey, runtimeProfile))
+    if let runtimeLane = resolvedRuntimeLane(using: environment) {
+      entries.append((HarnessMonitorRuntimeLane.environmentKey, runtimeLane))
     }
 
     if let commandDataHomeRoot = commandDataHomeRoot(using: environment) {
@@ -127,7 +115,7 @@ extension HarnessMonitorPaths {
     }
 
     if let codexBridgePort = resolvedCodexBridgePortString(using: environment) {
-      entries.append((HarnessMonitorRuntimeProfile.codexWSPortEnvironmentKey, codexBridgePort))
+      entries.append((HarnessMonitorRuntimeLane.codexWSPortEnvironmentKey, codexBridgePort))
     }
 
     return entries
@@ -139,34 +127,34 @@ extension HarnessMonitorPaths {
     if let configuredRoot = configuredDataHomeRoot(using: environment) {
       return configuredRoot
     }
-    return runtimeProfileBaseRoot(using: environment)
+    return runtimeLaneBaseRoot(using: environment)
   }
 
   static func resolvedCodexBridgePortString(
     using environment: HarnessMonitorEnvironment
   ) -> String? {
     if let explicitPort = normalizedNonEmpty(
-      environment.values[HarnessMonitorRuntimeProfile.codexWSPortEnvironmentKey]
+      environment.values[HarnessMonitorRuntimeLane.codexWSPortEnvironmentKey]
     ) {
       return explicitPort
     }
 
-    guard let profile = resolvedRuntimeProfile(using: environment) else {
+    guard let lane = resolvedRuntimeLane(using: environment) else {
       return nil
     }
-    return String(derivedCodexBridgePort(for: profile))
+    return String(derivedCodexBridgePort(for: lane))
   }
 
-  static func derivedCodexBridgePort(for profile: String) -> Int {
-    let digest = SHA256.hash(data: Data(profile.utf8))
+  static func derivedCodexBridgePort(for lane: String) -> Int {
+    let digest = SHA256.hash(data: Data(lane.utf8))
     let prefix = digest.prefix(4).reduce(0) { partial, byte in
       (partial << 8) | Int(byte)
     }
-    return HarnessMonitorRuntimeProfile.codexWSPortBase
-      + (prefix % HarnessMonitorRuntimeProfile.codexWSPortSpan)
+    return HarnessMonitorRuntimeLane.codexWSPortBase
+      + (prefix % HarnessMonitorRuntimeLane.codexWSPortSpan)
   }
 
-  static func inferRuntimeProfile(fromPath rawPath: String?) -> String? {
+  static func inferRuntimeLane(fromPath rawPath: String?) -> String? {
     guard let rawPath = normalizedNonEmpty(rawPath) else {
       return nil
     }
@@ -180,24 +168,17 @@ extension HarnessMonitorPaths {
 
     for index in components.indices {
       let component = components[index]
-      if HarnessMonitorRuntimeProfile.supportedDerivedDataRoots.contains(component),
-        components.indices.contains(index + 2),
-        components[index + 1] == HarnessMonitorRuntimeProfile.derivedDataProfilesDirectoryName
-      {
-        return sanitizeRuntimeProfile(components[index + 2])
-      }
-
-      if component == HarnessMonitorRuntimeProfile.dataHomeProfilesDirectoryName,
+      if component == HarnessMonitorRuntimeLane.dataHomeLanesDirectoryName,
         components.indices.contains(index + 1)
       {
-        return sanitizeRuntimeProfile(components[index + 1])
+        return sanitizeRuntimeLane(components[index + 1])
       }
     }
 
     return nil
   }
 
-  static func sanitizeRuntimeProfile(_ rawValue: String?) -> String? {
+  static func sanitizeRuntimeLane(_ rawValue: String?) -> String? {
     guard let trimmed = normalizedNonEmpty(rawValue) else {
       return nil
     }

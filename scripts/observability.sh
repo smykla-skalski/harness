@@ -837,7 +837,7 @@ run_monitor_smoke() {
   trap 'write_shared_config false >/dev/null || true; remove_monitor_smoke_data_home_marker; rm -f "$log_path"' RETURN
   if ! XDG_DATA_HOME="$(resolve_data_root)" \
     run_with_cleared_otel_env \
-      "$ROOT/apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh" \
+      "$ROOT/apps/harness-monitor-macos/Scripts/monitor-xcodebuild.sh" \
         -project "$ROOT/apps/harness-monitor-macos/HarnessMonitor.xcodeproj" \
         -scheme "HarnessMonitor" \
         -configuration Debug \

@@ -10,23 +10,29 @@ The Xcode project is generated from `Project.swift` (and `Tuist/Package.swift`) 
 The manifest tags targets for focused generation, so partial graphs can use selectors such as `tuist generate tag:feature:monitor`, `tuist generate tag:feature:previews`, or `tuist generate tag:feature:ui-testing`.
 Native Xcode local compilation cache is enabled directly through the generated build settings with `COMPILATION_CACHE_ENABLE_CACHING=YES`. This keeps the project auth-free for normal Tuist generation/builds; the remote-plugin settings (`COMPILATION_CACHE_ENABLE_PLUGIN` / `COMPILATION_CACHE_REMOTE_SERVICE_PATH`) are intentionally left unset here.
 
+Task closeout follows the repo-root rule: finished monitor work must be replayed onto `main` with a clean, flat history. Rebase or cherry-pick; never merge. Resolve conflicts by triaging the current `main` behavior against the monitor task intent, then rerun the smallest relevant monitor validation.
+
+Full git worktrees are mandatory for parallel monitor work. Any agent/user that edits Monitor files, regenerates Tuist projects, builds/tests, launches a daemon/bridge, or uses XcodeBuildMCP needs its own worktree. `HARNESS_MONITOR_BUILD_LANE` and `HARNESS_MONITOR_RUNTIME_LANE` isolate DerivedData, daemon roots, ports, launchd labels, and sockets inside that worktree; they are not a substitute for a separate checkout.
+
 Validation expectations (run from repo root):
 
 - `mise run monitor:lint`
 - `mise run monitor:quality-gate`
 - `mise run monitor:build`
 - `mise run monitor:test`
-- `mise run monitor:xcodebuild -- -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace ...` for custom lock-aware `xcodebuild` invocations that need flags not covered by the canned tasks
+- `mise run monitor:xcodebuild -- -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace ...` for custom lane-aware `xcodebuild` invocations that need flags not covered by the canned tasks
 - All xcodebuild invocations must use one of the approved `-derivedDataPath` values:
   - `xcode-derived` for quality gates, tests, and general dev builds
   - `xcode-derived-e2e` for swarm + agents e2e/UI lanes
   - `xcode-derived-instruments` for the instruments audit pipeline (isolated so the provenance fingerprint match is not contaminated by quality-gate builds)
+  - `xcode-derived-lanes/<lane>` when `HARNESS_MONITOR_BUILD_LANE=<lane>` is set for an isolated CLI build lane
 
   Xcode's default `~/Library/Developer/Xcode/DerivedData/HarnessMonitor-*` is Xcode UI's private index/cache and holds its fetched SPM `SourcePackages/`. CLI workflows do not read or write it (they always pass `-derivedDataPath` explicitly), so it is not flagged by `mise run check:stale` and no harness script touches it - regens and `mise run clean:stale` leave it intact so Xcode never loses its package cache.
-  `mise run clean:stale` is the safe shared scrub: it must not quit a live Harness Monitor session or stop live daemon work. Use `mise run clean:stale:full` or `mise run monitor:user:reset` only when an explicit live reset is intended.
-  The `mise run monitor:xcodebuild` wrapper resolves those approved logical paths at the git common root, so linked worktrees share one CLI DerivedData tree instead of creating one per checkout. When `HARNESS_MONITOR_RUNTIME_PROFILE=<name>` is set, the default local build root becomes `xcode-derived/profiles/<slug>` and the scripts derive a matching daemon data home, Codex bridge port, and launch-agent label so a personal dev lane does not interfere with parallel agents.
-  The wrapper does not re-run Tuist after every successful `xcodebuild` by default; set `HARNESS_MONITOR_REGENERATE_AFTER_XCODEBUILD=1` only for lanes that explicitly need regenerated shared scheme metadata afterward.
-- In a shared checkout, agent-driven local Xcode and XcodeBuildMCP work must go through `mise run monitor:agent:*` or `apps/harness-monitor-macos/Scripts/agent-xcode-env.sh ...`, not raw `xcodebuildmcp` and not the plain `monitor:*` wrappers. The agent wrapper derives an `agent-<session>` runtime profile from the active agent session ID, gives XcodeBuildMCP a separate socket under `~/.xcodebuildmcp/agents/`, and auto-selects a non-default `/Applications/Xcode*.app` through `DEVELOPER_DIR` when one exists. Agent sessions must stay on their own `agent-<session>` lane by default: do not hardcode shared names like `claude-main`, and clear inherited build-path env instead of reusing it. It disables `xcodebuildmcp xcode-ide` by default so agents cannot attach to the developer's running Xcode; only re-enable it with `HARNESS_MONITOR_AGENT_ALLOW_XCODE_IDE=1` plus a dedicated `XCODEBUILDMCP_XCODE_PID` or `XCODEBUILDMCP_XCODE_SESSION_ID` against a separate Xcode install.
+  `mise run clean:stale` is the safe shared scrub: it must not quit a live Harness Monitor session or stop live daemon work. Use `mise run clean:stale:full` or `mise run monitor:reset` only when an explicit live reset is intended.
+  The `mise run monitor:xcodebuild` wrapper resolves approved logical paths at the git common root, so linked worktrees share one default CLI DerivedData tree instead of creating one per checkout. Set `HARNESS_MONITOR_BUILD_LANE=<name>` when an agent or long-running task needs its own lock/build database under `xcode-derived-lanes/<name>`.
+  Runtime state is separate from build state. Set `HARNESS_MONITOR_RUNTIME_LANE=<name>` for an isolated daemon/bridge/MCP lane; otherwise the scripts derive a stable per-checkout runtime lane. Runtime lanes write daemon data under the app-group `runtime-lanes/<lane>`, derive a Codex bridge port, and use a lane-specific launch-agent label.
+  Legacy `HARNESS_MONITOR_RUNTIME_PROFILE`, `HARNESS_MONITOR_USER_RUNTIME_PROFILE`, and agent-profile env vars are intentionally rejected. Use `HARNESS_MONITOR_BUILD_LANE` for DerivedData isolation and `HARNESS_MONITOR_RUNTIME_LANE` for daemon/bridge isolation.
+- In each parallel worktree, agent-driven local Xcode and XcodeBuildMCP work must also set explicit lane names. Use `HARNESS_MONITOR_BUILD_LANE=agent-<session> mise run monitor:test` for isolated focused tests, and `HARNESS_MONITOR_RUNTIME_LANE=agent-<session> mise run monitor:xcodebuildmcp -- ...` or `mise run monitor:mcp` for XcodeBuildMCP. Do not hardcode shared names like `claude-main`.
 - For local macOS Harness Monitor lanes, never use bare `-destination 'platform=macOS'`. Xcode sees both `My Mac` and `Any Mac`, prints `Using the first of multiple matching destinations`, and silently picks one. On Apple Silicon, even `name=My Mac` is still ambiguous because Xcode exposes both `arm64` and `x86_64` destinations. Use `-destination "platform=macOS,arch=$(uname -m),name=My Mac"` unless you intentionally need a stricter `id=...` selector.
 - Hard requirement: do not run the full macOS UI suite by default. Run only the smallest targeted build/test command needed for the current change, such as a single XCTest case, a single XCTest class, or a non-UI build lane.
 - Only run the full macOS app validation lane or the full `HarnessMonitorUITests` suite after the user explicitly asks for the full suite.
@@ -35,7 +41,7 @@ Validation expectations (run from repo root):
 - If a control is visually correct in the app but a macOS UI test cannot find or tap it, fix the test query/interaction path before changing product layout, copy, or semantics. Do not introduce UI changes just to make a flaky lookup pass unless the product truly has a visual or accessibility bug.
 - Reuse the existing UI-test helpers exactly. New preflight/wait helpers for action controls must mirror `HarnessMonitorUITestInteractionSupport.tapButton(...)`: search button-role queries first, then the generic identified element, then the `identifier.frame` marker via `element(in:app,identifier:)` (not `frameElement(...)`, which is narrower and can miss real markers).
 - Do not put `.accessibilityIdentifier(...)` on a container that wraps interactive children with their own IDs or `.accessibilityFrameMarker(...)` probes. In the macOS accessibility tree, the container identifier can clobber the nested button/marker contract. Use `.accessibilityTestProbe(...)` for container-level probes and keep child control identifiers on the controls themselves.
-- Prefer existing container-aware patterns before inventing new gestures: `window(in:app,containing:)`, `descendantElement(...)`, `descendantFrameElement(...)`, and the visible-frame click flow from `PreferencesUITests+AcpPermissionLogReveal.swift` for controls inside scroll views or secondary windows.
+- Prefer existing container-aware patterns before inventing new gestures: `window(in:app,containing:)`, `descendantElement(...)`, `descendantFrameElement(...)`, and the visible-frame click flow from `SettingsUITests+AcpPermissionLogReveal.swift` for controls inside scroll views or secondary windows.
 - SwiftLint runs externally via `mise run monitor:lint` and CI, not as an Xcode build plugin or part of `mise run monitor:test`. The lint lane is intentionally non-build-only: it generate-checks the workspace, runs `swift format`, and runs `swiftlint` without invoking `xcodebuild` or daemon bundle logic. Config lives in `.swiftlint.yml`.
 - `mise run monitor:quality-gate` owns the slower build-based sandbox and daemon validation that used to be bundled into the lint lane.
 - Prefer shared layout and control primitives for Harness Monitor UI density/readability work so button sizing and glass treatment stay consistent across screens.
@@ -47,31 +53,14 @@ Validation expectations (run from repo root):
 
 ```bash
 XCODE_ONLY_TESTING='HarnessMonitorKitTests/A/test1(),HarnessMonitorKitTests/A/test2()' \
-  CLAUDE_SESSION_ID=<uuid> mise run monitor:agent:test
+  HARNESS_MONITOR_BUILD_LANE=agent-<uuid> mise run monitor:test
 ```
 
 `Scripts/test-swift.sh` defaults to skipping `build-for-testing` when the existing `.xctestrun` is fresher than every Swift source, project descriptor, SPM lockfile, and the cross-project `mcp-servers/` tree. Break-glass: set `HARNESS_MONITOR_FORCE_BUILD_FOR_TESTING=1` to always rebuild (use after .xcconfig edits, environment switches, or external package updates outside the scoped freshness roots).
 
-### DerivedData profile pruning
+### Lane Cleanup
 
-Each agent session writes `xcode-derived/profiles/agent-<sanitized-uuid>/` (~2 GB Debug build). Profiles accumulate forever because the UUID changes per session. The repo ships a LaunchAgent + helper script (`scripts/manage-prune-launch-agent.sh`) that runs `scripts/prune-xcode-derived-profiles.sh` on a schedule.
-
-```bash
-mise run monitor:gc:profiles:install     # render template + load (default 7200s = 2h)
-mise run monitor:gc:profiles:status      # state + interval + recent stdout
-mise run monitor:gc:profiles              # one-shot prune, no schedule (HARNESS_MONITOR_PROFILE_DRY_RUN=1 for preview)
-mise run monitor:gc:profiles:uninstall   # bootout + delete plist
-mise run monitor:gc:profiles:reinstall   # apply a new interval after changing it
-```
-
-Change interval:
-
-```bash
-HARNESS_MONITOR_PROFILE_PRUNE_INTERVAL_SECONDS=14400 \
-  mise run monitor:gc:profiles:reinstall   # 4h cadence
-```
-
-The prune is conservative by design: only `agent-*` profiles are touched, the active profile (resolved from `HARNESS_MONITOR_RUNTIME_PROFILE` / `*_SESSION_ID`) is always preserved, and the staleness threshold defaults to the schedule interval (override via `HARNESS_MONITOR_PROFILE_TTL_SECONDS`). Logs land in `tmp/prune-xcode-derived-profiles.{out,err}.log`. The plist source is `scripts/launchd/io.harnessmonitor.prune-xcode-derived-profiles.plist.template`.
+Named build lanes live under `xcode-derived-lanes/<lane>` and are safe to delete when no process is using that lane. `mise run clean:stale` handles stale process/socket cleanup without killing live Monitor work; `mise run clean:stale:full` and `mise run monitor:reset` are explicit live-reset paths.
 
 ## Debugging discipline
 
@@ -146,7 +135,7 @@ Harness Monitor supports two daemon ownership modes. Pick the right one for the 
 
 ### External daemon (recommended dev workflow)
 
-Launch the app under the `HarnessMonitor (External Daemon)` scheme in Xcode and run `harness daemon dev` in a terminal. The dev daemon runs unsandboxed, writes its manifest into the `Q498EB36N4.io.harnessmonitor` app group container so the sandboxed Monitor app can read it, and spawns codex as its own stdio child - no `harness codex-bridge` process required. For an isolated personal lane, export `HARNESS_MONITOR_RUNTIME_PROFILE=<name>` before generating/building and use the same env prefix in the terminal where you start `harness daemon dev` or `harness bridge start`. If you want that configured automatically, the simplest path is `mise run monitor:user`; after that, stick to the small `monitor:user:{build,test,daemon:dev,bridge:start}` task set.
+Launch the app under the `HarnessMonitor (External Daemon)` scheme in Xcode and run `mise run monitor:daemon:dev` in a terminal. The dev daemon runs unsandboxed, writes its manifest into the `Q498EB36N4.io.harnessmonitor` app group container so the sandboxed Monitor app can read it, and spawns codex as its own stdio child - no `harness codex-bridge` process required. For an isolated runtime lane, prefix the daemon and bridge commands with `HARNESS_MONITOR_RUNTIME_LANE=<name>`. For isolated CLI builds/tests, use `HARNESS_MONITOR_BUILD_LANE=<name>` separately.
 
 Debugging is `lldb -- harness daemon dev` or `cargo run --bin harness -- daemon dev` in a terminal. The scheme sets `HARNESS_MONITOR_EXTERNAL_DAEMON=1` and a 60s warm-up timeout so the app can wait for you to start the daemon after launch. Starting the app before the daemon also works: the manifest watcher fires on the first manifest write and auto-reconnects within ~250ms.
 
@@ -156,7 +145,7 @@ The `HARNESS_MONITOR_EXTERNAL_DAEMON` flag is gated behind `#if DEBUG` in `Daemo
 
 ### Managed daemon (release and distribution)
 
-Use the default `HarnessMonitor` scheme. This exercises the shipping path: the daemon runs under the macOS App Sandbox via `SMAppService`, and the launch agent plist sets `HARNESS_SANDBOXED=1` and `HARNESS_APP_GROUP_ID=Q498EB36N4.io.harnessmonitor`. With `HARNESS_MONITOR_RUNTIME_PROFILE=<name>` set during the build, the bundled launch agent also gets a profile-specific label plus matching `HARNESS_DAEMON_DATA_HOME` and `HARNESS_CODEX_WS_PORT` env so concurrent managed dev builds stay isolated. Subprocess-spawning code paths (launchd management, codex stdio transport, daemon restart) are gated off in sandboxed mode and surface structured errors.
+Use the default `HarnessMonitor` scheme. This exercises the shipping path: the daemon runs under the macOS App Sandbox via `SMAppService`, and the launch agent plist sets `HARNESS_SANDBOXED=1` and `HARNESS_APP_GROUP_ID=Q498EB36N4.io.harnessmonitor`. With `HARNESS_MONITOR_RUNTIME_LANE=<name>` set during the build, the bundled launch agent also gets a lane-specific label plus matching `HARNESS_DAEMON_DATA_HOME` and `HARNESS_CODEX_WS_PORT` env so concurrent managed dev builds stay isolated. Subprocess-spawning code paths (launchd management, codex stdio transport, daemon restart) are gated off in sandboxed mode and surface structured errors.
 
 Run this scheme before cutting a TestFlight / notarized build - it's the only way to validate the release code path end-to-end.
 
@@ -176,20 +165,10 @@ Rules:
 - Every `#Preview` that exercises `@Query` or other SwiftData-backed views must inject `.modelContainer(PreviewFixtures.previewContainer())` (or equivalent fixture container).
 - Allocate no `DateFormatter`/`JSONEncoder`/`NumberFormatter` in view bodies - use static `@MainActor` lets.
 - Never wrap `#Preview` in `#if DEBUG` - DEBUG is already defined in preview builds, this is noise.
-- Add canonical screens to `Previews.json` when you add a new top-level surface. Run `mise run preview:smoke` before merging view-layer changes.
+- Add canonical screens to `Previews.json` when you add a new top-level surface.
 - If a `#Preview` crashes with `TableViewListCore_Mac2.swift:5170`, mark with a TODO referencing the macOS 26 SwiftUI bug and comment out the offending preview - don't hack around it.
 
-CLI verification:
-
-```bash
-mise run preview:list
-mise run preview:render -- --id ContentView
-mise run preview:render -- --id SessionCockpitTimelineSignalSquish --theme dark --text-size default
-mise run preview:render -- --file Sources/HarnessMonitorUIPreviewable/Views/SessionCockpitTimelineSection+Previews.swift --index 0 --out tmp/previews/timeline-squish.png
-mise run preview:smoke
-```
-
-Both scripts require `xcode-cli` (`npm install -g xcode-cli`), `jq`, and an Xcode tab open on this project. Output lands in `tmp/previews/`.
+Preview render scripts are not part of the current lane model. Use the Xcode canvas or a targeted `monitor:build`/`monitor:test` lane for compile verification.
 
 ## Gotchas
 

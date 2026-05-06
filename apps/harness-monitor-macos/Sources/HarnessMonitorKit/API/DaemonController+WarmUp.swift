@@ -383,7 +383,7 @@ extension DaemonController {
     guard state.signaledManagedRecoveryManifestSignature != signature else {
       return
     }
-    guard refuseCrossProfileSignalIfNeeded(manifest: manifest) == false else {
+    guard refuseCrossLaneSignalIfNeeded(manifest: manifest) == false else {
       state.signaledManagedRecoveryManifestSignature = signature
       return
     }
@@ -392,22 +392,22 @@ extension DaemonController {
   }
 
   /// Defense-in-depth: refuse to SIGTERM a daemon whose on-disk root
-  /// belongs to a different profile family than the current process.
+  /// belongs to a different lane family than the current process.
   /// Returns `true` when the signal was refused. Mirrors the daemon-side
   /// `families_compatible` check in `crate::daemon::discovery`.
-  func refuseCrossProfileSignalIfNeeded(manifest: DaemonManifest) -> Bool {
+  func refuseCrossLaneSignalIfNeeded(manifest: DaemonManifest) -> Bool {
     let manifestURL = HarnessMonitorPaths.manifestURL(using: environment)
     let manifestRoot = manifestURL.deletingLastPathComponent()
-    let ownFamily = HarnessMonitorPaths.ownProfileFamily(using: environment)
-    let manifestFamily = HarnessMonitorPaths.profileFamily(forRoot: manifestRoot)
+    let ownFamily = HarnessMonitorPaths.ownLaneFamily(using: environment)
+    let manifestFamily = HarnessMonitorPaths.laneFamily(forRoot: manifestRoot)
     guard
-      HarnessMonitorProfileFamily.compatible(ownFamily, manifestFamily) == false
+      HarnessMonitorLaneFamily.compatible(ownFamily, manifestFamily) == false
     else {
       return false
     }
     HarnessMonitorLogger.lifecycle.warning(
       """
-      Refusing cross-profile SIGTERM to daemon \
+      Refusing cross-lane SIGTERM to daemon \
       pid=\(manifest.pid, privacy: .public) \
       manifest_root=\(manifestRoot.path, privacy: .public)
       """

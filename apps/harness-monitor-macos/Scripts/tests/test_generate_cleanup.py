@@ -15,7 +15,7 @@ from generate_test_support import (
     NON_INDEXABLE_ROOTS_SOURCE,
     POST_GENERATE_SOURCE,
     PREPARE_APP_ENTITLEMENTS_SOURCE,
-    RUNTIME_PROFILE_SOURCE,
+    MONITOR_LANES_SOURCE,
     SWIFT_TOOL_ENV_SOURCE,
     XCODE_VERSION_SOURCE,
     base_env,
@@ -141,7 +141,7 @@ class GenerateCleanupScriptTests(unittest.TestCase):
             shutil.copy(GENERATE_SOURCE, generated_script)
             generated_script.chmod(generated_script.stat().st_mode | stat.S_IXUSR)
             shutil.copy(SWIFT_TOOL_ENV_SOURCE, generated_helper)
-            shutil.copy(RUNTIME_PROFILE_SOURCE, lib_root / "runtime-profile.sh")
+            shutil.copy(MONITOR_LANES_SOURCE, lib_root / "monitor-lanes.sh")
             write_executable(fake_post_generate, "#!/bin/bash\nset -euo pipefail\n")
             fake_patcher.write_text("# test\n")
             write_executable(

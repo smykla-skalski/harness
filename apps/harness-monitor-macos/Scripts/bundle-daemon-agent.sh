@@ -35,13 +35,13 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 # Shared helpers keep path selection testable without executing the bundle flow.
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/daemon-bundle-env.sh
 source "$SCRIPT_DIR/lib/daemon-bundle-env.sh"
-# shellcheck source=apps/harness-monitor-macos/Scripts/lib/runtime-profile.sh
-source "$SCRIPT_DIR/lib/runtime-profile.sh"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/monitor-lanes.sh
+source "$SCRIPT_DIR/lib/monitor-lanes.sh"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/daemon-cargo-build.sh
 source "$SCRIPT_DIR/lib/daemon-cargo-build.sh"
 
 repo_root="$(resolve_repo_root)"
-harness_monitor_apply_runtime_profile_environment
+harness_monitor_apply_runtime_lane_environment "$repo_root"
 
 daemon_source="${HARNESS_MONITOR_DAEMON_BINARY:-}"
 if [ -z "$daemon_source" ]; then
@@ -95,7 +95,7 @@ helpers_dir="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers"
 launch_agents_dir="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Library/LaunchAgents"
 daemon_target="$helpers_dir/harness"
 plist_target="$launch_agents_dir/io.harnessmonitor.daemon.plist"
-launch_agent_label="$(harness_monitor_runtime_launch_agent_label)"
+launch_agent_label="$(harness_monitor_runtime_launch_agent_label "$repo_root")"
 app_group_id="$(harness_monitor_runtime_app_group_id)"
 
 /bin/mkdir -p "$helpers_dir" "$launch_agents_dir"
@@ -120,8 +120,8 @@ fi
 if [[ -n "${HARNESS_CODEX_WS_PORT:-}" ]]; then
   /usr/bin/plutil -replace EnvironmentVariables.HARNESS_CODEX_WS_PORT -string "$HARNESS_CODEX_WS_PORT" "$plist_target"
 fi
-if [[ -n "${HARNESS_MONITOR_RUNTIME_PROFILE:-}" ]]; then
-  /usr/bin/plutil -replace EnvironmentVariables.HARNESS_MONITOR_RUNTIME_PROFILE -string "$HARNESS_MONITOR_RUNTIME_PROFILE" "$plist_target"
+if [[ -n "${HARNESS_MONITOR_RUNTIME_LANE:-}" ]]; then
+  /usr/bin/plutil -replace EnvironmentVariables.HARNESS_MONITOR_RUNTIME_LANE -string "$HARNESS_MONITOR_RUNTIME_LANE" "$plist_target"
 fi
 /usr/bin/plutil -lint "$plist_target"
 
@@ -134,8 +134,8 @@ package_version="$(resolve_package_version)"
 validate_package_version "$package_version" "${MARKETING_VERSION:-}"
 
 # Resolve a codesign identity. Xcode populates EXPANDED_CODE_SIGN_IDENTITY
-# only when CODE_SIGNING_ALLOWED=YES; the mise `monitor:agent:build` and
-# `monitor:build` lanes pass NO so Xcode skips the embedded-binary sign
+# only when CODE_SIGNING_ALLOWED=YES; the `monitor:build` and named build
+# lanes pass NO so Xcode skips the embedded-binary sign
 # phase. Without a fallback the helper would carry only the linker
 # ad-hoc signature (TeamIdentifier=not set), which Group Container
 # access denies — daemon would either crash on `cs_mtime != mtime` or

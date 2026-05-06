@@ -20,8 +20,8 @@ extension PreviewFixtures {
           kind: "tool_failed",
           agentID: "worker-codex",
           taskID: "task-ui",
-          summary: "preview:render failed once while the host was still reconnecting.",
-          payload: .object(["tool": .string("xcode-cli"), "status": .string("failed")])
+          summary: "Preview render failed once while the host was still reconnecting.",
+          payload: .object(["tool": .string("preview-renderer"), "status": .string("failed")])
         )),
       sessionTimelineEntry(
         .init(

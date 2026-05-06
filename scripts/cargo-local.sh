@@ -28,6 +28,47 @@ sanitize_segment() {
   printf '%s' "$1" | tr -cs '[:alnum:]._-' '-'
 }
 
+short_hash() {
+  local input="$1" digest
+
+  if command -v shasum >/dev/null 2>&1; then
+    digest="$(printf '%s' "$input" | shasum -a 256)"
+    digest="${digest%% *}"
+  elif command -v cksum >/dev/null 2>&1; then
+    digest="$(printf '%s' "$input" | cksum)"
+    digest="${digest//[^[:alnum:]]/}"
+  else
+    digest="$(sanitize_segment "$input")"
+  fi
+
+  printf '%s\n' "${digest:0:16}"
+}
+
+configure_sccache_socket() {
+  local socket_root socket_id safe_user
+
+  if [[ -n "${SCCACHE_SERVER_UDS:-}" ]] \
+    || [[ -n "${SCCACHE_SERVER_PORT:-}" ]] \
+    || [[ -n "${SCCACHE_NO_DAEMON:-}" ]]; then
+    return 0
+  fi
+
+  socket_root="${TMPDIR:-/tmp}"
+  socket_root="${socket_root%/}/harness-sccache"
+  if (( ${#socket_root} > 70 )); then
+    safe_user="$(sanitize_segment "${USER:-user}")"
+    socket_root="/tmp/harness-sccache-$safe_user"
+  fi
+
+  if ! mkdir -p "$socket_root"; then
+    return 1
+  fi
+
+  socket_id="$(short_hash "$COMMON_REPO_ROOT:$target_segment")"
+  export SCCACHE_SERVER_UDS="$socket_root/$socket_id.sock"
+  export SCCACHE_IDLE_TIMEOUT="${SCCACHE_IDLE_TIMEOUT:-120}"
+}
+
 cargo_bin_usable() {
   local candidate="${1:-}"
   [[ -n "$candidate" ]] || return 1
@@ -179,6 +220,8 @@ if ! tmpdir_is_usable "${TMPDIR:-}"; then
   export TMPDIR="$tmpdir_fallback/"
 fi
 
+configure_sccache_socket || true
+
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${HARNESS_CARGO_TARGET_DIR:-$COMMON_REPO_ROOT/target/dev/$target_segment}}"
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-${HARNESS_CARGO_JOBS:-$(default_jobs)}}"
 
@@ -197,6 +240,7 @@ if [[ "${1:-}" == "--print-env" ]]; then
     printf 'SESSION_MODE=local\n'
   fi
   printf 'TMPDIR=%s\n' "${TMPDIR:-}"
+  printf 'SCCACHE_SERVER_UDS=%s\n' "${SCCACHE_SERVER_UDS:-}"
   printf 'RUSTC_WRAPPER=%s\n' "${RUSTC_WRAPPER:-}"
   if [[ -n "${RUSTC_WRAPPER:-}" ]]; then
     printf 'CACHE_MODE=sccache\n'

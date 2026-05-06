@@ -91,20 +91,20 @@ struct HarnessMonitorStoreHostBridgeTests {
     )
   }
 
-  @Test("Host bridge command inherits the current runtime profile env prefix")
-  func hostBridgeCommandInheritsRuntimeProfilePrefix() async {
+  @Test("Host bridge command inherits the current runtime lane env prefix")
+  func hostBridgeCommandInheritsRuntimeLanePrefix() async {
     let environment = HarnessMonitorEnvironment(
       values: [
-        HarnessMonitorRuntimeProfile.environmentKey: "dev-profile",
+        HarnessMonitorRuntimeLane.environmentKey: "dev-profile",
         HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: "/tmp/harness-profile-home",
-        HarnessMonitorRuntimeProfile.codexWSPortEnvironmentKey: "31337",
+        HarnessMonitorRuntimeLane.codexWSPortEnvironmentKey: "31337",
       ],
       homeDirectory: URL(fileURLWithPath: "/tmp/harness-monitor-host-bridge-tests"),
       bundleURL: nil
     )
     let store = await makeBootstrappedStore()
     let expectedCommand = """
-      HARNESS_MONITOR_RUNTIME_PROFILE='dev-profile' \
+      HARNESS_MONITOR_RUNTIME_LANE='dev-profile' \
       HARNESS_DAEMON_DATA_HOME='/tmp/harness-profile-home' \
       HARNESS_CODEX_WS_PORT='31337' harness bridge start
       """

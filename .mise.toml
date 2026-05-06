@@ -19,30 +19,6 @@ run = "./scripts/clean-stale-state.sh"
 description = "Quit Harness Monitor and stop live daemon work while resetting stale shared dev state"
 run = "HARNESS_STALE_CLEANUP_ALLOW_LIVE_RESET=1 ./scripts/clean-stale-state.sh"
 
-[tasks."monitor:gc:profiles"]
-description = "Run xcode-derived/profiles/agent-* prune once (HARNESS_MONITOR_PROFILE_TTL_SECONDS, _DRY_RUN, _PRESERVE_GLOB)"
-run = "./scripts/prune-xcode-derived-profiles.sh"
-
-[tasks."monitor:gc:profiles:install"]
-description = "Install + load the LaunchAgent that prunes xcode-derived/profiles every HARNESS_MONITOR_PROFILE_PRUNE_INTERVAL_SECONDS (default 7200=2h)"
-run = "./scripts/manage-prune-launch-agent.sh install"
-
-[tasks."monitor:gc:profiles:uninstall"]
-description = "Bootout + delete the prune-xcode-derived-profiles LaunchAgent plist"
-run = "./scripts/manage-prune-launch-agent.sh uninstall"
-
-[tasks."monitor:gc:profiles:reinstall"]
-description = "Reinstall the prune LaunchAgent (run after changing HARNESS_MONITOR_PROFILE_PRUNE_INTERVAL_SECONDS to apply the new schedule)"
-run = "./scripts/manage-prune-launch-agent.sh reinstall"
-
-[tasks."monitor:gc:profiles:status"]
-description = "Show the prune LaunchAgent state, configured interval, and last stdout"
-run = "./scripts/manage-prune-launch-agent.sh status"
-
-[tasks."monitor:gc:profiles:show-plist"]
-description = "Print the rendered prune LaunchAgent plist without installing it"
-run = "./scripts/manage-prune-launch-agent.sh show-plist"
-
 [tasks."version:show"]
 description = "Print the canonical harness package version"
 run = "./scripts/version.sh show"
@@ -167,59 +143,17 @@ run = "./scripts/cargo-local.sh --print-env"
 description = "Generate the Harness Monitor macOS Xcode project via Tuist"
 run = "apps/harness-monitor-macos/Scripts/generate.sh"
 
-[tasks."monitor:user:generate"]
-description = "Generate the Harness Monitor macOS Xcode project with the current user's isolated runtime profile"
-run = "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh apps/harness-monitor-macos/Scripts/generate.sh"
-
-[tasks."monitor:user:profile"]
-description = "Print the personal Harness Monitor runtime profile, DerivedData root, daemon root, port, and launch-agent label"
-run = "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh"
-
-[tasks."monitor:user"]
-description = "Configure the generated Harness Monitor workspace for the current user's isolated runtime profile and print the exact next commands"
-depends = ["monitor:user:generate"]
-run = "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh"
-
-[tasks."monitor:user:bootstrap"]
-description = "Configure the generated Harness Monitor workspace for the current user's isolated runtime profile"
-depends = ["monitor:user:generate"]
-run = "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh"
-
-[tasks."monitor:user:reset"]
-description = "Quit Harness Monitor and reset the current user's isolated runtime profile plus stale bridge/daemon state"
-run = "HARNESS_STALE_CLEANUP_ALLOW_LIVE_RESET=1 apps/harness-monitor-macos/Scripts/user-runtime-profile.sh ./scripts/clean-stale-state.sh"
-
-[tasks."monitor:user:xcode-native"]
-description = "Ensure the xcode-native Xcode MCP bridge is installed, healthy, and attached to the current user workspace"
-run = "apps/harness-monitor-macos/Scripts/xcode-native-bridge.sh"
-
-[tasks."monitor:user:xcode-native:status"]
-description = "Show xcode-native bridge launchd and health status"
-run = "apps/harness-monitor-macos/Scripts/xcode-native-bridge.sh status"
-
-[tasks."monitor:user:xcode-native:restart"]
-description = "Rebind the xcode-native Xcode MCP bridge against the current Xcode session"
-run = "apps/harness-monitor-macos/Scripts/xcode-native-bridge.sh restart"
-
-[tasks."monitor:user:xcode-native:logs"]
-description = "Show recent xcode-native bridge logs (pass extra xcode-cli-ctl logs args after --)"
-run = "apps/harness-monitor-macos/Scripts/xcode-native-bridge.sh logs"
-
 [tasks."monitor:debug:attributegraph"]
 description = "Attach LLDB to a running Harness Monitor process and break on AttributeGraph cycle logging (pass -- --pid <pid> or --process-name <name>)"
 run = "apps/harness-monitor-macos/Scripts/attach-attributegraph-breakpoint.sh"
 
 [tasks."monitor:xcodebuild"]
-description = "Run the lock-aware Harness Monitor xcodebuild wrapper (pass xcodebuild args after --)"
-run = "apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh"
+description = "Run the Harness Monitor xcodebuild lane wrapper (pass xcodebuild args after --)"
+run = "apps/harness-monitor-macos/Scripts/monitor-xcodebuild.sh"
 
 [tasks."monitor:build"]
-description = "Build the Harness Monitor macOS app (Debug) via the lock-aware shared xcodebuild wrapper"
-run = "apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build CODE_SIGNING_ALLOWED=NO"
-
-[tasks."monitor:user:build"]
-description = "Build the Harness Monitor macOS app (Debug) with the current user's isolated runtime profile"
-run = "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build CODE_SIGNING_ALLOWED=NO"
+description = "Build the Harness Monitor macOS app (Debug) via the shared build lane"
+run = "apps/harness-monitor-macos/Scripts/monitor-xcodebuild.sh -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build CODE_SIGNING_ALLOWED=NO"
 
 [tasks."monitor:lint"]
 description = "Run the strict non-build Swift format and SwiftLint checks for the Harness Monitor macOS app"
@@ -233,67 +167,47 @@ run = "apps/harness-monitor-macos/Scripts/run-quality-gates.sh"
 description = "Build-for-testing and test the Harness Monitor macOS app (set XCODE_ONLY_TESTING for focused selectors)"
 run = "apps/harness-monitor-macos/Scripts/test-swift.sh"
 
-[tasks."monitor:user:test"]
-description = "Build-for-testing and test the Harness Monitor macOS app with the current user's isolated runtime profile (set XCODE_ONLY_TESTING for focused selectors)"
-run = "apps/harness-monitor-macos/Scripts/user-runtime-profile.sh apps/harness-monitor-macos/Scripts/test-swift.sh"
-
 [tasks."monitor:test:scripts"]
 description = "Run the Harness Monitor Instruments/parser Python regression tests"
 run = "find apps/harness-monitor-macos/Scripts/tests -name '__pycache__' -type d -prune -exec rm -rf {} + && env -i HOME=\"$HOME\" PATH=\"$PATH\" TMPDIR=\"${TMPDIR:-/tmp}\" HARNESS_APP_GROUP_ID=\"${HARNESS_APP_GROUP_ID:-Q498EB36N4.io.harnessmonitor}\" PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s apps/harness-monitor-macos/Scripts/tests -p 'test_*.py'"
 
-[tasks."monitor:user:daemon:dev"]
-description = "Run `harness daemon dev` with the current user's isolated runtime profile"
+[tasks."monitor:runtime"]
+description = "Print the current Harness Monitor runtime lane, daemon root, Codex port, launchd label, and MCP socket"
+run = "apps/harness-monitor-macos/Scripts/monitor-runtime-env.sh"
+
+[tasks."monitor:reset"]
+description = "Quit Harness Monitor and reset current-lane stale bridge/daemon state"
+run = "HARNESS_STALE_CLEANUP_ALLOW_LIVE_RESET=1 apps/harness-monitor-macos/Scripts/monitor-runtime-env.sh ./scripts/clean-stale-state.sh"
+
+[tasks."monitor:daemon:dev"]
+description = "Run `harness daemon dev` with the current Harness Monitor runtime lane"
 env = { RUST_LOG = "harness=trace,agent_client_protocol=trace,tokio_tungstenite=debug,info,runtime=warn,tokio=warn,pyroscope=warn,pyroscope_pprofrs=warn,h2=warn,hyper=warn,hyper_util=warn,tower=warn,reqwest=warn,sqlx=warn" }
 run = '''
-  log="tmp/logs/$(date +%y%m%d%H%M)-monitor-user-daemon-dev.log"
-  apps/harness-monitor-macos/Scripts/user-runtime-profile.sh \
+  log="tmp/logs/$(date +%y%m%d%H%M)-monitor-daemon-dev.log"
+  apps/harness-monitor-macos/Scripts/monitor-runtime-env.sh \
     ./scripts/cargo-local.sh run --quiet -- daemon dev \
     2>&1 | tee "$log"
   echo "$log"
 '''
 
-[tasks."monitor:user:bridge:start"]
-description = "Run `harness bridge start` with the current user's isolated runtime profile"
+[tasks."monitor:bridge:start"]
+description = "Run `harness bridge start` with the current Harness Monitor runtime lane"
 env = { RUST_LOG = "harness=trace,agent_client_protocol=trace,tokio_tungstenite=debug,info,runtime=warn,tokio=warn,pyroscope=warn,pyroscope_pprofrs=warn,h2=warn,hyper=warn,hyper_util=warn,tower=warn,reqwest=warn,sqlx=warn", HARNESS_RUN_STEP_ACCEPT_STATUSES = "130,143" }
 run = '''
-  log="tmp/logs/$(date +%y%m%d%H%M)-monitor-user-bridge-start.log"
-  apps/harness-monitor-macos/Scripts/user-runtime-profile.sh \
+  log="tmp/logs/$(date +%y%m%d%H%M)-monitor-bridge-start.log"
+  apps/harness-monitor-macos/Scripts/monitor-runtime-env.sh \
     ./scripts/cargo-local.sh run --quiet -- bridge start \
     2>&1 | tee "$log"
   echo "$log"
 '''
 
-[tasks."monitor:agent"]
-description = "Print the current agent's isolated Xcode / XcodeBuildMCP profile and exact next commands"
-run = "apps/harness-monitor-macos/Scripts/agent-xcode-env.sh"
+[tasks."monitor:xcodebuildmcp"]
+description = "Run xcodebuildmcp with the current Harness Monitor runtime lane socket (pass xcodebuildmcp args after --)"
+run = "apps/harness-monitor-macos/Scripts/monitor-runtime-env.sh xcodebuildmcp"
 
-[tasks."monitor:agent:build"]
-description = "Build the Harness Monitor macOS app (Debug) with the current agent's isolated runtime profile"
-run = "apps/harness-monitor-macos/Scripts/agent-xcode-env.sh apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build CODE_SIGNING_ALLOWED=NO"
-
-[tasks."monitor:agent:test"]
-description = "Build-for-testing and test the Harness Monitor macOS app with the current agent's isolated runtime profile (set XCODE_ONLY_TESTING for focused selectors)"
-run = "apps/harness-monitor-macos/Scripts/agent-xcode-env.sh apps/harness-monitor-macos/Scripts/test-swift.sh"
-
-[tasks."monitor:agent:xcodebuild"]
-description = "Run the lock-aware Harness Monitor xcodebuild wrapper with the current agent's isolated runtime profile (pass xcodebuild args after --)"
-run = "apps/harness-monitor-macos/Scripts/agent-xcode-env.sh apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh"
-
-[tasks."monitor:agent:xcodebuildmcp"]
-description = "Run xcodebuildmcp with the current agent's isolated DerivedData, daemon socket, and optional alternate Xcode install (pass xcodebuildmcp args after --)"
-run = "apps/harness-monitor-macos/Scripts/agent-xcode-env.sh xcodebuildmcp"
-
-[tasks."monitor:agent:mcp"]
-description = "Start an isolated xcodebuildmcp MCP server for the current agent"
-run = "apps/harness-monitor-macos/Scripts/agent-xcode-env.sh xcodebuildmcp mcp"
-
-[tasks."monitor:agent:daemon:dev"]
-description = "Run `harness daemon dev` with the current agent's isolated runtime profile"
-run = "RUST_LOG='harness=trace,agent_client_protocol=trace,tokio_tungstenite=debug,info,runtime=warn,tokio=warn,pyroscope=warn,pyroscope_pprofrs=warn,h2=warn,hyper=warn,hyper_util=warn,tower=warn,reqwest=warn,sqlx=warn' apps/harness-monitor-macos/Scripts/agent-xcode-env.sh ./scripts/cargo-local.sh run --quiet -- daemon dev"
-
-[tasks."monitor:agent:bridge:start"]
-description = "Run `harness bridge start` with the current agent's isolated runtime profile"
-run = "RUST_LOG='harness=trace,agent_client_protocol=trace,tokio_tungstenite=debug,info,runtime=warn,tokio=warn,pyroscope=warn,pyroscope_pprofrs=warn,h2=warn,hyper=warn,hyper_util=warn,tower=warn,reqwest=warn,sqlx=warn' HARNESS_RUN_STEP_ACCEPT_STATUSES=130,143 apps/harness-monitor-macos/Scripts/agent-xcode-env.sh ./scripts/cargo-local.sh run --quiet -- bridge start"
+[tasks."monitor:mcp"]
+description = "Start an xcodebuildmcp MCP server with the current Harness Monitor runtime lane socket"
+run = "apps/harness-monitor-macos/Scripts/monitor-runtime-env.sh xcodebuildmcp mcp"
 
 [tasks."monitor:tools:build:e2e"]
 description = "Build the Harness Monitor agents e2e helper Swift CLI (release)"
@@ -368,18 +282,6 @@ run = "apps/harness-monitor-macos/Scripts/run-instruments-audit.sh"
 description = "Run the Harness Monitor Instruments audit pipeline from a temporary detached worktree (pass args after --)"
 depends = ["monitor:tools:build:perf"]
 run = "apps/harness-monitor-macos/Scripts/run-instruments-audit-from-ref.sh"
-
-[tasks."preview:render"]
-description = "Render one SwiftUI preview via xcode-cli (args: --id/--file, --theme, --text-size, --time-zone, --out)"
-run = "apps/harness-monitor-macos/Scripts/preview-render.sh"
-
-[tasks."preview:list"]
-description = "List the curated SwiftUI preview ids, files, indexes, and descriptions"
-run = "apps/harness-monitor-macos/Scripts/preview-render.sh --list"
-
-[tasks."preview:smoke"]
-description = "Render every entry in apps/harness-monitor-macos/Previews.json; fails on any timeout/crash"
-run = "apps/harness-monitor-macos/Scripts/preview-smoke.sh"
 
 [tasks."observability:start"]
 description = "Start the local Grafana, Alloy, Tempo, Loki, and Prometheus stack and write the shared harness observability config"
@@ -474,7 +376,7 @@ run = "swift build -c release --package-path mcp-servers/harness-monitor-registr
 
 [tasks."mcp:build:monitor"]
 description = "Build the Harness Monitor macOS app (Debug) with the MCP registry host wired in"
-run = "apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build"
+run = "apps/harness-monitor-macos/Scripts/monitor-xcodebuild.sh -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build"
 
 [tasks."mcp:launch:monitor"]
 description = "Open the Debug build of Harness Monitor.app"

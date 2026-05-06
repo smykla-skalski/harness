@@ -55,24 +55,46 @@ emit_pid_block() {
   done <<<"$pids"
 }
 
-cleanup_stale_lease() {
-  if declare -F lease_lock_cleanup >/dev/null; then
-    lease_lock_cleanup
+cleanup_stale_lock() {
+  if [[ -n "${STALE_CLEANUP_LOCK_DIR:-}" ]]; then
+    rm -rf "$STALE_CLEANUP_LOCK_DIR"
   fi
 }
 
-acquire_stale_cleanup_lease() {
+stale_cleanup_lock_owner_alive() {
+  local lock_dir="$1"
+  local owner_file="$lock_dir/owner.env"
+  local pid
+  [[ -f "$owner_file" ]] || return 1
+  pid="$(sed -n 's/^pid=//p' "$owner_file" | head -n 1)"
+  [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+  kill -0 "$pid" 2>/dev/null
+}
+
+acquire_stale_cleanup_lock() {
   if [[ "${HARNESS_STALE_CLEANUP_LEASE_HELD:-0}" == "1" ]]; then
     return 0
   fi
 
-  # shellcheck source=scripts/lib/lease-lock.sh
-  LEASE_LOCK_DIR="$COMMON_REPO_ROOT/tmp/.stale-state-cleanup.lock"
-  LEASE_LOCK_RESOURCE="stale-state-cleanup:${COMMON_REPO_ROOT}"
-  LEASE_LOCK_WAITER_ID="clean-stale-$$"
-  source "$ROOT/scripts/lib/lease-lock.sh"
-  trap cleanup_stale_lease EXIT
-  lease_lock_acquire
+  STALE_CLEANUP_LOCK_DIR="$COMMON_REPO_ROOT/tmp/.stale-state-cleanup.lock"
+  while :; do
+    if mkdir "$STALE_CLEANUP_LOCK_DIR" 2>/dev/null; then
+      {
+        printf 'pid=%s\n' "$$"
+        printf 'started_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      } >"$STALE_CLEANUP_LOCK_DIR/owner.env"
+      trap cleanup_stale_lock EXIT
+      return 0
+    fi
+
+    if ! stale_cleanup_lock_owner_alive "$STALE_CLEANUP_LOCK_DIR"; then
+      rm -rf "$STALE_CLEANUP_LOCK_DIR"
+      continue
+    fi
+
+    echo "error: clean:stale blocked by active cleanup lock at $STALE_CLEANUP_LOCK_DIR" >&2
+    exit 1
+  done
 }
 
 block_live_repo_gate_helpers() {
@@ -178,7 +200,7 @@ orphan_monitor_wrapper_lock_dirs() {
     [[ -n "$desc" ]] || continue
     derived_data_path="$(stale_scan_monitor_wrapper_derived_data_path "$desc")"
     [[ -n "$derived_data_path" ]] || continue
-    printf '%s\n' "$derived_data_path/.xcodebuild.lock"
+    printf '%s\n' "$derived_data_path/.harness-monitor-xcodebuild.lock"
   done
 }
 
@@ -368,7 +390,7 @@ remove_stale_swarm_e2e_worktrees() {
   fi
 }
 
-acquire_stale_cleanup_lease
+acquire_stale_cleanup_lock
 block_live_repo_gate_helpers
 
 quit_monitor_app

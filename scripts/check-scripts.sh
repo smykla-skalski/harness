@@ -95,6 +95,7 @@ monitor_shell_scripts=(
   "$ROOT"/apps/harness-monitor-macos/Scripts/*.sh
   "$ROOT"/apps/harness-monitor-macos/Scripts/lib/*.sh
 )
+monitor_python_tests_dir="$ROOT/apps/harness-monitor-macos/Scripts/tests"
 monitor_python_tests=("$ROOT"/apps/harness-monitor-macos/Scripts/tests/*.py)
 monitor_python_fast_tests=()
 
@@ -129,12 +130,12 @@ if (( ${#monitor_python_tests[@]} > 0 )); then
   if (( ${#monitor_python_fast_tests[@]} > 0 )); then
     run_quiet_step \
       "monitor python script tests (fast subset)" \
+      env "PYTHONPATH=$monitor_python_tests_dir${PYTHONPATH:+:$PYTHONPATH}" \
       python3 -m unittest "${monitor_python_fast_tests[@]}"
   fi
 fi
 
 run_quiet_step "run-step shell tests" "$ROOT/scripts/tests/test-run-step.sh"
-run_quiet_step "lease-lock shell tests" bash "$ROOT/scripts/tests/test-lease-lock.sh"
 run_quiet_step "mcp shell tests" "$ROOT/scripts/tests/test-mcp-scripts.sh"
 if [[ "${HARNESS_CHECK_SCRIPTS_FULL:-0}" == "1" ]]; then
   HARNESS_CHECK_SCRIPTS_STEP_TIMEOUT_SECONDS=180 \

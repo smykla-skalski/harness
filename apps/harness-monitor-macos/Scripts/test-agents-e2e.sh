@@ -10,7 +10,7 @@ COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
 source "$ROOT/Scripts/lib/xcodebuild-destination.sh"
 DESTINATION="$(harness_monitor_xcodebuild_destination)"
 DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$COMMON_REPO_ROOT/xcode-derived-e2e}"
-CANONICAL_XCODEBUILD_RUNNER="$ROOT/Scripts/xcodebuild-with-lock.sh"
+CANONICAL_XCODEBUILD_RUNNER="$ROOT/Scripts/monitor-xcodebuild.sh"
 XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$CANONICAL_XCODEBUILD_RUNNER}"
 STALE_CHECK_SCRIPT="$CHECKOUT_ROOT/scripts/check-no-stale-state.sh"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh

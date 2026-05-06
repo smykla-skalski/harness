@@ -64,9 +64,9 @@ public struct HarnessMonitorEnvironment: Equatable, Sendable {
   private static let liveEnvironmentOverrideKeys = [
     HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey,
     HarnessMonitorAppGroup.environmentKey,
-    HarnessMonitorRuntimeProfile.environmentKey,
-    HarnessMonitorRuntimeProfile.launchAgentLabelEnvKey,
-    HarnessMonitorRuntimeProfile.codexWSPortEnvironmentKey,
+    HarnessMonitorRuntimeLane.environmentKey,
+    HarnessMonitorRuntimeLane.launchAgentLabelEnvKey,
+    HarnessMonitorRuntimeLane.codexWSPortEnvironmentKey,
     "HARNESS_MONITOR_EXTERNAL_DAEMON",
     "XDG_DATA_HOME",
     "XCODEBUILD_DERIVED_DATA_PATH",
@@ -79,17 +79,13 @@ public enum HarnessMonitorAppGroup {
   public static let daemonDataHomeEnvironmentKey = "HARNESS_DAEMON_DATA_HOME"
 }
 
-public enum HarnessMonitorRuntimeProfile {
-  public static let environmentKey = "HARNESS_MONITOR_RUNTIME_PROFILE"
+public enum HarnessMonitorRuntimeLane {
+  public static let environmentKey = "HARNESS_MONITOR_RUNTIME_LANE"
   public static let launchAgentLabelEnvKey = "HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL"
   public static let codexWSPortEnvironmentKey = "HARNESS_CODEX_WS_PORT"
 
   static let launchAgentBaseLabel = "io.harnessmonitor.daemon"
-  static let derivedDataProfilesDirectoryName = "profiles"
-  static let dataHomeProfilesDirectoryName = "runtime-profiles"
-  static let supportedDerivedDataRoots = Set([
-    "xcode-derived", "xcode-derived-e2e", "xcode-derived-instruments",
-  ])
+  static let dataHomeLanesDirectoryName = "runtime-lanes"
   static let codexWSPortBase = 4_600
   static let codexWSPortSpan = 20_000
 }
@@ -138,8 +134,8 @@ public enum HarnessMonitorPaths {
       return configuredRoot
     }
 
-    if let profileRoot = runtimeProfileBaseRoot(using: environment) {
-      return profileRoot
+    if let laneRoot = runtimeLaneBaseRoot(using: environment) {
+      return laneRoot
     }
 
     if let appGroupIdentifier = normalizedAppGroupIdentifier(using: environment) {
@@ -184,10 +180,10 @@ public enum HarnessMonitorPaths {
       .appendingPathComponent("Application Support", isDirectory: true)
   }
 
-  public static func runtimeProfile(
+  public static func runtimeLane(
     using environment: HarnessMonitorEnvironment = .current
   ) -> String? {
-    resolvedRuntimeProfile(using: environment)
+    resolvedRuntimeLane(using: environment)
   }
 
   public static func codexBridgePort(
@@ -203,15 +199,15 @@ public enum HarnessMonitorPaths {
     using environment: HarnessMonitorEnvironment = .current
   ) -> String {
     if let explicitLabel = normalizedNonEmpty(
-      environment.values[HarnessMonitorRuntimeProfile.launchAgentLabelEnvKey]
+      environment.values[HarnessMonitorRuntimeLane.launchAgentLabelEnvKey]
     ) {
       return explicitLabel
     }
 
-    guard let profile = resolvedRuntimeProfile(using: environment) else {
-      return HarnessMonitorRuntimeProfile.launchAgentBaseLabel
+    guard let lane = resolvedRuntimeLane(using: environment) else {
+      return HarnessMonitorRuntimeLane.launchAgentBaseLabel
     }
-    return "\(HarnessMonitorRuntimeProfile.launchAgentBaseLabel).\(profile)"
+    return "\(HarnessMonitorRuntimeLane.launchAgentBaseLabel).\(lane)"
   }
 
   public static func commandEnvironmentVariables(

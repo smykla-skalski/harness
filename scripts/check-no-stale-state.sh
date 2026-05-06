@@ -8,7 +8,7 @@
 # the destructive live-reset path (quit Monitor / stop launchd / kill live lock
 # holders); if live shared state is the blocker, the gate still fails and
 # points the user at the explicit reset task. Healthy parallel agents are not
-# pollution; coordination belongs to resource-specific lease locks, not argv/cwd
+# pollution; coordination belongs to resource-specific lane locks, not argv/cwd
 # heuristics, but auto-clean must still not race other repo-local build/check
 # helpers on shared state.
 set -euo pipefail
@@ -24,17 +24,13 @@ STALE_SCAN_COMMON_REPO_ROOT="$COMMON_REPO_ROOT"
 export STALE_SCAN_ROOT STALE_SCAN_COMMON_REPO_ROOT
 # shellcheck source=scripts/lib/stale-scan.sh
 source "$ROOT/scripts/lib/stale-scan.sh"
-# shellcheck source=scripts/lib/lease-lock.sh
-LEASE_LOCK_DIR="$COMMON_REPO_ROOT/tmp/.stale-state-cleanup.lock"
-LEASE_LOCK_RESOURCE="stale-state-cleanup:${COMMON_REPO_ROOT}"
-LEASE_LOCK_WAITER_ID="check-stale-$$"
-source "$ROOT/scripts/lib/lease-lock.sh"
-
-readonly RESET_HINT="run 'mise run clean:stale' for a safe scrub, 'mise run monitor:user:reset' or 'mise run clean:stale:full' for a live reset (or re-run with HARNESS_CHECK_AUTOCLEAN=1)"
+readonly RESET_HINT="run 'mise run clean:stale' for a safe scrub, 'mise run monitor:reset' or 'mise run clean:stale:full' for a live reset (or re-run with HARNESS_CHECK_AUTOCLEAN=1)"
 # Allow tests to redirect autoclean to a sandbox-safe stub. Production runs
 # always resolve this to scripts/clean-stale-state.sh.
 readonly CLEAN_SCRIPT="${HARNESS_CHECK_CLEAN_SCRIPT:-$ROOT/scripts/clean-stale-state.sh}"
 stale_lines=()
+AUTOCLEAN_LOCK_DIR=""
+AUTOCLEAN_LOCK_OWNED=0
 
 should_skip_live_daemon_lock_holder_check() {
   [[ "${HARNESS_CHECK_ALLOW_DAEMON_LOCK_HOLDERS:-0}" == "1" ]]
@@ -90,15 +86,15 @@ collect_stale_lines() {
   orphans="$(stale_scan_orphan_harness_build_pids)"
   append_pid_block "orphan local cargo-built harness processes" "$orphans"
 
-  # 1b. Parentless xcodebuild-with-lock wrapper shells with no surviving lease
+  # 1b. Parentless monitor-xcodebuild wrapper shells with no surviving lock
   #     metadata are dead wrappers left behind by aborted runs.
   local monitor_wrapper_orphans
   monitor_wrapper_orphans="$(stale_scan_orphan_monitor_wrapper_pids)"
-  append_pid_block "orphan xcodebuild wrapper shells with no lease metadata" "$monitor_wrapper_orphans"
+  append_pid_block "orphan xcodebuild wrapper shells with no lock metadata" "$monitor_wrapper_orphans"
 
   # 2. Live unscoped harness daemon/bridge processes only count as stale when
   #    they still hold the well-known locks under the real Harness roots.
-  #    Profile-scoped bridges/daemons are deliberate isolated work and must not
+  #    Lane-scoped bridges/daemons are deliberate isolated work and must not
   #    be swept by shared stale cleanup.
   if ! should_skip_live_daemon_lock_holder_check; then
     local daemon_root lock_holders
@@ -112,7 +108,7 @@ collect_stale_lines() {
   # 3. /tmp bridge artifacts. Sandboxed daemon uses Group Container fallback;
   #    anything in /tmp is from before the sandbox fix or from an unsandboxed
   #    bridge that did not unlink on shutdown. Sweep .sock, .pid, and .lock.
-  if ! stale_scan_is_profile_scoped; then
+  if ! stale_scan_is_runtime_scoped; then
     local tmp_artifacts=()
     local artifact
     while IFS= read -r artifact; do
@@ -185,6 +181,47 @@ report_stale() {
   } >&2
 }
 
+# shellcheck disable=SC2329 # invoked by EXIT trap after acquiring the autoclean lock
+release_autoclean_lock() {
+  if (( AUTOCLEAN_LOCK_OWNED == 1 )) && [[ -n "$AUTOCLEAN_LOCK_DIR" ]]; then
+    rm -rf "$AUTOCLEAN_LOCK_DIR"
+  fi
+}
+
+autoclean_lock_owner_alive() {
+  local lock_dir="$1"
+  local owner_file="$lock_dir/owner.env"
+  local pid
+  [[ -f "$owner_file" ]] || return 1
+  pid="$(sed -n 's/^pid=//p' "$owner_file" | head -n 1)"
+  [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+  kill -0 "$pid" 2>/dev/null
+}
+
+acquire_autoclean_lock() {
+  AUTOCLEAN_LOCK_DIR="$COMMON_REPO_ROOT/tmp/.stale-state-cleanup.lock"
+  while :; do
+    if mkdir "$AUTOCLEAN_LOCK_DIR" 2>/dev/null; then
+      {
+        printf 'pid=%s\n' "$$"
+        printf 'started_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      } >"$AUTOCLEAN_LOCK_DIR/owner.env"
+      AUTOCLEAN_LOCK_OWNED=1
+      trap release_autoclean_lock EXIT
+      return 0
+    fi
+
+    if ! autoclean_lock_owner_alive "$AUTOCLEAN_LOCK_DIR"; then
+      rm -rf "$AUTOCLEAN_LOCK_DIR"
+      continue
+    fi
+
+    echo "error: auto-clean blocked by active cleanup lock at $AUTOCLEAN_LOCK_DIR" >&2
+    report_stale
+    exit 1
+  done
+}
+
 # Xcode UI silently recreates its default DerivedData HarnessMonitor bundle
 # as part of indexing whenever the project is open, so checking that path
 # here would fail on every CLI run that follows an IDE session. CLI builds
@@ -211,8 +248,7 @@ if [[ "${HARNESS_CHECK_AUTOCLEAN:-}" == "1" ]]; then
     fi
   fi
 
-  trap 'lease_lock_cleanup' EXIT
-  lease_lock_acquire
+  acquire_autoclean_lock
 
   {
     echo "check:stale detected pollution; HARNESS_CHECK_AUTOCLEAN=1 is set, running clean:stale..."

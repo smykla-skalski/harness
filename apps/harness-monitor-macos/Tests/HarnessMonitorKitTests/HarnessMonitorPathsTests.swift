@@ -97,20 +97,20 @@ struct HarnessMonitorPathsTests {
     )
   }
 
-  @Test("Runtime profile resolves to a profiled app-group daemon root")
-  func runtimeProfileResolvesToProfiledAppGroupDaemonRoot() {
+  @Test("Runtime lane resolves to a lane app-group daemon root")
+  func runtimeLaneResolvesToLaneAppGroupDaemonRoot() {
     let homeDirectory = URL(fileURLWithPath: "/Users/example", isDirectory: true)
     let environment = HarnessMonitorEnvironment(
-      values: [HarnessMonitorRuntimeProfile.environmentKey: "Bart Dev"],
+      values: [HarnessMonitorRuntimeLane.environmentKey: "Bart Dev"],
       homeDirectory: homeDirectory
     )
 
-    #expect(HarnessMonitorPaths.runtimeProfile(using: environment) == "bart-dev")
+    #expect(HarnessMonitorPaths.runtimeLane(using: environment) == "bart-dev")
     #expect(
       HarnessMonitorPaths.daemonRoot(using: environment).path
-        == expectedRuntimeProfileRoot(
+        == expectedRuntimeLaneRoot(
           homeDirectory: homeDirectory,
-          profile: "bart-dev"
+          lane: "bart-dev"
         )
         .appendingPathComponent("harness", isDirectory: true)
         .appendingPathComponent("daemon", isDirectory: true)
@@ -118,44 +118,23 @@ struct HarnessMonitorPathsTests {
     )
   }
 
-  @Test("Runtime profile can be inferred from a profiled DerivedData bundle path")
-  func runtimeProfileCanBeInferredFromBundlePath() {
-    let homeDirectory = URL(fileURLWithPath: "/Users/example", isDirectory: true)
-    let bundleURL = URL(
-      fileURLWithPath:
-        "/tmp/repo/xcode-derived/profiles/my-profile/Build/Products/Debug/Harness Monitor.app",
-      isDirectory: true
-    )
-    let environment = HarnessMonitorEnvironment(
-      values: [:],
-      homeDirectory: homeDirectory,
-      bundleURL: bundleURL
-    )
-
-    #expect(HarnessMonitorPaths.runtimeProfile(using: environment) == "my-profile")
-    #expect(
-      HarnessMonitorPaths.launchAgentLabel(using: environment)
-        == "io.harnessmonitor.daemon.my-profile"
-    )
-  }
-
-  @Test("Profiled shell command prefix includes runtime profile, daemon root, and Codex port")
-  func profiledShellCommandPrefixIncludesRuntimeProfileDaemonRootAndCodexPort() {
+  @Test("Lane shell command prefix includes runtime lane, daemon root, and Codex port")
+  func laneShellCommandPrefixIncludesRuntimeLaneDaemonRootAndCodexPort() {
     let homeDirectory = URL(
       fileURLWithPath: "/Users/monitor",
       isDirectory: true
     )
     let environment = HarnessMonitorEnvironment(
-      values: [HarnessMonitorRuntimeProfile.environmentKey: "Bart Dev"],
+      values: [HarnessMonitorRuntimeLane.environmentKey: "Bart Dev"],
       homeDirectory: homeDirectory
     )
-    let expectedRoot = expectedRuntimeProfileRoot(
+    let expectedRoot = expectedRuntimeLaneRoot(
       homeDirectory: homeDirectory,
-      profile: "bart-dev"
+      lane: "bart-dev"
     )
     let expectedPort = HarnessMonitorPaths.codexBridgePort(using: environment)
     let expectedPrefix = """
-      HARNESS_MONITOR_RUNTIME_PROFILE='bart-dev' \
+      HARNESS_MONITOR_RUNTIME_LANE='bart-dev' \
       HARNESS_DAEMON_DATA_HOME='\(expectedRoot.path)' \
       HARNESS_CODEX_WS_PORT='\(expectedPort!)'
       """
@@ -389,8 +368,8 @@ private func expectedAppGroupRoot(identifier: String, homeDirectory: URL) -> URL
     .appendingPathComponent(identifier, isDirectory: true)
 }
 
-private func expectedRuntimeProfileRoot(homeDirectory: URL, profile: String) -> URL {
+private func expectedRuntimeLaneRoot(homeDirectory: URL, lane: String) -> URL {
   expectedDefaultAppGroupRoot(homeDirectory: homeDirectory)
-    .appendingPathComponent("runtime-profiles", isDirectory: true)
-    .appendingPathComponent(profile, isDirectory: true)
+    .appendingPathComponent("runtime-lanes", isDirectory: true)
+    .appendingPathComponent(lane, isDirectory: true)
 }

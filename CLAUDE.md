@@ -10,6 +10,12 @@ For the Harness Monitor macOS app (`apps/harness-monitor-macos`), see that direc
 
 **`rtk proxy` is last resort only.** It bypasses all output filters and leaks raw command output (4000+ line dumps), burning the context window. Use it only when filtered output hides information you genuinely need to debug a specific issue, and switch back to plain `rtk` immediately after.
 
+## Task closeout
+
+Finished tasks must be replayed onto `main` with clean, flat history. Rebase or cherry-pick; never create merge commits. Resolve conflicts by comparing current `main` behavior with the task intent, do not accept either side blindly, keep unrelated edits out of conflict resolution, and rerun the smallest relevant validation before handoff.
+
+Parallel Claude sessions that edit, generate, build, test, run daemons, or use XcodeBuildMCP need separate full git worktrees. Lanes and env vars isolate build/runtime side effects inside a worktree; they do not make concurrent write/build work in one checkout acceptable.
+
 ## Hook system (Claude Code dispatch)
 
 Claude Code uses these hook constants in `cli.rs` (Codex maps the same triggers to its unified `tool-guard` / `tool-result` / `tool-failure` constants - see `AGENTS.md`):

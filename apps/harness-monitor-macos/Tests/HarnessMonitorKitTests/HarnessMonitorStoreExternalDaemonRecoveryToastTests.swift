@@ -46,7 +46,7 @@ struct ExternalDaemonRecoveryToastTests {
     let feedback = try #require(store.toast.activeFeedback.first)
     #expect(feedback.title == "Restart background helper")
     #expect(feedback.message.contains("restart the helper in Terminal"))
-    #expect(feedback.details?.summary?.contains("does not delete profile data") == true)
+    #expect(feedback.details?.summary?.contains("does not delete lane data") == true)
     #expect(feedback.details?.command?.contains("harness daemon dev") == true)
     #expect(feedback.details?.rows.contains { $0.value == manifestPath } == true)
     #expect(feedback.primaryAction?.successAnnouncement == "Terminal restart command copied")

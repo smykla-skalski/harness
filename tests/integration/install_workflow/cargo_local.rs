@@ -108,6 +108,69 @@ fn cargo_local_script_preserves_explicit_writable_tmpdir() {
 }
 
 #[test]
+fn cargo_local_script_isolates_sccache_server_socket() {
+    let tmp = tempdir().expect("tempdir");
+    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let explicit_tmpdir = tmp.path().join("explicit-tmp");
+    let fake_bin = tmp.path().join("fake-bin");
+    std::fs::create_dir_all(&explicit_tmpdir).expect("create explicit tmpdir");
+
+    write_fake_shell_tool(
+        &fake_bin.join("sccache"),
+        "#!/bin/sh\nset -eu\nif [ \"$1\" = \"cc\" ] && [ \"$2\" = \"--version\" ]; then\n  echo 'sccache fake cc'\n  exit 0\nfi\nexit 1\n",
+    );
+
+    let output = Command::new("/bin/bash")
+        .arg(repo.join("scripts/cargo-local.sh"))
+        .arg("--print-env")
+        .current_dir(&repo)
+        .env("HOME", tmp.path().join("home"))
+        .env("PATH", format!("{}:/usr/bin:/bin", fake_bin.display()))
+        .env("TMPDIR", &explicit_tmpdir)
+        .env_remove("RUSTC_WRAPPER")
+        .env_remove("SCCACHE_SERVER_UDS")
+        .env_remove("SCCACHE_SERVER_PORT")
+        .env_remove("SCCACHE_NO_DAEMON")
+        .env_remove("CODEX_SESSION_ID")
+        .env_remove("CODEX_THREAD_ID")
+        .env_remove("CLAUDE_SESSION_ID")
+        .env_remove("GEMINI_SESSION_ID")
+        .env_remove("COPILOT_SESSION_ID")
+        .env_remove("OPENCODE_SESSION_ID")
+        .output()
+        .expect("run cargo-local script");
+
+    assert!(
+        output.status.success(),
+        "script failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let env = parse_env_output(&output.stdout);
+    let socket = env
+        .get("SCCACHE_SERVER_UDS")
+        .expect("SCCACHE_SERVER_UDS line");
+    assert!(
+        socket.contains("/harness-sccache"),
+        "unexpected socket path: {socket}"
+    );
+    assert!(socket.ends_with(".sock"), "unexpected socket path: {socket}");
+    assert!(
+        socket.len() < 104,
+        "sccache Unix socket path should stay below macOS sockaddr_un limits: {socket}"
+    );
+    assert!(
+        Path::new(socket).parent().expect("socket parent").is_dir(),
+        "expected socket parent to exist: {socket}"
+    );
+    assert_eq!(
+        env.get("RUSTC_WRAPPER").expect("RUSTC_WRAPPER line"),
+        &fake_bin.join("sccache").display().to_string()
+    );
+}
+
+#[test]
 fn install_script_resolves_build_binary_from_cargo_local_target_dir() {
     let tmp = tempdir().expect("tempdir");
     let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

@@ -18,13 +18,13 @@ ENTRYPOINT_SCRIPTS = (
 
 
 class MonitorXcodebuildPolicyTests(unittest.TestCase):
-    def test_monitor_shell_entrypoints_pin_the_lock_aware_runner(self) -> None:
+    def test_monitor_shell_entrypoints_pin_the_lane_runner(self) -> None:
         for script_path in ENTRYPOINT_SCRIPTS:
             script = script_path.read_text(encoding="utf-8")
             self.assertIn(
-                'xcodebuild-with-lock.sh',
+                'monitor-xcodebuild.sh',
                 script,
-                f"{script_path.name} must route monitor xcodebuild traffic through the canonical wrapper",
+                f"{script_path.name} must route monitor xcodebuild traffic through the canonical lane wrapper",
             )
 
     def test_monitor_shell_entrypoints_do_not_opt_out_of_tuist(self) -> None:
@@ -43,7 +43,7 @@ class MonitorXcodebuildPolicyTests(unittest.TestCase):
             mise_toml,
         )
         self.assertIn(
-            'run = "apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh"',
+            'run = "apps/harness-monitor-macos/Scripts/monitor-xcodebuild.sh"',
             mise_toml,
         )
 
