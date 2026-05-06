@@ -131,6 +131,7 @@ struct AgentDetailComposerRegion: View {
         )
       }
     }
+    .harnessPanelGlass()
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Send update composer")
     .accessibilityIdentifier(

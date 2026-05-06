@@ -34,6 +34,7 @@ public struct WorkspaceWindowView: View {
   @State private var decisionInspectorVisible = false
   @State private var decisionInspectorPreferredVisibility = false
   @State private var agentDetailComposerBackdropHeight: CGFloat = 0
+  @State private var workspaceSidebarWidth: CGFloat = WorkspaceChromeMetrics.sidebarIdealWidth
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @AppStorage(HarnessMonitorAgentTuiDefaults.submitSendsEnterKey)
   var submitSendsEnter = HarnessMonitorAgentTuiDefaults.submitSendsEnterDefault
@@ -258,8 +259,8 @@ public struct WorkspaceWindowView: View {
     splitView
       .navigationSplitViewStyle(.prominentDetail)
       .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
-      .background(alignment: .bottom) {
-        agentDetailComposerBackdrop
+      .overlay(alignment: .bottomLeading) {
+        agentDetailSidebarBackdrop
       }
       .toolbar {
         agentTuiNavigationToolbarItems
@@ -322,6 +323,9 @@ public struct WorkspaceWindowView: View {
       .onPreferenceChange(AgentDetailComposerHeightPreferenceKey.self) { newHeight in
         agentDetailComposerBackdropHeight = newHeight
       }
+      .onPreferenceChange(WorkspaceSidebarWidthPreferenceKey.self) { newWidth in
+        workspaceSidebarWidth = newWidth
+      }
       .onDisappear {
         hasCompletedInitialWorkspacePreparation = false
         handleWindowDisappear()
@@ -340,10 +344,10 @@ public struct WorkspaceWindowView: View {
       }
   }
 
-  @ViewBuilder private var agentDetailComposerBackdrop: some View {
+  @ViewBuilder private var agentDetailSidebarBackdrop: some View {
     if case .agent = viewModel.selection, agentDetailComposerBackdropHeight > 0 {
       Color.clear
-        .frame(maxWidth: .infinity)
+        .frame(width: workspaceSidebarWidth)
         .frame(height: agentDetailComposerBackdropHeight + 2)
         .harnessPanelGlass()
         .mask {
