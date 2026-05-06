@@ -298,6 +298,69 @@ fn migrates_v8_schema_repairs_active_sessions_without_leader() {
 }
 
 #[test]
+fn open_repairs_latest_session_state_agent_wire_aliases() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let path = tmp.path().join("harness.db");
+
+    let session_id = {
+        let db = DaemonDb::open(&path).expect("open fresh db");
+        let project = sample_project();
+        db.sync_project(&project).expect("sync project");
+        let mut state = sample_session_state();
+        state.schema_version = CURRENT_VERSION;
+        db.sync_session(&project.project_id, &state)
+            .expect("sync session");
+
+        let mut state_json = serde_json::to_value(&state).expect("serialize state");
+        let agent = state_json
+            .pointer_mut("/agents/claude-leader")
+            .and_then(serde_json::Value::as_object_mut)
+            .expect("agent object");
+        let session_agent_id = agent
+            .remove("session_agent_id")
+            .expect("canonical session agent id");
+        agent.insert("agent_id".into(), session_agent_id);
+        let runtime_session_id = agent
+            .remove("runtime_session_id")
+            .expect("canonical runtime session id");
+        agent.insert("agent_session_id".into(), runtime_session_id);
+
+        db.conn
+            .execute(
+                "UPDATE sessions SET state_json = ?1 WHERE session_id = ?2",
+                rusqlite::params![state_json.to_string(), &state.session_id],
+            )
+            .expect("write noncanonical state");
+        state.session_id
+    };
+
+    let db = DaemonDb::open(&path).expect("open repaired db");
+    let stored_state_json: String = db
+        .conn
+        .query_row(
+            "SELECT state_json FROM sessions WHERE session_id = ?1",
+            [&session_id],
+            |row| row.get(0),
+        )
+        .expect("load repaired state json");
+    let stored_state: serde_json::Value =
+        serde_json::from_str(&stored_state_json).expect("parse repaired json");
+    let agent = stored_state
+        .pointer("/agents/claude-leader")
+        .expect("repaired agent");
+    assert_eq!(agent["session_agent_id"], "claude-leader");
+    assert_eq!(agent["runtime_session_id"], "claude-session-1");
+    assert!(agent.get("agent_id").is_none());
+    assert!(agent.get("agent_session_id").is_none());
+
+    let loaded = db
+        .load_session_state(&session_id)
+        .expect("load repaired session")
+        .expect("session present");
+    assert!(loaded.agents.contains_key("claude-leader"));
+}
+
+#[test]
 fn sync_session_backfills_managed_agent_identity_after_v10_schema_migration() {
     use crate::session::types::ManagedAgentRef;
 
