@@ -13,6 +13,7 @@ from generate_test_support import (
     APP_ROOT,
     GENERATE_SOURCE,
     NON_INDEXABLE_ROOTS_SOURCE,
+    PATCH_RUN_SCHEME_ENV_SOURCE,
     POST_GENERATE_SOURCE,
     PREPARE_APP_ENTITLEMENTS_SOURCE,
     MONITOR_LANES_SOURCE,
@@ -42,10 +43,31 @@ class PostGenerateScriptTests(unittest.TestCase):
             generated_prepare_entitlements.chmod(
                 generated_prepare_entitlements.stat().st_mode | stat.S_IXUSR
             )
+            shutil.copy(PATCH_RUN_SCHEME_ENV_SOURCE, scripts_root / "patch-run-scheme-env.py")
             shutil.copy(SWIFT_TOOL_ENV_SOURCE, lib_root / "swift-tool-env.sh")
             shutil.copy(NON_INDEXABLE_ROOTS_SOURCE, lib_root / "non-indexable-roots.sh")
             shutil.copy(MONITOR_LANES_SOURCE, lib_root / "monitor-lanes.sh")
             shutil.copy(XCODE_VERSION_SOURCE, lib_root / "xcode-version.sh")
+            scheme_root = app_root / "HarnessMonitor.xcodeproj" / "xcshareddata" / "xcschemes"
+            scheme_root.mkdir(parents=True)
+            for scheme_name in (
+                "HarnessMonitor.xcscheme",
+                "HarnessMonitor (External Daemon).xcscheme",
+            ):
+                (scheme_root / scheme_name).write_text(
+                    """<?xml version="1.0" encoding="UTF-8"?>
+<Scheme LastUpgradeVersion="1600" version="1.7">
+   <LaunchAction buildConfiguration="Debug">
+      <CommandLineArguments>
+      </CommandLineArguments>
+      <EnvironmentVariables>
+         <EnvironmentVariable key="HARNESS_OTEL_EXPORT" value="1" isEnabled="YES">
+         </EnvironmentVariable>
+      </EnvironmentVariables>
+   </LaunchAction>
+</Scheme>
+"""
+                )
 
             monitor_entitlements = {
                 "com.apple.security.application-groups": ["Q498EB36N4.io.harnessmonitor"],
@@ -132,6 +154,27 @@ class PostGenerateScriptTests(unittest.TestCase):
             self.assertTrue(
                 (repo_root / "xcode-derived" / ".metadata_never_index").exists()
             )
+            canonical_repo_root = repo_root.resolve()
+            default_lane = "repo-" + subprocess.check_output(
+                [
+                    "shasum",
+                    "-a",
+                    "256",
+                ],
+                input=str(canonical_repo_root),
+                text=True,
+            ).split()[0][:8]
+            for scheme_name in (
+                "HarnessMonitor.xcscheme",
+                "HarnessMonitor (External Daemon).xcscheme",
+            ):
+                with self.subTest(scheme=scheme_name):
+                    scheme = (scheme_root / scheme_name).read_text()
+                    self.assertIn('key="HARNESS_MONITOR_RUNTIME_LANE"', scheme)
+                    self.assertIn(f'value="{default_lane}"', scheme)
+                    self.assertIn('key="HARNESS_DAEMON_DATA_HOME"', scheme)
+                    self.assertIn(f"runtime-lanes/{default_lane}", scheme)
+                    self.assertIn('key="HARNESS_CODEX_WS_PORT"', scheme)
 
     def test_post_generate_uses_laned_derived_data_when_build_lane_is_set(
         self,

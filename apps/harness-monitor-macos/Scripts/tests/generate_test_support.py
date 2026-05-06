@@ -13,6 +13,7 @@ APP_ROOT = Path(__file__).resolve().parents[2]
 GENERATE_SOURCE = APP_ROOT / "Scripts" / "generate.sh"
 POST_GENERATE_SOURCE = APP_ROOT / "Scripts" / "post-generate.sh"
 PREPARE_APP_ENTITLEMENTS_SOURCE = APP_ROOT / "Scripts" / "prepare-app-entitlements.sh"
+PATCH_RUN_SCHEME_ENV_SOURCE = APP_ROOT / "Scripts" / "patch-run-scheme-env.py"
 SWIFT_TOOL_ENV_SOURCE = APP_ROOT / "Scripts" / "lib" / "swift-tool-env.sh"
 NON_INDEXABLE_ROOTS_SOURCE = APP_ROOT / "Scripts" / "lib" / "non-indexable-roots.sh"
 XCODE_VERSION_SOURCE = APP_ROOT / "Scripts" / "lib" / "xcode-version.sh"
@@ -53,4 +54,3 @@ def base_env() -> dict[str, str]:
     ):
         env.pop(key, None)
     return env
-

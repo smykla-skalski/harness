@@ -13,6 +13,7 @@ source "$ROOT/Scripts/lib/monitor-lanes.sh"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/xcode-version.sh
 source "$ROOT/Scripts/lib/xcode-version.sh"
 sanitize_xcode_only_swift_environment
+harness_monitor_apply_runtime_lane_environment "$REPO_ROOT"
 
 DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$(harness_monitor_build_derived_data_path "$REPO_ROOT")}"
 export XCODEBUILD_DERIVED_DATA_PATH="$DERIVED_DATA_PATH"
@@ -69,6 +70,21 @@ seed_generated_app_entitlements() {
   PROJECT_TEMP_DIR="$project_temp_dir" /bin/bash "$ROOT/Scripts/prepare-app-entitlements.sh"
 }
 
+patch_run_scheme_runtime_env() {
+  local scheme_path="$1"
+
+  if [[ ! -f "$scheme_path" ]]; then
+    return 0
+  fi
+
+  /usr/bin/python3 "$ROOT/Scripts/patch-run-scheme-env.py" \
+    "$scheme_path" \
+    "HARNESS_MONITOR_RUNTIME_LANE=${HARNESS_MONITOR_RUNTIME_LANE}" \
+    "HARNESS_DAEMON_DATA_HOME=${HARNESS_DAEMON_DATA_HOME}" \
+    "HARNESS_CODEX_WS_PORT=${HARNESS_CODEX_WS_PORT}" \
+    "HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL=${HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL}"
+}
+
 write_build_server_config \
   "$ROOT/buildServer.json" \
   "./Scripts/run-xcode-build-server.sh" \
@@ -96,6 +112,11 @@ harness_monitor_write_user_workspace_settings "$ROOT" "$DERIVED_DATA_PATH"
 
 seed_generated_app_entitlements \
   "$DERIVED_DATA_PATH/Build/Intermediates.noindex/HarnessMonitor.build"
+
+patch_run_scheme_runtime_env \
+  "$ROOT/HarnessMonitor.xcodeproj/xcshareddata/xcschemes/HarnessMonitor.xcscheme"
+patch_run_scheme_runtime_env \
+  "$ROOT/HarnessMonitor.xcodeproj/xcshareddata/xcschemes/HarnessMonitor (External Daemon).xcscheme"
 
 PBXPROJ="$ROOT/HarnessMonitor.xcodeproj/project.pbxproj"
 DEFAULT_LAST_UPGRADE_CHECK="$(harness_monitor_default_xcode_upgrade_check)"
