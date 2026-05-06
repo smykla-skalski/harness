@@ -5,26 +5,42 @@ extension HarnessMonitorStore {
     guard pageSize > 0 else {
       return
     }
+    let totalCount = max(timeline.count, timelineWindow?.totalCount ?? 0)
+    let pageCount = max(1, Int(ceil(Double(totalCount) / Double(pageSize))))
+    let clampedPage = min(max(page, 0), pageCount - 1)
+    let targetEnd = min(totalCount, (clampedPage + 1) * pageSize)
+    await loadSelectedTimelinePrefix(targetEnd: targetEnd, pageSize: pageSize)
+  }
+
+  public func appendSelectedTimelineOlderChunk(limit: Int) async {
+    guard limit > 0, selectedTimelineWindowLoadTask == nil, timelineWindow?.hasOlder == true else {
+      return
+    }
+    let totalCount = max(timeline.count, timelineWindow?.totalCount ?? 0)
+    let targetEnd = min(totalCount, timeline.count + limit)
+    await loadSelectedTimelinePrefix(targetEnd: targetEnd, pageSize: limit)
+  }
+
+  private func loadSelectedTimelinePrefix(targetEnd: Int, pageSize: Int) async {
+    guard pageSize > 0 else {
+      return
+    }
     guard let sessionID = selectedSessionID, let selectedSession, connectionState == .online,
       let client
     else {
       return
     }
 
-    let totalCount = max(timeline.count, timelineWindow?.totalCount ?? 0)
-    let pageCount = max(1, Int(ceil(Double(totalCount) / Double(pageSize))))
-    let clampedPage = min(max(page, 0), pageCount - 1)
-    let targetEnd = min(totalCount, (clampedPage + 1) * pageSize)
-
-    guard targetEnd > 0, timeline.count < targetEnd else {
+    let clampedTargetEnd = min(max(targetEnd, 0), max(timeline.count, timelineWindow?.totalCount ?? 0))
+    guard clampedTargetEnd > 0, timeline.count < clampedTargetEnd else {
       return
     }
 
     let currentRevision = timelineWindow?.revision
-    let missingCount = targetEnd - timeline.count
+    let missingCount = clampedTargetEnd - timeline.count
     let loadKey = SelectedTimelinePageLoadKey(
       sessionID: sessionID,
-      targetEnd: targetEnd,
+      targetEnd: clampedTargetEnd,
       pageSize: pageSize,
       revision: currentRevision
     )
@@ -54,7 +70,7 @@ extension HarnessMonitorStore {
         let response = try await self.fetchSelectedTimelinePrefix(
           using: client,
           sessionID: sessionID,
-          targetEnd: targetEnd,
+          targetEnd: clampedTargetEnd,
           missingCount: missingCount,
           currentRevision: currentRevision
         )

@@ -105,6 +105,8 @@ extension HarnessMonitorStore {
     let resolvedTimeline: [TimelineEntry]
     let resolvedTimelineWindow: TimelineWindowResponse?
     if response.windowStart == 0 || response.revision != currentRevision {
+      // Revision drift refreshes the loaded latest-anchored prefix in one shot so
+      // the store can recover to a coherent window before incremental loads resume.
       resolvedTimeline = response.entries ?? timeline
       resolvedTimelineWindow = normalizedTimelineWindow(
         response.metadataOnly,

@@ -165,6 +165,10 @@ extension MonitorTimelineSection {
     SessionTimelineContentIdentity(sessionID: sessionID)
   }
 
+  func loadOlderTimelineChunk(limit: Int) async {
+    await store.appendSelectedTimelineOlderChunk(limit: limit)
+  }
+
   func loadWindow(_ request: TimelineWindowRequest) async {
     await store.loadSelectedTimelineWindow(request: request)
   }
