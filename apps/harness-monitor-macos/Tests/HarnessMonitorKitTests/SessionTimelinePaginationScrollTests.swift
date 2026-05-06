@@ -121,6 +121,28 @@ struct SessionTimelineNavigationScrollTests {
     )
   }
 
+  @Test("Latest normalization only corrects minor top drift")
+  func latestNormalizationOnlyCorrectsMinorTopDrift() {
+    #expect(
+      SessionTimelineTableMetrics.shouldNormalizeLatestViewport(
+        visibleMinY: SessionTimelineTableMetrics.pinnedLatestDriftTolerance + 12,
+        firstVisibleRowIndex: 0
+      )
+    )
+    #expect(
+      !SessionTimelineTableMetrics.shouldNormalizeLatestViewport(
+        visibleMinY: 40,
+        firstVisibleRowIndex: 0
+      )
+    )
+    #expect(
+      !SessionTimelineTableMetrics.shouldNormalizeLatestViewport(
+        visibleMinY: SessionTimelineTableMetrics.pinnedLatestDriftTolerance + 12,
+        firstVisibleRowIndex: 1
+      )
+    )
+  }
+
   @Test("Top visible first row normalizes back to latest after rows prepend")
   @MainActor
   func topVisibleFirstRowNormalizesBackToLatestAfterRowsPrepend() async {

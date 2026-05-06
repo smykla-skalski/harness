@@ -155,8 +155,11 @@ extension SessionTimelineTableView.Coordinator {
     wasPinnedToLatest: Bool,
     previousAnchor: SessionTimelineTableAnchor?
   ) {
+    if !hasUnfulfilledScrollCommand && normalizePinnedLatestViewportIfNeeded() {
+      boundsDidChange()
+      return
+    }
     if wasPinnedToLatest && !hasUnfulfilledScrollCommand {
-      normalizePinnedLatestViewportIfNeeded()
       boundsDidChange()
       return
     }

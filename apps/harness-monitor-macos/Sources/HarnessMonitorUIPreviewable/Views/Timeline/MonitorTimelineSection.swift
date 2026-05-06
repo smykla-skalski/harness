@@ -180,6 +180,7 @@ struct MonitorTimelineSection: View {
       requestLatestWindow()
     }
     .onChange(of: presentation.scrollNodeIDs) { _, ids in
+      guard !ids.isEmpty else { return }
       deferOffViewUpdate {
         reconcileTimelineAnchor(with: ids)
         completePendingNavigationIfNeeded(cachedPresentation)

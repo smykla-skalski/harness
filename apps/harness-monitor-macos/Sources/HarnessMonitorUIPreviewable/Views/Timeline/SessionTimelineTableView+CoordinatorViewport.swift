@@ -27,6 +27,7 @@ extension SessionTimelineTableView.Coordinator {
     let y = clampedScrollY(rowRect.minY, scrollView: scrollView)
     scrollView.contentView.scroll(to: NSPoint(x: 0, y: y))
     scrollView.reflectScrolledClipView(scrollView.contentView)
+    reseedBoundaryStateToCurrentViewport()
     return true
   }
 
@@ -47,6 +48,7 @@ extension SessionTimelineTableView.Coordinator {
     )
     scrollView.contentView.scroll(to: NSPoint(x: 0, y: y))
     scrollView.reflectScrolledClipView(scrollView.contentView)
+    reseedBoundaryStateToCurrentViewport()
   }
 
   func clampedScrollY(_ y: CGFloat, scrollView: NSScrollView) -> CGFloat {
@@ -106,16 +108,41 @@ extension SessionTimelineTableView.Coordinator {
       return false
     }
     let visibleMinY = scrollView.contentView.bounds.minY
-    guard visibleMinY > 0 else {
-      return false
-    }
     let visibleRows = tableView.rows(in: scrollView.contentView.bounds)
-    guard visibleRows.location == 0 else {
+    guard
+      SessionTimelineTableMetrics.shouldNormalizeLatestViewport(
+        visibleMinY: visibleMinY,
+        firstVisibleRowIndex: visibleRows.location == NSNotFound ? nil : visibleRows.location
+      )
+    else {
       return false
     }
     scrollView.contentView.scroll(to: .zero)
     scrollView.reflectScrolledClipView(scrollView.contentView)
+    reseedBoundaryStateToCurrentViewport()
     return true
+  }
+
+  func currentBoundaryState() -> SessionTimelineScrollBoundaryState? {
+    guard let tableView, let scrollView else {
+      return nil
+    }
+    let visibleRect = scrollView.contentView.bounds
+    guard visibleRect.height > 0, visibleRect.width > 0 else {
+      return nil
+    }
+    return SessionTimelineScrollBoundaryState(
+      visibleMinY: visibleRect.minY,
+      visibleMaxY: visibleRect.maxY,
+      contentHeight: tableView.bounds.height
+    )
+  }
+
+  func reseedBoundaryStateToCurrentViewport() {
+    guard let boundaryState = currentBoundaryState() else {
+      return
+    }
+    lastBoundaryState = boundaryState
   }
 
   func publishViewportState() {
@@ -147,18 +174,16 @@ extension SessionTimelineTableView.Coordinator {
       scheduleIncrementalMeasurement(columnWidth: lastColumnWidth)
     }
 
-    let boundaryState = SessionTimelineScrollBoundaryState(
-      visibleMinY: visibleRect.minY,
-      visibleMaxY: visibleRect.maxY,
-      contentHeight: tableView.bounds.height
-    )
+    guard let boundaryState = currentBoundaryState() else {
+      return
+    }
     if boundaryState.enteredTopEdge(from: lastBoundaryState)
       || boundaryState.enteredBottomEdge(from: lastBoundaryState)
     {
       let oldValue = lastBoundaryState
       lastBoundaryState = boundaryState
       scrollBoundaryChanged(oldValue, boundaryState)
-    } else if boundaryState != lastBoundaryState {
+    } else if boundaryState.shouldTrack(from: lastBoundaryState) {
       lastBoundaryState = boundaryState
     }
   }

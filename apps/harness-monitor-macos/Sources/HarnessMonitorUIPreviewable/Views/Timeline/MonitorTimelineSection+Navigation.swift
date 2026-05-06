@@ -166,8 +166,14 @@ extension MonitorTimelineSection {
       return
     }
     if !ids.contains(anchorID) {
+      // Bottom-edge pagination can replace the loaded window with older rows
+      // that no longer include the previously visible anchor. In that case the
+      // coordinator already restored the viewport as far as possible, and any
+      // explicit navigation follow-up is handled by pending navigation. Forcing
+      // a new scroll to the first row here snaps the user back toward the top
+      // of the newly loaded window while they are still scrolling downward.
       timelineViewport.setAnchorID(ids.first)
-      issueScrollCommand(ids.first)
+      currentTimelineScrollCommand = nil
     }
   }
 
