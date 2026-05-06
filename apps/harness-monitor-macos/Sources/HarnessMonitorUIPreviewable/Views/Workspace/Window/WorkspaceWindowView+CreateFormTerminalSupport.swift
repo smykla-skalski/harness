@@ -260,6 +260,15 @@ extension WorkspaceWindowCreatePane {
     guard !viewModel.isSubmitting, createPaneSessionActionUnavailableNote == nil else {
       return false
     }
+    let trimmedName = viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmedName.isEmpty else {
+      return false
+    }
+    if existingAgentNamesInSession().contains(where: {
+      $0.caseInsensitiveCompare(trimmedName) == .orderedSame
+    }) {
+      return false
+    }
     switch viewModel.selectedLaunchSelection {
     case .tui:
       return viewModel.rows > 0 && viewModel.cols > 0
