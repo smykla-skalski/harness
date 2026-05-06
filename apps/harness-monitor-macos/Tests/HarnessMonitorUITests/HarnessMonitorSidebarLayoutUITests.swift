@@ -189,6 +189,22 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertEqual(taskStat.label, "arrow.triangle.2.circlepath")
   }
 
+  func testSidebarSessionRowDoesNotExposeRawSessionID() throws {
+    let app = launch(mode: "preview")
+    let rawSessionIDMatches = app.descendants(matching: .any).matching(
+      NSPredicate(format: "label CONTAINS %@", "sess1234")
+    )
+
+    XCTAssertTrue(
+      waitForElement(previewSessionTrigger(in: app), timeout: Self.fastActionTimeout)
+    )
+    XCTAssertEqual(
+      rawSessionIDMatches.count,
+      0,
+      "Sidebar session rows should not surface raw session IDs in visible or accessibility labels"
+    )
+  }
+
   func testSelectedSidebarSessionOffersContextMenuActions() throws {
     let app = launch(mode: "preview")
     let sessionRow = previewSessionTrigger(in: app)
