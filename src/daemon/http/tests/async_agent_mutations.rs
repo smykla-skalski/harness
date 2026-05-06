@@ -78,7 +78,9 @@ fn post_role_change_uses_async_db_when_sync_db_is_unavailable() {
                         .as_array()
                         .expect("agents array")
                         .iter()
-                        .find(|agent| agent["agent_id"].as_str() == Some(worker_id.as_str()))
+                        .find(|agent| {
+                            agent["session_agent_id"].as_str() == Some(worker_id.as_str())
+                        })
                         .and_then(|agent| agent["role"].as_str());
                     assert_eq!(role, Some("reviewer"));
                 });

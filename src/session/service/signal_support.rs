@@ -136,16 +136,13 @@ pub(crate) fn signal_dirs_for_agent_in_context_root(
     agent_session_id: Option<&str>,
     context_root: &Path,
 ) -> Vec<(String, PathBuf)> {
-    crate::session::types::crosswalk::legacy_compatible_signal_session_keys(
+    let signal_session_id = crate::session::types::crosswalk::effective_runtime_session_key(
         orchestration_session_id,
         agent_session_id,
     )
-    .into_iter()
-    .map(|signal_session_id| {
-        let signal_dir = signal_dir_in_context_root(runtime, context_root, &signal_session_id);
-        (signal_session_id, signal_dir)
-    })
-    .collect()
+    .to_string();
+    let signal_dir = signal_dir_in_context_root(runtime, context_root, &signal_session_id);
+    vec![(signal_session_id, signal_dir)]
 }
 
 pub(crate) fn agent_runtime_session_id<'a>(

@@ -303,7 +303,7 @@ struct WebSocketProtocolTests {
             },
             "agents": [
               {
-                "agent_id": "copilot-worker",
+                "session_agent_id": "copilot-worker",
                 "name": "GitHub Copilot",
                 "runtime": {
                   "kind": "acp",
@@ -314,7 +314,7 @@ struct WebSocketProtocolTests {
                 "joined_at": "2026-05-01T17:00:00Z",
                 "updated_at": "2026-05-01T17:00:00Z",
                 "status": "active",
-                "agent_session_id": "acp-session-1",
+                "runtime_session_id": "acp-session-1",
                 "runtime_capabilities": {
                   "runtime": "copilot",
                   "supports_native_transcript": true,

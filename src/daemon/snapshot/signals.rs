@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 
 use super::super::index::{self, DiscoveredProject, ResolvedSession};
-use crate::agents::runtime::legacy_compatible_signal_session_keys;
 use crate::agents::runtime::signal::{
     read_acknowledged_signals, read_acknowledgments, read_pending_signals, signal_matches_session,
 };
@@ -49,31 +48,25 @@ pub fn load_signals_for(
     for (agent_id, agent) in &state.agents {
         let mut signals_by_id = BTreeMap::new();
         let mut acknowledgments_by_id = BTreeMap::new();
-        for signal_session_id in legacy_compatible_signal_session_keys(
-            &state.session_id,
-            agent.agent_session_id.as_deref(),
-        ) {
-            let signal_dir = root
-                .join(agent.runtime.runtime_name())
-                .join(&signal_session_id);
-            for signal in read_pending_signals(&signal_dir)? {
-                signals_by_id.entry(signal.signal_id.clone()).or_insert((
-                    signal,
-                    false,
-                    signal_session_id.clone(),
-                ));
-            }
-            for signal in read_acknowledged_signals(&signal_dir)? {
-                signals_by_id.insert(
-                    signal.signal_id.clone(),
-                    (signal, true, signal_session_id.clone()),
-                );
-            }
-            for acknowledgment in read_acknowledgments(&signal_dir)? {
-                acknowledgments_by_id
-                    .entry(acknowledgment.signal_id.clone())
-                    .or_insert(acknowledgment);
-            }
+        let signal_session_id = agent.runtime_session_key(&state.session_id).to_string();
+        let signal_dir = root
+            .join(agent.runtime.runtime_name())
+            .join(&signal_session_id);
+        for signal in read_pending_signals(&signal_dir)? {
+            signals_by_id
+                .entry(signal.signal_id.clone())
+                .or_insert((signal, false, signal_session_id.clone()));
+        }
+        for signal in read_acknowledged_signals(&signal_dir)? {
+            signals_by_id.insert(
+                signal.signal_id.clone(),
+                (signal, true, signal_session_id.clone()),
+            );
+        }
+        for acknowledgment in read_acknowledgments(&signal_dir)? {
+            acknowledgments_by_id
+                .entry(acknowledgment.signal_id.clone())
+                .or_insert(acknowledgment);
         }
 
         for (signal, was_acknowledged, signal_session_id) in signals_by_id.into_values() {

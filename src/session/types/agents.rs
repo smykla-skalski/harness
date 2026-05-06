@@ -143,17 +143,6 @@ impl AgentRegistration {
     }
 
     #[must_use]
-    pub fn legacy_compatible_signal_session_keys(
-        &self,
-        orchestration_session_id: &str,
-    ) -> Vec<String> {
-        super::crosswalk::legacy_compatible_signal_session_keys(
-            orchestration_session_id,
-            self.agent_session_id.as_deref(),
-        )
-    }
-
-    #[must_use]
     pub fn matches_runtime_session_id(
         &self,
         orchestration_session_id: &str,

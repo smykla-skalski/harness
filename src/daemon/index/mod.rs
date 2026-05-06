@@ -19,9 +19,7 @@ pub use projects::{
     fast_counts, projects_root,
 };
 pub use reviews::load_task_reviews;
-pub use runtime_sessions::{
-    resolve_session_id_for_runtime_session, resolve_session_id_for_signal_session_key,
-};
+pub use runtime_sessions::resolve_session_id_for_runtime_session;
 pub use sessions::{
     discover_sessions, discover_sessions_for, load_conversation_events, load_log_entries,
     load_session_state, load_task_checkpoints, resolve_session,

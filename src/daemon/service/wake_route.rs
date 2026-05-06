@@ -254,9 +254,7 @@ mod tests {
     use super::{NoneReason, WakeDispatch, WakeRoute, wake_route_for_registration};
     use crate::agents::kind::{AcpAgentId, RuntimeKind};
     use crate::agents::runtime::RuntimeCapabilities;
-    use crate::daemon::service::signals::{
-        legacy_compatible_tui_id_for_signal_delivery, managed_tui_id_for_registration,
-    };
+    use crate::daemon::service::signals::managed_tui_id_for_registration;
     use crate::session::types::{
         AgentRegistration, AgentStatus, ManagedAgentKind, ManagedAgentRef, SessionRole,
     };
@@ -324,10 +322,6 @@ mod tests {
         let reg = registration(vec!["agent-tui:legacy-tui".into()], None);
 
         assert_eq!(managed_tui_id_for_registration(&reg), None);
-        assert_eq!(
-            legacy_compatible_tui_id_for_signal_delivery(&reg),
-            Some("legacy-tui")
-        );
 
         let route = wake_route_for_registration(Some(&reg), WakeDispatch::none());
         assert_none_reason(&route, NoneReason::Unmanaged);
@@ -353,10 +347,6 @@ mod tests {
 
         assert_eq!(
             managed_tui_id_for_registration(&reg),
-            Some("managed-tui-id")
-        );
-        assert_eq!(
-            legacy_compatible_tui_id_for_signal_delivery(&reg),
             Some("managed-tui-id")
         );
     }

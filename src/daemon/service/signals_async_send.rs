@@ -6,7 +6,7 @@ use tokio::time::{Instant as TokioInstant, sleep};
 
 use super::signals::{
     handled_active_signal_ack_wait_result, handled_active_signal_wake_result,
-    legacy_compatible_tui_id_for_signal_delivery, managed_tui_wake, wake_tui_for_signal,
+    managed_tui_id_for_registration, managed_tui_wake, wake_tui_for_signal,
     warn_active_signal_ack_record_failure,
 };
 use super::signals_async::{
@@ -68,7 +68,7 @@ async fn persist_sent_signal_state(
             let target_tui_id = state
                 .agents
                 .get(&request.agent_id)
-                .and_then(legacy_compatible_tui_id_for_signal_delivery)
+                .and_then(managed_tui_id_for_registration)
                 .map(ToString::to_string);
             Ok((runtime_name, target_agent_session_id, target_tui_id))
         })

@@ -13,9 +13,7 @@ use tokio::sync::broadcast;
 
 mod tui_identity;
 
-pub(crate) use tui_identity::{
-    legacy_compatible_tui_id_for_signal_delivery, managed_tui_id_for_registration,
-};
+pub(crate) use tui_identity::managed_tui_id_for_registration;
 
 /// Send a signal through the shared session service.
 ///
@@ -45,7 +43,7 @@ pub fn send_signal(
         let target_tui_id = state
             .agents
             .get(&request.agent_id)
-            .and_then(legacy_compatible_tui_id_for_signal_delivery)
+            .and_then(managed_tui_id_for_registration)
             .map(ToString::to_string);
         let project_id = db
             .project_id_for_session(session_id)?

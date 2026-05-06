@@ -69,13 +69,9 @@ fn resolve_runtime_session_returns_resolved_match() {
         .resolve_runtime_session("codex", "runtime-worker-42")
         .expect("resolve runtime session");
 
-    match outcome {
-        crate::daemon::client::RuntimeSessionLookup::Resolved(agent) => {
-            assert_eq!(agent.orchestration_session_id, "sess-1");
-            assert_eq!(agent.session_agent_id, "codex-abc");
-        }
-        other => panic!("expected Resolved, got {other:?}"),
-    }
+    let agent = outcome.expect("resolved runtime session");
+    assert_eq!(agent.orchestration_session_id, "sess-1");
+    assert_eq!(agent.session_agent_id, "codex-abc");
     let query = captured_query.lock().expect("query").clone();
     assert!(
         query.starts_with("/v1/runtime-sessions/resolve?"),
@@ -109,15 +105,12 @@ fn resolve_runtime_session_returns_not_found_when_resolved_is_null() {
     let outcome = client
         .resolve_runtime_session("codex", "unknown")
         .expect("resolve runtime session");
-    assert!(matches!(
-        outcome,
-        crate::daemon::client::RuntimeSessionLookup::NotFound
-    ));
+    assert_eq!(outcome, None);
     server.join().expect("server");
 }
 
 #[test]
-fn resolve_runtime_session_signals_endpoint_unavailable_on_404() {
+fn resolve_runtime_session_errors_when_endpoint_is_missing() {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
     let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
     let server = thread::spawn(move || {
@@ -138,11 +131,10 @@ fn resolve_runtime_session_signals_endpoint_unavailable_on_404() {
     };
     let outcome = client
         .resolve_runtime_session("codex", "sess-worker-a")
-        .expect("resolve runtime session");
-    assert!(matches!(
-        outcome,
-        crate::daemon::client::RuntimeSessionLookup::EndpointUnavailable
-    ));
+        .expect_err("missing resolver endpoint should fail");
+    assert!(outcome
+        .to_string()
+        .contains("daemon does not support /v1/runtime-sessions/resolve"));
     server.join().expect("server");
 }
 

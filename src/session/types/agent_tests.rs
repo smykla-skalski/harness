@@ -119,7 +119,7 @@ fn agent_persona_with_asset_serde_round_trip() {
 #[test]
 fn agent_registration_without_persona_deserializes() {
     let json = r#"{
-        "agent_id": "a1",
+        "session_agent_id": "a1",
         "name": "agent",
         "runtime": "codex",
         "role": "worker",
@@ -156,10 +156,9 @@ fn agent_registration_with_canonical_identity_fields_deserializes() {
 }
 
 #[test]
-fn agent_registration_matching_legacy_and_canonical_identity_fields_deserialize() {
+fn agent_registration_rejects_legacy_identity_aliases() {
     let json = r#"{
         "agent_id": "a1",
-        "session_agent_id": "a1",
         "name": "agent",
         "runtime": "codex",
         "role": "worker",
@@ -167,18 +166,19 @@ fn agent_registration_matching_legacy_and_canonical_identity_fields_deserialize(
         "joined_at": "2026-01-01T00:00:00Z",
         "updated_at": "2026-01-01T00:00:00Z",
         "status": "active",
-        "agent_session_id": "runtime-1",
-        "runtime_session_id": "runtime-1"
+        "agent_session_id": "runtime-1"
     }"#;
-    let reg: AgentRegistration = serde_json::from_str(json).expect("deserializes");
-    assert_eq!(reg.agent_id, "a1");
-    assert_eq!(reg.agent_session_id.as_deref(), Some("runtime-1"));
+    let error = serde_json::from_str::<AgentRegistration>(json).expect_err("legacy fields fail");
+    assert!(
+        error.to_string().contains("session_agent_id"),
+        "expected canonical field error, got {error}"
+    );
 }
 
 #[test]
 fn agent_registration_with_persona_deserializes() {
     let json = r#"{
-        "agent_id": "a1",
+        "session_agent_id": "a1",
         "name": "agent",
         "runtime": "codex",
         "role": "worker",
@@ -270,7 +270,7 @@ fn agent_registration_identity_accessors_classify_descriptor_runtime_ids() {
 }
 
 #[test]
-fn agent_registration_runtime_session_helpers_isolate_legacy_fallback() {
+fn agent_registration_runtime_session_helpers_use_canonical_runtime_key() {
     let reg = agent_registration(
         "worker-1",
         "codex",
@@ -280,10 +280,6 @@ fn agent_registration_runtime_session_helpers_isolate_legacy_fallback() {
 
     assert_eq!(reg.runtime_session_id(), None);
     assert_eq!(reg.runtime_session_key("sess-1"), "sess-1");
-    assert_eq!(
-        reg.legacy_compatible_signal_session_keys("sess-1"),
-        vec!["sess-1".to_string()]
-    );
     assert!(reg.matches_runtime_session_id("sess-1", &RuntimeSessionId::from("sess-1")));
 
     let mut bound = reg.clone();
@@ -294,10 +290,6 @@ fn agent_registration_runtime_session_helpers_isolate_legacy_fallback() {
         Some(RuntimeSessionId::from("runtime-1"))
     );
     assert_eq!(bound.runtime_session_key("sess-1"), "runtime-1");
-    assert_eq!(
-        bound.legacy_compatible_signal_session_keys("sess-1"),
-        vec!["runtime-1".to_string(), "sess-1".to_string()]
-    );
     assert!(bound.matches_runtime_session_id("sess-1", &RuntimeSessionId::from("runtime-1")));
     assert!(!bound.matches_runtime_session_id("sess-1", &RuntimeSessionId::from("sess-1")));
 }

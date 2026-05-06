@@ -58,7 +58,7 @@ fn session_id_from_path_extracts_known_layouts() {
                 &context_root.join("agents/signals/codex/watch-map/pending/sig.json")
             )
             .expect("legacy signal path"),
-            Some("watch-map".to_string())
+            None
         );
         assert_eq!(
             session_id_from_path(

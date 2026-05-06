@@ -234,7 +234,7 @@ pub struct AdoptSessionRequest {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AgentRuntimeSessionRegistrationRequest {
-    pub tui_id: String,
+    pub managed_agent_id: String,
     pub runtime: String,
     pub runtime_session_id: String,
     pub project_dir: String,
@@ -247,7 +247,7 @@ mod tests {
     #[test]
     fn agent_runtime_session_registration_request_serializes_runtime_session_id() {
         let request = AgentRuntimeSessionRegistrationRequest {
-            tui_id: "tui-1".into(),
+            managed_agent_id: "managed-agent-1".into(),
             runtime: "codex".into(),
             runtime_session_id: "runtime-1".into(),
             project_dir: "/tmp/project".into(),
@@ -255,6 +255,7 @@ mod tests {
 
         let json = serde_json::to_value(&request).expect("serialize runtime session request");
 
+        assert_eq!(json["managed_agent_id"], "managed-agent-1");
         assert_eq!(json["runtime_session_id"], "runtime-1");
     }
 }

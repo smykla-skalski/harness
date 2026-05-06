@@ -20,7 +20,6 @@ struct WebSocketProtocolAcpTests {
         "recorded_at": "2026-04-28T00:00:00Z",
         "payload": {
           "batch_id": "batch-1",
-          "acp_id": "legacy-acp",
           "managed_agent_id": "acp-1",
           "managed_agent_family": "acp",
           "session_id": "session-1",
@@ -78,7 +77,6 @@ struct WebSocketProtocolAcpTests {
         "recorded_at": "2026-04-28T00:05:00Z",
         "payload": {
           "batch_id": "batch-1",
-          "acp_id": "legacy-acp",
           "managed_agent_id": "acp-1",
           "managed_agent_family": "acp",
           "session_id": "session-1",
@@ -108,7 +106,6 @@ struct WebSocketProtocolAcpTests {
         "session_id": "session-1",
         "recorded_at": "2026-04-28T00:00:30Z",
         "payload": {
-          "acp_id": "legacy-acp",
           "managed_agent_id": "acp-1",
           "managed_agent_family": "acp",
           "session_id": "session-1",
@@ -178,6 +175,8 @@ struct WebSocketProtocolAcpTests {
         "recorded_at": "2026-05-05T00:00:30Z",
         "payload": {
           "acp_id": "acp-1",
+          "managed_agent_id": "acp-1",
+          "managed_agent_family": "acp",
           "session_id": "session-1",
           "raw_count": 3,
           "events": [
@@ -257,8 +256,10 @@ struct WebSocketProtocolAcpTests {
             "agents": [
               {
                 "acp_id": "acp-1",
+                "managed_agent_id": "acp-1",
                 "session_id": "session-1",
                 "agent_id": "worker-codex",
+                "session_agent_id": "worker-codex",
                 "display_name": "worker-codex",
                 "pid": 41001,
                 "pgid": 41001,

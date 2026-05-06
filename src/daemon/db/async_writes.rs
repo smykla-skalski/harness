@@ -103,7 +103,7 @@ impl AsyncDaemonDb {
             })?
             .ok_or_else(|| {
                 CliError::from(CliErrorKind::session_not_active(format!(
-                    "session '{session_id}' not found"
+                    "harness session '{session_id}' not found"
                 )))
             })?;
         let mut state: SessionState = serde_json::from_str(&row.state_json)

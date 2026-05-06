@@ -40,7 +40,7 @@ pub(super) fn resolve_tui_project(
     }
 
     let resolved = db.resolve_session(session_id)?.ok_or_else(|| {
-        CliErrorKind::session_not_active(format!("session '{session_id}' not found"))
+        CliErrorKind::session_not_active(format!("harness session '{session_id}' not found"))
     })?;
     let context_root = resolved.project.context_root;
     let project_dir = resolved
@@ -68,7 +68,7 @@ pub(super) async fn resolve_tui_project_async(
     }
 
     let resolved = db.resolve_session(session_id).await?.ok_or_else(|| {
-        CliErrorKind::session_not_active(format!("session '{session_id}' not found"))
+        CliErrorKind::session_not_active(format!("harness session '{session_id}' not found"))
     })?;
     let context_root = resolved.project.context_root;
     let project_dir = resolved

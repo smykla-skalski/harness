@@ -41,8 +41,10 @@ struct HarnessMonitorAgentModelsTests {
         "kind": "acp",
         "snapshot": {
           "acp_id": "acp-1",
+          "managed_agent_id": "acp-1",
           "session_id": "session-1",
           "agent_id": "copilot",
+          "session_agent_id": "copilot",
           "display_name": "Copilot",
           "status": {
             "state": "disconnected",
@@ -58,6 +60,7 @@ struct HarnessMonitorAgentModelsTests {
             {
               "batch_id": "batch-1",
               "acp_id": "acp-1",
+              "managed_agent_id": "acp-1",
               "session_id": "session-1",
               "created_at": "2026-04-28T00:00:00Z",
               "requests": [
@@ -93,7 +96,7 @@ struct HarnessMonitorAgentModelsTests {
     let data = Data(
       #"""
       {
-        "agent_id": "copilot-worker",
+        "session_agent_id": "copilot-worker",
         "name": "GitHub Copilot",
         "runtime": {
           "kind": "acp",
@@ -104,7 +107,7 @@ struct HarnessMonitorAgentModelsTests {
         "joined_at": "2026-05-01T17:00:00Z",
         "updated_at": "2026-05-01T17:00:01Z",
         "status": "active",
-        "agent_session_id": "acp-session-1",
+        "runtime_session_id": "acp-session-1",
         "managed_agent": {
           "kind": "acp",
           "id": "acp-runtime-1"
@@ -417,13 +420,12 @@ struct HarnessMonitorAgentModelsTests {
     #expect(ManagedAgentSnapshot.acp(acp).sessionAgentIdentity == Optional(acp.sessionAgentIdentity))
   }
 
-  @Test("Agent registration decodes and encodes explicit identity aliases")
-  func agentRegistrationWireAliasesRoundTrip() throws {
+  @Test("Agent registration rejects legacy identity aliases")
+  func agentRegistrationRejectsLegacyIdentityAliases() throws {
     let data = Data(
       #"""
       {
         "agent_id": "legacy-agent",
-        "session_agent_id": "worker-1",
         "name": "Worker",
         "runtime": { "kind": "acp", "id": "copilot" },
         "descriptor_id": "copilot",
@@ -433,7 +435,6 @@ struct HarnessMonitorAgentModelsTests {
         "updated_at": "2026-05-01T00:00:01Z",
         "status": "active",
         "agent_session_id": "legacy-runtime",
-        "runtime_session_id": "runtime-1",
         "managed_agent_id": "acp-1",
         "managed_agent_family": "acp",
         "runtime_capabilities": {
@@ -448,22 +449,12 @@ struct HarnessMonitorAgentModelsTests {
       """#.utf8
     )
 
-    let registration = try decoder.decode(AgentRegistration.self, from: data)
-    #expect(registration.sessionAgentID == "worker-1")
-    #expect(registration.runtimeSessionID == "runtime-1")
-    #expect(registration.managedAgentID == "acp-1")
-    #expect(registration.runtime == "copilot")
-
-    let wireEncoder = JSONEncoder()
-    wireEncoder.keyEncodingStrategy = .convertToSnakeCase
-    let encoded = try wireEncoder.encode(registration)
-    let json = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
-    #expect(json["agent_id"] as? String == "worker-1")
-    #expect(json["session_agent_id"] as? String == "worker-1")
-    #expect(json["runtime_session_id"] as? String == "runtime-1")
-    #expect(json["managed_agent_id"] as? String == "acp-1")
-    #expect(json["managed_agent_family"] as? String == "acp")
-    #expect(json["descriptor_id"] as? String == "copilot")
+    do {
+      _ = try decoder.decode(AgentRegistration.self, from: data)
+      Issue.record("Expected legacy identity aliases to fail decoding")
+    } catch {
+      #expect(true)
+    }
   }
 
 }

@@ -1,10 +1,9 @@
 use std::path::PathBuf;
 
 use super::{
-    BTreeMap, CURRENT_VERSION, CliError, CliErrorKind, DaemonClient, ResolvedRuntimeSessionAgent,
-    SessionState, protocol, runtime_session_matches_agent,
+    BTreeMap, CURRENT_VERSION, CliError, DaemonClient, ResolvedRuntimeSessionAgent, SessionState,
+    protocol,
 };
-use crate::daemon::client::RuntimeSessionLookup;
 use crate::session::types::SessionPolicy;
 
 pub(crate) fn detail_to_session_state(detail: &protocol::SessionDetail) -> SessionState {
@@ -84,52 +83,7 @@ pub(crate) fn resolve_runtime_session_via_daemon(
     runtime_name: &str,
     runtime_session_id: &str,
 ) -> Result<Option<ResolvedRuntimeSessionAgent>, CliError> {
-    match client.resolve_runtime_session(runtime_name, runtime_session_id)? {
-        RuntimeSessionLookup::Resolved(agent) => Ok(Some(agent)),
-        RuntimeSessionLookup::NotFound => Ok(None),
-        RuntimeSessionLookup::EndpointUnavailable => {
-            resolve_runtime_session_via_legacy_fanout(client, runtime_name, runtime_session_id)
-        }
-    }
-}
-
-/// Legacy resolver used only when the daemon predates
-/// `/v1/runtime-sessions/resolve`. Kept intact for seamless upgrades -
-/// delete once the minimum supported daemon version ships the new endpoint.
-fn resolve_runtime_session_via_legacy_fanout(
-    client: &DaemonClient,
-    runtime_name: &str,
-    runtime_session_id: &str,
-) -> Result<Option<ResolvedRuntimeSessionAgent>, CliError> {
-    let summaries = client.list_sessions()?;
-    let mut matches = Vec::new();
-    for summary in &summaries {
-        if !summary.status.is_joinable() {
-            continue;
-        }
-        let Ok(detail) = client.get_session_detail(&summary.session_id) else {
-            continue;
-        };
-        for agent in &detail.agents {
-            if !agent.status.is_alive() || agent.runtime != runtime_name {
-                continue;
-            }
-            if runtime_session_matches_agent(&summary.session_id, agent, runtime_session_id) {
-                matches.push(ResolvedRuntimeSessionAgent {
-                    orchestration_session_id: summary.session_id.clone(),
-                    session_agent_id: agent.agent_id.clone(),
-                });
-            }
-        }
-    }
-    match matches.len() {
-        0 => Ok(None),
-        1 => Ok(matches.into_iter().next()),
-        _ => Err(CliErrorKind::session_ambiguous(format!(
-            "runtime session '{runtime_session_id}' for runtime '{runtime_name}' maps to multiple orchestration sessions"
-        ))
-        .into()),
-    }
+    client.resolve_runtime_session(runtime_name, runtime_session_id)
 }
 
 #[cfg(test)]

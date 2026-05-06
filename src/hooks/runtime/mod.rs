@@ -315,13 +315,12 @@ fn find_pending_signals(
     let orchestration_id = resolved_session.map_or(runtime_session_id, |resolved| {
         resolved.orchestration_session_id.as_str()
     });
-    let signal_sources =
-        runtime::legacy_compatible_signal_session_keys(orchestration_id, Some(runtime_session_id));
-    let runtime_name = agent_runtime.name();
-    signal_sources.into_iter().find_map(|signal_session_id| {
-        let signal_dir = agent_runtime.signal_dir(project_dir, &signal_session_id);
-        read_signals_from_dir(&signal_dir, runtime_name, &signal_session_id)
-    })
+    let signal_session_id = orchestration_id
+        .eq(runtime_session_id)
+        .then_some(orchestration_id)
+        .unwrap_or(runtime_session_id);
+    let signal_dir = agent_runtime.signal_dir(project_dir, signal_session_id);
+    read_signals_from_dir(&signal_dir, agent_runtime.name(), signal_session_id)
 }
 
 fn read_signals_from_dir(

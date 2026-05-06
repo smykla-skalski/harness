@@ -309,7 +309,9 @@ fn sample_checkpoint() -> TaskCheckpoint {
 }
 
 fn write_signal_fixture(context_root: &Path, session_id: &str) {
-    let signal_dir = context_root.join("agents/signals/codex").join(session_id);
+    let signal_dir = context_root
+        .join("agents/signals/codex")
+        .join(RUNTIME_SESSION_ID);
     let signal = sample_signal(SIGNAL_ID, "merged timeline");
     write_signal_file(&signal_dir, &signal).expect("write acked signal");
     acknowledge_signal(

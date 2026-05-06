@@ -314,13 +314,9 @@ public struct AcpAgentInspectSnapshot: Codable, Equatable, Identifiable, Sendabl
 
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    acpId =
-      try container.decodeIfPresent(String.self, forKey: .managedAgentId)
-      ?? container.decode(String.self, forKey: .acpId)
+    acpId = try container.decode(String.self, forKey: .managedAgentId)
     sessionId = try container.decode(String.self, forKey: .sessionId)
-    agentId =
-      try container.decodeIfPresent(String.self, forKey: .sessionAgentId)
-      ?? container.decode(String.self, forKey: .agentId)
+    agentId = try container.decode(String.self, forKey: .sessionAgentId)
     displayName = try container.decode(String.self, forKey: .displayName)
     pid = try container.decode(UInt32.self, forKey: .pid)
     pgid = try container.decode(Int32.self, forKey: .pgid)

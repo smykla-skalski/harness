@@ -346,7 +346,9 @@ fn post_remove_agent_and_end_session_use_async_db_when_sync_db_is_unavailable() 
                             .as_array()
                             .expect("agents array")
                             .iter()
-                            .all(|agent| agent["agent_id"].as_str() != Some(worker_id.as_str()))
+                            .all(|agent| {
+                                agent["session_agent_id"].as_str() != Some(worker_id.as_str())
+                            })
                     );
                     assert_eq!(body["signals"].as_array().map(Vec::len), Some(1));
 
@@ -427,7 +429,7 @@ fn post_runtime_session_uses_async_db_when_sync_db_is_unavailable() {
                         auth_headers(),
                         State(state.clone()),
                         Json(AgentRuntimeSessionRegistrationRequest {
-                            tui_id: tui_id.into(),
+                            managed_agent_id: tui_id.into(),
                             runtime: "gemini".into(),
                             runtime_session_id: "gemini-runtime-2152464d".into(),
                             project_dir: project_dir.to_string_lossy().into_owned(),
