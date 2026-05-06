@@ -1,6 +1,14 @@
 import HarnessMonitorKit
 import SwiftUI
 
+struct WorkspaceSidebarWidthPreferenceKey: PreferenceKey {
+  static let defaultValue: CGFloat = WorkspaceChromeMetrics.sidebarIdealWidth
+
+  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+    value = nextValue()
+  }
+}
+
 enum WorkspaceDecisionFilterDefaults {
   static let severitiesKey = "harness.workspace.sidebar.severitiesCSV"
   static let searchScopeKey = "harness.workspace.sidebar.searchScope"
@@ -127,6 +135,14 @@ struct WorkspaceSidebar: View {
 
   var body: some View {
     searchableSidebarList
+      .background {
+        GeometryReader { proxy in
+          Color.clear.preference(
+            key: WorkspaceSidebarWidthPreferenceKey.self,
+            value: proxy.size.width
+          )
+        }
+      }
       .toolbar {
         WorkspaceSidebarDecisionFilterToolbarItem(
           selectedSeverities: decisionFilters.severities,
