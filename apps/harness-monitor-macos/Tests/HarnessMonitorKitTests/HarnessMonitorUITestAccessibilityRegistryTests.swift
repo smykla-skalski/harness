@@ -218,6 +218,52 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(settingsMCP.contains("settingsMCPStatus"))
   }
 
+  @Test("Menu bar extra identifiers match UI-test mirror")
+  func menuBarExtraIdentifiersMirror() {
+    #expect(HarnessMonitorAccessibility.menuBarExtra == "harness.menu-bar.extra")
+    #expect(
+      HarnessMonitorAccessibility.menuBarConnectionStatus
+        == "harness.menu-bar.status.connection"
+    )
+    #expect(
+      HarnessMonitorAccessibility.menuBarSessionStatus
+        == "harness.menu-bar.status.sessions"
+    )
+    #expect(
+      HarnessMonitorAccessibility.menuBarDecisionStatus == "harness.menu-bar.status.decisions"
+    )
+    #expect(
+      HarnessMonitorAccessibility.menuBarSupervisorStatus
+        == "harness.menu-bar.status.supervisor"
+    )
+    #expect(
+      HarnessMonitorAccessibility.menuBarOpenMonitor
+        == "harness.menu-bar.action.open-monitor"
+    )
+    #expect(
+      HarnessMonitorAccessibility.menuBarOpenWorkspace
+        == "harness.menu-bar.action.open-workspace"
+    )
+    #expect(
+      HarnessMonitorAccessibility.menuBarOpenSettings
+        == "harness.menu-bar.action.open-settings"
+    )
+    #expect(HarnessMonitorAccessibility.menuBarRefresh == "harness.menu-bar.action.refresh")
+    #expect(
+      HarnessMonitorAccessibility.menuBarSupervisorToggle
+        == "harness.menu-bar.action.supervisor-toggle"
+    )
+    #expect(
+      HarnessMonitorAccessibility.menuBarSupervisorCheckNow
+        == "harness.menu-bar.action.supervisor-check-now"
+    )
+    #expect(
+      HarnessMonitorAccessibility.menuBarRunWhenClosed
+        == "harness.menu-bar.action.run-when-closed"
+    )
+    #expect(HarnessMonitorAccessibility.menuBarQuit == "harness.menu-bar.action.quit")
+  }
+
   @Test("New session capability identifiers match UI-test mirror")
   func newSessionCapabilityIdentifiersMirror() {
     #expect(

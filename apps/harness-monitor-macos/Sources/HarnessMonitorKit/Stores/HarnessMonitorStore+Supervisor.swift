@@ -5,6 +5,10 @@ extension HarnessMonitorStore {
     supervisorStack?.decisionStore
   }
 
+  public var canRequestSupervisorCheckNow: Bool {
+    supervisorRuntimeState != .starting && supervisorRuntimeState != .stopping
+  }
+
   public func requestObserverFocusInDecisions() {
     supervisorObserverFocusTick &+= 1
   }
@@ -53,16 +57,23 @@ extension HarnessMonitorStore {
   }
 
   public func startSupervisor() async {
+    if let stopTask = supervisorStopTask {
+      await stopTask.value
+    }
+
     guard supervisorStack == nil else {
+      setSupervisorRuntimeState(.running)
       HarnessMonitorLogger.supervisorTrace("supervisor.start skipped — already running")
       return
     }
 
     if let startTask = supervisorStartTask {
+      setSupervisorRuntimeState(.starting)
       await startTask.value
       return
     }
 
+    setSupervisorRuntimeState(.starting)
     let startTask = Task { @MainActor [weak self] in
       guard let self else {
         return
@@ -74,15 +85,43 @@ extension HarnessMonitorStore {
   }
 
   public func stopSupervisor() async {
+    if let stopTask = supervisorStopTask {
+      await stopTask.value
+      return
+    }
+
     if supervisorStack == nil, let startTask = supervisorStartTask {
+      setSupervisorRuntimeState(.stopping)
       await startTask.value
     }
     guard let stack = supervisorStack else {
+      setSupervisorRuntimeState(.stopped)
       HarnessMonitorLogger.supervisorTrace("supervisor.stop skipped — not running")
       return
     }
+
+    setSupervisorRuntimeState(.stopping)
+    let stopTask = Task { @MainActor [weak self] in
+      guard let self else {
+        return
+      }
+      await self.performSupervisorShutdown(stack)
+    }
+    supervisorStopTask = stopTask
+    await stopTask.value
+  }
+
+  private func performSupervisorShutdown(_ stack: SupervisorStack) async {
+    defer {
+      supervisorStopTask = nil
+      setSupervisorRuntimeState(.stopped)
+      HarnessMonitorLogger.supervisorTrace("supervisor.stopped")
+    }
+
     stopAcpPermissionDecisionProcessing()
-    supervisorStack = nil
+    if supervisorStack === stack {
+      supervisorStack = nil
+    }
 
     stack.relayTask.cancel()
     supervisorTickTrigger.cancel()
@@ -99,8 +138,6 @@ extension HarnessMonitorStore {
       await controller.resetBadge()
     }
     supervisorDecisionRefreshTick &+= 1
-
-    HarnessMonitorLogger.supervisorTrace("supervisor.stopped")
   }
 
   public func setSupervisorRunInBackgroundEnabled(_ enabled: Bool) {
@@ -131,6 +168,13 @@ extension HarnessMonitorStore {
       return
     }
     await registry.applyOverrides(Self.loadPolicyOverrides(from: modelContext))
+  }
+
+  public func requestSupervisorCheckNow() async {
+    guard canRequestSupervisorCheckNow else {
+      return
+    }
+    await runSupervisorTickNow()
   }
 
   public func supervisorLiveTickSnapshot() async -> DecisionLiveTickSnapshot {

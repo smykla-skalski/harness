@@ -3,9 +3,15 @@ import SwiftData
 
 extension HarnessMonitorStore {
   func performSupervisorStartup() async {
-    defer { supervisorStartTask = nil }
+    defer {
+      if supervisorStack == nil {
+        setSupervisorRuntimeState(.stopped)
+      }
+      supervisorStartTask = nil
+    }
 
     guard supervisorStack == nil else {
+      setSupervisorRuntimeState(.running)
       HarnessMonitorLogger.supervisorTrace("supervisor.start skipped — already running")
       return
     }
@@ -102,6 +108,9 @@ extension HarnessMonitorStore {
     lifecycle.startBackgroundActivity()
     auditRetention?.startBackgroundCompaction()
 
+    if supervisorRuntimeState != .stopping {
+      setSupervisorRuntimeState(.running)
+    }
     HarnessMonitorLogger.supervisorTrace("supervisor.started")
   }
 

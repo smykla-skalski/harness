@@ -17,6 +17,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var supervisorStack: SupervisorStack?
   @ObservationIgnored var supervisorBindings = SupervisorBindings()
   @ObservationIgnored var supervisorStartTask: Task<Void, Never>?
+  @ObservationIgnored var supervisorStopTask: Task<Void, Never>?
   @ObservationIgnored let supervisorTickTrigger = SupervisorTickTrigger()
   @ObservationIgnored var cachedNullActionHandler: NullDecisionActionHandler?
 
@@ -27,6 +28,7 @@ public final class HarnessMonitorStore {
   public var supervisorOpenDecisions: [Decision] = []
   public var supervisorDecisionRefreshTick: Int = 0
   public internal(set) var supervisorLiveTickRefreshTick: Int = 0
+  public private(set) var supervisorRuntimeState: SupervisorRuntimeState = .stopped
   public var supervisorObserverFocusTick: Int = 0
   public var supervisorPrimaryActionFocusDecisionID: String?
   public var supervisorPrimaryActionFocusRequestTick: Int = 0
@@ -343,6 +345,13 @@ public final class HarnessMonitorStore {
     bindUISlices()
     refreshBookmarkedSessionIds()
     syncAllUI()
+  }
+
+  func setSupervisorRuntimeState(_ state: SupervisorRuntimeState) {
+    guard supervisorRuntimeState != state else {
+      return
+    }
+    supervisorRuntimeState = state
   }
 
 }
