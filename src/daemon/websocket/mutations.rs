@@ -283,11 +283,7 @@ pub(crate) fn dispatch_mutation_with_agent(
         return error_response(&request.id, "MISSING_PARAM", "missing session_id");
     };
     let Some(agent_id) = extract_session_agent_id(&request.params) else {
-        return error_response(
-            &request.id,
-            "MISSING_PARAM",
-            "missing session_agent_id",
-        );
+        return error_response(&request.id, "MISSING_PARAM", "missing session_agent_id");
     };
     let mut params = request.params.clone();
     bind_control_plane_actor_value(&mut params);
@@ -331,11 +327,7 @@ where
         return error_response(&request.id, "MISSING_PARAM", "missing session_id");
     };
     let Some(agent_id) = extract_session_agent_id(&request.params) else {
-        return error_response(
-            &request.id,
-            "MISSING_PARAM",
-            "missing session_agent_id",
-        );
+        return error_response(&request.id, "MISSING_PARAM", "missing session_agent_id");
     };
     let mut params = request.params.clone();
     bind_control_plane_actor_value(&mut params);

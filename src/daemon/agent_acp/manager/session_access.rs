@@ -77,7 +77,7 @@ impl AcpAgentManagerHandle {
                     WakeEventLevel::Warn,
                     "skipped",
                     &[
-                        ("acp_id", &prompt.acp_id),
+                        ("managed_agent_id", &prompt.acp_id),
                         ("signal_id", &prompt.signal_id),
                         ("reason", &"session_not_active"),
                         ("error", &error),
@@ -90,7 +90,10 @@ impl AcpAgentManagerHandle {
             record_wake_event(
                 WakeEventLevel::Info,
                 "coalesced",
-                &[("acp_id", &prompt.acp_id), ("signal_id", &prompt.signal_id)],
+                &[
+                    ("managed_agent_id", &prompt.acp_id),
+                    ("signal_id", &prompt.signal_id),
+                ],
             );
             return;
         }
@@ -104,7 +107,7 @@ impl AcpAgentManagerHandle {
             record_wake_event(
                 WakeEventLevel::Error,
                 "thread_spawn_failed",
-                &[("acp_id", &acp_id_for_diag), ("error", &error)],
+                &[("managed_agent_id", &acp_id_for_diag), ("error", &error)],
             );
         }
     }
@@ -223,10 +226,10 @@ fn run_wake_prompt(
                 WakeEventLevel::Info,
                 "dispatched",
                 &[
-                    ("acp_id", &acp_id),
-                    ("protocol_session_id", &returned_session_id),
+                    ("managed_agent_id", &acp_id),
+                    ("runtime_session_id", &returned_session_id),
                     ("signal_id", &signal_id),
-                    ("agent_id", &agent_id),
+                    ("session_agent_id", &agent_id),
                 ],
             );
             if !sync_returned_runtime_session(
@@ -271,8 +274,8 @@ fn run_wake_prompt(
                 WakeEventLevel::Warn,
                 "failed",
                 &[
-                    ("acp_id", &acp_id),
-                    ("signal_session_id", &signal_session_id),
+                    ("managed_agent_id", &acp_id),
+                    ("requested_runtime_session_id", &signal_session_id),
                     ("signal_id", &signal_id),
                     ("error", &error),
                 ],
@@ -306,11 +309,11 @@ fn sync_returned_runtime_session(
                 WakeEventLevel::Warn,
                 "runtime_bind_skipped",
                 &[
-                    ("acp_id", &acp_id),
+                    ("managed_agent_id", &acp_id),
                     ("signal_id", &signal_id),
                     ("runtime_name", &runtime_name),
-                    ("requested_session_id", &requested_session_id),
-                    ("returned_session_id", &returned_session_id),
+                    ("requested_runtime_session_id", &requested_session_id),
+                    ("returned_runtime_session_id", &returned_session_id),
                     ("reason", &"session_or_agent_missing"),
                 ],
             );
@@ -321,11 +324,11 @@ fn sync_returned_runtime_session(
                 WakeEventLevel::Warn,
                 "runtime_bind_failed",
                 &[
-                    ("acp_id", &acp_id),
+                    ("managed_agent_id", &acp_id),
                     ("signal_id", &signal_id),
                     ("runtime_name", &runtime_name),
-                    ("requested_session_id", &requested_session_id),
-                    ("returned_session_id", &returned_session_id),
+                    ("requested_runtime_session_id", &requested_session_id),
+                    ("returned_runtime_session_id", &returned_session_id),
                     ("error", &error),
                 ],
             );
@@ -358,11 +361,11 @@ fn record_wake_accept(
                 WakeEventLevel::Info,
                 "accepted",
                 &[
-                    ("acp_id", &acp_id),
+                    ("managed_agent_id", &acp_id),
                     ("orchestration_session_id", &orchestration_session_id),
-                    ("signal_session_id", &signal_session_id),
+                    ("runtime_session_id", &signal_session_id),
                     ("signal_id", &signal_id),
-                    ("agent_id", &agent_id),
+                    ("session_agent_id", &agent_id),
                 ],
             );
             true
@@ -372,9 +375,9 @@ fn record_wake_accept(
                 WakeEventLevel::Warn,
                 "ack_write_failed",
                 &[
-                    ("acp_id", &acp_id),
+                    ("managed_agent_id", &acp_id),
                     ("orchestration_session_id", &orchestration_session_id),
-                    ("signal_session_id", &signal_session_id),
+                    ("runtime_session_id", &signal_session_id),
                     ("signal_id", &signal_id),
                     ("error", &error),
                 ],
@@ -399,7 +402,7 @@ fn sync_wake_accept_to_daemon(
                 WakeEventLevel::Warn,
                 "ack_sync_skipped",
                 &[
-                    ("acp_id", &acp_id),
+                    ("managed_agent_id", &acp_id),
                     ("signal_id", &signal_id),
                     ("error", &error),
                 ],
@@ -414,7 +417,7 @@ fn sync_wake_accept_to_daemon(
                 WakeEventLevel::Warn,
                 "ack_sync_lock_poisoned",
                 &[
-                    ("acp_id", &acp_id),
+                    ("managed_agent_id", &acp_id),
                     ("signal_id", &signal_id),
                     ("error", &error),
                 ],
@@ -435,7 +438,7 @@ fn sync_wake_accept_to_daemon(
             WakeEventLevel::Warn,
             "ack_sync_failed",
             &[
-                ("acp_id", &acp_id),
+                ("managed_agent_id", &acp_id),
                 ("signal_id", &signal_id),
                 ("error", &error),
             ],

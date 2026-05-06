@@ -81,20 +81,20 @@ struct PendingAcpEventPushBatch: Sendable {
 extension WebSocketTransport {
   func sessionScopeParams(sessionID: String) -> [String: JSONValue] {
     [
-      "session_id": .string(sessionID),
+      "session_id": .string(sessionID)
     ]
   }
 
   func managedAgentParams(agentID: String) -> [String: JSONValue] {
     [
-      "managed_agent_id": .string(agentID),
+      "managed_agent_id": .string(agentID)
     ]
   }
 
   func sessionAgentMutationParams(sessionID: String, agentID: String) -> [String: JSONValue] {
     sessionScopeParams(sessionID: sessionID).merging(
       [
-        "session_agent_id": .string(agentID),
+        "session_agent_id": .string(agentID)
       ]
     ) { _, newValue in newValue }
   }

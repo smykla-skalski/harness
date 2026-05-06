@@ -70,11 +70,11 @@ extension WebSocketProtocolTests {
       statusCode: 503,
       data: bridgePayloadData
     )
-    guard case let .server(code, message)? = bridgeError as? HarnessMonitorAPIError else {
+    guard case .server(let code, let message)? = bridgeError as? HarnessMonitorAPIError else {
       Issue.record("Expected bridge parity error to map to a server API error")
       return
     }
-    guard case let .server(expectedCode, expectedMessage) = decodedBridgeError else {
+    guard case .server(let expectedCode, let expectedMessage) = decodedBridgeError else {
       Issue.record("Expected HTTP decoder to produce a server API error")
       return
     }
@@ -85,7 +85,9 @@ extension WebSocketProtocolTests {
     let expectedPayloadObject = try #require(
       JSONSerialization.jsonObject(with: Data(expectedMessage.utf8)) as? [String: Any]
     )
-    #expect(NSDictionary(dictionary: bridgePayloadObject) == NSDictionary(dictionary: expectedPayloadObject))
+    #expect(
+      NSDictionary(dictionary: bridgePayloadObject)
+        == NSDictionary(dictionary: expectedPayloadObject))
   }
 
   @Test("WsFrame returns unknown for empty object")

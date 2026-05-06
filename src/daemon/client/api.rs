@@ -13,7 +13,7 @@ use crate::daemon::protocol::{
     TaskCreateRequest, TaskDeleteRequest, TaskDropRequest, TaskRespondReviewRequest,
     TaskSubmitForReviewRequest, TaskSubmitReviewRequest, TaskUpdateRequest,
 };
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::session::service::{ImproverApplyOutcome, ResolvedRuntimeSessionAgent};
 use crate::session::types::SessionState;
 
@@ -42,14 +42,12 @@ impl DaemonClient {
                 ("runtime_session_id", runtime_session_id),
             ],
         )?;
-        response
-            .map(|payload| payload.resolved)
-            .ok_or_else(|| {
-                CliError::from(crate::errors::CliErrorKind::session_agent_conflict(
-                    "daemon does not support /v1/runtime-sessions/resolve; upgrade the daemon"
-                        .to_string(),
-                ))
-            })
+        response.map(|payload| payload.resolved).ok_or_else(|| {
+            CliError::from(CliErrorKind::session_agent_conflict(
+                "daemon does not support /v1/runtime-sessions/resolve; upgrade the daemon"
+                    .to_string(),
+            ))
+        })
     }
 
     pub fn start_session(&self, request: &SessionStartRequest) -> Result<SessionState, CliError> {

@@ -16,11 +16,13 @@ struct StoreAPIClient: SupervisorAPIClient {
     guard let client = await MainActor.run(body: { store.client }) else {
       throw StoreDecisionActionError.daemonUnavailable
     }
-    guard let target = await MainActor.run(body: {
-      store.managedAgentNudgeTarget(
-        forSessionAgentIdentity: SessionAgentID(rawValue: agentID)
-      )
-    }) else {
+    guard
+      let target = await MainActor.run(body: {
+        store.managedAgentNudgeTarget(
+          forSessionAgentIdentity: SessionAgentID(rawValue: agentID)
+        )
+      })
+    else {
       throw StoreDecisionActionError.missingTargetMetadata("sessionAgentID")
     }
     try await SupervisorManagedAgentNudgeDispatcher.dispatch(

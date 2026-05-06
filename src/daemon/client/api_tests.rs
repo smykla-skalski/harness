@@ -315,9 +315,10 @@ fn acp_inspect_gets_optional_session_filter() {
     let body = json!({
         "daemon_perceived_now": "2026-04-28T00:00:05Z",
         "agents": [{
-            "acp_id": "agent-acp-1",
+            "managed_agent_id": "agent-acp-1",
+            "managed_agent_family": "acp",
             "session_id": "sess-1",
-            "agent_id": "copilot",
+            "session_agent_id": "copilot",
             "display_name": "GitHub Copilot",
             "pid": 42,
             "pgid": 42,

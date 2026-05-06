@@ -128,7 +128,8 @@ extension ToolCallTimelineViewTests {
     #expect(rows.map(\.id) == ["session-1::acp-a::call-10", "session-1::acp-a::call-2"])
   }
 
-  @Test("Store ACP timeline metadata keeps managed fallback explicit when no session agent is known")
+  @Test(
+    "Store ACP timeline metadata keeps managed fallback explicit when no session agent is known")
   func storeTimelineMetadataKeepsManagedFallbackExplicit() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     let metadata = store.acpToolCallTimelineMetadata(

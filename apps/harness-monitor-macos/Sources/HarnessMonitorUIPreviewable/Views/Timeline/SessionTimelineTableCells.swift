@@ -73,10 +73,7 @@ final class SessionTimelineTableCellView: NSTableCellView {
       guard measured > 4 else {
         return SessionTimelineTableMetrics.estimatedHeight(for: row, fontScale: fontScale)
       }
-      return max(
-        measured,
-        SessionTimelineTableMetrics.minimumCardHeight(for: row, fontScale: fontScale)
-      )
+      return measured
     }
   }
 

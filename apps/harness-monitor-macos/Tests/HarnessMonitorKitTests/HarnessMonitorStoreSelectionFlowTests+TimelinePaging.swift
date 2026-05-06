@@ -123,8 +123,10 @@ extension HarnessMonitorStoreSelectionFlowTests {
     await store.selectSession(summary.sessionId)
     client.configureTimelineWindowDelay(.milliseconds(250), for: summary.sessionId)
 
-    async let firstLoad: Void = store.loadSelectedTimelinePage(page: requestedPage, pageSize: pageSize)
-    async let secondLoad: Void = store.loadSelectedTimelinePage(page: requestedPage, pageSize: pageSize)
+    async let firstLoad: Void = store.loadSelectedTimelinePage(
+      page: requestedPage, pageSize: pageSize)
+    async let secondLoad: Void = store.loadSelectedTimelinePage(
+      page: requestedPage, pageSize: pageSize)
     await firstLoad
     await secondLoad
 

@@ -6,10 +6,9 @@ use crate::agents::acp::probe::probe_acp_agents_cached;
 use crate::daemon::http::{
     AsyncDaemonDbSlot, DaemonHttpState, acp_inspect_response, acp_transcript_response,
     ensure_acp_enabled, managed_agent_list_response, managed_agent_snapshot, require_async_db,
-    resolve_acp_inspect_session_scope,
 };
 use crate::daemon::protocol::{
-    AcpTranscriptResponse, StreamEvent, TimelineWindowRequest, WsRequest, WsResponse, ws_methods,
+    StreamEvent, TimelineWindowRequest, WsRequest, WsResponse, ws_methods,
 };
 use crate::daemon::service;
 
@@ -218,55 +217,45 @@ fn dispatch_session_managed_agents_query(
 
 fn dispatch_managed_agent_detail_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     let Some(agent_id) = extract_managed_agent_id(&request.params) else {
-        return error_response(
-            &request.id,
-            "MISSING_PARAM",
-            "missing managed_agent_id",
-        );
+        return error_response(&request.id, "MISSING_PARAM", "missing managed_agent_id");
     };
 
     dispatch_query_result(&request.id, managed_agent_snapshot(state, &agent_id))
 }
 
 fn dispatch_acp_inspect_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    if let Some(response) = reject_legacy_acp_scope_param(request) {
+        return response;
+    }
     let session_id = extract_string_param(&request.params, "session_id");
-    let require_session_id = extract_string_param(&request.params, "require_session_id");
     dispatch_query_result(
         &request.id,
-        ensure_acp_enabled().and_then(|()| {
-            let effective = resolve_acp_inspect_session_scope(
-                session_id.as_deref(),
-                require_session_id.as_deref(),
-            )?;
-            acp_inspect_response(state, effective)
-        }),
+        ensure_acp_enabled().and_then(|()| acp_inspect_response(state, session_id.as_deref())),
     )
 }
 
 async fn dispatch_acp_transcript_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
-    let session_id = extract_string_param(&request.params, "session_id");
-    let require_session_id = extract_string_param(&request.params, "require_session_id");
-    let effective_session_id = match resolve_acp_inspect_session_scope(
-        session_id.as_deref(),
-        require_session_id.as_deref(),
-    ) {
-        Ok(Some(session_id)) => session_id.to_string(),
-        Ok(None) => {
-            return error_response(
-                &request.id,
-                "MISSING_PARAM",
-                "missing session_id or require_session_id",
-            );
-        }
-        Err(error) => {
-            return dispatch_query_result::<AcpTranscriptResponse>(&request.id, Err(error));
-        }
+    if let Some(response) = reject_legacy_acp_scope_param(request) {
+        return response;
+    }
+    let Some(session_id) = extract_string_param(&request.params, "session_id") else {
+        return error_response(&request.id, "MISSING_PARAM", "missing session_id");
     };
     let result = match ensure_acp_enabled() {
-        Ok(()) => acp_transcript_response(state, &effective_session_id).await,
+        Ok(()) => acp_transcript_response(state, &session_id).await,
         Err(error) => Err(error),
     };
     dispatch_query_result(&request.id, result)
+}
+
+fn reject_legacy_acp_scope_param(request: &WsRequest) -> Option<WsResponse> {
+    request.params.get("require_session_id").map(|_| {
+        error_response(
+            &request.id,
+            "INVALID_PARAMS",
+            "require_session_id is no longer supported; use session_id",
+        )
+    })
 }
 
 async fn dispatch_health_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {

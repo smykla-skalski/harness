@@ -11,12 +11,12 @@ use crate::errors::{CliError, CliErrorKind};
 use super::super::DaemonHttpState;
 use super::super::auth::require_auth;
 use super::super::response::{extract_request_id, timed_json};
-use super::{ensure_acp_enabled, resolve_acp_inspect_session_scope};
+use super::ensure_acp_enabled;
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(super) struct AcpTranscriptQuery {
     session_id: Option<String>,
-    require_session_id: Option<String>,
 }
 
 pub(super) async fn get_acp_transcript(
@@ -32,16 +32,10 @@ pub(super) async fn get_acp_transcript(
 
     let result: Result<AcpTranscriptResponse, CliError> =
         match ensure_acp_enabled().and_then(|()| {
-            resolve_acp_inspect_session_scope(
-                query.session_id.as_deref(),
-                query.require_session_id.as_deref(),
-            )
-            .and_then(|effective| {
-                effective.map(ToString::to_string).ok_or_else(|| {
-                    CliError::new(CliErrorKind::usage_error(
-                        "session_id or require_session_id is required for ACP transcript reads",
-                    ))
-                })
+            query.session_id.ok_or_else(|| {
+                CliError::new(CliErrorKind::usage_error(
+                    "session_id is required for ACP transcript reads",
+                ))
             })
         }) {
             Ok(session_id) => super::acp_transcript_response(&state, &session_id).await,
@@ -116,34 +110,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn transcript_returns_scope_denied_when_require_and_session_ids_conflict() {
-        temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
-            let state = minimal_state();
-            let response = get_acp_transcript(
-                Query(AcpTranscriptQuery {
-                    session_id: Some("session-a".into()),
-                    require_session_id: Some("session-b".into()),
-                }),
-                auth_headers(),
-                State(state),
-            )
-            .await;
-            let (status, body) = response_json(response).await;
-            assert_eq!(status, StatusCode::FORBIDDEN);
-            assert_eq!(body["error"]["code"], "SESSION_SCOPE_DENIED");
-        })
-        .await;
-    }
-
-    #[tokio::test]
     async fn transcript_requires_a_scoped_session_id() {
         temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
             let state = minimal_state();
             let response = get_acp_transcript(
-                Query(AcpTranscriptQuery {
-                    session_id: None,
-                    require_session_id: None,
-                }),
+                Query(AcpTranscriptQuery { session_id: None }),
                 auth_headers(),
                 State(state),
             )
@@ -151,8 +122,9 @@ mod tests {
             let (status, body) = response_json(response).await;
             assert_eq!(status, StatusCode::BAD_REQUEST);
             assert!(
-                body.to_string().contains("session_id"),
-                "expected usage error to mention session_id"
+                body.to_string()
+                    .contains("session_id is required for ACP transcript reads"),
+                "expected usage error to mention canonical session_id"
             );
         })
         .await;
@@ -176,7 +148,6 @@ mod tests {
             let response = get_acp_transcript(
                 Query(AcpTranscriptQuery {
                     session_id: Some("sess-test-1".into()),
-                    require_session_id: None,
                 }),
                 auth_headers(),
                 State(state),

@@ -84,7 +84,7 @@ impl Default for AcpAgentStartRequest {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AcpAgentSnapshot {
     pub acp_id: String,
     pub session_id: String,
@@ -98,16 +98,14 @@ pub struct AcpAgentSnapshot {
     pub pending_permissions: usize,
     pub permission_queue_depth: usize,
     pub pending_permission_batches: Vec<AcpPermissionBatch>,
-    #[serde(default)]
     pub permission_mode: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub permission_log_path: Option<String>,
     pub terminal_count: usize,
     pub created_at: String,
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AcpAgentInspectSnapshot {
     pub acp_id: String,
     pub session_id: String,
@@ -115,18 +113,14 @@ pub struct AcpAgentInspectSnapshot {
     pub display_name: String,
     pub pid: u32,
     pub pgid: i32,
-    #[serde(default)]
     pub process_key: String,
     pub uptime_ms: u64,
     pub last_update_at: String,
     pub last_client_call_at: Option<String>,
     pub watchdog_state: String,
-    #[serde(default)]
     pub permission_mode: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub permission_log_path: Option<String>,
     pub pending_permissions: usize,
-    #[serde(default)]
     pub permission_queue_depth: usize,
     pub terminal_count: usize,
     pub prompt_deadline_remaining_ms: u64,

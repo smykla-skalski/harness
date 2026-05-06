@@ -1,19 +1,17 @@
+use serde::de::Error as DeError;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{AcpAgentStartRequest, default_acp_role};
+use crate::session::types::SessionRole;
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 struct AcpAgentStartRequestDecode {
-    #[serde(default)]
-    descriptor_id: Option<String>,
-    #[serde(default)]
-    agent: Option<String>,
-    #[serde(default)]
-    agent_id: Option<String>,
+    descriptor_id: String,
     #[serde(default = "default_acp_role")]
-    role: crate::session::types::SessionRole,
+    role: SessionRole,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    fallback_role: Option<crate::session::types::SessionRole>,
+    fallback_role: Option<SessionRole>,
     #[serde(default)]
     capabilities: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -31,10 +29,9 @@ struct AcpAgentStartRequestDecode {
 #[derive(Serialize)]
 struct AcpAgentStartRequestEncode<'a> {
     descriptor_id: &'a str,
-    agent: &'a str,
-    role: crate::session::types::SessionRole,
+    role: SessionRole,
     #[serde(skip_serializing_if = "Option::is_none")]
-    fallback_role: Option<crate::session::types::SessionRole>,
+    fallback_role: Option<SessionRole>,
     capabilities: &'a [String],
     #[serde(skip_serializing_if = "Option::is_none")]
     name: Option<&'a str>,
@@ -54,7 +51,6 @@ impl Serialize for AcpAgentStartRequest {
     {
         AcpAgentStartRequestEncode {
             descriptor_id: &self.agent,
-            agent: &self.agent,
             role: self.role,
             fallback_role: self.fallback_role,
             capabilities: &self.capabilities,
@@ -74,12 +70,11 @@ impl<'de> Deserialize<'de> for AcpAgentStartRequest {
         D: Deserializer<'de>,
     {
         let decoded = AcpAgentStartRequestDecode::deserialize(deserializer)?;
+        if decoded.descriptor_id.trim().is_empty() {
+            return Err(DeError::custom("descriptor_id must not be empty"));
+        }
         Ok(Self {
-            agent: decoded
-                .descriptor_id
-                .or(decoded.agent)
-                .or(decoded.agent_id)
-                .unwrap_or_default(),
+            agent: decoded.descriptor_id,
             role: decoded.role,
             fallback_role: decoded.fallback_role,
             capabilities: decoded.capabilities,
@@ -97,7 +92,7 @@ mod tests {
     use super::AcpAgentStartRequest;
 
     #[test]
-    fn acp_start_request_accepts_descriptor_id_alias() {
+    fn acp_start_request_decodes_canonical_descriptor_id() {
         let request: AcpAgentStartRequest = serde_json::from_value(serde_json::json!({
             "descriptor_id": "copilot",
             "role": "reviewer",
@@ -111,7 +106,34 @@ mod tests {
     }
 
     #[test]
-    fn acp_start_request_serializes_descriptor_and_legacy_agent_fields() {
+    fn acp_start_request_rejects_missing_descriptor_id() {
+        let error = serde_json::from_value::<AcpAgentStartRequest>(serde_json::json!({
+            "role": "reviewer",
+        }))
+        .expect_err("missing descriptor_id should fail");
+
+        assert!(
+            error.to_string().contains("descriptor_id"),
+            "expected descriptor_id error, got {error}"
+        );
+    }
+
+    #[test]
+    fn acp_start_request_rejects_legacy_alias_fields() {
+        let error = serde_json::from_value::<AcpAgentStartRequest>(serde_json::json!({
+            "descriptor_id": "copilot",
+            "agent": "copilot",
+        }))
+        .expect_err("legacy alias should fail");
+
+        assert!(
+            error.to_string().contains("unknown field"),
+            "expected unknown field error, got {error}"
+        );
+    }
+
+    #[test]
+    fn acp_start_request_serializes_canonical_descriptor_field() {
         let request = AcpAgentStartRequest {
             agent: "copilot".into(),
             role: crate::session::types::SessionRole::Reviewer,
@@ -126,7 +148,7 @@ mod tests {
 
         let value = serde_json::to_value(&request).expect("serialize request");
         assert_eq!(value["descriptor_id"], "copilot");
-        assert_eq!(value["agent"], "copilot");
+        assert!(value.get("agent").is_none());
         assert_eq!(value["role"], "reviewer");
         assert_eq!(value["fallback_role"], "observer");
         assert_eq!(value["record_permissions"], true);

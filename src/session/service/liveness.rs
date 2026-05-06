@@ -6,6 +6,7 @@ use super::{
     signal_dirs_for_agent_in_context_root, signal_matches_session, storage, utc_now,
 };
 use crate::agents::kind::DisconnectReason;
+use crate::session::types::ManagedAgentKind;
 
 /// Result of a liveness synchronization pass.
 #[derive(Debug, Clone, Default)]
@@ -150,9 +151,11 @@ pub(crate) fn compute_agent_transition(
     if agent.status == AgentStatus::AwaitingReview {
         return None;
     }
-    if agent.managed_agent.as_ref().is_some_and(|managed_agent| {
-        managed_agent.kind == crate::session::types::ManagedAgentKind::Acp
-    }) {
+    if agent
+        .managed_agent
+        .as_ref()
+        .is_some_and(|managed_agent| managed_agent.kind == ManagedAgentKind::Acp)
+    {
         return None;
     }
 

@@ -258,6 +258,25 @@ pub(super) fn migrate_v12_to_v13(mut value: Value) -> Result<Value, CliError> {
     Ok(value)
 }
 
+pub(super) fn migrate_v13_to_v14(mut value: Value) -> Result<Value, CliError> {
+    let Some(object) = value.as_object_mut() else {
+        return Err(CliErrorKind::workflow_version("session state is not a JSON object").into());
+    };
+    object.insert("schema_version".to_string(), json!(14));
+
+    if let Some(agents) = object.get_mut("agents").and_then(Value::as_object_mut) {
+        for agent in agents.values_mut() {
+            let Some(agent_object) = agent.as_object_mut() else {
+                continue;
+            };
+            migrate_session_identity_fields(agent_object)?;
+            migrate_managed_agent_identity_fields(agent_object)?;
+        }
+    }
+
+    Ok(value)
+}
+
 fn migrate_runtime_field(agent: &mut serde_json::Map<String, Value>) {
     let Some(runtime) = agent.get("runtime") else {
         return;
@@ -332,6 +351,134 @@ fn migrate_managed_agent_field(
     })))
 }
 
+fn migrate_session_identity_fields(
+    agent: &mut serde_json::Map<String, Value>,
+) -> Result<(), CliError> {
+    migrate_identity_alias_field(agent, "session_agent_id", "agent_id", "session_agent_id")?;
+    migrate_identity_alias_field(
+        agent,
+        "runtime_session_id",
+        "agent_session_id",
+        "runtime_session_id",
+    )
+}
+
+fn migrate_identity_alias_field(
+    agent: &mut serde_json::Map<String, Value>,
+    canonical_key: &str,
+    legacy_key: &str,
+    field_label: &str,
+) -> Result<(), CliError> {
+    let canonical = agent
+        .get(canonical_key)
+        .map(|value| string_field(value, canonical_key, agent))
+        .transpose()?;
+    let legacy = agent
+        .remove(legacy_key)
+        .map(|value| string_field(&value, legacy_key, agent))
+        .transpose()?;
+
+    match (canonical, legacy) {
+        (None, None) => Ok(()),
+        (Some(current), None) => {
+            agent.insert(canonical_key.to_string(), json!(current));
+            Ok(())
+        }
+        (None, Some(legacy_value)) => {
+            agent.insert(canonical_key.to_string(), json!(legacy_value));
+            Ok(())
+        }
+        (Some(current), Some(legacy_value)) if current == legacy_value => {
+            agent.insert(canonical_key.to_string(), json!(current));
+            Ok(())
+        }
+        (Some(_), Some(_)) => Err(CliErrorKind::workflow_version(format!(
+            "session state agent '{}' has conflicting {field_label} values",
+            agent_label(agent)
+        ))
+        .into()),
+    }
+}
+
+fn migrate_managed_agent_identity_fields(
+    agent: &mut serde_json::Map<String, Value>,
+) -> Result<(), CliError> {
+    let legacy = agent.remove("managed_agent");
+    let explicit_id = agent
+        .get("managed_agent_id")
+        .map(|value| string_field(value, "managed_agent_id", agent))
+        .transpose()?;
+    let explicit_family = agent
+        .get("managed_agent_family")
+        .map(|value| string_field(value, "managed_agent_family", agent))
+        .transpose()?;
+
+    let legacy_identity = match legacy.as_ref() {
+        None | Some(Value::Null) => None,
+        Some(value) => {
+            let Some(managed_agent) = value.as_object() else {
+                return Err(CliErrorKind::workflow_version(format!(
+                    "session state agent '{}' has invalid managed_agent object",
+                    agent_label(agent)
+                ))
+                .into());
+            };
+            let kind = managed_agent.get("kind").ok_or_else(|| {
+                CliErrorKind::workflow_version(format!(
+                    "session state agent '{}' has invalid managed_agent.kind",
+                    agent_label(agent)
+                ))
+            })?;
+            let id = managed_agent.get("id").ok_or_else(|| {
+                CliErrorKind::workflow_version(format!(
+                    "session state agent '{}' has invalid managed_agent.id",
+                    agent_label(agent)
+                ))
+            })?;
+            Some((
+                string_field(kind, "managed_agent.kind", agent)?,
+                string_field(id, "managed_agent.id", agent)?,
+            ))
+        }
+    };
+
+    match (legacy_identity, explicit_family, explicit_id) {
+        (None, None, None) => Ok(()),
+        (None, Some(kind), Some(id)) => {
+            agent.insert("managed_agent_family".to_string(), json!(kind));
+            agent.insert("managed_agent_id".to_string(), json!(id));
+            Ok(())
+        }
+        (None, _, _) => Err(CliErrorKind::workflow_version(format!(
+            "session state agent '{}' must provide managed_agent_id and managed_agent_family together",
+            agent_label(agent)
+        ))
+        .into()),
+        (Some((legacy_kind, legacy_id)), Some(kind), Some(id))
+            if legacy_kind == kind && legacy_id == id =>
+        {
+            agent.insert("managed_agent_family".to_string(), json!(kind));
+            agent.insert("managed_agent_id".to_string(), json!(id));
+            Ok(())
+        }
+        (Some(_), Some(_), Some(_)) => Err(CliErrorKind::workflow_version(format!(
+            "session state agent '{}' has conflicting managed-agent identity fields",
+            agent_label(agent)
+        ))
+        .into()),
+        (Some((legacy_kind, legacy_id)), None, None) => {
+            agent.insert("managed_agent_family".to_string(), json!(legacy_kind));
+            agent.insert("managed_agent_id".to_string(), json!(legacy_id));
+            Ok(())
+        }
+        (Some(_), _, _) => Err(CliErrorKind::workflow_version(format!(
+            "session state agent '{}' must not mix legacy managed_agent with partial flattened fields",
+            agent_label(agent)
+        ))
+        .into()),
+    }
+}
+
 fn quarantine_managed_agent_markers(agent: &mut serde_json::Map<String, Value>) {
     let Some(capabilities) = agent.get_mut("capabilities").and_then(Value::as_array_mut) else {
         return;
@@ -345,8 +492,23 @@ fn quarantine_managed_agent_markers(agent: &mut serde_json::Map<String, Value>) 
 
 fn agent_label(agent: &serde_json::Map<String, Value>) -> String {
     agent
-        .get("agent_id")
+        .get("session_agent_id")
+        .or_else(|| agent.get("agent_id"))
         .and_then(Value::as_str)
         .unwrap_or("<unknown>")
         .to_string()
+}
+
+fn string_field(
+    value: &Value,
+    field_name: &str,
+    agent: &serde_json::Map<String, Value>,
+) -> Result<String, CliError> {
+    value.as_str().map(ToOwned::to_owned).ok_or_else(|| {
+        CliErrorKind::workflow_version(format!(
+            "session state agent '{}' has invalid {field_name}",
+            agent_label(agent)
+        ))
+        .into()
+    })
 }

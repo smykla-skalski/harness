@@ -100,11 +100,7 @@ pub(crate) async fn dispatch_managed_agent_input(
     state: &DaemonHttpState,
 ) -> WsResponse {
     let Some(agent_id) = extract_managed_agent_id(&request.params) else {
-        return error_response(
-            &request.id,
-            "MISSING_PARAM",
-            "missing managed_agent_id",
-        );
+        return error_response(&request.id, "MISSING_PARAM", "missing managed_agent_id");
     };
     let body = match serde_json::from_value(request.params.clone()) {
         Ok(body) => body,
@@ -136,11 +132,7 @@ pub(crate) async fn dispatch_managed_agent_resize(
     state: &DaemonHttpState,
 ) -> WsResponse {
     let Some(agent_id) = extract_managed_agent_id(&request.params) else {
-        return error_response(
-            &request.id,
-            "MISSING_PARAM",
-            "missing managed_agent_id",
-        );
+        return error_response(&request.id, "MISSING_PARAM", "missing managed_agent_id");
     };
     let body = match serde_json::from_value(request.params.clone()) {
         Ok(body) => body,
@@ -172,11 +164,7 @@ pub(crate) async fn dispatch_managed_agent_stop(
     state: &DaemonHttpState,
 ) -> WsResponse {
     let Some(agent_id) = extract_managed_agent_id(&request.params) else {
-        return error_response(
-            &request.id,
-            "MISSING_PARAM",
-            "missing managed_agent_id",
-        );
+        return error_response(&request.id, "MISSING_PARAM", "missing managed_agent_id");
     };
     let result = if let Ok(session_id) = state
         .acp_agent_manager
@@ -212,11 +200,7 @@ pub(crate) async fn dispatch_managed_agent_ready(
     state: &DaemonHttpState,
 ) -> WsResponse {
     let Some(agent_id) = extract_managed_agent_id(&request.params) else {
-        return error_response(
-            &request.id,
-            "MISSING_PARAM",
-            "missing managed_agent_id",
-        );
+        return error_response(&request.id, "MISSING_PARAM", "missing managed_agent_id");
     };
     let result = match terminal_session_id(state, &agent_id) {
         Ok(session_id) => {
@@ -238,11 +222,7 @@ pub(crate) async fn dispatch_managed_agent_steer_codex(
     state: &DaemonHttpState,
 ) -> WsResponse {
     let Some(agent_id) = extract_managed_agent_id(&request.params) else {
-        return error_response(
-            &request.id,
-            "MISSING_PARAM",
-            "missing managed_agent_id",
-        );
+        return error_response(&request.id, "MISSING_PARAM", "missing managed_agent_id");
     };
     let body: CodexSteerRequest = match serde_json::from_value(request.params.clone()) {
         Ok(body) => body,
@@ -274,11 +254,7 @@ pub(crate) async fn dispatch_managed_agent_interrupt_codex(
     state: &DaemonHttpState,
 ) -> WsResponse {
     let Some(agent_id) = extract_managed_agent_id(&request.params) else {
-        return error_response(
-            &request.id,
-            "MISSING_PARAM",
-            "missing managed_agent_id",
-        );
+        return error_response(&request.id, "MISSING_PARAM", "missing managed_agent_id");
     };
     let result = match codex_session_id(state, &agent_id) {
         Ok(session_id) => {
@@ -300,11 +276,7 @@ pub(crate) async fn dispatch_managed_agent_resolve_codex_approval(
     state: &DaemonHttpState,
 ) -> WsResponse {
     let Some(agent_id) = extract_managed_agent_id(&request.params) else {
-        return error_response(
-            &request.id,
-            "MISSING_PARAM",
-            "missing managed_agent_id",
-        );
+        return error_response(&request.id, "MISSING_PARAM", "missing managed_agent_id");
     };
     let Some(approval_id) = extract_string_param(&request.params, "approval_id") else {
         return error_response(&request.id, "MISSING_PARAM", "missing approval_id");
@@ -342,11 +314,7 @@ pub(crate) async fn dispatch_managed_agent_stop_acp(
         return error_response(&request.id, error.code(), &error.message());
     }
     let Some(agent_id) = extract_managed_agent_id(&request.params) else {
-        return error_response(
-            &request.id,
-            "MISSING_PARAM",
-            "missing managed_agent_id",
-        );
+        return error_response(&request.id, "MISSING_PARAM", "missing managed_agent_id");
     };
     let result = match acp_session_id(state, &agent_id) {
         Ok(session_id) => {
@@ -371,11 +339,7 @@ pub(crate) async fn dispatch_managed_agent_resolve_acp_permission(
         return error_response(&request.id, error.code(), &error.message());
     }
     let Some(agent_id) = extract_managed_agent_id(&request.params) else {
-        return error_response(
-            &request.id,
-            "MISSING_PARAM",
-            "missing managed_agent_id",
-        );
+        return error_response(&request.id, "MISSING_PARAM", "missing managed_agent_id");
     };
     let Some(batch_id) = extract_string_param(&request.params, "batch_id") else {
         return error_response(&request.id, "MISSING_PARAM", "missing batch_id");

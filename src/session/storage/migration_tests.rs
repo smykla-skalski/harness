@@ -3,9 +3,8 @@ use serde_json::json;
 use super::migrations::{
     migrate_v1_to_v2, migrate_v2_to_v3, migrate_v3_to_v4, migrate_v4_to_v5, migrate_v5_to_v6,
     migrate_v6_to_v7, migrate_v7_to_v8, migrate_v10_to_v11, migrate_v11_to_v12, migrate_v12_to_v13,
+    migrate_v13_to_v14,
 };
-use super::registry::{ProjectOriginRecord, merge_project_origin};
-
 #[test]
 fn migrate_v1_and_v2_stamp_expected_schema_versions() {
     let v1 = json!({
@@ -320,6 +319,104 @@ fn migrate_v11_to_v12_backfills_tui_managed_agent_from_legacy_capability() {
 }
 
 #[test]
+fn migrate_v13_to_v14_renames_legacy_session_fields_and_flattens_managed_agent_identity() {
+    let migrated = migrate_v13_to_v14(json!({
+        "schema_version": 13,
+        "agents": {
+            "agent-1": {
+                "agent_id": "agent-1",
+                "agent_session_id": "runtime-1",
+                "managed_agent": {
+                    "kind": "acp",
+                    "id": "acp-1"
+                }
+            }
+        },
+        "tasks": {}
+    }))
+    .expect("migrate v13");
+
+    assert_eq!(migrated["schema_version"], json!(14));
+    assert!(
+        migrated["agents"]["agent-1"]
+            .get("managed_agent")
+            .is_none_or(serde_json::Value::is_null)
+    );
+    assert_eq!(
+        migrated["agents"]["agent-1"]["managed_agent_family"],
+        json!("acp")
+    );
+    assert_eq!(
+        migrated["agents"]["agent-1"]["managed_agent_id"],
+        json!("acp-1")
+    );
+    assert_eq!(
+        migrated["agents"]["agent-1"]["session_agent_id"],
+        json!("agent-1")
+    );
+    assert_eq!(
+        migrated["agents"]["agent-1"]["runtime_session_id"],
+        json!("runtime-1")
+    );
+    assert!(
+        migrated["agents"]["agent-1"]
+            .get("agent_id")
+            .is_none_or(serde_json::Value::is_null)
+    );
+    assert!(
+        migrated["agents"]["agent-1"]
+            .get("agent_session_id")
+            .is_none_or(serde_json::Value::is_null)
+    );
+}
+
+#[test]
+fn migrate_v13_to_v14_rejects_malformed_legacy_managed_agent() {
+    let error = migrate_v13_to_v14(json!({
+        "schema_version": 13,
+        "agents": {
+            "agent-1": {
+                "agent_id": "agent-1",
+                "managed_agent": "acp-1"
+            }
+        },
+        "tasks": {}
+    }))
+    .expect_err("invalid managed_agent should fail");
+
+    assert!(
+        error.to_string().contains("invalid managed_agent object"),
+        "expected managed_agent object error, got {error}"
+    );
+}
+
+#[test]
+fn migrate_v13_to_v14_rejects_partial_flattened_managed_agent_with_legacy_shape() {
+    let error = migrate_v13_to_v14(json!({
+        "schema_version": 13,
+        "agents": {
+            "agent-1": {
+                "agent_id": "agent-1",
+                "managed_agent": {
+                    "kind": "acp",
+                    "id": "acp-1"
+                },
+                "managed_agent_id": "acp-1"
+            }
+        },
+        "tasks": {}
+    }))
+    .expect_err("mixed partial managed-agent identity should fail");
+
+    assert!(
+        error
+            .to_string()
+            .contains("must not mix legacy managed_agent with partial flattened fields"),
+        "expected partial managed-agent error, got {error}"
+    );
+}
+
+#[test]
 fn migrate_v11_to_v12_quarantines_blank_tui_marker_ids() {
     let migrated = migrate_v11_to_v12(json!({
         "schema_version": 11,
@@ -395,43 +492,4 @@ fn migrate_v12_to_v13_clears_legacy_end_session_archive_timestamp() {
 
     assert_eq!(migrated["schema_version"], json!(13));
     assert!(migrated["archived_at"].is_null());
-}
-
-// TODO(b-task-8): is_worktree and worktree_name were removed from ProjectOriginRecord.
-// The merge function no longer needs to track worktree metadata since the daemon
-// always creates worktrees and the information is available via git itself.
-#[test]
-fn merge_project_origin_preserves_existing_git_identity() {
-    let merged = merge_project_origin(
-        ProjectOriginRecord {
-            recorded_from_dir: "/repo/.claude/worktrees/feature".to_string(),
-            repository_root: None,
-            checkout_root: None,
-            adopted_session_roots: Default::default(),
-            recorded_at: "2026-04-10T10:00:00Z".to_string(),
-        },
-        Some(&ProjectOriginRecord {
-            recorded_from_dir: "/repo/.claude/worktrees/feature".to_string(),
-            repository_root: Some("/repo".to_string()),
-            checkout_root: Some("/repo/.claude/worktrees/feature".to_string()),
-            adopted_session_roots: std::collections::BTreeMap::from([(
-                "abc12345".to_string(),
-                "/tmp/external/demo/abc12345".to_string(),
-            )]),
-            recorded_at: "2026-04-10T09:00:00Z".to_string(),
-        }),
-    );
-
-    assert_eq!(merged.repository_root.as_deref(), Some("/repo"));
-    assert_eq!(
-        merged.checkout_root.as_deref(),
-        Some("/repo/.claude/worktrees/feature")
-    );
-    assert_eq!(
-        merged
-            .adopted_session_roots
-            .get("abc12345")
-            .map(std::string::String::as_str),
-        Some("/tmp/external/demo/abc12345")
-    );
 }

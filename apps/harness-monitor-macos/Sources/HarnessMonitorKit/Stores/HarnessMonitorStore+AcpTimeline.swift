@@ -20,7 +20,8 @@ extension HarnessMonitorStore {
         for: payload.managedAgentIdentity
       )
     return AcpToolCallTimelineMetadata(
-      managedAgentID: linkage?.managedAgentIdentity.rawValue ?? payload.managedAgentIdentity.rawValue,
+      managedAgentID: linkage?.managedAgentIdentity.rawValue
+        ?? payload.managedAgentIdentity.rawValue,
       sessionAgentID: linkage?.sessionAgentIdentity?.rawValue ?? fallbackSessionAgentID,
       displayName: linkage?.explicitDisplayName
         ?? fallbackSessionAgentIdentity?.rawValue

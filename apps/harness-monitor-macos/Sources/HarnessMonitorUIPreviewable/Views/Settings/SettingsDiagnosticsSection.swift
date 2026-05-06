@@ -152,9 +152,10 @@ private struct SettingsAcpPermissionLogSection: View {
               title: "Reveal permission-log.ndjson in Finder (\(run.displayName))",
               tint: .secondary,
               variant: .bordered,
-              accessibilityIdentifier: HarnessMonitorAccessibility.settingsAcpPermissionLogRevealButton(
-                run.id
-              ),
+              accessibilityIdentifier:
+                HarnessMonitorAccessibility.settingsAcpPermissionLogRevealButton(
+                  run.id
+                ),
             ) {
               let result = reveal(run.sessionID, run.path)
               if result == .revealed {

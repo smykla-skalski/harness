@@ -238,7 +238,7 @@ final class HarnessMonitorStoreDecisionActionHandlerTests: XCTestCase {
     XCTAssertFalse(
       client.recordedCalls().contains { call in
         switch call {
-        case .sendSignal(_, _, _, _), .sendAgentTuiInput(_, _):
+        case .sendSignal, .sendAgentTuiInput:
           true
         default:
           false
@@ -285,7 +285,7 @@ final class HarnessMonitorStoreDecisionActionHandlerTests: XCTestCase {
     XCTAssertFalse(
       client.recordedCalls().contains { call in
         switch call {
-        case .sendSignal(_, _, _, _), .sendAgentTuiInput(_, _):
+        case .sendSignal, .sendAgentTuiInput:
           true
         default:
           false

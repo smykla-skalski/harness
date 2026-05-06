@@ -1,5 +1,19 @@
 import Foundation
 
+func requireAcpManagedAgentFamily<Key: CodingKey>(
+  _ container: KeyedDecodingContainer<Key>,
+  forKey key: Key
+) throws {
+  let family = try container.decode(ManagedAgentKind.self, forKey: key)
+  guard family == .acp else {
+    throw DecodingError.dataCorruptedError(
+      forKey: key,
+      in: container,
+      debugDescription: "managed_agent_family must be 'acp'"
+    )
+  }
+}
+
 /// One daemon-issued permission item inside an ACP batch.
 ///
 /// UI-0 contract: approval granularity is request-level, but queue ownership is batch-level.
@@ -53,7 +67,6 @@ public struct AcpPermissionBatch: Codable, Equatable, Identifiable, Sendable {
 
   private enum CodingKeys: String, CodingKey {
     case batchId
-    case acpId
     case managedAgentId
     case managedAgentFamily
     case sessionId
@@ -65,6 +78,7 @@ public struct AcpPermissionBatch: Codable, Equatable, Identifiable, Sendable {
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     batchId = try container.decode(String.self, forKey: .batchId)
+    try requireAcpManagedAgentFamily(container, forKey: .managedAgentFamily)
     acpId = try container.decode(String.self, forKey: .managedAgentId)
     sessionId = try container.decode(String.self, forKey: .sessionId)
     requests = try container.decode([AcpPermissionItem].self, forKey: .requests)
@@ -75,7 +89,6 @@ public struct AcpPermissionBatch: Codable, Equatable, Identifiable, Sendable {
   public func encode(to encoder: any Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
     try container.encode(batchId, forKey: .batchId)
-    try container.encode(acpId, forKey: .acpId)
     try container.encode(acpId, forKey: .managedAgentId)
     try container.encode("acp", forKey: .managedAgentFamily)
     try container.encode(sessionId, forKey: .sessionId)
@@ -198,10 +211,9 @@ public struct AcpAgentSnapshot: Codable, Equatable, Identifiable, Sendable {
   }
 
   private enum CodingKeys: String, CodingKey {
-    case acpId
     case managedAgentId
+    case managedAgentFamily
     case sessionId
-    case agentId
     case sessionAgentId
     case displayName
     case status
@@ -218,6 +230,7 @@ public struct AcpAgentSnapshot: Codable, Equatable, Identifiable, Sendable {
 
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
+    try requireAcpManagedAgentFamily(container, forKey: .managedAgentFamily)
     acpId = try container.decode(String.self, forKey: .managedAgentId)
     sessionId = try container.decode(String.self, forKey: .sessionId)
     agentId = try container.decode(String.self, forKey: .sessionAgentId)
@@ -242,10 +255,9 @@ public struct AcpAgentSnapshot: Codable, Equatable, Identifiable, Sendable {
 
   public func encode(to encoder: any Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
-    try container.encode(acpId, forKey: .acpId)
     try container.encode(acpId, forKey: .managedAgentId)
+    try container.encode("acp", forKey: .managedAgentFamily)
     try container.encode(sessionId, forKey: .sessionId)
-    try container.encode(agentId, forKey: .agentId)
     try container.encode(agentId, forKey: .sessionAgentId)
     try container.encode(displayName, forKey: .displayName)
     if status == .disconnected && (disconnectReason != nil || stderrTail != nil) {

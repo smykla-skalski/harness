@@ -63,9 +63,32 @@ struct WebSocketProtocolAcpTests {
     encoder.keyEncodingStrategy = .convertToSnakeCase
     let encoded = try encoder.encode(batch)
     let json = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
-    #expect(json["acp_id"] as? String == "acp-1")
     #expect(json["managed_agent_id"] as? String == "acp-1")
     #expect(json["managed_agent_family"] as? String == "acp")
+    #expect(json["acp_id"] == nil)
+  }
+
+  @Test("Daemon push event rejects ACP permission batches without managed-agent family")
+  func daemonPushEventRejectsAcpPermissionBatchWithoutManagedAgentFamily() {
+    let json = """
+      {
+        "event": "acp_permission_requested",
+        "session_id": "session-1",
+        "recorded_at": "2026-04-28T00:00:00Z",
+        "payload": {
+          "batch_id": "batch-1",
+          "managed_agent_id": "acp-1",
+          "session_id": "session-1",
+          "created_at": "2026-04-28T00:00:00Z",
+          "requests": []
+        }
+      }
+      """
+
+    #expect(throws: DecodingError.self) {
+      let streamEvent = try decoder.decode(StreamEvent.self, from: Data(json.utf8))
+      _ = try DaemonPushEvent(streamEvent: streamEvent)
+    }
   }
 
   @Test("Daemon push event decodes ACP permission timeout as removal")
@@ -174,7 +197,6 @@ struct WebSocketProtocolAcpTests {
         "session_id": "session-1",
         "recorded_at": "2026-05-05T00:00:30Z",
         "payload": {
-          "acp_id": "acp-1",
           "managed_agent_id": "acp-1",
           "managed_agent_family": "acp",
           "session_id": "session-1",
@@ -244,6 +266,29 @@ struct WebSocketProtocolAcpTests {
     #expect(entries[2].entryId == "acp-copilot-agent_context_injected-3")
   }
 
+  @Test("Daemon push event rejects ACP events with non-ACP managed-agent family")
+  func daemonPushEventRejectsAcpEventsWithWrongManagedAgentFamily() {
+    let json = """
+      {
+        "event": "acp_events",
+        "session_id": "session-1",
+        "recorded_at": "2026-04-28T00:00:30Z",
+        "payload": {
+          "managed_agent_id": "acp-1",
+          "managed_agent_family": "tui",
+          "session_id": "session-1",
+          "raw_count": 1,
+          "events": []
+        }
+      }
+      """
+
+    #expect(throws: DecodingError.self) {
+      let streamEvent = try decoder.decode(StreamEvent.self, from: Data(json.utf8))
+      _ = try DaemonPushEvent(streamEvent: streamEvent)
+    }
+  }
+
   @Test("Daemon push event decodes ACP inspect snapshots")
   func daemonPushEventDecodesAcpInspectSnapshots() throws {
     let json = """
@@ -255,10 +300,9 @@ struct WebSocketProtocolAcpTests {
           "inspect": {
             "agents": [
               {
-                "acp_id": "acp-1",
                 "managed_agent_id": "acp-1",
+                "managed_agent_family": "acp",
                 "session_id": "session-1",
-                "agent_id": "worker-codex",
                 "session_agent_id": "worker-codex",
                 "display_name": "worker-codex",
                 "pid": 41001,

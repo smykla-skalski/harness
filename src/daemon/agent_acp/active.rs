@@ -12,7 +12,7 @@ use crate::agents::runtime::event::ConversationEvent;
 use crate::daemon::db::DaemonDb;
 use crate::daemon::protocol::StreamEvent;
 use crate::errors::CliError;
-use crate::session::types::AgentStatus;
+use crate::session::types::{AgentStatus, ManagedAgentKind};
 use crate::workspace::utc_now;
 
 use super::manager::{AcpAgentManagerHandle, AcpAgentSnapshot};
@@ -100,9 +100,8 @@ pub(super) fn spawn_event_forwarder(
         while let Some(batch) = events.recv().await {
             let persisted_events = batch.events.clone();
             let payload = serde_json::json!({
-                "acp_id": batch.acp_id,
                 "managed_agent_id": batch.acp_id,
-                "managed_agent_family": crate::session::types::ManagedAgentKind::Acp,
+                "managed_agent_family": ManagedAgentKind::Acp,
                 "session_id": batch.session_id,
                 "raw_count": batch.raw_count,
                 "events": batch.events,
@@ -120,13 +119,13 @@ pub(super) fn spawn_event_forwarder(
                     Ok(Ok(())) => {}
                     Ok(Err(error)) => tracing::warn!(
                         session_id = persist_session_id,
-                        agent_id = persist_agent_id,
+                        session_agent_id = persist_agent_id,
                         %error,
                         "failed to persist live ACP events"
                     ),
                     Err(error) => tracing::warn!(
                         session_id = persist_session_id,
-                        agent_id = persist_agent_id,
+                        session_agent_id = persist_agent_id,
                         %error,
                         "failed to join live ACP event persistence task"
                     ),

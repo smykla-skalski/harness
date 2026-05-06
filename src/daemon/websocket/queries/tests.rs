@@ -185,50 +185,6 @@ async fn dispatch_read_query_managed_agent_acp_inspect_returns_acp_disabled_when
 }
 
 #[tokio::test]
-async fn dispatch_read_query_managed_agent_acp_inspect_rejects_conflicting_require_session_id() {
-    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
-        let state = test_http_state_with_db();
-        let request = WsRequest {
-            id: "req-acp-inspect-conflict".into(),
-            method: "managed_agent.acp_inspect".into(),
-            params: serde_json::json!({
-                "session_id": "session-a",
-                "require_session_id": "session-b",
-            }),
-            trace_context: None,
-        };
-
-        let response = dispatch_read_query(&request, &state).await;
-
-        let error = response.error.expect("scope denied error");
-        assert_eq!(error.code, "SESSION_SCOPE_DENIED");
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn dispatch_read_query_managed_agent_acp_inspect_uses_require_session_id_as_filter() {
-    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
-        let state = test_http_state_with_db();
-        let request = WsRequest {
-            id: "req-acp-inspect-filter".into(),
-            method: "managed_agent.acp_inspect".into(),
-            params: serde_json::json!({
-                "require_session_id": "sess-test-1",
-            }),
-            trace_context: None,
-        };
-
-        let response = dispatch_read_query(&request, &state).await;
-
-        assert!(response.error.is_none());
-        let result = response.result.expect("ACP inspect response");
-        assert_eq!(result["agents"].as_array().map(Vec::len), Some(0));
-    })
-    .await;
-}
-
-#[tokio::test]
 async fn dispatch_read_query_managed_agent_acp_inspect_uses_session_id_scope() {
     temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
         let state = test_http_state_with_db();
@@ -248,6 +204,28 @@ async fn dispatch_read_query_managed_agent_acp_inspect_uses_session_id_scope() {
         assert_eq!(result["agents"].as_array().map(Vec::len), Some(0));
     })
     .await;
+}
+
+#[tokio::test]
+async fn dispatch_read_query_managed_agent_acp_inspect_rejects_legacy_require_session_id() {
+    let state = test_http_state_with_db();
+    let request = WsRequest {
+        id: "req-acp-inspect-legacy-scope".into(),
+        method: "managed_agent.acp_inspect".into(),
+        params: serde_json::json!({
+            "require_session_id": "sess-test-1",
+        }),
+        trace_context: None,
+    };
+
+    let response = dispatch_read_query(&request, &state).await;
+
+    let error = response.error.expect("invalid params error");
+    assert_eq!(error.code, "INVALID_PARAMS");
+    assert_eq!(
+        error.message,
+        "require_session_id is no longer supported; use session_id"
+    );
 }
 
 #[tokio::test]
@@ -305,6 +283,28 @@ async fn dispatch_read_query_managed_agent_acp_transcript_uses_session_id_scope(
         assert_eq!(entries.len(), 1);
     })
     .await;
+}
+
+#[tokio::test]
+async fn dispatch_read_query_managed_agent_acp_transcript_rejects_legacy_require_session_id() {
+    let state = test_http_state_with_db();
+    let request = WsRequest {
+        id: "req-acp-transcript-legacy-scope".into(),
+        method: "managed_agent.acp_transcript".into(),
+        params: serde_json::json!({
+            "require_session_id": "sess-test-1",
+        }),
+        trace_context: None,
+    };
+
+    let response = dispatch_read_query(&request, &state).await;
+
+    let error = response.error.expect("invalid params error");
+    assert_eq!(error.code, "INVALID_PARAMS");
+    assert_eq!(
+        error.message,
+        "require_session_id is no longer supported; use session_id"
+    );
 }
 
 #[tokio::test]

@@ -51,7 +51,7 @@ extension HarnessMonitorAPIClient {
       return []
     }
     return [
-      URLQueryItem(name: "session_id", value: sessionID),
+      URLQueryItem(name: "session_id", value: sessionID)
     ]
   }
 }

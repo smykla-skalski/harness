@@ -14,7 +14,7 @@ actor PreviewHarnessClientState {
   var acpAgentsBySessionID: [String: [AcpAgentSnapshot]]
   var codexRunsBySessionID: [String: [CodexRunSnapshot]]
   private var nextAgentTuiSequence: Int
-  private var nextCodexRunSequence: Int
+  var nextCodexRunSequence: Int
   var nextAcpAgentSequence: Int
   let fallbackDetail: SessionDetail?
   private let fallbackTimeline: [TimelineEntry]
@@ -180,46 +180,6 @@ actor PreviewHarnessClientState {
     }
     let response = AcpTranscriptResponse(entries: entries)
     return response
-  }
-
-  func codexRuns(sessionID: String) -> [CodexRunSnapshot] {
-    codexRunsBySessionID[sessionID] ?? []
-  }
-
-  func codexRun(runID: String) -> CodexRunSnapshot? {
-    codexRunsBySessionID.values
-      .flatMap(\.self)
-      .first { run in
-        run.runId == runID
-      }
-  }
-
-  func startCodexRun(
-    sessionID: String,
-    request: CodexRunRequest
-  ) -> CodexRunSnapshot {
-    nextCodexRunSequence += 1
-    let run = CodexRunSnapshot(
-      runId: "preview-codex-run-\(nextCodexRunSequence)",
-      sessionId: sessionID,
-      projectDir: fallbackDetail?.session.projectDir ?? "/Users/example/Projects/harness",
-      threadId: request.resumeThreadId,
-      turnId: nil,
-      mode: request.mode,
-      status: .queued,
-      prompt: request.prompt,
-      latestSummary: request.actor.map { "Queued by \($0)" } ?? "Queued by preview",
-      finalMessage: nil,
-      error: nil,
-      pendingApprovals: [],
-      createdAt: Self.mutationTimestamp,
-      updatedAt: Self.mutationTimestamp
-    )
-    var runs = codexRunsBySessionID[sessionID] ?? []
-    runs.removeAll { $0.runId == run.runId }
-    runs.insert(run, at: 0)
-    codexRunsBySessionID[sessionID] = runs
-    return run
   }
 
   func agentTuis(sessionID: String) -> [AgentTuiSnapshot] {

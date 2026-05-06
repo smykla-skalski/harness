@@ -1,6 +1,9 @@
 use crate::workspace::layout::SessionLayout;
 
-use super::registry::{deregister_active, load_active_registry_for_layout, register_active};
+use super::registry::{
+    ProjectOriginRecord, deregister_active, load_active_registry_for_layout, merge_project_origin,
+    register_active,
+};
 
 fn layout(tmp: &std::path::Path, session_id: &str) -> SessionLayout {
     SessionLayout {
@@ -46,4 +49,40 @@ fn registry_stored_at_project_dir_active_json() {
     let expected = layout.active_registry();
     assert!(expected.exists(), ".active.json must exist at project dir");
     assert_eq!(expected, tmp.path().join("sessions/demo/.active.json"),);
+}
+
+#[test]
+fn merge_project_origin_preserves_existing_git_identity() {
+    let merged = merge_project_origin(
+        ProjectOriginRecord {
+            recorded_from_dir: "/repo/.claude/worktrees/feature".to_string(),
+            repository_root: None,
+            checkout_root: None,
+            adopted_session_roots: Default::default(),
+            recorded_at: "2026-04-10T10:00:00Z".to_string(),
+        },
+        Some(&ProjectOriginRecord {
+            recorded_from_dir: "/repo/.claude/worktrees/feature".to_string(),
+            repository_root: Some("/repo".to_string()),
+            checkout_root: Some("/repo/.claude/worktrees/feature".to_string()),
+            adopted_session_roots: std::collections::BTreeMap::from([(
+                "abc12345".to_string(),
+                "/tmp/external/demo/abc12345".to_string(),
+            )]),
+            recorded_at: "2026-04-10T09:00:00Z".to_string(),
+        }),
+    );
+
+    assert_eq!(merged.repository_root.as_deref(), Some("/repo"));
+    assert_eq!(
+        merged.checkout_root.as_deref(),
+        Some("/repo/.claude/worktrees/feature")
+    );
+    assert_eq!(
+        merged
+            .adopted_session_roots
+            .get("abc12345")
+            .map(std::string::String::as_str),
+        Some("/tmp/external/demo/abc12345")
+    );
 }

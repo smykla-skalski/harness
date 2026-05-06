@@ -315,10 +315,11 @@ fn find_pending_signals(
     let orchestration_id = resolved_session.map_or(runtime_session_id, |resolved| {
         resolved.orchestration_session_id.as_str()
     });
-    let signal_session_id = orchestration_id
-        .eq(runtime_session_id)
-        .then_some(orchestration_id)
-        .unwrap_or(runtime_session_id);
+    let signal_session_id = if orchestration_id.eq(runtime_session_id) {
+        orchestration_id
+    } else {
+        runtime_session_id
+    };
     let signal_dir = agent_runtime.signal_dir(project_dir, signal_session_id);
     read_signals_from_dir(&signal_dir, agent_runtime.name(), signal_session_id)
 }

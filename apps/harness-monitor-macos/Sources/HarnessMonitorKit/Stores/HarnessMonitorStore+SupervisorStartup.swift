@@ -20,33 +20,19 @@ extension HarnessMonitorStore {
 
     let supervisorClock = WallClock()
     let decisionStore: DecisionStore
-    if let container = modelContext?.container {
-      decisionStore = DecisionStore(container: container, now: { supervisorClock.now() })
-    } else {
-      do {
-        decisionStore = try DecisionStore.makeInMemory(now: { supervisorClock.now() })
-      } catch {
-        HarnessMonitorLogger.supervisorError(
-          "supervisor.start failed to create DecisionStore: \(error.localizedDescription)"
-        )
-        return
-      }
+    do {
+      decisionStore = try makeSupervisorDecisionStore(clock: supervisorClock)
+    } catch {
+      HarnessMonitorLogger.supervisorError(
+        "supervisor.start failed to create DecisionStore: \(error.localizedDescription)"
+      )
+      return
     }
 
-    let registry = PolicyRegistry()
-    await registry.registerDefaults()
-    await registry.applyOverrides(Self.loadPolicyOverrides(from: modelContext))
+    let registry = await makeSupervisorRegistry()
 
     let apiClient = StoreAPIClient(store: self)
-    let auditWriter: any SupervisorAuditWriter
-    let auditRetention: SupervisorAuditRetention?
-    if let container = modelContext?.container {
-      auditWriter = SwiftDataSupervisorAuditWriter(container: container)
-      auditRetention = SupervisorAuditRetention(container: container)
-    } else {
-      auditWriter = NoOpSupervisorAuditWriter()
-      auditRetention = nil
-    }
+    let (auditWriter, auditRetention) = makeSupervisorAuditSupport()
 
     let executor = PolicyExecutor(
       api: apiClient,
@@ -112,6 +98,33 @@ extension HarnessMonitorStore {
       setSupervisorRuntimeState(.running)
     }
     HarnessMonitorLogger.supervisorTrace("supervisor.started")
+  }
+
+  private func makeSupervisorDecisionStore(clock: WallClock) throws -> DecisionStore {
+    if let container = modelContext?.container {
+      return DecisionStore(container: container, now: { clock.now() })
+    }
+    return try DecisionStore.makeInMemory(now: { clock.now() })
+  }
+
+  private func makeSupervisorRegistry() async -> PolicyRegistry {
+    let registry = PolicyRegistry()
+    await registry.registerDefaults()
+    await registry.applyOverrides(Self.loadPolicyOverrides(from: modelContext))
+    return registry
+  }
+
+  private func makeSupervisorAuditSupport() -> (
+    auditWriter: any SupervisorAuditWriter,
+    auditRetention: SupervisorAuditRetention?
+  ) {
+    if let container = modelContext?.container {
+      return (
+        SwiftDataSupervisorAuditWriter(container: container),
+        SupervisorAuditRetention(container: container)
+      )
+    }
+    return (NoOpSupervisorAuditWriter(), nil)
   }
 
   private func refreshSupervisorDecisionSurfaces(decisions: DecisionStore) async {
