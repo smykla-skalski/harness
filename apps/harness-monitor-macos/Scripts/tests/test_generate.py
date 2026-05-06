@@ -16,6 +16,7 @@ from generate_test_support import (
     POST_GENERATE_SOURCE,
     PREPARE_APP_ENTITLEMENTS_SOURCE,
     MONITOR_LANES_SOURCE,
+    PATCH_RUN_SCHEME_ENV_SOURCE,
     SWIFT_TOOL_ENV_SOURCE,
     XCODE_VERSION_SOURCE,
     base_env,
@@ -27,6 +28,57 @@ class GenerateScriptTests(unittest.TestCase):
         source = POST_GENERATE_SOURCE.read_text()
 
         self.assertNotIn("../../../mcp-servers", source)
+
+    def test_project_manifest_does_not_hardcode_personal_runtime_lane(self) -> None:
+        source = (APP_ROOT / "Project.swift").read_text()
+
+        self.assertNotIn("bartsmykla", source)
+
+    def test_patch_run_scheme_env_updates_launch_environment(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            scheme_path = temp_root / "HarnessMonitor.xcscheme"
+            scheme_path.write_text(
+                """<?xml version="1.0" encoding="UTF-8"?>
+<Scheme LastUpgradeVersion="1600" version="1.7">
+   <LaunchAction buildConfiguration="Debug">
+      <CommandLineArguments>
+      </CommandLineArguments>
+      <EnvironmentVariables>
+         <EnvironmentVariable key="HARNESS_OTEL_EXPORT" value="1" isEnabled="YES">
+         </EnvironmentVariable>
+      </EnvironmentVariables>
+   </LaunchAction>
+</Scheme>
+"""
+            )
+
+            completed = subprocess.run(
+                [
+                    "python3",
+                    str(PATCH_RUN_SCHEME_ENV_SOURCE),
+                    str(scheme_path),
+                    "HARNESS_MONITOR_RUNTIME_LANE=harness-deadbeef",
+                    "HARNESS_DAEMON_DATA_HOME=/tmp/harness-lane",
+                    "HARNESS_CODEX_WS_PORT=12345",
+                    "HARNESS_EMPTY_TEST_VALUE=",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            scheme = scheme_path.read_text()
+            self.assertIn('key="HARNESS_OTEL_EXPORT"', scheme)
+            self.assertIn('key="HARNESS_MONITOR_RUNTIME_LANE"', scheme)
+            self.assertIn('value="harness-deadbeef"', scheme)
+            self.assertIn('key="HARNESS_DAEMON_DATA_HOME"', scheme)
+            self.assertIn('value="/tmp/harness-lane"', scheme)
+            self.assertIn('key="HARNESS_CODEX_WS_PORT"', scheme)
+            self.assertIn('value="12345"', scheme)
+            self.assertIn('key="HARNESS_EMPTY_TEST_VALUE"', scheme)
+            self.assertIn('value=""', scheme)
 
     def test_unsets_xcode_only_swift_debug_environment_before_tuist(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -89,6 +141,17 @@ class GenerateScriptTests(unittest.TestCase):
             captured_env = captured_env_path.read_text()
             self.assertNotIn("SWIFT_DEBUG_INFORMATION_FORMAT=", captured_env)
             self.assertNotIn("SWIFT_DEBUG_INFORMATION_VERSION=", captured_env)
+            runtime_lane = next(
+                line.split("=", 1)[1]
+                for line in captured_env.splitlines()
+                if line.startswith("HARNESS_MONITOR_RUNTIME_LANE=")
+            )
+            self.assertIn(
+                f"HARNESS_DAEMON_DATA_HOME={Path.home()}/Library/Group Containers/"
+                f"Q498EB36N4.io.harnessmonitor/runtime-lanes/{runtime_lane}",
+                captured_env,
+            )
+            self.assertIn("HARNESS_CODEX_WS_PORT=", captured_env)
 
     def test_runs_post_generate_even_when_tuist_regeneration_is_not_needed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

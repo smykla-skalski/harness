@@ -14,6 +14,7 @@ source "$SCRIPT_DIR/lib/swift-tool-env.sh"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/monitor-lanes.sh
 source "$SCRIPT_DIR/lib/monitor-lanes.sh"
 sanitize_xcode_only_swift_environment
+harness_monitor_apply_runtime_lane_environment "$REPO_ROOT"
 
 tuist_generation_inputs=(
   "$ROOT/Project.swift"
