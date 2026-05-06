@@ -7,6 +7,8 @@ final class SettingsUITestsAcpPermissionLogReveal:
   HarnessMonitorUITestCase,
   WorkspaceWindowUITestSupporting
 {
+  private let previewPermissionLogEntryID = "preview-managed-agent-1"
+
   private enum PermissionLogRevealExpectation {
     case opensLog
     case reportsUnavailable
@@ -42,7 +44,9 @@ final class SettingsUITestsAcpPermissionLogReveal:
       expectedTitle: "Diagnostics"
     )
 
-    let revealButtonID = Accessibility.settingsAcpPermissionLogRevealButton("sess1234")
+    let revealButtonID = Accessibility.settingsAcpPermissionLogRevealButton(
+      previewPermissionLogEntryID
+    )
     let revealButton = scrollDiagnosticsUntilRevealButtonIsVisible(
       in: app,
       identifier: revealButtonID
@@ -69,12 +73,14 @@ final class SettingsUITestsAcpPermissionLogReveal:
     file: StaticString,
     line: UInt
   ) {
-    let inlineErrorID = Accessibility.settingsAcpPermissionLogError("sess1234")
+    let inlineErrorID = Accessibility.settingsAcpPermissionLogError(previewPermissionLogEntryID)
 
     switch expectation {
     case .opensLog:
       let statusMessage = "Reveal requested in Finder."
-      let statusID = Accessibility.settingsAcpPermissionLogRevealStatus("sess1234")
+      let statusID = Accessibility.settingsAcpPermissionLogRevealStatus(
+        previewPermissionLogEntryID
+      )
       let status = element(in: app, identifier: statusID)
       let statusProbe = element(in: app, identifier: "\(statusID).probe")
       XCTAssertTrue(

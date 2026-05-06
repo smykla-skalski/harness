@@ -138,6 +138,36 @@ struct HarnessMonitorStoreExternalSessionTests {
     #expect(boolField(named: "lastExternalSessionAttachSucceeded", in: snapshot) == false)
   }
 
+  @Test("Diagnostics snapshot keeps ACP permission-log rows unique within one session")
+  func diagnosticsSnapshotKeepsUniqueAcpPermissionLogEntryIDs() async {
+    let store = await makeBootstrappedStore()
+    store.selectedSessionID = "sess-shared"
+    store.selectedAcpInspectState = AcpInspectSample(
+      sessionID: "sess-shared",
+      sampledAt: Date(timeIntervalSince1970: 10),
+      agents: [
+        makeAcpInspectSnapshot(
+          acpID: "acp-worker-1",
+          sessionID: "sess-shared",
+          agentID: "worker-1",
+          displayName: "Worker One"
+        ),
+        makeAcpInspectSnapshot(
+          acpID: "acp-worker-2",
+          sessionID: "sess-shared",
+          agentID: "worker-2",
+          displayName: "Worker Two"
+        ),
+      ]
+    )
+
+    let snapshot = SettingsDiagnosticsSnapshot(store: store)
+
+    #expect(snapshot.acpPermissionLogRuns.map(\.sessionID) == ["sess-shared", "sess-shared"])
+    #expect(snapshot.acpPermissionLogRuns.map(\.id) == ["acp-worker-1", "acp-worker-2"])
+    #expect(Set(snapshot.acpPermissionLogRuns.map(\.id)).count == snapshot.acpPermissionLogRuns.count)
+  }
+
   @Test("Importing an external session folder presents the attach sheet")
   func handleImportedExternalSessionFolderPresentsAttachSheet() async throws {
     let store = await makeBootstrappedStore()
