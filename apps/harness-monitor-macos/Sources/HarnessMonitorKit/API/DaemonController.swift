@@ -47,6 +47,7 @@ public struct DaemonController: DaemonControlling {
   let managedLaunchAgentDeferredRefreshState: ManagedLaunchAgentDeferredRefreshState
   let processLiveness: ProcessLivenessProbe
   let bootSessionUUID: BootSessionUUIDProbe
+  let externalManifestLocator: ExternalDaemonManifestLocator
 
   public init(
     environment: HarnessMonitorEnvironment = .current,
@@ -94,7 +95,8 @@ public struct DaemonController: DaemonControlling {
         try Self.currentManagedLaunchAgentBundleStamp()
       },
     processLiveness: @escaping ProcessLivenessProbe = Self.defaultProcessLiveness,
-    bootSessionUUID: @escaping BootSessionUUIDProbe = Self.defaultBootSessionUUID
+    bootSessionUUID: @escaping BootSessionUUIDProbe = Self.defaultBootSessionUUID,
+    externalManifestDefaults: UserDefaults = .standard
   ) {
     self.environment = environment
     self.transportPreference = transportPreference
@@ -111,6 +113,11 @@ public struct DaemonController: DaemonControlling {
     self.managedLaunchAgentDeferredRefreshState = ManagedLaunchAgentDeferredRefreshState()
     self.processLiveness = processLiveness
     self.bootSessionUUID = bootSessionUUID
+    self.externalManifestLocator = ExternalDaemonManifestLocator(
+      environment: environment,
+      ownership: ownership,
+      defaults: externalManifestDefaults
+    )
   }
 
   public func bootstrapClient() async throws -> any HarnessMonitorClientProtocol {
@@ -118,7 +125,9 @@ public struct DaemonController: DaemonControlling {
       "Bootstrapping daemon client for \(String(describing: ownership), privacy: .public) daemon mode"
     )
     let connection = try loadConnection()
-    return try await bootstrap(connection: connection)
+    let client = try await bootstrap(connection: connection)
+    externalManifestLocator.rememberActiveManifestIfNeeded()
+    return client
   }
 
   public func performDeferredManagedLaunchAgentRefreshIfNeeded() async -> Bool {

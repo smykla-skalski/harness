@@ -19,25 +19,22 @@ extension DaemonController {
   }
 
   func loadManifest(emitTrace: Bool = true) throws -> DaemonManifest {
-    let manifestURL = HarnessMonitorPaths.manifestURL(using: environment)
-    guard FileManager.default.fileExists(atPath: manifestURL.path) else {
-      throw DaemonControlError.manifestMissing
+    var lastError: (any Error)?
+    for manifestURL in externalManifestLocator.candidateManifestURLs() {
+      do {
+        return try loadManifest(at: manifestURL, emitTrace: emitTrace)
+      } catch let error as DaemonControlError {
+        lastError = error
+        if shouldFallbackToNextManifestCandidate(after: error) {
+          continue
+        }
+        throw error
+      } catch {
+        lastError = error
+        throw error
+      }
     }
-
-    guard let data = FileManager.default.contents(atPath: manifestURL.path) else {
-      throw DaemonControlError.manifestUnreadable
-    }
-
-    let manifest = try makeDecoder().decode(DaemonManifest.self, from: data)
-    let resolvedManifest = recoverManifestEndpointIfNeeded(manifest)
-    if emitTrace {
-      let manifestFilePath = manifestURL.path
-      let pid = resolvedManifest.pid
-      HarnessMonitorLogger.lifecycle.trace(
-        "Loaded daemon manifest from \(manifestFilePath, privacy: .public) for pid \(pid, privacy: .public)"
-      )
-    }
-    return resolvedManifest
+    throw lastError ?? DaemonControlError.manifestMissing
   }
 
   func loadToken(path: String, emitTrace: Bool = true) throws -> String {
@@ -107,7 +104,7 @@ extension DaemonController {
   }
 
   private func latestDaemonListeningEvent() -> DaemonListeningEvent? {
-    let eventsURL = HarnessMonitorPaths.daemonRoot(using: environment)
+    let eventsURL = externalManifestLocator.daemonRoot
       .appendingPathComponent("events.jsonl")
     guard let handle = try? FileHandle(forReadingFrom: eventsURL) else {
       return nil
@@ -171,7 +168,7 @@ extension DaemonController {
       throw DaemonControlError.invalidManifest("token path must not include symlinks")
     }
 
-    let daemonRoot = HarnessMonitorPaths.daemonRoot(using: environment)
+    let daemonRoot = externalManifestLocator.daemonRoot
       .standardizedFileURL
       .resolvingSymlinksInPath()
     guard Self.isWithinDirectory(resolvedTokenURL, root: daemonRoot) else {
@@ -268,5 +265,42 @@ extension DaemonController {
     let decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
     return decoder
+  }
+
+  private func loadManifest(
+    at manifestURL: URL,
+    emitTrace: Bool
+  ) throws -> DaemonManifest {
+    guard FileManager.default.fileExists(atPath: manifestURL.path) else {
+      throw DaemonControlError.manifestMissing
+    }
+
+    guard let data = FileManager.default.contents(atPath: manifestURL.path) else {
+      throw DaemonControlError.manifestUnreadable
+    }
+
+    let manifest = try makeDecoder().decode(DaemonManifest.self, from: data)
+    externalManifestLocator.activate(manifestURL)
+    let resolvedManifest = recoverManifestEndpointIfNeeded(manifest)
+    if emitTrace {
+      let manifestFilePath = manifestURL.path
+      let pid = resolvedManifest.pid
+      HarnessMonitorLogger.lifecycle.trace(
+        "Loaded daemon manifest from \(manifestFilePath, privacy: .public) for pid \(pid, privacy: .public)"
+      )
+    }
+    return resolvedManifest
+  }
+
+  private func shouldFallbackToNextManifestCandidate(
+    after error: DaemonControlError
+  ) -> Bool {
+    switch error {
+    case .manifestMissing, .manifestUnreadable, .invalidManifest:
+      return true
+    case .daemonDidNotStart, .daemonOffline, .harnessBinaryNotFound, .externalDaemonOffline,
+      .externalDaemonManifestStale, .managedDaemonVersionMismatch, .commandFailed:
+      return false
+    }
   }
 }
