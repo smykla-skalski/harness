@@ -120,3 +120,23 @@ private struct FeedbackToastBalancePreviewBoard: View {
 #Preview("Toast balance board largest", traits: .fixedLayout(width: 620, height: 860)) {
   FeedbackToastBalancePreviewBoard(textSizeIndex: 6)
 }
+
+#Preview("Toast primary action copied", traits: .fixedLayout(width: 360, height: 100)) {
+  HarnessMonitorFeedbackToastPrimaryActionButton(
+    action: ActionFeedbackAction(
+      title: "Copy restart command",
+      systemImage: "doc.on.clipboard",
+      kind: .copy(text: FeedbackToastBalancePreviewData.restartCommand),
+      successAnnouncement: "Restart command copied"
+    ),
+    copied: true,
+    tint: HarnessMonitorTheme.caution,
+    reduceMotion: false,
+    onPress: {},
+    onPendingDismissCancelled: {},
+    onBeginDismiss: {},
+    onFinishDismiss: {}
+  )
+  .padding(24)
+  .harnessPreviewSceneAppearance()
+}
