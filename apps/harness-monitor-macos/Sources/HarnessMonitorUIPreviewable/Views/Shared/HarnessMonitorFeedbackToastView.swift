@@ -94,7 +94,7 @@ private struct HarnessMonitorFeedbackToastRow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
+      HStack(alignment: rowAlignment, spacing: HarnessMonitorTheme.spacingMD) {
         content
         Button {
           toast.dismiss(id: feedback.id)
@@ -338,6 +338,10 @@ private struct HarnessMonitorFeedbackToastRow: View {
     feedback.primaryAction != nil
       || feedback.details != nil
       || (feedback.severity == .undoable && toast.hasUndoAction(id: feedback.id))
+  }
+
+  private var rowAlignment: VerticalAlignment {
+    feedback.title == nil && !hasActions ? .center : .top
   }
 
   private func handleDragChanged(_ value: DragGesture.Value) {
