@@ -28,7 +28,7 @@ struct WorkspaceAcpSessionContextTests {
   }
 
   @Test("ACP start from create uses anchored session instead of no-selection guard")
-  func acpStartFromCreateUsesAnchoredSession() async {
+  func acpStartFromCreateUsesAnchoredSession() async throws {
     let client = RecordingHarnessClient()
     let store = await makeBootstrappedStore(client: client)
     let view = WorkspaceWindowView(store: store)
@@ -79,20 +79,16 @@ struct WorkspaceAcpSessionContextTests {
     #expect(store.selectedSessionActionUnavailableMessage == nil)
     #expect(store.currentFailureFeedbackMessage?.contains("No session is selected") != true)
     #expect(store.selectedSessionID == PreviewFixtures.summary.sessionId)
-    #expect(
-      store.selectedSession?.agents.contains(where: { $0.agentId == "copilot" }) == true
-    )
-    #expect(
-      store.selectedSession?.agents.first(where: { $0.agentId == "copilot" })?.role == .observer
-    )
+    let startedAgent = try #require(selectedAcpAgent(in: store))
+    #expect(startedAgent.role == .observer)
     #expect(
       view.viewModel.selection
-        == .agent(sessionID: PreviewFixtures.summary.sessionId, agentID: "copilot")
+        == .agent(sessionID: PreviewFixtures.summary.sessionId, agentID: startedAgent.agentId)
     )
   }
 
   @Test("ACP start from create falls back to the selected session when no cached anchor exists")
-  func acpStartFromCreateUsesSelectedSessionFallback() async {
+  func acpStartFromCreateUsesSelectedSessionFallback() async throws {
     let client = RecordingHarnessClient()
     let store = await makeBootstrappedStore(client: client)
     let view = WorkspaceWindowView(store: store)
@@ -136,15 +132,11 @@ struct WorkspaceAcpSessionContextTests {
     #expect(store.currentFailureFeedbackMessage == nil)
     #expect(store.selectedSessionID == PreviewFixtures.summary.sessionId)
     #expect(view.viewModel.createSessionID == PreviewFixtures.summary.sessionId)
-    #expect(
-      store.selectedSession?.agents.contains(where: { $0.agentId == "copilot" }) == true
-    )
-    #expect(
-      store.selectedSession?.agents.first(where: { $0.agentId == "copilot" })?.role == .worker
-    )
+    let startedAgent = try #require(selectedAcpAgent(in: store))
+    #expect(startedAgent.role == .worker)
     #expect(
       view.viewModel.selection
-        == .agent(sessionID: PreviewFixtures.summary.sessionId, agentID: "copilot")
+        == .agent(sessionID: PreviewFixtures.summary.sessionId, agentID: startedAgent.agentId)
     )
   }
 
@@ -161,7 +153,7 @@ struct WorkspaceAcpSessionContextTests {
   }
 
   @Test("Store ACP start reseats anchored session detail")
-  func storeAcpStartReseatsAnchoredSessionDetail() async {
+  func storeAcpStartReseatsAnchoredSessionDetail() async throws {
     let client = RecordingHarnessClient()
     let store = await makeBootstrappedStore(client: client)
     store.toast.dismissAll()
@@ -178,22 +170,21 @@ struct WorkspaceAcpSessionContextTests {
       persona: "reviewer",
       sessionID: PreviewFixtures.summary.sessionId
     )
+    let startedAgentID = try #require(started?.sessionAgentID)
 
-    #expect(started?.agentId == "copilot")
+    #expect(startedAgentID.hasPrefix("recording-session-agent-copilot-acp-"))
 
     await store.refreshSessionDetail(sessionID: PreviewFixtures.summary.sessionId)
 
     #expect(store.selectedSessionID == PreviewFixtures.summary.sessionId)
-    #expect(
-      store.selectedSession?.agents.contains(where: { $0.agentId == "copilot" }) == true
+    let startedAgent = try #require(
+      selectedAcpAgent(in: store, sessionAgentID: startedAgentID)
     )
-    #expect(
-      store.selectedSession?.agents.first(where: { $0.agentId == "copilot" })?.role == .observer
-    )
+    #expect(startedAgent.role == .observer)
   }
 
   @Test("Store ACP start succeeds with anchored session")
-  func storeAcpStartSucceedsWithAnchoredSession() async {
+  func storeAcpStartSucceedsWithAnchoredSession() async throws {
     let client = RecordingHarnessClient()
     let store = await makeBootstrappedStore(client: client)
     store.toast.dismissAll()
@@ -211,7 +202,8 @@ struct WorkspaceAcpSessionContextTests {
       sessionID: PreviewFixtures.summary.sessionId
     )
 
-    #expect(started?.agentId == "copilot")
+    let startedAgentID = try #require(started?.sessionAgentID)
+    #expect(startedAgentID.hasPrefix("recording-session-agent-copilot-acp-"))
     #expect(store.currentFailureFeedbackMessage == nil)
   }
 
@@ -249,7 +241,7 @@ struct WorkspaceAcpSessionContextTests {
   }
 
   @Test("Store ACP start enables ACP host bridge and retries when bridge is already running")
-  func storeAcpStartEnablesHostBridgeCapabilityAndRetries() async {
+  func storeAcpStartEnablesHostBridgeCapabilityAndRetries() async throws {
     let client = RecordingHarnessClient()
     client.configureAcpStartErrors([
       HarnessMonitorAPIError.server(code: 501, message: "sandbox-disabled - acp.host-bridge")
@@ -292,7 +284,8 @@ struct WorkspaceAcpSessionContextTests {
       sessionID: PreviewFixtures.summary.sessionId
     )
 
-    #expect(started?.agentId == "copilot")
+    let startedAgentID = try #require(started?.sessionAgentID)
+    #expect(startedAgentID.hasPrefix("recording-session-agent-copilot-acp-"))
     #expect(
       client.recordedCalls()
         == [
@@ -327,6 +320,17 @@ struct WorkspaceAcpSessionContextTests {
     #expect(store.currentFailureFeedbackMessage == nil)
   }
 
+}
+
+@MainActor
+private func selectedAcpAgent(
+  in store: HarnessMonitorStore,
+  sessionAgentID: String? = nil
+) -> AgentRegistration? {
+  store.selectedSession?.agents.first {
+    $0.managedAgent?.kind == .acp
+      && (sessionAgentID == nil || $0.agentId == sessionAgentID)
+  }
 }
 
 func makeSummary(sessionID: String) -> SessionSummary {

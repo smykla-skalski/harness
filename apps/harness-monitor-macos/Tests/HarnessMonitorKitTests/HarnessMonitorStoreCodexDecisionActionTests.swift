@@ -16,6 +16,8 @@ final class HarnessMonitorStoreCodexDecisionActionTests: XCTestCase {
     client.configureCodexRuns([run], for: PreviewFixtures.summary.sessionId)
 
     let store = await makeBootstrappedStore(client: client)
+    await store.startSupervisor()
+    addTeardownBlock { await store.stopSupervisor() }
     await store.selectSession(PreviewFixtures.summary.sessionId)
     _ = await store.refreshSelectedCodexRuns()
     store.selectCodexRun(runID: run.runId)

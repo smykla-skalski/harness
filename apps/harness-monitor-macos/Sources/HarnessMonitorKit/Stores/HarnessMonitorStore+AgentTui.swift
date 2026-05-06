@@ -271,7 +271,6 @@ extension HarnessMonitorStore {
         return true
       }
       clearHostBridgeIssue(for: "agent-tui")
-      cancelAgentTuiActionRefresh()
       let sortedTuis = measuredTuis.value.canonicallySorted(roleByAgent: selectedSessionRoles())
         .tuis
       assignAgentTuis(sortedTuis, selected: preferredAgentTui(from: sortedTuis))

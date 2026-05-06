@@ -33,6 +33,13 @@ extension WebSocketProtocolTests {
   @Test("WebSocket transport maps parity errors to HTTP-equivalent client errors")
   func parityErrorMappingMatchesHTTPSemantics() async throws {
     let transport = makeTransport()
+    let bridgePayload: JSONValue = .object([
+      "error": .object([
+        "code": .string("bridge_unavailable"),
+        "message": .string("bridge unavailable"),
+        "details": .array([]),
+      ])
+    ])
     let adoptError = await transport.responseError(
       method: .sessionAdopt,
       error: WsErrorPayload(
@@ -53,21 +60,32 @@ extension WebSocketProtocolTests {
         message: "bridge unavailable",
         details: [],
         statusCode: 503,
-        data: .object([
-          "error": .object([
-            "code": .string("bridge_unavailable"),
-            "message": .string("bridge unavailable"),
-            "details": .array([]),
-          ])
-        ])
+        data: bridgePayload
       )
     )
+    let bridgePayloadData = try JSONEncoder().encode(bridgePayload)
 
     #expect(adoptError as? HarnessMonitorAPIError == .adoptAlreadyAttached(sessionId: "sess-1"))
-    #expect(
-      bridgeError as? HarnessMonitorAPIError
-        == .server(code: 503, message: "bridge unavailable")
+    let decodedBridgeError = HarnessMonitorAPIClient.decodeError(
+      statusCode: 503,
+      data: bridgePayloadData
     )
+    guard case let .server(code, message)? = bridgeError as? HarnessMonitorAPIError else {
+      Issue.record("Expected bridge parity error to map to a server API error")
+      return
+    }
+    guard case let .server(expectedCode, expectedMessage) = decodedBridgeError else {
+      Issue.record("Expected HTTP decoder to produce a server API error")
+      return
+    }
+    #expect(code == expectedCode)
+    let bridgePayloadObject = try #require(
+      JSONSerialization.jsonObject(with: Data(message.utf8)) as? [String: Any]
+    )
+    let expectedPayloadObject = try #require(
+      JSONSerialization.jsonObject(with: Data(expectedMessage.utf8)) as? [String: Any]
+    )
+    #expect(NSDictionary(dictionary: bridgePayloadObject) == NSDictionary(dictionary: expectedPayloadObject))
   }
 
   @Test("WsFrame returns unknown for empty object")

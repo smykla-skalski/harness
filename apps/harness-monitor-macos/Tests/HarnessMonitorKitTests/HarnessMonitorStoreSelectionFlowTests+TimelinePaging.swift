@@ -44,26 +44,33 @@ extension HarnessMonitorStoreSelectionFlowTests {
       detail: detail
     )
     let store = await makeBootstrappedStore(client: client)
+    let pageSize = 10
+    let initialWindowSize = HarnessMonitorStoreSelectionTestSupport.initialTimelineWindowSize(
+      for: fullTimeline.count
+    )
+    let requestedPage = 2
+    let targetEnd = min(fullTimeline.count, (requestedPage + 1) * pageSize)
+    let missingCount = targetEnd - initialWindowSize
 
     await store.selectSession(summary.sessionId)
-    await store.loadSelectedTimelinePage(page: 1, pageSize: 10)
+    await store.loadSelectedTimelinePage(page: requestedPage, pageSize: pageSize)
 
     #expect(
       client.recordedTimelineWindowRequests(for: summary.sessionId) == [
-        .latest(limit: 10),
+        .latest(limit: initialWindowSize),
         TimelineWindowRequest(
           scope: .summary,
-          limit: 10,
+          limit: missingCount,
           before: TimelineCursor(
-            recordedAt: fullTimeline[9].recordedAt,
-            entryId: fullTimeline[9].entryId
+            recordedAt: fullTimeline[initialWindowSize - 1].recordedAt,
+            entryId: fullTimeline[initialWindowSize - 1].entryId
           )
         ),
       ])
-    #expect(store.timeline == Array(fullTimeline.prefix(20)))
+    #expect(store.timeline == Array(fullTimeline.prefix(targetEnd)))
     #expect(store.timelineWindow?.totalCount == fullTimeline.count)
     #expect(store.timelineWindow?.windowStart == 0)
-    #expect(store.timelineWindow?.windowEnd == 20)
+    #expect(store.timelineWindow?.windowEnd == targetEnd)
   }
 
   @Test("Loading the same timeline page while it is already in flight coalesces requests")
@@ -86,7 +93,7 @@ extension HarnessMonitorStoreSelectionFlowTests {
       workerID: "worker-window-page-coalesce",
       workerName: "Window Coalescing Worker"
     )
-    let fullTimeline = (0..<25).map { index in
+    let fullTimeline = (0..<35).map { index in
       TimelineEntry(
         entryId: "timeline-page-coalesce-\(index)",
         recordedAt: String(format: "2026-04-14T10:%02d:00Z", 59 - index),
@@ -105,30 +112,37 @@ extension HarnessMonitorStoreSelectionFlowTests {
       detail: detail
     )
     let store = await makeBootstrappedStore(client: client)
+    let pageSize = 10
+    let initialWindowSize = HarnessMonitorStoreSelectionTestSupport.initialTimelineWindowSize(
+      for: fullTimeline.count
+    )
+    let requestedPage = 2
+    let targetEnd = min(fullTimeline.count, (requestedPage + 1) * pageSize)
+    let missingCount = targetEnd - initialWindowSize
 
     await store.selectSession(summary.sessionId)
     client.configureTimelineWindowDelay(.milliseconds(250), for: summary.sessionId)
 
-    async let firstLoad: Void = store.loadSelectedTimelinePage(page: 1, pageSize: 10)
-    async let secondLoad: Void = store.loadSelectedTimelinePage(page: 1, pageSize: 10)
+    async let firstLoad: Void = store.loadSelectedTimelinePage(page: requestedPage, pageSize: pageSize)
+    async let secondLoad: Void = store.loadSelectedTimelinePage(page: requestedPage, pageSize: pageSize)
     await firstLoad
     await secondLoad
 
     #expect(
       client.recordedTimelineWindowRequests(for: summary.sessionId) == [
-        .latest(limit: 10),
+        .latest(limit: initialWindowSize),
         TimelineWindowRequest(
           scope: .summary,
-          limit: 10,
+          limit: missingCount,
           before: TimelineCursor(
-            recordedAt: fullTimeline[9].recordedAt,
-            entryId: fullTimeline[9].entryId
+            recordedAt: fullTimeline[initialWindowSize - 1].recordedAt,
+            entryId: fullTimeline[initialWindowSize - 1].entryId
           )
         ),
       ])
-    #expect(store.timeline == Array(fullTimeline.prefix(20)))
+    #expect(store.timeline == Array(fullTimeline.prefix(targetEnd)))
     #expect(store.timelineWindow?.totalCount == fullTimeline.count)
-    #expect(store.timelineWindow?.windowEnd == 20)
+    #expect(store.timelineWindow?.windowEnd == targetEnd)
   }
 
   @Test("Loading a farther timeline page requests only the missing prefix")
@@ -170,25 +184,32 @@ extension HarnessMonitorStoreSelectionFlowTests {
       detail: detail
     )
     let store = await makeBootstrappedStore(client: client)
+    let pageSize = 10
+    let initialWindowSize = HarnessMonitorStoreSelectionTestSupport.initialTimelineWindowSize(
+      for: fullTimeline.count
+    )
+    let requestedPage = 3
+    let targetEnd = min(fullTimeline.count, (requestedPage + 1) * pageSize)
+    let missingCount = targetEnd - initialWindowSize
 
     await store.selectSession(summary.sessionId)
-    await store.loadSelectedTimelinePage(page: 2, pageSize: 10)
+    await store.loadSelectedTimelinePage(page: requestedPage, pageSize: pageSize)
 
     #expect(
       client.recordedTimelineWindowRequests(for: summary.sessionId) == [
-        .latest(limit: 10),
+        .latest(limit: initialWindowSize),
         TimelineWindowRequest(
           scope: .summary,
-          limit: 20,
+          limit: missingCount,
           before: TimelineCursor(
-            recordedAt: fullTimeline[9].recordedAt,
-            entryId: fullTimeline[9].entryId
+            recordedAt: fullTimeline[initialWindowSize - 1].recordedAt,
+            entryId: fullTimeline[initialWindowSize - 1].entryId
           )
         ),
       ])
-    #expect(store.timeline == Array(fullTimeline.prefix(30)))
+    #expect(store.timeline == Array(fullTimeline.prefix(targetEnd)))
     #expect(store.timelineWindow?.totalCount == fullTimeline.count)
-    #expect(store.timelineWindow?.windowEnd == 30)
+    #expect(store.timelineWindow?.windowEnd == targetEnd)
   }
 
   @Test("Loading a timeline page falls back to a bounded latest refresh after revision drift")
@@ -211,7 +232,7 @@ extension HarnessMonitorStoreSelectionFlowTests {
       workerID: "worker-window-page-refresh",
       workerName: "Window Refresh Worker"
     )
-    let fullTimeline = (0..<25).map { index in
+    let fullTimeline = (0..<35).map { index in
       TimelineEntry(
         entryId: "timeline-page-refresh-\(index)",
         recordedAt: String(format: "2026-04-14T08:%02d:00Z", 59 - index),
@@ -223,7 +244,7 @@ extension HarnessMonitorStoreSelectionFlowTests {
         payload: .object([:])
       )
     }
-    let refreshedPrefix = Array(fullTimeline.prefix(20))
+    let refreshedPrefix = Array(fullTimeline.prefix(30))
     let driftedResponse = TimelineWindowResponse(
       revision: 99,
       totalCount: fullTimeline.count,
@@ -247,24 +268,31 @@ extension HarnessMonitorStoreSelectionFlowTests {
       detail: detail
     )
     let store = await makeBootstrappedStore(client: client)
+    let pageSize = 10
+    let initialWindowSize = HarnessMonitorStoreSelectionTestSupport.initialTimelineWindowSize(
+      for: fullTimeline.count
+    )
+    let requestedPage = 2
+    let targetEnd = min(fullTimeline.count, (requestedPage + 1) * pageSize)
+    let missingCount = targetEnd - initialWindowSize
 
     await store.selectSession(summary.sessionId)
     client.configureTimelineWindowResponse(driftedResponse, for: summary.sessionId)
 
-    await store.loadSelectedTimelinePage(page: 1, pageSize: 10)
+    await store.loadSelectedTimelinePage(page: requestedPage, pageSize: pageSize)
 
     #expect(
       client.recordedTimelineWindowRequests(for: summary.sessionId) == [
-        .latest(limit: 10),
+        .latest(limit: initialWindowSize),
         TimelineWindowRequest(
           scope: .summary,
-          limit: 10,
+          limit: missingCount,
           before: TimelineCursor(
-            recordedAt: fullTimeline[9].recordedAt,
-            entryId: fullTimeline[9].entryId
+            recordedAt: fullTimeline[initialWindowSize - 1].recordedAt,
+            entryId: fullTimeline[initialWindowSize - 1].entryId
           )
         ),
-        .latest(limit: 20),
+        .latest(limit: targetEnd),
       ])
     #expect(store.timeline == refreshedPrefix)
     #expect(store.timelineWindow?.revision == driftedResponse.revision)

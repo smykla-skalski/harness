@@ -38,14 +38,18 @@ enum SessionTimelineTableMetrics {
     return min(safeProposedWidth, visibleContentWidth)
   }
 
-  static func minimumCardHeight(for row: SessionTimelineRow) -> CGFloat {
+  static func minimumCardHeight(
+    for row: SessionTimelineRow,
+    fontScale: CGFloat = 1.0
+  ) -> CGFloat {
+    let scale = max(1, fontScale)
     if prefersCompactLayout(for: row) {
-      return minimumCompactCardHeight
+      return minimumCompactCardHeight * scale
     }
     if usesSimpleWideLayout(for: row) {
-      return minimumSimpleWideCardHeight
+      return minimumSimpleWideCardHeight * scale
     }
-    return minimumDetailedWideCardHeight
+    return minimumDetailedWideCardHeight * scale
   }
 
   static func rowBottomPadding(for _: SessionTimelineRow) -> CGFloat {
@@ -81,8 +85,11 @@ enum SessionTimelineTableMetrics {
       && row.node.actions.isEmpty
   }
 
-  static func estimatedHeight(for row: SessionTimelineRow) -> CGFloat {
-    var height = max(estimatedBaseRowHeight, minimumCardHeight(for: row))
+  static func estimatedHeight(
+    for row: SessionTimelineRow,
+    fontScale: CGFloat = 1.0
+  ) -> CGFloat {
+    var height = max(estimatedBaseRowHeight, minimumCardHeight(for: row, fontScale: fontScale))
     if row.dayDividerLabel != nil {
       height += dayDividerHeight
     }

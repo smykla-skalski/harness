@@ -44,6 +44,12 @@ struct DecisionContractNarrativeTests {
         "non-renderable fallback content for ACP Decisions rows."
       ),
       entry(
+        "- `AcpPermissionDecisionPayload.decisionKind` in",
+        "`Supervisor/Decision/AcpPermissionDecision.swift`:",
+        "first-class ACP decision-kind contract marker used during decode/reconciliation,",
+        "so ACP routing is not only a `ruleID`/payload-shape convention."
+      ),
+      entry(
         "- `AcpPermissionBatch` in `Models/AcpAgentModels.swift`:",
         "one queue element carries `1...N` permission items and uses `batchId`",
         "as the idempotency key."
@@ -100,8 +106,9 @@ struct DecisionContractNarrativeTests {
       entry(
         "- `AcpAgentsReconciledPayload` in",
         "`Models/HarnessMonitorDaemonPushEvent.swift`:",
-        "confirms reconcile snapshots already exist in-tree and remain",
-        "authoritative."
+        "confirms reconcile snapshots already exist in-tree, remain authoritative,",
+        "and may carry inline ACP inspect telemetry so runtime chrome can",
+        "hydrate without waiting for a separate inspect push."
       ),
     ]
 

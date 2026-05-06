@@ -232,7 +232,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(client.shutdownCallCount() == 1)
   }
 
-  @Test("App inactivity applies any deferred managed launch-agent refresh after suspending")
+  @Test("App inactivity does not apply any deferred managed launch-agent refresh after suspending")
   func appInactivityAppliesDeferredManagedLaunchAgentRefresh() async {
     let client = RecordingHarnessClient()
     let daemon = RecordingDaemonController(
@@ -248,7 +248,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.connectionState == .idle)
     #expect(store.client == nil)
     #expect(client.shutdownCallCount() == 1)
-    #expect(await daemon.recordedDeferredManagedLaunchAgentRefreshCallCount() == 1)
+    #expect(await daemon.recordedDeferredManagedLaunchAgentRefreshCallCount() == 0)
   }
 
   @Test("App activation cancels a pending inactivity suspend")

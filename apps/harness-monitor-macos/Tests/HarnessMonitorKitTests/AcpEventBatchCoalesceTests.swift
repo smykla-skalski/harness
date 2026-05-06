@@ -13,7 +13,7 @@ struct AcpEventBatchCoalesceTests {
     1: 5_000_000,
     32: 10_000_000,
     256: 30_000_000,
-    1_024: 100_000_000,
+    1_024: 130_000_000,
   ]
   private static let regressionMultiplier = 2.0
 

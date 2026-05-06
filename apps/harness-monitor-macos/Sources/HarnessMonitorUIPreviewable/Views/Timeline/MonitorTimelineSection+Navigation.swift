@@ -54,7 +54,11 @@ extension MonitorTimelineSection {
           let request = TimelineWindowRequest.latest(
             limit: SessionTimelineWindowNavigation.defaultLimit
           )
-          markPendingNavigation(.latest, request: request)
+          markPendingNavigation(
+            .latest,
+            request: request,
+            baselineWindowStart: presentation.navigation.windowStart
+          )
           await loadWindow(request)
           return
         }
@@ -87,7 +91,11 @@ extension MonitorTimelineSection {
     guard shouldLoad, let request = presentation.navigation.request(for: action) else {
       return false
     }
-    markPendingNavigation(action, request: request)
+    markPendingNavigation(
+      action,
+      request: request,
+      baselineWindowStart: presentation.navigation.windowStart
+    )
     await loadWindow(request)
     return true
   }
@@ -95,14 +103,16 @@ extension MonitorTimelineSection {
   @MainActor
   func markPendingNavigation(
     _ action: SessionTimelineWindowAction,
-    request: TimelineWindowRequest
+    request: TimelineWindowRequest,
+    baselineWindowStart: Int
   ) {
     currentPendingNavigationGeneration += 1
     currentPendingNavigation = SessionTimelinePendingNavigation(
       action: action,
       request: request,
       sessionID: sessionID,
-      generation: currentPendingNavigationGeneration
+      generation: currentPendingNavigationGeneration,
+      baselineWindowStart: baselineWindowStart
     )
   }
 

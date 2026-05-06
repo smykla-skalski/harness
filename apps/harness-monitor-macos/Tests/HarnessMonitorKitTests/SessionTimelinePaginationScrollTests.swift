@@ -273,13 +273,15 @@ struct SessionTimelineNavigationScrollTests {
       action: .older,
       request: olderRequest,
       sessionID: "sess-pagination",
-      generation: 1
+      generation: 1,
+      baselineWindowStart: initialNavigation.windowStart
     )
     let newerPending = SessionTimelinePendingNavigation(
       action: .newer,
       request: newerRequest,
       sessionID: "sess-pagination",
-      generation: 2
+      generation: 2,
+      baselineWindowStart: initialNavigation.windowStart
     )
 
     #expect(!olderPending.isSatisfied(sessionID: "other-session", navigation: initialNavigation))
@@ -319,7 +321,8 @@ struct SessionTimelineNavigationScrollTests {
       action: .latest,
       request: .latest(limit: SessionTimelineWindowNavigation.defaultLimit),
       sessionID: "sess-pagination",
-      generation: 1
+      generation: 1,
+      baselineWindowStart: 6
     )
     let olderNavigation = SessionTimelineWindowNavigation(
       timeline: olderEntries,

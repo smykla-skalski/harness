@@ -9,13 +9,37 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()
-    let fileURL =
+    let viewsRoot =
       repoRoot
       .appendingPathComponent(
         "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views"
       )
-      .appendingPathComponent(name)
-    return try String(contentsOf: fileURL, encoding: .utf8)
+    let fileURL = viewsRoot.appendingPathComponent(name)
+    if FileManager.default.fileExists(atPath: fileURL.path) {
+      return try String(contentsOf: fileURL, encoding: .utf8)
+    }
+
+    let requestedBasename = URL(fileURLWithPath: name).lastPathComponent
+    let candidateURLs =
+      FileManager.default.enumerator(
+        at: viewsRoot,
+        includingPropertiesForKeys: [.isRegularFileKey],
+        options: [.skipsHiddenFiles]
+      )?
+      .compactMap { element -> URL? in
+        guard let url = element as? URL, url.lastPathComponent == requestedBasename else {
+          return nil
+        }
+        return url
+      } ?? []
+
+    if let matchedURL = candidateURLs.first(where: { $0.path.hasSuffix("/\(name)") }) {
+      return try String(contentsOf: matchedURL, encoding: .utf8)
+    }
+    guard let resolvedURL = candidateURLs.only else {
+      throw CocoaError(.fileNoSuchFile)
+    }
+    return try String(contentsOf: resolvedURL, encoding: .utf8)
   }
 
   func uiTestSupportFile(named name: String) throws -> String {
@@ -50,6 +74,12 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       try? await Task.sleep(for: interval)
     }
     return await predicate()
+  }
+}
+
+private extension Array {
+  var only: Element? {
+    count == 1 ? first : nil
   }
 }
 

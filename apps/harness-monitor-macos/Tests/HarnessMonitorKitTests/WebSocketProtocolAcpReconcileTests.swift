@@ -23,8 +23,10 @@ struct WebSocketProtocolAcpReconcileTests {
           "agents": [
             {
               "acp_id": "acp-1",
+              "managed_agent_id": "acp-1",
               "session_id": "session-1",
               "agent_id": "worker-codex",
+              "session_agent_id": "worker-codex",
               "display_name": "worker-codex",
               "status": "active",
               "pid": 41001,
@@ -45,8 +47,10 @@ struct WebSocketProtocolAcpReconcileTests {
             "agents": [
               {
                 "acp_id": "acp-1",
+                "managed_agent_id": "acp-1",
                 "session_id": "session-1",
                 "agent_id": "worker-codex",
+                "session_agent_id": "worker-codex",
                 "display_name": "worker-codex",
                 "pid": 41001,
                 "pgid": 41001,
@@ -88,8 +92,10 @@ struct WebSocketProtocolAcpReconcileTests {
           "agents": [
             {
               "acp_id": "acp-1",
+              "managed_agent_id": "acp-1",
               "session_id": "session-1",
               "agent_id": "worker-codex",
+              "session_agent_id": "worker-codex",
               "display_name": "worker-codex",
               "status": "active",
               "pid": 41001,

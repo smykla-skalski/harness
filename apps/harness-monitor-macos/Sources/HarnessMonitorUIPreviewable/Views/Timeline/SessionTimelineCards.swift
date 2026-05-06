@@ -58,6 +58,9 @@ struct SessionTimelineNodeCluster: View {
 }
 
 private struct SessionTimelineNodeRow: View {
+  @Environment(\.fontScale)
+  private var fontScale
+
   let row: SessionTimelineRow
   let actionHandler: any DecisionActionHandler
   let onSignalTap: ((String) -> Void)?
@@ -101,6 +104,13 @@ private struct SessionTimelineNodeRow: View {
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
+      .frame(
+        minHeight: SessionTimelineTableMetrics.minimumCardHeight(
+          for: row,
+          fontScale: fontScale
+        ),
+        alignment: .topLeading
+      )
       .padding(.horizontal, HarnessMonitorTheme.cardPadding)
       .padding(.vertical, HarnessMonitorTheme.spacingSM)
       .background(SessionTimelineCardBackground(tint: cardTint))

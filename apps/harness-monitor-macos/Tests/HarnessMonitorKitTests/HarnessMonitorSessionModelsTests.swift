@@ -193,7 +193,7 @@ struct HarnessMonitorSessionModelsTests {
         },
         "agents": [
           {
-            "agent_id": "claude-leader",
+            "session_agent_id": "claude-leader",
             "name": "claude leader",
             "runtime": "claude",
             "role": "leader",

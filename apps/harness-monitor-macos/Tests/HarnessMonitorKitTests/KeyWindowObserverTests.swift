@@ -49,7 +49,7 @@ struct KeyWindowObserverTests {
   }
 
   @Test("observer refreshes from window lifecycle notifications")
-  func observerRefreshesFromNotifications() {
+  func observerRefreshesFromNotifications() async {
     let notificationCenter = NotificationCenter()
     let application = FakeKeyWindowApplication(
       keyWindowIdentifier: "main",
@@ -74,6 +74,8 @@ struct KeyWindowObserverTests {
     ]
 
     notificationCenter.post(name: NSWindow.didMiniaturizeNotification, object: nil)
+    await Task.yield()
+    await Task.yield()
 
     #expect(observer.snapshot.keyWindowIdentifier == nil)
     #expect(observer.snapshot.prefersUserNotificationDelivery)

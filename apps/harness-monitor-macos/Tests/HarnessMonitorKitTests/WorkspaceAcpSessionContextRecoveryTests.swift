@@ -9,7 +9,7 @@ struct WorkspaceAcpSessionContextRecoveryTests {
   @Test(
     "Store ACP start retries with the restarted managed daemon client after legacy 404 recovery"
   )
-  func storeAcpStartUsesRestartedClientAfterLegacy404Recovery() async {
+  func storeAcpStartUsesRestartedClientAfterLegacy404Recovery() async throws {
     let staleClient = RecordingHarnessClient()
     staleClient.configureAcpStartErrors([
       HarnessMonitorAPIError.server(code: 501, message: "sandbox-disabled - acp.host-bridge")
@@ -63,7 +63,8 @@ struct WorkspaceAcpSessionContextRecoveryTests {
       sessionID: PreviewFixtures.summary.sessionId
     )
 
-    #expect(started?.agentId == "copilot")
+    let startedAgentID = try #require(started?.sessionAgentID)
+    #expect(startedAgentID.hasPrefix("recording-session-agent-copilot-acp-"))
     #expect(
       staleClient.recordedCalls()
         == [

@@ -26,13 +26,28 @@ extension HarnessMonitorStore {
       return fallbackTimelineWindow(for: loadedTimeline)
     }
 
+    let totalCount = max(timelineWindow.totalCount, loadedTimeline.count)
+    let preservesExplicitWindow = timelineWindow.windowStart > 0 || timelineWindow.hasNewer
+    let windowStart =
+      if preservesExplicitWindow {
+        min(timelineWindow.windowStart, totalCount)
+      } else {
+        0
+      }
+    let windowEnd =
+      if preservesExplicitWindow {
+        min(totalCount, windowStart + loadedTimeline.count)
+      } else {
+        loadedTimeline.count
+      }
+
     return TimelineWindowResponse(
       revision: timelineWindow.revision,
-      totalCount: max(timelineWindow.totalCount, loadedTimeline.count),
-      windowStart: 0,
-      windowEnd: loadedTimeline.count,
-      hasOlder: loadedTimeline.count < timelineWindow.totalCount,
-      hasNewer: false,
+      totalCount: totalCount,
+      windowStart: windowStart,
+      windowEnd: windowEnd,
+      hasOlder: timelineWindow.hasOlder || windowEnd < totalCount,
+      hasNewer: timelineWindow.hasNewer || windowStart > 0,
       oldestCursor: loadedTimeline.last.map(\.timelineCursor),
       newestCursor: loadedTimeline.first.map(\.timelineCursor),
       entries: nil,
