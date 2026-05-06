@@ -31,7 +31,7 @@ extension DaemonController {
       return client
     }
     if ownership == .external {
-      let manifestPath = HarnessMonitorPaths.manifestURL(using: environment).path
+      let manifestPath = externalManifestLocator.manifestURL.path
       if state.sawUnreachableManifest {
         // Manifest existed throughout the warm-up but nothing bound to its
         // endpoint. Classic crash-without-cleanup: SIGKILL'd dev daemon.
@@ -78,7 +78,7 @@ extension DaemonController {
       let staleSignature = Self.managedStaleManifestSignature(for: manifest)
       let isFreshObservation = state.lastLoggedManifestSignature != staleSignature
       if isFreshObservation {
-        let manifestPath = HarnessMonitorPaths.manifestURL(using: environment).path
+        let manifestPath = externalManifestLocator.manifestURL.path
         let pid = manifest.pid
         let tokenPath = manifest.tokenPath
         HarnessMonitorLogger.lifecycle.trace(
@@ -129,6 +129,7 @@ extension DaemonController {
           await clearDeferredManagedLaunchAgentRefresh()
         }
         let client = try await bootstrap(connection: connection)
+        externalManifestLocator.rememberActiveManifestIfNeeded()
         return WarmUpIterationOutcome(liveClient: client, stop: true, progressed: true)
       }
       return try handleStaleManifest(
@@ -184,7 +185,7 @@ extension DaemonController {
     isFreshObservation: Bool,
     state: inout WarmUpLoopState
   ) throws -> WarmUpIterationOutcome {
-    let manifestPath = HarnessMonitorPaths.manifestURL(using: environment).path
+    let manifestPath = externalManifestLocator.manifestURL.path
     if isFreshObservation {
       HarnessMonitorLogger.lifecycle.error(
         "\(Self.warmUpStaleManifestMessage(path: manifestPath, endpoint: endpoint), privacy: .public)"

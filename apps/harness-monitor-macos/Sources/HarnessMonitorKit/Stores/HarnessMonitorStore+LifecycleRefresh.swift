@@ -217,6 +217,7 @@ extension HarnessMonitorStore {
       daemonLogLevel =
         measuredDiagnostics.value.health?.logLevel
         ?? HarnessMonitorLogger.defaultDaemonLogLevel
+      adoptManifestURL(from: measuredDiagnostics.value.workspace.manifestPath)
     }
     clearTransientHostBridgeIssues()
     if recordConnectionTelemetry {

@@ -287,7 +287,9 @@ extension HarnessMonitorStore {
 
   public func refreshDaemonStatus() async {
     do {
-      daemonStatus = try await daemonController.daemonStatus()
+      let status = try await daemonController.daemonStatus()
+      daemonStatus = status
+      adoptManifestURL(from: status.diagnostics.manifestPath)
       clearTransientHostBridgeIssues()
     } catch {
       presentFailureFeedback(error.localizedDescription)
