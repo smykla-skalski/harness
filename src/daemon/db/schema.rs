@@ -88,6 +88,7 @@ impl DaemonDb {
         if should_reclaim_space {
             reclaim_unused_pages(&self.conn)?;
         }
+        super::schema_repairs::repair_noncanonical_session_state_wire(self)?;
         Ok(())
     }
 
