@@ -20,7 +20,10 @@ extension MonitorTimelineSection {
   }
 
   func requestOlderWindowIfNeeded(_ presentation: SessionTimelineSectionPresentation) {
-    requestWindowIfNeeded(for: .older, presentation: presentation)
+    guard !isTimelineLoading, presentation.navigation.hasOlder else {
+      return
+    }
+    Task { await loadOlderTimelineChunk(limit: presentation.navigation.limit) }
   }
 
   func requestNewerWindowIfNeeded(_ presentation: SessionTimelineSectionPresentation) {
@@ -166,12 +169,11 @@ extension MonitorTimelineSection {
       return
     }
     if !ids.contains(anchorID) {
-      // Bottom-edge pagination can replace the loaded window with older rows
-      // that no longer include the previously visible anchor. In that case the
+      // Explicit cursor-window loads and revision-refresh fallbacks can still
+      // replace the loaded slice and drop the previous anchor. In that case the
       // coordinator already restored the viewport as far as possible, and any
       // explicit navigation follow-up is handled by pending navigation. Forcing
-      // a new scroll to the first row here snaps the user back toward the top
-      // of the newly loaded window while they are still scrolling downward.
+      // a new scroll to the first row here snaps the user back toward the top.
       timelineViewport.setAnchorID(ids.first)
       currentTimelineScrollCommand = nil
     }
