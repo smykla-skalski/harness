@@ -164,6 +164,17 @@ public enum ManagedAgentSnapshot: Equatable, Identifiable, Sendable {
   case acp(AcpAgentSnapshot)
 
   public var id: String { agentId }
+  public var family: ManagedAgentFamily {
+    switch self {
+    case .terminal:
+      .terminal
+    case .codex:
+      .codex
+    case .acp:
+      .acp
+    }
+  }
+  public var managedAgentID: String { agentId }
 
   public var agentId: String {
     switch self {
@@ -173,6 +184,17 @@ public enum ManagedAgentSnapshot: Equatable, Identifiable, Sendable {
       snapshot.runId
     case .acp(let snapshot):
       snapshot.acpId
+    }
+  }
+
+  public var sessionAgentID: String? {
+    switch self {
+    case .terminal(let snapshot):
+      snapshot.sessionAgentID
+    case .codex(let snapshot):
+      snapshot.sessionAgentID
+    case .acp(let snapshot):
+      snapshot.sessionAgentID
     }
   }
 
@@ -272,6 +294,8 @@ public struct AgentTuiSnapshot: Codable, Equatable, Identifiable, Sendable {
   public let updatedAt: String
 
   public var id: String { tuiId }
+  public var managedAgentID: String { tuiId }
+  public var sessionAgentID: String { agentId }
 }
 
 extension AgentTuiListResponse {
@@ -332,6 +356,12 @@ extension AgentTuiStatus {
       3
     }
   }
+}
+
+public enum ManagedAgentFamily: String, Codable, Sendable {
+  case terminal
+  case codex
+  case acp
 }
 
 extension AgentTuiSnapshot {

@@ -2,9 +2,10 @@ use std::collections::BTreeMap;
 
 use super::test_support::{agent_registration, persona, session_state, work_item};
 use super::{
-    ARBITRATION_BLOCKED_REASON, AgentStatus, AutoPromotionPolicy, LeaderJoinPolicy,
-    LeaderRecoveryPolicy, SessionMetrics, SessionPolicy, SessionRole, SessionState, SessionStatus,
-    TaskCheckpointSummary, TaskNote, TaskQueuePolicy, TaskSeverity, TaskStatus,
+    ARBITRATION_BLOCKED_REASON, AgentStatus, AutoPromotionPolicy, HarnessSessionId,
+    LeaderJoinPolicy, LeaderRecoveryPolicy, ManagedAgentRef, RuntimeSessionId, SessionAgentId,
+    SessionMetrics, SessionPolicy, SessionRole, SessionState, SessionStatus, TaskCheckpointSummary,
+    TaskNote, TaskQueuePolicy, TaskSeverity, TaskStatus,
 };
 
 #[test]
@@ -280,5 +281,66 @@ fn session_state_round_trip_preserves_persona_tasks_and_metrics() {
             .and_then(|task| task.checkpoint_summary.as_ref())
             .map(|checkpoint| checkpoint.progress),
         Some(80)
+    );
+}
+
+#[test]
+fn session_state_identity_accessors_expose_typed_ids() {
+    let mut agents = BTreeMap::new();
+    agents.insert(
+        "leader".into(),
+        agent_registration("leader", "claude", SessionRole::Leader, AgentStatus::Active),
+    );
+    let state = session_state(agents, BTreeMap::new());
+
+    assert_eq!(state.harness_session_id(), HarnessSessionId::from("sess-1"));
+    assert_eq!(
+        state.leader_session_agent_id(),
+        Some(SessionAgentId::from("leader"))
+    );
+    assert_eq!(
+        state
+            .agent(&SessionAgentId::from("leader"))
+            .expect("leader registration")
+            .session_agent_id(),
+        SessionAgentId::from("leader")
+    );
+}
+
+#[test]
+fn session_state_identity_helpers_resolve_managed_and_runtime_links() {
+    let leader = agent_registration("leader", "claude", SessionRole::Leader, AgentStatus::Active);
+    let mut worker = agent_registration(
+        "worker-1",
+        "codex",
+        SessionRole::Worker,
+        AgentStatus::Active,
+    );
+    worker.managed_agent = Some(ManagedAgentRef::tui("tui-1"));
+    worker.agent_session_id = Some("runtime-1".into());
+
+    let mut agents = BTreeMap::new();
+    agents.insert(leader.agent_id.clone(), leader);
+    agents.insert(worker.agent_id.clone(), worker);
+    let state = session_state(agents, BTreeMap::new());
+
+    assert_eq!(
+        state.find_session_agent_id_by_managed_agent(&ManagedAgentRef::tui("tui-1")),
+        Some(SessionAgentId::from("worker-1"))
+    );
+    assert_eq!(
+        state.find_session_agent_id_by_runtime_session(
+            "codex",
+            &RuntimeSessionId::from("runtime-1")
+        ),
+        Some(SessionAgentId::from("worker-1"))
+    );
+    assert_eq!(
+        state.find_session_agent_id_by_runtime_session("claude", &RuntimeSessionId::from("sess-1")),
+        Some(SessionAgentId::from("leader"))
+    );
+    assert_eq!(
+        state.find_session_agent_id_by_runtime_session("codex", &RuntimeSessionId::from("sess-1")),
+        None
     );
 }

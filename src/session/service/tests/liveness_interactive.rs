@@ -187,3 +187,52 @@ fn sync_liveness_keeps_pending_signal_available_for_stale_agent() {
         );
     });
 }
+
+#[test]
+fn sync_liveness_skips_disconnect_for_acp_managed_gemini_agents() {
+    with_temp_project(|project| {
+        start_active_session("test", "", project, Some("claude"), Some("sync-acp-gemini"))
+            .expect("start");
+
+        temp_env::with_var("GEMINI_SESSION_ID", Some("native-gemini-worker"), || {
+            join_session(
+                "sync-acp-gemini",
+                SessionRole::Worker,
+                "gemini",
+                &[],
+                None,
+                project,
+                None,
+            )
+            .expect("join worker");
+        });
+
+        let state = session_status("sync-acp-gemini", project).expect("status");
+        let worker_id = find_agent_by_runtime(&state, "gemini").agent_id.clone();
+        let layout = storage::layout_from_project_dir(project, "sync-acp-gemini").expect("layout");
+        storage::update_state(&layout, |state| {
+            let worker = state.agents.get_mut(&worker_id).expect("worker");
+            worker.managed_agent =
+                Some(crate::session::types::ManagedAgentRef::acp("acp-gemini-1"));
+            worker.agent_session_id = Some("acp-runtime-session-1".into());
+            Ok(())
+        })
+        .expect("bind acp worker");
+        age_agent_activity(project, "sync-acp-gemini", &worker_id, 1_200);
+        write_agent_log_file(project, "claude", "test-service");
+
+        let result = sync_agent_liveness("sync-acp-gemini", project).expect("sync");
+
+        assert!(
+            result.disconnected.is_empty(),
+            "ACP-managed Gemini agents should stay connected when native runtime logs are unavailable"
+        );
+        assert!(result.idled.is_empty());
+
+        let updated = session_status("sync-acp-gemini", project).expect("updated");
+        assert_eq!(
+            updated.agents.get(&worker_id).expect("worker").status,
+            AgentStatus::Active
+        );
+    });
+}

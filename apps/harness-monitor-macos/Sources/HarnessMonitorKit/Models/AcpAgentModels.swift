@@ -49,6 +49,42 @@ public struct AcpPermissionBatch: Codable, Equatable, Identifiable, Sendable {
   }
 
   public var id: String { batchId }
+  public var managedAgentID: String { acpId }
+
+  private enum CodingKeys: String, CodingKey {
+    case batchId
+    case acpId
+    case managedAgentId
+    case managedAgentFamily
+    case sessionId
+    case requests
+    case createdAt
+    case expiresAt
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    batchId = try container.decode(String.self, forKey: .batchId)
+    acpId =
+      try container.decodeIfPresent(String.self, forKey: .managedAgentId)
+      ?? container.decode(String.self, forKey: .acpId)
+    sessionId = try container.decode(String.self, forKey: .sessionId)
+    requests = try container.decode([AcpPermissionItem].self, forKey: .requests)
+    createdAt = try container.decode(String.self, forKey: .createdAt)
+    expiresAt = try container.decodeIfPresent(String.self, forKey: .expiresAt)
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(batchId, forKey: .batchId)
+    try container.encode(acpId, forKey: .acpId)
+    try container.encode(acpId, forKey: .managedAgentId)
+    try container.encode("acp", forKey: .managedAgentFamily)
+    try container.encode(sessionId, forKey: .sessionId)
+    try container.encode(requests, forKey: .requests)
+    try container.encode(createdAt, forKey: .createdAt)
+    try container.encodeIfPresent(expiresAt, forKey: .expiresAt)
+  }
 }
 
 /// Canonical outcome semantics for ACP permission resolution.
@@ -120,9 +156,11 @@ public struct AcpAgentSnapshot: Codable, Equatable, Identifiable, Sendable {
   public let disconnectReason: AgentDisconnectReason?
   public let stderrTail: String?
 
-  /// Stable UI identity. `acpId` stays runtime-scoped so restarted ACP processes replace the same
-  /// row instead of looking like a removal plus insertion.
+  /// Stable UI row identity is currently session-agent-scoped. Use `managedAgentID` for daemon
+  /// transport calls and `sessionAgentID` when joining back to session state.
   public var id: String { agentId }
+  public var managedAgentID: String { acpId }
+  public var sessionAgentID: String { agentId }
   public var isRestartable: Bool { disconnectReason?.isRestartable ?? false }
 
   public init(
@@ -163,8 +201,10 @@ public struct AcpAgentSnapshot: Codable, Equatable, Identifiable, Sendable {
 
   private enum CodingKeys: String, CodingKey {
     case acpId
+    case managedAgentId
     case sessionId
     case agentId
+    case sessionAgentId
     case displayName
     case status
     case pid
@@ -180,9 +220,13 @@ public struct AcpAgentSnapshot: Codable, Equatable, Identifiable, Sendable {
 
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    acpId = try container.decode(String.self, forKey: .acpId)
+    acpId =
+      try container.decodeIfPresent(String.self, forKey: .managedAgentId)
+      ?? container.decode(String.self, forKey: .acpId)
     sessionId = try container.decode(String.self, forKey: .sessionId)
-    agentId = try container.decode(String.self, forKey: .agentId)
+    agentId =
+      try container.decodeIfPresent(String.self, forKey: .sessionAgentId)
+      ?? container.decode(String.self, forKey: .agentId)
     displayName = try container.decode(String.self, forKey: .displayName)
     status = try container.decode(AgentStatus.self, forKey: .status)
     pid = try container.decode(UInt32.self, forKey: .pid)
@@ -205,8 +249,10 @@ public struct AcpAgentSnapshot: Codable, Equatable, Identifiable, Sendable {
   public func encode(to encoder: any Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
     try container.encode(acpId, forKey: .acpId)
+    try container.encode(acpId, forKey: .managedAgentId)
     try container.encode(sessionId, forKey: .sessionId)
     try container.encode(agentId, forKey: .agentId)
+    try container.encode(agentId, forKey: .sessionAgentId)
     try container.encode(displayName, forKey: .displayName)
     if status == .disconnected && (disconnectReason != nil || stderrTail != nil) {
       try container.encode(
@@ -236,4 +282,42 @@ private struct AcpAgentStatusDetails: Codable, Equatable, Sendable {
   let state: String
   let reason: AgentDisconnectReason?
   let stderrTail: String?
+}
+
+extension AcpPermissionItem {
+  public var requestIdentity: AcpPermissionRequestID {
+    AcpPermissionRequestID(rawValue: requestId)
+  }
+
+  public var sessionIdentity: HarnessSessionID {
+    HarnessSessionID(rawValue: sessionId)
+  }
+}
+
+extension AcpPermissionBatch {
+  public var batchIdentity: AcpPermissionBatchID {
+    AcpPermissionBatchID(rawValue: batchId)
+  }
+
+  public var managedAgentIdentity: ManagedAgentID {
+    ManagedAgentID(rawValue: acpId)
+  }
+
+  public var sessionIdentity: HarnessSessionID {
+    HarnessSessionID(rawValue: sessionId)
+  }
+}
+
+extension AcpAgentSnapshot {
+  public var managedAgentIdentity: ManagedAgentID {
+    ManagedAgentID(rawValue: managedAgentID)
+  }
+
+  public var sessionIdentity: HarnessSessionID {
+    HarnessSessionID(rawValue: sessionId)
+  }
+
+  public var sessionAgentIdentity: SessionAgentID {
+    SessionAgentID(rawValue: sessionAgentID)
+  }
 }

@@ -43,9 +43,11 @@ mod orchestration;
 mod process_fault;
 mod process_pool;
 mod reconcile;
+mod request_wire;
 mod session_access;
 #[cfg(test)]
 mod shutdown_tests;
+mod snapshot_wire;
 #[cfg(test)]
 mod test_support;
 pub(in crate::daemon::agent_acp) use process_fault::process_fault_policy_enabled;
@@ -53,25 +55,16 @@ pub(in crate::daemon::agent_acp) use process_pool::process_pooling_disabled;
 pub use reconcile::AcpAgentReconcileResponse;
 pub use session_access::AcpWakePrompt;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AcpAgentStartRequest {
-    #[serde(alias = "agent_id")]
     pub agent: String,
-    #[serde(default = "default_acp_role")]
     pub role: SessionRole,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fallback_role: Option<SessionRole>,
-    #[serde(default)]
     pub capabilities: Vec<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prompt: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project_dir: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub persona: Option<String>,
-    #[serde(default)]
     pub record_permissions: bool,
 }
 
@@ -91,7 +84,7 @@ impl Default for AcpAgentStartRequest {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct AcpAgentSnapshot {
     pub acp_id: String,
     pub session_id: String,
@@ -114,7 +107,7 @@ pub struct AcpAgentSnapshot {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct AcpAgentInspectSnapshot {
     pub acp_id: String,
     pub session_id: String,

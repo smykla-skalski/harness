@@ -4,6 +4,13 @@ import XCTest
 import HarnessMonitorKit
 
 final class HarnessMonitorMenuBarExtraTests: XCTestCase {
+  func testStatusItemUsesLighthouseAsset() {
+    XCTAssertEqual(
+      HarnessMonitorMenuBarSnapshot.statusItemImageName,
+      "HarnessMonitorMenuBarLighthouse"
+    )
+  }
+
   func testSnapshotSummarizesStatusAndCounts() {
     let snapshot = HarnessMonitorMenuBarSnapshot(
       connectionState: .online,

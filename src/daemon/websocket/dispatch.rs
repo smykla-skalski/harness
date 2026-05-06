@@ -154,7 +154,11 @@ async fn dispatch_inner(
     if let Some(response) = dispatch_known_method(request, state, connection).await {
         return response;
     }
-    unknown_method_response(&request.id, &request.method)
+    error_response(
+        &request.id,
+        "UNKNOWN_METHOD",
+        &format!("unknown method: {}", request.method),
+    )
 }
 
 async fn dispatch_known_method(
@@ -505,14 +509,6 @@ async fn dispatch_voice_mutation(
         }
         _ => None,
     }
-}
-
-fn unknown_method_response(request_id: &str, method: &str) -> WsResponse {
-    error_response(
-        request_id,
-        "UNKNOWN_METHOD",
-        &format!("unknown method: {method}"),
-    )
 }
 
 #[cfg(test)]

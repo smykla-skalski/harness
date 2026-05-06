@@ -283,7 +283,7 @@ fn disconnect_managed_runtime_session_if_ended(
     };
     let state =
         orchestration_service::session_status(&resolved.orchestration_session_id, project_dir)?;
-    let Some(agent_state) = state.agents.get(&resolved.agent_id) else {
+    let Some(agent_state) = state.agents.get(&resolved.session_agent_id) else {
         return Ok(());
     };
     if !agent_state.status.is_alive() {
@@ -291,7 +291,7 @@ fn disconnect_managed_runtime_session_if_ended(
     }
     orchestration_service::leave_session(
         &resolved.orchestration_session_id,
-        &resolved.agent_id,
+        &resolved.session_agent_id,
         project_dir,
     )
 }

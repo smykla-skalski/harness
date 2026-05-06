@@ -112,7 +112,7 @@ pub(crate) async fn resolve_runtime_session_agent_async(
             let (orchestration_session_id, agent_id) = matches.remove(0);
             Ok(Some(ResolvedRuntimeSessionAgent {
                 orchestration_session_id,
-                agent_id,
+                session_agent_id: agent_id,
             }))
         }
         _ => Err(CliErrorKind::session_ambiguous(format!(

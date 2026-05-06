@@ -11,6 +11,12 @@ use super::{
 use crate::daemon::agent_acp::AcpWakePrompt;
 use tokio::sync::broadcast;
 
+mod tui_identity;
+
+pub(crate) use tui_identity::{
+    legacy_compatible_tui_id_for_signal_delivery, managed_tui_id_for_registration,
+};
+
 /// Send a signal through the shared session service.
 ///
 /// Signal files are always written to disk for runtime pickup, even in
@@ -39,7 +45,7 @@ pub fn send_signal(
         let target_tui_id = state
             .agents
             .get(&request.agent_id)
-            .and_then(agent_tui_id_for_registration)
+            .and_then(legacy_compatible_tui_id_for_signal_delivery)
             .map(ToString::to_string);
         let project_id = db
             .project_id_for_session(session_id)?
@@ -430,14 +436,6 @@ pub(crate) fn try_wake_started_workers(
             }
         }
     }
-}
-
-pub(crate) fn agent_tui_id_for_registration(agent: &AgentRegistration) -> Option<&str> {
-    agent.capabilities.iter().find_map(|capability| {
-        capability
-            .strip_prefix("agent-tui:")
-            .filter(|value| !value.trim().is_empty())
-    })
 }
 
 /// Cancel a pending signal by writing a rejected acknowledgment.

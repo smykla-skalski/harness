@@ -54,7 +54,7 @@ pub struct TaskSpec<'a> {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ResolvedRuntimeSessionAgent {
     pub orchestration_session_id: String,
-    pub agent_id: String,
+    pub session_agent_id: String,
 }
 
 #[derive(Debug, Clone)]

@@ -26,7 +26,7 @@ use crate::workspace::adopter::AdoptionOutcome;
 
 use super::frames::{error_response, error_response_with_payload};
 use super::mutations::{cli_error_response, dispatch_query_result};
-use super::params::{extract_session_id, extract_string_param};
+use super::params::{extract_managed_agent_id, extract_session_id, extract_string_param};
 
 mod managed_agents;
 #[cfg(test)]

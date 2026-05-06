@@ -95,7 +95,7 @@ extension WebSocketTransport {
   ) async throws -> SessionDetail {
     let params = try encodeParams(
       request,
-      extra: ["session_id": .string(sessionID), "agent_id": .string(agentID)]
+      extra: sessionAgentMutationParams(sessionID: sessionID, agentID: agentID)
     )
     let value = try await rpc(method: .agentChangeRole, params: params)
     return try decode(value)
@@ -108,7 +108,7 @@ extension WebSocketTransport {
   ) async throws -> SessionDetail {
     let params = try encodeParams(
       request,
-      extra: ["session_id": .string(sessionID), "agent_id": .string(agentID)]
+      extra: sessionAgentMutationParams(sessionID: sessionID, agentID: agentID)
     )
     let value = try await rpc(method: .agentRemove, params: params)
     return try decode(value)
@@ -207,7 +207,7 @@ extension WebSocketTransport {
   public func managedAgents(sessionID: String) async throws -> ManagedAgentListResponse {
     let value = try await rpc(
       method: .sessionManagedAgents,
-      params: .object(["session_id": .string(sessionID)])
+      params: .object(sessionScopeParams(sessionID: sessionID))
     )
     return try decode(value)
   }
@@ -215,7 +215,7 @@ extension WebSocketTransport {
   public func managedAgent(agentID: String) async throws -> ManagedAgentSnapshot {
     let value = try await rpc(
       method: .managedAgentDetail,
-      params: .object(["agent_id": .string(agentID)])
+      params: .object(managedAgentParams(agentID: agentID))
     )
     return try decode(value)
   }
@@ -224,7 +224,7 @@ extension WebSocketTransport {
     sessionID: String,
     request: AgentTuiStartRequest
   ) async throws -> ManagedAgentSnapshot {
-    let params = try encodeParams(request, extra: ["session_id": .string(sessionID)])
+    let params = try encodeParams(request, extra: sessionScopeParams(sessionID: sessionID))
     let value = try await rpc(method: .managedAgentStartTerminal, params: params)
     return try decode(value)
   }
@@ -233,7 +233,7 @@ extension WebSocketTransport {
     sessionID: String,
     request: CodexRunRequest
   ) async throws -> ManagedAgentSnapshot {
-    let params = try encodeParams(request, extra: ["session_id": .string(sessionID)])
+    let params = try encodeParams(request, extra: sessionScopeParams(sessionID: sessionID))
     let value = try await rpc(method: .managedAgentStartCodex, params: params)
     return try decode(value)
   }
@@ -242,7 +242,7 @@ extension WebSocketTransport {
     sessionID: String,
     request: AcpAgentStartRequest
   ) async throws -> ManagedAgentSnapshot {
-    let params = try encodeParams(request, extra: ["session_id": .string(sessionID)])
+    let params = try encodeParams(request, extra: sessionScopeParams(sessionID: sessionID))
     let value = try await rpc(method: .managedAgentStartAcp, params: params)
     return try decode(value)
   }
@@ -251,7 +251,7 @@ extension WebSocketTransport {
     agentID: String,
     request: AgentTuiInputRequest
   ) async throws -> ManagedAgentSnapshot {
-    let params = try encodeParams(request, extra: ["agent_id": .string(agentID)])
+    let params = try encodeParams(request, extra: managedAgentParams(agentID: agentID))
     let value = try await rpc(method: .managedAgentInput, params: params)
     return try decode(value)
   }
@@ -260,7 +260,7 @@ extension WebSocketTransport {
     agentID: String,
     request: AgentTuiResizeRequest
   ) async throws -> ManagedAgentSnapshot {
-    let params = try encodeParams(request, extra: ["agent_id": .string(agentID)])
+    let params = try encodeParams(request, extra: managedAgentParams(agentID: agentID))
     let value = try await rpc(method: .managedAgentResize, params: params)
     return try decode(value)
   }
@@ -268,7 +268,7 @@ extension WebSocketTransport {
   public func stopManagedAgent(agentID: String) async throws -> ManagedAgentSnapshot {
     let value = try await rpc(
       method: .managedAgentStop,
-      params: .object(["agent_id": .string(agentID)])
+      params: .object(managedAgentParams(agentID: agentID))
     )
     return try decode(value)
   }
@@ -276,7 +276,7 @@ extension WebSocketTransport {
   public func stopManagedAcpAgent(agentID: String) async throws -> ManagedAgentSnapshot {
     let value = try await rpc(
       method: .managedAgentStopAcp,
-      params: .object(["agent_id": .string(agentID)])
+      params: .object(managedAgentParams(agentID: agentID))
     )
     return try decode(value)
   }
@@ -285,7 +285,7 @@ extension WebSocketTransport {
     agentID: String,
     request: CodexSteerRequest
   ) async throws -> ManagedAgentSnapshot {
-    let params = try encodeParams(request, extra: ["agent_id": .string(agentID)])
+    let params = try encodeParams(request, extra: managedAgentParams(agentID: agentID))
     let value = try await rpc(method: .managedAgentSteerCodex, params: params)
     return try decode(value)
   }
@@ -293,7 +293,7 @@ extension WebSocketTransport {
   public func interruptManagedCodexAgent(agentID: String) async throws -> ManagedAgentSnapshot {
     let value = try await rpc(
       method: .managedAgentInterruptCodex,
-      params: .object(["agent_id": .string(agentID)])
+      params: .object(managedAgentParams(agentID: agentID))
     )
     return try decode(value)
   }
@@ -305,10 +305,9 @@ extension WebSocketTransport {
   ) async throws -> ManagedAgentSnapshot {
     let params = try encodeParams(
       request,
-      extra: [
-        "agent_id": .string(agentID),
-        "approval_id": .string(approvalID),
-      ]
+      extra: managedAgentParams(agentID: agentID).merging(
+        ["approval_id": .string(approvalID)]
+      ) { _, newValue in newValue }
     )
     let value = try await rpc(method: .managedAgentResolveCodexApproval, params: params)
     return try decode(value)
@@ -321,10 +320,9 @@ extension WebSocketTransport {
   ) async throws -> ManagedAgentSnapshot {
     let params = try encodeParams(
       decision,
-      extra: [
-        "agent_id": .string(agentID),
-        "batch_id": .string(batchID),
-      ]
+      extra: managedAgentParams(agentID: agentID).merging(
+        ["batch_id": .string(batchID)]
+      ) { _, newValue in newValue }
     )
     let value = try await rpc(method: .managedAgentResolveAcpPermission, params: params)
     return try decode(value)

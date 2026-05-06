@@ -117,7 +117,7 @@ fn resolve_runtime_session_via_legacy_fanout(
             if runtime_session_matches_agent(&summary.session_id, agent, runtime_session_id) {
                 matches.push(ResolvedRuntimeSessionAgent {
                     orchestration_session_id: summary.session_id.clone(),
-                    agent_id: agent.agent_id.clone(),
+                    session_agent_id: agent.agent_id.clone(),
                 });
             }
         }

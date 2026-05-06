@@ -1,6 +1,9 @@
 import Foundation
 
 extension PreviewHarnessClientState {
+  static let previewSeededAcpDescriptorID = "copilot"
+  static let previewSeededAcpDisplayName = "GitHub Copilot"
+
   static func seededAgentTuisBySessionID(
     fixtures: PreviewHarnessClient.Fixtures,
     environment: HarnessMonitorEnvironment
@@ -75,11 +78,15 @@ extension PreviewHarnessClientState {
     sessionID: String,
     projectDir: String
   ) -> AcpAgentSnapshot {
-    AcpAgentSnapshot(
-      acpId: "preview-managed-agent-1",
+    let managedAgentID = "preview-managed-agent-1"
+    return AcpAgentSnapshot(
+      acpId: managedAgentID,
       sessionId: sessionID,
-      agentId: "worker-codex",
-      displayName: "worker-codex",
+      agentId: previewAcpSessionAgentID(
+        descriptorID: previewSeededAcpDescriptorID,
+        managedAgentID: managedAgentID
+      ),
+      displayName: previewSeededAcpDisplayName,
       status: .active,
       pid: 41_001,
       pgid: 41_001,

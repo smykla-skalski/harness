@@ -55,7 +55,7 @@ fn resolve_runtime_session_returns_resolved_match() {
                 &mut stream,
                 "200 OK",
                 "application/json",
-                "{\"resolved\":{\"orchestration_session_id\":\"sess-1\",\"agent_id\":\"codex-abc\"}}",
+                "{\"resolved\":{\"orchestration_session_id\":\"sess-1\",\"session_agent_id\":\"codex-abc\"}}",
             );
         })
     };
@@ -72,7 +72,7 @@ fn resolve_runtime_session_returns_resolved_match() {
     match outcome {
         crate::daemon::client::RuntimeSessionLookup::Resolved(agent) => {
             assert_eq!(agent.orchestration_session_id, "sess-1");
-            assert_eq!(agent.agent_id, "codex-abc");
+            assert_eq!(agent.session_agent_id, "codex-abc");
         }
         other => panic!("expected Resolved, got {other:?}"),
     }

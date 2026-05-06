@@ -1,5 +1,7 @@
 mod agents;
+pub(crate) mod crosswalk;
 mod events;
+mod identity;
 mod policy;
 mod state;
 mod tasks;
@@ -20,6 +22,9 @@ pub use agents::{
     PendingLeaderTransfer, PersonaSymbol, SessionRole,
 };
 pub use events::{SessionLogEntry, SessionSignalRecord, SessionSignalStatus, SessionTransition};
+pub use identity::{
+    AgentDescriptorId, HarnessSessionId, ManagedAgentId, RuntimeSessionId, SessionAgentId,
+};
 pub use policy::{AutoPromotionPolicy, LeaderJoinPolicy, LeaderRecoveryPolicy, SessionPolicy};
 pub use state::{
     CONTROL_PLANE_ACTOR_ID, CURRENT_VERSION, SessionMetrics, SessionState, SessionStatus,

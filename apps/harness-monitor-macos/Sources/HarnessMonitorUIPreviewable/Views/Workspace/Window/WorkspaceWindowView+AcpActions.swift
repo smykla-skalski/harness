@@ -4,14 +4,16 @@ import SwiftUI
 extension WorkspaceWindowView {
   @MainActor
   func startAcpAgentIfSelected() async -> Bool {
-    guard case .acp(let agentID) = viewModel.selectedLaunchSelection else {
+    guard case .acp(let descriptorIDValue) = viewModel.selectedLaunchSelection else {
       return false
     }
+    let descriptorIdentity = AcpDescriptorID(rawValue: descriptorIDValue)
     let capabilities =
-      viewModel.availableAcpAgents.first(where: { $0.id == agentID })?.capabilities ?? []
+      viewModel.availableAcpAgents.first(where: { $0.descriptorIdentity == descriptorIdentity })?
+      .capabilities ?? []
     let startSessionID = resolvedCreateSessionID
     let started = await store.startAcpAgent(
-      agentID: agentID,
+      descriptorID: descriptorIdentity,
       role: viewModel.selectedRole,
       fallbackRole: viewModel.selectedRole == .leader ? viewModel.selectedAcpFallbackRole : nil,
       capabilities: capabilities,

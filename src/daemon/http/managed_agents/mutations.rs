@@ -66,7 +66,7 @@ pub(super) async fn post_codex_agent_start(
 }
 
 pub(super) async fn post_terminal_agent_input(
-    Path(agent_id): Path<String>,
+    Path(managed_agent_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<AgentTuiInputRequest>,
@@ -76,8 +76,8 @@ pub(super) async fn post_terminal_agent_input(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = ensure_terminal_agent(&state, &agent_id)
-        .and_then(|()| state.agent_tui_manager.input(&agent_id, &request))
+    let result = ensure_terminal_agent(&state, &managed_agent_id)
+        .and_then(|()| state.agent_tui_manager.input(&managed_agent_id, &request))
         .map(ManagedAgentSnapshot::Terminal);
     timed_json(
         "POST",
@@ -89,7 +89,7 @@ pub(super) async fn post_terminal_agent_input(
 }
 
 pub(super) async fn post_terminal_agent_resize(
-    Path(agent_id): Path<String>,
+    Path(managed_agent_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<AgentTuiResizeRequest>,
@@ -99,8 +99,8 @@ pub(super) async fn post_terminal_agent_resize(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = ensure_terminal_agent(&state, &agent_id)
-        .and_then(|()| state.agent_tui_manager.resize(&agent_id, &request))
+    let result = ensure_terminal_agent(&state, &managed_agent_id)
+        .and_then(|()| state.agent_tui_manager.resize(&managed_agent_id, &request))
         .map(ManagedAgentSnapshot::Terminal);
     timed_json(
         "POST",
@@ -112,7 +112,7 @@ pub(super) async fn post_terminal_agent_resize(
 }
 
 pub(super) async fn post_terminal_agent_stop(
-    Path(agent_id): Path<String>,
+    Path(managed_agent_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
@@ -121,14 +121,14 @@ pub(super) async fn post_terminal_agent_stop(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = if state.acp_agent_manager.get(&agent_id).is_ok() {
+    let result = if state.acp_agent_manager.get(&managed_agent_id).is_ok() {
         state
             .acp_agent_manager
-            .stop(&agent_id)
+            .stop(&managed_agent_id)
             .map(ManagedAgentSnapshot::Acp)
     } else {
-        ensure_terminal_agent(&state, &agent_id)
-            .and_then(|()| state.agent_tui_manager.stop(&agent_id))
+        ensure_terminal_agent(&state, &managed_agent_id)
+            .and_then(|()| state.agent_tui_manager.stop(&managed_agent_id))
             .map(ManagedAgentSnapshot::Terminal)
     };
     timed_json(
@@ -141,7 +141,7 @@ pub(super) async fn post_terminal_agent_stop(
 }
 
 pub(super) async fn post_terminal_agent_ready(
-    Path(agent_id): Path<String>,
+    Path(managed_agent_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
@@ -150,8 +150,8 @@ pub(super) async fn post_terminal_agent_ready(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = ensure_terminal_agent(&state, &agent_id)
-        .and_then(|()| state.agent_tui_manager.signal_ready(&agent_id))
+    let result = ensure_terminal_agent(&state, &managed_agent_id)
+        .and_then(|()| state.agent_tui_manager.signal_ready(&managed_agent_id))
         .map(ManagedAgentSnapshot::Terminal);
     timed_json(
         "POST",
@@ -163,7 +163,7 @@ pub(super) async fn post_terminal_agent_ready(
 }
 
 pub(super) async fn post_codex_agent_steer(
-    Path(agent_id): Path<String>,
+    Path(managed_agent_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<CodexSteerRequest>,
@@ -173,8 +173,8 @@ pub(super) async fn post_codex_agent_steer(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = ensure_codex_agent(&state, &agent_id)
-        .and_then(|()| state.codex_controller.steer(&agent_id, &request))
+    let result = ensure_codex_agent(&state, &managed_agent_id)
+        .and_then(|()| state.codex_controller.steer(&managed_agent_id, &request))
         .map(ManagedAgentSnapshot::Codex);
     timed_json(
         "POST",

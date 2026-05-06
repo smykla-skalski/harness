@@ -51,7 +51,7 @@ async fn repeated_session_restarts_keep_runtime_bindings_scoped_to_each_managed_
         };
         assert_eq!(
             first_agent.managed_agent,
-            Some(ManagedAgentRef::acp(&first.acp_id))
+            Some(ManagedAgentRef::acp(first.acp_id.as_str()))
         );
         assert_eq!(
             first_agent.agent_session_id.as_deref(),
@@ -70,7 +70,7 @@ async fn repeated_session_restarts_keep_runtime_bindings_scoped_to_each_managed_
         };
         assert_eq!(
             second_agent.managed_agent,
-            Some(ManagedAgentRef::acp(&second.acp_id))
+            Some(ManagedAgentRef::acp(second.acp_id.as_str()))
         );
         assert_eq!(
             second_agent.agent_session_id.as_deref(),

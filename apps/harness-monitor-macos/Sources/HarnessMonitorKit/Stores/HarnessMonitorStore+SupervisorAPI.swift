@@ -16,8 +16,16 @@ struct StoreAPIClient: SupervisorAPIClient {
     guard let client = await MainActor.run(body: { store.client }) else {
       throw StoreDecisionActionError.daemonUnavailable
     }
+    guard let target = await MainActor.run(body: {
+      store.managedAgentNudgeTarget(
+        forSessionAgentIdentity: SessionAgentID(rawValue: agentID)
+      )
+    }) else {
+      throw StoreDecisionActionError.missingTargetMetadata("sessionAgentID")
+    }
     try await SupervisorManagedAgentNudgeDispatcher.dispatch(
-      agentID: agentID,
+      managedAgentID: target.managedAgentID,
+      signalAgentID: target.signalAgentID,
       input: input,
       client: client
     )
@@ -120,6 +128,66 @@ struct StoreAPIClient: SupervisorAPIClient {
         continue
       }
       return TaskLocation(sessionID: sessionID, assignedAgentID: task.assignedTo)
+    }
+    return nil
+  }
+}
+
+extension HarnessMonitorStore {
+  func managedAgentNudgeTarget(
+    forSessionAgentIdentity sessionAgentIdentity: SessionAgentID
+  ) -> ManagedAgentNudgeTarget? {
+    if let linkage = acpIdentityCrosswalk().agentLinkage(
+      forSessionAgentIdentity: sessionAgentIdentity
+    ),
+      let sessionAgentIdentity = linkage.sessionAgentIdentity
+    {
+      return ManagedAgentNudgeTarget(
+        managedAgentID: linkage.managedAgentIdentity.rawValue,
+        signalAgentID: sessionAgentIdentity.rawValue
+      )
+    }
+    if let snapshot = selectedAgentTuis.first(where: {
+      $0.sessionAgentIdentity == sessionAgentIdentity
+    }) {
+      return ManagedAgentNudgeTarget(
+        managedAgentID: snapshot.managedAgentID,
+        signalAgentID: snapshot.sessionAgentID
+      )
+    }
+    // Legacy terminal nudge decisions can still carry the managed TUI id in `agentID`.
+    let legacyManagedAgentIdentity = ManagedAgentID(rawValue: sessionAgentIdentity.rawValue)
+    if let snapshot = selectedAgentTuis.first(where: {
+      $0.managedAgentIdentity == legacyManagedAgentIdentity
+    }) {
+      return ManagedAgentNudgeTarget(
+        managedAgentID: snapshot.managedAgentID,
+        signalAgentID: snapshot.sessionAgentID
+      )
+    }
+    return nil
+  }
+
+  func managedAgentNudgeTarget(
+    forManagedAgentIdentity managedAgentIdentity: ManagedAgentID
+  ) -> ManagedAgentNudgeTarget? {
+    if let linkage = acpIdentityCrosswalk().agentLinkage(
+      forManagedAgentIdentity: managedAgentIdentity
+    ),
+      let sessionAgentIdentity = linkage.sessionAgentIdentity
+    {
+      return ManagedAgentNudgeTarget(
+        managedAgentID: linkage.managedAgentIdentity.rawValue,
+        signalAgentID: sessionAgentIdentity.rawValue
+      )
+    }
+    if let snapshot = selectedAgentTuis.first(where: {
+      $0.managedAgentIdentity == managedAgentIdentity
+    }) {
+      return ManagedAgentNudgeTarget(
+        managedAgentID: snapshot.managedAgentID,
+        signalAgentID: snapshot.sessionAgentID
+      )
     }
     return nil
   }

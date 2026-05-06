@@ -167,6 +167,7 @@ fn write_process_agent_bootstrap(
         include_gemini_commands,
         flags,
     )?;
+    remove_skipped_runtime_hook_config(project_dir, agent, skip_runtime_hooks)?;
     let existing = written.iter().cloned().collect::<BTreeSet<_>>();
     let planned = planned_agent_bootstrap_files(project_dir, agent, skip_runtime_hooks, flags);
     for (path, content) in planned {
@@ -178,6 +179,24 @@ fn write_process_agent_bootstrap(
     }
 
     Ok(written)
+}
+
+fn remove_skipped_runtime_hook_config(
+    project_dir: &Path,
+    agent: HookAgent,
+    skip_runtime_hooks: &[HookAgent],
+) -> Result<(), CliError> {
+    if !skip_runtime_hooks.contains(&agent) {
+        return Ok(());
+    }
+    let Some(path) = runtime_config_path(project_dir, agent) else {
+        return Ok(());
+    };
+    if path.is_file() {
+        fs_err::remove_file(&path)
+            .map_err(|error| CliError::from(CliErrorKind::workflow_io(error.to_string())))?;
+    }
+    Ok(())
 }
 
 fn log_omitted_hook_families(path: &Path, flags: RuntimeHookFlags) {
@@ -217,19 +236,7 @@ pub(crate) fn planned_agent_bootstrap_files(
 ) -> Vec<(PathBuf, String)> {
     let mut planned = Vec::new();
     if !skip_runtime_hooks.contains(&agent) {
-        let path = match agent {
-            HookAgent::Claude => Some(project_dir.join(".claude").join("settings.json")),
-            HookAgent::Copilot => Some(
-                project_dir
-                    .join(".github")
-                    .join("hooks")
-                    .join("harness.json"),
-            ),
-            HookAgent::Codex => None,
-            HookAgent::Gemini => Some(project_dir.join(".gemini").join("settings.json")),
-            HookAgent::Vibe => Some(project_dir.join(".vibe").join("hooks.json")),
-            HookAgent::OpenCode => Some(project_dir.join(".opencode").join("hooks.json")),
-        };
+        let path = runtime_config_path(project_dir, agent);
         if let Some(path) = path {
             let registrations = process_agent_registrations(agent, flags);
             let config = adapter_for(agent).generate_config(&registrations);
@@ -238,4 +245,20 @@ pub(crate) fn planned_agent_bootstrap_files(
         }
     }
     planned
+}
+
+fn runtime_config_path(project_dir: &Path, agent: HookAgent) -> Option<PathBuf> {
+    match agent {
+        HookAgent::Claude => Some(project_dir.join(".claude").join("settings.json")),
+        HookAgent::Copilot => Some(
+            project_dir
+                .join(".github")
+                .join("hooks")
+                .join("harness.json"),
+        ),
+        HookAgent::Codex => None,
+        HookAgent::Gemini => Some(project_dir.join(".gemini").join("settings.json")),
+        HookAgent::Vibe => Some(project_dir.join(".vibe").join("hooks.json")),
+        HookAgent::OpenCode => Some(project_dir.join(".opencode").join("hooks.json")),
+    }
 }

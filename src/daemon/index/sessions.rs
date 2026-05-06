@@ -195,54 +195,6 @@ pub fn load_conversation_events(
     load_ledger_conversation_events(project, runtime, session_id, agent_id)
 }
 
-/// Resolve an orchestration session ID from a runtime session key within one
-/// discovered project context.
-///
-/// Scopes the new-layout scan to the project's bucket when `project.project_dir`
-/// is known. Falls back to scanning every project bucket plus the legacy
-/// orchestration paths when only the `context_root` is available.
-///
-/// # Errors
-/// Returns `CliError` when session state cannot be loaded or when the runtime
-/// session key is ambiguous.
-pub fn resolve_session_id_for_runtime_session(
-    project: &DiscoveredProject,
-    runtime_name: &str,
-    runtime_session_id: &str,
-) -> Result<Option<String>, CliError> {
-    if list_session_ids_for_project(project)?
-        .iter()
-        .any(|session_id| session_id == runtime_session_id)
-    {
-        return Ok(Some(runtime_session_id.to_string()));
-    }
-
-    let mut matches = Vec::new();
-
-    for session_id in list_active_session_ids_for_project(project)? {
-        let Some(state) = load_session_state_for_project(project, &session_id)? else {
-            continue;
-        };
-        let agent_found = state.agents.values().any(|agent| {
-            agent.runtime == runtime_name
-                && (agent.agent_session_id.as_deref() == Some(runtime_session_id)
-                    || (agent.agent_session_id.is_none() && state.session_id == runtime_session_id))
-        });
-        if agent_found {
-            matches.push(state.session_id);
-        }
-    }
-
-    match matches.len() {
-        0 => Ok(None),
-        1 => Ok(matches.into_iter().next()),
-        _ => Err(CliErrorKind::session_ambiguous(format!(
-            "runtime session '{runtime_session_id}' for runtime '{runtime_name}' maps to multiple orchestration sessions"
-        ))
-        .into()),
-    }
-}
-
 /// Project-scoped session id list. Unions the legacy orchestration layout
 /// at `<context_root>/orchestration/sessions/` with the new layout at
 /// `<sessions_root>/<project_name>/`. When `project.project_dir` is `None`,
@@ -266,7 +218,7 @@ pub(super) fn list_session_ids_for_project(
     Ok(session_ids)
 }
 
-fn list_active_session_ids_for_project(
+pub(super) fn list_active_session_ids_for_project(
     project: &DiscoveredProject,
 ) -> Result<Vec<String>, CliError> {
     let mut active_ids = legacy_active_session_ids(&project.context_root)?;
@@ -319,7 +271,7 @@ fn read_active_registry_at(path: &Path) -> Vec<String> {
         .unwrap_or_default()
 }
 
-fn load_session_state_for_project(
+pub(super) fn load_session_state_for_project(
     project: &DiscoveredProject,
     session_id: &str,
 ) -> Result<Option<SessionState>, CliError> {

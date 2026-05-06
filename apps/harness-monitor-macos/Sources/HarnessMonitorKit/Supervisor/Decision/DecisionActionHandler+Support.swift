@@ -15,6 +15,7 @@ struct TaskActionPayload: Decodable {
 
 struct NudgeActionPayload: Decodable {
   let agentID: String?
+  let managedAgentID: String?
   let input: String?
 }
 
@@ -25,6 +26,7 @@ struct SupervisorCustomActionPayload: Decodable {
 
 struct DecisionContextEnvelope {
   let agentID: String?
+  let managedAgentID: String?
 
   init?(_ json: String) {
     guard let data = json.data(using: .utf8),
@@ -33,13 +35,21 @@ struct DecisionContextEnvelope {
     else {
       return nil
     }
-    agentID = dictionary["agentID"] as? String
+    let agent = dictionary["agent"] as? [String: Any]
+    agentID = dictionary["agentID"] as? String ?? agent?["agentID"] as? String
+    managedAgentID =
+      dictionary["managedAgentID"] as? String ?? agent?["managedAgentID"] as? String
   }
 }
 
 struct TaskLocation {
   let sessionID: String
   let assignedAgentID: String?
+}
+
+struct ManagedAgentNudgeTarget: Sendable {
+  let managedAgentID: String
+  let signalAgentID: String
 }
 
 struct DecisionActionSnapshot: Sendable {
@@ -111,14 +121,15 @@ enum SupervisorManagedAgentNudgeDispatcher {
   private static let signalCommand = "request_action"
 
   static func dispatch(
-    agentID: String,
+    managedAgentID: String,
+    signalAgentID: String,
     input: String,
     client: any HarnessMonitorClientProtocol
   ) async throws {
-    let snapshot = try await client.managedAgent(agentID: agentID)
+    let snapshot = try await client.managedAgent(agentID: managedAgentID)
     if snapshot.terminal != nil {
       _ = try await client.sendManagedAgentInput(
-        agentID: agentID,
+        agentID: managedAgentID,
         request: AgentTuiInputRequest(input: .text(input))
       )
       return
@@ -129,7 +140,7 @@ enum SupervisorManagedAgentNudgeDispatcher {
       sessionID: snapshot.sessionId,
       request: SignalSendRequest(
         actor: supervisorActor,
-        agentId: agentID,
+        agentId: signalAgentID,
         command: signalCommand,
         message: input,
         actionHint: nil

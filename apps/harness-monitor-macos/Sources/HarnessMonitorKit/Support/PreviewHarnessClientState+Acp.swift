@@ -6,6 +6,11 @@ extension PreviewHarnessClientState {
     request: AcpAgentStartRequest
   ) -> AcpAgentSnapshot {
     nextAcpAgentSequence += 1
+    let managedAgentID = "preview-managed-agent-\(nextAcpAgentSequence)"
+    let sessionAgentID = Self.previewAcpSessionAgentID(
+      descriptorID: request.agent,
+      managedAgentID: managedAgentID
+    )
     let trimmedName = request.name?.trimmingCharacters(in: .whitespacesAndNewlines)
     let displayName =
       if let trimmedName, !trimmedName.isEmpty {
@@ -17,12 +22,12 @@ extension PreviewHarnessClientState {
       }
     let permissionBatches = previewPermissionBatches(
       sessionID: sessionID,
-      acpID: "preview-managed-agent-\(nextAcpAgentSequence)"
+      acpID: managedAgentID
     )
     let snapshot = AcpAgentSnapshot(
-      acpId: "preview-managed-agent-\(nextAcpAgentSequence)",
+      acpId: managedAgentID,
       sessionId: sessionID,
-      agentId: request.agent,
+      agentId: sessionAgentID,
       displayName: displayName,
       status: .active,
       pid: UInt32(40_000 + nextAcpAgentSequence),
@@ -76,32 +81,6 @@ extension PreviewHarnessClientState {
       updatedAgents[index] = updated
       acpAgentsBySessionID[sessionID] = updatedAgents
       return updated
-    }
-    let seedsPermission = Self.seedsPendingAcp(in: environment)
-    if seedsPermission,
-      let detail = fallbackDetail,
-      !detail.session.sessionId.isEmpty
-    {
-      let seededSnapshot = Self.seededAcpAgentSnapshot(
-        sessionID: detail.session.sessionId,
-        projectDir: detail.session.projectDir ?? "/Users/example/Projects/harness"
-      )
-      return AcpAgentSnapshot(
-        acpId: seededSnapshot.acpId,
-        sessionId: seededSnapshot.sessionId,
-        agentId: seededSnapshot.agentId,
-        displayName: seededSnapshot.displayName,
-        status: seededSnapshot.status,
-        pid: seededSnapshot.pid,
-        pgid: seededSnapshot.pgid,
-        projectDir: seededSnapshot.projectDir,
-        pendingPermissions: 0,
-        permissionQueueDepth: seededSnapshot.permissionQueueDepth,
-        pendingPermissionBatches: [],
-        terminalCount: seededSnapshot.terminalCount,
-        createdAt: seededSnapshot.createdAt,
-        updatedAt: Self.mutationTimestamp
-      )
     }
     return nil
   }
@@ -216,13 +195,19 @@ extension PreviewHarnessClientState {
       return
     }
 
-    let assignedRole = startedAcpRole(for: request, currentDetail: currentDetail)
+    let assignedRole = startedAcpRole(
+      for: request,
+      currentDetail: currentDetail,
+      sessionAgentID: snapshot.sessionAgentID
+    )
     let registration = previewAcpRegistration(
       from: snapshot,
       request: request,
       assignedRole: assignedRole
     )
-    let updatedAgents = currentDetail.agents.filter { $0.agentId != request.agent } + [registration]
+    let updatedAgents = currentDetail.agents.filter {
+      $0.managedAgentID != snapshot.managedAgentID
+    } + [registration]
     let updatedSummary = SessionSummary(
       projectId: currentDetail.session.projectId,
       projectName: currentDetail.session.projectName,
@@ -239,7 +224,7 @@ extension PreviewHarnessClientState {
       createdAt: currentDetail.session.createdAt,
       updatedAt: snapshot.updatedAt,
       lastActivityAt: snapshot.updatedAt,
-      leaderId: assignedRole == .leader ? request.agent : currentDetail.session.leaderId,
+      leaderId: assignedRole == .leader ? registration.agentId : currentDetail.session.leaderId,
       observeId: currentDetail.session.observeId,
       pendingLeaderTransfer: currentDetail.session.pendingLeaderTransfer,
       externalOrigin: currentDetail.session.externalOrigin,
@@ -260,12 +245,13 @@ extension PreviewHarnessClientState {
 
   private func startedAcpRole(
     for request: AcpAgentStartRequest,
-    currentDetail: SessionDetail
+    currentDetail: SessionDetail,
+    sessionAgentID: String
   ) -> SessionRole {
     if request.role == .leader,
       let fallbackRole = request.fallbackRole,
       let leaderID = currentDetail.session.leaderId,
-      leaderID != request.agent
+      leaderID != sessionAgentID
     {
       return fallbackRole
     }
@@ -286,7 +272,7 @@ extension PreviewHarnessClientState {
       hookPoints: []
     )
     return AgentRegistration(
-      agentId: request.agent,
+      agentId: snapshot.sessionAgentID,
       name: snapshot.displayName,
       runtime: request.agent,
       role: assignedRole,
@@ -294,11 +280,25 @@ extension PreviewHarnessClientState {
       joinedAt: snapshot.createdAt,
       updatedAt: snapshot.updatedAt,
       status: snapshot.status,
-      agentSessionId: nil,
+      agentSessionId: Self.previewAcpRuntimeSessionID(
+        managedAgentID: snapshot.managedAgentID
+      ),
+      managedAgent: ManagedAgentRef(kind: .acp, id: snapshot.managedAgentID),
       lastActivityAt: snapshot.updatedAt,
       currentTaskId: nil,
       runtimeCapabilities: runtimeCapabilities,
       persona: nil
     )
+  }
+
+  static func previewAcpRuntimeSessionID(managedAgentID: String) -> String {
+    "preview-runtime-session-\(managedAgentID)"
+  }
+
+  static func previewAcpSessionAgentID(
+    descriptorID: String,
+    managedAgentID: String
+  ) -> String {
+    "preview-session-agent-\(descriptorID)-\(managedAgentID)"
   }
 }

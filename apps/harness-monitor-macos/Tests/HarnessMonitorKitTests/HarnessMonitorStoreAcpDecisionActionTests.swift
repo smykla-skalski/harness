@@ -404,6 +404,8 @@ final class HarnessMonitorStoreAcpDecisionActionTests: XCTestCase {
     )
     await store.bootstrap()
     await store.selectSession(PreviewFixtures.summary.sessionId)
+    await store.startSupervisor()
+    addTeardownBlock { await store.stopSupervisor() }
     store.stopAllStreams(resetSubscriptions: false)
     return store
   }

@@ -101,6 +101,8 @@ pub(super) fn spawn_event_forwarder(
             let persisted_events = batch.events.clone();
             let payload = serde_json::json!({
                 "acp_id": batch.acp_id,
+                "managed_agent_id": batch.acp_id,
+                "managed_agent_family": crate::session::types::ManagedAgentKind::Acp,
                 "session_id": batch.session_id,
                 "raw_count": batch.raw_count,
                 "events": batch.events,

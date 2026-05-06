@@ -118,7 +118,13 @@ extension RecordingHarnessClient {
     if let error = configuredSessionDetailError(for: id) {
       throw error
     }
-    return configuredSessionDetail(id: id) ?? detail
+    if let configuredDetail = configuredSessionDetail(id: id) {
+      return configuredDetail
+    }
+    guard detail.session.sessionId == id else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Session unavailable.")
+    }
+    return detail
   }
 
   nonisolated func globalStream() -> DaemonPushEventStream {

@@ -276,7 +276,10 @@ fn derive_signal_ids(
             || runtime_session_id.to_string(),
             |r| r.orchestration_session_id.clone(),
         ),
-        agent: resolved.map_or_else(|| agent_runtime.name().to_string(), |r| r.agent_id.clone()),
+        agent: resolved.map_or_else(
+            || agent_runtime.name().to_string(),
+            |r| r.session_agent_id.clone(),
+        ),
     }
 }
 
@@ -312,7 +315,8 @@ fn find_pending_signals(
     let orchestration_id = resolved_session.map_or(runtime_session_id, |resolved| {
         resolved.orchestration_session_id.as_str()
     });
-    let signal_sources = runtime::signal_session_keys(orchestration_id, Some(runtime_session_id));
+    let signal_sources =
+        runtime::legacy_compatible_signal_session_keys(orchestration_id, Some(runtime_session_id));
     let runtime_name = agent_runtime.name();
     signal_sources.into_iter().find_map(|signal_session_id| {
         let signal_dir = agent_runtime.signal_dir(project_dir, &signal_session_id);

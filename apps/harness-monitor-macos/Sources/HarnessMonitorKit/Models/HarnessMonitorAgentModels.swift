@@ -1,5 +1,19 @@
 import Foundation
 
+/// Identity glossary for Harness Monitor's session and managed-agent models.
+///
+/// - `sessionId` is the orchestration `HarnessSessionId`.
+/// - `AgentRegistration.agentId` is the per-session `SessionAgentID`.
+/// - `ManagedAgentRef.id` / `managedAgentID` is the daemon-owned `ManagedAgentID`.
+/// - `agentSessionId` / `runtimeSessionID` is the runtime/log/signal session key and is
+///   the future `RuntimeSessionID` wire name.
+/// - Descriptor/catalog identifiers are separate and must not be reused as live managed IDs.
+/// - `Identifiable.id` on UI models is a view identity, not a transport contract, unless the
+///   model explicitly documents otherwise.
+///
+/// Codex remains managed-only in the current architecture: it belongs to a harness session,
+/// but `sessionAgentID` is intentionally `nil` unless codex is later promoted into the
+/// session-agent orchestration model.
 public struct HookIntegrationDescriptor: Codable, Equatable, Identifiable, Sendable {
   public let name: String
   public let typicalLatencySeconds: Int
@@ -15,6 +29,18 @@ public struct RuntimeCapabilities: Codable, Equatable, Sendable {
   public let supportsContextInjection: Bool
   public let typicalSignalLatencySeconds: Int
   public let hookPoints: [HookIntegrationDescriptor]
+}
+
+public enum ManagedAgentKind: String, Codable, Sendable {
+  case tui
+  case acp
+}
+
+public struct ManagedAgentRef: Codable, Equatable, Sendable {
+  public let kind: ManagedAgentKind
+  public let id: String
+
+  public var managedAgentID: String { id }
 }
 
 public enum SessionRole: String, Codable, CaseIterable, Sendable {
@@ -180,12 +206,16 @@ public struct AgentRegistration: Codable, Equatable, Identifiable, Sendable {
   public let updatedAt: String
   public let status: AgentStatus
   public let agentSessionId: String?
+  public let managedAgent: ManagedAgentRef?
   public let lastActivityAt: String?
   public let currentTaskId: String?
   public let runtimeCapabilities: RuntimeCapabilities
   public let persona: AgentPersona?
 
   public var id: String { agentId }
+  public var sessionAgentID: String { agentId }
+  public var runtimeSessionID: String? { agentSessionId }
+  public var managedAgentID: String? { managedAgent?.managedAgentID }
 
   public init(
     agentId: String,
@@ -197,6 +227,7 @@ public struct AgentRegistration: Codable, Equatable, Identifiable, Sendable {
     updatedAt: String,
     status: AgentStatus,
     agentSessionId: String?,
+    managedAgent: ManagedAgentRef? = nil,
     lastActivityAt: String?,
     currentTaskId: String?,
     runtimeCapabilities: RuntimeCapabilities,
@@ -211,6 +242,7 @@ public struct AgentRegistration: Codable, Equatable, Identifiable, Sendable {
     self.updatedAt = updatedAt
     self.status = status
     self.agentSessionId = agentSessionId
+    self.managedAgent = managedAgent
     self.lastActivityAt = lastActivityAt
     self.currentTaskId = currentTaskId
     self.runtimeCapabilities = runtimeCapabilities
@@ -219,14 +251,20 @@ public struct AgentRegistration: Codable, Equatable, Identifiable, Sendable {
 
   enum CodingKeys: String, CodingKey {
     case agentId
+    case sessionAgentId
     case name
     case runtime
+    case descriptorId
     case role
     case capabilities
     case joinedAt
     case updatedAt
     case status
     case agentSessionId
+    case runtimeSessionId
+    case managedAgent
+    case managedAgentId
+    case managedAgentFamily
     case lastActivityAt
     case currentTaskId
     case runtimeCapabilities
@@ -239,8 +277,14 @@ public struct AgentRegistration: Codable, Equatable, Identifiable, Sendable {
   }
 
   public init(from decoder: Decoder) throws {
+    // Accept older cached payloads during the identity migration; new encodes
+    // below write only the canonical session/runtime identity fields. Remove
+    // these decode fallbacks once supported daemon and persisted-state
+    // versions are canonical-only.
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    agentId = try container.decode(String.self, forKey: .agentId)
+    agentId =
+      try container.decodeIfPresent(String.self, forKey: .sessionAgentId)
+      ?? container.decode(String.self, forKey: .agentId)
     name = try container.decode(String.self, forKey: .name)
     if let runtime = try? container.decode(String.self, forKey: .runtime) {
       self.runtime = runtime
@@ -252,7 +296,22 @@ public struct AgentRegistration: Codable, Equatable, Identifiable, Sendable {
     joinedAt = try container.decode(String.self, forKey: .joinedAt)
     updatedAt = try container.decode(String.self, forKey: .updatedAt)
     status = try container.decode(AgentStatus.self, forKey: .status)
-    agentSessionId = try container.decodeIfPresent(String.self, forKey: .agentSessionId)
+    agentSessionId =
+      try container.decodeIfPresent(String.self, forKey: .runtimeSessionId)
+      ?? container.decodeIfPresent(String.self, forKey: .agentSessionId)
+    if let managedAgent = try container.decodeIfPresent(ManagedAgentRef.self, forKey: .managedAgent) {
+      self.managedAgent = managedAgent
+    } else if
+      let managedAgentID = try container.decodeIfPresent(String.self, forKey: .managedAgentId),
+      let managedAgentFamily = try container.decodeIfPresent(
+        ManagedAgentKind.self,
+        forKey: .managedAgentFamily
+      )
+    {
+      self.managedAgent = ManagedAgentRef(kind: managedAgentFamily, id: managedAgentID)
+    } else {
+      self.managedAgent = nil
+    }
     lastActivityAt = try container.decodeIfPresent(String.self, forKey: .lastActivityAt)
     currentTaskId = try container.decodeIfPresent(String.self, forKey: .currentTaskId)
     runtimeCapabilities = try container.decode(
@@ -260,6 +319,29 @@ public struct AgentRegistration: Codable, Equatable, Identifiable, Sendable {
       forKey: .runtimeCapabilities
     )
     persona = try container.decodeIfPresent(AgentPersona.self, forKey: .persona)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(agentId, forKey: .sessionAgentId)
+    try container.encode(name, forKey: .name)
+    try container.encode(runtime, forKey: .runtime)
+    if managedAgent?.kind == .acp {
+      try container.encode(runtime, forKey: .descriptorId)
+    }
+    try container.encode(role, forKey: .role)
+    try container.encode(capabilities, forKey: .capabilities)
+    try container.encode(joinedAt, forKey: .joinedAt)
+    try container.encode(updatedAt, forKey: .updatedAt)
+    try container.encode(status, forKey: .status)
+    try container.encodeIfPresent(agentSessionId, forKey: .runtimeSessionId)
+    try container.encodeIfPresent(managedAgent, forKey: .managedAgent)
+    try container.encodeIfPresent(managedAgent?.managedAgentID, forKey: .managedAgentId)
+    try container.encodeIfPresent(managedAgent?.kind, forKey: .managedAgentFamily)
+    try container.encodeIfPresent(lastActivityAt, forKey: .lastActivityAt)
+    try container.encodeIfPresent(currentTaskId, forKey: .currentTaskId)
+    try container.encode(runtimeCapabilities, forKey: .runtimeCapabilities)
+    try container.encodeIfPresent(persona, forKey: .persona)
   }
 }
 

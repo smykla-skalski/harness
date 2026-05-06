@@ -45,6 +45,9 @@ extension RecordingHarnessClient {
       }
       return timelineWindowResponse(entries: allEntries, request: request)
     }
+    guard detail.session.sessionId == sessionID else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Timeline unavailable.")
+    }
     let response = timelineWindowResponse(
       entries: configuredTimeline(for: sessionID) ?? PreviewFixtures.timeline,
       request: request
@@ -88,6 +91,9 @@ extension RecordingHarnessClient {
         }
       }
       return batches.flatMap(\.self)
+    }
+    guard detail.session.sessionId == sessionID else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "Timeline unavailable.")
     }
     return configuredTimeline(for: sessionID) ?? PreviewFixtures.timeline
   }

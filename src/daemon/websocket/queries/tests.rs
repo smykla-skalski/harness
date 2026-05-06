@@ -113,7 +113,7 @@ async fn dispatch_read_query_managed_agent_detail_returns_coded_snapshot() {
     let request = WsRequest {
         id: "req-managed-agent".into(),
         method: "managed_agent.detail".into(),
-        params: serde_json::json!({ "agent_id": "run-2" }),
+        params: serde_json::json!({ "managed_agent_id": "run-2" }),
         trace_context: None,
     };
 
@@ -127,6 +127,41 @@ async fn dispatch_read_query_managed_agent_detail_returns_coded_snapshot() {
         result["snapshot"]["session_id"].as_str(),
         Some("sess-test-1")
     );
+}
+
+#[tokio::test]
+async fn dispatch_read_query_managed_agent_detail_rejects_session_agent_id_alias() {
+    let state = test_http_state_with_db();
+    let request = WsRequest {
+        id: "req-managed-agent-wrong-id".into(),
+        method: "managed_agent.detail".into(),
+        params: serde_json::json!({ "session_agent_id": "worker-1" }),
+        trace_context: None,
+    };
+
+    let response = dispatch_read_query(&request, &state).await;
+
+    assert_eq!(response.id, "req-managed-agent-wrong-id");
+    let error = response.error.expect("missing param error");
+    assert_eq!(error.code, "MISSING_PARAM");
+}
+
+#[tokio::test]
+async fn dispatch_read_query_managed_agent_detail_rejects_legacy_agent_id_param() {
+    let state = test_http_state_with_db();
+    let request = WsRequest {
+        id: "req-managed-agent-legacy-id".into(),
+        method: "managed_agent.detail".into(),
+        params: serde_json::json!({ "agent_id": "run-2" }),
+        trace_context: None,
+    };
+
+    let response = dispatch_read_query(&request, &state).await;
+
+    assert_eq!(response.id, "req-managed-agent-legacy-id");
+    let error = response.error.expect("missing param error");
+    assert_eq!(error.code, "MISSING_PARAM");
+    assert_eq!(error.message, "missing managed_agent_id");
 }
 
 #[tokio::test]
@@ -151,68 +186,125 @@ async fn dispatch_read_query_managed_agent_acp_inspect_returns_acp_disabled_when
 
 #[tokio::test]
 async fn dispatch_read_query_managed_agent_acp_inspect_rejects_conflicting_require_session_id() {
-    let state = test_http_state_with_db();
-    let request = WsRequest {
-        id: "req-acp-inspect-conflict".into(),
-        method: "managed_agent.acp_inspect".into(),
-        params: serde_json::json!({
-            "session_id": "session-a",
-            "require_session_id": "session-b",
-        }),
-        trace_context: None,
-    };
+    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
+        let state = test_http_state_with_db();
+        let request = WsRequest {
+            id: "req-acp-inspect-conflict".into(),
+            method: "managed_agent.acp_inspect".into(),
+            params: serde_json::json!({
+                "session_id": "session-a",
+                "require_session_id": "session-b",
+            }),
+            trace_context: None,
+        };
 
-    let response = dispatch_read_query(&request, &state).await;
+        let response = dispatch_read_query(&request, &state).await;
 
-    let error = response.error.expect("scope denied error");
-    assert_eq!(error.code, "SESSION_SCOPE_DENIED");
+        let error = response.error.expect("scope denied error");
+        assert_eq!(error.code, "SESSION_SCOPE_DENIED");
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn dispatch_read_query_managed_agent_acp_inspect_uses_require_session_id_as_filter() {
-    let state = test_http_state_with_db();
-    let request = WsRequest {
-        id: "req-acp-inspect-filter".into(),
-        method: "managed_agent.acp_inspect".into(),
-        params: serde_json::json!({
-            "require_session_id": "sess-test-1",
-        }),
-        trace_context: None,
-    };
+    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
+        let state = test_http_state_with_db();
+        let request = WsRequest {
+            id: "req-acp-inspect-filter".into(),
+            method: "managed_agent.acp_inspect".into(),
+            params: serde_json::json!({
+                "require_session_id": "sess-test-1",
+            }),
+            trace_context: None,
+        };
 
-    let response = dispatch_read_query(&request, &state).await;
+        let response = dispatch_read_query(&request, &state).await;
 
-    assert!(response.error.is_none());
-    let result = response.result.expect("ACP inspect response");
-    assert_eq!(result["agents"].as_array().map(Vec::len), Some(0));
+        assert!(response.error.is_none());
+        let result = response.result.expect("ACP inspect response");
+        assert_eq!(result["agents"].as_array().map(Vec::len), Some(0));
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn dispatch_read_query_managed_agent_acp_inspect_uses_session_id_scope() {
+    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
+        let state = test_http_state_with_db();
+        let request = WsRequest {
+            id: "req-acp-inspect-alias".into(),
+            method: "managed_agent.acp_inspect".into(),
+            params: serde_json::json!({
+                "session_id": "sess-test-1",
+            }),
+            trace_context: None,
+        };
+
+        let response = dispatch_read_query(&request, &state).await;
+
+        assert!(response.error.is_none());
+        let result = response.result.expect("ACP inspect response");
+        assert_eq!(result["agents"].as_array().map(Vec::len), Some(0));
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn dispatch_read_query_managed_agent_acp_transcript_returns_only_acp_rows() {
-    let state = test_http_state_with_async_db_timeline().await;
-    seed_sample_acp_transcript(&state);
-    let request = WsRequest {
-        id: "req-acp-transcript".into(),
-        method: "managed_agent.acp_transcript".into(),
-        params: serde_json::json!({
-            "session_id": "sess-test-1",
-        }),
-        trace_context: None,
-    };
+    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
+        let state = test_http_state_with_async_db_timeline().await;
+        seed_sample_acp_transcript(&state);
+        let request = WsRequest {
+            id: "req-acp-transcript".into(),
+            method: "managed_agent.acp_transcript".into(),
+            params: serde_json::json!({
+                "session_id": "sess-test-1",
+            }),
+            trace_context: None,
+        };
 
-    let response = dispatch_read_query(&request, &state).await;
+        let response = dispatch_read_query(&request, &state).await;
 
-    assert!(response.error.is_none());
-    let result = response.result.expect("ACP transcript response");
-    let Value::Array(entries) = result["entries"].clone() else {
-        panic!("expected ACP transcript entries array");
-    };
-    assert_eq!(entries.len(), 1);
-    assert_eq!(entries[0]["kind"].as_str(), Some("assistant_text"));
-    assert_eq!(entries[0]["session_id"].as_str(), Some("sess-test-1"));
-    assert_eq!(entries[0]["agent_id"].as_str(), Some("codex-worker"));
-    assert_eq!(entries[0]["summary"].as_str(), Some("ACP transcript line"));
-    assert_eq!(entries[0]["payload"]["runtime"].as_str(), Some("gemini"));
+        assert!(response.error.is_none());
+        let result = response.result.expect("ACP transcript response");
+        let Value::Array(entries) = result["entries"].clone() else {
+            panic!("expected ACP transcript entries array");
+        };
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0]["kind"].as_str(), Some("assistant_text"));
+        assert_eq!(entries[0]["session_id"].as_str(), Some("sess-test-1"));
+        assert_eq!(entries[0]["agent_id"].as_str(), Some("codex-worker"));
+        assert_eq!(entries[0]["summary"].as_str(), Some("ACP transcript line"));
+        assert_eq!(entries[0]["payload"]["runtime"].as_str(), Some("gemini"));
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn dispatch_read_query_managed_agent_acp_transcript_uses_session_id_scope() {
+    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
+        let state = test_http_state_with_async_db_timeline().await;
+        seed_sample_acp_transcript(&state);
+        let request = WsRequest {
+            id: "req-acp-transcript-alias".into(),
+            method: "managed_agent.acp_transcript".into(),
+            params: serde_json::json!({
+                "session_id": "sess-test-1",
+            }),
+            trace_context: None,
+        };
+
+        let response = dispatch_read_query(&request, &state).await;
+
+        assert!(response.error.is_none());
+        let result = response.result.expect("ACP transcript response");
+        let Value::Array(entries) = result["entries"].clone() else {
+            panic!("expected ACP transcript entries array");
+        };
+        assert_eq!(entries.len(), 1);
+    })
+    .await;
 }
 
 #[tokio::test]

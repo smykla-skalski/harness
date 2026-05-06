@@ -50,6 +50,28 @@ struct WebSocketProtocolParityTests {
     )
   }
 
+  @Test("WebSocket transport query params carry explicit identity aliases")
+  func parityQueriesUseExplicitIdentityAliases() async throws {
+    let probe = RPCProbe()
+    let transport = makeQueryRPCTransport(probe: probe)
+
+    try await exerciseParityQueries(transport: transport)
+
+    let calls = await probe.snapshot()
+    assertExpectedQueryParameters(calls)
+  }
+
+  @Test("WebSocket session-agent mutations carry explicit identity aliases")
+  func paritySessionAgentMutationsUseExplicitIdentityAliases() async throws {
+    let probe = RPCProbe()
+    let transport = makeSessionAgentMutationRPCTransport(probe: probe)
+
+    try await exerciseSessionAgentMutations(transport: transport)
+
+    let calls = await probe.snapshot()
+    assertExpectedSessionAgentMutationParameters(calls)
+  }
+
   @Test("Swift RPC method catalog matches daemon websocket constants")
   func swiftRPCMethodCatalogMatchesDaemonConstants() throws {
     let daemonMethods = try daemonRPCMethodValues()

@@ -429,7 +429,7 @@ fn post_runtime_session_uses_async_db_when_sync_db_is_unavailable() {
                         Json(AgentRuntimeSessionRegistrationRequest {
                             tui_id: tui_id.into(),
                             runtime: "gemini".into(),
-                            agent_session_id: "gemini-runtime-2152464d".into(),
+                            runtime_session_id: "gemini-runtime-2152464d".into(),
                             project_dir: project_dir.to_string_lossy().into_owned(),
                         }),
                     )

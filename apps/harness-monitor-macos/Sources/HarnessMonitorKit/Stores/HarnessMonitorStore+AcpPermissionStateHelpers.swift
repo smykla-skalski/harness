@@ -4,17 +4,17 @@ extension HarnessMonitorStore {
   func makeAcpPermissionDecisionPayload(
     for batch: AcpPermissionBatch
   ) -> AcpPermissionDecisionPayload {
-    if let snapshot = selectedAcpAgents.first(where: { $0.acpId == batch.acpId }) {
-      return AcpPermissionDecisionPayload.make(
-        batch: batch,
-        agentID: snapshot.agentId,
-        agentName: snapshot.displayName
-      )
-    }
+    let linkage = acpIdentityCrosswalk().agentLinkage(
+      forManagedAgentIdentity: batch.managedAgentIdentity
+    )
     return AcpPermissionDecisionPayload.make(
       batch: batch,
-      agentID: batch.acpId,
-      agentName: batch.acpId
+      agentID: linkage?.explicitSessionAgentLookupKey
+        ?? AcpAgentIdentityCrosswalk.explicitSessionAgentFallbackKey(
+          for: batch.managedAgentIdentity
+        ),
+      agentName: linkage?.explicitDisplayName
+        ?? AcpAgentIdentityCrosswalk.unresolvedDisplayName(for: batch.managedAgentIdentity)
     )
   }
 

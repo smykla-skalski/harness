@@ -153,7 +153,13 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
   }
 
   public func timeline(sessionID: String) async throws -> [TimelineEntry] {
-    await state.timeline(for: sessionID)
+    guard await state.containsSession(sessionID) else {
+      throw HarnessMonitorAPIError.server(
+        code: 404,
+        message: "No preview timeline available."
+      )
+    }
+    return await state.timeline(for: sessionID)
   }
 
   public func codexRuns(sessionID: String) async throws -> CodexRunListResponse {
@@ -223,7 +229,13 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
   }
 
   public func acpTranscript(sessionID: String) async throws -> AcpTranscriptResponse {
-    await state.acpTranscript(sessionID: sessionID)
+    guard await state.containsSession(sessionID) else {
+      throw HarnessMonitorAPIError.server(
+        code: 404,
+        message: "ACP transcript unavailable."
+      )
+    }
+    return await state.acpTranscript(sessionID: sessionID)
   }
 
   public func resolveCodexApproval(

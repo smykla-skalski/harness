@@ -27,7 +27,7 @@ pub(super) fn agent_routes() -> Router<DaemonHttpState> {
 }
 
 pub(super) async fn post_role_change(
-    Path((session_id, agent_id)): Path<(String, String)>,
+    Path((session_id, session_agent_id)): Path<(String, String)>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(mut request): Json<RoleChangeRequest>,
@@ -37,7 +37,7 @@ pub(super) async fn post_role_change(
     if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
-    let result = role_change_response(&state, &session_id, &agent_id, &request).await;
+    let result = role_change_response(&state, &session_id, &session_agent_id, &request).await;
     if result.is_ok() {
         broadcast_agent_snapshot(&state, &session_id).await;
     }
@@ -51,7 +51,7 @@ pub(super) async fn post_role_change(
 }
 
 pub(super) async fn post_remove_agent(
-    Path((session_id, agent_id)): Path<(String, String)>,
+    Path((session_id, session_agent_id)): Path<(String, String)>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(mut request): Json<AgentRemoveRequest>,
@@ -61,7 +61,7 @@ pub(super) async fn post_remove_agent(
     if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
-    let result = remove_agent_response(&state, &session_id, &agent_id, &request).await;
+    let result = remove_agent_response(&state, &session_id, &session_agent_id, &request).await;
     if result.is_ok() {
         broadcast_agent_snapshot(&state, &session_id).await;
     }
@@ -101,14 +101,20 @@ pub(super) async fn post_transfer_leader(
 async fn role_change_response(
     state: &DaemonHttpState,
     session_id: &str,
-    agent_id: &str,
+    session_agent_id: &str,
     request: &RoleChangeRequest,
 ) -> Result<SessionDetail, CliError> {
     if let Some(async_db) = state.async_db.get() {
-        return service::change_role_async(session_id, agent_id, request, async_db.as_ref()).await;
+        return service::change_role_async(
+            session_id,
+            session_agent_id,
+            request,
+            async_db.as_ref(),
+        )
+        .await;
     }
     let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-    service::change_role(session_id, agent_id, request, db_guard.as_deref())
+    service::change_role(session_id, session_agent_id, request, db_guard.as_deref())
 }
 
 async fn transfer_leader_response(
@@ -126,14 +132,20 @@ async fn transfer_leader_response(
 async fn remove_agent_response(
     state: &DaemonHttpState,
     session_id: &str,
-    agent_id: &str,
+    session_agent_id: &str,
     request: &AgentRemoveRequest,
 ) -> Result<SessionDetail, CliError> {
     if let Some(async_db) = state.async_db.get() {
-        return service::remove_agent_async(session_id, agent_id, request, async_db.as_ref()).await;
+        return service::remove_agent_async(
+            session_id,
+            session_agent_id,
+            request,
+            async_db.as_ref(),
+        )
+        .await;
     }
     let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-    service::remove_agent(session_id, agent_id, request, db_guard.as_deref())
+    service::remove_agent(session_id, session_agent_id, request, db_guard.as_deref())
 }
 
 async fn broadcast_agent_snapshot(state: &DaemonHttpState, session_id: &str) {

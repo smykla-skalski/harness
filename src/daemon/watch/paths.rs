@@ -3,7 +3,7 @@ use std::path::{Component, Path, PathBuf};
 use crate::daemon::index;
 use crate::errors::CliError;
 
-use super::state::{RuntimeSessionResolveCache, RuntimeSessionTarget};
+use super::state::{RuntimeSessionResolveCache, RuntimeSessionResolveKind, RuntimeSessionTarget};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum WatchPathTarget {
@@ -43,7 +43,7 @@ pub(super) fn watch_target_from_path_with_cache(
     path: &Path,
     resolve_cache: &mut RuntimeSessionResolveCache,
 ) -> Result<Option<WatchPathTarget>, CliError> {
-    watch_target_from_path_with(
+    watch_target_from_path_with_resolvers(
         path,
         resolve_cache,
         &mut |context_root, runtime_name, runtime_session_id| {
@@ -54,16 +54,26 @@ pub(super) fn watch_target_from_path_with_cache(
                 runtime_session_id,
             )
         },
+        &mut |context_root, runtime_name, signal_session_key| {
+            let project = index::discovered_project_for_context_root(context_root);
+            index::resolve_session_id_for_signal_session_key(
+                &project,
+                runtime_name,
+                signal_session_key,
+            )
+        },
     )
 }
 
-pub(super) fn watch_target_from_path_with<F>(
+fn watch_target_from_path_with_resolvers<RuntimeResolver, SignalResolver>(
     path: &Path,
     resolve_cache: &mut RuntimeSessionResolveCache,
-    resolver: &mut F,
+    runtime_resolver: &mut RuntimeResolver,
+    signal_resolver: &mut SignalResolver,
 ) -> Result<Option<WatchPathTarget>, CliError>
 where
-    F: FnMut(&Path, &str, &str) -> Result<Option<String>, CliError>,
+    RuntimeResolver: FnMut(&Path, &str, &str) -> Result<Option<String>, CliError>,
+    SignalResolver: FnMut(&Path, &str, &str) -> Result<Option<String>, CliError>,
 {
     if let Some(session_id) = orchestration_session_id_from_path(path) {
         return Ok(Some(WatchPathTarget::Session(session_id)));
@@ -75,7 +85,7 @@ where
         let runtime_name = target.runtime_name.clone();
         let runtime_session_id = target.runtime_session_id.clone();
         return Ok(resolve_cache
-            .resolve_with(target, resolver)?
+            .resolve_with(target, runtime_resolver)?
             .map(|session_id| WatchPathTarget::Transcript {
                 session_id,
                 runtime_name,
@@ -84,7 +94,7 @@ where
     }
     if let Some(target) = runtime_session_target_from_signal(path) {
         return Ok(resolve_cache
-            .resolve_with(target, resolver)?
+            .resolve_with(target, signal_resolver)?
             .map(WatchPathTarget::Session));
     }
     Ok(None)
@@ -99,11 +109,16 @@ pub(super) fn session_id_from_path_with<F>(
 where
     F: FnMut(&Path, &str, &str) -> Result<Option<String>, CliError>,
 {
+    let mut signal_resolver = |_root: &Path,
+                               _runtime_name: &str,
+                               _runtime_session_id: &str|
+     -> Result<Option<String>, CliError> { Ok(None) };
     Ok(
-        watch_target_from_path_with(path, resolve_cache, resolver)?.map(|target| match target {
-            WatchPathTarget::Session(session_id)
-            | WatchPathTarget::Transcript { session_id, .. } => session_id,
-        }),
+        watch_target_from_path_with_resolvers(path, resolve_cache, resolver, &mut signal_resolver)?
+            .map(|target| match target {
+                WatchPathTarget::Session(session_id)
+                | WatchPathTarget::Transcript { session_id, .. } => session_id,
+            }),
     )
 }
 
@@ -157,6 +172,7 @@ fn runtime_session_target_from_transcript(path: &Path) -> Option<RuntimeSessionT
         context_root: path.ancestors().nth(5)?.to_path_buf(),
         runtime_name,
         runtime_session_id,
+        resolve_kind: RuntimeSessionResolveKind::Runtime,
     })
 }
 
@@ -173,6 +189,7 @@ fn runtime_session_target_from_signal(path: &Path) -> Option<RuntimeSessionTarge
         context_root: path.ancestors().nth(6)?.to_path_buf(),
         runtime_name,
         runtime_session_id,
+        resolve_kind: RuntimeSessionResolveKind::Signal,
     })
 }
 

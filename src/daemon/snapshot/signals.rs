@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
 use super::super::index::{self, DiscoveredProject, ResolvedSession};
+use crate::agents::runtime::legacy_compatible_signal_session_keys;
 use crate::agents::runtime::signal::{
     read_acknowledged_signals, read_acknowledgments, read_pending_signals, signal_matches_session,
 };
-use crate::agents::runtime::signal_session_keys;
 use crate::daemon::db::DaemonDb;
 use crate::errors::CliError;
 use crate::session::types::{SessionSignalRecord, SessionSignalStatus, SessionState};
@@ -49,9 +49,10 @@ pub fn load_signals_for(
     for (agent_id, agent) in &state.agents {
         let mut signals_by_id = BTreeMap::new();
         let mut acknowledgments_by_id = BTreeMap::new();
-        for signal_session_id in
-            signal_session_keys(&state.session_id, agent.agent_session_id.as_deref())
-        {
+        for signal_session_id in legacy_compatible_signal_session_keys(
+            &state.session_id,
+            agent.agent_session_id.as_deref(),
+        ) {
             let signal_dir = root
                 .join(agent.runtime.runtime_name())
                 .join(&signal_session_id);

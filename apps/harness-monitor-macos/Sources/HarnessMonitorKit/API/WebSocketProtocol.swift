@@ -47,6 +47,7 @@ struct WsErrorPayload: Codable, Sendable {
 
 enum WebSocketRPCMethod: String, CaseIterable, Equatable, Sendable {
   case ping = "ping"
+  case configGet = "config.get"
   case health = "health"
   case diagnostics = "diagnostics"
   case daemonStop = "daemon.stop"

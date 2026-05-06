@@ -1,0 +1,17 @@
+{
+  "images": [
+    {
+      "filename": "harness-monitor-menubar-lighthouse.svg",
+      "idiom": "mac",
+      "scale": "1x"
+    }
+  ],
+  "info": {
+    "author": "OpenAI",
+    "version": 1
+  },
+  "properties": {
+    "template-rendering-intent": "template",
+    "preserves-vector-representation": true
+  }
+}

@@ -6,6 +6,9 @@ public struct AcpTimelineIdentityMetadata: Equatable, Sendable {
   public let agentDisplayName: String?
   public let sequence: UInt64?
 
+  public var managedAgentID: String { acpAgentID }
+  public var sessionAgentID: String? { agentID }
+
   public init(
     acpAgentID: String,
     agentID: String?,
@@ -31,6 +34,9 @@ public struct ToolCallTimelineEntryMetadata: Equatable, Sendable {
   public let capabilityTags: [String]
   public let sequence: UInt64?
   public let stopReason: String?
+
+  public var managedAgentID: String? { acpAgentID }
+  public var sessionAgentID: String? { agentID }
 
   public init(
     rowID: String,

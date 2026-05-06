@@ -48,7 +48,7 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func startAcpAgent(
-    agentID: String,
+    descriptorID: AcpDescriptorID,
     role: SessionRole = .worker,
     fallbackRole: SessionRole? = nil,
     capabilities: [String] = [],
@@ -77,7 +77,7 @@ extension HarnessMonitorStore {
       .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
       .filter { !$0.isEmpty }
     let request = AcpAgentStartRequest(
-      agent: agentID,
+      agent: descriptorID.rawValue,
       role: role,
       fallbackRole: fallbackRole,
       capabilities: normalizedCapabilities,
@@ -137,6 +137,33 @@ extension HarnessMonitorStore {
       presentFailureFeedback(error.localizedDescription)
       return nil
     }
+  }
+
+  @discardableResult
+  public func startAcpAgent(
+    agentID: String,
+    role: SessionRole = .worker,
+    fallbackRole: SessionRole? = nil,
+    capabilities: [String] = [],
+    name: String?,
+    prompt: String?,
+    projectDir: String? = nil,
+    persona: String? = nil,
+    recordPermissions: Bool = false,
+    sessionID: String? = nil
+  ) async -> AcpAgentSnapshot? {
+    await startAcpAgent(
+      descriptorID: AcpDescriptorID(rawValue: agentID),
+      role: role,
+      fallbackRole: fallbackRole,
+      capabilities: capabilities,
+      name: name,
+      prompt: prompt,
+      projectDir: projectDir,
+      persona: persona,
+      recordPermissions: recordPermissions,
+      sessionID: sessionID
+    )
   }
 
   private func applyAcpAgentStartSuccess(

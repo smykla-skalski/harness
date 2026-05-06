@@ -20,7 +20,9 @@ struct WebSocketProtocolAcpTests {
         "recorded_at": "2026-04-28T00:00:00Z",
         "payload": {
           "batch_id": "batch-1",
-          "acp_id": "acp-1",
+          "acp_id": "legacy-acp",
+          "managed_agent_id": "acp-1",
+          "managed_agent_family": "acp",
           "session_id": "session-1",
           "created_at": "2026-04-28T00:00:00Z",
           "expires_at": "2026-04-28T00:05:00Z",
@@ -42,8 +44,29 @@ struct WebSocketProtocolAcpTests {
       return
     }
     #expect(batch.batchId == "batch-1")
+    #expect(batch.acpId == "acp-1")
     #expect(batch.expiresAt == "2026-04-28T00:05:00Z")
     #expect(batch.requests.first?.requestId == "request-1")
+  }
+
+  @Test("ACP permission batches encode explicit managed-agent identity aliases")
+  func acpPermissionBatchEncodesExplicitManagedAgentIdentityAliases() throws {
+    let batch = AcpPermissionBatch(
+      batchId: "batch-1",
+      acpId: "acp-1",
+      sessionId: "session-1",
+      requests: [],
+      createdAt: "2026-04-28T00:00:00Z",
+      expiresAt: "2026-04-28T00:05:00Z"
+    )
+
+    let encoder = JSONEncoder()
+    encoder.keyEncodingStrategy = .convertToSnakeCase
+    let encoded = try encoder.encode(batch)
+    let json = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    #expect(json["acp_id"] as? String == "acp-1")
+    #expect(json["managed_agent_id"] as? String == "acp-1")
+    #expect(json["managed_agent_family"] as? String == "acp")
   }
 
   @Test("Daemon push event decodes ACP permission timeout as removal")
@@ -55,7 +78,9 @@ struct WebSocketProtocolAcpTests {
         "recorded_at": "2026-04-28T00:05:00Z",
         "payload": {
           "batch_id": "batch-1",
-          "acp_id": "acp-1",
+          "acp_id": "legacy-acp",
+          "managed_agent_id": "acp-1",
+          "managed_agent_family": "acp",
           "session_id": "session-1",
           "created_at": "2026-04-28T00:00:00Z",
           "expires_at": "2026-04-28T00:05:00Z",
@@ -70,6 +95,7 @@ struct WebSocketProtocolAcpTests {
       return
     }
     #expect(removal.batch.batchId == "batch-1")
+    #expect(removal.batch.acpId == "acp-1")
     #expect(removal.batch.expiresAt == "2026-04-28T00:05:00Z")
     #expect(removal.reason == .timeout)
   }
@@ -82,7 +108,9 @@ struct WebSocketProtocolAcpTests {
         "session_id": "session-1",
         "recorded_at": "2026-04-28T00:00:30Z",
         "payload": {
-          "acp_id": "acp-1",
+          "acp_id": "legacy-acp",
+          "managed_agent_id": "acp-1",
+          "managed_agent_family": "acp",
           "session_id": "session-1",
           "raw_count": 2,
           "events": [

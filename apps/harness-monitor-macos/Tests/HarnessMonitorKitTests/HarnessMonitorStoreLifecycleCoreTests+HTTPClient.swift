@@ -65,6 +65,54 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(queryItems.contains(URLQueryItem(name: "scope", value: "summary")))
     #expect(queryItems.contains(URLQueryItem(name: "limit", value: "10")))
   }
+
+  @Test("API client ACP inspect uses canonical session query parameter")
+  func apiClientAcpInspectUsesCanonicalSessionQueryParameter() async throws {
+    AcpConfigurationURLProtocol.reset()
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [AcpConfigurationURLProtocol.self]
+    let session = URLSession(configuration: configuration)
+    let client = HarnessMonitorAPIClient(
+      connection: HarnessMonitorConnection(
+        endpoint: URL(string: "http://127.0.0.1:9999")!,
+        token: "token"
+      ),
+      session: session
+    )
+
+    let response = try await client.acpInspect(sessionID: "sess-http-acp")
+    let requestURL = try #require(AcpConfigurationURLProtocol.lastRequestURL)
+    let queryItems =
+      URLComponents(url: requestURL, resolvingAgainstBaseURL: false)?.queryItems ?? []
+
+    #expect(response.agents.isEmpty)
+    #expect(requestURL.path == "/v1/managed-agents/acp/inspect")
+    #expect(queryItems.contains(URLQueryItem(name: "session_id", value: "sess-http-acp")))
+  }
+
+  @Test("API client ACP transcript uses canonical session query parameter")
+  func apiClientAcpTranscriptUsesCanonicalSessionQueryParameter() async throws {
+    AcpConfigurationURLProtocol.reset()
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [AcpConfigurationURLProtocol.self]
+    let session = URLSession(configuration: configuration)
+    let client = HarnessMonitorAPIClient(
+      connection: HarnessMonitorConnection(
+        endpoint: URL(string: "http://127.0.0.1:9999")!,
+        token: "token"
+      ),
+      session: session
+    )
+
+    let response = try await client.acpTranscript(sessionID: "sess-http-acp")
+    let requestURL = try #require(AcpConfigurationURLProtocol.lastRequestURL)
+    let queryItems =
+      URLComponents(url: requestURL, resolvingAgainstBaseURL: false)?.queryItems ?? []
+
+    #expect(response.entries.isEmpty)
+    #expect(requestURL.path == "/v1/managed-agents/acp/transcript")
+    #expect(queryItems.contains(URLQueryItem(name: "session_id", value: "sess-http-acp")))
+  }
 }
 
 private final class SummaryTimelineURLProtocol: URLProtocol, @unchecked Sendable {
@@ -205,6 +253,65 @@ private final class TimelineWindowURLProtocol: URLProtocol, @unchecked Sendable 
         "unchanged": false
       }
       """
+    let data = Data(responseBody.utf8)
+    client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+    client?.urlProtocol(self, didLoad: data)
+    client?.urlProtocolDidFinishLoading(self)
+  }
+
+  override func stopLoading() {}
+}
+
+private final class AcpConfigurationURLProtocol: URLProtocol, @unchecked Sendable {
+  private static let lock = NSLock()
+  nonisolated(unsafe) private static var requestURL: URL?
+
+  static var lastRequestURL: URL? {
+    lock.withLock { requestURL }
+  }
+
+  static func reset() {
+    lock.withLock {
+      requestURL = nil
+    }
+  }
+
+  override static func canInit(with request: URLRequest) -> Bool {
+    true
+  }
+
+  override static func canonicalRequest(for request: URLRequest) -> URLRequest {
+    request
+  }
+
+  override func startLoading() {
+    guard let requestURL = request.url else {
+      client?.urlProtocol(self, didFailWithError: URLError(.badURL))
+      return
+    }
+
+    Self.lock.withLock {
+      Self.requestURL = requestURL
+    }
+
+    guard
+      let response = HTTPURLResponse(
+        url: requestURL,
+        statusCode: 200,
+        httpVersion: nil,
+        headerFields: ["Content-Type": "application/json"]
+      )
+    else {
+      client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
+      return
+    }
+
+    let responseBody =
+      if requestURL.path.hasSuffix("/inspect") {
+        #"{"agents":[]}"#
+      } else {
+        #"{"entries":[]}"#
+      }
     let data = Data(responseBody.utf8)
     client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
     client?.urlProtocol(self, didLoad: data)

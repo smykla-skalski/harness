@@ -106,7 +106,21 @@ actor PreviewHarnessClientState {
       return scopedDetail
     }
 
+    guard fallbackDetail?.session.sessionId == sessionID else {
+      return nil
+    }
     return fallbackDetail
+  }
+
+  func containsSession(_ sessionID: String) -> Bool {
+    sessionSummaries.contains(where: { $0.sessionId == sessionID })
+      || detailsBySessionID[sessionID] != nil
+      || coreDetailsBySessionID[sessionID] != nil
+      || timelinesBySessionID[sessionID] != nil
+      || agentTuisBySessionID[sessionID] != nil
+      || acpAgentsBySessionID[sessionID] != nil
+      || codexRunsBySessionID[sessionID] != nil
+      || fallbackDetail?.session.sessionId == sessionID
   }
 
   func currentMutableSessionDetail(sessionID: String) -> SessionDetail? {
@@ -150,13 +164,19 @@ actor PreviewHarnessClientState {
   }
 
   func timeline(for sessionID: String) -> [TimelineEntry] {
-    timelinesBySessionID[sessionID] ?? fallbackTimeline
+    if let timeline = timelinesBySessionID[sessionID] {
+      return timeline
+    }
+    guard fallbackDetail?.session.sessionId == sessionID else {
+      return []
+    }
+    return fallbackTimeline
   }
 
   func acpTranscript(sessionID: String) -> AcpTranscriptResponse {
-    let managedAgentIDs = Set((acpAgentsBySessionID[sessionID] ?? []).map(\.agentId))
+    let sessionAgentIDs = Set((acpAgentsBySessionID[sessionID] ?? []).map(\.sessionAgentID))
     let entries = timeline(for: sessionID).filter {
-      $0.matchesDerivedAcpTranscriptHistory(managedAgentIDs: managedAgentIDs)
+      $0.matchesDerivedAcpTranscriptHistory(sessionAgentIDs: sessionAgentIDs)
     }
     let response = AcpTranscriptResponse(entries: entries)
     return response

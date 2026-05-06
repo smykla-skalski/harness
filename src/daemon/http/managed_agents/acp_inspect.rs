@@ -110,35 +110,61 @@ mod tests {
 
     #[tokio::test]
     async fn inspect_returns_scope_denied_when_require_and_session_ids_conflict() {
-        let state = minimal_state();
-        let response = get_acp_inspect(
-            Query(AcpInspectQuery {
-                session_id: Some("session-a".into()),
-                require_session_id: Some("session-b".into()),
-            }),
-            auth_headers(),
-            State(state),
-        )
+        temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
+            let state = minimal_state();
+            let response = get_acp_inspect(
+                Query(AcpInspectQuery {
+                    session_id: Some("session-a".into()),
+                    require_session_id: Some("session-b".into()),
+                }),
+                auth_headers(),
+                State(state),
+            )
+            .await;
+            let (status, body) = response_json(response).await;
+            assert_eq!(status, StatusCode::FORBIDDEN);
+            assert_eq!(body["error"]["code"], "SESSION_SCOPE_DENIED");
+        })
         .await;
-        let (status, body) = response_json(response).await;
-        assert_eq!(status, StatusCode::FORBIDDEN);
-        assert_eq!(body["error"]["code"], "SESSION_SCOPE_DENIED");
     }
 
     #[tokio::test]
     async fn inspect_uses_require_session_id_as_filter_when_session_id_absent() {
-        let state = minimal_state();
-        let response = get_acp_inspect(
-            Query(AcpInspectQuery {
-                session_id: None,
-                require_session_id: Some("session-a".into()),
-            }),
-            auth_headers(),
-            State(state),
-        )
+        temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
+            let state = minimal_state();
+            let response = get_acp_inspect(
+                Query(AcpInspectQuery {
+                    session_id: None,
+                    require_session_id: Some("session-a".into()),
+                }),
+                auth_headers(),
+                State(state),
+            )
+            .await;
+            let (status, body) = response_json(response).await;
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(body["agents"].as_array().map(Vec::len), Some(0));
+        })
         .await;
-        let (status, body) = response_json(response).await;
-        assert_eq!(status, StatusCode::OK);
-        assert_eq!(body["agents"].as_array().map(Vec::len), Some(0));
+    }
+
+    #[tokio::test]
+    async fn inspect_uses_session_id_scope() {
+        temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
+            let state = minimal_state();
+            let response = get_acp_inspect(
+                Query(AcpInspectQuery {
+                    session_id: Some("session-a".into()),
+                    require_session_id: None,
+                }),
+                auth_headers(),
+                State(state),
+            )
+            .await;
+            let (status, body) = response_json(response).await;
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(body["agents"].as_array().map(Vec::len), Some(0));
+        })
+        .await;
     }
 }

@@ -122,6 +122,51 @@ public struct AcpAgentStartRequest: Codable, Equatable, Sendable {
     self.persona = persona
     self.recordPermissions = recordPermissions
   }
+
+  private enum CodingKeys: String, CodingKey {
+    case descriptorId
+    case agent
+    case agentId
+    case role
+    case fallbackRole
+    case capabilities
+    case name
+    case prompt
+    case projectDir
+    case persona
+    case recordPermissions
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    agent =
+      try container.decodeIfPresent(String.self, forKey: .descriptorId)
+      ?? container.decodeIfPresent(String.self, forKey: .agent)
+      ?? container.decodeIfPresent(String.self, forKey: .agentId)
+      ?? ""
+    role = try container.decodeIfPresent(SessionRole.self, forKey: .role) ?? .worker
+    fallbackRole = try container.decodeIfPresent(SessionRole.self, forKey: .fallbackRole)
+    capabilities = try container.decodeIfPresent([String].self, forKey: .capabilities) ?? []
+    name = try container.decodeIfPresent(String.self, forKey: .name)
+    prompt = try container.decodeIfPresent(String.self, forKey: .prompt)
+    projectDir = try container.decodeIfPresent(String.self, forKey: .projectDir)
+    persona = try container.decodeIfPresent(String.self, forKey: .persona)
+    recordPermissions = try container.decodeIfPresent(Bool.self, forKey: .recordPermissions) ?? false
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(agent, forKey: .descriptorId)
+    try container.encode(agent, forKey: .agent)
+    try container.encode(role, forKey: .role)
+    try container.encodeIfPresent(fallbackRole, forKey: .fallbackRole)
+    try container.encode(capabilities, forKey: .capabilities)
+    try container.encodeIfPresent(name, forKey: .name)
+    try container.encodeIfPresent(prompt, forKey: .prompt)
+    try container.encodeIfPresent(projectDir, forKey: .projectDir)
+    try container.encodeIfPresent(persona, forKey: .persona)
+    try container.encode(recordPermissions, forKey: .recordPermissions)
+  }
 }
 
 public struct AcpAgentInspectResponse: Codable, Equatable, Sendable {
@@ -207,6 +252,8 @@ public struct AcpAgentInspectSnapshot: Codable, Equatable, Identifiable, Sendabl
   public let promptDeadlineRemainingMs: UInt64
 
   public var id: String { acpId }
+  public var managedAgentID: String { acpId }
+  public var sessionAgentID: String { agentId }
 
   public init(
     acpId: String,
@@ -246,8 +293,10 @@ public struct AcpAgentInspectSnapshot: Codable, Equatable, Identifiable, Sendabl
 
   private enum CodingKeys: String, CodingKey {
     case acpId
+    case managedAgentId
     case sessionId
     case agentId
+    case sessionAgentId
     case displayName
     case pid
     case pgid
@@ -265,9 +314,13 @@ public struct AcpAgentInspectSnapshot: Codable, Equatable, Identifiable, Sendabl
 
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    acpId = try container.decode(String.self, forKey: .acpId)
+    acpId =
+      try container.decodeIfPresent(String.self, forKey: .managedAgentId)
+      ?? container.decode(String.self, forKey: .acpId)
     sessionId = try container.decode(String.self, forKey: .sessionId)
-    agentId = try container.decode(String.self, forKey: .agentId)
+    agentId =
+      try container.decodeIfPresent(String.self, forKey: .sessionAgentId)
+      ?? container.decode(String.self, forKey: .agentId)
     displayName = try container.decode(String.self, forKey: .displayName)
     pid = try container.decode(UInt32.self, forKey: .pid)
     pgid = try container.decode(Int32.self, forKey: .pgid)
@@ -288,5 +341,59 @@ public struct AcpAgentInspectSnapshot: Codable, Equatable, Identifiable, Sendabl
       UInt64.self,
       forKey: .promptDeadlineRemainingMs
     )
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(acpId, forKey: .acpId)
+    try container.encode(acpId, forKey: .managedAgentId)
+    try container.encode(sessionId, forKey: .sessionId)
+    try container.encode(agentId, forKey: .agentId)
+    try container.encode(agentId, forKey: .sessionAgentId)
+    try container.encode(displayName, forKey: .displayName)
+    try container.encode(pid, forKey: .pid)
+    try container.encode(pgid, forKey: .pgid)
+    try container.encode(uptimeMs, forKey: .uptimeMs)
+    try container.encode(lastUpdateAt, forKey: .lastUpdateAt)
+    try container.encodeIfPresent(lastClientCallAt, forKey: .lastClientCallAt)
+    try container.encode(watchdogState, forKey: .watchdogState)
+    try container.encode(permissionMode, forKey: .permissionMode)
+    try container.encodeIfPresent(permissionLogPath, forKey: .permissionLogPath)
+    try container.encode(pendingPermissions, forKey: .pendingPermissions)
+    try container.encode(permissionQueueDepth, forKey: .permissionQueueDepth)
+    try container.encode(terminalCount, forKey: .terminalCount)
+    try container.encode(promptDeadlineRemainingMs, forKey: .promptDeadlineRemainingMs)
+  }
+}
+
+extension AcpAgentDescriptor {
+  public var descriptorIdentity: AcpDescriptorID {
+    AcpDescriptorID(rawValue: id)
+  }
+}
+
+extension AcpRuntimeProbe {
+  public var descriptorIdentity: AcpDescriptorID {
+    AcpDescriptorID(rawValue: agentId)
+  }
+}
+
+extension AcpAgentStartRequest {
+  public var descriptorIdentity: AcpDescriptorID {
+    AcpDescriptorID(rawValue: agent)
+  }
+}
+
+extension AcpAgentInspectSnapshot {
+  public var managedAgentIdentity: ManagedAgentID {
+    ManagedAgentID(rawValue: managedAgentID)
+  }
+
+  public var sessionIdentity: HarnessSessionID {
+    HarnessSessionID(rawValue: sessionId)
+  }
+
+  public var sessionAgentIdentity: SessionAgentID {
+    SessionAgentID(rawValue: sessionAgentID)
   }
 }

@@ -1,15 +1,15 @@
 import Foundation
 
 struct AcpToolCallTimelineMetadata: Equatable, Sendable {
-  let acpAgentId: String?
-  let agentId: String?
+  let managedAgentID: String?
+  let sessionAgentID: String?
   let displayName: String?
   let capabilityTags: [String]
 }
 
 private struct AcpTimelineIdentity: Sendable {
-  let acpAgentId: String
-  let agentId: String
+  let managedAgentID: String
+  let sessionAgentID: String
   let summaryActor: String
 }
 
@@ -129,11 +129,11 @@ extension AcpConversationEvent {
     )
 
     return TimelineEntry(
-      entryId: "acp-\(context.identity.agentId)-\(entryKind)-\(sequence)",
+      entryId: "acp-\(context.identity.sessionAgentID)-\(entryKind)-\(sequence)",
       recordedAt: context.recordedAt,
       kind: entryKind,
       sessionId: sessionId,
-      agentId: context.identity.agentId,
+      agentId: context.identity.sessionAgentID,
       taskId: nil,
       summary: summary,
       payload: .object([
@@ -147,8 +147,8 @@ extension AcpConversationEvent {
           "tool_call_id": context.event["invocation_id"] ?? .null,
           "tool_name": .string(toolName),
           "status": .string(status),
-          "acp_agent_id": .string(context.identity.acpAgentId),
-          "agent_id": .string(context.identity.agentId),
+          "acp_agent_id": .string(context.identity.managedAgentID),
+          "agent_id": .string(context.identity.sessionAgentID),
           "agent_display_name": .string(context.identity.summaryActor),
           "capability_tags": .array(
             (context.toolCallMetadata?.capabilityTags ?? []).map(JSONValue.string)
@@ -332,11 +332,11 @@ extension AcpConversationEvent {
     identity: AcpTimelineIdentity
   ) -> TimelineEntry {
     TimelineEntry(
-      entryId: "acp-\(identity.agentId)-\(entryKind)-\(sequence)",
+      entryId: "acp-\(identity.sessionAgentID)-\(entryKind)-\(sequence)",
       recordedAt: recordedAt,
       kind: entryKind,
       sessionId: sessionId,
-      agentId: identity.agentId,
+      agentId: identity.sessionAgentID,
       taskId: nil,
       summary: summary,
       payload: .object([
@@ -366,10 +366,10 @@ extension AcpConversationEvent {
     fallbackAgent: String,
     toolCallMetadata: AcpToolCallTimelineMetadata?
   ) -> AcpTimelineIdentity {
-    let acpAgentId = toolCallMetadata?.acpAgentId ?? acpID
+    let managedAgentID = toolCallMetadata?.managedAgentID ?? acpID
     let fallbackAgentID = fallbackAgent.isEmpty ? acpID : fallbackAgent
-    let agentId = resolvedIdentityValue(
-      metadataValue: toolCallMetadata?.agentId,
+    let sessionAgentID = resolvedIdentityValue(
+      metadataValue: toolCallMetadata?.sessionAgentID,
       acpID: acpID,
       fallbackAgent: fallbackAgent,
       fallbackValue: fallbackAgentID
@@ -381,8 +381,8 @@ extension AcpConversationEvent {
       fallbackValue: fallbackAgentID
     )
     return AcpTimelineIdentity(
-      acpAgentId: acpAgentId,
-      agentId: agentId,
+      managedAgentID: managedAgentID,
+      sessionAgentID: sessionAgentID,
       summaryActor: summaryActor
     )
   }
@@ -406,8 +406,8 @@ extension AcpConversationEvent {
     sequence: UInt64
   ) -> JSONValue {
     .object([
-      "acp_agent_id": .string(identity.acpAgentId),
-      "agent_id": .string(identity.agentId),
+      "acp_agent_id": .string(identity.managedAgentID),
+      "agent_id": .string(identity.sessionAgentID),
       "agent_display_name": .string(identity.summaryActor),
       "sequence": .number(Double(sequence)),
     ])

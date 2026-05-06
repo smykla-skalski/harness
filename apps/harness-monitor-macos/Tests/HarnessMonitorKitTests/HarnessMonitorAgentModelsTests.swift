@@ -79,6 +79,9 @@ struct HarnessMonitorAgentModelsTests {
     )
     let snapshot = try decoder.decode(ManagedAgentSnapshot.self, from: data)
     #expect(snapshot.agentId == "acp-1")
+    #expect(snapshot.managedAgentID == "acp-1")
+    #expect(snapshot.sessionAgentID == "copilot")
+    #expect(snapshot.family == .acp)
     #expect(snapshot.acp?.status == .disconnected)
     #expect(snapshot.acp?.disconnectReason?.kind == "process_exited")
     #expect(snapshot.acp?.isRestartable == true)
@@ -102,6 +105,10 @@ struct HarnessMonitorAgentModelsTests {
         "updated_at": "2026-05-01T17:00:01Z",
         "status": "active",
         "agent_session_id": "acp-session-1",
+        "managed_agent": {
+          "kind": "acp",
+          "id": "acp-runtime-1"
+        },
         "runtime_capabilities": {
           "runtime": "copilot",
           "supports_native_transcript": true,
@@ -117,9 +124,47 @@ struct HarnessMonitorAgentModelsTests {
     let registration = try decoder.decode(AgentRegistration.self, from: data)
 
     #expect(registration.agentId == "copilot-worker")
+    #expect(registration.sessionAgentID == "copilot-worker")
     #expect(registration.runtime == "copilot")
     #expect(registration.agentSessionId == "acp-session-1")
+    #expect(registration.runtimeSessionID == "acp-session-1")
+    #expect(registration.managedAgent?.kind == .acp)
+    #expect(registration.managedAgentID == "acp-runtime-1")
     #expect(registration.status == .active)
+  }
+
+  @Test("AgentRegistration encodes canonical identity fields only")
+  func agentRegistrationEncodesCanonicalIdentityFieldsOnly() throws {
+    let registration = AgentRegistration(
+      agentId: "copilot-worker",
+      name: "GitHub Copilot",
+      runtime: "copilot",
+      role: .worker,
+      capabilities: [],
+      joinedAt: "2026-05-01T17:00:00Z",
+      updatedAt: "2026-05-01T17:00:01Z",
+      status: .active,
+      agentSessionId: "acp-session-1",
+      managedAgent: ManagedAgentRef(kind: .acp, id: "acp-runtime-1"),
+      lastActivityAt: nil,
+      currentTaskId: nil,
+      runtimeCapabilities: RuntimeCapabilities(
+        runtime: "copilot",
+        supportsNativeTranscript: true,
+        supportsSignalDelivery: true,
+        supportsContextInjection: true,
+        typicalSignalLatencySeconds: 5,
+        hookPoints: []
+      ),
+      persona: nil
+    )
+
+    let json = try encodedJSONObject(registration)
+
+    #expect(json["session_agent_id"] as? String == "copilot-worker")
+    #expect(json["runtime_session_id"] as? String == "acp-session-1")
+    #expect(json["agent_id"] == nil)
+    #expect(json["agent_session_id"] == nil)
   }
 
   @Test("Transport-closed disconnect is restartable")
@@ -263,5 +308,162 @@ struct HarnessMonitorAgentModelsTests {
     )
 
     #expect(snapshot.id == "worker-codex")
+    #expect(snapshot.managedAgentID == "acp-runtime-2")
+    #expect(snapshot.sessionAgentID == "worker-codex")
   }
+
+  @Test("Identity wrappers encode as single JSON strings")
+  func identityWrappersEncodeAsSingleJSONStrings() throws {
+    let encoder = JSONEncoder()
+    let decoder = JSONDecoder()
+    let managedAgentID = ManagedAgentID(rawValue: "managed-1")
+    let sessionID = HarnessSessionID(rawValue: "session-1")
+    let batchID = AcpPermissionBatchID(rawValue: "batch-1")
+
+    #expect(String(decoding: try encoder.encode(managedAgentID), as: UTF8.self) == "\"managed-1\"")
+    #expect(try decoder.decode(ManagedAgentID.self, from: Data("\"managed-1\"".utf8)) == managedAgentID)
+    #expect(String(decoding: try encoder.encode(sessionID), as: UTF8.self) == "\"session-1\"")
+    #expect(String(decoding: try encoder.encode(batchID), as: UTF8.self) == "\"batch-1\"")
+  }
+
+  @Test("Core managed-agent models expose typed identity wrappers")
+  func coreManagedAgentModelsExposeTypedIdentityWrappers() throws {
+    let client = RecordingHarnessClient()
+    let sessionID = HarnessSessionID(rawValue: "session-typed")
+    let approval = client.codexApprovalFixture(approvalID: "approval-typed")
+    let terminal = client.agentTuiFixture(tuiID: "tui-typed", sessionID: sessionID.rawValue)
+    let codex = client.codexRunFixture(
+      runID: "codex-typed",
+      sessionID: sessionID.rawValue,
+      pendingApprovals: [approval]
+    )
+    let permissionItem = AcpPermissionItem(
+      requestId: "request-typed",
+      sessionId: sessionID.rawValue,
+      toolCall: .object(["name": .string("write_file")]),
+      options: []
+    )
+    let permissionBatch = AcpPermissionBatch(
+      batchId: "batch-typed",
+      acpId: "acp-typed",
+      sessionId: sessionID.rawValue,
+      requests: [permissionItem],
+      createdAt: "2026-05-01T00:00:00Z"
+    )
+    let acp = AcpAgentSnapshot(
+      acpId: "acp-typed",
+      sessionId: sessionID.rawValue,
+      agentId: "worker-typed",
+      displayName: "Worker",
+      status: .active,
+      pid: 7,
+      pgid: 7,
+      projectDir: "/tmp/project",
+      pendingPermissions: 1,
+      permissionQueueDepth: 1,
+      pendingPermissionBatches: [permissionBatch],
+      terminalCount: 0,
+      createdAt: "2026-05-01T00:00:00Z",
+      updatedAt: "2026-05-01T00:00:01Z"
+    )
+    let registration = AgentRegistration(
+      agentId: "worker-typed",
+      name: "Worker",
+      runtime: "copilot",
+      role: .worker,
+      capabilities: [],
+      joinedAt: "2026-05-01T00:00:00Z",
+      updatedAt: "2026-05-01T00:00:01Z",
+      status: .active,
+      agentSessionId: "runtime-session-typed",
+      managedAgent: ManagedAgentRef(kind: .acp, id: acp.managedAgentID),
+      lastActivityAt: nil,
+      currentTaskId: nil,
+      runtimeCapabilities: RuntimeCapabilities(
+        runtime: "copilot",
+        supportsNativeTranscript: true,
+        supportsSignalDelivery: true,
+        supportsContextInjection: true,
+        typicalSignalLatencySeconds: 5,
+        hookPoints: []
+      ),
+      persona: nil
+    )
+    let runtimeState = try #require(AcpAgentRuntimeState(snapshot: acp, inspect: nil, inspectSampledAt: nil))
+
+    #expect(registration.sessionAgentIdentity == SessionAgentID(rawValue: "worker-typed"))
+    #expect(registration.runtimeSessionIdentity == Optional(RuntimeSessionID(rawValue: "runtime-session-typed")))
+    #expect(registration.managedAgentIdentity == Optional(ManagedAgentID(rawValue: "acp-typed")))
+    #expect(terminal.sessionIdentity == sessionID)
+    #expect(terminal.managedAgentIdentity == ManagedAgentID(rawValue: "tui-typed"))
+    #expect(terminal.sessionAgentIdentity == SessionAgentID(rawValue: "agent-tui-typed"))
+    #expect(codex.sessionIdentity == sessionID)
+    #expect(codex.managedAgentIdentity == ManagedAgentID(rawValue: "codex-typed"))
+    #expect(codex.sessionAgentIdentity == nil)
+    #expect(codex.threadIdentity == Optional(CodexThreadID(rawValue: "thread-codex-typed")))
+    #expect(approval.approvalIdentity == CodexApprovalID(rawValue: "approval-typed"))
+    #expect(approval.requestIdentity == CodexApprovalRequestID(rawValue: "json-rpc-approval-1"))
+    #expect(permissionItem.requestIdentity == AcpPermissionRequestID(rawValue: "request-typed"))
+    #expect(permissionBatch.batchIdentity == AcpPermissionBatchID(rawValue: "batch-typed"))
+    #expect(permissionBatch.managedAgentIdentity == ManagedAgentID(rawValue: "acp-typed"))
+    #expect(acp.sessionIdentity == sessionID)
+    #expect(acp.managedAgentIdentity == ManagedAgentID(rawValue: "acp-typed"))
+    #expect(acp.sessionAgentIdentity == SessionAgentID(rawValue: "worker-typed"))
+    #expect(runtimeState.sessionIdentity == sessionID)
+    #expect(runtimeState.managedAgentIdentity == ManagedAgentID(rawValue: "acp-typed"))
+    #expect(runtimeState.sessionAgentIdentity == SessionAgentID(rawValue: "worker-typed"))
+    #expect(ManagedAgentSnapshot.terminal(terminal).sessionIdentity == sessionID)
+    #expect(ManagedAgentSnapshot.codex(codex).managedAgentIdentity == codex.managedAgentIdentity)
+    #expect(ManagedAgentSnapshot.acp(acp).sessionAgentIdentity == Optional(acp.sessionAgentIdentity))
+  }
+
+  @Test("Agent registration decodes and encodes explicit identity aliases")
+  func agentRegistrationWireAliasesRoundTrip() throws {
+    let data = Data(
+      #"""
+      {
+        "agent_id": "legacy-agent",
+        "session_agent_id": "worker-1",
+        "name": "Worker",
+        "runtime": { "kind": "acp", "id": "copilot" },
+        "descriptor_id": "copilot",
+        "role": "worker",
+        "capabilities": ["acp"],
+        "joined_at": "2026-05-01T00:00:00Z",
+        "updated_at": "2026-05-01T00:00:01Z",
+        "status": "active",
+        "agent_session_id": "legacy-runtime",
+        "runtime_session_id": "runtime-1",
+        "managed_agent_id": "acp-1",
+        "managed_agent_family": "acp",
+        "runtime_capabilities": {
+          "runtime": "copilot",
+          "supports_native_transcript": true,
+          "supports_signal_delivery": true,
+          "supports_context_injection": true,
+          "typical_signal_latency_seconds": 5,
+          "hook_points": []
+        }
+      }
+      """#.utf8
+    )
+
+    let registration = try decoder.decode(AgentRegistration.self, from: data)
+    #expect(registration.sessionAgentID == "worker-1")
+    #expect(registration.runtimeSessionID == "runtime-1")
+    #expect(registration.managedAgentID == "acp-1")
+    #expect(registration.runtime == "copilot")
+
+    let wireEncoder = JSONEncoder()
+    wireEncoder.keyEncodingStrategy = .convertToSnakeCase
+    let encoded = try wireEncoder.encode(registration)
+    let json = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    #expect(json["agent_id"] as? String == "worker-1")
+    #expect(json["session_agent_id"] as? String == "worker-1")
+    #expect(json["runtime_session_id"] as? String == "runtime-1")
+    #expect(json["managed_agent_id"] as? String == "acp-1")
+    #expect(json["managed_agent_family"] as? String == "acp")
+    #expect(json["descriptor_id"] as? String == "copilot")
+  }
+
 }
