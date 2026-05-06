@@ -2,7 +2,7 @@
 
 This directory is the previewable SwiftUI layer for Harness Monitor. The app-level `apps/harness-monitor-macos/AGENTS.md` still applies; this file is the local structure contract for `Sources/HarnessMonitorUIPreviewable/`.
 
-The layout follows the common large-SwiftUI pattern of feature-local folders plus dedicated preview folders. This tree also adds explicit `Canvas/` folders so legacy inline-preview files are obvious in Xcode until they are extracted.
+The layout follows the common large-SwiftUI pattern of feature-local folders plus dedicated preview folders. Inline previews have been fully extracted, so preview code belongs only in `Previews/`.
 
 ## Directory map
 
@@ -23,7 +23,6 @@ The layout follows the common large-SwiftUI pattern of feature-local folders plu
   - `Voice/`
   - `Workspace/`
 - `Views/<Domain>/Previews/` - dedicated preview files. This is the preferred home for new preview code.
-- `Views/<Domain>/Canvas/` - transitional bucket for implementation files that still embed `#Preview`.
 - `Support/` - cross-cutting non-view support for this target.
 - `Theme/` - shared styling primitives.
 - `Features/` - feature-flagged source roots only.
@@ -34,9 +33,8 @@ The layout follows the common large-SwiftUI pattern of feature-local folders plu
 1. Prefer dedicated preview files over inline previews in implementation files.
 2. Dedicated preview files live in the nearest `Previews/` folder and use a leading `Preview` prefix, for example `PreviewWorkspaceWindowView.swift`.
 3. Do not introduce trailing preview suffixes such as `+Preview`, `+Previews`, `Previews`, or one-off names like `CrowdedPreview` for new files.
-4. Implementation files that still contain `#Preview` must live under a `Canvas/` folder so navigator scanning immediately shows that they carry canvas code.
-5. When you touch a file in `Canvas/`, extract its previews into `Previews/Preview<Name>.swift` when the preview helpers are reasonably local, then move the implementation back out of `Canvas/`.
-6. Keep preview-only helpers private and next to the preview file unless they are reused by multiple preview files in the same domain; only then promote them to a clearly named support file such as `PreferencesPreviewSupport.swift`.
+4. Runtime implementation files should not contain `#Preview`; add or update a mirrored companion in `Previews/` instead.
+5. Keep preview-only helpers private and next to the preview file unless they are reused by multiple preview files in the same domain; only then promote them to a clearly named support file such as `PreferencesPreviewSupport.swift`.
 
 ## Domain notes
 
@@ -49,4 +47,4 @@ The layout follows the common large-SwiftUI pattern of feature-local folders plu
 
 1. Avoid creating new top-level files under `Views/`.
 2. Keep implementation and preview files in the same domain so navigator grouping and Open Quickly stay predictable.
-3. If a runtime file gains a preview, add a mirrored companion in `Previews/` instead of dropping preview code into an unrelated folder.
+3. If a runtime file gains a preview, add a mirrored companion in `Previews/` instead of dropping preview code into the runtime file or an unrelated folder.
