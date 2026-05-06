@@ -174,60 +174,67 @@ struct SidebarSessionListColumn: View {
   let fontScale: CGFloat
   let collapsedCheckoutKeys: Set<String>
   let setCheckoutCollapsed: (String, Bool) -> Void
+  @State private var localSelection: Set<String>
 
-  private var sidebarSelection: Binding<String?> {
+  init(
+    store: HarnessMonitorStore,
+    controls: HarnessMonitorStore.SessionControlsSlice,
+    projection: HarnessMonitorStore.SessionProjectionSlice,
+    searchResults: HarnessMonitorStore.SessionSearchResultsSlice,
+    sidebarUI: HarnessMonitorStore.SidebarUISlice,
+    dateTimeConfiguration: HarnessMonitorDateTimeConfiguration,
+    fontScale: CGFloat,
+    collapsedCheckoutKeys: Set<String>,
+    setCheckoutCollapsed: @escaping (String, Bool) -> Void
+  ) {
+    self.store = store
+    self.controls = controls
+    self.projection = projection
+    self.searchResults = searchResults
+    self.sidebarUI = sidebarUI
+    self.dateTimeConfiguration = dateTimeConfiguration
+    self.fontScale = fontScale
+    self.collapsedCheckoutKeys = collapsedCheckoutKeys
+    self.setCheckoutCollapsed = setCheckoutCollapsed
+    _localSelection = State(
+      initialValue: SidebarSessionListSelectionSync.selection(for: sidebarUI.selectedSessionID)
+    )
+  }
+
+  private var visibleSessionIDs: Set<String> {
+    Set(searchResults.visibleSessionIDs)
+  }
+
+  private var renderedSidebarSelection: Set<String> {
+    SidebarSessionListSelectionSync.renderedSelection(
+      from: localSelection,
+      visibleSessionIDs: visibleSessionIDs
+    )
+  }
+
+  private var sidebarSelection: Binding<Set<String>> {
     Binding(
-      get: { renderedSidebarSelectionID },
+      get: { renderedSidebarSelection },
       set: { newValue in
+        let change = SidebarSessionListSelectionSync.resolve(
+          previousSelection: localSelection,
+          newRenderedSelection: newValue,
+          visibleSessionIDs: visibleSessionIDs,
+          storeSelectedSessionID: sidebarUI.selectedSessionID
+        )
         HarnessMonitorUITestTrace.record(
           component: "sidebar.selection-binding",
           event: "set",
           details: [
-            "new_value": newValue ?? "nil",
+            "new_count": "\(newValue.count)",
+            "new_ids": newValue.sorted().joined(separator: ","),
             "sidebar_selected_session_id": sidebarUI.selectedSessionID ?? "nil",
-            "rendered_selection_id": renderedSidebarSelectionID ?? "nil",
+            "rendered_selection_ids": renderedSidebarSelection.sorted().joined(separator: ","),
           ]
         )
-        if newValue == nil, shouldIgnoreFilteredSidebarDeselection {
-          HarnessMonitorUITestTrace.record(
-            component: "sidebar.selection-binding",
-            event: "ignored-nil-clear",
-            details: [
-              "sidebar_selected_session_id": sidebarUI.selectedSessionID ?? "nil",
-              "rendered_selection_id": renderedSidebarSelectionID ?? "nil",
-            ]
-          )
-          return
-        }
-        guard sidebarUI.selectedSessionID != newValue else {
-          HarnessMonitorUITestTrace.record(
-            component: "sidebar.selection-binding",
-            event: "ignored-duplicate",
-            details: [
-              "new_value": newValue ?? "nil"
-            ]
-          )
-          return
-        }
-        store.selectSessionFromList(newValue)
+        applySelectionChange(change)
       }
     )
-  }
-
-  private var shouldIgnoreFilteredSidebarDeselection: Bool {
-    guard sidebarUI.selectedSessionID != nil else {
-      return false
-    }
-    return renderedSidebarSelectionID == nil
-  }
-
-  private var renderedSidebarSelectionID: String? {
-    guard let selectedSessionID = sidebarUI.selectedSessionID,
-      searchResults.visibleSessionIDs.contains(selectedSessionID)
-    else {
-      return nil
-    }
-    return selectedSessionID
   }
 
   private var renderState: SidebarSessionListRenderState {
@@ -236,8 +243,7 @@ struct SidebarSessionListColumn: View {
       projectionGroups: projection.groupedSessions,
       searchPresentation: searchResults.presentationState,
       searchVisibleSessionIDs: searchResults.visibleSessionIDs,
-      selectedSessionIDForAccessibilityMarkers: HarnessMonitorUITestEnvironment
-        .selectionMarkersEnabled ? sidebarUI.selectedSessionID : nil,
+      selectedSessionIDs: renderedSidebarSelection,
       bookmarkedSessionIDs: sidebarUI.bookmarkedSessionIds,
       isPersistenceAvailable: sidebarUI.isPersistenceAvailable,
       dateTimeConfiguration: dateTimeConfiguration,
@@ -251,17 +257,69 @@ struct SidebarSessionListColumn: View {
       SidebarSessionListContent(
         store: store,
         renderState: renderState,
+        activateSessionRow: activateSessionRow,
         toggleBookmark: { sessionID, projectID in
           store.toggleBookmark(sessionId: sessionID, projectId: projectID)
         },
         setCheckoutCollapsed: setCheckoutCollapsed
       )
     }
+    .onChange(of: sidebarUI.selectedSessionID, initial: true) { _, newValue in
+      syncSelectionFromStore(newValue)
+    }
     .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarSessionListContent)
     .accessibilityTestProbe(
       HarnessMonitorAccessibility.sidebarSessionListState,
       label: renderState.groupedStateAccessibilityLabel
     )
+  }
+
+  private func activateSessionRow(_ sessionID: String) {
+    let change = SidebarSessionListSelectionSync.semanticActivation(
+      sessionID: sessionID,
+      storeSelectedSessionID: sidebarUI.selectedSessionID
+    )
+    HarnessMonitorUITestTrace.record(
+      component: "sidebar.selection-semantic-press",
+      event: "activate",
+      details: [
+        "session_id": sessionID,
+        "previous_ids": localSelection.sorted().joined(separator: ","),
+        "store_selected_session_id": sidebarUI.selectedSessionID ?? "nil",
+      ]
+    )
+    applySelectionChange(change)
+  }
+
+  private func syncSelectionFromStore(_ sessionID: String?) {
+    let nextSelection = SidebarSessionListSelectionSync.selection(for: sessionID)
+    guard localSelection != nextSelection else {
+      return
+    }
+    HarnessMonitorUITestTrace.record(
+      component: "sidebar.selection-store-sync",
+      event: "applied",
+      details: [
+        "from_ids": localSelection.sorted().joined(separator: ","),
+        "to_ids": nextSelection.sorted().joined(separator: ","),
+        "store_selected_session_id": sessionID ?? "nil",
+      ]
+    )
+    localSelection = nextSelection
+  }
+
+  private func applySelectionChange(_ change: SidebarSessionListSelectionChange) {
+    localSelection = change.nextSelection
+    switch change.storeSelection {
+    case .unchanged:
+      return
+    case .cleared:
+      if sidebarUI.selectedSessionID != nil {
+        store.selectSessionFromList(nil)
+      }
+    case .selected(let sessionID):
+      store.selectSessionFromList(sessionID)
+    }
   }
 }
 
