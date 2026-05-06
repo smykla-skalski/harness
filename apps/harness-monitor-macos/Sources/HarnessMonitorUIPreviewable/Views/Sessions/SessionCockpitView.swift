@@ -60,7 +60,13 @@ struct SessionCockpitView: View {
         readableWidth: false,
         topScrollEdgeEffect: .soft,
         scrollSurfaceIdentifier: HarnessMonitorAccessibility.sessionCockpitScrollView,
-        scrollSurfaceLabel: "Session cockpit scroll view"
+        scrollSurfaceLabel: "Session cockpit scroll view",
+        underlay: {
+          ContentStatusBackdrop(
+            status: detail.session.status,
+            isStale: isSessionStatusStale
+          )
+        }
       ) {
         VStack(alignment: .leading, spacing: 16) {
           SessionCockpitHeaderCard(
