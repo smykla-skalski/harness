@@ -40,6 +40,25 @@ extension HarnessMonitorUITestCase {
     return true
   }
 
+  @discardableResult
+  func clickVisibleFrameMarker(
+    in app: XCUIApplication,
+    identifier: String,
+    normalizedOffset: CGVector
+  ) -> Bool {
+    guard
+      let coordinate = visibleFrameMarkerCoordinate(
+        in: app,
+        identifier: identifier,
+        normalizedOffset: normalizedOffset
+      )
+    else {
+      return false
+    }
+    coordinate.click()
+    return true
+  }
+
   func hasVisibleFrameMarker(
     in app: XCUIApplication,
     identifier: String
@@ -68,7 +87,8 @@ extension HarnessMonitorUITestCase {
 
   private func visibleFrameMarkerCoordinate(
     in app: XCUIApplication,
-    identifier: String
+    identifier: String,
+    normalizedOffset: CGVector = CGVector(dx: 0.5, dy: 0.5)
   ) -> XCUICoordinate? {
     let frameMarker = self.element(in: app, identifier: "\(identifier).frame")
     guard waitForElement(frameMarker, timeout: Self.fastPollInterval) else {
@@ -90,7 +110,14 @@ extension HarnessMonitorUITestCase {
       dy: min(4, max(visibleFrame.height / 4, 0))
     )
     let targetFrame = clampedFrame.isEmpty ? visibleFrame : clampedFrame
-    let targetPoint = CGPoint(x: targetFrame.midX, y: targetFrame.midY)
+    let clampedOffset = CGVector(
+      dx: min(max(normalizedOffset.dx, 0), 1),
+      dy: min(max(normalizedOffset.dy, 0), 1)
+    )
+    let targetPoint = CGPoint(
+      x: targetFrame.minX + (targetFrame.width * clampedOffset.dx),
+      y: targetFrame.minY + (targetFrame.height * clampedOffset.dy)
+    )
     guard !targetPoint.x.isNaN, !targetPoint.y.isNaN else {
       return nil
     }
