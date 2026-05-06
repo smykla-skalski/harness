@@ -91,4 +91,26 @@ struct SidebarSessionListSelectionSyncTests {
     #expect(change.nextSelection == ["sess5678"])
     #expect(change.storeSelection == .unchanged)
   }
+
+  @Test("explicit single selection collapses local selection and syncs the cockpit")
+  func explicitSingleSelectionSyncsToStore() {
+    let change = SidebarSessionListSelectionSync.explicitSingleSelection(
+      sessionID: "sess5678",
+      storeSelectedSessionID: "sess1234"
+    )
+
+    #expect(change.nextSelection == ["sess5678"])
+    #expect(change.storeSelection == .selected("sess5678"))
+  }
+
+  @Test("explicit single selection stays unchanged when the session is already selected")
+  func explicitSingleSelectionKeepsStoreSelectionWhenAlreadySelected() {
+    let change = SidebarSessionListSelectionSync.explicitSingleSelection(
+      sessionID: "sess5678",
+      storeSelectedSessionID: "sess5678"
+    )
+
+    #expect(change.nextSelection == ["sess5678"])
+    #expect(change.storeSelection == .unchanged)
+  }
 }

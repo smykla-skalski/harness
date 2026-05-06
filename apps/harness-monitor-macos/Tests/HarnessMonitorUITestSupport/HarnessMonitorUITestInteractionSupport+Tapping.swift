@@ -62,11 +62,12 @@ extension HarnessMonitorUITestCase {
     XCTFail("Failed to tap session row \(identifier)")
   }
 
-#if os(macOS)
+  #if os(macOS)
   func modifierClickSession(
     in app: XCUIApplication,
     identifier: String,
-    modifierFlags: XCUIElement.KeyModifierFlags
+    modifierFlags: XCUIElement.KeyModifierFlags,
+    settleAfterClick: Bool = true
   ) {
     let sessionRow = sessionTrigger(in: app, identifier: identifier)
     let elementCenterCoordinate = centerCoordinate(in: app, for: sessionRow)
@@ -121,7 +122,9 @@ extension HarnessMonitorUITestCase {
         sessionRow.click()
       }
     }
-    RunLoop.current.run(until: Date.now.addingTimeInterval(Self.fastPollInterval))
+    if settleAfterClick {
+      RunLoop.current.run(until: Date.now.addingTimeInterval(Self.fastPollInterval))
+    }
     recordDiagnosticsTrace(
       event: "tap-session.modifier.end",
       app: app,
@@ -131,7 +134,7 @@ extension HarnessMonitorUITestCase {
       ]
     )
   }
-#endif
+  #endif
 
   func terminateIfRunning(_ app: XCUIApplication) {
     HarnessMonitorUITestCase.terminateAndWait(app)
