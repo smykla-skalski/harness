@@ -115,7 +115,7 @@ struct MonitorTimelineSectionTests {
     let linkedEntries = nodes.filter { $0.kind == .linkedDecision }
 
     #expect(linkedEntries.map(\.id).sorted() == ["entry:supervisor", "entry:top-level"])
-    #expect(linkedEntries.allSatisfy { !$0.actions.isEmpty })
+    #expect(linkedEntries.allSatisfy { $0.decision?.actions.isEmpty == false })
   }
 
   @Test("Builder does not infer decision links from summary task agent or rule context")

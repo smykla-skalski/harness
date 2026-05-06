@@ -12,6 +12,7 @@ struct SessionTimelinePendingNavigation: Equatable, Sendable {
   let request: TimelineWindowRequest
   let sessionID: String
   let generation: Int
+  let baselineWindowStart: Int
 
   func isSatisfied(
     sessionID currentSessionID: String,
@@ -22,7 +23,19 @@ struct SessionTimelinePendingNavigation: Equatable, Sendable {
     }
     switch action {
     case .older, .newer:
-      return navigation.request(for: action) != request
+      let movedInRequestedDirection =
+        switch action {
+        case .older:
+          navigation.windowStart > baselineWindowStart
+        case .latest:
+          false
+        case .newer:
+          navigation.windowStart < baselineWindowStart || !navigation.hasNewer
+        }
+      guard movedInRequestedDirection else {
+        return false
+      }
+      return navigation.request(for: action) != request || !navigation.isLoading
     case .latest:
       return !navigation.hasNewer
     }

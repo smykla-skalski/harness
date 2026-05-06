@@ -269,6 +269,9 @@ struct HarnessMonitorStoreSelectionFlowTests {
     let cachedTimeline = Array(fullTimeline.dropFirst(2))
     let cachedWindow = TimelineWindowResponse.fallbackMetadata(for: cachedTimeline)
     let newestCursor = try #require(cachedWindow.newestCursor)
+    let refreshLimit = HarnessMonitorStoreSelectionTestSupport.timelineRefreshLimit(
+      loadedCount: cachedTimeline.count
+    )
     let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
       summaries: [summary],
       detailsByID: [summary.sessionId: detail],
@@ -298,7 +301,7 @@ struct HarnessMonitorStoreSelectionFlowTests {
       client.recordedTimelineWindowRequests(for: summary.sessionId) == [
         TimelineWindowRequest(
           scope: .summary,
-          limit: cachedTimeline.count,
+          limit: refreshLimit,
           after: newestCursor
         )
       ])
@@ -342,8 +345,10 @@ struct HarnessMonitorStoreSelectionFlowTests {
         payload: .object([:])
       )
     }
-    let pageSize = 10
-    let latestWindowEntries = Array(fullTimeline.prefix(pageSize))
+    let latestWindowSize = HarnessMonitorStoreSelectionTestSupport.initialTimelineWindowSize(
+      for: fullTimeline.count
+    )
+    let latestWindowEntries = Array(fullTimeline.prefix(latestWindowSize))
     let latestWindowResponse = TimelineWindowResponse(
       revision: 7,
       totalCount: fullTimeline.count,
@@ -373,7 +378,7 @@ struct HarnessMonitorStoreSelectionFlowTests {
 
     #expect(
       client.recordedTimelineWindowRequests(for: summary.sessionId) == [
-        .latest(limit: pageSize)
+        .latest(limit: latestWindowSize)
       ])
     #expect(client.readCallCount(.timeline(summary.sessionId)) == 0)
     #expect(store.timeline == latestWindowEntries)

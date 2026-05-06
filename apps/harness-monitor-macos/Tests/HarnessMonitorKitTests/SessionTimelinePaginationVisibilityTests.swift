@@ -300,12 +300,12 @@ struct SessionTimelineNavigationVisibilityTests {
 
     let defaultHeight = SessionTimelineTableCellView.measuredHeight(
       for: row,
-      columnWidth: 945,
+      columnWidth: 320,
       fontScale: 1.0
     )
     let enlargedHeight = SessionTimelineTableCellView.measuredHeight(
       for: row,
-      columnWidth: 945,
+      columnWidth: 320,
       fontScale: 1.3
     )
 

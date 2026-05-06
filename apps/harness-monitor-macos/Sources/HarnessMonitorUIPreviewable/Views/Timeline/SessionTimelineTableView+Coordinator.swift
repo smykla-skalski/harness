@@ -263,7 +263,7 @@ extension SessionTimelineTableView {
       // invoking the SwiftUI hosting-view layout. The incremental measurement
       // task fills in real heights asynchronously and calls noteHeightOfRows
       // per chunk so layout converges without blocking the session switch.
-      return SessionTimelineTableMetrics.estimatedHeight(for: rowData)
+      return SessionTimelineTableMetrics.estimatedHeight(for: rowData, fontScale: fontScale)
     }
 
     func tableView(

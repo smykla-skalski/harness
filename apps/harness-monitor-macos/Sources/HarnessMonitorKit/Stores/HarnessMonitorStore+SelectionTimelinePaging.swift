@@ -103,17 +103,38 @@ extension HarnessMonitorStore {
     selectedSession: SessionDetail
   ) {
     let resolvedTimeline: [TimelineEntry]
+    let resolvedTimelineWindow: TimelineWindowResponse?
     if response.windowStart == 0 || response.revision != currentRevision {
       resolvedTimeline = response.entries ?? timeline
+      resolvedTimelineWindow = normalizedTimelineWindow(
+        response.metadataOnly,
+        loadedTimeline: resolvedTimeline
+      )
     } else if let responseEntries = response.entries {
       resolvedTimeline = mergeTimelinePrefix(timeline, olderEntries: responseEntries)
+      resolvedTimelineWindow = TimelineWindowResponse(
+        revision: response.revision,
+        totalCount: max(response.totalCount, resolvedTimeline.count),
+        windowStart: 0,
+        windowEnd: resolvedTimeline.count,
+        hasOlder: response.hasOlder,
+        hasNewer: false,
+        oldestCursor: resolvedTimeline.last.map {
+          TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
+        },
+        newestCursor: resolvedTimeline.first.map {
+          TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
+        },
+        entries: nil,
+        unchanged: response.unchanged
+      )
     } else {
       resolvedTimeline = timeline
+      resolvedTimelineWindow = normalizedTimelineWindow(
+        response.metadataOnly,
+        loadedTimeline: resolvedTimeline
+      )
     }
-    let resolvedTimelineWindow = normalizedTimelineWindow(
-      response.metadataOnly,
-      loadedTimeline: resolvedTimeline
-    )
 
     withUISyncBatch {
       replaceSelectedTimelineSnapshot(

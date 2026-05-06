@@ -59,7 +59,7 @@ final class SessionTimelineTableCellView: NSTableCellView {
     fontScale: CGFloat = 1.0
   ) -> CGFloat {
     guard columnWidth > 1 else {
-      return SessionTimelineTableMetrics.estimatedHeight(for: row)
+      return SessionTimelineTableMetrics.estimatedHeight(for: row, fontScale: fontScale)
     }
     return autoreleasepool {
       sizingHost.rootView = SessionTimelineHostedRow(
@@ -70,7 +70,13 @@ final class SessionTimelineTableCellView: NSTableCellView {
       sizingHost.frame = NSRect(x: 0, y: 0, width: columnWidth, height: 2_000)
       sizingHost.layoutSubtreeIfNeeded()
       let measured = ceil(sizingHost.fittingSize.height)
-      return measured > 4 ? measured : SessionTimelineTableMetrics.estimatedHeight(for: row)
+      guard measured > 4 else {
+        return SessionTimelineTableMetrics.estimatedHeight(for: row, fontScale: fontScale)
+      }
+      return max(
+        measured,
+        SessionTimelineTableMetrics.minimumCardHeight(for: row, fontScale: fontScale)
+      )
     }
   }
 

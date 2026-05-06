@@ -171,7 +171,7 @@ extension HarnessMonitorStoreSelectionFlowTests {
       workerID: "worker-fallback",
       workerName: "Worker Fallback"
     )
-    let fullTimeline = (0..<25).map { index in
+    let fullTimeline = (0..<50).map { index in
       TimelineEntry(
         entryId: "cache-revisit-fallback-\(index)",
         recordedAt: String(format: "2026-04-16T11:%02d:00Z", 59 - index),
@@ -183,9 +183,12 @@ extension HarnessMonitorStoreSelectionFlowTests {
         payload: .object([:])
       )
     }
-    let cachedTimeline = Array(fullTimeline.dropFirst(15))
+    let cachedTimeline = Array(fullTimeline.dropFirst(40))
     let cachedWindow = TimelineWindowResponse.fallbackMetadata(for: cachedTimeline)
     let newestCursor = try #require(cachedWindow.newestCursor)
+    let refreshLimit = HarnessMonitorStoreSelectionTestSupport.timelineRefreshLimit(
+      loadedCount: cachedTimeline.count
+    )
     let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
       summaries: [summary],
       detailsByID: [summary.sessionId: detail],
@@ -211,14 +214,14 @@ extension HarnessMonitorStoreSelectionFlowTests {
       client.recordedTimelineWindowRequests(for: summary.sessionId) == [
         TimelineWindowRequest(
           scope: .summary,
-          limit: cachedTimeline.count,
+          limit: refreshLimit,
           after: newestCursor
         ),
-        .latest(limit: cachedTimeline.count),
+        .latest(limit: refreshLimit),
       ])
-    #expect(store.timeline == Array(fullTimeline.prefix(cachedTimeline.count)))
+    #expect(store.timeline == Array(fullTimeline.prefix(refreshLimit)))
     #expect(store.timelineWindow?.totalCount == fullTimeline.count)
-    #expect(store.timelineWindow?.windowEnd == cachedTimeline.count)
+    #expect(store.timelineWindow?.windowEnd == refreshLimit)
   }
 }
 

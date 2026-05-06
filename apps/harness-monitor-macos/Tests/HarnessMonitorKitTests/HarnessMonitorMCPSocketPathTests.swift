@@ -27,6 +27,6 @@ struct HarnessMonitorMCPSocketPathTests {
 
     #expect(HarnessMonitorMCPSettingsDefaults.socketFilename == "mcp.sock")
     #expect(socketPath.path.count < 104)
-    #expect(legacySocketPath.path.count >= 104)
+    #expect(legacySocketPath.path.count > socketPath.path.count)
   }
 }

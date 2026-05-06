@@ -124,6 +124,9 @@ struct AcpAgentIdentityCrosswalk {
         registration.flatMap { registration in
           descriptorLinkagesByIdentity[AcpDescriptorID(rawValue: registration.runtime)]
         }
+        ?? sessionAgentIdentity.flatMap { sessionAgentIdentity in
+          descriptorLinkagesByIdentity[AcpDescriptorID(rawValue: sessionAgentIdentity.rawValue)]
+        }
       let displayName =
         snapshot?.displayName
         ?? inspect?.displayName
