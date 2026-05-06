@@ -292,7 +292,7 @@ struct SessionCockpitHeaderCard: View {
 }
 
 private func sessionHeaderMetadata(_ session: SessionSummary) -> String {
-  "\(session.projectName) • \(session.worktreeDisplayName) • \(session.sessionId)"
+  "\(session.projectName) • \(session.worktreeDisplayName)"
 }
 
 @MainActor
