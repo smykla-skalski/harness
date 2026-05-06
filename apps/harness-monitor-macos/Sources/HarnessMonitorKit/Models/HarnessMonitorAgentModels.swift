@@ -277,14 +277,8 @@ public struct AgentRegistration: Codable, Equatable, Identifiable, Sendable {
   }
 
   public init(from decoder: Decoder) throws {
-    // Accept older cached payloads during the identity migration; new encodes
-    // below write only the canonical session/runtime identity fields. Remove
-    // these decode fallbacks once supported daemon and persisted-state
-    // versions are canonical-only.
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    agentId =
-      try container.decodeIfPresent(String.self, forKey: .sessionAgentId)
-      ?? container.decode(String.self, forKey: .agentId)
+    agentId = try container.decode(String.self, forKey: .sessionAgentId)
     name = try container.decode(String.self, forKey: .name)
     if let runtime = try? container.decode(String.self, forKey: .runtime) {
       self.runtime = runtime
@@ -296,9 +290,7 @@ public struct AgentRegistration: Codable, Equatable, Identifiable, Sendable {
     joinedAt = try container.decode(String.self, forKey: .joinedAt)
     updatedAt = try container.decode(String.self, forKey: .updatedAt)
     status = try container.decode(AgentStatus.self, forKey: .status)
-    agentSessionId =
-      try container.decodeIfPresent(String.self, forKey: .runtimeSessionId)
-      ?? container.decodeIfPresent(String.self, forKey: .agentSessionId)
+    agentSessionId = try container.decodeIfPresent(String.self, forKey: .runtimeSessionId)
     if let managedAgent = try container.decodeIfPresent(ManagedAgentRef.self, forKey: .managedAgent) {
       self.managedAgent = managedAgent
     } else if

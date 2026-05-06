@@ -176,7 +176,10 @@ impl AcpAgentManagerHandle {
 
     pub(super) fn session(&self, acp_id: &str) -> Result<Arc<ActiveAcpSession>, CliError> {
         self.sessions_guard()?.get(acp_id).cloned().ok_or_else(|| {
-            CliErrorKind::session_not_active(format!("ACP session '{acp_id}' not found")).into()
+            CliErrorKind::session_not_active(format!(
+                "ACP managed agent '{acp_id}' not found; expected managed_agent_id (acp_id)"
+            ))
+            .into()
         })
     }
 

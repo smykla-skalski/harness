@@ -65,9 +65,7 @@ public struct AcpPermissionBatch: Codable, Equatable, Identifiable, Sendable {
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     batchId = try container.decode(String.self, forKey: .batchId)
-    acpId =
-      try container.decodeIfPresent(String.self, forKey: .managedAgentId)
-      ?? container.decode(String.self, forKey: .acpId)
+    acpId = try container.decode(String.self, forKey: .managedAgentId)
     sessionId = try container.decode(String.self, forKey: .sessionId)
     requests = try container.decode([AcpPermissionItem].self, forKey: .requests)
     createdAt = try container.decode(String.self, forKey: .createdAt)
@@ -220,13 +218,9 @@ public struct AcpAgentSnapshot: Codable, Equatable, Identifiable, Sendable {
 
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    acpId =
-      try container.decodeIfPresent(String.self, forKey: .managedAgentId)
-      ?? container.decode(String.self, forKey: .acpId)
+    acpId = try container.decode(String.self, forKey: .managedAgentId)
     sessionId = try container.decode(String.self, forKey: .sessionId)
-    agentId =
-      try container.decodeIfPresent(String.self, forKey: .sessionAgentId)
-      ?? container.decode(String.self, forKey: .agentId)
+    agentId = try container.decode(String.self, forKey: .sessionAgentId)
     displayName = try container.decode(String.self, forKey: .displayName)
     status = try container.decode(AgentStatus.self, forKey: .status)
     pid = try container.decode(UInt32.self, forKey: .pid)

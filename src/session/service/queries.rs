@@ -22,7 +22,9 @@ pub fn session_status(session_id: &str, project_dir: &Path) -> Result<SessionSta
     reconcile_expired_pending_signals(session_id, project_dir)?;
     let mut state = visible_local_session_state(load_state_or_err(session_id, project_dir)?)
         .ok_or_else(|| {
-            CliErrorKind::session_not_active(format!("session '{session_id}' not found"))
+            CliErrorKind::session_not_active(format!(
+                "harness session '{session_id}' not found"
+            ))
         })?;
     state.metrics = SessionMetrics::recalculate(&state);
     Ok(state)

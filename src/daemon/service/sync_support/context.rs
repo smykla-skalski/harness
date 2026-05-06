@@ -16,7 +16,7 @@ pub(crate) fn resolve_hook_agent(runtime_name: &str) -> Option<HookAgent> {
 }
 
 pub(crate) fn session_not_found(session_id: &str) -> CliError {
-    CliErrorKind::session_not_active(format!("session '{session_id}' not found")).into()
+    CliErrorKind::session_not_active(format!("harness session '{session_id}' not found")).into()
 }
 
 pub(crate) fn project_dir_for_db_session(

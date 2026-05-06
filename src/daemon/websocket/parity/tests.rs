@@ -102,56 +102,82 @@ async fn parity_concurrent_mutation_serializes_acp_start_by_session_and_agent() 
 
 #[tokio::test]
 async fn dispatch_managed_agent_start_acp_rejects_missing_session_before_spawn() {
-    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
-        let state = super::super::test_support::test_http_state_with_db();
-        let request = WsRequest {
-            id: "req-start-stale-acp".into(),
-            method: "managed_agent.start_acp".into(),
-            params: json!({
-                "session_id": "nod8ccog",
-                "agent": "copilot",
-            }),
-            trace_context: None,
-        };
+    let tmp = tempdir().expect("tempdir");
+    temp_env::async_with_vars(
+        [
+            ("HARNESS_FEATURE_ACP", Some("1")),
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 tempdir path")),
+            ),
+            ("CLAUDE_SESSION_ID", Some("ws-acp-missing-session")),
+        ],
+        async {
+            let state = super::super::test_support::test_http_state_with_db();
+            let request = WsRequest {
+                id: "req-start-stale-acp".into(),
+                method: "managed_agent.start_acp".into(),
+                params: json!({
+                    "session_id": "nod8ccog",
+                    "descriptor_id": "copilot",
+                }),
+                trace_context: None,
+            };
 
-        let response = dispatch_managed_agent_start_acp(&request, &state).await;
+            let response = dispatch_managed_agent_start_acp(&request, &state).await;
 
-        let error = response.error.expect("missing-session error");
-        assert_eq!(error.code, "KSRCLI090");
-        assert!(
-            error.message.contains("session 'nod8ccog' not found"),
-            "unexpected error message: {}",
-            error.message
-        );
-    })
+            let error = response.error.expect("missing-session error");
+            assert_eq!(error.code, "KSRCLI090");
+            assert!(
+                error
+                    .message
+                    .contains("harness session 'nod8ccog' not found"),
+                "unexpected error message: {}",
+                error.message
+            );
+        },
+    )
     .await;
 }
 
 #[tokio::test]
 async fn dispatch_managed_agent_start_acp_rejects_archived_session_before_spawn() {
-    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
-        let state = super::super::test_support::test_http_state_with_db();
-        super::super::test_support::archive_sample_session(&state);
-        let request = WsRequest {
-            id: "req-start-archived-acp".into(),
-            method: "managed_agent.start_acp".into(),
-            params: json!({
-                "session_id": "sess-test-1",
-                "agent": "copilot",
-            }),
-            trace_context: None,
-        };
+    let tmp = tempdir().expect("tempdir");
+    temp_env::async_with_vars(
+        [
+            ("HARNESS_FEATURE_ACP", Some("1")),
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 tempdir path")),
+            ),
+            ("CLAUDE_SESSION_ID", Some("ws-acp-archived-session")),
+        ],
+        async {
+            let state = super::super::test_support::test_http_state_with_db();
+            super::super::test_support::archive_sample_session(&state);
+            let request = WsRequest {
+                id: "req-start-archived-acp".into(),
+                method: "managed_agent.start_acp".into(),
+                params: json!({
+                    "session_id": "sess-test-1",
+                    "descriptor_id": "copilot",
+                }),
+                trace_context: None,
+            };
 
-        let response = dispatch_managed_agent_start_acp(&request, &state).await;
+            let response = dispatch_managed_agent_start_acp(&request, &state).await;
 
-        let error = response.error.expect("archived-session error");
-        assert_eq!(error.code, "KSRCLI090");
-        assert!(
-            error.message.contains("session 'sess-test-1' not found"),
-            "unexpected error message: {}",
-            error.message
-        );
-    })
+            let error = response.error.expect("archived-session error");
+            assert_eq!(error.code, "KSRCLI090");
+            assert!(
+                error
+                    .message
+                    .contains("harness session 'sess-test-1' not found"),
+                "unexpected error message: {}",
+                error.message
+            );
+        },
+    )
     .await;
 }
 

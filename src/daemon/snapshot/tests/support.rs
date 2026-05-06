@@ -19,6 +19,7 @@ use crate::session::types::{
 };
 
 pub(super) const OBSERVE_ID: &str = "observe-sess-merge";
+const RUNTIME_SESSION_ID: &str = "codex-session-1";
 
 pub(super) fn write_json(path: &Path, value: &impl serde::Serialize) {
     if let Some(parent) = path.parent() {
@@ -45,7 +46,7 @@ pub(super) fn write_json_line(path: &Path, value: &impl serde::Serialize) {
 }
 
 pub(super) fn sample_state(session_id: &str) -> SessionState {
-    sample_state_for_runtime(session_id, "codex", "codex-session-1")
+    sample_state_for_runtime(session_id, "codex", RUNTIME_SESSION_ID)
 }
 
 pub(super) fn sample_state_for_runtime(
@@ -228,9 +229,19 @@ pub(super) fn seed_snapshot_fixture(context_root: &Path, session_id: &str) {
         .join("state.json");
     write_json(&state_path, &sample_state(session_id));
 
-    let signal_dir = context_root.join("agents/signals/codex").join(session_id);
-    write_signal_file(&signal_dir, &sample_signal("sig-pending", "keep going"))
-        .expect("write pending signal");
+    let signal_dir = context_root
+        .join("agents/signals/codex")
+        .join(RUNTIME_SESSION_ID);
+    let pending_idempotency_key = format!("{session_id}:codex-worker:keep going");
+    write_signal_file(
+        &signal_dir,
+        &sample_signal_with_idempotency(
+            "sig-pending",
+            "keep going",
+            Some(&pending_idempotency_key),
+        ),
+    )
+    .expect("write pending signal");
 
     let signal = sample_signal("sig-acked", "merged timeline");
     write_signal_file(&signal_dir, &signal).expect("write acked signal");

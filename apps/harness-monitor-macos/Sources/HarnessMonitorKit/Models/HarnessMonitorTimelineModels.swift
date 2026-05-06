@@ -214,9 +214,7 @@ public struct AcpEventBatchPayload: Codable, Equatable, Sendable {
 
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    acpId =
-      try container.decodeIfPresent(String.self, forKey: .managedAgentId)
-      ?? container.decode(String.self, forKey: .acpId)
+    acpId = try container.decode(String.self, forKey: .managedAgentId)
     sessionId = try container.decode(String.self, forKey: .sessionId)
     rawCount = try container.decode(Int.self, forKey: .rawCount)
     events = try container.decode([AcpConversationEvent].self, forKey: .events)

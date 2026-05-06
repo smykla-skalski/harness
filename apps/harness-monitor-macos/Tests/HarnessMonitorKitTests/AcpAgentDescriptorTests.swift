@@ -103,10 +103,8 @@ final class AcpAgentDescriptorTests: XCTestCase {
     let json = Data(
       """
       {
-        "acp_id": "legacy-acp",
         "managed_agent_id": "acp-1",
         "session_id": "session-1",
-        "agent_id": "legacy-agent",
         "session_agent_id": "copilot",
         "display_name": "GitHub Copilot",
         "pid": 123,
@@ -140,9 +138,9 @@ final class AcpAgentDescriptorTests: XCTestCase {
     let json = Data(
       """
       {
-        "acp_id": "acp-1",
+        "managed_agent_id": "acp-1",
         "session_id": "session-1",
-        "agent_id": "copilot",
+        "session_agent_id": "copilot",
         "display_name": "GitHub Copilot",
         "pid": 123,
         "pgid": 123,
@@ -190,14 +188,12 @@ final class AcpAgentDescriptorTests: XCTestCase {
     XCTAssertEqual(request.descriptorIdentity, descriptor.descriptorIdentity)
   }
 
-  func testAcpSnapshotPrefersExplicitIdentityFields() throws {
+  func testAcpSnapshotDecodesCanonicalIdentityFields() throws {
     let json = Data(
       """
       {
-        "acp_id": "legacy-acp",
         "managed_agent_id": "acp-1",
         "session_id": "session-1",
-        "agent_id": "legacy-agent",
         "session_agent_id": "agent-1",
         "display_name": "GitHub Copilot",
         "status": "active",
@@ -226,7 +222,6 @@ final class AcpAgentDescriptorTests: XCTestCase {
     let json = Data(
       """
       {
-        "acp_id": "legacy-acp",
         "managed_agent_id": "acp-1",
         "managed_agent_family": "acp",
         "session_id": "session-1",

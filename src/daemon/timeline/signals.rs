@@ -1,7 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
-use crate::agents::runtime::legacy_compatible_signal_session_keys;
 use crate::agents::runtime::signal::{
     Signal, SignalAck, read_acknowledged_signals, read_acknowledgments,
 };
@@ -32,23 +31,19 @@ pub(super) fn signal_ack_entries(
     let mut signals_by_id = BTreeMap::new();
 
     for agent in state.agents.values() {
-        for signal_session_id in legacy_compatible_signal_session_keys(
-            &state.session_id,
-            agent.agent_session_id.as_deref(),
-        ) {
-            let signal_dir = signals_root
-                .join(agent.runtime.runtime_name())
-                .join(signal_session_id);
-            for acknowledgment in read_acknowledgments(&signal_dir)? {
-                acknowledgments_by_id
-                    .entry(acknowledgment.signal_id.clone())
-                    .or_insert((agent.runtime.clone(), acknowledgment));
-            }
-            for signal in read_acknowledged_signals(&signal_dir)? {
-                signals_by_id
-                    .entry(signal.signal_id.clone())
-                    .or_insert(signal);
-            }
+        let signal_session_id = agent.runtime_session_key(&state.session_id);
+        let signal_dir = signals_root
+            .join(agent.runtime.runtime_name())
+            .join(signal_session_id);
+        for acknowledgment in read_acknowledgments(&signal_dir)? {
+            acknowledgments_by_id
+                .entry(acknowledgment.signal_id.clone())
+                .or_insert((agent.runtime.clone(), acknowledgment));
+        }
+        for signal in read_acknowledged_signals(&signal_dir)? {
+            signals_by_id
+                .entry(signal.signal_id.clone())
+                .or_insert(signal);
         }
     }
 

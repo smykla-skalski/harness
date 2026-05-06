@@ -65,7 +65,7 @@ pub(crate) fn save_state(layout: &SessionLayout, state: &SessionState) -> Result
     let _ = state_repository(layout).update(|current| {
         if current.is_none() {
             return Err(CliErrorKind::session_not_active(format!(
-                "session '{session_id}' not found"
+                "harness session '{session_id}' not found"
             ))
             .into());
         }
@@ -87,7 +87,7 @@ where
         .update(|state| {
             let Some(mut state) = state else {
                 return Err(CliErrorKind::session_not_active(format!(
-                    "session '{session_id}' not found"
+                    "harness session '{session_id}' not found"
                 ))
                 .into());
             };
@@ -98,7 +98,10 @@ where
         })
         .and_then(|result| {
             result.ok_or_else(|| {
-                CliErrorKind::session_not_active(format!("session '{session_id}' not found")).into()
+                CliErrorKind::session_not_active(format!(
+                    "harness session '{session_id}' not found"
+                ))
+                .into()
             })
         })
 }
@@ -123,7 +126,7 @@ where
         .update(|state| {
             let Some(mut state) = state else {
                 return Err(CliErrorKind::session_not_active(format!(
-                    "session '{session_id}' not found"
+                    "harness session '{session_id}' not found"
                 ))
                 .into());
             };
@@ -136,7 +139,10 @@ where
         })
         .and_then(|result| {
             result.ok_or_else(|| {
-                CliErrorKind::session_not_active(format!("session '{session_id}' not found")).into()
+                CliErrorKind::session_not_active(format!(
+                    "harness session '{session_id}' not found"
+                ))
+                .into()
             })
         })
 }

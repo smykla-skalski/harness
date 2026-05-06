@@ -73,7 +73,10 @@ pub fn resolve_session(session_id: &str) -> Result<ResolvedSession, CliError> {
 
     match matches.len() {
         0 => Err(
-            CliErrorKind::session_not_active(format!("session '{session_id}' not found")).into(),
+            CliErrorKind::session_not_active(format!(
+                "harness session '{session_id}' not found"
+            ))
+            .into(),
         ),
         1 => Ok(matches.swap_remove(0)),
         _ => Err(CliErrorKind::session_ambiguous(format!(

@@ -150,24 +150,14 @@ fn signal_dirs_in_context_root_do_not_rehash_existing_context_root() {
 
         assert_eq!(
             signal_dirs,
-            vec![
-                (
-                    "signal-root-worker".to_string(),
-                    context_root
-                        .join("agents")
-                        .join("signals")
-                        .join("codex")
-                        .join("signal-root-worker"),
-                ),
-                (
-                    "signal-root-session".to_string(),
-                    context_root
-                        .join("agents")
-                        .join("signals")
-                        .join("codex")
-                        .join("signal-root-session"),
-                ),
-            ]
+            vec![(
+                "signal-root-worker".to_string(),
+                context_root
+                    .join("agents")
+                    .join("signals")
+                    .join("codex")
+                    .join("signal-root-worker"),
+            )]
         );
     });
 }

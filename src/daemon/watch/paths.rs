@@ -56,11 +56,7 @@ pub(super) fn watch_target_from_path_with_cache(
         },
         &mut |context_root, runtime_name, signal_session_key| {
             let project = index::discovered_project_for_context_root(context_root);
-            index::resolve_session_id_for_signal_session_key(
-                &project,
-                runtime_name,
-                signal_session_key,
-            )
+            index::resolve_session_id_for_runtime_session(&project, runtime_name, signal_session_key)
         },
     )
 }
