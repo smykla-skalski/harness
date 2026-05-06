@@ -81,6 +81,18 @@ class MonitorLaneHelperTests(unittest.TestCase):
             "/repo-common/xcode-derived-lanes/agent-session-123",
         )
 
+    def test_shared_derived_data_helper_ignores_active_build_lane(self) -> None:
+        env = base_env()
+        env["HARNESS_MONITOR_BUILD_LANE"] = "Agent Session 123"
+
+        completed = run_helper(
+            'harness_monitor_shared_derived_data_path "/repo-common"',
+            env,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(completed.stdout.strip(), "/repo-common/xcode-derived")
+
     def test_runtime_lane_defaults_to_worktree_stable_slug(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             checkout_root = Path(tmp_dir) / "harness-worktree"

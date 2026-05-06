@@ -124,6 +124,14 @@ class PostGenerateScriptTests(unittest.TestCase):
                         str(repo_root / "xcode-derived"),
                         settings_path.read_text(),
                     )
+            self.assertIn(
+                '"build_root": "../../xcode-derived"',
+                (app_root / "buildServer.json").read_text(),
+            )
+            self.assertIn(
+                '"build_root": "xcode-derived"',
+                (repo_root / "buildServer.json").read_text(),
+            )
 
             generated_entitlements_dir = (
                 repo_root
@@ -176,7 +184,7 @@ class PostGenerateScriptTests(unittest.TestCase):
                     self.assertIn(f"runtime-lanes/{default_lane}", scheme)
                     self.assertIn('key="HARNESS_CODEX_WS_PORT"', scheme)
 
-    def test_post_generate_uses_laned_derived_data_when_build_lane_is_set(
+    def test_post_generate_keeps_tracked_build_server_stable_when_build_lane_is_set(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -258,11 +266,11 @@ class PostGenerateScriptTests(unittest.TestCase):
                     self.assertIn(str(laned_root), settings_path.read_text())
 
             self.assertIn(
-                '"build_root": "../../xcode-derived-lanes/bart-dev"',
+                '"build_root": "../../xcode-derived"',
                 (app_root / "buildServer.json").read_text(),
             )
             self.assertIn(
-                '"build_root": "xcode-derived-lanes/bart-dev"',
+                '"build_root": "xcode-derived"',
                 (repo_root / "buildServer.json").read_text(),
             )
 

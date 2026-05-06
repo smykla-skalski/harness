@@ -124,11 +124,16 @@ harness_monitor_build_derived_data_path() {
   fi
   lane="$(harness_monitor_build_lane)"
   case "$lane" in
-    default) printf '%s/xcode-derived\n' "$common_repo_root" ;;
+    default) harness_monitor_shared_derived_data_path "$common_repo_root" ;;
     e2e) printf '%s/xcode-derived-e2e\n' "$common_repo_root" ;;
     instruments) printf '%s/xcode-derived-instruments\n' "$common_repo_root" ;;
     *) printf '%s/xcode-derived-lanes/%s\n' "$common_repo_root" "$lane" ;;
   esac
+}
+
+harness_monitor_shared_derived_data_path() {
+  local common_repo_root="$1"
+  printf '%s/xcode-derived\n' "$common_repo_root"
 }
 
 harness_monitor_runtime_app_group_id() {
