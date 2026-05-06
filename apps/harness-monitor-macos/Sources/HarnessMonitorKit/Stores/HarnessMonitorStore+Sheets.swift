@@ -182,6 +182,16 @@ extension HarnessMonitorStore {
         details: ["session_id": sessionID]
       )
       _ = await removeSession(sessionID: sessionID, actorID: actorID)
+    case .removeSessions(let sessionIDs, let actorID):
+      HarnessMonitorUITestTrace.record(
+        component: "store.confirmation",
+        event: "dispatch-remove-sessions",
+        details: [
+          "session_count": String(sessionIDs.count),
+          "session_ids": sessionIDs.joined(separator: ","),
+        ]
+      )
+      _ = await removeSessions(sessionIDs: sessionIDs, actorID: actorID)
     case .deleteTask(let sessionID, let taskID, _, let actorID, let noteCount):
       _ = await deleteTask(
         sessionID: sessionID,

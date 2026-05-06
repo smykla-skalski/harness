@@ -99,6 +99,28 @@ extension HarnessMonitorStore {
     }
   }
 
+  @discardableResult
+  func removeSessions(
+    sessionIDs: [String],
+    actorID: String
+  ) async -> Bool {
+    guard !sessionIDs.isEmpty else {
+      return false
+    }
+
+    for sessionID in sessionIDs {
+      guard await removeSession(sessionID: sessionID, actorID: actorID) else {
+        return false
+      }
+    }
+
+    if sessionIDs.count > 1 {
+      presentSuccessFeedback("Removed \(sessionIDs.count) sessions")
+    }
+
+    return true
+  }
+
   private func archiveAndFinalizeRemovedSession(
     sessionID: String,
     actorID: String,
