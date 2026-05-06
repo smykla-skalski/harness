@@ -186,6 +186,26 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testCockpitHeaderDoesNotExposeRawSessionID() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "cockpit"]
+    )
+    let sessionRow = previewSessionTrigger(in: app)
+    let headerCard = element(in: app, identifier: Accessibility.sessionHeaderCard)
+
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
+    tapPreviewSession(in: app)
+    XCTAssertTrue(waitForElement(headerCard, timeout: Self.actionTimeout))
+    XCTAssertEqual(
+      headerCard.descendants(matching: .any).matching(
+        NSPredicate(format: "label CONTAINS %@", "sess1234")
+      ).count,
+      0,
+      "Cockpit header should not surface raw session IDs below the session title"
+    )
+  }
+
   func testCockpitNewTaskButtonSharesTasksHeaderRow() throws {
     let app = launch(
       mode: "preview",
