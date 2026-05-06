@@ -17,21 +17,25 @@ harness_monitor_apply_runtime_lane_environment "$REPO_ROOT"
 
 DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$(harness_monitor_build_derived_data_path "$REPO_ROOT")}"
 export XCODEBUILD_DERIVED_DATA_PATH="$DERIVED_DATA_PATH"
+# Keep tracked buildServer configs stable even when an isolated build lane is
+# active. Lane-specific DerivedData belongs in workspace settings and explicit
+# CLI invocations, not in checked-in repo files.
+BUILD_SERVER_DERIVED_DATA_PATH="$(harness_monitor_shared_derived_data_path "$REPO_ROOT")"
 
 build_server_build_root_for_app_root() {
-  if [[ "$DERIVED_DATA_PATH" == "$REPO_ROOT/"* ]]; then
-    printf '../../%s\n' "${DERIVED_DATA_PATH#"$REPO_ROOT"/}"
+  if [[ "$BUILD_SERVER_DERIVED_DATA_PATH" == "$REPO_ROOT/"* ]]; then
+    printf '../../%s\n' "${BUILD_SERVER_DERIVED_DATA_PATH#"$REPO_ROOT"/}"
     return 0
   fi
-  printf '%s\n' "$DERIVED_DATA_PATH"
+  printf '%s\n' "$BUILD_SERVER_DERIVED_DATA_PATH"
 }
 
 build_server_build_root_for_repo_root() {
-  if [[ "$DERIVED_DATA_PATH" == "$REPO_ROOT/"* ]]; then
-    printf '%s\n' "${DERIVED_DATA_PATH#"$REPO_ROOT"/}"
+  if [[ "$BUILD_SERVER_DERIVED_DATA_PATH" == "$REPO_ROOT/"* ]]; then
+    printf '%s\n' "${BUILD_SERVER_DERIVED_DATA_PATH#"$REPO_ROOT"/}"
     return 0
   fi
-  printf '%s\n' "$DERIVED_DATA_PATH"
+  printf '%s\n' "$BUILD_SERVER_DERIVED_DATA_PATH"
 }
 
 write_build_server_config() {
