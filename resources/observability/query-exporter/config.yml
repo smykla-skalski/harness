@@ -100,7 +100,7 @@ queries:
       UNION ALL
       SELECT 'cached_observer' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM ZCACHEDOBSERVER
       UNION ALL
-      SELECT 'project_filter_preferences' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM ZPROJECTFILTERPREFERENCE
+      SELECT 'project_filter_settings' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM ZPROJECTFILTERPREFERENCE
       UNION ALL
       SELECT 'recent_searches' AS entity, COUNT(*) AS harness_sqlite_table_rows FROM ZRECENTSEARCH
       UNION ALL

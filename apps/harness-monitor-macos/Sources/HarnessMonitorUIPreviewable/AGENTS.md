@@ -12,7 +12,7 @@ The layout follows the common large-SwiftUI pattern of feature-local folders plu
   - `App/`
   - `Attention/`
   - `Decisions/`
-  - `Preferences/`
+  - `Settings/`
   - `Review/`
   - `Sessions/`
   - `Shared/`
@@ -34,13 +34,13 @@ The layout follows the common large-SwiftUI pattern of feature-local folders plu
 2. Dedicated preview files live in the nearest `Previews/` folder and use a leading `Preview` prefix, for example `PreviewWorkspaceWindowView.swift`.
 3. Do not introduce trailing preview suffixes such as `+Preview`, `+Previews`, `Previews`, or one-off names like `CrowdedPreview` for new files.
 4. Runtime implementation files should not contain `#Preview`; add or update a mirrored companion in `Previews/` instead.
-5. Keep preview-only helpers private and next to the preview file unless they are reused by multiple preview files in the same domain; only then promote them to a clearly named support file such as `PreferencesPreviewSupport.swift`.
+5. Keep preview-only helpers private and next to the preview file unless they are reused by multiple preview files in the same domain; only then promote them to a clearly named support file such as `SettingsPreviewSupport.swift`.
 
 ## Domain notes
 
 - `Workspace/Window/` holds `WorkspaceWindowView` and its extensions/support strips.
 - `Workspace/Sidebar/` holds workspace sidebar-specific surfaces.
-- `Preferences/Supervisor/` holds supervisor-specific preferences panes and their split helpers.
+- `Settings/Supervisor/` holds supervisor-specific settings panes and their split helpers.
 - `Shared/` is only for reusable UI primitives used by multiple domains. If a file serves one feature, keep it in that feature.
 
 ## Navigation discipline

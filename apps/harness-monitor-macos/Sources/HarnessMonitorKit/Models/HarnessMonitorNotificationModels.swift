@@ -183,9 +183,9 @@ public struct HarnessMonitorNotificationDraft: Equatable, Sendable {
   public init(
     title: String = "Harness Monitor",
     subtitle: String = "Manual notification test",
-    body: String = "This notification was scheduled from Preferences",
+    body: String = "This notification was scheduled from Settings",
     threadIdentifier: String = "manual-tests",
-    targetContentIdentifier: String = "preferences-notifications",
+    targetContentIdentifier: String = "settings-notifications",
     filterCriteria: String = "manual",
     summaryArgument: String = "Harness Monitor",
     summaryArgumentCount: Int = 1,

@@ -51,7 +51,7 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     measureScenario("settings-background-cycle", includeMemoryMetric: true)
   }
 
-  func testPreferencesDatabaseScrollHitchRate() {
+  func testSettingsDatabaseScrollHitchRate() {
     let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
     let options = XCTMeasureOptions()
     options.iterationCount = 3
@@ -65,7 +65,7 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
         "HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard",
       ]
       guard
-        configureIsolatedDataHome(for: app, purpose: "preferences-database-scroll") != nil
+        configureIsolatedDataHome(for: app, purpose: "settings-database-scroll") != nil
       else {
         return
       }
@@ -73,8 +73,8 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
       app.launch()
 
       openSettings(in: app)
-      let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
-      XCTAssertTrue(waitForElement(preferencesRoot, timeout: Self.uiTimeout))
+      let settingsRoot = element(in: app, identifier: Accessibility.settingsRoot)
+      XCTAssertTrue(waitForElement(settingsRoot, timeout: Self.uiTimeout))
 
       let databaseItem = button(in: app, title: "Database")
       XCTAssertTrue(waitForElement(databaseItem, timeout: Self.actionTimeout))
@@ -87,7 +87,7 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
         return
       }
 
-      let title = element(in: app, identifier: Accessibility.preferencesTitle)
+      let title = element(in: app, identifier: Accessibility.settingsTitle)
       XCTAssertTrue(
         waitUntil(timeout: Self.actionTimeout) {
           title.exists && title.label == "Database"

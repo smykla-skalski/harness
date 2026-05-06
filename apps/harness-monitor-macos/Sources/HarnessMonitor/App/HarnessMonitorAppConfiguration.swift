@@ -19,7 +19,7 @@ struct HarnessMonitorAppConfiguration {
   let defersInitialMainWindowUntilBootstrap: Bool
   let mainWindowDefaultSize: CGSize
   let perfScenario: HarnessMonitorPerfScenario?
-  let preferencesInitialSection: PreferencesSection
+  let settingsInitialSection: SettingsSection
   let environment: HarnessMonitorEnvironment
 
   @MainActor
@@ -79,7 +79,7 @@ struct HarnessMonitorAppConfiguration {
         isUITesting: isUITesting
       ),
       perfScenario: perfScenario,
-      preferencesInitialSection: perfScenario?.initialPreferencesSection ?? .general,
+      settingsInitialSection: perfScenario?.initialSettingsSection ?? .general,
       environment: resolvedEnvironment
     )
   }
@@ -307,79 +307,79 @@ struct HarnessMonitorAppConfiguration {
 
   private static func applyVoiceUITestDefaults(environment: HarnessMonitorEnvironment) {
     let localeIdentifier = voiceStringOverride(
-      environment.values[HarnessMonitorVoicePreferencesDefaults.uiTestLocaleIdentifierOverrideKey],
-      fallback: HarnessMonitorVoicePreferences.uiTestDefaultLocaleIdentifier
+      environment.values[HarnessMonitorVoiceSettingsDefaults.uiTestLocaleIdentifierOverrideKey],
+      fallback: HarnessMonitorVoiceSettings.uiTestDefaultLocaleIdentifier
     )
     let transcriptInsertionMode =
       HarnessMonitorVoiceTranscriptInsertionMode(
         rawValue: environment.values[
-          HarnessMonitorVoicePreferencesDefaults.uiTestTranscriptInsertionModeOverrideKey
+          HarnessMonitorVoiceSettingsDefaults.uiTestTranscriptInsertionModeOverrideKey
         ] ?? ""
       ) ?? .manualConfirm
     let localDaemonSinkEnabled =
       uiTestBoolOverride(
         from: environment.values[
-          HarnessMonitorVoicePreferencesDefaults.uiTestLocalDaemonSinkEnabledOverrideKey
+          HarnessMonitorVoiceSettingsDefaults.uiTestLocalDaemonSinkEnabledOverrideKey
         ]
       ) ?? true
     let agentBridgeSinkEnabled =
       uiTestBoolOverride(
         from: environment.values[
-          HarnessMonitorVoicePreferencesDefaults.uiTestAgentBridgeSinkEnabledOverrideKey
+          HarnessMonitorVoiceSettingsDefaults.uiTestAgentBridgeSinkEnabledOverrideKey
         ]
       ) ?? true
     let remoteProcessorSinkEnabled =
       uiTestBoolOverride(
         from: environment.values[
-          HarnessMonitorVoicePreferencesDefaults.uiTestRemoteProcessorEnabledOverrideKey
+          HarnessMonitorVoiceSettingsDefaults.uiTestRemoteProcessorEnabledOverrideKey
         ]
       ) ?? false
     let remoteProcessorURL = voiceStringOverride(
       environment.values[
-        HarnessMonitorVoicePreferencesDefaults.uiTestRemoteProcessorURLOverrideKey
+        HarnessMonitorVoiceSettingsDefaults.uiTestRemoteProcessorURLOverrideKey
       ],
       fallback: ""
     )
     let deliversAudioChunks =
       uiTestBoolOverride(
         from: environment.values[
-          HarnessMonitorVoicePreferencesDefaults.uiTestDeliversAudioChunksOverrideKey
+          HarnessMonitorVoiceSettingsDefaults.uiTestDeliversAudioChunksOverrideKey
         ]
       ) ?? true
-    let pendingAudioChunkLimit = HarnessMonitorVoicePreferences.normalizedPendingAudioChunkLimit(
+    let pendingAudioChunkLimit = HarnessMonitorVoiceSettings.normalizedPendingAudioChunkLimit(
       uiTestIntOverride(
         from: environment.values[
-          HarnessMonitorVoicePreferencesDefaults.uiTestPendingAudioChunkLimitOverrideKey
+          HarnessMonitorVoiceSettingsDefaults.uiTestPendingAudioChunkLimitOverrideKey
         ]
-      ) ?? HarnessMonitorVoicePreferences.defaultPendingAudioChunkLimit
+      ) ?? HarnessMonitorVoiceSettings.defaultPendingAudioChunkLimit
     )
     let pendingTranscriptSegmentLimit =
-      HarnessMonitorVoicePreferences.normalizedPendingTranscriptSegmentLimit(
+      HarnessMonitorVoiceSettings.normalizedPendingTranscriptSegmentLimit(
         uiTestIntOverride(
           from: environment.values[
-            HarnessMonitorVoicePreferencesDefaults.uiTestPendingTranscriptLimitOverrideKey
+            HarnessMonitorVoiceSettingsDefaults.uiTestPendingTranscriptLimitOverrideKey
           ]
-        ) ?? HarnessMonitorVoicePreferences.defaultPendingTranscriptSegmentLimit
+        ) ?? HarnessMonitorVoiceSettings.defaultPendingTranscriptSegmentLimit
       )
 
     applyVoiceDefaultPairs([
-      (localeIdentifier, HarnessMonitorVoicePreferencesDefaults.localeIdentifierKey),
-      (localDaemonSinkEnabled, HarnessMonitorVoicePreferencesDefaults.localDaemonSinkEnabledKey),
-      (agentBridgeSinkEnabled, HarnessMonitorVoicePreferencesDefaults.agentBridgeSinkEnabledKey),
+      (localeIdentifier, HarnessMonitorVoiceSettingsDefaults.localeIdentifierKey),
+      (localDaemonSinkEnabled, HarnessMonitorVoiceSettingsDefaults.localDaemonSinkEnabledKey),
+      (agentBridgeSinkEnabled, HarnessMonitorVoiceSettingsDefaults.agentBridgeSinkEnabledKey),
       (
         remoteProcessorSinkEnabled,
-        HarnessMonitorVoicePreferencesDefaults.remoteProcessorSinkEnabledKey
+        HarnessMonitorVoiceSettingsDefaults.remoteProcessorSinkEnabledKey
       ),
-      (remoteProcessorURL, HarnessMonitorVoicePreferencesDefaults.remoteProcessorURLKey),
+      (remoteProcessorURL, HarnessMonitorVoiceSettingsDefaults.remoteProcessorURLKey),
       (
         transcriptInsertionMode.rawValue,
-        HarnessMonitorVoicePreferencesDefaults.transcriptInsertionModeKey
+        HarnessMonitorVoiceSettingsDefaults.transcriptInsertionModeKey
       ),
-      (deliversAudioChunks, HarnessMonitorVoicePreferencesDefaults.deliversAudioChunksKey),
-      (pendingAudioChunkLimit, HarnessMonitorVoicePreferencesDefaults.pendingAudioChunkLimitKey),
+      (deliversAudioChunks, HarnessMonitorVoiceSettingsDefaults.deliversAudioChunksKey),
+      (pendingAudioChunkLimit, HarnessMonitorVoiceSettingsDefaults.pendingAudioChunkLimitKey),
       (
         pendingTranscriptSegmentLimit,
-        HarnessMonitorVoicePreferencesDefaults.pendingTranscriptSegmentLimitKey
+        HarnessMonitorVoiceSettingsDefaults.pendingTranscriptSegmentLimitKey
       ),
     ])
   }

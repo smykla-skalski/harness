@@ -2,7 +2,7 @@
 # Launch the Debug build of Harness Monitor.app with the dev-mode env
 # override so the accessibility registry host starts automatically. The
 # override only works in DEBUG builds (gated inside
-# HarnessMonitorMCPPreferencesDefaults.forceEnableFromEnvironment).
+# HarnessMonitorMCPSettingsDefaults.forceEnableFromEnvironment).
 #
 # If an instance is already running we do nothing - the env var would
 # not reach it anyway.

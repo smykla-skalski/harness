@@ -124,7 +124,7 @@
 - Sort options by predicted relevance, not just alphabetically
 
 ### Progressive choices
-- Don't ask for all preferences upfront
+- Don't ask for all settings upfront
 - Collect information as needed during natural workflow
 - "Default + customize later" pattern for settings
 
@@ -208,7 +208,7 @@
 
 ### Safe defaults
 - New documents: untitled, auto-saved
-- Preferences: most common/safest option pre-selected
+- Settings: most common/safest option pre-selected
 - Filters: "All" selected by default, not an empty/zero state
 - Permissions: least privilege by default
 - Destructive options: never the default button
@@ -265,7 +265,7 @@
 
 ### Terminology
 - One word for one concept throughout: don't alternate "delete/remove/trash"
-- Match platform language: "Settings" (iOS) / "Preferences" (macOS pre-Ventura) / "Settings" (macOS Ventura+)
+- Match platform language: "Settings" (iOS) / "Settings" (macOS pre-Ventura) / "Settings" (macOS Ventura+)
 - Button labels match menu item labels for same action
 - Use user-facing language, not developer jargon
 
@@ -428,7 +428,7 @@
 - Last used option pre-selected in dialogs
 - Recently accessed items shown first
 - Search history preserved
-- Filter/sort preferences remembered per context
+- Filter/sort settings remembered per context
 - Form values preserved if user navigates away and returns
 
 ---

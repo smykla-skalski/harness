@@ -165,9 +165,9 @@ fn monitor_and_daemon_logging_defaults_stay_production_safe() {
     let claude = read_repo_file(root, "CLAUDE.md");
 
     assert!(
-        app_info.contains("<key>OSLogPreferences</key>")
+        app_info.contains("<key>OSLogSettings</key>")
             && app_info.contains("<string>Debug</string>"),
-        "Harness Monitor app Info.plist should keep OSLogPreferences at Debug persistence/enabling for investigation-grade logging"
+        "Harness Monitor app Info.plist should keep OSLogSettings at Debug persistence/enabling for investigation-grade logging"
     );
     assert!(
         agents.contains("Default filter: `RUST_LOG=harness=info`"),

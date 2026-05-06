@@ -112,7 +112,7 @@ struct HarnessMonitorStoreExternalSessionTests {
 
     await store.adoptExternalSession(bookmarkID: "B-external", preview: preview)
 
-    let snapshot = PreferencesDiagnosticsSnapshot(store: store)
+    let snapshot = SettingsDiagnosticsSnapshot(store: store)
     #expect(intField(named: "externalSessionCount", in: snapshot) == 1)
     #expect(
       stringField(named: "lastExternalSessionAttachOutcome", in: snapshot)
@@ -129,7 +129,7 @@ struct HarnessMonitorStoreExternalSessionTests {
       .failure(NSError(domain: NSCocoaErrorDomain, code: NSUserCancelledError))
     )
 
-    let snapshot = PreferencesDiagnosticsSnapshot(store: store)
+    let snapshot = SettingsDiagnosticsSnapshot(store: store)
     #expect(intField(named: "externalSessionCount", in: snapshot) == 0)
     #expect(
       stringField(named: "lastExternalSessionAttachOutcome", in: snapshot)?

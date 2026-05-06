@@ -2,7 +2,7 @@
 
 ## Problem
 
-UI tests had multi-second delays between actions. After opening the preferences window and clicking a sidebar item, there was a 3-5 second pause before the mouse moved. Total test runtime was 36+ seconds for a single test covering navigation, scrolling, and button verification.
+UI tests had multi-second delays between actions. After opening the settings window and clicking a sidebar item, there was a 3-5 second pause before the mouse moved. Total test runtime was 36+ seconds for a single test covering navigation, scrolling, and button verification.
 
 ## Root causes
 
@@ -65,7 +65,7 @@ Apple documentation (requires JS to view): https://developer.apple.com/documenta
 window.animationBehavior = .none
 ```
 
-Set on `NSWindow.didBecomeKeyNotification` so every new window gets instant presentation. Without this, new windows (like the Preferences `Window` scene) animate in with a fade/scale that XCUITest waits for.
+Set on `NSWindow.didBecomeKeyNotification` so every new window gets instant presentation. Without this, new windows (like the Settings `Window` scene) animate in with a fade/scale that XCUITest waits for.
 
 ```swift
 NotificationCenter.default.addObserver(
@@ -164,7 +164,7 @@ macOS SwiftUI `List` sidebar items appear as `.button`, `.cell`, or `.radioButto
 | Settings window open delay | 3-5s visible | <1s | eliminated |
 | Confirmation dialog cycle | ~8s each | ~3s each | -62% |
 
-The remaining 29 seconds breaks down as: app launch ~8s, main window render ~3s, preferences window open + navigate ~4s, 3 confirmation cycles ~9s, scroll + verify ~5s. The launch and main window render are irreducible overhead from XCUITest's process management.
+The remaining 29 seconds breaks down as: app launch ~8s, main window render ~3s, settings window open + navigate ~4s, 3 confirmation cycles ~9s, scroll + verify ~5s. The launch and main window render are irreducible overhead from XCUITest's process management.
 
 ## References
 

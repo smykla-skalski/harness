@@ -44,7 +44,7 @@ struct HarnessMonitorAppCommands: Commands {
     TextEditingCommands()
     CommandGroup(replacing: .appSettings) {
       Button("Settings…") {
-        openWindow(id: HarnessMonitorWindowID.preferences)
+        openWindow(id: HarnessMonitorWindowID.settings)
       }
       .keyboardShortcut(",", modifiers: .command)
     }

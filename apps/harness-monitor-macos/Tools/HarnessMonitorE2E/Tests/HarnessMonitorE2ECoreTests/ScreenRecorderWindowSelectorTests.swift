@@ -14,7 +14,7 @@ final class ScreenRecorderWindowSelectorTests: XCTestCase {
       ),
       ScreenRecorderWindowCandidate(
         windowID: 2,
-        title: "Preferences",
+        title: "Settings",
         bundleIdentifier: "io.harnessmonitor.app.ui-testing",
         isOnScreen: true
       ),
@@ -218,7 +218,7 @@ final class ScreenRecorderWindowSelectorTests: XCTestCase {
         from: [
           ScreenRecorderWindowCandidate(
             windowID: 500,
-            title: "Preferences",
+            title: "Settings",
             bundleIdentifier: "io.harnessmonitor.app.ui-testing",
             processID: 5252,
             isOnScreen: true

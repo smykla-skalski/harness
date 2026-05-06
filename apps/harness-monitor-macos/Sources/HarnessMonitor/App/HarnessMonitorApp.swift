@@ -25,7 +25,7 @@ struct HarnessMonitorApp: App {
   @State private var workspaceNavigationBridge: WorkspaceWindowNavigationBridge
   @State private var windowCommandRouting: WindowCommandRoutingState
   @State private var mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
-  @State private var preferencesSelectedSection: PreferencesSection
+  @State private var settingsSelectedSection: SettingsSection
   @AppStorage(HarnessMonitorThemeDefaults.modeKey)
   private var themeMode: HarnessMonitorThemeMode = .auto
   @AppStorage(HarnessMonitorTextSize.storageKey)
@@ -105,7 +105,7 @@ struct HarnessMonitorApp: App {
     _workspaceNavigationBridge = State(initialValue: WorkspaceWindowNavigationBridge())
     _windowCommandRouting = State(initialValue: WindowCommandRoutingState())
     _mcpWindowCommandRegistrar = State(initialValue: HarnessMonitorMCPWindowCommandRegistrar())
-    _preferencesSelectedSection = State(initialValue: configuration.preferencesInitialSection)
+    _settingsSelectedSection = State(initialValue: configuration.settingsInitialSection)
     delegate.bind(store: store)
   }
 
@@ -184,7 +184,7 @@ struct HarnessMonitorApp: App {
         windowCommandRouting: windowCommandRouting,
         mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
         themeMode: $themeMode,
-        selectedSection: $preferencesSelectedSection
+        selectedSection: $settingsSelectedSection
       )
       .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
       .modifier(HarnessMonitorMainWindowLauncherBinder())
@@ -194,7 +194,7 @@ struct HarnessMonitorApp: App {
   }
 
   private var settingsWindowScene: some Scene {
-    Window("Settings", id: HarnessMonitorWindowID.preferences) {
+    Window("Settings", id: HarnessMonitorWindowID.settings) {
       settingsSceneContent
     }
     .windowStyle(.titleBar)
@@ -242,7 +242,7 @@ struct HarnessMonitorApp: App {
           windowCommandRouting: windowCommandRouting,
           mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
           themeMode: $themeMode,
-          preferencesSelectedSection: $preferencesSelectedSection,
+          settingsSelectedSection: $settingsSelectedSection,
           perfScenario: perfScenario,
           defersInitialContentUntilBootstrap: defersInitialMainWindowUntilBootstrap
         )
@@ -257,7 +257,7 @@ struct HarnessMonitorApp: App {
           windowCommandRouting: windowCommandRouting,
           mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
           themeMode: $themeMode,
-          preferencesSelectedSection: $preferencesSelectedSection,
+          settingsSelectedSection: $settingsSelectedSection,
           perfScenario: perfScenario,
           defersInitialContentUntilBootstrap: defersInitialMainWindowUntilBootstrap
         )

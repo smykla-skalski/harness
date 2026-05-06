@@ -62,7 +62,7 @@ extension HarnessMonitorAccessibility {
     "harness.acp-permission.item.\(slug(id))"
   }
 
-  public static func preferencesSupervisorPane(_ key: String) -> String {
-    "harness.preferences.supervisor.\(slug(key))"
+  public static func settingsSupervisorPane(_ key: String) -> String {
+    "harness.settings.supervisor.\(slug(key))"
   }
 }

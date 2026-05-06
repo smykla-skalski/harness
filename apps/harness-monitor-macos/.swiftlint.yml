@@ -62,10 +62,10 @@ custom_rules:
     severity: error
     included:
       - "Sources/HarnessMonitor/Views"
-  no_preferences_overlay_flow:
-    name: "No Preferences Overlay Flow"
-    regex: '(showsPreferences|preferencesOverlay|preferencesBackdrop|preferencesFocused|onExitCommand)'
-    message: "Use the native Settings scene instead of a custom preferences overlay."
+  no_settings_overlay_flow:
+    name: "No Settings Overlay Flow"
+    regex: '(showsSettings|settingsOverlay|settingsBackdrop|settingsFocused|onExitCommand)'
+    message: "Use the native Settings scene instead of a custom settings overlay."
     severity: error
     included:
       - "Sources/HarnessMonitor/Views/ContentView.swift"

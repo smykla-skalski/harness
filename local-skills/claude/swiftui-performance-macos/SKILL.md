@@ -233,7 +233,7 @@ The driver uses `beginAnimationInterval` (not `beginInterval`). The animation va
 When adding a case to `HarnessMonitorPerfScenario`, update all of these:
 
 1. The enum case and `rawValue` in `HarnessMonitorAppConfiguration.swift`
-2. `defaultPreviewScenario` and `initialPreferencesSection` on the enum
+2. `defaultPreviewScenario` and `initialSettingsSection` on the enum
 3. `signpostName` in the private extension in `HarnessMonitorAppSceneSupport.swift` (must return `StaticString` matching the raw value exactly)
 4. The scenario's execution branch in `HarnessMonitorPerfDriver.run(scenario:store:openWindow:)`
 5. A `testXxxHitchRate()` method in `HarnessMonitorPerfTests.swift`

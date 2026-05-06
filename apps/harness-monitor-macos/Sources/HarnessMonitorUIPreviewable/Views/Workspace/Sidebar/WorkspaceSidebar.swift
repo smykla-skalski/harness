@@ -168,7 +168,7 @@ struct WorkspaceSidebar: View {
         await hydratePersistedDecisionFiltersIfNeeded()
       }
       .onChange(of: decisionFilters) { _, newValue in
-        syncPersistedDecisionPreferences(from: newValue)
+        syncPersistedDecisionSettings(from: newValue)
       }
       .onChange(of: isStartupFocusParticipationEnabled, initial: true) { _, _ in
         applyPendingSearchPresentationIfNeeded()
@@ -338,7 +338,7 @@ extension WorkspaceSidebar {
         scope: DecisionsSidebarSearchScope(rawValue: decisionSearchScopeRaw) ?? .summary
       )
     } else {
-      syncPersistedDecisionPreferences(from: decisionFilters)
+      syncPersistedDecisionSettings(from: decisionFilters)
     }
   }
 
@@ -357,14 +357,14 @@ extension WorkspaceSidebar {
       scope: scope ?? decisionFilters.scope
     )
     guard next != decisionFilters else {
-      syncPersistedDecisionPreferences(from: next)
+      syncPersistedDecisionSettings(from: next)
       return
     }
     decisionFilters = next
-    syncPersistedDecisionPreferences(from: next)
+    syncPersistedDecisionSettings(from: next)
   }
 
-  fileprivate func syncPersistedDecisionPreferences(
+  fileprivate func syncPersistedDecisionSettings(
     from filters: DecisionsSidebarViewModel.FilterState
   ) {
     let severityCSV = filters.severities.map(\.rawValue).sorted().joined(separator: ",")

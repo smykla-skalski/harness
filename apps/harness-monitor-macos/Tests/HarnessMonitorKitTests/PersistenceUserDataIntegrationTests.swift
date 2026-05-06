@@ -111,8 +111,8 @@ struct PersistenceUserDataIntegrationTests {
     #expect(summary?.status == .ended)
   }
 
-  @Test("Filter preferences save and restore")
-  func filterPreferencesSaveAndRestore() {
+  @Test("Filter settings save and restore")
+  func filterSettingsSaveAndRestore() {
     let store = harness.makeStore()
 
     store.sessionFilter = .ended

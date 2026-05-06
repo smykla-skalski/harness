@@ -17,9 +17,9 @@ extension HarnessMonitorStore {
   public var isSupervisorRunInBackgroundEnabled: Bool {
     let storedValue =
       UserDefaults.standard.object(
-        forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+        forKey: SupervisorSettingsDefaults.runInBackgroundKey
       ) as? Bool
-    return storedValue ?? SupervisorPreferencesDefaults.runInBackgroundDefault
+    return storedValue ?? SupervisorSettingsDefaults.runInBackgroundDefault
   }
 
   public func bindSupervisorNotifications(_ controller: HarnessMonitorUserNotificationController) {
@@ -104,7 +104,7 @@ extension HarnessMonitorStore {
   }
 
   public func setSupervisorRunInBackgroundEnabled(_ enabled: Bool) {
-    UserDefaults.standard.set(enabled, forKey: SupervisorPreferencesDefaults.runInBackgroundKey)
+    UserDefaults.standard.set(enabled, forKey: SupervisorSettingsDefaults.runInBackgroundKey)
     guard let stack = supervisorStack else {
       return
     }

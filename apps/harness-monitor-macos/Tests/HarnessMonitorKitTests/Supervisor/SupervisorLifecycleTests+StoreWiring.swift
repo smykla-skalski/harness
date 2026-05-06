@@ -13,10 +13,10 @@ extension SupervisorLifecycleTests {
 
   @MainActor
   func testStartSupervisorHonorsDisabledBackgroundPreference() async throws {
-    UserDefaults.standard.set(false, forKey: SupervisorPreferencesDefaults.runInBackgroundKey)
+    UserDefaults.standard.set(false, forKey: SupervisorSettingsDefaults.runInBackgroundKey)
     defer {
       UserDefaults.standard.removeObject(
-        forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+        forKey: SupervisorSettingsDefaults.runInBackgroundKey
       )
     }
 
@@ -107,10 +107,10 @@ extension SupervisorLifecycleTests {
   @MainActor
   func testStartSupervisorWithPersistenceSchedulesAuditRetention() async throws {
     let store = try await HarnessMonitorStore.fixture(sessions: .twoActiveSessions)
-    UserDefaults.standard.set(true, forKey: SupervisorPreferencesDefaults.runInBackgroundKey)
+    UserDefaults.standard.set(true, forKey: SupervisorSettingsDefaults.runInBackgroundKey)
     defer {
       UserDefaults.standard.removeObject(
-        forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+        forKey: SupervisorSettingsDefaults.runInBackgroundKey
       )
     }
     await store.startSupervisor()
@@ -123,10 +123,10 @@ extension SupervisorLifecycleTests {
   @MainActor
   func testBackgroundLifecycleDoesNotDriveProductionPolicyTicks() async throws {
     let store = try await HarnessMonitorStore.fixture(sessions: .twoActiveSessions)
-    UserDefaults.standard.set(true, forKey: SupervisorPreferencesDefaults.runInBackgroundKey)
+    UserDefaults.standard.set(true, forKey: SupervisorSettingsDefaults.runInBackgroundKey)
     defer {
       UserDefaults.standard.removeObject(
-        forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+        forKey: SupervisorSettingsDefaults.runInBackgroundKey
       )
     }
     await store.startSupervisor()

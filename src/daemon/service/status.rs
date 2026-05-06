@@ -128,7 +128,7 @@ fn log_ignored_diagnostics_manifest_error(error: &CliError) {
     );
 }
 
-/// Build a richer diagnostics report for the daemon preferences screen.
+/// Build a richer diagnostics report for the daemon settings screen.
 ///
 /// # Errors
 /// Returns `CliError` when daemon state cannot be loaded.
@@ -155,7 +155,7 @@ pub fn diagnostics_report(
     })
 }
 
-/// Build a richer diagnostics report for the daemon preferences screen using
+/// Build a richer diagnostics report for the daemon settings screen using
 /// the canonical async daemon DB.
 ///
 /// # Errors

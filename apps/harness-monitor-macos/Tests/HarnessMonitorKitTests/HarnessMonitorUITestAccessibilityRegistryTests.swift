@@ -201,21 +201,21 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
 
   @Test("MCP reliability identifiers match UI-test mirror")
   func mcpReliabilityIdentifiersMirror() throws {
-    #expect(HarnessMonitorAccessibility.preferencesMCPSection == "harness.preferences.mcp")
+    #expect(HarnessMonitorAccessibility.settingsMCPSection == "harness.settings.mcp")
     #expect(
-      HarnessMonitorAccessibility.preferencesMCPRegistryHostToggle
-        == "harness.preferences.mcp.registry-host"
+      HarnessMonitorAccessibility.settingsMCPRegistryHostToggle
+        == "harness.settings.mcp.registry-host"
     )
-    #expect(HarnessMonitorAccessibility.preferencesMCPStatus == "harness.preferences.mcp.status")
+    #expect(HarnessMonitorAccessibility.settingsMCPStatus == "harness.settings.mcp.status")
     #expect(HarnessMonitorAccessibility.mcpBanner == "harness.content.mcp.banner")
 
     let contentToolbar = try sourceFile(named: "ContentToolbarItems.swift")
     let contentChrome = try sourceFile(named: "ContentChromeSupport.swift")
-    let preferencesMCP = try sourceFile(named: "PreferencesMCPSection.swift")
+    let settingsMCP = try sourceFile(named: "SettingsMCPSection.swift")
 
     #expect(!contentToolbar.contains("mcpToolbarStatus"))
     #expect(contentChrome.contains("MCPStatusBanner(status: mcpStatus)"))
-    #expect(preferencesMCP.contains("preferencesMCPStatus"))
+    #expect(settingsMCP.contains("settingsMCPStatus"))
   }
 
   @Test("New session capability identifiers match UI-test mirror")

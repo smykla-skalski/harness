@@ -95,7 +95,7 @@ public struct HarnessMonitorDateTimeConfiguration: Equatable {
     }
   }
 
-  public var preferencesStateValue: String {
+  public var settingsStateValue: String {
     switch timeZoneMode {
     case .local:
       "local"

@@ -10,6 +10,7 @@ ADAPTIVE_GRID_LAYOUT = (
     / "Sources"
     / "HarnessMonitorUIPreviewable"
     / "Views"
+    / "Shared"
     / "HarnessMonitorAdaptiveGridLayout.swift"
 )
 COLUMN_SCROLL_VIEW = (
@@ -17,14 +18,16 @@ COLUMN_SCROLL_VIEW = (
     / "Sources"
     / "HarnessMonitorUIPreviewable"
     / "Views"
+    / "Shared"
     / "HarnessMonitorColumnScrollView.swift"
 )
-PREFERENCES_PREVIEW_SUPPORT = (
+SETTINGS_PREVIEW_SUPPORT = (
     APP_ROOT
     / "Sources"
     / "HarnessMonitorUIPreviewable"
     / "Views"
-    / "PreferencesPreviewSupport.swift"
+    / "Settings"
+    / "SettingsPreviewSupport.swift"
 )
 
 
@@ -53,7 +56,7 @@ class PreviewableExportTests(unittest.TestCase):
 
     def test_public_preview_support_avoids_default_argument_generators(self) -> None:
         column_source = COLUMN_SCROLL_VIEW.read_text()
-        preview_source = PREFERENCES_PREVIEW_SUPPORT.read_text()
+        preview_source = SETTINGS_PREVIEW_SUPPORT.read_text()
 
         forbidden_column_defaults = (
             "horizontalPadding: CGFloat = 24",

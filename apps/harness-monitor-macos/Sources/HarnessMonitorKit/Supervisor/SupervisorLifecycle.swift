@@ -29,9 +29,9 @@ public final class SupervisorLifecycle: @unchecked Sendable {
   // MARK: - Init
 
   public init(
-    interval: TimeInterval = SupervisorPreferencesDefaults.defaultIntervalSeconds,
-    tolerance: TimeInterval = SupervisorPreferencesDefaults.schedulerTolerance,
-    identifier: String = SupervisorPreferencesDefaults.activityIdentifier
+    interval: TimeInterval = SupervisorSettingsDefaults.defaultIntervalSeconds,
+    tolerance: TimeInterval = SupervisorSettingsDefaults.schedulerTolerance,
+    identifier: String = SupervisorSettingsDefaults.activityIdentifier
   ) {
     self.interval = interval
     self.tolerance = tolerance
@@ -46,13 +46,13 @@ public final class SupervisorLifecycle: @unchecked Sendable {
     stopBackgroundActivity()
 
     let enabled = UserDefaults.standard.object(
-      forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+      forKey: SupervisorSettingsDefaults.runInBackgroundKey
     )
     let runInBackground: Bool
     if let storedValue = enabled as? Bool {
       runInBackground = storedValue
     } else {
-      runInBackground = SupervisorPreferencesDefaults.runInBackgroundDefault
+      runInBackground = SupervisorSettingsDefaults.runInBackgroundDefault
     }
 
     guard runInBackground else {

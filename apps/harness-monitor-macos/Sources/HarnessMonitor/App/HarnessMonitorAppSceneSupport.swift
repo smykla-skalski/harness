@@ -12,7 +12,7 @@ struct HarnessMonitorWindowRootView: View {
   let windowCommandRouting: WindowCommandRoutingState
   let mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   @Binding var themeMode: HarnessMonitorThemeMode
-  @Binding var preferencesSelectedSection: PreferencesSection
+  @Binding var settingsSelectedSection: SettingsSection
   let perfScenario: HarnessMonitorPerfScenario?
   let defersInitialContentUntilBootstrap: Bool
   @Environment(\.openWindow)
@@ -80,8 +80,8 @@ struct HarnessMonitorWindowRootView: View {
           return
         }
         handledSettingsOpenRequestID = requestID
-        preferencesSelectedSection = .notifications
-        openWindow(id: HarnessMonitorWindowID.preferences)
+        settingsSelectedSection = .notifications
+        openWindow(id: HarnessMonitorWindowID.settings)
       }
   }
 
@@ -241,7 +241,7 @@ struct HarnessMonitorSettingsRootView: View {
   let windowCommandRouting: WindowCommandRoutingState
   let mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   @Binding var themeMode: HarnessMonitorThemeMode
-  @Binding var selectedSection: PreferencesSection
+  @Binding var selectedSection: SettingsSection
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
   private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
   @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
@@ -255,7 +255,7 @@ struct HarnessMonitorSettingsRootView: View {
     windowCommandRouting: WindowCommandRoutingState,
     mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar,
     themeMode: Binding<HarnessMonitorThemeMode>,
-    selectedSection: Binding<PreferencesSection>
+    selectedSection: Binding<SettingsSection>
   ) {
     self.store = store
     self.notifications = notifications
@@ -275,7 +275,7 @@ struct HarnessMonitorSettingsRootView: View {
   }
 
   var body: some View {
-    PreferencesView(
+    SettingsView(
       store: store,
       notifications: notifications,
       themeMode: $themeMode,

@@ -34,7 +34,7 @@
 	<false/>
 	<key>NSSupportsSuddenTermination</key>
 	<false/>
-	<key>OSLogPreferences</key>
+	<key>OSLogSettings</key>
 	<dict>
 		<key>io.harnessmonitor</key>
 		<dict>

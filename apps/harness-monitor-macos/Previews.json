@@ -9,9 +9,9 @@
       "index": 0
     },
     {
-      "id": "PreferencesView",
-      "description": "Preferences root window",
-      "file": "Sources/HarnessMonitorUIPreviewable/Views/PreferencesViewPreviews.swift",
+      "id": "SettingsView",
+      "description": "Settings root window",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/SettingsViewPreviews.swift",
       "index": 0
     },
     {

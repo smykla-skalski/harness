@@ -68,18 +68,18 @@ final class AttentionInfrastructureUITestsUserNotification:
 
     let acpStatusState = element(
       in: app,
-      identifier: Accessibility.preferencesAcpNotificationStatusState
+      identifier: Accessibility.settingsAcpNotificationStatusState
     )
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {
         self.markerText(for: acpStatusState).contains("authorization=denied")
       },
-      "Supervisor Notifications preferences should publish the denied ACP authorization marker"
+      "Supervisor Notifications settings should publish the denied ACP authorization marker"
     )
 
     let settingsButton = button(
       in: app,
-      identifier: Accessibility.preferencesAcpOpenSystemSettings
+      identifier: Accessibility.settingsAcpOpenSystemSettings
     )
     XCTAssertTrue(
       waitForElement(settingsButton, timeout: Self.actionTimeout),

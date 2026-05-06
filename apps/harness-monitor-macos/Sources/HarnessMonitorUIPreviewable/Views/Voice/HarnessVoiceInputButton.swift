@@ -8,26 +8,26 @@ struct HarnessVoiceInputButton: View {
   let routeTarget: () -> VoiceRouteTarget
   let accessibilityIdentifier: String
 
-  @AppStorage(HarnessMonitorVoicePreferencesDefaults.localeIdentifierKey)
-  var localeIdentifier = HarnessMonitorVoicePreferences.defaultLocaleIdentifier
-  @AppStorage(HarnessMonitorVoicePreferencesDefaults.localDaemonSinkEnabledKey)
+  @AppStorage(HarnessMonitorVoiceSettingsDefaults.localeIdentifierKey)
+  var localeIdentifier = HarnessMonitorVoiceSettings.defaultLocaleIdentifier
+  @AppStorage(HarnessMonitorVoiceSettingsDefaults.localDaemonSinkEnabledKey)
   var localDaemonSinkEnabled = true
-  @AppStorage(HarnessMonitorVoicePreferencesDefaults.agentBridgeSinkEnabledKey)
+  @AppStorage(HarnessMonitorVoiceSettingsDefaults.agentBridgeSinkEnabledKey)
   var agentBridgeSinkEnabled = true
-  @AppStorage(HarnessMonitorVoicePreferencesDefaults.remoteProcessorSinkEnabledKey)
+  @AppStorage(HarnessMonitorVoiceSettingsDefaults.remoteProcessorSinkEnabledKey)
   var remoteProcessorSinkEnabled = false
-  @AppStorage(HarnessMonitorVoicePreferencesDefaults.remoteProcessorURLKey)
+  @AppStorage(HarnessMonitorVoiceSettingsDefaults.remoteProcessorURLKey)
   var remoteProcessorURLText = ""
-  @AppStorage(HarnessMonitorVoicePreferencesDefaults.transcriptInsertionModeKey)
+  @AppStorage(HarnessMonitorVoiceSettingsDefaults.transcriptInsertionModeKey)
   var transcriptInsertionModeRawValue =
     HarnessMonitorVoiceTranscriptInsertionMode.manualConfirm.rawValue
-  @AppStorage(HarnessMonitorVoicePreferencesDefaults.deliversAudioChunksKey)
+  @AppStorage(HarnessMonitorVoiceSettingsDefaults.deliversAudioChunksKey)
   var deliversAudioChunks = true
-  @AppStorage(HarnessMonitorVoicePreferencesDefaults.pendingAudioChunkLimitKey)
-  var pendingAudioChunkLimit = HarnessMonitorVoicePreferences.defaultPendingAudioChunkLimit
-  @AppStorage(HarnessMonitorVoicePreferencesDefaults.pendingTranscriptSegmentLimitKey)
+  @AppStorage(HarnessMonitorVoiceSettingsDefaults.pendingAudioChunkLimitKey)
+  var pendingAudioChunkLimit = HarnessMonitorVoiceSettings.defaultPendingAudioChunkLimit
+  @AppStorage(HarnessMonitorVoiceSettingsDefaults.pendingTranscriptSegmentLimitKey)
   var pendingTranscriptSegmentLimit =
-    HarnessMonitorVoicePreferences.defaultPendingTranscriptSegmentLimit
+    HarnessMonitorVoiceSettings.defaultPendingTranscriptSegmentLimit
   @State private var _model = ViewModel()
   @ScaledMetric(relativeTo: .headline)
   private var progressSize: CGFloat = 16
@@ -41,8 +41,8 @@ struct HarnessVoiceInputButton: View {
       .joined(separator: " ")
   }
 
-  var voicePreferences: HarnessMonitorVoicePreferences {
-    HarnessMonitorVoicePreferences(
+  var voiceSettings: HarnessMonitorVoiceSettings {
+    HarnessMonitorVoiceSettings(
       localeIdentifier: localeIdentifier,
       localDaemonSinkEnabled: localDaemonSinkEnabled,
       agentBridgeSinkEnabled: agentBridgeSinkEnabled,
@@ -184,6 +184,6 @@ struct HarnessVoiceInputButton: View {
   }
 
   private var configurationSummary: some View {
-    VoicePopoverConfigurationSummary(preferences: voicePreferences)
+    VoicePopoverConfigurationSummary(settings: voiceSettings)
   }
 }

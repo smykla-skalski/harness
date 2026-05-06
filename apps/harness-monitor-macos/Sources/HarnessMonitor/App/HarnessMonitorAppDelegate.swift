@@ -84,7 +84,7 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   func bind(store: HarnessMonitorStore) {
     self.store = store
     // The startup controller owns MCP runtime/recovery truth. The store only mirrors
-    // snapshots so toolbar, banner, preferences, and feedback stay passive observers.
+    // snapshots so toolbar, banner, settings, and feedback stay passive observers.
     mcpStartupController.statusDidChange = { [weak store] status in
       store?.updateMCPStatus(status)
     }
@@ -285,9 +285,9 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   private var supervisorRunInBackgroundEnabled: Bool {
     let storedValue =
       UserDefaults.standard.object(
-        forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+        forKey: SupervisorSettingsDefaults.runInBackgroundKey
       ) as? Bool
-    return storedValue ?? SupervisorPreferencesDefaults.runInBackgroundDefault
+    return storedValue ?? SupervisorSettingsDefaults.runInBackgroundDefault
   }
 
   private static func launchEnvironment() -> [String: String] {

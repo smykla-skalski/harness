@@ -12,20 +12,20 @@ struct HarnessMonitorMCPSocketPathTests {
       .appendingPathComponent("Library", isDirectory: true)
       .appendingPathComponent("Group Containers", isDirectory: true)
       .appendingPathComponent(
-        HarnessMonitorMCPPreferencesDefaults.appGroupIdentifier,
+        HarnessMonitorMCPSettingsDefaults.appGroupIdentifier,
         isDirectory: true
       )
     let socketPath =
       appGroupDirectory
       .appendingPathComponent(
-        HarnessMonitorMCPPreferencesDefaults.socketFilename,
+        HarnessMonitorMCPSettingsDefaults.socketFilename,
         isDirectory: false
       )
     let legacySocketPath =
       appGroupDirectory
       .appendingPathComponent("harness-monitor-mcp.sock", isDirectory: false)
 
-    #expect(HarnessMonitorMCPPreferencesDefaults.socketFilename == "mcp.sock")
+    #expect(HarnessMonitorMCPSettingsDefaults.socketFilename == "mcp.sock")
     #expect(socketPath.path.count < 104)
     #expect(legacySocketPath.path.count >= 104)
   }

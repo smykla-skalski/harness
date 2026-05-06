@@ -43,7 +43,7 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
     }
   }
 
-  var initialPreferencesSection: PreferencesSection {
+  var initialSettingsSection: SettingsSection {
     switch self {
     case .settingsBackdropCycle, .settingsBackgroundCycle:
       return .appearance

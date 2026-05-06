@@ -54,67 +54,67 @@ public enum HarnessMonitorAccessibility {
   public static let sessionsBoardScrollView = "harness.board.scroll"
   public static let recentSessionsCard = "harness.board.recent-sessions-card"
   public static let contentRoot = "harness.content.root"
-  public static let preferencesRoot = "harness.preferences.root"
-  public static let preferencesState = "harness.preferences.state"
-  public static let preferencesPanel = "harness.preferences.panel"
-  public static let preferencesToolbarSeparatorSuppressed =
-    "harness.preferences.toolbar.separator-suppressed"
-  public static let preferencesSidebar = "harness.preferences.sidebar"
-  public static let preferencesBackButton = "harness.preferences.nav.back"
-  public static let preferencesForwardButton = "harness.preferences.nav.forward"
-  public static let preferencesTitle = "harness.preferences.title"
-  public static let preferencesThemeModePicker = "harness.preferences.theme-mode"
-  public static let preferencesBackdropModePicker = "harness.preferences.backdrop-mode"
-  public static let preferencesBackgroundCollectionPicker =
-    "harness.preferences.background-collection"
-  public static let preferencesBackgroundGallery = "harness.preferences.background-gallery"
-  public static let preferencesBackgroundRecentsSection =
-    "harness.preferences.background.recents-section"
-  public static let preferencesBackgroundRecentState =
-    "harness.preferences.background.recents-state"
-  public static let preferencesTextSizePicker = "harness.preferences.text-size"
-  public static let preferencesTimeZoneModePicker = "harness.preferences.time-zone-mode"
-  public static let preferencesCustomTimeZonePicker = "harness.preferences.custom-time-zone"
-  public static let preferencesTimelinePersistencePicker =
-    "harness.preferences.timeline.filter-persistence"
-  public static let preferencesMCPSection = "harness.preferences.mcp"
-  public static let preferencesMCPRegistryHostToggle =
-    "harness.preferences.mcp.registry-host"
-  public static let preferencesMCPStatus = "harness.preferences.mcp.status"
-  public static let preferencesLaunchAgentRepairButton =
-    "harness.preferences.diagnostics.launch-agent.repair"
-  public static let preferencesVoiceSection = "harness.preferences.voice"
-  public static let preferencesVoiceLocaleField = "harness.preferences.voice.locale-field"
-  public static let preferencesVoiceLocalePicker = "harness.preferences.voice.locale-picker"
-  public static let preferencesVoiceLocalDaemonToggle = "harness.preferences.voice.local-daemon"
-  public static let preferencesVoiceAgentBridgeToggle = "harness.preferences.voice.agent-bridge"
-  public static let preferencesVoiceRemoteProcessorToggle =
-    "harness.preferences.voice.remote-processor"
-  public static let preferencesVoiceRemoteProcessorURLField =
-    "harness.preferences.voice.remote-processor-url"
-  public static let preferencesVoiceInsertionModePicker =
-    "harness.preferences.voice.insertion-mode"
-  public static let preferencesVoiceAudioChunksToggle = "harness.preferences.voice.audio-chunks"
-  public static let preferencesVoicePendingAudioField =
-    "harness.preferences.voice.pending-audio-limit"
-  public static let preferencesVoicePendingTranscriptField =
-    "harness.preferences.voice.pending-transcript-limit"
-  public static let preferencesVoiceStatus = "harness.preferences.voice.status"
-  public static let preferencesNotificationsStatus = "harness.preferences.notifications.status"
-  public static let preferencesNotificationsPresetPicker =
-    "harness.preferences.notifications.preset"
-  public static let preferencesNotificationsCategoryPicker =
-    "harness.preferences.notifications.category"
-  public static let preferencesNotificationsSoundPicker = "harness.preferences.notifications.sound"
-  public static let preferencesNotificationsAttachmentPicker =
-    "harness.preferences.notifications.attachment"
-  public static let preferencesNotificationsTriggerPicker =
-    "harness.preferences.notifications.trigger"
-  public static let preferencesNotificationsSendButton = "harness.preferences.notifications.send"
+  public static let settingsRoot = "harness.settings.root"
+  public static let settingsState = "harness.settings.state"
+  public static let settingsPanel = "harness.settings.panel"
+  public static let settingsToolbarSeparatorSuppressed =
+    "harness.settings.toolbar.separator-suppressed"
+  public static let settingsSidebar = "harness.settings.sidebar"
+  public static let settingsBackButton = "harness.settings.nav.back"
+  public static let settingsForwardButton = "harness.settings.nav.forward"
+  public static let settingsTitle = "harness.settings.title"
+  public static let settingsThemeModePicker = "harness.settings.theme-mode"
+  public static let settingsBackdropModePicker = "harness.settings.backdrop-mode"
+  public static let settingsBackgroundCollectionPicker =
+    "harness.settings.background-collection"
+  public static let settingsBackgroundGallery = "harness.settings.background-gallery"
+  public static let settingsBackgroundRecentsSection =
+    "harness.settings.background.recents-section"
+  public static let settingsBackgroundRecentState =
+    "harness.settings.background.recents-state"
+  public static let settingsTextSizePicker = "harness.settings.text-size"
+  public static let settingsTimeZoneModePicker = "harness.settings.time-zone-mode"
+  public static let settingsCustomTimeZonePicker = "harness.settings.custom-time-zone"
+  public static let settingsTimelinePersistencePicker =
+    "harness.settings.timeline.filter-persistence"
+  public static let settingsMCPSection = "harness.settings.mcp"
+  public static let settingsMCPRegistryHostToggle =
+    "harness.settings.mcp.registry-host"
+  public static let settingsMCPStatus = "harness.settings.mcp.status"
+  public static let settingsLaunchAgentRepairButton =
+    "harness.settings.diagnostics.launch-agent.repair"
+  public static let settingsVoiceSection = "harness.settings.voice"
+  public static let settingsVoiceLocaleField = "harness.settings.voice.locale-field"
+  public static let settingsVoiceLocalePicker = "harness.settings.voice.locale-picker"
+  public static let settingsVoiceLocalDaemonToggle = "harness.settings.voice.local-daemon"
+  public static let settingsVoiceAgentBridgeToggle = "harness.settings.voice.agent-bridge"
+  public static let settingsVoiceRemoteProcessorToggle =
+    "harness.settings.voice.remote-processor"
+  public static let settingsVoiceRemoteProcessorURLField =
+    "harness.settings.voice.remote-processor-url"
+  public static let settingsVoiceInsertionModePicker =
+    "harness.settings.voice.insertion-mode"
+  public static let settingsVoiceAudioChunksToggle = "harness.settings.voice.audio-chunks"
+  public static let settingsVoicePendingAudioField =
+    "harness.settings.voice.pending-audio-limit"
+  public static let settingsVoicePendingTranscriptField =
+    "harness.settings.voice.pending-transcript-limit"
+  public static let settingsVoiceStatus = "harness.settings.voice.status"
+  public static let settingsNotificationsStatus = "harness.settings.notifications.status"
+  public static let settingsNotificationsPresetPicker =
+    "harness.settings.notifications.preset"
+  public static let settingsNotificationsCategoryPicker =
+    "harness.settings.notifications.category"
+  public static let settingsNotificationsSoundPicker = "harness.settings.notifications.sound"
+  public static let settingsNotificationsAttachmentPicker =
+    "harness.settings.notifications.attachment"
+  public static let settingsNotificationsTriggerPicker =
+    "harness.settings.notifications.trigger"
+  public static let settingsNotificationsSendButton = "harness.settings.notifications.send"
   public static let navigateBackButton = "harness.toolbar.navigate-back"
   public static let navigateForwardButton = "harness.toolbar.navigate-forward"
   public static let refreshButton = "harness.toolbar.refresh"
-  public static let daemonPreferencesButton = "harness.toolbar.preferences"
+  public static let daemonSettingsButton = "harness.toolbar.settings"
   public static let sleepPreventionButton = "harness.toolbar.sleep-prevention"
   public static let mcpBanner = "harness.content.mcp.banner"
   public static let windowMenuWorkspaceItem = "harness.menu.window.workspace"
@@ -166,7 +166,7 @@ public enum HarnessMonitorAccessibility {
   public static let sessionTimelineOlderButton = "harness.session.timeline.navigation.older"
   public static let sessionTimelineLatestButton = "harness.session.timeline.navigation.latest"
   public static let sessionTimelineNewerButton = "harness.session.timeline.navigation.newer"
-  public static let connectionCard = "harness.preferences.connection-card"
+  public static let connectionCard = "harness.settings.connection-card"
   public static let cornerOverlay = "harness.corner-overlay"
   public static let agentTuiButton = "harness.session.agent-tui"
   public static let workspaceSheet = agentTuiSheet, workspaceState = agentTuiState
@@ -271,26 +271,26 @@ public enum HarnessMonitorAccessibility {
   public static let sendSignalSheetActionHintField = "harness.sheet.send-signal.action-hint"
   public static let sendSignalSheetCancelButton = "harness.sheet.send-signal.cancel"
   public static let sendSignalSheetSubmitButton = "harness.sheet.send-signal.submit"
-  public static let preferencesCodexSection = "harness.preferences.codex"
-  public static let preferencesAgentsSection = preferencesCodexSection
-  public static let preferencesCodexCopyStartButton = "harness.preferences.codex.copy-start"
-  public static let preferencesCodexCopyInstallButton = "harness.preferences.codex.copy-install"
-  public static let preferencesAgentsCopyStartButton = preferencesCodexCopyStartButton
-  public static let preferencesAgentsCopyInstallButton = preferencesCodexCopyInstallButton
-  public static let preferencesDatabaseStatistics = "harness.preferences.database.statistics"
-  public static let preferencesDatabaseStatisticsPicker =
-    "harness.preferences.database.statistics-picker"
-  public static let preferencesDatabaseOperations = "harness.preferences.database.operations"
-  public static let preferencesDatabaseHealth = "harness.preferences.database.health"
-  public static let preferencesAuthorizedFoldersAddButton =
-    "harness.preferences.authorized-folders.add"
-  public static let preferencesAuthorizedFoldersUnavailable =
-    "harness.preferences.authorized-folders.unavailable"
-  public static let preferencesAuthorizedFoldersEmpty =
-    "harness.preferences.authorized-folders.empty"
+  public static let settingsCodexSection = "harness.settings.codex"
+  public static let settingsAgentsSection = settingsCodexSection
+  public static let settingsCodexCopyStartButton = "harness.settings.codex.copy-start"
+  public static let settingsCodexCopyInstallButton = "harness.settings.codex.copy-install"
+  public static let settingsAgentsCopyStartButton = settingsCodexCopyStartButton
+  public static let settingsAgentsCopyInstallButton = settingsCodexCopyInstallButton
+  public static let settingsDatabaseStatistics = "harness.settings.database.statistics"
+  public static let settingsDatabaseStatisticsPicker =
+    "harness.settings.database.statistics-picker"
+  public static let settingsDatabaseOperations = "harness.settings.database.operations"
+  public static let settingsDatabaseHealth = "harness.settings.database.health"
+  public static let settingsAuthorizedFoldersAddButton =
+    "harness.settings.authorized-folders.add"
+  public static let settingsAuthorizedFoldersUnavailable =
+    "harness.settings.authorized-folders.unavailable"
+  public static let settingsAuthorizedFoldersEmpty =
+    "harness.settings.authorized-folders.empty"
 
-  public static func preferencesAuthorizedFolderRow(_ id: String) -> String {
-    "harness.preferences.authorized-folders.row.\(id)"
+  public static func settingsAuthorizedFolderRow(_ id: String) -> String {
+    "harness.settings.authorized-folders.row.\(id)"
   }
   public static let voiceInputPopover = "harness.voice-input.popover"
   public static let voiceInputTranscript = "harness.voice-input.transcript"

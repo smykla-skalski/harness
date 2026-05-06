@@ -4,7 +4,7 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
 final class HarnessMonitorSettingsVoiceUITests: HarnessMonitorUITestCase {
-  func testVoiceSettingsExposeSharedConfigurationControlsAndPersistAcrossReopeningPreferences()
+  func testVoiceSettingsExposeSharedConfigurationControlsAndPersistAcrossReopeningSettings()
     throws
   {
     let app = launch(
@@ -14,90 +14,90 @@ final class HarnessMonitorSettingsVoiceUITests: HarnessMonitorUITestCase {
 
     openSettings(in: app)
 
-    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
-    let preferencesState = element(in: app, identifier: Accessibility.preferencesState)
-    let voiceRoot = element(in: app, identifier: Accessibility.preferencesVoiceRoot)
+    let settingsRoot = element(in: app, identifier: Accessibility.settingsRoot)
+    let settingsState = element(in: app, identifier: Accessibility.settingsState)
+    let voiceRoot = element(in: app, identifier: Accessibility.settingsVoiceRoot)
 
-    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(settingsRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(settingsState.waitForExistence(timeout: Self.actionTimeout))
 
     selectVoiceSection(in: app)
 
     XCTAssertTrue(voiceRoot.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(
-      editableField(in: app, identifier: Accessibility.preferencesVoiceLocaleField).exists
+      editableField(in: app, identifier: Accessibility.settingsVoiceLocaleField).exists
     )
     XCTAssertTrue(
-      element(in: app, identifier: Accessibility.preferencesVoiceLocalePicker).exists
+      element(in: app, identifier: Accessibility.settingsVoiceLocalePicker).exists
     )
     XCTAssertTrue(
-      element(in: app, identifier: Accessibility.preferencesVoiceLocalDaemonToggle).exists
+      element(in: app, identifier: Accessibility.settingsVoiceLocalDaemonToggle).exists
     )
     XCTAssertTrue(
-      element(in: app, identifier: Accessibility.preferencesVoiceAgentBridgeToggle).exists
+      element(in: app, identifier: Accessibility.settingsVoiceAgentBridgeToggle).exists
     )
     XCTAssertTrue(
-      element(in: app, identifier: Accessibility.preferencesVoiceRemoteProcessorToggle).exists
+      element(in: app, identifier: Accessibility.settingsVoiceRemoteProcessorToggle).exists
     )
     XCTAssertTrue(
-      element(in: app, identifier: Accessibility.preferencesVoiceInsertionModePicker).exists
+      element(in: app, identifier: Accessibility.settingsVoiceInsertionModePicker).exists
     )
     XCTAssertTrue(
-      element(in: app, identifier: Accessibility.preferencesVoiceAudioChunksToggle).exists
+      element(in: app, identifier: Accessibility.settingsVoiceAudioChunksToggle).exists
     )
     XCTAssertTrue(
       editableField(
         in: app,
-        identifier: Accessibility.preferencesVoicePendingAudioField
+        identifier: Accessibility.settingsVoicePendingAudioField
       ).exists
     )
     XCTAssertTrue(
       editableField(
         in: app,
-        identifier: Accessibility.preferencesVoicePendingTranscriptField
+        identifier: Accessibility.settingsVoicePendingTranscriptField
       ).exists
     )
     XCTAssertTrue(
-      element(in: app, identifier: Accessibility.preferencesVoiceStatus).exists
+      element(in: app, identifier: Accessibility.settingsVoiceStatus).exists
     )
     XCTAssertEqual(
-      preferencesState.label,
-      preferencesStateLabel(.voice(mode: "dark"))
+      settingsState.label,
+      settingsStateLabel(.voice(mode: "dark"))
     )
 
     let remoteToggle = element(
-      in: app, identifier: Accessibility.preferencesVoiceRemoteProcessorToggle)
+      in: app, identifier: Accessibility.settingsVoiceRemoteProcessorToggle)
     XCTAssertTrue(remoteToggle.waitForExistence(timeout: Self.actionTimeout))
     if (remoteToggle.value as? String) != "1" {
-      tapElement(in: app, identifier: Accessibility.preferencesVoiceRemoteProcessorToggle)
+      tapElement(in: app, identifier: Accessibility.settingsVoiceRemoteProcessorToggle)
     }
 
     let remoteURLField = editableField(
       in: app,
-      identifier: Accessibility.preferencesVoiceRemoteProcessorURLField
+      identifier: Accessibility.settingsVoiceRemoteProcessorURLField
     )
     XCTAssertTrue(remoteURLField.waitForExistence(timeout: Self.actionTimeout))
-    tapElement(in: app, identifier: Accessibility.preferencesVoiceRemoteProcessorURLField)
+    tapElement(in: app, identifier: Accessibility.settingsVoiceRemoteProcessorURLField)
     app.typeText("https://processor.example/voice")
     app.typeKey(.tab, modifierFlags: [])
 
     selectMenuOption(
       in: app,
-      controlIdentifier: Accessibility.preferencesVoiceInsertionModePicker,
+      controlIdentifier: Accessibility.settingsVoiceInsertionModePicker,
       optionTitle: "Auto Insert"
     )
 
-    closeSettings(in: app, preferencesRoot: preferencesRoot)
+    closeSettings(in: app, settingsRoot: settingsRoot)
     openSettings(in: app)
     selectVoiceSection(in: app)
 
     let reopenedRemoteURLField = editableField(
       in: app,
-      identifier: Accessibility.preferencesVoiceRemoteProcessorURLField
+      identifier: Accessibility.settingsVoiceRemoteProcessorURLField
     )
     let insertionModePicker = popUpButton(
       in: app,
-      identifier: Accessibility.preferencesVoiceInsertionModePicker
+      identifier: Accessibility.settingsVoiceInsertionModePicker
     )
 
     XCTAssertEqual(

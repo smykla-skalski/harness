@@ -183,9 +183,9 @@ public final class SupervisorAuditRetention: @unchecked Sendable {
   private var runInBackgroundEnabled: Bool {
     let storedValue =
       UserDefaults.standard.object(
-        forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+        forKey: SupervisorSettingsDefaults.runInBackgroundKey
       ) as? Bool
-    return storedValue ?? SupervisorPreferencesDefaults.runInBackgroundDefault
+    return storedValue ?? SupervisorSettingsDefaults.runInBackgroundDefault
   }
 
   private var normalizedTolerance: TimeInterval {
