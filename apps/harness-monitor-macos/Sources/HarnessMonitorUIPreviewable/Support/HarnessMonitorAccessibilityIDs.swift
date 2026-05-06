@@ -230,6 +230,7 @@ public enum HarnessMonitorAccessibility {
   public static let agentTuiRolePicker = "harness.sheet.agent-tui.role"
   public static let agentTuiFallbackRolePicker = "harness.window.workspace.role-fallback"
   public static let agentTuiNameField = "harness.sheet.agent-tui.name"
+  public static let agentTuiNameSuggestButton = "harness.sheet.agent-tui.name.suggest"
   public static let agentTuiPromptField = "harness.sheet.agent-tui.prompt"
   public static let agentTuiProjectDirField = "harness.sheet.agent-tui.project-dir"
   public static let agentTuiArgvField = "harness.sheet.agent-tui.argv"

@@ -326,13 +326,14 @@ extension WorkspaceWindowCreatePane {
   }
 
   func applySavedLaunchPresetIfFresh() {
-    guard let snapshot = LaunchPresetDefaults.read() else { return }
-    restoreCreateMode(from: snapshot)
-    guard canRestoreSavedLaunchPreset else {
-      return
+    if let snapshot = LaunchPresetDefaults.read() {
+      restoreCreateMode(from: snapshot)
+      if canRestoreSavedLaunchPreset {
+        restoreTerminalLaunchPreset(from: snapshot)
+        restoreCodexLaunchPreset(from: snapshot)
+      }
     }
-    restoreTerminalLaunchPreset(from: snapshot)
-    restoreCodexLaunchPreset(from: snapshot)
+    prefillAgentNameIfEligible()
   }
 
   private var canRestoreSavedLaunchPreset: Bool {
