@@ -42,9 +42,15 @@ struct MonitorTimelineSection: View {
     // .onAppear/.onChange writes here interleaved @State (cachedPresentation)
     // and @Observable (viewport) mutations during body eval, surfacing as an
     // AttributeGraph cycle when ACP timeline bursts arrived faster than the
-    // run loop could drain (rdar://timeline-burst). Deferring keeps ~6.4/s
-    // body-update budget intact because rebuild only fires on input change.
+    // run loop could drain (rdar://timeline-burst). Yield once so SwiftUI can
+    // cancel superseded same-frame input bursts before they mutate state; that
+    // removes the "update multiple times per frame" fault without touching the
+    // table's measurement, height cache, or scrolling paths.
     .task(id: input) {
+      await Task.yield()
+      guard !Task.isCancelled else {
+        return
+      }
       rebuildPresentationIfNeeded(for: input)
     }
     .task(id: filterHydrationInput) {
