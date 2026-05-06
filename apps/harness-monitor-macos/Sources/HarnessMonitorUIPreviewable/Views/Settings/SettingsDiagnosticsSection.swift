@@ -2,8 +2,9 @@ import HarnessMonitorKit
 import SwiftUI
 
 public struct SettingsDiagnosticsSnapshot {
-  public struct AcpPermissionLogRun: Equatable {
-    public let runID: String
+  public struct AcpPermissionLogRun: Equatable, Identifiable {
+    public let id: String
+    public let sessionID: String
     public let displayName: String
     public let path: String?
   }
@@ -52,7 +53,8 @@ public struct SettingsDiagnosticsSnapshot {
     acpPermissionLogRuns = store.selectedAcpInspectAgents
       .map { snapshot in
         AcpPermissionLogRun(
-          runID: snapshot.sessionId,
+          id: snapshot.acpId,
+          sessionID: snapshot.sessionId,
           displayName: snapshot.displayName,
           path: snapshot.permissionLogPath
         )
@@ -61,7 +63,7 @@ public struct SettingsDiagnosticsSnapshot {
         if left.displayName != right.displayName {
           return left.displayName.localizedStandardCompare(right.displayName) == .orderedAscending
         }
-        return left.runID < right.runID
+        return left.id < right.id
       }
   }
 }
@@ -70,8 +72,8 @@ public struct SettingsDiagnosticsSection: View {
   public let snapshot: SettingsDiagnosticsSnapshot
   public let revealPermissionLog: (String, String?) -> RevealAcpPermissionLogResult
   public let repairLaunchAgent: (() async -> Void)?
-  @State private var permissionLogErrorsByRunID: [String: String] = [:]
-  @State private var permissionLogRevealStatusesByRunID: [String: String] = [:]
+  @State private var permissionLogErrorsByEntryID: [String: String] = [:]
+  @State private var permissionLogRevealStatusesByEntryID: [String: String] = [:]
 
   public init(
     snapshot: SettingsDiagnosticsSnapshot,
@@ -102,30 +104,30 @@ public struct SettingsDiagnosticsSection: View {
       )
       SettingsAcpPermissionLogSection(
         runs: snapshot.acpPermissionLogRuns,
-        errorsByRunID: permissionLogErrorsByRunID,
-        revealStatusesByRunID: permissionLogRevealStatusesByRunID,
+        errorsByEntryID: permissionLogErrorsByEntryID,
+        revealStatusesByEntryID: permissionLogRevealStatusesByEntryID,
         reveal: revealPermissionLog,
-        onRevealed: { runID, message in
-          permissionLogRevealStatusesByRunID[runID] = message
+        onRevealed: { entryID, message in
+          permissionLogRevealStatusesByEntryID[entryID] = message
         },
-        onError: { runID, message in
-          permissionLogRevealStatusesByRunID.removeValue(forKey: runID)
-          permissionLogErrorsByRunID[runID] = message
+        onError: { entryID, message in
+          permissionLogRevealStatusesByEntryID.removeValue(forKey: entryID)
+          permissionLogErrorsByEntryID[entryID] = message
         },
-        clearError: { runID in
-          permissionLogErrorsByRunID.removeValue(forKey: runID)
+        clearError: { entryID in
+          permissionLogErrorsByEntryID.removeValue(forKey: entryID)
         }
       )
       SettingsPathsSection(paths: snapshot.paths)
       SettingsRecentEventsSection(events: snapshot.recentEvents)
     }
     .settingsDetailFormStyle()
-    .onChange(of: snapshot.acpPermissionLogRuns.map(\.runID)) { _, runIDs in
-      let activeIDs = Set(runIDs)
-      permissionLogErrorsByRunID = permissionLogErrorsByRunID.filter { entry in
+    .onChange(of: snapshot.acpPermissionLogRuns.map(\.id)) { _, entryIDs in
+      let activeIDs = Set(entryIDs)
+      permissionLogErrorsByEntryID = permissionLogErrorsByEntryID.filter { entry in
         activeIDs.contains(entry.key)
       }
-      permissionLogRevealStatusesByRunID = permissionLogRevealStatusesByRunID.filter { entry in
+      permissionLogRevealStatusesByEntryID = permissionLogRevealStatusesByEntryID.filter { entry in
         activeIDs.contains(entry.key)
       }
     }
@@ -134,8 +136,8 @@ public struct SettingsDiagnosticsSection: View {
 
 private struct SettingsAcpPermissionLogSection: View {
   let runs: [SettingsDiagnosticsSnapshot.AcpPermissionLogRun]
-  let errorsByRunID: [String: String]
-  let revealStatusesByRunID: [String: String]
+  let errorsByEntryID: [String: String]
+  let revealStatusesByEntryID: [String: String]
   let reveal: (String, String?) -> RevealAcpPermissionLogResult
   let onRevealed: (String, String) -> Void
   let onError: (String, String) -> Void
@@ -144,38 +146,39 @@ private struct SettingsAcpPermissionLogSection: View {
   @ViewBuilder var body: some View {
     if !runs.isEmpty {
       Section("ACP Permission Logs") {
-        ForEach(runs, id: \.runID) { run in
+        ForEach(runs) { run in
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
             HarnessMonitorActionButton(
               title: "Reveal permission-log.ndjson in Finder (\(run.displayName))",
               tint: .secondary,
               variant: .bordered,
-              accessibilityIdentifier:
-                "harness.settings.diagnostics.acp-permission-log.reveal.\(run.runID)",
+              accessibilityIdentifier: HarnessMonitorAccessibility.settingsAcpPermissionLogRevealButton(
+                run.id
+              ),
             ) {
-              let result = reveal(run.runID, run.path)
+              let result = reveal(run.sessionID, run.path)
               if result == .revealed {
-                clearError(run.runID)
+                clearError(run.id)
                 onRevealed(
-                  run.runID,
+                  run.id,
                   "Reveal requested in Finder."
                 )
               } else {
                 onError(
-                  run.runID,
+                  run.id,
                   "ACP permission log for this run is unavailable."
                 )
               }
             }
-            if let status = revealStatusesByRunID[run.runID] {
+            if let status = revealStatusesByEntryID[run.id] {
               SettingsAcpPermissionLogRevealStatusRow(
-                runID: run.runID,
+                entryID: run.id,
                 message: status
               )
             }
-            if let error = errorsByRunID[run.runID] {
+            if let error = errorsByEntryID[run.id] {
               SettingsAcpPermissionLogErrorRow(
-                runID: run.runID,
+                entryID: run.id,
                 message: error
               )
             }
@@ -187,11 +190,11 @@ private struct SettingsAcpPermissionLogSection: View {
 }
 
 private struct SettingsAcpPermissionLogRevealStatusRow: View {
-  let runID: String
+  let entryID: String
   let message: String
 
   private var identifier: String {
-    HarnessMonitorAccessibility.settingsAcpPermissionLogRevealStatus(runID)
+    HarnessMonitorAccessibility.settingsAcpPermissionLogRevealStatus(entryID)
   }
 
   var body: some View {
@@ -215,11 +218,11 @@ private struct SettingsAcpPermissionLogRevealStatusRow: View {
 }
 
 private struct SettingsAcpPermissionLogErrorRow: View {
-  let runID: String
+  let entryID: String
   let message: String
 
   private var identifier: String {
-    "harness.settings.diagnostics.acp-permission-log.error.\(runID)"
+    HarnessMonitorAccessibility.settingsAcpPermissionLogError(entryID)
   }
 
   var body: some View {
