@@ -11,7 +11,7 @@ struct SessionTimelineConnectorVisibility {
 // offset preservation stay in AppKit instead of feeding per-row geometry back into SwiftUI.
 enum SessionTimelineTableMetrics {
   static let estimatedBaseRowHeight: CGFloat = 92
-  static let pinnedLatestDriftTolerance = HarnessMonitorTheme.spacingSM
+  static let pinnedLatestDriftTolerance: CGFloat = 1
   private static let minimumSimpleWideCardHeight: CGFloat = 40
   private static let minimumDetailedWideCardHeight: CGFloat = 60
   private static let minimumCompactCardHeight: CGFloat = 96

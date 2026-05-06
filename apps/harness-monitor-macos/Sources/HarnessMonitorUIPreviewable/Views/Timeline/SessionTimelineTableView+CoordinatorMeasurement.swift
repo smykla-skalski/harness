@@ -173,7 +173,9 @@ extension SessionTimelineTableView.Coordinator {
     // keep painting against the old estimated row bounds until a later scroll.
     tableView?.layoutSubtreeIfNeeded()
     scrollView?.layoutSubtreeIfNeeded()
-    _ = normalizePinnedLatestViewportIfNeeded()
+    if isPinnedToLatestViewport() {
+      _ = normalizePinnedLatestViewportIfNeeded()
+    }
   }
 
   private func changedIndexesAffectVisibleRows(_ changedIndexes: IndexSet) -> Bool {
