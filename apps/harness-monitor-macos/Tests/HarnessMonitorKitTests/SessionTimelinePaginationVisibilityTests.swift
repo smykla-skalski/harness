@@ -193,9 +193,9 @@ struct SessionTimelineNavigationVisibilityTests {
     )
   }
 
-  @Test("Signal timeline rows keep minimum breathing room for compact and wide cards")
+  @Test("Simple liveness rows avoid inflated minimum-card padding")
   @MainActor
-  func signalTimelineRowsKeepMinimumBreathingRoomForCompactAndWideCards() throws {
+  func simpleLivenessRowsAvoidInflatedMinimumCardPadding() throws {
     let rows = SessionTimelineRow.rows(
       for: SessionTimelineNodeBuilder(
         sessionID: PreviewFixtures.summary.sessionId,
@@ -218,8 +218,8 @@ struct SessionTimelineNavigationVisibilityTests {
       columnWidth: 945
     )
 
-    #expect(livenessHeight >= SessionTimelineTableMetrics.minimumCardHeight(for: livenessRow))
-    #expect(signalHeight >= SessionTimelineTableMetrics.minimumCardHeight(for: signalRow))
+    #expect(livenessHeight < SessionTimelineTableMetrics.estimatedBaseRowHeight)
+    #expect(signalHeight >= livenessHeight)
   }
 
   @Test("Agentless single-line wide rows do not reserve empty action spacing")
