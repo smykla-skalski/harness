@@ -136,7 +136,6 @@ final class AgentNameGeneratorTests: XCTestCase {
   }
 
   func testFallbackAvoidsCollidingNumberedNames() {
-    var rng = SeededRNG(state: 11)
     let taken = ["Codex Agent 1", "Codex Agent 2", "Codex Agent 3", "Codex Agent 4"]
     let outcome = AgentNameGenerator.numberedFallback(
       for: .codex,

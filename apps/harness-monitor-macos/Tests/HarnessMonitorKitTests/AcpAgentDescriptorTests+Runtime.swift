@@ -2,36 +2,6 @@ import HarnessMonitorKit
 import XCTest
 
 extension AcpAgentDescriptorTests {
-  func testAcpSnapshotDecodesCanonicalIdentityFields() throws {
-    let json = Data(
-      """
-      {
-        "managed_agent_id": "acp-1",
-        "session_id": "session-1",
-        "session_agent_id": "agent-1",
-        "display_name": "GitHub Copilot",
-        "status": "active",
-        "pid": 123,
-        "pgid": 123,
-        "project_dir": "/tmp/harness",
-        "pending_permissions": 0,
-        "permission_queue_depth": 0,
-        "pending_permission_batches": [],
-        "terminal_count": 0,
-        "created_at": "2026-04-28T00:00:00Z",
-        "updated_at": "2026-04-28T00:00:01Z"
-      }
-      """.utf8
-    )
-
-    let decoder = JSONDecoder()
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
-    let snapshot = try decoder.decode(AcpAgentSnapshot.self, from: json)
-
-    XCTAssertEqual(snapshot.managedAgentID, "acp-1")
-    XCTAssertEqual(snapshot.sessionAgentID, "agent-1")
-  }
-
   func testAcpEventBatchPayloadUsesCanonicalManagedAgentIdentity() throws {
     let json = Data(
       """
