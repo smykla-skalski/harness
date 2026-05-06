@@ -89,6 +89,52 @@ struct SessionTimelineNavigationTests {
     #expect(advancedBottomEntry.enteredBottomEdge(from: firstBottomEntry))
   }
 
+  @Test("Scroll boundary state ignores reverse motion inside the bottom edge zone")
+  func scrollBoundaryStateIgnoresReverseMotionInsideTheBottomEdgeZone() {
+    let deeperBottomEntry = SessionTimelineScrollBoundaryState(
+      visibleMinY: 275,
+      visibleMaxY: 832,
+      contentHeight: 1_000
+    )
+    let reversedBottomEntry = SessionTimelineScrollBoundaryState(
+      visibleMinY: 246,
+      visibleMaxY: 790,
+      contentHeight: 1_000
+    )
+    let reboundBottomEntry = SessionTimelineScrollBoundaryState(
+      visibleMinY: 275,
+      visibleMaxY: 832,
+      contentHeight: 1_000
+    )
+
+    #expect(!reversedBottomEntry.enteredBottomEdge(from: deeperBottomEntry))
+    #expect(!reversedBottomEntry.shouldTrack(from: deeperBottomEntry))
+    #expect(!reboundBottomEntry.enteredBottomEdge(from: deeperBottomEntry))
+  }
+
+  @Test("Scroll boundary state ignores reverse motion inside the top edge zone")
+  func scrollBoundaryStateIgnoresReverseMotionInsideTheTopEdgeZone() {
+    let deeperTopEntry = SessionTimelineScrollBoundaryState(
+      visibleMinY: 32,
+      visibleMaxY: 470,
+      contentHeight: 1_000
+    )
+    let reversedTopEntry = SessionTimelineScrollBoundaryState(
+      visibleMinY: 70,
+      visibleMaxY: 508,
+      contentHeight: 1_000
+    )
+    let reboundTopEntry = SessionTimelineScrollBoundaryState(
+      visibleMinY: 32,
+      visibleMaxY: 470,
+      contentHeight: 1_000
+    )
+
+    #expect(!reversedTopEntry.enteredTopEdge(from: deeperTopEntry))
+    #expect(!reversedTopEntry.shouldTrack(from: deeperTopEntry))
+    #expect(!reboundTopEntry.enteredTopEdge(from: deeperTopEntry))
+  }
+
   @Test("Table row metrics reserve space for rich timeline rows")
   func tableRowMetricsReserveSpaceForRichTimelineRows() {
     let rows = makeTimelineRows(count: 13)

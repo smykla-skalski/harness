@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SessionTimelineScrollBoundaryState: Equatable {
   static let triggerDistance: CGFloat = 220
-  private static let bucketSize: CGFloat = 24
+  private static let bucketSize: CGFloat = SessionTimelineSectionPresentation.rowHeightEstimate
 
   private let topBucket: Int?
   private let bottomBucket: Int?
@@ -31,18 +31,45 @@ struct SessionTimelineScrollBoundaryState: Equatable {
   }
 
   func enteredTopEdge(from oldValue: Self) -> Bool {
-    enteredEdge(topBucket, from: oldValue.topBucket)
+    enteredEdge(topBucket, from: oldValue.topBucket, towardEdge: <)
   }
 
   func enteredBottomEdge(from oldValue: Self) -> Bool {
-    enteredEdge(bottomBucket, from: oldValue.bottomBucket)
+    enteredEdge(bottomBucket, from: oldValue.bottomBucket, towardEdge: >)
   }
 
-  private func enteredEdge(_ newBucket: Int?, from oldBucket: Int?) -> Bool {
+  func shouldTrack(from oldValue: Self) -> Bool {
+    shouldTrackEdge(topBucket, from: oldValue.topBucket, towardEdge: <)
+      || shouldTrackEdge(bottomBucket, from: oldValue.bottomBucket, towardEdge: >)
+  }
+
+  private func enteredEdge(
+    _ newBucket: Int?,
+    from oldBucket: Int?,
+    towardEdge: (Int, Int) -> Bool
+  ) -> Bool {
     guard let newBucket else {
       return false
     }
-    return oldBucket != newBucket
+    guard let oldBucket else {
+      return true
+    }
+    return towardEdge(newBucket, oldBucket)
+  }
+
+  private func shouldTrackEdge(
+    _ newBucket: Int?,
+    from oldBucket: Int?,
+    towardEdge: (Int, Int) -> Bool
+  ) -> Bool {
+    switch (oldBucket, newBucket) {
+    case (nil, nil):
+      false
+    case (.some, nil), (nil, .some):
+      true
+    case let (.some(oldBucket), .some(newBucket)):
+      towardEdge(newBucket, oldBucket)
+    }
   }
 
   private static func bucket(for offset: CGFloat) -> Int {

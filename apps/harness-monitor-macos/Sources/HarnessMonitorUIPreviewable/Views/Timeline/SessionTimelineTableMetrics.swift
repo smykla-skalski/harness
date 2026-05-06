@@ -12,6 +12,7 @@ struct SessionTimelineConnectorVisibility {
 enum SessionTimelineTableMetrics {
   static let estimatedBaseRowHeight: CGFloat = 92
   static let pinnedLatestDriftTolerance: CGFloat = 1
+  static let pinnedLatestNormalizationTolerance: CGFloat = 16
   private static let minimumSimpleWideCardHeight: CGFloat = 40
   private static let minimumDetailedWideCardHeight: CGFloat = 60
   private static let minimumCompactCardHeight: CGFloat = 96
@@ -77,6 +78,18 @@ enum SessionTimelineTableMetrics {
       return false
     }
     return firstVisibleRowIndex == 0 && visibleMinY <= pinnedLatestDriftTolerance
+  }
+
+  static func shouldNormalizeLatestViewport(
+    visibleMinY: CGFloat,
+    firstVisibleRowIndex: Int?
+  ) -> Bool {
+    guard let firstVisibleRowIndex else {
+      return false
+    }
+    return firstVisibleRowIndex == 0
+      && visibleMinY > 0
+      && visibleMinY <= pinnedLatestNormalizationTolerance
   }
 
   static func usesSimpleWideLayout(for row: SessionTimelineRow) -> Bool {
