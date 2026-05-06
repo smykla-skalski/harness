@@ -31,6 +31,7 @@ struct SidebarSearchHost: View {
   let searchResults: HarnessMonitorStore.SessionSearchResultsSlice
   let sidebarUI: HarnessMonitorStore.SidebarUISlice
   let canPresentSearch: Bool
+  let interactionRelay: ContentInteractionRelay
   let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
   let fontScale: CGFloat
   let collapsedCheckoutKeys: Set<String>
@@ -84,6 +85,7 @@ struct SidebarSearchHost: View {
         projection: projection,
         searchResults: searchResults,
         sidebarUI: sidebarUI,
+        interactionRelay: interactionRelay,
         dateTimeConfiguration: dateTimeConfiguration,
         fontScale: fontScale,
         collapsedCheckoutKeys: collapsedCheckoutKeys,

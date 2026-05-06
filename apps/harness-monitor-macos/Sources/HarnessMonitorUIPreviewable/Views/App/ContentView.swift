@@ -1,8 +1,34 @@
 import HarnessMonitorKit
+import Observation
 import SwiftUI
 
 private let contentWindowToolbarBackgroundVisibility: Visibility = .automatic
 private let contentToolbarBackgroundMarker = "automatic"
+
+struct ContentPlainClickSignal: Equatable {
+  var generation: UInt64 = 0
+  var modifiers: EventModifiers = []
+}
+
+@MainActor
+@Observable
+final class ContentInteractionRelay {
+  var plainClickSignal = ContentPlainClickSignal()
+  @ObservationIgnored private var currentModifiers: EventModifiers = []
+
+  func updateModifierKeys(_ modifiers: EventModifiers) {
+    if currentModifiers != modifiers {
+      currentModifiers = modifiers
+    }
+  }
+
+  func recordPlainTap() {
+    plainClickSignal = ContentPlainClickSignal(
+      generation: plainClickSignal.generation &+ 1,
+      modifiers: currentModifiers
+    )
+  }
+}
 
 public struct ContentView<CornerContent: View>: View {
   let store: HarnessMonitorStore
@@ -18,6 +44,7 @@ public struct ContentView<CornerContent: View>: View {
   let auditBuildState: AuditBuildDisplayState?
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @State private var isStartupFocusParticipationEnabled = HarnessMonitorUITestEnvironment.isEnabled
+  @State private var interactionRelay = ContentInteractionRelay()
   private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
 
   private var appChromeAccessibilityValue: String {
@@ -123,6 +150,15 @@ public struct ContentView<CornerContent: View>: View {
     .background(contentBackground)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .coordinateSpace(name: "contentRoot")
+    .onModifierKeysChanged { _, newModifiers in
+      interactionRelay.updateModifierKeys(newModifiers)
+    }
+    .simultaneousGesture(
+      SpatialTapGesture().onEnded { _ in
+        interactionRelay.recordPlainTap()
+      },
+      including: .all
+    )
     .modifier(
       HarnessMonitorConfirmationDialogModifier(
         store: store,
@@ -215,7 +251,8 @@ public struct ContentView<CornerContent: View>: View {
       projection: store.sessionIndex.projection,
       searchResults: store.sessionIndex.searchResults,
       sidebarUI: store.sidebarUI,
-      canPresentSearch: isStartupFocusParticipationEnabled
+      canPresentSearch: isStartupFocusParticipationEnabled,
+      interactionRelay: interactionRelay
     )
     .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
   }

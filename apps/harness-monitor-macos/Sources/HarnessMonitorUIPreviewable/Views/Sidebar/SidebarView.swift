@@ -8,6 +8,7 @@ struct SidebarView: View {
   let searchResults: HarnessMonitorStore.SessionSearchResultsSlice
   let sidebarUI: HarnessMonitorStore.SidebarUISlice
   let canPresentSearch: Bool
+  let interactionRelay: ContentInteractionRelay
   @Environment(\.harnessDateTimeConfiguration)
   var dateTimeConfiguration
   @Environment(\.fontScale)
@@ -23,6 +24,7 @@ struct SidebarView: View {
       searchResults: searchResults,
       sidebarUI: sidebarUI,
       canPresentSearch: canPresentSearch,
+      interactionRelay: interactionRelay,
       dateTimeConfiguration: dateTimeConfiguration,
       fontScale: fontScale,
       collapsedCheckoutKeys: collapsedCheckoutKeys,
@@ -42,139 +44,20 @@ struct SidebarView: View {
   }
 }
 
-struct SidebarToolbarCreateMenuToolbarItem: ToolbarContent {
-  let store: HarnessMonitorStore
-  let canCreateTask: Bool
-
-  private var createMenuAccessibilityValue: String {
-    canCreateTask
-      ? "New Agent and New Task available"
-      : "New Agent available. New Task unavailable until a writable session is selected"
-  }
-
-  var body: some ToolbarContent {
-    ToolbarItem(placement: .primaryAction) {
-      SidebarCreateMenu(
-        store: store,
-        canCreateTask: canCreateTask,
-        menuStateValue: createMenuAccessibilityValue
-      )
-    }
-  }
-}
-
-private struct SidebarCreateMenu: View {
-  let store: HarnessMonitorStore
-  let canCreateTask: Bool
-  let menuStateValue: String
-  @Environment(\.openWindow)
-  private var openWindow
-
-  var body: some View {
-    Menu {
-      Button("New Agent", action: openNewAgent)
-        .harnessMCPMenuItem(
-          HarnessMonitorAccessibility.sidebarCreateMenuNewAgentItem,
-          label: "New Agent"
-        )
-
-      Button("New Task", action: openNewTask)
-        .disabled(!canCreateTask)
-        .harnessMCPMenuItem(
-          HarnessMonitorAccessibility.sidebarCreateMenuNewTaskItem,
-          label: "New Task",
-          enabled: canCreateTask
-        )
-    } label: {
-      Label("Create", systemImage: "plus")
-    }
-    .help("Create agent or task")
-    .menuIndicator(.hidden)
-    .accessibilityLabel("Create")
-    .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarCreateMenuButton)
-    .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarCreateMenuButtonFrame)
-    .harnessMCPButton(
-      HarnessMonitorAccessibility.sidebarCreateMenuButton,
-      label: "Create",
-      value: menuStateValue
-    )
-  }
-
-  private func openNewAgent() {
-    store.requestWorkspaceCreateEntryPoint(
-      .agent,
-      sessionID: store.selectedSession?.session.sessionId
-    )
-    openWindow(id: HarnessMonitorWindowID.workspace)
-  }
-
-  private func openNewTask() {
-    store.requestCreateTaskSheet()
-  }
-}
-
-struct SidebarToolbarFilterToolbarItem: ToolbarContent {
-  let store: HarnessMonitorStore
-  let controls: HarnessMonitorStore.SessionControlsSlice
-
-  var body: some ToolbarContent {
-    ToolbarItem(placement: .automatic) {
-      SidebarFilterMenu(store: store, controls: controls)
-    }
-  }
-}
-
-struct SidebarFilterStateMarker: View {
-  let controls: HarnessMonitorStore.SessionControlsSlice
-  let searchResults: HarnessMonitorStore.SessionSearchResultsSlice
-  let isSidebarSearchPresented: Bool
-
-  private var sidebarFilterStateValue: String {
-    [
-      "status=\(controls.sessionFilter.rawValue)",
-      "focus=\(controls.sessionFocusFilter.rawValue)",
-      "sort=\(controls.sessionSortOrder.rawValue)",
-      "visible=\(searchResults.filteredSessionCount)",
-      "total=\(searchResults.totalSessionCount)",
-      "search=\(controls.searchText)",
-    ].joined(separator: ", ")
-  }
-
-  private var sidebarSearchStateValue: String {
-    [
-      "presented=\(isSidebarSearchPresented)",
-      "active=\(isSidebarSearchPresented)",
-      "visible=true",
-    ].joined(separator: ", ")
-  }
-
-  var body: some View {
-    if HarnessMonitorUITestEnvironment.searchMarkersEnabled {
-      Group {
-        AccessibilityTextMarker(
-          identifier: HarnessMonitorAccessibility.sidebarFilterState,
-          text: sidebarFilterStateValue
-        )
-        AccessibilityTextMarker(
-          identifier: HarnessMonitorAccessibility.sidebarSearchState,
-          text: sidebarSearchStateValue
-        )
-      }
-    }
-  }
-}
-
 struct SidebarSessionListColumn: View {
   let store: HarnessMonitorStore
   let controls: HarnessMonitorStore.SessionControlsSlice
   let projection: HarnessMonitorStore.SessionProjectionSlice
   let searchResults: HarnessMonitorStore.SessionSearchResultsSlice
   let sidebarUI: HarnessMonitorStore.SidebarUISlice
+  let interactionRelay: ContentInteractionRelay
   let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
   let fontScale: CGFloat
   let collapsedCheckoutKeys: Set<String>
   let setCheckoutCollapsed: (String, Bool) -> Void
   @State private var localSelection: Set<String>
+  @State private var currentModifiers: EventModifiers = []
+  @State private var trailingWhitespaceBoundaryMaxY: CGFloat = 0
 
   init(
     store: HarnessMonitorStore,
@@ -182,6 +65,7 @@ struct SidebarSessionListColumn: View {
     projection: HarnessMonitorStore.SessionProjectionSlice,
     searchResults: HarnessMonitorStore.SessionSearchResultsSlice,
     sidebarUI: HarnessMonitorStore.SidebarUISlice,
+    interactionRelay: ContentInteractionRelay,
     dateTimeConfiguration: HarnessMonitorDateTimeConfiguration,
     fontScale: CGFloat,
     collapsedCheckoutKeys: Set<String>,
@@ -192,6 +76,7 @@ struct SidebarSessionListColumn: View {
     self.projection = projection
     self.searchResults = searchResults
     self.sidebarUI = sidebarUI
+    self.interactionRelay = interactionRelay
     self.dateTimeConfiguration = dateTimeConfiguration
     self.fontScale = fontScale
     self.collapsedCheckoutKeys = collapsedCheckoutKeys
@@ -253,19 +138,39 @@ struct SidebarSessionListColumn: View {
   }
 
   var body: some View {
-    List(selection: sidebarSelection) {
-      SidebarSessionListContent(
-        store: store,
-        renderState: renderState,
-        activateSessionRow: activateSessionRow,
-        toggleBookmark: { sessionID, projectID in
-          store.toggleBookmark(sessionId: sessionID, projectId: projectID)
-        },
-        setCheckoutCollapsed: setCheckoutCollapsed
-      )
+    GeometryReader { proxy in
+      ZStack(alignment: .topLeading) {
+        Color.clear.accessibilityHidden(true)
+        List(selection: sidebarSelection) {
+          SidebarSessionListContent(
+            store: store,
+            renderState: renderState,
+            activateSessionRow: activateSessionRow,
+            collapseSelectionToRow: collapseSelectionToRow,
+            toggleBookmark: { sessionID, projectID in
+              store.toggleBookmark(sessionId: sessionID, projectId: projectID)
+            },
+            setCheckoutCollapsed: setCheckoutCollapsed
+          )
+        }
+        trailingWhitespaceTapLayer(containerSize: proxy.size)
+      }
+    }
+    .contentShape(Rectangle())
+    .coordinateSpace(name: SidebarSessionListInteractionMetrics.coordinateSpaceName)
+    .onPreferenceChange(SidebarSessionListTrailingWhitespaceBoundaryPreferenceKey.self) {
+      trailingWhitespaceBoundaryMaxY = $0
+    }
+    .onModifierKeysChanged { _, newModifiers in
+      if currentModifiers != newModifiers {
+        currentModifiers = newModifiers
+      }
     }
     .onChange(of: sidebarUI.selectedSessionID, initial: true) { _, newValue in
       syncSelectionFromStore(newValue)
+    }
+    .onChange(of: interactionRelay.plainClickSignal) { _, signal in
+      collapseSelectionFromApplicationTap(signal)
     }
     .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarSessionListContent)
     .accessibilityTestProbe(
@@ -289,6 +194,100 @@ struct SidebarSessionListColumn: View {
       ]
     )
     applySelectionChange(change)
+  }
+
+  private func collapseSelectionToRow(_ sessionID: String) {
+    guard renderedSidebarSelection.count > 1 else {
+      return
+    }
+    let blockingModifiers = currentModifiers.intersection([
+      .command, .shift, .control, .option,
+    ])
+    guard blockingModifiers.isEmpty else {
+      return
+    }
+    applySelectionChange(
+      SidebarSessionListSelectionSync.explicitSingleSelection(
+        sessionID: sessionID,
+        storeSelectedSessionID: sidebarUI.selectedSessionID
+      )
+    )
+  }
+
+  private func collapseSelectionFromApplicationTap(_ signal: ContentPlainClickSignal) {
+    guard renderedSidebarSelection.count > 1 else {
+      return
+    }
+    let blockingModifiers = signal.modifiers.intersection([
+      .command, .shift, .control, .option,
+    ])
+    guard blockingModifiers.isEmpty else {
+      return
+    }
+    if let sessionID = sidebarUI.selectedSessionID,
+      renderedSidebarSelection.contains(sessionID)
+    {
+      applySelectionChange(
+        SidebarSessionListSelectionSync.explicitSingleSelection(
+          sessionID: sessionID,
+          storeSelectedSessionID: sidebarUI.selectedSessionID
+        )
+      )
+    } else {
+      collapseSelectionFromPlainBackground()
+    }
+  }
+
+  private func collapseSelectionFromPlainBackground() {
+    guard renderedSidebarSelection.count > 1 else {
+      return
+    }
+    let change =
+      if let sessionID = sidebarUI.selectedSessionID,
+        renderedSidebarSelection.contains(sessionID)
+      {
+        SidebarSessionListSelectionSync.explicitSingleSelection(
+          sessionID: sessionID,
+          storeSelectedSessionID: sidebarUI.selectedSessionID
+        )
+      } else {
+        SidebarSessionListSelectionChange(
+          nextSelection: [],
+          storeSelection: .cleared
+        )
+      }
+    applySelectionChange(change)
+  }
+
+  @ViewBuilder
+  private func trailingWhitespaceTapLayer(containerSize: CGSize) -> some View {
+    let whitespaceHeight = max(0, containerSize.height - trailingWhitespaceBoundaryMaxY)
+
+    if renderedSidebarSelection.count > 1,
+      trailingWhitespaceBoundaryMaxY > 0,
+      whitespaceHeight > 1
+    {
+      Color.clear
+        .contentShape(Rectangle())
+        .frame(width: containerSize.width, height: whitespaceHeight)
+        .offset(y: trailingWhitespaceBoundaryMaxY)
+        .gesture(
+          SpatialTapGesture().onEnded { _ in
+            collapseSelectionFromSidebarWhitespaceTap()
+          }
+        )
+        .accessibilityHidden(true)
+    }
+  }
+
+  private func collapseSelectionFromSidebarWhitespaceTap() {
+    let blockingModifiers = currentModifiers.intersection([
+      .command, .shift, .control, .option,
+    ])
+    guard blockingModifiers.isEmpty else {
+      return
+    }
+    collapseSelectionFromPlainBackground()
   }
 
   private func syncSelectionFromStore(_ sessionID: String?) {
@@ -320,35 +319,5 @@ struct SidebarSessionListColumn: View {
     case .selected(let sessionID):
       store.selectSessionFromList(sessionID)
     }
-  }
-}
-
-@MainActor
-enum SidebarFilterVisibilityPolicy {
-  static func hasActiveFilters(
-    in controls: HarnessMonitorStore.SessionControlsSlice
-  ) -> Bool {
-    !controls.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-      || controls.sessionFilter != .all
-      || controls.sessionFocusFilter != .all
-      || controls.sessionSortOrder != .recentActivity
-  }
-}
-
-struct SidebarFooterAccessoryBridge: View {
-  let sidebarUI: HarnessMonitorStore.SidebarUISlice
-  let daemonOwnership: DaemonOwnership
-  let bridgeRunning: Bool
-  let mcpStatus: HarnessMonitorMCPStatusSnapshot
-  let isMCPRegistryHostEnabled: Bool
-
-  var body: some View {
-    SidebarFooterAccessory(
-      metrics: sidebarUI.connectionMetrics,
-      daemonOwnership: daemonOwnership,
-      bridgeRunning: bridgeRunning,
-      mcpStatus: mcpStatus,
-      isMCPRegistryHostEnabled: isMCPRegistryHostEnabled
-    )
   }
 }

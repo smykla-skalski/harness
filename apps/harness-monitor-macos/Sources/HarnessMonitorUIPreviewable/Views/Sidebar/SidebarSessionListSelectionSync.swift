@@ -19,8 +19,8 @@ struct SidebarSessionListSelectionChange: Equatable {
 /// - a visible single selection may sync back to the store
 /// - a visible multi-selection stays local to the sidebar
 /// - filtered-out selections stay in local state until visibility changes again
-/// - semantic MCP/accessibility row activation is an explicit single-target path
-///   that collapses local selection to one row and targets the cockpit
+/// - explicit single-target paths (plain pointer clicks and semantic activation)
+///   collapse local selection to one row and target the cockpit
 enum SidebarSessionListSelectionSync {
   static func selection(for sessionID: String?) -> Set<String> {
     guard let sessionID else {
@@ -87,6 +87,16 @@ enum SidebarSessionListSelectionSync {
   }
 
   static func semanticActivation(
+    sessionID: String,
+    storeSelectedSessionID: String?
+  ) -> SidebarSessionListSelectionChange {
+    explicitSingleSelection(
+      sessionID: sessionID,
+      storeSelectedSessionID: storeSelectedSessionID
+    )
+  }
+
+  static func explicitSingleSelection(
     sessionID: String,
     storeSelectedSessionID: String?
   ) -> SidebarSessionListSelectionChange {

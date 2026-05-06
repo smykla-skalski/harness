@@ -42,6 +42,34 @@ struct SidebarSessionListRenderState {
     "projects=\(groupedProjectCount), worktrees=\(groupedWorktreeCount), sessions=\(groupedSessionCount)"
   }
 
+  var lastVisibleSessionID: String? {
+    if usesFlatSearchResults {
+      return searchVisibleSessionIDs.last { sessionSummary(for: $0) != nil }
+    }
+
+    for group in projectionGroups.reversed() {
+      for checkoutGroup in group.checkoutGroups.reversed() {
+        guard
+          isCheckoutExpanded(
+            projectID: group.project.projectId,
+            checkoutID: checkoutGroup.checkoutId
+          )
+        else {
+          continue
+        }
+
+        if let sessionID = checkoutGroup.sessionIDs
+          .reversed()
+          .first(where: { sessionSummary(for: $0) != nil })
+        {
+          return sessionID
+        }
+      }
+    }
+
+    return nil
+  }
+
   func sessionSummary(for sessionID: String) -> SessionSummary? {
     sessionCatalog.sessionSummary(for: sessionID)
   }
@@ -67,6 +95,7 @@ struct SidebarSessionListContent: View {
   let store: HarnessMonitorStore
   let renderState: SidebarSessionListRenderState
   let activateSessionRow: (String) -> Void
+  let collapseSelectionToRow: (String) -> Void
   let toggleBookmark: (String, String) -> Void
   let setCheckoutCollapsed: (String, Bool) -> Void
 
@@ -205,6 +234,11 @@ struct SidebarSessionListContent: View {
     let baseRow =
       row
       .tag(session.sessionId)
+      .background {
+        if session.sessionId == renderState.lastVisibleSessionID {
+          SidebarSessionListTrailingWhitespaceBoundaryReporter()
+        }
+      }
       .contentShape(Rectangle())
       .accessibilityAddTraits(.isButton)
       .accessibilityLabel(
@@ -221,7 +255,8 @@ struct SidebarSessionListContent: View {
             event: "press-action",
             details: [
               "session_id": session.sessionId,
-              "selected_session_ids": renderState.selectedSessionIDs.sorted().joined(separator: ","),
+              "selected_session_ids":
+                renderState.selectedSessionIDs.sorted().joined(separator: ","),
             ]
           )
           activateSessionRow(session.sessionId)
@@ -231,6 +266,12 @@ struct SidebarSessionListContent: View {
         isSelectedForUITest
           ? "selected, interactive=button, selectionChrome=translucent"
           : "interactive=button"
+      )
+      .simultaneousGesture(
+        SpatialTapGesture().onEnded { _ in
+          collapseSelectionToRow(session.sessionId)
+        },
+        including: renderState.selectedSessionIDs.count > 1 ? .gesture : []
       )
 
     if renderState.isPersistenceAvailable {
@@ -300,39 +341,6 @@ struct SidebarSessionListContent: View {
 
   private func scaledSidebarFont(_ font: Font) -> Font {
     HarnessMonitorTextSize.scaledFont(font, by: renderState.fontScale)
-  }
-
-  @ViewBuilder
-  private func sessionContextMenu(for session: SessionSummary) -> some View {
-    if renderState.isPersistenceAvailable {
-      Button {
-        toggleBookmark(session.sessionId, session.projectId)
-      } label: {
-        if renderState.bookmarkedSessionIDs.contains(session.sessionId) {
-          Label("Remove Bookmark", systemImage: "bookmark.slash")
-        } else {
-          Label("Bookmark", systemImage: "bookmark")
-        }
-      }
-      Divider()
-    }
-    Button {
-      HarnessMonitorClipboard.copy(session.title)
-    } label: {
-      Label("Copy Title", systemImage: "doc.on.doc")
-    }
-    .disabled(session.title.isEmpty)
-    Button {
-      HarnessMonitorClipboard.copy(session.sessionId)
-    } label: {
-      Label("Copy Session ID", systemImage: "doc.on.doc")
-    }
-    Divider()
-    Button(role: .destructive) {
-      store.requestRemoveSessionConfirmation(sessionID: session.sessionId)
-    } label: {
-      Label("Remove Session...", systemImage: "trash")
-    }
   }
 }
 
