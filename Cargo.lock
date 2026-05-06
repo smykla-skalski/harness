@@ -35,7 +35,7 @@ checksum = "aae1277d39aeec15cb388266ecc24b11c80469deae6067e17a1a7aa9e5c1f234"
 
 [[package]]
 name = "aff"
-version = "32.1.0"
+version = "32.1.1"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -2671,7 +2671,7 @@ dependencies = [
 
 [[package]]
 name = "harness"
-version = "32.1.0"
+version = "32.1.1"
 dependencies = [
  "agent-client-protocol",
  "assert_cmd",
@@ -2748,7 +2748,7 @@ dependencies = [
 
 [[package]]
 name = "harness-testkit"
-version = "32.1.0"
+version = "32.1.1"
 dependencies = [
  "assert_cmd",
  "harness",

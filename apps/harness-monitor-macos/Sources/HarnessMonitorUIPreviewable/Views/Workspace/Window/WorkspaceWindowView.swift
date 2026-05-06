@@ -51,33 +51,17 @@ public struct WorkspaceWindowView: View {
     self.store = store
     self.keyWindowObserver = keyWindowObserver
     self.navigationBridge = navigationBridge
-    let initialWorkspaceRequest = store.consumePendingWorkspaceSelectionRequest()
-    if initialWorkspaceRequest?.resetDecisionFilters == true {
-      WorkspaceDecisionFilterDefaults.reset()
-    }
     let initialDisplayState = AgentTuiDisplayState(initialWindowStore: store)
     let initialSelection = Self.initialWindowSelection(
       store: store,
       displayState: initialDisplayState,
-      pendingRequest: initialWorkspaceRequest
+      pendingSelection: store.pendingWorkspaceSelection
     )
     let initialViewModel = ViewModel(
       selection: initialSelection,
       displayState: initialDisplayState,
       createSessionID: store.selectedSessionID
     )
-    if case .create = initialSelection,
-      let createEntryPoint = initialWorkspaceRequest?.createEntryPoint
-    {
-      Self.applyWorkspaceCreateEntryPoint(createEntryPoint, to: initialViewModel)
-      let normalizedCreateSessionID = Self.normalizedCreateSessionAnchor(
-        initialWorkspaceRequest?.createSessionID
-      )
-      initialViewModel.pendingCreateSessionID = normalizedCreateSessionID
-      if let normalizedCreateSessionID {
-        initialViewModel.createSessionID = normalizedCreateSessionID
-      }
-    }
     Self.applyPreviewCreatePresetIfNeeded(to: initialViewModel)
     _stateViewModel = State(
       wrappedValue: initialViewModel
