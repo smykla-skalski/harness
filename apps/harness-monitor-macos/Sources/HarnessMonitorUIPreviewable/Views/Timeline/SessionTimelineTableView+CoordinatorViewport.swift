@@ -60,20 +60,6 @@ extension SessionTimelineTableView.Coordinator {
     )
   }
 
-  func invalidateVisibleRowHeights() {
-    guard let tableView, let scrollView else { return }
-    let visibleRows = tableView.rows(in: scrollView.contentView.bounds)
-    guard visibleRows.location != NSNotFound, visibleRows.length > 0 else { return }
-    let rowRange = visibleRows.location..<(visibleRows.location + visibleRows.length)
-    // Evict cached heights for visible rows so heightOfRow falls back to
-    // estimate; the background measurement pass will replace them with
-    // current-width values.
-    for row in rowRange where rows.indices.contains(row) {
-      rowHeightCache.removeValue(forKey: rows[row].id)
-    }
-    tableView.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: rowRange))
-  }
-
   func currentVisibleAnchor() -> SessionTimelineTableAnchor? {
     guard let tableView, let scrollView else {
       return nil
