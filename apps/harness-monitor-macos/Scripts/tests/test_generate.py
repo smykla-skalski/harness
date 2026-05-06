@@ -15,7 +15,7 @@ from generate_test_support import (
     NON_INDEXABLE_ROOTS_SOURCE,
     POST_GENERATE_SOURCE,
     PREPARE_APP_ENTITLEMENTS_SOURCE,
-    RUNTIME_PROFILE_SOURCE,
+    MONITOR_LANES_SOURCE,
     SWIFT_TOOL_ENV_SOURCE,
     XCODE_VERSION_SOURCE,
     base_env,
@@ -50,7 +50,7 @@ class GenerateScriptTests(unittest.TestCase):
             shutil.copy(GENERATE_SOURCE, generated_script)
             generated_script.chmod(generated_script.stat().st_mode | stat.S_IXUSR)
             shutil.copy(SWIFT_TOOL_ENV_SOURCE, generated_helper)
-            shutil.copy(RUNTIME_PROFILE_SOURCE, lib_root / "runtime-profile.sh")
+            shutil.copy(MONITOR_LANES_SOURCE, lib_root / "monitor-lanes.sh")
             write_executable(fake_post_generate, "#!/bin/bash\nset -euo pipefail\n")
             fake_patcher.write_text("# test\n")
             write_executable(
@@ -112,7 +112,7 @@ class GenerateScriptTests(unittest.TestCase):
             shutil.copy(GENERATE_SOURCE, generated_script)
             generated_script.chmod(generated_script.stat().st_mode | stat.S_IXUSR)
             shutil.copy(SWIFT_TOOL_ENV_SOURCE, generated_helper)
-            shutil.copy(RUNTIME_PROFILE_SOURCE, lib_root / "runtime-profile.sh")
+            shutil.copy(MONITOR_LANES_SOURCE, lib_root / "monitor-lanes.sh")
             write_executable(
                 fake_post_generate,
                 "#!/bin/bash\nset -euo pipefail\n: > \"$POST_GENERATE_MARKER\"\n",
@@ -171,7 +171,7 @@ class GenerateScriptTests(unittest.TestCase):
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertTrue(marker_path.exists(), "post-generate should still run")
 
-    def test_profile_scoped_non_owner_lane_refuses_to_regenerate_shared_project(
+    def test_legacy_profile_env_refuses_to_regenerate_project(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -196,7 +196,7 @@ class GenerateScriptTests(unittest.TestCase):
             shutil.copy(GENERATE_SOURCE, generated_script)
             generated_script.chmod(generated_script.stat().st_mode | stat.S_IXUSR)
             shutil.copy(SWIFT_TOOL_ENV_SOURCE, generated_helper)
-            shutil.copy(RUNTIME_PROFILE_SOURCE, lib_root / "runtime-profile.sh")
+            shutil.copy(MONITOR_LANES_SOURCE, lib_root / "monitor-lanes.sh")
             write_executable(fake_post_generate, "#!/bin/bash\nset -euo pipefail\n")
             fake_patcher.write_text("# test\n")
             write_executable(
@@ -226,15 +226,15 @@ class GenerateScriptTests(unittest.TestCase):
 
             self.assertNotEqual(completed.returncode, 0)
             self.assertIn(
-                "must not regenerate the shared Harness Monitor Xcode project",
+                "HARNESS_MONITOR_RUNTIME_PROFILE is no longer supported",
                 completed.stderr,
             )
             self.assertFalse(
                 captured_args_path.exists(),
-                "non-owner profile lane must fail before invoking tuist",
+                "legacy profile env must fail before invoking tuist",
             )
 
-    def test_profile_scoped_non_owner_lane_skips_regenerate_when_pbxproj_is_fresh(
+    def test_runtime_lane_skips_regenerate_when_pbxproj_is_fresh(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -262,7 +262,7 @@ class GenerateScriptTests(unittest.TestCase):
             shutil.copy(GENERATE_SOURCE, generated_script)
             generated_script.chmod(generated_script.stat().st_mode | stat.S_IXUSR)
             shutil.copy(SWIFT_TOOL_ENV_SOURCE, generated_helper)
-            shutil.copy(RUNTIME_PROFILE_SOURCE, lib_root / "runtime-profile.sh")
+            shutil.copy(MONITOR_LANES_SOURCE, lib_root / "monitor-lanes.sh")
             write_executable(
                 fake_post_generate,
                 "#!/bin/bash\nset -euo pipefail\n: > \"$POST_GENERATE_MARKER\"\n",
@@ -306,7 +306,7 @@ class GenerateScriptTests(unittest.TestCase):
             env.update(
                 {
                     "CAPTURED_TUIST_ARGS": str(captured_args_path),
-                    "HARNESS_MONITOR_RUNTIME_PROFILE": "agent-foo",
+                    "HARNESS_MONITOR_RUNTIME_LANE": "agent-foo",
                     "POST_GENERATE_MARKER": str(marker_path),
                     "TMPDIR": str(temp_root),
                     "TUIST_BIN": str(fake_tuist),
@@ -325,7 +325,7 @@ class GenerateScriptTests(unittest.TestCase):
             self.assertTrue(marker_path.exists(), "post-generate should still run")
             self.assertFalse(
                 captured_args_path.exists(),
-                "fresh pbxproj should let non-owner lanes skip tuist generate",
+                "fresh pbxproj should skip tuist generate",
             )
 
 

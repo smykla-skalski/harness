@@ -4,11 +4,11 @@ import SwiftUI
 private enum DaemonRecoveryToastPreview {
   static let manifestPath =
     "/Users/monitor/Library/Group Containers/Q498EB36N4.io.harnessmonitor/"
-    + "runtime-profiles/monitor/harness/daemon/manifest.json"
+    + "runtime-lanes/monitor/harness/daemon/manifest.json"
   static let restartCommand =
-    "HARNESS_MONITOR_RUNTIME_PROFILE='monitor' "
+    "HARNESS_MONITOR_RUNTIME_LANE='monitor' "
     + "HARNESS_DAEMON_DATA_HOME='/Users/monitor/Library/Group Containers/"
-    + "Q498EB36N4.io.harnessmonitor/runtime-profiles/monitor' "
+    + "Q498EB36N4.io.harnessmonitor/runtime-lanes/monitor' "
     + "HARNESS_CODEX_WS_PORT='20336' harness daemon dev"
 
   @MainActor
@@ -16,11 +16,11 @@ private enum DaemonRecoveryToastPreview {
     let toast = ToastSlice()
     toast.warningDismissDelay = .seconds(120)
     toast.presentWarning(
-      "Monitor will reconnect to profile \"monitor\" after you restart the helper in Terminal",
+      "Monitor will reconnect to lane \"monitor\" after you restart the helper in Terminal",
       title: "Restart background helper",
       details: ActionFeedbackDetails(
         disclosureLabel: "restart details",
-        summary: "Restarting replaces the stale daemon state; it does not delete profile data.",
+        summary: "Restarting replaces the stale daemon state; it does not delete lane data.",
         rows: [
           ActionFeedbackDetailRow(label: "Mode", value: "External daemon"),
           ActionFeedbackDetailRow(label: "Manifest", value: manifestPath),

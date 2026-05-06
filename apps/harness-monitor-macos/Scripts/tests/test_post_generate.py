@@ -15,7 +15,7 @@ from generate_test_support import (
     NON_INDEXABLE_ROOTS_SOURCE,
     POST_GENERATE_SOURCE,
     PREPARE_APP_ENTITLEMENTS_SOURCE,
-    RUNTIME_PROFILE_SOURCE,
+    MONITOR_LANES_SOURCE,
     SWIFT_TOOL_ENV_SOURCE,
     XCODE_VERSION_SOURCE,
     base_env,
@@ -44,10 +44,7 @@ class PostGenerateScriptTests(unittest.TestCase):
             )
             shutil.copy(SWIFT_TOOL_ENV_SOURCE, lib_root / "swift-tool-env.sh")
             shutil.copy(NON_INDEXABLE_ROOTS_SOURCE, lib_root / "non-indexable-roots.sh")
-            shutil.copy(
-                APP_ROOT / "Scripts" / "lib" / "runtime-profile.sh",
-                lib_root / "runtime-profile.sh",
-            )
+            shutil.copy(MONITOR_LANES_SOURCE, lib_root / "monitor-lanes.sh")
             shutil.copy(XCODE_VERSION_SOURCE, lib_root / "xcode-version.sh")
 
             monitor_entitlements = {
@@ -136,7 +133,7 @@ class PostGenerateScriptTests(unittest.TestCase):
                 (repo_root / "xcode-derived" / ".metadata_never_index").exists()
             )
 
-    def test_post_generate_uses_profiled_derived_data_when_runtime_profile_is_set(
+    def test_post_generate_uses_laned_derived_data_when_build_lane_is_set(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -160,10 +157,7 @@ class PostGenerateScriptTests(unittest.TestCase):
             shutil.copy(SWIFT_TOOL_ENV_SOURCE, lib_root / "swift-tool-env.sh")
             shutil.copy(NON_INDEXABLE_ROOTS_SOURCE, lib_root / "non-indexable-roots.sh")
             shutil.copy(XCODE_VERSION_SOURCE, lib_root / "xcode-version.sh")
-            shutil.copy(
-                APP_ROOT / "Scripts" / "lib" / "runtime-profile.sh",
-                lib_root / "runtime-profile.sh",
-            )
+            shutil.copy(MONITOR_LANES_SOURCE, lib_root / "monitor-lanes.sh")
 
             monitor_entitlements = {
                 "com.apple.security.application-groups": ["Q498EB36N4.io.harnessmonitor"],
@@ -185,7 +179,7 @@ class PostGenerateScriptTests(unittest.TestCase):
                 {
                     "HARNESS_MONITOR_APP_ROOT": str(app_root),
                     "HARNESS_MONITOR_OWNS_WORKSPACE": "1",
-                    "HARNESS_MONITOR_RUNTIME_PROFILE": "Bart Dev",
+                    "HARNESS_MONITOR_BUILD_LANE": "Bart Dev",
                     "HARNESS_MONITOR_SKIP_VERSION_SYNC": "1",
                     "HARNESS_MONITOR_XCODE_DTXCODE": "2640",
                     "REPO_ROOT": str(repo_root),
@@ -203,7 +197,7 @@ class PostGenerateScriptTests(unittest.TestCase):
 
             self.assertEqual(completed.returncode, 0, completed.stderr)
 
-            profiled_root = repo_root / "xcode-derived" / "profiles" / "bart-dev"
+            laned_root = repo_root / "xcode-derived-lanes" / "bart-dev"
 
             settings_paths = (
                 app_root
@@ -218,19 +212,19 @@ class PostGenerateScriptTests(unittest.TestCase):
             )
             for settings_path in settings_paths:
                 with self.subTest(settings_path=settings_path):
-                    self.assertIn(str(profiled_root), settings_path.read_text())
+                    self.assertIn(str(laned_root), settings_path.read_text())
 
             self.assertIn(
-                '"build_root": "../../xcode-derived/profiles/bart-dev"',
+                '"build_root": "../../xcode-derived-lanes/bart-dev"',
                 (app_root / "buildServer.json").read_text(),
             )
             self.assertIn(
-                '"build_root": "xcode-derived/profiles/bart-dev"',
+                '"build_root": "xcode-derived-lanes/bart-dev"',
                 (repo_root / "buildServer.json").read_text(),
             )
 
             generated_entitlements_dir = (
-                profiled_root
+                laned_root
                 / "Build"
                 / "Intermediates.noindex"
                 / "HarnessMonitor.build"
@@ -254,7 +248,7 @@ class PostGenerateScriptTests(unittest.TestCase):
                 ),
                 ui_test_host_entitlements,
             )
-            self.assertTrue((profiled_root / ".metadata_never_index").exists())
+            self.assertTrue((laned_root / ".metadata_never_index").exists())
 
 
 if __name__ == "__main__":

@@ -167,7 +167,7 @@ run_xcodebuild_with_formatter() {
 }
 
 # Returns 0 when the xcodebuild arg list contains a test action, 1 otherwise.
-# Used by xcodebuild-with-lock.sh to decide whether to enable native test
+# Used by monitor-xcodebuild.sh to decide whether to enable native test
 # retry flags and JUnit reporting.
 xcodebuild_args_are_test_action() {
   local arg

@@ -31,10 +31,10 @@ extension HarnessMonitorStore {
   }
 
   private func externalDaemonProfileLabel() -> String {
-    guard let profile = HarnessMonitorPaths.runtimeProfile() else {
-      return "the default profile"
+    guard let lane = HarnessMonitorPaths.runtimeLane() else {
+      return "the default lane"
     }
-    return "profile \"\(profile)\""
+    return "lane \"\(lane)\""
   }
 }
 
@@ -55,7 +55,7 @@ struct ExternalDaemonRecoveryFeedback {
       message: "Monitor will reconnect to \(profileLabel) after you restart the helper in Terminal",
       offlineMessage: "Background helper stopped. Restart it to reconnect.",
       details: details(
-        summary: "Restarting replaces the stale daemon state; it does not delete profile data.",
+        summary: "Restarting replaces the stale daemon state; it does not delete lane data.",
         manifestPath: manifestPath,
         daemonCommand: daemonCommand
       ),

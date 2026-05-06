@@ -4,7 +4,7 @@
 # Sourced by test-swift.sh. Required env on entry:
 #   ROOT                  - apps/harness-monitor-macos
 #   CHECKOUT_ROOT         - the harness checkout containing apps/, scripts/, mcp-servers/
-#   DERIVED_DATA_PATH     - resolved xcode-derived/profiles/<profile>
+#   DERIVED_DATA_PATH     - resolved xcode-derived or xcode-derived-lanes/<lane>
 #
 # Defaults to ON. Break-glass: HARNESS_MONITOR_FORCE_BUILD_FOR_TESTING=1.
 

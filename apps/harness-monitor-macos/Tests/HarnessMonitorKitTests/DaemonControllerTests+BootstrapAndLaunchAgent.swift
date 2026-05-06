@@ -258,11 +258,11 @@ extension DaemonControllerTests {
     #expect(offlineSnapshot.loaded == false)
   }
 
-  @Test("launchAgentSnapshot uses the profiled launch-agent label")
-  func launchAgentSnapshotUsesProfiledLaunchAgentLabel() async {
+  @Test("launchAgentSnapshot uses the lane launch-agent label")
+  func launchAgentSnapshotUsesLaneLaunchAgentLabel() async {
     let manager = RecordingLaunchAgentManager(state: .enabled)
     let environment = HarnessMonitorEnvironment(
-      values: [HarnessMonitorRuntimeProfile.environmentKey: "Bart Dev"],
+      values: [HarnessMonitorRuntimeLane.environmentKey: "Bart Dev"],
       homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
     )
     let controller = DaemonController(

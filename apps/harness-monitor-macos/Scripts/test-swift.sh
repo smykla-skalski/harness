@@ -10,14 +10,14 @@ COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
 source "$ROOT/Scripts/lib/xcodebuild-destination.sh"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/rtk-shell.sh
 source "$ROOT/Scripts/lib/rtk-shell.sh"
-# shellcheck source=apps/harness-monitor-macos/Scripts/lib/runtime-profile.sh
-source "$ROOT/Scripts/lib/runtime-profile.sh"
+# shellcheck source=apps/harness-monitor-macos/Scripts/lib/monitor-lanes.sh
+source "$ROOT/Scripts/lib/monitor-lanes.sh"
 # shellcheck source=apps/harness-monitor-macos/Scripts/lib/build-for-testing-reuse.sh
 source "$ROOT/Scripts/lib/build-for-testing-reuse.sh"
 STALE_CHECK_SCRIPT="$CHECKOUT_ROOT/scripts/check-no-stale-state.sh"
 DESTINATION="$(harness_monitor_xcodebuild_destination)"
-DERIVED_DATA_PATH="$(harness_monitor_runtime_derived_data_path "$COMMON_REPO_ROOT" "xcode-derived")"
-CANONICAL_XCODEBUILD_RUNNER="$ROOT/Scripts/xcodebuild-with-lock.sh"
+DERIVED_DATA_PATH="$(harness_monitor_build_derived_data_path "$COMMON_REPO_ROOT")"
+CANONICAL_XCODEBUILD_RUNNER="$ROOT/Scripts/monitor-xcodebuild.sh"
 XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$CANONICAL_XCODEBUILD_RUNNER}"
 XCODE_ONLY_TESTING="${XCODE_ONLY_TESTING:-}"
 BUILD_FOR_TESTING_SCRIPT="${BUILD_FOR_TESTING_SCRIPT:-$ROOT/Scripts/build-for-testing.sh}"
@@ -26,7 +26,6 @@ TEST_LOCK_WAIT_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS:-15}"
 REUSED_EXISTING_BUILD=0
 
 export XCODEBUILD_DERIVED_DATA_PATH="$DERIVED_DATA_PATH"
-harness_monitor_apply_runtime_profile_environment
 
 test_lane_env() {
   # Local monitor test runs should fail fast on contention and on the first

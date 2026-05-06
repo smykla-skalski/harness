@@ -70,7 +70,7 @@ struct AgentDetailSection: View {
     ]
   }
 
-  private var runtimeProfileFacts: [AgentDetailFact] {
+  private var runtimeLaneFacts: [AgentDetailFact] {
     [
       .init(
         title: "Transcript",
@@ -301,7 +301,7 @@ struct AgentDetailSection: View {
       store: store,
       agentID: agent.agentId,
       timeline: agentTimelineEntries,
-      runtimeProfileFacts: runtimeProfileFacts,
+      runtimeLaneFacts: runtimeLaneFacts,
       capabilityValues: capabilityValues,
       hookPoints: hookPoints,
       activityFacts: activityFacts,

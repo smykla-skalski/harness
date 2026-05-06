@@ -85,7 +85,7 @@ extension DaemonController {
           sibling_pid=\(owner.pid, privacy: .public) \
           sibling_executable=\(owner.executablePath, privacy: .public) \
           registered_at=\(owner.registeredAt.timeIntervalSince1970, privacy: .public). \
-          Set HARNESS_MONITOR_RUNTIME_PROFILE on this build to claim a \
+          Set HARNESS_MONITOR_RUNTIME_LANE on this build to claim a \
           separate lane.
           """
         )

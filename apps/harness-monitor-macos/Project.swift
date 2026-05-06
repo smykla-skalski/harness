@@ -329,7 +329,7 @@ private let agentsE2ETarget: Target = .target(
 private let monitorRunEnv: [String: EnvironmentVariable] = [
     "HARNESS_OTEL_EXPORT": .environmentVariable(value: "1", isEnabled: true),
     "OTEL_EXPORTER_OTLP_ENDPOINT": .environmentVariable(value: "http://127.0.0.1:4317", isEnabled: true),
-    "HARNESS_MONITOR_RUNTIME_PROFILE": .environmentVariable(value: "bartsmykla", isEnabled: true)
+    "HARNESS_MONITOR_RUNTIME_LANE": .environmentVariable(value: "bartsmykla", isEnabled: true)
 ]
 
 private let monitorTestEnv: [String: EnvironmentVariable] = [

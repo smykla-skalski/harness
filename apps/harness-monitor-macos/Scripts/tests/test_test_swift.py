@@ -194,7 +194,6 @@ exit 1
             env.update(
                 {
                     "BUILD_FOR_TESTING_SCRIPT": str(build_for_testing_script),
-                    "HARNESS_MONITOR_APP_ROOT": str(app_root),
                     "XCODEBUILD_DERIVED_DATA_PATH": str(derived_data_path),
                     "LOG_BIN": str(fake_log),
                     "HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE": "1",
@@ -278,7 +277,6 @@ cat
             env.update(
                 {
                     "BUILD_FOR_TESTING_SCRIPT": str(build_for_testing_script),
-                    "HARNESS_MONITOR_APP_ROOT": str(app_root),
                     "XCODEBUILD_DERIVED_DATA_PATH": str(derived_data_path),
                     "HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE": "1",
                     "HARNESS_MONITOR_DISABLE_XCBEAUTIFY": "1",
@@ -298,11 +296,13 @@ cat
                 env=env,
             )
 
-            lock_owner_file = derived_data_path / ".xcodebuild.lock" / "owner" / "lease.env"
+            lock_owner_file = (
+                derived_data_path / ".harness-monitor-xcodebuild.lock" / "owner.env"
+            )
             self.wait_for_path(lock_owner_file)
             self.assertTrue(
                 lock_owner_file.is_file(),
-                "test-swift must publish shared lease owner metadata",
+                "test-swift must publish lane lock owner metadata",
             )
             self.wait_for_path(child_pid_path)
 
@@ -313,7 +313,7 @@ cat
             self.assertEqual(process.returncode, 143, stdout + stderr)
             self.assertFalse(
                 lock_owner_file.exists(),
-                "test-swift must not leave shared lease owner metadata behind",
+                "test-swift must not leave lane lock owner metadata behind",
             )
             with self.assertRaises(ProcessLookupError):
                 os.kill(child_pid, 0)

@@ -47,7 +47,7 @@ struct AgentDetailActivityBand: View {
   let store: HarnessMonitorStore
   let agentID: String
   let timeline: [TimelineEntry]
-  let runtimeProfileFacts: [AgentDetailFact]
+  let runtimeLaneFacts: [AgentDetailFact]
   let capabilityValues: [String]
   let hookPoints: [HookIntegrationDescriptor]
   let activityFacts: [AgentDetailFact]
@@ -78,19 +78,19 @@ struct AgentDetailActivityBand: View {
         if prefersWideLayout {
           ViewThatFits(in: .horizontal) {
             HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
-              runtimeProfilePane
+              runtimeLanePane
                 .frame(maxWidth: .infinity, alignment: .leading)
               assignmentPane
                 .frame(maxWidth: isSparseState ? 248 : 232, alignment: .leading)
             }
             VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-              runtimeProfilePane
+              runtimeLanePane
               assignmentPane
             }
           }
         } else {
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-            runtimeProfilePane
+            runtimeLanePane
             assignmentPane
           }
         }
@@ -98,11 +98,11 @@ struct AgentDetailActivityBand: View {
     }
   }
 
-  private var runtimeProfilePane: some View {
+  private var runtimeLanePane: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
       AgentDetailFactInlineRow(
-        title: "Runtime profile",
-        facts: runtimeProfileFacts
+        title: "Runtime lane",
+        facts: runtimeLaneFacts
       )
       if !activityFacts.isEmpty || !recentToolValues.isEmpty {
         AgentDetailFactInlineRow(

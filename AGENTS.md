@@ -10,6 +10,10 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 Discover supported workflows with `rtk mise tasks ls` and run repo logic only through `rtk mise run <task>` or `rtk mise run <task> -- <args>`. Do not wrap `mise` in `bash -lc`, `zsh -lc`, `env`, or other shells. Do not run repo scripts, raw `cargo`, or raw `xcodebuild` when a `mise` task already covers the workflow.
 
+## Parallel worktrees are mandatory
+
+Every parallel user, agent, or long-running task that edits files, generates projects, builds, tests, runs daemons, or drives XcodeBuildMCP must use its own full git worktree. Do not share one checkout for concurrent write/build work and try to make it safe with profiles, lanes, locks, or environment variables. Build/runtime lanes are secondary isolation for caches, daemon state, ports, labels, and sockets inside a worktree; they are not a substitute for a full worktree.
+
 ## Build and test commands
 
 ```bash
@@ -33,7 +37,7 @@ Unit tests are in-crate `#[test]` blocks. Integration tests live in `tests/integ
 
 Pre-commit: `cargo fmt --check && cargo clippy --lib && mise run test`
 
-For the Harness Monitor macOS app (`apps/harness-monitor-macos`), see that directory's own `AGENTS.md` - it covers the Tuist project layout, exact `xcodebuild` destination rules, derivedData paths, agent profile wrappers, SwiftUI/UX rules, performance measurement, daemon modes, and Swift-specific gotchas (deinit isolation, scheme selection).
+For the Harness Monitor macOS app (`apps/harness-monitor-macos`), see that directory's own `AGENTS.md` - it covers the Tuist project layout, exact `xcodebuild` destination rules, build/runtime lanes, SwiftUI/UX rules, performance measurement, daemon modes, and Swift-specific gotchas (deinit isolation, scheme selection).
 
 ## Agent asset architecture
 
@@ -108,6 +112,10 @@ Every commit **must** be created with `git commit -sS` - both the `-s` sign-off 
 - the sign-off trailer is exactly `Signed-off-by: Bart Smykla <bartek@smykla.com>`
 
 Never bypass signing with `--no-gpg-sign`, `-c commit.gpgsign=false`, `--no-verify`, or by using a different key. If 1Password (signing key source) is unavailable, hard stop and wait for the user - do not commit unsigned and do not substitute another key.
+
+## Task closeout and main integration
+
+Every finished task must be integrated through `main` with clean, flat history. Rebase or cherry-pick; never create merge commits. Before handing off or pushing, update from `main`, replay the task changes on top, and triage every conflict deliberately against both the current `main` behavior and the task intent. Do not accept one side blindly, do not bury unrelated edits in conflict resolution, and rerun the smallest relevant validation after conflicts are resolved.
 
 ## Versioning
 
@@ -199,5 +207,5 @@ All dashboards in `resources/observability/grafana/dashboards/` use Grafana 12+ 
 
 - `tool-guard` denies direct use of `kubectl`, `kumactl`, `helm`, `docker`, `k3d` and routes write/question policy through the same combined pre-tool hook (see `rules.rs:26`)
 - `VersionedJsonRepository` saves atomically via tmp-file rename - don't read state files by path while a save is in progress, use the repository's `load()` method
-- If using XcodeBuildMCP, use the installed XcodeBuildMCP skill before calling XcodeBuildMCP tools. For `apps/harness-monitor-macos` work in a shared checkout, use `mise run monitor:agent:*` or `apps/harness-monitor-macos/Scripts/agent-xcode-env.sh ...` instead of raw `xcodebuildmcp` / plain `monitor:*` wrappers so agent Xcode state stays isolated from the developer's local Xcode.
-- For Swift / macOS UI work in `apps/harness-monitor-macos`, see that directory's `AGENTS.md` gotchas (xcodeproj sync, External Daemon scheme, `MainActor.assumeIsolated` deinit trap). The fast-test-iteration and `xcode-derived/profiles/agent-*` LaunchAgent prune (`mise run monitor:gc:profiles:install`) sections live there.
+- If using XcodeBuildMCP, use the installed XcodeBuildMCP skill before calling XcodeBuildMCP tools. For `apps/harness-monitor-macos` work, use a full git worktree per parallel actor and set explicit lanes inside that worktree: `HARNESS_MONITOR_BUILD_LANE=<lane>` for DerivedData isolation and `HARNESS_MONITOR_RUNTIME_LANE=<lane>` for daemon/bridge/MCP isolation.
+- For Swift / macOS UI work in `apps/harness-monitor-macos`, see that directory's `AGENTS.md` gotchas (xcodeproj sync, External Daemon scheme, `MainActor.assumeIsolated` deinit trap, lane cleanup).

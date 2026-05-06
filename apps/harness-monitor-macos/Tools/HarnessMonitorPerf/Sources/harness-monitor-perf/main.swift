@@ -75,7 +75,7 @@ struct Audit: ParsableCommand {
     @Option(name: [.long, .customLong("app-root")], help: "apps/harness-monitor-macos absolute path.")
     var appRoot: String
 
-    @Option(name: [.long, .customLong("xcodebuild-runner")], help: "Path to xcodebuild-with-lock.sh wrapper.")
+    @Option(name: [.long, .customLong("xcodebuild-runner")], help: "Path to monitor-xcodebuild.sh wrapper.")
     var xcodebuildRunner: String
 
     @Option(name: [.long, .customLong("destination")], help: "xcodebuild -destination string.")

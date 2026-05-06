@@ -17,8 +17,8 @@ extension DaemonController {
   /// file, holding it across the supplied closure. The lock
   /// serializes the marker-read / decide / IPC / marker-write
   /// transaction across sibling Monitor processes that resolve to
-  /// the same daemon root (e.g. two non-agent profiles with no
-  /// `HARNESS_MONITOR_RUNTIME_PROFILE`).
+  /// the same daemon root (e.g. two processes with no
+  /// `HARNESS_MONITOR_RUNTIME_LANE`).
   ///
   /// Lock semantics:
   /// - `flock(2)` is per open-file-description on Darwin, so two

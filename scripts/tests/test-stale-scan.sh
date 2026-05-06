@@ -29,12 +29,10 @@ AGENT_SESSION_ENV_KEYS=(
   VIBE_SESSION_ID
 )
 ISOLATED_TEST_ENV_KEYS=(
-  HARNESS_MONITOR_RUNTIME_PROFILE
+  HARNESS_MONITOR_RUNTIME_LANE
   HARNESS_DAEMON_DATA_HOME
   HARNESS_CODEX_WS_PORT
   HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL
-  HARNESS_MONITOR_ALLOW_NON_AGENT_RUNTIME_PROFILE
-  HARNESS_MONITOR_ALLOW_AGENT_USER_PROFILE
 )
 SAVED_AGENT_SESSION_ENV=()
 
@@ -218,11 +216,11 @@ spawn_labelled() {
   wait_for_pid_argv_contains "$LAST_SPAWN_PID" "$label" || return 1
 }
 
-spawn_labelled_with_runtime_profile() {
-  local profile="$1"
+spawn_labelled_with_runtime_lane() {
+  local lane="$1"
   local label="$2"
   # shellcheck disable=SC2016  # $1 is resolved by the inner bash, not this shell
-  nohup env HARNESS_MONITOR_RUNTIME_PROFILE="$profile" \
+  nohup env HARNESS_MONITOR_RUNTIME_LANE="$lane" \
     bash -c 'exec -a "$1" sleep 300' bash-spawner "$label" >/dev/null 2>&1 &
   LAST_SPAWN_PID=$!
   SPAWNED_PIDS+=("$LAST_SPAWN_PID")
@@ -244,14 +242,14 @@ spawn_labelled_with_open_lock() {
   wait_for_pid_argv_contains "$LAST_SPAWN_PID" "$label" || return 1
 }
 
-spawn_labelled_with_runtime_profile_and_open_lock() {
-  local profile="$1"
+spawn_labelled_with_runtime_lane_and_open_lock() {
+  local lane="$1"
   local label="$2"
   local lock_path="$3"
   mkdir -p "$(dirname "$lock_path")"
   : >"$lock_path"
   # shellcheck disable=SC2016  # $1/$2 are resolved by the inner bash, not this shell
-  nohup env HARNESS_MONITOR_RUNTIME_PROFILE="$profile" \
+  nohup env HARNESS_MONITOR_RUNTIME_LANE="$lane" \
     bash -c 'exec 9>>"$2"; exec -a "$1" sleep 300' \
     bash-spawner "$label" "$lock_path" >/dev/null 2>&1 &
   LAST_SPAWN_PID=$!
@@ -328,10 +326,10 @@ start_test() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 1: debug-profile orphan (the historical coverage)
+# Scenario 1: debug build orphan (the historical coverage)
 # ---------------------------------------------------------------------------
 scenario_debug_orphan() {
-  start_test "debug-profile orphan detected"
+  start_test "debug build orphan detected"
   spawn_target_harness "target/debug" daemon || { fail "spawn failed"; return; }
   local pid="$LAST_SPAWN_PID"
   stale_scan_refresh_ps
@@ -341,10 +339,10 @@ scenario_debug_orphan() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 2: release-profile orphan (new coverage)
+# Scenario 2: release build orphan (new coverage)
 # ---------------------------------------------------------------------------
 scenario_release_orphan() {
-  start_test "release-profile orphan detected"
+  start_test "release build orphan detected"
   spawn_target_harness "target/release" bridge || { fail "spawn failed"; return; }
   local pid="$LAST_SPAWN_PID"
   stale_scan_refresh_ps
@@ -453,29 +451,29 @@ scenario_tmp_artifacts() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 8: profile-scoped scans skip global /tmp bridge artifacts
+# Scenario 8: lane-scoped scans skip global /tmp bridge artifacts
 # ---------------------------------------------------------------------------
-scenario_profile_scoped_tmp_artifacts_are_ignored() {
-  start_test "profile-scoped scans ignore global /tmp bridge artifacts"
-  local marker="$TMP_BRIDGE_ROOT/h-bridge-TEST-$RUN_ID-profile.sock"
+scenario_lane_scoped_tmp_artifacts_are_ignored() {
+  start_test "lane-scoped scans ignore global /tmp bridge artifacts"
+  local marker="$TMP_BRIDGE_ROOT/h-bridge-TEST-$RUN_ID-lane.sock"
   : >"$marker"
   TMP_MARKERS+=("$marker")
 
   local found
-  found="$(HARNESS_DAEMON_DATA_HOME="$SANDBOX/profile-home" stale_scan_tmp_bridge_artifacts)"
+  found="$(HARNESS_DAEMON_DATA_HOME="$SANDBOX/lane-home" stale_scan_tmp_bridge_artifacts)"
   if [[ -z "$found" ]]; then
     pass
   else
-    fail "expected profile-scoped /tmp scan to be empty, got: $found"
+    fail "expected lane-scoped /tmp scan to be empty, got: $found"
   fi
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 9: profile-scoped daemon roots resolve from HARNESS_DAEMON_DATA_HOME
+# Scenario 9: lane-scoped daemon roots resolve from HARNESS_DAEMON_DATA_HOME
 # ---------------------------------------------------------------------------
-scenario_profile_scoped_daemon_root() {
-  start_test "profile-scoped daemon roots use HARNESS_DAEMON_DATA_HOME"
-  local daemon_data_home="$SANDBOX/profile-home"
+scenario_lane_scoped_daemon_root() {
+  start_test "lane-scoped daemon roots use HARNESS_DAEMON_DATA_HOME"
+  local daemon_data_home="$SANDBOX/lane-home"
   local roots
   roots="$(HARNESS_DAEMON_DATA_HOME="$daemon_data_home" stale_scan_daemon_roots)"
   if [[ "$roots" == "$daemon_data_home/harness/daemon" ]]; then
@@ -491,7 +489,7 @@ scenario_profile_scoped_daemon_root() {
 # ---------------------------------------------------------------------------
 scenario_lock_holding_build_process_not_orphaned() {
   start_test "lock-holding cargo-built harness process is not treated as orphan"
-  local fake_root="$SANDBOX/profile-build-root-$RUN_ID/harness/daemon"
+  local fake_root="$SANDBOX/lane-build-root-$RUN_ID/harness/daemon"
   local lock_path="$fake_root/bridge.lock"
   spawn_target_harness_with_open_lock "target/debug" bridge "$lock_path" || {
     fail "spawn failed"
@@ -537,14 +535,14 @@ scenario_lock_holder() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 10a: profile-scoped live lock holders are deliberate isolated work
+# Scenario 10a: lane-scoped live lock holders are deliberate isolated work
 # and must not be treated as stale cleanup targets.
 # ---------------------------------------------------------------------------
-scenario_profiled_live_lock_holder_not_stale() {
-  start_test "profile-scoped live lock holder is not stale pollution"
-  local fake_root="$SANDBOX/profile-live-root-$RUN_ID/harness/daemon"
+scenario_laned_live_lock_holder_not_stale() {
+  start_test "lane-scoped live lock holder is not stale pollution"
+  local fake_root="$SANDBOX/lane-live-root-$RUN_ID/harness/daemon"
   local lock_path="$fake_root/bridge.lock"
-  spawn_labelled_with_runtime_profile_and_open_lock \
+  spawn_labelled_with_runtime_lane_and_open_lock \
     "bartsmykla" \
     "/opt/fake/harness bridge start" \
     "$lock_path" || {
@@ -566,11 +564,11 @@ scenario_profiled_live_lock_holder_not_stale() {
 
 # ---------------------------------------------------------------------------
 # Scenario 10b: data-home-scoped live lock holders are deliberate isolated work
-# even if the runtime-profile env is absent.
+# even if the runtime-lane env is absent.
 # ---------------------------------------------------------------------------
 scenario_data_home_scoped_live_lock_holder_not_stale() {
   start_test "data-home-scoped live lock holder is not stale pollution"
-  local daemon_data_home="$SANDBOX/runtime-profiles/bartsmykla"
+  local daemon_data_home="$SANDBOX/runtime-lanes/bartsmykla"
   local fake_root="$daemon_data_home/harness/daemon"
   local lock_path="$fake_root/bridge.lock"
   spawn_labelled_with_daemon_data_home_and_open_lock \
@@ -671,7 +669,7 @@ EOF
   output="$(
     env \
       -u HARNESS_DAEMON_DATA_HOME \
-      -u HARNESS_MONITOR_RUNTIME_PROFILE \
+      -u HARNESS_MONITOR_RUNTIME_LANE \
       HOME="$fake_home" \
       PATH="$fake_bin:$PATH" \
       HARNESS_APP_GROUP_ID="$app_group_id" \
@@ -721,11 +719,11 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 10e: full clean:stale reset preserves a profiled live bridge root
+# Scenario 10e: full clean:stale reset preserves a laned live bridge root
 # while still reaping stale unscoped holders and orphan build processes.
 # ---------------------------------------------------------------------------
-scenario_clean_stale_full_reset_preserves_profiled_bridge_end_to_end() {
-  start_test "clean:stale full reset preserves profiled bridge while reaping stale shared holders"
+scenario_clean_stale_full_reset_preserves_laned_bridge_end_to_end() {
+  start_test "clean:stale full reset preserves laned bridge while reaping stale shared holders"
   local fake_home="$SANDBOX/clean-home-$RUN_ID"
   local fake_bin="$SANDBOX/clean-bin-$RUN_ID"
   local app_group_id="$STALE_SCAN_APP_GROUP_ID"
@@ -736,7 +734,7 @@ scenario_clean_stale_full_reset_preserves_profiled_bridge_end_to_end() {
   local shared_state="$shared_root/bridge.json"
   local legacy_state="$legacy_root/bridge.json"
   local output status=0
-  local profiled_pid unscoped_pid orphan_pid codex_pid codex_port codex_port_file
+  local laned_pid unscoped_pid orphan_pid codex_pid codex_port codex_port_file
 
   mkdir -p "$fake_bin" "$shared_root" "$legacy_root"
   cat >"$fake_bin/pgrep" <<'EOF'
@@ -748,17 +746,17 @@ EOF
 exit 1
 EOF
   chmod +x "$fake_bin/pgrep" "$fake_bin/launchctl"
-  printf '{"bridge":"profiled"}\n' >"$shared_state"
+  printf '{"bridge":"laned"}\n' >"$shared_state"
   printf '{"bridge":"legacy"}\n' >"$legacy_state"
 
-  spawn_labelled_with_runtime_profile_and_open_lock \
+  spawn_labelled_with_runtime_lane_and_open_lock \
     "bartsmykla" \
     "$SANDBOX/target/debug/harness bridge" \
     "$shared_lock" || {
-    fail "spawn profiled holder failed"
+    fail "spawn laned holder failed"
     return
   }
-  profiled_pid="$LAST_SPAWN_PID"
+  laned_pid="$LAST_SPAWN_PID"
   spawn_labelled_with_open_lock "/opt/fake/harness daemon serve" "$legacy_lock" || {
     fail "spawn unscoped holder failed"
     return
@@ -781,7 +779,7 @@ EOF
   output="$(
     env \
       -u HARNESS_DAEMON_DATA_HOME \
-      -u HARNESS_MONITOR_RUNTIME_PROFILE \
+      -u HARNESS_MONITOR_RUNTIME_LANE \
       HOME="$fake_home" \
       PATH="$fake_bin:$PATH" \
       HARNESS_APP_GROUP_ID="$app_group_id" \
@@ -799,8 +797,8 @@ EOF
   fi
 
   sleep 0.3
-  if ! kill -0 "$profiled_pid" 2>/dev/null; then
-    fail "profiled bridge pid died during clean:stale"
+  if ! kill -0 "$laned_pid" 2>/dev/null; then
+    fail "laned bridge pid died during clean:stale"
     return
   fi
   if kill -0 "$unscoped_pid" 2>/dev/null; then
@@ -816,7 +814,7 @@ EOF
     return
   fi
   if [[ ! -e "$shared_lock" || ! -e "$shared_state" ]]; then
-    fail "profiled live root was wiped during clean:stale"
+    fail "laned live root was wiped during clean:stale"
     return
   fi
   local legacy_holders
@@ -931,41 +929,41 @@ scenario_common_root_gate_helper_detection() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 10c: profile-scoped lanes only conflict with same-profile repo gate
-# helpers; other isolated profiles are allowed to coexist in the same checkout.
+# Scenario 10c: lane-scoped lanes only conflict with same-lane repo gate
+# helpers; other isolated lanes are allowed to coexist in the same checkout.
 # ---------------------------------------------------------------------------
-scenario_profile_scoped_gate_helper_ignores_other_profiles() {
-  start_test "profile-scoped repo gate helper scan ignores other profiles"
-  local saved_profile_set=0
-  local saved_profile=""
+scenario_lane_scoped_gate_helper_ignores_other_lanes() {
+  start_test "lane-scoped repo gate helper scan ignores other lanes"
+  local saved_lane_set=0
+  local saved_lane=""
   local saved_daemon_data_home_set=0
   local saved_daemon_data_home=""
   local gate_pids user_pid agent_pid unscoped_pid
   local ok=1
 
-  if [[ -n "${HARNESS_MONITOR_RUNTIME_PROFILE+x}" ]]; then
-    saved_profile_set=1
-    saved_profile="$HARNESS_MONITOR_RUNTIME_PROFILE"
+  if [[ -n "${HARNESS_MONITOR_RUNTIME_LANE+x}" ]]; then
+    saved_lane_set=1
+    saved_lane="$HARNESS_MONITOR_RUNTIME_LANE"
   fi
   if [[ -n "${HARNESS_DAEMON_DATA_HOME+x}" ]]; then
     saved_daemon_data_home_set=1
     saved_daemon_data_home="$HARNESS_DAEMON_DATA_HOME"
   fi
 
-  export HARNESS_MONITOR_RUNTIME_PROFILE="bartsmykla"
+  export HARNESS_MONITOR_RUNTIME_LANE="bartsmykla"
   unset HARNESS_DAEMON_DATA_HOME
 
   pushd "$ROOT" >/dev/null || {
     fail "pushd $ROOT failed"
     return
   }
-  spawn_labelled_with_runtime_profile "bartsmykla" \
+  spawn_labelled_with_runtime_lane "bartsmykla" \
     "apps/harness-monitor-macos/Scripts/test-swift.sh" || ok=0
   user_pid="$LAST_SPAWN_PID"
-  spawn_labelled_with_runtime_profile "agent-sibling" \
+  spawn_labelled_with_runtime_lane "agent-sibling" \
     "apps/harness-monitor-macos/Scripts/build-for-testing.sh" || ok=0
   agent_pid="$LAST_SPAWN_PID"
-  spawn_labelled "apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh" || ok=0
+  spawn_labelled "apps/harness-monitor-macos/Scripts/monitor-xcodebuild.sh" || ok=0
   unscoped_pid="$LAST_SPAWN_PID"
   popd >/dev/null || {
     fail "popd failed"
@@ -976,10 +974,10 @@ scenario_profile_scoped_gate_helper_ignores_other_profiles() {
   stale_scan_refresh_ps
   gate_pids="$(stale_scan_repo_gate_pids "$$")"
 
-  if (( saved_profile_set )); then
-    export HARNESS_MONITOR_RUNTIME_PROFILE="$saved_profile"
+  if (( saved_lane_set )); then
+    export HARNESS_MONITOR_RUNTIME_LANE="$saved_lane"
   else
-    unset HARNESS_MONITOR_RUNTIME_PROFILE
+    unset HARNESS_MONITOR_RUNTIME_LANE
   fi
   if (( saved_daemon_data_home_set )); then
     export HARNESS_DAEMON_DATA_HOME="$saved_daemon_data_home"
@@ -987,8 +985,8 @@ scenario_profile_scoped_gate_helper_ignores_other_profiles() {
     unset HARNESS_DAEMON_DATA_HOME
   fi
 
-  assert_in_list "$user_pid" "same-profile gate pid" "$gate_pids" || ok=0
-  assert_not_in_list "$agent_pid" "other-profile gate pid" "$gate_pids" || ok=0
+  assert_in_list "$user_pid" "same-lane gate pid" "$gate_pids" || ok=0
+  assert_not_in_list "$agent_pid" "other-lane gate pid" "$gate_pids" || ok=0
   assert_in_list "$unscoped_pid" "unscoped gate pid" "$gate_pids" || ok=0
   if (( ok )); then pass; fi
 }
@@ -1439,7 +1437,7 @@ scenario_codex_ws_port_env() {
 # ---------------------------------------------------------------------------
 scenario_codex_app_server_listener_detected() {
   start_test "codex app-server listener on Codex port is detected for cleanup"
-  local daemon_data_home="$SANDBOX/runtime-profiles/codex-detect"
+  local daemon_data_home="$SANDBOX/runtime-lanes/codex-detect"
   local port
   port="$(allocate_free_tcp_port)"
   local port_file="$SANDBOX/codex-$RUN_ID.port"
@@ -1461,7 +1459,7 @@ scenario_codex_app_server_listener_detected() {
 # ---------------------------------------------------------------------------
 scenario_live_codex_app_server_listener_not_stale() {
   start_test "live codex app-server listener on current lane is not stale"
-  local daemon_data_home="$SANDBOX/runtime-profiles/codex-live"
+  local daemon_data_home="$SANDBOX/runtime-lanes/codex-live"
   local fake_root="$daemon_data_home/harness/daemon"
   local lock_path="$fake_root/bridge.lock"
   local port port_file pid
@@ -1491,15 +1489,15 @@ scenario_live_codex_app_server_listener_not_stale() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 32: parentless xcodebuild wrapper without surviving lease metadata
+# Scenario 32: parentless xcodebuild wrapper without surviving owner metadata
 # is detected as a stale orphan.
 # ---------------------------------------------------------------------------
 scenario_orphan_monitor_wrapper_detected() {
-  start_test "parentless xcodebuild wrapper without lease metadata is detected"
+  start_test "parentless xcodebuild wrapper without owner metadata is detected"
   local derived_data_path="$SANDBOX/orphan-derived"
   mkdir -p "$derived_data_path"
 
-  _stale_scan_ps_snapshot=$'12345 1 00:10 /bin/bash '"$ROOT"'/apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh -derivedDataPath '"$derived_data_path"' -scheme HarnessMonitor build'
+  _stale_scan_ps_snapshot=$'12345 1 00:10 /bin/bash '"$ROOT"'/apps/harness-monitor-macos/Scripts/monitor-xcodebuild.sh -derivedDataPath '"$derived_data_path"' -scheme HarnessMonitor build'
   _stale_scan_ppid_map=""
 
   local pids
@@ -1508,19 +1506,20 @@ scenario_orphan_monitor_wrapper_detected() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 29: parentless xcodebuild wrapper with live owner metadata is not
+# Scenario 29: parentless xcodebuild wrapper with owner metadata is not
 # treated as stale just because its parent is gone.
 # ---------------------------------------------------------------------------
 scenario_monitor_wrapper_with_owner_metadata_not_flagged() {
-  start_test "parentless xcodebuild wrapper with owner lease metadata is not flagged"
+  start_test "parentless xcodebuild wrapper with owner metadata is not flagged"
   local derived_data_path="$SANDBOX/live-owner-derived"
-  mkdir -p "$derived_data_path/.xcodebuild.lock/owner"
-  cat >"$derived_data_path/.xcodebuild.lock/owner/lease.env" <<EOF
-LOCK_PROTOCOL_VERSION=1
-LOCK_PID=22334
+  mkdir -p "$derived_data_path/.harness-monitor-xcodebuild.lock"
+  cat >"$derived_data_path/.harness-monitor-xcodebuild.lock/owner.env" <<EOF
+pid=22334
+started_at=2026-01-01T00:00:00Z
+derived_data_path=$derived_data_path
 EOF
 
-  _stale_scan_ps_snapshot=$'22334 1 00:10 /bin/bash '"$ROOT"'/apps/harness-monitor-macos/Scripts/xcodebuild-with-lock.sh -derivedDataPath '"$derived_data_path"' -scheme HarnessMonitor build'
+  _stale_scan_ps_snapshot=$'22334 1 00:10 /bin/bash '"$ROOT"'/apps/harness-monitor-macos/Scripts/monitor-xcodebuild.sh -derivedDataPath '"$derived_data_path"' -scheme HarnessMonitor build'
   _stale_scan_ppid_map=""
 
   local pids
@@ -1529,55 +1528,28 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 29b: xcodebuild lock cleanup must treat a recorded live mutator as
-# active work even if the wrapper owner pid itself is gone.
+# Scenario 29b: xcodebuild lock cleanup must treat a recorded live owner as
+# active work.
 # ---------------------------------------------------------------------------
-scenario_xcodebuild_lock_live_mutator_detected() {
-  start_test "xcodebuild lock runtime metadata keeps live mutator from being treated as stale"
-  local lock_path="$SANDBOX/live-mutator-lock/.xcodebuild.lock"
-  local owner_hostname mutator_command mutator_start
-  mkdir -p "$lock_path/owner"
+scenario_xcodebuild_lock_live_owner_detected() {
+  start_test "xcodebuild lock owner metadata keeps live work from being treated as stale"
+  local lock_path="$SANDBOX/live-owner-lock/.harness-monitor-xcodebuild.lock"
+  mkdir -p "$lock_path"
 
   /bin/sleep 300 &
-  local mutator_pid=$!
-  SPAWNED_PIDS+=("$mutator_pid")
-  owner_hostname="$(/bin/hostname)"
-  mutator_command="$(ps -p "$mutator_pid" -o command= 2>/dev/null | sed 's/^[[:space:]]*//' | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g; s/[[:space:]]$//')"
-  mutator_start="$(ps -p "$mutator_pid" -o lstart= 2>/dev/null | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]\+/ /g; s/[[:space:]]$//')"
+  local owner_pid=$!
+  SPAWNED_PIDS+=("$owner_pid")
 
-  cat >"$lock_path/owner/lease.env" <<EOF
-LOCK_PROTOCOL_VERSION=1
-LOCK_RESOURCE=test-resource
-LOCK_ROLE=owner
-LOCK_OWNER_ID=dead-wrapper
-LOCK_AGENT_ID=test
-LOCK_PID=999999
-LOCK_HOSTNAME=$owner_hostname
-LOCK_REPO_ROOT=$ROOT
-LOCK_COMMAND=stale
-LOCK_ACQUIRED_AT_EPOCH=1
-LOCK_HEARTBEAT_EVERY_SEC=1
-LOCK_OWNER_STALE_AFTER_SEC=3
-LOCK_WAITER_TIMEOUT_SEC=6
-LOCK_LEASE_TIMEOUT_SEC=3
-LOCK_LAST_HEARTBEAT_EPOCH=1
-LOCK_NEXT_HEARTBEAT_DUE_EPOCH=2
-LOCK_STATE=holding
-EOF
-  cat >"$lock_path/owner/runtime.env" <<EOF
-LOCK_RUNTIME_VERSION=1
-LOCK_RESOURCE=test-resource
-LOCK_HOSTNAME=$owner_hostname
-LOCK_COMMON_REPO_ROOT=$ROOT
-LOCK_MUTATOR_PID=$mutator_pid
-LOCK_MUTATOR_COMMAND=$mutator_command
-LOCK_MUTATOR_PROCESS_START=$mutator_start
+  cat >"$lock_path/owner.env" <<EOF
+pid=$owner_pid
+started_at=2026-01-01T00:00:00Z
+derived_data_path=${lock_path%/.harness-monitor-xcodebuild.lock}
 EOF
 
   if stale_scan_xcodebuild_lock_has_live_work "$lock_path"; then
     pass
   else
-    fail "lock helper treated a live mutator as stale"
+    fail "lock helper treated a live owner as stale"
   fi
 }
 
@@ -1919,19 +1891,19 @@ run_all() {
   scenario_gate_bucket
   scenario_test_runners_not_gate_bucket
   scenario_tmp_artifacts
-  scenario_profile_scoped_tmp_artifacts_are_ignored
-  scenario_profile_scoped_daemon_root
+  scenario_lane_scoped_tmp_artifacts_are_ignored
+  scenario_lane_scoped_daemon_root
   scenario_lock_holding_build_process_not_orphaned
   scenario_lock_holder
-  scenario_profiled_live_lock_holder_not_stale
+  scenario_laned_live_lock_holder_not_stale
   scenario_data_home_scoped_live_lock_holder_not_stale
   scenario_unscoped_live_lock_holder_still_stale
   scenario_clean_stale_safe_mode_preserves_live_shared_state
-  scenario_clean_stale_full_reset_preserves_profiled_bridge_end_to_end
+  scenario_clean_stale_full_reset_preserves_laned_bridge_end_to_end
   scenario_pid_describe_format
   scenario_ancestor_exclusion
   scenario_common_root_gate_helper_detection
-  scenario_profile_scoped_gate_helper_ignores_other_profiles
+  scenario_lane_scoped_gate_helper_ignores_other_lanes
   scenario_congested_env
   scenario_end_to_end_detection
   scenario_clean_tmp_removal_is_idempotent
@@ -1953,7 +1925,7 @@ run_all() {
   scenario_live_codex_app_server_listener_not_stale
   scenario_orphan_monitor_wrapper_detected
   scenario_monitor_wrapper_with_owner_metadata_not_flagged
-  scenario_xcodebuild_lock_live_mutator_detected
+  scenario_xcodebuild_lock_live_owner_detected
   scenario_autoclean_success
   scenario_autoclean_unresolved_still_fails
   scenario_autoclean_clean_script_fails

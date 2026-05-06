@@ -6,6 +6,7 @@
 - Prefer `rtk mise run <task>` over raw `cargo`, `xcodebuild`, or repo scripts. When there is no dedicated task, use `rtk mise run cargo:local -- <cargo args>`.
 - Use `rtk mise tasks ls` to discover supported workflows.
 - Use `rtk proxy` only when filtered `rtk` output hides information you genuinely need.
+- Parallel Copilot/user sessions that edit, generate, build, test, run daemons, or use XcodeBuildMCP must use separate full git worktrees. Lanes isolate build/runtime side effects inside a worktree; they are not a substitute for a separate checkout.
 
 ## Build, test, and lint commands
 
@@ -62,15 +63,18 @@ XCODE_ONLY_TESTING=HarnessMonitorKitTests/PolicyGapRuleTests \
 XCODE_ONLY_TESTING=HarnessMonitorUITests/HarnessMonitorUITests/testToolbarOpensSettingsWindow \
   rtk mise run monitor:test
 
-COPILOT_SESSION_ID=<uuid> XCODE_ONLY_TESTING=HarnessMonitorKitTests/PolicyGapRuleTests \
-  rtk mise run monitor:agent:test
+HARNESS_MONITOR_BUILD_LANE=copilot-<uuid> XCODE_ONLY_TESTING=HarnessMonitorKitTests/PolicyGapRuleTests \
+  rtk mise run monitor:test
 
 # Batch many focused selectors into one call - chaining N calls forces N
 # build-for-testing cold starts. Comma-separated selectors are supported.
-COPILOT_SESSION_ID=<uuid> XCODE_ONLY_TESTING='HarnessMonitorKitTests/A/test1(),HarnessMonitorKitTests/A/test2()' \
-  rtk mise run monitor:agent:test
+HARNESS_MONITOR_BUILD_LANE=copilot-<uuid> XCODE_ONLY_TESTING='HarnessMonitorKitTests/A/test1(),HarnessMonitorKitTests/A/test2()' \
+  rtk mise run monitor:test
 
-COPILOT_SESSION_ID=<uuid> rtk mise run monitor:agent:build
+HARNESS_MONITOR_BUILD_LANE=copilot-<uuid> rtk mise run monitor:build
+
+HARNESS_MONITOR_RUNTIME_LANE=copilot-<uuid> \
+  rtk mise run monitor:xcodebuildmcp -- macos build --scheme HarnessMonitor
 
 rtk mise run monitor:xcodebuild -- \
   -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace \
@@ -82,19 +86,11 @@ rtk mise run monitor:xcodebuild -- \
 
 - `apps/harness-monitor-macos/HarnessMonitor.xcodeproj` and `.xcworkspace` are generated, ignored outputs from Tuist. Regenerate them with `rtk mise run monitor:generate`.
 - Do not run the full `HarnessMonitorUITests` suite by default. Prefer `XCODE_ONLY_TESTING` with the smallest possible selector.
-- In shared-checkout or agent-driven work, use `monitor:agent:*`. The isolated profile is derived from agent session env vars such as `COPILOT_SESSION_ID`.
+- In each parallel worktree, set explicit lanes for agent-driven work. Use `HARNESS_MONITOR_BUILD_LANE=copilot-<uuid>` for DerivedData isolation and `HARNESS_MONITOR_RUNTIME_LANE=copilot-<uuid>` for daemon, bridge, launchd label, port, and XcodeBuildMCP socket isolation. Do not rely on removed per-agent task aliases or profile env vars.
 - For custom macOS lanes, never use bare `-destination 'platform=macOS'`; use `platform=macOS,arch=$(uname -m),name=My Mac`.
-- `monitor:agent:test` defaults to skipping `build-for-testing` when the existing `.xctestrun` is fresher than every Swift source, project descriptor, SPM lockfile, and the cross-project `mcp-servers/` tree. Break-glass: set `HARNESS_MONITOR_FORCE_BUILD_FOR_TESTING=1` to always rebuild (use after .xcconfig edits, environment switches, or external package updates outside the scoped freshness roots).
-- Each agent session writes `xcode-derived/profiles/agent-<sanitized-uuid>/` (~2 GB Debug build). Install the periodic prune LaunchAgent so old profiles do not accumulate:
-  ```bash
-  rtk mise run monitor:gc:profiles:install     # default 7200s = 2h cadence
-  rtk mise run monitor:gc:profiles:status      # state + interval + recent stdout
-  rtk mise run monitor:gc:profiles              # one-shot prune (HARNESS_MONITOR_PROFILE_DRY_RUN=1 to preview)
-  rtk mise run monitor:gc:profiles:uninstall   # bootout + delete plist
-  HARNESS_MONITOR_PROFILE_PRUNE_INTERVAL_SECONDS=14400 \
-    rtk mise run monitor:gc:profiles:reinstall # change cadence to 4h
-  ```
-  The active profile (resolved from `HARNESS_MONITOR_RUNTIME_PROFILE` / `*_SESSION_ID`) is always preserved; only `agent-*` profiles older than the staleness threshold are removed. Logs land in `tmp/prune-xcode-derived-profiles.{out,err}.log`.
+- `monitor:test` defaults to skipping `build-for-testing` when the existing `.xctestrun` is fresher than every Swift source, project descriptor, SPM lockfile, and the cross-project `mcp-servers/` tree. Break-glass: set `HARNESS_MONITOR_FORCE_BUILD_FOR_TESTING=1` to always rebuild (use after .xcconfig edits, environment switches, or external package updates outside the scoped freshness roots).
+- Named build lanes write to `xcode-derived-lanes/<lane>`; runtime lanes write to the app-group `runtime-lanes/<lane>` tree. Delete stale lane directories only after confirming no process is using that lane. Use `rtk mise run clean:stale` for safe orphan cleanup and `rtk mise run monitor:reset` only when resetting the active runtime lane is intended.
+- Legacy profile env vars such as `HARNESS_MONITOR_RUNTIME_PROFILE`, `HARNESS_MONITOR_USER_RUNTIME_PROFILE`, and the old agent-profile overrides are intentionally rejected.
 
 ## High-level architecture
 
@@ -133,6 +129,7 @@ rtk mise run monitor:xcodebuild -- \
 - Clippy is strict (`pedantic` plus extra denies), and `build.rs` makes `cargo clippy --lib` fail when tracked Rust files under `src/`, `tests/`, or `testkit/` exceed 520 lines.
 - Evaluate semver whenever shipped behavior changes. `Cargo.toml` is the canonical version source; use `rtk mise run version:set -- <version>` and `rtk mise run version:sync` to update derived surfaces.
 - Commit and PR titles should follow `type(scope): description`.
+- Finished tasks must be integrated through `main` with clean, flat history. Rebase or cherry-pick; never create merge commits. Resolve conflicts by triaging current `main` behavior against the task intent, keep unrelated edits out of conflict resolution, and rerun the smallest relevant validation after conflicts are resolved.
 - For Harness Monitor SwiftUI work, prefer existing shared layout/control primitives and existing UI-test helpers instead of inventing one-off patterns.
 - If a macOS UI test cannot find or tap a control that looks correct, fix the test query/interaction path before changing product UI.
 - Do not put `.accessibilityIdentifier(...)` on container views that wrap interactive children with their own identifiers or frame markers. Keep identifiers on the controls and use container probes instead.
@@ -153,7 +150,7 @@ rtk mise run monitor:xcodebuild -- \
 - When preview and live app disagree, first prove whether they share the same rendering and measurement path. If preview is synchronous or fixture-driven while live is incremental/AppKit-backed, debug the live path first instead of spending cycles polishing preview parity.
 - Before changing spacing, padding, or borders, verify that live row measurement receives the real environment inputs (`fontScale`, current width, cache state) and add a coordinator-level regression for that wiring. A passing leaf measurement helper test is not enough if callers can still pass stale/default values.
 - Separate viewport/container bugs from row-content sizing bugs early. A clipped first row at `Latest` can be a top-edge inset/scroll issue even when lower-row gaps come from bad height measurement; do not mix those hypotheses into one patch loop.
-- When `monitor:agent:test` fails, read the generated `swift-diagnostics`/xcodebuild failure report first and only fall back to raw tee logs if the report is insufficient.
+- When `monitor:test` fails, read the generated `swift-diagnostics`/xcodebuild failure report first and only fall back to raw tee logs if the report is insufficient.
 
 ## Harness Monitor crash patterns to avoid
 
