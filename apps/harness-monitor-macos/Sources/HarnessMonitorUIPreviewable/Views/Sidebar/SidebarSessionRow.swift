@@ -34,10 +34,6 @@ struct SidebarSessionRow: View {
             .foregroundStyle(.secondary)
             .accessibilityHidden(true)
         }
-        Text(verbatim: session.sessionId)
-          .font(scaled(.caption.monospaced()))
-          .truncationMode(.middle)
-          .foregroundStyle(.secondary)
         HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
           HStack(spacing: HarnessMonitorTheme.itemSpacing) {
             footerStatBadge(

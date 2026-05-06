@@ -12,6 +12,5 @@ public func sessionAccessibilityLabel(
     presentation.accessibilityStatusText,
     presentation.agentStat.helpText,
     presentation.taskStat.helpText,
-    session.sessionId,
   ].joined(separator: ", ")
 }
