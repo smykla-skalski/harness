@@ -29,30 +29,26 @@ public struct ContentStatusBackdrop: View {
 
   public var body: some View {
     let radius = ContentStatusBackdropLayout.gradientRadius
-    Color.clear
-      .overlay(alignment: .topLeading) {
-        Circle()
-          .fill(
-            RadialGradient(
-              colors: [
-                color.opacity(tintOpacity),
-                color.opacity(tintOpacity * 0.5),
-                .clear,
-              ],
-              center: .center,
-              startRadius: 0,
-              endRadius: radius
-            )
-          )
-          .frame(width: radius * 2, height: radius * 2)
-          .offset(
-            x: ContentStatusBackdropLayout.titleLeadingPadding - radius,
-            y: -radius
-          )
-      }
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    Circle()
+      .fill(
+        RadialGradient(
+          colors: [
+            color.opacity(tintOpacity),
+            color.opacity(tintOpacity * 0.5),
+            .clear,
+          ],
+          center: .center,
+          startRadius: 0,
+          endRadius: radius
+        )
+      )
+      .frame(width: radius * 2, height: radius * 2)
+      .offset(
+        x: ContentStatusBackdropLayout.titleLeadingPadding - radius,
+        y: -radius
+      )
+      .frame(maxWidth: .infinity, alignment: .topLeading)
       .ignoresSafeArea(.container, edges: .top)
-      .backgroundExtensionEffect()
       .allowsHitTesting(false)
       .accessibilityHidden(true)
   }

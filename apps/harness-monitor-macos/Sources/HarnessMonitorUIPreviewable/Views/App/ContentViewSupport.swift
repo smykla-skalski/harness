@@ -81,10 +81,6 @@ public struct ContentDetailColumn: View {
     )
   }
 
-  private var statusBackdropDetail: SessionDetail? {
-    contentSessionDetail.presentedSessionDetail
-  }
-
   public var body: some View {
     ZStack {
       if toolbarGlassReproConfiguration.disablesContentDetailChrome {
@@ -102,14 +98,6 @@ public struct ContentDetailColumn: View {
         ) {
           sessionContent
         }
-      }
-    }
-    .background(alignment: .topLeading) {
-      if let detail = statusBackdropDetail {
-        ContentStatusBackdrop(
-          status: detail.session.status,
-          isStale: contentChrome.sessionDataAvailability != .live
-        )
       }
     }
     .toolbar {
