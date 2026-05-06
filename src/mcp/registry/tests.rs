@@ -295,7 +295,7 @@ fn default_socket_path_falls_back_to_group_container() {
 
 #[test]
 fn default_socket_path_uses_short_filename_for_realistic_group_container_paths() {
-    let home = "/Users/monitor";
+    let home = "/Users/bart.smykla@konghq.com";
     temp_env::with_vars(
         [(SOCKET_OVERRIDE_ENV, None::<&str>), ("HOME", Some(home))],
         || {
