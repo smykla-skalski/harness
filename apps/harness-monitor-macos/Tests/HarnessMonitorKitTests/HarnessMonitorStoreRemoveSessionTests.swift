@@ -20,6 +20,30 @@ struct HarnessMonitorStoreRemoveSessionTests {
     )
   }
 
+  @Test("Request multi remove-session confirmation uses the control-plane actor")
+  func requestRemoveSessionsConfirmationUsesControlPlaneActor() async {
+    let client = makeMultiSessionClient()
+    let store = await makeBootstrappedStore(client: client)
+
+    store.requestRemoveSessionConfirmation(
+      sessionIDs: [
+        PreviewFixtures.summary.sessionId,
+        PreviewFixtures.signalRegressionSecondarySummary.sessionId,
+      ]
+    )
+
+    #expect(
+      store.pendingConfirmation
+        == .removeSessions(
+          sessionIDs: [
+            PreviewFixtures.summary.sessionId,
+            PreviewFixtures.signalRegressionSecondarySummary.sessionId,
+          ],
+          actorID: "harness-app"
+        )
+    )
+  }
+
   @Test("Confirm pending remove-session action clears the cockpit and prunes navigation")
   func confirmPendingRemoveSessionClearsCockpitAndPrunesNavigation() async {
     let client = RecordingHarnessClient()
@@ -192,5 +216,77 @@ struct HarnessMonitorStoreRemoveSessionTests {
     await store.confirmPendingAction()
 
     #expect(store.pendingWorkspaceCreateSessionID == nil)
+  }
+
+  @Test("Confirm pending multi remove-session action removes every selected session")
+  func confirmPendingRemoveSessionsRemovesEverySelectedSession() async {
+    let client = makeMultiSessionClient()
+    let store = await makeBootstrappedStore(client: client)
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+    store.navigationBackStack = [
+      PreviewFixtures.summary.sessionId,
+      PreviewFixtures.signalRegressionSecondarySummary.sessionId,
+      nil,
+    ]
+    store.navigationForwardStack = [PreviewFixtures.signalRegressionSecondarySummary.sessionId]
+
+    store.requestRemoveSessionConfirmation(
+      sessionIDs: [
+        PreviewFixtures.summary.sessionId,
+        PreviewFixtures.signalRegressionSecondarySummary.sessionId,
+      ]
+    )
+    await store.confirmPendingAction()
+
+    #expect(store.pendingConfirmation == nil)
+    #expect(store.sessions.isEmpty)
+    #expect(store.projects.isEmpty)
+    #expect(store.selectedSessionID == nil)
+    #expect(store.selectedSession == nil)
+    #expect(store.contentUI.session.selectedSessionSummary == nil)
+    #expect(store.contentUI.sessionDetail.presentedSessionDetail == nil)
+    #expect(store.currentSuccessFeedbackMessage == "Removed 2 sessions")
+    #expect(
+      store.navigationBackStack.allSatisfy {
+        $0 != PreviewFixtures.summary.sessionId
+          && $0 != PreviewFixtures.signalRegressionSecondarySummary.sessionId
+      }
+    )
+    #expect(
+      store.navigationForwardStack.allSatisfy {
+        $0 != PreviewFixtures.summary.sessionId
+          && $0 != PreviewFixtures.signalRegressionSecondarySummary.sessionId
+      }
+    )
+    #expect(
+      client.recordedCalls()
+        == [
+          .removeSession(
+            sessionID: PreviewFixtures.summary.sessionId,
+            actor: "harness-app"
+          ),
+          .removeSession(
+            sessionID: PreviewFixtures.signalRegressionSecondarySummary.sessionId,
+            actor: "harness-app"
+          ),
+        ]
+    )
+  }
+
+  private func makeMultiSessionClient() -> RecordingHarnessClient {
+    let client = RecordingHarnessClient()
+    client.configureSessions(
+      summaries: PreviewFixtures.signalRegressionSessions,
+      detailsByID: [
+        PreviewFixtures.summary.sessionId: PreviewFixtures.detail,
+        PreviewFixtures.signalRegressionSecondarySummary.sessionId:
+          PreviewFixtures.signalRegressionSecondaryDetail,
+      ],
+      timelinesBySessionID: [
+        PreviewFixtures.summary.sessionId: PreviewFixtures.pagedTimeline,
+        PreviewFixtures.signalRegressionSecondarySummary.sessionId: PreviewFixtures.timeline,
+      ]
+    )
+    return client
   }
 }

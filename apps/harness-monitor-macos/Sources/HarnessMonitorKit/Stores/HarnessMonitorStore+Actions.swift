@@ -192,14 +192,38 @@ extension HarnessMonitorStore {
   }
 
   public func requestRemoveSessionConfirmation(sessionID: String) {
-    requestRemoveSessionConfirmation(sessionID: sessionID, actor: "harness-app")
+    requestRemoveSessionConfirmation(sessionIDs: [sessionID], actor: "harness-app")
+  }
+
+  public func requestRemoveSessionConfirmation(sessionIDs: [String]) {
+    requestRemoveSessionConfirmation(sessionIDs: sessionIDs, actor: "harness-app")
   }
 
   func requestRemoveSessionConfirmation(sessionID: String, actor: String) {
+    requestRemoveSessionConfirmation(sessionIDs: [sessionID], actor: actor)
+  }
+
+  func requestRemoveSessionConfirmation(sessionIDs: [String], actor: String) {
+    let normalizedSessionIDs = orderedUniqueSessionIDs(sessionIDs)
     let actionName = "Remove session"
-    guard prepareSessionAction(named: actionName, sessionID: sessionID) != nil else { return }
+    guard !normalizedSessionIDs.isEmpty else { return }
+    guard
+      normalizedSessionIDs.allSatisfy({
+        prepareSessionAction(named: actionName, sessionID: $0) != nil
+      })
+    else { return }
     let actorID = controlPlaneActionActor(for: actor)
-    pendingConfirmation = .removeSession(sessionID: sessionID, actorID: actorID)
+    if normalizedSessionIDs.count == 1 {
+      pendingConfirmation = .removeSession(
+        sessionID: normalizedSessionIDs[0],
+        actorID: actorID
+      )
+    } else {
+      pendingConfirmation = .removeSessions(
+        sessionIDs: normalizedSessionIDs,
+        actorID: actorID
+      )
+    }
   }
 
   public func setDaemonLogLevel(_ level: String) async {
@@ -227,6 +251,13 @@ extension HarnessMonitorStore {
 
   func controlPlaneActionActor(for actor: String) -> String {
     actor == "harness-app" ? "harness-app" : actor
+  }
+
+  private func orderedUniqueSessionIDs(_ sessionIDs: [String]) -> [String] {
+    var seen: Set<String> = []
+    return sessionIDs.filter { sessionID in
+      seen.insert(sessionID).inserted
+    }
   }
 
   func leaderActionActor(

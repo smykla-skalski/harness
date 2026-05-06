@@ -64,6 +64,7 @@ public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
     switch shellUI.pendingConfirmation {
     case .endSession: "End Session?"
     case .removeSession: "Remove Session?"
+    case .removeSessions(let sessionIDs, _): "Remove \(sessionIDs.count) Sessions?"
     case .deleteTask(_, _, _, _, let noteCount) where noteCount > 0:
       "Delete Task and \(noteCount) \(noteCount == 1 ? "Note" : "Notes")?"
     case .deleteTask: "Delete Task?"
@@ -79,6 +80,8 @@ public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
       "End Session Now"
     case .removeSession:
       "Remove Session Now"
+    case .removeSessions(let sessionIDs, _):
+      "Remove \(sessionIDs.count) Sessions Now"
     case .deleteTask:
       "Delete Task Now"
     case .removeAgent:
@@ -103,6 +106,13 @@ public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
       immediately. It disappears from the sidebar, open cockpit views, and cached data. \
       If the underlying session is still running, Monitor will stop showing it. Restoring \
       it requires a manual database operation.
+      """
+    case .removeSessions(let sessionIDs, _):
+      """
+      This removes \(sessionIDs.count) selected sessions from Monitor immediately. \
+      They disappear from the sidebar, open cockpit views, and cached data. If any \
+      underlying sessions are still running, Monitor will stop showing them. Restoring \
+      them requires manual database operations.
       """
     case .deleteTask(_, _, let taskTitle, _, let noteCount):
       if noteCount > 0 {
