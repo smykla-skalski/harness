@@ -119,10 +119,10 @@ final class SupervisorAuditRetentionTests: XCTestCase {
   func test_startBackgroundCompactionRespectsDisabledPreference() throws {
     let container = try makeContainer()
     let retention1 = SupervisorAuditRetention(container: container)
-    UserDefaults.standard.set(false, forKey: SupervisorPreferencesDefaults.runInBackgroundKey)
+    UserDefaults.standard.set(false, forKey: SupervisorSettingsDefaults.runInBackgroundKey)
     defer {
       UserDefaults.standard.removeObject(
-        forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+        forKey: SupervisorSettingsDefaults.runInBackgroundKey
       )
     }
 
@@ -134,11 +134,11 @@ final class SupervisorAuditRetentionTests: XCTestCase {
   func test_startBackgroundCompactionSchedulesWhenPreferenceEnabled() throws {
     let container = try makeContainer()
     let retention1 = SupervisorAuditRetention(container: container)
-    UserDefaults.standard.set(true, forKey: SupervisorPreferencesDefaults.runInBackgroundKey)
+    UserDefaults.standard.set(true, forKey: SupervisorSettingsDefaults.runInBackgroundKey)
     defer {
       retention1.stopBackgroundCompaction()
       UserDefaults.standard.removeObject(
-        forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+        forKey: SupervisorSettingsDefaults.runInBackgroundKey
       )
     }
 

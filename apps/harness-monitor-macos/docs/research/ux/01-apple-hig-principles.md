@@ -9,7 +9,7 @@ This document distills Apple's Human Interface Guidelines into concrete, enforce
 ### macOS expectations
 
 - Every app has a menu bar with standard menus in this order: App menu, File, Edit, View, Window, Help. Omit menus that don't apply but never reorder the standard ones.
-- The App menu contains About, Preferences/Settings (Cmd+,), Services, Hide (Cmd+H), Hide Others (Cmd+Opt+H), Show All, Quit (Cmd+Q).
+- The App menu contains About, Settings (Cmd+,), Services, Hide (Cmd+H), Hide Others (Cmd+Opt+H), Show All, Quit (Cmd+Q).
 - Edit menu contains Undo (Cmd+Z), Redo (Cmd+Shift+Z), Cut (Cmd+X), Copy (Cmd+C), Paste (Cmd+V), Select All (Cmd+A). If the app handles text, these must work.
 - Window menu contains Minimize (Cmd+M), Zoom, Bring All to Front, and a list of open windows.
 - Windows are resizable by default. If a window cannot be resized, it must have a fixed aspect ratio or functional reason.
@@ -43,8 +43,8 @@ This document distills Apple's Human Interface Guidelines into concrete, enforce
 - Copy/paste works everywhere text is displayed.
 - System share sheet for sharing content.
 - Respect system appearance (light/dark mode).
-- Respect text size preferences (Dynamic Type).
-- Respect reduce motion preferences.
+- Respect text size settings (Dynamic Type).
+- Respect reduce motion settings.
 - Standard alert/confirmation dialog patterns.
 
 ### Standard keyboard shortcuts (macOS)
@@ -66,7 +66,7 @@ This document distills Apple's Human Interface Guidelines into concrete, enforce
 | Select All | Cmd+A |
 | Find | Cmd+F |
 | Find Next | Cmd+G |
-| Preferences/Settings | Cmd+, |
+| Settings | Cmd+, |
 | Minimize | Cmd+M |
 | Full Screen | Ctrl+Cmd+F |
 | Hide | Cmd+H |
@@ -98,7 +98,7 @@ This document distills Apple's Human Interface Guidelines into concrete, enforce
 ### TabView
 
 - iOS: Tab bar sits at the bottom of the screen. Maximum 5 tabs visible; a "More" tab appears if there are more than 5. Each tab has an icon and a short label.
-- macOS: Tab views typically appear as segmented controls or toolbar-style tabs, not at the bottom of the window. Use for settings/preferences windows (toolbar tab style).
+- macOS: Tab views typically appear as segmented controls or toolbar-style tabs, not at the bottom of the window. Use for settings windows (toolbar tab style).
 - Tab bar icons: 25x25pt (regular), 18x18pt (compact). Use filled SF Symbols for the selected state, outlined for unselected.
 - Tab labels are single words or very short phrases. Sentence case, not title case.
 - The tab bar is always visible during navigation within a tab. Never hide it when pushing a detail view in a NavigationStack.
@@ -774,10 +774,10 @@ All spacing and sizing should be multiples of 4pt (ideally 8pt). Standard spacin
 - Grouped by conversation/topic.
 - Sound only for time-sensitive notifications.
 
-### Settings/preferences window
+### Settings window
 
-- Open with Cmd+, (always). Menu: App Name > Settings (macOS 13+) or Preferences (macOS 12 and earlier).
-- Use `Settings` scene in SwiftUI (replaces `Preferences`).
+- Open with Cmd+, (always). Menu: App Name > Settings (macOS 13+) or Settings (macOS 12 and earlier).
+- Use `Settings` scene in SwiftUI.
 - Tab-based layout for multiple categories. Use SF Symbols for tab icons (General, Appearance, Accounts, Advanced, etc.).
 - Form layout within tabs.
 - Window is non-resizable, fixed appropriate size per tab. Standard width: 500-650pt. Centered on screen.

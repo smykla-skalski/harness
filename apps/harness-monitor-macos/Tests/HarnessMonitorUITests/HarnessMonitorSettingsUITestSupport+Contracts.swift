@@ -1,6 +1,6 @@
 import XCTest
 
-struct PreferencesStateSnapshot {
+struct SettingsStateSnapshot {
   let mode: String
   let section: String
   let backdrop: String
@@ -93,13 +93,13 @@ extension HarnessMonitorUITestCase {
 
     openSettings(in: app)
 
-    let preferencesRoot = element(
+    let settingsRoot = element(
       in: app,
-      identifier: HarnessMonitorUITestAccessibility.preferencesRoot
+      identifier: HarnessMonitorUITestAccessibility.settingsRoot
     )
-    let preferencesState = element(
+    let settingsState = element(
       in: app,
-      identifier: HarnessMonitorUITestAccessibility.preferencesState
+      identifier: HarnessMonitorUITestAccessibility.settingsState
     )
     let appChromeState = element(
       in: app,
@@ -107,15 +107,15 @@ extension HarnessMonitorUITestCase {
     )
     let modePicker = element(
       in: app,
-      identifier: HarnessMonitorUITestAccessibility.preferencesThemeModePicker
+      identifier: HarnessMonitorUITestAccessibility.settingsThemeModePicker
     )
     let textSizePicker = element(
       in: app,
-      identifier: HarnessMonitorUITestAccessibility.preferencesTextSizePicker
+      identifier: HarnessMonitorUITestAccessibility.settingsTextSizePicker
     )
 
-    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(settingsRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(settingsState.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(appChromeState.waitForExistence(timeout: Self.actionTimeout))
 
     selectAppearanceSection(in: app)
@@ -123,8 +123,8 @@ extension HarnessMonitorUITestCase {
     XCTAssertTrue(modePicker.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(textSizePicker.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertEqual(
-      preferencesState.label,
-      preferencesStateLabel(
+      settingsState.label,
+      settingsStateLabel(
         .appearance(
           mode: expectedMode,
           textSize: expectedTextSize,
@@ -137,7 +137,7 @@ extension HarnessMonitorUITestCase {
       "contentChrome=native, interactiveRows=button, controlGlass=native"
     )
 
-    closeSettings(in: app, preferencesRoot: preferencesRoot)
+    closeSettings(in: app, settingsRoot: settingsRoot)
 
     let sessionRow = previewSessionTrigger(in: app)
     let observeSummaryButton = app.buttons
@@ -184,13 +184,13 @@ extension HarnessMonitorUITestCase {
 
     openSettings(in: app)
 
-    let preferencesRoot = element(
+    let settingsRoot = element(
       in: app,
-      identifier: HarnessMonitorUITestAccessibility.preferencesRoot
+      identifier: HarnessMonitorUITestAccessibility.settingsRoot
     )
-    let preferencesState = element(
+    let settingsState = element(
       in: app,
-      identifier: HarnessMonitorUITestAccessibility.preferencesState
+      identifier: HarnessMonitorUITestAccessibility.settingsState
     )
     let appChromeState = element(
       in: app,
@@ -198,23 +198,23 @@ extension HarnessMonitorUITestCase {
     )
     let timeZonePicker = element(
       in: app,
-      identifier: HarnessMonitorUITestAccessibility.preferencesTimeZoneModePicker
+      identifier: HarnessMonitorUITestAccessibility.settingsTimeZoneModePicker
     )
     let customTimeZonePicker = element(
       in: app,
-      identifier: HarnessMonitorUITestAccessibility.preferencesCustomTimeZonePicker
+      identifier: HarnessMonitorUITestAccessibility.settingsCustomTimeZonePicker
     )
 
-    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(settingsRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(settingsState.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(appChromeState.waitForExistence(timeout: Self.actionTimeout))
 
     selectGeneralSection(in: app)
 
     XCTAssertTrue(timeZonePicker.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertEqual(
-      preferencesState.label,
-      preferencesStateLabel(
+      settingsState.label,
+      settingsStateLabel(
         .general(
           mode: expectedMode,
           timeZoneMode: expectedTimeZoneMode,
@@ -228,7 +228,7 @@ extension HarnessMonitorUITestCase {
       "contentChrome=native, interactiveRows=button, controlGlass=native"
     )
 
-    closeSettings(in: app, preferencesRoot: preferencesRoot)
+    closeSettings(in: app, settingsRoot: settingsRoot)
 
     let sessionRow = previewSessionTrigger(in: app)
     let observeSummaryButton = app.buttons
@@ -251,7 +251,7 @@ extension HarnessMonitorUITestCase {
     )
   }
 
-  func preferencesStateLabel(_ snapshot: PreferencesStateSnapshot) -> String {
+  func settingsStateLabel(_ snapshot: SettingsStateSnapshot) -> String {
     [
       "mode=\(snapshot.mode)",
       "section=\(snapshot.section)",
@@ -261,7 +261,7 @@ extension HarnessMonitorUITestCase {
       "controlSize=\(snapshot.controlSize)",
       "timeZoneMode=\(snapshot.timeZoneMode)",
       "timeZone=\(snapshot.timeZone)",
-      "preferencesChrome=native",
+      "settingsChrome=native",
     ].joined(separator: ", ")
   }
 }

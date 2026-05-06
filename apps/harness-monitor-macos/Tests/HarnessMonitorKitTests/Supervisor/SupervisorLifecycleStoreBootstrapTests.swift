@@ -33,10 +33,10 @@ final class SupervisorLifecycleStoreBootstrapTests: XCTestCase {
   @MainActor
   func test_setSupervisorRunInBackgroundEnabledStopsAndStartsScheduler() async throws {
     let store = try await HarnessMonitorStore.fixture(sessions: .twoActiveSessions)
-    UserDefaults.standard.set(true, forKey: SupervisorPreferencesDefaults.runInBackgroundKey)
+    UserDefaults.standard.set(true, forKey: SupervisorSettingsDefaults.runInBackgroundKey)
     defer {
       UserDefaults.standard.removeObject(
-        forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+        forKey: SupervisorSettingsDefaults.runInBackgroundKey
       )
     }
     await store.startSupervisor()

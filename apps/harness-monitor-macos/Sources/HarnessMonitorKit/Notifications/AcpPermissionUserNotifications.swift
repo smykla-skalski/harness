@@ -94,7 +94,7 @@ public enum AcpPermissionUserNotifications {
   public static let previewAuthorizationEnvironmentKey =
     "HARNESS_MONITOR_PREVIEW_NOTIFICATION_AUTHORIZATION"
   public static let systemSettingsURLString =
-    "x-apple.systempreferences:com.apple.Notifications-Settings.extension"
+    "x-apple.systemsettings:com.apple.Notifications-Settings.extension"
 
   public static var systemSettingsURL: URL? {
     URL(string: systemSettingsURLString)

@@ -9,7 +9,7 @@ extension HarnessMonitorMCPContractTests {
     let suiteName = "io.harnessmonitor.tests.mcp.recovery.\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     defaults.removePersistentDomain(forName: suiteName)
-    defaults.register(defaults: HarnessMonitorMCPPreferencesDefaults.registrationDefaults())
+    defaults.register(defaults: HarnessMonitorMCPSettingsDefaults.registrationDefaults())
     return (defaults, suiteName)
   }
 

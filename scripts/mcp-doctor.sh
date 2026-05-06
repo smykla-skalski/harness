@@ -95,7 +95,7 @@ else
     "Run: mise run mcp:launch:monitor"
 fi
 
-# 4. Socket + Preferences toggle
+# 4. Socket + Settings toggle
 
 section "Registry socket"
 socket_path=$("$ROOT/scripts/mcp-socket-path.sh")
@@ -112,7 +112,7 @@ elif [[ -e "$socket_path" ]]; then
   fail_critical "path exists but is not a socket" "$socket_path"
 else
   warn "socket not bound" \
-    "Enable Preferences > MCP > \"Expose accessibility registry to MCP clients\"" \
+    "Enable Settings > MCP > \"Expose accessibility registry to MCP clients\"" \
     "Or run with HARNESS_MONITOR_MCP_FORCE_ENABLE=1 for dev builds" \
     "Expected path: $socket_path"
 fi

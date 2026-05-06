@@ -2,7 +2,7 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct VoicePopoverConfigurationSummary: View {
-  let preferences: HarnessMonitorVoicePreferences
+  let settings: HarnessMonitorVoiceSettings
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
@@ -12,27 +12,27 @@ struct VoicePopoverConfigurationSummary: View {
 
       VoicePopoverConfigurationRow(
         title: "Language",
-        value: HarnessMonitorVoicePreferences.localeDisplayLabel(
-          for: preferences.effectiveLocaleIdentifier
+        value: HarnessMonitorVoiceSettings.localeDisplayLabel(
+          for: settings.effectiveLocaleIdentifier
         )
       )
       VoicePopoverConfigurationRow(
         title: "Processing",
-        value: preferences.requestedSinksSummary
+        value: settings.requestedSinksSummary
       )
       VoicePopoverConfigurationRow(
         title: "Insert",
-        value: preferences.transcriptInsertionMode.title
+        value: settings.transcriptInsertionMode.title
       )
 
-      if preferences.remoteProcessorSinkEnabled {
+      if settings.remoteProcessorSinkEnabled {
         VoicePopoverConfigurationRow(
           title: "Remote",
-          value: preferences.remoteProcessorSummary
+          value: settings.remoteProcessorSummary
         )
       }
 
-      Text("Change defaults in Preferences > Voice.")
+      Text("Change defaults in Settings > Voice.")
         .scaledFont(.caption)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
@@ -100,7 +100,7 @@ struct VoiceCaptureFailurePresentation: Equatable {
         title: "Speech Assets Needed",
         message: message,
         recoverySuggestion:
-          "Open Preferences > Voice to confirm the selected locale, then open System Settings > "
+          "Open Settings > Voice to confirm the selected locale, then open System Settings > "
           + "Keyboard > Dictation and download that language or switch to a supported English locale "
           + "such as English (US). macOS does not have an on-device speech asset ready for \(locale)."
       )
@@ -109,7 +109,7 @@ struct VoiceCaptureFailurePresentation: Equatable {
         title: "Speech Language Unsupported",
         message: message,
         recoverySuggestion:
-          "Open Preferences > Voice and choose a Speech-supported locale such as English (US), "
+          "Open Settings > Voice and choose a Speech-supported locale such as English (US), "
           + "then try recording again. Harness Monitor asked for \(locale)."
       )
     case .speechUnavailable:

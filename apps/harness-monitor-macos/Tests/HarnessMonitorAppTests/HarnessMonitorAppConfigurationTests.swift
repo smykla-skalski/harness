@@ -25,7 +25,7 @@ final class HarnessMonitorAppConfigurationTests: XCTestCase {
     )
 
     let value = isolated.object(
-      forKey: HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey
+      forKey: HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey
     ) as? Bool
     XCTAssertEqual(value, true)
   }

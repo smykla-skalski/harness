@@ -15,7 +15,7 @@ public struct AuthorizedFoldersSection: View {
     Form {
       foldersSection
     }
-    .preferencesDetailFormStyle()
+    .settingsDetailFormStyle()
     .task { await reload() }
   }
 
@@ -29,7 +29,7 @@ public struct AuthorizedFoldersSection: View {
         tint: nil,
         variant: .bordered,
         accessibilityIdentifier: HarnessMonitorAccessibility
-          .preferencesAuthorizedFoldersAddButton
+          .settingsAuthorizedFoldersAddButton
       ) {
         store.requestOpenFolder()
       }
@@ -49,7 +49,7 @@ public struct AuthorizedFoldersSection: View {
         )
       )
       .accessibilityIdentifier(
-        HarnessMonitorAccessibility.preferencesAuthorizedFoldersUnavailable
+        HarnessMonitorAccessibility.settingsAuthorizedFoldersUnavailable
       )
     } else if records.isEmpty {
       ContentUnavailableView(
@@ -58,7 +58,7 @@ public struct AuthorizedFoldersSection: View {
         description: Text("Use File > Open Folder… to authorize a project directory.")
       )
       .accessibilityIdentifier(
-        HarnessMonitorAccessibility.preferencesAuthorizedFoldersEmpty
+        HarnessMonitorAccessibility.settingsAuthorizedFoldersEmpty
       )
     } else {
       ForEach(records, id: \.id) { record in
@@ -97,7 +97,7 @@ public struct AuthorizedFoldersSection: View {
     .accessibilityElement(children: .combine)
     .accessibilityLabel(Text("\(record.displayName), \(record.lastResolvedPath)"))
     .accessibilityIdentifier(
-      HarnessMonitorAccessibility.preferencesAuthorizedFolderRow(record.id)
+      HarnessMonitorAccessibility.settingsAuthorizedFolderRow(record.id)
     )
   }
 

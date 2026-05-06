@@ -88,9 +88,9 @@ extension HarnessMonitorUITestCase {
   }
 
   func openSettings(in app: XCUIApplication) {
-    let preferencesRoot = element(
-      in: app, identifier: HarnessMonitorUITestAccessibility.preferencesRoot)
-    if preferencesRoot.exists {
+    let settingsRoot = element(
+      in: app, identifier: HarnessMonitorUITestAccessibility.settingsRoot)
+    if settingsRoot.exists {
       return
     }
 

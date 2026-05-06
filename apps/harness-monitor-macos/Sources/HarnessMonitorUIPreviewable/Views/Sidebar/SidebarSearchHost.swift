@@ -36,8 +36,8 @@ struct SidebarSearchHost: View {
   let collapsedCheckoutKeys: Set<String>
   let setCheckoutCollapsed: (String, Bool) -> Void
 
-  @AppStorage(HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey)
-  private var mcpRegistryHostEnabled = HarnessMonitorMCPPreferencesDefaults
+  @AppStorage(HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
+  private var mcpRegistryHostEnabled = HarnessMonitorMCPSettingsDefaults
     .registryHostEnabledDefault
   @State private var searchPresentationState = SidebarSearchPresentationState()
   @State private var searchFocusDispatcher = HarnessSidebarSearchFocusDispatcher()

@@ -162,7 +162,7 @@ public struct HarnessMonitorMCPStatusSnapshot: Equatable, Sendable {
     if isRecovering {
       return "You can keep working while the registry retries in the background."
     }
-    return "Correct the problem, then open Preferences > MCP to re-enable the registry host."
+    return "Correct the problem, then open Settings > MCP to re-enable the registry host."
   }
 
   private var hostScopeClarification: String {

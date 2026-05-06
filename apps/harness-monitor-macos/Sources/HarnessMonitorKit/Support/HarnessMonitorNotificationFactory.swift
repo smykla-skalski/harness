@@ -51,7 +51,7 @@ enum HarnessMonitorNotificationRequestFactory {
     }
     if draft.includesUserInfo {
       content.userInfo = [
-        "source": "preferences",
+        "source": "settings",
         "thread": draft.threadIdentifier,
         "presetCategory": draft.category.rawValue,
       ]
@@ -92,7 +92,7 @@ enum HarnessMonitorNotificationRequestFactory {
     summary: String,
     decisionID: String
   ) async throws -> UNNotificationRequest {
-    let preferences = SupervisorNotificationPreferences.load()
+    let settings = SupervisorNotificationSettings.load()
     let content = UNMutableNotificationContent()
     content.title = "Harness Monitor"
     content.subtitle = severity.supervisorNotificationSubtitle
@@ -101,7 +101,7 @@ enum HarnessMonitorNotificationRequestFactory {
     content.categoryIdentifier = HarnessMonitorSupervisorNotificationID.category(for: severity)
     content.interruptionLevel = severity.supervisorInterruptionLevel
     content.relevanceScore = severity.supervisorRelevanceScore
-    content.sound = preferences.requestSound(for: severity)
+    content.sound = settings.requestSound(for: severity)
     content.userInfo = [
       HarnessMonitorSupervisorNotificationID.decisionIDKey: decisionID,
       HarnessMonitorSupervisorNotificationID.severityKey: severity.rawValue,
@@ -115,7 +115,7 @@ enum HarnessMonitorNotificationRequestFactory {
     summary: String,
     ruleID: String
   ) async throws -> UNNotificationRequest {
-    let preferences = SupervisorNotificationPreferences.load()
+    let settings = SupervisorNotificationSettings.load()
     let content = UNMutableNotificationContent()
     content.title = "Harness Monitor"
     content.subtitle = severity.supervisorNotificationSubtitle
@@ -124,7 +124,7 @@ enum HarnessMonitorNotificationRequestFactory {
     content.categoryIdentifier = HarnessMonitorSupervisorNotificationID.noticeCategoryIdentifier
     content.interruptionLevel = severity.supervisorInterruptionLevel
     content.relevanceScore = severity.supervisorRelevanceScore
-    content.sound = preferences.requestSound(for: severity)
+    content.sound = settings.requestSound(for: severity)
     content.userInfo = [
       HarnessMonitorSupervisorNotificationID.ruleIDKey: ruleID,
       HarnessMonitorSupervisorNotificationID.severityKey: severity.rawValue,
@@ -155,7 +155,7 @@ enum HarnessMonitorNotificationRequestFactory {
   }
 
   /// Convenience helper mirroring `makeSupervisorRequest` that produces a
-  /// `HarnessMonitorNotificationDraft` for surfaces that still use the Preferences draft flow
+  /// `HarnessMonitorNotificationDraft` for surfaces that still use the Settings draft flow
   /// (for example, the debug "Send test supervisor notification" affordance).
   static func supervisorDecision(
     severity: DecisionSeverity,

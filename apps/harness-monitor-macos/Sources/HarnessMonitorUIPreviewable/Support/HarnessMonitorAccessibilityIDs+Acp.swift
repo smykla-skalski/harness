@@ -5,14 +5,14 @@ extension HarnessMonitorAccessibility {
   public static let contentAcpBridgeOpenLogButton = "harness.content.acp-bridge.open-log"
   public static let contentAcpBridgeRunDoctorButton = "harness.content.acp-bridge.run-doctor"
 
-  public static let preferencesAcpNotificationStatus = "harness.preferences.acp.status"
-  public static let preferencesAcpNotificationStatusState = "harness.preferences.acp.status.state"
-  public static let preferencesAcpCatalogToggle = "harness.preferences.acp.catalog.toggle"
-  public static let preferencesAcpCatalogPermission = "harness.preferences.acp.catalog.permission"
-  public static let preferencesAcpVerboseAnnounceToggle =
-    "harness.preferences.acp.verbose-tool-call-announcements"
-  public static let preferencesAcpOpenSystemSettings =
-    "harness.preferences.acp.open-system-settings"
+  public static let settingsAcpNotificationStatus = "harness.settings.acp.status"
+  public static let settingsAcpNotificationStatusState = "harness.settings.acp.status.state"
+  public static let settingsAcpCatalogToggle = "harness.settings.acp.catalog.toggle"
+  public static let settingsAcpCatalogPermission = "harness.settings.acp.catalog.permission"
+  public static let settingsAcpVerboseAnnounceToggle =
+    "harness.settings.acp.verbose-tool-call-announcements"
+  public static let settingsAcpOpenSystemSettings =
+    "harness.settings.acp.open-system-settings"
 
   public static let acpPermissionToast = "harness.acp-permission.toast"
   public static let acpPermissionToastFrame = "harness.acp-permission.toast.frame"

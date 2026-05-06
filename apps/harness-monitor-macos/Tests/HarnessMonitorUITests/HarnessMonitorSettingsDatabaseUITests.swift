@@ -10,8 +10,8 @@ class HarnessMonitorSettingsDatabaseUITests: HarnessMonitorUITestCase {
     let app = launch(mode: "preview")
 
     openSettings(in: app)
-    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
-    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.actionTimeout))
+    let settingsRoot = element(in: app, identifier: Accessibility.settingsRoot)
+    XCTAssertTrue(settingsRoot.waitForExistence(timeout: Self.actionTimeout))
 
     // Click "Database" in the sidebar. Sidebar items may appear as buttons,
     // cells, or radio buttons depending on the macOS version.
@@ -20,15 +20,15 @@ class HarnessMonitorSettingsDatabaseUITests: HarnessMonitorUITestCase {
     tapViaCoordinate(in: app, element: databaseItem)
 
     // Verify Database section loaded.
-    let title = element(in: app, identifier: Accessibility.preferencesTitle)
+    let title = element(in: app, identifier: Accessibility.settingsTitle)
     XCTAssertTrue(
       waitUntil(timeout: 2) { title.exists && title.label == "Database" },
       "Title should be 'Database' but got '\(title.label)'"
     )
 
-    let preferencesState = element(in: app, identifier: Accessibility.preferencesState)
-    XCTAssertTrue(preferencesState.exists)
-    XCTAssertTrue(preferencesState.label.contains("section=database"))
+    let settingsState = element(in: app, identifier: Accessibility.settingsState)
+    XCTAssertTrue(settingsState.exists)
+    XCTAssertTrue(settingsState.label.contains("section=database"))
 
     // -- Verify Statistics section (visible at the top) --
     let statisticsHeader = app.staticTexts["Statistics"]
@@ -92,15 +92,15 @@ class HarnessMonitorSettingsDatabaseUITests: HarnessMonitorUITestCase {
     let app = launch(mode: "preview")
 
     openSettings(in: app)
-    selectPreferencesSection(
+    selectSettingsSection(
       in: app,
-      identifier: Accessibility.preferencesDatabaseSection,
+      identifier: Accessibility.settingsDatabaseSection,
       expectedTitle: "Database"
     )
 
     let statisticsPicker = segmentedControl(
       in: app,
-      identifier: Accessibility.preferencesDatabaseStatisticsPicker
+      identifier: Accessibility.settingsDatabaseStatisticsPicker
     )
     XCTAssertTrue(statisticsPicker.waitForExistence(timeout: Self.actionTimeout))
 

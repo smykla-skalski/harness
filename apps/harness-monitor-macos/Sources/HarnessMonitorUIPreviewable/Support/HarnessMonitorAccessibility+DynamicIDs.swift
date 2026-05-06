@@ -117,7 +117,7 @@ extension HarnessMonitorAccessibility {
     "harness.session.timeline.action.\(slug(decisionID)).\(slug(actionID))"
   }
 
-  public static func preferencesMetricCard(_ key: String) -> String {
-    "harness.preferences.metric.\(slug(key))"
+  public static func settingsMetricCard(_ key: String) -> String {
+    "harness.settings.metric.\(slug(key))"
   }
 }

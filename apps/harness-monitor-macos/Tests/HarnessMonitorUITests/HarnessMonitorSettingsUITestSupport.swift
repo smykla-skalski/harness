@@ -15,33 +15,33 @@ enum HarnessMonitorSettingsUITestKeys {
 
 extension HarnessMonitorUITestCase {
   func selectAppearanceSection(in app: XCUIApplication) {
-    selectPreferencesSection(
+    selectSettingsSection(
       in: app,
-      identifier: HarnessMonitorUITestAccessibility.preferencesAppearanceSection,
+      identifier: HarnessMonitorUITestAccessibility.settingsAppearanceSection,
       expectedTitle: "Appearance"
     )
   }
 
   func selectNotificationsSection(in app: XCUIApplication) {
-    selectPreferencesSection(
+    selectSettingsSection(
       in: app,
-      identifier: HarnessMonitorUITestAccessibility.preferencesNotificationsSection,
+      identifier: HarnessMonitorUITestAccessibility.settingsNotificationsSection,
       expectedTitle: "Notifications"
     )
   }
 
   func selectVoiceSection(in app: XCUIApplication) {
-    selectPreferencesSection(
+    selectSettingsSection(
       in: app,
-      identifier: HarnessMonitorUITestAccessibility.preferencesVoiceSection,
+      identifier: HarnessMonitorUITestAccessibility.settingsVoiceSection,
       expectedTitle: "Voice"
     )
   }
 
   func selectSupervisorSection(in app: XCUIApplication) {
-    selectPreferencesSection(
+    selectSettingsSection(
       in: app,
-      identifier: HarnessMonitorUITestAccessibility.preferencesSupervisorSection,
+      identifier: HarnessMonitorUITestAccessibility.settingsSupervisorSection,
       expectedTitle: "Supervisor"
     )
   }
@@ -49,7 +49,7 @@ extension HarnessMonitorUITestCase {
   func selectSupervisorNotificationsPane(in app: XCUIApplication) {
     let notificationsPane = element(
       in: app,
-      identifier: HarnessMonitorUITestAccessibility.preferencesSupervisorPane("notifications")
+      identifier: HarnessMonitorUITestAccessibility.settingsSupervisorPane("notifications")
     )
     if notificationsPane.exists {
       return
@@ -59,7 +59,7 @@ extension HarnessMonitorUITestCase {
 
     let panePicker = segmentedControl(
       in: app,
-      identifier: HarnessMonitorUITestAccessibility.preferencesSupervisorPane("pane-picker")
+      identifier: HarnessMonitorUITestAccessibility.settingsSupervisorPane("pane-picker")
     )
     XCTAssertTrue(
       panePicker.waitForExistence(timeout: Self.actionTimeout),
@@ -69,7 +69,7 @@ extension HarnessMonitorUITestCase {
     tapButton(
       in: app,
       identifier: HarnessMonitorUITestAccessibility.segmentedOption(
-        HarnessMonitorUITestAccessibility.preferencesSupervisorPane("pane-picker"),
+        HarnessMonitorUITestAccessibility.settingsSupervisorPane("pane-picker"),
         option: "Notifications"
       )
     )
@@ -80,21 +80,21 @@ extension HarnessMonitorUITestCase {
   }
 
   func selectGeneralSection(in app: XCUIApplication) {
-    selectPreferencesSection(
+    selectSettingsSection(
       in: app,
-      identifier: HarnessMonitorUITestAccessibility.preferencesGeneralSection,
+      identifier: HarnessMonitorUITestAccessibility.settingsGeneralSection,
       expectedTitle: "General"
     )
   }
 
-  func selectPreferencesSection(
+  func selectSettingsSection(
     in app: XCUIApplication,
     identifier: String,
     expectedTitle: String
   ) {
     let title = element(
       in: app,
-      identifier: HarnessMonitorUITestAccessibility.preferencesTitle
+      identifier: HarnessMonitorUITestAccessibility.settingsTitle
     )
     if title.exists, title.label == expectedTitle {
       return
@@ -125,7 +125,7 @@ extension HarnessMonitorUITestCase {
       waitUntil(timeout: Self.fastActionTimeout) {
         title.exists && title.label == expectedTitle
       },
-      "Preferences title did not switch to \(expectedTitle); got '\(title.label)'"
+      "Settings title did not switch to \(expectedTitle); got '\(title.label)'"
     )
   }
 
@@ -133,14 +133,14 @@ extension HarnessMonitorUITestCase {
     in app: XCUIApplication,
     candidates: [String]
   ) -> String? {
-    let preferencesRoot = element(
+    let settingsRoot = element(
       in: app,
-      identifier: HarnessMonitorUITestAccessibility.preferencesRoot
+      identifier: HarnessMonitorUITestAccessibility.settingsRoot
     )
-    let preferencesWindow = window(in: app, containing: preferencesRoot)
+    let settingsWindow = window(in: app, containing: settingsRoot)
     let collectionPicker = segmentedControl(
       in: app,
-      identifier: HarnessMonitorUITestAccessibility.preferencesBackgroundCollectionPicker
+      identifier: HarnessMonitorUITestAccessibility.settingsBackgroundCollectionPicker
     )
     let nativeTab = button(in: app, title: "Native")
 
@@ -148,7 +148,7 @@ extension HarnessMonitorUITestCase {
     XCTAssertTrue(nativeTab.waitForExistence(timeout: Self.fastActionTimeout))
 
     for _ in 0..<4 where !nativeTab.isHittable {
-      dragUp(in: app, element: preferencesWindow, distanceRatio: 0.18)
+      dragUp(in: app, element: settingsWindow, distanceRatio: 0.18)
     }
 
     XCTAssertTrue(nativeTab.isHittable, "Native background tab never became hittable")
@@ -158,7 +158,7 @@ extension HarnessMonitorUITestCase {
       candidates.contains { candidate in
         self.element(
           in: app,
-          identifier: HarnessMonitorUITestAccessibility.preferencesBackgroundTile(candidate)
+          identifier: HarnessMonitorUITestAccessibility.settingsBackgroundTile(candidate)
         ).exists
       }
     }
@@ -171,7 +171,7 @@ extension HarnessMonitorUITestCase {
       for candidate in candidates {
         let tile = element(
           in: app,
-          identifier: HarnessMonitorUITestAccessibility.preferencesBackgroundTile(candidate)
+          identifier: HarnessMonitorUITestAccessibility.settingsBackgroundTile(candidate)
         )
         if tile.exists, tile.isHittable {
           tile.tap()
@@ -185,28 +185,28 @@ extension HarnessMonitorUITestCase {
   }
 
   func tapBackgroundTile(in app: XCUIApplication, key: String) {
-    let preferencesRoot = element(
+    let settingsRoot = element(
       in: app,
-      identifier: HarnessMonitorUITestAccessibility.preferencesRoot
+      identifier: HarnessMonitorUITestAccessibility.settingsRoot
     )
-    let preferencesWindow = window(in: app, containing: preferencesRoot)
-    let identifier = HarnessMonitorUITestAccessibility.preferencesBackgroundTile(key)
+    let settingsWindow = window(in: app, containing: settingsRoot)
+    let identifier = HarnessMonitorUITestAccessibility.settingsBackgroundTile(key)
 
     for _ in 0..<2 {
-      let tile = descendantElement(in: preferencesWindow, identifier: identifier)
+      let tile = descendantElement(in: settingsWindow, identifier: identifier)
       if tile.exists, tile.isHittable {
         tile.tap()
         return
       }
 
-      dragUp(in: app, element: preferencesWindow, distanceRatio: 0.18)
+      dragUp(in: app, element: settingsWindow, distanceRatio: 0.18)
     }
 
     XCTFail("Failed to tap background tile \(key)")
   }
 
-  func closeSettings(in app: XCUIApplication, preferencesRoot: XCUIElement) {
-    if !preferencesRoot.exists {
+  func closeSettings(in app: XCUIApplication, settingsRoot: XCUIElement) {
+    if !settingsRoot.exists {
       return
     }
 
@@ -214,18 +214,18 @@ extension HarnessMonitorUITestCase {
 
     XCTAssertTrue(
       waitUntil(timeout: Self.fastActionTimeout) {
-        !preferencesRoot.exists
+        !settingsRoot.exists
       }
     )
   }
 
-  func preferencesRootCount(in app: XCUIApplication) -> Int {
+  func settingsRootCount(in app: XCUIApplication) -> Int {
     app.descendants(matching: .any)
-      .matching(identifier: HarnessMonitorUITestAccessibility.preferencesRoot)
+      .matching(identifier: HarnessMonitorUITestAccessibility.settingsRoot)
       .count
   }
 
-  func preferencesMetricValue(in element: XCUIElement, label: String) -> XCUIElement {
+  func settingsMetricValue(in element: XCUIElement, label: String) -> XCUIElement {
     element.descendants(matching: .staticText)
       .matching(NSPredicate(format: "label == %@", label))
       .firstMatch

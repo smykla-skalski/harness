@@ -5,13 +5,13 @@ extension HarnessVoiceInputButton {
   func startCapture() {
     guard !model.isRecording else { return }
     model.failurePresentation = nil
-    if remoteProcessorSinkEnabled, voicePreferences.remoteProcessorURL == nil {
+    if remoteProcessorSinkEnabled, voiceSettings.remoteProcessorURL == nil {
       model.statusText = "Remote processor endpoint must be HTTPS."
       model.failurePresentation = VoiceCaptureFailurePresentation(
         title: "Remote Processor Unavailable",
         message: "Remote processor endpoint must be a full HTTPS URL.",
         recoverySuggestion:
-          "Open Preferences > Voice, turn off Remote processor or save a full HTTPS endpoint, then try again."
+          "Open Settings > Voice, turn off Remote processor or save a full HTTPS endpoint, then try again."
       )
       return
     }
@@ -20,25 +20,25 @@ extension HarnessVoiceInputButton {
     model.partialTranscript = ""
     model.statusText = "Preparing microphone"
     model.isRecording = true
-    model.pendingAutoInsert = voicePreferences.shouldAutoInsertTranscript
+    model.pendingAutoInsert = voiceSettings.shouldAutoInsertTranscript
     model.captureTask?.cancel()
     model.processingSessionTask?.cancel()
     model.voiceSessionID = nil
     model.pendingAudioChunks.removeAll(keepingCapacity: true)
     model.pendingTranscriptSegments.removeAll(keepingCapacity: true)
 
-    let voicePreferences = self.voicePreferences
-    let localeIdentifier = voicePreferences.effectiveLocaleIdentifier
+    let voiceSettings = self.voiceSettings
+    let localeIdentifier = voiceSettings.effectiveLocaleIdentifier
     let routeTarget = routeTarget()
-    let sinks = voicePreferences.requestedSinks
-    let remoteURL = voicePreferences.remoteProcessorURL
+    let sinks = voiceSettings.requestedSinks
+    let remoteURL = voiceSettings.remoteProcessorURL
     let processingSessionTask = Task { @MainActor in
       let response = await store.startVoiceProcessingSession(
         localeIdentifier: localeIdentifier,
         requestedSinks: sinks,
         routeTarget: routeTarget,
         remoteProcessorURL: remoteURL,
-        requiresConfirmation: voicePreferences.transcriptInsertionMode.requiresConfirmation
+        requiresConfirmation: voiceSettings.transcriptInsertionMode.requiresConfirmation
       )
       guard !Task.isCancelled else { return response }
       model.voiceSessionID = response?.voiceSessionId
@@ -58,7 +58,7 @@ extension HarnessVoiceInputButton {
     model.captureTask = Task { @MainActor in
       do {
         for try await event in store.voiceCaptureStream(
-          configuration: voicePreferences.captureConfiguration
+          configuration: voiceSettings.captureConfiguration
         ) {
           await handle(event)
         }
@@ -213,14 +213,14 @@ extension HarnessVoiceInputButton {
   }
 
   func appendPendingAudioChunk(_ chunk: VoiceAudioChunk) {
-    if model.pendingAudioChunks.count >= voicePreferences.pendingAudioChunkLimit {
+    if model.pendingAudioChunks.count >= voiceSettings.pendingAudioChunkLimit {
       model.pendingAudioChunks.removeFirst()
     }
     model.pendingAudioChunks.append(chunk)
   }
 
   func appendPendingTranscriptSegment(_ segment: VoiceTranscriptSegment) {
-    if model.pendingTranscriptSegments.count >= voicePreferences.pendingTranscriptSegmentLimit {
+    if model.pendingTranscriptSegments.count >= voiceSettings.pendingTranscriptSegmentLimit {
       model.pendingTranscriptSegments.removeFirst()
     }
     model.pendingTranscriptSegments.append(segment)

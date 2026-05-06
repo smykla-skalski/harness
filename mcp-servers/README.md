@@ -129,7 +129,7 @@ The Swift host is implemented as a sibling SPM package so the app's `project.yml
 
 3. Regenerate with `mise run monitor:macos:generate`.
 
-4. Bind the listener at app startup, gated by the Preferences toggle (see that module's README).
+4. Bind the listener at app startup, gated by the Settings toggle (see that module's README).
 
 5. Attach `.trackWindow(...)` at each tracked scene root so the app publishes window metadata and auto-harvested controls. Use `.trackAccessibility(...)` only for explicit per-view registration when a view needs precise manual metadata.
 

@@ -242,7 +242,7 @@ enum HarnessMonitorPerfDriver {
       HarnessMonitorBackdropMode.window.rawValue,
       forKey: HarnessMonitorBackdropDefaults.modeKey
     )
-    openWindow(id: HarnessMonitorWindowID.preferences)
+    openWindow(id: HarnessMonitorWindowID.settings)
     await settle(.milliseconds(1_000))
   }
 

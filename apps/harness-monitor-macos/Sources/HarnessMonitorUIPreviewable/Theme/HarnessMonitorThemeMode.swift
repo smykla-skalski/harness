@@ -36,7 +36,7 @@ public struct HarnessMonitorBackgroundSelection: Equatable, Identifiable, Sendab
   public let label: String
   public let subtitle: String
   public let accessibilityKey: String
-  public let preferencesStateValue: String
+  public let settingsStateValue: String
 
   public static let defaultSelection = Self.bundled(.defaultSelection)
   public static let bundledLibrary = HarnessMonitorBackgroundImage.allCases.map(Self.bundled)
@@ -70,7 +70,7 @@ public struct HarnessMonitorBackgroundSelection: Equatable, Identifiable, Sendab
       label: image.label,
       subtitle: image.subtitle,
       accessibilityKey: image.rawValue,
-      preferencesStateValue: image.rawValue
+      settingsStateValue: image.rawValue
     )
   }
 
@@ -81,7 +81,7 @@ public struct HarnessMonitorBackgroundSelection: Equatable, Identifiable, Sendab
       label: wallpaper.label,
       subtitle: wallpaper.subtitle,
       accessibilityKey: wallpaper.selectionToken,
-      preferencesStateValue: wallpaper.selectionToken
+      settingsStateValue: wallpaper.selectionToken
     )
   }
 }

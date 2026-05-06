@@ -15,10 +15,10 @@ struct ToolCallTimelineView: View {
   @State private var cachedRowFrames: [String: CGRect] = [:]
 
   @AppStorage(
-    HarnessMonitorToolCallAnnouncementPreferences.verboseAnnouncementsKey
+    HarnessMonitorToolCallAnnouncementSettings.verboseAnnouncementsKey
   )
   private var verboseToolCallAnnouncements =
-    HarnessMonitorToolCallAnnouncementPreferences.verboseAnnouncementsDefault
+    HarnessMonitorToolCallAnnouncementSettings.verboseAnnouncementsDefault
 
   init(
     entries: [TimelineEntry],

@@ -17,7 +17,7 @@ How SwiftUI APIs are used in the Harness Monitor macOS app. Hard rules learned f
 | `@Binding` | Child needs read-write access to parent's state |
 | `@Observable` (macro) | Preferred over ObservableObject for new code (iOS 17+/macOS 14+) |
 | `@Environment` | System values or injected dependencies |
-| `@AppStorage` | Persistent preferences (small values only) |
+| `@AppStorage` | Persistent settings (small values only) |
 | `@SceneStorage` | Per-window state restoration |
 | `@FocusState` | Keyboard/focus management |
 
@@ -70,15 +70,15 @@ struct InspectorToolbarActions: ToolbarContent {
   @Environment(\.openWindow) private var openWindow
 
   var body: some ToolbarContent {
-    Button { openWindow(id: HarnessMonitorWindowID.preferences) } label: { ... }
+    Button { openWindow(id: HarnessMonitorWindowID.settings) } label: { ... }
   }
 }
 
 // wrong - closure passed from parent
 struct InspectorToolbarActions: ToolbarContent {
-  let openPreferences: () -> Void
+  let openSettings: () -> Void
   var body: some ToolbarContent {
-    Button(action: openPreferences) { ... }
+    Button(action: openSettings) { ... }
   }
 }
 ```
@@ -573,9 +573,9 @@ Do not use `.onChange(of: isDragEnabled)` or similar to tear down drag state mid
 
 - `WindowGroup` for main content. `Window` for auxiliary windows.
 - `.defaultSize(width:height:)` and `.windowResizability(.contentMinSize)`.
-- `Settings { }` scene for preferences (Cmd+, opens it).
+- Use the `Settings { }` scene (Cmd+, opens it).
 - `MenuBarExtra` for menu bar items.
-- `@AppStorage` for user preferences. Changes apply immediately, no Save button.
+- `@AppStorage` for user settings. Changes apply immediately, no Save button.
 
 ## Commands (macOS)
 

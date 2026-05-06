@@ -13,7 +13,7 @@
 | @EnvironmentObject | No | Environment | Shared ObservableObject injected higher in the tree (legacy) |
 | @Observable (macro) | Varies | Modern | Preferred over ObservableObject for new code (iOS 17+/macOS 14+) |
 | @Environment | No | System | System values (colorScheme, dynamicTypeSize) or custom keys |
-| @AppStorage | Yes | UserDefaults | Persistent preferences (small values only) |
+| @AppStorage | Yes | UserDefaults | Persistent settings (small values only) |
 | @SceneStorage | Yes | Scene | Per-window state restoration |
 | @FocusState | Yes | View-local | Keyboard/focus management |
 
@@ -584,7 +584,7 @@ struct MyApp: App {
 }
 ```
 
-## 14. Settings/preferences
+## 14. Settings
 
 ### macOS Settings scene
 ```swift
@@ -607,7 +607,7 @@ struct MyApp: App {
 }
 ```
 
-### @AppStorage for preferences
+### @AppStorage for settings
 ```swift
 @AppStorage("showSidebar") private var showSidebar = true
 @AppStorage("refreshInterval") private var refreshInterval = 300

@@ -62,7 +62,7 @@ struct HarnessMonitorMCPHealthSurfacingTests {
         .contains("MCP registry host degraded:") == true
     )
 
-    let snapshot = PreferencesDiagnosticsSnapshot(store: store)
+    let snapshot = SettingsDiagnosticsSnapshot(store: store)
     #expect(snapshot.mcpStatus == degraded)
 
     let healthy = HarnessMonitorMCPStatusSnapshot(

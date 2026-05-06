@@ -155,9 +155,9 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     makeRequest: () async throws -> UNNotificationRequest
   ) async -> Bool {
     await performNotificationOperation {
-      let preferences = SupervisorNotificationPreferences.load()
-      guard preferences.allowsAnyDelivery(for: severity) else {
-        lastResult = "Supervisor notification suppressed by preferences."
+      let settings = SupervisorNotificationSettings.load()
+      guard settings.allowsAnyDelivery(for: severity) else {
+        lastResult = "Supervisor notification suppressed by settings."
         return false
       }
       do {
@@ -302,7 +302,7 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     else {
       return [.banner, .list, .sound, .badge]
     }
-    return SupervisorNotificationPreferences.load().foregroundPresentationOptions(for: severity)
+    return SupervisorNotificationSettings.load().foregroundPresentationOptions(for: severity)
   }
 
   nonisolated public func userNotificationCenter(

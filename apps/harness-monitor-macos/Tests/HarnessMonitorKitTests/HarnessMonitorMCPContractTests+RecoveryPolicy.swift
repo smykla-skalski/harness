@@ -7,7 +7,7 @@ extension HarnessMonitorMCPContractTests {
   @Test("degraded startup schedules bounded recovery and converges healthy")
   func degradedStartupSchedulesBoundedRecoveryAndConvergesHealthy() async throws {
     let defaults = try isolatedRecoveryDefaults()
-    defaults.defaults.set(true, forKey: HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey)
+    defaults.defaults.set(true, forKey: HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
     defer { defaults.defaults.removePersistentDomain(forName: defaults.suiteName) }
 
     let clock = TestClock()
@@ -74,7 +74,7 @@ extension HarnessMonitorMCPContractTests {
   @Test("degraded startup exhausts its bounded retries")
   func degradedStartupExhaustsItsBoundedRetries() async throws {
     let defaults = try isolatedRecoveryDefaults()
-    defaults.defaults.set(true, forKey: HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey)
+    defaults.defaults.set(true, forKey: HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
     defer { defaults.defaults.removePersistentDomain(forName: defaults.suiteName) }
 
     let clock = TestClock()
@@ -170,7 +170,7 @@ extension HarnessMonitorMCPContractTests {
   @Test("disable cancels pending recovery before retry runs")
   func disableCancelsPendingRecoveryBeforeRetryRuns() async throws {
     let defaults = try isolatedRecoveryDefaults()
-    defaults.defaults.set(true, forKey: HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey)
+    defaults.defaults.set(true, forKey: HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
     defer { defaults.defaults.removePersistentDomain(forName: defaults.suiteName) }
 
     let notificationCenter = NotificationCenter()
@@ -201,7 +201,7 @@ extension HarnessMonitorMCPContractTests {
 
     defaults.defaults.set(
       false,
-      forKey: HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey
+      forKey: HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey
     )
     notificationCenter.post(name: UserDefaults.didChangeNotification, object: defaults.defaults)
     await waitForCondition {
@@ -223,7 +223,7 @@ extension HarnessMonitorMCPContractTests {
   @Test("healthy state schedules recovery when health check detects broken connection")
   func healthyStateSchedulesRecoveryWhenHealthCheckDetectsBrokenConnection() async throws {
     let defaults = try isolatedRecoveryDefaults()
-    defaults.defaults.set(true, forKey: HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey)
+    defaults.defaults.set(true, forKey: HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
     defer { defaults.defaults.removePersistentDomain(forName: defaults.suiteName) }
 
     let clock = TestClock()
@@ -309,7 +309,7 @@ extension HarnessMonitorMCPContractTests {
   @Test("re-enable after exhausted recovery starts fresh retry budget")
   func reenableAfterExhaustedRecoveryStartsFreshRetryBudget() async throws {
     let defaults = try isolatedRecoveryDefaults()
-    defaults.defaults.set(true, forKey: HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey)
+    defaults.defaults.set(true, forKey: HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
     defer { defaults.defaults.removePersistentDomain(forName: defaults.suiteName) }
 
     let notificationCenter = NotificationCenter()
@@ -369,14 +369,14 @@ extension HarnessMonitorMCPContractTests {
 
     defaults.defaults.set(
       false,
-      forKey: HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey
+      forKey: HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey
     )
     notificationCenter.post(name: UserDefaults.didChangeNotification, object: defaults.defaults)
     await waitForCondition {
       controller.runtimeState == HarnessMonitorMCPRuntimeState.disabled
     }
 
-    defaults.defaults.set(true, forKey: HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey)
+    defaults.defaults.set(true, forKey: HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
     notificationCenter.post(name: UserDefaults.didChangeNotification, object: defaults.defaults)
     await waitForCondition {
       service.recordedEnabledStates == [true, true, false, true]

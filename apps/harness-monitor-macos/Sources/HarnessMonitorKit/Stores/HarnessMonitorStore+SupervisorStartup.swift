@@ -54,13 +54,13 @@ extension HarnessMonitorStore {
       registry: registry,
       executor: executor,
       clock: supervisorClock,
-      interval: SupervisorPreferencesDefaults.defaultIntervalSeconds
+      interval: SupervisorSettingsDefaults.defaultIntervalSeconds
     )
-    await service.setQuietHoursWindow(SupervisorPreferencesDefaults.quietHoursWindow())
+    await service.setQuietHoursWindow(SupervisorSettingsDefaults.quietHoursWindow())
 
     let lifecycle = SupervisorLifecycle(
-      interval: SupervisorPreferencesDefaults.defaultIntervalSeconds,
-      tolerance: SupervisorPreferencesDefaults.schedulerTolerance
+      interval: SupervisorSettingsDefaults.defaultIntervalSeconds,
+      tolerance: SupervisorSettingsDefaults.schedulerTolerance
     )
 
     do {

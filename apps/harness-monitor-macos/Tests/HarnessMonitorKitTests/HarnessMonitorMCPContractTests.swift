@@ -15,20 +15,20 @@ struct HarnessMonitorMCPContractTests {
 
   @Test("Default value constant is true")
   func defaultValueConstantIsTrue() {
-    #expect(HarnessMonitorMCPPreferencesDefaults.registryHostEnabledDefault == true)
+    #expect(HarnessMonitorMCPSettingsDefaults.registryHostEnabledDefault == true)
   }
 
   @Test("Registration defaults dictionary enables the registry host")
   func registrationDefaultsDictionaryEnablesTheRegistryHost() {
-    let defaults = HarnessMonitorMCPPreferencesDefaults.registrationDefaults()
-    let value = defaults[HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey] as? Bool
+    let defaults = HarnessMonitorMCPSettingsDefaults.registrationDefaults()
+    let value = defaults[HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey] as? Bool
     #expect(value == true)
   }
 
   @Test("Startup registration defaults helper includes the MCP key")
   func startupRegistrationDefaultsIncludesMCPKey() {
     let values = HarnessMonitorStartupRegistrationDefaults.values()
-    let value = values[HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey] as? Bool
+    let value = values[HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey] as? Bool
     #expect(value == true)
   }
 
@@ -38,7 +38,7 @@ struct HarnessMonitorMCPContractTests {
   @Test("enabled startup success converges to healthy")
   func enabledStartupSuccessConvergesToHealthy() async throws {
     let defaults = try isolatedDefaults()
-    defaults.defaults.set(true, forKey: HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey)
+    defaults.defaults.set(true, forKey: HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
     defer { defaults.defaults.removePersistentDomain(forName: defaults.suiteName) }
 
     let service = StubMCPService()
@@ -63,7 +63,7 @@ struct HarnessMonitorMCPContractTests {
   @Test("disabled startup stays disabled and does not start the service")
   func disabledStartupStaysDisabled() async throws {
     let defaults = try isolatedDefaults()
-    let enabledKey = HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey
+    let enabledKey = HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey
     defaults.defaults.set(false, forKey: enabledKey)
     defer { defaults.defaults.removePersistentDomain(forName: defaults.suiteName) }
 
@@ -88,7 +88,7 @@ struct HarnessMonitorMCPContractTests {
   @Test("enabled startup failure retains the degraded reason")
   func enabledStartupFailureRetainsTheDegradedReason() async throws {
     let defaults = try isolatedDefaults()
-    defaults.defaults.set(true, forKey: HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey)
+    defaults.defaults.set(true, forKey: HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
     defer { defaults.defaults.removePersistentDomain(forName: defaults.suiteName) }
 
     let degradedState = HarnessMonitorMCPRuntimeState.degraded(
@@ -116,7 +116,7 @@ struct HarnessMonitorMCPContractTests {
   @Test("startup controller publishes starting before settling healthy")
   func startupControllerPublishesStartingBeforeSettlingHealthy() async throws {
     let defaults = try isolatedDefaults()
-    defaults.defaults.set(true, forKey: HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey)
+    defaults.defaults.set(true, forKey: HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
     defer { defaults.defaults.removePersistentDomain(forName: defaults.suiteName) }
 
     let service = BlockingMCPService()
@@ -144,7 +144,7 @@ struct HarnessMonitorMCPContractTests {
   @Test("later preference changes disable and then re-enable through the owner")
   func laterPreferenceChangesDisableAndReenableThroughTheOwner() async throws {
     let defaults = try isolatedDefaults()
-    defaults.defaults.set(true, forKey: HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey)
+    defaults.defaults.set(true, forKey: HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
     defer { defaults.defaults.removePersistentDomain(forName: defaults.suiteName) }
 
     let notificationCenter = NotificationCenter()
@@ -160,7 +160,7 @@ struct HarnessMonitorMCPContractTests {
     controller.start()
     await Task.yield()
 
-    let enabledKey = HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey
+    let enabledKey = HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey
     defaults.defaults.set(false, forKey: enabledKey)
     notificationCenter.post(name: UserDefaults.didChangeNotification, object: defaults.defaults)
     try await awaitRuntimeState(
@@ -172,7 +172,7 @@ struct HarnessMonitorMCPContractTests {
     #expect(controller.runtimeState == .disabled)
 
     service.nextEnabledRuntimeState = .healthy(socketPath: "/tmp/mcp.sock")
-    defaults.defaults.set(true, forKey: HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey)
+    defaults.defaults.set(true, forKey: HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
     notificationCenter.post(name: UserDefaults.didChangeNotification, object: defaults.defaults)
     await Task.yield()
 

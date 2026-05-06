@@ -3,6 +3,6 @@ import HarnessMonitorKit
 import SwiftUI
 
 #Preview("Authorized Folders Section - Empty") {
-  AuthorizedFoldersSection(store: PreferencesPreviewSupport.makeStore())
+  AuthorizedFoldersSection(store: SettingsPreviewSupport.makeStore())
     .frame(width: 720)
 }

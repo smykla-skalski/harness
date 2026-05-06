@@ -10,28 +10,28 @@ final class HarnessMonitorSettingsNotificationsUITests: HarnessMonitorUITestCase
     openSettings(in: app)
     selectNotificationsSection(in: app)
 
-    let status = element(in: app, identifier: Accessibility.preferencesNotificationsStatus)
+    let status = element(in: app, identifier: Accessibility.settingsNotificationsStatus)
     let presetPicker = element(
       in: app,
-      identifier: Accessibility.preferencesNotificationsPresetPicker
+      identifier: Accessibility.settingsNotificationsPresetPicker
     )
     let categoryPicker = element(
       in: app,
-      identifier: Accessibility.preferencesNotificationsCategoryPicker
+      identifier: Accessibility.settingsNotificationsCategoryPicker
     )
     let soundPicker = element(
       in: app,
-      identifier: Accessibility.preferencesNotificationsSoundPicker
+      identifier: Accessibility.settingsNotificationsSoundPicker
     )
     let attachmentPicker = element(
       in: app,
-      identifier: Accessibility.preferencesNotificationsAttachmentPicker
+      identifier: Accessibility.settingsNotificationsAttachmentPicker
     )
     let triggerPicker = element(
       in: app,
-      identifier: Accessibility.preferencesNotificationsTriggerPicker
+      identifier: Accessibility.settingsNotificationsTriggerPicker
     )
-    let sendButton = element(in: app, identifier: Accessibility.preferencesNotificationsSendButton)
+    let sendButton = element(in: app, identifier: Accessibility.settingsNotificationsSendButton)
 
     XCTAssertTrue(status.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(presetPicker.waitForExistence(timeout: Self.actionTimeout))
@@ -41,9 +41,9 @@ final class HarnessMonitorSettingsNotificationsUITests: HarnessMonitorUITestCase
     XCTAssertTrue(triggerPicker.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(sendButton.waitForExistence(timeout: Self.actionTimeout))
 
-    let preferencesState = element(in: app, identifier: Accessibility.preferencesState)
-    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(preferencesState.label.contains("section=notifications"))
-    XCTAssertTrue(preferencesState.label.contains("preferencesChrome=native"))
+    let settingsState = element(in: app, identifier: Accessibility.settingsState)
+    XCTAssertTrue(settingsState.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(settingsState.label.contains("section=notifications"))
+    XCTAssertTrue(settingsState.label.contains("settingsChrome=native"))
   }
 }

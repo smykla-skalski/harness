@@ -47,7 +47,7 @@ func bootstrap() async {
     await registry.registerWindow(
       RegistryWindow(
         id: 1002,
-        title: "Preferences",
+        title: "Settings",
         role: "AXWindow",
         frame: RegistryRect(x: 200, y: 200, width: 860, height: 620)
       )

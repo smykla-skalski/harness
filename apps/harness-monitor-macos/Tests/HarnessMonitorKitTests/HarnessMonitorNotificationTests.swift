@@ -40,7 +40,7 @@ struct HarnessMonitorNotificationTests {
     #expect(content.attachments.count == 1)
     #expect(content.attachments.first?.type == "public.png")
     #expect(content.sound != nil)
-    #expect(content.userInfo["source"] as? String == "preferences")
+    #expect(content.userInfo["source"] as? String == "settings")
     #expect(try sampleImageHasAlpha(at: writer.sampleImageURL()) == false)
   }
 

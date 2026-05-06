@@ -92,10 +92,10 @@ public final class HarnessMonitorMCPStartupController {
     notificationCenter: NotificationCenter = .default,
     recoveryPolicy: HarnessMonitorMCPRecoveryPolicy = .default,
     forceEnable: @escaping @Sendable () -> Bool = {
-      HarnessMonitorMCPPreferencesDefaults.forceEnableFromEnvironment
+      HarnessMonitorMCPSettingsDefaults.forceEnableFromEnvironment
     },
-    enabledKey: String = HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey,
-    enabledDefault: Bool = HarnessMonitorMCPPreferencesDefaults.registryHostEnabledDefault
+    enabledKey: String = HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey,
+    enabledDefault: Bool = HarnessMonitorMCPSettingsDefaults.registryHostEnabledDefault
   ) {
     self.init(
       service: service,
@@ -118,8 +118,8 @@ public final class HarnessMonitorMCPStartupController {
     recoveryPolicy: HarnessMonitorMCPRecoveryPolicy,
     forceEnable: @escaping @Sendable () -> Bool,
     sleep: @escaping HarnessMonitorMCPSleep,
-    enabledKey: String = HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey,
-    enabledDefault: Bool = HarnessMonitorMCPPreferencesDefaults.registryHostEnabledDefault
+    enabledKey: String = HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey,
+    enabledDefault: Bool = HarnessMonitorMCPSettingsDefaults.registryHostEnabledDefault
   ) {
     self.service = service
     self.defaults = defaults

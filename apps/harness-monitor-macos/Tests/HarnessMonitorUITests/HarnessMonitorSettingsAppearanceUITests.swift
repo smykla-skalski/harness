@@ -24,14 +24,14 @@ final class HarnessMonitorSettingsAppearanceUITests: HarnessMonitorUITestCase {
 
     openSettings(in: app)
 
-    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
-    let preferencesState = element(in: app, identifier: Accessibility.preferencesState)
+    let settingsRoot = element(in: app, identifier: Accessibility.settingsRoot)
+    let settingsState = element(in: app, identifier: Accessibility.settingsState)
     let observeSummaryButton = app.buttons
       .matching(identifier: Accessibility.observeSummaryButton)
       .firstMatch
 
-    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(settingsRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(settingsState.waitForExistence(timeout: Self.actionTimeout))
     selectAppearanceSection(in: app)
 
     let expectedModes: [(title: String, rawValue: String)] = [
@@ -43,27 +43,27 @@ final class HarnessMonitorSettingsAppearanceUITests: HarnessMonitorUITestCase {
     ]
 
     for expectedMode in expectedModes {
-      let expectedState = preferencesStateLabel(
+      let expectedState = settingsStateLabel(
         .appearance(mode: expectedMode.rawValue)
       )
       selectMenuOption(
         in: app,
-        controlIdentifier: Accessibility.preferencesThemeModePicker,
+        controlIdentifier: Accessibility.settingsThemeModePicker,
         optionTitle: expectedMode.title
       )
 
       XCTAssertTrue(
         waitUntil(timeout: Self.actionTimeout) {
-          preferencesState.label == expectedState
+          settingsState.label == expectedState
         },
         """
-        Preferences state did not settle after selecting \(expectedMode.title); got \
-        '\(preferencesState.label)'
+        Settings state did not settle after selecting \(expectedMode.title); got \
+        '\(settingsState.label)'
         """
       )
     }
 
-    closeSettings(in: app, preferencesRoot: preferencesRoot)
+    closeSettings(in: app, settingsRoot: settingsRoot)
 
     let sessionRow = previewSessionTrigger(in: app)
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
@@ -92,20 +92,20 @@ final class HarnessMonitorSettingsAppearanceUITests: HarnessMonitorUITestCase {
 
     openSettings(in: app)
 
-    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
-    let backdropPicker = element(in: app, identifier: Accessibility.preferencesBackdropModePicker)
+    let settingsRoot = element(in: app, identifier: Accessibility.settingsRoot)
+    let backdropPicker = element(in: app, identifier: Accessibility.settingsBackdropModePicker)
     let observeSummaryButton = app.buttons
       .matching(identifier: Accessibility.observeSummaryButton)
       .firstMatch
 
-    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(settingsRoot.waitForExistence(timeout: Self.actionTimeout))
     selectAppearanceSection(in: app)
     XCTAssertTrue(backdropPicker.waitForExistence(timeout: Self.actionTimeout))
 
     for option in ["Window", "Content", "None", "Window", "None"] {
       selectMenuOption(
         in: app,
-        controlIdentifier: Accessibility.preferencesBackdropModePicker,
+        controlIdentifier: Accessibility.settingsBackdropModePicker,
         optionTitle: option
       )
 
@@ -113,7 +113,7 @@ final class HarnessMonitorSettingsAppearanceUITests: HarnessMonitorUITestCase {
         waitUntil(timeout: Self.actionTimeout) {
           let currentBackdropPicker = self.element(
             in: app,
-            identifier: Accessibility.preferencesBackdropModePicker
+            identifier: Accessibility.settingsBackdropModePicker
           )
           return (currentBackdropPicker.value as? String) == option
         },
@@ -121,7 +121,7 @@ final class HarnessMonitorSettingsAppearanceUITests: HarnessMonitorUITestCase {
       )
     }
 
-    closeSettings(in: app, preferencesRoot: preferencesRoot)
+    closeSettings(in: app, settingsRoot: settingsRoot)
 
     let sessionRow = previewSessionTrigger(in: app)
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.actionTimeout))
@@ -147,23 +147,23 @@ final class HarnessMonitorSettingsAppearanceUITests: HarnessMonitorUITestCase {
 
     openSettings(in: app)
 
-    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
-    let preferencesState = element(in: app, identifier: Accessibility.preferencesState)
+    let settingsRoot = element(in: app, identifier: Accessibility.settingsRoot)
+    let settingsState = element(in: app, identifier: Accessibility.settingsState)
     let recentSection = element(
       in: app,
-      identifier: Accessibility.preferencesBackgroundRecentsSection
+      identifier: Accessibility.settingsBackgroundRecentsSection
     )
-    let recentState = element(in: app, identifier: Accessibility.preferencesBackgroundRecentState)
-    let gallery = element(in: app, identifier: Accessibility.preferencesBackgroundGallery)
+    let recentState = element(in: app, identifier: Accessibility.settingsBackgroundRecentState)
+    let gallery = element(in: app, identifier: Accessibility.settingsBackgroundGallery)
 
-    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.fastActionTimeout))
+    XCTAssertTrue(settingsRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(settingsState.waitForExistence(timeout: Self.fastActionTimeout))
     selectAppearanceSection(in: app)
     XCTAssertTrue(gallery.waitForExistence(timeout: Self.fastActionTimeout))
 
     let collectionPicker = segmentedControl(
       in: app,
-      identifier: Accessibility.preferencesBackgroundCollectionPicker
+      identifier: Accessibility.settingsBackgroundCollectionPicker
     )
     XCTAssertTrue(collectionPicker.waitForExistence(timeout: Self.fastActionTimeout))
 
@@ -177,7 +177,7 @@ final class HarnessMonitorSettingsAppearanceUITests: HarnessMonitorUITestCase {
         background: expectedSelection.background,
         recent: expectedSelection.recent,
         in: app,
-        preferencesState: preferencesState,
+        settingsState: settingsState,
         recentState: recentState
       )
     }
@@ -194,7 +194,7 @@ final class HarnessMonitorSettingsAppearanceUITests: HarnessMonitorUITestCase {
         "system:imac-blue",
       ]
     ) {
-      let expectedState = preferencesStateLabel(
+      let expectedState = settingsStateLabel(
         .appearance(
           mode: "auto",
           backdrop: "window",
@@ -202,12 +202,12 @@ final class HarnessMonitorSettingsAppearanceUITests: HarnessMonitorUITestCase {
         )
       )
       assertSettledLabel(
-        of: preferencesState,
+        of: settingsState,
         equals: expectedState,
         timeout: Self.fastActionTimeout,
         message: """
-          Preferences state did not settle after selecting \(background); got \
-          '\(preferencesState.label)'
+          Settings state did not settle after selecting \(background); got \
+          '\(settingsState.label)'
           """
       )
       assertSettledLabel(
@@ -223,7 +223,7 @@ final class HarnessMonitorSettingsAppearanceUITests: HarnessMonitorUITestCase {
 
     selectMenuOption(
       in: app,
-      controlIdentifier: Accessibility.preferencesBackdropModePicker,
+      controlIdentifier: Accessibility.settingsBackdropModePicker,
       optionTitle: "None"
     )
     let disabledMessage = app.staticTexts["Background image requires a backdrop"].firstMatch
@@ -235,7 +235,7 @@ final class HarnessMonitorSettingsAppearanceUITests: HarnessMonitorUITestCase {
       "Recent backgrounds section should be hidden when backdrop is None"
     )
 
-    closeSettings(in: app, preferencesRoot: preferencesRoot)
+    closeSettings(in: app, settingsRoot: settingsRoot)
   }
 
   func testSettingsTextSizePickerKeepsNativeChromeContractAtLargestSize() throws {
@@ -265,20 +265,20 @@ final class HarnessMonitorSettingsAppearanceUITests: HarnessMonitorUITestCase {
     background: String,
     recent: String,
     in app: XCUIApplication,
-    preferencesState: XCUIElement,
+    settingsState: XCUIElement,
     recentState: XCUIElement
   ) {
-    let expectedState = preferencesStateLabel(
+    let expectedState = settingsStateLabel(
       .appearance(mode: "auto", backdrop: "window", background: background)
     )
     tapBackgroundTile(in: app, key: background)
     assertSettledLabel(
-      of: preferencesState,
+      of: settingsState,
       equals: expectedState,
       timeout: Self.fastActionTimeout,
       message: """
-        Preferences state did not settle after selecting \(background); got \
-        '\(preferencesState.label)'
+        Settings state did not settle after selecting \(background); got \
+        '\(settingsState.label)'
         """
     )
     assertSettledLabel(

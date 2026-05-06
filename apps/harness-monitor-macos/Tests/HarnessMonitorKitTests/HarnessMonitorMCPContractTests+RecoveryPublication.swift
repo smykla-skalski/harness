@@ -7,7 +7,7 @@ extension HarnessMonitorMCPContractTests {
   @Test("disable publishes single disabled snapshot when clearing recovery state")
   func disablePublishesSingleDisabledSnapshotWhenClearingRecoveryState() async throws {
     let defaults = try isolatedRecoveryDefaults()
-    defaults.defaults.set(true, forKey: HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey)
+    defaults.defaults.set(true, forKey: HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
     defer { defaults.defaults.removePersistentDomain(forName: defaults.suiteName) }
 
     let notificationCenter = NotificationCenter()
@@ -68,7 +68,7 @@ extension HarnessMonitorMCPContractTests {
 
     defaults.defaults.set(
       false,
-      forKey: HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey
+      forKey: HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey
     )
     notificationCenter.post(name: UserDefaults.didChangeNotification, object: defaults.defaults)
     await waitForCondition {
@@ -91,7 +91,7 @@ extension HarnessMonitorMCPContractTests {
   @Test("health check failure publishes recovery-aware degraded snapshot")
   func healthCheckFailurePublishesRecoveryAwareDegradedSnapshot() async throws {
     let defaults = try isolatedRecoveryDefaults()
-    defaults.defaults.set(true, forKey: HarnessMonitorMCPPreferencesDefaults.registryHostEnabledKey)
+    defaults.defaults.set(true, forKey: HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
     defer { defaults.defaults.removePersistentDomain(forName: defaults.suiteName) }
 
     let clock = TestClock()

@@ -17,10 +17,10 @@ final class SupervisorLifecycleTests: XCTestCase {
 
   func test_startBackgroundActivitySchedulesActivity() async throws {
     let lifecycle = SupervisorLifecycle()
-    UserDefaults.standard.set(true, forKey: SupervisorPreferencesDefaults.runInBackgroundKey)
+    UserDefaults.standard.set(true, forKey: SupervisorSettingsDefaults.runInBackgroundKey)
     defer {
       UserDefaults.standard.removeObject(
-        forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+        forKey: SupervisorSettingsDefaults.runInBackgroundKey
       )
     }
     lifecycle.startBackgroundActivity()
@@ -35,10 +35,10 @@ final class SupervisorLifecycleTests: XCTestCase {
 
   func test_startBackgroundActivityClampsToleranceBelowInterval() {
     let lifecycle = SupervisorLifecycle(interval: 10, tolerance: 30)
-    UserDefaults.standard.set(true, forKey: SupervisorPreferencesDefaults.runInBackgroundKey)
+    UserDefaults.standard.set(true, forKey: SupervisorSettingsDefaults.runInBackgroundKey)
     defer {
       UserDefaults.standard.removeObject(
-        forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+        forKey: SupervisorSettingsDefaults.runInBackgroundKey
       )
       lifecycle.stopBackgroundActivity()
     }
@@ -60,10 +60,10 @@ final class SupervisorLifecycleTests: XCTestCase {
 
   func test_startFollowedByStopClearsScheduledFlag() {
     let lifecycle = SupervisorLifecycle()
-    UserDefaults.standard.set(true, forKey: SupervisorPreferencesDefaults.runInBackgroundKey)
+    UserDefaults.standard.set(true, forKey: SupervisorSettingsDefaults.runInBackgroundKey)
     defer {
       UserDefaults.standard.removeObject(
-        forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+        forKey: SupervisorSettingsDefaults.runInBackgroundKey
       )
     }
     lifecycle.startBackgroundActivity()
@@ -74,10 +74,10 @@ final class SupervisorLifecycleTests: XCTestCase {
 
   func test_startAfterStopRearmsScheduler() {
     let lifecycle = SupervisorLifecycle()
-    UserDefaults.standard.set(true, forKey: SupervisorPreferencesDefaults.runInBackgroundKey)
+    UserDefaults.standard.set(true, forKey: SupervisorSettingsDefaults.runInBackgroundKey)
     defer {
       UserDefaults.standard.removeObject(
-        forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+        forKey: SupervisorSettingsDefaults.runInBackgroundKey
       )
     }
     lifecycle.startBackgroundActivity()
@@ -91,10 +91,10 @@ final class SupervisorLifecycleTests: XCTestCase {
 
   func test_startRespectsSupervisorRunInBackgroundFalse() {
     let lifecycle = SupervisorLifecycle()
-    UserDefaults.standard.set(false, forKey: SupervisorPreferencesDefaults.runInBackgroundKey)
+    UserDefaults.standard.set(false, forKey: SupervisorSettingsDefaults.runInBackgroundKey)
     defer {
       UserDefaults.standard.removeObject(
-        forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+        forKey: SupervisorSettingsDefaults.runInBackgroundKey
       )
     }
     lifecycle.startBackgroundActivity()
@@ -107,10 +107,10 @@ final class SupervisorLifecycleTests: XCTestCase {
 
   func test_startRespectsSupervisorRunInBackgroundTrue() {
     let lifecycle = SupervisorLifecycle()
-    UserDefaults.standard.set(true, forKey: SupervisorPreferencesDefaults.runInBackgroundKey)
+    UserDefaults.standard.set(true, forKey: SupervisorSettingsDefaults.runInBackgroundKey)
     defer {
       UserDefaults.standard.removeObject(
-        forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+        forKey: SupervisorSettingsDefaults.runInBackgroundKey
       )
     }
     lifecycle.startBackgroundActivity()
@@ -124,7 +124,7 @@ final class SupervisorLifecycleTests: XCTestCase {
   func test_missingPreferenceDefaultsToDisabled() {
     let lifecycle = SupervisorLifecycle()
     UserDefaults.standard.removeObject(
-      forKey: SupervisorPreferencesDefaults.runInBackgroundKey
+      forKey: SupervisorSettingsDefaults.runInBackgroundKey
     )
     lifecycle.startBackgroundActivity()
     XCTAssertFalse(
@@ -165,17 +165,17 @@ final class SupervisorLifecycleTests: XCTestCase {
     XCTAssertEqual(count, 3)
   }
 
-  // MARK: - PreferencesDefaults constants
+  // MARK: - SettingsDefaults constants
 
   func test_activityIdentifierIsStable() {
     XCTAssertEqual(
-      SupervisorPreferencesDefaults.activityIdentifier,
+      SupervisorSettingsDefaults.activityIdentifier,
       "io.harnessmonitor.supervisor"
     )
   }
 
   func test_runInBackgroundDefaultIsFalse() {
-    XCTAssertFalse(SupervisorPreferencesDefaults.runInBackgroundDefault)
+    XCTAssertFalse(SupervisorSettingsDefaults.runInBackgroundDefault)
   }
 
 }

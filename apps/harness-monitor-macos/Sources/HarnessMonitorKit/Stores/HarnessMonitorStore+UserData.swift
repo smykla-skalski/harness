@@ -212,7 +212,7 @@ extension HarnessMonitorStore {
     }
   }
 
-  // MARK: - Filter preferences
+  // MARK: - Filter settings
 
   public func saveFilterPreference(for projectId: String) {
     guard let modelContext, persistenceError == nil else { return }
@@ -239,7 +239,7 @@ extension HarnessMonitorStore {
     } catch {
       modelContext.rollback()
       recordPersistenceFailure(
-        action: "Filter preferences could not be saved.",
+        action: "Filter settings could not be saved.",
         underlyingError: error
       )
     }
@@ -266,7 +266,7 @@ extension HarnessMonitorStore {
       }
     } catch {
       recordPersistenceFailure(
-        action: "Filter preferences could not be loaded.",
+        action: "Filter settings could not be loaded.",
         underlyingError: error
       )
     }
