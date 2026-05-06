@@ -1,14 +1,5 @@
-import AppKit
 import HarnessMonitorKit
 import SwiftUI
-
-private struct ToastSnapBackSpring {
-  let duration: TimeInterval
-  let bounce: Double
-  let initialVelocity: Double
-
-  static let `default` = Self(duration: 0.25, bounce: 0.18, initialVelocity: 0)
-}
 
 public struct HarnessMonitorFeedbackToastView: View {
   public let toast: ToastSlice
@@ -46,30 +37,6 @@ public struct HarnessMonitorFeedbackToastView: View {
       HarnessMonitorAccessibility.actionToast,
       value: "count=\(toast.activeFeedback.count)"
     )
-  }
-}
-
-private struct HarnessMonitorFeedbackToastDetailRow: View {
-  let row: ActionFeedbackDetailRow
-
-  var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-      Text("\(row.label):")
-        .scaledFont(.caption2.weight(.semibold))
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .frame(width: 60, alignment: .leading)
-
-      Text(row.value)
-        .scaledFont(.caption.monospaced())
-        .foregroundStyle(HarnessMonitorTheme.ink)
-        .lineLimit(1)
-        .truncationMode(.middle)
-        .textSelection(.enabled)
-        .help(row.value)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-    .accessibilityElement(children: .combine)
-    .accessibilityLabel(Text("\(row.label): \(row.value)"))
   }
 }
 
@@ -269,19 +236,21 @@ private struct HarnessMonitorFeedbackToastRow: View {
       lineSpacing: HarnessMonitorTheme.spacingXS
     ) {
       if let action = feedback.primaryAction {
-        Button {
-          perform(action)
-        } label: {
-          Label(
-            copiedPrimaryAction ? action.successAnnouncement : action.title,
-            systemImage: copiedPrimaryAction ? "checkmark" : action.systemImage
-          )
-          .labelStyle(.titleAndIcon)
-          .lineLimit(1)
-          .scaledFont(.system(.caption, design: .rounded, weight: .semibold))
-        }
-        .harnessFlatActionButtonStyle(tint: tintColor)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.actionToastPrimaryButton)
+        HarnessMonitorFeedbackToastPrimaryActionButton(
+          action: action,
+          copied: copiedPrimaryAction,
+          tint: tintColor,
+          reduceMotion: reduceMotion,
+          onPress: { perform(action) },
+          onPendingDismissCancelled: { toast.resumeTimers() },
+          onBeginDismiss: {
+            toast.resumeTimers()
+            withAnimation(reduceMotion ? .linear(duration: 0.01) : .easeIn(duration: 0.22)) {
+              dragOffset = dismissThreshold * 2.4
+            }
+          },
+          onFinishDismiss: { toast.dismiss(id: feedback.id) }
+        )
       }
 
       if let details = feedback.details {
@@ -345,6 +314,9 @@ private struct HarnessMonitorFeedbackToastRow: View {
   }
 
   private func handleDragChanged(_ value: DragGesture.Value) {
+    guard !copiedPrimaryAction else {
+      return
+    }
     let nextOffset = max(0, value.translation.width)
     guard nextOffset > 0 || isDragging else {
       return
@@ -357,6 +329,9 @@ private struct HarnessMonitorFeedbackToastRow: View {
   }
 
   private func handleDragEnded(_ value: DragGesture.Value) {
+    guard !copiedPrimaryAction else {
+      return
+    }
     guard isDragging else {
       return
     }
@@ -394,10 +369,16 @@ private struct HarnessMonitorFeedbackToastRow: View {
   }
 
   private func perform(_ action: ActionFeedbackAction) {
+    guard !copiedPrimaryAction else {
+      return
+    }
     switch action.kind {
     case .copy(let text):
+      toast.pauseTimers()
       HarnessMonitorClipboard.copy(text)
-      copiedPrimaryAction = true
+      withAnimation(reduceMotion ? .linear(duration: 0.01) : .easeInOut(duration: 0.18)) {
+        copiedPrimaryAction = true
+      }
       AccessibilityNotification.Announcement(action.successAnnouncement).post()
     }
   }
