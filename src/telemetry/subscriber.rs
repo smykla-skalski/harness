@@ -2,6 +2,7 @@ use std::env;
 use std::io;
 #[cfg(feature = "tokio-console")]
 use std::net::SocketAddr;
+use std::time::Duration;
 
 use opentelemetry::global;
 use opentelemetry::trace::TracerProvider as _;
@@ -20,10 +21,14 @@ use super::config::{
     ResolvedTelemetryConfig, RuntimeService, resolve_telemetry_config,
     runtime_service_from_current_process,
 };
+use super::console_fields::{FilteredDefaultFields, FilteredJsonFields};
 use super::guard::TelemetryGuard;
 use super::metrics::install_text_map_propagator;
 use super::profiler::DaemonProfiler;
 use super::providers::{build_export_providers, telemetry_resource};
+use super::reachability::endpoint_reachable;
+
+const OTLP_REACHABILITY_TIMEOUT: Duration = Duration::from_millis(500);
 
 /// # Errors
 ///
@@ -39,6 +44,11 @@ pub fn init_tracing_subscriber() -> Result<TelemetryGuard, CliError> {
     let export = resolve_telemetry_config()?;
 
     if let Some(export) = export {
+        if !should_enable_telemetry_export(service, &export) {
+            init_subscriber_without_telemetry(filter_layer, use_json_format)?;
+            tracing::info!("OTLP endpoint unreachable; telemetry disabled for this process");
+            return Ok(TelemetryGuard::disabled(service));
+        }
         init_subscriber_with_telemetry(filter_layer, use_json_format, service, export)
     } else {
         init_subscriber_without_telemetry(filter_layer, use_json_format)?;
@@ -84,7 +94,12 @@ fn init_subscriber_without_telemetry(
         tracing_subscriber::registry()
             .with(filter_layer)
             .with(console_layer)
-            .with(fmt::layer().json().with_writer(io::stderr))
+            .with(
+                fmt::layer()
+                    .json()
+                    .fmt_fields(FilteredJsonFields::new())
+                    .with_writer(io::stderr),
+            )
             .try_init()
             .map_err(|error| {
                 CliErrorKind::workflow_io(format!("initialize tracing subscriber: {error}")).into()
@@ -95,6 +110,7 @@ fn init_subscriber_without_telemetry(
             .with(console_layer)
             .with(
                 fmt::layer()
+                    .fmt_fields(FilteredDefaultFields::new())
                     .with_writer(io::stderr)
                     .with_target(false)
                     .with_timer(ChronoUtc::rfc_3339()),
@@ -127,44 +143,89 @@ fn init_subscriber_with_telemetry(
     let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = None;
 
     if use_json_format {
-        let otel_trace_layer = tracing_opentelemetry::layer()
-            .with_tracer(tracer_provider.tracer(service.service_name()));
-        let otel_log_layer =
-            OpenTelemetryTracingBridge::new(&logger_provider).with_filter(filter_fn(|metadata| {
-                metadata.target().starts_with("harness")
-            }));
-        tracing_subscriber::registry()
-            .with(filter_layer)
-            .with(console_layer)
-            .with(fmt::layer().json().with_writer(io::stderr))
-            .with(otel_trace_layer)
-            .with(otel_log_layer)
-            .try_init()
-            .map_err(|error| {
-                CliErrorKind::workflow_io(format!("initialize tracing subscriber: {error}"))
-            })?;
+        if show_console_observability_fields(service) {
+            let otel_trace_layer = tracing_opentelemetry::layer()
+                .with_tracer(tracer_provider.tracer(service.service_name()));
+            let otel_log_layer = OpenTelemetryTracingBridge::new(&logger_provider).with_filter(
+                filter_fn(|metadata| metadata.target().starts_with("harness")),
+            );
+            tracing_subscriber::registry()
+                .with(filter_layer)
+                .with(console_layer)
+                .with(fmt::layer().json().with_writer(io::stderr))
+                .with(otel_trace_layer)
+                .with(otel_log_layer)
+                .try_init()
+                .map_err(|error| {
+                    CliErrorKind::workflow_io(format!("initialize tracing subscriber: {error}"))
+                })?;
+        } else {
+            let otel_trace_layer = tracing_opentelemetry::layer()
+                .with_tracer(tracer_provider.tracer(service.service_name()));
+            let otel_log_layer = OpenTelemetryTracingBridge::new(&logger_provider).with_filter(
+                filter_fn(|metadata| metadata.target().starts_with("harness")),
+            );
+            tracing_subscriber::registry()
+                .with(filter_layer)
+                .with(console_layer)
+                .with(
+                    fmt::layer()
+                        .json()
+                        .fmt_fields(FilteredJsonFields::new())
+                        .with_writer(io::stderr),
+                )
+                .with(otel_trace_layer)
+                .with(otel_log_layer)
+                .try_init()
+                .map_err(|error| {
+                    CliErrorKind::workflow_io(format!("initialize tracing subscriber: {error}"))
+                })?;
+        }
     } else {
-        let otel_trace_layer = tracing_opentelemetry::layer()
-            .with_tracer(tracer_provider.tracer(service.service_name()));
-        let otel_log_layer =
-            OpenTelemetryTracingBridge::new(&logger_provider).with_filter(filter_fn(|metadata| {
-                metadata.target().starts_with("harness")
-            }));
-        tracing_subscriber::registry()
-            .with(filter_layer)
-            .with(console_layer)
-            .with(
-                fmt::layer()
-                    .with_writer(io::stderr)
-                    .with_target(false)
-                    .with_timer(ChronoUtc::rfc_3339()),
-            )
-            .with(otel_trace_layer)
-            .with(otel_log_layer)
-            .try_init()
-            .map_err(|error| {
-                CliErrorKind::workflow_io(format!("initialize tracing subscriber: {error}"))
-            })?;
+        if show_console_observability_fields(service) {
+            let otel_trace_layer = tracing_opentelemetry::layer()
+                .with_tracer(tracer_provider.tracer(service.service_name()));
+            let otel_log_layer = OpenTelemetryTracingBridge::new(&logger_provider).with_filter(
+                filter_fn(|metadata| metadata.target().starts_with("harness")),
+            );
+            tracing_subscriber::registry()
+                .with(filter_layer)
+                .with(console_layer)
+                .with(
+                    fmt::layer()
+                        .with_writer(io::stderr)
+                        .with_target(false)
+                        .with_timer(ChronoUtc::rfc_3339()),
+                )
+                .with(otel_trace_layer)
+                .with(otel_log_layer)
+                .try_init()
+                .map_err(|error| {
+                    CliErrorKind::workflow_io(format!("initialize tracing subscriber: {error}"))
+                })?;
+        } else {
+            let otel_trace_layer = tracing_opentelemetry::layer()
+                .with_tracer(tracer_provider.tracer(service.service_name()));
+            let otel_log_layer = OpenTelemetryTracingBridge::new(&logger_provider).with_filter(
+                filter_fn(|metadata| metadata.target().starts_with("harness")),
+            );
+            tracing_subscriber::registry()
+                .with(filter_layer)
+                .with(console_layer)
+                .with(
+                    fmt::layer()
+                        .fmt_fields(FilteredDefaultFields::new())
+                        .with_writer(io::stderr)
+                        .with_target(false)
+                        .with_timer(ChronoUtc::rfc_3339()),
+                )
+                .with(otel_trace_layer)
+                .with(otel_log_layer)
+                .try_init()
+                .map_err(|error| {
+                    CliErrorKind::workflow_io(format!("initialize tracing subscriber: {error}"))
+                })?;
+        }
     }
 
     let daemon_profiler = DaemonProfiler::start(service, &export);
@@ -178,4 +239,72 @@ fn init_subscriber_with_telemetry(
         logger_provider,
         daemon_profiler,
     ))
+}
+
+fn should_enable_telemetry_export(
+    service: RuntimeService,
+    export: &ResolvedTelemetryConfig,
+) -> bool {
+    !matches!(service, RuntimeService::Daemon | RuntimeService::Bridge)
+        || endpoint_reachable(&export.endpoint, OTLP_REACHABILITY_TIMEOUT)
+}
+
+const fn show_console_observability_fields(service: RuntimeService) -> bool {
+    matches!(service, RuntimeService::Daemon | RuntimeService::Bridge)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use super::*;
+    use crate::telemetry::config::{ExportProtocol, TelemetryConfigSource};
+
+    fn export(endpoint: &str) -> ResolvedTelemetryConfig {
+        ResolvedTelemetryConfig {
+            source: TelemetryConfigSource::Environment,
+            protocol: ExportProtocol::Grpc,
+            endpoint: endpoint.to_string(),
+            grafana_url: None,
+            pyroscope_url: None,
+            headers: BTreeMap::new(),
+        }
+    }
+
+    #[test]
+    fn daemon_telemetry_requires_reachable_otlp_endpoint() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let reachable = export(&format!("http://{}", listener.local_addr().expect("addr")));
+
+        assert!(should_enable_telemetry_export(
+            RuntimeService::Daemon,
+            &reachable
+        ));
+        assert!(!should_enable_telemetry_export(
+            RuntimeService::Daemon,
+            &export("http://127.0.0.1:1")
+        ));
+    }
+
+    #[test]
+    fn short_lived_services_do_not_probe_otlp_endpoint() {
+        let unreachable = export("http://127.0.0.1:1");
+
+        assert!(should_enable_telemetry_export(
+            RuntimeService::Cli,
+            &unreachable
+        ));
+        assert!(should_enable_telemetry_export(
+            RuntimeService::Hook,
+            &unreachable
+        ));
+    }
+
+    #[test]
+    fn console_observability_fields_only_show_for_long_lived_services() {
+        assert!(show_console_observability_fields(RuntimeService::Daemon));
+        assert!(show_console_observability_fields(RuntimeService::Bridge));
+        assert!(!show_console_observability_fields(RuntimeService::Cli));
+        assert!(!show_console_observability_fields(RuntimeService::Hook));
+    }
 }

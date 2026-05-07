@@ -106,7 +106,7 @@ public final class HarnessMonitorTelemetry: @unchecked Sendable {
   ) -> String {
     bootstrap()
 
-    let requestID = UUID().uuidString
+    let requestID = HarnessMonitorRequestID.next()
     request.setValue(requestID, forHTTPHeaderField: "X-Request-Id")
 
     for (header, value) in traceContext(spanContext: spanContext) {
