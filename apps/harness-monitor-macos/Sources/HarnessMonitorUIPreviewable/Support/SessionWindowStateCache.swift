@@ -65,6 +65,7 @@ public final class SessionWindowStateCache {
   public var sidebarOrdering = SessionSidebarOrderingState()
   public var sidebarSelection = SessionSidebarSelectionState()
   public var sectionState = SessionWindowSectionState()
+  public var decisionRuntime = SessionDecisionRuntime()
   public var navigationHistory = SessionWindowNavigationHistory()
   public var attention = SessionAttentionState()
   public var lastTaskDecisionLink: SessionTaskDecisionLink?
