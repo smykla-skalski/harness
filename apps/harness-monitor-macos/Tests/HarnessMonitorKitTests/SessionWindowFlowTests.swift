@@ -55,6 +55,32 @@ struct SessionWindowFlowTests {
     #expect(SessionWindowRoute.decisions.systemImage == "exclamationmark.bubble")
   }
 
+  @MainActor
+  @Test("Session window state cache records session-scoped deep selections")
+  func sessionWindowStateCacheRecordsDeepSelections() {
+    let state = SessionWindowStateCache(sessionID: "sess-alpha")
+
+    #expect(state.selection == .route(.overview))
+    state.selectRoute(.timeline)
+    state.selectDecision("decision-1")
+    state.selectAgent("agent-1")
+    state.selectTask("task-1")
+
+    #expect(state.selection == .task(sessionID: "sess-alpha", taskID: "task-1"))
+    #expect(state.selection.taskID == "task-1")
+    #expect(
+      state.navigationHistory.backStack == [
+        .route(.overview),
+        .route(.timeline),
+        .decision(sessionID: "sess-alpha", decisionID: "decision-1"),
+        .agent(sessionID: "sess-alpha", agentID: "agent-1"),
+      ]
+    )
+
+    state.selectTask("task-1")
+    #expect(state.navigationHistory.backStack.count == 4)
+  }
+
   @Test("Launch behavior defaults to restoring session windows")
   func launchBehaviorDefaultsToRestoringSessionWindows() throws {
     let defaults = try isolatedDefaults()

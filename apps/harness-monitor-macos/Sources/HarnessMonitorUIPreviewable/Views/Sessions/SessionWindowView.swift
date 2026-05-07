@@ -4,19 +4,39 @@ import SwiftUI
 public struct SessionWindowView: View {
   public let store: HarnessMonitorStore
   public let token: SessionWindowToken
-  @State private var selectedRoute: SessionWindowRoute = .overview
+  @State private var stateCache: SessionWindowStateCache
+  @SceneStorage("session.route")
+  private var persistedRoute: SessionWindowRoute = .overview
+  @SceneStorage("session.decisionID")
+  private var persistedDecisionID: String = ""
+  @SceneStorage("session.searchText")
+  private var searchText: String = ""
+  @SceneStorage("session.focusMode")
+  private var focusMode = false
+  @SceneStorage("session.inspector.visible")
+  private var inspectorVisible = false
+  @SceneStorage("session.inspector.width")
+  private var inspectorWidth = 280.0
   @State private var snapshot: HarnessMonitorSessionWindowSnapshot?
   @State private var isLoading = false
-  @State private var searchText = ""
-  @State private var selectedDecisionID: String?
 
   public init(store: HarnessMonitorStore, token: SessionWindowToken) {
     self.store = store
     self.token = token
+    _stateCache = State(wrappedValue: SessionWindowStateCache(sessionID: token.sessionID))
   }
 
   private var route: SessionWindowRoute {
-    selectedRoute
+    switch stateCache.selection {
+    case .route(let route):
+      route
+    case .agent:
+      .agents
+    case .decision:
+      .decisions
+    case .task:
+      .tasks
+    }
   }
 
   private var summary: SessionSummary? {
@@ -29,29 +49,86 @@ public struct SessionWindowView: View {
     }
   }
 
+  private var selectedDecision: Decision? {
+    guard let decisionID = stateCache.selection.decisionID else { return nil }
+    return matchingDecisions.first { $0.id == decisionID }
+  }
+
   public var body: some View {
     NavigationSplitView {
-      List(SessionWindowRoute.allCases, selection: $selectedRoute) { route in
-        Label(route.title, systemImage: route.systemImage)
-          .tag(route)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowRoute(route))
-      }
-      .listStyle(.sidebar)
+      SessionSidebar(
+        snapshot: snapshot,
+        decisions: matchingDecisions,
+        state: stateCache
+      )
       .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 280)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowSidebar)
     } detail: {
-      routeContent
-        .backgroundExtensionEffect()
-        .navigationTitle(summary?.displayTitle ?? "Session")
-        .navigationSubtitle(token.sessionID)
+      HStack(spacing: 0) {
+        routeContent
+          .backgroundExtensionEffect()
+          .navigationTitle(summary?.displayTitle ?? "Session")
+          .navigationSubtitle(token.sessionID)
+        if inspectorVisible {
+          Divider()
+          SessionWindowInspector(
+            selection: stateCache.selection,
+            selectedDecision: selectedDecision
+          )
+          .frame(width: max(220, min(inspectorWidth, 420)))
+        }
+      }
     }
-    .toolbar { statusToolbarItem }
+    .toolbar {
+      SessionWindowToolbar(
+        snapshot: snapshot,
+        connectionTitle: connectionTitle,
+        statusSystemImage: statusSystemImage,
+        sessionID: token.sessionID,
+        focusMode: $focusMode,
+        inspectorVisible: $inspectorVisible
+      )
+    }
     .searchable(text: $searchText, placement: .toolbar, prompt: routeSearchPrompt)
+    .onChange(of: focusMode) { _, newValue in
+      if newValue {
+        inspectorVisible = false
+      }
+    }
     .task(id: token.sessionID) {
+      hydrateSelectionFromPersistedStorage()
       await loadSnapshot()
+    }
+    .onChange(of: stateCache.selection) { _, newSelection in
+      syncPersistedStorage(from: newSelection)
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowShell)
+  }
+
+  private func hydrateSelectionFromPersistedStorage() {
+    guard case .route(.overview) = stateCache.selection else { return }
+    if !persistedDecisionID.isEmpty {
+      stateCache.selectDecision(persistedDecisionID)
+    } else if persistedRoute != .overview {
+      stateCache.selectRoute(persistedRoute)
+    }
+  }
+
+  private func syncPersistedStorage(from selection: SessionSelection) {
+    switch selection {
+    case .route(let route):
+      persistedRoute = route
+      persistedDecisionID = ""
+    case .agent:
+      persistedRoute = .agents
+      persistedDecisionID = ""
+    case .decision(_, let decisionID):
+      persistedRoute = .decisions
+      persistedDecisionID = decisionID
+    case .task:
+      persistedRoute = .tasks
+      persistedDecisionID = ""
+    }
   }
 
   @ViewBuilder private var routeContent: some View {
@@ -69,7 +146,7 @@ public struct SessionWindowView: View {
       case .decisions:
         SessionWindowDecisions(
           decisions: matchingDecisions,
-          selectedDecisionID: $selectedDecisionID
+          state: stateCache
         )
       case .timeline:
         MonitorTimelineSection(
@@ -101,22 +178,6 @@ public struct SessionWindowView: View {
       Text("Search timeline")
     case .overview, .agents, .tasks, .terminal:
       Text("Search")
-    }
-  }
-
-  @ToolbarContentBuilder private var statusToolbarItem: some ToolbarContent {
-    ToolbarItem(placement: .automatic) {
-      Menu {
-        Text("Connection: \(connectionTitle)")
-        Text("Source: \(snapshot?.source.rawValue ?? "loading")")
-        if let summary {
-          Text("Status: \(summary.status.title)")
-        }
-        Text("Session: \(token.sessionID)")
-      } label: {
-        Label("Session Status", systemImage: statusSystemImage)
-      }
-      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowStatusMenu)
     }
   }
 
@@ -254,11 +315,11 @@ private struct SessionWindowTasks: View {
 
 private struct SessionWindowDecisions: View {
   let decisions: [Decision]
-  @Binding var selectedDecisionID: String?
+  @Bindable var state: SessionWindowStateCache
 
   var body: some View {
     NavigationSplitView {
-      List(selection: $selectedDecisionID) {
+      List(selection: decisionBinding) {
         ForEach(decisions) { decision in
           VStack(alignment: .leading, spacing: 2) {
             Text(decision.summary)
@@ -267,21 +328,31 @@ private struct SessionWindowDecisions: View {
               .font(.caption)
               .foregroundStyle(.secondary)
           }
-          .tag(Optional(decision.id))
+          .tag(decision.id)
         }
       }
       .listStyle(.sidebar)
     } detail: {
-      if let selected = decisions.first(where: { $0.id == selectedDecisionID }) {
+      if let selected = decisions.first(where: { $0.id == state.selection.decisionID }) {
         DecisionDetailSummary(decision: selected)
       } else {
         ContentUnavailableView("No Decision Selected", systemImage: "exclamationmark.bubble")
       }
     }
   }
+
+  private var decisionBinding: Binding<String?> {
+    Binding(
+      get: { state.selection.decisionID },
+      set: { decisionID in
+        guard let decisionID else { return }
+        state.selectDecision(decisionID)
+      }
+    )
+  }
 }
 
-private struct DecisionDetailSummary: View {
+struct DecisionDetailSummary: View {
   let decision: Decision
 
   var body: some View {
