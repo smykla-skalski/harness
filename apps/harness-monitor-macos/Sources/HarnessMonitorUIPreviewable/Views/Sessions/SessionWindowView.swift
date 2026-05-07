@@ -178,22 +178,25 @@ public struct SessionWindowView: View {
   }
 
   @ViewBuilder private var detailColumn: some View {
-    HStack(spacing: 0) {
-      detailFocus
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .backgroundExtensionEffect()
-      if inspectorVisible {
-        SessionInspectorDivider(
-          width: $inspectorWidth,
-          minWidth: 220,
-          maxWidth: 420
-        )
-        SessionWindowInspector(
-          selection: stateCache.selection,
-          selectedDecision: selectedDecision,
-          visible: $inspectorVisible
-        )
-        .frame(width: max(220, min(inspectorWidth, 420)))
+    GeometryReader { geometry in
+      HStack(spacing: 0) {
+        detailFocus
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .backgroundExtensionEffect()
+        if inspectorVisible && stateCache.decisionRuntime.allowsInspector(width: geometry.size.width) {
+          SessionInspectorDivider(
+            width: $inspectorWidth,
+            minWidth: 220,
+            maxWidth: 420
+          )
+          SessionWindowInspector(
+            selection: stateCache.selection,
+            selectedDecision: selectedDecision,
+            decisionRuntime: stateCache.decisionRuntime,
+            visible: $inspectorVisible
+          )
+          .frame(width: max(220, min(inspectorWidth, 420)))
+        }
       }
     }
   }
@@ -217,7 +220,10 @@ public struct SessionWindowView: View {
       }
     case .decision:
       if let selectedDecision {
-        DecisionDetailSummary(decision: selectedDecision)
+        SessionDecisionDetailPane(
+          decision: selectedDecision,
+          runtime: stateCache.decisionRuntime
+        )
       } else {
         ContentUnavailableView(
           "No Decision Selected",

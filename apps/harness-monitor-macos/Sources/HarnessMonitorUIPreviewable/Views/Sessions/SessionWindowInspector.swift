@@ -4,6 +4,7 @@ import SwiftUI
 struct SessionWindowInspector: View {
   let selection: SessionSelection
   let selectedDecision: Decision?
+  @Bindable var decisionRuntime: SessionDecisionRuntime
   @Binding var visible: Bool
   @FocusState private var closeButtonFocused: Bool
   @Environment(\.accessibilityVoiceOverEnabled)
@@ -56,7 +57,10 @@ struct SessionWindowInspector: View {
     switch selection {
     case .decision:
       if let selectedDecision {
-        DecisionDetailSummary(decision: selectedDecision)
+        SessionDecisionInspectorContent(
+          decision: selectedDecision,
+          runtime: decisionRuntime
+        )
       } else {
         ContentUnavailableView("Decision Not Available", systemImage: "exclamationmark.bubble")
       }
