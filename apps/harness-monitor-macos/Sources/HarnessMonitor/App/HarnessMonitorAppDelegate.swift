@@ -44,7 +44,6 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   }
 
   func applicationWillFinishLaunching(_ notification: Notification) {
-    NSWindow.allowsAutomaticWindowTabbing = false
     if hidesDockIconForPerfRuns {
       NSApplication.shared.setActivationPolicy(.accessory)
       return

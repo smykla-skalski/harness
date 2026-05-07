@@ -81,6 +81,8 @@ public struct SettingsGeneralSection: View {
     SessionTimelineFilterDefaults.defaultPersistenceMode.rawValue
   @AppStorage(HarnessMonitorLaunchBehavior.storageKey)
   private var launchBehaviorRawValue = HarnessMonitorLaunchBehavior.defaultValue.rawValue
+  @AppStorage(SessionWindowTabbingPreference.storageKey)
+  private var sessionWindowTabbingRawValue = SessionWindowTabbingPreference.defaultValue.rawValue
   @State private var isRemoveLaunchAgentConfirmationPresented = false
 
   public init(store: HarnessMonitorStore, overview: SettingsGeneralOverviewState) {
@@ -142,6 +144,10 @@ public struct SettingsGeneralSection: View {
 
   private var launchBehavior: HarnessMonitorLaunchBehavior {
     HarnessMonitorLaunchBehavior.resolved(rawValue: launchBehaviorRawValue)
+  }
+
+  private var sessionWindowTabbingPreference: SessionWindowTabbingPreference {
+    SessionWindowTabbingPreference.resolved(rawValue: sessionWindowTabbingRawValue)
   }
 
   public var body: some View {
@@ -210,10 +216,19 @@ public struct SettingsGeneralSection: View {
         }
         .harnessNativeFormControl()
         .accessibilityIdentifier(HarnessMonitorAccessibility.settingsLaunchBehaviorPicker)
+
+        Picker("Session window tabs", selection: $sessionWindowTabbingRawValue) {
+          ForEach(SessionWindowTabbingPreference.allCases) { preference in
+            Text(preference.label).tag(preference.rawValue)
+          }
+        }
+        .harnessNativeFormControl()
+        .accessibilityLabel("Session window tabs")
+        .accessibilityHint("Controls whether session windows prefer native macOS tabs.")
       } header: {
         Text("Windows")
       } footer: {
-        Text(launchBehavior.description)
+        Text("\(launchBehavior.description) \(sessionWindowTabbingPreference.description)")
       }
 
       SettingsLoggingSection(store: store)
