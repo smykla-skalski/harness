@@ -131,6 +131,44 @@ struct SessionWindowFlowTests {
     #expect(selection.selectedDecisionIDs.isEmpty)
   }
 
+  @MainActor
+  @Test("Session decision filters match query and severity")
+  func sessionDecisionFiltersMatchQueryAndSeverity() {
+    let filters = SessionDecisionFilterState()
+    let decision = Decision(
+      id: "decision-a",
+      severity: .critical,
+      ruleID: "stuck-agent",
+      sessionID: "sess-alpha",
+      agentID: "agent-a",
+      taskID: "task-a",
+      summary: "Agent stopped responding",
+      contextJSON: "{}",
+      suggestedActionsJSON: "[]"
+    )
+
+    filters.query = "responding"
+    #expect(filters.matches(decision))
+    filters.severities = [.warn]
+    #expect(!filters.matches(decision))
+    filters.severities = [.critical]
+    #expect(filters.matches(decision))
+  }
+
+  @MainActor
+  @Test("Session decision bulk actions register undo reopen requests")
+  func sessionDecisionBulkActionsRegisterUndoReopenRequests() {
+    let bulkActions = SessionDecisionBulkActionState()
+    let undoManager = UndoManager()
+
+    bulkActions.recordDismissedBatch(["decision-a", "decision-b"], undoManager: undoManager)
+
+    #expect(bulkActions.lastDismissedBatch == ["decision-a", "decision-b"])
+    #expect(undoManager.canUndo)
+    undoManager.undo()
+    #expect(bulkActions.reopenRequestedBatch == ["decision-a", "decision-b"])
+  }
+
   @Test("Launch behavior defaults to restoring session windows")
   func launchBehaviorDefaultsToRestoringSessionWindows() throws {
     let defaults = try isolatedDefaults()

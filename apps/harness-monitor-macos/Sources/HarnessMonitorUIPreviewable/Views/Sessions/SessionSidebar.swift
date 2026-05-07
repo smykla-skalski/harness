@@ -2,11 +2,12 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct SessionSidebar: View {
+  let store: HarnessMonitorStore
   let snapshot: HarnessMonitorSessionWindowSnapshot?
   let decisions: [Decision]
   @Bindable var state: SessionWindowStateCache
   @Environment(\.undoManager)
-  private var undoManager
+  var undoManager
   @State private var agentDropTargetID: String?
   @State private var decisionDropTargetID: String?
 
@@ -20,6 +21,11 @@ struct SessionSidebar: View {
     .listStyle(.sidebar)
     .onChange(of: decisions.map(\.id)) { _, ids in
       state.sidebarSelection.pruneDecisionSelection(to: Set(ids))
+    }
+    .onChange(of: state.decisionBulkActions.reopenRequestedBatch) { _, ids in
+      guard let ids else { return }
+      Task { await reopenDecisionBatch(ids) }
+      state.decisionBulkActions.reopenRequestedBatch = nil
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowSidebar)
   }
@@ -135,6 +141,7 @@ struct SessionSidebar: View {
 
   @ViewBuilder private var decisionsSection: some View {
     Section {
+      decisionFilterRow
       ForEach(decisions) { decision in
         let severity = DecisionSeverity(rawValue: decision.severityRaw)
         SessionSidebarRow(
@@ -156,6 +163,10 @@ struct SessionSidebar: View {
           decisionDropTargetID = isTargeted ? decision.id : nil
         }
         .contextMenu {
+          Button("Dismiss Decision") {
+            dismissDecisions([decision.id])
+          }
+          Divider()
           Button("Copy Decision ID") {
             HarnessMonitorClipboard.copy(decision.id)
           }
@@ -190,6 +201,26 @@ struct SessionSidebar: View {
       Text("Decisions")
         .badge(Text("\(decisions.count) pending"))
       Spacer()
+      Menu {
+        Button("Dismiss Selected") {
+          dismissDecisions(Array(state.sidebarSelection.selectedDecisionIDs))
+        }
+        .disabled(state.sidebarSelection.selectedDecisionIDs.isEmpty)
+        Button("Dismiss All Visible") {
+          dismissDecisions(decisions.map(\.id))
+        }
+        .disabled(decisions.isEmpty)
+        if !state.decisionBulkActions.lastDismissedBatch.isEmpty {
+          Button("Reopen Dismissed Batch") {
+            Task { await reopenDecisionBatch(state.decisionBulkActions.lastDismissedBatch) }
+          }
+        }
+      } label: {
+        Image(systemName: "ellipsis.circle")
+      }
+      .menuIndicator(.hidden)
+      .help("Decision Bulk Actions")
+      .accessibilityLabel("Decision Bulk Actions")
       Button {
         state.sidebarSelection.toggleDecisionMultiSelect()
       } label: {
@@ -213,81 +244,8 @@ struct SessionSidebar: View {
     }
   }
 
-  private func handleAgentDrop(
-    _ payloads: [SessionAgentDragPayload],
-    before agentID: String
-  ) -> Bool {
-    guard let payload = payloads.first, payload.sessionID == state.sessionID else {
-      return false
-    }
-    state.sidebarOrdering.moveAgent(
-      payload.agentID,
-      before: agentID,
-      undoManager: undoManager
-    )
-    return true
+  private var decisionFilterRow: some View {
+    SessionDecisionFilterControls(filters: state.decisionFilters)
   }
 
-  private func handleTaskDecisionDrop(
-    _ payloads: [TaskDragPayload],
-    decisionID: String
-  ) -> Bool {
-    guard let payload = payloads.first, payload.sessionID == state.sessionID else {
-      return false
-    }
-    state.lastTaskDecisionLink = SessionTaskDecisionLink(
-      sessionID: state.sessionID,
-      taskID: payload.taskID,
-      decisionID: decisionID
-    )
-    return true
-  }
-
-  private func severityShape(for status: AgentStatus) -> SessionSidebarSeverityShape {
-    switch status {
-    case .active: .dot
-    case .awaitingReview: .alert
-    case .idle: .none
-    case .disconnected, .removed: .ring
-    }
-  }
-
-  private func severityTint(for status: AgentStatus) -> Color {
-    switch status {
-    case .active, .awaitingReview: .accentColor
-    case .idle, .disconnected, .removed: .gray
-    }
-  }
-
-  private func severityShape(for severity: TaskSeverity) -> SessionSidebarSeverityShape {
-    switch severity {
-    case .low: .none
-    case .medium: .dot
-    case .high: .ring
-    case .critical: .alert
-    }
-  }
-
-  private func severityTint(for severity: TaskSeverity) -> Color {
-    switch severity {
-    case .low: .gray
-    case .medium, .high, .critical: .accentColor
-    }
-  }
-
-  private func severityShape(for severity: DecisionSeverity?) -> SessionSidebarSeverityShape {
-    switch severity {
-    case .info: .dot
-    case .warn: .ring
-    case .needsUser, .critical: .alert
-    case .none: .none
-    }
-  }
-
-  private func severityTint(for severity: DecisionSeverity?) -> Color {
-    switch severity {
-    case .info, .none: .gray
-    case .warn, .needsUser, .critical: .accentColor
-    }
-  }
 }
