@@ -40,15 +40,15 @@ struct HarnessMonitorSessionModelsTests {
     #expect(item.checkpointSummary == nil)
   }
 
-  @Test("Repository origins keep repository checkout semantics")
-  func repositoryOriginsKeepRepositoryCheckoutSemantics() {
+  @Test("Primary checkout origins use the main checkout label")
+  func primaryCheckoutOriginsUseMainCheckoutLabel() {
     let summary = makeSessionModelsSummary()
 
     #expect(summary.isWorktree == false)
     #expect(summary.worktreeName == nil)
     #expect(summary.checkoutId == summary.projectId)
-    #expect(summary.checkoutDisplayName == "Repository")
-    #expect(summary.worktreeDisplayName == "Repository")
+    #expect(summary.checkoutDisplayName == "main")
+    #expect(summary.worktreeDisplayName == "main")
   }
 
   @Test("Known worktree origins recover the worktree display name")

@@ -172,7 +172,7 @@ pub fn discovered_project_for_checkout(project_dir: &Path) -> DiscoveredProject 
                     .map_or_else(String::new, |name| name.to_string_lossy().to_string())
             })
         } else {
-            "Repository".to_string()
+            "main".to_string()
         };
 
         return DiscoveredProject {
@@ -242,7 +242,7 @@ fn build_discovered_project(context_root: &Path) -> Option<DiscoveredProject> {
                 .map_or_else(String::new, |name| name.to_string_lossy().to_string())
         })
     } else {
-        "Repository".to_string()
+        "main".to_string()
     };
 
     Some(DiscoveredProject {

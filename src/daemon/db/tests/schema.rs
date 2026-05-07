@@ -235,7 +235,7 @@ fn migrates_v6_schema_to_timeline_ledger() {
                     origin_json, discovered_at, updated_at
                 ) VALUES (
                     'project-1', 'harness', '/tmp/harness', '/tmp/harness', 'checkout',
-                    'Repository', '/tmp/data/project-1', 0, NULL,
+                    'main', '/tmp/data/project-1', 0, NULL,
                     NULL, '2026-04-14T10:00:00Z', '2026-04-14T10:00:00Z'
                 );
                 INSERT INTO sessions (

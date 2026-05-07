@@ -426,7 +426,7 @@ fn load_conversation_events_falls_back_to_ledger_for_copilot() {
         project_dir: None,
         repository_root: None,
         checkout_id: "project-alpha".into(),
-        checkout_name: "Repository".into(),
+        checkout_name: "main".into(),
         context_root,
         is_worktree: false,
         worktree_name: None,

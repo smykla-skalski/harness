@@ -199,7 +199,7 @@ struct HarnessMonitorStoreProjectionTests {
     ]
     store.sessionFilter = .all
 
-    // Repository-backed sessions share one checkout group, so default ordering follows
+    // Main-checkout sessions share one checkout group, so default ordering follows
     // recent activity inside that group.
     #expect(
       HarnessMonitorStoreFilteringTestSupport.orderedVisibleIDs(from: store)
@@ -230,14 +230,14 @@ struct HarnessMonitorStoreProjectionTests {
     #expect(store.sessionIndex.debugProjectionRebuildCount == projectionAfterNameSort + 1)
   }
 
-  @Test("Repository-backed sessions collapse into one sidebar checkout group")
-  func repositoryBackedSessionsShareOneCheckoutGroup() {
+  @Test("Main-checkout sessions collapse into one sidebar checkout group")
+  func mainCheckoutSessionsShareOneCheckoutGroup() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.projects = [makeProject(totalSessionCount: 2, activeSessionCount: 2)]
 
     var first = SessionFixture(
       sessionId: "repo-first",
-      context: "Repository lane",
+      context: "Main lane",
       status: .active,
       leaderId: "leader-first",
       observeId: nil,
@@ -250,7 +250,7 @@ struct HarnessMonitorStoreProjectionTests {
 
     var second = SessionFixture(
       sessionId: "repo-second",
-      context: "Repository lane",
+      context: "Main lane",
       status: .active,
       leaderId: "leader-second",
       observeId: nil,
@@ -270,13 +270,13 @@ struct HarnessMonitorStoreProjectionTests {
       let projectGroup = store.groupedSessions.first,
       let checkoutGroup = projectGroup.checkoutGroups.first
     else {
-      Issue.record("Expected one grouped repository checkout")
+      Issue.record("Expected one grouped main checkout")
       return
     }
 
     #expect(projectGroup.checkoutGroups.count == 1)
     #expect(checkoutGroup.isWorktree == false)
-    #expect(checkoutGroup.title == "Repository")
+    #expect(checkoutGroup.title == "main")
     #expect(checkoutGroup.sessionIDs == ["repo-second", "repo-first"])
   }
 

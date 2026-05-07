@@ -285,7 +285,7 @@ public struct SessionSummary: Codable, Equatable, Identifiable, Sendable {
     if isWorktree {
       return worktreeName ?? URL(fileURLWithPath: checkoutRoot).lastPathComponent
     }
-    return "Repository"
+    return "main"
   }
 
   /// Display name for the origin checkout/worktree.
