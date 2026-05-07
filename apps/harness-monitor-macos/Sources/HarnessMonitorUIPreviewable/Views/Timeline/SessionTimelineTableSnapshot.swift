@@ -33,7 +33,7 @@ struct SessionTimelineTableSnapshot: Equatable {
     return Set(changedRowIDs)
   }
 
-  private var rowSnapshotsByID: [String: SessionTimelineTableRowSnapshot] {
+  var rowSnapshotsByID: [String: SessionTimelineTableRowSnapshot] {
     Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0) })
   }
 }

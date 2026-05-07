@@ -62,6 +62,8 @@ private struct SessionTimelineNodeRow: View {
   let actionHandler: any DecisionActionHandler
   let onSignalTap: ((String) -> Void)?
   private let statusBadges: [SessionTimelineStatusBadge]
+  @Environment(\.fontScale)
+  private var fontScale
 
   init(
     row: SessionTimelineRow,
@@ -102,7 +104,7 @@ private struct SessionTimelineNodeRow: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.horizontal, HarnessMonitorTheme.cardPadding)
-      .padding(.vertical, HarnessMonitorTheme.spacingSM)
+      .padding(.vertical, HarnessMonitorTheme.spacingSM * max(1, fontScale))
       .background(SessionTimelineCardBackground(tint: cardTint))
       .alignmentGuide(.sessionTimelineMarkerCenter) { dimensions in
         dimensions[.sessionTimelineFirstLineCenter]

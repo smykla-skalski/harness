@@ -35,8 +35,9 @@ struct MonitorTimelineSection: View {
 
   var body: some View {
     let input = presentationInput
+    let displayPresentation = presentationForBody(input: input)
     ViewBodySignposter.measure("MonitorTimelineSection") {
-      content(for: cachedPresentation)
+      content(for: displayPresentation)
     }
     // .task(id:) hops state writes off the view-update phase. Synchronous
     // .onAppear/.onChange writes here interleaved @State (cachedPresentation)
@@ -110,18 +111,7 @@ struct MonitorTimelineSection: View {
     guard force || cachedPresentationInput != input else {
       return
     }
-    let nextPresentation = SessionTimelineSectionPresentation(
-      sessionID: sessionID,
-      timeline: timeline,
-      timelineWindow: timelineWindow,
-      decisions: decisions,
-      signals: store.selectedSessionSignals,
-      filters: filters,
-      isTimelineLoading: isTimelineLoading,
-      reduceMotion: reduceMotion,
-      textSizeIndex: textSizeIndex,
-      dateTimeConfiguration: dateTimeConfiguration
-    )
+    let nextPresentation = makePresentation()
     cachedPresentation = SessionTimelinePresentationRetention.resolved(
       previousPresentation: cachedPresentation,
       previousInput: cachedPresentationInput,
@@ -140,6 +130,30 @@ struct MonitorTimelineSection: View {
         cachedPresentation.navigation.loadedCount,
         cachedPresentation.fallbackVisibleRowCount
       )
+    )
+  }
+
+  private func presentationForBody(
+    input: SessionTimelinePresentationInput
+  ) -> SessionTimelineSectionPresentation {
+    if cachedPresentationInput == .empty || cachedPresentationInput.sessionID != input.sessionID {
+      return makePresentation()
+    }
+    return cachedPresentation
+  }
+
+  private func makePresentation() -> SessionTimelineSectionPresentation {
+    SessionTimelineSectionPresentation(
+      sessionID: sessionID,
+      timeline: timeline,
+      timelineWindow: timelineWindow,
+      decisions: decisions,
+      signals: store.selectedSessionSignals,
+      filters: filters,
+      isTimelineLoading: isTimelineLoading,
+      reduceMotion: reduceMotion,
+      textSizeIndex: textSizeIndex,
+      dateTimeConfiguration: dateTimeConfiguration
     )
   }
 
@@ -167,7 +181,7 @@ struct MonitorTimelineSection: View {
     // scrollNodeIDs only flips on data update, not per scroll.
     .onAppear {
       deferOffViewUpdate {
-        reconcileTimelineAnchor(with: cachedPresentation.scrollNodeIDs)
+        reconcileTimelineAnchor(with: presentation.scrollNodeIDs)
       }
       requestLatestWindowIfNeeded(presentation)
     }
@@ -183,7 +197,7 @@ struct MonitorTimelineSection: View {
       guard !ids.isEmpty else { return }
       deferOffViewUpdate {
         reconcileTimelineAnchor(with: ids)
-        completePendingNavigationIfNeeded(cachedPresentation)
+        completePendingNavigationIfNeeded(presentation)
       }
     }
   }
@@ -258,6 +272,7 @@ struct MonitorTimelineSection: View {
           SessionTimelineTableView(
             columnWidth: geo.size.width,
             rows: presentation.rows,
+            contentIdentity: contentIdentity,
             scrollCommand: scrollCommand,
             actionHandler: actionHandler,
             onSignalTap: { [store] signalID in

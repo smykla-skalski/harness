@@ -12,7 +12,8 @@ struct SessionTimelineNavigationScrollTests {
   @MainActor
   func coordinatorMeasurementUsesCurrentFontScaleForWrappingRows() {
     let acknowledgedSummary =
-      "sig-20260504124537520229000 acknowledged by gemini-20260504124513402981000 after expired retry validation and operator review follow-up"
+      "sig-20260504124537520229000 acknowledged by "
+      + "gemini-20260504124513402981000 after expired retry validation and operator review follow-up"
     let row = SessionTimelineRow.rows(
       for: SessionTimelineNodeBuilder(
         sessionID: "session-1",
