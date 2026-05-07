@@ -61,6 +61,20 @@ extension FocusedValues {
   @Entry public var harnessSidebarVisibilityRequest: HarnessSidebarVisibilityRequest?
 }
 
+extension View {
+  @ViewBuilder
+  func harnessFocusedSceneValue<Value>(
+    _ keyPath: WritableKeyPath<FocusedValues, Value?>,
+    _ value: Value?
+  ) -> some View {
+    if let value {
+      focusedSceneValue(keyPath, value)
+    } else {
+      self
+    }
+  }
+}
+
 @MainActor
 public final class HarnessSidebarVisibilityExpander {
   public var handler: (() -> Void)?

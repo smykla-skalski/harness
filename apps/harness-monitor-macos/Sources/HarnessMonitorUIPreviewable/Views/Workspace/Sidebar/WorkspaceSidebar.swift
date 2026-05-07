@@ -95,6 +95,17 @@ struct WorkspaceSidebar: View {
     )
   }
 
+  private var searchFocusAction: HarnessSidebarSearchFocus? {
+    guard isStartupFocusParticipationEnabled else {
+      return nil
+    }
+    return HarnessSidebarSearchFocus(
+      isAvailable: true,
+      menuLabel: showsDecisionSearchChrome ? .findInDecisions : .findGeneric,
+      dispatcher: searchFocusDispatcher
+    )
+  }
+
   private var decisionFiltersMenuEnabled: Bool {
     decisionScope.totalCount > 0 || !decisionFilters.severities.isEmpty
   }
@@ -150,14 +161,7 @@ struct WorkspaceSidebar: View {
           setSelectedSeverities: setDecisionSeverities
         )
       }
-      .focusedSceneValue(
-        \.harnessSidebarSearchFocusAction,
-        HarnessSidebarSearchFocus(
-          isAvailable: isStartupFocusParticipationEnabled,
-          menuLabel: showsDecisionSearchChrome ? .findInDecisions : .findGeneric,
-          dispatcher: searchFocusDispatcher
-        )
-      )
+      .harnessFocusedSceneValue(\.harnessSidebarSearchFocusAction, searchFocusAction)
       .task {
         searchFocusDispatcher.handler = { handleSearchFocusRequest() }
       }
