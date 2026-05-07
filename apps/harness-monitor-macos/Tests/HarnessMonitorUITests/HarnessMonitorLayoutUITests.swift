@@ -118,6 +118,26 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testDashboardSessionCardDoesNotExposeRawSessionID() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard-landing"]
+    )
+    let sessionCard = sessionTrigger(
+      in: app,
+      identifier: Accessibility.dashboardSessionCard("sess1234")
+    )
+
+    XCTAssertTrue(sessionCard.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertEqual(
+      sessionCard.descendants(matching: .any).matching(
+        NSPredicate(format: "label CONTAINS %@", "sess1234")
+      ).count,
+      0,
+      "Dashboard session cards should not surface raw session IDs below the session title"
+    )
+  }
+
   func testOfflineCachedScenarioKeepsSessionsReadableButActionsDisabled() throws {
     let app = launch(
       mode: "preview",
