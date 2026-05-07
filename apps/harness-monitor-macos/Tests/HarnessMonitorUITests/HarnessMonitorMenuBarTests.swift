@@ -2,24 +2,24 @@ import XCTest
 
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
-/// UI tests covering the consolidated Workspace window menu affordances.
+/// UI tests covering the welcome-window menu affordances.
 @MainActor
 final class HarnessMonitorMenuBarTests: HarnessMonitorUITestCase {
   // swiftlint:disable:next static_over_final_class
   override nonisolated class var reuseLaunchedApp: Bool { true }
 
-  func testWindowMenuOpensWorkspaceWindow() throws {
+  func testWindowMenuOpensOpenRecentWindow() throws {
     let app = launch(mode: "preview")
-    invokeMenuItem(in: app, menu: "Window", title: "Workspace")
+    invokeMenuItem(in: app, menu: "Window", title: "Open Recent Session")
 
-    let workspaceWindow = element(in: app, identifier: Accessibility.workspaceWindow)
+    let openRecentWindow = element(in: app, identifier: Accessibility.openRecentRoot)
     XCTAssertTrue(
-      waitUntil(timeout: Self.uiTimeout) { workspaceWindow.exists },
-      "Workspace window should appear after invoking Window > Workspace"
+      waitUntil(timeout: Self.uiTimeout) { openRecentWindow.exists },
+      "Open Recent should appear after invoking Window > Open Recent Session"
     )
   }
 
-  func testWindowMenuHasNoTabbingItems() throws {
+  func testWelcomeWindowDoesNotExposeTabbingItems() throws {
     let app = launch(mode: "preview")
     let windowMenu = app.menuBars.firstMatch.menuBarItems["Window"]
     XCTAssertTrue(
@@ -34,15 +34,15 @@ final class HarnessMonitorMenuBarTests: HarnessMonitorUITestCase {
 
     XCTAssertFalse(
       tabBarItem.exists,
-      "Window menu must not surface 'Show Tab Bar' once tabbing is disabled per HIG"
+      "The welcome window opts out of native tabbing and should not expose a tab bar"
     )
     XCTAssertFalse(
       mergeWindowsItem.exists,
-      "Window menu must not surface 'Merge All Windows' once tabbing is disabled per HIG"
+      "The welcome window opts out of native tabbing and should not expose merge commands"
     )
     XCTAssertFalse(
       moveTabItem.exists,
-      "Window menu must not surface 'Move Tab to New Window' once tabbing is disabled per HIG"
+      "The welcome window opts out of native tabbing and should not expose tab extraction"
     )
 
     windowMenu.typeKey(.escape, modifierFlags: [])

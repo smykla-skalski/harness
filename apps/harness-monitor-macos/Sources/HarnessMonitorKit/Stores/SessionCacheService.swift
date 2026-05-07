@@ -209,14 +209,28 @@ public actor SessionCacheService {
     return result
   }
 
-  func recentlyViewedSessionIDs(limit: Int) -> [String] {
+  func recentlyViewedSessionIDs(limit: Int? = nil) -> [String] {
     let startedAt = ContinuousClock.now
     let context = makeContext()
     var descriptor = FetchDescriptor<CachedSession>(
       predicate: #Predicate { $0.lastViewedAt != nil },
       sortBy: [SortDescriptor(\.lastViewedAt, order: .reverse)]
     )
-    descriptor.fetchLimit = limit
+    if let limit {
+      let normalizedLimit = max(limit, 0)
+      guard normalizedLimit > 0 else {
+        #if HARNESS_FEATURE_OTEL
+          let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+          HarnessMonitorTelemetry.shared.recordCacheRead(
+            operation: "recently_viewed_session_ids", hit: false, durationMs: durationMs
+          )
+        #else
+          _ = startedAt
+        #endif
+        return []
+      }
+      descriptor.fetchLimit = normalizedLimit
+    }
     let ids = ((try? context.fetch(descriptor)) ?? []).map(\.sessionId)
     #if HARNESS_FEATURE_OTEL
       let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
@@ -229,14 +243,28 @@ public actor SessionCacheService {
     return ids
   }
 
-  func sessionWindowIDsOpenAtQuit(limit: Int) -> [String] {
+  func sessionWindowIDsOpenAtQuit(limit: Int? = nil) -> [String] {
     let startedAt = ContinuousClock.now
     let context = makeContext()
     var descriptor = FetchDescriptor<CachedSessionWindowState>(
       predicate: #Predicate { $0.wasOpenAtQuit },
       sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
     )
-    descriptor.fetchLimit = limit
+    if let limit {
+      let normalizedLimit = max(limit, 0)
+      guard normalizedLimit > 0 else {
+        #if HARNESS_FEATURE_OTEL
+          let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+          HarnessMonitorTelemetry.shared.recordCacheRead(
+            operation: "session_window_ids_open_at_quit", hit: false, durationMs: durationMs
+          )
+        #else
+          _ = startedAt
+        #endif
+        return []
+      }
+      descriptor.fetchLimit = normalizedLimit
+    }
     let ids = ((try? context.fetch(descriptor)) ?? []).map(\.sessionId)
     #if HARNESS_FEATURE_OTEL
       let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
