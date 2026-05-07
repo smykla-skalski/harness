@@ -465,7 +465,6 @@ fn task_start_signal_acceptance_marks_task_in_progress() {
             project,
         )
         .expect("queued");
-
         drop_task(
             "00000000-0000-4002-8000-000000000009",
             &task.task_id,
