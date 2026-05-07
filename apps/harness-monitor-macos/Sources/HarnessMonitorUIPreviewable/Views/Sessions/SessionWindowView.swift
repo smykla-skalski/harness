@@ -183,7 +183,9 @@ public struct SessionWindowView: View {
         detailFocus
           .frame(maxWidth: .infinity, maxHeight: .infinity)
           .backgroundExtensionEffect()
-        if inspectorVisible && stateCache.decisionRuntime.allowsInspector(width: geometry.size.width) {
+        if inspectorVisible
+          && stateCache.decisionRuntime.allowsInspector(width: geometry.size.width)
+        {
           SessionInspectorDivider(
             width: $inspectorWidth,
             minWidth: 220,
