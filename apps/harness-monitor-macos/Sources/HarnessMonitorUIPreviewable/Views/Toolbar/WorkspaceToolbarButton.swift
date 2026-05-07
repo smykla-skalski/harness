@@ -84,14 +84,7 @@ public struct WorkspaceToolbarButton: View {
   }
 
   private func toolbarTint(for severity: DecisionSeverity?) -> Color {
-    switch severity {
-    case .none, .info:
-      return .secondary
-    case .warn, .needsUser:
-      return .orange
-    case .critical:
-      return .red
-    }
+    WorkspaceAttentionBadgeStyle.badgeColor(for: severity)
   }
 
   private func buttonStateLabel(count: Int, maxSeverity: DecisionSeverity?) -> String {
@@ -106,14 +99,7 @@ public struct WorkspaceToolbarButton: View {
   }
 
   private func tintLabel(for severity: DecisionSeverity?) -> String {
-    switch severity {
-    case .none, .info:
-      return "primary"
-    case .warn, .needsUser:
-      return "orange"
-    case .critical:
-      return "red"
-    }
+    WorkspaceAttentionBadgeStyle.tintLabel(for: severity)
   }
 
   private func attentionAccessibilityValue(count: Int, maxSeverity: DecisionSeverity?) -> String {

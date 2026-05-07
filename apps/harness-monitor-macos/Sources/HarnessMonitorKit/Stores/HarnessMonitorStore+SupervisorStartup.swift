@@ -139,6 +139,10 @@ extension HarnessMonitorStore {
     supervisorOpenDecisions = openDecisions
     supervisorToolbarSlice.refresh(counts: counts)
     supervisorBindings.pendingDecisionsBadgeSync?(openDecisions.count)
+    supervisorBindings.pendingDecisionsStatusSync?(
+      supervisorToolbarSlice.count,
+      supervisorToolbarSlice.maxSeverity
+    )
     if let controller = supervisorBindings.notificationController {
       await controller.syncAppBadgeCount(openDecisions.count)
     }

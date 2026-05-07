@@ -233,6 +233,55 @@ extension SupervisorLifecycleTests {
   }
 
   @MainActor
+  func testPendingDecisionsStatusSyncReflectsInsertedAndDismissedDecision() async throws {
+    let store = HarnessMonitorStore.fixture()
+    let recorder = PendingDecisionsStatusSyncRecorder()
+    store.bindPendingDecisionsStatusSync { count, severity in
+      recorder.record(count: count, severity: severity)
+    }
+    await store.startSupervisor()
+    addTeardownBlock { await store.stopSupervisor() }
+
+    let decisionID = "d-pending-status-sync"
+    try await store.insertDecisionForTesting(
+      DecisionDraft.fixture(id: decisionID, severity: .critical)
+    )
+    try await waitForPendingDecisionStatusUpdates(
+      [
+        PendingDecisionsStatusSyncUpdate(count: 0, severity: nil),
+        PendingDecisionsStatusSyncUpdate(count: 1, severity: .critical),
+      ],
+      recorder: recorder
+    )
+    XCTAssertEqual(
+      recorder.updates,
+      [
+        PendingDecisionsStatusSyncUpdate(count: 0, severity: nil),
+        PendingDecisionsStatusSyncUpdate(count: 1, severity: .critical),
+      ]
+    )
+
+    let decisionStore = try XCTUnwrap(store.supervisorDecisionStore)
+    try await decisionStore.dismiss(id: decisionID)
+    try await waitForPendingDecisionStatusUpdates(
+      [
+        PendingDecisionsStatusSyncUpdate(count: 0, severity: nil),
+        PendingDecisionsStatusSyncUpdate(count: 1, severity: .critical),
+        PendingDecisionsStatusSyncUpdate(count: 0, severity: nil),
+      ],
+      recorder: recorder
+    )
+    XCTAssertEqual(
+      recorder.updates,
+      [
+        PendingDecisionsStatusSyncUpdate(count: 0, severity: nil),
+        PendingDecisionsStatusSyncUpdate(count: 1, severity: .critical),
+        PendingDecisionsStatusSyncUpdate(count: 0, severity: nil),
+      ]
+    )
+  }
+
+  @MainActor
   func testStopSupervisorClearsBadge() async throws {
     let store = HarnessMonitorStore.fixture()
     let center = RecordingNotificationCenter()
@@ -265,5 +314,44 @@ extension SupervisorLifecycleTests {
     await store.stopSupervisor()
 
     XCTAssertEqual(recorder.counts, [0, 1, 0])
+  }
+
+  @MainActor
+  func testStopSupervisorClearsPendingDecisionsStatusSync() async throws {
+    let store = HarnessMonitorStore.fixture()
+    let recorder = PendingDecisionsStatusSyncRecorder()
+    store.bindPendingDecisionsStatusSync { count, severity in
+      recorder.record(count: count, severity: severity)
+    }
+    await store.startSupervisor()
+
+    try await store.insertDecisionForTesting(
+      DecisionDraft.fixture(id: "d-pending-status-stop", severity: .warn)
+    )
+    try await waitForPendingDecisionStatusUpdates(
+      [
+        PendingDecisionsStatusSyncUpdate(count: 0, severity: nil),
+        PendingDecisionsStatusSyncUpdate(count: 1, severity: .warn),
+      ],
+      recorder: recorder
+    )
+    XCTAssertEqual(
+      recorder.updates,
+      [
+        PendingDecisionsStatusSyncUpdate(count: 0, severity: nil),
+        PendingDecisionsStatusSyncUpdate(count: 1, severity: .warn),
+      ]
+    )
+
+    await store.stopSupervisor()
+
+    XCTAssertEqual(
+      recorder.updates,
+      [
+        PendingDecisionsStatusSyncUpdate(count: 0, severity: nil),
+        PendingDecisionsStatusSyncUpdate(count: 1, severity: .warn),
+        PendingDecisionsStatusSyncUpdate(count: 0, severity: nil),
+      ]
+    )
   }
 }

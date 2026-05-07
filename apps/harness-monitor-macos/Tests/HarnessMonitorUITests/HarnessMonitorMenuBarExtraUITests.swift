@@ -49,19 +49,27 @@ final class HarnessMonitorMenuBarExtraUITests: HarnessMonitorUITestCase {
 
   private func menuBarExtraCandidates(in app: XCUIApplication) -> [XCUIElement] {
     let systemUIServer = XCUIApplication(bundleIdentifier: "com.apple.systemuiserver")
+    let controlCenter = XCUIApplication(bundleIdentifier: "com.apple.controlcenter")
+    let statusItemTitle = "Harness Monitor"
     let titlePredicate = NSPredicate(
       format: "identifier == %@ OR label == %@",
       Accessibility.menuBarExtra,
-      "Harness Monitor"
+      statusItemTitle
     )
     return [
       app.descendants(matching: .any)
         .matching(identifier: Accessibility.menuBarExtra)
         .firstMatch,
+      app.menuBars.firstMatch.menuBarItems[statusItemTitle].firstMatch,
       systemUIServer.descendants(matching: .any)
         .matching(identifier: Accessibility.menuBarExtra)
         .firstMatch,
+      systemUIServer.menuBars.firstMatch.menuBarItems[statusItemTitle].firstMatch,
       systemUIServer.descendants(matching: .any)
+        .matching(titlePredicate)
+        .firstMatch,
+      controlCenter.menuBars.firstMatch.menuBarItems[statusItemTitle].firstMatch,
+      controlCenter.descendants(matching: .any)
         .matching(titlePredicate)
         .firstMatch,
     ]
@@ -93,10 +101,15 @@ final class HarnessMonitorMenuBarExtraUITests: HarnessMonitorUITestCase {
   private func menuItem(_ title: String) -> XCUIElement {
     let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
     let systemUIServer = XCUIApplication(bundleIdentifier: "com.apple.systemuiserver")
+    let controlCenter = XCUIApplication(bundleIdentifier: "com.apple.controlcenter")
     let appItem = app.menuItems[title].firstMatch
     if appItem.exists {
       return appItem
     }
-    return systemUIServer.menuItems[title].firstMatch
+    let systemItem = systemUIServer.menuItems[title].firstMatch
+    if systemItem.exists {
+      return systemItem
+    }
+    return controlCenter.menuItems[title].firstMatch
   }
 }

@@ -44,6 +44,12 @@ extension HarnessMonitorStore {
     supervisorBindings.pendingDecisionsBadgeSync = sync
   }
 
+  public func bindPendingDecisionsStatusSync(
+    _ sync: @escaping @MainActor (Int, DecisionSeverity?) -> Void
+  ) {
+    supervisorBindings.pendingDecisionsStatusSync = sync
+  }
+
   public func supervisorDecisionActionHandler() -> any DecisionActionHandler {
     if let stack = supervisorStack {
       return stack.actionHandler(for: self)
@@ -134,6 +140,7 @@ extension HarnessMonitorStore {
     supervisorPrimaryActionFocusDecisionID = nil
     resetSupervisorLiveTick()
     supervisorBindings.pendingDecisionsBadgeSync?(0)
+    supervisorBindings.pendingDecisionsStatusSync?(0, nil)
     if let controller = supervisorBindings.notificationController {
       await controller.resetBadge()
     }

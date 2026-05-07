@@ -52,4 +52,5 @@ final class SupervisorStack {
 final class SupervisorBindings {
   weak var notificationController: HarnessMonitorUserNotificationController?
   var pendingDecisionsBadgeSync: (@MainActor (Int) -> Void)?
+  var pendingDecisionsStatusSync: (@MainActor (Int, DecisionSeverity?) -> Void)?
 }

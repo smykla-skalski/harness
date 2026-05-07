@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="21" height="21" viewBox="-3 -3 30 30">
-  <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10">
+  <g fill="none" stroke="#1C1C1E" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10">
     <polyline points="2.5,23.5 4.5,21.5 6.5,23.5 8.5,21.5 10.5,23.5 12.5,21.5 14.5,23.5 16.5,21.5 18.5,23.5 20.5,21.5 22.5,23.5"/>
     <line x1="17" y1="8.5" x2="8" y2="8.5"/>
     <polyline points="6,23 9.5,8 9.5,4.5 15.5,4.5 15.5,8 19,23"/>
@@ -13,4 +13,5 @@
     <polyline points="4.5,0.5 6,2 7.5,0.5"/>
     <polyline points="1.5,4 3,5.5 4.5,4"/>
   </g>
+  <path d="M21.5,-1 L25.5,6 L17.5,6 Z" fill="#FF9F0A"/>
 </svg>
