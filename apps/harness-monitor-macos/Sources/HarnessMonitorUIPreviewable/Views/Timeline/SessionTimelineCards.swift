@@ -62,8 +62,6 @@ private struct SessionTimelineNodeRow: View {
   let actionHandler: any DecisionActionHandler
   let onSignalTap: ((String) -> Void)?
   private let statusBadges: [SessionTimelineStatusBadge]
-  @Environment(\.fontScale)
-  private var fontScale
 
   init(
     row: SessionTimelineRow,
@@ -102,13 +100,6 @@ private struct SessionTimelineNodeRow: View {
           SessionTimelineActionButtons(actions: node.actions, handler: actionHandler)
         }
       }
-      .frame(
-        minHeight: SessionTimelineTableMetrics.minimumCardHeight(
-          for: row,
-          fontScale: fontScale
-        ),
-        alignment: .topLeading
-      )
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.horizontal, HarnessMonitorTheme.cardPadding)
       .padding(.vertical, HarnessMonitorTheme.spacingSM)
