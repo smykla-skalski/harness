@@ -1,4 +1,5 @@
 use std::env;
+use std::fmt::Display;
 use std::io;
 #[cfg(feature = "tokio-console")]
 use std::net::SocketAddr;
@@ -7,6 +8,8 @@ use std::time::Duration;
 use opentelemetry::global;
 use opentelemetry::trace::TracerProvider as _;
 use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
+use opentelemetry_sdk::logs::SdkLoggerProvider;
+use opentelemetry_sdk::trace::SdkTracerProvider;
 use tracing_subscriber::filter::filter_fn;
 use tracing_subscriber::fmt;
 use tracing_subscriber::fmt::time::ChronoUtc;
@@ -41,19 +44,53 @@ pub fn init_tracing_subscriber() -> Result<TelemetryGuard, CliError> {
     crate::set_log_filter_handle(handle);
 
     let use_json_format = env::var("HARNESS_LOG_FORMAT").ok().as_deref() == Some("json");
-    let export = resolve_telemetry_config()?;
+    init_subscriber_with_resolved_export(
+        filter_layer,
+        use_json_format,
+        service,
+        resolve_telemetry_config()?,
+    )
+}
 
-    if let Some(export) = export {
-        if !should_enable_telemetry_export(service, &export) {
-            init_subscriber_without_telemetry(filter_layer, use_json_format)?;
-            tracing::info!("OTLP endpoint unreachable; telemetry disabled for this process");
-            return Ok(TelemetryGuard::disabled(service));
-        }
+fn init_subscriber_with_resolved_export(
+    filter_layer: reload::Layer<tracing_subscriber::EnvFilter, tracing_subscriber::Registry>,
+    use_json_format: bool,
+    service: RuntimeService,
+    export: Option<ResolvedTelemetryConfig>,
+) -> Result<TelemetryGuard, CliError> {
+    let Some(export) = export else {
+        return init_disabled_subscriber(filter_layer, use_json_format, service, None);
+    };
+
+    if should_enable_telemetry_export(service, &export) {
         init_subscriber_with_telemetry(filter_layer, use_json_format, service, export)
     } else {
-        init_subscriber_without_telemetry(filter_layer, use_json_format)?;
-        Ok(TelemetryGuard::disabled(service))
+        init_disabled_subscriber(
+            filter_layer,
+            use_json_format,
+            service,
+            Some("OTLP endpoint unreachable; telemetry disabled for this process"),
+        )
     }
+}
+
+fn init_disabled_subscriber(
+    filter_layer: reload::Layer<tracing_subscriber::EnvFilter, tracing_subscriber::Registry>,
+    use_json_format: bool,
+    service: RuntimeService,
+    log_message: Option<&str>,
+) -> Result<TelemetryGuard, CliError> {
+    init_subscriber_without_telemetry(filter_layer, use_json_format)?;
+    log_message.into_iter().for_each(log_telemetry_disable);
+    Ok(TelemetryGuard::disabled(service))
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score for a single info! call"
+)]
+fn log_telemetry_disable(log_message: &str) {
+    tracing::info!("{log_message}");
 }
 
 #[cfg(feature = "tokio-console")]
@@ -101,9 +138,7 @@ fn init_subscriber_without_telemetry(
                     .with_writer(io::stderr),
             )
             .try_init()
-            .map_err(|error| {
-                CliErrorKind::workflow_io(format!("initialize tracing subscriber: {error}")).into()
-            })
+            .map_err(tracing_init_error)
     } else {
         tracing_subscriber::registry()
             .with(filter_layer)
@@ -116,10 +151,144 @@ fn init_subscriber_without_telemetry(
                     .with_timer(ChronoUtc::rfc_3339()),
             )
             .try_init()
-            .map_err(|error| {
-                CliErrorKind::workflow_io(format!("initialize tracing subscriber: {error}")).into()
-            })
+            .map_err(tracing_init_error)
     }
+}
+
+fn tracing_init_error(error: impl Display) -> CliError {
+    CliErrorKind::workflow_io(format!("initialize tracing subscriber: {error}")).into()
+}
+
+fn init_json_telemetry_subscriber(
+    filter_layer: reload::Layer<tracing_subscriber::EnvFilter, tracing_subscriber::Registry>,
+    service: RuntimeService,
+    tracer_provider: &SdkTracerProvider,
+    logger_provider: &SdkLoggerProvider,
+) -> Result<(), CliError> {
+    #[cfg(feature = "tokio-console")]
+    let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> =
+        build_console_layer();
+    #[cfg(not(feature = "tokio-console"))]
+    let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = None;
+
+    let otel_trace_layer =
+        tracing_opentelemetry::layer().with_tracer(tracer_provider.tracer(service.service_name()));
+    let otel_log_layer =
+        OpenTelemetryTracingBridge::new(logger_provider).with_filter(filter_fn(|metadata| {
+            metadata.target().starts_with("harness")
+        }));
+
+    tracing_subscriber::registry()
+        .with(filter_layer)
+        .with(console_layer)
+        .with(fmt::layer().json().with_writer(io::stderr))
+        .with(otel_trace_layer)
+        .with(otel_log_layer)
+        .try_init()
+        .map_err(tracing_init_error)
+}
+
+fn init_filtered_json_telemetry_subscriber(
+    filter_layer: reload::Layer<tracing_subscriber::EnvFilter, tracing_subscriber::Registry>,
+    service: RuntimeService,
+    tracer_provider: &SdkTracerProvider,
+    logger_provider: &SdkLoggerProvider,
+) -> Result<(), CliError> {
+    #[cfg(feature = "tokio-console")]
+    let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> =
+        build_console_layer();
+    #[cfg(not(feature = "tokio-console"))]
+    let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = None;
+
+    let otel_trace_layer =
+        tracing_opentelemetry::layer().with_tracer(tracer_provider.tracer(service.service_name()));
+    let otel_log_layer =
+        OpenTelemetryTracingBridge::new(logger_provider).with_filter(filter_fn(|metadata| {
+            metadata.target().starts_with("harness")
+        }));
+
+    tracing_subscriber::registry()
+        .with(filter_layer)
+        .with(console_layer)
+        .with(
+            fmt::layer()
+                .json()
+                .fmt_fields(FilteredJsonFields::new())
+                .with_writer(io::stderr),
+        )
+        .with(otel_trace_layer)
+        .with(otel_log_layer)
+        .try_init()
+        .map_err(tracing_init_error)
+}
+
+fn init_text_telemetry_subscriber(
+    filter_layer: reload::Layer<tracing_subscriber::EnvFilter, tracing_subscriber::Registry>,
+    service: RuntimeService,
+    tracer_provider: &SdkTracerProvider,
+    logger_provider: &SdkLoggerProvider,
+) -> Result<(), CliError> {
+    #[cfg(feature = "tokio-console")]
+    let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> =
+        build_console_layer();
+    #[cfg(not(feature = "tokio-console"))]
+    let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = None;
+
+    let otel_trace_layer =
+        tracing_opentelemetry::layer().with_tracer(tracer_provider.tracer(service.service_name()));
+    let otel_log_layer =
+        OpenTelemetryTracingBridge::new(logger_provider).with_filter(filter_fn(|metadata| {
+            metadata.target().starts_with("harness")
+        }));
+
+    tracing_subscriber::registry()
+        .with(filter_layer)
+        .with(console_layer)
+        .with(
+            fmt::layer()
+                .with_writer(io::stderr)
+                .with_target(false)
+                .with_timer(ChronoUtc::rfc_3339()),
+        )
+        .with(otel_trace_layer)
+        .with(otel_log_layer)
+        .try_init()
+        .map_err(tracing_init_error)
+}
+
+fn init_filtered_text_telemetry_subscriber(
+    filter_layer: reload::Layer<tracing_subscriber::EnvFilter, tracing_subscriber::Registry>,
+    service: RuntimeService,
+    tracer_provider: &SdkTracerProvider,
+    logger_provider: &SdkLoggerProvider,
+) -> Result<(), CliError> {
+    #[cfg(feature = "tokio-console")]
+    let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> =
+        build_console_layer();
+    #[cfg(not(feature = "tokio-console"))]
+    let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = None;
+
+    let otel_trace_layer =
+        tracing_opentelemetry::layer().with_tracer(tracer_provider.tracer(service.service_name()));
+    let otel_log_layer =
+        OpenTelemetryTracingBridge::new(logger_provider).with_filter(filter_fn(|metadata| {
+            metadata.target().starts_with("harness")
+        }));
+
+    tracing_subscriber::registry()
+        .with(filter_layer)
+        .with(console_layer)
+        .with(
+            fmt::layer()
+                .fmt_fields(FilteredDefaultFields::new())
+                .with_writer(io::stderr)
+                .with_target(false)
+                .with_timer(ChronoUtc::rfc_3339()),
+        )
+        .with(otel_trace_layer)
+        .with(otel_log_layer)
+        .try_init()
+        .map_err(tracing_init_error)
 }
 
 fn init_subscriber_with_telemetry(
@@ -136,95 +305,38 @@ fn init_subscriber_with_telemetry(
     global::set_tracer_provider(tracer_provider.clone());
     global::set_meter_provider(meter_provider.clone());
 
-    #[cfg(feature = "tokio-console")]
-    let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> =
-        build_console_layer();
-    #[cfg(not(feature = "tokio-console"))]
-    let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = None;
-
+    let show_observability_fields = show_console_observability_fields(service);
     if use_json_format {
-        if show_console_observability_fields(service) {
-            let otel_trace_layer = tracing_opentelemetry::layer()
-                .with_tracer(tracer_provider.tracer(service.service_name()));
-            let otel_log_layer = OpenTelemetryTracingBridge::new(&logger_provider).with_filter(
-                filter_fn(|metadata| metadata.target().starts_with("harness")),
-            );
-            tracing_subscriber::registry()
-                .with(filter_layer)
-                .with(console_layer)
-                .with(fmt::layer().json().with_writer(io::stderr))
-                .with(otel_trace_layer)
-                .with(otel_log_layer)
-                .try_init()
-                .map_err(|error| {
-                    CliErrorKind::workflow_io(format!("initialize tracing subscriber: {error}"))
-                })?;
+        if show_observability_fields {
+            init_json_telemetry_subscriber(
+                filter_layer,
+                service,
+                &tracer_provider,
+                &logger_provider,
+            )?;
         } else {
-            let otel_trace_layer = tracing_opentelemetry::layer()
-                .with_tracer(tracer_provider.tracer(service.service_name()));
-            let otel_log_layer = OpenTelemetryTracingBridge::new(&logger_provider).with_filter(
-                filter_fn(|metadata| metadata.target().starts_with("harness")),
-            );
-            tracing_subscriber::registry()
-                .with(filter_layer)
-                .with(console_layer)
-                .with(
-                    fmt::layer()
-                        .json()
-                        .fmt_fields(FilteredJsonFields::new())
-                        .with_writer(io::stderr),
-                )
-                .with(otel_trace_layer)
-                .with(otel_log_layer)
-                .try_init()
-                .map_err(|error| {
-                    CliErrorKind::workflow_io(format!("initialize tracing subscriber: {error}"))
-                })?;
+            init_filtered_json_telemetry_subscriber(
+                filter_layer,
+                service,
+                &tracer_provider,
+                &logger_provider,
+            )?;
         }
     } else {
-        if show_console_observability_fields(service) {
-            let otel_trace_layer = tracing_opentelemetry::layer()
-                .with_tracer(tracer_provider.tracer(service.service_name()));
-            let otel_log_layer = OpenTelemetryTracingBridge::new(&logger_provider).with_filter(
-                filter_fn(|metadata| metadata.target().starts_with("harness")),
-            );
-            tracing_subscriber::registry()
-                .with(filter_layer)
-                .with(console_layer)
-                .with(
-                    fmt::layer()
-                        .with_writer(io::stderr)
-                        .with_target(false)
-                        .with_timer(ChronoUtc::rfc_3339()),
-                )
-                .with(otel_trace_layer)
-                .with(otel_log_layer)
-                .try_init()
-                .map_err(|error| {
-                    CliErrorKind::workflow_io(format!("initialize tracing subscriber: {error}"))
-                })?;
+        if show_observability_fields {
+            init_text_telemetry_subscriber(
+                filter_layer,
+                service,
+                &tracer_provider,
+                &logger_provider,
+            )?;
         } else {
-            let otel_trace_layer = tracing_opentelemetry::layer()
-                .with_tracer(tracer_provider.tracer(service.service_name()));
-            let otel_log_layer = OpenTelemetryTracingBridge::new(&logger_provider).with_filter(
-                filter_fn(|metadata| metadata.target().starts_with("harness")),
-            );
-            tracing_subscriber::registry()
-                .with(filter_layer)
-                .with(console_layer)
-                .with(
-                    fmt::layer()
-                        .fmt_fields(FilteredDefaultFields::new())
-                        .with_writer(io::stderr)
-                        .with_target(false)
-                        .with_timer(ChronoUtc::rfc_3339()),
-                )
-                .with(otel_trace_layer)
-                .with(otel_log_layer)
-                .try_init()
-                .map_err(|error| {
-                    CliErrorKind::workflow_io(format!("initialize tracing subscriber: {error}"))
-                })?;
+            init_filtered_text_telemetry_subscriber(
+                filter_layer,
+                service,
+                &tracer_provider,
+                &logger_provider,
+            )?;
         }
     }
 

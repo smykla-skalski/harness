@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::error::Error;
 use std::fmt;
 
 use tracing::field::{Field, Visit};
@@ -41,7 +42,7 @@ impl Visit for FilteredDefaultVisitor<'_> {
         self.inner.record_str(field, value);
     }
 
-    fn record_error(&mut self, field: &Field, value: &(dyn std::error::Error + 'static)) {
+    fn record_error(&mut self, field: &Field, value: &(dyn Error + 'static)) {
         if should_hide_console_field(field.name()) {
             return;
         }
