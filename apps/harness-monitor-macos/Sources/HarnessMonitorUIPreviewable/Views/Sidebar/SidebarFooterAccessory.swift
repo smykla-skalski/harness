@@ -19,10 +19,10 @@ enum SidebarFooterGlassTintStopRole: Equatable {
   case connection
   case token(SidebarFooterStatusTone)
 
-  func color(connectionTint: Color) -> Color {
+  func color(connectionTint: Color?) -> Color {
     switch self {
     case .connection:
-      connectionTint
+      connectionTint ?? .clear
     case .token(let tone):
       tone.color
     }
@@ -68,7 +68,7 @@ struct SidebarFooterGlassTintBlend: Equatable {
     stops.count > 2
   }
 
-  func gradient(connectionTint: Color) -> LinearGradient {
+  func gradient(connectionTint: Color?) -> LinearGradient {
     LinearGradient(
       stops: stops.map {
         Gradient.Stop(
@@ -189,8 +189,8 @@ public struct SidebarFooterAccessory: View {
     self.isMCPRegistryHostEnabled = isMCPRegistryHostEnabled
   }
 
-  private var connectionTint: Color {
-    metrics.latencyTint
+  private var connectionTint: Color? {
+    metrics.sidebarFooterTint
   }
 
   private var statusStripState: SidebarFooterStatusStripState {
@@ -226,7 +226,8 @@ public struct SidebarFooterAccessory: View {
     }
     .harnessFloatingControlGlass(
       cornerRadius: Self.glassCornerRadius,
-      tint: connectionTint
+      tint: connectionTint,
+      prominence: .subdued
     )
     .padding(HarnessMonitorTheme.itemSpacing)
     .accessibilityElement(children: .contain)
@@ -235,13 +236,17 @@ public struct SidebarFooterAccessory: View {
 }
 
 private struct SidebarFooterGlassTintWash: View {
-  let connectionTint: Color
+  let connectionTint: Color?
   let blend: SidebarFooterGlassTintBlend
   let cornerRadius: CGFloat
   @Environment(\.accessibilityReduceTransparency)
   private var reduceTransparency
   @Environment(\.colorSchemeContrast)
   private var colorSchemeContrast
+
+  private var showsTintWash: Bool {
+    connectionTint != nil && blend.hasTrailingTint
+  }
 
   private var fillOpacity: Double {
     if reduceTransparency {
@@ -250,13 +255,15 @@ private struct SidebarFooterGlassTintWash: View {
     return colorSchemeContrast == .increased ? 0.24 : 0.18
   }
 
-  @ViewBuilder var body: some View {
-    if blend.hasTrailingTint {
-      RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        .fill(blend.gradient(connectionTint: connectionTint).opacity(fillOpacity))
-        .accessibilityHidden(true)
-        .allowsHitTesting(false)
-    }
+  var body: some View {
+    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+      .fill(
+        blend.gradient(connectionTint: connectionTint).opacity(
+          showsTintWash ? fillOpacity : 0
+        )
+      )
+      .accessibilityHidden(true)
+      .allowsHitTesting(false)
   }
 }
 
