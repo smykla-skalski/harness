@@ -79,7 +79,7 @@ struct ActivityPulse: View {
     outerSize: CGFloat = 16,
     innerSize: CGFloat = 7,
     activeColor: Color = HarnessMonitorTheme.success,
-    inactiveColor: Color = HarnessMonitorTheme.ink.opacity(0.32)
+    inactiveColor: Color = HarnessMonitorTheme.disabledConnectionChrome
   ) {
     self.isActive = isActive
     self.activeColor = activeColor
