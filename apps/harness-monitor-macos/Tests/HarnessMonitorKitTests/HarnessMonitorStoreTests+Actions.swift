@@ -44,7 +44,7 @@ extension HarnessMonitorStoreTests {
 
     #expect(store.isRefreshing)
 
-    await refreshTask.value
+    _ = await refreshTask.value
 
     #expect(store.isRefreshing == false)
     #expect(store.connectionState == .online)

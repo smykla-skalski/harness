@@ -54,7 +54,7 @@ extension HarnessMonitorStoreTests {
     )
     let store = HarnessMonitorStore(daemonController: daemon)
 
-    await store.refresh()
+    _ = await store.refresh()
 
     #expect(store.currentFailureFeedbackMessage != nil)
   }

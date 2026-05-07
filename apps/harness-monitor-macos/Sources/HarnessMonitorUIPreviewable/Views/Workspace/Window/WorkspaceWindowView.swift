@@ -130,6 +130,13 @@ public struct WorkspaceWindowView: View {
     nonmutating set { isStartupFocusParticipationEnabled = newValue }
   }
 
+  var sidebarVisibilityRequest: HarnessSidebarVisibilityRequest? {
+    guard startupFocusParticipationActive else {
+      return nil
+    }
+    return HarnessSidebarVisibilityRequest(expander: sidebarVisibilityExpander)
+  }
+
   var columnVisibilityBinding: Binding<NavigationSplitViewVisibility> {
     $columnVisibility
   }
@@ -316,10 +323,7 @@ public struct WorkspaceWindowView: View {
         sidebarVisibilityExpander.handler = nil
       }
       .acpPermissionPresentation(store: store)
-      .focusedSceneValue(
-        \.harnessSidebarVisibilityRequest,
-        HarnessSidebarVisibilityRequest(expander: sidebarVisibilityExpander)
-      )
+      .harnessFocusedSceneValue(\.harnessSidebarVisibilityRequest, sidebarVisibilityRequest)
       .task {
         let binding = columnVisibilityBinding
         sidebarVisibilityExpander.handler = {
