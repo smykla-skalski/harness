@@ -23,7 +23,7 @@ public final class ToastSlice {
   public var successDismissDelay: Duration = .seconds(4)
   public var warningDismissDelay: Duration = .seconds(12)
   public var failureDismissDelay: Duration = .seconds(8)
-  public var undoableDismissDelay: Duration = .seconds(5)
+  public var undoableDismissDelay: Duration = .seconds(8)
   public var dedupeWindow: Duration = .seconds(2)
 
   @ObservationIgnored private var dismissTasks: [UUID: Task<Void, Never>] = [:]
