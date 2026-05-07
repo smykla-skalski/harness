@@ -15,6 +15,14 @@ extension ConnectionQuality {
 }
 
 extension ConnectionMetrics {
+  var showsSidebarFooterTint: Bool {
+    connectedSince != nil
+  }
+
+  var sidebarFooterTint: Color? {
+    showsSidebarFooterTint ? latencyTint : nil
+  }
+
   var latencyTint: Color {
     guard transportLatencyMs != nil else {
       return HarnessMonitorTheme.ink

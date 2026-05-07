@@ -28,7 +28,7 @@ struct HarnessMonitorGlassControlGroup<Content: View>: View {
 
 private struct HarnessMonitorFloatingGlassModifier: ViewModifier {
   let cornerRadius: CGFloat
-  let tint: Color
+  let tint: Color?
   let prominence: HarnessMonitorFloatingGlassProminence
   @Environment(\.accessibilityReduceTransparency)
   private var reduceTransparency
@@ -66,22 +66,44 @@ private struct HarnessMonitorFloatingGlassModifier: ViewModifier {
     return colorSchemeContrast == .increased ? 0.24 : 0.16
   }
 
+  private var fallbackFillColor: Color {
+    guard let tint else {
+      return Color(nsColor: .windowBackgroundColor).opacity(
+        colorSchemeContrast == .increased ? 0.98 : 0.94
+      )
+    }
+    return tint.opacity(fallbackFillOpacity)
+  }
+
+  private var fallbackStrokeColor: Color {
+    guard let tint else {
+      return Color.primary.opacity(colorSchemeContrast == .increased ? 0.24 : 0.12)
+    }
+    return tint.opacity(fallbackStrokeOpacity)
+  }
+
   func body(content: Content) -> some View {
     let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
     if reduceTransparency {
       content
         .background {
           shape
-            .fill(tint.opacity(fallbackFillOpacity))
+            .fill(fallbackFillColor)
         }
         .overlay {
           shape
-            .strokeBorder(tint.opacity(fallbackStrokeOpacity), lineWidth: fallbackStrokeWidth)
+            .strokeBorder(fallbackStrokeColor, lineWidth: fallbackStrokeWidth)
         }
-    } else {
+    } else if let tint {
       content
         .glassEffect(
           .regular.tint(tint.opacity(glassTintOpacity)),
+          in: .rect(cornerRadius: cornerRadius, style: .continuous)
+        )
+    } else {
+      content
+        .glassEffect(
+          .regular,
           in: .rect(cornerRadius: cornerRadius, style: .continuous)
         )
     }
@@ -91,7 +113,7 @@ private struct HarnessMonitorFloatingGlassModifier: ViewModifier {
 extension View {
   func harnessFloatingControlGlass(
     cornerRadius: CGFloat = HarnessMonitorTheme.cornerRadiusSM,
-    tint: Color = HarnessMonitorTheme.ink,
+    tint: Color? = HarnessMonitorTheme.ink,
     prominence: HarnessMonitorFloatingGlassProminence = .regular
   ) -> some View {
     modifier(

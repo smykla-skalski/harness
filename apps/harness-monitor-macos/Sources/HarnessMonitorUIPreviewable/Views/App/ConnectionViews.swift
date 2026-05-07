@@ -79,7 +79,7 @@ struct ActivityPulse: View {
     outerSize: CGFloat = 16,
     innerSize: CGFloat = 7,
     activeColor: Color = HarnessMonitorTheme.success,
-    inactiveColor: Color = HarnessMonitorTheme.secondaryInk.opacity(0.55)
+    inactiveColor: Color = HarnessMonitorTheme.ink.opacity(0.32)
   ) {
     self.isActive = isActive
     self.activeColor = activeColor
@@ -93,7 +93,11 @@ struct ActivityPulse: View {
   }
 
   private var outerOpacity: Double {
-    isActive ? 0.18 : 0.10
+    isActive ? 0.18 : 0.05
+  }
+
+  private var strokeOpacity: Double {
+    isActive ? 0.14 : 0.06
   }
 
   var body: some View {
@@ -107,7 +111,7 @@ struct ActivityPulse: View {
         .frame(width: innerSize, height: innerSize)
         .overlay(
           Circle()
-            .stroke(Color.primary.opacity(0.14), lineWidth: 1)
+            .stroke(Color.primary.opacity(strokeOpacity), lineWidth: 1)
         )
         .animation(.easeOut(duration: 0.3), value: isActive)
     }

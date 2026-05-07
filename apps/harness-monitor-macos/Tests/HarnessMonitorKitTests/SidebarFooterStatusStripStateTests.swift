@@ -151,3 +151,22 @@ struct SidebarFooterGlassTintBlendTests {
     )
   }
 }
+
+@Suite("SidebarFooterConnectionTint")
+struct SidebarFooterConnectionTintTests {
+  @Test("Disconnected footer renders without a connection tint")
+  func disconnectedFooterRendersWithoutAConnectionTint() {
+    #expect(!ConnectionMetrics.initial.showsSidebarFooterTint)
+  }
+
+  @Test("Connected footer keeps the connection tint")
+  func connectedFooterKeepsTheConnectionTint() {
+    var metrics = ConnectionMetrics.initial
+    metrics.transportKind = .webSocket
+    metrics.transportLatencyMs = 42
+    metrics.connectedSince = .now
+    metrics.lastMessageAt = .now
+
+    #expect(metrics.showsSidebarFooterTint)
+  }
+}
