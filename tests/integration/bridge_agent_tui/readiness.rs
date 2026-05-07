@@ -14,13 +14,14 @@ fn readiness_callback_triggers_agent_tui_ready_event() {
     let db = DaemonDb::open(&db_path).expect("open db");
     let project = harness::daemon::index::discovered_project_for_checkout(&project_dir);
     db.sync_project(&project).expect("sync project");
+    let session_id = session_uuid("sess-readiness-cb");
 
     let state = with_isolated_harness_env(tmp.path(), || {
         harness::session::service::start_session(
             "readiness",
             "readiness callback test",
             &project_dir,
-            Some("sess-readiness-cb"),
+            Some(&session_id),
         )
         .expect("start session")
     });
@@ -36,7 +37,7 @@ fn readiness_callback_triggers_agent_tui_ready_event() {
 
     let snapshot = manager
         .start(
-            "sess-readiness-cb",
+            &session_id,
             &AgentTuiStartRequest {
                 runtime: "codex".into(),
                 role: SessionRole::Worker,

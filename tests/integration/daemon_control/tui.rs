@@ -169,6 +169,7 @@ fn cli_tui_commands_follow_running_app_group_daemon_root() {
     let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &["agent-tui"]);
 
     let project_arg = project.to_str().expect("utf8 project");
+    let session_id = session_uuid("app-group-cli-tui");
     let (endpoint, token) = current_app_group_daemon_endpoint_and_token(&home);
     let (session_status, session_body) = post_json(
         &endpoint,
@@ -178,7 +179,7 @@ fn cli_tui_commands_follow_running_app_group_daemon_root() {
             "title": "app group tui",
             "context": "prove cli tui commands follow the running app-group daemon",
             "runtime": "codex",
-            "session_id": "app-group-cli-tui",
+            "session_id": session_id.as_str(),
             "project_dir": project_arg,
         }),
     );
@@ -195,7 +196,7 @@ fn cli_tui_commands_follow_running_app_group_daemon_root() {
             "agents",
             "start",
             "terminal",
-            "app-group-cli-tui",
+            session_id.as_str(),
             "--runtime",
             "codex",
             "--role",

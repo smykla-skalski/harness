@@ -49,18 +49,19 @@ fn sandboxed_recovery_prompt_routes_through_bridge() {
     )
     .expect("spawn bridge");
     let _state = wait_for_bridge_state(tmp.path());
+    let session_id = session_uuid("bridge-recovery");
 
     let request = with_bridge_env(tmp.path(), &host_home, || {
         let _state = service::start_session_with_policy(
             "",
             "bridge recovery",
             &project,
-            Some("bridge-recovery"),
+            Some(&session_id),
             Some("swarm-default"),
         )
         .expect("start session");
         let state = service::join_session(
-            "bridge-recovery",
+            &session_id,
             SessionRole::Leader,
             "claude",
             &[],
@@ -70,13 +71,13 @@ fn sandboxed_recovery_prompt_routes_through_bridge() {
         )
         .expect("join leader");
         let leader_id = state.leader_id.expect("leader id");
-        service::leave_session("bridge-recovery", &leader_id, &project).expect("leave leader");
-        service::build_recovery_tui_request("bridge-recovery", "swarm-default", "codex", &project)
+        service::leave_session(&session_id, &leader_id, &project).expect("leave leader");
+        service::build_recovery_tui_request(&session_id, "swarm-default", "codex", &project)
             .expect("build request")
     });
 
     let current_state = with_bridge_env(tmp.path(), &host_home, || {
-        service::session_status("bridge-recovery", &project)
+        service::session_status(&session_id, &project)
     })
     .expect("session status");
     let db_path = tmp.path().join("daemon.sqlite3");
@@ -93,7 +94,7 @@ fn sandboxed_recovery_prompt_routes_through_bridge() {
     let (sender, _receiver) = broadcast::channel(8);
     let manager = AgentTuiManagerHandle::new(sender, std::sync::Arc::clone(&db_slot), true);
     let snapshot = with_bridge_env(tmp.path(), &host_home, || {
-        manager.start("bridge-recovery", &request)
+        manager.start(&session_id, &request)
     })
     .expect("start via bridge");
     assert_eq!(snapshot.status, AgentTuiStatus::Running);

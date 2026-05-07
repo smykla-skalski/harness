@@ -8,22 +8,23 @@ fn recover_leader_builds_managed_tui_request_from_policy_preset() {
     let tmp = tempfile::tempdir().expect("tempdir");
     with_session_test_env(tmp.path(), "recover-leader", || {
         let project = tmp.path().join("project");
+        let session_id = super::session_uuid("recover-1");
         let state = super::start_active_session_with_policy(
             "",
             "recover leader",
             &project,
-            "recover-1",
+            &session_id,
             "swarm-default",
         );
         let leader_id = state.leader_id.expect("leader");
 
-        service::leave_session("recover-1", &leader_id, &project).expect("leave");
+        service::leave_session(&session_id, &leader_id, &project).expect("leave");
 
-        let updated = service::session_status("recover-1", &project).expect("status");
+        let updated = service::session_status(&session_id, &project).expect("status");
         assert_eq!(updated.status, SessionStatus::LeaderlessDegraded);
 
         let request =
-            service::build_recovery_tui_request("recover-1", "swarm-default", "codex", &project)
+            service::build_recovery_tui_request(&session_id, "swarm-default", "codex", &project)
                 .expect("build recovery request");
         assert_eq!(request.runtime, "codex");
         assert_eq!(request.role, SessionRole::Leader);

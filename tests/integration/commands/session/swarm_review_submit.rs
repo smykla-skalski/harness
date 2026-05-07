@@ -6,18 +6,19 @@ use harness::session::types::{
 use super::swarm_review_helpers::{
     join_reviewer, prepare_in_progress_task, setup_two_reviewers_on_claimed_task,
 };
-use super::with_session_test_env;
+use super::{session_uuid, with_session_test_env};
 
 #[test]
 fn submit_review_stamps_reviewer_entry_and_persists_review() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-submit-review-1", || {
         let project = tmp.path().join("project");
+        let session_id = session_uuid("sub-rev-1");
         let (_worker, task_id, gemini_id, _claude) =
-            setup_two_reviewers_on_claimed_task("sub-rev-1", &project);
+            setup_two_reviewers_on_claimed_task(&session_id, &project);
 
         service::submit_review(
-            "sub-rev-1",
+            &session_id,
             &task_id,
             &gemini_id,
             ReviewVerdict::Approve,
@@ -27,7 +28,7 @@ fn submit_review_stamps_reviewer_entry_and_persists_review() {
         )
         .expect("submit review");
 
-        let state = service::session_status("sub-rev-1", &project).unwrap();
+        let state = service::session_status(&session_id, &project).unwrap();
         let task = state.tasks.get(&task_id).unwrap();
         assert_eq!(
             task.status,
@@ -50,11 +51,12 @@ fn submit_review_quorum_approve_closes_task_as_done() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-submit-review-approve", || {
         let project = tmp.path().join("project");
+        let session_id = session_uuid("sub-rev-2");
         let (_worker, task_id, gemini_id, claude_id) =
-            setup_two_reviewers_on_claimed_task("sub-rev-2", &project);
+            setup_two_reviewers_on_claimed_task(&session_id, &project);
 
         service::submit_review(
-            "sub-rev-2",
+            &session_id,
             &task_id,
             &gemini_id,
             ReviewVerdict::Approve,
@@ -64,7 +66,7 @@ fn submit_review_quorum_approve_closes_task_as_done() {
         )
         .unwrap();
         service::submit_review(
-            "sub-rev-2",
+            &session_id,
             &task_id,
             &claude_id,
             ReviewVerdict::Approve,
@@ -74,7 +76,7 @@ fn submit_review_quorum_approve_closes_task_as_done() {
         )
         .unwrap();
 
-        let state = service::session_status("sub-rev-2", &project).unwrap();
+        let state = service::session_status(&session_id, &project).unwrap();
         let task = state.tasks.get(&task_id).unwrap();
         assert_eq!(task.status, TaskStatus::Done);
         let consensus = task.consensus.as_ref().expect("consensus set");
@@ -89,8 +91,9 @@ fn submit_review_quorum_request_changes_records_consensus_keeps_in_review() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-submit-review-changes", || {
         let project = tmp.path().join("project");
+        let session_id = session_uuid("sub-rev-3");
         let (_worker, task_id, gemini_id, claude_id) =
-            setup_two_reviewers_on_claimed_task("sub-rev-3", &project);
+            setup_two_reviewers_on_claimed_task(&session_id, &project);
 
         let points = vec![ReviewPoint {
             point_id: "p1".to_string(),
@@ -100,7 +103,7 @@ fn submit_review_quorum_request_changes_records_consensus_keeps_in_review() {
         }];
 
         service::submit_review(
-            "sub-rev-3",
+            &session_id,
             &task_id,
             &gemini_id,
             ReviewVerdict::RequestChanges,
@@ -110,7 +113,7 @@ fn submit_review_quorum_request_changes_records_consensus_keeps_in_review() {
         )
         .unwrap();
         service::submit_review(
-            "sub-rev-3",
+            &session_id,
             &task_id,
             &claude_id,
             ReviewVerdict::Approve,
@@ -120,7 +123,7 @@ fn submit_review_quorum_request_changes_records_consensus_keeps_in_review() {
         )
         .unwrap();
 
-        let state = service::session_status("sub-rev-3", &project).unwrap();
+        let state = service::session_status(&session_id, &project).unwrap();
         let task = state.tasks.get(&task_id).unwrap();
         assert_eq!(task.status, TaskStatus::InReview);
         let consensus = task.consensus.as_ref().expect("consensus set");
@@ -138,10 +141,11 @@ fn quorum_approve_releases_submitter_and_allows_new_assignment() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-approve-release", || {
         let project = tmp.path().join("project");
+        let session_id = session_uuid("approve-rel");
         let (worker_id, task_id, gemini_id, claude_id) =
-            setup_two_reviewers_on_claimed_task("approve-rel", &project);
+            setup_two_reviewers_on_claimed_task(&session_id, &project);
         service::submit_review(
-            "approve-rel",
+            &session_id,
             &task_id,
             &gemini_id,
             ReviewVerdict::Approve,
@@ -151,7 +155,7 @@ fn quorum_approve_releases_submitter_and_allows_new_assignment() {
         )
         .unwrap();
         service::submit_review(
-            "approve-rel",
+            &session_id,
             &task_id,
             &claude_id,
             ReviewVerdict::Approve,
@@ -161,7 +165,7 @@ fn quorum_approve_releases_submitter_and_allows_new_assignment() {
         )
         .unwrap();
 
-        let state = service::session_status("approve-rel", &project).unwrap();
+        let state = service::session_status(&session_id, &project).unwrap();
         let agent = state.agents.get(&worker_id).expect("submitter present");
         assert_eq!(
             agent.status,
@@ -182,7 +186,7 @@ fn quorum_approve_releases_submitter_and_allows_new_assignment() {
             .agent_id
             .clone();
         let second = service::create_task(
-            "approve-rel",
+            &session_id,
             "followup",
             None,
             harness::session::types::TaskSeverity::Low,
@@ -191,7 +195,7 @@ fn quorum_approve_releases_submitter_and_allows_new_assignment() {
         )
         .unwrap();
         service::assign_task(
-            "approve-rel",
+            &session_id,
             &second.task_id,
             &worker_id,
             &leader_id,
@@ -206,8 +210,9 @@ fn quorum_ignores_stale_reviews_from_prior_rounds() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-stale-rounds", || {
         let project = tmp.path().join("project");
+        let session_id = session_uuid("stale-rnd");
         let (worker_id, task_id, gemini_id, claude_id) =
-            setup_two_reviewers_on_claimed_task("stale-rnd", &project);
+            setup_two_reviewers_on_claimed_task(&session_id, &project);
         // Round 1: gemini RequestChanges with one open point, claude Approve.
         let points = vec![ReviewPoint {
             point_id: "p1".to_string(),
@@ -216,7 +221,7 @@ fn quorum_ignores_stale_reviews_from_prior_rounds() {
             worker_note: None,
         }];
         service::submit_review(
-            "stale-rnd",
+            &session_id,
             &task_id,
             &gemini_id,
             ReviewVerdict::RequestChanges,
@@ -226,7 +231,7 @@ fn quorum_ignores_stale_reviews_from_prior_rounds() {
         )
         .unwrap();
         service::submit_review(
-            "stale-rnd",
+            &session_id,
             &task_id,
             &claude_id,
             ReviewVerdict::Approve,
@@ -238,7 +243,7 @@ fn quorum_ignores_stale_reviews_from_prior_rounds() {
 
         // Worker disputes p1 which clears submitted_at and bumps round.
         service::respond_review(
-            "stale-rnd",
+            &session_id,
             &task_id,
             &worker_id,
             &[],
@@ -251,7 +256,7 @@ fn quorum_ignores_stale_reviews_from_prior_rounds() {
         // Round 2: both reviewers approve. Task must close as Done despite
         // the stale round-1 RequestChanges review still sitting on disk.
         service::submit_review(
-            "stale-rnd",
+            &session_id,
             &task_id,
             &gemini_id,
             ReviewVerdict::Approve,
@@ -261,7 +266,7 @@ fn quorum_ignores_stale_reviews_from_prior_rounds() {
         )
         .unwrap();
         service::submit_review(
-            "stale-rnd",
+            &session_id,
             &task_id,
             &claude_id,
             ReviewVerdict::Approve,
@@ -271,7 +276,7 @@ fn quorum_ignores_stale_reviews_from_prior_rounds() {
         )
         .unwrap();
 
-        let state = service::session_status("stale-rnd", &project).unwrap();
+        let state = service::session_status(&session_id, &project).unwrap();
         let task = state.tasks.get(&task_id).unwrap();
         assert_eq!(
             task.status,
@@ -288,13 +293,14 @@ fn rejected_submit_review_leaves_no_durable_record() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-no-record-on-reject", || {
         let project = tmp.path().join("project");
-        let (_leader, worker_id, task_id) = prepare_in_progress_task("nr-reject", &project);
-        service::submit_for_review("nr-reject", &task_id, &worker_id, None, &project).unwrap();
-        let gemini_id = join_reviewer("nr-reject", "gemini", "GEMINI_SESSION_ID", &project);
+        let session_id = session_uuid("nr-reject");
+        let (_leader, worker_id, task_id) = prepare_in_progress_task(&session_id, &project);
+        service::submit_for_review(&session_id, &task_id, &worker_id, None, &project).unwrap();
+        let gemini_id = join_reviewer(&session_id, "gemini", "GEMINI_SESSION_ID", &project);
         // Skip claim: submit_review must reject AND must not touch reviews.jsonl.
 
         let err = service::submit_review(
-            "nr-reject",
+            &session_id,
             &task_id,
             &gemini_id,
             ReviewVerdict::Approve,
@@ -308,7 +314,7 @@ fn rejected_submit_review_leaves_no_durable_record() {
         let reviews_path = project
             .join("agents")
             .join("sessions")
-            .join("nr-reject")
+            .join(&session_id)
             .join("tasks")
             .join(&task_id)
             .join("reviews.jsonl");
@@ -324,13 +330,14 @@ fn submit_review_rejects_non_claimed_reviewer() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-submit-review-nonclaim", || {
         let project = tmp.path().join("project");
-        let (_leader, worker_id, task_id) = prepare_in_progress_task("sub-rev-4", &project);
-        service::submit_for_review("sub-rev-4", &task_id, &worker_id, None, &project).unwrap();
-        let gemini_id = join_reviewer("sub-rev-4", "gemini", "GEMINI_SESSION_ID", &project);
+        let session_id = session_uuid("sub-rev-4");
+        let (_leader, worker_id, task_id) = prepare_in_progress_task(&session_id, &project);
+        service::submit_for_review(&session_id, &task_id, &worker_id, None, &project).unwrap();
+        let gemini_id = join_reviewer(&session_id, "gemini", "GEMINI_SESSION_ID", &project);
         // No claim before submit.
 
         let result = service::submit_review(
-            "sub-rev-4",
+            &session_id,
             &task_id,
             &gemini_id,
             ReviewVerdict::Approve,

@@ -367,11 +367,12 @@ fn sandboxed_agent_tui_publishes_live_refresh_over_bridge() {
         || {
             let db_path = tmp.path().join("daemon.sqlite3");
             let db = DaemonDb::open(&db_path).expect("open daemon db");
+            let session_id = session_uuid("sess-sandbox-tui");
             let session_state = daemon_service::start_session_direct(
                 &SessionStartRequest {
                     title: "sandboxed tui live refresh".into(),
                     context: "sandboxed tui".into(),
-                    session_id: Some("sess-sandbox-tui".into()),
+                    session_id: Some(session_id),
                     project_dir: project.to_string_lossy().into_owned(),
                     policy_preset: None,
                     base_ref: None,

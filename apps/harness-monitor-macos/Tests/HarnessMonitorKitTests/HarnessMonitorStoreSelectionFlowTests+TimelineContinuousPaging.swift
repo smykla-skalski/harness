@@ -130,16 +130,14 @@ extension HarnessMonitorStoreSelectionFlowTests {
       detail: detail
     )
     let store = await makeBootstrappedStore(client: client)
-    let initialWindowSize = HarnessMonitorStoreSelectionTestSupport.initialTimelineWindowSize(
-      for: fullTimeline.count
-    )
+    let initialRequestLimit = HarnessMonitorStore.initialSelectedTimelineWindowLimit
 
     await store.selectSession(summary.sessionId)
     await store.appendSelectedTimelineOlderChunk(limit: 24)
 
     #expect(
       client.recordedTimelineWindowRequests(for: summary.sessionId) == [
-        .latest(limit: initialWindowSize)
+        .latest(limit: initialRequestLimit)
       ]
     )
     #expect(store.timeline == fullTimeline)

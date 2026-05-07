@@ -13,7 +13,7 @@ use harness::session::types::{AgentStatus, ReviewPointState, ReviewVerdict, Task
 use super::swarm_review_helpers::{
     join_reviewer, prepare_in_progress_task, setup_two_reviewers_on_claimed_task,
 };
-use super::with_session_test_env;
+use super::{session_uuid, with_session_test_env};
 use crate::integration::helpers::run_command;
 
 fn run_cli(args: &[&str]) -> i32 {
@@ -27,14 +27,15 @@ fn submit_for_review_via_cli_flips_task_and_worker() {
     with_session_test_env(tmp.path(), "integ-rev-cli-sfr", || {
         let project = tmp.path().join("project");
         let project_str = project.to_string_lossy().to_string();
-        let (_leader, worker_id, task_id) = prepare_in_progress_task("rev-cli-1", &project);
+        let session_id = session_uuid("rev-cli-1");
+        let (_leader, worker_id, task_id) = prepare_in_progress_task(&session_id, &project);
 
         let exit = run_cli(&[
             "harness",
             "session",
             "task",
             "submit-for-review",
-            "rev-cli-1",
+            session_id.as_str(),
             &task_id,
             "--actor",
             &worker_id,
@@ -47,7 +48,7 @@ fn submit_for_review_via_cli_flips_task_and_worker() {
         ]);
         assert_eq!(exit, 0);
 
-        let state = service::session_status("rev-cli-1", &project).unwrap();
+        let state = service::session_status(&session_id, &project).unwrap();
         let task = state.tasks.get(&task_id).unwrap();
         assert_eq!(task.status, TaskStatus::AwaitingReview);
         assert_eq!(
@@ -66,17 +67,18 @@ fn claim_review_via_cli_moves_task_to_in_review() {
     with_session_test_env(tmp.path(), "integ-rev-cli-claim", || {
         let project = tmp.path().join("project");
         let project_str = project.to_string_lossy().to_string();
-        let (_leader, worker_id, task_id) = prepare_in_progress_task("rev-cli-2", &project);
-        service::submit_for_review("rev-cli-2", &task_id, &worker_id, None, &project)
+        let session_id = session_uuid("rev-cli-2");
+        let (_leader, worker_id, task_id) = prepare_in_progress_task(&session_id, &project);
+        service::submit_for_review(&session_id, &task_id, &worker_id, None, &project)
             .expect("submit for review");
-        let gemini_id = join_reviewer("rev-cli-2", "gemini", "GEMINI_SESSION_ID", &project);
+        let gemini_id = join_reviewer(&session_id, "gemini", "GEMINI_SESSION_ID", &project);
 
         let exit = run_cli(&[
             "harness",
             "session",
             "task",
             "claim-review",
-            "rev-cli-2",
+            session_id.as_str(),
             &task_id,
             "--actor",
             &gemini_id,
@@ -85,7 +87,7 @@ fn claim_review_via_cli_moves_task_to_in_review() {
         ]);
         assert_eq!(exit, 0);
 
-        let state = service::session_status("rev-cli-2", &project).unwrap();
+        let state = service::session_status(&session_id, &project).unwrap();
         let task = state.tasks.get(&task_id).unwrap();
         assert_eq!(task.status, TaskStatus::InReview);
         let claim = task.review_claim.as_ref().expect("claim recorded");
@@ -105,8 +107,9 @@ fn submit_review_via_cli_accepts_snake_case_verdict_and_json_points() {
     with_session_test_env(tmp.path(), "integ-rev-cli-sr-snake", || {
         let project = tmp.path().join("project");
         let project_str = project.to_string_lossy().to_string();
+        let session_id = session_uuid("rev-cli-3");
         let (_w, task_id, gemini_id, claude_id) =
-            setup_two_reviewers_on_claimed_task("rev-cli-3", &project);
+            setup_two_reviewers_on_claimed_task(&session_id, &project);
 
         let points_json = r#"[{"point_id":"p1","text":"needs docs","state":"open"}]"#;
         let exit = run_cli(&[
@@ -114,7 +117,7 @@ fn submit_review_via_cli_accepts_snake_case_verdict_and_json_points() {
             "session",
             "task",
             "submit-review",
-            "rev-cli-3",
+            session_id.as_str(),
             &task_id,
             "--actor",
             &gemini_id,
@@ -135,7 +138,7 @@ fn submit_review_via_cli_accepts_snake_case_verdict_and_json_points() {
             "session",
             "task",
             "submit-review",
-            "rev-cli-3",
+            session_id.as_str(),
             &task_id,
             "--actor",
             &claude_id,
@@ -148,7 +151,7 @@ fn submit_review_via_cli_accepts_snake_case_verdict_and_json_points() {
         ]);
         assert_eq!(exit2, 0);
 
-        let state = service::session_status("rev-cli-3", &project).unwrap();
+        let state = service::session_status(&session_id, &project).unwrap();
         let task = state.tasks.get(&task_id).unwrap();
         let consensus = task.consensus.as_ref().expect("quorum recorded");
         assert_eq!(consensus.verdict, ReviewVerdict::RequestChanges);
@@ -165,8 +168,9 @@ fn respond_review_via_cli_splits_csv_into_agreed_and_disputed() {
     with_session_test_env(tmp.path(), "integ-rev-cli-respond", || {
         let project = tmp.path().join("project");
         let project_str = project.to_string_lossy().to_string();
+        let session_id = session_uuid("rev-cli-4");
         let (worker_id, task_id, gemini_id, claude_id) =
-            setup_two_reviewers_on_claimed_task("rev-cli-4", &project);
+            setup_two_reviewers_on_claimed_task(&session_id, &project);
 
         let points = r#"[
             {"point_id":"p1","text":"A","state":"open"},
@@ -178,7 +182,7 @@ fn respond_review_via_cli_splits_csv_into_agreed_and_disputed() {
                 "session",
                 "task",
                 "submit-review",
-                "rev-cli-4",
+                session_id.as_str(),
                 &task_id,
                 "--actor",
                 reviewer,
@@ -198,7 +202,7 @@ fn respond_review_via_cli_splits_csv_into_agreed_and_disputed() {
             "session",
             "task",
             "respond-review",
-            "rev-cli-4",
+            session_id.as_str(),
             &task_id,
             "--actor",
             &worker_id,
@@ -213,7 +217,7 @@ fn respond_review_via_cli_splits_csv_into_agreed_and_disputed() {
         ]);
         assert_eq!(exit, 0);
 
-        let state = service::session_status("rev-cli-4", &project).unwrap();
+        let state = service::session_status(&session_id, &project).unwrap();
         let task = state.tasks.get(&task_id).unwrap();
         assert_eq!(task.review_round, 1, "respond-review bumps round counter");
         let history = task
@@ -241,8 +245,9 @@ fn arbitrate_via_cli_requires_third_round_and_closes_task_on_approve() {
     with_session_test_env(tmp.path(), "integ-rev-cli-arb", || {
         let project = tmp.path().join("project");
         let project_str = project.to_string_lossy().to_string();
+        let session_id = session_uuid("rev-cli-5");
         let (worker_id, task_id, gemini_id, claude_id) =
-            setup_two_reviewers_on_claimed_task("rev-cli-5", &project);
+            setup_two_reviewers_on_claimed_task(&session_id, &project);
 
         // Drive three rounds of request_changes + dispute to arm the
         // arbitration gate (review_round >= 3).
@@ -254,7 +259,7 @@ fn arbitrate_via_cli_requires_third_round_and_closes_task_on_approve() {
                     "session",
                     "task",
                     "submit-review",
-                    "rev-cli-5",
+                    session_id.as_str(),
                     &task_id,
                     "--actor",
                     reviewer,
@@ -273,7 +278,7 @@ fn arbitrate_via_cli_requires_third_round_and_closes_task_on_approve() {
                 "session",
                 "task",
                 "respond-review",
-                "rev-cli-5",
+                session_id.as_str(),
                 &task_id,
                 "--actor",
                 &worker_id,
@@ -284,7 +289,7 @@ fn arbitrate_via_cli_requires_third_round_and_closes_task_on_approve() {
             ]);
         }
 
-        let leader_id = service::session_status("rev-cli-5", &project)
+        let leader_id = service::session_status(&session_id, &project)
             .unwrap()
             .leader_id
             .expect("leader present");
@@ -293,7 +298,7 @@ fn arbitrate_via_cli_requires_third_round_and_closes_task_on_approve() {
             "session",
             "task",
             "arbitrate",
-            "rev-cli-5",
+            session_id.as_str(),
             &task_id,
             "--actor",
             &leader_id,
@@ -306,7 +311,7 @@ fn arbitrate_via_cli_requires_third_round_and_closes_task_on_approve() {
         ]);
         assert_eq!(exit, 0);
 
-        let state = service::session_status("rev-cli-5", &project).unwrap();
+        let state = service::session_status(&session_id, &project).unwrap();
         let task = state.tasks.get(&task_id).unwrap();
         let arb = task.arbitration.as_ref().expect("arbitration recorded");
         assert_eq!(arb.verdict, ReviewVerdict::Approve);

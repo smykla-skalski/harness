@@ -151,9 +151,10 @@ extension HarnessMonitorStore {
       fallbackRecordedAt: recordedAt,
       toolCallMetadata: acpToolCallTimelineMetadata(for: payload)
     )
-    let visibleToolCallCount = Set(
-      entries.compactMap { $0.toolCallTimelineEntryMetadata()?.rowID }
-    ).count
+    let liveToolCallRowIDs = Set(
+      entries.lazy.compactMap { $0.toolCallTimelineEntryMetadata()?.rowID }
+    )
+    let visibleToolCallCount = liveToolCallRowIDs.count
     toolCallTimelineOverflowNotice =
       if payload.rawCount > payload.events.count {
         ToolCallTimelineOverflowNotice(
@@ -165,9 +166,7 @@ extension HarnessMonitorStore {
       } else {
         nil
       }
-    liveToolCallAnnouncementRowIDs = Set(
-      entries.compactMap { $0.toolCallTimelineEntryMetadata()?.rowID }
-    )
+    liveToolCallAnnouncementRowIDs = liveToolCallRowIDs
     guard !entries.isEmpty else {
       return
     }
