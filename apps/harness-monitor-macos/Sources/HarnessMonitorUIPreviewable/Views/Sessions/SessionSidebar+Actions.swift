@@ -29,6 +29,15 @@ extension SessionSidebar {
   func dismissDecisions(_ ids: [String]) {
     guard !ids.isEmpty else { return }
     state.decisionBulkActions.recordDismissedBatch(ids, undoManager: undoManager)
+    let bulkActions = state.decisionBulkActions
+    let count = ids.count
+    let suffix = count == 1 ? "" : "s"
+    store.toast.enqueueUndoable(
+      "\(count) decision\(suffix) dismissed",
+      accessibilityIdentifier: HarnessMonitorAccessibility.sessionWindowDismissUndoToast
+    ) { @MainActor in
+      bulkActions.reopenRequestedBatch = ids
+    }
     Task {
       let handler = store.supervisorDecisionActionHandler()
       for id in ids {
@@ -40,10 +49,7 @@ extension SessionSidebar {
   func reopenDecisionBatch(_ ids: [String]) async {
     guard let decisionStore = store.supervisorDecisionStore else { return }
     for id in ids {
-      guard let decision = try? await decisionStore.decision(id: id) else { continue }
-      guard decision.statusRaw == "dismissed" else { continue }
-      decision.statusRaw = "open"
-      decision.resolutionJSON = nil
+      _ = try? await decisionStore.reopen(id: id)
     }
   }
 
