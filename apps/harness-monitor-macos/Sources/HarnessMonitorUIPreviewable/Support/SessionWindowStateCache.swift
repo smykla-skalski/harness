@@ -10,11 +10,21 @@ public enum SessionCreateKind: String, Codable, Hashable, Sendable {
 public struct SessionCreateDraft: Codable, Hashable, Sendable {
   public var kind: SessionCreateKind
   public var title: String
+  public var prompt: String
+  public var runtime: String
   public var sessionID: String
 
-  public init(kind: SessionCreateKind, title: String = "", sessionID: String) {
+  public init(
+    kind: SessionCreateKind,
+    title: String = "",
+    prompt: String = "",
+    runtime: String = AgentTuiRuntime.codex.rawValue,
+    sessionID: String
+  ) {
     self.kind = kind
     self.title = title
+    self.prompt = prompt
+    self.runtime = runtime
     self.sessionID = sessionID
   }
 }
