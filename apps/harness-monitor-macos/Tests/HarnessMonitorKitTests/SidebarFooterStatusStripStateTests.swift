@@ -169,4 +169,14 @@ struct SidebarFooterConnectionTintTests {
 
     #expect(metrics.showsSidebarFooterTint)
   }
+
+  @Test("Connecting footer stays muted until latency is measured")
+  func connectingFooterStaysMutedUntilLatencyIsMeasured() {
+    var metrics = ConnectionMetrics.initial
+    metrics.transportKind = .webSocket
+    metrics.connectedSince = .now
+
+    #expect(metrics.usesMutedConnectionChrome)
+    #expect(!metrics.showsSidebarFooterTint)
+  }
 }

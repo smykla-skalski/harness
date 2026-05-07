@@ -15,8 +15,12 @@ extension ConnectionQuality {
 }
 
 extension ConnectionMetrics {
+  var usesMutedConnectionChrome: Bool {
+    transportLatencyMs == nil && requestLatencyMs == nil
+  }
+
   var showsSidebarFooterTint: Bool {
-    connectedSince != nil
+    connectedSince != nil && !usesMutedConnectionChrome
   }
 
   var sidebarFooterTint: Color? {
@@ -24,9 +28,12 @@ extension ConnectionMetrics {
   }
 
   var latencyTint: Color {
-    guard transportLatencyMs != nil else {
-      return HarnessMonitorTheme.ink
+    if usesMutedConnectionChrome {
+      return HarnessMonitorTheme.disabledConnectionChrome
     }
-    return transportQuality.themeColor
+    if transportLatencyMs != nil {
+      return transportQuality.themeColor
+    }
+    return requestQuality.themeColor
   }
 }

@@ -24,6 +24,7 @@ public enum HarnessMonitorTheme {
   public static let danger = harnessColor("HarnessMonitorDanger")
   public static let controlBorder = harnessColor("HarnessMonitorControlBorder")
   public static let overlayScrim = harnessColor("HarnessMonitorOverlayScrim")
+  public static let disabledConnectionChrome = ink.opacity(0.32)
   public static let secondaryInk = ink.opacity(0.88)
   public static let tertiaryInk = ink.opacity(0.76)
   public static let onContrast = Color.white

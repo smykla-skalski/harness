@@ -10,7 +10,7 @@ enum SidebarFooterStatusTone: Equatable {
     case .success:
       HarnessMonitorTheme.success
     case .muted:
-      HarnessMonitorTheme.secondaryInk
+      HarnessMonitorTheme.disabledConnectionChrome
     }
   }
 }
@@ -278,8 +278,8 @@ private struct SidebarFooterStatusStrip: View {
       }
       if state.showsSeparator {
         Text(verbatim: "·")
-          .scaledFont(.system(.caption2, design: .rounded, weight: .semibold))
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk.opacity(0.55))
+          .font(.system(.caption2, design: .rounded, weight: .semibold))
+          .foregroundStyle(HarnessMonitorTheme.disabledConnectionChrome)
           .accessibilityHidden(true)
       }
       if let mcp = state.mcp {
@@ -298,7 +298,7 @@ private struct SidebarFooterStatusWord: View {
 
   var body: some View {
     Text(token.label)
-      .scaledFont(.system(.caption, design: .rounded, weight: .semibold))
+      .font(.system(.caption2, design: .rounded, weight: .semibold))
       .foregroundStyle(token.tone.color)
       .lineLimit(1)
       .fixedSize(horizontal: true, vertical: false)
