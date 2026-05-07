@@ -140,8 +140,8 @@ public struct SessionTitleBlurChrome: View {
   }
 }
 
-public extension View {
-  func sessionTitleBlurChrome(status: SessionStatus, isStale: Bool) -> some View {
+extension View {
+  public func sessionTitleBlurChrome(status: SessionStatus, isStale: Bool) -> some View {
     overlay(alignment: .top) {
       SessionTitleBlurChrome(status: status, isStale: isStale)
     }
