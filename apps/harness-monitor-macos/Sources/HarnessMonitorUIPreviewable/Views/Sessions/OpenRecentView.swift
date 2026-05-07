@@ -1,5 +1,5 @@
-import HarnessMonitorKit
 import AppKit
+import HarnessMonitorKit
 import SwiftUI
 
 public struct OpenRecentView: View {

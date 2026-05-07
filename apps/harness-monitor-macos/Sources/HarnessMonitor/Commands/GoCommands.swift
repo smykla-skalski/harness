@@ -7,7 +7,8 @@ struct GoCommands: Commands {
   let workspaceNavigationBridge: WorkspaceWindowNavigationBridge
   let windowCommandRouting: WindowCommandRoutingState
   let displayState: CommandsDisplayState
-  @FocusedValue(\.sessionNavigation) private var sessionNavigation
+  @FocusedValue(\.sessionNavigation)
+  private var sessionNavigation
 
   private var activeScope: WindowNavigationScope {
     windowCommandRouting.activeScope ?? .main

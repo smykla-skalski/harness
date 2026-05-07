@@ -21,7 +21,7 @@ public struct SessionNavigationCommand: Equatable, @unchecked Sendable {
     self.goForward = goForward
   }
 
-  public static func == (lhs: SessionNavigationCommand, rhs: SessionNavigationCommand) -> Bool {
+  public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.sessionID == rhs.sessionID
       && lhs.canGoBack == rhs.canGoBack
       && lhs.canGoForward == rhs.canGoForward
@@ -49,7 +49,7 @@ public struct SessionInspectorCommand: Equatable, @unchecked Sendable {
     self.toggle = toggle
   }
 
-  public static func == (lhs: SessionInspectorCommand, rhs: SessionInspectorCommand) -> Bool {
+  public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.sessionID == rhs.sessionID && lhs.isVisible == rhs.isVisible
   }
 }
