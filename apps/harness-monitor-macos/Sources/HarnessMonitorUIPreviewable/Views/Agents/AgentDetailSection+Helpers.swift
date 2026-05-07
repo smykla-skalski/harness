@@ -68,7 +68,9 @@ extension AgentDetailSection {
       store.requestWorkspaceDecisionSelection(decisionID: decisionID)
       store.supervisorSelectedDecisionID = decisionID
       store.requestPrimaryDecisionActionFocus(decisionID: decisionID)
+      openWindow.openHarnessDecisionSession(decisionID: decisionID, store: store)
+    } else {
+      openWindow.openHarnessSessionWindow(sessionID: store.selectedSessionID)
     }
-    openWindow(id: HarnessMonitorWindowID.workspace)
   }
 }

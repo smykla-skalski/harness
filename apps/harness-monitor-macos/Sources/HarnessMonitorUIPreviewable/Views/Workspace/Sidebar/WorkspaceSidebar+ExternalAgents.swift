@@ -59,7 +59,9 @@ struct WorkspaceSidebarExternalAgentRow: View {
         selection = rowSelection
       }
     )
-    .accessibilityFrameMarker("\(HarnessMonitorAccessibility.agentTuiExternalTab(agent.agentId)).frame")
+    .accessibilityFrameMarker(
+      "\(HarnessMonitorAccessibility.agentTuiExternalTab(agent.agentId)).frame"
+    )
     .accessibilityTestProbe(
       pendingDecisionBadgeID,
       label: "Pending decisions",
@@ -71,7 +73,9 @@ struct WorkspaceSidebarExternalAgentRow: View {
     if let decisionID = store.selectOldestDecision(for: agent.agentId) {
       store.requestWorkspaceDecisionSelection(decisionID: decisionID)
       store.requestPrimaryDecisionActionFocus(decisionID: decisionID)
+      openWindow.openHarnessDecisionSession(decisionID: decisionID, store: store)
+    } else {
+      openWindow.openHarnessSessionWindow(sessionID: store.selectedSessionID)
     }
-    openWindow(id: HarnessMonitorWindowID.workspace)
   }
 }

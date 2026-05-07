@@ -16,6 +16,8 @@ struct GoCommands: Commands {
     switch activeScope {
     case .workspace:
       workspaceNavigationBridge.state.canGoBack
+    case .session:
+      false
     case .main:
       displayState.canNavigateBack
     }
@@ -25,6 +27,8 @@ struct GoCommands: Commands {
     switch activeScope {
     case .workspace:
       workspaceNavigationBridge.state.canGoForward
+    case .session:
+      false
     case .main:
       displayState.canNavigateForward
     }
@@ -48,6 +52,8 @@ struct GoCommands: Commands {
       switch scope {
       case .workspace:
         await workspaceNavigationBridge.navigateBack()
+      case .session:
+        break
       case .main:
         await store.navigateBack()
       }
@@ -60,6 +66,8 @@ struct GoCommands: Commands {
       switch scope {
       case .workspace:
         await workspaceNavigationBridge.navigateForward()
+      case .session:
+        break
       case .main:
         await store.navigateForward()
       }

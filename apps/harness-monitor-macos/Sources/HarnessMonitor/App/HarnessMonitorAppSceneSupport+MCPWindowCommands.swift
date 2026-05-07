@@ -25,17 +25,11 @@ private enum HarnessMonitorMCPWindowCommandRegistration {
   static let frame = RegistryRect(x: 0, y: 0, width: 0, height: 0)
   static let descriptors = [
     HarnessMonitorMCPWindowCommandDescriptor(
-      identifier: HarnessMonitorAccessibility.windowMenuWorkspaceItem,
-      label: WindowMenuCommands.workspaceTitle,
-      hint: "Open the Workspace window.",
-      windowID: HarnessMonitorWindowID.workspace
-    ),
-    HarnessMonitorMCPWindowCommandDescriptor(
       identifier: HarnessMonitorAccessibility.windowMenuMainItem,
       label: WindowMenuCommands.mainTitle,
-      hint: "Open the Main window.",
+      hint: "Open the Welcome Recents window.",
       windowID: HarnessMonitorWindowID.main
-    ),
+    )
   ]
 }
 

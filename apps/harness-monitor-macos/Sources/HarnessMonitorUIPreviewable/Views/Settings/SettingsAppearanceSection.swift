@@ -68,7 +68,7 @@ public struct SettingsAppearanceSection: View {
         }
         .harnessNativeFormControl()
         .accessibilityHint(
-          "Switches the main sidebar between concise rows and detailed rows with more metadata"
+          "Switches the session sidebar between strict rows and a native-compatible dense mode"
         )
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.settingsSessionRowModePicker

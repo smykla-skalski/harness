@@ -66,9 +66,22 @@ public enum HarnessMonitorAccessibility {
     "harness.sidebar.sort.\(slug(order))"
   }
 
+  public static func welcomeRecentSessionRow(_ sessionID: String) -> String {
+    "harness.welcome.recents.session.\(slug(sessionID))"
+  }
+
+  public static func sessionWindowRoute(_ route: SessionWindowRoute) -> String {
+    "harness.session.window.route.\(slug(route.rawValue))"
+  }
+
   public static let sessionsBoardRoot = "harness.board.root"
   public static let sessionsBoardScrollView = "harness.board.scroll"
   public static let recentSessionsCard = "harness.board.recent-sessions-card"
+  public static let welcomeRecentsRoot = "harness.welcome.recents"
+  public static let welcomeRecentsProjectList = "harness.welcome.recents.projects"
+  public static let sessionWindowShell = "harness.session.window"
+  public static let sessionWindowSidebar = "harness.session.window.sidebar"
+  public static let sessionWindowStatusMenu = "harness.session.window.toolbar.status"
   public static let contentRoot = "harness.content.root"
   public static let settingsRoot = "harness.settings.root"
   public static let settingsState = "harness.settings.state"
@@ -81,6 +94,7 @@ public enum HarnessMonitorAccessibility {
   public static let settingsTitle = "harness.settings.title"
   public static let settingsThemeModePicker = "harness.settings.theme-mode"
   public static let settingsBackdropModePicker = "harness.settings.backdrop-mode"
+  public static let settingsLaunchBehaviorPicker = "harness.settings.launch-behavior"
   public static let settingsBackgroundCollectionPicker =
     "harness.settings.background-collection"
   public static let settingsBackgroundGallery = "harness.settings.background-gallery"

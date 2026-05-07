@@ -184,7 +184,7 @@ enum HarnessMonitorPerfDriver {
       ]
     )
     store.presentingAcpPermissionBatch = batch
-    openWindow(id: HarnessMonitorWindowID.workspace)
+    openWindow.openHarnessDecisionSession(decisionID: decisionID, store: store)
     guard await waitForRoutedWorkspaceDecision(decisionID: decisionID, store: store) else {
       HarnessMonitorUITestTrace.record(
         component: "perf.permission-modal",

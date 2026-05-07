@@ -40,7 +40,7 @@ struct SessionCockpitView: View {
     store.requestWorkspaceSelection(
       .agent(sessionID: detail.session.sessionId, agentID: agentID)
     )
-    openWindow(id: HarnessMonitorWindowID.workspace)
+    openWindow.openHarnessSessionWindow(sessionID: detail.session.sessionId)
   }
 
   private func focusObserver() {
@@ -48,7 +48,7 @@ struct SessionCockpitView: View {
       .decisions(sessionID: detail.session.sessionId),
       resetDecisionFilters: true
     )
-    openWindow(id: HarnessMonitorWindowID.workspace)
+    openWindow.openHarnessSessionWindow(sessionID: detail.session.sessionId)
   }
 
   var body: some View {

@@ -35,7 +35,7 @@ struct SidebarSessionRow: View {
             .foregroundStyle(.secondary)
             .accessibilityHidden(true)
         }
-        if displayMode == .detailed {
+        if displayMode == .dense {
           HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
             HStack(spacing: HarnessMonitorTheme.itemSpacing) {
               footerStatBadge(
@@ -70,11 +70,11 @@ struct SidebarSessionRow: View {
   }
 
   private var rowAlignment: VerticalAlignment {
-    displayMode == .detailed ? .top : .center
+    displayMode == .dense ? .top : .center
   }
 
   private var titleRowAlignment: VerticalAlignment {
-    displayMode == .detailed ? .top : .center
+    displayMode == .dense ? .top : .center
   }
 
   private func footerStatBadge(
