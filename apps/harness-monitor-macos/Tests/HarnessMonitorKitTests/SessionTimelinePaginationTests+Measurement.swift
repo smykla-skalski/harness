@@ -53,6 +53,117 @@ extension SessionTimelineNavigationTests {
     )
   }
 
+  @Test("Persistent height cache restores only unchanged measured rows")
+  @MainActor
+  func persistentHeightCacheRestoresOnlyUnchangedMeasuredRows() {
+    SessionTimelineTableHeightCacheStore.removeAllForTests()
+    defer { SessionTimelineTableHeightCacheStore.removeAllForTests() }
+
+    let identity = SessionTimelineContentIdentity(sessionID: "session-revisit")
+    let unchangedRow = makeCustomTimelineRow(
+      id: "timeline-entry-unchanged",
+      title: "Stable row"
+    )
+    let originalRow = makeCustomTimelineRow(
+      id: "timeline-entry-stable",
+      title: "Expandable row"
+    )
+    let changedRow = makeCustomTimelineRow(
+      id: "timeline-entry-stable",
+      title: "Expandable row",
+      detail: "Expanded detail that changes the row layout"
+    )
+
+    SessionTimelineTableHeightCacheStore.save(
+      identity: identity,
+      snapshot: SessionTimelineTableSnapshot(rows: [unchangedRow, originalRow]),
+      heightsByID: [
+        unchangedRow.id: CachedRowHeight(width: 945, height: 118, isMeasured: true),
+        originalRow.id: CachedRowHeight(width: 945, height: 136, isMeasured: true),
+      ],
+      fontScale: 1
+    )
+
+    let restored = SessionTimelineTableHeightCacheStore.restore(
+      identity: identity,
+      snapshot: SessionTimelineTableSnapshot(rows: [unchangedRow, changedRow]),
+      fontScale: 1
+    )
+
+    #expect(restored?.heightsByID[unchangedRow.id]?.height == 118)
+    #expect(restored?.heightsByID[changedRow.id] == nil)
+  }
+
+  @Test("Persistent height cache is scoped to font scale")
+  @MainActor
+  func persistentHeightCacheIsScopedToFontScale() {
+    SessionTimelineTableHeightCacheStore.removeAllForTests()
+    defer { SessionTimelineTableHeightCacheStore.removeAllForTests() }
+
+    let identity = SessionTimelineContentIdentity(sessionID: "session-revisit")
+    let row = makeCustomTimelineRow(id: "timeline-entry-stable", title: "Stable row")
+    let otherRow = makeCustomTimelineRow(id: "timeline-entry-other", title: "Other stable row")
+    let snapshot = SessionTimelineTableSnapshot(rows: [row, otherRow])
+
+    SessionTimelineTableHeightCacheStore.save(
+      identity: identity,
+      snapshot: snapshot,
+      heightsByID: [
+        row.id: CachedRowHeight(width: 945, height: 118, isMeasured: true),
+        otherRow.id: CachedRowHeight(width: 945, height: 122, isMeasured: true),
+      ],
+      fontScale: 1
+    )
+
+    let restored = SessionTimelineTableHeightCacheStore.restore(
+      identity: identity,
+      snapshot: snapshot,
+      fontScale: 1.2
+    )
+
+    #expect(restored == nil)
+
+    SessionTimelineTableHeightCacheStore.save(
+      identity: identity,
+      snapshot: snapshot,
+      heightsByID: [
+        row.id: CachedRowHeight(width: 945, height: 142, isMeasured: true)
+      ],
+      fontScale: 1.2
+    )
+
+    let restoredAtNewScale = SessionTimelineTableHeightCacheStore.restore(
+      identity: identity,
+      snapshot: snapshot,
+      fontScale: 1.2
+    )
+
+    #expect(restoredAtNewScale?.heightsByID[row.id]?.height == 142)
+    #expect(restoredAtNewScale?.heightsByID[otherRow.id] == nil)
+  }
+
+  @Test("Incremental measurement limits work to visible rows and prefetch")
+  func incrementalMeasurementLimitsWorkToVisibleRowsAndPrefetch() {
+    let indexes = SessionTimelineTableView.Coordinator.orderedMeasurementIndexes(
+      rowCount: 40,
+      visibleRange: 10..<14,
+      mode: .incremental
+    )
+
+    #expect(indexes == Array(10..<18) + Array(6..<10))
+  }
+
+  @Test("Synchronous measurement still covers every row")
+  func synchronousMeasurementStillCoversEveryRow() {
+    let indexes = SessionTimelineTableView.Coordinator.orderedMeasurementIndexes(
+      rowCount: 12,
+      visibleRange: 3..<6,
+      mode: .synchronous
+    )
+
+    #expect(indexes == Array(0..<12))
+  }
+
   @Test("Viewport publish schedules measurement for visible unmeasured rows")
   @MainActor
   func viewportPublishSchedulesMeasurementForVisibleUnmeasuredRows() {

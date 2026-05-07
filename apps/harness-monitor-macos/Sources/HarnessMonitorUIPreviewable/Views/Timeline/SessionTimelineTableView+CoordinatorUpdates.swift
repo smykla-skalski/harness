@@ -7,6 +7,7 @@ import SwiftUI
 extension SessionTimelineTableView.Coordinator {
   func update(
     rows: [SessionTimelineRow],
+    contentIdentity: SessionTimelineContentIdentity? = nil,
     actionHandler: any DecisionActionHandler,
     onSignalTap: ((String) -> Void)?,
     scrollCommand: SessionTimelineScrollCommand?,
@@ -22,11 +23,18 @@ extension SessionTimelineTableView.Coordinator {
     )
     self.actionHandler = actionHandler
     self.onSignalTap = onSignalTap
-    let fontScaleChanged = abs(self.fontScale - request.fontScale) > 0.001
-    self.fontScale = request.fontScale
+    let previousFontScale = fontScale
     let wasPinnedToLatest = isPinnedToLatestViewport()
     let previousAnchor = wasPinnedToLatest ? nil : currentVisibleAnchor()
     let nextSnapshot = SessionTimelineTableSnapshot(rows: rows)
+    let restoredHeightCache = restoreHeightCacheIfNeeded(
+      identity: contentIdentity,
+      snapshot: nextSnapshot,
+      fontScale: request.fontScale
+    )
+    let fontScaleChanged =
+      !restoredHeightCache && abs(previousFontScale - request.fontScale) > 0.001
+    fontScale = request.fontScale
     let invalidatedHeightIDs = nextSnapshot.heightCacheInvalidationIDs(
       comparedTo: rowSnapshot,
       fontScaleChanged: fontScaleChanged
@@ -101,6 +109,7 @@ extension SessionTimelineTableView.Coordinator {
     rowSnapshot = nextSnapshot
     tableView.reloadData()
     tableView.layoutSubtreeIfNeeded()
+    persistHeightCache()
 
     if resolvedColumnWidth > 1 {
       scheduleIncrementalMeasurement(columnWidth: resolvedColumnWidth)
@@ -117,6 +126,43 @@ extension SessionTimelineTableView.Coordinator {
       "session_timeline.update_rows_changed",
       id: Self.signposter.makeSignpostID(),
       "n=\(rowCount, privacy: .public) r=\(willReuseAny, privacy: .public) w=\(colWidth, privacy: .public)"
+    )
+  }
+
+  func restoreHeightCacheIfNeeded(
+    identity: SessionTimelineContentIdentity?,
+    snapshot: SessionTimelineTableSnapshot,
+    fontScale: CGFloat
+  ) -> Bool {
+    if heightCacheIdentity != identity {
+      persistHeightCache()
+      heightCacheIdentity = identity
+      rowHeightCache = [:]
+      rowSnapshot = .empty
+    }
+    guard
+      let seed = SessionTimelineTableHeightCacheStore.restore(
+        identity: identity,
+        snapshot: snapshot,
+        fontScale: fontScale
+      )
+    else {
+      return false
+    }
+    var didRestoreHeight = false
+    for (id, height) in seed.heightsByID where rowHeightCache[id] == nil {
+      rowHeightCache[id] = height
+      didRestoreHeight = true
+    }
+    return didRestoreHeight
+  }
+
+  func persistHeightCache() {
+    SessionTimelineTableHeightCacheStore.save(
+      identity: heightCacheIdentity,
+      snapshot: rowSnapshot,
+      heightsByID: rowHeightCache,
+      fontScale: fontScale
     )
   }
 
@@ -251,9 +297,10 @@ extension SessionTimelineTableView.Coordinator {
     }
     let snapshot = rows
     let visibleRange = visibleRowIndexRange()
-    let measurementOrder = orderedMeasurementIndexes(
+    let measurementOrder = Self.orderedMeasurementIndexes(
       rowCount: snapshot.count,
-      visibleRange: visibleRange
+      visibleRange: visibleRange,
+      mode: SessionTimelineTableMeasurementMode.current
     )
     let outstanding = measurementOrder.filter { index in
       guard snapshot.indices.contains(index) else { return false }
@@ -307,23 +354,31 @@ extension SessionTimelineTableView.Coordinator {
     return lower < upper ? lower..<upper : nil
   }
 
-  private func orderedMeasurementIndexes(
+  nonisolated static let measurementPrefetchRowCount = 4
+
+  nonisolated static func orderedMeasurementIndexes(
     rowCount: Int,
-    visibleRange: Range<Int>?
+    visibleRange: Range<Int>?,
+    mode: SessionTimelineTableMeasurementMode
   ) -> [Int] {
     guard rowCount > 0 else { return [] }
-    guard let visibleRange else {
+    guard mode == .incremental else {
       return Array(0..<rowCount)
     }
+    guard let visibleRange else {
+      return Array(0..<min(rowCount, measurementPrefetchRowCount))
+    }
     var indexes: [Int] = []
-    indexes.reserveCapacity(rowCount)
+    indexes.reserveCapacity(visibleRange.count + (measurementPrefetchRowCount * 2))
     indexes.append(contentsOf: visibleRange)
     let belowStart = visibleRange.upperBound
-    if belowStart < rowCount {
-      indexes.append(contentsOf: belowStart..<rowCount)
+    let belowEnd = min(rowCount, belowStart + measurementPrefetchRowCount)
+    if belowStart < belowEnd {
+      indexes.append(contentsOf: belowStart..<belowEnd)
     }
-    if visibleRange.lowerBound > 0 {
-      indexes.append(contentsOf: 0..<visibleRange.lowerBound)
+    let aboveStart = max(0, visibleRange.lowerBound - measurementPrefetchRowCount)
+    if aboveStart < visibleRange.lowerBound {
+      indexes.append(contentsOf: aboveStart..<visibleRange.lowerBound)
     }
     return indexes
   }

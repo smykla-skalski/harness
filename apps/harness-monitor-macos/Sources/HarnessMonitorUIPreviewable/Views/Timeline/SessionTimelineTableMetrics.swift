@@ -10,7 +10,7 @@ struct SessionTimelineConnectorVisibility {
 // NSTableView owns the hot scroll path here: row reuse, visible ranges, and content
 // offset preservation stay in AppKit instead of feeding per-row geometry back into SwiftUI.
 enum SessionTimelineTableMetrics {
-  static let estimatedBaseRowHeight: CGFloat = 92
+  static let estimatedBaseRowHeight: CGFloat = SessionTimelineSectionPresentation.rowHeightEstimate
   static let pinnedLatestDriftTolerance: CGFloat = 1
   static let pinnedLatestNormalizationTolerance: CGFloat = 16
   private static let minimumSimpleWideCardHeight: CGFloat = 40
@@ -102,7 +102,11 @@ enum SessionTimelineTableMetrics {
     for row: SessionTimelineRow,
     fontScale: CGFloat = 1.0
   ) -> CGFloat {
-    var height = max(estimatedBaseRowHeight, minimumCardHeight(for: row, fontScale: fontScale))
+    let scale = max(1, fontScale)
+    var height = max(
+      estimatedBaseRowHeight * scale,
+      minimumCardHeight(for: row, fontScale: fontScale)
+    )
     if row.dayDividerLabel != nil {
       height += dayDividerHeight
     }

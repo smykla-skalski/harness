@@ -20,6 +20,7 @@ extension SessionTimelineTableView {
     weak var viewport: SessionTimelineViewportModel?
     var scrollBoundaryChanged: SessionTimelineScrollBoundaryHandler
 
+    var heightCacheIdentity: SessionTimelineContentIdentity?
     var rowHeightCache: [String: CachedRowHeight] = [:]
     var lastColumnWidth: CGFloat = 0
     var rows: [SessionTimelineRow] = []

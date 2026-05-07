@@ -155,6 +155,7 @@ extension SessionTimelineTableView.Coordinator {
     if !changedIndexes.isEmpty {
       applyMeasuredHeights(changedIndexes)
     }
+    persistHeightCache()
     Self.signposter.emitEvent(
       "session_timeline.measurement.completed",
       "g=\(generation, privacy: .public) m=\(totalOutstanding, privacy: .public)"

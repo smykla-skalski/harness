@@ -142,7 +142,10 @@ struct SessionTimelineNavigationTests {
     let detailedRow = rows[2]
     let dayDividerRow = rows[12]
 
-    #expect(SessionTimelineTableMetrics.estimatedHeight(for: plainRow) >= 92)
+    #expect(
+      SessionTimelineTableMetrics.estimatedHeight(for: plainRow)
+        >= SessionTimelineSectionPresentation.rowHeightEstimate
+    )
     #expect(SessionTimelineTableMetrics.estimatedHeight(for: detailedRow) > 92)
     #expect(
       SessionTimelineTableMetrics.estimatedHeight(for: dayDividerRow)
