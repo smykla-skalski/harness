@@ -21,6 +21,7 @@ struct HarnessMonitorApp: App {
   private let pendingDecisionsDockBadgeController: PendingDecisionsDockBadgeController
   private let perfScenario: HarnessMonitorPerfScenario?
   @State private var store: HarnessMonitorStore
+  @State private var menuBarStatusController: HarnessMonitorMenuBarStatusController
   @State private var showOpenFolder = false
   @State private var workspaceNavigationBridge: WorkspaceWindowNavigationBridge
   @State private var windowCommandRouting: WindowCommandRoutingState
@@ -94,6 +95,7 @@ struct HarnessMonitorApp: App {
       keyWindowObserver: keyWindowObserver,
       notifications: notificationController
     )
+    let menuBarStatusController = HarnessMonitorMenuBarStatusController()
     pendingDecisionsDockBadgeController = PendingDecisionsDockBadgeController()
     perfScenario = configuration.perfScenario
     let store = configuration.store
@@ -101,7 +103,18 @@ struct HarnessMonitorApp: App {
     store.bindPendingDecisionsBadgeSync { [pendingDecisionsDockBadgeController] count in
       pendingDecisionsDockBadgeController.sync(count: count)
     }
+    store.bindPendingDecisionsStatusSync { [menuBarStatusController] count, severity in
+      if count == .zero {
+        menuBarStatusController.reset()
+      } else {
+        menuBarStatusController.schedule(
+          pendingDecisionCount: count,
+          pendingDecisionSeverity: severity
+        )
+      }
+    }
     _store = State(initialValue: store)
+    _menuBarStatusController = State(initialValue: menuBarStatusController)
     _workspaceNavigationBridge = State(initialValue: WorkspaceWindowNavigationBridge())
     _windowCommandRouting = State(initialValue: WindowCommandRoutingState())
     _mcpWindowCommandRegistrar = State(initialValue: HarnessMonitorMCPWindowCommandRegistrar())
@@ -128,7 +141,7 @@ struct HarnessMonitorApp: App {
   }
 
   private var rendersMenuBarExtraContent: Bool {
-    rendersLiveSceneContent
+    (launchMode == .live && !isTestRun) || isUITesting
   }
 
   private var allowsWindowRestoration: Bool {
@@ -236,10 +249,14 @@ struct HarnessMonitorApp: App {
   }
 
   private var menuBarExtraScene: some Scene {
-    MenuBarExtra(isInserted: .constant(rendersMenuBarExtraContent)) {
+    // SwiftUI owns the status-item scene; keep dynamic state to asset-catalog
+    // image names so the inserted MenuBarExtra stays stable.
+    MenuBarExtra(
+      HarnessMonitorMenuBarSnapshot.statusItemTitle,
+      image: menuBarStatusController.presentation.statusItemAssetName,
+      isInserted: .constant(rendersMenuBarExtraContent)
+    ) {
       HarnessMonitorMenuBarExtraContent(store: store)
-    } label: {
-      HarnessMonitorMenuBarExtraLabel(store: store)
     }
     .menuBarExtraStyle(.menu)
   }

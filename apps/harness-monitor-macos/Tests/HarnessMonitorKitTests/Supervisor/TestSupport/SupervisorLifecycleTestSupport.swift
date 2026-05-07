@@ -20,6 +20,20 @@ final class PendingDecisionsBadgeSyncRecorder {
   }
 }
 
+struct PendingDecisionsStatusSyncUpdate: Equatable {
+  let count: Int
+  let severity: DecisionSeverity?
+}
+
+@MainActor
+final class PendingDecisionsStatusSyncRecorder {
+  private(set) var updates: [PendingDecisionsStatusSyncUpdate] = []
+
+  func record(count: Int, severity: DecisionSeverity?) {
+    updates.append(PendingDecisionsStatusSyncUpdate(count: count, severity: severity))
+  }
+}
+
 final class RecordingNotificationCenter: HarnessMonitorUserNotificationCenter, @unchecked Sendable {
   var delegate: UNUserNotificationCenterDelegate?
   private(set) var badgeCounts: [Int] = []
@@ -75,6 +89,25 @@ func waitForPendingDecisionBadgeCounts(
     if clock.now >= deadline {
       XCTFail(
         "Timed out waiting for pending decision badge counts \(expected); got \(recorder.counts)"
+      )
+      return
+    }
+    try await Task.sleep(for: .milliseconds(10))
+  }
+}
+
+@MainActor
+func waitForPendingDecisionStatusUpdates(
+  _ expected: [PendingDecisionsStatusSyncUpdate],
+  recorder: PendingDecisionsStatusSyncRecorder,
+  timeout: Duration = .seconds(1)
+) async throws {
+  let clock = ContinuousClock()
+  let deadline = clock.now + timeout
+  while recorder.updates != expected {
+    if clock.now >= deadline {
+      XCTFail(
+        "Timed out waiting for pending decision status updates \(expected); got \(recorder.updates)"
       )
       return
     }

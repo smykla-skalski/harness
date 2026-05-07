@@ -216,14 +216,7 @@ public struct ContentView<CornerContent: View>: View {
   }
 
   private func workspaceToolbarTint(for severity: DecisionSeverity?) -> String {
-    switch severity {
-    case .none, .info:
-      return "primary"
-    case .warn, .needsUser:
-      return "orange"
-    case .critical:
-      return "red"
-    }
+    WorkspaceAttentionBadgeStyle.tintLabel(for: severity)
   }
 
   @ViewBuilder private var contentBackground: some View {

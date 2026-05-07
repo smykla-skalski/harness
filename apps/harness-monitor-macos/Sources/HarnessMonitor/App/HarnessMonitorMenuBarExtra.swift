@@ -1,11 +1,15 @@
 import AppKit
 import HarnessMonitorKit
 import HarnessMonitorUIPreviewable
+import Observation
 import SwiftUI
 
 struct HarnessMonitorMenuBarSnapshot: Equatable {
   static let statusItemTitle = "Harness Monitor"
   static let statusItemImageName = "HarnessMonitorMenuBarLighthouse"
+  static let statusItemInfoImageName = "HarnessMonitorMenuBarLighthouseInfo"
+  static let statusItemWarningImageName = "HarnessMonitorMenuBarLighthouseWarning"
+  static let statusItemCriticalImageName = "HarnessMonitorMenuBarLighthouseCritical"
   static let openMonitorLabel = "Open Monitor"
   static let openWorkspaceLabel = "Open Workspace"
   static let openSettingsLabel = "Settings..."
@@ -14,6 +18,8 @@ struct HarnessMonitorMenuBarSnapshot: Equatable {
   static let runWhenClosedLabel = "Run When Closed"
   static let quitLabel = "Quit Harness Monitor"
 
+  let pendingDecisionCount: Int
+  let pendingDecisionSeverity: DecisionSeverity?
   let connectionLabel: String
   let sessionCountLabel: String
   let pendingDecisionLabel: String
@@ -25,8 +31,11 @@ struct HarnessMonitorMenuBarSnapshot: Equatable {
     connectionState: HarnessMonitorStore.ConnectionState,
     sessionCount: Int,
     pendingDecisionCount: Int,
+    pendingDecisionSeverity: DecisionSeverity?,
     supervisorRuntimeState: HarnessMonitorStore.SupervisorRuntimeState
   ) {
+    self.pendingDecisionCount = pendingDecisionCount
+    self.pendingDecisionSeverity = pendingDecisionSeverity
     connectionLabel = "Connection: \(Self.connectionTitle(connectionState))"
     sessionCountLabel = "Sessions: \(Self.countTitle(sessionCount))"
     pendingDecisionLabel = "Decisions: \(Self.countTitle(pendingDecisionCount))"
@@ -35,6 +44,48 @@ struct HarnessMonitorMenuBarSnapshot: Equatable {
     supervisorToggleDisabled =
       supervisorRuntimeState == .starting
       || supervisorRuntimeState == .stopping
+  }
+
+  var showsAttentionBadge: Bool {
+    pendingDecisionCount > .zero
+  }
+
+  var attentionBadgeTintLabel: String {
+    WorkspaceAttentionBadgeStyle.tintLabel(for: pendingDecisionSeverity)
+  }
+
+  var attentionBadgeAccessibilityLabel: String {
+    guard showsAttentionBadge else {
+      return "Attention badge: hidden"
+    }
+    return "Attention badge: \(attentionBadgeTintLabel)"
+  }
+
+  var statusItemAccessibilitySummary: String {
+    (Array(visibleMenuLabels.prefix(4)) + [attentionBadgeAccessibilityLabel])
+      .joined(separator: ", ")
+  }
+
+  var statusItemDisplayTitle: String {
+    guard showsAttentionBadge else {
+      return Self.statusItemTitle
+    }
+    let decisionNoun = pendingDecisionCount == 1 ? "decision" : "decisions"
+    return "\(Self.statusItemTitle): \(Self.countTitle(pendingDecisionCount)) \(decisionNoun)"
+  }
+
+  var statusItemAssetName: String {
+    guard showsAttentionBadge else {
+      return Self.statusItemImageName
+    }
+    switch pendingDecisionSeverity {
+    case .critical:
+      return Self.statusItemCriticalImageName
+    case .warn, .needsUser:
+      return Self.statusItemWarningImageName
+    case .none, .info:
+      return Self.statusItemInfoImageName
+    }
   }
 
   var visibleMenuLabels: [String] {
@@ -107,31 +158,55 @@ struct HarnessMonitorMenuBarSnapshot: Equatable {
   }
 }
 
-struct HarnessMonitorMenuBarExtraLabel: View {
-  let store: HarnessMonitorStore
+struct HarnessMonitorMenuBarStatusPresentation: Equatable {
+  static let idle = Self(pendingDecisionCount: 0, pendingDecisionSeverity: nil)
 
-  var body: some View {
-    Label {
-      Text(verbatim: HarnessMonitorMenuBarSnapshot.statusItemTitle)
-    } icon: {
-      Image(HarnessMonitorMenuBarSnapshot.statusItemImageName)
-        .renderingMode(.template)
+  let pendingDecisionCount: Int
+  let pendingDecisionSeverity: DecisionSeverity?
+
+  var statusItemAssetName: String {
+    guard pendingDecisionCount > .zero else {
+      return HarnessMonitorMenuBarSnapshot.statusItemImageName
     }
-    .accessibilityIdentifier(HarnessMonitorAccessibility.menuBarExtra)
-    .accessibilityLabel(HarnessMonitorMenuBarSnapshot.statusItemTitle)
-    .accessibilityValue(accessibilityValue)
+    switch pendingDecisionSeverity {
+    case .critical:
+      return HarnessMonitorMenuBarSnapshot.statusItemCriticalImageName
+    case .warn, .needsUser:
+      return HarnessMonitorMenuBarSnapshot.statusItemWarningImageName
+    case .none, .info:
+      return HarnessMonitorMenuBarSnapshot.statusItemInfoImageName
+    }
+  }
+}
+
+@MainActor
+@Observable
+final class HarnessMonitorMenuBarStatusController {
+  private(set) var presentation = HarnessMonitorMenuBarStatusPresentation.idle
+  @ObservationIgnored private var updateTask: Task<Void, Never>?
+
+  func schedule(pendingDecisionCount: Int, pendingDecisionSeverity: DecisionSeverity?) {
+    let next = HarnessMonitorMenuBarStatusPresentation(
+      pendingDecisionCount: pendingDecisionCount,
+      pendingDecisionSeverity: pendingDecisionSeverity
+    )
+    guard next != presentation else {
+      return
+    }
+    updateTask?.cancel()
+    updateTask = Task { @MainActor [weak self] in
+      try? await Task.sleep(for: .milliseconds(350))
+      guard !Task.isCancelled else {
+        return
+      }
+      self?.presentation = next
+    }
   }
 
-  private var accessibilityValue: String {
-    HarnessMonitorMenuBarSnapshot(
-      connectionState: store.connectionState,
-      sessionCount: store.sessionIndex.totalSessionCount,
-      pendingDecisionCount: store.supervisorOpenDecisions.count,
-      supervisorRuntimeState: store.supervisorRuntimeState
-    )
-    .visibleMenuLabels
-    .prefix(4)
-    .joined(separator: ", ")
+  func reset() {
+    updateTask?.cancel()
+    updateTask = nil
+    presentation = .idle
   }
 }
 
@@ -143,10 +218,12 @@ struct HarnessMonitorMenuBarExtraContent: View {
   private var runWhenClosed = SupervisorSettingsDefaults.runInBackgroundDefault
 
   private var snapshot: HarnessMonitorMenuBarSnapshot {
-    HarnessMonitorMenuBarSnapshot(
+    let toolbarSlice = store.supervisorToolbarSlice
+    return HarnessMonitorMenuBarSnapshot(
       connectionState: store.connectionState,
       sessionCount: store.sessionIndex.totalSessionCount,
-      pendingDecisionCount: store.supervisorOpenDecisions.count,
+      pendingDecisionCount: toolbarSlice.count,
+      pendingDecisionSeverity: toolbarSlice.maxSeverity,
       supervisorRuntimeState: store.supervisorRuntimeState
     )
   }
