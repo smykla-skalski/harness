@@ -11,7 +11,7 @@ struct HarnessMonitorMenuBarSnapshot: Equatable {
   static let statusItemWarningImageName = "HarnessMonitorMenuBarLighthouseWarning"
   static let statusItemCriticalImageName = "HarnessMonitorMenuBarLighthouseCritical"
   static let openMonitorLabel = "Open Monitor"
-  static let openWorkspaceLabel = "Open Welcome Recents"
+  static let openWorkspaceLabel = "Open Recent Session"
   static let openSettingsLabel = "Settings..."
   static let refreshLabel = "Refresh"
   static let checkSupervisorLabel = "Check Supervisor Now"

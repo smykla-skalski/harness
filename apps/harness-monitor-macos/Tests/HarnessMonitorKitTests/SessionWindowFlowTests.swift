@@ -35,12 +35,12 @@ struct SessionWindowFlowTests {
         == .restoreSessionWindows
     )
     defaults.userDefaults.set(
-      HarnessMonitorLaunchBehavior.alwaysWelcomeRecents.rawValue,
+      HarnessMonitorLaunchBehavior.alwaysOpenRecent.rawValue,
       forKey: HarnessMonitorLaunchBehavior.storageKey
     )
     #expect(
       HarnessMonitorLaunchBehavior.read(userDefaults: defaults.userDefaults)
-        == .alwaysWelcomeRecents
+        == .alwaysOpenRecent
     )
     defaults.userDefaults.set("legacy-garbage", forKey: HarnessMonitorLaunchBehavior.storageKey)
     #expect(

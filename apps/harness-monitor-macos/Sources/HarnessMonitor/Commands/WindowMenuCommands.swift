@@ -3,7 +3,7 @@ import HarnessMonitorUIPreviewable
 import SwiftUI
 
 struct WindowMenuCommands: Commands {
-  nonisolated static let mainTitle = "Welcome Recents"
+  nonisolated static let mainTitle = "Open Recent Session"
 
   @Environment(\.openWindow)
   private var openWindow

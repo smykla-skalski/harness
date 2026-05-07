@@ -236,17 +236,22 @@ extension HarnessMonitorUITestCase {
     let contentReady = waitUntil(timeout: Self.uiTimeout) {
       let window = self.mainWindow(in: app)
       let appChrome = self.appChromeRoot(in: app)
+      let openRecent = self.openRecentRoot(in: app)
       return
         window.exists
         && window.frame.width > 0
         && window.frame.height > 0
-        && appChrome.exists
+        && (appChrome.exists || openRecent.exists)
     }
     if !contentReady {
       recordDiagnosticsTrace(
         event: "launch.content.timeout",
         app: app,
-        details: ["mode": mode]
+        details: [
+          "mode": mode,
+          "app_chrome_exists": String(appChromeRoot(in: app).exists),
+          "open_recent_exists": String(openRecentRoot(in: app).exists),
+        ]
       )
     }
     return contentReady

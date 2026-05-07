@@ -4,7 +4,7 @@ import SwiftUI
 public struct SessionWindowView: View {
   public let store: HarnessMonitorStore
   public let token: SessionWindowToken
-  @State private var selectedRoute: SessionWindowRoute? = .overview
+  @State private var selectedRoute: SessionWindowRoute = .overview
   @State private var snapshot: HarnessMonitorSessionWindowSnapshot?
   @State private var isLoading = false
   @State private var searchText = ""
@@ -16,7 +16,7 @@ public struct SessionWindowView: View {
   }
 
   private var route: SessionWindowRoute {
-    selectedRoute ?? .overview
+    selectedRoute
   }
 
   private var summary: SessionSummary? {
@@ -31,12 +31,10 @@ public struct SessionWindowView: View {
 
   public var body: some View {
     NavigationSplitView {
-      List(selection: $selectedRoute) {
-        ForEach(SessionWindowRoute.allCases) { route in
-          Label(route.title, systemImage: route.systemImage)
-            .tag(Optional(route))
-            .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowRoute(route))
-        }
+      List(SessionWindowRoute.allCases, selection: $selectedRoute) { route in
+        Label(route.title, systemImage: route.systemImage)
+          .tag(route)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowRoute(route))
       }
       .listStyle(.sidebar)
       .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 280)
@@ -144,6 +142,7 @@ public struct SessionWindowView: View {
 
   private func loadSnapshot() async {
     isLoading = true
+    await store.bootstrapIfNeeded()
     snapshot = await store.sessionWindowSnapshot(sessionID: token.sessionID)
     isLoading = false
   }

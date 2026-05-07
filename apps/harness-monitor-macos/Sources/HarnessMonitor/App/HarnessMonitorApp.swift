@@ -1,9 +1,9 @@
+import AppKit
 import HarnessMonitorKit
 import HarnessMonitorRegistry
 import HarnessMonitorUIPreviewable
 import SwiftData
 import SwiftUI
-import UniformTypeIdentifiers
 
 @main
 @MainActor
@@ -22,7 +22,6 @@ struct HarnessMonitorApp: App {
   private let perfScenario: HarnessMonitorPerfScenario?
   @State private var store: HarnessMonitorStore
   @State private var menuBarStatusController: HarnessMonitorMenuBarStatusController
-  @State private var showOpenFolder = false
   @State private var workspaceNavigationBridge: WorkspaceWindowNavigationBridge
   @State private var windowCommandRouting: WindowCommandRoutingState
   @State private var mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
@@ -126,6 +125,7 @@ struct HarnessMonitorApp: App {
     _mcpWindowCommandRegistrar = State(initialValue: HarnessMonitorMCPWindowCommandRegistrar())
     _settingsSelectedSection = State(initialValue: configuration.settingsInitialSection)
     delegate.bind(store: store)
+    pendingDecisionsDockBadgeController.sync(count: 0)
   }
 
   var body: some Scene {
@@ -175,14 +175,14 @@ struct HarnessMonitorApp: App {
   }
 
   private var mainWindowScene: some Scene {
-    WindowGroup("Welcome Recents", id: HarnessMonitorWindowID.main) {
+    WindowGroup("Open Recent Session", id: HarnessMonitorWindowID.main) {
       mainWindowSceneContent
     }
     .windowToolbarStyle(.unified)
     .defaultSize(width: mainWindowDefaultSize.width, height: mainWindowDefaultSize.height)
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
     .defaultLaunchBehavior(
-      launchBehavior == .alwaysWelcomeRecents ? .presented : .automatic
+      launchBehavior == .alwaysOpenRecent ? .presented : .automatic
     )
     .commands {
       HarnessMonitorAppCommands(
@@ -195,7 +195,7 @@ struct HarnessMonitorApp: App {
         refreshStore: refreshStore
       )
       NewSessionCommand(store: store)
-      OpenFolderCommand(isPresented: $showOpenFolder)
+      OpenFolderCommand(store: store)
       AttachExternalSessionCommand(store: store)
       GoCommands(
         store: store,
@@ -253,8 +253,6 @@ struct HarnessMonitorApp: App {
       )
       .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
       .modifier(HarnessMonitorMainWindowLauncherBinder())
-    } else if rendersLiveSceneContent {
-      WelcomeRecentsView(store: store)
     } else {
       Color.clear.accessibilityHidden(true)
     }
@@ -302,7 +300,8 @@ struct HarnessMonitorApp: App {
           themeMode: $themeMode,
           settingsSelectedSection: $settingsSelectedSection,
           perfScenario: perfScenario,
-          defersInitialContentUntilBootstrap: defersInitialMainWindowUntilBootstrap
+          defersInitialContentUntilBootstrap: defersInitialMainWindowUntilBootstrap,
+          refresh: refreshOpenRecent
         )
         .modelContainer(container)
       } else {
@@ -317,25 +316,22 @@ struct HarnessMonitorApp: App {
           themeMode: $themeMode,
           settingsSelectedSection: $settingsSelectedSection,
           perfScenario: perfScenario,
-          defersInitialContentUntilBootstrap: defersInitialMainWindowUntilBootstrap
+          defersInitialContentUntilBootstrap: defersInitialMainWindowUntilBootstrap,
+          refresh: refreshOpenRecent
         )
       }
     }
-    .fileImporter(
-      isPresented: $showOpenFolder,
-      allowedContentTypes: [.folder],
-      allowsMultipleSelection: false
-    ) { result in
-      Task { await handleOpenFolder(result) }
-    }
     .onChange(of: store.openFolderRequest) { _, _ in
-      showOpenFolder = true
+      presentOpenFolder()
     }
     .attachExternalSessionImporter(store: store)
   }
 
   private func handleOpenFolder(_ result: Result<[URL], any Error>) async {
-    _ = await store.handleImportedFolder(result)
+    let record = await store.handleImportedFolder(result)
+    HarnessMonitorLogger.swiftui.info(
+      "Open folder importer handling finished: bookmarked=\((record != nil), privacy: .public)"
+    )
   }
 
   private func increaseTextSize() {
@@ -359,6 +355,41 @@ struct HarnessMonitorApp: App {
   private func refreshStore() {
     Task {
       await store.manualRefresh()
+    }
+  }
+
+  private func refreshOpenRecent() {
+    Task {
+      await store.refreshOpenRecentSessions()
+    }
+  }
+
+  private func presentOpenFolder() {
+    HarnessMonitorLogger.swiftui.info(
+      "Presenting open folder importer: token=\(store.openFolderRequest, privacy: .public)"
+    )
+    let panel = NSOpenPanel()
+    panel.canChooseFiles = false
+    panel.canChooseDirectories = true
+    panel.allowsMultipleSelection = false
+    panel.canCreateDirectories = true
+    panel.prompt = "Open"
+    panel.message = "Select a project folder"
+    let parent = NSApp.keyWindow ?? NSApp.mainWindow
+    let completion: @Sendable (NSApplication.ModalResponse) -> Void = { [store] response in
+      Task { @MainActor in
+        let result: Result<[URL], any Error> =
+          response == .OK ? .success(panel.urls) : .success([])
+        let record = await store.handleImportedFolder(result)
+        HarnessMonitorLogger.swiftui.info(
+          "Open folder importer handling finished: bookmarked=\((record != nil), privacy: .public)"
+        )
+      }
+    }
+    if let parent {
+      panel.beginSheetModal(for: parent, completionHandler: completion)
+    } else {
+      panel.begin(completionHandler: completion)
     }
   }
 

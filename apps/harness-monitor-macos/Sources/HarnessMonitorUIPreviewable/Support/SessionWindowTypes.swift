@@ -49,7 +49,7 @@ public enum HarnessMonitorLaunchBehavior: String, CaseIterable, Codable, Hashabl
   Identifiable, Sendable
 {
   case restoreSessionWindows
-  case alwaysWelcomeRecents
+  case alwaysOpenRecent
 
   public static let storageKey = "harness.monitor.launch-behavior"
   public static let defaultValue: Self = .restoreSessionWindows
@@ -59,7 +59,7 @@ public enum HarnessMonitorLaunchBehavior: String, CaseIterable, Codable, Hashabl
   public var label: String {
     switch self {
     case .restoreSessionWindows: "Restore session windows"
-    case .alwaysWelcomeRecents: "Always show Welcome Recents"
+    case .alwaysOpenRecent: "Always show Open Recent"
     }
   }
 
@@ -67,7 +67,7 @@ public enum HarnessMonitorLaunchBehavior: String, CaseIterable, Codable, Hashabl
     switch self {
     case .restoreSessionWindows:
       "Reopen session windows from system restoration when available."
-    case .alwaysWelcomeRecents:
+    case .alwaysOpenRecent:
       "Open the recents window on launch even when session windows restore."
     }
   }
