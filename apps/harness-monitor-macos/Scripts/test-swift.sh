@@ -334,8 +334,8 @@ clear_gatekeeper_metadata() {
     "$build_products_path"/*.framework
   do
     if [ -e "$path" ]; then
-      xattr -dr com.apple.provenance "$path" 2>/dev/null || true
-      xattr -dr com.apple.quarantine "$path" 2>/dev/null || true
+      /usr/bin/xattr -dr com.apple.provenance "$path" 2>/dev/null || true
+      /usr/bin/xattr -dr com.apple.quarantine "$path" 2>/dev/null || true
     fi
   done
 }
@@ -359,9 +359,10 @@ trap 'cleanup_script_descendants 129' HUP
 
 run_build_for_testing
 
-if (( REUSED_EXISTING_BUILD == 0 )); then
-  clear_gatekeeper_metadata
-fi
+# Reused build-for-testing products can still carry Gatekeeper metadata from a
+# prior launch/build, and the macOS UI test runner will get killed before
+# XCTest connects if those attrs remain.
+clear_gatekeeper_metadata
 
 BASE_TEST_ARGS=(
   -workspace "$ROOT/HarnessMonitor.xcworkspace" \
