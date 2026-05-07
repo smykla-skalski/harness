@@ -137,9 +137,11 @@ extension HarnessMonitorStoreSelectionFlowTests {
     await store.selectSession(summary.sessionId)
     await store.appendSelectedTimelineOlderChunk(limit: 24)
 
-    #expect(client.recordedTimelineWindowRequests(for: summary.sessionId) == [
-      .latest(limit: initialWindowSize),
-    ])
+    #expect(
+      client.recordedTimelineWindowRequests(for: summary.sessionId) == [
+        .latest(limit: initialWindowSize)
+      ]
+    )
     #expect(store.timeline == fullTimeline)
     #expect(store.timelineWindow?.hasOlder == false)
   }

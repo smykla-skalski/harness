@@ -67,7 +67,7 @@ struct SessionTimelineScrollBoundaryState: Equatable {
       false
     case (.some, nil), (nil, .some):
       true
-    case let (.some(oldBucket), .some(newBucket)):
+    case (.some(let oldBucket), .some(let newBucket)):
       towardEdge(newBucket, oldBucket)
     }
   }

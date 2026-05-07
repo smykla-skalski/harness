@@ -93,7 +93,6 @@ extension WorkspaceWindowCreatePane {
                 .imageScale(.medium)
                 .accessibilityHidden(true)
             }
-            .buttonStyle(.bordered)
             .help("Suggest another name")
             .accessibilityLabel("Suggest another name")
             .accessibilityIdentifier(HarnessMonitorAccessibility.agentTuiNameSuggestButton)

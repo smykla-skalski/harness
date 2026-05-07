@@ -31,7 +31,9 @@ struct SidebarSessionContextMenuScopeTests {
     #expect(scope.copySessionIDLabel == "Copy Session IDs")
     #expect(
       scope.copySessionIDText
-        == "\(PreviewFixtures.summary.sessionId)\n\(PreviewFixtures.signalRegressionSecondarySummary.sessionId)"
+        == PreviewFixtures.summary.sessionId
+        + "\n"
+        + PreviewFixtures.signalRegressionSecondarySummary.sessionId
     )
     #expect(scope.removeLabel == "Remove Sessions...")
   }

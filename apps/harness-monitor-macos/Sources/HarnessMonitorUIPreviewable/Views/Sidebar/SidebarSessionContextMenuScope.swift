@@ -34,7 +34,7 @@ struct SidebarSessionContextMenuScope: Equatable {
     let orderedSessions = orderedVisibleSessions.filter { scopedIDs.contains($0.sessionId) }
     let resolvedSessions = orderedSessions.isEmpty ? [rowSession] : orderedSessions
 
-    return SidebarSessionContextMenuScope(
+    return Self(
       sessions: resolvedSessions.map { session in
         SessionItem(
           session: session,
