@@ -12,7 +12,7 @@ extension SessionSidebar {
           systemImage: "exclamationmark.bubble",
           severityShape: severityShape(for: severity),
           severityTint: severityTint(for: severity),
-          isDropTargeted: decisionDropTargetID == decision.id,
+          isDropTargeted: targetedDecisionDropID == decision.id,
           isMultiSelect: state.sidebarSelection.isDecisionMultiSelectEnabled,
           isSelected: state.sidebarSelection.selectedDecisionIDs.contains(decision.id),
           toggleSelection: {
@@ -23,7 +23,7 @@ extension SessionSidebar {
         .dropDestination(for: TaskDragPayload.self) { payloads, _ in
           handleTaskDecisionDrop(payloads, decisionID: decision.id)
         } isTargeted: { isTargeted in
-          decisionDropTargetID = isTargeted ? decision.id : nil
+          targetedDecisionDropID = isTargeted ? decision.id : nil
         }
         .contextMenu {
           Button("Dismiss Decision") {
