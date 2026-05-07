@@ -1,211 +1,188 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+This is the repo-level contract for agents working in `harness`. Direct system,
+developer, and user instructions outrank this file. A deeper `AGENTS.md`
+overrides this file for its subtree.
+
+## Task routing
+
+| Work area | Start here |
+| --- | --- |
+| Rust CLI, hooks, orchestration, agent assets | This file, then `docs/agent-guides/root-reference.md` when details are needed |
+| Harness Monitor macOS app | `apps/harness-monitor-macos/AGENTS.md` |
+| Monitor previewable SwiftUI layer | `apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/AGENTS.md` |
+| Generated plugin/skill output roots | The local generated-root `AGENTS.md`; update canonical sources, not outputs |
+| Runtime config layering | `docs/agents/runtime-config-layering.md` |
 
 ## Command execution
 
-**Always use `rtk`** - it is the token-optimized proxy for shell commands and saves 60-90% on dev operations. Prefix every shell command with `rtk` (e.g. `rtk git status`, `rtk cargo test`). The Claude Code hook auto-rewrites commands transparently; do not fight it.
+**Always use `rtk`.** Prefix every shell command with `rtk`
+(for example, `rtk git status` or `rtk mise run check`).
 
-**`rtk proxy` is last resort only.** It bypasses all output filters and leaks raw command output (4000+ line dumps), burning the context window. Use it only when filtered output hides information you genuinely need to debug a specific issue, and switch back to plain `rtk` immediately after.
+`rtk proxy` is a last resort. Use it only when filtered output hides data needed
+for a specific diagnosis, then return to plain `rtk`.
 
-Discover supported workflows with `rtk mise tasks ls` and run repo logic only through `rtk mise run <task>` or `rtk mise run <task> -- <args>`. Do not wrap `mise` in `bash -lc`, `zsh -lc`, `env`, or other shells. Do not run repo scripts, raw `cargo`, or raw `xcodebuild` when a `mise` task already covers the workflow.
+Discover repo workflows with `rtk mise tasks ls`. Run repo logic through
+`rtk mise run <task>` or `rtk mise run <task> -- <args>` whenever a task exists.
+Do not wrap `mise` in `bash -lc`, `zsh -lc`, the `env` binary, or helper
+scripts. When an environment assignment is needed, put it before `rtk`, for
+example `VAR=value rtk mise run ...`. Do not run repo scripts, direct `cargo`,
+or direct `xcodebuild` when a `mise` task covers the workflow. Direct
+`rtk cargo ...` is acceptable only for targeted Rust diagnosis that has no
+equivalent `mise` task granularity.
 
-## Parallel worktrees are mandatory
+## Parallel worktrees
 
-Every parallel user, agent, or long-running task that edits files, generates projects, builds, tests, runs daemons, or drives XcodeBuildMCP must use its own full git worktree. Do not share one checkout for concurrent write/build work and try to make it safe with profiles, lanes, locks, or environment variables. Build/runtime lanes are secondary isolation for caches, daemon state, ports, labels, and sockets inside a worktree; they are not a substitute for a full worktree.
+Every parallel user, agent, or long-running task that edits files, generates
+projects, builds, tests, runs daemons, or drives XcodeBuildMCP must use its own
+full git worktree. Build/runtime lanes isolate caches, daemon state, ports,
+labels, and sockets inside a worktree; they are not a substitute for a separate
+checkout.
 
-## Build and test commands
+## Build and test
+
+Run commands from the repo root:
 
 ```bash
-mise run check                 # default harness quality gate
-mise run harness:check         # harness-only quality gate (same gates as default check)
-mise run aff:check             # aff-only quality gate (manual; not default)
-mise run test                  # default aggregate fast tests: harness + aff
-mise run test:unit             # unit tests only
-mise run test:integration      # integration tests only
-mise run aff:test              # aff package tests only (opt-in; not default)
-mise run test:slow             # slow tests (#[ignore])
-mise run lint:fix              # format + clippy fixes
-mise run install               # build release binary, install to ~/.local/bin
-cargo test --lib cli::tests    # all tests in a module
-cargo test --lib errors::tests::cli_err_basic_fields -- --exact  # single test
-cargo fmt --check              # check formatting
-cargo clippy --lib             # lint check only
+rtk mise run check
+rtk mise run harness:check
+rtk mise run aff:check
+rtk mise run test
+rtk mise run test:unit
+rtk mise run test:integration
+rtk mise run aff:test
+rtk mise run test:slow
+rtk mise run lint:fix
+rtk mise run install
 ```
 
-Unit tests are in-crate `#[test]` blocks. Integration tests live in `tests/integration/` and cover hooks, commands, and workflows end-to-end. Integration tests run single-threaded (`--test-threads=1`) for env safety. Tests that read XDG paths must isolate state with `temp_env::with_vars` setting both `XDG_DATA_HOME` and `CLAUDE_SESSION_ID`. No mocks - tests use real filesystem state. Slow tests are marked `#[ignore]` and run via `mise run test:slow`.
+Targeted Rust diagnosis examples, only when no `mise` task is precise enough:
 
-Pre-commit: `cargo fmt --check && cargo clippy --lib && mise run test`
+```bash
+rtk cargo test --lib cli::tests
+rtk cargo test --lib errors::tests::cli_err_basic_fields -- --exact
+rtk cargo fmt --check
+rtk cargo clippy --lib
+```
 
-For the Harness Monitor macOS app (`apps/harness-monitor-macos`), see that directory's own `AGENTS.md` - it covers the Tuist project layout, exact `xcodebuild` destination rules, build/runtime lanes, SwiftUI/UX rules, performance measurement, daemon modes, and Swift-specific gotchas (deinit isolation, scheme selection).
+Unit tests are in-crate `#[test]` blocks. Integration tests live in
+`tests/integration/` and run single-threaded for environment safety. Tests that
+read XDG paths must isolate state with `temp_env::with_vars`, setting both
+`XDG_DATA_HOME` and `CLAUDE_SESSION_ID`. Tests use real filesystem state.
 
-## Agent asset architecture
+Pre-commit gate: `rtk mise run check`. Add `rtk mise run aff:check` when the
+task touches `aff` or aff-owned runtime hooks.
 
-`agents/skills/` and `agents/plugins/` are the only canonical cross-runtime skill and plugin sources in this repo.
+## Agent assets
 
-`local-skills/claude/` holds Claude-only project-local skill sources. The generator symlinks each subdirectory into `.claude/skills/` so Claude Code picks them up. This works around the `.claude/rules/` auto-load bug - edits to the source files are live immediately.
+Canonical source roots:
 
-Every directory under `.claude/`, `.agents/`, `.gemini/`, `.vibe/`, `.opencode/`, `.github/hooks/`, and `plugins/` that holds agent assets is a managed output root. The renderer owns these directories. Each contains an `AGENTS.md` marker it emits. Do not hand-edit files inside managed roots.
+- `agents/skills/` and `agents/plugins/` for cross-runtime assets.
+- `local-skills/claude/` for Claude-only project-local skills.
 
-- `harness setup agents generate` - renders skill/plugin assets from canonical sources into all managed roots
-- `harness setup bootstrap` - writes runtime config files (`.claude/settings.json`, `.gemini/settings.json`, `.github/hooks/harness.json`, `.vibe/hooks.json`, `.opencode/hooks.json`) and syncs the Claude plugin cache
+Managed output roots include `.claude/`, `.agents/`, `.gemini/`, `.vibe/`,
+`.opencode/`, `.github/hooks/`, `.claude-plugin/`, and `plugins/`. Each managed
+root has a generated `AGENTS.md` marker. Do not hand-edit generated outputs.
+
+Use:
+
+```bash
+rtk mise run setup:agents:generate
+rtk mise run setup:bootstrap
+rtk mise run check:agent-assets
+```
 
 ## Architecture
 
-Harness is a test orchestration framework for Kubernetes/Kuma. It enforces tracked, user-story-first testing through state machines and hook-based guardrails.
+Harness is a test orchestration framework for Kubernetes/Kuma. It enforces
+tracked, user-story-first testing through state machines and hook-based
+guardrails.
 
-### Two parallel workflow systems (`src/workflow/`)
+Core areas:
 
-**suite:run** (`workflow/runner.rs`): orchestrates test runs through phases `bootstrap` -> `ready` -> `approved` -> `running` -> `verdict`. State persisted as versioned JSON via `VersionedJsonRepository` (atomic tmp-file -> rename saves).
+- `src/workflow/` owns `suite:run` and `suite:create`.
+- `src/hooks/` and `src/cli.rs` own tool lifecycle hooks and hook dispatch.
+- `src/session/` owns multi-agent orchestration state, roles, service logic,
+  transport, storage, and observation.
+- `src/agents/runtime/` owns runtime adapters for Claude, Codex, Gemini,
+  Copilot, Vibe, and OpenCode.
+- `src/commands/` owns CLI command handlers.
 
-**suite:create** (`workflow/create.rs`): manages interactive suite creation with multi-step proposals and manifest validation.
+Detailed module and data-directory notes live in
+`docs/agent-guides/root-reference.md`.
 
-### Hook system (`src/hooks/`, `src/cli.rs`)
+## Hooks
 
-Hooks intercept Codex tool usage. Classified in `cli.rs` as constants:
+The active unified tool lifecycle is `tool-guard`, `tool-result`, and optional
+`tool-failure`. Suite-lifecycle hooks (`guard-stop`, `context-agent`,
+`validate-agent`, `tool-failure`) are off by default unless enabled with
+`HARNESS_FEATURE_SUITE_HOOKS=1` or the matching setup flag.
 
-- **Unified tool lifecycle**: `tool-guard` (pre-tool policy dispatch), `tool-result` (post-tool verification and audit), `tool-failure` (failure enrichment and audit, **off by default**)
-- **Blocking**: `guard-stop` (prevents session end if run incomplete, **off by default**)
-- **Subagent gates**: `context-agent` (start), `validate-agent` (stop) — **off by default**
+Repo-policy/manual-task enforcement is owned by the standalone `aff` CLI. Keep
+harness-owned setup (`setup:bootstrap`, `setup:agents:generate`,
+`check:agent-assets`) separate from the manual `aff:*` tasks.
 
-The four suite-lifecycle hooks (`guard-stop`, `context-agent`, `validate-agent`, `tool-failure`) are gated behind the `HARNESS_FEATURE_SUITE_HOOKS` feature flag because the underlying suite workflow is unfinished and slow tool calls without producing useful guidance. Re-enable them per invocation with `--enable-suite-hooks` on `harness setup bootstrap` or `harness setup agents generate`, or globally via `HARNESS_FEATURE_SUITE_HOOKS=1`. CLI flag wins over env var; default is off. Bootstrap logs an `info!` line per regenerated config naming the omitted family.
-
-Repo-policy/manual-task enforcement is owned by the standalone `aff` CLI. Keep the flows separate: use `mise run setup:bootstrap`, `mise run setup:agents:generate`, and `mise run check:agent-assets` for harness-owned outputs only. If you want aff-owned runtime hooks, run the separate manual `aff:*` mise tasks yourself.
-
-**Hook landing rule**: a new hook lands with its handler doing observable work, *or* behind a dated feature flag in `src/feature_flags.rs` with a tracking issue. Triggers without working handlers slow every tool call without producing signal — that is what the current `RuntimeHookFlags` exists to undo.
-
-### Key modules
-
-- `errors.rs` - unified error/hook message system with `{placeholder}` template substitution (fallback to `?`)
-- `schema.rs` - custom frontmatter parser for suite/run YAML metadata
-- `context.rs` - run lifecycle types: `RunLayout` (directory structure), `RunMetadata`, `CommandEnv`
-- `prepared_suite.rs` - suite artifact types (manifests, groups, digests)
-- `compact.rs` - file fingerprinting (SHA256 + mtime) for change tracking
-- `core_defs.rs` - build info, timestamps, XDG paths, session scope (SHA256-hashed)
-- `rules.rs` - declarative denied-binary lists, make targets, etc.
-- `commands/` - 33 command handlers dispatched from CLI
-- `session/` - multi-agent orchestration: `types.rs` (SessionState, AgentRegistration, WorkItem, SessionRole), `roles.rs` (permission matrix), `storage.rs` (VersionedJsonRepository + JSONL audit log), `service.rs` (12 orchestration functions), `transport.rs` (13 CLI commands), `observe.rs` (cross-agent observation with periodic sweep)
-- `agents/runtime/` - AgentRuntime trait with 6 implementations (claude, codex, gemini, copilot, vibe, opencode), ConversationEvent types, signal protocol (write/read/acknowledge), liveness detection
-
-### Data directories (XDG)
-
-- `$XDG_DATA_HOME/harness/suites/` - suite library
-- `$XDG_DATA_HOME/harness/runs/` - run directories (`{run_id}/{artifacts,commands,state,manifests,reports}`)
-- `$XDG_DATA_HOME/harness/contexts/{session-hash}/` - session context
-- `$XDG_DATA_HOME/harness/projects/project-{digest}/orchestration/` - multi-agent session state
-- `$XDG_DATA_HOME/harness/projects/project-{digest}/agents/signals/` - file-based agent signaling
+Hook landing rule: a new hook lands with observable handler behavior, or behind
+a dated feature flag in `src/feature_flags.rs` with a tracking issue.
 
 ## Code conventions
 
-- Rust 2024 edition, requires rustc 1.94+
-- Clippy pedantic is set to `deny` - all new code must pass pedantic lints
-- Errors use `CliErrorKind` enum variants with typed fields via thiserror
-- Hook messages use `HookMessage` enum with `into_result()` conversion
-- Commits: `{type}({scope}): {message}` — types: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `perf`
-- Never create merge commits. Keep history flat with rebase/cherry-pick workflows only; if a merge commit appears locally, rewrite it out before pushing or handing off.
+- Rust 2024 edition, rustc 1.94+.
+- Clippy pedantic is `deny`; new Rust must pass it.
+- Errors use `CliErrorKind` variants with typed fields via `thiserror`.
+- Hook messages use `HookMessage` with `into_result()`.
+- Diagnostic output uses `tracing` macros. Do not add `eprintln!` diagnostics.
+- Commit messages: `{type}({scope}): {message}` with `feat`, `fix`,
+  `refactor`, `chore`, `docs`, `test`, or `perf`.
+- Never create merge commits. Keep history flat with rebase or cherry-pick.
 
-## Commit signing (strict)
+## Commit signing
 
-Every commit **must** be created with `git commit -sS` - both the `-s` sign-off and `-S` GPG signature are required, no exceptions. After each commit, verify:
+Every commit must use `git commit -sS`. Verify after committing:
 
-- the commit signature is valid (`git log --show-signature -1`)
-- the sign-off trailer is exactly `Signed-off-by: Bart Smykla <bartek@smykla.com>`
-
-Never bypass signing with `--no-gpg-sign`, `-c commit.gpgsign=false`, `--no-verify`, or by using a different key. If 1Password (signing key source) is unavailable, hard stop and wait for the user - do not commit unsigned and do not substitute another key.
-
-## Task closeout and main integration
-
-Every finished task must be integrated through `main` with clean, flat history. Rebase or cherry-pick; never create merge commits. Before handing off or pushing, update from `main`, replay the task changes on top, and triage every conflict deliberately against both the current `main` behavior and the task intent. Do not accept one side blindly, do not bury unrelated edits in conflict resolution, and rerun the smallest relevant validation after conflicts are resolved.
-
-## Versioning
-
-Every change must evaluate semver. Never bump versions without explicit user approval. Small changes can skip a bump unless they change shipped `harness` or `aff` logic enough that the local binary must be reinstalled; those changes require a bump once the user approves it.
-
-- `major` - any breaking change to CLI commands or flags, hook payload contracts, persisted state/schema/artifact formats, machine-consumed output, or behavior that user scripts or suites can reasonably rely on
-- `minor` - backward-compatible new functionality such as a new command, flag, output field, hook capability, report surface, or materially expanded behavior
-- `patch` - backward-compatible bug fixes, internal refactors, diagnostics, performance work, or test/doc updates that do not add new capability and do not break an existing contract
-
-Canonical version source for harness:
-
-- `Cargo.toml` - canonical crate/package version
-
-Automatic sync workflow:
-
-- bump the canonical version with `mise run version:set -- <version>`; if you edit `Cargo.toml` directly, run `mise run version:sync` immediately afterward
-- `mise run version:check` verifies every derived version surface and runs as part of `mise run check`
-- `mise run monitor:generate` regenerates the Tuist project, then `Scripts/post-generate.sh` resyncs the monitor version metadata from the root package version so the regenerated project always tracks the canonical Cargo version
-
-Derived surfaces maintained by the `mise run version:*` sync workflow:
-
-- `testkit/Cargo.toml`
-- `Cargo.lock` package entries for `harness` and `harness-testkit`
-- `apps/harness-monitor-macos/Tuist/ProjectDescriptionHelpers/BuildSettings.swift` (the `// VERSION_MARKER_CURRENT` and `// VERSION_MARKER_MARKETING` lines)
-- `apps/harness-monitor-macos/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist`
-
-Additional version notes:
-
-- `.Codex/plugins/suite/.Codex-plugin/plugin.json` - bump only when plugin content changes (prompts, tools, SKILL.md, agent config); harness-only changes do not require a plugin version bump; `src/bootstrap.rs` reads this file for plugin-cache sync
-- `src/observe/output.rs` sources the SARIF `driver.version` from `env!("CARGO_PKG_VERSION")`; do not replace that with a manual version string
-- `src/bootstrap.rs` - update only versioned plugin fixtures and cache-path expectations in tests when they intentionally track the released version; this file consumes the plugin version but is not a canonical version source
-- `src/cli.rs` uses Clap's derived `version`, so it follows the root `Cargo.toml` version automatically and should not get a manual version string
-
-## Logging
-
-All diagnostic output uses `tracing` macros. Never use `eprintln!` for new diagnostic messages.
-
-- `warn!` - non-fatal failures, fallbacks, degraded operations
-- `info!` - progress updates, phase transitions, completion
-- `debug!` - verbose dumps (full JSON specs, etc.)
-- `println!` stays for user-facing command output and hook JSON protocol
-- Use structured fields: `warn!(%error, "failed to load context")`, `info!(name = %value, "message")`
-- No `#[instrument]` unless explicitly requested
-- Subscriber is initialized in `main.rs` only - tests run without one (silent no-op)
-- Default filter: `RUST_LOG=harness=info`
-
-## Clippy complexity and tracing
-
-Tracing macros inflate `clippy::cognitive_complexity` scores artificially (tokio-rs/tracing#553). When clippy flags a function for complexity, triage before suppressing:
-
-1. Read the function critically - if it is genuinely complex, simplify it first. Be strict: even slightly too complex means refactor.
-2. Only after the function is as simple as it can be, check whether tracing macro expansion is the sole remaining driver of the warning.
-3. If and only if tracing is the only reason the score is over threshold, suppress with `#[expect]` and cite the known issue:
-
-```rust
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-)]
+```bash
+rtk git log --show-signature -1
 ```
 
-Never add `#[expect(clippy::cognitive_complexity)]` as a first move. Always simplify first.
+The sign-off trailer must be exactly:
+
+```text
+Signed-off-by: Bart Smykla <bartek@smykla.com>
+```
+
+Never bypass signing with `--no-gpg-sign`, `-c commit.gpgsign=false`,
+`--no-verify`, or another key. If 1Password signing is unavailable, stop and
+wait for the user.
+
+## Closeout and versioning
+
+Every finished task must be integrated through `main` with clean, flat history.
+Update from `main`, replay the task changes, resolve conflicts deliberately, and
+rerun the smallest relevant validation.
+
+Every change must evaluate semver. Do not bump versions without explicit user
+approval. Docs-only changes normally require no version bump. If shipped
+`harness` or `aff` behavior changes enough that the local binary must be
+reinstalled, a version bump is required after approval.
+
+Use `rtk mise run version:set -- <version>` for approved bumps, or
+`rtk mise run version:sync` after any direct canonical-version edit. See
+`docs/agent-guides/root-reference.md` for derived version surfaces.
 
 ## Debugging discipline
 
-When debugging regressions, especially Harness Monitor macOS/UI work:
-
-1. Start with real data. Reproduce with the smallest targeted command and collect the preserved app/UI traces, logs, screenshots, or failure artifacts before changing behavior.
-2. If the signal path is weak - bare `XCTAssertTrue`, missing preserved traces, cleaned-up artifacts, or ambiguous failures - stop and improve observability first. Fix the test or tracing surface before patching product code.
-3. Correlate the failing path across layers before editing: UI-test host trace, app-side trace/logging, and the concrete source path that emitted the event.
-4. Reuse known-good setups. Compare against existing passing tests, fixtures, and launch scenarios before inventing a new preview path, launch mode, or test harness flow.
-5. Do not trust scenario names or assumptions about mounted UI. Trace the recognized scenario and the actual rendered surface (`dashboard` vs `cockpit`) and patch the proven cause only.
-6. Avoid infer -> patch -> rerun loops. The correct loop is observe -> instrument -> prove -> patch -> rerun.
-7. Keep each iteration single-cause and targeted: one hypothesis, one instrumentation or code change, one narrow rerun. Do not bundle speculative fixes.
-8. Keep task state honest. Close or reset stale `in_progress` work when the scope shifts so the todo list reflects reality.
-
-## Grafana dashboards
-
-All dashboards in `resources/observability/grafana/dashboards/` use Grafana 12+ responsive auto-grid layout. When creating or modifying dashboards:
-
-- Include the `layout` block at the dashboard root with `kind: "auto-grid"`, `maxColumns: 4`, `minColumnWidth: 300`
-- Use `gridPos.w: 6` (quarter width) for stat panels - 4 across on large screens, stacks on narrow
-- Use `gridPos.w: 12` (half width) for time series and logs - 2 across on large screens, stacks on narrow
-- Use `gridPos.w: 24` (full width) sparingly for wide panels like log viewers
-- Avoid `gridPos.w: 3` or `w: 4` - too dense for mobile/tablet viewports
-- Panel order in the JSON determines auto-grid placement when widths allow reflow
+Start with real data. Reproduce with the smallest targeted command and collect
+preserved traces, logs, screenshots, or failure artifacts before changing
+behavior. If the signal is weak, improve observability first. Correlate across
+layers, patch the proven cause only, keep each iteration single-cause, and keep
+task state honest.
 
 ## Gotchas
 
-- `tool-guard` denies direct use of `kubectl`, `kumactl`, `helm`, `docker`, `k3d` and routes write/question policy through the same combined pre-tool hook (see `rules.rs:26`)
-- `VersionedJsonRepository` saves atomically via tmp-file rename - don't read state files by path while a save is in progress, use the repository's `load()` method
-- If using XcodeBuildMCP, use the installed XcodeBuildMCP skill before calling XcodeBuildMCP tools. For `apps/harness-monitor-macos` work, use a full git worktree per parallel actor and set explicit lanes inside that worktree: `HARNESS_MONITOR_BUILD_LANE=<lane>` for DerivedData isolation and `HARNESS_MONITOR_RUNTIME_LANE=<lane>` for daemon/bridge/MCP isolation.
-- For Swift / macOS UI work in `apps/harness-monitor-macos`, see that directory's `AGENTS.md` gotchas (xcodeproj sync, External Daemon scheme, `MainActor.assumeIsolated` deinit trap, lane cleanup).
+- `tool-guard` denies direct use of `kubectl`, `kumactl`, `helm`, `docker`, and
+  `k3d`; see `rules.rs`.
+- `VersionedJsonRepository` saves atomically with tmp-file rename. Use the
+  repository `load()` path instead of reading state files during saves.
+- Use the installed XcodeBuildMCP skill before XcodeBuildMCP tools. Monitor app
+  work needs a full worktree plus explicit `HARNESS_MONITOR_BUILD_LANE` and
+  `HARNESS_MONITOR_RUNTIME_LANE`.
