@@ -13,5 +13,5 @@
     <polyline points="4.5,0.5 6,2 7.5,0.5"/>
     <polyline points="1.5,4 3,5.5 4.5,4"/>
   </g>
-  <path d="M21.5,-1 L25,2.5 L21.5,6 L18,2.5 Z" fill="#FF453A"/>
+  <path d="M21,-3 L27,3 L21,9 L15,3 Z" fill="#FF453A"/>
 </svg>
