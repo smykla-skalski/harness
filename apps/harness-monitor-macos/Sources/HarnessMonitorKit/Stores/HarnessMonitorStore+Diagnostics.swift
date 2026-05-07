@@ -25,12 +25,35 @@ extension HarnessMonitorStore {
     }
   }
 
-  public func refresh() async {
+  @discardableResult
+  public func refresh() async -> Bool {
     guard let client else {
       await bootstrap()
-      return
+      return connectionState == .online
     }
     await refresh(using: client, preserveSelection: true)
+    return connectionState == .online
+  }
+
+  public func manualRefresh() async {
+    guard !isRefreshing, !isBootstrapping else {
+      return
+    }
+
+    let bootstrapsConnection = client == nil
+    if bootstrapsConnection {
+      isRefreshing = true
+    }
+    defer {
+      if bootstrapsConnection {
+        isRefreshing = false
+      }
+    }
+
+    guard await refresh() else {
+      return
+    }
+    manualRefreshSuccessToken &+= 1
   }
 
   public func configureUITestBehavior(

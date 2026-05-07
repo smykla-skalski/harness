@@ -7,6 +7,7 @@ struct ContentWindowToolbarModel: Equatable {
   let canCreateTask: Bool
   let isRefreshing: Bool
   let sleepPreventionEnabled: Bool
+  let manualRefreshSuccessToken: Int
 
   var sleepPreventionTitle: String {
     sleepPreventionEnabled ? "Allow Sleep" : "Prevent Sleep"
@@ -40,7 +41,7 @@ struct ContentPrimaryToolbarItems: ToolbarContent {
   let model: ContentWindowToolbarModel
 
   var body: some ToolbarContent {
-    ToolbarItemGroup(placement: .primaryAction) {
+    ToolbarItem(placement: .primaryAction) {
       Button {
         store.sleepPreventionEnabled.toggle()
       } label: {
@@ -56,10 +57,10 @@ struct ContentPrimaryToolbarItems: ToolbarContent {
           : "Keep the system awake while sessions are active"
       )
       .accessibilityIdentifier(HarnessMonitorAccessibility.sleepPreventionButton)
-      RefreshToolbarButton(isRefreshing: model.isRefreshing) {
-        Task { await store.refresh() }
-      }
-      .help("Refresh sessions")
+    }
+    ToolbarSpacer(.fixed, placement: .primaryAction)
+    ToolbarItem(placement: .primaryAction) {
+      RefreshToolbarButton(store: store, model: model)
     }
     ToolbarSpacer(.fixed, placement: .primaryAction)
     ToolbarItem(placement: .primaryAction) {

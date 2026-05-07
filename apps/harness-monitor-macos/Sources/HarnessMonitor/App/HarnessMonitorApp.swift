@@ -314,7 +314,7 @@ struct HarnessMonitorApp: App {
 
   private func refreshStore() {
     Task {
-      await store.refresh()
+      await store.manualRefresh()
     }
   }
 

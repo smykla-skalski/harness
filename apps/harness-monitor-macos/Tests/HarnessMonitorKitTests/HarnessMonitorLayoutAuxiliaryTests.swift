@@ -158,14 +158,16 @@ struct ContentWindowToolbarModelTests {
       canNavigateForward: false,
       canCreateTask: false,
       isRefreshing: false,
-      sleepPreventionEnabled: true
+      sleepPreventionEnabled: true,
+      manualRefreshSuccessToken: 0
     )
     let disabled = ContentWindowToolbarModel(
       canNavigateBack: false,
       canNavigateForward: false,
       canCreateTask: false,
       isRefreshing: false,
-      sleepPreventionEnabled: false
+      sleepPreventionEnabled: false,
+      manualRefreshSuccessToken: 0
     )
 
     #expect(enabled.sleepPreventionTitle == "Allow Sleep")
