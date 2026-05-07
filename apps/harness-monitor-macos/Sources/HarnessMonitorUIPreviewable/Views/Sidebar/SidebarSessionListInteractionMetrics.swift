@@ -4,7 +4,7 @@ enum SidebarSessionListInteractionMetrics {
   static let coordinateSpaceName = "sidebar.session-list.interaction"
 }
 
-struct SidebarSessionListTrailingWhitespaceBoundaryPreferenceKey: PreferenceKey {
+struct SidebarSessionListWhitespaceBoundaryKey: PreferenceKey {
   static let defaultValue: CGFloat = 0
 
   static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
@@ -12,13 +12,13 @@ struct SidebarSessionListTrailingWhitespaceBoundaryPreferenceKey: PreferenceKey 
   }
 }
 
-struct SidebarSessionListTrailingWhitespaceBoundaryReporter: View {
+struct SidebarSessionListWhitespaceBoundaryReporter: View {
   var body: some View {
     GeometryReader { proxy in
       Color.clear
         .accessibilityHidden(true)
         .preference(
-          key: SidebarSessionListTrailingWhitespaceBoundaryPreferenceKey.self,
+          key: SidebarSessionListWhitespaceBoundaryKey.self,
           value: proxy.frame(
             in: .named(SidebarSessionListInteractionMetrics.coordinateSpaceName)
           ).maxY

@@ -31,7 +31,10 @@ extension HarnessMonitorStore {
       return
     }
 
-    let clampedTargetEnd = min(max(targetEnd, 0), max(timeline.count, timelineWindow?.totalCount ?? 0))
+    let clampedTargetEnd = min(
+      max(targetEnd, 0),
+      max(timeline.count, timelineWindow?.totalCount ?? 0)
+    )
     guard clampedTargetEnd > 0, timeline.count < clampedTargetEnd else {
       return
     }

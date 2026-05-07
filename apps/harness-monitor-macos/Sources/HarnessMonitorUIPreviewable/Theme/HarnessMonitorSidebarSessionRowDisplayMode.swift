@@ -26,6 +26,6 @@ public enum HarnessMonitorSidebarSessionRowDisplayMode: String, CaseIterable, Id
 }
 
 extension EnvironmentValues {
-  @Entry public var harnessSidebarSessionRowDisplayMode: HarnessMonitorSidebarSessionRowDisplayMode =
-    .defaultMode
+  @Entry public var harnessSidebarSessionRowDisplayMode:
+    HarnessMonitorSidebarSessionRowDisplayMode = .defaultMode
 }

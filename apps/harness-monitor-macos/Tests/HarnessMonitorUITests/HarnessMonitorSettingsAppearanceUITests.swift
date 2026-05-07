@@ -261,7 +261,7 @@ final class HarnessMonitorSettingsAppearanceUITests: HarnessMonitorUITestCase {
     let settingsState = element(in: app, identifier: Accessibility.settingsState)
     let sidebarRowModePicker = element(
       in: app,
-      identifier: Accessibility.settingsSidebarSessionRowDisplayModePicker
+      identifier: Accessibility.settingsSessionRowModePicker
     )
     let agentStat = element(in: app, identifier: Accessibility.previewSessionRowAgentStat)
     let taskStat = element(in: app, identifier: Accessibility.previewSessionRowTaskStat)
@@ -277,7 +277,7 @@ final class HarnessMonitorSettingsAppearanceUITests: HarnessMonitorUITestCase {
 
     selectMenuOption(
       in: app,
-      controlIdentifier: Accessibility.settingsSidebarSessionRowDisplayModePicker,
+      controlIdentifier: Accessibility.settingsSessionRowModePicker,
       optionTitle: "Detailed"
     )
 
@@ -304,7 +304,7 @@ final class HarnessMonitorSettingsAppearanceUITests: HarnessMonitorUITestCase {
 
     selectMenuOption(
       in: app,
-      controlIdentifier: Accessibility.settingsSidebarSessionRowDisplayModePicker,
+      controlIdentifier: Accessibility.settingsSessionRowModePicker,
       optionTitle: "Concise"
     )
 

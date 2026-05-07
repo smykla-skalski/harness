@@ -165,7 +165,7 @@ struct SidebarSessionListColumn: View {
     }
     .contentShape(Rectangle())
     .coordinateSpace(name: SidebarSessionListInteractionMetrics.coordinateSpaceName)
-    .onPreferenceChange(SidebarSessionListTrailingWhitespaceBoundaryPreferenceKey.self) {
+    .onPreferenceChange(SidebarSessionListWhitespaceBoundaryKey.self) {
       trailingWhitespaceBoundaryMaxY = $0
     }
     .onModifierKeysChanged { _, newModifiers in

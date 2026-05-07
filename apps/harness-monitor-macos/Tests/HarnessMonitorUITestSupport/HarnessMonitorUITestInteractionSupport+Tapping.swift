@@ -63,77 +63,77 @@ extension HarnessMonitorUITestCase {
   }
 
   #if os(macOS)
-  func modifierClickSession(
-    in app: XCUIApplication,
-    identifier: String,
-    modifierFlags: XCUIElement.KeyModifierFlags,
-    settleAfterClick: Bool = true
-  ) {
-    let sessionRow = sessionTrigger(in: app, identifier: identifier)
-    let elementCenterCoordinate = centerCoordinate(in: app, for: sessionRow)
-    let fallbackCoordinate = preferredTapCoordinate(in: app, for: sessionRow)
-    let exists =
-      waitForElement(sessionRow, timeout: Self.fastActionTimeout)
-      || elementCenterCoordinate != nil
-      || fallbackCoordinate != nil
-    XCTAssertTrue(
-      exists,
-      """
-      Expected session row \(identifier)
-      trace=\(diagnosticsTracePath() ?? "unavailable")
-      """
-    )
-    guard exists else { return }
+    func modifierClickSession(
+      in app: XCUIApplication,
+      identifier: String,
+      modifierFlags: XCUIElement.KeyModifierFlags,
+      settleAfterClick: Bool = true
+    ) {
+      let sessionRow = sessionTrigger(in: app, identifier: identifier)
+      let elementCenterCoordinate = centerCoordinate(in: app, for: sessionRow)
+      let fallbackCoordinate = preferredTapCoordinate(in: app, for: sessionRow)
+      let exists =
+        waitForElement(sessionRow, timeout: Self.fastActionTimeout)
+        || elementCenterCoordinate != nil
+        || fallbackCoordinate != nil
+      XCTAssertTrue(
+        exists,
+        """
+        Expected session row \(identifier)
+        trace=\(diagnosticsTracePath() ?? "unavailable")
+        """
+      )
+      guard exists else { return }
 
-    if app.state != .runningForeground {
-      app.activate()
-    }
+      if app.state != .runningForeground {
+        app.activate()
+      }
 
-    recordDiagnosticsTrace(
-      event: "tap-session.modifier.begin",
-      app: app,
-      details: [
-        "identifier": identifier,
-        "element_type": "\(sessionRow.elementType.rawValue)",
-        "is_hittable": "\(sessionRow.isHittable)",
-        "modifier_flags": "\(modifierFlags.rawValue)",
-        "coordinate_source": {
-          if elementCenterCoordinate != nil {
-            return "element-center"
-          }
-          if fallbackCoordinate != nil {
-            return "fallback"
-          }
-          return "element-click"
-        }(),
-      ]
-    )
+      recordDiagnosticsTrace(
+        event: "tap-session.modifier.begin",
+        app: app,
+        details: [
+          "identifier": identifier,
+          "element_type": "\(sessionRow.elementType.rawValue)",
+          "is_hittable": "\(sessionRow.isHittable)",
+          "modifier_flags": "\(modifierFlags.rawValue)",
+          "coordinate_source": {
+            if elementCenterCoordinate != nil {
+              return "element-center"
+            }
+            if fallbackCoordinate != nil {
+              return "fallback"
+            }
+            return "element-click"
+          }(),
+        ]
+      )
 
-    if let elementCenterCoordinate {
-      XCUIElement.perform(withKeyModifiers: modifierFlags) {
-        elementCenterCoordinate.click()
+      if let elementCenterCoordinate {
+        XCUIElement.perform(withKeyModifiers: modifierFlags) {
+          elementCenterCoordinate.click()
+        }
+      } else if let fallbackCoordinate {
+        XCUIElement.perform(withKeyModifiers: modifierFlags) {
+          fallbackCoordinate.click()
+        }
+      } else {
+        XCUIElement.perform(withKeyModifiers: modifierFlags) {
+          sessionRow.click()
+        }
       }
-    } else if let fallbackCoordinate {
-      XCUIElement.perform(withKeyModifiers: modifierFlags) {
-        fallbackCoordinate.click()
+      if settleAfterClick {
+        RunLoop.current.run(until: Date.now.addingTimeInterval(Self.fastPollInterval))
       }
-    } else {
-      XCUIElement.perform(withKeyModifiers: modifierFlags) {
-        sessionRow.click()
-      }
+      recordDiagnosticsTrace(
+        event: "tap-session.modifier.end",
+        app: app,
+        details: [
+          "identifier": identifier,
+          "value_after": String(describing: sessionRow.value ?? "nil"),
+        ]
+      )
     }
-    if settleAfterClick {
-      RunLoop.current.run(until: Date.now.addingTimeInterval(Self.fastPollInterval))
-    }
-    recordDiagnosticsTrace(
-      event: "tap-session.modifier.end",
-      app: app,
-      details: [
-        "identifier": identifier,
-        "value_after": String(describing: sessionRow.value ?? "nil"),
-      ]
-    )
-  }
   #endif
 
   func terminateIfRunning(_ app: XCUIApplication) {

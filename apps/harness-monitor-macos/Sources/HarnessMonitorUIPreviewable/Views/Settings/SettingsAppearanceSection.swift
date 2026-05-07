@@ -68,7 +68,7 @@ public struct SettingsAppearanceSection: View {
           "Switches the main sidebar between concise rows and detailed rows with more metadata"
         )
         .accessibilityIdentifier(
-          HarnessMonitorAccessibility.settingsSidebarSessionRowDisplayModePicker
+          HarnessMonitorAccessibility.settingsSessionRowModePicker
         )
 
         Picker("Backdrop", selection: $backdropModeRawValue) {
@@ -104,7 +104,8 @@ public struct SettingsAppearanceSection: View {
   private var appearanceFooterText: String {
     var parts = [
       "Theme mode, text size, and sidebar session rows apply to every Harness Monitor window.",
-      "Backdrop controls where the softened background image renders, and choosing an image turns on the window backdrop if it is currently off.",
+      "Backdrop controls where the softened background image renders.",
+      "Choosing an image turns on the window backdrop if it is currently off.",
     ]
     #if HARNESS_FEATURE_LOTTIE
       parts.append("Corner animation shows a dancing llama during activity.")

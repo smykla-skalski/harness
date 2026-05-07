@@ -237,7 +237,7 @@ struct SidebarSessionListContent: View {
       .tag(session.sessionId)
       .background {
         if session.sessionId == renderState.lastVisibleSessionID {
-          SidebarSessionListTrailingWhitespaceBoundaryReporter()
+          SidebarSessionListWhitespaceBoundaryReporter()
         }
       }
       .contentShape(Rectangle())

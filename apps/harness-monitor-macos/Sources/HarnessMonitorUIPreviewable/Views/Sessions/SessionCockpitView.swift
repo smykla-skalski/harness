@@ -66,38 +66,39 @@ struct SessionCockpitView: View {
             status: detail.session.status,
             isStale: isSessionStatusStale
           )
-        }
-      ) {
-        VStack(alignment: .leading, spacing: 16) {
-          SessionCockpitHeaderCard(
-            store: store,
-            detail: detail,
-            observeSelectedSession: { Task { await store.observeSelectedSession() } },
-            requestEndSessionConfirmation: store.requestEndSelectedSessionConfirmation,
-            inspectObserver: focusObserver
-          )
-          if let heuristicIssues = detail.observer?.openIssues, !heuristicIssues.isEmpty {
-            SessionCockpitHeuristicIssuesSection(issues: heuristicIssues)
+        },
+        content: {
+          VStack(alignment: .leading, spacing: 16) {
+            SessionCockpitHeaderCard(
+              store: store,
+              detail: detail,
+              observeSelectedSession: { Task { await store.observeSelectedSession() } },
+              requestEndSessionConfirmation: store.requestEndSelectedSessionConfirmation,
+              inspectObserver: focusObserver
+            )
+            if let heuristicIssues = detail.observer?.openIssues, !heuristicIssues.isEmpty {
+              SessionCockpitHeuristicIssuesSection(issues: heuristicIssues)
+            }
+            HarnessMonitorAdaptiveGridLayout(
+              minimumColumnWidth: 340,
+              maximumColumns: 2,
+              spacing: 16
+            ) {
+              taskSection
+              agentSection
+            }
+            MonitorTimelineSection(
+              host: .session(detail.session.sessionId),
+              timeline: timeline,
+              timelineWindow: timelineWindow,
+              decisions: store.supervisorOpenDecisions,
+              isTimelineLoading: isTimelineLoading,
+              store: store
+            )
           }
-          HarnessMonitorAdaptiveGridLayout(
-            minimumColumnWidth: 340,
-            maximumColumns: 2,
-            spacing: 16
-          ) {
-            taskSection
-            agentSection
-          }
-          MonitorTimelineSection(
-            host: .session(detail.session.sessionId),
-            timeline: timeline,
-            timelineWindow: timelineWindow,
-            decisions: store.supervisorOpenDecisions,
-            isTimelineLoading: isTimelineLoading,
-            store: store
-          )
+          .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-      }
+      )
     }
   }
 

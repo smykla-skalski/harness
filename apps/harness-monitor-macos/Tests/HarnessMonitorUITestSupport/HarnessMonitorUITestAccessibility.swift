@@ -151,7 +151,7 @@ enum HarnessMonitorUITestAccessibility {
   static let settingsBackgroundRecentsSection = "harness.settings.background.recents-section"
   static let settingsBackgroundRecentState = "harness.settings.background.recents-state"
   static let settingsTextSizePicker = "harness.settings.text-size"
-  static let settingsSidebarSessionRowDisplayModePicker =
+  static let settingsSessionRowModePicker =
     "harness.settings.sidebar-session-row-mode"
   static let settingsTimeZoneModePicker = "harness.settings.time-zone-mode"
   static let settingsCustomTimeZonePicker = "harness.settings.custom-time-zone"
