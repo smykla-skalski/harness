@@ -6,7 +6,8 @@ struct SessionWindowInspector: View {
   let selectedDecision: Decision?
   @Binding var visible: Bool
   @FocusState private var closeButtonFocused: Bool
-  @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
+  @Environment(\.accessibilityVoiceOverEnabled)
+  private var voiceOverEnabled
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
@@ -43,7 +44,7 @@ struct SessionWindowInspector: View {
           .font(.title3)
           .foregroundStyle(.secondary)
       }
-      .buttonStyle(.plain)
+      .harnessPlainButtonStyle()
       .focused($closeButtonFocused)
       .keyboardShortcut(.cancelAction)
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowInspectorCloseButton)

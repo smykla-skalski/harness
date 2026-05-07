@@ -5,7 +5,8 @@ struct SessionSidebar: View {
   let snapshot: HarnessMonitorSessionWindowSnapshot?
   let decisions: [Decision]
   @Bindable var state: SessionWindowStateCache
-  @Environment(\.undoManager) private var undoManager
+  @Environment(\.undoManager)
+  private var undoManager
   @State private var agentDropTargetID: String?
   @State private var decisionDropTargetID: String?
 
@@ -127,8 +128,7 @@ struct SessionSidebar: View {
         Text("No tasks")
           .foregroundStyle(.secondary)
       }
-    }
-    header: {
+    } header: {
       taskSectionHeader
     }
   }

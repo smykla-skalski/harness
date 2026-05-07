@@ -201,11 +201,20 @@ public struct SessionWindowView: View {
   @ViewBuilder private var detailFocus: some View {
     switch stateCache.selection {
     case .agent(_, let agentID):
-      ContentUnavailableView(
-        "Agent \(agentID)",
-        systemImage: "person.crop.circle",
-        description: Text("Agent detail lands in a later chunk.")
-      )
+      if let agent = snapshot?.detail?.agents.first(where: { $0.agentId == agentID }) {
+        SessionAgentDetailSection(
+          store: store,
+          sessionID: token.sessionID,
+          agent: agent,
+          tui: agentTui(for: agent)
+        )
+      } else {
+        ContentUnavailableView(
+          "Agent \(agentID)",
+          systemImage: "person.crop.circle",
+          description: Text("Agent detail is not available.")
+        )
+      }
     case .decision:
       if let selectedDecision {
         DecisionDetailSummary(decision: selectedDecision)
@@ -303,6 +312,15 @@ public struct SessionWindowView: View {
       || decision.ruleID.localizedCaseInsensitiveContains(query)
       || (decision.agentID?.localizedCaseInsensitiveContains(query) ?? false)
       || (decision.taskID?.localizedCaseInsensitiveContains(query) ?? false)
+  }
+
+  private func agentTui(for agent: AgentRegistration) -> AgentTuiSnapshot? {
+    store.selectedAgentTuis.first { tui in
+      tui.sessionId == token.sessionID
+        && (tui.sessionAgentID == agent.agentId
+          || tui.managedAgentID == agent.managedAgentID
+          || tui.tuiId == agent.managedAgentID)
+    }
   }
 }
 

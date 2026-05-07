@@ -2,7 +2,8 @@ import HarnessMonitorUIPreviewable
 import SwiftUI
 
 struct InspectorCommands: Commands {
-  @FocusedValue(\.sessionInspector) private var sessionInspector
+  @FocusedValue(\.sessionInspector)
+  private var sessionInspector
 
   var body: some Commands {
     CommandGroup(after: .toolbar) {

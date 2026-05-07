@@ -94,8 +94,8 @@ public final class SessionWindowStateCache {
   }
 
   public func selectCreate(_ kind: SessionCreateKind) {
-    let draft = sectionState.createDrafts[kind]
-      ?? SessionCreateDraft(kind: kind, sessionID: sessionID)
+    let existing = sectionState.createDrafts[kind]
+    let draft = existing ?? SessionCreateDraft(kind: kind, sessionID: sessionID)
     updateSelection(.create(draft))
   }
 

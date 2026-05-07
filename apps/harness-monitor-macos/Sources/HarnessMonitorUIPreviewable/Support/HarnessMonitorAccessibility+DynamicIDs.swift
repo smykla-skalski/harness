@@ -81,6 +81,14 @@ extension HarnessMonitorAccessibility {
     "harness.session.agent.\(slug(agentID)).tui-marker"
   }
 
+  public static func sessionAgentTuiViewport(_ agentID: String) -> String {
+    "harness.session.agent.\(slug(agentID)).tui-viewport"
+  }
+
+  public static func sessionAgentComposer(_ agentID: String) -> String {
+    "harness.session.agent.\(slug(agentID)).composer"
+  }
+
   public static func sessionAgentSignalTrigger(_ agentID: String) -> String {
     "harness.session.agent.\(slug(agentID)).signal-trigger"
   }
