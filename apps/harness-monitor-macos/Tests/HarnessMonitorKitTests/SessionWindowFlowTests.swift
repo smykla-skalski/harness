@@ -105,6 +105,23 @@ struct SessionWindowFlowTests {
     )
   }
 
+  @Test("Open Recent closes after picking a session by default")
+  func openRecentCloseAfterPickDefaultsOnAndPersistsOff() throws {
+    let defaults = try isolatedDefaults()
+    defer { defaults.userDefaults.removePersistentDomain(forName: defaults.suiteName) }
+
+    #expect(OpenRecentCloseAfterPickDefaults.read(userDefaults: defaults.userDefaults))
+    defaults.userDefaults.set(
+      false,
+      forKey: OpenRecentCloseAfterPickDefaults.storageKey
+    )
+    #expect(!OpenRecentCloseAfterPickDefaults.read(userDefaults: defaults.userDefaults))
+    #expect(
+      OpenRecentCloseAfterPickDefaults.storageKey
+        == "harness.monitor.open-recent.close-after-pick"
+    )
+  }
+
   @Test("Sidebar density keeps strict default and maps legacy values")
   func sidebarDensityResolvesStrictDefaultAndLegacyValues() {
     #expect(HarnessMonitorSidebarSessionRowDisplayMode.defaultMode == .strict)
