@@ -152,4 +152,39 @@ extension SessionCacheService {
       metadataUpdate: .advance(insertedSessionCount: isInsert ? 1 : 0)
     )
   }
+
+  func replaceSessionWindowsOpenAtQuit(
+    sessionIDs: Set<String>
+  ) async -> WriteResult {
+    let context = makeContext()
+    let descriptor = FetchDescriptor<CachedSessionWindowState>()
+    let existing = (try? context.fetch(descriptor)) ?? []
+    let now = Date.now
+    var seen: Set<String> = []
+    for row in existing {
+      if sessionIDs.contains(row.sessionId) {
+        if !row.wasOpenAtQuit {
+          row.wasOpenAtQuit = true
+        }
+        row.updatedAt = now
+        seen.insert(row.sessionId)
+      } else {
+        context.delete(row)
+      }
+    }
+    for sessionID in sessionIDs where !seen.contains(sessionID) {
+      context.insert(
+        CachedSessionWindowState(
+          sessionId: sessionID,
+          wasOpenAtQuit: true,
+          updatedAt: now
+        )
+      )
+    }
+    let didPersist = await persist(
+      context,
+      operation: "replace session windows open at quit"
+    )
+    return WriteResult(didPersist: didPersist, metadataUpdate: .refresh)
+  }
 }
