@@ -16,7 +16,7 @@ use serde_json::{Value, json};
 use tempfile::tempdir;
 use tokio::runtime::Runtime;
 
-use super::helpers::ManagedChild;
+use super::helpers::{ManagedChild, test_session_uuid};
 
 mod bridge;
 mod daemon_api;
@@ -32,6 +32,10 @@ const DAEMON_WAIT_TIMEOUT: Duration = Duration::from_secs(15);
 const DAEMON_WAIT_INTERVAL: Duration = Duration::from_millis(250);
 const DAEMON_HTTP_TIMEOUT: Duration = Duration::from_secs(1);
 const COMMAND_WAIT_TIMEOUT: Duration = Duration::from_secs(10);
+
+fn session_uuid(label: &str) -> String {
+    test_session_uuid(label)
+}
 
 fn parse_terminal_agent_output(bytes: &[u8]) -> AgentTuiSnapshot {
     match serde_json::from_slice::<ManagedAgentSnapshot>(bytes).expect("parse managed agent output")

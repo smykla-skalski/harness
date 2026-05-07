@@ -321,9 +321,11 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
   @Test("Sidebar session rows stay MCP-selectable")
   func sidebarSessionRowsStayMCPSelectable() throws {
     let sidebarSections = try sourceFile(named: "SidebarView+Sections.swift")
+    let sidebarView = try sourceFile(named: "SidebarView.swift")
 
     #expect(sidebarSections.contains("HarnessMonitorAccessibility.sessionRow(session.sessionId)"))
-    #expect(sidebarSections.contains("store.selectSessionFromList(session.sessionId)"))
+    #expect(sidebarSections.contains("activateSessionRow(session.sessionId)"))
+    #expect(sidebarView.contains("store.selectSessionFromList(sessionID)"))
     #expect(sidebarSections.contains(".harnessMCPRow("))
   }
 

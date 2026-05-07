@@ -68,6 +68,8 @@ final class SessionTimelineTableCellView: NSTableCellView {
         fontScale: fontScale
       )
       sizingHost.frame = NSRect(x: 0, y: 0, width: columnWidth, height: 2_000)
+      sizingHost.invalidateIntrinsicContentSize()
+      sizingHost.needsLayout = true
       sizingHost.layoutSubtreeIfNeeded()
       let measured = ceil(sizingHost.fittingSize.height)
       guard measured > 4 else {

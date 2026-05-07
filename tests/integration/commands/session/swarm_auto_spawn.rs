@@ -5,18 +5,19 @@ use harness::session::service;
 use harness::session::types::SessionRole;
 
 use super::swarm_review_helpers::{join_reviewer, prepare_in_progress_task};
-use super::with_session_test_env;
+use super::{session_uuid, with_session_test_env};
 
 #[test]
 fn submit_for_review_with_no_reviewer_emits_spawn_reviewer_signal() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-auto-spawn", || {
         let project = tmp.path().join("project");
-        let (_leader_id, worker_id, task_id) = prepare_in_progress_task("auto-1", &project);
+        let session_id = session_uuid("auto-1");
+        let (_leader_id, worker_id, task_id) = prepare_in_progress_task(&session_id, &project);
 
-        service::submit_for_review("auto-1", &task_id, &worker_id, None, &project).unwrap();
+        service::submit_for_review(&session_id, &task_id, &worker_id, None, &project).unwrap();
 
-        let signals = service::list_signals("auto-1", None, &project).expect("list signals");
+        let signals = service::list_signals(&session_id, None, &project).expect("list signals");
         assert!(
             signals
                 .iter()
@@ -32,7 +33,7 @@ fn submit_for_review_with_no_reviewer_emits_spawn_reviewer_signal() {
             .find(|rec| rec.signal.command == "spawn_reviewer")
             .expect("spawn_reviewer record");
         // spawn_reviewer is addressed to the session leader.
-        let state = service::session_status("auto-1", &project).unwrap();
+        let state = service::session_status(&session_id, &project).unwrap();
         let leader_agent = state
             .agents
             .values()
@@ -47,12 +48,13 @@ fn submit_for_review_with_reviewer_does_not_emit_spawn_reviewer() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-auto-spawn-skip", || {
         let project = tmp.path().join("project");
-        let (_leader_id, worker_id, task_id) = prepare_in_progress_task("auto-2", &project);
-        let _reviewer = join_reviewer("auto-2", "gemini", "GEMINI_SESSION_ID", &project);
+        let session_id = session_uuid("auto-2");
+        let (_leader_id, worker_id, task_id) = prepare_in_progress_task(&session_id, &project);
+        let _reviewer = join_reviewer(&session_id, "gemini", "GEMINI_SESSION_ID", &project);
 
-        service::submit_for_review("auto-2", &task_id, &worker_id, None, &project).unwrap();
+        service::submit_for_review(&session_id, &task_id, &worker_id, None, &project).unwrap();
 
-        let signals = service::list_signals("auto-2", None, &project).expect("list signals");
+        let signals = service::list_signals(&session_id, None, &project).expect("list signals");
         assert!(
             !signals
                 .iter()

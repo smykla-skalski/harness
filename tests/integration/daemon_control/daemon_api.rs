@@ -238,17 +238,18 @@ pub(super) fn start_session_via_http(
     home: &Path,
     xdg: &Path,
     project_arg: &str,
-    session_id: &str,
+    session_label: &str,
     title: &str,
     context: &str,
 ) -> SessionState {
     let runtime = Runtime::new().expect("runtime");
     let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
+    let session_id = session_uuid(session_label);
     let request_body = json!({
         "title": title,
         "context": context,
         "runtime": "codex",
-        "session_id": session_id,
+        "session_id": session_id.as_str(),
         "project_dir": project_arg,
     });
 
@@ -277,14 +278,14 @@ pub(super) fn start_session_via_http(
                         .state;
                 }
                 if status == 409
-                    && let Some(state) = read_session_status(home, xdg, project_arg, session_id)
+                    && let Some(state) = read_session_status(home, xdg, project_arg, &session_id)
                 {
                     return state;
                 }
                 panic!("unexpected body: {body}");
             }
             Err(error) if daemon_request_error_is_retryable(&error) => {
-                if let Some(state) = read_session_status(home, xdg, project_arg, session_id) {
+                if let Some(state) = read_session_status(home, xdg, project_arg, &session_id) {
                     return state;
                 }
                 assert!(Instant::now() < deadline, "daemon post: {error:?}");

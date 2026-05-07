@@ -11,7 +11,7 @@ use clap::Parser;
 use harness::app::cli::Cli;
 use harness::session::service;
 
-use super::with_session_test_env;
+use super::{session_uuid, with_session_test_env};
 use crate::integration::helpers::run_command;
 
 fn run_cli(args: &[&str]) -> i32 {
@@ -78,12 +78,13 @@ fn improver_apply_via_cli_allows_improver_and_uses_session_project_dir() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-rev-cli-improver", || {
         let project = tmp.path().join("project");
+        let session_id = session_uuid("rev-cli-6");
         fs::create_dir_all(project.join("agents/skills/demo")).unwrap();
         fs::write(project.join("agents/skills/demo/SKILL.md"), "old\n").unwrap();
         let contents_file = tmp.path().join("new-contents.md");
         fs::write(&contents_file, "new\n").unwrap();
 
-        let (improver_id, _worker_id) = bootstrap_improver_session("rev-cli-6", &project);
+        let (improver_id, _worker_id) = bootstrap_improver_session(&session_id, &project);
 
         // Pass a bogus --project-dir to prove it cannot escape the session's
         // real project directory. The write must land in `project/`, not in
@@ -96,7 +97,7 @@ fn improver_apply_via_cli_allows_improver_and_uses_session_project_dir() {
             "session",
             "improver",
             "apply",
-            "rev-cli-6",
+            session_id.as_str(),
             "--actor",
             &improver_id,
             "--issue-id",
@@ -126,12 +127,13 @@ fn improver_apply_via_cli_denies_worker_actor() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-rev-cli-improver-deny-worker", || {
         let project = tmp.path().join("project");
+        let session_id = session_uuid("rev-cli-6-worker");
         fs::create_dir_all(project.join("agents/skills/demo")).unwrap();
         fs::write(project.join("agents/skills/demo/SKILL.md"), "old\n").unwrap();
         let contents_file = tmp.path().join("new-contents.md");
         fs::write(&contents_file, "new\n").unwrap();
 
-        let (_improver_id, worker_id) = bootstrap_improver_session("rev-cli-6-worker", &project);
+        let (_improver_id, worker_id) = bootstrap_improver_session(&session_id, &project);
 
         let project_str = project.to_string_lossy().to_string();
         let contents_str = contents_file.to_string_lossy().to_string();
@@ -140,7 +142,7 @@ fn improver_apply_via_cli_denies_worker_actor() {
             "session",
             "improver",
             "apply",
-            "rev-cli-6-worker",
+            session_id.as_str(),
             "--actor",
             &worker_id,
             "--issue-id",
@@ -174,6 +176,7 @@ fn improver_apply_via_cli_denies_observer_actor() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-rev-cli-improver-deny-observer", || {
         let project = tmp.path().join("project");
+        let session_id = session_uuid("rev-cli-6-observer");
         fs::create_dir_all(project.join("agents/skills/demo")).unwrap();
         fs::write(project.join("agents/skills/demo/SKILL.md"), "old\n").unwrap();
         let contents_file = tmp.path().join("new-contents.md");
@@ -183,12 +186,12 @@ fn improver_apply_via_cli_denies_observer_actor() {
             "",
             "observer attempt",
             &project,
-            Some("rev-cli-6-observer"),
+            Some(&session_id),
             None,
         )
         .unwrap();
         let _leader = service::join_session(
-            "rev-cli-6-observer",
+            &session_id,
             harness::session::types::SessionRole::Leader,
             "claude",
             &[],
@@ -200,7 +203,7 @@ fn improver_apply_via_cli_denies_observer_actor() {
         let observer_joined =
             temp_env::with_var("CODEX_SESSION_ID", Some("improver-cli-observer"), || {
                 service::join_session(
-                    "rev-cli-6-observer",
+                    &session_id,
                     harness::session::types::SessionRole::Observer,
                     "codex",
                     &[],
@@ -224,7 +227,7 @@ fn improver_apply_via_cli_denies_observer_actor() {
             "session",
             "improver",
             "apply",
-            "rev-cli-6-observer",
+            session_id.as_str(),
             "--actor",
             &observer_id,
             "--issue-id",
@@ -253,13 +256,14 @@ fn improver_apply_dry_run_as_improver_leaves_file_unchanged() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-rev-cli-improver-dry", || {
         let project = tmp.path().join("project");
+        let session_id = session_uuid("rev-cli-7");
         fs::create_dir_all(project.join("agents/skills/demo")).unwrap();
         let target = project.join("agents/skills/demo/SKILL.md");
         fs::write(&target, "pristine\n").unwrap();
         let contents_file = tmp.path().join("new.md");
         fs::write(&contents_file, "would-write\n").unwrap();
 
-        let (improver_id, _worker_id) = bootstrap_improver_session("rev-cli-7", &project);
+        let (improver_id, _worker_id) = bootstrap_improver_session(&session_id, &project);
 
         let project_str = project.to_string_lossy().to_string();
         let contents_str = contents_file.to_string_lossy().to_string();
@@ -268,7 +272,7 @@ fn improver_apply_dry_run_as_improver_leaves_file_unchanged() {
             "session",
             "improver",
             "apply",
-            "rev-cli-7",
+            session_id.as_str(),
             "--actor",
             &improver_id,
             "--issue-id",

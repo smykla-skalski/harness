@@ -139,7 +139,7 @@ fn daemon_only_session_status_and_end_work_after_list() {
         &[
             "session",
             "status",
-            "34320f82-1f15-597f-8885-b098eafe1e7a-session",
+            started.session_id.as_str(),
             "--json",
             "--project-dir",
             project_arg,
@@ -160,7 +160,7 @@ fn daemon_only_session_status_and_end_work_after_list() {
         &[
             "session",
             "end",
-            "34320f82-1f15-597f-8885-b098eafe1e7a-session",
+            started.session_id.as_str(),
             "--actor",
             "codex-leader",
             "--project-dir",

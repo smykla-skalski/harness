@@ -4,7 +4,7 @@ use harness::session::types::{
 };
 
 use super::swarm_review_helpers::setup_two_reviewers_on_claimed_task;
-use super::with_session_test_env;
+use super::{session_uuid, with_session_test_env};
 
 fn drive_to_request_changes_consensus(
     session_id: &str,
@@ -57,10 +57,11 @@ fn respond_review_all_agreed_returns_task_to_in_progress() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-respond-agree", || {
         let project = tmp.path().join("project");
-        let (worker_id, task_id) = drive_to_request_changes_consensus("resp-rev-1", &project);
+        let session_id = session_uuid("resp-rev-1");
+        let (worker_id, task_id) = drive_to_request_changes_consensus(&session_id, &project);
 
         service::respond_review(
-            "resp-rev-1",
+            &session_id,
             &task_id,
             &worker_id,
             &["p1".to_string(), "p2".to_string()],
@@ -70,7 +71,7 @@ fn respond_review_all_agreed_returns_task_to_in_progress() {
         )
         .expect("respond review");
 
-        let state = service::session_status("resp-rev-1", &project).unwrap();
+        let state = service::session_status(&session_id, &project).unwrap();
         let task = state.tasks.get(&task_id).unwrap();
         assert_eq!(task.status, TaskStatus::InProgress);
         assert_eq!(task.assigned_to.as_deref(), Some(worker_id.as_str()));
@@ -86,10 +87,11 @@ fn respond_review_with_disputed_points_bumps_round_and_reopens_review() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-respond-dispute", || {
         let project = tmp.path().join("project");
-        let (worker_id, task_id) = drive_to_request_changes_consensus("resp-rev-2", &project);
+        let session_id = session_uuid("resp-rev-2");
+        let (worker_id, task_id) = drive_to_request_changes_consensus(&session_id, &project);
 
         service::respond_review(
-            "resp-rev-2",
+            &session_id,
             &task_id,
             &worker_id,
             &["p1".to_string()],
@@ -99,7 +101,7 @@ fn respond_review_with_disputed_points_bumps_round_and_reopens_review() {
         )
         .expect("respond review");
 
-        let state = service::session_status("resp-rev-2", &project).unwrap();
+        let state = service::session_status(&session_id, &project).unwrap();
         let task = state.tasks.get(&task_id).unwrap();
         assert_eq!(task.status, TaskStatus::InReview);
         assert_eq!(task.review_round, 1);
@@ -117,11 +119,12 @@ fn respond_review_records_per_point_history_across_rounds() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-respond-history", || {
         let project = tmp.path().join("project");
-        let (worker_id, task_id) = drive_to_request_changes_consensus("resp-hist", &project);
+        let session_id = session_uuid("resp-hist");
+        let (worker_id, task_id) = drive_to_request_changes_consensus(&session_id, &project);
 
         // Round 1: agree p1, dispute p2.
         service::respond_review(
-            "resp-hist",
+            &session_id,
             &task_id,
             &worker_id,
             &["p1".to_string()],
@@ -131,7 +134,7 @@ fn respond_review_records_per_point_history_across_rounds() {
         )
         .unwrap();
 
-        let state = service::session_status("resp-hist", &project).unwrap();
+        let state = service::session_status(&session_id, &project).unwrap();
         let task = state.tasks.get(&task_id).unwrap();
         assert_eq!(
             task.review_history.len(),
@@ -161,10 +164,11 @@ fn respond_review_rejects_unknown_point_id() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-respond-unknown", || {
         let project = tmp.path().join("project");
-        let (worker_id, task_id) = drive_to_request_changes_consensus("resp-unk", &project);
+        let session_id = session_uuid("resp-unk");
+        let (worker_id, task_id) = drive_to_request_changes_consensus(&session_id, &project);
 
         let err = service::respond_review(
-            "resp-unk",
+            &session_id,
             &task_id,
             &worker_id,
             &["p1".to_string()],
@@ -185,10 +189,11 @@ fn respond_review_rejects_duplicate_point_across_lists() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-respond-dup", || {
         let project = tmp.path().join("project");
-        let (worker_id, task_id) = drive_to_request_changes_consensus("resp-dup", &project);
+        let session_id = session_uuid("resp-dup");
+        let (worker_id, task_id) = drive_to_request_changes_consensus(&session_id, &project);
 
         let err = service::respond_review(
-            "resp-dup",
+            &session_id,
             &task_id,
             &worker_id,
             &["p1".to_string()],
@@ -209,11 +214,12 @@ fn respond_review_rejects_partial_coverage() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-respond-partial", || {
         let project = tmp.path().join("project");
-        let (worker_id, task_id) = drive_to_request_changes_consensus("resp-part", &project);
+        let session_id = session_uuid("resp-part");
+        let (worker_id, task_id) = drive_to_request_changes_consensus(&session_id, &project);
 
         // Consensus has p1 and p2 — worker must address both.
         let err = service::respond_review(
-            "resp-part",
+            &session_id,
             &task_id,
             &worker_id,
             &["p1".to_string()],
@@ -234,10 +240,11 @@ fn respond_review_rejects_duplicate_within_single_list() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-respond-dup-agreed", || {
         let project = tmp.path().join("project");
-        let (worker_id, task_id) = drive_to_request_changes_consensus("resp-dup-ag", &project);
+        let session_id = session_uuid("resp-dup-ag");
+        let (worker_id, task_id) = drive_to_request_changes_consensus(&session_id, &project);
 
         let err = service::respond_review(
-            "resp-dup-ag",
+            &session_id,
             &task_id,
             &worker_id,
             &["p1".to_string(), "p1".to_string(), "p2".to_string()],
@@ -258,13 +265,14 @@ fn respond_review_rejects_non_submitter() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-respond-other", || {
         let project = tmp.path().join("project");
-        let (_worker, task_id) = drive_to_request_changes_consensus("resp-rev-3", &project);
+        let session_id = session_uuid("resp-rev-3");
+        let (_worker, task_id) = drive_to_request_changes_consensus(&session_id, &project);
         // Leader agent id: derive from session state.
-        let state = service::session_status("resp-rev-3", &project).unwrap();
+        let state = service::session_status(&session_id, &project).unwrap();
         let leader_id = state.leader_id.as_ref().unwrap().clone();
 
         let result = service::respond_review(
-            "resp-rev-3",
+            &session_id,
             &task_id,
             &leader_id,
             &["p1".to_string()],

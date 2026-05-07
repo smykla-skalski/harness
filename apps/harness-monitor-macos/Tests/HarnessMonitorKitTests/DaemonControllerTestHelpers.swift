@@ -117,13 +117,26 @@ func withSignalIgnoringSleepProcessPID(
   process.executableURL = URL(fileURLWithPath: "/bin/sh")
   process.arguments = ["-c", "trap '' TERM; sleep \(durationSeconds)"]
   try process.run()
-  defer {
-    if process.isRunning {
-      kill(process.processIdentifier, SIGKILL)
-      process.waitUntilExit()
-    }
-  }
+  defer { forceKillProcess(process) }
   try await perform(UInt32(process.processIdentifier))
+}
+
+private func forceKillProcess(_ process: Process, timeout: TimeInterval = 5) {
+  guard process.isRunning else {
+    return
+  }
+
+  kill(process.processIdentifier, SIGKILL)
+  let deadline = Date().addingTimeInterval(timeout)
+  while process.isRunning && Date() < deadline {
+    Thread.sleep(forTimeInterval: 0.01)
+  }
+
+  if process.isRunning {
+    Issue.record(
+      "Signal-ignoring helper pid \(process.processIdentifier) did not exit after SIGKILL"
+    )
+  }
 }
 
 struct DaemonBinaryStampFixture: Codable, Equatable {

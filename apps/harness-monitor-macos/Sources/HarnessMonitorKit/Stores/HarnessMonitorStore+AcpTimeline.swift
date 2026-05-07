@@ -1,6 +1,11 @@
 import Foundation
 
 extension HarnessMonitorStore {
+  private struct TimelineEntrySortKey {
+    let entry: TimelineEntry
+    let toolCallSequence: UInt64?
+  }
+
   static func acpInspectSampledAt(from recordedAt: String?) -> Date {
     parsedAcpInspectRecordedAt(recordedAt) ?? Date()
   }
@@ -89,30 +94,36 @@ extension HarnessMonitorStore {
 
     return Dictionary(grouping: normalizedCurrent + normalizedIncoming, by: \.entryId)
       .compactMap { _, entries in entries.last }
+      .map(Self.timelineEntrySortKey(for:))
       .sorted(by: Self.timelineEntrySortOrder)
+      .map(\.entry)
   }
 
-  static func timelineEntrySortOrder(
-    lhs: TimelineEntry,
-    rhs: TimelineEntry
+  private static func timelineEntrySortOrder(
+    lhs: TimelineEntrySortKey,
+    rhs: TimelineEntrySortKey
   ) -> Bool {
-    if lhs.recordedAt != rhs.recordedAt {
-      return lhs.recordedAt > rhs.recordedAt
+    if lhs.entry.recordedAt != rhs.entry.recordedAt {
+      return lhs.entry.recordedAt > rhs.entry.recordedAt
     }
-    if let lhsSequence = lhs.toolCallTimelineEntryMetadata()?.sequence,
-      let rhsSequence = rhs.toolCallTimelineEntryMetadata()?.sequence,
+    if let lhsSequence = lhs.toolCallSequence,
+      let rhsSequence = rhs.toolCallSequence,
       lhsSequence != rhsSequence
     {
       return lhsSequence > rhsSequence
     }
-    return lhs.entryId < rhs.entryId
+    return lhs.entry.entryId < rhs.entry.entryId
   }
 
   static func preferredTimelineEntry(
     _ lhs: TimelineEntry,
     over rhs: TimelineEntry
   ) -> TimelineEntry {
-    timelineEntrySortOrder(lhs: lhs, rhs: rhs) ? lhs : rhs
+    timelineEntrySortOrder(
+      lhs: timelineEntrySortKey(for: lhs),
+      rhs: timelineEntrySortKey(for: rhs)
+    )
+      ? lhs : rhs
   }
 
   static func parsedAcpInspectRecordedAt(_ recordedAt: String?) -> Date? {
@@ -289,6 +300,13 @@ extension HarnessMonitorStore {
       return
     }
     selectedAcpTranscriptLiveEntries = updatedTimeline
+  }
+
+  private static func timelineEntrySortKey(for entry: TimelineEntry) -> TimelineEntrySortKey {
+    TimelineEntrySortKey(
+      entry: entry,
+      toolCallSequence: entry.toolCallTimelineEntryMetadata()?.sequence
+    )
   }
 }
 

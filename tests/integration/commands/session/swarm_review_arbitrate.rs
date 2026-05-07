@@ -2,7 +2,7 @@ use harness::session::service;
 use harness::session::types::{AgentStatus, ReviewVerdict, TaskStatus};
 
 use super::swarm_review_helpers::{prepare_in_progress_task, setup_two_reviewers_on_claimed_task};
-use super::with_session_test_env;
+use super::{session_uuid, with_session_test_env};
 
 fn drive_to_round_three_dispute(
     session_id: &str,
@@ -61,10 +61,11 @@ fn arbitrate_leader_approves_and_closes_task_as_done() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-arb-approve", || {
         let project = tmp.path().join("project");
-        let (leader_id, _worker, task_id) = drive_to_round_three_dispute("arb-1", &project);
+        let session_id = session_uuid("arb-1");
+        let (leader_id, _worker, task_id) = drive_to_round_three_dispute(&session_id, &project);
 
         service::arbitrate(
-            "arb-1",
+            &session_id,
             &task_id,
             &leader_id,
             ReviewVerdict::Approve,
@@ -73,7 +74,7 @@ fn arbitrate_leader_approves_and_closes_task_as_done() {
         )
         .expect("arbitrate approve");
 
-        let state = service::session_status("arb-1", &project).unwrap();
+        let state = service::session_status(&session_id, &project).unwrap();
         let task = state.tasks.get(&task_id).unwrap();
         assert_eq!(task.status, TaskStatus::Done);
         let outcome = task.arbitration.as_ref().expect("arbitration recorded");
@@ -88,10 +89,11 @@ fn arbitrate_rejects_non_leader() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-arb-nonleader", || {
         let project = tmp.path().join("project");
-        let (_leader, worker_id, task_id) = drive_to_round_three_dispute("arb-2", &project);
+        let session_id = session_uuid("arb-2");
+        let (_leader, worker_id, task_id) = drive_to_round_three_dispute(&session_id, &project);
 
         let result = service::arbitrate(
-            "arb-2",
+            &session_id,
             &task_id,
             &worker_id,
             ReviewVerdict::Approve,
@@ -107,9 +109,10 @@ fn third_round_dispute_transitions_task_to_blocked_awaiting_arbitration() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-arb-blocked", || {
         let project = tmp.path().join("project");
-        let (_leader, _worker, task_id) = drive_to_round_three_dispute("arb-blocked", &project);
+        let session_id = session_uuid("arb-blocked");
+        let (_leader, _worker, task_id) = drive_to_round_three_dispute(&session_id, &project);
 
-        let state = service::session_status("arb-blocked", &project).unwrap();
+        let state = service::session_status(&session_id, &project).unwrap();
         let task = state.tasks.get(&task_id).unwrap();
         assert_eq!(
             task.status,
@@ -130,10 +133,11 @@ fn arbitrate_rework_returns_task_to_in_progress_with_worker_reassigned() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-arb-rework", || {
         let project = tmp.path().join("project");
-        let (leader_id, worker_id, task_id) = drive_to_round_three_dispute("arb-rw", &project);
+        let session_id = session_uuid("arb-rw");
+        let (leader_id, worker_id, task_id) = drive_to_round_three_dispute(&session_id, &project);
 
         service::arbitrate(
-            "arb-rw",
+            &session_id,
             &task_id,
             &leader_id,
             ReviewVerdict::RequestChanges,
@@ -142,7 +146,7 @@ fn arbitrate_rework_returns_task_to_in_progress_with_worker_reassigned() {
         )
         .expect("arbitrate rework");
 
-        let state = service::session_status("arb-rw", &project).unwrap();
+        let state = service::session_status(&session_id, &project).unwrap();
         let task = state.tasks.get(&task_id).unwrap();
         assert_eq!(task.status, TaskStatus::InProgress);
         assert_eq!(task.assigned_to.as_deref(), Some(worker_id.as_str()));
@@ -168,10 +172,11 @@ fn arbitrate_rejects_task_not_awaiting_arbitration() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-arb-notblocked", || {
         let project = tmp.path().join("project");
+        let session_id = session_uuid("arb-nb");
         // InReview task at round 0 never reached arbitration state.
         let (_worker, task_id, _gemini, _claude) =
-            super::swarm_review_helpers::setup_two_reviewers_on_claimed_task("arb-nb", &project);
-        let leader_id = service::session_status("arb-nb", &project)
+            super::swarm_review_helpers::setup_two_reviewers_on_claimed_task(&session_id, &project);
+        let leader_id = service::session_status(&session_id, &project)
             .unwrap()
             .leader_id
             .unwrap();
@@ -180,7 +185,7 @@ fn arbitrate_rejects_task_not_awaiting_arbitration() {
         // disputes; here verify that the task (which has round=0, status=InReview)
         // cannot be arbitrated.
         let err = service::arbitrate(
-            "arb-nb",
+            &session_id,
             &task_id,
             &leader_id,
             ReviewVerdict::Approve,
@@ -204,12 +209,13 @@ fn arbitrate_requires_three_completed_rounds() {
     let tmp = tempfile::tempdir().unwrap();
     with_session_test_env(tmp.path(), "integ-arb-early", || {
         let project = tmp.path().join("project");
-        let (_leader, _worker, task_id) = prepare_in_progress_task("arb-3", &project);
-        let state = service::session_status("arb-3", &project).unwrap();
+        let session_id = session_uuid("arb-3");
+        let (_leader, _worker, task_id) = prepare_in_progress_task(&session_id, &project);
+        let state = service::session_status(&session_id, &project).unwrap();
         let leader_id = state.leader_id.unwrap();
 
         let result = service::arbitrate(
-            "arb-3",
+            &session_id,
             &task_id,
             &leader_id,
             ReviewVerdict::Approve,

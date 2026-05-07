@@ -19,10 +19,21 @@ use harness::setup::{
     CapabilitiesArgs, ClusterArgs, GatewayArgs, KumaSetupArgs, KumaSetupCommand, PreCompactArgs,
     SessionStartArgs, SessionStopArgs,
 };
+use sha2::{Digest, Sha256};
 
 // Re-export everything from the testkit so integration tests can use
 // `helpers::write_suite`, `helpers::make_bash_payload`, etc. unchanged.
 pub use harness_testkit::*;
+
+/// Deterministically derive a valid UUID from a readable test label.
+pub fn test_session_uuid(label: &str) -> String {
+    let digest = Sha256::digest(label.as_bytes());
+    let mut bytes = [0_u8; 16];
+    bytes.copy_from_slice(&digest[..16]);
+    bytes[6] = (bytes[6] & 0x0F) | 0x50;
+    bytes[8] = (bytes[8] & 0x3F) | 0x80;
+    uuid::Uuid::from_bytes(bytes).to_string()
+}
 
 /// Global lock for tests that modify the process environment via `with_env_vars`.
 ///

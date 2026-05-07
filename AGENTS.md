@@ -131,7 +131,7 @@ a dated feature flag in `src/feature_flags.rs` with a tracking issue.
 - Clippy pedantic is `deny`; new Rust must pass it.
 - Errors use `CliErrorKind` variants with typed fields via `thiserror`.
 - Hook messages use `HookMessage` with `into_result()`.
-- Diagnostic output uses `tracing` macros. Do not add `eprintln!` diagnostics.
+- Diagnostic output uses `tracing` macros. Default filter: `RUST_LOG=harness=info`. Do not add `eprintln!` diagnostics.
 - Commit messages: `{type}({scope}): {message}` with `feat`, `fix`,
   `refactor`, `chore`, `docs`, `test`, or `perf`.
 - Never create merge commits. Keep history flat with rebase or cherry-pick.
@@ -160,10 +160,10 @@ Every finished task must be integrated through `main` with clean, flat history.
 Update from `main`, replay the task changes, resolve conflicts deliberately, and
 rerun the smallest relevant validation.
 
-Every change must evaluate semver. Do not bump versions without explicit user
-approval. Docs-only changes normally require no version bump. If shipped
-`harness` or `aff` behavior changes enough that the local binary must be
-reinstalled, a version bump is required after approval.
+Every change must evaluate semver. Do not bump versions without explicit user approval.
+Docs-only changes normally require no version bump. If shipped `harness` or `aff`
+behavior changes enough that the local binary must be reinstalled, a version bump
+is required after approval.
 
 Use `rtk mise run version:set -- <version>` for approved bumps, or
 `rtk mise run version:sync` after any direct canonical-version edit. See
