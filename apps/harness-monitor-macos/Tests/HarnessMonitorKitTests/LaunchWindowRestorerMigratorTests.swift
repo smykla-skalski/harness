@@ -46,9 +46,9 @@ struct LaunchWindowRestorerMigratorTests {
   }
 
   @Test("Begin termination snapshot freezes the live registry for later flush")
-  func beginTerminationSnapshotFreezesRegistry() async {
+  func beginTerminationSnapshotFreezesRegistry() async throws {
     let store = makeStore(cacheService: cacheService)
-    let defaults = try! isolatedDefaults()
+    let defaults = try isolatedDefaults()
     defer { defaults.userDefaults.removePersistentDomain(forName: defaults.suiteName) }
 
     store.registerOpenSessionWindow(sessionID: "sess-a")
@@ -64,9 +64,9 @@ struct LaunchWindowRestorerMigratorTests {
   }
 
   @Test("Flush without a snapshot uses the current registry contents")
-  func flushWithoutSnapshotUsesCurrentRegistry() async {
+  func flushWithoutSnapshotUsesCurrentRegistry() async throws {
     let store = makeStore(cacheService: cacheService)
-    let defaults = try! isolatedDefaults()
+    let defaults = try isolatedDefaults()
     defer { defaults.userDefaults.removePersistentDomain(forName: defaults.suiteName) }
 
     store.registerOpenSessionWindow(sessionID: "sess-a")
@@ -78,9 +78,9 @@ struct LaunchWindowRestorerMigratorTests {
   }
 
   @Test("Bridge fallback runs once when wasOpenAtQuit is empty")
-  func bridgeFallbackRunsOnceWhenWasOpenAtQuitIsEmpty() async {
+  func bridgeFallbackRunsOnceWhenWasOpenAtQuitIsEmpty() async throws {
     let store = makeStore(cacheService: cacheService)
-    let defaults = try! isolatedDefaults()
+    let defaults = try isolatedDefaults()
     defer { defaults.userDefaults.removePersistentDomain(forName: defaults.suiteName) }
 
     let firstResult = await store.recentSessionIDsForLaunchWindows(
@@ -98,11 +98,11 @@ struct LaunchWindowRestorerMigratorTests {
   }
 
   @Test("Existing wasOpenAtQuit rows suppress the bridge fallback even if catalog filters them out")
-  func priorWasOpenAtQuitRowsSuppressBridgeFallback() async {
+  func priorWasOpenAtQuitRowsSuppressBridgeFallback() async throws {
     _ = await cacheService.replaceSessionWindowsOpenAtQuit(sessionIDs: ["sess-a"])
     let store = makeStore(cacheService: cacheService)
 
-    let defaults = try! isolatedDefaults()
+    let defaults = try isolatedDefaults()
     defer { defaults.userDefaults.removePersistentDomain(forName: defaults.suiteName) }
 
     let result = await store.recentSessionIDsForLaunchWindows(
