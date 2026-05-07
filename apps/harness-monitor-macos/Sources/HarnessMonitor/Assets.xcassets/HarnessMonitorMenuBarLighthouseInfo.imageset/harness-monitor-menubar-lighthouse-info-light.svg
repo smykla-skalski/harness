@@ -13,5 +13,5 @@
     <polyline points="4.5,0.5 6,2 7.5,0.5"/>
     <polyline points="1.5,4 3,5.5 4.5,4"/>
   </g>
-  <circle cx="21.5" cy="2.5" r="3" fill="#8E8E93"/>
+  <circle cx="21" cy="3" r="6" fill="#8E8E93"/>
 </svg>
