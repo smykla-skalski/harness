@@ -4,32 +4,42 @@ extension HarnessMonitorStore {
   public static let launchWindowBridgeFallbackKey =
     "harness.monitor.launch-window.bridge-fallback-done"
 
-  public func recentSessionIDsForLaunchWindows(limit: Int) async -> [String] {
-    await recentSessionIDsForLaunchWindows(
-      limit: limit,
-      userDefaults: .standard
-    )
+  public struct LaunchWindowRestorePlan: Equatable, Sendable {
+    public let sessionIDs: [String]
+    public let usedBridgeFallback: Bool
+
+    public init(
+      sessionIDs: [String] = [],
+      usedBridgeFallback: Bool = false
+    ) {
+      self.sessionIDs = sessionIDs
+      self.usedBridgeFallback = usedBridgeFallback
+    }
   }
 
-  func recentSessionIDsForLaunchWindows(
-    limit: Int,
-    userDefaults: UserDefaults
-  ) async -> [String] {
-    let normalizedLimit = max(limit, 0)
-    guard normalizedLimit > 0 else { return [] }
-
-    let openAtQuit = await sessionWindowIDsOpenAtQuit(limit: normalizedLimit)
+  public func launchWindowRestorePlan(
+    userDefaults: UserDefaults = .standard
+  ) async -> LaunchWindowRestorePlan {
+    let openAtQuit = await sessionWindowIDsOpenAtQuit()
     if !openAtQuit.isEmpty {
-      return openAtQuit
+      return LaunchWindowRestorePlan(sessionIDs: openAtQuit)
     }
     let hasPriorWindowState = await rawSessionWindowsOpenAtQuitExist()
     if hasPriorWindowState || hasCompletedLaunchWindowBridgeFallback(userDefaults: userDefaults) {
-      return []
+      return LaunchWindowRestorePlan()
     }
+    var bridgedIDs = await recentlyViewedSessionIDs()
+    appendFallbackRecentSessionIDs(to: &bridgedIDs)
+    return LaunchWindowRestorePlan(
+      sessionIDs: bridgedIDs,
+      usedBridgeFallback: true
+    )
+  }
+
+  public func completeLaunchWindowBridgeFallback(
+    userDefaults: UserDefaults = .standard
+  ) {
     markLaunchWindowBridgeFallbackComplete(userDefaults: userDefaults)
-    var bridgedIDs = await recentlyViewedSessionIDs(limit: normalizedLimit)
-    appendFallbackRecentSessionIDs(to: &bridgedIDs, limit: normalizedLimit)
-    return Array(bridgedIDs.prefix(normalizedLimit))
   }
 
   private func rawSessionWindowsOpenAtQuitExist() async -> Bool {
@@ -37,20 +47,23 @@ extension HarnessMonitorStore {
     return await !cacheService.sessionWindowIDsOpenAtQuit(limit: 1).isEmpty
   }
 
-  public func registerOpenSessionWindow(sessionID: String) {
-    openSessionWindowIDs.insert(sessionID)
+  public func registerOpenSessionWindow(
+    windowID: ObjectIdentifier,
+    sessionID: String
+  ) {
+    openSessionWindowsByID[windowID] = sessionID
   }
 
-  public func unregisterOpenSessionWindow(sessionID: String) {
-    openSessionWindowIDs.remove(sessionID)
+  public func unregisterOpenSessionWindow(windowID: ObjectIdentifier) {
+    openSessionWindowsByID.removeValue(forKey: windowID)
   }
 
   public var openSessionWindowIDsSnapshot: Set<String> {
-    openSessionWindowIDs
+    Set(openSessionWindowsByID.values)
   }
 
   public func beginSessionWindowTerminationSnapshot() {
-    pendingSessionWindowTerminationSnapshot = openSessionWindowIDs
+    pendingSessionWindowTerminationSnapshot = openSessionWindowIDsSnapshot
   }
 
   public func flushSessionWindowsOpenAtQuit() async {
@@ -58,30 +71,30 @@ extension HarnessMonitorStore {
   }
 
   func flushSessionWindowsOpenAtQuit(userDefaults: UserDefaults) async {
-    let snapshot = pendingSessionWindowTerminationSnapshot ?? openSessionWindowIDs
+    let snapshot = pendingSessionWindowTerminationSnapshot ?? openSessionWindowIDsSnapshot
     pendingSessionWindowTerminationSnapshot = nil
     guard let cacheService, persistenceError == nil else { return }
     _ = await cacheService.replaceSessionWindowsOpenAtQuit(sessionIDs: snapshot)
     markLaunchWindowBridgeFallbackComplete(userDefaults: userDefaults)
   }
 
-  private func sessionWindowIDsOpenAtQuit(limit: Int) async -> [String] {
+  private func sessionWindowIDsOpenAtQuit() async -> [String] {
     guard let cacheService else { return [] }
     let knownSessionIDs = Set(sessionIndex.catalog.sessions.map(\.sessionId))
-    return await cacheService.sessionWindowIDsOpenAtQuit(limit: limit)
+    return await cacheService.sessionWindowIDsOpenAtQuit()
       .filter { knownSessionIDs.contains($0) }
   }
 
-  private func recentlyViewedSessionIDs(limit: Int) async -> [String] {
+  private func recentlyViewedSessionIDs() async -> [String] {
     guard let cacheService else { return [] }
     let knownSessionIDs = Set(sessionIndex.catalog.sessions.map(\.sessionId))
-    return await cacheService.recentlyViewedSessionIDs(limit: limit)
+    return await cacheService.recentlyViewedSessionIDs()
       .filter { knownSessionIDs.contains($0) }
   }
 
-  private func appendFallbackRecentSessionIDs(to sessionIDs: inout [String], limit: Int) {
+  private func appendFallbackRecentSessionIDs(to sessionIDs: inout [String]) {
     var seen = Set(sessionIDs)
-    for summary in sessionIndex.catalog.recentSessions where sessionIDs.count < limit {
+    for summary in sessionIndex.catalog.recentSessions {
       guard seen.insert(summary.sessionId).inserted else {
         continue
       }

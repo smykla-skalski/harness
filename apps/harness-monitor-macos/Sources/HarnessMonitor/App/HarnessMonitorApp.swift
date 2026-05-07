@@ -32,6 +32,7 @@ struct HarnessMonitorApp: App {
   @State private var mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   @State private var settingsSelectedSection: SettingsSection
   @State private var hasInstalledMainWindowLauncher = false
+  @State private var hasScheduledInitialWindowRouting = false
   @AppStorage(HarnessMonitorThemeDefaults.modeKey)
   private var themeMode: HarnessMonitorThemeMode = .auto
   @AppStorage(HarnessMonitorTextSize.storageKey)
@@ -176,12 +177,6 @@ struct HarnessMonitorApp: App {
       mainWindowContent
         .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
         .modifier(SessionWindowTabbing(isSessionWindow: false))
-        .modifier(
-          LaunchWindowRestorerMigrator(
-            store: store,
-            isEnabled: allowsWindowRestoration && launchBehavior == .restoreSessionWindows
-          )
-        )
     } else {
       Color.clear.accessibilityHidden(true)
     }
@@ -198,40 +193,46 @@ struct HarnessMonitorApp: App {
     .windowToolbarStyle(.unified)
     .defaultSize(width: mainWindowDefaultSize.width, height: mainWindowDefaultSize.height)
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
-    .defaultLaunchBehavior(.suppressed)
-    .onChange(of: scenePhase, initial: true) {
+    .defaultLaunchBehavior(shouldHandleInitialWindowRouting ? .suppressed : .automatic)
+    .onChange(of: scenePhase, initial: true) { _, newPhase in
       installMainWindowLauncherIfNeeded()
+      scheduleInitialWindowRoutingIfNeeded(for: newPhase)
     }
     .commands {
-      HarnessMonitorAppCommands(
-        store: store,
-        displayState: store.commandsDisplayState,
-        textSizeIndex: textSizeIndex,
-        increaseTextSize: increaseTextSize,
-        decreaseTextSize: decreaseTextSize,
-        resetTextSize: resetTextSize,
-        refreshStore: refreshStore
-      )
-      NewSessionCommand(store: store)
-      SessionCreateCommands()
-      OpenFolderCommand(store: store)
-      AttachExternalSessionCommand(store: store)
-      GoCommands(
-        store: store,
-        workspaceNavigationBridge: workspaceNavigationBridge,
-        windowCommandRouting: windowCommandRouting,
-        displayState: store.commandsDisplayState
-      )
-      SessionCommands(
-        store: store,
-        displayState: store.commandsDisplayState
-      )
-      WindowMenuCommands(
-        store: store
-      )
-      InspectorCommands()
-      DecisionCommands()
+      mainWindowCommands
     }
+  }
+
+  @CommandsBuilder
+  private var mainWindowCommands: some Commands {
+    HarnessMonitorAppCommands(
+      store: store,
+      displayState: store.commandsDisplayState,
+      textSizeIndex: textSizeIndex,
+      increaseTextSize: increaseTextSize,
+      decreaseTextSize: decreaseTextSize,
+      resetTextSize: resetTextSize,
+      refreshStore: refreshStore
+    )
+    NewSessionCommand(store: store)
+    SessionCreateCommands()
+    OpenFolderCommand(store: store)
+    AttachExternalSessionCommand(store: store)
+    GoCommands(
+      store: store,
+      workspaceNavigationBridge: workspaceNavigationBridge,
+      windowCommandRouting: windowCommandRouting,
+      displayState: store.commandsDisplayState
+    )
+    SessionCommands(
+      store: store,
+      displayState: store.commandsDisplayState
+    )
+    WindowMenuCommands(
+      store: store
+    )
+    InspectorCommands()
+    DecisionCommands()
   }
 
   private func installMainWindowLauncherIfNeeded() {
@@ -241,6 +242,85 @@ struct HarnessMonitorApp: App {
     hasInstalledMainWindowLauncher = true
     HarnessMonitorMainWindowLauncher.shared.installOpenMainWindow {
       openWindow(id: HarnessMonitorWindowID.main)
+    }
+  }
+
+  private var shouldHandleInitialWindowRouting: Bool {
+    launchMode == .live && !isTestRun
+  }
+
+  private func scheduleInitialWindowRoutingIfNeeded(for phase: ScenePhase) {
+    guard shouldHandleInitialWindowRouting else {
+      return
+    }
+    guard phase == .active, !hasScheduledInitialWindowRouting else {
+      return
+    }
+    hasScheduledInitialWindowRouting = true
+    Task { @MainActor in
+      await routeInitialWindows()
+    }
+  }
+
+  @MainActor
+  private func routeInitialWindows() async {
+    let restoredWindowVisible = await waitForVisibleHarnessWindowDuringLaunch()
+    if restoredWindowVisible {
+      return
+    }
+
+    var restorePlan = HarnessMonitorStore.LaunchWindowRestorePlan()
+    if launchBehavior == .restoreSessionWindows {
+      await store.prepareOpenRecentSessions()
+      if hasVisibleHarnessWindow() {
+        return
+      }
+      restorePlan = await store.launchWindowRestorePlan()
+    }
+
+    let initialPlan = HarnessMonitorInitialWindowPlan.resolve(
+      launchBehavior: launchBehavior,
+      hasVisibleWindows: hasVisibleHarnessWindow(),
+      restorePlan: restorePlan
+    )
+
+    switch initialPlan.destination {
+    case .none:
+      break
+    case .welcome:
+      openWindow(id: HarnessMonitorWindowID.main)
+    case .sessions(let sessionIDs):
+      for sessionID in sessionIDs {
+        openWindow(
+          id: HarnessMonitorWindowID.main,
+          value: SessionWindowToken(sessionID: sessionID)
+        )
+      }
+    }
+
+    if initialPlan.shouldMarkBridgeFallbackComplete {
+      store.completeLaunchWindowBridgeFallback()
+    }
+  }
+
+  @MainActor
+  private func waitForVisibleHarnessWindowDuringLaunch() async -> Bool {
+    guard !hasVisibleHarnessWindow() else {
+      return true
+    }
+    for _ in 0..<6 {
+      try? await Task.sleep(for: .milliseconds(50))
+      guard !hasVisibleHarnessWindow() else {
+        return true
+      }
+    }
+    return hasVisibleHarnessWindow()
+  }
+
+  @MainActor
+  private func hasVisibleHarnessWindow() -> Bool {
+    NSApplication.shared.windows.contains { window in
+      window.isVisible && !window.isMiniaturized
     }
   }
 
@@ -280,7 +360,10 @@ struct HarnessMonitorApp: App {
       ),
       isInserted: .constant(rendersMenuBarExtraContent)
     ) {
-      HarnessMonitorMenuBarExtraContent(store: store)
+      HarnessMonitorMenuBarExtraContent(
+        store: store,
+        activeSessionWindowCount: sessionWindowPresenceTracker.activeSessionWindowCount
+      )
     }
     .menuBarExtraStyle(.menu)
   }

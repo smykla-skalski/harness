@@ -5,6 +5,7 @@ import Observation
 @Observable
 final class SessionWindowPresenceTracker {
   private(set) var activeSessionWindowCount = 0
+  @ObservationIgnored private var activeSessionWindowIDs: Set<ObjectIdentifier> = []
   private let store: HarnessMonitorStore
   private weak var notificationController: HarnessMonitorUserNotificationController?
   private let dockBadgeController: PendingDecisionsDockBadgeController
@@ -22,15 +23,20 @@ final class SessionWindowPresenceTracker {
     self.menuBarStatusController = menuBarStatusController
   }
 
-  func sessionWindowAppeared() {
-    activeSessionWindowCount += 1
+  func sessionWindowAppeared(windowID: ObjectIdentifier) {
+    guard activeSessionWindowIDs.insert(windowID).inserted else {
+      return
+    }
+    activeSessionWindowCount = activeSessionWindowIDs.count
     guard activeSessionWindowCount == 1 else { return }
     bindSessionWindowUI()
   }
 
-  func sessionWindowDisappeared() {
-    guard activeSessionWindowCount > 0 else { return }
-    activeSessionWindowCount -= 1
+  func sessionWindowDisappeared(windowID: ObjectIdentifier) {
+    guard activeSessionWindowIDs.remove(windowID) != nil else {
+      return
+    }
+    activeSessionWindowCount = activeSessionWindowIDs.count
     guard activeSessionWindowCount == 0 else { return }
     unbindSessionWindowUI()
   }

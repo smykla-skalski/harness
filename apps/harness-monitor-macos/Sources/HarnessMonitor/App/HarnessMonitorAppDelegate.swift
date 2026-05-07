@@ -52,22 +52,12 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   }
 
   func applicationDidFinishLaunching(_ notification: Notification) {
+    _ = notification
     // MCP startup spins up background HTTP/IPC tasks that bind sandboxed
     // services - those abort under the preview shell and the user-facing
     // symptom is "Harness Monitor crashed" in the canvas.
     if runsLiveSideEffects {
       mcpStartupController.start()
-    }
-    guard runsLiveSideEffects, !hidesDockIconForPerfRuns else {
-      return
-    }
-    Task { @MainActor in
-      try? await Task.sleep(for: .milliseconds(300))
-      let launchBehavior = HarnessMonitorLaunchBehavior.read()
-      guard launchBehavior == .alwaysOpenRecent || !hasVisibleMainWindow() else {
-        return
-      }
-      HarnessMonitorMainWindowLauncher.shared.requestOpenMainWindow()
     }
   }
 
@@ -81,17 +71,6 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
     }
     HarnessMonitorMainWindowLauncher.shared.requestOpenMainWindow()
     return false
-  }
-
-  @MainActor
-  private func hasVisibleMainWindow() -> Bool {
-    NSApplication.shared.windows.contains { window in
-      guard window.isVisible else {
-        return false
-      }
-      let identifier = window.identifier?.rawValue ?? ""
-      return identifier.contains(HarnessMonitorWindowID.main)
-    }
   }
 
   func bind(store: HarnessMonitorStore) {

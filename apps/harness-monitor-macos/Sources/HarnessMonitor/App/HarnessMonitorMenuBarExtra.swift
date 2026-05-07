@@ -17,10 +17,13 @@ struct HarnessMonitorMenuBarSnapshot: Equatable {
   static let checkSupervisorLabel = "Check Supervisor Now"
   static let runWhenClosedLabel = "Run When Closed"
   static let quitLabel = "Quit Harness Monitor"
+  static let activeMonitoringLabel = "Monitoring: Active session"
+  static let idleMonitoringLabel = "Monitoring: No active session"
 
   let pendingDecisionCount: Int
   let pendingDecisionSeverity: DecisionSeverity?
   let connectionLabel: String
+  let monitoringLabel: String
   let sessionCountLabel: String
   let pendingDecisionLabel: String
   let supervisorLabel: String
@@ -32,14 +35,24 @@ struct HarnessMonitorMenuBarSnapshot: Equatable {
     sessionCount: Int,
     pendingDecisionCount: Int,
     pendingDecisionSeverity: DecisionSeverity?,
-    supervisorRuntimeState: HarnessMonitorStore.SupervisorRuntimeState
+    supervisorRuntimeState: HarnessMonitorStore.SupervisorRuntimeState,
+    activeSessionWindowCount: Int,
+    runsWhenClosed: Bool
   ) {
     self.pendingDecisionCount = pendingDecisionCount
     self.pendingDecisionSeverity = pendingDecisionSeverity
     connectionLabel = "Connection: \(Self.connectionTitle(connectionState))"
+    monitoringLabel =
+      activeSessionWindowCount > 0
+      ? Self.activeMonitoringLabel
+      : Self.idleMonitoringLabel
     sessionCountLabel = "Sessions: \(Self.countTitle(sessionCount))"
     pendingDecisionLabel = "Decisions: \(Self.countTitle(pendingDecisionCount))"
-    supervisorLabel = "Supervisor: \(Self.supervisorTitle(supervisorRuntimeState))"
+    supervisorLabel = Self.supervisorLabel(
+      supervisorRuntimeState,
+      activeSessionWindowCount: activeSessionWindowCount,
+      runsWhenClosed: runsWhenClosed
+    )
     supervisorToggleLabel = Self.supervisorToggleTitle(supervisorRuntimeState)
     supervisorToggleDisabled =
       supervisorRuntimeState == .starting
@@ -91,6 +104,7 @@ struct HarnessMonitorMenuBarSnapshot: Equatable {
   var visibleMenuLabels: [String] {
     [
       connectionLabel,
+      monitoringLabel,
       sessionCountLabel,
       pendingDecisionLabel,
       supervisorLabel,
@@ -133,6 +147,17 @@ struct HarnessMonitorMenuBarSnapshot: Equatable {
     case .stopping:
       "Stopping"
     }
+  }
+
+  private static func supervisorLabel(
+    _ state: HarnessMonitorStore.SupervisorRuntimeState,
+    activeSessionWindowCount: Int,
+    runsWhenClosed: Bool
+  ) -> String {
+    if activeSessionWindowCount == 0 && state == .running && runsWhenClosed {
+      return "Supervisor: Running in background"
+    }
+    return "Supervisor: \(supervisorTitle(state))"
   }
 
   private static func supervisorToggleTitle(
@@ -216,6 +241,7 @@ final class HarnessMonitorMenuBarStatusController {
 
 struct HarnessMonitorMenuBarExtraContent: View {
   let store: HarnessMonitorStore
+  let activeSessionWindowCount: Int
   @Environment(\.openWindow)
   private var openWindow
   @AppStorage(SupervisorSettingsDefaults.runInBackgroundKey)
@@ -228,7 +254,9 @@ struct HarnessMonitorMenuBarExtraContent: View {
       sessionCount: store.sessionIndex.totalSessionCount,
       pendingDecisionCount: toolbarSlice.count,
       pendingDecisionSeverity: toolbarSlice.maxSeverity,
-      supervisorRuntimeState: store.supervisorRuntimeState
+      supervisorRuntimeState: store.supervisorRuntimeState,
+      activeSessionWindowCount: activeSessionWindowCount,
+      runsWhenClosed: runWhenClosed
     )
   }
 
@@ -248,6 +276,8 @@ struct HarnessMonitorMenuBarExtraContent: View {
   @ViewBuilder private var statusSection: some View {
     Text(verbatim: snapshot.connectionLabel)
       .accessibilityIdentifier(HarnessMonitorAccessibility.menuBarConnectionStatus)
+    Text(verbatim: snapshot.monitoringLabel)
+      .accessibilityIdentifier("harness.menu-bar.monitoring-status")
     Text(verbatim: snapshot.sessionCountLabel)
       .accessibilityIdentifier(HarnessMonitorAccessibility.menuBarSessionStatus)
     Text(verbatim: snapshot.pendingDecisionLabel)

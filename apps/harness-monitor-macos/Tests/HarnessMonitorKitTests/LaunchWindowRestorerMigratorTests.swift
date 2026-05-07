@@ -34,15 +34,26 @@ struct LaunchWindowRestorerMigratorTests {
     #expect(ids.isEmpty)
   }
 
-  @Test("Register and unregister mutate the in-memory open window set")
+  @Test("Register and unregister mutate the in-memory open window registry")
   func registerAndUnregisterSessionWindowMutatesInMemorySet() {
     let store = makeStore()
-    store.registerOpenSessionWindow(sessionID: "sess-a")
-    store.registerOpenSessionWindow(sessionID: "sess-b")
+    let firstWindow = NSObject()
+    let secondWindow = NSObject()
+    let duplicateSessionWindow = NSObject()
+    let firstWindowID = ObjectIdentifier(firstWindow)
+    let secondWindowID = ObjectIdentifier(secondWindow)
+    let duplicateSessionWindowID = ObjectIdentifier(duplicateSessionWindow)
+    store.registerOpenSessionWindow(windowID: firstWindowID, sessionID: "sess-a")
+    store.registerOpenSessionWindow(windowID: secondWindowID, sessionID: "sess-b")
+    store.registerOpenSessionWindow(windowID: duplicateSessionWindowID, sessionID: "sess-b")
     #expect(store.openSessionWindowIDsSnapshot == ["sess-a", "sess-b"])
 
-    store.unregisterOpenSessionWindow(sessionID: "sess-a")
+    store.unregisterOpenSessionWindow(windowID: firstWindowID)
     #expect(store.openSessionWindowIDsSnapshot == ["sess-b"])
+    store.unregisterOpenSessionWindow(windowID: secondWindowID)
+    #expect(store.openSessionWindowIDsSnapshot == ["sess-b"])
+    store.unregisterOpenSessionWindow(windowID: duplicateSessionWindowID)
+    #expect(store.openSessionWindowIDsSnapshot.isEmpty)
   }
 
   @Test("Begin termination snapshot freezes the live registry for later flush")
@@ -51,11 +62,15 @@ struct LaunchWindowRestorerMigratorTests {
     let defaults = try isolatedDefaults()
     defer { defaults.userDefaults.removePersistentDomain(forName: defaults.suiteName) }
 
-    store.registerOpenSessionWindow(sessionID: "sess-a")
-    store.registerOpenSessionWindow(sessionID: "sess-b")
+    let firstWindow = NSObject()
+    let secondWindow = NSObject()
+    let firstWindowID = ObjectIdentifier(firstWindow)
+    let secondWindowID = ObjectIdentifier(secondWindow)
+    store.registerOpenSessionWindow(windowID: firstWindowID, sessionID: "sess-a")
+    store.registerOpenSessionWindow(windowID: secondWindowID, sessionID: "sess-b")
     store.beginSessionWindowTerminationSnapshot()
-    store.unregisterOpenSessionWindow(sessionID: "sess-a")
-    store.unregisterOpenSessionWindow(sessionID: "sess-b")
+    store.unregisterOpenSessionWindow(windowID: firstWindowID)
+    store.unregisterOpenSessionWindow(windowID: secondWindowID)
 
     await store.flushSessionWindowsOpenAtQuit(userDefaults: defaults.userDefaults)
 
@@ -69,7 +84,8 @@ struct LaunchWindowRestorerMigratorTests {
     let defaults = try isolatedDefaults()
     defer { defaults.userDefaults.removePersistentDomain(forName: defaults.suiteName) }
 
-    store.registerOpenSessionWindow(sessionID: "sess-a")
+    let window = NSObject()
+    store.registerOpenSessionWindow(windowID: ObjectIdentifier(window), sessionID: "sess-a")
     await store.flushSessionWindowsOpenAtQuit(userDefaults: defaults.userDefaults)
 
     let ids = await cacheService.sessionWindowIDsOpenAtQuit(limit: 10)
@@ -77,24 +93,27 @@ struct LaunchWindowRestorerMigratorTests {
     #expect(defaults.userDefaults.bool(forKey: HarnessMonitorStore.launchWindowBridgeFallbackKey))
   }
 
-  @Test("Bridge fallback runs once when wasOpenAtQuit is empty")
+  @Test("Bridge fallback remains pending until launch routing completes")
   func bridgeFallbackRunsOnceWhenWasOpenAtQuitIsEmpty() async throws {
     let store = makeStore(cacheService: cacheService)
     let defaults = try isolatedDefaults()
     defer { defaults.userDefaults.removePersistentDomain(forName: defaults.suiteName) }
 
-    let firstResult = await store.recentSessionIDsForLaunchWindows(
-      limit: 4,
+    let firstPlan = await store.launchWindowRestorePlan(
       userDefaults: defaults.userDefaults
     )
-    #expect(firstResult.isEmpty)
+    #expect(firstPlan.sessionIDs.isEmpty)
+    #expect(firstPlan.usedBridgeFallback)
+    #expect(!defaults.userDefaults.bool(forKey: HarnessMonitorStore.launchWindowBridgeFallbackKey))
+
+    store.completeLaunchWindowBridgeFallback(userDefaults: defaults.userDefaults)
     #expect(defaults.userDefaults.bool(forKey: HarnessMonitorStore.launchWindowBridgeFallbackKey))
 
-    let secondResult = await store.recentSessionIDsForLaunchWindows(
-      limit: 4,
+    let secondPlan = await store.launchWindowRestorePlan(
       userDefaults: defaults.userDefaults
     )
-    #expect(secondResult.isEmpty)
+    #expect(secondPlan.sessionIDs.isEmpty)
+    #expect(!secondPlan.usedBridgeFallback)
   }
 
   @Test("Existing wasOpenAtQuit rows suppress the bridge fallback even if catalog filters them out")
@@ -105,14 +124,14 @@ struct LaunchWindowRestorerMigratorTests {
     let defaults = try isolatedDefaults()
     defer { defaults.userDefaults.removePersistentDomain(forName: defaults.suiteName) }
 
-    let result = await store.recentSessionIDsForLaunchWindows(
-      limit: 4,
+    let plan = await store.launchWindowRestorePlan(
       userDefaults: defaults.userDefaults
     )
     // sess-a is filtered out by the empty session catalog, so the visible
     // result is empty, but the raw cache still has a row — the bridge must
     // not run and the bridge flag stays unset.
-    #expect(result.isEmpty)
+    #expect(plan.sessionIDs.isEmpty)
+    #expect(!plan.usedBridgeFallback)
     #expect(!defaults.userDefaults.bool(forKey: HarnessMonitorStore.launchWindowBridgeFallbackKey))
   }
 

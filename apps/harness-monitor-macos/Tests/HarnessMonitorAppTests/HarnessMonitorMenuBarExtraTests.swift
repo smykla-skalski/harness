@@ -12,7 +12,7 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
   }
 
   func testSnapshotSummarizesStatusAndCounts() {
-    let snapshot = HarnessMonitorMenuBarSnapshot(
+    let snapshot = makeSnapshot(
       connectionState: .online,
       sessionCount: 3,
       pendingDecisionCount: 2,
@@ -21,6 +21,7 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
     )
 
     XCTAssertEqual(snapshot.connectionLabel, "Connection: Online")
+    XCTAssertEqual(snapshot.monitoringLabel, "Monitoring: Active session")
     XCTAssertEqual(snapshot.sessionCountLabel, "Sessions: 3")
     XCTAssertEqual(snapshot.pendingDecisionLabel, "Decisions: 2")
     XCTAssertEqual(snapshot.supervisorLabel, "Supervisor: Running")
@@ -29,7 +30,7 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
   }
 
   func testStoppedSnapshotOffersEnableSupervisor() {
-    let snapshot = HarnessMonitorMenuBarSnapshot(
+    let snapshot = makeSnapshot(
       connectionState: .offline("bridge unavailable"),
       sessionCount: 0,
       pendingDecisionCount: 0,
@@ -44,14 +45,14 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
   }
 
   func testTransitionalSupervisorStatesDisableToggle() {
-    let starting = HarnessMonitorMenuBarSnapshot(
+    let starting = makeSnapshot(
       connectionState: .connecting,
       sessionCount: 1,
       pendingDecisionCount: 0,
       pendingDecisionSeverity: nil,
       supervisorRuntimeState: .starting
     )
-    let stopping = HarnessMonitorMenuBarSnapshot(
+    let stopping = makeSnapshot(
       connectionState: .idle,
       sessionCount: 1,
       pendingDecisionCount: 0,
@@ -76,13 +77,14 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
     ]
 
     let labels = states.flatMap { state in
-      HarnessMonitorMenuBarSnapshot(
+      makeSnapshot(
         connectionState: .offline("ignored reason"),
         sessionCount: 42_000,
         pendingDecisionCount: 42_000,
         pendingDecisionSeverity: .critical,
         supervisorRuntimeState: state
-      ).visibleMenuLabels
+      )
+      .visibleMenuLabels
     }
 
     for label in labels {
@@ -95,7 +97,7 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
   }
 
   func testVisibleDecisionsPublishOrangeAttentionBadgeSummary() {
-    let snapshot = HarnessMonitorMenuBarSnapshot(
+    let snapshot = makeSnapshot(
       connectionState: .online,
       sessionCount: 3,
       pendingDecisionCount: 1,
@@ -113,14 +115,14 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
     XCTAssertEqual(
       snapshot.statusItemAccessibilitySummary,
       """
-      Connection: Online, Sessions: 3, Decisions: 1, Supervisor: Running, \
+      Connection: Online, Monitoring: Active session, Sessions: 3, Decisions: 1, \
       Attention badge: orange
       """
     )
   }
 
   func testHiddenBadgePublishesHiddenAccessibilitySummary() {
-    let snapshot = HarnessMonitorMenuBarSnapshot(
+    let snapshot = makeSnapshot(
       connectionState: .idle,
       sessionCount: 0,
       pendingDecisionCount: 0,
@@ -135,7 +137,7 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
   }
 
   func testCriticalDecisionUsesCriticalStatusAsset() {
-    let snapshot = HarnessMonitorMenuBarSnapshot(
+    let snapshot = makeSnapshot(
       connectionState: .online,
       sessionCount: 3,
       pendingDecisionCount: 2,
@@ -191,6 +193,26 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
     XCTAssertEqual(
       presentation.statusItemAssetName(showsStateColorVariants: true),
       HarnessMonitorMenuBarSnapshot.statusItemCriticalImageName
+    )
+  }
+
+  private func makeSnapshot(
+    connectionState: HarnessMonitorStore.ConnectionState,
+    sessionCount: Int,
+    pendingDecisionCount: Int,
+    pendingDecisionSeverity: DecisionSeverity?,
+    supervisorRuntimeState: HarnessMonitorStore.SupervisorRuntimeState,
+    activeSessionWindowCount: Int = 1,
+    runsWhenClosed: Bool = false
+  ) -> HarnessMonitorMenuBarSnapshot {
+    HarnessMonitorMenuBarSnapshot(
+      connectionState: connectionState,
+      sessionCount: sessionCount,
+      pendingDecisionCount: pendingDecisionCount,
+      pendingDecisionSeverity: pendingDecisionSeverity,
+      supervisorRuntimeState: supervisorRuntimeState,
+      activeSessionWindowCount: activeSessionWindowCount,
+      runsWhenClosed: runsWhenClosed
     )
   }
 }
