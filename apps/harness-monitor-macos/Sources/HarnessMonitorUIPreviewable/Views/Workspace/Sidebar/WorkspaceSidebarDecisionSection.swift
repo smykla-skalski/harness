@@ -2,14 +2,13 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct WorkspaceSidebarDecisionSection: View {
+  let store: HarnessMonitorStore
   @Binding var selection: WorkspaceSelection
   @Binding var decisionFilters: DecisionsSidebarViewModel.FilterState
   let scope: DecisionWorkspaceScope
   let currentSessionID: String?
   let currentSessionTitle: String?
   let fontScale: CGFloat
-  let acpPayload: (Decision) -> AcpPermissionDecisionPayload?
-  let lastMessageAt: (Decision) -> Date?
 
   private var rowPadding: CGFloat {
     HarnessMonitorTheme.spacingXS * fontScale
@@ -31,25 +30,26 @@ struct WorkspaceSidebarDecisionSection: View {
   }
 
   var body: some View {
-    Section("Decisions") {
-      decisionDeskRow
-      if scope.groups.isEmpty {
-        decisionEmptyState
-          .listRowSeparator(.hidden)
-      } else {
-        ForEach(scope.groups, id: \.sessionID) { group in
-          decisionSessionHeader(group)
+    Group {
+      Section("Decisions") {
+        decisionDeskRow
+        if scope.groups.isEmpty {
+          decisionEmptyState
             .listRowSeparator(.hidden)
+        }
+      }
+
+      ForEach(scope.groups, id: \.sessionID) { group in
+        Section {
           ForEach(group.decisions, id: \.id) { decision in
             DecisionRow(
               decision: decision,
-              isSelected: selection.decisionID == decision.id,
+              selection: $selection,
+              selectionValue: .decision(sessionID: decision.sessionID, decisionID: decision.id),
               fontScale: fontScale,
-              acpPayload: acpPayload(decision),
-              lastMessageAt: lastMessageAt(decision)
-            ) {
-              selection = .decision(sessionID: decision.sessionID, decisionID: decision.id)
-            }
+              acpPayload: acpPayload(for: decision),
+              lastMessageAt: lastAcpMessageAt(for: decision)
+            )
             .tag(
               WorkspaceSelection.decision(
                 sessionID: decision.sessionID,
@@ -59,6 +59,11 @@ struct WorkspaceSidebarDecisionSection: View {
             .listRowInsets(EdgeInsets(top: 2, leading: 10, bottom: 2, trailing: 10))
             .listRowSeparator(.hidden)
           }
+        } header: {
+          WorkspaceSidebarDecisionGroupHeader(
+            title: sessionHeading(for: group.sessionID),
+            count: group.decisions.count
+          )
         }
       }
     }
@@ -131,29 +136,28 @@ struct WorkspaceSidebarDecisionSection: View {
     .padding(.vertical, HarnessMonitorTheme.spacingSM)
   }
 
-  private func decisionSessionHeader(
-    _ group: DecisionsSidebarViewModel.SessionGroup
-  ) -> some View {
-    HStack {
-      Text(sessionHeading(for: group.sessionID))
-        .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(.secondary)
-      Spacer()
-      Text("\(group.decisions.count)")
-        .scaledFont(.caption)
-        .foregroundStyle(.secondary)
-        .monospacedDigit()
-    }
-    .padding(.horizontal, HarnessMonitorTheme.spacingXS)
-    .padding(.top, HarnessMonitorTheme.spacingSM)
-  }
-
   private func clearFilters() {
     decisionFilters = DecisionsSidebarViewModel.FilterState(
       query: "",
       severities: [],
       scope: .summary
     )
+  }
+
+  private func lastAcpMessageAt(
+    for decision: Decision
+  ) -> Date? {
+    store.acpPermissionLastSignalAt(sessionID: decision.sessionID)
+  }
+
+  private func acpPayload(
+    for decision: Decision
+  ) -> AcpPermissionDecisionPayload? {
+    guard decision.ruleID == AcpPermissionDecisionPayload.ruleID else {
+      return nil
+    }
+    return store.acpPermissionDecisionPayload(for: decision.id)
+      ?? AcpPermissionDecisionPayload.decode(from: decision)
   }
 
   private func sessionHeading(for sessionID: String?) -> String {
@@ -185,5 +189,25 @@ struct WorkspaceSidebarDecisionSection: View {
       .split(whereSeparator: { $0 == "-" || $0 == "_" })
       .last
       .map(String.init)
+  }
+}
+
+private struct WorkspaceSidebarDecisionGroupHeader: View {
+  let title: String
+  let count: Int
+
+  var body: some View {
+    HStack {
+      Text(title)
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(.secondary)
+      Spacer()
+      Text("\(count)")
+        .scaledFont(.caption)
+        .foregroundStyle(.secondary)
+        .monospacedDigit()
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityAddTraits(.isHeader)
   }
 }

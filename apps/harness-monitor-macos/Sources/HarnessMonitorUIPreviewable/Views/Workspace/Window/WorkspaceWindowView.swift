@@ -145,6 +145,10 @@ public struct WorkspaceWindowView: View {
     $decisionFilters
   }
 
+  var workspaceSidebarWidthBinding: Binding<CGFloat> {
+    $workspaceSidebarWidth
+  }
+
   func resetDecisionFiltersToInitialState() {
     decisionFilters = Self.initialDecisionFilters
   }
@@ -313,9 +317,6 @@ public struct WorkspaceWindowView: View {
       }
       .onPreferenceChange(AgentDetailComposerHeightPreferenceKey.self) { newHeight in
         agentDetailComposerBackdropHeight = newHeight
-      }
-      .onPreferenceChange(WorkspaceSidebarWidthPreferenceKey.self) { newWidth in
-        workspaceSidebarWidth = newWidth
       }
       .onDisappear {
         hasCompletedInitialWorkspacePreparation = false

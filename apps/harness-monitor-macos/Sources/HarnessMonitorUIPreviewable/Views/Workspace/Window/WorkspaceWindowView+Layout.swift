@@ -48,6 +48,7 @@ extension WorkspaceWindowView {
         store: store,
         selection: selection,
         decisionFilters: decisionFiltersBinding,
+        sidebarWidth: workspaceSidebarWidthBinding,
         isStartupFocusParticipationEnabled: startupFocusParticipationEnabled,
         decisionScope: decisionScope,
         currentSessionID: store.selectedSessionID,
@@ -58,9 +59,7 @@ extension WorkspaceWindowView {
         codexTitlesByID: displayState.codexTitlesByID,
         externalAgents: displayState.externalAgents,
         pendingDecisionAttention: pendingDecisionAttentionByAgentID,
-        openPendingDecisions: openPendingDecisions,
-        tasks: store.selectedSession?.tasks ?? [],
-        refresh: refresh
+        tasks: store.selectedSession?.tasks ?? []
       )
       .navigationSplitViewColumnWidth(
         min: WorkspaceChromeMetrics.sidebarMinWidth,

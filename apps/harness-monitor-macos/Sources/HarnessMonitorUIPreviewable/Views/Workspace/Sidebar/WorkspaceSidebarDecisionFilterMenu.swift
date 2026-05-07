@@ -2,16 +2,22 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct WorkspaceSidebarDecisionFilterToolbarItem: ToolbarContent {
-  let selectedSeverities: Set<DecisionSeverity>
+  @Binding var selectedSeverities: Set<DecisionSeverity>
   let isEnabled: Bool
-  let setSelectedSeverities: (Set<DecisionSeverity>) -> Void
+
+  init(
+    selectedSeverities: Binding<Set<DecisionSeverity>>,
+    isEnabled: Bool
+  ) {
+    _selectedSeverities = selectedSeverities
+    self.isEnabled = isEnabled
+  }
 
   var body: some ToolbarContent {
     ToolbarItem(placement: .automatic) {
       WorkspaceSidebarDecisionFilterMenu(
-        selectedSeverities: selectedSeverities,
-        isEnabled: isEnabled,
-        setSelectedSeverities: setSelectedSeverities
+        selectedSeverities: $selectedSeverities,
+        isEnabled: isEnabled
       )
       .disabled(!isEnabled)
     }
@@ -19,9 +25,16 @@ struct WorkspaceSidebarDecisionFilterToolbarItem: ToolbarContent {
 }
 
 private struct WorkspaceSidebarDecisionFilterMenu: View {
-  let selectedSeverities: Set<DecisionSeverity>
+  @Binding var selectedSeverities: Set<DecisionSeverity>
   let isEnabled: Bool
-  let setSelectedSeverities: (Set<DecisionSeverity>) -> Void
+
+  init(
+    selectedSeverities: Binding<Set<DecisionSeverity>>,
+    isEnabled: Bool
+  ) {
+    _selectedSeverities = selectedSeverities
+    self.isEnabled = isEnabled
+  }
 
   private var hasActiveFilters: Bool {
     !selectedSeverities.isEmpty
@@ -53,14 +66,14 @@ private struct WorkspaceSidebarDecisionFilterMenu: View {
   var body: some View {
     Menu {
       Button("All severities") {
-        setSelectedSeverities([])
+        selectedSeverities = []
       }
       .disabled(!hasActiveFilters)
       .harnessMCPMenuItem(
         HarnessMonitorAccessibility.decisionsSidebarAllChip,
         label: "All severities",
         enabled: hasActiveFilters,
-        pressAction: { setSelectedSeverities([]) }
+        pressAction: { selectedSeverities = [] }
       )
 
       Divider()
@@ -107,7 +120,7 @@ private struct WorkspaceSidebarDecisionFilterMenu: View {
     } else {
       next.insert(severity)
     }
-    setSelectedSeverities(next)
+    selectedSeverities = next
   }
 }
 

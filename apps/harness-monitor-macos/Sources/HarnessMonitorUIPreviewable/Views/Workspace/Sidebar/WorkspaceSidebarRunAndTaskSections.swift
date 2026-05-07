@@ -35,7 +35,12 @@ struct WorkspaceSidebarRunAndTaskSections: View {
     if !activeCodexRuns.isEmpty {
       Section("Open Runs") {
         ForEach(activeCodexRuns) { run in
-          codexRunRow(run)
+          WorkspaceSidebarCodexRunRow(
+            selection: $selection,
+            snapshot: run,
+            title: codexTitlesByID[run.runId] ?? "Run",
+            rowPadding: rowPadding
+          )
         }
       }
     }
@@ -43,7 +48,12 @@ struct WorkspaceSidebarRunAndTaskSections: View {
     if !inactiveCodexRuns.isEmpty {
       Section("Past Runs") {
         ForEach(inactiveCodexRuns) { run in
-          codexRunRow(run)
+          WorkspaceSidebarCodexRunRow(
+            selection: $selection,
+            snapshot: run,
+            title: codexTitlesByID[run.runId] ?? "Run",
+            rowPadding: rowPadding
+          )
         }
       }
     }
@@ -51,29 +61,50 @@ struct WorkspaceSidebarRunAndTaskSections: View {
     if !tasks.isEmpty {
       Section("Tasks") {
         ForEach(tasks, id: \.taskId) { task in
-          taskRow(task)
+          WorkspaceSidebarTaskRow(
+            store: store,
+            selection: $selection,
+            task: task,
+            rowPadding: rowPadding,
+            currentSessionID: currentSessionID
+          )
         }
       }
     }
   }
+}
 
-  private func codexRunRow(_ run: CodexRunSnapshot) -> some View {
+private struct WorkspaceSidebarCodexRunRow: View {
+  @Binding var selection: WorkspaceSelection
+  let snapshot: CodexRunSnapshot
+  let title: String
+  let rowPadding: CGFloat
+
+  var body: some View {
     CodexRunSidebarRow(
-      snapshot: run,
-      title: codexTitlesByID[run.runId] ?? "Run"
+      snapshot: snapshot,
+      title: title
     )
     .padding(.vertical, rowPadding)
-    .tag(WorkspaceSelection.codex(sessionID: run.sessionId, runID: run.runId))
+    .tag(WorkspaceSelection.codex(sessionID: snapshot.sessionId, runID: snapshot.runId))
     .harnessMCPTab(
-      HarnessMonitorAccessibility.agentTuiTab(run.runId),
-      label: codexTitlesByID[run.runId] ?? "Run",
+      HarnessMonitorAccessibility.agentTuiTab(snapshot.runId),
+      label: title,
       pressAction: {
-        selection = .codex(sessionID: run.sessionId, runID: run.runId)
+        selection = .codex(sessionID: snapshot.sessionId, runID: snapshot.runId)
       }
     )
   }
+}
 
-  private func taskRow(_ task: WorkItem) -> some View {
+private struct WorkspaceSidebarTaskRow: View {
+  let store: HarnessMonitorStore
+  @Binding var selection: WorkspaceSelection
+  let task: WorkItem
+  let rowPadding: CGFloat
+  let currentSessionID: String?
+
+  var body: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
       Image(systemName: "checklist")
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)

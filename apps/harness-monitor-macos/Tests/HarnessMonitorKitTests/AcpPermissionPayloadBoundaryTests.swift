@@ -363,9 +363,9 @@ struct AcpPermissionPayloadBoundaryTests {
     let host = hostingView(
       for: DecisionRow(
         decision: decision,
-        isSelected: false,
+        selection: .constant(""),
+        selectionValue: decision.id,
         fontScale: 1,
-        select: {}
       ),
       width: 360,
       height: 120

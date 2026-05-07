@@ -1,14 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct WorkspaceSidebarWidthPreferenceKey: PreferenceKey {
-  static let defaultValue: CGFloat = WorkspaceChromeMetrics.sidebarIdealWidth
-
-  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-    value = nextValue()
-  }
-}
-
 enum WorkspaceDecisionFilterDefaults {
   static let severitiesKey = "harness.workspace.sidebar.severitiesCSV"
   static let searchScopeKey = "harness.workspace.sidebar.searchScope"
@@ -23,6 +15,7 @@ struct WorkspaceSidebar: View {
   let store: HarnessMonitorStore
   @Binding var selection: WorkspaceSelection
   @Binding var decisionFilters: DecisionsSidebarViewModel.FilterState
+  @Binding var sidebarWidth: CGFloat
   let isStartupFocusParticipationEnabled: Bool
   let decisionScope: DecisionWorkspaceScope
   let currentSessionID: String?
@@ -33,9 +26,7 @@ struct WorkspaceSidebar: View {
   let codexTitlesByID: [String: String]
   let externalAgents: [AgentRegistration]
   let pendingDecisionAttention: [String: AcpDecisionAttention]
-  let openPendingDecisions: (String) -> Void
   let tasks: [WorkItem]
-  let refresh: () -> Void
 
   @AppStorage(WorkspaceDecisionFilterDefaults.severitiesKey)
   private var decisionSeveritiesCSV = ""
@@ -43,6 +34,7 @@ struct WorkspaceSidebar: View {
   private var decisionSearchScopeRaw = DecisionsSidebarSearchScope.summary.rawValue
   @State private var hasHydratedPersistedDecisionFilters = false
   @State private var workspaceSearchQuery = ""
+  @State private var sidebarSearchQuery = ""
   @State private var searchFocusDispatcher = HarnessSidebarSearchFocusDispatcher()
   @State private var searchPresentationState = SidebarSearchPresentationState()
   @Environment(\.fontScale)
@@ -59,26 +51,11 @@ struct WorkspaceSidebar: View {
     )
   }
 
-  private var decisionSearchText: Binding<String> {
+  private var selectedDecisionSeveritiesBinding: Binding<Set<DecisionSeverity>> {
     Binding(
-      get: { decisionFilters.query },
-      set: { updateDecisionFilters(query: $0) }
+      get: { decisionFilters.severities },
+      set: { updateDecisionFilters(severities: $0) }
     )
-  }
-
-  private var workspaceSearchText: Binding<String> {
-    Binding(
-      get: { workspaceSearchQuery },
-      set: { workspaceSearchQuery = $0 }
-    )
-  }
-
-  var normalizedWorkspaceSearchQuery: String {
-    workspaceSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-  }
-
-  private var sidebarSearchText: Binding<String> {
-    showsDecisionSearchChrome ? decisionSearchText : workspaceSearchText
   }
 
   private var decisionSearchScope: Binding<DecisionsSidebarSearchScope> {
@@ -108,6 +85,14 @@ struct WorkspaceSidebar: View {
 
   private var decisionFiltersMenuEnabled: Bool {
     decisionScope.totalCount > 0 || !decisionFilters.severities.isEmpty
+  }
+
+  private var currentRouteSearchQuery: String {
+    showsDecisionSearchChrome ? decisionFilters.query : workspaceSearchQuery
+  }
+
+  var normalizedWorkspaceSearchQuery: String {
+    workspaceSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
   }
 
   var activeTuis: [AgentTuiSnapshot] {
@@ -144,21 +129,43 @@ struct WorkspaceSidebar: View {
     )
   }
 
+  private func syncSidebarSearchQueryFromCurrentRoute() {
+    let currentRouteSearchQuery = currentRouteSearchQuery
+    guard sidebarSearchQuery != currentRouteSearchQuery else {
+      return
+    }
+    sidebarSearchQuery = currentRouteSearchQuery
+  }
+
+  private func handleSidebarSearchQueryChange(_ newValue: String) {
+    if showsDecisionSearchChrome {
+      guard decisionFilters.query != newValue else {
+        return
+      }
+      updateDecisionFilters(query: newValue)
+      return
+    }
+
+    guard workspaceSearchQuery != newValue else {
+      return
+    }
+    workspaceSearchQuery = newValue
+  }
+
   var body: some View {
     searchableSidebarList
-      .background {
-        GeometryReader { proxy in
-          Color.clear.preference(
-            key: WorkspaceSidebarWidthPreferenceKey.self,
-            value: proxy.size.width
-          )
+      .onGeometryChange(for: CGFloat.self) { proxy in
+        proxy.size.width
+      } action: { newWidth in
+        guard abs(sidebarWidth - newWidth) > 0.5 else {
+          return
         }
+        sidebarWidth = newWidth
       }
       .toolbar {
         WorkspaceSidebarDecisionFilterToolbarItem(
-          selectedSeverities: decisionFilters.severities,
-          isEnabled: decisionFiltersMenuEnabled,
-          setSelectedSeverities: setDecisionSeverities
+          selectedSeverities: selectedDecisionSeveritiesBinding,
+          isEnabled: decisionFiltersMenuEnabled
         )
       }
       .harnessFocusedSceneValue(\.harnessSidebarSearchFocusAction, searchFocusAction)
@@ -174,36 +181,41 @@ struct WorkspaceSidebar: View {
       .onChange(of: decisionFilters) { _, newValue in
         syncPersistedDecisionSettings(from: newValue)
       }
+      .onChange(of: decisionFilters.query) { _, newValue in
+        guard showsDecisionSearchChrome, sidebarSearchQuery != newValue else {
+          return
+        }
+        sidebarSearchQuery = newValue
+      }
+      .onChange(of: sidebarSearchQuery) { _, newValue in
+        handleSidebarSearchQueryChange(newValue)
+      }
       .onChange(of: isStartupFocusParticipationEnabled, initial: true) { _, _ in
+        syncSidebarSearchQueryFromCurrentRoute()
         applyPendingSearchPresentationIfNeeded()
       }
       .onChange(of: showsDecisionSearchChrome) { _, _ in
+        syncSidebarSearchQueryFromCurrentRoute()
         applyPendingSearchPresentationIfNeeded()
       }
   }
 
   @ViewBuilder private var searchableSidebarList: some View {
-    let searchableList =
-      sidebarList
-      .listStyle(.sidebar)
-      .scrollEdgeEffectStyle(.soft, for: .top)
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-      .searchable(
-        text: sidebarSearchText,
-        isPresented: searchPresentation,
-        placement: .sidebar,
+    if showsDecisionSearchChrome {
+      WorkspaceSidebarDecisionSearchContainer(
+        content: sidebarList,
+        searchText: $sidebarSearchQuery,
+        searchPresentation: searchPresentation,
+        decisionSearchScope: decisionSearchScope,
         prompt: sidebarSearchPrompt
       )
-
-    if showsDecisionSearchChrome {
-      searchableList
-        .searchScopes(decisionSearchScope, activation: .onSearchPresentation) {
-          ForEach(DecisionsSidebarSearchScope.allCases) { scope in
-            Text(scope.label).tag(scope)
-          }
-        }
     } else {
-      searchableList
+      WorkspaceSidebarGenericSearchContainer(
+        content: sidebarList,
+        searchText: $sidebarSearchQuery,
+        searchPresentation: searchPresentation,
+        prompt: sidebarSearchPrompt
+      )
     }
   }
 
@@ -230,31 +242,26 @@ struct WorkspaceSidebar: View {
       }
 
       WorkspaceSidebarDecisionSection(
+        store: store,
         selection: $selection,
         decisionFilters: $decisionFilters,
         scope: decisionScope,
         currentSessionID: currentSessionID,
         currentSessionTitle: currentSessionTitle,
-        fontScale: fontScale,
-        acpPayload: acpPayload(for:),
-        lastMessageAt: lastAcpMessageAt(for:)
+        fontScale: fontScale
       )
 
       if !filteredExternalAgents.isEmpty {
         Section("Connected Agents") {
           ForEach(filteredExternalAgents) { agent in
-            externalAgentRow(agent)
-              .tag(WorkspaceSelection.agent(sessionID: currentSessionID, agentID: agent.agentId))
-              .harnessMCPTab(
-                HarnessMonitorAccessibility.agentTuiExternalTab(agent.agentId),
-                label: agent.name,
-                pressAction: {
-                  selection = .agent(sessionID: currentSessionID, agentID: agent.agentId)
-                }
-              )
-              .accessibilityFrameMarker(
-                "\(HarnessMonitorAccessibility.agentTuiExternalTab(agent.agentId)).frame"
-              )
+            WorkspaceSidebarExternalAgentRow(
+              store: store,
+              selection: $selection,
+              agent: agent,
+              currentSessionID: currentSessionID,
+              rowPadding: rowPadding,
+              attention: pendingDecisionAttention[agent.agentId]
+            )
           }
         }
       }
@@ -344,10 +351,6 @@ extension WorkspaceSidebar {
     } else {
       syncPersistedDecisionSettings(from: decisionFilters)
     }
-  }
-
-  fileprivate func setDecisionSeverities(_ newValue: Set<DecisionSeverity>) {
-    updateDecisionFilters(severities: newValue)
   }
 
   fileprivate func updateDecisionFilters(

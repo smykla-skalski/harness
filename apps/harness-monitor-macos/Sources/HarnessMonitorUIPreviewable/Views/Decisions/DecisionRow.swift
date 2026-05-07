@@ -1,37 +1,37 @@
 import HarnessMonitorKit
 import SwiftUI
 
+@MainActor private let decisionRowAgeFormatter: RelativeDateTimeFormatter = {
+  let formatter = RelativeDateTimeFormatter()
+  formatter.unitsStyle = .abbreviated
+  return formatter
+}()
+
 /// Single row in the Decisions sidebar. Keep the first line focused on the decision itself and
 /// the second line on quieter scope metadata so operators can scan the queue quickly.
-struct DecisionRow: View {
+struct DecisionRow<Selection: Equatable>: View {
   let decision: Decision
-  let isSelected: Bool
+  @Binding var selection: Selection
+  let selectionValue: Selection
   let fontScale: CGFloat
   let acpPayload: AcpPermissionDecisionPayload?
   let lastMessageAt: Date?
-  let select: () -> Void
 
   init(
     decision: Decision,
-    isSelected: Bool,
+    selection: Binding<Selection>,
+    selectionValue: Selection,
     fontScale: CGFloat,
     acpPayload: AcpPermissionDecisionPayload? = nil,
-    lastMessageAt: Date? = nil,
-    select: @escaping () -> Void
+    lastMessageAt: Date? = nil
   ) {
     self.decision = decision
-    self.isSelected = isSelected
+    _selection = selection
+    self.selectionValue = selectionValue
     self.fontScale = fontScale
     self.acpPayload = acpPayload
     self.lastMessageAt = lastMessageAt
-    self.select = select
   }
-
-  @MainActor private static let ageFormatter: RelativeDateTimeFormatter = {
-    let formatter = RelativeDateTimeFormatter()
-    formatter.unitsStyle = .abbreviated
-    return formatter
-  }()
 
   private var severity: DecisionSeverity {
     DecisionSeverity(rawValue: decision.severityRaw) ?? .info
@@ -39,7 +39,11 @@ struct DecisionRow: View {
 
   private var age: String {
     let interval = Date.now.timeIntervalSince(decision.createdAt)
-    return Self.ageFormatter.localizedString(fromTimeInterval: -interval)
+    return decisionRowAgeFormatter.localizedString(fromTimeInterval: -interval)
+  }
+
+  private var isSelected: Bool {
+    selection == selectionValue
   }
 
   private var metaLine: String {
@@ -73,7 +77,9 @@ struct DecisionRow: View {
       lastMessageAt: lastMessageAt
     )
 
-    return Button(action: select) {
+    return Button {
+      selection = selectionValue
+    } label: {
       HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
         Circle()
           .fill(severity.chipColor)
@@ -131,7 +137,7 @@ struct DecisionRow: View {
       HarnessMonitorAccessibility.decisionRow(decision.id),
       label: accessibilityLabelText(deadlineStatus: deadlineStatus),
       value: accessibilityValueText(deadlineStatus: deadlineStatus),
-      pressAction: select
+      pressAction: { selection = selectionValue }
     )
   }
 
