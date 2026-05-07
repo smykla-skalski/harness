@@ -392,6 +392,7 @@ extension HarnessMonitorStore {
     public var canNavigateForward = false
     public var isRefreshing = false
     public var sleepPreventionEnabled = false
+    public var manualRefreshSuccessToken = 0
 
     public init() {}
   }

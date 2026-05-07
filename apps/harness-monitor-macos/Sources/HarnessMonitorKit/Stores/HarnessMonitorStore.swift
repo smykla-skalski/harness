@@ -181,6 +181,12 @@ public final class HarnessMonitorStore {
       scheduleUISync([.contentToolbar])
     }
   }
+  var manualRefreshSuccessToken = 0 {
+    didSet {
+      guard oldValue != manualRefreshSuccessToken else { return }
+      scheduleUISync([.contentToolbar])
+    }
+  }
   public var navigationBackStack: [String?] = [] {
     didSet {
       guard oldValue != navigationBackStack else { return }

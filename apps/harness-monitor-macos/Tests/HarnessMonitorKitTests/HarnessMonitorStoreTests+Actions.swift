@@ -54,6 +54,37 @@ extension HarnessMonitorStoreTests {
     store.stopAllStreams()
   }
 
+  @Test("Manual refresh publishes success feedback only after a successful refresh")
+  func manualRefreshPublishesSuccessFeedbackAfterSuccess() async {
+    let client = RecordingHarnessClient()
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client)
+    )
+    await store.bootstrap()
+    defer { store.stopAllStreams() }
+
+    #expect(store.manualRefreshSuccessToken == 0)
+
+    await store.manualRefresh()
+
+    #expect(store.manualRefreshSuccessToken == 1)
+    #expect(store.isRefreshing == false)
+  }
+
+  @Test("Manual refresh does not publish success feedback when bootstrap fails")
+  func manualRefreshSkipsSuccessFeedbackOnBootstrapFailure() async {
+    let daemon = FailingDaemonController(
+      bootstrapError: DaemonControlError.daemonDidNotStart
+    )
+    let store = HarnessMonitorStore(daemonController: daemon)
+
+    await store.manualRefresh()
+
+    #expect(store.manualRefreshSuccessToken == 0)
+    #expect(store.isRefreshing == false)
+    #expect(store.currentFailureFeedbackMessage != nil)
+  }
+
   @Test("Install launch agent failure sets the last error")
   func installLaunchAgentFailureSetsLastError() async {
     let daemon = FailingDaemonController(
