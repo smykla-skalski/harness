@@ -141,7 +141,7 @@ run = "./scripts/cargo-local.sh --print-env"
 
 [tasks."monitor:generate"]
 description = "Generate the Harness Monitor macOS Xcode project via Tuist"
-run = "apps/harness-monitor-macos/Scripts/generate.sh"
+run = "HARNESS_MONITOR_FORCE_GENERATE=1 apps/harness-monitor-macos/Scripts/generate.sh"
 
 [tasks."monitor:debug:attributegraph"]
 description = "Attach LLDB to a running Harness Monitor process and break on AttributeGraph cycle logging (pass -- --pid <pid> or --process-name <name>)"
