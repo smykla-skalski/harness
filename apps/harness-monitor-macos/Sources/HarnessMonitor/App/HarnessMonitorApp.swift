@@ -213,6 +213,7 @@ struct HarnessMonitorApp: App {
         refreshStore: refreshStore
       )
       NewSessionCommand(store: store)
+      SessionCreateCommands()
       OpenFolderCommand(store: store)
       AttachExternalSessionCommand(store: store)
       GoCommands(
@@ -230,6 +231,7 @@ struct HarnessMonitorApp: App {
         displayState: store.commandsDisplayState
       )
       InspectorCommands()
+      DecisionCommands()
     }
   }
 
