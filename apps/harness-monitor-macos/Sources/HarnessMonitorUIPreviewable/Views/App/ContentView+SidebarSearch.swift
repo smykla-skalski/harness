@@ -62,16 +62,11 @@ extension FocusedValues {
 }
 
 extension View {
-  @ViewBuilder
   func harnessFocusedSceneValue<Value>(
     _ keyPath: WritableKeyPath<FocusedValues, Value?>,
     _ value: Value?
   ) -> some View {
-    if let value {
-      focusedSceneValue(keyPath, value)
-    } else {
-      self
-    }
+    focusedSceneValue(keyPath, value)
   }
 }
 

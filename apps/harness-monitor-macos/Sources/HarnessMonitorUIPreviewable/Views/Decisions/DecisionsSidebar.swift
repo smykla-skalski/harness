@@ -285,13 +285,12 @@ public struct DecisionsSidebar: View {
       ForEach(group.decisions, id: \.id) { decision in
         DecisionRow(
           decision: decision,
-          isSelected: selectedDecisionID == decision.id,
+          selection: $selectedDecisionID,
+          selectionValue: decision.id,
           fontScale: fontScale,
           acpPayload: acpPayload(for: decision),
           lastMessageAt: lastAcpMessageAt(for: decision)
-        ) {
-          selectedDecisionID = decision.id
-        }
+        )
       }
     } header: {
       sessionHeader(group)

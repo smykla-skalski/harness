@@ -1,13 +1,26 @@
 import HarnessMonitorKit
 import SwiftUI
 
-extension WorkspaceSidebar {
-  @ViewBuilder
-  func externalAgentRow(_ agent: AgentRegistration) -> some View {
-    let pendingDecisionBadgeID =
-      HarnessMonitorAccessibility.agentPendingDecisionBadge(agent.agentId)
-    let attention = pendingDecisionAttention[agent.agentId]
+struct WorkspaceSidebarExternalAgentRow: View {
+  let store: HarnessMonitorStore
+  @Binding var selection: WorkspaceSelection
+  let agent: AgentRegistration
+  let currentSessionID: String?
+  let rowPadding: CGFloat
+  let attention: AcpDecisionAttention?
 
+  @Environment(\.openWindow)
+  private var openWindow
+
+  private var rowSelection: WorkspaceSelection {
+    .agent(sessionID: currentSessionID, agentID: agent.agentId)
+  }
+
+  private var pendingDecisionBadgeID: String {
+    HarnessMonitorAccessibility.agentPendingDecisionBadge(agent.agentId)
+  }
+
+  var body: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
       Image(systemName: "person.crop.circle")
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -25,16 +38,12 @@ extension WorkspaceSidebar {
           accessibilityIdentifier: HarnessMonitorUITestEnvironment
             .accessibilityMarkersEnabled ? nil : pendingDecisionBadgeID
         ) {
-          openPendingDecisions(agent.agentId)
+          openPendingDecisions()
         }
         .harnessUITestValue("count=\(attention.count) batch=\(attention.oldestBatchID)")
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .contentShape(Rectangle())
-    .onTapGesture {
-      selection = .agent(sessionID: currentSessionID, agentID: agent.agentId)
-    }
     .overlay(alignment: .topTrailing) {
       if agent.isAutoSpawned {
         AutoSpawnedBadgeView(agentID: agent.agentId)
@@ -42,6 +51,15 @@ extension WorkspaceSidebar {
       }
     }
     .padding(.vertical, rowPadding)
+    .tag(rowSelection)
+    .harnessMCPTab(
+      HarnessMonitorAccessibility.agentTuiExternalTab(agent.agentId),
+      label: agent.name,
+      pressAction: {
+        selection = rowSelection
+      }
+    )
+    .accessibilityFrameMarker("\(HarnessMonitorAccessibility.agentTuiExternalTab(agent.agentId)).frame")
     .accessibilityTestProbe(
       pendingDecisionBadgeID,
       label: "Pending decisions",
@@ -49,19 +67,11 @@ extension WorkspaceSidebar {
     )
   }
 
-  func lastAcpMessageAt(
-    for decision: Decision
-  ) -> Date? {
-    store.acpPermissionLastSignalAt(sessionID: decision.sessionID)
-  }
-
-  func acpPayload(
-    for decision: Decision
-  ) -> AcpPermissionDecisionPayload? {
-    guard decision.ruleID == AcpPermissionDecisionPayload.ruleID else {
-      return nil
+  private func openPendingDecisions() {
+    if let decisionID = store.selectOldestDecision(for: agent.agentId) {
+      store.requestWorkspaceDecisionSelection(decisionID: decisionID)
+      store.requestPrimaryDecisionActionFocus(decisionID: decisionID)
     }
-    return store.acpPermissionDecisionPayload(for: decision.id)
-      ?? AcpPermissionDecisionPayload.decode(from: decision)
+    openWindow(id: HarnessMonitorWindowID.workspace)
   }
 }
