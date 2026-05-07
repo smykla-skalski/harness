@@ -282,6 +282,35 @@ extension SupervisorLifecycleTests {
   }
 
   @MainActor
+  func testLatePendingDecisionBindingsPublishCurrentSupervisorSnapshot() async throws {
+    let store = HarnessMonitorStore.fixture()
+    await store.startSupervisor()
+    addTeardownBlock { await store.stopSupervisor() }
+
+    try await store.insertDecisionForTesting(
+      DecisionDraft.fixture(id: "d-late-pending-sync", severity: .critical)
+    )
+    try await waitForSupervisorOpenDecisionCount(1, store: store)
+
+    let badgeRecorder = PendingDecisionsBadgeSyncRecorder()
+    store.bindPendingDecisionsBadgeSync { count in
+      badgeRecorder.record(count)
+    }
+    XCTAssertEqual(badgeRecorder.counts, [1])
+
+    let statusRecorder = PendingDecisionsStatusSyncRecorder()
+    store.bindPendingDecisionsStatusSync { count, severity in
+      statusRecorder.record(count: count, severity: severity)
+    }
+    XCTAssertEqual(
+      statusRecorder.updates,
+      [
+        PendingDecisionsStatusSyncUpdate(count: 1, severity: .critical)
+      ]
+    )
+  }
+
+  @MainActor
   func testStopSupervisorClearsBadge() async throws {
     let store = HarnessMonitorStore.fixture()
     let center = RecordingNotificationCenter()

@@ -114,3 +114,25 @@ func waitForPendingDecisionStatusUpdates(
     try await Task.sleep(for: .milliseconds(10))
   }
 }
+
+@MainActor
+func waitForSupervisorOpenDecisionCount(
+  _ expected: Int,
+  store: HarnessMonitorStore,
+  timeout: Duration = .seconds(1)
+) async throws {
+  let clock = ContinuousClock()
+  let deadline = clock.now + timeout
+  while store.supervisorOpenDecisions.count != expected {
+    if clock.now >= deadline {
+      XCTFail(
+        """
+        Timed out waiting for supervisor open decision count \(expected); \
+        got \(store.supervisorOpenDecisions.count)
+        """
+      )
+      return
+    }
+    try await Task.sleep(for: .milliseconds(10))
+  }
+}

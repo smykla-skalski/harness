@@ -38,16 +38,37 @@ extension HarnessMonitorStore {
     }
   }
 
+  public func unbindSupervisorNotifications() {
+    supervisorBindings.notificationController?.detachResolveHandler()
+    supervisorBindings.notificationController = nil
+  }
+
   public func bindPendingDecisionsBadgeSync(
     _ sync: @escaping @MainActor (Int) -> Void
   ) {
     supervisorBindings.pendingDecisionsBadgeSync = sync
+    if supervisorStack != nil {
+      sync(supervisorOpenDecisions.count)
+    }
+  }
+
+  public func unbindPendingDecisionsBadgeSync() {
+    supervisorBindings.pendingDecisionsBadgeSync?(0)
+    supervisorBindings.pendingDecisionsBadgeSync = nil
   }
 
   public func bindPendingDecisionsStatusSync(
     _ sync: @escaping @MainActor (Int, DecisionSeverity?) -> Void
   ) {
     supervisorBindings.pendingDecisionsStatusSync = sync
+    if supervisorStack != nil {
+      sync(supervisorToolbarSlice.count, supervisorToolbarSlice.maxSeverity)
+    }
+  }
+
+  public func unbindPendingDecisionsStatusSync() {
+    supervisorBindings.pendingDecisionsStatusSync?(0, nil)
+    supervisorBindings.pendingDecisionsStatusSync = nil
   }
 
   public func supervisorDecisionActionHandler() -> any DecisionActionHandler {

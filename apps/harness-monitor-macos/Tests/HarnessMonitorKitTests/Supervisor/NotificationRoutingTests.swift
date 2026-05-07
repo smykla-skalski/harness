@@ -211,6 +211,31 @@ final class NotificationRoutingTests: XCTestCase {
     )
   }
 
+  func test_detachResolveHandlerSuppressesAcknowledgeDispatch() async throws {
+    let recorder = ResolveRecorder()
+    let controller = makeController()
+    controller.attachResolveHandler { id, outcome in
+      await recorder.record(id: id, outcome: outcome)
+    }
+    controller.detachResolveHandler()
+
+    let decisionID = "codex-approval:sess-7:appr-detached"
+    let request = try await makeSupervisorRequest(
+      decisionID: decisionID,
+      severity: .warn
+    )
+    let response = TestNotificationResponseFactory.make(
+      request: request,
+      actionIdentifier: HarnessMonitorNotificationActionID.acknowledge
+    )
+
+    controller.handleNotificationResponseForTesting(response)
+
+    try await Task.sleep(nanoseconds: 50_000_000)
+    let entries = await recorder.entries
+    XCTAssertTrue(entries.isEmpty)
+  }
+
   func test_deliverAcpPermissionRequest_schedulesWhenAuthorized() async {
     let center = TestNotificationCenter()
     let controller = HarnessMonitorUserNotificationController(

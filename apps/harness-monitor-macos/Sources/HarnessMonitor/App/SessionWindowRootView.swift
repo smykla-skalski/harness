@@ -10,6 +10,7 @@ struct SessionWindowRootView: View {
   let keyWindowObserver: KeyWindowObserver
   let windowCommandRouting: WindowCommandRoutingState
   let mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
+  let sessionWindowPresenceTracker: SessionWindowPresenceTracker
   @Binding var themeMode: HarnessMonitorThemeMode
 
   private var windowID: String {
@@ -37,5 +38,6 @@ struct SessionWindowRootView: View {
     }
     .navigationTitle(windowTitle)
     .modifier(SessionWindowOpenStateModifier(store: store, sessionID: token.sessionID))
+    .modifier(SupervisorBindingsModifier(tracker: sessionWindowPresenceTracker))
   }
 }
