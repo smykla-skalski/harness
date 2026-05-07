@@ -131,7 +131,6 @@ struct HarnessMonitorApp: App {
   var body: some Scene {
     mainWindowScene
     settingsWindowScene
-    sessionWindowScene
     menuBarExtraScene
   }
 
@@ -158,8 +157,22 @@ struct HarnessMonitorApp: App {
     HarnessMonitorLaunchBehavior.resolved(rawValue: sessionWindowLaunchModeRawValue)
   }
 
-  @ViewBuilder private var mainWindowSceneContent: some View {
-    if rendersLiveSceneContent {
+  @ViewBuilder
+  private func mainWindowSceneContent(
+    token: Binding<SessionWindowToken?>
+  ) -> some View {
+    if rendersLiveSceneContent, let tokenValue = token.wrappedValue {
+      SessionWindowRootView(
+        token: tokenValue,
+        store: store,
+        keyWindowObserver: keyWindowObserver,
+        windowCommandRouting: windowCommandRouting,
+        mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
+        themeMode: $themeMode
+      )
+      .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
+      .modifier(HarnessMonitorMainWindowLauncherBinder())
+    } else if rendersLiveSceneContent {
       mainWindowContent
         .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
         .modifier(HarnessMonitorMainWindowLauncherBinder())
@@ -175,15 +188,17 @@ struct HarnessMonitorApp: App {
   }
 
   private var mainWindowScene: some Scene {
-    WindowGroup("Open Recent Session", id: HarnessMonitorWindowID.main) {
-      mainWindowSceneContent
+    WindowGroup(
+      "Open Recent Session",
+      id: HarnessMonitorWindowID.main,
+      for: SessionWindowToken.self
+    ) { token in
+      mainWindowSceneContent(token: token)
     }
     .windowToolbarStyle(.unified)
     .defaultSize(width: mainWindowDefaultSize.width, height: mainWindowDefaultSize.height)
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
-    .defaultLaunchBehavior(
-      launchBehavior == .alwaysOpenRecent ? .presented : .automatic
-    )
+    .defaultLaunchBehavior(.automatic)
     .commands {
       HarnessMonitorAppCommands(
         store: store,
@@ -207,7 +222,10 @@ struct HarnessMonitorApp: App {
         store: store,
         displayState: store.commandsDisplayState
       )
-      WindowMenuCommands()
+      WindowMenuCommands(
+        store: store,
+        displayState: store.commandsDisplayState
+      )
     }
   }
 
@@ -235,39 +253,6 @@ struct HarnessMonitorApp: App {
     }
     .windowStyle(.titleBar)
     .defaultSize(width: 860, height: 620)
-    .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
-  }
-
-  @ViewBuilder
-  private func sessionSceneContent(
-    token: SessionWindowToken?
-  ) -> some View {
-    if rendersLiveSceneContent, let token {
-      SessionWindowRootView(
-        token: token,
-        store: store,
-        keyWindowObserver: keyWindowObserver,
-        windowCommandRouting: windowCommandRouting,
-        mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
-        themeMode: $themeMode
-      )
-      .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
-      .modifier(HarnessMonitorMainWindowLauncherBinder())
-    } else {
-      Color.clear.accessibilityHidden(true)
-    }
-  }
-
-  private var sessionWindowScene: some Scene {
-    WindowGroup(
-      "Session",
-      id: HarnessMonitorWindowID.session,
-      for: SessionWindowToken.self
-    ) { token in
-      sessionSceneContent(token: token.wrappedValue)
-    }
-    .windowToolbarStyle(.unified)
-    .defaultSize(width: 1_080, height: 720)
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
   }
 

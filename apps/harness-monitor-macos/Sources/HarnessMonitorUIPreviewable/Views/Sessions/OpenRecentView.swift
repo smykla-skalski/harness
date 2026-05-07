@@ -77,7 +77,7 @@ public struct OpenRecentView: View {
 
   private func openSession(_ sessionID: String) {
     openWindow(
-      id: HarnessMonitorWindowID.session,
+      id: HarnessMonitorWindowID.main,
       value: SessionWindowToken(sessionID: sessionID)
     )
     dismissWindow(id: HarnessMonitorWindowID.main)

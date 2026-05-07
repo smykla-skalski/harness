@@ -8,7 +8,7 @@ extension OpenWindowAction {
       return
     }
     self(
-      id: HarnessMonitorWindowID.session,
+      id: HarnessMonitorWindowID.main,
       value: SessionWindowToken(sessionID: sessionID)
     )
   }
