@@ -35,11 +35,14 @@ struct ContentDetailChrome<Content: View>: View {
   }
 
   var body: some View {
-    content
-      .safeAreaInset(edge: .top, spacing: 0) {
-        topChrome
-      }
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
+    WindowBannerChrome(
+      windowID: windowID,
+      isPresented: showsTopChrome
+    ) {
+      content
+    } banners: {
+      topChrome
+    }
   }
 
   private var showsTopChrome: Bool {
@@ -54,51 +57,42 @@ struct ContentDetailChrome<Content: View>: View {
     sessionDataAvailability != .live
   }
 
-  /// Always returns a view so the enclosing `safeAreaInset` keeps stable
-  /// subtree identity. When no chrome kind applies, `EmptyView` contributes
-  /// zero height and leaves content layout unchanged.
   @ViewBuilder private var topChrome: some View {
-    if showsTopChrome {
-      VStack(spacing: 0) {
-        if let persistenceError {
-          PersistenceUnavailableBanner(message: persistenceError)
-          chromeDivider(tint: HarnessMonitorTheme.caution)
-        }
-        if isStale {
-          SessionDataAvailabilityBanner(availability: sessionDataAvailability)
-          chromeDivider(tint: HarnessMonitorTheme.caution)
-        }
-        if mcpStatus.shouldShowChromeBanner {
-          MCPStatusBanner(status: mcpStatus)
-          chromeDivider(tint: MCPStatusViewSupport.tint(for: mcpStatus.tone))
-        }
-        if contentChrome.acpBridgeBanner != nil {
-          ContentAcpBridgeBannerBridge(
-            store: store,
-            contentChrome: contentChrome,
-            keyWindowObserver: keyWindowObserver,
-            windowID: windowID
-          )
-          chromeDivider(tint: HarnessMonitorTheme.caution)
-        }
-        ForEach(arbitrationTasks) { task in
-          ArbitrationBannerView(task: task)
-          chromeDivider(
-            tint: task.arbitration != nil
-              ? HarnessMonitorTheme.success
-              : HarnessMonitorTheme.caution
-          )
-        }
+    VStack(spacing: 0) {
+      if let persistenceError {
+        PersistenceUnavailableBanner(message: persistenceError)
+        chromeDivider(tint: HarnessMonitorTheme.caution)
       }
-      .background(Color(nsColor: .windowBackgroundColor))
+      if isStale {
+        SessionDataAvailabilityBanner(availability: sessionDataAvailability)
+        chromeDivider(tint: HarnessMonitorTheme.caution)
+      }
+      if mcpStatus.shouldShowChromeBanner {
+        MCPStatusBanner(status: mcpStatus)
+        chromeDivider(tint: MCPStatusViewSupport.tint(for: mcpStatus.tone))
+      }
+      if contentChrome.acpBridgeBanner != nil {
+        ContentAcpBridgeBannerBridge(
+          store: store,
+          contentChrome: contentChrome,
+          keyWindowObserver: keyWindowObserver,
+          windowID: windowID
+        )
+        chromeDivider(tint: HarnessMonitorTheme.caution)
+      }
+      ForEach(arbitrationTasks) { task in
+        ArbitrationBannerView(task: task)
+        chromeDivider(
+          tint: task.arbitration != nil
+            ? HarnessMonitorTheme.success
+            : HarnessMonitorTheme.caution
+        )
+      }
     }
   }
 
   private func chromeDivider(tint: Color) -> some View {
-    Rectangle()
-      .fill(tint.opacity(0.35))
-      .frame(height: 1)
-      .accessibilityHidden(true)
+    WindowBannerDivider(tint: tint)
   }
 }
 

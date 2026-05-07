@@ -57,7 +57,7 @@ public struct WindowNavigationState {
   }
 }
 
-public enum WindowNavigationScope: Hashable {
+public enum WindowNavigationScope: Hashable, Sendable {
   case main
   case workspace
 }

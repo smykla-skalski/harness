@@ -10,26 +10,19 @@ struct WorkspaceWindowRootView: View {
 
   let store: HarnessMonitorStore
   let keyWindowObserver: KeyWindowObserver
-  let notifications: HarnessMonitorUserNotificationController
-  let acpAttentionState: AcpPermissionAttentionState
   let navigationBridge: WorkspaceWindowNavigationBridge
   let windowCommandRouting: WindowCommandRoutingState
   let mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   @Binding var themeMode: HarnessMonitorThemeMode
-  private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
-  @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
-  private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
-  @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
-  private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection
-    .storageValue
   @State private var showsWorkspaceContent = false
 
-  private var backdropMode: HarnessMonitorBackdropMode {
-    HarnessMonitorBackdropMode(rawValue: backdropModeRawValue) ?? .none
-  }
-
-  private var backgroundImage: HarnessMonitorBackgroundSelection {
-    HarnessMonitorBackgroundSelection.decode(backgroundImageRawValue)
+  private var contentReadiness: WindowContentReadiness {
+    WindowContentReadiness(
+      isReady: showsWorkspaceContent,
+      stateLabel: showsWorkspaceContent ? "ready" : "stable-frame",
+      placeholder: .workspaceOpening,
+      prepare: { await revealWorkspaceContentIfNeeded() }
+    )
   }
 
   private var commandRoutingStateText: String {
@@ -50,45 +43,30 @@ struct WorkspaceWindowRootView: View {
   }
 
   var body: some View {
-    rootContent
-      .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceWindow)
-      .writingToolsBehavior(.disabled)
-      .frame(minWidth: 1_020, minHeight: 680)
-      .modifier(
-        HarnessMonitorWindowBackdropModifier(
-          mode: backdropMode,
-          backgroundImage: backgroundImage
-        )
-      )
-      .modifier(
-        WindowCommandScopeTrackingModifier(
-          scope: .workspace,
-          routingState: windowCommandRouting
-        )
-      )
-      .harnessMonitorMCPWindowCommands(registrar: mcpWindowCommandRegistrar)
-      .modifier(
-        HarnessMonitorSceneAppearanceModifier(
-          themeMode: $themeMode,
-          appliesPreferredColorScheme: true
-        )
-      )
-      .modifier(PinchToZoomTextSizeModifier())
-      .modifier(HarnessMonitorUITestAnimationModifier())
-      .overlay { commandRoutingMarker }
-      .task { await revealWorkspaceContentIfNeeded() }
+    HarnessMonitorWindowShell(
+      windowID: HarnessMonitorWindowID.workspace,
+      windowTitle: "Workspace",
+      scope: .workspace,
+      minimumSize: Self.contentRevealMinimumSize,
+      accessibilityIdentifier: HarnessMonitorAccessibility.workspaceWindow,
+      keyWindowObserver: keyWindowObserver,
+      windowCommandRouting: windowCommandRouting,
+      mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
+      themeMode: $themeMode,
+      contentReadiness: contentReadiness,
+      appliesPreferredColorScheme: true
+    ) {
+      workspaceContent
+    }
+    .overlay { commandRoutingMarker }
   }
 
-  @ViewBuilder private var rootContent: some View {
-    if showsWorkspaceContent {
-      WorkspaceWindowView(
-        store: store,
-        keyWindowObserver: keyWindowObserver,
-        navigationBridge: navigationBridge
-      )
-    } else {
-      WorkspaceWindowOpeningView()
-    }
+  private var workspaceContent: some View {
+    WorkspaceWindowView(
+      store: store,
+      keyWindowObserver: keyWindowObserver,
+      navigationBridge: navigationBridge
+    )
   }
 
   @ViewBuilder private var commandRoutingMarker: some View {

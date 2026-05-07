@@ -20,11 +20,16 @@ extension WorkspaceWindowView {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .overlay { workspaceStateMarkerOverlay() }
     } else if case .create = viewModel.selection {
-      createPane
-        .safeAreaInset(edge: .top, spacing: 0) {
-          createPaneTopChrome
-        }
-        .overlay { workspaceStateMarkerOverlay() }
+      WindowBannerChrome(
+        windowID: HarnessMonitorWindowID.workspace,
+        isPresented: showsCreatePaneTopChrome,
+        publishesStateMarker: false
+      ) {
+        createPane
+      } banners: {
+        createPaneTopChrome
+      }
+      .overlay { workspaceStateMarkerOverlay() }
     } else if viewModel.selection.isDecisionRoute {
       paneContent(decisionScope: decisionScope)
         .overlay { workspaceStateMarkerOverlay() }
