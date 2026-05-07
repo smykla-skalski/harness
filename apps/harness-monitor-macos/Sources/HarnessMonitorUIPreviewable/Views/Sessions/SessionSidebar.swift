@@ -11,6 +11,11 @@ struct SessionSidebar: View {
   @State private var agentDropTargetID: String?
   @State private var decisionDropTargetID: String?
 
+  var targetedDecisionDropID: String? {
+    get { decisionDropTargetID }
+    nonmutating set { decisionDropTargetID = newValue }
+  }
+
   var body: some View {
     List(selection: selectionBinding) {
       routeSection
