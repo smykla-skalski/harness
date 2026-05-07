@@ -21,6 +21,8 @@ struct WorkspaceSidebarDecisionFilterToolbarItem: ToolbarContent {
       )
       .disabled(!isEnabled)
     }
+
+    ToolbarSpacer(.fixed, placement: .automatic)
   }
 }
 

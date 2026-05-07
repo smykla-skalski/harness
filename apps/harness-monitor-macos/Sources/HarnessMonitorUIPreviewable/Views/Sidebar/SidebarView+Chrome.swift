@@ -19,6 +19,8 @@ struct SidebarToolbarCreateMenuToolbarItem: ToolbarContent {
         menuStateValue: createMenuAccessibilityValue
       )
     }
+
+    ToolbarSpacer(.fixed, placement: .primaryAction)
   }
 }
 
@@ -80,6 +82,8 @@ struct SidebarToolbarFilterToolbarItem: ToolbarContent {
     ToolbarItem(placement: .automatic) {
       SidebarFilterMenu(store: store, controls: controls)
     }
+
+    ToolbarSpacer(.fixed, placement: .automatic)
   }
 }
 
