@@ -64,7 +64,8 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
     }
     Task { @MainActor in
       try? await Task.sleep(for: .milliseconds(300))
-      guard !hasVisibleMainWindow() else {
+      let launchBehavior = HarnessMonitorLaunchBehavior.read()
+      guard launchBehavior == .alwaysOpenRecent || !hasVisibleMainWindow() else {
         return
       }
       HarnessMonitorMainWindowLauncher.shared.openMainWindow?()
@@ -209,6 +210,7 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
       return .terminateNow
     }
 
+    store.beginSessionWindowTerminationSnapshot()
     terminationTask = Task { @MainActor [weak self] in
       await self?.prepareForTermination(using: store)
       self?.terminationTask = nil
@@ -248,6 +250,7 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
       return
     }
 
+    store?.beginSessionWindowTerminationSnapshot()
     terminationTask = Task { @MainActor [weak self] in
       if let self {
         await self.prepareForTermination(using: self.store)

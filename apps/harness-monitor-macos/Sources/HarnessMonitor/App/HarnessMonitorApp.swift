@@ -177,7 +177,7 @@ struct HarnessMonitorApp: App {
         .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
         .modifier(HarnessMonitorMainWindowLauncherBinder())
         .modifier(
-          HarnessMonitorLaunchWindowRestorer(
+          LaunchWindowRestorerMigrator(
             store: store,
             isEnabled: allowsWindowRestoration && launchBehavior == .restoreSessionWindows
           )
@@ -198,7 +198,7 @@ struct HarnessMonitorApp: App {
     .windowToolbarStyle(.unified)
     .defaultSize(width: mainWindowDefaultSize.width, height: mainWindowDefaultSize.height)
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
-    .defaultLaunchBehavior(.automatic)
+    .defaultLaunchBehavior(.suppressed)
     .commands {
       HarnessMonitorAppCommands(
         store: store,

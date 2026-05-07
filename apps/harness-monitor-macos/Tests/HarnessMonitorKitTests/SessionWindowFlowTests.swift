@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 
+@testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
 @Suite("Session window flow contracts")
@@ -19,6 +20,16 @@ struct SessionWindowFlowTests {
   func sessionWindowsRouteThroughMainSceneID() {
     #expect(HarnessMonitorWindowID.main == "main")
     #expect(HarnessMonitorWindowID.sessionWindow("sess-alpha") == "session-sess-alpha")
+  }
+
+  @Test("Current schema includes session window restoration state")
+  func currentSchemaIncludesSessionWindowRestorationState() {
+    #expect(HarnessMonitorCurrentSchema.versionString == "9.0.0")
+    #expect(
+      HarnessMonitorSchemaV9.models.contains {
+        String(describing: $0) == "CachedSessionWindowState"
+      }
+    )
   }
 
   @Test("Session routes expose stable sidebar order")
