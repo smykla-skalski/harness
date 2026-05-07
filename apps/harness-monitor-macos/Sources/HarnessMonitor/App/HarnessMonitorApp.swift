@@ -204,34 +204,16 @@ struct HarnessMonitorApp: App {
   }
 
   @CommandsBuilder private var mainWindowCommands: some Commands {
-    HarnessMonitorAppCommands(
+    HarnessMonitorMainCommandSet(
       store: store,
-      displayState: store.commandsDisplayState,
       textSizeIndex: textSizeIndex,
+      workspaceNavigationBridge: workspaceNavigationBridge,
+      windowCommandRouting: windowCommandRouting,
       increaseTextSize: increaseTextSize,
       decreaseTextSize: decreaseTextSize,
       resetTextSize: resetTextSize,
       refreshStore: refreshStore
     )
-    NewSessionCommand(store: store)
-    SessionCreateCommands()
-    OpenFolderCommand(store: store)
-    AttachExternalSessionCommand(store: store)
-    GoCommands(
-      store: store,
-      workspaceNavigationBridge: workspaceNavigationBridge,
-      windowCommandRouting: windowCommandRouting,
-      displayState: store.commandsDisplayState
-    )
-    SessionCommands(
-      store: store,
-      displayState: store.commandsDisplayState
-    )
-    WindowMenuCommands(
-      store: store
-    )
-    InspectorCommands()
-    DecisionCommands()
   }
 
   private func installMainWindowLauncherIfNeeded() {
@@ -263,64 +245,20 @@ struct HarnessMonitorApp: App {
 
   @MainActor
   private func routeInitialWindows() async {
-    let restoredWindowVisible = await waitForVisibleHarnessWindowDuringLaunch()
-    if restoredWindowVisible {
-      return
-    }
-
-    var restorePlan = HarnessMonitorStore.LaunchWindowRestorePlan()
-    if launchBehavior == .restoreSessionWindows {
-      await store.prepareOpenRecentSessions()
-      if hasVisibleHarnessWindow() {
-        return
-      }
-      restorePlan = await store.launchWindowRestorePlan()
-    }
-
-    let initialPlan = HarnessMonitorInitialWindowPlan.resolve(
+    let router = HarnessMonitorInitialWindowRouter(
+      store: store,
       launchBehavior: launchBehavior,
-      hasVisibleWindows: hasVisibleHarnessWindow(),
-      restorePlan: restorePlan
-    )
-
-    switch initialPlan.destination {
-    case .none:
-      break
-    case .welcome:
-      openWindow(id: HarnessMonitorWindowID.main)
-    case .sessions(let sessionIDs):
-      for sessionID in sessionIDs {
+      openWelcomeWindow: {
+        openWindow(id: HarnessMonitorWindowID.main)
+      },
+      openSessionWindow: { sessionID in
         openWindow(
           id: HarnessMonitorWindowID.main,
           value: SessionWindowToken(sessionID: sessionID)
         )
       }
-    }
-
-    if initialPlan.shouldMarkBridgeFallbackComplete {
-      store.completeLaunchWindowBridgeFallback()
-    }
-  }
-
-  @MainActor
-  private func waitForVisibleHarnessWindowDuringLaunch() async -> Bool {
-    guard !hasVisibleHarnessWindow() else {
-      return true
-    }
-    for _ in 0..<6 {
-      try? await Task.sleep(for: .milliseconds(50))
-      guard !hasVisibleHarnessWindow() else {
-        return true
-      }
-    }
-    return hasVisibleHarnessWindow()
-  }
-
-  @MainActor
-  private func hasVisibleHarnessWindow() -> Bool {
-    NSApplication.shared.windows.contains { window in
-      window.isVisible && !window.isMiniaturized
-    }
+    )
+    await router.route()
   }
 
   @ViewBuilder private var settingsSceneContent: some View {
