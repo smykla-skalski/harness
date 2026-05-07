@@ -264,6 +264,14 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(HarnessMonitorAccessibility.menuBarQuit == "harness.menu-bar.action.quit")
   }
 
+  @Test("Settings appearance identifiers match UI-test mirror")
+  func settingsAppearanceIdentifiersMirror() {
+    #expect(
+      HarnessMonitorAccessibility.settingsMenuBarStateColorsToggle
+        == "harness.settings.menu-bar.state-colors"
+    )
+  }
+
   @Test("New session capability identifiers match UI-test mirror")
   func newSessionCapabilityIdentifiersMirror() {
     #expect(

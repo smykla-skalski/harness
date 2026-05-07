@@ -177,4 +177,20 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
       HarnessMonitorMenuBarSnapshot.statusItemCriticalImageName
     )
   }
+
+  func testMenuBarStatusPresentationCanSuppressStateColoredVariants() {
+    let presentation = HarnessMonitorMenuBarStatusPresentation(
+      pendingDecisionCount: 1,
+      pendingDecisionSeverity: .critical
+    )
+
+    XCTAssertEqual(
+      presentation.statusItemAssetName(showsStateColorVariants: false),
+      HarnessMonitorMenuBarSnapshot.statusItemImageName
+    )
+    XCTAssertEqual(
+      presentation.statusItemAssetName(showsStateColorVariants: true),
+      HarnessMonitorMenuBarSnapshot.statusItemCriticalImageName
+    )
+  }
 }

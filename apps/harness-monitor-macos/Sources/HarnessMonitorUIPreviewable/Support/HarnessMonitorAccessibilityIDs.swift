@@ -6,6 +6,18 @@ public enum HarnessMonitorAccessibility {
   public static let auditBuildState = "harness.audit.build.state"
   public static let auditBuildBadge = "harness.audit.build.badge"
   public static let perfScenarioState = "harness.perf.scenario.state"
+  public static func windowShellState(_ windowID: String) -> String {
+    "harness.window.\(slug(windowID)).shell.state"
+  }
+
+  public static func windowBannerChrome(_ windowID: String) -> String {
+    "harness.window.\(slug(windowID)).banner-chrome"
+  }
+
+  public static func windowBannerChromeState(_ windowID: String) -> String {
+    "\(windowBannerChrome(windowID)).state"
+  }
+
   public static let toolbarChromeState = "harness.toolbar.chrome.state"
   public static let toolbarBaselineDivider = "harness.toolbar.baseline-divider"
   public static let persistenceBanner = "harness.persistence.banner"
@@ -77,6 +89,8 @@ public enum HarnessMonitorAccessibility {
   public static let settingsBackgroundRecentState =
     "harness.settings.background.recents-state"
   public static let settingsTextSizePicker = "harness.settings.text-size"
+  public static let settingsMenuBarStateColorsToggle =
+    "harness.settings.menu-bar.state-colors"
   public static let settingsSessionRowModePicker =
     "harness.settings.sidebar-session-row-mode"
   public static let settingsTimeZoneModePicker = "harness.settings.time-zone-mode"

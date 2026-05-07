@@ -164,8 +164,8 @@ struct HarnessMonitorMenuBarStatusPresentation: Equatable {
   let pendingDecisionCount: Int
   let pendingDecisionSeverity: DecisionSeverity?
 
-  var statusItemAssetName: String {
-    guard pendingDecisionCount > .zero else {
+  func statusItemAssetName(showsStateColorVariants: Bool) -> String {
+    guard showsStateColorVariants, pendingDecisionCount > .zero else {
       return HarnessMonitorMenuBarSnapshot.statusItemImageName
     }
     switch pendingDecisionSeverity {
@@ -176,6 +176,10 @@ struct HarnessMonitorMenuBarStatusPresentation: Equatable {
     case .none, .info:
       return HarnessMonitorMenuBarSnapshot.statusItemInfoImageName
     }
+  }
+
+  var statusItemAssetName: String {
+    statusItemAssetName(showsStateColorVariants: true)
   }
 }
 

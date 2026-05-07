@@ -31,6 +31,9 @@ struct HarnessMonitorApp: App {
   private var themeMode: HarnessMonitorThemeMode = .auto
   @AppStorage(HarnessMonitorTextSize.storageKey)
   private var textSizeIndex = HarnessMonitorTextSize.defaultIndex
+  @AppStorage(HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledKey)
+  private var menuBarStateColorVariantsEnabled =
+    HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledDefault
 
   init() {
     UserDefaults.standard.register(defaults: [
@@ -225,8 +228,6 @@ struct HarnessMonitorApp: App {
       WorkspaceWindowRootView(
         store: store,
         keyWindowObserver: keyWindowObserver,
-        notifications: notificationController,
-        acpAttentionState: acpAttentionState,
         navigationBridge: workspaceNavigationBridge,
         windowCommandRouting: windowCommandRouting,
         mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
@@ -253,7 +254,9 @@ struct HarnessMonitorApp: App {
     // image names so the inserted MenuBarExtra stays stable.
     MenuBarExtra(
       HarnessMonitorMenuBarSnapshot.statusItemTitle,
-      image: menuBarStatusController.presentation.statusItemAssetName,
+      image: menuBarStatusController.presentation.statusItemAssetName(
+        showsStateColorVariants: menuBarStateColorVariantsEnabled
+      ),
       isInserted: .constant(rendersMenuBarExtraContent)
     ) {
       HarnessMonitorMenuBarExtraContent(store: store)
