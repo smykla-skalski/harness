@@ -242,10 +242,10 @@ public struct SessionWindowView: View {
         description: Text("Task detail lands in a later chunk.")
       )
     case .create(let draft):
-      ContentUnavailableView(
-        "Create \(draft.kind.rawValue.capitalized)",
-        systemImage: "plus.circle",
-        description: Text("Form lands in a later chunk.")
+      SessionWindowCreateForm(
+        store: store,
+        state: stateCache,
+        draft: draft
       )
     case .route:
       ContentUnavailableView(
