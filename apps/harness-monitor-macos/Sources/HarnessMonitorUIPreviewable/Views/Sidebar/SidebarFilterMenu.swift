@@ -84,7 +84,6 @@ struct SidebarFilterMenu: View {
             ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
       }
       .help("Filter sessions")
-      .menuIndicator(.hidden)
       .accessibilityLabel("Filters")
       .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarFiltersCard)
       .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarFiltersCardFrame)

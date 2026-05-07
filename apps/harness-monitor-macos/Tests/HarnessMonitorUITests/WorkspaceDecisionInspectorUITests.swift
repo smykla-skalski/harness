@@ -32,7 +32,7 @@ final class WorkspaceDecisionInspectorUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(waitForElement(detail, timeout: Self.actionTimeout))
 
     let inspector = element(in: app, identifier: Accessibility.decisionInspector)
-    let bulkMenu = element(in: app, identifier: Accessibility.decisionBulkActions)
+    let bulkMenu = button(in: app, identifier: Accessibility.decisionBulkActions)
     XCTAssertTrue(
       waitForElement(bulkMenu, timeout: Self.actionTimeout),
       "Bulk-actions toolbar menu should be present in primaryAction slot"

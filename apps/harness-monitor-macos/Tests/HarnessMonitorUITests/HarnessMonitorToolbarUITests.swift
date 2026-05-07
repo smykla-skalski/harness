@@ -239,6 +239,35 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testCockpitPlacesCreateMenuBeforeRefreshGroup() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "cockpit"]
+    )
+    let createButton = button(in: app, identifier: Accessibility.sidebarCreateMenuButton)
+    let refreshButton = toolbarButton(in: app, identifier: Accessibility.refreshButton)
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        createButton.exists && !createButton.frame.isEmpty
+          && refreshButton.exists && !refreshButton.frame.isEmpty
+      },
+      "Expected create and refresh toolbar controls to be visible"
+    )
+
+    let gap = refreshButton.frame.minX - createButton.frame.maxX
+    XCTAssertLessThan(
+      createButton.frame.maxX,
+      refreshButton.frame.minX,
+      "Create menu should sit before the refresh group"
+    )
+    XCTAssertGreaterThan(
+      gap,
+      4,
+      "Create menu should be separated from the refresh group by toolbar spacing"
+    )
+  }
+
   func testCockpitUsesSingleWorkspaceToolbarAction() throws {
     let app = launch(
       mode: "preview",

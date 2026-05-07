@@ -187,8 +187,13 @@ public struct WorkspaceDecisionDeskPreviewView: View {
   }
 
   @ToolbarContentBuilder private var windowToolbar: some ToolbarContent {
-    ToolbarItemGroup(placement: .primaryAction) {
+    ToolbarItem(placement: .primaryAction) {
       bulkActionsMenu
+    }
+
+    ToolbarSpacer(.fixed, placement: .primaryAction)
+
+    ToolbarItem(placement: .primaryAction) {
       inspectorToggleButton
     }
   }

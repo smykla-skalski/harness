@@ -69,7 +69,7 @@ extension WorkspaceWindowView {
     decisionScope: DecisionWorkspaceScope
   ) -> some ToolbarContent {
     if viewModel.selection.isDecisionRoute {
-      ToolbarItemGroup(placement: .primaryAction) {
+      ToolbarItem(placement: .primaryAction) {
         Menu {
           decisionBulkActionItems(decisionScope: decisionScope)
         } label: {
@@ -81,7 +81,11 @@ extension WorkspaceWindowView {
           HarnessMonitorAccessibility.decisionBulkActions,
           label: "Decision bulk actions"
         )
+      }
 
+      ToolbarSpacer(.fixed, placement: .primaryAction)
+
+      ToolbarItem(placement: .primaryAction) {
         Button {
           toggleDecisionInspector()
         } label: {
