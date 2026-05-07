@@ -35,7 +35,7 @@ struct SessionAgentDetailSection: View {
     }
     .padding(20)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .task(id: agent.agentId) {
+    .task {
       if tui?.status.isActive == true {
         focusedField = .composer
       }
