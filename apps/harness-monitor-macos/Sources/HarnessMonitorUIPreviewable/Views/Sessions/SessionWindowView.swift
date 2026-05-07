@@ -47,7 +47,9 @@ public struct SessionWindowView: View {
 
   private var matchingDecisions: [Decision] {
     store.supervisorOpenDecisions.filter { decision in
-      decision.sessionID == token.sessionID && decisionMatchesSearch(decision)
+      decision.sessionID == token.sessionID
+        && decisionMatchesSearch(decision)
+        && stateCache.decisionFilters.matches(decision)
     }
   }
 
@@ -59,6 +61,7 @@ public struct SessionWindowView: View {
   public var body: some View {
     NavigationSplitView(columnVisibility: columnVisibilityBinding) {
       SessionSidebar(
+        store: store,
         snapshot: snapshot,
         decisions: matchingDecisions,
         state: stateCache

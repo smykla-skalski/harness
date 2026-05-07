@@ -1,4 +1,3 @@
-import Foundation
 import HarnessMonitorKit
 import Observation
 
@@ -13,11 +12,7 @@ public struct SessionCreateDraft: Codable, Hashable, Sendable {
   public var title: String
   public var sessionID: String
 
-  public init(
-    kind: SessionCreateKind,
-    title: String = "",
-    sessionID: String
-  ) {
+  public init(kind: SessionCreateKind, title: String = "", sessionID: String) {
     self.kind = kind
     self.title = title
     self.sessionID = sessionID
@@ -66,14 +61,13 @@ public final class SessionWindowStateCache {
   public var sidebarSelection = SessionSidebarSelectionState()
   public var sectionState = SessionWindowSectionState()
   public var decisionRuntime = SessionDecisionRuntime()
+  public var decisionFilters = SessionDecisionFilterState()
+  public var decisionBulkActions = SessionDecisionBulkActionState()
   public var navigationHistory = SessionWindowNavigationHistory()
   public var attention = SessionAttentionState()
   public var lastTaskDecisionLink: SessionTaskDecisionLink?
 
-  public init(
-    sessionID: String,
-    selection: SessionSelection = .route(.overview)
-  ) {
+  public init(sessionID: String, selection: SessionSelection = .route(.overview)) {
     self.sessionID = sessionID
     self.selection = selection
   }
@@ -128,46 +122,6 @@ public final class SessionWindowStateCache {
   }
 }
 
-public struct SessionTaskDecisionLink: Equatable, Sendable {
-  public let sessionID: String
-  public let taskID: String
-  public let decisionID: String
-
-  public init(sessionID: String, taskID: String, decisionID: String) {
-    self.sessionID = sessionID
-    self.taskID = taskID
-    self.decisionID = decisionID
-  }
-}
-
-@MainActor
-@Observable
-public final class SessionSidebarSelectionState {
-  public var isDecisionMultiSelectEnabled = false
-  public var selectedDecisionIDs: Set<String> = []
-
-  public init() {}
-
-  public func toggleDecisionMultiSelect() {
-    isDecisionMultiSelectEnabled.toggle()
-    if !isDecisionMultiSelectEnabled {
-      selectedDecisionIDs.removeAll()
-    }
-  }
-
-  public func toggleDecision(_ decisionID: String) {
-    if selectedDecisionIDs.contains(decisionID) {
-      selectedDecisionIDs.remove(decisionID)
-    } else {
-      selectedDecisionIDs.insert(decisionID)
-    }
-  }
-
-  public func pruneDecisionSelection(to visibleDecisionIDs: Set<String>) {
-    selectedDecisionIDs.formIntersection(visibleDecisionIDs)
-  }
-}
-
 @MainActor
 @Observable
 public final class SessionWindowSectionState {
@@ -193,88 +147,4 @@ public final class SessionWindowSectionState {
       createDrafts[draft.kind] = draft
     }
   }
-}
-
-@MainActor
-@Observable
-public final class SessionSidebarOrderingState {
-  public var agentIDs: [String] = []
-
-  public init() {}
-
-  public func orderedAgents(_ agents: [AgentRegistration]) -> [AgentRegistration] {
-    reconcileAgentIDs(with: agents.map(\.agentId))
-    let order = Dictionary(uniqueKeysWithValues: agentIDs.enumerated().map { ($1, $0) })
-    return agents.sorted { left, right in
-      (order[left.agentId] ?? Int.max, left.agentId)
-        < (order[right.agentId] ?? Int.max, right.agentId)
-    }
-  }
-
-  public func moveAgent(
-    _ agentID: String,
-    before targetID: String?,
-    undoManager: UndoManager?
-  ) {
-    let previous = agentIDs
-    applyAgentMove(agentID, before: targetID)
-    guard previous != agentIDs else { return }
-    undoManager?.registerUndo(withTarget: self) { target in
-      target.agentIDs = previous
-    }
-    undoManager?.setActionName("Move Agent")
-  }
-
-  private func reconcileAgentIDs(with liveIDs: [String]) {
-    let liveSet = Set(liveIDs)
-    let retained = agentIDs.filter { liveSet.contains($0) }
-    let retainedSet = Set(retained)
-    agentIDs = retained + liveIDs.filter { !retainedSet.contains($0) }
-  }
-
-  private func applyAgentMove(_ agentID: String, before targetID: String?) {
-    agentIDs.removeAll { $0 == agentID }
-    guard let targetID, let targetIndex = agentIDs.firstIndex(of: targetID) else {
-      agentIDs.append(agentID)
-      return
-    }
-    agentIDs.insert(agentID, at: targetIndex)
-  }
-}
-
-@MainActor
-@Observable
-public final class SessionWindowNavigationHistory {
-  public private(set) var backStack: [SessionSelection] = []
-  public private(set) var forwardStack: [SessionSelection] = []
-
-  public init() {}
-
-  public var canGoBack: Bool { !backStack.isEmpty }
-  public var canGoForward: Bool { !forwardStack.isEmpty }
-
-  public func record(_ selection: SessionSelection) {
-    backStack.append(selection)
-    forwardStack.removeAll()
-  }
-
-  public func popBack(current: SessionSelection) -> SessionSelection? {
-    guard let previous = backStack.popLast() else { return nil }
-    forwardStack.append(current)
-    return previous
-  }
-
-  public func popForward(current: SessionSelection) -> SessionSelection? {
-    guard let next = forwardStack.popLast() else { return nil }
-    backStack.append(current)
-    return next
-  }
-}
-
-@MainActor
-@Observable
-public final class SessionAttentionState {
-  public var pendingDecisionCount = 0
-
-  public init() {}
 }
