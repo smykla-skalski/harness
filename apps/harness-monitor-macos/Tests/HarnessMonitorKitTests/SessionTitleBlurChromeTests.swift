@@ -35,7 +35,10 @@ final class SessionTitleBlurChromeTests: XCTestCase {
     XCTAssertEqual(SessionTitleBlurChromeConfiguration.gradientRadius, 360)
     XCTAssertEqual(SessionTitleBlurChromeConfiguration.titleLeadingPadding, 78)
     XCTAssertEqual(SessionTitleBlurChromeConfiguration.tintOpacity, 0.18)
-    XCTAssertEqual(SessionTitleBlurChromeConfiguration.reducedTransparencyOpacity, 0.82)
+    XCTAssertEqual(
+      SessionTitleBlurChromeConfiguration.reducedTransparencyOpacity,
+      0.82
+    )
     XCTAssertEqual(SessionTitleBlurChromeConfiguration.animationDuration, 0.18)
     XCTAssertEqual(
       SessionTitleBlurChromeConfiguration.accessibilityIdentifier,
