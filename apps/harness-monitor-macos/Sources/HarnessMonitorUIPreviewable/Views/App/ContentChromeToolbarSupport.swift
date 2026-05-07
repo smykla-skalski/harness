@@ -2,10 +2,12 @@ import HarnessMonitorKit
 import SwiftUI
 
 private enum RefreshToolbarFeedbackTiming {
-  static let successDuration: Duration = .milliseconds(400)
-  static let reduceMotionDuration: Duration = .milliseconds(320)
-  static let transitionAnimation: Animation = .smooth(duration: 0.28)
-  static let bounceOptions: SymbolEffectOptions = .speed(0.8)
+  static let successDuration: Duration = .milliseconds(900)
+  static let successTintFadeDuration: Duration = .milliseconds(405)
+  static let reduceMotionDuration: Duration = .milliseconds(720)
+  static let transitionAnimation: Animation = .smooth(duration: 0.14)
+  static let replaceOptions: SymbolEffectOptions = .speed(1.55)
+  static let bounceOptions: SymbolEffectOptions = .speed(1.1)
 }
 
 struct ContentNavigationToolbar: ToolbarContent {
@@ -41,10 +43,11 @@ struct RefreshToolbarButton: View {
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
   @State private var showsSuccessFeedback = false
+  @State private var showsSuccessTint = false
   @State private var successPopToken = 0
 
   private var displaysSuccessFeedback: Bool {
-    showsSuccessFeedback && !model.isRefreshing
+    (showsSuccessFeedback || showsSuccessTint) && !model.isRefreshing
   }
 
   private var helpText: String {
@@ -93,42 +96,66 @@ struct RefreshToolbarButton: View {
       guard model.manualRefreshSuccessToken > 0 else {
         return
       }
-      if showsSuccessFeedback {
+      if showsSuccessFeedback || showsSuccessTint {
         showsSuccessFeedback = false
+        showsSuccessTint = false
         await Task.yield()
       }
       showsSuccessFeedback = true
+      showsSuccessTint = true
       guard !reduceMotion else {
         try? await Task.sleep(for: RefreshToolbarFeedbackTiming.reduceMotionDuration)
         guard !Task.isCancelled else {
+          showsSuccessFeedback = false
+          showsSuccessTint = false
           return
         }
         showsSuccessFeedback = false
+        showsSuccessTint = false
         return
       }
       await Task.yield()
       successPopToken += 1
       try? await Task.sleep(for: RefreshToolbarFeedbackTiming.successDuration)
       guard !Task.isCancelled else {
+        showsSuccessFeedback = false
+        showsSuccessTint = false
         return
       }
       showsSuccessFeedback = false
+      try? await Task.sleep(for: RefreshToolbarFeedbackTiming.successTintFadeDuration)
+      guard !Task.isCancelled else {
+        showsSuccessTint = false
+        return
+      }
+      showsSuccessTint = false
     }
   }
 
   private func toolbarSymbol(at date: Date) -> some View {
-    Image(systemName: displaysSuccessFeedback ? "checkmark" : "arrow.clockwise")
-      .foregroundStyle(displaysSuccessFeedback ? Color.green : Color.primary)
-      .rotationEffect(.degrees(displaysSuccessFeedback ? 0 : rotationDegrees(at: date)))
-      .contentTransition(.symbolEffect(.replace))
-      .symbolEffect(
-        .bounce,
-        options: RefreshToolbarFeedbackTiming.bounceOptions,
-        value: successPopToken
+    Image(systemName: showsSuccessFeedback ? "checkmark" : "arrow.clockwise")
+      .foregroundStyle(.primary)
+      .rotationEffect(.degrees(showsSuccessFeedback ? 0 : rotationDegrees(at: date)))
+      .contentTransition(
+        .symbolEffect(.replace, options: RefreshToolbarFeedbackTiming.replaceOptions)
       )
+      .overlay {
+        if showsSuccessTint {
+          Image(systemName: "checkmark")
+            .foregroundStyle(.green)
+            .symbolEffect(
+              .bounce,
+              options: RefreshToolbarFeedbackTiming.bounceOptions,
+              value: successPopToken
+            )
+            .blendMode(.sourceAtop)
+            .accessibilityHidden(true)
+        }
+      }
+      .compositingGroup()
       .animation(
         reduceMotion ? nil : RefreshToolbarFeedbackTiming.transitionAnimation,
-        value: displaysSuccessFeedback
+        value: showsSuccessFeedback
       )
       .frame(width: 14, height: 14)
       .accessibilityHidden(true)
