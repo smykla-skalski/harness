@@ -1,4 +1,5 @@
 import HarnessMonitorKit
+import AppKit
 import SwiftUI
 
 public struct OpenRecentView: View {
@@ -12,6 +13,10 @@ public struct OpenRecentView: View {
   private var dateTimeConfiguration
   @Environment(\.fontScale)
   private var fontScale
+  @Environment(\.accessibilityReduceMotion)
+  private var reduceMotion
+  @AppStorage(OpenRecentCloseAfterPickDefaults.storageKey)
+  private var closeAfterPick = OpenRecentCloseAfterPickDefaults.defaultValue
   @State private var refreshActivationCount = 0
   @State private var openFolderActivationCount = 0
 
@@ -40,8 +45,10 @@ public struct OpenRecentView: View {
           dateTimeConfiguration: dateTimeConfiguration,
           refresh: refreshAction,
           openFolder: openFolderAction,
-          openSession: openSession
+          openSession: openSession,
+          closeAfterPick: $closeAfterPick
         )
+        .transition(reduceMotion ? .identity : .opacity)
         Spacer(minLength: 132 * layoutScale)
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -80,7 +87,10 @@ public struct OpenRecentView: View {
       id: HarnessMonitorWindowID.main,
       value: SessionWindowToken(sessionID: sessionID)
     )
-    dismissWindow(id: HarnessMonitorWindowID.main)
+    NSApp.activate(ignoringOtherApps: true)
+    if closeAfterPick {
+      dismissWindow(id: HarnessMonitorWindowID.main)
+    }
   }
 
   @ViewBuilder private var actionStateMarker: some View {
@@ -99,6 +109,7 @@ private struct OpenRecentStartPanel: View {
   let refresh: () -> Void
   let openFolder: () -> Void
   let openSession: (String) -> Void
+  @Binding var closeAfterPick: Bool
   @Environment(\.fontScale)
   private var fontScale
 
@@ -142,6 +153,12 @@ private struct OpenRecentStartPanel: View {
         }
       }
       .accessibilityIdentifier(HarnessMonitorAccessibility.openRecentProjectList)
+      Toggle("Close after opening a session", isOn: $closeAfterPick)
+        .toggleStyle(.checkbox)
+        .scaledFont(.caption)
+        .foregroundStyle(.secondary)
+        .accessibilityLabel("Close Open Recent after picking a session")
+        .accessibilityHint("When enabled, this welcome window closes after a session opens.")
     }
     .frame(width: panelWidth)
   }

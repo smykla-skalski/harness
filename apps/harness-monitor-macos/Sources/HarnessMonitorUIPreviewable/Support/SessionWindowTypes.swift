@@ -81,6 +81,18 @@ public enum HarnessMonitorLaunchBehavior: String, CaseIterable, Codable, Hashabl
   }
 }
 
+public enum OpenRecentCloseAfterPickDefaults {
+  public static let storageKey = "harness.monitor.open-recent.close-after-pick"
+  public static let defaultValue = true
+
+  public static func read(userDefaults: UserDefaults = .standard) -> Bool {
+    if userDefaults.object(forKey: storageKey) == nil {
+      return defaultValue
+    }
+    return userDefaults.bool(forKey: storageKey)
+  }
+}
+
 public enum SessionWindowTabbingPreference: String, CaseIterable, Codable, Hashable,
   Identifiable, Sendable
 {

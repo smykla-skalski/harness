@@ -81,6 +81,8 @@ public struct SettingsGeneralSection: View {
     SessionTimelineFilterDefaults.defaultPersistenceMode.rawValue
   @AppStorage(HarnessMonitorLaunchBehavior.storageKey)
   private var launchBehaviorRawValue = HarnessMonitorLaunchBehavior.defaultValue.rawValue
+  @AppStorage(OpenRecentCloseAfterPickDefaults.storageKey)
+  private var closeOpenRecentAfterPick = OpenRecentCloseAfterPickDefaults.defaultValue
   @AppStorage(SessionWindowTabbingPreference.storageKey)
   private var sessionWindowTabbingRawValue = SessionWindowTabbingPreference.defaultValue.rawValue
   @State private var isRemoveLaunchAgentConfirmationPresented = false
@@ -225,6 +227,10 @@ public struct SettingsGeneralSection: View {
         .harnessNativeFormControl()
         .accessibilityLabel("Session window tabs")
         .accessibilityHint("Controls whether session windows prefer native macOS tabs.")
+
+        Toggle("Close Open Recent after picking a session", isOn: $closeOpenRecentAfterPick)
+          .accessibilityLabel("Close Open Recent after picking a session")
+          .accessibilityHint("When enabled, choosing a recent session closes the welcome window.")
       } header: {
         Text("Windows")
       } footer: {

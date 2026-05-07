@@ -9,6 +9,10 @@ import SwiftUI
 @MainActor
 struct HarnessMonitorApp: App {
   @NSApplicationDelegateAdaptor private var delegate: HarnessMonitorAppDelegate
+  @Environment(\.openWindow)
+  private var openWindow
+  @Environment(\.scenePhase)
+  private var scenePhase
   private let container: ModelContainer?
   private let isUITesting: Bool
   private let isTestRun: Bool
@@ -27,6 +31,7 @@ struct HarnessMonitorApp: App {
   @State private var windowCommandRouting: WindowCommandRoutingState
   @State private var mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   @State private var settingsSelectedSection: SettingsSection
+  @State private var hasInstalledMainWindowLauncher = false
   @AppStorage(HarnessMonitorThemeDefaults.modeKey)
   private var themeMode: HarnessMonitorThemeMode = .auto
   @AppStorage(HarnessMonitorTextSize.storageKey)
@@ -167,11 +172,9 @@ struct HarnessMonitorApp: App {
         themeMode: $themeMode
       )
       .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
-      .modifier(HarnessMonitorMainWindowLauncherBinder())
     } else if rendersLiveSceneContent {
       mainWindowContent
         .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
-        .modifier(HarnessMonitorMainWindowLauncherBinder())
         .modifier(SessionWindowTabbing(isSessionWindow: false))
         .modifier(
           LaunchWindowRestorerMigrator(
@@ -196,6 +199,9 @@ struct HarnessMonitorApp: App {
     .defaultSize(width: mainWindowDefaultSize.width, height: mainWindowDefaultSize.height)
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
     .defaultLaunchBehavior(.suppressed)
+    .onChange(of: scenePhase, initial: true) {
+      installMainWindowLauncherIfNeeded()
+    }
     .commands {
       HarnessMonitorAppCommands(
         store: store,
@@ -226,6 +232,16 @@ struct HarnessMonitorApp: App {
     }
   }
 
+  private func installMainWindowLauncherIfNeeded() {
+    guard !hasInstalledMainWindowLauncher else {
+      return
+    }
+    hasInstalledMainWindowLauncher = true
+    HarnessMonitorMainWindowLauncher.shared.installOpenMainWindow {
+      openWindow(id: HarnessMonitorWindowID.main)
+    }
+  }
+
   @ViewBuilder private var settingsSceneContent: some View {
     if rendersLiveSceneContent {
       HarnessMonitorSettingsRootView(
@@ -238,7 +254,6 @@ struct HarnessMonitorApp: App {
         selectedSection: $settingsSelectedSection
       )
       .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
-      .modifier(HarnessMonitorMainWindowLauncherBinder())
     } else {
       Color.clear.accessibilityHidden(true)
     }

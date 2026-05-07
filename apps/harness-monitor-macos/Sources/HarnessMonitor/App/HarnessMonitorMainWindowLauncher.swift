@@ -1,22 +1,33 @@
-import HarnessMonitorUIPreviewable
-import SwiftUI
-
 @MainActor
 final class HarnessMonitorMainWindowLauncher {
   static let shared = HarnessMonitorMainWindowLauncher()
-  var openMainWindow: (() -> Void)?
+  private var openMainWindow: (() -> Void)?
+  private var hasPendingOpenRequest = false
   private init() {}
-}
 
-struct HarnessMonitorMainWindowLauncherBinder: ViewModifier {
-  @Environment(\.openWindow)
-  private var openWindow
-
-  func body(content: Content) -> some View {
-    content.onAppear {
-      HarnessMonitorMainWindowLauncher.shared.openMainWindow = {
-        openWindow(id: HarnessMonitorWindowID.main)
-      }
+  func requestOpenMainWindow() {
+    guard let openMainWindow else {
+      hasPendingOpenRequest = true
+      return
     }
+    openMainWindow()
+  }
+
+  func installOpenMainWindow(_ openMainWindow: @escaping () -> Void) {
+    self.openMainWindow = openMainWindow
+    guard hasPendingOpenRequest else {
+      return
+    }
+    hasPendingOpenRequest = false
+    openMainWindow()
+  }
+
+  var hasPendingOpenRequestForTesting: Bool {
+    hasPendingOpenRequest
+  }
+
+  func resetForTesting() {
+    openMainWindow = nil
+    hasPendingOpenRequest = false
   }
 }

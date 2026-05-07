@@ -67,8 +67,20 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
       guard launchBehavior == .alwaysOpenRecent || !hasVisibleMainWindow() else {
         return
       }
-      HarnessMonitorMainWindowLauncher.shared.openMainWindow?()
+      HarnessMonitorMainWindowLauncher.shared.requestOpenMainWindow()
     }
+  }
+
+  func applicationShouldHandleReopen(
+    _ sender: NSApplication,
+    hasVisibleWindows flag: Bool
+  ) -> Bool {
+    _ = sender
+    guard Self.shouldRequestMainWindowOnReopen(hasVisibleWindows: flag) else {
+      return true
+    }
+    HarnessMonitorMainWindowLauncher.shared.requestOpenMainWindow()
+    return false
   }
 
   @MainActor
@@ -138,6 +150,12 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
     isTestHarnessRun: Bool
   ) -> Bool {
     isTestHarnessRun
+  }
+
+  nonisolated static func shouldRequestMainWindowOnReopen(
+    hasVisibleWindows: Bool
+  ) -> Bool {
+    !hasVisibleWindows
   }
 
   func applicationDidResignActive(_ notification: Notification) {
