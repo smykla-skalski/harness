@@ -197,7 +197,7 @@ fn sample_project() -> DiscoveredProject {
         project_dir: Some("/tmp/harness".into()),
         repository_root: Some("/tmp/harness".into()),
         checkout_id: "checkout-abc123".into(),
-        checkout_name: "Repository".into(),
+        checkout_name: "main".into(),
         context_root: "/tmp/data/projects/project-abc123".into(),
         is_worktree: false,
         worktree_name: None,

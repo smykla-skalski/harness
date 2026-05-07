@@ -338,7 +338,7 @@ final class ActSurfaceAssertionTests: XCTestCase {
   func testAct16FindsEndedStatusInSidebarRow() {
     let session = "sess-foo"
     let text = """
-      Cell, 0x2, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.sidebar.session.\(session)', label: 'Demo, harness, Repository, Ended, 0 active, 0 moving, sess-foo'
+      Cell, 0x2, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.sidebar.session.\(session)', label: 'Demo, harness, main, Ended, 0 active, 0 moving, sess-foo'
       """
     let findings = RecordingTriage.assertActSurface(
       act: "act16",
@@ -351,7 +351,7 @@ final class ActSurfaceAssertionTests: XCTestCase {
   func testAct16FlagsLingeringActiveStatusInSidebarRow() {
     let session = "sess-foo"
     let text = """
-      Cell, 0x2, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.sidebar.session.\(session)', label: 'Demo, harness, Repository, Active, 3 active, 1 moving, sess-foo'
+      Cell, 0x2, {{0.0, 0.0}, {1.0, 1.0}}, identifier: 'harness.sidebar.session.\(session)', label: 'Demo, harness, main, Active, 3 active, 1 moving, sess-foo'
       """
     let findings = RecordingTriage.assertActSurface(
       act: "act16",

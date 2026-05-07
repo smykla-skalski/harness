@@ -47,7 +47,7 @@ fn protocol_manager(runtime_name: &str, acp_id: &str, session_id: &str) -> AcpAg
         project_dir: Some("/tmp/harness".into()),
         repository_root: Some("/tmp/harness".into()),
         checkout_id: "checkout-protocol".into(),
-        checkout_name: "Repository".into(),
+        checkout_name: "main".into(),
         context_root: "/tmp/data/projects/project-protocol".into(),
         is_worktree: false,
         worktree_name: None,

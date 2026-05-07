@@ -242,7 +242,7 @@ fn repoint_project_dir(manager: &AcpAgentManagerHandle, project_dir: &Path) {
         project_dir: Some(project_dir.to_path_buf()),
         repository_root: Some(project_dir.to_path_buf()),
         checkout_id: "checkout-abc123".into(),
-        checkout_name: "Repository".into(),
+        checkout_name: "main".into(),
         context_root: crate::workspace::project_context_dir(project_dir),
         is_worktree: false,
         worktree_name: None,

@@ -122,7 +122,7 @@ async fn emit_watch_changes_prefers_async_broadcast_builders() {
         project_dir: Some("/tmp/harness".into()),
         repository_root: Some("/tmp/harness".into()),
         checkout_id: "checkout-watch".into(),
-        checkout_name: "Repository".into(),
+        checkout_name: "main".into(),
         context_root: "/tmp/harness-context".into(),
         is_worktree: false,
         worktree_name: None,

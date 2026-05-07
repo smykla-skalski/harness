@@ -7,7 +7,7 @@ pub(crate) fn performance_project(index: usize) -> DiscoveredProject {
         project_dir: Some(format!("/tmp/harness-{index}").into()),
         repository_root: Some(format!("/tmp/harness-{index}").into()),
         checkout_id: format!("checkout-{index}"),
-        checkout_name: "Repository".into(),
+        checkout_name: "main".into(),
         context_root: format!("/tmp/data/projects/project-{index}").into(),
         is_worktree: false,
         worktree_name: None,
