@@ -19,6 +19,42 @@ run = "./scripts/clean-stale-state.sh"
 description = "Quit Harness Monitor and stop live daemon work while resetting stale shared dev state"
 run = "HARNESS_STALE_CLEANUP_ALLOW_LIVE_RESET=1 ./scripts/clean-stale-state.sh"
 
+[tasks."clean:caches"]
+description = "Reclaim disk by removing repo Rust + Xcode build artifacts and global build caches (pass --dry-run or --aggressive after --)"
+run = "./scripts/clean-build-caches.sh"
+
+[tasks."clean:caches:dry-run"]
+description = "Preview clean:caches: print every target and its size; delete nothing"
+run = "./scripts/clean-build-caches.sh --dry-run"
+
+[tasks."clean:caches:aggressive"]
+description = "clean:caches plus Xcode UI HarnessMonitor-* DerivedData slots (loses SourcePackages cache; full regen)"
+run = "./scripts/clean-build-caches.sh --aggressive"
+
+[tasks."clean:system"]
+description = "Reclaim disk by garbage-collecting nix, deleting stale Simulator runtimes (iOS<26, watchOS<26, duplicate majors), Xcode testmanagerd Daemon Containers, and Xcode CompilationCache (pass --dry-run after --)"
+run = "./scripts/clean-system-state.sh"
+
+[tasks."clean:system:dry-run"]
+description = "Preview clean:system: list every Simulator runtime, Daemon Container, and Xcode cache that would be removed; delete nothing"
+run = "./scripts/clean-system-state.sh --dry-run"
+
+[tasks."clean:repos:cold"]
+description = "Audit and delete cold non-harness repos (kong, bartsmykla, klab, kubernetes-manifests, JetBrains) - skips any root with dirty trees, unpushed commits, or untracked branches (pass --dry-run or --root PATH after --)"
+run = "./scripts/clean-cold-repos.sh"
+
+[tasks."clean:repos:cold:dry-run"]
+description = "Preview clean:repos:cold: report each root's size and any safety blockers; delete nothing"
+run = "./scripts/clean-cold-repos.sh --dry-run"
+
+[tasks."clean:repos:cold:skip-vendored"]
+description = "clean:repos:cold ignoring cargo/go/npm vendored checkouts (tmp/cargo/git/checkouts, .cargo/git/checkouts, go/pkg/mod/cache, node_modules) whose dirty state is normal"
+run = "./scripts/clean-cold-repos.sh --skip-vendored"
+
+[tasks."clean:repos:cold:skip-vendored:dry-run"]
+description = "Preview clean:repos:cold:skip-vendored: same blockers as default minus vendored false positives"
+run = "./scripts/clean-cold-repos.sh --skip-vendored --dry-run"
+
 [tasks."version:show"]
 description = "Print the canonical harness package version"
 run = "./scripts/version.sh show"
