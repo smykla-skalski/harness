@@ -8,11 +8,11 @@ import Testing
 
 @Suite("SessionTimeline cursor navigation")
 struct SessionTimelineNavigationScrollTests {
-  @Test("Coordinator measurement uses the current font scale")
+  @Test("Coordinator measurement uses the current font scale for wrapping rows")
   @MainActor
-  func coordinatorMeasurementUsesCurrentFontScale() {
+  func coordinatorMeasurementUsesCurrentFontScaleForWrappingRows() {
     let acknowledgedSummary =
-      "sig-20260504124537520229000 acknowledged by gemini-20260504124513402981000: Expired"
+      "sig-20260504124537520229000 acknowledged by gemini-20260504124513402981000 after expired retry validation and operator review follow-up"
     let row = SessionTimelineRow.rows(
       for: SessionTimelineNodeBuilder(
         sessionID: "session-1",
@@ -28,6 +28,7 @@ struct SessionTimelineNavigationScrollTests {
       .build(),
       configuration: .default
     )[0]
+    let columnWidth: CGFloat = 320
 
     let viewport = SessionTimelineViewportModel()
     let coordinator = SessionTimelineTableView.Coordinator(
@@ -36,7 +37,7 @@ struct SessionTimelineNavigationScrollTests {
     )
     defer { coordinator.cancelMeasurement(reason: "test") }
 
-    let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 945, height: 320))
+    let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: columnWidth, height: 320))
     scrollView.drawsBackground = false
     scrollView.hasVerticalScroller = true
     scrollView.autohidesScrollers = false
@@ -48,7 +49,7 @@ struct SessionTimelineNavigationScrollTests {
     tableView.usesAutomaticRowHeights = false
 
     let column = NSTableColumn(identifier: SessionTimelineTableCellView.columnIdentifier)
-    column.width = 945
+    column.width = columnWidth
     tableView.addTableColumn(column)
     tableView.delegate = coordinator
     tableView.dataSource = coordinator
@@ -63,7 +64,7 @@ struct SessionTimelineNavigationScrollTests {
       scrollCommand: nil,
       request: .init(
         scrollView: scrollView,
-        columnWidth: 945,
+        columnWidth: columnWidth,
         fontScale: 1.3
       )
     )
@@ -73,19 +74,19 @@ struct SessionTimelineNavigationScrollTests {
     coordinator.measureSynchronously(
       outstanding: [0],
       snapshot: [row],
-      columnWidth: 945,
+      columnWidth: columnWidth,
       generation: 1,
       totalOutstanding: 1
     )
 
     let defaultHeight = SessionTimelineTableCellView.measuredHeight(
       for: row,
-      columnWidth: 945,
+      columnWidth: columnWidth,
       fontScale: 1.0
     )
     let enlargedHeight = SessionTimelineTableCellView.measuredHeight(
       for: row,
-      columnWidth: 945,
+      columnWidth: columnWidth,
       fontScale: 1.3
     )
 
