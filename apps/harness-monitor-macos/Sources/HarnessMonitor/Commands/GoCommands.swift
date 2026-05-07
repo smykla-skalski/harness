@@ -7,6 +7,7 @@ struct GoCommands: Commands {
   let workspaceNavigationBridge: WorkspaceWindowNavigationBridge
   let windowCommandRouting: WindowCommandRoutingState
   let displayState: CommandsDisplayState
+  @FocusedValue(\.sessionNavigation) private var sessionNavigation
 
   private var activeScope: WindowNavigationScope {
     windowCommandRouting.activeScope ?? .main
@@ -17,7 +18,7 @@ struct GoCommands: Commands {
     case .workspace:
       workspaceNavigationBridge.state.canGoBack
     case .session:
-      false
+      sessionNavigation?.canGoBack ?? false
     case .main:
       displayState.canNavigateBack
     }
@@ -28,7 +29,7 @@ struct GoCommands: Commands {
     case .workspace:
       workspaceNavigationBridge.state.canGoForward
     case .session:
-      false
+      sessionNavigation?.canGoForward ?? false
     case .main:
       displayState.canNavigateForward
     }
@@ -48,29 +49,25 @@ struct GoCommands: Commands {
 
   private func navigateBack() {
     let scope = activeScope
-    Task {
-      switch scope {
-      case .workspace:
-        await workspaceNavigationBridge.navigateBack()
-      case .session:
-        break
-      case .main:
-        await store.navigateBack()
-      }
+    switch scope {
+    case .workspace:
+      Task { await workspaceNavigationBridge.navigateBack() }
+    case .session:
+      sessionNavigation?.goBack()
+    case .main:
+      Task { await store.navigateBack() }
     }
   }
 
   private func navigateForward() {
     let scope = activeScope
-    Task {
-      switch scope {
-      case .workspace:
-        await workspaceNavigationBridge.navigateForward()
-      case .session:
-        break
-      case .main:
-        await store.navigateForward()
-      }
+    switch scope {
+    case .workspace:
+      Task { await workspaceNavigationBridge.navigateForward() }
+    case .session:
+      sessionNavigation?.goForward()
+    case .main:
+      Task { await store.navigateForward() }
     }
   }
 }

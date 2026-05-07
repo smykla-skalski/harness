@@ -7,7 +7,6 @@ struct SessionWindowToolbar: ToolbarContent {
   let statusSystemImage: String
   let sessionID: String
   @Binding var focusMode: Bool
-  @Binding var inspectorVisible: Bool
 
   var body: some ToolbarContent {
     ToolbarItem(placement: .automatic) {
@@ -17,15 +16,6 @@ struct SessionWindowToolbar: ToolbarContent {
       .toggleStyle(.button)
       .accessibilityLabel("Focus mode")
       .accessibilityHint("Shows or hides secondary session columns.")
-    }
-    ToolbarItem(placement: .automatic) {
-      Button {
-        inspectorVisible.toggle()
-      } label: {
-        Label("Inspector", systemImage: "sidebar.trailing")
-      }
-      .accessibilityLabel("Inspector")
-      .accessibilityHint("Shows or hides the session inspector pane.")
     }
     ToolbarItem(placement: .automatic) {
       Menu {

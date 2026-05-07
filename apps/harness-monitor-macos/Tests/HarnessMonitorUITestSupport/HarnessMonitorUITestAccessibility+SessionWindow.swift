@@ -7,6 +7,8 @@ extension HarnessMonitorUITestAccessibility {
   static let sessionWindowShell = "harness.session.window"
   static let sessionWindowSidebar = "harness.session.window.sidebar"
   static let sessionWindowStatusMenu = "harness.session.window.toolbar.status"
+  static let sessionWindowInspector = "harness.session.window.inspector"
+  static let sessionWindowInspectorCloseButton = "harness.session.window.inspector.close"
   static let settingsLaunchBehaviorPicker = "harness.settings.launch-behavior"
 
   static func openRecentSessionRow(_ sessionID: String) -> String {

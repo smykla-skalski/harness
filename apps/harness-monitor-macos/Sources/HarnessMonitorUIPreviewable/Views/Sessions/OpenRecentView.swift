@@ -7,8 +7,8 @@ public struct OpenRecentView: View {
   public let refresh: (() -> Void)?
   @Environment(\.openWindow)
   private var openWindow
-  @Environment(\.dismissWindow)
-  private var dismissWindow
+  @Environment(\.dismiss)
+  private var dismiss
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
   @Environment(\.fontScale)
@@ -89,7 +89,7 @@ public struct OpenRecentView: View {
     )
     NSApp.activate(ignoringOtherApps: true)
     if closeAfterPick {
-      dismissWindow(id: HarnessMonitorWindowID.main)
+      dismiss()
     }
   }
 

@@ -229,6 +229,7 @@ struct HarnessMonitorApp: App {
         store: store,
         displayState: store.commandsDisplayState
       )
+      InspectorCommands()
     }
   }
 
