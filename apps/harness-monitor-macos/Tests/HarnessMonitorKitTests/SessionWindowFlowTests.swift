@@ -81,6 +81,56 @@ struct SessionWindowFlowTests {
     #expect(state.navigationHistory.backStack.count == 4)
   }
 
+  @MainActor
+  @Test("Session window cache preserves create drafts and section selections")
+  func sessionWindowCachePreservesCreateDraftsAndSectionSelections() throws {
+    let state = SessionWindowStateCache(sessionID: "sess-alpha")
+
+    state.selectAgent("agent-1")
+    state.selectCreate(.agent)
+    var draft = try #require(state.selection.createDraft)
+    draft.title = "Review worker"
+    state.updateCreateDraft(draft)
+    state.selectTask("task-1")
+    state.selectCreate(.agent)
+
+    #expect(state.sectionState.agentID == "agent-1")
+    #expect(state.sectionState.taskID == "task-1")
+    #expect(state.selection.createDraft?.title == "Review worker")
+    #expect(state.selection.createDraft?.sessionID == "sess-alpha")
+  }
+
+  @MainActor
+  @Test("Session sidebar ordering registers undoable agent moves")
+  func sessionSidebarOrderingRegistersUndoableAgentMoves() {
+    let ordering = SessionSidebarOrderingState()
+    ordering.agentIDs = ["agent-a", "agent-b", "agent-c"]
+    let undoManager = UndoManager()
+
+    ordering.moveAgent("agent-c", before: "agent-a", undoManager: undoManager)
+
+    #expect(ordering.agentIDs == ["agent-c", "agent-a", "agent-b"])
+    #expect(undoManager.canUndo)
+    undoManager.undo()
+    #expect(ordering.agentIDs == ["agent-a", "agent-b", "agent-c"])
+  }
+
+  @MainActor
+  @Test("Session sidebar decision multi-select prunes to visible rows")
+  func sessionSidebarDecisionMultiSelectPrunesToVisibleRows() {
+    let selection = SessionSidebarSelectionState()
+
+    selection.toggleDecisionMultiSelect()
+    selection.toggleDecision("decision-a")
+    selection.toggleDecision("decision-b")
+    selection.pruneDecisionSelection(to: ["decision-b", "decision-c"])
+
+    #expect(selection.isDecisionMultiSelectEnabled)
+    #expect(selection.selectedDecisionIDs == ["decision-b"])
+    selection.toggleDecisionMultiSelect()
+    #expect(selection.selectedDecisionIDs.isEmpty)
+  }
+
   @Test("Launch behavior defaults to restoring session windows")
   func launchBehaviorDefaultsToRestoringSessionWindows() throws {
     let defaults = try isolatedDefaults()
@@ -122,6 +172,16 @@ struct SessionWindowFlowTests {
     )
   }
 
+  @Test("Open Recent close-after-pick dismisses only the current welcome window")
+  func openRecentCloseAfterPickUsesCurrentWindowDismiss() throws {
+    let source = try previewableSourceFile(named: "Views/Sessions/OpenRecentView.swift")
+
+    #expect(source.contains("@Environment(\\.dismiss)"))
+    #expect(source.contains("dismiss()"))
+    #expect(!source.contains("@Environment(\\.dismissWindow)"))
+    #expect(!source.contains("dismissWindow(id: HarnessMonitorWindowID.main)"))
+  }
+
   @Test("Sidebar density keeps strict default and maps legacy values")
   func sidebarDensityResolvesStrictDefaultAndLegacyValues() {
     #expect(HarnessMonitorSidebarSessionRowDisplayMode.defaultMode == .strict)
@@ -138,5 +198,20 @@ struct SessionWindowFlowTests {
     let userDefaults = try #require(UserDefaults(suiteName: suiteName))
     userDefaults.removePersistentDomain(forName: suiteName)
     return (userDefaults, suiteName)
+  }
+
+  private func previewableSourceFile(named relativePath: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent("apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable")
+      .appendingPathComponent(relativePath)
+    return try String(contentsOf: fileURL, encoding: .utf8)
   }
 }
