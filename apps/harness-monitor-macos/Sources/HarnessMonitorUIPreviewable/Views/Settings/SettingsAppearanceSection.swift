@@ -84,7 +84,6 @@ public struct SettingsAppearanceSection: View {
         .accessibilityIdentifier(HarnessMonitorAccessibility.settingsBackdropModePicker)
 
         Toggle("Color menu bar icon by state", isOn: $menuBarStateColorVariantsEnabled)
-          .harnessNativeFormControl()
           .accessibilityHint(
             "Uses colored warning and critical variants for the menu bar icon when attention changes"
           )
@@ -94,7 +93,6 @@ public struct SettingsAppearanceSection: View {
 
         #if HARNESS_FEATURE_LOTTIE
           Toggle("Corner animation", isOn: $cornerAnimationEnabled)
-            .harnessNativeFormControl()
             .accessibilityHint("Shows a dancing llama during activity")
             .accessibilityIdentifier("harness.settings.appearance.cornerAnimation")
         #endif
