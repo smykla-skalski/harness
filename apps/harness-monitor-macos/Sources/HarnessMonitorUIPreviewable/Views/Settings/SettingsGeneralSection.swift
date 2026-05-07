@@ -79,6 +79,8 @@ public struct SettingsGeneralSection: View {
   @AppStorage(SessionTimelineFilterDefaults.persistenceModeKey)
   private var timelineFilterPersistenceModeRawValue =
     SessionTimelineFilterDefaults.defaultPersistenceMode.rawValue
+  @AppStorage(HarnessMonitorLaunchBehavior.storageKey)
+  private var launchBehaviorRawValue = HarnessMonitorLaunchBehavior.defaultValue.rawValue
   @State private var isRemoveLaunchAgentConfirmationPresented = false
 
   public init(store: HarnessMonitorStore, overview: SettingsGeneralOverviewState) {
@@ -138,6 +140,10 @@ public struct SettingsGeneralSection: View {
     )
   }
 
+  private var launchBehavior: HarnessMonitorLaunchBehavior {
+    HarnessMonitorLaunchBehavior.resolved(rawValue: launchBehaviorRawValue)
+  }
+
   public var body: some View {
     Form {
       Section {
@@ -194,6 +200,20 @@ public struct SettingsGeneralSection: View {
           "Controls whether Session cockpit timeline filters reset each time, "
             + "restore per window and session, or reopen app-wide."
         )
+      }
+
+      Section {
+        Picker("Launch behavior", selection: $launchBehaviorRawValue) {
+          ForEach(HarnessMonitorLaunchBehavior.allCases) { behavior in
+            Text(behavior.label).tag(behavior.rawValue)
+          }
+        }
+        .harnessNativeFormControl()
+        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsLaunchBehaviorPicker)
+      } header: {
+        Text("Windows")
+      } footer: {
+        Text(launchBehavior.description)
       }
 
       SettingsLoggingSection(store: store)

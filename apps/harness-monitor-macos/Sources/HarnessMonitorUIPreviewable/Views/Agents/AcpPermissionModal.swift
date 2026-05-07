@@ -92,7 +92,7 @@ struct AcpPermissionModal: View {
           store.requestWorkspaceDecisionSelection(decisionID: decisionID)
           store.supervisorSelectedDecisionID = decisionID
           store.requestPrimaryDecisionActionFocus(decisionID: decisionID)
-          openWindow(id: HarnessMonitorWindowID.workspace)
+          openWindow.openHarnessDecisionSession(decisionID: decisionID, store: store)
         }
         .keyboardShortcut(.defaultAction)
         .accessibilityIdentifier(HarnessMonitorAccessibility.acpPermissionModalOpenWorkspace)

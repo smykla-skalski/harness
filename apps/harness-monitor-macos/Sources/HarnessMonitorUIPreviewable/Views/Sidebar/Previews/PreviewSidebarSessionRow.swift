@@ -2,11 +2,11 @@ import HarnessMonitorKit
 import SwiftUI
 
 #Preview("Sidebar row") {
-  sidebarSessionRowPreview(displayMode: .concise)
+  sidebarSessionRowPreview(displayMode: .strict)
 }
 
-#Preview("Sidebar row – Detailed") {
-  sidebarSessionRowPreview(displayMode: .detailed)
+#Preview("Sidebar row - Dense") {
+  sidebarSessionRowPreview(displayMode: .dense)
 }
 
 @MainActor

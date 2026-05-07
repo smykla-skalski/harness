@@ -34,6 +34,9 @@ struct HarnessMonitorApp: App {
   @AppStorage(HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledKey)
   private var menuBarStateColorVariantsEnabled =
     HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledDefault
+  @AppStorage(HarnessMonitorLaunchBehavior.storageKey)
+  private var sessionWindowLaunchModeRawValue =
+    HarnessMonitorLaunchBehavior.defaultValue.rawValue
 
   init() {
     UserDefaults.standard.register(defaults: [
@@ -128,7 +131,7 @@ struct HarnessMonitorApp: App {
   var body: some Scene {
     mainWindowScene
     settingsWindowScene
-    workspaceWindowScene
+    sessionWindowScene
     menuBarExtraScene
   }
 
@@ -151,24 +154,36 @@ struct HarnessMonitorApp: App {
     launchMode == .live && !isTestRun
   }
 
+  private var launchBehavior: HarnessMonitorLaunchBehavior {
+    HarnessMonitorLaunchBehavior.resolved(rawValue: sessionWindowLaunchModeRawValue)
+  }
+
   @ViewBuilder private var mainWindowSceneContent: some View {
     if rendersLiveSceneContent {
       mainWindowContent
         .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
         .modifier(HarnessMonitorMainWindowLauncherBinder())
+        .modifier(
+          HarnessMonitorLaunchWindowRestorer(
+            store: store,
+            isEnabled: allowsWindowRestoration && launchBehavior == .restoreSessionWindows
+          )
+        )
     } else {
       Color.clear.accessibilityHidden(true)
     }
   }
 
   private var mainWindowScene: some Scene {
-    WindowGroup("Harness Monitor", id: HarnessMonitorWindowID.main) {
+    WindowGroup("Welcome Recents", id: HarnessMonitorWindowID.main) {
       mainWindowSceneContent
     }
     .windowToolbarStyle(.unified)
     .defaultSize(width: mainWindowDefaultSize.width, height: mainWindowDefaultSize.height)
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
-    .defaultLaunchBehavior(.presented)
+    .defaultLaunchBehavior(
+      launchBehavior == .alwaysWelcomeRecents ? .presented : .automatic
+    )
     .commands {
       HarnessMonitorAppCommands(
         store: store,
@@ -223,29 +238,38 @@ struct HarnessMonitorApp: App {
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
   }
 
-  @ViewBuilder private var workspaceSceneContent: some View {
-    if rendersLiveSceneContent {
-      WorkspaceWindowRootView(
+  @ViewBuilder
+  private func sessionSceneContent(
+    token: SessionWindowToken?
+  ) -> some View {
+    if rendersLiveSceneContent, let token {
+      SessionWindowRootView(
+        token: token,
         store: store,
         keyWindowObserver: keyWindowObserver,
-        navigationBridge: workspaceNavigationBridge,
         windowCommandRouting: windowCommandRouting,
         mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
         themeMode: $themeMode
       )
       .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
       .modifier(HarnessMonitorMainWindowLauncherBinder())
+    } else if rendersLiveSceneContent {
+      WelcomeRecentsView(store: store)
     } else {
       Color.clear.accessibilityHidden(true)
     }
   }
 
-  private var workspaceWindowScene: some Scene {
-    Window("Workspace", id: HarnessMonitorWindowID.workspace) {
-      workspaceSceneContent
+  private var sessionWindowScene: some Scene {
+    WindowGroup(
+      "Session",
+      id: HarnessMonitorWindowID.session,
+      for: SessionWindowToken.self
+    ) { token in
+      sessionSceneContent(token: token.wrappedValue)
     }
     .windowToolbarStyle(.unified)
-    .defaultSize(width: 1_140, height: 700)
+    .defaultSize(width: 1_080, height: 720)
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
   }
 

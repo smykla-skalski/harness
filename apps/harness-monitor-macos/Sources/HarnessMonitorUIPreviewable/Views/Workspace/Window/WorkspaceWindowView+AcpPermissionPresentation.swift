@@ -60,6 +60,6 @@ private struct AcpPermissionPresentationModifier: ViewModifier {
         "decision_id": payload.decisionID,
       ]
     )
-    openWindow(id: HarnessMonitorWindowID.workspace)
+    openWindow.openHarnessDecisionSession(decisionID: payload.decisionID, store: store)
   }
 }

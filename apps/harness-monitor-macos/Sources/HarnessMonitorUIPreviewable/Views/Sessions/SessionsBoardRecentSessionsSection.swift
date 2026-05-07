@@ -45,6 +45,8 @@ private struct DashboardSessionCard: View {
   let store: HarnessMonitorStore
   let session: SessionSummary
   @State private var isHovered = false
+  @Environment(\.openWindow)
+  private var openWindow
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
 
@@ -54,7 +56,7 @@ private struct DashboardSessionCard: View {
 
   var body: some View {
     Button {
-      Task { await store.selectSession(session.sessionId) }
+      openSessionWindow()
     } label: {
       HStack(alignment: .top, spacing: HarnessMonitorTheme.sectionSpacing) {
         RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
@@ -108,9 +110,9 @@ private struct DashboardSessionCard: View {
     .onHover { isHovered = $0 }
     .contextMenu {
       Button {
-        Task { await store.selectSession(session.sessionId) }
+        openSessionWindow()
       } label: {
-        Label("Inspect", systemImage: "info.circle")
+        Label("Open Session", systemImage: "rectangle.stack")
       }
       Divider()
       Button {
@@ -131,6 +133,13 @@ private struct DashboardSessionCard: View {
         Label("Remove Session...", systemImage: "trash")
       }
     }
+  }
+
+  private func openSessionWindow() {
+    openWindow(
+      id: HarnessMonitorWindowID.session,
+      value: SessionWindowToken(sessionID: session.sessionId)
+    )
   }
 }
 

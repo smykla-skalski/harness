@@ -270,7 +270,7 @@ final class AcpPermissionAttentionState {
     if activatesApp {
       Self.activateHarnessMonitorApp()
     }
-    openWindow(id: HarnessMonitorWindowID.workspace)
+    openWindow.openHarnessDecisionSession(decisionID: decisionID, store: store)
     Task { @MainActor in
       await Self.focusWorkspaceWindow()
     }

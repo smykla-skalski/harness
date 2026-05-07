@@ -17,10 +17,10 @@ public struct WorkspaceToolbarButton: View {
     @Bindable var slice = slice
 
     Button(
-      action: { openWorkspace(focusesDecisions: slice.count > .zero) },
+      action: { openSessionWindow(focusesDecisions: slice.count > .zero) },
       label: {
         Label {
-          Text("Workspace")
+          Text("Session")
         } icon: {
           toolbarIcon(count: slice.count, maxSeverity: slice.maxSeverity)
         }
@@ -28,7 +28,7 @@ public struct WorkspaceToolbarButton: View {
     )
     .help(helpText(count: slice.count))
     .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceToolbarButton)
-    .accessibilityLabel("Workspace")
+    .accessibilityLabel("Session")
     .accessibilityValue(
       attentionAccessibilityValue(count: slice.count, maxSeverity: slice.maxSeverity)
     )
@@ -37,22 +37,22 @@ public struct WorkspaceToolbarButton: View {
     )
   }
 
-  private func openWorkspace(focusesDecisions: Bool) {
+  private func openSessionWindow(focusesDecisions: Bool) {
     if focusesDecisions && !WorkspaceSelectionDefaults.hasStoredSelection() {
       store.requestWorkspaceSelection(
         .decisions(sessionID: store.selectedSessionID),
         resetDecisionFilters: true
       )
     }
-    openWindow(id: HarnessMonitorWindowID.workspace)
+    openWindow.openHarnessSessionWindow(sessionID: store.selectedSessionID)
   }
 
   private func helpText(count: Int) -> String {
     guard count > .zero else {
-      return "Open workspace"
+      return "Open selected session"
     }
     return
-      "Open workspace (\(count.formatted()) "
+      "Open selected session (\(count.formatted()) "
       + "item\(count == 1 ? "needs" : "need") attention)"
   }
 

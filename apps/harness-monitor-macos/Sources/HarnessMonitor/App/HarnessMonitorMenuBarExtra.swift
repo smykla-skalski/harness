@@ -11,7 +11,7 @@ struct HarnessMonitorMenuBarSnapshot: Equatable {
   static let statusItemWarningImageName = "HarnessMonitorMenuBarLighthouseWarning"
   static let statusItemCriticalImageName = "HarnessMonitorMenuBarLighthouseCritical"
   static let openMonitorLabel = "Open Monitor"
-  static let openWorkspaceLabel = "Open Workspace"
+  static let openWorkspaceLabel = "Open Welcome Recents"
   static let openSettingsLabel = "Settings..."
   static let refreshLabel = "Refresh"
   static let checkSupervisorLabel = "Check Supervisor Now"
@@ -263,7 +263,7 @@ struct HarnessMonitorMenuBarExtraContent: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.menuBarOpenMonitor)
 
     Button(HarnessMonitorMenuBarSnapshot.openWorkspaceLabel) {
-      openAppWindow(id: HarnessMonitorWindowID.workspace)
+      openAppWindow(id: HarnessMonitorWindowID.main)
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.menuBarOpenWorkspace)
 

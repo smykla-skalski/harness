@@ -66,7 +66,7 @@ private struct SidebarCreateMenu: View {
       .agent,
       sessionID: store.selectedSession?.session.sessionId
     )
-    openWindow(id: HarnessMonitorWindowID.workspace)
+    openWindow.openHarnessSessionWindow(sessionID: store.selectedSession?.session.sessionId)
   }
 
   private func openNewTask() {

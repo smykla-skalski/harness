@@ -18,6 +18,7 @@ public enum HarnessMonitorStartupRegistrationDefaults {
         HarnessMonitorDateTimeConfiguration.defaultCustomTimeZoneIdentifier,
       HarnessMonitorAgentTuiDefaults.submitSendsEnterKey:
         HarnessMonitorAgentTuiDefaults.submitSendsEnterDefault,
+      HarnessMonitorLaunchBehavior.storageKey: HarnessMonitorLaunchBehavior.defaultValue.rawValue,
     ]
     dict.merge(HarnessMonitorLoggerDefaults.registrationDefaults()) { _, new in new }
     #if HARNESS_FEATURE_LOTTIE

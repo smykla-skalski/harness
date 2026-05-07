@@ -30,6 +30,8 @@ struct WorkspaceWindowRootView: View {
       switch windowCommandRouting.activeScope {
       case .workspace:
         "workspace"
+      case .session:
+        "session"
       case .main:
         "main"
       case nil:

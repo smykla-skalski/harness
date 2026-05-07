@@ -42,7 +42,7 @@ struct HarnessMonitorWindowRootView: View {
   var body: some View {
     HarnessMonitorWindowShell(
       windowID: HarnessMonitorWindowID.main,
-      windowTitle: "Harness Monitor",
+      windowTitle: "Welcome Recents",
       scope: .main,
       minimumSize: Self.minimumSize,
       keyWindowObserver: keyWindowObserver,
@@ -71,26 +71,14 @@ struct HarnessMonitorWindowRootView: View {
   }
 
   @ViewBuilder private var liveContent: some View {
-    Group {
-      #if HARNESS_FEATURE_LOTTIE
-        ContentView(
+    WelcomeRecentsView(store: store)
+      .modifier(
+        HarnessMonitorPerfScenarioModifier(
+          delegate: delegate,
           store: store,
-          keyWindowObserver: keyWindowObserver,
-          showsCornerAnimation: cornerAnimationEnabled
-        ) {
-          HarnessMonitorAppLlamaAnimation()
-        }
-      #else
-        ContentView(store: store, keyWindowObserver: keyWindowObserver)
-      #endif
-    }
-    .modifier(
-      HarnessMonitorPerfScenarioModifier(
-        delegate: delegate,
-        store: store,
-        perfScenario: perfScenario
+          perfScenario: perfScenario
+        )
       )
-    )
   }
 
   @MainActor
