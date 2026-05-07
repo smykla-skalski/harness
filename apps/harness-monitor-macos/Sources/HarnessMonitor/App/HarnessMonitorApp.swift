@@ -203,8 +203,7 @@ struct HarnessMonitorApp: App {
     }
   }
 
-  @CommandsBuilder
-  private var mainWindowCommands: some Commands {
+  @CommandsBuilder private var mainWindowCommands: some Commands {
     HarnessMonitorAppCommands(
       store: store,
       displayState: store.commandsDisplayState,
