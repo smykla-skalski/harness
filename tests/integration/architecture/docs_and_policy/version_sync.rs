@@ -150,6 +150,19 @@ fn monitor_generate_script_invokes_tuist_then_post_generate() {
 }
 
 #[test]
+fn monitor_generate_task_forces_regenerate_by_default() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mise = read_repo_file(root, ".mise.toml");
+
+    assert!(
+        mise.contains(
+            "run = \"HARNESS_MONITOR_FORCE_GENERATE=1 apps/harness-monitor-macos/Scripts/generate.sh\""
+        ),
+        "monitor:generate should force Tuist regeneration by default"
+    );
+}
+
+#[test]
 fn monitor_pbxproj_stays_on_current_xcode_format() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let post_generate = read_repo_file(root, "apps/harness-monitor-macos/Scripts/post-generate.sh");
