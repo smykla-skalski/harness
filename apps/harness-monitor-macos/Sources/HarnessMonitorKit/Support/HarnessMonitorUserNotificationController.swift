@@ -109,6 +109,10 @@ public final class HarnessMonitorUserNotificationController: NSObject,
     resolveHandler = handler
   }
 
+  public func detachResolveHandler() {
+    resolveHandler = nil
+  }
+
   /// Schedules a supervisor decision notification for the given severity and decision id.
   /// Registers the supervisor categories on first call so action icons and titles match the
   /// category lookup in Notification Center.

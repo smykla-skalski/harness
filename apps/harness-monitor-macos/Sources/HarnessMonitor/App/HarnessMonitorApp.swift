@@ -22,6 +22,7 @@ struct HarnessMonitorApp: App {
   private let perfScenario: HarnessMonitorPerfScenario?
   @State private var store: HarnessMonitorStore
   @State private var menuBarStatusController: HarnessMonitorMenuBarStatusController
+  @State private var sessionWindowPresenceTracker: SessionWindowPresenceTracker
   @State private var workspaceNavigationBridge: WorkspaceWindowNavigationBridge
   @State private var windowCommandRouting: WindowCommandRoutingState
   @State private var mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
@@ -104,22 +105,16 @@ struct HarnessMonitorApp: App {
     pendingDecisionsDockBadgeController = PendingDecisionsDockBadgeController()
     perfScenario = configuration.perfScenario
     let store = configuration.store
-    store.bindSupervisorNotifications(notificationController)
-    store.bindPendingDecisionsBadgeSync { [pendingDecisionsDockBadgeController] count in
-      pendingDecisionsDockBadgeController.sync(count: count)
-    }
-    store.bindPendingDecisionsStatusSync { [menuBarStatusController] count, severity in
-      if count == .zero {
-        menuBarStatusController.reset()
-      } else {
-        menuBarStatusController.schedule(
-          pendingDecisionCount: count,
-          pendingDecisionSeverity: severity
-        )
-      }
-    }
     _store = State(initialValue: store)
     _menuBarStatusController = State(initialValue: menuBarStatusController)
+    _sessionWindowPresenceTracker = State(
+      initialValue: SessionWindowPresenceTracker(
+        store: store,
+        notificationController: notificationController,
+        dockBadgeController: pendingDecisionsDockBadgeController,
+        menuBarStatusController: menuBarStatusController
+      )
+    )
     _workspaceNavigationBridge = State(initialValue: WorkspaceWindowNavigationBridge())
     _windowCommandRouting = State(initialValue: WindowCommandRoutingState())
     _mcpWindowCommandRegistrar = State(initialValue: HarnessMonitorMCPWindowCommandRegistrar())
@@ -168,6 +163,7 @@ struct HarnessMonitorApp: App {
         keyWindowObserver: keyWindowObserver,
         windowCommandRouting: windowCommandRouting,
         mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
+        sessionWindowPresenceTracker: sessionWindowPresenceTracker,
         themeMode: $themeMode
       )
       .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
