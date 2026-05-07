@@ -227,8 +227,7 @@ struct HarnessMonitorApp: App {
         displayState: store.commandsDisplayState
       )
       WindowMenuCommands(
-        store: store,
-        displayState: store.commandsDisplayState
+        store: store
       )
       InspectorCommands()
       DecisionCommands()
