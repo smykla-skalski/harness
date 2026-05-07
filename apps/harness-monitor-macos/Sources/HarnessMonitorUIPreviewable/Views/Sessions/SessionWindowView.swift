@@ -86,6 +86,7 @@ public struct SessionWindowView: View {
         focusMode: $focusMode
       )
     }
+    .sessionTitleBlurChrome(status: summary?.status ?? .awaitingLeader, isStale: snapshot == nil)
     .searchable(text: $searchText, placement: .toolbar, prompt: routeSearchPrompt)
     .onChange(of: focusMode) { _, newValue in
       if newValue {
