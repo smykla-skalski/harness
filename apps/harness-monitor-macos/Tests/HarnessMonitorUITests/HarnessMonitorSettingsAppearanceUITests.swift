@@ -247,6 +247,86 @@ final class HarnessMonitorSettingsAppearanceUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testSidebarSessionRowModePickerSwitchesBetweenConciseAndDetailedLayouts() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: [
+        HarnessMonitorSettingsUITestKeys.sidebarSessionRowDisplayModeOverride: "concise"
+      ]
+    )
+
+    openSettings(in: app)
+
+    let settingsRoot = element(in: app, identifier: Accessibility.settingsRoot)
+    let settingsState = element(in: app, identifier: Accessibility.settingsState)
+    let sidebarRowModePicker = element(
+      in: app,
+      identifier: Accessibility.settingsSidebarSessionRowDisplayModePicker
+    )
+    let agentStat = element(in: app, identifier: Accessibility.previewSessionRowAgentStat)
+    let taskStat = element(in: app, identifier: Accessibility.previewSessionRowTaskStat)
+
+    XCTAssertTrue(settingsRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(settingsState.waitForExistence(timeout: Self.actionTimeout))
+
+    selectAppearanceSection(in: app)
+
+    XCTAssertTrue(sidebarRowModePicker.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertFalse(agentStat.exists)
+    XCTAssertFalse(taskStat.exists)
+
+    selectMenuOption(
+      in: app,
+      controlIdentifier: Accessibility.settingsSidebarSessionRowDisplayModePicker,
+      optionTitle: "Detailed"
+    )
+
+    assertSettledLabel(
+      of: settingsState,
+      equals: settingsStateLabel(
+        .appearance(mode: "auto", sidebarRowMode: "detailed")
+      ),
+      timeout: Self.actionTimeout,
+      message: """
+        Settings state did not settle after selecting Detailed; got '\(settingsState.label)'
+        """
+    )
+
+    closeSettings(in: app, settingsRoot: settingsRoot)
+
+    XCTAssertTrue(agentStat.waitForExistence(timeout: Self.fastActionTimeout))
+    XCTAssertTrue(taskStat.waitForExistence(timeout: Self.fastActionTimeout))
+
+    openSettings(in: app)
+    XCTAssertTrue(settingsRoot.waitForExistence(timeout: Self.actionTimeout))
+    selectAppearanceSection(in: app)
+    XCTAssertTrue(sidebarRowModePicker.waitForExistence(timeout: Self.actionTimeout))
+
+    selectMenuOption(
+      in: app,
+      controlIdentifier: Accessibility.settingsSidebarSessionRowDisplayModePicker,
+      optionTitle: "Concise"
+    )
+
+    assertSettledLabel(
+      of: settingsState,
+      equals: settingsStateLabel(.appearance(mode: "auto")),
+      timeout: Self.actionTimeout,
+      message: """
+        Settings state did not settle after selecting Concise; got '\(settingsState.label)'
+        """
+    )
+
+    closeSettings(in: app, settingsRoot: settingsRoot)
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.fastActionTimeout) {
+        !agentStat.exists && !taskStat.exists
+      },
+      "Detailed probes should disappear again after returning to concise mode"
+    )
+  }
+
   private func assertSettledLabel(
     of element: XCUIElement,
     equals expectedLabel: String,

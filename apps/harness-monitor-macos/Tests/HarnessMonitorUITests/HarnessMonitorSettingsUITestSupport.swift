@@ -2,6 +2,8 @@ import XCTest
 
 enum HarnessMonitorSettingsUITestKeys {
   static let textSizeOverride = "HARNESS_MONITOR_TEXT_SIZE_OVERRIDE"
+  static let sidebarSessionRowDisplayModeOverride =
+    "HARNESS_MONITOR_SIDEBAR_SESSION_ROW_DISPLAY_MODE_OVERRIDE"
   static let timeZoneModeOverride = "HARNESS_MONITOR_TIME_ZONE_MODE_OVERRIDE"
   static let customTimeZoneOverride = "HARNESS_MONITOR_CUSTOM_TIME_ZONE_OVERRIDE"
   static let backgroundImageOverride = "HARNESS_MONITOR_BACKGROUND_IMAGE_OVERRIDE"

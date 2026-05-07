@@ -2,15 +2,27 @@ import HarnessMonitorKit
 import SwiftUI
 
 #Preview("Sidebar row") {
+  sidebarSessionRowPreview(displayMode: .concise)
+}
+
+#Preview("Sidebar row – Detailed") {
+  sidebarSessionRowPreview(displayMode: .detailed)
+}
+
+@MainActor
+private func sidebarSessionRowPreview(
+  displayMode: HarnessMonitorSidebarSessionRowDisplayMode
+) -> some View {
   let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded)
 
-  VStack(spacing: HarnessMonitorTheme.sectionSpacing) {
+  return VStack(spacing: HarnessMonitorTheme.sectionSpacing) {
     SidebarSessionRow(
       session: PreviewFixtures.summary,
       presentation: store.sessionSummaryPresentation(for: PreviewFixtures.summary),
       isBookmarked: true,
       lastActivityText: formatTimestamp(PreviewFixtures.summary.lastActivityAt),
-      fontScale: 1
+      fontScale: 1,
+      displayMode: displayMode
     )
     .padding()
 
@@ -20,7 +32,8 @@ import SwiftUI
       presentation: store.sessionSummaryPresentation(for: overflowSession),
       isBookmarked: false,
       lastActivityText: formatTimestamp(overflowSession.lastActivityAt),
-      fontScale: 1
+      fontScale: 1,
+      displayMode: displayMode
     )
     .padding()
   }

@@ -77,6 +77,8 @@ public enum HarnessMonitorAccessibility {
   public static let settingsBackgroundRecentState =
     "harness.settings.background.recents-state"
   public static let settingsTextSizePicker = "harness.settings.text-size"
+  public static let settingsSidebarSessionRowDisplayModePicker =
+    "harness.settings.sidebar-session-row-mode"
   public static let settingsTimeZoneModePicker = "harness.settings.time-zone-mode"
   public static let settingsCustomTimeZonePicker = "harness.settings.custom-time-zone"
   public static let settingsTimelinePersistencePicker =

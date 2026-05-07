@@ -21,6 +21,9 @@ struct HarnessMonitorSceneAppearanceModifier: ViewModifier {
   let appliesPreferredColorScheme: Bool
   @AppStorage(HarnessMonitorTextSize.storageKey)
   private var textSizeIndex = HarnessMonitorTextSize.defaultIndex
+  @AppStorage(HarnessMonitorSidebarSessionRowDisplayMode.storageKey)
+  private var sidebarSessionRowDisplayModeRawValue =
+    HarnessMonitorSidebarSessionRowDisplayMode.defaultMode.rawValue
   @AppStorage(HarnessMonitorDateTimeConfiguration.timeZoneModeKey)
   private var timeZoneModeRawValue = HarnessMonitorDateTimeConfiguration.defaultTimeZoneModeRawValue
   @AppStorage(HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey)
@@ -31,6 +34,12 @@ struct HarnessMonitorSceneAppearanceModifier: ViewModifier {
     HarnessMonitorDateTimeConfiguration(
       timeZoneModeRawValue: timeZoneModeRawValue,
       customTimeZoneIdentifier: customTimeZoneIdentifier
+    )
+  }
+
+  private var sidebarSessionRowDisplayMode: HarnessMonitorSidebarSessionRowDisplayMode {
+    HarnessMonitorSidebarSessionRowDisplayMode.resolved(
+      rawValue: sidebarSessionRowDisplayModeRawValue
     )
   }
 
@@ -48,6 +57,7 @@ struct HarnessMonitorSceneAppearanceModifier: ViewModifier {
         \.harnessNativeFormControlSize,
         HarnessMonitorTextSize.controlSize(at: normalizedTextSizeIndex)
       )
+      .environment(\.harnessSidebarSessionRowDisplayMode, sidebarSessionRowDisplayMode)
       .environment(\.harnessDateTimeConfiguration, dateTimeConfiguration)
       .modifier(
         OptionalPreferredColorSchemeModifier(

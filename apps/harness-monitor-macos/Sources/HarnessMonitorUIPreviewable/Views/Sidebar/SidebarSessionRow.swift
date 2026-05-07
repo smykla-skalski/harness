@@ -7,15 +7,16 @@ struct SidebarSessionRow: View {
   let isBookmarked: Bool
   let lastActivityText: String
   let fontScale: CGFloat
+  let displayMode: HarnessMonitorSidebarSessionRowDisplayMode
 
   var body: some View {
-    HStack(alignment: .top, spacing: HarnessMonitorTheme.sectionSpacing) {
+    HStack(alignment: rowAlignment, spacing: HarnessMonitorTheme.sectionSpacing) {
       RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
         .fill(statusColor(for: presentation.statusTone))
         .frame(width: 8)
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-        HStack(alignment: .top, spacing: HarnessMonitorTheme.itemSpacing) {
+        HStack(alignment: titleRowAlignment, spacing: HarnessMonitorTheme.itemSpacing) {
           Text(verbatim: session.displayTitle)
             .font(scaled(.system(.body, design: .rounded, weight: .semibold)))
             .italic(session.title.isEmpty)
@@ -34,35 +35,46 @@ struct SidebarSessionRow: View {
             .foregroundStyle(.secondary)
             .accessibilityHidden(true)
         }
-        HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-          HStack(spacing: HarnessMonitorTheme.itemSpacing) {
-            footerStatBadge(
-              presentation.agentStat,
-              identifier: HarnessMonitorAccessibility.sessionRowAgentStat(session.sessionId)
-            )
-            footerStatBadge(
-              presentation.taskStat,
-              identifier: HarnessMonitorAccessibility.sessionRowTaskStat(session.sessionId)
-            )
-          }
-          .fixedSize(horizontal: true, vertical: false)
-          .accessibilityFrameMarker(
-            HarnessMonitorAccessibility.sessionRowStatsFrame(session.sessionId)
-          )
-          Spacer(minLength: HarnessMonitorTheme.spacingXS)
-          Text(verbatim: lastActivityText)
-            .font(scaled(.caption.weight(.medium)))
-            .lineLimit(1)
-            .truncationMode(.head)
-            .foregroundStyle(.secondary)
+        if displayMode == .detailed {
+          HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
+            HStack(spacing: HarnessMonitorTheme.itemSpacing) {
+              footerStatBadge(
+                presentation.agentStat,
+                identifier: HarnessMonitorAccessibility.sessionRowAgentStat(session.sessionId)
+              )
+              footerStatBadge(
+                presentation.taskStat,
+                identifier: HarnessMonitorAccessibility.sessionRowTaskStat(session.sessionId)
+              )
+            }
+            .fixedSize(horizontal: true, vertical: false)
             .accessibilityFrameMarker(
-              HarnessMonitorAccessibility.sessionRowLastActivityFrame(session.sessionId)
+              HarnessMonitorAccessibility.sessionRowStatsFrame(session.sessionId)
             )
+            Spacer(minLength: HarnessMonitorTheme.spacingXS)
+            Text(verbatim: lastActivityText)
+              .font(scaled(.caption.weight(.medium)))
+              .lineLimit(1)
+              .truncationMode(.head)
+              .foregroundStyle(.secondary)
+              .accessibilityFrameMarker(
+                HarnessMonitorAccessibility.sessionRowLastActivityFrame(session.sessionId)
+              )
+          }
+          .frame(maxWidth: .infinity)
         }
-        .frame(maxWidth: .infinity)
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private var rowAlignment: VerticalAlignment {
+    displayMode == .detailed ? .top : .center
+  }
+
+  private var titleRowAlignment: VerticalAlignment {
+    displayMode == .detailed ? .top : .center
   }
 
   private func footerStatBadge(
