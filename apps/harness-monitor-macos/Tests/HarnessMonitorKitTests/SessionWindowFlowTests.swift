@@ -32,6 +32,19 @@ struct SessionWindowFlowTests {
     )
   }
 
+  @Test("Session window tabbing preference defaults to system")
+  func sessionWindowTabbingPreferenceDefaultsToSystem() {
+    #expect(SessionWindowTabbingPreference.defaultValue == .system)
+    #expect(SessionWindowTabbingPreference.resolved(rawValue: nil) == .system)
+    #expect(SessionWindowTabbingPreference.resolved(rawValue: "system") == .system)
+    #expect(SessionWindowTabbingPreference.resolved(rawValue: "always") == .always)
+    #expect(SessionWindowTabbingPreference.resolved(rawValue: "never") == .never)
+    #expect(SessionWindowTabbingPreference.resolved(rawValue: "unknown") == .system)
+    #expect(
+      SessionWindowTabbingPreference.storageKey == "harness.monitor.session-window.tabbing"
+    )
+  }
+
   @Test("Session routes expose stable sidebar order")
   func sessionRoutesExposeStableSidebarOrder() {
     #expect(

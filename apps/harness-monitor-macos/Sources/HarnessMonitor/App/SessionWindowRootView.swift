@@ -39,5 +39,6 @@ struct SessionWindowRootView: View {
     .navigationTitle(windowTitle)
     .modifier(SessionWindowOpenStateModifier(store: store, sessionID: token.sessionID))
     .modifier(SupervisorBindingsModifier(tracker: sessionWindowPresenceTracker))
+    .modifier(SessionWindowTabbing(isSessionWindow: true))
   }
 }

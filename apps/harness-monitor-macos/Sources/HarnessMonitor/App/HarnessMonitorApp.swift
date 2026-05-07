@@ -172,6 +172,7 @@ struct HarnessMonitorApp: App {
       mainWindowContent
         .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
         .modifier(HarnessMonitorMainWindowLauncherBinder())
+        .modifier(SessionWindowTabbing(isSessionWindow: false))
         .modifier(
           LaunchWindowRestorerMigrator(
             store: store,

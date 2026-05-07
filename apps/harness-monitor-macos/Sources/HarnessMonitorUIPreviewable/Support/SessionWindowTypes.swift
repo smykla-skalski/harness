@@ -80,3 +80,39 @@ public enum HarnessMonitorLaunchBehavior: String, CaseIterable, Codable, Hashabl
     resolved(rawValue: userDefaults.string(forKey: storageKey))
   }
 }
+
+public enum SessionWindowTabbingPreference: String, CaseIterable, Codable, Hashable,
+  Identifiable, Sendable
+{
+  case system
+  case always
+  case never
+
+  public static let storageKey = "harness.monitor.session-window.tabbing"
+  public static let defaultValue: Self = .system
+
+  public var id: String { rawValue }
+
+  public var label: String {
+    switch self {
+    case .system: "System"
+    case .always: "Always"
+    case .never: "Never"
+    }
+  }
+
+  public var description: String {
+    switch self {
+    case .system:
+      "Follow the macOS setting for opening windows as tabs."
+    case .always:
+      "Prefer native tabs for session windows."
+    case .never:
+      "Open session windows as separate windows."
+    }
+  }
+
+  public static func resolved(rawValue: String?) -> Self {
+    Self(rawValue: rawValue ?? "") ?? defaultValue
+  }
+}
