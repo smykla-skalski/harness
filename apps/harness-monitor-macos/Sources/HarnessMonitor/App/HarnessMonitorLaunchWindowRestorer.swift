@@ -31,7 +31,7 @@ struct HarnessMonitorLaunchWindowRestorer: ViewModifier {
     )
     for sessionID in sessionIDs {
       openWindow(
-        id: HarnessMonitorWindowID.session,
+        id: HarnessMonitorWindowID.main,
         value: SessionWindowToken(sessionID: sessionID)
       )
     }

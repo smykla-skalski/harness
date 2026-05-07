@@ -15,6 +15,12 @@ struct SessionWindowFlowTests {
     #expect(decoded.sessionID == "sess-alpha")
   }
 
+  @Test("Session windows route through the main value-routed scene")
+  func sessionWindowsRouteThroughMainSceneID() {
+    #expect(HarnessMonitorWindowID.main == "main")
+    #expect(HarnessMonitorWindowID.sessionWindow("sess-alpha") == "session-sess-alpha")
+  }
+
   @Test("Session routes expose stable sidebar order")
   func sessionRoutesExposeStableSidebarOrder() {
     #expect(

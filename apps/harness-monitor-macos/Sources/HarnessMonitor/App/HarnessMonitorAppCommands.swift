@@ -55,7 +55,6 @@ struct HarnessMonitorAppCommands: Commands {
       Button("New Task") {
         store.requestCreateTaskSheet()
       }
-      .keyboardShortcut("t", modifiers: .command)
       .disabled(!displayState.hasSelectedSession || displayState.isSessionReadOnly)
       Button("Send Signal") {
         store.presentSendSignalSheetForSelectedSessionLeader()

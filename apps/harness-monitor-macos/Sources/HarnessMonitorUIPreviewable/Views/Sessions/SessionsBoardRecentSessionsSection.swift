@@ -137,7 +137,7 @@ private struct DashboardSessionCard: View {
 
   private func openSessionWindow() {
     openWindow(
-      id: HarnessMonitorWindowID.session,
+      id: HarnessMonitorWindowID.main,
       value: SessionWindowToken(sessionID: session.sessionId)
     )
   }
