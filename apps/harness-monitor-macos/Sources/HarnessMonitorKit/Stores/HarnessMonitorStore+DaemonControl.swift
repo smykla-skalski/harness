@@ -394,6 +394,7 @@ extension HarnessMonitorStore {
   }
 
   public func prepareForTermination() async {
+    await flushSessionWindowsOpenAtQuit()
     toast.dismissAll()
     cancelPendingAppInactivitySuspend()
     stopAllStreams()

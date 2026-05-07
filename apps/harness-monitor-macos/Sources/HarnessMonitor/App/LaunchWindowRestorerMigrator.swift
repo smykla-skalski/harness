@@ -2,7 +2,7 @@ import HarnessMonitorKit
 import HarnessMonitorUIPreviewable
 import SwiftUI
 
-struct HarnessMonitorLaunchWindowRestorer: ViewModifier {
+struct LaunchWindowRestorerMigrator: ViewModifier {
   private static let restoredSessionLimit = 4
 
   let store: HarnessMonitorStore
@@ -11,20 +11,20 @@ struct HarnessMonitorLaunchWindowRestorer: ViewModifier {
   private var openWindow
   @Environment(\.dismissWindow)
   private var dismissWindow
-  @State private var didRestore = false
+  @State private var didRun = false
 
   func body(content: Content) -> some View {
     content.task {
-      await restoreSessionWindowsIfNeeded()
+      await runIfNeeded()
     }
   }
 
   @MainActor
-  private func restoreSessionWindowsIfNeeded() async {
-    guard isEnabled, !didRestore else {
+  private func runIfNeeded() async {
+    guard isEnabled, !didRun else {
       return
     }
-    didRestore = true
+    didRun = true
     await store.prepareOpenRecentSessions()
     let sessionIDs = await store.recentSessionIDsForLaunchWindows(
       limit: Self.restoredSessionLimit

@@ -20,6 +20,8 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var supervisorStopTask: Task<Void, Never>?
   @ObservationIgnored let supervisorTickTrigger = SupervisorTickTrigger()
   @ObservationIgnored var cachedNullActionHandler: NullDecisionActionHandler?
+  @ObservationIgnored var openSessionWindowIDs: Set<String> = []
+  @ObservationIgnored var pendingSessionWindowTerminationSnapshot: Set<String>?
 
   public var openFolderRequest = 0
   public var attachSessionRequest = 0

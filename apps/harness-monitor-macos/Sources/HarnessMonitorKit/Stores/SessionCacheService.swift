@@ -229,6 +229,61 @@ public actor SessionCacheService {
     return ids
   }
 
+  func sessionWindowIDsOpenAtQuit(limit: Int) -> [String] {
+    let startedAt = ContinuousClock.now
+    let context = makeContext()
+    var descriptor = FetchDescriptor<CachedSessionWindowState>(
+      predicate: #Predicate { $0.wasOpenAtQuit },
+      sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
+    )
+    descriptor.fetchLimit = limit
+    let ids = ((try? context.fetch(descriptor)) ?? []).map(\.sessionId)
+    #if HARNESS_FEATURE_OTEL
+      let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
+      HarnessMonitorTelemetry.shared.recordCacheRead(
+        operation: "session_window_ids_open_at_quit", hit: !ids.isEmpty, durationMs: durationMs
+      )
+    #else
+      _ = startedAt
+    #endif
+    return ids
+  }
+
+  func replaceSessionWindowsOpenAtQuit(
+    sessionIDs: Set<String>
+  ) async -> WriteResult {
+    let context = makeContext()
+    let descriptor = FetchDescriptor<CachedSessionWindowState>()
+    let existing = (try? context.fetch(descriptor)) ?? []
+    let now = Date.now
+    var seen: Set<String> = []
+    for row in existing {
+      if sessionIDs.contains(row.sessionId) {
+        if !row.wasOpenAtQuit {
+          row.wasOpenAtQuit = true
+        }
+        row.updatedAt = now
+        seen.insert(row.sessionId)
+      } else {
+        context.delete(row)
+      }
+    }
+    for sessionID in sessionIDs where !seen.contains(sessionID) {
+      context.insert(
+        CachedSessionWindowState(
+          sessionId: sessionID,
+          wasOpenAtQuit: true,
+          updatedAt: now
+        )
+      )
+    }
+    let didPersist = await persist(
+      context,
+      operation: "replace session windows open at quit"
+    )
+    return WriteResult(didPersist: didPersist, metadataUpdate: .refresh)
+  }
+
   func sessionMetadata() -> SessionMetadata {
     let startedAt = ContinuousClock.now
     let context = makeContext()

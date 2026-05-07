@@ -191,6 +191,32 @@ public enum HarnessMonitorSchemaV8: VersionedSchema {
   }
 }
 
+public enum HarnessMonitorSchemaV9: VersionedSchema {
+  public static var versionIdentifier: Schema.Version { Schema.Version(9, 0, 0) }
+
+  public static var models: [any PersistentModel.Type] {
+    [
+      HarnessMonitorSchemaV6.CachedProject.self,
+      HarnessMonitorSchemaV6.CachedSession.self,
+      HarnessMonitorSchemaV6.CachedAgent.self,
+      HarnessMonitorSchemaV6.CachedWorkItem.self,
+      HarnessMonitorSchemaV6.CachedSignalRecord.self,
+      HarnessMonitorSchemaV6.CachedTimelineEntry.self,
+      HarnessMonitorSchemaV6.CachedObserver.self,
+      HarnessMonitorSchemaV6.CachedAgentActivity.self,
+      SessionBookmark.self,
+      UserNote.self,
+      RecentSearch.self,
+      ProjectFilterPreference.self,
+      Decision.self,
+      SupervisorEvent.self,
+      PolicyConfigRow.self,
+      HarnessMonitorSchemaV8.CachedTaskReviewMetadata.self,
+      Self.CachedSessionWindowState.self,
+    ]
+  }
+}
+
 public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
   public static var schemas: [any VersionedSchema.Type] {
     [
@@ -202,6 +228,7 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       HarnessMonitorSchemaV6.self,
       HarnessMonitorSchemaV7.self,
       HarnessMonitorSchemaV8.self,
+      HarnessMonitorSchemaV9.self,
     ]
   }
 
@@ -214,6 +241,7 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       migrateV5toV6,
       migrateV6toV7,
       migrateV7toV8,
+      migrateV8toV9,
     ]
   }
 
@@ -270,6 +298,11 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
     fromVersion: HarnessMonitorSchemaV7.self,
     toVersion: HarnessMonitorSchemaV8.self
   )
+
+  static let migrateV8toV9 = MigrationStage.lightweight(
+    fromVersion: HarnessMonitorSchemaV8.self,
+    toVersion: HarnessMonitorSchemaV9.self
+  )
 }
 
-public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV8
+public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV9
