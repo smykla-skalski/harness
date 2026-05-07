@@ -34,6 +34,8 @@ struct ContentAcpBridgeBannerBridge: View {
   let contentChrome: HarnessMonitorStore.ContentChromeSlice
   let keyWindowObserver: KeyWindowObserver?
   let windowID: String
+  @Environment(\.windowSurfaceContext)
+  private var windowSurfaceContext
   @State private var lastAnnouncedIncidentAt: Date?
 
   private var bannerState: AcpBridgeBannerState? {
@@ -48,13 +50,17 @@ struct ContentAcpBridgeBannerBridge: View {
       return true
     }
     guard let keyWindowObserver else {
-      return true
+      return windowSurfaceContext.isKeyWindow
     }
     let snapshot = keyWindowObserver.snapshot
     guard !snapshot.prefersUserNotificationDelivery else {
       return false
     }
-    return keyWindowObserver.isKey(windowID: windowID)
+    return keyWindowObserver.isKey(windowID: effectiveWindowID)
+  }
+
+  private var effectiveWindowID: String {
+    windowID.isEmpty ? windowSurfaceContext.windowID : windowID
   }
 
   private var visibleBannerAnnouncement: ContentAcpBridgeBannerAnnouncement? {

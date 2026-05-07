@@ -13,33 +13,30 @@ extension WorkspaceWindowView {
   }
 
   @ViewBuilder var createPaneTopChrome: some View {
-    if showsCreatePaneTopChrome {
-      VStack(spacing: 0) {
-        if let message = createPaneSessionActionUnavailableNote {
-          createPaneSessionActionBanner(message: message)
-          createPaneChromeDivider()
-        }
-        if viewModel.createMode == .terminal {
-          if viewModel.selectedLaunchSelection.isAcp {
-            if store.acpUnavailable {
-              acpUnavailableBanner
-              createPaneChromeDivider()
-            }
-          } else if store.agentTuiUnavailable {
-            agentTuiUnavailableBanner
+    VStack(spacing: 0) {
+      if let message = createPaneSessionActionUnavailableNote {
+        createPaneSessionActionBanner(message: message)
+        createPaneChromeDivider()
+      }
+      if viewModel.createMode == .terminal {
+        if viewModel.selectedLaunchSelection.isAcp {
+          if store.acpUnavailable {
+            acpUnavailableBanner
             createPaneChromeDivider()
           }
-        }
-        if viewModel.createMode == .codex, store.codexUnavailable {
-          codexUnavailableBanner
+        } else if store.agentTuiUnavailable {
+          agentTuiUnavailableBanner
           createPaneChromeDivider()
         }
       }
-      .background(Color(nsColor: .windowBackgroundColor))
+      if viewModel.createMode == .codex, store.codexUnavailable {
+        codexUnavailableBanner
+        createPaneChromeDivider()
+      }
     }
   }
 
-  private var showsCreatePaneTopChrome: Bool {
+  var showsCreatePaneTopChrome: Bool {
     if createPaneSessionActionUnavailableNote != nil {
       return true
     }
@@ -81,10 +78,7 @@ extension WorkspaceWindowView {
   }
 
   private func createPaneChromeDivider() -> some View {
-    Rectangle()
-      .fill(HarnessMonitorTheme.caution.opacity(0.35))
-      .frame(height: 1)
-      .accessibilityHidden(true)
+    WindowBannerDivider(tint: HarnessMonitorTheme.caution)
   }
 }
 

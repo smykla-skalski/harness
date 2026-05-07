@@ -23,6 +23,7 @@ extension HarnessMonitorUITestAccessibility {
   static let agentTuiStopButton = "harness.sheet.agent-tui.stop"
   static let agentTuiRevealTranscriptButton = "harness.sheet.agent-tui.transcript"
   static let agentTuiRecoveryBanner = "harness.sheet.agent-tui.recovery-banner"
+  static let workspaceRecoveryBanner = agentTuiRecoveryBanner
   static let agentTuiSessionActionBanner = "harness.sheet.agent-tui.session-action-banner"
   static let agentTuiEnableBridgeButton = "harness.sheet.agent-tui.enable-bridge"
   static let agentTuiNewSessionButton = "harness.sheet.agent-tui.new-session"

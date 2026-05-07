@@ -4,6 +4,8 @@ import HarnessMonitorUIPreviewable
 import SwiftUI
 
 struct HarnessMonitorWindowRootView: View {
+  private static let minimumSize = CGSize(width: 900, height: 600)
+
   let delegate: HarnessMonitorAppDelegate
   let store: HarnessMonitorStore
   let notifications: HarnessMonitorUserNotificationController
@@ -17,79 +19,54 @@ struct HarnessMonitorWindowRootView: View {
   let defersInitialContentUntilBootstrap: Bool
   @Environment(\.openWindow)
   private var openWindow
-  @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
-  private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
-  @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
-  private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection
-    .storageValue
   #if HARNESS_FEATURE_LOTTIE
     @AppStorage(HarnessMonitorCornerAnimationDefaults.enabledKey)
     private var cornerAnimationEnabled = false
   #endif
   @State private var completedInitialBootstrap = false
   @State private var handledSettingsOpenRequestID = 0
-  private let toolbarGlassReproConfiguration = ToolbarGlassReproConfiguration.current
-  private var backdropMode: HarnessMonitorBackdropMode {
-    HarnessMonitorBackdropMode(rawValue: backdropModeRawValue) ?? .none
-  }
-  private var backgroundImage: HarnessMonitorBackgroundSelection {
-    HarnessMonitorBackgroundSelection.decode(backgroundImageRawValue)
-  }
 
   private var shouldShowBootstrapPlaceholder: Bool {
     defersInitialContentUntilBootstrap && !completedInitialBootstrap
   }
 
-  var body: some View {
-    rootContent
-      .writingToolsBehavior(.disabled)
-      .frame(minWidth: 900, minHeight: 600)
-      .modifier(
-        HarnessMonitorSceneAppearanceModifier(
-          themeMode: $themeMode,
-          appliesPreferredColorScheme: !toolbarGlassReproConfiguration.disablesPreferredColorScheme
-        )
-      )
-      .modifier(PinchToZoomTextSizeModifier())
-      .modifier(
-        HarnessMonitorWindowBackdropModifier(
-          mode: backdropMode,
-          backgroundImage: backgroundImage
-        )
-      )
-      .modifier(
-        WindowCommandScopeTrackingModifier(
-          scope: .main,
-          routingState: windowCommandRouting
-        )
-      )
-      .harnessMonitorMCPWindowCommands(registrar: mcpWindowCommandRegistrar)
-      .modifier(HarnessMonitorUITestAnimationModifier())
-      .acpPermissionAttentionScene(
-        store: store,
-        notifications: notifications,
-        attentionState: acpAttentionState,
-        windowID: HarnessMonitorWindowID.main
-      )
-      .modifier(WorkspaceToolbarUITestForceTickModifier(store: store))
-      .task(id: shouldShowBootstrapPlaceholder) {
-        await bootstrapDeferredContentIfNeeded()
-      }
-      .onChange(of: notifications.settingsOpenRequestID) { _, requestID in
-        guard requestID != handledSettingsOpenRequestID else {
-          return
-        }
-        handledSettingsOpenRequestID = requestID
-        settingsSelectedSection = .notifications
-        openWindow(id: HarnessMonitorWindowID.settings)
-      }
+  private var contentReadiness: WindowContentReadiness {
+    WindowContentReadiness(
+      isReady: !shouldShowBootstrapPlaceholder,
+      stateLabel: shouldShowBootstrapPlaceholder ? "bootstrap-deferred" : "ready",
+      placeholder: .clear,
+      prepare: { await bootstrapDeferredContentIfNeeded() }
+    )
   }
 
-  @ViewBuilder private var rootContent: some View {
-    if shouldShowBootstrapPlaceholder {
-      HarnessMonitorBootstrapPlaceholderView()
-    } else {
+  var body: some View {
+    HarnessMonitorWindowShell(
+      windowID: HarnessMonitorWindowID.main,
+      windowTitle: "Harness Monitor",
+      scope: .main,
+      minimumSize: Self.minimumSize,
+      keyWindowObserver: keyWindowObserver,
+      windowCommandRouting: windowCommandRouting,
+      mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
+      themeMode: $themeMode,
+      contentReadiness: contentReadiness
+    ) {
       liveContent
+    }
+    .acpPermissionAttentionScene(
+      store: store,
+      notifications: notifications,
+      attentionState: acpAttentionState,
+      windowID: HarnessMonitorWindowID.main
+    )
+    .modifier(WorkspaceToolbarUITestForceTickModifier(store: store))
+    .onChange(of: notifications.settingsOpenRequestID) { _, requestID in
+      guard requestID != handledSettingsOpenRequestID else {
+        return
+      }
+      handledSettingsOpenRequestID = requestID
+      settingsSelectedSection = .notifications
+      openWindow(id: HarnessMonitorWindowID.settings)
     }
   }
 
@@ -116,6 +93,7 @@ struct HarnessMonitorWindowRootView: View {
     )
   }
 
+  @MainActor
   private func bootstrapDeferredContentIfNeeded() async {
     guard shouldShowBootstrapPlaceholder else {
       return
@@ -126,13 +104,6 @@ struct HarnessMonitorWindowRootView: View {
   }
 }
 
-private struct HarnessMonitorBootstrapPlaceholderView: View {
-  var body: some View {
-    Color.clear
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .accessibilityHidden(true)
-  }
-}
 private enum HarnessMonitorPerfScenarioStatus: String {
   case idle
   case bootstrapping

@@ -38,6 +38,8 @@ public struct WorkspaceWindowView: View {
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @AppStorage(HarnessMonitorAgentTuiDefaults.submitSendsEnterKey)
   var submitSendsEnter = HarnessMonitorAgentTuiDefaults.submitSendsEnterDefault
+  @Environment(\.windowSurfaceContext)
+  private var windowSurfaceContext
   @Environment(\.fontScale)
   private var stateFontScale
   @FocusState private var stateFocusedField: Field?
@@ -203,7 +205,14 @@ public struct WorkspaceWindowView: View {
   }
 
   var isWorkspaceKeyWindow: Bool {
-    keyWindowObserver?.isKey(windowID: HarnessMonitorWindowID.workspace) ?? true
+    let windowID: String
+    if windowSurfaceContext.windowID.isEmpty {
+      windowID = HarnessMonitorWindowID.workspace
+    } else {
+      windowID = windowSurfaceContext.windowID
+    }
+
+    return keyWindowObserver?.isKey(windowID: windowID) ?? windowSurfaceContext.isKeyWindow
   }
 
   func toggleDecisionInspector() {
@@ -257,6 +266,7 @@ public struct WorkspaceWindowView: View {
       .overlay(alignment: .bottomLeading) {
         agentDetailSidebarBackdrop
       }
+      .overlay { workspaceBannerChromeStateMarker }
       .toolbar {
         agentTuiNavigationToolbarItems
         sessionToolbarItems
@@ -331,6 +341,35 @@ public struct WorkspaceWindowView: View {
           restoreSidebarVisibility(using: binding)
         }
       }
+  }
+
+  @ViewBuilder private var workspaceBannerChromeStateMarker: some View {
+    if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
+      AccessibilityTextMarker(
+        identifier: HarnessMonitorAccessibility.windowBannerChromeState(
+          HarnessMonitorWindowID.workspace
+        ),
+        text: workspaceBannerChromeStateText
+      )
+    }
+  }
+
+  private var workspaceBannerChromeStateText: String {
+    [
+      "windowID=\(HarnessMonitorWindowID.workspace)",
+      "chrome=shared",
+      "placement=safeAreaTop",
+      "material=windowBackground",
+      "divider=shared",
+      "visible=\(workspaceBannerChromeIsVisible ? "true" : "false")",
+    ].joined(separator: ", ")
+  }
+
+  private var workspaceBannerChromeIsVisible: Bool {
+    guard case .create = viewModel.selection else {
+      return false
+    }
+    return showsCreatePaneTopChrome
   }
 
   @ViewBuilder private var agentDetailSidebarBackdrop: some View {
