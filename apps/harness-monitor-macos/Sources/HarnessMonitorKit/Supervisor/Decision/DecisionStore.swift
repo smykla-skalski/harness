@@ -47,6 +47,12 @@ public actor DecisionStore {
     case unchanged
   }
 
+  public enum ReopenResult: Sendable, Hashable {
+    case reopened
+    case missing
+    case notDismissed(statusRaw: String)
+  }
+
   /// Broadcast channel of decision lifecycle events. Buffered so slow consumers do not block
   /// mutations — the most recent events survive under `.bufferingNewest`.
   nonisolated public let events: AsyncStream<DecisionEvent>
@@ -236,6 +242,25 @@ public actor DecisionStore {
     }
     guard updated else { return }
     yield(.init(kind: .dismissed, decisionID: id))
+  }
+
+  @discardableResult
+  public func reopen(id: String) async throws -> ReopenResult {
+    let result = try withMutationContext { context in
+      guard let decision = try fetchDecision(id: id, context: context) else {
+        return ReopenResult.missing
+      }
+      guard decision.statusRaw == Status.dismissed else {
+        return .notDismissed(statusRaw: decision.statusRaw)
+      }
+      decision.statusRaw = Status.open
+      decision.snoozedUntil = nil
+      decision.resolutionJSON = nil
+      return .reopened
+    }
+    guard result == .reopened else { return result }
+    yield(.init(kind: .updated, decisionID: id))
+    return result
   }
 
   public func openCountBySeverity() async throws -> [DecisionSeverity: Int] {

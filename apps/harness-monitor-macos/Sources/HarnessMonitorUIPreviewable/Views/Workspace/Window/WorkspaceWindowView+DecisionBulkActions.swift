@@ -74,17 +74,14 @@ extension WorkspaceWindowView {
 
     for id in batch.ids {
       do {
-        guard let decision = try await decisionStore.decision(id: id) else {
+        switch try await decisionStore.reopen(id: id) {
+        case .reopened:
+          break
+        case .missing:
           store.presentFailureFeedback("Cannot reopen \(id): decision missing.")
-          continue
-        }
-        guard decision.statusRaw == "dismissed" else {
+        case .notDismissed:
           store.presentFailureFeedback("Cannot reopen \(id): decision state changed.")
-          continue
         }
-
-        decision.statusRaw = "open"
-        decision.resolutionJSON = nil
       } catch {
         store.presentFailureFeedback("Failed to reopen \(id): \(error.localizedDescription)")
       }

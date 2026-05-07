@@ -102,8 +102,9 @@ struct SessionSidebar: View {
           .foregroundStyle(.secondary)
       }
     } header: {
-      HStack {
+      HStack(spacing: 6) {
         Text("Agents")
+        sectionDraftIndicator(.agent)
         Spacer()
         Button {
           state.selectCreate(.agent)
@@ -193,8 +194,9 @@ struct SessionSidebar: View {
   }
 
   private var taskSectionHeader: some View {
-    HStack {
+    HStack(spacing: 6) {
       Text("Tasks")
+      sectionDraftIndicator(.task)
       Spacer()
       Button {
         state.selectCreate(.task)
@@ -208,9 +210,10 @@ struct SessionSidebar: View {
   }
 
   private var decisionsHeader: some View {
-    HStack {
+    HStack(spacing: 6) {
       Text("Decisions")
         .badge(Text("\(decisions.count) pending"))
+      sectionDraftIndicator(.decision)
       Spacer()
       Menu {
         Button("Dismiss Selected") {
@@ -258,6 +261,16 @@ struct SessionSidebar: View {
 
   private var decisionFilterRow: some View {
     SessionDecisionFilterControls(filters: state.decisionFilters)
+  }
+
+  @ViewBuilder
+  private func sectionDraftIndicator(_ kind: SessionCreateKind) -> some View {
+    if state.sectionState.hasDraft(kind) {
+      Image(systemName: "circle.fill")
+        .font(.caption2)
+        .foregroundStyle(.tint)
+        .accessibilityLabel("Unsaved draft")
+    }
   }
 
   private var multiSelectAccessibilityValue: Text {
