@@ -6,6 +6,8 @@ public struct SessionWindowView: View {
   public let store: HarnessMonitorStore
   public let token: SessionWindowToken
   @State private var stateCache: SessionWindowStateCache
+  @Environment(\.undoManager)
+  private var undoManager
   @SceneStorage("session.route")
   private var persistedRoute: SessionWindowRoute = .overview
   @SceneStorage("session.decisionID")
@@ -100,6 +102,8 @@ public struct SessionWindowView: View {
     .focusedSceneValue(\.sessionNavigation, navigationCommand)
     .focusedSceneValue(\.sessionAttention, attentionFocus)
     .focusedSceneValue(\.sessionInspector, inspectorCommand)
+    .focusedSceneValue(\.sessionDecisionCommands, decisionCommand)
+    .focusedSceneValue(\.sessionCreateContext, createContext)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowShell)
   }
@@ -146,6 +150,41 @@ public struct SessionWindowView: View {
         binding.wrappedValue = next
       }
     )
+  }
+
+  private var decisionCommand: SessionDecisionCommand {
+    SessionDecisionCommandFactory.make(
+      store: store,
+      state: stateCache,
+      visibleDecisions: matchingDecisions,
+      undoManager: undoManager
+    )
+  }
+
+  private var createContext: SessionCreateContext {
+    let cache = stateCache
+    return SessionCreateContext(
+      sessionID: token.sessionID,
+      primaryKind: primaryCreateKind,
+      createAgent: { cache.selectCreate(.agent) },
+      createTask: { cache.selectCreate(.task) },
+      createDecision: { cache.selectCreate(.decision) }
+    )
+  }
+
+  private var primaryCreateKind: SessionCreateKind {
+    switch stateCache.selection {
+    case .agent: .agent
+    case .task: .task
+    case .decision: .decision
+    case .create(let draft): draft.kind
+    case .route(let route):
+      switch route {
+      case .tasks: .task
+      case .decisions: .decision
+      case .agents, .overview, .timeline, .terminal: .agent
+      }
+    }
   }
 
   @ViewBuilder private var contentColumn: some View {
