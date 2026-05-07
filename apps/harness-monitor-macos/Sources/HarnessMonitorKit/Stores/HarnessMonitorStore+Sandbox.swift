@@ -9,6 +9,9 @@ extension HarnessMonitorStore {
   /// direct binding to the app-level state.
   public func requestOpenFolder() {
     openFolderRequest += 1
+    HarnessMonitorLogger.swiftui.info(
+      "Open folder importer requested: token=\(self.openFolderRequest, privacy: .public)"
+    )
   }
 
   /// Handles a `fileImporter` result by bookmarking the selected folder.
@@ -21,6 +24,9 @@ extension HarnessMonitorStore {
   ) async -> BookmarkStore.Record? {
     switch result {
     case .success(let urls):
+      HarnessMonitorLogger.swiftui.info(
+        "Open folder importer completed: selectedCount=\(urls.count, privacy: .public)"
+      )
       guard let url = urls.first else { return nil }
       guard let store = bookmarkStore else {
         presentFailureFeedback("Bookmark store unavailable: app group container missing")
@@ -39,6 +45,9 @@ extension HarnessMonitorStore {
         return nil
       }
     case .failure(let error):
+      HarnessMonitorLogger.swiftui.warning(
+        "Open folder importer failed: \(String(describing: error), privacy: .public)"
+      )
       presentFailureFeedback("Could not open folder: \(error.localizedDescription)")
       return nil
     }

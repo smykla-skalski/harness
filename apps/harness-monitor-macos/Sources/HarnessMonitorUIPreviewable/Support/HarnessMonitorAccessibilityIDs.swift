@@ -66,8 +66,8 @@ public enum HarnessMonitorAccessibility {
     "harness.sidebar.sort.\(slug(order))"
   }
 
-  public static func welcomeRecentSessionRow(_ sessionID: String) -> String {
-    "harness.welcome.recents.session.\(slug(sessionID))"
+  public static func openRecentSessionRow(_ sessionID: String) -> String {
+    "harness.open.recent.session.\(slug(sessionID))"
   }
 
   public static func sessionWindowRoute(_ route: SessionWindowRoute) -> String {
@@ -77,8 +77,11 @@ public enum HarnessMonitorAccessibility {
   public static let sessionsBoardRoot = "harness.board.root"
   public static let sessionsBoardScrollView = "harness.board.scroll"
   public static let recentSessionsCard = "harness.board.recent-sessions-card"
-  public static let welcomeRecentsRoot = "harness.welcome.recents"
-  public static let welcomeRecentsProjectList = "harness.welcome.recents.projects"
+  public static let openRecentRoot = "harness.open.recent"
+  public static let openRecentProjectList = "harness.open.recent.projects"
+  public static let openRecentRefreshButton = "harness.open.recent.refresh"
+  public static let openRecentOpenFolderButton = "harness.open.recent.open-folder"
+  public static let openRecentActionState = "harness.open.recent.action-state"
   public static let sessionWindowShell = "harness.session.window"
   public static let sessionWindowSidebar = "harness.session.window.sidebar"
   public static let sessionWindowStatusMenu = "harness.session.window.toolbar.status"

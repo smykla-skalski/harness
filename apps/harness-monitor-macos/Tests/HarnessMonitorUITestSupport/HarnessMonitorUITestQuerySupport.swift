@@ -28,11 +28,17 @@ extension HarnessMonitorUITestCase {
   }
 
   func mainWindow(in app: XCUIApplication) -> XCUIElement {
-    if let mainWindowIdentifier = windowIdentifier(
-      in: app,
-      containingDescendantIdentifier: HarnessMonitorUITestAccessibility.appChromeRoot
-    ) {
-      return app.windows.matching(identifier: mainWindowIdentifier).firstMatch
+    let mainContentIdentifiers = [
+      HarnessMonitorUITestAccessibility.appChromeRoot,
+      HarnessMonitorUITestAccessibility.openRecentRoot,
+    ]
+    for identifier in mainContentIdentifiers {
+      if let mainWindowIdentifier = windowIdentifier(
+        in: app,
+        containingDescendantIdentifier: identifier
+      ) {
+        return app.windows.matching(identifier: mainWindowIdentifier).firstMatch
+      }
     }
 
     let mainIdentifierWindow = app.windows.matching(
@@ -44,6 +50,12 @@ extension HarnessMonitorUITestCase {
   func appChromeRoot(in app: XCUIApplication) -> XCUIElement {
     app.descendants(matching: .any)
       .matching(identifier: HarnessMonitorUITestAccessibility.appChromeRoot)
+      .firstMatch
+  }
+
+  func openRecentRoot(in app: XCUIApplication) -> XCUIElement {
+    app.descendants(matching: .any)
+      .matching(identifier: HarnessMonitorUITestAccessibility.openRecentRoot)
       .firstMatch
   }
 

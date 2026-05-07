@@ -9,6 +9,8 @@ struct HarnessMonitorLaunchWindowRestorer: ViewModifier {
   let isEnabled: Bool
   @Environment(\.openWindow)
   private var openWindow
+  @Environment(\.dismissWindow)
+  private var dismissWindow
   @State private var didRestore = false
 
   func body(content: Content) -> some View {
@@ -23,7 +25,7 @@ struct HarnessMonitorLaunchWindowRestorer: ViewModifier {
       return
     }
     didRestore = true
-    await store.bootstrapIfNeeded()
+    await store.prepareOpenRecentSessions()
     let sessionIDs = await store.recentSessionIDsForLaunchWindows(
       limit: Self.restoredSessionLimit
     )
@@ -32,6 +34,9 @@ struct HarnessMonitorLaunchWindowRestorer: ViewModifier {
         id: HarnessMonitorWindowID.session,
         value: SessionWindowToken(sessionID: sessionID)
       )
+    }
+    if !sessionIDs.isEmpty {
+      dismissWindow(id: HarnessMonitorWindowID.main)
     }
   }
 }

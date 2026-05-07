@@ -2,11 +2,11 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct OpenFolderCommand: Commands {
-  @Binding var isPresented: Bool
+  let store: HarnessMonitorStore
 
   var body: some Commands {
     CommandGroup(after: .newItem) {
-      Button("Open Folder…") { isPresented = true }
+      Button("Open Folder…") { store.requestOpenFolder() }
         .keyboardShortcut("o", modifiers: [.command])
     }
   }

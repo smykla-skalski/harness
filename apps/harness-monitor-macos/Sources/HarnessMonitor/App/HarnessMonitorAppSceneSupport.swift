@@ -17,6 +17,7 @@ struct HarnessMonitorWindowRootView: View {
   @Binding var settingsSelectedSection: SettingsSection
   let perfScenario: HarnessMonitorPerfScenario?
   let defersInitialContentUntilBootstrap: Bool
+  let refresh: () -> Void
   @Environment(\.openWindow)
   private var openWindow
   #if HARNESS_FEATURE_LOTTIE
@@ -33,7 +34,7 @@ struct HarnessMonitorWindowRootView: View {
   private var contentReadiness: WindowContentReadiness {
     WindowContentReadiness(
       isReady: !shouldShowBootstrapPlaceholder,
-      stateLabel: shouldShowBootstrapPlaceholder ? "bootstrap-deferred" : "ready",
+      stateLabel: shouldShowBootstrapPlaceholder ? "welcome-cache-deferred" : "ready",
       placeholder: .clear,
       prepare: { await bootstrapDeferredContentIfNeeded() }
     )
@@ -42,7 +43,7 @@ struct HarnessMonitorWindowRootView: View {
   var body: some View {
     HarnessMonitorWindowShell(
       windowID: HarnessMonitorWindowID.main,
-      windowTitle: "Welcome Recents",
+      windowTitle: "Open Recent Session",
       scope: .main,
       minimumSize: Self.minimumSize,
       keyWindowObserver: keyWindowObserver,
@@ -53,12 +54,6 @@ struct HarnessMonitorWindowRootView: View {
     ) {
       liveContent
     }
-    .acpPermissionAttentionScene(
-      store: store,
-      notifications: notifications,
-      attentionState: acpAttentionState,
-      windowID: HarnessMonitorWindowID.main
-    )
     .modifier(WorkspaceToolbarUITestForceTickModifier(store: store))
     .onChange(of: notifications.settingsOpenRequestID) { _, requestID in
       guard requestID != handledSettingsOpenRequestID else {
@@ -71,14 +66,17 @@ struct HarnessMonitorWindowRootView: View {
   }
 
   @ViewBuilder private var liveContent: some View {
-    WelcomeRecentsView(store: store)
-      .modifier(
-        HarnessMonitorPerfScenarioModifier(
-          delegate: delegate,
-          store: store,
-          perfScenario: perfScenario
-        )
+    OpenRecentView(
+      store: store,
+      refresh: refresh
+    )
+    .modifier(
+      HarnessMonitorPerfScenarioModifier(
+        delegate: delegate,
+        store: store,
+        perfScenario: perfScenario
       )
+    )
   }
 
   @MainActor
@@ -87,7 +85,7 @@ struct HarnessMonitorWindowRootView: View {
       return
     }
     delegate.bind(store: store)
-    await store.bootstrapIfNeeded()
+    await store.prepareOpenRecentSessions()
     completedInitialBootstrap = true
   }
 }
@@ -144,7 +142,7 @@ private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
   private func runPerfScenarioIfNeeded() async {
     delegate.bind(store: store)
     guard let perfScenario else {
-      await store.bootstrapIfNeeded()
+      await store.prepareOpenRecentSessions()
       return
     }
     guard !hasRunPerfScenario else {
