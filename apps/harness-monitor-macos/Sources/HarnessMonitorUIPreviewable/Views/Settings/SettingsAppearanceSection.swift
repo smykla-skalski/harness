@@ -9,6 +9,9 @@ public struct SettingsAppearanceSection: View {
     .storageValue
   @AppStorage(HarnessMonitorTextSize.storageKey)
   private var textSizeIndex = HarnessMonitorTextSize.defaultIndex
+  @AppStorage(HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledKey)
+  private var menuBarStateColorVariantsEnabled =
+    HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledDefault
   @AppStorage(HarnessMonitorSidebarSessionRowDisplayMode.storageKey)
   private var sidebarSessionRowDisplayModeRawValue =
     HarnessMonitorSidebarSessionRowDisplayMode.defaultMode.rawValue
@@ -80,6 +83,15 @@ public struct SettingsAppearanceSection: View {
         .accessibilityHint("Controls where the background image renders")
         .accessibilityIdentifier(HarnessMonitorAccessibility.settingsBackdropModePicker)
 
+        Toggle("Color menu bar icon by state", isOn: $menuBarStateColorVariantsEnabled)
+          .harnessNativeFormControl()
+          .accessibilityHint(
+            "Uses colored warning and critical variants for the menu bar icon when attention changes"
+          )
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.settingsMenuBarStateColorsToggle
+          )
+
         #if HARNESS_FEATURE_LOTTIE
           Toggle("Corner animation", isOn: $cornerAnimationEnabled)
             .harnessNativeFormControl()
@@ -105,6 +117,7 @@ public struct SettingsAppearanceSection: View {
     var parts = [
       "Theme mode, text size, and sidebar session rows apply to every Harness Monitor window.",
       "Backdrop controls where the softened background image renders.",
+      "The menu bar icon can follow app state colors or stay neutral.",
       "Choosing an image turns on the window backdrop if it is currently off.",
     ]
     #if HARNESS_FEATURE_LOTTIE

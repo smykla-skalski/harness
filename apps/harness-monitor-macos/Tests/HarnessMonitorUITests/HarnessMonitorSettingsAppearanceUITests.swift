@@ -135,6 +135,42 @@ final class HarnessMonitorSettingsAppearanceUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testMenuBarStateColorsTogglePersistsAcrossReopeningSettings() throws {
+    let app = launch(mode: "preview")
+
+    openSettings(in: app)
+
+    let settingsRoot = element(in: app, identifier: Accessibility.settingsRoot)
+    let menuBarStateColorsToggle = element(
+      in: app,
+      identifier: Accessibility.settingsMenuBarStateColorsToggle
+    )
+
+    XCTAssertTrue(settingsRoot.waitForExistence(timeout: Self.actionTimeout))
+    selectAppearanceSection(in: app)
+    XCTAssertTrue(menuBarStateColorsToggle.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertEqual(menuBarStateColorsToggle.value as? String, "1")
+
+    tapElement(in: app, identifier: Accessibility.settingsMenuBarStateColorsToggle)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        (menuBarStateColorsToggle.value as? String) == "0"
+      },
+      "Menu bar state colors toggle should turn off after it is clicked"
+    )
+
+    closeSettings(in: app, settingsRoot: settingsRoot)
+    openSettings(in: app)
+    selectAppearanceSection(in: app)
+
+    let reopenedToggle = element(
+      in: app,
+      identifier: Accessibility.settingsMenuBarStateColorsToggle
+    )
+    XCTAssertTrue(reopenedToggle.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertEqual(reopenedToggle.value as? String, "0")
+  }
+
   func testBackgroundGalleryRecentsStayStableAcrossSelections() throws {
     let app = launch(
       mode: "preview",

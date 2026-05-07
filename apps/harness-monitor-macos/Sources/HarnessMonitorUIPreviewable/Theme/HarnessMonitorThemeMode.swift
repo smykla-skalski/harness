@@ -25,6 +25,16 @@ public enum HarnessMonitorAgentTuiDefaults {
   public static let submitSendsEnterDefault = false
 }
 
+public enum HarnessMonitorMenuBarDefaults {
+  public static let stateColorVariantsEnabledKey =
+    "harnessMenuBarStateColorVariantsEnabled"
+  public static let stateColorVariantsEnabledDefault = true
+
+  public static func registrationDefaults() -> [String: Any] {
+    [stateColorVariantsEnabledKey: stateColorVariantsEnabledDefault]
+  }
+}
+
 public struct HarnessMonitorBackgroundSelection: Equatable, Identifiable, Sendable {
   public enum Source: Equatable, Sendable {
     case bundled(HarnessMonitorBackgroundImage)
