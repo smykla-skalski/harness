@@ -104,7 +104,12 @@ struct SessionSidebar: View {
     } header: {
       HStack(spacing: 6) {
         Text("Agents")
-        sectionDraftIndicator(.agent)
+        if state.sectionState.hasDraft(.agent) {
+          Image(systemName: "circle.fill")
+            .font(.caption2)
+            .foregroundStyle(.tint)
+            .accessibilityLabel("Unsaved draft")
+        }
         Spacer()
         Button {
           state.selectCreate(.agent)
@@ -196,7 +201,12 @@ struct SessionSidebar: View {
   private var taskSectionHeader: some View {
     HStack(spacing: 6) {
       Text("Tasks")
-      sectionDraftIndicator(.task)
+      if state.sectionState.hasDraft(.task) {
+        Image(systemName: "circle.fill")
+          .font(.caption2)
+          .foregroundStyle(.tint)
+          .accessibilityLabel("Unsaved draft")
+      }
       Spacer()
       Button {
         state.selectCreate(.task)
@@ -213,7 +223,12 @@ struct SessionSidebar: View {
     HStack(spacing: 6) {
       Text("Decisions")
         .badge(Text("\(decisions.count) pending"))
-      sectionDraftIndicator(.decision)
+      if state.sectionState.hasDraft(.decision) {
+        Image(systemName: "circle.fill")
+          .font(.caption2)
+          .foregroundStyle(.tint)
+          .accessibilityLabel("Unsaved draft")
+      }
       Spacer()
       Menu {
         Button("Dismiss Selected") {
@@ -224,6 +239,7 @@ struct SessionSidebar: View {
           dismissDecisions(decisions.map(\.id))
         }
         .disabled(decisions.isEmpty)
+        .help("Dismisses only the decisions that match the current filter and search.")
         if !state.decisionBulkActions.lastDismissedBatch.isEmpty {
           Button("Reopen Dismissed Batch") {
             Task { await reopenDecisionBatch(state.decisionBulkActions.lastDismissedBatch) }
@@ -261,16 +277,6 @@ struct SessionSidebar: View {
 
   private var decisionFilterRow: some View {
     SessionDecisionFilterControls(filters: state.decisionFilters)
-  }
-
-  @ViewBuilder
-  private func sectionDraftIndicator(_ kind: SessionCreateKind) -> some View {
-    if state.sectionState.hasDraft(kind) {
-      Image(systemName: "circle.fill")
-        .font(.caption2)
-        .foregroundStyle(.tint)
-        .accessibilityLabel("Unsaved draft")
-    }
   }
 
   private var multiSelectAccessibilityValue: Text {
