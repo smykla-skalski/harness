@@ -27,6 +27,17 @@ struct SessionSidebar: View {
       Task { await reopenDecisionBatch(ids) }
       state.decisionBulkActions.reopenRequestedBatch = nil
     }
+    .onChange(of: state.sidebarSelection.selectedDecisionIDs.count) { previous, count in
+      guard previous != count else { return }
+      guard state.sidebarSelection.isDecisionMultiSelectEnabled else { return }
+      SessionSidebarMultiSelectAnnouncer.announce(count: count)
+    }
+    .onChange(of: state.sidebarSelection.isDecisionMultiSelectEnabled) { _, enabled in
+      guard enabled else { return }
+      SessionSidebarMultiSelectAnnouncer.announce(
+        count: state.sidebarSelection.selectedDecisionIDs.count
+      )
+    }
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowSidebar)
   }
 
@@ -233,6 +244,7 @@ struct SessionSidebar: View {
       .buttonStyle(.borderless)
       .help("Select Decisions")
       .accessibilityLabel("Select Decisions")
+      .accessibilityValue(multiSelectAccessibilityValue)
       Button {
         state.selectCreate(.decision)
       } label: {
@@ -248,4 +260,30 @@ struct SessionSidebar: View {
     SessionDecisionFilterControls(filters: state.decisionFilters)
   }
 
+  private var multiSelectAccessibilityValue: Text {
+    guard state.sidebarSelection.isDecisionMultiSelectEnabled else {
+      return Text("Off")
+    }
+    let count = state.sidebarSelection.selectedDecisionIDs.count
+    return Text("\(count) decision\(count == 1 ? "" : "s") selected")
+  }
+
+}
+
+@MainActor
+public enum SessionSidebarMultiSelectAnnouncer {
+  private static var pendingTask: Task<Void, Never>?
+  private static let debounceInterval: Duration = .milliseconds(150)
+
+  public static func announce(count: Int) {
+    pendingTask?.cancel()
+    pendingTask = Task { @MainActor in
+      try? await Task.sleep(for: debounceInterval)
+      guard !Task.isCancelled else { return }
+      let suffix = count == 1 ? "" : "s"
+      AccessibilityNotification.Announcement(
+        "\(count) decision\(suffix) selected"
+      ).post()
+    }
+  }
 }
