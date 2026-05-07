@@ -157,4 +157,10 @@ public final class SessionWindowSectionState {
       createDrafts[draft.kind] = draft
     }
   }
+
+  public func hasDraft(_ kind: SessionCreateKind) -> Bool {
+    guard let draft = createDrafts[kind] else { return false }
+    return !draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      || !draft.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
 }
