@@ -34,6 +34,7 @@ struct SidebarSearchHost: View {
   let interactionRelay: ContentInteractionRelay
   let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
   let fontScale: CGFloat
+  let sidebarSessionRowDisplayMode: HarnessMonitorSidebarSessionRowDisplayMode
   let collapsedCheckoutKeys: Set<String>
   let setCheckoutCollapsed: (String, Bool) -> Void
 
@@ -68,6 +69,17 @@ struct SidebarSearchHost: View {
     )
   }
 
+  private var searchFocusAction: HarnessSidebarSearchFocus? {
+    guard canPresentSearch else {
+      return nil
+    }
+    return HarnessSidebarSearchFocus(
+      isAvailable: true,
+      menuLabel: .findInSessions,
+      dispatcher: searchFocusDispatcher
+    )
+  }
+
   private var sidebarFooterStateMarkerValue: String {
     SidebarFooterStatusStripState(
       daemonOwnership: store.daemonOwnership,
@@ -88,6 +100,7 @@ struct SidebarSearchHost: View {
         interactionRelay: interactionRelay,
         dateTimeConfiguration: dateTimeConfiguration,
         fontScale: fontScale,
+        sidebarSessionRowDisplayMode: sidebarSessionRowDisplayMode,
         collapsedCheckoutKeys: collapsedCheckoutKeys,
         setCheckoutCollapsed: setCheckoutCollapsed
       )
@@ -128,14 +141,7 @@ struct SidebarSearchHost: View {
       .toolbar {
         SidebarToolbarFilterToolbarItem(store: store, controls: controls)
       }
-      .focusedSceneValue(
-        \.harnessSidebarSearchFocusAction,
-        HarnessSidebarSearchFocus(
-          isAvailable: canPresentSearch,
-          menuLabel: .findInSessions,
-          dispatcher: searchFocusDispatcher
-        )
-      )
+      .harnessFocusedSceneValue(\.harnessSidebarSearchFocusAction, searchFocusAction)
       .task {
         searchFocusDispatcher.handler = {
           _ = searchPresentationState.requestPresentation(canPresent: true)

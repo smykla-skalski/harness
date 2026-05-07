@@ -173,7 +173,12 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
   }
 
   func testSidebarSessionRowPublishesCompactStatIconProbes() throws {
-    let app = launch(mode: "preview")
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: [
+        HarnessMonitorSettingsUITestKeys.sidebarSessionRowDisplayModeOverride: "detailed"
+      ]
+    )
     let agentStat = element(in: app, identifier: Accessibility.previewSessionRowAgentStat)
     let taskStat = element(in: app, identifier: Accessibility.previewSessionRowTaskStat)
 
@@ -280,7 +285,10 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
   func testSidebarSessionRowKeepsStatClusterAndTimestampSeparatedAtLargeTextSize() throws {
     let app = launch(
       mode: "preview",
-      additionalEnvironment: [HarnessMonitorSettingsUITestKeys.textSizeOverride: "6"]
+      additionalEnvironment: [
+        HarnessMonitorSettingsUITestKeys.textSizeOverride: "6",
+        HarnessMonitorSettingsUITestKeys.sidebarSessionRowDisplayModeOverride: "detailed",
+      ]
     )
     let sidebarToggle = sidebarToggleButton(in: app)
     let sidebarShellQuery = app.otherElements

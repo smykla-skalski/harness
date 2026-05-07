@@ -7,19 +7,22 @@ public struct SidebarSessionListLinkRow: View, Equatable {
   public let isBookmarked: Bool
   public let lastActivityText: String
   public let fontScale: CGFloat
+  public let displayMode: HarnessMonitorSidebarSessionRowDisplayMode
 
   public init(
     session: SessionSummary,
     presentation: HarnessMonitorStore.SessionSummaryPresentation,
     isBookmarked: Bool,
     lastActivityText: String,
-    fontScale: CGFloat
+    fontScale: CGFloat,
+    displayMode: HarnessMonitorSidebarSessionRowDisplayMode
   ) {
     self.session = session
     self.presentation = presentation
     self.isBookmarked = isBookmarked
     self.lastActivityText = lastActivityText
     self.fontScale = fontScale
+    self.displayMode = displayMode
   }
 
   public var body: some View {
@@ -28,7 +31,8 @@ public struct SidebarSessionListLinkRow: View, Equatable {
       presentation: presentation,
       isBookmarked: isBookmarked,
       lastActivityText: lastActivityText,
-      fontScale: fontScale
+      fontScale: fontScale,
+      displayMode: displayMode
     )
     .padding(.vertical, HarnessMonitorTheme.spacingXS)
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -41,6 +45,7 @@ public struct SidebarSessionListLinkRow: View, Equatable {
       && lhs.isBookmarked == rhs.isBookmarked
       && lhs.lastActivityText == rhs.lastActivityText
       && lhs.fontScale == rhs.fontScale
+      && lhs.displayMode == rhs.displayMode
   }
 }
 

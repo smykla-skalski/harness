@@ -92,6 +92,7 @@ struct HarnessMonitorAppConfiguration {
       return UITestOverrides(
         themeMode: .auto,
         textSizeIndex: HarnessMonitorTextSize.defaultIndex,
+        sidebarSessionRowDisplayMode: .defaultMode,
         backdropMode: .none,
         backgroundImage: .defaultSelection,
         resetBackgroundRecents: false
@@ -104,6 +105,9 @@ struct HarnessMonitorAppConfiguration {
       textSizeIndex: HarnessMonitorTextSize.uiTestOverrideIndex(
         from: environment.values[HarnessMonitorTextSize.uiTestOverrideKey]
       ) ?? HarnessMonitorTextSize.defaultIndex,
+      sidebarSessionRowDisplayMode: HarnessMonitorSidebarSessionRowDisplayMode.resolved(
+        rawValue: environment.values[HarnessMonitorSidebarSessionRowDisplayMode.uiTestOverrideKey]
+      ),
       backdropMode: HarnessMonitorBackdropMode(
         rawValue: environment.values["HARNESS_MONITOR_BACKDROP_MODE_OVERRIDE"] ?? ""
       ) ?? .none,
@@ -129,6 +133,7 @@ struct HarnessMonitorAppConfiguration {
   private struct UITestOverrides {
     let themeMode: HarnessMonitorThemeMode
     let textSizeIndex: Int
+    let sidebarSessionRowDisplayMode: HarnessMonitorSidebarSessionRowDisplayMode
     let backdropMode: HarnessMonitorBackdropMode
     let backgroundImage: HarnessMonitorBackgroundSelection
     let resetBackgroundRecents: Bool
@@ -236,6 +241,10 @@ struct HarnessMonitorAppConfiguration {
     UserDefaults.standard.set(
       overrides.textSizeIndex,
       forKey: HarnessMonitorTextSize.storageKey
+    )
+    UserDefaults.standard.set(
+      overrides.sidebarSessionRowDisplayMode.rawValue,
+      forKey: HarnessMonitorSidebarSessionRowDisplayMode.storageKey
     )
     UserDefaults.standard.set(
       overrides.backdropMode.rawValue,

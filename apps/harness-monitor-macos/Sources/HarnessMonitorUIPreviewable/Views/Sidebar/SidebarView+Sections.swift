@@ -12,6 +12,7 @@ struct SidebarSessionListRenderState {
   let isPersistenceAvailable: Bool
   let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
   let fontScale: CGFloat
+  let sidebarSessionRowDisplayMode: HarnessMonitorSidebarSessionRowDisplayMode
   let collapsedCheckoutKeys: Set<String>
 
   var emptyState: HarnessMonitorStore.SidebarEmptyState {
@@ -313,7 +314,8 @@ struct SidebarSessionListContent: View {
         session.lastActivityAt,
         configuration: renderState.dateTimeConfiguration
       ),
-      fontScale: renderState.fontScale
+      fontScale: renderState.fontScale,
+      displayMode: renderState.sidebarSessionRowDisplayMode
     )
 
     if HarnessMonitorUITestEnvironment.isPerfScenarioActive {

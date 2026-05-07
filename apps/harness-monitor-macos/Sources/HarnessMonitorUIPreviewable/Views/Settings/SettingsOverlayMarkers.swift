@@ -10,6 +10,9 @@ public struct SettingsOverlayMarkers: View {
   @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
   private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection
     .storageValue
+  @AppStorage(HarnessMonitorSidebarSessionRowDisplayMode.storageKey)
+  private var sidebarSessionRowDisplayModeRawValue =
+    HarnessMonitorSidebarSessionRowDisplayMode.defaultMode.rawValue
   @AppStorage(HarnessMonitorDateTimeConfiguration.timeZoneModeKey)
   private var timeZoneModeRawValue = HarnessMonitorDateTimeConfiguration.defaultTimeZoneModeRawValue
   @AppStorage(HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey)
@@ -28,6 +31,12 @@ public struct SettingsOverlayMarkers: View {
     )
   }
 
+  private var sidebarSessionRowDisplayMode: HarnessMonitorSidebarSessionRowDisplayMode {
+    HarnessMonitorSidebarSessionRowDisplayMode.resolved(
+      rawValue: sidebarSessionRowDisplayModeRawValue
+    )
+  }
+
   private var settingsStateLabel: String {
     let backgroundSelection = HarnessMonitorBackgroundSelection.decode(backgroundImageRawValue)
     return [
@@ -37,6 +46,7 @@ public struct SettingsOverlayMarkers: View {
       "background=\(backgroundSelection.settingsStateValue)",
       "textSize=\(HarnessMonitorTextSize.label(for: textSizeIndex))",
       "controlSize=" + "\(HarnessMonitorTextSize.controlSizeLabel(at: textSizeIndex))",
+      "sidebarRowMode=\(sidebarSessionRowDisplayMode.rawValue)",
       "timeZoneMode=\(dateTimeConfiguration.timeZoneMode.rawValue)",
       "timeZone=\(dateTimeConfiguration.settingsStateValue)",
       "settingsChrome=native",

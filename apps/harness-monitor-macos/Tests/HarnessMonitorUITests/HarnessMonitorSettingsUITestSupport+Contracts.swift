@@ -7,6 +7,7 @@ struct SettingsStateSnapshot {
   let background: String
   let textSize: String
   let controlSize: String
+  let sidebarRowMode: String
   let timeZoneMode: String
   let timeZone: String
 
@@ -16,6 +17,7 @@ struct SettingsStateSnapshot {
     background: String = "auroraVeil",
     textSize: String = "Default",
     controlSize: String = "small",
+    sidebarRowMode: String = "concise",
     timeZoneMode: String = "local",
     timeZone: String = "local"
   ) -> Self {
@@ -26,6 +28,7 @@ struct SettingsStateSnapshot {
       background: background,
       textSize: textSize,
       controlSize: controlSize,
+      sidebarRowMode: sidebarRowMode,
       timeZoneMode: timeZoneMode,
       timeZone: timeZone
     )
@@ -37,6 +40,7 @@ struct SettingsStateSnapshot {
     background: String = "auroraVeil",
     textSize: String = "Default",
     controlSize: String = "small",
+    sidebarRowMode: String = "concise",
     timeZoneMode: String = "local",
     timeZone: String = "local"
   ) -> Self {
@@ -47,6 +51,7 @@ struct SettingsStateSnapshot {
       background: background,
       textSize: textSize,
       controlSize: controlSize,
+      sidebarRowMode: sidebarRowMode,
       timeZoneMode: timeZoneMode,
       timeZone: timeZone
     )
@@ -58,6 +63,7 @@ struct SettingsStateSnapshot {
     background: String = "auroraVeil",
     textSize: String = "Default",
     controlSize: String = "small",
+    sidebarRowMode: String = "concise",
     timeZoneMode: String = "local",
     timeZone: String = "local"
   ) -> Self {
@@ -68,6 +74,7 @@ struct SettingsStateSnapshot {
       background: background,
       textSize: textSize,
       controlSize: controlSize,
+      sidebarRowMode: sidebarRowMode,
       timeZoneMode: timeZoneMode,
       timeZone: timeZone
     )
@@ -78,12 +85,18 @@ extension HarnessMonitorUITestCase {
   func assertAppearanceSettingsContract(
     expectedMode: String,
     textSizeOverride: String? = nil,
+    sidebarRowModeOverride: String? = nil,
     expectedTextSize: String = "Default",
-    expectedControlSize: String = "small"
+    expectedControlSize: String = "small",
+    expectedSidebarRowMode: String = "concise"
   ) {
     var additionalEnvironment = ["HARNESS_MONITOR_THEME_MODE_OVERRIDE": expectedMode]
     if let textSizeOverride {
       additionalEnvironment[HarnessMonitorSettingsUITestKeys.textSizeOverride] = textSizeOverride
+    }
+    if let sidebarRowModeOverride {
+      additionalEnvironment[HarnessMonitorSettingsUITestKeys.sidebarSessionRowDisplayModeOverride] =
+        sidebarRowModeOverride
     }
 
     let app = launch(
@@ -128,7 +141,8 @@ extension HarnessMonitorUITestCase {
         .appearance(
           mode: expectedMode,
           textSize: expectedTextSize,
-          controlSize: expectedControlSize
+          controlSize: expectedControlSize,
+          sidebarRowMode: expectedSidebarRowMode
         )
       )
     )
@@ -259,6 +273,7 @@ extension HarnessMonitorUITestCase {
       "background=\(snapshot.background)",
       "textSize=\(snapshot.textSize)",
       "controlSize=\(snapshot.controlSize)",
+      "sidebarRowMode=\(snapshot.sidebarRowMode)",
       "timeZoneMode=\(snapshot.timeZoneMode)",
       "timeZone=\(snapshot.timeZone)",
       "settingsChrome=native",

@@ -13,6 +13,8 @@ struct SidebarView: View {
   var dateTimeConfiguration
   @Environment(\.fontScale)
   var fontScale
+  @Environment(\.harnessSidebarSessionRowDisplayMode)
+  var sidebarSessionRowDisplayMode
 
   @State private var collapsedCheckoutKeys: Set<String> = []
 
@@ -27,6 +29,7 @@ struct SidebarView: View {
       interactionRelay: interactionRelay,
       dateTimeConfiguration: dateTimeConfiguration,
       fontScale: fontScale,
+      sidebarSessionRowDisplayMode: sidebarSessionRowDisplayMode,
       collapsedCheckoutKeys: collapsedCheckoutKeys,
       setCheckoutCollapsed: setCheckoutCollapsed
     )
@@ -53,6 +56,7 @@ struct SidebarSessionListColumn: View {
   let interactionRelay: ContentInteractionRelay
   let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
   let fontScale: CGFloat
+  let sidebarSessionRowDisplayMode: HarnessMonitorSidebarSessionRowDisplayMode
   let collapsedCheckoutKeys: Set<String>
   let setCheckoutCollapsed: (String, Bool) -> Void
   @State private var localSelection: Set<String>
@@ -68,6 +72,7 @@ struct SidebarSessionListColumn: View {
     interactionRelay: ContentInteractionRelay,
     dateTimeConfiguration: HarnessMonitorDateTimeConfiguration,
     fontScale: CGFloat,
+    sidebarSessionRowDisplayMode: HarnessMonitorSidebarSessionRowDisplayMode,
     collapsedCheckoutKeys: Set<String>,
     setCheckoutCollapsed: @escaping (String, Bool) -> Void
   ) {
@@ -79,6 +84,7 @@ struct SidebarSessionListColumn: View {
     self.interactionRelay = interactionRelay
     self.dateTimeConfiguration = dateTimeConfiguration
     self.fontScale = fontScale
+    self.sidebarSessionRowDisplayMode = sidebarSessionRowDisplayMode
     self.collapsedCheckoutKeys = collapsedCheckoutKeys
     self.setCheckoutCollapsed = setCheckoutCollapsed
     _localSelection = State(
@@ -133,6 +139,7 @@ struct SidebarSessionListColumn: View {
       isPersistenceAvailable: sidebarUI.isPersistenceAvailable,
       dateTimeConfiguration: dateTimeConfiguration,
       fontScale: fontScale,
+      sidebarSessionRowDisplayMode: sidebarSessionRowDisplayMode,
       collapsedCheckoutKeys: collapsedCheckoutKeys
     )
   }
