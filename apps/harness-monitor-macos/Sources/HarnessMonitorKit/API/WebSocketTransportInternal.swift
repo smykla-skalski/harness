@@ -101,7 +101,7 @@ extension WebSocketTransport {
     #endif
 
     let startedAt = ContinuousClock.now
-    let id = UUID().uuidString
+    let id = HarnessMonitorRequestID.next()
     #if HARNESS_FEATURE_OTEL
       span.setAttribute(key: "rpc.request_id", value: id)
     #endif

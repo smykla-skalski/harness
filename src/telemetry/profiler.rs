@@ -1,4 +1,3 @@
-use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::time::Duration;
 
 use pyroscope::PyroscopeError;
@@ -7,6 +6,7 @@ use pyroscope::pyroscope::{PyroscopeAgent, PyroscopeAgentBuilder, PyroscopeAgent
 use tracing::{info, warn};
 
 use super::config::{ResolvedTelemetryConfig, RuntimeService};
+use super::reachability::endpoint_reachable;
 
 const PYROSCOPE_SAMPLE_RATE_HZ: u32 = 100;
 const PYROSCOPE_REACHABILITY_TIMEOUT: Duration = Duration::from_millis(500);
@@ -129,34 +129,7 @@ fn daemon_profiler_settings(
 // otherwise the agent floods the daemon log with `Failed to send session`
 // every 10 s and steals CPU from the profiler thread.
 fn pyroscope_endpoint_reachable(url: &str, timeout: Duration) -> bool {
-    let Some(authority) = parse_authority(url) else {
-        return false;
-    };
-    let addrs: Vec<SocketAddr> = match authority.to_socket_addrs() {
-        Ok(iter) => iter.collect(),
-        Err(_) => return false,
-    };
-    addrs
-        .into_iter()
-        .any(|addr| TcpStream::connect_timeout(&addr, timeout).is_ok())
-}
-
-// Extract the `host:port` slice from a `scheme://host[:port][/path]` URL,
-// defaulting the port from the scheme when none is supplied.
-fn parse_authority(url: &str) -> Option<String> {
-    let (scheme, rest) = url.split_once("://")?;
-    let authority = rest.split(['/', '?', '#']).next().unwrap_or(rest);
-    if authority.is_empty() {
-        return None;
-    }
-    if authority.contains(':') {
-        return Some(authority.to_string());
-    }
-    let default_port = match scheme {
-        "https" => 443,
-        _ => 80,
-    };
-    Some(format!("{authority}:{default_port}"))
+    endpoint_reachable(url, timeout)
 }
 
 fn build_running_agent(settings: &DaemonProfilerSettings) -> Result<RunningAgent, PyroscopeError> {
@@ -232,31 +205,6 @@ mod tests {
             daemon_profiler_settings(RuntimeService::Daemon, &export(None)),
             None
         );
-    }
-
-    #[test]
-    fn parse_authority_extracts_host_port_with_path() {
-        assert_eq!(
-            parse_authority("http://127.0.0.1:4040/push"),
-            Some("127.0.0.1:4040".to_string())
-        );
-    }
-
-    #[test]
-    fn parse_authority_defaults_port_from_scheme() {
-        assert_eq!(
-            parse_authority("https://pyroscope.example.com/api"),
-            Some("pyroscope.example.com:443".to_string())
-        );
-        assert_eq!(
-            parse_authority("http://pyroscope.example.com"),
-            Some("pyroscope.example.com:80".to_string())
-        );
-    }
-
-    #[test]
-    fn parse_authority_rejects_missing_scheme() {
-        assert_eq!(parse_authority("127.0.0.1:4040"), None);
     }
 
     #[test]

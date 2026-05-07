@@ -1,8 +1,10 @@
 mod config;
+mod console_fields;
 mod guard;
 mod metrics;
 mod profiler;
 mod providers;
+mod reachability;
 mod subscriber;
 
 #[cfg(test)]
