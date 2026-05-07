@@ -141,7 +141,7 @@ struct SessionAgentDetailSection: View {
       input: .text("\(text)\n"),
       showSuccessFeedback: false
     )
-    AccessibilityNotification.Announcement("Message sent").post()
+    AccessibilityNotification.Announcement("Message sent. Waiting for agent reply.").post()
   }
 
   @MainActor
