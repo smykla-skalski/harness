@@ -7,10 +7,16 @@ struct WindowMenuCommands: Commands {
   nonisolated static let newTabTitle = "New Tab"
   nonisolated static let newTabShortcut: KeyEquivalent = "t"
 
+  enum NewTabDestination: Equatable {
+    case newSessionSheet
+    case session(String)
+  }
+
   @Environment(\.openWindow)
   private var openWindow
+  @FocusedValue(\.sessionNavigation)
+  private var sessionNavigation
   let store: HarnessMonitorStore
-  let displayState: CommandsDisplayState
 
   var body: some Commands {
     CommandGroup(after: .windowList) {
@@ -27,13 +33,23 @@ struct WindowMenuCommands: Commands {
   }
 
   private func openSessionTab() {
-    guard displayState.hasSelectedSession, let sessionID = store.selectedSessionID else {
+    switch Self.newTabDestination(sessionNavigation: sessionNavigation) {
+    case .newSessionSheet:
       store.presentedSheet = .newSession
-      return
+    case .session(let sessionID):
+      openWindow(
+        id: HarnessMonitorWindowID.main,
+        value: SessionWindowToken(sessionID: sessionID)
+      )
     }
-    openWindow(
-      id: HarnessMonitorWindowID.main,
-      value: SessionWindowToken(sessionID: sessionID)
-    )
+  }
+
+  nonisolated static func newTabDestination(
+    sessionNavigation: SessionNavigationCommand?
+  ) -> NewTabDestination {
+    guard let sessionID = sessionNavigation?.sessionID, !sessionID.isEmpty else {
+      return .newSessionSheet
+    }
+    return .session(sessionID)
   }
 }
