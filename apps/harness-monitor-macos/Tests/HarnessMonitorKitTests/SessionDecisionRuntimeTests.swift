@@ -44,15 +44,55 @@ struct SessionDecisionRuntimeTests {
     #expect(runtime.allowsInspector(width: 1_100))
   }
 
-  private func makeDecision(contextJSON: String = "{}") -> Decision {
+  @Test("Filter worker returns matching IDs without moving Decision models off main actor")
+  func filterWorkerReturnsMatchingIDsWithoutMovingDecisionModelsOffMainActor() async {
+    let runtime = SessionDecisionRuntime()
+    let decisions = [
+      makeDecision(id: "d-low", severity: .warn, summary: "Low attention", agentID: "agent-b"),
+      makeDecision(id: "d-high", severity: .critical, summary: "Escalate", agentID: "agent-a"),
+      makeDecision(id: "d-info", severity: .info, summary: "FYI", agentID: "agent-a"),
+    ]
+    let filters = SessionDecisionFilterState()
+    filters.scope = .agent
+    filters.query = "agent-a"
+    filters.severities = [.critical, .info]
+
+    runtime.updateFilteredDecisions(
+      input: SessionDecisionFilterInput(sessionID: "s1", decisions: decisions, filters: filters)
+    )
+    await runtime.waitForDecisionFilterIdle()
+
+    #expect(runtime.filteredDecisionIDs == ["d-high", "d-info"])
+    #expect(runtime.filteredDecisions(from: decisions).map(\.id) == ["d-high", "d-info"])
+  }
+
+  @Test("Filter key changes when decision searchable fields change")
+  func filterKeyChangesWhenDecisionSearchableFieldsChange() {
+    let filters = SessionDecisionFilterState()
+    let first = makeDecision(id: "d1", summary: "Old summary")
+    let second = makeDecision(id: "d1", summary: "New summary")
+
+    let firstKey = SessionDecisionFilterKey(sessionID: "s1", decisions: [first], filters: filters)
+    let secondKey = SessionDecisionFilterKey(sessionID: "s1", decisions: [second], filters: filters)
+
+    #expect(firstKey != secondKey)
+  }
+
+  private func makeDecision(
+    id: String = "d1",
+    severity: DecisionSeverity = .needsUser,
+    summary: String = "Agent stalled",
+    agentID: String? = "a1",
+    contextJSON: String = "{}"
+  ) -> Decision {
     Decision(
-      id: "d1",
-      severity: .needsUser,
+      id: id,
+      severity: severity,
       ruleID: "stuck-agent",
       sessionID: "s1",
-      agentID: "a1",
+      agentID: agentID,
       taskID: "t1",
-      summary: "Agent stalled",
+      summary: summary,
       contextJSON: contextJSON,
       suggestedActionsJSON: "[]"
     )
