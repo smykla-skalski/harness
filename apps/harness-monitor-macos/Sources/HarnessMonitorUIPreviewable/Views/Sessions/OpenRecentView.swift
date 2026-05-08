@@ -40,6 +40,7 @@ public struct OpenRecentView: View {
     ZStack {
       Color.clear.accessibilityHidden(true)
       VStack(spacing: 0) {
+        Spacer(minLength: 96 * layoutScale)
         if showsStartPanel {
           OpenRecentStartPanel(
             groups: groups,
@@ -51,9 +52,9 @@ public struct OpenRecentView: View {
           )
           .transition(OpenRecentCloseAfterPickMotionPolicy.transition(reduceMotion: reduceMotion))
         }
+        Spacer(minLength: 132 * layoutScale)
       }
-      .padding(.top, 48 * layoutScale)
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
       actionStateMarker
     }
     .backgroundExtensionEffect()
