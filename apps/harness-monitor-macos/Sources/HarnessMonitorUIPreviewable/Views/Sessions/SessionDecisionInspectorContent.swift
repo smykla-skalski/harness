@@ -4,12 +4,20 @@ import SwiftUI
 struct SessionDecisionInspectorContent: View {
   let decision: Decision
   @Bindable var runtime: SessionDecisionRuntime
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var metrics: SessionDecisionInspectorContentMetrics {
+    SessionDecisionInspectorContentMetrics(fontScale: fontScale)
+  }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
       Picker("Inspector Tab", selection: $runtime.inspectorTab) {
         ForEach(SessionDecisionInspectorTab.allCases, id: \.self) { tab in
-          Text(tab.title).tag(tab)
+          Text(tab.title)
+            .scaledFont(.body)
+            .tag(tab)
         }
       }
       .pickerStyle(.segmented)
@@ -25,10 +33,10 @@ struct SessionDecisionInspectorContent: View {
   }
 
   private var contextRows: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: metrics.rowSpacing) {
       ForEach(runtime.contextRows(for: decision)) { row in
         Text(row.value)
-          .font(.caption)
+          .scaledFont(.caption)
           .textSelection(.enabled)
           .frame(maxWidth: .infinity, alignment: .leading)
       }
@@ -36,18 +44,31 @@ struct SessionDecisionInspectorContent: View {
   }
 
   private var historyRows: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: metrics.rowSpacing) {
       ForEach(runtime.historyRows(for: decision)) { row in
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: metrics.historyTitleSpacing) {
           Text(row.title)
-            .font(.caption.weight(.semibold))
+            .scaledFont(.caption.weight(.semibold))
           Text(row.value)
-            .font(.caption)
+            .scaledFont(.caption)
             .foregroundStyle(.secondary)
             .textSelection(.enabled)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
+  }
+}
+
+struct SessionDecisionInspectorContentMetrics: Equatable {
+  let sectionSpacing: CGFloat
+  let rowSpacing: CGFloat
+  let historyTitleSpacing: CGFloat
+
+  init(fontScale: CGFloat) {
+    let scale = min(max(fontScale, 0.85), 1.8)
+    sectionSpacing = max(12, 12 * min(scale, 1.35))
+    rowSpacing = max(8, 8 * min(scale, 1.45))
+    historyTitleSpacing = max(2, 2 * min(scale, 1.45))
   }
 }
