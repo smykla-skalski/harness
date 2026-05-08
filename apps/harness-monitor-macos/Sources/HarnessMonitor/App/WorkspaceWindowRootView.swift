@@ -10,10 +10,11 @@ struct WorkspaceWindowRootView: View {
 
   let store: HarnessMonitorStore
   let keyWindowObserver: KeyWindowObserver
-  let navigationBridge: WorkspaceWindowNavigationBridge
   let windowCommandRouting: WindowCommandRoutingState
   let mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   @Binding var themeMode: HarnessMonitorThemeMode
+  @FocusedValue(\.windowNavigation)
+  private var workspaceNavigation
   @State private var showsWorkspaceContent = false
 
   private var contentReadiness: WindowContentReadiness {
@@ -39,8 +40,8 @@ struct WorkspaceWindowRootView: View {
       }
     return [
       "scope=\(scopeLabel)",
-      "canGoBack=\(navigationBridge.state.canGoBack)",
-      "canGoForward=\(navigationBridge.state.canGoForward)",
+      "canGoBack=\(workspaceNavigation?.canGoBack ?? false)",
+      "canGoForward=\(workspaceNavigation?.canGoForward ?? false)",
     ].joined(separator: ",")
   }
 
@@ -66,8 +67,7 @@ struct WorkspaceWindowRootView: View {
   private var workspaceContent: some View {
     WorkspaceWindowView(
       store: store,
-      keyWindowObserver: keyWindowObserver,
-      navigationBridge: navigationBridge
+      keyWindowObserver: keyWindowObserver
     )
   }
 

@@ -5,7 +5,6 @@ import SwiftUI
 struct HarnessMonitorMainCommandSet: Commands {
   let store: HarnessMonitorStore
   let textSizeIndex: Int
-  let workspaceNavigationBridge: WorkspaceWindowNavigationBridge
   let windowCommandRouting: WindowCommandRoutingState
   let increaseTextSize: () -> Void
   let decreaseTextSize: () -> Void
@@ -28,7 +27,6 @@ struct HarnessMonitorMainCommandSet: Commands {
     AttachExternalSessionCommand(store: store)
     GoCommands(
       store: store,
-      workspaceNavigationBridge: workspaceNavigationBridge,
       windowCommandRouting: windowCommandRouting,
       displayState: store.commandsDisplayState
     )

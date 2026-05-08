@@ -58,7 +58,6 @@ extension WorkspaceWindowView {
     Task {
       await flushPendingKeySequenceIfNeeded()
     }
-    navigationBridge.update(WindowNavigationState())
   }
 
   func handleSelectionChange(

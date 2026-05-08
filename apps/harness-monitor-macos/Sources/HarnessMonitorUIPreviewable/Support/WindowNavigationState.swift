@@ -63,6 +63,17 @@ public enum WindowNavigationScope: Hashable, Sendable {
   case workspace
 }
 
+private struct WindowNavigationFocusKey: FocusedValueKey {
+  typealias Value = WindowNavigationState
+}
+
+extension FocusedValues {
+  public var windowNavigation: WindowNavigationState? {
+    get { self[WindowNavigationFocusKey.self] }
+    set { self[WindowNavigationFocusKey.self] = newValue }
+  }
+}
+
 @MainActor
 private final class WindowNavigationHandlers {
   var backHandler: (@MainActor () async -> Void)?
@@ -93,25 +104,5 @@ public final class WindowCommandRoutingState {
     }
     activeScope = nil
     activeWindowID = nil
-  }
-}
-
-@MainActor
-@Observable
-public final class WorkspaceWindowNavigationBridge {
-  public var state = WindowNavigationState()
-
-  public init() {}
-
-  public func update(_ state: WindowNavigationState) {
-    self.state = state
-  }
-
-  public func navigateBack() async {
-    await state.navigateBack()
-  }
-
-  public func navigateForward() async {
-    await state.navigateForward()
   }
 }

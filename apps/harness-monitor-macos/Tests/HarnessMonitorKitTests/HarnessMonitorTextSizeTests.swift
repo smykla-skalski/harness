@@ -361,12 +361,8 @@ struct WorkspaceWindowMountTests {
   @Test("Workspace window mounts from the cockpit preview store without crashing")
   func workspaceWindowMountsFromCockpitPreviewStore() async {
     let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded)
-    let navigationBridge = WorkspaceWindowNavigationBridge()
     let host = NSHostingView(
-      rootView: WorkspaceWindowView(
-        store: store,
-        navigationBridge: navigationBridge
-      )
+      rootView: WorkspaceWindowView(store: store)
     )
     let window = NSWindow(
       contentRect: CGRect(x: 0, y: 0, width: 1_240, height: 820),

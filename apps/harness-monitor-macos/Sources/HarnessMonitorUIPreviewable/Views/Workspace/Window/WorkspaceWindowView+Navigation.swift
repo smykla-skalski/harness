@@ -50,6 +50,5 @@ extension WorkspaceWindowView {
       canGoBack: canGoBack,
       canGoForward: canGoForward
     )
-    navigationBridge.update(viewModel.windowNavigation)
   }
 }

@@ -27,7 +27,6 @@ struct HarnessMonitorApp: App {
   @State private var store: HarnessMonitorStore
   @State private var menuBarStatusController: HarnessMonitorMenuBarStatusController
   @State private var sessionWindowPresenceTracker: SessionWindowPresenceTracker
-  @State private var workspaceNavigationBridge: WorkspaceWindowNavigationBridge
   @State private var windowCommandRouting: WindowCommandRoutingState
   @State private var mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   @State private var settingsSelectedSection: SettingsSection
@@ -121,7 +120,6 @@ struct HarnessMonitorApp: App {
         menuBarStatusController: menuBarStatusController
       )
     )
-    _workspaceNavigationBridge = State(initialValue: WorkspaceWindowNavigationBridge())
     _windowCommandRouting = State(initialValue: WindowCommandRoutingState())
     _mcpWindowCommandRegistrar = State(initialValue: HarnessMonitorMCPWindowCommandRegistrar())
     _settingsSelectedSection = State(initialValue: configuration.settingsInitialSection)
@@ -207,7 +205,6 @@ struct HarnessMonitorApp: App {
     HarnessMonitorMainCommandSet(
       store: store,
       textSizeIndex: textSizeIndex,
-      workspaceNavigationBridge: workspaceNavigationBridge,
       windowCommandRouting: windowCommandRouting,
       increaseTextSize: increaseTextSize,
       decreaseTextSize: decreaseTextSize,

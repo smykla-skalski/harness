@@ -10,7 +10,6 @@ public struct WorkspaceWindowView: View {
 
   let store: HarnessMonitorStore
   let keyWindowObserver: KeyWindowObserver?
-  let navigationBridge: WorkspaceWindowNavigationBridge
   @State private var sidebarVisibilityExpander = HarnessSidebarVisibilityExpander()
   @Environment(\.openWindow)
   var openWindow
@@ -47,12 +46,10 @@ public struct WorkspaceWindowView: View {
   @MainActor
   public init(
     store: HarnessMonitorStore,
-    keyWindowObserver: KeyWindowObserver? = nil,
-    navigationBridge: WorkspaceWindowNavigationBridge = WorkspaceWindowNavigationBridge()
+    keyWindowObserver: KeyWindowObserver? = nil
   ) {
     self.store = store
     self.keyWindowObserver = keyWindowObserver
-    self.navigationBridge = navigationBridge
     let initialDisplayState = AgentTuiDisplayState(initialWindowStore: store)
     let initialSelection = Self.initialWindowSelection(
       store: store,
@@ -251,6 +248,7 @@ public struct WorkspaceWindowView: View {
       applyDismissAllVisibleDialog(to: content)
       .navigationTitle(workspaceNavigationTitle(for: viewModel.selection))
       .navigationSubtitle(workspaceNavigationSubtitle(for: viewModel.selection))
+      .focusedSceneValue(\.windowNavigation, viewModel.windowNavigation)
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceWindow)
   }
