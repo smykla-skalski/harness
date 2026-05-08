@@ -176,23 +176,14 @@ public struct SessionWindowView: View {
     .task(id: decisionsCacheTrigger) {
       await recomputeDecisionsCache()
     }
-    .onChange(of: stateCache.selection) { oldSelection, newSelection in
+    .onChange(of: stateCache.selection) { _, newSelection in
       syncPersistedStorage(from: newSelection)
       reconcileInspectorVisibility(
         visibleBinding: $inspectorVisible,
         preferredBinding: $inspectorPreferred
       )
-      // Freeze rendered detail/content at the previous selection so the click
-      // frame paints the sidebar highlight and the still-current panes without
-      // also remounting SessionAgentDetailSection / a fresh middle-column List
-      // on the same runloop. The async hop promotes the cache on the next
-      // runloop tick, off the click event's main-thread budget.
-      detailRenderedSelection = oldSelection
-      contentRenderedRoute = route(for: oldSelection)
-      DispatchQueue.main.async {
-        detailRenderedSelection = newSelection
-        contentRenderedRoute = route(for: newSelection)
-      }
+      detailRenderedSelection = newSelection
+      contentRenderedRoute = route(for: newSelection)
     }
     .onChange(of: stateCache.decisionFilters.query) { _, newValue in
       guard persistedDecisionQuery != newValue else { return }
