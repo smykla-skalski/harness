@@ -9,6 +9,27 @@ struct SessionToolbarButtonStyle: ButtonStyle {
     static let iconWidth: CGFloat = 16
     static let pressedScale = 0.98
     static let animationDuration = 0.14
+
+    static func resolved(fontScale: CGFloat) -> ResolvedMetrics {
+      ResolvedMetrics(fontScale: fontScale)
+    }
+  }
+
+  struct ResolvedMetrics: Equatable {
+    let cornerRadius: CGFloat
+    let horizontalPadding: CGFloat
+    let verticalPadding: CGFloat
+    let minHeight: CGFloat
+    let iconWidth: CGFloat
+
+    init(fontScale: CGFloat) {
+      let scale = min(max(fontScale, 0.85), 1.8)
+      cornerRadius = Metrics.cornerRadius * min(scale, 1.25)
+      horizontalPadding = Metrics.horizontalPadding * min(scale, 1.45)
+      verticalPadding = Metrics.verticalPadding * min(scale, 1.45)
+      minHeight = max(Metrics.minHeight, Metrics.minHeight * scale)
+      iconWidth = max(Metrics.iconWidth, Metrics.iconWidth * min(scale, 1.35))
+    }
   }
 
   var isSelected = false
@@ -31,11 +52,17 @@ private struct SessionToolbarButtonStyleBody: View {
   private var colorSchemeContrast
   @Environment(\.isEnabled)
   private var isEnabled
+  @Environment(\.fontScale)
+  private var fontScale
   @State private var isHovering = false
+
+  private var metrics: SessionToolbarButtonStyle.ResolvedMetrics {
+    SessionToolbarButtonStyle.Metrics.resolved(fontScale: fontScale)
+  }
 
   private var shape: RoundedRectangle {
     RoundedRectangle(
-      cornerRadius: SessionToolbarButtonStyle.Metrics.cornerRadius,
+      cornerRadius: metrics.cornerRadius,
       style: .continuous
     )
   }
@@ -67,13 +94,13 @@ private struct SessionToolbarButtonStyleBody: View {
   var body: some View {
     configuration.label
       .labelStyle(.titleAndIcon)
-      .font(.system(.callout, design: .rounded, weight: .semibold))
+      .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
       .foregroundStyle(HarnessMonitorTheme.ink.opacity(isEnabled ? 0.96 : 0.52))
-      .padding(.horizontal, SessionToolbarButtonStyle.Metrics.horizontalPadding)
-      .padding(.vertical, SessionToolbarButtonStyle.Metrics.verticalPadding)
-      .frame(minHeight: SessionToolbarButtonStyle.Metrics.minHeight)
+      .padding(.horizontal, metrics.horizontalPadding)
+      .padding(.vertical, metrics.verticalPadding)
+      .frame(minHeight: metrics.minHeight)
       .harnessFloatingControlGlass(
-        cornerRadius: SessionToolbarButtonStyle.Metrics.cornerRadius,
+        cornerRadius: metrics.cornerRadius,
         tint: HarnessMonitorTheme.ink,
         prominence: .subdued
       )
