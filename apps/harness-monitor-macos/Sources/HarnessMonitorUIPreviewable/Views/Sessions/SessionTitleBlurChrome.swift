@@ -82,9 +82,13 @@ public struct SessionTitleBlurChrome: View {
   }
 
   private var opacity: Double {
-    colorSchemeContrast == .increased
-      ? SessionTitleBlurChromeConfiguration.tintOpacity * 1.45
+    let baseOpacity =
+      configuration.reduceTransparency
+      ? SessionTitleBlurChromeConfiguration.reducedTransparencyOpacity * 0.35
       : SessionTitleBlurChromeConfiguration.tintOpacity
+    return colorSchemeContrast == .increased
+      ? baseOpacity * 1.45
+      : baseOpacity
   }
 
   public var body: some View {
@@ -93,7 +97,6 @@ public struct SessionTitleBlurChrome: View {
     }
     .frame(height: SessionTitleBlurChromeConfiguration.height)
     .frame(maxWidth: .infinity, alignment: .top)
-    .background(backgroundStyle)
     .ignoresSafeArea(.container, edges: .top)
     .allowsHitTesting(false)
     .accessibilityHidden(true)
@@ -106,14 +109,6 @@ public struct SessionTitleBlurChrome: View {
       .easeInOut(duration: SessionTitleBlurChromeConfiguration.animationDuration),
       value: isStale
     )
-  }
-
-  private var backgroundStyle: AnyShapeStyle {
-    if configuration.reduceTransparency {
-      AnyShapeStyle(tint.opacity(SessionTitleBlurChromeConfiguration.reducedTransparencyOpacity))
-    } else {
-      AnyShapeStyle(.bar)
-    }
   }
 
   private var titleTint: some View {
