@@ -1,6 +1,7 @@
 import Foundation
 import HarnessMonitorKit
 import Observation
+import OSLog
 
 public enum SessionDecisionInspectorTab: String, CaseIterable, Codable, Hashable, Sendable {
   case context
@@ -152,6 +153,10 @@ public final class SessionDecisionRuntime {
   private var latestFilterInput: SessionDecisionFilterInput?
 
   private static let cacheLimit = 32
+  private static let filterSignposter = OSSignposter(
+    subsystem: "io.harnessmonitor",
+    category: "perf/session-decision-filter"
+  )
 
   public init() {}
 
@@ -174,7 +179,18 @@ public final class SessionDecisionRuntime {
 
     isFilteringDecisions = true
     filterTask = Task { @MainActor [weak self] in
+      let signpostID = Self.filterSignposter.makeSignpostID()
+      let interval = Self.filterSignposter.beginInterval(
+        "session_decision_filter.apply",
+        id: signpostID,
+        "session=\(input.sessionID, privacy: .public) count=\(input.items.count, privacy: .public)"
+      )
       let ids = await sessionDecisionFilterWorker.filteredIDs(input: input)
+      Self.filterSignposter.endInterval(
+        "session_decision_filter.apply",
+        interval,
+        "matches=\(ids.count, privacy: .public)"
+      )
       guard !Task.isCancelled else { return }
       guard let self, latestFilterInput == input else { return }
       filteredDecisionIDs = ids
