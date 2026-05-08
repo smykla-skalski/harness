@@ -22,4 +22,31 @@ final class SessionToolbarButtonStyleTests: XCTestCase {
     XCTAssertGreaterThan(largeMetrics.horizontalPadding, defaultMetrics.horizontalPadding)
     XCTAssertGreaterThan(largeMetrics.iconWidth, defaultMetrics.iconWidth)
   }
+
+  func testToolbarStyleFilesStayWithinPlanCaps() throws {
+    let styleSource = try sourceFile(named: "SessionToolbarButtonStyle.swift")
+    let bodySource = try sourceFile(named: "SessionToolbarButtonStyleBody.swift")
+
+    XCTAssertLessThanOrEqual(styleSource.split(separator: "\n").count, 120)
+    XCTAssertLessThanOrEqual(bodySource.split(separator: "\n").count, 120)
+    XCTAssertTrue(styleSource.contains("SessionToolbarButtonStyleBody("))
+    XCTAssertTrue(bodySource.contains("accessibilityReduceMotion"))
+  }
+
+  private func sourceFile(named relativePath: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent(
+        "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Sessions"
+      )
+      .appendingPathComponent(relativePath)
+    return try String(contentsOf: fileURL, encoding: .utf8)
+  }
 }
