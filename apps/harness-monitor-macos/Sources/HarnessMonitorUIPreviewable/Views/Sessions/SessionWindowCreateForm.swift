@@ -1,10 +1,25 @@
 import HarnessMonitorKit
 import SwiftUI
 
+struct SessionWindowCreateFormMetrics: Equatable {
+  let formPadding: CGFloat
+  let promptMinHeight: CGFloat
+  let submitButtonMinHeight: CGFloat
+
+  init(fontScale: CGFloat) {
+    let scale = min(max(fontScale, 0.85), 1.8)
+    formPadding = 24 * min(scale, 1.3)
+    promptMinHeight = max(90, 90 * min(scale, 1.25))
+    submitButtonMinHeight = scale >= 1.45 ? 44 : 0
+  }
+}
+
 struct SessionWindowCreateForm: View {
   let store: HarnessMonitorStore
   @Bindable var state: SessionWindowStateCache
   let draft: SessionCreateDraft
+  @Environment(\.fontScale)
+  private var fontScale
   @State private var validationMessage = ""
 
   private var title: Binding<String> {
@@ -28,10 +43,15 @@ struct SessionWindowCreateForm: View {
     )
   }
 
+  private var metrics: SessionWindowCreateFormMetrics {
+    SessionWindowCreateFormMetrics(fontScale: fontScale)
+  }
+
   var body: some View {
     Form {
       Section(draft.kind.rawValue.capitalized) {
         TextField("Name", text: title)
+          .scaledFont(.body)
           .accessibilityLabel("\(draft.kind.rawValue.capitalized) name")
         if draft.kind == .agent {
           Picker("Runtime", selection: runtime) {
@@ -39,14 +59,17 @@ struct SessionWindowCreateForm: View {
               Text(runtime.title).tag(runtime.rawValue)
             }
           }
+          .scaledFont(.body)
         }
         TextEditor(text: prompt)
-          .frame(minHeight: 90)
+          .scaledFont(.body)
+          .frame(minHeight: metrics.promptMinHeight)
           .accessibilityLabel("Prompt")
       }
       if !validationMessage.isEmpty {
         Section {
           Text(validationMessage)
+            .scaledFont(.callout)
             .foregroundStyle(.red)
             .accessibilityLabel(validationMessage)
         }
@@ -56,12 +79,15 @@ struct SessionWindowCreateForm: View {
           Task { await submit() }
         } label: {
           Label("Create", systemImage: "plus.circle.fill")
+            .scaledFont(.body.weight(.semibold))
         }
+        .frame(minHeight: metrics.submitButtonMinHeight)
         .keyboardShortcut("n", modifiers: [.command])
       }
     }
     .formStyle(.grouped)
-    .padding(24)
+    .padding(metrics.formPadding)
+    .dynamicTypeSize(.xSmall ... .accessibility5)
   }
 
   private func updateDraft(
