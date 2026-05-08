@@ -465,6 +465,32 @@ struct SessionWindowFlowTests {
     #expect(!dividerSource.contains("NSCursor"))
   }
 
+  @Test("Session window owns the content-detail split UX")
+  func sessionWindowOwnsTheContentDetailSplitUX() throws {
+    let viewSource = try previewableSourceFile(named: "Views/Sessions/SessionWindowView.swift")
+    let columnsSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+Columns.swift"
+    )
+    let splitSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionContentDetailSplitView.swift"
+    )
+
+    #expect(viewSource.contains("@SceneStorage(\"session.content-detail.width\")"))
+    #expect(viewSource.contains("sessionSurface"))
+    #expect(
+      columnsSource.contains("SessionContentDetailSplitView(contentWidth: $contentColumnWidth)")
+    )
+    #expect(columnsSource.contains(".navigationSplitViewStyle(.prominentDetail)"))
+    #expect(splitSource.contains("NSCursor.resizeLeftRight"))
+    #expect(splitSource.contains("@State private var liveContentWidth"))
+    #expect(splitSource.contains("_liveContentWidth = State(wrappedValue: contentWidth.wrappedValue)"))
+    #expect(splitSource.contains(".accessibilityAdjustableAction"))
+    #expect(splitSource.contains(".focusEffectDisabled()"))
+    #expect(splitSource.contains(".focusable(interactions: .activate)"))
+    #expect(splitSource.contains("if !isDragging {"))
+    #expect(splitSource.contains(".onMoveCommand"))
+  }
+
   @Test("Sidebar density keeps strict default and maps legacy values")
   func sidebarDensityResolvesStrictDefaultAndLegacyValues() {
     #expect(HarnessMonitorSidebarSessionRowDisplayMode.defaultMode == .strict)
@@ -510,6 +536,7 @@ struct SessionWindowFlowTests {
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()
+
     return repoRoot
       .appendingPathComponent("apps/harness-monitor-macos/Sources/HarnessMonitor")
       .appendingPathComponent(relativePath)
