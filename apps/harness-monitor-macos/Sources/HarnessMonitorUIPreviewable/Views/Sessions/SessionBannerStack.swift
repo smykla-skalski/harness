@@ -36,6 +36,21 @@ struct SessionBannerStackModel: Equatable {
   }
 }
 
+struct SessionBannerStackMetrics: Equatable {
+  let itemSpacing: CGFloat
+  let horizontalPadding: CGFloat
+  let verticalPadding: CGFloat
+  let reviewButtonMinHeight: CGFloat
+
+  init(fontScale: CGFloat) {
+    let scale = min(max(fontScale, 0.85), 1.8)
+    itemSpacing = HarnessMonitorTheme.itemSpacing * min(scale, 1.4)
+    horizontalPadding = HarnessMonitorTheme.spacingMD * min(scale, 1.35)
+    verticalPadding = HarnessMonitorTheme.spacingSM * min(scale, 1.45)
+    reviewButtonMinHeight = scale >= 1.45 ? 44 : 0
+  }
+}
+
 public struct SessionBannerStack<Content: View>: View {
   let store: HarnessMonitorStore
   let sessionID: String
@@ -133,8 +148,15 @@ public struct SessionBannerStack<Content: View>: View {
 }
 
 private struct SessionLoadingBanner: View {
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var metrics: SessionBannerStackMetrics {
+    SessionBannerStackMetrics(fontScale: fontScale)
+  }
+
   var body: some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
+    HStack(alignment: .center, spacing: metrics.itemSpacing) {
       ProgressView()
         .controlSize(.small)
         .accessibilityHidden(true)
@@ -142,8 +164,9 @@ private struct SessionLoadingBanner: View {
         .scaledFont(.caption.weight(.medium))
       Spacer(minLength: 0)
     }
-    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-    .padding(.vertical, HarnessMonitorTheme.spacingSM)
+    .padding(.horizontal, metrics.horizontalPadding)
+    .padding(.vertical, metrics.verticalPadding)
+    .dynamicTypeSize(.xSmall ... .accessibility5)
     .foregroundStyle(HarnessMonitorTheme.accent)
     .modifier(ChromeBannerSurfaceModifier(tint: HarnessMonitorTheme.accent))
     .accessibilityElement(children: .ignore)
@@ -154,6 +177,12 @@ private struct SessionLoadingBanner: View {
 private struct SessionDecisionAttentionBanner: View {
   let count: Int
   let selectDecisions: (() -> Void)?
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var metrics: SessionBannerStackMetrics {
+    SessionBannerStackMetrics(fontScale: fontScale)
+  }
 
   private var message: String {
     let suffix = count == 1 ? "" : "s"
@@ -161,7 +190,7 @@ private struct SessionDecisionAttentionBanner: View {
   }
 
   var body: some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
+    HStack(alignment: .center, spacing: metrics.itemSpacing) {
       Image(systemName: "exclamationmark.bubble")
         .scaledFont(.caption)
         .accessibilityHidden(true)
@@ -171,11 +200,13 @@ private struct SessionDecisionAttentionBanner: View {
       if let selectDecisions {
         Button("Review", action: selectDecisions)
           .buttonStyle(.borderless)
+          .frame(minHeight: metrics.reviewButtonMinHeight)
           .accessibilityLabel("Review pending decisions")
       }
     }
-    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-    .padding(.vertical, HarnessMonitorTheme.spacingSM)
+    .padding(.horizontal, metrics.horizontalPadding)
+    .padding(.vertical, metrics.verticalPadding)
+    .dynamicTypeSize(.xSmall ... .accessibility5)
     .foregroundStyle(HarnessMonitorTheme.accent)
     .modifier(ChromeBannerSurfaceModifier(tint: HarnessMonitorTheme.accent))
     .accessibilityElement(children: .combine)
