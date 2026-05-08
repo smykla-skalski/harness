@@ -6,18 +6,39 @@ import Testing
 @MainActor
 @Suite("Session decision runtime")
 struct SessionDecisionRuntimeTests {
-  @Test("Context rows include routing fields and flattened JSON")
-  func contextRowsIncludeRoutingFieldsAndFlattenedJSON() {
+  @Test("Context rows omit detail-owned fields and keep orthogonal context")
+  func contextRowsOmitDetailOwnedFieldsAndKeepOrthogonalContext() {
     let runtime = SessionDecisionRuntime()
-    let rows = runtime.contextRows(for: makeDecision(contextJSON: #"{"zone":"dev","attempt":2}"#))
+    let rows = runtime.contextRows(
+      for: makeDecision(
+        contextJSON: #"""
+          {"zone":"dev","attempt":2,"status":"open","ruleID":"stuck-agent","agentID":"a1","taskID":"t1","summary":"Agent stalled"}
+          """#
+      )
+    )
 
-    #expect(rows.contains(.init(id: "rule", value: "stuck-agent")))
-    #expect(rows.contains(.init(id: "status", value: "open")))
-    #expect(rows.contains(.init(id: "session", value: "s1")))
-    #expect(rows.contains(.init(id: "agent", value: "a1")))
-    #expect(rows.contains(.init(id: "task", value: "t1")))
+    #expect(rows.contains(.init(id: "session", value: "Session: s1")))
     #expect(rows.contains { $0.id == "context.zone" && $0.value == "zone: dev" })
     #expect(rows.contains { $0.id == "context.attempt" && $0.value == "attempt: 2" })
+    #expect(!rows.contains { $0.id == "context.status" })
+    #expect(!rows.contains { $0.id == "context.ruleID" })
+    #expect(!rows.contains { $0.id == "context.agentID" })
+    #expect(!rows.contains { $0.id == "context.taskID" })
+    #expect(!rows.contains { $0.id == "context.summary" })
+  }
+
+  @Test("Context rows are empty when only detail-owned values remain")
+  func contextRowsAreEmptyWhenOnlyDetailOwnedValuesRemain() {
+    let rows = SessionDecisionRuntime().contextRows(
+      for: makeDecision(
+        sessionID: nil,
+        contextJSON: #"""
+          {"status":"open","ruleID":"stuck-agent","agentID":"a1","taskID":"t1"}
+          """#
+      )
+    )
+
+    #expect(rows.isEmpty)
   }
 
   @Test("History rows include status and optional resolution data")
@@ -83,13 +104,14 @@ struct SessionDecisionRuntimeTests {
     severity: DecisionSeverity = .needsUser,
     summary: String = "Agent stalled",
     agentID: String? = "a1",
+    sessionID: String? = "s1",
     contextJSON: String = "{}"
   ) -> Decision {
     Decision(
       id: id,
       severity: severity,
       ruleID: "stuck-agent",
-      sessionID: "s1",
+      sessionID: sessionID,
       agentID: agentID,
       taskID: "t1",
       summary: summary,

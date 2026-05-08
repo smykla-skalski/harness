@@ -198,18 +198,9 @@ public final class SessionDecisionRuntime {
     if let cached = contextRowCache[key] {
       return cached
     }
-    var rows: [SessionDecisionContextRow] = [
-      .init(id: "rule", value: decision.ruleID),
-      .init(id: "status", value: decision.statusRaw),
-    ]
+    var rows: [SessionDecisionContextRow] = []
     if let sessionID = decision.sessionID {
-      rows.append(.init(id: "session", value: sessionID))
-    }
-    if let agentID = decision.agentID {
-      rows.append(.init(id: "agent", value: agentID))
-    }
-    if let taskID = decision.taskID {
-      rows.append(.init(id: "task", value: taskID))
+      rows.append(.init(id: "session", value: "Session: \(sessionID)"))
     }
     rows.append(contentsOf: flattenedContextRows(from: decision.contextJSON))
     storeContextRows(rows, forKey: key)
@@ -240,7 +231,7 @@ public final class SessionDecisionRuntime {
   }
 
   private func contextCacheKey(for decision: Decision) -> String {
-    "\(decision.id):\(decision.contextJSON.hashValue)"
+    "\(decision.id):\(decision.sessionID ?? ""):\(decision.contextJSON.hashValue)"
   }
 
   private func historyCacheKey(for decision: Decision) -> String {
@@ -278,10 +269,41 @@ public final class SessionDecisionRuntime {
     else {
       return []
     }
-    return object.keys.sorted().prefix(12).map { key in
-      SessionDecisionContextRow(id: "context.\(key)", value: "\(key): \(object[key] ?? "")")
-    }
+    return object.keys.sorted()
+      .filter { !Self.isDetailOwnedContextKey($0) }
+      .prefix(12)
+      .map { key in
+        SessionDecisionContextRow(id: "context.\(key)", value: "\(key): \(object[key] ?? "")")
+      }
   }
+
+  private static func isDetailOwnedContextKey(_ key: String) -> Bool {
+    detailOwnedContextKeys.contains(normalizedContextKey(key))
+  }
+
+  private static func normalizedContextKey(_ key: String) -> String {
+    key.lowercased().filter { $0.isLetter || $0.isNumber }
+  }
+
+  private static let detailOwnedContextKeys: Set<String> = [
+    "agent",
+    "agentid",
+    "decision",
+    "decisionid",
+    "rule",
+    "ruleid",
+    "session",
+    "sessionid",
+    "severity",
+    "severityraw",
+    "status",
+    "statusraw",
+    "suggestedactions",
+    "suggestedactionsjson",
+    "summary",
+    "task",
+    "taskid",
+  ]
 }
 
 private let sessionDecisionFilterWorker = SessionDecisionFilterWorker()
