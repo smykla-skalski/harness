@@ -46,6 +46,29 @@ struct SessionBannerStackTests {
     #expect(model.isPresented)
   }
 
+  @Test("Banner metrics scale chrome and preserve large hit targets")
+  func bannerMetricsScaleChromeAndPreserveLargeHitTargets() {
+    let regular = SessionBannerStackMetrics(fontScale: 1)
+    let large = SessionBannerStackMetrics(fontScale: 1.8)
+
+    #expect(large.itemSpacing > regular.itemSpacing)
+    #expect(large.horizontalPadding > regular.horizontalPadding)
+    #expect(large.verticalPadding > regular.verticalPadding)
+    #expect(large.reviewButtonMinHeight == 44)
+  }
+
+  @Test("Banner metrics clamp extreme font scales")
+  func bannerMetricsClampExtremeFontScales() {
+    #expect(
+      SessionBannerStackMetrics(fontScale: 0.1)
+        == SessionBannerStackMetrics(fontScale: 0.85)
+    )
+    #expect(
+      SessionBannerStackMetrics(fontScale: 9.0)
+        == SessionBannerStackMetrics(fontScale: 1.8)
+    )
+  }
+
   private func makeModel(
     persistenceError: String? = nil,
     sessionDataAvailability: HarnessMonitorStore.SessionDataAvailability = .live,
