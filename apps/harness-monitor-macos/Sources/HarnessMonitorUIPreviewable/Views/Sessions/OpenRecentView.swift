@@ -1,4 +1,3 @@
-import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
@@ -92,16 +91,8 @@ public struct OpenRecentView: View {
       value: SessionWindowToken(sessionID: sessionID)
     )
     Task { @MainActor in
-      let outcome = await OpenRecentSessionLaunchHandoff.perform(
-        sessionID: sessionID,
-        store: store
-      )
-      if outcome == .unresolved {
-        HarnessMonitorLogger.swiftui.warning(
-          "Open Recent could not resolve the opened session window for \(sessionID, privacy: .public)"
-        )
-      }
-      guard shouldCloseAfterPick, outcome != .unresolved else {
+      await Task.yield()
+      guard shouldCloseAfterPick else {
         return
       }
       await dismissCurrentWindow()
@@ -225,7 +216,7 @@ private struct OpenRecentStartPanel: View {
           .scaledFont(.caption2.weight(.semibold))
           .foregroundStyle(.tertiary)
         Rectangle()
-          .fill(Color(nsColor: .separatorColor).opacity(0.45))
+          .fill(Color.secondary.opacity(0.18))
           .frame(height: 1)
           .accessibilityHidden(true)
       }
@@ -392,138 +383,6 @@ enum OpenRecentCloseAfterPickMotionPolicy {
 
   static func dismissDelay(reduceMotion: Bool) -> Duration {
     reduceMotion ? .zero : .milliseconds(Int(animatedDismissDuration * 1000))
-  }
-}
-
-@MainActor
-enum OpenRecentSessionLaunchHandoff {
-  static let pollAttempts = 20
-  static let pollInterval: Duration = .milliseconds(25)
-
-  enum Outcome: Equatable {
-    case focused
-    case attentionRequested
-    case unresolved
-  }
-
-  @MainActor
-  protocol ApplicationDriver {
-    func activate()
-    func requestAttention()
-  }
-
-  @MainActor
-  protocol WindowDriver {
-    var isVisible: Bool { get }
-    var isMiniaturized: Bool { get }
-    var isKeyWindow: Bool { get }
-    var isOnActiveSpace: Bool { get }
-    var isOcclusionVisible: Bool { get }
-
-    func makeKeyAndOrderFront()
-  }
-
-  struct Environment {
-    let application: any ApplicationDriver
-    let resolveWindow: @MainActor () -> (any WindowDriver)?
-    let pause: @MainActor () async -> Void
-
-    init(
-      application: any ApplicationDriver,
-      resolveWindow: @escaping @MainActor () -> (any WindowDriver)?,
-      pause: @escaping @MainActor () async -> Void = {
-        await Task.yield()
-        try? await Task.sleep(for: OpenRecentSessionLaunchHandoff.pollInterval)
-      }
-    ) {
-      self.application = application
-      self.resolveWindow = resolveWindow
-      self.pause = pause
-    }
-
-    static func live(
-      sessionID: String,
-      store: HarnessMonitorStore
-    ) -> Self {
-      Self(
-        application: LiveApplicationDriver(),
-        resolveWindow: {
-          NSApplication.shared.windows.first { window in
-            store.sessionID(forOpenSessionWindowID: ObjectIdentifier(window)) == sessionID
-          }
-          .map(LiveWindowDriver.init)
-        }
-      )
-    }
-  }
-
-  static func perform(
-    sessionID: String,
-    store: HarnessMonitorStore
-  ) async -> Outcome {
-    await perform(environment: .live(sessionID: sessionID, store: store))
-  }
-
-  static func perform(environment: Environment) async -> Outcome {
-    environment.application.activate()
-
-    for _ in 0..<pollAttempts {
-      if let window = environment.resolveWindow() {
-        window.makeKeyAndOrderFront()
-        if window.isKeyWindow && isUsablyVisible(window) {
-          return .focused
-        }
-      }
-      await environment.pause()
-    }
-
-    guard let window = environment.resolveWindow() else {
-      return .unresolved
-    }
-
-    window.makeKeyAndOrderFront()
-    guard window.isKeyWindow && isUsablyVisible(window) else {
-      environment.application.requestAttention()
-      return .attentionRequested
-    }
-    return .focused
-  }
-
-  private static func isUsablyVisible(_ window: any WindowDriver) -> Bool {
-    window.isVisible
-      && !window.isMiniaturized
-      && window.isOnActiveSpace
-      && window.isOcclusionVisible
-  }
-}
-
-@MainActor
-private struct LiveApplicationDriver: OpenRecentSessionLaunchHandoff.ApplicationDriver {
-  func activate() {
-    if #available(macOS 14.0, *) {
-      NSApplication.shared.activate()
-    } else {
-      NSApplication.shared.activate(ignoringOtherApps: true)
-    }
-  }
-
-  func requestAttention() {
-    _ = NSApplication.shared.requestUserAttention(.informationalRequest)
-  }
-}
-
-@MainActor
-private struct LiveWindowDriver: OpenRecentSessionLaunchHandoff.WindowDriver {
-  let window: NSWindow
-
-  var isVisible: Bool { window.isVisible }
-  var isMiniaturized: Bool { window.isMiniaturized }
-  var isKeyWindow: Bool { window.isKeyWindow }
-  var isOnActiveSpace: Bool { window.isOnActiveSpace }
-  var isOcclusionVisible: Bool { window.occlusionState.contains(.visible) }
-
-  func makeKeyAndOrderFront() {
-    window.makeKeyAndOrderFront(nil)
   }
 }
 

@@ -174,7 +174,6 @@ struct HarnessMonitorApp: App {
     } else if rendersLiveSceneContent {
       mainWindowContent
         .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
-        .modifier(SessionWindowTabbing(isSessionWindow: false))
     } else {
       Color.clear.accessibilityHidden(true)
     }

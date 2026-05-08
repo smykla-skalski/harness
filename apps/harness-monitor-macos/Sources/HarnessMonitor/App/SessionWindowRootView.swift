@@ -44,6 +44,5 @@ struct SessionWindowRootView: View {
         tracker: sessionWindowPresenceTracker
       )
     )
-    .modifier(SessionWindowTabbing(isSessionWindow: true))
   }
 }
