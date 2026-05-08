@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorKit
 import Testing
 
 @testable import HarnessMonitorUIPreviewable
@@ -36,6 +37,54 @@ struct SessionWindowCreateFormMetricsTests {
     #expect(SessionWindowCreateFormValidation.message(for: named) == nil)
   }
 
+  @Test("Draft launch selection preserves legacy runtime and provider storage keys")
+  func draftLaunchSelectionPreservesLegacyRuntimeAndProviderStorageKeys() {
+    let legacyRuntime = SessionCreateDraft(
+      kind: .agent,
+      runtime: AgentTuiRuntime.gemini.rawValue,
+      sessionID: "session-1"
+    )
+    let projectAccess = SessionCreateDraft(
+      kind: .agent,
+      runtime: AgentLaunchSelection.acp("copilot").storageKey,
+      sessionID: "session-1"
+    )
+
+    #expect(legacyRuntime.launchSelection == .tui(.gemini))
+    #expect(projectAccess.launchSelection == .acp("copilot"))
+  }
+
+  @Test("Validation rejects unavailable selected capability")
+  func validationRejectsUnavailableSelectedCapability() {
+    let draft = SessionCreateDraft(
+      kind: .agent,
+      title: "Review worker",
+      runtime: AgentLaunchSelection.acp("copilot").storageKey,
+      sessionID: "session-1"
+    )
+    let option = AgentCapabilityOption(
+      id: "copilot",
+      title: "Copilot",
+      transportChoices: [
+        AgentCapabilityTransportChoice(
+          id: .acp("copilot"),
+          title: "Project access",
+          capabilities: ["workspace.read"]
+        )
+      ],
+      doctorProbe: nil,
+      probe: nil,
+      installHint: nil,
+      sandboxed: true,
+      acpHostBridgeReady: false
+    )
+
+    #expect(
+      SessionWindowCreateFormValidation.message(for: draft, capabilityOptions: [option])
+        == "Turn on bridge access to use project access here"
+    )
+  }
+
   @MainActor
   @Test("Cancelling a create draft clears it and returns to its section")
   func cancellingCreateDraftClearsItAndReturnsToSection() {
@@ -60,6 +109,20 @@ struct SessionWindowCreateFormMetricsTests {
     #expect(source.contains("@FocusState"))
     #expect(source.contains("Button(\"Cancel\", role: .cancel)"))
     #expect(source.contains("SessionWindowCreateFormValidation.message"))
+    #expect(source.contains("SessionWindowCreateFormCapabilityPicker"))
+    #expect(source.contains("startAcpAgent("))
+  }
+
+  @Test("Create form capability support is split into catalog and picker sources")
+  func createFormCapabilitySupportIsSplitIntoCatalogAndPickerSources() throws {
+    let catalogSource = try sourceFile(named: "SessionWindowCreateFormCatalogs.swift")
+    let pickerSource = try sourceFile(named: "SessionWindowCreateFormCapabilityPicker.swift")
+    let sharedCatalogSource = try agentSourceFile(named: "AgentCapabilityCatalog.swift")
+
+    #expect(catalogSource.contains("loadAgentOptions"))
+    #expect(catalogSource.contains("fallbackAgentOptions"))
+    #expect(pickerSource.contains("AgentCapabilityRow"))
+    #expect(sharedCatalogSource.contains("enum AgentCapabilityCatalog"))
   }
 
   private func sourceFile(named relativePath: String) throws -> String {
@@ -74,6 +137,23 @@ struct SessionWindowCreateFormMetricsTests {
       repoRoot
       .appendingPathComponent(
         "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Sessions"
+      )
+      .appendingPathComponent(relativePath)
+    return try String(contentsOf: fileURL, encoding: .utf8)
+  }
+
+  private func agentSourceFile(named relativePath: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent(
+        "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Agents"
       )
       .appendingPathComponent(relativePath)
     return try String(contentsOf: fileURL, encoding: .utf8)
