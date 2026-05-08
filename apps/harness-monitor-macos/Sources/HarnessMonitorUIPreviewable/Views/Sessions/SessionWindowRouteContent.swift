@@ -75,6 +75,8 @@ struct SessionWindowOverview: View {
 
 struct SessionWindowAgentsList: View {
   let detail: SessionDetail?
+  @Bindable var state: SessionWindowStateCache
+  @State private var selectedAgentID: String?
   @Environment(\.fontScale)
   private var fontScale
 
@@ -83,30 +85,43 @@ struct SessionWindowAgentsList: View {
   }
 
   var body: some View {
-    sessionListSurface("Agents") {
-      if let agents = detail?.agents, !agents.isEmpty {
-        ForEach(agents) { agent in
-          Label {
-            VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
-              Text(agent.name)
-                .scaledFont(.body)
-              Text("\(agent.role.title) - \(agent.runtime) - \(agent.agentId)")
-                .scaledFont(.caption)
-                .foregroundStyle(.secondary)
+    List(selection: $selectedAgentID) {
+      Section("Agents") {
+        if let agents = detail?.agents, !agents.isEmpty {
+          ForEach(agents) { agent in
+            Label {
+              VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
+                Text(agent.name)
+                  .scaledFont(.body)
+                Text("\(agent.role.title) - \(agent.runtime) - \(agent.agentId)")
+                  .scaledFont(.caption)
+                  .foregroundStyle(.secondary)
+              }
+            } icon: {
+              Image(systemName: "person.crop.circle")
             }
-          } icon: {
-            Image(systemName: "person.crop.circle")
+            .tag(agent.agentId)
           }
+        } else {
+          ContentUnavailableView("No Agents", systemImage: "person.3")
         }
-      } else {
-        ContentUnavailableView("No Agents", systemImage: "person.3")
       }
+    }
+    .listStyle(.inset)
+    .task(id: state.selection.agentID) {
+      selectedAgentID = state.selection.agentID
+    }
+    .onChange(of: selectedAgentID) { _, agentID in
+      guard let agentID, agentID != state.selection.agentID else { return }
+      state.selectAgent(agentID)
     }
   }
 }
 
 struct SessionWindowTasksList: View {
   let detail: SessionDetail?
+  @Bindable var state: SessionWindowStateCache
+  @State private var selectedTaskID: String?
   @Environment(\.fontScale)
   private var fontScale
 
@@ -115,24 +130,35 @@ struct SessionWindowTasksList: View {
   }
 
   var body: some View {
-    sessionListSurface("Tasks") {
-      if let tasks = detail?.tasks, !tasks.isEmpty {
-        ForEach(tasks) { task in
-          Label {
-            VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
-              Text(task.title)
-                .scaledFont(.body)
-              Text("\(task.status.title) - \(task.severity.title)")
-                .scaledFont(.caption)
-                .foregroundStyle(.secondary)
+    List(selection: $selectedTaskID) {
+      Section("Tasks") {
+        if let tasks = detail?.tasks, !tasks.isEmpty {
+          ForEach(tasks) { task in
+            Label {
+              VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
+                Text(task.title)
+                  .scaledFont(.body)
+                Text("\(task.status.title) - \(task.severity.title)")
+                  .scaledFont(.caption)
+                  .foregroundStyle(.secondary)
+              }
+            } icon: {
+              Image(systemName: "checklist")
             }
-          } icon: {
-            Image(systemName: "checklist")
+            .tag(task.taskId)
           }
+        } else {
+          ContentUnavailableView("No Tasks", systemImage: "checklist")
         }
-      } else {
-        ContentUnavailableView("No Tasks", systemImage: "checklist")
       }
+    }
+    .listStyle(.inset)
+    .task(id: state.selection.taskID) {
+      selectedTaskID = state.selection.taskID
+    }
+    .onChange(of: selectedTaskID) { _, taskID in
+      guard let taskID, taskID != state.selection.taskID else { return }
+      state.selectTask(taskID)
     }
   }
 }
@@ -140,6 +166,7 @@ struct SessionWindowTasksList: View {
 struct SessionWindowDecisionsList: View {
   let decisions: [Decision]
   @Bindable var state: SessionWindowStateCache
+  @State private var selectedDecisionID: String?
   @Environment(\.fontScale)
   private var fontScale
 
@@ -148,7 +175,7 @@ struct SessionWindowDecisionsList: View {
   }
 
   var body: some View {
-    List(selection: decisionBinding) {
+    List(selection: $selectedDecisionID) {
       ForEach(decisions) { decision in
         VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
           Text(decision.summary)
@@ -162,31 +189,41 @@ struct SessionWindowDecisionsList: View {
       }
     }
     .listStyle(.inset)
-  }
-
-  private var decisionBinding: Binding<String?> {
-    Binding(
-      get: { state.selection.decisionID },
-      set: { decisionID in
-        guard let decisionID else { return }
-        state.selectDecision(decisionID)
-      }
-    )
+    .task(id: state.selection.decisionID) {
+      selectedDecisionID = state.selection.decisionID
+    }
+    .onChange(of: selectedDecisionID) { _, decisionID in
+      guard let decisionID, decisionID != state.selection.decisionID else { return }
+      state.selectDecision(decisionID)
+    }
   }
 }
 
 struct SessionWindowRunsList: View {
   let detail: SessionDetail?
+  @Bindable var state: SessionWindowStateCache
+  @State private var selectedAgentID: String?
 
   var body: some View {
-    sessionListSurface("Terminal/Runs") {
-      if let agents = detail?.agents, !agents.isEmpty {
-        ForEach(agents) { agent in
-          Label(agent.name, systemImage: "terminal")
+    List(selection: $selectedAgentID) {
+      Section("Terminal/Runs") {
+        if let agents = detail?.agents, !agents.isEmpty {
+          ForEach(agents) { agent in
+            Label(agent.name, systemImage: "terminal")
+              .tag(agent.agentId)
+          }
+        } else {
+          ContentUnavailableView("No Terminal Sessions", systemImage: "terminal")
         }
-      } else {
-        ContentUnavailableView("No Terminal Sessions", systemImage: "terminal")
       }
+    }
+    .listStyle(.inset)
+    .task(id: state.selection.agentID) {
+      selectedAgentID = state.selection.agentID
+    }
+    .onChange(of: selectedAgentID) { _, agentID in
+      guard let agentID, agentID != state.selection.agentID else { return }
+      state.selectAgent(agentID)
     }
   }
 }
@@ -220,17 +257,4 @@ public struct DecisionDetailSummary: View {
     .padding(metrics.contentPadding)
     .dynamicTypeSize(.xSmall ... .accessibility5)
   }
-}
-
-@MainActor
-func sessionListSurface<Content: View>(
-  _ title: String,
-  @ViewBuilder content: () -> Content
-) -> some View {
-  List {
-    Section(title) {
-      content()
-    }
-  }
-  .listStyle(.inset)
 }
