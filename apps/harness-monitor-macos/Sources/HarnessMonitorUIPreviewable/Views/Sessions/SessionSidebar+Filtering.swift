@@ -1,12 +1,31 @@
 import HarnessMonitorKit
 import SwiftUI
 
+struct SessionDecisionFilterMetrics: Equatable {
+  let verticalSpacing: CGFloat
+  let horizontalSpacing: CGFloat
+  let filterButtonSize: CGFloat
+
+  init(fontScale: CGFloat) {
+    let scale = min(max(fontScale, 0.85), 1.8)
+    verticalSpacing = 6 * min(scale, 1.45)
+    horizontalSpacing = HarnessMonitorTheme.spacingSM * min(scale, 1.35)
+    filterButtonSize = scale >= 1.45 ? 44 : max(24, 24 * scale)
+  }
+}
+
 struct SessionDecisionFilterControls: View {
   @Bindable var filters: SessionDecisionFilterState
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var metrics: SessionDecisionFilterMetrics {
+    SessionDecisionFilterMetrics(fontScale: fontScale)
+  }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      HStack {
+    VStack(alignment: .leading, spacing: metrics.verticalSpacing) {
+      HStack(spacing: metrics.horizontalSpacing) {
         TextField("Filter decisions", text: $filters.query)
           .textFieldStyle(.roundedBorder)
         Menu {
@@ -28,6 +47,7 @@ struct SessionDecisionFilterControls: View {
           Image(systemName: "line.3.horizontal.decrease.circle")
         }
         .menuIndicator(.hidden)
+        .frame(width: metrics.filterButtonSize, height: metrics.filterButtonSize)
         .help("Decision Filters")
         .accessibilityLabel("Decision Filters")
       }
@@ -38,6 +58,7 @@ struct SessionDecisionFilterControls: View {
           .lineLimit(1)
       }
     }
+    .dynamicTypeSize(.xSmall ... .accessibility5)
   }
 
   private var filterSummary: String {
