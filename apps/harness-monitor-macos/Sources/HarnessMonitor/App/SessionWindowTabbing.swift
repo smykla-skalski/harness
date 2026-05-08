@@ -70,6 +70,11 @@ private final class AccessorView: NSView {
     if configuration.isSessionWindow {
       window.tabbingIdentifier = Self.sessionTabbingIdentifier
       window.tabbingMode = tabbingMode(for: configuration.preference)
+      guard window.tabbingIdentifier == Self.sessionTabbingIdentifier else {
+        Self.log.warning("Session tabbing identifier unavailable; falling back to standalone windows")
+        window.tabbingMode = .automatic
+        return
+      }
     } else {
       window.tabbingIdentifier = ""
       window.tabbingMode = .disallowed
