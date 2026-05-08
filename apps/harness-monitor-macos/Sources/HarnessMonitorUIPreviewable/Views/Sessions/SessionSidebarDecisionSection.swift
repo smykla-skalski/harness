@@ -116,8 +116,13 @@ extension SessionSidebar {
       HStack(spacing: HarnessMonitorTheme.spacingSM) {
         Image(systemName: "arrow.uturn.backward.circle")
           .foregroundStyle(.tint)
-        Text("Dismissed \(toast.count) decision\(toast.count == 1 ? "" : "s")")
-          .lineLimit(1)
+        VStack(alignment: .leading, spacing: 1) {
+          Text(toast.dismissedCopy)
+            .lineLimit(1)
+          Text(SessionDecisionUndoToastState.commitBarrierCopy)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+        }
         Spacer(minLength: HarnessMonitorTheme.spacingSM)
         Button("Undo") {
           state.decisionBulkActions.requestUndoToastReopen()
@@ -128,9 +133,7 @@ extension SessionSidebar {
       .font(.caption)
       .padding(.vertical, HarnessMonitorTheme.spacingXS)
       .accessibilityElement(children: .combine)
-      .accessibilityLabel(
-        "Dismissed \(toast.count) decision\(toast.count == 1 ? "" : "s"). Undo available."
-      )
+      .accessibilityLabel(toast.accessibilityCopy)
       .task(id: toast.id) {
         let delay = max(0, Int((toast.expiresAt.timeIntervalSinceNow * 1000).rounded(.up)))
         try? await Task.sleep(for: .milliseconds(delay))

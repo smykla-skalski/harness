@@ -20,6 +20,7 @@ public struct SessionTaskDecisionLink: Equatable, Sendable {
 }
 
 public struct SessionDecisionUndoToastState: Equatable, Identifiable, Sendable {
+  public static let commitBarrierCopy = "Closing window confirms dismissal."
   public let id: String
   public let decisionIDs: [String]
   public let expiresAt: Date
@@ -32,6 +33,14 @@ public struct SessionDecisionUndoToastState: Equatable, Identifiable, Sendable {
 
   public var count: Int {
     decisionIDs.count
+  }
+
+  public var dismissedCopy: String {
+    "Dismissed \(count) decision\(count == 1 ? "" : "s")"
+  }
+
+  public var accessibilityCopy: String {
+    "\(dismissedCopy). Undo available. \(Self.commitBarrierCopy)"
   }
 }
 

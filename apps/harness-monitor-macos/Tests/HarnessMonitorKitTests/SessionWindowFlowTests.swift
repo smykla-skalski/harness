@@ -340,6 +340,11 @@ struct SessionWindowFlowTests {
     let toast = try #require(bulkActions.undoToast)
     #expect(toast.count == 2)
     #expect(toast.expiresAt == now.addingTimeInterval(8))
+    #expect(toast.dismissedCopy == "Dismissed 2 decisions")
+    #expect(
+      toast.accessibilityCopy
+        == "Dismissed 2 decisions. Undo available. Closing window confirms dismissal."
+    )
     bulkActions.clearExpiredUndoToast(now: now.addingTimeInterval(7.9))
     #expect(bulkActions.undoToast != nil)
     bulkActions.clearExpiredUndoToast(now: now.addingTimeInterval(8))
