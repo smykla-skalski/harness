@@ -5,6 +5,7 @@ extension SessionSidebar {
   @ViewBuilder var decisionsSection: some View {
     Section {
       decisionFilterRow
+      undoToastRow
       ForEach(decisions) { decision in
         let severity = DecisionSeverity(rawValue: decision.severityRaw)
         SessionSidebarRow(
@@ -108,6 +109,36 @@ extension SessionSidebar {
 
   var decisionFilterRow: some View {
     SessionDecisionFilterControls(filters: state.decisionFilters)
+  }
+
+  @ViewBuilder var undoToastRow: some View {
+    if let toast = state.decisionBulkActions.undoToast {
+      HStack(spacing: HarnessMonitorTheme.spacingSM) {
+        Image(systemName: "arrow.uturn.backward.circle")
+          .foregroundStyle(.tint)
+        Text("Dismissed \(toast.count) decision\(toast.count == 1 ? "" : "s")")
+          .lineLimit(1)
+        Spacer(minLength: HarnessMonitorTheme.spacingSM)
+        Button("Undo") {
+          state.decisionBulkActions.requestUndoToastReopen()
+        }
+        .buttonStyle(.link)
+        .keyboardShortcut("z", modifiers: .command)
+      }
+      .font(.caption)
+      .padding(.vertical, HarnessMonitorTheme.spacingXS)
+      .accessibilityElement(children: .combine)
+      .accessibilityLabel(
+        "Dismissed \(toast.count) decision\(toast.count == 1 ? "" : "s"). Undo available."
+      )
+      .task(id: toast.id) {
+        let delay = max(0, Int((toast.expiresAt.timeIntervalSinceNow * 1000).rounded(.up)))
+        try? await Task.sleep(for: .milliseconds(delay))
+        await MainActor.run {
+          state.decisionBulkActions.clearExpiredUndoToast()
+        }
+      }
+    }
   }
 
   var multiSelectAccessibilityValue: Text {

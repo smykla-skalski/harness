@@ -14,6 +14,22 @@ public struct SessionTaskDecisionLink: Equatable, Sendable {
   }
 }
 
+public struct SessionDecisionUndoToastState: Equatable, Identifiable, Sendable {
+  public let id: String
+  public let decisionIDs: [String]
+  public let expiresAt: Date
+
+  public init(decisionIDs: [String], now: Date = Date()) {
+    self.decisionIDs = decisionIDs
+    expiresAt = now.addingTimeInterval(8)
+    id = "\(decisionIDs.joined(separator: ","))-\(expiresAt.timeIntervalSinceReferenceDate)"
+  }
+
+  public var count: Int {
+    decisionIDs.count
+  }
+}
+
 @MainActor
 @Observable
 public final class SessionDecisionFilterState {
@@ -53,16 +69,37 @@ public final class SessionDecisionFilterState {
 public final class SessionDecisionBulkActionState {
   public var lastDismissedBatch: [String] = []
   public var reopenRequestedBatch: [String]?
+  public var undoToast: SessionDecisionUndoToastState?
 
   public init() {}
 
-  public func recordDismissedBatch(_ ids: [String], undoManager: UndoManager?) {
+  public func recordDismissedBatch(
+    _ ids: [String],
+    undoManager: UndoManager?,
+    now: Date = Date()
+  ) {
     guard !ids.isEmpty else { return }
     lastDismissedBatch = ids
+    undoToast = SessionDecisionUndoToastState(decisionIDs: ids, now: now)
     undoManager?.registerUndo(withTarget: self) { target in
-      target.reopenRequestedBatch = ids
+      target.requestReopen(ids)
     }
     undoManager?.setActionName("Dismiss Decisions")
+  }
+
+  public func requestReopen(_ ids: [String]) {
+    reopenRequestedBatch = ids
+    undoToast = nil
+  }
+
+  public func requestUndoToastReopen() {
+    guard let undoToast else { return }
+    requestReopen(undoToast.decisionIDs)
+  }
+
+  public func clearExpiredUndoToast(now: Date = Date()) {
+    guard let undoToast, now >= undoToast.expiresAt else { return }
+    self.undoToast = nil
   }
 }
 

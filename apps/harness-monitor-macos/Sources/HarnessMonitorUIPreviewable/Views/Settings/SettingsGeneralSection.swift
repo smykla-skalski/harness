@@ -83,6 +83,8 @@ public struct SettingsGeneralSection: View {
   private var launchBehaviorRawValue = HarnessMonitorLaunchBehavior.defaultValue.rawValue
   @AppStorage(OpenRecentCloseAfterPickDefaults.storageKey)
   private var closeOpenRecentAfterPick = OpenRecentCloseAfterPickDefaults.defaultValue
+  @AppStorage(SessionWindowTabbingPreference.storageKey)
+  private var sessionWindowTabbingRawValue = SessionWindowTabbingPreference.defaultValue.rawValue
   @State private var isRemoveLaunchAgentConfirmationPresented = false
 
   public init(store: HarnessMonitorStore, overview: SettingsGeneralOverviewState) {
@@ -144,6 +146,10 @@ public struct SettingsGeneralSection: View {
 
   private var launchBehavior: HarnessMonitorLaunchBehavior {
     HarnessMonitorLaunchBehavior.resolved(rawValue: launchBehaviorRawValue)
+  }
+
+  private var sessionWindowTabbingPreference: SessionWindowTabbingPreference {
+    SessionWindowTabbingPreference.resolved(rawValue: sessionWindowTabbingRawValue)
   }
 
   public var body: some View {
@@ -216,10 +222,19 @@ public struct SettingsGeneralSection: View {
         Toggle("Close Open Recent after picking a session", isOn: $closeOpenRecentAfterPick)
           .accessibilityLabel("Close Open Recent after picking a session")
           .accessibilityHint("When enabled, choosing a recent session closes the welcome window.")
+
+        Picker("Session window tabs", selection: $sessionWindowTabbingRawValue) {
+          ForEach(SessionWindowTabbingPreference.allCases) { preference in
+            Text(preference.label).tag(preference.rawValue)
+          }
+        }
+        .harnessNativeFormControl()
+        .accessibilityLabel("Session window tabs")
+        .accessibilityHint("Controls whether session windows prefer native macOS tabs.")
       } header: {
         Text("Windows")
       } footer: {
-        Text(launchBehavior.description)
+        Text("\(launchBehavior.description) \(sessionWindowTabbingPreference.description)")
       }
 
       SettingsLoggingSection(store: store)

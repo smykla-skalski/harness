@@ -32,6 +32,19 @@ struct SessionWindowFlowTests {
     )
   }
 
+  @Test("Session window tabbing preference defaults to system")
+  func sessionWindowTabbingPreferenceDefaultsToSystem() {
+    #expect(SessionWindowTabbingPreference.defaultValue == .system)
+    #expect(SessionWindowTabbingPreference.resolved(rawValue: nil) == .system)
+    #expect(SessionWindowTabbingPreference.resolved(rawValue: "system") == .system)
+    #expect(SessionWindowTabbingPreference.resolved(rawValue: "always") == .always)
+    #expect(SessionWindowTabbingPreference.resolved(rawValue: "never") == .never)
+    #expect(SessionWindowTabbingPreference.resolved(rawValue: "unknown") == .system)
+    #expect(
+      SessionWindowTabbingPreference.storageKey == "harness.monitor.session-window.tabbing"
+    )
+  }
+
   @Test("Session routes expose stable sidebar order")
   func sessionRoutesExposeStableSidebarOrder() {
     #expect(
@@ -223,6 +236,29 @@ struct SessionWindowFlowTests {
     #expect(bulkActions.reopenRequestedBatch == ["decision-a", "decision-b"])
   }
 
+  @MainActor
+  @Test("Session decision bulk actions expose expiring undo toast")
+  func sessionDecisionBulkActionsExposeExpiringUndoToast() throws {
+    let bulkActions = SessionDecisionBulkActionState()
+    let now = Date(timeIntervalSinceReferenceDate: 100)
+
+    bulkActions.recordDismissedBatch(["decision-a", "decision-b"], undoManager: nil, now: now)
+
+    let toast = try #require(bulkActions.undoToast)
+    #expect(toast.count == 2)
+    #expect(toast.expiresAt == now.addingTimeInterval(8))
+    bulkActions.clearExpiredUndoToast(now: now.addingTimeInterval(7.9))
+    #expect(bulkActions.undoToast != nil)
+    bulkActions.clearExpiredUndoToast(now: now.addingTimeInterval(8))
+    #expect(bulkActions.undoToast == nil)
+
+    bulkActions.recordDismissedBatch(["decision-c"], undoManager: nil, now: now)
+    bulkActions.requestUndoToastReopen()
+
+    #expect(bulkActions.reopenRequestedBatch == ["decision-c"])
+    #expect(bulkActions.undoToast == nil)
+  }
+
   @Test("Launch behavior defaults to restoring session windows")
   func launchBehaviorDefaultsToRestoringSessionWindows() throws {
     let defaults = try isolatedDefaults()
@@ -305,19 +341,22 @@ struct SessionWindowFlowTests {
     #expect(!source.contains("dismissWindow(id: HarnessMonitorWindowID.main)"))
   }
 
-  @Test("Session tabs are routed through native SwiftUI scene commands")
+  @Test("Session tabs route through SwiftUI commands plus the tabbing accessor")
   func sessionTabsUseSwiftUISceneCommands() throws {
     let appSource = try harnessSourceFile(named: "App/HarnessMonitorApp.swift")
     let rootSource = try harnessSourceFile(named: "App/SessionWindowRootView.swift")
     let commandsSource = try harnessSourceFile(named: "Commands/WindowMenuCommands.swift")
     let tabbingAccessorPath = harnessSourceURL(named: "App/SessionWindowTabbing.swift").path
+    let tabbingSource = try harnessSourceFile(named: "App/SessionWindowTabbing.swift")
 
-    #expect(!FileManager.default.fileExists(atPath: tabbingAccessorPath))
+    #expect(FileManager.default.fileExists(atPath: tabbingAccessorPath))
     #expect(appSource.contains("WindowGroup("))
     #expect(appSource.contains("for: SessionWindowToken.self"))
+    #expect(appSource.contains("SessionWindowTabbing(isSessionWindow: false)"))
     #expect(commandsSource.contains("@Environment(\\.openWindow)"))
     #expect(commandsSource.contains("openWindow("))
-    #expect(!rootSource.contains("SessionWindowTabbing"))
+    #expect(rootSource.contains("SessionWindowTabbing(isSessionWindow: true)"))
+    #expect(tabbingSource.contains("tabbingIdentifier"))
     #expect(!commandsSource.contains("NSWindow"))
     #expect(!commandsSource.contains("tabbingIdentifier"))
   }
