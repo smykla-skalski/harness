@@ -12,8 +12,8 @@ public struct SessionWindowView: View {
   private var persistedRoute: SessionWindowRoute = .overview
   @SceneStorage("session.decisionID")
   private var persistedDecisionID: String = ""
-  @SceneStorage("session.searchText")
-  private var searchText: String = ""
+  @SceneStorage("session.decisionFilters.query")
+  private var persistedDecisionQuery = ""
   @SceneStorage("session.focusMode")
   private var focusMode = false
   @SceneStorage("session.inspector.visible")
@@ -26,6 +26,7 @@ public struct SessionWindowView: View {
   private var columnVisibilityRaw = "automatic"
   @State private var snapshot: HarnessMonitorSessionWindowSnapshot?
   @State private var isLoading = false
+  @State private var detailColumnWidth: CGFloat = 0
 
   public init(store: HarnessMonitorStore, token: SessionWindowToken) {
     self.store = store
@@ -47,17 +48,44 @@ public struct SessionWindowView: View {
     snapshot?.summary ?? store.sessionIndex.sessionSummary(for: token.sessionID)
   }
 
+  private var allSessionDecisions: [Decision] {
+    store.supervisorOpenDecisions.filter { $0.sessionID == token.sessionID }
+  }
+
   private var matchingDecisions: [Decision] {
-    store.supervisorOpenDecisions.filter { decision in
-      decision.sessionID == token.sessionID
-        && decisionMatchesSearch(decision)
-        && stateCache.decisionFilters.matches(decision)
-    }
+    allSessionDecisions.filter { stateCache.decisionFilters.matches($0) }
   }
 
   private var selectedDecision: Decision? {
-    guard let decisionID = stateCache.selection.decisionID else { return nil }
-    return matchingDecisions.first { $0.id == decisionID }
+    stateCache.selectedDecision(in: allSessionDecisions)
+  }
+
+  private var selectedDecisionVisibility: SessionSelectedDecisionVisibility {
+    stateCache.selectedDecisionVisibility(
+      allDecisionIDs: Set(allSessionDecisions.map(\.id)),
+      visibleDecisionIDs: Set(matchingDecisions.map(\.id))
+    )
+  }
+
+  private var selectedDecisionHiddenByFilters: Bool {
+    selectedDecisionVisibility == .hidden
+  }
+
+  private var inspectorContextDecision: Decision? {
+    guard case .decision = stateCache.selection else {
+      return nil
+    }
+    return selectedDecision
+  }
+
+  private var canPresentInspector: Bool {
+    guard !focusMode, inspectorContextDecision != nil else {
+      return false
+    }
+    guard detailColumnWidth > 0 else {
+      return false
+    }
+    return stateCache.decisionRuntime.allowsInspector(width: detailColumnWidth)
   }
 
   public var body: some View {
@@ -90,22 +118,30 @@ public struct SessionWindowView: View {
       status: summary?.status ?? .awaitingLeader,
       isStale: snapshot == nil
     )
-    .searchable(text: $searchText, placement: .toolbar, prompt: routeSearchPrompt)
-    .onChange(of: focusMode) { _, newValue in
-      if newValue {
-        inspectorVisible = false
-      }
+    .onChange(of: focusMode) { _, _ in
+      reconcileInspectorVisibility(binding: $inspectorVisible)
     }
     .task(id: token.sessionID) {
       hydrateSelectionFromPersistedStorage()
+      hydrateDecisionFiltersFromPersistedStorage()
+      reconcileInspectorVisibility(binding: $inspectorVisible, announce: false)
       await loadSnapshot()
+      reconcileInspectorVisibility(binding: $inspectorVisible, announce: false)
     }
     .onChange(of: stateCache.selection) { _, newSelection in
       syncPersistedStorage(from: newSelection)
+      reconcileInspectorVisibility(binding: $inspectorVisible)
+    }
+    .onChange(of: stateCache.decisionFilters.query) { _, newValue in
+      guard persistedDecisionQuery != newValue else { return }
+      persistedDecisionQuery = newValue
+    }
+    .onChange(of: allSessionDecisions.map(\.id)) { _, _ in
+      reconcileInspectorVisibility(binding: $inspectorVisible)
     }
     .focusedSceneValue(\.sessionNavigation, navigationCommand)
     .focusedSceneValue(\.sessionAttention, attentionFocus)
-    .focusedSceneValue(\.sessionInspector, inspectorCommand)
+    .focusedSceneValue(\.sessionInspector, canPresentInspector ? inspectorCommand : nil)
     .focusedSceneValue(\.sessionDecisionCommands, decisionCommand)
     .focusedSceneValue(\.sessionCreateContext, createContext)
     .accessibilityElement(children: .contain)
@@ -147,11 +183,10 @@ public struct SessionWindowView: View {
     let binding = $inspectorVisible
     return SessionInspectorCommand(
       sessionID: token.sessionID,
-      isVisible: inspectorVisible,
+      isVisible: binding.wrappedValue && canPresentInspector,
       toggle: {
         let next = !binding.wrappedValue
-        SessionInspectorAnnouncer.announce(visible: next)
-        binding.wrappedValue = next
+        setInspectorVisibility(next, binding: binding)
       }
     )
   }
@@ -225,26 +260,38 @@ public struct SessionWindowView: View {
 
   @ViewBuilder private var detailColumn: some View {
     GeometryReader { geometry in
+      let inspectorAllowed = inspectorContextDecision != nil
+        && !focusMode
+        && stateCache.decisionRuntime.allowsInspector(width: geometry.size.width)
       HStack(spacing: 0) {
         detailFocus
           .frame(maxWidth: .infinity, maxHeight: .infinity)
           .backgroundExtensionEffect()
-        if inspectorVisible
-          && stateCache.decisionRuntime.allowsInspector(width: geometry.size.width)
-        {
+        if inspectorVisible, inspectorAllowed, let inspectorDecision = inspectorContextDecision {
           SessionInspectorDivider(
             width: $inspectorWidth,
             minWidth: 220,
             maxWidth: 420
           )
           SessionWindowInspector(
-            selection: stateCache.selection,
-            selectedDecision: selectedDecision,
+            decision: inspectorDecision,
+            isFilteredOut: selectedDecisionHiddenByFilters,
+            decisionFilters: stateCache.decisionFilters,
             decisionRuntime: stateCache.decisionRuntime,
             visible: $inspectorVisible
           )
           .frame(width: max(220, min(inspectorWidth, 420)))
         }
+      }
+      .onAppear {
+        updateDetailColumnWidth(
+          geometry.size.width,
+          binding: $inspectorVisible,
+          announce: false
+        )
+      }
+      .onChange(of: geometry.size.width) { _, newWidth in
+        updateDetailColumnWidth(newWidth, binding: $inspectorVisible)
       }
     }
   }
@@ -268,13 +315,20 @@ public struct SessionWindowView: View {
       }
     case .decision:
       if let selectedDecision {
-        SessionDecisionDetailPane(
-          decision: selectedDecision,
-          runtime: stateCache.decisionRuntime
-        )
+        VStack(alignment: .leading, spacing: 12) {
+          if selectedDecisionHiddenByFilters {
+            SessionFilteredDecisionNotice(filters: stateCache.decisionFilters)
+          }
+          SessionDecisionDetailPane(
+            decision: selectedDecision,
+            runtime: stateCache.decisionRuntime
+          )
+        }
       } else {
         ContentUnavailableView(
-          "No Decision Selected",
+          selectedDecisionVisibility == .missing
+            ? "Decision Not Available"
+            : "No Decision Selected",
           systemImage: "exclamationmark.bubble"
         )
       }
@@ -308,6 +362,11 @@ public struct SessionWindowView: View {
     }
   }
 
+  private func hydrateDecisionFiltersFromPersistedStorage() {
+    guard stateCache.decisionFilters.query != persistedDecisionQuery else { return }
+    stateCache.decisionFilters.query = persistedDecisionQuery
+  }
+
   private func syncPersistedStorage(from selection: SessionSelection) {
     switch selection {
     case .route(let route):
@@ -325,14 +384,6 @@ public struct SessionWindowView: View {
     case .create:
       persistedRoute = .agents
       persistedDecisionID = ""
-    }
-  }
-
-  private var routeSearchPrompt: Text {
-    switch route {
-    case .decisions: Text("Search decisions")
-    case .timeline: Text("Search timeline")
-    case .overview, .agents, .tasks, .terminal: Text("Search")
     }
   }
 
@@ -359,21 +410,45 @@ public struct SessionWindowView: View {
     isLoading = false
   }
 
-  private func decisionMatchesSearch(_ decision: Decision) -> Bool {
-    let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !query.isEmpty else { return true }
-    return decision.summary.localizedCaseInsensitiveContains(query)
-      || decision.ruleID.localizedCaseInsensitiveContains(query)
-      || (decision.agentID?.localizedCaseInsensitiveContains(query) ?? false)
-      || (decision.taskID?.localizedCaseInsensitiveContains(query) ?? false)
-  }
-
   private func agentTui(for agent: AgentRegistration) -> AgentTuiSnapshot? {
     store.selectedAgentTuis.first { tui in
       tui.sessionId == token.sessionID
         && (tui.sessionAgentID == agent.agentId
           || tui.managedAgentID == agent.managedAgentID
           || tui.tuiId == agent.managedAgentID)
+    }
+  }
+
+  private func updateDetailColumnWidth(
+    _ width: CGFloat,
+    binding: Binding<Bool>,
+    announce: Bool = true
+  ) {
+    guard abs(detailColumnWidth - width) > 0.5 else { return }
+    detailColumnWidth = width
+    reconcileInspectorVisibility(binding: binding, announce: announce)
+  }
+
+  private func reconcileInspectorVisibility(
+    binding: Binding<Bool>,
+    announce: Bool = true
+  ) {
+    guard binding.wrappedValue, !canPresentInspector else { return }
+    setInspectorVisibility(false, binding: binding, announce: announce)
+  }
+
+  private func setInspectorVisibility(
+    _ visible: Bool,
+    binding: Binding<Bool>,
+    announce: Bool = true
+  ) {
+    guard binding.wrappedValue != visible else { return }
+    if visible {
+      guard canPresentInspector else { return }
+    }
+    binding.wrappedValue = visible
+    if announce {
+      SessionInspectorAnnouncer.announce(visible: visible)
     }
   }
 }

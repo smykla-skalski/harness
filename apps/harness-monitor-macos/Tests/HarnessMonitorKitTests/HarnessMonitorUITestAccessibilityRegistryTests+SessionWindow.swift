@@ -36,12 +36,58 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.session.window.toolbar.status"
     )
     #expect(
+      HarnessMonitorAccessibility.sessionWindowInspector
+        == "harness.session.window.inspector"
+    )
+    #expect(
+      HarnessMonitorAccessibility.sessionWindowInspectorCloseButton
+        == "harness.session.window.inspector.close"
+    )
+    #expect(
       HarnessMonitorAccessibility.sessionWindowRoute(.decisions)
         == "harness.session.window.route.decisions"
     )
     #expect(
       HarnessMonitorAccessibility.settingsLaunchBehaviorPicker
         == "harness.settings.launch-behavior"
+    )
+  }
+
+  @Test("Session window accessibility identifiers are attached by production views")
+  func sessionWindowAccessibilityIdentifiersAreAttachedByProductionViews() throws {
+    let openRecentView = try sourceFile(named: "OpenRecentView.swift")
+    let windowView = try sourceFile(named: "SessionWindowView.swift")
+    let sidebarView = try sourceFile(named: "SessionSidebar.swift")
+    let inspectorView = try sourceFile(named: "SessionWindowInspector.swift")
+
+    #expect(openRecentView.contains("HarnessMonitorAccessibility.openRecentRoot"))
+    #expect(openRecentView.contains("HarnessMonitorAccessibility.openRecentSessionRow"))
+    #expect(
+      openRecentView.contains(
+        "accessibilityMarkerID: HarnessMonitorAccessibility.openRecentProjectList"
+      )
+    )
+    #expect(
+      !openRecentView.contains(
+        ".accessibilityIdentifier(HarnessMonitorAccessibility.openRecentProjectList)"
+      )
+    )
+    #expect(windowView.contains("HarnessMonitorAccessibility.sessionWindowShell"))
+    #expect(sidebarView.contains("HarnessMonitorAccessibility.sessionWindowSidebar"))
+    #expect(
+      inspectorView.contains(
+        ".accessibilityTestProbe(\n      HarnessMonitorAccessibility.sessionWindowInspector"
+      )
+    )
+    #expect(
+      !inspectorView.contains(
+        ".accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowInspector)"
+      )
+    )
+    #expect(
+      inspectorView.contains(
+        "HarnessMonitorAccessibility.sessionWindowInspectorCloseButton"
+      )
     )
   }
 }

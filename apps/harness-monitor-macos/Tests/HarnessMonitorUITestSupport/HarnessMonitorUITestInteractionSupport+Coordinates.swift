@@ -70,16 +70,16 @@ extension HarnessMonitorUITestCase {
     in app: XCUIApplication,
     for element: XCUIElement
   ) -> XCUICoordinate? {
-    let identifier = element.identifier.trimmingCharacters(in: .whitespacesAndNewlines)
-    if !identifier.isEmpty,
-      let coordinate = visibleFrameMarkerCoordinate(in: app, identifier: identifier)
-    {
-      return coordinate
-    }
     if let coordinate = clampedWindowCoordinate(in: app, for: element) {
       return coordinate
     }
     if let coordinate = centerCoordinate(in: app, for: element) {
+      return coordinate
+    }
+    let identifier = element.identifier.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !identifier.isEmpty,
+      let coordinate = visibleFrameMarkerCoordinate(in: app, identifier: identifier)
+    {
       return coordinate
     }
     return nil

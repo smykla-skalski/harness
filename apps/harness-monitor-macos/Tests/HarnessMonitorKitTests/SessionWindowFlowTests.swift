@@ -156,6 +156,40 @@ struct SessionWindowFlowTests {
   }
 
   @MainActor
+  @Test("Session window decision visibility distinguishes visible hidden and missing states")
+  func sessionWindowDecisionVisibilityDistinguishesStates() {
+    let state = SessionWindowStateCache(sessionID: "sess-alpha")
+    state.selectDecision("decision-visible")
+
+    #expect(
+      state.selectedDecisionVisibility(
+        allDecisionIDs: ["decision-visible", "decision-hidden"],
+        visibleDecisionIDs: ["decision-visible"]
+      ) == .visible
+    )
+    #expect(
+      state.selectedDecisionVisibility(
+        allDecisionIDs: ["decision-visible", "decision-hidden"],
+        visibleDecisionIDs: ["decision-hidden"]
+      ) == .hidden
+    )
+    #expect(
+      state.selectedDecisionVisibility(
+        allDecisionIDs: ["decision-hidden"],
+        visibleDecisionIDs: ["decision-hidden"]
+      ) == .missing
+    )
+
+    state.selectRoute(.overview)
+    #expect(
+      state.selectedDecisionVisibility(
+        allDecisionIDs: ["decision-visible"],
+        visibleDecisionIDs: ["decision-visible"]
+      ) == .none
+    )
+  }
+
+  @MainActor
   @Test("Session decision bulk actions register undo reopen requests")
   func sessionDecisionBulkActionsRegisterUndoReopenRequests() {
     let bulkActions = SessionDecisionBulkActionState()
@@ -210,6 +244,85 @@ struct SessionWindowFlowTests {
     )
   }
 
+  @Test("Open Recent toggle uses the canonical close-after-pick copy")
+  func openRecentCloseAfterPickUsesCanonicalVisibleCopy() throws {
+    let source = try previewableSourceFile(named: "Views/Sessions/OpenRecentView.swift")
+
+    #expect(source.contains("Toggle(\"Close Open Recent after picking a session\", isOn: $closeAfterPick)"))
+    #expect(!source.contains("Toggle(\"Close after opening a session\", isOn: $closeAfterPick)"))
+  }
+
+  @MainActor
+  @Test("Open Recent motion policy disables animation for reduce motion")
+  func openRecentCloseAfterPickMotionPolicyRespectsReduceMotion() {
+    #expect(OpenRecentCloseAfterPickMotionPolicy.animation(reduceMotion: true) == nil)
+    #expect(OpenRecentCloseAfterPickMotionPolicy.animation(reduceMotion: false) != nil)
+    #expect(OpenRecentCloseAfterPickMotionPolicy.dismissDelay(reduceMotion: true) == .zero)
+    #expect(
+      OpenRecentCloseAfterPickMotionPolicy.dismissDelay(reduceMotion: false)
+        == .milliseconds(160)
+    )
+  }
+
+  @MainActor
+  @Test("Open Recent handoff focuses the resolved session window")
+  func openRecentHandoffFocusesResolvedWindow() async {
+    let application = RecordingOpenRecentSessionLaunchApplication()
+    let window = RecordingOpenRecentSessionLaunchWindow()
+
+    let outcome = await OpenRecentSessionLaunchHandoff.perform(
+      environment: .init(
+        application: application,
+        resolveWindow: { window },
+        pause: {}
+      )
+    )
+
+    #expect(outcome == .focused)
+    #expect(application.activateCount == 1)
+    #expect(application.attentionRequestCount == 0)
+    #expect(window.makeKeyCallCount >= 1)
+  }
+
+  @MainActor
+  @Test("Open Recent handoff requests attention when the session window stays occluded")
+  func openRecentHandoffRequestsAttentionForOccludedWindow() async {
+    let application = RecordingOpenRecentSessionLaunchApplication()
+    let window = RecordingOpenRecentSessionLaunchWindow(
+      isOnActiveSpace: false
+    )
+
+    let outcome = await OpenRecentSessionLaunchHandoff.perform(
+      environment: .init(
+        application: application,
+        resolveWindow: { window },
+        pause: {}
+      )
+    )
+
+    #expect(outcome == .attentionRequested)
+    #expect(application.activateCount == 1)
+    #expect(application.attentionRequestCount == 1)
+  }
+
+  @MainActor
+  @Test("Open Recent handoff keeps the launcher open when no session window resolves")
+  func openRecentHandoffReturnsUnresolvedWhenWindowNeverAppears() async {
+    let application = RecordingOpenRecentSessionLaunchApplication()
+
+    let outcome = await OpenRecentSessionLaunchHandoff.perform(
+      environment: .init(
+        application: application,
+        resolveWindow: { nil },
+        pause: {}
+      )
+    )
+
+    #expect(outcome == .unresolved)
+    #expect(application.activateCount == 1)
+    #expect(application.attentionRequestCount == 0)
+  }
+
   @Test("Open Recent close-after-pick dismisses only the current welcome window")
   func openRecentCloseAfterPickUsesCurrentWindowDismiss() throws {
     let source = try previewableSourceFile(named: "Views/Sessions/OpenRecentView.swift")
@@ -251,5 +364,52 @@ struct SessionWindowFlowTests {
       .appendingPathComponent("apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable")
       .appendingPathComponent(relativePath)
     return try String(contentsOf: fileURL, encoding: .utf8)
+  }
+}
+
+@MainActor
+private final class RecordingOpenRecentSessionLaunchApplication:
+  OpenRecentSessionLaunchHandoff.ApplicationDriver
+{
+  private(set) var activateCount = 0
+  private(set) var attentionRequestCount = 0
+
+  func activate() {
+    activateCount += 1
+  }
+
+  func requestAttention() {
+    attentionRequestCount += 1
+  }
+}
+
+@MainActor
+private final class RecordingOpenRecentSessionLaunchWindow:
+  OpenRecentSessionLaunchHandoff.WindowDriver
+{
+  var isVisible: Bool
+  var isMiniaturized: Bool
+  var isKeyWindow: Bool
+  var isOnActiveSpace: Bool
+  var isOcclusionVisible: Bool
+  private(set) var makeKeyCallCount = 0
+
+  init(
+    isVisible: Bool = true,
+    isMiniaturized: Bool = false,
+    isKeyWindow: Bool = false,
+    isOnActiveSpace: Bool = true,
+    isOcclusionVisible: Bool = true
+  ) {
+    self.isVisible = isVisible
+    self.isMiniaturized = isMiniaturized
+    self.isKeyWindow = isKeyWindow
+    self.isOnActiveSpace = isOnActiveSpace
+    self.isOcclusionVisible = isOcclusionVisible
+  }
+
+  func makeKeyAndOrderFront() {
+    makeKeyCallCount += 1
+    isKeyWindow = true
   }
 }
