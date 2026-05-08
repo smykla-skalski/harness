@@ -225,6 +225,22 @@ struct SessionWindowFlowTests {
     #expect(filters.matches(decision))
   }
 
+  @Test("Session decision filters use toggles and live region includes visible count")
+  func sessionDecisionFiltersUseTogglesAndLiveRegionIncludesVisibleCount() throws {
+    let sidebarSource = try previewableSourceFile(named: "Views/Sessions/SessionSidebar.swift")
+    let filterSource = try previewableSourceFile(named: "Views/Sessions/SessionSidebar+Filtering.swift")
+    let decisionSectionSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionSidebarDecisionSection.swift"
+    )
+
+    #expect(filterSource.contains("Toggle(severity.rawValue.capitalized"))
+    #expect(filterSource.contains("private func severityBinding"))
+    #expect(sidebarSource.contains(".accessibilityValue(decisionSelectionAccessibilityValue)"))
+    #expect(sidebarSource.contains(#""\(count) of \(decisions.count) decisions selected""#))
+    #expect(sidebarSource.contains("visibleCount: decisions.count"))
+    #expect(decisionSectionSource.contains(#""\(count) of \(visibleCount) decisions selected""#))
+  }
+
   @MainActor
   @Test("Session window decision visibility distinguishes visible hidden and missing states")
   func sessionWindowDecisionVisibilityDistinguishesStates() {

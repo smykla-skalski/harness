@@ -36,12 +36,16 @@ struct SessionSidebar: View {
     .onChange(of: state.sidebarSelection.selectedDecisionIDs.count) { previous, count in
       guard previous != count else { return }
       guard state.sidebarSelection.isDecisionMultiSelectEnabled else { return }
-      SessionSidebarMultiSelectAnnouncer.announce(count: count)
+      SessionSidebarMultiSelectAnnouncer.announce(
+        count: count,
+        visibleCount: decisions.count
+      )
     }
     .onChange(of: state.sidebarSelection.isDecisionMultiSelectEnabled) { _, enabled in
       guard enabled else { return }
       SessionSidebarMultiSelectAnnouncer.announce(
-        count: state.sidebarSelection.selectedDecisionIDs.count
+        count: state.sidebarSelection.selectedDecisionIDs.count,
+        visibleCount: decisions.count
       )
     }
     .onModifierKeysChanged { _, modifiers in
@@ -54,7 +58,16 @@ struct SessionSidebar: View {
           .tag(scope)
       }
     }
+    .accessibilityValue(decisionSelectionAccessibilityValue)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowSidebar)
+  }
+
+  private var decisionSelectionAccessibilityValue: Text {
+    guard state.sidebarSelection.isDecisionMultiSelectEnabled else {
+      return Text("Decision multi-select off")
+    }
+    let count = state.sidebarSelection.selectedDecisionIDs.count
+    return Text("\(count) of \(decisions.count) decisions selected")
   }
 
   private var selectionBinding: Binding<SessionSelection?> {

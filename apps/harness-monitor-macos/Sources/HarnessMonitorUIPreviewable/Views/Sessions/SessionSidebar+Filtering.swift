@@ -45,14 +45,7 @@ struct SessionDecisionFilterControls: View {
           .disabled(filters.severities.isEmpty)
           Divider()
           ForEach(DecisionSeverity.allCases, id: \.self) { severity in
-            Button {
-              filters.toggle(severity)
-            } label: {
-              Label(
-                severity.rawValue.capitalized,
-                systemImage: filters.severities.contains(severity) ? "checkmark" : ""
-              )
-            }
+            Toggle(severity.rawValue.capitalized, isOn: severityBinding(severity))
           }
           Divider()
           Button("Clear Filters") {
@@ -74,6 +67,19 @@ struct SessionDecisionFilterControls: View {
       }
     }
     .dynamicTypeSize(.xSmall ... .accessibility5)
+  }
+
+  private func severityBinding(_ severity: DecisionSeverity) -> Binding<Bool> {
+    Binding(
+      get: { filters.severities.contains(severity) },
+      set: { isSelected in
+        if isSelected {
+          filters.severities.insert(severity)
+        } else {
+          filters.severities.remove(severity)
+        }
+      }
+    )
   }
 
   private var hasActiveFilters: Bool {

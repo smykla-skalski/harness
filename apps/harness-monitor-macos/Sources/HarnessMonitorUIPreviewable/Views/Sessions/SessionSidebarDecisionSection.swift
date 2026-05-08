@@ -146,7 +146,7 @@ extension SessionSidebar {
       return Text("Off")
     }
     let count = state.sidebarSelection.selectedDecisionIDs.count
-    return Text("\(count) decision\(count == 1 ? "" : "s") selected")
+    return Text("\(count) of \(decisions.count) decisions selected")
   }
 }
 
@@ -155,14 +155,13 @@ public enum SessionSidebarMultiSelectAnnouncer {
   private static var pendingTask: Task<Void, Never>?
   private static let debounceInterval: Duration = .milliseconds(150)
 
-  public static func announce(count: Int) {
+  public static func announce(count: Int, visibleCount: Int) {
     pendingTask?.cancel()
     pendingTask = Task { @MainActor in
       try? await Task.sleep(for: debounceInterval)
       guard !Task.isCancelled else { return }
-      let suffix = count == 1 ? "" : "s"
       AccessibilityNotification.Announcement(
-        "\(count) decision\(suffix) selected"
+        "\(count) of \(visibleCount) decisions selected"
       ).post()
     }
   }
