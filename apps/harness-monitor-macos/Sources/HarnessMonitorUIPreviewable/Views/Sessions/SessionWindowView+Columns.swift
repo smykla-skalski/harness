@@ -1,8 +1,8 @@
 import HarnessMonitorKit
 import SwiftUI
 
-enum SessionWindowFocusModePolicy {
-  static func usesRouteContent(selection: SessionSelection) -> Bool {
+public enum SessionWindowFocusModePolicy {
+  public static func usesRouteContent(selection: SessionSelection) -> Bool {
     selection.route != nil
   }
 }

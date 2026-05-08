@@ -18,6 +18,19 @@ struct SessionWindowUnavailableViewTests {
     #expect(unavailableExtensionSource.contains("openWindow(id: HarnessMonitorWindowID.main)"))
   }
 
+  @Test("Session windows request native accessibility focus after opening")
+  func sessionWindowsRequestNativeAccessibilityFocusAfterOpening() throws {
+    let windowSource = try sourceFile(named: "SessionWindowView.swift")
+
+    #expect(windowSource.contains("@AccessibilityFocusState"))
+    #expect(windowSource.contains("primaryContentAccessibilityFocused = true"))
+    #expect(windowSource.contains(".accessibilityFocused($primaryContentAccessibilityFocused)"))
+    #expect(windowSource.contains("requestPrimaryContentAccessibilityFocus()"))
+    #expect(windowSource.contains("AccessibilityNotification.Announcement"))
+    #expect(!windowSource.contains("NSAccessibility"))
+    #expect(!windowSource.contains("NSWindow"))
+  }
+
   private func sourceFile(named fileName: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
