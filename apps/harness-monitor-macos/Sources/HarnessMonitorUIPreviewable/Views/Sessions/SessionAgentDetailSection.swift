@@ -45,12 +45,23 @@ struct SessionAgentOutputAnnouncementGate: Equatable {
   }
 }
 
+enum SessionAgentComposerFocusPolicy {
+  static func shouldPromoteComposerFocus(
+    requestID: Int,
+    isTuiActive: Bool
+  ) -> Bool {
+    requestID > 0 && isTuiActive
+  }
+}
+
 struct SessionAgentDetailSection: View {
   let store: HarnessMonitorStore
   let sessionID: String
   let agent: AgentRegistration
   let tui: AgentTuiSnapshot?
   let composerFocusRequestID: Int
+  @Environment(\.accessibilityVoiceOverEnabled)
+  private var voiceOverEnabled
   @Environment(\.fontScale)
   private var fontScale
   @State private var message = ""
@@ -159,7 +170,21 @@ struct SessionAgentDetailSection: View {
   }
 
   private func promoteComposerFocusIfRequested() {
-    guard composerFocusRequestID > 0, isTuiActive else { return }
-    focusedField = .composer
+    guard
+      SessionAgentComposerFocusPolicy.shouldPromoteComposerFocus(
+        requestID: composerFocusRequestID,
+        isTuiActive: isTuiActive
+      )
+    else {
+      return
+    }
+    if voiceOverEnabled {
+      Task { @MainActor in
+        await Task.yield()
+        focusedField = .composer
+      }
+    } else {
+      focusedField = .composer
+    }
   }
 }

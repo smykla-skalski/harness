@@ -60,6 +60,28 @@ struct SessionAgentDetailSectionMetricsTests {
     #expect(nextAllowed)
   }
 
+  @Test("Composer focus policy only promotes active keyboard requests")
+  func composerFocusPolicyOnlyPromotesActiveKeyboardRequests() {
+    #expect(
+      !SessionAgentComposerFocusPolicy.shouldPromoteComposerFocus(
+        requestID: 0,
+        isTuiActive: true
+      )
+    )
+    #expect(
+      !SessionAgentComposerFocusPolicy.shouldPromoteComposerFocus(
+        requestID: 1,
+        isTuiActive: false
+      )
+    )
+    #expect(
+      SessionAgentComposerFocusPolicy.shouldPromoteComposerFocus(
+        requestID: 1,
+        isTuiActive: true
+      )
+    )
+  }
+
   @Test("Agent detail is split into viewport and composer views")
   func agentDetailIsSplitIntoViewportAndComposerViews() throws {
     let detailSource = try sourceFile(named: "SessionAgentDetailSection.swift")
@@ -68,6 +90,8 @@ struct SessionAgentDetailSectionMetricsTests {
 
     #expect(detailSource.contains("SessionAgentTuiViewport("))
     #expect(detailSource.contains("SessionAgentComposer("))
+    #expect(detailSource.contains("@Environment(\\.accessibilityVoiceOverEnabled)"))
+    #expect(detailSource.contains("await Task.yield()"))
     #expect(laneSource.contains("accessibilityLabel(Text(latestOutput))"))
     #expect(composerSource.contains("GeometryReader"))
     #expect(composerSource.contains("SessionAgentComposerKeyLayout.rows"))
