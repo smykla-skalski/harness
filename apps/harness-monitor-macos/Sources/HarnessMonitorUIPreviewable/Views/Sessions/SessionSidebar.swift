@@ -114,7 +114,6 @@ struct SessionSidebar: View {
           isDropTargeted: agentDropTargetID == agent.agentId
         )
         .tag(selection)
-        .simultaneousGesture(pointerSelectionGesture(for: selection))
         .draggable(SessionAgentDragPayload(sessionID: state.sessionID, agentID: agent.agentId))
         .dropDestination(for: SessionAgentDragPayload.self) { payloads, _ in
           handleAgentDrop(payloads, before: agent.agentId)
@@ -182,13 +181,6 @@ struct SessionSidebar: View {
         .accessibilityLabel("New Agent")
       }
     }
-  }
-
-  private func pointerSelectionGesture(for selection: SessionSelection) -> some Gesture {
-    DragGesture(minimumDistance: 0)
-      .onChanged { _ in
-        state.markPointerSelectionIntent(for: selection)
-      }
   }
 
   @ViewBuilder private var tasksSection: some View {
