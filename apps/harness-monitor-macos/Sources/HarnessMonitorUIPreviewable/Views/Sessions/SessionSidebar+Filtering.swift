@@ -26,9 +26,24 @@ struct SessionDecisionFilterControls: View {
   var body: some View {
     VStack(alignment: .leading, spacing: metrics.verticalSpacing) {
       HStack(spacing: metrics.horizontalSpacing) {
-        TextField("Filter decisions", text: $filters.query)
-          .textFieldStyle(.roundedBorder)
+        Picker("Search scope", selection: $filters.scope) {
+          ForEach(DecisionsSidebarSearchScope.allCases) { scope in
+            Label(scope.label, systemImage: scope.systemImage)
+              .tag(scope)
+          }
+        }
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .frame(minWidth: 92)
+        .help("Decision Search Scope")
+        .accessibilityLabel("Decision Search Scope")
+        .accessibilityValue(filters.scope.label)
         Menu {
+          Button("All severities") {
+            filters.severities.removeAll()
+          }
+          .disabled(filters.severities.isEmpty)
+          Divider()
           ForEach(DecisionSeverity.allCases, id: \.self) { severity in
             Button {
               filters.toggle(severity)
@@ -51,7 +66,7 @@ struct SessionDecisionFilterControls: View {
         .help("Decision Filters")
         .accessibilityLabel("Decision Filters")
       }
-      if !filters.query.isEmpty || !filters.severities.isEmpty {
+      if hasActiveFilters {
         Text(filterSummary)
           .font(.caption2)
           .foregroundStyle(.secondary)
@@ -61,14 +76,22 @@ struct SessionDecisionFilterControls: View {
     .dynamicTypeSize(.xSmall ... .accessibility5)
   }
 
+  private var hasActiveFilters: Bool {
+    !filters.query.isEmpty || !filters.severities.isEmpty || filters.scope != .summary
+  }
+
   private var filterSummary: String {
     let severityText = filters.severities.map(\.rawValue).sorted().joined(separator: ", ")
-    if filters.query.isEmpty {
-      return "Severity: \(severityText)"
+    var segments: [String] = []
+    if !filters.query.isEmpty {
+      segments.append("Query: \(filters.query)")
     }
-    if severityText.isEmpty {
-      return "Query: \(filters.query)"
+    if filters.scope != .summary || !filters.query.isEmpty {
+      segments.append("scope: \(filters.scope.label)")
     }
-    return "Query: \(filters.query), severity: \(severityText)"
+    if !severityText.isEmpty {
+      segments.append("severity: \(severityText)")
+    }
+    return segments.joined(separator: ", ")
   }
 }

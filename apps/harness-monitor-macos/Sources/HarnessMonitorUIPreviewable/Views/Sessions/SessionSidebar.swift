@@ -47,6 +47,13 @@ struct SessionSidebar: View {
     .onModifierKeysChanged { _, modifiers in
       currentModifiers = modifiers
     }
+    .searchable(text: decisionQueryBinding, placement: .sidebar, prompt: "Filter decisions")
+    .searchScopes(decisionScopeBinding) {
+      ForEach(DecisionsSidebarSearchScope.allCases) { scope in
+        Label(scope.label, systemImage: scope.systemImage)
+          .tag(scope)
+      }
+    }
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowSidebar)
   }
 
@@ -54,6 +61,20 @@ struct SessionSidebar: View {
     Binding(
       get: { state.selection },
       set: { state.select($0 ?? .route(.overview)) }
+    )
+  }
+
+  private var decisionQueryBinding: Binding<String> {
+    Binding(
+      get: { state.decisionFilters.query },
+      set: { state.decisionFilters.query = $0 }
+    )
+  }
+
+  private var decisionScopeBinding: Binding<DecisionsSidebarSearchScope> {
+    Binding(
+      get: { state.decisionFilters.scope },
+      set: { state.decisionFilters.scope = $0 }
     )
   }
 
