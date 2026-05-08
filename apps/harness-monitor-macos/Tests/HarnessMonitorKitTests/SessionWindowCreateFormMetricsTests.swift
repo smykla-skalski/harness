@@ -125,18 +125,19 @@ struct SessionWindowCreateFormMetricsTests {
   @Test("Create form keeps focus and cancel affordances in source")
   func createFormKeepsFocusAndCancelAffordancesInSource() throws {
     let source = try sourceFile(named: "SessionWindowCreateForm.swift")
+    let submissionSource = try sourceFile(named: "SessionWindowCreateForm+Submission.swift")
 
     #expect(source.contains("@FocusState"))
     #expect(source.contains("Button(\"Cancel\", role: .cancel)"))
-    #expect(source.contains("SessionWindowCreateFormValidation.result"))
+    #expect(submissionSource.contains("SessionWindowCreateFormValidation.result"))
     #expect(source.contains("validationMessage(for: .name)"))
     #expect(source.contains("validationMessage(for: .capability)"))
     #expect(source.contains("Validation error:"))
-    #expect(source.contains("focusedField = .name"))
+    #expect(submissionSource.contains("focusedField = .name"))
     #expect(source.contains("SessionWindowCreateFormCapabilityPicker"))
     #expect(source.contains("Picker(\"Severity\", selection: taskSeverity)"))
-    #expect(source.contains("sessionID: draft.sessionID"))
-    #expect(source.contains("startAcpAgent("))
+    #expect(submissionSource.contains("sessionID: draft.sessionID"))
+    #expect(submissionSource.contains("startAcpAgent("))
     #expect(!source.contains("requestCreateTaskSheet()"))
     #expect(!source.contains(".keyboardShortcut(\"n\", modifiers: [.command])"))
     #expect(source.contains(".keyboardShortcut(.defaultAction)"))
@@ -146,11 +147,13 @@ struct SessionWindowCreateFormMetricsTests {
   func createFormCapabilitySupportIsSplitIntoCatalogAndPickerSources() throws {
     let catalogSource = try sourceFile(named: "SessionWindowCreateFormCatalogs.swift")
     let pickerSource = try sourceFile(named: "SessionWindowCreateFormCapabilityPicker.swift")
+    let submissionSource = try sourceFile(named: "SessionWindowCreateForm+Submission.swift")
     let sharedCatalogSource = try agentSourceFile(named: "AgentCapabilityCatalog.swift")
 
     #expect(catalogSource.contains("loadAgentOptions"))
     #expect(catalogSource.contains("fallbackAgentOptions"))
     #expect(pickerSource.contains("AgentCapabilityRow"))
+    #expect(submissionSource.contains("loadAgentCapabilitiesIfNeeded"))
     #expect(sharedCatalogSource.contains("enum AgentCapabilityCatalog"))
   }
 
