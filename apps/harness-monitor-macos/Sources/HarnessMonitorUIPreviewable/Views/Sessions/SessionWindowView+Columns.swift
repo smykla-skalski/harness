@@ -165,6 +165,18 @@ extension SessionWindowView {
   }
 
   @ViewBuilder var detailFocus: some View {
+    if detailRenderedSelection == stateCache.selection {
+      detailFocusContent
+    } else {
+      ProgressView()
+        .progressViewStyle(.circular)
+        .controlSize(.small)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityLabel("Loading detail")
+    }
+  }
+
+  @ViewBuilder var detailFocusContent: some View {
     switch stateCache.selection {
     case .agent(_, let agentID):
       if let agent = snapshot?.detail?.agents.first(where: { $0.agentId == agentID }) {
