@@ -75,9 +75,18 @@ seed_generated_app_entitlements() {
 }
 
 patch_run_scheme_runtime_env() {
+  # Intentionally a no-op. The Run scheme stays lane-agnostic so Xcode IDE
+  # launches always go through cross-lane discovery in HarnessMonitorPaths.
+  # Agents still pass HARNESS_MONITOR_RUNTIME_LANE on the xcodebuild command
+  # line; that env propagates to the test/run process and overrides discovery.
+  # Set HARNESS_MONITOR_PATCH_RUN_SCHEME=1 to opt back into the legacy patch.
   local scheme_path="$1"
 
   if [[ ! -f "$scheme_path" ]]; then
+    return 0
+  fi
+
+  if [[ "${HARNESS_MONITOR_PATCH_RUN_SCHEME:-0}" != "1" ]]; then
     return 0
   fi
 

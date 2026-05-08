@@ -118,9 +118,13 @@ public enum HarnessMonitorPaths {
   ///
   /// Resolution order:
   /// 1. Explicit configured root (`HARNESS_DAEMON_DATA_HOME` / `XDG_DATA_HOME`).
-  /// 2. Native group-container resolution for the configured or default app group id.
-  /// 3. Home-relative app-group fallback via `HARNESS_APP_GROUP_ID`.
-  /// 4. External-daemon bypass (`HARNESS_MONITOR_EXTERNAL_DAEMON=1`, debug builds only):
+  /// 2. Explicit runtime lane (`HARNESS_MONITOR_RUNTIME_LANE`).
+  /// 3. Cross-lane discovery: pick the live daemon whose manifest pid is alive.
+  ///    Lets Xcode IDE launches always find the user's externally-started daemon
+  ///    without baking a lane into the scheme.
+  /// 4. Native group-container resolution for the configured or default app group id.
+  /// 5. Home-relative app-group fallback via `HARNESS_APP_GROUP_ID`.
+  /// 6. External-daemon bypass (`HARNESS_MONITOR_EXTERNAL_DAEMON=1`, debug builds only):
   ///    returns `~/Library/Application Support` directly so dev mode skips the
   ///    group-container lookup and stays symmetric with the pre-Task-11 behaviour.
   ///    Only evaluated when `preferExternalDaemon` is true.
@@ -136,6 +140,10 @@ public enum HarnessMonitorPaths {
 
     if let laneRoot = runtimeLaneBaseRoot(using: environment) {
       return laneRoot
+    }
+
+    if let discoveredRoot = discoverLiveDaemonRoot(using: environment) {
+      return discoveredRoot
     }
 
     if let appGroupIdentifier = normalizedAppGroupIdentifier(using: environment) {

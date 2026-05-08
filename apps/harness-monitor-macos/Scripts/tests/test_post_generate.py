@@ -162,27 +162,18 @@ class PostGenerateScriptTests(unittest.TestCase):
             self.assertTrue(
                 (repo_root / "xcode-derived" / ".metadata_never_index").exists()
             )
-            canonical_repo_root = repo_root.resolve()
-            default_lane = "repo-" + subprocess.check_output(
-                [
-                    "shasum",
-                    "-a",
-                    "256",
-                ],
-                input=str(canonical_repo_root),
-                text=True,
-            ).split()[0][:8]
             for scheme_name in (
                 "HarnessMonitor.xcscheme",
                 "HarnessMonitor (External Daemon).xcscheme",
             ):
                 with self.subTest(scheme=scheme_name):
                     scheme = (scheme_root / scheme_name).read_text()
-                    self.assertIn('key="HARNESS_MONITOR_RUNTIME_LANE"', scheme)
-                    self.assertIn(f'value="{default_lane}"', scheme)
-                    self.assertIn('key="HARNESS_DAEMON_DATA_HOME"', scheme)
-                    self.assertIn(f"runtime-lanes/{default_lane}", scheme)
-                    self.assertIn('key="HARNESS_CODEX_WS_PORT"', scheme)
+                    self.assertNotIn('key="HARNESS_MONITOR_RUNTIME_LANE"', scheme)
+                    self.assertNotIn('key="HARNESS_DAEMON_DATA_HOME"', scheme)
+                    self.assertNotIn('key="HARNESS_CODEX_WS_PORT"', scheme)
+                    self.assertNotIn(
+                        'key="HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL"', scheme
+                    )
 
     def test_post_generate_keeps_tracked_build_server_stable_when_build_lane_is_set(
         self,
