@@ -38,6 +38,28 @@ struct SessionAgentDetailSectionMetricsTests {
     #expect(SessionAgentComposerKeyLayout.flattened.count == AgentTuiKey.allCases.count)
   }
 
+  @Test("Output announcement gate suppresses empty and throttled updates")
+  func outputAnnouncementGateSuppressesEmptyAndThrottledUpdates() {
+    var gate = SessionAgentOutputAnnouncementGate()
+    let start = Date(timeIntervalSinceReferenceDate: 100)
+
+    let emptyAllowed = gate.shouldAnnounce(output: "   ", now: start)
+    let firstAllowed = gate.shouldAnnounce(output: "Ready", now: start)
+    let throttledAllowed = gate.shouldAnnounce(
+      output: "Still ready",
+      now: start.addingTimeInterval(SessionAgentOutputAnnouncementGate.minimumInterval - 0.001)
+    )
+    let nextAllowed = gate.shouldAnnounce(
+      output: "Done",
+      now: start.addingTimeInterval(SessionAgentOutputAnnouncementGate.minimumInterval + 0.001)
+    )
+
+    #expect(!emptyAllowed)
+    #expect(firstAllowed)
+    #expect(!throttledAllowed)
+    #expect(nextAllowed)
+  }
+
   @Test("Agent detail is split into viewport and composer views")
   func agentDetailIsSplitIntoViewportAndComposerViews() throws {
     let detailSource = try sourceFile(named: "SessionAgentDetailSection.swift")

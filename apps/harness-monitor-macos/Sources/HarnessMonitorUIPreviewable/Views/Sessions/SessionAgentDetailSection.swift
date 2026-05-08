@@ -32,6 +32,19 @@ struct SessionAgentDetailSectionMetrics: Equatable {
   }
 }
 
+struct SessionAgentOutputAnnouncementGate: Equatable {
+  static let minimumInterval: TimeInterval = 0.1
+
+  private var lastAnnouncementAt = Date.distantPast
+
+  mutating func shouldAnnounce(output: String, now: Date = Date()) -> Bool {
+    guard !output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+    guard now.timeIntervalSince(lastAnnouncementAt) >= Self.minimumInterval else { return false }
+    lastAnnouncementAt = now
+    return true
+  }
+}
+
 struct SessionAgentDetailSection: View {
   let store: HarnessMonitorStore
   let sessionID: String
@@ -41,7 +54,7 @@ struct SessionAgentDetailSection: View {
   private var fontScale
   @State private var message = ""
   @State private var composerBackdropHeight: CGFloat = 0
-  @State private var lastAnnouncementAt = Date.distantPast
+  @State private var outputAnnouncementGate = SessionAgentOutputAnnouncementGate()
   @State private var latestOutput = "No output"
   @FocusState private var focusedField: SessionAgentComposerField?
 
@@ -133,10 +146,7 @@ struct SessionAgentDetailSection: View {
   }
 
   private func announceOutputIfAllowed(_ output: String) {
-    guard !output.isEmpty else { return }
-    let now = Date()
-    guard now.timeIntervalSince(lastAnnouncementAt) >= 0.1 else { return }
-    lastAnnouncementAt = now
+    guard outputAnnouncementGate.shouldAnnounce(output: output) else { return }
     AccessibilityNotification.Announcement(output).post()
   }
 }
