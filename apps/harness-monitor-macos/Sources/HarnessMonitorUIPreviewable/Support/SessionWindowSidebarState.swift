@@ -72,6 +72,7 @@ public final class SessionDecisionBulkActionState {
 public final class SessionSidebarSelectionState {
   public var isDecisionMultiSelectEnabled = false
   public var selectedDecisionIDs: Set<String> = []
+  public var decisionSelectionAnchorID: String?
 
   public init() {}
 
@@ -79,6 +80,7 @@ public final class SessionSidebarSelectionState {
     isDecisionMultiSelectEnabled.toggle()
     if !isDecisionMultiSelectEnabled {
       selectedDecisionIDs.removeAll()
+      decisionSelectionAnchorID = nil
     }
   }
 
@@ -88,10 +90,14 @@ public final class SessionSidebarSelectionState {
     } else {
       selectedDecisionIDs.insert(decisionID)
     }
+    decisionSelectionAnchorID = decisionID
   }
 
   public func pruneDecisionSelection(to visibleDecisionIDs: Set<String>) {
     selectedDecisionIDs.formIntersection(visibleDecisionIDs)
+    if let decisionSelectionAnchorID, !visibleDecisionIDs.contains(decisionSelectionAnchorID) {
+      self.decisionSelectionAnchorID = selectedDecisionIDs.first
+    }
   }
 }
 

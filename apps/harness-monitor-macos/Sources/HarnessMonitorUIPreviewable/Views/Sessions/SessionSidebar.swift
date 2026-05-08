@@ -8,6 +8,7 @@ struct SessionSidebar: View {
   @Bindable var state: SessionWindowStateCache
   @Environment(\.undoManager)
   var undoManager
+  @State private var currentModifiers: EventModifiers = []
   @State private var agentDropTargetID: String?
   @State private var decisionDropTargetID: String?
 
@@ -42,6 +43,9 @@ struct SessionSidebar: View {
       SessionSidebarMultiSelectAnnouncer.announce(
         count: state.sidebarSelection.selectedDecisionIDs.count
       )
+    }
+    .onModifierKeysChanged { _, modifiers in
+      currentModifiers = modifiers
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowSidebar)
   }
@@ -182,4 +186,18 @@ struct SessionSidebar: View {
     }
   }
 
+  func handleDecisionRowTap(_ decisionID: String) {
+    let change = SessionSidebarMultiSelect.resolve(
+      rowID: decisionID,
+      orderedVisibleIDs: decisions.map(\.id),
+      selectedIDs: state.sidebarSelection.selectedDecisionIDs,
+      anchorID: state.sidebarSelection.decisionSelectionAnchorID,
+      modifiers: currentModifiers
+    )
+    state.sidebarSelection.selectedDecisionIDs = change.selectedIDs
+    state.sidebarSelection.decisionSelectionAnchorID = change.anchorID
+    if change.activatesRow {
+      state.select(.decision(sessionID: state.sessionID, decisionID: decisionID))
+    }
+  }
 }
