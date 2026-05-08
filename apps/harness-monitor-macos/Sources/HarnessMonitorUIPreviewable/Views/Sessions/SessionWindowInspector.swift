@@ -20,6 +20,7 @@ struct SessionWindowInspector: View {
   let decisionFilters: SessionDecisionFilterState
   @Bindable var decisionRuntime: SessionDecisionRuntime
   @Binding var visible: Bool
+  @Binding var preferredVisible: Bool
   @FocusState private var closeButtonFocused: Bool
   @Environment(\.accessibilityVoiceOverEnabled)
   private var voiceOverEnabled
@@ -88,8 +89,10 @@ struct SessionWindowInspector: View {
   }
 
   private func hideInspector() {
-    SessionInspectorAnnouncer.announce(visible: false)
+    preferredVisible = false
+    guard visible else { return }
     visible = false
+    SessionInspectorAnnouncer.announce(visible: false)
   }
 }
 

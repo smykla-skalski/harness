@@ -17,6 +17,8 @@ public struct SessionWindowView: View {
   var focusMode = false
   @SceneStorage("session.inspector.visible")
   var inspectorVisible = false
+  @SceneStorage("session.inspector.preferred")
+  var inspectorPreferred = false
   @SceneStorage("session.inspector.width")
   var inspectorWidth = 280.0
   @SceneStorage("session.sidebarWidth")
@@ -25,7 +27,7 @@ public struct SessionWindowView: View {
   private var columnVisibilityRaw = "automatic"
   @State var snapshot: HarnessMonitorSessionWindowSnapshot?
   @State var isLoading = false
-  @State private var detailColumnWidth: CGFloat = 0
+  @State var detailColumnWidth: CGFloat = 0
 
   public init(store: HarnessMonitorStore, token: SessionWindowToken) {
     self.store = store
@@ -77,7 +79,7 @@ public struct SessionWindowView: View {
     return selectedDecision
   }
 
-  private var canPresentInspector: Bool {
+  var canPresentInspector: Bool {
     guard !focusMode, inspectorContextDecision != nil else {
       return false
     }
@@ -121,25 +123,42 @@ public struct SessionWindowView: View {
       isStale: snapshot == nil
     )
     .onChange(of: focusMode) { _, _ in
-      reconcileInspectorVisibility(binding: $inspectorVisible)
+      reconcileInspectorVisibility(
+        visibleBinding: $inspectorVisible,
+        preferredBinding: $inspectorPreferred
+      )
     }
     .task(id: token.sessionID) {
       hydrateSelectionFromPersistedStorage()
       hydrateDecisionFiltersFromPersistedStorage()
-      reconcileInspectorVisibility(binding: $inspectorVisible, announce: false)
+      reconcileInspectorVisibility(
+        visibleBinding: $inspectorVisible,
+        preferredBinding: $inspectorPreferred,
+        announce: false
+      )
       await loadSnapshot()
-      reconcileInspectorVisibility(binding: $inspectorVisible, announce: false)
+      reconcileInspectorVisibility(
+        visibleBinding: $inspectorVisible,
+        preferredBinding: $inspectorPreferred,
+        announce: false
+      )
     }
     .onChange(of: stateCache.selection) { _, newSelection in
       syncPersistedStorage(from: newSelection)
-      reconcileInspectorVisibility(binding: $inspectorVisible)
+      reconcileInspectorVisibility(
+        visibleBinding: $inspectorVisible,
+        preferredBinding: $inspectorPreferred
+      )
     }
     .onChange(of: stateCache.decisionFilters.query) { _, newValue in
       guard persistedDecisionQuery != newValue else { return }
       persistedDecisionQuery = newValue
     }
     .onChange(of: allSessionDecisions.map(\.id)) { _, _ in
-      reconcileInspectorVisibility(binding: $inspectorVisible)
+      reconcileInspectorVisibility(
+        visibleBinding: $inspectorVisible,
+        preferredBinding: $inspectorPreferred
+      )
     }
     .focusedSceneValue(\.sessionNavigation, navigationCommand)
     .focusedSceneValue(\.sessionAttention, attentionFocus)
@@ -183,13 +202,17 @@ public struct SessionWindowView: View {
   }
 
   private var inspectorCommand: SessionInspectorCommand {
-    let binding = $inspectorVisible
+    let visibleBinding = $inspectorVisible
+    let preferredBinding = $inspectorPreferred
     return SessionInspectorCommand(
       sessionID: token.sessionID,
-      isVisible: binding.wrappedValue && canPresentInspector,
+      isVisible: visibleBinding.wrappedValue && canPresentInspector,
       toggle: {
-        let next = !binding.wrappedValue
-        setInspectorVisibility(next, binding: binding)
+        setInspectorPreference(
+          !preferredBinding.wrappedValue,
+          visibleBinding: visibleBinding,
+          preferredBinding: preferredBinding
+        )
       }
     )
   }
@@ -295,36 +318,4 @@ public struct SessionWindowView: View {
     }
   }
 
-  func updateDetailColumnWidth(
-    _ width: CGFloat,
-    binding: Binding<Bool>,
-    announce: Bool = true
-  ) {
-    guard abs(detailColumnWidth - width) > 0.5 else { return }
-    detailColumnWidth = width
-    reconcileInspectorVisibility(binding: binding, announce: announce)
-  }
-
-  private func reconcileInspectorVisibility(
-    binding: Binding<Bool>,
-    announce: Bool = true
-  ) {
-    guard binding.wrappedValue, !canPresentInspector else { return }
-    setInspectorVisibility(false, binding: binding, announce: announce)
-  }
-
-  private func setInspectorVisibility(
-    _ visible: Bool,
-    binding: Binding<Bool>,
-    announce: Bool = true
-  ) {
-    guard binding.wrappedValue != visible else { return }
-    if visible {
-      guard canPresentInspector else { return }
-    }
-    binding.wrappedValue = visible
-    if announce {
-      SessionInspectorAnnouncer.announce(visible: visible)
-    }
-  }
 }
