@@ -329,6 +329,8 @@ struct SessionWindowFlowTests {
 
     #expect(source.contains("@Environment(\\.dismiss)"))
     #expect(source.contains("dismiss()"))
+    #expect(!source.contains("OpenRecentSourceWindowResolver"))
+    #expect(!source.contains("sourceWindow.close()"))
     #expect(!source.contains("@Environment(\\.dismissWindow)"))
     #expect(!source.contains("dismissWindow(id: HarnessMonitorWindowID.main)"))
   }

@@ -87,7 +87,6 @@ public struct OpenRecentView: View {
 
   private func openSession(_ sessionID: String) {
     let shouldCloseAfterPick = closeAfterPick
-    let sourceWindow = OpenRecentSourceWindowResolver.currentWindow()
     openWindow(
       id: HarnessMonitorWindowID.main,
       value: SessionWindowToken(sessionID: sessionID)
@@ -105,12 +104,12 @@ public struct OpenRecentView: View {
       guard shouldCloseAfterPick, outcome != .unresolved else {
         return
       }
-      await dismissCurrentWindow(sourceWindow: sourceWindow)
+      await dismissCurrentWindow()
     }
   }
 
   @MainActor
-  private func dismissCurrentWindow(sourceWindow: NSWindow?) async {
+  private func dismissCurrentWindow() async {
     let animation = OpenRecentCloseAfterPickMotionPolicy.animation(reduceMotion: reduceMotion)
     if let animation {
       withAnimation(animation) {
@@ -123,11 +122,7 @@ public struct OpenRecentView: View {
     if delay != .zero {
       try? await Task.sleep(for: delay)
     }
-    if let sourceWindow {
-      sourceWindow.close()
-    } else {
-      dismiss()
-    }
+    dismiss()
   }
 
   @ViewBuilder private var actionStateMarker: some View {
@@ -137,13 +132,6 @@ public struct OpenRecentView: View {
         text: "refresh=\(refreshActivationCount);openFolder=\(openFolderActivationCount)"
       )
     }
-  }
-}
-
-@MainActor
-private enum OpenRecentSourceWindowResolver {
-  static func currentWindow() -> NSWindow? {
-    NSApp.keyWindow ?? NSApp.mainWindow
   }
 }
 
