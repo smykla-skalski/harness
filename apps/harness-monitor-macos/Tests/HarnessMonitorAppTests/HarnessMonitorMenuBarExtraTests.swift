@@ -9,6 +9,10 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
       HarnessMonitorMenuBarSnapshot.statusItemImageName,
       "HarnessMonitorMenuBarLighthouse"
     )
+    XCTAssertEqual(
+      HarnessMonitorMenuBarSnapshot.statusItemIdleImageName,
+      "HarnessMonitorMenuBarLighthouseInfo"
+    )
   }
 
   func testSnapshotSummarizesStatusAndCounts() {
@@ -136,6 +140,39 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
     XCTAssertEqual(snapshot.attentionBadgeAccessibilityLabel, "Attention badge: hidden")
   }
 
+  func testIdleMonitoringPublishesTooltipAndAccessibilityState() {
+    let snapshot = makeSnapshot(
+      connectionState: .idle,
+      sessionCount: 0,
+      pendingDecisionCount: 0,
+      pendingDecisionSeverity: nil,
+      supervisorRuntimeState: .stopped,
+      activeSessionWindowCount: 0
+    )
+
+    XCTAssertTrue(snapshot.isMonitoringIdle)
+    XCTAssertEqual(snapshot.monitoringLabel, "Monitoring: No active session")
+    XCTAssertEqual(
+      snapshot.statusItemHelpText,
+      "No active session - open one to monitor"
+    )
+    XCTAssertEqual(
+      HarnessMonitorMenuBarSnapshot.statusItemHelpText(activeSessionWindowCount: 0),
+      snapshot.statusItemHelpText
+    )
+    XCTAssertEqual(
+      HarnessMonitorMenuBarSnapshot.statusItemAccessibilityLabel(activeSessionWindowCount: 0),
+      "Harness Monitor: No active session - open one to monitor"
+    )
+    XCTAssertEqual(
+      snapshot.statusItemAccessibilitySummary,
+      """
+      Connection: Idle, Monitoring: No active session, Sessions: 0, Decisions: 0, \
+      No active session - open one to monitor, Attention badge: hidden
+      """
+    )
+  }
+
   func testCriticalDecisionUsesCriticalStatusAsset() {
     let snapshot = makeSnapshot(
       connectionState: .online,
@@ -157,6 +194,20 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
 
     XCTAssertEqual(
       presentation.statusItemAssetName,
+      HarnessMonitorMenuBarSnapshot.statusItemImageName
+    )
+    XCTAssertEqual(
+      presentation.statusItemAssetName(
+        activeSessionWindowCount: 0,
+        showsStateColorVariants: true
+      ),
+      HarnessMonitorMenuBarSnapshot.statusItemIdleImageName
+    )
+    XCTAssertEqual(
+      presentation.statusItemAssetName(
+        activeSessionWindowCount: 1,
+        showsStateColorVariants: true
+      ),
       HarnessMonitorMenuBarSnapshot.statusItemImageName
     )
   }
