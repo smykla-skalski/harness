@@ -21,6 +21,7 @@ struct SessionWindowCreateForm: View {
   @Environment(\.fontScale)
   private var fontScale
   @State private var validationMessage = ""
+  @FocusState private var focusedField: SessionWindowCreateFormField?
 
   private var title: Binding<String> {
     Binding(
@@ -49,10 +50,11 @@ struct SessionWindowCreateForm: View {
 
   var body: some View {
     Form {
-      Section(draft.kind.rawValue.capitalized) {
+      Section(draft.kind.title) {
         TextField("Name", text: title)
           .scaledFont(.body)
-          .accessibilityLabel("\(draft.kind.rawValue.capitalized) name")
+          .focused($focusedField, equals: .name)
+          .accessibilityLabel("\(draft.kind.title) name")
         if draft.kind == .agent {
           Picker("Runtime", selection: runtime) {
             ForEach(AgentTuiRuntime.allCases) { runtime in
@@ -64,6 +66,7 @@ struct SessionWindowCreateForm: View {
         TextEditor(text: prompt)
           .scaledFont(.body)
           .frame(minHeight: metrics.promptMinHeight)
+          .focused($focusedField, equals: .prompt)
           .accessibilityLabel("Prompt")
       }
       if !validationMessage.isEmpty {
@@ -75,19 +78,30 @@ struct SessionWindowCreateForm: View {
         }
       }
       Section {
-        Button {
-          Task { await submit() }
-        } label: {
-          Label("Create", systemImage: "plus.circle.fill")
-            .scaledFont(.body.weight(.semibold))
+        HStack {
+          Button("Cancel", role: .cancel) {
+            cancel()
+          }
+          Spacer()
+          Button {
+            Task { await submit() }
+          } label: {
+            Label("Create", systemImage: "plus.circle.fill")
+              .scaledFont(.body.weight(.semibold))
+          }
+          .frame(minHeight: metrics.submitButtonMinHeight)
+          .keyboardShortcut("n", modifiers: [.command])
         }
-        .frame(minHeight: metrics.submitButtonMinHeight)
-        .keyboardShortcut("n", modifiers: [.command])
       }
     }
     .formStyle(.grouped)
     .padding(metrics.formPadding)
     .dynamicTypeSize(.xSmall ... .accessibility5)
+    .task {
+      if focusedField == nil {
+        focusedField = .name
+      }
+    }
   }
 
   private func updateDraft(
@@ -110,11 +124,11 @@ struct SessionWindowCreateForm: View {
 
   @MainActor
   private func submit() async {
-    let name = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !name.isEmpty else {
-      validationMessage = "Name is required."
+    if let message = SessionWindowCreateFormValidation.message(for: draft) {
+      validationMessage = message
       return
     }
+    let name = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
     validationMessage = ""
     switch draft.kind {
     case .agent:
@@ -125,6 +139,11 @@ struct SessionWindowCreateForm: View {
     case .decision:
       await createDecision(summary: name)
     }
+  }
+
+  private func cancel() {
+    validationMessage = ""
+    state.cancelCreateDraft(draft.kind)
   }
 
   @MainActor
@@ -170,4 +189,9 @@ struct SessionWindowCreateForm: View {
       validationMessage = error.localizedDescription
     }
   }
+}
+
+private enum SessionWindowCreateFormField: Hashable {
+  case name
+  case prompt
 }

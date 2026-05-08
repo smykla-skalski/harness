@@ -5,6 +5,14 @@ public enum SessionCreateKind: String, Codable, Hashable, Sendable {
   case agent
   case task
   case decision
+
+  public var route: SessionWindowRoute {
+    switch self {
+    case .agent: .agents
+    case .task: .tasks
+    case .decision: .decisions
+    }
+  }
 }
 
 public struct SessionCreateDraft: Codable, Hashable, Sendable {
@@ -121,6 +129,15 @@ public final class SessionWindowStateCache {
     selection = .create(draft)
   }
 
+  public func cancelCreateDraft(_ kind: SessionCreateKind) {
+    sectionState.createDrafts[kind] = nil
+    updateSelection(
+      .route(kind.route),
+      rememberCurrentSelection: false,
+      recordHistory: false
+    )
+  }
+
   public func navigateBack() {
     guard let previous = navigationHistory.popBack(current: selection) else { return }
     selection = previous
@@ -154,10 +171,18 @@ public final class SessionWindowStateCache {
     return .missing
   }
 
-  private func updateSelection(_ nextSelection: SessionSelection) {
+  private func updateSelection(
+    _ nextSelection: SessionSelection,
+    rememberCurrentSelection: Bool = true,
+    recordHistory: Bool = true
+  ) {
     guard selection != nextSelection else { return }
-    sectionState.remember(selection)
-    navigationHistory.record(selection)
+    if rememberCurrentSelection {
+      sectionState.remember(selection)
+    }
+    if recordHistory {
+      navigationHistory.record(selection)
+    }
     selection = nextSelection
   }
 }
