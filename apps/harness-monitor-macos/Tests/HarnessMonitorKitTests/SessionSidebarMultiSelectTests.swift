@@ -120,6 +120,18 @@ struct SessionSidebarMultiSelectTests {
     #expect(source.contains("Filter decisions to show more"))
   }
 
+  @Test("Draggable sidebar rows render a hover drag handle")
+  func draggableRowsRenderHoverDragHandle() throws {
+    let source = try sourceFile(named: "SessionSidebarRow.swift")
+
+    #expect(source.contains("showsDragHandle"))
+    #expect(source.contains("isHoveringDragHandle"))
+    #expect(source.contains("Image(systemName: \"ellipsis\")"))
+    #expect(source.contains(".onHover"))
+    #expect(source.contains("dragHandleColumnWidth"))
+    #expect(source.contains("dragHandleHitTarget"))
+  }
+
   private func sourceFile(named name: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =

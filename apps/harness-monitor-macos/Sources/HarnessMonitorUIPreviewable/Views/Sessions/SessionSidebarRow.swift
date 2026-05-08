@@ -13,6 +13,7 @@ struct SessionSidebarRow: View {
   var toggleSelection: (() -> Void)?
   @Environment(\.fontScale)
   private var fontScale
+  @State private var isHoveringDragHandle = false
 
   private var metrics: SessionSidebarRowMetrics {
     SessionSidebarRowMetrics(fontScale: fontScale)
@@ -20,6 +21,19 @@ struct SessionSidebarRow: View {
 
   var body: some View {
     HStack(spacing: metrics.spacing) {
+      if showsDragHandle {
+        Image(systemName: "ellipsis")
+          .scaledFont(.caption)
+          .rotationEffect(.degrees(90))
+          .foregroundStyle(.tertiary)
+          .frame(
+            width: metrics.dragHandleColumnWidth,
+            height: metrics.dragHandleHitTarget
+          )
+          .opacity(isHoveringDragHandle ? 1 : 0)
+          .accessibilityHidden(true)
+      }
+
       if isMultiSelect {
         Button {
           toggleSelection?()
@@ -67,6 +81,10 @@ struct SessionSidebarRow: View {
     }
     .accessibilityElement(children: .combine)
     .accessibilityLabel(title)
+    .onHover { isHovering in
+      guard showsDragHandle else { return }
+      isHoveringDragHandle = isHovering
+    }
   }
 
   @ViewBuilder private var severityIndicator: some View {
@@ -91,6 +109,8 @@ struct SessionSidebarRowMetrics: Equatable {
   let verticalPadding: CGFloat
   let iconColumnWidth: CGFloat
   let multiSelectControlSize: CGFloat
+  let dragHandleColumnWidth: CGFloat
+  let dragHandleHitTarget: CGFloat
   let severityIndicatorSize: CGFloat
   let severityIndicatorOffset: CGFloat
   let severityAlertFontSize: CGFloat
@@ -103,6 +123,8 @@ struct SessionSidebarRowMetrics: Equatable {
     verticalPadding = max(1, 1.5 * min(scale, 1.4))
     iconColumnWidth = max(16, 16 * min(scale, 1.35))
     multiSelectControlSize = scale >= 1.45 ? 44 : max(24, 22 * scale)
+    dragHandleColumnWidth = max(12, 12 * min(scale, 1.35))
+    dragHandleHitTarget = scale >= 1.45 ? 44 : max(24, 22 * scale)
     severityIndicatorSize = max(8, 8 * min(scale, 1.5))
     severityIndicatorOffset = max(4, 4 * min(scale, 1.35))
     severityAlertFontSize = max(6, 6 * min(scale, 1.5))
