@@ -8,6 +8,12 @@ import SwiftUI
 struct SessionDecisionDetailPane: View {
   let decision: Decision
   @Bindable var runtime: SessionDecisionRuntime
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var metrics: SessionDecisionDetailPaneMetrics {
+    SessionDecisionDetailPaneMetrics(fontScale: fontScale)
+  }
 
   var body: some View {
     Form {
@@ -28,12 +34,21 @@ struct SessionDecisionDetailPane: View {
       if !decision.suggestedActionsJSON.isEmpty {
         Section("Suggested Actions") {
           Text(decision.suggestedActionsJSON)
-            .font(.system(.caption, design: .monospaced))
+            .scaledFont(.system(.caption, design: .monospaced))
             .textSelection(.enabled)
         }
       }
     }
     .formStyle(.grouped)
-    .padding(24)
+    .padding(metrics.contentPadding)
+  }
+}
+
+struct SessionDecisionDetailPaneMetrics: Equatable {
+  let contentPadding: CGFloat
+
+  init(fontScale: CGFloat) {
+    let scale = min(max(fontScale, 0.85), 1.8)
+    contentPadding = max(24, 24 * min(scale, 1.35))
   }
 }
