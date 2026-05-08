@@ -211,6 +211,15 @@ public struct SettingsGeneralSection: View {
       }
 
       Section {
+        Text(SessionDecisionBulkActionCopy.dismissVisibleHelp)
+          .scaledFont(.caption)
+          .foregroundStyle(.secondary)
+          .accessibilityIdentifier("harness.settings.decisions.dismiss-visible-help")
+      } header: {
+        Text("Decisions")
+      }
+
+      Section {
         Picker("Launch behavior", selection: $launchBehaviorRawValue) {
           ForEach(HarnessMonitorLaunchBehavior.allCases) { behavior in
             Text(behavior.label).tag(behavior.rawValue)
