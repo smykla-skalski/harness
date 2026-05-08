@@ -1,10 +1,8 @@
 import HarnessMonitorKit
 import SwiftUI
 
-// Detail pane is the primary surface: identity, routing, and suggested actions
-// users act on. Inspector is supplementary: context that explains the decision
-// and history of prior touches. Detail content must never duplicate the
-// inspector's tab content; inspector must never own primary actions.
+// Detail owns the decision body, routing, and suggested actions users act on.
+// The inspector stays supplementary: orthogonal context and prior touches only.
 struct SessionDecisionDetailPane: View {
   let decision: Decision
   @Bindable var runtime: SessionDecisionRuntime

@@ -1,6 +1,8 @@
 import HarnessMonitorKit
 import SwiftUI
 
+// Inspector content is supplemental. Do not reintroduce detail-owned decision
+// body, routing, or action fields into the context tab.
 struct SessionDecisionInspectorContent: View {
   let decision: Decision
   @Bindable var runtime: SessionDecisionRuntime
@@ -48,12 +50,20 @@ struct SessionDecisionInspectorContent: View {
   }
 
   private var contextRows: some View {
-    VStack(alignment: .leading, spacing: metrics.rowSpacing) {
-      ForEach(runtime.contextRows(for: decision)) { row in
-        Text(row.value)
+    let rows = runtime.contextRows(for: decision)
+    return VStack(alignment: .leading, spacing: metrics.rowSpacing) {
+      if rows.isEmpty {
+        Text("No additional context")
           .scaledFont(.caption)
-          .textSelection(.enabled)
+          .foregroundStyle(.secondary)
           .frame(maxWidth: .infinity, alignment: .leading)
+      } else {
+        ForEach(rows) { row in
+          Text(row.value)
+            .scaledFont(.caption)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
       }
     }
   }
