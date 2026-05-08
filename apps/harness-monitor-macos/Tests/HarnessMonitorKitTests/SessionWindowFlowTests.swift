@@ -32,19 +32,6 @@ struct SessionWindowFlowTests {
     )
   }
 
-  @Test("Session window tabbing preference defaults to system")
-  func sessionWindowTabbingPreferenceDefaultsToSystem() {
-    #expect(SessionWindowTabbingPreference.defaultValue == .system)
-    #expect(SessionWindowTabbingPreference.resolved(rawValue: nil) == .system)
-    #expect(SessionWindowTabbingPreference.resolved(rawValue: "system") == .system)
-    #expect(SessionWindowTabbingPreference.resolved(rawValue: "always") == .always)
-    #expect(SessionWindowTabbingPreference.resolved(rawValue: "never") == .never)
-    #expect(SessionWindowTabbingPreference.resolved(rawValue: "unknown") == .system)
-    #expect(
-      SessionWindowTabbingPreference.storageKey == "harness.monitor.session-window.tabbing"
-    )
-  }
-
   @Test("Session routes expose stable sidebar order")
   func sessionRoutesExposeStableSidebarOrder() {
     #expect(
@@ -264,75 +251,42 @@ struct SessionWindowFlowTests {
     )
   }
 
-  @MainActor
-  @Test("Open Recent handoff focuses the resolved session window")
-  func openRecentHandoffFocusesResolvedWindow() async {
-    let application = RecordingOpenRecentSessionLaunchApplication()
-    let window = RecordingOpenRecentSessionLaunchWindow()
-
-    let outcome = await OpenRecentSessionLaunchHandoff.perform(
-      environment: .init(
-        application: application,
-        resolveWindow: { window },
-        pause: {}
-      )
-    )
-
-    #expect(outcome == .focused)
-    #expect(application.activateCount == 1)
-    #expect(application.attentionRequestCount == 0)
-    #expect(window.makeKeyCallCount >= 1)
-  }
-
-  @MainActor
-  @Test("Open Recent handoff requests attention when the session window stays occluded")
-  func openRecentHandoffRequestsAttentionForOccludedWindow() async {
-    let application = RecordingOpenRecentSessionLaunchApplication()
-    let window = RecordingOpenRecentSessionLaunchWindow(
-      isOnActiveSpace: false
-    )
-
-    let outcome = await OpenRecentSessionLaunchHandoff.perform(
-      environment: .init(
-        application: application,
-        resolveWindow: { window },
-        pause: {}
-      )
-    )
-
-    #expect(outcome == .attentionRequested)
-    #expect(application.activateCount == 1)
-    #expect(application.attentionRequestCount == 1)
-  }
-
-  @MainActor
-  @Test("Open Recent handoff keeps the launcher open when no session window resolves")
-  func openRecentHandoffReturnsUnresolvedWhenWindowNeverAppears() async {
-    let application = RecordingOpenRecentSessionLaunchApplication()
-
-    let outcome = await OpenRecentSessionLaunchHandoff.perform(
-      environment: .init(
-        application: application,
-        resolveWindow: { nil },
-        pause: {}
-      )
-    )
-
-    #expect(outcome == .unresolved)
-    #expect(application.activateCount == 1)
-    #expect(application.attentionRequestCount == 0)
-  }
-
-  @Test("Open Recent close-after-pick dismisses only the current welcome window")
+  @Test("Open Recent close-after-pick uses native SwiftUI scene routing")
   func openRecentCloseAfterPickUsesCurrentWindowDismiss() throws {
     let source = try previewableSourceFile(named: "Views/Sessions/OpenRecentView.swift")
 
+    #expect(!source.contains("import AppKit"))
     #expect(source.contains("@Environment(\\.dismiss)"))
+    #expect(source.contains("@Environment(\\.openWindow)"))
+    #expect(source.contains("openWindow("))
+    #expect(source.contains("await Task.yield()"))
     #expect(source.contains("dismiss()"))
+    #expect(!source.contains("OpenRecentSessionLaunchHandoff"))
     #expect(!source.contains("OpenRecentSourceWindowResolver"))
+    #expect(!source.contains("NSApplication"))
+    #expect(!source.contains("NSWindow"))
+    #expect(!source.contains("requestUserAttention"))
+    #expect(!source.contains("makeKeyAndOrderFront"))
     #expect(!source.contains("sourceWindow.close()"))
     #expect(!source.contains("@Environment(\\.dismissWindow)"))
     #expect(!source.contains("dismissWindow(id: HarnessMonitorWindowID.main)"))
+  }
+
+  @Test("Session tabs are routed through native SwiftUI scene commands")
+  func sessionTabsUseSwiftUISceneCommands() throws {
+    let appSource = try harnessSourceFile(named: "App/HarnessMonitorApp.swift")
+    let rootSource = try harnessSourceFile(named: "App/SessionWindowRootView.swift")
+    let commandsSource = try harnessSourceFile(named: "Commands/WindowMenuCommands.swift")
+    let tabbingAccessorPath = harnessSourceURL(named: "App/SessionWindowTabbing.swift").path
+
+    #expect(!FileManager.default.fileExists(atPath: tabbingAccessorPath))
+    #expect(appSource.contains("WindowGroup("))
+    #expect(appSource.contains("for: SessionWindowToken.self"))
+    #expect(commandsSource.contains("@Environment(\\.openWindow)"))
+    #expect(commandsSource.contains("openWindow("))
+    #expect(!rootSource.contains("SessionWindowTabbing"))
+    #expect(!commandsSource.contains("NSWindow"))
+    #expect(!commandsSource.contains("tabbingIdentifier"))
   }
 
   @Test("Sidebar density keeps strict default and maps legacy values")
@@ -367,51 +321,21 @@ struct SessionWindowFlowTests {
       .appendingPathComponent(relativePath)
     return try String(contentsOf: fileURL, encoding: .utf8)
   }
-}
 
-@MainActor
-private final class RecordingOpenRecentSessionLaunchApplication:
-  OpenRecentSessionLaunchHandoff.ApplicationDriver
-{
-  private(set) var activateCount = 0
-  private(set) var attentionRequestCount = 0
-
-  func activate() {
-    activateCount += 1
+  private func harnessSourceFile(named relativePath: String) throws -> String {
+    try String(contentsOf: harnessSourceURL(named: relativePath), encoding: .utf8)
   }
 
-  func requestAttention() {
-    attentionRequestCount += 1
-  }
-}
-
-@MainActor
-private final class RecordingOpenRecentSessionLaunchWindow:
-  OpenRecentSessionLaunchHandoff.WindowDriver
-{
-  var isVisible: Bool
-  var isMiniaturized: Bool
-  var isKeyWindow: Bool
-  var isOnActiveSpace: Bool
-  var isOcclusionVisible: Bool
-  private(set) var makeKeyCallCount = 0
-
-  init(
-    isVisible: Bool = true,
-    isMiniaturized: Bool = false,
-    isKeyWindow: Bool = false,
-    isOnActiveSpace: Bool = true,
-    isOcclusionVisible: Bool = true
-  ) {
-    self.isVisible = isVisible
-    self.isMiniaturized = isMiniaturized
-    self.isKeyWindow = isKeyWindow
-    self.isOnActiveSpace = isOnActiveSpace
-    self.isOcclusionVisible = isOcclusionVisible
-  }
-
-  func makeKeyAndOrderFront() {
-    makeKeyCallCount += 1
-    isKeyWindow = true
+  private func harnessSourceURL(named relativePath: String) -> URL {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    return repoRoot
+      .appendingPathComponent("apps/harness-monitor-macos/Sources/HarnessMonitor")
+      .appendingPathComponent(relativePath)
   }
 }

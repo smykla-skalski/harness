@@ -19,7 +19,7 @@ final class HarnessMonitorMenuBarTests: HarnessMonitorUITestCase {
     )
   }
 
-  func testWelcomeWindowDoesNotExposeTabbingItems() throws {
+  func testWindowMenuKeepsOpenRecentCommandAvailableAlongsideSystemItems() throws {
     let app = launch(mode: "preview")
     let windowMenu = app.menuBars.firstMatch.menuBarItems["Window"]
     XCTAssertTrue(
@@ -28,21 +28,9 @@ final class HarnessMonitorMenuBarTests: HarnessMonitorUITestCase {
     )
     windowMenu.click()
 
-    let tabBarItem = windowMenu.menuItems["Show Tab Bar"]
-    let mergeWindowsItem = windowMenu.menuItems["Merge All Windows"]
-    let moveTabItem = windowMenu.menuItems["Move Tab to New Window"]
-
-    XCTAssertFalse(
-      tabBarItem.exists,
-      "The welcome window opts out of native tabbing and should not expose a tab bar"
-    )
-    XCTAssertFalse(
-      mergeWindowsItem.exists,
-      "The welcome window opts out of native tabbing and should not expose merge commands"
-    )
-    XCTAssertFalse(
-      moveTabItem.exists,
-      "The welcome window opts out of native tabbing and should not expose tab extraction"
+    XCTAssertTrue(
+      windowMenu.menuItems["Open Recent Session"].exists,
+      "The app-owned window command should stay available while native window items remain system-owned"
     )
 
     windowMenu.typeKey(.escape, modifierFlags: [])
