@@ -2,8 +2,9 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct SessionWindowInspector: View {
-  let selection: SessionSelection
-  let selectedDecision: Decision?
+  let decision: Decision
+  let isFilteredOut: Bool
+  let decisionFilters: SessionDecisionFilterState
   @Bindable var decisionRuntime: SessionDecisionRuntime
   @Binding var visible: Bool
   @FocusState private var closeButtonFocused: Bool
@@ -13,15 +14,20 @@ struct SessionWindowInspector: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       header
+      if isFilteredOut {
+        SessionFilteredDecisionNotice(filters: decisionFilters)
+      }
       content
       Spacer(minLength: 0)
     }
     .padding(16)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .background(.background)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowInspector)
     .accessibilityElement(children: .contain)
-    .accessibilityLabel("Session inspector")
+    .accessibilityTestProbe(
+      HarnessMonitorAccessibility.sessionWindowInspector,
+      label: "Session inspector"
+    )
     .onAppear {
       if voiceOverEnabled {
         closeButtonFocused = true
@@ -53,20 +59,11 @@ struct SessionWindowInspector: View {
     }
   }
 
-  @ViewBuilder private var content: some View {
-    switch selection {
-    case .decision:
-      if let selectedDecision {
-        SessionDecisionInspectorContent(
-          decision: selectedDecision,
-          runtime: decisionRuntime
-        )
-      } else {
-        ContentUnavailableView("Decision Not Available", systemImage: "exclamationmark.bubble")
-      }
-    default:
-      ContentUnavailableView("No Inspector Context", systemImage: "sidebar.trailing")
-    }
+  private var content: some View {
+    SessionDecisionInspectorContent(
+      decision: decision,
+      runtime: decisionRuntime
+    )
   }
 
   private func hideInspector() {

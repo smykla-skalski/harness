@@ -2,50 +2,47 @@ import XCTest
 
 extension HarnessMonitorUITestCase {
   func tapButton(in app: XCUIApplication, title: String) {
-    let deadline = Date.now.addingTimeInterval(Self.fastActionTimeout)
+    if app.state != .runningForeground {
+      app.activate()
+    }
 
-    while Date.now < deadline {
-      if app.state != .runningForeground {
-        app.activate()
-      }
+    let buttonTarget = button(in: app, title: title)
+    let presentedTarget = element(in: app, title: title)
+    let ready = waitUntil(timeout: Self.fastActionTimeout) {
+      (buttonTarget.exists && (buttonTarget.isHittable || !buttonTarget.frame.isEmpty))
+        || (presentedTarget.exists && (presentedTarget.isHittable || !presentedTarget.frame.isEmpty))
+    }
+    guard ready else {
+      XCTFail("Failed to tap button titled \(title)")
+      return
+    }
 
-      let buttonTarget = button(in: app, title: title)
-      if waitForElement(buttonTarget, timeout: Self.fastPollInterval) {
-        if tapButtonElementReliably(in: app, element: buttonTarget) {
-          return
-        }
-
-      }
-
-      let presentedTarget = element(in: app, title: title)
-      if waitForElement(presentedTarget, timeout: Self.fastPollInterval) {
-        if tapButtonElementReliably(in: app, element: presentedTarget) {
-          return
-        }
-      }
-
-      RunLoop.current.run(until: Date.now.addingTimeInterval(Self.fastPollInterval))
+    if tapButtonElementReliably(in: app, element: buttonTarget) {
+      return
+    }
+    if tapButtonElementReliably(in: app, element: presentedTarget) {
+      return
     }
 
     XCTFail("Failed to tap button titled \(title)")
   }
 
   func tapElement(in app: XCUIApplication, identifier: String) {
-    let deadline = Date.now.addingTimeInterval(Self.fastActionTimeout)
+    if app.state != .runningForeground {
+      app.activate()
+    }
 
-    while Date.now < deadline {
-      if app.state != .runningForeground {
-        app.activate()
-      }
+    let target = element(in: app, identifier: identifier)
+    let ready = waitUntil(timeout: Self.fastActionTimeout) {
+      target.exists && (target.isHittable || !target.frame.isEmpty)
+    }
+    guard ready else {
+      XCTFail("Failed to tap element \(identifier)")
+      return
+    }
 
-      let target = element(in: app, identifier: identifier)
-      if waitForElement(target, timeout: Self.fastPollInterval) {
-        if tapElementReliably(in: app, element: target) {
-          return
-        }
-      }
-
-      RunLoop.current.run(until: Date.now.addingTimeInterval(Self.fastPollInterval))
+    if tapElementReliably(in: app, element: target) {
+      return
     }
 
     XCTFail("Failed to tap element \(identifier)")
@@ -156,13 +153,13 @@ extension HarnessMonitorUITestCase {
 
   @discardableResult
   func tapButtonElementReliably(in app: XCUIApplication, element: XCUIElement) -> Bool {
-    if element.isHittable {
-      element.click()
+    if let coordinate = preferredTapCoordinate(in: app, for: element) {
+      coordinate.click()
       return true
     }
 
-    if let coordinate = preferredTapCoordinate(in: app, for: element) {
-      coordinate.click()
+    if element.isHittable {
+      element.click()
       return true
     }
 
@@ -196,13 +193,13 @@ extension HarnessMonitorUITestCase {
 
   @discardableResult
   func tapElementReliably(in app: XCUIApplication, element: XCUIElement) -> Bool {
-    if element.isHittable {
-      element.click()
+    if let coordinate = preferredTapCoordinate(in: app, for: element) {
+      coordinate.click()
       return true
     }
 
-    if let coordinate = preferredTapCoordinate(in: app, for: element) {
-      coordinate.click()
+    if element.isHittable {
+      element.click()
       return true
     }
 

@@ -62,6 +62,13 @@ public enum SessionSelection: Hashable, Sendable {
   }
 }
 
+public enum SessionSelectedDecisionVisibility: Equatable, Sendable {
+  case none
+  case visible
+  case hidden
+  case missing
+}
+
 @MainActor
 @Observable
 public final class SessionWindowStateCache {
@@ -122,6 +129,29 @@ public final class SessionWindowStateCache {
   public func navigateForward() {
     guard let next = navigationHistory.popForward(current: selection) else { return }
     selection = next
+  }
+
+  public func selectedDecision(in decisions: [Decision]) -> Decision? {
+    guard let decisionID = selection.decisionID else {
+      return nil
+    }
+    return decisions.first { $0.id == decisionID }
+  }
+
+  public func selectedDecisionVisibility(
+    allDecisionIDs: Set<String>,
+    visibleDecisionIDs: Set<String>
+  ) -> SessionSelectedDecisionVisibility {
+    guard let decisionID = selection.decisionID else {
+      return .none
+    }
+    if visibleDecisionIDs.contains(decisionID) {
+      return .visible
+    }
+    if allDecisionIDs.contains(decisionID) {
+      return .hidden
+    }
+    return .missing
   }
 
   private func updateSelection(_ nextSelection: SessionSelection) {
