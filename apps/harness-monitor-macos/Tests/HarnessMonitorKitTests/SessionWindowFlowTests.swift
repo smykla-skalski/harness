@@ -289,6 +289,17 @@ struct SessionWindowFlowTests {
     #expect(!commandsSource.contains("tabbingIdentifier"))
   }
 
+  @Test("Session inspector divider remains SwiftUI native")
+  func sessionInspectorDividerRemainsSwiftUINative() throws {
+    let viewSource = try previewableSourceFile(named: "Views/Sessions/SessionWindowView.swift")
+    let dividerSource = try previewableSourceFile(named: "Views/Sessions/SessionInspectorDivider.swift")
+
+    #expect(!viewSource.contains("import AppKit"))
+    #expect(!dividerSource.contains("import AppKit"))
+    #expect(dividerSource.contains("DragGesture("))
+    #expect(!dividerSource.contains("NSCursor"))
+  }
+
   @Test("Sidebar density keeps strict default and maps legacy values")
   func sidebarDensityResolvesStrictDefaultAndLegacyValues() {
     #expect(HarnessMonitorSidebarSessionRowDisplayMode.defaultMode == .strict)
