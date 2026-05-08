@@ -50,6 +50,7 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
     @ViewBuilder detail: () -> Detail
   ) {
     _contentWidth = contentWidth
+    _liveContentWidth = State(wrappedValue: contentWidth.wrappedValue)
     self.content = content()
     self.detail = detail()
   }
@@ -147,7 +148,7 @@ private struct SessionContentDetailDivider: View {
       .overlay(alignment: .center) {
         Rectangle()
           .fill(separatorTint)
-          .frame(width: isKeyboardFocused ? 2 : SessionContentDetailSplitLayout.dividerWidth)
+          .frame(width: separatorLineWidth)
       }
       .overlay(alignment: .center) {
         interactiveSurface
@@ -163,16 +164,39 @@ private struct SessionContentDetailDivider: View {
 
   private var separatorTint: Color {
     if isKeyboardFocused {
-      return focusTint
+      return focusTint.opacity(0.92)
     }
-    return Color(nsColor: .separatorColor).opacity(isDragging ? 0.95 : isHovered ? 0.82 : 0.68)
+    if isHovered || isDragging {
+      return Color(nsColor: .separatorColor).opacity(0.9)
+    }
+    return Color(nsColor: .separatorColor).opacity(0.68)
   }
 
-  private var hoverFill: Color {
+  private var separatorLineWidth: CGFloat {
     if isKeyboardFocused {
-      return focusTint.opacity(isDragging ? 0.22 : 0.16)
+      return 3
     }
-    return Color.primary.opacity(isDragging ? 0.14 : isHovered ? 0.08 : 0)
+    if isHovered || isDragging {
+      return 2
+    }
+    return SessionContentDetailSplitLayout.dividerWidth
+  }
+
+  private var handleWidth: CGFloat {
+    if isKeyboardFocused {
+      return 5
+    }
+    if isHovered || isDragging {
+      return 4
+    }
+    return 3
+  }
+
+  private var resolvedHandleHeight: CGFloat {
+    if isKeyboardFocused || isHovered || isDragging {
+      return handleHeight + 4
+    }
+    return handleHeight
   }
 
   private var animationDuration: Double {
@@ -186,16 +210,16 @@ private struct SessionContentDetailDivider: View {
   private var interactiveSurface: some View {
     ZStack {
       Rectangle()
-        .fill(hoverFill)
+        .fill(.clear)
 
       RoundedRectangle(cornerRadius: 2, style: .continuous)
         .fill(isKeyboardFocused ? focusTint : separatorTint)
-        .frame(width: isKeyboardFocused ? 4 : 3, height: handleHeight)
+        .frame(width: handleWidth, height: resolvedHandleHeight)
         .opacity(isKeyboardFocused || isHovered || isDragging ? 1 : 0)
     }
     .frame(width: interactiveWidth)
     .contentShape(Rectangle())
-    .focusable()
+    .focusable(interactions: .activate)
     .focusEffectDisabled()
     .focused($isKeyboardFocused)
     .help("Drag or use the arrow keys to resize the content and detail panes.")
@@ -233,7 +257,9 @@ private struct SessionContentDetailDivider: View {
         if dragStartWidth == nil {
           dragStartWidth = contentWidth
         }
-        isDragging = true
+        if !isDragging {
+          isDragging = true
+        }
         updateCursor(active: true)
         let next = (dragStartWidth ?? contentWidth) + value.translation.width
         contentWidth = min(max(next, widthRange.lowerBound), widthRange.upperBound)
