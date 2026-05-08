@@ -1,23 +1,50 @@
 import HarnessMonitorKit
 import SwiftUI
 
+struct SessionWindowRouteContentMetrics: Equatable {
+  let contentPadding: CGFloat
+  let overviewSpacing: CGFloat
+  let gridHorizontalSpacing: CGFloat
+  let gridVerticalSpacing: CGFloat
+  let rowTextSpacing: CGFloat
+
+  init(fontScale: CGFloat) {
+    let scale = min(max(fontScale, 0.85), 1.8)
+    contentPadding = 24 * min(scale, 1.3)
+    overviewSpacing = 16 * min(scale, 1.35)
+    gridHorizontalSpacing = 24 * min(scale, 1.25)
+    gridVerticalSpacing = 10 * min(scale, 1.35)
+    rowTextSpacing = 2 * min(scale, 1.45)
+  }
+}
+
 struct SessionWindowOverview: View {
   let snapshot: HarnessMonitorSessionWindowSnapshot
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var metrics: SessionWindowRouteContentMetrics {
+    SessionWindowRouteContentMetrics(fontScale: fontScale)
+  }
 
   var body: some View {
     HarnessMonitorColumnScrollView(
-      horizontalPadding: 24,
-      verticalPadding: 24,
+      horizontalPadding: metrics.contentPadding,
+      verticalPadding: metrics.contentPadding,
       constrainContentWidth: true,
       readableWidth: false,
       topScrollEdgeEffect: .soft,
       scrollSurfaceIdentifier: HarnessMonitorAccessibility.sessionCockpitScrollView,
       scrollSurfaceLabel: "Session overview"
     ) {
-      VStack(alignment: .leading, spacing: 16) {
+      VStack(alignment: .leading, spacing: metrics.overviewSpacing) {
         Text(snapshot.summary.displayTitle)
           .scaledFont(.system(.title2, design: .rounded, weight: .semibold))
-        Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 10) {
+        Grid(
+          alignment: .leading,
+          horizontalSpacing: metrics.gridHorizontalSpacing,
+          verticalSpacing: metrics.gridVerticalSpacing
+        ) {
           metric("Status", snapshot.summary.status.title)
           metric("Project", snapshot.summary.projectName)
           metric("Worktree", snapshot.summary.worktreeDisplayName)
@@ -33,8 +60,10 @@ struct SessionWindowOverview: View {
   private func metric(_ title: String, _ value: String) -> some View {
     GridRow {
       Text(title)
+        .scaledFont(.body)
         .foregroundStyle(.secondary)
       Text(value)
+        .scaledFont(.body)
         .textSelection(.enabled)
     }
   }
@@ -46,16 +75,23 @@ struct SessionWindowOverview: View {
 
 struct SessionWindowAgentsList: View {
   let detail: SessionDetail?
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var metrics: SessionWindowRouteContentMetrics {
+    SessionWindowRouteContentMetrics(fontScale: fontScale)
+  }
 
   var body: some View {
     sessionListSurface("Agents") {
       if let agents = detail?.agents, !agents.isEmpty {
         ForEach(agents) { agent in
           Label {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
               Text(agent.name)
+                .scaledFont(.body)
               Text("\(agent.role.title) - \(agent.runtime) - \(agent.agentId)")
-                .font(.caption)
+                .scaledFont(.caption)
                 .foregroundStyle(.secondary)
             }
           } icon: {
@@ -71,16 +107,23 @@ struct SessionWindowAgentsList: View {
 
 struct SessionWindowTasksList: View {
   let detail: SessionDetail?
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var metrics: SessionWindowRouteContentMetrics {
+    SessionWindowRouteContentMetrics(fontScale: fontScale)
+  }
 
   var body: some View {
     sessionListSurface("Tasks") {
       if let tasks = detail?.tasks, !tasks.isEmpty {
         ForEach(tasks) { task in
           Label {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
               Text(task.title)
+                .scaledFont(.body)
               Text("\(task.status.title) - \(task.severity.title)")
-                .font(.caption)
+                .scaledFont(.caption)
                 .foregroundStyle(.secondary)
             }
           } icon: {
@@ -97,15 +140,22 @@ struct SessionWindowTasksList: View {
 struct SessionWindowDecisionsList: View {
   let decisions: [Decision]
   @Bindable var state: SessionWindowStateCache
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var metrics: SessionWindowRouteContentMetrics {
+    SessionWindowRouteContentMetrics(fontScale: fontScale)
+  }
 
   var body: some View {
     List(selection: decisionBinding) {
       ForEach(decisions) { decision in
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
           Text(decision.summary)
+            .scaledFont(.body)
             .lineLimit(1)
           Text(decision.ruleID)
-            .font(.caption)
+            .scaledFont(.caption)
             .foregroundStyle(.secondary)
         }
         .tag(decision.id)
@@ -143,6 +193,12 @@ struct SessionWindowRunsList: View {
 
 public struct DecisionDetailSummary: View {
   let decision: Decision
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var metrics: SessionWindowRouteContentMetrics {
+    SessionWindowRouteContentMetrics(fontScale: fontScale)
+  }
 
   public init(decision: Decision) {
     self.decision = decision
@@ -161,7 +217,8 @@ public struct DecisionDetailSummary: View {
       }
     }
     .formStyle(.grouped)
-    .padding(24)
+    .padding(metrics.contentPadding)
+    .dynamicTypeSize(.xSmall ... .accessibility5)
   }
 }
 
