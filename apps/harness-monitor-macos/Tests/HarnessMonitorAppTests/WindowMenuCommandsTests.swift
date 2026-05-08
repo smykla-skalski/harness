@@ -43,6 +43,20 @@ final class WindowMenuCommandsTests: XCTestCase {
     XCTAssertEqual(DecisionCommands.reopenBatchTitle, "Reopen Dismissed Batch")
   }
 
+  func testCommandNUsesFocusedSessionCreateContext() throws {
+    let source = try harnessSourceFile(named: "Commands/NewSessionCommand.swift")
+    let commandSetSource = try harnessSourceFile(named: "App/HarnessMonitorMainCommandSet.swift")
+
+    XCTAssertTrue(commandSetSource.contains("NewSessionCommand(store: store)"))
+    XCTAssertTrue(source.contains("@FocusedValue(\\.sessionCreateContext)"))
+    XCTAssertTrue(source.contains(".keyboardShortcut(\"n\", modifiers: [.command])"))
+    XCTAssertTrue(source.contains("guard let kind = sessionCreate?.primaryKind"))
+    XCTAssertTrue(source.contains("case .agent: sessionCreate.createAgent()"))
+    XCTAssertTrue(source.contains("case .task: sessionCreate.createTask()"))
+    XCTAssertTrue(source.contains("case .decision: sessionCreate.createDecision()"))
+    XCTAssertTrue(source.contains("store.presentedSheet = .newSession"))
+  }
+
   func testGoCommandsUseSessionFocusedNavigationOnly() throws {
     let source = try harnessSourceFile(named: "Commands/GoCommands.swift")
 
