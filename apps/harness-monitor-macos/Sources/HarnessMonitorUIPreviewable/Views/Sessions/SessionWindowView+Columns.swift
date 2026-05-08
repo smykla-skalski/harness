@@ -92,30 +92,38 @@ extension SessionWindowView {
       ProgressView("Loading session")
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     } else if let snapshot {
-      switch route {
-      case .overview: SessionWindowOverview(snapshot: snapshot)
-      case .agents: SessionWindowAgentsList(detail: snapshot.detail, state: stateCache)
-      case .tasks: SessionWindowTasksList(detail: snapshot.detail, state: stateCache)
-      case .decisions:
-        SessionWindowDecisionsList(decisions: matchingDecisions, state: stateCache)
-      case .timeline:
-        MonitorTimelineSection(
-          host: .session(snapshot.summary.sessionId),
-          timeline: snapshot.timeline,
-          timelineWindow: snapshot.timelineWindow,
-          decisions: matchingDecisions,
-          isTimelineLoading: isLoading,
-          store: store
-        )
-        .padding(24)
-      case .terminal: SessionWindowRunsList(detail: snapshot.detail, state: stateCache)
-      }
+      contentColumnBody(snapshot: snapshot, route: contentRenderedRoute ?? route)
     } else {
       ContentUnavailableView(
         "Session Not Available",
         systemImage: "questionmark.folder",
         description: Text(token.sessionID)
       )
+    }
+  }
+
+  @ViewBuilder
+  private func contentColumnBody(
+    snapshot: HarnessMonitorSessionWindowSnapshot,
+    route: SessionWindowRoute
+  ) -> some View {
+    switch route {
+    case .overview: SessionWindowOverview(snapshot: snapshot)
+    case .agents: SessionWindowAgentsList(detail: snapshot.detail, state: stateCache)
+    case .tasks: SessionWindowTasksList(detail: snapshot.detail, state: stateCache)
+    case .decisions:
+      SessionWindowDecisionsList(decisions: matchingDecisions, state: stateCache)
+    case .timeline:
+      MonitorTimelineSection(
+        host: .session(snapshot.summary.sessionId),
+        timeline: snapshot.timeline,
+        timelineWindow: snapshot.timelineWindow,
+        decisions: matchingDecisions,
+        isTimelineLoading: isLoading,
+        store: store
+      )
+      .padding(24)
+    case .terminal: SessionWindowRunsList(detail: snapshot.detail, state: stateCache)
     }
   }
 
@@ -165,19 +173,12 @@ extension SessionWindowView {
   }
 
   @ViewBuilder var detailFocus: some View {
-    if detailRenderedSelection == stateCache.selection {
-      detailFocusContent
-    } else {
-      ProgressView()
-        .progressViewStyle(.circular)
-        .controlSize(.small)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .accessibilityLabel("Loading detail")
-    }
+    detailFocusContent(for: detailRenderedSelection ?? stateCache.selection)
   }
 
-  @ViewBuilder var detailFocusContent: some View {
-    switch stateCache.selection {
+  @ViewBuilder
+  private func detailFocusContent(for selection: SessionSelection) -> some View {
+    switch selection {
     case .agent(_, let agentID):
       if let agent = snapshot?.detail?.agents.first(where: { $0.agentId == agentID }) {
         SessionAgentDetailSection(
@@ -194,22 +195,20 @@ extension SessionWindowView {
           description: Text("Agent detail is not available.")
         )
       }
-    case .decision:
-      if let selectedDecision {
+    case .decision(_, let decisionID):
+      if let decision = allSessionDecisionsCache.first(where: { $0.id == decisionID }) {
         VStack(alignment: .leading, spacing: 12) {
-          if selectedDecisionHiddenByFilters {
+          if !matchingDecisionIDsCache.contains(decisionID) {
             SessionFilteredDecisionNotice(filters: stateCache.decisionFilters)
           }
           SessionDecisionDetailPane(
-            decision: selectedDecision,
+            decision: decision,
             runtime: stateCache.decisionRuntime
           )
         }
       } else {
         ContentUnavailableView(
-          selectedDecisionVisibility == .missing
-            ? "Decision Not Available"
-            : "No Decision Selected",
+          "No Decision Selected",
           systemImage: "exclamationmark.bubble"
         )
       }
