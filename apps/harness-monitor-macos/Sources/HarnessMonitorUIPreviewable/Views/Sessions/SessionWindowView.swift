@@ -37,6 +37,10 @@ public struct SessionWindowView: View {
   @State private var isLoadingStorage = false
   @State private var didLoadSnapshotStorage = false
   @State private var detailColumnWidthStorage: CGFloat = 0
+  @State private var allSessionDecisionsCache: [Decision] = []
+  @State private var matchingDecisionsCache: [Decision] = []
+  @State private var allSessionDecisionIDsCache: Set<String> = []
+  @State private var matchingDecisionIDsCache: Set<String> = []
 
   public init(store: HarnessMonitorStore, token: SessionWindowToken) {
     self.store = store
@@ -81,22 +85,58 @@ public struct SessionWindowView: View {
   }
 
   var allSessionDecisions: [Decision] {
-    store.supervisorOpenDecisions.filter { $0.sessionID == token.sessionID }
+    allSessionDecisionsCache
   }
 
   var matchingDecisions: [Decision] {
-    allSessionDecisions.filter { stateCache.decisionFilters.matches($0) }
+    matchingDecisionsCache
   }
 
   var selectedDecision: Decision? {
-    stateCache.selectedDecision(in: allSessionDecisions)
+    stateCache.selectedDecision(in: allSessionDecisionsCache)
   }
 
   var selectedDecisionVisibility: SessionSelectedDecisionVisibility {
     stateCache.selectedDecisionVisibility(
-      allDecisionIDs: Set(allSessionDecisions.map(\.id)),
-      visibleDecisionIDs: Set(matchingDecisions.map(\.id))
+      allDecisionIDs: allSessionDecisionIDsCache,
+      visibleDecisionIDs: matchingDecisionIDsCache
     )
+  }
+
+  private var decisionsCacheTrigger: SessionDecisionFilterKey {
+    SessionDecisionFilterKey(
+      sessionID: token.sessionID,
+      decisions: store.supervisorOpenDecisions.filter { $0.sessionID == token.sessionID },
+      filters: stateCache.decisionFilters
+    )
+  }
+
+  private func recomputeDecisionsCache() async {
+    let all = store.supervisorOpenDecisions.filter { $0.sessionID == token.sessionID }
+    let allIDs = Set(all.map(\.id))
+    if all.map(\.id) != allSessionDecisionsCache.map(\.id) {
+      allSessionDecisionsCache = all
+    }
+    if allIDs != allSessionDecisionIDsCache {
+      allSessionDecisionIDsCache = allIDs
+    }
+    stateCache.decisionRuntime.updateFilteredDecisions(
+      input: SessionDecisionFilterInput(
+        sessionID: token.sessionID,
+        decisions: all,
+        filters: stateCache.decisionFilters
+      )
+    )
+    await stateCache.decisionRuntime.waitForDecisionFilterIdle()
+    guard !Task.isCancelled else { return }
+    let matching = stateCache.decisionRuntime.filteredDecisions(from: all)
+    let matchingIDs = Set(matching.map(\.id))
+    if matching.map(\.id) != matchingDecisionsCache.map(\.id) {
+      matchingDecisionsCache = matching
+    }
+    if matchingIDs != matchingDecisionIDsCache {
+      matchingDecisionIDsCache = matchingIDs
+    }
   }
 
   var selectedDecisionHiddenByFilters: Bool {
@@ -162,6 +202,9 @@ public struct SessionWindowView: View {
         preferredBinding: $inspectorPreferred,
         announce: false
       )
+    }
+    .task(id: decisionsCacheTrigger) {
+      await recomputeDecisionsCache()
     }
     .onChange(of: stateCache.selection) { _, newSelection in
       syncPersistedStorage(from: newSelection)
