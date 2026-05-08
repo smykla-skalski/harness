@@ -43,7 +43,7 @@ struct SessionBannerStackMetrics: Equatable {
   let reviewButtonMinHeight: CGFloat
 
   init(fontScale: CGFloat) {
-    let scale = min(max(fontScale, 0.85), 1.8)
+    let scale = SessionWindowFontScale.metricsScale(for: fontScale)
     itemSpacing = HarnessMonitorTheme.itemSpacing * min(scale, 1.4)
     horizontalPadding = HarnessMonitorTheme.spacingMD * min(scale, 1.35)
     verticalPadding = HarnessMonitorTheme.spacingSM * min(scale, 1.45)

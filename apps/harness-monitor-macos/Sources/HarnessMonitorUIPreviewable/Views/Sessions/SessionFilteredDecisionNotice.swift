@@ -8,7 +8,7 @@ struct SessionFilteredDecisionNoticeMetrics: Equatable {
   let clearButtonMinHeight: CGFloat
 
   init(fontScale: CGFloat) {
-    let scale = min(max(fontScale, 0.85), 1.8)
+    let scale = SessionWindowFontScale.metricsScale(for: fontScale)
     spacing = 12 * min(scale, 1.35)
     textSpacing = 4 * min(scale, 1.45)
     padding = 12 * min(scale, 1.35)

@@ -16,7 +16,7 @@ struct SessionAgentDetailSectionMetrics: Equatable {
   let composerMaxHeight: CGFloat
 
   init(fontScale: CGFloat) {
-    let scale = min(max(fontScale, 0.85), 1.8)
+    let scale = SessionWindowFontScale.metricsScale(for: fontScale)
     sectionSpacing = 12 * min(scale, 1.35)
     sectionPadding = 20 * min(scale, 1.25)
     headerSpacing = 4 * min(scale, 1.4)

@@ -48,7 +48,7 @@ struct HarnessMonitorSceneAppearanceModifier: ViewModifier {
 
     content
       .environment(\.harnessTextSizeIndex, normalizedTextSizeIndex)
-      .environment(\.fontScale, HarnessMonitorTextSize.scale(at: normalizedTextSizeIndex))
+      .sessionFontScale(textSizeIndex: normalizedTextSizeIndex)
       .environment(
         \.harnessNativeFormControlFont,
         HarnessMonitorTextSize.nativeFormControlFont(at: normalizedTextSizeIndex)

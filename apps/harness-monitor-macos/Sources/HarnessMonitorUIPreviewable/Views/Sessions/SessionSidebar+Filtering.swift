@@ -7,7 +7,7 @@ struct SessionDecisionFilterMetrics: Equatable {
   let filterButtonSize: CGFloat
 
   init(fontScale: CGFloat) {
-    let scale = min(max(fontScale, 0.85), 1.8)
+    let scale = SessionWindowFontScale.metricsScale(for: fontScale)
     verticalSpacing = 6 * min(scale, 1.45)
     horizontalSpacing = HarnessMonitorTheme.spacingSM * min(scale, 1.35)
     filterButtonSize = scale >= 1.45 ? 44 : max(24, 24 * scale)
