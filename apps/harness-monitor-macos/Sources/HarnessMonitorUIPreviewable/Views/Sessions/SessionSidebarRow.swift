@@ -13,7 +13,6 @@ struct SessionSidebarRow: View {
   var toggleSelection: (() -> Void)?
   @Environment(\.fontScale)
   private var fontScale
-  @State private var isHovering = false
 
   private var metrics: SessionSidebarRowMetrics {
     SessionSidebarRowMetrics(fontScale: fontScale)
@@ -38,7 +37,7 @@ struct SessionSidebarRow: View {
         .accessibilityLabel(isSelected ? "Deselect \(title)" : "Select \(title)")
       }
 
-      Image(systemName: showsDragHandle && isHovering ? "line.3.horizontal" : systemImage)
+      Image(systemName: systemImage)
         .scaledFont(.body)
         .foregroundStyle(.secondary)
         .frame(width: metrics.iconColumnWidth)
@@ -66,7 +65,6 @@ struct SessionSidebarRow: View {
           .strokeBorder(.tint, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
       }
     }
-    .onHover { isHovering = $0 }
     .accessibilityElement(children: .combine)
     .accessibilityLabel(title)
   }

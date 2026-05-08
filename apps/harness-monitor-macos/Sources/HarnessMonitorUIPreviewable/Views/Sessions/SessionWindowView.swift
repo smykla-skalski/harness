@@ -42,6 +42,7 @@ public struct SessionWindowView: View {
   @State var allSessionDecisionIDsCache: Set<String> = []
   @State var matchingDecisionIDsCache: Set<String> = []
   @State var detailRenderedSelection: SessionSelection?
+  @State var contentRenderedRoute: SessionWindowRoute?
 
   public init(store: HarnessMonitorStore, token: SessionWindowToken) {
     self.store = store
@@ -72,7 +73,11 @@ public struct SessionWindowView: View {
   }
 
   var route: SessionWindowRoute {
-    switch stateCache.selection {
+    route(for: stateCache.selection)
+  }
+
+  func route(for selection: SessionSelection) -> SessionWindowRoute {
+    switch selection {
     case .route(let route): route
     case .agent: .agents
     case .decision: .decisions
@@ -171,20 +176,23 @@ public struct SessionWindowView: View {
     .task(id: decisionsCacheTrigger) {
       await recomputeDecisionsCache()
     }
-    .task(id: stateCache.selection) {
-      // Yield once so the click feedback (sidebar/middle row highlight) paints
-      // before the detail subtree mounts. Heavy detail subviews (TUI viewport,
-      // task forms) otherwise block the same runloop the click event lives on,
-      // which the user perceives as a delayed reaction.
-      await Task.yield()
-      detailRenderedSelection = stateCache.selection
-    }
-    .onChange(of: stateCache.selection) { _, newSelection in
+    .onChange(of: stateCache.selection) { oldSelection, newSelection in
       syncPersistedStorage(from: newSelection)
       reconcileInspectorVisibility(
         visibleBinding: $inspectorVisible,
         preferredBinding: $inspectorPreferred
       )
+      // Freeze rendered detail/content at the previous selection so the click
+      // frame paints the sidebar highlight and the still-current panes without
+      // also remounting SessionAgentDetailSection / a fresh middle-column List
+      // on the same runloop. The async hop promotes the cache on the next
+      // runloop tick, off the click event's main-thread budget.
+      detailRenderedSelection = oldSelection
+      contentRenderedRoute = route(for: oldSelection)
+      DispatchQueue.main.async {
+        detailRenderedSelection = newSelection
+        contentRenderedRoute = route(for: newSelection)
+      }
     }
     .onChange(of: stateCache.decisionFilters.query) { _, newValue in
       guard persistedDecisionQuery != newValue else { return }
