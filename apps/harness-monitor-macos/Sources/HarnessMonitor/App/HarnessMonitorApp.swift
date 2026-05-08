@@ -124,7 +124,6 @@ struct HarnessMonitorApp: App {
     _mcpWindowCommandRegistrar = State(initialValue: HarnessMonitorMCPWindowCommandRegistrar())
     _settingsSelectedSection = State(initialValue: configuration.settingsInitialSection)
     delegate.bind(store: store)
-    pendingDecisionsDockBadgeController.sync(count: 0)
   }
 
   var body: some Scene {

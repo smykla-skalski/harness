@@ -105,6 +105,15 @@ final class SessionWindowPresenceTrackerTests: XCTestCase {
     XCTAssertFalse(source.contains("NSWindow"))
   }
 
+  func testAppInitDoesNotSeedSessionWindowBadgeBindings() throws {
+    let appSource = try harnessSourceFile(named: "App/HarnessMonitorApp.swift")
+    let trackerSource = try harnessSourceFile(named: "App/SessionWindowPresenceTracker.swift")
+
+    XCTAssertFalse(appSource.contains("pendingDecisionsDockBadgeController.sync(count: 0)"))
+    XCTAssertTrue(trackerSource.contains("dockBadgeController.sync(count: 0)"))
+    XCTAssertTrue(trackerSource.contains("unbindSessionWindowUI()"))
+  }
+
   private func makeTracker(
     store: HarnessMonitorStore,
     notifications: HarnessMonitorUserNotificationController =
