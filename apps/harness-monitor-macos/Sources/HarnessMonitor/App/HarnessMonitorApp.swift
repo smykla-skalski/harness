@@ -204,7 +204,6 @@ struct HarnessMonitorApp: App {
     HarnessMonitorMainCommandSet(
       store: store,
       textSizeIndex: textSizeIndex,
-      windowCommandRouting: windowCommandRouting,
       increaseTextSize: increaseTextSize,
       decreaseTextSize: decreaseTextSize,
       resetTextSize: resetTextSize,

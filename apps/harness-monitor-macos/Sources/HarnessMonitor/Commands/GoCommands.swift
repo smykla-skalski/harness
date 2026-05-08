@@ -4,35 +4,26 @@ import SwiftUI
 
 struct GoCommands: Commands {
   let store: HarnessMonitorStore
-  let windowCommandRouting: WindowCommandRoutingState
   let displayState: CommandsDisplayState
-  @FocusedValue(\.windowNavigation)
-  private var workspaceNavigation
   @FocusedValue(\.sessionNavigation)
   private var sessionNavigation
 
-  private var activeScope: WindowNavigationScope {
-    windowCommandRouting.activeScope ?? .main
+  private var usesSessionHistory: Bool {
+    sessionNavigation != nil
   }
 
   private var canNavigateBack: Bool {
-    switch activeScope {
-    case .workspace:
-      workspaceNavigation?.canGoBack ?? false
-    case .session:
+    if usesSessionHistory {
       sessionNavigation?.canGoBack ?? false
-    case .main:
+    } else {
       displayState.canNavigateBack
     }
   }
 
   private var canNavigateForward: Bool {
-    switch activeScope {
-    case .workspace:
-      workspaceNavigation?.canGoForward ?? false
-    case .session:
+    if usesSessionHistory {
       sessionNavigation?.canGoForward ?? false
-    case .main:
+    } else {
       displayState.canNavigateForward
     }
   }
@@ -50,25 +41,17 @@ struct GoCommands: Commands {
   }
 
   private func navigateBack() {
-    let scope = activeScope
-    switch scope {
-    case .workspace:
-      Task { await workspaceNavigation?.navigateBack() }
-    case .session:
+    if usesSessionHistory {
       sessionNavigation?.goBack()
-    case .main:
+    } else {
       Task { await store.navigateBack() }
     }
   }
 
   private func navigateForward() {
-    let scope = activeScope
-    switch scope {
-    case .workspace:
-      Task { await workspaceNavigation?.navigateForward() }
-    case .session:
+    if usesSessionHistory {
       sessionNavigation?.goForward()
-    case .main:
+    } else {
       Task { await store.navigateForward() }
     }
   }

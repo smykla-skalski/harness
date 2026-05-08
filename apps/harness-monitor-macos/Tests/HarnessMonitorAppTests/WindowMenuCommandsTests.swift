@@ -42,4 +42,28 @@ final class WindowMenuCommandsTests: XCTestCase {
     XCTAssertEqual(DecisionCommands.dismissVisibleTitle, "Dismiss All Visible")
     XCTAssertEqual(DecisionCommands.reopenBatchTitle, "Reopen Dismissed Batch")
   }
+
+  func testGoCommandsUseSessionFocusedNavigationOnly() throws {
+    let source = try harnessSourceFile(named: "Commands/GoCommands.swift")
+
+    XCTAssertTrue(source.contains("@FocusedValue(\\.sessionNavigation)"))
+    XCTAssertFalse(source.contains("@FocusedValue(\\.windowNavigation)"))
+    XCTAssertFalse(source.contains("workspaceNavigation"))
+    XCTAssertFalse(source.contains("WindowNavigationScope"))
+  }
+
+  private func harnessSourceFile(named relativePath: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent("apps/harness-monitor-macos/Sources/HarnessMonitor")
+      .appendingPathComponent(relativePath)
+    return try String(contentsOf: fileURL, encoding: .utf8)
+  }
 }

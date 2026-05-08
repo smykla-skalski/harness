@@ -69,6 +69,28 @@ struct SessionWindowFlowTests {
   }
 
   @MainActor
+  @Test("Session window navigation history is isolated per window cache")
+  func sessionWindowNavigationHistoryIsIsolatedPerWindowCache() {
+    let alpha = SessionWindowStateCache(sessionID: "sess-alpha")
+    let beta = SessionWindowStateCache(sessionID: "sess-beta")
+
+    alpha.selectRoute(.timeline)
+    alpha.selectAgent("agent-alpha")
+    beta.selectRoute(.decisions)
+
+    alpha.navigateBack()
+
+    #expect(alpha.selection == .route(.timeline))
+    #expect(beta.selection == .route(.decisions))
+    #expect(beta.navigationHistory.backStack == [.route(.overview)])
+
+    beta.navigateBack()
+
+    #expect(alpha.selection == .route(.timeline))
+    #expect(beta.selection == .route(.overview))
+  }
+
+  @MainActor
   @Test("Session window cache preserves create drafts and section selections")
   func sessionWindowCachePreservesCreateDraftsAndSectionSelections() throws {
     let state = SessionWindowStateCache(sessionID: "sess-alpha")
