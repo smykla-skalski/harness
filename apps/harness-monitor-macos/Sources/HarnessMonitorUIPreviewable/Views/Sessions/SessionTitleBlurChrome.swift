@@ -89,12 +89,11 @@ public struct SessionTitleBlurChrome: View {
 
   public var body: some View {
     ZStack(alignment: .topLeading) {
-      Rectangle()
-        .fill(backgroundStyle)
       titleTint
     }
     .frame(height: SessionTitleBlurChromeConfiguration.height)
     .frame(maxWidth: .infinity, alignment: .top)
+    .background(backgroundStyle)
     .ignoresSafeArea(.container, edges: .top)
     .allowsHitTesting(false)
     .accessibilityHidden(true)
