@@ -7,9 +7,10 @@ struct SessionAgentTuiViewport: View {
   let metrics: SessionAgentDetailSectionMetrics
   let latestOutput: String
 
-  private var visibleRows: [AgentTuiScreenSnapshot.VisibleRow] {
-    tui?.screen.visibleRows(maxRows: 160) ?? []
-  }
+  @State private var visibleRows: [AgentTuiScreenSnapshot.VisibleRow] = []
+  @State private var lastScrollAt = Date.distantPast
+
+  private static let scrollThrottleInterval: TimeInterval = 1.0 / 60.0
 
   var body: some View {
     ScrollViewReader { proxy in
@@ -39,8 +40,16 @@ struct SessionAgentTuiViewport: View {
       .accessibilityElement(children: .ignore)
       .accessibilityLabel(Text(latestOutput))
       .accessibilityIdentifier(tuiViewportIdentifier)
+      .task(id: agentID) {
+        visibleRows = tui?.screen.visibleRows(maxRows: 160) ?? []
+      }
       .onChange(of: tui?.screen.text ?? "") { _, _ in
-        if let last = visibleRows.last {
+        let nextRows = tui?.screen.visibleRows(maxRows: 160) ?? []
+        visibleRows = nextRows
+        let now = Date.now
+        guard now.timeIntervalSince(lastScrollAt) >= Self.scrollThrottleInterval else { return }
+        lastScrollAt = now
+        if let last = nextRows.last {
           proxy.scrollTo(last.id, anchor: .bottom)
         }
       }
