@@ -21,6 +21,8 @@ struct SessionWindowCreateForm: View {
   @Environment(\.fontScale)
   private var fontScale
   @State private var validationMessage = ""
+  @State private var agentCapabilityOptions: [AgentCapabilityOption] = []
+  @State private var isLoadingAgentCapabilities = false
   @FocusState private var focusedField: SessionWindowCreateFormField?
 
   private var title: Binding<String> {
@@ -37,11 +39,17 @@ struct SessionWindowCreateForm: View {
     )
   }
 
-  private var runtime: Binding<String> {
+  private var launchSelection: Binding<AgentLaunchSelection> {
     Binding(
-      get: { draft.runtime },
-      set: { updateDraft(runtime: $0) }
+      get: { draft.launchSelection },
+      set: { updateDraft(runtime: $0.storageKey) }
     )
+  }
+
+  private var activeAgentCapabilityOptions: [AgentCapabilityOption] {
+    agentCapabilityOptions.isEmpty
+      ? SessionWindowCreateFormCatalogs.fallbackAgentOptions(store: store)
+      : agentCapabilityOptions
   }
 
   private var metrics: SessionWindowCreateFormMetrics {
@@ -55,19 +63,18 @@ struct SessionWindowCreateForm: View {
           .scaledFont(.body)
           .focused($focusedField, equals: .name)
           .accessibilityLabel("\(draft.kind.title) name")
-        if draft.kind == .agent {
-          Picker("Runtime", selection: runtime) {
-            ForEach(AgentTuiRuntime.allCases) { runtime in
-              Text(runtime.title).tag(runtime.rawValue)
-            }
-          }
-          .scaledFont(.body)
-        }
         TextEditor(text: prompt)
           .scaledFont(.body)
           .frame(minHeight: metrics.promptMinHeight)
           .focused($focusedField, equals: .prompt)
           .accessibilityLabel("Prompt")
+      }
+      if draft.kind == .agent {
+        SessionWindowCreateFormCapabilityPicker(
+          options: activeAgentCapabilityOptions,
+          selection: launchSelection,
+          isLoading: isLoadingAgentCapabilities
+        )
       }
       if !validationMessage.isEmpty {
         Section {
@@ -101,6 +108,7 @@ struct SessionWindowCreateForm: View {
       if focusedField == nil {
         focusedField = .name
       }
+      await loadAgentCapabilitiesIfNeeded()
     }
   }
 
@@ -124,7 +132,10 @@ struct SessionWindowCreateForm: View {
 
   @MainActor
   private func submit() async {
-    if let message = SessionWindowCreateFormValidation.message(for: draft) {
+    if let message = SessionWindowCreateFormValidation.message(
+      for: draft,
+      capabilityOptions: activeAgentCapabilityOptions
+    ) {
       validationMessage = message
       return
     }
@@ -148,19 +159,69 @@ struct SessionWindowCreateForm: View {
 
   @MainActor
   private func createAgent(named name: String) async {
-    let runtime = AgentTuiRuntime(rawValue: draft.runtime) ?? .codex
-    let created = await store.startAgentTui(
-      runtime: runtime,
-      name: name,
-      prompt: draft.prompt,
-      rows: 32,
-      cols: 120,
-      sessionID: draft.sessionID
-    )
-    if created {
+    switch SessionWindowCreateFormCatalogs.normalizedLaunchSelection(
+      draft: draft,
+      options: activeAgentCapabilityOptions
+    ) {
+    case .tui(let runtime):
+      guard
+        let created = await store.startAgentTuiSnapshot(
+          runtime: runtime,
+          name: name,
+          prompt: draft.prompt,
+          rows: 32,
+          cols: 120,
+          sessionID: draft.sessionID
+        )
+      else {
+        return
+      }
       state.updateCreateDraft(SessionCreateDraft(kind: .agent, sessionID: draft.sessionID))
-      state.selectRoute(.agents)
+      state.selectAgent(created.agentId)
+    case .acp(let descriptorID):
+      let capabilities = capabilities(for: .acp(descriptorID))
+      guard
+        let created = await store.startAcpAgent(
+          agentID: descriptorID,
+          capabilities: capabilities,
+          name: name,
+          prompt: draft.prompt,
+          sessionID: draft.sessionID
+        )
+      else {
+        return
+      }
+      state.updateCreateDraft(SessionCreateDraft(kind: .agent, sessionID: draft.sessionID))
+      state.selectAgent(created.agentId)
     }
+  }
+
+  @MainActor
+  private func loadAgentCapabilitiesIfNeeded() async {
+    guard draft.kind == .agent else { return }
+    guard agentCapabilityOptions.isEmpty else { return }
+    isLoadingAgentCapabilities = true
+    let options = await SessionWindowCreateFormCatalogs.loadAgentOptions(store: store)
+    agentCapabilityOptions = options
+    isLoadingAgentCapabilities = false
+    let normalized = SessionWindowCreateFormCatalogs.normalizedLaunchSelection(
+      draft: draft,
+      options: options
+    )
+    if normalized.storageKey != draft.launchSelection.storageKey {
+      updateDraft(runtime: normalized.storageKey)
+    }
+  }
+
+  private func capabilities(for selection: AgentLaunchSelection) -> [String] {
+    guard
+      let option = activeAgentCapabilityOptions.first(where: { option in
+        option.transportChoices.contains { $0.id == selection }
+      })
+    else {
+      return []
+    }
+    return option.transportChoice(for: selection).capabilities
   }
 
   @MainActor
