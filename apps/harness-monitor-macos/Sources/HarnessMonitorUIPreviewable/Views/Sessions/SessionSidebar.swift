@@ -97,9 +97,13 @@ struct SessionSidebar: View {
   private var routeSection: some View {
     Section("Routes") {
       ForEach([SessionWindowRoute.overview, .timeline, .terminal]) { route in
-        Label(route.title, systemImage: route.systemImage)
-          .tag(SessionSelection.route(route))
-          .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowRoute(route))
+        let selection = SessionSelection.route(route)
+        SessionSidebarRow(
+          title: route.title,
+          systemImage: route.systemImage
+        )
+        .tag(selection)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowRoute(route))
       }
     }
   }
@@ -113,11 +117,14 @@ struct SessionSidebar: View {
           systemImage: "person.crop.circle",
           severityShape: severityShape(for: agent.status),
           severityTint: severityTint(for: agent.status),
-          showsDragHandle: true,
           isDropTargeted: agentDropTargetID == agent.agentId
-        )
+        ) { metrics in
+          SessionSidebarDragHandle(metrics: metrics)
+            .draggable(
+              SessionAgentDragPayload(sessionID: state.sessionID, agentID: agent.agentId)
+            )
+        }
         .tag(selection)
-        .draggable(SessionAgentDragPayload(sessionID: state.sessionID, agentID: agent.agentId))
         .dropDestination(for: SessionAgentDragPayload.self) { payloads, _ in
           handleAgentDrop(payloads, before: agent.agentId)
         } isTargeted: { isTargeted in
@@ -189,21 +196,23 @@ struct SessionSidebar: View {
   @ViewBuilder private var tasksSection: some View {
     Section {
       ForEach(snapshot?.detail?.tasks ?? []) { task in
+        let selection = SessionSelection.task(sessionID: state.sessionID, taskID: task.taskId)
         SessionSidebarRow(
           title: task.title,
           systemImage: "checklist",
           severityShape: severityShape(for: task.severity),
-          severityTint: severityTint(for: task.severity),
-          showsDragHandle: true
-        )
-        .tag(SessionSelection.task(sessionID: state.sessionID, taskID: task.taskId))
-        .draggable(
-          TaskDragPayload(
-            sessionID: state.sessionID,
-            taskID: task.taskId,
-            queuePolicy: task.queuePolicy
-          )
-        )
+          severityTint: severityTint(for: task.severity)
+        ) { metrics in
+          SessionSidebarDragHandle(metrics: metrics)
+            .draggable(
+              TaskDragPayload(
+                sessionID: state.sessionID,
+                taskID: task.taskId,
+                queuePolicy: task.queuePolicy
+              )
+            )
+        }
+        .tag(selection)
         .contextMenu {
           Menu("Move to...") {
             ForEach(decisions.prefix(10)) { decision in

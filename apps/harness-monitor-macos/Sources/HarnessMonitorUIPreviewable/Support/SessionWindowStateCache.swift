@@ -1,10 +1,6 @@
 import HarnessMonitorKit
 import Observation
 
-#if canImport(AppKit)
-  import AppKit
-#endif
-
 @MainActor
 @Observable
 public final class SessionWindowStateCache {
@@ -21,7 +17,6 @@ public final class SessionWindowStateCache {
   public var lastTaskDecisionLink: SessionTaskDecisionLink?
   public private(set) var selectionSource: SessionSelectionSource = .programmatic
   public private(set) var agentComposerFocusRequestID = 0
-  private var pendingSourceOverride: SessionSelectionSource?
 
   public init(sessionID: String, selection: SessionSelection = .route(.overview)) {
     self.sessionID = sessionID
@@ -56,34 +51,13 @@ public final class SessionWindowStateCache {
 
   public func selectFromSidebar(_ selection: SessionSelection?) {
     let nextSelection = selection ?? .route(.overview)
-    let source = pendingSourceOverride ?? Self.detectSidebarSelectionSource()
-    pendingSourceOverride = nil
-    updateSelection(nextSelection, source: source)
+    updateSelection(nextSelection, source: .sidebar)
   }
 
-  /// Test-only seam: pin the next `selectFromSidebar` source to `.pointer` so
-  /// unit tests can simulate a click without an `NSEvent`. Real UI never calls
-  /// this — the View layer relies on `NSApp.currentEvent` detection inside
-  /// `selectFromSidebar`. Kept named for back-compat with existing tests; the
-  /// `selection` argument is ignored.
+  /// Test seam kept for older selection-source checks. Product sidebar rows use
+  /// native `List` selection and do not install tap gestures to classify input.
   public func markPointerSelectionIntent(for selection: SessionSelection) {
     _ = selection
-    pendingSourceOverride = .pointer
-  }
-
-  private static func detectSidebarSelectionSource() -> SessionSelectionSource {
-    #if canImport(AppKit)
-      if let event = NSApp.currentEvent {
-        switch event.type {
-        case .leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp,
-          .otherMouseDown, .otherMouseUp:
-          return .pointer
-        default:
-          break
-        }
-      }
-    #endif
-    return .keyboard
   }
 
   public func updateCreateDraft(_ draft: SessionCreateDraft) {

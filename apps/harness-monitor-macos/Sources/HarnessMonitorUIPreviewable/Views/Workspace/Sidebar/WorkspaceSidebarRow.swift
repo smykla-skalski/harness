@@ -46,6 +46,7 @@ struct WorkspaceSidebarRow: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+    .contentShape(Rectangle())
     .overlay(alignment: .trailing) {
       WorkspaceSidebarRowBrandOverlay(brandSymbol: brandSymbol)
     }
@@ -196,6 +197,7 @@ struct CodexRunSidebarRow: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+    .contentShape(Rectangle())
     .accessibilityElement(children: .combine)
     .accessibilityLabel("\(title), run, \(snapshot.status.title), updated \(relativeUpdatedAt)")
   }

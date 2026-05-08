@@ -119,6 +119,7 @@ private struct WorkspaceSidebarTaskRow: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.vertical, rowPadding)
+    .contentShape(Rectangle())
     .tag(WorkspaceSelection.task(sessionID: currentSessionID, taskID: task.taskId))
     .harnessMCPRow(
       HarnessMonitorAccessibility.workspaceTaskTab(task.taskId),
