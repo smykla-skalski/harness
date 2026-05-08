@@ -122,6 +122,22 @@ struct SessionSidebar: View {
           agentDropTargetID = isTargeted ? agent.agentId : nil
         }
         .contextMenu {
+          Menu("Move to...") {
+            Button("Top") {
+              state.sidebarOrdering.moveAgent(
+                agent.agentId,
+                before: state.sidebarOrdering.agentIDs.first,
+                undoManager: undoManager
+              )
+            }
+            Button("Bottom") {
+              state.sidebarOrdering.moveAgent(
+                agent.agentId,
+                before: nil,
+                undoManager: undoManager
+              )
+            }
+          }
           Button("Move to Top") {
             state.sidebarOrdering.moveAgent(
               agent.agentId,
@@ -194,6 +210,19 @@ struct SessionSidebar: View {
           )
         )
         .contextMenu {
+          Menu("Move to...") {
+            ForEach(decisions.prefix(10)) { decision in
+              Button(decision.summary) {
+                linkTask(task.taskId, to: decision.id)
+              }
+            }
+            if decisions.isEmpty {
+              Text("No visible decisions")
+            }
+            if decisions.count > 10 {
+              Text("Filter decisions to show more")
+            }
+          }
           Button("Copy Task ID") {
             HarnessMonitorClipboard.copy(task.taskId)
           }

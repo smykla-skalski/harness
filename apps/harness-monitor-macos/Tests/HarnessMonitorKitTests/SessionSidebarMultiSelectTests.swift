@@ -1,6 +1,8 @@
+import Foundation
 import SwiftUI
 import Testing
 
+@testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
 @Suite("Session sidebar multi-select")
@@ -85,5 +87,53 @@ struct SessionSidebarMultiSelectTests {
 
     #expect(state.selectedDecisionIDs == ["d2"])
     #expect(state.decisionSelectionAnchorID == "d2")
+  }
+
+  @MainActor
+  @Test("Task move keyboard alternative records the same decision link as drag drop")
+  func taskMoveKeyboardAlternativeRecordsDecisionLink() {
+    let state = SessionWindowStateCache(sessionID: "session-1")
+    let sidebar = SessionSidebar(
+      store: HarnessMonitorStore(daemonController: PreviewDaemonController(mode: .empty)),
+      snapshot: nil,
+      decisions: [],
+      state: state
+    )
+
+    sidebar.linkTask("task-1", to: "decision-1")
+
+    #expect(
+      state.lastTaskDecisionLink == SessionTaskDecisionLink(
+        sessionID: "session-1",
+        taskID: "task-1",
+        decisionID: "decision-1"
+      )
+    )
+  }
+
+  @Test("Draggable sidebar rows expose Move to context menus")
+  func draggableRowsExposeMoveToContextMenus() throws {
+    let source = try sourceFile(named: "SessionSidebar.swift")
+
+    #expect(source.contains("Menu(\"Move to...\")"))
+    #expect(source.contains("No visible decisions"))
+    #expect(source.contains("Filter decisions to show more"))
+  }
+
+  private func sourceFile(named name: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent(
+        "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Sessions"
+      )
+      .appendingPathComponent(name)
+    return try String(contentsOf: fileURL, encoding: .utf8)
   }
 }
