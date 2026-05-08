@@ -59,6 +59,14 @@ final class WindowMenuCommandsTests: XCTestCase {
     XCTAssertFalse(source.contains("(⌘T)"))
   }
 
+  func testSessionWindowTabbingAccessorHasFallbackWarning() throws {
+    let source = try harnessSourceFile(named: "App/SessionWindowTabbing.swift")
+
+    XCTAssertTrue(source.contains("Session tabbing identifier unavailable"))
+    XCTAssertTrue(source.contains("falling back to standalone windows"))
+    XCTAssertTrue(source.contains("window.tabbingMode = .automatic"))
+  }
+
   private func harnessSourceFile(named relativePath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
