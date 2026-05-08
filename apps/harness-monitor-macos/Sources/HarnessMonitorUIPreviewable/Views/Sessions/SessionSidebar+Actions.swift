@@ -18,12 +18,16 @@ extension SessionSidebar {
     guard let payload = payloads.first, payload.sessionID == state.sessionID else {
       return false
     }
+    linkTask(payload.taskID, to: decisionID)
+    return true
+  }
+
+  func linkTask(_ taskID: String, to decisionID: String) {
     state.lastTaskDecisionLink = SessionTaskDecisionLink(
       sessionID: state.sessionID,
-      taskID: payload.taskID,
+      taskID: taskID,
       decisionID: decisionID
     )
-    return true
   }
 
   func dismissDecisions(_ ids: [String]) {
