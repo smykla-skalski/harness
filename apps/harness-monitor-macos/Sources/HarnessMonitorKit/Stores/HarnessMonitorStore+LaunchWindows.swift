@@ -62,6 +62,10 @@ extension HarnessMonitorStore {
     Set(openSessionWindowsByID.values)
   }
 
+  public func sessionID(forOpenSessionWindowID windowID: ObjectIdentifier) -> String? {
+    openSessionWindowsByID[windowID]
+  }
+
   public func beginSessionWindowTerminationSnapshot() {
     pendingSessionWindowTerminationSnapshot = openSessionWindowIDsSnapshot
   }

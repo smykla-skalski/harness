@@ -36,8 +36,11 @@ extension HarnessMonitorUITestCase {
       """
     )
     guard allowAlreadySelected || !sessionRowIsSelected(sessionRow) else { return }
-    if sessionRow.isHittable {
-      sessionRow.tap()
+    if app.state != .runningForeground {
+      app.activate()
+    }
+    if let coordinate = preferredTapCoordinate(in: app, for: sessionRow) {
+      coordinate.click()
       recordDiagnosticsTrace(
         event: "tap-session.hittable",
         app: app,
@@ -46,9 +49,18 @@ extension HarnessMonitorUITestCase {
       return
     }
     if let coordinate = centerCoordinate(in: app, for: sessionRow) {
-      coordinate.tap()
+      coordinate.click()
       recordDiagnosticsTrace(
         event: "tap-session.coordinate",
+        app: app,
+        details: ["identifier": identifier]
+      )
+      return
+    }
+    if sessionRow.isHittable {
+      sessionRow.click()
+      recordDiagnosticsTrace(
+        event: "tap-session.element-click",
         app: app,
         details: ["identifier": identifier]
       )
@@ -141,38 +153,31 @@ extension HarnessMonitorUITestCase {
   }
 
   func tapButton(in app: XCUIApplication, identifier: String) {
-    let deadline = Date.now.addingTimeInterval(Self.fastActionTimeout)
+    if app.state != .runningForeground {
+      app.activate()
+    }
 
-    while Date.now < deadline {
-      if app.state != .runningForeground {
-        app.activate()
-      }
+    guard waitForButtonReady(in: app, identifier: identifier, timeout: Self.fastActionTimeout) else {
+      XCTFail("Failed to tap button \(identifier)")
+      return
+    }
 
-      let buttonTarget = button(in: app, identifier: identifier)
-      if waitForElement(buttonTarget, timeout: Self.fastPollInterval) {
-        if tapButtonElementReliably(in: app, element: buttonTarget) {
-          return
-        }
-        if clickVisibleFrameMarker(in: app, identifier: identifier) {
-          return
-        }
-      }
+    let buttonTarget = button(in: app, identifier: identifier)
+    if buttonTargetIsReady(in: app, element: buttonTarget, identifier: identifier),
+      tapButtonElementReliably(in: app, element: buttonTarget)
+    {
+      return
+    }
 
-      let genericTarget = element(in: app, identifier: identifier)
-      if waitForElement(genericTarget, timeout: Self.fastPollInterval) {
-        if tapButtonElementReliably(in: app, element: genericTarget) {
-          return
-        }
-        if clickVisibleFrameMarker(in: app, identifier: identifier) {
-          return
-        }
-      }
+    let genericTarget = element(in: app, identifier: identifier)
+    if buttonTargetIsReady(in: app, element: genericTarget, identifier: identifier),
+      tapButtonElementReliably(in: app, element: genericTarget)
+    {
+      return
+    }
 
-      if clickVisibleFrameMarker(in: app, identifier: identifier) {
-        return
-      }
-
-      RunLoop.current.run(until: Date.now.addingTimeInterval(Self.fastPollInterval))
+    if clickVisibleFrameMarker(in: app, identifier: identifier) {
+      return
     }
 
     XCTFail("Failed to tap button \(identifier)")

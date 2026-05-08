@@ -246,6 +246,10 @@ struct HarnessMonitorAppConfiguration {
       overrides.sidebarSessionRowDisplayMode.rawValue,
       forKey: HarnessMonitorSidebarSessionRowDisplayMode.storageKey
     )
+    UserDefaults.standard.set(
+      OpenRecentCloseAfterPickDefaults.defaultValue,
+      forKey: OpenRecentCloseAfterPickDefaults.storageKey
+    )
     applyMenuBarUITestDefaults()
     UserDefaults.standard.set(
       overrides.backdropMode.rawValue,

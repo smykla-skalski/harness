@@ -95,14 +95,17 @@ public struct SessionWindowView: View {
         decisions: matchingDecisions,
         state: stateCache
       )
+      .padding(.top, HarnessMonitorTheme.spacingLG)
       .navigationSplitViewColumnWidth(min: 190, ideal: sidebarWidth, max: 360)
     } content: {
       contentColumn
+        .padding(.top, HarnessMonitorTheme.spacingLG)
         .navigationSplitViewColumnWidth(min: 280, ideal: 360, max: 520)
         .navigationTitle(summary?.displayTitle ?? "Session")
         .navigationSubtitle(token.sessionID)
     } detail: {
       detailColumn
+        .padding(.top, HarnessMonitorTheme.spacingLG)
     }
     .toolbar {
       SessionWindowToolbar(
@@ -143,6 +146,7 @@ public struct SessionWindowView: View {
     .focusedSceneValue(\.sessionInspector, canPresentInspector ? inspectorCommand : nil)
     .focusedSceneValue(\.sessionDecisionCommands, decisionCommand)
     .focusedSceneValue(\.sessionCreateContext, createContext)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowShell)
   }

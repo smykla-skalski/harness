@@ -58,14 +58,29 @@ final class OpenRecentWindowUITests: HarnessMonitorUITestCase {
       waitForButtonReady(
         in: app,
         identifier: sessionRowIdentifier,
-        timeout: Self.uiTimeout
+        timeout: Self.actionTimeout
       )
     )
 
     tapButton(in: app, identifier: sessionRowIdentifier)
 
     let sessionWindow = element(in: app, identifier: Accessibility.sessionWindowShell)
-    XCTAssertTrue(waitForElement(sessionWindow, timeout: Self.uiTimeout))
+    XCTAssertTrue(waitForElement(sessionWindow, timeout: Self.actionTimeout))
+    let openedWindow = mainWindow(in: app)
+    let topGap = sessionWindow.frame.minY - openedWindow.frame.minY
+    XCTAssertLessThanOrEqual(
+      topGap,
+      140,
+      "Session content should anchor near the top of the window instead of floating in the lower half."
+    )
+    let overviewRoute = element(in: app, identifier: Accessibility.sessionWindowRoute("overview"))
+    XCTAssertTrue(waitForElement(overviewRoute, timeout: Self.fastActionTimeout))
+    let overviewTopInset = overviewRoute.frame.minY - openedWindow.frame.minY
+    XCTAssertGreaterThanOrEqual(
+      overviewTopInset,
+      80,
+      "Top session sidebar content should stay clear of the toolbar chrome instead of rendering underneath it."
+    )
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) { !openRecentWindow.exists },
       "Open Recent should dismiss itself once the chosen session window opens."
