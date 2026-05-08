@@ -33,6 +33,35 @@ struct HarnessMonitorStoreActionTests {
     #expect(store.currentSuccessFeedbackMessage == "Create task")
   }
 
+  @Test("Create task can target a session window without global selection")
+  func createTaskCanTargetSessionWindowWithoutGlobalSelection() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+
+    let success = await store.createTask(
+      title: "Window scoped task",
+      context: nil,
+      severity: .medium,
+      sessionID: PreviewFixtures.summary.sessionId,
+      actor: "leader-claude"
+    )
+
+    #expect(success)
+    #expect(
+      client.recordedCalls()
+        == [
+          .createTask(
+            sessionID: PreviewFixtures.summary.sessionId,
+            title: "Window scoped task",
+            context: nil,
+            severity: .medium,
+            actor: "leader-claude"
+          )
+        ]
+    )
+    #expect(store.selectedSession == nil)
+  }
+
   @Test("Assign task sends request and refreshes the selected session")
   func assignTaskSendsRequestAndRefreshesSession() async {
     let client = RecordingHarnessClient()
