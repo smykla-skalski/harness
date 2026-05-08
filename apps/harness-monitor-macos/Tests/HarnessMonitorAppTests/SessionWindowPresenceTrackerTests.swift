@@ -95,6 +95,16 @@ final class SessionWindowPresenceTrackerTests: XCTestCase {
     XCTAssertNil(store.supervisorBindings.pendingDecisionsStatusSync)
   }
 
+  func testLifecycleModifierUsesNativeSwiftUILifecycle() throws {
+    let source = try harnessSourceFile(named: "App/SessionWindowLifecycleModifier.swift")
+
+    XCTAssertTrue(source.contains(".task(id: sessionID)"))
+    XCTAssertTrue(source.contains(".onDisappear"))
+    XCTAssertFalse(source.contains("import AppKit"))
+    XCTAssertFalse(source.contains("NSViewRepresentable"))
+    XCTAssertFalse(source.contains("NSWindow"))
+  }
+
   private func makeTracker(
     store: HarnessMonitorStore,
     notifications: HarnessMonitorUserNotificationController =
@@ -114,5 +124,20 @@ final class SessionWindowPresenceTrackerTests: XCTestCase {
       voiceCapture: PreviewVoiceCaptureService(),
       daemonOwnership: .managed
     )
+  }
+
+  private func harnessSourceFile(named relativePath: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent("apps/harness-monitor-macos/Sources/HarnessMonitor")
+      .appendingPathComponent(relativePath)
+    return try String(contentsOf: fileURL, encoding: .utf8)
   }
 }
