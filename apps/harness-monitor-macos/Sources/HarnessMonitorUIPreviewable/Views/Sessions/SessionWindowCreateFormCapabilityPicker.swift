@@ -4,6 +4,7 @@ struct SessionWindowCreateFormCapabilityPicker: View {
   let options: [AgentCapabilityOption]
   @Binding var selection: AgentLaunchSelection
   let isLoading: Bool
+  let validationMessage: String?
 
   var body: some View {
     Section("Capability") {
@@ -17,5 +18,6 @@ struct SessionWindowCreateFormCapabilityPicker: View {
         AgentCapabilityRow(option: option, selection: $selection)
       }
     }
+    .accessibilityHint(validationMessage ?? "")
   }
 }

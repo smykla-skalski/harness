@@ -1,20 +1,38 @@
 import Foundation
 
+enum SessionWindowCreateFormValidationField: Equatable {
+  case capability
+  case form
+  case name
+}
+
+struct SessionWindowCreateFormValidationResult: Equatable {
+  let message: String
+  let field: SessionWindowCreateFormValidationField
+}
+
 enum SessionWindowCreateFormValidation {
-  static func message(
+  static func result(
     for draft: SessionCreateDraft,
     capabilityOptions: [AgentCapabilityOption] = []
-  ) -> String? {
+  ) -> SessionWindowCreateFormValidationResult? {
     let title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !title.isEmpty else {
-      return "\(draft.kind.title) name is required."
+      return .init(message: "\(draft.kind.title) name is required.", field: .name)
     }
     if draft.kind == .agent,
       let message = capabilityMessage(for: draft, options: capabilityOptions)
     {
-      return message
+      return .init(message: message, field: .capability)
     }
     return nil
+  }
+
+  static func message(
+    for draft: SessionCreateDraft,
+    capabilityOptions: [AgentCapabilityOption] = []
+  ) -> String? {
+    result(for: draft, capabilityOptions: capabilityOptions)?.message
   }
 
   private static func capabilityMessage(
