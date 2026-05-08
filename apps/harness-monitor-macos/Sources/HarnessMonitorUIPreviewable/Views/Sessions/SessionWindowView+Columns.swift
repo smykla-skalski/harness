@@ -54,7 +54,8 @@ extension SessionWindowView {
             isFilteredOut: selectedDecisionHiddenByFilters,
             decisionFilters: stateCache.decisionFilters,
             decisionRuntime: stateCache.decisionRuntime,
-            visible: $inspectorVisible
+            visible: $inspectorVisible,
+            preferredVisible: $inspectorPreferred
           )
           .frame(width: max(220, min(inspectorWidth, 420)))
         }
@@ -62,12 +63,17 @@ extension SessionWindowView {
       .onAppear {
         updateDetailColumnWidth(
           geometry.size.width,
-          binding: $inspectorVisible,
+          visibleBinding: $inspectorVisible,
+          preferredBinding: $inspectorPreferred,
           announce: false
         )
       }
       .onChange(of: geometry.size.width) { _, newWidth in
-        updateDetailColumnWidth(newWidth, binding: $inspectorVisible)
+        updateDetailColumnWidth(
+          newWidth,
+          visibleBinding: $inspectorVisible,
+          preferredBinding: $inspectorPreferred
+        )
       }
     }
   }

@@ -25,6 +25,18 @@ public struct SessionDecisionHistoryRow: Identifiable, Hashable, Sendable {
   public let value: String
 }
 
+public enum SessionInspectorVisibilityPolicy {
+  public static let collapseThreshold: CGFloat = 1100
+
+  public static func allowsInspector(width: CGFloat) -> Bool {
+    width >= collapseThreshold
+  }
+
+  public static func resolvedVisible(preferredVisible: Bool, canPresent: Bool) -> Bool {
+    preferredVisible && canPresent
+  }
+}
+
 @MainActor
 @Observable
 public final class SessionDecisionRuntime {
@@ -86,7 +98,7 @@ public final class SessionDecisionRuntime {
   }
 
   public func allowsInspector(width: CGFloat) -> Bool {
-    width >= 1100
+    SessionInspectorVisibilityPolicy.allowsInspector(width: width)
   }
 
   private func contextCacheKey(for decision: Decision) -> String {

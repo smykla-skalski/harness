@@ -259,6 +259,46 @@ struct SessionWindowFlowTests {
     )
   }
 
+  @Test("Session inspector auto-collapse preserves preferred visibility")
+  func sessionInspectorAutoCollapsePreservesPreferredVisibility() {
+    #expect(!SessionInspectorVisibilityPolicy.allowsInspector(width: 1099))
+    #expect(SessionInspectorVisibilityPolicy.allowsInspector(width: 1100))
+    #expect(
+      !SessionInspectorVisibilityPolicy.resolvedVisible(
+        preferredVisible: true,
+        canPresent: false
+      )
+    )
+    #expect(
+      SessionInspectorVisibilityPolicy.resolvedVisible(
+        preferredVisible: true,
+        canPresent: true
+      )
+    )
+    #expect(
+      !SessionInspectorVisibilityPolicy.resolvedVisible(
+        preferredVisible: false,
+        canPresent: true
+      )
+    )
+  }
+
+  @Test("Session window stores inspector preference separately from actual visibility")
+  func sessionWindowStoresInspectorPreferenceSeparatelyFromActualVisibility() throws {
+    let viewSource = try previewableSourceFile(named: "Views/Sessions/SessionWindowView.swift")
+    let inspectorPolicySource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+Inspector.swift"
+    )
+    let columnsSource = try previewableSourceFile(named: "Views/Sessions/SessionWindowView+Columns.swift")
+    let inspectorSource = try previewableSourceFile(named: "Views/Sessions/SessionWindowInspector.swift")
+
+    #expect(viewSource.contains("@SceneStorage(\"session.inspector.visible\")"))
+    #expect(viewSource.contains("@SceneStorage(\"session.inspector.preferred\")"))
+    #expect(inspectorPolicySource.contains("preferredVisible: preferredBinding.wrappedValue"))
+    #expect(columnsSource.contains("preferredVisible: $inspectorPreferred"))
+    #expect(inspectorSource.contains("@Binding var preferredVisible"))
+  }
+
   @MainActor
   @Test("Session decision bulk actions register undo reopen requests")
   func sessionDecisionBulkActionsRegisterUndoReopenRequests() {
