@@ -52,6 +52,13 @@ final class WindowMenuCommandsTests: XCTestCase {
     XCTAssertFalse(source.contains("WindowNavigationScope"))
   }
 
+  func testTaskLaneHelpDoesNotAdvertiseCommandT() throws {
+    let source = try uiPreviewableSourceFile(named: "Views/Sessions/SessionTaskLaneViews.swift")
+
+    XCTAssertTrue(source.contains("⌥⌘T"))
+    XCTAssertFalse(source.contains("(⌘T)"))
+  }
+
   private func harnessSourceFile(named relativePath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
@@ -63,6 +70,21 @@ final class WindowMenuCommandsTests: XCTestCase {
     let fileURL =
       repoRoot
       .appendingPathComponent("apps/harness-monitor-macos/Sources/HarnessMonitor")
+      .appendingPathComponent(relativePath)
+    return try String(contentsOf: fileURL, encoding: .utf8)
+  }
+
+  private func uiPreviewableSourceFile(named relativePath: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent("apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable")
       .appendingPathComponent(relativePath)
     return try String(contentsOf: fileURL, encoding: .utf8)
   }

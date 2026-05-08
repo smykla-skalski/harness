@@ -37,7 +37,7 @@ struct SessionTaskListSection: View {
 
   private var newTaskHelp: String {
     if unavailableActionHelp.isEmpty {
-      "Create a new task in this session (⌘T)"
+      "Create a new task in this session (⌥⌘T)"
     } else {
       unavailableActionHelp
     }
