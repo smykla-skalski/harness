@@ -44,6 +44,7 @@ struct WorkspaceSidebarExternalAgentRow: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+    .contentShape(Rectangle())
     .overlay(alignment: .topTrailing) {
       if agent.isAutoSpawned {
         AutoSpawnedBadgeView(agentID: agent.agentId)

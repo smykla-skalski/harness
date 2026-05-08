@@ -82,26 +82,26 @@ struct SessionWindowFlowTests {
   }
 
   @MainActor
-  @Test("Session sidebar keyboard selection requests agent composer focus only for agents")
-  func sessionSidebarKeyboardSelectionRequestsAgentComposerFocusOnlyForAgents() {
+  @Test("Session sidebar selection uses native rows without composer focus")
+  func sessionSidebarSelectionUsesNativeRowsWithoutComposerFocus() {
     let state = SessionWindowStateCache(sessionID: "sess-alpha")
 
     state.selectFromSidebar(.route(.timeline))
-    #expect(state.selectionSource == .keyboard)
+    #expect(state.selectionSource == .sidebar)
     #expect(state.agentComposerFocusRequestID == 0)
 
     state.selectFromSidebar(.agent(sessionID: "sess-alpha", agentID: "agent-a"))
     #expect(state.selection == .agent(sessionID: "sess-alpha", agentID: "agent-a"))
-    #expect(state.selectionSource == .keyboard)
-    #expect(state.agentComposerFocusRequestID == 1)
+    #expect(state.selectionSource == .sidebar)
+    #expect(state.agentComposerFocusRequestID == 0)
 
     state.selectFromSidebar(.task(sessionID: "sess-alpha", taskID: "task-a"))
-    #expect(state.agentComposerFocusRequestID == 1)
+    #expect(state.agentComposerFocusRequestID == 0)
   }
 
   @MainActor
-  @Test("Session sidebar pointer selection suppresses agent composer focus")
-  func sessionSidebarPointerSelectionSuppressesAgentComposerFocus() {
+  @Test("Session sidebar legacy pointer seam preserves native selection behavior")
+  func sessionSidebarLegacyPointerSeamPreservesNativeSelectionBehavior() {
     let state = SessionWindowStateCache(sessionID: "sess-alpha")
     let pointerSelection = SessionSelection.agent(sessionID: "sess-alpha", agentID: "agent-a")
 
@@ -109,12 +109,32 @@ struct SessionWindowFlowTests {
     state.selectFromSidebar(pointerSelection)
 
     #expect(state.selection == pointerSelection)
-    #expect(state.selectionSource == .pointer)
+    #expect(state.selectionSource == .sidebar)
     #expect(state.agentComposerFocusRequestID == 0)
 
     state.selectAgent("agent-b")
     #expect(state.selection == .agent(sessionID: "sess-alpha", agentID: "agent-b"))
     #expect(state.selectionSource == .programmatic)
+    #expect(state.agentComposerFocusRequestID == 0)
+  }
+
+  @MainActor
+  @Test("Session sidebar legacy pointer intent does not alter native List selection")
+  func sessionSidebarLegacyPointerIntentDoesNotAlterNativeListSelection() {
+    let state = SessionWindowStateCache(sessionID: "sess-alpha")
+    let pointerSelection = SessionSelection.agent(sessionID: "sess-alpha", agentID: "agent-a")
+
+    state.markPointerSelectionIntent(for: pointerSelection)
+    state.selectFromSidebar(.task(sessionID: "sess-alpha", taskID: "task-a"))
+
+    #expect(state.selection == .task(sessionID: "sess-alpha", taskID: "task-a"))
+    #expect(state.selectionSource == .sidebar)
+    #expect(state.agentComposerFocusRequestID == 0)
+
+    state.selectFromSidebar(pointerSelection)
+
+    #expect(state.selection == pointerSelection)
+    #expect(state.selectionSource == .sidebar)
     #expect(state.agentComposerFocusRequestID == 0)
   }
 

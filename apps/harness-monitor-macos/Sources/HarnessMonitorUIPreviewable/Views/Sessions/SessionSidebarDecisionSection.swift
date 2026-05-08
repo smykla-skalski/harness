@@ -7,6 +7,10 @@ extension SessionSidebar {
       decisionFilterRow
       undoToastRow
       ForEach(decisions) { decision in
+        let selection = SessionSelection.decision(
+          sessionID: state.sessionID,
+          decisionID: decision.id
+        )
         let severity = DecisionSeverity(rawValue: decision.severityRaw)
         SessionSidebarRow(
           title: decision.summary,
@@ -20,7 +24,7 @@ extension SessionSidebar {
             state.sidebarSelection.toggleDecision(decision.id)
           }
         )
-        .tag(SessionSelection.decision(sessionID: state.sessionID, decisionID: decision.id))
+        .tag(selection)
         .dropDestination(for: TaskDragPayload.self) { payloads, _ in
           handleTaskDecisionDrop(payloads, decisionID: decision.id)
         } isTargeted: { isTargeted in

@@ -1,19 +1,43 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct SessionSidebarRow: View {
+struct SessionSidebarRow<DragHandle: View>: View {
   let title: String
   let systemImage: String
-  let severityShape: SessionSidebarSeverityShape
-  let severityTint: Color
+  var severityShape: SessionSidebarSeverityShape = .none
+  var severityTint: Color = .gray
   var showsDragHandle = false
   var isDropTargeted = false
   var isMultiSelect = false
   var isSelected = false
   var toggleSelection: (() -> Void)?
+  let dragHandle: (SessionSidebarRowMetrics) -> DragHandle
   @Environment(\.fontScale)
   private var fontScale
   @State private var isHoveringDragHandle = false
+
+  init(
+    title: String,
+    systemImage: String,
+    severityShape: SessionSidebarSeverityShape = .none,
+    severityTint: Color = .gray,
+    isDropTargeted: Bool = false,
+    isMultiSelect: Bool = false,
+    isSelected: Bool = false,
+    toggleSelection: (() -> Void)? = nil,
+    @ViewBuilder dragHandle: @escaping (SessionSidebarRowMetrics) -> DragHandle
+  ) {
+    self.title = title
+    self.systemImage = systemImage
+    self.severityShape = severityShape
+    self.severityTint = severityTint
+    showsDragHandle = true
+    self.isDropTargeted = isDropTargeted
+    self.isMultiSelect = isMultiSelect
+    self.isSelected = isSelected
+    self.toggleSelection = toggleSelection
+    self.dragHandle = dragHandle
+  }
 
   private var metrics: SessionSidebarRowMetrics {
     SessionSidebarRowMetrics(fontScale: fontScale)
@@ -22,16 +46,7 @@ struct SessionSidebarRow: View {
   var body: some View {
     HStack(spacing: metrics.spacing) {
       if showsDragHandle {
-        Image(systemName: "ellipsis")
-          .scaledFont(.caption)
-          .rotationEffect(.degrees(90))
-          .foregroundStyle(.tertiary)
-          .frame(
-            width: metrics.dragHandleColumnWidth,
-            height: metrics.dragHandleHitTarget
-          )
-          .opacity(isHoveringDragHandle ? 1 : 0)
-          .accessibilityHidden(true)
+        dragHandleColumn
       }
 
       if isMultiSelect {
@@ -79,12 +94,19 @@ struct SessionSidebarRow: View {
           .strokeBorder(.tint, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
       }
     }
+    .contentShape(Rectangle())
     .accessibilityElement(children: .combine)
     .accessibilityLabel(title)
     .onHover { isHovering in
       guard showsDragHandle else { return }
       isHoveringDragHandle = isHovering
     }
+  }
+
+  @ViewBuilder private var dragHandleColumn: some View {
+    dragHandle(metrics)
+      .opacity(isHoveringDragHandle ? 1 : 0)
+      .accessibilityHidden(true)
   }
 
   @ViewBuilder private var severityIndicator: some View {
@@ -129,6 +151,45 @@ struct SessionSidebarRowMetrics: Equatable {
     severityIndicatorOffset = max(4, 4 * min(scale, 1.35))
     severityAlertFontSize = max(6, 6 * min(scale, 1.5))
     dropCornerRadius = max(5, 5 * min(scale, 1.25))
+  }
+}
+
+extension SessionSidebarRow where DragHandle == EmptyView {
+  init(
+    title: String,
+    systemImage: String,
+    severityShape: SessionSidebarSeverityShape = .none,
+    severityTint: Color = .gray,
+    isDropTargeted: Bool = false,
+    isMultiSelect: Bool = false,
+    isSelected: Bool = false,
+    toggleSelection: (() -> Void)? = nil
+  ) {
+    self.title = title
+    self.systemImage = systemImage
+    self.severityShape = severityShape
+    self.severityTint = severityTint
+    showsDragHandle = false
+    self.isDropTargeted = isDropTargeted
+    self.isMultiSelect = isMultiSelect
+    self.isSelected = isSelected
+    self.toggleSelection = toggleSelection
+    dragHandle = { _ in EmptyView() }
+  }
+}
+
+struct SessionSidebarDragHandle: View {
+  let metrics: SessionSidebarRowMetrics
+
+  var body: some View {
+    Image(systemName: "ellipsis")
+      .scaledFont(.caption)
+      .rotationEffect(.degrees(90))
+      .foregroundStyle(.tertiary)
+      .frame(
+        width: metrics.dragHandleColumnWidth,
+        height: metrics.dragHandleHitTarget
+      )
   }
 }
 

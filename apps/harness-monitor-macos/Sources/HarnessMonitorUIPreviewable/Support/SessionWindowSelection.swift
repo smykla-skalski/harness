@@ -83,6 +83,7 @@ public enum SessionSelection: Hashable, Sendable {
 
 public enum SessionSelectionSource: Hashable, Sendable {
   case programmatic
+  case sidebar
   case keyboard
   case pointer
 }

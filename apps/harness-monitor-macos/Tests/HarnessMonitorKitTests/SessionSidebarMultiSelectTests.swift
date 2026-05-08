@@ -102,13 +102,13 @@ struct SessionSidebarMultiSelectTests {
 
     sidebar.linkTask("task-1", to: "decision-1")
 
-    #expect(
-      state.lastTaskDecisionLink == SessionTaskDecisionLink(
-        sessionID: "session-1",
-        taskID: "task-1",
-        decisionID: "decision-1"
-      )
+    let expectedLink = SessionTaskDecisionLink(
+      sessionID: "session-1",
+      taskID: "task-1",
+      decisionID: "decision-1"
     )
+
+    #expect(state.lastTaskDecisionLink == expectedLink)
   }
 
   @Test("Draggable sidebar rows expose Move to context menus")
@@ -125,11 +125,35 @@ struct SessionSidebarMultiSelectTests {
     let source = try sourceFile(named: "SessionSidebarRow.swift")
 
     #expect(source.contains("showsDragHandle"))
+    #expect(source.contains("SessionSidebarDragHandle"))
     #expect(source.contains("isHoveringDragHandle"))
     #expect(source.contains("Image(systemName: \"ellipsis\")"))
     #expect(source.contains(".onHover"))
     #expect(source.contains("dragHandleColumnWidth"))
     #expect(source.contains("dragHandleHitTarget"))
+  }
+
+  @Test("Sidebar rows rely on native List selection instead of tap gestures")
+  func sidebarRowsRelyOnNativeListSelection() throws {
+    let source = try sourceFile(named: "SessionSidebar.swift")
+
+    #expect(!source.contains("pointerSelectionGesture"))
+    #expect(!source.contains(".simultaneousGesture("))
+  }
+
+  @Test("Draggable sidebar rows keep drag gestures on the handle")
+  func draggableRowsKeepDragGesturesOnHandle() throws {
+    let sidebarSource = try sourceFile(named: "SessionSidebar.swift")
+    let rowSource = try sourceFile(named: "SessionSidebarRow.swift")
+
+    #expect(sidebarSource.contains("SessionSidebarDragHandle(metrics: metrics)"))
+    #expect(!rowSource.contains("AnyView"))
+    #expect(rowSource.contains(".contentShape(Rectangle())"))
+    #expect(
+      !sidebarSource.contains(
+        ".simultaneousGesture(pointerSelectionGesture(for: selection))\n        .draggable("
+      )
+    )
   }
 
   private func sourceFile(named name: String) throws -> String {
