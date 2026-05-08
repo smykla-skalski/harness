@@ -12,6 +12,62 @@ final class SessionWindowVoiceOverTests: HarnessMonitorUITestCase {
   private static let previewSessionID = "sess1234"
   private static let decisionSummary = "Seeded session-window decision"
 
+  func testFocusModeKeepsRouteContentVisible() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: [
+        Self.previewScenarioKey: Self.dashboardLandingScenario,
+        Self.uiTestsKey: "1",
+        Self.mainWindowWidthKey: "1800",
+        Self.decisionSeedEnvKey: makeSeededDecisionsPayload(),
+      ]
+    )
+
+    let openRecentWindow = element(in: app, identifier: Accessibility.openRecentRoot)
+    XCTAssertTrue(waitForElement(openRecentWindow, timeout: Self.uiTimeout))
+
+    let sessionRowIdentifier = Accessibility.openRecentSessionRow(Self.previewSessionID)
+    XCTAssertTrue(
+      waitForButtonReady(
+        in: app,
+        identifier: sessionRowIdentifier,
+        timeout: Self.uiTimeout
+      )
+    )
+    tapButton(in: app, identifier: sessionRowIdentifier)
+
+    let sessionWindow = element(in: app, identifier: Accessibility.sessionWindowShell)
+    XCTAssertTrue(waitForElement(sessionWindow, timeout: Self.uiTimeout))
+
+    let sidebar = element(in: app, identifier: Accessibility.sessionWindowSidebar)
+    XCTAssertTrue(waitForElement(sidebar, timeout: Self.actionTimeout))
+
+    let overviewRoute = element(
+      in: app,
+      identifier: Accessibility.sessionWindowRoute("overview")
+    )
+    XCTAssertTrue(waitForElement(overviewRoute, timeout: Self.actionTimeout))
+    XCTAssertTrue(tapElementReliably(in: app, element: overviewRoute))
+
+    let focusModeToggle = app.checkBoxes["Focus Mode"].firstMatch
+    XCTAssertTrue(waitForElement(focusModeToggle, timeout: Self.actionTimeout))
+    XCTAssertTrue(tapElementReliably(in: app, element: focusModeToggle))
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) { !sidebar.exists },
+      "Focus mode should replace the split-shell chrome with a single focused surface."
+    )
+
+    let openTasksMetric = staticText(in: app, containing: "Open tasks")
+    XCTAssertTrue(
+      waitForElement(openTasksMetric, timeout: Self.actionTimeout),
+      "Focus mode should keep overview content visible instead of showing the empty placeholder."
+    )
+    XCTAssertFalse(
+      app.staticTexts["Select an Item"].firstMatch.exists,
+      "Focus mode should preserve route content instead of showing the generic empty-state prompt."
+    )
+  }
+
   func testSessionWindowKeepsInspectorAndFilteredSelectionAccessible() throws {
     let app = launch(
       mode: "preview",
@@ -107,6 +163,70 @@ final class SessionWindowVoiceOverTests: HarnessMonitorUITestCase {
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) { !inspector.exists },
       "Close inspector should hide the custom side pane."
+    )
+  }
+
+  func testSessionWindowContentDetailDividerSupportsResizing() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: [
+        Self.previewScenarioKey: Self.dashboardLandingScenario,
+        Self.uiTestsKey: "1",
+        Self.mainWindowWidthKey: "1800",
+        Self.decisionSeedEnvKey: makeSeededDecisionsPayload(),
+      ]
+    )
+
+    let openRecentWindow = element(in: app, identifier: Accessibility.openRecentRoot)
+    XCTAssertTrue(waitForElement(openRecentWindow, timeout: Self.uiTimeout))
+
+    let sessionRowIdentifier = Accessibility.openRecentSessionRow(Self.previewSessionID)
+    XCTAssertTrue(
+      waitForButtonReady(
+        in: app,
+        identifier: sessionRowIdentifier,
+        timeout: Self.uiTimeout
+      )
+    )
+    tapButton(in: app, identifier: sessionRowIdentifier)
+
+    let sessionWindow = element(in: app, identifier: Accessibility.sessionWindowShell)
+    XCTAssertTrue(waitForElement(sessionWindow, timeout: Self.uiTimeout))
+
+    let timelineRoute = element(
+      in: app,
+      identifier: Accessibility.sessionWindowRoute("timeline")
+    )
+    XCTAssertTrue(waitForElement(timelineRoute, timeout: Self.actionTimeout))
+    XCTAssertTrue(tapElementReliably(in: app, element: timelineRoute))
+
+    let dividerFrame = element(
+      in: app,
+      identifier: "\(Accessibility.sessionWindowContentDetailDivider).frame"
+    )
+    XCTAssertTrue(
+      waitForElement(dividerFrame, timeout: Self.actionTimeout),
+      "The content-detail divider should expose a visible frame marker for pointer interaction."
+    )
+    let initialMidX = dividerFrame.frame.midX
+
+    guard let start = centerCoordinate(in: app, for: dividerFrame) else {
+      XCTFail("Unable to resolve the content-detail divider coordinate")
+      return
+    }
+    let end = start.withOffset(CGVector(dx: -120, dy: 0))
+    start.press(forDuration: 0.01, thenDragTo: end)
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        abs(dividerFrame.frame.midX - initialMidX) > 40
+      },
+      "Dragging the divider should move the split boundary by a noticeable amount."
+    )
+    XCTAssertLessThan(
+      dividerFrame.frame.midX,
+      initialMidX - 40,
+      "Dragging left should move the split divider leftward and widen the detail pane."
     )
   }
 
