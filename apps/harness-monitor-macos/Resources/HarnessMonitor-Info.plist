@@ -58,6 +58,18 @@
 			<key>UTTypeTagSpecification</key>
 			<dict/>
 		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>io.harnessmonitor.session-agent</string>
+			<key>UTTypeDescription</key>
+			<string>Harness Monitor Session Agent</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict/>
+		</dict>
 	</array>
 </dict>
 </plist>
