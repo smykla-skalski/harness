@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
@@ -99,6 +100,15 @@ struct SessionDecisionRuntimeTests {
     #expect(firstKey != secondKey)
   }
 
+  @Test("Filter runtime emits apply signpost for the performance budget")
+  func filterRuntimeEmitsApplySignpostForPerformanceBudget() throws {
+    let source = try sourceFile(named: "SessionDecisionRuntime.swift")
+
+    #expect(source.contains("OSSignposter"))
+    #expect(source.contains("perf/session-decision-filter"))
+    #expect(source.contains("session_decision_filter.apply"))
+  }
+
   private func makeDecision(
     id: String = "d1",
     severity: DecisionSeverity = .needsUser,
@@ -118,5 +128,22 @@ struct SessionDecisionRuntimeTests {
       contextJSON: contextJSON,
       suggestedActionsJSON: "[]"
     )
+  }
+
+  private func sourceFile(named relativePath: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent(
+        "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Sessions"
+      )
+      .appendingPathComponent(relativePath)
+    return try String(contentsOf: fileURL, encoding: .utf8)
   }
 }
