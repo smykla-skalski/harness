@@ -17,6 +17,8 @@ HARNESS_MONITOR_RUNTIME_LANE=agent-<uuid> rtk mise run monitor:mcp
 
 `monitor:test` auto-passes `-workspace HarnessMonitor.xcworkspace`, which resolves cross-project SPM dependencies (e.g. `HarnessMonitorRegistry` in `mcp-servers/`). `monitor:xcodebuild` does not add `-workspace` - pass it yourself when using that task. If a Swift error persists after fixing a source file, a stale `.dia` from the prior failed build is the cause; delete it and rebuild: `xcode-derived-lanes/<lane>/Build/Intermediates.noindex/HarnessMonitor.build/Debug/<Target>.build/Objects-normal/arm64/<File>.dia`.
 
+The Run scheme is lane-agnostic by contract (see `AGENTS.md` "Daemon discovery and IDE Run"). Agents must keep passing `HARNESS_MONITOR_RUNTIME_LANE` on the `xcodebuild` command line — the env reaches the test/run process and overrides the cross-lane discovery resolver. Never re-enable `Scripts/post-generate.sh::patch_run_scheme_runtime_env` (gated on `HARNESS_MONITOR_PATCH_RUN_SCHEME=1`); patching the user's scheme on every regen hijacks their IDE Run.
+
 ## Task Closeout
 
 Finished monitor tasks follow the repo-root rule: replay onto `main` with clean, flat history, never through merge commits. Resolve conflicts by triaging current `main` behavior against the monitor change intent, keep unrelated edits out, and rerun the smallest relevant monitor validation before handoff.
