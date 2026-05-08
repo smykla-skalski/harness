@@ -93,6 +93,10 @@ public struct OpenRecentView: View {
     Task { @MainActor in
       await Task.yield()
       guard shouldCloseAfterPick else {
+        // SwiftUI may bring the session-bound sibling forward and hide the
+        // nil-token welcome; explicitly re-open the welcome instance so it
+        // stays visible alongside the new session window.
+        openWindow(id: HarnessMonitorWindowID.main)
         return
       }
       await dismissCurrentWindow()
