@@ -1,6 +1,19 @@
 import HarnessMonitorKit
 import SwiftUI
 
+struct SessionWindowInspectorMetrics: Equatable {
+  let spacing: CGFloat
+  let padding: CGFloat
+  let closeButtonMinSize: CGFloat
+
+  init(fontScale: CGFloat) {
+    let scale = min(max(fontScale, 0.85), 1.8)
+    spacing = 12 * min(scale, 1.35)
+    padding = 16 * min(scale, 1.3)
+    closeButtonMinSize = scale >= 1.45 ? 44 : 0
+  }
+}
+
 struct SessionWindowInspector: View {
   let decision: Decision
   let isFilteredOut: Bool
@@ -10,9 +23,15 @@ struct SessionWindowInspector: View {
   @FocusState private var closeButtonFocused: Bool
   @Environment(\.accessibilityVoiceOverEnabled)
   private var voiceOverEnabled
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var metrics: SessionWindowInspectorMetrics {
+    SessionWindowInspectorMetrics(fontScale: fontScale)
+  }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: metrics.spacing) {
       header
       if isFilteredOut {
         SessionFilteredDecisionNotice(filters: decisionFilters)
@@ -20,7 +39,8 @@ struct SessionWindowInspector: View {
       content
       Spacer(minLength: 0)
     }
-    .padding(16)
+    .padding(metrics.padding)
+    .dynamicTypeSize(.xSmall ... .accessibility5)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .background(.background)
     .accessibilityElement(children: .contain)
@@ -42,16 +62,17 @@ struct SessionWindowInspector: View {
   private var header: some View {
     HStack {
       Text("Inspector")
-        .font(.headline)
+        .scaledFont(.headline)
       Spacer()
       Button {
         hideInspector()
       } label: {
         Image(systemName: "xmark.circle.fill")
-          .font(.title3)
+          .scaledFont(.title3)
           .foregroundStyle(.secondary)
       }
       .harnessPlainButtonStyle()
+      .frame(minWidth: metrics.closeButtonMinSize, minHeight: metrics.closeButtonMinSize)
       .focused($closeButtonFocused)
       .keyboardShortcut(.cancelAction)
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowInspectorCloseButton)
