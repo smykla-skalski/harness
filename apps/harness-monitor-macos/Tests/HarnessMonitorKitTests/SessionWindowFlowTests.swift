@@ -82,6 +82,43 @@ struct SessionWindowFlowTests {
   }
 
   @MainActor
+  @Test("Session sidebar keyboard selection requests agent composer focus only for agents")
+  func sessionSidebarKeyboardSelectionRequestsAgentComposerFocusOnlyForAgents() {
+    let state = SessionWindowStateCache(sessionID: "sess-alpha")
+
+    state.selectFromSidebar(.route(.timeline))
+    #expect(state.selectionSource == .keyboard)
+    #expect(state.agentComposerFocusRequestID == 0)
+
+    state.selectFromSidebar(.agent(sessionID: "sess-alpha", agentID: "agent-a"))
+    #expect(state.selection == .agent(sessionID: "sess-alpha", agentID: "agent-a"))
+    #expect(state.selectionSource == .keyboard)
+    #expect(state.agentComposerFocusRequestID == 1)
+
+    state.selectFromSidebar(.task(sessionID: "sess-alpha", taskID: "task-a"))
+    #expect(state.agentComposerFocusRequestID == 1)
+  }
+
+  @MainActor
+  @Test("Session sidebar pointer selection suppresses agent composer focus")
+  func sessionSidebarPointerSelectionSuppressesAgentComposerFocus() {
+    let state = SessionWindowStateCache(sessionID: "sess-alpha")
+    let pointerSelection = SessionSelection.agent(sessionID: "sess-alpha", agentID: "agent-a")
+
+    state.markPointerSelectionIntent(for: pointerSelection)
+    state.selectFromSidebar(pointerSelection)
+
+    #expect(state.selection == pointerSelection)
+    #expect(state.selectionSource == .pointer)
+    #expect(state.agentComposerFocusRequestID == 0)
+
+    state.selectAgent("agent-b")
+    #expect(state.selection == .agent(sessionID: "sess-alpha", agentID: "agent-b"))
+    #expect(state.selectionSource == .programmatic)
+    #expect(state.agentComposerFocusRequestID == 0)
+  }
+
+  @MainActor
   @Test("Session window navigation history is isolated per window cache")
   func sessionWindowNavigationHistoryIsIsolatedPerWindowCache() {
     let alpha = SessionWindowStateCache(sessionID: "sess-alpha")

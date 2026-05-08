@@ -80,7 +80,8 @@ extension SessionWindowView {
           store: store,
           sessionID: token.sessionID,
           agent: agent,
-          tui: agentTui(for: agent)
+          tui: agentTui(for: agent),
+          composerFocusRequestID: stateCache.agentComposerFocusRequestID
         )
       } else {
         ContentUnavailableView(

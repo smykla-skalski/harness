@@ -70,6 +70,12 @@ public enum SessionSelection: Hashable, Sendable {
   }
 }
 
+public enum SessionSelectionSource: Hashable, Sendable {
+  case programmatic
+  case keyboard
+  case pointer
+}
+
 public enum SessionSelectedDecisionVisibility: Equatable, Sendable {
   case none
   case visible
@@ -91,6 +97,9 @@ public final class SessionWindowStateCache {
   public var navigationHistory = SessionWindowNavigationHistory()
   public var attention = SessionAttentionState()
   public var lastTaskDecisionLink: SessionTaskDecisionLink?
+  public private(set) var selectionSource: SessionSelectionSource = .programmatic
+  public private(set) var agentComposerFocusRequestID = 0
+  private var pendingSelectionSource: (selection: SessionSelection, source: SessionSelectionSource)?
 
   public init(sessionID: String, selection: SessionSelection = .route(.overview)) {
     self.sessionID = sessionID
@@ -98,29 +107,45 @@ public final class SessionWindowStateCache {
   }
 
   public func selectRoute(_ route: SessionWindowRoute) {
-    updateSelection(.route(route))
+    updateSelection(.route(route), source: .programmatic)
   }
 
   public func selectAgent(_ agentID: String) {
-    updateSelection(.agent(sessionID: sessionID, agentID: agentID))
+    updateSelection(.agent(sessionID: sessionID, agentID: agentID), source: .programmatic)
   }
 
   public func selectDecision(_ decisionID: String) {
-    updateSelection(.decision(sessionID: sessionID, decisionID: decisionID))
+    updateSelection(.decision(sessionID: sessionID, decisionID: decisionID), source: .programmatic)
   }
 
   public func selectTask(_ taskID: String) {
-    updateSelection(.task(sessionID: sessionID, taskID: taskID))
+    updateSelection(.task(sessionID: sessionID, taskID: taskID), source: .programmatic)
   }
 
   public func selectCreate(_ kind: SessionCreateKind) {
     let existing = sectionState.createDrafts[kind]
     let draft = existing ?? SessionCreateDraft(kind: kind, sessionID: sessionID)
-    updateSelection(.create(draft))
+    updateSelection(.create(draft), source: .programmatic)
   }
 
   public func select(_ selection: SessionSelection) {
-    updateSelection(selection)
+    updateSelection(selection, source: .programmatic)
+  }
+
+  public func selectFromSidebar(_ selection: SessionSelection?) {
+    let nextSelection = selection ?? .route(.overview)
+    let source: SessionSelectionSource
+    if pendingSelectionSource?.selection == nextSelection {
+      source = pendingSelectionSource?.source ?? .keyboard
+    } else {
+      source = .keyboard
+    }
+    pendingSelectionSource = nil
+    updateSelection(nextSelection, source: source)
+  }
+
+  public func markPointerSelectionIntent(for selection: SessionSelection) {
+    pendingSelectionSource = (selection, .pointer)
   }
 
   public func updateCreateDraft(_ draft: SessionCreateDraft) {
@@ -133,6 +158,7 @@ public final class SessionWindowStateCache {
     sectionState.createDrafts[kind] = nil
     updateSelection(
       .route(kind.route),
+      source: .programmatic,
       rememberCurrentSelection: false,
       recordHistory: false
     )
@@ -173,17 +199,23 @@ public final class SessionWindowStateCache {
 
   private func updateSelection(
     _ nextSelection: SessionSelection,
+    source: SessionSelectionSource,
     rememberCurrentSelection: Bool = true,
     recordHistory: Bool = true
   ) {
-    guard selection != nextSelection else { return }
-    if rememberCurrentSelection {
-      sectionState.remember(selection)
+    if selection != nextSelection {
+      if rememberCurrentSelection {
+        sectionState.remember(selection)
+      }
+      if recordHistory {
+        navigationHistory.record(selection)
+      }
+      selection = nextSelection
     }
-    if recordHistory {
-      navigationHistory.record(selection)
+    selectionSource = source
+    if case .agent = nextSelection, source == .keyboard {
+      agentComposerFocusRequestID += 1
     }
-    selection = nextSelection
   }
 }
 
