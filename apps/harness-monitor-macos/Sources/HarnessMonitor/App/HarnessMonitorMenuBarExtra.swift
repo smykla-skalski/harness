@@ -8,6 +8,7 @@ struct HarnessMonitorMenuBarSnapshot: Equatable {
   static let statusItemTitle = "Harness Monitor"
   static let statusItemImageName = "HarnessMonitorMenuBarLighthouse"
   static let statusItemInfoImageName = "HarnessMonitorMenuBarLighthouseInfo"
+  static let statusItemIdleImageName = statusItemInfoImageName
   static let statusItemWarningImageName = "HarnessMonitorMenuBarLighthouseWarning"
   static let statusItemCriticalImageName = "HarnessMonitorMenuBarLighthouseCritical"
   static let openMonitorLabel = "Open Monitor"
@@ -19,9 +20,12 @@ struct HarnessMonitorMenuBarSnapshot: Equatable {
   static let quitLabel = "Quit Harness Monitor"
   static let activeMonitoringLabel = "Monitoring: Active session"
   static let idleMonitoringLabel = "Monitoring: No active session"
+  static let activeStatusItemHelp = "Monitoring active sessions"
+  static let idleStatusItemHelp = "No active session - open one to monitor"
 
   let pendingDecisionCount: Int
   let pendingDecisionSeverity: DecisionSeverity?
+  let isMonitoringIdle: Bool
   let connectionLabel: String
   let monitoringLabel: String
   let sessionCountLabel: String
@@ -41,11 +45,12 @@ struct HarnessMonitorMenuBarSnapshot: Equatable {
   ) {
     self.pendingDecisionCount = pendingDecisionCount
     self.pendingDecisionSeverity = pendingDecisionSeverity
+    isMonitoringIdle = activeSessionWindowCount <= 0
     connectionLabel = "Connection: \(Self.connectionTitle(connectionState))"
     monitoringLabel =
-      activeSessionWindowCount > 0
-      ? Self.activeMonitoringLabel
-      : Self.idleMonitoringLabel
+      isMonitoringIdle
+      ? Self.idleMonitoringLabel
+      : Self.activeMonitoringLabel
     sessionCountLabel = "Sessions: \(Self.countTitle(sessionCount))"
     pendingDecisionLabel = "Decisions: \(Self.countTitle(pendingDecisionCount))"
     supervisorLabel = Self.supervisorLabel(
@@ -60,7 +65,7 @@ struct HarnessMonitorMenuBarSnapshot: Equatable {
   }
 
   var showsAttentionBadge: Bool {
-    pendingDecisionCount > .zero
+    !isMonitoringIdle && pendingDecisionCount > .zero
   }
 
   var attentionBadgeTintLabel: String {
@@ -75,8 +80,13 @@ struct HarnessMonitorMenuBarSnapshot: Equatable {
   }
 
   var statusItemAccessibilitySummary: String {
-    (Array(visibleMenuLabels.prefix(4)) + [attentionBadgeAccessibilityLabel])
+    let idleStatus = isMonitoringIdle ? [Self.idleStatusItemHelp] : []
+    return (Array(visibleMenuLabels.prefix(4)) + idleStatus + [attentionBadgeAccessibilityLabel])
       .joined(separator: ", ")
+  }
+
+  var statusItemHelpText: String {
+    isMonitoringIdle ? Self.idleStatusItemHelp : Self.activeStatusItemHelp
   }
 
   var statusItemDisplayTitle: String {
@@ -88,6 +98,9 @@ struct HarnessMonitorMenuBarSnapshot: Equatable {
   }
 
   var statusItemAssetName: String {
+    guard !isMonitoringIdle else {
+      return Self.statusItemIdleImageName
+    }
     guard showsAttentionBadge else {
       return Self.statusItemImageName
     }
@@ -181,6 +194,17 @@ struct HarnessMonitorMenuBarSnapshot: Equatable {
       "999+"
     }
   }
+
+  static func statusItemHelpText(activeSessionWindowCount: Int) -> String {
+    activeSessionWindowCount <= 0 ? idleStatusItemHelp : activeStatusItemHelp
+  }
+
+  static func statusItemAccessibilityLabel(activeSessionWindowCount: Int) -> String {
+    guard activeSessionWindowCount <= 0 else {
+      return statusItemTitle
+    }
+    return "\(statusItemTitle): \(idleStatusItemHelp)"
+  }
 }
 
 struct HarnessMonitorMenuBarStatusPresentation: Equatable {
@@ -201,6 +225,16 @@ struct HarnessMonitorMenuBarStatusPresentation: Equatable {
     case .none, .info:
       return HarnessMonitorMenuBarSnapshot.statusItemInfoImageName
     }
+  }
+
+  func statusItemAssetName(
+    activeSessionWindowCount: Int,
+    showsStateColorVariants: Bool
+  ) -> String {
+    guard activeSessionWindowCount > 0 else {
+      return HarnessMonitorMenuBarSnapshot.statusItemIdleImageName
+    }
+    return statusItemAssetName(showsStateColorVariants: showsStateColorVariants)
   }
 
   var statusItemAssetName: String {

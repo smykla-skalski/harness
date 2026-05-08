@@ -286,18 +286,37 @@ struct HarnessMonitorApp: App {
     // SwiftUI owns the status-item scene; keep dynamic state to asset-catalog
     // image names so the inserted MenuBarExtra stays stable.
     MenuBarExtra(
-      HarnessMonitorMenuBarSnapshot.statusItemTitle,
-      image: menuBarStatusController.presentation.statusItemAssetName(
-        showsStateColorVariants: menuBarStateColorVariantsEnabled
-      ),
       isInserted: .constant(rendersMenuBarExtraContent)
     ) {
       HarnessMonitorMenuBarExtraContent(
         store: store,
         activeSessionWindowCount: sessionWindowPresenceTracker.activeSessionWindowCount
       )
+    } label: {
+      Label(HarnessMonitorMenuBarSnapshot.statusItemTitle, image: menuBarStatusItemImageName)
+        .help(menuBarStatusItemHelpText)
+        .accessibilityLabel(menuBarStatusItemAccessibilityLabel)
     }
     .menuBarExtraStyle(.menu)
+  }
+
+  private var menuBarStatusItemImageName: String {
+    menuBarStatusController.presentation.statusItemAssetName(
+      activeSessionWindowCount: sessionWindowPresenceTracker.activeSessionWindowCount,
+      showsStateColorVariants: menuBarStateColorVariantsEnabled
+    )
+  }
+
+  private var menuBarStatusItemHelpText: String {
+    HarnessMonitorMenuBarSnapshot.statusItemHelpText(
+      activeSessionWindowCount: sessionWindowPresenceTracker.activeSessionWindowCount
+    )
+  }
+
+  private var menuBarStatusItemAccessibilityLabel: String {
+    HarnessMonitorMenuBarSnapshot.statusItemAccessibilityLabel(
+      activeSessionWindowCount: sessionWindowPresenceTracker.activeSessionWindowCount
+    )
   }
 
   @ViewBuilder private var mainWindowContent: some View {
