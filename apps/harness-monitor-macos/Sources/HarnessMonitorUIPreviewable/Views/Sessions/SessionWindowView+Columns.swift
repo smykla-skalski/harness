@@ -2,15 +2,55 @@ import HarnessMonitorKit
 import SwiftUI
 
 enum SessionWindowFocusModePolicy {
-  static func showsRouteContentInDetail(
-    focusMode: Bool,
-    selection: SessionSelection
-  ) -> Bool {
-    focusMode && selection.route != nil
+  static func usesRouteContent(selection: SessionSelection) -> Bool {
+    selection.route != nil
   }
 }
 
 extension SessionWindowView {
+  @ViewBuilder var focusModeSurface: some View {
+    if SessionWindowFocusModePolicy.usesRouteContent(selection: stateCache.selection) {
+      contentColumn
+    } else {
+      detailFocus
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .backgroundExtensionEffect()
+    }
+  }
+
+  @ViewBuilder var standardSessionLayout: some View {
+    NavigationSplitView(columnVisibility: columnVisibilityBinding) {
+      SessionSidebar(
+        store: store,
+        snapshot: snapshot,
+        decisions: matchingDecisions,
+        state: stateCache
+      )
+      .padding(.top, HarnessMonitorTheme.spacingLG)
+      .navigationSplitViewColumnWidth(min: 190, ideal: sidebarWidth, max: 360)
+    } detail: {
+      SessionContentDetailSplitView(contentWidth: $contentColumnWidth) {
+        contentColumn
+          .padding(.top, HarnessMonitorTheme.spacingLG)
+      } detail: {
+        detailColumn
+          .padding(.top, HarnessMonitorTheme.spacingLG)
+      }
+      .navigationTitle(summary?.displayTitle ?? "Session")
+      .navigationSubtitle(token.sessionID)
+    }
+    .navigationSplitViewStyle(.prominentDetail)
+  }
+
+  @ViewBuilder var sessionSurface: some View {
+    if focusMode {
+      focusModeSurface
+        .padding(.top, HarnessMonitorTheme.spacingLG)
+    } else {
+      standardSessionLayout
+    }
+  }
+
   @ViewBuilder var contentColumn: some View {
     if isLoading && snapshot == nil {
       ProgressView("Loading session")
@@ -45,7 +85,8 @@ extension SessionWindowView {
 
   @ViewBuilder var detailColumn: some View {
     GeometryReader { geometry in
-      let inspectorAllowed = inspectorContextDecision != nil
+      let inspectorAllowed =
+        inspectorContextDecision != nil
         && !focusMode
         && stateCache.decisionRuntime.allowsInspector(width: geometry.size.width)
       HStack(spacing: 0) {
@@ -149,18 +190,11 @@ extension SessionWindowView {
         draft: draft
       )
     case .route:
-      if SessionWindowFocusModePolicy.showsRouteContentInDetail(
-        focusMode: focusMode,
-        selection: stateCache.selection
-      ) {
-        contentColumn
-      } else {
-        ContentUnavailableView(
-          "Select an Item",
-          systemImage: "sidebar.right",
-          description: Text("Pick an agent, decision, or task in the sidebar.")
-        )
-      }
+      ContentUnavailableView(
+        "Select an Item",
+        systemImage: "sidebar.right",
+        description: Text("Pick an agent, decision, or task in the sidebar.")
+      )
     }
   }
 }

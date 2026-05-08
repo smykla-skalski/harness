@@ -4,7 +4,7 @@ import SwiftUI
 public struct SessionWindowView: View {
   public let store: HarnessMonitorStore
   public let token: SessionWindowToken
-  @State var stateCache: SessionWindowStateCache
+  @State private var stateCacheStorage: SessionWindowStateCache
   @Environment(\.dismiss)
   var dismiss
   @Environment(\.openWindow)
@@ -27,17 +27,41 @@ public struct SessionWindowView: View {
   var inspectorWidth = 280.0
   @SceneStorage("session.sidebarWidth")
   var sidebarWidth = 220.0
+  @SceneStorage("session.content-detail.width")
+  var contentColumnWidth = SessionContentDetailSplitLayout.defaultContentWidth
   @SceneStorage("session.columnVisibility")
   var columnVisibilityRaw = "automatic"
-  @State var snapshot: HarnessMonitorSessionWindowSnapshot?
-  @State var isLoading = false
-  @State var didLoadSnapshot = false
-  @State var detailColumnWidth: CGFloat = 0
+  @State private var snapshotStorage: HarnessMonitorSessionWindowSnapshot?
+  @State private var isLoadingStorage = false
+  @State private var didLoadSnapshotStorage = false
+  @State private var detailColumnWidthStorage: CGFloat = 0
 
   public init(store: HarnessMonitorStore, token: SessionWindowToken) {
     self.store = store
     self.token = token
-    _stateCache = State(wrappedValue: SessionWindowStateCache(sessionID: token.sessionID))
+    _stateCacheStorage = State(wrappedValue: SessionWindowStateCache(sessionID: token.sessionID))
+  }
+
+  var stateCache: SessionWindowStateCache { stateCacheStorage }
+
+  var snapshot: HarnessMonitorSessionWindowSnapshot? {
+    get { snapshotStorage }
+    nonmutating set { snapshotStorage = newValue }
+  }
+
+  var isLoading: Bool {
+    get { isLoadingStorage }
+    nonmutating set { isLoadingStorage = newValue }
+  }
+
+  var didLoadSnapshot: Bool {
+    get { didLoadSnapshotStorage }
+    nonmutating set { didLoadSnapshotStorage = newValue }
+  }
+
+  var detailColumnWidth: CGFloat {
+    get { detailColumnWidthStorage }
+    nonmutating set { detailColumnWidthStorage = newValue }
   }
 
   var route: SessionWindowRoute {
@@ -99,25 +123,7 @@ public struct SessionWindowView: View {
       if isUnknownSession {
         unknownSessionContent
       } else {
-        NavigationSplitView(columnVisibility: columnVisibilityBinding) {
-          SessionSidebar(
-            store: store,
-            snapshot: snapshot,
-            decisions: matchingDecisions,
-            state: stateCache
-          )
-          .padding(.top, HarnessMonitorTheme.spacingLG)
-          .navigationSplitViewColumnWidth(min: 190, ideal: sidebarWidth, max: 360)
-        } content: {
-          contentColumn
-            .padding(.top, HarnessMonitorTheme.spacingLG)
-            .navigationSplitViewColumnWidth(min: 280, ideal: 360, max: 520)
-            .navigationTitle(summary?.displayTitle ?? "Session")
-            .navigationSubtitle(token.sessionID)
-        } detail: {
-          detailColumn
-            .padding(.top, HarnessMonitorTheme.spacingLG)
-        }
+        sessionSurface
       }
     }
     .toolbar {
@@ -184,12 +190,13 @@ public struct SessionWindowView: View {
   var columnVisibilityBinding: Binding<NavigationSplitViewVisibility> {
     Binding(
       get: {
-        focusMode
-          ? .detailOnly
-          : SessionColumnVisibilityCodec.decode(columnVisibilityRaw)
+        let decodedVisibility = SessionColumnVisibilityCodec.decode(columnVisibilityRaw)
+        return decodedVisibility == .all ? .doubleColumn : decodedVisibility
       },
       set: { newValue in
-        columnVisibilityRaw = SessionColumnVisibilityCodec.encode(newValue)
+        let storedVisibility: NavigationSplitViewVisibility =
+          newValue == .all ? .doubleColumn : newValue
+        columnVisibilityRaw = SessionColumnVisibilityCodec.encode(storedVisibility)
       }
     )
   }

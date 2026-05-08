@@ -1,0 +1,273 @@
+import AppKit
+import SwiftUI
+
+enum SessionContentDetailSplitLayout {
+  static let dividerWidth: CGFloat = 1
+  static let defaultContentWidth: Double = 440
+  static let minimumContentWidth: CGFloat = 280
+  static let minimumDetailWidth: CGFloat = 320
+  static let minimumVisibleColumnWidth: CGFloat = 220
+  static let keyboardAdjustmentStep: Double = 40
+
+  static func contentWidthRange(availableWidth: CGFloat) -> ClosedRange<Double> {
+    let safeAvailable =
+      max(
+        availableWidth - dividerWidth,
+        (minimumVisibleColumnWidth * 2) + dividerWidth
+      )
+    let resolvedMinimumDetailWidth =
+      min(minimumDetailWidth, safeAvailable - minimumVisibleColumnWidth)
+    let resolvedMinimumContentWidth =
+      max(
+        minimumVisibleColumnWidth,
+        min(minimumContentWidth, safeAvailable - resolvedMinimumDetailWidth)
+      )
+    let resolvedMaximumContentWidth =
+      max(resolvedMinimumContentWidth, safeAvailable - resolvedMinimumDetailWidth)
+
+    return Double(resolvedMinimumContentWidth)...Double(resolvedMaximumContentWidth)
+  }
+
+  static func clampedContentWidth(
+    preferredWidth: Double,
+    availableWidth: CGFloat
+  ) -> Double {
+    let range = contentWidthRange(availableWidth: availableWidth)
+    return min(max(preferredWidth, range.lowerBound), range.upperBound)
+  }
+}
+
+struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
+  @Binding private var contentWidth: Double
+  @State private var liveContentWidth = SessionContentDetailSplitLayout.defaultContentWidth
+  @State private var isDragging = false
+  private let content: Content
+  private let detail: Detail
+
+  init(
+    contentWidth: Binding<Double>,
+    @ViewBuilder content: () -> Content,
+    @ViewBuilder detail: () -> Detail
+  ) {
+    _contentWidth = contentWidth
+    self.content = content()
+    self.detail = detail()
+  }
+
+  var body: some View {
+    GeometryReader { geometry in
+      let resolvedContentWidth = SessionContentDetailSplitLayout.clampedContentWidth(
+        preferredWidth: liveContentWidth,
+        availableWidth: geometry.size.width
+      )
+      let contentRange = SessionContentDetailSplitLayout.contentWidthRange(
+        availableWidth: geometry.size.width
+      )
+
+      HStack(spacing: 0) {
+        content
+          .frame(width: resolvedContentWidth)
+          .frame(maxHeight: .infinity, alignment: .topLeading)
+
+        SessionContentDetailDivider(
+          contentWidth: $liveContentWidth,
+          isDragging: $isDragging,
+          widthRange: contentRange
+        )
+
+        detail
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      .onAppear {
+        syncLiveWidth(resolvedContentWidth, shouldPersist: true)
+      }
+      .onChange(of: geometry.size.width) { _, newWidth in
+        syncLiveWidth(
+          SessionContentDetailSplitLayout.clampedContentWidth(
+            preferredWidth: liveContentWidth,
+            availableWidth: newWidth
+          ),
+          shouldPersist: !isDragging
+        )
+      }
+      .onChange(of: contentWidth) { _, newValue in
+        guard !isDragging else { return }
+        syncLiveWidth(
+          SessionContentDetailSplitLayout.clampedContentWidth(
+            preferredWidth: newValue,
+            availableWidth: geometry.size.width
+          ),
+          shouldPersist: false
+        )
+      }
+      .onChange(of: liveContentWidth) { _, newValue in
+        guard !isDragging else { return }
+        syncPersistedWidth(newValue)
+      }
+      .onChange(of: isDragging) { _, dragging in
+        guard !dragging else { return }
+        syncPersistedWidth(liveContentWidth)
+      }
+    }
+  }
+
+  private func syncLiveWidth(_ resolvedContentWidth: Double, shouldPersist: Bool) {
+    if abs(liveContentWidth - resolvedContentWidth) > 0.5 {
+      liveContentWidth = resolvedContentWidth
+    }
+    guard shouldPersist else { return }
+    syncPersistedWidth(resolvedContentWidth)
+  }
+
+  private func syncPersistedWidth(_ resolvedContentWidth: Double) {
+    guard abs(contentWidth - resolvedContentWidth) > 0.5 else { return }
+    contentWidth = resolvedContentWidth
+  }
+}
+
+private struct SessionContentDetailDivider: View {
+  @Binding var contentWidth: Double
+  @Binding var isDragging: Bool
+  let widthRange: ClosedRange<Double>
+  @Environment(\.accessibilityReduceMotion)
+  private var reduceMotion
+  @FocusState private var isKeyboardFocused: Bool
+  @ScaledMetric(relativeTo: .body)
+  private var interactiveWidth = 24.0
+  @ScaledMetric(relativeTo: .body)
+  private var handleHeight = 44.0
+  @State private var dragStartWidth: Double?
+  @State private var isHovered = false
+  @State private var cursorActive = false
+
+  var body: some View {
+    Color.clear
+      .frame(width: SessionContentDetailSplitLayout.dividerWidth)
+      .overlay(alignment: .center) {
+        Rectangle()
+          .fill(separatorTint)
+          .frame(width: isKeyboardFocused ? 2 : SessionContentDetailSplitLayout.dividerWidth)
+      }
+      .overlay(alignment: .center) {
+        interactiveSurface
+      }
+      .onDisappear {
+        updateCursor(active: false)
+      }
+  }
+
+  private var focusTint: Color {
+    Color(nsColor: .keyboardFocusIndicatorColor)
+  }
+
+  private var separatorTint: Color {
+    if isKeyboardFocused {
+      return focusTint
+    }
+    return Color(nsColor: .separatorColor).opacity(isDragging ? 0.95 : isHovered ? 0.82 : 0.68)
+  }
+
+  private var hoverFill: Color {
+    if isKeyboardFocused {
+      return focusTint.opacity(isDragging ? 0.22 : 0.16)
+    }
+    return Color.primary.opacity(isDragging ? 0.14 : isHovered ? 0.08 : 0)
+  }
+
+  private var animationDuration: Double {
+    reduceMotion ? 0.01 : 0.12
+  }
+
+  private var dividerValue: String {
+    "Content width \(Int(contentWidth.rounded())) points"
+  }
+
+  private var interactiveSurface: some View {
+    ZStack {
+      Rectangle()
+        .fill(hoverFill)
+
+      RoundedRectangle(cornerRadius: 2, style: .continuous)
+        .fill(isKeyboardFocused ? focusTint : separatorTint)
+        .frame(width: isKeyboardFocused ? 4 : 3, height: handleHeight)
+        .opacity(isKeyboardFocused || isHovered || isDragging ? 1 : 0)
+    }
+    .frame(width: interactiveWidth)
+    .contentShape(Rectangle())
+    .focusable()
+    .focusEffectDisabled()
+    .focused($isKeyboardFocused)
+    .help("Drag or use the arrow keys to resize the content and detail panes.")
+    .gesture(dragGesture)
+    .onHover { isHovering in
+      isHovered = isHovering
+      updateCursor(active: isHovering || isDragging)
+    }
+    .onMoveCommand(perform: handleMoveCommand)
+    .accessibilityElement()
+    .accessibilityLabel("Content and detail divider")
+    .accessibilityHint("Drag left or right to resize the content and detail panes")
+    .accessibilityValue(dividerValue)
+    .accessibilityAdjustableAction { direction in
+      switch direction {
+      case .increment:
+        adjustContentWidth(by: SessionContentDetailSplitLayout.keyboardAdjustmentStep)
+      case .decrement:
+        adjustContentWidth(by: -SessionContentDetailSplitLayout.keyboardAdjustmentStep)
+      @unknown default:
+        break
+      }
+    }
+    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowContentDetailDivider)
+    .accessibilityFrameMarker(
+      "\(HarnessMonitorAccessibility.sessionWindowContentDetailDivider).frame"
+    )
+    .animation(.easeOut(duration: animationDuration), value: isHovered)
+    .animation(.easeOut(duration: animationDuration), value: isDragging)
+  }
+
+  private var dragGesture: some Gesture {
+    DragGesture(minimumDistance: 0, coordinateSpace: .global)
+      .onChanged { value in
+        if dragStartWidth == nil {
+          dragStartWidth = contentWidth
+        }
+        isDragging = true
+        updateCursor(active: true)
+        let next = (dragStartWidth ?? contentWidth) + value.translation.width
+        contentWidth = min(max(next, widthRange.lowerBound), widthRange.upperBound)
+      }
+      .onEnded { _ in
+        dragStartWidth = nil
+        isDragging = false
+        updateCursor(active: isHovered)
+      }
+  }
+
+  private func handleMoveCommand(_ direction: MoveCommandDirection) {
+    switch direction {
+    case .left:
+      adjustContentWidth(by: -SessionContentDetailSplitLayout.keyboardAdjustmentStep)
+    case .right:
+      adjustContentWidth(by: SessionContentDetailSplitLayout.keyboardAdjustmentStep)
+    default:
+      break
+    }
+  }
+
+  private func adjustContentWidth(by delta: Double) {
+    let next = contentWidth + delta
+    contentWidth = min(max(next, widthRange.lowerBound), widthRange.upperBound)
+  }
+
+  private func updateCursor(active: Bool) {
+    guard cursorActive != active else { return }
+    cursorActive = active
+    if active {
+      NSCursor.resizeLeftRight.push()
+    } else {
+      NSCursor.pop()
+    }
+  }
+}
