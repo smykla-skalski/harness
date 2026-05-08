@@ -122,7 +122,12 @@ struct HarnessMonitorWindowShell<Content: View>: View {
     }
     .modifier(OptionalAccessibilityIdentifierModifier(identifier: accessibilityIdentifier))
     .writingToolsBehavior(.disabled)
-    .frame(minWidth: minimumSize.width, minHeight: minimumSize.height)
+    .frame(
+      minWidth: minimumSize.width,
+      maxWidth: .infinity,
+      minHeight: minimumSize.height,
+      maxHeight: .infinity
+    )
     .modifier(
       HarnessMonitorSceneAppearanceModifier(
         themeMode: $themeMode,
