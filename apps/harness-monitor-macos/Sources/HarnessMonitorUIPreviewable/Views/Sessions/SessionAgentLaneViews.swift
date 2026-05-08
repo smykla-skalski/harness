@@ -1,6 +1,57 @@
 import HarnessMonitorKit
 import SwiftUI
 
+struct SessionAgentTuiViewport: View {
+  let agentID: String
+  let tui: AgentTuiSnapshot?
+  let metrics: SessionAgentDetailSectionMetrics
+  let latestOutput: String
+
+  private var visibleRows: [AgentTuiScreenSnapshot.VisibleRow] {
+    tui?.screen.visibleRows(maxRows: 160) ?? []
+  }
+
+  var body: some View {
+    ScrollViewReader { proxy in
+      ScrollView {
+        LazyVStack(alignment: .leading, spacing: metrics.terminalRowSpacing) {
+          if visibleRows.isEmpty {
+            Text(tui == nil ? "No terminal attached" : "No terminal output")
+              .scaledFont(.caption.monospaced())
+              .foregroundStyle(.secondary)
+              .frame(maxWidth: .infinity, alignment: .leading)
+          } else {
+            ForEach(visibleRows) { row in
+              Text(row.text.isEmpty ? " " : row.text)
+                .scaledFont(.caption.monospaced())
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .id(row.id)
+            }
+          }
+        }
+        .padding(metrics.terminalPadding)
+      }
+      .background(
+        .quaternary.opacity(0.4),
+        in: RoundedRectangle(cornerRadius: metrics.terminalCornerRadius)
+      )
+      .accessibilityElement(children: .ignore)
+      .accessibilityLabel(Text(latestOutput))
+      .accessibilityIdentifier(tuiViewportIdentifier)
+      .onChange(of: tui?.screen.text ?? "") { _, _ in
+        if let last = visibleRows.last {
+          proxy.scrollTo(last.id, anchor: .bottom)
+        }
+      }
+    }
+  }
+
+  private var tuiViewportIdentifier: String {
+    HarnessMonitorAccessibility.sessionAgentTuiViewport(agentID)
+  }
+}
+
 struct SessionAgentListSection: View {
   let store: HarnessMonitorStore
   let sessionID: String
