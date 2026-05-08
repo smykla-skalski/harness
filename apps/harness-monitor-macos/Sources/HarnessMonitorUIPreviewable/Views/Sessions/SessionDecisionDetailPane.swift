@@ -33,9 +33,11 @@ struct SessionDecisionDetailPane: View {
       }
       if !decision.suggestedActionsJSON.isEmpty {
         Section("Suggested Actions") {
-          Text(decision.suggestedActionsJSON)
-            .scaledFont(.system(.caption, design: .monospaced))
-            .textSelection(.enabled)
+          HarnessMonitorJSONCodeBlock(
+            rawJSON: decision.suggestedActionsJSON,
+            chrome: .plain,
+            wrapLongLines: true
+          )
         }
       }
     }

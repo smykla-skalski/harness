@@ -83,20 +83,3 @@ public struct InspectorBadgeColumn: View {
     }
   }
 }
-
-extension JSONValue {
-  private static let prettyEncoder: JSONEncoder = {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-    return encoder
-  }()
-
-  func prettyPrintedJSONString() -> String {
-    guard let data = try? Self.prettyEncoder.encode(self),
-      let string = String(data: data, encoding: .utf8)
-    else {
-      return "null"
-    }
-    return string
-  }
-}
