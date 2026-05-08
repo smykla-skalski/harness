@@ -19,6 +19,7 @@ public struct SessionTaskDecisionLink: Equatable, Sendable {
 public final class SessionDecisionFilterState {
   public var query = ""
   public var severities: Set<DecisionSeverity> = []
+  public var scope: DecisionsSidebarSearchScope = .summary
 
   public init() {}
 
@@ -29,10 +30,7 @@ public final class SessionDecisionFilterState {
     }
     let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedQuery.isEmpty else { return true }
-    return decision.summary.localizedCaseInsensitiveContains(trimmedQuery)
-      || decision.ruleID.localizedCaseInsensitiveContains(trimmedQuery)
-      || (decision.agentID?.localizedCaseInsensitiveContains(trimmedQuery) ?? false)
-      || (decision.taskID?.localizedCaseInsensitiveContains(trimmedQuery) ?? false)
+    return scope.matches(decision, trimmedQuery: trimmedQuery)
   }
 
   public func toggle(_ severity: DecisionSeverity) {
@@ -46,6 +44,7 @@ public final class SessionDecisionFilterState {
   public func clear() {
     query = ""
     severities.removeAll()
+    scope = .summary
   }
 }
 

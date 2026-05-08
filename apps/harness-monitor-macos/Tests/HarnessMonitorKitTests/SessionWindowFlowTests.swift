@@ -141,8 +141,8 @@ struct SessionWindowFlowTests {
   }
 
   @MainActor
-  @Test("Session decision filters match query and severity")
-  func sessionDecisionFiltersMatchQueryAndSeverity() {
+  @Test("Session decision filters match query severity and scope")
+  func sessionDecisionFiltersMatchQuerySeverityAndScope() {
     let filters = SessionDecisionFilterState()
     let decision = Decision(
       id: "decision-a",
@@ -158,9 +158,20 @@ struct SessionWindowFlowTests {
 
     filters.query = "responding"
     #expect(filters.matches(decision))
+    filters.scope = .ruleID
+    #expect(!filters.matches(decision))
+    filters.query = "stuck-agent"
+    #expect(filters.matches(decision))
+    filters.scope = .agent
+    #expect(!filters.matches(decision))
+    filters.query = "agent-a"
+    #expect(filters.matches(decision))
     filters.severities = [.warn]
     #expect(!filters.matches(decision))
     filters.severities = [.critical]
+    #expect(filters.matches(decision))
+    filters.clear()
+    #expect(filters.scope == .summary)
     #expect(filters.matches(decision))
   }
 
