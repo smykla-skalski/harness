@@ -40,20 +40,13 @@ struct SessionAgentDetailSection: View {
   @Environment(\.fontScale)
   private var fontScale
   @State private var message = ""
+  @State private var composerBackdropHeight: CGFloat = 0
   @State private var lastAnnouncementAt = Date.distantPast
-  @FocusState private var focusedField: Field?
-
-  private enum Field {
-    case composer
-  }
+  @FocusState private var focusedField: SessionAgentComposerField?
 
   private var latestOutput: String {
     let rows = tui?.screen.visibleRows(maxRows: 1) ?? []
     return rows.first?.text.trimmingCharacters(in: .whitespacesAndNewlines) ?? "No output"
-  }
-
-  private var visibleRows: [AgentTuiScreenSnapshot.VisibleRow] {
-    tui?.screen.visibleRows(maxRows: 160) ?? []
   }
 
   private var canSendInput: Bool {
@@ -67,8 +60,23 @@ struct SessionAgentDetailSection: View {
   var body: some View {
     VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
       header
-      tuiViewport
-      composer
+      SessionAgentTuiViewport(
+        agentID: agent.agentId,
+        tui: tui,
+        metrics: metrics,
+        latestOutput: latestOutput
+      )
+      SessionAgentComposer(
+        agentID: agent.agentId,
+        message: $message,
+        focusedField: $focusedField,
+        backdropHeight: $composerBackdropHeight,
+        metrics: metrics,
+        isActive: tui?.status.isActive == true,
+        canSendInput: canSendInput,
+        sendMessage: { Task { await sendMessage() } },
+        sendKey: { key in Task { await sendKey(key) } }
+      )
     }
     .padding(metrics.sectionPadding)
     .dynamicTypeSize(.xSmall ... .accessibility5)
@@ -94,86 +102,6 @@ struct SessionAgentDetailSection: View {
         .lineLimit(1)
     }
     .accessibilityElement(children: .combine)
-  }
-
-  private var tuiViewport: some View {
-    ScrollViewReader { proxy in
-      ScrollView {
-        LazyVStack(alignment: .leading, spacing: metrics.terminalRowSpacing) {
-          if visibleRows.isEmpty {
-            Text(tui == nil ? "No terminal attached" : "No terminal output")
-              .scaledFont(.caption.monospaced())
-              .foregroundStyle(.secondary)
-              .frame(maxWidth: .infinity, alignment: .leading)
-          } else {
-            ForEach(visibleRows) { row in
-              Text(row.text.isEmpty ? " " : row.text)
-                .scaledFont(.caption.monospaced())
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .id(row.id)
-            }
-          }
-        }
-        .padding(metrics.terminalPadding)
-      }
-      .background(
-        .quaternary.opacity(0.4),
-        in: RoundedRectangle(cornerRadius: metrics.terminalCornerRadius)
-      )
-      .accessibilityElement(children: .ignore)
-      .accessibilityLabel(Text(latestOutput))
-      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionAgentTuiViewport(agent.agentId))
-      .onChange(of: tui?.screen.text ?? "") { _, _ in
-        if let last = visibleRows.last {
-          proxy.scrollTo(last.id, anchor: .bottom)
-        }
-      }
-    }
-  }
-
-  private var composer: some View {
-    HStack(alignment: .bottom, spacing: metrics.composerSpacing) {
-      TextEditor(text: $message)
-        .scaledFont(.body)
-        .frame(minHeight: metrics.composerMinHeight, maxHeight: metrics.composerMaxHeight)
-        .focused($focusedField, equals: .composer)
-        .accessibilityLabel("Agent message")
-        .accessibilityIdentifier(HarnessMonitorAccessibility.sessionAgentComposer(agent.agentId))
-
-      VStack(spacing: metrics.keyStackSpacing) {
-        keyButton(.arrowUp)
-        keyButton(.arrowDown)
-        sendButton
-      }
-    }
-  }
-
-  private var sendButton: some View {
-    Button {
-      Task { await sendMessage() }
-    } label: {
-      Image(systemName: "paperplane.fill")
-    }
-    .keyboardShortcut(.return, modifiers: [.command])
-    .help("Send Message")
-    .accessibilityLabel("Send Message")
-    .disabled(!canSendInput)
-    .frame(minWidth: metrics.controlButtonMinSize, minHeight: metrics.controlButtonMinSize)
-  }
-
-  private func keyButton(_ key: AgentTuiKey) -> some View {
-    Button {
-      Task { await sendKey(key) }
-    } label: {
-      Text(key.glyph)
-        .scaledFont(.body)
-        .frame(width: metrics.keyButtonWidth)
-    }
-    .help(key.title)
-    .accessibilityLabel(key.title)
-    .disabled(tui?.status.isActive != true)
-    .frame(minWidth: metrics.controlButtonMinSize, minHeight: metrics.controlButtonMinSize)
   }
 
   @MainActor
