@@ -31,6 +31,8 @@ public struct SessionWindowView: View {
   var contentColumnWidth = SessionContentDetailSplitLayout.defaultContentWidth
   @SceneStorage("session.columnVisibility")
   var columnVisibilityRaw = "automatic"
+  @AccessibilityFocusState
+  private var primaryContentAccessibilityFocused: Bool
   @State private var snapshotStorage: HarnessMonitorSessionWindowSnapshot?
   @State private var isLoadingStorage = false
   @State private var didLoadSnapshotStorage = false
@@ -154,6 +156,7 @@ public struct SessionWindowView: View {
         announce: false
       )
       await loadSnapshot()
+      requestPrimaryContentAccessibilityFocus()
       reconcileInspectorVisibility(
         visibleBinding: $inspectorVisible,
         preferredBinding: $inspectorPreferred,
@@ -184,6 +187,7 @@ public struct SessionWindowView: View {
     .focusedSceneValue(\.sessionCreateContext, createContext)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .accessibilityElement(children: .contain)
+    .accessibilityFocused($primaryContentAccessibilityFocused)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowShell)
   }
 
@@ -326,6 +330,13 @@ public struct SessionWindowView: View {
     snapshot = await store.sessionWindowSnapshot(sessionID: token.sessionID)
     didLoadSnapshot = true
     isLoading = false
+  }
+
+  private func requestPrimaryContentAccessibilityFocus() {
+    guard !isUnknownSession else { return }
+    primaryContentAccessibilityFocused = true
+    let title = summary?.displayTitle ?? "Session"
+    AccessibilityNotification.Announcement("\(title) session window opened").post()
   }
 
   func agentTui(for agent: AgentRegistration) -> AgentTuiSnapshot? {
