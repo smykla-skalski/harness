@@ -1,6 +1,15 @@
 import HarnessMonitorKit
 import SwiftUI
 
+enum SessionWindowFocusModePolicy {
+  static func showsRouteContentInDetail(
+    focusMode: Bool,
+    selection: SessionSelection
+  ) -> Bool {
+    focusMode && selection.route != nil
+  }
+}
+
 extension SessionWindowView {
   @ViewBuilder var contentColumn: some View {
     if isLoading && snapshot == nil {
@@ -9,8 +18,8 @@ extension SessionWindowView {
     } else if let snapshot {
       switch route {
       case .overview: SessionWindowOverview(snapshot: snapshot)
-      case .agents: SessionWindowAgentsList(detail: snapshot.detail)
-      case .tasks: SessionWindowTasksList(detail: snapshot.detail)
+      case .agents: SessionWindowAgentsList(detail: snapshot.detail, state: stateCache)
+      case .tasks: SessionWindowTasksList(detail: snapshot.detail, state: stateCache)
       case .decisions:
         SessionWindowDecisionsList(decisions: matchingDecisions, state: stateCache)
       case .timeline:
@@ -23,7 +32,7 @@ extension SessionWindowView {
           store: store
         )
         .padding(24)
-      case .terminal: SessionWindowRunsList(detail: snapshot.detail)
+      case .terminal: SessionWindowRunsList(detail: snapshot.detail, state: stateCache)
       }
     } else {
       ContentUnavailableView(
@@ -140,11 +149,18 @@ extension SessionWindowView {
         draft: draft
       )
     case .route:
-      ContentUnavailableView(
-        "Select an Item",
-        systemImage: "sidebar.right",
-        description: Text("Pick an agent, decision, or task in the sidebar.")
-      )
+      if SessionWindowFocusModePolicy.showsRouteContentInDetail(
+        focusMode: focusMode,
+        selection: stateCache.selection
+      ) {
+        contentColumn
+      } else {
+        ContentUnavailableView(
+          "Select an Item",
+          systemImage: "sidebar.right",
+          description: Text("Pick an agent, decision, or task in the sidebar.")
+        )
+      }
     }
   }
 }
