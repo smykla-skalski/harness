@@ -5,6 +5,10 @@ public struct SessionWindowView: View {
   public let store: HarnessMonitorStore
   public let token: SessionWindowToken
   @State var stateCache: SessionWindowStateCache
+  @Environment(\.dismiss)
+  var dismiss
+  @Environment(\.openWindow)
+  var openWindow
   @Environment(\.undoManager)
   private var undoManager
   @SceneStorage("session.route")
@@ -22,11 +26,12 @@ public struct SessionWindowView: View {
   @SceneStorage("session.inspector.width")
   var inspectorWidth = 280.0
   @SceneStorage("session.sidebarWidth")
-  private var sidebarWidth = 220.0
+  var sidebarWidth = 220.0
   @SceneStorage("session.columnVisibility")
-  private var columnVisibilityRaw = "automatic"
+  var columnVisibilityRaw = "automatic"
   @State var snapshot: HarnessMonitorSessionWindowSnapshot?
   @State var isLoading = false
+  @State var didLoadSnapshot = false
   @State var detailColumnWidth: CGFloat = 0
 
   public init(store: HarnessMonitorStore, token: SessionWindowToken) {
@@ -90,24 +95,30 @@ public struct SessionWindowView: View {
   }
 
   public var body: some View {
-    NavigationSplitView(columnVisibility: columnVisibilityBinding) {
-      SessionSidebar(
-        store: store,
-        snapshot: snapshot,
-        decisions: matchingDecisions,
-        state: stateCache
-      )
-      .padding(.top, HarnessMonitorTheme.spacingLG)
-      .navigationSplitViewColumnWidth(min: 190, ideal: sidebarWidth, max: 360)
-    } content: {
-      contentColumn
-        .padding(.top, HarnessMonitorTheme.spacingLG)
-        .navigationSplitViewColumnWidth(min: 280, ideal: 360, max: 520)
-        .navigationTitle(summary?.displayTitle ?? "Session")
-        .navigationSubtitle(token.sessionID)
-    } detail: {
-      detailColumn
-        .padding(.top, HarnessMonitorTheme.spacingLG)
+    Group {
+      if isUnknownSession {
+        unknownSessionContent
+      } else {
+        NavigationSplitView(columnVisibility: columnVisibilityBinding) {
+          SessionSidebar(
+            store: store,
+            snapshot: snapshot,
+            decisions: matchingDecisions,
+            state: stateCache
+          )
+          .padding(.top, HarnessMonitorTheme.spacingLG)
+          .navigationSplitViewColumnWidth(min: 190, ideal: sidebarWidth, max: 360)
+        } content: {
+          contentColumn
+            .padding(.top, HarnessMonitorTheme.spacingLG)
+            .navigationSplitViewColumnWidth(min: 280, ideal: 360, max: 520)
+            .navigationTitle(summary?.displayTitle ?? "Session")
+            .navigationSubtitle(token.sessionID)
+        } detail: {
+          detailColumn
+            .padding(.top, HarnessMonitorTheme.spacingLG)
+        }
+      }
     }
     .toolbar {
       SessionWindowToolbar(
@@ -170,7 +181,7 @@ public struct SessionWindowView: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowShell)
   }
 
-  private var columnVisibilityBinding: Binding<NavigationSplitViewVisibility> {
+  var columnVisibilityBinding: Binding<NavigationSplitViewVisibility> {
     Binding(
       get: {
         focusMode
@@ -306,6 +317,7 @@ public struct SessionWindowView: View {
     isLoading = true
     await store.bootstrapIfNeeded()
     snapshot = await store.sessionWindowSnapshot(sessionID: token.sessionID)
+    didLoadSnapshot = true
     isLoading = false
   }
 
