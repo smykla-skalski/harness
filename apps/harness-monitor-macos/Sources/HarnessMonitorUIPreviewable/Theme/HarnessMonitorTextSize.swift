@@ -330,7 +330,7 @@ private struct HarnessMonitorPreviewSceneAppearanceModifier: ViewModifier {
   func body(content: Content) -> some View {
     content
       .environment(\.harnessTextSizeIndex, resolvedTextSizeIndex)
-      .environment(\.fontScale, HarnessMonitorTextSize.scale(at: resolvedTextSizeIndex))
+      .sessionFontScale(textSizeIndex: resolvedTextSizeIndex)
       .environment(
         \.harnessNativeFormControlFont,
         HarnessMonitorTextSize.nativeFormControlFont(at: resolvedTextSizeIndex)

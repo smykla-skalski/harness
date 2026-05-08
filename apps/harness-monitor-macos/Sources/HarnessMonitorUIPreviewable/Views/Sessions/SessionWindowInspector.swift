@@ -7,7 +7,7 @@ struct SessionWindowInspectorMetrics: Equatable {
   let closeButtonMinSize: CGFloat
 
   init(fontScale: CGFloat) {
-    let scale = min(max(fontScale, 0.85), 1.8)
+    let scale = SessionWindowFontScale.metricsScale(for: fontScale)
     spacing = 12 * min(scale, 1.35)
     padding = 16 * min(scale, 1.3)
     closeButtonMinSize = scale >= 1.45 ? 44 : 0

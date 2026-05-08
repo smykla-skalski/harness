@@ -23,7 +23,7 @@ struct SessionToolbarButtonStyle: ButtonStyle {
     let iconWidth: CGFloat
 
     init(fontScale: CGFloat) {
-      let scale = min(max(fontScale, 0.85), 1.8)
+      let scale = SessionWindowFontScale.metricsScale(for: fontScale)
       cornerRadius = Metrics.cornerRadius * min(scale, 1.25)
       horizontalPadding = Metrics.horizontalPadding * min(scale, 1.45)
       verticalPadding = Metrics.verticalPadding * min(scale, 1.45)

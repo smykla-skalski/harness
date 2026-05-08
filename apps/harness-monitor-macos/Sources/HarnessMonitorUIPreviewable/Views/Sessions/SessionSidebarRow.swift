@@ -99,7 +99,7 @@ struct SessionSidebarRowMetrics: Equatable {
   let dropCornerRadius: CGFloat
 
   init(fontScale: CGFloat) {
-    let scale = min(max(fontScale, 0.85), 1.8)
+    let scale = SessionWindowFontScale.metricsScale(for: fontScale)
     spacing = 8
     minHeight = max(28, 26 * scale)
     verticalPadding = max(1, 1.5 * min(scale, 1.4))

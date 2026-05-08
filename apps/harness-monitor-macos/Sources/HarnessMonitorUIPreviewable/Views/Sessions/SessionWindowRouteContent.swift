@@ -9,7 +9,7 @@ struct SessionWindowRouteContentMetrics: Equatable {
   let rowTextSpacing: CGFloat
 
   init(fontScale: CGFloat) {
-    let scale = min(max(fontScale, 0.85), 1.8)
+    let scale = SessionWindowFontScale.metricsScale(for: fontScale)
     contentPadding = 24 * min(scale, 1.3)
     overviewSpacing = 16 * min(scale, 1.35)
     gridHorizontalSpacing = 24 * min(scale, 1.25)

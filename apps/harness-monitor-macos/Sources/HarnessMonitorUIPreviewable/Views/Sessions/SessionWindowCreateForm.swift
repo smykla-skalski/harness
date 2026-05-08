@@ -7,7 +7,7 @@ struct SessionWindowCreateFormMetrics: Equatable {
   let submitButtonMinHeight: CGFloat
 
   init(fontScale: CGFloat) {
-    let scale = min(max(fontScale, 0.85), 1.8)
+    let scale = SessionWindowFontScale.metricsScale(for: fontScale)
     formPadding = 24 * min(scale, 1.3)
     promptMinHeight = max(90, 90 * min(scale, 1.25))
     submitButtonMinHeight = scale >= 1.45 ? 44 : 0

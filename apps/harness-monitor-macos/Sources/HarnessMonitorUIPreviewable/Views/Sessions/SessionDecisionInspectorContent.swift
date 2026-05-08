@@ -81,7 +81,7 @@ struct SessionDecisionInspectorContentMetrics: Equatable {
   let historyTitleSpacing: CGFloat
 
   init(fontScale: CGFloat) {
-    let scale = min(max(fontScale, 0.85), 1.8)
+    let scale = SessionWindowFontScale.metricsScale(for: fontScale)
     sectionSpacing = max(12, 12 * min(scale, 1.35))
     rowSpacing = max(8, 8 * min(scale, 1.45))
     historyTitleSpacing = max(2, 2 * min(scale, 1.45))

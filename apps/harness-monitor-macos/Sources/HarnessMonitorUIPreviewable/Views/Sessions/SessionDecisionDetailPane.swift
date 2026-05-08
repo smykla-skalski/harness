@@ -48,7 +48,7 @@ struct SessionDecisionDetailPaneMetrics: Equatable {
   let contentPadding: CGFloat
 
   init(fontScale: CGFloat) {
-    let scale = min(max(fontScale, 0.85), 1.8)
+    let scale = SessionWindowFontScale.metricsScale(for: fontScale)
     contentPadding = max(24, 24 * min(scale, 1.35))
   }
 }
