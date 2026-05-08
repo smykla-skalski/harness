@@ -46,6 +46,17 @@ final class SessionTitleBlurChromeTests: XCTestCase {
     )
   }
 
+  func testTitleBlurChromeStaysNativeSwiftUI() throws {
+    let source = try sourceFile(named: "SessionTitleBlurChrome.swift")
+
+    XCTAssertTrue(source.contains("import SwiftUI"))
+    XCTAssertTrue(source.contains("@Environment(\\.accessibilityReduceTransparency)"))
+    XCTAssertTrue(source.contains("RadialGradient("))
+    XCTAssertFalse(source.contains("import AppKit"))
+    XCTAssertFalse(source.contains("NSViewRepresentable"))
+    XCTAssertFalse(source.contains("NSVisualEffectView"))
+  }
+
   private func configuration(
     status: SessionStatus,
     isStale: Bool = false
@@ -55,5 +66,22 @@ final class SessionTitleBlurChromeTests: XCTestCase {
       isStale: isStale,
       reduceTransparency: false
     )
+  }
+
+  private func sourceFile(named relativePath: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent(
+        "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Sessions"
+      )
+      .appendingPathComponent(relativePath)
+    return try String(contentsOf: fileURL, encoding: .utf8)
   }
 }
