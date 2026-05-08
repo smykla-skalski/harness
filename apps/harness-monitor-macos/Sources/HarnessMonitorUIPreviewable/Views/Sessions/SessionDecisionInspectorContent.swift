@@ -6,6 +6,8 @@ struct SessionDecisionInspectorContent: View {
   @Bindable var runtime: SessionDecisionRuntime
   @Environment(\.fontScale)
   private var fontScale
+  @SceneStorage("session.decisionInspectorTab")
+  private var persistedInspectorTabRaw = ""
 
   private var metrics: SessionDecisionInspectorContentMetrics {
     SessionDecisionInspectorContentMetrics(fontScale: fontScale)
@@ -30,6 +32,19 @@ struct SessionDecisionInspectorContent: View {
         historyRows
       }
     }
+    .onAppear {
+      hydrateInspectorTabFromPersistedStorage()
+    }
+    .onChange(of: runtime.inspectorTab) { _, newValue in
+      guard persistedInspectorTabRaw != newValue.rawValue else { return }
+      persistedInspectorTabRaw = newValue.rawValue
+    }
+  }
+
+  private func hydrateInspectorTabFromPersistedStorage() {
+    guard let tab = SessionDecisionInspectorTab(rawValue: persistedInspectorTabRaw) else { return }
+    guard runtime.inspectorTab != tab else { return }
+    runtime.inspectorTab = tab
   }
 
   private var contextRows: some View {
