@@ -60,7 +60,7 @@ struct SessionSidebar: View {
   private var selectionBinding: Binding<SessionSelection?> {
     Binding(
       get: { state.selection },
-      set: { state.select($0 ?? .route(.overview)) }
+      set: { state.selectFromSidebar($0) }
     )
   }
 
@@ -91,6 +91,7 @@ struct SessionSidebar: View {
   @ViewBuilder private var agentsSection: some View {
     Section {
       ForEach(state.sidebarOrdering.orderedAgents(snapshot?.detail?.agents ?? [])) { agent in
+        let selection = SessionSelection.agent(sessionID: state.sessionID, agentID: agent.agentId)
         SessionSidebarRow(
           title: agent.name,
           systemImage: "person.crop.circle",
@@ -99,7 +100,8 @@ struct SessionSidebar: View {
           showsDragHandle: true,
           isDropTargeted: agentDropTargetID == agent.agentId
         )
-        .tag(SessionSelection.agent(sessionID: state.sessionID, agentID: agent.agentId))
+        .tag(selection)
+        .simultaneousGesture(pointerSelectionGesture(for: selection))
         .draggable(SessionAgentDragPayload(sessionID: state.sessionID, agentID: agent.agentId))
         .dropDestination(for: SessionAgentDragPayload.self) { payloads, _ in
           handleAgentDrop(payloads, before: agent.agentId)
@@ -151,6 +153,13 @@ struct SessionSidebar: View {
         .accessibilityLabel("New Agent")
       }
     }
+  }
+
+  private func pointerSelectionGesture(for selection: SessionSelection) -> some Gesture {
+    DragGesture(minimumDistance: 0)
+      .onChanged { _ in
+        state.markPointerSelectionIntent(for: selection)
+      }
   }
 
   @ViewBuilder private var tasksSection: some View {

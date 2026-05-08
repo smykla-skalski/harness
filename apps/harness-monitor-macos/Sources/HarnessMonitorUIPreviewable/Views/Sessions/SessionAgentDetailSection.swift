@@ -50,6 +50,7 @@ struct SessionAgentDetailSection: View {
   let sessionID: String
   let agent: AgentRegistration
   let tui: AgentTuiSnapshot?
+  let composerFocusRequestID: Int
   @Environment(\.fontScale)
   private var fontScale
   @State private var message = ""
@@ -64,7 +65,11 @@ struct SessionAgentDetailSection: View {
   }
 
   private var canSendInput: Bool {
-    tui?.status.isActive == true && !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    isTuiActive && !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
+  private var isTuiActive: Bool {
+    tui?.status.isActive == true
   }
 
   private var metrics: SessionAgentDetailSectionMetrics {
@@ -97,9 +102,12 @@ struct SessionAgentDetailSection: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .task {
       latestOutput = computeLatestOutput()
-      if tui?.status.isActive == true {
-        focusedField = .composer
-      }
+    }
+    .task(id: composerFocusRequestID) {
+      promoteComposerFocusIfRequested()
+    }
+    .onChange(of: isTuiActive) { _, _ in
+      promoteComposerFocusIfRequested()
     }
     .onChange(of: tui?.screen.text ?? "") { _, _ in
       let next = computeLatestOutput()
@@ -148,5 +156,10 @@ struct SessionAgentDetailSection: View {
   private func announceOutputIfAllowed(_ output: String) {
     guard outputAnnouncementGate.shouldAnnounce(output: output) else { return }
     AccessibilityNotification.Announcement(output).post()
+  }
+
+  private func promoteComposerFocusIfRequested() {
+    guard composerFocusRequestID > 0, isTuiActive else { return }
+    focusedField = .composer
   }
 }
