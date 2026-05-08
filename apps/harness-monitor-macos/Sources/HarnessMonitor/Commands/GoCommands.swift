@@ -4,9 +4,10 @@ import SwiftUI
 
 struct GoCommands: Commands {
   let store: HarnessMonitorStore
-  let workspaceNavigationBridge: WorkspaceWindowNavigationBridge
   let windowCommandRouting: WindowCommandRoutingState
   let displayState: CommandsDisplayState
+  @FocusedValue(\.windowNavigation)
+  private var workspaceNavigation
   @FocusedValue(\.sessionNavigation)
   private var sessionNavigation
 
@@ -17,7 +18,7 @@ struct GoCommands: Commands {
   private var canNavigateBack: Bool {
     switch activeScope {
     case .workspace:
-      workspaceNavigationBridge.state.canGoBack
+      workspaceNavigation?.canGoBack ?? false
     case .session:
       sessionNavigation?.canGoBack ?? false
     case .main:
@@ -28,7 +29,7 @@ struct GoCommands: Commands {
   private var canNavigateForward: Bool {
     switch activeScope {
     case .workspace:
-      workspaceNavigationBridge.state.canGoForward
+      workspaceNavigation?.canGoForward ?? false
     case .session:
       sessionNavigation?.canGoForward ?? false
     case .main:
@@ -52,7 +53,7 @@ struct GoCommands: Commands {
     let scope = activeScope
     switch scope {
     case .workspace:
-      Task { await workspaceNavigationBridge.navigateBack() }
+      Task { await workspaceNavigation?.navigateBack() }
     case .session:
       sessionNavigation?.goBack()
     case .main:
@@ -64,7 +65,7 @@ struct GoCommands: Commands {
     let scope = activeScope
     switch scope {
     case .workspace:
-      Task { await workspaceNavigationBridge.navigateForward() }
+      Task { await workspaceNavigation?.navigateForward() }
     case .session:
       sessionNavigation?.goForward()
     case .main:
