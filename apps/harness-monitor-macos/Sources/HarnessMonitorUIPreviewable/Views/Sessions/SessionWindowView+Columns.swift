@@ -109,11 +109,23 @@ extension SessionWindowView {
         )
       }
     case .task(_, let taskID):
-      ContentUnavailableView(
-        "Task \(taskID)",
-        systemImage: "checklist",
-        description: Text("Task detail lands in a later chunk.")
-      )
+      if let task = snapshot?.detail?.tasks.first(where: { $0.taskId == taskID }) {
+        SessionTaskDetailPane(
+          task: task,
+          openActions: {
+            store.presentedSheet = .taskActions(
+              sessionID: token.sessionID,
+              taskID: task.taskId
+            )
+          }
+        )
+      } else {
+        ContentUnavailableView(
+          "Task Not Available",
+          systemImage: "checklist",
+          description: Text(taskID)
+        )
+      }
     case .create(let draft):
       SessionWindowCreateForm(
         store: store,
