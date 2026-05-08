@@ -42,9 +42,10 @@ struct SessionAgentDetailSection: View {
   @State private var message = ""
   @State private var composerBackdropHeight: CGFloat = 0
   @State private var lastAnnouncementAt = Date.distantPast
+  @State private var latestOutput = "No output"
   @FocusState private var focusedField: SessionAgentComposerField?
 
-  private var latestOutput: String {
+  private func computeLatestOutput() -> String {
     let rows = tui?.screen.visibleRows(maxRows: 1) ?? []
     return rows.first?.text.trimmingCharacters(in: .whitespacesAndNewlines) ?? "No output"
   }
@@ -82,12 +83,16 @@ struct SessionAgentDetailSection: View {
     .dynamicTypeSize(.xSmall ... .accessibility5)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .task {
+      latestOutput = computeLatestOutput()
       if tui?.status.isActive == true {
         focusedField = .composer
       }
     }
-    .onChange(of: latestOutput) { _, output in
-      announceOutputIfAllowed(output)
+    .onChange(of: tui?.screen.text ?? "") { _, _ in
+      let next = computeLatestOutput()
+      guard next != latestOutput else { return }
+      latestOutput = next
+      announceOutputIfAllowed(next)
     }
   }
 
