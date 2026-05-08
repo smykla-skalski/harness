@@ -35,6 +35,7 @@ struct SessionWindowCreateFormMetricsTests {
 
     #expect(SessionWindowCreateFormValidation.message(for: blank) == "Agent name is required.")
     #expect(SessionWindowCreateFormValidation.message(for: named) == nil)
+    #expect(SessionWindowCreateFormValidation.result(for: blank)?.field == .name)
   }
 
   @Test("Draft launch selection preserves legacy runtime and provider storage keys")
@@ -98,6 +99,10 @@ struct SessionWindowCreateFormMetricsTests {
       SessionWindowCreateFormValidation.message(for: draft, capabilityOptions: [option])
         == "Turn on bridge access to use project access here"
     )
+    #expect(
+      SessionWindowCreateFormValidation.result(for: draft, capabilityOptions: [option])?.field
+        == .capability
+    )
   }
 
   @MainActor
@@ -123,7 +128,11 @@ struct SessionWindowCreateFormMetricsTests {
 
     #expect(source.contains("@FocusState"))
     #expect(source.contains("Button(\"Cancel\", role: .cancel)"))
-    #expect(source.contains("SessionWindowCreateFormValidation.message"))
+    #expect(source.contains("SessionWindowCreateFormValidation.result"))
+    #expect(source.contains("validationMessage(for: .name)"))
+    #expect(source.contains("validationMessage(for: .capability)"))
+    #expect(source.contains("Validation error:"))
+    #expect(source.contains("focusedField = .name"))
     #expect(source.contains("SessionWindowCreateFormCapabilityPicker"))
     #expect(source.contains("Picker(\"Severity\", selection: taskSeverity)"))
     #expect(source.contains("sessionID: draft.sessionID"))

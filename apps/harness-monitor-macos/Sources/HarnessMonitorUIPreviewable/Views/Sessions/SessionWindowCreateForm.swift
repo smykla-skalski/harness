@@ -20,7 +20,7 @@ struct SessionWindowCreateForm: View {
   let draft: SessionCreateDraft
   @Environment(\.fontScale)
   private var fontScale
-  @State private var validationMessage = ""
+  @State private var validationResult: SessionWindowCreateFormValidationResult?
   @State private var agentCapabilityOptions: [AgentCapabilityOption] = []
   @State private var isLoadingAgentCapabilities = false
   @FocusState private var focusedField: SessionWindowCreateFormField?
@@ -70,6 +70,7 @@ struct SessionWindowCreateForm: View {
           .scaledFont(.body)
           .focused($focusedField, equals: .name)
           .accessibilityLabel("\(draft.kind.title) name")
+          .accessibilityHint(validationMessage(for: .name) ?? "")
         TextEditor(text: prompt)
           .scaledFont(.body)
           .frame(minHeight: metrics.promptMinHeight)
@@ -80,7 +81,8 @@ struct SessionWindowCreateForm: View {
         SessionWindowCreateFormCapabilityPicker(
           options: activeAgentCapabilityOptions,
           selection: launchSelection,
-          isLoading: isLoadingAgentCapabilities
+          isLoading: isLoadingAgentCapabilities,
+          validationMessage: validationMessage(for: .capability)
         )
       }
       if draft.kind == .task {
@@ -93,12 +95,12 @@ struct SessionWindowCreateForm: View {
           .accessibilityLabel("Task severity")
         }
       }
-      if !validationMessage.isEmpty {
+      if let validationResult {
         Section {
-          Text(validationMessage)
+          Text(validationResult.message)
             .scaledFont(.callout)
             .foregroundStyle(.red)
-            .accessibilityLabel(validationMessage)
+            .accessibilityLabel("Validation error: \(validationResult.message)")
         }
       }
       Section {
@@ -148,20 +150,22 @@ struct SessionWindowCreateForm: View {
     if let taskSeverity {
       next.taskSeverity = taskSeverity
     }
+    clearValidationIfNeeded(title: title, runtime: runtime)
     state.updateCreateDraft(next)
   }
 
   @MainActor
   private func submit() async {
-    if let message = SessionWindowCreateFormValidation.message(
+    if let validationResult = SessionWindowCreateFormValidation.result(
       for: draft,
       capabilityOptions: activeAgentCapabilityOptions
     ) {
-      validationMessage = message
+      self.validationResult = validationResult
+      focusValidationField(validationResult.field)
       return
     }
     let name = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
-    validationMessage = ""
+    validationResult = nil
     switch draft.kind {
     case .agent:
       await createAgent(named: name)
@@ -173,7 +177,7 @@ struct SessionWindowCreateForm: View {
   }
 
   private func cancel() {
-    validationMessage = ""
+    validationResult = nil
     state.cancelCreateDraft(draft.kind)
   }
 
@@ -261,7 +265,7 @@ struct SessionWindowCreateForm: View {
   @MainActor
   private func createDecision(summary: String) async {
     guard let decisionStore = store.supervisorDecisionStore else {
-      validationMessage = "Decision store is unavailable."
+      validationResult = .init(message: "Decision store is unavailable.", field: .form)
       return
     }
     let id = "manual-\(UUID().uuidString)"
@@ -281,7 +285,31 @@ struct SessionWindowCreateForm: View {
       state.updateCreateDraft(SessionCreateDraft(kind: .decision, sessionID: draft.sessionID))
       state.selectDecision(id)
     } catch {
-      validationMessage = error.localizedDescription
+      validationResult = .init(message: error.localizedDescription, field: .form)
+    }
+  }
+
+  private func validationMessage(
+    for field: SessionWindowCreateFormValidationField
+  ) -> String? {
+    guard validationResult?.field == field else { return nil }
+    return validationResult?.message
+  }
+
+  private func clearValidationIfNeeded(title: String?, runtime: String?) {
+    switch validationResult?.field {
+    case .name where title != nil:
+      validationResult = nil
+    case .capability where runtime != nil:
+      validationResult = nil
+    case .form, .name, .capability, nil:
+      break
+    }
+  }
+
+  private func focusValidationField(_ field: SessionWindowCreateFormValidationField) {
+    if field == .name {
+      focusedField = .name
     }
   }
 }
