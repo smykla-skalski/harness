@@ -55,7 +55,7 @@ public final class SessionDecisionRuntime {
   @ObservationIgnored
   private var historyRowKeyOrder: [String] = []
   @ObservationIgnored
-  private var filterTask: Task<Void, Never>?
+  nonisolated(unsafe) private var filterTask: Task<Void, Never>?
   @ObservationIgnored
   private var latestFilterInput: SessionDecisionFilterInput?
 
@@ -67,8 +67,16 @@ public final class SessionDecisionRuntime {
 
   public init() {}
 
+  // ARC may drop this `@MainActor` instance on a background thread (the
+  // SwiftUI DisplayLink / dispatch worker), so `deinit` runs off-actor on
+  // macOS 26 + Swift 6.2. `Task.cancel()` is itself thread-safe, but reading
+  // `filterTask` from a `@MainActor`-isolated stored property in an off-actor
+  // deinit traps libdispatch's queue assertion. Backing the storage with
+  // `nonisolated(unsafe)` matches the project-wide pattern documented in the
+  // assumeIsolated-in-deinit playbook.
   deinit {
     filterTask?.cancel()
+    filterTask = nil
   }
 
   public func updateFilteredDecisions(input: SessionDecisionFilterInput) {
