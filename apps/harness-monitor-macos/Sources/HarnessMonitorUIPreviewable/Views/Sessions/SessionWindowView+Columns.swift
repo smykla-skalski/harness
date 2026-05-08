@@ -8,6 +8,42 @@ public enum SessionWindowFocusModePolicy {
 }
 
 extension SessionWindowView {
+  var decisionsCacheTrigger: SessionDecisionFilterKey {
+    SessionDecisionFilterKey(
+      sessionID: token.sessionID,
+      decisions: store.supervisorOpenDecisions.filter { $0.sessionID == token.sessionID },
+      filters: stateCache.decisionFilters
+    )
+  }
+
+  func recomputeDecisionsCache() async {
+    let all = store.supervisorOpenDecisions.filter { $0.sessionID == token.sessionID }
+    let allIDs = Set(all.map(\.id))
+    if all.map(\.id) != allSessionDecisionsCache.map(\.id) {
+      allSessionDecisionsCache = all
+    }
+    if allIDs != allSessionDecisionIDsCache {
+      allSessionDecisionIDsCache = allIDs
+    }
+    stateCache.decisionRuntime.updateFilteredDecisions(
+      input: SessionDecisionFilterInput(
+        sessionID: token.sessionID,
+        decisions: all,
+        filters: stateCache.decisionFilters
+      )
+    )
+    await stateCache.decisionRuntime.waitForDecisionFilterIdle()
+    guard !Task.isCancelled else { return }
+    let matching = stateCache.decisionRuntime.filteredDecisions(from: all)
+    let matchingIDs = Set(matching.map(\.id))
+    if matching.map(\.id) != matchingDecisionsCache.map(\.id) {
+      matchingDecisionsCache = matching
+    }
+    if matchingIDs != matchingDecisionIDsCache {
+      matchingDecisionIDsCache = matchingIDs
+    }
+  }
+
   @ViewBuilder var focusModeSurface: some View {
     if SessionWindowFocusModePolicy.usesRouteContent(selection: stateCache.selection) {
       contentColumn

@@ -10,7 +10,7 @@ public struct SessionWindowView: View {
   @Environment(\.openWindow)
   var openWindow
   @Environment(\.undoManager)
-  private var undoManager
+  var undoManager
   @SceneStorage("session.route")
   private var persistedRoute: SessionWindowRoute = .overview
   @SceneStorage("session.decisionID")
@@ -37,10 +37,11 @@ public struct SessionWindowView: View {
   @State private var isLoadingStorage = false
   @State private var didLoadSnapshotStorage = false
   @State private var detailColumnWidthStorage: CGFloat = 0
-  @State private var allSessionDecisionsCache: [Decision] = []
-  @State private var matchingDecisionsCache: [Decision] = []
-  @State private var allSessionDecisionIDsCache: Set<String> = []
-  @State private var matchingDecisionIDsCache: Set<String> = []
+  @State var allSessionDecisionsCache: [Decision] = []
+  @State var matchingDecisionsCache: [Decision] = []
+  @State var allSessionDecisionIDsCache: Set<String> = []
+  @State var matchingDecisionIDsCache: Set<String> = []
+  @State var detailRenderedSelection: SessionSelection?
 
   public init(store: HarnessMonitorStore, token: SessionWindowToken) {
     self.store = store
@@ -101,42 +102,6 @@ public struct SessionWindowView: View {
       allDecisionIDs: allSessionDecisionIDsCache,
       visibleDecisionIDs: matchingDecisionIDsCache
     )
-  }
-
-  private var decisionsCacheTrigger: SessionDecisionFilterKey {
-    SessionDecisionFilterKey(
-      sessionID: token.sessionID,
-      decisions: store.supervisorOpenDecisions.filter { $0.sessionID == token.sessionID },
-      filters: stateCache.decisionFilters
-    )
-  }
-
-  private func recomputeDecisionsCache() async {
-    let all = store.supervisorOpenDecisions.filter { $0.sessionID == token.sessionID }
-    let allIDs = Set(all.map(\.id))
-    if all.map(\.id) != allSessionDecisionsCache.map(\.id) {
-      allSessionDecisionsCache = all
-    }
-    if allIDs != allSessionDecisionIDsCache {
-      allSessionDecisionIDsCache = allIDs
-    }
-    stateCache.decisionRuntime.updateFilteredDecisions(
-      input: SessionDecisionFilterInput(
-        sessionID: token.sessionID,
-        decisions: all,
-        filters: stateCache.decisionFilters
-      )
-    )
-    await stateCache.decisionRuntime.waitForDecisionFilterIdle()
-    guard !Task.isCancelled else { return }
-    let matching = stateCache.decisionRuntime.filteredDecisions(from: all)
-    let matchingIDs = Set(matching.map(\.id))
-    if matching.map(\.id) != matchingDecisionsCache.map(\.id) {
-      matchingDecisionsCache = matching
-    }
-    if matchingIDs != matchingDecisionIDsCache {
-      matchingDecisionIDsCache = matchingIDs
-    }
   }
 
   var selectedDecisionHiddenByFilters: Bool {
@@ -206,6 +171,14 @@ public struct SessionWindowView: View {
     .task(id: decisionsCacheTrigger) {
       await recomputeDecisionsCache()
     }
+    .task(id: stateCache.selection) {
+      // Yield once so the click feedback (sidebar/middle row highlight) paints
+      // before the detail subtree mounts. Heavy detail subviews (TUI viewport,
+      // task forms) otherwise block the same runloop the click event lives on,
+      // which the user perceives as a delayed reaction.
+      await Task.yield()
+      detailRenderedSelection = stateCache.selection
+    }
     .onChange(of: stateCache.selection) { _, newSelection in
       syncPersistedStorage(from: newSelection)
       reconcileInspectorVisibility(
@@ -246,75 +219,6 @@ public struct SessionWindowView: View {
         columnVisibilityRaw = SessionColumnVisibilityCodec.encode(storedVisibility)
       }
     )
-  }
-
-  private var navigationCommand: SessionNavigationCommand {
-    let cache = stateCache
-    return SessionNavigationCommand(
-      sessionID: token.sessionID,
-      canGoBack: stateCache.navigationHistory.canGoBack,
-      canGoForward: stateCache.navigationHistory.canGoForward,
-      goBack: { cache.navigateBack() },
-      goForward: { cache.navigateForward() }
-    )
-  }
-
-  private var attentionFocus: SessionAttentionFocus {
-    SessionAttentionFocus(
-      sessionID: token.sessionID,
-      pendingDecisionCount: matchingDecisions.count
-    )
-  }
-
-  private var inspectorCommand: SessionInspectorCommand {
-    let visibleBinding = $inspectorVisible
-    let preferredBinding = $inspectorPreferred
-    return SessionInspectorCommand(
-      sessionID: token.sessionID,
-      isVisible: visibleBinding.wrappedValue && canPresentInspector,
-      toggle: {
-        setInspectorPreference(
-          !preferredBinding.wrappedValue,
-          visibleBinding: visibleBinding,
-          preferredBinding: preferredBinding
-        )
-      }
-    )
-  }
-
-  private var decisionCommand: SessionDecisionCommand {
-    SessionDecisionCommandFactory.make(
-      store: store,
-      state: stateCache,
-      visibleDecisions: matchingDecisions,
-      undoManager: undoManager
-    )
-  }
-
-  private var createContext: SessionCreateContext {
-    let cache = stateCache
-    return SessionCreateContext(
-      sessionID: token.sessionID,
-      primaryKind: primaryCreateKind,
-      createAgent: { cache.selectCreate(.agent) },
-      createTask: { cache.selectCreate(.task) },
-      createDecision: { cache.selectCreate(.decision) }
-    )
-  }
-
-  private var primaryCreateKind: SessionCreateKind {
-    switch stateCache.selection {
-    case .agent: .agent
-    case .task: .task
-    case .decision: .decision
-    case .create(let draft): draft.kind
-    case .route(let route):
-      switch route {
-      case .tasks: .task
-      case .decisions: .decision
-      case .agents, .overview, .timeline, .terminal: .agent
-      }
-    }
   }
 
   private func hydrateSelectionFromPersistedStorage() {
