@@ -28,6 +28,9 @@ struct SessionSidebar: View {
     .onChange(of: decisions.map(\.id)) { _, ids in
       state.sidebarSelection.pruneDecisionSelection(to: Set(ids))
     }
+    .task(id: (snapshot?.detail?.agents ?? []).map(\.agentId)) {
+      state.sidebarOrdering.reconcileAgentOrder(with: snapshot?.detail?.agents ?? [])
+    }
     .onChange(of: state.decisionBulkActions.reopenRequestedBatch) { _, ids in
       guard let ids else { return }
       Task { await reopenDecisionBatch(ids) }

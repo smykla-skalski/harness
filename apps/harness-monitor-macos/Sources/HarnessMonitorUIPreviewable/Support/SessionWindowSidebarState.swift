@@ -150,12 +150,26 @@ public final class SessionSidebarOrderingState {
   public init() {}
 
   public func orderedAgents(_ agents: [AgentRegistration]) -> [AgentRegistration] {
-    reconcileAgentIDs(with: agents.map(\.agentId))
-    let order = Dictionary(uniqueKeysWithValues: agentIDs.enumerated().map { ($1, $0) })
+    let liveIDs = agents.map(\.agentId)
+    let liveSet = Set(liveIDs)
+    let retained = agentIDs.filter { liveSet.contains($0) }
+    let retainedSet = Set(retained)
+    let effectiveOrder = retained + liveIDs.filter { !retainedSet.contains($0) }
+    let order = Dictionary(
+      uniqueKeysWithValues: effectiveOrder.enumerated().map { ($1, $0) }
+    )
     return agents.sorted { left, right in
       (order[left.agentId] ?? Int.max, left.agentId)
         < (order[right.agentId] ?? Int.max, right.agentId)
     }
+  }
+
+  /// Reconcile the persisted agent ordering against the live agent list.
+  /// Call from `.onChange(of: agents.map(\.agentId))` or a similar lifecycle
+  /// hook — never from a view body, since this mutates an `@Observable`
+  /// property and would feed back into the next render.
+  public func reconcileAgentOrder(with agents: [AgentRegistration]) {
+    reconcileAgentIDs(with: agents.map(\.agentId))
   }
 
   public func moveAgent(_ agentID: String, before targetID: String?, undoManager: UndoManager?) {
@@ -172,7 +186,9 @@ public final class SessionSidebarOrderingState {
     let liveSet = Set(liveIDs)
     let retained = agentIDs.filter { liveSet.contains($0) }
     let retainedSet = Set(retained)
-    agentIDs = retained + liveIDs.filter { !retainedSet.contains($0) }
+    let next = retained + liveIDs.filter { !retainedSet.contains($0) }
+    guard next != agentIDs else { return }
+    agentIDs = next
   }
 
   private func applyAgentMove(_ agentID: String, before targetID: String?) {

@@ -25,6 +25,99 @@ public struct SessionDecisionHistoryRow: Identifiable, Hashable, Sendable {
   public let value: String
 }
 
+public struct SessionDecisionFilterSnapshot: Hashable, Sendable {
+  public let query: String
+  public let trimmedQuery: String
+  public let severityRawValues: Set<String>
+  public let scopeRawValue: String
+
+  @MainActor
+  public init(filters: SessionDecisionFilterState) {
+    query = filters.query
+    trimmedQuery = filters.query.trimmingCharacters(in: .whitespacesAndNewlines)
+    severityRawValues = Set(filters.severities.map(\.rawValue))
+    scopeRawValue = filters.scope.rawValue
+  }
+
+  fileprivate func matches(_ item: SessionDecisionFilterItem) -> Bool {
+    if !severityRawValues.isEmpty, !severityRawValues.contains(item.severityRaw) {
+      return false
+    }
+    guard !trimmedQuery.isEmpty else { return true }
+    guard let haystack = item.searchValue(scopeRawValue: scopeRawValue) else { return false }
+    return haystack.range(of: trimmedQuery, options: .caseInsensitive) != nil
+  }
+}
+
+public struct SessionDecisionFilterItem: Hashable, Sendable {
+  public let id: String
+  public let severityRaw: String
+  public let summary: String
+  public let ruleID: String
+  public let agentID: String?
+  public let taskID: String?
+
+  public init(decision: Decision) {
+    id = decision.id
+    severityRaw = decision.severityRaw
+    summary = decision.summary
+    ruleID = decision.ruleID
+    agentID = decision.agentID
+    taskID = decision.taskID
+  }
+
+  fileprivate func searchValue(scopeRawValue: String) -> String? {
+    switch scopeRawValue {
+    case DecisionsSidebarSearchScope.summary.rawValue:
+      summary
+    case DecisionsSidebarSearchScope.ruleID.rawValue:
+      ruleID
+    case DecisionsSidebarSearchScope.agent.rawValue:
+      agentID
+    case DecisionsSidebarSearchScope.task.rawValue:
+      taskID
+    default:
+      summary
+    }
+  }
+}
+
+public struct SessionDecisionFilterInput: Equatable, Sendable {
+  public let sessionID: String
+  public let items: [SessionDecisionFilterItem]
+  public let filters: SessionDecisionFilterSnapshot
+
+  @MainActor
+  public init(sessionID: String, decisions: [Decision], filters: SessionDecisionFilterState) {
+    self.sessionID = sessionID
+    items = decisions.map(SessionDecisionFilterItem.init)
+    self.filters = SessionDecisionFilterSnapshot(filters: filters)
+  }
+}
+
+public struct SessionDecisionFilterKey: Hashable, Sendable {
+  public let sessionID: String
+  public let decisionFingerprint: Int
+  public let filters: SessionDecisionFilterSnapshot
+
+  @MainActor
+  public init(sessionID: String, decisions: [Decision], filters: SessionDecisionFilterState) {
+    self.sessionID = sessionID
+    var hasher = Hasher()
+    hasher.combine(decisions.count)
+    for decision in decisions {
+      hasher.combine(decision.id)
+      hasher.combine(decision.severityRaw)
+      hasher.combine(decision.summary)
+      hasher.combine(decision.ruleID)
+      hasher.combine(decision.agentID)
+      hasher.combine(decision.taskID)
+    }
+    decisionFingerprint = hasher.finalize()
+    self.filters = SessionDecisionFilterSnapshot(filters: filters)
+  }
+}
+
 public enum SessionInspectorVisibilityPolicy {
   public static let collapseThreshold: CGFloat = 1100
 
@@ -41,6 +134,9 @@ public enum SessionInspectorVisibilityPolicy {
 @Observable
 public final class SessionDecisionRuntime {
   public var inspectorTab: SessionDecisionInspectorTab = .context
+  public private(set) var filteredDecisionIDs: [String] = []
+  public private(set) var hasFilteredDecisions = false
+  public private(set) var isFilteringDecisions = false
 
   @ObservationIgnored
   private var contextRowCache: [String: [SessionDecisionContextRow]] = [:]
@@ -50,10 +146,52 @@ public final class SessionDecisionRuntime {
   private var historyRowCache: [String: [SessionDecisionHistoryRow]] = [:]
   @ObservationIgnored
   private var historyRowKeyOrder: [String] = []
+  @ObservationIgnored
+  private var filterTask: Task<Void, Never>?
+  @ObservationIgnored
+  private var latestFilterInput: SessionDecisionFilterInput?
 
   private static let cacheLimit = 32
 
   public init() {}
+
+  deinit {
+    filterTask?.cancel()
+  }
+
+  public func updateFilteredDecisions(input: SessionDecisionFilterInput) {
+    guard latestFilterInput != input else { return }
+    latestFilterInput = input
+    filterTask?.cancel()
+
+    guard !input.items.isEmpty else {
+      filterTask = nil
+      filteredDecisionIDs = []
+      hasFilteredDecisions = true
+      isFilteringDecisions = false
+      return
+    }
+
+    isFilteringDecisions = true
+    filterTask = Task { @MainActor [weak self] in
+      let ids = await sessionDecisionFilterWorker.filteredIDs(input: input)
+      guard !Task.isCancelled else { return }
+      guard let self, latestFilterInput == input else { return }
+      filteredDecisionIDs = ids
+      hasFilteredDecisions = true
+      isFilteringDecisions = false
+    }
+  }
+
+  public func filteredDecisions(from decisions: [Decision]) -> [Decision] {
+    guard hasFilteredDecisions else { return decisions }
+    let decisionsByID = Dictionary(uniqueKeysWithValues: decisions.map { ($0.id, $0) })
+    return filteredDecisionIDs.compactMap { decisionsByID[$0] }
+  }
+
+  public func waitForDecisionFilterIdle() async {
+    await filterTask?.value
+  }
 
   public func contextRows(for decision: Decision) -> [SessionDecisionContextRow] {
     let key = contextCacheKey(for: decision)
@@ -143,5 +281,13 @@ public final class SessionDecisionRuntime {
     return object.keys.sorted().prefix(12).map { key in
       SessionDecisionContextRow(id: "context.\(key)", value: "\(key): \(object[key] ?? "")")
     }
+  }
+}
+
+private let sessionDecisionFilterWorker = SessionDecisionFilterWorker()
+
+private actor SessionDecisionFilterWorker {
+  func filteredIDs(input: SessionDecisionFilterInput) -> [String] {
+    input.items.lazy.filter { input.filters.matches($0) }.map(\.id)
   }
 }
