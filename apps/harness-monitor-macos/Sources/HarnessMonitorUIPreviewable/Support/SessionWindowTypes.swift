@@ -53,6 +53,9 @@ public enum HarnessMonitorLaunchBehavior: String, CaseIterable, Codable, Hashabl
 
   public static let storageKey = "harness.monitor.launch-behavior"
   public static let defaultValue: Self = .restoreSessionWindows
+  public static let closingBehaviorDescription =
+    "Command-W or the red close button removes a session window from relaunch. "
+    + "Windows left open at quit restore open; minimized session windows restore visible."
 
   public var id: String { rawValue }
 

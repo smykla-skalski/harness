@@ -234,7 +234,11 @@ public struct SettingsGeneralSection: View {
       } header: {
         Text("Windows")
       } footer: {
-        Text("\(launchBehavior.description) \(sessionWindowTabbingPreference.description)")
+        Text(
+          "\(launchBehavior.description) "
+            + "\(HarnessMonitorLaunchBehavior.closingBehaviorDescription) "
+            + "\(sessionWindowTabbingPreference.description)"
+        )
       }
 
       SettingsLoggingSection(store: store)
