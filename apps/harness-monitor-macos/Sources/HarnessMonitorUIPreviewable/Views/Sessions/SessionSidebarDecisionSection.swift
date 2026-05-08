@@ -25,6 +25,12 @@ extension SessionSidebar {
         } isTargeted: { isTargeted in
           targetedDecisionDropID = isTargeted ? decision.id : nil
         }
+        .modifier(
+          SessionSidebarMultiSelectRowGesture(
+            isEnabled: state.sidebarSelection.isDecisionMultiSelectEnabled,
+            perform: { handleDecisionRowTap(decision.id) }
+          )
+        )
         .contextMenu {
           Button("Dismiss Decision") {
             dismissDecisions([decision.id])
