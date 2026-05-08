@@ -51,6 +51,30 @@ Inside a worktree:
 Do not use legacy runtime-profile env vars. Do not hardcode shared lane names
 such as `claude-main`.
 
+## Daemon discovery and IDE Run
+
+The `HarnessMonitor.xcscheme` LaunchAction is intentionally lane-agnostic. The
+user's Xcode IDE "Run" must connect to whichever daemon they have running,
+regardless of which lane any agent is using. App-side resolution
+(`HarnessMonitorPaths.resolveBaseRoot`) checks, in order:
+
+1. `HARNESS_DAEMON_DATA_HOME` / `XDG_DATA_HOME` — explicit override.
+2. `HARNESS_MONITOR_RUNTIME_LANE` — explicit lane.
+3. Cross-lane discovery — scans the group container root and
+   `runtime-lanes/*/harness/daemon/manifest.json`, filters by `kill(pid, 0)`
+   liveness, picks newest `started_at`.
+4. Generic group container fallback.
+
+Agents do not use IDE Run. They drive `xcodebuild` and pass
+`HARNESS_MONITOR_RUNTIME_LANE` (and friends) on the command line so the lane
+env reaches the test/run process. That hits step 2 of the resolver and wins
+over discovery — agent isolation is preserved.
+
+Do not reintroduce LaunchAction env patching in `Scripts/post-generate.sh`
+without an explicit opt-in (`HARNESS_MONITOR_PATCH_RUN_SCHEME=1`). Patching
+the user's scheme on every `monitor:generate` overwrites their lane env and
+silently routes IDE Run at an empty agent container.
+
 ## Validation
 
 Run from the repo root:
