@@ -2,6 +2,11 @@ import Foundation
 import HarnessMonitorKit
 import Observation
 
+public enum SessionDecisionBulkActionCopy {
+  public static let dismissVisibleHelp =
+    "Dismiss All Visible applies to decisions matching the current filter and search."
+}
+
 public struct SessionTaskDecisionLink: Equatable, Sendable {
   public let sessionID: String
   public let taskID: String

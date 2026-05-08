@@ -1,3 +1,4 @@
+import Foundation
 import XCTest
 
 @testable import HarnessMonitorKit
@@ -56,6 +57,26 @@ final class SessionDecisionCommandFactoryTests: XCTestCase {
     XCTAssertEqual(state.decisionBulkActions.lastDismissedBatch, ["d-visible-a", "d-visible-b"])
   }
 
+  func testDismissVisibleCopyIsSharedBySidebarAndSettings() throws {
+    XCTAssertEqual(
+      SessionDecisionBulkActionCopy.dismissVisibleHelp,
+      "Dismiss All Visible applies to decisions matching the current filter and search."
+    )
+
+    let sidebarSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionSidebarDecisionSection.swift"
+    )
+    let settingsSource = try previewableSourceFile(
+      named: "Views/Settings/SettingsGeneralSection.swift"
+    )
+
+    XCTAssertTrue(sidebarSource.contains("SessionDecisionBulkActionCopy.dismissVisibleHelp"))
+    XCTAssertTrue(settingsSource.contains("SessionDecisionBulkActionCopy.dismissVisibleHelp"))
+    XCTAssertTrue(
+      settingsSource.contains("harness.settings.decisions.dismiss-visible-help")
+    )
+  }
+
   func testReopenBatchUsesDecisionStoreMutation() async throws {
     let store = HarnessMonitorStore.fixture()
     await store.startSupervisor()
@@ -110,4 +131,18 @@ final class SessionDecisionCommandFactoryTests: XCTestCase {
     try? await Task.sleep(for: .milliseconds(50))
   }
 
+  private func previewableSourceFile(named relativePath: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent("apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable")
+      .appendingPathComponent(relativePath)
+    return try String(contentsOf: fileURL, encoding: .utf8)
+  }
 }

@@ -71,7 +71,7 @@ extension SessionSidebar {
           dismissDecisions(decisions.map(\.id))
         }
         .disabled(decisions.isEmpty)
-        .help("Dismisses only the decisions that match the current filter and search.")
+        .help(SessionDecisionBulkActionCopy.dismissVisibleHelp)
         if !state.decisionBulkActions.lastDismissedBatch.isEmpty {
           Button("Reopen Dismissed Batch") {
             Task { await reopenDecisionBatch(state.decisionBulkActions.lastDismissedBatch) }
