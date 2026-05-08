@@ -21,10 +21,6 @@ struct SessionWindowRootView: View {
     store.sessionIndex.sessionSummary(for: token.sessionID)?.displayTitle ?? "Session"
   }
 
-  private var pendingDecisionCount: Int {
-    store.supervisorOpenDecisions.filter { $0.sessionID == token.sessionID }.count
-  }
-
   var body: some View {
     HarnessMonitorWindowShell(
       windowID: windowID,
@@ -38,13 +34,7 @@ struct SessionWindowRootView: View {
       themeMode: $themeMode,
       appliesPreferredColorScheme: true
     ) {
-      SessionBannerStack(
-        store: store,
-        sessionID: token.sessionID,
-        pendingDecisionCount: pendingDecisionCount
-      ) {
-        SessionWindowView(store: store, token: token)
-      }
+      SessionWindowView(store: store, token: token)
     }
     .navigationTitle(windowTitle)
     .modifier(
