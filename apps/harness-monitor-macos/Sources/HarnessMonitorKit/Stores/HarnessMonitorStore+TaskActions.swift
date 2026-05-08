@@ -6,10 +6,17 @@ extension HarnessMonitorStore {
     title: String,
     context: String?,
     severity: TaskSeverity,
+    sessionID: String? = nil,
     actor: String = "harness-app"
   ) async -> Bool {
     let actionName = "Create task"
-    guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
+    let action =
+      if let sessionID {
+        prepareSessionAction(named: actionName, sessionID: sessionID)
+      } else {
+        prepareSelectedSessionAction(named: actionName)
+      }
+    guard let action else { return false }
     let actor = controlPlaneActionActor(for: actor)
     return await mutateSelectedSession(
       actionName: actionName,

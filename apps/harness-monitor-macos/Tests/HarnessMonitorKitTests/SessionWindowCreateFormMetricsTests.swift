@@ -54,6 +54,21 @@ struct SessionWindowCreateFormMetricsTests {
     #expect(projectAccess.launchSelection == .acp("copilot"))
   }
 
+  @Test("Task draft preserves severity in the in-window form")
+  func taskDraftPreservesSeverityInWindowForm() {
+    var draft = SessionCreateDraft(
+      kind: .task,
+      taskSeverity: .critical,
+      sessionID: "session-1"
+    )
+
+    #expect(draft.taskSeverity == .critical)
+    draft.taskSeverityRawValue = "legacy"
+    #expect(draft.taskSeverity == .medium)
+    draft.taskSeverity = .high
+    #expect(draft.taskSeverityRawValue == "high")
+  }
+
   @Test("Validation rejects unavailable selected capability")
   func validationRejectsUnavailableSelectedCapability() {
     let draft = SessionCreateDraft(
@@ -110,7 +125,12 @@ struct SessionWindowCreateFormMetricsTests {
     #expect(source.contains("Button(\"Cancel\", role: .cancel)"))
     #expect(source.contains("SessionWindowCreateFormValidation.message"))
     #expect(source.contains("SessionWindowCreateFormCapabilityPicker"))
+    #expect(source.contains("Picker(\"Severity\", selection: taskSeverity)"))
+    #expect(source.contains("sessionID: draft.sessionID"))
     #expect(source.contains("startAcpAgent("))
+    #expect(!source.contains("requestCreateTaskSheet()"))
+    #expect(!source.contains(".keyboardShortcut(\"n\", modifiers: [.command])"))
+    #expect(source.contains(".keyboardShortcut(.defaultAction)"))
   }
 
   @Test("Create form capability support is split into catalog and picker sources")

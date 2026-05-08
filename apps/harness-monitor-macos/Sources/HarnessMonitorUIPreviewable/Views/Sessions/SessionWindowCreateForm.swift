@@ -46,6 +46,13 @@ struct SessionWindowCreateForm: View {
     )
   }
 
+  private var taskSeverity: Binding<TaskSeverity> {
+    Binding(
+      get: { draft.taskSeverity },
+      set: { updateDraft(taskSeverity: $0) }
+    )
+  }
+
   private var activeAgentCapabilityOptions: [AgentCapabilityOption] {
     agentCapabilityOptions.isEmpty
       ? SessionWindowCreateFormCatalogs.fallbackAgentOptions(store: store)
@@ -76,6 +83,16 @@ struct SessionWindowCreateForm: View {
           isLoading: isLoadingAgentCapabilities
         )
       }
+      if draft.kind == .task {
+        Section("Task Details") {
+          Picker("Severity", selection: taskSeverity) {
+            ForEach(TaskSeverity.allCases, id: \.rawValue) { severity in
+              Text(severity.title).tag(severity)
+            }
+          }
+          .accessibilityLabel("Task severity")
+        }
+      }
       if !validationMessage.isEmpty {
         Section {
           Text(validationMessage)
@@ -97,7 +114,7 @@ struct SessionWindowCreateForm: View {
               .scaledFont(.body.weight(.semibold))
           }
           .frame(minHeight: metrics.submitButtonMinHeight)
-          .keyboardShortcut("n", modifiers: [.command])
+          .keyboardShortcut(.defaultAction)
         }
       }
     }
@@ -115,7 +132,8 @@ struct SessionWindowCreateForm: View {
   private func updateDraft(
     title: String? = nil,
     prompt: String? = nil,
-    runtime: String? = nil
+    runtime: String? = nil,
+    taskSeverity: TaskSeverity? = nil
   ) {
     var next = draft
     if let title {
@@ -126,6 +144,9 @@ struct SessionWindowCreateForm: View {
     }
     if let runtime {
       next.runtime = runtime
+    }
+    if let taskSeverity {
+      next.taskSeverity = taskSeverity
     }
     state.updateCreateDraft(next)
   }
@@ -145,8 +166,7 @@ struct SessionWindowCreateForm: View {
     case .agent:
       await createAgent(named: name)
     case .task:
-      store.requestCreateTaskSheet()
-      state.selectRoute(.tasks)
+      await createTask(named: name)
     case .decision:
       await createDecision(summary: name)
     }
@@ -222,6 +242,20 @@ struct SessionWindowCreateForm: View {
       return []
     }
     return option.transportChoice(for: selection).capabilities
+  }
+
+  @MainActor
+  private func createTask(named name: String) async {
+    let context = draft.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+    let success = await store.createTask(
+      title: name,
+      context: context.isEmpty ? nil : context,
+      severity: draft.taskSeverity,
+      sessionID: draft.sessionID
+    )
+    guard success else { return }
+    state.updateCreateDraft(SessionCreateDraft(kind: .task, sessionID: draft.sessionID))
+    state.selectRoute(.tasks)
   }
 
   @MainActor
