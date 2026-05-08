@@ -14,6 +14,7 @@ struct SessionWindowToolbar: ToolbarContent {
         Label("Focus Mode", systemImage: "sidebar.leading")
       }
       .toggleStyle(.button)
+      .buttonStyle(SessionToolbarButtonStyle(isSelected: focusMode))
       .accessibilityLabel("Focus mode")
       .accessibilityHint("Shows or hides secondary session columns.")
     }
@@ -31,6 +32,7 @@ struct SessionWindowToolbar: ToolbarContent {
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowStatusMenu)
       .accessibilityLabel("Session status")
       .accessibilityHint("Shows current connection and session status.")
+      .buttonStyle(SessionToolbarButtonStyle())
     }
   }
 }
