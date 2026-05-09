@@ -185,21 +185,26 @@ private struct SessionDecisionAttentionBanner: View {
   }
 
   private var message: String {
-    let suffix = count == 1 ? "" : "s"
-    return "\(count) pending decision\(suffix) need attention."
+    if count == 1 {
+      return "1 pending decision needs attention."
+    }
+    return "\(count) pending decisions need attention."
   }
 
   var body: some View {
     HStack(alignment: .center, spacing: metrics.itemSpacing) {
-      Image(systemName: "exclamationmark.bubble")
-        .scaledFont(.caption)
-        .accessibilityHidden(true)
-      Text(message)
-        .scaledFont(.caption.weight(.medium))
+      Label {
+        Text(message)
+          .scaledFont(.caption.weight(.medium))
+      } icon: {
+        Image(systemName: "exclamationmark.bubble")
+          .scaledFont(.caption)
+      }
+      .labelStyle(.titleAndIcon)
       Spacer(minLength: 0)
       if let selectDecisions {
         Button("Review", action: selectDecisions)
-          .buttonStyle(.borderless)
+          .harnessActionButtonStyle(variant: .bordered, tint: nil)
           .frame(minHeight: metrics.reviewButtonMinHeight)
           .accessibilityLabel("Review pending decisions")
       }

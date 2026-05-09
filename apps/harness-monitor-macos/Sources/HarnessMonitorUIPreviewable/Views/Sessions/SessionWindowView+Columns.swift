@@ -87,7 +87,10 @@ extension SessionWindowView {
     SessionBannerStack(
       store: store,
       sessionID: token.sessionID,
-      pendingDecisionCount: 0,
+      isLoading: isLoading,
+      hasSnapshot: snapshot != nil,
+      pendingDecisionCount: allSessionDecisionsCache.count,
+      selectDecisions: { stateCache.selectRoute(.decisions) },
       content: content
     )
   }
