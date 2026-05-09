@@ -17,7 +17,6 @@ struct HarnessMonitorWindowRootView: View {
   @Binding var settingsSelectedSection: SettingsSection
   let perfScenario: HarnessMonitorPerfScenario?
   let defersInitialContentUntilBootstrap: Bool
-  let refresh: () -> Void
   @Environment(\.openWindow)
   private var openWindow
   #if HARNESS_FEATURE_LOTTIE
@@ -74,10 +73,7 @@ struct HarnessMonitorWindowRootView: View {
   }
 
   @ViewBuilder private var liveContent: some View {
-    OpenRecentView(
-      store: store,
-      refresh: refresh
-    )
+    OpenRecentView(store: store)
     .modifier(
       HarnessMonitorPerfScenarioModifier(
         delegate: delegate,

@@ -35,23 +35,20 @@ final class OpenRecentWindowUITests: HarnessMonitorUITestCase {
     app.typeKey(.escape, modifierFlags: [])
   }
 
-  func testCloseAfterPickToggleUsesCanonicalCopy() {
+  func testOpenRecentDoesNotShowCloseAfterPickCheckbox() {
     let app = launchPreviewOpenRecent()
     let toggle = app.checkBoxes["Close Open Recent after picking a session"].firstMatch
 
-    XCTAssertTrue(
-      waitForElement(toggle, timeout: Self.fastActionTimeout),
-      "Open Recent should expose the canonical close-after-pick toggle copy."
+    XCTAssertFalse(
+      toggle.waitForExistence(timeout: Self.fastActionTimeout),
+      "Open Recent should not expose the close-after-pick checkbox."
     )
-    XCTAssertEqual(toggle.label, "Close Open Recent after picking a session")
   }
 
   func testCloseAfterPickDismissesWelcomeWindowAfterSessionOpens() {
     let app = launchPreviewOpenRecent()
     let openRecentWindow = element(in: app, identifier: Accessibility.openRecentRoot)
     XCTAssertTrue(waitForElement(openRecentWindow, timeout: Self.uiTimeout))
-    let toggle = app.checkBoxes["Close Open Recent after picking a session"].firstMatch
-    ensureCloseAfterPickEnabled(true, toggle: toggle)
 
     let sessionRowIdentifier = Accessibility.openRecentSessionRow(Self.previewSessionID)
     XCTAssertTrue(
@@ -87,13 +84,51 @@ final class OpenRecentWindowUITests: HarnessMonitorUITestCase {
     )
   }
 
-  func testDisablingCloseAfterPickKeepsWelcomeWindowVisible() {
+  func testSessionWindowToolbarSeparatorIsSuppressed() {
     let app = launchPreviewOpenRecent()
     let openRecentWindow = element(in: app, identifier: Accessibility.openRecentRoot)
     XCTAssertTrue(waitForElement(openRecentWindow, timeout: Self.uiTimeout))
 
-    let toggle = app.checkBoxes["Close Open Recent after picking a session"].firstMatch
-    ensureCloseAfterPickEnabled(false, toggle: toggle)
+    let sessionRowIdentifier = Accessibility.openRecentSessionRow(Self.previewSessionID)
+    XCTAssertTrue(
+      waitForButtonReady(
+        in: app,
+        identifier: sessionRowIdentifier,
+        timeout: Self.actionTimeout
+      )
+    )
+
+    tapButton(in: app, identifier: sessionRowIdentifier)
+
+    let sessionWindow = element(in: app, identifier: Accessibility.sessionWindowShell)
+    XCTAssertTrue(waitForElement(sessionWindow, timeout: Self.actionTimeout))
+
+    let separatorSuppressed = element(
+      in: app,
+      identifier: Accessibility.sessionWindowToolbarSeparatorSuppressed
+    )
+    XCTAssertTrue(
+      separatorSuppressed.waitForExistence(timeout: Self.actionTimeout),
+      """
+      Session window toolbar separator suppressor must be applied to prevent the seam between
+      native toolbar glass and the sidebar
+      """
+    )
+    XCTAssertEqual(
+      separatorSuppressed.label,
+      "suppressed",
+      "Session window separator suppressor marker should report 'suppressed'"
+    )
+  }
+
+  func testDisablingCloseAfterPickKeepsWelcomeWindowVisible() {
+    let app = launchPreviewOpenRecent(
+      additionalEnvironment: [
+        HarnessMonitorSettingsUITestKeys.openRecentCloseAfterPickOverride: "0"
+      ]
+    )
+    let openRecentWindow = element(in: app, identifier: Accessibility.openRecentRoot)
+    XCTAssertTrue(waitForElement(openRecentWindow, timeout: Self.uiTimeout))
 
     let sessionRowIdentifier = Accessibility.openRecentSessionRow(Self.previewSessionID)
     XCTAssertTrue(
@@ -114,36 +149,16 @@ final class OpenRecentWindowUITests: HarnessMonitorUITestCase {
     )
   }
 
-  private func checkboxValue(_ checkbox: XCUIElement) -> String {
-    let rawValue = String(describing: checkbox.value ?? "")
-    guard rawValue.hasPrefix("Optional("), rawValue.hasSuffix(")") else {
-      return rawValue
-    }
-    return String(rawValue.dropFirst("Optional(".count).dropLast())
-  }
-
-  private func ensureCloseAfterPickEnabled(
-    _ isEnabled: Bool,
-    toggle: XCUIElement
-  ) {
-    XCTAssertTrue(waitForElement(toggle, timeout: Self.fastActionTimeout))
-    let expectedValue = isEnabled ? "1" : "0"
-    guard checkboxValue(toggle) != expectedValue else {
-      return
-    }
-    toggle.click()
-    XCTAssertTrue(
-      waitUntil(timeout: Self.fastActionTimeout) { self.checkboxValue(toggle) == expectedValue },
-      "Close-after-pick toggle should update to \(expectedValue)."
-    )
-  }
-
-  private func launchPreviewOpenRecent() -> XCUIApplication {
+  private func launchPreviewOpenRecent(
+    additionalEnvironment: [String: String] = [:]
+  ) -> XCUIApplication {
     launch(
       mode: "preview",
-      additionalEnvironment: [
-        Self.previewScenarioKey: Self.dashboardLandingScenario
-      ]
+      additionalEnvironment:
+        [
+          Self.previewScenarioKey: Self.dashboardLandingScenario
+        ]
+        .merging(additionalEnvironment) { _, newValue in newValue }
     )
   }
 }

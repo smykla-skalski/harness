@@ -243,7 +243,7 @@ struct SessionWindowCreateAgentRuntimeContent: View {
         .accessibilityHint("Chooses \(option.title)")
       }
     }
-    .padding(.horizontal, -HarnessMonitorTheme.spacingXS)
+    .padding(.horizontal, -HarnessMonitorTheme.spacingSM)
   }
 
   private var codexSupportContent: some View {
@@ -413,6 +413,7 @@ struct SessionWindowCreateProviderListRow: View {
           .truncationMode(.tail)
       }
     }
+    .padding(.horizontal, HarnessMonitorTheme.spacingSM)
     .padding(.vertical, HarnessMonitorTheme.spacingXS)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(rowTint)

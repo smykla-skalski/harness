@@ -12,9 +12,6 @@ public struct SettingsAppearanceSection: View {
   @AppStorage(HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledKey)
   private var menuBarStateColorVariantsEnabled =
     HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledDefault
-  @AppStorage(HarnessMonitorSessionTitleBlurDefaults.enabledKey)
-  private var sessionTitleBlurEnabled =
-    HarnessMonitorSessionTitleBlurDefaults.enabledDefault
   @AppStorage(HarnessMonitorSidebarSessionRowDisplayMode.storageKey)
   private var sidebarSessionRowDisplayModeRawValue =
     HarnessMonitorSidebarSessionRowDisplayMode.defaultMode.rawValue
@@ -92,14 +89,6 @@ public struct SettingsAppearanceSection: View {
           )
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.settingsMenuBarStateColorsToggle
-          )
-
-        Toggle("Session status blur", isOn: $sessionTitleBlurEnabled)
-          .accessibilityHint(
-            "Shows a soft colored blur behind the session title that follows the session status"
-          )
-          .accessibilityIdentifier(
-            HarnessMonitorAccessibility.settingsSessionTitleBlurToggle
           )
 
         #if HARNESS_FEATURE_LOTTIE

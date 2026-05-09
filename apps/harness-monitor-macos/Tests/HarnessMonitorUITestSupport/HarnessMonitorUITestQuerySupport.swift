@@ -9,14 +9,21 @@ extension HarnessMonitorUITestCase {
   }
 
   func sessionTrigger(in app: XCUIApplication, identifier: String) -> XCUIElement {
-    let identifiedButton = button(in: app, identifier: identifier)
-    if identifiedButton.exists {
-      return identifiedButton
-    }
+    for candidateIdentifier in sessionTriggerIdentifiers(for: identifier) {
+      let identifiedButton = button(in: app, identifier: candidateIdentifier)
+      if identifiedButton.exists {
+        return identifiedButton
+      }
 
-    let cell = app.cells.matching(identifier: identifier).firstMatch
-    if cell.exists {
-      return cell
+      let cell = app.cells.matching(identifier: candidateIdentifier).firstMatch
+      if cell.exists {
+        return cell
+      }
+
+      let identifiedElement = element(in: app, identifier: candidateIdentifier)
+      if identifiedElement.exists {
+        return identifiedElement
+      }
     }
 
     return element(in: app, identifier: identifier)
@@ -215,6 +222,16 @@ extension HarnessMonitorUITestCase {
     }
 
     return app.buttons.matching(identifier: identifier).firstMatch
+  }
+
+  private func sessionTriggerIdentifiers(for identifier: String) -> [String] {
+    guard identifier == HarnessMonitorUITestAccessibility.previewSessionRow else {
+      return [identifier]
+    }
+    return [
+      HarnessMonitorUITestAccessibility.openRecentSessionRow("sess1234"),
+      identifier,
+    ]
   }
 
   func descendantButton(in container: XCUIElement, identifier: String) -> XCUIElement {

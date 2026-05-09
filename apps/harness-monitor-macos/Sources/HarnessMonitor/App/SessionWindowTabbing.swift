@@ -132,9 +132,9 @@ private final class AccessorView: NSView {
 
   /// Setting `tabbingIdentifier` flips AppKit into a tabbable-window toolbar
   /// mode that draws an opaque titlebar with a baseline separator under the
-  /// tab strip, masking the Liquid Glass blur and the SessionTitleBlurChrome
-  /// status backdrop. AppKit also re-applies its defaults whenever a new tab
-  /// is added or removed, so the override has to run again on every change.
+  /// tab strip, masking the Liquid Glass blur in the unified toolbar. AppKit
+  /// also re-applies its defaults whenever a new tab is added or removed, so
+  /// the override has to run again on every change.
   private func applyTitlebarChromeOverrides(to window: NSWindow) {
     window.titlebarSeparatorStyle = .none
     window.titlebarAppearsTransparent = true

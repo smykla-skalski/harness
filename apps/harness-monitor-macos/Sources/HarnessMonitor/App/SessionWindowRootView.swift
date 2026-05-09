@@ -39,6 +39,9 @@ struct SessionWindowRootView: View {
     ) {
       SessionWindowView(store: store, token: token)
     }
+    .suppressToolbarBaselineSeparator(
+      markedAs: HarnessMonitorAccessibility.sessionWindowToolbarSeparatorSuppressed
+    )
     .modifier(
       SessionWindowLifecycleModifier(
         store: store,

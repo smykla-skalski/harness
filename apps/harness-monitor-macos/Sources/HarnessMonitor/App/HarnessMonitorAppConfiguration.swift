@@ -8,6 +8,8 @@ struct HarnessMonitorAppConfiguration {
   private static let uiTestsEnvironmentKey = "HARNESS_MONITOR_UI_TESTS"
   private static let uiTestDefaultDataRootName = "HarnessMonitorUITestHost"
   private static let resetBackgroundRecentsOverrideKey = "HARNESS_MONITOR_RESET_BACKGROUND_RECENTS"
+  private static let openRecentCloseAfterPickOverrideKey =
+    "HARNESS_MONITOR_OPEN_RECENT_CLOSE_AFTER_PICK_OVERRIDE"
   private static let toastDismissOverrideKey = "HARNESS_MONITOR_TEST_TOAST_DISMISS_MS"
   private static let toastSeedKey = "HARNESS_MONITOR_TEST_SEED_TOASTS"
 
@@ -95,7 +97,8 @@ struct HarnessMonitorAppConfiguration {
         sidebarSessionRowDisplayMode: .defaultMode,
         backdropMode: .none,
         backgroundImage: .defaultSelection,
-        resetBackgroundRecents: false
+        resetBackgroundRecents: false,
+        openRecentCloseAfterPick: OpenRecentCloseAfterPickDefaults.defaultValue
       )
     }
     return UITestOverrides(
@@ -116,7 +119,10 @@ struct HarnessMonitorAppConfiguration {
       ),
       resetBackgroundRecents: uiTestBoolOverride(
         from: environment.values[resetBackgroundRecentsOverrideKey]
-      ) ?? false
+      ) ?? false,
+      openRecentCloseAfterPick: uiTestBoolOverride(
+        from: environment.values[openRecentCloseAfterPickOverrideKey]
+      ) ?? OpenRecentCloseAfterPickDefaults.defaultValue
     )
   }
 
@@ -137,6 +143,7 @@ struct HarnessMonitorAppConfiguration {
     let backdropMode: HarnessMonitorBackdropMode
     let backgroundImage: HarnessMonitorBackgroundSelection
     let resetBackgroundRecents: Bool
+    let openRecentCloseAfterPick: Bool
   }
 
   private static func uiTestSafeEnvironment(
@@ -247,7 +254,7 @@ struct HarnessMonitorAppConfiguration {
       forKey: HarnessMonitorSidebarSessionRowDisplayMode.storageKey
     )
     UserDefaults.standard.set(
-      OpenRecentCloseAfterPickDefaults.defaultValue,
+      overrides.openRecentCloseAfterPick,
       forKey: OpenRecentCloseAfterPickDefaults.storageKey
     )
     applyMenuBarUITestDefaults()

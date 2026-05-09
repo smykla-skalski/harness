@@ -353,8 +353,7 @@ struct HarnessMonitorApp: App {
           themeMode: $themeMode,
           settingsSelectedSection: $settingsSelectedSection,
           perfScenario: perfScenario,
-          defersInitialContentUntilBootstrap: defersInitialMainWindowUntilBootstrap,
-          refresh: refreshOpenRecent
+          defersInitialContentUntilBootstrap: defersInitialMainWindowUntilBootstrap
         )
         .modelContainer(container)
       } else {
@@ -369,8 +368,7 @@ struct HarnessMonitorApp: App {
           themeMode: $themeMode,
           settingsSelectedSection: $settingsSelectedSection,
           perfScenario: perfScenario,
-          defersInitialContentUntilBootstrap: defersInitialMainWindowUntilBootstrap,
-          refresh: refreshOpenRecent
+          defersInitialContentUntilBootstrap: defersInitialMainWindowUntilBootstrap
         )
       }
     }
@@ -408,12 +406,6 @@ struct HarnessMonitorApp: App {
   private func refreshStore() {
     Task {
       await store.manualRefresh()
-    }
-  }
-
-  private func refreshOpenRecent() {
-    Task {
-      await store.refreshOpenRecentSessions()
     }
   }
 
