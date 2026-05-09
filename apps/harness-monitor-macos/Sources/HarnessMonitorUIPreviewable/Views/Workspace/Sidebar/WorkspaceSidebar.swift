@@ -152,6 +152,15 @@ struct WorkspaceSidebar: View {
     workspaceSearchQuery = newValue
   }
 
+  private func deferSidebarWidthCommit(_ newWidth: CGFloat) {
+    Task { @MainActor in
+      guard abs(sidebarWidth - newWidth) > 0.5 else {
+        return
+      }
+      sidebarWidth = newWidth
+    }
+  }
+
   var body: some View {
     searchableSidebarList
       .onGeometryChange(for: CGFloat.self) { proxy in
@@ -160,7 +169,9 @@ struct WorkspaceSidebar: View {
         guard abs(sidebarWidth - newWidth) > 0.5 else {
           return
         }
-        sidebarWidth = newWidth
+        // Delay the binding write until after SwiftUI finishes this geometry
+        // update pass; synchronous writes here trigger the live CGFloat fault.
+        deferSidebarWidthCommit(newWidth)
       }
       .toolbar {
         WorkspaceSidebarDecisionFilterToolbarItem(

@@ -5,12 +5,15 @@ struct SessionSidebar: View {
   let store: HarnessMonitorStore
   let snapshot: HarnessMonitorSessionWindowSnapshot?
   let decisions: [Decision]
+  let canPresentSearch: Bool
   @Bindable var state: SessionWindowStateCache
   @Environment(\.undoManager)
   var undoManager
   @State private var currentModifiers: EventModifiers = []
   @State private var agentDropTargetID: String?
   @State private var decisionDropTargetID: String?
+  @State private var searchPresentationState = SidebarSearchPresentationState()
+  @State private var searchFocusDispatcher = HarnessSidebarSearchFocusDispatcher()
 
   var targetedDecisionDropID: String? {
     get { decisionDropTargetID }
@@ -54,15 +57,47 @@ struct SessionSidebar: View {
     .onModifierKeysChanged { _, modifiers in
       currentModifiers = modifiers
     }
-    .searchable(text: decisionQueryBinding, placement: .sidebar, prompt: "Filter decisions")
+    .searchable(
+      text: decisionQueryBinding,
+      isPresented: searchPresentation,
+      placement: .sidebar,
+      prompt: "Filter decisions"
+    )
     .searchScopes(decisionScopeBinding) {
       ForEach(DecisionsSidebarSearchScope.allCases) { scope in
         Label(scope.label, systemImage: scope.systemImage)
           .tag(scope)
       }
     }
+    .harnessFocusedSceneValue(\.harnessSidebarSearchFocusAction, searchFocusAction)
+    .task(id: canPresentSearch) {
+      searchFocusDispatcher.handler = { handleSearchFocusRequest() }
+    }
+    .onChange(of: canPresentSearch, initial: true) { _, canPresent in
+      applySearchPresentationAvailability(canPresent)
+    }
+    .onDisappear {
+      searchFocusDispatcher.handler = nil
+    }
     .accessibilityValue(decisionSelectionAccessibilityValue)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowSidebar)
+  }
+
+  private func handleSearchFocusRequest() {
+    _ = searchPresentationState.requestPresentation(canPresent: canPresentSearch)
+  }
+
+  private func applySearchPresentationAvailability(_ canPresent: Bool) {
+    guard canPresent else {
+      searchPresentationState.isPresented = false
+      return
+    }
+    if searchPresentationState.applyPendingPresentationIfNeeded(canPresent: canPresent) {
+      return
+    }
+    if !decisionQueryBinding.wrappedValue.isEmpty {
+      searchPresentationState.isPresented = true
+    }
   }
 
   private var decisionSelectionAccessibilityValue: Text {
@@ -91,6 +126,24 @@ struct SessionSidebar: View {
     Binding(
       get: { state.decisionFilters.scope },
       set: { state.decisionFilters.scope = $0 }
+    )
+  }
+
+  private var searchPresentation: Binding<Bool> {
+    Binding(
+      get: { canPresentSearch && searchPresentationState.isPresented },
+      set: { searchPresentationState.isPresented = $0 }
+    )
+  }
+
+  private var searchFocusAction: HarnessSidebarSearchFocus? {
+    guard canPresentSearch else {
+      return nil
+    }
+    return HarnessSidebarSearchFocus(
+      isAvailable: true,
+      menuLabel: .findInDecisions,
+      dispatcher: searchFocusDispatcher
     )
   }
 
