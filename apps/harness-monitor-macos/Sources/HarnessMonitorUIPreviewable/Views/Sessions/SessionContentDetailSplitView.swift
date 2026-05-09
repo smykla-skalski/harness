@@ -80,48 +80,35 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-      .onAppear {
-        syncLiveWidth(resolvedContentWidth, shouldPersist: true)
-      }
-      .onChange(of: geometry.size.width) { _, newWidth in
-        syncLiveWidth(
-          SessionContentDetailSplitLayout.clampedContentWidth(
-            preferredWidth: liveContentWidth,
-            availableWidth: newWidth
-          ),
-          shouldPersist: !isDragging
-        )
-      }
-      .onChange(of: contentWidth) { _, newValue in
-        guard !isDragging else { return }
-        syncLiveWidth(
-          SessionContentDetailSplitLayout.clampedContentWidth(
-            preferredWidth: newValue,
-            availableWidth: geometry.size.width
-          ),
-          shouldPersist: false
-        )
+      .onChange(of: geometry.size.width, initial: true) { _, newWidth in
+        reclampLiveWidth(availableWidth: newWidth)
       }
       .onChange(of: liveContentWidth) { _, newValue in
         guard !isDragging else { return }
-        syncPersistedWidth(newValue)
+        commitPersistedWidth(newValue)
       }
       .onChange(of: isDragging) { _, dragging in
         guard !dragging else { return }
-        syncPersistedWidth(liveContentWidth)
+        commitPersistedWidth(liveContentWidth)
       }
     }
   }
 
-  private func syncLiveWidth(_ resolvedContentWidth: Double, shouldPersist: Bool) {
-    if abs(liveContentWidth - resolvedContentWidth) > 0.5 {
-      liveContentWidth = resolvedContentWidth
+  // No `onChange(of: contentWidth)` writer: paired listeners on the two widths
+  // ping-ponged into the SwiftUI multi-update-per-frame fault on window resize.
+  private func reclampLiveWidth(availableWidth: CGFloat) {
+    let clamped = SessionContentDetailSplitLayout.clampedContentWidth(
+      preferredWidth: liveContentWidth,
+      availableWidth: availableWidth
+    )
+    if abs(liveContentWidth - clamped) > 0.5 {
+      liveContentWidth = clamped
     }
-    guard shouldPersist else { return }
-    syncPersistedWidth(resolvedContentWidth)
+    guard !isDragging else { return }
+    commitPersistedWidth(clamped)
   }
 
-  private func syncPersistedWidth(_ resolvedContentWidth: Double) {
+  private func commitPersistedWidth(_ resolvedContentWidth: Double) {
     guard abs(contentWidth - resolvedContentWidth) > 0.5 else { return }
     contentWidth = resolvedContentWidth
   }
