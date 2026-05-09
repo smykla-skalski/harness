@@ -66,7 +66,7 @@ private struct SettingsConnectionMetricsSection: View {
   }
 
   var body: some View {
-    Section("Metrics") {
+    Section {
       LabeledContent("Transport", value: metrics.transportKind.title)
       LabeledContent("Transport RTT", value: transportLatencyText)
       LabeledContent("Request Latency", value: requestLatencyText)
@@ -81,6 +81,9 @@ private struct SettingsConnectionMetricsSection: View {
       }
       LabeledContent("Msg/sec", value: rateText)
       LabeledContent("Quality", value: metrics.quality.title)
+    } header: {
+      Text("Metrics")
+        .harnessNativeFormSectionHeader()
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.connectionCard)
   }
@@ -92,7 +95,7 @@ private struct SettingsConnectionRecentEventsSection: View {
   private var dateTimeConfiguration
 
   var body: some View {
-    Section("Recent Events") {
+    Section {
       ForEach(events.suffix(10)) { event in
         HStack(spacing: HarnessMonitorTheme.itemSpacing) {
           Image(systemName: connectionEventIcon(for: event.kind))
@@ -109,6 +112,9 @@ private struct SettingsConnectionRecentEventsSection: View {
         }
         .accessibilityElement(children: .combine)
       }
+    } header: {
+      Text("Recent Events")
+        .harnessNativeFormSectionHeader()
     }
   }
 }

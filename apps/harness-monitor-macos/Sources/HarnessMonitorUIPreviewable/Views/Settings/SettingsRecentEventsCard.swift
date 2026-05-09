@@ -7,7 +7,7 @@ struct SettingsRecentEventsSection: View {
   private var dateTimeConfiguration
 
   var body: some View {
-    Section("Recent Events") {
+    Section {
       if events.isEmpty {
         Text("No daemon events available yet")
           .foregroundStyle(.secondary)
@@ -29,6 +29,9 @@ struct SettingsRecentEventsSection: View {
           .accessibilityElement(children: .combine)
         }
       }
+    } header: {
+      Text("Recent Events")
+        .harnessNativeFormSectionHeader()
     }
   }
 

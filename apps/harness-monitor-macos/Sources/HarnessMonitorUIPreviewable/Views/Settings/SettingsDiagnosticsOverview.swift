@@ -18,7 +18,7 @@ struct SettingsDiagnosticsOverview: View {
   private var dateTimeConfiguration
 
   var body: some View {
-    Section("Overview") {
+    Section {
       LabeledContent("Token") {
         Label(
           tokenPresent ? "Present" : "Missing",
@@ -54,10 +54,13 @@ struct SettingsDiagnosticsOverview: View {
           }
         }
       }
+    } header: {
+      Text("Overview")
+        .harnessNativeFormSectionHeader()
     }
 
     if let launchAgent {
-      Section("Launch Agent") {
+      Section {
         LabeledContent("Status") {
           Text(launchAgent.lifecycleTitle)
             .foregroundStyle(
@@ -99,10 +102,13 @@ struct SettingsDiagnosticsOverview: View {
           .scaledFont(.caption)
           .foregroundStyle(.secondary)
         }
+      } header: {
+        Text("Launch Agent")
+          .harnessNativeFormSectionHeader()
       }
     }
 
-    Section("MCP") {
+    Section {
       LabeledContent("Status") {
         MCPStatusLabel(status: mcpStatus, variant: .detail)
       }
@@ -121,10 +127,13 @@ struct SettingsDiagnosticsOverview: View {
             .textSelection(.enabled)
         }
       }
+    } header: {
+      Text("MCP")
+        .harnessNativeFormSectionHeader()
     }
 
     if let lastEvent {
-      Section("Latest Event") {
+      Section {
         LabeledContent("Level") {
           Text(lastEvent.level.uppercased())
             .tracking(HarnessMonitorTheme.uppercaseTracking)
@@ -134,6 +143,9 @@ struct SettingsDiagnosticsOverview: View {
           Text(formatTimestamp(lastEvent.recordedAt, configuration: dateTimeConfiguration))
             .scaledFont(.caption.monospaced())
         }
+      } header: {
+        Text("Latest Event")
+          .harnessNativeFormSectionHeader()
       }
     }
   }

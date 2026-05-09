@@ -6,7 +6,7 @@ struct SettingsStatusSection: View {
   private var dateTimeConfiguration
 
   var body: some View {
-    Section("Status") {
+    Section {
       if let startedAt {
         LabeledContent(
           "Started",
@@ -16,6 +16,9 @@ struct SettingsStatusSection: View {
         Text("Daemon not started.")
           .foregroundStyle(.secondary)
       }
+    } header: {
+      Text("Status")
+        .harnessNativeFormSectionHeader()
     }
   }
 }

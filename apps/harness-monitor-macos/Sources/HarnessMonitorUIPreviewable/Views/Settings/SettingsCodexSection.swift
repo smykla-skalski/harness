@@ -27,7 +27,7 @@ public struct SettingsHostBridgeSection: View {
 
   public var body: some View {
     Form {
-      Section("Host Bridge") {
+      Section {
         LabeledContent("Status") {
           HStack(spacing: HarnessMonitorTheme.spacingXS) {
             Circle()
@@ -48,24 +48,31 @@ public struct SettingsHostBridgeSection: View {
               .foregroundStyle(.orange)
           }
         }
+      } header: {
+        Text("Host Bridge")
+          .harnessNativeFormSectionHeader()
       }
 
-      Section("Capabilities") {
+      Section {
         ForEach(capabilityNames, id: \.self) { name in
           capabilityRow(name: name)
         }
+      } header: {
+        Text("Capabilities")
+          .harnessNativeFormSectionHeader()
       }
 
       Section {
         HostBridgeCommandsView()
       } header: {
         Text("Setup")
+          .harnessNativeFormSectionHeader()
       } footer: {
         Text(
           "Sandboxed monitor features use the shared host bridge. Start it once to enable every "
             + "compiled capability, or narrow it with repeated --capability flags."
         )
-        .scaledFont(.caption)
+        .harnessNativeFormSectionFooter()
       }
     }
     .settingsDetailFormStyle()

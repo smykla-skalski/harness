@@ -7,7 +7,7 @@ struct SessionWindowCreateFormCapabilityPicker: View {
   let validationMessage: String?
 
   var body: some View {
-    Section("Capability") {
+    Section {
       if isLoading {
         Label("Checking available agent capabilities", systemImage: "clock")
           .scaledFont(.callout)
@@ -17,6 +17,9 @@ struct SessionWindowCreateFormCapabilityPicker: View {
       ForEach(options) { option in
         AgentCapabilityRow(option: option, selection: $selection)
       }
+    } header: {
+      Text("Capability")
+        .harnessNativeFormSectionHeader()
     }
     .accessibilityHint(validationMessage ?? "")
   }

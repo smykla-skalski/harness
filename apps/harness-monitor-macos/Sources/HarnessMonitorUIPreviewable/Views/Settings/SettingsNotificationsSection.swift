@@ -46,15 +46,17 @@ public struct SettingsNotificationsSection: View {
         .textSelection(.enabled)
     } header: {
       Text("System Status")
+        .harnessNativeFormSectionHeader()
     } footer: {
       Text("These values come from the system notification center for this app.")
+        .harnessNativeFormSectionFooter()
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsNotificationsStatus)
   }
 
   private var authorizationSection: some View {
-    Section("Authorization") {
+    Section {
       HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
         HarnessMonitorWrapLayout(
           spacing: HarnessMonitorTheme.itemSpacing,
@@ -84,11 +86,14 @@ public struct SettingsNotificationsSection: View {
           )
         }
       }
+    } header: {
+      Text("Authorization")
+        .harnessNativeFormSectionHeader()
     }
   }
 
   private var presetSection: some View {
-    Section("Presets") {
+    Section {
       Picker("Preset", selection: $selectedPreset) {
         ForEach(HarnessMonitorNotificationPreset.allCases) { preset in
           Text(preset.title).tag(preset)
@@ -107,6 +112,9 @@ public struct SettingsNotificationsSection: View {
       ) {
         notifications.applyPreset(selectedPreset)
       }
+    } header: {
+      Text("Presets")
+        .harnessNativeFormSectionHeader()
     }
   }
 
@@ -201,6 +209,7 @@ public struct SettingsNotificationsSection: View {
       }
     } header: {
       Text("Content")
+        .harnessNativeFormSectionHeader()
     }
   }
 
@@ -237,8 +246,10 @@ public struct SettingsNotificationsSection: View {
       }
     } header: {
       Text("Native Options")
+        .harnessNativeFormSectionHeader()
     } footer: {
       Text("Time-sensitive delivery remains available when the system allows it.")
+        .harnessNativeFormSectionFooter()
     }
   }
 
@@ -269,6 +280,7 @@ public struct SettingsNotificationsSection: View {
       }
     } header: {
       Text("Attachments")
+        .harnessNativeFormSectionHeader()
     }
   }
 
@@ -347,12 +359,13 @@ public struct SettingsNotificationsSection: View {
       }
     } header: {
       Text("Delivery")
+        .harnessNativeFormSectionHeader()
     }
   }
 
   @ViewBuilder private var responseSection: some View {
     if let lastResponse = notifications.lastResponse {
-      Section("Last Response") {
+      Section {
         LabeledContent("Action", value: lastResponse.actionIdentifier)
         LabeledContent("Request", value: lastResponse.requestIdentifier)
         LabeledContent("Category", value: lastResponse.categoryIdentifier)
@@ -363,6 +376,9 @@ public struct SettingsNotificationsSection: View {
           "Received",
           value: lastResponse.receivedAt.formatted(date: .abbreviated, time: .standard)
         )
+      } header: {
+        Text("Last Response")
+          .harnessNativeFormSectionHeader()
       }
     }
   }
