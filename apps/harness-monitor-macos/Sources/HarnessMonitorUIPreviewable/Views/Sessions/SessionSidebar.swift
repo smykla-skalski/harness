@@ -11,15 +11,8 @@ struct SessionSidebar: View {
   @Environment(\.undoManager)
   var undoManager
   @State private var currentModifiers: EventModifiers = []
-  @State private var agentDropTargetID: String?
-  @State private var decisionDropTargetID: String?
   @State private var searchPresentationState = SidebarSearchPresentationState()
   @State private var searchFocusDispatcher = HarnessSidebarSearchFocusDispatcher()
-
-  var targetedDecisionDropID: String? {
-    get { decisionDropTargetID }
-    nonmutating set { decisionDropTargetID = newValue }
-  }
 
   var body: some View {
     @Bindable var filters = state.decisionFilters
@@ -169,20 +162,9 @@ struct SessionSidebar: View {
           title: agent.name,
           systemImage: "person.crop.circle",
           severityShape: severityShape(for: agent.status),
-          severityTint: severityTint(for: agent.status),
-          isDropTargeted: agentDropTargetID == agent.agentId
-        ) { metrics in
-          SessionSidebarDragHandle(metrics: metrics)
-            .draggable(
-              SessionAgentDragPayload(sessionID: state.sessionID, agentID: agent.agentId)
-            )
-        }
+          severityTint: severityTint(for: agent.status)
+        )
         .tag(selection)
-        .dropDestination(for: SessionAgentDragPayload.self) { payloads, _ in
-          handleAgentDrop(payloads, before: agent.agentId)
-        } isTargeted: { isTargeted in
-          agentDropTargetID = isTargeted ? agent.agentId : nil
-        }
         .contextMenu {
           Menu("Move to...") {
             Button("Top") {
@@ -227,7 +209,7 @@ struct SessionSidebar: View {
           systemImage: "wand.and.stars",
           severityShape: SessionCodexRunRowFormatter.severityShape(for: run.status),
           severityTint: SessionCodexRunRowFormatter.severityTint(for: run.status)
-        ) { _ in EmptyView() }
+        )
         .tag(selection)
         .contextMenu {
           Button("Copy Run ID") {
@@ -270,16 +252,7 @@ struct SessionSidebar: View {
           systemImage: "checklist",
           severityShape: severityShape(for: task.severity),
           severityTint: severityTint(for: task.severity)
-        ) { metrics in
-          SessionSidebarDragHandle(metrics: metrics)
-            .draggable(
-              TaskDragPayload(
-                sessionID: state.sessionID,
-                taskID: task.taskId,
-                queuePolicy: task.queuePolicy
-              )
-            )
-        }
+        )
         .tag(selection)
         .contextMenu {
           Menu("Move to...") {

@@ -2,26 +2,6 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension SessionSidebar {
-  func handleAgentDrop(_ payloads: [SessionAgentDragPayload], before agentID: String) -> Bool {
-    guard let payload = payloads.first, payload.sessionID == state.sessionID else {
-      return false
-    }
-    state.sidebarOrdering.moveAgent(
-      payload.agentID,
-      before: agentID,
-      undoManager: undoManager
-    )
-    return true
-  }
-
-  func handleTaskDecisionDrop(_ payloads: [TaskDragPayload], decisionID: String) -> Bool {
-    guard let payload = payloads.first, payload.sessionID == state.sessionID else {
-      return false
-    }
-    linkTask(payload.taskID, to: decisionID)
-    return true
-  }
-
   func linkTask(_ taskID: String, to decisionID: String) {
     state.lastTaskDecisionLink = SessionTaskDecisionLink(
       sessionID: state.sessionID,

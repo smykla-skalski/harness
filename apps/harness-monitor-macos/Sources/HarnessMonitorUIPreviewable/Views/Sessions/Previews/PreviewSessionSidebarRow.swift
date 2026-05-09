@@ -37,9 +37,7 @@ struct SessionSidebarRowPreviewContent: View {
       systemImage: "person.crop.circle",
       severityShape: .dot,
       severityTint: .orange
-    ) { metrics in
-      SessionSidebarDragHandle(metrics: metrics)
-    }
+    )
   }
 }
 
@@ -61,9 +59,7 @@ struct SessionSidebarRowSelectionPreviewContent: View {
           systemImage: "person.crop.circle",
           severityShape: .dot,
           severityTint: .orange
-        ) { metrics in
-          SessionSidebarDragHandle(metrics: metrics)
-        }
+        )
         .tag(
           SessionSelection.agent(
             sessionID: SessionSidebarRowPreviewFixtures.sessionID,

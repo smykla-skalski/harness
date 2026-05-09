@@ -17,7 +17,6 @@ extension SessionSidebar {
           systemImage: "exclamationmark.bubble",
           severityShape: severityShape(for: severity),
           severityTint: severityTint(for: severity),
-          isDropTargeted: targetedDecisionDropID == decision.id,
           isMultiSelect: state.sidebarSelection.isDecisionMultiSelectEnabled,
           isSelected: state.sidebarSelection.selectedDecisionIDs.contains(decision.id),
           toggleSelection: {
@@ -25,11 +24,6 @@ extension SessionSidebar {
           }
         )
         .tag(selection)
-        .dropDestination(for: TaskDragPayload.self) { payloads, _ in
-          handleTaskDecisionDrop(payloads, decisionID: decision.id)
-        } isTargeted: { isTargeted in
-          targetedDecisionDropID = isTargeted ? decision.id : nil
-        }
         .modifier(
           SessionSidebarMultiSelectRowGesture(
             isEnabled: state.sidebarSelection.isDecisionMultiSelectEnabled,

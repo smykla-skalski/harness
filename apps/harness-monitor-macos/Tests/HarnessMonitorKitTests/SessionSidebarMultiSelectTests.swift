@@ -90,8 +90,8 @@ struct SessionSidebarMultiSelectTests {
   }
 
   @MainActor
-  @Test("Task move keyboard alternative records the same decision link as drag drop")
-  func taskMoveKeyboardAlternativeRecordsDecisionLink() {
+  @Test("Task move helper records the expected decision link")
+  func taskMoveHelperRecordsDecisionLink() {
     let state = SessionWindowStateCache(sessionID: "session-1")
     let sidebar = SessionSidebar(
       store: HarnessMonitorStore(daemonController: PreviewDaemonController(mode: .empty)),
@@ -112,8 +112,8 @@ struct SessionSidebarMultiSelectTests {
     #expect(state.lastTaskDecisionLink == expectedLink)
   }
 
-  @Test("Draggable sidebar rows expose Move to context menus")
-  func draggableRowsExposeMoveToContextMenus() throws {
+  @Test("Sidebar task rows expose Move to context menus")
+  func taskRowsExposeMoveToContextMenus() throws {
     let source = try sourceFile(named: "SessionSidebar.swift")
 
     #expect(source.contains("Menu(\"Move to...\")"))
@@ -121,26 +121,22 @@ struct SessionSidebarMultiSelectTests {
     #expect(source.contains("Filter decisions to show more"))
   }
 
-  @Test("Draggable sidebar rows render a native hover drag handle")
-  func draggableRowsRenderNativeHoverDragHandle() throws {
+  @Test("Sidebar rows remove drag handle and drop target chrome")
+  func sidebarRowsRemoveDragHandleAndDropTargetChrome() throws {
     let source = try sourceFile(named: "SessionSidebarRow.swift")
 
-    #expect(source.contains("showsDragHandle"))
-    #expect(source.contains("SessionSidebarDragHandle"))
-    #expect(source.contains("isHoveringDragHandle"))
-    #expect(source.contains("SessionSidebarDragHandleGlyph"))
-    #expect(source.contains("path.addEllipse"))
-    #expect(source.contains("for column in 0..<2"))
-    #expect(source.contains("for row in 0..<3"))
-    #expect(source.contains(".overlay(alignment: .trailing)"))
-    #expect(source.contains(".onHover"))
-    #expect(!source.contains("Image(systemName: \"ellipsis\")"))
-    #expect(!source.contains("ForEach(0..<3"))
-    #expect(!source.contains("grip.vertical"))
-    #expect(!source.contains("line.3.horizontal"))
-    #expect(!source.contains("rectangle.grid.3x2.fill"))
-    #expect(!source.contains("dragHandleColumnWidth"))
-    #expect(source.contains("dragHandleHitTarget"))
+    #expect(!source.contains("showsDragHandle"))
+    #expect(!source.contains("SessionSidebarDragHandle"))
+    #expect(!source.contains("isHoveringDragHandle"))
+    #expect(!source.contains("SessionSidebarDragHandleGlyph"))
+    #expect(!source.contains("path.addEllipse"))
+    #expect(!source.contains("for column in 0..<2"))
+    #expect(!source.contains("for row in 0..<3"))
+    #expect(!source.contains(".overlay(alignment: .trailing)"))
+    #expect(!source.contains(".onHover"))
+    #expect(!source.contains("isDropTargeted"))
+    #expect(!source.contains("dragHandleHitTarget"))
+    #expect(!source.contains("dropCornerRadius"))
   }
 
   @Test("Sidebar rows rely on native List selection instead of tap gestures")
@@ -166,19 +162,19 @@ struct SessionSidebarMultiSelectTests {
     #expect(columnsSource.contains("canPresentSearch: sessionSidebarSearchAvailable"))
   }
 
-  @Test("Draggable sidebar rows keep drag gestures on the handle")
-  func draggableRowsKeepDragGesturesOnHandle() throws {
+  @Test("Sidebar sources no longer install drag and drop")
+  func sidebarSourcesNoLongerInstallDragAndDrop() throws {
     let sidebarSource = try sourceFile(named: "SessionSidebar.swift")
+    let decisionSource = try sourceFile(named: "SessionSidebarDecisionSection.swift")
     let rowSource = try sourceFile(named: "SessionSidebarRow.swift")
 
-    #expect(sidebarSource.contains("SessionSidebarDragHandle(metrics: metrics)"))
     #expect(!rowSource.contains("AnyView"))
     #expect(rowSource.contains(".contentShape(Rectangle())"))
-    #expect(
-      !sidebarSource.contains(
-        ".simultaneousGesture(pointerSelectionGesture(for: selection))\n        .draggable("
-      )
-    )
+    #expect(!sidebarSource.contains(".draggable("))
+    #expect(!sidebarSource.contains(".dropDestination("))
+    #expect(!sidebarSource.contains("SessionAgentDragPayload"))
+    #expect(!sidebarSource.contains("TaskDragPayload("))
+    #expect(!decisionSource.contains(".dropDestination("))
   }
 
   private func sourceFile(named name: String) throws -> String {
