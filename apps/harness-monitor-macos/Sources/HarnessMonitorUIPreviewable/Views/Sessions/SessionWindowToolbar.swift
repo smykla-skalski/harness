@@ -50,7 +50,7 @@ struct SessionWindowToolbar: ToolbarContent {
     case .live:
       return HarnessMonitorTheme.success
     case .cache:
-      return HarnessMonitorTheme.secondaryInk
+      return HarnessMonitorTheme.disabledConnectionChrome
     case .catalog:
       return HarnessMonitorTheme.tertiaryInk
     }
@@ -188,11 +188,11 @@ private struct SessionToolbarCenterpiece: View {
 
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.itemSpacing) {
+      SessionToolbarCenterpieceSourceIcon(source: source)
       ConnectionToolbarBadge(metrics: metrics)
         .accessibilityHidden(true)
       Spacer(minLength: 0)
       SessionToolbarCenterpieceServiceStrip(
-        source: source,
         statusStripState: statusStripState
       )
     }
@@ -211,7 +211,6 @@ private struct SessionToolbarCenterpieceSourcePresentation {
 }
 
 private struct SessionToolbarCenterpieceServiceStrip: View {
-  let source: SessionToolbarCenterpieceSourcePresentation
   let statusStripState: SessionToolbarCenterpieceStatusStripState
   @ScaledMetric(relativeTo: .caption)
   private var chromeHeight: CGFloat = 14
@@ -234,15 +233,24 @@ private struct SessionToolbarCenterpieceServiceStrip: View {
           }
         }
       }
-      Image(systemName: source.systemImage)
-        .scaledFont(.system(.caption2, design: .rounded, weight: .semibold))
-        .foregroundStyle(source.tint)
-        .frame(minHeight: chromeHeight, alignment: .center)
-        .accessibilityHidden(true)
     }
     .fixedSize(horizontal: true, vertical: false)
     .frame(minHeight: chromeHeight, alignment: .center)
     .accessibilityHidden(true)
+  }
+}
+
+private struct SessionToolbarCenterpieceSourceIcon: View {
+  let source: SessionToolbarCenterpieceSourcePresentation
+  @ScaledMetric(relativeTo: .caption)
+  private var chromeHeight: CGFloat = 14
+
+  var body: some View {
+    Image(systemName: source.systemImage)
+      .scaledFont(.system(.caption2, design: .rounded, weight: .semibold))
+      .foregroundStyle(source.tint)
+      .frame(minHeight: chromeHeight, alignment: .center)
+      .accessibilityHidden(true)
   }
 }
 
