@@ -219,6 +219,7 @@ run = "HARNESS_STALE_CLEANUP_ALLOW_LIVE_RESET=1 apps/harness-monitor-macos/Scrip
 description = "Run `harness daemon dev` with the current Harness Monitor runtime lane"
 env = { RUST_LOG = "harness=trace,agent_client_protocol=trace,tokio_tungstenite=debug,info,runtime=warn,tokio=warn,pyroscope=warn,pyroscope_pprofrs=warn,h2=warn,hyper=warn,hyper_util=warn,tower=warn,reqwest=warn,sqlx=warn" }
 run = '''
+  mkdir -p tmp/logs
   log="tmp/logs/$(date +%y%m%d%H%M)-monitor-daemon-dev.log"
   apps/harness-monitor-macos/Scripts/monitor-runtime-env.sh \
     ./scripts/cargo-local.sh run --quiet -- daemon dev \
@@ -230,6 +231,7 @@ run = '''
 description = "Run `harness bridge start` with the current Harness Monitor runtime lane"
 env = { RUST_LOG = "harness=trace,agent_client_protocol=trace,tokio_tungstenite=debug,info,runtime=warn,tokio=warn,pyroscope=warn,pyroscope_pprofrs=warn,h2=warn,hyper=warn,hyper_util=warn,tower=warn,reqwest=warn,sqlx=warn", HARNESS_RUN_STEP_ACCEPT_STATUSES = "130,143" }
 run = '''
+  mkdir -p tmp/logs
   log="tmp/logs/$(date +%y%m%d%H%M)-monitor-bridge-start.log"
   apps/harness-monitor-macos/Scripts/monitor-runtime-env.sh \
     ./scripts/cargo-local.sh run --quiet -- bridge start \
