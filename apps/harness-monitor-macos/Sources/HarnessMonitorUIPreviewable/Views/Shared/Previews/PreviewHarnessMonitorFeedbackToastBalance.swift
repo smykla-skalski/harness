@@ -122,32 +122,21 @@ private struct FeedbackToastBalancePreviewBoard: View {
 }
 
 #Preview("Toast primary action copied", traits: .fixedLayout(width: 360, height: 100)) {
-  FeedbackToastPrimaryActionCopiedPreview()
-}
-
-@MainActor
-private struct FeedbackToastPrimaryActionCopiedPreview: View {
-  private let toast = FeedbackToastBalancePreviewData.makeCompactToast()
-  @State private var copied = true
-  @State private var dragOffset: CGFloat = 0
-
-  var body: some View {
-    HarnessMonitorFeedbackToastPrimaryActionButton(
-      action: ActionFeedbackAction(
-        title: "Copy restart command",
-        systemImage: "doc.on.clipboard",
-        kind: .copy(text: FeedbackToastBalancePreviewData.restartCommand),
-        successAnnouncement: "Restart command copied"
-      ),
-      feedbackID: UUID(),
-      toast: toast,
-      copied: $copied,
-      dragOffset: $dragOffset,
-      tint: HarnessMonitorTheme.caution,
-      reduceMotion: false,
-      dismissThreshold: 80
-    )
-    .padding(24)
-    .harnessPreviewSceneAppearance()
-  }
+  HarnessMonitorFeedbackToastPrimaryActionButton(
+    action: ActionFeedbackAction(
+      title: "Copy restart command",
+      systemImage: "doc.on.clipboard",
+      kind: .copy(text: FeedbackToastBalancePreviewData.restartCommand),
+      successAnnouncement: "Restart command copied"
+    ),
+    copied: true,
+    tint: HarnessMonitorTheme.caution,
+    reduceMotion: false,
+    onPress: {},
+    onPendingDismissCancelled: {},
+    onBeginDismiss: {},
+    onFinishDismiss: {}
+  )
+  .padding(24)
+  .harnessPreviewSceneAppearance()
 }
