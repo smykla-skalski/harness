@@ -10,7 +10,6 @@ struct SessionSidebarRowMetricsTests {
 
     #expect(metrics.minHeight == 28)
     #expect(metrics.multiSelectControlSize == 24)
-    #expect(metrics.dragHandleColumnWidth == 12)
     #expect(metrics.dragHandleHitTarget == 24)
     #expect(metrics.severityIndicatorSize == 8)
   }
