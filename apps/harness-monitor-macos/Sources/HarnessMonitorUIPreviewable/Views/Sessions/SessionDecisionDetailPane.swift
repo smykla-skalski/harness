@@ -15,11 +15,17 @@ struct SessionDecisionDetailPane: View {
     SessionDecisionDetailPaneMetrics(fontScale: fontScale)
   }
 
+  private var formTopContentPadding: CGFloat {
+    showsFilteredNotice ? 0 : metrics.contentPadding
+  }
+
   var body: some View {
-    SessionDetailScrollSurface(contentPadding: metrics.contentPadding) {
+    SessionDetailScrollSurface(contentPadding: 0) {
       VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
         if showsFilteredNotice, let filters {
           SessionFilteredDecisionNotice(filters: filters)
+            .padding(.top, metrics.contentPadding)
+            .padding(.horizontal, metrics.contentPadding)
         }
         Form {
           Section {
@@ -58,6 +64,9 @@ struct SessionDecisionDetailPane: View {
           }
         }
         .harnessNativeFormContainer()
+        .contentMargins(.horizontal, metrics.contentPadding, for: .scrollContent)
+        .contentMargins(.top, formTopContentPadding, for: .scrollContent)
+        .contentMargins(.bottom, metrics.contentPadding, for: .scrollContent)
         .scrollDisabled(true)
         .scrollContentBackground(.hidden)
       }

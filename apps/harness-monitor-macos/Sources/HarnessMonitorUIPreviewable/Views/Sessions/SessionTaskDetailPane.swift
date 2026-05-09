@@ -12,7 +12,7 @@ struct SessionTaskDetailPane: View {
   }
 
   var body: some View {
-    SessionDetailScrollSurface(contentPadding: metrics.contentPadding) {
+    SessionDetailScrollSurface(contentPadding: 0) {
       Form {
         Section {
           LabeledContent("Title", value: task.title)
@@ -125,6 +125,8 @@ struct SessionTaskDetailPane: View {
         }
       }
       .harnessNativeFormContainer()
+      .contentMargins(.horizontal, metrics.contentPadding, for: .scrollContent)
+      .contentMargins(.vertical, metrics.contentPadding, for: .scrollContent)
       .scrollDisabled(true)
       .scrollContentBackground(.hidden)
     }

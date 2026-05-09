@@ -162,7 +162,8 @@ struct SessionWindowCreateForm: View {
       }
     }
     .harnessNativeFormContainer()
-    .padding(metrics.formPadding)
+    .contentMargins(.horizontal, metrics.formPadding, for: .scrollContent)
+    .contentMargins(.vertical, metrics.formPadding, for: .scrollContent)
     .dynamicTypeSize(.xSmall ... .accessibility5)
     .task {
       if focusedField == nil {
