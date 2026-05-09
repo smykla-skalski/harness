@@ -127,7 +127,8 @@ struct HarnessMonitorApp: App {
   }
 
   var body: some Scene {
-    mainWindowScene
+    openRecentWindowScene
+    sessionWindowScene
     settingsWindowScene
     menuBarExtraScene
   }
@@ -156,7 +157,7 @@ struct HarnessMonitorApp: App {
   }
 
   @ViewBuilder
-  private func mainWindowSceneContent(
+  private func sessionWindowSceneContent(
     token: Binding<SessionWindowToken?>
   ) -> some View {
     if rendersLiveSceneContent, let tokenValue = token.wrappedValue {
@@ -170,8 +171,15 @@ struct HarnessMonitorApp: App {
         themeMode: $themeMode
       )
       .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
-    } else if rendersLiveSceneContent {
-      mainWindowContent
+    } else {
+      Color.clear.accessibilityHidden(true)
+    }
+  }
+
+  @ViewBuilder
+  private var openRecentWindowSceneContent: some View {
+    if rendersLiveSceneContent {
+      openRecentWindowContent
         .modifier(SessionWindowTabbing(isSessionWindow: false))
         .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
     } else {
@@ -179,17 +187,16 @@ struct HarnessMonitorApp: App {
     }
   }
 
-  private var mainWindowScene: some Scene {
-    WindowGroup(
+  private var openRecentWindowScene: some Scene {
+    Window(
       "Open Recent Session",
-      id: HarnessMonitorWindowID.main,
-      for: SessionWindowToken.self
-    ) { token in
-      mainWindowSceneContent(token: token)
+      id: HarnessMonitorWindowID.openRecent
+    ) {
+      openRecentWindowSceneContent
     }
     .windowToolbarStyle(.unified)
     .defaultSize(width: mainWindowDefaultSize.width, height: mainWindowDefaultSize.height)
-    .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
+    .restorationBehavior(.disabled)
     .defaultLaunchBehavior(shouldHandleInitialWindowRouting ? .suppressed : .automatic)
     .onChange(of: scenePhase, initial: true) { _, newPhase in
       installMainWindowLauncherIfNeeded()
@@ -198,6 +205,20 @@ struct HarnessMonitorApp: App {
     .commands {
       mainWindowCommands
     }
+  }
+
+  private var sessionWindowScene: some Scene {
+    WindowGroup(
+      id: HarnessMonitorWindowID.sessionScene,
+      for: SessionWindowToken.self
+    ) { token in
+      sessionWindowSceneContent(token: token)
+    }
+    .windowToolbarStyle(.unified)
+    .defaultSize(width: mainWindowDefaultSize.width, height: mainWindowDefaultSize.height)
+    .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
+    .defaultLaunchBehavior(shouldHandleInitialWindowRouting ? .suppressed : .automatic)
+    .commandsRemoved()
   }
 
   @CommandsBuilder private var mainWindowCommands: some Commands {
@@ -217,7 +238,7 @@ struct HarnessMonitorApp: App {
     }
     hasInstalledMainWindowLauncher = true
     HarnessMonitorMainWindowLauncher.shared.installOpenMainWindow {
-      openWindow(id: HarnessMonitorWindowID.main)
+      openWindow(id: HarnessMonitorWindowID.openRecent)
     }
   }
 
@@ -244,13 +265,10 @@ struct HarnessMonitorApp: App {
       store: store,
       launchBehavior: launchBehavior,
       openWelcomeWindow: {
-        openWindow(id: HarnessMonitorWindowID.main)
+        openWindow(id: HarnessMonitorWindowID.openRecent)
       },
       openSessionWindow: { sessionID in
-        openWindow(
-          id: HarnessMonitorWindowID.main,
-          value: SessionWindowToken(sessionID: sessionID)
-        )
+        openWindow.openHarnessSessionWindow(sessionID: sessionID)
       }
     )
     await router.route()
@@ -319,7 +337,7 @@ struct HarnessMonitorApp: App {
     )
   }
 
-  @ViewBuilder private var mainWindowContent: some View {
+  @ViewBuilder private var openRecentWindowContent: some View {
     Group {
       if let container {
         HarnessMonitorWindowRootView(

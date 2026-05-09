@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 
@@ -16,9 +17,10 @@ struct SessionWindowFlowTests {
     #expect(decoded.sessionID == "sess-alpha")
   }
 
-  @Test("Session windows route through the main value-routed scene")
-  func sessionWindowsRouteThroughMainSceneID() {
-    #expect(HarnessMonitorWindowID.main == "main")
+  @Test("Session windows use dedicated scene identifiers")
+  func sessionWindowsUseDedicatedSceneIdentifiers() {
+    #expect(HarnessMonitorWindowID.openRecent == "open-recent")
+    #expect(HarnessMonitorWindowID.sessionScene == "session")
     #expect(HarnessMonitorWindowID.sessionWindow("sess-alpha") == "session-sess-alpha")
   }
 
@@ -42,6 +44,52 @@ struct SessionWindowFlowTests {
     #expect(SessionWindowTabbingPreference.resolved(rawValue: "unknown") == .system)
     #expect(
       SessionWindowTabbingPreference.storageKey == "harness.monitor.session-window.tabbing"
+    )
+  }
+
+  @Test("Session tab opening honors app and system tabbing preferences")
+  func sessionTabOpeningHonorsAppAndSystemPreferences() {
+    #expect(
+      !SessionWindowTabbingSupport.shouldPreferTabbedOpen(
+        preference: .never,
+        userPreference: .always,
+        targetIsFullScreen: true
+      )
+    )
+    #expect(
+      SessionWindowTabbingSupport.shouldPreferTabbedOpen(
+        preference: .always,
+        userPreference: .manual,
+        targetIsFullScreen: false
+      )
+    )
+    #expect(
+      !SessionWindowTabbingSupport.shouldPreferTabbedOpen(
+        preference: .system,
+        userPreference: .manual,
+        targetIsFullScreen: true
+      )
+    )
+    #expect(
+      SessionWindowTabbingSupport.shouldPreferTabbedOpen(
+        preference: .system,
+        userPreference: .always,
+        targetIsFullScreen: false
+      )
+    )
+    #expect(
+      !SessionWindowTabbingSupport.shouldPreferTabbedOpen(
+        preference: .system,
+        userPreference: .inFullScreen,
+        targetIsFullScreen: false
+      )
+    )
+    #expect(
+      SessionWindowTabbingSupport.shouldPreferTabbedOpen(
+        preference: .system,
+        userPreference: .inFullScreen,
+        targetIsFullScreen: true
+      )
     )
   }
 
@@ -576,7 +624,7 @@ struct SessionWindowFlowTests {
     #expect(!source.contains("import AppKit"))
     #expect(source.contains("@Environment(\\.dismiss)"))
     #expect(source.contains("@Environment(\\.openWindow)"))
-    #expect(source.contains("openWindow("))
+    #expect(source.contains("openWindow.openHarnessSessionWindow"))
     #expect(source.contains("await Task.yield()"))
     #expect(source.contains("dismiss()"))
     #expect(!source.contains("OpenRecentSessionLaunchHandoff"))
@@ -587,7 +635,8 @@ struct SessionWindowFlowTests {
     #expect(!source.contains("makeKeyAndOrderFront"))
     #expect(!source.contains("sourceWindow.close()"))
     #expect(!source.contains("@Environment(\\.dismissWindow)"))
-    #expect(!source.contains("dismissWindow(id: HarnessMonitorWindowID.main)"))
+    #expect(!source.contains("dismissWindow(id: HarnessMonitorWindowID.openRecent)"))
+    #expect(!source.contains("openWindow(id: HarnessMonitorWindowID.openRecent)"))
   }
 
   @Test("Session tabs route through SwiftUI commands plus the tabbing accessor")
@@ -597,20 +646,28 @@ struct SessionWindowFlowTests {
     let commandsSource = try harnessSourceFile(named: "Commands/WindowMenuCommands.swift")
     let tabbingAccessorPath = harnessSourceURL(named: "App/SessionWindowTabbing.swift").path
     let tabbingSource = try harnessSourceFile(named: "App/SessionWindowTabbing.swift")
+    let tabbingSupportSource = try previewableSourceFile(
+      named: "Support/SessionWindowTabbingSupport.swift"
+    )
 
     #expect(FileManager.default.fileExists(atPath: tabbingAccessorPath))
+    #expect(appSource.contains("Window("))
     #expect(appSource.contains("WindowGroup("))
+    #expect(appSource.contains("id: HarnessMonitorWindowID.openRecent"))
+    #expect(appSource.contains("id: HarnessMonitorWindowID.sessionScene"))
     #expect(appSource.contains("for: SessionWindowToken.self"))
+    #expect(appSource.contains(".restorationBehavior(.disabled)"))
+    #expect(appSource.contains(".commandsRemoved()"))
     #expect(appSource.contains("SessionWindowTabbing(isSessionWindow: false)"))
     #expect(commandsSource.contains("@Environment(\\.openWindow)"))
-    #expect(commandsSource.contains("openWindow("))
+    #expect(commandsSource.contains("openHarnessSessionWindow"))
     #expect(rootSource.contains("SessionWindowTabbing(isSessionWindow: true)"))
-    #expect(tabbingSource.contains("tabbingIdentifier"))
     #expect(tabbingSource.contains("scheduleWindowTabbingApplication()"))
     #expect(tabbingSource.contains("await Task.yield()"))
     #expect(tabbingSource.contains("guard window.toolbar != nil else"))
-    #expect(!commandsSource.contains("NSWindow"))
-    #expect(!commandsSource.contains("tabbingIdentifier"))
+    #expect(tabbingSupportSource.contains("tabbingIdentifier"))
+    #expect(tabbingSupportSource.contains("shouldPreferTabbedOpen"))
+    #expect(tabbingSupportSource.contains("visibleSessionTabTargetWindow"))
   }
 
   @Test("Session inspector divider remains SwiftUI native")

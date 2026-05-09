@@ -100,7 +100,7 @@ final class AcpPermissionAttentionState {
         return true
       }
       return keyWindowObserver.snapshot.keyWindowIdentifier == nil
-        && windowID == HarnessMonitorWindowID.main
+        && windowID == HarnessMonitorWindowID.openRecent
     case .hidden:
       return false
     case nil:

@@ -91,7 +91,7 @@ public struct ContentDetailColumn: View {
           store: store,
           contentChrome: contentChrome,
           keyWindowObserver: keyWindowObserver,
-          windowID: HarnessMonitorWindowID.main,
+          windowID: HarnessMonitorWindowID.openRecent,
           persistenceError: contentChrome.persistenceError,
           sessionDataAvailability: contentChrome.sessionDataAvailability,
           mcpStatus: contentChrome.mcpStatus,

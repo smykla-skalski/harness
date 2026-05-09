@@ -94,19 +94,14 @@ public struct OpenRecentView: View {
 
   private func openSession(_ sessionID: String) {
     let shouldCloseAfterPick = closeAfterPick
-    openWindow(
-      id: HarnessMonitorWindowID.main,
-      value: SessionWindowToken(sessionID: sessionID)
-    )
+    openWindow.openHarnessSessionWindow(sessionID: sessionID)
+    guard shouldCloseAfterPick else {
+      return
+    }
     Task { @MainActor in
+      // Let SwiftUI create and focus the new session window before dismissing
+      // the current Open Recent window.
       await Task.yield()
-      guard shouldCloseAfterPick else {
-        // SwiftUI may bring the session-bound sibling forward and hide the
-        // nil-token welcome; explicitly re-open the welcome instance so it
-        // stays visible alongside the new session window.
-        openWindow(id: HarnessMonitorWindowID.main)
-        return
-      }
       await dismissCurrentWindow()
     }
   }

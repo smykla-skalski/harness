@@ -15,7 +15,7 @@ struct SessionWindowUnavailableViewTests {
     #expect(unavailableExtensionSource.contains("SessionWindowUnavailableView("))
     #expect(windowSource.contains("if isUnknownSession"))
     #expect(unavailableExtensionSource.contains("didLoadSnapshot && snapshot == nil && summary == nil"))
-    #expect(unavailableExtensionSource.contains("openWindow(id: HarnessMonitorWindowID.main)"))
+    #expect(unavailableExtensionSource.contains("openWindow(id: HarnessMonitorWindowID.openRecent)"))
   }
 
   @Test("Session windows request native accessibility focus after opening")

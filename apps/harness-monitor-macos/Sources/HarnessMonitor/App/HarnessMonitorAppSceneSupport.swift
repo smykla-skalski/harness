@@ -42,7 +42,7 @@ struct HarnessMonitorWindowRootView: View {
 
   var body: some View {
     HarnessMonitorWindowShell(
-      windowID: HarnessMonitorWindowID.main,
+      windowID: HarnessMonitorWindowID.openRecent,
       windowTitle: "Open Recent Session",
       scope: .main,
       minimumSize: Self.minimumSize,

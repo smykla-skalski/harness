@@ -1,5 +1,6 @@
 public enum HarnessMonitorWindowID {
-  public static let main = "main"
+  public static let openRecent = "open-recent"
+  public static let sessionScene = "session"
   public static let settings = "settings"
 
   public static func sessionWindow(_ sessionID: String) -> String {

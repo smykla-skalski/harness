@@ -28,7 +28,7 @@ private enum HarnessMonitorMCPWindowCommandRegistration {
       identifier: HarnessMonitorAccessibility.windowMenuMainItem,
       label: WindowMenuCommands.mainTitle,
       hint: "Open the recent sessions window.",
-      windowID: HarnessMonitorWindowID.main
+      windowID: HarnessMonitorWindowID.openRecent
     )
   ]
 }

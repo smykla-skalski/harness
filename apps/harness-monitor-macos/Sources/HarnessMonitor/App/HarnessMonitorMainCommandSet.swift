@@ -23,14 +23,27 @@ struct HarnessMonitorMainCommandSet: Commands {
     NewSessionCommand(store: store)
     SessionCreateCommands()
     OpenFolderCommand(store: store)
+    RecentSessionsCommand(store: store)
     AttachExternalSessionCommand(store: store)
     GoCommands(
       store: store,
       displayState: store.commandsDisplayState
     )
-    SessionCommands(
+    HarnessMonitorSupplementalCommandSet(
       store: store,
       displayState: store.commandsDisplayState
+    )
+  }
+}
+
+private struct HarnessMonitorSupplementalCommandSet: Commands {
+  let store: HarnessMonitorStore
+  let displayState: CommandsDisplayState
+
+  var body: some Commands {
+    SessionCommands(
+      store: store,
+      displayState: displayState
     )
     WindowMenuCommands(
       store: store

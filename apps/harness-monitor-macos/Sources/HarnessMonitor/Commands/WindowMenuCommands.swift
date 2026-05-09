@@ -26,7 +26,7 @@ struct WindowMenuCommands: Commands {
       .keyboardShortcut(Self.newTabShortcut, modifiers: .command)
 
       Button(Self.mainTitle) {
-        openWindow(id: HarnessMonitorWindowID.main)
+        openWindow(id: HarnessMonitorWindowID.openRecent)
       }
       .keyboardShortcut("1", modifiers: [.command, .shift])
     }
@@ -37,10 +37,7 @@ struct WindowMenuCommands: Commands {
     case .newSessionSheet:
       store.presentedSheet = .newSession
     case .session(let sessionID):
-      openWindow(
-        id: HarnessMonitorWindowID.main,
-        value: SessionWindowToken(sessionID: sessionID)
-      )
+      openWindow.openHarnessSessionWindow(sessionID: sessionID)
     }
   }
 

@@ -16,7 +16,7 @@ struct ContentDetailChrome<Content: View>: View {
     store: HarnessMonitorStore,
     contentChrome: HarnessMonitorStore.ContentChromeSlice,
     keyWindowObserver: KeyWindowObserver? = nil,
-    windowID: String = HarnessMonitorWindowID.main,
+    windowID: String = HarnessMonitorWindowID.openRecent,
     persistenceError: String?,
     sessionDataAvailability: HarnessMonitorStore.SessionDataAvailability,
     mcpStatus: HarnessMonitorMCPStatusSnapshot,
