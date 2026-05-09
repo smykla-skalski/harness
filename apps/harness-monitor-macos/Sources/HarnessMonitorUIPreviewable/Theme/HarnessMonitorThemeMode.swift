@@ -35,6 +35,15 @@ public enum HarnessMonitorMenuBarDefaults {
   }
 }
 
+public enum HarnessMonitorSessionTitleBlurDefaults {
+  public static let enabledKey = "harnessSessionTitleBlurEnabled"
+  public static let enabledDefault = true
+
+  public static func registrationDefaults() -> [String: Any] {
+    [enabledKey: enabledDefault]
+  }
+}
+
 public struct HarnessMonitorBackgroundSelection: Equatable, Identifiable, Sendable {
   public enum Source: Equatable, Sendable {
     case bundled(HarnessMonitorBackgroundImage)

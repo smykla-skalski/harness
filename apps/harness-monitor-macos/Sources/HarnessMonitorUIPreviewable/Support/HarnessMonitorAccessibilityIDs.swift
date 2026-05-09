@@ -115,6 +115,8 @@ public enum HarnessMonitorAccessibility {
   public static let settingsTextSizePicker = "harness.settings.text-size"
   public static let settingsMenuBarStateColorsToggle =
     "harness.settings.menu-bar.state-colors"
+  public static let settingsSessionTitleBlurToggle =
+    "harness.settings.session.title-blur"
   public static let settingsSessionRowModePicker =
     "harness.settings.sidebar-session-row-mode"
   public static let settingsTimeZoneModePicker = "harness.settings.time-zone-mode"
