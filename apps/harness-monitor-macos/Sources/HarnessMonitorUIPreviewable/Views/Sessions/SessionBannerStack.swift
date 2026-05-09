@@ -43,6 +43,7 @@ struct SessionBannerStackMetrics: Equatable {
   let itemSpacing: CGFloat
   let horizontalPadding: CGFloat
   let verticalPadding: CGFloat
+  let actionVerticalPadding: CGFloat
   let reviewButtonMinHeight: CGFloat
 
   init(fontScale: CGFloat) {
@@ -50,6 +51,7 @@ struct SessionBannerStackMetrics: Equatable {
     itemSpacing = HarnessMonitorTheme.itemSpacing * min(scale, 1.4)
     horizontalPadding = HarnessMonitorTheme.spacingMD * min(scale, 1.35)
     verticalPadding = HarnessMonitorTheme.spacingSM * min(scale, 1.45)
+    actionVerticalPadding = HarnessMonitorTheme.spacingXS * min(scale, 1.3)
     reviewButtonMinHeight = scale >= 1.45 ? 44 : 0
   }
 }
@@ -204,6 +206,10 @@ private struct SessionDecisionAttentionBanner: View {
     return "\(count) pending decisions need attention."
   }
 
+  private var bannerVerticalPadding: CGFloat {
+    selectDecisions == nil ? metrics.verticalPadding : metrics.actionVerticalPadding
+  }
+
   var body: some View {
     HStack(alignment: .center, spacing: metrics.itemSpacing) {
       Label {
@@ -224,7 +230,7 @@ private struct SessionDecisionAttentionBanner: View {
       }
     }
     .padding(.horizontal, metrics.horizontalPadding)
-    .padding(.vertical, metrics.verticalPadding)
+    .padding(.vertical, bannerVerticalPadding)
     .dynamicTypeSize(.xSmall ... .accessibility5)
     .foregroundStyle(HarnessMonitorTheme.accent)
     .modifier(ChromeBannerSurfaceModifier(tint: HarnessMonitorTheme.accent))
