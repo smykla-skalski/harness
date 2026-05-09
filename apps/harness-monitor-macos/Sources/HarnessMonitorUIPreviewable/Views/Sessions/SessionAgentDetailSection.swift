@@ -59,6 +59,7 @@ struct SessionAgentDetailSection: View {
   let sessionID: String
   let agent: AgentRegistration
   let tui: AgentTuiSnapshot?
+  let pendingPrompt: AgentPendingUserPrompt?
   let composerFocusRequestID: Int
   @Environment(\.accessibilityVoiceOverEnabled)
   private var voiceOverEnabled
@@ -90,12 +91,21 @@ struct SessionAgentDetailSection: View {
   var body: some View {
     VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
       header
+      if let error = tui?.error, !error.isEmpty {
+        SessionAgentTuiErrorBanner(message: error)
+      }
+      if let tui, !tui.status.isActive, tui.exitCode != nil || (tui.signal?.isEmpty == false) {
+        SessionAgentTuiOutcomeBanner(exitCode: tui.exitCode, signal: tui.signal)
+      }
       SessionAgentTuiViewport(
         agentID: agent.agentId,
         tui: tui,
         metrics: metrics,
         latestOutput: latestOutput
       )
+      if let pendingPrompt {
+        SessionAgentTuiPendingPromptBanner(prompt: pendingPrompt)
+      }
       SessionAgentComposer(
         agentID: agent.agentId,
         message: $message,
