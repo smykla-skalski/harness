@@ -1,7 +1,36 @@
 import HarnessMonitorKit
 import SwiftUI
 
+enum SessionTimelineViewStyle {
+  case cockpitSection
+  case routePage
+}
+
 struct MonitorTimelineSection: View {
+  let host: MonitorTimelineHost
+  let timeline: [TimelineEntry]
+  let timelineWindow: TimelineWindowResponse?
+  let decisions: [Decision]
+  let isTimelineLoading: Bool
+  let store: HarnessMonitorStore
+
+  var body: some View {
+    ViewBodySignposter.measure("MonitorTimelineSection") {
+      SessionTimelineView(
+        style: .cockpitSection,
+        host: host,
+        timeline: timeline,
+        timelineWindow: timelineWindow,
+        decisions: decisions,
+        isTimelineLoading: isTimelineLoading,
+        store: store
+      )
+    }
+  }
+}
+
+struct SessionTimelineView: View {
+  let style: SessionTimelineViewStyle
   let host: MonitorTimelineHost
   let timeline: [TimelineEntry]
   let timelineWindow: TimelineWindowResponse?
@@ -13,6 +42,8 @@ struct MonitorTimelineSection: View {
 
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
+  @Environment(\.fontScale)
+  private var fontScale
   @Environment(\.harnessTextSizeIndex)
   private var textSizeIndex
   @Environment(\.accessibilityReduceMotion)
@@ -36,33 +67,31 @@ struct MonitorTimelineSection: View {
   var body: some View {
     let input = presentationInput
     let displayPresentation = presentationForBody(input: input)
-    ViewBodySignposter.measure("MonitorTimelineSection") {
-      content(for: displayPresentation)
-    }
-    // .task(id:) hops state writes off the view-update phase. Synchronous
-    // .onAppear/.onChange writes here interleaved @State (cachedPresentation)
-    // and @Observable (viewport) mutations during body eval, surfacing as an
-    // AttributeGraph cycle when ACP timeline bursts arrived faster than the
-    // run loop could drain (rdar://timeline-burst). Yield once so SwiftUI can
-    // cancel superseded same-frame input bursts before they mutate state; that
-    // removes the "update multiple times per frame" fault without touching the
-    // table's measurement, height cache, or scrolling paths.
-    .task(id: input) {
-      await Task.yield()
-      guard !Task.isCancelled else {
-        return
+    content(for: displayPresentation)
+      // .task(id:) hops state writes off the view-update phase. Synchronous
+      // .onAppear/.onChange writes here interleaved @State (cachedPresentation)
+      // and @Observable (viewport) mutations during body eval, surfacing as an
+      // AttributeGraph cycle when ACP timeline bursts arrived faster than the
+      // run loop could drain (rdar://timeline-burst). Yield once so SwiftUI can
+      // cancel superseded same-frame input bursts before they mutate state; that
+      // removes the "update multiple times per frame" fault without touching the
+      // table's measurement, height cache, or scrolling paths.
+      .task(id: input) {
+        await Task.yield()
+        guard !Task.isCancelled else {
+          return
+        }
+        rebuildPresentationIfNeeded(for: input)
       }
-      rebuildPresentationIfNeeded(for: input)
-    }
-    .task(id: filterHydrationInput) {
-      hydrateFilters(for: filterHydrationInput)
-    }
-    .onChange(of: filters) { _, newValue in
-      persistFilters(newValue)
-    }
-    .onChange(of: filterPersistenceModeRawValue) { _, _ in
-      persistFilters(filters)
-    }
+      .task(id: filterHydrationInput) {
+        hydrateFilters(for: filterHydrationInput)
+      }
+      .onChange(of: filters) { _, newValue in
+        persistFilters(newValue)
+      }
+      .onChange(of: filterPersistenceModeRawValue) { _, _ in
+        persistFilters(filters)
+      }
   }
 
   private var presentationInput: SessionTimelinePresentationInput {
@@ -101,6 +130,10 @@ struct MonitorTimelineSection: View {
   private var filterPersistenceMode: SessionTimelineFilterPersistenceMode {
     SessionTimelineFilterPersistenceMode(rawValue: filterPersistenceModeRawValue)
       ?? SessionTimelineFilterDefaults.defaultPersistenceMode
+  }
+
+  private var routeMetrics: SessionWindowRouteContentMetrics {
+    SessionWindowRouteContentMetrics(fontScale: fontScale)
   }
 
   @MainActor
@@ -157,7 +190,19 @@ struct MonitorTimelineSection: View {
     )
   }
 
+  @ViewBuilder
   private func content(for presentation: SessionTimelineSectionPresentation) -> some View {
+    switch style {
+    case .cockpitSection:
+      cockpitSectionContent(for: presentation)
+    case .routePage:
+      routePageContent(for: presentation)
+    }
+  }
+
+  private func cockpitSectionContent(
+    for presentation: SessionTimelineSectionPresentation
+  ) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       Text("Timeline")
         .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
@@ -166,40 +211,52 @@ struct MonitorTimelineSection: View {
       if presentation.showsEmptyState {
         SessionCockpitEmptyStateRow(section: .timeline)
       } else {
-        timelineSurface(for: presentation)
+        cockpitTimelineSurface(for: presentation)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    // The three modifiers below all use `deferOffViewUpdate { ... }` to hop
-    // state writes to the next run-loop turn. Synchronous writes here ran
-    // inside SwiftUI's view-update phase and produced an AttributeGraph cycle
-    // during ACP timeline bursts (writes to @State scrollCommand +
-    // @Observable viewport interleaved with parent body re-eval from store
-    // mutations). The helper is the single place that names the rule "no
-    // synchronous state mutation in lifecycle handlers on this view"; new
-    // handlers must route through it. Per-scroll cost is unchanged because
-    // scrollNodeIDs only flips on data update, not per scroll.
-    .onAppear {
-      deferOffViewUpdate {
-        reconcileTimelineAnchor(with: presentation.scrollNodeIDs)
+    .timelineLifecycle(for: presentation, host: self)
+  }
+
+  private func routePageContent(for presentation: SessionTimelineSectionPresentation) -> some View {
+    VStack(alignment: .leading, spacing: routeMetrics.overviewSpacing) {
+      Text("Timeline")
+        .scaledFont(.system(.title2, design: .rounded, weight: .semibold))
+        .accessibilityAddTraits(.isHeader)
+
+      if presentation.showsEmptyState {
+        ContentUnavailableView(
+          "No Timeline Events",
+          systemImage: "clock.arrow.circlepath",
+          description: Text("This session has not recorded timeline activity yet.")
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+      } else {
+        SessionTimelineFilterControls(
+          filters: $filters,
+          inventory: presentation.filterSnapshot.inventory,
+          summary: presentation.filterSnapshot.summary
+        )
+
+        routeTimelineContent(for: presentation)
+
+        if presentation.navigation.showsNavigation {
+          SessionTimelineNavigationControls(
+            navigation: presentation.navigation,
+            presentation: presentation,
+            filterSummary: presentation.filterSnapshot.summary,
+            scrollCommandTargetID: scrollCommand?.targetID,
+            viewport: viewport,
+            performAction: { action in
+              performNavigationAction(action, presentation: presentation)
+            }
+          )
+        }
       }
-      requestLatestWindowIfNeeded(presentation)
     }
-    .onChange(of: sessionID) { _, _ in
-      deferOffViewUpdate {
-        viewport.clear()
-        scrollCommand = nil
-        pendingNavigationAfterLoad = nil
-      }
-      requestLatestWindow()
-    }
-    .onChange(of: presentation.scrollNodeIDs) { _, ids in
-      guard !ids.isEmpty else { return }
-      deferOffViewUpdate {
-        reconcileTimelineAnchor(with: ids)
-        completePendingNavigationIfNeeded(presentation)
-      }
-    }
+    .padding(routeMetrics.contentPadding)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .timelineLifecycle(for: presentation, host: self)
   }
 
   /// Run a state-mutating closure on the next run-loop turn instead of inside
@@ -211,13 +268,15 @@ struct MonitorTimelineSection: View {
   /// invoke this from change-event handlers (`.onAppear`, `.onChange`), never
   /// from per-scroll publishes; the latter would allocate per frame and
   /// regress the body-update budget.
-  private func deferOffViewUpdate(_ work: @escaping @MainActor () -> Void) {
+  fileprivate func deferOffViewUpdate(_ work: @escaping @MainActor () -> Void) {
     Task { @MainActor in
       work()
     }
   }
 
-  private func timelineSurface(for presentation: SessionTimelineSectionPresentation) -> some View {
+  private func cockpitTimelineSurface(
+    for presentation: SessionTimelineSectionPresentation
+  ) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
       SessionTimelineFilterControls(
         filters: $filters,
@@ -225,7 +284,8 @@ struct MonitorTimelineSection: View {
         summary: presentation.filterSnapshot.summary
       )
 
-      timelineScrollContent(for: presentation)
+      timelineRows(for: presentation)
+        .frame(height: presentation.scrollViewportHeight)
 
       if presentation.navigation.showsNavigation {
         SessionTimelineNavigationControls(
@@ -255,42 +315,49 @@ struct MonitorTimelineSection: View {
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  private func timelineScrollContent(
+  private func routeTimelineContent(
     for presentation: SessionTimelineSectionPresentation
   ) -> some View {
-    Group {
-      if presentation.showsFilteredEmptyState {
-        SessionTimelineFilteredEmptyState(filters: $filters)
-      } else if presentation.rows.isEmpty {
-        SessionTimelinePlaceholderScrollView(
-          presentation: presentation,
+    timelineRows(for: presentation)
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+
+  @ViewBuilder
+  private func timelineRows(
+    for presentation: SessionTimelineSectionPresentation
+  ) -> some View {
+    if presentation.showsFilteredEmptyState {
+      SessionTimelineFilteredEmptyState(filters: $filters)
+    } else if presentation.rows.isEmpty {
+      SessionTimelinePlaceholderScrollView(
+        presentation: presentation,
+        actionHandler: actionHandler,
+        contentIdentity: contentIdentity
+      )
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    } else {
+      GeometryReader { geo in
+        SessionTimelineTableView(
+          columnWidth: geo.size.width,
+          rows: presentation.rows,
+          contentIdentity: contentIdentity,
+          scrollCommand: scrollCommand,
           actionHandler: actionHandler,
-          contentIdentity: contentIdentity
+          onSignalTap: { [store] signalID in
+            store.presentedSheet = .signalDetail(signalID: signalID)
+          },
+          viewport: viewport,
+          scrollBoundaryChanged: { oldValue, newValue in
+            handleScrollBoundaryChange(
+              from: oldValue,
+              to: newValue,
+              presentation: presentation
+            )
+          }
         )
-      } else {
-        GeometryReader { geo in
-          SessionTimelineTableView(
-            columnWidth: geo.size.width,
-            rows: presentation.rows,
-            contentIdentity: contentIdentity,
-            scrollCommand: scrollCommand,
-            actionHandler: actionHandler,
-            onSignalTap: { [store] signalID in
-              store.presentedSheet = .signalDetail(signalID: signalID)
-            },
-            viewport: viewport,
-            scrollBoundaryChanged: { oldValue, newValue in
-              handleScrollBoundaryChange(
-                from: oldValue,
-                to: newValue,
-                presentation: presentation
-              )
-            }
-          )
-        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
     }
-    .frame(height: presentation.scrollViewportHeight)
   }
 
   var timelineNavigationAnchorID: String? {
@@ -338,5 +405,34 @@ struct MonitorTimelineSection: View {
   var currentSceneStoredFilterRegistryRawValue: String {
     get { sceneStoredFilterRegistryRawValue }
     nonmutating set { sceneStoredFilterRegistryRawValue = newValue }
+  }
+}
+
+private extension View {
+  func timelineLifecycle(
+    for presentation: SessionTimelineSectionPresentation,
+    host: SessionTimelineView
+  ) -> some View {
+    onAppear {
+      host.deferOffViewUpdate {
+        host.reconcileTimelineAnchor(with: presentation.scrollNodeIDs)
+      }
+      host.requestLatestWindowIfNeeded(presentation)
+    }
+    .onChange(of: host.sessionID) { _, _ in
+      host.deferOffViewUpdate {
+        host.timelineViewport.clear()
+        host.currentTimelineScrollCommand = nil
+        host.currentPendingNavigation = nil
+      }
+      host.requestLatestWindow()
+    }
+    .onChange(of: presentation.scrollNodeIDs) { _, ids in
+      guard !ids.isEmpty else { return }
+      host.deferOffViewUpdate {
+        host.reconcileTimelineAnchor(with: ids)
+        host.completePendingNavigationIfNeeded(presentation)
+      }
+    }
   }
 }

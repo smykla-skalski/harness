@@ -28,6 +28,15 @@ struct SessionWindowRouteContentSelectionTests {
     #expect(columns.contains("contentColumnBody(snapshot: snapshot, route: renderedRoute)"))
   }
 
+  @Test("Timeline route uses the dedicated route page instead of the cockpit section wrapper")
+  func timelineRouteUsesTheDedicatedRoutePage() throws {
+    let columns = try sourceFile(named: "SessionWindowView+Columns.swift")
+
+    #expect(columns.contains("SessionTimelineView("))
+    #expect(columns.contains("style: .routePage"))
+    #expect(!columns.contains("MonitorTimelineSection("))
+  }
+
   private func sourceFile(named name: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =

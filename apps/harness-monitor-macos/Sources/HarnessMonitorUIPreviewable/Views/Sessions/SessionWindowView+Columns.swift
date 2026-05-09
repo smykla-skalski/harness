@@ -186,7 +186,8 @@ extension SessionWindowView {
     case .decisions:
       SessionWindowDecisionsList(decisions: matchingDecisions, state: stateCache)
     case .timeline:
-      MonitorTimelineSection(
+      SessionTimelineView(
+        style: .routePage,
         host: .session(snapshot.summary.sessionId),
         timeline: snapshot.timeline,
         timelineWindow: snapshot.timelineWindow,
@@ -194,7 +195,6 @@ extension SessionWindowView {
         isTimelineLoading: isLoading,
         store: store
       )
-      .padding(24)
     case .terminal: SessionWindowRunsList(detail: snapshot.detail, state: stateCache)
     }
   }
@@ -301,6 +301,16 @@ extension SessionWindowView {
           "Task Not Available",
           systemImage: "checklist",
           description: Text(taskID)
+        )
+      }
+    case .codexRun(_, let runID):
+      if let run = store.selectedCodexRuns.first(where: { $0.runId == runID }) {
+        SessionCodexRunDetailSection(store: store, run: run)
+      } else {
+        ContentUnavailableView(
+          "Codex Run Not Available",
+          systemImage: "wand.and.stars",
+          description: Text(runID)
         )
       }
     case .create(let draft):

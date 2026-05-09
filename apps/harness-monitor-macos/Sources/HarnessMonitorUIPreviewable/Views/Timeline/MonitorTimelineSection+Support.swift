@@ -160,7 +160,7 @@ enum SessionTimelinePlaceholderShimmer {
   }
 }
 
-extension MonitorTimelineSection {
+extension SessionTimelineView {
   var contentIdentity: SessionTimelineContentIdentity {
     SessionTimelineContentIdentity(sessionID: sessionID)
   }
