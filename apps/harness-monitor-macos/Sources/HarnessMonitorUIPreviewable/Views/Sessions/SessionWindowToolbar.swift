@@ -9,6 +9,8 @@ struct SessionWindowToolbar: ToolbarContent {
   let sessionID: String
   let state: SessionWindowStateCache
   @Binding var focusMode: Bool
+  @Environment(\.accessibilityReduceMotion)
+  private var reduceMotion
 
   private var sleepPreventionPresentation: SleepPreventionToolbarPresentation {
     SleepPreventionToolbarPresentation(isEnabled: store.sleepPreventionEnabled)
@@ -35,7 +37,9 @@ struct SessionWindowToolbar: ToolbarContent {
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionNavigateForwardButton)
     }
     ToolbarItem(placement: .automatic) {
-      Toggle(isOn: $focusMode) {
+      Button {
+        toggleFocusMode()
+      } label: {
         Label {
           Text("Focus Mode")
         } icon: {
@@ -46,11 +50,13 @@ struct SessionWindowToolbar: ToolbarContent {
                 options: .nonRepeating
               )
             )
+            .frame(width: 14, height: 14)
         }
       }
-      .animation(.default, value: focusMode)
-      .toggleStyle(.button)
+      .help(focusMode ? "Exit focus mode" : "Enter focus mode")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowFocusModeButton)
       .accessibilityLabel("Focus mode")
+      .accessibilityValue(focusMode ? "On" : "Off")
       .accessibilityHint("Shows or hides secondary session columns.")
     }
     ToolbarItem(placement: .primaryAction) {
@@ -73,6 +79,17 @@ struct SessionWindowToolbar: ToolbarContent {
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowStatusMenu)
       .accessibilityLabel("Session status")
       .accessibilityHint("Shows current connection and session status.")
+    }
+  }
+
+  private func toggleFocusMode() {
+    let animation = SessionFocusModeMotionPolicy.animation(reduceMotion: reduceMotion)
+    if let animation {
+      withAnimation(animation) {
+        focusMode.toggle()
+      }
+    } else {
+      focusMode.toggle()
     }
   }
 }
