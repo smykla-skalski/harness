@@ -76,7 +76,18 @@ extension SessionWindowView {
     preferredBinding: Binding<Bool>,
     announce: Bool = true
   ) {
-    guard abs(detailColumnWidth - width) > 0.5 else { return }
+    // Only commit width changes that flip canPresentInspector. Continuous
+    // geometry updates during the NSP sidebar reveal otherwise churn
+    // focusedSceneValue(\.sessionInspector, …), which propagates through
+    // FocusedValues into OutlineListRepresentable.update mid-animation
+    // and snaps the spring.
+    let previousAllows =
+      detailColumnWidth > 0
+      && SessionInspectorVisibilityPolicy.allowsInspector(width: detailColumnWidth)
+    let nextAllows =
+      width > 0
+      && SessionInspectorVisibilityPolicy.allowsInspector(width: width)
+    guard previousAllows != nextAllows || detailColumnWidth == 0 else { return }
     detailColumnWidth = width
     reconcileInspectorVisibility(
       visibleBinding: visibleBinding,
