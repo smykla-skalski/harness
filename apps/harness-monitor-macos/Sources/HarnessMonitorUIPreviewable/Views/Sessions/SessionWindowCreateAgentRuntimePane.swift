@@ -133,14 +133,8 @@ struct SessionWindowCreateAgentRuntimeContent: View {
           .fixedSize(horizontal: true, vertical: false)
       }
 
-      Text(paneDescription)
-        .scaledFont(.subheadline)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .frame(maxWidth: 620, alignment: .leading)
-
       availabilityNote
     }
-    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
   }
 
   private var compactHeader: some View {
@@ -156,13 +150,6 @@ struct SessionWindowCreateAgentRuntimeContent: View {
 
   private var paneTitle: String {
     draft.useCodex ? "New Codex run" : "New terminal agent"
-  }
-
-  private var paneDescription: String {
-    if draft.useCodex {
-      return "Choose the launch kind here. The form holds the prompt, mode, model, and effort."
-    }
-    return "Choose a provider from the list here. The form holds the prompt, configuration, and advanced overrides."
   }
 
   private var compactDescription: String {
@@ -256,6 +243,7 @@ struct SessionWindowCreateAgentRuntimeContent: View {
         .accessibilityHint("Chooses \(option.title)")
       }
     }
+    .padding(.horizontal, -HarnessMonitorTheme.spacingXS)
   }
 
   private var codexSupportContent: some View {
@@ -342,7 +330,6 @@ private struct SessionWindowCreateSidebarSectionHeader: View {
         .frame(height: 1)
         .accessibilityHidden(true)
     }
-    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
   }
 }
 
@@ -426,8 +413,7 @@ struct SessionWindowCreateProviderListRow: View {
           .truncationMode(.tail)
       }
     }
-    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-    .padding(.vertical, HarnessMonitorTheme.spacingSM)
+    .padding(.vertical, HarnessMonitorTheme.spacingXS)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(rowTint)
     .clipShape(.rect(cornerRadius: HarnessMonitorTheme.cornerRadiusSM))
