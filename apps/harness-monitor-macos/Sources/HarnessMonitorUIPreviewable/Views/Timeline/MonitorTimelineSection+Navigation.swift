@@ -232,6 +232,7 @@ extension SessionTimelineView {
     )
     if currentAppStoredFilterStateRawValue != persisted.appStateRawValue {
       currentAppStoredFilterStateRawValue = persisted.appStateRawValue
+      SessionTimelineFilterDefaults.writeAppStateRawValue(persisted.appStateRawValue)
     }
     if currentSceneStoredFilterRegistryRawValue != persisted.sceneRegistryRawValue {
       currentSceneStoredFilterRegistryRawValue = persisted.sceneRegistryRawValue

@@ -135,43 +135,6 @@ struct SessionTimelineNavigationControls: View {
     let canOlder = presentation.canScrollOlder(from: anchorID)
     let canNewer = presentation.canScrollNewer(from: anchorID)
     let visibilityStats = viewport.visibilityStats
-    return ViewThatFits(in: .horizontal) {
-      horizontalControls(
-        canOlder: canOlder,
-        canNewer: canNewer,
-        visibilityStats: visibilityStats
-      )
-      verticalControls(
-        canOlder: canOlder,
-        canNewer: canNewer,
-        visibilityStats: visibilityStats
-      )
-    }
-    .accessibilityElement(children: .contain)
-    .accessibilityLabel("Timeline navigation")
-    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineNavigation)
-  }
-
-  private func horizontalControls(
-    canOlder: Bool,
-    canNewer: Bool,
-    visibilityStats: SessionTimelineVisibilityStats
-  ) -> some View {
-    let detail = navigationDetail(for: visibilityStats)
-    return HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
-      if let detail {
-        navigationDetailLabel(detail)
-      }
-      Spacer(minLength: 0)
-      buttons(canOlder: canOlder, canNewer: canNewer)
-    }
-  }
-
-  private func verticalControls(
-    canOlder: Bool,
-    canNewer: Bool,
-    visibilityStats: SessionTimelineVisibilityStats
-  ) -> some View {
     let detail = navigationDetail(for: visibilityStats)
     return VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       buttons(canOlder: canOlder, canNewer: canNewer)
@@ -182,17 +145,9 @@ struct SessionTimelineNavigationControls: View {
         }
       }
     }
-  }
-
-  @ViewBuilder
-  private func statusRow(detail: NavigationDetail?) -> some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
-      statusLabel
-      if let detail {
-        statusSeparator
-        navigationDetailLabel(detail)
-      }
-    }
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel("Timeline navigation")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineNavigation)
   }
 
   private var statusLabel: some View {
@@ -200,13 +155,6 @@ struct SessionTimelineNavigationControls: View {
       .scaledFont(.caption.weight(.medium))
       .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineNavigationStatus)
-  }
-
-  private var statusSeparator: some View {
-    Circle()
-      .fill(HarnessMonitorTheme.secondaryInk.opacity(0.7))
-      .frame(width: 4, height: 4)
-      .accessibilityHidden(true)
   }
 
   @ViewBuilder

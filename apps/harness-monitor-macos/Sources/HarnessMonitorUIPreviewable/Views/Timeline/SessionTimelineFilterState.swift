@@ -102,6 +102,26 @@ enum SessionTimelineFilterDefaults {
   static let sceneRegistryKey = "harness.session.timeline.filters.scene-registry"
 
   static let defaultPersistenceMode = SessionTimelineFilterPersistenceMode.sessionWindow
+  static let defaultAppStateRawValue = ""
+
+  static func readPersistenceModeRawValue(userDefaults: UserDefaults = .standard) -> String {
+    userDefaults.string(forKey: persistenceModeKey) ?? defaultPersistenceMode.rawValue
+  }
+
+  static func readAppStateRawValue(userDefaults: UserDefaults = .standard) -> String {
+    userDefaults.string(forKey: appStateKey) ?? defaultAppStateRawValue
+  }
+
+  static func writeAppStateRawValue(
+    _ rawValue: String,
+    userDefaults: UserDefaults = .standard
+  ) {
+    if rawValue.isEmpty {
+      userDefaults.removeObject(forKey: appStateKey)
+    } else {
+      userDefaults.set(rawValue, forKey: appStateKey)
+    }
+  }
 }
 
 struct SessionTimelineFilterState: Equatable, Sendable {

@@ -40,14 +40,6 @@ struct SessionTimelineSearchField: View {
   }
 }
 
-enum SessionTimelineFilterControlLayout {
-  static let readableHorizontalSearchWidth: CGFloat = 560
-
-  static func horizontalMinimumWidth(fontScale: CGFloat) -> CGFloat {
-    readableHorizontalSearchWidth * max(1, min(fontScale, 1.3))
-  }
-}
-
 private struct SessionTimelineSearchFieldChromeModifier: ViewModifier {
   let isFocused: Bool
 

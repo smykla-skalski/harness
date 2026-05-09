@@ -1,5 +1,21 @@
+import Combine
 import HarnessMonitorKit
 import SwiftUI
+
+private struct SessionPendingDecisionBannerPreferenceState: Equatable {
+  var showsPendingDecisionBanners: Bool
+  var showsPendingDecisionBannersInFocusMode: Bool
+
+  static func read(userDefaults: UserDefaults = .standard) -> Self {
+    Self(
+      showsPendingDecisionBanners: SessionPendingDecisionBannerSettings.readEnabled(
+        userDefaults: userDefaults
+      ),
+      showsPendingDecisionBannersInFocusMode: SessionPendingDecisionBannerSettings
+        .readFocusModeEnabled(userDefaults: userDefaults)
+    )
+  }
+}
 
 struct SessionBannerStackModel: Equatable {
   let showsPersistenceError: Bool
@@ -65,11 +81,7 @@ public struct SessionBannerStack<Content: View>: View {
   let pendingDecisionCount: Int
   let selectDecisions: (() -> Void)?
   let content: Content
-  @AppStorage(SessionPendingDecisionBannerSettings.enabledKey)
-  private var showsPendingDecisionBanners = SessionPendingDecisionBannerSettings.enabledDefaultValue
-  @AppStorage(SessionPendingDecisionBannerSettings.focusModeEnabledKey)
-  private var showsPendingDecisionBannersInFocusMode =
-    SessionPendingDecisionBannerSettings.focusModeEnabledDefaultValue
+  @State private var preferenceState = SessionPendingDecisionBannerPreferenceState.read()
 
   public init(
     store: HarnessMonitorStore,
@@ -104,7 +116,8 @@ public struct SessionBannerStack<Content: View>: View {
       isLoading: isLoading,
       hasSnapshot: hasSnapshot,
       showsPendingDecisionBanner:
-        showsPendingDecisionBanners && (!isFocusMode || showsPendingDecisionBannersInFocusMode),
+        preferenceState.showsPendingDecisionBanners
+        && (!isFocusMode || preferenceState.showsPendingDecisionBannersInFocusMode),
       pendingDecisionCount: pendingDecisionCount
     )
   }
@@ -117,6 +130,21 @@ public struct SessionBannerStack<Content: View>: View {
       content
     } banners: {
       topChrome
+    }
+    .onReceive(
+      NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+        .receive(on: RunLoop.main)
+    ) { _ in
+      refreshPreferenceState()
+    }
+  }
+
+  private func refreshPreferenceState(userDefaults: UserDefaults = .standard) {
+    let nextPreferenceState = SessionPendingDecisionBannerPreferenceState.read(
+      userDefaults: userDefaults
+    )
+    if preferenceState != nextPreferenceState {
+      preferenceState = nextPreferenceState
     }
   }
 

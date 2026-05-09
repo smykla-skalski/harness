@@ -291,22 +291,12 @@ struct MonitorTimelineSectionTests {
     #expect(largePresentation.scrollViewportHeight < defaultPresentation.scrollViewportHeight)
   }
 
-  @Test("Filter controls stack before the search field becomes unreadable")
-  func filterControlsStackBeforeSearchFieldBecomesUnreadable() {
-    let threshold = SessionTimelineFilterControlLayout.horizontalMinimumWidth(fontScale: 1)
-    let compactHeight = measuredFilterControlsHeight(width: threshold - 20)
-    let wideHeight = measuredFilterControlsHeight(width: threshold + 120)
+  @Test("Filter controls keep a stable stacked layout across widths")
+  func filterControlsKeepStableStackedLayoutAcrossWidths() {
+    let mediumHeight = measuredFilterControlsHeight(width: 540)
+    let wideHeight = measuredFilterControlsHeight(width: 680)
 
-    #expect(compactHeight > wideHeight + HarnessMonitorTheme.spacingXS)
-  }
-
-  @Test("Filter controls reserve more row width for larger text")
-  func filterControlsReserveMoreRowWidthForLargerText() {
-    let defaultWidth = SessionTimelineFilterControlLayout.horizontalMinimumWidth(fontScale: 1)
-    let largestWidth = SessionTimelineFilterControlLayout.horizontalMinimumWidth(fontScale: 1.3)
-
-    #expect(largestWidth > defaultWidth)
-    #expect(defaultWidth >= SessionTimelineFilterControlLayout.readableHorizontalSearchWidth)
+    #expect(abs(mediumHeight - wideHeight) <= 1)
   }
 
   private func measuredFilterControlsHeight(width: CGFloat) -> CGFloat {

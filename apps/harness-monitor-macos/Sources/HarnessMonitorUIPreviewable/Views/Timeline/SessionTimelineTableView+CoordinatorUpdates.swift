@@ -48,7 +48,10 @@ extension SessionTimelineTableView.Coordinator {
           column.width = request.columnWidth
         }
         lastColumnWidth = request.columnWidth
-        scheduleIncrementalMeasurement(columnWidth: request.columnWidth)
+        scheduleIncrementalMeasurement(
+          columnWidth: request.columnWidth,
+          debounceNanoseconds: Self.widthAnimationMeasurementDebounceNs
+        )
       }
       return
     }
@@ -326,7 +329,10 @@ extension SessionTimelineTableView.Coordinator {
     scheduleIncrementalMeasurement(columnWidth: columnWidth)
   }
 
-  func scheduleIncrementalMeasurement(columnWidth: CGFloat) {
+  func scheduleIncrementalMeasurement(
+    columnWidth: CGFloat,
+    debounceNanoseconds: UInt64 = 0
+  ) {
     guard columnWidth > 1, !rows.isEmpty else {
       return
     }
@@ -367,6 +373,10 @@ extension SessionTimelineTableView.Coordinator {
     }
     let task = Task { @MainActor [weak self] in
       guard let self else { return }
+      if debounceNanoseconds > 0 {
+        try? await Task.sleep(nanoseconds: debounceNanoseconds)
+        guard !Task.isCancelled else { return }
+      }
       await self.runMeasurementTask(
         outstanding: outstanding,
         snapshot: snapshot,
