@@ -81,9 +81,9 @@ struct SessionSidebarRow<DragHandle: View>: View {
         .lineLimit(1)
       Spacer(minLength: 0)
     }
+    .padding(.vertical, metrics.verticalPadding)
     .padding(.trailing, showsDragHandle ? metrics.dragHandleHitTarget : 0)
     .frame(maxWidth: .infinity, minHeight: metrics.minHeight, alignment: .leading)
-    .padding(.vertical, metrics.verticalPadding)
     .padding(.horizontal, isDropTargeted ? 4 : 0)
     .background {
       if isDropTargeted {
