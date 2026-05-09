@@ -203,6 +203,7 @@ extension HarnessMonitorStore {
     }
     connectionMetrics.connectedSince = recordedAt
     connectionMetrics.disconnectedSince = nil
+    refreshExternalManifestDiscoveryTask()
   }
 
   func markConnectionOffline(_ message: String) {
@@ -217,6 +218,7 @@ extension HarnessMonitorStore {
     connectionMetrics.messagesPerSecond = 0
     connectionMetrics.reconnectAttempt = 0
     scheduleSupervisorTick(reason: "connection-offline")
+    refreshExternalManifestDiscoveryTask()
   }
 
   private func updateDisconnectedSince(

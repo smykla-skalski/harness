@@ -7,6 +7,7 @@ final class ExternalDaemonManifestLocator: @unchecked Sendable {
   }
 
   private let defaults: UserDefaults
+  private let environment: HarnessMonitorEnvironment
   private let configuredManifestURL: URL
   private let shouldConsultRememberedManifest: Bool
   private let shouldRememberLiveManifest: Bool
@@ -19,6 +20,7 @@ final class ExternalDaemonManifestLocator: @unchecked Sendable {
     defaults: UserDefaults = .standard
   ) {
     self.defaults = defaults
+    self.environment = environment
     self.configuredManifestURL = HarnessMonitorPaths.manifestURL(using: environment)
     self.shouldRememberLiveManifest = ownership == .external
     self.shouldConsultRememberedManifest =
@@ -41,13 +43,11 @@ final class ExternalDaemonManifestLocator: @unchecked Sendable {
   }
 
   func candidateManifestURLs() -> [URL] {
-    guard let rememberedManifestURL else {
-      return [configuredManifestURL]
-    }
-    guard rememberedManifestURL != configuredManifestURL else {
-      return [configuredManifestURL]
-    }
-    return [rememberedManifestURL, configuredManifestURL]
+    var manifestURLs: [URL] = []
+    appendCandidate(manifestURL, to: &manifestURLs)
+    appendCandidate(rememberedManifestURL, to: &manifestURLs)
+    appendCandidate(configuredManifestURL, to: &manifestURLs)
+    return manifestURLs
   }
 
   func activate(_ manifestURL: URL) {
@@ -61,6 +61,22 @@ final class ExternalDaemonManifestLocator: @unchecked Sendable {
       return
     }
     defaults.set(manifestURL.path, forKey: DefaultsKey.rememberedManifestPath)
+  }
+
+  func refreshDiscoveredManifestURLIfNeeded() -> URL? {
+    guard shouldConsultRememberedManifest else {
+      return nil
+    }
+
+    let discoveredManifestURL = HarnessMonitorPaths.manifestURL(using: environment)
+      .standardizedFileURL
+    return lock.withLock {
+      guard activeManifestURL != discoveredManifestURL else {
+        return nil
+      }
+      activeManifestURL = discoveredManifestURL
+      return discoveredManifestURL
+    }
   }
 
   private var rememberedManifestURL: URL? {
@@ -81,5 +97,34 @@ final class ExternalDaemonManifestLocator: @unchecked Sendable {
       return nil
     }
     return manifestURL
+  }
+
+  private func appendCandidate(_ manifestURL: URL?, to manifestURLs: inout [URL]) {
+    guard let manifestURL else {
+      return
+    }
+
+    let standardizedManifestURL = manifestURL.standardizedFileURL
+    guard manifestURLs.contains(standardizedManifestURL) == false else {
+      return
+    }
+    manifestURLs.append(standardizedManifestURL)
+  }
+}
+
+protocol ExternalManifestLocationRefreshing: Sendable {
+  func refreshExternalManifestLocation() async -> URL?
+}
+
+extension DaemonController: ExternalManifestLocationRefreshing {
+  func refreshExternalManifestLocation() async -> URL? {
+    guard ownership == .external else {
+      return nil
+    }
+
+    let locator = externalManifestLocator
+    return await Task.detached(priority: .utility) {
+      locator.refreshDiscoveredManifestURLIfNeeded()
+    }.value
   }
 }

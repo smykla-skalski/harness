@@ -71,6 +71,60 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.connectionState == .idle)
   }
 
+  @Test("bootstrapIfNeeded survives caller cancellation during external daemon warm-up")
+  func bootstrapIfNeededSurvivesCallerCancellationDuringWarmUp() async {
+    let daemon = BootstrapBarrierDaemonController()
+    let store = HarnessMonitorStore(
+      daemonController: daemon,
+      daemonOwnership: .external
+    )
+
+    let firstCall = Task { @MainActor in
+      await store.bootstrapIfNeeded()
+    }
+    await daemon.waitUntilWarmUpStarted()
+    #expect(store.connectionState == .connecting)
+
+    firstCall.cancel()
+
+    let secondCall = Task { @MainActor in
+      await store.bootstrapIfNeeded()
+    }
+    await daemon.releaseWarmUp()
+
+    #expect(await bootstrapTaskCompletes(firstCall, timeout: .seconds(1)))
+    #expect(await bootstrapTaskCompletes(secondCall, timeout: .seconds(1)))
+    #expect(store.connectionState == .online)
+    #expect(await daemon.recordedWarmUpCallCount() == 1)
+  }
+
+  @Test("bootstrapIfNeeded coalesces concurrent external warm-up callers")
+  func bootstrapIfNeededCoalescesConcurrentWarmUpCallers() async {
+    let daemon = BootstrapBarrierDaemonController()
+    let store = HarnessMonitorStore(
+      daemonController: daemon,
+      daemonOwnership: .external
+    )
+
+    let firstCall = Task { @MainActor in
+      await store.bootstrapIfNeeded()
+    }
+    await daemon.waitUntilWarmUpStarted()
+    let secondCall = Task { @MainActor in
+      await store.bootstrapIfNeeded()
+    }
+
+    try? await Task.sleep(for: .milliseconds(20))
+    #expect(await daemon.recordedWarmUpCallCount() == 1)
+
+    await daemon.releaseWarmUp()
+
+    #expect(await bootstrapTaskCompletes(firstCall, timeout: .seconds(1)))
+    #expect(await bootstrapTaskCompletes(secondCall, timeout: .seconds(1)))
+    #expect(store.connectionState == .online)
+    #expect(await daemon.recordedWarmUpCallCount() == 1)
+  }
+
   @Test("Bootstrap adopts trace as the default daemon log level")
   func bootstrapAdoptsTraceAsDefaultDaemonLogLevel() async {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
@@ -407,4 +461,115 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.sessionStreamTask != nil)
   }
 
+}
+
+private actor BootstrapBarrierDaemonController: DaemonControlling {
+  private let base: RecordingDaemonController
+  private var warmUpStarted = false
+  private var warmUpStartedContinuation: CheckedContinuation<Void, Never>?
+  private var warmUpReleaseContinuation: CheckedContinuation<Void, Never>?
+  private var warmUpCallCount = 0
+
+  init(client: any HarnessMonitorClientProtocol = PreviewHarnessClient()) {
+    base = RecordingDaemonController(client: client)
+  }
+
+  func bootstrapClient() async throws -> any HarnessMonitorClientProtocol {
+    try await base.bootstrapClient()
+  }
+
+  func stopDaemon() async throws -> String {
+    try await base.stopDaemon()
+  }
+
+  func daemonStatus() async throws -> DaemonStatusReport {
+    try await base.daemonStatus()
+  }
+
+  func installLaunchAgent() async throws -> String {
+    try await base.installLaunchAgent()
+  }
+
+  func removeLaunchAgent() async throws -> String {
+    try await base.removeLaunchAgent()
+  }
+
+  func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState {
+    try await base.registerLaunchAgent()
+  }
+
+  func repairLaunchAgentRegistration() async throws -> String {
+    try await base.repairLaunchAgentRegistration()
+  }
+
+  func launchAgentRegistrationState() async -> DaemonLaunchAgentRegistrationState {
+    await base.launchAgentRegistrationState()
+  }
+
+  func launchAgentSnapshot() async -> LaunchAgentStatus {
+    await base.launchAgentSnapshot()
+  }
+
+  func awaitLaunchAgentState(
+    _ target: DaemonLaunchAgentRegistrationState,
+    timeout: Duration
+  ) async throws {
+    try await base.awaitLaunchAgentState(target, timeout: timeout)
+  }
+
+  func awaitManifestWarmUp(
+    timeout: Duration
+  ) async throws -> any HarnessMonitorClientProtocol {
+    _ = timeout
+    warmUpCallCount += 1
+    warmUpStarted = true
+    warmUpStartedContinuation?.resume()
+    warmUpStartedContinuation = nil
+    await withCheckedContinuation { continuation in
+      warmUpReleaseContinuation = continuation
+    }
+    return try await base.awaitManifestWarmUp(timeout: timeout)
+  }
+
+  func performDeferredManagedLaunchAgentRefreshIfNeeded() async -> Bool {
+    await base.performDeferredManagedLaunchAgentRefreshIfNeeded()
+  }
+
+  func waitUntilWarmUpStarted() async {
+    guard !warmUpStarted else {
+      return
+    }
+    await withCheckedContinuation { continuation in
+      warmUpStartedContinuation = continuation
+    }
+  }
+
+  func releaseWarmUp() {
+    warmUpReleaseContinuation?.resume()
+    warmUpReleaseContinuation = nil
+  }
+
+  func recordedWarmUpCallCount() -> Int {
+    warmUpCallCount
+  }
+}
+
+private func bootstrapTaskCompletes(
+  _ task: Task<Void, Never>,
+  timeout: Duration
+) async -> Bool {
+  await withTaskGroup(of: Bool.self) { group in
+    group.addTask {
+      await task.value
+      return true
+    }
+    group.addTask {
+      try? await Task.sleep(for: timeout)
+      return false
+    }
+
+    let completed = await group.next() ?? false
+    group.cancelAll()
+    return completed
+  }
 }

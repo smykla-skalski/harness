@@ -132,13 +132,19 @@ extension DaemonController {
         externalManifestLocator.rememberActiveManifestIfNeeded()
         return WarmUpIterationOutcome(liveClient: client, stop: true, progressed: true)
       }
-      return try handleStaleManifest(
+      return try await handleStaleManifest(
         manifest: manifest,
         endpoint: endpoint,
         isFreshObservation: isFreshObservation,
         state: &state
       )
     } catch let error as DaemonControlError {
+      if let outcome = await externalManifestLocationRefreshOutcome(
+        after: error,
+        state: &state
+      ) {
+        return outcome
+      }
       if try refreshManagedLaunchAgentAfterManifestLoadFailureIfNeeded(
         error: error,
         state: &state
@@ -165,6 +171,27 @@ extension DaemonController {
     return .continueLoop
   }
 
+  func externalManifestLocationRefreshOutcome(
+    after error: DaemonControlError,
+    state: inout WarmUpLoopState
+  ) async -> WarmUpIterationOutcome? {
+    guard ownership == .external,
+      let refreshedManifestURL = await refreshExternalManifestLocation()
+    else {
+      return nil
+    }
+
+    state.immediateError = nil
+    state.lastError = error
+    state.sawUnreachableManifest = false
+    state.lastLoggedManifestSignature = nil
+    state.lastLoggedRetryErrorDescription = nil
+    HarnessMonitorLogger.lifecycle.notice(
+      "External daemon discovery switched manifest to \(refreshedManifestURL.path, privacy: .public)"
+    )
+    return .progressedLoop
+  }
+
   func emitWarmUpRetryTraceIfChanged(
     error: any Error,
     state: inout WarmUpLoopState
@@ -184,7 +211,7 @@ extension DaemonController {
     endpoint: String,
     isFreshObservation: Bool,
     state: inout WarmUpLoopState
-  ) throws -> WarmUpIterationOutcome {
+  ) async throws -> WarmUpIterationOutcome {
     let manifestPath = externalManifestLocator.manifestURL.path
     if isFreshObservation {
       HarnessMonitorLogger.lifecycle.error(
@@ -193,10 +220,29 @@ extension DaemonController {
     }
     state.sawUnreachableManifest = true
     if ownership == .external {
-      state.immediateError = DaemonControlError.externalDaemonManifestStale(
-        manifestPath: manifestPath
-      )
-      return .stopLoop
+      if Self.processIsAlive(pid: manifest.pid) == true {
+        if isFreshObservation {
+          HarnessMonitorLogger.lifecycle.trace(
+            """
+            Warm-up waiting for external daemon pid \(manifest.pid, privacy: .public) \
+            to answer at \(endpoint, privacy: .public)
+            """
+          )
+        }
+        return .continueLoop
+      }
+      if let outcome = await externalManifestLocationRefreshOutcome(
+        after: .externalDaemonManifestStale(manifestPath: manifestPath),
+        state: &state
+      ) {
+        return outcome
+      }
+      if isFreshObservation {
+        HarnessMonitorLogger.lifecycle.trace(
+          "Warm-up waiting for a replacement external manifest after stale pid \(manifest.pid, privacy: .public)"
+        )
+      }
+      return .continueLoop
     }
     return try handleManagedStaleManifest(
       manifest: manifest,

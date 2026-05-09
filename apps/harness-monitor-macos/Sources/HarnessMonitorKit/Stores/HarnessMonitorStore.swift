@@ -212,6 +212,7 @@ public final class HarnessMonitorStore {
   var sessionPushFallbackDelay: Duration = .seconds(5)
   var sessionPushFallbackMinimumInterval: Duration = .seconds(5)
   var appInactivitySuspendDelay: Duration = .seconds(5)
+  var externalManifestDiscoveryInterval: Duration = .seconds(1)
   var timelineMinimumLoadingDuration: Duration = .milliseconds(500)
   @ObservationIgnored var timelineLoadingGateClock: any TimelineLoadingGateClock =
     LiveContinuousClockSource()
@@ -254,6 +255,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var pendingCacheWriteTaskToken: UInt64 = 0
   @ObservationIgnored var agentTuiActionRefreshTask: Task<Void, Never>?
   var manifestWatcher: ManifestWatcher?
+  @ObservationIgnored var externalManifestDiscoveryTask: Task<Void, Never>?
   @ObservationIgnored var manifestURL = HarnessMonitorPaths.manifestURL()
   var transportLatencySamplesMs: [Int] = []
   var requestLatencySamplesMs: [Int] = []
@@ -273,6 +275,7 @@ public final class HarnessMonitorStore {
   var pendingExtensions: SessionExtensionsPayload?
   var isNavigatingHistory = false
   var hasBootstrapped = false
+  @ObservationIgnored var bootstrapTask: Task<Void, Never>?
   var isBootstrapping = false
   var isReconnecting = false
   var isAppLifecycleSuspended = false

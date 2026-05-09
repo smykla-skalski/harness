@@ -406,11 +406,67 @@ extension HarnessMonitorStore {
     }
     manifestWatcher = watcher
     watcher.start()
+    refreshExternalManifestDiscoveryTask()
   }
 
   func stopManifestWatcher() {
+    stopExternalManifestDiscoveryTask()
     manifestWatcher?.stop()
     manifestWatcher = nil
+  }
+
+  func refreshExternalManifestDiscoveryTask() {
+    guard manifestWatcher != nil,
+      maintainsLiveDaemonObservation,
+      daemonOwnership == .external
+    else {
+      stopExternalManifestDiscoveryTask()
+      return
+    }
+    if case .online = connectionState {
+      stopExternalManifestDiscoveryTask()
+      return
+    }
+    guard externalManifestDiscoveryTask == nil,
+      let refresher = daemonController as? any ExternalManifestLocationRefreshing
+    else {
+      return
+    }
+
+    externalManifestDiscoveryTask = Task { @MainActor [weak self] in
+      while !Task.isCancelled {
+        guard let self else {
+          return
+        }
+        guard self.manifestWatcher != nil else {
+          return
+        }
+        if case .online = self.connectionState {
+          return
+        }
+
+        if let refreshedManifestURL = await refresher.refreshExternalManifestLocation() {
+          self.adoptManifestURL(from: refreshedManifestURL.path)
+          self.appendConnectionEvent(
+            kind: .reconnecting,
+            detail: "Discovered live external daemon manifest, re-bootstrapping"
+          )
+          await self.reconnect()
+          return
+        }
+
+        do {
+          try await Task.sleep(for: self.externalManifestDiscoveryInterval)
+        } catch {
+          return
+        }
+      }
+    }
+  }
+
+  func stopExternalManifestDiscoveryTask() {
+    externalManifestDiscoveryTask?.cancel()
+    externalManifestDiscoveryTask = nil
   }
 
 }
