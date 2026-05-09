@@ -129,7 +129,7 @@ struct ToolCallTimelineView: View {
     .padding(.vertical, HarnessMonitorTheme.spacingSM)
     .accessibilityElement(children: .contain)
     .accessibilityLiveRegion(.polite)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceToolCallTimeline)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.toolCallTimeline)
     .overlay {
       AccessibilityTextMarker(
         identifier: HarnessMonitorAccessibility.toolCallTimelineAccessibilityState,

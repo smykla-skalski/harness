@@ -255,7 +255,7 @@ final class AcpPermissionAttentionState {
     openWindow: OpenWindowAction,
     activatesApp: Bool = true
   ) {
-    store.requestWorkspaceDecisionSelection(decisionID: decisionID)
+    store.requestSessionDecisionRoute(decisionID: decisionID)
     store.supervisorSelectedDecisionID = decisionID
     store.requestPrimaryDecisionActionFocus(decisionID: decisionID)
     HarnessMonitorUITestTrace.record(

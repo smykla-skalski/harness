@@ -19,7 +19,7 @@ struct WorkspaceToolbarUITestForceTickModifier: ViewModifier {
           .frame(width: 24, height: 24)
           .opacity(0.01)
           .padding(8)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceToolbarForceTick)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.sessionAttentionToolbarForceTick)
         }
     } else {
       content

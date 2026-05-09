@@ -107,14 +107,14 @@ struct DecisionRelatedAgentContextSection: View {
     guard let store else {
       return
     }
-    store.requestWorkspaceSelection(.agent(sessionID: decision.sessionID, agentID: agentID))
+    store.requestSessionRoute(.agent(sessionID: decision.sessionID, agentID: agentID))
   }
 
   private func routeToTask(_ taskID: String) {
     guard let store else {
       return
     }
-    store.requestWorkspaceSelection(.task(sessionID: decision.sessionID, taskID: taskID))
+    store.requestSessionRoute(.task(sessionID: decision.sessionID, taskID: taskID))
   }
 
   private func nonEmpty(_ value: String?) -> String? {

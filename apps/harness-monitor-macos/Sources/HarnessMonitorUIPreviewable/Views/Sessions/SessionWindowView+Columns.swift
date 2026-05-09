@@ -99,10 +99,8 @@ extension SessionWindowView {
     case .sidebarContentDetail:
       SessionContentDetailSplitView(contentWidth: $contentColumnWidth) {
         contentColumn
-          .padding(.top, HarnessMonitorTheme.spacingLG)
       } detail: {
         detailColumn
-          .padding(.top, HarnessMonitorTheme.spacingLG)
       }
     }
   }
@@ -110,7 +108,6 @@ extension SessionWindowView {
   @ViewBuilder
   private var routeDetailColumn: some View {
     contentColumn
-      .padding(.top, HarnessMonitorTheme.spacingLG)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       .backgroundExtensionEffect()
   }
@@ -153,7 +150,6 @@ extension SessionWindowView {
   @ViewBuilder var sessionSurface: some View {
     if focusMode {
       focusModeSurface
-        .padding(.top, HarnessMonitorTheme.spacingLG)
     } else {
       standardSessionLayout
     }

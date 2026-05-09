@@ -1,4 +1,4 @@
-public enum WorkspaceSelection: Hashable, Sendable {
+public enum SessionRouteSelection: Hashable, Sendable {
   case create
   case decisions(sessionID: String?)
   case decision(sessionID: String?, decisionID: String)
@@ -70,9 +70,9 @@ public enum WorkspaceSelection: Hashable, Sendable {
   }
 }
 
-public enum WorkspaceCreateEntryPoint: Hashable, Sendable {
+public enum SessionRouteCreateEntryPoint: Hashable, Sendable {
   case agent
 }
 
-@available(*, deprecated, renamed: "WorkspaceSelection")
-public typealias AgentTuiSheetSelection = WorkspaceSelection
+@available(*, deprecated, renamed: "SessionRouteSelection")
+public typealias AgentTuiSheetSelection = SessionRouteSelection

@@ -65,7 +65,7 @@ extension AgentDetailSection {
       }?.id
 
     if let decisionID = oldestOpenDecisionID ?? store.selectOldestDecision(for: agent.agentId) {
-      store.requestWorkspaceDecisionSelection(decisionID: decisionID)
+      store.requestSessionDecisionRoute(decisionID: decisionID)
       store.supervisorSelectedDecisionID = decisionID
       store.requestPrimaryDecisionActionFocus(decisionID: decisionID)
       openWindow.openHarnessDecisionSession(decisionID: decisionID, store: store)

@@ -89,13 +89,13 @@ struct AcpPermissionModal: View {
       Spacer()
       if payload.isRenderable {
         Button("Open Workspace") {
-          store.requestWorkspaceDecisionSelection(decisionID: decisionID)
+          store.requestSessionDecisionRoute(decisionID: decisionID)
           store.supervisorSelectedDecisionID = decisionID
           store.requestPrimaryDecisionActionFocus(decisionID: decisionID)
           openWindow.openHarnessDecisionSession(decisionID: decisionID, store: store)
         }
         .keyboardShortcut(.defaultAction)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.acpPermissionModalOpenWorkspace)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.acpPermissionModalOpenDecisions)
       }
     }
   }

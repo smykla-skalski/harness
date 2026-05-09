@@ -139,7 +139,7 @@ private let crowdedDecisionSpecs: [DecisionSpec] = [
     sessionID: "sess-gamma",
     agentID: "agent-07",
     taskID: "task-303",
-    summary: "Retain cycle suspected in WorkspaceDecisionRuntime snapshot.",
+    summary: "Retain cycle suspected in DecisionRuntime snapshot.",
     ageSeconds: 480
   ),
   DecisionSpec(

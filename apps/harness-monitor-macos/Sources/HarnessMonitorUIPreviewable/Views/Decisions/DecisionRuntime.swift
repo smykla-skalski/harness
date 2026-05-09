@@ -4,7 +4,7 @@ import SwiftUI
 
 @MainActor
 @Observable
-final class WorkspaceDecisionRuntime {
+final class DecisionRuntime {
   var decisions: [Decision] = []
   var auditEvents: [SupervisorEvent] = []
   var liveTick: DecisionLiveTickSnapshot = .placeholder

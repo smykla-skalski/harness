@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Inspector column for the workspace decision desk. Hosts the metadata grid that mirrors the
 /// hero chips in scannable `LabeledContent` rows plus the live tick. Toggled from the toolbar and
-/// persisted via `@AppStorage` on `WorkspaceDecisionDeskPreviewView`.
+/// persisted via `@AppStorage` on `DecisionDeskPreviewView`.
 @MainActor
 public struct DecisionInspector: View {
   @Environment(\.harnessDateTimeConfiguration)

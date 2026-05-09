@@ -232,7 +232,7 @@ struct ContentAccessibilityOverlayBridge: View {
             text: appChromeAccessibilityValue
           )
           AccessibilityTextMarker(
-            identifier: HarnessMonitorAccessibility.workspaceToolbarButtonState,
+            identifier: HarnessMonitorAccessibility.sessionAttentionToolbarButtonState,
             text: workspaceToolbarAccessibilityValue
           )
           ContentToolbarChromeAccessibilityMarker(
