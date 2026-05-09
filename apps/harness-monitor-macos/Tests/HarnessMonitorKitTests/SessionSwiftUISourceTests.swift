@@ -96,6 +96,7 @@ struct SessionSwiftUISourceTests {
     #expect(createFormSource.contains("Picker(\"Provider\", selection: selectedProviderID)"))
     #expect(createFormSource.contains(".contentMargins(.horizontal, metrics.formPadding, for: .scrollContent)"))
     #expect(createFormSource.contains(".contentMargins(.vertical, metrics.formPadding, for: .scrollContent)"))
+    #expect(createFormSource.contains(".scrollContentBackground(.hidden)"))
     #expect(!createFormSource.contains(".padding(metrics.formPadding)"))
     #expect(!createFormSource.contains("DisclosureGroup(\""))
     #expect(!createFormSource.contains("SessionWindowCreateFieldBlock("))
