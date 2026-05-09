@@ -8,12 +8,12 @@ final class ScenarioCatalogTests: XCTestCase {
     }
 
     func testResolveCommaListPreservesOrderAndTrims() throws {
-        let resolved = try ScenarioCatalog.resolve("launch-dashboard, offline-cached-open")
-        XCTAssertEqual(resolved, ["launch-dashboard", "offline-cached-open"])
+        let resolved = try ScenarioCatalog.resolve("open-recent-window, offline-cached-open")
+        XCTAssertEqual(resolved, ["open-recent-window", "offline-cached-open"])
     }
 
     func testResolveRejectsUnknownScenario() {
-        XCTAssertThrowsError(try ScenarioCatalog.resolve("launch-dashboard,bogus")) { error in
+        XCTAssertThrowsError(try ScenarioCatalog.resolve("open-recent-window,bogus")) { error in
             guard let failure = error as? ScenarioCatalog.Failure else {
                 XCTFail("expected ScenarioCatalog.Failure")
                 return
@@ -27,18 +27,20 @@ final class ScenarioCatalogTests: XCTestCase {
     }
 
     func testDurationsAreStable() {
-        XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "launch-dashboard"), 6)
-        XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "refresh-and-search"), 10)
+        XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "open-recent-window"), 6)
+        XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "permission-modal"), 8)
         XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "unknown-scenario"), 8)
     }
 
     func testPreviewScenarioMapping() {
-        XCTAssertEqual(ScenarioCatalog.previewScenario(for: "launch-dashboard"), "dashboard-landing")
+        XCTAssertEqual(ScenarioCatalog.previewScenario(for: "open-recent-window"), "dashboard-landing")
+        XCTAssertEqual(ScenarioCatalog.previewScenario(for: "permission-modal"), "cockpit")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "offline-cached-open"), "offline-cached")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "anything-else"), "dashboard")
     }
 
-    func testTemplateRoutingMatchesShellLists() {
+    func testTemplateRoutingMatchesCatalog() {
+        XCTAssertTrue(ScenarioCatalog.swiftUI.contains("permission-modal"))
         XCTAssertTrue(ScenarioCatalog.swiftUI.contains("toast-overlay-churn"))
         XCTAssertFalse(ScenarioCatalog.swiftUI.contains("settings-backdrop-cycle"))
         XCTAssertTrue(ScenarioCatalog.allocations.contains("settings-background-cycle"))
@@ -56,9 +58,9 @@ final class RunPrunerTests: XCTestCase {
 
     func testRetainScopedMetricsAndLogs() {
         XCTAssertTrue(RunPruner.retain(relativePath: "logs/anything.log", keepTraces: false))
-        XCTAssertTrue(RunPruner.retain(relativePath: "metrics/launch-dashboard/swiftui.json", keepTraces: false))
-        XCTAssertTrue(RunPruner.retain(relativePath: "metrics/select-session-cockpit/top-offenders.json", keepTraces: false))
-        XCTAssertFalse(RunPruner.retain(relativePath: "metrics/launch-dashboard/raw.json", keepTraces: false))
+        XCTAssertTrue(RunPruner.retain(relativePath: "metrics/open-recent-window/swiftui.json", keepTraces: false))
+        XCTAssertTrue(RunPruner.retain(relativePath: "metrics/open-session-window/top-offenders.json", keepTraces: false))
+        XCTAssertFalse(RunPruner.retain(relativePath: "metrics/open-recent-window/raw.json", keepTraces: false))
     }
 
     func testTracesGatedByKeepFlag() {
@@ -94,7 +96,7 @@ final class PlistAccessorTests: XCTestCase {
 final class TraceRecorderCommandTests: XCTestCase {
     func testEnvFlagsAreSorted() {
         let inputs = TraceRecorder.ScenarioInputs(
-            scenario: "launch-dashboard", template: "SwiftUI",
+            scenario: "open-recent-window", template: "SwiftUI",
             previewScenario: "dashboard-landing", durationSeconds: 6,
             hostAppPath: URL(fileURLWithPath: "/staged.app"),
             hostBinaryPath: URL(fileURLWithPath: "/staged.app/Contents/MacOS/App"),

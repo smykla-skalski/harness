@@ -1,13 +1,11 @@
 import Foundation
 
-/// Static catalog mirroring the ALL_SCENARIOS / SWIFTUI_SCENARIOS / ALLOCATIONS_SCENARIOS
-/// arrays plus duration_for/preview_scenario_for switch tables in run-instruments-audit.sh.
+/// Static scenario catalog shared by the audit CLI, manifest writer, and tests.
 public enum ScenarioCatalog {
     public static let all: [String] = [
-        "launch-dashboard",
-        "select-session-cockpit",
-        "refresh-and-search",
-        "sidebar-overflow-search",
+        "open-recent-window",
+        "open-session-window",
+        "permission-modal",
         "settings-backdrop-cycle",
         "settings-background-cycle",
         "timeline-burst",
@@ -16,10 +14,9 @@ public enum ScenarioCatalog {
     ]
 
     public static let swiftUI: Set<String> = [
-        "launch-dashboard",
-        "select-session-cockpit",
-        "refresh-and-search",
-        "sidebar-overflow-search",
+        "open-recent-window",
+        "open-session-window",
+        "permission-modal",
         "timeline-burst",
         "toast-overlay-churn",
         "offline-cached-open",
@@ -33,10 +30,9 @@ public enum ScenarioCatalog {
 
     public static func durationSeconds(for scenario: String) -> Int {
         switch scenario {
-        case "launch-dashboard": return 6
-        case "select-session-cockpit": return 8
-        case "refresh-and-search": return 10
-        case "sidebar-overflow-search": return 8
+        case "open-recent-window": return 6
+        case "open-session-window": return 8
+        case "permission-modal": return 8
         case "settings-backdrop-cycle": return 9
         case "settings-background-cycle": return 10
         case "timeline-burst": return 8
@@ -48,10 +44,11 @@ public enum ScenarioCatalog {
 
     public static func previewScenario(for scenario: String) -> String {
         switch scenario {
-        case "launch-dashboard", "select-session-cockpit": return "dashboard-landing"
+        case "open-recent-window", "open-session-window", "timeline-burst", "toast-overlay-churn":
+            return "dashboard-landing"
+        case "permission-modal":
+            return "cockpit"
         case "settings-backdrop-cycle", "settings-background-cycle": return "dashboard"
-        case "refresh-and-search", "sidebar-overflow-search": return "overflow"
-        case "timeline-burst", "toast-overlay-churn": return "cockpit"
         case "offline-cached-open": return "offline-cached"
         default: return "dashboard"
         }

@@ -31,6 +31,7 @@ enum HarnessMonitorPerfDriver {
     "HARNESS_MONITOR_PERF_SETTLE_DELAY_MS", fallback: 900
   )
   private static let routeTimeout = Duration.seconds(2)
+  private static let sessionWindowTimeout = Duration.seconds(3)
 
   private static func envMilliseconds(_ key: String, fallback: Int) -> Duration {
     guard let raw = ProcessInfo.processInfo.environment[key],
@@ -68,35 +69,22 @@ enum HarnessMonitorPerfDriver {
     openWindow: OpenWindowAction
   ) async -> ScenarioResult {
     switch scenario {
-    case .launchDashboard:
+    case .openRecentWindow:
       await store.bootstrapIfNeeded()
+      await store.prepareOpenRecentSessions()
       await settle()
       return .completed
-    case .selectSessionCockpit:
-      await settle()
-      await store.selectSession(PreviewFixtures.summary.sessionId)
-      await settle()
-      return .completed
+    case .openSessionWindow:
+      return await openSessionWindow(
+        sessionID: PreviewFixtures.summary.sessionId,
+        store: store,
+        openWindow: openWindow
+      )
     case .permissionModal:
       return await routePermissionDecisionToWorkspace(
         store: store,
         openWindow: openWindow
       )
-    case .refreshAndSearch:
-      await settle()
-      await store.refresh()
-      await runSearchPasses(
-        queries: ["timeline", "observer", "blocked"],
-        store: store
-      )
-      return .completed
-    case .sidebarOverflowSearch:
-      await settle()
-      await runSearchPasses(
-        queries: ["sidebar", "search", "observer", "blocked", "transport"],
-        store: store
-      )
-      return .completed
     case .settingsBackdropCycle:
       await openAppearanceSettings(openWindow: openWindow)
       await cycleBackdropModes()
@@ -106,18 +94,38 @@ enum HarnessMonitorPerfDriver {
       await cycleBackgroundSelections()
       return .completed
     case .timelineBurst:
-      await settle()
-      await store.selectSession(PreviewFixtures.summary.sessionId)
-      await burstTimeline(store: store)
+      let sessionID = PreviewFixtures.summary.sessionId
+      guard
+        await ensureSessionWindow(
+          sessionID: sessionID,
+          store: store,
+          openWindow: openWindow
+        )
+      else {
+        return .failed("session-window-timeout")
+      }
+      guard await burstTimeline(sessionID: sessionID, store: store) else {
+        return .failed("preview-timeline-unavailable")
+      }
       return .completed
     case .toastOverlayChurn:
-      await settle()
-      await store.selectSession(PreviewFixtures.summary.sessionId)
+      guard
+        await ensureSessionWindow(
+          sessionID: PreviewFixtures.summary.sessionId,
+          store: store,
+          openWindow: openWindow
+        )
+      else {
+        return .failed("session-window-timeout")
+      }
       await churnToastOverlay(store: store)
       return .completed
     case .offlineCachedOpen:
-      await settle()
-      return .completed
+      return await openSessionWindow(
+        sessionID: PreviewFixtures.summary.sessionId,
+        store: store,
+        openWindow: openWindow
+      )
     }
   }
 
@@ -125,16 +133,21 @@ enum HarnessMonitorPerfDriver {
     try? await Task.sleep(for: delay ?? settleDelay)
   }
 
-  private static func runSearchPasses(
-    queries: [String],
-    store: HarnessMonitorStore
-  ) async {
-    for query in queries {
-      store.searchText = query
-      try? await Task.sleep(for: stepDelay)
+  private static func openSessionWindow(
+    sessionID: String,
+    store: HarnessMonitorStore,
+    openWindow: OpenWindowAction
+  ) async -> ScenarioResult {
+    guard
+      await ensureSessionWindow(
+        sessionID: sessionID,
+        store: store,
+        openWindow: openWindow
+      )
+    else {
+      return .failed("session-window-timeout")
     }
-    store.searchText = ""
-    await settle()
+    return .completed
   }
 
   private static func routePermissionDecisionToWorkspace(
@@ -210,6 +223,24 @@ enum HarnessMonitorPerfDriver {
         "open_decision_count": String(store.supervisorOpenDecisions.count),
       ]
     )
+    guard
+      let sessionID =
+        store.supervisorOpenDecisions.first(where: { $0.id == decisionID })?.sessionID
+        ?? store.selectedSessionID
+    else {
+      HarnessMonitorLogger.store.error(
+        "ACP decision \(decisionID, privacy: .public) routed without a session window target"
+      )
+      await settle()
+      return .failed("missing-session-id")
+    }
+    guard await waitForSessionWindow(sessionID: sessionID, store: store) else {
+      HarnessMonitorLogger.store.error(
+        "ACP decision \(decisionID, privacy: .public) did not open session window \(sessionID, privacy: .public)"
+      )
+      await settle(.milliseconds(1_000))
+      return .failed("session-window-timeout")
+    }
     await settle()
     return .completed
   }
@@ -235,6 +266,41 @@ enum HarnessMonitorPerfDriver {
   ) -> Bool {
     let hasOpenDecision = store.supervisorOpenDecisions.contains { $0.id == decisionID }
     return store.supervisorSelectedDecisionID != decisionID || !hasOpenDecision
+  }
+
+  private static func ensureSessionWindow(
+    sessionID: String,
+    store: HarnessMonitorStore,
+    openWindow: OpenWindowAction
+  ) async -> Bool {
+    if store.openSessionWindowIDsSnapshot.contains(sessionID) {
+      await settle()
+      return true
+    }
+
+    await store.prepareOpenRecentSessions()
+    await settle()
+    openWindow.openHarnessSessionWindow(sessionID: sessionID)
+    guard await waitForSessionWindow(sessionID: sessionID, store: store) else {
+      return false
+    }
+    await settle()
+    return true
+  }
+
+  private static func waitForSessionWindow(
+    sessionID: String,
+    store: HarnessMonitorStore
+  ) async -> Bool {
+    let clock = ContinuousClock()
+    let deadline = clock.now.advanced(by: sessionWindowTimeout)
+    while store.openSessionWindowIDsSnapshot.contains(sessionID) == false {
+      guard clock.now < deadline else {
+        return false
+      }
+      try? await Task.sleep(for: shortDelay)
+    }
+    return true
   }
 
   private static func openAppearanceSettings(openWindow: OpenWindowAction) async {
@@ -276,12 +342,26 @@ enum HarnessMonitorPerfDriver {
     await settle()
   }
 
-  private static func burstTimeline(store: HarnessMonitorStore) async {
+  private static func burstTimeline(
+    sessionID: String,
+    store: HarnessMonitorStore
+  ) async -> Bool {
     for batch in 1...8 {
-      store.timeline = PreviewFixtures.timelineBurst(batch: batch)
+      guard
+        await store.replacePreviewTimeline(
+          sessionID: sessionID,
+          entries: PreviewFixtures.timelineBurst(batch: batch)
+        )
+      else {
+        HarnessMonitorLogger.store.error(
+          "Timeline perf scenario requires a preview session snapshot for \(sessionID, privacy: .public)"
+        )
+        return false
+      }
       try? await Task.sleep(for: shortDelay)
     }
     await settle()
+    return true
   }
 
   private static func churnToastOverlay(store: HarnessMonitorStore) async {
@@ -314,12 +394,10 @@ enum HarnessMonitorPerfDriver {
 extension HarnessMonitorPerfScenario {
   var includesBootstrapInMeasurement: Bool {
     switch self {
-    case .launchDashboard:
+    case .openRecentWindow:
       true
-    case .selectSessionCockpit,
+    case .openSessionWindow,
       .permissionModal,
-      .refreshAndSearch,
-      .sidebarOverflowSearch,
       .settingsBackdropCycle,
       .settingsBackgroundCycle,
       .timelineBurst,
@@ -331,11 +409,9 @@ extension HarnessMonitorPerfScenario {
 
   var signpostName: StaticString {
     switch self {
-    case .launchDashboard: "launch-dashboard"
-    case .selectSessionCockpit: "select-session-cockpit"
+    case .openRecentWindow: "open-recent-window"
+    case .openSessionWindow: "open-session-window"
     case .permissionModal: "permission-modal"
-    case .refreshAndSearch: "refresh-and-search"
-    case .sidebarOverflowSearch: "sidebar-overflow-search"
     case .settingsBackdropCycle: "settings-backdrop-cycle"
     case .settingsBackgroundCycle: "settings-background-cycle"
     case .timelineBurst: "timeline-burst"

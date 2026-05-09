@@ -60,6 +60,9 @@ public struct OpenRecentView: View {
     }
     .backgroundExtensionEffect()
     .task {
+      guard !HarnessMonitorUITestEnvironment.isPerfScenarioActive else {
+        return
+      }
       await store.prepareOpenRecentSessions()
     }
     .accessibilityElement(children: .contain)

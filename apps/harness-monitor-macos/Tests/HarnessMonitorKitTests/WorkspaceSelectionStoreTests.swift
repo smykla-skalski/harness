@@ -34,6 +34,44 @@ struct SessionRouteSelectionStoreTests {
     #expect(store.consumePendingSessionRouteRequest() == nil)
   }
 
+  @Test("Matching session windows consume pending workspace requests")
+  func matchingSessionWindowConsumesPendingRequest() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    let selection = SessionRouteSelection.decision(
+      sessionID: "sess-alpha",
+      decisionID: "decision-1"
+    )
+    store.requestSessionRoute(selection, resetDecisionFilters: true)
+
+    let request = store.consumePendingSessionRouteRequest(forSessionID: "sess-alpha")
+
+    #expect(request?.selection == selection)
+    #expect(request?.resetDecisionFilters == true)
+    #expect(store.consumePendingSessionRouteRequest(forSessionID: "sess-alpha") == nil)
+  }
+
+  @Test("Nonmatching session windows leave pending workspace requests intact")
+  func nonmatchingSessionWindowLeavesPendingRequestIntact() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    let selection = SessionRouteSelection.task(sessionID: "sess-alpha", taskID: "task-1")
+    store.requestSessionRoute(selection)
+
+    #expect(store.consumePendingSessionRouteRequest(forSessionID: "sess-beta") == nil)
+    #expect(store.consumePendingSessionRouteRequest(forSessionID: "sess-alpha")?.selection == selection)
+  }
+
+  @Test("Create requests target the matching session window")
+  func createRequestTargetsMatchingSessionWindow() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.requestSessionRouteCreate(.agent, sessionID: "sess-alpha")
+
+    #expect(store.consumePendingSessionRouteRequest(forSessionID: "sess-beta") == nil)
+    let request = store.consumePendingSessionRouteRequest(forSessionID: "sess-alpha")
+    #expect(request?.selection == .create)
+    #expect(request?.createEntryPoint == .agent)
+    #expect(request?.createSessionID == "sess-alpha")
+  }
+
   @Test("Create-agent workspace requests carry a selected live session summary")
   func createAgentRequestCarriesEntryPoint() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())

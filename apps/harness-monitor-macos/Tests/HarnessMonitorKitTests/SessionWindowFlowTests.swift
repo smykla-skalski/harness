@@ -177,6 +177,22 @@ struct SessionWindowFlowTests {
   }
 
   @MainActor
+  @Test("Transient nil sidebar updates do not reset routed session selection")
+  func transientNilSidebarUpdatesDoNotResetSelection() {
+    let state = SessionWindowStateCache(sessionID: "sess-alpha")
+    let decisionSelection = SessionSelection.decision(
+      sessionID: "sess-alpha",
+      decisionID: "decision-a"
+    )
+
+    state.select(decisionSelection)
+    state.selectFromSidebar(nil)
+
+    #expect(state.selection == decisionSelection)
+    #expect(state.selectionSource == .programmatic)
+  }
+
+  @MainActor
   @Test("Session sidebar legacy pointer intent does not alter native List selection")
   func sessionSidebarLegacyPointerIntentDoesNotAlterNativeListSelection() {
     let state = SessionWindowStateCache(sessionID: "sess-alpha")
@@ -668,6 +684,15 @@ struct SessionWindowFlowTests {
     #expect(tabbingSupportSource.contains("tabbingIdentifier"))
     #expect(tabbingSupportSource.contains("shouldPreferTabbedOpen"))
     #expect(tabbingSupportSource.contains("visibleSessionTabTargetWindow"))
+  }
+
+  @Test("Decision routing reuses an already open session window")
+  func decisionRoutingReusesAnAlreadyOpenSessionWindow() throws {
+    let source = try previewableSourceFile(named: "Support/SessionWindowOpenAction.swift")
+
+    #expect(source.contains("store.openSessionWindowIDsSnapshot.contains(sessionID)"))
+    #expect(source.contains("NSApplication.shared.activate()"))
+    #expect(source.contains("openHarnessSessionWindow(sessionID: sessionID)"))
   }
 
   @Test("Session inspector divider remains SwiftUI native")

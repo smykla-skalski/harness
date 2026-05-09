@@ -55,7 +55,7 @@ final class ExtractorOrchestratorTests: XCTestCase {
           "label": "perf",
           "created_at_utc": "2026-04-25T00:00:00Z",
           "captures": [
-            {"scenario": "launch-dashboard", "template": "SwiftUI", "trace_relpath": "traces/launch.trace", "duration_seconds": 5, "exit_status": 0, "end_reason": "completed"},
+            {"scenario": "open-recent-window", "template": "SwiftUI", "trace_relpath": "traces/open-recent-window.trace", "duration_seconds": 5, "exit_status": 0, "end_reason": "completed"},
             {"scenario": "offline-cached-open", "template": "Allocations", "trace_relpath": "traces/offline.trace", "duration_seconds": 3, "exit_status": 0, "end_reason": "completed"}
           ]
         }
@@ -79,7 +79,7 @@ final class ExtractorOrchestratorTests: XCTestCase {
         XCTAssertEqual(summary.label, "perf")
         XCTAssertEqual(summary.captures.count, 2)
 
-        let swiftUIPath = runDir.appendingPathComponent("metrics/launch-dashboard/swiftui.json")
+        let swiftUIPath = runDir.appendingPathComponent("metrics/open-recent-window/swiftui.json")
         XCTAssertTrue(FileManager.default.fileExists(atPath: swiftUIPath.path))
         let swiftUIData = try Data(contentsOf: swiftUIPath)
         XCTAssertTrue(String(data: swiftUIData, encoding: .utf8)!.contains("\"swiftui_updates\""))
@@ -87,7 +87,7 @@ final class ExtractorOrchestratorTests: XCTestCase {
         let allocationsPath = runDir.appendingPathComponent("metrics/offline-cached-open/allocations.json")
         XCTAssertTrue(FileManager.default.fileExists(atPath: allocationsPath.path))
 
-        let topOffenders = runDir.appendingPathComponent("metrics/launch-dashboard/top-offenders.json")
+        let topOffenders = runDir.appendingPathComponent("metrics/open-recent-window/top-offenders.json")
         XCTAssertTrue(FileManager.default.fileExists(atPath: topOffenders.path))
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: runDir.appendingPathComponent("summary.json").path))
@@ -168,14 +168,14 @@ final class AuditLockTests: XCTestCase {
 final class TraceRecorderTests: XCTestCase {
     func testRecordCommandIncludesAllExpectedFlags() {
         let inputs = TraceRecorder.ScenarioInputs(
-            scenario: "launch-dashboard",
+            scenario: "open-recent-window",
             template: "SwiftUI",
-            previewScenario: "DashboardPreview",
+            previewScenario: "dashboard-landing",
             durationSeconds: 6,
             hostAppPath: URL(fileURLWithPath: "/staged/App.app"),
             hostBinaryPath: URL(fileURLWithPath: "/staged/App.app/Contents/MacOS/App"),
             launchArguments: ["-ApplePersistenceIgnoreState", "YES"],
-            environment: ["HARNESS_MONITOR_PERF_SCENARIO": "launch-dashboard"],
+            environment: ["HARNESS_MONITOR_PERF_SCENARIO": "open-recent-window"],
             traceURL: URL(fileURLWithPath: "/run/traces/launch.trace"),
             tocURL: URL(fileURLWithPath: "/run/traces/launch.toc.xml"),
             logURL: URL(fileURLWithPath: "/run/logs/launch.log"),
@@ -192,7 +192,7 @@ final class TraceRecorderTests: XCTestCase {
         XCTAssertTrue(arguments.contains("--output"))
         XCTAssertTrue(arguments.contains("/run/traces/launch.trace"))
         XCTAssertTrue(arguments.contains("--env"))
-        XCTAssertTrue(arguments.contains("HARNESS_MONITOR_PERF_SCENARIO=launch-dashboard"))
+        XCTAssertTrue(arguments.contains("HARNESS_MONITOR_PERF_SCENARIO=open-recent-window"))
         // Launch args appear after `--`.
         XCTAssertTrue(arguments.contains("-ApplePersistenceIgnoreState"))
         XCTAssertTrue(arguments.contains("YES"))

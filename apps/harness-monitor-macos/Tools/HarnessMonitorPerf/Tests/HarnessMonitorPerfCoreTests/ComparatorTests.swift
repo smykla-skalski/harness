@@ -26,7 +26,7 @@ final class ComparatorTests: XCTestCase {
       "created_at_utc": "2026-04-01T00:00:00Z",
       "captures": [
         {
-          "scenario": "launch-dashboard",
+          "scenario": "open-recent-window",
           "template": "SwiftUI",
           "metrics": {
             "swiftui_updates": {"total_count": 10000, "body_update_count": 1000, "duration_ms_p95": 10.0, "duration_ns_max": 12000000},
@@ -57,7 +57,7 @@ final class ComparatorTests: XCTestCase {
       "created_at_utc": "2026-04-25T00:00:00Z",
       "captures": [
         {
-          "scenario": "launch-dashboard",
+          "scenario": "open-recent-window",
           "template": "SwiftUI",
           "metrics": {
             "swiftui_updates": {"total_count": 11000, "body_update_count": 1100, "duration_ms_p95": 11.5, "duration_ns_max": 15000000},
@@ -125,7 +125,7 @@ final class ComparatorTests: XCTestCase {
 
         let markdown = try String(contentsOf: outputDir.appendingPathComponent("comparison.md"), encoding: .utf8)
         XCTAssertTrue(markdown.contains("Instruments Comparison: baseline -> current"))
-        XCTAssertTrue(markdown.contains("## launch-dashboard (SwiftUI)"))
+        XCTAssertTrue(markdown.contains("## open-recent-window (SwiftUI)"))
         XCTAssertTrue(markdown.contains("| total_updates | 10000 | 11000 | 1000 |"))
         XCTAssertTrue(markdown.contains("| All Heap Allocations | total_bytes | 100 | 120 | 20 |"))
         XCTAssertTrue(markdown.contains("Baseline hot frames: DashboardView.body"))

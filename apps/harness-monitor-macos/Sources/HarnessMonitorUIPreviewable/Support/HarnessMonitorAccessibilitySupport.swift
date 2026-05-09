@@ -34,15 +34,7 @@ public enum HarnessMonitorUITestEnvironment {
     guard accessibilityMarkersEnabled else {
       return false
     }
-    guard let perfScenarioRawValue else {
-      return true
-    }
-    switch perfScenarioRawValue {
-    case "refresh-and-search", "sidebar-overflow-search":
-      return true
-    default:
-      return false
-    }
+    return perfScenarioRawValue == nil
   }()
   public static let selectionMarkersEnabled = generalMarkersEnabled
 }

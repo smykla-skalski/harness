@@ -29,13 +29,13 @@ final class SummarizerTests: XCTestCase {
           "git": {"commit": "deadbeef"},
           "system": {"machine": "arm64"},
           "targets": {"app": "HarnessMonitor"},
-          "selected_scenarios": ["launch-dashboard", "offline-cached-open"],
+          "selected_scenarios": ["open-recent-window", "offline-cached-open"],
           "captures": [
             {
-              "scenario": "launch-dashboard",
+              "scenario": "open-recent-window",
               "template": "SwiftUI",
               "duration_seconds": 4.5,
-              "trace_relpath": "traces/swiftui/launch-dashboard.trace",
+              "trace_relpath": "traces/swiftui/open-recent-window.trace",
               "exit_status": 0,
               "end_reason": "completed"
             },
@@ -63,7 +63,7 @@ final class SummarizerTests: XCTestCase {
         """
         try writeJSON(
             swiftuiMetrics,
-            to: runDir.appendingPathComponent("metrics/launch-dashboard/swiftui.json")
+            to: runDir.appendingPathComponent("metrics/open-recent-window/swiftui.json")
         )
 
         let allocationsMetrics = """
@@ -104,7 +104,7 @@ final class SummarizerTests: XCTestCase {
         let lines = csv.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
         XCTAssertEqual(lines.count, 3)
         XCTAssertEqual(lines[0], Summarizer.csvHeader.joined(separator: ","))
-        XCTAssertTrue(lines[1].hasPrefix("launch-dashboard,SwiftUI,4.5,0,completed,1234,100,12.5,25,8,"))
+        XCTAssertTrue(lines[1].hasPrefix("open-recent-window,SwiftUI,4.5,0,completed,1234,100,12.5,25,8,"))
         XCTAssertTrue(lines[2].hasPrefix("offline-cached-open,Allocations,3,0,completed,,,,,,,,,,250000,500000,60000,120000"))
     }
 
@@ -120,7 +120,7 @@ final class SummarizerTests: XCTestCase {
 
     func testSummarizeFailsWhenMetricsFileMissing() throws {
         try seedRun()
-        let metricsURL = runDir.appendingPathComponent("metrics/launch-dashboard/swiftui.json")
+        let metricsURL = runDir.appendingPathComponent("metrics/open-recent-window/swiftui.json")
         try FileManager.default.removeItem(at: metricsURL)
         XCTAssertThrowsError(try Summarizer.summarize(runDir: runDir)) { error in
             guard let failure = error as? Summarizer.Failure else {

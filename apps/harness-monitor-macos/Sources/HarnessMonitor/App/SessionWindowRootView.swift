@@ -7,6 +7,8 @@ struct SessionWindowRootView: View {
 
   let token: SessionWindowToken
   let store: HarnessMonitorStore
+  let notifications: HarnessMonitorUserNotificationController
+  let acpAttentionState: AcpPermissionAttentionState
   let keyWindowObserver: KeyWindowObserver
   let windowCommandRouting: WindowCommandRoutingState
   let mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
@@ -45,5 +47,11 @@ struct SessionWindowRootView: View {
       )
     )
     .modifier(SessionWindowTabbing(isSessionWindow: true))
+    .acpPermissionAttentionScene(
+      store: store,
+      notifications: notifications,
+      attentionState: acpAttentionState,
+      windowID: windowID
+    )
   }
 }

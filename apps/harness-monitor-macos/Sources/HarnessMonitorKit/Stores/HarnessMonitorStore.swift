@@ -55,6 +55,7 @@ public final class HarnessMonitorStore {
     }
   }
   public var pendingSessionRoute: SessionRouteSelection?
+  public internal(set) var pendingSessionRouteRequestID = 0
   var pendingSessionRouteDecisionFilterReset = false
   var pendingSessionRouteCreateEntryPoint: SessionRouteCreateEntryPoint?
   var pendingSessionRouteCreateSessionID: String?

@@ -1,7 +1,6 @@
 import Foundation
 
-/// Builds `manifest.json` for an audit run. Mirrors the python heredoc in
-/// run-instruments-audit.sh (lines ~1170-1354) so the JSON shape is preserved.
+/// Builds `manifest.json` for an audit run.
 public enum ManifestBuilder {
     public struct GitProvenance: Codable, Equatable {
         public var commit: String
@@ -232,10 +231,9 @@ public enum ManifestBuilder {
 
     public static let defaultTemplates = Templates(
         swiftui: [
-            "launch-dashboard",
-            "select-session-cockpit",
-            "refresh-and-search",
-            "sidebar-overflow-search",
+            "open-recent-window",
+            "open-session-window",
+            "permission-modal",
             "timeline-burst",
             "toast-overlay-churn",
             "offline-cached-open",

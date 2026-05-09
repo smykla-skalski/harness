@@ -1,6 +1,24 @@
 import Foundation
 
 extension HarnessMonitorStore {
+  public func replacePreviewTimeline(
+    sessionID: String,
+    entries: [TimelineEntry]
+  ) async -> Bool {
+    guard
+      let previewClient = client as? PreviewHarnessClient,
+      let updatedSummary = await previewClient.replaceTimeline(
+        sessionID: sessionID,
+        entries: entries
+      )
+    else {
+      return false
+    }
+
+    applySessionSummaryUpdate(updatedSummary)
+    return true
+  }
+
   public func sessionWindowSnapshot(
     sessionID: String
   ) async -> HarnessMonitorSessionWindowSnapshot? {

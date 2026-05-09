@@ -38,12 +38,12 @@ final class ManifestWriterTests: XCTestCase {
             "host": {"embedded_commit": "deadbeef", "embedded_dirty": "false", "embedded_workspace_fingerprint": "wf", "embedded_started_at_utc": "2026-04-25T00:00:00Z", "binary_sha256": "bs", "bundle_sha256": "us", "binary_mtime_utc": "m"},
             "shipping": {"built": false, "embedded_commit": "", "embedded_dirty": "", "embedded_workspace_fingerprint": "", "embedded_started_at_utc": "", "binary_sha256": "", "bundle_sha256": "", "binary_mtime_utc": ""}
           },
-          "selected_scenarios": ["launch-dashboard"]
+          "selected_scenarios": ["open-recent-window"]
         }
         """, at: "inputs.json")
 
         let captures = try writeFile(
-            "launch-dashboard\tSwiftUI\t5\ttraces/launch.trace\t0\tcompleted\tDashboardPreview\t/staged/Bin\t/run/dh\n",
+            "open-recent-window\tSwiftUI\t5\ttraces/open-recent-window.trace\t0\tcompleted\tdashboard-landing\t/staged/Bin\t/run/dh\n",
             at: "captures.tsv"
         )
 
@@ -58,7 +58,7 @@ final class ManifestWriterTests: XCTestCase {
         XCTAssertEqual(manifest.label, "perf")
         XCTAssertEqual(manifest.captures.count, 1)
         XCTAssertEqual(manifest.captures[0].environment["HARNESS_DAEMON_DATA_HOME"], "/run/dh")
-        XCTAssertEqual(manifest.captures[0].environment["HARNESS_MONITOR_PERF_SCENARIO"], "launch-dashboard")
+        XCTAssertEqual(manifest.captures[0].environment["HARNESS_MONITOR_PERF_SCENARIO"], "open-recent-window")
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: output.path))
         let written = try String(contentsOf: output, encoding: .utf8)

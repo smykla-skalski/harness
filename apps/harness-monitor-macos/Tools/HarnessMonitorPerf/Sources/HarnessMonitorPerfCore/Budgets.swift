@@ -1,10 +1,6 @@
 import Foundation
 
 /// Per-scenario budgets for SwiftUI and Allocations Instruments templates.
-///
-/// Mirrors the python tables in `Scripts/run-instruments-audit.sh` exactly so the Swift CLI
-/// produces identical pass/fail verdicts on the same `summary.json` inputs. Update both sides
-/// when adding scenarios; golden fixtures under `Tests/.../Fixtures/` lock the cross-check.
 public enum Budgets {
     public struct SwiftUIBudget: Equatable, Sendable {
         public var totalUpdates: Double
@@ -42,19 +38,27 @@ public enum Budgets {
     )
 
     public static let swiftUIByScenario: [String: SwiftUIBudget] = [
-        "launch-dashboard": SwiftUIBudget(
+        "open-recent-window": SwiftUIBudget(
             totalUpdates: 25_000, bodyUpdates: 2_500,
             maxUpdateGroupMilliseconds: 50, hitches: 0, potentialHangs: 0
         ),
-        "select-session-cockpit": SwiftUIBudget(
+        "open-session-window": SwiftUIBudget(
             totalUpdates: 35_000, bodyUpdates: 3_500,
             maxUpdateGroupMilliseconds: 50, hitches: 0, potentialHangs: 0
         ),
-        "refresh-and-search": SwiftUIBudget(
-            totalUpdates: 30_000, bodyUpdates: 3_000,
+        "permission-modal": SwiftUIBudget(
+            totalUpdates: 35_000, bodyUpdates: 3_500,
             maxUpdateGroupMilliseconds: 50, hitches: 0, potentialHangs: 0
         ),
         "timeline-burst": SwiftUIBudget(
+            totalUpdates: 30_000, bodyUpdates: 3_000,
+            maxUpdateGroupMilliseconds: 50, hitches: 0, potentialHangs: 0
+        ),
+        "toast-overlay-churn": SwiftUIBudget(
+            totalUpdates: 35_000, bodyUpdates: 3_500,
+            maxUpdateGroupMilliseconds: 50, hitches: 0, potentialHangs: 0
+        ),
+        "offline-cached-open": SwiftUIBudget(
             totalUpdates: 30_000, bodyUpdates: 3_000,
             maxUpdateGroupMilliseconds: 50, hitches: 0, potentialHangs: 0
         ),
