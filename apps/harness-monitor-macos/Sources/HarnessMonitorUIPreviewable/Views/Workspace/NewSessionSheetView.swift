@@ -193,7 +193,7 @@ struct NewSessionSheetView: View {
   }
 
   var agentCapabilityOptions: [AgentCapabilityOption] {
-    WorkspaceWindowView.agentCapabilityOptions(
+    AgentCapabilityCatalog.options(
       acpAgents: availableAcpAgents,
       runtimeProbeResults: runtimeProbeResults,
       sandboxed: store.daemonStatus?.manifest?.sandboxed == true,
@@ -371,7 +371,7 @@ struct NewSessionSheetView: View {
   private func normalizePreferredSelection() {
     let options = agentCapabilityOptions
     if didPickLaunchSelectionManually {
-      selectedLaunchSelection = WorkspaceWindowView.normalizedLaunchSelection(
+      selectedLaunchSelection = AgentCapabilityCatalog.normalizedLaunchSelection(
         options: options,
         selection: selectedLaunchSelection,
         fallbackRuntime: selectedLaunchSelection.preferredRuntime
@@ -380,7 +380,7 @@ struct NewSessionSheetView: View {
     }
 
     if let preferredProviderID = HarnessMonitorAgentLaunchDefaults.preferredProviderID() {
-      selectedLaunchSelection = WorkspaceWindowView.defaultLaunchSelection(
+      selectedLaunchSelection = AgentCapabilityCatalog.defaultLaunchSelection(
         providerID: preferredProviderID,
         options: options,
         fallback: selectedLaunchSelection
@@ -388,7 +388,7 @@ struct NewSessionSheetView: View {
       return
     }
 
-    selectedLaunchSelection = WorkspaceWindowView.firstProviderLaunchSelection(
+    selectedLaunchSelection = AgentCapabilityCatalog.firstProviderLaunchSelection(
       options: options,
       fallback: selectedLaunchSelection
     )

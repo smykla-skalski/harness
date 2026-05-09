@@ -8,7 +8,7 @@ import Testing
 struct AgentCapabilityPickerTests {
   @Test("built-in runtimes merge matching ACP descriptors into one row")
   func mergesMatchingAcpDescriptors() throws {
-    let options = WorkspaceWindowView.agentCapabilityOptions(
+    let options = AgentCapabilityCatalog.options(
       acpAgents: [
         descriptor(id: "copilot", displayName: "GitHub Copilot"),
         descriptor(id: "gemini", displayName: "Gemini CLI"),
@@ -132,7 +132,7 @@ struct AgentCapabilityPickerTests {
 
   @Test("sandboxed monitor disables ACP transport even when binary exists")
   func sandboxedMonitorDisablesAcpTransport() throws {
-    let options = WorkspaceWindowView.agentCapabilityOptions(
+    let options = AgentCapabilityCatalog.options(
       acpAgents: [descriptor(id: "copilot", displayName: "GitHub Copilot")],
       runtimeProbeResults: AcpRuntimeProbeResponse(
         probes: [
@@ -157,7 +157,7 @@ struct AgentCapabilityPickerTests {
 
   @Test("sandboxed monitor shows bridge access before local install setup")
   func sandboxedMonitorPrioritizesBridgeAccessOverInstallCTA() throws {
-    let options = WorkspaceWindowView.agentCapabilityOptions(
+    let options = AgentCapabilityCatalog.options(
       acpAgents: [descriptor(id: "copilot", displayName: "GitHub Copilot")],
       runtimeProbeResults: AcpRuntimeProbeResponse(
         probes: [
@@ -184,7 +184,7 @@ struct AgentCapabilityPickerTests {
     "sandboxed monitor keeps ACP transport enabled via host bridge even when local probe is missing"
   )
   func sandboxedMonitorAllowsAcpTransportViaHostBridge() throws {
-    let options = WorkspaceWindowView.agentCapabilityOptions(
+    let options = AgentCapabilityCatalog.options(
       acpAgents: [descriptor(id: "copilot", displayName: "GitHub Copilot")],
       runtimeProbeResults: AcpRuntimeProbeResponse(
         probes: [
@@ -240,7 +240,7 @@ struct AgentCapabilityPickerTests {
 
   @Test("missing selected ACP descriptor falls back to runtime TUI choice")
   func missingSelectedAcpDescriptorFallsBackToRuntime() {
-    let options = WorkspaceWindowView.agentCapabilityOptions(
+    let options = AgentCapabilityCatalog.options(
       acpAgents: [descriptor(id: "copilot", displayName: "GitHub Copilot")],
       runtimeProbeResults: AcpRuntimeProbeResponse(
         probes: [
@@ -255,7 +255,7 @@ struct AgentCapabilityPickerTests {
       )
     )
 
-    let normalizedSelection = WorkspaceWindowView.normalizedLaunchSelection(
+    let normalizedSelection = AgentCapabilityCatalog.normalizedLaunchSelection(
       options: options,
       selection: .acp("removed-agent"),
       fallbackRuntime: .gemini
@@ -266,7 +266,7 @@ struct AgentCapabilityPickerTests {
 
   @Test("first launch selection uses the first rendered provider row")
   func firstLaunchSelectionUsesFirstRenderedProviderRow() {
-    let options = WorkspaceWindowView.agentCapabilityOptions(
+    let options = AgentCapabilityCatalog.options(
       acpAgents: [
         descriptor(id: "copilot", displayName: "GitHub Copilot"),
         descriptor(id: "gemini", displayName: "Gemini CLI"),
@@ -290,12 +290,12 @@ struct AgentCapabilityPickerTests {
       )
     )
 
-    #expect(WorkspaceWindowView.firstProviderLaunchSelection(options: options) == .tui(.codex))
+    #expect(AgentCapabilityCatalog.firstProviderLaunchSelection(options: options) == .tui(.codex))
   }
 
   @Test("stored provider id defaults to ACP when that provider supports ACP")
   func storedProviderDefaultsToAcpWhenAvailable() {
-    let options = WorkspaceWindowView.agentCapabilityOptions(
+    let options = AgentCapabilityCatalog.options(
       acpAgents: [
         descriptor(id: "gemini", displayName: "Gemini CLI")
       ],
@@ -313,7 +313,7 @@ struct AgentCapabilityPickerTests {
     )
 
     #expect(
-      WorkspaceWindowView.defaultLaunchSelection(
+      AgentCapabilityCatalog.defaultLaunchSelection(
         providerID: "gemini",
         options: options,
         fallback: .tui(.codex)
@@ -323,7 +323,7 @@ struct AgentCapabilityPickerTests {
 
   @Test("stored provider id falls back to TUI when ACP is unavailable")
   func storedProviderFallsBackToTuiWhenAcpUnavailable() {
-    let options = WorkspaceWindowView.agentCapabilityOptions(
+    let options = AgentCapabilityCatalog.options(
       acpAgents: [
         descriptor(id: "gemini", displayName: "Gemini CLI")
       ],
@@ -341,7 +341,7 @@ struct AgentCapabilityPickerTests {
     )
 
     #expect(
-      WorkspaceWindowView.defaultLaunchSelection(
+      AgentCapabilityCatalog.defaultLaunchSelection(
         providerID: "gemini",
         options: options,
         fallback: .tui(.codex)
@@ -365,13 +365,13 @@ struct AgentCapabilityPickerTests {
       ],
       checkedAt: "2026-04-28T22:30:00Z"
     )
-    let waitingOptions = WorkspaceWindowView.agentCapabilityOptions(
+    let waitingOptions = AgentCapabilityCatalog.options(
       acpAgents: descriptors,
       runtimeProbeResults: probes,
       sandboxed: true,
       acpHostBridgeReady: false
     )
-    let readyOptions = WorkspaceWindowView.agentCapabilityOptions(
+    let readyOptions = AgentCapabilityCatalog.options(
       acpAgents: descriptors,
       runtimeProbeResults: probes,
       sandboxed: true,
@@ -379,14 +379,14 @@ struct AgentCapabilityPickerTests {
     )
 
     #expect(
-      WorkspaceWindowView.defaultLaunchSelection(
+      AgentCapabilityCatalog.defaultLaunchSelection(
         providerID: "gemini",
         options: waitingOptions,
         fallback: .tui(.codex)
       ) == .tui(.gemini)
     )
     #expect(
-      WorkspaceWindowView.defaultLaunchSelection(
+      AgentCapabilityCatalog.defaultLaunchSelection(
         providerID: "gemini",
         options: readyOptions,
         fallback: .tui(.gemini)
