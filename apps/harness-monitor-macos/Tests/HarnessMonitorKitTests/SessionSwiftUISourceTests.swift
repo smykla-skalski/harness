@@ -5,8 +5,8 @@ import Testing
 
 @Suite("Session SwiftUI source contracts")
 struct SessionSwiftUISourceTests {
-  @Test("Session detail panes share the native detail scroll surface")
-  func sessionDetailPanesShareNativeDetailScrollSurface() throws {
+  @Test("Task detail uses native form sections while detail scroll surface stays shared")
+  func taskDetailUsesNativeFormSectionsWhileScrollSurfaceStaysShared() throws {
     let taskSource = try sourceFile(at: "Views/Sessions/SessionTaskDetailPane.swift")
     let decisionSource = try sourceFile(at: "Views/Sessions/SessionDecisionDetailPane.swift")
     let codexSource = try sourceFile(at: "Views/Sessions/SessionCodexRunDetailSection.swift")
@@ -15,7 +15,10 @@ struct SessionSwiftUISourceTests {
     let columnsSource = try sourceFile(at: "Views/Sessions/SessionWindowView+Columns.swift")
 
     #expect(taskSource.contains("SessionDetailScrollSurface("))
-    #expect(!taskSource.contains("Form {"))
+    #expect(taskSource.contains("Form {"))
+    #expect(taskSource.contains(".scrollDisabled(true)"))
+    #expect(taskSource.contains(".scrollContentBackground(.hidden)"))
+    #expect(!taskSource.contains("SessionDetailPanel("))
     #expect(decisionSource.contains("SessionDetailScrollSurface("))
     #expect(decisionSource.contains("SessionFilteredDecisionNotice("))
     #expect(!decisionSource.contains("Form {"))
