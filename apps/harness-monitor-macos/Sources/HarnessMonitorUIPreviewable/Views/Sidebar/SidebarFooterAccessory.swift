@@ -235,7 +235,7 @@ public struct SidebarFooterAccessory: View {
   }
 }
 
-private struct SidebarFooterGlassTintWash: View {
+struct SidebarFooterGlassTintWash: View {
   let connectionTint: Color?
   let blend: SidebarFooterGlassTintBlend
   let cornerRadius: CGFloat

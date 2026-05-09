@@ -1,6 +1,13 @@
 import HarnessMonitorKit
 import SwiftUI
 
+struct SessionWindowSnapshotRefreshTrigger: Equatable {
+  let sessionID: String
+  let connectionState: HarnessMonitorStore.ConnectionState
+  let lastPersistedSnapshotAt: Date?
+  let summaryUpdatedAt: String?
+}
+
 public struct SessionWindowView: View {
   public let store: HarnessMonitorStore
   public let token: SessionWindowToken
@@ -78,6 +85,10 @@ public struct SessionWindowView: View {
     route(for: stateCache.selection)
   }
 
+  var renderedRoute: SessionWindowRoute {
+    contentRenderedRoute ?? route
+  }
+
   func route(for selection: SessionSelection) -> SessionWindowRoute {
     switch selection {
     case .route(let route): route
@@ -89,7 +100,20 @@ public struct SessionWindowView: View {
   }
 
   var summary: SessionSummary? {
-    snapshot?.summary ?? store.sessionIndex.sessionSummary(for: token.sessionID)
+    catalogSummary ?? snapshot?.summary
+  }
+
+  var catalogSummary: SessionSummary? {
+    store.sessionIndex.sessionSummary(for: token.sessionID)
+  }
+
+  var snapshotRefreshTrigger: SessionWindowSnapshotRefreshTrigger {
+    SessionWindowSnapshotRefreshTrigger(
+      sessionID: token.sessionID,
+      connectionState: store.connectionState,
+      lastPersistedSnapshotAt: store.lastPersistedSnapshotAt,
+      summaryUpdatedAt: catalogSummary?.updatedAt
+    )
   }
 
   var navigationTitleText: String {
@@ -163,8 +187,8 @@ public struct SessionWindowView: View {
         preferredBinding: $inspectorPreferred
       )
     }
-    .task(id: token.sessionID) {
-      await performInitialLoad()
+    .task(id: snapshotRefreshTrigger) {
+      await refreshSnapshot(for: snapshotRefreshTrigger)
     }
     .task(id: decisionsCacheTrigger) {
       await recomputeDecisionsCache()
@@ -177,6 +201,10 @@ public struct SessionWindowView: View {
       )
       detailRenderedSelection = newSelection
       contentRenderedRoute = route(for: newSelection)
+    }
+    .onChange(of: renderedRoute) { _, newRoute in
+      guard newRoute.layoutStyle == .sidebarDetail else { return }
+      detailColumnWidth = 0
     }
     .onChange(of: stateCache.decisionFilters.query) { _, newValue in
       guard persistedDecisionQuery != newValue else { return }
@@ -204,9 +232,10 @@ public struct SessionWindowView: View {
     SessionWindowToolbar(
       store: store,
       snapshot: snapshot,
+      isLoading: isLoading,
+      summary: summary,
       connectionTitle: connectionTitle,
-      statusSystemImage: statusSystemImage,
-      sessionID: token.sessionID,
+      sourceSystemImage: sourceSystemImage,
       state: stateCache,
       focusMode: $focusMode
     )
@@ -255,6 +284,16 @@ public struct SessionWindowView: View {
   }
 
   @MainActor
+  private func refreshSnapshot(for trigger: SessionWindowSnapshotRefreshTrigger) async {
+    guard trigger.sessionID == token.sessionID else { return }
+    if didLoadSnapshot {
+      await loadSnapshot()
+    } else {
+      await performInitialLoad()
+    }
+  }
+
+  @MainActor
   private func performInitialLoad() async {
     hydrateSelectionFromPersistedStorage()
     hydrateDecisionFiltersFromPersistedStorage()
@@ -292,11 +331,18 @@ public struct SessionWindowView: View {
     }
   }
 
-  private var statusSystemImage: String {
-    guard let source = snapshot?.source else {
-      return "arrow.trianglehead.2.clockwise"
+  private var sourceSystemImage: String {
+    guard !isLoading, let source = snapshot?.source else {
+      return "arrow.clockwise"
     }
-    return source == .live ? "bolt.horizontal.circle" : "externaldrive"
+    switch source {
+    case .live:
+      return "bolt.horizontal.circle"
+    case .cache:
+      return "externaldrive"
+    case .catalog:
+      return "square.stack.3d.up"
+    }
   }
 
   private var connectionTitle: String {
@@ -309,11 +355,15 @@ public struct SessionWindowView: View {
   }
 
   private func loadSnapshot() async {
+    guard !Task.isCancelled else { return }
     isLoading = true
+    defer { isLoading = false }
     await store.bootstrapIfNeeded()
-    snapshot = await store.sessionWindowSnapshot(sessionID: token.sessionID)
+    guard !Task.isCancelled else { return }
+    let nextSnapshot = await store.sessionWindowSnapshot(sessionID: token.sessionID)
+    guard !Task.isCancelled else { return }
+    snapshot = nextSnapshot
     didLoadSnapshot = true
-    isLoading = false
   }
 
   private func requestPrimaryContentAccessibilityFocus() {

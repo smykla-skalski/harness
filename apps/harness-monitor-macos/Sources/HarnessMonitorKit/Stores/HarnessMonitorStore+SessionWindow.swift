@@ -4,6 +4,7 @@ extension HarnessMonitorStore {
   public func sessionWindowSnapshot(
     sessionID: String
   ) async -> HarnessMonitorSessionWindowSnapshot? {
+    guard !Task.isCancelled else { return nil }
     if connectionState == .online, let client {
       if let liveSnapshot = await loadLiveSessionWindowSnapshot(
         sessionID: sessionID,
@@ -11,9 +12,11 @@ extension HarnessMonitorStore {
       ) {
         return liveSnapshot
       }
+      guard !Task.isCancelled else { return nil }
     }
 
     if let cached = await loadCachedSessionDetail(sessionID: sessionID) {
+      guard !Task.isCancelled else { return nil }
       return HarnessMonitorSessionWindowSnapshot(
         summary: cached.detail.session,
         detail: cached.detail,
@@ -23,6 +26,7 @@ extension HarnessMonitorStore {
       )
     }
 
+    guard !Task.isCancelled else { return nil }
     guard let summary = sessionIndex.sessionSummary(for: sessionID) else {
       return nil
     }
@@ -42,10 +46,12 @@ extension HarnessMonitorStore {
     do {
       let detailScope = activeTransport == .webSocket ? "core" : nil
       let detail = try await client.sessionDetail(id: sessionID, scope: detailScope)
+      guard !Task.isCancelled else { return nil }
       let timelineWindow = try? await client.timelineWindow(
         sessionID: sessionID,
         request: .latest(limit: Self.initialSelectedTimelineWindowLimit)
       ) { _, _, _ in }
+      guard !Task.isCancelled else { return nil }
       return HarnessMonitorSessionWindowSnapshot(
         summary: detail.session,
         detail: detail,
@@ -54,6 +60,9 @@ extension HarnessMonitorStore {
         source: .live
       )
     } catch {
+      guard !(error is CancellationError) else {
+        return nil
+      }
       let errorDescription = String(describing: error)
       HarnessMonitorLogger.store.debug(
         """

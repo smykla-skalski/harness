@@ -36,6 +36,10 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.session.window.toolbar.status"
     )
     #expect(
+      HarnessMonitorAccessibility.sessionWindowFocusModeButton
+        == "harness.session.window.toolbar.focus-mode"
+    )
+    #expect(
       HarnessMonitorAccessibility.sessionNavigateBackButton
         == "harness.session.window.toolbar.navigate-back"
     )
@@ -83,6 +87,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     )
     #expect(windowView.contains("HarnessMonitorAccessibility.sessionWindowShell"))
     #expect(sidebarView.contains("HarnessMonitorAccessibility.sessionWindowSidebar"))
+    #expect(toolbarView.contains("HarnessMonitorAccessibility.sessionWindowFocusModeButton"))
     #expect(toolbarView.contains("HarnessMonitorAccessibility.sessionNavigateBackButton"))
     #expect(toolbarView.contains("HarnessMonitorAccessibility.sessionNavigateForwardButton"))
     #expect(

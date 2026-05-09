@@ -1,6 +1,10 @@
 import HarnessMonitorKit
 import SwiftUI
 
+private enum SleepPreventionToolbarSymbolLayout {
+  static let size: CGFloat = 14
+}
+
 struct SleepPreventionToolbarPresentation: Equatable {
   let isEnabled: Bool
 
@@ -46,6 +50,10 @@ struct SleepPreventionToolbarButton: View {
               .replace.magic(fallback: .downUp.wholeSymbol),
               options: .nonRepeating
             )
+          )
+          .frame(
+            width: SleepPreventionToolbarSymbolLayout.size,
+            height: SleepPreventionToolbarSymbolLayout.size
           )
       }
     }

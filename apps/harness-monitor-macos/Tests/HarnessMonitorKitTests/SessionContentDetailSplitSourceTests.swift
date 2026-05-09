@@ -24,6 +24,23 @@ struct SessionContentDetailSplitSourceTests {
     #expect(splitSource.contains(".onMoveCommand"))
   }
 
+  @Test("Session split layout defers geometry-driven width writes")
+  func sessionSplitLayoutDefersGeometryDrivenWidthWrites() throws {
+    let columnsSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+Columns.swift"
+    )
+    let splitSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionContentDetailSplitView.swift"
+    )
+
+    #expect(columnsSource.contains("deferDetailColumnWidthUpdate("))
+    #expect(columnsSource.contains("Task { @MainActor in"))
+    #expect(columnsSource.contains("await Task.yield()"))
+    #expect(splitSource.contains("deferReclampLiveWidth(availableWidth: newWidth)"))
+    #expect(splitSource.contains("Task { @MainActor in"))
+    #expect(splitSource.contains("await Task.yield()"))
+  }
+
   private func previewableSourceFile(named relativePath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =

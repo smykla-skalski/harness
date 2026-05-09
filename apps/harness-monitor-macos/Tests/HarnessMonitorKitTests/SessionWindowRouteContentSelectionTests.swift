@@ -15,6 +15,19 @@ struct SessionWindowRouteContentSelectionTests {
     #expect(!source.contains("@State private var selectedDecisionID"))
   }
 
+  @Test("Session layouts follow the rendered route when switching route-only surfaces")
+  func sessionLayoutsFollowTheRenderedRoute() throws {
+    let windowView = try sourceFile(named: "SessionWindowView.swift")
+    let columns = try sourceFile(named: "SessionWindowView+Columns.swift")
+
+    #expect(windowView.contains("var renderedRoute: SessionWindowRoute"))
+    #expect(windowView.contains(".onChange(of: renderedRoute)"))
+    #expect(columns.contains("switch renderedRoute.layoutStyle"))
+    #expect(columns.contains("case .sidebarDetail"))
+    #expect(columns.contains("case .sidebarContentDetail"))
+    #expect(columns.contains("contentColumnBody(snapshot: snapshot, route: renderedRoute)"))
+  }
+
   private func sourceFile(named name: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =

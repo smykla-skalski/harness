@@ -73,16 +73,34 @@ extension SessionWindowView {
       .navigationSplitViewColumnWidth(min: 190, ideal: sidebarWidth, max: 360)
     } detail: {
       sessionBannerStack {
-        SessionContentDetailSplitView(contentWidth: $contentColumnWidth) {
-          contentColumn
-            .padding(.top, HarnessMonitorTheme.spacingLG)
-        } detail: {
-          detailColumn
-            .padding(.top, HarnessMonitorTheme.spacingLG)
-        }
+        standardSessionDetailSurface
       }
     }
     .navigationSplitViewStyle(.prominentDetail)
+  }
+
+  @ViewBuilder
+  private var standardSessionDetailSurface: some View {
+    switch renderedRoute.layoutStyle {
+    case .sidebarDetail:
+      routeDetailColumn
+    case .sidebarContentDetail:
+      SessionContentDetailSplitView(contentWidth: $contentColumnWidth) {
+        contentColumn
+          .padding(.top, HarnessMonitorTheme.spacingLG)
+      } detail: {
+        detailColumn
+          .padding(.top, HarnessMonitorTheme.spacingLG)
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var routeDetailColumn: some View {
+    contentColumn
+      .padding(.top, HarnessMonitorTheme.spacingLG)
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      .backgroundExtensionEffect()
   }
 
   @ViewBuilder
@@ -101,6 +119,25 @@ extension SessionWindowView {
     )
   }
 
+  private func deferDetailColumnWidthUpdate(
+    _ width: CGFloat,
+    visibleBinding: Binding<Bool>,
+    preferredBinding: Binding<Bool>,
+    announce: Bool = true
+  ) {
+    // Delay layout-driven writes until after SwiftUI finishes the current
+    // geometry pass; synchronous updates here trigger the startup CGFloat fault.
+    Task { @MainActor in
+      await Task.yield()
+      updateDetailColumnWidth(
+        width,
+        visibleBinding: visibleBinding,
+        preferredBinding: preferredBinding,
+        announce: announce
+      )
+    }
+  }
+
   @ViewBuilder var sessionSurface: some View {
     if focusMode {
       focusModeSurface
@@ -115,7 +152,7 @@ extension SessionWindowView {
       ProgressView("Loading session")
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     } else if let snapshot {
-      contentColumnBody(snapshot: snapshot, route: contentRenderedRoute ?? route)
+      contentColumnBody(snapshot: snapshot, route: renderedRoute)
     } else {
       ContentUnavailableView(
         "Session Not Available",
@@ -178,7 +215,7 @@ extension SessionWindowView {
         }
       }
       .onAppear {
-        updateDetailColumnWidth(
+        deferDetailColumnWidthUpdate(
           geometry.size.width,
           visibleBinding: $inspectorVisible,
           preferredBinding: $inspectorPreferred,
@@ -186,7 +223,7 @@ extension SessionWindowView {
         )
       }
       .onChange(of: geometry.size.width) { _, newWidth in
-        updateDetailColumnWidth(
+        deferDetailColumnWidthUpdate(
           newWidth,
           visibleBinding: $inspectorVisible,
           preferredBinding: $inspectorPreferred

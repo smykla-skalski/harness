@@ -24,7 +24,7 @@ final class SessionWindowVoiceOverTests: HarnessMonitorUITestCase {
     )
 
     let openRecentWindow = element(in: app, identifier: Accessibility.openRecentRoot)
-    XCTAssertTrue(waitForElement(openRecentWindow, timeout: Self.uiTimeout))
+    XCTAssertTrue(waitForElement(in: app, openRecentWindow, timeout: Self.uiTimeout))
 
     let sessionRowIdentifier = Accessibility.openRecentSessionRow(Self.previewSessionID)
     XCTAssertTrue(
@@ -37,29 +37,32 @@ final class SessionWindowVoiceOverTests: HarnessMonitorUITestCase {
     tapButton(in: app, identifier: sessionRowIdentifier)
 
     let sessionWindow = element(in: app, identifier: Accessibility.sessionWindowShell)
-    XCTAssertTrue(waitForElement(sessionWindow, timeout: Self.uiTimeout))
+    XCTAssertTrue(waitForElement(in: app, sessionWindow, timeout: Self.uiTimeout))
 
     let sidebar = element(in: app, identifier: Accessibility.sessionWindowSidebar)
-    XCTAssertTrue(waitForElement(sidebar, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(in: app, sidebar, timeout: Self.actionTimeout))
 
     let overviewRoute = element(
       in: app,
       identifier: Accessibility.sessionWindowRoute("overview")
     )
-    XCTAssertTrue(waitForElement(overviewRoute, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(in: app, overviewRoute, timeout: Self.actionTimeout))
     XCTAssertTrue(tapElementReliably(in: app, element: overviewRoute))
 
-    let focusModeToggle = app.checkBoxes["Focus Mode"].firstMatch
-    XCTAssertTrue(waitForElement(focusModeToggle, timeout: Self.actionTimeout))
+    let focusModeToggle = button(
+      in: app,
+      identifier: Accessibility.sessionWindowFocusModeButton
+    )
+    XCTAssertTrue(waitForElement(in: app, focusModeToggle, timeout: Self.actionTimeout))
     XCTAssertTrue(tapElementReliably(in: app, element: focusModeToggle))
     XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) { !sidebar.exists },
+      waitUntil(in: app, timeout: Self.actionTimeout) { !sidebar.exists },
       "Focus mode should replace the split-shell chrome with a single focused surface."
     )
 
     let openTasksMetric = staticText(in: app, containing: "Open tasks")
     XCTAssertTrue(
-      waitForElement(openTasksMetric, timeout: Self.actionTimeout),
+      waitForElement(in: app, openTasksMetric, timeout: Self.actionTimeout),
       "Focus mode should keep overview content visible instead of showing the empty placeholder."
     )
     XCTAssertFalse(
@@ -99,12 +102,15 @@ final class SessionWindowVoiceOverTests: HarnessMonitorUITestCase {
     let sidebar = element(in: app, identifier: Accessibility.sessionWindowSidebar)
     XCTAssertTrue(waitForElement(sidebar, timeout: Self.actionTimeout))
 
-    let focusModeToggle = app.checkBoxes["Focus Mode"].firstMatch
+    let focusModeToggle = button(
+      in: app,
+      identifier: Accessibility.sessionWindowFocusModeButton
+    )
     XCTAssertTrue(waitForElement(focusModeToggle, timeout: Self.actionTimeout))
 
-    let statusMenu = button(in: app, identifier: Accessibility.sessionWindowStatusMenu)
-    XCTAssertTrue(waitForElement(statusMenu, timeout: Self.actionTimeout))
-    XCTAssertTrue(statusMenu.label.contains("Session status"))
+    let statusSurface = element(in: app, identifier: Accessibility.sessionWindowStatusMenu)
+    XCTAssertTrue(waitForElement(statusSurface, timeout: Self.actionTimeout))
+    XCTAssertTrue(statusSurface.label.contains("Session status"))
 
     XCTAssertFalse(
       mainWindow(in: app).searchFields.firstMatch.exists,
