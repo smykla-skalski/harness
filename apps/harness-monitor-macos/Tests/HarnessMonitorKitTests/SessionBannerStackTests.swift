@@ -62,6 +62,9 @@ struct SessionBannerStackTests {
     #expect(large.itemSpacing > regular.itemSpacing)
     #expect(large.horizontalPadding > regular.horizontalPadding)
     #expect(large.verticalPadding > regular.verticalPadding)
+    #expect(regular.actionVerticalPadding < regular.verticalPadding)
+    #expect(large.actionVerticalPadding > regular.actionVerticalPadding)
+    #expect(large.actionVerticalPadding < large.verticalPadding)
     #expect(large.reviewButtonMinHeight == 44)
   }
 

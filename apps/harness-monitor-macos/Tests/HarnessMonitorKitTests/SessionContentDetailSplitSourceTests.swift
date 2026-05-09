@@ -41,6 +41,38 @@ struct SessionContentDetailSplitSourceTests {
     #expect(splitSource.contains("await Task.yield()"))
   }
 
+  @Test("Session detail columns leave top padding to the owned views")
+  func sessionDetailColumnsLeaveTopPaddingToOwnedViews() throws {
+    let columnsSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+Columns.swift"
+    )
+
+    #expect(
+      !columnsSource.contains(
+        """
+        contentColumn
+                  .padding(.top, HarnessMonitorTheme.spacingLG)
+        """
+      )
+    )
+    #expect(
+      !columnsSource.contains(
+        """
+        detailColumn
+                  .padding(.top, HarnessMonitorTheme.spacingLG)
+        """
+      )
+    )
+    #expect(
+      !columnsSource.contains(
+        """
+        focusModeSurface
+                .padding(.top, HarnessMonitorTheme.spacingLG)
+        """
+      )
+    )
+  }
+
   private func previewableSourceFile(named relativePath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
