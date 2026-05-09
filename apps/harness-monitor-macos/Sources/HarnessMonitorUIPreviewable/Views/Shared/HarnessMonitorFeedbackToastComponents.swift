@@ -74,17 +74,37 @@ private enum HarnessMonitorFeedbackToastFocus {
 
 struct HarnessMonitorFeedbackToastPrimaryActionButton: View {
   let action: ActionFeedbackAction
-  let copied: Bool
+  let feedbackID: UUID
+  let toast: ToastSlice
   let tint: Color
   let reduceMotion: Bool
-  let onPress: () -> Void
-  let onPendingDismissCancelled: () -> Void
-  let onBeginDismiss: () -> Void
-  let onFinishDismiss: () -> Void
+  let dismissThreshold: CGFloat
+  @Binding private var copied: Bool
+  @Binding private var dragOffset: CGFloat
+
+  init(
+    action: ActionFeedbackAction,
+    feedbackID: UUID,
+    toast: ToastSlice,
+    copied: Binding<Bool>,
+    dragOffset: Binding<CGFloat>,
+    tint: Color,
+    reduceMotion: Bool,
+    dismissThreshold: CGFloat
+  ) {
+    self.action = action
+    self.feedbackID = feedbackID
+    self.toast = toast
+    _copied = copied
+    _dragOffset = dragOffset
+    self.tint = tint
+    self.reduceMotion = reduceMotion
+    self.dismissThreshold = dismissThreshold
+  }
 
   var body: some View {
     Button {
-      onPress()
+      perform()
     } label: {
       HarnessMonitorFeedbackToastPrimaryActionLabel(action: action, copied: copied)
     }
@@ -95,18 +115,36 @@ struct HarnessMonitorFeedbackToastPrimaryActionButton: View {
       guard copied else { return }
       try? await Task.sleep(for: HarnessMonitorFeedbackToastPrimaryActionTiming.successHold)
       guard !Task.isCancelled else {
-        onPendingDismissCancelled()
+        toast.resumeTimers()
         return
       }
       HarnessMonitorFeedbackToastFocus.clear()
-      onBeginDismiss()
+      toast.resumeTimers()
+      withAnimation(reduceMotion ? .linear(duration: 0.01) : .easeIn(duration: 0.22)) {
+        dragOffset = dismissThreshold * 2.4
+      }
       if reduceMotion {
-        onFinishDismiss()
+        toast.dismiss(id: feedbackID)
         return
       }
       try? await Task.sleep(for: HarnessMonitorFeedbackToastPrimaryActionTiming.dismissDuration)
       guard !Task.isCancelled else { return }
-      onFinishDismiss()
+      toast.dismiss(id: feedbackID)
+    }
+  }
+
+  private func perform() {
+    guard !copied else {
+      return
+    }
+    switch action.kind {
+    case .copy(let text):
+      toast.pauseTimers()
+      HarnessMonitorClipboard.copy(text)
+      withAnimation(reduceMotion ? .linear(duration: 0.01) : .easeInOut(duration: 0.18)) {
+        copied = true
+      }
+      AccessibilityNotification.Announcement(action.successAnnouncement).post()
     }
   }
 }
