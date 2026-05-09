@@ -72,6 +72,8 @@ public struct SessionTitleBlurChrome: View {
   private var reduceTransparency
   @Environment(\.colorSchemeContrast)
   private var colorSchemeContrast
+  @AppStorage(HarnessMonitorSessionTitleBlurDefaults.enabledKey)
+  private var isEnabled: Bool = HarnessMonitorSessionTitleBlurDefaults.enabledDefault
 
   public init(status: SessionStatus, isStale: Bool) {
     self.status = status
@@ -101,21 +103,29 @@ public struct SessionTitleBlurChrome: View {
   }
 
   public var body: some View {
-    titleTint
-      .frame(height: SessionTitleBlurChromeConfiguration.height)
-      .frame(maxWidth: .infinity, alignment: .top)
-      .ignoresSafeArea(.container, edges: .top)
-      .allowsHitTesting(false)
-      .accessibilityHidden(true)
-      .accessibilityIdentifier(SessionTitleBlurChromeConfiguration.accessibilityIdentifier)
-      .animation(
-        .easeInOut(duration: SessionTitleBlurChromeConfiguration.animationDuration),
-        value: status
-      )
-      .animation(
-        .easeInOut(duration: SessionTitleBlurChromeConfiguration.animationDuration),
-        value: isStale
-      )
+    Group {
+      if isEnabled {
+        titleTint
+      }
+    }
+    .frame(height: SessionTitleBlurChromeConfiguration.height)
+    .frame(maxWidth: .infinity, alignment: .top)
+    .ignoresSafeArea(.container, edges: .top)
+    .allowsHitTesting(false)
+    .accessibilityHidden(true)
+    .accessibilityIdentifier(SessionTitleBlurChromeConfiguration.accessibilityIdentifier)
+    .animation(
+      .easeInOut(duration: SessionTitleBlurChromeConfiguration.animationDuration),
+      value: status
+    )
+    .animation(
+      .easeInOut(duration: SessionTitleBlurChromeConfiguration.animationDuration),
+      value: isStale
+    )
+    .animation(
+      .easeInOut(duration: SessionTitleBlurChromeConfiguration.animationDuration),
+      value: isEnabled
+    )
   }
 
   private var titleTint: some View {
