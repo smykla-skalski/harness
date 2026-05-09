@@ -33,6 +33,17 @@ struct ToolbarTitleScalingContractTests {
     #expect(!sessionSource.contains(".buttonStyle(.glassProminent)"))
   }
 
+  @Test("Session focus mode toolbar button uses animated moon symbols")
+  func sessionFocusModeToolbarButtonUsesAnimatedMoonSymbols() throws {
+    let sessionSource = try previewableSourceFile(named: "Views/Sessions/SessionWindowToolbar.swift")
+
+    #expect(sessionSource.contains("Image(systemName: focusMode ? \"moon.fill\" : \"moon\")"))
+    #expect(sessionSource.contains(".contentTransition("))
+    #expect(sessionSource.contains(".replace.magic(fallback: .downUp.wholeSymbol)"))
+    #expect(sessionSource.contains("options: .nonRepeating"))
+    #expect(sessionSource.contains(".animation(.default, value: focusMode)"))
+  }
+
   private func previewableSourceFile(named relativePath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
