@@ -258,6 +258,49 @@ build_test_action_args() {
   printf '%s\n' "${out[@]}"
 }
 
+build_setting_arg_present() {
+  local key="$1"
+  local arg
+  for arg in "${args[@]}"; do
+    if [[ "$arg" == "$key="* ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+xcodebuild_configuration() {
+  local index arg
+  for ((index = 0; index < ${#args[@]}; index += 1)); do
+    arg="${args[index]}"
+    if [[ "$arg" == "-configuration" ]] && (( index + 1 < ${#args[@]} )); then
+      printf '%s\n' "${args[index + 1]}"
+      return 0
+    fi
+    if [[ "$arg" == -configuration=* ]]; then
+      printf '%s\n' "${arg#*=}"
+      return 0
+    fi
+  done
+  printf 'Debug\n'
+}
+
+inject_local_script_sandbox_override() {
+  local configuration
+  if [[ "${HARNESS_MONITOR_KEEP_USER_SCRIPT_SANDBOXING:-0}" == "1" ]]; then
+    return 0
+  fi
+  if build_setting_arg_present "ENABLE_USER_SCRIPT_SANDBOXING"; then
+    return 0
+  fi
+  configuration="$(xcodebuild_configuration)"
+  case "$configuration" in
+    Debug|Preview)
+      args+=("ENABLE_USER_SCRIPT_SANDBOXING=NO")
+      ;;
+  esac
+}
+
 run_xcodebuild() {
   local status report_path log_path
   local -a run_args=()
@@ -281,6 +324,7 @@ run_xcodebuild() {
 
 normalize_xcodebuild_path_args
 find_or_inject_derived_data_path
+inject_local_script_sandbox_override
 export XCODEBUILD_DERIVED_DATA_PATH="$derive_data_path"
 ensure_non_indexable_directory "$derive_data_path"
 

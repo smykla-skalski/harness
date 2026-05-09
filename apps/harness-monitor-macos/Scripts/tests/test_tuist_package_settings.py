@@ -38,7 +38,7 @@ RECOMMENDED_FRAMEWORK_SETTINGS = (
 PREVIEW_OVERRIDE_SETTINGS = ('"SWIFT_ENABLE_PREFIX_MAPPING": "NO"',)
 
 PROJECT_MANIFEST_SETTINGS = (
-    '"REGISTER_APP_GROUPS": "NO"',
+    '"REGISTER_APP_GROUPS": "YES"',
     '"CODE_SIGN_ENTITLEMENTS": generatedAppEntitlements',
     "BuildSettings.canvasPreviewCompilationOverrides",
     "BuildPhases.prepareAppEntitlementsPreAction()",
@@ -80,15 +80,12 @@ class TuistPackageSettingsTests(unittest.TestCase):
         for setting in PROJECT_MANIFEST_SETTINGS:
             with self.subTest(setting=setting):
                 self.assertIn(setting, manifest)
-        # REGISTER_APP_GROUPS must stay NO on every signed app target so Xcode
-        # never re-recommends YES (which would make automatic signing claim
-        # ownership of the shared Q498EB36N4.io.harnessmonitor app group).
         self.assertEqual(
-            manifest.count('"REGISTER_APP_GROUPS": "NO"'),
+            manifest.count('"REGISTER_APP_GROUPS": "YES"'),
             2,
-            "REGISTER_APP_GROUPS=NO must be set on monitorAppSettings and uiTestHostSettings",
+            "REGISTER_APP_GROUPS=YES must be set on monitorAppSettings and uiTestHostSettings",
         )
-        self.assertNotIn('"REGISTER_APP_GROUPS": "YES"', manifest)
+        self.assertNotIn('"REGISTER_APP_GROUPS": "NO"', manifest)
         self.assertEqual(
             manifest.count(
                 "entitlements: .file(path: xcodeVisibleAppEntitlementsPath)"
@@ -126,6 +123,16 @@ class TuistPackageSettingsTests(unittest.TestCase):
         self.assertEqual(
             ui_test_host["com.apple.security.application-groups"],
             ["Q498EB36N4.io.harnessmonitor"],
+        )
+        self.assertFalse(
+            monitor["com.apple.security.application-groups"][0].startswith("group."),
+            "REGISTER_APP_GROUPS only auto-registers group.* identifiers",
+        )
+        self.assertFalse(
+            ui_test_host["com.apple.security.application-groups"][0].startswith(
+                "group."
+            ),
+            "REGISTER_APP_GROUPS only auto-registers group.* identifiers",
         )
         self.assertEqual(xcode_visible["com.apple.security.app-sandbox"], True)
 
