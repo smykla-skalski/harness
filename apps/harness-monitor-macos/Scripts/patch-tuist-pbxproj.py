@@ -12,6 +12,7 @@ Normalizes:
   `TargetAttributes`, so targets inherit signing cleanly from project settings.
 - macOS app-target `SystemCapabilities` metadata for disabled App Groups, so
   Xcode does not keep re-suggesting "Enable Register App Groups".
+- scheme-level `LastUpgradeVersion`, which Tuist emits as Xcode 10.1 metadata.
 
 Tuist 4 does not expose the project-format fields via its DSL, and its
 generator still hardcodes an Xcode 14-era object version. The text is edited
@@ -24,6 +25,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 PROJECT_OBJECT_VERSION_RE = re.compile(r"^(\tobjectVersion = )\d+;$", re.MULTILINE)
@@ -63,7 +65,9 @@ SYSTEM_CAPABILITIES_RE = re.compile(
     r"(\t\t\t\t\t\tSystemCapabilities = \{\n)((?:\t{7,}[^\n]*\n)*?)(\t\t\t\t\t\t\};)"
 )
 
-DISABLED_MAC_APP_GROUP_TARGETS = frozenset({"HarnessMonitor", "HarnessMonitorUITestHost"})
+DISABLED_MAC_APP_GROUP_TARGETS = frozenset(
+    {"HarnessMonitor", "HarnessMonitorUITestHost"}
+)
 MAC_APP_GROUPS_CAPABILITY_KEY = "com.apple.ApplicationGroups.Mac"
 
 
@@ -130,7 +134,9 @@ def strip_target_attribute_signing_metadata(text: str) -> str:
     def replace(match: re.Match[str]) -> str:
         head, body, tail = match.group(1), match.group(2), match.group(3)
         body = re.sub(r"^\t{6}DevelopmentTeam = [^;]+;\n", "", body, flags=re.MULTILINE)
-        body = re.sub(r"^\t{6}ProvisioningStyle = [^;]+;\n", "", body, flags=re.MULTILINE)
+        body = re.sub(
+            r"^\t{6}ProvisioningStyle = [^;]+;\n", "", body, flags=re.MULTILINE
+        )
         return head + body + tail
 
     return TARGET_ATTRIBUTES_RE.sub(replace, text, count=1)
@@ -144,7 +150,9 @@ def capability_entry(capability_key: str, enabled: int) -> str:
     )
 
 
-def upsert_system_capability(target_body: str, capability_key: str, enabled: int) -> str:
+def upsert_system_capability(
+    target_body: str, capability_key: str, enabled: int
+) -> str:
     entry = capability_entry(capability_key, enabled)
     capability_re = re.compile(
         rf"^\t{{7}}{re.escape(capability_key)} = \{{\n"
@@ -158,14 +166,20 @@ def upsert_system_capability(target_body: str, capability_key: str, enabled: int
         if capability_re.search(body):
             body = capability_re.sub(entry, body, count=1)
         else:
-            body = body.rstrip("\n") + "\n" if body and not body.endswith("\n") else body
+            body = (
+                body.rstrip("\n") + "\n" if body and not body.endswith("\n") else body
+            )
             body += entry
         return head + body + tail
 
     if SYSTEM_CAPABILITIES_RE.search(target_body):
         return SYSTEM_CAPABILITIES_RE.sub(replace, target_body, count=1)
 
-    body = target_body.rstrip("\n") + "\n" if target_body and not target_body.endswith("\n") else target_body
+    body = (
+        target_body.rstrip("\n") + "\n"
+        if target_body and not target_body.endswith("\n")
+        else target_body
+    )
     return body + "\t\t\t\t\t\tSystemCapabilities = {\n" + entry + "\t\t\t\t\t\t};\n"
 
 
@@ -217,7 +231,9 @@ def upsert_target_system_capability(
 
 
 def upsert_disabled_mac_app_group_metadata(text: str) -> str:
-    for target_id in native_target_ids(text, set(DISABLED_MAC_APP_GROUP_TARGETS)).values():
+    for target_id in native_target_ids(
+        text, set(DISABLED_MAC_APP_GROUP_TARGETS)
+    ).values():
         text = upsert_target_system_capability(
             text,
             target_id=target_id,
@@ -271,12 +287,47 @@ def patch_pbxproj(
     pbxproj_path.write_text(text)
 
 
+def patch_xcscheme_last_upgrade_version(path: Path, last_upgrade: str) -> None:
+    tree = ET.parse(path)
+    root = tree.getroot()
+    if root.tag != "Scheme":
+        return
+    if root.attrib.get("LastUpgradeVersion") == last_upgrade:
+        return
+
+    root.set("LastUpgradeVersion", last_upgrade)
+    ET.indent(tree, space="   ")
+    tree.write(path, encoding="UTF-8", xml_declaration=True)
+
+
+def generated_scheme_roots(app_root: Path, main_xcodeproj_root: Path) -> list[Path]:
+    return [
+        main_xcodeproj_root / "xcshareddata" / "xcschemes",
+        app_root / "HarnessMonitor.xcworkspace" / "xcshareddata" / "xcschemes",
+    ]
+
+
+def patch_generated_xcschemes(
+    *,
+    app_root: Path,
+    main_xcodeproj_root: Path,
+    last_upgrade: str,
+) -> None:
+    for scheme_root in generated_scheme_roots(app_root, main_xcodeproj_root):
+        if not scheme_root.exists():
+            continue
+        for scheme_path in sorted(scheme_root.glob("*.xcscheme")):
+            patch_xcscheme_last_upgrade_version(scheme_path, last_upgrade)
+
+
 def main() -> int:
     main_pbxproj = Path(os.environ["HARNESS_MONITOR_PBXPROJ"])
     last_upgrade = os.environ["HARNESS_MONITOR_LAST_UPGRADE_CHECK"]
     last_swift_update = os.environ["HARNESS_MONITOR_LAST_SWIFT_UPDATE_CHECK"]
     object_version = os.environ["HARNESS_MONITOR_PROJECT_OBJECT_VERSION"]
-    preferred_project_object_version = os.environ["HARNESS_MONITOR_PREFERRED_PROJECT_OBJECT_VERSION"]
+    preferred_project_object_version = os.environ[
+        "HARNESS_MONITOR_PREFERRED_PROJECT_OBJECT_VERSION"
+    ]
     repo_root = Path(os.environ["HARNESS_MONITOR_REPO_ROOT"])
     marketing_version = os.environ.get("HARNESS_MONITOR_MARKETING_VERSION")
     current_project_version = os.environ.get("HARNESS_MONITOR_CURRENT_PROJECT_VERSION")
@@ -291,6 +342,13 @@ def main() -> int:
         current_project_version=current_project_version,
     )
 
+    app_root = Path(os.environ.get("HARNESS_MONITOR_APP_ROOT", main_pbxproj.parents[1]))
+    patch_generated_xcschemes(
+        app_root=app_root,
+        main_xcodeproj_root=main_pbxproj.parent,
+        last_upgrade=last_upgrade,
+    )
+
     # Tuist generates standalone xcodeprojs for external SPM packages it
     # materializes (HarnessMonitorRegistry under mcp-servers, opentelemetry,
     # grpc-swift, etc.). Each one defaults to `LastUpgradeCheck = 9999;`
@@ -298,7 +356,6 @@ def main() -> int:
     # to the same value as the main project and patch any app/test targets
     # those generated projects materialize so their TargetAttributes block
     # matches the same automatic-signing metadata Xcode expects.
-    app_root = Path(os.environ.get("HARNESS_MONITOR_APP_ROOT", main_pbxproj.parents[1]))
     # Only patch xcodeprojs Tuist generates, not vendored package examples.
     # Tuist materializes external SPM packages into per-package xcodeprojs:
     # - the local registry SPM: mcp-servers/harness-monitor-registry/HarnessMonitorRegistry.xcodeproj
