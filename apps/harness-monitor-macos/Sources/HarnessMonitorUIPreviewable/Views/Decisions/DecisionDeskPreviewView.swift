@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-public struct WorkspaceDecisionDeskPreviewView: View {
+public struct DecisionDeskPreviewView: View {
   private let store: HarnessMonitorStore?
 
   @State private var selection: String?
@@ -119,11 +119,11 @@ public struct WorkspaceDecisionDeskPreviewView: View {
         }
     }
     .navigationSplitViewStyle(.balanced)
-    .navigationTitle("Workspace")
+    .navigationTitle("Decisions")
     .navigationSubtitle(navigationSubtitle)
     .toolbar { windowToolbar }
     .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceWindow)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.decisionDeskRoot)
     .task {
       syncSelectionFromStoreIfNeeded()
       await reload()

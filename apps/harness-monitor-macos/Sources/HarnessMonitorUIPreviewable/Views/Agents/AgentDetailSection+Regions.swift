@@ -43,7 +43,7 @@ struct AgentDetailAwaitingDecisionRegion: View {
       value: "count=\(attention.count) batch=\(attention.oldestBatchID)"
     )
     .accessibilityTestProbe(
-      HarnessMonitorAccessibility.workspaceDetailAwaitingDecisionState,
+      HarnessMonitorAccessibility.agentDetailAwaitingDecisionState,
       label: "count=\(attention.count) batch=\(attention.oldestBatchID)",
       value: agentID
     )

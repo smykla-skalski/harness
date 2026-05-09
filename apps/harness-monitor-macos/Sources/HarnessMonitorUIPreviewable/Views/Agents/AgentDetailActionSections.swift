@@ -49,7 +49,7 @@ struct AgentDetailRoleActionsSection: View {
           .labelsHidden()
           .harnessNativeFormControl()
           .accessibilityLabel("Role")
-          .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailRolePicker)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.agentDetailRolePicker)
         }
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
           HarnessInlineActionButton(
@@ -59,7 +59,7 @@ struct AgentDetailRoleActionsSection: View {
             variant: .prominent,
             tint: nil,
             isExternallyDisabled: false,
-            accessibilityIdentifier: HarnessMonitorAccessibility.workspaceDetailRoleChange,
+            accessibilityIdentifier: HarnessMonitorAccessibility.agentDetailRoleChange,
             action: {
               Task {
                 _ = await store.changeRole(agentID: agentID, role: rolePickerSelection)
@@ -73,7 +73,7 @@ struct AgentDetailRoleActionsSection: View {
             variant: .bordered,
             tint: .red,
             isExternallyDisabled: false,
-            accessibilityIdentifier: HarnessMonitorAccessibility.workspaceDetailRoleRemove,
+            accessibilityIdentifier: HarnessMonitorAccessibility.agentDetailRoleRemove,
             action: { store.requestRemoveAgentConfirmation(agentID: agentID) }
           )
         }

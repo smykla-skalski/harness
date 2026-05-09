@@ -186,7 +186,7 @@ struct AgentDetailSendUpdateSection: View {
     .labelsHidden()
     .harnessNativeFormControl()
     .accessibilityLabel("Update type")
-    .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailSignalCommand)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.agentDetailSignalCommand)
     .disabled(isSessionReadOnly)
   }
 
@@ -194,7 +194,7 @@ struct AgentDetailSendUpdateSection: View {
     TextField("Tell this agent what to do next", text: $signalMessage, axis: .vertical)
       .harnessNativeFormControl()
       .lineLimit(1...3)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailSignalMessage)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.agentDetailSignalMessage)
       .accessibilityLabel("Message")
       .submitLabel(.send)
       .disabled(isSessionReadOnly)
@@ -222,7 +222,7 @@ struct AgentDetailSendUpdateSection: View {
             text: $signalActionHint
           )
           .harnessNativeFormControl()
-          .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailSignalAction)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.agentDetailSignalAction)
           .accessibilityLabel("Optional context")
           .submitLabel(.send)
           .disabled(isSessionReadOnly)
@@ -248,7 +248,7 @@ struct AgentDetailSendUpdateSection: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailSignalDisclosure)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.agentDetailSignalDisclosure)
   }
 
   @ViewBuilder private var composerStatusRow: some View {
@@ -273,7 +273,7 @@ struct AgentDetailSendUpdateSection: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailSignalStatus)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.agentDetailSignalStatus)
   }
 
   private func composerStatusLabel(_ label: String) -> some View {
@@ -314,7 +314,7 @@ struct AgentDetailSendUpdateSection: View {
       variant: .prominent,
       tint: nil,
       isExternallyDisabled: statusMessage != nil,
-      accessibilityIdentifier: HarnessMonitorAccessibility.workspaceDetailSignalSend,
+      accessibilityIdentifier: HarnessMonitorAccessibility.agentDetailSignalSend,
       action: dispatchSendUpdate
     )
     .accessibilityLabel("Send Update")
