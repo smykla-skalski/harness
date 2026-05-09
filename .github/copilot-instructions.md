@@ -2,10 +2,9 @@
 
 ## Command execution
 
-- Prefix shell commands with `rtk`.
-- Prefer `rtk mise run <task>` over raw `cargo`, `xcodebuild`, or repo scripts. When there is no dedicated task, use `rtk mise run cargo:local -- <cargo args>`.
-- Use `rtk mise tasks ls` to discover supported workflows.
-- Use `rtk proxy` only when filtered `rtk` output hides information you genuinely need.
+- `rtk` must not be used in Copilot sessions for this repository; run commands directly.
+- Prefer `mise run <task>` over raw `cargo`, `xcodebuild`, or repo scripts. When there is no dedicated task, use `mise run cargo:local -- <cargo args>`.
+- Use `mise tasks ls` to discover supported workflows.
 - Parallel Copilot/user sessions that edit, generate, build, test, run daemons, or use XcodeBuildMCP must use separate full git worktrees. Lanes isolate build/runtime side effects inside a worktree; they are not a substitute for a separate checkout.
 
 ## Build, test, and lint commands
@@ -13,70 +12,70 @@
 ### Harness CLI and `aff`
 
 ```bash
-rtk mise run check
-rtk mise run harness:check
-rtk mise run aff:check
-rtk mise run test
-rtk mise run test:unit
-rtk mise run test:integration
-rtk mise run test:slow
-rtk mise run aff:test
-rtk mise run lint:fix
-rtk mise run install
-rtk mise run check:agent-assets
-rtk mise run setup:agents:generate
-rtk mise run setup:bootstrap
+mise run check
+mise run harness:check
+mise run aff:check
+mise run test
+mise run test:unit
+mise run test:integration
+mise run test:slow
+mise run aff:test
+mise run lint:fix
+mise run install
+mise run check:agent-assets
+mise run setup:agents:generate
+mise run setup:bootstrap
 ```
 
 Single-test patterns:
 
 ```bash
-rtk mise run cargo:local -- test --quiet --lib cli::tests
-rtk mise run cargo:local -- test --quiet --lib errors::tests::cli_err_basic_fields -- --exact
-rtk mise run cargo:local -- test --quiet --test integration integration::hooks::guard_bash::guard_bash_payloads -- --exact --test-threads=1
+mise run cargo:local -- test --quiet --lib cli::tests
+mise run cargo:local -- test --quiet --lib errors::tests::cli_err_basic_fields -- --exact
+mise run cargo:local -- test --quiet --test integration integration::hooks::guard_bash::guard_bash_payloads -- --exact --test-threads=1
 ```
 
 - Unit tests live next to the code in `src/**`.
 - Integration tests live under `tests/integration/`, but the target is `tests/integration.rs`.
 - Integration tests intentionally run single-threaded because they use real filesystem and environment state.
 - XDG-sensitive tests should isolate `XDG_DATA_HOME` and the active session env var via `temp_env::with_vars`.
-- Slow tests are `#[ignore]` and run through `rtk mise run test:slow`.
+- Slow tests are `#[ignore]` and run through `mise run test:slow`.
 
 ### Harness Monitor macOS
 
 ```bash
-rtk mise run monitor:generate
-rtk mise run monitor:lint
-rtk mise run monitor:quality-gate
-rtk mise run monitor:build
-rtk mise run monitor:test
-rtk mise run monitor:test:scripts
-rtk mise run monitor:audit -- --label baseline
+mise run monitor:generate
+mise run monitor:lint
+mise run monitor:quality-gate
+mise run monitor:build
+mise run monitor:test
+mise run monitor:test:scripts
+mise run monitor:audit -- --label baseline
 ```
 
 Focused examples:
 
 ```bash
 XCODE_ONLY_TESTING=HarnessMonitorKitTests/PolicyGapRuleTests \
-  rtk mise run monitor:test
+  mise run monitor:test
 
 XCODE_ONLY_TESTING=HarnessMonitorUITests/HarnessMonitorUITests/testToolbarOpensSettingsWindow \
-  rtk mise run monitor:test
+  mise run monitor:test
 
 HARNESS_MONITOR_BUILD_LANE=copilot-<uuid> XCODE_ONLY_TESTING=HarnessMonitorKitTests/PolicyGapRuleTests \
-  rtk mise run monitor:test
+  mise run monitor:test
 
 # Batch many focused selectors into one call - chaining N calls forces N
 # build-for-testing cold starts. Comma-separated selectors are supported.
 HARNESS_MONITOR_BUILD_LANE=copilot-<uuid> XCODE_ONLY_TESTING='HarnessMonitorKitTests/A/test1(),HarnessMonitorKitTests/A/test2()' \
-  rtk mise run monitor:test
+  mise run monitor:test
 
-HARNESS_MONITOR_BUILD_LANE=copilot-<uuid> rtk mise run monitor:build
+HARNESS_MONITOR_BUILD_LANE=copilot-<uuid> mise run monitor:build
 
 HARNESS_MONITOR_RUNTIME_LANE=copilot-<uuid> \
-  rtk mise run monitor:xcodebuildmcp -- macos build --scheme HarnessMonitor
+  mise run monitor:xcodebuildmcp -- macos build --scheme HarnessMonitor
 
-rtk mise run monitor:xcodebuild -- \
+mise run monitor:xcodebuild -- \
   -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace \
   -scheme HarnessMonitor \
   -configuration Debug \
@@ -84,12 +83,12 @@ rtk mise run monitor:xcodebuild -- \
   build CODE_SIGNING_ALLOWED=NO
 ```
 
-- `apps/harness-monitor-macos/HarnessMonitor.xcodeproj` and `.xcworkspace` are generated, ignored outputs from Tuist. Regenerate them with `rtk mise run monitor:generate`.
+- `apps/harness-monitor-macos/HarnessMonitor.xcodeproj` and `.xcworkspace` are generated, ignored outputs from Tuist. Regenerate them with `mise run monitor:generate`.
 - Do not run the full `HarnessMonitorUITests` suite by default. Prefer `XCODE_ONLY_TESTING` with the smallest possible selector.
 - In each parallel worktree, set explicit lanes for agent-driven work. Use `HARNESS_MONITOR_BUILD_LANE=copilot-<uuid>` for DerivedData isolation and `HARNESS_MONITOR_RUNTIME_LANE=copilot-<uuid>` for daemon, bridge, launchd label, port, and XcodeBuildMCP socket isolation. Do not rely on removed per-agent task aliases or profile env vars.
 - For custom macOS lanes, never use bare `-destination 'platform=macOS'`; use `platform=macOS,arch=$(uname -m),name=My Mac`.
 - `monitor:test` defaults to skipping `build-for-testing` when the existing `.xctestrun` is fresher than every Swift source, project descriptor, SPM lockfile, and the cross-project `mcp-servers/` tree. Break-glass: set `HARNESS_MONITOR_FORCE_BUILD_FOR_TESTING=1` to always rebuild (use after .xcconfig edits, environment switches, or external package updates outside the scoped freshness roots).
-- Named build lanes write to `xcode-derived-lanes/<lane>`; runtime lanes write to the app-group `runtime-lanes/<lane>` tree. Delete stale lane directories only after confirming no process is using that lane. Use `rtk mise run clean:stale` for safe orphan cleanup and `rtk mise run monitor:reset` only when resetting the active runtime lane is intended.
+- Named build lanes write to `xcode-derived-lanes/<lane>`; runtime lanes write to the app-group `runtime-lanes/<lane>` tree. Delete stale lane directories only after confirming no process is using that lane. Use `mise run clean:stale` for safe orphan cleanup and `mise run monitor:reset` only when resetting the active runtime lane is intended.
 - Legacy profile env vars such as `HARNESS_MONITOR_RUNTIME_PROFILE`, `HARNESS_MONITOR_USER_RUNTIME_PROFILE`, and the old agent-profile overrides are intentionally rejected.
 
 ## High-level architecture
@@ -127,7 +126,7 @@ rtk mise run monitor:xcodebuild -- \
 - In `create`, writes are allowed only under `suite.md`, `groups/**`, and `baseline/**`, and only during the `writing` phase unless bypass mode is active.
 - Use `tracing` macros for diagnostics. Keep `println!` for user-facing CLI output and hook JSON protocol; do not add new diagnostic `eprintln!`.
 - Clippy is strict (`pedantic` plus extra denies), and `build.rs` makes `cargo clippy --lib` fail when tracked Rust files under `src/`, `tests/`, or `testkit/` exceed 520 lines.
-- Evaluate semver whenever shipped behavior changes. `Cargo.toml` is the canonical version source; use `rtk mise run version:set -- <version>` and `rtk mise run version:sync` to update derived surfaces.
+- Evaluate semver whenever shipped behavior changes. `Cargo.toml` is the canonical version source; use `mise run version:set -- <version>` and `mise run version:sync` to update derived surfaces.
 - Commit and PR titles should follow `type(scope): description`.
 - Finished tasks must be integrated through `main` with clean, flat history. Rebase or cherry-pick; never create merge commits. Resolve conflicts by triaging current `main` behavior against the task intent, keep unrelated edits out of conflict resolution, and rerun the smallest relevant validation after conflicts are resolved.
 - For Harness Monitor SwiftUI work, prefer existing shared layout/control primitives and existing UI-test helpers instead of inventing one-off patterns.
@@ -145,7 +144,7 @@ rtk mise run monitor:xcodebuild -- \
 - Do not trust scenario names or assumed mounted UI; confirm the actual rendered surface (`dashboard` vs `cockpit`) and patch the proven cause only.
 - Avoid infer -> patch -> rerun loops. Prefer one hypothesis, one instrumentation or code change, and one narrow rerun.
 - For day-to-day Harness Monitor development, the external daemon path (`harness daemon dev`) is the normal debug lane. Use the managed `HarnessMonitor` scheme when you need to validate the shipping sandboxed path.
-- For performance regressions, use targeted perf tests through `XCODE_ONLY_TESTING=HarnessMonitorUITests/HarnessMonitorPerfTests/... rtk mise run monitor:test` and the deeper Instruments pipeline through `rtk mise run monitor:audit`.
+- For performance regressions, use targeted perf tests through `XCODE_ONLY_TESTING=HarnessMonitorUITests/HarnessMonitorPerfTests/... mise run monitor:test` and the deeper Instruments pipeline through `mise run monitor:audit`.
 - For Swift-only verification when the working tree carries dirty Rust changes from parallel agents, build with the `HarnessMonitor (External Daemon)` scheme; the default `HarnessMonitor` scheme runs a `Build harness daemon (parallel)` script phase that fails on broken Rust.
 - When preview and live app disagree, first prove whether they share the same rendering and measurement path. If preview is synchronous or fixture-driven while live is incremental/AppKit-backed, debug the live path first instead of spending cycles polishing preview parity.
 - Before changing spacing, padding, or borders, verify that live row measurement receives the real environment inputs (`fontScale`, current width, cache state) and add a coordinator-level regression for that wiring. A passing leaf measurement helper test is not enough if callers can still pass stale/default values.
