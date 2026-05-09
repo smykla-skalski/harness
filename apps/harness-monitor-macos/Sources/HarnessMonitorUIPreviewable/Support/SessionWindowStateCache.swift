@@ -42,7 +42,10 @@ public final class SessionWindowStateCache {
 
   public func selectCreate(_ kind: SessionCreateKind) {
     let existing = sectionState.createDrafts[kind]
-    let draft = existing ?? SessionCreateDraft(kind: kind, sessionID: sessionID)
+    var draft = existing ?? SessionCreateDraft(kind: kind, sessionID: sessionID)
+    if kind == .agent {
+      draft.useCodex = false
+    }
     updateSelection(.create(draft), source: .programmatic)
   }
 

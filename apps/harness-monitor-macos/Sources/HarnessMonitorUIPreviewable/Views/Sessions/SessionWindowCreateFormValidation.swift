@@ -20,13 +20,6 @@ enum SessionWindowCreateFormValidation {
     guard !title.isEmpty else {
       return .init(message: "\(draft.kind.title) name is required.", field: .name)
     }
-    if draft.kind == .agent, draft.useCodex {
-      let prompt = draft.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-      guard !prompt.isEmpty else {
-        return .init(message: "Codex prompt is required.", field: .form)
-      }
-      return nil
-    }
     if draft.kind == .agent,
       let message = capabilityMessage(for: draft, options: capabilityOptions)
     {

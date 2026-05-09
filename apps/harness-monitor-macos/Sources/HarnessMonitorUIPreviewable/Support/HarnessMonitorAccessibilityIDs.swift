@@ -88,7 +88,8 @@ public enum HarnessMonitorAccessibility {
   public static let sessionWindowToolbarSeparatorSuppressed =
     "harness.session.window.toolbar.separator-suppressed"
   public static let sessionWindowFocusModeButton = "harness.session.window.toolbar.focus-mode"
-  public static let sessionWindowCreateModePicker = "harness.session.window.create.mode"
+  public static let sessionWindowCreateProviderPane =
+    "harness.session.window.create.provider-pane"
   public static let sessionWindowInspector = "harness.session.window.inspector"
   public static let sessionWindowInspectorCloseButton =
     "harness.session.window.inspector.close"

@@ -126,6 +126,12 @@ struct HarnessMonitorStoreSheetTests {
     #expect(sheet.id == "leaderTransfer:sess1234")
   }
 
+  @Test("newCodexAgent sheet id encodes session id")
+  func newCodexAgentSheetIdEncodesSession() {
+    let sheet = HarnessMonitorStore.PresentedSheet.newCodexAgent(sessionID: "sess1234")
+    #expect(sheet.id == "newCodexAgent:sess1234")
+  }
+
   @Test("Setting createTask sheet replaces a prior sendSignal sheet")
   func createTaskReplacesPriorSheet() async {
     let store = await makeBootstrappedStore()
@@ -167,6 +173,7 @@ struct HarnessMonitorStoreSheetTests {
     case .createTask: break
     case .taskActions: break
     case .leaderTransfer: break
+    case .newCodexAgent: break
     }
   }
 

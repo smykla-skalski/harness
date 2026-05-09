@@ -102,6 +102,7 @@ extension HarnessMonitorStore {
   public enum PresentedSheet: Identifiable, Equatable {
     case sendSignal(agentID: String)
     case newSession
+    case newCodexAgent(sessionID: String)
     case attachExternal(bookmarkId: String, preview: SessionDiscoveryProbe.Preview?)
     case signalDetail(signalID: String)
     case createTask(sessionID: String)
@@ -112,6 +113,7 @@ extension HarnessMonitorStore {
       switch self {
       case .sendSignal(let agentID): "sendSignal:\(agentID)"
       case .newSession: "newSession"
+      case .newCodexAgent(let sessionID): "newCodexAgent:\(sessionID)"
       case .attachExternal(let bookmarkId, _): "attachExternal:\(bookmarkId)"
       case .signalDetail(let signalID): "signalDetail:\(signalID)"
       case .createTask(let sessionID): "createTask:\(sessionID)"

@@ -58,20 +58,10 @@ struct SessionWindowCreateAgentRuntimeContent: View {
 
   private var bridgeBannerKind: SessionCreateBridgeBannerKind? {
     guard draft.kind == .agent else { return nil }
-    if draft.useCodex {
-      return store.codexUnavailable ? .codex : nil
-    }
     if normalizedLaunchSelection.isAcp {
       return store.acpUnavailable ? .acp : nil
     }
     return store.agentTuiUnavailable ? .agentTui : nil
-  }
-
-  private var useCodex: Binding<Bool> {
-    Binding(
-      get: { draft.useCodex },
-      set: { updateDraft(useCodex: $0) }
-    )
   }
 
   private var launchSelection: Binding<AgentLaunchSelection> {
@@ -96,13 +86,14 @@ struct SessionWindowCreateAgentRuntimeContent: View {
         )
       }
 
-      if draft.useCodex {
-        codexSupportContent
-      } else {
-        providerSection
-      }
+      providerSection
     }
     .frame(maxWidth: .infinity, alignment: .topLeading)
+    .accessibilityElement(children: .contain)
+    .accessibilityTestProbe(
+      HarnessMonitorAccessibility.sessionWindowCreateProviderPane,
+      label: "New agent provider pane"
+    )
     .task(id: draft.kind == .agent ? draft.sessionID : "") {
       guard draft.kind == .agent else { return }
       await SessionWindowCreateFormCatalogs.loadAgentCatalogStateIfNeeded(
@@ -124,14 +115,9 @@ struct SessionWindowCreateAgentRuntimeContent: View {
 
   private var paneHeader: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
-        Text(paneTitle)
-          .scaledFont(.title2.weight(.semibold))
-          .accessibilityAddTraits(.isHeader)
-        Spacer(minLength: HarnessMonitorTheme.spacingSM)
-        modePicker
-          .fixedSize(horizontal: true, vertical: false)
-      }
+      Text(paneTitle)
+        .scaledFont(.title2.weight(.semibold))
+        .accessibilityAddTraits(.isHeader)
 
       availabilityNote
     }
@@ -139,7 +125,9 @@ struct SessionWindowCreateAgentRuntimeContent: View {
 
   private var compactHeader: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      modePicker
+      Text(paneTitle)
+        .scaledFont(.headline.weight(.semibold))
+        .accessibilityAddTraits(.isHeader)
       Text(compactDescription)
         .scaledFont(.caption)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -149,13 +137,10 @@ struct SessionWindowCreateAgentRuntimeContent: View {
   }
 
   private var paneTitle: String {
-    draft.useCodex ? "New Codex run" : "New terminal agent"
+    "New agent"
   }
 
   private var compactDescription: String {
-    if draft.useCodex {
-      return "The form below holds the prompt and configuration for this run."
-    }
     return "Choose a provider below, then finish configuration in the form."
   }
 
@@ -166,52 +151,6 @@ struct SessionWindowCreateAgentRuntimeContent: View {
         .scaledFont(.caption)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
-  }
-
-  private var modePicker: some View {
-    Picker("Create", selection: useCodex) {
-      Text("Terminal")
-        .tag(false)
-        .accessibilityIdentifier(
-          HarnessMonitorAccessibility.segmentedOption(
-            HarnessMonitorAccessibility.sessionWindowCreateModePicker,
-            option: "Terminal"
-          )
-        )
-        .harnessMCPButton(
-          HarnessMonitorAccessibility.segmentedOption(
-            HarnessMonitorAccessibility.sessionWindowCreateModePicker,
-            option: "Terminal"
-          ),
-          label: "Terminal",
-          pressAction: { useCodex.wrappedValue = false }
-        )
-      Text("Codex")
-        .tag(true)
-        .accessibilityIdentifier(
-          HarnessMonitorAccessibility.segmentedOption(
-            HarnessMonitorAccessibility.sessionWindowCreateModePicker,
-            option: "Codex"
-          )
-        )
-        .harnessMCPButton(
-          HarnessMonitorAccessibility.segmentedOption(
-            HarnessMonitorAccessibility.sessionWindowCreateModePicker,
-            option: "Codex"
-          ),
-          label: "Codex",
-          pressAction: { useCodex.wrappedValue = true }
-        )
-    }
-    .labelsHidden()
-    .pickerStyle(.segmented)
-    .harnessNativeFormControl()
-    .harnessMCPButton(
-      HarnessMonitorAccessibility.sessionWindowCreateModePicker,
-      label: "Create"
-    )
-    .accessibilityLabel("Create")
-    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowCreateModePicker)
   }
 
   @ViewBuilder
@@ -246,30 +185,14 @@ struct SessionWindowCreateAgentRuntimeContent: View {
     .padding(.horizontal, -HarnessMonitorTheme.spacingSM)
   }
 
-  private var codexSupportContent: some View {
-    SessionWindowCreateSectionCard {
-      SessionWindowCreateSectionHeading(
-        title: "Codex",
-        description:
-          "The form holds the prompt plus the run mode, model, and effort for this draft."
-      )
-    }
-  }
-
   private func selectProvider(_ option: AgentCapabilityOption) {
     launchSelection.wrappedValue = option.normalizedSelection(for: launchSelection.wrappedValue)
   }
 
-  private func updateDraft(
-    runtime: String? = nil,
-    useCodex: Bool? = nil
-  ) {
+  private func updateDraft(runtime: String? = nil) {
     var next = draft
     if let runtime {
       next.runtime = runtime
-    }
-    if let useCodex {
-      next.useCodex = useCodex
     }
     state.updateCreateDraft(next)
   }
