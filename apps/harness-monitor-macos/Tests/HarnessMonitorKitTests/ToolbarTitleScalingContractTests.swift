@@ -22,14 +22,14 @@ struct ToolbarTitleScalingContractTests {
     #expect(!sessionRootSource.contains(".navigationTitle(windowTitle)"))
   }
 
-  @Test("Session toolbar uses a static glass status bubble")
-  func sessionToolbarUsesStaticGlassStatusBubble() throws {
+  @Test("Session toolbar uses a static centerpiece and leaves glass to the system toolbar")
+  func sessionToolbarUsesStaticCenterpieceAndSystemToolbarGlass() throws {
     let sessionSource = try previewableSourceFile(named: "Views/Sessions/SessionWindowToolbar.swift")
 
-    #expect(sessionSource.contains("HarnessMonitorGlassControlGroup"))
-    #expect(sessionSource.contains("SessionWindowStatusBubble("))
-    #expect(sessionSource.contains("harnessFloatingControlGlass"))
-    #expect(sessionSource.contains("prominence: .subdued"))
+    #expect(sessionSource.contains("SessionToolbarCenterpiece("))
+    #expect(sessionSource.contains("SessionToolbarCenterpieceStatusStripState("))
+    #expect(!sessionSource.contains("HarnessMonitorGlassControlGroup"))
+    #expect(!sessionSource.contains("harnessFloatingControlGlass"))
     #expect(!sessionSource.contains("Menu {"))
     #expect(!sessionSource.contains(".buttonStyle(.glass)"))
     #expect(!sessionSource.contains(".buttonStyle(.glassProminent)"))

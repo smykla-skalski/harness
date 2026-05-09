@@ -327,7 +327,6 @@ extension HarnessMonitorStore {
   @MainActor
   @Observable
   public final class SidebarUISlice {
-    public var connectionMetrics: ConnectionMetrics = .initial
     public var selectedSessionID: String?
     public var isPersistenceAvailable = false
     public var bookmarkedSessionIds: Set<String> = []
@@ -340,9 +339,6 @@ extension HarnessMonitorStore {
     public init() {}
 
     internal func apply(_ state: SidebarUIState) {
-      if connectionMetrics != state.connectionMetrics {
-        connectionMetrics = state.connectionMetrics
-      }
       if selectedSessionID != state.selectedSessionID {
         selectedSessionID = state.selectedSessionID
       }

@@ -34,11 +34,7 @@ struct SessionWindowToolbar: ToolbarContent {
     store.connectionMetrics
   }
 
-  private var connectionTint: Color? {
-    connectionMetrics.sidebarFooterTint
-  }
-
-  private var sourcePresentation: SessionWindowSourcePresentation {
+  private var sourcePresentation: SessionToolbarCenterpieceSourcePresentation {
     .init(
       title: sourceTitle,
       systemImage: sourceSystemImage,
@@ -60,8 +56,8 @@ struct SessionWindowToolbar: ToolbarContent {
     }
   }
 
-  private var statusStripState: SidebarFooterStatusStripState {
-    SidebarFooterStatusStripState(
+  private var statusStripState: SessionToolbarCenterpieceStatusStripState {
+    SessionToolbarCenterpieceStatusStripState(
       daemonOwnership: store.daemonOwnership,
       bridgeRunning: store.daemonStatus?.manifest?.hostBridge.running == true,
       mcpStatus: store.mcpStatus,
@@ -150,14 +146,11 @@ struct SessionWindowToolbar: ToolbarContent {
       .accessibilityHint("Shows or hides secondary session columns.")
     }
     ToolbarItem(placement: .principal) {
-      HarnessMonitorGlassControlGroup {
-        SessionWindowStatusBubble(
-          metrics: connectionMetrics,
-          source: sourcePresentation,
-          statusStripState: statusStripState,
-          connectionTint: connectionTint
-        )
-      }
+      SessionToolbarCenterpiece(
+        metrics: connectionMetrics,
+        source: sourcePresentation,
+        statusStripState: statusStripState
+      )
       .help("Current connection, source, session, and service status.")
       .accessibilityElement(children: .ignore)
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowStatusMenu)
@@ -184,47 +177,42 @@ struct SessionWindowToolbar: ToolbarContent {
   }
 }
 
-private struct SessionWindowStatusBubble: View {
-  private static let glassCornerRadius = HarnessMonitorTheme.cornerRadiusMD
+private struct SessionToolbarCenterpiece: View {
   let metrics: ConnectionMetrics
-  let source: SessionWindowSourcePresentation
-  let statusStripState: SidebarFooterStatusStripState
-  let connectionTint: Color?
+  let source: SessionToolbarCenterpieceSourcePresentation
+  let statusStripState: SessionToolbarCenterpieceStatusStripState
   @ScaledMetric(relativeTo: .caption)
-  private var bubbleWidth: CGFloat = 280
+  private var centerpieceContentWidth: CGFloat = 280
+  @ScaledMetric(relativeTo: .caption)
+  private var centerpieceHorizontalPadding: CGFloat = 12
 
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.itemSpacing) {
       ConnectionToolbarBadge(metrics: metrics)
         .accessibilityHidden(true)
       Spacer(minLength: 0)
-      SessionWindowStatusServiceStrip(
+      SessionToolbarCenterpieceServiceStrip(
         source: source,
         statusStripState: statusStripState
       )
     }
     .padding(.vertical, HarnessMonitorTheme.itemSpacing)
-    .padding(.horizontal, HarnessMonitorTheme.itemSpacing)
-    .frame(width: bubbleWidth)
-    .harnessFloatingControlGlass(
-      cornerRadius: Self.glassCornerRadius,
-      tint: connectionTint,
-      prominence: .subdued
-    )
+    .padding(.horizontal, centerpieceHorizontalPadding)
+    .frame(width: centerpieceContentWidth)
     .fixedSize(horizontal: true, vertical: false)
     .layoutPriority(1)
   }
 }
 
-private struct SessionWindowSourcePresentation {
+private struct SessionToolbarCenterpieceSourcePresentation {
   let title: String
   let systemImage: String
   let tint: Color
 }
 
-private struct SessionWindowStatusServiceStrip: View {
-  let source: SessionWindowSourcePresentation
-  let statusStripState: SidebarFooterStatusStripState
+private struct SessionToolbarCenterpieceServiceStrip: View {
+  let source: SessionToolbarCenterpieceSourcePresentation
+  let statusStripState: SessionToolbarCenterpieceStatusStripState
   @ScaledMetric(relativeTo: .caption)
   private var chromeHeight: CGFloat = 14
 
@@ -233,7 +221,7 @@ private struct SessionWindowStatusServiceStrip: View {
       if statusStripState.hasVisibleTokens {
         HStack(alignment: .center, spacing: 3) {
           if let bridge = statusStripState.bridge {
-            SessionWindowStatusWord(token: bridge)
+            SessionToolbarCenterpieceStatusWord(token: bridge)
           }
           if statusStripState.showsSeparator {
             Text(verbatim: "·")
@@ -242,7 +230,7 @@ private struct SessionWindowStatusServiceStrip: View {
               .accessibilityHidden(true)
           }
           if let mcp = statusStripState.mcp {
-            SessionWindowStatusWord(token: mcp)
+            SessionToolbarCenterpieceStatusWord(token: mcp)
           }
         }
       }
@@ -258,8 +246,8 @@ private struct SessionWindowStatusServiceStrip: View {
   }
 }
 
-private struct SessionWindowStatusWord: View {
-  let token: SidebarFooterStatusToken
+private struct SessionToolbarCenterpieceStatusWord: View {
+  let token: SessionToolbarCenterpieceStatusToken
   @ScaledMetric(relativeTo: .caption)
   private var chromeHeight: CGFloat = 14
 

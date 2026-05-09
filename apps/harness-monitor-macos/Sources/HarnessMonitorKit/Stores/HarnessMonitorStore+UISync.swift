@@ -283,7 +283,6 @@ extension HarnessMonitorStore {
   private func syncSidebarUI() {
     sidebarUI.apply(
       SidebarUIState(
-        connectionMetrics: connectionMetrics,
         selectedSessionID: selection.selectedSessionID,
         isPersistenceAvailable: isPersistenceAvailable,
         bookmarkedSessionIds: userData.bookmarkedSessionIds,

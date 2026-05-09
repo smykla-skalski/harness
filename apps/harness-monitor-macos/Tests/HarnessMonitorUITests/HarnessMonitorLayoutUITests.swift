@@ -21,21 +21,15 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     )
   }
 
-  func testDashboardUsesSidebarFooterStatusStripInsteadOfMetricCards() throws {
+  func testDashboardRemovesSummaryMetricCards() throws {
     let app = launch(
       mode: "preview",
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard"]
     )
-    let sidebarFooterState = element(in: app, identifier: Accessibility.sidebarFooterState)
     let boardMetricElements = app.descendants(matching: .any).matching(
       NSPredicate(format: "identifier BEGINSWITH %@", "harness.board.metric.")
     )
 
-    XCTAssertTrue(sidebarFooterState.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertEqual(
-      sidebarFooterState.label,
-      "bridge=stopped, mcp=unavailable"
-    )
     XCTAssertEqual(
       boardMetricElements.count,
       0,

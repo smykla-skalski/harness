@@ -138,21 +138,3 @@ enum SidebarFilterVisibilityPolicy {
       || controls.sessionSortOrder != .recentActivity
   }
 }
-
-struct SidebarFooterAccessoryBridge: View {
-  let sidebarUI: HarnessMonitorStore.SidebarUISlice
-  let daemonOwnership: DaemonOwnership
-  let bridgeRunning: Bool
-  let mcpStatus: HarnessMonitorMCPStatusSnapshot
-  let isMCPRegistryHostEnabled: Bool
-
-  var body: some View {
-    SidebarFooterAccessory(
-      metrics: sidebarUI.connectionMetrics,
-      daemonOwnership: daemonOwnership,
-      bridgeRunning: bridgeRunning,
-      mcpStatus: mcpStatus,
-      isMCPRegistryHostEnabled: isMCPRegistryHostEnabled
-    )
-  }
-}

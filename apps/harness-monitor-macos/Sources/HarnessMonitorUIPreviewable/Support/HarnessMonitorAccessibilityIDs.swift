@@ -51,8 +51,6 @@ public enum HarnessMonitorAccessibility {
   public static let sidebarStatusPicker = "harness.sidebar.picker.status"
   public static let sidebarSortPicker = "harness.sidebar.picker.sort"
   public static let sidebarFocusPicker = "harness.sidebar.picker.focus"
-  public static let sidebarFooter = "harness.sidebar.footer"
-  public static let sidebarFooterState = "harness.sidebar.footer.state"
 
   public static func sidebarFilterChip(_ filter: String) -> String {
     "harness.sidebar.filter-chip.\(slug(filter))"

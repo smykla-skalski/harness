@@ -80,15 +80,6 @@ struct SidebarSearchHost: View {
     )
   }
 
-  private var sidebarFooterStateMarkerValue: String {
-    SidebarFooterStatusStripState(
-      daemonOwnership: store.daemonOwnership,
-      bridgeRunning: store.daemonStatus?.manifest?.hostBridge.running == true,
-      mcpStatus: store.mcpStatus,
-      isMCPRegistryHostEnabled: mcpRegistryHostEnabled
-    ).stateMarkerValue
-  }
-
   var body: some View {
     ViewBodySignposter.trace(Self.self, "SidebarView", attributes: profilingAttributes) {
       SidebarSessionListColumn(
@@ -106,15 +97,6 @@ struct SidebarSearchHost: View {
       )
       .listStyle(.sidebar)
       .scrollEdgeEffectStyle(.soft, for: .top)
-      .safeAreaInset(edge: .bottom, spacing: 0) {
-        SidebarFooterAccessoryBridge(
-          sidebarUI: sidebarUI,
-          daemonOwnership: store.daemonOwnership,
-          bridgeRunning: store.daemonStatus?.manifest?.hostBridge.running == true,
-          mcpStatus: store.mcpStatus,
-          isMCPRegistryHostEnabled: mcpRegistryHostEnabled
-        )
-      }
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarShellFrame)
       .accessibilityElement(children: .contain)
@@ -125,10 +107,6 @@ struct SidebarSearchHost: View {
             controls: controls,
             searchResults: searchResults,
             isSidebarSearchPresented: searchPresentationState.isPresented
-          )
-          AccessibilityTextMarker(
-            identifier: HarnessMonitorAccessibility.sidebarFooterState,
-            text: sidebarFooterStateMarkerValue
           )
         }
       }
