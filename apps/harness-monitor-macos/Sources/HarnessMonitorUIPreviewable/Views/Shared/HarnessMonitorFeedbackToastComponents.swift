@@ -39,20 +39,9 @@ struct HarnessMonitorFeedbackToastPrimaryActionLabel: View {
   let copied: Bool
 
   var body: some View {
-    ZStack {
-      HStack(spacing: HarnessMonitorTheme.spacingXS) {
-        Image(systemName: action.systemImage)
-        Text(action.title)
-      }
-      .hidden()
-      .accessibilityHidden(true)
-
-      HStack(spacing: HarnessMonitorTheme.spacingXS) {
-        Image(systemName: copied ? "checkmark" : action.systemImage)
-          .contentTransition(.symbolEffect(.replace))
-        Text(copied ? "Copied" : action.title)
-          .contentTransition(.opacity)
-      }
+    HStack(spacing: HarnessMonitorTheme.spacingXS) {
+      Image(systemName: copied ? "checkmark" : action.systemImage)
+      Text(copied ? "Copied" : action.title)
     }
     .lineLimit(1)
     .scaledFont(.system(.caption, design: .rounded, weight: .semibold))
