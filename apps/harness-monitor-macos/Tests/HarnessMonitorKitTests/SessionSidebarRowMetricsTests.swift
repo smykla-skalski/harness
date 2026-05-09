@@ -11,8 +11,8 @@ final class SessionSidebarRowMetricsTests: XCTestCase {
 
     XCTAssertEqual(metrics.minHeight, 28)
     XCTAssertEqual(metrics.multiSelectControlSize, 24)
-    XCTAssertEqual(metrics.dragHandleHitTarget, 24)
     XCTAssertEqual(metrics.severityIndicatorSize, 8)
+    XCTAssertEqual(metrics.severityIndicatorOffset, 4)
     XCTAssertEqual(
       fittedHeight(for: 1.0),
       metrics.minHeight,
@@ -26,7 +26,6 @@ final class SessionSidebarRowMetricsTests: XCTestCase {
 
     XCTAssertGreaterThanOrEqual(metrics.minHeight, 44)
     XCTAssertGreaterThanOrEqual(metrics.multiSelectControlSize, 44)
-    XCTAssertGreaterThanOrEqual(metrics.dragHandleHitTarget, 44)
     XCTAssertGreaterThan(
       metrics.iconColumnWidth,
       SessionSidebarRowMetrics(fontScale: 1.0).iconColumnWidth
@@ -34,6 +33,10 @@ final class SessionSidebarRowMetricsTests: XCTestCase {
     XCTAssertGreaterThan(
       metrics.severityIndicatorSize,
       SessionSidebarRowMetrics(fontScale: 1.0).severityIndicatorSize
+    )
+    XCTAssertGreaterThan(
+      metrics.severityIndicatorOffset,
+      SessionSidebarRowMetrics(fontScale: 1.0).severityIndicatorOffset
     )
     XCTAssertEqual(fittedHeight, metrics.minHeight, accuracy: 0.5)
     XCTAssertLessThan(
