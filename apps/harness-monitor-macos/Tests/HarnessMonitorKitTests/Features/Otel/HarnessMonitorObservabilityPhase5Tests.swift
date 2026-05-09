@@ -93,7 +93,7 @@ struct HarnessMonitorObservabilityPhase5Tests {
     HarnessMonitorTelemetry.shared.bootstrap(using: environment)
 
     let bridge = HarnessMonitorSignpostBridge()
-    let result = await bridge.withInterval(name: "launch-dashboard") {
+    let result = await bridge.withInterval(name: "open-recent-window") {
       "measured"
     }
     #expect(result == "measured")
@@ -101,11 +101,11 @@ struct HarnessMonitorObservabilityPhase5Tests {
     HarnessMonitorTelemetry.shared.shutdown()
 
     try await waitForTraceExport(timeout: .seconds(3)) {
-      collector.traceCollector.exportedSpans.contains { $0.name == "perf.launch-dashboard" }
+      collector.traceCollector.exportedSpans.contains { $0.name == "perf.open-recent-window" }
     }
 
     #expect(
-      collector.traceCollector.exportedSpans.contains { $0.name == "perf.launch-dashboard" }
+      collector.traceCollector.exportedSpans.contains { $0.name == "perf.open-recent-window" }
     )
   }
 
@@ -125,18 +125,18 @@ struct HarnessMonitorObservabilityPhase5Tests {
 
     let bridge = HarnessMonitorSignpostBridge()
     await bridge.withInterval(
-      name: "launch-dashboard",
+      name: "open-recent-window",
       flushOnCompletion: true
     ) {
       try? await Task.sleep(for: .milliseconds(50))
     }
 
     try await waitForTraceExport(timeout: .milliseconds(500)) {
-      collector.traceCollector.exportedSpans.contains { $0.name == "perf.launch-dashboard" }
+      collector.traceCollector.exportedSpans.contains { $0.name == "perf.open-recent-window" }
     }
 
     #expect(
-      collector.traceCollector.exportedSpans.contains { $0.name == "perf.launch-dashboard" }
+      collector.traceCollector.exportedSpans.contains { $0.name == "perf.open-recent-window" }
     )
   }
 

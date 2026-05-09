@@ -57,6 +57,12 @@ struct HarnessMonitorWindowRootView: View {
       liveContent
     }
     .modifier(WorkspaceToolbarUITestForceTickModifier(store: store))
+    .acpPermissionAttentionScene(
+      store: store,
+      notifications: notifications,
+      attentionState: acpAttentionState,
+      windowID: HarnessMonitorWindowID.openRecent
+    )
     .onChange(of: notifications.settingsOpenRequestID) { _, requestID in
       guard requestID != handledSettingsOpenRequestID else {
         return

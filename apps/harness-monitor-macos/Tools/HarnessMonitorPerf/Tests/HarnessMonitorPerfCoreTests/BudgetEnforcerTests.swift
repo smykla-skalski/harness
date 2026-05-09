@@ -71,12 +71,14 @@ final class BudgetEnforcerTests: XCTestCase {
         XCTAssertTrue(BudgetEnforcer.collectFailures(summaryJSON: data).isEmpty)
     }
 
-    func testCatalogParityWithPython() {
+    func testCatalogParityWithAuditDefinitions() {
         XCTAssertEqual(Budgets.swiftUIByScenario.keys.sorted(), [
-            "launch-dashboard",
-            "refresh-and-search",
-            "select-session-cockpit",
+            "offline-cached-open",
+            "open-recent-window",
+            "open-session-window",
+            "permission-modal",
             "timeline-burst",
+            "toast-overlay-churn",
         ])
         XCTAssertEqual(Budgets.allocationsByScenario.keys.sorted(), [
             "offline-cached-open",

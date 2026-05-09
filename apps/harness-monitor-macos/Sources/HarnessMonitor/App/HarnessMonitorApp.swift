@@ -164,6 +164,8 @@ struct HarnessMonitorApp: App {
       SessionWindowRootView(
         token: tokenValue,
         store: store,
+        notifications: notificationController,
+        acpAttentionState: acpAttentionState,
         keyWindowObserver: keyWindowObserver,
         windowCommandRouting: windowCommandRouting,
         mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,

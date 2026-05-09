@@ -98,16 +98,16 @@ boundaries.
 Targeted run:
 
 ```bash
-XCODE_ONLY_TESTING=HarnessMonitorUITests/HarnessMonitorPerfTests/testLaunchDashboardHitchRate \
-  rtk mise run monitor:test
+XCODE_ONLY_TESTING=HarnessMonitorUITests/HarnessMonitorPerfTests/testOpenRecentWindowHitchRate \
+  mise run monitor:test
 ```
 
 Layer 2 is the Instruments `xctrace` pipeline:
 
 ```bash
-rtk mise run monitor:audit -- --label baseline
-rtk mise run monitor:audit -- --label after-fix --compare-to tmp/perf/harness-monitor-instruments/runs/<baseline-dir>
-rtk mise run monitor:test:scripts
+mise run monitor:audit -- --label baseline
+mise run monitor:audit -- --label after-fix --compare-to tmp/perf/harness-monitor-instruments/runs/<baseline-dir>
+mise run monitor:test:scripts
 ```
 
 Artifacts land in `tmp/perf/harness-monitor-instruments/runs/` with

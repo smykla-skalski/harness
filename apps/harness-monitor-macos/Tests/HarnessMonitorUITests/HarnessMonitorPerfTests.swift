@@ -4,6 +4,7 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
 final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
+  private static let previewSessionID = "sess1234"
 
   // MARK: - Application launch
 
@@ -23,24 +24,16 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
 
   // MARK: - Scenario hitch rate
 
-  func testLaunchDashboardHitchRate() {
-    measureScenario("launch-dashboard")
+  func testOpenRecentWindowHitchRate() {
+    measureScenario("open-recent-window")
   }
 
-  func testSelectSessionCockpitHitchRate() {
-    measureScenario("select-session-cockpit")
+  func testOpenSessionWindowHitchRate() {
+    measureScenario("open-session-window")
   }
 
   func testPermissionModalHitchRate() {
     measureScenario("permission-modal")
-  }
-
-  func testRefreshAndSearchHitchRate() {
-    measureScenario("refresh-and-search")
-  }
-
-  func testSidebarOverflowSearchHitchRate() {
-    measureScenario("sidebar-overflow-search")
   }
 
   func testSettingsBackdropCycleHitchRate() {
@@ -140,24 +133,23 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     measureScenario("toast-overlay-churn")
   }
 
-  func testLaunchDashboardScenarioState() {
+  func testOpenRecentWindowScenarioState() {
     let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
-    let launched = launchForPerf(app: app, scenario: "launch-dashboard")
-    let boardRoot = element(in: launched, identifier: Accessibility.sessionsBoardRoot)
-    let sessionRow = sessionTrigger(in: launched, identifier: Accessibility.previewSessionRow)
-    // Regression guard: the legacy inspector column is retired; the dashboard
-    // launch path must not resurrect a `harness.inspector.session-card` element.
-    let retiredSessionInspectorCard = element(
+    let launched = launchForPerf(app: app, scenario: "open-recent-window")
+    let openRecentRoot = element(in: launched, identifier: Accessibility.openRecentRoot)
+    let projectList = element(in: launched, identifier: Accessibility.openRecentProjectList)
+    let sessionRow = element(
       in: launched,
-      identifier: "harness.inspector.session-card"
+      identifier: Accessibility.openRecentSessionRow(Self.previewSessionID)
     )
+    let sessionWindow = element(in: launched, identifier: Accessibility.sessionWindowShell)
 
-    waitForScenarioCompletion(app: launched, scenario: "launch-dashboard")
+    waitForScenarioCompletion(app: launched, scenario: "open-recent-window")
 
-    XCTAssertTrue(boardRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(openRecentRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(projectList.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertFalse(retiredSessionInspectorCard.exists)
-    assertAuditBuildState(in: launched, scenario: "launch-dashboard")
+    XCTAssertFalse(sessionWindow.exists)
 
     launched.terminate()
   }
@@ -184,51 +176,36 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     XCTAssertTrue(configBody.contains("\"grpc_endpoint\": \"http://127.0.0.1:4317\""))
   }
 
-  func testSelectSessionCockpitScenarioState() {
+  func testOpenSessionWindowScenarioState() {
     let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
-    let launched = launchForPerf(app: app, scenario: "select-session-cockpit")
-    let boardRoot = element(in: launched, identifier: Accessibility.sessionsBoardRoot)
-    let sessionHeaderCard = element(in: launched, identifier: Accessibility.sessionHeaderCard)
+    let launched = launchForPerf(app: app, scenario: "open-session-window")
+    let sessionWindow = element(in: launched, identifier: Accessibility.sessionWindowShell)
 
-    if boardRoot.waitForExistence(timeout: Self.actionTimeout) {
-      XCTAssertFalse(sessionHeaderCard.exists)
-    }
+    waitForScenarioCompletion(app: launched, scenario: "open-session-window")
 
-    waitForScenarioCompletion(app: launched, scenario: "select-session-cockpit")
-
-    XCTAssertTrue(sessionHeaderCard.waitForExistence(timeout: Self.uiTimeout))
-    assertAuditBuildState(in: launched, scenario: "select-session-cockpit")
+    XCTAssertTrue(sessionWindow.waitForExistence(timeout: Self.uiTimeout))
 
     launched.terminate()
   }
 
-  func testPermissionModalScenarioAuditState() {
+  func testPermissionModalScenarioState() {
     let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
     let launched = launchForPerf(app: app, scenario: "permission-modal")
-    let window = mainWindow(in: launched)
+    let sessionWindow = element(in: launched, identifier: Accessibility.sessionWindowShell)
     let decisionID = "acp-permission:preview-acp-permission-1"
     let decisionRow = element(in: launched, identifier: Accessibility.decisionRow(decisionID))
     let legacyModal = element(in: launched, identifier: Accessibility.acpPermissionModal)
 
     waitForScenarioCompletion(app: launched, scenario: "permission-modal")
 
-    XCTAssertTrue(window.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionWindow.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(
       waitForElement(decisionRow, timeout: Self.uiTimeout),
       "Permission perf scenario did not surface the routed ACP decision row"
     )
     XCTAssertFalse(legacyModal.exists)
-    assertAuditBuildState(in: launched, scenario: "permission-modal")
 
     launched.terminate()
-  }
-
-  func testRefreshAndSearchScenarioState() {
-    assertSearchHeavyScenarioState("refresh-and-search")
-  }
-
-  func testSidebarOverflowSearchScenarioState() {
-    assertSearchHeavyScenarioState("sidebar-overflow-search")
   }
 
   // MARK: - Private
@@ -272,7 +249,6 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     app.launchArguments = ["-ApplePersistenceIgnoreState", "YES"]
     app.launchEnvironment = [
       "HARNESS_MONITOR_UI_TESTS": "1",
-      Self.launchModeKey: "preview",
       "HARNESS_MONITOR_KEEP_ANIMATIONS": "1",
       "HARNESS_MONITOR_PERF_SCENARIO": scenario,
       "HARNESS_MONITOR_PREVIEW_SCENARIO": expectedPreviewScenario(for: scenario),
@@ -316,31 +292,6 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
       stateText.contains("status=failed"),
       "Perf scenario \(scenario) failed early: \(stateText)"
     )
-  }
-
-  private func assertSearchHeavyScenarioState(_ scenario: String) {
-    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
-    let launched = launchForPerf(app: app, scenario: scenario)
-    let sidebarRoot = element(in: launched, identifier: Accessibility.sidebarRoot)
-    let filterState = element(in: launched, identifier: Accessibility.sidebarFilterState)
-    let sessionRow = sessionTrigger(in: launched, identifier: Accessibility.previewSessionRow)
-    let noMatches = launched.staticTexts["No sessions match"]
-
-    XCTAssertTrue(sidebarRoot.waitForExistence(timeout: Self.uiTimeout))
-
-    waitForScenarioCompletion(
-      app: launched,
-      scenario: scenario
-    )
-
-    XCTAssertTrue(filterState.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertFalse(noMatches.exists)
-    XCTAssertTrue(filterState.label.contains("search="))
-    XCTAssertTrue(filterState.label.contains("visible="))
-    assertAuditBuildState(in: launched, scenario: scenario)
-
-    launched.terminate()
   }
 
   private func assertAuditBuildState(in app: XCUIApplication, scenario: String) {
@@ -409,9 +360,10 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
 
   private func expectedPreviewScenario(for scenario: String) -> String {
     switch scenario {
-    case "launch-dashboard", "select-session-cockpit": "dashboard-landing"
-    case "permission-modal", "timeline-burst", "toast-overlay-churn": "cockpit"
-    case "refresh-and-search", "sidebar-overflow-search": "overflow"
+    case "open-recent-window", "open-session-window", "timeline-burst", "toast-overlay-churn":
+      "dashboard-landing"
+    case "permission-modal":
+      "cockpit"
     case "offline-cached-open": "offline-cached"
     default: "dashboard"
     }

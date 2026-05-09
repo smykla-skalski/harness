@@ -217,10 +217,6 @@ public struct SessionWindowView: View {
     }
     .navigationTitle(navigationTitleText)
     .navigationSubtitle(navigationSubtitleText)
-    .sessionTitleBlurChrome(
-      status: summary?.status ?? .awaitingLeader,
-      isStale: snapshot == nil
-    )
     .onChange(of: focusMode) { _, _ in
       reconcileInspectorVisibility(
         visibleBinding: $inspectorVisible,
@@ -233,6 +229,9 @@ public struct SessionWindowView: View {
     .task(id: decisionsCacheTrigger) {
       await recomputeDecisionsCache()
     }
+    .task(id: store.pendingSessionRouteRequestID) {
+      await applyPendingSessionRouteIfNeeded()
+    }
     .onChange(of: stateCache.selection) { _, newSelection in
       syncPersistedStorage(from: newSelection)
       reconcileInspectorVisibility(
@@ -241,6 +240,9 @@ public struct SessionWindowView: View {
       )
       detailRenderedSelection = newSelection
       contentRenderedRoute = route(for: newSelection)
+      if case .create(let draft) = newSelection, draft.kind == .agent {
+        contentColumnWidth = SessionContentDetailSplitLayout.defaultContentWidth
+      }
     }
     .onChange(of: renderedRoute) { _, newRoute in
       guard newRoute.layoutStyle == .sidebarDetail else { return }
@@ -337,6 +339,7 @@ public struct SessionWindowView: View {
   private func performInitialLoad() async {
     hydrateSelectionFromPersistedStorage()
     hydrateDecisionFiltersFromPersistedStorage()
+    await applyPendingSessionRouteIfNeeded()
     reconcileInspectorVisibility(
       visibleBinding: $inspectorVisible,
       preferredBinding: $inspectorPreferred,
@@ -371,6 +374,85 @@ public struct SessionWindowView: View {
     case .create:
       persistedRoute = .agents
       persistedDecisionID = ""
+    }
+  }
+
+  @MainActor
+  private func applyPendingSessionRouteIfNeeded() async {
+    let pendingRequest = store.pendingSessionRouteRequestSnapshot
+    guard let request = store.consumePendingSessionRouteRequest(forSessionID: token.sessionID) else {
+      if let pendingRequest {
+        HarnessMonitorUITestTrace.record(
+          component: "session.window.route",
+          event: "request.unmatched",
+          details: [
+            "window_session_id": token.sessionID,
+            "selection": routeSelectionTraceLabel(for: pendingRequest.selection),
+            "target_session_id": pendingRequest.selection.sessionID ?? pendingRequest.createSessionID
+              ?? "nil",
+            "request_id": String(store.pendingSessionRouteRequestID),
+          ]
+        )
+      }
+      return
+    }
+    HarnessMonitorUITestTrace.record(
+      component: "session.window.route",
+      event: "request.applied",
+      details: [
+        "window_session_id": token.sessionID,
+        "selection": routeSelectionTraceLabel(for: request.selection),
+        "target_session_id": request.selection.sessionID ?? request.createSessionID ?? "nil",
+        "request_id": String(store.pendingSessionRouteRequestID),
+      ]
+    )
+    if request.resetDecisionFilters {
+      stateCache.decisionFilters.clear()
+      persistedDecisionQuery = ""
+    }
+    switch request.selection {
+    case .create:
+      stateCache.selectCreate(routeCreateKind(for: request))
+    case .decisions:
+      stateCache.selectRoute(.decisions)
+    case .decision(_, let decisionID):
+      stateCache.selectDecision(decisionID)
+    case .terminal:
+      stateCache.selectRoute(.terminal)
+    case .codex(_, let runID):
+      stateCache.select(.codexRun(sessionID: token.sessionID, runID: runID))
+    case .agent(_, let agentID):
+      stateCache.selectAgent(agentID)
+    case .task(_, let taskID):
+      stateCache.selectTask(taskID)
+    }
+  }
+
+  private func routeCreateKind(
+    for request: HarnessMonitorStore.PendingSessionRouteRequest
+  ) -> SessionCreateKind {
+    switch request.createEntryPoint {
+    case .agent, nil:
+      return .agent
+    }
+  }
+
+  private func routeSelectionTraceLabel(for selection: SessionRouteSelection) -> String {
+    switch selection {
+    case .create:
+      return "create"
+    case .decisions:
+      return "decisions"
+    case .decision(_, let decisionID):
+      return "decision:\(decisionID)"
+    case .terminal(_, let terminalID):
+      return "terminal:\(terminalID)"
+    case .codex(_, let runID):
+      return "codex:\(runID)"
+    case .agent(_, let agentID):
+      return "agent:\(agentID)"
+    case .task(_, let taskID):
+      return "task:\(taskID)"
     }
   }
 

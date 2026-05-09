@@ -37,7 +37,16 @@ extension OpenWindowAction {
   ) {
     let sessionID =
       store.supervisorOpenDecisions.first { $0.id == decisionID }?.sessionID
+      ?? store.acpPermissionDecisionPayload(for: decisionID)?.rawBatch.sessionId
       ?? store.selectedSessionID
+    if let sessionID, store.openSessionWindowIDsSnapshot.contains(sessionID) {
+      if #available(macOS 14.0, *) {
+        NSApplication.shared.activate()
+      } else {
+        NSApplication.shared.activate(ignoringOtherApps: true)
+      }
+      return
+    }
     openHarnessSessionWindow(sessionID: sessionID)
   }
 }

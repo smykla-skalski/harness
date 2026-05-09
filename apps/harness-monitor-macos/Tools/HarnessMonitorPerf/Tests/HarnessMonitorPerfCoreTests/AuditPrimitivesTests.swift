@@ -135,13 +135,13 @@ final class AuditPrimitivesTests: XCTestCase {
             ),
             defaultEnvironment: ["HARNESS_MONITOR_UI_TESTS": "1"],
             launchArguments: ["-ApplePersistenceIgnoreState", "YES"],
-            selectedScenarios: ["launch-dashboard"],
+            selectedScenarios: ["open-recent-window"],
             captureRecords: [
                 .init(
-                    scenario: "launch-dashboard", template: "SwiftUI",
-                    durationSeconds: 5, traceRelpath: "traces/launch-dashboard.trace",
+                    scenario: "open-recent-window", template: "SwiftUI",
+                    durationSeconds: 5, traceRelpath: "traces/open-recent-window.trace",
                     exitStatus: 0, endReason: "completed",
-                    previewScenario: "DashboardPreview",
+                    previewScenario: "dashboard-landing",
                     launchedProcessPath: "/staged.app/MacOS/Bin",
                     daemonDataHome: "/tmp/run-1/dh"
                 ),
@@ -153,8 +153,8 @@ final class AuditPrimitivesTests: XCTestCase {
         XCTAssertEqual(manifest.captures.count, 1)
         let capture = manifest.captures[0]
         XCTAssertEqual(capture.environment["HARNESS_DAEMON_DATA_HOME"], "/tmp/run-1/dh")
-        XCTAssertEqual(capture.environment["HARNESS_MONITOR_PERF_SCENARIO"], "launch-dashboard")
-        XCTAssertEqual(capture.environment["HARNESS_MONITOR_PREVIEW_SCENARIO"], "DashboardPreview")
+        XCTAssertEqual(capture.environment["HARNESS_MONITOR_PERF_SCENARIO"], "open-recent-window")
+        XCTAssertEqual(capture.environment["HARNESS_MONITOR_PREVIEW_SCENARIO"], "dashboard-landing")
         XCTAssertEqual(capture.launchArguments, ["-ApplePersistenceIgnoreState", "YES"])
 
         let url = workDir.appendingPathComponent("manifest.json")
@@ -173,7 +173,8 @@ final class AuditPrimitivesTests: XCTestCase {
     }
 
     func testManifestTemplatesIncludeKnownScenarios() {
-        XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("launch-dashboard"))
+        XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("open-recent-window"))
+        XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("permission-modal"))
         XCTAssertTrue(ManifestBuilder.defaultTemplates.allocations.contains("offline-cached-open"))
     }
 

@@ -28,6 +28,17 @@ struct SessionWindowRouteContentSelectionTests {
     #expect(columns.contains("contentColumnBody(snapshot: snapshot, route: renderedRoute)"))
   }
 
+  @Test("Create-agent selection swaps the middle pane to runtime configuration")
+  func createAgentSelectionSwapsTheMiddlePaneToRuntimeConfiguration() throws {
+    let windowView = try sourceFile(named: "SessionWindowView.swift")
+    let columns = try sourceFile(named: "SessionWindowView+Columns.swift")
+
+    #expect(columns.contains("case .create(let draft) = stateCache.selection, draft.kind == .agent"))
+    #expect(columns.contains("SessionWindowCreateAgentRuntimePane("))
+    #expect(columns.contains("embedsRuntimeConfiguration: focusMode"))
+    #expect(windowView.contains("contentColumnWidth = SessionContentDetailSplitLayout.defaultContentWidth"))
+  }
+
   @Test("Timeline route uses the dedicated route page instead of the cockpit section wrapper")
   func timelineRouteUsesTheDedicatedRoutePage() throws {
     let columns = try sourceFile(named: "SessionWindowView+Columns.swift")
@@ -35,6 +46,22 @@ struct SessionWindowRouteContentSelectionTests {
     #expect(columns.contains("SessionTimelineView("))
     #expect(columns.contains("style: .routePage"))
     #expect(!columns.contains("MonitorTimelineSection("))
+  }
+
+  @Test("Session windows consume pending store route requests")
+  func sessionWindowConsumesPendingStoreRouteRequests() throws {
+    let windowView = try sourceFile(named: "SessionWindowView.swift")
+
+    #expect(windowView.contains(".task(id: store.pendingSessionRouteRequestID)"))
+    #expect(windowView.contains("consumePendingSessionRouteRequest(forSessionID: token.sessionID)"))
+  }
+
+  @Test("Session-window decision rows keep the shared accessibility contract")
+  func decisionRowsKeepSharedAccessibilityContract() throws {
+    let columns = try sourceFile(named: "SessionWindowRouteContent.swift")
+
+    #expect(columns.contains("HarnessMonitorAccessibility.decisionRow(decision.id)"))
+    #expect(columns.contains(".harnessMCPRow("))
   }
 
   private func sourceFile(named name: String) throws -> String {

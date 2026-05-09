@@ -30,6 +30,7 @@ extension HarnessMonitorStore {
     pendingSessionRouteDecisionFilterReset = resetDecisionFilters
     pendingSessionRouteCreateEntryPoint = createEntryPoint
     pendingSessionRouteCreateSessionID = normalizedWorkspaceSessionID(createSessionID)
+    pendingSessionRouteRequestID += 1
   }
 
   public func requestSessionRouteCreate(
@@ -69,24 +70,42 @@ extension HarnessMonitorStore {
     consumePendingSessionRouteRequest()?.selection
   }
 
-  public func consumePendingSessionRouteRequest() -> PendingSessionRouteRequest? {
+  public var pendingSessionRouteRequestSnapshot: PendingSessionRouteRequest? {
     guard let selection = pendingSessionRoute else {
+      return nil
+    }
+    return PendingSessionRouteRequest(
+      selection: selection,
+      resetDecisionFilters: pendingSessionRouteDecisionFilterReset,
+      createEntryPoint: pendingSessionRouteCreateEntryPoint,
+      createSessionID: pendingSessionRouteCreateSessionID
+    )
+  }
+
+  public func consumePendingSessionRouteRequest() -> PendingSessionRouteRequest? {
+    guard let request = pendingSessionRouteRequestSnapshot else {
       pendingSessionRouteDecisionFilterReset = false
       pendingSessionRouteCreateEntryPoint = nil
       pendingSessionRouteCreateSessionID = nil
       return nil
     }
     pendingSessionRoute = nil
-    let request = PendingSessionRouteRequest(
-      selection: selection,
-      resetDecisionFilters: pendingSessionRouteDecisionFilterReset,
-      createEntryPoint: pendingSessionRouteCreateEntryPoint,
-      createSessionID: pendingSessionRouteCreateSessionID
-    )
     pendingSessionRouteDecisionFilterReset = false
     pendingSessionRouteCreateEntryPoint = nil
     pendingSessionRouteCreateSessionID = nil
     return request
+  }
+
+  public func consumePendingSessionRouteRequest(
+    forSessionID sessionID: String
+  ) -> PendingSessionRouteRequest? {
+    guard
+      let request = pendingSessionRouteRequestSnapshot,
+      pendingSessionRouteAppliesToSessionWindow(request, sessionID: sessionID)
+    else {
+      return nil
+    }
+    return consumePendingSessionRouteRequest()
   }
 
   private func workspaceSessionID(forDecisionID decisionID: String) -> String? {
@@ -109,5 +128,28 @@ extension HarnessMonitorStore {
     }
     let trimmed = sessionID.trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed
+  }
+
+  private func pendingSessionRouteAppliesToSessionWindow(
+    _ request: PendingSessionRouteRequest,
+    sessionID: String
+  ) -> Bool {
+    let normalizedSessionID = normalizedWorkspaceSessionID(sessionID)
+    let targetSessionID: String?
+    switch request.selection {
+    case .create:
+      targetSessionID = normalizedWorkspaceSessionID(request.createSessionID)
+    case .decisions(let sessionID),
+      .decision(let sessionID, _),
+      .terminal(let sessionID, _),
+      .codex(let sessionID, _),
+      .agent(let sessionID, _),
+      .task(let sessionID, _):
+      targetSessionID = normalizedWorkspaceSessionID(sessionID)
+    }
+    guard let targetSessionID else {
+      return false
+    }
+    return targetSessionID == normalizedSessionID
   }
 }

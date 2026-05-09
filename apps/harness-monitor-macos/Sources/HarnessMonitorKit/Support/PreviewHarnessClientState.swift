@@ -16,6 +16,7 @@ actor PreviewHarnessClientState {
   private var nextAgentTuiSequence: Int
   var nextCodexRunSequence: Int
   var nextAcpAgentSequence: Int
+  private var nextMutationSecond: Int
   let fallbackDetail: SessionDetail?
   private let fallbackTimeline: [TimelineEntry]
 
@@ -46,6 +47,7 @@ actor PreviewHarnessClientState {
       0
     )
     self.nextAcpAgentSequence = 0
+    self.nextMutationSecond = 30
     self.fallbackDetail = fixtures.detail
     self.fallbackTimeline = fixtures.timeline
   }
@@ -171,6 +173,71 @@ actor PreviewHarnessClientState {
       return []
     }
     return fallbackTimeline
+  }
+
+  @discardableResult
+  func replaceTimeline(
+    sessionID: String,
+    entries: [TimelineEntry]
+  ) -> SessionSummary? {
+    timelinesBySessionID[sessionID] = entries
+    let updatedAt = nextSyntheticMutationTimestamp()
+
+    if let detail = currentMutableSessionDetail(sessionID: sessionID) {
+      let updatedSummary = summaryByUpdatingActivity(detail.session, updatedAt: updatedAt)
+      storeMutatedSessionDetail(
+        SessionDetail(
+          session: updatedSummary,
+          agents: detail.agents,
+          tasks: detail.tasks,
+          signals: detail.signals,
+          observer: detail.observer,
+          agentActivity: detail.agentActivity
+        )
+      )
+      return updatedSummary
+    }
+
+    guard let index = sessionSummaries.firstIndex(where: { $0.sessionId == sessionID }) else {
+      return nil
+    }
+    let updatedSummary = summaryByUpdatingActivity(sessionSummaries[index], updatedAt: updatedAt)
+    sessionSummaries[index] = updatedSummary
+    return updatedSummary
+  }
+
+  private func nextSyntheticMutationTimestamp() -> String {
+    nextMutationSecond = (nextMutationSecond + 1) % 60
+    return String(format: "2026-03-28T14:20:%02dZ", nextMutationSecond)
+  }
+
+  private func summaryByUpdatingActivity(
+    _ summary: SessionSummary,
+    updatedAt: String
+  ) -> SessionSummary {
+    SessionSummary(
+      projectId: summary.projectId,
+      projectName: summary.projectName,
+      projectDir: summary.projectDir,
+      contextRoot: summary.contextRoot,
+      sessionId: summary.sessionId,
+      worktreePath: summary.worktreePath,
+      sharedPath: summary.sharedPath,
+      originPath: summary.originPath,
+      branchRef: summary.branchRef,
+      title: summary.title,
+      context: summary.context,
+      status: summary.status,
+      createdAt: summary.createdAt,
+      updatedAt: updatedAt,
+      lastActivityAt: updatedAt,
+      leaderId: summary.leaderId,
+      observeId: summary.observeId,
+      pendingLeaderTransfer: summary.pendingLeaderTransfer,
+      externalOrigin: summary.externalOrigin,
+      adoptedAt: summary.adoptedAt,
+      metrics: summary.metrics
+    )
   }
 
   func acpTranscript(sessionID: String) -> AcpTranscriptResponse {

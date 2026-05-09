@@ -199,9 +199,24 @@ struct SessionWindowDecisionsList: View {
             .foregroundStyle(.secondary)
         }
         .tag(decision.id)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel(decisionAccessibilityLabel(for: decision))
+        .accessibilityIdentifier(HarnessMonitorAccessibility.decisionRow(decision.id))
+        .harnessMCPRow(
+          HarnessMonitorAccessibility.decisionRow(decision.id),
+          label: decisionAccessibilityLabel(for: decision),
+          value: state.selection.decisionID == decision.id ? "selected" : "not selected",
+          pressAction: { state.selectDecision(decision.id) }
+        )
       }
     }
     .listStyle(.inset)
+  }
+
+  private func decisionAccessibilityLabel(for decision: Decision) -> String {
+    "\(decision.summary). \(decision.ruleID)"
   }
 }
 

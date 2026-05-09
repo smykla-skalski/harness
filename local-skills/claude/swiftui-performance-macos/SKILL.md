@@ -222,7 +222,7 @@ The perf driver and XCTest perf tests share a signpost contract. Both sides must
 
 - Subsystem: `"io.harnessmonitor"`
 - Category: `"perf"`
-- Name: the scenario's raw value (e.g. `"launch-dashboard"`)
+- Name: the scenario's raw value (e.g. `"open-recent-window"`)
 
 If the subsystem or category drifts between the driver (`OSSignposter`) and the tests (`XCTOSSignpostMetric`), the metric captures zero data silently. No error, just empty results.
 
@@ -232,16 +232,16 @@ The driver uses `beginAnimationInterval` (not `beginInterval`). The animation va
 
 When adding a case to `HarnessMonitorPerfScenario`, update all of these:
 
-1. The enum case and `rawValue` in `HarnessMonitorAppConfiguration.swift`
-2. `defaultPreviewScenario` and `initialSettingsSection` on the enum
-3. `signpostName` in the private extension in `HarnessMonitorAppSceneSupport.swift` (must return `StaticString` matching the raw value exactly)
+1. The enum case and `rawValue` in `Sources/HarnessMonitor/App/HarnessMonitorPerfScenario.swift`
+2. `defaultPreviewScenario` and `initialSettingsSection` on that enum
+3. `signpostName` in `Sources/HarnessMonitor/App/HarnessMonitorPerfDriver.swift` (must return a `StaticString` matching the raw value exactly)
 4. The scenario's execution branch in `HarnessMonitorPerfDriver.run(scenario:store:openWindow:)`
-5. A `testXxxHitchRate()` method in `HarnessMonitorPerfTests.swift`
-6. `scenarioWaitDuration` in `HarnessMonitorPerfTests.swift`
-7. The `ALL_SCENARIOS` array in `Scripts/run-instruments-audit.sh`
-8. The `SWIFTUI_SCENARIOS` or `ALLOCATIONS_SCENARIOS` array in `Scripts/run-instruments-audit.sh`
-9. The `preview_scenario_for` and `duration_for` functions in `Scripts/run-instruments-audit.sh`
-10. The `templates` dict in the manifest generation Python block in `Scripts/run-instruments-audit.sh`
+5. The relevant hitch-rate or state assertions in `Tests/HarnessMonitorUITests/HarnessMonitorPerfTests.swift`
+6. `expectedPreviewScenario(for:)` in `HarnessMonitorPerfTests.swift`
+7. `ScenarioCatalog.swift` in `Tools/HarnessMonitorPerf`
+8. `Budgets.swift` in `Tools/HarnessMonitorPerf`
+9. `ManifestBuilder.defaultTemplates` in `Tools/HarnessMonitorPerf`
+10. Any affected fixtures and golden tests under `Tools/HarnessMonitorPerf/Tests/`
 
 Missing any of these causes silent failures - the test runs but captures no signpost data, or the xctrace pipeline skips the scenario.
 

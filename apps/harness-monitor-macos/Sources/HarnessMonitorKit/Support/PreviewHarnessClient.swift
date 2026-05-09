@@ -162,6 +162,14 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     return await state.timeline(for: sessionID)
   }
 
+  @discardableResult
+  public func replaceTimeline(
+    sessionID: String,
+    entries: [TimelineEntry]
+  ) async -> SessionSummary? {
+    await state.replaceTimeline(sessionID: sessionID, entries: entries)
+  }
+
   public func codexRuns(sessionID: String) async throws -> CodexRunListResponse {
     CodexRunListResponse(runs: await state.codexRuns(sessionID: sessionID))
   }

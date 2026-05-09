@@ -14,7 +14,7 @@ final class RecapTests: XCTestCase {
           "git": {"commit": "abcdef0", "dirty": false},
           "captures": [
             {
-              "scenario": "launch-dashboard",
+              "scenario": "open-recent-window",
               "template": "SwiftUI",
               "metrics": {
                 "swiftui_updates": {"total_count": 1234, "body_update_count": 100, "duration_ms_p95": 12.5, "duration_ns_max": 25000000},
@@ -33,7 +33,7 @@ final class RecapTests: XCTestCase {
         XCTAssertTrue(text.contains("- label=perf"))
         XCTAssertTrue(text.contains("- run_id=2026-04-25T00:00:00Z"))
         XCTAssertTrue(text.contains("- commit=abcdef0 dirty=False"))
-        XCTAssertTrue(text.contains("launch-dashboard [SwiftUI]: total_updates=1234 body_updates=100"))
+        XCTAssertTrue(text.contains("open-recent-window [SwiftUI]: total_updates=1234 body_updates=100"))
         XCTAssertTrue(text.contains("p95_ms=12.5000"))
         XCTAssertTrue(text.contains("max_ms=25.0000"))
         XCTAssertTrue(text.contains("hitches=1 potential_hangs=0"))
@@ -46,7 +46,7 @@ final class RecapTests: XCTestCase {
         {
           "label": "current",
           "captures": [{
-            "scenario": "launch-dashboard",
+            "scenario": "open-recent-window",
             "template": "SwiftUI",
             "metrics": {
               "swiftui_updates": {"total_count": 1100, "body_update_count": 110, "duration_ms_p95": 11.0, "duration_ns_max": 15000000},
@@ -58,7 +58,7 @@ final class RecapTests: XCTestCase {
         """)
         let comparison = try decode("""
         {"comparisons": [{
-          "scenario": "launch-dashboard",
+          "scenario": "open-recent-window",
           "template": "SwiftUI",
           "metrics": {
             "total_updates": {"baseline": 1000, "current": 1100, "delta": 100},

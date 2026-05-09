@@ -9,6 +9,7 @@ public final class SessionWindowStateCache {
   public var sidebarOrdering = SessionSidebarOrderingState()
   public var sidebarSelection = SessionSidebarSelectionState()
   public var sectionState = SessionWindowSectionState()
+  var agentCreateCatalog = SessionWindowAgentCreateCatalogState()
   public var decisionRuntime = SessionDecisionRuntime()
   public var decisionFilters = SessionDecisionFilterState()
   public var decisionBulkActions = SessionDecisionBulkActionState()
@@ -50,8 +51,10 @@ public final class SessionWindowStateCache {
   }
 
   public func selectFromSidebar(_ selection: SessionSelection?) {
-    let nextSelection = selection ?? .route(.overview)
-    updateSelection(nextSelection, source: .sidebar)
+    guard let selection else {
+      return
+    }
+    updateSelection(selection, source: .sidebar)
   }
 
   /// Test seam kept for older selection-source checks. Product sidebar rows use
@@ -138,6 +141,59 @@ public final class SessionWindowStateCache {
     if case .agent = nextSelection, source == .keyboard {
       agentComposerFocusRequestID += 1
     }
+  }
+
+  public func beginAgentCreateCatalogLoading() -> Bool {
+    guard !agentCreateCatalog.isLoading, !agentCreateCatalog.hasLoaded else {
+      return false
+    }
+    agentCreateCatalog.isLoading = true
+    return true
+  }
+
+  func finishAgentCreateCatalogLoading(
+    descriptors: [AcpAgentDescriptor],
+    runtimeModelCatalogs: [RuntimeModelCatalog],
+    capabilityOptions: [AgentCapabilityOption],
+    personas: [AgentPersona]
+  ) {
+    agentCreateCatalog = SessionWindowAgentCreateCatalogState(
+      descriptors: descriptors,
+      runtimeModelCatalogs: runtimeModelCatalogs,
+      capabilityOptions: capabilityOptions,
+      personas: personas,
+      isLoading: false,
+      hasLoaded: true
+    )
+  }
+
+  public func failAgentCreateCatalogLoading() {
+    agentCreateCatalog.isLoading = false
+  }
+}
+
+struct SessionWindowAgentCreateCatalogState: Equatable {
+  public var descriptors: [AcpAgentDescriptor] = []
+  public var runtimeModelCatalogs: [RuntimeModelCatalog] = []
+  public var capabilityOptions: [AgentCapabilityOption] = []
+  public var personas: [AgentPersona] = []
+  public var isLoading = false
+  public var hasLoaded = false
+
+  init(
+    descriptors: [AcpAgentDescriptor] = [],
+    runtimeModelCatalogs: [RuntimeModelCatalog] = [],
+    capabilityOptions: [AgentCapabilityOption] = [],
+    personas: [AgentPersona] = [],
+    isLoading: Bool = false,
+    hasLoaded: Bool = false
+  ) {
+    self.descriptors = descriptors
+    self.runtimeModelCatalogs = runtimeModelCatalogs
+    self.capabilityOptions = capabilityOptions
+    self.personas = personas
+    self.isLoading = isLoading
+    self.hasLoaded = hasLoaded
   }
 }
 

@@ -1,7 +1,7 @@
 {
   "captures": [
     {
-      "scenario": "launch-dashboard",
+      "scenario": "open-recent-window",
       "template": "SwiftUI",
       "metrics": {
         "swiftui_updates": {"total_count": 20000, "body_update_count": 2000},
