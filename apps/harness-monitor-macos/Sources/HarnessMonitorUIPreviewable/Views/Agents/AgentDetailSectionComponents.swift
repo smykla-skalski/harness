@@ -307,7 +307,7 @@ struct AgentDetailAssignmentSection: View {
         nextStep: "Send an update below or assign a task from the workspace board.",
         tint: HarnessMonitorTheme.secondaryInk
       )
-      .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailPersona)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.agentDetailPersona)
     } else {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
         if let persona {
@@ -322,7 +322,7 @@ struct AgentDetailAssignmentSection: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
           }
-          .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailPersona)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.agentDetailPersona)
         }
         if !assignedTasks.isEmpty {
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
@@ -348,7 +348,7 @@ struct AgentDetailAssignmentSection: View {
               }
             }
           }
-          .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailAssignedTasks)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.agentDetailAssignedTasks)
         }
       }
     }

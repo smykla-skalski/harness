@@ -70,7 +70,7 @@ struct AgentDetailActivityBand: View {
             store: store
           )
           .accessibilityElement(children: .contain)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceDetailTimeline)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.agentDetailTimeline)
         }
 
         Divider()

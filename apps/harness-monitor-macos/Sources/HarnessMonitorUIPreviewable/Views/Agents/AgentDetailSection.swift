@@ -217,7 +217,7 @@ struct AgentDetailSection: View {
       readableWidth: false,
       topScrollEdgeEffect: .soft,
       bottomScrollContentMargin: 0,
-      scrollSurfaceIdentifier: HarnessMonitorAccessibility.workspaceDetailScrollView,
+      scrollSurfaceIdentifier: HarnessMonitorAccessibility.agentDetailScrollView,
       scrollSurfaceLabel: "Workspace detail",
       bottomInset: {
         composerInset

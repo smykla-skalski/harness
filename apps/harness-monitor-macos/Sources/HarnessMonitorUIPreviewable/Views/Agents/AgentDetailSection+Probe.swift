@@ -8,11 +8,11 @@ struct AgentDetailCardProbeModifier: ViewModifier {
   func body(content: Content) -> some View {
     content
       .accessibilityTestProbe(
-        HarnessMonitorAccessibility.workspaceDetailCard,
+        HarnessMonitorAccessibility.agentDetailCard,
         label: name,
         value: agentID
       )
-      .accessibilityFrameMarker("\(HarnessMonitorAccessibility.workspaceDetailCard).frame")
+      .accessibilityFrameMarker("\(HarnessMonitorAccessibility.agentDetailCard).frame")
   }
 }
 
