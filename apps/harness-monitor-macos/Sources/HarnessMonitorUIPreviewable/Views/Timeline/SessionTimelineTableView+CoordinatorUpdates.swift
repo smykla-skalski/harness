@@ -13,16 +13,51 @@ extension SessionTimelineTableView.Coordinator {
     scrollCommand: SessionTimelineScrollCommand?,
     request: SessionTimelineTableView.UpdateRequest
   ) {
-    guard tableView != nil else {
+    guard let tableView else {
       return
     }
+    self.actionHandler = actionHandler
+    self.onSignalTap = onSignalTap
+
+    // Cheap fingerprint identifies "same rows" in O(1). When the parent body
+    // re-renders during the sidebar reveal animation the rows array is
+    // structurally unchanged, so a count + endpoints check reliably matches
+    // and lets us skip the per-frame snapshot allocation (~17 strings × N
+    // rows) and the Set<String> diff that dominate the time profile.
+    let rowsLookSame =
+      rows.count == self.rows.count && rows.first?.id == self.rows.first?.id
+      && rows.last?.id == self.rows.last?.id
+    let widthDelta = abs(request.columnWidth - lastColumnWidth)
+    let widthSame = widthDelta < Self.widthEqualityTolerance
+    let fontSame = abs(request.fontScale - fontScale) < 0.001
+    let scrollSame = scrollCommand == lastScrollCommand && pendingScrollCommand == nil
+    let identitySame = contentIdentity == heightCacheIdentity
+
+    if rowsLookSame, widthSame, fontSame, scrollSame, identitySame {
+      return
+    }
+
+    // Width-only path: during animation the only thing that changes per frame
+    // is the proposed column width. Apply it smoothly to the AppKit column
+    // and reschedule the measurement task (which auto-debounces by cancelling
+    // its predecessor) without invalidating heights via noteHeightOfRows. The
+    // per-tick noteHeightOfRows call was the source of the reveal stall.
+    if rowsLookSame, fontSame, scrollSame, identitySame {
+      if request.columnWidth > 1, let column = tableView.tableColumns.first {
+        if column.width != request.columnWidth {
+          column.width = request.columnWidth
+        }
+        lastColumnWidth = request.columnWidth
+        scheduleIncrementalMeasurement(columnWidth: request.columnWidth)
+      }
+      return
+    }
+
     request.scrollView.layoutSubtreeIfNeeded()
     let resolvedColumnWidth = SessionTimelineTableMetrics.resolvedColumnWidth(
       proposedWidth: request.columnWidth,
       visibleContentWidth: request.scrollView.contentSize.width
     )
-    self.actionHandler = actionHandler
-    self.onSignalTap = onSignalTap
     let previousFontScale = fontScale
     let wasPinnedToLatest = isPinnedToLatestViewport()
     let previousAnchor = wasPinnedToLatest ? nil : currentVisibleAnchor()
