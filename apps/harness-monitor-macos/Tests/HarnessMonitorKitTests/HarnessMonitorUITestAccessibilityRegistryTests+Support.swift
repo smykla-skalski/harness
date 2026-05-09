@@ -6,32 +6,47 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     let repoRoot =
       testsDirectory
       .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-    let viewsRoot =
-      repoRoot
-      .appendingPathComponent(
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let sourceRoots = [
+      repoRoot.appendingPathComponent(
         "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views"
-      )
-    let fileURL = viewsRoot.appendingPathComponent(name)
-    if FileManager.default.fileExists(atPath: fileURL.path) {
-      return try String(contentsOf: fileURL, encoding: .utf8)
+      ),
+      repoRoot.appendingPathComponent(
+        "apps/harness-monitor-macos/Sources/HarnessMonitor/App"
+      ),
+      repoRoot.appendingPathComponent(
+        "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable"
+      ),
+    ]
+
+    for sourceRoot in sourceRoots {
+      let fileURL = sourceRoot.appendingPathComponent(name)
+      if FileManager.default.fileExists(atPath: fileURL.path) {
+        return try String(contentsOf: fileURL, encoding: .utf8)
+      }
     }
 
     let requestedBasename = URL(fileURLWithPath: name).lastPathComponent
     let candidateURLs =
-      FileManager.default.enumerator(
-        at: viewsRoot,
-        includingPropertiesForKeys: [.isRegularFileKey],
-        options: [.skipsHiddenFiles]
-      )?
-      .compactMap { element -> URL? in
-        guard let url = element as? URL, url.lastPathComponent == requestedBasename else {
-          return nil
-        }
-        return url
-      } ?? []
+      Array(
+        Set(
+          sourceRoots.flatMap { sourceRoot in
+            FileManager.default.enumerator(
+              at: sourceRoot,
+              includingPropertiesForKeys: [.isRegularFileKey],
+              options: [.skipsHiddenFiles]
+            )?
+            .compactMap { element -> URL? in
+              guard let url = element as? URL, url.lastPathComponent == requestedBasename else {
+                return nil
+              }
+              return url
+            } ?? []
+          }
+        )
+      )
 
     if let matchedURL = candidateURLs.first(where: { $0.path.hasSuffix("/\(name)") }) {
       return try String(contentsOf: matchedURL, encoding: .utf8)

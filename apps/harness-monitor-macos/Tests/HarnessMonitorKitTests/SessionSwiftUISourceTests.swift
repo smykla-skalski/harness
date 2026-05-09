@@ -41,8 +41,6 @@ struct SessionSwiftUISourceTests {
       "Views/Sessions/SessionTaskDetailPane.swift",
       "Views/Sessions/SessionDecisionDetailPane.swift",
       "Views/Sessions/SessionWindowCreateForm.swift",
-      "Views/Sessions/SessionWindowCreateFormCapabilityPicker.swift",
-      "Views/Sessions/SessionWindowCreateFormCodexFields.swift",
       "Views/Settings/SettingsConnectionCard.swift",
       "Views/Settings/SettingsCodexSection.swift",
       "Views/Settings/SettingsConnectionSection.swift",

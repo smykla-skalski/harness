@@ -19,6 +19,14 @@ public struct SessionCreateDraft: Codable, Hashable, Sendable {
   public var title: String
   public var prompt: String
   public var runtime: String
+  public var modelByRuntime: [String: String]
+  public var customModelByRuntime: [String: String]
+  public var effortByRuntime: [String: String]
+  public var roleRawValue: String?
+  public var fallbackRoleRawValue: String?
+  public var personaID: String
+  public var projectDir: String
+  public var argvOverride: String
   public var taskSeverityRawValue: String?
   public var sessionID: String
   public var useCodex: Bool
@@ -32,6 +40,14 @@ public struct SessionCreateDraft: Codable, Hashable, Sendable {
     title: String = "",
     prompt: String = "",
     runtime: String = AgentTuiRuntime.codex.rawValue,
+    modelByRuntime: [String: String] = [:],
+    customModelByRuntime: [String: String] = [:],
+    effortByRuntime: [String: String] = [:],
+    role: SessionRole = .worker,
+    fallbackRole: SessionRole = .worker,
+    personaID: String = "",
+    projectDir: String = "",
+    argvOverride: String = "",
     taskSeverity: TaskSeverity = .medium,
     sessionID: String,
     useCodex: Bool = false,
@@ -44,6 +60,14 @@ public struct SessionCreateDraft: Codable, Hashable, Sendable {
     self.title = title
     self.prompt = prompt
     self.runtime = runtime
+    self.modelByRuntime = modelByRuntime
+    self.customModelByRuntime = customModelByRuntime
+    self.effortByRuntime = effortByRuntime
+    roleRawValue = role.rawValue
+    fallbackRoleRawValue = fallbackRole.rawValue
+    self.personaID = personaID
+    self.projectDir = projectDir
+    self.argvOverride = argvOverride
     taskSeverityRawValue = taskSeverity.rawValue
     self.sessionID = sessionID
     self.useCodex = useCodex
@@ -60,6 +84,31 @@ public struct SessionCreateDraft: Codable, Hashable, Sendable {
     set {
       taskSeverityRawValue = newValue.rawValue
     }
+  }
+
+  public var role: SessionRole {
+    get {
+      roleRawValue.flatMap(SessionRole.init(rawValue:)) ?? .worker
+    }
+    set {
+      roleRawValue = newValue.rawValue
+    }
+  }
+
+  public var fallbackRole: SessionRole {
+    get {
+      fallbackRoleRawValue.flatMap(SessionRole.init(rawValue:)) ?? .worker
+    }
+    set {
+      fallbackRoleRawValue = newValue.rawValue
+    }
+  }
+
+  public var normalizedArgvOverride: [String] {
+    argvOverride
+      .components(separatedBy: .newlines)
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
   }
 
   public var codexMode: CodexRunMode {
