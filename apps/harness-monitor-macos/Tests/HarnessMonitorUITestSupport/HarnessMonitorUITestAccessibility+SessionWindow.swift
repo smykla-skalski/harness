@@ -11,7 +11,8 @@ extension HarnessMonitorUITestAccessibility {
   static let sessionWindowStatusMenu = "harness.session.window.toolbar.status"
   static let sessionWindowToolbarSeparatorSuppressed =
     "harness.session.window.toolbar.separator-suppressed"
-  static let sessionWindowCreateModePicker = "harness.session.window.create.mode"
+  static let sessionWindowCreateProviderPane =
+    "harness.session.window.create.provider-pane"
   static let sessionWindowInspector = "harness.session.window.inspector"
   static let sessionWindowInspectorCloseButton = "harness.session.window.inspector.close"
   static let settingsLaunchBehaviorPicker = "harness.settings.launch-behavior"

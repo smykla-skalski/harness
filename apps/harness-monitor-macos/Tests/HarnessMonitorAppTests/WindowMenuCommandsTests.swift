@@ -57,6 +57,21 @@ final class WindowMenuCommandsTests: XCTestCase {
     XCTAssertTrue(source.contains("store.presentedSheet = .newSession"))
   }
 
+  func testSessionCreateCommandsExposeMenuOnlyCodexAgentEntry() throws {
+    let commandsSource = try harnessSourceFile(named: "Commands/SessionCreateCommands.swift")
+    let focusedValuesSource = try uiPreviewableSourceFile(named: "Support/SessionFocusedValues.swift")
+    let inspectorSource = try uiPreviewableSourceFile(named: "Views/Sessions/SessionWindowView+Inspector.swift")
+    let sheetRouterSource = try uiPreviewableSourceFile(named: "Views/Shared/HarnessMonitorSheetRouter.swift")
+    let storeEnumsSource = try kitSourceFile(named: "Stores/HarnessMonitorStore+Enums.swift")
+
+    XCTAssertTrue(commandsSource.contains("Button(\"New Codex Agent\") { sessionCreate?.createCodexAgent() }"))
+    XCTAssertTrue(focusedValuesSource.contains("public let createCodexAgent: () -> Void"))
+    XCTAssertTrue(inspectorSource.contains("createCodexAgent: { store.presentedSheet = .newCodexAgent(sessionID: token.sessionID) }"))
+    XCTAssertTrue(sheetRouterSource.contains("case .newCodexAgent(let sessionID):"))
+    XCTAssertTrue(sheetRouterSource.contains("NewCodexAgentSheet(store: store, sessionID: sessionID)"))
+    XCTAssertTrue(storeEnumsSource.contains("case newCodexAgent(sessionID: String)"))
+  }
+
   func testGoCommandsUseSessionFocusedNavigationOnly() throws {
     let source = try harnessSourceFile(named: "Commands/GoCommands.swift")
 
@@ -135,6 +150,21 @@ final class WindowMenuCommandsTests: XCTestCase {
     let fileURL =
       repoRoot
       .appendingPathComponent("apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable")
+      .appendingPathComponent(relativePath)
+    return try String(contentsOf: fileURL, encoding: .utf8)
+  }
+
+  private func kitSourceFile(named relativePath: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent("apps/harness-monitor-macos/Sources/HarnessMonitorKit")
       .appendingPathComponent(relativePath)
     return try String(contentsOf: fileURL, encoding: .utf8)
   }

@@ -40,8 +40,8 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.session.window.toolbar.focus-mode"
     )
     #expect(
-      HarnessMonitorAccessibility.sessionWindowCreateModePicker
-        == "harness.session.window.create.mode"
+      HarnessMonitorAccessibility.sessionWindowCreateProviderPane
+        == "harness.session.window.create.provider-pane"
     )
     #expect(
       HarnessMonitorAccessibility.sessionNavigateBackButton
@@ -98,11 +98,13 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       )
     )
     #expect(sidebarView.contains("HarnessMonitorAccessibility.sessionWindowSidebar"))
+    #expect(createRuntimeView.contains("HarnessMonitorAccessibility.sessionWindowCreateProviderPane"))
     #expect(
       createRuntimeView.contains(
-        "HarnessMonitorAccessibility.sessionWindowCreateModePicker"
+        ".accessibilityTestProbe(\n      HarnessMonitorAccessibility.sessionWindowCreateProviderPane"
       )
     )
+    #expect(!createRuntimeView.contains("sessionWindowCreateModePicker"))
     #expect(toolbarView.contains("HarnessMonitorAccessibility.sessionWindowFocusModeButton"))
     #expect(toolbarView.contains("HarnessMonitorAccessibility.sessionNavigateBackButton"))
     #expect(toolbarView.contains("HarnessMonitorAccessibility.sessionNavigateForwardButton"))

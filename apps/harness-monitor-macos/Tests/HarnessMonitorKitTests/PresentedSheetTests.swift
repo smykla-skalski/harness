@@ -13,4 +13,11 @@ final class PresentedSheetTests: XCTestCase {
       "sendSignal:a"
     )
   }
+
+  func testNewCodexAgentCaseIsIdentifiable() {
+    XCTAssertEqual(
+      HarnessMonitorStore.PresentedSheet.newCodexAgent(sessionID: "sess-1").id,
+      "newCodexAgent:sess-1"
+    )
+  }
 }

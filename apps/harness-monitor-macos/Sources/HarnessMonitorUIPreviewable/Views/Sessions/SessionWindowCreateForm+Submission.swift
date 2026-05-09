@@ -23,79 +23,12 @@ extension SessionWindowCreateForm {
     validationResult = nil
     switch draft.kind {
     case .agent:
-      if draft.useCodex {
-        await createCodexRun(named: name)
-      } else {
-        await createAgent(named: name)
-      }
+      await createAgent(named: name)
     case .task:
       await createTask(named: name)
     case .decision:
       await createDecision(summary: name)
     }
-  }
-
-  @MainActor
-  func createCodexRun(named name: String) async {
-    let trimmedPrompt = draft.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-    let codexCatalog = SessionWindowCreateFormCatalogs.codexModelCatalog(
-      catalogState: state.agentCreateCatalog
-    )
-    let pickerValue: String = {
-      if draft.codexAllowCustomModel {
-        return SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag
-      }
-      let stored = draft.codexModel.trimmingCharacters(in: .whitespacesAndNewlines)
-      if !stored.isEmpty {
-        return stored
-      }
-      return codexCatalog?.default ?? ""
-    }()
-    let modelSelection = SessionWindowCreateFormCatalogs.effectiveModelSelection(
-      pickerValue: pickerValue,
-      customValue: draft.codexAllowCustomModel ? draft.codexModel : "",
-      catalogDefault: codexCatalog?.default ?? ""
-    )
-    let effortValues =
-      codexCatalog.map {
-        SessionWindowCreateFormCatalogs.effortValues(
-          catalog: $0,
-          selectedModelID: pickerValue
-        )
-      } ?? (
-        pickerValue == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag
-          ? SessionWindowCreateFormCatalogs.allEffortLevels : []
-      )
-    let trimmedEffort = draft.codexEffort.trimmingCharacters(in: .whitespacesAndNewlines)
-    let effort =
-      trimmedEffort.isEmpty
-      ? SessionWindowCreateFormCatalogs.defaultEffortLevel(from: effortValues)
-      : trimmedEffort
-    guard
-      let started = await store.startCodexRunSnapshot(
-        prompt: trimmedPrompt,
-        mode: draft.codexMode,
-        model: modelSelection.id,
-        effort: effort.isEmpty ? nil : effort,
-        allowCustomModel: modelSelection.allowCustomModel,
-        sessionID: draft.sessionID
-      )
-    else {
-      return
-    }
-    _ = name
-    LaunchPresetDefaults.write(
-      LaunchPresetSnapshot(
-        mode: .codex,
-        codexMode: draft.codexMode.rawValue,
-        codexModel:
-          pickerValue == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag ? nil : modelSelection.id,
-        customCodexModel: modelSelection.allowCustomModel ? modelSelection.id : nil,
-        codexEffort: effort.isEmpty ? nil : effort
-      )
-    )
-    state.updateCreateDraft(SessionCreateDraft(kind: .agent, sessionID: draft.sessionID))
-    state.select(.codexRun(sessionID: draft.sessionID, runID: started.runId))
   }
 
   @MainActor
@@ -300,11 +233,11 @@ extension SessionWindowCreateForm {
     return validationResult?.message
   }
 
-  func clearValidationIfNeeded(title: String?, runtime: String?, useCodex: Bool? = nil) {
+  func clearValidationIfNeeded(title: String?, runtime: String?) {
     switch validationResult?.field {
     case .name where title != nil:
       validationResult = nil
-    case .capability where runtime != nil || useCodex != nil:
+    case .capability where runtime != nil:
       validationResult = nil
     case .form, .name, .capability, nil:
       break

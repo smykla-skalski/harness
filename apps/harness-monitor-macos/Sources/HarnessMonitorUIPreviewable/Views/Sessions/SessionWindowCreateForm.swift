@@ -182,16 +182,6 @@ struct SessionWindowCreateForm: View {
       prefillAgentNameIfEligible()
       clearValidationIfResolved()
     }
-    .onChange(of: draft.useCodex) { _, _ in
-      prefillAgentNameIfEligible()
-      clearValidationIfResolved()
-    }
-    .onChange(of: draft.codexModel) { _, _ in
-      clearValidationIfResolved()
-    }
-    .onChange(of: draft.codexEffort) { _, _ in
-      clearValidationIfResolved()
-    }
     .onChange(of: draft.prompt) { _, _ in
       clearValidationIfResolved()
     }
@@ -207,7 +197,6 @@ struct SessionWindowCreateForm: View {
     projectDir: String? = nil,
     argvOverride: String? = nil,
     taskSeverity: TaskSeverity? = nil,
-    useCodex: Bool? = nil,
     codexMode: CodexRunMode? = nil,
     codexModel: String? = nil,
     codexEffort: String? = nil,
@@ -241,9 +230,6 @@ struct SessionWindowCreateForm: View {
     if let taskSeverity {
       next.taskSeverity = taskSeverity
     }
-    if let useCodex {
-      next.useCodex = useCodex
-    }
     if let codexMode {
       next.codexMode = codexMode
     }
@@ -256,7 +242,7 @@ struct SessionWindowCreateForm: View {
     if let codexAllowCustomModel {
       next.codexAllowCustomModel = codexAllowCustomModel
     }
-    clearValidationIfNeeded(title: title, runtime: runtime, useCodex: useCodex)
+    clearValidationIfNeeded(title: title, runtime: runtime)
     state.updateCreateDraft(next)
   }
 
@@ -340,9 +326,6 @@ extension SessionWindowCreateForm {
 
   private var agentBridgeBannerKind: SessionCreateBridgeBannerKind? {
     guard draft.kind == .agent else { return nil }
-    if draft.useCodex {
-      return store.codexUnavailable ? .codex : nil
-    }
     if normalizedLaunchSelection.isAcp {
       return store.acpUnavailable ? .acp : nil
     }
@@ -367,13 +350,6 @@ extension SessionWindowCreateForm {
     Binding(
       get: { draft.fallbackRole },
       set: { updateDraft(fallbackRole: $0) }
-    )
-  }
-
-  private var useCodex: Binding<Bool> {
-    Binding(
-      get: { draft.useCodex },
-      set: { updateDraft(useCodex: $0) }
     )
   }
 
@@ -470,69 +446,39 @@ extension SessionWindowCreateForm {
 
   @ViewBuilder
   private var agentConfigurationSections: some View {
-    if draft.useCodex {
-      codexConfigurationSection
-    } else {
-      terminalConfigurationSections
-    }
+    terminalConfigurationSections
   }
 
   @ViewBuilder
   private var embeddedAgentRuntimeSections: some View {
     Section {
-      Picker("Create", selection: useCodex) {
-        Text("Terminal").tag(false)
-        Text("Codex").tag(true)
-      }
-      .pickerStyle(.segmented)
-      .harnessNativeFormControl()
-      .accessibilityLabel("Create")
-
       if catalogState.isLoading && !catalogState.hasLoaded {
         Label("Checking available runtimes", systemImage: "clock")
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
+      if let capabilityValidation = validationMessage(for: .capability) {
+        Text(capabilityValidation)
+          .scaledFont(.caption)
+          .foregroundStyle(.red)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+
+      Picker("Provider", selection: selectedProviderID) {
+        ForEach(activeAgentCapabilityOptions) { option in
+          Text(option.title).tag(option.id)
+        }
+      }
+      .pickerStyle(.menu)
+      .harnessNativeFormControl()
+      .accessibilityLabel("Provider")
     } header: {
-      Text("Create")
+      Text("Provider")
         .harnessNativeFormSectionHeader()
     } footer: {
-      Text(embeddedCreateDescription)
+      Text(embeddedProviderDescription)
         .harnessNativeFormSectionFooter()
     }
-
-    if !draft.useCodex {
-      Section {
-        if let capabilityValidation = validationMessage(for: .capability) {
-          Text(capabilityValidation)
-            .scaledFont(.caption)
-            .foregroundStyle(.red)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-
-        Picker("Provider", selection: selectedProviderID) {
-          ForEach(activeAgentCapabilityOptions) { option in
-            Text(option.title).tag(option.id)
-          }
-        }
-        .pickerStyle(.menu)
-        .harnessNativeFormControl()
-        .accessibilityLabel("Provider")
-      } header: {
-        Text("Provider")
-          .harnessNativeFormSectionHeader()
-      } footer: {
-        Text(embeddedProviderDescription)
-          .harnessNativeFormSectionFooter()
-      }
-    }
-  }
-
-  private var embeddedCreateDescription: String {
-    if draft.useCodex {
-      return "The form below holds the prompt and configuration for this run."
-    }
-    return "Choose a provider below, then finish configuration in the remaining form sections."
   }
 
   private var embeddedProviderDescription: String {

@@ -33,9 +33,6 @@ extension SessionWindowCreateForm {
   }
 
   private var agentNameRuntime: AgentTuiRuntime {
-    if draft.useCodex {
-      return .codex
-    }
     return draft.launchSelection.preferredRuntime
   }
 

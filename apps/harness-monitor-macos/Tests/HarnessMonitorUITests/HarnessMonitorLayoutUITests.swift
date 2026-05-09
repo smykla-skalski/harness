@@ -360,7 +360,7 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     )
   }
 
-  func testSessionCreateModePickerStartsBelowToolbarChrome() throws {
+  func testSessionCreateHeaderStartsBelowToolbarChrome() throws {
     let app = launch(
       mode: "preview",
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "cockpit"]
@@ -406,23 +406,20 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
       app: app
     )
 
-    let terminalOption = button(
+    let createProviderPane = element(
       in: app,
-      identifier: Accessibility.segmentedOption(
-        Accessibility.sessionWindowCreateModePicker,
-        option: "Terminal"
-      )
+      identifier: Accessibility.sessionWindowCreateProviderPane
     )
-    if waitForElement(terminalOption, timeout: Self.actionTimeout) == false {
-      recordDiagnosticsSnapshot(in: app, named: "session-create-mode-picker-terminal-option-missing")
-      XCTFail("Create mode picker should appear after opening the New Agent flow")
+    if waitForElement(createProviderPane, timeout: Self.actionTimeout) == false {
+      recordDiagnosticsSnapshot(in: app, named: "session-create-provider-pane-missing")
+      XCTFail("Provider pane should appear after opening the New Agent flow")
     }
 
     let window = mainWindow(in: app)
-    let topInset = terminalOption.frame.minY - window.frame.minY
+    let topInset = createProviderPane.frame.minY - window.frame.minY
     let diagnostics = """
       window: \(window.frame)
-      terminalOption: \(terminalOption.frame)
+      createProviderPane: \(createProviderPane.frame)
       topInset: \(topInset)
       """
     XCTAssertGreaterThan(topInset, 72, diagnostics)

@@ -58,6 +58,7 @@ public struct SessionCreateContext: Equatable, @unchecked Sendable {
   public let sessionID: String
   public let primaryKind: SessionCreateKind
   public let createAgent: () -> Void
+  public let createCodexAgent: () -> Void
   public let createTask: () -> Void
   public let createDecision: () -> Void
 
@@ -65,12 +66,14 @@ public struct SessionCreateContext: Equatable, @unchecked Sendable {
     sessionID: String,
     primaryKind: SessionCreateKind,
     createAgent: @escaping () -> Void,
+    createCodexAgent: @escaping () -> Void,
     createTask: @escaping () -> Void,
     createDecision: @escaping () -> Void
   ) {
     self.sessionID = sessionID
     self.primaryKind = primaryKind
     self.createAgent = createAgent
+    self.createCodexAgent = createCodexAgent
     self.createTask = createTask
     self.createDecision = createDecision
   }

@@ -50,6 +50,7 @@ extension SessionWindowView {
       sessionID: token.sessionID,
       primaryKind: primaryCreateKind,
       createAgent: { cache.selectCreate(.agent) },
+      createCodexAgent: { store.presentedSheet = .newCodexAgent(sessionID: token.sessionID) },
       createTask: { cache.selectCreate(.task) },
       createDecision: { cache.selectCreate(.decision) }
     )

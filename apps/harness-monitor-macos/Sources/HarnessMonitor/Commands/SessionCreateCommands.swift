@@ -10,6 +10,8 @@ struct SessionCreateCommands: Commands {
       Button("New Agent") { sessionCreate?.createAgent() }
         .keyboardShortcut("a", modifiers: [.command, .option])
         .disabled(sessionCreate == nil)
+      Button("New Codex Agent") { sessionCreate?.createCodexAgent() }
+        .disabled(sessionCreate == nil)
       Button("New Task") { sessionCreate?.createTask() }
         .keyboardShortcut("t", modifiers: [.command, .option])
         .disabled(sessionCreate == nil)
