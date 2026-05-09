@@ -28,6 +28,14 @@ struct ToolbarTitleScalingContractTests {
 
     #expect(sessionSource.contains("SessionToolbarCenterpiece("))
     #expect(sessionSource.contains("SessionToolbarCenterpieceStatusStripState("))
+    #expect(
+      sessionSource.contains(
+        """
+              SessionToolbarCenterpieceSourceIcon(source: source)
+              ConnectionToolbarBadge(metrics: metrics)
+        """
+      )
+    )
     #expect(!sessionSource.contains("HarnessMonitorGlassControlGroup"))
     #expect(!sessionSource.contains("harnessFloatingControlGlass"))
     #expect(!sessionSource.contains("Menu {"))
