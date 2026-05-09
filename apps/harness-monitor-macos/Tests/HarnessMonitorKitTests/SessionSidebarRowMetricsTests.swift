@@ -53,6 +53,16 @@ final class SessionSidebarRowMetricsTests: XCTestCase {
     )
   }
 
+  func testSelectedSidebarListRowShrinksBelowThePreviousSidebarFloorForSmallText() {
+    let compactSelectedRowHeight = selectedRowHeightInList(textSizeIndex: 0)
+    let largestSelectedRowHeight = selectedRowHeightInList(
+      textSizeIndex: HarnessMonitorTextSize.scales.count - 1
+    )
+
+    XCTAssertLessThan(compactSelectedRowHeight, 40)
+    XCTAssertLessThan(compactSelectedRowHeight, largestSelectedRowHeight)
+  }
+
   private func fittedHeight(for scale: CGFloat) -> CGFloat {
     let host = hostingView(for: scale)
     attachSnapshot(for: host, named: "session-sidebar-row-scale-\(scale)")
@@ -92,5 +102,92 @@ final class SessionSidebarRowMetricsTests: XCTestCase {
     attachment.name = name
     attachment.lifetime = .keepAlways
     add(attachment)
+  }
+
+  private func selectedRowHeightInList(textSizeIndex: Int) -> CGFloat {
+    let host = NSHostingView(
+      rootView: AnyView(
+        SessionSidebarRowSelectionPreviewContent(
+          selection: .constant(.route(.overview))
+        )
+        .harnessPreviewSceneAppearance(textSizeIndex: textSizeIndex)
+        .environment(\.controlActiveState, .key)
+      )
+    )
+    let window = NSWindow(
+      contentRect: CGRect(x: 0, y: 0, width: 260, height: 220),
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    host.frame = CGRect(x: 0, y: 0, width: 260, height: 220)
+    window.contentView = host
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+    RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+    attachWindowSizedSnapshot(
+      for: host,
+      named: "session-sidebar-list-text-size-\(textSizeIndex)"
+    )
+
+    guard let tableView = firstDescendant(in: host, as: NSTableView.self) else {
+      XCTFail("Expected SessionSidebar list preview to bridge to NSTableView")
+      return 0
+    }
+
+    guard tableView.selectedRow >= 0 else {
+      XCTFail("Expected SessionSidebar list preview to have a selected row")
+      return 0
+    }
+
+    return tableView.rect(ofRow: tableView.selectedRow).height
+  }
+
+  private func attachWindowSizedSnapshot(
+    for host: NSHostingView<AnyView>,
+    named name: String
+  ) {
+    let bounds = host.bounds
+    guard
+      !bounds.isEmpty,
+      let bitmap = host.bitmapImageRepForCachingDisplay(in: bounds)
+    else {
+      XCTFail("Expected SessionSidebar list preview host to produce a bitmap snapshot")
+      return
+    }
+    host.cacheDisplay(in: bounds, to: bitmap)
+
+    let image = NSImage(size: bounds.size)
+    image.addRepresentation(bitmap)
+
+    let attachment = XCTAttachment(image: image)
+    attachment.name = name
+    attachment.lifetime = .keepAlways
+    add(attachment)
+  }
+
+  private func firstDescendant<ViewType: NSView>(
+    in root: NSView,
+    as type: ViewType.Type
+  ) -> ViewType? {
+    if let view = root as? ViewType {
+      return view
+    }
+
+    for subview in root.subviews {
+      if let match = firstDescendant(in: subview, as: type) {
+        return match
+      }
+    }
+
+    return nil
   }
 }
