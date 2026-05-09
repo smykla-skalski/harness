@@ -121,6 +121,10 @@ public struct SessionWindowView: View {
     summary?.displayTitle ?? "Session"
   }
 
+  var navigationSubtitleText: String {
+    summary?.projectAndWorktreeDisplayLabel(separator: "·") ?? ""
+  }
+
   var allSessionDecisions: [Decision] {
     allSessionDecisionsCache
   }
@@ -178,6 +182,7 @@ public struct SessionWindowView: View {
       }
     }
     .navigationTitle(navigationTitleText)
+    .navigationSubtitle(navigationSubtitleText)
     .sessionTitleBlurChrome(
       status: summary?.status ?? .awaitingLeader,
       isStale: snapshot == nil

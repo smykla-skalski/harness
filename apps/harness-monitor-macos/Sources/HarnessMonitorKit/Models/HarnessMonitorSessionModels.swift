@@ -293,6 +293,22 @@ public struct SessionSummary: Codable, Equatable, Identifiable, Sendable {
     checkoutDisplayName
   }
 
+  public func projectAndWorktreeDisplayLabel(separator: String = "•") -> String {
+    let trimmedProjectName = projectName.trimmingCharacters(in: .whitespacesAndNewlines)
+    let trimmedWorktreeName = worktreeDisplayName.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    switch (trimmedProjectName.isEmpty, trimmedWorktreeName.isEmpty) {
+    case (false, false):
+      return "\(trimmedProjectName) \(separator) \(trimmedWorktreeName)"
+    case (false, true):
+      return trimmedProjectName
+    case (true, false):
+      return trimmedWorktreeName
+    case (true, true):
+      return ""
+    }
+  }
+
   enum CodingKeys: CodingKey {
     case projectId, projectName, projectDir, contextRoot
     case sessionId, worktreePath, sharedPath, originPath, branchRef

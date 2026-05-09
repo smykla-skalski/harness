@@ -144,5 +144,5 @@ private struct DashboardSessionCard: View {
 }
 
 private func sessionMetadata(_ session: SessionSummary) -> String {
-  "\(session.projectName) • \(session.worktreeDisplayName)"
+  session.projectAndWorktreeDisplayLabel()
 }
