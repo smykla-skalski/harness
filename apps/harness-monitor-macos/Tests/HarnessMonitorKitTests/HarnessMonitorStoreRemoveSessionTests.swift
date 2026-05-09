@@ -208,14 +208,14 @@ struct HarnessMonitorStoreRemoveSessionTests {
   @Test("Removing a session clears stale pending workspace create anchors")
   func removingSessionClearsPendingWorkspaceCreateAnchor() async {
     let store = await makeBootstrappedStore()
-    store.requestWorkspaceCreateEntryPoint(.agent, sessionID: PreviewFixtures.summary.sessionId)
+    store.requestSessionRouteCreate(.agent, sessionID: PreviewFixtures.summary.sessionId)
 
-    #expect(store.pendingWorkspaceCreateSessionID == PreviewFixtures.summary.sessionId)
+    #expect(store.pendingSessionRouteCreateSessionID == PreviewFixtures.summary.sessionId)
 
     store.requestRemoveSessionConfirmation(sessionID: PreviewFixtures.summary.sessionId)
     await store.confirmPendingAction()
 
-    #expect(store.pendingWorkspaceCreateSessionID == nil)
+    #expect(store.pendingSessionRouteCreateSessionID == nil)
   }
 
   @Test("Confirm pending multi remove-session action removes every selected session")

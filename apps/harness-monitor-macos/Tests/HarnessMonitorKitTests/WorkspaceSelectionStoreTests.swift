@@ -5,33 +5,33 @@ import Testing
 
 @Suite("Workspace selection bridge")
 @MainActor
-struct WorkspaceSelectionStoreTests {
+struct SessionRouteSelectionStoreTests {
   @Test("Fresh store has no pending workspace selection")
   func freshStoreHasNoPendingSelection() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
-    #expect(store.consumePendingWorkspaceSelection() == nil)
+    #expect(store.consumePendingSessionRoute() == nil)
   }
 
-  @Test("requestWorkspaceSelection round-trips the value once")
+  @Test("requestSessionRoute round-trips the value once")
   func requestRoundTripsOnce() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
-    let selection = WorkspaceSelection.agent(sessionID: nil, agentID: "agent-alpha")
-    store.requestWorkspaceSelection(selection)
-    #expect(store.consumePendingWorkspaceSelection() == selection)
-    #expect(store.consumePendingWorkspaceSelection() == nil)
+    let selection = SessionRouteSelection.agent(sessionID: nil, agentID: "agent-alpha")
+    store.requestSessionRoute(selection)
+    #expect(store.consumePendingSessionRoute() == selection)
+    #expect(store.consumePendingSessionRoute() == nil)
   }
 
   @Test("Attention-driven workspace requests carry the decision-filter reset flag")
   func requestCarriesDecisionFilterResetFlag() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
-    let selection = WorkspaceSelection.decisions(sessionID: "sess-alpha")
-    store.requestWorkspaceSelection(selection, resetDecisionFilters: true)
+    let selection = SessionRouteSelection.decisions(sessionID: "sess-alpha")
+    store.requestSessionRoute(selection, resetDecisionFilters: true)
 
-    let request = store.consumePendingWorkspaceSelectionRequest()
+    let request = store.consumePendingSessionRouteRequest()
 
     #expect(request?.selection == selection)
     #expect(request?.resetDecisionFilters == true)
-    #expect(store.consumePendingWorkspaceSelectionRequest() == nil)
+    #expect(store.consumePendingSessionRouteRequest() == nil)
   }
 
   @Test("Create-agent workspace requests carry a selected live session summary")
@@ -39,14 +39,14 @@ struct WorkspaceSelectionStoreTests {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.sessionIndex.sessions = [makeSummary(sessionID: "sess-alpha")]
     store.selectedSessionID = "sess-alpha"
-    store.requestWorkspaceCreateEntryPoint(.agent)
+    store.requestSessionRouteCreate(.agent)
 
-    let request = store.consumePendingWorkspaceSelectionRequest()
+    let request = store.consumePendingSessionRouteRequest()
 
     #expect(request?.selection == .create)
     #expect(request?.createEntryPoint == .agent)
     #expect(request?.createSessionID == "sess-alpha")
-    #expect(store.consumePendingWorkspaceSelectionRequest() == nil)
+    #expect(store.consumePendingSessionRouteRequest() == nil)
   }
 
   @Test("Create-agent workspace requests ignore stale selected session IDs without live context")
@@ -54,9 +54,9 @@ struct WorkspaceSelectionStoreTests {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.selectedSessionID = "sess-alpha"
 
-    store.requestWorkspaceCreateEntryPoint(.agent)
+    store.requestSessionRouteCreate(.agent)
 
-    let request = store.consumePendingWorkspaceSelectionRequest()
+    let request = store.consumePendingSessionRouteRequest()
 
     #expect(request?.selection == .create)
     #expect(request?.createEntryPoint == .agent)
@@ -70,9 +70,9 @@ struct WorkspaceSelectionStoreTests {
     store.selectedSessionID = "sess-alpha"
     store.isShowingCachedCatalog = true
 
-    store.requestWorkspaceCreateEntryPoint(.agent)
+    store.requestSessionRouteCreate(.agent)
 
-    let request = store.consumePendingWorkspaceSelectionRequest()
+    let request = store.consumePendingSessionRouteRequest()
 
     #expect(request?.selection == .create)
     #expect(request?.createEntryPoint == .agent)
@@ -83,9 +83,9 @@ struct WorkspaceSelectionStoreTests {
   func createAgentRequestUsesExplicitSessionOverride() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.selectedSessionID = "sess-alpha"
-    store.requestWorkspaceCreateEntryPoint(.agent, sessionID: "sess-beta")
+    store.requestSessionRouteCreate(.agent, sessionID: "sess-beta")
 
-    let request = store.consumePendingWorkspaceSelectionRequest()
+    let request = store.consumePendingSessionRouteRequest()
 
     #expect(request?.selection == .create)
     #expect(request?.createEntryPoint == .agent)
@@ -95,51 +95,51 @@ struct WorkspaceSelectionStoreTests {
   @Test("Multiple pending requests keep the latest value")
   func latestRequestWins() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
-    store.requestWorkspaceSelection(.terminal(sessionID: nil, terminalID: "t-1"))
-    store.requestWorkspaceSelection(.codex(sessionID: nil, runID: "c-1"))
-    let latest = WorkspaceSelection.agent(sessionID: nil, agentID: "agent-beta")
-    store.requestWorkspaceSelection(latest)
-    #expect(store.consumePendingWorkspaceSelection() == latest)
-    #expect(store.consumePendingWorkspaceSelection() == nil)
+    store.requestSessionRoute(.terminal(sessionID: nil, terminalID: "t-1"))
+    store.requestSessionRoute(.codex(sessionID: nil, runID: "c-1"))
+    let latest = SessionRouteSelection.agent(sessionID: nil, agentID: "agent-beta")
+    store.requestSessionRoute(latest)
+    #expect(store.consumePendingSessionRoute() == latest)
+    #expect(store.consumePendingSessionRoute() == nil)
   }
 
-  @Test("WorkspaceSelection.agent exposes its agentID accessor")
+  @Test("SessionRouteSelection.agent exposes its agentID accessor")
   func agentAccessorReturnsAgentID() {
     #expect(
-      WorkspaceSelection.agent(sessionID: nil, agentID: "agent-gamma").agentID == "agent-gamma"
+      SessionRouteSelection.agent(sessionID: nil, agentID: "agent-gamma").agentID == "agent-gamma"
     )
-    #expect(WorkspaceSelection.terminal(sessionID: nil, terminalID: "t-1").agentID == nil)
-    #expect(WorkspaceSelection.codex(sessionID: nil, runID: "c-1").agentID == nil)
-    #expect(WorkspaceSelection.create.agentID == nil)
-    #expect(WorkspaceSelection.task(sessionID: nil, taskID: "task-1").agentID == nil)
+    #expect(SessionRouteSelection.terminal(sessionID: nil, terminalID: "t-1").agentID == nil)
+    #expect(SessionRouteSelection.codex(sessionID: nil, runID: "c-1").agentID == nil)
+    #expect(SessionRouteSelection.create.agentID == nil)
+    #expect(SessionRouteSelection.task(sessionID: nil, taskID: "task-1").agentID == nil)
   }
 
-  @Test("WorkspaceSelection.task exposes its taskID accessor")
+  @Test("SessionRouteSelection.task exposes its taskID accessor")
   func taskAccessorReturnsTaskID() {
-    #expect(WorkspaceSelection.task(sessionID: nil, taskID: "task-omega").taskID == "task-omega")
-    #expect(WorkspaceSelection.terminal(sessionID: nil, terminalID: "t-1").taskID == nil)
-    #expect(WorkspaceSelection.codex(sessionID: nil, runID: "c-1").taskID == nil)
-    #expect(WorkspaceSelection.agent(sessionID: nil, agentID: "agent-1").taskID == nil)
-    #expect(WorkspaceSelection.create.taskID == nil)
+    #expect(SessionRouteSelection.task(sessionID: nil, taskID: "task-omega").taskID == "task-omega")
+    #expect(SessionRouteSelection.terminal(sessionID: nil, terminalID: "t-1").taskID == nil)
+    #expect(SessionRouteSelection.codex(sessionID: nil, runID: "c-1").taskID == nil)
+    #expect(SessionRouteSelection.agent(sessionID: nil, agentID: "agent-1").taskID == nil)
+    #expect(SessionRouteSelection.create.taskID == nil)
   }
 
-  @Test("requestWorkspaceSelection round-trips a task selection")
+  @Test("requestSessionRoute round-trips a task selection")
   func taskSelectionRoundTrips() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
-    let selection = WorkspaceSelection.task(sessionID: nil, taskID: "task-zeta")
-    store.requestWorkspaceSelection(selection)
-    #expect(store.consumePendingWorkspaceSelection() == selection)
-    #expect(store.consumePendingWorkspaceSelection() == nil)
+    let selection = SessionRouteSelection.task(sessionID: nil, taskID: "task-zeta")
+    store.requestSessionRoute(selection)
+    #expect(store.consumePendingSessionRoute() == selection)
+    #expect(store.consumePendingSessionRoute() == nil)
   }
 
   @Test("Existing terminal/codex accessors keep working")
   func existingAccessorsUnchanged() {
-    #expect(WorkspaceSelection.terminal(sessionID: nil, terminalID: "t-1").terminalID == "t-1")
-    #expect(WorkspaceSelection.codex(sessionID: nil, runID: "c-1").codexRunID == "c-1")
-    #expect(WorkspaceSelection.agent(sessionID: nil, agentID: "agent-delta").terminalID == nil)
-    #expect(WorkspaceSelection.agent(sessionID: nil, agentID: "agent-delta").codexRunID == nil)
-    #expect(WorkspaceSelection.task(sessionID: nil, taskID: "task-1").terminalID == nil)
-    #expect(WorkspaceSelection.task(sessionID: nil, taskID: "task-1").codexRunID == nil)
+    #expect(SessionRouteSelection.terminal(sessionID: nil, terminalID: "t-1").terminalID == "t-1")
+    #expect(SessionRouteSelection.codex(sessionID: nil, runID: "c-1").codexRunID == "c-1")
+    #expect(SessionRouteSelection.agent(sessionID: nil, agentID: "agent-delta").terminalID == nil)
+    #expect(SessionRouteSelection.agent(sessionID: nil, agentID: "agent-delta").codexRunID == nil)
+    #expect(SessionRouteSelection.task(sessionID: nil, taskID: "task-1").terminalID == nil)
+    #expect(SessionRouteSelection.task(sessionID: nil, taskID: "task-1").codexRunID == nil)
   }
 
   private func makeSummary(sessionID: String) -> SessionSummary {

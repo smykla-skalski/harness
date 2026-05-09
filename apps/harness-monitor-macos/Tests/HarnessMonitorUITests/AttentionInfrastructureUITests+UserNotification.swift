@@ -234,9 +234,9 @@ final class AttentionInfrastructureUITestsUserNotification:
   }
 
   private func assertToastRouteOpensDecision(_ app: XCUIApplication) {
-    let workspaceWindow = element(in: app, identifier: Accessibility.workspaceWindow)
+    let decisionDeskRoot = element(in: app, identifier: Accessibility.decisionDeskRoot)
     XCTAssertTrue(
-      waitForElement(workspaceWindow, timeout: Self.uiTimeout),
+      waitForElement(decisionDeskRoot, timeout: Self.uiTimeout),
       "Toast route should open the Workspace window"
     )
 
@@ -247,7 +247,7 @@ final class AttentionInfrastructureUITestsUserNotification:
     )
 
     let acpPanel = descendantElement(
-      in: workspaceWindow,
+      in: decisionDeskRoot,
       identifier: Accessibility.decisionAcpPanel
     )
     XCTAssertTrue(
@@ -256,7 +256,7 @@ final class AttentionInfrastructureUITestsUserNotification:
     )
 
     let primaryAction = descendantButton(
-      in: workspaceWindow,
+      in: decisionDeskRoot,
       identifier: Accessibility.decisionAction(Self.primaryActionID)
     )
     XCTAssertTrue(waitForElement(primaryAction, timeout: Self.actionTimeout))

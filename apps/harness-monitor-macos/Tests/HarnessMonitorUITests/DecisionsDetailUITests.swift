@@ -19,7 +19,7 @@ final class DecisionsDetailUITests: HarnessMonitorUITestCase {
       ]
     )
 
-    tapButton(in: app, identifier: Accessibility.workspaceToolbarButton)
+    tapButton(in: app, identifier: Accessibility.sessionAttentionToolbarButton)
 
     let decisionRow = button(in: app, identifier: Accessibility.decisionRow(Self.decisionID))
     XCTAssertTrue(waitForElement(decisionRow, timeout: Self.uiTimeout))
@@ -76,7 +76,7 @@ final class DecisionsDetailUITests: HarnessMonitorUITestCase {
       ]
     )
 
-    tapButton(in: app, identifier: Accessibility.workspaceToolbarButton)
+    tapButton(in: app, identifier: Accessibility.sessionAttentionToolbarButton)
     XCTAssertTrue(
       waitForElement(
         button(in: app, identifier: Accessibility.decisionRow(Self.fallbackDecisionID)),

@@ -108,7 +108,7 @@ extension HarnessMonitorMCPContractTests {
   @Test("persistent semantic elements register live menu item actions")
   func persistentSemanticElementsRegisterLiveMenuItemActions() async {
     let service = HarnessMonitorMCPAccessibilityService()
-    let identifier = "harness.test.window-menu.workspace"
+    let identifier = "harness.test.window-menu.session"
     let probe = MCPContractSemanticPressProbe()
     let semanticActions = RegistryTrackedSemanticActions(press: { probe.recordPress() })
     let element = RegistryElement(

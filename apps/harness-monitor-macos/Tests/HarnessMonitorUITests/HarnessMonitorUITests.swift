@@ -42,10 +42,10 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     tapPreviewSession(in: app)
     tapButton(in: app, identifier: Accessibility.taskUICard)
 
-    let notesUnavailable = element(in: app, identifier: Accessibility.workspaceTaskNotesUnavailable)
+    let notesUnavailable = element(in: app, identifier: Accessibility.sessionTaskNotesUnavailable)
     XCTAssertTrue(notesUnavailable.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertFalse(element(in: app, identifier: Accessibility.workspaceTaskNoteField).exists)
-    XCTAssertFalse(element(in: app, identifier: Accessibility.workspaceTaskNoteAddButton).exists)
+    XCTAssertFalse(element(in: app, identifier: Accessibility.sessionTaskNoteField).exists)
+    XCTAssertFalse(element(in: app, identifier: Accessibility.sessionTaskNoteAddButton).exists)
   }
 
   func testObserveSummaryIsAvailableInSessionCockpit() throws {
