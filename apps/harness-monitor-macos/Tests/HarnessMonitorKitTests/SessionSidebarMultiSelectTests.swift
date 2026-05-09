@@ -120,16 +120,25 @@ struct SessionSidebarMultiSelectTests {
     #expect(source.contains("Filter decisions to show more"))
   }
 
-  @Test("Draggable sidebar rows render a hover drag handle")
-  func draggableRowsRenderHoverDragHandle() throws {
+  @Test("Draggable sidebar rows render a native hover drag handle")
+  func draggableRowsRenderNativeHoverDragHandle() throws {
     let source = try sourceFile(named: "SessionSidebarRow.swift")
 
     #expect(source.contains("showsDragHandle"))
     #expect(source.contains("SessionSidebarDragHandle"))
     #expect(source.contains("isHoveringDragHandle"))
-    #expect(source.contains("Image(systemName: \"ellipsis\")"))
+    #expect(source.contains("SessionSidebarDragHandleGlyph"))
+    #expect(source.contains("path.addEllipse"))
+    #expect(source.contains("for column in 0..<2"))
+    #expect(source.contains("for row in 0..<3"))
+    #expect(source.contains(".overlay(alignment: .trailing)"))
     #expect(source.contains(".onHover"))
-    #expect(source.contains("dragHandleColumnWidth"))
+    #expect(!source.contains("Image(systemName: \"ellipsis\")"))
+    #expect(!source.contains("ForEach(0..<3"))
+    #expect(!source.contains("grip.vertical"))
+    #expect(!source.contains("line.3.horizontal"))
+    #expect(!source.contains("rectangle.grid.3x2.fill"))
+    #expect(!source.contains("dragHandleColumnWidth"))
     #expect(source.contains("dragHandleHitTarget"))
   }
 
