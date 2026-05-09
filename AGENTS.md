@@ -33,6 +33,10 @@ full git worktree. Build/runtime lanes isolate caches, daemon state, ports,
 labels, and sockets inside a worktree; they are not a substitute for a separate
 checkout.
 
+## UI test failures
+
+When UI tests are failing, run one failing test at a time using `XCODE_ONLY_TESTING`. Never run a broad suite or multiple failing tests together — XCUITest runs block the whole machine and the run time compounds fast. Fix one, verify it passes, then move to the next.
+
 ## Build and test
 
 Run commands from the repo root:
