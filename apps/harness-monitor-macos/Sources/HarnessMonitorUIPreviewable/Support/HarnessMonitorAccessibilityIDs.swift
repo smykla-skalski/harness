@@ -157,6 +157,8 @@ public enum HarnessMonitorAccessibility {
   public static let settingsNotificationsSendButton = "harness.settings.notifications.send"
   public static let navigateBackButton = "harness.toolbar.navigate-back"
   public static let navigateForwardButton = "harness.toolbar.navigate-forward"
+  public static let sessionNavigateBackButton = "harness.session.window.toolbar.navigate-back"
+  public static let sessionNavigateForwardButton = "harness.session.window.toolbar.navigate-forward"
   public static let refreshButton = "harness.toolbar.refresh"
   public static let daemonSettingsButton = "harness.toolbar.settings"
   public static let sleepPreventionButton = "harness.toolbar.sleep-prevention"

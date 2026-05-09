@@ -36,7 +36,6 @@ struct SessionWindowRootView: View {
     ) {
       SessionWindowView(store: store, token: token)
     }
-    .navigationTitle(windowTitle)
     .modifier(
       SessionWindowLifecycleModifier(
         store: store,

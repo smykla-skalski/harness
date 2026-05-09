@@ -6,15 +6,34 @@ struct SessionWindowToolbar: ToolbarContent {
   let connectionTitle: String
   let statusSystemImage: String
   let sessionID: String
+  let state: SessionWindowStateCache
   @Binding var focusMode: Bool
 
   var body: some ToolbarContent {
+    ToolbarItemGroup(placement: .navigation) {
+      Button {
+        state.navigateBack()
+      } label: {
+        Label("Back", systemImage: "chevron.backward")
+      }
+      .disabled(!state.navigationHistory.canGoBack)
+      .help("Go back")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionNavigateBackButton)
+
+      Button {
+        state.navigateForward()
+      } label: {
+        Label("Forward", systemImage: "chevron.forward")
+      }
+      .disabled(!state.navigationHistory.canGoForward)
+      .help("Go forward")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionNavigateForwardButton)
+    }
     ToolbarItem(placement: .automatic) {
       Toggle(isOn: $focusMode) {
         Label("Focus Mode", systemImage: "sidebar.leading")
       }
       .toggleStyle(.button)
-      .buttonStyle(SessionToolbarButtonStyle(isSelected: focusMode))
       .accessibilityLabel("Focus mode")
       .accessibilityHint("Shows or hides secondary session columns.")
     }
@@ -32,7 +51,6 @@ struct SessionWindowToolbar: ToolbarContent {
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowStatusMenu)
       .accessibilityLabel("Session status")
       .accessibilityHint("Shows current connection and session status.")
-      .buttonStyle(SessionToolbarButtonStyle())
     }
   }
 }

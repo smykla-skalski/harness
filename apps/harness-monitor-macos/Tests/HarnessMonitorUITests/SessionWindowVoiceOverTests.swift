@@ -166,6 +166,80 @@ final class SessionWindowVoiceOverTests: HarnessMonitorUITestCase {
     )
   }
 
+  func testSessionToolbarHistoryButtonsNavigateRoutes() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: [
+        Self.previewScenarioKey: Self.dashboardLandingScenario,
+        Self.uiTestsKey: "1",
+        Self.mainWindowWidthKey: "1800",
+        Self.decisionSeedEnvKey: makeSeededDecisionsPayload(),
+      ]
+    )
+
+    let openRecentWindow = element(in: app, identifier: Accessibility.openRecentRoot)
+    XCTAssertTrue(waitForElement(openRecentWindow, timeout: Self.uiTimeout))
+
+    let sessionRowIdentifier = Accessibility.openRecentSessionRow(Self.previewSessionID)
+    XCTAssertTrue(
+      waitForButtonReady(
+        in: app,
+        identifier: sessionRowIdentifier,
+        timeout: Self.uiTimeout
+      )
+    )
+    tapButton(in: app, identifier: sessionRowIdentifier)
+
+    let sessionWindow = element(in: app, identifier: Accessibility.sessionWindowShell)
+    XCTAssertTrue(waitForElement(sessionWindow, timeout: Self.uiTimeout))
+
+    let backButton = button(in: app, identifier: Accessibility.sessionNavigateBackButton)
+    let forwardButton = button(in: app, identifier: Accessibility.sessionNavigateForwardButton)
+    XCTAssertTrue(waitForElement(backButton, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(forwardButton, timeout: Self.actionTimeout))
+    XCTAssertFalse(backButton.isEnabled)
+    XCTAssertFalse(forwardButton.isEnabled)
+
+    let timelineRoute = element(
+      in: app,
+      identifier: Accessibility.sessionWindowRoute("timeline")
+    )
+    XCTAssertTrue(waitForElement(timelineRoute, timeout: Self.actionTimeout))
+    XCTAssertTrue(tapElementReliably(in: app, element: timelineRoute))
+
+    let timelineNavigation = element(
+      in: app,
+      identifier: Accessibility.sessionTimelineNavigation
+    )
+    XCTAssertTrue(waitForElement(timelineNavigation, timeout: Self.actionTimeout))
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        backButton.isEnabled && !forwardButton.isEnabled
+      },
+      "Opening another route should enable back while forward stays unavailable."
+    )
+
+    backButton.tap()
+
+    let openTasksMetric = staticText(in: app, containing: "Open tasks")
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        openTasksMetric.exists && !timelineNavigation.exists && !backButton.isEnabled
+          && forwardButton.isEnabled
+      },
+      "Back should restore the overview route and enable forward navigation."
+    )
+
+    forwardButton.tap()
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        timelineNavigation.exists && backButton.isEnabled && !forwardButton.isEnabled
+      },
+      "Forward should return to the timeline route once back has been used."
+    )
+  }
+
   func testSessionWindowContentDetailDividerSupportsResizing() throws {
     let app = launch(
       mode: "preview",

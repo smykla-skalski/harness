@@ -78,12 +78,22 @@ public final class SessionWindowStateCache {
 
   public func navigateBack() {
     guard let previous = navigationHistory.popBack(current: selection) else { return }
-    selection = previous
+    updateSelection(
+      previous,
+      source: .programmatic,
+      rememberCurrentSelection: false,
+      recordHistory: false
+    )
   }
 
   public func navigateForward() {
     guard let next = navigationHistory.popForward(current: selection) else { return }
-    selection = next
+    updateSelection(
+      next,
+      source: .programmatic,
+      rememberCurrentSelection: false,
+      recordHistory: false
+    )
   }
 
   public func selectedDecision(in decisions: [Decision]) -> Decision? {
