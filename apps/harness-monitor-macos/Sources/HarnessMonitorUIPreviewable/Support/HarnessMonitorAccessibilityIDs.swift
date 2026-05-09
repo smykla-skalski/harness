@@ -87,6 +87,7 @@ public enum HarnessMonitorAccessibility {
   public static let sessionWindowContentDetailDivider =
     "harness.session.window.content-detail-divider"
   public static let sessionWindowStatusMenu = "harness.session.window.toolbar.status"
+  public static let sessionWindowFocusModeButton = "harness.session.window.toolbar.focus-mode"
   public static let sessionWindowInspector = "harness.session.window.inspector"
   public static let sessionWindowInspectorCloseButton =
     "harness.session.window.inspector.close"

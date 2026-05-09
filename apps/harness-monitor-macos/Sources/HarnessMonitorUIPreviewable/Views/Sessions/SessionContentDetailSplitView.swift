@@ -81,7 +81,7 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       .onChange(of: geometry.size.width, initial: true) { _, newWidth in
-        reclampLiveWidth(availableWidth: newWidth)
+        deferReclampLiveWidth(availableWidth: newWidth)
       }
       .onChange(of: liveContentWidth) { _, newValue in
         guard !isDragging else { return }
@@ -91,6 +91,15 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
         guard !dragging else { return }
         commitPersistedWidth(liveContentWidth)
       }
+    }
+  }
+
+  private func deferReclampLiveWidth(availableWidth: CGFloat) {
+    // Re-clamp on the next main-actor turn so startup geometry changes do not
+    // write width state back into the same frame.
+    Task { @MainActor in
+      await Task.yield()
+      reclampLiveWidth(availableWidth: availableWidth)
     }
   }
 

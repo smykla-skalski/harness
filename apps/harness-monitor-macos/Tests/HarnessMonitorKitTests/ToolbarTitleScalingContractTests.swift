@@ -22,12 +22,15 @@ struct ToolbarTitleScalingContractTests {
     #expect(!sessionRootSource.contains(".navigationTitle(windowTitle)"))
   }
 
-  @Test("Session toolbar leaves glass chrome to the system toolbar")
-  func sessionToolbarLeavesGlassChromeToTheSystemToolbar() throws {
+  @Test("Session toolbar uses a static glass status bubble")
+  func sessionToolbarUsesStaticGlassStatusBubble() throws {
     let sessionSource = try previewableSourceFile(named: "Views/Sessions/SessionWindowToolbar.swift")
 
-    #expect(!sessionSource.contains("SessionToolbarButtonStyle"))
-    #expect(!sessionSource.contains("harnessFloatingControlGlass"))
+    #expect(sessionSource.contains("HarnessMonitorGlassControlGroup"))
+    #expect(sessionSource.contains("SessionWindowStatusBubble("))
+    #expect(sessionSource.contains("harnessFloatingControlGlass"))
+    #expect(sessionSource.contains("prominence: .subdued"))
+    #expect(!sessionSource.contains("Menu {"))
     #expect(!sessionSource.contains(".buttonStyle(.glass)"))
     #expect(!sessionSource.contains(".buttonStyle(.glassProminent)"))
   }
@@ -49,11 +52,11 @@ struct ToolbarTitleScalingContractTests {
     #expect(sessionSource.contains("SessionFocusModeMotionPolicy.animation(reduceMotion: reduceMotion)"))
     #expect(sessionSource.contains("withAnimation(animation)"))
     #expect(!sessionSource.contains(".animation(.default, value: focusMode)"))
-    #expect(columnsSource.contains("NavigationSplitView(columnVisibility: focusModeColumnVisibilityBinding)"))
-    #expect(!columnsSource.contains("focusModeSurface\n        .padding(.top, HarnessMonitorTheme.spacingLG)"))
-    #expect(columnsSource.contains("SessionFocusModeMotionPolicy.standardSurfaceTransition"))
-    #expect(columnsSource.contains("SessionFocusModeMotionPolicy.focusedSurfaceTransition"))
-    #expect(bannerSource.contains("SessionFocusModeMotionPolicy.bannerTransition"))
+    #expect(columnsSource.contains("NavigationSplitView(columnVisibility: columnVisibilityBinding)"))
+    #expect(columnsSource.contains("if focusMode {\n      focusModeSurface"))
+    #expect(!columnsSource.contains("SessionFocusModeMotionPolicy.focusedSurfaceTransition"))
+    #expect(!columnsSource.contains("sidebarMinimumWidth"))
+    #expect(!bannerSource.contains("SessionFocusModeMotionPolicy.bannerTransition"))
   }
 
   @Test("Workspace toolbar keeps refresh as an explicit primary action")
@@ -66,6 +69,15 @@ struct ToolbarTitleScalingContractTests {
       )
     )
     #expect(workspaceSource.contains(".help(\"Refresh workspace\")"))
+  }
+
+  @Test("Session window leaves toolbar chrome to tabbing and scene shell")
+  func sessionWindowLeavesToolbarChromeToTabbingAndSceneShell() throws {
+    let sessionSource = try previewableSourceFile(named: "Views/Sessions/SessionWindowView.swift")
+    let columnsSource = try previewableSourceFile(named: "Views/Sessions/SessionWindowView+Columns.swift")
+
+    #expect(!sessionSource.contains(".suppressToolbarBaselineSeparator()"))
+    #expect(!columnsSource.contains(".toolbarBackgroundVisibility(.automatic, for: .windowToolbar)"))
   }
 
   private func previewableSourceFile(named relativePath: String) throws -> String {

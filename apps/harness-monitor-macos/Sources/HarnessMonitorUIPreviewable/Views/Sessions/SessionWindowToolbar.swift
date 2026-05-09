@@ -4,16 +4,106 @@ import SwiftUI
 struct SessionWindowToolbar: ToolbarContent {
   let store: HarnessMonitorStore
   let snapshot: HarnessMonitorSessionWindowSnapshot?
+  let isLoading: Bool
+  let summary: SessionSummary?
   let connectionTitle: String
-  let statusSystemImage: String
-  let sessionID: String
+  let sourceSystemImage: String
   let state: SessionWindowStateCache
   @Binding var focusMode: Bool
+  @AppStorage(HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
+  private var mcpRegistryHostEnabled = HarnessMonitorMCPSettingsDefaults
+    .registryHostEnabledDefault
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
 
   private var sleepPreventionPresentation: SleepPreventionToolbarPresentation {
     SleepPreventionToolbarPresentation(isEnabled: store.sleepPreventionEnabled)
+  }
+
+  private var sourceTitle: String {
+    guard snapshot != nil else {
+      return "Loading"
+    }
+    guard !isLoading, let source = snapshot?.source else {
+      return "Refreshing"
+    }
+    return source.rawValue.capitalized
+  }
+
+  private var connectionMetrics: ConnectionMetrics {
+    store.connectionMetrics
+  }
+
+  private var connectionTint: Color? {
+    connectionMetrics.sidebarFooterTint
+  }
+
+  private var sourcePresentation: SessionWindowSourcePresentation {
+    .init(
+      title: sourceTitle,
+      systemImage: sourceSystemImage,
+      tint: sourceTint
+    )
+  }
+
+  private var sourceTint: Color {
+    guard !isLoading, let source = snapshot?.source else {
+      return HarnessMonitorTheme.tertiaryInk
+    }
+    switch source {
+    case .live:
+      return HarnessMonitorTheme.success
+    case .cache:
+      return HarnessMonitorTheme.secondaryInk
+    case .catalog:
+      return HarnessMonitorTheme.tertiaryInk
+    }
+  }
+
+  private var statusStripState: SidebarFooterStatusStripState {
+    SidebarFooterStatusStripState(
+      daemonOwnership: store.daemonOwnership,
+      bridgeRunning: store.daemonStatus?.manifest?.hostBridge.running == true,
+      mcpStatus: store.mcpStatus,
+      isMCPRegistryHostEnabled: mcpRegistryHostEnabled
+    )
+  }
+
+  private var sessionStatusTitle: String {
+    summary?.status.title ?? "Loading"
+  }
+
+  private var connectionSummaryText: String {
+    guard connectionMetrics.connectedSince != nil else {
+      return "Connection: \(connectionTitle)"
+    }
+    if let latency = connectionMetrics.transportLatencyMs {
+      return
+        "Connection: \(connectionMetrics.transportKind.shortTitle), transport latency \(latency) milliseconds"
+    }
+    if let requestLatency = connectionMetrics.requestLatencyMs {
+      return [
+        "Connection: \(connectionMetrics.transportKind.shortTitle)",
+        "transport latency unavailable,",
+        "last request latency \(requestLatency) milliseconds",
+      ].joined(separator: " ")
+    }
+    return "Connection: \(connectionMetrics.transportKind.title)"
+  }
+
+  private var sessionStatusAccessibilityValue: String {
+    var parts = [
+      connectionSummaryText,
+      "Source: \(sourcePresentation.title)",
+      "Status: \(sessionStatusTitle)",
+    ]
+    if let bridge = statusStripState.bridge {
+      parts.append(bridge.accessibilityValue)
+    }
+    if let mcp = statusStripState.mcp {
+      parts.append(mcp.accessibilityValue)
+    }
+    return parts.joined(separator: ", ")
   }
 
   var body: some ToolbarContent {
@@ -59,26 +149,26 @@ struct SessionWindowToolbar: ToolbarContent {
       .accessibilityValue(focusMode ? "On" : "Off")
       .accessibilityHint("Shows or hides secondary session columns.")
     }
+    ToolbarItem(placement: .principal) {
+      HarnessMonitorGlassControlGroup {
+        SessionWindowStatusBubble(
+          metrics: connectionMetrics,
+          source: sourcePresentation,
+          statusStripState: statusStripState,
+          connectionTint: connectionTint
+        )
+      }
+      .help("Current connection, source, session, and service status.")
+      .accessibilityElement(children: .ignore)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowStatusMenu)
+      .accessibilityLabel("Session status")
+      .accessibilityValue(sessionStatusAccessibilityValue)
+    }
     ToolbarItem(placement: .primaryAction) {
       SleepPreventionToolbarButton(
         store: store,
         presentation: sleepPreventionPresentation
       )
-    }
-    ToolbarItem(placement: .automatic) {
-      Menu {
-        Text("Connection: \(connectionTitle)")
-        Text("Source: \(snapshot?.source.rawValue ?? "loading")")
-        if let summary = snapshot?.summary {
-          Text("Status: \(summary.status.title)")
-        }
-        Text("Session: \(sessionID)")
-      } label: {
-        Label("Session Status", systemImage: statusSystemImage)
-      }
-      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowStatusMenu)
-      .accessibilityLabel("Session status")
-      .accessibilityHint("Shows current connection and session status.")
     }
   }
 
@@ -91,5 +181,95 @@ struct SessionWindowToolbar: ToolbarContent {
     } else {
       focusMode.toggle()
     }
+  }
+}
+
+private struct SessionWindowStatusBubble: View {
+  private static let glassCornerRadius = HarnessMonitorTheme.cornerRadiusMD
+  let metrics: ConnectionMetrics
+  let source: SessionWindowSourcePresentation
+  let statusStripState: SidebarFooterStatusStripState
+  let connectionTint: Color?
+  @ScaledMetric(relativeTo: .caption)
+  private var bubbleWidth: CGFloat = 280
+
+  var body: some View {
+    HStack(spacing: HarnessMonitorTheme.itemSpacing) {
+      ConnectionToolbarBadge(metrics: metrics)
+        .accessibilityHidden(true)
+      Spacer(minLength: 0)
+      SessionWindowStatusServiceStrip(
+        source: source,
+        statusStripState: statusStripState
+      )
+    }
+    .padding(.vertical, HarnessMonitorTheme.itemSpacing)
+    .padding(.horizontal, HarnessMonitorTheme.itemSpacing)
+    .frame(width: bubbleWidth)
+    .harnessFloatingControlGlass(
+      cornerRadius: Self.glassCornerRadius,
+      tint: connectionTint,
+      prominence: .subdued
+    )
+    .fixedSize(horizontal: true, vertical: false)
+    .layoutPriority(1)
+  }
+}
+
+private struct SessionWindowSourcePresentation {
+  let title: String
+  let systemImage: String
+  let tint: Color
+}
+
+private struct SessionWindowStatusServiceStrip: View {
+  let source: SessionWindowSourcePresentation
+  let statusStripState: SidebarFooterStatusStripState
+  @ScaledMetric(relativeTo: .caption)
+  private var chromeHeight: CGFloat = 14
+
+  var body: some View {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+      Image(systemName: source.systemImage)
+        .scaledFont(.system(.caption2, design: .rounded, weight: .semibold))
+        .foregroundStyle(source.tint)
+        .frame(minHeight: chromeHeight, alignment: .center)
+        .accessibilityHidden(true)
+      if statusStripState.hasVisibleTokens {
+        HStack(alignment: .center, spacing: 3) {
+          if let bridge = statusStripState.bridge {
+            SessionWindowStatusWord(token: bridge)
+          }
+          if statusStripState.showsSeparator {
+            Text(verbatim: "·")
+              .font(.system(.caption2, design: .rounded, weight: .semibold))
+              .foregroundStyle(HarnessMonitorTheme.disabledConnectionChrome)
+              .accessibilityHidden(true)
+          }
+          if let mcp = statusStripState.mcp {
+            SessionWindowStatusWord(token: mcp)
+          }
+        }
+      }
+    }
+    .fixedSize(horizontal: true, vertical: false)
+    .frame(minHeight: chromeHeight, alignment: .center)
+    .accessibilityHidden(true)
+  }
+}
+
+private struct SessionWindowStatusWord: View {
+  let token: SidebarFooterStatusToken
+  @ScaledMetric(relativeTo: .caption)
+  private var chromeHeight: CGFloat = 14
+
+  var body: some View {
+    Text(token.label)
+      .font(.system(.caption2, design: .rounded, weight: .semibold))
+      .foregroundStyle(token.tone.color)
+      .lineLimit(1)
+      .fixedSize(horizontal: true, vertical: false)
+      .frame(minHeight: chromeHeight, alignment: .center)
+      .accessibilityHidden(true)
   }
 }

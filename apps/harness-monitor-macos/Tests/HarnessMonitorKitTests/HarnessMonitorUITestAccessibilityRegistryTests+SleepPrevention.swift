@@ -29,6 +29,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       )
     )
     #expect(sleepToolbarButton.contains("options: .nonRepeating"))
+    #expect(sleepToolbarButton.contains("SleepPreventionToolbarSymbolLayout.size"))
     #expect(contentToolbar.contains("SleepPreventionToolbarButton("))
     #expect(sessionToolbar.contains("SleepPreventionToolbarButton("))
     #expect(workspaceWindow.contains("ToolbarItem(placement: .primaryAction)"))
