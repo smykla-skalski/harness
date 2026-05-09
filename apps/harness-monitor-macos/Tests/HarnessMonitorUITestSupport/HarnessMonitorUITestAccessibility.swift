@@ -80,8 +80,6 @@ enum HarnessMonitorUITestAccessibility {
   static let sessionHeaderCard = "harness.session.header"
   static let sessionHeaderCardFrame = "harness.session.header.frame"
   static let sidebarRoot = "harness.sidebar.root"
-  static let sidebarFooter = "harness.sidebar.footer"
-  static let sidebarFooterState = "harness.sidebar.footer.state"
   static let previewProjectHeader = "harness.sidebar.project-header.project-6ccf8d0a"
   static let previewProjectHeaderFrame = "harness.sidebar.project-header.project-6ccf8d0a.frame"
   static let previewCheckoutHeader = "harness.sidebar.worktree-header.sess1234"

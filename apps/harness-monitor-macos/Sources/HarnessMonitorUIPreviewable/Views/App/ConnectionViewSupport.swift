@@ -19,14 +19,6 @@ extension ConnectionMetrics {
     transportLatencyMs == nil && requestLatencyMs == nil
   }
 
-  var showsSidebarFooterTint: Bool {
-    connectedSince != nil && !usesMutedConnectionChrome
-  }
-
-  var sidebarFooterTint: Color? {
-    showsSidebarFooterTint ? latencyTint : nil
-  }
-
   var latencyTint: Color {
     if usesMutedConnectionChrome {
       return HarnessMonitorTheme.disabledConnectionChrome

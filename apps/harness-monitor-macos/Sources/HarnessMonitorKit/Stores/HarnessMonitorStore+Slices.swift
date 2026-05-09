@@ -352,7 +352,6 @@ extension HarnessMonitorStore {
   }
 
   public struct SidebarUIState: Equatable {
-    public var connectionMetrics: ConnectionMetrics = .initial
     public var selectedSessionID: String?
     public var isPersistenceAvailable = false
     public var bookmarkedSessionIds: Set<String> = []
