@@ -98,6 +98,7 @@ struct SessionAgentDetailSection: View {
         SessionAgentTuiOutcomeBanner(exitCode: tui.exitCode, signal: tui.signal)
       }
       SessionAgentTuiViewport(
+        store: store,
         agentID: agent.agentId,
         tui: tui,
         metrics: metrics,
