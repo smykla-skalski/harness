@@ -42,7 +42,7 @@ private struct SessionWindowTabbingAccessor: NSViewRepresentable {
 
   func updateNSView(_ nsView: AccessorView, context: Context) {
     nsView.configuration = configuration
-    nsView.applyWindowTabbing()
+    nsView.scheduleWindowTabbingApplication()
   }
 }
 
@@ -57,20 +57,22 @@ private final class AccessorView: NSView {
     isSessionWindow: false,
     preference: .system
   )
+  private var pendingTabbingTask: Task<Void, Never>?
 
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
     registerWindowObservers()
-    applyWindowTabbing()
+    scheduleWindowTabbingApplication()
   }
 
   override func viewDidUnhide() {
     super.viewDidUnhide()
-    applyWindowTabbing()
+    scheduleWindowTabbingApplication()
   }
 
   override func viewWillMove(toWindow newWindow: NSWindow?) {
     super.viewWillMove(toWindow: newWindow)
+    pendingTabbingTask?.cancel()
     NotificationCenter.default.removeObserver(self)
   }
 
@@ -94,7 +96,15 @@ private final class AccessorView: NSView {
   }
 
   @objc private func reapplyWindowTabbingFromNotification(_ note: Notification) {
-    applyWindowTabbing()
+    scheduleWindowTabbingApplication()
+  }
+
+  func scheduleWindowTabbingApplication() {
+    pendingTabbingTask?.cancel()
+    pendingTabbingTask = Task { @MainActor [weak self] in
+      await Task.yield()
+      self?.applyWindowTabbing()
+    }
   }
 
   func applyWindowTabbing() {
@@ -102,6 +112,9 @@ private final class AccessorView: NSView {
       return
     }
     if configuration.isSessionWindow {
+      guard window.toolbar != nil else {
+        return
+      }
       window.tabbingIdentifier = Self.sessionTabbingIdentifier
       window.tabbingMode = tabbingMode(for: configuration.preference)
       guard window.tabbingIdentifier == Self.sessionTabbingIdentifier else {

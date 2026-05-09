@@ -14,6 +14,8 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
     XCTAssertTrue(workspaceRoot.contains("HarnessMonitorWindowShell("))
     XCTAssertTrue(mainRoot.contains("WindowContentReadiness("))
     XCTAssertTrue(workspaceRoot.contains("WindowContentReadiness("))
+    XCTAssertTrue(mainRoot.contains("windowToolbarBackgroundVisibility: nil"))
+    XCTAssertFalse(workspaceRoot.contains("windowToolbarBackgroundVisibility: nil"))
 
     for modifier in duplicatedChromeModifiers {
       XCTAssertFalse(mainRoot.contains(modifier), "main root still owns \(modifier)")
@@ -27,6 +29,7 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
     for modifier in duplicatedChromeModifiers {
       XCTAssertTrue(shell.contains(modifier), "scene shell is missing \(modifier)")
     }
+    XCTAssertTrue(shell.contains("OptionalWindowToolbarBackgroundVisibilityModifier("))
     XCTAssertTrue(shell.contains("HarnessMonitorBackdropDefaults.modeKey"))
     XCTAssertTrue(shell.contains("HarnessMonitorBackgroundDefaults.imageKey"))
     XCTAssertTrue(shell.contains("WindowContentReadinessGate("))
@@ -43,7 +46,6 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
       "WindowCommandScopeTrackingModifier(",
       ".harnessMonitorMCPWindowCommands(",
       "HarnessMonitorUITestAnimationModifier()",
-      ".toolbarBackgroundVisibility(.automatic, for: .windowToolbar)",
     ]
   }
 

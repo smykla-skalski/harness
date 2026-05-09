@@ -55,6 +55,7 @@ struct HarnessMonitorWindowShell<Content: View>: View {
   let mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   let contentReadiness: WindowContentReadiness
   let preferredColorSchemeOverride: Bool?
+  let windowToolbarBackgroundVisibility: Visibility?
   private let toast: ToastSlice?
   private let content: Content
   @Binding private var themeMode: HarnessMonitorThemeMode
@@ -79,6 +80,7 @@ struct HarnessMonitorWindowShell<Content: View>: View {
     themeMode: Binding<HarnessMonitorThemeMode>,
     contentReadiness: WindowContentReadiness = .ready(),
     appliesPreferredColorScheme: Bool? = nil,
+    windowToolbarBackgroundVisibility: Visibility? = .automatic,
     toast: ToastSlice? = nil,
     @ViewBuilder content: () -> Content
   ) {
@@ -93,6 +95,7 @@ struct HarnessMonitorWindowShell<Content: View>: View {
     _themeMode = themeMode
     self.contentReadiness = contentReadiness
     preferredColorSchemeOverride = appliesPreferredColorScheme
+    self.windowToolbarBackgroundVisibility = windowToolbarBackgroundVisibility
     self.toast = toast
     self.content = content()
   }
@@ -106,6 +109,21 @@ struct HarnessMonitorWindowShell<Content: View>: View {
 
   private var appliesPreferredColorScheme: Bool {
     preferredColorSchemeOverride ?? !toolbarGlassReproConfiguration.disablesPreferredColorScheme
+  }
+
+  private var toolbarBackgroundMarker: String {
+    switch windowToolbarBackgroundVisibility {
+    case .automatic?:
+      "automatic"
+    case .hidden?:
+      "hidden"
+    case .visible?:
+      "visible"
+    case nil:
+      "disabled"
+    @unknown default:
+      "unknown"
+    }
   }
 
   private var surfaceContext: WindowSurfaceContext {
@@ -152,7 +170,11 @@ struct HarnessMonitorWindowShell<Content: View>: View {
     )
     .harnessMonitorMCPWindowCommands(registrar: mcpWindowCommandRegistrar)
     .modifier(HarnessMonitorUITestAnimationModifier())
-    .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
+    .modifier(
+      OptionalWindowToolbarBackgroundVisibilityModifier(
+        visibility: windowToolbarBackgroundVisibility
+      )
+    )
     .environment(\.windowSurfaceContext, surfaceContext)
     .overlay(alignment: .topTrailing) { toastOverlay }
     .overlay { shellStateMarker }
@@ -178,7 +200,7 @@ struct HarnessMonitorWindowShell<Content: View>: View {
           "commandRouting=window-scoped",
           "navigationScope=tracked",
           "backdrop=\(backdrop.accessibilityValue)",
-          "toolbarBackground=automatic",
+          "toolbarBackground=\(toolbarBackgroundMarker)",
           "preferredColorScheme=\(appliesPreferredColorScheme ? "enabled" : "disabled")",
           "contentReadiness=\(contentReadiness.stateLabel)",
           "mcpCommands=shared",
@@ -187,6 +209,19 @@ struct HarnessMonitorWindowShell<Content: View>: View {
           "bannerChrome=shared",
         ].joined(separator: ", ")
       )
+    }
+  }
+}
+
+private struct OptionalWindowToolbarBackgroundVisibilityModifier: ViewModifier {
+  let visibility: Visibility?
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if let visibility {
+      content.toolbarBackgroundVisibility(visibility, for: .windowToolbar)
+    } else {
+      content
     }
   }
 }

@@ -51,6 +51,7 @@ struct HarnessMonitorWindowRootView: View {
       mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
       themeMode: $themeMode,
       contentReadiness: contentReadiness,
+      windowToolbarBackgroundVisibility: nil,
       toast: store.toast
     ) {
       liveContent
