@@ -48,8 +48,8 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.review.task.improver.task-1"
     )
     #expect(
-      HarnessMonitorAccessibility.workspaceTaskSelection("task-1")
-        == "harness.workspace.task.selection.task-1"
+      HarnessMonitorAccessibility.sessionTaskSelection("task-1")
+        == "harness.session.task.selection.task-1"
     )
   }
 
@@ -241,8 +241,8 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.menu-bar.action.open-monitor"
     )
     #expect(
-      HarnessMonitorAccessibility.menuBarOpenWorkspace
-        == "harness.menu-bar.action.open-workspace"
+      HarnessMonitorAccessibility.menuBarOpenSession
+        == "harness.menu-bar.action.open-session"
     )
     #expect(
       HarnessMonitorAccessibility.menuBarOpenSettings
@@ -291,41 +291,6 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     )
   }
 
-  @Test("Workspace create pane keeps MCP-tracked provider controls eagerly mounted")
-  func workspaceCreatePaneKeepsMCPTrackedProviderControlsEagerlyMounted() throws {
-    let createForm = try sourceFile(named: "WorkspaceWindowView+CreateForm.swift")
-    let terminalCreateForm = try sourceFile(named: "WorkspaceWindowView+CreateFormTerminal.swift")
-
-    #expect(
-      createForm.contains("Keep MCP-tracked controls instantiated even while this pane scrolls."))
-    #expect(
-      !createForm.contains(
-        "LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXL)")
-    )
-    #expect(
-      !terminalCreateForm.contains(
-        "LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing)")
-    )
-  }
-
-  @Test("Workspace create pane config pills use wrapping flow layout")
-  func workspaceCreatePaneConfigPillsUseWrappingFlowLayout() throws {
-    let createFormPills = try sourceFile(named: "WorkspaceWindowView+CreateFormPills.swift")
-
-    #expect(createFormPills.contains("AgentsConfigPillFlow("))
-  }
-
-  @Test("Workspace create pane resets scroll position when selected")
-  func workspaceCreatePaneResetsScrollPositionWhenSelected() throws {
-    let createForm = try sourceFile(named: "WorkspaceWindowView+CreateForm.swift")
-    let workspaceLayout = try sourceFile(named: "WorkspaceWindowView+Layout.swift")
-
-    #expect(createForm.contains("ScrollViewReader"))
-    #expect(createForm.contains("scrollProxy.scrollTo(Self.topAnchorID, anchor: .top)"))
-    #expect(workspaceLayout.contains(".id(detailIdentity)"))
-    #expect(workspaceLayout.contains("let detailIdentity = scrollContainerIdentity"))
-  }
-
   @Test("Sidebar session rows stay MCP-selectable")
   func sidebarSessionRowsStayMCPSelectable() throws {
     let sidebarSections = try sourceFile(named: "SidebarView+Sections.swift")
@@ -341,35 +306,35 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
   func agentsRuntimeIdentifiersMirror() {
     #expect(
       HarnessMonitorAccessibility.agentRuntimeStrip("worker-codex")
-        == "harness.workspace.detail.runtime.strip.worker-codex"
+        == "harness.agent.detail.runtime.strip.worker-codex"
     )
     #expect(
       HarnessMonitorAccessibility.agentRuntimeWatchdog("worker-codex")
-        == "harness.workspace.detail.runtime.watchdog.worker-codex"
+        == "harness.agent.detail.runtime.watchdog.worker-codex"
     )
     #expect(
       HarnessMonitorAccessibility.agentRuntimePendingPermissions("worker-codex")
-        == "harness.workspace.detail.runtime.pending-permissions.worker-codex"
+        == "harness.agent.detail.runtime.pending-permissions.worker-codex"
     )
     #expect(
       HarnessMonitorAccessibility.agentRuntimeDeadline("worker-codex")
-        == "harness.workspace.detail.runtime.deadline.worker-codex"
+        == "harness.agent.detail.runtime.deadline.worker-codex"
     )
     #expect(
       HarnessMonitorAccessibility.agentRuntimeDisclosure("worker-codex")
-        == "harness.workspace.detail.runtime.disclosure.worker-codex"
+        == "harness.agent.detail.runtime.disclosure.worker-codex"
     )
     #expect(
       HarnessMonitorAccessibility.agentRuntimeDisclosureContent("worker-codex")
-        == "harness.workspace.detail.runtime.disclosure-content.worker-codex"
+        == "harness.agent.detail.runtime.disclosure-content.worker-codex"
     )
     #expect(
       HarnessMonitorAccessibility.agentRuntimeWatchdogAccessibilityState
-        == "harness.workspace.detail.runtime.watchdog.accessibility.state"
+        == "harness.agent.detail.runtime.watchdog.accessibility.state"
     )
     #expect(
       HarnessMonitorAccessibility.toolCallTimelineAccessibilityState
-        == "harness.window.workspace.tool-call-timeline.accessibility.state"
+        == "harness.timeline.tool-call.accessibility.state"
     )
   }
 
@@ -398,7 +363,7 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(taskLaneView.contains("sessionTaskListState"))
     #expect(taskActionsSheet.contains("ReviewStatePanel(task: task)"))
     #expect(taskLaneView.contains("harnessTrackMCPElement"))
-    #expect(agentLaneView.contains("harnessTrackMCPElement"))
+    #expect(agentLaneView.contains("accessibilityTestProbe"))
     #expect(toastView.contains("feedback.accessibilityIdentifier"))
   }
 

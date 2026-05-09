@@ -21,35 +21,50 @@ struct SessionCodexRunDetailSection: View {
   }
 
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
-        header
-        if let error = run.error, !error.isEmpty {
-          SessionAgentTuiErrorBanner(message: error)
-        }
-        block(
-          label: "Prompt",
-          body: run.prompt.isEmpty ? "(empty prompt)" : run.prompt,
-          tint: 0.4
+    Group {
+      if isActive {
+        SessionDetailScrollSurface(
+          contentPadding: metrics.sectionPadding,
+          bottomInsetSpacing: metrics.sectionSpacing,
+          bottomInset: {
+            steerComposer
+          },
+          content: {
+            contentColumn
+          }
         )
-        if let summary = run.latestSummary, !summary.isEmpty {
-          block(label: "Latest update", body: summary, tint: 0.25)
-        }
-        if let final = run.finalMessage, !final.isEmpty {
-          block(label: "Final message", body: final, tint: 0.25)
-        }
-        if !run.pendingApprovals.isEmpty {
-          approvalsSection
-        }
-        if isActive {
-          steerComposer
+      } else {
+        SessionDetailScrollSurface(contentPadding: metrics.sectionPadding) {
+          contentColumn
         }
       }
-      .padding(metrics.sectionPadding)
-      .frame(maxWidth: .infinity, alignment: .topLeading)
     }
     .dynamicTypeSize(.xSmall ... .accessibility5)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+
+  @ViewBuilder
+  private var contentColumn: some View {
+    VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
+      header
+      if let error = run.error, !error.isEmpty {
+        SessionAgentTuiErrorBanner(message: error)
+      }
+      block(
+        label: "Prompt",
+        body: run.prompt.isEmpty ? "(empty prompt)" : run.prompt,
+        tint: 0.4
+      )
+      if let summary = run.latestSummary, !summary.isEmpty {
+        block(label: "Latest update", body: summary, tint: 0.25)
+      }
+      if let final = run.finalMessage, !final.isEmpty {
+        block(label: "Final message", body: final, tint: 0.25)
+      }
+      if !run.pendingApprovals.isEmpty {
+        approvalsSection
+      }
+    }
   }
 
   private var header: some View {

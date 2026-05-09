@@ -35,19 +35,19 @@ enum HarnessMonitorUITestAccessibility {
   static let menuBarDecisionStatus = "harness.menu-bar.status.decisions"
   static let menuBarSupervisorStatus = "harness.menu-bar.status.supervisor"
   static let menuBarOpenMonitor = "harness.menu-bar.action.open-monitor"
-  static let menuBarOpenWorkspace = "harness.menu-bar.action.open-workspace"
+  static let menuBarOpenSession = "harness.menu-bar.action.open-session"
   static let menuBarOpenSettings = "harness.menu-bar.action.open-settings"
   static let menuBarRefresh = "harness.menu-bar.action.refresh"
   static let menuBarSupervisorToggle = "harness.menu-bar.action.supervisor-toggle"
   static let menuBarSupervisorCheckNow = "harness.menu-bar.action.supervisor-check-now"
   static let menuBarRunWhenClosed = "harness.menu-bar.action.run-when-closed"
   static let menuBarQuit = "harness.menu-bar.action.quit"
-  static let workspaceToolbarButton = "harness.toolbar.workspace"
-  static let workspaceToolbarButtonState = "harness.toolbar.workspace.state"
-  static let workspaceToolbarForceTick = "harness.toolbar.workspace.force-tick"
-  static let workspaceWindow = "harness.workspace.window"
-  static let workspaceDetailAwaitingDecisionState =
-    "harness.workspace.detail.awaiting-decision.state"
+  static let sessionAttentionToolbarButton = "harness.toolbar.session-attention"
+  static let sessionAttentionToolbarButtonState = "harness.toolbar.session-attention.state"
+  static let sessionAttentionToolbarForceTick = "harness.toolbar.session-attention.force-tick"
+  static let decisionDeskRoot = "harness.decisions.desk"
+  static let agentDetailAwaitingDecisionState =
+    "harness.agent.detail.awaiting-decision.state"
   static let decisionsSidebar = "harness.decisions.sidebar"
   static let decisionDetail = "harness.decisions.detail"
   static let decisionDetailScrollView = "harness.decisions.detail.scroll"
@@ -98,6 +98,9 @@ enum HarnessMonitorUITestAccessibility {
     "harness.session.window.content-detail-divider"
   static let signalRegressionSecondarySessionRow = "harness.sidebar.session.sess-harness-secondary"
   static let previewSignalCard = "harness.session.signal.sig-ui-1"
+  static let signalDetailSheet = "harness.signal.detail.sheet"
+  static let signalDetailCard = "harness.signal.detail.card"
+  static let signalDetailDismissButton = "harness.signal.detail.dismiss"
   static let singleAgentSessionRow = "harness.sidebar.session.sess-harness-solo"
   static let overflowSessionRow = "harness.sidebar.session.sess-harness-17"
   static let previewSessionTitle =
@@ -256,11 +259,11 @@ enum HarnessMonitorUITestAccessibility {
   static let acpPermissionToastAccessibilityState =
     "harness.acp-permission.toast.accessibility.state"
   static let toolCallTimelineAccessibilityState =
-    "harness.window.workspace.tool-call-timeline.accessibility.state"
+    "harness.timeline.tool-call.accessibility.state"
   static let agentRuntimeWatchdogAccessibilityState =
-    "harness.workspace.detail.runtime.watchdog.accessibility.state"
+    "harness.agent.detail.runtime.watchdog.accessibility.state"
   static let acpPermissionToastRouteState = "harness.acp-permission.toast.route.state"
-  static let acpPermissionToastActionButton = "harness.acp-permission.toast.open-workspace"
+  static let acpPermissionToastActionButton = "harness.acp-permission.toast.open-decisions"
   static let acpPermissionToastCloseButton = "harness.acp-permission.toast.close"
   static let sessionTimelinePagination = "harness.session.timeline.pagination"
   static let sessionTimelinePageSizePicker = "harness.session.timeline.pagination.page-size"
@@ -369,6 +372,8 @@ enum HarnessMonitorUITestAccessibility {
     "harness.session.agent.\(slug(agentID))"
   }
 
+  static let sessionTaskCard = "harness.session.task.card"
+
   static func sessionTaskCard(_ taskID: String) -> String {
     "harness.session.task.\(slug(taskID))"
   }
@@ -378,6 +383,9 @@ enum HarnessMonitorUITestAccessibility {
   static let sessionTaskListHeader = "harness.session.tasks.header"
   static let sessionTaskListHeaderFrame = "\(sessionTaskListHeader).frame"
   static let sessionTaskListState = "harness.session.tasks.state"
+  static let sessionTaskNoteField = "harness.session.task.note-field"
+  static let sessionTaskNoteAddButton = "harness.session.task.note-add"
+  static let sessionTaskNotesUnavailable = "harness.session.task.notes-unavailable"
   static func agentRowPersonaChip(_ agentID: String) -> String {
     "\(sessionAgentCard(agentID)).persona"
   }
@@ -392,6 +400,10 @@ enum HarnessMonitorUITestAccessibility {
 
   static func dashboardSessionCardFrame(_ sessionID: String) -> String {
     "\(dashboardSessionCard(sessionID)).frame"
+  }
+
+  static func segmentedOption(_ controlID: String, option: String) -> String {
+    "\(controlID).option.\(slug(option))"
   }
 
   static func slug(_ value: String) -> String {

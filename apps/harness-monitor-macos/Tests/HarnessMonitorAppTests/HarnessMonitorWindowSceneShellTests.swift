@@ -2,24 +2,19 @@ import Foundation
 import XCTest
 
 final class HarnessMonitorWindowShellTests: XCTestCase {
-  func testMainAndWorkspaceRootsDelegateSharedChromeToSceneShell() throws {
+  func testMainRootDelegatesSharedChromeToSceneShell() throws {
     let mainRootSource = try appSourceFile(named: "HarnessMonitorAppSceneSupport.swift")
     let mainRoot = try mainRootSource.slice(
       from: "struct HarnessMonitorWindowRootView",
       to: "private enum HarnessMonitorPerfScenarioStatus"
     )
-    let workspaceRoot = try appSourceFile(named: "WorkspaceWindowRootView.swift")
 
     XCTAssertTrue(mainRoot.contains("HarnessMonitorWindowShell("))
-    XCTAssertTrue(workspaceRoot.contains("HarnessMonitorWindowShell("))
     XCTAssertTrue(mainRoot.contains("WindowContentReadiness("))
-    XCTAssertTrue(workspaceRoot.contains("WindowContentReadiness("))
     XCTAssertTrue(mainRoot.contains("windowToolbarBackgroundVisibility: nil"))
-    XCTAssertFalse(workspaceRoot.contains("windowToolbarBackgroundVisibility: nil"))
 
     for modifier in duplicatedChromeModifiers {
       XCTAssertFalse(mainRoot.contains(modifier), "main root still owns \(modifier)")
-      XCTAssertFalse(workspaceRoot.contains(modifier), "workspace root still owns \(modifier)")
     }
   }
 

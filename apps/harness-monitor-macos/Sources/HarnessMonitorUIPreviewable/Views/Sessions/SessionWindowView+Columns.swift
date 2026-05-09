@@ -81,7 +81,6 @@ extension SessionWindowView {
         canPresentSearch: sessionSidebarSearchAvailable,
         state: stateCache
       )
-      .padding(.top, HarnessMonitorTheme.spacingLG)
       .navigationSplitViewColumnWidth(min: 190, ideal: sidebarWidth, max: 360)
     } detail: {
       sessionBannerStack {
@@ -162,11 +161,13 @@ extension SessionWindowView {
     } else if let snapshot {
       contentColumnBody(snapshot: snapshot, route: renderedRoute)
     } else {
-      ContentUnavailableView(
-        "Session Not Available",
-        systemImage: "questionmark.folder",
-        description: Text(token.sessionID)
-      )
+      SessionDetailEmptySurface {
+        ContentUnavailableView(
+          "Session Not Available",
+          systemImage: "questionmark.folder",
+          description: Text(token.sessionID)
+        )
+      }
     }
   }
 
@@ -258,28 +259,29 @@ extension SessionWindowView {
           composerFocusRequestID: stateCache.agentComposerFocusRequestID
         )
       } else {
-        ContentUnavailableView(
-          "Agent \(agentID)",
-          systemImage: "person.crop.circle",
-          description: Text("Agent detail is not available.")
-        )
+        SessionDetailEmptySurface {
+          ContentUnavailableView(
+            "Agent \(agentID)",
+            systemImage: "person.crop.circle",
+            description: Text("Agent detail is not available.")
+          )
+        }
       }
     case .decision(_, let decisionID):
       if let decision = allSessionDecisionsCache.first(where: { $0.id == decisionID }) {
-        VStack(alignment: .leading, spacing: 12) {
-          if !matchingDecisionIDsCache.contains(decisionID) {
-            SessionFilteredDecisionNotice(filters: stateCache.decisionFilters)
-          }
-          SessionDecisionDetailPane(
-            decision: decision,
-            runtime: stateCache.decisionRuntime
+        SessionDecisionDetailPane(
+          decision: decision,
+          runtime: stateCache.decisionRuntime,
+          filters: stateCache.decisionFilters,
+          showsFilteredNotice: !matchingDecisionIDsCache.contains(decisionID)
+        )
+      } else {
+        SessionDetailEmptySurface {
+          ContentUnavailableView(
+            "No Decision Selected",
+            systemImage: "exclamationmark.bubble"
           )
         }
-      } else {
-        ContentUnavailableView(
-          "No Decision Selected",
-          systemImage: "exclamationmark.bubble"
-        )
       }
     case .task(_, let taskID):
       if let task = snapshot?.detail?.tasks.first(where: { $0.taskId == taskID }) {
@@ -293,21 +295,25 @@ extension SessionWindowView {
           }
         )
       } else {
-        ContentUnavailableView(
-          "Task Not Available",
-          systemImage: "checklist",
-          description: Text(taskID)
-        )
+        SessionDetailEmptySurface {
+          ContentUnavailableView(
+            "Task Not Available",
+            systemImage: "checklist",
+            description: Text(taskID)
+          )
+        }
       }
     case .codexRun(_, let runID):
       if let run = store.selectedCodexRuns.first(where: { $0.runId == runID }) {
         SessionCodexRunDetailSection(store: store, run: run)
       } else {
-        ContentUnavailableView(
-          "Codex Run Not Available",
-          systemImage: "wand.and.stars",
-          description: Text(runID)
-        )
+        SessionDetailEmptySurface {
+          ContentUnavailableView(
+            "Codex Run Not Available",
+            systemImage: "wand.and.stars",
+            description: Text(runID)
+          )
+        }
       }
     case .create(let draft):
       SessionWindowCreateForm(
@@ -316,11 +322,13 @@ extension SessionWindowView {
         draft: draft
       )
     case .route:
-      ContentUnavailableView(
-        "Select an Item",
-        systemImage: "sidebar.right",
-        description: Text("Pick an agent, decision, or task in the sidebar.")
-      )
+      SessionDetailEmptySurface {
+        ContentUnavailableView(
+          "Select an Item",
+          systemImage: "sidebar.right",
+          description: Text("Pick an agent, decision, or task in the sidebar.")
+        )
+      }
     }
   }
 }

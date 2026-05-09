@@ -7,21 +7,19 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
   func agentDetailComposerInsetIdentifierMirrors() {
     #expect(
       HarnessMonitorAccessibility.agentDetailComposerInset("worker-codex")
-        == "harness.workspace.detail.composer-inset.worker-codex"
+        == "harness.agent.detail.composer-inset.worker-codex"
     )
     #expect(
       HarnessMonitorAccessibility.agentDetailComposerInset("Worker_Foo:Bar.1")
-        == "harness.workspace.detail.composer-inset.worker-foo-bar1"
+        == "harness.agent.detail.composer-inset.worker-foo-bar1"
     )
   }
 
-  @Test("Workspace agent detail pane delegates scroll to AgentDetailSection")
-  func workspaceAgentDetailPaneDelegatesScrollToAgentDetailSection() throws {
-    let panes = try sourceFile(named: "WorkspaceWindowView+Panes.swift")
+  @Test("Agent detail section delegates scroll via column scroll view")
+  func agentDetailSectionDelegatesScroll() throws {
     let section = try sourceFile(named: "AgentDetailSection.swift")
     let regions = try sourceFile(named: "AgentDetailSection+Regions.swift")
 
-    #expect(panes.contains("} else if case .agent = viewModel.selection {"))
     #expect(section.contains("HarnessMonitorColumnScrollView("))
     #expect(section.contains("bottomInset: {"))
     #expect(section.contains("composerInset"))
@@ -32,7 +30,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
   func agentDetailRoleActionsDisclosureIdentifierMirrors() {
     #expect(
       HarnessMonitorAccessibility.agentDetailRoleActionsDisclosure("worker-codex")
-        == "harness.workspace.detail.role-actions.disclosure.worker-codex"
+        == "harness.agent.detail.role-actions.disclosure.worker-codex"
     )
   }
 

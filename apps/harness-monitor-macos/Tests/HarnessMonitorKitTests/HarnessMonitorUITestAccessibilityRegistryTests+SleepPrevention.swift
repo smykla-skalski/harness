@@ -13,7 +13,6 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     let sleepToolbarButton = try sourceFile(named: "SleepPreventionToolbarButton.swift")
     let contentToolbar = try sourceFile(named: "ContentToolbarItems.swift")
     let sessionToolbar = try sourceFile(named: "SessionWindowToolbar.swift")
-    let workspaceWindow = try sourceFile(named: "WorkspaceWindowView.swift")
 
     #expect(
       sleepToolbarButton.contains(
@@ -32,7 +31,5 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(sleepToolbarButton.contains("SleepPreventionToolbarSymbolLayout.size"))
     #expect(contentToolbar.contains("SleepPreventionToolbarButton("))
     #expect(sessionToolbar.contains("SleepPreventionToolbarButton("))
-    #expect(workspaceWindow.contains("ToolbarItem(placement: .primaryAction)"))
-    #expect(workspaceWindow.contains("SleepPreventionToolbarButton("))
   }
 }

@@ -156,7 +156,7 @@ struct SessionSidebarMultiSelectTests {
     let sidebarSource = try sourceFile(named: "SessionSidebar.swift")
     let columnsSource = try sourceFile(named: "SessionWindowView+Columns.swift")
 
-    #expect(sidebarSource.contains("isPresented: searchPresentation"))
+    #expect(sidebarSource.contains("isPresented: $searchPresentationState.isPresented"))
     #expect(sidebarSource.contains("applySearchPresentationAvailability"))
     #expect(
       sidebarSource.contains(

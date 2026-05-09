@@ -6,6 +6,8 @@ import SwiftUI
 struct SessionDecisionDetailPane: View {
   let decision: Decision
   @Bindable var runtime: SessionDecisionRuntime
+  let filters: SessionDecisionFilterState?
+  let showsFilteredNotice: Bool
   @Environment(\.fontScale)
   private var fontScale
 
@@ -14,41 +16,60 @@ struct SessionDecisionDetailPane: View {
   }
 
   var body: some View {
-    Form {
-      Section("Decision") {
-        LabeledContent("Summary", value: decision.summary)
-        LabeledContent("Severity", value: decision.severityRaw)
-        LabeledContent("Status", value: decision.statusRaw)
-      }
-      Section("Routing") {
-        LabeledContent("Rule", value: decision.ruleID)
-        if let agentID = decision.agentID {
-          LabeledContent("Agent", value: agentID)
+    SessionDetailScrollSurface(contentPadding: metrics.contentPadding) {
+      VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
+        if showsFilteredNotice, let filters {
+          SessionFilteredDecisionNotice(filters: filters)
         }
-        if let taskID = decision.taskID {
-          LabeledContent("Task", value: taskID)
+        SessionDetailPanel(title: "Decision") {
+          SessionDetailFactsGrid(facts: summaryFacts)
         }
-      }
-      if !decision.suggestedActionsJSON.isEmpty {
-        Section("Suggested Actions") {
-          HarnessMonitorJSONCodeBlock(
-            rawJSON: decision.suggestedActionsJSON,
-            chrome: .plain,
-            wrapLongLines: true
-          )
+        SessionDetailPanel(title: "Routing") {
+          SessionDetailFactsGrid(facts: routingFacts)
+        }
+        if !decision.suggestedActionsJSON.isEmpty {
+          SessionDetailPanel(title: "Suggested Actions") {
+            HarnessMonitorJSONCodeBlock(
+              rawJSON: decision.suggestedActionsJSON,
+              chrome: .plain,
+              wrapLongLines: true
+            )
+          }
         }
       }
     }
-    .formStyle(.grouped)
-    .padding(metrics.contentPadding)
+    .dynamicTypeSize(.xSmall ... .accessibility5)
+  }
+
+  private var summaryFacts: [SessionDetailFact] {
+    [
+      .init("Summary", value: decision.summary),
+      .init("Severity", value: decision.severityRaw),
+      .init("Status", value: decision.statusRaw),
+    ]
+  }
+
+  private var routingFacts: [SessionDetailFact] {
+    var facts: [SessionDetailFact] = [
+      .init("Rule", value: decision.ruleID)
+    ]
+    if let agentID = decision.agentID {
+      facts.append(.init("Agent", value: agentID))
+    }
+    if let taskID = decision.taskID {
+      facts.append(.init("Task", value: taskID))
+    }
+    return facts
   }
 }
 
 struct SessionDecisionDetailPaneMetrics: Equatable {
   let contentPadding: CGFloat
+  let sectionSpacing: CGFloat
 
   init(fontScale: CGFloat) {
     let scale = SessionWindowFontScale.metricsScale(for: fontScale)
     contentPadding = max(24, 24 * min(scale, 1.35))
+    sectionSpacing = max(16, 16 * min(scale, 1.35))
   }
 }
