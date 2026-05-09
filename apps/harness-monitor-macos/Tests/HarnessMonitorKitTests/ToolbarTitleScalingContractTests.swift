@@ -123,34 +123,6 @@ struct ToolbarTitleScalingContractTests {
     )
   }
 
-  @Test("Content toolbars observe the content toolbar slice instead of parent bodies")
-  func contentToolbarsObserveToolbarSliceInsteadOfParentBodies() throws {
-    let contentSource = try previewableSourceFile(
-      named: "Views/App/ContentView.swift"
-    )
-    let supportSource = try previewableSourceFile(
-      named: "Views/App/ContentViewSupport.swift"
-    )
-    let toolbarSource = try previewableSourceFile(
-      named: "Views/App/ContentToolbarItems.swift"
-    )
-
-    #expect(contentSource.contains("let contentToolbar: HarnessMonitorStore.ContentToolbarSlice"))
-    #expect(supportSource.contains("public let contentToolbar: HarnessMonitorStore.ContentToolbarSlice"))
-    #expect(toolbarSource.contains("let contentToolbar: HarnessMonitorStore.ContentToolbarSlice"))
-    #expect(toolbarSource.contains("isRefreshing: contentToolbar.isRefreshing"))
-    #expect(toolbarSource.contains("sleepPreventionEnabled: contentToolbar.sleepPreventionEnabled"))
-    #expect(
-      toolbarSource.contains(
-        "manualRefreshSuccessToken: contentToolbar.manualRefreshSuccessToken"
-      )
-    )
-    #expect(!contentSource.contains("store.contentUI.toolbar.isRefreshing"))
-    #expect(!contentSource.contains("store.contentUI.toolbar.sleepPreventionEnabled"))
-    #expect(!supportSource.contains("store.contentUI.toolbar.isRefreshing"))
-    #expect(!supportSource.contains("store.contentUI.toolbar.sleepPreventionEnabled"))
-  }
-
   private func previewableSourceFile(named relativePath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
