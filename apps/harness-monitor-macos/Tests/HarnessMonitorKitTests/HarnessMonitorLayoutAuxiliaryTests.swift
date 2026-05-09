@@ -170,10 +170,10 @@ struct ContentWindowToolbarModelTests {
       manualRefreshSuccessToken: 0
     )
 
-    #expect(enabled.sleepPreventionTitle == "Allow Sleep")
-    #expect(enabled.sleepPreventionSystemImage == "moon.zzz.fill")
-    #expect(disabled.sleepPreventionTitle == "Prevent Sleep")
-    #expect(disabled.sleepPreventionSystemImage == "moon.zzz")
+    #expect(enabled.sleepPreventionPresentation.title == "Allow Sleep")
+    #expect(enabled.sleepPreventionPresentation.systemImage == "cup.and.heat.waves.fill")
+    #expect(disabled.sleepPreventionPresentation.title == "Prevent Sleep")
+    #expect(disabled.sleepPreventionPresentation.systemImage == "cup.and.heat.waves")
   }
 }
 

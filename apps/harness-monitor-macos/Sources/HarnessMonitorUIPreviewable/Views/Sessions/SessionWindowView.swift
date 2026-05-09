@@ -205,6 +205,7 @@ public struct SessionWindowView: View {
   @ToolbarContentBuilder
   private var sessionToolbar: some ToolbarContent {
     SessionWindowToolbar(
+      store: store,
       snapshot: snapshot,
       connectionTitle: connectionTitle,
       statusSystemImage: statusSystemImage,

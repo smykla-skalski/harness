@@ -269,6 +269,14 @@ public struct WorkspaceWindowView: View {
         agentTuiNavigationToolbarItems
         sessionToolbarItems
         decisionToolbarItems(decisionScope: decisionScope)
+        ToolbarItem(placement: .primaryAction) {
+          SleepPreventionToolbarButton(
+            store: store,
+            presentation: SleepPreventionToolbarPresentation(
+              isEnabled: store.sleepPreventionEnabled
+            )
+          )
+        }
         ToolbarItem(placement: .automatic) {
           Button(action: refresh) {
             Label("Refresh", systemImage: "arrow.clockwise")
