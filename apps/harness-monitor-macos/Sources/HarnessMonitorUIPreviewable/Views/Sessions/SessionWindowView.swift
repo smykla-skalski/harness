@@ -93,6 +93,7 @@ public struct SessionWindowView: View {
     switch selection {
     case .route(let route): route
     case .agent: .agents
+    case .codexRun: .agents
     case .decision: .decisions
     case .task: .tasks
     case .create: .agents
@@ -317,6 +318,9 @@ public struct SessionWindowView: View {
       persistedRoute = route
       persistedDecisionID = ""
     case .agent:
+      persistedRoute = .agents
+      persistedDecisionID = ""
+    case .codexRun:
       persistedRoute = .agents
       persistedDecisionID = ""
     case .decision(_, let decisionID):

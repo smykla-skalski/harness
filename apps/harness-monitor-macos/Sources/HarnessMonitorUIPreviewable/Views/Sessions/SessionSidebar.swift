@@ -84,6 +84,10 @@ struct SessionSidebar: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowSidebar)
   }
 
+  private var sessionCodexRuns: [CodexRunSnapshot] {
+    store.selectedCodexRuns.filter { $0.sessionId == state.sessionID }
+  }
+
   private func handleSearchFocusRequest() {
     _ = searchPresentationState.requestPresentation(canPresent: canPresentSearch)
   }
@@ -200,7 +204,22 @@ struct SessionSidebar: View {
           }
         }
       }
-      if (snapshot?.detail?.agents ?? []).isEmpty {
+      ForEach(sessionCodexRuns) { run in
+        let selection = SessionSelection.codexRun(sessionID: state.sessionID, runID: run.runId)
+        SessionSidebarRow(
+          title: SessionCodexRunRowFormatter.title(for: run),
+          systemImage: "wand.and.stars",
+          severityShape: SessionCodexRunRowFormatter.severityShape(for: run.status),
+          severityTint: SessionCodexRunRowFormatter.severityTint(for: run.status)
+        ) { _ in EmptyView() }
+        .tag(selection)
+        .contextMenu {
+          Button("Copy Run ID") {
+            HarnessMonitorClipboard.copy(run.runId)
+          }
+        }
+      }
+      if (snapshot?.detail?.agents ?? []).isEmpty && sessionCodexRuns.isEmpty {
         Text("No agents")
           .foregroundStyle(.secondary)
       }

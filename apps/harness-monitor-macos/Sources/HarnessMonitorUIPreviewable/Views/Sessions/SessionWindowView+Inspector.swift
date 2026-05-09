@@ -58,6 +58,7 @@ extension SessionWindowView {
   var primaryCreateKind: SessionCreateKind {
     switch stateCache.selection {
     case .agent: .agent
+    case .codexRun: .agent
     case .task: .task
     case .decision: .decision
     case .create(let draft): draft.kind
