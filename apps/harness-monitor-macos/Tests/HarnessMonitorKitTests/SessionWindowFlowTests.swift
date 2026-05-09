@@ -618,6 +618,8 @@ struct SessionWindowFlowTests {
     let source = try previewableSourceFile(named: "Views/Sessions/OpenRecentView.swift")
 
     #expect(!source.contains("Toggle(\"Close Open Recent after picking a session\", isOn: $closeAfterPick)"))
+    #expect(!source.contains(".onGeometryChange("))
+    #expect(source.contains("OpenRecentStartPanelLayout("))
   }
 
   @MainActor

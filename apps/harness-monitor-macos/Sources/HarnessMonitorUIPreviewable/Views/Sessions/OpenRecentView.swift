@@ -33,8 +33,7 @@ public struct OpenRecentView: View {
   public var body: some View {
     ZStack {
       Color.clear.accessibilityHidden(true)
-      VStack(spacing: 0) {
-        Spacer(minLength: 96 * layoutScale)
+      Group {
         if showsStartPanel {
           OpenRecentStartPanel(
             groups: groups,
@@ -45,7 +44,6 @@ public struct OpenRecentView: View {
           )
           .transition(OpenRecentCloseAfterPickMotionPolicy.transition(reduceMotion: reduceMotion))
         }
-        Spacer(minLength: 132 * layoutScale)
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       actionStateMarker
@@ -132,8 +130,37 @@ private struct OpenRecentStartPanel: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 22 * layoutScale) {
+    OpenRecentStartPanelLayout(
+      topInset: 96 * layoutScale,
+      bottomInset: 132 * layoutScale,
+      headerSpacing: sectionSpacing
+    ) {
       header
+      content
+    }
+    .frame(width: panelWidth)
+    .frame(maxHeight: .infinity, alignment: .top)
+  }
+
+  private var header: some View {
+    HStack(spacing: 14 * layoutScale) {
+      Image(systemName: "rectangle.stack.badge.play")
+        .scaledFont(.system(size: 34, weight: .regular))
+        .frame(width: 44 * layoutScale, height: 44 * layoutScale)
+        .symbolRenderingMode(.hierarchical)
+      VStack(alignment: .leading, spacing: 2) {
+        Text("Open Recent Session")
+          .scaledFont(.title3.weight(.semibold))
+        Text("Return to active harness work")
+          .scaledFont(.caption)
+          .foregroundStyle(.secondary)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .center)
+  }
+
+  private var content: some View {
+    VStack(alignment: .leading, spacing: sectionSpacing) {
       section(title: "Get Started") {
         actionButton(
           "New Session",
@@ -170,24 +197,7 @@ private struct OpenRecentStartPanel: View {
         }
       }
     }
-    .frame(width: panelWidth)
-  }
-
-  private var header: some View {
-    HStack(spacing: 14 * layoutScale) {
-      Image(systemName: "rectangle.stack.badge.play")
-        .scaledFont(.system(size: 34, weight: .regular))
-        .frame(width: 44 * layoutScale, height: 44 * layoutScale)
-        .symbolRenderingMode(.hierarchical)
-      VStack(alignment: .leading, spacing: 2) {
-        Text("Open Recent Session")
-          .scaledFont(.title3.weight(.semibold))
-        Text("Return to active harness work")
-          .scaledFont(.caption)
-          .foregroundStyle(.secondary)
-      }
-    }
-    .frame(maxWidth: .infinity, alignment: .center)
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   private func section<Content: View>(
@@ -261,6 +271,70 @@ private struct OpenRecentStartPanel: View {
 
   private var panelWidth: CGFloat {
     500 * layoutScale
+  }
+
+  private var sectionSpacing: CGFloat {
+    22 * layoutScale
+  }
+}
+
+private struct OpenRecentStartPanelLayout: Layout {
+  let topInset: CGFloat
+  let bottomInset: CGFloat
+  let headerSpacing: CGFloat
+
+  func sizeThatFits(
+    proposal: ProposedViewSize,
+    subviews: Subviews,
+    cache _: inout ()
+  ) -> CGSize {
+    let width = proposal.width ?? 0
+    let fittedProposal = ProposedViewSize(width: width > 0 ? width : nil, height: nil)
+    let headerSize = measuredSize(for: 0, subviews: subviews, proposal: fittedProposal)
+    let contentSize = measuredSize(for: 1, subviews: subviews, proposal: fittedProposal)
+    let naturalHeight = topInset + headerSize.height + headerSpacing + contentSize.height + bottomInset
+    return CGSize(
+      width: width > 0 ? width : max(headerSize.width, contentSize.width),
+      height: proposal.height ?? naturalHeight
+    )
+  }
+
+  func placeSubviews(
+    in bounds: CGRect,
+    proposal _: ProposedViewSize,
+    subviews: Subviews,
+    cache _: inout ()
+  ) {
+    let fittedProposal = ProposedViewSize(width: bounds.width, height: nil)
+    let headerSize = measuredSize(for: 0, subviews: subviews, proposal: fittedProposal)
+    let contentSize = measuredSize(for: 1, subviews: subviews, proposal: fittedProposal)
+    let contentAreaTop = bounds.minY + topInset
+    let contentAreaHeight = max(bounds.height - topInset - bottomInset, contentSize.height)
+    let contentTop = contentAreaTop + max((contentAreaHeight - contentSize.height) / 2, 0)
+    let headerTop = max(bounds.minY + topInset, contentTop - headerSpacing - headerSize.height)
+    let placementProposal = ProposedViewSize(width: bounds.width, height: nil)
+
+    subviews[0].place(
+      at: CGPoint(x: bounds.minX, y: headerTop),
+      anchor: .topLeading,
+      proposal: placementProposal
+    )
+    subviews[1].place(
+      at: CGPoint(x: bounds.minX, y: contentTop),
+      anchor: .topLeading,
+      proposal: placementProposal
+    )
+  }
+
+  private func measuredSize(
+    for index: Int,
+    subviews: Subviews,
+    proposal: ProposedViewSize
+  ) -> CGSize {
+    guard subviews.indices.contains(index) else {
+      return .zero
+    }
+    return subviews[index].sizeThatFits(proposal)
   }
 }
 
