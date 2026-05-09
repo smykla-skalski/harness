@@ -132,7 +132,7 @@ struct SessionSidebar: View {
   }
 
   private var routeSection: some View {
-    Section("Routes") {
+    Section {
       ForEach([SessionWindowRoute.overview, .timeline, .terminal]) { route in
         let selection = SessionSelection.route(route)
         SessionSidebarRow(
@@ -142,6 +142,9 @@ struct SessionSidebar: View {
         .tag(selection)
         .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowRoute(route))
       }
+    } header: {
+      Text("Routes")
+        .padding(.top, HarnessMonitorTheme.spacingLG)
     }
   }
 
