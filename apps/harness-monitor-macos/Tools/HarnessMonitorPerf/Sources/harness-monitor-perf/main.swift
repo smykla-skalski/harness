@@ -197,15 +197,38 @@ struct AuditFromRef: ParsableCommand {
             FileHandle.standardError.write(addResult.stderr)
             throw ExitCode(1)
         }
-        let auditScript = worktreePath
-            .appendingPathComponent("apps/harness-monitor-macos/Scripts/run-instruments-audit.sh")
-        guard FileManager.default.isExecutableFile(atPath: auditScript.path) else {
-            FileHandle.standardError.write(Data("Audit script not found in worktree: \(auditScript.path)\n".utf8))
-            throw ExitCode(1)
-        }
-        var auditArgs = ["--label", label]
+
+        let miseBinary = try resolveMiseBinary()
+        let environmentOverrides = gitSafeBareRepositoryEnvironment()
+
+        let trustResult = try ProcessRunner.run(
+            miseBinary,
+            arguments: ["trust"],
+            environmentOverrides: environmentOverrides,
+            workingDirectory: worktreePath
+        )
+        FileHandle.standardOutput.write(trustResult.stdout)
+        FileHandle.standardError.write(trustResult.stderr)
+        if trustResult.exitStatus != 0 { throw ExitCode(trustResult.exitStatus) }
+
+        let generateResult = try ProcessRunner.run(
+            miseBinary,
+            arguments: ["run", "monitor:generate"],
+            environmentOverrides: environmentOverrides,
+            workingDirectory: worktreePath
+        )
+        FileHandle.standardOutput.write(generateResult.stdout)
+        FileHandle.standardError.write(generateResult.stderr)
+        if generateResult.exitStatus != 0 { throw ExitCode(generateResult.exitStatus) }
+
+        var auditArgs = ["run", "monitor:audit", "--", "--label", label]
         auditArgs.append(contentsOf: passthrough)
-        let auditResult = try ProcessRunner.run(auditScript.path, arguments: auditArgs)
+        let auditResult = try ProcessRunner.run(
+            miseBinary,
+            arguments: auditArgs,
+            environmentOverrides: environmentOverrides,
+            workingDirectory: worktreePath
+        )
         FileHandle.standardOutput.write(auditResult.stdout)
         FileHandle.standardError.write(auditResult.stderr)
         if auditResult.exitStatus != 0 { throw ExitCode(auditResult.exitStatus) }
@@ -231,6 +254,26 @@ struct AuditFromRef: ParsableCommand {
             }
         }
         return last
+    }
+
+    private func resolveMiseBinary() throws -> String {
+        let result = try ProcessRunner.runChecked("/usr/bin/which", arguments: ["mise"])
+        let path = result.stdoutString.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !path.isEmpty else {
+            FileHandle.standardError.write(Data("Unable to resolve mise on PATH\n".utf8))
+            throw ExitCode(1)
+        }
+        return path
+    }
+
+    private func gitSafeBareRepositoryEnvironment() -> [String: String] {
+        let inherited = ProcessInfo.processInfo.environment
+        let nextIndex = Int(inherited["GIT_CONFIG_COUNT"] ?? "") ?? 0
+        return [
+            "GIT_CONFIG_COUNT": String(nextIndex + 1),
+            "GIT_CONFIG_KEY_\(nextIndex)": "safe.bareRepository",
+            "GIT_CONFIG_VALUE_\(nextIndex)": "all",
+        ]
     }
 }
 
@@ -320,7 +363,7 @@ struct Extract: ParsableCommand {
     @Option(name: .long, help: "xctrace launcher executable. Default: /usr/bin/xcrun")
     var xctrace: String = "/usr/bin/xcrun"
 
-    @Option(name: [.long, .customLong("xctrace-args")], help: "Comma-separated args before `export ...`.")
+    @Option(name: .long, help: "Comma-separated args before `export ...`.")
     var xctraceArgs: String = "xctrace"
 
     func run() throws {

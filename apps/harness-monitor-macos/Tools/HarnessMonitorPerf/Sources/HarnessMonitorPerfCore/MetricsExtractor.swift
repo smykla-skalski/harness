@@ -51,7 +51,10 @@ public enum MetricsExtractor {
         public var topOffenders: [Offender]
     }
 
-    public static func parseSwiftUIUpdates(_ document: XctraceQueryDocument) -> SwiftUIUpdates {
+    public static func parseSwiftUIUpdates(
+        _ document: XctraceQueryDocument,
+        maximumValidDurationNs: Int? = nil
+    ) -> SwiftUIUpdates {
         var durationsNs: [Int] = []
         var updateTypeCounts: [String: Int] = [:]
         var severityCounts: [String: Int] = [:]
@@ -64,7 +67,10 @@ public enum MetricsExtractor {
 
         for row in rows {
             let record = document.record(for: row)
-            let durationNs = parseInt(record["duration"])
+            let durationNs = parseDurationNs(
+                record["duration"],
+                maximumValidDurationNs: maximumValidDurationNs
+            )
             let allocations = parseInt(record["allocations"]) ?? 0
             let updateType = normalize(record["update-type"])
             let severity = normalize(record["severity"])
@@ -137,6 +143,15 @@ public enum MetricsExtractor {
         if let direct = Int(trimmed) { return direct }
         if let asDouble = Double(trimmed) { return Int(asDouble) }
         return nil
+    }
+
+    /// Some xctrace SwiftUI tables occasionally emit corrupt multi-million-minute durations.
+    /// Treat those samples as missing so summaries stay meaningful and optimized builds do not
+    /// trap on integer overflow while aggregating them.
+    public static func parseDurationNs(_ raw: String?, maximumValidDurationNs: Int? = nil) -> Int? {
+        guard let duration = parseInt(raw), duration >= 0 else { return nil }
+        guard let maximumValidDurationNs else { return duration }
+        return duration <= maximumValidDurationNs ? duration : nil
     }
 
     /// Replace blank/missing values with `<unknown>` so counters group consistently.

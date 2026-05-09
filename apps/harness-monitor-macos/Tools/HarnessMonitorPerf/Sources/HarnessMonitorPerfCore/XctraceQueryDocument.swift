@@ -27,7 +27,10 @@ public struct XctraceQueryDocument {
     public let idIndex: [String: XMLElement]
 
     public init(data: Data) throws {
-        let xml = try XMLDocument(data: data, options: [.nodePreserveAttributeOrder])
+        let xml = try XMLDocument(
+            data: XMLSanitizer.sanitize(data),
+            options: [.nodePreserveAttributeOrder]
+        )
         guard let root = xml.rootElement() else {
             throw ParseError.missingRootElement
         }
@@ -134,7 +137,10 @@ public struct XctraceTOC {
     public let document: XMLDocument
 
     public init(data: Data) throws {
-        document = try XMLDocument(data: data, options: [.nodePreserveAttributeOrder])
+        document = try XMLDocument(
+            data: XMLSanitizer.sanitize(data),
+            options: [.nodePreserveAttributeOrder]
+        )
     }
 
     public init(path: URL) throws {
@@ -180,5 +186,34 @@ public struct XctraceTOC {
         let nodes = (try? document.nodes(forXPath: ".//end-reason"))?
             .compactMap { $0 as? XMLElement } ?? []
         return nodes.first?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+}
+
+enum XMLSanitizer {
+    static func sanitize(_ data: Data) -> Data {
+        let text = String(decoding: data, as: UTF8.self)
+        var removedInvalidScalars = false
+        let filtered = String.UnicodeScalarView(
+            text.unicodeScalars.compactMap { scalar in
+                if isValidXMLScalar(scalar) {
+                    return scalar
+                }
+                removedInvalidScalars = true
+                return nil
+            }
+        )
+        guard removedInvalidScalars else { return data }
+        return Data(String(filtered).utf8)
+    }
+
+    private static func isValidXMLScalar(_ scalar: UnicodeScalar) -> Bool {
+        switch scalar.value {
+        case 0x9, 0xA, 0xD:
+            return true
+        case 0x20...0xD7FF, 0xE000...0xFFFD, 0x10000...0x10FFFF:
+            return true
+        default:
+            return false
+        }
     }
 }

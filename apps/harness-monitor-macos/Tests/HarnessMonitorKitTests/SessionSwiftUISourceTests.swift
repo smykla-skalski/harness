@@ -111,12 +111,33 @@ struct SessionSwiftUISourceTests {
     #expect(!sessionWindowSource.contains("@State var matchingDecisionsCache"))
     #expect(!sessionWindowSource.contains("@State var detailRenderedSelection"))
     #expect(!sessionWindowSource.contains("@State var contentRenderedRoute"))
+    #expect(sessionWindowSource.contains("private var focusModeStorage = false"))
+    #expect(sessionWindowSource.contains("private var inspectorVisibleStorage = false"))
+    #expect(sessionWindowSource.contains("private var inspectorPreferredStorage = false"))
+    #expect(sessionWindowSource.contains("private var inspectorWidthStorage = 280.0"))
+    #expect(sessionWindowSource.contains("private var sidebarWidthStorage = 220.0"))
+    #expect(
+      sessionWindowSource.contains(
+        "private var contentColumnWidthStorage = SessionContentDetailSplitLayout.defaultContentWidth"
+      )
+    )
+    #expect(sessionWindowSource.contains("private var columnVisibilityRawStorage = \"automatic\""))
+    #expect(!sessionWindowSource.contains("@SceneStorage(\"session.focusMode\")\n  var focusMode = false"))
+    #expect(!sessionWindowSource.contains("@SceneStorage(\"session.inspector.visible\")\n  var inspectorVisible = false"))
+    #expect(!sessionWindowSource.contains("@SceneStorage(\"session.inspector.preferred\")\n  var inspectorPreferred = false"))
 
     #expect(createFormSource.contains("@State private var stateStorage"))
     #expect(createFormSource.contains("@FocusState private var focusedFieldStorage"))
     #expect(!createFormSource.contains("@State var validationResult"))
     #expect(!createFormSource.contains("@State var agentCapabilityOptions"))
     #expect(!createFormSource.contains("@FocusState var focusedField"))
+  }
+
+  @Test("Session content columns extend behind toolbar glass")
+  func sessionContentColumnsExtendBehindToolbarGlass() throws {
+    let columnsSource = try sourceFile(at: "Views/Sessions/SessionWindowView+Columns.swift")
+
+    #expect(columnsSource.contains(".backgroundExtensionEffect()"))
   }
 
   @Test("Toast keeps its AppKit pointer shield while spinner stays pure SwiftUI")

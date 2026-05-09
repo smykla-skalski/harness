@@ -1,85 +1,30 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct SessionWindowToolbar: ToolbarContent {
-  let store: HarnessMonitorStore
-  let snapshot: HarnessMonitorSessionWindowSnapshot?
-  let isLoading: Bool
-  let summary: SessionSummary?
-  let connectionTitle: String
+struct SessionWindowToolbarModel: Equatable {
+  let canNavigateBack: Bool
+  let canNavigateForward: Bool
+  let sleepPreventionPresentation: SleepPreventionToolbarPresentation
+  let connectionMetrics: ConnectionMetrics
+  let sourceTitle: String
   let sourceSystemImage: String
-  let state: SessionWindowStateCache
-  @Binding var focusMode: Bool
-  @AppStorage(HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
-  private var mcpRegistryHostEnabled = HarnessMonitorMCPSettingsDefaults
-    .registryHostEnabledDefault
-  @Environment(\.accessibilityReduceMotion)
-  private var reduceMotion
+  let sourceTint: SessionToolbarSourceTint
+  let statusStripState: SessionToolbarCenterpieceStatusStripState
+  let connectionSummaryText: String
+  let sessionStatusTitle: String
 
-  private var sleepPreventionPresentation: SleepPreventionToolbarPresentation {
-    SleepPreventionToolbarPresentation(isEnabled: store.sleepPreventionEnabled)
-  }
-
-  private var sourceTitle: String {
-    guard snapshot != nil else {
-      return "Loading"
-    }
-    guard !isLoading, let source = snapshot?.source else {
-      return "Refreshing"
-    }
-    return source.rawValue.capitalized
-  }
-
-  private var connectionMetrics: ConnectionMetrics {
-    store.connectionMetrics
-  }
-
-  private var sourcePresentation: SessionToolbarCenterpieceSourcePresentation {
+  fileprivate var sourcePresentation: SessionToolbarCenterpieceSourcePresentation {
     .init(
       title: sourceTitle,
       systemImage: sourceSystemImage,
-      tint: sourceTint
+      tint: sourceTint.color
     )
   }
 
-  private var sourceTint: Color {
-    guard !isLoading, let source = snapshot?.source else {
-      return HarnessMonitorTheme.tertiaryInk
-    }
-    switch source {
-    case .live:
-      return HarnessMonitorTheme.success
-    case .cache:
-      return HarnessMonitorTheme.disabledConnectionChrome
-    case .catalog:
-      return HarnessMonitorTheme.tertiaryInk
-    }
-  }
-
-  private var statusStripState: SessionToolbarCenterpieceStatusStripState {
-    SessionToolbarCenterpieceStatusStripState(
-      daemonOwnership: store.daemonOwnership,
-      bridgeRunning: store.daemonStatus?.manifest?.hostBridge.running == true,
-      mcpStatus: store.mcpStatus,
-      isMCPRegistryHostEnabled: mcpRegistryHostEnabled
-    )
-  }
-
-  private var sessionStatusTitle: String {
-    summary?.status.title ?? "Loading"
-  }
-
-  private var connectionSummaryText: String {
-    guard connectionMetrics.connectedSince != nil else {
-      return "Connection: \(connectionTitle)"
-    }
-    return "Connection: \(connectionMetrics.transportKind.title)"
-  }
-
-  private var sessionStatusAccessibilityValue: String {
+  var sessionStatusAccessibilityValue: String {
     var parts = [
       connectionSummaryText,
-      "Source: \(sourcePresentation.title)",
+      "Source: \(sourceTitle)",
       "Status: \(sessionStatusTitle)",
     ]
     if let bridge = statusStripState.bridge {
@@ -90,43 +35,63 @@ struct SessionWindowToolbar: ToolbarContent {
     }
     return parts.joined(separator: ", ")
   }
+}
+
+enum SessionToolbarSourceTint: Equatable {
+  case tertiary
+  case success
+  case disabledConnection
+
+  var color: Color {
+    switch self {
+    case .tertiary:
+      HarnessMonitorTheme.tertiaryInk
+    case .success:
+      HarnessMonitorTheme.success
+    case .disabledConnection:
+      HarnessMonitorTheme.disabledConnectionChrome
+    }
+  }
+}
+
+struct SessionWindowToolbar: ToolbarContent {
+  let store: HarnessMonitorStore
+  let model: SessionWindowToolbarModel
+  let state: SessionWindowStateCache
+  @Binding var focusMode: Bool
+  @Environment(\.accessibilityReduceMotion)
+  private var reduceMotion
 
   var body: some ToolbarContent {
     ToolbarItemGroup(placement: .navigation) {
       Button {
         state.navigateBack()
       } label: {
-        Label("Back", systemImage: "chevron.backward")
+        Image(systemName: "chevron.backward")
+          .frame(width: 14, height: 14)
       }
-      .disabled(!state.navigationHistory.canGoBack)
+      .disabled(!model.canNavigateBack)
       .help("Go back")
+      .accessibilityLabel("Back")
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionNavigateBackButton)
 
       Button {
         state.navigateForward()
       } label: {
-        Label("Forward", systemImage: "chevron.forward")
+        Image(systemName: "chevron.forward")
+          .frame(width: 14, height: 14)
       }
-      .disabled(!state.navigationHistory.canGoForward)
+      .disabled(!model.canNavigateForward)
       .help("Go forward")
+      .accessibilityLabel("Forward")
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionNavigateForwardButton)
     }
     ToolbarItem(placement: .automatic) {
       Button {
         toggleFocusMode()
       } label: {
-        Label {
-          Text("Focus Mode")
-        } icon: {
-          Image(systemName: focusMode ? "moon.fill" : "moon")
-            .contentTransition(
-              .symbolEffect(
-                .replace.magic(fallback: .downUp.wholeSymbol),
-                options: .nonRepeating
-              )
-            )
-            .frame(width: 14, height: 14)
-        }
+        Image(systemName: focusMode ? "moon.fill" : "moon")
+          .frame(width: 14, height: 14)
       }
       .help(focusMode ? "Exit focus mode" : "Enter focus mode")
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowFocusModeButton)
@@ -136,20 +101,20 @@ struct SessionWindowToolbar: ToolbarContent {
     }
     ToolbarItem(placement: .principal) {
       SessionToolbarCenterpiece(
-        metrics: connectionMetrics,
-        source: sourcePresentation,
-        statusStripState: statusStripState
+        metrics: model.connectionMetrics,
+        source: model.sourcePresentation,
+        statusStripState: model.statusStripState
       )
       .help("Current connection, source, session, and service status.")
       .accessibilityElement(children: .ignore)
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowStatusMenu)
       .accessibilityLabel("Session status")
-      .accessibilityValue(sessionStatusAccessibilityValue)
+      .accessibilityValue(model.sessionStatusAccessibilityValue)
     }
     ToolbarItem(placement: .primaryAction) {
       SleepPreventionToolbarButton(
         store: store,
-        presentation: sleepPreventionPresentation
+        presentation: model.sleepPreventionPresentation
       )
     }
   }

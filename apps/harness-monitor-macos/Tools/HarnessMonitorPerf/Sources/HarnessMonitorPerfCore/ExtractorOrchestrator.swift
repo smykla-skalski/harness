@@ -118,12 +118,14 @@ public enum ExtractorOrchestrator {
         let toc = try XctraceTOC(data: tocData)
         let availableSchemas = toc.availableSchemas()
         let availableAllocDetails = toc.availableAllocationDetails()
+        let maximumValidDurationNs = maximumValidDurationNs(for: capture)
 
         switch capture.template {
         case "SwiftUI":
             return try extractSwiftUI(
                 tracePath: tracePath, exporter: exporter,
-                availableSchemas: availableSchemas
+                availableSchemas: availableSchemas,
+                maximumValidDurationNs: maximumValidDurationNs
             )
         case "Allocations":
             return try extractAllocations(
@@ -137,7 +139,8 @@ public enum ExtractorOrchestrator {
     }
 
     private static func extractSwiftUI(
-        tracePath: URL, exporter: XctraceExporting, availableSchemas: Set<String>
+        tracePath: URL, exporter: XctraceExporting, availableSchemas: Set<String>,
+        maximumValidDurationNs: Int
     ) throws -> JSONValue {
         var documents: [String: XctraceQueryDocument] = [:]
         for schema in swiftUISchemaXPaths {
@@ -146,11 +149,19 @@ public enum ExtractorOrchestrator {
             documents[schema.name] = try XctraceQueryDocument(data: data)
         }
 
-        let updates = documents["swiftui-updates"].map { MetricsExtractor.parseSwiftUIUpdates($0) }
-        let updateGroups = documents["swiftui-update-groups"].map { MetricsExtractor.parseSwiftUIUpdateGroups($0) }
+        let updates = documents["swiftui-updates"].map {
+            MetricsExtractor.parseSwiftUIUpdates($0, maximumValidDurationNs: maximumValidDurationNs)
+        }
+        let updateGroups = documents["swiftui-update-groups"].map {
+            MetricsExtractor.parseSwiftUIUpdateGroups($0, maximumValidDurationNs: maximumValidDurationNs)
+        }
         let causes = documents["swiftui-causes"].map { MetricsExtractor.parseSwiftUICauses($0) }
-        let hitches = documents["hitches"].map { MetricsExtractor.parseEventTable($0) }
-        let hangs = documents["potential-hangs"].map { MetricsExtractor.parseEventTable($0) }
+        let hitches = documents["hitches"].map {
+            MetricsExtractor.parseEventTable($0, maximumValidDurationNs: maximumValidDurationNs)
+        }
+        let hangs = documents["potential-hangs"].map {
+            MetricsExtractor.parseEventTable($0, maximumValidDurationNs: maximumValidDurationNs)
+        }
         let profile = documents["time-profile"].map { MetricsExtractor.parseTimeProfile($0) }
 
         var root: [String: JSONValue] = [:]
@@ -206,5 +217,16 @@ public enum ExtractorOrchestrator {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(value)
         try data.write(to: url, options: .atomic)
+    }
+
+    private static func maximumValidDurationNs(for capture: RunManifest.Capture) -> Int {
+        let fallback = 60 * 1_000_000_000
+        guard let durationSeconds = capture.durationSeconds, durationSeconds > 0 else {
+            return fallback
+        }
+        let bufferedNs = (durationSeconds * 2.0 * 1_000_000_000).rounded(.up)
+        guard bufferedNs.isFinite, bufferedNs > 0 else { return fallback }
+        let clamped = min(bufferedNs, Double(Int.max))
+        return max(Int(clamped), 10 * 1_000_000_000)
     }
 }

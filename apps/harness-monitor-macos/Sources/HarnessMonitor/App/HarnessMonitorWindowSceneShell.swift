@@ -173,16 +173,10 @@ struct HarnessMonitorWindowShell<Content: View>: View {
       )
     )
     .environment(\.windowSurfaceContext, surfaceContext)
-    .overlay(alignment: .topTrailing) { toastOverlay }
-    .overlay { shellStateMarker }
-  }
-
-  @ViewBuilder private var toastOverlay: some View {
-    if let toast, !toast.activeFeedback.isEmpty {
-      HarnessMonitorFeedbackToastView(toast: toast)
-        .padding(.top, HarnessMonitorTheme.spacingSM)
-        .padding(.trailing, HarnessMonitorTheme.spacingLG)
+    .overlay(alignment: .topTrailing) {
+      HarnessMonitorWindowShellToastOverlay(toast: toast)
     }
+    .overlay { shellStateMarker }
   }
 
   @ViewBuilder private var shellStateMarker: some View {
@@ -206,6 +200,20 @@ struct HarnessMonitorWindowShell<Content: View>: View {
           "bannerChrome=shared",
         ].joined(separator: ", ")
       )
+    }
+  }
+}
+
+private struct HarnessMonitorWindowShellToastOverlay: View {
+  let toast: ToastSlice?
+
+  var body: some View {
+    Group {
+      if let toast, !toast.activeFeedback.isEmpty {
+        HarnessMonitorFeedbackToastView(toast: toast)
+          .padding(.top, HarnessMonitorTheme.spacingSM)
+          .padding(.trailing, HarnessMonitorTheme.spacingLG)
+      }
     }
   }
 }

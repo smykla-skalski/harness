@@ -98,7 +98,7 @@ extension SessionWindowView {
     case .sidebarDetail:
       routeDetailColumn
     case .sidebarContentDetail:
-      SessionContentDetailSplitView(contentWidth: $contentColumnWidth) {
+      SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding) {
         contentColumn
           .backgroundExtensionEffect()
       } detail: {
@@ -217,7 +217,7 @@ extension SessionWindowView {
           .frame(maxWidth: .infinity, maxHeight: .infinity)
         if inspectorVisible, inspectorAllowed, let inspectorDecision = inspectorContextDecision {
           SessionInspectorDivider(
-            width: $inspectorWidth,
+            width: inspectorWidthBinding,
             minWidth: 220,
             maxWidth: 420
           )
@@ -226,8 +226,8 @@ extension SessionWindowView {
             isFilteredOut: selectedDecisionHiddenByFilters,
             decisionFilters: stateCache.decisionFilters,
             decisionRuntime: stateCache.decisionRuntime,
-            visible: $inspectorVisible,
-            preferredVisible: $inspectorPreferred
+            visible: inspectorVisibleBinding,
+            preferredVisible: inspectorPreferredBinding
           )
           .frame(width: max(220, min(inspectorWidth, 420)))
         }
@@ -235,16 +235,16 @@ extension SessionWindowView {
       .onAppear {
         deferDetailColumnWidthUpdate(
           geometry.size.width,
-          visibleBinding: $inspectorVisible,
-          preferredBinding: $inspectorPreferred,
+          visibleBinding: inspectorVisibleBinding,
+          preferredBinding: inspectorPreferredBinding,
           announce: false
         )
       }
       .onChange(of: geometry.size.width) { _, newWidth in
         deferDetailColumnWidthUpdate(
           newWidth,
-          visibleBinding: $inspectorVisible,
-          preferredBinding: $inspectorPreferred
+          visibleBinding: inspectorVisibleBinding,
+          preferredBinding: inspectorPreferredBinding
         )
       }
     }

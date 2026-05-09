@@ -35,7 +35,10 @@ extension MetricsExtractor {
         public var topGroups: [Group]
     }
 
-    public static func parseSwiftUIUpdateGroups(_ document: XctraceQueryDocument) -> UpdateGroups {
+    public static func parseSwiftUIUpdateGroups(
+        _ document: XctraceQueryDocument,
+        maximumValidDurationNs: Int? = nil
+    ) -> UpdateGroups {
         var durations: [Int] = []
         var labelCounts: [String: Int] = [:]
         var labelTotals: [String: (count: Int, durationNs: Int)] = [:]
@@ -43,8 +46,11 @@ extension MetricsExtractor {
         for row in document.rows {
             let record = document.record(for: row)
             let label = normalize(record["label"])
-            let durationNs = parseInt(record["duration"]) ?? 0
-            durations.append(durationNs)
+            let durationNs = parseDurationNs(
+                record["duration"],
+                maximumValidDurationNs: maximumValidDurationNs
+            ) ?? 0
+            if durationNs > 0 { durations.append(durationNs) }
             labelCounts[label, default: 0] += 1
             var entry = labelTotals[label] ?? (0, 0)
             entry.count += 1
@@ -183,13 +189,21 @@ extension MetricsExtractor {
 
     /// Mirrors `parse_event_table` for hitches and potential-hangs. When duration is missing it
     /// falls back to label counts (some xctrace schemas emit only narrative text).
-    public static func parseEventTable(_ document: XctraceQueryDocument) -> EventTable {
+    public static func parseEventTable(
+        _ document: XctraceQueryDocument,
+        maximumValidDurationNs: Int? = nil
+    ) -> EventTable {
         var durations: [Int] = []
         var labels: [String: Int] = [:]
 
         for row in document.rows {
             let record = document.record(for: row)
-            if let duration = parseInt(record["duration"]) { durations.append(duration) }
+            if let duration = parseDurationNs(
+                record["duration"],
+                maximumValidDurationNs: maximumValidDurationNs
+            ) {
+                durations.append(duration)
+            }
             let labelText = record["narrative-description"]
                 ?? record["label"]
                 ?? record["description"]

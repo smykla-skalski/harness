@@ -40,7 +40,10 @@ extension MetricsExtractor {
     /// Parses the Statistics detail of an Allocations track. Each `<row>` is a flat element
     /// with attributes such as `persistent_bytes`, `total_bytes`, `count_events`.
     public static func parseAllocationsStatistics(data: Data) throws -> Allocations {
-        let document = try XMLDocument(data: data, options: [.nodePreserveAttributeOrder])
+        let document = try XMLDocument(
+            data: XMLSanitizer.sanitize(data),
+            options: [.nodePreserveAttributeOrder]
+        )
         guard let root = document.rootElement() else {
             throw XctraceQueryDocument.ParseError.missingRootElement
         }

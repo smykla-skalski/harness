@@ -139,7 +139,11 @@ final class BackgroundGalleryPrefetchPlanTests: XCTestCase {
       visibleIDs: []
     )
 
-    XCTAssertEqual(plan.map(\.storageValue), Array(options.prefix(10)).map(\.storageValue))
+    XCTAssertEqual(
+      plan.map(\.storageValue),
+      Array(options.prefix(SettingsBackgroundGalleryPrefetchPlan.initialLimit)).map(\.storageValue)
+        + [selectedBackground.storageValue, recentItems[0].storageValue]
+    )
   }
 
   func testVisibleTileChurnDoesNotChangeGalleryPrefetchPlan() {

@@ -274,6 +274,7 @@ public enum HarnessMonitorAccessibility {
   public static let agentTuiNavigateBackButton = "harness.sheet.agent-tui.navigate-back"
   public static let agentTuiNavigateForwardButton = "harness.sheet.agent-tui.navigate-forward"
   public static let newSessionSheet = "harness.new-session.sheet"
+  public static let newCodexAgentSheet = "harness.new-codex-agent.sheet"
   public static let newSessionTitle = "harness.new-session.title"
   public static let newSessionContext = "harness.new-session.context"
   public static let newSessionBaseRef = "harness.new-session.base-ref"

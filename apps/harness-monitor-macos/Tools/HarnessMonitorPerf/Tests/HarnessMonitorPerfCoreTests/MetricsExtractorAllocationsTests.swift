@@ -64,4 +64,17 @@ final class MetricsExtractorAllocationsTests: XCTestCase {
         XCTAssertEqual(result.topOffenders.first?.persistentBytes, 50)
         XCTAssertEqual(result.topOffenders.first?.countEvents, 1)
     }
+
+    func testAllocationsStatisticsStripsInvalidXMLScalars() throws {
+        var data = Data("<?xml version=\"1.0\"?><root><row category=\"Bad".utf8)
+        data.append(0x18)
+        data.append(Data("Name\" persistent-bytes=\"12\" total-bytes=\"18\" count-events=\"2\"/></root>".utf8))
+
+        let result = try MetricsExtractor.parseAllocationsStatistics(data: data)
+        XCTAssertEqual(result.allocations.categoryCount, 1)
+        XCTAssertEqual(result.topOffenders.first?.category, "BadName")
+        XCTAssertEqual(result.topOffenders.first?.persistentBytes, 12)
+        XCTAssertEqual(result.topOffenders.first?.totalBytes, 18)
+        XCTAssertEqual(result.topOffenders.first?.countEvents, 2)
+    }
 }

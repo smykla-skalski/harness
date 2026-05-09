@@ -30,6 +30,10 @@ struct HarnessMonitorWindowRootView: View {
     defersInitialContentUntilBootstrap && !completedInitialBootstrap
   }
 
+  private var hostsSharedShellPresentation: Bool {
+    keyWindowObserver.isKey(windowID: HarnessMonitorWindowID.openRecent)
+  }
+
   private var contentReadiness: WindowContentReadiness {
     WindowContentReadiness(
       isReady: !shouldShowBootstrapPlaceholder,
@@ -56,6 +60,20 @@ struct HarnessMonitorWindowRootView: View {
       liveContent
     }
     .modifier(WorkspaceToolbarUITestForceTickModifier(store: store))
+    .modifier(
+      HarnessMonitorConfirmationDialogModifier(
+        store: store,
+        shellUI: store.contentUI.shell,
+        isEnabled: hostsSharedShellPresentation
+      )
+    )
+    .modifier(
+      HarnessMonitorSheetModifier(
+        store: store,
+        shellUI: store.contentUI.shell,
+        isEnabled: hostsSharedShellPresentation
+      )
+    )
     .acpPermissionAttentionScene(
       store: store,
       notifications: notifications,

@@ -99,6 +99,7 @@ enum HarnessMonitorUITestAccessibility {
   static let signalRegressionSecondarySessionRow = "harness.sidebar.session.sess-harness-secondary"
   static let previewSignalCard = "harness.session.signal.sig-ui-1"
   static let signalDetailSheet = "harness.signal.detail.sheet"
+  static let newCodexAgentSheet = "harness.new-codex-agent.sheet"
   static let signalDetailCard = "harness.signal.detail.card"
   static let signalDetailDismissButton = "harness.signal.detail.dismiss"
   static let singleAgentSessionRow = "harness.sidebar.session.sess-harness-solo"

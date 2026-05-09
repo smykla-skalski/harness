@@ -70,6 +70,7 @@ struct NewCodexAgentSheet: View {
       Divider()
       footer
     }
+    .accessibilityIdentifier(HarnessMonitorAccessibility.newCodexAgentSheet)
     .task {
       await loadCodexCatalogIfNeeded()
       focusedField = .prompt
