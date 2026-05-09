@@ -4,6 +4,13 @@ import SwiftUI
 extension SessionWindowCreateForm {
   @MainActor
   func submit() async {
+    if draft.kind == .agent {
+      await SessionWindowCreateFormCatalogs.loadAgentCatalogStateIfNeeded(
+        store: store,
+        state: state,
+        draft: draft
+      )
+    }
     if let validationResult = SessionWindowCreateFormValidation.result(
       for: draft,
       capabilityOptions: activeAgentCapabilityOptions
@@ -31,15 +38,46 @@ extension SessionWindowCreateForm {
   @MainActor
   func createCodexRun(named name: String) async {
     let trimmedPrompt = draft.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-    let model = draft.codexModel.trimmingCharacters(in: .whitespacesAndNewlines)
-    let effort = draft.codexEffort.trimmingCharacters(in: .whitespacesAndNewlines)
+    let codexCatalog = SessionWindowCreateFormCatalogs.codexModelCatalog(
+      catalogState: state.agentCreateCatalog
+    )
+    let pickerValue: String = {
+      if draft.codexAllowCustomModel {
+        return SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag
+      }
+      let stored = draft.codexModel.trimmingCharacters(in: .whitespacesAndNewlines)
+      if !stored.isEmpty {
+        return stored
+      }
+      return codexCatalog?.default ?? ""
+    }()
+    let modelSelection = SessionWindowCreateFormCatalogs.effectiveModelSelection(
+      pickerValue: pickerValue,
+      customValue: draft.codexAllowCustomModel ? draft.codexModel : "",
+      catalogDefault: codexCatalog?.default ?? ""
+    )
+    let effortValues =
+      codexCatalog.map {
+        SessionWindowCreateFormCatalogs.effortValues(
+          catalog: $0,
+          selectedModelID: pickerValue
+        )
+      } ?? (
+        pickerValue == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag
+          ? SessionWindowCreateFormCatalogs.allEffortLevels : []
+      )
+    let trimmedEffort = draft.codexEffort.trimmingCharacters(in: .whitespacesAndNewlines)
+    let effort =
+      trimmedEffort.isEmpty
+      ? SessionWindowCreateFormCatalogs.defaultEffortLevel(from: effortValues)
+      : trimmedEffort
     guard
       let started = await store.startCodexRunSnapshot(
         prompt: trimmedPrompt,
         mode: draft.codexMode,
-        model: model.isEmpty ? nil : model,
+        model: modelSelection.id,
         effort: effort.isEmpty ? nil : effort,
-        allowCustomModel: draft.codexAllowCustomModel,
+        allowCustomModel: modelSelection.allowCustomModel,
         sessionID: draft.sessionID
       )
     else {
@@ -50,8 +88,9 @@ extension SessionWindowCreateForm {
       LaunchPresetSnapshot(
         mode: .codex,
         codexMode: draft.codexMode.rawValue,
-        codexModel: model.isEmpty ? nil : model,
-        customCodexModel: draft.codexAllowCustomModel ? model : nil,
+        codexModel:
+          pickerValue == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag ? nil : modelSelection.id,
+        customCodexModel: modelSelection.allowCustomModel ? modelSelection.id : nil,
         codexEffort: effort.isEmpty ? nil : effort
       )
     )
@@ -65,13 +104,68 @@ extension SessionWindowCreateForm {
       draft: draft,
       options: activeAgentCapabilityOptions
     )
+    let trimmedProjectDir = draft.projectDir.trimmingCharacters(in: .whitespacesAndNewlines)
+    let projectDir = trimmedProjectDir.isEmpty ? nil : trimmedProjectDir
+    let trimmedPersonaID = draft.personaID.trimmingCharacters(in: .whitespacesAndNewlines)
+    let personaID = trimmedPersonaID.isEmpty ? nil : trimmedPersonaID
+    let selectedRole = draft.role
+    let fallbackRole =
+      SessionWindowCreateFormCatalogs.shouldShowAcpFallbackRole(
+        selection: resolvedSelection,
+        role: selectedRole
+      ) ? draft.fallbackRole : nil
     switch resolvedSelection {
     case .tui(let runtime):
+      let pickerValue =
+        draft.modelByRuntime[runtime.rawValue]
+        ?? SessionWindowCreateFormCatalogs.selectedModelCatalog(
+          selection: .tui(runtime),
+          catalogState: state.agentCreateCatalog
+        )?.default
+        ?? ""
+      let customValue = draft.customModelByRuntime[runtime.rawValue] ?? ""
+      let catalogDefault =
+        SessionWindowCreateFormCatalogs.selectedModelCatalog(
+          selection: .tui(runtime),
+          catalogState: state.agentCreateCatalog
+        )?.default ?? ""
+      let modelSelection = SessionWindowCreateFormCatalogs.effectiveModelSelection(
+        pickerValue: pickerValue,
+        customValue: customValue,
+        catalogDefault: catalogDefault
+      )
+      let effortValues =
+        SessionWindowCreateFormCatalogs.selectedModelCatalog(
+          selection: .tui(runtime),
+          catalogState: state.agentCreateCatalog
+        ).map {
+          SessionWindowCreateFormCatalogs.effortValues(
+            catalog: $0,
+            selectedModelID: pickerValue
+          )
+        } ?? (
+          pickerValue == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag
+            ? SessionWindowCreateFormCatalogs.allEffortLevels : []
+        )
+      let trimmedEffort =
+        draft.effortByRuntime[runtime.rawValue]?
+        .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+      let effort =
+        trimmedEffort.isEmpty
+        ? SessionWindowCreateFormCatalogs.defaultEffortLevel(from: effortValues)
+        : trimmedEffort
       guard
         let created = await store.startAgentTuiSnapshot(
           runtime: runtime,
+          role: selectedRole,
           name: name,
           prompt: draft.prompt,
+          projectDir: projectDir,
+          persona: personaID,
+          model: modelSelection.id,
+          effort: effort.isEmpty ? nil : effort,
+          allowCustomModel: modelSelection.allowCustomModel,
+          argv: draft.normalizedArgvOverride,
           rows: 32,
           cols: 120,
           sessionID: draft.sessionID
@@ -79,7 +173,17 @@ extension SessionWindowCreateForm {
       else {
         return
       }
-      writeTerminalLaunchPreset(selection: resolvedSelection)
+      writeTerminalLaunchPreset(
+        selection: resolvedSelection,
+        role: selectedRole,
+        modelByRuntime:
+          pickerValue.isEmpty ? [:] : [runtime.rawValue: pickerValue],
+        customModelByRuntime:
+          customValue.isEmpty ? [:] : [runtime.rawValue: customValue],
+        effortByRuntime:
+          effort.isEmpty ? [:] : [runtime.rawValue: effort],
+        personaID: personaID
+      )
       state.updateCreateDraft(SessionCreateDraft(kind: .agent, sessionID: draft.sessionID))
       state.selectAgent(created.agentId)
     case .acp(let descriptorID):
@@ -87,48 +191,54 @@ extension SessionWindowCreateForm {
       guard
         let created = await store.startAcpAgent(
           agentID: descriptorID,
+          role: selectedRole,
+          fallbackRole: fallbackRole,
           capabilities: capabilities,
           name: name,
           prompt: draft.prompt,
+          projectDir: projectDir,
+          persona: personaID,
           sessionID: draft.sessionID
         )
       else {
         return
       }
-      writeTerminalLaunchPreset(selection: resolvedSelection)
+      writeTerminalLaunchPreset(
+        selection: resolvedSelection,
+        role: selectedRole,
+        fallbackRole: fallbackRole,
+        personaID: personaID
+      )
       state.updateCreateDraft(SessionCreateDraft(kind: .agent, sessionID: draft.sessionID))
       state.selectAgent(created.agentId)
     }
   }
 
   @MainActor
-  private func writeTerminalLaunchPreset(selection: AgentLaunchSelection) {
+  private func writeTerminalLaunchPreset(
+    selection: AgentLaunchSelection,
+    role: SessionRole,
+    modelByRuntime: [String: String] = [:],
+    customModelByRuntime: [String: String] = [:],
+    effortByRuntime: [String: String] = [:],
+    fallbackRole: SessionRole? = nil,
+    personaID: String? = nil
+  ) {
     HarnessMonitorAgentLaunchDefaults.noteExplicitSelection(selection)
     LaunchPresetDefaults.write(
       LaunchPresetSnapshot(
         mode: .terminal,
         providerStorageKey: selection.storageKey,
+        role: role.rawValue,
+        fallbackRole: fallbackRole?.rawValue,
+        personaID: personaID,
+        modelByRuntime: modelByRuntime,
+        customModelByRuntime: customModelByRuntime,
+        effortByRuntime: effortByRuntime,
         rows: 32,
         cols: 120
       )
     )
-  }
-
-  @MainActor
-  func loadAgentCapabilitiesIfNeeded() async {
-    guard draft.kind == .agent else { return }
-    guard agentCapabilityOptions.isEmpty else { return }
-    isLoadingAgentCapabilities = true
-    let options = await SessionWindowCreateFormCatalogs.loadAgentOptions(store: store)
-    agentCapabilityOptions = options
-    isLoadingAgentCapabilities = false
-    let normalized = SessionWindowCreateFormCatalogs.normalizedLaunchSelection(
-      draft: draft,
-      options: options
-    )
-    if normalized.storageKey != draft.launchSelection.storageKey {
-      updateDraft(runtime: normalized.storageKey)
-    }
   }
 
   func capabilities(for selection: AgentLaunchSelection) -> [String] {
@@ -199,6 +309,14 @@ extension SessionWindowCreateForm {
     case .form, .name, .capability, nil:
       break
     }
+  }
+
+  func clearValidationIfResolved() {
+    guard validationResult != nil else { return }
+    validationResult = SessionWindowCreateFormValidation.result(
+      for: draft,
+      capabilityOptions: activeAgentCapabilityOptions
+    )
   }
 
   func focusValidationField(_ field: SessionWindowCreateFormValidationField) {

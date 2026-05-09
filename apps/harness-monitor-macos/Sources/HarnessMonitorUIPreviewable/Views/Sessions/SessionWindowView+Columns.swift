@@ -67,7 +67,6 @@ extension SessionWindowView {
       } else {
         detailFocus
           .frame(maxWidth: .infinity, maxHeight: .infinity)
-          .backgroundExtensionEffect()
       }
     }
   }
@@ -108,7 +107,6 @@ extension SessionWindowView {
   private var routeDetailColumn: some View {
     contentColumn
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-      .backgroundExtensionEffect()
   }
 
   @ViewBuilder
@@ -158,6 +156,12 @@ extension SessionWindowView {
     if isLoading && snapshot == nil {
       ProgressView("Loading session")
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    } else if case .create(let draft) = stateCache.selection, draft.kind == .agent {
+      SessionWindowCreateAgentRuntimePane(
+        store: store,
+        state: stateCache,
+        draft: draft
+      )
     } else if let snapshot {
       contentColumnBody(snapshot: snapshot, route: renderedRoute)
     } else {
@@ -205,7 +209,6 @@ extension SessionWindowView {
       HStack(spacing: 0) {
         detailFocus
           .frame(maxWidth: .infinity, maxHeight: .infinity)
-          .backgroundExtensionEffect()
         if inspectorVisible, inspectorAllowed, let inspectorDecision = inspectorContextDecision {
           SessionInspectorDivider(
             width: $inspectorWidth,
@@ -319,7 +322,8 @@ extension SessionWindowView {
       SessionWindowCreateForm(
         store: store,
         state: stateCache,
-        draft: draft
+        draft: draft,
+        embedsRuntimeConfiguration: focusMode
       )
     case .route:
       SessionDetailEmptySurface {

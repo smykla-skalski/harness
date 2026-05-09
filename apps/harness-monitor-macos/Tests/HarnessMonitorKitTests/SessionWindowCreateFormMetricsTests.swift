@@ -70,6 +70,26 @@ struct SessionWindowCreateFormMetricsTests {
     #expect(draft.taskSeverityRawValue == "high")
   }
 
+  @Test("Agent draft preserves session role, persona, and argv overrides")
+  func agentDraftPreservesRolePersonaAndArgvOverrides() {
+    var draft = SessionCreateDraft(kind: .agent, sessionID: "session-1")
+
+    #expect(draft.role == .worker)
+    #expect(draft.fallbackRole == .worker)
+
+    draft.role = .leader
+    draft.fallbackRole = .observer
+    draft.personaID = "reviewer"
+    draft.projectDir = "/Users/example/Projects/harness"
+    draft.argvOverride = "codex\n--model\ngpt-5\n\n"
+
+    #expect(draft.roleRawValue == SessionRole.leader.rawValue)
+    #expect(draft.fallbackRoleRawValue == SessionRole.observer.rawValue)
+    #expect(draft.personaID == "reviewer")
+    #expect(draft.projectDir == "/Users/example/Projects/harness")
+    #expect(draft.normalizedArgvOverride == ["codex", "--model", "gpt-5"])
+  }
+
   @Test("Validation rejects unavailable selected capability")
   func validationRejectsUnavailableSelectedCapability() {
     let draft = SessionCreateDraft(
@@ -126,15 +146,24 @@ struct SessionWindowCreateFormMetricsTests {
   func createFormKeepsFocusAndCancelAffordancesInSource() throws {
     let source = try sourceFile(named: "SessionWindowCreateForm.swift")
     let submissionSource = try sourceFile(named: "SessionWindowCreateForm+Submission.swift")
+    let runtimePaneSource = try sourceFile(named: "SessionWindowCreateAgentRuntimePane.swift")
 
     #expect(source.contains("@FocusState"))
     #expect(source.contains("Button(\"Cancel\", role: .cancel)"))
     #expect(submissionSource.contains("SessionWindowCreateFormValidation.result"))
     #expect(source.contains("validationMessage(for: .name)"))
-    #expect(source.contains("validationMessage(for: .capability)"))
     #expect(source.contains("Validation error:"))
     #expect(submissionSource.contains("focusedField = .name"))
-    #expect(source.contains("SessionWindowCreateFormCapabilityPicker"))
+    #expect(source.contains("SessionWindowCreateAgentRuntimeContent("))
+    #expect(source.contains("embedsRuntimeConfiguration"))
+    #expect(!source.contains("SessionWindowCreateFormAgentLaunchToggle("))
+    #expect(!source.contains("SessionWindowCreateFormCapabilityPicker("))
+    #expect(runtimePaneSource.contains("SessionWindowCreateProviderListRow"))
+    #expect(runtimePaneSource.contains("HarnessMonitorColumnScrollView("))
+    #expect(!runtimePaneSource.contains("List(selection: selectedProviderID)"))
+    #expect(!runtimePaneSource.contains("LazyVGrid("))
+    #expect(!runtimePaneSource.contains("capabilitySummary"))
+    #expect(!runtimePaneSource.contains(".buttonStyle(.plain)"))
     #expect(source.contains("Picker(\"Severity\", selection: taskSeverity)"))
     #expect(submissionSource.contains("sessionID: draft.sessionID"))
     #expect(submissionSource.contains("startAcpAgent("))
@@ -143,18 +172,85 @@ struct SessionWindowCreateFormMetricsTests {
     #expect(source.contains(".keyboardShortcut(.defaultAction)"))
   }
 
-  @Test("Create form capability support is split into catalog and picker sources")
-  func createFormCapabilitySupportIsSplitIntoCatalogAndPickerSources() throws {
+  @Test("Runtime configuration support is split between catalog and pane sources")
+  func runtimeConfigurationSupportIsSplitBetweenCatalogAndPaneSources() throws {
     let catalogSource = try sourceFile(named: "SessionWindowCreateFormCatalogs.swift")
-    let pickerSource = try sourceFile(named: "SessionWindowCreateFormCapabilityPicker.swift")
+    let formSource = try sourceFile(named: "SessionWindowCreateForm.swift")
+    let runtimePaneSource = try sourceFile(named: "SessionWindowCreateAgentRuntimePane.swift")
     let submissionSource = try sourceFile(named: "SessionWindowCreateForm+Submission.swift")
     let sharedCatalogSource = try agentSourceFile(named: "AgentCapabilityCatalog.swift")
 
-    #expect(catalogSource.contains("loadAgentOptions"))
+    #expect(catalogSource.contains("loadAgentCatalogStateIfNeeded"))
     #expect(catalogSource.contains("fallbackAgentOptions"))
-    #expect(pickerSource.contains("AgentCapabilityRow"))
-    #expect(submissionSource.contains("loadAgentCapabilitiesIfNeeded"))
+    #expect(catalogSource.contains("effectiveModelSelection"))
+    #expect(catalogSource.contains("fetchPersonas()"))
+    #expect(catalogSource.contains("selectedPersonaStateText"))
+    #expect(formSource.contains("DisclosureGroup(\"Advanced overrides\")"))
+    #expect(formSource.contains("DisclosureGroup(\"Configure\")"))
+    #expect(formSource.contains("SessionWindowCreateFieldBlock(title: \"Role in session\")"))
+    #expect(formSource.contains("SessionWindowCreateFieldBlock(title: \"Model\")"))
+    #expect(formSource.contains("selectedCodexModelMenuTitle"))
+    #expect(runtimePaneSource.contains("SessionWindowCreateProviderListRow"))
+    #expect(runtimePaneSource.contains("providerSubtitle(for: option)"))
+    #expect(runtimePaneSource.contains("HarnessMonitorColumnScrollView("))
+    #expect(!runtimePaneSource.contains("List(selection: selectedProviderID)"))
+    #expect(!runtimePaneSource.contains("SessionWindowCreateProviderGridCard"))
+    #expect(!runtimePaneSource.contains("SessionWindowCreateFieldBlock(title: \"Model\")"))
+    #expect(!runtimePaneSource.contains("selectedCodexModelMenuTitle"))
+    #expect(submissionSource.contains("writeTerminalLaunchPreset("))
+    #expect(submissionSource.contains("role: selectedRole"))
+    #expect(submissionSource.contains("fallbackRole: fallbackRole"))
+    #expect(submissionSource.contains("projectDir: projectDir"))
+    #expect(submissionSource.contains("persona: personaID"))
+    #expect(submissionSource.contains("argv: draft.normalizedArgvOverride"))
+    #expect(!submissionSource.contains("loadAgentCapabilitiesIfNeeded"))
     #expect(sharedCatalogSource.contains("enum AgentCapabilityCatalog"))
+  }
+
+  @Test("Catalog helpers resolve default and custom runtime models")
+  func catalogHelpersResolveDefaultAndCustomRuntimeModels() {
+    #expect(
+      SessionWindowCreateFormCatalogs.effectiveModelSelection(
+        pickerValue: "",
+        customValue: "",
+        catalogDefault: "gpt-5"
+      ).id == "gpt-5"
+    )
+    #expect(
+      SessionWindowCreateFormCatalogs.effectiveModelSelection(
+        pickerValue: SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag,
+        customValue: "claude-opus",
+        catalogDefault: "gpt-5"
+      ).id == "claude-opus"
+    )
+    #expect(
+      SessionWindowCreateFormCatalogs.effectiveModelSelection(
+        pickerValue: SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag,
+        customValue: "claude-opus",
+        catalogDefault: "gpt-5"
+      ).allowCustomModel
+    )
+    #expect(
+      SessionWindowCreateFormCatalogs.defaultEffortLevel(from: ["low", "medium", "high"]) == "medium"
+    )
+  }
+
+  @Test("Catalog helper resolves selected persona state text")
+  func catalogHelperResolvesSelectedPersonaStateText() {
+    let personas = PreviewHarnessClient.previewPersonas
+
+    #expect(
+      SessionWindowCreateFormCatalogs.selectedPersonaStateText(
+        personaID: "reviewer",
+        personas: personas
+      ) == "Using Reviewer."
+    )
+    #expect(
+      SessionWindowCreateFormCatalogs.selectedPersonaStateText(
+        personaID: "",
+        personas: personas
+      ) == "No persona selected."
+    )
   }
 
   private func sourceFile(named relativePath: String) throws -> String {
