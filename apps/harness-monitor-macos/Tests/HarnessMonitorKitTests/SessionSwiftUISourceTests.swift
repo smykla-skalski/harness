@@ -44,15 +44,18 @@ struct SessionSwiftUISourceTests {
     #expect(!createFormSource.contains("@FocusState var focusedField"))
   }
 
-  @Test("Toast and spinner avoid manual view-layer interop boilerplate")
-  func toastAndSpinnerAvoidManualViewLayerInteropBoilerplate() throws {
+  @Test("Toast keeps its AppKit pointer shield while spinner stays pure SwiftUI")
+  func toastKeepsPointerShieldWhileSpinnerAvoidsInterop() throws {
     let toastSource = try sourceFile(at: "Views/Attention/AcpPermissionAttentionToastView.swift")
     let spinnerSource = try sourceFile(at: "Views/Shared/HarnessMonitorSpinner.swift")
 
     #expect(toastSource.contains("@Entry public var acpToastOpenDecisions"))
     #expect(toastSource.contains("@Entry public var acpToastDismiss"))
     #expect(!toastSource.contains("EnvironmentKey"))
-    #expect(!toastSource.contains("NSViewRepresentable"))
+    #expect(toastSource.contains("NSViewRepresentable"))
+    #expect(toastSource.contains("override func mouseDown"))
+    #expect(toastSource.contains("override func rightMouseDown"))
+    #expect(toastSource.contains("override func otherMouseDown"))
     #expect(!spinnerSource.contains("NSViewRepresentable"))
   }
 
