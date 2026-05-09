@@ -3,10 +3,19 @@ import SwiftUI
 
 struct SessionTitleBlurChromeConfiguration: Equatable {
   static let accessibilityIdentifier = "harness.session.title-blur-chrome"
-  static let height: CGFloat = 96
-  static let gradientRadius: CGFloat = 360
-  static let titleLeadingPadding: CGFloat = 78
-  static let tintOpacity = 0.18
+  static let height: CGFloat = 160
+  // Approximate x-position of the title's first letter in the toolbar:
+  // sidebar (~220) + back/forward chevrons (~92) + leading padding.
+  static let titleLeadingPadding: CGFloat = 320
+  // Vertical center of the bright spot, measured from the top of the chrome
+  // band (which starts at the window top via .ignoresSafeArea(.top)). The
+  // titlebar/toolbar takes ~28-52pt; placing the center at 56pt keeps it
+  // just below the title baseline so the glow blooms downward into content.
+  static let titleVerticalOffset: CGFloat = 56
+  static let blurWidth: CGFloat = 280
+  static let blurHeight: CGFloat = 96
+  static let blurRadius: CGFloat = 56
+  static let tintOpacity = 0.30
   static let reducedTransparencyOpacity = 0.82
   static let animationDuration = 0.18
 
@@ -30,14 +39,14 @@ struct SessionTitleBlurChromeConfiguration: Equatable {
   private static func tone(status: SessionStatus, isStale: Bool) -> Tone {
     guard !isStale else { return .idle }
     switch status {
-    case .awaitingLeader, .paused:
-      return .idle
-    case .active:
+    case .awaitingLeader:
       return .attached
-    case .leaderlessDegraded:
+    case .active:
+      return .completed
+    case .paused, .leaderlessDegraded:
       return .degraded
     case .ended:
-      return .completed
+      return .idle
     }
   }
 
@@ -92,44 +101,36 @@ public struct SessionTitleBlurChrome: View {
   }
 
   public var body: some View {
-    ZStack(alignment: .topLeading) {
-      titleTint
-    }
-    .frame(height: SessionTitleBlurChromeConfiguration.height)
-    .frame(maxWidth: .infinity, alignment: .top)
-    .ignoresSafeArea(.container, edges: .top)
-    .allowsHitTesting(false)
-    .accessibilityHidden(true)
-    .accessibilityIdentifier(SessionTitleBlurChromeConfiguration.accessibilityIdentifier)
-    .animation(
-      .easeInOut(duration: SessionTitleBlurChromeConfiguration.animationDuration),
-      value: status
-    )
-    .animation(
-      .easeInOut(duration: SessionTitleBlurChromeConfiguration.animationDuration),
-      value: isStale
-    )
+    titleTint
+      .frame(height: SessionTitleBlurChromeConfiguration.height)
+      .frame(maxWidth: .infinity, alignment: .top)
+      .ignoresSafeArea(.container, edges: .top)
+      .allowsHitTesting(false)
+      .accessibilityHidden(true)
+      .accessibilityIdentifier(SessionTitleBlurChromeConfiguration.accessibilityIdentifier)
+      .animation(
+        .easeInOut(duration: SessionTitleBlurChromeConfiguration.animationDuration),
+        value: status
+      )
+      .animation(
+        .easeInOut(duration: SessionTitleBlurChromeConfiguration.animationDuration),
+        value: isStale
+      )
   }
 
   private var titleTint: some View {
-    let radius = SessionTitleBlurChromeConfiguration.gradientRadius
-    return Circle()
-      .fill(
-        RadialGradient(
-          colors: [
-            tint.opacity(opacity),
-            tint.opacity(opacity * 0.55),
-            tint.opacity(0),
-          ],
-          center: .center,
-          startRadius: 0,
-          endRadius: radius
-        )
-      )
-      .frame(width: radius * 2, height: radius * 2)
+    let centerX = SessionTitleBlurChromeConfiguration.titleLeadingPadding
+    let centerY = SessionTitleBlurChromeConfiguration.titleVerticalOffset
+    let blurWidth = SessionTitleBlurChromeConfiguration.blurWidth
+    let blurHeight = SessionTitleBlurChromeConfiguration.blurHeight
+    return Capsule()
+      .fill(tint.opacity(opacity))
+      .frame(width: blurWidth, height: blurHeight)
+      .blur(radius: SessionTitleBlurChromeConfiguration.blurRadius)
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       .offset(
-        x: SessionTitleBlurChromeConfiguration.titleLeadingPadding - radius,
-        y: -radius + SessionTitleBlurChromeConfiguration.height * 0.35
+        x: centerX - blurWidth / 2,
+        y: centerY - blurHeight / 2
       )
   }
 }

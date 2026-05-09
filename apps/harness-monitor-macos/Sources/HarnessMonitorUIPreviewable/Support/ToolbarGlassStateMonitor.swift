@@ -19,6 +19,11 @@ private final class _TitlebarSeparatorSuppressorView: NSView {
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
     window?.titlebarSeparatorStyle = .none
+    // Tabbable session windows (windows with `tabbingIdentifier` set) otherwise
+    // render an opaque titlebar that masks the Liquid Glass blur. Mark the
+    // titlebar transparent so the toolbar samples through to the colored chrome
+    // and banner stack beneath it.
+    window?.titlebarAppearsTransparent = true
   }
 }
 

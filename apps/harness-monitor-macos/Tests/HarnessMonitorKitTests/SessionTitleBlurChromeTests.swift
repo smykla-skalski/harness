@@ -4,14 +4,18 @@ import XCTest
 @testable import HarnessMonitorUIPreviewable
 
 final class SessionTitleBlurChromeTests: XCTestCase {
-  func testStatusPaletteMatchesChunkSevenContract() {
+  func testStatusPaletteMatchesLegacyChrome() {
     XCTAssertEqual(
-      configuration(status: .awaitingLeader).tone,
-      .idle
+      configuration(status: .awaitingLeader).assetName,
+      "HarnessMonitorAccent"
     )
     XCTAssertEqual(
       configuration(status: .active).assetName,
-      "HarnessMonitorAccent"
+      "HarnessMonitorSuccess"
+    )
+    XCTAssertEqual(
+      configuration(status: .paused).assetName,
+      "HarnessMonitorCaution"
     )
     XCTAssertEqual(
       configuration(status: .leaderlessDegraded).assetName,
@@ -19,7 +23,7 @@ final class SessionTitleBlurChromeTests: XCTestCase {
     )
     XCTAssertEqual(
       configuration(status: .ended).assetName,
-      "HarnessMonitorSuccess"
+      "HarnessMonitorInk"
     )
   }
 
@@ -31,10 +35,13 @@ final class SessionTitleBlurChromeTests: XCTestCase {
   }
 
   func testGeometryAndAnimationConstantsStayStable() {
-    XCTAssertEqual(SessionTitleBlurChromeConfiguration.height, 96)
-    XCTAssertEqual(SessionTitleBlurChromeConfiguration.gradientRadius, 360)
-    XCTAssertEqual(SessionTitleBlurChromeConfiguration.titleLeadingPadding, 78)
-    XCTAssertEqual(SessionTitleBlurChromeConfiguration.tintOpacity, 0.18)
+    XCTAssertEqual(SessionTitleBlurChromeConfiguration.height, 160)
+    XCTAssertEqual(SessionTitleBlurChromeConfiguration.titleLeadingPadding, 320)
+    XCTAssertEqual(SessionTitleBlurChromeConfiguration.titleVerticalOffset, 56)
+    XCTAssertEqual(SessionTitleBlurChromeConfiguration.blurWidth, 280)
+    XCTAssertEqual(SessionTitleBlurChromeConfiguration.blurHeight, 96)
+    XCTAssertEqual(SessionTitleBlurChromeConfiguration.blurRadius, 56)
+    XCTAssertEqual(SessionTitleBlurChromeConfiguration.tintOpacity, 0.30)
     XCTAssertEqual(
       SessionTitleBlurChromeConfiguration.reducedTransparencyOpacity,
       0.82
@@ -51,7 +58,9 @@ final class SessionTitleBlurChromeTests: XCTestCase {
 
     XCTAssertTrue(source.contains("import SwiftUI"))
     XCTAssertTrue(source.contains("@Environment(\\.accessibilityReduceTransparency)"))
-    XCTAssertTrue(source.contains("RadialGradient("))
+    XCTAssertTrue(source.contains(".blur(radius:"))
+    XCTAssertFalse(source.contains("Circle()"))
+    XCTAssertFalse(source.contains("RadialGradient("))
     XCTAssertFalse(source.contains("import AppKit"))
     XCTAssertFalse(source.contains("NSViewRepresentable"))
     XCTAssertFalse(source.contains("NSVisualEffectView"))
