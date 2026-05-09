@@ -29,7 +29,7 @@ public enum HostStager {
     public static func stage(
         hostAppPath: URL,
         stageRoot: URL,
-        stagedBundleName: String = "Harness Monitor UI Testing.app",
+        stagedBundleName: String = "Harness Monitor UI Testing Audit.app",
         stagedBundleID: String,
         stagedBinaryName: String = "Harness Monitor UI Testing"
     ) throws -> Result {

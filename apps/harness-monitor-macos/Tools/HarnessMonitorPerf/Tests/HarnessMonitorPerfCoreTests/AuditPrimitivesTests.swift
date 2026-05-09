@@ -176,4 +176,34 @@ final class AuditPrimitivesTests: XCTestCase {
         XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("launch-dashboard"))
         XCTAssertTrue(ManifestBuilder.defaultTemplates.allocations.contains("offline-cached-open"))
     }
+
+    func testHostStagerUsesUniqueAuditBundleName() throws {
+        let sourceApp = workDir.appendingPathComponent("Harness Monitor UI Testing.app", isDirectory: true)
+        let sourceContents = sourceApp.appendingPathComponent("Contents", isDirectory: true)
+        let sourceMacOS = sourceContents.appendingPathComponent("MacOS", isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceMacOS, withIntermediateDirectories: true)
+        try Data().write(to: sourceMacOS.appendingPathComponent("Harness Monitor UI Testing"))
+        let plistData = try PropertyListSerialization.data(
+            fromPropertyList: [
+                "CFBundleExecutable": "Harness Monitor UI Testing",
+                "CFBundleIdentifier": "io.harnessmonitor.app.ui-testing",
+            ],
+            format: .xml,
+            options: 0
+        )
+        try plistData.write(to: sourceContents.appendingPathComponent("Info.plist"))
+
+        let staged = try HostStager.stage(
+            hostAppPath: sourceApp,
+            stageRoot: workDir.appendingPathComponent("staged-host", isDirectory: true),
+            stagedBundleID: "io.harnessmonitor.app.ui-testing.audit"
+        )
+
+        XCTAssertEqual(staged.stagedAppPath.lastPathComponent, "Harness Monitor UI Testing Audit.app")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: staged.stagedBinaryPath.path))
+        XCTAssertEqual(
+            PlistAccessor.value(at: staged.stagedAppPath.appendingPathComponent("Contents/Info.plist"), key: "CFBundleIdentifier"),
+            "io.harnessmonitor.app.ui-testing.audit"
+        )
+    }
 }

@@ -129,14 +129,7 @@ private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
   }
   func body(content: Content) -> some View {
     content
-      .overlay {
-        if let perfScenarioStateText {
-          AccessibilityTextMarker(
-            identifier: HarnessMonitorAccessibility.perfScenarioState,
-            text: perfScenarioStateText
-          )
-        }
-      }
+      .modifier(PerfScenarioStateMarker(text: perfScenarioStateText))
       .task {
         await runPerfScenarioIfNeeded()
       }
@@ -189,6 +182,24 @@ private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
     case .failed(let reason):
       perfScenarioFailureReason = reason
       publishPerfScenarioStatus(.failed)
+    }
+  }
+}
+
+private struct PerfScenarioStateMarker: ViewModifier {
+  let text: String?
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if let text {
+      content.overlay {
+        AccessibilityTextMarker(
+          identifier: HarnessMonitorAccessibility.perfScenarioState,
+          text: text
+        )
+      }
+    } else {
+      content
     }
   }
 }
