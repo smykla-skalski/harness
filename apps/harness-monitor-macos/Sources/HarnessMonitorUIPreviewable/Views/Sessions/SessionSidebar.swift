@@ -21,6 +21,7 @@ struct SessionSidebar: View {
   }
 
   var body: some View {
+    @Bindable var filters = state.decisionFilters
     List(selection: selectionBinding) {
       routeSection
       agentsSection
@@ -58,12 +59,12 @@ struct SessionSidebar: View {
       currentModifiers = modifiers
     }
     .searchable(
-      text: decisionQueryBinding,
-      isPresented: searchPresentation,
+      text: $filters.query,
+      isPresented: $searchPresentationState.isPresented,
       placement: .sidebar,
       prompt: "Filter decisions"
     )
-    .searchScopes(decisionScopeBinding) {
+    .searchScopes($filters.scope) {
       ForEach(DecisionsSidebarSearchScope.allCases) { scope in
         Label(scope.label, systemImage: scope.systemImage)
           .tag(scope)
@@ -95,7 +96,7 @@ struct SessionSidebar: View {
     if searchPresentationState.applyPendingPresentationIfNeeded(canPresent: canPresent) {
       return
     }
-    if !decisionQueryBinding.wrappedValue.isEmpty {
+    if !state.decisionFilters.query.isEmpty {
       searchPresentationState.isPresented = true
     }
   }
@@ -112,27 +113,6 @@ struct SessionSidebar: View {
     Binding(
       get: { state.selection },
       set: { state.selectFromSidebar($0) }
-    )
-  }
-
-  private var decisionQueryBinding: Binding<String> {
-    Binding(
-      get: { state.decisionFilters.query },
-      set: { state.decisionFilters.query = $0 }
-    )
-  }
-
-  private var decisionScopeBinding: Binding<DecisionsSidebarSearchScope> {
-    Binding(
-      get: { state.decisionFilters.scope },
-      set: { state.decisionFilters.scope = $0 }
-    )
-  }
-
-  private var searchPresentation: Binding<Bool> {
-    Binding(
-      get: { canPresentSearch && searchPresentationState.isPresented },
-      set: { searchPresentationState.isPresented = $0 }
     )
   }
 
