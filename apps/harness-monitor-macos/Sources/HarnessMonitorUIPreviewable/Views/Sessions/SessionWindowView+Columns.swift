@@ -8,6 +8,18 @@ public enum SessionWindowFocusModePolicy {
 }
 
 extension SessionWindowView {
+  func pendingUserPrompt(for agentID: String) -> AgentPendingUserPrompt? {
+    guard
+      let prompt = snapshot?.detail?.agentActivity
+        .first(where: { $0.agentId == agentID })?
+        .pendingUserPrompt,
+      prompt.primaryQuestion != nil
+    else {
+      return nil
+    }
+    return prompt
+  }
+
   var sessionSidebarSearchAvailable: Bool {
     !focusMode && columnVisibilityBinding.wrappedValue != .detailOnly
   }
@@ -246,6 +258,7 @@ extension SessionWindowView {
           sessionID: token.sessionID,
           agent: agent,
           tui: agentTui(for: agent),
+          pendingPrompt: pendingUserPrompt(for: agent.agentId),
           composerFocusRequestID: stateCache.agentComposerFocusRequestID
         )
       } else {
