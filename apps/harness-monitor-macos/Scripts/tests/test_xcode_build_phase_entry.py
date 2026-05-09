@@ -10,7 +10,9 @@ from pathlib import Path
 
 
 APP_ROOT = Path(__file__).resolve().parents[2]
-BUILD_PHASES_SOURCE = APP_ROOT / "Tuist" / "ProjectDescriptionHelpers" / "BuildPhases.swift"
+BUILD_PHASES_SOURCE = (
+    APP_ROOT / "Tuist" / "ProjectDescriptionHelpers" / "BuildPhases.swift"
+)
 ENTRY_SCRIPT_SOURCE = APP_ROOT / "Scripts" / "lib" / "xcode-build-phase-entry.sh"
 
 
@@ -20,7 +22,9 @@ def write_executable(path: Path, content: str) -> None:
 
 
 class XcodeBuildPhaseEntryTests(unittest.TestCase):
-    def test_build_phases_route_bash_scripts_through_xcode_build_phase_entry(self) -> None:
+    def test_build_phases_route_bash_scripts_through_xcode_build_phase_entry(
+        self,
+    ) -> None:
         source = BUILD_PHASES_SOURCE.read_text()
 
         self.assertIn("scriptPhaseBody(", source)
@@ -41,9 +45,29 @@ class XcodeBuildPhaseEntryTests(unittest.TestCase):
             'script: "strip-test-xattrs.sh"',
             source,
         )
-        self.assertNotIn("Helpers/harness.cstemp", source)
 
-    def test_entry_script_unsets_swift_debug_environment_before_bash_starts(self) -> None:
+    def test_sandboxed_build_phases_declare_inputs_and_use_dependency_analysis(
+        self,
+    ) -> None:
+        source = BUILD_PHASES_SOURCE.read_text()
+
+        required_inputs = (
+            '"$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.plist"',
+            '"$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist"',
+            '"$(PROJECT_DIR)/HarnessMonitorDaemon.entitlements"',
+            '"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness.cstemp"',
+            'inputPaths: variant.inputPaths + ["$(TARGET_BUILD_DIR)/$(FULL_PRODUCT_NAME)"]',
+        )
+
+        for required_input in required_inputs:
+            with self.subTest(required_input=required_input):
+                self.assertIn(required_input, source)
+
+        self.assertNotIn("basedOnDependencyAnalysis: false", source)
+
+    def test_entry_script_unsets_swift_debug_environment_before_bash_starts(
+        self,
+    ) -> None:
         self.assertTrue(
             ENTRY_SCRIPT_SOURCE.exists(),
             f"Missing build phase entry helper: {ENTRY_SCRIPT_SOURCE}",
@@ -59,9 +83,7 @@ class XcodeBuildPhaseEntryTests(unittest.TestCase):
             entry_script.chmod(entry_script.stat().st_mode | stat.S_IXUSR)
             write_executable(
                 target_script,
-                "#!/bin/bash\n"
-                "set -euo pipefail\n"
-                "env | sort > \"$CAPTURED_ENV\"\n",
+                '#!/bin/bash\nset -euo pipefail\nenv | sort > "$CAPTURED_ENV"\n',
             )
 
             env = os.environ.copy()

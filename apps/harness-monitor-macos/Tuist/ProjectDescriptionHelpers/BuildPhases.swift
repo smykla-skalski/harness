@@ -46,11 +46,23 @@ public enum BuildPhases {
                 script: "bundle-daemon-agent.sh"
             ),
             name: "Bundle Daemon Agent",
+            inputPaths: [
+                "$(PROJECT_DIR)/Scripts/lib/xcode-build-phase-entry.sh",
+                "$(PROJECT_DIR)/Scripts/bundle-daemon-agent.sh",
+                "$(PROJECT_DIR)/Scripts/lib/daemon-bundle-env.sh",
+                "$(PROJECT_DIR)/Scripts/lib/daemon-cargo-build.sh",
+                "$(PROJECT_DIR)/Scripts/lib/monitor-lanes.sh",
+                "$(PROJECT_DIR)/Scripts/lib/swift-tool-env.sh",
+                "$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.plist",
+                "$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist",
+                "$(PROJECT_DIR)/HarnessMonitorDaemon.entitlements"
+            ],
             outputPaths: [
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness",
+                "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness.cstemp",
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/io.harnessmonitor.daemon.plist"
             ],
-            basedOnDependencyAnalysis: false
+            basedOnDependencyAnalysis: true
         )
     }
 
@@ -58,8 +70,8 @@ public enum BuildPhases {
         case monitorApp = "monitor-app"
         case uiTestHost = "ui-test-host"
 
-        var inputPaths: [String] {
-            var paths: [String] = [
+        var inputPaths: [FileListGlob] {
+            var paths: [FileListGlob] = [
                 "$(PROJECT_DIR)/HarnessMonitorBase.entitlements",
                 "$(PROJECT_DIR)/HarnessMonitor.entitlements"
             ]
@@ -94,10 +106,11 @@ public enum BuildPhases {
                 arguments: " \(variant.rawValue)"
             ),
             name: "Clear Gatekeeper Metadata",
+            inputPaths: variant.inputPaths + ["$(TARGET_BUILD_DIR)/$(FULL_PRODUCT_NAME)"],
             outputPaths: [
                 "$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/HarnessMonitorBuildProvenance.plist"
             ],
-            basedOnDependencyAnalysis: false
+            basedOnDependencyAnalysis: true
         )
     }
 
