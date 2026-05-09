@@ -126,6 +126,14 @@ struct SessionWindowCreateForm: View {
           .accessibilityLabel("Prompt")
       }
       if draft.kind == .agent {
+        if let bannerKind = bridgeBannerKind {
+          Section {
+            SessionCreateBridgeBanner(
+              store: store,
+              copy: bannerKind.copy(store: store)
+            )
+          }
+        }
         SessionWindowCreateFormAgentLaunchToggle(useCodex: useCodex)
         if draft.useCodex {
           SessionWindowCreateFormCodexFields(
@@ -236,6 +244,17 @@ struct SessionWindowCreateForm: View {
   private func cancel() {
     validationResult = nil
     state.cancelCreateDraft(draft.kind)
+  }
+
+  private var bridgeBannerKind: SessionCreateBridgeBannerKind? {
+    guard draft.kind == .agent else { return nil }
+    if draft.useCodex {
+      return store.codexUnavailable ? .codex : nil
+    }
+    if draft.launchSelection.isAcp {
+      return store.acpUnavailable ? .acp : nil
+    }
+    return store.agentTuiUnavailable ? .agentTui : nil
   }
 }
 
