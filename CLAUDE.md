@@ -41,6 +41,10 @@ Never bump versions without explicit user approval. Changes to shipped `harness`
 
 Diagnostic output uses `tracing` macros. Default filter: `RUST_LOG=harness=info`.
 
+## UI test failures
+
+When UI tests are failing, run one failing test at a time using `XCODE_ONLY_TESTING`. Never run a broad suite or multiple failing tests together — XCUITest runs block the whole machine and the run time compounds fast. Fix one, verify it passes, then move to the next.
+
 ## Working session efficiency
 
 Token-burn lessons from real Claude Code sessions. Apply to every Harness Monitor crash or regression triage:
