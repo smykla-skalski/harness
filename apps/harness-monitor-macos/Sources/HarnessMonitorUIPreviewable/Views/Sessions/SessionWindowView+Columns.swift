@@ -45,12 +45,14 @@ extension SessionWindowView {
   }
 
   @ViewBuilder var focusModeSurface: some View {
-    if SessionWindowFocusModePolicy.usesRouteContent(selection: stateCache.selection) {
-      contentColumn
-    } else {
-      detailFocus
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .backgroundExtensionEffect()
+    sessionBannerStack {
+      if SessionWindowFocusModePolicy.usesRouteContent(selection: stateCache.selection) {
+        contentColumn
+      } else {
+        detailFocus
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .backgroundExtensionEffect()
+      }
     }
   }
 
@@ -65,17 +67,29 @@ extension SessionWindowView {
       .padding(.top, HarnessMonitorTheme.spacingLG)
       .navigationSplitViewColumnWidth(min: 190, ideal: sidebarWidth, max: 360)
     } detail: {
-      SessionContentDetailSplitView(contentWidth: $contentColumnWidth) {
-        contentColumn
-          .padding(.top, HarnessMonitorTheme.spacingLG)
-      } detail: {
-        detailColumn
-          .padding(.top, HarnessMonitorTheme.spacingLG)
+      sessionBannerStack {
+        SessionContentDetailSplitView(contentWidth: $contentColumnWidth) {
+          contentColumn
+            .padding(.top, HarnessMonitorTheme.spacingLG)
+        } detail: {
+          detailColumn
+            .padding(.top, HarnessMonitorTheme.spacingLG)
+        }
       }
-      .navigationTitle(summary?.displayTitle ?? "Session")
-      .navigationSubtitle(token.sessionID)
     }
     .navigationSplitViewStyle(.prominentDetail)
+  }
+
+  @ViewBuilder
+  private func sessionBannerStack<Content: View>(
+    @ViewBuilder content: () -> Content
+  ) -> some View {
+    SessionBannerStack(
+      store: store,
+      sessionID: token.sessionID,
+      pendingDecisionCount: 0,
+      content: content
+    )
   }
 
   @ViewBuilder var sessionSurface: some View {
