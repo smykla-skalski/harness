@@ -115,12 +115,20 @@ struct SessionWindowCreateForm: View {
           .frame(minHeight: metrics.promptMinHeight)
           .focused(focusedFieldBinding, equals: .prompt)
           .accessibilityLabel("Prompt")
-        if draft.kind == .agent {
-          agentConfigurationFields
-        }
       } header: {
         Text(draft.kind.title)
           .harnessNativeFormSectionHeader()
+      }
+      if draft.kind == .agent, let agentBridgeBannerKind {
+        Section {
+          SessionCreateBridgeBanner(
+            store: store,
+            copy: agentBridgeBannerKind.copy(store: store)
+          )
+        }
+      }
+      if draft.kind == .agent {
+        agentConfigurationSections
       }
       if draft.kind == .task {
         Section {
@@ -168,11 +176,13 @@ struct SessionWindowCreateForm: View {
         focusedField = .name
       }
       prefillAgentNameIfEligible()
-      await SessionWindowCreateFormCatalogs.loadAgentCatalogStateIfNeeded(
-        store: store,
-        state: state,
-        draft: draft
-      )
+      if draft.kind == .agent, embedsRuntimeConfiguration {
+        await SessionWindowCreateFormCatalogs.loadAgentCatalogStateIfNeeded(
+          store: store,
+          state: state,
+          draft: draft
+        )
+      }
     }
     .onChange(of: draft.runtime) { _, _ in
       prefillAgentNameIfEligible()
@@ -320,6 +330,17 @@ extension SessionWindowCreateForm {
     )
   }
 
+  private var agentBridgeBannerKind: SessionCreateBridgeBannerKind? {
+    guard draft.kind == .agent else { return nil }
+    if draft.useCodex {
+      return store.codexUnavailable ? .codex : nil
+    }
+    if normalizedLaunchSelection.isAcp {
+      return store.acpUnavailable ? .acp : nil
+    }
+    return store.agentTuiUnavailable ? .agentTui : nil
+  }
+
   private var launchSelection: Binding<AgentLaunchSelection> {
     Binding(
       get: { normalizedLaunchSelection },
@@ -440,77 +461,153 @@ extension SessionWindowCreateForm {
   }
 
   @ViewBuilder
-  private var agentConfigurationFields: some View {
+  private var agentConfigurationSections: some View {
     if draft.useCodex {
       codexConfigurationFields
     } else {
-      terminalConfigurationFields
+      terminalConfigurationSections
     }
   }
 
   @ViewBuilder
-  private var terminalConfigurationFields: some View {
-    terminalAdvancedOverrides
+  private var embeddedAgentRuntimeSections: some View {
+    Section {
+      Picker("Create", selection: useCodex) {
+        Text("Terminal").tag(false)
+        Text("Codex").tag(true)
+      }
+      .pickerStyle(.segmented)
+      .harnessNativeFormControl()
+      .accessibilityLabel("Create")
 
-    if let option = selectedCapabilityOption, let choice = selectedTransportChoice {
-      terminalRuntimeConfigurationFields
+      if catalogState.isLoading && !catalogState.hasLoaded {
+        Label("Checking available runtimes", systemImage: "clock")
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      }
+    } header: {
+      Text("Create")
+        .harnessNativeFormSectionHeader()
+    } footer: {
+      Text(embeddedCreateDescription)
+        .harnessNativeFormSectionFooter()
+    }
+
+    if !draft.useCodex {
+      Section {
+        if let capabilityValidation = validationMessage(for: .capability) {
+          Text(capabilityValidation)
+            .scaledFont(.caption)
+            .foregroundStyle(.red)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+
+        SessionWindowCreateProviderButtonList(
+          options: activeAgentCapabilityOptions,
+          selectedProviderID: selectedCapabilityOption?.id,
+          onSelect: selectProvider
+        )
+      } header: {
+        Text("Provider")
+          .harnessNativeFormSectionHeader()
+      } footer: {
+        Text(embeddedProviderDescription)
+          .harnessNativeFormSectionFooter()
+      }
+    }
+  }
+
+  private var embeddedCreateDescription: String {
+    if draft.useCodex {
+      return "The form below holds the prompt and configuration for this run."
+    }
+    return "Choose a provider below, then finish configuration in the remaining form sections."
+  }
+
+  private var embeddedProviderDescription: String {
+    if let option = selectedCapabilityOption {
+      return
+        "\(SessionWindowCreateProviderListRow.providerSummary(for: option)) "
+        + "Finish the remaining setup in the sections below."
+    }
+    return "Choose how this agent starts. The remaining form sections hold the configuration and advanced overrides."
+  }
+
+  @ViewBuilder
+  private var terminalConfigurationSections: some View {
+    if let option = selectedCapabilityOption, option.transportChoices.count > 1 {
+      terminalTransportChoicesSection(option: option)
+    } else if !embedsRuntimeConfiguration, selectedCapabilityOption == nil {
+      Section {
+        Text("Choose a provider in the middle pane to configure this agent.")
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .fixedSize(horizontal: false, vertical: true)
+      } header: {
+        Text("Provider")
+          .harnessNativeFormSectionHeader()
+      }
+    }
+
+    terminalRuntimeConfigurationSection
+    terminalSessionSection
+    terminalAdvancedOverridesSection
+  }
+
+  private var terminalSessionSection: some View {
+    Section {
       roleMenu
       if showsAcpFallbackRoleMenu {
         acpFallbackRoleMenu
       }
       personaMenu
-      terminalTransportNotice(option: option, choice: choice)
-    } else {
-      SessionWindowCreateFieldBlock(title: "Provider") {
-        Text(
-          embedsRuntimeConfiguration
-            ? "Choose a provider in the middle pane to configure this agent."
-            : "Choose a provider above to configure this agent."
-        )
-          .scaledFont(.caption)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .fixedSize(horizontal: false, vertical: true)
-      }
-      roleMenu
-      personaMenu
     }
   }
 
-  private var terminalAdvancedOverrides: some View {
-    DisclosureGroup("Advanced overrides") {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-        SessionWindowCreateFieldBlock(
-          title: "Project directory override"
-        ) {
-          TextField("Optional project directory override", text: projectDirOverride)
-            .harnessNativeTextField()
-            .accessibilityLabel("Project directory override")
-        }
-
-        if !normalizedLaunchSelection.isAcp {
+  private var terminalAdvancedOverridesSection: some View {
+    Section {
+      DisclosureGroup("Advanced overrides") {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
           SessionWindowCreateFieldBlock(
-            title: "Command override",
-            help: "One argument per line. The first line is the executable."
+            title: "Project directory override"
           ) {
-            TextEditor(text: argvOverrideText)
-              .scaledFont(.body)
-              .frame(minHeight: 100)
-              .accessibilityLabel("Command override")
+            TextField("Optional project directory override", text: projectDirOverride)
+              .harnessNativeTextField()
+              .accessibilityLabel("Project directory override")
+          }
+
+          if !normalizedLaunchSelection.isAcp {
+            SessionWindowCreateFieldBlock(
+              title: "Command override",
+              help: "One argument per line. The first line is the executable."
+            ) {
+              TextEditor(text: argvOverrideText)
+                .scaledFont(.body)
+                .frame(minHeight: 100)
+                .accessibilityLabel("Command override")
+            }
           }
         }
+        .padding(.top, HarnessMonitorTheme.spacingSM)
       }
-      .padding(.top, HarnessMonitorTheme.spacingSM)
+      .accessibilityLabel("Advanced overrides")
+    } footer: {
+      Text(advancedOverridesDescription)
+        .harnessNativeFormSectionFooter()
     }
-    .accessibilityLabel("Advanced overrides")
+  }
+
+  private var advancedOverridesDescription: String {
+    if normalizedLaunchSelection.isAcp {
+      return "Set an optional project directory override for this agent."
+    }
+    return "Set an optional project directory override. Use one argument per line for a command override; the first line is the executable."
   }
 
   @ViewBuilder
   private func terminalTransportChoicesSection(option: AgentCapabilityOption) -> some View {
     if option.transportChoices.count > 1 {
-      SessionWindowCreateFieldBlock(
-        title: "Start with",
-        help: "Choose whether this provider opens in Terminal or joins with project access."
-      ) {
+      Section {
         ViewThatFits(in: .horizontal) {
           HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
             ForEach(option.transportChoices) { transportChoice in
@@ -544,18 +641,30 @@ extension SessionWindowCreateForm {
             }
           }
         }
+
+        if let choice = selectedTransportChoice {
+          terminalTransportNotice(option: option, choice: choice)
+        }
+      } header: {
+        Text("Start with")
+          .harnessNativeFormSectionHeader()
+      } footer: {
+        Text("Choose whether this provider opens in Terminal or joins with project access.")
+          .harnessNativeFormSectionFooter()
       }
     }
   }
 
   @ViewBuilder
-  private var terminalRuntimeConfigurationFields: some View {
-    if let runtime = selectedTerminalRuntime, let catalog = selectedTerminalCatalog {
-      SessionWindowCreateFieldBlock(title: "Model") {
-        Picker(
-          selectedTerminalModelMenuTitle(runtime: runtime, catalog: catalog),
-          selection: terminalModelPickerSelection(for: runtime, catalog: catalog)
-        ) {
+  private var terminalRuntimeConfigurationSection: some View {
+    let option = selectedCapabilityOption
+    let choice = selectedTransportChoice
+
+    Section {
+      if let runtime = selectedTerminalRuntime, let catalog = selectedTerminalCatalog {
+        let modelSelection = terminalModelPickerSelection(for: runtime, catalog: catalog)
+
+        Picker("Model", selection: modelSelection) {
           ForEach(catalog.models) { model in
             Text(model.displayName).tag(model.id)
           }
@@ -566,9 +675,7 @@ extension SessionWindowCreateForm {
         .harnessNativeFormControl()
         .accessibilityLabel("Runtime model")
 
-        if terminalModelPickerSelection(for: runtime, catalog: catalog).wrappedValue
-          == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag
-        {
+        if modelSelection.wrappedValue == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag {
           TextField(
             "Provider-specific model id",
             text: terminalCustomModel(for: runtime)
@@ -576,11 +683,9 @@ extension SessionWindowCreateForm {
           .harnessNativeTextField()
           .accessibilityLabel("Custom runtime model")
         }
-      }
 
-      let effortValues = terminalEffortValues(for: runtime, catalog: catalog)
-      if !effortValues.isEmpty {
-        SessionWindowCreateFieldBlock(title: "Effort") {
+        let effortValues = terminalEffortValues(for: runtime, catalog: catalog)
+        if !effortValues.isEmpty {
           Picker("Effort", selection: terminalEffortSelection(for: runtime, values: effortValues)) {
             ForEach(effortValues, id: \.self) { level in
               Text(level.capitalized).tag(level)
@@ -590,22 +695,34 @@ extension SessionWindowCreateForm {
           .harnessNativeFormControl()
           .accessibilityLabel("Runtime effort")
         }
-      }
-    } else if normalizedLaunchSelection.isAcp {
-      SessionWindowCreateFieldBlock(title: "Project access") {
+      } else if normalizedLaunchSelection.isAcp {
         Text("Project access uses the provider's configured defaults.")
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .fixedSize(horizontal: false, vertical: true)
-      }
-    } else {
-      SessionWindowCreateFieldBlock(title: "Runtime defaults") {
+      } else {
         Text("This runtime does not publish additional model controls here.")
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .fixedSize(horizontal: false, vertical: true)
       }
+
+      if let option, let choice, option.transportChoices.count <= 1 {
+        terminalTransportNotice(option: option, choice: choice)
+      }
+    } header: {
+      Text("Runtime")
+        .harnessNativeFormSectionHeader()
+    } footer: {
+      if let option, let choice {
+        Text(SessionWindowCreateFormCatalogs.transportSummary(option: option, choice: choice))
+          .harnessNativeFormSectionFooter()
+      }
     }
+  }
+
+  private func selectProvider(_ option: AgentCapabilityOption) {
+    launchSelection.wrappedValue = option.normalizedSelection(for: launchSelection.wrappedValue)
   }
 
   private var roleMenu: some View {

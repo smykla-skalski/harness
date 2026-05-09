@@ -56,12 +56,6 @@ struct SessionWindowCreateAgentRuntimeContent: View {
     )
   }
 
-  private var selectedTransportChoice: AgentCapabilityTransportChoice? {
-    selectedCapabilityOption.map { option in
-      option.transportChoice(for: normalizedLaunchSelection)
-    }
-  }
-
   private var bridgeBannerKind: SessionCreateBridgeBannerKind? {
     guard draft.kind == .agent else { return nil }
     if draft.useCodex {
@@ -146,6 +140,7 @@ struct SessionWindowCreateAgentRuntimeContent: View {
 
       availabilityNote
     }
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
   }
 
   private var compactHeader: some View {
@@ -188,12 +183,46 @@ struct SessionWindowCreateAgentRuntimeContent: View {
 
   private var modePicker: some View {
     Picker("Create", selection: useCodex) {
-      Text("Terminal").tag(false)
-      Text("Codex").tag(true)
+      Text("Terminal")
+        .tag(false)
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.segmentedOption(
+            HarnessMonitorAccessibility.sessionWindowCreateModePicker,
+            option: "Terminal"
+          )
+        )
+        .harnessMCPButton(
+          HarnessMonitorAccessibility.segmentedOption(
+            HarnessMonitorAccessibility.sessionWindowCreateModePicker,
+            option: "Terminal"
+          ),
+          label: "Terminal",
+          pressAction: { useCodex.wrappedValue = false }
+        )
+      Text("Codex")
+        .tag(true)
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.segmentedOption(
+            HarnessMonitorAccessibility.sessionWindowCreateModePicker,
+            option: "Codex"
+          )
+        )
+        .harnessMCPButton(
+          HarnessMonitorAccessibility.segmentedOption(
+            HarnessMonitorAccessibility.sessionWindowCreateModePicker,
+            option: "Codex"
+          ),
+          label: "Codex",
+          pressAction: { useCodex.wrappedValue = true }
+        )
     }
     .labelsHidden()
     .pickerStyle(.segmented)
     .harnessNativeFormControl()
+    .harnessMCPButton(
+      HarnessMonitorAccessibility.sessionWindowCreateModePicker,
+      label: "Create"
+    )
     .accessibilityLabel("Create")
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowCreateModePicker)
   }
@@ -201,26 +230,14 @@ struct SessionWindowCreateAgentRuntimeContent: View {
   @ViewBuilder
   private var providerSection: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-      SessionWindowCreateSectionHeading(
-        title: "Provider",
-        description: providerDescription
-      )
+      SessionWindowCreateSidebarSectionHeader(title: "Provider")
       providerRows
     }
   }
 
-  private var providerDescription: String {
-    if let option = selectedCapabilityOption {
-      return
-        "\(SessionWindowCreateProviderListRow.providerSubtitle(for: option)) "
-        + "Finish the remaining setup in the form."
-    }
-    return "Choose how this agent starts. The form holds the prompt, configuration, and advanced overrides."
-  }
-
   private var providerRows: some View {
-    VStack(spacing: 0) {
-      ForEach(Array(activeAgentOptions.enumerated()), id: \.element.id) { index, option in
+    VStack(spacing: HarnessMonitorTheme.spacingXS) {
+      ForEach(activeAgentOptions) { option in
         Button {
           selectProvider(option)
         } label: {
@@ -228,8 +245,6 @@ struct SessionWindowCreateAgentRuntimeContent: View {
             option: option,
             isSelected: selectedProviderID == option.id
           )
-          .padding(.vertical, HarnessMonitorTheme.spacingXS)
-          .padding(.horizontal, embeddedInForm ? 0 : HarnessMonitorTheme.spacingXS)
           .frame(maxWidth: .infinity, alignment: .leading)
           .contentShape(Rectangle())
         }
@@ -239,10 +254,6 @@ struct SessionWindowCreateAgentRuntimeContent: View {
           selectedProviderID == option.id ? "Selected" : ""
         )
         .accessibilityHint("Chooses \(option.title)")
-
-        if index < activeAgentOptions.count - 1 {
-          Divider()
-        }
       }
     }
   }
@@ -315,6 +326,26 @@ private struct SessionWindowCreateSectionHeading: View {
   }
 }
 
+private struct SessionWindowCreateSidebarSectionHeader: View {
+  let title: String
+
+  var body: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      Text(title.uppercased())
+        .scaledFont(.caption2.weight(.semibold))
+        .tracking(HarnessMonitorTheme.uppercaseTracking)
+        .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
+        .accessibilityAddTraits(.isHeader)
+
+      Rectangle()
+        .fill(Color.secondary.opacity(0.18))
+        .frame(height: 1)
+        .accessibilityHidden(true)
+    }
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+  }
+}
+
 struct SessionWindowCreateFieldBlock<Content: View>: View {
   let title: String
   let help: String?
@@ -348,7 +379,7 @@ struct SessionWindowCreateFieldBlock<Content: View>: View {
   }
 }
 
-private struct SessionWindowCreateProviderListRow: View {
+struct SessionWindowCreateProviderListRow: View {
   let option: AgentCapabilityOption
   let isSelected: Bool
 
@@ -374,6 +405,8 @@ private struct SessionWindowCreateProviderListRow: View {
           Text(option.title)
             .scaledFont(.body.weight(.semibold))
             .lineLimit(1)
+            .truncationMode(.tail)
+            .foregroundStyle(HarnessMonitorTheme.ink)
 
           Spacer(minLength: HarnessMonitorTheme.spacingSM)
 
@@ -382,17 +415,20 @@ private struct SessionWindowCreateProviderListRow: View {
             .foregroundStyle(statusTint)
             .multilineTextAlignment(.trailing)
             .lineLimit(1)
+            .truncationMode(.tail)
+            .fixedSize(horizontal: true, vertical: false)
         }
 
         Text(Self.providerSubtitle(for: option))
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .lineLimit(2)
-          .fixedSize(horizontal: false, vertical: true)
+          .lineLimit(1)
+          .truncationMode(.tail)
       }
     }
-    .padding(.horizontal, HarnessMonitorTheme.spacingSM)
-    .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+    .padding(.vertical, HarnessMonitorTheme.spacingSM)
+    .frame(maxWidth: .infinity, alignment: .leading)
     .background(rowTint)
     .clipShape(.rect(cornerRadius: HarnessMonitorTheme.cornerRadiusSM))
     .accessibilityElement(children: .combine)
@@ -419,6 +455,10 @@ private struct SessionWindowCreateProviderListRow: View {
     }
   }
 
+  static func providerSummary(for option: AgentCapabilityOption) -> String {
+    providerSubtitle(for: option)
+  }
+
   static func providerIconName(for option: AgentCapabilityOption) -> String {
     switch option.id {
     case "codex":
@@ -442,6 +482,33 @@ private struct SessionWindowCreateProviderListRow: View {
     [option.title, providerSubtitle(for: option), option.availabilityState.compactTitle]
       .compactMap { $0 }
       .joined(separator: ", ")
+  }
+}
+
+struct SessionWindowCreateProviderButtonList: View {
+  let options: [AgentCapabilityOption]
+  let selectedProviderID: String?
+  let onSelect: (AgentCapabilityOption) -> Void
+
+  var body: some View {
+    VStack(spacing: HarnessMonitorTheme.spacingXS) {
+      ForEach(options) { option in
+        Button {
+          onSelect(option)
+        } label: {
+          SessionWindowCreateProviderListRow(
+            option: option,
+            isSelected: selectedProviderID == option.id
+          )
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel(SessionWindowCreateProviderListRow.accessibilityLabel(for: option))
+        .accessibilityValue(selectedProviderID == option.id ? "Selected" : "")
+        .accessibilityHint("Chooses \(option.title)")
+      }
+    }
   }
 }
 

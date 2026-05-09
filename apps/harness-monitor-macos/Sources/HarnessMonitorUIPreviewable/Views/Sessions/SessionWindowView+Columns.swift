@@ -76,6 +76,7 @@ extension SessionWindowView {
       SessionSidebar(
         store: store,
         snapshot: snapshot,
+        sessionCodexRuns: sessionCodexRuns,
         decisions: matchingDecisions,
         canPresentSearch: sessionSidebarSearchAvailable,
         state: stateCache
@@ -307,7 +308,7 @@ extension SessionWindowView {
         }
       }
     case .codexRun(_, let runID):
-      if let run = store.selectedCodexRuns.first(where: { $0.runId == runID }) {
+      if let run = sessionCodexRuns.first(where: { $0.runId == runID }) {
         SessionCodexRunDetailSection(store: store, run: run)
       } else {
         SessionDetailEmptySurface {
@@ -334,5 +335,9 @@ extension SessionWindowView {
         )
       }
     }
+  }
+
+  var sessionCodexRuns: [CodexRunSnapshot] {
+    store.selectedCodexRuns.filter { $0.sessionId == token.sessionID }
   }
 }
