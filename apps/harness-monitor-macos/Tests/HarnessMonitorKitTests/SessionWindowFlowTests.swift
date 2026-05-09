@@ -613,12 +613,11 @@ struct SessionWindowFlowTests {
     #expect(values[SessionPendingDecisionBannerSettings.focusModeEnabledKey] as? Bool == true)
   }
 
-  @Test("Open Recent toggle uses the canonical close-after-pick copy")
-  func openRecentCloseAfterPickUsesCanonicalVisibleCopy() throws {
+  @Test("Open Recent window does not show the close-after-pick checkbox")
+  func openRecentDoesNotRenderCloseAfterPickCheckbox() throws {
     let source = try previewableSourceFile(named: "Views/Sessions/OpenRecentView.swift")
 
-    #expect(source.contains("Toggle(\"Close Open Recent after picking a session\", isOn: $closeAfterPick)"))
-    #expect(!source.contains("Toggle(\"Close after opening a session\", isOn: $closeAfterPick)"))
+    #expect(!source.contains("Toggle(\"Close Open Recent after picking a session\", isOn: $closeAfterPick)"))
   }
 
   @MainActor

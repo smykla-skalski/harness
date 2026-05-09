@@ -11,10 +11,6 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.open.recent.projects"
     )
     #expect(
-      HarnessMonitorAccessibility.openRecentRefreshButton
-        == "harness.open.recent.refresh"
-    )
-    #expect(
       HarnessMonitorAccessibility.openRecentOpenFolderButton
         == "harness.open.recent.open-folder"
     )
@@ -36,8 +32,16 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.session.window.toolbar.status"
     )
     #expect(
+      HarnessMonitorAccessibility.sessionWindowToolbarSeparatorSuppressed
+        == "harness.session.window.toolbar.separator-suppressed"
+    )
+    #expect(
       HarnessMonitorAccessibility.sessionWindowFocusModeButton
         == "harness.session.window.toolbar.focus-mode"
+    )
+    #expect(
+      HarnessMonitorAccessibility.sessionWindowCreateModePicker
+        == "harness.session.window.create.mode"
     )
     #expect(
       HarnessMonitorAccessibility.sessionNavigateBackButton
@@ -68,7 +72,9 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
   @Test("Session window accessibility identifiers are attached by production views")
   func sessionWindowAccessibilityIdentifiersAreAttachedByProductionViews() throws {
     let openRecentView = try sourceFile(named: "OpenRecentView.swift")
+    let rootView = try sourceFile(named: "SessionWindowRootView.swift")
     let windowView = try sourceFile(named: "SessionWindowView.swift")
+    let createRuntimeView = try sourceFile(named: "SessionWindowCreateAgentRuntimePane.swift")
     let sidebarView = try sourceFile(named: "SessionSidebar.swift")
     let inspectorView = try sourceFile(named: "SessionWindowInspector.swift")
     let toolbarView = try sourceFile(named: "SessionWindowToolbar.swift")
@@ -86,7 +92,17 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       )
     )
     #expect(windowView.contains("HarnessMonitorAccessibility.sessionWindowShell"))
+    #expect(
+      rootView.contains(
+        "HarnessMonitorAccessibility.sessionWindowToolbarSeparatorSuppressed"
+      )
+    )
     #expect(sidebarView.contains("HarnessMonitorAccessibility.sessionWindowSidebar"))
+    #expect(
+      createRuntimeView.contains(
+        "HarnessMonitorAccessibility.sessionWindowCreateModePicker"
+      )
+    )
     #expect(toolbarView.contains("HarnessMonitorAccessibility.sessionWindowFocusModeButton"))
     #expect(toolbarView.contains("HarnessMonitorAccessibility.sessionNavigateBackButton"))
     #expect(toolbarView.contains("HarnessMonitorAccessibility.sessionNavigateForwardButton"))

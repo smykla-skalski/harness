@@ -3,7 +3,6 @@ import SwiftUI
 
 public struct OpenRecentView: View {
   public let store: HarnessMonitorStore
-  public let refresh: (() -> Void)?
   @Environment(\.openWindow)
   private var openWindow
   @Environment(\.dismiss)
@@ -16,17 +15,12 @@ public struct OpenRecentView: View {
   private var reduceMotion
   @AppStorage(OpenRecentCloseAfterPickDefaults.storageKey)
   private var closeAfterPick = OpenRecentCloseAfterPickDefaults.defaultValue
-  @State private var refreshActivationCount = 0
   @State private var openFolderActivationCount = 0
   @State private var newSessionActivationCount = 0
   @State private var showsStartPanel = true
 
-  public init(
-    store: HarnessMonitorStore,
-    refresh: (() -> Void)? = nil
-  ) {
+  public init(store: HarnessMonitorStore) {
     self.store = store
-    self.refresh = refresh
   }
 
   private var groups: [OpenRecentProjectGroup] {
@@ -45,11 +39,9 @@ public struct OpenRecentView: View {
           OpenRecentStartPanel(
             groups: groups,
             dateTimeConfiguration: dateTimeConfiguration,
-            refresh: refreshAction,
             openFolder: openFolderAction,
             newSession: newSessionAction,
-            openSession: openSession,
-            closeAfterPick: $closeAfterPick
+            openSession: openSession
           )
           .transition(OpenRecentCloseAfterPickMotionPolicy.transition(reduceMotion: reduceMotion))
         }
@@ -71,16 +63,6 @@ public struct OpenRecentView: View {
 
   private var layoutScale: CGFloat {
     min(max(fontScale, 0.88), 1.18)
-  }
-
-  private func refreshAction() {
-    refreshActivationCount += 1
-    HarnessMonitorLogger.swiftui.info("Open Recent refresh action activated")
-    if let refresh {
-      refresh()
-    } else {
-      Task { await store.refreshOpenRecentSessions() }
-    }
   }
 
   private func openFolderAction() {
@@ -130,7 +112,7 @@ public struct OpenRecentView: View {
     if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
       AccessibilityTextMarker(
         identifier: HarnessMonitorAccessibility.openRecentActionState,
-        text: "refresh=\(refreshActivationCount);openFolder=\(openFolderActivationCount);newSession=\(newSessionActivationCount)"
+        text: "openFolder=\(openFolderActivationCount);newSession=\(newSessionActivationCount)"
       )
     }
   }
@@ -139,11 +121,9 @@ public struct OpenRecentView: View {
 private struct OpenRecentStartPanel: View {
   let groups: [OpenRecentProjectGroup]
   let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
-  let refresh: () -> Void
   let openFolder: () -> Void
   let newSession: () -> Void
   let openSession: (String) -> Void
-  @Binding var closeAfterPick: Bool
   @Environment(\.fontScale)
   private var fontScale
 
@@ -161,13 +141,6 @@ private struct OpenRecentStartPanel: View {
           shortcut: "⌘N",
           accessibilityID: HarnessMonitorAccessibility.openRecentNewSessionButton,
           action: newSession
-        )
-        actionButton(
-          "Refresh",
-          systemImage: "arrow.clockwise",
-          shortcut: "⌘R",
-          accessibilityID: HarnessMonitorAccessibility.openRecentRefreshButton,
-          action: refresh
         )
         actionButton(
           "Open Folder",
@@ -196,12 +169,6 @@ private struct OpenRecentStartPanel: View {
           }
         }
       }
-      Toggle("Close Open Recent after picking a session", isOn: $closeAfterPick)
-        .toggleStyle(.checkbox)
-        .scaledFont(.caption)
-        .foregroundStyle(.secondary)
-        .accessibilityLabel("Close Open Recent after picking a session")
-        .accessibilityHint("When enabled, this welcome window closes after a session opens.")
     }
     .frame(width: panelWidth)
   }
@@ -282,7 +249,6 @@ private struct OpenRecentStartPanel: View {
 
   private func keyEquivalent(for title: String) -> KeyEquivalent {
     switch title {
-    case "Refresh": "r"
     case "Open Folder": "o"
     case "New Session": "n"
     default: "o"

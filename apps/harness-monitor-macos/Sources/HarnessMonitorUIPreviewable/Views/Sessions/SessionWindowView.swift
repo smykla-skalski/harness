@@ -51,6 +51,9 @@ public struct SessionWindowView: View {
   var columnVisibilityRaw = "automatic"
   @AccessibilityFocusState
   private var primaryContentAccessibilityFocused: Bool
+  @AppStorage(HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
+  private var mcpRegistryHostEnabled = HarnessMonitorMCPSettingsDefaults
+    .registryHostEnabledDefault
   @State private var snapshotStorage: HarnessMonitorSessionWindowSnapshot?
   @State private var isLoadingStorage = false
   @State private var didLoadSnapshotStorage = false
@@ -272,14 +275,64 @@ public struct SessionWindowView: View {
   @ToolbarContentBuilder
   private var sessionToolbar: some ToolbarContent {
     SessionWindowToolbar(
-      store: store,
-      snapshot: snapshot,
-      isLoading: isLoading,
-      summary: summary,
-      connectionTitle: connectionTitle,
-      sourceSystemImage: sourceSystemImage,
+      model: sessionToolbarModel,
+      onToggleSleepPrevention: { store.sleepPreventionEnabled.toggle() },
       state: stateCache,
       focusMode: $focusMode
+    )
+  }
+
+  private var sessionToolbarModel: SessionWindowToolbarModel {
+    let toolbar = store.contentUI.toolbar
+    let chrome = store.contentUI.chrome
+    let metrics = store.connectionMetrics
+    let sourceTitle: String =
+      if snapshot == nil {
+        "Loading"
+      } else if isLoading || snapshot?.source == nil {
+        "Refreshing"
+      } else {
+        snapshot?.source.rawValue.capitalized ?? "Loading"
+      }
+    let sourceTint: SessionToolbarSourceTint =
+      if isLoading || snapshot?.source == nil {
+        .tertiary
+      } else {
+        switch snapshot?.source {
+        case .live:
+          .success
+        case .cache:
+          .disabledConnection
+        case .catalog:
+          .tertiary
+        case .none:
+          .tertiary
+        }
+      }
+    let connectionSummaryText =
+      if metrics.connectedSince != nil {
+        "Connection: \(metrics.transportKind.title)"
+      } else {
+        "Connection: \(connectionTitle)"
+      }
+    return SessionWindowToolbarModel(
+      canNavigateBack: toolbar.canNavigateBack,
+      canNavigateForward: toolbar.canNavigateForward,
+      sleepPreventionPresentation: SleepPreventionToolbarPresentation(
+        isEnabled: toolbar.sleepPreventionEnabled
+      ),
+      connectionMetrics: metrics,
+      sourceTitle: sourceTitle,
+      sourceSystemImage: sourceSystemImage,
+      sourceTint: sourceTint,
+      statusStripState: SessionToolbarCenterpieceStatusStripState(
+        daemonOwnership: store.daemonOwnership,
+        bridgeRunning: store.daemonStatus?.manifest?.hostBridge.running == true,
+        mcpStatus: chrome.mcpStatus,
+        isMCPRegistryHostEnabled: mcpRegistryHostEnabled
+      ),
+      connectionSummaryText: connectionSummaryText,
+      sessionStatusTitle: summary?.status.title ?? "Loading"
     )
   }
 

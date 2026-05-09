@@ -360,4 +360,73 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testSessionCreateModePickerStartsBelowToolbarChrome() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "cockpit"]
+    )
+    let sessionRow = previewSessionTrigger(in: app)
+    let sessionWindow = element(in: app, identifier: Accessibility.sessionWindowShell)
+    recordDiagnosticsTrace(
+      event: "session-create-mode-picker.preflight",
+      app: app,
+      details: [
+        "session_window_exists_initial": String(sessionWindow.exists),
+        "preview_session_row_exists_initial": String(sessionRow.exists),
+      ]
+    )
+
+    if !waitForElement(sessionWindow, timeout: Self.fastActionTimeout) {
+      if sessionRow.waitForExistence(timeout: Self.actionTimeout) == false {
+        recordDiagnosticsSnapshot(in: app, named: "session-create-mode-picker-session-row-missing")
+        XCTFail("Preview session row should exist before opening the session window")
+      }
+      tapPreviewSession(in: app)
+      recordDiagnosticsTrace(
+        event: "session-create-mode-picker.session-opened",
+        app: app,
+        details: [
+          "session_window_exists_after_open": String(sessionWindow.exists)
+        ]
+      )
+      if waitForElement(sessionWindow, timeout: Self.actionTimeout) == false {
+        recordDiagnosticsSnapshot(in: app, named: "session-create-mode-picker-session-window-missing")
+        XCTFail("Session window should open before entering create mode")
+      }
+    }
+
+    app.activate()
+    recordDiagnosticsTrace(
+      event: "session-create-mode-picker.shortcut.begin",
+      app: app
+    )
+    app.typeKey("a", modifierFlags: [.command, .option])
+    recordDiagnosticsTrace(
+      event: "session-create-mode-picker.shortcut.end",
+      app: app
+    )
+
+    let terminalOption = button(
+      in: app,
+      identifier: Accessibility.segmentedOption(
+        Accessibility.sessionWindowCreateModePicker,
+        option: "Terminal"
+      )
+    )
+    if waitForElement(terminalOption, timeout: Self.actionTimeout) == false {
+      recordDiagnosticsSnapshot(in: app, named: "session-create-mode-picker-terminal-option-missing")
+      XCTFail("Create mode picker should appear after opening the New Agent flow")
+    }
+
+    let window = mainWindow(in: app)
+    let topInset = terminalOption.frame.minY - window.frame.minY
+    let diagnostics = """
+      window: \(window.frame)
+      terminalOption: \(terminalOption.frame)
+      topInset: \(topInset)
+      """
+    XCTAssertGreaterThan(topInset, 72, diagnostics)
+    XCTAssertLessThan(topInset, 140, diagnostics)
+  }
+
 }
