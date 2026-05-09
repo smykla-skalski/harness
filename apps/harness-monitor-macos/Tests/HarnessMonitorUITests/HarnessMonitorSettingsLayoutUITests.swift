@@ -116,6 +116,27 @@ class HarnessMonitorSettingsLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertLessThan(daemonLogLevel.frame.minY, supervisorLogLevel.frame.minY)
   }
 
+  func testSettingsGeneralSectionShowsPendingDecisionBannerToggles() throws {
+    let app = launch(mode: "preview")
+
+    openSettings(in: app)
+    selectGeneralSection(in: app)
+
+    let settingsPanel = frameElement(in: app, identifier: Accessibility.settingsPanel)
+    XCTAssertTrue(settingsPanel.waitForExistence(timeout: Self.actionTimeout))
+
+    let visibilityToggle = element(
+      in: app,
+      identifier: Accessibility.settingsPendingDecisionBannersToggle
+    )
+    let focusModeToggle = element(
+      in: app,
+      identifier: Accessibility.settingsPendingDecisionBannersFocusModeToggle
+    )
+    XCTAssertTrue(visibilityToggle.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(focusModeToggle.waitForExistence(timeout: Self.actionTimeout))
+  }
+
   func testSettingsSidebarChromeMatchesNativeInsetLayout() throws {
     let app = launch(mode: "preview")
 

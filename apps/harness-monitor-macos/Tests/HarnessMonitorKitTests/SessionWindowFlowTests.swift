@@ -449,6 +449,96 @@ struct SessionWindowFlowTests {
     )
   }
 
+  @Test("Pending decision banners default on and persist off")
+  func pendingDecisionBannerDefaultsOnAndPersistsOff() throws {
+    let defaults = try isolatedDefaults()
+    defer { defaults.userDefaults.removePersistentDomain(forName: defaults.suiteName) }
+
+    #expect(SessionPendingDecisionBannerSettings.readEnabled(userDefaults: defaults.userDefaults))
+    defaults.userDefaults.set(
+      false,
+      forKey: SessionPendingDecisionBannerSettings.enabledKey
+    )
+    #expect(!SessionPendingDecisionBannerSettings.readEnabled(userDefaults: defaults.userDefaults))
+    #expect(
+      SessionPendingDecisionBannerSettings.enabledKey
+        == "harness.monitor.decisions.pending-banner-enabled"
+    )
+  }
+
+  @Test("Pending decision banners in Focus mode default on and can be disabled separately")
+  func pendingDecisionBannerFocusModeDefaultsOnAndPersistsOff() throws {
+    let defaults = try isolatedDefaults()
+    defer { defaults.userDefaults.removePersistentDomain(forName: defaults.suiteName) }
+
+    #expect(
+      SessionPendingDecisionBannerSettings.readFocusModeEnabled(userDefaults: defaults.userDefaults)
+    )
+    defaults.userDefaults.set(
+      false,
+      forKey: SessionPendingDecisionBannerSettings.focusModeEnabledKey
+    )
+    #expect(
+      !SessionPendingDecisionBannerSettings.readFocusModeEnabled(userDefaults: defaults.userDefaults)
+    )
+    #expect(
+      SessionPendingDecisionBannerSettings.focusModeEnabledKey
+        == "harness.monitor.decisions.pending-banner.focus-mode"
+    )
+  }
+
+  @Test("Pending decision banner visibility respects the Focus mode setting")
+  func pendingDecisionBannerVisibilityRespectsFocusModeSetting() throws {
+    let defaults = try isolatedDefaults()
+    defer { defaults.userDefaults.removePersistentDomain(forName: defaults.suiteName) }
+
+    #expect(
+      SessionPendingDecisionBannerSettings.showsBanner(
+        isFocusMode: false,
+        userDefaults: defaults.userDefaults
+      )
+    )
+    #expect(
+      SessionPendingDecisionBannerSettings.showsBanner(
+        isFocusMode: true,
+        userDefaults: defaults.userDefaults
+      )
+    )
+
+    defaults.userDefaults.set(
+      false,
+      forKey: SessionPendingDecisionBannerSettings.focusModeEnabledKey
+    )
+    #expect(
+      SessionPendingDecisionBannerSettings.showsBanner(
+        isFocusMode: false,
+        userDefaults: defaults.userDefaults
+      )
+    )
+    #expect(
+      !SessionPendingDecisionBannerSettings.showsBanner(
+        isFocusMode: true,
+        userDefaults: defaults.userDefaults
+      )
+    )
+
+    defaults.userDefaults.set(false, forKey: SessionPendingDecisionBannerSettings.enabledKey)
+    #expect(
+      !SessionPendingDecisionBannerSettings.showsBanner(
+        isFocusMode: false,
+        userDefaults: defaults.userDefaults
+      )
+    )
+  }
+
+  @Test("Startup registration defaults include pending decision banner settings")
+  func startupRegistrationDefaultsIncludePendingDecisionBannerSettings() {
+    let values = HarnessMonitorStartupRegistrationDefaults.values()
+
+    #expect(values[SessionPendingDecisionBannerSettings.enabledKey] as? Bool == true)
+    #expect(values[SessionPendingDecisionBannerSettings.focusModeEnabledKey] as? Bool == true)
+  }
+
   @Test("Open Recent toggle uses the canonical close-after-pick copy")
   func openRecentCloseAfterPickUsesCanonicalVisibleCopy() throws {
     let source = try previewableSourceFile(named: "Views/Sessions/OpenRecentView.swift")

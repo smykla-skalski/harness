@@ -7,6 +7,7 @@ struct SessionBannerStackModel: Equatable {
   let showsMCPStatus: Bool
   let showsACPBridge: Bool
   let showsLoading: Bool
+  let showsPendingDecisionBanner: Bool
   let pendingDecisionCount: Int
 
   init(
@@ -16,6 +17,7 @@ struct SessionBannerStackModel: Equatable {
     hasACPBridgeBanner: Bool,
     isLoading: Bool,
     hasSnapshot: Bool,
+    showsPendingDecisionBanner: Bool,
     pendingDecisionCount: Int
   ) {
     showsPersistenceError = persistenceError != nil
@@ -23,6 +25,7 @@ struct SessionBannerStackModel: Equatable {
     showsMCPStatus = mcpStatus.shouldShowChromeBanner
     showsACPBridge = hasACPBridgeBanner
     showsLoading = isLoading && !hasSnapshot
+    self.showsPendingDecisionBanner = showsPendingDecisionBanner
     self.pendingDecisionCount = pendingDecisionCount
   }
 
@@ -32,7 +35,7 @@ struct SessionBannerStackModel: Equatable {
       || showsMCPStatus
       || showsACPBridge
       || showsLoading
-      || pendingDecisionCount > 0
+      || (showsPendingDecisionBanner && pendingDecisionCount > 0)
   }
 }
 
@@ -54,15 +57,22 @@ struct SessionBannerStackMetrics: Equatable {
 public struct SessionBannerStack<Content: View>: View {
   let store: HarnessMonitorStore
   let sessionID: String
+  let isFocusMode: Bool
   let isLoading: Bool
   let hasSnapshot: Bool
   let pendingDecisionCount: Int
   let selectDecisions: (() -> Void)?
   let content: Content
+  @AppStorage(SessionPendingDecisionBannerSettings.enabledKey)
+  private var showsPendingDecisionBanners = SessionPendingDecisionBannerSettings.enabledDefaultValue
+  @AppStorage(SessionPendingDecisionBannerSettings.focusModeEnabledKey)
+  private var showsPendingDecisionBannersInFocusMode =
+    SessionPendingDecisionBannerSettings.focusModeEnabledDefaultValue
 
   public init(
     store: HarnessMonitorStore,
     sessionID: String,
+    isFocusMode: Bool = false,
     isLoading: Bool = false,
     hasSnapshot: Bool = true,
     pendingDecisionCount: Int,
@@ -71,6 +81,7 @@ public struct SessionBannerStack<Content: View>: View {
   ) {
     self.store = store
     self.sessionID = sessionID
+    self.isFocusMode = isFocusMode
     self.isLoading = isLoading
     self.hasSnapshot = hasSnapshot
     self.pendingDecisionCount = pendingDecisionCount
@@ -90,6 +101,8 @@ public struct SessionBannerStack<Content: View>: View {
       hasACPBridgeBanner: chrome.acpBridgeBanner != nil,
       isLoading: isLoading,
       hasSnapshot: hasSnapshot,
+      showsPendingDecisionBanner:
+        showsPendingDecisionBanners && (!isFocusMode || showsPendingDecisionBannersInFocusMode),
       pendingDecisionCount: pendingDecisionCount
     )
   }
@@ -132,7 +145,7 @@ public struct SessionBannerStack<Content: View>: View {
         )
         chromeDivider(tint: HarnessMonitorTheme.caution)
       }
-      if pendingDecisionCount > 0 {
+      if model.showsPendingDecisionBanner && pendingDecisionCount > 0 {
         SessionDecisionAttentionBanner(
           count: pendingDecisionCount,
           selectDecisions: selectDecisions

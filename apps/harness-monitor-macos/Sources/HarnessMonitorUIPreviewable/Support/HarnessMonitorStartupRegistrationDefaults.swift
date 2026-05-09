@@ -19,9 +19,9 @@ public enum HarnessMonitorStartupRegistrationDefaults {
       HarnessMonitorAgentTuiDefaults.submitSendsEnterKey:
         HarnessMonitorAgentTuiDefaults.submitSendsEnterDefault,
       HarnessMonitorLaunchBehavior.storageKey: HarnessMonitorLaunchBehavior.defaultValue.rawValue,
-      OpenRecentCloseAfterPickDefaults.storageKey:
-        OpenRecentCloseAfterPickDefaults.defaultValue,
+      OpenRecentCloseAfterPickDefaults.storageKey: OpenRecentCloseAfterPickDefaults.defaultValue,
     ]
+    dict.merge(SessionPendingDecisionBannerSettings.registrationDefaults()) { _, new in new }
     dict.merge(HarnessMonitorLoggerDefaults.registrationDefaults()) { _, new in new }
     #if HARNESS_FEATURE_LOTTIE
       dict[HarnessMonitorCornerAnimationDefaults.enabledKey] = false

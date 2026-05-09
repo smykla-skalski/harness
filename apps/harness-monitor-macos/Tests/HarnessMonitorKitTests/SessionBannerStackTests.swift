@@ -40,10 +40,18 @@ struct SessionBannerStackTests {
 
   @Test("Pending decisions show the session attention banner")
   func pendingDecisionsShowAttentionBanner() {
-    let model = makeModel(pendingDecisionCount: 3)
+    let model = makeModel(showsPendingDecisionBanner: true, pendingDecisionCount: 3)
 
     #expect(model.pendingDecisionCount == 3)
     #expect(model.isPresented)
+  }
+
+  @Test("Pending decisions stay hidden when the banner setting is off")
+  func pendingDecisionsStayHiddenWhenBannerSettingIsOff() {
+    let model = makeModel(showsPendingDecisionBanner: false, pendingDecisionCount: 3)
+
+    #expect(!model.showsPendingDecisionBanner)
+    #expect(!model.isPresented)
   }
 
   @Test("Banner metrics scale chrome and preserve large hit targets")
@@ -79,6 +87,7 @@ struct SessionBannerStackTests {
     hasACPBridgeBanner: Bool = false,
     isLoading: Bool = false,
     hasSnapshot: Bool = true,
+    showsPendingDecisionBanner: Bool = true,
     pendingDecisionCount: Int = 0
   ) -> SessionBannerStackModel {
     SessionBannerStackModel(
@@ -88,6 +97,7 @@ struct SessionBannerStackTests {
       hasACPBridgeBanner: hasACPBridgeBanner,
       isLoading: isLoading,
       hasSnapshot: hasSnapshot,
+      showsPendingDecisionBanner: showsPendingDecisionBanner,
       pendingDecisionCount: pendingDecisionCount
     )
   }

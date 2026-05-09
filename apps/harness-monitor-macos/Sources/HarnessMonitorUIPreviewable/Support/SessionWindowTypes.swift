@@ -96,6 +96,42 @@ public enum OpenRecentCloseAfterPickDefaults {
   }
 }
 
+public enum SessionPendingDecisionBannerSettings {
+  public static let enabledKey = "harness.monitor.decisions.pending-banner-enabled"
+  public static let focusModeEnabledKey = "harness.monitor.decisions.pending-banner.focus-mode"
+  public static let enabledDefaultValue = true
+  public static let focusModeEnabledDefaultValue = true
+
+  public static func registrationDefaults() -> [String: Any] {
+    [
+      enabledKey: enabledDefaultValue,
+      focusModeEnabledKey: focusModeEnabledDefaultValue,
+    ]
+  }
+
+  public static func readEnabled(userDefaults: UserDefaults = .standard) -> Bool {
+    if userDefaults.object(forKey: enabledKey) == nil {
+      return enabledDefaultValue
+    }
+    return userDefaults.bool(forKey: enabledKey)
+  }
+
+  public static func readFocusModeEnabled(userDefaults: UserDefaults = .standard) -> Bool {
+    if userDefaults.object(forKey: focusModeEnabledKey) == nil {
+      return focusModeEnabledDefaultValue
+    }
+    return userDefaults.bool(forKey: focusModeEnabledKey)
+  }
+
+  public static func showsBanner(
+    isFocusMode: Bool,
+    userDefaults: UserDefaults = .standard
+  ) -> Bool {
+    readEnabled(userDefaults: userDefaults)
+      && (!isFocusMode || readFocusModeEnabled(userDefaults: userDefaults))
+  }
+}
+
 public enum SessionWindowTabbingPreference: String, CaseIterable, Codable, Hashable,
   Identifiable, Sendable
 {
