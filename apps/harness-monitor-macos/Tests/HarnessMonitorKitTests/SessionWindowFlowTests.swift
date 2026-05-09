@@ -161,6 +161,37 @@ struct SessionWindowFlowTests {
   }
 
   @MainActor
+  @Test("Session history navigation resets selection source and preserves forward state")
+  func sessionHistoryNavigationResetsSelectionSourceAndPreservesForwardState() {
+    let state = SessionWindowStateCache(sessionID: "sess-alpha")
+
+    state.selectFromSidebar(.route(.timeline))
+    state.selectFromSidebar(.decision(sessionID: "sess-alpha", decisionID: "decision-a"))
+
+    #expect(state.selectionSource == .sidebar)
+    #expect(state.navigationHistory.canGoBack)
+    #expect(!state.navigationHistory.canGoForward)
+
+    state.navigateBack()
+
+    #expect(state.selection == .route(.timeline))
+    #expect(state.selectionSource == .programmatic)
+    #expect(state.navigationHistory.canGoBack)
+    #expect(state.navigationHistory.canGoForward)
+    #expect(
+      state.navigationHistory.forwardStack
+        == [.decision(sessionID: "sess-alpha", decisionID: "decision-a")]
+    )
+
+    state.navigateForward()
+
+    #expect(state.selection == .decision(sessionID: "sess-alpha", decisionID: "decision-a"))
+    #expect(state.selectionSource == .programmatic)
+    #expect(state.navigationHistory.canGoBack)
+    #expect(!state.navigationHistory.canGoForward)
+  }
+
+  @MainActor
   @Test("Session window cache preserves create drafts and section selections")
   func sessionWindowCachePreservesCreateDraftsAndSectionSelections() throws {
     let state = SessionWindowStateCache(sessionID: "sess-alpha")

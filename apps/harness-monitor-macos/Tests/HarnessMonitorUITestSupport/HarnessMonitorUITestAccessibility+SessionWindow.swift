@@ -6,6 +6,8 @@ extension HarnessMonitorUITestAccessibility {
   static let openRecentActionState = "harness.open.recent.action-state"
   static let sessionWindowShell = "harness.session.window"
   static let sessionWindowSidebar = "harness.session.window.sidebar"
+  static let sessionNavigateBackButton = "harness.session.window.toolbar.navigate-back"
+  static let sessionNavigateForwardButton = "harness.session.window.toolbar.navigate-forward"
   static let sessionWindowStatusMenu = "harness.session.window.toolbar.status"
   static let sessionWindowInspector = "harness.session.window.inspector"
   static let sessionWindowInspectorCloseButton = "harness.session.window.inspector.close"

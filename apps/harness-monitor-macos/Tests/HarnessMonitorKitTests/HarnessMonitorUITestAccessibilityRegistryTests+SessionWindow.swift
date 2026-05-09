@@ -36,6 +36,14 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.session.window.toolbar.status"
     )
     #expect(
+      HarnessMonitorAccessibility.sessionNavigateBackButton
+        == "harness.session.window.toolbar.navigate-back"
+    )
+    #expect(
+      HarnessMonitorAccessibility.sessionNavigateForwardButton
+        == "harness.session.window.toolbar.navigate-forward"
+    )
+    #expect(
       HarnessMonitorAccessibility.sessionWindowInspector
         == "harness.session.window.inspector"
     )
@@ -59,6 +67,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     let windowView = try sourceFile(named: "SessionWindowView.swift")
     let sidebarView = try sourceFile(named: "SessionSidebar.swift")
     let inspectorView = try sourceFile(named: "SessionWindowInspector.swift")
+    let toolbarView = try sourceFile(named: "SessionWindowToolbar.swift")
 
     #expect(openRecentView.contains("HarnessMonitorAccessibility.openRecentRoot"))
     #expect(openRecentView.contains("HarnessMonitorAccessibility.openRecentSessionRow"))
@@ -74,6 +83,8 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     )
     #expect(windowView.contains("HarnessMonitorAccessibility.sessionWindowShell"))
     #expect(sidebarView.contains("HarnessMonitorAccessibility.sessionWindowSidebar"))
+    #expect(toolbarView.contains("HarnessMonitorAccessibility.sessionNavigateBackButton"))
+    #expect(toolbarView.contains("HarnessMonitorAccessibility.sessionNavigateForwardButton"))
     #expect(
       inspectorView.contains(
         ".accessibilityTestProbe(\n      HarnessMonitorAccessibility.sessionWindowInspector"

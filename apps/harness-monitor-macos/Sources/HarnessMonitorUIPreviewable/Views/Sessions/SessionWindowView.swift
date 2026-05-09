@@ -90,6 +90,14 @@ public struct SessionWindowView: View {
     snapshot?.summary ?? store.sessionIndex.sessionSummary(for: token.sessionID)
   }
 
+  var navigationTitleText: String {
+    summary?.displayTitle ?? "Session"
+  }
+
+  var navigationSubtitleText: String {
+    token.sessionID
+  }
+
   var allSessionDecisions: [Decision] {
     allSessionDecisionsCache
   }
@@ -131,6 +139,14 @@ public struct SessionWindowView: View {
   }
 
   public var body: some View {
+    bodyContent
+      .toolbar {
+        sessionToolbar
+      }
+  }
+
+  @ViewBuilder
+  private var bodyContent: some View {
     Group {
       if isUnknownSession {
         unknownSessionContent
@@ -138,15 +154,8 @@ public struct SessionWindowView: View {
         sessionSurface
       }
     }
-    .toolbar {
-      SessionWindowToolbar(
-        snapshot: snapshot,
-        connectionTitle: connectionTitle,
-        statusSystemImage: statusSystemImage,
-        sessionID: token.sessionID,
-        focusMode: $focusMode
-      )
-    }
+    .navigationTitle(navigationTitleText)
+    .navigationSubtitle(navigationSubtitleText)
     .sessionTitleBlurChrome(
       status: summary?.status ?? .awaitingLeader,
       isStale: snapshot == nil
@@ -158,20 +167,7 @@ public struct SessionWindowView: View {
       )
     }
     .task(id: token.sessionID) {
-      hydrateSelectionFromPersistedStorage()
-      hydrateDecisionFiltersFromPersistedStorage()
-      reconcileInspectorVisibility(
-        visibleBinding: $inspectorVisible,
-        preferredBinding: $inspectorPreferred,
-        announce: false
-      )
-      await loadSnapshot()
-      requestPrimaryContentAccessibilityFocus()
-      reconcileInspectorVisibility(
-        visibleBinding: $inspectorVisible,
-        preferredBinding: $inspectorPreferred,
-        announce: false
-      )
+      await performInitialLoad()
     }
     .task(id: decisionsCacheTrigger) {
       await recomputeDecisionsCache()
@@ -206,6 +202,18 @@ public struct SessionWindowView: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowShell)
   }
 
+  @ToolbarContentBuilder
+  private var sessionToolbar: some ToolbarContent {
+    SessionWindowToolbar(
+      snapshot: snapshot,
+      connectionTitle: connectionTitle,
+      statusSystemImage: statusSystemImage,
+      sessionID: token.sessionID,
+      state: stateCache,
+      focusMode: $focusMode
+    )
+  }
+
   var columnVisibilityBinding: Binding<NavigationSplitViewVisibility> {
     Binding(
       get: {
@@ -232,6 +240,24 @@ public struct SessionWindowView: View {
   private func hydrateDecisionFiltersFromPersistedStorage() {
     guard stateCache.decisionFilters.query != persistedDecisionQuery else { return }
     stateCache.decisionFilters.query = persistedDecisionQuery
+  }
+
+  @MainActor
+  private func performInitialLoad() async {
+    hydrateSelectionFromPersistedStorage()
+    hydrateDecisionFiltersFromPersistedStorage()
+    reconcileInspectorVisibility(
+      visibleBinding: $inspectorVisible,
+      preferredBinding: $inspectorPreferred,
+      announce: false
+    )
+    await loadSnapshot()
+    requestPrimaryContentAccessibilityFocus()
+    reconcileInspectorVisibility(
+      visibleBinding: $inspectorVisible,
+      preferredBinding: $inspectorPreferred,
+      announce: false
+    )
   }
 
   private func syncPersistedStorage(from selection: SessionSelection) {
