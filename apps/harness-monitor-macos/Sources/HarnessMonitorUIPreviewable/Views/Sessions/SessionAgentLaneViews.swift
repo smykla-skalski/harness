@@ -2,13 +2,17 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct SessionAgentTuiViewport: View {
+  let store: HarnessMonitorStore
   let agentID: String
   let tui: AgentTuiSnapshot?
   let metrics: SessionAgentDetailSectionMetrics
   let latestOutput: String
+  @Environment(\.fontScale)
+  private var fontScale
 
   @State private var visibleRows: [AgentTuiScreenSnapshot.VisibleRow] = []
   @State private var lastScrollAt = Date.distantPast
+  @State private var resizeState = SessionAgentTuiViewportResizeState()
 
   private static let scrollThrottleInterval: TimeInterval = 1.0 / 60.0
 
@@ -37,11 +41,28 @@ struct SessionAgentTuiViewport: View {
         .quaternary.opacity(0.4),
         in: RoundedRectangle(cornerRadius: metrics.terminalCornerRadius)
       )
+      .frame(
+        minHeight: TerminalViewportSizing.minimumViewportHeight,
+        idealHeight: TerminalViewportSizing.idealViewportHeight,
+        maxHeight: (tui?.status.isActive == true)
+          ? .infinity
+          : TerminalViewportSizing.idealViewportHeight
+      )
+      .onGeometryChange(for: CGSize.self) { proxy in
+        proxy.size
+      } action: { newSize in
+        Task { @MainActor in
+          await syncTerminalSize(viewportSize: newSize)
+        }
+      }
       .accessibilityElement(children: .ignore)
       .accessibilityLabel(Text(latestOutput))
       .accessibilityIdentifier(tuiViewportIdentifier)
       .task(id: agentID) {
         visibleRows = tui?.screen.visibleRows(maxRows: 160) ?? []
+      }
+      .onDisappear {
+        resizeState.cancelPending()
       }
       .onChange(of: tui?.screen.text ?? "") { _, _ in
         let nextRows = tui?.screen.visibleRows(maxRows: 160) ?? []
@@ -58,6 +79,84 @@ struct SessionAgentTuiViewport: View {
 
   private var tuiViewportIdentifier: String {
     HarnessMonitorAccessibility.sessionAgentTuiViewport(agentID)
+  }
+
+  @MainActor
+  private func syncTerminalSize(viewportSize: CGSize) async {
+    guard let tui, tui.status.isActive else { return }
+    guard resizeState.recordViewportPoints(viewportSize) else { return }
+    guard
+      let measured = TerminalViewportSizing.terminalSize(
+        for: viewportSize,
+        fontScale: fontScale
+      )
+    else {
+      resizeState.clearMeasuredTerminalSize()
+      return
+    }
+    resizeState.recordMeasuredTerminalSize(measured)
+    let baseline = TerminalViewportSizing.automaticResizeBaseline(
+      serverSize: tui.size,
+      pendingTarget: resizeState.pendingTarget,
+      expectedSize: resizeState.expectedSize
+    )
+    let stabilized = TerminalViewportSizing.stabilizedAutomaticSize(
+      measured: measured,
+      baseline: baseline
+    )
+    guard stabilized != tui.size, stabilized != resizeState.pendingTarget else { return }
+    resizeState.pendingTarget = stabilized
+    resizeState.expectedSize = stabilized
+    resizeState.cancelPending()
+    let tuiID = tui.tuiId
+    let store = store
+    resizeState.resizeTask = Task { @MainActor in
+      try? await Task.sleep(for: TerminalViewportSizing.debounce)
+      guard !Task.isCancelled else { return }
+      _ = await store.resizeAgentTui(
+        tuiID: tuiID,
+        rows: stabilized.rows,
+        cols: stabilized.cols,
+        feedback: .silent
+      )
+      if resizeState.pendingTarget == stabilized {
+        resizeState.pendingTarget = nil
+      }
+    }
+  }
+}
+
+@MainActor
+@Observable
+final class SessionAgentTuiViewportResizeState {
+  var lastMeasuredPoints: CGSize?
+  var lastMeasuredTerminalSize: AgentTuiSize?
+  var expectedSize: AgentTuiSize?
+  var pendingTarget: AgentTuiSize?
+  @ObservationIgnored nonisolated(unsafe) var resizeTask: Task<Void, Never>?
+
+  deinit {
+    resizeTask?.cancel()
+  }
+
+  func recordViewportPoints(_ size: CGSize) -> Bool {
+    guard lastMeasuredPoints != size else { return false }
+    lastMeasuredPoints = size
+    return true
+  }
+
+  func clearMeasuredTerminalSize() {
+    lastMeasuredTerminalSize = nil
+  }
+
+  func recordMeasuredTerminalSize(_ size: AgentTuiSize) {
+    guard lastMeasuredTerminalSize != size else { return }
+    lastMeasuredTerminalSize = size
+  }
+
+  func cancelPending() {
+    resizeTask?.cancel()
+    resizeTask = nil
   }
 }
 
