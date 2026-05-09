@@ -57,7 +57,8 @@ struct WorkspaceWindowRootView: View {
       mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
       themeMode: $themeMode,
       contentReadiness: contentReadiness,
-      appliesPreferredColorScheme: true
+      appliesPreferredColorScheme: true,
+      toast: store.toast
     ) {
       workspaceContent
     }

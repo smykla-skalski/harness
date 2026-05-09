@@ -50,7 +50,8 @@ struct HarnessMonitorWindowRootView: View {
       windowCommandRouting: windowCommandRouting,
       mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
       themeMode: $themeMode,
-      contentReadiness: contentReadiness
+      contentReadiness: contentReadiness,
+      toast: store.toast
     ) {
       liveContent
     }

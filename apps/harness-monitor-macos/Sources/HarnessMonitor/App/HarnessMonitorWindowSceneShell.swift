@@ -55,6 +55,7 @@ struct HarnessMonitorWindowShell<Content: View>: View {
   let mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   let contentReadiness: WindowContentReadiness
   let preferredColorSchemeOverride: Bool?
+  private let toast: ToastSlice?
   private let content: Content
   @Binding private var themeMode: HarnessMonitorThemeMode
   @Environment(\.openWindow)
@@ -78,6 +79,7 @@ struct HarnessMonitorWindowShell<Content: View>: View {
     themeMode: Binding<HarnessMonitorThemeMode>,
     contentReadiness: WindowContentReadiness = .ready(),
     appliesPreferredColorScheme: Bool? = nil,
+    toast: ToastSlice? = nil,
     @ViewBuilder content: () -> Content
   ) {
     self.windowID = windowID
@@ -91,6 +93,7 @@ struct HarnessMonitorWindowShell<Content: View>: View {
     _themeMode = themeMode
     self.contentReadiness = contentReadiness
     preferredColorSchemeOverride = appliesPreferredColorScheme
+    self.toast = toast
     self.content = content()
   }
 
@@ -151,7 +154,16 @@ struct HarnessMonitorWindowShell<Content: View>: View {
     .modifier(HarnessMonitorUITestAnimationModifier())
     .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
     .environment(\.windowSurfaceContext, surfaceContext)
+    .overlay(alignment: .topTrailing) { toastOverlay }
     .overlay { shellStateMarker }
+  }
+
+  @ViewBuilder private var toastOverlay: some View {
+    if let toast, !toast.activeFeedback.isEmpty {
+      HarnessMonitorFeedbackToastView(toast: toast)
+        .padding(.top, HarnessMonitorTheme.spacingSM)
+        .padding(.trailing, HarnessMonitorTheme.spacingLG)
+    }
   }
 
   @ViewBuilder private var shellStateMarker: some View {
