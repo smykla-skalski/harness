@@ -271,9 +271,6 @@ final class AcpPermissionAttentionState {
       Self.activateHarnessMonitorApp()
     }
     openWindow.openHarnessDecisionSession(decisionID: decisionID, store: store)
-    Task { @MainActor in
-      await Self.focusWorkspaceWindow()
-    }
   }
 
   private static func activateHarnessMonitorApp() {
@@ -281,32 +278,6 @@ final class AcpPermissionAttentionState {
       NSApplication.shared.activate()
     } else {
       NSApplication.shared.activate(ignoringOtherApps: true)
-    }
-  }
-
-  private static func workspaceWindow() -> NSWindow? {
-    NSApplication.shared.windows.first { window in
-      let identifier = window.identifier?.rawValue ?? ""
-      return KeyWindowObserver.matchesWindowID(
-        identifier, expected: HarnessMonitorWindowID.workspace)
-    }
-  }
-
-  private static func focusWorkspaceWindow() async {
-    for _ in 0..<20 {
-      await Task.yield()
-      guard let window = workspaceWindow() else {
-        try? await Task.sleep(for: .milliseconds(25))
-        continue
-      }
-      window.makeKeyAndOrderFront(nil)
-      if window.isKeyWindow {
-        return
-      }
-      try? await Task.sleep(for: .milliseconds(25))
-      if window.isKeyWindow {
-        return
-      }
     }
   }
 

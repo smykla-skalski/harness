@@ -22,11 +22,6 @@ public struct WindowSurfaceContext: Sendable {
   public func openMainWindow() {
     openWindow(HarnessMonitorWindowID.main)
   }
-
-  @MainActor
-  public func openWorkspaceWindow() {
-    openWindow(HarnessMonitorWindowID.workspace)
-  }
 }
 
 private struct WindowSurfaceContextKey: EnvironmentKey {

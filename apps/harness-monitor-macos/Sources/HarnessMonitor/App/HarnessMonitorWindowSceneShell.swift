@@ -30,7 +30,6 @@ struct WindowContentReadiness {
 @MainActor
 enum WindowContentReadinessPlaceholder {
   case clear
-  case workspaceOpening
 
   @ViewBuilder var body: some View {
     switch self {
@@ -38,8 +37,6 @@ enum WindowContentReadinessPlaceholder {
       Color.clear
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityHidden(true)
-    case .workspaceOpening:
-      WorkspaceWindowOpeningView()
     }
   }
 }

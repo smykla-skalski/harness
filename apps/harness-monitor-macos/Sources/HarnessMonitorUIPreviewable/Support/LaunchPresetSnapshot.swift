@@ -108,43 +108,4 @@ enum LaunchPresetDefaults {
     }
   }
 
-  @MainActor
-  static func captureAndWrite(
-    viewModel: WorkspaceWindowView.ViewModel,
-    mode: LaunchPresetSnapshot.Mode
-  ) {
-    HarnessMonitorAgentLaunchDefaults.noteExplicitSelection(viewModel.selectedLaunchSelection)
-    let modelByRuntime = Dictionary(
-      uniqueKeysWithValues: viewModel.selectedTerminalModelByRuntime.map {
-        ($0.key.rawValue, $0.value)
-      }
-    )
-    let customModelByRuntime = Dictionary(
-      uniqueKeysWithValues: viewModel.customTerminalModelByRuntime.map {
-        ($0.key.rawValue, $0.value)
-      }
-    )
-    let effortByRuntime = Dictionary(
-      uniqueKeysWithValues: viewModel.selectedTerminalEffortByRuntime.map {
-        ($0.key.rawValue, $0.value)
-      }
-    )
-    let snapshot = LaunchPresetSnapshot(
-      mode: mode,
-      providerStorageKey: viewModel.selectedLaunchSelection.storageKey,
-      role: viewModel.selectedRole.rawValue,
-      fallbackRole: viewModel.selectedAcpFallbackRole.rawValue,
-      personaID: viewModel.selectedPersona,
-      modelByRuntime: modelByRuntime,
-      customModelByRuntime: customModelByRuntime,
-      effortByRuntime: effortByRuntime,
-      rows: viewModel.rows,
-      cols: viewModel.cols,
-      codexMode: viewModel.codexMode.rawValue,
-      codexModel: viewModel.selectedCodexModel,
-      customCodexModel: viewModel.customCodexModel,
-      codexEffort: viewModel.selectedCodexEffort
-    )
-    write(snapshot)
-  }
 }
