@@ -230,11 +230,6 @@ private struct SessionWindowStatusServiceStrip: View {
 
   var body: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
-      Image(systemName: source.systemImage)
-        .scaledFont(.system(.caption2, design: .rounded, weight: .semibold))
-        .foregroundStyle(source.tint)
-        .frame(minHeight: chromeHeight, alignment: .center)
-        .accessibilityHidden(true)
       if statusStripState.hasVisibleTokens {
         HStack(alignment: .center, spacing: 3) {
           if let bridge = statusStripState.bridge {
@@ -251,6 +246,11 @@ private struct SessionWindowStatusServiceStrip: View {
           }
         }
       }
+      Image(systemName: source.systemImage)
+        .scaledFont(.system(.caption2, design: .rounded, weight: .semibold))
+        .foregroundStyle(source.tint)
+        .frame(minHeight: chromeHeight, alignment: .center)
+        .accessibilityHidden(true)
     }
     .fixedSize(horizontal: true, vertical: false)
     .frame(minHeight: chromeHeight, alignment: .center)
