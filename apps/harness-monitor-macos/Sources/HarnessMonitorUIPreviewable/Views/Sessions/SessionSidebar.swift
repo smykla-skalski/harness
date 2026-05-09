@@ -11,7 +11,7 @@ struct SessionSidebar: View {
   @Environment(\.harnessTextSizeIndex) private var textSizeIndex
   @Environment(\.undoManager)
   var undoManager
-  @State private var currentModifiers: EventModifiers = []
+  @State var currentModifiers: EventModifiers = []
   @State private var searchPresentationState = SidebarSearchPresentationState()
   @State private var searchFocusDispatcher = HarnessSidebarSearchFocusDispatcher()
   @State private var selectionDispatcher = SessionSidebarSelectionDispatcher()
