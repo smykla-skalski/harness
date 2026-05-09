@@ -48,6 +48,7 @@ private struct HarnessMonitorSupplementalCommandSet: Commands {
     WindowMenuCommands(
       store: store
     )
+    SessionWindowCycleCommands()
     InspectorCommands()
     DecisionCommands()
   }
