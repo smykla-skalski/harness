@@ -5,10 +5,10 @@ import XCTest
 @testable import HarnessMonitorUIPreviewable
 
 final class HarnessMonitorInitialWindowPlanTests: XCTestCase {
-  func testVisibleWindowsSuppressAdditionalLaunchActions() {
+  func testVisibleSessionWindowsSuppressRestoreLaunchActions() {
     let plan = HarnessMonitorInitialWindowPlan.resolve(
       launchBehavior: .restoreSessionWindows,
-      hasVisibleWindows: true,
+      hasVisibleSessionWindows: true,
       restorePlan: .init(sessionIDs: ["sess-a"], usedBridgeFallback: true)
     )
 
@@ -19,7 +19,18 @@ final class HarnessMonitorInitialWindowPlanTests: XCTestCase {
   func testAlwaysOpenRecentOpensWelcomeWindow() {
     let plan = HarnessMonitorInitialWindowPlan.resolve(
       launchBehavior: .alwaysOpenRecent,
-      hasVisibleWindows: false
+      hasVisibleSessionWindows: false
+    )
+
+    XCTAssertEqual(plan.destination, .welcome)
+    XCTAssertFalse(plan.shouldMarkBridgeFallbackComplete)
+  }
+
+  func testAlwaysOpenRecentIgnoresVisibleSessionWindows() {
+    let plan = HarnessMonitorInitialWindowPlan.resolve(
+      launchBehavior: .alwaysOpenRecent,
+      hasVisibleSessionWindows: true,
+      restorePlan: .init(sessionIDs: ["sess-a"])
     )
 
     XCTAssertEqual(plan.destination, .welcome)
@@ -29,7 +40,7 @@ final class HarnessMonitorInitialWindowPlanTests: XCTestCase {
   func testRestoreSessionWindowsOpensTrackedSessions() {
     let plan = HarnessMonitorInitialWindowPlan.resolve(
       launchBehavior: .restoreSessionWindows,
-      hasVisibleWindows: false,
+      hasVisibleSessionWindows: false,
       restorePlan: .init(sessionIDs: ["sess-a", "sess-b"], usedBridgeFallback: true)
     )
 
@@ -40,7 +51,7 @@ final class HarnessMonitorInitialWindowPlanTests: XCTestCase {
   func testRestoreSessionWindowsFallsBackToWelcomeWhenNothingRestored() {
     let plan = HarnessMonitorInitialWindowPlan.resolve(
       launchBehavior: .restoreSessionWindows,
-      hasVisibleWindows: false,
+      hasVisibleSessionWindows: false,
       restorePlan: .init(sessionIDs: [], usedBridgeFallback: true)
     )
 

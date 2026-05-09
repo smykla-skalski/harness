@@ -20,7 +20,7 @@ public struct WindowSurfaceContext: Sendable {
 
   @MainActor
   public func openMainWindow() {
-    openWindow(HarnessMonitorWindowID.main)
+    openWindow(HarnessMonitorWindowID.openRecent)
   }
 }
 

@@ -12,7 +12,7 @@ extension SessionWindowView {
         dismiss()
       },
       openRecents: {
-        openWindow(id: HarnessMonitorWindowID.main)
+        openWindow(id: HarnessMonitorWindowID.openRecent)
         dismiss()
       }
     )

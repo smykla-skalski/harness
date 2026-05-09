@@ -81,6 +81,17 @@ final class WindowMenuCommandsTests: XCTestCase {
     XCTAssertTrue(source.contains("window.tabbingMode = .automatic"))
   }
 
+  func testRecentSessionsCommandBuildsFileSubmenu() throws {
+    let source = try harnessSourceFile(named: "Commands/RecentSessionsCommand.swift")
+    let commandSetSource = try harnessSourceFile(named: "App/HarnessMonitorMainCommandSet.swift")
+
+    XCTAssertTrue(commandSetSource.contains("RecentSessionsCommand(store: store)"))
+    XCTAssertTrue(source.contains("Menu(Self.menuTitle)"))
+    XCTAssertTrue(source.contains("openWindow.openHarnessSessionWindow"))
+    XCTAssertTrue(source.contains("HarnessMonitorWindowID.openRecent"))
+    XCTAssertTrue(source.contains("Show Open Recent Window"))
+  }
+
   private func harnessSourceFile(named relativePath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =

@@ -13,17 +13,16 @@ struct HarnessMonitorInitialWindowPlan: Equatable {
 
   static func resolve(
     launchBehavior: HarnessMonitorLaunchBehavior,
-    hasVisibleWindows: Bool,
+    hasVisibleSessionWindows: Bool,
     restorePlan: HarnessMonitorStore.LaunchWindowRestorePlan = .init()
   ) -> Self {
-    guard !hasVisibleWindows else {
-      return Self(destination: .none, shouldMarkBridgeFallbackComplete: false)
-    }
-
     switch launchBehavior {
     case .alwaysOpenRecent:
       return Self(destination: .welcome, shouldMarkBridgeFallbackComplete: false)
     case .restoreSessionWindows:
+      guard !hasVisibleSessionWindows else {
+        return Self(destination: .none, shouldMarkBridgeFallbackComplete: false)
+      }
       if restorePlan.sessionIDs.isEmpty {
         return Self(
           destination: .welcome,

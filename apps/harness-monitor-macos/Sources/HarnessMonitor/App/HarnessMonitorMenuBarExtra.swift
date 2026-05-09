@@ -322,12 +322,12 @@ struct HarnessMonitorMenuBarExtraContent: View {
 
   @ViewBuilder private var windowActions: some View {
     Button(HarnessMonitorMenuBarSnapshot.openMonitorLabel) {
-      openAppWindow(id: HarnessMonitorWindowID.main)
+      openAppWindow(id: HarnessMonitorWindowID.openRecent)
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.menuBarOpenMonitor)
 
     Button(HarnessMonitorMenuBarSnapshot.openWorkspaceLabel) {
-      openAppWindow(id: HarnessMonitorWindowID.main)
+      openAppWindow(id: HarnessMonitorWindowID.openRecent)
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.menuBarOpenSession)
 

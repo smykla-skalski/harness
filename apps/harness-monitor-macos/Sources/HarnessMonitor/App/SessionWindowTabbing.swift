@@ -51,7 +51,6 @@ private final class AccessorView: NSView {
     subsystem: "io.harnessmonitor",
     category: "SessionWindowTabbing"
   )
-  private static let sessionTabbingIdentifier = "io.harnessmonitor.session"
 
   var configuration = SessionWindowTabbingAccessor.Configuration(
     isSessionWindow: false,
@@ -115,9 +114,11 @@ private final class AccessorView: NSView {
       guard window.toolbar != nil else {
         return
       }
-      window.tabbingIdentifier = Self.sessionTabbingIdentifier
-      window.tabbingMode = tabbingMode(for: configuration.preference)
-      guard window.tabbingIdentifier == Self.sessionTabbingIdentifier else {
+      SessionWindowTabbingSupport.prepareSessionWindowForTabbing(
+        window,
+        preference: configuration.preference
+      )
+      guard window.tabbingIdentifier == SessionWindowTabbingSupport.tabbingIdentifier else {
         Self.log.warning("Session tabbing identifier unavailable; falling back to standalone windows")
         window.tabbingMode = .automatic
         return
@@ -137,16 +138,5 @@ private final class AccessorView: NSView {
   private func applyTitlebarChromeOverrides(to window: NSWindow) {
     window.titlebarSeparatorStyle = .none
     window.titlebarAppearsTransparent = true
-  }
-
-  private func tabbingMode(for preference: SessionWindowTabbingPreference) -> NSWindow.TabbingMode {
-    switch preference {
-    case .system:
-      .automatic
-    case .always:
-      .preferred
-    case .never:
-      .disallowed
-    }
   }
 }
