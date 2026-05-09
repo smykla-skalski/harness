@@ -35,7 +35,6 @@ public struct ContentDetailColumn: View {
   public let keyWindowObserver: KeyWindowObserver?
   public let toast: ToastSlice
   public let selection: HarnessMonitorStore.SelectionSlice
-  public let contentToolbar: HarnessMonitorStore.ContentToolbarSlice
   public let contentChrome: HarnessMonitorStore.ContentChromeSlice
   public let contentSession: HarnessMonitorStore.ContentSessionSlice
   public let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
@@ -47,7 +46,6 @@ public struct ContentDetailColumn: View {
     keyWindowObserver: KeyWindowObserver? = nil,
     toast: ToastSlice,
     selection: HarnessMonitorStore.SelectionSlice,
-    contentToolbar: HarnessMonitorStore.ContentToolbarSlice,
     contentChrome: HarnessMonitorStore.ContentChromeSlice,
     contentSession: HarnessMonitorStore.ContentSessionSlice,
     contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice,
@@ -58,7 +56,6 @@ public struct ContentDetailColumn: View {
     self.keyWindowObserver = keyWindowObserver
     self.toast = toast
     self.selection = selection
-    self.contentToolbar = contentToolbar
     self.contentChrome = contentChrome
     self.contentSession = contentSession
     self.contentSessionDetail = contentSessionDetail
@@ -72,6 +69,17 @@ public struct ContentDetailColumn: View {
 
   private var navigationSubtitleText: String? {
     contentSessionDetail.presentedSessionDetail?.session.status.title.uppercased()
+  }
+
+  private var contentToolbarModel: ContentWindowToolbarModel {
+    ContentWindowToolbarModel(
+      canNavigateBack: false,
+      canNavigateForward: false,
+      canCreateTask: false,
+      isRefreshing: store.contentUI.toolbar.isRefreshing,
+      sleepPreventionEnabled: store.contentUI.toolbar.sleepPreventionEnabled,
+      manualRefreshSuccessToken: store.contentUI.toolbar.manualRefreshSuccessToken
+    )
   }
 
   public var body: some View {
@@ -96,7 +104,7 @@ public struct ContentDetailColumn: View {
     .toolbar {
       ContentPrimaryToolbarItems(
         store: store,
-        contentToolbar: contentToolbar
+        model: contentToolbarModel
       )
     }
     .navigationTitle(navigationTitleText)
