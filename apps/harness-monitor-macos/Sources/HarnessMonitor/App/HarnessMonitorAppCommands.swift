@@ -16,6 +16,8 @@ struct HarnessMonitorAppCommands: Commands {
   private var sidebarSearchFocus
   @FocusedValue(\.harnessSidebarVisibilityRequest)
   private var sidebarVisibilityRequest
+  @FocusedValue(\.harnessSessionSidebarSelection)
+  private var sidebarSelectionFocus
   let store: HarnessMonitorStore
   let displayState: CommandsDisplayState
   let textSizeIndex: Int
@@ -75,6 +77,28 @@ struct HarnessMonitorAppCommands: Commands {
       .keyboardShortcut("f", modifiers: .command)
       .disabled(!isAvailable)
       .help(isAvailable ? "" : "Search isn't available on this view")
+    }
+    sidebarSelectionCommands
+  }
+
+  @CommandsBuilder private var sidebarSelectionCommands: some Commands {
+    CommandGroup(after: .pasteboard) {
+      Divider()
+      Button("Select All in Sidebar") {
+        sidebarSelectionFocus?.dispatcher.performSelectAll()
+      }
+      .keyboardShortcut("a", modifiers: [.command, .option])
+      .disabled(sidebarSelectionFocus == nil)
+      Button("Clear Sidebar Selection") {
+        sidebarSelectionFocus?.dispatcher.performClearSelection()
+      }
+      .keyboardShortcut(.escape, modifiers: [])
+      .disabled(sidebarSelectionFocus?.hasMultiSelection != true)
+      Button("Delete Sidebar Selection") {
+        sidebarSelectionFocus?.dispatcher.performDeleteSelection()
+      }
+      .keyboardShortcut(.delete, modifiers: [])
+      .disabled(sidebarSelectionFocus?.canDelete != true)
     }
   }
 

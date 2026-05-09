@@ -6,37 +6,52 @@ extension SessionSidebar {
     Section {
       decisionFilterRow
       undoToastRow
+      let orderedDecisionIDs = decisions.map(\.id)
       ForEach(decisions) { decision in
         let selection = SessionSelection.decision(
           sessionID: state.sessionID,
           decisionID: decision.id
         )
         let severity = DecisionSeverity(rawValue: decision.severityRaw)
+        let isMulti =
+          state.sidebarSelection.count(of: .decision) > 1
+          || state.sidebarSelection.isDecisionMultiSelectEnabled
         SessionSidebarRow(
           title: decision.summary,
           systemImage: "exclamationmark.bubble",
           severityShape: severityShape(for: severity),
           severityTint: severityTint(for: severity),
-          isMultiSelect: state.sidebarSelection.isDecisionMultiSelectEnabled,
+          isMultiSelect: isMulti,
           isSelected: state.sidebarSelection.selectedDecisionIDs.contains(decision.id),
           toggleSelection: {
-            state.sidebarSelection.toggleDecision(decision.id)
+            state.sidebarSelection.applyChange(
+              kind: .decision,
+              selectedIDs: toggle(decision.id, in: state.sidebarSelection.selectedDecisionIDs),
+              anchorID: decision.id
+            )
           }
         )
         .tag(selection)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarDecisionRow(decision.id))
         .modifier(
           SessionSidebarMultiSelectRowGesture(
-            isEnabled: state.sidebarSelection.isDecisionMultiSelectEnabled,
+            isEnabled: true,
             perform: { handleDecisionRowTap(decision.id) }
           )
         )
         .contextMenu {
-          Button("Dismiss Decision") {
-            dismissDecisions([decision.id])
+          let scope = SessionSidebarContextMenuScope.resolve(
+            kind: .decision,
+            rowID: decision.id,
+            selectedIDs: state.sidebarSelection.selectedDecisionIDs,
+            orderedVisibleIDs: orderedDecisionIDs
+          )
+          Button(scope.destructiveLabel) {
+            dismissDecisions(scope.ids)
           }
           Divider()
-          Button("Copy Decision ID") {
-            HarnessMonitorClipboard.copy(decision.id)
+          Button(scope.copyIDsLabel) {
+            HarnessMonitorClipboard.copy(scope.clipboardText)
           }
         }
       }
@@ -82,19 +97,6 @@ extension SessionSidebar {
       .help("Decision Bulk Actions")
       .accessibilityLabel("Decision Bulk Actions")
       Button {
-        state.sidebarSelection.toggleDecisionMultiSelect()
-      } label: {
-        Image(
-          systemName: state.sidebarSelection.isDecisionMultiSelectEnabled
-            ? "checkmark.circle.fill"
-            : "checkmark.circle"
-        )
-      }
-      .buttonStyle(.borderless)
-      .help("Select Decisions")
-      .accessibilityLabel("Select Decisions")
-      .accessibilityValue(multiSelectAccessibilityValue)
-      Button {
         state.selectCreate(.decision)
       } label: {
         Image(systemName: "plus")
@@ -139,31 +141,6 @@ extension SessionSidebar {
           state.decisionBulkActions.clearExpiredUndoToast()
         }
       }
-    }
-  }
-
-  var multiSelectAccessibilityValue: Text {
-    guard state.sidebarSelection.isDecisionMultiSelectEnabled else {
-      return Text("Off")
-    }
-    let count = state.sidebarSelection.selectedDecisionIDs.count
-    return Text("\(count) of \(decisions.count) decisions selected")
-  }
-}
-
-@MainActor
-public enum SessionSidebarMultiSelectAnnouncer {
-  private static var pendingTask: Task<Void, Never>?
-  private static let debounceInterval: Duration = .milliseconds(150)
-
-  public static func announce(count: Int, visibleCount: Int) {
-    pendingTask?.cancel()
-    pendingTask = Task { @MainActor in
-      try? await Task.sleep(for: debounceInterval)
-      guard !Task.isCancelled else { return }
-      AccessibilityNotification.Announcement(
-        "\(count) of \(visibleCount) decisions selected"
-      ).post()
     }
   }
 }

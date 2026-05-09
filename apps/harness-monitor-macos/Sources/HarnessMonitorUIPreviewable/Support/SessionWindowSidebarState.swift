@@ -117,36 +117,166 @@ public final class SessionDecisionBulkActionState {
   }
 }
 
+public enum SessionSidebarSelectionKind: Hashable, Sendable {
+  case agent
+  case task
+  case decision
+
+  public var pluralNoun: String {
+    switch self {
+    case .agent: "agents"
+    case .task: "tasks"
+    case .decision: "decisions"
+    }
+  }
+
+  public var singularNoun: String {
+    switch self {
+    case .agent: "agent"
+    case .task: "task"
+    case .decision: "decision"
+    }
+  }
+
+  /// Default kind for select-all when no anchor is set. Policy: agents take
+  /// priority, then tasks, then decisions — first non-empty wins. Lives next
+  /// to the selection state because that's where the rule belongs, not in a
+  /// view file.
+  public static func inferredAnchorKind(
+    agentCount: Int,
+    taskCount: Int,
+    decisionCount: Int
+  ) -> SessionSidebarSelectionKind? {
+    if agentCount > 0 { return .agent }
+    if taskCount > 0 { return .task }
+    if decisionCount > 0 { return .decision }
+    return nil
+  }
+}
+
+public struct SessionSidebarAnchor: Equatable, Sendable {
+  public let kind: SessionSidebarSelectionKind
+  public let id: String
+
+  public init(kind: SessionSidebarSelectionKind, id: String) {
+    self.kind = kind
+    self.id = id
+  }
+}
+
 @MainActor
 @Observable
 public final class SessionSidebarSelectionState {
+  /// User-toggled "show checkboxes" mode for decisions only. Gesture-driven multi-select
+  /// works regardless; this flag forces the checkbox affordance on for accessibility.
   public var isDecisionMultiSelectEnabled = false
-  public var selectedDecisionIDs: Set<String> = []
-  public var decisionSelectionAnchorID: String?
+
+  /// At most one kind has a non-empty multi-selection at a time. Mutations
+  /// must go through `applyChange`, `prune`, or `clear` so the invariant holds.
+  public private(set) var selectedAgentIDs: Set<String> = []
+  public private(set) var selectedTaskIDs: Set<String> = []
+  public private(set) var selectedDecisionIDs: Set<String> = []
+  public private(set) var anchor: SessionSidebarAnchor?
+
+  /// Bumped on every selection mutation. Forward-looking primitive — keep
+  /// it stable so a future watcher (e.g. a per-window analytics probe, or
+  /// a virtualized row that wants a coarser invalidation key than four
+  /// `@Observable` fields) can subscribe via `.onChange(of: state.sidebarSelection.revision)`
+  /// without hashing ID arrays. Bumps on no-op writes too — treat as an
+  /// "edit happened" signal, not a content hash.
+  public private(set) var revision: Int = 0
 
   public init() {}
+
+  public func count(of kind: SessionSidebarSelectionKind) -> Int {
+    selectedIDs(of: kind).count
+  }
+
+  public func selectedIDs(of kind: SessionSidebarSelectionKind) -> Set<String> {
+    switch kind {
+    case .agent: selectedAgentIDs
+    case .task: selectedTaskIDs
+    case .decision: selectedDecisionIDs
+    }
+  }
+
+  public func clear() {
+    selectedAgentIDs.removeAll()
+    selectedTaskIDs.removeAll()
+    selectedDecisionIDs.removeAll()
+    anchor = nil
+    revision &+= 1
+  }
 
   public func toggleDecisionMultiSelect() {
     isDecisionMultiSelectEnabled.toggle()
     if !isDecisionMultiSelectEnabled {
       selectedDecisionIDs.removeAll()
-      decisionSelectionAnchorID = nil
+      if anchor?.kind == .decision {
+        anchor = nil
+      }
+      revision &+= 1
     }
   }
 
+  /// Convenience for the existing decision-row checkbox path.
   public func toggleDecision(_ decisionID: String) {
-    if selectedDecisionIDs.contains(decisionID) {
-      selectedDecisionIDs.remove(decisionID)
+    var next = selectedDecisionIDs
+    if next.contains(decisionID) {
+      next.remove(decisionID)
     } else {
-      selectedDecisionIDs.insert(decisionID)
+      next.insert(decisionID)
     }
-    decisionSelectionAnchorID = decisionID
+    applyChange(kind: .decision, selectedIDs: next, anchorID: decisionID)
   }
 
-  public func pruneDecisionSelection(to visibleDecisionIDs: Set<String>) {
-    selectedDecisionIDs.formIntersection(visibleDecisionIDs)
-    if let decisionSelectionAnchorID, !visibleDecisionIDs.contains(decisionSelectionAnchorID) {
-      self.decisionSelectionAnchorID = selectedDecisionIDs.first
+  /// Apply a click-resolver outcome under the anchor-locked cross-type rule:
+  /// switching kinds first clears the other kinds via `switchActiveKind(to:)`,
+  /// then writes the new selection. Single chokepoint for the invariant.
+  public func applyChange(
+    kind: SessionSidebarSelectionKind,
+    selectedIDs: Set<String>,
+    anchorID: String?
+  ) {
+    if let existing = anchor, existing.kind != kind {
+      switchActiveKind(to: kind)
+    }
+    write(ids: selectedIDs, of: kind)
+    if let anchorID {
+      anchor = SessionSidebarAnchor(kind: kind, id: anchorID)
+    } else if anchor?.kind == kind {
+      anchor = nil
+    }
+    revision &+= 1
+  }
+
+  public func prune(
+    kind: SessionSidebarSelectionKind,
+    visibleIDs: Set<String>
+  ) {
+    let pruned = selectedIDs(of: kind).intersection(visibleIDs)
+    write(ids: pruned, of: kind)
+    if let current = anchor, current.kind == kind, !visibleIDs.contains(current.id) {
+      anchor = pruned.first.map { SessionSidebarAnchor(kind: kind, id: $0) }
+    }
+    revision &+= 1
+  }
+
+  /// Drops every per-kind set when the active anchor kind is about to change.
+  /// Caller asserts the new kind differs from the current anchor; that's the
+  /// invariant this method enforces — at most one kind active at a time.
+  private func switchActiveKind(to newKind: SessionSidebarSelectionKind) {
+    assert(anchor?.kind != newKind, "switchActiveKind only valid on a kind change")
+    selectedAgentIDs.removeAll()
+    selectedTaskIDs.removeAll()
+    selectedDecisionIDs.removeAll()
+  }
+
+  private func write(ids: Set<String>, of kind: SessionSidebarSelectionKind) {
+    switch kind {
+    case .agent: selectedAgentIDs = ids
+    case .task: selectedTaskIDs = ids
+    case .decision: selectedDecisionIDs = ids
     }
   }
 }
