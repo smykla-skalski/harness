@@ -122,6 +122,42 @@ shift
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("xcode-derived-lanes/agent-42", log)
 
+    def test_debug_lanes_disable_user_script_sandboxing_without_project_warning(self) -> None:
+        completed, log, _ = self.run_script(
+            "-scheme",
+            "HarnessMonitor",
+            "-configuration",
+            "Debug",
+            "build",
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("ENABLE_USER_SCRIPT_SANDBOXING=NO", log)
+
+    def test_release_lanes_keep_user_script_sandboxing_project_default(self) -> None:
+        completed, log, _ = self.run_script(
+            "-scheme",
+            "HarnessMonitor",
+            "-configuration",
+            "Release",
+            "build",
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertNotIn("ENABLE_USER_SCRIPT_SANDBOXING=NO", log)
+
+    def test_explicit_script_sandboxing_setting_is_not_overridden(self) -> None:
+        completed, log, _ = self.run_script(
+            "-scheme",
+            "HarnessMonitor",
+            "build",
+            "ENABLE_USER_SCRIPT_SANDBOXING=YES",
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertNotIn("ENABLE_USER_SCRIPT_SANDBOXING=NO", log)
+        self.assertIn("ENABLE_USER_SCRIPT_SANDBOXING=YES", log)
+
     def test_legacy_profile_env_is_rejected(self) -> None:
         completed, log, _ = self.run_script(
             "-scheme",

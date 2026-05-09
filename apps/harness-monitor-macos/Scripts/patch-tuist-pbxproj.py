@@ -10,7 +10,7 @@ Normalizes:
   on the PBXProject `attributes` block.
 - target-level `DevelopmentTeam` / `ProvisioningStyle` metadata from
   `TargetAttributes`, so targets inherit signing cleanly from project settings.
-- macOS app-target `SystemCapabilities` metadata for disabled App Groups, so
+- macOS app-target `SystemCapabilities` metadata for enabled App Groups, so
   Xcode does not keep re-suggesting "Enable Register App Groups".
 - scheme-level `LastUpgradeVersion`, which Tuist emits as Xcode 10.1 metadata.
 
@@ -65,7 +65,7 @@ SYSTEM_CAPABILITIES_RE = re.compile(
     r"(\t\t\t\t\t\tSystemCapabilities = \{\n)((?:\t{7,}[^\n]*\n)*?)(\t\t\t\t\t\t\};)"
 )
 
-DISABLED_MAC_APP_GROUP_TARGETS = frozenset(
+MAC_APP_GROUP_TARGETS = frozenset(
     {"HarnessMonitor", "HarnessMonitorUITestHost"}
 )
 MAC_APP_GROUPS_CAPABILITY_KEY = "com.apple.ApplicationGroups.Mac"
@@ -230,15 +230,15 @@ def upsert_target_system_capability(
     return TARGET_ATTRIBUTES_RE.sub(replace_target_attributes, text, count=1)
 
 
-def upsert_disabled_mac_app_group_metadata(text: str) -> str:
+def upsert_mac_app_group_metadata(text: str) -> str:
     for target_id in native_target_ids(
-        text, set(DISABLED_MAC_APP_GROUP_TARGETS)
+        text, set(MAC_APP_GROUP_TARGETS)
     ).values():
         text = upsert_target_system_capability(
             text,
             target_id=target_id,
             capability_key=MAC_APP_GROUPS_CAPABILITY_KEY,
-            enabled=0,
+            enabled=1,
         )
     return text
 
@@ -278,7 +278,7 @@ def patch_pbxproj(
     text = upsert_project_attribute(text, "LastSwiftUpdateCheck", last_swift_update)
     text = upsert_project_attribute(text, "LastUpgradeCheck", last_upgrade)
     text = strip_target_attribute_signing_metadata(text)
-    text = upsert_disabled_mac_app_group_metadata(text)
+    text = upsert_mac_app_group_metadata(text)
     text = normalize_generated_versions(
         text,
         marketing_version=marketing_version,

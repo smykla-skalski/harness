@@ -78,7 +78,7 @@ class PatchTuistPbxprojTests(unittest.TestCase):
         self.assertNotIn("DevelopmentTeam = Q498EB36N4;", patched)
         self.assertNotIn("ProvisioningStyle = Automatic;", patched)
 
-    def test_adds_disabled_mac_app_groups_capability_for_monitor_app_targets(
+    def test_enables_mac_app_groups_capability_for_monitor_app_targets(
         self,
     ) -> None:
         module = load_patcher_module()
@@ -137,7 +137,7 @@ class PatchTuistPbxprojTests(unittest.TestCase):
             "\t\t\t\t\tAAAAAAAAAAAAAAAAAAAAAAAA = {\n"
             "\t\t\t\t\t\tSystemCapabilities = {\n"
             "\t\t\t\t\t\t\tcom.apple.ApplicationGroups.Mac = {\n"
-            "\t\t\t\t\t\t\t\tenabled = 0;\n"
+            "\t\t\t\t\t\t\t\tenabled = 1;\n"
             "\t\t\t\t\t\t\t};\n"
             "\t\t\t\t\t\t};\n"
             "\t\t\t\t\t};\n",
@@ -147,7 +147,7 @@ class PatchTuistPbxprojTests(unittest.TestCase):
             "\t\t\t\t\tBBBBBBBBBBBBBBBBBBBBBBBB = {\n"
             "\t\t\t\t\t\tSystemCapabilities = {\n"
             "\t\t\t\t\t\t\tcom.apple.ApplicationGroups.Mac = {\n"
-            "\t\t\t\t\t\t\t\tenabled = 0;\n"
+            "\t\t\t\t\t\t\t\tenabled = 1;\n"
             "\t\t\t\t\t\t\t};\n"
             "\t\t\t\t\t\t};\n"
             "\t\t\t\t\t};\n",
