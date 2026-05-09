@@ -11,6 +11,8 @@ public struct SessionWindowView: View {
   var openWindow
   @Environment(\.undoManager)
   var undoManager
+  @Environment(\.accessibilityReduceMotion)
+  var reduceMotion: Bool
   @SceneStorage("session.route")
   private var persistedRoute: SessionWindowRoute = .overview
   @SceneStorage("session.decisionID")
@@ -220,6 +222,20 @@ public struct SessionWindowView: View {
         let storedVisibility: NavigationSplitViewVisibility =
           newValue == .all ? .doubleColumn : newValue
         columnVisibilityRaw = SessionColumnVisibilityCodec.encode(storedVisibility)
+      }
+    )
+  }
+
+  var focusModeColumnVisibilityBinding: Binding<NavigationSplitViewVisibility> {
+    Binding(
+      get: {
+        focusMode
+          ? .detailOnly
+          : columnVisibilityBinding.wrappedValue
+      },
+      set: { newValue in
+        guard !focusMode else { return }
+        columnVisibilityBinding.wrappedValue = newValue
       }
     )
   }

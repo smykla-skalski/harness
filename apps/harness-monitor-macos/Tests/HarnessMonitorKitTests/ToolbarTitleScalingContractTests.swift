@@ -35,12 +35,37 @@ struct ToolbarTitleScalingContractTests {
   @Test("Session focus mode toolbar button uses animated moon symbols")
   func sessionFocusModeToolbarButtonUsesAnimatedMoonSymbols() throws {
     let sessionSource = try previewableSourceFile(named: "Views/Sessions/SessionWindowToolbar.swift")
+    let columnsSource = try previewableSourceFile(named: "Views/Sessions/SessionWindowView+Columns.swift")
+    let bannerSource = try previewableSourceFile(named: "Views/Sessions/SessionBannerStack.swift")
 
+    #expect(!sessionSource.contains("Toggle(isOn: $focusMode)"))
     #expect(sessionSource.contains("Image(systemName: focusMode ? \"moon.fill\" : \"moon\")"))
     #expect(sessionSource.contains(".contentTransition("))
     #expect(sessionSource.contains(".replace.magic(fallback: .downUp.wholeSymbol)"))
     #expect(sessionSource.contains("options: .nonRepeating"))
-    #expect(sessionSource.contains(".animation(.default, value: focusMode)"))
+    #expect(sessionSource.contains(".frame(width: 14, height: 14)"))
+    #expect(sessionSource.contains(".help(focusMode ? \"Exit focus mode\" : \"Enter focus mode\")"))
+    #expect(sessionSource.contains("toggleFocusMode()"))
+    #expect(sessionSource.contains("SessionFocusModeMotionPolicy.animation(reduceMotion: reduceMotion)"))
+    #expect(sessionSource.contains("withAnimation(animation)"))
+    #expect(!sessionSource.contains(".animation(.default, value: focusMode)"))
+    #expect(columnsSource.contains("NavigationSplitView(columnVisibility: focusModeColumnVisibilityBinding)"))
+    #expect(!columnsSource.contains("focusModeSurface\n        .padding(.top, HarnessMonitorTheme.spacingLG)"))
+    #expect(columnsSource.contains("SessionFocusModeMotionPolicy.standardSurfaceTransition"))
+    #expect(columnsSource.contains("SessionFocusModeMotionPolicy.focusedSurfaceTransition"))
+    #expect(bannerSource.contains("SessionFocusModeMotionPolicy.bannerTransition"))
+  }
+
+  @Test("Workspace toolbar keeps refresh as an explicit primary action")
+  func workspaceToolbarKeepsRefreshAsPrimaryAction() throws {
+    let workspaceSource = try previewableSourceFile(named: "Views/Workspace/Window/WorkspaceWindowView.swift")
+
+    #expect(
+      workspaceSource.contains(
+        "ToolbarItem(placement: .primaryAction) {\n          Button(action: refresh)"
+      )
+    )
+    #expect(workspaceSource.contains(".help(\"Refresh workspace\")"))
   }
 
   private func previewableSourceFile(named relativePath: String) throws -> String {

@@ -277,10 +277,11 @@ public struct WorkspaceWindowView: View {
             )
           )
         }
-        ToolbarItem(placement: .automatic) {
+        ToolbarItem(placement: .primaryAction) {
           Button(action: refresh) {
             Label("Refresh", systemImage: "arrow.clockwise")
           }
+          .help("Refresh workspace")
           .harnessMCPButton(
             HarnessMonitorAccessibility.agentTuiRefreshButton,
             label: "Refresh workspace",
