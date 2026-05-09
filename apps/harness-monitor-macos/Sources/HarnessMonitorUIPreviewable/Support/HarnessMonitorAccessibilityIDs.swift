@@ -121,6 +121,10 @@ public enum HarnessMonitorAccessibility {
   public static let settingsCustomTimeZonePicker = "harness.settings.custom-time-zone"
   public static let settingsTimelinePersistencePicker =
     "harness.settings.timeline.filter-persistence"
+  public static let settingsPendingDecisionBannersToggle =
+    "harness.settings.decisions.pending-banners"
+  public static let settingsPendingDecisionBannersFocusModeToggle =
+    "harness.settings.decisions.pending-banners.focus-mode"
   public static let settingsMCPSection = "harness.settings.mcp"
   public static let settingsMCPRegistryHostToggle =
     "harness.settings.mcp.registry-host"

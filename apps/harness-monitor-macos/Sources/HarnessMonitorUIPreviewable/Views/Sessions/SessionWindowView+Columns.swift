@@ -87,6 +87,7 @@ extension SessionWindowView {
     SessionBannerStack(
       store: store,
       sessionID: token.sessionID,
+      isFocusMode: focusMode,
       isLoading: isLoading,
       hasSnapshot: snapshot != nil,
       pendingDecisionCount: allSessionDecisionsCache.count,
