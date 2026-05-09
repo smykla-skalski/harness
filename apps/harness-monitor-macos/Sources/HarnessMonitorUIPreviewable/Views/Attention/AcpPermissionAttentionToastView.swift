@@ -1,3 +1,4 @@
+import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
@@ -131,14 +132,51 @@ public struct AcpPermissionAttentionToastView: View {
   }
 }
 
-private struct AcpPermissionToastPointerShield: View {
+private struct AcpPermissionToastPointerShield: NSViewRepresentable {
   let cornerRadius: CGFloat
 
-  var body: some View {
-    Color.clear
-      .contentShape(
-        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+  func makeNSView(context: Context) -> ShieldView {
+    let view = ShieldView()
+    view.cornerRadius = cornerRadius
+    view.setAccessibilityElement(false)
+    return view
+  }
+
+  func updateNSView(_ nsView: ShieldView, context: Context) {
+    nsView.cornerRadius = cornerRadius
+  }
+
+  final class ShieldView: NSView {
+    var cornerRadius: CGFloat = 0
+
+    override var isOpaque: Bool { false }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+      true
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+      guard !isHidden, alphaValue > 0, bounds.contains(point) else {
+        return nil
+      }
+
+      let path = NSBezierPath(
+        roundedRect: bounds,
+        xRadius: cornerRadius,
+        yRadius: cornerRadius
       )
-      .onTapGesture {}
+      guard path.contains(point) else {
+        return nil
+      }
+
+      return super.hitTest(point) ?? self
+    }
+
+    override func mouseDown(with event: NSEvent) {}
+    override func mouseUp(with event: NSEvent) {}
+    override func rightMouseDown(with event: NSEvent) {}
+    override func rightMouseUp(with event: NSEvent) {}
+    override func otherMouseDown(with event: NSEvent) {}
+    override func otherMouseUp(with event: NSEvent) {}
   }
 }
