@@ -16,11 +16,28 @@ struct ContentWindowToolbarModel: Equatable {
 
 struct ContentWindowToolbarItems: ToolbarContent {
   let store: HarnessMonitorStore
-  let model: ContentWindowToolbarModel
+  let contentToolbar: HarnessMonitorStore.ContentToolbarSlice
+  let canCreateTask: Bool
 
-  init(store: HarnessMonitorStore, model: ContentWindowToolbarModel) {
+  private var model: ContentWindowToolbarModel {
+    ContentWindowToolbarModel(
+      canNavigateBack: contentToolbar.canNavigateBack,
+      canNavigateForward: contentToolbar.canNavigateForward,
+      canCreateTask: canCreateTask,
+      isRefreshing: contentToolbar.isRefreshing,
+      sleepPreventionEnabled: contentToolbar.sleepPreventionEnabled,
+      manualRefreshSuccessToken: contentToolbar.manualRefreshSuccessToken
+    )
+  }
+
+  init(
+    store: HarnessMonitorStore,
+    contentToolbar: HarnessMonitorStore.ContentToolbarSlice,
+    canCreateTask: Bool
+  ) {
     self.store = store
-    self.model = model
+    self.contentToolbar = contentToolbar
+    self.canCreateTask = canCreateTask
   }
 
   @ToolbarContentBuilder var body: some ToolbarContent {
@@ -34,7 +51,18 @@ struct ContentWindowToolbarItems: ToolbarContent {
 
 struct ContentPrimaryToolbarItems: ToolbarContent {
   let store: HarnessMonitorStore
-  let model: ContentWindowToolbarModel
+  let contentToolbar: HarnessMonitorStore.ContentToolbarSlice
+
+  private var model: ContentWindowToolbarModel {
+    ContentWindowToolbarModel(
+      canNavigateBack: false,
+      canNavigateForward: false,
+      canCreateTask: false,
+      isRefreshing: contentToolbar.isRefreshing,
+      sleepPreventionEnabled: contentToolbar.sleepPreventionEnabled,
+      manualRefreshSuccessToken: contentToolbar.manualRefreshSuccessToken
+    )
+  }
 
   var body: some ToolbarContent {
     ToolbarItem(placement: .primaryAction) {
