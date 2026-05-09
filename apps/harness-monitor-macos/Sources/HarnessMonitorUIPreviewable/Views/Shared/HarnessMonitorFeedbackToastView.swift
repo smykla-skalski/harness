@@ -72,6 +72,7 @@ private struct HarnessMonitorFeedbackToastRow: View {
         .harnessDismissButtonStyle()
         .accessibilityLabel("Dismiss feedback")
         .accessibilityIdentifier(HarnessMonitorAccessibility.actionToastCloseButton)
+        .keyboardShortcut(.cancelAction)
       }
 
       if showsDetails, let details = feedback.details {
