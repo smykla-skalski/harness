@@ -41,6 +41,7 @@ struct SessionAgentTuiViewport: View {
         .quaternary.opacity(0.4),
         in: RoundedRectangle(cornerRadius: metrics.terminalCornerRadius)
       )
+      .scrollBounceBehavior(.always, axes: .vertical)
       .frame(
         minHeight: TerminalViewportSizing.minimumViewportHeight,
         idealHeight: TerminalViewportSizing.idealViewportHeight,

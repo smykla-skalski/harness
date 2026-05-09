@@ -1,4 +1,3 @@
-import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
@@ -82,8 +81,6 @@ struct SettingsActionButtons: View {
   }
 
   private func copyExternalDaemonCommandToClipboard() {
-    let pasteboard = NSPasteboard.general
-    pasteboard.clearContents()
-    pasteboard.setString(Self.externalDaemonCommand, forType: .string)
+    HarnessMonitorClipboard.copy(Self.externalDaemonCommand)
   }
 }

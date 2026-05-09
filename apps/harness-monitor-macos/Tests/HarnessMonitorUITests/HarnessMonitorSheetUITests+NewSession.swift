@@ -45,7 +45,7 @@ extension HarnessMonitorSheetUITests {
     )
     XCTAssertTrue(
       waitForElement(
-        element(in: app, identifier: Accessibility.agentCapabilityRow("copilot")),
+        element(in: app, identifier: Accessibility.newSessionCapabilityRow("copilot")),
         timeout: Self.fastActionTimeout
       ),
       "New Session should render the shared capability row experience"

@@ -182,7 +182,6 @@ public enum HarnessMonitorAccessibility {
   public static let menuBarSupervisorCheckNow = "harness.menu-bar.action.supervisor-check-now"
   public static let menuBarRunWhenClosed = "harness.menu-bar.action.run-when-closed"
   public static let menuBarQuit = "harness.menu-bar.action.quit"
-  public static let windowMenuSessionItem = "harness.menu.window.session"
   public static let windowMenuMainItem = "harness.menu.window.main"
   public static let sessionHeaderCard = "harness.session.header"
   public static let sessionHeaderCardFrame = "\(sessionHeaderCard).frame"

@@ -1,25 +1,9 @@
-import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
-private struct AcpToastOpenDecisionsKey: EnvironmentKey {
-  static let defaultValue: @MainActor @Sendable () -> Void = {}
-}
-
-private struct AcpToastDismissKey: EnvironmentKey {
-  static let defaultValue: @MainActor @Sendable () -> Void = {}
-}
-
 extension EnvironmentValues {
-  public var acpToastOpenDecisions: @MainActor @Sendable () -> Void {
-    get { self[AcpToastOpenDecisionsKey.self] }
-    set { self[AcpToastOpenDecisionsKey.self] = newValue }
-  }
-
-  public var acpToastDismiss: @MainActor @Sendable () -> Void {
-    get { self[AcpToastDismissKey.self] }
-    set { self[AcpToastDismissKey.self] = newValue }
-  }
+  @Entry public var acpToastOpenDecisions: @MainActor @Sendable () -> Void = {}
+  @Entry public var acpToastDismiss: @MainActor @Sendable () -> Void = {}
 }
 
 public struct AcpPermissionAttentionToastView: View {
@@ -147,53 +131,14 @@ public struct AcpPermissionAttentionToastView: View {
   }
 }
 
-private struct AcpPermissionToastPointerShield: NSViewRepresentable {
+private struct AcpPermissionToastPointerShield: View {
   let cornerRadius: CGFloat
 
-  func makeNSView(context: Context) -> ShieldView {
-    let view = ShieldView()
-    view.cornerRadius = cornerRadius
-    view.setAccessibilityElement(false)
-    return view
-  }
-
-  func updateNSView(_ nsView: ShieldView, context: Context) {
-    nsView.cornerRadius = cornerRadius
-  }
-
-  final class ShieldView: NSView {
-    var cornerRadius: CGFloat = 0
-
-    override var isOpaque: Bool { false }
-
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
-      true
-    }
-
-    override func hitTest(_ point: NSPoint) -> NSView? {
-      guard !isHidden, alphaValue > 0, bounds.contains(point) else {
-        return nil
-      }
-
-      let path = NSBezierPath(
-        roundedRect: bounds,
-        xRadius: cornerRadius,
-        yRadius: cornerRadius
+  var body: some View {
+    Color.clear
+      .contentShape(
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
       )
-      guard path.contains(point) else {
-        return nil
-      }
-
-      // Let interactive subviews (buttons) win first; otherwise absorb taps
-      // on the remaining toast body so underlying UI cannot be activated.
-      return super.hitTest(point) ?? self
-    }
-
-    override func mouseDown(with event: NSEvent) {}
-    override func mouseUp(with event: NSEvent) {}
-    override func rightMouseDown(with event: NSEvent) {}
-    override func rightMouseUp(with event: NSEvent) {}
-    override func otherMouseDown(with event: NSEvent) {}
-    override func otherMouseUp(with event: NSEvent) {}
+      .onTapGesture {}
   }
 }

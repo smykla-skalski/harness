@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 private let commandBoxCornerRadius: CGFloat = 6

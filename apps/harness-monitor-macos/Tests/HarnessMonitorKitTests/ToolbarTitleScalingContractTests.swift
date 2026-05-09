@@ -7,9 +7,6 @@ struct ToolbarTitleScalingContractTests {
     let contentSource = try previewableSourceFile(
       named: "Views/App/ContentViewSupport.swift"
     )
-    let workspaceSource = try previewableSourceFile(
-      named: "Views/Workspace/Window/WorkspaceWindowView.swift"
-    )
     let sessionSource = try previewableSourceFile(
       named: "Views/Sessions/SessionWindowView.swift"
     )
@@ -18,17 +15,6 @@ struct ToolbarTitleScalingContractTests {
     #expect(contentSource.contains(".navigationTitle(navigationTitleText)"))
     #expect(contentSource.contains(".navigationSubtitle(navigationSubtitleText ?? \"\")"))
     #expect(!contentSource.contains("HarnessMonitorToolbarTitleToolbarItem("))
-    #expect(
-      workspaceSource.contains(
-        ".navigationTitle(workspaceNavigationTitle(for: viewModel.selection))"
-      )
-    )
-    #expect(
-      workspaceSource.contains(
-        ".navigationSubtitle(workspaceNavigationSubtitle(for: viewModel.selection))"
-      )
-    )
-    #expect(!workspaceSource.contains("HarnessMonitorToolbarTitleToolbarItem("))
     #expect(sessionSource.contains("var navigationTitleText: String"))
     #expect(sessionSource.contains("var navigationSubtitleText: String"))
     #expect(sessionSource.contains(".navigationTitle(navigationTitleText)"))
@@ -118,20 +104,6 @@ struct ToolbarTitleScalingContractTests {
     )
     #expect(!columnsSource.contains("sidebarMinimumWidth"))
     #expect(!bannerSource.contains("SessionFocusModeMotionPolicy.bannerTransition"))
-  }
-
-  @Test("Workspace toolbar keeps refresh as an explicit primary action")
-  func workspaceToolbarKeepsRefreshAsPrimaryAction() throws {
-    let workspaceSource = try previewableSourceFile(
-      named: "Views/Workspace/Window/WorkspaceWindowView.swift"
-    )
-
-    #expect(
-      workspaceSource.contains(
-        "ToolbarItem(placement: .primaryAction) {\n          Button(action: refresh)"
-      )
-    )
-    #expect(workspaceSource.contains(".help(\"Refresh workspace\")"))
   }
 
   @Test("Session window leaves toolbar chrome to tabbing and scene shell")

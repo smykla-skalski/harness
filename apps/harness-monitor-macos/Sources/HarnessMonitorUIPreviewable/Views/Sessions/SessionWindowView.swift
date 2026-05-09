@@ -8,6 +8,15 @@ struct SessionWindowSnapshotRefreshTrigger: Equatable {
   let summaryUpdatedAt: String?
 }
 
+private struct SessionWindowDecisionCacheStorage {
+  var allSessionDecisions: [Decision] = []
+  var matchingDecisions: [Decision] = []
+  var allSessionDecisionIDs: Set<String> = []
+  var matchingDecisionIDs: Set<String> = []
+  var detailRenderedSelection: SessionSelection?
+  var contentRenderedRoute: SessionWindowRoute?
+}
+
 public struct SessionWindowView: View {
   public let store: HarnessMonitorStore
   public let token: SessionWindowToken
@@ -46,12 +55,7 @@ public struct SessionWindowView: View {
   @State private var isLoadingStorage = false
   @State private var didLoadSnapshotStorage = false
   @State private var detailColumnWidthStorage: CGFloat = 0
-  @State var allSessionDecisionsCache: [Decision] = []
-  @State var matchingDecisionsCache: [Decision] = []
-  @State var allSessionDecisionIDsCache: Set<String> = []
-  @State var matchingDecisionIDsCache: Set<String> = []
-  @State var detailRenderedSelection: SessionSelection?
-  @State var contentRenderedRoute: SessionWindowRoute?
+  @State private var decisionCacheStorage = SessionWindowDecisionCacheStorage()
 
   public init(store: HarnessMonitorStore, token: SessionWindowToken) {
     self.store = store
@@ -79,6 +83,36 @@ public struct SessionWindowView: View {
   var detailColumnWidth: CGFloat {
     get { detailColumnWidthStorage }
     nonmutating set { detailColumnWidthStorage = newValue }
+  }
+
+  var allSessionDecisionsCache: [Decision] {
+    get { decisionCacheStorage.allSessionDecisions }
+    nonmutating set { decisionCacheStorage.allSessionDecisions = newValue }
+  }
+
+  var matchingDecisionsCache: [Decision] {
+    get { decisionCacheStorage.matchingDecisions }
+    nonmutating set { decisionCacheStorage.matchingDecisions = newValue }
+  }
+
+  var allSessionDecisionIDsCache: Set<String> {
+    get { decisionCacheStorage.allSessionDecisionIDs }
+    nonmutating set { decisionCacheStorage.allSessionDecisionIDs = newValue }
+  }
+
+  var matchingDecisionIDsCache: Set<String> {
+    get { decisionCacheStorage.matchingDecisionIDs }
+    nonmutating set { decisionCacheStorage.matchingDecisionIDs = newValue }
+  }
+
+  var detailRenderedSelection: SessionSelection? {
+    get { decisionCacheStorage.detailRenderedSelection }
+    nonmutating set { decisionCacheStorage.detailRenderedSelection = newValue }
+  }
+
+  var contentRenderedRoute: SessionWindowRoute? {
+    get { decisionCacheStorage.contentRenderedRoute }
+    nonmutating set { decisionCacheStorage.contentRenderedRoute = newValue }
   }
 
   var route: SessionWindowRoute {
