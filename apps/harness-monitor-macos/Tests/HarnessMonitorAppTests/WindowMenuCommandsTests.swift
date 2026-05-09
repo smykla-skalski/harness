@@ -81,6 +81,23 @@ final class WindowMenuCommandsTests: XCTestCase {
     XCTAssertTrue(source.contains("window.tabbingMode = .automatic"))
   }
 
+  func testSessionWindowCycleCommandsAreWiredAndUseCommandBacktick() throws {
+    let commandSetSource = try harnessSourceFile(named: "App/HarnessMonitorMainCommandSet.swift")
+    let cycleSource = try harnessSourceFile(named: "Commands/SessionWindowCycleCommands.swift")
+
+    XCTAssertTrue(commandSetSource.contains("SessionWindowCycleCommands()"))
+    XCTAssertTrue(cycleSource.contains("CommandGroup(after: .windowArrangement)"))
+    XCTAssertTrue(cycleSource.contains(".keyboardShortcut(Self.cycleShortcut, modifiers: .command)"))
+    XCTAssertTrue(
+      cycleSource.contains(
+        ".keyboardShortcut(Self.cycleShortcut, modifiers: [.command, .shift])"
+      )
+    )
+    XCTAssertTrue(cycleSource.contains("SessionWindowCycler.cycle(direction: .forward)"))
+    XCTAssertTrue(cycleSource.contains("SessionWindowCycler.cycle(direction: .backward)"))
+    XCTAssertEqual(SessionWindowCycleCommands.cycleShortcut, "`")
+  }
+
   func testRecentSessionsCommandBuildsFileSubmenu() throws {
     let source = try harnessSourceFile(named: "Commands/RecentSessionsCommand.swift")
     let commandSetSource = try harnessSourceFile(named: "App/HarnessMonitorMainCommandSet.swift")
