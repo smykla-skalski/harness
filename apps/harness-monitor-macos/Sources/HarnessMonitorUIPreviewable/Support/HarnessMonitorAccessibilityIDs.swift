@@ -79,6 +79,7 @@ public enum HarnessMonitorAccessibility {
   public static let openRecentProjectList = "harness.open.recent.projects"
   public static let openRecentRefreshButton = "harness.open.recent.refresh"
   public static let openRecentOpenFolderButton = "harness.open.recent.open-folder"
+  public static let openRecentNewSessionButton = "harness.open.recent.new-session"
   public static let openRecentActionState = "harness.open.recent.action-state"
   public static let sessionWindowShell = "harness.session.window"
   public static let sessionWindowSidebar = "harness.session.window.sidebar"

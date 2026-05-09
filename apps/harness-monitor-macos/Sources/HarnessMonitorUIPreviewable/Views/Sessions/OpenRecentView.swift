@@ -18,6 +18,7 @@ public struct OpenRecentView: View {
   private var closeAfterPick = OpenRecentCloseAfterPickDefaults.defaultValue
   @State private var refreshActivationCount = 0
   @State private var openFolderActivationCount = 0
+  @State private var newSessionActivationCount = 0
   @State private var showsStartPanel = true
 
   public init(
@@ -46,6 +47,7 @@ public struct OpenRecentView: View {
             dateTimeConfiguration: dateTimeConfiguration,
             refresh: refreshAction,
             openFolder: openFolderAction,
+            newSession: newSessionAction,
             openSession: openSession,
             closeAfterPick: $closeAfterPick
           )
@@ -82,6 +84,12 @@ public struct OpenRecentView: View {
     openFolderActivationCount += 1
     HarnessMonitorLogger.swiftui.info("Open Recent open folder action activated")
     store.requestOpenFolder()
+  }
+
+  private func newSessionAction() {
+    newSessionActivationCount += 1
+    HarnessMonitorLogger.swiftui.info("Open Recent new session action activated")
+    store.presentedSheet = .newSession
   }
 
   private func openSession(_ sessionID: String) {
@@ -124,7 +132,7 @@ public struct OpenRecentView: View {
     if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
       AccessibilityTextMarker(
         identifier: HarnessMonitorAccessibility.openRecentActionState,
-        text: "refresh=\(refreshActivationCount);openFolder=\(openFolderActivationCount)"
+        text: "refresh=\(refreshActivationCount);openFolder=\(openFolderActivationCount);newSession=\(newSessionActivationCount)"
       )
     }
   }
@@ -135,6 +143,7 @@ private struct OpenRecentStartPanel: View {
   let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
   let refresh: () -> Void
   let openFolder: () -> Void
+  let newSession: () -> Void
   let openSession: (String) -> Void
   @Binding var closeAfterPick: Bool
   @Environment(\.fontScale)
@@ -148,6 +157,13 @@ private struct OpenRecentStartPanel: View {
     VStack(alignment: .leading, spacing: 22 * layoutScale) {
       header
       section(title: "Get Started") {
+        actionButton(
+          "New Session",
+          systemImage: "plus.square",
+          shortcut: "⌘N",
+          accessibilityID: HarnessMonitorAccessibility.openRecentNewSessionButton,
+          action: newSession
+        )
         actionButton(
           "Refresh",
           systemImage: "arrow.clockwise",
@@ -267,7 +283,12 @@ private struct OpenRecentStartPanel: View {
   }
 
   private func keyEquivalent(for title: String) -> KeyEquivalent {
-    title == "Refresh" ? "r" : "o"
+    switch title {
+    case "Refresh": "r"
+    case "Open Folder": "o"
+    case "New Session": "n"
+    default: "o"
+    }
   }
 
   private var layoutScale: CGFloat {
