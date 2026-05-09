@@ -49,6 +49,8 @@ struct HarnessMonitorSessionModelsTests {
     #expect(summary.checkoutId == summary.projectId)
     #expect(summary.checkoutDisplayName == "main")
     #expect(summary.worktreeDisplayName == "main")
+    #expect(summary.projectAndWorktreeDisplayLabel() == "harness • main")
+    #expect(summary.projectAndWorktreeDisplayLabel(separator: "·") == "harness · main")
   }
 
   @Test("Known worktree origins recover the worktree display name")
@@ -61,6 +63,8 @@ struct HarnessMonitorSessionModelsTests {
     #expect(summary.checkoutId == worktreeRoot)
     #expect(summary.checkoutDisplayName == "feature-branch")
     #expect(summary.worktreeDisplayName == "feature-branch")
+    #expect(summary.projectAndWorktreeDisplayLabel() == "harness • feature-branch")
+    #expect(summary.projectAndWorktreeDisplayLabel(separator: "·") == "harness · feature-branch")
   }
 
   @Test("Work item decoding accepts queued daemon fields")
