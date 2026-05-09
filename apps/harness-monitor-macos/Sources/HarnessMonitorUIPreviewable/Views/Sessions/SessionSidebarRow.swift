@@ -6,9 +6,6 @@ struct SessionSidebarRow: View {
   let systemImage: String
   var severityShape: SessionSidebarSeverityShape = .none
   var severityTint: Color = .gray
-  var isMultiSelect = false
-  var isSelected = false
-  var toggleSelection: (() -> Void)?
   @Environment(\.fontScale)
   private var fontScale
 
@@ -18,23 +15,6 @@ struct SessionSidebarRow: View {
 
   var body: some View {
     HStack(spacing: metrics.spacing) {
-      if isMultiSelect {
-        Button {
-          toggleSelection?()
-        } label: {
-          Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-            .imageScale(.small)
-            .scaledFont(.body)
-        }
-        .buttonStyle(.borderless)
-        .frame(
-          width: metrics.multiSelectControlSize,
-          height: metrics.multiSelectControlSize
-        )
-        .contentShape(Rectangle())
-        .accessibilityLabel(isSelected ? "Deselect \(title)" : "Select \(title)")
-      }
-
       Image(systemName: systemImage)
         .scaledFont(.body)
         .foregroundStyle(.secondary)
@@ -82,7 +62,6 @@ struct SessionSidebarRowMetrics: Equatable {
   let minHeight: CGFloat
   let verticalPadding: CGFloat
   let iconColumnWidth: CGFloat
-  let multiSelectControlSize: CGFloat
   let severityIndicatorSize: CGFloat
   let severityIndicatorOffset: CGFloat
   let severityAlertFontSize: CGFloat
@@ -93,7 +72,6 @@ struct SessionSidebarRowMetrics: Equatable {
     minHeight = max(28, 26 * scale)
     verticalPadding = max(1, 1.5 * min(scale, 1.4))
     iconColumnWidth = max(16, 16 * min(scale, 1.35))
-    multiSelectControlSize = scale >= 1.45 ? 44 : max(24, 22 * scale)
     severityIndicatorSize = max(8, 8 * min(scale, 1.5))
     severityIndicatorOffset = max(4, 4 * min(scale, 1.35))
     severityAlertFontSize = max(6, 6 * min(scale, 1.5))
