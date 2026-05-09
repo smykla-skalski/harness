@@ -8,7 +8,9 @@ from pathlib import Path
 APP_ROOT = Path(__file__).resolve().parents[2]
 PROJECT_MANIFEST = APP_ROOT / "Project.swift"
 PACKAGE_MANIFEST = APP_ROOT / "Tuist" / "Package.swift"
-BUILD_SETTINGS_HELPER = APP_ROOT / "Tuist" / "ProjectDescriptionHelpers" / "BuildSettings.swift"
+BUILD_SETTINGS_HELPER = (
+    APP_ROOT / "Tuist" / "ProjectDescriptionHelpers" / "BuildSettings.swift"
+)
 XCODE_VISIBLE_ENTITLEMENTS = APP_ROOT / "HarnessMonitorBase.entitlements"
 MONITOR_ENTITLEMENTS = APP_ROOT / "HarnessMonitor.entitlements"
 UI_TEST_HOST_ENTITLEMENTS = APP_ROOT / "HarnessMonitorUITestHost.entitlements"
@@ -33,9 +35,7 @@ RECOMMENDED_FRAMEWORK_SETTINGS = (
     '"MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS": "gnu17 gnu++20"',
 )
 
-PREVIEW_OVERRIDE_SETTINGS = (
-    '"SWIFT_ENABLE_PREFIX_MAPPING": "NO"',
-)
+PREVIEW_OVERRIDE_SETTINGS = ('"SWIFT_ENABLE_PREFIX_MAPPING": "NO"',)
 
 PROJECT_MANIFEST_SETTINGS = (
     '"REGISTER_APP_GROUPS": "NO"',
@@ -90,19 +90,30 @@ class TuistPackageSettingsTests(unittest.TestCase):
         )
         self.assertNotIn('"REGISTER_APP_GROUPS": "YES"', manifest)
         self.assertEqual(
-            manifest.count("entitlements: .file(path: xcodeVisibleAppEntitlementsPath)"),
+            manifest.count(
+                "entitlements: .file(path: xcodeVisibleAppEntitlementsPath)"
+            ),
             2,
             "app targets must expose app-group-free entitlements to Xcode",
         )
-        self.assertIn("$(PROJECT_TEMP_DIR)/GeneratedAppEntitlements/$(TARGET_NAME).codesign.entitlements", manifest)
+        self.assertIn(
+            "$(PROJECT_TEMP_DIR)/GeneratedAppEntitlements/$(TARGET_NAME).codesign.entitlements",
+            manifest,
+        )
         self.assertNotIn("BuildPhases.prepareAppEntitlements(variant:", manifest)
         self.assertNotIn('"OTHER_CODE_SIGN_FLAGS"', manifest)
+        self.assertNotIn('"ENABLE_USER_SCRIPT_SANDBOXING": "NO"', manifest)
+        self.assertIn(
+            '"ENABLE_USER_SCRIPT_SANDBOXING": "YES"', BUILD_SETTINGS_HELPER.read_text()
+        )
         for setting in PREVIEW_SCHEME_MACRO_EXPANSIONS:
             with self.subTest(setting=setting):
                 self.assertIn(setting, manifest)
         self.assertNotIn('"DEVELOPMENT_TEAM": "Q498EB36N4"', manifest)
 
-    def test_xcode_visible_entitlements_do_not_trigger_app_group_registration_upgrade(self) -> None:
+    def test_xcode_visible_entitlements_do_not_trigger_app_group_registration_upgrade(
+        self,
+    ) -> None:
         xcode_visible = plistlib.loads(XCODE_VISIBLE_ENTITLEMENTS.read_bytes())
         monitor = plistlib.loads(MONITOR_ENTITLEMENTS.read_bytes())
         ui_test_host = plistlib.loads(UI_TEST_HOST_ENTITLEMENTS.read_bytes())
