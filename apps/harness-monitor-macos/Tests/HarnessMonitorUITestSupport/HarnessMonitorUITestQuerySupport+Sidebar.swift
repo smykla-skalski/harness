@@ -9,7 +9,7 @@ extension HarnessMonitorUITestCase {
       HarnessMonitorUITestAccessibility.sleepPreventionButton,
       HarnessMonitorUITestAccessibility.sidebarFiltersCard,
       HarnessMonitorUITestAccessibility.sidebarCreateMenuButton,
-      HarnessMonitorUITestAccessibility.workspaceToolbarButton,
+      HarnessMonitorUITestAccessibility.sessionAttentionToolbarButton,
     ]
     let toolbarButtons = mainWindow(in: app).toolbars.buttons
     let searchCount = min(toolbarButtons.count, Self.maxToolbarButtonSearchCount)

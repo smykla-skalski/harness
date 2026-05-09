@@ -14,9 +14,9 @@ final class HarnessMonitorMenuBarExtraUITests: HarnessMonitorUITestCase {
     assertMenuItemExists("Enable Supervisor")
 
     tapMenuExtraItem("Open Workspace")
-    let workspaceWindow = element(in: app, identifier: Accessibility.workspaceWindow)
+    let decisionDeskRoot = element(in: app, identifier: Accessibility.decisionDeskRoot)
     XCTAssertTrue(
-      waitForElement(workspaceWindow, timeout: Self.uiTimeout),
+      waitForElement(decisionDeskRoot, timeout: Self.uiTimeout),
       "Open Workspace should open the Workspace window"
     )
 

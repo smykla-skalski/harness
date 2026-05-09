@@ -41,18 +41,18 @@ extension HarnessMonitorAgentsE2ETests {
     revealAction(
       in: app,
       containerIdentifier: Accessibility.agentTuiLaunchPane,
-      identifier: Accessibility.workspaceModelPicker,
+      identifier: Accessibility.sessionModelPicker,
       title: "Model"
     )
     selectMenuOption(
       in: app,
-      controlIdentifier: Accessibility.workspaceModelPicker,
+      controlIdentifier: Accessibility.sessionModelPicker,
       optionTitle: displayName
     )
     if let effortTitle = Self.e2eLowestEffortTitle[runtime] {
       selectSegment(
         in: app,
-        controlIdentifier: Accessibility.workspaceEffortPicker,
+        controlIdentifier: Accessibility.sessionEffortPicker,
         title: effortTitle
       )
     }
@@ -66,7 +66,7 @@ extension HarnessMonitorAgentsE2ETests {
       if let displayName = Self.codexModelDisplayNameByID[customModel] {
         selectMenuOption(
           in: app,
-          controlIdentifier: Accessibility.workspaceCodexModelPicker,
+          controlIdentifier: Accessibility.sessionCodexModelPicker,
           optionTitle: displayName
         )
         if let effort = ProcessInfo.processInfo.environment[Self.liveCodexEffortEnvKey]?
@@ -75,7 +75,7 @@ extension HarnessMonitorAgentsE2ETests {
         {
           selectSegment(
             in: app,
-            controlIdentifier: Accessibility.workspaceCodexEffortPicker,
+            controlIdentifier: Accessibility.sessionCodexEffortPicker,
             title: effort.capitalized
           )
         }
@@ -83,12 +83,12 @@ extension HarnessMonitorAgentsE2ETests {
       }
       selectMenuOption(
         in: app,
-        controlIdentifier: Accessibility.workspaceCodexModelPicker,
+        controlIdentifier: Accessibility.sessionCodexModelPicker,
         optionTitle: "Custom..."
       )
       replaceText(
         in: app,
-        identifier: Accessibility.workspaceCodexCustomModelField,
+        identifier: Accessibility.sessionCodexCustomModelField,
         text: customModel
       )
       if let effort = ProcessInfo.processInfo.environment[Self.liveCodexEffortEnvKey]?
@@ -97,7 +97,7 @@ extension HarnessMonitorAgentsE2ETests {
       {
         selectSegment(
           in: app,
-          controlIdentifier: Accessibility.workspaceCodexEffortPicker,
+          controlIdentifier: Accessibility.sessionCodexEffortPicker,
           title: effort.capitalized
         )
       }
@@ -107,17 +107,17 @@ extension HarnessMonitorAgentsE2ETests {
     revealAction(
       in: app,
       containerIdentifier: Accessibility.agentTuiLaunchPane,
-      identifier: Accessibility.workspaceCodexModelPicker,
+      identifier: Accessibility.sessionCodexModelPicker,
       title: "Model"
     )
     selectMenuOption(
       in: app,
-      controlIdentifier: Accessibility.workspaceCodexModelPicker,
+      controlIdentifier: Accessibility.sessionCodexModelPicker,
       optionTitle: displayName
     )
     selectSegment(
       in: app,
-      controlIdentifier: Accessibility.workspaceCodexEffortPicker,
+      controlIdentifier: Accessibility.sessionCodexEffortPicker,
       title: Self.e2eLowestEffortTitle["codex"] ?? "Low"
     )
   }
@@ -198,7 +198,7 @@ extension HarnessMonitorAgentsE2ETests {
       )
     }
 
-    let workspaceButton = button(in: app, identifier: Accessibility.workspaceToolbarButton)
+    let workspaceButton = button(in: app, identifier: Accessibility.sessionAttentionToolbarButton)
     XCTAssertTrue(
       waitUntil(timeout: Self.liveStartupTimeout) {
         toolbarState.label.contains("windowTitle=Cockpit")
@@ -217,7 +217,7 @@ extension HarnessMonitorAgentsE2ETests {
     in app: XCUIApplication,
     harness: HarnessMonitorAgentsE2ELiveHarness
   ) {
-    tapDockButton(in: app, identifier: Accessibility.workspaceToolbarButton, label: "agents")
+    tapDockButton(in: app, identifier: Accessibility.sessionAttentionToolbarButton, label: "agents")
     let launchPane = element(in: app, identifier: Accessibility.agentTuiLaunchPane)
     let sessionPane = element(in: app, identifier: Accessibility.agentTuiSessionPane)
     let state = element(in: app, identifier: Accessibility.agentTuiState)

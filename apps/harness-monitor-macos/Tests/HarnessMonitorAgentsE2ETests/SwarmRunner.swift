@@ -147,7 +147,7 @@ final class SwarmRunner {
     _ = try fixture.waitForReady("act14")
     fixture.expectAnyIdentifier([
       Accessibility.signalCollisionToast,
-      Accessibility.workspaceTaskCard,
+      Accessibility.sessionTaskCard,
     ])
     try acknowledge("act14")
   }

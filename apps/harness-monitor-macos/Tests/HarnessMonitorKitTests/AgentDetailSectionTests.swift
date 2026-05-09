@@ -10,46 +10,46 @@ import Testing
 struct AgentDetailSectionTests {
   @Test("Section publishes the workspace detail accessibility identifier")
   func publishesAccessibilityIdentifier() {
-    #expect(HarnessMonitorAccessibility.workspaceDetailCard == "harness.workspace.detail-card")
+    #expect(HarnessMonitorAccessibility.agentDetailCard == "harness.agent.detail-card")
   }
 
   @Test("Section publishes external-addition accessibility identifiers")
   func publishesExternalAdditionIdentifiers() {
     #expect(
-      HarnessMonitorAccessibility.workspaceDetailPersona
-        == "harness.workspace.detail.persona"
+      HarnessMonitorAccessibility.agentDetailPersona
+        == "harness.agent.detail.persona"
     )
     #expect(
-      HarnessMonitorAccessibility.workspaceDetailAssignedTasks
-        == "harness.workspace.detail.assigned-tasks"
+      HarnessMonitorAccessibility.agentDetailAssignedTasks
+        == "harness.agent.detail.assigned-tasks"
     )
     #expect(
-      HarnessMonitorAccessibility.workspaceDetailTimeline
-        == "harness.workspace.detail.timeline"
+      HarnessMonitorAccessibility.agentDetailTimeline
+        == "harness.agent.detail.timeline"
     )
   }
 
   @Test("Section publishes role-action accessibility identifiers")
   func publishesRoleActionIdentifiers() {
     #expect(
-      HarnessMonitorAccessibility.workspaceDetailRolePicker
-        == "harness.workspace.detail.role-picker"
+      HarnessMonitorAccessibility.agentDetailRolePicker
+        == "harness.agent.detail.role-picker"
     )
     #expect(
-      HarnessMonitorAccessibility.workspaceDetailRoleChange
-        == "harness.workspace.detail.role-change"
+      HarnessMonitorAccessibility.agentDetailRoleChange
+        == "harness.agent.detail.role-change"
     )
     #expect(
-      HarnessMonitorAccessibility.workspaceDetailRoleRemove
-        == "harness.workspace.detail.role-remove"
+      HarnessMonitorAccessibility.agentDetailRoleRemove
+        == "harness.agent.detail.role-remove"
     )
     #expect(
-      HarnessMonitorAccessibility.workspaceDetailSignalDisclosure
-        == "harness.workspace.detail.signal-disclosure"
+      HarnessMonitorAccessibility.agentDetailSignalDisclosure
+        == "harness.agent.detail.signal-disclosure"
     )
     #expect(
-      HarnessMonitorAccessibility.workspaceDetailSignalStatus
-        == "harness.workspace.detail.signal-status"
+      HarnessMonitorAccessibility.agentDetailSignalStatus
+        == "harness.agent.detail.signal-status"
     )
   }
 

@@ -152,21 +152,21 @@ struct HarnessMonitorStoreNavigationTests {
   func commandRoutingScopePersistsUntilClear() async {
     let routingState = WindowCommandRoutingState()
     let mainWindow = NSObject()
-    let workspaceWindow = NSObject()
+    let decisionDeskRoot = NSObject()
 
     routingState.activate(scope: .main, windowID: ObjectIdentifier(mainWindow))
     #expect(routingState.activeScope == .main)
 
-    routingState.activate(scope: .workspace, windowID: ObjectIdentifier(workspaceWindow))
-    #expect(routingState.activeScope == .workspace)
+    routingState.activate(scope: .session, windowID: ObjectIdentifier(decisionDeskRoot))
+    #expect(routingState.activeScope == .session)
 
     routingState.clear(windowID: ObjectIdentifier(mainWindow))
     #expect(
-      routingState.activeScope == .workspace,
+      routingState.activeScope == .session,
       "Clearing a background window must not drop routing for the active window"
     )
 
-    routingState.clear(windowID: ObjectIdentifier(workspaceWindow))
+    routingState.clear(windowID: ObjectIdentifier(decisionDeskRoot))
     #expect(routingState.activeScope == nil)
   }
 
