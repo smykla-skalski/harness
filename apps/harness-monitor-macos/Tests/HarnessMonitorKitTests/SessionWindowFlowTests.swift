@@ -55,6 +55,16 @@ struct SessionWindowFlowTests {
     #expect(SessionWindowRoute.decisions.systemImage == "exclamationmark.bubble")
   }
 
+  @Test("Session routes expose stable layout policy")
+  func sessionRoutesExposeStableLayoutPolicy() {
+    #expect(SessionWindowRoute.overview.layoutStyle == .sidebarDetail)
+    #expect(SessionWindowRoute.timeline.layoutStyle == .sidebarDetail)
+    #expect(SessionWindowRoute.agents.layoutStyle == .sidebarContentDetail)
+    #expect(SessionWindowRoute.tasks.layoutStyle == .sidebarContentDetail)
+    #expect(SessionWindowRoute.decisions.layoutStyle == .sidebarContentDetail)
+    #expect(SessionWindowRoute.terminal.layoutStyle == .sidebarContentDetail)
+  }
+
   @MainActor
   @Test("Session window state cache records session-scoped deep selections")
   func sessionWindowStateCacheRecordsDeepSelections() {
@@ -596,6 +606,9 @@ struct SessionWindowFlowTests {
     #expect(commandsSource.contains("openWindow("))
     #expect(rootSource.contains("SessionWindowTabbing(isSessionWindow: true)"))
     #expect(tabbingSource.contains("tabbingIdentifier"))
+    #expect(tabbingSource.contains("scheduleWindowTabbingApplication()"))
+    #expect(tabbingSource.contains("await Task.yield()"))
+    #expect(tabbingSource.contains("guard window.toolbar != nil else"))
     #expect(!commandsSource.contains("NSWindow"))
     #expect(!commandsSource.contains("tabbingIdentifier"))
   }
