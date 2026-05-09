@@ -60,6 +60,40 @@ private final class AccessorView: NSView {
 
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
+    registerWindowObservers()
+    applyWindowTabbing()
+  }
+
+  override func viewDidUnhide() {
+    super.viewDidUnhide()
+    applyWindowTabbing()
+  }
+
+  override func viewWillMove(toWindow newWindow: NSWindow?) {
+    super.viewWillMove(toWindow: newWindow)
+    NotificationCenter.default.removeObserver(self)
+  }
+
+  private func registerWindowObservers() {
+    guard let window else { return }
+    let center = NotificationCenter.default
+    let names: [Notification.Name] = [
+      NSWindow.didBecomeKeyNotification,
+      NSWindow.didChangeOcclusionStateNotification,
+      NSWindow.didEnterFullScreenNotification,
+      NSWindow.didExitFullScreenNotification,
+    ]
+    for name in names {
+      center.addObserver(
+        self,
+        selector: #selector(reapplyWindowTabbingFromNotification(_:)),
+        name: name,
+        object: window
+      )
+    }
+  }
+
+  @objc private func reapplyWindowTabbingFromNotification(_ note: Notification) {
     applyWindowTabbing()
   }
 
@@ -75,10 +109,21 @@ private final class AccessorView: NSView {
         window.tabbingMode = .automatic
         return
       }
+      applyTitlebarChromeOverrides(to: window)
     } else {
       window.tabbingIdentifier = ""
       window.tabbingMode = .disallowed
     }
+  }
+
+  /// Setting `tabbingIdentifier` flips AppKit into a tabbable-window toolbar
+  /// mode that draws an opaque titlebar with a baseline separator under the
+  /// tab strip, masking the Liquid Glass blur and the SessionTitleBlurChrome
+  /// status backdrop. AppKit also re-applies its defaults whenever a new tab
+  /// is added or removed, so the override has to run again on every change.
+  private func applyTitlebarChromeOverrides(to window: NSWindow) {
+    window.titlebarSeparatorStyle = .none
+    window.titlebarAppearsTransparent = true
   }
 
   private func tabbingMode(for preference: SessionWindowTabbingPreference) -> NSWindow.TabbingMode {
