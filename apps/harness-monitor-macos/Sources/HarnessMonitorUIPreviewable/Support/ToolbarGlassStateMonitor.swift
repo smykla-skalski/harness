@@ -36,11 +36,11 @@ private struct ToolbarBaselineSeparatorSuppressor: NSViewRepresentable {
 }
 
 extension View {
-  func suppressToolbarBaselineSeparator() -> some View {
+  public func suppressToolbarBaselineSeparator() -> some View {
     background(ToolbarBaselineSeparatorSuppressor())
   }
 
-  func suppressToolbarBaselineSeparator(markedAs identifier: String) -> some View {
+  public func suppressToolbarBaselineSeparator(markedAs identifier: String) -> some View {
     suppressToolbarBaselineSeparator()
       .overlay {
         AccessibilityTextMarker(identifier: identifier, text: "suppressed")
