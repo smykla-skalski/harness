@@ -44,7 +44,7 @@ struct ToolbarTitleScalingContractTests {
     #expect(!sessionSource.contains(".buttonStyle(.glassProminent)"))
   }
 
-  @Test("Connection toolbar badge keeps compact text with the pulsing status dot last")
+  @Test("Connection toolbar badge keeps compact text with the static status dot last")
   func connectionToolbarBadgeKeepsCompactTrailingStatusLayout() throws {
     let connectionSource = try previewableSourceFile(
       named: "Views/App/ConnectionViews.swift"
@@ -61,7 +61,9 @@ struct ToolbarTitleScalingContractTests {
       )
     )
     #expect(connectionSource.contains(".font(Self.badgeFont)"))
-    #expect(connectionSource.contains(".repeatForever(autoreverses: true)"))
+    #expect(!connectionSource.contains(".repeatForever(autoreverses: true)"))
+    #expect(!connectionSource.contains("@State private var isPulsing"))
+    #expect(connectionSource.contains(".animation(.easeOut(duration: 0.3), value: isActive)"))
   }
 
   @Test("Session focus mode toolbar button uses animated moon symbols")

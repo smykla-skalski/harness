@@ -70,9 +70,6 @@ struct ActivityPulse: View {
   private var outerSize: CGFloat = 16
   @ScaledMetric(relativeTo: .caption2)
   private var innerSize: CGFloat = 7
-  @State private var isPulsing = false
-  @Environment(\.accessibilityReduceMotion)
-  private var reduceMotion
 
   init(
     isActive: Bool,
@@ -95,17 +92,8 @@ struct ActivityPulse: View {
   var body: some View {
     ZStack {
       Circle()
-        .fill(baseColor.opacity(isPulsing ? 0.22 : 0.14))
+        .fill(baseColor.opacity(isActive ? 0.22 : 0.14))
         .frame(width: outerSize, height: outerSize)
-        .scaleEffect(reduceMotion ? 1.0 : (isPulsing ? 1.3 : 1.0))
-        .animation(
-          reduceMotion
-            ? .easeOut(duration: 0.3)
-            : isPulsing
-              ? .easeInOut(duration: 1.2).repeatForever(autoreverses: true)
-              : .easeOut(duration: 0.3),
-          value: isPulsing
-        )
       Circle()
         .fill(baseColor)
         .frame(width: innerSize, height: innerSize)
@@ -113,15 +101,9 @@ struct ActivityPulse: View {
           Circle()
             .stroke(Color.primary.opacity(0.14), lineWidth: 1)
         )
-        .animation(.easeOut(duration: 0.3), value: isActive)
     }
     .frame(width: outerSize, height: outerSize)
-    .onChange(of: isActive) { _, active in
-      isPulsing = active
-    }
-    .onAppear {
-      isPulsing = isActive
-    }
+    .animation(.easeOut(duration: 0.3), value: isActive)
   }
 }
 

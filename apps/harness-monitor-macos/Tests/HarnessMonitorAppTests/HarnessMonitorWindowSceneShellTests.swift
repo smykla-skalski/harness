@@ -32,6 +32,14 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
     XCTAssertTrue(shell.contains("HarnessMonitorAccessibility.windowShellState(windowID)"))
   }
 
+  func testPerfScenarioStateMarkerIsNotInstalledWhenDisabled() throws {
+    let source = try appSourceFile(named: "HarnessMonitorAppSceneSupport.swift")
+
+    XCTAssertTrue(source.contains(".modifier(PerfScenarioStateMarker(text: perfScenarioStateText))"))
+    XCTAssertTrue(source.contains("private struct PerfScenarioStateMarker: ViewModifier"))
+    XCTAssertFalse(source.contains(".overlay {\n        if let perfScenarioStateText"))
+  }
+
   private var duplicatedChromeModifiers: [String] {
     [
       ".writingToolsBehavior(.disabled)",
