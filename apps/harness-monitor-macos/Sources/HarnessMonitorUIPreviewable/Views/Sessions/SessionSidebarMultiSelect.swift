@@ -64,18 +64,3 @@ enum SessionSidebarMultiSelect {
   }
 }
 
-struct SessionSidebarMultiSelectRowGesture: ViewModifier {
-  let isEnabled: Bool
-  let perform: () -> Void
-
-  func body(content: Content) -> some View {
-    if isEnabled {
-      content.highPriorityGesture(
-        TapGesture().onEnded(perform),
-        including: .gesture
-      )
-    } else {
-      content
-    }
-  }
-}

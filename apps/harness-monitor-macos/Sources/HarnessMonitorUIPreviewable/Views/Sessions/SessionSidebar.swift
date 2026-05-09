@@ -43,16 +43,13 @@ struct SessionSidebar: View {
       Task { await reopenDecisionBatch(ids) }
       state.decisionBulkActions.reopenRequestedBatch = nil
     }
-    .onChange(of: state.sidebarSelection.isDecisionMultiSelectEnabled) { _, enabled in
-      guard enabled else { return }
-      state.sidebarAnnouncer.announce(
-        kind: .decision,
-        count: state.sidebarSelection.selectedDecisionIDs.count,
-        visibleCount: decisions.count
-      )
+    .onModifierKeysChanged { _, newModifiers in
+      if currentModifiers != newModifiers {
+        currentModifiers = newModifiers
+      }
     }
-    .onModifierKeysChanged { _, modifiers in
-      currentModifiers = modifiers
+    .onChange(of: state.lastPlainClick) { _, signal in
+      collapseSelectionFromApplicationTap(signal)
     }
     .searchable(
       text: $filters.query,
@@ -132,11 +129,121 @@ struct SessionSidebar: View {
     }
   }
 
-  private var selectionBinding: Binding<SessionSelection?> {
+  private var selectionBinding: Binding<Set<SessionSelection>> {
     Binding(
-      get: { state.selection },
-      set: { state.selectFromSidebar($0) }
+      get: { renderedSelectionSet() },
+      set: { applyListSelection($0) }
     )
+  }
+
+  private func renderedSelectionSet() -> Set<SessionSelection> {
+    var set: Set<SessionSelection> = []
+    set.insert(state.selection)
+    let sid = state.sessionID
+    for id in state.sidebarSelection.selectedAgentIDs {
+      set.insert(.agent(sessionID: sid, agentID: id))
+    }
+    for id in state.sidebarSelection.selectedTaskIDs {
+      set.insert(.task(sessionID: sid, taskID: id))
+    }
+    for id in state.sidebarSelection.selectedDecisionIDs {
+      set.insert(.decision(sessionID: sid, decisionID: id))
+    }
+    return set
+  }
+
+  private func applyListSelection(_ new: Set<SessionSelection>) {
+    let old = renderedSelectionSet()
+    guard new != old else { return }
+
+    if new.isEmpty {
+      state.sidebarSelection.clear()
+      state.selectFromSidebar(nil)
+      return
+    }
+
+    let added = new.subtracting(old)
+    let pivot = added.first ?? new.first
+    guard let pivotItem = pivot else { return }
+
+    if new.count == 1 {
+      state.sidebarSelection.clear()
+      state.selectFromSidebar(pivotItem)
+      return
+    }
+
+    guard let kind = multiSelectKind(of: pivotItem) else {
+      state.sidebarSelection.clear()
+      state.selectFromSidebar(pivotItem)
+      return
+    }
+
+    let oldHasSameKind = old.contains { multiSelectKind(of: $0) == kind }
+    guard oldHasSameKind else {
+      state.sidebarSelection.clear()
+      state.selectFromSidebar(pivotItem)
+      return
+    }
+
+    let filtered = new.filter { multiSelectKind(of: $0) == kind }
+    let ids = Set(filtered.compactMap { multiSelectID(of: $0) })
+    let anchorID = multiSelectID(of: pivotItem) ?? state.sidebarSelection.anchor?.id
+    state.sidebarSelection.applyChange(
+      kind: kind,
+      selectedIDs: ids,
+      anchorID: anchorID
+    )
+    state.sidebarAnnouncer.announce(
+      kind: kind,
+      count: ids.count,
+      visibleCount: visibleCount(for: kind)
+    )
+  }
+
+  /// Native `List(selection: Set<>)` does not collapse a multi-selection when the
+  /// user plain-clicks a row that is already in the set — the selection is left
+  /// alone. Mirror the legacy app's collapse-on-tap so plain clicks act like a
+  /// "back to single-select on this row" intent.
+  func collapseToRowFromPlainTap(_ selection: SessionSelection) {
+    let blocking = currentModifiers.intersection([.command, .shift, .control, .option])
+    guard blocking.isEmpty else { return }
+    guard hasActiveMultiSelection else { return }
+    state.sidebarSelection.clear()
+    state.selectFromSidebar(selection)
+  }
+
+  /// Plain tap anywhere in the SessionWindow (outside the sidebar list).
+  /// Mirrors legacy `collapseSelectionFromApplicationTap`: bail on modifiers,
+  /// otherwise clear the multi-extension and leave primary intact.
+  private func collapseSelectionFromApplicationTap(_ signal: SessionPlainClickSignal) {
+    let blocking = signal.modifiers.intersection([.command, .shift, .control, .option])
+    guard blocking.isEmpty else { return }
+    guard hasActiveMultiSelection else { return }
+    state.sidebarSelection.clear()
+  }
+
+  var hasActiveMultiSelection: Bool {
+    state.sidebarSelection.selectedAgentIDs.count > 1
+      || state.sidebarSelection.selectedTaskIDs.count > 1
+      || state.sidebarSelection.selectedDecisionIDs.count > 1
+  }
+
+  private func multiSelectKind(of selection: SessionSelection) -> SessionSidebarSelectionKind? {
+    switch selection {
+    case .agent: .agent
+    case .task: .task
+    case .decision: .decision
+    case .route, .codexRun, .create: nil
+    }
+  }
+
+  private func multiSelectID(of selection: SessionSelection) -> String? {
+    switch selection {
+    case .agent(_, let id): id
+    case .task(_, let id): id
+    case .decision(_, let id): id
+    case .route, .codexRun, .create: nil
+    }
   }
 
   private var searchFocusAction: HarnessSidebarSearchFocus? {
@@ -165,14 +272,6 @@ struct SessionSidebar: View {
       Text("Routes")
         .padding(.top, HarnessMonitorTheme.spacingLG)
     }
-  }
-
-  func handleDecisionRowTap(_ decisionID: String) {
-    handleSidebarRowTap(
-      kind: .decision,
-      rowID: decisionID,
-      orderedVisibleIDs: decisions.map(\.id)
-    )
   }
 
   private var selectionFocus: SessionSidebarSelectionFocus {

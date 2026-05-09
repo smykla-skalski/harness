@@ -1,5 +1,11 @@
 import HarnessMonitorKit
 import Observation
+import SwiftUI
+
+public struct SessionPlainClickSignal: Equatable, Sendable {
+  public var generation: UInt64 = 0
+  public var modifiers: EventModifiers = []
+}
 
 @MainActor
 @Observable
@@ -19,6 +25,19 @@ public final class SessionWindowStateCache {
   public var lastTaskDecisionLink: SessionTaskDecisionLink?
   public private(set) var selectionSource: SessionSelectionSource = .programmatic
   public private(set) var agentComposerFocusRequestID = 0
+  /// Bumped by the SessionWindow root on every tap anywhere in the window.
+  /// Sidebar watches this to collapse multi-selection when the user taps
+  /// outside the selected rows. Carries the modifiers held at click time so
+  /// the receiver can bail on cmd/shift/etc.-clicks. Mirrors legacy
+  /// ContentInteractionRelay.plainClickSignal.
+  public private(set) var lastPlainClick = SessionPlainClickSignal()
+
+  public func recordPlainTap(modifiers: EventModifiers) {
+    lastPlainClick = SessionPlainClickSignal(
+      generation: lastPlainClick.generation &+ 1,
+      modifiers: modifiers
+    )
+  }
 
   public init(sessionID: String, selection: SessionSelection = .route(.overview)) {
     self.sessionID = sessionID

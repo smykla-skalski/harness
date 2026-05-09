@@ -54,39 +54,6 @@ extension SessionSidebar {
     }
   }
 
-  func handleSidebarRowTap(
-    kind: SessionSidebarSelectionKind,
-    rowID: String,
-    orderedVisibleIDs: [String]
-  ) {
-    let change = SessionSidebarMultiSelect.resolve(
-      rowID: rowID,
-      orderedVisibleIDs: orderedVisibleIDs,
-      selectedIDs: state.sidebarSelection.selectedIDs(of: kind),
-      anchorID: state.sidebarSelection.anchor?.kind == kind
-        ? state.sidebarSelection.anchor?.id : nil,
-      modifiers: currentModifiers
-    )
-    let previousCount = state.sidebarSelection.count(of: kind)
-    state.sidebarSelection.applyChange(
-      kind: kind,
-      selectedIDs: change.selectedIDs,
-      anchorID: change.anchorID
-    )
-    if change.activatesRow {
-      let selection = sidebarSelection(for: kind, id: rowID)
-      state.selectFromSidebar(selection)
-    }
-    let nextCount = state.sidebarSelection.count(of: kind)
-    if nextCount != previousCount {
-      state.sidebarAnnouncer.announce(
-        kind: kind,
-        count: nextCount,
-        visibleCount: orderedVisibleIDs.count
-      )
-    }
-  }
-
   func sidebarSelection(
     for kind: SessionSidebarSelectionKind,
     id: String

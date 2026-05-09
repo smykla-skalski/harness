@@ -55,35 +55,19 @@ extension SessionSidebar {
     orderedAgentIDs: [String]
   ) -> some View {
     let selection = SessionSelection.agent(sessionID: state.sessionID, agentID: agent.agentId)
-    let isMulti = state.sidebarSelection.count(of: .agent) > 1
     SessionSidebarRow(
       title: agent.name,
       systemImage: "person.crop.circle",
       severityShape: severityShape(for: agent.status),
-      severityTint: severityTint(for: agent.status),
-      isMultiSelect: isMulti,
-      isSelected: state.sidebarSelection.selectedAgentIDs.contains(agent.agentId),
-      toggleSelection: {
-        state.sidebarSelection.applyChange(
-          kind: .agent,
-          selectedIDs: toggle(agent.agentId, in: state.sidebarSelection.selectedAgentIDs),
-          anchorID: agent.agentId
-        )
-      }
+      severityTint: severityTint(for: agent.status)
     )
     .tag(selection)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarAgentRow(agent.agentId))
-    .modifier(
-      SessionSidebarMultiSelectRowGesture(
-        isEnabled: true,
-        perform: {
-          handleSidebarRowTap(
-            kind: .agent,
-            rowID: agent.agentId,
-            orderedVisibleIDs: orderedAgentIDs
-          )
-        }
-      )
+    .simultaneousGesture(
+      SpatialTapGesture().onEnded { _ in
+        collapseToRowFromPlainTap(selection)
+      },
+      including: hasActiveMultiSelection ? .gesture : []
     )
     .contextMenu {
       agentRowContextMenu(agent, orderedAgentIDs: orderedAgentIDs)
@@ -149,35 +133,19 @@ extension SessionSidebar {
     orderedTaskIDs: [String]
   ) -> some View {
     let selection = SessionSelection.task(sessionID: state.sessionID, taskID: task.taskId)
-    let isMulti = state.sidebarSelection.count(of: .task) > 1
     SessionSidebarRow(
       title: task.title,
       systemImage: "checklist",
       severityShape: severityShape(for: task.severity),
-      severityTint: severityTint(for: task.severity),
-      isMultiSelect: isMulti,
-      isSelected: state.sidebarSelection.selectedTaskIDs.contains(task.taskId),
-      toggleSelection: {
-        state.sidebarSelection.applyChange(
-          kind: .task,
-          selectedIDs: toggle(task.taskId, in: state.sidebarSelection.selectedTaskIDs),
-          anchorID: task.taskId
-        )
-      }
+      severityTint: severityTint(for: task.severity)
     )
     .tag(selection)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarTaskRow(task.taskId))
-    .modifier(
-      SessionSidebarMultiSelectRowGesture(
-        isEnabled: true,
-        perform: {
-          handleSidebarRowTap(
-            kind: .task,
-            rowID: task.taskId,
-            orderedVisibleIDs: orderedTaskIDs
-          )
-        }
-      )
+    .simultaneousGesture(
+      SpatialTapGesture().onEnded { _ in
+        collapseToRowFromPlainTap(selection)
+      },
+      including: hasActiveMultiSelection ? .gesture : []
     )
     .contextMenu {
       taskRowContextMenu(task, orderedTaskIDs: orderedTaskIDs)
@@ -217,16 +185,6 @@ extension SessionSidebar {
     Button(scope.destructiveLabel, role: .destructive) {
       requestDeleteTasks(scope.ids)
     }
-  }
-
-  func toggle(_ id: String, in set: Set<String>) -> Set<String> {
-    var next = set
-    if next.contains(id) {
-      next.remove(id)
-    } else {
-      next.insert(id)
-    }
-    return next
   }
 
   private var agentsSectionHeader: some View {

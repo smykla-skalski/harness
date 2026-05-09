@@ -13,31 +13,19 @@ extension SessionSidebar {
           decisionID: decision.id
         )
         let severity = DecisionSeverity(rawValue: decision.severityRaw)
-        let isMulti =
-          state.sidebarSelection.count(of: .decision) > 1
-          || state.sidebarSelection.isDecisionMultiSelectEnabled
         SessionSidebarRow(
           title: decision.summary,
           systemImage: "exclamationmark.bubble",
           severityShape: severityShape(for: severity),
-          severityTint: severityTint(for: severity),
-          isMultiSelect: isMulti,
-          isSelected: state.sidebarSelection.selectedDecisionIDs.contains(decision.id),
-          toggleSelection: {
-            state.sidebarSelection.applyChange(
-              kind: .decision,
-              selectedIDs: toggle(decision.id, in: state.sidebarSelection.selectedDecisionIDs),
-              anchorID: decision.id
-            )
-          }
+          severityTint: severityTint(for: severity)
         )
         .tag(selection)
         .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarDecisionRow(decision.id))
-        .modifier(
-          SessionSidebarMultiSelectRowGesture(
-            isEnabled: true,
-            perform: { handleDecisionRowTap(decision.id) }
-          )
+        .simultaneousGesture(
+          SpatialTapGesture().onEnded { _ in
+            collapseToRowFromPlainTap(selection)
+          },
+          including: hasActiveMultiSelection ? .gesture : []
         )
         .contextMenu {
           let scope = SessionSidebarContextMenuScope.resolve(
