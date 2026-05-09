@@ -73,17 +73,6 @@ struct SessionWindowToolbar: ToolbarContent {
     guard connectionMetrics.connectedSince != nil else {
       return "Connection: \(connectionTitle)"
     }
-    if let latency = connectionMetrics.transportLatencyMs {
-      return
-        "Connection: \(connectionMetrics.transportKind.shortTitle), transport latency \(latency) milliseconds"
-    }
-    if let requestLatency = connectionMetrics.requestLatencyMs {
-      return [
-        "Connection: \(connectionMetrics.transportKind.shortTitle)",
-        "transport latency unavailable,",
-        "last request latency \(requestLatency) milliseconds",
-      ].joined(separator: " ")
-    }
     return "Connection: \(connectionMetrics.transportKind.title)"
   }
 
@@ -189,11 +178,10 @@ private struct SessionToolbarCenterpiece: View {
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.itemSpacing) {
       SessionToolbarCenterpieceSourceIcon(source: source)
-      ConnectionToolbarBadge(metrics: metrics)
-        .accessibilityHidden(true)
       Spacer(minLength: 0)
-      SessionToolbarCenterpieceServiceStrip(
-        statusStripState: statusStripState
+      SessionToolbarCenterpieceStatusStrip(
+        statusStripState: statusStripState,
+        metrics: metrics
       )
     }
     .padding(.vertical, HarnessMonitorTheme.itemSpacing)
@@ -210,33 +198,45 @@ private struct SessionToolbarCenterpieceSourcePresentation {
   let tint: Color
 }
 
-private struct SessionToolbarCenterpieceServiceStrip: View {
+private struct SessionToolbarCenterpieceStatusStrip: View {
   let statusStripState: SessionToolbarCenterpieceStatusStripState
+  let metrics: ConnectionMetrics
   @ScaledMetric(relativeTo: .caption)
   private var chromeHeight: CGFloat = 14
 
   var body: some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
-      if statusStripState.hasVisibleTokens {
-        HStack(alignment: .center, spacing: 3) {
-          if let bridge = statusStripState.bridge {
-            SessionToolbarCenterpieceStatusWord(token: bridge)
-          }
-          if statusStripState.showsSeparator {
-            Text(verbatim: "·")
-              .font(.system(.caption2, design: .rounded, weight: .semibold))
-              .foregroundStyle(HarnessMonitorTheme.disabledConnectionChrome)
-              .accessibilityHidden(true)
-          }
-          if let mcp = statusStripState.mcp {
-            SessionToolbarCenterpieceStatusWord(token: mcp)
-          }
-        }
+    HStack(alignment: .center, spacing: 3) {
+      if let bridge = statusStripState.bridge {
+        SessionToolbarCenterpieceStatusWord(token: bridge)
       }
+      if statusStripState.showsSeparator {
+        SessionToolbarCenterpieceSeparator()
+      }
+      if let mcp = statusStripState.mcp {
+        SessionToolbarCenterpieceStatusWord(token: mcp)
+      }
+      if statusStripState.hasVisibleTokens {
+        SessionToolbarCenterpieceSeparator()
+      }
+      ConnectionToolbarBadge(metrics: metrics)
+        .accessibilityHidden(true)
     }
     .fixedSize(horizontal: true, vertical: false)
     .frame(minHeight: chromeHeight, alignment: .center)
     .accessibilityHidden(true)
+  }
+}
+
+private struct SessionToolbarCenterpieceSeparator: View {
+  @ScaledMetric(relativeTo: .caption)
+  private var chromeHeight: CGFloat = 14
+
+  var body: some View {
+    Text(verbatim: "·")
+      .font(.system(.caption2, design: .rounded, weight: .semibold))
+      .foregroundStyle(HarnessMonitorTheme.disabledConnectionChrome)
+      .frame(minHeight: chromeHeight, alignment: .center)
+      .accessibilityHidden(true)
   }
 }
 

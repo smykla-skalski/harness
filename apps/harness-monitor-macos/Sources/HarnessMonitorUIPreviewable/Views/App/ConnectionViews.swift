@@ -66,11 +66,11 @@ struct ActivityPulse: View {
   let isActive: Bool
   private let activeColor: Color
   private let inactiveColor: Color
-  @ScaledMetric(relativeTo: .caption)
+  @ScaledMetric(relativeTo: .caption2)
   private var outerSize: CGFloat = 16
-  @ScaledMetric(relativeTo: .caption)
+  @ScaledMetric(relativeTo: .caption2)
   private var innerSize: CGFloat = 7
-  @State private var flashTrigger = 0
+  @State private var isPulsing = false
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
 
@@ -84,86 +84,43 @@ struct ActivityPulse: View {
     self.isActive = isActive
     self.activeColor = activeColor
     self.inactiveColor = inactiveColor
-    _outerSize = ScaledMetric(wrappedValue: outerSize, relativeTo: .caption)
-    _innerSize = ScaledMetric(wrappedValue: innerSize, relativeTo: .caption)
+    _outerSize = ScaledMetric(wrappedValue: outerSize, relativeTo: .caption2)
+    _innerSize = ScaledMetric(wrappedValue: innerSize, relativeTo: .caption2)
   }
 
   private var baseColor: Color {
     isActive ? activeColor : inactiveColor
   }
 
-  private var outerOpacity: Double {
-    isActive ? 0.18 : 0.05
-  }
-
-  private var strokeOpacity: Double {
-    isActive ? 0.14 : 0.06
-  }
-
   var body: some View {
     ZStack {
       Circle()
-        .fill(baseColor.opacity(outerOpacity))
+        .fill(baseColor.opacity(isPulsing ? 0.22 : 0.14))
         .frame(width: outerSize, height: outerSize)
-        .animation(.easeOut(duration: 0.3), value: isActive)
+        .scaleEffect(reduceMotion ? 1.0 : (isPulsing ? 1.3 : 1.0))
+        .animation(
+          reduceMotion
+            ? .easeOut(duration: 0.3)
+            : isPulsing
+              ? .easeInOut(duration: 1.2).repeatForever(autoreverses: true)
+              : .easeOut(duration: 0.3),
+          value: isPulsing
+        )
       Circle()
         .fill(baseColor)
         .frame(width: innerSize, height: innerSize)
         .overlay(
           Circle()
-            .stroke(Color.primary.opacity(strokeOpacity), lineWidth: 1)
+            .stroke(Color.primary.opacity(0.14), lineWidth: 1)
         )
         .animation(.easeOut(duration: 0.3), value: isActive)
     }
     .frame(width: outerSize, height: outerSize)
     .onChange(of: isActive) { _, active in
-      guard active else { return }
-      flashTrigger += 1
+      isPulsing = active
     }
-    .modifier(ActivityPulseFlashModifier(trigger: flashTrigger, reduceMotion: reduceMotion))
-  }
-}
-
-private struct ActivityPulseFlashModifier: ViewModifier {
-  let trigger: Int
-  let reduceMotion: Bool
-
-  private enum Phase: CaseIterable {
-    case idle, bright, settle
-
-    var scale: CGFloat {
-      switch self {
-      case .idle: 1.0
-      case .bright: 1.15
-      case .settle: 1.0
-      }
-    }
-
-    var brightness: Double {
-      switch self {
-      case .idle: 0
-      case .bright: 0.12
-      case .settle: 0
-      }
-    }
-  }
-
-  func body(content: Content) -> some View {
-    if reduceMotion {
-      content
-    } else {
-      content
-        .phaseAnimator(Phase.allCases, trigger: trigger) { view, phase in
-          view
-            .scaleEffect(phase.scale)
-            .brightness(phase.brightness)
-        } animation: { phase in
-          switch phase {
-          case .idle: .easeOut(duration: 0.3)
-          case .bright: .easeIn(duration: 0.12)
-          case .settle: .easeOut(duration: 0.3)
-          }
-        }
+    .onAppear {
+      isPulsing = isActive
     }
   }
 }
@@ -171,62 +128,36 @@ private struct ActivityPulseFlashModifier: ViewModifier {
 struct ConnectionToolbarBadge: View {
   let metrics: ConnectionMetrics
 
-  private static let badgeFont = Font.system(.caption, design: .rounded, weight: .semibold)
-    .monospacedDigit()
-  @ScaledMetric(relativeTo: .caption)
+  private static let badgeFont = Font.system(.caption2, design: .rounded, weight: .semibold)
+  @ScaledMetric(relativeTo: .caption2)
   private var transportLabelWidth: CGFloat = 24
-  @ScaledMetric(relativeTo: .caption)
-  private var latencyLabelWidth: CGFloat = 34
 
   private var showsConnectionDetails: Bool {
     metrics.connectedSince != nil
-  }
-
-  private var showsLatencyValue: Bool {
-    showsConnectionDetails && metrics.transportLatencyMs != nil
   }
 
   private var transportLabel: String {
     metrics.transportKind.shortTitle
   }
 
-  private var latencyLabel: String {
-    guard let latencyMs = metrics.transportLatencyMs else {
-      return "--ms"
-    }
-    if latencyMs >= 1_000 {
-      return "999+"
-    }
-    return "\(latencyMs)ms"
-  }
-
   private var accessibilityLabel: String {
     guard showsConnectionDetails else {
       return "Connection unavailable"
-    }
-    if let latency = metrics.transportLatencyMs {
-      return
-        "Connection: \(metrics.transportKind.shortTitle), transport latency \(latency) milliseconds"
-    }
-    if let requestLatency = metrics.requestLatencyMs {
-      return [
-        "Connection: \(metrics.transportKind.shortTitle)",
-        "transport latency unavailable,",
-        "last request latency \(requestLatency) milliseconds",
-      ].joined(separator: " ")
     }
     return "Connection: \(metrics.transportKind.title)"
   }
 
   private var statusTint: Color {
-    metrics.latencyTint
+    if showsConnectionDetails, metrics.latencyMs == nil {
+      return HarnessMonitorTheme.success
+    }
+    return metrics.latencyTint
   }
 
   private var profilingAttributes: [String: String] {
     [
       "harness.view.transport": metrics.transportKind.rawValue,
       "harness.view.has_connection_details": showsConnectionDetails ? "true" : "false",
-      "harness.view.has_latency": showsLatencyValue ? "true" : "false",
     ]
   }
 
@@ -236,7 +167,15 @@ struct ConnectionToolbarBadge: View {
       "ConnectionToolbarBadge",
       attributes: profilingAttributes
     ) {
-      HStack(spacing: 4) {
+      HStack(spacing: 2) {
+        Text(transportLabel)
+          .font(Self.badgeFont)
+          .foregroundStyle(statusTint)
+          .lineLimit(1)
+          .frame(minWidth: transportLabelWidth, alignment: .leading)
+          .fixedSize(horizontal: true, vertical: false)
+          .opacity(showsConnectionDetails ? 1 : 0)
+          .accessibilityHidden(!showsConnectionDetails)
         ActivityPulse(
           isActive: showsConnectionDetails,
           outerSize: 14,
@@ -244,39 +183,6 @@ struct ConnectionToolbarBadge: View {
           activeColor: statusTint
         )
         .accessibilityHidden(true)
-        if showsConnectionDetails {
-          Text(transportLabel)
-            .scaledFont(Self.badgeFont)
-            .foregroundStyle(statusTint)
-            .lineLimit(1)
-            .frame(minWidth: transportLabelWidth, alignment: .leading)
-            .fixedSize(horizontal: true, vertical: false)
-            .opacity(1)
-          Text(latencyLabel)
-            .scaledFont(Self.badgeFont)
-            .foregroundStyle(statusTint.opacity(0.5))
-            .lineLimit(1)
-            .frame(minWidth: latencyLabelWidth, alignment: .leading)
-            .fixedSize(horizontal: true, vertical: false)
-            .opacity(showsLatencyValue ? 1 : 0)
-        } else {
-          Text(transportLabel)
-            .scaledFont(Self.badgeFont)
-            .foregroundStyle(statusTint)
-            .lineLimit(1)
-            .frame(minWidth: transportLabelWidth, alignment: .leading)
-            .fixedSize(horizontal: true, vertical: false)
-            .opacity(0)
-            .accessibilityHidden(true)
-          Text(latencyLabel)
-            .scaledFont(Self.badgeFont)
-            .foregroundStyle(statusTint.opacity(0.5))
-            .lineLimit(1)
-            .frame(minWidth: latencyLabelWidth, alignment: .leading)
-            .fixedSize(horizontal: true, vertical: false)
-            .opacity(0)
-            .accessibilityHidden(true)
-        }
       }
       .accessibilityElement(children: .ignore)
       .accessibilityIdentifier(HarnessMonitorAccessibility.connectionBadge)
