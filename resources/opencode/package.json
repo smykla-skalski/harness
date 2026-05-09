@@ -4,6 +4,6 @@
   "type": "module",
   "devDependencies": {
     "@opencode-ai/plugin": "1.14.41",
-    "@types/node": "25.6.0"
+    "@types/node": "25.6.2"
   }
 }
