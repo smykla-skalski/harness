@@ -21,6 +21,11 @@ public struct SessionCreateDraft: Codable, Hashable, Sendable {
   public var runtime: String
   public var taskSeverityRawValue: String?
   public var sessionID: String
+  public var useCodex: Bool
+  public var codexModeRawValue: String?
+  public var codexModel: String
+  public var codexEffort: String
+  public var codexAllowCustomModel: Bool
 
   public init(
     kind: SessionCreateKind,
@@ -28,7 +33,12 @@ public struct SessionCreateDraft: Codable, Hashable, Sendable {
     prompt: String = "",
     runtime: String = AgentTuiRuntime.codex.rawValue,
     taskSeverity: TaskSeverity = .medium,
-    sessionID: String
+    sessionID: String,
+    useCodex: Bool = false,
+    codexMode: CodexRunMode = .report,
+    codexModel: String = "",
+    codexEffort: String = "",
+    codexAllowCustomModel: Bool = false
   ) {
     self.kind = kind
     self.title = title
@@ -36,6 +46,11 @@ public struct SessionCreateDraft: Codable, Hashable, Sendable {
     self.runtime = runtime
     taskSeverityRawValue = taskSeverity.rawValue
     self.sessionID = sessionID
+    self.useCodex = useCodex
+    codexModeRawValue = codexMode.rawValue
+    self.codexModel = codexModel
+    self.codexEffort = codexEffort
+    self.codexAllowCustomModel = codexAllowCustomModel
   }
 
   public var taskSeverity: TaskSeverity {
@@ -44,6 +59,15 @@ public struct SessionCreateDraft: Codable, Hashable, Sendable {
     }
     set {
       taskSeverityRawValue = newValue.rawValue
+    }
+  }
+
+  public var codexMode: CodexRunMode {
+    get {
+      codexModeRawValue.flatMap(CodexRunMode.init(rawValue:)) ?? .report
+    }
+    set {
+      codexModeRawValue = newValue.rawValue
     }
   }
 }

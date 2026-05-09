@@ -16,12 +16,38 @@ extension SessionWindowCreateForm {
     validationResult = nil
     switch draft.kind {
     case .agent:
-      await createAgent(named: name)
+      if draft.useCodex {
+        await createCodexRun(named: name)
+      } else {
+        await createAgent(named: name)
+      }
     case .task:
       await createTask(named: name)
     case .decision:
       await createDecision(summary: name)
     }
+  }
+
+  @MainActor
+  func createCodexRun(named name: String) async {
+    let trimmedPrompt = draft.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+    let model = draft.codexModel.trimmingCharacters(in: .whitespacesAndNewlines)
+    let effort = draft.codexEffort.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard
+      let started = await store.startCodexRunSnapshot(
+        prompt: trimmedPrompt,
+        mode: draft.codexMode,
+        model: model.isEmpty ? nil : model,
+        effort: effort.isEmpty ? nil : effort,
+        allowCustomModel: draft.codexAllowCustomModel,
+        sessionID: draft.sessionID
+      )
+    else {
+      return
+    }
+    _ = name
+    state.updateCreateDraft(SessionCreateDraft(kind: .agent, sessionID: draft.sessionID))
+    state.select(.codexRun(sessionID: draft.sessionID, runID: started.runId))
   }
 
   @MainActor
@@ -139,11 +165,11 @@ extension SessionWindowCreateForm {
     return validationResult?.message
   }
 
-  func clearValidationIfNeeded(title: String?, runtime: String?) {
+  func clearValidationIfNeeded(title: String?, runtime: String?, useCodex: Bool? = nil) {
     switch validationResult?.field {
     case .name where title != nil:
       validationResult = nil
-    case .capability where runtime != nil:
+    case .capability where runtime != nil || useCodex != nil:
       validationResult = nil
     case .form, .name, .capability, nil:
       break
