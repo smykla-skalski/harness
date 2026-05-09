@@ -171,7 +171,7 @@ extension HarnessMonitorUITestCase {
     element: XCUIElement,
     identifier: String
   ) -> Bool {
-    guard waitForElement(element, timeout: Self.fastPollInterval) else {
+    guard waitForElement(in: app, element, timeout: Self.fastPollInterval) else {
       return false
     }
 
@@ -184,7 +184,7 @@ extension HarnessMonitorUITestCase {
     }
 
     let frameMarker = self.element(in: app, identifier: "\(identifier).frame")
-    guard waitForElement(frameMarker, timeout: Self.fastPollInterval) else {
+    guard waitForElement(in: app, frameMarker, timeout: Self.fastPollInterval) else {
       return false
     }
 

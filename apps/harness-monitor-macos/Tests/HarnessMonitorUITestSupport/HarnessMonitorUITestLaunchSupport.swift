@@ -169,7 +169,7 @@ extension HarnessMonitorUITestCase {
   }
 
   private func waitForLaunchForeground(_ app: XCUIApplication, mode: String) -> Bool {
-    let foregroundReady = waitUntil(timeout: Self.uiTimeout) {
+    let foregroundReady = waitUntil(in: app, timeout: Self.uiTimeout) {
       app.state == .runningForeground || self.mainWindow(in: app).exists
     }
     if !foregroundReady {
@@ -180,6 +180,7 @@ extension HarnessMonitorUITestCase {
       )
       app.activate()
       if waitUntil(
+        in: app,
         timeout: Self.fastActionTimeout,
         condition: {
           app.state == .runningForeground || self.mainWindow(in: app).exists
@@ -197,7 +198,7 @@ extension HarnessMonitorUITestCase {
   }
 
   private func waitForLaunchWindow(_ app: XCUIApplication, mode: String) -> Bool {
-    let windowReady = waitUntil(timeout: Self.uiTimeout) {
+    let windowReady = waitUntil(in: app, timeout: Self.uiTimeout) {
       let window = self.mainWindow(in: app)
       return
         window.exists
@@ -212,6 +213,7 @@ extension HarnessMonitorUITestCase {
       )
       app.activate()
       if waitUntil(
+        in: app,
         timeout: Self.fastActionTimeout,
         condition: {
           let window = self.mainWindow(in: app)
@@ -233,7 +235,7 @@ extension HarnessMonitorUITestCase {
   }
 
   private func waitForLaunchContent(_ app: XCUIApplication, mode: String) -> Bool {
-    let contentReady = waitUntil(timeout: Self.uiTimeout) {
+    let contentReady = waitUntil(in: app, timeout: Self.uiTimeout) {
       let window = self.mainWindow(in: app)
       let appChrome = self.appChromeRoot(in: app)
       let openRecent = self.openRecentRoot(in: app)

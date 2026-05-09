@@ -90,7 +90,7 @@ extension HarnessMonitorUITestCase {
     identifier: String,
     normalizedOffset: CGVector = CGVector(dx: 0.5, dy: 0.5)
   ) -> XCUICoordinate? {
-    let frameMarker = self.element(in: app, identifier: "\(identifier).frame")
+    let frameMarker = frameElement(in: app, identifier: "\(identifier).frame")
     guard waitForElement(frameMarker, timeout: Self.fastPollInterval) else {
       return nil
     }

@@ -83,11 +83,6 @@ public struct SettingsGeneralSection: View {
   private var launchBehaviorRawValue = HarnessMonitorLaunchBehavior.defaultValue.rawValue
   @AppStorage(OpenRecentCloseAfterPickDefaults.storageKey)
   private var closeOpenRecentAfterPick = OpenRecentCloseAfterPickDefaults.defaultValue
-  @AppStorage(SessionPendingDecisionBannerSettings.enabledKey)
-  private var showsPendingDecisionBanners = SessionPendingDecisionBannerSettings.enabledDefaultValue
-  @AppStorage(SessionPendingDecisionBannerSettings.focusModeEnabledKey)
-  private var showsPendingDecisionBannersInFocusMode =
-    SessionPendingDecisionBannerSettings.focusModeEnabledDefaultValue
   @AppStorage(SessionWindowTabbingPreference.storageKey)
   private var sessionWindowTabbingRawValue = SessionWindowTabbingPreference.defaultValue.rawValue
   @State private var isRemoveLaunchAgentConfirmationPresented = false
@@ -213,32 +208,6 @@ public struct SettingsGeneralSection: View {
           "Controls whether Session cockpit timeline filters reset each time, "
             + "restore per window and session, or reopen app-wide."
         )
-      }
-
-      Section {
-        Toggle("Show pending decision banners", isOn: $showsPendingDecisionBanners)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.settingsPendingDecisionBannersToggle)
-          .accessibilityLabel("Show pending decision banners")
-          .accessibilityHint(
-            "When disabled, session windows hide the banner that highlights pending decisions."
-          )
-        Toggle(
-          "Show pending decision banners in Focus mode",
-          isOn: $showsPendingDecisionBannersInFocusMode
-        )
-        .accessibilityIdentifier(
-          HarnessMonitorAccessibility.settingsPendingDecisionBannersFocusModeToggle
-        )
-        .accessibilityLabel("Show pending decision banners in Focus mode")
-        .accessibilityHint(
-          "When disabled, Focus mode hides the pending decision banner even while banners stay enabled elsewhere."
-        )
-        .disabled(!showsPendingDecisionBanners)
-      } header: {
-        Text("Decisions")
-      } footer: {
-        Text(SessionDecisionBulkActionCopy.dismissVisibleHelp)
-          .accessibilityIdentifier("harness.settings.decisions.dismiss-visible-help")
       }
 
       Section {

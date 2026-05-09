@@ -2,6 +2,8 @@ import SwiftUI
 
 public enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
   case general
+  case focusMode
+  case banners
   case appearance
   case notifications
   case voice
@@ -18,6 +20,8 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
   public var title: String {
     switch self {
     case .general: "General"
+    case .focusMode: "Focus Mode"
+    case .banners: "Banners"
     case .appearance: "Appearance"
     case .notifications: "Notifications"
     case .voice: "Voice"
@@ -31,9 +35,18 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
     }
   }
 
+  public var sidebarTitle: String {
+    switch self {
+    case .focusMode: "Focus"
+    default: title
+    }
+  }
+
   public var systemImage: String {
     switch self {
     case .general: "gearshape"
+    case .focusMode: "moon"
+    case .banners: "megaphone"
     case .appearance: "paintbrush"
     case .notifications: "bell.badge"
     case .voice: "mic"
@@ -82,7 +95,7 @@ public struct SettingsSidebarList: View {
 
   public var body: some View {
     List(SettingsSection.allCases, selection: $selection) { section in
-      Label(section.title, systemImage: section.systemImage)
+      Label(section.sidebarTitle, systemImage: section.systemImage)
         .scaledFont(.body)
         .padding(.vertical, rowPadding)
         .tag(section)
@@ -91,6 +104,9 @@ public struct SettingsSidebarList: View {
         )
         .accessibilityValue(
           selection == section ? "selected" : "not selected"
+        )
+        .accessibilityFrameMarker(
+          "\(HarnessMonitorAccessibility.settingsSectionButton(section.rawValue)).frame"
         )
     }
     .listStyle(.sidebar)

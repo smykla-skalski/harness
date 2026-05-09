@@ -86,18 +86,28 @@ private func performHarnessMonitorUITestTeardown(
   if context.failureTracker.takeFailure(for: context.testName) {
     let snapshotName = "failure-final-\(UUID().uuidString.lowercased())"
     let app = XCUIApplication(bundleIdentifier: context.uiTestHostBundleIdentifier)
-    appendDiagnosticsTrace(
-      component: "ui-test",
-      event: "test.failure.snapshot",
-      testName: context.testName,
-      details: ["snapshot": snapshotName],
-      artifactsDirectoryKey: context.artifactsDirectoryKey
-    )
-    recordStandaloneDiagnosticsSnapshot(
-      in: app,
-      named: snapshotName,
-      artifactsDirectoryKey: context.artifactsDirectoryKey
-    )
+    if app.state != .notRunning {
+      appendDiagnosticsTrace(
+        component: "ui-test",
+        event: "test.failure.snapshot",
+        testName: context.testName,
+        details: ["snapshot": snapshotName],
+        artifactsDirectoryKey: context.artifactsDirectoryKey
+      )
+      recordStandaloneDiagnosticsSnapshot(
+        in: app,
+        named: snapshotName,
+        artifactsDirectoryKey: context.artifactsDirectoryKey
+      )
+    } else {
+      appendDiagnosticsTrace(
+        component: "ui-test",
+        event: "test.failure.snapshot-skipped",
+        testName: context.testName,
+        details: ["reason": "app-not-running"],
+        artifactsDirectoryKey: context.artifactsDirectoryKey
+      )
+    }
   }
   if !context.reuseLaunchedApp {
     appendDiagnosticsTrace(
@@ -230,6 +240,17 @@ class HarnessMonitorUITestCase: XCTestCase {
       let deadline = Date.now.addingTimeInterval(fastActionTimeout)
       while Date.now < deadline, app.state != .notRunning {
         RunLoop.current.run(until: Date.now.addingTimeInterval(fastPollInterval))
+      }
+      if app.state != .notRunning,
+        let runningApplication = mostRecentRunningApplication(
+          forBundleIdentifier: uiTestHostBundleIdentifier
+        )
+      {
+        runningApplication.forceTerminate()
+        let forcedDeadline = Date.now.addingTimeInterval(fastActionTimeout)
+        while Date.now < forcedDeadline, app.state != .notRunning {
+          RunLoop.current.run(until: Date.now.addingTimeInterval(fastPollInterval))
+        }
       }
     case .notRunning, .unknown:
       break
