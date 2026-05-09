@@ -112,9 +112,10 @@ final class SessionWindowVoiceOverTests: HarnessMonitorUITestCase {
     XCTAssertTrue(waitForElement(statusSurface, timeout: Self.actionTimeout))
     XCTAssertTrue(statusSurface.label.contains("Session status"))
 
-    XCTAssertFalse(
-      mainWindow(in: app).searchFields.firstMatch.exists,
-      "Chunk 5 should not keep a toolbar search field once decision filtering lives in the sidebar."
+    let filterField = mainWindow(in: app).searchFields["Filter decisions"].firstMatch
+    XCTAssertTrue(
+      waitForElement(filterField, timeout: Self.actionTimeout),
+      "Decision filtering should stay available from the session sidebar."
     )
 
     let inspector = element(in: app, identifier: Accessibility.sessionWindowInspector)
@@ -141,8 +142,6 @@ final class SessionWindowVoiceOverTests: HarnessMonitorUITestCase {
     XCTAssertTrue(waitForElement(closeButton, timeout: Self.actionTimeout))
     XCTAssertEqual(closeButton.label, "Close inspector")
 
-    let filterField = mainWindow(in: app).textFields["Filter decisions"].firstMatch
-    XCTAssertTrue(waitForElement(filterField, timeout: Self.actionTimeout))
     filterField.tap()
     filterField.typeText("does-not-match")
 
@@ -311,12 +310,12 @@ final class SessionWindowVoiceOverTests: HarnessMonitorUITestCase {
     let sessionWindow = element(in: app, identifier: Accessibility.sessionWindowShell)
     XCTAssertTrue(waitForElement(sessionWindow, timeout: Self.uiTimeout))
 
-    let timelineRoute = element(
+    let terminalRoute = element(
       in: app,
-      identifier: Accessibility.sessionWindowRoute("timeline")
+      identifier: Accessibility.sessionWindowRoute("terminal")
     )
-    XCTAssertTrue(waitForElement(timelineRoute, timeout: Self.actionTimeout))
-    XCTAssertTrue(tapElementReliably(in: app, element: timelineRoute))
+    XCTAssertTrue(waitForElement(terminalRoute, timeout: Self.actionTimeout))
+    XCTAssertTrue(tapElementReliably(in: app, element: terminalRoute))
 
     let dividerFrame = element(
       in: app,
