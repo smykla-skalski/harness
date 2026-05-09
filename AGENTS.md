@@ -16,19 +16,13 @@ overrides this file for its subtree.
 
 ## Command execution
 
-**Always use `rtk`.** Prefix every shell command with `rtk`
-(for example, `rtk git status` or `rtk mise run check`).
-
-`rtk proxy` is a last resort. Use it only when filtered output hides data needed
-for a specific diagnosis, then return to plain `rtk`.
-
-Discover repo workflows with `rtk mise tasks ls`. Run repo logic through
-`rtk mise run <task>` or `rtk mise run <task> -- <args>` whenever a task exists.
+Discover repo workflows with `mise tasks ls`. Run repo logic through
+`mise run <task>` or `mise run <task> -- <args>` whenever a task exists.
 Do not wrap `mise` in `bash -lc`, `zsh -lc`, the `env` binary, or helper
-scripts. When an environment assignment is needed, put it before `rtk`, for
-example `VAR=value rtk mise run ...`. Do not run repo scripts, direct `cargo`,
+scripts. When an environment assignment is needed, put it before `mise`, for
+example `VAR=value mise run ...`. Do not run repo scripts, direct `cargo`,
 or direct `xcodebuild` when a `mise` task covers the workflow. Direct
-`rtk cargo ...` is acceptable only for targeted Rust diagnosis that has no
+`cargo ...` is acceptable only for targeted Rust diagnosis that has no
 equivalent `mise` task granularity.
 
 ## Parallel worktrees
@@ -44,25 +38,25 @@ checkout.
 Run commands from the repo root:
 
 ```bash
-rtk mise run check
-rtk mise run harness:check
-rtk mise run aff:check
-rtk mise run test
-rtk mise run test:unit
-rtk mise run test:integration
-rtk mise run aff:test
-rtk mise run test:slow
-rtk mise run lint:fix
-rtk mise run install
+mise run check
+mise run harness:check
+mise run aff:check
+mise run test
+mise run test:unit
+mise run test:integration
+mise run aff:test
+mise run test:slow
+mise run lint:fix
+mise run install
 ```
 
 Targeted Rust diagnosis examples, only when no `mise` task is precise enough:
 
 ```bash
-rtk cargo test --lib cli::tests
-rtk cargo test --lib errors::tests::cli_err_basic_fields -- --exact
-rtk cargo fmt --check
-rtk cargo clippy --lib
+cargo test --lib cli::tests
+cargo test --lib errors::tests::cli_err_basic_fields -- --exact
+cargo fmt --check
+cargo clippy --lib
 ```
 
 Unit tests are in-crate `#[test]` blocks. Integration tests live in
@@ -70,7 +64,7 @@ Unit tests are in-crate `#[test]` blocks. Integration tests live in
 read XDG paths must isolate state with `temp_env::with_vars`, setting both
 `XDG_DATA_HOME` and `CLAUDE_SESSION_ID`. Tests use real filesystem state.
 
-Pre-commit gate: `rtk mise run check`. Add `rtk mise run aff:check` when the
+Pre-commit gate: `mise run check`. Add `mise run aff:check` when the
 task touches `aff` or aff-owned runtime hooks.
 
 ## Agent assets
@@ -87,9 +81,9 @@ root has a generated `AGENTS.md` marker. Do not hand-edit generated outputs.
 Use:
 
 ```bash
-rtk mise run setup:agents:generate
-rtk mise run setup:bootstrap
-rtk mise run check:agent-assets
+mise run setup:agents:generate
+mise run setup:bootstrap
+mise run check:agent-assets
 ```
 
 ## Architecture
@@ -141,7 +135,7 @@ a dated feature flag in `src/feature_flags.rs` with a tracking issue.
 Every commit must use `git commit -sS`. Verify after committing:
 
 ```bash
-rtk git log --show-signature -1
+git log --show-signature -1
 ```
 
 The sign-off trailer must be exactly:
@@ -165,8 +159,8 @@ Docs-only changes normally require no version bump. If shipped `harness` or `aff
 behavior changes enough that the local binary must be reinstalled, a version bump
 is required after approval.
 
-Use `rtk mise run version:set -- <version>` for approved bumps, or
-`rtk mise run version:sync` after any direct canonical-version edit. See
+Use `mise run version:set -- <version>` for approved bumps, or
+`mise run version:sync` after any direct canonical-version edit. See
 `docs/agent-guides/root-reference.md` for derived version surfaces.
 
 ## Debugging discipline
