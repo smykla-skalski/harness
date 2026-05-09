@@ -83,14 +83,7 @@ struct SessionWindowCreateForm: View {
   var body: some View {
     Form {
       if draft.kind == .agent, embedsRuntimeConfiguration {
-        Section {
-          SessionWindowCreateAgentRuntimeContent(
-            store: store,
-            state: state,
-            draft: draft,
-            embeddedInForm: true
-          )
-        }
+        embeddedAgentRuntimeSections
       }
       Section {
         HStack(spacing: 6) {
@@ -306,6 +299,20 @@ extension SessionWindowCreateForm {
     }
   }
 
+  private var selectedProviderID: Binding<String> {
+    Binding(
+      get: { selectedCapabilityOption?.id ?? "" },
+      set: { newValue in
+        guard
+          let option = activeAgentCapabilityOptions.first(where: { $0.id == newValue })
+        else {
+          return
+        }
+        selectProvider(option)
+      }
+    )
+  }
+
   private var selectedTerminalRuntime: AgentTuiRuntime? {
     guard case .tui(let runtime) = normalizedLaunchSelection else { return nil }
     return runtime
@@ -463,7 +470,7 @@ extension SessionWindowCreateForm {
   @ViewBuilder
   private var agentConfigurationSections: some View {
     if draft.useCodex {
-      codexConfigurationFields
+      codexConfigurationSection
     } else {
       terminalConfigurationSections
     }
@@ -502,11 +509,14 @@ extension SessionWindowCreateForm {
             .fixedSize(horizontal: false, vertical: true)
         }
 
-        SessionWindowCreateProviderButtonList(
-          options: activeAgentCapabilityOptions,
-          selectedProviderID: selectedCapabilityOption?.id,
-          onSelect: selectProvider
-        )
+        Picker("Provider", selection: selectedProviderID) {
+          ForEach(activeAgentCapabilityOptions) { option in
+            Text(option.title).tag(option.id)
+          }
+        }
+        .pickerStyle(.menu)
+        .harnessNativeFormControl()
+        .accessibilityLabel("Provider")
       } header: {
         Text("Provider")
           .harnessNativeFormSectionHeader()
@@ -525,9 +535,9 @@ extension SessionWindowCreateForm {
   }
 
   private var embeddedProviderDescription: String {
-    if let option = selectedCapabilityOption {
+    if let option = selectedCapabilityOption, let choice = selectedTransportChoice {
       return
-        "\(SessionWindowCreateProviderListRow.providerSummary(for: option)) "
+        "\(SessionWindowCreateFormCatalogs.transportSummary(option: option, choice: choice)) "
         + "Finish the remaining setup in the sections below."
     }
     return "Choose how this agent starts. The remaining form sections hold the configuration and advanced overrides."
@@ -556,41 +566,63 @@ extension SessionWindowCreateForm {
 
   private var terminalSessionSection: some View {
     Section {
-      roleMenu
-      if showsAcpFallbackRoleMenu {
-        acpFallbackRoleMenu
+      Picker("Role", selection: selectedRole) {
+        ForEach(SessionRole.allCases, id: \.self) { role in
+          Text(role.title).tag(role)
+        }
       }
-      personaMenu
+      .pickerStyle(.menu)
+      .harnessNativeFormControl()
+      .accessibilityLabel("Role")
+
+      if showsAcpFallbackRoleMenu {
+        Picker("Fallback role", selection: selectedFallbackRole) {
+          ForEach(SessionRole.allCases.filter { $0 != .leader }, id: \.self) { role in
+            Text(role.title).tag(role)
+          }
+        }
+        .pickerStyle(.menu)
+        .harnessNativeFormControl()
+        .accessibilityLabel("Fallback role")
+      }
+      Picker("Persona", selection: selectedPersonaID) {
+        Text("None").tag("")
+        ForEach(activePersonas, id: \.identifier) { persona in
+          Text(persona.name).tag(persona.identifier)
+        }
+      }
+      .pickerStyle(.menu)
+      .harnessNativeFormControl()
+      .accessibilityLabel("Persona")
+    } header: {
+      Text("Session")
+        .harnessNativeFormSectionHeader()
+    } footer: {
+      Text(
+        SessionWindowCreateFormCatalogs.selectedPersonaStateText(
+          personaID: draft.personaID,
+          personas: activePersonas
+        )
+      )
+      .harnessNativeFormSectionFooter()
     }
   }
 
   private var terminalAdvancedOverridesSection: some View {
     Section {
-      DisclosureGroup("Advanced overrides") {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-          SessionWindowCreateFieldBlock(
-            title: "Project directory override"
-          ) {
-            TextField("Optional project directory override", text: projectDirOverride)
-              .harnessNativeTextField()
-              .accessibilityLabel("Project directory override")
-          }
+      TextField("Optional project directory override", text: projectDirOverride)
+        .harnessNativeTextField()
+        .accessibilityLabel("Project directory override")
 
-          if !normalizedLaunchSelection.isAcp {
-            SessionWindowCreateFieldBlock(
-              title: "Command override",
-              help: "One argument per line. The first line is the executable."
-            ) {
-              TextEditor(text: argvOverrideText)
-                .scaledFont(.body)
-                .frame(minHeight: 100)
-                .accessibilityLabel("Command override")
-            }
-          }
-        }
-        .padding(.top, HarnessMonitorTheme.spacingSM)
+      if !normalizedLaunchSelection.isAcp {
+        TextEditor(text: argvOverrideText)
+          .scaledFont(.body)
+          .frame(minHeight: 100)
+          .accessibilityLabel("Command override")
       }
-      .accessibilityLabel("Advanced overrides")
+    } header: {
+      Text("Advanced overrides")
+        .harnessNativeFormSectionHeader()
     } footer: {
       Text(advancedOverridesDescription)
         .harnessNativeFormSectionFooter()
@@ -725,56 +757,6 @@ extension SessionWindowCreateForm {
     launchSelection.wrappedValue = option.normalizedSelection(for: launchSelection.wrappedValue)
   }
 
-  private var roleMenu: some View {
-    SessionWindowCreateFieldBlock(title: "Role in session") {
-      Picker("Role", selection: selectedRole) {
-        ForEach(SessionRole.allCases, id: \.self) { role in
-          Text(role.title).tag(role)
-        }
-      }
-      .pickerStyle(.menu)
-      .harnessNativeFormControl()
-      .accessibilityLabel("Role")
-    }
-  }
-
-  private var personaMenu: some View {
-    SessionWindowCreateFieldBlock(title: "Persona (optional)") {
-      Picker("Persona", selection: selectedPersonaID) {
-        Text("None").tag("")
-        ForEach(activePersonas, id: \.identifier) { persona in
-          Text(persona.name).tag(persona.identifier)
-        }
-      }
-      .pickerStyle(.menu)
-      .harnessNativeFormControl()
-      .accessibilityLabel("Persona")
-
-      Text(
-        SessionWindowCreateFormCatalogs.selectedPersonaStateText(
-          personaID: draft.personaID,
-          personas: activePersonas
-        )
-      )
-      .scaledFont(.caption)
-      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      .fixedSize(horizontal: false, vertical: true)
-    }
-  }
-
-  private var acpFallbackRoleMenu: some View {
-    SessionWindowCreateFieldBlock(title: "If a leader already runs in this session") {
-      Picker("Fallback role", selection: selectedFallbackRole) {
-        ForEach(SessionRole.allCases.filter { $0 != .leader }, id: \.self) { role in
-          Text(role.title).tag(role)
-        }
-      }
-      .pickerStyle(.menu)
-      .harnessNativeFormControl()
-      .accessibilityLabel("Fallback role")
-    }
-  }
-
   @ViewBuilder
   private func terminalTransportNotice(
     option: AgentCapabilityOption,
@@ -820,74 +802,66 @@ extension SessionWindowCreateForm {
     }
   }
 
-  private var codexConfigurationFields: some View {
-    DisclosureGroup("Configure") {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-        SessionWindowCreateFieldBlock(title: "Run mode") {
-          Picker("Run mode", selection: codexMode) {
-            ForEach(CodexRunMode.allCases) { mode in
-              Text(mode.title).tag(mode)
+  private var codexConfigurationSection: some View {
+    Section {
+      Picker("Run mode", selection: codexMode) {
+        ForEach(CodexRunMode.allCases) { mode in
+          Text(mode.title).tag(mode)
+        }
+      }
+      .pickerStyle(.segmented)
+      .harnessNativeFormControl()
+      .accessibilityLabel("Codex mode")
+
+      if let codexCatalog {
+        Picker(
+          selectedCodexModelMenuTitle(catalog: codexCatalog),
+          selection: codexModelPickerSelection
+        ) {
+          ForEach(codexCatalog.models) { model in
+            Text(model.displayName).tag(model.id)
+          }
+          Text("Custom...")
+            .tag(SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag)
+        }
+        .pickerStyle(.menu)
+        .harnessNativeFormControl()
+        .accessibilityLabel("Codex model")
+
+        if codexModelPickerSelection.wrappedValue
+          == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag
+        {
+          TextField("Provider-specific model id", text: codexCustomModel)
+            .harnessNativeTextField()
+            .accessibilityLabel("Custom Codex model")
+        }
+
+        if !codexEffortValues.isEmpty {
+          Picker("Effort", selection: codexEffortSelection) {
+            ForEach(codexEffortValues, id: \.self) { level in
+              Text(level.capitalized).tag(level)
             }
           }
           .pickerStyle(.segmented)
           .harnessNativeFormControl()
-          .accessibilityLabel("Codex mode")
+          .accessibilityLabel("Codex effort")
         }
+      } else {
+        TextField("Model (optional)", text: codexCustomModel)
+          .harnessNativeTextField()
+          .accessibilityLabel("Codex model")
 
-        if let codexCatalog {
-          SessionWindowCreateFieldBlock(title: "Model") {
-            Picker(
-              selectedCodexModelMenuTitle(catalog: codexCatalog),
-              selection: codexModelPickerSelection
-            ) {
-              ForEach(codexCatalog.models) { model in
-                Text(model.displayName).tag(model.id)
-              }
-              Text("Custom...")
-                .tag(SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag)
-            }
-            .pickerStyle(.menu)
-            .harnessNativeFormControl()
-            .accessibilityLabel("Codex model")
-
-            if codexModelPickerSelection.wrappedValue
-              == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag
-            {
-              TextField("Provider-specific model id", text: codexCustomModel)
-                .harnessNativeTextField()
-                .accessibilityLabel("Custom Codex model")
-            }
-          }
-
-          if !codexEffortValues.isEmpty {
-            SessionWindowCreateFieldBlock(title: "Effort") {
-              Picker("Effort", selection: codexEffortSelection) {
-                ForEach(codexEffortValues, id: \.self) { level in
-                  Text(level.capitalized).tag(level)
-                }
-              }
-              .pickerStyle(.segmented)
-              .harnessNativeFormControl()
-              .accessibilityLabel("Codex effort")
-            }
-          }
-        } else {
-          SessionWindowCreateFieldBlock(title: "Model") {
-            TextField("Model (optional)", text: codexCustomModel)
-              .harnessNativeTextField()
-              .accessibilityLabel("Codex model")
-          }
-
-          SessionWindowCreateFieldBlock(title: "Effort") {
-            TextField("Effort (optional)", text: codexEffortText)
-              .harnessNativeTextField()
-              .accessibilityLabel("Codex effort")
-          }
-        }
+        TextField("Effort (optional)", text: codexEffortText)
+          .harnessNativeTextField()
+          .accessibilityLabel("Codex effort")
       }
-      .padding(.top, HarnessMonitorTheme.spacingSM)
+    } header: {
+      Text("Codex")
+        .harnessNativeFormSectionHeader()
+    } footer: {
+      Text("Choose the run mode, model, and effort for this draft.")
+        .harnessNativeFormSectionFooter()
     }
-    .accessibilityLabel("Configure")
   }
 
   private var codexEffortText: Binding<String> {

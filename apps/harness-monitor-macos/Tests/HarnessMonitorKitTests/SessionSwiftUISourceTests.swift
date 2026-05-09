@@ -87,6 +87,10 @@ struct SessionSwiftUISourceTests {
 
     let createFormSource = try sourceFile(at: "Views/Sessions/SessionWindowCreateForm.swift")
     #expect(!createFormSource.contains("Section(draft.kind.title)"))
+    #expect(createFormSource.contains("embeddedAgentRuntimeSections"))
+    #expect(createFormSource.contains("Picker(\"Provider\", selection: selectedProviderID)"))
+    #expect(!createFormSource.contains("DisclosureGroup(\""))
+    #expect(!createFormSource.contains("SessionWindowCreateFieldBlock("))
   }
 
   @Test("Session view state wrappers stay private")
