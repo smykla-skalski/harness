@@ -146,6 +146,7 @@ public final class SessionWindowStateCache {
 public final class SessionWindowSectionState {
   public var routeSelection: SessionWindowRoute = .overview
   public var agentID: String?
+  public var codexRunID: String?
   public var decisionID: String?
   public var taskID: String?
   public var createDrafts: [SessionCreateKind: SessionCreateDraft] = [:]
@@ -158,6 +159,8 @@ public final class SessionWindowSectionState {
       routeSelection = route
     case .agent(_, let agentID):
       self.agentID = agentID
+    case .codexRun(_, let runID):
+      codexRunID = runID
     case .decision(_, let decisionID):
       self.decisionID = decisionID
     case .task(_, let taskID):

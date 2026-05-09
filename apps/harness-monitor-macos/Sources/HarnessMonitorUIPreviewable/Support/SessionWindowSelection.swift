@@ -51,6 +51,7 @@ public struct SessionCreateDraft: Codable, Hashable, Sendable {
 public enum SessionSelection: Hashable, Sendable {
   case route(SessionWindowRoute)
   case agent(sessionID: String, agentID: String)
+  case codexRun(sessionID: String, runID: String)
   case decision(sessionID: String, decisionID: String)
   case task(sessionID: String, taskID: String)
   case create(SessionCreateDraft)
@@ -63,6 +64,11 @@ public enum SessionSelection: Hashable, Sendable {
   public var agentID: String? {
     guard case .agent(_, let agentID) = self else { return nil }
     return agentID
+  }
+
+  public var codexRunID: String? {
+    guard case .codexRun(_, let runID) = self else { return nil }
+    return runID
   }
 
   public var decisionID: String? {
