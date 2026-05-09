@@ -88,7 +88,7 @@ resources_dir="$(dirname "$provenance_path")"
 EOF
 
 target_path="$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME"
-if [ -e "$target_path" ]; then
+if [ "${ENABLE_USER_SCRIPT_SANDBOXING:-}" != "YES" ] && [ -e "$target_path" ]; then
   /usr/bin/xattr -dr com.apple.provenance "$target_path" 2>/dev/null || true
   /usr/bin/xattr -dr com.apple.quarantine "$target_path" 2>/dev/null || true
 fi

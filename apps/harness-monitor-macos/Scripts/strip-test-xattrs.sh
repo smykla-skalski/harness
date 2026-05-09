@@ -11,6 +11,9 @@ fi
 
 strip_attrs() {
   local target_path="$1"
+  if [ "${ENABLE_USER_SCRIPT_SANDBOXING:-}" = "YES" ]; then
+    return
+  fi
   if [ -e "$target_path" ]; then
     /usr/bin/xattr -dr com.apple.provenance "$target_path" 2>/dev/null || true
     /usr/bin/xattr -dr com.apple.quarantine "$target_path" 2>/dev/null || true
