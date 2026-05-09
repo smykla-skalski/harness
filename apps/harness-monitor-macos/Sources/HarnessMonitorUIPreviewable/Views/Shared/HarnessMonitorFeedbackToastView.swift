@@ -237,18 +237,13 @@ private struct HarnessMonitorFeedbackToastRow: View {
       if let action = feedback.primaryAction {
         HarnessMonitorFeedbackToastPrimaryActionButton(
           action: action,
-          copied: copiedPrimaryAction,
+          feedbackID: feedback.id,
+          toast: toast,
+          copied: $copiedPrimaryAction,
+          dragOffset: $dragOffset,
           tint: tintColor,
           reduceMotion: reduceMotion,
-          onPress: { perform(action) },
-          onPendingDismissCancelled: { toast.resumeTimers() },
-          onBeginDismiss: {
-            toast.resumeTimers()
-            withAnimation(reduceMotion ? .linear(duration: 0.01) : .easeIn(duration: 0.22)) {
-              dragOffset = dismissThreshold * 2.4
-            }
-          },
-          onFinishDismiss: { toast.dismiss(id: feedback.id) }
+          dismissThreshold: dismissThreshold
         )
       }
 
@@ -365,21 +360,6 @@ private struct HarnessMonitorFeedbackToastRow: View {
       bounce: 0.18 + (0.18 * springiness),
       initialVelocity: springiness
     )
-  }
-
-  private func perform(_ action: ActionFeedbackAction) {
-    guard !copiedPrimaryAction else {
-      return
-    }
-    switch action.kind {
-    case .copy(let text):
-      toast.pauseTimers()
-      HarnessMonitorClipboard.copy(text)
-      withAnimation(reduceMotion ? .linear(duration: 0.01) : .easeInOut(duration: 0.18)) {
-        copiedPrimaryAction = true
-      }
-      AccessibilityNotification.Announcement(action.successAnnouncement).post()
-    }
   }
 
   private func detailsDisclosureTitle(_ details: ActionFeedbackDetails) -> String {
