@@ -46,16 +46,26 @@ extension SessionWindowCreateForm {
       return
     }
     _ = name
+    LaunchPresetDefaults.write(
+      LaunchPresetSnapshot(
+        mode: .codex,
+        codexMode: draft.codexMode.rawValue,
+        codexModel: model.isEmpty ? nil : model,
+        customCodexModel: draft.codexAllowCustomModel ? model : nil,
+        codexEffort: effort.isEmpty ? nil : effort
+      )
+    )
     state.updateCreateDraft(SessionCreateDraft(kind: .agent, sessionID: draft.sessionID))
     state.select(.codexRun(sessionID: draft.sessionID, runID: started.runId))
   }
 
   @MainActor
   func createAgent(named name: String) async {
-    switch SessionWindowCreateFormCatalogs.normalizedLaunchSelection(
+    let resolvedSelection = SessionWindowCreateFormCatalogs.normalizedLaunchSelection(
       draft: draft,
       options: activeAgentCapabilityOptions
-    ) {
+    )
+    switch resolvedSelection {
     case .tui(let runtime):
       guard
         let created = await store.startAgentTuiSnapshot(
@@ -69,6 +79,7 @@ extension SessionWindowCreateForm {
       else {
         return
       }
+      writeTerminalLaunchPreset(selection: resolvedSelection)
       state.updateCreateDraft(SessionCreateDraft(kind: .agent, sessionID: draft.sessionID))
       state.selectAgent(created.agentId)
     case .acp(let descriptorID):
@@ -84,9 +95,23 @@ extension SessionWindowCreateForm {
       else {
         return
       }
+      writeTerminalLaunchPreset(selection: resolvedSelection)
       state.updateCreateDraft(SessionCreateDraft(kind: .agent, sessionID: draft.sessionID))
       state.selectAgent(created.agentId)
     }
+  }
+
+  @MainActor
+  private func writeTerminalLaunchPreset(selection: AgentLaunchSelection) {
+    HarnessMonitorAgentLaunchDefaults.noteExplicitSelection(selection)
+    LaunchPresetDefaults.write(
+      LaunchPresetSnapshot(
+        mode: .terminal,
+        providerStorageKey: selection.storageKey,
+        rows: 32,
+        cols: 120
+      )
+    )
   }
 
   @MainActor
