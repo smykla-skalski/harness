@@ -176,6 +176,8 @@ enum HarnessMonitorUITestAccessibility {
   static let settingsPendingDecisionBannersFocusModeToggle =
     "harness.settings.decisions.pending-banners.focus-mode"
   static let settingsGeneralSection = "harness.settings.section.general"
+  static let settingsFocusModeSection = "harness.settings.section.focusmode"
+  static let settingsBannersSection = "harness.settings.section.banners"
   static let settingsAppearanceSection = "harness.settings.section.appearance"
   static let settingsNotificationsSection = "harness.settings.section.notifications"
   static let settingsSupervisorSection = "harness.settings.section.supervisor"
@@ -298,7 +300,7 @@ enum HarnessMonitorUITestAccessibility {
   }
 
   static func settingsSectionButton(_ key: String) -> String {
-    "harness.settings.section.\(key)"
+    "harness.settings.section.\(slug(key))"
   }
 
   static func settingsSupervisorPane(_ key: String) -> String {

@@ -67,7 +67,7 @@ final class SessionDecisionCommandFactoryTests: XCTestCase {
       named: "Views/Sessions/SessionSidebarDecisionSection.swift"
     )
     let settingsSource = try previewableSourceFile(
-      named: "Views/Settings/SettingsGeneralSection.swift"
+      named: "Views/Settings/SettingsBannersSection.swift"
     )
 
     XCTAssertTrue(sidebarSource.contains("SessionDecisionBulkActionCopy.dismissVisibleHelp"))

@@ -93,7 +93,6 @@ extension HarnessMonitorUITestCase {
     if settingsRoot.exists {
       return
     }
-
     app.activate()
     app.typeKey(",", modifierFlags: .command)
   }

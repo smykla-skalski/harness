@@ -10,6 +10,24 @@ import SwiftUI
   )
 }
 
+#Preview("Settings Window - Focus Mode") {
+  @Previewable @State var themeMode: HarnessMonitorThemeMode = .auto
+
+  settingsWindowPreview(
+    section: .focusMode,
+    themeMode: $themeMode
+  )
+}
+
+#Preview("Settings Window - Banners") {
+  @Previewable @State var themeMode: HarnessMonitorThemeMode = .auto
+
+  settingsWindowPreview(
+    section: .banners,
+    themeMode: $themeMode
+  )
+}
+
 #Preview("Settings Window - Appearance") {
   @Previewable @State var themeMode: HarnessMonitorThemeMode = .auto
 
@@ -34,6 +52,16 @@ import SwiftUI
     overview: SettingsGeneralOverviewState(store: store)
   )
   .frame(width: 720)
+}
+
+#Preview("Settings Focus Mode Section") {
+  SettingsFocusModeSection()
+    .frame(width: 720)
+}
+
+#Preview("Settings Banners Section") {
+  SettingsBannersSection()
+    .frame(width: 720)
 }
 
 #Preview("Settings Window - Connection") {

@@ -116,25 +116,50 @@ class HarnessMonitorSettingsLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertLessThan(daemonLogLevel.frame.minY, supervisorLogLevel.frame.minY)
   }
 
-  func testSettingsGeneralSectionShowsPendingDecisionBannerToggles() throws {
+  func testSettingsBannersSectionShowsPendingDecisionBannerToggle() throws {
     let app = launch(mode: "preview")
 
     openSettings(in: app)
-    selectGeneralSection(in: app)
+    selectBannersSection(in: app)
 
+    let settingsRoot = element(in: app, identifier: Accessibility.settingsRoot)
     let settingsPanel = frameElement(in: app, identifier: Accessibility.settingsPanel)
+    XCTAssertTrue(settingsRoot.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(settingsPanel.waitForExistence(timeout: Self.actionTimeout))
 
-    let visibilityToggle = element(
-      in: app,
+    let visibilityToggle = descendantElement(
+      in: settingsRoot,
       identifier: Accessibility.settingsPendingDecisionBannersToggle
     )
-    let focusModeToggle = element(
-      in: app,
+    let focusModeToggle = descendantElement(
+      in: settingsRoot,
       identifier: Accessibility.settingsPendingDecisionBannersFocusModeToggle
     )
     XCTAssertTrue(visibilityToggle.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertFalse(focusModeToggle.exists)
+  }
+
+  func testSettingsFocusModeSectionShowsPendingDecisionBannerToggle() throws {
+    let app = launch(mode: "preview")
+
+    openSettings(in: app)
+    selectFocusModeSection(in: app)
+
+    let settingsRoot = element(in: app, identifier: Accessibility.settingsRoot)
+    let settingsPanel = frameElement(in: app, identifier: Accessibility.settingsPanel)
+    XCTAssertTrue(settingsRoot.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(settingsPanel.waitForExistence(timeout: Self.actionTimeout))
+
+    let visibilityToggle = descendantElement(
+      in: settingsRoot,
+      identifier: Accessibility.settingsPendingDecisionBannersToggle
+    )
+    let focusModeToggle = descendantElement(
+      in: settingsRoot,
+      identifier: Accessibility.settingsPendingDecisionBannersFocusModeToggle
+    )
     XCTAssertTrue(focusModeToggle.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertFalse(visibilityToggle.exists)
   }
 
   func testSettingsSidebarChromeMatchesNativeInsetLayout() throws {

@@ -89,46 +89,131 @@ extension HarnessMonitorUITestCase {
     )
   }
 
+  func selectFocusModeSection(in app: XCUIApplication) {
+    selectSettingsSection(
+      in: app,
+      identifier: HarnessMonitorUITestAccessibility.settingsFocusModeSection,
+      expectedTitle: "Focus Mode",
+      sidebarTitle: "Focus"
+    )
+  }
+
+  func selectBannersSection(in app: XCUIApplication) {
+    selectSettingsSection(
+      in: app,
+      identifier: HarnessMonitorUITestAccessibility.settingsBannersSection,
+      expectedTitle: "Banners"
+    )
+  }
+
   func selectSettingsSection(
     in app: XCUIApplication,
     identifier: String,
-    expectedTitle: String
+    expectedTitle: String,
+    sidebarTitle: String? = nil
   ) {
-    let title = element(
-      in: app,
-      identifier: HarnessMonitorUITestAccessibility.settingsTitle
-    )
-    if title.exists, title.label == expectedTitle {
+    let sidebarTitle = sidebarTitle ?? expectedTitle
+    let section = settingsSectionElement(in: app, identifier: identifier)
+    if section.exists, (section.value as? String) == "selected" {
       return
     }
-
-    let sectionAppeared = waitUntil(timeout: Self.fastActionTimeout) {
-      let identifiedSection = self.button(in: app, identifier: identifier)
-      if identifiedSection.exists {
-        return true
-      }
-      return self.button(in: app, title: expectedTitle).exists
+    if app.state != .runningForeground {
+      app.activate()
     }
-    XCTAssertTrue(sectionAppeared, "\(expectedTitle) sidebar item not found")
-
-    let section = {
-      let identifiedSection = button(in: app, identifier: identifier)
-      return identifiedSection.exists ? identifiedSection : button(in: app, title: expectedTitle)
-    }()
-    if section.isHittable {
-      section.tap()
+    var tapped = false
+    let sectionFrameMarker = settingsSectionFrameMarker(in: app, identifier: identifier)
+    if let coordinate = centerCoordinate(in: app, for: sectionFrameMarker) {
+      tapped = true
+      coordinate.click()
     } else if let coordinate = centerCoordinate(in: app, for: section) {
-      coordinate.tap()
-    } else {
-      tapElement(in: app, identifier: identifier)
+      coordinate.click()
+      tapped = true
+    } else if section.isHittable {
+      section.click()
+      tapped = true
     }
+    if !tapped {
+      XCTAssertTrue(
+        waitForElement(section, timeout: Self.fastActionTimeout),
+        "\(sidebarTitle) sidebar item not found"
+      )
+      let refreshedSection = settingsSectionElement(in: app, identifier: identifier)
+      let refreshedSectionFrameMarker = settingsSectionFrameMarker(in: app, identifier: identifier)
+      if let coordinate = centerCoordinate(in: app, for: refreshedSectionFrameMarker) {
+        tapped = true
+        coordinate.click()
+      } else if let coordinate = centerCoordinate(in: app, for: refreshedSection) {
+        coordinate.click()
+        tapped = true
+      } else if refreshedSection.isHittable {
+        refreshedSection.click()
+        tapped = true
+      }
+    }
+    XCTAssertTrue(tapped, "Failed to tap \(sidebarTitle) settings section")
 
     XCTAssertTrue(
       waitUntil(timeout: Self.fastActionTimeout) {
-        title.exists && title.label == expectedTitle
+        let selectedSection = self.element(in: app, identifier: identifier)
+        return selectedSection.exists && (selectedSection.value as? String) == "selected"
       },
-      "Settings title did not switch to \(expectedTitle); got '\(title.label)'"
+      "\(sidebarTitle) settings section did not become selected"
     )
+  }
+
+  private func settingsSectionElement(
+    in app: XCUIApplication,
+    identifier: String
+  ) -> XCUIElement {
+    let container = settingsSectionContainer(in: app)
+    let scopedMatch = descendantElement(in: container, identifier: identifier)
+    if scopedMatch.exists {
+      return scopedMatch
+    }
+
+    return element(in: app, identifier: identifier)
+  }
+
+  private func settingsSectionFrameMarker(
+    in app: XCUIApplication,
+    identifier: String
+  ) -> XCUIElement {
+    let container = settingsSectionContainer(in: app)
+    let scopedMatch = descendantFrameElement(
+      in: container,
+      identifier: "\(identifier).frame"
+    )
+    if scopedMatch.exists {
+      return scopedMatch
+    }
+
+    return frameElement(in: app, identifier: "\(identifier).frame")
+  }
+
+  private func settingsSectionContainer(in app: XCUIApplication) -> XCUIElement {
+    let settingsWindow = app.windows.matching(identifier: "settings").firstMatch
+    let scopedWindow = settingsWindow.exists ? settingsWindow : resolvedSettingsWindow(in: app)
+    let sidebar = descendantElement(
+      in: scopedWindow,
+      identifier: HarnessMonitorUITestAccessibility.settingsSidebar
+    )
+    return sidebar.exists ? sidebar : scopedWindow
+  }
+
+  private func resolvedSettingsWindow(in app: XCUIApplication) -> XCUIElement {
+    let settingsRoot = app.otherElements
+      .matching(identifier: HarnessMonitorUITestAccessibility.settingsRoot)
+      .firstMatch
+    if settingsRoot.exists {
+      return window(in: app, containing: settingsRoot)
+    }
+
+    let genericSettingsRoot = element(in: app, identifier: HarnessMonitorUITestAccessibility.settingsRoot)
+    if genericSettingsRoot.exists {
+      return window(in: app, containing: genericSettingsRoot)
+    }
+
+    return app.windows.firstMatch
   }
 
   func selectFirstExistingBackground(

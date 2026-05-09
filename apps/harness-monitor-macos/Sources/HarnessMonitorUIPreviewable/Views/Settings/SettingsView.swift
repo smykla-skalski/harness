@@ -35,6 +35,10 @@ public struct SettingsView: View {
         case .general:
           let overview = SettingsGeneralOverviewState(store: store)
           SettingsGeneralSection(store: store, overview: overview)
+        case .focusMode:
+          SettingsFocusModeSection()
+        case .banners:
+          SettingsBannersSection()
         case .appearance:
           SettingsAppearanceSection(themeMode: $themeMode)
         case .notifications:

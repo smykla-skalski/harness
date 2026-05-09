@@ -191,6 +191,9 @@ extension HarnessMonitorUITestCase {
     let deadline = Date.now.addingTimeInterval(timeout)
 
     while Date.now < deadline {
+      if app.state == .notRunning {
+        return false
+      }
       if app.state != .runningForeground {
         app.activate()
       }
