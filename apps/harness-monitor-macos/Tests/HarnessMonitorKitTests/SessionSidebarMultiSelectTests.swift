@@ -97,6 +97,7 @@ struct SessionSidebarMultiSelectTests {
       store: HarnessMonitorStore(daemonController: PreviewDaemonController(mode: .empty)),
       snapshot: nil,
       decisions: [],
+      canPresentSearch: true,
       state: state
     )
 
@@ -148,6 +149,21 @@ struct SessionSidebarMultiSelectTests {
 
     #expect(!source.contains("pointerSelectionGesture"))
     #expect(!source.contains(".simultaneousGesture("))
+  }
+
+  @Test("Session sidebar search is availability gated")
+  func sessionSidebarSearchIsAvailabilityGated() throws {
+    let sidebarSource = try sourceFile(named: "SessionSidebar.swift")
+    let columnsSource = try sourceFile(named: "SessionWindowView+Columns.swift")
+
+    #expect(sidebarSource.contains("isPresented: searchPresentation"))
+    #expect(sidebarSource.contains("applySearchPresentationAvailability"))
+    #expect(
+      sidebarSource.contains(
+        ".harnessFocusedSceneValue(\\.harnessSidebarSearchFocusAction, searchFocusAction)"
+      )
+    )
+    #expect(columnsSource.contains("canPresentSearch: sessionSidebarSearchAvailable"))
   }
 
   @Test("Draggable sidebar rows keep drag gestures on the handle")

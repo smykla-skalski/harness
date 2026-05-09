@@ -8,6 +8,10 @@ public enum SessionWindowFocusModePolicy {
 }
 
 extension SessionWindowView {
+  var sessionSidebarSearchAvailable: Bool {
+    !focusMode && columnVisibilityBinding.wrappedValue != .detailOnly
+  }
+
   var decisionsCacheTrigger: SessionDecisionFilterKey {
     SessionDecisionFilterKey(
       sessionID: token.sessionID,
@@ -62,6 +66,7 @@ extension SessionWindowView {
         store: store,
         snapshot: snapshot,
         decisions: matchingDecisions,
+        canPresentSearch: sessionSidebarSearchAvailable,
         state: stateCache
       )
       .padding(.top, HarnessMonitorTheme.spacingLG)
