@@ -16,9 +16,8 @@ struct ToolbarTitleScalingContractTests {
     #expect(workspaceSource.contains(".navigationSubtitle(workspaceNavigationSubtitle(for: viewModel.selection))"))
     #expect(!workspaceSource.contains("HarnessMonitorToolbarTitleToolbarItem("))
     #expect(sessionSource.contains("var navigationTitleText: String"))
-    #expect(sessionSource.contains("var navigationSubtitleText: String"))
     #expect(sessionSource.contains(".navigationTitle(navigationTitleText)"))
-    #expect(sessionSource.contains(".navigationSubtitle(navigationSubtitleText)"))
+    #expect(!sessionSource.contains(".navigationSubtitle("))
     #expect(!sessionSource.contains("HarnessMonitorToolbarTitleToolbarItem("))
     #expect(!sessionRootSource.contains(".navigationTitle(windowTitle)"))
   }
