@@ -7,6 +7,7 @@ struct SessionSidebar: View {
   let decisions: [Decision]
   let canPresentSearch: Bool
   @Bindable var state: SessionWindowStateCache
+  @Environment(\.harnessTextSizeIndex) private var textSizeIndex
   @Environment(\.undoManager)
   var undoManager
   @State private var currentModifiers: EventModifiers = []
@@ -29,6 +30,7 @@ struct SessionSidebar: View {
       decisionsSection
     }
     .listStyle(.sidebar)
+    .environment(\.sidebarRowSize, sidebarRowSize)
     .onChange(of: decisions.map(\.id)) { _, ids in
       state.sidebarSelection.pruneDecisionSelection(to: Set(ids))
     }
@@ -86,6 +88,17 @@ struct SessionSidebar: View {
 
   private var sessionCodexRuns: [CodexRunSnapshot] {
     store.selectedCodexRuns.filter { $0.sessionId == state.sessionID }
+  }
+
+  private var sidebarRowSize: SidebarRowSize {
+    switch HarnessMonitorTextSize.normalizedIndex(textSizeIndex) {
+    case ..<HarnessMonitorTextSize.defaultIndex:
+      .small
+    case HarnessMonitorTextSize.defaultIndex..<HarnessMonitorTextSize.scales.count - 1:
+      .medium
+    default:
+      .large
+    }
   }
 
   private func handleSearchFocusRequest() {

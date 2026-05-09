@@ -3,8 +3,18 @@ import SwiftUI
 #Preview("Session sidebar row") {
   @Previewable @State var selection: SessionSelection? = nil
 
-  SessionSidebarRowSelectionPreview(selection: $selection)
+  SessionSidebarRowSelectionPreviewContent(selection: $selection)
     .frame(width: 260, height: 220)
+    .harnessPreviewSceneAppearance()
+    .environment(\.controlActiveState, .key)
+}
+
+#Preview("Session sidebar row - Smallest text") {
+  @Previewable @State var selection: SessionSelection? = .route(.overview)
+
+  SessionSidebarRowSelectionPreviewContent(selection: $selection)
+    .frame(width: 260, height: 220)
+    .harnessPreviewSceneAppearance(textSizeIndex: 0)
     .environment(\.controlActiveState, .key)
 }
 
@@ -14,12 +24,9 @@ import SwiftUI
     agentID: SessionSidebarRowPreviewFixtures.workersAgentID
   )
 
-  SessionSidebarRowSelectionPreview(selection: $selection)
-    .environment(
-      \.fontScale,
-      HarnessMonitorTextSize.scale(at: HarnessMonitorTextSize.scales.count - 1)
-    )
+  SessionSidebarRowSelectionPreviewContent(selection: $selection)
     .frame(width: 260, height: 220)
+    .harnessPreviewSceneAppearance(textSizeIndex: HarnessMonitorTextSize.scales.count - 1)
     .environment(\.controlActiveState, .key)
 }
 
@@ -36,8 +43,9 @@ struct SessionSidebarRowPreviewContent: View {
   }
 }
 
-private struct SessionSidebarRowSelectionPreview: View {
+struct SessionSidebarRowSelectionPreviewContent: View {
   @Binding var selection: SessionSelection?
+  @Environment(\.harnessTextSizeIndex) private var textSizeIndex
 
   var body: some View {
     List(selection: $selection) {
@@ -81,6 +89,18 @@ private struct SessionSidebarRowSelectionPreview: View {
       }
     }
     .listStyle(.sidebar)
+    .environment(\.sidebarRowSize, sidebarRowSize)
+  }
+
+  private var sidebarRowSize: SidebarRowSize {
+    switch HarnessMonitorTextSize.normalizedIndex(textSizeIndex) {
+    case ..<HarnessMonitorTextSize.defaultIndex:
+      .small
+    case HarnessMonitorTextSize.defaultIndex..<HarnessMonitorTextSize.scales.count - 1:
+      .medium
+    default:
+      .large
+    }
   }
 }
 
