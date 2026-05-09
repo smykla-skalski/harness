@@ -64,9 +64,11 @@ extension SessionWindowView {
     sessionBannerStack {
       if SessionWindowFocusModePolicy.usesRouteContent(selection: stateCache.selection) {
         contentColumn
+          .backgroundExtensionEffect()
       } else {
         detailFocus
           .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .backgroundExtensionEffect()
       }
     }
   }
@@ -98,8 +100,10 @@ extension SessionWindowView {
     case .sidebarContentDetail:
       SessionContentDetailSplitView(contentWidth: $contentColumnWidth) {
         contentColumn
+          .backgroundExtensionEffect()
       } detail: {
         detailColumn
+          .backgroundExtensionEffect()
       }
     }
   }
@@ -108,6 +112,7 @@ extension SessionWindowView {
   private var routeDetailColumn: some View {
     contentColumn
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      .backgroundExtensionEffect()
   }
 
   @ViewBuilder
