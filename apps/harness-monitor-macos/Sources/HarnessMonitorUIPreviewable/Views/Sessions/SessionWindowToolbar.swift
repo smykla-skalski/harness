@@ -2,12 +2,17 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct SessionWindowToolbar: ToolbarContent {
+  let store: HarnessMonitorStore
   let snapshot: HarnessMonitorSessionWindowSnapshot?
   let connectionTitle: String
   let statusSystemImage: String
   let sessionID: String
   let state: SessionWindowStateCache
   @Binding var focusMode: Bool
+
+  private var sleepPreventionPresentation: SleepPreventionToolbarPresentation {
+    SleepPreventionToolbarPresentation(isEnabled: store.sleepPreventionEnabled)
+  }
 
   var body: some ToolbarContent {
     ToolbarItemGroup(placement: .navigation) {
@@ -31,11 +36,28 @@ struct SessionWindowToolbar: ToolbarContent {
     }
     ToolbarItem(placement: .automatic) {
       Toggle(isOn: $focusMode) {
-        Label("Focus Mode", systemImage: "sidebar.leading")
+        Label {
+          Text("Focus Mode")
+        } icon: {
+          Image(systemName: focusMode ? "moon.fill" : "moon")
+            .contentTransition(
+              .symbolEffect(
+                .replace.magic(fallback: .downUp.wholeSymbol),
+                options: .nonRepeating
+              )
+            )
+        }
       }
+      .animation(.default, value: focusMode)
       .toggleStyle(.button)
       .accessibilityLabel("Focus mode")
       .accessibilityHint("Shows or hides secondary session columns.")
+    }
+    ToolbarItem(placement: .primaryAction) {
+      SleepPreventionToolbarButton(
+        store: store,
+        presentation: sleepPreventionPresentation
+      )
     }
     ToolbarItem(placement: .automatic) {
       Menu {

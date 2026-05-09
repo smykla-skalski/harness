@@ -240,6 +240,44 @@ final class SessionWindowVoiceOverTests: HarnessMonitorUITestCase {
     )
   }
 
+  func testSessionWindowShowsSleepPreventionToolbarButton() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: [
+        Self.previewScenarioKey: Self.dashboardLandingScenario,
+        Self.uiTestsKey: "1",
+        Self.mainWindowWidthKey: "1800",
+        Self.decisionSeedEnvKey: makeSeededDecisionsPayload(),
+      ]
+    )
+
+    let openRecentWindow = element(in: app, identifier: Accessibility.openRecentRoot)
+    XCTAssertTrue(waitForElement(openRecentWindow, timeout: Self.uiTimeout))
+
+    let sessionRowIdentifier = Accessibility.openRecentSessionRow(Self.previewSessionID)
+    XCTAssertTrue(
+      waitForButtonReady(
+        in: app,
+        identifier: sessionRowIdentifier,
+        timeout: Self.uiTimeout
+      ),
+      "Preview launch should expose the seeded session row."
+    )
+    tapButton(in: app, identifier: sessionRowIdentifier)
+
+    let sessionWindow = element(in: app, identifier: Accessibility.sessionWindowShell)
+    XCTAssertTrue(waitForElement(sessionWindow, timeout: Self.uiTimeout))
+
+    let sessionShell = window(in: app, containing: sessionWindow)
+    let sleepButton = sessionShell.toolbars.buttons
+      .matching(identifier: Accessibility.sleepPreventionButton)
+      .firstMatch
+    XCTAssertTrue(
+      waitForElement(sleepButton, timeout: Self.actionTimeout),
+      "Session windows should expose the sleep prevention toolbar button."
+    )
+  }
+
   func testSessionWindowContentDetailDividerSupportsResizing() throws {
     let app = launch(
       mode: "preview",

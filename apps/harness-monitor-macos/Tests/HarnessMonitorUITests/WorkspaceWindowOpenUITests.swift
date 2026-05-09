@@ -4,7 +4,9 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 /// UI tests for the consolidated Workspace toolbar/window flow.
 @MainActor
-final class WorkspaceWindowOpenUITests: HarnessMonitorUITestCase {
+final class WorkspaceWindowOpenUITests:
+  HarnessMonitorUITestCase
+{
   private static let decisionSeedEnvKey = "HARNESS_MONITOR_SUPERVISOR_SEED_DECISIONS"
   private static let uiTestsKey = "HARNESS_MONITOR_UI_TESTS"
   private static let seededDecisionID = "ui-test-seed-decision-1"
@@ -39,6 +41,7 @@ final class WorkspaceWindowOpenUITests: HarnessMonitorUITestCase {
       },
       "Workspace window should open after tapping the workspace toolbar button"
     )
+
   }
 
   func testSeededDecisionRowAppearsAfterOpeningWorkspaceWindow() throws {

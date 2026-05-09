@@ -9,12 +9,8 @@ struct ContentWindowToolbarModel: Equatable {
   let sleepPreventionEnabled: Bool
   let manualRefreshSuccessToken: Int
 
-  var sleepPreventionTitle: String {
-    sleepPreventionEnabled ? "Allow Sleep" : "Prevent Sleep"
-  }
-
-  var sleepPreventionSystemImage: String {
-    sleepPreventionEnabled ? "moon.zzz.fill" : "moon.zzz"
+  var sleepPreventionPresentation: SleepPreventionToolbarPresentation {
+    SleepPreventionToolbarPresentation(isEnabled: sleepPreventionEnabled)
   }
 }
 
@@ -42,21 +38,10 @@ struct ContentPrimaryToolbarItems: ToolbarContent {
 
   var body: some ToolbarContent {
     ToolbarItem(placement: .primaryAction) {
-      Button {
-        store.sleepPreventionEnabled.toggle()
-      } label: {
-        Label(
-          model.sleepPreventionTitle,
-          systemImage: model.sleepPreventionSystemImage
-        )
-      }
-      .tint(model.sleepPreventionEnabled ? .orange : nil)
-      .help(
-        model.sleepPreventionEnabled
-          ? "Allow system sleep"
-          : "Keep the system awake while sessions are active"
+      SleepPreventionToolbarButton(
+        store: store,
+        presentation: model.sleepPreventionPresentation
       )
-      .accessibilityIdentifier(HarnessMonitorAccessibility.sleepPreventionButton)
     }
     ToolbarSpacer(.fixed, placement: .primaryAction)
     ToolbarItem(placement: .primaryAction) {
