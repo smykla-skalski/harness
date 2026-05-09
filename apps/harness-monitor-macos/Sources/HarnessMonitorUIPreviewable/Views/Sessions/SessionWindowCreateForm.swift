@@ -53,6 +53,41 @@ struct SessionWindowCreateForm: View {
     )
   }
 
+  private var useCodex: Binding<Bool> {
+    Binding(
+      get: { draft.useCodex },
+      set: { updateDraft(useCodex: $0) }
+    )
+  }
+
+  private var codexMode: Binding<CodexRunMode> {
+    Binding(
+      get: { draft.codexMode },
+      set: { updateDraft(codexMode: $0) }
+    )
+  }
+
+  private var codexModel: Binding<String> {
+    Binding(
+      get: { draft.codexModel },
+      set: { updateDraft(codexModel: $0) }
+    )
+  }
+
+  private var codexEffort: Binding<String> {
+    Binding(
+      get: { draft.codexEffort },
+      set: { updateDraft(codexEffort: $0) }
+    )
+  }
+
+  private var codexAllowCustomModel: Binding<Bool> {
+    Binding(
+      get: { draft.codexAllowCustomModel },
+      set: { updateDraft(codexAllowCustomModel: $0) }
+    )
+  }
+
   var activeAgentCapabilityOptions: [AgentCapabilityOption] {
     agentCapabilityOptions.isEmpty
       ? SessionWindowCreateFormCatalogs.fallbackAgentOptions(store: store)
@@ -78,12 +113,22 @@ struct SessionWindowCreateForm: View {
           .accessibilityLabel("Prompt")
       }
       if draft.kind == .agent {
-        SessionWindowCreateFormCapabilityPicker(
-          options: activeAgentCapabilityOptions,
-          selection: launchSelection,
-          isLoading: isLoadingAgentCapabilities,
-          validationMessage: validationMessage(for: .capability)
-        )
+        SessionWindowCreateFormAgentLaunchToggle(useCodex: useCodex)
+        if draft.useCodex {
+          SessionWindowCreateFormCodexFields(
+            mode: codexMode,
+            model: codexModel,
+            effort: codexEffort,
+            allowCustomModel: codexAllowCustomModel
+          )
+        } else {
+          SessionWindowCreateFormCapabilityPicker(
+            options: activeAgentCapabilityOptions,
+            selection: launchSelection,
+            isLoading: isLoadingAgentCapabilities,
+            validationMessage: validationMessage(for: .capability)
+          )
+        }
       }
       if draft.kind == .task {
         Section("Task Details") {
@@ -135,7 +180,12 @@ struct SessionWindowCreateForm: View {
     title: String? = nil,
     prompt: String? = nil,
     runtime: String? = nil,
-    taskSeverity: TaskSeverity? = nil
+    taskSeverity: TaskSeverity? = nil,
+    useCodex: Bool? = nil,
+    codexMode: CodexRunMode? = nil,
+    codexModel: String? = nil,
+    codexEffort: String? = nil,
+    codexAllowCustomModel: Bool? = nil
   ) {
     var next = draft
     if let title {
@@ -150,7 +200,22 @@ struct SessionWindowCreateForm: View {
     if let taskSeverity {
       next.taskSeverity = taskSeverity
     }
-    clearValidationIfNeeded(title: title, runtime: runtime)
+    if let useCodex {
+      next.useCodex = useCodex
+    }
+    if let codexMode {
+      next.codexMode = codexMode
+    }
+    if let codexModel {
+      next.codexModel = codexModel
+    }
+    if let codexEffort {
+      next.codexEffort = codexEffort
+    }
+    if let codexAllowCustomModel {
+      next.codexAllowCustomModel = codexAllowCustomModel
+    }
+    clearValidationIfNeeded(title: title, runtime: runtime, useCodex: useCodex)
     state.updateCreateDraft(next)
   }
 
