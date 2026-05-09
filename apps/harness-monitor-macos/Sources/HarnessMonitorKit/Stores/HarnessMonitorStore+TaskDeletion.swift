@@ -18,6 +18,75 @@ extension HarnessMonitorStore {
     )
   }
 
+  public func requestDeleteTaskConfirmation(
+    sessionID: String,
+    taskIDs: [String],
+    taskTitleProvider: (String) -> String
+  ) {
+    let normalized = orderedUniqueDeletionTaskIDs(taskIDs)
+    guard !normalized.isEmpty else { return }
+    let actionName = "Delete task"
+    guard prepareSessionAction(named: actionName, sessionID: sessionID) != nil else { return }
+    let actorID = controlPlaneActionActor(for: "harness-app")
+    if normalized.count == 1 {
+      let id = normalized[0]
+      pendingConfirmation = .deleteTask(
+        sessionID: sessionID,
+        taskID: id,
+        taskTitle: taskTitleProvider(id),
+        actorID: actorID,
+        noteCount: taskUserNoteCount(taskID: id, sessionID: sessionID)
+      )
+    } else {
+      pendingConfirmation = .deleteTasks(
+        sessionID: sessionID,
+        taskIDs: normalized,
+        actorID: actorID
+      )
+    }
+  }
+
+  /// Stop-on-first-failure policy mirrors `removeAgents`: surface where the
+  /// boundary fell rather than hammer through. Transient failure on item N
+  /// strands items N+1…M; the toast names the unattempted suffix so the user
+  /// can re-select and retry.
+  @discardableResult
+  func deleteTasks(
+    sessionID: String,
+    taskIDs: [String],
+    actorID: String
+  ) async -> Bool {
+    guard !taskIDs.isEmpty else { return false }
+    var succeeded = 0
+    for (index, taskID) in taskIDs.enumerated() {
+      let noteCount = taskUserNoteCount(taskID: taskID, sessionID: sessionID)
+      let didDelete = await deleteTask(
+        sessionID: sessionID,
+        taskID: taskID,
+        actorID: actorID,
+        expectedNoteCount: noteCount
+      )
+      guard didDelete else {
+        let remaining = taskIDs.count - index - 1
+        presentFailureFeedback(
+          "Deleted \(succeeded) of \(taskIDs.count) tasks. "
+            + "Stopped after a failure with \(remaining) not attempted."
+        )
+        return false
+      }
+      succeeded += 1
+    }
+    if taskIDs.count > 1 {
+      presentSuccessFeedback("Deleted \(taskIDs.count) tasks")
+    }
+    return true
+  }
+
+  private func orderedUniqueDeletionTaskIDs(_ ids: [String]) -> [String] {
+    var seen: Set<String> = []
+    return ids.filter { seen.insert($0).inserted }
+  }
+
   @discardableResult
   func deleteTask(
     sessionID: String,

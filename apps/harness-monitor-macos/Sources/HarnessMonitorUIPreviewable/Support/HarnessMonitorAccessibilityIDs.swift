@@ -95,6 +95,8 @@ public enum HarnessMonitorAccessibility {
     "harness.session.window.inspector.close"
   public static let sessionWindowDismissUndoToast =
     "harness.session.window.decisions.dismiss-undo-toast"
+  public static let sessionWindowSidebarSelectionState =
+    "harness.session.window.sidebar.selection-state"
   public static let contentRoot = "harness.content.root"
   public static let settingsRoot = "harness.settings.root"
   public static let settingsState = "harness.settings.state"

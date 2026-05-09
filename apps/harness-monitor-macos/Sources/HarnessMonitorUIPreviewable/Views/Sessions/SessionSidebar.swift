@@ -14,6 +14,7 @@ struct SessionSidebar: View {
   @State private var currentModifiers: EventModifiers = []
   @State private var searchPresentationState = SidebarSearchPresentationState()
   @State private var searchFocusDispatcher = HarnessSidebarSearchFocusDispatcher()
+  @State private var selectionDispatcher = SessionSidebarSelectionDispatcher()
 
   var body: some View {
     @Bindable var filters = state.decisionFilters
@@ -26,7 +27,13 @@ struct SessionSidebar: View {
     .listStyle(.sidebar)
     .environment(\.sidebarRowSize, sidebarRowSize)
     .onChange(of: decisions.map(\.id)) { _, ids in
-      state.sidebarSelection.pruneDecisionSelection(to: Set(ids))
+      state.sidebarSelection.prune(kind: .decision, visibleIDs: Set(ids))
+    }
+    .onChange(of: (snapshot?.detail?.agents ?? []).map(\.agentId)) { _, ids in
+      state.sidebarSelection.prune(kind: .agent, visibleIDs: Set(ids))
+    }
+    .onChange(of: (snapshot?.detail?.tasks ?? []).map(\.taskId)) { _, ids in
+      state.sidebarSelection.prune(kind: .task, visibleIDs: Set(ids))
     }
     .task(id: (snapshot?.detail?.agents ?? []).map(\.agentId)) {
       state.sidebarOrdering.reconcileAgentOrder(with: snapshot?.detail?.agents ?? [])
@@ -36,17 +43,10 @@ struct SessionSidebar: View {
       Task { await reopenDecisionBatch(ids) }
       state.decisionBulkActions.reopenRequestedBatch = nil
     }
-    .onChange(of: state.sidebarSelection.selectedDecisionIDs.count) { previous, count in
-      guard previous != count else { return }
-      guard state.sidebarSelection.isDecisionMultiSelectEnabled else { return }
-      SessionSidebarMultiSelectAnnouncer.announce(
-        count: count,
-        visibleCount: decisions.count
-      )
-    }
     .onChange(of: state.sidebarSelection.isDecisionMultiSelectEnabled) { _, enabled in
       guard enabled else { return }
-      SessionSidebarMultiSelectAnnouncer.announce(
+      state.sidebarAnnouncer.announce(
+        kind: .decision,
         count: state.sidebarSelection.selectedDecisionIDs.count,
         visibleCount: decisions.count
       )
@@ -67,14 +67,21 @@ struct SessionSidebar: View {
       }
     }
     .harnessFocusedSceneValue(\.harnessSidebarSearchFocusAction, searchFocusAction)
+    .harnessFocusedSceneValue(\.harnessSessionSidebarSelection, selectionFocus)
     .task(id: canPresentSearch) {
       searchFocusDispatcher.handler = { handleSearchFocusRequest() }
     }
     .onChange(of: canPresentSearch, initial: true) { _, canPresent in
       applySearchPresentationAvailability(canPresent)
     }
+    .task(id: state.sessionID) {
+      bindSelectionDispatcher()
+    }
     .onDisappear {
       searchFocusDispatcher.handler = nil
+      selectionDispatcher.selectAll = nil
+      selectionDispatcher.clearSelection = nil
+      selectionDispatcher.deleteSelection = nil
     }
     .accessibilityValue(decisionSelectionAccessibilityValue)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowSidebar)
@@ -109,11 +116,20 @@ struct SessionSidebar: View {
   }
 
   private var decisionSelectionAccessibilityValue: Text {
-    guard state.sidebarSelection.isDecisionMultiSelectEnabled else {
-      return Text("Decision multi-select off")
+    if let anchor = state.sidebarSelection.anchor {
+      let count = state.sidebarSelection.count(of: anchor.kind)
+      let visible = visibleCount(for: anchor.kind)
+      return Text("\(count) of \(visible) \(anchor.kind.pluralNoun) selected")
     }
-    let count = state.sidebarSelection.selectedDecisionIDs.count
-    return Text("\(count) of \(decisions.count) decisions selected")
+    return Text("No multi-selection")
+  }
+
+  private func visibleCount(for kind: SessionSidebarSelectionKind) -> Int {
+    switch kind {
+    case .agent: (snapshot?.detail?.agents ?? []).count
+    case .task: (snapshot?.detail?.tasks ?? []).count
+    case .decision: decisions.count
+    }
   }
 
   private var selectionBinding: Binding<SessionSelection?> {
@@ -151,167 +167,109 @@ struct SessionSidebar: View {
     }
   }
 
-  @ViewBuilder private var agentsSection: some View {
-    Section {
-      ForEach(state.sidebarOrdering.orderedAgents(snapshot?.detail?.agents ?? [])) { agent in
-        let selection = SessionSelection.agent(sessionID: state.sessionID, agentID: agent.agentId)
-        SessionSidebarRow(
-          title: agent.name,
-          systemImage: "person.crop.circle",
-          severityShape: severityShape(for: agent.status),
-          severityTint: severityTint(for: agent.status)
-        )
-        .tag(selection)
-        .contextMenu {
-          Menu("Move to...") {
-            Button("Top") {
-              state.sidebarOrdering.moveAgent(
-                agent.agentId,
-                before: state.sidebarOrdering.agentIDs.first,
-                undoManager: undoManager
-              )
-            }
-            Button("Bottom") {
-              state.sidebarOrdering.moveAgent(
-                agent.agentId,
-                before: nil,
-                undoManager: undoManager
-              )
-            }
-          }
-          Button("Move to Top") {
-            state.sidebarOrdering.moveAgent(
-              agent.agentId,
-              before: state.sidebarOrdering.agentIDs.first,
-              undoManager: undoManager
-            )
-          }
-          Button("Move to Bottom") {
-            state.sidebarOrdering.moveAgent(
-              agent.agentId,
-              before: nil,
-              undoManager: undoManager
-            )
-          }
-          Divider()
-          Button("Copy Agent ID") {
-            HarnessMonitorClipboard.copy(agent.agentId)
-          }
-        }
-      }
-      ForEach(sessionCodexRuns) { run in
-        let selection = SessionSelection.codexRun(sessionID: state.sessionID, runID: run.runId)
-        SessionSidebarRow(
-          title: SessionCodexRunRowFormatter.title(for: run),
-          systemImage: "wand.and.stars",
-          severityShape: SessionCodexRunRowFormatter.severityShape(for: run.status),
-          severityTint: SessionCodexRunRowFormatter.severityTint(for: run.status)
-        )
-        .tag(selection)
-        .contextMenu {
-          Button("Copy Run ID") {
-            HarnessMonitorClipboard.copy(run.runId)
-          }
-        }
-      }
-      if (snapshot?.detail?.agents ?? []).isEmpty && sessionCodexRuns.isEmpty {
-        Text("No agents")
-          .foregroundStyle(.secondary)
-      }
-    } header: {
-      HStack(spacing: 6) {
-        Text("Agents")
-        if state.sectionState.hasDraft(.agent) {
-          Image(systemName: "circle.fill")
-            .font(.caption2)
-            .foregroundStyle(.tint)
-            .accessibilityLabel("Unsaved draft")
-        }
-        Spacer()
-        Button {
-          state.selectCreate(.agent)
-        } label: {
-          Image(systemName: "plus")
-        }
-        .buttonStyle(.borderless)
-        .help("New Agent")
-        .accessibilityLabel("New Agent")
-      }
-    }
-  }
-
-  @ViewBuilder private var tasksSection: some View {
-    Section {
-      ForEach(snapshot?.detail?.tasks ?? []) { task in
-        let selection = SessionSelection.task(sessionID: state.sessionID, taskID: task.taskId)
-        SessionSidebarRow(
-          title: task.title,
-          systemImage: "checklist",
-          severityShape: severityShape(for: task.severity),
-          severityTint: severityTint(for: task.severity)
-        )
-        .tag(selection)
-        .contextMenu {
-          Menu("Move to...") {
-            ForEach(decisions.prefix(10)) { decision in
-              Button(decision.summary) {
-                linkTask(task.taskId, to: decision.id)
-              }
-            }
-            if decisions.isEmpty {
-              Text("No visible decisions")
-            }
-            if decisions.count > 10 {
-              Text("Filter decisions to show more")
-            }
-          }
-          Button("Copy Task ID") {
-            HarnessMonitorClipboard.copy(task.taskId)
-          }
-        }
-      }
-      if (snapshot?.detail?.tasks ?? []).isEmpty {
-        Text("No tasks")
-          .foregroundStyle(.secondary)
-      }
-    } header: {
-      taskSectionHeader
-    }
-  }
-
-  private var taskSectionHeader: some View {
-    HStack(spacing: 6) {
-      Text("Tasks")
-      if state.sectionState.hasDraft(.task) {
-        Image(systemName: "circle.fill")
-          .font(.caption2)
-          .foregroundStyle(.tint)
-          .accessibilityLabel("Unsaved draft")
-      }
-      Spacer()
-      Button {
-        state.selectCreate(.task)
-      } label: {
-        Image(systemName: "plus")
-      }
-      .buttonStyle(.borderless)
-      .help("New Task")
-      .accessibilityLabel("New Task")
-    }
-  }
-
   func handleDecisionRowTap(_ decisionID: String) {
-    let change = SessionSidebarMultiSelect.resolve(
+    handleSidebarRowTap(
+      kind: .decision,
       rowID: decisionID,
-      orderedVisibleIDs: decisions.map(\.id),
-      selectedIDs: state.sidebarSelection.selectedDecisionIDs,
-      anchorID: state.sidebarSelection.decisionSelectionAnchorID,
-      modifiers: currentModifiers
+      orderedVisibleIDs: decisions.map(\.id)
     )
-    state.sidebarSelection.selectedDecisionIDs = change.selectedIDs
-    state.sidebarSelection.decisionSelectionAnchorID = change.anchorID
-    if change.activatesRow {
-      state.select(.decision(sessionID: state.sessionID, decisionID: decisionID))
+  }
+
+  private var selectionFocus: SessionSidebarSelectionFocus {
+    let hasMulti = state.sidebarSelection.anchor != nil
+    let canDelete: Bool = {
+      guard let anchor = state.sidebarSelection.anchor else { return false }
+      return state.sidebarSelection.count(of: anchor.kind) > 0
+    }()
+    return SessionSidebarSelectionFocus(
+      hasMultiSelection: hasMulti,
+      canDelete: canDelete,
+      dispatcher: selectionDispatcher
+    )
+  }
+
+  /// Closures live-read the prop closures captured here. The captures are
+  /// `[state, agentIDsClosure, taskIDsClosure, decisionIDsClosure]` so the
+  /// dispatcher reads the *current* visible IDs at fire time, not whatever
+  /// snapshot was current when this method was last called.
+  private func bindSelectionDispatcher() {
+    let agentIDsProvider: () -> [String] = { [self] in
+      (self.snapshot?.detail?.agents ?? []).map(\.agentId)
+    }
+    let taskIDsProvider: () -> [String] = { [self] in
+      (self.snapshot?.detail?.tasks ?? []).map(\.taskId)
+    }
+    let decisionIDsProvider: () -> [String] = { [self] in
+      self.decisions.map(\.id)
+    }
+    selectionDispatcher.selectAll = {
+      [state, agentIDsProvider, taskIDsProvider, decisionIDsProvider] in
+      let agents = agentIDsProvider()
+      let tasks = taskIDsProvider()
+      let decisions = decisionIDsProvider()
+      let inferred = SessionSidebarSelectionKind.inferredAnchorKind(
+        agentCount: agents.count,
+        taskCount: tasks.count,
+        decisionCount: decisions.count
+      )
+      let kind = state.sidebarSelection.anchor?.kind ?? inferred
+      guard let kind else { return }
+      let visible = SessionSidebarSelectionKind.visibleIDs(
+        for: kind,
+        agents: agents,
+        tasks: tasks,
+        decisions: decisions
+      )
+      state.sidebarSelection.applyChange(
+        kind: kind,
+        selectedIDs: Set(visible),
+        anchorID: visible.first
+      )
+      state.sidebarAnnouncer.announce(
+        kind: kind,
+        count: visible.count,
+        visibleCount: visible.count
+      )
+    }
+    selectionDispatcher.clearSelection = { [state] in
+      let priorKind = state.sidebarSelection.anchor?.kind
+      state.sidebarSelection.clear()
+      if let priorKind {
+        state.sidebarAnnouncer.announce(kind: priorKind, count: 0, visibleCount: 0)
+      }
+    }
+    selectionDispatcher.deleteSelection = {
+      [agentIDsProvider, taskIDsProvider, decisionIDsProvider] in
+      guard let anchor = state.sidebarSelection.anchor else { return }
+      let ordered = SessionSidebarSelectionKind.visibleIDs(
+        for: anchor.kind,
+        agents: agentIDsProvider(),
+        tasks: taskIDsProvider(),
+        decisions: decisionIDsProvider()
+      )
+      let set = state.sidebarSelection.selectedIDs(of: anchor.kind)
+      let ids = ordered.filter { set.contains($0) }
+      guard !ids.isEmpty else { return }
+      switch anchor.kind {
+      case .agent: requestRemoveAgents(ids)
+      case .task: requestDeleteTasks(ids)
+      case .decision: dismissDecisions(ids)
+      }
+    }
+  }
+}
+
+extension SessionSidebarSelectionKind {
+  fileprivate static func visibleIDs(
+    for kind: SessionSidebarSelectionKind,
+    agents: [String],
+    tasks: [String],
+    decisions: [String]
+  ) -> [String] {
+    switch kind {
+    case .agent: agents
+    case .task: tasks
+    case .decision: decisions
     }
   }
 }

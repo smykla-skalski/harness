@@ -59,7 +59,9 @@ extension HarnessMonitorStore {
       actorID: String,
       noteCount: Int
     )
+    case deleteTasks(sessionID: String, taskIDs: [String], actorID: String)
     case removeAgent(sessionID: String, agentID: String, actorID: String)
+    case removeAgents(sessionID: String, agentIDs: [String], actorID: String)
     case interruptCodexRun(sessionID: String, runID: String, runTitle: String)
   }
 

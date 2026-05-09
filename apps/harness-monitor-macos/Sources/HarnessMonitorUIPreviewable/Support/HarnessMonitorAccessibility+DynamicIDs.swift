@@ -69,6 +69,30 @@ extension HarnessMonitorAccessibility {
     "harness.session.agent.\(slug(agentID))"
   }
 
+  public static func sidebarAgentRow(_ agentID: String) -> String {
+    "harness.session.window.sidebar.agent.\(slug(agentID))"
+  }
+
+  public static func sidebarTaskRow(_ taskID: String) -> String {
+    "harness.session.window.sidebar.task.\(slug(taskID))"
+  }
+
+  public static func sidebarDecisionRow(_ decisionID: String) -> String {
+    "harness.session.window.sidebar.decision.\(slug(decisionID))"
+  }
+
+  public static func sidebarAgentRowSelectionFrame(_ agentID: String) -> String {
+    "\(sidebarAgentRow(agentID)).selection-frame"
+  }
+
+  public static func sidebarTaskRowSelectionFrame(_ taskID: String) -> String {
+    "\(sidebarTaskRow(taskID)).selection-frame"
+  }
+
+  public static func sidebarDecisionRowSelectionFrame(_ decisionID: String) -> String {
+    "\(sidebarDecisionRow(decisionID)).selection-frame"
+  }
+
   public static let sessionCockpitScrollView = "harness.session.cockpit.scroll"
   public static let sessionTaskListState = "harness.session.tasks.state"
   public static let sessionAgentListState = "harness.session.agents.state"

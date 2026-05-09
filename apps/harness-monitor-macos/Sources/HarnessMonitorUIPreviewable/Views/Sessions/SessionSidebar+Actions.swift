@@ -36,6 +36,68 @@ extension SessionSidebar {
     }
   }
 
+  func requestRemoveAgents(_ agentIDs: [String]) {
+    guard !agentIDs.isEmpty else { return }
+    store.requestRemoveAgentConfirmation(agentIDs: agentIDs)
+  }
+
+  func requestDeleteTasks(_ taskIDs: [String]) {
+    guard !taskIDs.isEmpty else { return }
+    let titlesByID = Dictionary(
+      uniqueKeysWithValues: (snapshot?.detail?.tasks ?? []).map { ($0.taskId, $0.title) }
+    )
+    store.requestDeleteTaskConfirmation(
+      sessionID: state.sessionID,
+      taskIDs: taskIDs
+    ) { taskID in
+      titlesByID[taskID] ?? taskID
+    }
+  }
+
+  func handleSidebarRowTap(
+    kind: SessionSidebarSelectionKind,
+    rowID: String,
+    orderedVisibleIDs: [String]
+  ) {
+    let change = SessionSidebarMultiSelect.resolve(
+      rowID: rowID,
+      orderedVisibleIDs: orderedVisibleIDs,
+      selectedIDs: state.sidebarSelection.selectedIDs(of: kind),
+      anchorID: state.sidebarSelection.anchor?.kind == kind
+        ? state.sidebarSelection.anchor?.id : nil,
+      modifiers: currentModifiers
+    )
+    let previousCount = state.sidebarSelection.count(of: kind)
+    state.sidebarSelection.applyChange(
+      kind: kind,
+      selectedIDs: change.selectedIDs,
+      anchorID: change.anchorID
+    )
+    if change.activatesRow {
+      let selection = sidebarSelection(for: kind, id: rowID)
+      state.selectFromSidebar(selection)
+    }
+    let nextCount = state.sidebarSelection.count(of: kind)
+    if nextCount != previousCount {
+      state.sidebarAnnouncer.announce(
+        kind: kind,
+        count: nextCount,
+        visibleCount: orderedVisibleIDs.count
+      )
+    }
+  }
+
+  func sidebarSelection(
+    for kind: SessionSidebarSelectionKind,
+    id: String
+  ) -> SessionSelection {
+    switch kind {
+    case .agent: .agent(sessionID: state.sessionID, agentID: id)
+    case .task: .task(sessionID: state.sessionID, taskID: id)
+    case .decision: .decision(sessionID: state.sessionID, decisionID: id)
+    }
+  }
+
   func severityShape(for status: AgentStatus) -> SessionSidebarSeverityShape {
     switch status {
     case .active: .dot

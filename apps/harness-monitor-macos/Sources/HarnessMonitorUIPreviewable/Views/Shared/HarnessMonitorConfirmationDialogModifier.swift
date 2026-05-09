@@ -79,7 +79,9 @@ public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
     case .deleteTask(_, _, _, _, let noteCount) where noteCount > 0:
       "Delete Task and \(noteCount) \(noteCount == 1 ? "Note" : "Notes")?"
     case .deleteTask: "Delete Task?"
+    case .deleteTasks(_, let taskIDs, _): "Delete \(taskIDs.count) Tasks?"
     case .removeAgent: "Remove Agent?"
+    case .removeAgents(_, let agentIDs, _): "Remove \(agentIDs.count) Agents?"
     case .interruptCodexRun: "Interrupt Whole Run?"
     case nil: ""
     }
@@ -95,8 +97,12 @@ public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
       "Remove \(sessionIDs.count) Sessions Now"
     case .deleteTask:
       "Delete Task Now"
+    case .deleteTasks(_, let taskIDs, _):
+      "Delete \(taskIDs.count) Tasks Now"
     case .removeAgent:
       "Remove Agent Now"
+    case .removeAgents(_, let agentIDs, _):
+      "Remove \(agentIDs.count) Agents Now"
     case .interruptCodexRun:
       "Interrupt Whole Run Now"
     case nil:
@@ -142,6 +148,17 @@ public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
       """
       This removes \(store.confirmationAgentSubject(sessionID: sessionID, agentID: agentID)) \
       and returns any active work to the queue.
+      """
+    case .removeAgents(_, let agentIDs, _):
+      """
+      This removes \(agentIDs.count) selected agents and returns any active work to the queue. \
+      Cannot be undone.
+      """
+    case .deleteTasks(_, let taskIDs, _):
+      """
+      This deletes \(taskIDs.count) selected tasks from active task views. \
+      Existing task history stays on the timeline as deletion events. Local workspace notes \
+      attached to these tasks will be deleted with them.
       """
     case .interruptCodexRun(_, _, let runTitle):
       "This interrupts the active Codex run for \"\(runTitle)\". The current turn stops immediately."

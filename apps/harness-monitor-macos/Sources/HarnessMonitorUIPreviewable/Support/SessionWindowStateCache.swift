@@ -13,6 +13,7 @@ public final class SessionWindowStateCache {
   public var decisionRuntime = SessionDecisionRuntime()
   public var decisionFilters = SessionDecisionFilterState()
   public var decisionBulkActions = SessionDecisionBulkActionState()
+  public var sidebarAnnouncer = SessionSidebarMultiSelectAnnouncer()
   public var navigationHistory = SessionWindowNavigationHistory()
   public var attention = SessionAttentionState()
   public var lastTaskDecisionLink: SessionTaskDecisionLink?

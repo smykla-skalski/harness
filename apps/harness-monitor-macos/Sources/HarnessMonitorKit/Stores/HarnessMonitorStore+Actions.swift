@@ -180,15 +180,65 @@ extension HarnessMonitorStore {
   }
 
   public func requestRemoveAgentConfirmation(agentID: String) {
+    requestRemoveAgentConfirmation(agentIDs: [agentID])
+  }
+
+  public func requestRemoveAgentConfirmation(agentIDs: [String]) {
+    let normalized = orderedUniqueIDs(agentIDs)
+    guard !normalized.isEmpty else { return }
     let actionName = "Remove agent"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return }
     guard guardLeaderActionsAvailable(actionName: actionName) else { return }
     guard let actorID = resolvedActionActorOrReport(actionName: actionName) else { return }
-    pendingConfirmation = .removeAgent(
-      sessionID: action.sessionID,
-      agentID: agentID,
-      actorID: actorID
-    )
+    if normalized.count == 1 {
+      pendingConfirmation = .removeAgent(
+        sessionID: action.sessionID,
+        agentID: normalized[0],
+        actorID: actorID
+      )
+    } else {
+      pendingConfirmation = .removeAgents(
+        sessionID: action.sessionID,
+        agentIDs: normalized,
+        actorID: actorID
+      )
+    }
+  }
+
+  /// Stop-on-first-failure policy: a structural failure (auth lapse, daemon
+  /// gone, network down) usually means the next call also fails — better to
+  /// surface where the boundary fell than hammer through 30 retries. The
+  /// trade-off: a transient on item N strands items N+1…M even if they would
+  /// individually succeed. The toast names the unattempted suffix so the user
+  /// can re-select and retry.
+  @discardableResult
+  func removeAgents(
+    sessionID: String,
+    agentIDs: [String],
+    actorID: String
+  ) async -> Bool {
+    guard !agentIDs.isEmpty else { return false }
+    var succeeded = 0
+    for (index, agentID) in agentIDs.enumerated() {
+      let didRemove = await removeAgent(
+        sessionID: sessionID,
+        agentID: agentID,
+        actorID: actorID
+      )
+      guard didRemove else {
+        let remaining = agentIDs.count - index - 1
+        presentFailureFeedback(
+          "Removed \(succeeded) of \(agentIDs.count) agents. "
+            + "Stopped after a failure with \(remaining) not attempted."
+        )
+        return false
+      }
+      succeeded += 1
+    }
+    if agentIDs.count > 1 {
+      presentSuccessFeedback("Removed \(agentIDs.count) agents")
+    }
+    return true
   }
 
   public func requestRemoveSessionConfirmation(sessionID: String) {
@@ -254,10 +304,12 @@ extension HarnessMonitorStore {
   }
 
   private func orderedUniqueSessionIDs(_ sessionIDs: [String]) -> [String] {
+    orderedUniqueIDs(sessionIDs)
+  }
+
+  private func orderedUniqueIDs(_ ids: [String]) -> [String] {
     var seen: Set<String> = []
-    return sessionIDs.filter { sessionID in
-      seen.insert(sessionID).inserted
-    }
+    return ids.filter { seen.insert($0).inserted }
   }
 
   func leaderActionActor(

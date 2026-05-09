@@ -80,13 +80,12 @@ struct SessionSidebarMultiSelectTests {
   @Test("Pruning visible decisions also repairs stale anchor")
   func pruningRepairsStaleAnchor() {
     let state = SessionSidebarSelectionState()
-    state.selectedDecisionIDs = ["d1", "d2"]
-    state.decisionSelectionAnchorID = "d3"
+    state.applyChange(kind: .decision, selectedIDs: ["d1", "d2"], anchorID: "d3")
 
-    state.pruneDecisionSelection(to: ["d2"])
+    state.prune(kind: .decision, visibleIDs: ["d2"])
 
     #expect(state.selectedDecisionIDs == ["d2"])
-    #expect(state.decisionSelectionAnchorID == "d2")
+    #expect(state.anchor == SessionSidebarAnchor(kind: .decision, id: "d2"))
   }
 
   @MainActor
@@ -115,7 +114,7 @@ struct SessionSidebarMultiSelectTests {
 
   @Test("Sidebar task rows expose Move to context menus")
   func taskRowsExposeMoveToContextMenus() throws {
-    let source = try sourceFile(named: "SessionSidebar.swift")
+    let source = try sourceFile(named: "SessionSidebar+Sections.swift")
 
     #expect(source.contains("Menu(\"Move to...\")"))
     #expect(source.contains("No visible decisions"))

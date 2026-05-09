@@ -199,8 +199,28 @@ extension HarnessMonitorStore {
         actorID: actorID,
         expectedNoteCount: noteCount
       )
+    case .deleteTasks(let sessionID, let taskIDs, let actorID):
+      HarnessMonitorUITestTrace.record(
+        component: "store.confirmation",
+        event: "dispatch-delete-tasks",
+        details: [
+          "task_count": String(taskIDs.count),
+          "task_ids": taskIDs.joined(separator: ","),
+        ]
+      )
+      _ = await deleteTasks(sessionID: sessionID, taskIDs: taskIDs, actorID: actorID)
     case .removeAgent(let sessionID, let agentID, let actorID):
       _ = await removeAgent(sessionID: sessionID, agentID: agentID, actorID: actorID)
+    case .removeAgents(let sessionID, let agentIDs, let actorID):
+      HarnessMonitorUITestTrace.record(
+        component: "store.confirmation",
+        event: "dispatch-remove-agents",
+        details: [
+          "agent_count": String(agentIDs.count),
+          "agent_ids": agentIDs.joined(separator: ","),
+        ]
+      )
+      _ = await removeAgents(sessionID: sessionID, agentIDs: agentIDs, actorID: actorID)
     case .interruptCodexRun(let sessionID, let runID, _):
       _ = await interruptCodexRun(sessionID: sessionID, runID: runID)
     }
