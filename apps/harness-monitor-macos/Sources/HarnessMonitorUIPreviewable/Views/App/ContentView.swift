@@ -35,7 +35,9 @@ public struct ContentView<CornerContent: View>: View {
   let keyWindowObserver: KeyWindowObserver?
   let showsCornerAnimation: Bool
   let cornerAnimationContent: CornerContent
+  let selection: HarnessMonitorStore.SelectionSlice
   let contentShell: HarnessMonitorStore.ContentShellSlice
+  let contentToolbar: HarnessMonitorStore.ContentToolbarSlice
   let contentChrome: HarnessMonitorStore.ContentChromeSlice
   let contentSession: HarnessMonitorStore.ContentSessionSlice
   let contentSessionDetail: HarnessMonitorStore.ContentSessionDetailSlice
@@ -102,7 +104,9 @@ public struct ContentView<CornerContent: View>: View {
     self.keyWindowObserver = keyWindowObserver
     self.showsCornerAnimation = showsCornerAnimation
     self.cornerAnimationContent = cornerAnimationContent()
+    self.selection = store.selection
     self.contentShell = store.contentUI.shell
+    self.contentToolbar = store.contentUI.toolbar
     self.contentChrome = store.contentUI.chrome
     self.contentSession = store.contentUI.session
     self.contentSessionDetail = store.contentUI.sessionDetail
@@ -186,21 +190,11 @@ public struct ContentView<CornerContent: View>: View {
     }
   }
 
-  private var contentToolbarModel: ContentWindowToolbarModel {
-    ContentWindowToolbarModel(
-      canNavigateBack: store.contentUI.toolbar.canNavigateBack,
-      canNavigateForward: store.contentUI.toolbar.canNavigateForward,
-      canCreateTask: store.areSelectedSessionActionsAvailable,
-      isRefreshing: store.contentUI.toolbar.isRefreshing,
-      sleepPreventionEnabled: store.contentUI.toolbar.sleepPreventionEnabled,
-      manualRefreshSuccessToken: store.contentUI.toolbar.manualRefreshSuccessToken
-    )
-  }
-
   @ToolbarContentBuilder private var contentToolbarItems: some ToolbarContent {
     ContentWindowToolbarItems(
       store: store,
-      model: contentToolbarModel
+      contentToolbar: contentToolbar,
+      canCreateTask: store.areSelectedSessionActionsAvailable
     )
   }
 
@@ -252,14 +246,15 @@ public struct ContentView<CornerContent: View>: View {
   }
 
   private var detailColumn: some View {
-    ContentDetailColumn(
-      store: store,
-      keyWindowObserver: keyWindowObserver,
-      toast: toast,
-      selection: store.selection,
-      contentChrome: contentChrome,
-      contentSession: contentSession,
-      contentSessionDetail: contentSessionDetail,
+      ContentDetailColumn(
+        store: store,
+        keyWindowObserver: keyWindowObserver,
+        toast: toast,
+        selection: selection,
+        contentToolbar: contentToolbar,
+        contentChrome: contentChrome,
+        contentSession: contentSession,
+        contentSessionDetail: contentSessionDetail,
       dashboardUI: contentDashboard,
       toolbarGlassReproConfiguration: toolbarGlassReproConfiguration
     )
