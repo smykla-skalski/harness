@@ -12,6 +12,10 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
     XCTAssertTrue(mainRoot.contains("HarnessMonitorWindowShell("))
     XCTAssertTrue(mainRoot.contains("WindowContentReadiness("))
     XCTAssertTrue(mainRoot.contains("windowToolbarBackgroundVisibility: nil"))
+    XCTAssertTrue(mainRoot.contains("private var hostsSharedShellPresentation"))
+    XCTAssertTrue(mainRoot.contains("HarnessMonitorConfirmationDialogModifier("))
+    XCTAssertTrue(mainRoot.contains("HarnessMonitorSheetModifier("))
+    XCTAssertTrue(mainRoot.contains("isEnabled: hostsSharedShellPresentation"))
 
     for modifier in duplicatedChromeModifiers {
       XCTAssertFalse(mainRoot.contains(modifier), "main root still owns \(modifier)")

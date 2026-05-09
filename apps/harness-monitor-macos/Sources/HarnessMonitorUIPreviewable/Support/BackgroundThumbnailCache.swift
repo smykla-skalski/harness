@@ -30,8 +30,8 @@ public actor BackgroundThumbnailCache {
 
   public init(
     cacheDirectory: URL = HarnessMonitorPaths.thumbnailCacheRoot(),
-    maxPixelSize: Int = 512,
-    maxFullImagePixelSize: Int = 2_560,
+    maxPixelSize: Int = 384,
+    maxFullImagePixelSize: Int = 1_280,
     thumbnailMemoryLimit: Int = 24,
     fullImageMemoryLimit: Int = 1,
     thumbnailMemoryByteLimit: Int = 48 * 1024 * 1024,

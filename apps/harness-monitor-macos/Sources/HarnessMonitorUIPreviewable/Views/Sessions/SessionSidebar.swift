@@ -4,6 +4,7 @@ import SwiftUI
 struct SessionSidebar: View {
   let store: HarnessMonitorStore
   let snapshot: HarnessMonitorSessionWindowSnapshot?
+  let sessionCodexRuns: [CodexRunSnapshot]
   let decisions: [Decision]
   let canPresentSearch: Bool
   @Bindable var state: SessionWindowStateCache
@@ -77,10 +78,6 @@ struct SessionSidebar: View {
     }
     .accessibilityValue(decisionSelectionAccessibilityValue)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowSidebar)
-  }
-
-  private var sessionCodexRuns: [CodexRunSnapshot] {
-    store.selectedCodexRuns.filter { $0.sessionId == state.sessionID }
   }
 
   private var sidebarRowSize: SidebarRowSize {

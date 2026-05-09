@@ -47,7 +47,7 @@ private enum SettingsBackgroundGalleryRecents {
 }
 
 enum SettingsBackgroundGalleryPrefetchPlan {
-  static let initialLimit = 12
+  static let initialLimit = 8
 
   static func selections(
     options: [HarnessMonitorBackgroundSelection],

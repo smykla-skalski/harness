@@ -23,6 +23,10 @@ struct SessionWindowRootView: View {
     store.sessionIndex.sessionSummary(for: token.sessionID)?.displayTitle ?? "Session"
   }
 
+  private var hostsSharedShellPresentation: Bool {
+    keyWindowObserver.isKey(windowID: windowID)
+  }
+
   var body: some View {
     HarnessMonitorWindowShell(
       windowID: windowID,
@@ -50,6 +54,20 @@ struct SessionWindowRootView: View {
       )
     )
     .modifier(SessionWindowTabbing(isSessionWindow: true))
+    .modifier(
+      HarnessMonitorConfirmationDialogModifier(
+        store: store,
+        shellUI: store.contentUI.shell,
+        isEnabled: hostsSharedShellPresentation
+      )
+    )
+    .modifier(
+      HarnessMonitorSheetModifier(
+        store: store,
+        shellUI: store.contentUI.shell,
+        isEnabled: hostsSharedShellPresentation
+      )
+    )
     .acpPermissionAttentionScene(
       store: store,
       notifications: notifications,

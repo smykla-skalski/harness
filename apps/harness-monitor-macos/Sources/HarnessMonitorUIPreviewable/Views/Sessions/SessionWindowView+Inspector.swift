@@ -20,8 +20,8 @@ extension SessionWindowView {
   }
 
   var inspectorCommand: SessionInspectorCommand {
-    let visibleBinding = $inspectorVisible
-    let preferredBinding = $inspectorPreferred
+    let visibleBinding = inspectorVisibleBinding
+    let preferredBinding = inspectorPreferredBinding
     return SessionInspectorCommand(
       sessionID: token.sessionID,
       isVisible: visibleBinding.wrappedValue && canPresentInspector,

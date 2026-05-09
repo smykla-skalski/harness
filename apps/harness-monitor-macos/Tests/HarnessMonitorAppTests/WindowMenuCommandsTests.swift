@@ -72,6 +72,24 @@ final class WindowMenuCommandsTests: XCTestCase {
     XCTAssertTrue(storeEnumsSource.contains("case newCodexAgent(sessionID: String)"))
   }
 
+  func testSessionCreateCommandsHideThePrimaryDuplicateEntry() {
+    XCTAssertFalse(
+      SessionCreateCommands.shouldShowExplicitCommand(for: .agent, primaryKind: .agent)
+    )
+    XCTAssertFalse(
+      SessionCreateCommands.shouldShowExplicitCommand(for: .task, primaryKind: .task)
+    )
+    XCTAssertFalse(
+      SessionCreateCommands.shouldShowExplicitCommand(for: .decision, primaryKind: .decision)
+    )
+    XCTAssertTrue(
+      SessionCreateCommands.shouldShowExplicitCommand(for: .agent, primaryKind: .task)
+    )
+    XCTAssertTrue(
+      SessionCreateCommands.shouldShowExplicitCommand(for: .task, primaryKind: nil)
+    )
+  }
+
   func testGoCommandsUseSessionFocusedNavigationOnly() throws {
     let source = try harnessSourceFile(named: "Commands/GoCommands.swift")
 

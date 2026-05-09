@@ -96,6 +96,7 @@ struct SessionSidebarMultiSelectTests {
     let sidebar = SessionSidebar(
       store: HarnessMonitorStore(daemonController: PreviewDaemonController(mode: .empty)),
       snapshot: nil,
+      sessionCodexRuns: [],
       decisions: [],
       canPresentSearch: true,
       state: state

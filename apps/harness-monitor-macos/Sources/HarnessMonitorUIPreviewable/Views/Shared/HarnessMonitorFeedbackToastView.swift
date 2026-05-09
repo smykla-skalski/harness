@@ -11,25 +11,17 @@ public struct HarnessMonitorFeedbackToastView: View {
   }
 
   public var body: some View {
-    HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.spacingSM) {
-      VStack(alignment: .trailing, spacing: HarnessMonitorTheme.spacingXS) {
-        ForEach(toast.activeFeedback) { feedback in
-          HarnessMonitorFeedbackToastRow(
-            feedback: feedback,
-            toast: toast,
-            detailsInitiallyExpanded: detailsInitiallyExpanded
-          )
-          .transition(
-            .asymmetric(
-              insertion: .move(edge: .top).combined(with: .opacity),
-              removal: .opacity.combined(with: .scale(scale: 0.95))
-            )
-          )
-        }
+    VStack(alignment: .trailing, spacing: HarnessMonitorTheme.spacingXS) {
+      ForEach(toast.activeFeedback) { feedback in
+        HarnessMonitorFeedbackToastRow(
+          feedback: feedback,
+          toast: toast,
+          canUndo: toast.hasUndoAction(id: feedback.id),
+          detailsInitiallyExpanded: detailsInitiallyExpanded
+        )
       }
     }
     .frame(maxWidth: 540, alignment: .trailing)
-    .animation(.spring(duration: 0.25, bounce: 0.18), value: toast.activeFeedback.map(\.id))
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.actionToast)
     .accessibilityFrameMarker(HarnessMonitorAccessibility.actionToastFrame)
@@ -43,6 +35,7 @@ public struct HarnessMonitorFeedbackToastView: View {
 private struct HarnessMonitorFeedbackToastRow: View {
   let feedback: ActionFeedback
   let toast: ToastSlice
+  let canUndo: Bool
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
   @State private var showsDetails: Bool
@@ -53,9 +46,15 @@ private struct HarnessMonitorFeedbackToastRow: View {
   private let dismissThreshold: CGFloat = 80
   private let minimumDragDistance: CGFloat = 10
 
-  init(feedback: ActionFeedback, toast: ToastSlice, detailsInitiallyExpanded: Bool) {
+  init(
+    feedback: ActionFeedback,
+    toast: ToastSlice,
+    canUndo: Bool,
+    detailsInitiallyExpanded: Bool
+  ) {
     self.feedback = feedback
     self.toast = toast
+    self.canUndo = canUndo
     _showsDetails = State(initialValue: detailsInitiallyExpanded)
   }
 
@@ -269,7 +268,7 @@ private struct HarnessMonitorFeedbackToastRow: View {
         .accessibilityIdentifier(HarnessMonitorAccessibility.actionToastDetailsButton)
       }
 
-      if feedback.severity == .undoable, toast.hasUndoAction(id: feedback.id) {
+      if feedback.severity == .undoable, canUndo {
         Button("Undo") {
           toast.invokeUndo(id: feedback.id)
         }
@@ -306,7 +305,7 @@ private struct HarnessMonitorFeedbackToastRow: View {
   private var hasActions: Bool {
     feedback.primaryAction != nil
       || feedback.details != nil
-      || (feedback.severity == .undoable && toast.hasUndoAction(id: feedback.id))
+      || (feedback.severity == .undoable && canUndo)
   }
 
   private var rowAlignment: VerticalAlignment {

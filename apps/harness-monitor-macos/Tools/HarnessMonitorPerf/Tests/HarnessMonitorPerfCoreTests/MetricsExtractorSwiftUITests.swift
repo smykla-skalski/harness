@@ -28,6 +28,27 @@ final class MetricsExtractorSwiftUITests: XCTestCase {
         XCTAssertEqual(result.topGroups[1].label, "Sidebar")
     }
 
+    func testUpdateGroupsDropsCorruptOutlierDurations() throws {
+        let document = try XctraceQueryDocument(path: try fixtureURL("swiftui-update-groups-outlier"))
+        let result = MetricsExtractor.parseSwiftUIUpdateGroups(
+            document,
+            maximumValidDurationNs: 10_000_000_000
+        )
+
+        XCTAssertEqual(result.summary.totalCount, 3)
+        XCTAssertEqual(result.summary.durationNsTotal, 4_000_000)
+        XCTAssertEqual(result.summary.durationNsMax, 3_000_000)
+        XCTAssertEqual(result.summary.durationMsP95, 3.0, accuracy: 0.0001)
+        XCTAssertEqual(result.summary.labelCounts, ["Transaction": 2, "Sidebar": 1])
+
+        XCTAssertEqual(result.topGroups.count, 2)
+        XCTAssertEqual(result.topGroups[0].label, "Sidebar")
+        XCTAssertEqual(result.topGroups[0].durationNs, 3_000_000)
+        XCTAssertEqual(result.topGroups[1].label, "Transaction")
+        XCTAssertEqual(result.topGroups[1].count, 2)
+        XCTAssertEqual(result.topGroups[1].durationNs, 1_000_000)
+    }
+
     func testCausesGroupsBySourceDestinationLabel() throws {
         let document = try XctraceQueryDocument(path: try fixtureURL("swiftui-causes-minimal"))
         let result = MetricsExtractor.parseSwiftUICauses(document)

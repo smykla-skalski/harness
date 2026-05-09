@@ -31,6 +31,19 @@ final class MetricsExtractorTests: XCTestCase {
         XCTAssertEqual(secondRecord["update-type"], "body")
     }
 
+    func testQueryDocumentStripsInvalidXMLScalars() throws {
+        var data = Data("<?xml version=\"1.0\"?><trace-query-result><node><schema><col><mnemonic>label</mnemonic></col></schema><row><string id=\"1\" fmt=\"Bad".utf8)
+        data.append(0x18)
+        data.append(Data("Name\">Bad".utf8))
+        data.append(0x18)
+        data.append(Data("Name</string></row></node></trace-query-result>".utf8))
+
+        let document = try XctraceQueryDocument(data: data)
+        let row = try XCTUnwrap(document.rows.first)
+        let record = document.record(for: row)
+        XCTAssertEqual(record["label"], "BadName")
+    }
+
     func testSwiftUIUpdatesAggregation() throws {
         let document = try XctraceQueryDocument(path: try fixtureURL("swiftui-updates-minimal"))
         let result = MetricsExtractor.parseSwiftUIUpdates(document)

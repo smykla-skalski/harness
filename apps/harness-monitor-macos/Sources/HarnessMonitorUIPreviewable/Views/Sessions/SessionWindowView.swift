@@ -36,19 +36,19 @@ public struct SessionWindowView: View {
   @SceneStorage("session.decisionFilters.query")
   private var persistedDecisionQuery = ""
   @SceneStorage("session.focusMode")
-  var focusMode = false
+  private var focusModeStorage = false
   @SceneStorage("session.inspector.visible")
-  var inspectorVisible = false
+  private var inspectorVisibleStorage = false
   @SceneStorage("session.inspector.preferred")
-  var inspectorPreferred = false
+  private var inspectorPreferredStorage = false
   @SceneStorage("session.inspector.width")
-  var inspectorWidth = 280.0
+  private var inspectorWidthStorage = 280.0
   @SceneStorage("session.sidebarWidth")
-  var sidebarWidth = 220.0
+  private var sidebarWidthStorage = 220.0
   @SceneStorage("session.content-detail.width")
-  var contentColumnWidth = SessionContentDetailSplitLayout.defaultContentWidth
+  private var contentColumnWidthStorage = SessionContentDetailSplitLayout.defaultContentWidth
   @SceneStorage("session.columnVisibility")
-  var columnVisibilityRaw = "automatic"
+  private var columnVisibilityRawStorage = "automatic"
   @AccessibilityFocusState
   private var primaryContentAccessibilityFocused: Bool
   @AppStorage(HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
@@ -86,6 +86,61 @@ public struct SessionWindowView: View {
   var detailColumnWidth: CGFloat {
     get { detailColumnWidthStorage }
     nonmutating set { detailColumnWidthStorage = newValue }
+  }
+
+  var focusMode: Bool {
+    get { focusModeStorage }
+    nonmutating set { focusModeStorage = newValue }
+  }
+
+  var focusModeBinding: Binding<Bool> {
+    $focusModeStorage
+  }
+
+  var inspectorVisible: Bool {
+    get { inspectorVisibleStorage }
+    nonmutating set { inspectorVisibleStorage = newValue }
+  }
+
+  var inspectorVisibleBinding: Binding<Bool> {
+    $inspectorVisibleStorage
+  }
+
+  var inspectorPreferred: Bool {
+    get { inspectorPreferredStorage }
+    nonmutating set { inspectorPreferredStorage = newValue }
+  }
+
+  var inspectorPreferredBinding: Binding<Bool> {
+    $inspectorPreferredStorage
+  }
+
+  var inspectorWidth: Double {
+    get { inspectorWidthStorage }
+    nonmutating set { inspectorWidthStorage = newValue }
+  }
+
+  var inspectorWidthBinding: Binding<Double> {
+    $inspectorWidthStorage
+  }
+
+  var sidebarWidth: Double {
+    get { sidebarWidthStorage }
+    nonmutating set { sidebarWidthStorage = newValue }
+  }
+
+  var contentColumnWidth: Double {
+    get { contentColumnWidthStorage }
+    nonmutating set { contentColumnWidthStorage = newValue }
+  }
+
+  var contentColumnWidthBinding: Binding<Double> {
+    $contentColumnWidthStorage
+  }
+
+  var columnVisibilityRaw: String {
+    get { columnVisibilityRawStorage }
+    nonmutating set { columnVisibilityRawStorage = newValue }
   }
 
   var allSessionDecisionsCache: [Decision] {
@@ -222,8 +277,8 @@ public struct SessionWindowView: View {
     .navigationSubtitle(navigationSubtitleText)
     .onChange(of: focusMode) { _, _ in
       reconcileInspectorVisibility(
-        visibleBinding: $inspectorVisible,
-        preferredBinding: $inspectorPreferred
+        visibleBinding: inspectorVisibleBinding,
+        preferredBinding: inspectorPreferredBinding
       )
     }
     .task(id: snapshotRefreshTrigger) {
@@ -238,8 +293,8 @@ public struct SessionWindowView: View {
     .onChange(of: stateCache.selection) { _, newSelection in
       syncPersistedStorage(from: newSelection)
       reconcileInspectorVisibility(
-        visibleBinding: $inspectorVisible,
-        preferredBinding: $inspectorPreferred
+        visibleBinding: inspectorVisibleBinding,
+        preferredBinding: inspectorPreferredBinding
       )
       detailRenderedSelection = newSelection
       contentRenderedRoute = route(for: newSelection)
@@ -257,8 +312,8 @@ public struct SessionWindowView: View {
     }
     .onChange(of: allSessionDecisions.map(\.id)) { _, _ in
       reconcileInspectorVisibility(
-        visibleBinding: $inspectorVisible,
-        preferredBinding: $inspectorPreferred
+        visibleBinding: inspectorVisibleBinding,
+        preferredBinding: inspectorPreferredBinding
       )
     }
     .focusedSceneValue(\.sessionNavigation, navigationCommand)
@@ -275,10 +330,10 @@ public struct SessionWindowView: View {
   @ToolbarContentBuilder
   private var sessionToolbar: some ToolbarContent {
     SessionWindowToolbar(
+      store: store,
       model: sessionToolbarModel,
-      onToggleSleepPrevention: { store.sleepPreventionEnabled.toggle() },
       state: stateCache,
-      focusMode: $focusMode
+      focusMode: focusModeBinding
     )
   }
 
@@ -394,15 +449,15 @@ public struct SessionWindowView: View {
     hydrateDecisionFiltersFromPersistedStorage()
     await applyPendingSessionRouteIfNeeded()
     reconcileInspectorVisibility(
-      visibleBinding: $inspectorVisible,
-      preferredBinding: $inspectorPreferred,
+      visibleBinding: inspectorVisibleBinding,
+      preferredBinding: inspectorPreferredBinding,
       announce: false
     )
     await loadSnapshot()
     requestPrimaryContentAccessibilityFocus()
     reconcileInspectorVisibility(
-      visibleBinding: $inspectorVisible,
-      preferredBinding: $inspectorPreferred,
+      visibleBinding: inspectorVisibleBinding,
+      preferredBinding: inspectorPreferredBinding,
       announce: false
     )
   }

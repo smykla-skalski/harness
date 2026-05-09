@@ -47,7 +47,7 @@ extension BackgroundThumbnailCache {
     )
     context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
     context.fill(targetRect)
-    context.interpolationQuality = .high
+    context.interpolationQuality = .low
     context.draw(image, in: targetRect)
     return context.makeImage()
   }

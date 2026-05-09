@@ -67,6 +67,10 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       HarnessMonitorAccessibility.settingsLaunchBehaviorPicker
         == "harness.settings.launch-behavior"
     )
+    #expect(
+      HarnessMonitorAccessibility.newCodexAgentSheet
+        == "harness.new-codex-agent.sheet"
+    )
   }
 
   @Test("Session window accessibility identifiers are attached by production views")
