@@ -39,6 +39,7 @@ extension SessionTimelineTableView.Coordinator {
   // budget on heavy variants. Yielding once a chunk has spent this many
   // milliseconds keeps the main-thread block bounded by clock time.
   static let measurementChunkBudgetMs: Double = 12.0
+  static let widthAnimationMeasurementDebounceNs: UInt64 = 120_000_000
   static let signposter = OSSignposter(
     subsystem: "io.harnessmonitor",
     category: "perf"

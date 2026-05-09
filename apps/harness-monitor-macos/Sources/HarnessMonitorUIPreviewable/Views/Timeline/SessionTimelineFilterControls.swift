@@ -5,9 +5,6 @@ struct SessionTimelineFilterControls: View {
   @Binding private var filters: SessionTimelineFilterState
   private let inventory: SessionTimelineFilterInventory
   private let summary: SessionTimelineFilterSummary
-
-  @Environment(\.fontScale)
-  private var fontScale
   @State private var showsAdvancedFilters = false
 
   init(
@@ -88,39 +85,18 @@ struct SessionTimelineFilterControls: View {
   }
 
   private var searchControls: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingXS) {
-        searchField
-        searchAccessoryRow
-      }
-      .frame(
-        minWidth: SessionTimelineFilterControlLayout.horizontalMinimumWidth(
-          fontScale: fontScale
-        ),
-        alignment: .leading
-      )
-
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-        searchField
-        HarnessMonitorWrapLayout(
-          spacing: HarnessMonitorTheme.spacingXS,
-          lineSpacing: HarnessMonitorTheme.spacingXS
-        ) {
-          scopeMenu
-          moreFiltersButton
-          clearFiltersButton
-        }
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      searchField
+      HarnessMonitorWrapLayout(
+        spacing: HarnessMonitorTheme.spacingXS,
+        lineSpacing: HarnessMonitorTheme.spacingXS
+      ) {
+        scopeMenu
+        moreFiltersButton
+        clearFiltersButton
       }
     }
-  }
-
-  private var searchAccessoryRow: some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingXS) {
-      scopeMenu
-      moreFiltersButton
-      clearFiltersButton
-    }
-    .fixedSize(horizontal: true, vertical: false)
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   private var searchField: some View {

@@ -1,3 +1,4 @@
+import Combine
 import HarnessMonitorKit
 import SwiftUI
 
@@ -48,11 +49,10 @@ struct SessionTimelineView: View {
   private var textSizeIndex
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
-  @AppStorage(SessionTimelineFilterDefaults.persistenceModeKey)
-  private var filterPersistenceModeRawValue =
-    SessionTimelineFilterDefaults.defaultPersistenceMode.rawValue
-  @AppStorage(SessionTimelineFilterDefaults.appStateKey)
-  private var appStoredFilterStateRawValue = ""
+  @State private var filterPersistenceModeRawValue =
+    SessionTimelineFilterDefaults.readPersistenceModeRawValue()
+  @State private var appStoredFilterStateRawValue = SessionTimelineFilterDefaults
+    .readAppStateRawValue()
   @SceneStorage(SessionTimelineFilterDefaults.sceneRegistryKey)
   private var sceneStoredFilterRegistryRawValue = ""
   @State private var scrollCommand: SessionTimelineScrollCommand?
@@ -85,6 +85,12 @@ struct SessionTimelineView: View {
       }
       .task(id: filterHydrationInput) {
         hydrateFilters(for: filterHydrationInput)
+      }
+      .onReceive(
+        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+          .receive(on: RunLoop.main)
+      ) { _ in
+        refreshStoredFilterDefaults()
       }
       .onChange(of: filters) { _, newValue in
         persistFilters(newValue)
@@ -130,6 +136,20 @@ struct SessionTimelineView: View {
   private var filterPersistenceMode: SessionTimelineFilterPersistenceMode {
     SessionTimelineFilterPersistenceMode(rawValue: filterPersistenceModeRawValue)
       ?? SessionTimelineFilterDefaults.defaultPersistenceMode
+  }
+
+  private func refreshStoredFilterDefaults(userDefaults: UserDefaults = .standard) {
+    let nextPersistenceModeRawValue = SessionTimelineFilterDefaults
+      .readPersistenceModeRawValue(userDefaults: userDefaults)
+    if filterPersistenceModeRawValue != nextPersistenceModeRawValue {
+      filterPersistenceModeRawValue = nextPersistenceModeRawValue
+    }
+    let nextAppStateRawValue = SessionTimelineFilterDefaults.readAppStateRawValue(
+      userDefaults: userDefaults
+    )
+    if appStoredFilterStateRawValue != nextAppStateRawValue {
+      appStoredFilterStateRawValue = nextAppStateRawValue
+    }
   }
 
   private var routeMetrics: SessionWindowRouteContentMetrics {
