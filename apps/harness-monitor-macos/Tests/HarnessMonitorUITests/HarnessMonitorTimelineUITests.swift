@@ -4,6 +4,63 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
 final class HarnessMonitorTimelineUITests: HarnessMonitorUITestCase {
+  func testTimelineRouteKeepsSidebarFrameAndNavigationAnchoredToTheWindow() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: [
+        "HARNESS_MONITOR_UI_MAIN_WINDOW_WIDTH": "1640",
+        "HARNESS_MONITOR_UI_MAIN_WINDOW_HEIGHT": "980",
+      ]
+    )
+
+    tapPreviewSession(in: app)
+
+    let window = mainWindow(in: app)
+    let sidebarShell = frameElement(in: app, identifier: Accessibility.sidebarShellFrame)
+    let timelineRoute = element(
+      in: app,
+      identifier: Accessibility.sessionWindowRoute("timeline")
+    )
+
+    XCTAssertTrue(waitForElement(window, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(sidebarShell, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(timelineRoute, timeout: Self.actionTimeout))
+
+    let overviewSidebarFrame = sidebarShell.frame
+    XCTAssertTrue(tapElementReliably(in: app, element: timelineRoute))
+
+    let navigation = element(
+      in: app,
+      identifier: Accessibility.sessionTimelineNavigation
+    )
+    XCTAssertTrue(waitForElement(navigation, timeout: Self.actionTimeout))
+
+    let timelineSidebarFrame = sidebarShell.frame
+    let navigationBottomInset = window.frame.maxY - navigation.frame.maxY
+    let diagnostics = """
+      window: \(window.frame)
+      overviewSidebar: \(overviewSidebarFrame)
+      timelineSidebar: \(timelineSidebarFrame)
+      navigation: \(navigation.frame)
+      navigationBottomInset: \(navigationBottomInset)
+      """
+
+    XCTAssertEqual(
+      timelineSidebarFrame.minY,
+      overviewSidebarFrame.minY,
+      accuracy: 2,
+      diagnostics
+    )
+    XCTAssertEqual(
+      timelineSidebarFrame.maxY,
+      overviewSidebarFrame.maxY,
+      accuracy: 2,
+      diagnostics
+    )
+    XCTAssertLessThanOrEqual(timelineSidebarFrame.maxY, window.frame.maxY, diagnostics)
+    XCTAssertLessThan(navigationBottomInset, 220, diagnostics)
+  }
+
   func testTimelineCursorNavigationChangesVisibleEntriesAndResetsAfterSessionSwitch() throws {
     let app = launch(
       mode: "preview",

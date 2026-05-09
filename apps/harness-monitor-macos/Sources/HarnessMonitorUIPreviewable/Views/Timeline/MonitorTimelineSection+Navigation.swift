@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-extension MonitorTimelineSection {
+extension SessionTimelineView {
   // navigationAnchorID is read only from non-body code paths (async Tasks
   // and onChange/onAppear closures). Reading viewport.visibleAnchorID here
   // therefore does NOT register a SwiftUI body dependency on the model and
