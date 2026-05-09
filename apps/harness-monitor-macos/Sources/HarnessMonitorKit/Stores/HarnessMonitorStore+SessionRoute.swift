@@ -1,16 +1,16 @@
 import Foundation
 
 extension HarnessMonitorStore {
-  public struct PendingWorkspaceSelectionRequest: Equatable {
-    public let selection: WorkspaceSelection
+  public struct PendingSessionRouteRequest: Equatable {
+    public let selection: SessionRouteSelection
     public let resetDecisionFilters: Bool
-    public let createEntryPoint: WorkspaceCreateEntryPoint?
+    public let createEntryPoint: SessionRouteCreateEntryPoint?
     public let createSessionID: String?
 
     public init(
-      selection: WorkspaceSelection,
+      selection: SessionRouteSelection,
       resetDecisionFilters: Bool,
-      createEntryPoint: WorkspaceCreateEntryPoint?,
+      createEntryPoint: SessionRouteCreateEntryPoint?,
       createSessionID: String?
     ) {
       self.selection = selection
@@ -20,23 +20,23 @@ extension HarnessMonitorStore {
     }
   }
 
-  public func requestWorkspaceSelection(
-    _ selection: WorkspaceSelection,
+  public func requestSessionRoute(
+    _ selection: SessionRouteSelection,
     resetDecisionFilters: Bool = false,
-    createEntryPoint: WorkspaceCreateEntryPoint? = nil,
+    createEntryPoint: SessionRouteCreateEntryPoint? = nil,
     createSessionID: String? = nil
   ) {
-    pendingWorkspaceSelection = selection
-    pendingWorkspaceDecisionFilterReset = resetDecisionFilters
-    pendingWorkspaceCreateEntryPoint = createEntryPoint
-    pendingWorkspaceCreateSessionID = normalizedWorkspaceSessionID(createSessionID)
+    pendingSessionRoute = selection
+    pendingSessionRouteDecisionFilterReset = resetDecisionFilters
+    pendingSessionRouteCreateEntryPoint = createEntryPoint
+    pendingSessionRouteCreateSessionID = normalizedWorkspaceSessionID(createSessionID)
   }
 
-  public func requestWorkspaceCreateEntryPoint(
-    _ entryPoint: WorkspaceCreateEntryPoint,
+  public func requestSessionRouteCreate(
+    _ entryPoint: SessionRouteCreateEntryPoint,
     sessionID: String? = nil
   ) {
-    requestWorkspaceSelection(
+    requestSessionRoute(
       .create,
       createEntryPoint: entryPoint,
       createSessionID: normalizedWorkspaceSessionID(sessionID)
@@ -52,11 +52,11 @@ extension HarnessMonitorStore {
       ?? normalizedWorkspaceSessionID(selectedSessionSummary?.sessionId)
   }
 
-  public func requestWorkspaceDecisionSelection(
+  public func requestSessionDecisionRoute(
     decisionID: String,
     resetDecisionFilters: Bool = true
   ) {
-    requestWorkspaceSelection(
+    requestSessionRoute(
       .decision(
         sessionID: workspaceSessionID(forDecisionID: decisionID),
         decisionID: decisionID
@@ -65,27 +65,27 @@ extension HarnessMonitorStore {
     )
   }
 
-  public func consumePendingWorkspaceSelection() -> WorkspaceSelection? {
-    consumePendingWorkspaceSelectionRequest()?.selection
+  public func consumePendingSessionRoute() -> SessionRouteSelection? {
+    consumePendingSessionRouteRequest()?.selection
   }
 
-  public func consumePendingWorkspaceSelectionRequest() -> PendingWorkspaceSelectionRequest? {
-    guard let selection = pendingWorkspaceSelection else {
-      pendingWorkspaceDecisionFilterReset = false
-      pendingWorkspaceCreateEntryPoint = nil
-      pendingWorkspaceCreateSessionID = nil
+  public func consumePendingSessionRouteRequest() -> PendingSessionRouteRequest? {
+    guard let selection = pendingSessionRoute else {
+      pendingSessionRouteDecisionFilterReset = false
+      pendingSessionRouteCreateEntryPoint = nil
+      pendingSessionRouteCreateSessionID = nil
       return nil
     }
-    pendingWorkspaceSelection = nil
-    let request = PendingWorkspaceSelectionRequest(
+    pendingSessionRoute = nil
+    let request = PendingSessionRouteRequest(
       selection: selection,
-      resetDecisionFilters: pendingWorkspaceDecisionFilterReset,
-      createEntryPoint: pendingWorkspaceCreateEntryPoint,
-      createSessionID: pendingWorkspaceCreateSessionID
+      resetDecisionFilters: pendingSessionRouteDecisionFilterReset,
+      createEntryPoint: pendingSessionRouteCreateEntryPoint,
+      createSessionID: pendingSessionRouteCreateSessionID
     )
-    pendingWorkspaceDecisionFilterReset = false
-    pendingWorkspaceCreateEntryPoint = nil
-    pendingWorkspaceCreateSessionID = nil
+    pendingSessionRouteDecisionFilterReset = false
+    pendingSessionRouteCreateEntryPoint = nil
+    pendingSessionRouteCreateSessionID = nil
     return request
   }
 

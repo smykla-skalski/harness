@@ -102,7 +102,7 @@ extension HarnessMonitorAccessibility {
   }
 
   public static func codexApprovalButton(_ approvalID: String, decision: String) -> String {
-    "harness.window.workspace.codex.approval.\(slug(approvalID)).\(slug(decision))"
+    "harness.agent.codex.approval.\(slug(approvalID)).\(slug(decision))"
   }
 
   public static func agentTuiTab(_ tuiID: String) -> String {

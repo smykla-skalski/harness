@@ -62,7 +62,7 @@ private struct SidebarCreateMenu: View {
   }
 
   private func openNewAgent() {
-    store.requestWorkspaceCreateEntryPoint(
+    store.requestSessionRouteCreate(
       .agent,
       sessionID: store.selectedSession?.session.sessionId
     )

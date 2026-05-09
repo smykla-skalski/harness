@@ -69,7 +69,7 @@ struct HarnessMonitorMenuBarSnapshot: Equatable {
   }
 
   var attentionBadgeTintLabel: String {
-    WorkspaceAttentionBadgeStyle.tintLabel(for: pendingDecisionSeverity)
+    SessionAttentionBadgeStyle.tintLabel(for: pendingDecisionSeverity)
   }
 
   var attentionBadgeAccessibilityLabel: String {
@@ -329,7 +329,7 @@ struct HarnessMonitorMenuBarExtraContent: View {
     Button(HarnessMonitorMenuBarSnapshot.openWorkspaceLabel) {
       openAppWindow(id: HarnessMonitorWindowID.main)
     }
-    .accessibilityIdentifier(HarnessMonitorAccessibility.menuBarOpenWorkspace)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.menuBarOpenSession)
 
     Button(HarnessMonitorMenuBarSnapshot.openSettingsLabel) {
       openAppWindow(id: HarnessMonitorWindowID.settings)

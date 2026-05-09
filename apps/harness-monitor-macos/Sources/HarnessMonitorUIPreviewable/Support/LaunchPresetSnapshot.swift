@@ -62,7 +62,7 @@ struct LaunchPresetSnapshot: Codable, Sendable, Equatable {
 }
 
 enum LaunchPresetDefaults {
-  static let storageKey = "harness.monitor.workspace.lastLaunchPreset"
+  static let storageKey = "harness.monitor.session.lastLaunchPreset"
 
   static func decode(from raw: String?) -> LaunchPresetSnapshot? {
     guard let raw, let data = raw.data(using: .utf8) else {

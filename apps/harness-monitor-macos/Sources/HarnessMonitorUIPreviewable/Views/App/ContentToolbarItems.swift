@@ -49,7 +49,7 @@ struct ContentPrimaryToolbarItems: ToolbarContent {
     }
     ToolbarSpacer(.fixed, placement: .primaryAction)
     ToolbarItem(placement: .primaryAction) {
-      WorkspaceToolbarButton(store: store, slice: store.supervisorToolbarSlice)
+      SessionAttentionToolbarButton(store: store, slice: store.supervisorToolbarSlice)
     }
   }
 }

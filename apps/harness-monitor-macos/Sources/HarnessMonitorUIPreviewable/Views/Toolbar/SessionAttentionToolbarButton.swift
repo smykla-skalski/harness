@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-public struct WorkspaceToolbarButton: View {
+public struct SessionAttentionToolbarButton: View {
   @Environment(\.openWindow)
   private var openWindow
 
@@ -27,7 +27,7 @@ public struct WorkspaceToolbarButton: View {
       }
     )
     .help(helpText(count: slice.count))
-    .accessibilityIdentifier(HarnessMonitorAccessibility.workspaceToolbarButton)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionAttentionToolbarButton)
     .accessibilityLabel("Session")
     .accessibilityValue(
       attentionAccessibilityValue(count: slice.count, maxSeverity: slice.maxSeverity)
@@ -38,8 +38,8 @@ public struct WorkspaceToolbarButton: View {
   }
 
   private func openSessionWindow(focusesDecisions: Bool) {
-    if focusesDecisions && !WorkspaceSelectionDefaults.hasStoredSelection() {
-      store.requestWorkspaceSelection(
+    if focusesDecisions && !SessionRouteDefaults.hasStoredSelection() {
+      store.requestSessionRoute(
         .decisions(sessionID: store.selectedSessionID),
         resetDecisionFilters: true
       )
@@ -84,7 +84,7 @@ public struct WorkspaceToolbarButton: View {
   }
 
   private func toolbarTint(for severity: DecisionSeverity?) -> Color {
-    WorkspaceAttentionBadgeStyle.badgeColor(for: severity)
+    SessionAttentionBadgeStyle.badgeColor(for: severity)
   }
 
   private func buttonStateLabel(count: Int, maxSeverity: DecisionSeverity?) -> String {
@@ -99,7 +99,7 @@ public struct WorkspaceToolbarButton: View {
   }
 
   private func tintLabel(for severity: DecisionSeverity?) -> String {
-    WorkspaceAttentionBadgeStyle.tintLabel(for: severity)
+    SessionAttentionBadgeStyle.tintLabel(for: severity)
   }
 
   private func attentionAccessibilityValue(count: Int, maxSeverity: DecisionSeverity?) -> String {

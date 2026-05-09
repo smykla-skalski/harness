@@ -1,6 +1,6 @@
 import Foundation
 
-struct WorkspaceDecisionDismissBatchSnapshot: Equatable {
+struct DecisionDismissBatchSnapshot: Equatable {
   let ids: [String]
   let count: Int
   let filterSignature: String
@@ -8,7 +8,7 @@ struct WorkspaceDecisionDismissBatchSnapshot: Equatable {
   let capturedAt: Date
 }
 
-struct WorkspaceDecisionReopenBatchState: Equatable {
+struct DecisionReopenBatchState: Equatable {
   let ids: [String]
   let expiresAt: Date
 }

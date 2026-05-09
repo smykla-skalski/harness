@@ -1,8 +1,8 @@
 import Foundation
 import HarnessMonitorKit
 
-enum WorkspaceSelectionDefaults {
-  static let selectionKey = "HarnessMonitor.Workspace.selection"
+enum SessionRouteDefaults {
+  static let selectionKey = "HarnessMonitor.SessionRoute.selection"
 
   private static let uiTestsEnvironmentKey = "HARNESS_MONITOR_UI_TESTS"
   private enum StorageScope {
@@ -48,23 +48,23 @@ enum WorkspaceSelectionDefaults {
   static func read(
     environment: [String: String] = ProcessInfo.processInfo.environment,
     defaults: UserDefaults = .standard
-  ) -> WorkspaceSelection? {
+  ) -> SessionRouteSelection? {
     guard
       let data = defaults.data(forKey: scopedSelectionKey(environment: environment)),
-      let storedSelection = try? JSONDecoder().decode(StoredWorkspaceSelection.self, from: data)
+      let storedSelection = try? JSONDecoder().decode(StoredSessionRoute.self, from: data)
     else {
       return nil
     }
-    return storedSelection.workspaceSelection
+    return storedSelection.sessionRoute
   }
 
   static func write(
-    _ selection: WorkspaceSelection,
+    _ selection: SessionRouteSelection,
     environment: [String: String] = ProcessInfo.processInfo.environment,
     defaults: UserDefaults = .standard
   ) {
     guard
-      let data = try? JSONEncoder().encode(StoredWorkspaceSelection(workspaceSelection: selection))
+      let data = try? JSONEncoder().encode(StoredSessionRoute(sessionRoute: selection))
     else {
       return
     }
@@ -79,7 +79,7 @@ enum WorkspaceSelectionDefaults {
   }
 }
 
-private struct StoredWorkspaceSelection: Codable {
+private struct StoredSessionRoute: Codable {
   enum Kind: String, Codable {
     case create
     case decisions
@@ -94,8 +94,8 @@ private struct StoredWorkspaceSelection: Codable {
   let sessionID: String?
   let itemID: String?
 
-  init(workspaceSelection: WorkspaceSelection) {
-    switch workspaceSelection {
+  init(sessionRoute: SessionRouteSelection) {
+    switch sessionRoute {
     case .create:
       kind = .create
       sessionID = nil
@@ -127,8 +127,8 @@ private struct StoredWorkspaceSelection: Codable {
     }
   }
 
-  var workspaceSelection: WorkspaceSelection? {
-    let selection: WorkspaceSelection
+  var sessionRoute: SessionRouteSelection? {
+    let selection: SessionRouteSelection
 
     switch kind {
     case .create:

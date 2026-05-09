@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-public enum WorkspaceAttentionBadgeStyle {
+public enum SessionAttentionBadgeStyle {
   public static func badgeColor(for severity: DecisionSeverity?) -> Color {
     switch severity {
     case .none, .info:

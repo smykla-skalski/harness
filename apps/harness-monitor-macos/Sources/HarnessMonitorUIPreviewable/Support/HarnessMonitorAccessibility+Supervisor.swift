@@ -1,9 +1,9 @@
 import Foundation
 
 extension HarnessMonitorAccessibility {
-  public static let workspaceToolbarButton = "harness.toolbar.workspace"
-  public static let workspaceToolbarButtonState = "harness.toolbar.workspace.state"
-  public static let workspaceToolbarForceTick = "harness.toolbar.workspace.force-tick"
+  public static let sessionAttentionToolbarButton = "harness.toolbar.session-attention"
+  public static let sessionAttentionToolbarButtonState = "harness.toolbar.session-attention.state"
+  public static let sessionAttentionToolbarForceTick = "harness.toolbar.session-attention.force-tick"
   public static let decisionsSidebar = "harness.decisions.sidebar"
   public static let decisionDetail = "harness.decisions.detail"
   public static let decisionDetailScrollView = "harness.decisions.detail.scroll"
@@ -38,8 +38,8 @@ extension HarnessMonitorAccessibility {
   public static let acpPermissionModal = "harness.acp-permission.modal"
   public static let acpPermissionModalSelectionSummary =
     "harness.acp-permission.selection-summary"
-  public static let acpPermissionModalOpenWorkspace =
-    "harness.acp-permission.open-workspace"
+  public static let acpPermissionModalOpenDecisions =
+    "harness.acp-permission.open-decisions"
   public static let acpPermissionModalClose = "harness.acp-permission.close"
 
   public static func decisionRow(_ id: String) -> String {

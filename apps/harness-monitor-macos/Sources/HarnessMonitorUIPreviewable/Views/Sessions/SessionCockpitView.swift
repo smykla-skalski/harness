@@ -37,14 +37,14 @@ struct SessionCockpitView: View {
   }
 
   private func openAgent(_ agentID: String) {
-    store.requestWorkspaceSelection(
+    store.requestSessionRoute(
       .agent(sessionID: detail.session.sessionId, agentID: agentID)
     )
     openWindow.openHarnessSessionWindow(sessionID: detail.session.sessionId)
   }
 
   private func focusObserver() {
-    store.requestWorkspaceSelection(
+    store.requestSessionRoute(
       .decisions(sessionID: detail.session.sessionId),
       resetDecisionFilters: true
     )

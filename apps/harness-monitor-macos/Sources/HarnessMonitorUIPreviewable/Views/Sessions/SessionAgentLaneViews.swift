@@ -245,7 +245,7 @@ struct SessionAgentListSection: View {
   }
 
   private func openNewAgent() {
-    store.requestWorkspaceCreateEntryPoint(.agent, sessionID: sessionID)
+    store.requestSessionRouteCreate(.agent, sessionID: sessionID)
     openWindow.openHarnessSessionWindow(sessionID: sessionID)
   }
 }

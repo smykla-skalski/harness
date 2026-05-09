@@ -218,6 +218,7 @@ private struct SessionDecisionAttentionBanner: View {
       if let selectDecisions {
         Button("Review", action: selectDecisions)
           .harnessActionButtonStyle(variant: .bordered, tint: nil)
+          .harnessNativeFormControl()
           .frame(minHeight: metrics.reviewButtonMinHeight)
           .accessibilityLabel("Review pending decisions")
       }

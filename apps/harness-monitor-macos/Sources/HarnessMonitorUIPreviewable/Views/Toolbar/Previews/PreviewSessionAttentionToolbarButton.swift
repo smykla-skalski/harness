@@ -2,7 +2,7 @@ import HarnessMonitorKit
 import SwiftUI
 
 #Preview("Workspace Toolbar Button — empty") {
-  WorkspaceToolbarButton(
+  SessionAttentionToolbarButton(
     store: HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded),
     slice: SupervisorToolbarSlice()
   )

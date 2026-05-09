@@ -6,16 +6,16 @@ public struct DecisionDeskPreviewView: View {
 
   @State private var selection: String?
   @State private var detailTab: DecisionDetailTab = .context
-  @State private var runtime = WorkspaceDecisionRuntime()
+  @State private var runtime = DecisionRuntime()
   @State private var sidebarFilters = DecisionsSidebarViewModel.FilterState(
     query: "",
     severities: [],
     scope: .summary
   )
   @State private var dismissAllVisibleDraft = ""
-  @State private var pendingDismissBatch: WorkspaceDecisionDismissBatchSnapshot?
+  @State private var pendingDismissBatch: DecisionDismissBatchSnapshot?
   @State private var showDismissAllVisibleConfirmation = false
-  @State private var reopenBatch: WorkspaceDecisionReopenBatchState?
+  @State private var reopenBatch: DecisionReopenBatchState?
 
   @State private var inspectorVisible = false
 
@@ -322,7 +322,7 @@ public struct DecisionDeskPreviewView: View {
     guard !ids.isEmpty else {
       return
     }
-    pendingDismissBatch = WorkspaceDecisionDismissBatchSnapshot(
+    pendingDismissBatch = DecisionDismissBatchSnapshot(
       ids: ids,
       count: ids.count,
       filterSignature: visibleSnapshot.signature,
@@ -361,7 +361,7 @@ public struct DecisionDeskPreviewView: View {
     for id in snapshot.ids {
       await handler.dismiss(decisionID: id)
     }
-    reopenBatch = WorkspaceDecisionReopenBatchState(
+    reopenBatch = DecisionReopenBatchState(
       ids: snapshot.ids,
       expiresAt: Date().addingTimeInterval(15)
     )
@@ -369,7 +369,7 @@ public struct DecisionDeskPreviewView: View {
     dismissAllVisibleDraft = ""
   }
 
-  private func reopenDismissedBatch(_ batch: WorkspaceDecisionReopenBatchState) async {
+  private func reopenDismissedBatch(_ batch: DecisionReopenBatchState) async {
     guard Date() <= batch.expiresAt else {
       store?.presentFailureFeedback("Recovery window expired.")
       reopenBatch = nil

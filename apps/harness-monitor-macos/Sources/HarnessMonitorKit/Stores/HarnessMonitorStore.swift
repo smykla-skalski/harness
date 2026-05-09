@@ -54,10 +54,10 @@ public final class HarnessMonitorStore {
       scheduleUISync([.contentShell])
     }
   }
-  public var pendingWorkspaceSelection: WorkspaceSelection?
-  var pendingWorkspaceDecisionFilterReset = false
-  var pendingWorkspaceCreateEntryPoint: WorkspaceCreateEntryPoint?
-  var pendingWorkspaceCreateSessionID: String?
+  public var pendingSessionRoute: SessionRouteSelection?
+  var pendingSessionRouteDecisionFilterReset = false
+  var pendingSessionRouteCreateEntryPoint: SessionRouteCreateEntryPoint?
+  var pendingSessionRouteCreateSessionID: String?
   public var hostBridgeCapabilityIssues: [String: HostBridgeCapabilityIssue] = [:]
   public var acpBridgeHTTPIncident: AcpBridgeHTTPIncident? {
     didSet {

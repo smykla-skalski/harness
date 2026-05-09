@@ -21,8 +21,8 @@ extension HarnessMonitorStore {
     cancelPendingListSelection()
     cancelSessionPushFallback(for: sessionID)
     cancelSelectedSessionRefreshFallback(for: sessionID)
-    if pendingWorkspaceCreateSessionID == sessionID {
-      pendingWorkspaceCreateSessionID = nil
+    if pendingSessionRouteCreateSessionID == sessionID {
+      pendingSessionRouteCreateSessionID = nil
     }
 
     if clearsPresentation {

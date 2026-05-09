@@ -49,8 +49,8 @@ extension RecordingTriage {
       "harness.banner.arbitration.\(slug(taskID))"
     }
 
-    public static func workspaceTaskSelection(_ taskID: String) -> String {
-      "harness.workspace.task.selection.\(slug(taskID))"
+    public static func sessionTaskSelection(_ taskID: String) -> String {
+      "harness.session.task.selection.\(slug(taskID))"
     }
   }
 }
