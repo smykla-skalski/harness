@@ -51,11 +51,11 @@ base64 = "0.22.1"
 futures-util = "0.3.31"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["chrono", "env-filter", "json"] }
-opentelemetry = { version = "0.31.0", default-features = false, features = ["trace", "metrics", "logs"] }
-opentelemetry_sdk = { version = "0.31.0", default-features = false, features = ["trace", "metrics", "logs", "rt-tokio"] }
-opentelemetry-otlp = { version = "0.31.1", default-features = false, features = ["trace", "metrics", "logs", "grpc-tonic", "http-proto", "reqwest-client"] }
+opentelemetry = { version = "0.32.0", default-features = false, features = ["trace", "metrics", "logs"] }
+opentelemetry_sdk = { version = "0.32.0", default-features = false, features = ["trace", "metrics", "logs", "rt-tokio"] }
+opentelemetry-otlp = { version = "0.32.0", default-features = false, features = ["trace", "metrics", "logs", "grpc-tonic", "http-proto", "reqwest-client"] }
 tracing-opentelemetry = { version = "0.32.1", default-features = false }
-opentelemetry-appender-tracing = "0.31.1"
+opentelemetry-appender-tracing = "0.32.0"
 tonic = { version = "0.14.1", default-features = false }
 pyroscope = { version = "2.0.0", features = ["backend-pprof-rs"] }
 fs2 = "0.4.3"
