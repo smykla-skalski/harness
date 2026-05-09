@@ -14,7 +14,7 @@ struct SessionTaskDetailPane: View {
   var body: some View {
     SessionDetailScrollSurface(contentPadding: metrics.contentPadding) {
       Form {
-        Section("Task") {
+        Section {
           LabeledContent("Title", value: task.title)
           LabeledContent("Status", value: task.status.title)
           LabeledContent("Severity", value: task.severity.title)
@@ -24,41 +24,56 @@ struct SessionTaskDetailPane: View {
           Button("Task Actions", action: openActions)
             .harnessNativeFormControl()
             .accessibilityHint("Opens assignment, status, and checkpoint actions for this task")
+        } header: {
+          Text("Task")
+            .harnessNativeFormSectionHeader()
         }
 
         if let context = task.context, !context.isEmpty {
-          Section("Context") {
+          Section {
             detailText(context)
+          } header: {
+            Text("Context")
+              .harnessNativeFormSectionHeader()
           }
         }
 
         if let suggestedFix = task.suggestedFix, !suggestedFix.isEmpty {
-          Section("Suggested Fix") {
+          Section {
             detailText(suggestedFix)
+          } header: {
+            Text("Suggested Fix")
+              .harnessNativeFormSectionHeader()
           }
         }
 
-        Section("Timing") {
+        Section {
           LabeledContent("Created", value: task.createdAt)
           LabeledContent("Updated", value: task.updatedAt)
           if let completedAt = task.completedAt {
             LabeledContent("Completed", value: completedAt)
           }
+        } header: {
+          Text("Timing")
+            .harnessNativeFormSectionHeader()
         }
 
         if let checkpoint = task.checkpointSummary {
-          Section("Latest Checkpoint") {
+          Section {
             LabeledContent("Progress", value: "\(checkpoint.progress)%")
             LabeledContent("Recorded", value: checkpoint.recordedAt)
             if let actorID = checkpoint.actorId {
               LabeledContent("Actor", value: actorID)
             }
             detailText(checkpoint.summary)
+          } header: {
+            Text("Latest Checkpoint")
+              .harnessNativeFormSectionHeader()
           }
         }
 
         if !task.notes.isEmpty {
-          Section("Notes") {
+          Section {
             ForEach(task.notes) { note in
               VStack(alignment: .leading, spacing: metrics.noteSpacing) {
                 detailText(note.text)
@@ -72,11 +87,14 @@ struct SessionTaskDetailPane: View {
                 .foregroundStyle(.secondary)
               }
             }
+          } header: {
+            Text("Notes")
+              .harnessNativeFormSectionHeader()
           }
         }
 
         if task.reviewRound > 0 || task.awaitingReview != nil || task.reviewClaim != nil {
-          Section("Review") {
+          Section {
             LabeledContent("Round", value: "\(task.reviewRound)")
             if let awaitingReview = task.awaitingReview {
               LabeledContent("Submitter", value: awaitingReview.submitterAgentId)
@@ -88,19 +106,25 @@ struct SessionTaskDetailPane: View {
             if let reviewClaim = task.reviewClaim {
               LabeledContent("Reviewers", value: "\(reviewClaim.reviewers.count)")
             }
+          } header: {
+            Text("Review")
+              .harnessNativeFormSectionHeader()
           }
         }
 
         if let arbitration = task.arbitration {
-          Section("Arbitration") {
+          Section {
             LabeledContent("Arbiter", value: arbitration.arbiterAgentId)
             LabeledContent("Verdict", value: arbitration.verdict.title)
             LabeledContent("Recorded", value: arbitration.recordedAt)
             detailText(arbitration.summary)
+          } header: {
+            Text("Arbitration")
+              .harnessNativeFormSectionHeader()
           }
         }
       }
-      .formStyle(.grouped)
+      .harnessNativeFormContainer()
       .scrollDisabled(true)
       .scrollContentBackground(.hidden)
     }

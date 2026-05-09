@@ -164,6 +164,20 @@ private struct HarnessMonitorNativeTextFieldModifier: ViewModifier {
   }
 }
 
+private struct HarnessMonitorNativeFormSectionHeaderModifier: ViewModifier {
+  func body(content: Content) -> some View {
+    content
+      .scaledFont(.caption.weight(.semibold))
+      .accessibilityAddTraits(.isHeader)
+  }
+}
+
+private struct HarnessMonitorNativeFormSectionFooterModifier: ViewModifier {
+  func body(content: Content) -> some View {
+    content.scaledFont(.caption)
+  }
+}
+
 private struct HarnessMonitorFormContainerModifier: ViewModifier {
   @Environment(\.fontScale)
   private var scale
@@ -191,6 +205,14 @@ extension View {
 
   public func harnessNativeTextField() -> some View {
     modifier(HarnessMonitorNativeTextFieldModifier())
+  }
+
+  public func harnessNativeFormSectionHeader() -> some View {
+    modifier(HarnessMonitorNativeFormSectionHeaderModifier())
+  }
+
+  public func harnessNativeFormSectionFooter() -> some View {
+    modifier(HarnessMonitorNativeFormSectionFooterModifier())
   }
 
   public func harnessNativeFormContainer() -> some View {

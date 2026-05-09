@@ -8,7 +8,7 @@ struct SessionWindowCreateFormCodexFields: View {
   @Binding var allowCustomModel: Bool
 
   var body: some View {
-    Section("Codex Run") {
+    Section {
       Picker("Mode", selection: $mode) {
         ForEach(CodexRunMode.allCases) { mode in
           Text(mode.title).tag(mode)
@@ -28,6 +28,9 @@ struct SessionWindowCreateFormCodexFields: View {
 
       Toggle("Allow custom model", isOn: $allowCustomModel)
         .accessibilityLabel("Allow custom Codex model")
+    } header: {
+      Text("Codex Run")
+        .harnessNativeFormSectionHeader()
     }
   }
 }

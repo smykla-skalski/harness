@@ -27,7 +27,7 @@ public struct SettingsConnectionSection: View {
 
   public var body: some View {
     Form {
-      Section("Actions") {
+      Section {
         HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
           HarnessMonitorWrapLayout(
             spacing: HarnessMonitorTheme.itemSpacing,
@@ -55,6 +55,9 @@ public struct SettingsConnectionSection: View {
             )
           }
         }
+      } header: {
+        Text("Actions")
+          .harnessNativeFormSectionHeader()
       }
       SettingsConnectionMetrics(
         metrics: metrics,

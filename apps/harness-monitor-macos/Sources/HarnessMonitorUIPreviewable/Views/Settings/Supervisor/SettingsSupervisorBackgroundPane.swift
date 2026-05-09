@@ -24,7 +24,7 @@ public struct SettingsSupervisorBackgroundPane: View {
 
   public var body: some View {
     Form {
-      Section("Background Activity") {
+      Section {
         Toggle(
           "Run supervisor in background",
           isOn: Binding(
@@ -37,6 +37,9 @@ public struct SettingsSupervisorBackgroundPane: View {
         )
         .scaledFont(.caption)
         .foregroundStyle(.secondary)
+      } header: {
+        Text("Background Activity")
+          .harnessNativeFormSectionHeader()
       }
 
       Section {
@@ -76,8 +79,10 @@ public struct SettingsSupervisorBackgroundPane: View {
         }
       } header: {
         Text("Quiet Hours")
+          .harnessNativeFormSectionHeader()
       } footer: {
         Text("Quiet hours use the current local clock and support overnight ranges.")
+          .harnessNativeFormSectionFooter()
       }
     }
     .settingsDetailFormStyle()

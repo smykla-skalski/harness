@@ -32,7 +32,7 @@ struct SettingsPathsSection: View {
   let paths: SettingsDiagnosticsPaths
 
   var body: some View {
-    Section("Paths") {
+    Section {
       if let domain = paths.launchAgentDomain, !domain.isEmpty {
         pathRow("Launchd Domain", value: domain)
       }
@@ -44,6 +44,9 @@ struct SettingsPathsSection: View {
       pathRow("Auth Token", value: paths.authTokenPath)
       pathRow("Events Log", value: paths.eventsPath)
       pathRow("Database", value: paths.databasePath)
+    } header: {
+      Text("Paths")
+        .harnessNativeFormSectionHeader()
     }
   }
 

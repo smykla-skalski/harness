@@ -21,45 +21,48 @@ struct SessionDecisionDetailPane: View {
         if showsFilteredNotice, let filters {
           SessionFilteredDecisionNotice(filters: filters)
         }
-        SessionDetailPanel(title: "Decision") {
-          SessionDetailFactsGrid(facts: summaryFacts)
-        }
-        SessionDetailPanel(title: "Routing") {
-          SessionDetailFactsGrid(facts: routingFacts)
-        }
-        if !decision.suggestedActionsJSON.isEmpty {
-          SessionDetailPanel(title: "Suggested Actions") {
-            HarnessMonitorJSONCodeBlock(
-              rawJSON: decision.suggestedActionsJSON,
-              chrome: .plain,
-              wrapLongLines: true
-            )
+        Form {
+          Section {
+            LabeledContent("Summary", value: decision.summary)
+            LabeledContent("Severity", value: decision.severityRaw)
+            LabeledContent("Status", value: decision.statusRaw)
+          } header: {
+            Text("Decision")
+              .harnessNativeFormSectionHeader()
+          }
+
+          Section {
+            LabeledContent("Rule", value: decision.ruleID)
+            if let agentID = decision.agentID {
+              LabeledContent("Agent", value: agentID)
+            }
+            if let taskID = decision.taskID {
+              LabeledContent("Task", value: taskID)
+            }
+          } header: {
+            Text("Routing")
+              .harnessNativeFormSectionHeader()
+          }
+
+          if !decision.suggestedActionsJSON.isEmpty {
+            Section {
+              HarnessMonitorJSONCodeBlock(
+                rawJSON: decision.suggestedActionsJSON,
+                chrome: .plain,
+                wrapLongLines: true
+              )
+            } header: {
+              Text("Suggested Actions")
+                .harnessNativeFormSectionHeader()
+            }
           }
         }
+        .harnessNativeFormContainer()
+        .scrollDisabled(true)
+        .scrollContentBackground(.hidden)
       }
     }
     .dynamicTypeSize(.xSmall ... .accessibility5)
-  }
-
-  private var summaryFacts: [SessionDetailFact] {
-    [
-      .init("Summary", value: decision.summary),
-      .init("Severity", value: decision.severityRaw),
-      .init("Status", value: decision.statusRaw),
-    ]
-  }
-
-  private var routingFacts: [SessionDetailFact] {
-    var facts: [SessionDetailFact] = [
-      .init("Rule", value: decision.ruleID)
-    ]
-    if let agentID = decision.agentID {
-      facts.append(.init("Agent", value: agentID))
-    }
-    if let taskID = decision.taskID {
-      facts.append(.init("Task", value: taskID))
-    }
-    return facts
   }
 }
 

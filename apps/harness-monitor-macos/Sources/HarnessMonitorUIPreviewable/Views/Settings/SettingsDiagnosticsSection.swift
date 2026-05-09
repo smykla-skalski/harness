@@ -145,7 +145,7 @@ private struct SettingsAcpPermissionLogSection: View {
 
   @ViewBuilder var body: some View {
     if !runs.isEmpty {
-      Section("ACP Permission Logs") {
+      Section {
         ForEach(runs) { run in
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
             HarnessMonitorActionButton(
@@ -185,6 +185,9 @@ private struct SettingsAcpPermissionLogSection: View {
             }
           }
         }
+      } header: {
+        Text("ACP Permission Logs")
+          .harnessNativeFormSectionHeader()
       }
     }
   }
