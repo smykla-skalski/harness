@@ -74,10 +74,33 @@ extension HarnessMonitorStore {
     guard !hasBootstrapped else {
       return
     }
-    hasBootstrapped = true
-    refreshBookmarkedSessionIds()
-    await refreshPersistedSessionMetadata()
-    await bootstrap()
+    if let bootstrapTask {
+      await bootstrapTask.value
+      return
+    }
+
+    // SessionWindowView refreshes via `.task(id:)`, and the trigger includes
+    // connection state. Bootstrap flips that state to `.connecting`, so the
+    // originating SwiftUI task can be cancelled mid-warm-up. Keep the actual
+    // bootstrap owned by the store so a restarted view task can await the same
+    // in-flight work instead of permanently orphaning startup.
+    let bootstrapTask = Task { @MainActor [weak self] in
+      guard let self else {
+        return
+      }
+      defer {
+        self.bootstrapTask = nil
+      }
+      guard self.hasBootstrapped == false else {
+        return
+      }
+      self.refreshBookmarkedSessionIds()
+      await self.refreshPersistedSessionMetadata()
+      await self.bootstrap()
+      self.hasBootstrapped = true
+    }
+    self.bootstrapTask = bootstrapTask
+    await bootstrapTask.value
   }
 
   public func bootstrap() async {

@@ -88,9 +88,25 @@ struct SessionAgentDetailSection: View {
     SessionAgentDetailSectionMetrics(fontScale: fontScale)
   }
 
+  private var acpRuntimeState: AcpAgentRuntimeState? {
+    store.acpRuntimeState(for: agent.agentId)
+  }
+
+  private var acpRuntimeInspectStatus: AcpRuntimeInspectStatus? {
+    store.acpRuntimeInspectStatus(for: agent.agentId)
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
       header
+      if let runtimeState = acpRuntimeState, let inspectStatus = acpRuntimeInspectStatus {
+        AcpRuntimeView(
+          store: store,
+          runtimeState: runtimeState,
+          inspectStatus: inspectStatus,
+          presentation: .compact
+        )
+      }
       if let error = tui?.error, !error.isEmpty {
         SessionAgentTuiErrorBanner(message: error)
       }
