@@ -32,7 +32,8 @@ struct SessionWindowRootView: View {
       windowCommandRouting: windowCommandRouting,
       mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
       themeMode: $themeMode,
-      appliesPreferredColorScheme: true
+      appliesPreferredColorScheme: true,
+      toast: store.toast
     ) {
       SessionWindowView(store: store, token: token)
     }
