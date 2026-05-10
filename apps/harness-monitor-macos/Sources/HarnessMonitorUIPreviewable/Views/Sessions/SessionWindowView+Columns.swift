@@ -60,10 +60,6 @@ extension SessionWindowView {
     return prompt
   }
 
-  var sessionSidebarSearchAvailable: Bool {
-    !focusMode && columnVisibilityBinding.wrappedValue != .detailOnly
-  }
-
   var decisionsCacheTrigger: SessionDecisionFilterKey {
     SessionDecisionFilterKey(
       sessionID: token.sessionID,
@@ -192,7 +188,6 @@ extension SessionWindowView {
         snapshot: snapshot,
         sessionCodexRuns: sessionCodexRuns,
         decisions: matchingDecisions,
-        canPresentSearch: sessionSidebarSearchAvailable,
         state: stateCache
       )
       .navigationSplitViewColumnWidth(min: 190, ideal: sidebarWidth, max: 360)
