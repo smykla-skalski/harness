@@ -44,6 +44,10 @@ private struct SessionWindowTabbingAccessor: NSViewRepresentable {
     nsView.configuration = configuration
     nsView.scheduleWindowTabbingApplication()
   }
+
+  static func dismantleNSView(_ nsView: AccessorView, coordinator: ()) {
+    nsView.cancelWindowTabbingUpdates()
+  }
 }
 
 private final class AccessorView: NSView {
@@ -72,12 +76,7 @@ private final class AccessorView: NSView {
 
   override func viewWillMove(toWindow newWindow: NSWindow?) {
     super.viewWillMove(toWindow: newWindow)
-    pendingTabbingTask?.cancel()
-    tearDownWindowObservers()
-  }
-
-  deinit {
-    tearDownWindowObservers()
+    cancelWindowTabbingUpdates()
   }
 
   private func registerWindowObservers() {
@@ -113,6 +112,11 @@ private final class AccessorView: NSView {
       await Task.yield()
       self?.applyWindowTabbing()
     }
+  }
+
+  func cancelWindowTabbingUpdates() {
+    pendingTabbingTask?.cancel()
+    tearDownWindowObservers()
   }
 
   func applyWindowTabbing() {
