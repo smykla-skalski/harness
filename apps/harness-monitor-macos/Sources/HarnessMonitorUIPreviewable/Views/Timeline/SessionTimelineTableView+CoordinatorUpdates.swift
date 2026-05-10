@@ -141,7 +141,6 @@ extension SessionTimelineTableView.Coordinator {
     rowSnapshot = nextSnapshot
     performWithoutTableAnimation {
       tableView.reloadData()
-      tableView.layoutSubtreeIfNeeded()
     }
     persistHeightCache()
 

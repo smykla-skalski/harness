@@ -184,10 +184,11 @@ struct SessionTimelineFilterSnapshot: Equatable, Sendable {
     filters: SessionTimelineFilterState,
     configuration: HarnessMonitorDateTimeConfiguration
   ) {
+    let matcher = SessionTimelineFilterMatcher(filters: filters)
     sourceNodeCount = sourceNodes.count
-    inventory = SessionTimelineFilterInventory(nodes: sourceNodes, filters: filters)
+    inventory = SessionTimelineFilterInventory(nodes: sourceNodes, matcher: matcher)
     let filteredNodes = sourceNodes.filter { node in
-      Self.matches(node: node, filters: filters)
+      matcher.matches(node)
     }
     filteredNodeCount = filteredNodes.count
     nodes = filteredNodes
@@ -203,39 +204,137 @@ struct SessionTimelineFilterSnapshot: Equatable, Sendable {
     node: SessionTimelineNode,
     filters: SessionTimelineFilterState
   ) -> Bool {
-    guard matches(filters.tones, value: node.eventTone) else {
-      return false
-    }
-    guard matches(filters.eventTypes, value: node.entryKind) else {
-      return false
-    }
-    guard matches(filters.agents, value: node.agentID) else {
-      return false
-    }
-    guard matches(filters.tasks, value: node.taskID) else {
-      return false
-    }
-    guard matches(filters.decisionSeverities, value: node.decision?.severity.rawValue) else {
-      return false
-    }
-    guard matchesAny(filters.semanticProperties, values: node.semanticProperties) else {
-      return false
-    }
-    guard matchesAny(filters.rawPayloadKeys, values: node.rawPayloadKeys) else {
-      return false
-    }
-    let trimmedQuery = filters.trimmedQuery
-    if !trimmedQuery.isEmpty {
-      return node.matches(query: trimmedQuery, scope: filters.searchScope)
-    }
-    return true
+    SessionTimelineFilterMatcher(filters: filters).matches(node)
+  }
+}
+
+struct SessionTimelineFilterMatcher {
+  let filters: SessionTimelineFilterState
+  private let trimmedQuery: String
+
+  init(filters: SessionTimelineFilterState) {
+    self.filters = filters
+    trimmedQuery = filters.trimmedQuery
   }
 
-  private static func matches<T: Hashable>(_ selected: Set<T>, value: T?) -> Bool {
+  func matches(_ node: SessionTimelineNode) -> Bool {
+    matchesTone(node)
+      && matchesEventType(node)
+      && matchesAgent(node)
+      && matchesTask(node)
+      && matchesDecisionSeverity(node)
+      && matchesSemanticProperties(node)
+      && matchesRawPayloadKeys(node)
+      && matchesQuery(node)
+  }
+
+  func matchesExcludingTone(_ node: SessionTimelineNode) -> Bool {
+    matchesEventType(node)
+      && matchesAgent(node)
+      && matchesTask(node)
+      && matchesDecisionSeverity(node)
+      && matchesSemanticProperties(node)
+      && matchesRawPayloadKeys(node)
+      && matchesQuery(node)
+  }
+
+  func matchesExcludingEventType(_ node: SessionTimelineNode) -> Bool {
+    matchesTone(node)
+      && matchesAgent(node)
+      && matchesTask(node)
+      && matchesDecisionSeverity(node)
+      && matchesSemanticProperties(node)
+      && matchesRawPayloadKeys(node)
+      && matchesQuery(node)
+  }
+
+  func matchesExcludingAgent(_ node: SessionTimelineNode) -> Bool {
+    matchesTone(node)
+      && matchesEventType(node)
+      && matchesTask(node)
+      && matchesDecisionSeverity(node)
+      && matchesSemanticProperties(node)
+      && matchesRawPayloadKeys(node)
+      && matchesQuery(node)
+  }
+
+  func matchesExcludingTask(_ node: SessionTimelineNode) -> Bool {
+    matchesTone(node)
+      && matchesEventType(node)
+      && matchesAgent(node)
+      && matchesDecisionSeverity(node)
+      && matchesSemanticProperties(node)
+      && matchesRawPayloadKeys(node)
+      && matchesQuery(node)
+  }
+
+  func matchesExcludingDecisionSeverity(_ node: SessionTimelineNode) -> Bool {
+    matchesTone(node)
+      && matchesEventType(node)
+      && matchesAgent(node)
+      && matchesTask(node)
+      && matchesSemanticProperties(node)
+      && matchesRawPayloadKeys(node)
+      && matchesQuery(node)
+  }
+
+  func matchesExcludingSemanticProperties(_ node: SessionTimelineNode) -> Bool {
+    matchesTone(node)
+      && matchesEventType(node)
+      && matchesAgent(node)
+      && matchesTask(node)
+      && matchesDecisionSeverity(node)
+      && matchesRawPayloadKeys(node)
+      && matchesQuery(node)
+  }
+
+  func matchesExcludingRawPayloadKeys(_ node: SessionTimelineNode) -> Bool {
+    matchesTone(node)
+      && matchesEventType(node)
+      && matchesAgent(node)
+      && matchesTask(node)
+      && matchesDecisionSeverity(node)
+      && matchesSemanticProperties(node)
+      && matchesQuery(node)
+  }
+
+  private func matchesTone(_ node: SessionTimelineNode) -> Bool {
+    matches(filters.tones, value: node.eventTone)
+  }
+
+  private func matchesEventType(_ node: SessionTimelineNode) -> Bool {
+    matches(filters.eventTypes, value: node.entryKind)
+  }
+
+  private func matchesAgent(_ node: SessionTimelineNode) -> Bool {
+    matches(filters.agents, value: node.agentID)
+  }
+
+  private func matchesTask(_ node: SessionTimelineNode) -> Bool {
+    matches(filters.tasks, value: node.taskID)
+  }
+
+  private func matchesDecisionSeverity(_ node: SessionTimelineNode) -> Bool {
+    matches(filters.decisionSeverities, value: node.decision?.severity.rawValue)
+  }
+
+  private func matchesSemanticProperties(_ node: SessionTimelineNode) -> Bool {
+    matchesAny(filters.semanticProperties, values: node.semanticProperties)
+  }
+
+  private func matchesRawPayloadKeys(_ node: SessionTimelineNode) -> Bool {
+    matchesAny(filters.rawPayloadKeys, values: node.rawPayloadKeys)
+  }
+
+  private func matchesQuery(_ node: SessionTimelineNode) -> Bool {
+    trimmedQuery.isEmpty || node.matches(query: trimmedQuery, scope: filters.searchScope)
+  }
+
+  private func matches<T: Hashable>(_ selected: Set<T>, value: T?) -> Bool {
     selected.isEmpty || value.map(selected.contains) == true
   }
 
-  private static func matchesAny<T: Hashable>(_ selected: Set<T>, values: Set<T>) -> Bool {
+  private func matchesAny<T: Hashable>(_ selected: Set<T>, values: Set<T>) -> Bool {
     selected.isEmpty || !values.isDisjoint(with: selected)
   }
 }

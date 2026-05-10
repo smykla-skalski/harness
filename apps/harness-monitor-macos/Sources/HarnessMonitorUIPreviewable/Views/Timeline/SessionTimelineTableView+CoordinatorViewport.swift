@@ -238,8 +238,11 @@ extension SessionTimelineTableView.Coordinator {
     guard isFirstRealWidth || widthChanged else { return }
     lastColumnWidth = columnWidth
     cancelMeasurement(reason: widthChanged ? "width_changed" : "first_real_width")
-    performWithoutTableAnimation {
-      tableView.noteHeightOfRows(withIndexesChanged: IndexSet(0..<rows.count))
+    let invalidationIndexes = visibleMeasurementInvalidationIndexes()
+    if !invalidationIndexes.isEmpty {
+      performWithoutTableAnimation {
+        tableView.noteHeightOfRows(withIndexesChanged: invalidationIndexes)
+      }
     }
     scheduleIncrementalMeasurement(columnWidth: columnWidth)
   }
@@ -270,6 +273,37 @@ extension SessionTimelineTableView.Coordinator {
       columnWidth: columnWidth,
       debounceNanoseconds: Self.widthAnimationMeasurementDebounceNs
     )
+  }
+
+  private func visibleMeasurementInvalidationIndexes() -> IndexSet {
+    guard !rows.isEmpty else {
+      return []
+    }
+    let visibleRange =
+      visibleMeasurementRange() ?? 0..<min(rows.count, Self.measurementPrefetchRowCount)
+    let lowerBound = max(0, visibleRange.lowerBound - Self.measurementPrefetchRowCount)
+    let upperBound = min(rows.count, visibleRange.upperBound + Self.measurementPrefetchRowCount)
+    guard lowerBound < upperBound else {
+      return []
+    }
+    return IndexSet(integersIn: lowerBound..<upperBound)
+  }
+
+  private func visibleMeasurementRange() -> Range<Int>? {
+    guard let tableView, let scrollView else {
+      return nil
+    }
+    let bounds = scrollView.contentView.bounds
+    guard bounds.height > 0 else {
+      return nil
+    }
+    let visibleRows = tableView.rows(in: bounds)
+    guard visibleRows.location != NSNotFound, visibleRows.length > 0 else {
+      return nil
+    }
+    let lowerBound = max(0, visibleRows.location)
+    let upperBound = min(rows.count, lowerBound + visibleRows.length)
+    return lowerBound < upperBound ? lowerBound..<upperBound : nil
   }
 
   @discardableResult

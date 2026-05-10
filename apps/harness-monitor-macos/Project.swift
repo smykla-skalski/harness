@@ -327,6 +327,8 @@ private let agentsE2ETarget: Target = .target(
 private let monitorRunEnv: [String: EnvironmentVariable] = [
     "HARNESS_OTEL_EXPORT": .environmentVariable(value: "1", isEnabled: true),
     "OTEL_EXPORTER_OTLP_ENDPOINT": .environmentVariable(value: "http://127.0.0.1:4317", isEnabled: true),
+    "MTL_DEBUG_LAYER": .environmentVariable(value: "0", isEnabled: true),
+    "SWIFTUI_VIEW_DEBUG": .environmentVariable(value: "0", isEnabled: true),
 ]
 
 private let monitorTestEnv: [String: EnvironmentVariable] = [

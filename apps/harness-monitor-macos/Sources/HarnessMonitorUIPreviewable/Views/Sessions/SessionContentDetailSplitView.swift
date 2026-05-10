@@ -8,6 +8,7 @@ enum SessionContentDetailSplitLayout {
   static let minimumDetailWidth: CGFloat = 320
   static let minimumVisibleColumnWidth: CGFloat = 220
   static let keyboardAdjustmentStep: Double = 40
+  static let dragWidthStep: Double = 2
 
   static func contentWidthRange(availableWidth: CGFloat) -> ClosedRange<Double> {
     let safeAvailable =
@@ -80,6 +81,11 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      .transaction { transaction in
+        if isDragging {
+          transaction.animation = nil
+        }
+      }
       .onChange(of: geometry.size.width, initial: true) { _, newWidth in
         deferReclampLiveWidth(availableWidth: newWidth)
       }
@@ -256,14 +262,34 @@ private struct SessionContentDetailDivider: View {
           isDragging = true
         }
         updateCursor(active: true)
-        let next = (dragStartWidth ?? contentWidth) + value.translation.width
-        contentWidth = min(max(next, widthRange.lowerBound), widthRange.upperBound)
+        updateContentWidth(for: value, quantized: true)
       }
-      .onEnded { _ in
+      .onEnded { value in
+        updateContentWidth(for: value, quantized: false)
         dragStartWidth = nil
         isDragging = false
         updateCursor(active: isHovered)
       }
+  }
+
+  private func updateContentWidth(for value: DragGesture.Value, quantized: Bool) {
+    let startWidth = dragStartWidth ?? contentWidth
+    let rawWidth = min(
+      max(startWidth + value.translation.width, widthRange.lowerBound),
+      widthRange.upperBound
+    )
+    let nextWidth =
+      if quantized {
+        (rawWidth / SessionContentDetailSplitLayout.dragWidthStep).rounded()
+          * SessionContentDetailSplitLayout.dragWidthStep
+      } else {
+        rawWidth
+      }
+    guard abs(contentWidth - nextWidth) >= SessionContentDetailSplitLayout.dragWidthStep / 2
+    else {
+      return
+    }
+    contentWidth = nextWidth
   }
 
   private func handleMoveCommand(_ direction: MoveCommandDirection) {
