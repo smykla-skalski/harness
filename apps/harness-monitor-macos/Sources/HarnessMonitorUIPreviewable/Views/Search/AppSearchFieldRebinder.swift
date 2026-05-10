@@ -15,7 +15,7 @@ import SwiftUI
 ///
 /// `shouldRebind` gates the cycle so we only fire when the user has
 /// a non-empty query AND the search bar is still presented.
-struct AppSearchFieldRebinder: NSViewRepresentable {
+struct AppSearchFieldRebinder: NSViewRepresentable, Equatable {
   let shouldRebind: Bool
 
   func makeNSView(context: Context) -> NSView {
@@ -24,7 +24,12 @@ struct AppSearchFieldRebinder: NSViewRepresentable {
     return view
   }
 
+  // The Equatable conformance + this short-circuit make every
+  // representable diff cheap so updateNSView only forwards when the bool
+  // actually flipped. Without the gate, every parent body invocation
+  // forwards a fresh value into the coordinator even when nothing changed.
   func updateNSView(_ nsView: NSView, context: Context) {
+    guard context.coordinator.shouldRebind != shouldRebind else { return }
     context.coordinator.update(shouldRebind: shouldRebind)
   }
 
@@ -52,7 +57,7 @@ struct AppSearchFieldRebinder: NSViewRepresentable {
   final class Coordinator: NSObject {
     private weak var observedWindow: NSWindow?
     private var keyObserver: NSObjectProtocol?
-    private var shouldRebind = false
+    fileprivate var shouldRebind = false
 
     func update(shouldRebind newValue: Bool) {
       shouldRebind = newValue
