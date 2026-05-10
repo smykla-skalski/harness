@@ -40,9 +40,8 @@ public struct AppSearchHostModifier: ViewModifier {
 
   @State private var query: String = ""
   @State private var scope: AppSearchScope = .current
-  @State private var actionDispatcher = HarnessAppSearchActionDispatcher()
   @State private var lastAnnouncedHitCount = -1
-  @FocusState private var searchFieldFocused: Bool
+  @State private var isSearchPresented: Bool = false
 
   public init(
     model: AppSearchModel,
@@ -57,13 +56,17 @@ public struct AppSearchHostModifier: ViewModifier {
   }
 
   public func body(content: Content) -> some View {
+    // `isPresented:` is the system-Find auto-wire: SwiftUI binds Cmd-F (the
+    // standard `TextEditingCommands` Find item) to this binding, so the same
+    // write that programmatic callers would make is what the keyboard
+    // shortcut already triggers natively. No custom dispatcher needed.
     content
       .searchable(
         text: $query,
+        isPresented: $isSearchPresented,
         placement: .toolbar,
         prompt: prompt
       )
-      .searchFocused($searchFieldFocused)
       .searchPresentationToolbarBehavior(.avoidHidingContent)
       .harnessMinimizableSearchToolbar()
       .searchScopes($scope, activation: .onSearchPresentation) {
@@ -80,22 +83,10 @@ public struct AppSearchHostModifier: ViewModifier {
       .task(id: AppSearchTrigger(query: query, scope: scope)) {
         await runDebouncedSearch(for: query, scope: scope)
       }
-      .task {
-        actionDispatcher.handler = { searchFieldFocused = true }
-      }
       .onChange(of: model.results.totalHitCount) { _, newValue in
         announceResults(totalHitCount: newValue)
       }
-      .focusedSceneValue(\.harnessAppSearchAction, appSearchAction)
       .environment(\.appSearchModel, model)
-  }
-
-  private var appSearchAction: HarnessAppSearchAction {
-    HarnessAppSearchAction(
-      isAvailable: true,
-      menuLabel: .findInSession,
-      dispatcher: actionDispatcher
-    )
   }
 
   private func runDebouncedSearch(

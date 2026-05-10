@@ -94,8 +94,8 @@ struct AppSearchIndexTests {
     #expect(results.sections.first?.domain == .agents)
   }
 
-  @Test("With nil primary, canonical domain order is used")
-  func nilPrimaryGivesCanonicalOrder() async {
+  @Test("With nil primary, fallback domain order ranks decisions > tasks > agents > timeline")
+  func nilPrimaryGivesFallbackOrder() async {
     let index = AppSearchIndex()
     await index.reindex(agents: [makeAgent(id: "a1", name: "alpha agent")])
     await index.reindex(decisions: [makeDecisionProjection(id: "d1", summary: "alpha decision")])
@@ -103,7 +103,28 @@ struct AppSearchIndexTests {
     await index.reindex(events: [makeEvent(id: "e1", summary: "alpha event")])
     let results = await index.search(query: "alpha", primary: nil)
     let domains = results.sections.map(\.domain)
-    #expect(domains == [.agents, .decisions, .tasks, .timeline])
+    #expect(domains == [.decisions, .tasks, .agents, .timeline])
+  }
+
+  @Test("Primary domain leads, remaining domains follow fallback order")
+  func primaryLeadsThenFallbackOrder() async {
+    let index = AppSearchIndex()
+    await index.reindex(agents: [makeAgent(id: "a1", name: "alpha agent")])
+    await index.reindex(decisions: [makeDecisionProjection(id: "d1", summary: "alpha decision")])
+    await index.reindex(tasks: [makeTask(id: "t1", title: "alpha task")])
+    await index.reindex(events: [makeEvent(id: "e1", summary: "alpha event")])
+    let timelinePrimary = await index.search(query: "alpha", primary: .timeline)
+    #expect(
+      timelinePrimary.sections.map(\.domain) == [.timeline, .decisions, .tasks, .agents]
+    )
+    let agentsPrimary = await index.search(query: "alpha", primary: .agents)
+    #expect(
+      agentsPrimary.sections.map(\.domain) == [.agents, .decisions, .tasks, .timeline]
+    )
+    let tasksPrimary = await index.search(query: "alpha", primary: .tasks)
+    #expect(
+      tasksPrimary.sections.map(\.domain) == [.tasks, .decisions, .agents, .timeline]
+    )
   }
 
   // MARK: Top-K cap

@@ -177,12 +177,23 @@ public actor AppSearchIndex {
     )
   }
 
+  /// Ranked fallback order for non-primary domains.
+  ///
+  /// Decisions outrank Tasks, Tasks outrank Agents, Timeline trails. The
+  /// active route's domain (the `primary`) always anchors the head of the
+  /// returned list; remaining domains follow this fallback order.
+  private static let fallbackDomainOrder: [AppSearchDomain] = [
+    .decisions,
+    .tasks,
+    .agents,
+    .timeline,
+  ]
+
   private func orderedDomains(primary: AppSearchDomain?) -> [AppSearchDomain] {
-    let canonical: [AppSearchDomain] = AppSearchDomain.allCases
     guard let primary else {
-      return canonical
+      return Self.fallbackDomainOrder
     }
-    return [primary] + canonical.filter { $0 != primary }
+    return [primary] + Self.fallbackDomainOrder.filter { $0 != primary }
   }
 
   private func corpus(for domain: AppSearchDomain) -> [Record] {
