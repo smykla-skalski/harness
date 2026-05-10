@@ -60,6 +60,8 @@ public struct AppSearchHostModifier: ViewModifier {
         placement: .toolbar,
         prompt: prompt
       )
+      .searchPresentationToolbarBehavior(.avoidHidingContent)
+      .harnessMinimizableSearchToolbar()
       .searchScopes($scope, activation: .onSearchPresentation) {
         ForEach(AppSearchScope.allCases) { value in
           Text(value.label).tag(value)
