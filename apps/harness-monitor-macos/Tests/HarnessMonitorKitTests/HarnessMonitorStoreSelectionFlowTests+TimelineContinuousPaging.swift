@@ -25,7 +25,7 @@ extension HarnessMonitorStoreSelectionFlowTests {
       workerID: "worker-window-chunk-append",
       workerName: "Window Chunk Worker"
     )
-    let fullTimeline = (0..<60).map { index in
+    let fullTimeline = (0..<58).map { index in
       TimelineEntry(
         entryId: "timeline-chunk-append-\(index)",
         recordedAt: String(format: "2026-04-14T07:%02d:00Z", 59 - index),
@@ -91,8 +91,8 @@ extension HarnessMonitorStoreSelectionFlowTests {
     #expect(store.timelineWindow?.hasOlder == false)
   }
 
-  @Test("Appending an older timeline chunk does nothing when no older entries remain")
-  func appendingOlderTimelineChunkDoesNothingWhenNoOlderEntriesRemain() async throws {
+  @Test("Appending an older timeline chunk loads only the final partial chunk")
+  func appendingOlderTimelineChunkLoadsOnlyTheFinalPartialChunk() async throws {
     let summary = makeSession(
       .init(
         sessionId: "sess-window-chunk-no-older",
@@ -137,10 +137,81 @@ extension HarnessMonitorStoreSelectionFlowTests {
 
     #expect(
       client.recordedTimelineWindowRequests(for: summary.sessionId) == [
-        .latest(limit: initialRequestLimit)
+        .latest(limit: initialRequestLimit),
+        TimelineWindowRequest(
+          scope: .summary,
+          limit: fullTimeline.count - initialRequestLimit,
+          before: TimelineCursor(
+            recordedAt: fullTimeline[initialRequestLimit - 1].recordedAt,
+            entryId: fullTimeline[initialRequestLimit - 1].entryId
+          )
+        ),
       ]
     )
     #expect(store.timeline == fullTimeline)
     #expect(store.timelineWindow?.hasOlder == false)
+  }
+
+  @Test("Appending older timeline chunks preserves a middle cursor window")
+  func appendingOlderTimelineChunksPreservesMiddleCursorWindow() async throws {
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-window-middle-chunk",
+        context: "Window middle chunk lane",
+        status: .active,
+        leaderId: "leader-window-middle-chunk",
+        observeId: "observe-window-middle-chunk",
+        openTaskCount: 1,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      )
+    )
+    let detail = makeSessionDetail(
+      summary: summary,
+      workerID: "worker-window-middle-chunk",
+      workerName: "Window Middle Chunk Worker"
+    )
+    let fullTimeline = (0..<46).map { index in
+      TimelineEntry(
+        entryId: "timeline-middle-chunk-\(index)",
+        recordedAt: String(format: "2026-04-14T05:%02d:00Z", 59 - index),
+        kind: "task_checkpoint",
+        sessionId: summary.sessionId,
+        agentId: detail.agents[0].agentId,
+        taskId: nil,
+        summary: "Window middle chunk \(index)",
+        payload: .object([:])
+      )
+    }
+    let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
+      summaries: [summary],
+      detailsByID: [summary.sessionId: detail],
+      timelinesBySessionID: [summary.sessionId: fullTimeline],
+      detail: detail
+    )
+    let store = await makeBootstrappedStore(client: client)
+    let middleRequest = TimelineWindowRequest(
+      scope: .summary,
+      limit: 12,
+      before: TimelineCursor(
+        recordedAt: fullTimeline[11].recordedAt,
+        entryId: fullTimeline[11].entryId
+      )
+    )
+
+    await store.selectSession(summary.sessionId)
+    await store.loadSelectedTimelineWindow(request: middleRequest)
+    #expect(store.timeline == Array(fullTimeline[12..<24]))
+    #expect(store.timelineWindow?.windowStart == 12)
+    #expect(store.timelineWindow?.windowEnd == 24)
+
+    await store.appendSelectedTimelineOlderChunk(limit: 8)
+
+    #expect(store.timeline == Array(fullTimeline[12..<32]))
+    #expect(store.timelineWindow?.windowStart == 12)
+    #expect(store.timelineWindow?.windowEnd == 32)
+    #expect(store.timelineWindow?.hasNewer == true)
+    #expect(store.timelineWindow?.hasOlder == true)
   }
 }
