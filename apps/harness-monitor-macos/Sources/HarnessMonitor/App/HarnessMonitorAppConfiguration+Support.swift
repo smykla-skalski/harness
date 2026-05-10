@@ -77,3 +77,121 @@ struct HarnessMonitorPersistenceSetup {
     """
   }
 }
+
+extension HarnessMonitorAppConfiguration {
+  static func uiTestBoolOverride(from rawValue: String?) -> Bool? {
+    guard let rawValue else {
+      return nil
+    }
+
+    switch rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+    case "1", "true", "yes", "on":
+      return true
+    case "0", "false", "no", "off":
+      return false
+    default:
+      return nil
+    }
+  }
+
+  static func applyVoiceUITestDefaults(environment: HarnessMonitorEnvironment) {
+    let localeIdentifier = voiceStringOverride(
+      environment.values[HarnessMonitorVoiceSettingsDefaults.uiTestLocaleIdentifierOverrideKey],
+      fallback: HarnessMonitorVoiceSettings.uiTestDefaultLocaleIdentifier
+    )
+    let transcriptInsertionMode =
+      HarnessMonitorVoiceTranscriptInsertionMode(
+        rawValue: environment.values[
+          HarnessMonitorVoiceSettingsDefaults.uiTestTranscriptInsertionModeOverrideKey
+        ] ?? ""
+      ) ?? .manualConfirm
+    let localDaemonSinkEnabled =
+      uiTestBoolOverride(
+        from: environment.values[
+          HarnessMonitorVoiceSettingsDefaults.uiTestLocalDaemonSinkEnabledOverrideKey
+        ]
+      ) ?? true
+    let agentBridgeSinkEnabled =
+      uiTestBoolOverride(
+        from: environment.values[
+          HarnessMonitorVoiceSettingsDefaults.uiTestAgentBridgeSinkEnabledOverrideKey
+        ]
+      ) ?? true
+    let remoteProcessorSinkEnabled =
+      uiTestBoolOverride(
+        from: environment.values[
+          HarnessMonitorVoiceSettingsDefaults.uiTestRemoteProcessorEnabledOverrideKey
+        ]
+      ) ?? false
+    let remoteProcessorURL = voiceStringOverride(
+      environment.values[
+        HarnessMonitorVoiceSettingsDefaults.uiTestRemoteProcessorURLOverrideKey
+      ],
+      fallback: ""
+    )
+    let deliversAudioChunks =
+      uiTestBoolOverride(
+        from: environment.values[
+          HarnessMonitorVoiceSettingsDefaults.uiTestDeliversAudioChunksOverrideKey
+        ]
+      ) ?? true
+    let pendingAudioChunkLimit = HarnessMonitorVoiceSettings.normalizedPendingAudioChunkLimit(
+      uiTestIntOverride(
+        from: environment.values[
+          HarnessMonitorVoiceSettingsDefaults.uiTestPendingAudioChunkLimitOverrideKey
+        ]
+      ) ?? HarnessMonitorVoiceSettings.defaultPendingAudioChunkLimit
+    )
+    let pendingTranscriptSegmentLimit =
+      HarnessMonitorVoiceSettings.normalizedPendingTranscriptSegmentLimit(
+        uiTestIntOverride(
+          from: environment.values[
+            HarnessMonitorVoiceSettingsDefaults.uiTestPendingTranscriptLimitOverrideKey
+          ]
+        ) ?? HarnessMonitorVoiceSettings.defaultPendingTranscriptSegmentLimit
+      )
+
+    applyVoiceDefaultPairs([
+      (localeIdentifier, HarnessMonitorVoiceSettingsDefaults.localeIdentifierKey),
+      (localDaemonSinkEnabled, HarnessMonitorVoiceSettingsDefaults.localDaemonSinkEnabledKey),
+      (agentBridgeSinkEnabled, HarnessMonitorVoiceSettingsDefaults.agentBridgeSinkEnabledKey),
+      (
+        remoteProcessorSinkEnabled,
+        HarnessMonitorVoiceSettingsDefaults.remoteProcessorSinkEnabledKey
+      ),
+      (remoteProcessorURL, HarnessMonitorVoiceSettingsDefaults.remoteProcessorURLKey),
+      (
+        transcriptInsertionMode.rawValue,
+        HarnessMonitorVoiceSettingsDefaults.transcriptInsertionModeKey
+      ),
+      (deliversAudioChunks, HarnessMonitorVoiceSettingsDefaults.deliversAudioChunksKey),
+      (pendingAudioChunkLimit, HarnessMonitorVoiceSettingsDefaults.pendingAudioChunkLimitKey),
+      (
+        pendingTranscriptSegmentLimit,
+        HarnessMonitorVoiceSettingsDefaults.pendingTranscriptSegmentLimitKey
+      ),
+    ])
+  }
+
+  static func applyVoiceDefaultPairs(_ pairs: [(Any, String)]) {
+    for (value, key) in pairs {
+      UserDefaults.standard.set(value, forKey: key)
+    }
+  }
+
+  static func uiTestIntOverride(from rawValue: String?) -> Int? {
+    guard let rawValue else {
+      return nil
+    }
+    return Int(rawValue.trimmingCharacters(in: .whitespacesAndNewlines))
+  }
+
+  static func voiceStringOverride(_ rawValue: String?, fallback: String) -> String {
+    guard let rawValue else {
+      return fallback
+    }
+
+    let trimmedValue = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmedValue.isEmpty ? fallback : trimmedValue
+  }
+}
