@@ -14,6 +14,8 @@ struct HarnessMonitorAppCommands: Commands {
   private var openWindow
   @FocusedValue(\.harnessSidebarSearchFocusAction)
   private var sidebarSearchFocus
+  @FocusedValue(\.harnessAppSearchAction)
+  private var appSearchFocus
   @FocusedValue(\.harnessSidebarVisibilityRequest)
   private var sidebarVisibilityRequest
   @FocusedValue(\.harnessSessionSidebarSelection)
@@ -65,18 +67,28 @@ struct HarnessMonitorAppCommands: Commands {
       .disabled(!displayState.hasSelectedSession || displayState.isSessionReadOnly)
     }
     CommandGroup(after: .textEditing) {
-      let menuLabel = sidebarSearchFocus?.menuLabel ?? .findGeneric
-      let isAvailable = sidebarSearchFocus?.isAvailable == true
+      // Session-window unified search wins over the main app sidebar
+      // search when its window is key, so Cmd-F lands in the toolbar
+      // field for the focused session instead of the main sessions list.
+      let resolvedLabel = appSearchFocus?.menuLabel
+        ?? sidebarSearchFocus?.menuLabel
+        ?? .findGeneric
+      let resolvedIsAvailable = appSearchFocus?.isAvailable == true
+        || sidebarSearchFocus?.isAvailable == true
       Button {
+        if let appSearchFocus, appSearchFocus.isAvailable {
+          appSearchFocus.invoke()
+          return
+        }
         // expand() is idempotent — the handler guards against no-op expansion.
         sidebarVisibilityRequest?.expander.expand()
         sidebarSearchFocus?.invoke()
       } label: {
-        Text(menuLabel.localizedTitle)
+        Text(resolvedLabel.localizedTitle)
       }
       .keyboardShortcut("f", modifiers: .command)
-      .disabled(!isAvailable)
-      .help(isAvailable ? "" : "Search isn't available on this view")
+      .disabled(!resolvedIsAvailable)
+      .help(resolvedIsAvailable ? "" : "Search isn't available on this view")
     }
     sidebarSelectionCommands
   }

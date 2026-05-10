@@ -40,6 +40,9 @@ public struct AppSearchHostModifier: ViewModifier {
 
   @State private var query: String = ""
   @State private var scope: AppSearchScope = .current
+  @State private var actionDispatcher = HarnessAppSearchActionDispatcher()
+  @State private var lastAnnouncedHitCount = -1
+  @FocusState private var searchFieldFocused: Bool
 
   public init(
     model: AppSearchModel,
@@ -60,6 +63,7 @@ public struct AppSearchHostModifier: ViewModifier {
         placement: .toolbar,
         prompt: prompt
       )
+      .searchFocused($searchFieldFocused)
       .searchPresentationToolbarBehavior(.avoidHidingContent)
       .harnessMinimizableSearchToolbar()
       .searchScopes($scope, activation: .onSearchPresentation) {
@@ -76,7 +80,22 @@ public struct AppSearchHostModifier: ViewModifier {
       .task(id: AppSearchTrigger(query: query, scope: scope)) {
         await runDebouncedSearch(for: query, scope: scope)
       }
+      .task {
+        actionDispatcher.handler = { searchFieldFocused = true }
+      }
+      .onChange(of: model.results.totalHitCount) { _, newValue in
+        announceResults(totalHitCount: newValue)
+      }
+      .focusedSceneValue(\.harnessAppSearchAction, appSearchAction)
       .environment(\.appSearchModel, model)
+  }
+
+  private var appSearchAction: HarnessAppSearchAction {
+    HarnessAppSearchAction(
+      isAvailable: true,
+      menuLabel: .findInSession,
+      dispatcher: actionDispatcher
+    )
   }
 
   private func runDebouncedSearch(
@@ -100,6 +119,25 @@ public struct AppSearchHostModifier: ViewModifier {
     )
     await model.runSearch(query: liveQuery, primary: primary)
     appSearchSignposter.endInterval("app_search_query", state)
+  }
+
+  private func announceResults(totalHitCount: Int) {
+    guard totalHitCount > 0, totalHitCount != lastAnnouncedHitCount else {
+      lastAnnouncedHitCount = totalHitCount
+      return
+    }
+    lastAnnouncedHitCount = totalHitCount
+    let sectionCount = model.results.sections.count
+    let primaryLabel = model.results.sections.first?.domain.label.lowercased() ?? ""
+    let message: String
+    if sectionCount > 1, !primaryLabel.isEmpty {
+      message = "\(totalHitCount) results across \(sectionCount) sections, \(primaryLabel) first."
+    } else if !primaryLabel.isEmpty {
+      message = "\(totalHitCount) \(primaryLabel) results."
+    } else {
+      message = "\(totalHitCount) results."
+    }
+    AccessibilityNotification.Announcement(message).post()
   }
 }
 
