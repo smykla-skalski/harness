@@ -202,9 +202,9 @@ struct HarnessMonitorApp: App {
     .defaultSize(width: mainWindowDefaultSize.width, height: mainWindowDefaultSize.height)
     .restorationBehavior(.disabled)
     .defaultLaunchBehavior(shouldHandleInitialWindowRouting ? .suppressed : .automatic)
-    .onChange(of: scenePhase, initial: true) { _, newPhase in
+    .onChange(of: scenePhase, initial: true) { _, _ in
       installMainWindowLauncherIfNeeded()
-      scheduleInitialWindowRoutingIfNeeded(for: newPhase)
+      scheduleInitialWindowRoutingIfNeeded()
     }
     .commands {
       mainWindowCommands
@@ -251,21 +251,19 @@ struct HarnessMonitorApp: App {
     launchMode == .live && !isTestRun
   }
 
-  private func scheduleInitialWindowRoutingIfNeeded(for phase: ScenePhase) {
-    _ = phase
+  private func scheduleInitialWindowRoutingIfNeeded() {
     guard shouldHandleInitialWindowRouting else {
       return
     }
     guard !hasScheduledInitialWindowRouting else {
       return
     }
-    // The previous gate required `phase == .active`, but live launches set
-    // `defaultLaunchBehavior(.suppressed)` on every scene so no window opens
-    // automatically and the App-level scenePhase never advances past
-    // `.background`. That left routing parked until the user clicked the
-    // dock icon. Schedule on the first scenePhase callback regardless of
-    // value: `installMainWindowLauncherIfNeeded` runs in the same closure
-    // before us so the launcher's `openWindow` closure is captured, and the
+    // Live launches set `defaultLaunchBehavior(.suppressed)` on every scene,
+    // so no window opens automatically and the App-level scenePhase never
+    // advances past `.background`. Routing therefore fires on the first
+    // scenePhase callback regardless of its value:
+    // `installMainWindowLauncherIfNeeded` runs in the same closure first so
+    // the launcher's `openWindow` closure is already captured, and the
     // routed Task runs on MainActor where `openWindow` is valid.
     hasScheduledInitialWindowRouting = true
     Task { @MainActor in

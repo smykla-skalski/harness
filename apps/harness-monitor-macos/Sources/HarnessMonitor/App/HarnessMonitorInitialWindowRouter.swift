@@ -13,6 +13,8 @@ struct HarnessMonitorInitialWindowRouter {
   let openWelcomeWindow: () -> Void
   let openSessionWindow: (String) -> Void
 
+  static let restorationWaitTimeout: Duration = .milliseconds(1500)
+
   func route() async {
     var restorePlan = HarnessMonitorStore.LaunchWindowRestorePlan()
     if launchBehavior == .restoreSessionWindows {
@@ -66,19 +68,47 @@ struct HarnessMonitorInitialWindowRouter {
     guard tabbingPreference != .never else { return }
     guard !restorePlan.tabGroupings.isEmpty else { return }
     #if canImport(AppKit)
-      // Bindings update on MainActor when each restored session window's
-      // SessionWindowAppKitBinding view moves into its NSWindow. The
-      // store-side openSessionWindowIDsSnapshot may briefly populate
-      // before the AppKit registry catches up with that scene mount, so
-      // give the registry a small budget to converge before merging.
-      for _ in 0..<30 {
-        if HarnessMonitorInitialWindowRouter.allWindowsBoundForGroupings(
-          restorePlan.tabGroupings
-        ) {
-          break
+      let expectedSessionIDs = Set(restorePlan.tabGroupings.flatMap { $0.sessionIDs })
+      let registry = SessionWindowAppKitRegistry.shared
+      // Edge-triggered: returns as soon as every expected sessionID has an
+      // NSWindow bound, falling back to the timeout. Replaces the previous
+      // 30 x 50 ms polling loop.
+      let converged = await registry.waitForBindings(
+        satisfying: { sessionIDs in expectedSessionIDs.isSubset(of: sessionIDs) },
+        timeout: Self.restorationWaitTimeout
+      )
+
+      let boundSessionIDCount = expectedSessionIDs.reduce(into: 0) { count, sessionID in
+        if registry.window(forSessionID: sessionID) != nil {
+          count += 1
         }
-        try? await Task.sleep(for: .milliseconds(50))
       }
+      let foregroundExpectedCount = restorePlan.tabGroupings.reduce(into: 0) {
+        count, grouping in
+        if grouping.foregroundSessionID != nil {
+          count += 1
+        }
+      }
+      let foregroundResolvedCount = restorePlan.tabGroupings.reduce(into: 0) {
+        count, grouping in
+        guard let foregroundID = grouping.foregroundSessionID,
+          registry.window(forSessionID: foregroundID) != nil
+        else {
+          return
+        }
+        count += 1
+      }
+      HarnessMonitorLogger.lifecycle.info(
+        """
+        tab-grouping replay groups=\(restorePlan.tabGroupings.count, privacy: .public) \
+        expected_members=\(expectedSessionIDs.count, privacy: .public) \
+        bound_members=\(boundSessionIDCount, privacy: .public) \
+        missed_members=\(expectedSessionIDs.count - boundSessionIDCount, privacy: .public) \
+        foreground_resolved=\(foregroundResolvedCount, privacy: .public)/\(foregroundExpectedCount, privacy: .public) \
+        converged=\(converged, privacy: .public)
+        """
+      )
+
       for grouping in restorePlan.tabGroupings {
         Self.mergeTabGroup(grouping)
       }
@@ -87,29 +117,21 @@ struct HarnessMonitorInitialWindowRouter {
 
   private func waitForRestoredSessionWindowsToRegister(sessionIDs: [String]) async {
     let expected = Set(sessionIDs)
-    for _ in 0..<30 {
-      if expected.isSubset(of: store.openSessionWindowIDsSnapshot) {
-        return
+    guard !expected.isEmpty else { return }
+    #if canImport(AppKit)
+      _ = await SessionWindowAppKitRegistry.shared.waitForBindings(
+        satisfying: { boundIDs in expected.isSubset(of: boundIDs) },
+        timeout: Self.restorationWaitTimeout
+      )
+    #else
+      for _ in 0..<30 {
+        if expected.isSubset(of: store.openSessionWindowIDsSnapshot) { return }
+        try? await Task.sleep(for: .milliseconds(50))
       }
-      try? await Task.sleep(for: .milliseconds(50))
-    }
+    #endif
   }
 
   #if canImport(AppKit)
-    private static func allWindowsBoundForGroupings(
-      _ groupings: [HarnessMonitorStore.SessionTabGroupSnapshot]
-    ) -> Bool {
-      let registry = SessionWindowAppKitRegistry.shared
-      for grouping in groupings {
-        for sessionID in grouping.sessionIDs {
-          if registry.window(forSessionID: sessionID) == nil {
-            return false
-          }
-        }
-      }
-      return true
-    }
-
     private static func mergeTabGroup(
       _ grouping: HarnessMonitorStore.SessionTabGroupSnapshot
     ) {
@@ -137,22 +159,26 @@ struct HarnessMonitorInitialWindowRouter {
   #endif
 
   private func waitForVisibleSessionWindowDuringLaunch() async -> Bool {
-    guard !hasVisibleSessionWindows() else {
-      return true
-    }
-    // SwiftUI window restoration runs asynchronously after launch and on
-    // real machines the original 6 x 50 ms (300 ms) budget expired before
-    // restored session windows registered, so the router fell through to
-    // Welcome and the user saw both. 30 x 50 ms (1.5 s) consistently
-    // wins, with an early-out on the first registration so warm launches
-    // are not penalised.
-    for _ in 0..<30 {
-      try? await Task.sleep(for: .milliseconds(50))
-      if hasVisibleSessionWindows() {
-        return true
+    if hasVisibleSessionWindows() { return true }
+    #if canImport(AppKit)
+      // SwiftUI window restoration runs asynchronously after launch and on
+      // real machines the original 6 x 50 ms (300 ms) polling budget often
+      // expired before restored session windows registered, so the router
+      // fell through to Welcome and the user saw both. The registry's
+      // edge-triggered waiter wakes on the first matching `bind(...)` so
+      // warm launches finish on the first event; cold launches stay
+      // bounded by the 1.5 s timeout.
+      return await SessionWindowAppKitRegistry.shared.waitForBindings(
+        satisfying: { boundIDs in !boundIDs.isEmpty },
+        timeout: Self.restorationWaitTimeout
+      )
+    #else
+      for _ in 0..<30 {
+        try? await Task.sleep(for: .milliseconds(50))
+        if hasVisibleSessionWindows() { return true }
       }
-    }
-    return hasVisibleSessionWindows()
+      return false
+    #endif
   }
 
   private func hasVisibleSessionWindows() -> Bool {
