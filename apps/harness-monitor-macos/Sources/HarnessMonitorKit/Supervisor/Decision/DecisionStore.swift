@@ -12,7 +12,7 @@ import Synchronization
 /// Mutations fan out through `events` (an `AsyncStream<DecisionEvent>`) so downstream consumers
 /// (toolbar slice, notification controller) can react without repolling SwiftData.
 public actor DecisionStore {
-  private static let outcomeEncoder = JSONEncoder()
+  static let outcomeEncoder = JSONEncoder()
 
   public struct DecisionEvent: Sendable, Hashable {
     public enum Kind: String, Sendable {
@@ -56,11 +56,11 @@ public actor DecisionStore {
   /// Broadcast channel of decision lifecycle events. Buffered so slow consumers do not block
   /// mutations — the most recent events survive under `.bufferingNewest`.
   nonisolated public let events: AsyncStream<DecisionEvent>
-  private let eventsContinuation: AsyncStream<DecisionEvent>.Continuation
+  let eventsContinuation: AsyncStream<DecisionEvent>.Continuation
 
-  private let container: ModelContainer
+  let container: ModelContainer
   nonisolated private let now: @Sendable () -> Date
-  private let readContextLock = Mutex(())
+  let readContextLock = Mutex(())
 
   public init(container: ModelContainer, now: @escaping @Sendable () -> Date = { Date() }) {
     self.container = container
@@ -294,42 +294,6 @@ public actor DecisionStore {
 
   // MARK: - Private
 
-  nonisolated private func fetchDecision(id: String, context: ModelContext) throws -> Decision? {
-    var descriptor = FetchDescriptor<Decision>(
-      predicate: #Predicate<Decision> { $0.id == id }
-    )
-    descriptor.fetchLimit = 1
-    return try context.fetch(descriptor).first
-  }
-
-  nonisolated private func isOpen(_ decision: Decision, now: Date) -> Bool {
-    guard decision.statusRaw == Status.open || decision.statusRaw == Status.snoozed else {
-      return false
-    }
-    if decision.statusRaw == Status.snoozed {
-      guard let until = decision.snoozedUntil else { return true }
-      return until <= now
-    }
-    return true
-  }
-
-  nonisolated private func isUnresolved(_ decision: Decision) -> Bool {
-    decision.statusRaw == Status.open || decision.statusRaw == Status.snoozed
-  }
-
-  nonisolated private func shouldReopen(_ decision: Decision, now: Date) -> Bool {
-    if decision.statusRaw == Status.dismissed {
-      return true
-    }
-    guard decision.statusRaw == Status.snoozed else {
-      return false
-    }
-    guard let snoozedUntil = decision.snoozedUntil else {
-      return true
-    }
-    return snoozedUntil <= now
-  }
-
   nonisolated private func apply(
     _ draft: DecisionDraft,
     to decision: Decision,
@@ -391,49 +355,4 @@ public actor DecisionStore {
     return changed ? .updated : .unchanged
   }
 
-  nonisolated private func hasTerminalResolutionOutcome(_ decision: Decision) -> Bool {
-    guard let resolutionJSON = decision.resolutionJSON,
-      let data = resolutionJSON.data(using: .utf8),
-      let outcome = try? JSONDecoder().decode(DecisionOutcome.self, from: data)
-    else {
-      return false
-    }
-    return isTerminalResolutionOutcome(outcome)
-  }
-
-  nonisolated private func isTerminalResolutionOutcome(_ outcome: DecisionOutcome) -> Bool {
-    outcome.note == "client_deadline_exceeded" || outcome.note == "daemon_shutdown"
-  }
-
-  private func encodeOutcome(_ outcome: DecisionOutcome) throws -> String {
-    let data = try Self.outcomeEncoder.encode(outcome)
-    guard let string = String(bytes: data, encoding: .utf8) else {
-      throw EncodingError.invalidValue(
-        outcome,
-        .init(codingPath: [], debugDescription: "DecisionOutcome JSON was not valid UTF-8")
-      )
-    }
-    return string
-  }
-
-  private func yield(_ event: DecisionEvent) {
-    eventsContinuation.yield(event)
-  }
-
-  nonisolated private func withReadContext<T>(_ operation: (ModelContext) throws -> T) throws -> T {
-    try readContextLock.withLock { _ in
-      let context = ModelContext(container)
-      return try operation(context)
-    }
-  }
-
-  private func withMutationContext<T>(_ operation: (ModelContext) throws -> T) throws -> T {
-    let context = ModelContext(container)
-    context.autosaveEnabled = false
-    let result = try operation(context)
-    if context.hasChanges {
-      try context.save()
-    }
-    return result
-  }
 }
