@@ -23,6 +23,13 @@ struct SessionDecisionDetailPane: View {
     store.supervisorDecisionActionHandler()
   }
 
+  // Cache the @Observable view model across parent body invocations. Without
+  // this the view model would be reconstructed on every body call, which
+  // would (a) replace the deeplinks array reference and thrash the ForEach
+  // evictor (191 incoming edges in the post-fix trace), and (b) defeat the
+  // fine-grained property tracking @Observable is supposed to provide.
+  @State private var cachedViewModel: DecisionDetailViewModel?
+
   var body: some View {
     VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
       if showsFilteredNotice, let filters {
@@ -30,15 +37,13 @@ struct SessionDecisionDetailPane: View {
           .padding(.top, metrics.contentPadding)
           .padding(.horizontal, metrics.contentPadding)
       }
-      // Single call site — passing optional Decision keeps the SwiftUI tree
-      // identity stable when decision flips between nil and non-nil. The two
-      // separate call sites previously produced
-      // `_ConditionalContent<DecisionDetailView, DecisionDetailView>` and
-      // tore down @FocusState / @AccessibilityFocusState on every flip.
+      // Optional viewModel keeps the SwiftUI tree identity stable when
+      // decision flips between nil and non-nil; two separate call sites
+      // previously produced `_ConditionalContent<DecisionDetailView,
+      // DecisionDetailView>` and tore down @FocusState on every flip.
       DecisionDetailView(
-        decision: decision,
+        viewModel: cachedViewModel,
         store: store,
-        handler: actionHandler,
         auditEvents: auditEvents,
         selectedTab: $selectedTab,
         observer: observer,
@@ -49,6 +54,24 @@ struct SessionDecisionDetailPane: View {
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .dynamicTypeSize(.xSmall ... .accessibility5)
+    .task(id: decision?.id) {
+      syncCachedViewModel()
+    }
+  }
+
+  private func syncCachedViewModel() {
+    guard let decision else {
+      if cachedViewModel != nil {
+        cachedViewModel = nil
+      }
+      return
+    }
+    if cachedViewModel?.decision.id != decision.id {
+      cachedViewModel = DecisionDetailViewModel(
+        decision: decision,
+        handler: actionHandler
+      )
+    }
   }
 }
 
