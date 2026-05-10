@@ -64,7 +64,7 @@ struct SessionTimelineFilterControls: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      searchControls
+      filterActionRow
 
       if showsSignalPreset || !quickTones.isEmpty {
         presetAndToneChipsSection
@@ -84,25 +84,16 @@ struct SessionTimelineFilterControls: View {
     }
   }
 
-  private var searchControls: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      searchField
-      HarnessMonitorWrapLayout(
-        spacing: HarnessMonitorTheme.spacingXS,
-        lineSpacing: HarnessMonitorTheme.spacingXS
-      ) {
-        scopeMenu
-        moreFiltersButton
-        clearFiltersButton
-      }
+  private var filterActionRow: some View {
+    HarnessMonitorWrapLayout(
+      spacing: HarnessMonitorTheme.spacingXS,
+      lineSpacing: HarnessMonitorTheme.spacingXS
+    ) {
+      scopeMenu
+      moreFiltersButton
+      clearFiltersButton
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-  }
-
-  private var searchField: some View {
-    SessionTimelineSearchField(query: $filters.query)
-      .frame(maxWidth: .infinity)
-      .layoutPriority(1)
   }
 
   private var scopeMenu: some View {

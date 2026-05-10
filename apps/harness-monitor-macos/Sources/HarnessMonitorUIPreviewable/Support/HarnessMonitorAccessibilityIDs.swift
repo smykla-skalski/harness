@@ -225,7 +225,6 @@ public enum HarnessMonitorAccessibility {
   public static let sessionTimelineVisibleStatus =
     "harness.session.timeline.navigation.visible-status"
   public static let sessionTimelineFilterBar = "harness.session.timeline.filters"
-  public static let sessionTimelineFilterSearch = "harness.session.timeline.filters.search"
   public static let sessionTimelineFilterScopeMenu = "harness.session.timeline.filters.scope"
   public static let sessionTimelineFilterMoreButton = "harness.session.timeline.filters.more"
   public static let sessionTimelineFilterClearButton = "harness.session.timeline.filters.clear"

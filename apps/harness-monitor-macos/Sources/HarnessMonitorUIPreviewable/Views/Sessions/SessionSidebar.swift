@@ -6,20 +6,16 @@ struct SessionSidebar: View {
   let snapshot: HarnessMonitorSessionWindowSnapshot?
   let sessionCodexRuns: [CodexRunSnapshot]
   let decisions: [Decision]
-  let canPresentSearch: Bool
   @Bindable var state: SessionWindowStateCache
   @Environment(\.harnessTextSizeIndex)
   private var textSizeIndex
   @Environment(\.undoManager)
   var undoManager
   @State private var currentModifiers: EventModifiers = []
-  @State private var searchPresentationState = SidebarSearchPresentationState()
-  @State private var searchFocusDispatcher = HarnessSidebarSearchFocusDispatcher()
   @State private var selectionDispatcher = SessionSidebarSelectionDispatcher()
   @State private var listSelection: Set<SessionSelection> = []
 
   var body: some View {
-    @Bindable var filters = state.decisionFilters
     List(selection: selectionBinding) {
       routeSection
       agentsSection
@@ -56,26 +52,7 @@ struct SessionSidebar: View {
     .onChange(of: state.lastPlainClick) { _, signal in
       collapseSelectionFromApplicationTap(signal)
     }
-    .searchable(
-      text: $filters.query,
-      isPresented: $searchPresentationState.isPresented,
-      placement: .sidebar,
-      prompt: "Filter decisions"
-    )
-    .searchScopes($filters.scope) {
-      ForEach(DecisionsSidebarSearchScope.allCases) { scope in
-        Label(scope.label, systemImage: scope.systemImage)
-          .tag(scope)
-      }
-    }
-    .harnessFocusedSceneValue(\.harnessSidebarSearchFocusAction, searchFocusAction)
     .harnessFocusedSceneValue(\.harnessSessionSidebarSelection, selectionFocus)
-    .task(id: canPresentSearch) {
-      searchFocusDispatcher.handler = { handleSearchFocusRequest() }
-    }
-    .onChange(of: canPresentSearch, initial: true) { _, canPresent in
-      applySearchPresentationAvailability(canPresent)
-    }
     .onChange(of: state.selection) { _, _ in
       setListSelection(renderedSelectionSet())
     }
@@ -84,7 +61,6 @@ struct SessionSidebar: View {
       bindSelectionDispatcher()
     }
     .onDisappear {
-      searchFocusDispatcher.handler = nil
       selectionDispatcher.selectAll = nil
       selectionDispatcher.clearSelection = nil
       selectionDispatcher.deleteSelection = nil
@@ -101,23 +77,6 @@ struct SessionSidebar: View {
       .medium
     default:
       .large
-    }
-  }
-
-  private func handleSearchFocusRequest() {
-    _ = searchPresentationState.requestPresentation(canPresent: canPresentSearch)
-  }
-
-  private func applySearchPresentationAvailability(_ canPresent: Bool) {
-    guard canPresent else {
-      searchPresentationState.isPresented = false
-      return
-    }
-    if searchPresentationState.applyPendingPresentationIfNeeded(canPresent: canPresent) {
-      return
-    }
-    if !state.decisionFilters.query.isEmpty {
-      searchPresentationState.isPresented = true
     }
   }
 
@@ -280,17 +239,6 @@ struct SessionSidebar: View {
     case .decision(_, let id): id
     case .route, .codexRun, .create: nil
     }
-  }
-
-  private var searchFocusAction: HarnessSidebarSearchFocus? {
-    guard canPresentSearch else {
-      return nil
-    }
-    return HarnessSidebarSearchFocus(
-      isAvailable: true,
-      menuLabel: .findInDecisions,
-      dispatcher: searchFocusDispatcher
-    )
   }
 
   private var routeSection: some View {

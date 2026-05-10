@@ -97,7 +97,6 @@ struct SessionSidebarMultiSelectTests {
       snapshot: nil,
       sessionCodexRuns: [],
       decisions: [],
-      canPresentSearch: true,
       state: state
     )
 
@@ -156,19 +155,18 @@ struct SessionSidebarMultiSelectTests {
     #expect(source.contains("state.sidebarSelection.syncRenderedSelectionCount(selection.count)"))
   }
 
-  @Test("Session sidebar search is availability gated")
-  func sessionSidebarSearchIsAvailabilityGated() throws {
+  @Test("Session sidebar no longer hosts the legacy decisions search field")
+  func sessionSidebarLegacySearchRemoved() throws {
     let sidebarSource = try sourceFile(named: "SessionSidebar.swift")
     let columnsSource = try sourceFile(named: "SessionWindowView+Columns.swift")
 
-    #expect(sidebarSource.contains("isPresented: $searchPresentationState.isPresented"))
-    #expect(sidebarSource.contains("applySearchPresentationAvailability"))
-    #expect(
-      sidebarSource.contains(
-        ".harnessFocusedSceneValue(\\.harnessSidebarSearchFocusAction, searchFocusAction)"
-      )
-    )
-    #expect(columnsSource.contains("canPresentSearch: sessionSidebarSearchAvailable"))
+    #expect(!sidebarSource.contains(".searchable("))
+    #expect(!sidebarSource.contains("searchPresentationState"))
+    #expect(!sidebarSource.contains("searchFocusDispatcher"))
+    #expect(!sidebarSource.contains("applySearchPresentationAvailability"))
+    #expect(!sidebarSource.contains("harnessSidebarSearchFocusAction"))
+    #expect(!columnsSource.contains("canPresentSearch:"))
+    #expect(!columnsSource.contains("sessionSidebarSearchAvailable"))
   }
 
   @Test("Sidebar sources no longer install drag and drop")
