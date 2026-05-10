@@ -13,6 +13,18 @@ struct HarnessMonitorInitialWindowRouter {
   let openWelcomeWindow: () -> Void
   let openSessionWindow: (String) -> Void
 
+  // Upper bound for SwiftUI's `WindowGroup(id:for:)` restoration to bind
+  // every restored session window. 1.5 s was sized against Apple Silicon
+  // hardware with cold disk caches and FileVault on during development of
+  // 903a0eec0; the prior 6 x 50 ms (300 ms) budget regularly expired before
+  // restored windows registered. The real-world distribution has not yet
+  // been measured at scale — operators tracking the `lifecycle` log can
+  // collect the `converged` field per launch from the breadcrumbs emitted
+  // in `replayTabGroupingsIfNeeded`, `waitForRestoredSessionWindowsToRegister`,
+  // and `waitForVisibleSessionWindowDuringLaunch`. If `converged=false`
+  // shows up at non-trivial rates, prefer collapsing the two registries
+  // (or finding a SwiftUI restoration-complete signal) over raising this
+  // number further.
   static let restorationWaitTimeout: Duration = .milliseconds(1500)
 
   func route() async {
@@ -119,9 +131,18 @@ struct HarnessMonitorInitialWindowRouter {
     let expected = Set(sessionIDs)
     guard !expected.isEmpty else { return }
     #if canImport(AppKit)
-      _ = await SessionWindowAppKitRegistry.shared.waitForBindings(
+      let start = Date.now
+      let converged = await SessionWindowAppKitRegistry.shared.waitForBindings(
         satisfying: { boundIDs in expected.isSubset(of: boundIDs) },
         timeout: Self.restorationWaitTimeout
+      )
+      HarnessMonitorLogger.lifecycle.info(
+        """
+        session-window bridge-fallback wait \
+        expected=\(expected.count, privacy: .public) \
+        converged=\(converged, privacy: .public) \
+        elapsed_ms=\(Int(Date.now.timeIntervalSince(start) * 1000), privacy: .public)
+        """
       )
     #else
       for _ in 0..<30 {
@@ -167,11 +188,23 @@ struct HarnessMonitorInitialWindowRouter {
       // fell through to Welcome and the user saw both. The registry's
       // edge-triggered waiter wakes on the first matching `bind(...)` so
       // warm launches finish on the first event; cold launches stay
-      // bounded by the 1.5 s timeout.
-      return await SessionWindowAppKitRegistry.shared.waitForBindings(
+      // bounded by the timeout. Emit a breadcrumb so operators can build
+      // a real distribution of cold-launch convergence times — see the
+      // `restorationWaitTimeout` doc-comment for why that distribution
+      // matters.
+      let start = Date.now
+      let converged = await SessionWindowAppKitRegistry.shared.waitForBindings(
         satisfying: { boundIDs in !boundIDs.isEmpty },
         timeout: Self.restorationWaitTimeout
       )
+      HarnessMonitorLogger.lifecycle.info(
+        """
+        session-window cold-launch wait \
+        converged=\(converged, privacy: .public) \
+        elapsed_ms=\(Int(Date.now.timeIntervalSince(start) * 1000), privacy: .public)
+        """
+      )
+      return converged
     #else
       for _ in 0..<30 {
         try? await Task.sleep(for: .milliseconds(50))
