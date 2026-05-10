@@ -59,7 +59,7 @@ extension HarnessMonitorMCPAccessibilityService {
     acknowledgedReplacement = nil
     runtimeState = .healthy(socketPath: socket.path)
     logger.trace(
-      "harness-monitor MCP: reusing compatible registry host at \(socket.path, privacy: .public)"
+      "MCP: reusing compatible registry host at \(socket.path, privacy: .public)"
     )
   }
 
@@ -176,7 +176,7 @@ extension HarnessMonitorMCPAccessibilityService {
     runtimeState = .starting(socketPath: notice.socketPath)
     logger.info(
       """
-      harness-monitor MCP: yielding socket ownership to replacement host at \
+      MCP: yielding socket ownership to replacement host at \
       \(notice.socketPath, privacy: .public)
       """
     )
@@ -210,7 +210,7 @@ extension HarnessMonitorMCPAccessibilityService {
 
     logger.error(
       """
-      harness-monitor MCP: replacement host never appeared at \
+      MCP: replacement host never appeared at \
       \(notice.socketPath, privacy: .public); reclaiming the registry listener
       """
     )

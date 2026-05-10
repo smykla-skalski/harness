@@ -203,7 +203,7 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
     self.listener = nil
     if let socketURL = runningSocketURL {
       logger.trace(
-        "harness-monitor MCP: registry host stopped at \(socketURL.path, privacy: .public)"
+        "MCP: registry host stopped at \(socketURL.path, privacy: .public)"
       )
       runningSocketURL = nil
     }
@@ -216,7 +216,7 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
         reason: "cannot resolve app-group container"
       )
       logger.error(
-        "harness-monitor MCP: cannot resolve app-group container; host not started"
+        "MCP: cannot resolve app-group container; host not started"
       )
       return nil
     }
@@ -326,7 +326,7 @@ public final class HarnessMonitorMCPAccessibilityService: HarnessMonitorMCPStart
         pendingReplacementNotice = nil
         acknowledgedReplacement = nil
         logger.trace(
-          "harness-monitor MCP: registry host started at \(socket.path, privacy: .public)"
+          "MCP: registry host started at \(socket.path, privacy: .public)"
         )
         return
       }
