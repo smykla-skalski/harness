@@ -78,3 +78,33 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
     return HarnessMonitorEnvironment(values: values, homeDirectory: environment.homeDirectory)
   }
 }
+
+extension HarnessMonitorPerfScenario {
+  var includesBootstrapInMeasurement: Bool {
+    switch self {
+    case .openRecentWindow:
+      true
+    case .openSessionWindow,
+      .permissionModal,
+      .settingsBackdropCycle,
+      .settingsBackgroundCycle,
+      .timelineBurst,
+      .toastOverlayChurn,
+      .offlineCachedOpen:
+      false
+    }
+  }
+
+  var signpostName: StaticString {
+    switch self {
+    case .openRecentWindow: "open-recent-window"
+    case .openSessionWindow: "open-session-window"
+    case .permissionModal: "permission-modal"
+    case .settingsBackdropCycle: "settings-backdrop-cycle"
+    case .settingsBackgroundCycle: "settings-background-cycle"
+    case .timelineBurst: "timeline-burst"
+    case .toastOverlayChurn: "toast-overlay-churn"
+    case .offlineCachedOpen: "offline-cached-open"
+    }
+  }
+}
