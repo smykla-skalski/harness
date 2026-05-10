@@ -10,8 +10,29 @@ struct SessionTimelineView: View {
   let decisions: [Decision]
   let isTimelineLoading: Bool
   let store: HarnessMonitorStore
+  let timelineLoading: SessionTimelineLoading?
 
   var sessionID: String { host.id }
+
+  init(
+    style: SessionTimelineViewStyle,
+    host: MonitorTimelineHost,
+    timeline: [TimelineEntry],
+    timelineWindow: TimelineWindowResponse?,
+    decisions: [Decision],
+    isTimelineLoading: Bool,
+    store: HarnessMonitorStore,
+    timelineLoading: SessionTimelineLoading? = nil
+  ) {
+    self.style = style
+    self.host = host
+    self.timeline = timeline
+    self.timelineWindow = timelineWindow
+    self.decisions = decisions
+    self.isTimelineLoading = isTimelineLoading
+    self.store = store
+    self.timelineLoading = timelineLoading
+  }
 
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
@@ -41,14 +62,8 @@ struct SessionTimelineView: View {
     let input = presentationInput
     let displayPresentation = presentationForBody(input: input)
     content(for: displayPresentation)
-      // .task(id:) hops state writes off the view-update phase. Synchronous
-      // .onAppear/.onChange writes here interleaved @State (cachedPresentation)
-      // and @Observable (viewport) mutations during body eval, surfacing as an
-      // AttributeGraph cycle when ACP timeline bursts arrived faster than the
-      // run loop could drain (rdar://timeline-burst). Yield once so SwiftUI can
-      // cancel superseded same-frame input bursts before they mutate state; that
-      // removes the "update multiple times per frame" fault without touching the
-      // table's measurement, height cache, or scrolling paths.
+      // Hop presentation writes out of the view-update phase so timeline bursts
+      // do not interleave @State and @Observable mutations during body eval.
       .task(id: input) {
         await Task.yield()
         guard !Task.isCancelled else {
@@ -258,21 +273,6 @@ struct SessionTimelineView: View {
     .padding(routeMetrics.contentPadding)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .timelineLifecycle(for: presentation, host: self)
-  }
-
-  /// Run a state-mutating closure on the next run-loop turn instead of inside
-  /// SwiftUI's current view-update phase. Required for any write that touches
-  /// `@State` or `@Observable` storage read by this view's body or its
-  /// observable children — see the cycle context comment on `content(for:)`.
-  ///
-  /// Cost is one unstructured `Task` allocation per call. Callers must only
-  /// invoke this from change-event handlers (`.onAppear`, `.onChange`), never
-  /// from per-scroll publishes; the latter would allocate per frame and
-  /// regress the body-update budget.
-  func deferOffViewUpdate(_ work: @escaping @MainActor () -> Void) {
-    Task { @MainActor in
-      work()
-    }
   }
 
   private func cockpitTimelineSurface(

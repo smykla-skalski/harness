@@ -92,6 +92,44 @@ struct SessionTimelineNavigationVisibilityTests {
     )
   }
 
+  @Test("Presentation refresh does not reset an observed viewport anchor")
+  @MainActor
+  func presentationRefreshDoesNotResetObservedViewportAnchor() {
+    let viewport = SessionTimelineViewportModel()
+    viewport.updatePresentationCounts(
+      windowStart: 0,
+      loaded: 24,
+      total: 46,
+      filteredMatchCount: nil
+    )
+    viewport.recordViewportStats(
+      SessionTimelineTableViewportStats(
+        visibleRowCount: 5,
+        renderedRowCount: 5,
+        viewportRowCapacity: 5,
+        anchorRowID: "timeline-entry-visible-12",
+        firstVisibleEventOffset: 12,
+        lastVisibleEventOffset: 16
+      ),
+      publishImmediately: true
+    )
+
+    #expect(viewport.visibleAnchorID == "timeline-entry-visible-12")
+    #expect(viewport.visibilityStats.statusText == "Showing 13-17 of 46")
+
+    viewport.updatePresentationCounts(
+      windowStart: 0,
+      loaded: 34,
+      total: 46,
+      filteredMatchCount: nil
+    )
+    viewport.recordInitialViewport(estimatedVisibleEvents: 6)
+
+    #expect(viewport.visibleAnchorID == "timeline-entry-visible-12")
+    #expect(viewport.currentVisibleAnchorID() == "timeline-entry-visible-12")
+    #expect(viewport.visibilityStats.statusText == "Showing 13-17 of 46")
+  }
+
   @Test("Height cache invalidates changed carry-over rows and font scale changes")
   func heightCacheInvalidatesChangedCarryOverRowsAndFontScaleChanges() {
     let unchangedRow = makeCustomTimelineRow(

@@ -37,6 +37,12 @@ extension SessionTimelineView {
       from: oldValue,
       to: newValue
     )
+    traceTimelineEdge(
+      "older",
+      limit: limit,
+      advance: newValue.bottomEdgeAdvance(from: oldValue),
+      presentation: presentation
+    )
     return requestOlderWindowIfNeeded(presentation, limit: limit)
   }
 
@@ -45,17 +51,25 @@ extension SessionTimelineView {
     _ presentation: SessionTimelineSectionPresentation,
     limit: Int
   ) -> Bool {
-    guard limit > 0, presentation.navigation.hasOlder else {
+    guard limit > 0 else {
+      traceTimelineRequestSkip("older", reason: "limit", presentation: presentation)
       clearPendingEdgeLoadIfNeeded(.older)
       return false
     }
-    guard !isTimelineLoading else {
+    guard presentation.navigation.hasOlder else {
+      traceTimelineRequestSkip("older", reason: "no_older", presentation: presentation)
+      clearPendingEdgeLoadIfNeeded(.older)
+      return false
+    }
+    guard !shouldDeferTimelineEdgeRequest(presentation) else {
+      traceTimelineRequestDefer("older", presentation: presentation)
       markPendingEdgeLoad(.older, presentation: presentation)
       return false
     }
     clearPendingEdgeLoadIfNeeded(.older)
+    traceTimelineOlderRequestStart(limit: limit, presentation: presentation)
     Task {
-      await loadOlderTimelineChunk(limit: limit)
+      await loadOlderTimelineChunk(presentation: presentation, limit: limit)
       await MainActor.run {
         markPendingEdgeLoad(.older, presentation: presentation)
       }
@@ -75,6 +89,12 @@ extension SessionTimelineView {
       from: oldValue,
       to: newValue
     )
+    traceTimelineEdge(
+      "newer",
+      limit: limit,
+      advance: newValue.topEdgeAdvance(from: oldValue),
+      presentation: presentation
+    )
     return requestWindowIfNeeded(
       for: .newer,
       presentation: presentation,
@@ -90,21 +110,26 @@ extension SessionTimelineView {
     limit: Int? = nil,
     deferIfLoading: Bool = false
   ) -> Bool {
+    let actionName = timelineTraceActionName(action)
     if let limit, limit <= 0 {
+      traceTimelineRequestSkip(actionName, reason: "limit", presentation: presentation)
       clearPendingEdgeLoadIfNeeded(action)
       return false
     }
     guard let request = presentation.navigation.request(for: action, limit: limit) else {
+      traceTimelineRequestSkip(actionName, reason: "no_request", presentation: presentation)
       clearPendingEdgeLoadIfNeeded(action)
       return false
     }
-    guard !isTimelineLoading else {
+    guard !shouldDeferTimelineEdgeRequest(presentation) else {
+      traceTimelineRequestDefer(actionName, presentation: presentation)
       if deferIfLoading {
         markPendingEdgeLoad(action, presentation: presentation)
       }
       return false
     }
     clearPendingEdgeLoadIfNeeded(action)
+    traceTimelineWindowRequestStart(actionName, request: request, presentation: presentation)
     Task {
       await loadWindow(request)
       if deferIfLoading {
@@ -193,6 +218,12 @@ extension SessionTimelineView {
       viewportRowCapacity: timelineViewport.currentViewportRowCapacity(),
       fallbackVisibleRowCount: presentation.fallbackVisibleRowCount
     )
+  }
+
+  private func shouldDeferTimelineEdgeRequest(
+    _ presentation: SessionTimelineSectionPresentation
+  ) -> Bool {
+    isTimelineLoading || presentation.navigation.isLoading
   }
 
   func performNavigationAction(
@@ -329,37 +360,6 @@ extension SessionTimelineView {
       // a new scroll to the first row here snaps the user back toward the top.
       timelineViewport.setAnchorID(ids.first)
       currentTimelineScrollCommand = nil
-    }
-  }
-
-  @MainActor
-  func issueScroll(to targetID: String?) {
-    timelineViewport.setAnchorID(targetID)
-    issueScrollCommand(targetID)
-  }
-
-  func issueScrollCommand(_ targetID: String?) {
-    guard let targetID else {
-      currentTimelineScrollCommand = nil
-      return
-    }
-    currentTimelineScrollCommandGeneration += 1
-    currentTimelineScrollCommand = SessionTimelineScrollCommand(
-      targetID: targetID,
-      generation: currentTimelineScrollCommandGeneration
-    )
-  }
-
-  func handleScrollBoundaryChange(
-    from oldValue: SessionTimelineScrollBoundaryState,
-    to newValue: SessionTimelineScrollBoundaryState,
-    presentation: SessionTimelineSectionPresentation
-  ) {
-    if newValue.enteredTopEdge(from: oldValue) {
-      requestNewerWindowIfNeeded(presentation, from: oldValue, to: newValue)
-    }
-    if newValue.enteredBottomEdge(from: oldValue) {
-      requestOlderWindowIfNeeded(presentation, from: oldValue, to: newValue)
     }
   }
 

@@ -25,11 +25,13 @@ final class SessionTimelineViewportModel {
   @ObservationIgnored private var presentationTotalCount = 0
   @ObservationIgnored private var presentationFilteredMatchCount: Int?
   @ObservationIgnored private var lastScrollBoundaryState: SessionTimelineScrollBoundaryState?
+  @ObservationIgnored private var hasObservedViewportStats = false
 
   func recordViewportStats(
     _ stats: SessionTimelineTableViewportStats,
     publishImmediately: Bool = false
   ) {
+    hasObservedViewportStats = true
     lastViewport = stats
     if let anchorID = stats.anchorRowID {
       latestVisibleAnchorID = anchorID
@@ -99,6 +101,9 @@ final class SessionTimelineViewportModel {
   }
 
   func recordInitialViewport(estimatedVisibleEvents: Int) {
+    guard !hasObservedViewportStats else {
+      return
+    }
     let stats = SessionTimelineTableViewportStats.initial(
       estimatedVisibleEvents: min(max(estimatedVisibleEvents, 0), presentationLoadedCount)
     )
@@ -118,6 +123,7 @@ final class SessionTimelineViewportModel {
     )
     lastObservedViewportPublishTime = 0
     lastScrollBoundaryState = nil
+    hasObservedViewportStats = false
     presentationWindowStart = 0
     presentationLoadedCount = 0
     presentationTotalCount = 0
