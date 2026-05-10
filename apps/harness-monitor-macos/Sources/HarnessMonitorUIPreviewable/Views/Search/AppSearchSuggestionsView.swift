@@ -60,7 +60,7 @@ public struct AppSearchSuggestionsView: View {
         }
       }
     }
-    .buttonStyle(.plain)
+    .harnessPlainButtonStyle()
     .searchCompletion(hit.title)
   }
 

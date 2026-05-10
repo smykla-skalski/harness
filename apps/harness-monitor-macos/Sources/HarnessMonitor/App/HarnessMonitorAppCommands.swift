@@ -70,10 +70,12 @@ struct HarnessMonitorAppCommands: Commands {
       // Session-window unified search wins over the main app sidebar
       // search when its window is key, so Cmd-F lands in the toolbar
       // field for the focused session instead of the main sessions list.
-      let resolvedLabel = appSearchFocus?.menuLabel
+      let resolvedLabel =
+        appSearchFocus?.menuLabel
         ?? sidebarSearchFocus?.menuLabel
         ?? .findGeneric
-      let resolvedIsAvailable = appSearchFocus?.isAvailable == true
+      let resolvedIsAvailable =
+        appSearchFocus?.isAvailable == true
         || sidebarSearchFocus?.isAvailable == true
       Button {
         if let appSearchFocus, appSearchFocus.isAvailable {

@@ -442,7 +442,6 @@ public struct SessionWindowView: View {
       }
   }
 
-
   @ToolbarContentBuilder private var sessionToolbar: some ToolbarContent {
     SessionWindowToolbar(
       store: store,
