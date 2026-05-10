@@ -2,6 +2,13 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension SessionWindowCreateForm {
+  private struct AgentCreationContext {
+    let projectDir: String?
+    let personaID: String?
+    let selectedRole: SessionRole
+    let fallbackRole: SessionRole?
+  }
+
   @MainActor
   func submit() async {
     if draft.kind == .agent {
@@ -37,113 +44,148 @@ extension SessionWindowCreateForm {
       draft: draft,
       options: activeAgentCapabilityOptions
     )
+    let context = agentCreationContext(selection: resolvedSelection)
+    switch resolvedSelection {
+    case .tui(let runtime):
+      await createTuiAgent(
+        named: name,
+        runtime: runtime,
+        selection: resolvedSelection,
+        context: context
+      )
+    case .acp(let descriptorID):
+      await createAcpAgent(
+        named: name,
+        descriptorID: descriptorID,
+        selection: resolvedSelection,
+        context: context
+      )
+    }
+  }
+
+  private func agentCreationContext(selection: AgentLaunchSelection) -> AgentCreationContext {
     let trimmedProjectDir = draft.projectDir.trimmingCharacters(in: .whitespacesAndNewlines)
-    let projectDir = trimmedProjectDir.isEmpty ? nil : trimmedProjectDir
     let trimmedPersonaID = draft.personaID.trimmingCharacters(in: .whitespacesAndNewlines)
-    let personaID = trimmedPersonaID.isEmpty ? nil : trimmedPersonaID
     let selectedRole = draft.role
     let fallbackRole =
       SessionWindowCreateFormCatalogs.shouldShowAcpFallbackRole(
-        selection: resolvedSelection,
+        selection: selection,
         role: selectedRole
       ) ? draft.fallbackRole : nil
-    switch resolvedSelection {
-    case .tui(let runtime):
-      let pickerValue =
-        draft.modelByRuntime[runtime.rawValue]
-        ?? SessionWindowCreateFormCatalogs.selectedModelCatalog(
-          selection: .tui(runtime),
-          catalogState: state.agentCreateCatalog
-        )?.default
-        ?? ""
-      let customValue = draft.customModelByRuntime[runtime.rawValue] ?? ""
-      let catalogDefault =
-        SessionWindowCreateFormCatalogs.selectedModelCatalog(
-          selection: .tui(runtime),
-          catalogState: state.agentCreateCatalog
-        )?.default ?? ""
-      let modelSelection = SessionWindowCreateFormCatalogs.effectiveModelSelection(
-        pickerValue: pickerValue,
-        customValue: customValue,
-        catalogDefault: catalogDefault
-      )
-      let effortValues =
-        SessionWindowCreateFormCatalogs.selectedModelCatalog(
-          selection: .tui(runtime),
-          catalogState: state.agentCreateCatalog
-        ).map {
-          SessionWindowCreateFormCatalogs.effortValues(
-            catalog: $0,
-            selectedModelID: pickerValue
-          )
-        }
-        ?? (pickerValue == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag
-          ? SessionWindowCreateFormCatalogs.allEffortLevels : [])
-      let trimmedEffort =
-        draft.effortByRuntime[runtime.rawValue]?
-        .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-      let effort =
-        trimmedEffort.isEmpty
-        ? SessionWindowCreateFormCatalogs.defaultEffortLevel(from: effortValues)
-        : trimmedEffort
-      guard
-        let created = await store.startAgentTuiSnapshot(
-          runtime: runtime,
-          role: selectedRole,
-          name: name,
-          prompt: draft.prompt,
-          projectDir: projectDir,
-          persona: personaID,
-          model: modelSelection.id,
-          effort: effort.isEmpty ? nil : effort,
-          allowCustomModel: modelSelection.allowCustomModel,
-          argv: draft.normalizedArgvOverride,
-          rows: 32,
-          cols: 120,
-          sessionID: draft.sessionID
+    return AgentCreationContext(
+      projectDir: trimmedProjectDir.isEmpty ? nil : trimmedProjectDir,
+      personaID: trimmedPersonaID.isEmpty ? nil : trimmedPersonaID,
+      selectedRole: selectedRole,
+      fallbackRole: fallbackRole
+    )
+  }
+
+  @MainActor
+  private func createTuiAgent(
+    named name: String,
+    runtime: AgentTuiRuntime,
+    selection: AgentLaunchSelection,
+    context: AgentCreationContext
+  ) async {
+    let pickerValue =
+      draft.modelByRuntime[runtime.rawValue]
+      ?? SessionWindowCreateFormCatalogs.selectedModelCatalog(
+        selection: .tui(runtime),
+        catalogState: state.agentCreateCatalog
+      )?.default
+      ?? ""
+    let customValue = draft.customModelByRuntime[runtime.rawValue] ?? ""
+    let catalogDefault =
+      SessionWindowCreateFormCatalogs.selectedModelCatalog(
+        selection: .tui(runtime),
+        catalogState: state.agentCreateCatalog
+      )?.default ?? ""
+    let modelSelection = SessionWindowCreateFormCatalogs.effectiveModelSelection(
+      pickerValue: pickerValue,
+      customValue: customValue,
+      catalogDefault: catalogDefault
+    )
+    let effortValues =
+      SessionWindowCreateFormCatalogs.selectedModelCatalog(
+        selection: .tui(runtime),
+        catalogState: state.agentCreateCatalog
+      ).map {
+        SessionWindowCreateFormCatalogs.effortValues(
+          catalog: $0,
+          selectedModelID: pickerValue
         )
-      else {
-        return
       }
-      writeTerminalLaunchPreset(
-        selection: resolvedSelection,
-        role: selectedRole,
-        modelByRuntime:
-          pickerValue.isEmpty ? [:] : [runtime.rawValue: pickerValue],
-        customModelByRuntime:
-          customValue.isEmpty ? [:] : [runtime.rawValue: customValue],
-        effortByRuntime:
-          effort.isEmpty ? [:] : [runtime.rawValue: effort],
-        personaID: personaID
+      ?? (pickerValue == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag
+        ? SessionWindowCreateFormCatalogs.allEffortLevels : [])
+    let trimmedEffort =
+      draft.effortByRuntime[runtime.rawValue]?
+      .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    let effort =
+      trimmedEffort.isEmpty
+      ? SessionWindowCreateFormCatalogs.defaultEffortLevel(from: effortValues)
+      : trimmedEffort
+    guard
+      let created = await store.startAgentTuiSnapshot(
+        runtime: runtime,
+        role: context.selectedRole,
+        name: name,
+        prompt: draft.prompt,
+        projectDir: context.projectDir,
+        persona: context.personaID,
+        model: modelSelection.id,
+        effort: effort.isEmpty ? nil : effort,
+        allowCustomModel: modelSelection.allowCustomModel,
+        argv: draft.normalizedArgvOverride,
+        rows: 32,
+        cols: 120,
+        sessionID: draft.sessionID
       )
-      state.updateCreateDraft(SessionCreateDraft(kind: .agent, sessionID: draft.sessionID))
-      state.selectAgent(created.agentId)
-    case .acp(let descriptorID):
-      let capabilities = capabilities(for: .acp(descriptorID))
-      guard
-        let created = await store.startAcpAgent(
-          agentID: descriptorID,
-          role: selectedRole,
-          fallbackRole: fallbackRole,
-          capabilities: capabilities,
-          name: name,
-          prompt: draft.prompt,
-          projectDir: projectDir,
-          persona: personaID,
-          sessionID: draft.sessionID
-        )
-      else {
-        return
-      }
-      writeTerminalLaunchPreset(
-        selection: resolvedSelection,
-        role: selectedRole,
-        fallbackRole: fallbackRole,
-        personaID: personaID
-      )
-      state.updateCreateDraft(SessionCreateDraft(kind: .agent, sessionID: draft.sessionID))
-      state.selectAgent(created.agentId)
+    else {
+      return
     }
+    writeTerminalLaunchPreset(
+      selection: selection,
+      role: context.selectedRole,
+      modelByRuntime: pickerValue.isEmpty ? [:] : [runtime.rawValue: pickerValue],
+      customModelByRuntime: customValue.isEmpty ? [:] : [runtime.rawValue: customValue],
+      effortByRuntime: effort.isEmpty ? [:] : [runtime.rawValue: effort],
+      personaID: context.personaID
+    )
+    state.updateCreateDraft(SessionCreateDraft(kind: .agent, sessionID: draft.sessionID))
+    state.selectAgent(created.agentId)
+  }
+
+  @MainActor
+  private func createAcpAgent(
+    named name: String,
+    descriptorID: String,
+    selection: AgentLaunchSelection,
+    context: AgentCreationContext
+  ) async {
+    let capabilities = capabilities(for: .acp(descriptorID))
+    guard
+      let created = await store.startAcpAgent(
+        agentID: descriptorID,
+        role: context.selectedRole,
+        fallbackRole: context.fallbackRole,
+        capabilities: capabilities,
+        name: name,
+        prompt: draft.prompt,
+        projectDir: context.projectDir,
+        persona: context.personaID,
+        sessionID: draft.sessionID
+      )
+    else {
+      return
+    }
+    writeTerminalLaunchPreset(
+      selection: selection,
+      role: context.selectedRole,
+      fallbackRole: context.fallbackRole,
+      personaID: context.personaID
+    )
+    state.updateCreateDraft(SessionCreateDraft(kind: .agent, sessionID: draft.sessionID))
+    state.selectAgent(created.agentId)
   }
 
   @MainActor
