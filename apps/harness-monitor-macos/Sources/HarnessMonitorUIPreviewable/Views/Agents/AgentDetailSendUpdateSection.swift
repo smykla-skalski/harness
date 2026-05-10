@@ -21,6 +21,14 @@ struct AgentDetailSendUpdateSection: View {
   @FocusState private var focusedField: AgentDetailSendUpdateFocusField?
   @State private var deadlineNow = Date.now
   @State private var isMoreOptionsExpanded = false
+  // Measured container width drives the deterministic horizontal/vertical pick
+  // below. ViewThatFits would build both candidate trees on every body
+  // invocation; here we measure once and only re-pick on threshold crossings.
+  @State private var composerFitsHorizontally = true
+  @State private var statusFitsHorizontally = true
+
+  private static let composerHorizontalMinWidth: CGFloat = 480
+  private static let statusHorizontalMinWidth: CGFloat = 360
 
   init(
     store: HarnessMonitorStore,
@@ -186,21 +194,31 @@ struct AgentDetailSendUpdateSection: View {
   }
 
   @ViewBuilder private var compactComposer: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
-        updateTypePicker
-          .frame(maxWidth: 180, alignment: .leading)
-        messageField
-        sendButton
-      }
-
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        updateTypePicker
-        messageField
-        HStack(spacing: HarnessMonitorTheme.spacingSM) {
-          Spacer(minLength: 0)
+    Group {
+      if composerFitsHorizontally {
+        HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
+          updateTypePicker
+            .frame(maxWidth: 180, alignment: .leading)
+          messageField
           sendButton
         }
+      } else {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+          updateTypePicker
+          messageField
+          HStack(spacing: HarnessMonitorTheme.spacingSM) {
+            Spacer(minLength: 0)
+            sendButton
+          }
+        }
+      }
+    }
+    .onGeometryChange(for: CGFloat.self) { proxy in
+      proxy.size.width
+    } action: { width in
+      let next = width >= Self.composerHorizontalMinWidth
+      if composerFitsHorizontally != next {
+        composerFitsHorizontally = next
       }
     }
   }
@@ -280,27 +298,37 @@ struct AgentDetailSendUpdateSection: View {
   }
 
   @ViewBuilder private var composerStatusRow: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-        if let statusMessage {
-          composerStatusLabel(statusMessage)
+    Group {
+      if statusFitsHorizontally {
+        HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
+          if let statusMessage {
+            composerStatusLabel(statusMessage)
+          }
+          Spacer(minLength: HarnessMonitorTheme.spacingMD)
+          if let deadlineStatusLabel {
+            composerDeadlineLabel(deadlineStatusLabel)
+          }
         }
-        Spacer(minLength: HarnessMonitorTheme.spacingMD)
-        if let deadlineStatusLabel {
-          composerDeadlineLabel(deadlineStatusLabel)
-        }
-      }
-
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-        if let statusMessage {
-          composerStatusLabel(statusMessage)
-        }
-        if let deadlineStatusLabel {
-          composerDeadlineLabel(deadlineStatusLabel)
+      } else {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+          if let statusMessage {
+            composerStatusLabel(statusMessage)
+          }
+          if let deadlineStatusLabel {
+            composerDeadlineLabel(deadlineStatusLabel)
+          }
         }
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+    .onGeometryChange(for: CGFloat.self) { proxy in
+      proxy.size.width
+    } action: { width in
+      let next = width >= Self.statusHorizontalMinWidth
+      if statusFitsHorizontally != next {
+        statusFitsHorizontally = next
+      }
+    }
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentDetailSignalStatus)
   }
 
