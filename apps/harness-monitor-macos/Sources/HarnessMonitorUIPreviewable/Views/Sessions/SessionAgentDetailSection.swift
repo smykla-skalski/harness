@@ -60,7 +60,7 @@ struct SessionAgentDetailSection: View {
   let store: HarnessMonitorStore
   let sessionID: String
   let detail: SessionDetail
-  let timeline: [TimelineEntry]
+  let agentTimeline: [TimelineEntry]
   let agent: AgentRegistration
   let tui: AgentTuiSnapshot?
   let pendingPrompt: AgentPendingUserPrompt?
@@ -230,7 +230,7 @@ struct SessionAgentDetailSection: View {
   private var agentTimelineEntries: [TimelineEntry] {
     Self.transcriptEntries(
       agent: agent,
-      timeline: timeline,
+      agentTimeline: agentTimeline,
       acpTranscript: store.acpTranscript(forAgent: agent.agentId, sessionID: sessionID)
     )
   }
@@ -596,13 +596,13 @@ struct SessionAgentDetailSection: View {
 
   nonisolated static func transcriptEntries(
     agent: AgentRegistration,
-    timeline: [TimelineEntry],
+    agentTimeline: [TimelineEntry],
     acpTranscript: [TimelineEntry]
   ) -> [TimelineEntry] {
     if agent.runtimeCapabilities.supportsNativeTranscript, !acpTranscript.isEmpty {
       return acpTranscript
     }
-    return timeline.filter { $0.agentId == agent.agentId }
+    return agentTimeline
   }
 
   nonisolated static func resolvedActionActorID(

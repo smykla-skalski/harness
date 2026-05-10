@@ -35,7 +35,7 @@ extension HarnessMonitorStore {
   /// `timeline` writes; reads here are O(1) dictionary lookups, not a full
   /// timeline scan.
   public func timeline(forAgent agentID: String) -> [TimelineEntry] {
-    selection.agentTimelinesById[agentID] ?? []
+    selection.timelineEntriesByAgentID[agentID] ?? []
   }
 
   public func acpTranscript(forAgent agentID: String) -> [TimelineEntry] {

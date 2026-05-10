@@ -115,19 +115,21 @@ struct SessionAgentDetailSectionMetricsTests {
       makeTimelineEntry(entryID: "timeline-native", agentID: "agent-native"),
       makeTimelineEntry(entryID: "timeline-ledger", agentID: "agent-ledger"),
     ]
+    let nativeTimeline = [timeline[0]]
+    let ledgerTimeline = [timeline[1]]
     let acpTranscript = [makeTimelineEntry(entryID: "acp-native", agentID: "agent-native")]
 
     #expect(
       SessionAgentDetailSection.transcriptEntries(
         agent: nativeAgent,
-        timeline: timeline,
+        agentTimeline: nativeTimeline,
         acpTranscript: acpTranscript
       ).map(\.entryId) == ["acp-native"]
     )
     #expect(
       SessionAgentDetailSection.transcriptEntries(
         agent: ledgerAgent,
-        timeline: timeline,
+        agentTimeline: ledgerTimeline,
         acpTranscript: acpTranscript
       ).map(\.entryId) == ["timeline-ledger"]
     )

@@ -394,3 +394,15 @@ extension TimelineEntry {
   }
 
 }
+
+extension Collection where Element == TimelineEntry {
+  public func partitionedByAgentID() -> [String: [TimelineEntry]] {
+    var partition: [String: [TimelineEntry]] = [:]
+    partition.reserveCapacity(underestimatedCount)
+    for entry in self {
+      guard let agentID = entry.agentId else { continue }
+      partition[agentID, default: []].append(entry)
+    }
+    return partition
+  }
+}
