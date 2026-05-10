@@ -121,7 +121,7 @@ extension SessionWindowView {
         store: store,
         snapshot: snapshot,
         sessionCodexRuns: sessionCodexRuns,
-        decisions: matchingDecisions,
+        decisions: allSessionDecisions,
         statusModel: sessionStatusSummaryModel,
         state: stateCache
       )

@@ -350,45 +350,4 @@ struct SessionWindowFlowTests {
     #expect(filters.matches(decision))
   }
 
-  @MainActor
-  @Test("Session decision bulk actions register undo reopen requests")
-  func sessionDecisionBulkActionsRegisterUndoReopenRequests() {
-    let bulkActions = SessionDecisionBulkActionState()
-    let undoManager = UndoManager()
-
-    bulkActions.recordDismissedBatch(["decision-a", "decision-b"], undoManager: undoManager)
-
-    #expect(bulkActions.lastDismissedBatch == ["decision-a", "decision-b"])
-    #expect(undoManager.canUndo)
-    undoManager.undo()
-    #expect(bulkActions.reopenRequestedBatch == ["decision-a", "decision-b"])
-  }
-
-  @MainActor
-  @Test("Session decision bulk actions expose expiring undo toast")
-  func sessionDecisionBulkActionsExposeExpiringUndoToast() throws {
-    let bulkActions = SessionDecisionBulkActionState()
-    let now = Date(timeIntervalSinceReferenceDate: 100)
-
-    bulkActions.recordDismissedBatch(["decision-a", "decision-b"], undoManager: nil, now: now)
-
-    let toast = try #require(bulkActions.undoToast)
-    #expect(toast.count == 2)
-    #expect(toast.expiresAt == now.addingTimeInterval(8))
-    #expect(toast.dismissedCopy == "Dismissed 2 decisions")
-    #expect(
-      toast.accessibilityCopy
-        == "Dismissed 2 decisions. Undo available. Closing window confirms dismissal."
-    )
-    bulkActions.clearExpiredUndoToast(now: now.addingTimeInterval(7.9))
-    #expect(bulkActions.undoToast != nil)
-    bulkActions.clearExpiredUndoToast(now: now.addingTimeInterval(8))
-    #expect(bulkActions.undoToast == nil)
-
-    bulkActions.recordDismissedBatch(["decision-c"], undoManager: nil, now: now)
-    bulkActions.requestUndoToastReopen()
-
-    #expect(bulkActions.reopenRequestedBatch == ["decision-c"])
-    #expect(bulkActions.undoToast == nil)
-  }
 }

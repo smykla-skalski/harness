@@ -10,32 +10,6 @@ extension SessionSidebar {
     )
   }
 
-  func dismissDecisions(_ ids: [String]) {
-    guard !ids.isEmpty else { return }
-    state.decisionBulkActions.recordDismissedBatch(ids, undoManager: undoManager)
-    let bulkActions = state.decisionBulkActions
-    let toast = SessionDecisionUndoToastState(decisionIDs: ids)
-    store.toast.enqueueUndoable(
-      "\(toast.dismissedCopy). \(SessionDecisionUndoToastState.commitBarrierCopy)",
-      accessibilityIdentifier: HarnessMonitorAccessibility.sessionWindowDismissUndoToast
-    ) { @MainActor in
-      bulkActions.reopenRequestedBatch = ids
-    }
-    Task {
-      let handler = store.supervisorDecisionActionHandler()
-      for id in ids {
-        await handler.dismiss(decisionID: id)
-      }
-    }
-  }
-
-  func reopenDecisionBatch(_ ids: [String]) async {
-    guard let decisionStore = store.supervisorDecisionStore else { return }
-    for id in ids {
-      _ = try? await decisionStore.reopen(id: id)
-    }
-  }
-
   func requestRemoveAgents(_ agentIDs: [String]) {
     guard !agentIDs.isEmpty else { return }
     store.requestRemoveAgentConfirmation(agentIDs: agentIDs)

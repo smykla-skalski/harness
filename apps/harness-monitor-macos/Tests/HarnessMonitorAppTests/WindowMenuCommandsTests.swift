@@ -36,11 +36,10 @@ final class WindowMenuCommandsTests: XCTestCase {
     )
   }
 
-  func testDecisionCommandsExposeBulkActionMenuTitles() {
-    XCTAssertEqual(DecisionCommands.menuTitle, "Decisions")
-    XCTAssertEqual(DecisionCommands.dismissSelectedTitle, "Dismiss Selected")
-    XCTAssertEqual(DecisionCommands.dismissVisibleTitle, "Dismiss All Visible")
-    XCTAssertEqual(DecisionCommands.reopenBatchTitle, "Reopen Dismissed Batch")
+  func testMainCommandSetDoesNotIncludeDecisionMenu() throws {
+    let commandSetSource = try harnessSourceFile(named: "App/HarnessMonitorMainCommandSet.swift")
+
+    XCTAssertFalse(commandSetSource.contains("DecisionCommands()"))
   }
 
   func testCommandNUsesFocusedSessionCreateContext() throws {

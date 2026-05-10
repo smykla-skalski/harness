@@ -2,11 +2,6 @@ import Foundation
 import HarnessMonitorKit
 import Observation
 
-public enum SessionDecisionBulkActionCopy {
-  public static let dismissVisibleHelp =
-    "Dismiss All Visible applies to decisions matching the current filter and search."
-}
-
 public struct SessionTaskDecisionLink: Equatable, Sendable {
   public let sessionID: String
   public let taskID: String
@@ -16,31 +11,6 @@ public struct SessionTaskDecisionLink: Equatable, Sendable {
     self.sessionID = sessionID
     self.taskID = taskID
     self.decisionID = decisionID
-  }
-}
-
-public struct SessionDecisionUndoToastState: Equatable, Identifiable, Sendable {
-  public static let commitBarrierCopy = "Closing window confirms dismissal."
-  public let id: String
-  public let decisionIDs: [String]
-  public let expiresAt: Date
-
-  public init(decisionIDs: [String], now: Date = Date()) {
-    self.decisionIDs = decisionIDs
-    expiresAt = now.addingTimeInterval(8)
-    id = "\(decisionIDs.joined(separator: ","))-\(expiresAt.timeIntervalSinceReferenceDate)"
-  }
-
-  public var count: Int {
-    decisionIDs.count
-  }
-
-  public var dismissedCopy: String {
-    "Dismissed \(count) decision\(count == 1 ? "" : "s")"
-  }
-
-  public var accessibilityCopy: String {
-    "\(dismissedCopy). Undo available. \(Self.commitBarrierCopy)"
   }
 }
 
@@ -83,45 +53,6 @@ public final class SessionDecisionFilterState {
       severities: severities,
       scope: scope
     )
-  }
-}
-
-@MainActor
-@Observable
-public final class SessionDecisionBulkActionState {
-  public var lastDismissedBatch: [String] = []
-  public var reopenRequestedBatch: [String]?
-  public var undoToast: SessionDecisionUndoToastState?
-
-  public init() {}
-
-  public func recordDismissedBatch(
-    _ ids: [String],
-    undoManager: UndoManager?,
-    now: Date = Date()
-  ) {
-    guard !ids.isEmpty else { return }
-    lastDismissedBatch = ids
-    undoToast = SessionDecisionUndoToastState(decisionIDs: ids, now: now)
-    undoManager?.registerUndo(withTarget: self) { target in
-      target.requestReopen(ids)
-    }
-    undoManager?.setActionName("Dismiss Decisions")
-  }
-
-  public func requestReopen(_ ids: [String]) {
-    reopenRequestedBatch = ids
-    undoToast = nil
-  }
-
-  public func requestUndoToastReopen() {
-    guard let undoToast else { return }
-    requestReopen(undoToast.decisionIDs)
-  }
-
-  public func clearExpiredUndoToast(now: Date = Date()) {
-    guard let undoToast, now >= undoToast.expiresAt else { return }
-    self.undoToast = nil
   }
 }
 

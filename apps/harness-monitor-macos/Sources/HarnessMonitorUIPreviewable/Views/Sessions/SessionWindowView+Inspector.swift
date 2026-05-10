@@ -35,15 +35,6 @@ extension SessionWindowView {
     )
   }
 
-  var decisionCommand: SessionDecisionCommand {
-    SessionDecisionCommandFactory.make(
-      store: store,
-      state: stateCache,
-      visibleDecisions: matchingDecisions,
-      undoManager: undoManager
-    )
-  }
-
   var createContext: SessionCreateContext {
     let cache = stateCache
     return SessionCreateContext(

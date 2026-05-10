@@ -57,6 +57,5 @@ private struct HarnessMonitorSupplementalCommandSet: Commands {
     )
     SessionWindowCycleCommands()
     InspectorCommands()
-    DecisionCommands()
   }
 }

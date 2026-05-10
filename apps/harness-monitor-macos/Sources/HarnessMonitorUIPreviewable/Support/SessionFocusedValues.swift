@@ -83,41 +83,6 @@ public struct SessionCreateContext: Equatable, @unchecked Sendable {
   }
 }
 
-public struct SessionDecisionCommand: Equatable, @unchecked Sendable {
-  public let sessionID: String
-  public let canDismissSelected: Bool
-  public let canDismissVisible: Bool
-  public let canReopenBatch: Bool
-  public let dismissSelected: () -> Void
-  public let dismissVisible: () -> Void
-  public let reopenBatch: () -> Void
-
-  public init(
-    sessionID: String,
-    canDismissSelected: Bool,
-    canDismissVisible: Bool,
-    canReopenBatch: Bool,
-    dismissSelected: @escaping () -> Void,
-    dismissVisible: @escaping () -> Void,
-    reopenBatch: @escaping () -> Void
-  ) {
-    self.sessionID = sessionID
-    self.canDismissSelected = canDismissSelected
-    self.canDismissVisible = canDismissVisible
-    self.canReopenBatch = canReopenBatch
-    self.dismissSelected = dismissSelected
-    self.dismissVisible = dismissVisible
-    self.reopenBatch = reopenBatch
-  }
-
-  public static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.sessionID == rhs.sessionID
-      && lhs.canDismissSelected == rhs.canDismissSelected
-      && lhs.canDismissVisible == rhs.canDismissVisible
-      && lhs.canReopenBatch == rhs.canReopenBatch
-  }
-}
-
 private struct SessionNavigationFocusKey: FocusedValueKey {
   typealias Value = SessionNavigationCommand
 }
@@ -128,10 +93,6 @@ private struct SessionAttentionFocusKey: FocusedValueKey {
 
 private struct SessionInspectorFocusKey: FocusedValueKey {
   typealias Value = SessionInspectorCommand
-}
-
-private struct SessionDecisionFocusKey: FocusedValueKey {
-  typealias Value = SessionDecisionCommand
 }
 
 private struct SessionCreateContextFocusKey: FocusedValueKey {
@@ -152,11 +113,6 @@ extension FocusedValues {
   public var sessionInspector: SessionInspectorCommand? {
     get { self[SessionInspectorFocusKey.self] }
     set { self[SessionInspectorFocusKey.self] = newValue }
-  }
-
-  public var sessionDecisionCommands: SessionDecisionCommand? {
-    get { self[SessionDecisionFocusKey.self] }
-    set { self[SessionDecisionFocusKey.self] = newValue }
   }
 
   public var sessionCreateContext: SessionCreateContext? {
