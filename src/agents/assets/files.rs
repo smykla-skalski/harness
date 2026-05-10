@@ -115,6 +115,20 @@ fn unexpected_output_drift(output: &PlannedOutput) -> Result<Vec<String>, CliErr
         .collect())
 }
 
+fn walkdir_err(error: &walkdir::Error, managed_root: &Path) -> CliError {
+    let failing_path = error
+        .path()
+        .map_or_else(|| managed_root.display().to_string(), |path| {
+            path.display().to_string()
+        });
+    CliErrorKind::workflow_io(format!(
+        "failed to scan generated root {} at {}: {error}",
+        managed_root.display(),
+        failing_path
+    ))
+    .into()
+}
+
 fn unexpected_output_paths(output: &PlannedOutput) -> Result<Vec<PathBuf>, CliError> {
     if !output.managed_root.exists() {
         return Ok(Vec::new());
@@ -127,7 +141,7 @@ fn unexpected_output_paths(output: &PlannedOutput) -> Result<Vec<PathBuf>, CliEr
         .min_depth(1)
         .follow_links(false)
     {
-        let entry = entry.map_err(|error| io_err(&error))?;
+        let entry = entry.map_err(|error| walkdir_err(&error, &output.managed_root))?;
         if entry.file_type().is_dir() {
             continue;
         }
