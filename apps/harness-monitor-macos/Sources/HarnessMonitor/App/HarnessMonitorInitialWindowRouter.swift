@@ -95,14 +95,12 @@ struct HarnessMonitorInitialWindowRouter {
           count += 1
         }
       }
-      let foregroundExpectedCount = restorePlan.tabGroupings.reduce(into: 0) {
-        count, grouping in
+      let foregroundExpectedCount = restorePlan.tabGroupings.reduce(into: 0) { count, grouping in
         if grouping.foregroundSessionID != nil {
           count += 1
         }
       }
-      let foregroundResolvedCount = restorePlan.tabGroupings.reduce(into: 0) {
-        count, grouping in
+      let foregroundResolvedCount = restorePlan.tabGroupings.reduce(into: 0) { count, grouping in
         guard let foregroundID = grouping.foregroundSessionID,
           registry.window(forSessionID: foregroundID) != nil
         else {
@@ -116,7 +114,8 @@ struct HarnessMonitorInitialWindowRouter {
         expected_members=\(expectedSessionIDs.count, privacy: .public) \
         bound_members=\(boundSessionIDCount, privacy: .public) \
         missed_members=\(expectedSessionIDs.count - boundSessionIDCount, privacy: .public) \
-        foreground_resolved=\(foregroundResolvedCount, privacy: .public)/\(foregroundExpectedCount, privacy: .public) \
+        foreground_resolved=\(foregroundResolvedCount, privacy: .public)/\
+        \(foregroundExpectedCount, privacy: .public) \
         converged=\(converged, privacy: .public)
         """
       )

@@ -96,8 +96,9 @@ private struct SessionWindowPlainTapMonitor: NSViewRepresentable {
       guard hostWindow !== window else { return }
       stop()
       hostWindow = window
-      monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown]) {
-        [weak self, weak window] event in
+      monitor = NSEvent.addLocalMonitorForEvents(
+        matching: [.leftMouseDown]
+      ) { [weak self, weak window] event in
         guard let self, let window, event.window === window else {
           return event
         }
