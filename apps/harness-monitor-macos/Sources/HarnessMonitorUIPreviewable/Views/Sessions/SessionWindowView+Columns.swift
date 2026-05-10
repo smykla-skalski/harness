@@ -1,73 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-public enum SessionWindowFocusModePolicy {
-  public static func usesRouteContent(selection: SessionSelection) -> Bool {
-    selection.route != nil
-  }
-}
-
-public enum SessionDecisionAutoSelectionPolicy {
-  public static func preferredDecisionID(
-    selection: SessionSelection,
-    sessionID: String,
-    allDecisionIDs: Set<String>,
-    visibleDecisionIDs: [String]
-  ) -> String? {
-    guard let firstVisibleDecisionID = visibleDecisionIDs.first else {
-      return nil
-    }
-
-    switch selection {
-    case .decision(
-      let selectedSessionID,
-      let decisionID
-    ) where selectedSessionID == sessionID && !allDecisionIDs.contains(decisionID):
-      return firstVisibleDecisionID
-    default:
-      return nil
-    }
-  }
-
-  public static func preferredRouteDetailDecisionID(
-    rememberedDecisionID: String?,
-    allDecisionIDs: Set<String>,
-    visibleDecisionIDs: [String]
-  ) -> String? {
-    if let firstVisibleDecisionID = visibleDecisionIDs.first {
-      if let rememberedDecisionID, visibleDecisionIDs.contains(rememberedDecisionID) {
-        return rememberedDecisionID
-      }
-      return firstVisibleDecisionID
-    }
-    if let rememberedDecisionID, allDecisionIDs.contains(rememberedDecisionID) {
-      return rememberedDecisionID
-    }
-    return nil
-  }
-}
-
 extension SessionWindowView {
-  func pendingUserPrompt(for agentID: String) -> AgentPendingUserPrompt? {
-    guard
-      let prompt = snapshot?.detail?.agentActivity
-        .first(where: { $0.agentId == agentID })?
-        .pendingUserPrompt,
-      prompt.primaryQuestion != nil
-    else {
-      return nil
-    }
-    return prompt
-  }
-
-  var decisionsCacheTrigger: SessionDecisionFilterKey {
-    SessionDecisionFilterKey(
-      sessionID: token.sessionID,
-      decisions: store.supervisorOpenDecisions.filter { $0.sessionID == token.sessionID },
-      filters: stateCache.decisionFilters
-    )
-  }
-
   func recomputeDecisionsCache() async {
     let all = store.supervisorOpenDecisions.filter { $0.sessionID == token.sessionID }
     let decisionsByID = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
@@ -311,7 +245,8 @@ extension SessionWindowView {
         timelineWindow: snapshot.timelineWindow,
         decisions: matchingDecisions,
         isTimelineLoading: isLoading,
-        store: store
+        store: store,
+        timelineLoading: sessionTimelineLoading
       )
     case .terminal: SessionWindowRunsList(detail: snapshot.detail, state: stateCache)
     }
@@ -408,33 +343,24 @@ extension SessionWindowView {
       if let task = snapshot?.detail?.tasks.first(where: { $0.taskId == taskID }) {
         SessionTaskDetailPane(
           task: task,
-          openActions: {
-            store.presentedSheet = .taskActions(
-              sessionID: token.sessionID,
-              taskID: task.taskId
-            )
-          }
+          openActions: { presentTaskActions(for: task.taskId) }
         )
       } else {
-        SessionDetailEmptySurface {
-          ContentUnavailableView(
-            "Task Not Available",
-            systemImage: "checklist",
-            description: Text(taskID)
-          )
-        }
+        unavailableDetailSurface(
+          "Task Not Available",
+          systemImage: "checklist",
+          description: Text(taskID)
+        )
       }
     case .codexRun(_, let runID):
       if let run = sessionCodexRuns.first(where: { $0.runId == runID }) {
         SessionCodexRunDetailSection(store: store, run: run)
       } else {
-        SessionDetailEmptySurface {
-          ContentUnavailableView(
-            "Codex Run Not Available",
-            systemImage: "wand.and.stars",
-            description: Text(runID)
-          )
-        }
+        unavailableDetailSurface(
+          "Codex Run Not Available",
+          systemImage: "wand.and.stars",
+          description: Text(runID)
+        )
       }
     case .create(let draft):
       SessionWindowCreateForm(
@@ -455,18 +381,31 @@ extension SessionWindowView {
         showsFilteredNotice: sessionDecisionDetailHiddenByFilters
       )
     case .route:
-      SessionDetailEmptySurface {
-        ContentUnavailableView(
-          "Select an Item",
-          systemImage: "sidebar.right",
-          description: Text("Pick an agent, decision, or task in the sidebar.")
-        )
-      }
+      unavailableDetailSurface(
+        "Select an Item",
+        systemImage: "sidebar.right",
+        description: Text("Pick an agent, decision, or task in the sidebar.")
+      )
     }
   }
 
   var sessionCodexRuns: [CodexRunSnapshot] {
     store.selectedCodexRuns.filter { $0.sessionId == token.sessionID }
+  }
+
+  private func presentTaskActions(for taskID: String) {
+    store.presentedSheet = .taskActions(sessionID: token.sessionID, taskID: taskID)
+  }
+
+  @ViewBuilder
+  private func unavailableDetailSurface(
+    _ title: String,
+    systemImage: String,
+    description: Text
+  ) -> some View {
+    SessionDetailEmptySurface {
+      ContentUnavailableView(title, systemImage: systemImage, description: description)
+    }
   }
 
   private func decisionsByID(_ decision: Decision?, fallbackID: String) -> Decision? {
