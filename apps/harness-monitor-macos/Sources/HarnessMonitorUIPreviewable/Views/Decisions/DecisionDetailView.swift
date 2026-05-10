@@ -75,6 +75,31 @@ public struct DecisionDetailView: View {
     _selectedTab = selectedTab
   }
 
+  // Optional viewModel form. Callers that own a long-lived viewModel via
+  // `@State` keyed on decision.id pass nil here when there's no selection.
+  // This keeps the SwiftUI tree identity stable across nil flips without
+  // forcing the view to allocate a fresh `@Observable` instance per parent
+  // body invocation (which would thrash every ForEach evictor downstream).
+  public init(
+    viewModel: DecisionDetailViewModel?,
+    store: HarnessMonitorStore? = nil,
+    auditEvents: [SupervisorEvent] = [],
+    selectedTab: Binding<DecisionDetailTab> = .constant(.context),
+    observer: ObserverSummary? = nil,
+    decisionScope: DecisionWorkspaceScope? = nil,
+    primaryActionFocusDecisionID: String? = nil,
+    primaryActionFocusRequestTick: Int = 0
+  ) {
+    self.viewModel = viewModel
+    self.store = store
+    self.auditEvents = auditEvents
+    self.observer = observer
+    self.decisionScope = decisionScope
+    self.primaryActionFocusDecisionID = primaryActionFocusDecisionID
+    self.primaryActionFocusRequestTick = primaryActionFocusRequestTick
+    _selectedTab = selectedTab
+  }
+
   public init(
     decision: Decision,
     store: HarnessMonitorStore? = nil,
