@@ -42,21 +42,28 @@ struct SessionTimelineView: View {
   private var textSizeIndex
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
-  @State private var filterPersistenceModeRawValue =
-    SessionTimelineFilterDefaults.readPersistenceModeRawValue()
-  @State private var appStoredFilterStateRawValue =
-    SessionTimelineFilterDefaults.readAppStateRawValue()
+  // @AppStorage is keyed: SwiftUI only invalidates when the specific
+  // UserDefaults key changes. Switching from @State + a global
+  // UserDefaults.didChangeNotification observer eliminates the broadcast
+  // that fired on every keystroke when other parts of the app (e.g.
+  // agent-composer drafts) wrote unrelated UserDefaults keys.
+  @AppStorage(SessionTimelineFilterDefaults.persistenceModeKey)
+  var filterPersistenceModeRawValue =
+    SessionTimelineFilterDefaults.defaultPersistenceMode.rawValue
+  @AppStorage(SessionTimelineFilterDefaults.appStateKey)
+  var appStoredFilterStateRawValue =
+    SessionTimelineFilterDefaults.defaultAppStateRawValue
   @SceneStorage(SessionTimelineFilterDefaults.sceneRegistryKey)
-  private var sceneStoredFilterRegistryRawValue = ""
-  @State private var scrollCommand: SessionTimelineScrollCommand?
-  @State private var scrollCommandGeneration = 0
-  @State private var pendingNavigationAfterLoad: SessionTimelinePendingNavigation?
-  @State private var pendingNavigationGeneration = 0
-  @State private var pendingEdgeLoad: SessionTimelinePendingEdgeLoad?
+  var sceneStoredFilterRegistryRawValue = ""
+  @State var scrollCommand: SessionTimelineScrollCommand?
+  @State var scrollCommandGeneration = 0
+  @State var pendingNavigationAfterLoad: SessionTimelinePendingNavigation?
+  @State var pendingNavigationGeneration = 0
+  @State var pendingEdgeLoad: SessionTimelinePendingEdgeLoad?
   @State private var cachedPresentation = SessionTimelineSectionPresentation.empty
   @State private var cachedPresentationInput = SessionTimelinePresentationInput.empty
-  @State private var viewport = SessionTimelineViewportModel()
-  @State private var filters = SessionTimelineFilterState()
+  @State var viewport = SessionTimelineViewportModel()
+  @State var filters = SessionTimelineFilterState()
 
   var body: some View {
     let input = presentationInput
@@ -80,12 +87,6 @@ struct SessionTimelineView: View {
           return
         }
         retryPendingEdgeLoadIfNeeded(for: displayPresentation)
-      }
-      .onReceive(
-        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
-          .receive(on: RunLoop.main)
-      ) { _ in
-        refreshStoredFilterDefaults()
       }
       .onChange(of: filters) { _, newValue in
         persistFilters(normalizedFilters(newValue))
@@ -129,23 +130,9 @@ struct SessionTimelineView: View {
     )
   }
 
-  private var filterPersistenceMode: SessionTimelineFilterPersistenceMode {
+  var filterPersistenceMode: SessionTimelineFilterPersistenceMode {
     SessionTimelineFilterPersistenceMode(rawValue: filterPersistenceModeRawValue)
       ?? SessionTimelineFilterDefaults.defaultPersistenceMode
-  }
-
-  private func refreshStoredFilterDefaults(userDefaults: UserDefaults = .standard) {
-    let nextPersistenceModeRawValue =
-      SessionTimelineFilterDefaults.readPersistenceModeRawValue(userDefaults: userDefaults)
-    if filterPersistenceModeRawValue != nextPersistenceModeRawValue {
-      filterPersistenceModeRawValue = nextPersistenceModeRawValue
-    }
-    let nextAppStateRawValue = SessionTimelineFilterDefaults.readAppStateRawValue(
-      userDefaults: userDefaults
-    )
-    if appStoredFilterStateRawValue != nextAppStateRawValue {
-      appStoredFilterStateRawValue = nextAppStateRawValue
-    }
   }
 
   private var routeMetrics: SessionWindowRouteContentMetrics {
@@ -157,6 +144,14 @@ struct SessionTimelineView: View {
       HarnessMonitorTheme.spacingSM,
       min(routeMetrics.contentPadding * 0.5, HarnessMonitorTheme.spacingLG)
     )
+  }
+
+  private var routeHeaderHorizontalPadding: CGFloat {
+    routeMetrics.contentPadding
+  }
+
+  private var routeTimelineHorizontalContentInset: CGFloat {
+    routeMetrics.contentPadding
   }
 
   private func normalizedFilters(_ state: SessionTimelineFilterState) -> SessionTimelineFilterState {
@@ -284,6 +279,8 @@ struct SessionTimelineView: View {
           }
         }
       }
+      .padding(.horizontal, routeHeaderHorizontalPadding)
+      .padding(.top, routePageTopPadding)
 
       if presentation.showsEmptyState {
         ContentUnavailableView(
@@ -291,6 +288,7 @@ struct SessionTimelineView: View {
           systemImage: "clock.arrow.circlepath",
           description: Text("This session has not recorded timeline activity yet.")
         )
+        .padding(.horizontal, routeHeaderHorizontalPadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
       } else {
         SessionTimelineFilterControls(
@@ -299,13 +297,11 @@ struct SessionTimelineView: View {
           summary: presentation.filterSnapshot.summary,
           layout: .chipsOnly
         )
+        .padding(.horizontal, routeHeaderHorizontalPadding)
 
         routeTimelineContent(for: presentation)
       }
     }
-    .padding(.horizontal, routeMetrics.contentPadding)
-    .padding(.bottom, routeMetrics.contentPadding)
-    .padding(.top, routePageTopPadding)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .timelineLifecycle(for: presentation, host: self)
   }
@@ -354,13 +350,17 @@ struct SessionTimelineView: View {
   private func routeTimelineContent(
     for presentation: SessionTimelineSectionPresentation
   ) -> some View {
-    timelineRows(for: presentation)
+    timelineRows(
+      for: presentation,
+      horizontalContentInset: routeTimelineHorizontalContentInset
+    )
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   @ViewBuilder
   private func timelineRows(
-    for presentation: SessionTimelineSectionPresentation
+    for presentation: SessionTimelineSectionPresentation,
+    horizontalContentInset: CGFloat = 0
   ) -> some View {
     if presentation.showsFilteredEmptyState {
       SessionTimelineFilteredEmptyState(filters: $filters)
@@ -368,7 +368,8 @@ struct SessionTimelineView: View {
       SessionTimelinePlaceholderScrollView(
         presentation: presentation,
         actionHandler: actionHandler,
-        contentIdentity: contentIdentity
+        contentIdentity: contentIdentity,
+        horizontalContentInset: horizontalContentInset
       )
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     } else {
@@ -377,6 +378,7 @@ struct SessionTimelineView: View {
         rows: presentation.rows,
         virtualization: presentation.tableVirtualization,
         contentIdentity: contentIdentity,
+        horizontalContentInset: horizontalContentInset,
         scrollCommand: scrollCommand,
         actionHandler: actionHandler,
         onSignalTap: { [store] signalID in
@@ -398,51 +400,4 @@ struct SessionTimelineView: View {
     }
   }
 
-  var currentTimelineScrollCommand: SessionTimelineScrollCommand? {
-    get { scrollCommand }
-    nonmutating set { scrollCommand = newValue }
-  }
-
-  var currentTimelineScrollCommandGeneration: Int {
-    get { scrollCommandGeneration }
-    nonmutating set { scrollCommandGeneration = newValue }
-  }
-
-  var currentPendingNavigation: SessionTimelinePendingNavigation? {
-    get { pendingNavigationAfterLoad }
-    nonmutating set { pendingNavigationAfterLoad = newValue }
-  }
-
-  var currentPendingNavigationGeneration: Int {
-    get { pendingNavigationGeneration }
-    nonmutating set { pendingNavigationGeneration = newValue }
-  }
-
-  var currentPendingEdgeLoad: SessionTimelinePendingEdgeLoad? {
-    get { pendingEdgeLoad }
-    nonmutating set { pendingEdgeLoad = newValue }
-  }
-
-  var timelineViewport: SessionTimelineViewportModel {
-    viewport
-  }
-
-  var currentFilterPersistenceMode: SessionTimelineFilterPersistenceMode {
-    filterPersistenceMode
-  }
-
-  var currentFilters: SessionTimelineFilterState {
-    get { filters }
-    nonmutating set { filters = newValue }
-  }
-
-  var currentAppStoredFilterStateRawValue: String {
-    get { appStoredFilterStateRawValue }
-    nonmutating set { appStoredFilterStateRawValue = newValue }
-  }
-
-  var currentSceneStoredFilterRegistryRawValue: String {
-    get { sceneStoredFilterRegistryRawValue }
-    nonmutating set { sceneStoredFilterRegistryRawValue = newValue }
-  }
 }
