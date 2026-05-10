@@ -31,6 +31,7 @@ extension SessionWindowFlowTests {
     #expect(!sectionSource.contains("Dismiss Selected"))
     #expect(!sectionSource.contains("Dismiss All Visible"))
     #expect(!sectionSource.contains("SessionDecisionFilterControls"))
+    #expect(!sectionSource.contains(".badge(Text(\"\\(decisions.count) pending\"))"))
     #expect(columnsSource.contains("decisions: allSessionDecisions"))
     #expect(sidebarSource.contains("case .decision:\n        return false"))
     #expect(sidebarSource.contains("case .decision: return"))
@@ -45,16 +46,19 @@ extension SessionWindowFlowTests {
 
     #expect(sectionsSource.contains("struct SessionSidebarHeaderCreateButton: View"))
     #expect(sectionsSource.contains("Button(\"+\")"))
+    #expect(sectionsSource.contains("HStack(alignment: .sessionSidebarHeaderButtonCenter"))
     #expect(sectionsSource.contains(".buttonStyle(.bordered)"))
     #expect(sectionsSource.contains(".controlSize(.small)"))
-    #expect(sectionsSource.contains(".overlay(alignment: .top)"))
-    #expect(sectionsSource.contains("KeyboardShortcutLabel(\n        shortcut: kind.createShortcut"))
+    #expect(sectionsSource.contains("VStack(alignment: .trailing"))
+    #expect(sectionsSource.contains(".alignmentGuide(.sessionSidebarHeaderButtonCenter)"))
+    #expect(sectionsSource.contains("private var displayedShortcut: KeyboardShortcutDescriptor"))
+    #expect(sectionsSource.contains("shortcut: displayedShortcut"))
     #expect(sectionsSource.contains("revealPolicy: .revealOnRelevantModifierHold"))
     #expect(sectionsSource.contains(".padding(.trailing, HarnessMonitorTheme.spacingSM)"))
     #expect(sectionsSource.contains("currentModifiers: shortcutRevealModifiers"))
-    #expect(sectionsSource.contains("SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .agent,\n        accessibilityLabel: \"New Agent\",\n        currentModifiers: shortcutRevealModifiers"))
-    #expect(sectionsSource.contains("SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .task,\n        accessibilityLabel: \"New Task\",\n        currentModifiers: shortcutRevealModifiers"))
-    #expect(decisionsSource.contains("SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .decision,\n        accessibilityLabel: \"New Decision\",\n        currentModifiers: shortcutRevealModifiers"))
+    #expect(sectionsSource.contains("SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .agent,\n        primaryKind: primaryCreateKind,\n        accessibilityLabel: \"New Agent\",\n        currentModifiers: shortcutRevealModifiers"))
+    #expect(sectionsSource.contains("SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .task,\n        primaryKind: primaryCreateKind,\n        accessibilityLabel: \"New Task\",\n        currentModifiers: shortcutRevealModifiers"))
+    #expect(decisionsSource.contains("SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .decision,\n        primaryKind: primaryCreateKind,\n        accessibilityLabel: \"New Decision\",\n        currentModifiers: shortcutRevealModifiers"))
   }
 
   @Test("Keyboard shortcut descriptors support reveal across modifier families")
@@ -81,6 +85,16 @@ extension SessionWindowFlowTests {
     #expect(controlShiftShortcut.isRevealed(by: [.control]))
     #expect(controlShiftShortcut.isRevealed(by: [.shift]))
     #expect(!controlShiftShortcut.isRevealed(by: [.option]))
+  }
+
+  @Test("Displayed create shortcut follows the primary create kind")
+  func displayedCreateShortcutFollowsPrimaryCreateKind() {
+    #expect(SessionSelection.route(.agents).primaryCreateKind == .agent)
+    #expect(SessionSelection.route(.tasks).primaryCreateKind == .task)
+    #expect(SessionSelection.route(.decisions).primaryCreateKind == .decision)
+    #expect(SessionCreateKind.agent.displayedCreateShortcut(primaryKind: .agent).hint == "⌘N")
+    #expect(SessionCreateKind.task.displayedCreateShortcut(primaryKind: .agent).hint == "⌥⌘T")
+    #expect(SessionCreateKind.decision.displayedCreateShortcut(primaryKind: .decision).hint == "⌘N")
   }
 
   @MainActor

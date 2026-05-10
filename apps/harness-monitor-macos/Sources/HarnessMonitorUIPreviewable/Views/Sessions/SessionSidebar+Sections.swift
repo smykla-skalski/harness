@@ -1,6 +1,18 @@
 import HarnessMonitorKit
 import SwiftUI
 
+private enum SessionSidebarHeaderButtonCenterAlignment: AlignmentID {
+  static func defaultValue(in dimensions: ViewDimensions) -> CGFloat {
+    dimensions[VerticalAlignment.center]
+  }
+}
+
+extension VerticalAlignment {
+  static let sessionSidebarHeaderButtonCenter = VerticalAlignment(
+    SessionSidebarHeaderButtonCenterAlignment.self
+  )
+}
+
 extension SessionSidebar {
   @ViewBuilder var agentsSection: some View {
     Section {
@@ -215,7 +227,7 @@ extension SessionSidebar {
   }
 
   private var agentsSectionHeader: some View {
-    HStack(spacing: 6) {
+    HStack(alignment: .sessionSidebarHeaderButtonCenter, spacing: 6) {
       Text("Agents")
       if state.sectionState.hasDraft(.agent) {
         Image(systemName: "circle.fill")
@@ -227,6 +239,7 @@ extension SessionSidebar {
       SessionSidebarHeaderCreateButton(
         state: state,
         kind: .agent,
+        primaryKind: primaryCreateKind,
         accessibilityLabel: "New Agent",
         currentModifiers: shortcutRevealModifiers
       )
@@ -234,7 +247,7 @@ extension SessionSidebar {
   }
 
   private var taskSectionHeader: some View {
-    HStack(spacing: 6) {
+    HStack(alignment: .sessionSidebarHeaderButtonCenter, spacing: 6) {
       Text("Tasks")
       if state.sectionState.hasDraft(.task) {
         Image(systemName: "circle.fill")
@@ -246,6 +259,7 @@ extension SessionSidebar {
       SessionSidebarHeaderCreateButton(
         state: state,
         kind: .task,
+        primaryKind: primaryCreateKind,
         accessibilityLabel: "New Task",
         currentModifiers: shortcutRevealModifiers
       )
@@ -255,33 +269,39 @@ extension SessionSidebar {
 
 struct SessionSidebarHeaderCreateButton: View {
   @ScaledMetric(relativeTo: .caption) private var shortcutKeySpacing = HarnessMonitorTheme.spacingXS - 1
-  @ScaledMetric(relativeTo: .caption) private var shortcutOverlayOffset = HarnessMonitorTheme.spacingLG - 2
+  @ScaledMetric(relativeTo: .caption) private var shortcutButtonGap = 1
 
   let state: SessionWindowStateCache
   let kind: SessionCreateKind
+  let primaryKind: SessionCreateKind
   let accessibilityLabel: String
   let currentModifiers: EventModifiers
 
+  private var displayedShortcut: KeyboardShortcutDescriptor {
+    kind.displayedCreateShortcut(primaryKind: primaryKind)
+  }
+
   var body: some View {
-    Button("+") {
-      state.selectCreate(kind)
-    }
-    .buttonStyle(.bordered)
-    .controlSize(.small)
-    .overlay(alignment: .top) {
+    VStack(alignment: .trailing, spacing: shortcutButtonGap) {
       KeyboardShortcutLabel(
-        shortcut: kind.createShortcut,
+        shortcut: displayedShortcut,
         activeModifiers: currentModifiers,
         revealPolicy: .revealOnRelevantModifierHold,
         keySpacing: shortcutKeySpacing
       )
-      .fixedSize()
-      .allowsHitTesting(false)
-      .offset(y: -shortcutOverlayOffset)
-      .zIndex(1)
+      .fixedSize(horizontal: true, vertical: true)
+
+      Button("+") {
+        state.selectCreate(kind)
+      }
+      .alignmentGuide(.sessionSidebarHeaderButtonCenter) { dimensions in
+        dimensions[VerticalAlignment.center]
+      }
+      .buttonStyle(.bordered)
+      .controlSize(.small)
+      .help("\(accessibilityLabel) (\(displayedShortcut.hint))")
+      .accessibilityLabel(accessibilityLabel)
     }
-    .help("\(accessibilityLabel) (\(kind.createShortcutHint))")
-    .accessibilityLabel(accessibilityLabel)
     .padding(.trailing, HarnessMonitorTheme.spacingSM)
   }
 }

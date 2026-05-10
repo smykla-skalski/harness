@@ -58,9 +58,8 @@ extension SessionSidebar {
   }
 
   var decisionsHeader: some View {
-    HStack(spacing: 6) {
+    HStack(alignment: .sessionSidebarHeaderButtonCenter, spacing: 6) {
       Text("Decisions")
-        .badge(Text("\(decisions.count) pending"))
       if state.sectionState.hasDraft(.decision) {
         Image(systemName: "circle.fill")
           .font(.caption2)
@@ -71,6 +70,7 @@ extension SessionSidebar {
       SessionSidebarHeaderCreateButton(
         state: state,
         kind: .decision,
+        primaryKind: primaryCreateKind,
         accessibilityLabel: "New Decision",
         currentModifiers: shortcutRevealModifiers
       )

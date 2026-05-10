@@ -6,6 +6,12 @@ public enum SessionCreateKind: String, Codable, Hashable, Sendable {
   case task
   case decision
 
+  public static let primaryCreateShortcut = KeyboardShortcutDescriptor(
+    modifiers: [.command],
+    keyEquivalent: "n",
+    keyLabel: "N"
+  )
+
   public var createShortcut: KeyboardShortcutDescriptor {
     switch self {
     case .agent:
@@ -35,6 +41,10 @@ public enum SessionCreateKind: String, Codable, Hashable, Sendable {
 
   public var createShortcutHint: String {
     createShortcut.hint
+  }
+
+  public func displayedCreateShortcut(primaryKind: SessionCreateKind) -> KeyboardShortcutDescriptor {
+    self == primaryKind ? Self.primaryCreateShortcut : createShortcut
   }
 }
 
@@ -194,6 +204,28 @@ public enum SessionSelection: Hashable, Sendable {
     case .task: .tasks
     case .codexRun, .create: nil
     case .route(let route): route.appSearchDomain
+    }
+  }
+
+  public var primaryCreateKind: SessionCreateKind {
+    switch self {
+    case .agent, .codexRun:
+      .agent
+    case .task:
+      .task
+    case .decision:
+      .decision
+    case .create(let draft):
+      draft.kind
+    case .route(let route):
+      switch route {
+      case .tasks:
+        .task
+      case .decisions:
+        .decision
+      case .agents, .overview, .timeline, .terminal:
+        .agent
+      }
     }
   }
 }

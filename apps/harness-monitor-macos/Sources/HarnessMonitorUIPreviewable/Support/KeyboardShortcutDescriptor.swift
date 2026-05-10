@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum KeyboardShortcutModifierToken: Equatable {
+enum KeyboardShortcutModifierToken: Equatable, Sendable {
   case command
   case option
   case control
@@ -25,7 +25,7 @@ enum KeyboardShortcutModifierToken: Equatable {
   }
 }
 
-enum KeyboardShortcutDisplayPart: Equatable {
+enum KeyboardShortcutDisplayPart: Equatable, Sendable {
   case modifier(KeyboardShortcutModifierToken)
   case key(String)
 
@@ -46,7 +46,7 @@ enum KeyboardShortcutDisplayPart: Equatable {
   }
 }
 
-public struct KeyboardShortcutDescriptor: Equatable {
+public struct KeyboardShortcutDescriptor: Equatable, Sendable {
   let modifiers: [KeyboardShortcutModifierToken]
   let keyLabel: String
   public let keyEquivalent: KeyEquivalent
@@ -80,7 +80,7 @@ public struct KeyboardShortcutDescriptor: Equatable {
   }
 }
 
-enum KeyboardShortcutRevealPolicy: Equatable {
+enum KeyboardShortcutRevealPolicy: Equatable, Sendable {
   case alwaysVisible
   case revealOnRelevantModifierHold
 }

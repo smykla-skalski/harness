@@ -48,19 +48,7 @@ extension SessionWindowView {
   }
 
   var primaryCreateKind: SessionCreateKind {
-    switch stateCache.selection {
-    case .agent: .agent
-    case .codexRun: .agent
-    case .task: .task
-    case .decision: .decision
-    case .create(let draft): draft.kind
-    case .route(let route):
-      switch route {
-      case .tasks: .task
-      case .decisions: .decision
-      case .agents, .overview, .timeline, .terminal: .agent
-      }
-    }
+    stateCache.selection.primaryCreateKind
   }
 
   func updateDetailColumnWidth(

@@ -91,7 +91,7 @@ struct KeyboardShortcutLabel: View {
       ForEach(Array(shortcut.displayParts.enumerated()), id: \.offset) { _, part in
         Text(part.text)
           .scaledFont(.caption.monospaced())
-          .foregroundStyle(foregroundStyle(for: part))
+          .foregroundStyle(foregroundColor(for: part))
       }
     }
     .opacity(isRevealed ? 1 : 0)
@@ -99,11 +99,11 @@ struct KeyboardShortcutLabel: View {
     .accessibilityLabel(shortcut.hint)
   }
 
-  private func foregroundStyle(for part: KeyboardShortcutDisplayPart) -> AnyShapeStyle {
+  private func foregroundColor(for part: KeyboardShortcutDisplayPart) -> Color {
     if part.isHighlighted(with: activeModifiers) {
-      return AnyShapeStyle(HarnessMonitorTheme.secondaryInk)
+      return HarnessMonitorTheme.secondaryInk
     }
-    return AnyShapeStyle(.tertiary)
+    return .secondary
   }
 }
 
