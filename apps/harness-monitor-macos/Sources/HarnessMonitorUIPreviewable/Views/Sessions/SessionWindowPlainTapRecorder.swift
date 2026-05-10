@@ -135,7 +135,7 @@ private struct SessionWindowPlainTapMonitor: NSViewRepresentable {
   }
 }
 
-struct SessionSidebarModifierKeysMonitor: NSViewRepresentable {
+struct SessionWindowModifierKeysMonitor: NSViewRepresentable {
   @Binding var currentModifiers: EventModifiers
 
   func makeCoordinator() -> Coordinator {
@@ -218,6 +218,149 @@ struct SessionSidebarModifierKeysMonitor: NSViewRepresentable {
       let attachedWindow = window
       Task { @MainActor in
         coordinator?.attach(to: attachedWindow)
+      }
+    }
+  }
+}
+
+struct SessionWindowSidebarShortcutOverlay: View {
+  @ScaledMetric(relativeTo: .caption) private var shortcutKeySpacing = HarnessMonitorTheme.spacingXS - 1
+  @ScaledMetric(relativeTo: .caption) private var shortcutVerticalOffset = 18
+
+  let currentModifiers: EventModifiers
+  @State private var sidebarButtonFrame: CGRect = .null
+
+  private let shortcut = KeyboardShortcutDescriptor.toggleSidebar
+
+  var body: some View {
+    Color.clear
+      .background(
+        SessionWindowSidebarButtonFrameReader(sidebarButtonFrame: $sidebarButtonFrame)
+          .frame(width: 0, height: 0)
+          .accessibilityHidden(true)
+      )
+      .overlay(alignment: .topLeading) {
+        if !sidebarButtonFrame.isNull {
+          KeyboardShortcutLabel(
+            shortcut: shortcut,
+            activeModifiers: currentModifiers,
+            revealPolicy: .revealOnRelevantModifierHold,
+            keySpacing: shortcutKeySpacing
+          )
+          .fixedSize(horizontal: true, vertical: true)
+          .position(
+            x: sidebarButtonFrame.midX,
+            y: sidebarButtonFrame.maxY + shortcutVerticalOffset
+          )
+          .zIndex(1)
+        }
+      }
+      .allowsHitTesting(false)
+      .accessibilityHidden(true)
+      .ignoresSafeArea(.container, edges: .top)
+  }
+}
+
+private struct SessionWindowSidebarButtonFrameReader: NSViewRepresentable {
+  @Binding var sidebarButtonFrame: CGRect
+
+  func makeCoordinator() -> Coordinator {
+    Coordinator(update: { frame in
+      sidebarButtonFrame = frame
+    })
+  }
+
+  func makeNSView(context: Context) -> NSView {
+    let view = TrackingView()
+    view.coordinator = context.coordinator
+    return view
+  }
+
+  func updateNSView(_ nsView: NSView, context: Context) {
+    guard let trackingView = nsView as? TrackingView else {
+      return
+    }
+    trackingView.coordinator = context.coordinator
+    context.coordinator.refresh(relativeTo: trackingView)
+  }
+
+  static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+    if let trackingView = nsView as? TrackingView {
+      trackingView.coordinator = nil
+    }
+    coordinator.clear()
+  }
+
+  @MainActor
+  final class Coordinator {
+    private let update: (CGRect) -> Void
+    private let toggleSidebarSelector = NSSelectorFromString("toggleSidebar:")
+
+    init(update: @escaping (CGRect) -> Void) {
+      self.update = update
+    }
+
+    func refresh(relativeTo anchorView: NSView) {
+      guard let window = anchorView.window else {
+        update(.null)
+        return
+      }
+      guard let sidebarButton = locateSidebarButton(in: window.contentView?.superview) else {
+        update(.null)
+        return
+      }
+
+      let windowRect = sidebarButton.convert(sidebarButton.bounds, to: nil)
+      update(anchorView.convert(windowRect, from: nil))
+    }
+
+    func clear() {
+      update(.null)
+    }
+
+    private func locateSidebarButton(in view: NSView?) -> NSButton? {
+      guard let view else {
+        return nil
+      }
+      if let button = view as? NSButton, isSidebarButton(button) {
+        return button
+      }
+      for subview in view.subviews {
+        if let match = locateSidebarButton(in: subview) {
+          return match
+        }
+      }
+      return nil
+    }
+
+    private func isSidebarButton(_ button: NSButton) -> Bool {
+      if button.action == toggleSidebarSelector {
+        return true
+      }
+      if button.cell?.action == toggleSidebarSelector {
+        return true
+      }
+      if let toolTip = button.toolTip, toolTip.localizedCaseInsensitiveContains("sidebar") {
+        return true
+      }
+      if let identifier = button.identifier?.rawValue,
+         identifier.localizedCaseInsensitiveContains("sidebar")
+      {
+        return true
+      }
+      return false
+    }
+  }
+
+  final class TrackingView: NSView {
+    nonisolated(unsafe) var coordinator: Coordinator?
+
+    override func viewDidMoveToWindow() {
+      super.viewDidMoveToWindow()
+      let coordinator = coordinator
+      let view = self
+      Task { @MainActor in
+        coordinator?.refresh(relativeTo: view)
       }
     }
   }
