@@ -65,7 +65,13 @@ struct SessionAgentTuiViewport: View {
       .onDisappear {
         resizeState.cancelPending()
       }
-      .onChange(of: tui?.screen.text ?? "") { _, _ in
+      // Debounce TUI bursts (.task cancels on id change). Trace measured
+      // 130,932 StyledTextContentView updates over 30s; a 30ms quiet window
+      // collapses byte-by-byte emissions into batches without perceptible
+      // text lag. Scroll throttle is preserved unchanged.
+      .task(id: tui?.screen.text ?? "") {
+        try? await Task.sleep(for: .milliseconds(30))
+        guard !Task.isCancelled else { return }
         let nextRows = tui?.screen.visibleRows(maxRows: 160) ?? []
         visibleRows = nextRows
         let now = Date.now

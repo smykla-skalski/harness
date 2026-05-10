@@ -117,7 +117,12 @@ struct SessionAgentDetailSection: View {
     .onChange(of: isTuiActive) { _, _ in
       promoteComposerFocusIfRequested()
     }
-    .onChange(of: tui?.screen.text ?? "") { _, _ in
+    // Debounce TUI screen-text bursts (.task cancels on id change). Trace
+    // showed onChange firing per byte at ~60Hz; 80ms quiet window collapses
+    // a burst into one update without VoiceOver-perceptible lag.
+    .task(id: tui?.screen.text ?? "") {
+      try? await Task.sleep(for: .milliseconds(80))
+      guard !Task.isCancelled else { return }
       let next = computeLatestOutput()
       guard next != latestOutput else { return }
       latestOutput = next
