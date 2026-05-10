@@ -67,8 +67,6 @@ struct SessionTimelineTableView: NSViewRepresentable {
   let virtualization: SessionTimelineTableVirtualization
   let contentIdentity: SessionTimelineContentIdentity?
   let horizontalContentInset: CGFloat
-  let topScrollEdgeBlurHeight: CGFloat
-  let bottomScrollEdgeBlurHeight: CGFloat
   let scrollCommand: SessionTimelineScrollCommand?
   let actionHandler: any DecisionActionHandler
   let onSignalTap: ((String) -> Void)?
@@ -84,8 +82,6 @@ struct SessionTimelineTableView: NSViewRepresentable {
     virtualization: SessionTimelineTableVirtualization,
     contentIdentity: SessionTimelineContentIdentity?,
     horizontalContentInset: CGFloat = 0,
-    topScrollEdgeBlurHeight: CGFloat = 0,
-    bottomScrollEdgeBlurHeight: CGFloat = 0,
     scrollCommand: SessionTimelineScrollCommand?,
     actionHandler: any DecisionActionHandler,
     onSignalTap: ((String) -> Void)?,
@@ -98,8 +94,6 @@ struct SessionTimelineTableView: NSViewRepresentable {
     self.virtualization = virtualization
     self.contentIdentity = contentIdentity
     self.horizontalContentInset = horizontalContentInset
-    self.topScrollEdgeBlurHeight = topScrollEdgeBlurHeight
-    self.bottomScrollEdgeBlurHeight = bottomScrollEdgeBlurHeight
     self.scrollCommand = scrollCommand
     self.actionHandler = actionHandler
     self.onSignalTap = onSignalTap
@@ -117,7 +111,7 @@ struct SessionTimelineTableView: NSViewRepresentable {
   }
 
   func makeNSView(context: Context) -> NSScrollView {
-    let scrollView = SessionTimelineTableScrollView()
+    let scrollView = NSScrollView()
     scrollView.drawsBackground = false
     scrollView.hasVerticalScroller = true
     scrollView.autohidesScrollers = false
@@ -148,7 +142,6 @@ struct SessionTimelineTableView: NSViewRepresentable {
     let documentView = SessionTimelineTableDocumentView()
     documentView.addSubview(tableView)
     scrollView.documentView = documentView
-    scrollView.installScrollEdgeEffectViews()
     scrollView.contentView.postsBoundsChangedNotifications = true
     context.coordinator.configure(
       tableView: tableView,
@@ -165,12 +158,6 @@ struct SessionTimelineTableView: NSViewRepresentable {
     // its own change-detection and short-circuits when inputs match.
     if context.coordinator.viewport !== viewport {
       context.coordinator.viewport = viewport
-    }
-    if let scrollView = scrollView as? SessionTimelineTableScrollView {
-      scrollView.updateScrollEdgeEffectHeights(
-        top: topScrollEdgeBlurHeight,
-        bottom: bottomScrollEdgeBlurHeight
-      )
     }
     context.coordinator.viewportChanged = viewportChanged
     context.coordinator.scrollBoundaryChanged = scrollBoundaryChanged
@@ -209,8 +196,6 @@ extension SessionTimelineTableView: @MainActor Equatable {
   static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.columnWidth == rhs.columnWidth
       && lhs.horizontalContentInset == rhs.horizontalContentInset
-      && lhs.topScrollEdgeBlurHeight == rhs.topScrollEdgeBlurHeight
-      && lhs.bottomScrollEdgeBlurHeight == rhs.bottomScrollEdgeBlurHeight
       && lhs.contentIdentity == rhs.contentIdentity
       && lhs.scrollCommand == rhs.scrollCommand
       && lhs.virtualization == rhs.virtualization

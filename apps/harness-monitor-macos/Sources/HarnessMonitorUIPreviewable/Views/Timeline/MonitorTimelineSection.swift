@@ -73,7 +73,7 @@ struct SessionTimelineView: View {
   // AppKit-side bounds-change notification is the only path that applies a
   // real width after first render, and it does not always fire before the
   // first paint, so cards render at the placeholder column width.
-  @State private var measuredTimelineWidth: CGFloat = 0
+  @State var measuredTimelineWidth: CGFloat = 0
 
   var body: some View {
     let input = presentationInput
@@ -162,16 +162,8 @@ struct SessionTimelineView: View {
     routeMetrics.contentPadding
   }
 
-  private var routeTimelineHorizontalContentInset: CGFloat {
+  var routeTimelineHorizontalContentInset: CGFloat {
     routeMetrics.contentPadding
-  }
-
-  private var routeTimelineTopScrollEdgeBlurHeight: CGFloat {
-    min(max(routeMetrics.contentPadding * 2.1, 48), 72)
-  }
-
-  private var routeTimelineBottomScrollEdgeBlurHeight: CGFloat {
-    min(max(routeMetrics.contentPadding * 0.9, 18), 28)
   }
 
   private func normalizedFilters(_ state: SessionTimelineFilterState) -> SessionTimelineFilterState {
@@ -263,7 +255,7 @@ struct SessionTimelineView: View {
   }
 
   private func routePageContent(for presentation: SessionTimelineSectionPresentation) -> some View {
-    VStack(alignment: .leading, spacing: 0) {
+    VStack(alignment: .leading, spacing: routeMetrics.overviewSpacing) {
       routePageHeader(for: presentation)
 
       if presentation.showsEmptyState {
@@ -376,71 +368,6 @@ struct SessionTimelineView: View {
         }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-  }
-
-  private func routeTimelineContent(
-    for presentation: SessionTimelineSectionPresentation
-  ) -> some View {
-    timelineRows(
-      for: presentation,
-      horizontalContentInset: routeTimelineHorizontalContentInset,
-      topScrollEdgeBlurHeight: routeTimelineTopScrollEdgeBlurHeight,
-      bottomScrollEdgeBlurHeight: routeTimelineBottomScrollEdgeBlurHeight
-    )
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-  }
-
-  @ViewBuilder
-  private func timelineRows(
-    for presentation: SessionTimelineSectionPresentation,
-    horizontalContentInset: CGFloat = 0,
-    topScrollEdgeBlurHeight: CGFloat = 0,
-    bottomScrollEdgeBlurHeight: CGFloat = 0
-  ) -> some View {
-    if presentation.showsFilteredEmptyState {
-      SessionTimelineFilteredEmptyState(filters: $filters)
-    } else if presentation.rows.isEmpty {
-      SessionTimelinePlaceholderScrollView(
-        presentation: presentation,
-        actionHandler: actionHandler,
-        contentIdentity: contentIdentity,
-        horizontalContentInset: horizontalContentInset,
-        showsScrollEdgeEffects: topScrollEdgeBlurHeight > 0 || bottomScrollEdgeBlurHeight > 0
-      )
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    } else {
-      // Closures are method references that read self.cachedPresentation
-      // when fired, so the representable's identity does not depend on a
-      // per-render presentation capture. Wrap in .equatable() so SwiftUI
-      // can skip updateNSView when no input changed. onGeometryChange
-      // refreshes measuredTimelineWidth when the surrounding frame resizes,
-      // which then breaks Equatable equality and re-applies the column width
-      // in updateNSView.
-      SessionTimelineTableView(
-        columnWidth: measuredTimelineWidth,
-        rows: presentation.rows,
-        virtualization: presentation.tableVirtualization,
-        contentIdentity: contentIdentity,
-        horizontalContentInset: horizontalContentInset,
-        topScrollEdgeBlurHeight: topScrollEdgeBlurHeight,
-        bottomScrollEdgeBlurHeight: bottomScrollEdgeBlurHeight,
-        scrollCommand: scrollCommand,
-        actionHandler: actionHandler,
-        onSignalTap: handleSignalTap,
-        viewport: viewport,
-        viewportChanged: handleViewportStatsChange,
-        scrollBoundaryChanged: handleScrollBoundaryChange
-      )
-      .equatable()
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .onGeometryChange(for: CGFloat.self) { proxy in
-        proxy.size.width
-      } action: { width in
-        if abs(width - measuredTimelineWidth) >= 0.5 {
-          measuredTimelineWidth = width
-        }
-      }
-    }
   }
 
 }
