@@ -12,6 +12,7 @@ extension SessionTimelineTableView.Coordinator {
       guard let self, !Task.isCancelled else { return }
       self.isViewportMoving = false
       self.liveScrollEndTask = nil
+      self.flushPendingHeightInvalidations()
       self.boundsDidChange(forceObservedStats: true, suppressBoundaryCallbacks: true)
     }
   }
@@ -20,5 +21,6 @@ extension SessionTimelineTableView.Coordinator {
     liveScrollEndTask?.cancel()
     liveScrollEndTask = nil
     isViewportMoving = false
+    pendingHeightInvalidationIndexes = []
   }
 }

@@ -171,6 +171,9 @@ struct SessionSwiftUISourceTests {
     let filterSource = try sourceFile(at: "Views/Timeline/SessionTimelineFilterControls.swift")
     let advancedFilterSource = try sourceFile(at: "Views/Timeline/SessionTimelineFilterControls+AdvancedFilters.swift")
     let navigationSource = try sourceFile(at: "Views/Timeline/SessionTimelineNavigationControls.swift")
+    let cardsSource = try sourceFile(at: "Views/Timeline/SessionTimelineCards.swift")
+    let placeholderSource = try sourceFile(at: "Views/Timeline/SessionTimelinePlaceholderScrollView.swift")
+    let tableSource = try sourceFile(at: "Views/Timeline/SessionTimelineTableView.swift")
 
     #expect(timelineSource.contains("SessionTimelineFilterActionButtons("))
     #expect(timelineSource.contains("showsClearButton: false"))
@@ -182,9 +185,14 @@ struct SessionSwiftUISourceTests {
         "HarnessMonitorAccessibility.sessionTimelineNavigationStatus"
       )
     )
+    #expect(timelineSource.contains("private var routeHeaderHorizontalPadding"))
+    #expect(timelineSource.contains("private var routeTimelineHorizontalContentInset"))
+    #expect(timelineSource.contains(".padding(.horizontal, routeHeaderHorizontalPadding)"))
     #expect(!timelineSource.contains("showsButtons: false"))
     #expect(!timelineSource.contains("spacing: HarnessMonitorTheme.spacingSM * 2"))
     #expect(timelineSource.contains(".padding(.top, routePageTopPadding)"))
+    #expect(!timelineSource.contains(".padding(.bottom, routeMetrics.contentPadding)"))
+    #expect(timelineSource.contains("horizontalContentInset: routeTimelineHorizontalContentInset"))
     #expect(timelineSource.contains("copy.searchScope = .all"))
     #expect(filterSource.contains("enum Layout"))
     #expect(filterSource.contains("case chipsOnly"))
@@ -207,6 +215,10 @@ struct SessionSwiftUISourceTests {
       )
     )
     #expect(navigationSource.contains("if showsButtons {"))
+    #expect(cardsSource.contains(".multilineTextAlignment(.leading)"))
+    #expect(cardsSource.contains(".frame(width: SessionTimelineLayout.timeColumnWidth, alignment: .leading)"))
+    #expect(placeholderSource.contains(".contentMargins(.horizontal, horizontalContentInset, for: .scrollContent)"))
+    #expect(tableSource.contains("let horizontalContentInset: CGFloat"))
   }
 
   @Test("Session agent detail reuses the rich agent detail bands with session-scoped inputs")

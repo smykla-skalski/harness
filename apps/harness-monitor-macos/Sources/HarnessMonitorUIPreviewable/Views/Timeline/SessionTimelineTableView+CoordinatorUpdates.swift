@@ -31,22 +31,26 @@ extension SessionTimelineTableView.Coordinator {
     let resolvedColumnWidth = resolvedColumnWidth(for: request)
     let widthDelta = abs(resolvedColumnWidth - lastColumnWidth)
     let widthSame = widthDelta < Self.widthEqualityTolerance
+    let insetSame =
+      abs(request.horizontalContentInset - horizontalContentInset) < Self.widthEqualityTolerance
     let fontSame = abs(request.fontScale - fontScale) < 0.001
     let scrollSame = scrollCommand == lastScrollCommand && pendingScrollCommand == nil
     let identitySame = contentIdentity == heightCacheIdentity
     let virtualizationSame = virtualization == self.virtualization
 
-    if rowsLookSame, widthSame, fontSame, scrollSame, identitySame, virtualizationSame {
+    if rowsLookSame, widthSame, insetSame, fontSame, scrollSame, identitySame, virtualizationSame {
       return
     }
 
-    // Width-only path: during animation the only thing that changes per frame
-    // is the proposed column width. Apply it smoothly to the AppKit column
-    // and reschedule the measurement task (which auto-debounces by cancelling
-    // its predecessor) without invalidating heights via noteHeightOfRows. The
-    // per-tick noteHeightOfRows call was the source of the reveal stall.
+    // Width/inset-only path: during animation the row content is stable, so
+    // apply the new table layout without invalidating heights via
+    // noteHeightOfRows. The per-tick noteHeightOfRows call was the source of
+    // the reveal stall.
     if rowsLookSame, fontSame, scrollSame, identitySame, virtualizationSame {
-      applyWidthOnlyUpdateIfNeeded(columnWidth: resolvedColumnWidth)
+      applyWidthOnlyUpdateIfNeeded(
+        columnWidth: resolvedColumnWidth,
+        horizontalContentInset: request.horizontalContentInset
+      )
       return
     }
 
@@ -58,6 +62,7 @@ extension SessionTimelineTableView.Coordinator {
       previousRows: self.rows,
       nextRows: rows
     )
+    let previousVirtualY = rollingRowChange == nil ? nil : currentScrollY()
     let rollingAnchor = rollingRowChange?.restorationAnchor(
       primary: wasPinnedToLatest ? nil : previousAnchor,
       visibleAnchors: previousVisibleAnchors,
@@ -72,6 +77,7 @@ extension SessionTimelineTableView.Coordinator {
     let fontScaleChanged =
       !restoredHeightCache && abs(previousFontScale - request.fontScale) > 0.001
     fontScale = request.fontScale
+    horizontalContentInset = request.horizontalContentInset
     let invalidatedHeightIDs = nextSnapshot.heightCacheInvalidationIDs(
       comparedTo: rowSnapshot,
       fontScaleChanged: fontScaleChanged
@@ -104,7 +110,8 @@ extension SessionTimelineTableView.Coordinator {
         wasPinnedToLatest: wasPinnedToLatest,
         previousAnchor: previousAnchor,
         rollingRowChange: rollingRowChange,
-        rollingAnchor: rollingAnchor
+        rollingAnchor: rollingAnchor,
+        previousVirtualY: previousVirtualY
       )
     }
   }
@@ -133,6 +140,7 @@ extension SessionTimelineTableView.Coordinator {
       Self.signposter.endInterval("session_timeline.update_rows_changed", updateInterval)
     }
     cancelMeasurement(reason: "rows_changed")
+    recordCurrentKnownEventHeights(columnWidth: resolvedColumnWidth)
     rowHeightCache = rowHeightCache.filter {
       nextIDs.contains($0.key) && !invalidatedHeightIDs.contains($0.key)
         && $0.value.isMeasured
@@ -146,7 +154,7 @@ extension SessionTimelineTableView.Coordinator {
       columnWidth: resolvedColumnWidth
     )
     let nextEventOffsets = eventOffsets(for: rows)
-    _ = refreshVirtualSpacers(
+    refreshVirtualLayout(
       rows: rows,
       eventOffsets: nextEventOffsets,
       virtualization: virtualization,
@@ -163,6 +171,7 @@ extension SessionTimelineTableView.Coordinator {
     rowSnapshot = nextSnapshot
     performWithoutTableAnimation {
       tableView.reloadData()
+      layoutVirtualDocument(columnWidth: resolvedColumnWidth)
     }
     persistHeightCache()
 
@@ -194,6 +203,7 @@ extension SessionTimelineTableView.Coordinator {
       heightCacheIdentity = identity
       rowHeightCache = [:]
       knownEventHeights = [:]
+      virtualSpacers = .zero
       rowSnapshot = .empty
     }
     guard
@@ -227,10 +237,13 @@ extension SessionTimelineTableView.Coordinator {
     wasPinnedToLatest: Bool,
     previousAnchor: SessionTimelineTableAnchor?,
     rollingRowChange: SessionTimelineRollingRowChange?,
-    rollingAnchor: SessionTimelineTableAnchor?
+    rollingAnchor: SessionTimelineTableAnchor?,
+    previousVirtualY: CGFloat?
   ) {
     if !hasUnfulfilledScrollCommand, rollingRowChange != nil {
-      if let rollingAnchor {
+      if let previousVirtualY {
+        restoreScrollY(previousVirtualY, suppressBoundaryCallbacks: true)
+      } else if let rollingAnchor {
         restore(anchor: rollingAnchor)
       } else {
         boundsDidChange(forceObservedStats: true, suppressBoundaryCallbacks: true)
@@ -255,9 +268,6 @@ extension SessionTimelineTableView.Coordinator {
   }
 
   func tableView(_: NSTableView, heightOfRow row: Int) -> CGFloat {
-    if let spacerHeight = virtualSpacerHeight(forTableRow: row) {
-      return spacerHeight
-    }
     guard let dataIndex = dataIndex(forTableRow: row), rows.indices.contains(dataIndex) else {
       return SessionTimelineTableMetrics.estimatedBaseRowHeight
     }
@@ -275,9 +285,6 @@ extension SessionTimelineTableView.Coordinator {
     viewFor _: NSTableColumn?,
     row: Int
   ) -> NSView? {
-    if virtualSpacerHeight(forTableRow: row) != nil {
-      return makeSpacerCell(in: tableView)
-    }
     guard let dataIndex = dataIndex(forTableRow: row), rows.indices.contains(dataIndex) else {
       return nil
     }

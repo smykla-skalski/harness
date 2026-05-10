@@ -27,16 +27,22 @@ enum SessionTimelineTableMetrics {
 
   static func resolvedColumnWidth(
     proposedWidth: CGFloat,
-    visibleContentWidth: CGFloat
+    visibleContentWidth: CGFloat,
+    horizontalContentInset: CGFloat = 0
   ) -> CGFloat {
+    let safeInset = max(horizontalContentInset, 0)
+    let availableContentWidth = max(visibleContentWidth - (safeInset * 2), 0)
     let safeProposedWidth = max(proposedWidth, 0)
     guard visibleContentWidth > 1 else {
       return safeProposedWidth
     }
-    guard safeProposedWidth > 1 else {
-      return visibleContentWidth
+    guard availableContentWidth > 1 else {
+      return availableContentWidth
     }
-    return min(safeProposedWidth, visibleContentWidth)
+    guard safeProposedWidth > 1 else {
+      return availableContentWidth
+    }
+    return min(safeProposedWidth, availableContentWidth)
   }
 
   static func minimumCardHeight(
