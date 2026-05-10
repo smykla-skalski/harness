@@ -8,15 +8,8 @@ import SwiftUI
 /// `Environment(\.dismissSearch)`. `.searchCompletion(_:)` supplies
 /// the title as the keyboard completion so Tab pre-fills the query
 /// without leaving the field.
-///
-/// The multi-select filter rail lives outside this view (in
-/// ``AppSearchHostModifier`` via `.safeAreaInset(edge: .top)`) so
-/// `Toggle(.button)` chips remain clickable — `.searchSuggestions`
-/// content rows on macOS only hit-test reliably for Buttons that
-/// behave as suggestion completions.
 public struct AppSearchSuggestionsView: View {
   let results: AppSearchResults
-  let selectedDomains: Set<AppSearchDomain>
   let routeAction: (AppSearchHit) -> Void
 
   @Environment(\.dismissSearch)
@@ -24,16 +17,14 @@ public struct AppSearchSuggestionsView: View {
 
   public init(
     results: AppSearchResults,
-    selectedDomains: Set<AppSearchDomain>,
     routeAction: @escaping (AppSearchHit) -> Void
   ) {
     self.results = results
-    self.selectedDomains = selectedDomains
     self.routeAction = routeAction
   }
 
   public var body: some View {
-    ForEach(visibleSections) { section in
+    ForEach(results.sections) { section in
       Section {
         ForEach(section.hits) { hit in
           row(for: hit)
@@ -42,13 +33,6 @@ public struct AppSearchSuggestionsView: View {
         sectionHeader(section)
       }
     }
-  }
-
-  private var visibleSections: [AppSearchSection] {
-    guard !selectedDomains.isEmpty else {
-      return results.sections
-    }
-    return results.sections.filter { selectedDomains.contains($0.domain) }
   }
 
   private func row(for hit: AppSearchHit) -> some View {
