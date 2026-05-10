@@ -23,19 +23,28 @@ struct SessionCreateCommands: Commands {
     CommandGroup(after: .newItem) {
       if Self.shouldShowExplicitCommand(for: .agent, primaryKind: primaryKind) {
         Button("New Agent") { createAgent?() }
-          .keyboardShortcut("a", modifiers: [.command, .option])
+          .keyboardShortcut(
+            SessionCreateKind.agent.createShortcut.keyEquivalent,
+            modifiers: SessionCreateKind.agent.createShortcut.requiredEventModifiers
+          )
           .disabled(createAgent == nil)
       }
       Button("New Codex Agent") { createCodexAgent?() }
         .disabled(createCodexAgent == nil)
       if Self.shouldShowExplicitCommand(for: .task, primaryKind: primaryKind) {
         Button("New Task") { createTask?() }
-          .keyboardShortcut("t", modifiers: [.command, .option])
+          .keyboardShortcut(
+            SessionCreateKind.task.createShortcut.keyEquivalent,
+            modifiers: SessionCreateKind.task.createShortcut.requiredEventModifiers
+          )
           .disabled(createTask == nil)
       }
       if Self.shouldShowExplicitCommand(for: .decision, primaryKind: primaryKind) {
         Button("New Decision") { createDecision?() }
-          .keyboardShortcut("d", modifiers: [.command, .option])
+          .keyboardShortcut(
+            SessionCreateKind.decision.createShortcut.keyEquivalent,
+            modifiers: SessionCreateKind.decision.createShortcut.requiredEventModifiers
+          )
           .disabled(createDecision == nil)
       }
     }

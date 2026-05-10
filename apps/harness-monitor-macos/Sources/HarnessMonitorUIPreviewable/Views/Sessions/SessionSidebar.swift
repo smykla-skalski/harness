@@ -95,6 +95,10 @@ struct SessionSidebar: View {
     }
   }
 
+  var shortcutRevealModifiers: EventModifiers {
+    currentModifiers
+  }
+
   private var decisionSelectionAccessibilityValue: Text {
     if let anchor = state.sidebarSelection.anchor {
       let count = state.sidebarSelection.count(of: anchor.kind)
