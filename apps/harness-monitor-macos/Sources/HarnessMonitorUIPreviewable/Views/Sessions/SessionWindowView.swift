@@ -207,13 +207,10 @@ public struct SessionWindowView: View {
   }
 
   @ViewBuilder private var sessionWindowSurface: some View {
-    VStack(spacing: 0) {
-      AppSearchScopeRail(model: stateCache.appSearchModel)
-      if isUnknownSession {
-        unknownSessionContent
-      } else {
-        sessionSurface
-      }
+    if isUnknownSession {
+      unknownSessionContent
+    } else {
+      sessionSurface
     }
   }
   private func sessionWindowSelectionObservers<Content: View>(
