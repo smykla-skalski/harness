@@ -19,6 +19,7 @@ extension SessionSidebar {
           severityShape: severityShape(for: severity),
           severityTint: severityTint(for: severity)
         )
+        .accessibilityLabel(sidebarDecisionAccessibilityLabel(for: decision, severity: severity))
         .tag(selection)
         .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarDecisionRow(decision.id))
         .simultaneousGesture(
@@ -105,6 +106,14 @@ extension SessionSidebar {
 
   var decisionFilterRow: some View {
     SessionDecisionFilterControls(filters: state.decisionFilters)
+  }
+
+  private func sidebarDecisionAccessibilityLabel(
+    for decision: Decision,
+    severity: DecisionSeverity?
+  ) -> String {
+    let severityLabel = severity?.chipLabel ?? "Decision"
+    return "\(severityLabel). \(decision.summary). \(decision.ruleID)"
   }
 
   @ViewBuilder var undoToastRow: some View {

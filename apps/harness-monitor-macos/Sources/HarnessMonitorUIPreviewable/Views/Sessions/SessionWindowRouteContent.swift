@@ -179,44 +179,89 @@ struct SessionWindowDecisionsList: View {
 
   private var selectedDecisionID: Binding<String?> {
     Binding(
-      get: { state.selection.decisionID },
+      get: {
+        if case .route(.decisions) = state.selection {
+          return state.sectionState.decisionID
+        }
+        return state.selection.decisionID
+      },
       set: { decisionID in
-        guard let decisionID, decisionID != state.selection.decisionID else { return }
-        state.selectDecision(decisionID)
+        guard let decisionID else { return }
+        if case .route(.decisions) = state.selection {
+          guard decisionID != state.sectionState.decisionID else { return }
+          state.setRouteDecisionID(decisionID)
+        } else {
+          guard decisionID != state.selection.decisionID else { return }
+          state.selectDecision(decisionID)
+        }
       }
     )
   }
 
   var body: some View {
     List(selection: selectedDecisionID) {
-      ForEach(decisions) { decision in
-        VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
-          Text(decision.summary)
-            .scaledFont(.body)
-            .lineLimit(1)
-          Text(decision.ruleID)
-            .scaledFont(.caption)
-            .foregroundStyle(.secondary)
-        }
-        .tag(decision.id)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
-        .accessibilityLabel(decisionAccessibilityLabel(for: decision))
-        .accessibilityIdentifier(HarnessMonitorAccessibility.decisionRow(decision.id))
-        .harnessMCPRow(
-          HarnessMonitorAccessibility.decisionRow(decision.id),
-          label: decisionAccessibilityLabel(for: decision),
-          value: state.selection.decisionID == decision.id ? "selected" : "not selected",
-          pressAction: { state.selectDecision(decision.id) }
+      if decisions.isEmpty {
+        ContentUnavailableView(
+          emptyStateTitle,
+          systemImage: "exclamationmark.bubble",
+          description: Text(emptyStateDescription)
         )
+      } else {
+        ForEach(decisions) { decision in
+          VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
+            Text(decision.summary)
+              .scaledFont(.body)
+              .lineLimit(1)
+            Text("\(decisionSeverityLabel(for: decision)) - \(decision.ruleID)")
+              .scaledFont(.caption)
+              .foregroundStyle(.secondary)
+          }
+          .tag(decision.id)
+          .contentShape(Rectangle())
+          .accessibilityElement(children: .combine)
+          .accessibilityAddTraits(.isButton)
+          .accessibilityLabel(decisionAccessibilityLabel(for: decision))
+          .accessibilityIdentifier(HarnessMonitorAccessibility.decisionRow(decision.id))
+          .harnessMCPRow(
+            HarnessMonitorAccessibility.decisionRow(decision.id),
+            label: decisionAccessibilityLabel(for: decision),
+            value: selectedDecisionID.wrappedValue == decision.id ? "selected" : "not selected",
+            pressAction: {
+              if case .route(.decisions) = state.selection {
+                state.setRouteDecisionID(decision.id)
+              } else {
+                state.selectDecision(decision.id)
+              }
+            }
+          )
+        }
       }
     }
     .listStyle(.inset)
   }
 
   private func decisionAccessibilityLabel(for decision: Decision) -> String {
-    "\(decision.summary). \(decision.ruleID)"
+    "\(decisionSeverityLabel(for: decision)). \(decision.summary). \(decision.ruleID)"
+  }
+
+  private var emptyStateTitle: String {
+    hasActiveFilters ? "No Matching Decisions" : "No Pending Decisions"
+  }
+
+  private var emptyStateDescription: String {
+    if hasActiveFilters {
+      return "Clear or broaden the current filters to bring this session's decisions back into view."
+    }
+    return "This session has no open decisions right now."
+  }
+
+  private var hasActiveFilters: Bool {
+    let query = state.decisionFilters.query.trimmingCharacters(in: .whitespacesAndNewlines)
+    return !query.isEmpty || !state.decisionFilters.severities.isEmpty
+  }
+
+  private func decisionSeverityLabel(for decision: Decision) -> String {
+    DecisionSeverity(rawValue: decision.severityRaw)?.chipLabel ?? "Decision"
   }
 }
 

@@ -351,6 +351,91 @@ final class DecisionDetailViewModelTests: XCTestCase {
 
     XCTAssertEqual(scoped.map(\.id), ["evt-older", "evt-match"])
   }
+
+  func test_explicitlySessionScopedAuditEventsExcludeRuleOnlyHistory() {
+    let decisions = [
+      makeDecision(id: "d1", sessionID: "sess-1", agentID: "agent-1", taskID: "task-1"),
+      makeDecision(id: "d2", sessionID: "sess-1", agentID: "agent-2", taskID: nil),
+    ]
+    let unscopedRuleEvent = SupervisorEvent(
+      id: "evt-unscoped",
+      tickID: "tick-10",
+      kind: "observe",
+      ruleID: "stuck-agent",
+      severity: nil,
+      payloadJSON: "{\"summary\":\"rule-only history\"}"
+    )
+    let sessionMatch = SupervisorEvent(
+      id: "evt-session",
+      tickID: "tick-11",
+      kind: "dispatch",
+      ruleID: "stuck-agent",
+      severity: .warn,
+      payloadJSON: "{\"sessionID\":\"sess-1\"}"
+    )
+    let decisionMatch = SupervisorEvent(
+      id: "evt-decision",
+      tickID: "tick-12",
+      kind: "dispatch",
+      ruleID: "stuck-agent",
+      severity: .warn,
+      payloadJSON: "{\"decisionID\":\"d2\",\"sessionID\":\"sess-9\"}"
+    )
+    let wrongSession = SupervisorEvent(
+      id: "evt-other-session",
+      tickID: "tick-13",
+      kind: "dispatch",
+      ruleID: "stuck-agent",
+      severity: .warn,
+      payloadJSON: "{\"sessionID\":\"sess-9\"}"
+    )
+
+    let scoped = DecisionDetailViewModel.explicitlySessionScopedAuditEvents(
+      from: [unscopedRuleEvent, sessionMatch, decisionMatch, wrongSession],
+      sessionID: "sess-1",
+      decisions: decisions
+    )
+
+    XCTAssertEqual(scoped.map(\.id), ["evt-session", "evt-decision"])
+  }
+
+  func test_explicitlySessionScopedAuditEventsRejectContradictorySessionScope() {
+    let decisions = [
+      makeDecision(id: "d1", sessionID: "sess-1", agentID: "agent-1", taskID: "task-1")
+    ]
+    let contradictorySession = SupervisorEvent(
+      id: "evt-contradictory-session",
+      tickID: "tick-20",
+      kind: "dispatch",
+      ruleID: "stuck-agent",
+      severity: .warn,
+      payloadJSON: #"{"decisionID":"d1","sessionID":"sess-9"}"#
+    )
+    let contradictoryAgent = SupervisorEvent(
+      id: "evt-contradictory-agent",
+      tickID: "tick-21",
+      kind: "dispatch",
+      ruleID: "stuck-agent",
+      severity: .warn,
+      payloadJSON: #"{"decisionID":"d1","agentID":"agent-9"}"#
+    )
+    let matchingDecision = SupervisorEvent(
+      id: "evt-matching-decision",
+      tickID: "tick-22",
+      kind: "dispatch",
+      ruleID: "stuck-agent",
+      severity: .warn,
+      payloadJSON: #"{"decisionID":"d1","sessionID":"sess-1","agentID":"agent-1"}"#
+    )
+
+    let scoped = DecisionDetailViewModel.explicitlySessionScopedAuditEvents(
+      from: [contradictorySession, contradictoryAgent, matchingDecision],
+      sessionID: "sess-1",
+      decisions: decisions
+    )
+
+    XCTAssertEqual(scoped.map(\.id), ["evt-matching-decision"])
+  }
 }
 
 final class RecordingDecisionActionHandler: DecisionActionHandler, @unchecked Sendable {

@@ -35,6 +35,10 @@ public struct SessionWindowView: View {
   private var persistedDecisionID: String = ""
   @SceneStorage("session.decisionFilters.query")
   private var persistedDecisionQuery = ""
+  @SceneStorage("session.decisionFilters.scope")
+  private var persistedDecisionScopeRawStorage = DecisionsSidebarSearchScope.summary.rawValue
+  @SceneStorage("session.decisionFilters.severities")
+  private var persistedDecisionSeverityRawStorage = ""
   @SceneStorage("session.decision.detail-tab")
   private var persistedDecisionDetailTabRawStorage = DecisionDetailTab.context.rawValue
   @SceneStorage("session.focusMode")
@@ -254,6 +258,32 @@ public struct SessionWindowView: View {
     selectedDecisionVisibility == .hidden
   }
 
+  var sessionDecisionDetailID: String? {
+    switch stateCache.selection {
+    case .decision(_, let decisionID):
+      decisionID
+    case .route(.decisions):
+      stateCache.sectionState.decisionID
+    default:
+      nil
+    }
+  }
+
+  var sessionDecisionDetail: Decision? {
+    guard let sessionDecisionDetailID else {
+      return nil
+    }
+    return allSessionDecisionsCache.first { $0.id == sessionDecisionDetailID }
+  }
+
+  var sessionDecisionDetailHiddenByFilters: Bool {
+    guard let sessionDecisionDetailID else {
+      return false
+    }
+    return allSessionDecisionIDsCache.contains(sessionDecisionDetailID)
+      && !matchingDecisionIDsCache.contains(sessionDecisionDetailID)
+  }
+
   var sessionDecisionObserver: ObserverSummary? {
     snapshot?.detail?.observer
   }
@@ -280,7 +310,7 @@ public struct SessionWindowView: View {
       decisions: allSessionDecisionsCache,
       filters: stateCache.decisionFilters.decisionWorkspaceFilters,
       visibleSnapshot: sessionDecisionVisibleSnapshot,
-      selectedDecisionID: stateCache.selection.decisionID
+      selectedDecisionID: sessionDecisionDetailID
     )
   }
 
@@ -308,67 +338,115 @@ public struct SessionWindowView: View {
       }
   }
 
-  @ViewBuilder
   private var bodyContent: some View {
-    Group {
-      if isUnknownSession {
-        unknownSessionContent
-      } else {
-        sessionSurface
-      }
-    }
-    .navigationTitle(navigationTitleText)
-    .navigationSubtitle(navigationSubtitleText)
-    .onChange(of: focusMode) { _, _ in
-      reconcileInspectorVisibility(
-        visibleBinding: inspectorVisibleBinding,
-        preferredBinding: inspectorPreferredBinding
+    sessionWindowFocusedValues(
+      sessionWindowDecisionFilterPersistence(
+        sessionWindowSelectionObservers(
+          sessionWindowLifecycleModifiers(sessionWindowSurface)
+        )
       )
-    }
-    .task(id: snapshotRefreshTrigger) {
-      await refreshSnapshot(for: snapshotRefreshTrigger)
-    }
-    .task(id: decisionsCacheTrigger) {
-      await recomputeDecisionsCache()
-    }
-    .task(id: store.pendingSessionRouteRequestID) {
-      await applyPendingSessionRouteIfNeeded()
-    }
-    .onChange(of: stateCache.selection) { _, newSelection in
-      syncPersistedStorage(from: newSelection)
-      reconcileInspectorVisibility(
-        visibleBinding: inspectorVisibleBinding,
-        preferredBinding: inspectorPreferredBinding
-      )
-      detailRenderedSelection = newSelection
-      contentRenderedRoute = route(for: newSelection)
-      if case .create(let draft) = newSelection, draft.kind == .agent {
-        contentColumnWidth = SessionContentDetailSplitLayout.defaultContentWidth
-      }
-    }
-    .onChange(of: renderedRoute) { _, newRoute in
-      guard newRoute.layoutStyle == .sidebarDetail else { return }
-      detailColumnWidth = 0
-    }
-    .onChange(of: stateCache.decisionFilters.query) { _, newValue in
-      guard persistedDecisionQuery != newValue else { return }
-      persistedDecisionQuery = newValue
-    }
-    .onChange(of: allSessionDecisions.map(\.id)) { _, _ in
-      reconcileInspectorVisibility(
-        visibleBinding: inspectorVisibleBinding,
-        preferredBinding: inspectorPreferredBinding
-      )
-    }
-    .focusedSceneValue(\.sessionNavigation, navigationCommand)
-    .focusedSceneValue(\.sessionAttention, attentionFocus)
-    .focusedSceneValue(\.sessionInspector, canPresentInspector ? inspectorCommand : nil)
-    .focusedSceneValue(\.sessionDecisionCommands, decisionCommand)
-    .focusedSceneValue(\.sessionCreateContext, createContext)
+    )
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .accessibilityElement(children: .contain)
     .accessibilityFocused($primaryContentAccessibilityFocused)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowShell)
+  }
+
+  @ViewBuilder
+  private var sessionWindowSurface: some View {
+    if isUnknownSession {
+      unknownSessionContent
+    } else {
+      sessionSurface
+    }
+  }
+
+  private func sessionWindowLifecycleModifiers<Content: View>(
+    _ content: Content
+  ) -> some View {
+    content
+      .navigationTitle(navigationTitleText)
+      .navigationSubtitle(navigationSubtitleText)
+      .onChange(of: focusMode) { _, _ in
+        reconcileInspectorVisibility(
+          visibleBinding: inspectorVisibleBinding,
+          preferredBinding: inspectorPreferredBinding
+        )
+      }
+      .task(id: snapshotRefreshTrigger) {
+        await refreshSnapshot(for: snapshotRefreshTrigger)
+      }
+      .task(id: decisionsCacheTrigger) {
+        await recomputeDecisionsCache()
+      }
+      .task(id: store.pendingSessionRouteRequestID) {
+        await applyPendingSessionRouteIfNeeded()
+      }
+  }
+
+  private func sessionWindowSelectionObservers<Content: View>(
+    _ content: Content
+  ) -> some View {
+    content
+      .onChange(of: stateCache.selection) { _, newSelection in
+        syncPersistedStorage(from: newSelection)
+        reconcileInspectorVisibility(
+          visibleBinding: inspectorVisibleBinding,
+          preferredBinding: inspectorPreferredBinding
+        )
+        detailRenderedSelection = newSelection
+        contentRenderedRoute = route(for: newSelection)
+        if case .create(let draft) = newSelection, draft.kind == .agent {
+          contentColumnWidth = SessionContentDetailSplitLayout.defaultContentWidth
+        }
+      }
+      .onChange(of: stateCache.sectionState.decisionID) { _, newDecisionID in
+        guard case .route(.decisions) = stateCache.selection else { return }
+        let storedDecisionID = newDecisionID ?? ""
+        guard persistedDecisionID != storedDecisionID else { return }
+        persistedDecisionID = storedDecisionID
+      }
+      .onChange(of: renderedRoute) { _, newRoute in
+        guard newRoute.layoutStyle == .sidebarDetail else { return }
+        detailColumnWidth = 0
+      }
+      .onChange(of: allSessionDecisions.map(\.id)) { _, _ in
+        reconcileInspectorVisibility(
+          visibleBinding: inspectorVisibleBinding,
+          preferredBinding: inspectorPreferredBinding
+        )
+      }
+  }
+
+  private func sessionWindowDecisionFilterPersistence<Content: View>(
+    _ content: Content
+  ) -> some View {
+    content
+      .onChange(of: stateCache.decisionFilters.query) { _, newValue in
+        guard persistedDecisionQuery != newValue else { return }
+        persistedDecisionQuery = newValue
+      }
+      .onChange(of: stateCache.decisionFilters.scope) { _, newValue in
+        let rawValue = newValue.rawValue
+        guard persistedDecisionScopeRawStorage != rawValue else { return }
+        persistedDecisionScopeRawStorage = rawValue
+      }
+      .onChange(of: stateCache.decisionFilters.severities) { _, newValue in
+        let encoded = encodedDecisionSeverities(newValue)
+        guard persistedDecisionSeverityRawStorage != encoded else { return }
+        persistedDecisionSeverityRawStorage = encoded
+      }
+  }
+
+  private func sessionWindowFocusedValues<Content: View>(
+    _ content: Content
+  ) -> some View {
+    content
+      .focusedSceneValue(\.sessionNavigation, navigationCommand)
+      .focusedSceneValue(\.sessionAttention, attentionFocus)
+      .focusedSceneValue(\.sessionInspector, canPresentInspector ? inspectorCommand : nil)
+      .focusedSceneValue(\.sessionDecisionCommands, decisionCommand)
+      .focusedSceneValue(\.sessionCreateContext, createContext)
   }
 
   @ToolbarContentBuilder
@@ -465,7 +543,10 @@ public struct SessionWindowView: View {
 
   private func hydrateSelectionFromPersistedStorage() {
     guard case .route(.overview) = stateCache.selection else { return }
-    if !persistedDecisionID.isEmpty {
+    if persistedRoute == .decisions {
+      stateCache.selectRoute(.decisions)
+      stateCache.setRouteDecisionID(persistedDecisionID.isEmpty ? nil : persistedDecisionID)
+    } else if !persistedDecisionID.isEmpty {
       stateCache.selectDecision(persistedDecisionID)
     } else if persistedRoute != .overview {
       stateCache.selectRoute(persistedRoute)
@@ -473,8 +554,22 @@ public struct SessionWindowView: View {
   }
 
   private func hydrateDecisionFiltersFromPersistedStorage() {
-    guard stateCache.decisionFilters.query != persistedDecisionQuery else { return }
-    stateCache.decisionFilters.query = persistedDecisionQuery
+    if stateCache.decisionFilters.query != persistedDecisionQuery {
+      stateCache.decisionFilters.query = persistedDecisionQuery
+    }
+    let persistedScope =
+      DecisionsSidebarSearchScope(rawValue: persistedDecisionScopeRawStorage) ?? .summary
+    if stateCache.decisionFilters.scope != persistedScope {
+      stateCache.decisionFilters.scope = persistedScope
+    }
+    let persistedSeverities = Set(
+      persistedDecisionSeverityRawStorage
+        .split(separator: ",")
+        .compactMap { DecisionSeverity(rawValue: String($0)) }
+    )
+    if stateCache.decisionFilters.severities != persistedSeverities {
+      stateCache.decisionFilters.severities = persistedSeverities
+    }
   }
 
   @MainActor
@@ -510,7 +605,7 @@ public struct SessionWindowView: View {
     switch selection {
     case .route(let route):
       persistedRoute = route
-      persistedDecisionID = ""
+      persistedDecisionID = route == .decisions ? (stateCache.sectionState.decisionID ?? "") : ""
     case .agent:
       persistedRoute = .agents
       persistedDecisionID = ""
@@ -561,6 +656,8 @@ public struct SessionWindowView: View {
     if request.resetDecisionFilters {
       stateCache.decisionFilters.clear()
       persistedDecisionQuery = ""
+      persistedDecisionScopeRawStorage = DecisionsSidebarSearchScope.summary.rawValue
+      persistedDecisionSeverityRawStorage = ""
     }
     switch request.selection {
     case .create:
@@ -652,6 +749,10 @@ public struct SessionWindowView: View {
     primaryContentAccessibilityFocused = true
     let title = summary?.displayTitle ?? "Session"
     AccessibilityNotification.Announcement("\(title) session window opened").post()
+  }
+
+  private func encodedDecisionSeverities(_ severities: Set<DecisionSeverity>) -> String {
+    severities.map(\.rawValue).sorted().joined(separator: ",")
   }
 
   func agentTui(for agent: AgentRegistration) -> AgentTuiSnapshot? {

@@ -128,6 +128,24 @@ public final class DecisionDetailViewModel {
     return formatter.localizedString(fromTimeInterval: -interval)
   }
 
+  public static func explicitlySessionScopedAuditEvents(
+    from events: [SupervisorEvent],
+    sessionID: String,
+    decisions: [Decision]
+  ) -> [SupervisorEvent] {
+    let decisionIDs = Set(decisions.map(\.id))
+    let agentIDs = Set(decisions.compactMap(\.agentID))
+    let taskIDs = Set(decisions.compactMap(\.taskID))
+    return events.filter { event in
+      AuditPayloadScope(payloadJSON: event.payloadJSON).matchesExplicitSessionScope(
+        sessionID: sessionID,
+        decisionIDs: decisionIDs,
+        agentIDs: agentIDs,
+        taskIDs: taskIDs
+      )
+    }
+  }
+
   // MARK: Parsing
 
   private static func parseActions(from json: String) -> [SuggestedAction] {
@@ -278,6 +296,38 @@ private struct AuditPayloadScope {
       && matches(expected: decision.sessionID, actual: sessionID)
       && matches(expected: decision.agentID, actual: agentID)
       && matches(expected: decision.taskID, actual: taskID)
+  }
+
+  func matchesExplicitSessionScope(
+    sessionID expectedSessionID: String,
+    decisionIDs: Set<String>,
+    agentIDs: Set<String>,
+    taskIDs: Set<String>
+  ) -> Bool {
+    let sessionMatches = self.sessionID.map { $0 == expectedSessionID }
+    if sessionMatches == false {
+      return false
+    }
+
+    let decisionMatches = decisionID.map { decisionIDs.contains($0) }
+    if decisionMatches == false {
+      return false
+    }
+
+    let taskMatches = taskID.map { taskIDs.contains($0) }
+    if taskMatches == false {
+      return false
+    }
+
+    let agentMatches = agentID.map { agentIDs.contains($0) }
+    if agentMatches == false {
+      return false
+    }
+
+    return decisionMatches == true
+      || taskMatches == true
+      || agentMatches == true
+      || sessionMatches == true
   }
 
   private func matches(expected: String?, actual: String?) -> Bool {
