@@ -39,7 +39,6 @@ public struct AppSearchHostModifier: ViewModifier {
   private var routeFocus: HarnessSessionRouteFocus?
 
   @State private var query: String = ""
-  @State private var scope: AppSearchScope = .current
   @State private var lastAnnouncedHitCount = -1
   @State private var isSearchPresented: Bool = false
   @FocusState private var searchFieldFocused: Bool
@@ -64,6 +63,14 @@ public struct AppSearchHostModifier: ViewModifier {
     // command + cross-scene `@FocusedBinding` route is documented as
     // fragile (Apple Developer Forums thread #693580). Co-locating the
     // shortcut with its target state is the canonical pure-SwiftUI fix.
+    //
+    // Scope chips: `.searchScopes` is intentionally omitted — the
+    // system places those chips immediately under the search field
+    // (i.e. above the AppKit window-merge tab strip when one is
+    // visible). The scope picker is rendered separately via
+    // ``AppSearchScopeRail`` so it sits below the tab strip in the
+    // content area. The model owns the scope value so both surfaces
+    // bind to the same state.
     content
       .searchable(
         text: $query,
@@ -74,11 +81,6 @@ public struct AppSearchHostModifier: ViewModifier {
       .searchFocused($searchFieldFocused)
       .searchPresentationToolbarBehavior(.avoidHidingContent)
       .harnessMinimizableSearchToolbar()
-      .searchScopes($scope, activation: .onSearchPresentation) {
-        ForEach(AppSearchScope.allCases) { value in
-          Text(value.label).tag(value)
-        }
-      }
       .searchSuggestions {
         AppSearchSuggestionsView(
           results: model.results,
@@ -91,14 +93,16 @@ public struct AppSearchHostModifier: ViewModifier {
           .opacity(0)
           .accessibilityHidden(true)
       }
-      .task(id: AppSearchTrigger(query: query, scope: scope)) {
-        await runDebouncedSearch(for: query, scope: scope)
+      .task(id: AppSearchTrigger(query: query, scope: model.scope)) {
+        await runDebouncedSearch(for: query, scope: model.scope)
+      }
+      .onChange(of: isSearchPresented, initial: true) { _, newValue in
+        model.isPresented = newValue
       }
       .onChange(of: model.results.totalHitCount) { _, newValue in
         announceResults(totalHitCount: newValue)
       }
       .environment(\.appSearchModel, model)
-      .environment(\.harnessSearchActive, isSearchPresented)
   }
 
   private func focusSearchField() {

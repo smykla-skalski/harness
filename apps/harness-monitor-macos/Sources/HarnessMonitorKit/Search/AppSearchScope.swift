@@ -1,7 +1,4 @@
-import HarnessMonitorKit
-
-/// User-selectable search scope rendered by `.searchScopes` once the
-/// search field is presented.
+/// User-selectable search scope.
 ///
 /// `.current` defers to the focused route (resolved at search time via
 /// `@FocusedValue(\.harnessSessionRouteFocus)`); the four explicit

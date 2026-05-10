@@ -32,6 +32,20 @@ public final class AppSearchModel {
   /// returns its result (or the search is cancelled mid-flight).
   public private(set) var isSearching: Bool = false
 
+  /// `true` while the toolbar `.searchable` field is presented. Drives
+  /// lazy reindexing so the four corpora are not rebuilt on every
+  /// incoming timeline event when the search popover is closed.
+  /// Lives on the model (not in `@Environment`) because the index
+  /// updater modifier sits OUTSIDE the host modifier in the view tree
+  /// and SwiftUI environment values flow downward only.
+  public var isPresented: Bool = false
+
+  /// User-selected scope. Owned by the model so the inline scope rail
+  /// (rendered below the window tab bar) and the host modifier (which
+  /// resolves the primary domain at search time) bind to the same
+  /// state.
+  public var scope: AppSearchScope = .current
+
   /// Closure-based seam so tests can inject a controllable provider.
   /// Production binding wraps an ``AppSearchIndex`` reference.
   private let searchProvider: (String, AppSearchDomain?) async -> AppSearchResults
