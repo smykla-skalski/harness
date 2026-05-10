@@ -200,6 +200,33 @@ final class IdleSessionRuleTests: XCTestCase {
     XCTAssertEqual(actions1.first?.actionKey, "decision:idle-session:idle-session:s1")
   }
 
+  func test_suppressesDuplicateActionWhenRecentActionKeyAlreadyPresent() async {
+    let rule = IdleSessionRule()
+    let now = Date.fixed
+    let snapshot = snapshot(
+      sessions: [
+        session(
+          id: "s1",
+          agents: [agent(id: "a1", lastActivityAt: now.addingTimeInterval(-1_800))],
+          timelineDensityLastMinute: 0
+        )
+      ]
+    )
+
+    let actions = await rule.evaluate(
+      snapshot: snapshot,
+      context: PolicyContext(
+        now: now,
+        lastFiredAt: nil,
+        recentActionKeys: ["decision:idle-session:idle-session:s1"],
+        parameters: PolicyParameterValues(raw: ["sessionIdleThreshold": "600"]),
+        history: PolicyHistoryWindow(recentEvents: [], recentDecisions: [])
+      )
+    )
+
+    XCTAssertTrue(actions.isEmpty)
+  }
+
   // MARK: - Parameter overrides
 
   func test_respectsSessionIdleThresholdOverride() async {

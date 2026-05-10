@@ -54,7 +54,8 @@ public protocol SupervisorAuditWriter: Sendable {
 // MARK: - PolicyExecutor
 
 /// Bridges `PolicyAction`s from rules to the daemon API and to `DecisionStore`. Enforces
-/// audit-before-action ordering and sliding-window deduplication keyed by `actionKey`.
+/// audit-before-action ordering for side-effecting actions, store-backed suppression of unchanged
+/// decision replays, and sliding-window deduplication keyed by `actionKey`.
 public actor PolicyExecutor {
   private let api: any SupervisorAPIClient
   private let decisions: DecisionStore
@@ -82,8 +83,10 @@ public actor PolicyExecutor {
 
   /// Executes one `PolicyAction`, enforcing audit ordering and dedup.
   ///
-  /// Ordering invariant: `actionDispatched` is written before the action fires.
-  /// `actionExecuted` or `actionFailed` is written after the action completes.
+  /// Ordering invariant: `actionDispatched` is written before a side effect fires.
+  /// Stable `.queueDecision` replays are skipped before audit so unchanged open decisions do not
+  /// accumulate duplicate trail rows. `actionExecuted` or `actionFailed` is written after the
+  /// action completes.
   public func execute(_ action: PolicyAction, tickID: String? = nil) async -> PolicyOutcome {
     let key = action.actionKey
     let dispatchedAt = clock.now()
@@ -91,6 +94,18 @@ public actor PolicyExecutor {
 
     if recentKeys[key] != nil {
       return .skippedDuplicate(actionKey: key)
+    }
+
+    do {
+      if try await shouldSkipBeforeAudit(action) {
+        return .skippedDuplicate(actionKey: key)
+      }
+    } catch {
+      let sanitizedError = redactSupervisorErrorMessage(error.localizedDescription)
+      HarnessMonitorLogger.supervisorWarning(
+        "action preflight failed key=\(key) error=\(sanitizedError)"
+      )
+      return .failed(actionKey: key, error: sanitizedError)
     }
 
     let dispatchRecord = auditRecord(
@@ -199,6 +214,19 @@ public actor PolicyExecutor {
     )
   }
 
+  private func shouldSkipBeforeAudit(_ action: PolicyAction) async throws -> Bool {
+    switch action {
+    case .queueDecision(let payload):
+      guard !pendingDecisionNotifications.contains(payload.id) else {
+        return false
+      }
+      let preview = try await decisions.previewUpsertOpen(decisionDraft(from: payload))
+      return preview == .unchanged
+    default:
+      return false
+    }
+  }
+
   private func dispatch(_ action: PolicyAction) async throws {
     switch action {
     case .nudgeAgent(let payload):
@@ -233,8 +261,7 @@ public actor PolicyExecutor {
       let result = try await decisions.upsertOpen(draft)
       // The durable attention item is the open decision. OS notification retry is
       // best-effort in-process state, deliberately cooldown-throttled by the action
-      // key so transient delivery failure retries without repeatedly notifying
-      // stable open decisions.
+      // key so transient delivery failure retries without repeatedly notifying.
       let shouldNotify =
         result == .inserted
         || result == .reopened
@@ -297,6 +324,22 @@ public actor PolicyExecutor {
     case .notifyOnly(let payload): payload.severity
     default: nil
     }
+  }
+
+  private func decisionDraft(
+    from payload: PolicyAction.DecisionPayload
+  ) -> DecisionDraft {
+    DecisionDraft(
+      id: payload.id,
+      severity: payload.severity,
+      ruleID: payload.ruleID,
+      sessionID: payload.sessionID,
+      agentID: payload.agentID,
+      taskID: payload.taskID,
+      summary: payload.summary,
+      contextJSON: payload.contextJSON,
+      suggestedActionsJSON: payload.suggestedActionsJSON
+    )
   }
 
   private func actionPayloadJSON(_ action: PolicyAction) -> String {

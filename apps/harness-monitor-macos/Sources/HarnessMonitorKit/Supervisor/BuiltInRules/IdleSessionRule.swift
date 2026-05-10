@@ -6,9 +6,9 @@ import Foundation
 /// actions — a check-in nudge and a session close — so the operator can move the session forward
 /// without the supervisor acting autonomously.
 ///
-/// Idempotency is delegated to `PolicyExecutor`: the emitted `.queueDecision` carries the stable
-/// session id, so the executor's cool-down window dedupes repeat ticks until the decision
-/// resolves or the session becomes active again.
+/// The stable decision id lets `PolicyExecutor` suppress unchanged open-decision replays, while
+/// `PolicyContext.recentActionKeys` keeps the live policy loop from re-emitting the same action on
+/// every tick inside the recent-action window.
 public struct IdleSessionRule: PolicyRule {
   private static let payloadEncoder: JSONEncoder = {
     let encoder = JSONEncoder()
@@ -50,7 +50,12 @@ public struct IdleSessionRule: PolicyRule {
     )
 
     return snapshot.sessions.compactMap { session in
-      evaluateSession(session, now: context.now, thresholdSeconds: threshold)
+      evaluateSession(
+        session,
+        now: context.now,
+        thresholdSeconds: threshold,
+        recentActionKeys: context.recentActionKeys
+      )
     }
   }
 
@@ -59,7 +64,8 @@ public struct IdleSessionRule: PolicyRule {
   private func evaluateSession(
     _ session: SessionSnapshot,
     now: Date,
-    thresholdSeconds: Int
+    thresholdSeconds: Int,
+    recentActionKeys: Set<String>
   ) -> PolicyAction? {
     guard session.statusRaw == "active",
       session.timelineDensityLastMinute == 0,
@@ -70,7 +76,13 @@ public struct IdleSessionRule: PolicyRule {
     guard isIdle(session: session, now: now, thresholdSeconds: thresholdSeconds) else {
       return nil
     }
-    return .queueDecision(decisionPayload(for: session, idleSeconds: thresholdSeconds))
+    let action = PolicyAction.queueDecision(
+      decisionPayload(for: session, idleSeconds: thresholdSeconds)
+    )
+    guard !recentActionKeys.contains(action.actionKey) else {
+      return nil
+    }
+    return action
   }
 
   private func isIdle(session: SessionSnapshot, now: Date, thresholdSeconds: Int) -> Bool {
