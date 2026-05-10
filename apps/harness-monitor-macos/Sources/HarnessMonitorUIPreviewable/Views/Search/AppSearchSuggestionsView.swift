@@ -35,12 +35,19 @@ public struct AppSearchSuggestionsView: View {
     Button {
       onPick(hit)
     } label: {
-      HStack(spacing: 8) {
+      HStack(alignment: .firstTextBaseline, spacing: 8) {
         Image(systemName: hit.systemImage)
           .foregroundStyle(.secondary)
-          .frame(width: 18)
         VStack(alignment: .leading, spacing: 1) {
-          Text(hit.title)
+          HStack(spacing: 8) {
+            Text(hit.title)
+            Spacer(minLength: 8)
+            if let trailing = hit.trailing, !trailing.isEmpty {
+              Text(trailing)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+          }
           if let subtitle = hit.subtitle, !subtitle.isEmpty {
             Text(subtitle)
               .font(.caption)

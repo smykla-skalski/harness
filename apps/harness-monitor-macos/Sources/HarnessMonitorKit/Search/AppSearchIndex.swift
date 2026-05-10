@@ -51,6 +51,7 @@ public actor AppSearchIndex {
     let id: String
     let title: String
     let subtitle: String?
+    let trailing: String?
     let lowercasedTitle: String
     let lowercasedCorpus: String
   }
@@ -77,11 +78,13 @@ public actor AppSearchIndex {
         agent.persona?.description,
         agent.agentId,
         agent.role.rawValue,
+        agent.runtime,
       ].compactMap { $0 }
       return makeRecord(
         id: agent.agentId,
         title: agent.name,
         subtitle: agent.persona?.name,
+        trailing: agent.runtime,
         corpusParts: parts
       )
     }
@@ -99,6 +102,7 @@ public actor AppSearchIndex {
         id: decision.id,
         title: decision.summary,
         subtitle: decision.ruleID.isEmpty ? nil : decision.ruleID,
+        trailing: nil,
         corpusParts: parts
       )
     }
@@ -117,6 +121,7 @@ public actor AppSearchIndex {
         id: task.taskId,
         title: task.title,
         subtitle: task.assignedTo,
+        trailing: nil,
         corpusParts: parts
       )
     }
@@ -134,6 +139,7 @@ public actor AppSearchIndex {
         id: entry.entryId,
         title: entry.summary.isEmpty ? entry.kind : entry.summary,
         subtitle: entry.kind,
+        trailing: nil,
         corpusParts: parts
       )
     }
@@ -176,6 +182,7 @@ public actor AppSearchIndex {
     id: String,
     title: String,
     subtitle: String?,
+    trailing: String?,
     corpusParts: [String]
   ) -> Record {
     let nonEmptyParts = corpusParts.filter { !$0.isEmpty }
@@ -184,6 +191,7 @@ public actor AppSearchIndex {
       id: id,
       title: title,
       subtitle: subtitle,
+      trailing: trailing,
       lowercasedTitle: title.lowercased(),
       lowercasedCorpus: corpus
     )
@@ -251,6 +259,7 @@ public actor AppSearchIndex {
         id: entry.record.id,
         title: entry.record.title,
         subtitle: entry.record.subtitle,
+        trailing: entry.record.trailing,
         systemImage: domain.systemImage,
         score: entry.score
       )
