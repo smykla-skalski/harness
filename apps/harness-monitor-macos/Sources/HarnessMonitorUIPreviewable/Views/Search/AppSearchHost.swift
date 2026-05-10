@@ -82,11 +82,15 @@ public struct AppSearchHostModifier: ViewModifier {
       .searchSuggestions {
         AppSearchSuggestionsView(
           results: model.results,
-          selectedDomains: $model.selectedDomains,
+          selectedDomains: model.selectedDomains,
           routeAction: routeAction
         )
       }
-      .searchSuggestions(.visible, for: .menu)
+      .safeAreaInset(edge: .top, spacing: 0) {
+        if model.isPresented {
+          AppSearchFilterRail(selectedDomains: $model.selectedDomains)
+        }
+      }
       .background {
         Button("Find in Session", action: focusSearchField)
           .keyboardShortcut("f", modifiers: .command)
