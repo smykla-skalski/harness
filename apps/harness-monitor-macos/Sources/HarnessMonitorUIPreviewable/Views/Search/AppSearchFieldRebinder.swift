@@ -92,7 +92,13 @@ struct AppSearchFieldRebinder: NSViewRepresentable {
       }
       clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown]) {
         [weak self] event in
-        Task { @MainActor [weak self] in
+        // AppKit dispatches local mouse events on the main thread; we
+        // bridge synchronously so rearming happens BEFORE AppKit hands
+        // the click to the field. Going through Task { @MainActor }
+        // queues to the next runloop tick, by which point the field
+        // has already absorbed the click and the FR cycle becomes a
+        // visible flicker that doesn't reliably re-open the menu.
+        MainActor.assumeIsolated {
           self?.handleClick(event)
         }
         return event
@@ -134,9 +140,14 @@ struct AppSearchFieldRebinder: NSViewRepresentable {
       // AppKit's suggestion menu re-presents on a fresh
       // becomeFirstResponder; if `field` is already first responder,
       // `makeFirstResponder` is a no-op. Cycle off then back on to
-      // force the menu to reopen while keeping the typed query.
+      // force the menu to reopen while keeping the typed query. The
+      // restore step is dispatched on the next main runloop pass so
+      // the resign-first-responder propagation completes before the
+      // field is asked to take responder status again — without that
+      // ordering, AppKit collapses the pair into a single no-op.
       window.makeFirstResponder(nil)
-      Task { @MainActor in
+      DispatchQueue.main.async { [weak window] in
+        guard let window else { return }
         window.makeFirstResponder(field)
         field.selectText(nil)
       }
