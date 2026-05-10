@@ -65,7 +65,14 @@ fi
 
 "$GENERATE_PROJECT_SCRIPT"
 
-run_with_sanitized_xcode_only_swift_environment "$SWIFT_BIN" format lint \
+# Run linters at background QoS so all-cores parallel work yields to the foreground UI.
+TASKPOLICY_BIN="${TASKPOLICY_BIN:-$(type -P taskpolicy || true)}"
+QOS_WRAP=()
+if [ -n "${TASKPOLICY_BIN}" ]; then
+  QOS_WRAP=("${TASKPOLICY_BIN}" -b)
+fi
+
+run_with_sanitized_xcode_only_swift_environment "${QOS_WRAP[@]}" "$SWIFT_BIN" format lint \
   --configuration "$FORMAT_CONFIG" \
   --recursive \
   --parallel \
@@ -74,7 +81,7 @@ run_with_sanitized_xcode_only_swift_environment "$SWIFT_BIN" format lint \
 
 mkdir -p "$SWIFTLINT_CACHE_PATH"
 
-"$SWIFTLINT_BIN" lint \
+"${QOS_WRAP[@]}" "$SWIFTLINT_BIN" lint \
   --config "$ROOT/.swiftlint.yml" \
   --working-directory "$ROOT" \
   --cache-path "$SWIFTLINT_CACHE_PATH" \
@@ -83,7 +90,7 @@ mkdir -p "$SWIFTLINT_CACHE_PATH"
   --quiet \
   "${MAIN_LINT_TARGETS[@]}"
 
-"$SWIFTLINT_BIN" lint \
+"${QOS_WRAP[@]}" "$SWIFTLINT_BIN" lint \
   --config "$ROOT/Tools/HarnessMonitorE2E/.swiftlint.yml" \
   --working-directory "$ROOT/Tools/HarnessMonitorE2E" \
   --cache-path "$SWIFTLINT_CACHE_PATH" \
