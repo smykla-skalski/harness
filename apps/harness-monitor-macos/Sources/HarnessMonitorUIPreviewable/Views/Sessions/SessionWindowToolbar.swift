@@ -67,8 +67,12 @@ struct SessionWindowToolbar: ToolbarContent {
       Button {
         state.navigateBack()
       } label: {
-        Image(systemName: "chevron.backward")
-          .frame(width: 14, height: 14)
+        Label {
+          Text("Go back")
+        } icon: {
+          Image(systemName: "chevron.backward")
+            .frame(width: 14, height: 14)
+        }
       }
       .disabled(!state.navigationHistory.canGoBack)
       .help("Go back")
@@ -78,8 +82,12 @@ struct SessionWindowToolbar: ToolbarContent {
       Button {
         state.navigateForward()
       } label: {
-        Image(systemName: "chevron.forward")
-          .frame(width: 14, height: 14)
+        Label {
+          Text("Go forward")
+        } icon: {
+          Image(systemName: "chevron.forward")
+            .frame(width: 14, height: 14)
+        }
       }
       .disabled(!state.navigationHistory.canGoForward)
       .help("Go forward")
@@ -90,8 +98,12 @@ struct SessionWindowToolbar: ToolbarContent {
       Button {
         toggleFocusMode()
       } label: {
-        Image(systemName: focusMode ? "moon.fill" : "moon")
-          .frame(width: 14, height: 14)
+        Label {
+          Text(focusMode ? "Exit focus mode" : "Enter focus mode")
+        } icon: {
+          Image(systemName: focusMode ? "moon.fill" : "moon")
+            .frame(width: 14, height: 14)
+        }
       }
       .help(focusMode ? "Exit focus mode" : "Enter focus mode")
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowFocusModeButton)
