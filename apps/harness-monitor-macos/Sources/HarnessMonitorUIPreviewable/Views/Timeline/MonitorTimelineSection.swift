@@ -257,7 +257,15 @@ struct SessionTimelineView: View {
         Spacer(minLength: HarnessMonitorTheme.spacingLG)
 
         if !presentation.showsEmptyState {
-          HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM * 2) {
+          HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+            if presentation.navigation.showsNavigation {
+              SessionTimelineNavigationVisibilityStatus(
+                filterSummary: presentation.filterSnapshot.summary,
+                viewport: viewport,
+                accessibilityIdentifier:
+                  HarnessMonitorAccessibility.sessionTimelineNavigationStatus
+              )
+            }
             SessionTimelineFilterActionButtons(
               filters: $filters,
               inventory: presentation.filterSnapshot.inventory,
@@ -293,20 +301,6 @@ struct SessionTimelineView: View {
         )
 
         routeTimelineContent(for: presentation)
-
-        if presentation.navigation.showsNavigation {
-          SessionTimelineNavigationControls(
-            navigation: presentation.navigation,
-            presentation: presentation,
-            filterSummary: presentation.filterSnapshot.summary,
-            scrollCommandTargetID: scrollCommand?.targetID,
-            viewport: viewport,
-            performAction: { action in
-              performNavigationAction(action, presentation: presentation)
-            },
-            showsButtons: false
-          )
-        }
       }
     }
     .padding(.horizontal, routeMetrics.contentPadding)

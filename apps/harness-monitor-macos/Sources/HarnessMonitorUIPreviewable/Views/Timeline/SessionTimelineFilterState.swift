@@ -204,7 +204,8 @@ struct SessionTimelineFilterState: Equatable, Sendable {
   }
 
   var activeAdvancedFilterCount: Int {
-    eventTypes.count
+    tones.count
+      + eventTypes.count
       + agents.count
       + tasks.count
       + decisionSeverities.count
