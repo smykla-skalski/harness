@@ -64,6 +64,11 @@ struct SessionTimelineView: View {
   @State private var cachedPresentationInput = SessionTimelinePresentationInput.empty
   @State var viewport = SessionTimelineViewportModel()
   @State var filters = SessionTimelineFilterState()
+  // Cache the normalized filter signature so presentationInput does not
+  // rebuild and serialize the signature String on every body invocation.
+  // Updated via onChange when filters mutate.
+  @State private var cachedFilterSignature: String =
+    SessionTimelineFilterState().signature
 
   var body: some View {
     let input = presentationInput
@@ -89,7 +94,9 @@ struct SessionTimelineView: View {
         retryPendingEdgeLoadIfNeeded(for: displayPresentation)
       }
       .onChange(of: filters) { _, newValue in
-        persistFilters(normalizedFilters(newValue))
+        let normalized = normalizedFilters(newValue)
+        cachedFilterSignature = normalized.signature
+        persistFilters(normalized)
       }
       .onChange(of: filterPersistenceModeRawValue) { _, _ in
         persistFilters(normalizedFilters(filters))
@@ -115,7 +122,7 @@ struct SessionTimelineView: View {
       lastDecisionID: decisions.last?.id,
       signalCount: store.selectedSessionSignals.count,
       isTimelineLoading: isTimelineLoading,
-      filterSignature: normalizedFilters(filters).signature,
+      filterSignature: cachedFilterSignature,
       reduceMotion: reduceMotion,
       textSizeIndex: textSizeIndex,
       dateTimeConfiguration: dateTimeConfiguration
