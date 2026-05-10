@@ -86,7 +86,7 @@ struct AppSearchFieldRebinder: NSViewRepresentable {
       // Window-key path: no click is coming, so we drive the FR
       // cycle ourselves. Resign synchronously, restore on the next
       // runloop pass so AppKit fully propagates the
-      // resignFirstResponder before we re-promote — without the
+      // resignFirstResponder before we re-promote - without the
       // delay AppKit collapses the pair into a no-op and the menu
       // stays dismissed.
       guard shouldRebind else { return }

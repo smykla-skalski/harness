@@ -22,12 +22,12 @@ private struct AppSearchTrigger: Equatable {
 }
 
 /// Toolbar-placed `.searchable` field that drives the cross-domain
-/// ``AppSearchModel`` after a 150 ms debounce.
+/// `AppSearchModel` after a 150 ms debounce.
 ///
 /// The modifier owns one `@State` for the live query (the only main-actor
 /// write per keystroke). The primary domain at search time is resolved
-/// from the focused route, falling back to ``fallbackPrimaryDomain``.
-/// Ranking work happens off-MainActor inside ``AppSearchIndex``.
+/// from the focused route, falling back to `fallbackPrimaryDomain`.
+/// Ranking work happens off-MainActor inside `AppSearchIndex`.
 ///
 /// Suggestion-popover persistence: `.searchSuggestions` on macOS is
 /// backed by `NSSearchField`'s suggestion menu, which dismisses when
@@ -37,7 +37,7 @@ private struct AppSearchTrigger: Equatable {
 /// community recipe documented at
 /// https://github.com/siteline/swiftui-introspect/discussions/397
 /// and the Apple Developer Forums thread #704767, which has no
-/// SwiftUI workaround). The fix uses ``AppSearchFieldRebinder`` —
+/// SwiftUI workaround). The fix uses `AppSearchFieldRebinder` -
 /// an `NSViewRepresentable` that finds the underlying
 /// `NSSearchField` in the window hierarchy and calls
 /// `beginSearchInteraction()` (the same AppKit API
@@ -94,7 +94,7 @@ public struct AppSearchHostModifier: ViewModifier {
       .searchSuggestions {
         AppSearchSuggestionsView(
           results: model.results,
-          routeAction: routeAction
+          onPick: handleHit
         )
       }
       .background {
@@ -128,6 +128,19 @@ public struct AppSearchHostModifier: ViewModifier {
   private func focusSearchField() {
     isSearchPresented = true
     searchFieldFocused = true
+  }
+
+  /// Route to the hit, then clear the query and collapse the search
+  /// field as one atomic step. Without the clear, the per-route list
+  /// (which mirrors `appSearchModel.query`) keeps its filter applied
+  /// after drilling into a specific agent / decision / task and hides
+  /// the rest of the route.
+  private func handleHit(_ hit: AppSearchHit) {
+    routeAction(hit)
+    query = ""
+    model.clear()
+    isSearchPresented = false
+    searchFieldFocused = false
   }
 
   private var resolvedPrimaryDomain: AppSearchDomain {
