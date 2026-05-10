@@ -356,27 +356,25 @@ struct SessionTimelineView: View {
       )
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     } else {
-      GeometryReader { geo in
-        SessionTimelineTableView(
-          columnWidth: geo.size.width,
-          rows: presentation.rows,
-          contentIdentity: contentIdentity,
-          scrollCommand: scrollCommand,
-          actionHandler: actionHandler,
-          onSignalTap: { [store] signalID in
-            store.presentedSheet = .signalDetail(signalID: signalID)
-          },
-          viewport: viewport,
-          scrollBoundaryChanged: { oldValue, newValue in
-            handleScrollBoundaryChange(
-              from: oldValue,
-              to: newValue,
-              presentation: presentation
-            )
-          }
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-      }
+      SessionTimelineTableView(
+        columnWidth: 0,
+        rows: presentation.rows,
+        contentIdentity: contentIdentity,
+        scrollCommand: scrollCommand,
+        actionHandler: actionHandler,
+        onSignalTap: { [store] signalID in
+          store.presentedSheet = .signalDetail(signalID: signalID)
+        },
+        viewport: viewport,
+        scrollBoundaryChanged: { oldValue, newValue in
+          handleScrollBoundaryChange(
+            from: oldValue,
+            to: newValue,
+            presentation: presentation
+          )
+        }
+      )
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
   }
 

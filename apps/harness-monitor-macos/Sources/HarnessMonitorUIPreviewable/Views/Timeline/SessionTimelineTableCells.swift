@@ -70,12 +70,21 @@ private final class SessionTimelineConnectorView: NSView {
   }
 }
 
+private struct SessionTimelineTableCellConfiguration: Equatable {
+  let row: SessionTimelineRow
+  let fontScale: CGFloat
+  let connectorVisibility: SessionTimelineConnectorVisibility
+  let actionHandlerID: ObjectIdentifier
+  let hasSignalTap: Bool
+}
+
 final class SessionTimelineTableCellView: NSTableCellView {
   static let columnIdentifier = NSUserInterfaceItemIdentifier("session-timeline-column")
   static let cellIdentifier = NSUserInterfaceItemIdentifier("session-timeline-cell")
 
   private let connectorView = SessionTimelineConnectorView()
   private let hostingView = NSHostingView(rootView: SessionTimelineHostedRow.empty)
+  private var configuration: SessionTimelineTableCellConfiguration?
 
   init() {
     super.init(frame: .zero)
@@ -109,6 +118,17 @@ final class SessionTimelineTableCellView: NSTableCellView {
     fontScale: CGFloat,
     connectorVisibility: SessionTimelineConnectorVisibility
   ) {
+    let nextConfiguration = SessionTimelineTableCellConfiguration(
+      row: row,
+      fontScale: fontScale,
+      connectorVisibility: connectorVisibility,
+      actionHandlerID: ObjectIdentifier(actionHandler),
+      hasSignalTap: onSignalTap != nil
+    )
+    guard configuration != nextConfiguration else {
+      return
+    }
+    configuration = nextConfiguration
     connectorView.visibility = connectorVisibility
     connectorView.markerCenterY = SessionTimelineTableMetrics.estimatedMarkerCenterY(
       for: row,
