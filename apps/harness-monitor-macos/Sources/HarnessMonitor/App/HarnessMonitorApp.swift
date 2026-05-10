@@ -24,7 +24,8 @@ struct HarnessMonitorApp: App {
   private let acpAttentionState: AcpPermissionAttentionState
   private let pendingDecisionsDockBadgeController: PendingDecisionsDockBadgeController
   private let perfScenario: HarnessMonitorPerfScenario?
-  @State private var store: HarnessMonitorStore
+  // App-internal access; helpers in HarnessMonitorApp+Helpers.swift use it.
+  @State var store: HarnessMonitorStore
   @State private var menuBarStatusController: HarnessMonitorMenuBarStatusController
   @State private var sessionWindowPresenceTracker: SessionWindowPresenceTracker
   @State private var windowCommandRouting: WindowCommandRoutingState
@@ -34,8 +35,9 @@ struct HarnessMonitorApp: App {
   @State private var hasScheduledInitialWindowRouting = false
   @AppStorage(HarnessMonitorThemeDefaults.modeKey)
   private var themeMode: HarnessMonitorThemeMode = .auto
+  // App-internal access; text-size helpers live in HarnessMonitorApp+Helpers.swift.
   @AppStorage(HarnessMonitorTextSize.storageKey)
-  private var textSizeIndex = HarnessMonitorTextSize.defaultIndex
+  var textSizeIndex = HarnessMonitorTextSize.defaultIndex
   @AppStorage(HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledKey)
   private var menuBarStateColorVariantsEnabled =
     HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledDefault
@@ -273,9 +275,13 @@ struct HarnessMonitorApp: App {
 
   @MainActor
   private func routeInitialWindows() async {
+    let tabbingPreference = SessionWindowTabbingPreference.resolved(
+      rawValue: UserDefaults.standard.string(forKey: SessionWindowTabbingPreference.storageKey)
+    )
     let router = HarnessMonitorInitialWindowRouter(
       store: store,
       launchBehavior: launchBehavior,
+      tabbingPreference: tabbingPreference,
       openWelcomeWindow: {
         openWindow(id: HarnessMonitorWindowID.openRecent)
       },
@@ -386,66 +392,6 @@ struct HarnessMonitorApp: App {
       presentOpenFolder()
     }
     .attachExternalSessionImporter(store: store)
-  }
-
-  private func handleOpenFolder(_ result: Result<[URL], any Error>) async {
-    let record = await store.handleImportedFolder(result)
-    HarnessMonitorLogger.swiftui.info(
-      "Open folder importer handling finished: bookmarked=\((record != nil), privacy: .public)"
-    )
-  }
-
-  private func increaseTextSize() {
-    guard HarnessMonitorTextSize.canIncrease(textSizeIndex) else {
-      return
-    }
-    textSizeIndex += 1
-  }
-
-  private func decreaseTextSize() {
-    guard HarnessMonitorTextSize.canDecrease(textSizeIndex) else {
-      return
-    }
-    textSizeIndex -= 1
-  }
-
-  private func resetTextSize() {
-    textSizeIndex = HarnessMonitorTextSize.defaultIndex
-  }
-
-  private func refreshStore() {
-    Task {
-      await store.manualRefresh()
-    }
-  }
-
-  private func presentOpenFolder() {
-    HarnessMonitorLogger.swiftui.info(
-      "Presenting open folder importer: token=\(store.openFolderRequest, privacy: .public)"
-    )
-    let panel = NSOpenPanel()
-    panel.canChooseFiles = false
-    panel.canChooseDirectories = true
-    panel.allowsMultipleSelection = false
-    panel.canCreateDirectories = true
-    panel.prompt = "Open"
-    panel.message = "Select a project folder"
-    let parent = NSApp.keyWindow ?? NSApp.mainWindow
-    let completion: @Sendable (NSApplication.ModalResponse) -> Void = { [store] response in
-      Task { @MainActor in
-        let result: Result<[URL], any Error> =
-          response == .OK ? .success(panel.urls) : .success([])
-        let record = await store.handleImportedFolder(result)
-        HarnessMonitorLogger.swiftui.info(
-          "Open folder importer handling finished: bookmarked=\((record != nil), privacy: .public)"
-        )
-      }
-    }
-    if let parent {
-      panel.beginSheetModal(for: parent, completionHandler: completion)
-    } else {
-      panel.begin(completionHandler: completion)
-    }
   }
 
 }

@@ -54,6 +54,7 @@ struct SessionWindowRootView: View {
         tracker: sessionWindowPresenceTracker
       )
     )
+    .modifier(SessionWindowAppKitBinding(sessionID: token.sessionID))
     .modifier(SessionWindowTabbing(isSessionWindow: true))
     .modifier(
       HarnessMonitorConfirmationDialogModifier(

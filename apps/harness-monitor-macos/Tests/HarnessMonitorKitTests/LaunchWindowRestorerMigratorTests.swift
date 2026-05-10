@@ -135,6 +135,95 @@ struct LaunchWindowRestorerMigratorTests {
     #expect(!defaults.userDefaults.bool(forKey: HarnessMonitorStore.launchWindowBridgeFallbackKey))
   }
 
+  @Test("Snapshot with tab grouping round-trips through the cache layer")
+  func quitSnapshotPreservesTabGroupings() async {
+    let snapshot = HarnessMonitorStore.SessionWindowQuitSnapshot(
+      sessionIDs: ["sess-a", "sess-b", "sess-c", "sess-d"],
+      groupings: [
+        HarnessMonitorStore.SessionTabGroupSnapshot(
+          ordinal: 0,
+          sessionIDs: ["sess-a", "sess-b"],
+          foregroundSessionID: "sess-b"
+        ),
+        HarnessMonitorStore.SessionTabGroupSnapshot(
+          ordinal: 1,
+          sessionIDs: ["sess-c", "sess-d"],
+          foregroundSessionID: nil
+        ),
+      ]
+    )
+    _ = await cacheService.replaceSessionWindowsOpenAtQuit(snapshot: snapshot)
+
+    let groups = await cacheService.sessionTabGroupsAtQuit()
+    #expect(groups.count == 2)
+    let groupA = groups.first(where: { $0.sessionIDs.contains("sess-a") })
+    #expect(groupA?.sessionIDs == ["sess-a", "sess-b"])
+    #expect(groupA?.foregroundSessionID == "sess-b")
+    let groupC = groups.first(where: { $0.sessionIDs.contains("sess-c") })
+    #expect(groupC?.sessionIDs == ["sess-c", "sess-d"])
+    #expect(groupC?.foregroundSessionID == nil)
+  }
+
+  @Test("Standalone session windows survive the snapshot without a grouping entry")
+  func standaloneWindowsHaveNoGrouping() async {
+    let snapshot = HarnessMonitorStore.SessionWindowQuitSnapshot(
+      sessionIDs: ["sess-solo-1", "sess-solo-2"],
+      groupings: []
+    )
+    _ = await cacheService.replaceSessionWindowsOpenAtQuit(snapshot: snapshot)
+
+    let groups = await cacheService.sessionTabGroupsAtQuit()
+    #expect(groups.isEmpty)
+    let ids = await cacheService.sessionWindowIDsOpenAtQuit(limit: 10)
+    #expect(Set(ids) == ["sess-solo-1", "sess-solo-2"])
+  }
+
+  @Test("Replacing an existing snapshot drops stale tab grouping rows")
+  func replacingSnapshotResetsTabGrouping() async {
+    let initial = HarnessMonitorStore.SessionWindowQuitSnapshot(
+      sessionIDs: ["sess-a", "sess-b"],
+      groupings: [
+        HarnessMonitorStore.SessionTabGroupSnapshot(
+          ordinal: 0,
+          sessionIDs: ["sess-a", "sess-b"],
+          foregroundSessionID: "sess-a"
+        )
+      ]
+    )
+    _ = await cacheService.replaceSessionWindowsOpenAtQuit(snapshot: initial)
+
+    let cleared = HarnessMonitorStore.SessionWindowQuitSnapshot(
+      sessionIDs: ["sess-a", "sess-b"],
+      groupings: []
+    )
+    _ = await cacheService.replaceSessionWindowsOpenAtQuit(snapshot: cleared)
+
+    let groups = await cacheService.sessionTabGroupsAtQuit()
+    #expect(groups.isEmpty)
+  }
+
+  @Test("Legacy Set<String> overload preserves wasOpenAtQuit + clears any tab grouping")
+  func legacySetOverloadHasNoGrouping() async {
+    let initial = HarnessMonitorStore.SessionWindowQuitSnapshot(
+      sessionIDs: ["sess-a", "sess-b"],
+      groupings: [
+        HarnessMonitorStore.SessionTabGroupSnapshot(
+          ordinal: 0,
+          sessionIDs: ["sess-a", "sess-b"],
+          foregroundSessionID: nil
+        )
+      ]
+    )
+    _ = await cacheService.replaceSessionWindowsOpenAtQuit(snapshot: initial)
+
+    _ = await cacheService.replaceSessionWindowsOpenAtQuit(
+      sessionIDs: ["sess-a", "sess-b"]
+    )
+
+    let groups = await cacheService.sessionTabGroupsAtQuit()
+    #expect(groups.isEmpty)
+  }
+
   private func makeStore(cacheService: SessionCacheService? = nil) -> HarnessMonitorStore {
     HarnessMonitorStore(
       daemonController: RecordingDaemonController(),

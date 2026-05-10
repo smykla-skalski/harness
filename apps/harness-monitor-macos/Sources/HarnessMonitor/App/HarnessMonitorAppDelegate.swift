@@ -206,7 +206,8 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
       return .terminateNow
     }
 
-    store.beginSessionWindowTerminationSnapshot()
+    let quitSnapshot = SessionWindowQuitCapture.captureSnapshot()
+    store.beginSessionWindowTerminationSnapshot(quitSnapshot: quitSnapshot)
     terminationTask = Task { @MainActor [weak self] in
       await self?.prepareForTermination(using: store)
       self?.terminationTask = nil
@@ -246,7 +247,8 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
       return
     }
 
-    store?.beginSessionWindowTerminationSnapshot()
+    let quitSnapshot = SessionWindowQuitCapture.captureSnapshot()
+    store?.beginSessionWindowTerminationSnapshot(quitSnapshot: quitSnapshot)
     terminationTask = Task { @MainActor [weak self] in
       if let self {
         await self.prepareForTermination(using: self.store)
