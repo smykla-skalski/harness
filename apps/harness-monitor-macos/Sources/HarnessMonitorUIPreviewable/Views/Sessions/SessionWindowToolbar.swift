@@ -70,7 +70,7 @@ struct SessionWindowToolbar: ToolbarContent {
         Image(systemName: "chevron.backward")
           .frame(width: 14, height: 14)
       }
-      .disabled(!model.canNavigateBack)
+      .disabled(!state.navigationHistory.canGoBack)
       .help("Go back")
       .accessibilityLabel("Back")
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionNavigateBackButton)
@@ -81,7 +81,7 @@ struct SessionWindowToolbar: ToolbarContent {
         Image(systemName: "chevron.forward")
           .frame(width: 14, height: 14)
       }
-      .disabled(!model.canNavigateForward)
+      .disabled(!state.navigationHistory.canGoForward)
       .help("Go forward")
       .accessibilityLabel("Forward")
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionNavigateForwardButton)
