@@ -44,6 +44,8 @@ struct SessionStatusSummaryModel: Equatable {
 enum SessionStatusSourceTint: Equatable {
   case tertiary
   case success
+  case caution
+  case danger
   case disabledConnection
 
   var color: Color {
@@ -52,6 +54,10 @@ enum SessionStatusSourceTint: Equatable {
       HarnessMonitorTheme.tertiaryInk
     case .success:
       HarnessMonitorTheme.success
+    case .caution:
+      HarnessMonitorTheme.caution
+    case .danger:
+      HarnessMonitorTheme.danger
     case .disabledConnection:
       HarnessMonitorTheme.disabledConnectionChrome
     }
@@ -62,6 +68,8 @@ struct SessionSidebarFooter: View {
   let model: SessionStatusSummaryModel
   @ScaledMetric(relativeTo: .caption)
   private var horizontalPadding: CGFloat = 12
+  @ScaledMetric(relativeTo: .caption)
+  private var footerHorizontalPadding: CGFloat = 8
   @ScaledMetric(relativeTo: .caption)
   private var footerOuterPadding: CGFloat = 10
 
@@ -83,7 +91,7 @@ struct SessionSidebarFooter: View {
       RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
         .strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.32), lineWidth: 1)
     }
-    .padding(.horizontal, footerOuterPadding)
+    .padding(.horizontal, footerHorizontalPadding)
     .padding(.top, HarnessMonitorTheme.spacingXS)
     .padding(.bottom, footerOuterPadding)
     .help(model.helpText)
@@ -126,13 +134,11 @@ private struct SessionStatusSummary: View {
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.itemSpacing) {
       SessionStatusSourceIcon(source: source)
+      SessionStatusTransportChrome(metrics: metrics)
       if usesFlexibleSpacer {
         Spacer(minLength: 0)
       }
-      SessionStatusStrip(
-        statusStripState: statusStripState,
-        metrics: metrics
-      )
+      SessionStatusStrip(statusStripState: statusStripState)
     }
   }
 }
@@ -144,7 +150,6 @@ private struct SessionStatusSourcePresentation {
 
 private struct SessionStatusStrip: View {
   let statusStripState: SessionStatusStripState
-  let metrics: ConnectionMetrics
   @ScaledMetric(relativeTo: .caption)
   private var chromeHeight: CGFloat = 14
 
@@ -159,11 +164,69 @@ private struct SessionStatusStrip: View {
       if let mcp = statusStripState.mcp {
         SessionStatusWord(token: mcp)
       }
-      if statusStripState.hasVisibleTokens {
-        SessionStatusSeparator()
-      }
-      ConnectionToolbarBadge(metrics: metrics)
-        .accessibilityHidden(true)
+    }
+    .fixedSize(horizontal: true, vertical: false)
+    .frame(minHeight: chromeHeight, alignment: .center)
+    .accessibilityHidden(true)
+  }
+}
+
+private struct SessionStatusTransportChrome: View {
+  let metrics: ConnectionMetrics
+
+  private static let badgeFont = Font.system(.caption2, design: .rounded, weight: .semibold)
+    .monospacedDigit()
+  @ScaledMetric(relativeTo: .caption2)
+  private var transportLabelWidth: CGFloat = 24
+  @ScaledMetric(relativeTo: .caption2)
+  private var latencyLabelWidth: CGFloat = 34
+  @ScaledMetric(relativeTo: .caption)
+  private var chromeHeight: CGFloat = 14
+
+  private var showsConnectionDetails: Bool {
+    metrics.connectedSince != nil
+  }
+
+  private var showsLatencyValue: Bool {
+    showsConnectionDetails && metrics.transportLatencyMs != nil
+  }
+
+  private var transportLabel: String {
+    metrics.transportKind.shortTitle
+  }
+
+  private var latencyLabel: String {
+    guard let latencyMs = metrics.transportLatencyMs else {
+      return "--ms"
+    }
+    if latencyMs >= 1_000 {
+      return "999+"
+    }
+    return "\(latencyMs)ms"
+  }
+
+  private var statusTint: Color {
+    metrics.latencyTint
+  }
+
+  var body: some View {
+    HStack(alignment: .center, spacing: 3) {
+      Text(transportLabel)
+        .font(Self.badgeFont)
+        .foregroundStyle(statusTint)
+        .lineLimit(1)
+        .frame(minWidth: transportLabelWidth, alignment: .leading)
+        .fixedSize(horizontal: true, vertical: false)
+        .opacity(showsConnectionDetails ? 1 : 0)
+        .accessibilityHidden(!showsConnectionDetails)
+      Text(latencyLabel)
+        .font(Self.badgeFont)
+        .foregroundStyle(statusTint.opacity(0.5))
+        .lineLimit(1)
+        .frame(minWidth: latencyLabelWidth, alignment: .leading)
+        .fixedSize(horizontal: true, vertical: false)
+        .opacity(showsLatencyValue ? 1 : 0)
+        .accessibilityHidden(!showsLatencyValue)
     }
     .fixedSize(horizontal: true, vertical: false)
     .frame(minHeight: chromeHeight, alignment: .center)
@@ -191,7 +254,7 @@ private struct SessionStatusSourceIcon: View {
 
   var body: some View {
     Image(systemName: source.systemImage)
-      .scaledFont(.system(.caption2, design: .rounded, weight: .semibold))
+      .font(.system(.caption2, design: .rounded, weight: .semibold))
       .foregroundStyle(source.tint)
       .frame(minHeight: chromeHeight, alignment: .center)
       .accessibilityHidden(true)
