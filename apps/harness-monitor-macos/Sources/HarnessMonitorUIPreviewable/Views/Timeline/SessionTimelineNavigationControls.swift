@@ -131,18 +131,19 @@ struct SessionTimelineNavigationControls: View {
   let performAction: (SessionTimelineWindowAction) -> Void
 
   var body: some View {
-    let anchorID = viewport.visibleAnchorID ?? scrollCommandTargetID
-    let canOlder = presentation.canScrollOlder(from: anchorID)
-    let canNewer = presentation.canScrollNewer(from: anchorID)
-    let visibilityStats = viewport.visibilityStats
-    let detail = navigationDetail(for: visibilityStats)
-    return VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      buttons(canOlder: canOlder, canNewer: canNewer)
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      SessionTimelineNavigationButtonRow(
+        presentation: presentation,
+        scrollCommandTargetID: scrollCommandTargetID,
+        viewport: viewport,
+        performAction: performAction
+      )
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
         statusLabel
-        if let detail {
-          navigationDetailLabel(detail)
-        }
+        SessionTimelineNavigationVisibilityDetail(
+          filterSummary: filterSummary,
+          viewport: viewport
+        )
       }
     }
     .accessibilityElement(children: .contain)
@@ -156,15 +157,21 @@ struct SessionTimelineNavigationControls: View {
       .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineNavigationStatus)
   }
+}
 
-  @ViewBuilder
-  private func navigationDetailLabel(_ detail: NavigationDetail) -> some View {
-    Text(detail.text)
-      .scaledFont(.caption2)
-      .monospacedDigit()
-      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      .accessibilityLabel(detail.accessibilityText)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineVisibleStatus)
+private struct SessionTimelineNavigationVisibilityDetail: View {
+  let filterSummary: SessionTimelineFilterSummary
+  let viewport: SessionTimelineViewportModel
+
+  var body: some View {
+    if let detail = navigationDetail(for: viewport.visibilityStats) {
+      Text(detail.text)
+        .scaledFont(.caption2)
+        .monospacedDigit()
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .accessibilityLabel(detail.accessibilityText)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineVisibleStatus)
+    }
   }
 
   private func navigationDetail(
@@ -205,8 +212,18 @@ struct SessionTimelineNavigationControls: View {
       accessibilityText: visibilityStats.accessibilityStatusText
     )
   }
+}
 
-  private func buttons(canOlder: Bool, canNewer: Bool) -> some View {
+private struct SessionTimelineNavigationButtonRow: View {
+  let presentation: SessionTimelineSectionPresentation
+  let scrollCommandTargetID: String?
+  let viewport: SessionTimelineViewportModel
+  let performAction: (SessionTimelineWindowAction) -> Void
+
+  var body: some View {
+    let anchorID = viewport.visibleAnchorID ?? scrollCommandTargetID
+    let canOlder = presentation.canScrollOlder(from: anchorID)
+    let canNewer = presentation.canScrollNewer(from: anchorID)
     HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
       navigationButton(
         title: "Older",
