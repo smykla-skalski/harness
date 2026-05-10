@@ -97,15 +97,19 @@ extension SessionWindowView {
   }
 
   @ViewBuilder var focusModeSurface: some View {
+    // Single extension effect for both focus-mode branches. Previously
+    // each branch applied its own; the if/else flip would tear down +
+    // rebuild the animatable glass surface on every route change.
     sessionBannerStack {
-      if SessionWindowFocusModePolicy.usesRouteContent(selection: stateCache.selection) {
-        contentColumn
-          .backgroundExtensionEffect()
-      } else {
-        detailFocus
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
-          .backgroundExtensionEffect()
+      Group {
+        if SessionWindowFocusModePolicy.usesRouteContent(selection: stateCache.selection) {
+          contentColumn
+        } else {
+          detailFocus
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
       }
+      .backgroundExtensionEffect()
     }
     .modifier(
       SessionWindowPlainTapRecorder(
@@ -142,23 +146,27 @@ extension SessionWindowView {
   }
 
   @ViewBuilder private var standardSessionDetailSurface: some View {
-    switch renderedRoute.layoutStyle {
-    case .sidebarDetail:
-      routeDetailColumn
-    case .sidebarContentDetail:
-      SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding) {
-        contentColumn
-      } detail: {
-        detailColumn
+    // Single extension effect across both layout styles. Previously each
+    // branch wrapped its own; switching routes tore down + rebuilt the
+    // animatable glass surface.
+    Group {
+      switch renderedRoute.layoutStyle {
+      case .sidebarDetail:
+        routeDetailColumn
+      case .sidebarContentDetail:
+        SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding) {
+          contentColumn
+        } detail: {
+          detailColumn
+        }
       }
-      .backgroundExtensionEffect()
     }
+    .backgroundExtensionEffect()
   }
 
   @ViewBuilder private var routeDetailColumn: some View {
     contentColumn
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-      .backgroundExtensionEffect()
   }
 
   @ViewBuilder
