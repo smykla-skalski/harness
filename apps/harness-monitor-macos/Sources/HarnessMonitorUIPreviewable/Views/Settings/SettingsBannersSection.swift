@@ -19,7 +19,8 @@ public struct SettingsBannersSection: View {
         Text("Pending Decisions")
       } footer: {
         Text(
-          "Controls the pending decision banner across session windows. Focus Mode has its own override when banners stay enabled here. "
+          "Controls the pending decision banner across session windows. "
+            + "Focus Mode has its own override when banners stay enabled here. "
             + SessionDecisionBulkActionCopy.dismissVisibleHelp
         )
         .accessibilityIdentifier("harness.settings.decisions.dismiss-visible-help")

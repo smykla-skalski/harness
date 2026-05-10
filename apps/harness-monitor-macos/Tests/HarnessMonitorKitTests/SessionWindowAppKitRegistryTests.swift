@@ -8,7 +8,8 @@
   @Suite("Session window AppKit registry")
   struct SessionWindowAppKitRegistryTests {
 
-    @Test func waiterResolvesImmediatelyWhenPredicateAlreadyMatches() async {
+    @Test
+    func waiterResolvesImmediatelyWhenPredicateAlreadyMatches() async {
       let registry = SessionWindowAppKitRegistry()
       let window = makeOffscreenWindow()
       registry.bind(window: window, sessionID: "session-A")
@@ -22,7 +23,8 @@
       registry.unbind(window: window)
     }
 
-    @Test func waiterResolvesOnFirstMatchingBind() async throws {
+    @Test
+    func waiterResolvesOnFirstMatchingBind() async throws {
       let registry = SessionWindowAppKitRegistry()
 
       let task = Task { @MainActor in
@@ -44,7 +46,8 @@
       registry.unbind(window: window)
     }
 
-    @Test func waiterReturnsFalseAfterTimeoutWhenPredicateNeverMatches() async {
+    @Test
+    func waiterReturnsFalseAfterTimeoutWhenPredicateNeverMatches() async {
       let registry = SessionWindowAppKitRegistry()
 
       let resolved = await registry.waitForBindings(
@@ -55,7 +58,8 @@
       #expect(!resolved)
     }
 
-    @Test func windowForSessionIDReturnsBoundWindowAndNilAfterUnbind() {
+    @Test
+    func windowForSessionIDReturnsBoundWindowAndNilAfterUnbind() {
       let registry = SessionWindowAppKitRegistry()
       let window = makeOffscreenWindow()
 
@@ -67,7 +71,8 @@
       #expect(registry.window(forSessionID: "indexed") == nil)
     }
 
-    @Test func bindReplacingSessionIDReleasesPriorReverseIndexEntry() {
+    @Test
+    func bindReplacingSessionIDReleasesPriorReverseIndexEntry() {
       let registry = SessionWindowAppKitRegistry()
       let window = makeOffscreenWindow()
 

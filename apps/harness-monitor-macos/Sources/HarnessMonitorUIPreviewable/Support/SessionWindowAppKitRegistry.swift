@@ -112,8 +112,7 @@
       if predicate(liveSessionIDs()) { return true }
 
       let waiterID = UUID()
-      return await withCheckedContinuation {
-        (continuation: CheckedContinuation<Bool, Never>) in
+      return await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
         waiters[waiterID] = Waiter(
           predicate: predicate,
           continuation: continuation,

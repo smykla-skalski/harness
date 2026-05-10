@@ -36,7 +36,7 @@ import SwiftUI
       {
         "id": "idle-session.nudge.gemini-20260506193040829413000",
         "kind": "nudge",
-        "payloadJSON": "{\\"agentID\\":\\"gemini-20260506193040829413000\\",\\"input\\":\\"Quick check-in from Harness Monitor supervisor for idle session fd1ef36a-b97d-4dd3-9a4a-88f304599b2b.\\"}",
+        "payloadJSON": "{\\"agentID\\":\\"gemini-1\\",\\"input\\":\\"Quick check-in from supervisor.\\"}",
         "title": "Send check-in nudge"
       }
       """,
