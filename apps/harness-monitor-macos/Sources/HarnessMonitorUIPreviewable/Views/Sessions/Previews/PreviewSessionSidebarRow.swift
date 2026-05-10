@@ -43,7 +43,8 @@ struct SessionSidebarRowPreviewContent: View {
 
 struct SessionSidebarRowSelectionPreviewContent: View {
   @Binding var selection: SessionSelection?
-  @Environment(\.harnessTextSizeIndex) private var textSizeIndex
+  @Environment(\.harnessTextSizeIndex)
+  private var textSizeIndex
 
   var body: some View {
     List(selection: $selection) {

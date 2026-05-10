@@ -76,7 +76,8 @@ final class OpenRecentWindowUITests: HarnessMonitorUITestCase {
     XCTAssertGreaterThanOrEqual(
       overviewTopInset,
       80,
-      "Top session sidebar content should stay clear of the toolbar chrome instead of rendering underneath it."
+      "Top session sidebar content should stay clear of the toolbar chrome "
+        + "instead of rendering underneath it."
     )
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) { !openRecentWindow.exists },

@@ -13,7 +13,15 @@ struct SessionDecisionRuntimeTests {
     let rows = runtime.contextRows(
       for: makeDecision(
         contextJSON: #"""
-          {"zone":"dev","attempt":2,"status":"open","ruleID":"stuck-agent","agentID":"a1","taskID":"t1","summary":"Agent stalled"}
+          {
+            "zone":"dev",
+            "attempt":2,
+            "status":"open",
+            "ruleID":"stuck-agent",
+            "agentID":"a1",
+            "taskID":"t1",
+            "summary":"Agent stalled"
+          }
           """#
       )
     )
