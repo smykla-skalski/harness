@@ -176,6 +176,29 @@ struct AcpRuntimeDeadlinePresentation: Equatable {
   }
 }
 
+enum AcpRuntimeDeadlineClock {
+  @MainActor
+  static func now(store: HarnessMonitorStore, localNow: Date) -> Date {
+    store.currentAcpRuntimeClockNow(at: localNow) ?? localNow
+  }
+
+  static func shouldTick(deadline: Date?, now: Date) -> Bool {
+    guard let deadline else {
+      return false
+    }
+    return deadline.timeIntervalSince(now) > 0
+  }
+
+  static func sleepUntilNextTick() async -> Bool {
+    do {
+      try await Task.sleep(for: .seconds(1))
+      return !Task.isCancelled
+    } catch {
+      return false
+    }
+  }
+}
+
 struct AcpRuntimeDeadlineChip: View {
   let deadline: Date
   let now: Date

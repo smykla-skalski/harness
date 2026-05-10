@@ -150,7 +150,7 @@ public final class HarnessMonitorStore {
   public var selectedAcpInspectObservedAt: Date? {
     selectedAcpInspectState?.sampledAt
   }
-  public var acpRuntimeClockTick = Date.now
+  @ObservationIgnored public var acpRuntimeClockTick = Date.now
   var selectedAcpInspectSyncEntries: [AcpRuntimeIdentity: AcpInspectSyncEntry] = [:]
   public var liveToolCallAnnouncementRowIDs: Set<String> = []
   public var toolCallTimelineOverflowNotice: ToolCallTimelineOverflowNotice?

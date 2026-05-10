@@ -8,13 +8,12 @@ enum AcpRuntimePresentation: Equatable {
 }
 
 struct AcpRuntimeStatusStrip: View {
-  /// Observe the clock tick here so the 1 Hz invalidation stays scoped to the strip instead of the
-  /// wider agent detail hierarchy.
   let store: HarnessMonitorStore
   let runtimeState: AcpAgentRuntimeState
   let inspectStatus: AcpRuntimeInspectStatus
   let presentation: AcpRuntimePresentation
 
+  @State private var deadlineNow = Date.now
   @State private var lastWatchdogAnnouncement: AcpRuntimeWatchdogAnnouncement?
 
   private var promptDeadlineDate: Date? {
@@ -64,7 +63,7 @@ struct AcpRuntimeStatusStrip: View {
         watchdogDisplayState: runtimeState.watchdogDisplayState,
         pendingPermissions: runtimeState.pendingPermissions,
         promptDeadline: promptDeadlineDate,
-        now: store.acpRuntimeClockTick
+        now: deadlineNow
       )
     )
   }
@@ -139,6 +138,9 @@ struct AcpRuntimeStatusStrip: View {
         )
       )
     }
+    .task(id: promptDeadlineDate) {
+      await runDeadlineClockIfNeeded()
+    }
   }
 
   @ViewBuilder private var statusChips: some View {
@@ -189,7 +191,7 @@ struct AcpRuntimeStatusStrip: View {
     }
 
     if let promptDeadlineDate {
-      AcpRuntimeDeadlineChip(deadline: promptDeadlineDate, now: store.acpRuntimeClockTick)
+      AcpRuntimeDeadlineChip(deadline: promptDeadlineDate, now: deadlineNow)
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.agentRuntimeDeadline(runtimeState.agentId)
         )
@@ -211,6 +213,24 @@ struct AcpRuntimeStatusStrip: View {
       // 10-second polite throttle applies. The strip seeds last-state for
       // its own debounce but does not post a second NSAccessibility event.
       lastWatchdogAnnouncement = announcement
+    }
+  }
+
+  @MainActor
+  private func runDeadlineClockIfNeeded() async {
+    guard promptDeadlineDate != nil else {
+      return
+    }
+
+    while !Task.isCancelled {
+      let now = AcpRuntimeDeadlineClock.now(store: store, localNow: Date.now)
+      deadlineNow = now
+      guard AcpRuntimeDeadlineClock.shouldTick(deadline: promptDeadlineDate, now: now) else {
+        return
+      }
+      guard await AcpRuntimeDeadlineClock.sleepUntilNextTick() else {
+        return
+      }
     }
   }
 }

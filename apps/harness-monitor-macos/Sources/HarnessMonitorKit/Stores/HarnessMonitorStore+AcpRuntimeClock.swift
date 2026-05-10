@@ -4,7 +4,7 @@ extension HarnessMonitorStore {
   /// `sampledAt` is daemon-authored time while `receivedAt` is when this client saw that sample.
   /// Advancing the daemon sample by locally elapsed wall time keeps ACP countdowns honest under
   /// daemon/client clock skew without pretending both timestamps mean the same thing.
-  func currentAcpRuntimeClockNow(at localNow: Date) -> Date? {
+  public func currentAcpRuntimeClockNow(at localNow: Date) -> Date? {
     guard let selectedAcpInspectState else {
       return nil
     }
@@ -13,10 +13,10 @@ extension HarnessMonitorStore {
     )
   }
 
-  /// Keep one store-owned 1 Hz tick for the selected runtime strip only.
+  /// Keep a non-observed 1 Hz clock alive only while the selected runtime has a deadline.
   ///
-  /// The countdown must survive view recreation without each strip spinning up its own timer, but
-  /// it should stay dormant unless the selected inspect sample currently contains a live deadline.
+  /// Visible countdown views own their local invalidation so this store task does not refresh the
+  /// wider session window once per second.
   func reconcileAcpRuntimeClock() {
     let localNow = Date.now
     let now = currentAcpRuntimeClockNow(at: localNow) ?? localNow
