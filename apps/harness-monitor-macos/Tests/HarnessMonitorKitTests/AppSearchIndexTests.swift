@@ -94,7 +94,7 @@ struct AppSearchIndexTests {
     #expect(results.sections.first?.domain == .agents)
   }
 
-  @Test("With nil primary, fallback domain order ranks decisions > tasks > agents > timeline")
+  @Test("With nil primary, fallback domain order ranks tasks > agents > timeline > decisions")
   func nilPrimaryGivesFallbackOrder() async {
     let index = AppSearchIndex()
     await index.reindex(agents: [makeAgent(id: "a1", name: "alpha agent")])
@@ -103,7 +103,7 @@ struct AppSearchIndexTests {
     await index.reindex(events: [makeEvent(id: "e1", summary: "alpha event")])
     let results = await index.search(query: "alpha", primary: nil)
     let domains = results.sections.map(\.domain)
-    #expect(domains == [.decisions, .tasks, .agents, .timeline])
+    #expect(domains == [.tasks, .agents, .timeline, .decisions])
   }
 
   @Test("Primary domain leads, remaining domains follow fallback order")
@@ -115,15 +115,15 @@ struct AppSearchIndexTests {
     await index.reindex(events: [makeEvent(id: "e1", summary: "alpha event")])
     let timelinePrimary = await index.search(query: "alpha", primary: .timeline)
     #expect(
-      timelinePrimary.sections.map(\.domain) == [.timeline, .decisions, .tasks, .agents]
+      timelinePrimary.sections.map(\.domain) == [.timeline, .tasks, .agents, .decisions]
     )
     let agentsPrimary = await index.search(query: "alpha", primary: .agents)
     #expect(
-      agentsPrimary.sections.map(\.domain) == [.agents, .decisions, .tasks, .timeline]
+      agentsPrimary.sections.map(\.domain) == [.agents, .tasks, .timeline, .decisions]
     )
-    let tasksPrimary = await index.search(query: "alpha", primary: .tasks)
+    let decisionsPrimary = await index.search(query: "alpha", primary: .decisions)
     #expect(
-      tasksPrimary.sections.map(\.domain) == [.tasks, .decisions, .agents, .timeline]
+      decisionsPrimary.sections.map(\.domain) == [.decisions, .tasks, .agents, .timeline]
     )
   }
 
