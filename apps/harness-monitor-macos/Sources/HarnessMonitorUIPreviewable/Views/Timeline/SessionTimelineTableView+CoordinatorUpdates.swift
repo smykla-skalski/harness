@@ -13,7 +13,7 @@ extension SessionTimelineTableView.Coordinator {
     scrollCommand: SessionTimelineScrollCommand?,
     request: SessionTimelineTableView.UpdateRequest
   ) {
-    guard let tableView else {
+    guard tableView != nil else {
       return
     }
     self.actionHandler = actionHandler
@@ -27,7 +27,8 @@ extension SessionTimelineTableView.Coordinator {
     let rowsLookSame =
       rows.count == self.rows.count && rows.first?.id == self.rows.first?.id
       && rows.last?.id == self.rows.last?.id
-    let widthDelta = abs(request.columnWidth - lastColumnWidth)
+    let resolvedColumnWidth = resolvedColumnWidth(for: request)
+    let widthDelta = abs(resolvedColumnWidth - lastColumnWidth)
     let widthSame = widthDelta < Self.widthEqualityTolerance
     let fontSame = abs(request.fontScale - fontScale) < 0.001
     let scrollSame = scrollCommand == lastScrollCommand && pendingScrollCommand == nil
@@ -43,24 +44,10 @@ extension SessionTimelineTableView.Coordinator {
     // its predecessor) without invalidating heights via noteHeightOfRows. The
     // per-tick noteHeightOfRows call was the source of the reveal stall.
     if rowsLookSame, fontSame, scrollSame, identitySame {
-      if request.columnWidth > 1, let column = tableView.tableColumns.first {
-        if column.width != request.columnWidth {
-          column.width = request.columnWidth
-        }
-        lastColumnWidth = request.columnWidth
-        scheduleIncrementalMeasurement(
-          columnWidth: request.columnWidth,
-          debounceNanoseconds: Self.widthAnimationMeasurementDebounceNs
-        )
-      }
+      applyWidthOnlyUpdateIfNeeded(columnWidth: resolvedColumnWidth)
       return
     }
 
-    request.scrollView.layoutSubtreeIfNeeded()
-    let resolvedColumnWidth = SessionTimelineTableMetrics.resolvedColumnWidth(
-      proposedWidth: request.columnWidth,
-      visibleContentWidth: request.scrollView.contentSize.width
-    )
     let previousFontScale = fontScale
     let wasPinnedToLatest = isPinnedToLatestViewport()
     let previousAnchor = wasPinnedToLatest ? nil : currentVisibleAnchor()
@@ -306,6 +293,7 @@ extension SessionTimelineTableView.Coordinator {
   }
 
   func boundsDidChange() {
+    refreshColumnWidthFromScrollViewIfNeeded()
     guard !pendingPublish else { return }
     pendingPublish = true
     Task { @MainActor [weak self] in
@@ -331,6 +319,47 @@ extension SessionTimelineTableView.Coordinator {
       tableView.noteHeightOfRows(withIndexesChanged: IndexSet(0..<rows.count))
     }
     scheduleIncrementalMeasurement(columnWidth: columnWidth)
+  }
+
+  private func resolvedColumnWidth(for request: SessionTimelineTableView.UpdateRequest) -> CGFloat {
+    if lastColumnWidth <= 1 {
+      request.scrollView.layoutSubtreeIfNeeded()
+    }
+    return SessionTimelineTableMetrics.resolvedColumnWidth(
+      proposedWidth: request.columnWidth,
+      visibleContentWidth: request.scrollView.contentSize.width
+    )
+  }
+
+  private func applyWidthOnlyUpdateIfNeeded(columnWidth: CGFloat) {
+    guard columnWidth > 1, let tableView, let column = tableView.tableColumns.first else {
+      return
+    }
+    guard abs(columnWidth - lastColumnWidth) >= Self.widthEqualityTolerance else {
+      return
+    }
+    if column.width != columnWidth {
+      column.width = columnWidth
+    }
+    lastColumnWidth = columnWidth
+    scheduleIncrementalMeasurement(
+      columnWidth: columnWidth,
+      debounceNanoseconds: Self.widthAnimationMeasurementDebounceNs
+    )
+  }
+
+  @discardableResult
+  private func refreshColumnWidthFromScrollViewIfNeeded() -> Bool {
+    guard let scrollView else {
+      return false
+    }
+    let columnWidth = SessionTimelineTableMetrics.resolvedColumnWidth(
+      proposedWidth: 0,
+      visibleContentWidth: scrollView.contentSize.width
+    )
+    let previousWidth = lastColumnWidth
+    applyWidthOnlyUpdateIfNeeded(columnWidth: columnWidth)
+    return abs(columnWidth - previousWidth) >= Self.widthEqualityTolerance
   }
 
   func scheduleIncrementalMeasurement(
