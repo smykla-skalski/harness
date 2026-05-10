@@ -52,6 +52,14 @@ extension SessionTimelineTableView.Coordinator {
     return Double(seconds) * 1_000.0 + Double(attoseconds) / 1_000_000_000_000_000.0
   }
 
+  func performWithoutTableAnimation(_ updates: () -> Void) {
+    NSAnimationContext.runAnimationGroup { context in
+      context.duration = 0
+      context.allowsImplicitAnimation = false
+      updates()
+    }
+  }
+
   func runMeasurementTask(
     outstanding: [Int],
     snapshot: [SessionTimelineRow],
@@ -113,11 +121,11 @@ extension SessionTimelineTableView.Coordinator {
       await Task.yield()
     }
     if !Task.isCancelled {
-      Self.signposter.emitEvent(
-        "session_timeline.measurement.completed",
-        "g=\(generation, privacy: .public) m=\(totalOutstanding, privacy: .public)"
+      completeMeasurementTask(
+        generation: generation,
+        totalOutstanding: totalOutstanding,
+        columnWidth: columnWidth
       )
-      self.measurementTask = nil
     }
   }
 
@@ -156,25 +164,47 @@ extension SessionTimelineTableView.Coordinator {
     if !changedIndexes.isEmpty {
       applyMeasuredHeights(changedIndexes)
     }
+    completeMeasurementTask(
+      generation: generation,
+      totalOutstanding: totalOutstanding,
+      columnWidth: columnWidth
+    )
+  }
+
+  private func completeMeasurementTask(
+    generation: Int,
+    totalOutstanding: Int,
+    columnWidth: CGFloat
+  ) {
     persistHeightCache()
     Self.signposter.emitEvent(
       "session_timeline.measurement.completed",
       "g=\(generation, privacy: .public) m=\(totalOutstanding, privacy: .public)"
     )
-    self.measurementTask = nil
+    measurementTask = nil
+    scheduleVisibleRowsMeasurementIfNeeded(columnWidth: columnWidth)
+  }
+
+  private func scheduleVisibleRowsMeasurementIfNeeded(columnWidth: CGFloat) {
+    guard visibleRowsNeedMeasurement(columnWidth: columnWidth) else {
+      return
+    }
+    scheduleIncrementalMeasurement(columnWidth: columnWidth)
   }
 
   private func applyMeasuredHeights(_ changedIndexes: IndexSet) {
     guard !changedIndexes.isEmpty else { return }
-    tableView?.noteHeightOfRows(withIndexesChanged: changedIndexes)
-    guard changedIndexesAffectVisibleRows(changedIndexes) else {
+    let affectsVisibleRows = changedIndexesAffectVisibleRows(changedIndexes)
+    performWithoutTableAnimation {
+      tableView?.noteHeightOfRows(withIndexesChanged: changedIndexes)
+      if affectsVisibleRows {
+        tableView?.layoutSubtreeIfNeeded()
+        scrollView?.layoutSubtreeIfNeeded()
+      }
+    }
+    guard affectsVisibleRows else {
       return
     }
-    // When async measurement lands for rows already on screen, force AppKit to
-    // relayout that visible geometry immediately so reused hosting views do not
-    // keep painting against the old estimated row bounds until a later scroll.
-    tableView?.layoutSubtreeIfNeeded()
-    scrollView?.layoutSubtreeIfNeeded()
     if isPinnedToLatestViewport() {
       _ = normalizePinnedLatestViewportIfNeeded()
     }

@@ -6,10 +6,75 @@ final class SessionTimelineTableRowView: NSTableRowView {
   override func drawSelection(in _: NSRect) {}
 }
 
+private final class SessionTimelineConnectorView: NSView {
+  private static let strokeColor =
+    NSColor(
+      named: NSColor.Name("HarnessMonitorControlBorder"),
+      bundle: HarnessMonitorUIAssets.bundle
+    )?.withAlphaComponent(0.55) ?? NSColor.separatorColor.withAlphaComponent(0.55)
+
+  var visibility: SessionTimelineConnectorVisibility = .all {
+    didSet {
+      if oldValue != visibility {
+        needsDisplay = true
+      }
+    }
+  }
+
+  var markerCenterY: CGFloat = SessionTimelineTableMetrics.estimatedBaseRowHeight / 2 {
+    didSet {
+      if abs(oldValue - markerCenterY) > 0.5 {
+        needsDisplay = true
+      }
+    }
+  }
+
+  override var isFlipped: Bool { true }
+
+  override init(frame frameRect: NSRect) {
+    super.init(frame: frameRect)
+    translatesAutoresizingMaskIntoConstraints = false
+  }
+
+  @available(*, unavailable)
+  required init?(coder _: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func hitTest(_: NSPoint) -> NSView? {
+    nil
+  }
+
+  override func draw(_ dirtyRect: NSRect) {
+    super.draw(dirtyRect)
+    guard visibility.showsConnectorAbove || visibility.showsConnectorBelow else {
+      return
+    }
+    let x = SessionTimelineLayout.railLineOffset
+    guard bounds.minX <= x, x <= bounds.maxX else {
+      return
+    }
+    let centerY = min(max(markerCenterY, bounds.minY), bounds.maxY)
+    let path = NSBezierPath()
+    path.lineWidth = 2
+    if visibility.showsConnectorAbove {
+      path.move(to: NSPoint(x: x, y: bounds.minY))
+      path.line(to: NSPoint(x: x, y: centerY))
+    }
+    if visibility.showsConnectorBelow {
+      path.move(to: NSPoint(x: x, y: centerY))
+      path.line(to: NSPoint(x: x, y: bounds.maxY))
+    }
+    Self.strokeColor.setStroke()
+    path.stroke()
+  }
+}
+
 final class SessionTimelineTableCellView: NSTableCellView {
   static let columnIdentifier = NSUserInterfaceItemIdentifier("session-timeline-column")
   static let cellIdentifier = NSUserInterfaceItemIdentifier("session-timeline-cell")
 
+  private let connectorView = SessionTimelineConnectorView()
   private let hostingView = NSHostingView(rootView: SessionTimelineHostedRow.empty)
 
   init() {
@@ -17,9 +82,14 @@ final class SessionTimelineTableCellView: NSTableCellView {
     identifier = Self.cellIdentifier
     wantsLayer = true
     layer?.backgroundColor = NSColor.clear.cgColor
+    addSubview(connectorView)
     hostingView.translatesAutoresizingMaskIntoConstraints = false
     addSubview(hostingView)
     NSLayoutConstraint.activate([
+      connectorView.leadingAnchor.constraint(equalTo: leadingAnchor),
+      connectorView.trailingAnchor.constraint(equalTo: trailingAnchor),
+      connectorView.topAnchor.constraint(equalTo: topAnchor),
+      connectorView.bottomAnchor.constraint(equalTo: bottomAnchor),
       hostingView.leadingAnchor.constraint(equalTo: leadingAnchor),
       hostingView.trailingAnchor.constraint(equalTo: trailingAnchor),
       hostingView.topAnchor.constraint(equalTo: topAnchor),
@@ -39,12 +109,16 @@ final class SessionTimelineTableCellView: NSTableCellView {
     fontScale: CGFloat,
     connectorVisibility: SessionTimelineConnectorVisibility
   ) {
+    connectorView.visibility = connectorVisibility
+    connectorView.markerCenterY = SessionTimelineTableMetrics.estimatedMarkerCenterY(
+      for: row,
+      fontScale: fontScale
+    )
     hostingView.rootView = SessionTimelineHostedRow(
       row: row,
       actionHandler: actionHandler,
       onSignalTap: onSignalTap,
-      fontScale: fontScale,
-      connectorVisibility: connectorVisibility
+      fontScale: fontScale
     )
   }
 
@@ -86,20 +160,17 @@ private struct SessionTimelineHostedRow: View {
   let actionHandler: any DecisionActionHandler
   let onSignalTap: ((String) -> Void)?
   let fontScale: CGFloat
-  let connectorVisibility: SessionTimelineConnectorVisibility
 
   init(
     row: SessionTimelineRow?,
     actionHandler: any DecisionActionHandler,
     onSignalTap: ((String) -> Void)? = nil,
-    fontScale: CGFloat,
-    connectorVisibility: SessionTimelineConnectorVisibility = .all
+    fontScale: CGFloat
   ) {
     self.row = row
     self.actionHandler = actionHandler
     self.onSignalTap = onSignalTap
     self.fontScale = fontScale
-    self.connectorVisibility = connectorVisibility
   }
 
   static var empty: Self {
@@ -121,13 +192,6 @@ private struct SessionTimelineHostedRow: View {
     SessionTimelineNodeCluster(row: row, actionHandler: actionHandler, onSignalTap: onSignalTap)
       .padding(.trailing, HarnessMonitorTheme.spacingXS)
       .padding(.bottom, SessionTimelineTableMetrics.rowBottomPadding(for: row))
-      .overlayPreferenceValue(SessionTimelineMarkerBoundsKey.self) { markerAnchor in
-        SessionTimelineConnectorOverlay(
-          markerAnchor: markerAnchor,
-          showsConnectorAbove: connectorVisibility.showsConnectorAbove,
-          showsConnectorBelow: connectorVisibility.showsConnectorBelow
-        )
-      }
       .frame(maxWidth: .infinity, alignment: .leading)
       .fixedSize(horizontal: false, vertical: true)
   }

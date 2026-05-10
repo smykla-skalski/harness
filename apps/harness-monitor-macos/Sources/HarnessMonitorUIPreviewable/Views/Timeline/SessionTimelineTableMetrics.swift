@@ -1,6 +1,6 @@
 import CoreGraphics
 
-struct SessionTimelineConnectorVisibility {
+struct SessionTimelineConnectorVisibility: Equatable {
   let showsConnectorAbove: Bool
   let showsConnectorBelow: Bool
 
@@ -55,6 +55,17 @@ enum SessionTimelineTableMetrics {
 
   static func rowBottomPadding(for _: SessionTimelineRow) -> CGFloat {
     HarnessMonitorTheme.itemSpacing
+  }
+
+  static func estimatedMarkerCenterY(
+    for row: SessionTimelineRow,
+    fontScale: CGFloat = 1.0
+  ) -> CGFloat {
+    let scale = max(1, fontScale)
+    let dividerOffset =
+      row.dayDividerLabel == nil ? 0 : dayDividerHeight + HarnessMonitorTheme.itemSpacing
+    let firstLineCenter = (HarnessMonitorTheme.spacingSM * scale) + 11
+    return dividerOffset + firstLineCenter
   }
 
   static func connectorVisibility(

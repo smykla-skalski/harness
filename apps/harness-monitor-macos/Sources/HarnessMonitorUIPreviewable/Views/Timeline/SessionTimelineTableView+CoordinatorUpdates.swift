@@ -145,8 +145,10 @@ extension SessionTimelineTableView.Coordinator {
       }
     )
     rowSnapshot = nextSnapshot
-    tableView.reloadData()
-    tableView.layoutSubtreeIfNeeded()
+    performWithoutTableAnimation {
+      tableView.reloadData()
+      tableView.layoutSubtreeIfNeeded()
+    }
     persistHeightCache()
 
     if resolvedColumnWidth > 1 {
@@ -325,7 +327,9 @@ extension SessionTimelineTableView.Coordinator {
     guard isFirstRealWidth || widthChanged else { return }
     lastColumnWidth = columnWidth
     cancelMeasurement(reason: widthChanged ? "width_changed" : "first_real_width")
-    tableView.noteHeightOfRows(withIndexesChanged: IndexSet(0..<rows.count))
+    performWithoutTableAnimation {
+      tableView.noteHeightOfRows(withIndexesChanged: IndexSet(0..<rows.count))
+    }
     scheduleIncrementalMeasurement(columnWidth: columnWidth)
   }
 
