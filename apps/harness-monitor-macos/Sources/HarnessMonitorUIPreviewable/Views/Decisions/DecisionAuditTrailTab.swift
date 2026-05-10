@@ -19,10 +19,15 @@ public struct DecisionAuditTrailTab: View {
         emptyState
       } else {
         ForEach(Array(events.enumerated()), id: \.element.id) { index, event in
+          // Skip the per-row body (and its two JSON-parse passes for
+          // payloadSummary + formattedPayload) when the event and the
+          // formatted timestamp are unchanged across parent body
+          // invocations.
           AuditTrailTimelineRow(
             event: event,
             timestamp: formatTimestamp(event.createdAt, configuration: dateTimeConfiguration)
           )
+          .equatable()
           if index < events.count - 1 {
             Divider()
           }
@@ -187,5 +192,13 @@ private struct AuditTrailTimelineRow: View {
       return trimmed
     }
     return pretty
+  }
+}
+
+// MainActor isolation matches the implicit @MainActor on body; required
+// because Self conforms to View which is MainActor-isolated.
+extension AuditTrailTimelineRow: @MainActor Equatable {
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.event == rhs.event && lhs.timestamp == rhs.timestamp
   }
 }
