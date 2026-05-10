@@ -14,35 +14,43 @@ private let appSearchSignposter = OSSignposter(
   category: "perf"
 )
 
+/// Joins live query + selected scope into a single `.task(id:)` key so a
+/// scope flip without keystrokes still re-runs the search.
+private struct AppSearchTrigger: Equatable {
+  let query: String
+  let scope: AppSearchScope
+}
+
 /// Toolbar-placed `.searchable` field that drives the cross-domain
 /// ``AppSearchModel`` after a 150 ms debounce.
 ///
 /// The modifier owns one `@State` for the live query (the only main-actor
-/// write per keystroke) and resolves the primary domain at search time
-/// from `@FocusedValue(\.harnessSessionRouteFocus)`. All ranking work
-/// happens off-MainActor inside ``AppSearchIndex``.
-///
-/// The fallback domain (`fallbackPrimaryDomain`) is used when no route is
-/// focused — typically when the session window is on the Overview or
-/// Terminal routes that have no dedicated search corpus.
+/// write per keystroke) and one `@State` for the explicit scope. The
+/// primary domain at search time is resolved as: explicit scope wins,
+/// otherwise the focused-route domain, otherwise `fallbackPrimaryDomain`.
+/// Ranking work happens off-MainActor inside ``AppSearchIndex``.
 public struct AppSearchHostModifier: ViewModifier {
   let model: AppSearchModel
   let prompt: LocalizedStringKey
   let fallbackPrimaryDomain: AppSearchDomain
+  let routeAction: (AppSearchHit) -> Void
 
   @FocusedValue(\.harnessSessionRouteFocus)
   private var routeFocus: HarnessSessionRouteFocus?
 
   @State private var query: String = ""
+  @State private var scope: AppSearchScope = .current
 
   public init(
     model: AppSearchModel,
     prompt: LocalizedStringKey = "Search session",
-    fallbackPrimaryDomain: AppSearchDomain = .timeline
+    fallbackPrimaryDomain: AppSearchDomain = .timeline,
+    routeAction: @escaping (AppSearchHit) -> Void = { _ in }
   ) {
     self.model = model
     self.prompt = prompt
     self.fallbackPrimaryDomain = fallbackPrimaryDomain
+    self.routeAction = routeAction
   }
 
   public func body(content: Content) -> some View {
@@ -52,13 +60,27 @@ public struct AppSearchHostModifier: ViewModifier {
         placement: .toolbar,
         prompt: prompt
       )
-      .task(id: query) {
-        await runDebouncedSearch(for: query)
+      .searchScopes($scope, activation: .onSearchPresentation) {
+        ForEach(AppSearchScope.allCases) { value in
+          Text(value.label).tag(value)
+        }
+      }
+      .searchSuggestions {
+        AppSearchSuggestionsView(
+          results: model.results,
+          routeAction: routeAction
+        )
+      }
+      .task(id: AppSearchTrigger(query: query, scope: scope)) {
+        await runDebouncedSearch(for: query, scope: scope)
       }
       .environment(\.appSearchModel, model)
   }
 
-  private func runDebouncedSearch(for liveQuery: String) async {
+  private func runDebouncedSearch(
+    for liveQuery: String,
+    scope: AppSearchScope
+  ) async {
     do {
       try await Task.sleep(nanoseconds: appSearchDebounceNanoseconds)
     } catch {
@@ -67,7 +89,7 @@ public struct AppSearchHostModifier: ViewModifier {
     guard !Task.isCancelled else {
       return
     }
-    let primary = routeFocus?.domain ?? fallbackPrimaryDomain
+    let primary = scope.explicitDomain ?? routeFocus?.domain ?? fallbackPrimaryDomain
     let signpostID = appSearchSignposter.makeSignpostID()
     let state = appSearchSignposter.beginInterval(
       "app_search_query",
@@ -84,13 +106,15 @@ extension View {
   public func appSearchHost(
     model: AppSearchModel,
     prompt: LocalizedStringKey = "Search session",
-    fallbackPrimaryDomain: AppSearchDomain = .timeline
+    fallbackPrimaryDomain: AppSearchDomain = .timeline,
+    routeAction: @escaping (AppSearchHit) -> Void = { _ in }
   ) -> some View {
     modifier(
       AppSearchHostModifier(
         model: model,
         prompt: prompt,
-        fallbackPrimaryDomain: fallbackPrimaryDomain
+        fallbackPrimaryDomain: fallbackPrimaryDomain,
+        routeAction: routeAction
       )
     )
   }
