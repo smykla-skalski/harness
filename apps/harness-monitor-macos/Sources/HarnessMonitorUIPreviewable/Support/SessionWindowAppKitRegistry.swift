@@ -49,6 +49,7 @@
     private struct Waiter {
       let predicate: (Set<String>) -> Bool
       let continuation: CheckedContinuation<Bool, Never>
+      var timeoutTask: Task<Void, Never>?
     }
 
     private var bindings: [ObjectIdentifier: Binding] = [:]
@@ -115,15 +116,22 @@
         (continuation: CheckedContinuation<Bool, Never>) in
         waiters[waiterID] = Waiter(
           predicate: predicate,
-          continuation: continuation
+          continuation: continuation,
+          timeoutTask: nil
         )
-        Task { @MainActor [weak self] in
+        // Spawn the timeout sleeper *after* the waiter is in the dictionary,
+        // then store the handle so `notifyWaiters` and `resetForTesting` can
+        // cancel it when the waiter resolves early. Without the cancel,
+        // resolved waiters leave a dormant `Task.sleep` holding the closure
+        // for up to `timeout` past the actual resolve.
+        let timeoutTask = Task { @MainActor [weak self] in
           try? await Task.sleep(for: timeout)
           guard let self else { return }
           if let waiter = self.waiters.removeValue(forKey: waiterID) {
             waiter.continuation.resume(returning: false)
           }
         }
+        waiters[waiterID]?.timeoutTask = timeoutTask
       }
     }
 
@@ -133,6 +141,7 @@
       let pending = waiters
       waiters.removeAll()
       for waiter in pending.values {
+        waiter.timeoutTask?.cancel()
         waiter.continuation.resume(returning: false)
       }
     }
@@ -140,8 +149,15 @@
     private func notifyWaiters() {
       guard !waiters.isEmpty else { return }
       let currentIDs = liveSessionIDs()
+      // Collect satisfied IDs before mutating the dictionary so we never
+      // mutate the collection that's being iterated.
+      var satisfiedIDs: [UUID] = []
       for (id, waiter) in waiters where waiter.predicate(currentIDs) {
-        waiters.removeValue(forKey: id)
+        satisfiedIDs.append(id)
+      }
+      for id in satisfiedIDs {
+        guard let waiter = waiters.removeValue(forKey: id) else { continue }
+        waiter.timeoutTask?.cancel()
         waiter.continuation.resume(returning: true)
       }
     }
