@@ -11,8 +11,9 @@ public struct HarnessMonitorFeedbackToastView: View {
   }
 
   public var body: some View {
+    let activeFeedback = toast.activeFeedback
     VStack(alignment: .trailing, spacing: HarnessMonitorTheme.spacingXS) {
-      ForEach(toast.activeFeedback) { feedback in
+      ForEach(activeFeedback) { feedback in
         HarnessMonitorFeedbackToastRow(
           feedback: feedback,
           toast: toast,
@@ -27,8 +28,54 @@ public struct HarnessMonitorFeedbackToastView: View {
     .accessibilityFrameMarker(HarnessMonitorAccessibility.actionToastFrame)
     .accessibilityTestProbe(
       HarnessMonitorAccessibility.actionToast,
-      value: "count=\(toast.activeFeedback.count)"
+      value: "count=\(activeFeedback.count)"
     )
+    .overlay(alignment: .topLeading) {
+      HarnessMonitorFeedbackToastCancelShortcut(
+        toast: toast,
+        dismissibleFeedbackID: activeFeedback.first?.id
+      )
+    }
+  }
+}
+
+private struct HarnessMonitorFeedbackToastCancelShortcut: View {
+  let toast: ToastSlice
+  let dismissibleFeedbackID: UUID?
+
+  var body: some View {
+    if let dismissibleFeedbackID {
+      Button {
+        toast.dismiss(id: dismissibleFeedbackID)
+      } label: {
+        Color.clear
+          .frame(width: 1, height: 1)
+      }
+      .keyboardShortcut(.cancelAction)
+      .frame(width: 0, height: 0)
+      .opacity(0)
+      .allowsHitTesting(false)
+      .accessibilityHidden(true)
+    }
+  }
+}
+
+private struct HarnessMonitorFeedbackToastDismissButton: View {
+  let feedbackID: UUID
+  let toast: ToastSlice
+
+  var body: some View {
+    Button {
+      toast.dismiss(id: feedbackID)
+    } label: {
+      Image(systemName: "xmark")
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .harnessToastDismissButtonLabelStyle()
+        .accessibilityHidden(true)
+    }
+    .harnessDismissButtonStyle()
+    .accessibilityLabel("Dismiss feedback")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.actionToastCloseButton)
   }
 }
 
@@ -62,17 +109,10 @@ private struct HarnessMonitorFeedbackToastRow: View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       HStack(alignment: rowAlignment, spacing: HarnessMonitorTheme.spacingMD) {
         content
-        Button {
-          toast.dismiss(id: feedback.id)
-        } label: {
-          Image(systemName: "xmark")
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .harnessToastDismissButtonLabelStyle()
-        }
-        .harnessDismissButtonStyle()
-        .accessibilityLabel("Dismiss feedback")
-        .accessibilityIdentifier(HarnessMonitorAccessibility.actionToastCloseButton)
-        .keyboardShortcut(.cancelAction)
+        HarnessMonitorFeedbackToastDismissButton(
+          feedbackID: feedback.id,
+          toast: toast
+        )
       }
 
       if showsDetails, let details = feedback.details {
@@ -182,9 +222,6 @@ private struct HarnessMonitorFeedbackToastRow: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityElement(children: .contain)
     .accessibilityLabel(feedback.announcementText)
-    .accessibilityAction(named: "Dismiss") {
-      toast.dismiss(id: feedback.id)
-    }
   }
 
   @ViewBuilder private var titleAndMessage: some View {
