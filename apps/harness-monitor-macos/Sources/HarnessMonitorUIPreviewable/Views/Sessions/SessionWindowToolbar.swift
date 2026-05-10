@@ -102,6 +102,12 @@ struct SessionWindowToolbar: ToolbarContent {
           Text(focusMode ? "Exit focus mode" : "Enter focus mode")
         } icon: {
           Image(systemName: focusMode ? "moon.fill" : "moon")
+            .contentTransition(
+              .symbolEffect(
+                .replace.magic(fallback: .downUp.wholeSymbol),
+                options: .nonRepeating
+              )
+            )
             .frame(width: 14, height: 14)
         }
       }

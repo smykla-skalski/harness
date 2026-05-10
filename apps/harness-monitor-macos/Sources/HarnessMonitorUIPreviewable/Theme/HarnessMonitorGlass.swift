@@ -229,7 +229,7 @@ extension View {
   }
 }
 
-// MARK: - Panel glass (non-interactive rectangle backgrounds)
+// MARK: - Panel surfaces (non-interactive rectangle backgrounds)
 
 private struct HarnessMonitorPanelGlassModifier: ViewModifier {
   @Environment(\.accessibilityReduceTransparency)
@@ -243,16 +243,21 @@ private struct HarnessMonitorPanelGlassModifier: ViewModifier {
       : (colorSchemeContrast == .increased ? 0.18 : 0.12)
   }
 
+  private var strokeOpacity: Double {
+    colorSchemeContrast == .increased ? 0.28 : 0.16
+  }
+
   func body(content: Content) -> some View {
-    if reduceTransparency {
-      content
-        .background {
-          Rectangle().fill(HarnessMonitorTheme.ink.opacity(fallbackFillOpacity))
-        }
-    } else {
-      content
-        .glassEffect(.regular, in: .rect)
-    }
+    content
+      .background {
+        Rectangle().fill(HarnessMonitorTheme.ink.opacity(fallbackFillOpacity))
+      }
+      .overlay {
+        Rectangle().strokeBorder(
+          HarnessMonitorTheme.ink.opacity(strokeOpacity),
+          lineWidth: colorSchemeContrast == .increased ? 1.5 : 1
+        )
+      }
   }
 }
 

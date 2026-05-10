@@ -7,20 +7,23 @@ struct ToolbarTitleScalingContractTests {
     let contentSource = try previewableSourceFile(
       named: "Views/App/ContentViewSupport.swift"
     )
-    let sessionSource = try previewableSourceFile(
+    let sessionChromeSource = try previewableSourceFile(
       named: "Views/Sessions/SessionWindowView.swift"
+    )
+    let sessionPresentationSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+Presentation.swift"
     )
     let sessionRootSource = try appSourceFile(named: "SessionWindowRootView.swift")
 
     #expect(contentSource.contains(".navigationTitle(navigationTitleText)"))
     #expect(contentSource.contains(".navigationSubtitle(navigationSubtitleText ?? \"\")"))
     #expect(!contentSource.contains("HarnessMonitorToolbarTitleToolbarItem("))
-    #expect(sessionSource.contains("var navigationTitleText: String"))
-    #expect(sessionSource.contains("var navigationSubtitleText: String"))
-    #expect(sessionSource.contains(".navigationTitle(navigationTitleText)"))
-    #expect(sessionSource.contains(".navigationSubtitle(navigationSubtitleText)"))
-    #expect(sessionSource.contains("projectAndWorktreeDisplayLabel(separator: \"·\")"))
-    #expect(!sessionSource.contains("HarnessMonitorToolbarTitleToolbarItem("))
+    #expect(sessionPresentationSource.contains("var navigationTitleText: String"))
+    #expect(sessionPresentationSource.contains("var navigationSubtitleText: String"))
+    #expect(sessionPresentationSource.contains(".navigationTitle(navigationTitleText)"))
+    #expect(sessionPresentationSource.contains(".navigationSubtitle(navigationSubtitleText)"))
+    #expect(sessionPresentationSource.contains("projectAndWorktreeDisplayLabel(separator: \"·\")"))
+    #expect(!sessionChromeSource.contains("HarnessMonitorToolbarTitleToolbarItem("))
     #expect(!sessionRootSource.contains(".navigationTitle(windowTitle)"))
   }
 

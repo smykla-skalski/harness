@@ -33,13 +33,20 @@ enum SessionTimelineTableMeasurementMode: Equatable {
 }
 
 extension SessionTimelineTableView.Coordinator {
+  private struct MeasurementChunkResult {
+    let changedIndexes: IndexSet
+    let measuredCount: Int
+    let remainingCount: Int
+  }
+
   // Wall-clock budget for one synchronous measurement chunk. Each row's
   // SwiftUI hosting layout is variable cost (5-30ms+ depending on row
   // shape), so a fixed row count silently breaks the 100ms session-switch
   // budget on heavy variants. Yielding once a chunk has spent this many
   // milliseconds keeps the main-thread block bounded by clock time.
-  static let measurementChunkBudgetMs: Double = 12.0
-  static let widthAnimationMeasurementDebounceNs: UInt64 = 120_000_000
+  static let measurementChunkBudgetMs: Double = 6.0
+  static let measurementChunkPauseNs: UInt64 = 8_000_000
+  static let widthAnimationMeasurementDebounceNs: UInt64 = 180_000_000
   static let signposter = OSSignposter(
     subsystem: "io.harnessmonitor",
     category: "perf"
@@ -78,53 +85,23 @@ extension SessionTimelineTableView.Coordinator {
         id: Self.signposter.makeSignpostID(),
         "g=\(generation, privacy: .public) cur=\(cursor, privacy: .public)"
       )
-      var changedIndexes = IndexSet()
-      var measuredInChunk = 0
-      autoreleasepool {
-        let chunkStart = ContinuousClock.now
-        while cursor < outstanding.count {
-          let rowIndex = outstanding[cursor]
-          cursor += 1
-          guard self.rows.indices.contains(rowIndex),
-            self.rows[rowIndex].id == snapshot[rowIndex].id
-          else { continue }
-          let row = snapshot[rowIndex]
-          if let cached = self.rowHeightCache[row.id],
-            !cached.requiresMeasurement(for: columnWidth, tolerance: Self.widthEqualityTolerance)
-          {
-            continue
-          }
-          let height = SessionTimelineTableCellView.measuredHeight(
-            for: row,
-            columnWidth: columnWidth,
-            fontScale: fontScale
-          )
-          self.rowHeightCache[row.id] = CachedRowHeight(
-            width: columnWidth,
-            height: height,
-            isMeasured: true
-          )
-          changedIndexes.insert(rowIndex)
-          measuredInChunk += 1
-          let elapsedMs = Self.elapsedMilliseconds(since: chunkStart)
-          if elapsedMs >= Self.measurementChunkBudgetMs {
-            break
-          }
-        }
+      let chunk = measureNextChunk(
+        outstanding: outstanding,
+        snapshot: snapshot,
+        columnWidth: columnWidth,
+        cursor: &cursor
+      )
+      guard applyMeasuredHeightsIfCurrent(chunk.changedIndexes, columnWidth: columnWidth) else {
+        return
       }
-      if !changedIndexes.isEmpty {
-        guard isMeasurementColumnWidthCurrent(columnWidth) else {
-          return
-        }
-        applyMeasuredHeights(changedIndexes)
-      }
-      let remaining = outstanding.count - cursor
       Self.signposter.endInterval(
         "session_timeline.measurement.chunk",
         chunkInterval,
-        "m=\(measuredInChunk, privacy: .public) r=\(remaining, privacy: .public)"
+        "m=\(chunk.measuredCount, privacy: .public) r=\(chunk.remainingCount, privacy: .public)"
       )
-      await Task.yield()
+      guard await pauseAfterMeasurementChunk(remaining: chunk.remainingCount) else {
+        return
+      }
     }
     if !Task.isCancelled, isMeasurementColumnWidthCurrent(columnWidth) {
       completeMeasurementTask(
@@ -133,6 +110,103 @@ extension SessionTimelineTableView.Coordinator {
         columnWidth: columnWidth
       )
     }
+  }
+
+  private func measureNextChunk(
+    outstanding: [Int],
+    snapshot: [SessionTimelineRow],
+    columnWidth: CGFloat,
+    cursor: inout Int
+  ) -> MeasurementChunkResult {
+    var changedIndexes = IndexSet()
+    var measuredCount = 0
+    autoreleasepool {
+      let chunkStart = ContinuousClock.now
+      while cursor < outstanding.count {
+        let rowIndex = outstanding[cursor]
+        cursor += 1
+        guard let row = measurementRow(at: rowIndex, snapshot: snapshot) else {
+          continue
+        }
+        guard rowRequiresMeasurement(row, columnWidth: columnWidth) else {
+          continue
+        }
+        cacheMeasuredHeight(for: row, columnWidth: columnWidth)
+        changedIndexes.insert(rowIndex)
+        measuredCount += 1
+        if Self.elapsedMilliseconds(since: chunkStart) >= Self.measurementChunkBudgetMs {
+          break
+        }
+      }
+    }
+    return MeasurementChunkResult(
+      changedIndexes: changedIndexes,
+      measuredCount: measuredCount,
+      remainingCount: outstanding.count - cursor
+    )
+  }
+
+  private func measurementRow(
+    at rowIndex: Int,
+    snapshot: [SessionTimelineRow]
+  ) -> SessionTimelineRow? {
+    guard rows.indices.contains(rowIndex),
+      snapshot.indices.contains(rowIndex),
+      rows[rowIndex].id == snapshot[rowIndex].id
+    else {
+      return nil
+    }
+    return snapshot[rowIndex]
+  }
+
+  private func rowRequiresMeasurement(
+    _ row: SessionTimelineRow,
+    columnWidth: CGFloat
+  ) -> Bool {
+    guard let cached = rowHeightCache[row.id] else {
+      return true
+    }
+    return cached.requiresMeasurement(for: columnWidth, tolerance: Self.widthEqualityTolerance)
+  }
+
+  private func cacheMeasuredHeight(for row: SessionTimelineRow, columnWidth: CGFloat) {
+    let height = SessionTimelineTableCellView.measuredHeight(
+      for: row,
+      columnWidth: columnWidth,
+      fontScale: fontScale
+    )
+    rowHeightCache[row.id] = CachedRowHeight(
+      width: columnWidth,
+      height: height,
+      isMeasured: true
+    )
+  }
+
+  private func pauseAfterMeasurementChunk(remaining: Int) async -> Bool {
+    guard remaining > 0 else {
+      await Task.yield()
+      return true
+    }
+    do {
+      try await Task.sleep(nanoseconds: Self.measurementChunkPauseNs)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  private func applyMeasuredHeightsIfCurrent(
+    _ changedIndexes: IndexSet,
+    columnWidth: CGFloat
+  ) -> Bool {
+    guard !changedIndexes.isEmpty else {
+      return true
+    }
+    guard isMeasurementColumnWidthCurrent(columnWidth) else {
+      return false
+    }
+    applyMeasuredHeights(changedIndexes)
+    return true
   }
 
   func isMeasurementColumnWidthCurrent(_ columnWidth: CGFloat) -> Bool {

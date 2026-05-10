@@ -2,9 +2,17 @@ import HarnessMonitorKit
 
 extension SessionTimelineFilterInventory {
   init(nodes: [SessionTimelineNode], filters: SessionTimelineFilterState) {
-    let availability = Self.availableFacetValues(from: nodes)
-    let filteredNodeSets = Self.filteredNodeSets(from: nodes, filters: filters)
-    let counts = Self.counts(from: filteredNodeSets)
+    self.init(nodes: nodes, matcher: SessionTimelineFilterMatcher(filters: filters))
+  }
+
+  init(nodes: [SessionTimelineNode], matcher: SessionTimelineFilterMatcher) {
+    var accumulator = FacetAccumulator(matcher: matcher)
+    for node in nodes {
+      accumulator.record(node)
+    }
+    let availability = accumulator.available
+    let counts = accumulator.counts
+    let filters = matcher.filters
 
     toneCounts = Self.completedToneCounts(
       counts.toneCounts,
@@ -48,78 +56,80 @@ extension SessionTimelineFilterInventory {
   }
 
   private struct AvailableFacetValues {
-    let availableTones: Set<SessionTimelineTone>
-    let availableEventTypes: Set<String>
-    let availableAgents: Set<String>
-    let availableTasks: Set<String>
-    let availableSeverities: Set<String>
-    let availableSemanticProperties: Set<SessionTimelineSemanticProperty>
-    let availableRawKeys: Set<String>
-  }
-
-  private struct FilteredNodeSets {
-    let toneNodes: [SessionTimelineNode]
-    let eventTypeNodes: [SessionTimelineNode]
-    let agentNodes: [SessionTimelineNode]
-    let taskNodes: [SessionTimelineNode]
-    let severityNodes: [SessionTimelineNode]
-    let semanticNodes: [SessionTimelineNode]
-    let rawKeyNodes: [SessionTimelineNode]
+    var availableTones: Set<SessionTimelineTone> = []
+    var availableEventTypes: Set<String> = []
+    var availableAgents: Set<String> = []
+    var availableTasks: Set<String> = []
+    var availableSeverities: Set<String> = []
+    var availableSemanticProperties: Set<SessionTimelineSemanticProperty> = []
+    var availableRawKeys: Set<String> = []
   }
 
   private struct FacetCounts {
-    let toneCounts: [SessionTimelineTone: Int]
-    let eventTypeCounts: [String: Int]
-    let agentCounts: [String: Int]
-    let taskCounts: [String: Int]
-    let severityCounts: [String: Int]
-    let semanticPropertyCounts: [SessionTimelineSemanticProperty: Int]
-    let rawKeyCounts: [String: Int]
+    var toneCounts: [SessionTimelineTone: Int] = [:]
+    var eventTypeCounts: [String: Int] = [:]
+    var agentCounts: [String: Int] = [:]
+    var taskCounts: [String: Int] = [:]
+    var severityCounts: [String: Int] = [:]
+    var semanticPropertyCounts: [SessionTimelineSemanticProperty: Int] = [:]
+    var rawKeyCounts: [String: Int] = [:]
   }
 
-  private static func availableFacetValues(
-    from nodes: [SessionTimelineNode]
-  ) -> AvailableFacetValues {
-    AvailableFacetValues(
-      availableTones: Set(nodes.compactMap(\.eventTone)),
-      availableEventTypes: Set(nodes.compactMap(\.entryKind)),
-      availableAgents: Set(nodes.compactMap(\.agentID)),
-      availableTasks: Set(nodes.compactMap(\.taskID)),
-      availableSeverities: Set(nodes.compactMap { $0.decision?.severity.rawValue }),
-      availableSemanticProperties: nodes.reduce(into: Set<SessionTimelineSemanticProperty>()) {
-        $0.formUnion($1.semanticProperties)
-      },
-      availableRawKeys: nodes.reduce(into: Set<String>()) {
-        $0.formUnion($1.rawPayloadKeys)
+  private struct FacetAccumulator {
+    let matcher: SessionTimelineFilterMatcher
+    var available = AvailableFacetValues()
+    var counts = FacetCounts()
+
+    mutating func record(_ node: SessionTimelineNode) {
+      recordAvailability(node)
+      if matcher.matchesExcludingTone(node), let eventTone = node.eventTone {
+        counts.toneCounts[eventTone, default: 0] += 1
       }
-    )
-  }
+      if matcher.matchesExcludingEventType(node), let entryKind = node.entryKind {
+        counts.eventTypeCounts[entryKind, default: 0] += 1
+      }
+      if matcher.matchesExcludingAgent(node), let agentID = node.agentID {
+        counts.agentCounts[agentID, default: 0] += 1
+      }
+      if matcher.matchesExcludingTask(node), let taskID = node.taskID {
+        counts.taskCounts[taskID, default: 0] += 1
+      }
+      if matcher.matchesExcludingDecisionSeverity(node),
+        let severity = node.decision?.severity.rawValue
+      {
+        counts.severityCounts[severity, default: 0] += 1
+      }
+      if matcher.matchesExcludingSemanticProperties(node) {
+        for property in node.semanticProperties {
+          counts.semanticPropertyCounts[property, default: 0] += 1
+        }
+      }
+      if matcher.matchesExcludingRawPayloadKeys(node) {
+        for rawKey in node.rawPayloadKeys {
+          counts.rawKeyCounts[rawKey, default: 0] += 1
+        }
+      }
+    }
 
-  private static func filteredNodeSets(
-    from nodes: [SessionTimelineNode],
-    filters: SessionTimelineFilterState
-  ) -> FilteredNodeSets {
-    FilteredNodeSets(
-      toneNodes: Self.nodes(nodes, matching: filters.removingTones()),
-      eventTypeNodes: Self.nodes(nodes, matching: filters.removingEventTypes()),
-      agentNodes: Self.nodes(nodes, matching: filters.removingAgents()),
-      taskNodes: Self.nodes(nodes, matching: filters.removingTasks()),
-      severityNodes: Self.nodes(nodes, matching: filters.removingDecisionSeverities()),
-      semanticNodes: Self.nodes(nodes, matching: filters.removingSemanticProperties()),
-      rawKeyNodes: Self.nodes(nodes, matching: filters.removingRawPayloadKeys())
-    )
-  }
-
-  private static func counts(from filteredNodeSets: FilteredNodeSets) -> FacetCounts {
-    FacetCounts(
-      toneCounts: toneCounts(from: filteredNodeSets.toneNodes),
-      eventTypeCounts: stringCounts(from: filteredNodeSets.eventTypeNodes, value: \.entryKind),
-      agentCounts: stringCounts(from: filteredNodeSets.agentNodes, value: \.agentID),
-      taskCounts: stringCounts(from: filteredNodeSets.taskNodes, value: \.taskID),
-      severityCounts: severityCounts(from: filteredNodeSets.severityNodes),
-      semanticPropertyCounts: semanticPropertyCounts(from: filteredNodeSets.semanticNodes),
-      rawKeyCounts: rawKeyCounts(from: filteredNodeSets.rawKeyNodes)
-    )
+    private mutating func recordAvailability(_ node: SessionTimelineNode) {
+      if let eventTone = node.eventTone {
+        available.availableTones.insert(eventTone)
+      }
+      if let entryKind = node.entryKind {
+        available.availableEventTypes.insert(entryKind)
+      }
+      if let agentID = node.agentID {
+        available.availableAgents.insert(agentID)
+      }
+      if let taskID = node.taskID {
+        available.availableTasks.insert(taskID)
+      }
+      if let severity = node.decision?.severity.rawValue {
+        available.availableSeverities.insert(severity)
+      }
+      available.availableSemanticProperties.formUnion(node.semanticProperties)
+      available.availableRawKeys.formUnion(node.rawPayloadKeys)
+    }
   }
 
   private static func completedToneCounts(
@@ -132,54 +142,6 @@ extension SessionTimelineFilterInventory {
       mergedCounts[tone] = mergedCounts[tone] ?? 0
     }
     return mergedCounts
-  }
-
-  private static func toneCounts(from nodes: [SessionTimelineNode]) -> [SessionTimelineTone: Int] {
-    nodes.reduce(into: [SessionTimelineTone: Int]()) { counts, node in
-      guard let eventTone = node.eventTone else {
-        return
-      }
-      counts[eventTone, default: 0] += 1
-    }
-  }
-
-  private static func stringCounts(
-    from nodes: [SessionTimelineNode],
-    value: KeyPath<SessionTimelineNode, String?>
-  ) -> [String: Int] {
-    nodes.reduce(into: [String: Int]()) { counts, node in
-      guard let value = node[keyPath: value] else {
-        return
-      }
-      counts[value, default: 0] += 1
-    }
-  }
-
-  private static func severityCounts(from nodes: [SessionTimelineNode]) -> [String: Int] {
-    nodes.reduce(into: [String: Int]()) { counts, node in
-      guard let severity = node.decision?.severity.rawValue else {
-        return
-      }
-      counts[severity, default: 0] += 1
-    }
-  }
-
-  private static func semanticPropertyCounts(
-    from nodes: [SessionTimelineNode]
-  ) -> [SessionTimelineSemanticProperty: Int] {
-    nodes.reduce(into: [SessionTimelineSemanticProperty: Int]()) { counts, node in
-      for property in node.semanticProperties {
-        counts[property, default: 0] += 1
-      }
-    }
-  }
-
-  private static func rawKeyCounts(from nodes: [SessionTimelineNode]) -> [String: Int] {
-    nodes.reduce(into: [String: Int]()) { counts, node in
-      for rawKey in node.rawPayloadKeys {
-        counts[rawKey, default: 0] += 1
-      }
-    }
   }
 
   fileprivate static func options(
@@ -261,15 +223,6 @@ extension SessionTimelineFilterInventory {
         segment.prefix(1).uppercased() + segment.dropFirst().lowercased()
       }
       .joined(separator: " ")
-  }
-
-  fileprivate static func nodes(
-    _ sourceNodes: [SessionTimelineNode],
-    matching filters: SessionTimelineFilterState
-  ) -> [SessionTimelineNode] {
-    sourceNodes.filter { node in
-      SessionTimelineFilterSnapshot.matches(node: node, filters: filters)
-    }
   }
 }
 

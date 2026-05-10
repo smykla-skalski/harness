@@ -5,69 +5,63 @@ extension SessionTimelineNode {
     query trimmedQuery: String,
     scope: SessionTimelineSearchScope
   ) -> Bool {
-    let needles = searchTokens(for: scope)
-    return needles.contains { token in
-      token.range(of: trimmedQuery, options: .caseInsensitive) != nil
+    guard !trimmedQuery.isEmpty else {
+      return true
     }
-  }
-
-  fileprivate func searchTokens(for scope: SessionTimelineSearchScope) -> [String] {
     switch scope {
     case .all:
-      summaryTokens + sourceTokens + agentTokens + taskTokens + propertyTokens
+      return matchesSummary(query: trimmedQuery)
+        || matchesSource(query: trimmedQuery)
+        || matchesAgent(query: trimmedQuery)
+        || matchesTask(query: trimmedQuery)
+        || matchesProperties(query: trimmedQuery)
     case .summary:
-      summaryTokens
+      return matchesSummary(query: trimmedQuery)
     case .source:
-      sourceTokens
+      return matchesSource(query: trimmedQuery)
     case .agent:
-      agentTokens
+      return matchesAgent(query: trimmedQuery)
     case .task:
-      taskTokens
+      return matchesTask(query: trimmedQuery)
     case .properties:
-      propertyTokens
+      return matchesProperties(query: trimmedQuery)
     }
   }
 
-  fileprivate var summaryTokens: [String] {
-    Self.nonEmptyTokens([title, detail, decision?.summary])
+  private func matchesSummary(query: String) -> Bool {
+    contains(title, query: query)
+      || contains(detail, query: query)
+      || contains(decision?.summary, query: query)
   }
 
-  fileprivate var sourceTokens: [String] {
-    Self.nonEmptyTokens([sourceLabel, entryKind])
+  private func matchesSource(query: String) -> Bool {
+    contains(sourceLabel, query: query)
+      || contains(entryKind, query: query)
   }
 
-  fileprivate var agentTokens: [String] {
-    Self.nonEmptyTokens([
-      agentID,
-      toolCallMetadata?.agentID,
-      toolCallMetadata?.acpAgentID,
-      toolCallMetadata?.agentDisplayName,
-    ])
+  private func matchesAgent(query: String) -> Bool {
+    contains(agentID, query: query)
+      || contains(toolCallMetadata?.agentID, query: query)
+      || contains(toolCallMetadata?.acpAgentID, query: query)
+      || contains(toolCallMetadata?.agentDisplayName, query: query)
   }
 
-  fileprivate var taskTokens: [String] {
-    Self.nonEmptyTokens([taskID])
+  private func matchesTask(query: String) -> Bool {
+    contains(taskID, query: query)
   }
 
-  fileprivate var propertyTokens: [String] {
-    var tokens = rawPayloadKeys.sorted()
-    tokens += semanticProperties.map(\.label)
-    if let toolName = toolCallMetadata?.toolName, !toolName.isEmpty {
-      tokens.append(toolName)
+  private func matchesProperties(query: String) -> Bool {
+    rawPayloadKeys.contains { contains($0, query: query) }
+      || semanticProperties.contains { contains($0.label, query: query) }
+      || contains(toolCallMetadata?.toolName, query: query)
+      || contains(toolCallMetadata?.stopReason, query: query)
+      || (toolCallMetadata?.capabilityTags.contains { contains($0, query: query) } ?? false)
+  }
+
+  private func contains(_ value: String?, query: String) -> Bool {
+    guard let value, !value.isEmpty else {
+      return false
     }
-    if let stopReason = toolCallMetadata?.stopReason, !stopReason.isEmpty {
-      tokens.append(stopReason)
-    }
-    tokens += toolCallMetadata?.capabilityTags ?? []
-    return tokens
-  }
-
-  fileprivate static func nonEmptyTokens(_ values: [String?]) -> [String] {
-    values.compactMap { value in
-      guard let value, !value.isEmpty else {
-        return nil
-      }
-      return value
-    }
+    return value.range(of: query, options: .caseInsensitive) != nil
   }
 }
