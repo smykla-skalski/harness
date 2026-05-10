@@ -78,6 +78,8 @@ struct SessionWindowAgentsList: View {
   @Bindable var state: SessionWindowStateCache
   @Environment(\.fontScale)
   private var fontScale
+  @Environment(\.appSearchModel)
+  private var appSearchModel: AppSearchModel?
 
   private var metrics: SessionWindowRouteContentMetrics {
     SessionWindowRouteContentMetrics(fontScale: fontScale)
@@ -93,10 +95,34 @@ struct SessionWindowAgentsList: View {
     )
   }
 
+  private var trimmedQuery: String {
+    (appSearchModel?.query ?? "")
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .lowercased()
+  }
+
+  private var filteredAgents: [AgentRegistration] {
+    let agents = detail?.agents ?? []
+    let needle = trimmedQuery
+    guard !needle.isEmpty else { return agents }
+    return agents.filter { agent in
+      if agent.name.lowercased().contains(needle) { return true }
+      if let pname = agent.persona?.name.lowercased(), pname.contains(needle) {
+        return true
+      }
+      if let pdesc = agent.persona?.description.lowercased(), pdesc.contains(needle) {
+        return true
+      }
+      if agent.agentId.lowercased().contains(needle) { return true }
+      return false
+    }
+  }
+
   var body: some View {
+    let agents = filteredAgents
     List(selection: selectedAgentID) {
       Section("Agents") {
-        if let agents = detail?.agents, !agents.isEmpty {
+        if !agents.isEmpty {
           ForEach(agents) { agent in
             Label {
               VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
@@ -111,6 +137,12 @@ struct SessionWindowAgentsList: View {
             }
             .tag(agent.agentId)
           }
+        } else if !trimmedQuery.isEmpty {
+          ContentUnavailableView(
+            "No Matching Agents",
+            systemImage: "person.3",
+            description: Text("No agents match the current search.")
+          )
         } else {
           ContentUnavailableView("No Agents", systemImage: "person.3")
         }
@@ -125,6 +157,8 @@ struct SessionWindowTasksList: View {
   @Bindable var state: SessionWindowStateCache
   @Environment(\.fontScale)
   private var fontScale
+  @Environment(\.appSearchModel)
+  private var appSearchModel: AppSearchModel?
 
   private var metrics: SessionWindowRouteContentMetrics {
     SessionWindowRouteContentMetrics(fontScale: fontScale)
@@ -140,10 +174,34 @@ struct SessionWindowTasksList: View {
     )
   }
 
+  private var trimmedQuery: String {
+    (appSearchModel?.query ?? "")
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .lowercased()
+  }
+
+  private var filteredTasks: [WorkItem] {
+    let tasks = detail?.tasks ?? []
+    let needle = trimmedQuery
+    guard !needle.isEmpty else { return tasks }
+    return tasks.filter { task in
+      if task.title.lowercased().contains(needle) { return true }
+      if let context = task.context?.lowercased(), context.contains(needle) {
+        return true
+      }
+      if let fix = task.suggestedFix?.lowercased(), fix.contains(needle) {
+        return true
+      }
+      if task.taskId.lowercased().contains(needle) { return true }
+      return false
+    }
+  }
+
   var body: some View {
+    let tasks = filteredTasks
     List(selection: selectedTaskID) {
       Section("Tasks") {
-        if let tasks = detail?.tasks, !tasks.isEmpty {
+        if !tasks.isEmpty {
           ForEach(tasks) { task in
             Label {
               VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
@@ -158,6 +216,12 @@ struct SessionWindowTasksList: View {
             }
             .tag(task.taskId)
           }
+        } else if !trimmedQuery.isEmpty {
+          ContentUnavailableView(
+            "No Matching Tasks",
+            systemImage: "checklist",
+            description: Text("No tasks match the current search.")
+          )
         } else {
           ContentUnavailableView("No Tasks", systemImage: "checklist")
         }

@@ -78,6 +78,7 @@ struct SessionTimelineView: View {
       .onChange(of: filterPersistenceModeRawValue) { _, _ in
         persistFilters(filters)
       }
+      .modifier(SessionTimelineSearchMirror(filterQuery: $filters.query))
   }
 
   private var presentationInput: SessionTimelinePresentationInput {
