@@ -63,15 +63,8 @@ public struct AppSearchHostModifier: ViewModifier {
     // command + cross-scene `@FocusedBinding` route is documented as
     // fragile (Apple Developer Forums thread #693580). Co-locating the
     // shortcut with its target state is the canonical pure-SwiftUI fix.
-    //
-    // Scope chips: `.searchScopes` is intentionally omitted — the
-    // system places those chips immediately under the search field
-    // (i.e. above the AppKit window-merge tab strip when one is
-    // visible). The scope picker is rendered separately via
-    // ``AppSearchScopeRail`` so it sits below the tab strip in the
-    // content area. The model owns the scope value so both surfaces
-    // bind to the same state.
-    content
+    @Bindable var model = model
+    return content
       .searchable(
         text: $query,
         isPresented: $isSearchPresented,
@@ -81,6 +74,11 @@ public struct AppSearchHostModifier: ViewModifier {
       .searchFocused($searchFieldFocused)
       .searchPresentationToolbarBehavior(.avoidHidingContent)
       .harnessMinimizableSearchToolbar()
+      .searchScopes($model.scope, activation: .onSearchPresentation) {
+        ForEach(AppSearchScope.allCases) { value in
+          Text(value.label).tag(value)
+        }
+      }
       .searchSuggestions {
         AppSearchSuggestionsView(
           results: model.results,
