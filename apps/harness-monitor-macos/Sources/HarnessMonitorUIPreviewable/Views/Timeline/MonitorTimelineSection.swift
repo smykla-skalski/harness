@@ -346,6 +346,9 @@ struct SessionTimelineView: View {
           store.presentedSheet = .signalDetail(signalID: signalID)
         },
         viewport: viewport,
+        viewportChanged: { stats in
+          handleViewportStatsChange(stats, presentation: presentation)
+        },
         scrollBoundaryChanged: { oldValue, newValue in
           handleScrollBoundaryChange(
             from: oldValue,

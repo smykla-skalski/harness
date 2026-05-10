@@ -5,7 +5,7 @@ import SwiftUI
 
 extension HarnessMonitorApp {
   func handleOpenFolder(_ result: Result<[URL], any Error>) async {
-    let record = await store.handleImportedFolder(result)
+    let record = await appStore.handleImportedFolder(result)
     HarnessMonitorLogger.swiftui.info(
       "Open folder importer handling finished: bookmarked=\((record != nil), privacy: .public)"
     )
@@ -31,13 +31,13 @@ extension HarnessMonitorApp {
 
   func refreshStore() {
     Task {
-      await store.manualRefresh()
+      await appStore.manualRefresh()
     }
   }
 
   func presentOpenFolder() {
     HarnessMonitorLogger.swiftui.info(
-      "Presenting open folder importer: token=\(store.openFolderRequest, privacy: .public)"
+      "Presenting open folder importer: token=\(appStore.openFolderRequest, privacy: .public)"
     )
     let panel = NSOpenPanel()
     panel.canChooseFiles = false
@@ -47,6 +47,7 @@ extension HarnessMonitorApp {
     panel.prompt = "Open"
     panel.message = "Select a project folder"
     let parent = NSApp.keyWindow ?? NSApp.mainWindow
+    let store = appStore
     let completion: @Sendable (NSApplication.ModalResponse) -> Void = { [store] response in
       Task { @MainActor in
         let result: Result<[URL], any Error> =

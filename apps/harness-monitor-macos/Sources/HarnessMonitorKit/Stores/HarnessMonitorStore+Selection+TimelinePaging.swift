@@ -16,8 +16,9 @@ extension HarnessMonitorStore {
     guard limit > 0, selectedTimelineWindowLoadTask == nil, timelineWindow?.hasOlder == true else {
       return
     }
-    let totalCount = max(timeline.count, timelineWindow?.totalCount ?? 0)
-    let targetEnd = min(totalCount, timeline.count + limit)
+    let currentWindowEnd = timelineWindow?.windowEnd ?? timeline.count
+    let totalCount = max(currentWindowEnd, timeline.count, timelineWindow?.totalCount ?? 0)
+    let targetEnd = min(totalCount, currentWindowEnd + limit)
     await loadSelectedTimelinePrefix(targetEnd: targetEnd, pageSize: limit)
   }
 
@@ -31,16 +32,17 @@ extension HarnessMonitorStore {
       return
     }
 
+    let currentWindowEnd = timelineWindow?.windowEnd ?? timeline.count
     let clampedTargetEnd = min(
       max(targetEnd, 0),
-      max(timeline.count, timelineWindow?.totalCount ?? 0)
+      max(currentWindowEnd, timeline.count, timelineWindow?.totalCount ?? 0)
     )
-    guard clampedTargetEnd > 0, timeline.count < clampedTargetEnd else {
+    guard clampedTargetEnd > 0, currentWindowEnd < clampedTargetEnd else {
       return
     }
 
     let currentRevision = timelineWindow?.revision
-    let missingCount = clampedTargetEnd - timeline.count
+    let missingCount = clampedTargetEnd - currentWindowEnd
     let loadKey = SelectedTimelinePageLoadKey(
       sessionID: sessionID,
       targetEnd: clampedTargetEnd,

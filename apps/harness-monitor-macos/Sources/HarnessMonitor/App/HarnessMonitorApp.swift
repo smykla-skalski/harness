@@ -180,8 +180,7 @@ struct HarnessMonitorApp: App {
     }
   }
 
-  @ViewBuilder
-  private var openRecentWindowSceneContent: some View {
+  @ViewBuilder private var openRecentWindowSceneContent: some View {
     if rendersLiveSceneContent {
       openRecentWindowContent
         .modifier(SessionWindowTabbing(isSessionWindow: false))
@@ -189,6 +188,10 @@ struct HarnessMonitorApp: App {
     } else {
       Color.clear.accessibilityHidden(true)
     }
+  }
+
+  var appStore: HarnessMonitorStore {
+    store
   }
 
   private var openRecentWindowScene: some Scene {

@@ -1,7 +1,7 @@
 import Foundation
 
 extension HarnessMonitorStore {
-  nonisolated static let initialSelectedTimelineWindowLimit = 24
+  nonisolated public static let initialSelectedTimelineWindowLimit = 10
 
   func loadSession(
     using client: any HarnessMonitorClientProtocol,

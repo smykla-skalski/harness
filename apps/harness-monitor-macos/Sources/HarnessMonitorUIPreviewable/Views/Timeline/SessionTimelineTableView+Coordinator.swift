@@ -18,6 +18,7 @@ extension SessionTimelineTableView {
   @MainActor
   final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
     weak var viewport: SessionTimelineViewportModel?
+    var viewportChanged: SessionTimelineViewportHandler
     var scrollBoundaryChanged: SessionTimelineScrollBoundaryHandler
 
     var heightCacheIdentity: SessionTimelineContentIdentity?
@@ -48,9 +49,11 @@ extension SessionTimelineTableView {
 
     init(
       viewport: SessionTimelineViewportModel,
+      viewportChanged: @escaping SessionTimelineViewportHandler = { _ in },
       scrollBoundaryChanged: @escaping SessionTimelineScrollBoundaryHandler
     ) {
       self.viewport = viewport
+      self.viewportChanged = viewportChanged
       self.scrollBoundaryChanged = scrollBoundaryChanged
     }
 

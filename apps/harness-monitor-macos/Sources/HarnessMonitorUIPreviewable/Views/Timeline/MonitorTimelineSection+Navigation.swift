@@ -16,7 +16,9 @@ extension SessionTimelineView {
   }
 
   func requestLatestWindow() {
-    Task { await loadWindow(.latest(limit: SessionTimelineWindowNavigation.defaultLimit)) }
+    Task {
+      await loadWindow(.latest(limit: preferredTimelineWindowLimit()))
+    }
   }
 
   func requestOlderWindowIfNeeded(_ presentation: SessionTimelineSectionPresentation) {
@@ -188,6 +190,7 @@ extension SessionTimelineView {
     SessionTimelineEdgeLoadContext(
       navigation: presentation.navigation,
       visibleRowCount: timelineViewport.currentVisibleRowCount(),
+      viewportRowCapacity: timelineViewport.currentViewportRowCapacity(),
       fallbackVisibleRowCount: presentation.fallbackVisibleRowCount
     )
   }
@@ -206,9 +209,7 @@ extension SessionTimelineView {
         await scroll(to: nextTarget(for: .older, presentation: presentation))
       case .latest:
         if !presentation.hasLatestWindow || presentation.navigation.hasNewer {
-          let request = TimelineWindowRequest.latest(
-            limit: SessionTimelineWindowNavigation.defaultLimit
-          )
+          let request = TimelineWindowRequest.latest(limit: preferredTimelineWindowLimit())
           markPendingNavigation(
             .latest,
             request: request,
