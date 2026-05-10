@@ -82,7 +82,7 @@ public actor RegistryListener {
     socketPath = path
     acceptSource = source
     running = true
-    logger.info("harness-monitor MCP listener started at \(path, privacy: .public)")
+    logger.info("MCP listener started at \(path, privacy: .public)")
   }
 
   public func stop() {
