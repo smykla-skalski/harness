@@ -185,3 +185,31 @@ struct SessionTimelineTableView: NSViewRepresentable {
     coordinator.tableView?.dataSource = nil
   }
 }
+
+extension SessionTimelineTableView: @MainActor Equatable {
+  // Closures and the optional onSignalTap are intentionally excluded:
+  // they get reassigned on every parent body invocation, but they are
+  // method references on a stable view value, so their behavior depends
+  // only on the inputs already compared here. Excluding them lets
+  // .equatable() actually skip updateNSView when nothing meaningful
+  // changed.
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.columnWidth == rhs.columnWidth
+      && lhs.horizontalContentInset == rhs.horizontalContentInset
+      && lhs.contentIdentity == rhs.contentIdentity
+      && lhs.scrollCommand == rhs.scrollCommand
+      && lhs.virtualization == rhs.virtualization
+      && lhs.viewport === rhs.viewport
+      && ObjectIdentifier(lhs.actionHandler as AnyObject)
+        == ObjectIdentifier(rhs.actionHandler as AnyObject)
+      && rowsLookEqual(lhs: lhs.rows, rhs: rhs.rows)
+  }
+
+  private static func rowsLookEqual(
+    lhs: [SessionTimelineRow],
+    rhs: [SessionTimelineRow]
+  ) -> Bool {
+    lhs.count == rhs.count && lhs.first?.id == rhs.first?.id
+      && lhs.last?.id == rhs.last?.id
+  }
+}
