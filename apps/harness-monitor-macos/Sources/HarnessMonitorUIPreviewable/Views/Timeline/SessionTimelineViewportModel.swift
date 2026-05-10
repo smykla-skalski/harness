@@ -55,6 +55,14 @@ final class SessionTimelineViewportModel {
     lastScrollBoundaryState?.isNearBottomEdge ?? false
   }
 
+  func currentTopEdgeBufferDeficitRows() -> Int {
+    lastScrollBoundaryState?.topEdgeBufferDeficitRows() ?? 0
+  }
+
+  func currentBottomEdgeBufferDeficitRows() -> Int {
+    lastScrollBoundaryState?.bottomEdgeBufferDeficitRows() ?? 0
+  }
+
   func currentVisibleAnchorID() -> String? {
     latestVisibleAnchorID ?? visibleAnchorID
   }

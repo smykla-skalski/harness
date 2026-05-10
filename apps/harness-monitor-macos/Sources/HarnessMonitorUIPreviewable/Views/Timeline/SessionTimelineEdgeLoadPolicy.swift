@@ -48,23 +48,40 @@ struct SessionTimelineEdgeLoadContext {
   let visibleRowCount: Int
   let viewportRowCapacity: Int
   let fallbackVisibleRowCount: Int
+  let topEdgeBufferDeficitRows: Int
+  let bottomEdgeBufferDeficitRows: Int
 
   init(
     navigation: SessionTimelineWindowNavigation,
     visibleRowCount: Int,
     viewportRowCapacity: Int = 0,
-    fallbackVisibleRowCount: Int
+    fallbackVisibleRowCount: Int,
+    topEdgeBufferDeficitRows: Int = 0,
+    bottomEdgeBufferDeficitRows: Int = 0
   ) {
     self.navigation = navigation
     self.visibleRowCount = visibleRowCount
     self.viewportRowCapacity = viewportRowCapacity
     self.fallbackVisibleRowCount = fallbackVisibleRowCount
+    self.topEdgeBufferDeficitRows = topEdgeBufferDeficitRows
+    self.bottomEdgeBufferDeficitRows = bottomEdgeBufferDeficitRows
+  }
+
+  func bufferDeficitRows(for action: SessionTimelineWindowAction) -> Int {
+    switch action {
+    case .older:
+      bottomEdgeBufferDeficitRows
+    case .latest:
+      0
+    case .newer:
+      topEdgeBufferDeficitRows
+    }
   }
 }
 
 enum SessionTimelineEdgeLoadPolicy {
-  static let minimumChunkLimit = 4
-  static let maximumChunkLimit = SessionTimelineWindowBudget.maximumLimit
+  static let minimumChunkLimit = 1
+  static let maximumChunkLimit = SessionTimelineWindowNavigation.defaultLimit
 
   static func limit(
     for action: SessionTimelineWindowAction,
@@ -73,18 +90,23 @@ enum SessionTimelineEdgeLoadPolicy {
     to newValue: SessionTimelineScrollBoundaryState
   ) -> Int {
     let advance: Int
+    let bufferDeficitRows: Int
     switch action {
     case .older:
       advance = newValue.bottomEdgeAdvance(from: oldValue)
+      bufferDeficitRows = newValue.bottomEdgeBufferDeficitRows()
     case .newer:
       advance = newValue.topEdgeAdvance(from: oldValue)
+      bufferDeficitRows = newValue.topEdgeBufferDeficitRows()
     case .latest:
       advance = 0
+      bufferDeficitRows = 0
     }
     return limit(
       for: action,
       context: context,
-      edgeAdvanceRows: advance
+      edgeAdvanceRows: advance,
+      edgeBufferDeficitRows: bufferDeficitRows
     )
   }
 
@@ -95,32 +117,27 @@ enum SessionTimelineEdgeLoadPolicy {
     limit(
       for: action,
       context: context,
-      edgeAdvanceRows: 0
+      edgeAdvanceRows: 0,
+      edgeBufferDeficitRows: context.bufferDeficitRows(for: action)
     )
   }
 
   private static func limit(
     for action: SessionTimelineWindowAction,
     context: SessionTimelineEdgeLoadContext,
-    edgeAdvanceRows: Int
+    edgeAdvanceRows: Int,
+    edgeBufferDeficitRows: Int
   ) -> Int {
     let remaining = remainingEvents(for: action, navigation: context.navigation)
     guard remaining > 0 else {
       return 0
     }
-    let visibleRows = max(
-      1,
-      context.visibleRowCount,
-      context.viewportRowCapacity,
-      context.fallbackVisibleRowCount
-    )
-    let desiredLimit =
-      visibleRows + SessionTimelineScrollBoundaryState.triggerBufferRowCount
-      + max(0, edgeAdvanceRows)
-    let boundedLimit = max(
+    let desiredLimit = max(
       minimumChunkLimit,
-      min(maximumChunkLimit, desiredLimit)
+      max(0, edgeAdvanceRows),
+      max(0, edgeBufferDeficitRows)
     )
+    let boundedLimit = min(maximumChunkLimit, desiredLimit)
     return min(remaining, boundedLimit)
   }
 

@@ -216,7 +216,9 @@ extension SessionTimelineView {
       navigation: presentation.navigation,
       visibleRowCount: timelineViewport.currentVisibleRowCount(),
       viewportRowCapacity: timelineViewport.currentViewportRowCapacity(),
-      fallbackVisibleRowCount: presentation.fallbackVisibleRowCount
+      fallbackVisibleRowCount: presentation.fallbackVisibleRowCount,
+      topEdgeBufferDeficitRows: timelineViewport.currentTopEdgeBufferDeficitRows(),
+      bottomEdgeBufferDeficitRows: timelineViewport.currentBottomEdgeBufferDeficitRows()
     )
   }
 
