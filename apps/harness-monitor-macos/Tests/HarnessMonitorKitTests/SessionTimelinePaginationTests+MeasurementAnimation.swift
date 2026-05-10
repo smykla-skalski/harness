@@ -6,9 +6,9 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 extension SessionTimelineNavigationTests {
-  @Test("Reused visible row heights remain provisional after row updates")
+  @Test("Reused measured row heights remain measured after row updates")
   @MainActor
-  func reusedVisibleRowHeightsRemainProvisionalAfterRowUpdates() {
+  func reusedMeasuredRowHeightsRemainMeasuredAfterRowUpdates() {
     let viewport = SessionTimelineViewportModel()
     let coordinator = SessionTimelineTableView.Coordinator(
       viewport: viewport,
@@ -49,10 +49,11 @@ extension SessionTimelineNavigationTests {
     scrollView.layoutSubtreeIfNeeded()
 
     let reusedRow = initialRows[0]
+    let measuredHeight = tableView.rect(ofRow: 0).height + 180
     coordinator.rowHeightCache = [
       reusedRow.id: CachedRowHeight(
         width: 945,
-        height: tableView.rect(ofRow: 0).height + 180,
+        height: measuredHeight,
         isMeasured: true
       )
     ]
@@ -66,7 +67,8 @@ extension SessionTimelineNavigationTests {
       request: .init(scrollView: scrollView, columnWidth: 945, fontScale: 1)
     )
 
-    #expect(coordinator.rowHeightCache[reusedRow.id]?.isMeasured == false)
-    #expect(coordinator.measurementTask != nil)
+    #expect(coordinator.rowHeightCache[reusedRow.id]?.isMeasured == true)
+    #expect(coordinator.rowHeightCache[reusedRow.id]?.height == measuredHeight)
+    #expect(!coordinator.visibleRowsNeedMeasurement(columnWidth: 945))
   }
 }

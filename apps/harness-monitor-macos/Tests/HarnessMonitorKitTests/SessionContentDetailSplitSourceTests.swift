@@ -15,13 +15,54 @@ struct SessionContentDetailSplitSourceTests {
     #expect(viewSource.contains("@SceneStorage(\"session.content-detail.width\")"))
     #expect(viewSource.contains("sessionSurface"))
     #expect(
-      columnsSource.contains("SessionContentDetailSplitView(contentWidth: $contentColumnWidth)")
+      columnsSource.contains(
+        "SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding)"
+      )
     )
     #expect(columnsSource.contains(".navigationSplitViewStyle(.prominentDetail)"))
     #expect(splitSource.contains("NSCursor.resizeLeftRight"))
     #expect(splitSource.contains("@State private var liveContentWidth"))
     #expect(splitSource.contains(".accessibilityAdjustableAction"))
     #expect(splitSource.contains(".onMoveCommand"))
+  }
+
+  @Test("Session split uses one stable background extension host")
+  func sessionSplitUsesOneStableBackgroundExtensionHost() throws {
+    let columnsSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+Columns.swift"
+    )
+
+    #expect(
+      columnsSource.contains(
+        """
+        SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding) {
+                contentColumn
+              } detail: {
+                detailColumn
+              }
+              .backgroundExtensionEffect()
+        """
+      )
+    )
+    #expect(
+      !columnsSource.contains(
+        """
+        SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding) {
+                contentColumn
+                  .backgroundExtensionEffect()
+        """
+      )
+    )
+    #expect(
+      !columnsSource.contains(
+        """
+              } detail: {
+                detailColumn
+                  .backgroundExtensionEffect()
+              }
+        """
+      )
+    )
   }
 
   @Test("Session split layout defers geometry-driven width writes")

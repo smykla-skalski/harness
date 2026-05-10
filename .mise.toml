@@ -191,6 +191,23 @@ run = "apps/harness-monitor-macos/Scripts/monitor-xcodebuild.sh"
 description = "Build the Harness Monitor macOS app (Debug) via the shared build lane"
 run = "apps/harness-monitor-macos/Scripts/monitor-xcodebuild.sh -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build CODE_SIGNING_ALLOWED=NO"
 
+[tasks."monitor"]
+description = "Build and launch the Harness Monitor macOS app (Debug)"
+depends = ["monitor:build"]
+run = '''
+  set -euo pipefail
+  checkout_root="$(git rev-parse --show-toplevel)"
+  source "$checkout_root/scripts/lib/common-repo-root.sh"
+  source "$checkout_root/apps/harness-monitor-macos/Scripts/lib/monitor-lanes.sh"
+  common_repo_root="$(resolve_common_repo_root "$checkout_root")"
+  app_path="$(harness_monitor_build_derived_data_path "$common_repo_root")/Build/Products/Debug/Harness Monitor.app"
+  if [[ ! -d "$app_path" ]]; then
+    printf 'error: Built app not found: %s\n' "$app_path" >&2
+    exit 1
+  fi
+  open "$app_path"
+'''
+
 [tasks."monitor:lint"]
 description = "Run the strict non-build Swift format and SwiftLint checks for the Harness Monitor macOS app"
 run = "apps/harness-monitor-macos/Scripts/run-lint.sh"

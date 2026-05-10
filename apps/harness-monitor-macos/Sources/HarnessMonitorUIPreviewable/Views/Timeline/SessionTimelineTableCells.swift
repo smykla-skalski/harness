@@ -206,6 +206,10 @@ private struct SessionTimelineHostedRow: View {
       }
     }
     .environment(\.fontScale, fontScale)
+    .transaction { transaction in
+      transaction.animation = nil
+      transaction.disablesAnimations = true
+    }
   }
 
   private func populatedRow(_ row: SessionTimelineRow) -> some View {

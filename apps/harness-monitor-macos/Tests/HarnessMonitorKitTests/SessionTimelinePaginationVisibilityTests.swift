@@ -65,7 +65,7 @@ struct SessionTimelineNavigationVisibilityTests {
       total: 321,
       filteredMatchCount: nil
     )
-    coordinator.publishViewportState()
+    coordinator.publishViewportState(forceObservedStats: true)
 
     let topVisibleRows = tableView.rows(in: scrollView.contentView.bounds)
     let topStart = 47 + topVisibleRows.location + 1
@@ -79,7 +79,7 @@ struct SessionTimelineNavigationVisibilityTests {
     scrollView.reflectScrolledClipView(scrollView.contentView)
     tableView.layoutSubtreeIfNeeded()
     scrollView.layoutSubtreeIfNeeded()
-    coordinator.publishViewportState()
+    coordinator.publishViewportState(forceObservedStats: true)
 
     let scrolledVisibleRows = tableView.rows(in: scrollView.contentView.bounds)
     let scrolledStart = 47 + scrolledVisibleRows.location + 1

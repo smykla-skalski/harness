@@ -274,11 +274,18 @@ private struct SessionTimelineBadgeStrip: View {
 
   var body: some View {
     HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
-      ForEach(badges) { badge in
-        SessionTimelineBadge(label: badge.label, tint: badge.tint, style: .prominent)
+      if badges.indices.contains(0) {
+        badgeView(badges[0])
+      }
+      if badges.indices.contains(1) {
+        badgeView(badges[1])
       }
     }
     .textCase(.uppercase)
     .fixedSize(horizontal: true, vertical: false)
+  }
+
+  private func badgeView(_ badge: SessionTimelineStatusBadge) -> some View {
+    SessionTimelineBadge(label: badge.label, tint: badge.tint, style: .prominent)
   }
 }
