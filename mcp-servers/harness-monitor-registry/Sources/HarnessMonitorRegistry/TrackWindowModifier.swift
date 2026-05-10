@@ -35,6 +35,17 @@ private struct WindowTrackingRepresentable: NSViewRepresentable {
   }
 
   func updateNSView(_ nsView: WindowTrackingNSView, context: Context) {}
+
+  // SwiftUI sometimes drops this representable without first removing the
+  // backing NSView from its window (e.g. when the host window is torn down
+  // via WindowGroup dismissal). In that path `viewDidMoveToWindow(nil)`
+  // never fires and the registry keeps a stale RegistryWindow entry that
+  // shows up in `mcp__harness-monitor__list_windows` long after the window
+  // is gone. Detach the view explicitly so the move-to-nil hook drives
+  // `stopTracking` on the registry sync controllers.
+  static func dismantleNSView(_ nsView: WindowTrackingNSView, coordinator: ()) {
+    nsView.removeFromSuperview()
+  }
 }
 
 final class WindowTrackingNSView: NSView {
