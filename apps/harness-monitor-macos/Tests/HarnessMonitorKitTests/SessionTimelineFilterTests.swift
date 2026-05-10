@@ -227,6 +227,22 @@ struct SessionTimelineFilterTests {
     #expect(toolResultErrorCount == 0)
   }
 
+  @Test("Tone filters count toward the Filters button active state")
+  func toneFiltersCountTowardTheFiltersButtonActiveState() {
+    var filters = SessionTimelineFilterState()
+
+    #expect(filters.activeAdvancedFilterCount == 0)
+
+    filters.toggleTone(.warning)
+    #expect(filters.activeAdvancedFilterCount == 1)
+
+    filters.toggleTone(.critical)
+    #expect(filters.activeAdvancedFilterCount == 2)
+
+    filters.clearTones()
+    #expect(filters.activeAdvancedFilterCount == 0)
+  }
+
   @Test("Visibility stats switch to filtered match wording")
   func visibilityStatsSwitchToFilteredMatchWording() {
     let stats = SessionTimelineVisibilityStats(

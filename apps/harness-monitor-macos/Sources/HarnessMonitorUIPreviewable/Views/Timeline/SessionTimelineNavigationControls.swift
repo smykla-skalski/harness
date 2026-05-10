@@ -161,9 +161,10 @@ struct SessionTimelineNavigationControls: View {
       }
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
         statusLabel
-        SessionTimelineNavigationVisibilityDetail(
+        SessionTimelineNavigationVisibilityStatus(
           filterSummary: filterSummary,
-          viewport: viewport
+          viewport: viewport,
+          accessibilityIdentifier: HarnessMonitorAccessibility.sessionTimelineVisibleStatus
         )
       }
     }
@@ -180,18 +181,21 @@ struct SessionTimelineNavigationControls: View {
   }
 }
 
-private struct SessionTimelineNavigationVisibilityDetail: View {
+struct SessionTimelineNavigationVisibilityStatus: View {
   let filterSummary: SessionTimelineFilterSummary
   let viewport: SessionTimelineViewportModel
+  let accessibilityIdentifier: String
 
   var body: some View {
     if let detail = navigationDetail(for: viewport.visibilityStats) {
       Text(detail.text)
         .scaledFont(.caption2)
         .monospacedDigit()
+        .lineLimit(1)
+        .truncationMode(.tail)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .accessibilityLabel(detail.accessibilityText)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineVisibleStatus)
+        .accessibilityIdentifier(accessibilityIdentifier)
     }
   }
 

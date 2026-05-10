@@ -130,6 +130,13 @@ struct SessionTimelineAdvancedFiltersPopover: View {
     if !options.isEmpty {
       facetSection(title: "Event level") {
         facetGrid {
+          textFacetChip(
+            label: "All levels",
+            isSelected: filters.tones.isEmpty,
+            accessibilityValue: filters.tones.isEmpty ? "current default" : "clears level filters"
+          ) {
+            filters.clearTones()
+          }
           ForEach(options, id: \.rawValue) { tone in
             facetChip(
               label: tone.label,
@@ -281,6 +288,24 @@ struct SessionTimelineAdvancedFiltersPopover: View {
     .harnessFilterChipButtonStyle(isSelected: isSelected)
     .harnessNativeFormControl()
     .accessibilityValue(isSelected ? "selected" : "not selected")
+  }
+
+  private func textFacetChip(
+    label: String,
+    isSelected: Bool,
+    accessibilityValue: String,
+    action: @escaping () -> Void
+  ) -> some View {
+    Button(action: action) {
+      Text(label)
+        .lineLimit(1)
+        .truncationMode(.tail)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .scaledFont(.caption.weight(.semibold))
+    }
+    .harnessFilterChipButtonStyle(isSelected: isSelected)
+    .harnessNativeFormControl()
+    .accessibilityValue(accessibilityValue)
   }
 
   private func facetSection<Content: View>(

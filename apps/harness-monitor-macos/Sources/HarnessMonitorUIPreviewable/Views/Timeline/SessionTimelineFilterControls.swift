@@ -24,12 +24,6 @@ struct SessionTimelineFilterControls: View {
     self.layout = layout
   }
 
-  private var quickTones: [SessionTimelineTone] {
-    SessionTimelineTone.allCases.filter { tone in
-      inventory.toneCounts.keys.contains(tone) || filters.tones.contains(tone)
-    }
-  }
-
   private var activeFacetChips: [SessionTimelineActiveFilterChip] {
     var chips: [SessionTimelineActiveFilterChip] = []
     for option in inventory.eventTypes where filters.eventTypes.contains(option.id) {
@@ -68,7 +62,7 @@ struct SessionTimelineFilterControls: View {
   }
 
   private var showsSupportingSections: Bool {
-    showsSignalPreset || !quickTones.isEmpty || !activeFacetChips.isEmpty
+    showsSignalPreset || !activeFacetChips.isEmpty
   }
 
   @ViewBuilder
@@ -79,8 +73,8 @@ struct SessionTimelineFilterControls: View {
           filterActionRow
         }
 
-        if showsSignalPreset || !quickTones.isEmpty {
-          presetAndToneChipsSection
+        if showsSignalPreset {
+          signalPresetSection
         }
 
         if !activeFacetChips.isEmpty {
@@ -103,7 +97,7 @@ struct SessionTimelineFilterControls: View {
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  private var presetAndToneChipsSection: some View {
+  private var signalPresetSection: some View {
     HarnessMonitorWrapLayout(
       spacing: HarnessMonitorTheme.spacingXS,
       lineSpacing: HarnessMonitorTheme.spacingXS
@@ -124,32 +118,6 @@ struct SessionTimelineFilterControls: View {
         .harnessNativeFormControl()
         .accessibilityValue(filters.signalPresetActive ? "selected" : "not selected")
         .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterSignalsPreset)
-      }
-
-      if !quickTones.isEmpty {
-        Button("All levels") {
-          filters.clearTones()
-        }
-        .harnessFilterChipButtonStyle(isSelected: false)
-        .harnessNativeFormControl()
-        .accessibilityValue(filters.tones.isEmpty ? "current default" : "clears level filters")
-
-        ForEach(quickTones, id: \.rawValue) { tone in
-          Button {
-            filters.toggleTone(tone)
-          } label: {
-            HStack(spacing: 6) {
-              Text(tone.label)
-              Text("\(inventory.count(for: tone))")
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-            }
-            .scaledFont(.caption.weight(.semibold))
-          }
-          .harnessFilterChipButtonStyle(isSelected: filters.tones.contains(tone))
-          .harnessNativeFormControl()
-          .accessibilityValue(filters.tones.contains(tone) ? "selected" : "not selected")
-        }
       }
     }
   }

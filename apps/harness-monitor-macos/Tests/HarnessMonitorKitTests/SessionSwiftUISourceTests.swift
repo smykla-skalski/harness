@@ -176,18 +176,36 @@ struct SessionSwiftUISourceTests {
     #expect(timelineSource.contains("showsClearButton: false"))
     #expect(timelineSource.contains("layout: .chipsOnly"))
     #expect(timelineSource.contains("SessionTimelineNavigationButtonRow("))
-    #expect(timelineSource.contains("showsButtons: false"))
+    #expect(timelineSource.contains("SessionTimelineNavigationVisibilityStatus("))
+    #expect(
+      timelineSource.contains(
+        "HarnessMonitorAccessibility.sessionTimelineNavigationStatus"
+      )
+    )
+    #expect(!timelineSource.contains("showsButtons: false"))
+    #expect(!timelineSource.contains("spacing: HarnessMonitorTheme.spacingSM * 2"))
     #expect(timelineSource.contains(".padding(.top, routePageTopPadding)"))
     #expect(timelineSource.contains("copy.searchScope = .all"))
     #expect(filterSource.contains("enum Layout"))
     #expect(filterSource.contains("case chipsOnly"))
     #expect(filterSource.contains("let showsClearButton: Bool"))
+    #expect(!filterSource.contains("filters.clearTones()"))
+    #expect(!filterSource.contains("filters.toggleTone(tone)"))
     #expect(!filterSource.contains("scopeMenu"))
     #expect(!filterSource.contains("filters.searchScope = scope"))
     #expect(!filterSource.contains("sessionTimelineFilterScopeMenu"))
     #expect(advancedFilterSource.contains("Button(\"Clear\")"))
+    #expect(advancedFilterSource.contains("label: \"All levels\""))
+    #expect(advancedFilterSource.contains("filters.clearTones()"))
+    #expect(advancedFilterSource.contains("filters.toggleTone(tone)"))
     #expect(!advancedFilterSource.contains("Narrow the timeline with event details and related data."))
     #expect(navigationSource.contains("showsButtons: Bool = true"))
+    #expect(navigationSource.contains("struct SessionTimelineNavigationVisibilityStatus"))
+    #expect(
+      navigationSource.contains(
+        "accessibilityIdentifier: HarnessMonitorAccessibility.sessionTimelineVisibleStatus"
+      )
+    )
     #expect(navigationSource.contains("if showsButtons {"))
   }
 
