@@ -33,6 +33,13 @@ struct SessionSidebar: View {
   }
 
   var body: some View {
+    sidebarList
+      .safeAreaInset(edge: .bottom, spacing: 0) {
+        SessionSidebarFooter(model: statusModel)
+      }
+  }
+
+  private var sidebarList: some View {
     List(selection: selectionBinding) {
       routeSection
       agentsSection
@@ -41,6 +48,11 @@ struct SessionSidebar: View {
     }
     .listStyle(.sidebar)
     .environment(\.sidebarRowSize, sidebarRowSize)
+    .background(
+      SessionSidebarModifierKeysMonitor(currentModifiers: $currentModifiers)
+        .frame(width: 0, height: 0)
+        .accessibilityHidden(true)
+    )
     .onChange(of: decisions.map(\.id)) { _, ids in
       state.sidebarSelection.prune(kind: .decision, visibleIDs: Set(ids))
       pruneListSelection(kind: .decision, visibleIDs: Set(ids))
@@ -55,11 +67,6 @@ struct SessionSidebar: View {
     }
     .task(id: (snapshot?.detail?.agents ?? []).map(\.agentId)) {
       state.sidebarOrdering.reconcileAgentOrder(with: snapshot?.detail?.agents ?? [])
-    }
-    .onModifierKeysChanged { _, newModifiers in
-      if currentModifiers != newModifiers {
-        currentModifiers = newModifiers
-      }
     }
     .onChange(of: state.lastPlainClick) { _, signal in
       collapseSelectionFromApplicationTap(signal)
@@ -79,9 +86,6 @@ struct SessionSidebar: View {
     }
     .accessibilityValue(decisionSelectionAccessibilityValue)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowSidebar)
-    .safeAreaInset(edge: .bottom, spacing: 0) {
-      SessionSidebarFooter(model: statusModel)
-    }
   }
 
   private var sidebarRowSize: SidebarRowSize {
