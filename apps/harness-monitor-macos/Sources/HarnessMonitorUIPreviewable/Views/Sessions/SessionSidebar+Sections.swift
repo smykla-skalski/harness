@@ -224,14 +224,12 @@ extension SessionSidebar {
           .accessibilityLabel("Unsaved draft")
       }
       Spacer()
-      Button {
-        state.selectCreate(.agent)
-      } label: {
-        Image(systemName: "plus")
-      }
-      .buttonStyle(.borderless)
-      .help("New Agent")
-      .accessibilityLabel("New Agent")
+      SessionSidebarHeaderCreateButton(
+        state: state,
+        kind: .agent,
+        accessibilityLabel: "New Agent",
+        currentModifiers: shortcutRevealModifiers
+      )
     }
   }
 
@@ -245,14 +243,45 @@ extension SessionSidebar {
           .accessibilityLabel("Unsaved draft")
       }
       Spacer()
-      Button {
-        state.selectCreate(.task)
-      } label: {
-        Image(systemName: "plus")
-      }
-      .buttonStyle(.borderless)
-      .help("New Task")
-      .accessibilityLabel("New Task")
+      SessionSidebarHeaderCreateButton(
+        state: state,
+        kind: .task,
+        accessibilityLabel: "New Task",
+        currentModifiers: shortcutRevealModifiers
+      )
     }
+  }
+}
+
+struct SessionSidebarHeaderCreateButton: View {
+  @ScaledMetric(relativeTo: .caption) private var shortcutKeySpacing = HarnessMonitorTheme.spacingXS - 1
+  @ScaledMetric(relativeTo: .caption) private var shortcutOverlayOffset = HarnessMonitorTheme.spacingLG - 2
+
+  let state: SessionWindowStateCache
+  let kind: SessionCreateKind
+  let accessibilityLabel: String
+  let currentModifiers: EventModifiers
+
+  var body: some View {
+    Button("+") {
+      state.selectCreate(kind)
+    }
+    .buttonStyle(.bordered)
+    .controlSize(.small)
+    .overlay(alignment: .top) {
+      KeyboardShortcutLabel(
+        shortcut: kind.createShortcut,
+        activeModifiers: currentModifiers,
+        revealPolicy: .revealOnRelevantModifierHold,
+        keySpacing: shortcutKeySpacing
+      )
+      .fixedSize()
+      .allowsHitTesting(false)
+      .offset(y: -shortcutOverlayOffset)
+      .zIndex(1)
+    }
+    .help("\(accessibilityLabel) (\(kind.createShortcutHint))")
+    .accessibilityLabel(accessibilityLabel)
+    .padding(.trailing, HarnessMonitorTheme.spacingSM)
   }
 }

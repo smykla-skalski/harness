@@ -36,6 +36,53 @@ extension SessionWindowFlowTests {
     #expect(sidebarSource.contains("case .decision: return"))
   }
 
+  @Test("Session sidebar headers use inset bordered add buttons")
+  func sessionSidebarHeadersUseInsetBorderedAddButtons() throws {
+    let sectionsSource = try previewableSourceFile(named: "Views/Sessions/SessionSidebar+Sections.swift")
+    let decisionsSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionSidebarDecisionSection.swift"
+    )
+
+    #expect(sectionsSource.contains("struct SessionSidebarHeaderCreateButton: View"))
+    #expect(sectionsSource.contains("Button(\"+\")"))
+    #expect(sectionsSource.contains(".buttonStyle(.bordered)"))
+    #expect(sectionsSource.contains(".controlSize(.small)"))
+    #expect(sectionsSource.contains(".overlay(alignment: .top)"))
+    #expect(sectionsSource.contains("KeyboardShortcutLabel(\n        shortcut: kind.createShortcut"))
+    #expect(sectionsSource.contains("revealPolicy: .revealOnRelevantModifierHold"))
+    #expect(sectionsSource.contains(".padding(.trailing, HarnessMonitorTheme.spacingSM)"))
+    #expect(sectionsSource.contains("currentModifiers: shortcutRevealModifiers"))
+    #expect(sectionsSource.contains("SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .agent,\n        accessibilityLabel: \"New Agent\",\n        currentModifiers: shortcutRevealModifiers"))
+    #expect(sectionsSource.contains("SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .task,\n        accessibilityLabel: \"New Task\",\n        currentModifiers: shortcutRevealModifiers"))
+    #expect(decisionsSource.contains("SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .decision,\n        accessibilityLabel: \"New Decision\",\n        currentModifiers: shortcutRevealModifiers"))
+  }
+
+  @Test("Keyboard shortcut descriptors support reveal across modifier families")
+  func keyboardShortcutDescriptorsSupportRevealAcrossModifierFamilies() {
+    let createShortcut = SessionCreateKind.agent.createShortcut
+    let controlShiftShortcut = KeyboardShortcutDescriptor(
+      modifiers: [.control, .shift],
+      keyEquivalent: "k",
+      keyLabel: "K"
+    )
+
+    #expect(createShortcut.hint == "⌥⌘A")
+    #expect(createShortcut.requiredEventModifiers.contains(.option))
+    #expect(createShortcut.requiredEventModifiers.contains(.command))
+    #expect(!createShortcut.requiredEventModifiers.contains(.shift))
+    #expect(!createShortcut.isRevealed(by: []))
+    #expect(createShortcut.isRevealed(by: [.option]))
+    #expect(createShortcut.isRevealed(by: [.command]))
+    #expect(!createShortcut.isRevealed(by: [.shift]))
+
+    #expect(controlShiftShortcut.hint == "⌃⇧K")
+    #expect(controlShiftShortcut.requiredEventModifiers.contains(.control))
+    #expect(controlShiftShortcut.requiredEventModifiers.contains(.shift))
+    #expect(controlShiftShortcut.isRevealed(by: [.control]))
+    #expect(controlShiftShortcut.isRevealed(by: [.shift]))
+    #expect(!controlShiftShortcut.isRevealed(by: [.option]))
+  }
+
   @MainActor
   @Test("Session window decision visibility distinguishes visible hidden and missing states")
   func sessionWindowDecisionVisibilityDistinguishesStates() {

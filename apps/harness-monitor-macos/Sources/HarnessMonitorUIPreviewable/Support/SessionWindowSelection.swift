@@ -1,9 +1,21 @@
 import HarnessMonitorKit
+import SwiftUI
 
 public enum SessionCreateKind: String, Codable, Hashable, Sendable {
   case agent
   case task
   case decision
+
+  public var createShortcut: KeyboardShortcutDescriptor {
+    switch self {
+    case .agent:
+      .init(modifiers: [.option, .command], keyEquivalent: "a", keyLabel: "A")
+    case .task:
+      .init(modifiers: [.option, .command], keyEquivalent: "t", keyLabel: "T")
+    case .decision:
+      .init(modifiers: [.option, .command], keyEquivalent: "d", keyLabel: "D")
+    }
+  }
 
   public var route: SessionWindowRoute {
     switch self {
@@ -11,6 +23,18 @@ public enum SessionCreateKind: String, Codable, Hashable, Sendable {
     case .task: .tasks
     case .decision: .decisions
     }
+  }
+
+  public var createShortcutKey: KeyEquivalent {
+    createShortcut.keyEquivalent
+  }
+
+  public var createShortcutModifiers: EventModifiers {
+    createShortcut.requiredEventModifiers
+  }
+
+  public var createShortcutHint: String {
+    createShortcut.hint
   }
 }
 

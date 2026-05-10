@@ -68,14 +68,12 @@ extension SessionSidebar {
           .accessibilityLabel("Unsaved draft")
       }
       Spacer()
-      Button {
-        state.selectCreate(.decision)
-      } label: {
-        Image(systemName: "plus")
-      }
-      .buttonStyle(.borderless)
-      .help("New Decision")
-      .accessibilityLabel("New Decision")
+      SessionSidebarHeaderCreateButton(
+        state: state,
+        kind: .decision,
+        accessibilityLabel: "New Decision",
+        currentModifiers: shortcutRevealModifiers
+      )
     }
   }
 

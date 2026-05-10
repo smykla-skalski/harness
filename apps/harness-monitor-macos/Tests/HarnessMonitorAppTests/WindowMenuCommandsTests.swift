@@ -96,6 +96,41 @@ final class WindowMenuCommandsTests: XCTestCase {
     XCTAssertTrue(routeModelSource.contains("case decision"))
   }
 
+  func testSessionCreateShortcutsStaySharedAcrossMenuAndSidebarHints() throws {
+    let commandsSource = try harnessSourceFile(named: "Commands/SessionCreateCommands.swift")
+    let selectionSource = try uiPreviewableSourceFile(named: "Support/SessionWindowSelection.swift")
+    let shortcutSource = try uiPreviewableSourceFile(named: "Support/KeyboardShortcutDescriptor.swift")
+    let sidebarSource = try uiPreviewableSourceFile(named: "Views/Sessions/SessionSidebar+Sections.swift")
+
+    XCTAssertTrue(selectionSource.contains("public var createShortcut: KeyboardShortcutDescriptor"))
+    XCTAssertTrue(selectionSource.contains("public var createShortcutModifiers: EventModifiers"))
+    XCTAssertTrue(
+      selectionSource.contains(".init(modifiers: [.option, .command], keyEquivalent: \"a\", keyLabel: \"A\")")
+    )
+    XCTAssertTrue(
+      selectionSource.contains(".init(modifiers: [.option, .command], keyEquivalent: \"t\", keyLabel: \"T\")")
+    )
+    XCTAssertTrue(
+      selectionSource.contains(".init(modifiers: [.option, .command], keyEquivalent: \"d\", keyLabel: \"D\")")
+    )
+    XCTAssertTrue(shortcutSource.contains("case .control: \"⌃\""))
+    XCTAssertTrue(shortcutSource.contains("case .shift: \"⇧\""))
+    XCTAssertTrue(shortcutSource.contains("public func isRevealed(by activeModifiers: EventModifiers) -> Bool"))
+    XCTAssertTrue(
+      commandsSource.contains(
+        "SessionCreateKind.agent.createShortcut.requiredEventModifiers"
+      )
+    )
+    XCTAssertTrue(
+      commandsSource.contains(
+        "SessionCreateKind.task.createShortcut.requiredEventModifiers"
+      )
+    )
+    XCTAssertTrue(commandsSource.contains("SessionCreateKind.decision.createShortcut.requiredEventModifiers"))
+    XCTAssertFalse(commandsSource.contains("modifiers: [.command, .option]"))
+    XCTAssertTrue(sidebarSource.contains("KeyboardShortcutLabel(\n        shortcut: kind.createShortcut"))
+  }
+
   func testSharedPresentationModifiersKeepBindingsMountedAcrossKeyWindowLoss() throws {
     let sheetModifierSource = try uiPreviewableSourceFile(
       named: "Views/Shared/HarnessMonitorSheetModifier.swift"

@@ -165,14 +165,14 @@ private struct OpenRecentStartPanel: View {
         actionButton(
           "New Session",
           systemImage: "plus.square",
-          shortcut: "⌘N",
+          shortcut: .init(modifiers: [.command], keyEquivalent: "n", keyLabel: "N"),
           accessibilityID: HarnessMonitorAccessibility.openRecentNewSessionButton,
           action: newSession
         )
         actionButton(
           "Open Folder",
           systemImage: "folder",
-          shortcut: "⌘O",
+          shortcut: .init(modifiers: [.command], keyEquivalent: "o", keyLabel: "O"),
           accessibilityID: HarnessMonitorAccessibility.openRecentOpenFolderButton,
           action: openFolder
         )
@@ -227,7 +227,7 @@ private struct OpenRecentStartPanel: View {
   private func actionButton(
     _ title: String,
     systemImage: String,
-    shortcut: String,
+    shortcut: KeyboardShortcutDescriptor,
     accessibilityID: String,
     action: @escaping () -> Void
   ) -> some View {
@@ -237,7 +237,7 @@ private struct OpenRecentStartPanel: View {
           .frame(width: 16 * layoutScale)
         Text(title)
         Spacer()
-        OpenRecentShortcutLabel(shortcut: shortcut)
+        KeyboardShortcutLabel(shortcut: shortcut)
       }
       .padding(.horizontal, 6 * layoutScale)
       .padding(.vertical, 3 * layoutScale)

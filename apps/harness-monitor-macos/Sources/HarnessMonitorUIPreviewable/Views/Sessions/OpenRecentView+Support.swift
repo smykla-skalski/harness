@@ -62,18 +62,48 @@ struct OpenRecentStartPanelLayout: Layout {
   }
 }
 
-struct OpenRecentShortcutLabel: View {
-  let shortcut: String
+struct KeyboardShortcutLabel: View {
+  let shortcut: KeyboardShortcutDescriptor
+  var activeModifiers: EventModifiers = []
+  var revealPolicy: KeyboardShortcutRevealPolicy = .alwaysVisible
+  var keySpacing: CGFloat = HarnessMonitorTheme.spacingXS
+
+  private var isRevealed: Bool {
+    switch revealPolicy {
+    case .alwaysVisible:
+      true
+    case .revealOnRelevantModifierHold:
+      shortcut.isRevealed(by: activeModifiers)
+    }
+  }
+
+  private var isAccessibilityHidden: Bool {
+    switch revealPolicy {
+    case .alwaysVisible:
+      false
+    case .revealOnRelevantModifierHold:
+      true
+    }
+  }
 
   var body: some View {
-    HStack(spacing: 2) {
-      ForEach(Array(shortcut.enumerated()), id: \.offset) { _, character in
-        Text(String(character))
+    HStack(spacing: keySpacing) {
+      ForEach(Array(shortcut.displayParts.enumerated()), id: \.offset) { _, part in
+        Text(part.text)
           .scaledFont(.caption.monospaced())
+          .foregroundStyle(foregroundStyle(for: part))
       }
     }
-    .foregroundStyle(.tertiary)
-    .accessibilityLabel(shortcut)
+    .opacity(isRevealed ? 1 : 0)
+    .accessibilityHidden(isAccessibilityHidden)
+    .accessibilityLabel(shortcut.hint)
+  }
+
+  private func foregroundStyle(for part: KeyboardShortcutDisplayPart) -> AnyShapeStyle {
+    if part.isHighlighted(with: activeModifiers) {
+      return AnyShapeStyle(HarnessMonitorTheme.secondaryInk)
+    }
+    return AnyShapeStyle(.tertiary)
   }
 }
 
