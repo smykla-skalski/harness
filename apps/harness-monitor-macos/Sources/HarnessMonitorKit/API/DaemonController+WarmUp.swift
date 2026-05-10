@@ -238,8 +238,9 @@ extension DaemonController {
         return outcome
       }
       if isFreshObservation {
+        let stalePID = manifest.pid
         HarnessMonitorLogger.lifecycle.trace(
-          "Warm-up waiting for a replacement external manifest after stale pid \(manifest.pid, privacy: .public)"
+          "Warm-up waiting for replacement external manifest after stale pid \(stalePID, privacy: .public)"
         )
       }
       return .continueLoop

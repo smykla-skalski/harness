@@ -235,8 +235,9 @@ enum HarnessMonitorPerfDriver {
       return .failed("missing-session-id")
     }
     guard await waitForSessionWindow(sessionID: sessionID, store: store) else {
+      let sid = sessionID
       HarnessMonitorLogger.store.error(
-        "ACP decision \(decisionID, privacy: .public) did not open session window \(sessionID, privacy: .public)"
+        "ACP \(decisionID, privacy: .public) session window timeout for \(sid, privacy: .public)"
       )
       await settle(.milliseconds(1_000))
       return .failed("session-window-timeout")

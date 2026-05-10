@@ -387,12 +387,11 @@ struct AgentDetailSendUpdateSection: View {
       let success =
         if let actionActorID {
           await store.sendSignal(
-            sessionID: sessionID,
             agentID: agentID,
             command: dispatchedCommand,
             message: dispatchedMessage,
             actionHint: dispatchedActionHint,
-            actorID: actionActorID
+            actor: actionActorID
           )
         } else {
           await store.sendSignal(

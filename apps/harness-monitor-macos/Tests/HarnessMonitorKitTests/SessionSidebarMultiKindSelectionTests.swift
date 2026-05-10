@@ -117,9 +117,11 @@ struct SessionSidebarMultiKindSelectionTests {
     let selectedAgent = SessionSelection.agent(sessionID: "s1", agentID: "a2")
     let resolution = SessionSidebarContextMenuScope.resolve(
       kind: .agent,
-      rowSelection: selectedAgent,
       rowID: "a2",
-      listSelection: [.route(.overview), selectedAgent],
+      selectionState: .init(
+        rowSelection: selectedAgent,
+        listSelection: [.route(.overview), selectedAgent]
+      ),
       selectedIDs: [],
       orderedVisibleIDs: ["a1", "a2", "a3"]
     )
@@ -135,9 +137,11 @@ struct SessionSidebarMultiKindSelectionTests {
     let second = SessionSelection.task(sessionID: "s1", taskID: "t2")
     let resolution = SessionSidebarContextMenuScope.resolve(
       kind: .task,
-      rowSelection: second,
       rowID: "t2",
-      listSelection: [first, second],
+      selectionState: .init(
+        rowSelection: second,
+        listSelection: [first, second]
+      ),
       selectedIDs: ["t1", "t2"],
       orderedVisibleIDs: ["t1", "t2", "t3"]
     )
