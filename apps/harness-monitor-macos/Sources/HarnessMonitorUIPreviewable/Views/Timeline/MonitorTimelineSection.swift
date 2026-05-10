@@ -2,34 +2,6 @@ import Combine
 import HarnessMonitorKit
 import SwiftUI
 
-enum SessionTimelineViewStyle {
-  case cockpitSection
-  case routePage
-}
-
-struct MonitorTimelineSection: View {
-  let host: MonitorTimelineHost
-  let timeline: [TimelineEntry]
-  let timelineWindow: TimelineWindowResponse?
-  let decisions: [Decision]
-  let isTimelineLoading: Bool
-  let store: HarnessMonitorStore
-
-  var body: some View {
-    ViewBodySignposter.measure("MonitorTimelineSection") {
-      SessionTimelineView(
-        style: .cockpitSection,
-        host: host,
-        timeline: timeline,
-        timelineWindow: timelineWindow,
-        decisions: decisions,
-        isTimelineLoading: isTimelineLoading,
-        store: store
-      )
-    }
-  }
-}
-
 struct SessionTimelineView: View {
   let style: SessionTimelineViewStyle
   let host: MonitorTimelineHost
@@ -51,14 +23,15 @@ struct SessionTimelineView: View {
   private var reduceMotion
   @State private var filterPersistenceModeRawValue =
     SessionTimelineFilterDefaults.readPersistenceModeRawValue()
-  @State private var appStoredFilterStateRawValue = SessionTimelineFilterDefaults
-    .readAppStateRawValue()
+  @State private var appStoredFilterStateRawValue =
+    SessionTimelineFilterDefaults.readAppStateRawValue()
   @SceneStorage(SessionTimelineFilterDefaults.sceneRegistryKey)
   private var sceneStoredFilterRegistryRawValue = ""
   @State private var scrollCommand: SessionTimelineScrollCommand?
   @State private var scrollCommandGeneration = 0
   @State private var pendingNavigationAfterLoad: SessionTimelinePendingNavigation?
   @State private var pendingNavigationGeneration = 0
+  @State private var pendingEdgeLoadAction: SessionTimelineWindowAction?
   @State private var cachedPresentation = SessionTimelineSectionPresentation.empty
   @State private var cachedPresentationInput = SessionTimelinePresentationInput.empty
   @State private var viewport = SessionTimelineViewportModel()
@@ -85,6 +58,13 @@ struct SessionTimelineView: View {
       }
       .task(id: filterHydrationInput) {
         hydrateFilters(for: filterHydrationInput)
+      }
+      .task(id: edgeLoadRetryInput(for: displayPresentation)) {
+        await Task.yield()
+        guard !Task.isCancelled else {
+          return
+        }
+        retryPendingEdgeLoadIfNeeded(for: displayPresentation)
       }
       .onReceive(
         NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
@@ -139,8 +119,8 @@ struct SessionTimelineView: View {
   }
 
   private func refreshStoredFilterDefaults(userDefaults: UserDefaults = .standard) {
-    let nextPersistenceModeRawValue = SessionTimelineFilterDefaults
-      .readPersistenceModeRawValue(userDefaults: userDefaults)
+    let nextPersistenceModeRawValue =
+      SessionTimelineFilterDefaults.readPersistenceModeRawValue(userDefaults: userDefaults)
     if filterPersistenceModeRawValue != nextPersistenceModeRawValue {
       filterPersistenceModeRawValue = nextPersistenceModeRawValue
     }
@@ -288,7 +268,7 @@ struct SessionTimelineView: View {
   /// invoke this from change-event handlers (`.onAppear`, `.onChange`), never
   /// from per-scroll publishes; the latter would allocate per frame and
   /// regress the body-update budget.
-  fileprivate func deferOffViewUpdate(_ work: @escaping @MainActor () -> Void) {
+  func deferOffViewUpdate(_ work: @escaping @MainActor () -> Void) {
     Task { @MainActor in
       work()
     }
@@ -402,6 +382,11 @@ struct SessionTimelineView: View {
     nonmutating set { pendingNavigationGeneration = newValue }
   }
 
+  var currentPendingEdgeLoadAction: SessionTimelineWindowAction? {
+    get { pendingEdgeLoadAction }
+    nonmutating set { pendingEdgeLoadAction = newValue }
+  }
+
   var timelineViewport: SessionTimelineViewportModel {
     viewport
   }
@@ -423,34 +408,5 @@ struct SessionTimelineView: View {
   var currentSceneStoredFilterRegistryRawValue: String {
     get { sceneStoredFilterRegistryRawValue }
     nonmutating set { sceneStoredFilterRegistryRawValue = newValue }
-  }
-}
-
-private extension View {
-  func timelineLifecycle(
-    for presentation: SessionTimelineSectionPresentation,
-    host: SessionTimelineView
-  ) -> some View {
-    onAppear {
-      host.deferOffViewUpdate {
-        host.reconcileTimelineAnchor(with: presentation.scrollNodeIDs)
-      }
-      host.requestLatestWindowIfNeeded(presentation)
-    }
-    .onChange(of: host.sessionID) { _, _ in
-      host.deferOffViewUpdate {
-        host.timelineViewport.clear()
-        host.currentTimelineScrollCommand = nil
-        host.currentPendingNavigation = nil
-      }
-      host.requestLatestWindow()
-    }
-    .onChange(of: presentation.scrollNodeIDs) { _, ids in
-      guard !ids.isEmpty else { return }
-      host.deferOffViewUpdate {
-        host.reconcileTimelineAnchor(with: ids)
-        host.completePendingNavigationIfNeeded(presentation)
-      }
-    }
   }
 }

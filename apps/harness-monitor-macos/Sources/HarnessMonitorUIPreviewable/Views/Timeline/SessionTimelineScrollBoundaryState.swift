@@ -7,6 +7,18 @@ struct SessionTimelineScrollBoundaryState: Equatable {
   private let topBucket: Int?
   private let bottomBucket: Int?
 
+  static var triggerBufferRowCount: Int {
+    max(1, Int(ceil(triggerDistance / bucketSize)))
+  }
+
+  var isNearTopEdge: Bool {
+    topBucket != nil
+  }
+
+  var isNearBottomEdge: Bool {
+    bottomBucket != nil
+  }
+
   init(geometry: ScrollGeometry) {
     self.init(
       visibleMinY: geometry.visibleRect.minY,
@@ -43,6 +55,14 @@ struct SessionTimelineScrollBoundaryState: Equatable {
       || shouldTrackEdge(bottomBucket, from: oldValue.bottomBucket, towardEdge: >)
   }
 
+  func topEdgeAdvance(from oldValue: Self) -> Int {
+    edgeAdvance(topBucket, from: oldValue.topBucket, towardEdge: <)
+  }
+
+  func bottomEdgeAdvance(from oldValue: Self) -> Int {
+    edgeAdvance(bottomBucket, from: oldValue.bottomBucket, towardEdge: >)
+  }
+
   private func enteredEdge(
     _ newBucket: Int?,
     from oldBucket: Int?,
@@ -70,6 +90,23 @@ struct SessionTimelineScrollBoundaryState: Equatable {
     case (.some(let oldBucket), .some(let newBucket)):
       towardEdge(newBucket, oldBucket)
     }
+  }
+
+  private func edgeAdvance(
+    _ newBucket: Int?,
+    from oldBucket: Int?,
+    towardEdge: (Int, Int) -> Bool
+  ) -> Int {
+    guard let newBucket else {
+      return 0
+    }
+    guard let oldBucket else {
+      return 1
+    }
+    guard towardEdge(newBucket, oldBucket) else {
+      return 0
+    }
+    return max(1, abs(newBucket - oldBucket))
   }
 
   private static func bucket(for offset: CGFloat) -> Int {

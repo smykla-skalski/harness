@@ -70,11 +70,12 @@ func makeWindow(
   windowStart: Int,
   windowEnd: Int,
   hasOlder: Bool,
-  hasNewer: Bool
+  hasNewer: Bool,
+  totalCount: Int = 32
 ) -> TimelineWindowResponse {
   TimelineWindowResponse(
     revision: Int64(windowStart + windowEnd),
-    totalCount: 32,
+    totalCount: totalCount,
     windowStart: windowStart,
     windowEnd: windowEnd,
     hasOlder: hasOlder,
