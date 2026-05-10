@@ -104,20 +104,24 @@ struct SessionTimelineWindowNavigation: Equatable, Sendable {
     totalCount > 0 || isLoading
   }
 
-  func request(for action: SessionTimelineWindowAction) -> TimelineWindowRequest? {
+  func request(
+    for action: SessionTimelineWindowAction,
+    limit requestedLimit: Int? = nil
+  ) -> TimelineWindowRequest? {
+    let requestLimit = requestedLimit ?? limit
     switch action {
     case .older:
       guard hasOlder, let oldestCursor else {
         return nil
       }
-      return TimelineWindowRequest(scope: .summary, limit: limit, before: oldestCursor)
+      return TimelineWindowRequest(scope: .summary, limit: requestLimit, before: oldestCursor)
     case .latest:
-      return .latest(limit: limit)
+      return .latest(limit: requestLimit)
     case .newer:
       guard hasNewer, let newestCursor else {
         return nil
       }
-      return TimelineWindowRequest(scope: .summary, limit: limit, after: newestCursor)
+      return TimelineWindowRequest(scope: .summary, limit: requestLimit, after: newestCursor)
     }
   }
 }

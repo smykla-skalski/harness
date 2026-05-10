@@ -18,6 +18,7 @@ final class SessionTimelineViewportModel {
   @ObservationIgnored private var presentationLoadedCount = 0
   @ObservationIgnored private var presentationTotalCount = 0
   @ObservationIgnored private var presentationFilteredMatchCount: Int?
+  @ObservationIgnored private var lastScrollBoundaryState: SessionTimelineScrollBoundaryState?
 
   func recordViewportStats(_ stats: SessionTimelineTableViewportStats) {
     lastViewport = stats
@@ -25,6 +26,18 @@ final class SessionTimelineViewportModel {
       visibleAnchorID = anchorID
     }
     rebuildStats()
+  }
+
+  func recordScrollBoundaryState(_ state: SessionTimelineScrollBoundaryState) {
+    lastScrollBoundaryState = state
+  }
+
+  func isNearTopScrollEdge() -> Bool {
+    lastScrollBoundaryState?.isNearTopEdge ?? false
+  }
+
+  func isNearBottomScrollEdge() -> Bool {
+    lastScrollBoundaryState?.isNearBottomEdge ?? false
   }
 
   func setAnchorID(_ id: String?) {
@@ -72,6 +85,7 @@ final class SessionTimelineViewportModel {
     lastViewport = SessionTimelineTableViewportStats.initial(
       estimatedVisibleEvents: 0
     )
+    lastScrollBoundaryState = nil
     presentationWindowStart = 0
     presentationLoadedCount = 0
     presentationTotalCount = 0

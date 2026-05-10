@@ -177,6 +177,7 @@ extension SessionTimelineTableView.Coordinator {
     guard let boundaryState = currentBoundaryState() else {
       return
     }
+    viewport?.recordScrollBoundaryState(boundaryState)
     if boundaryState.enteredTopEdge(from: lastBoundaryState)
       || boundaryState.enteredBottomEdge(from: lastBoundaryState)
     {

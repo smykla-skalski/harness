@@ -135,6 +135,87 @@ struct SessionTimelineNavigationTests {
     #expect(!reboundTopEntry.enteredTopEdge(from: deeperTopEntry))
   }
 
+  @Test("Scroll edge loading chooses an adaptive partial chunk")
+  func scrollEdgeLoadingChoosesAnAdaptivePartialChunk() {
+    let entries = makeTimelineEntries(count: 12)
+    let navigation = SessionTimelineWindowNavigation(
+      timeline: entries,
+      timelineWindow: makeWindow(
+        entries: entries,
+        windowStart: 0,
+        windowEnd: 12,
+        hasOlder: true,
+        hasNewer: false,
+        totalCount: 80
+      ),
+      isLoading: false
+    )
+    let outsideBottom = SessionTimelineScrollBoundaryState(
+      visibleMinY: 200,
+      visibleMaxY: 760,
+      contentHeight: 1_000
+    )
+    let firstBottomEntry = SessionTimelineScrollBoundaryState(
+      visibleMinY: 250,
+      visibleMaxY: 800,
+      contentHeight: 1_000
+    )
+
+    let limit = SessionTimelineEdgeLoadPolicy.limit(
+      for: .older,
+      context: SessionTimelineEdgeLoadContext(
+        navigation: navigation,
+        visibleRowCount: 6,
+        fallbackVisibleRowCount: 6
+      ),
+      from: outsideBottom,
+      to: firstBottomEntry
+    )
+
+    #expect(limit == 10)
+    #expect(limit < SessionTimelineWindowNavigation.defaultLimit)
+  }
+
+  @Test("Scroll edge loading scales with fast edge movement and clamps to remaining events")
+  func scrollEdgeLoadingScalesWithFastEdgeMovementAndClampsToRemainingEvents() {
+    let entries = makeTimelineEntries(count: 22)
+    let navigation = SessionTimelineWindowNavigation(
+      timeline: entries,
+      timelineWindow: makeWindow(
+        entries: entries,
+        windowStart: 0,
+        windowEnd: 22,
+        hasOlder: true,
+        hasNewer: false,
+        totalCount: 30
+      ),
+      isLoading: false
+    )
+    let firstBottomEntry = SessionTimelineScrollBoundaryState(
+      visibleMinY: 250,
+      visibleMaxY: 800,
+      contentHeight: 1_000
+    )
+    let fastBottomEntry = SessionTimelineScrollBoundaryState(
+      visibleMinY: 470,
+      visibleMaxY: 1_000,
+      contentHeight: 1_000
+    )
+
+    let limit = SessionTimelineEdgeLoadPolicy.limit(
+      for: .older,
+      context: SessionTimelineEdgeLoadContext(
+        navigation: navigation,
+        visibleRowCount: 6,
+        fallbackVisibleRowCount: 6
+      ),
+      from: firstBottomEntry,
+      to: fastBottomEntry
+    )
+
+    #expect(limit == 8)
+  }
+
   @Test("Table row metrics reserve space for rich timeline rows")
   func tableRowMetricsReserveSpaceForRichTimelineRows() {
     let rows = makeTimelineRows(count: 13)

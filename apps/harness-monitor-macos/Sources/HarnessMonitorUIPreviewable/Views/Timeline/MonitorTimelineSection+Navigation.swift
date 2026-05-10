@@ -20,24 +20,140 @@ extension SessionTimelineView {
   }
 
   func requestOlderWindowIfNeeded(_ presentation: SessionTimelineSectionPresentation) {
-    guard !isTimelineLoading, presentation.navigation.hasOlder else {
-      return
+    requestOlderWindowIfNeeded(presentation, limit: presentation.navigation.limit)
+  }
+
+  @discardableResult
+  func requestOlderWindowIfNeeded(
+    _ presentation: SessionTimelineSectionPresentation,
+    from oldValue: SessionTimelineScrollBoundaryState,
+    to newValue: SessionTimelineScrollBoundaryState
+  ) -> Bool {
+    let limit = SessionTimelineEdgeLoadPolicy.limit(
+      for: .older,
+      context: edgeLoadContext(for: presentation),
+      from: oldValue,
+      to: newValue
+    )
+    return requestOlderWindowIfNeeded(presentation, limit: limit)
+  }
+
+  @discardableResult
+  func requestOlderWindowIfNeeded(
+    _ presentation: SessionTimelineSectionPresentation,
+    limit: Int
+  ) -> Bool {
+    guard limit > 0, presentation.navigation.hasOlder else {
+      clearPendingEdgeLoadIfNeeded(.older)
+      return false
     }
-    Task { await loadOlderTimelineChunk(limit: presentation.navigation.limit) }
+    guard !isTimelineLoading else {
+      currentPendingEdgeLoadAction = .older
+      return false
+    }
+    clearPendingEdgeLoadIfNeeded(.older)
+    Task { await loadOlderTimelineChunk(limit: limit) }
+    return true
   }
 
-  func requestNewerWindowIfNeeded(_ presentation: SessionTimelineSectionPresentation) {
-    requestWindowIfNeeded(for: .newer, presentation: presentation)
+  @discardableResult
+  func requestNewerWindowIfNeeded(
+    _ presentation: SessionTimelineSectionPresentation,
+    from oldValue: SessionTimelineScrollBoundaryState,
+    to newValue: SessionTimelineScrollBoundaryState
+  ) -> Bool {
+    let limit = SessionTimelineEdgeLoadPolicy.limit(
+      for: .newer,
+      context: edgeLoadContext(for: presentation),
+      from: oldValue,
+      to: newValue
+    )
+    return requestWindowIfNeeded(
+      for: .newer,
+      presentation: presentation,
+      limit: limit,
+      deferIfLoading: true
+    )
   }
 
+  @discardableResult
   func requestWindowIfNeeded(
     for action: SessionTimelineWindowAction,
-    presentation: SessionTimelineSectionPresentation
-  ) {
-    guard !isTimelineLoading, let request = presentation.navigation.request(for: action) else {
+    presentation: SessionTimelineSectionPresentation,
+    limit: Int? = nil,
+    deferIfLoading: Bool = false
+  ) -> Bool {
+    if let limit, limit <= 0 {
+      clearPendingEdgeLoadIfNeeded(action)
+      return false
+    }
+    guard let request = presentation.navigation.request(for: action, limit: limit) else {
+      clearPendingEdgeLoadIfNeeded(action)
+      return false
+    }
+    guard !isTimelineLoading else {
+      if deferIfLoading {
+        currentPendingEdgeLoadAction = action
+      }
+      return false
+    }
+    clearPendingEdgeLoadIfNeeded(action)
+    Task { await loadWindow(request) }
+    return true
+  }
+
+  @MainActor
+  func retryPendingEdgeLoadIfNeeded(for presentation: SessionTimelineSectionPresentation) {
+    guard let action = currentPendingEdgeLoadAction, !isTimelineLoading else {
       return
     }
-    Task { await loadWindow(request) }
+    let isStillNearEdge =
+      switch action {
+      case .older:
+        timelineViewport.isNearBottomScrollEdge()
+      case .latest:
+        false
+      case .newer:
+        timelineViewport.isNearTopScrollEdge()
+      }
+    guard isStillNearEdge else {
+      currentPendingEdgeLoadAction = nil
+      return
+    }
+    let limit = SessionTimelineEdgeLoadPolicy.retryLimit(
+      for: action,
+      context: edgeLoadContext(for: presentation)
+    )
+    switch action {
+    case .older:
+      requestOlderWindowIfNeeded(presentation, limit: limit)
+    case .latest:
+      currentPendingEdgeLoadAction = nil
+    case .newer:
+      requestWindowIfNeeded(
+        for: .newer,
+        presentation: presentation,
+        limit: limit,
+        deferIfLoading: false
+      )
+    }
+  }
+
+  @MainActor
+  private func clearPendingEdgeLoadIfNeeded(_ action: SessionTimelineWindowAction) {
+    if currentPendingEdgeLoadAction == action {
+      currentPendingEdgeLoadAction = nil
+    }
+  }
+
+  private func edgeLoadContext(
+    for presentation: SessionTimelineSectionPresentation
+  ) -> SessionTimelineEdgeLoadContext {
+    SessionTimelineEdgeLoadContext(
+      navigation: presentation.navigation,
+      visibleRowCount: timelineViewport.visibilityStats.visibleRowCount,
+      fallbackVisibleRowCount: presentation.fallbackVisibleRowCount
+    )
   }
 
   func performNavigationAction(
@@ -203,10 +319,10 @@ extension SessionTimelineView {
     presentation: SessionTimelineSectionPresentation
   ) {
     if newValue.enteredTopEdge(from: oldValue) {
-      requestNewerWindowIfNeeded(presentation)
+      requestNewerWindowIfNeeded(presentation, from: oldValue, to: newValue)
     }
     if newValue.enteredBottomEdge(from: oldValue) {
-      requestOlderWindowIfNeeded(presentation)
+      requestOlderWindowIfNeeded(presentation, from: oldValue, to: newValue)
     }
   }
 

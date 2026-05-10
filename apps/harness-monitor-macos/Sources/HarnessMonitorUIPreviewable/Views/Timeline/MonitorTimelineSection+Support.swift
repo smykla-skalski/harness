@@ -1,6 +1,34 @@
 import HarnessMonitorKit
 import SwiftUI
 
+enum SessionTimelineViewStyle {
+  case cockpitSection
+  case routePage
+}
+
+struct MonitorTimelineSection: View {
+  let host: MonitorTimelineHost
+  let timeline: [TimelineEntry]
+  let timelineWindow: TimelineWindowResponse?
+  let decisions: [Decision]
+  let isTimelineLoading: Bool
+  let store: HarnessMonitorStore
+
+  var body: some View {
+    ViewBodySignposter.measure("MonitorTimelineSection") {
+      SessionTimelineView(
+        style: .cockpitSection,
+        host: host,
+        timeline: timeline,
+        timelineWindow: timelineWindow,
+        decisions: decisions,
+        isTimelineLoading: isTimelineLoading,
+        store: store
+      )
+    }
+  }
+}
+
 struct SessionTimelinePresentationInput: Equatable {
   let sessionID: String
   let timelineCount: Int
@@ -175,5 +203,34 @@ extension SessionTimelineView {
 
   var actionHandler: any DecisionActionHandler {
     store.supervisorDecisionActionHandler()
+  }
+}
+
+extension View {
+  func timelineLifecycle(
+    for presentation: SessionTimelineSectionPresentation,
+    host: SessionTimelineView
+  ) -> some View {
+    onAppear {
+      host.deferOffViewUpdate {
+        host.reconcileTimelineAnchor(with: presentation.scrollNodeIDs)
+      }
+      host.requestLatestWindowIfNeeded(presentation)
+    }
+    .onChange(of: host.sessionID) { _, _ in
+      host.deferOffViewUpdate {
+        host.timelineViewport.clear()
+        host.currentTimelineScrollCommand = nil
+        host.currentPendingNavigation = nil
+      }
+      host.requestLatestWindow()
+    }
+    .onChange(of: presentation.scrollNodeIDs) { _, ids in
+      guard !ids.isEmpty else { return }
+      host.deferOffViewUpdate {
+        host.reconcileTimelineAnchor(with: ids)
+        host.completePendingNavigationIfNeeded(presentation)
+      }
+    }
   }
 }
