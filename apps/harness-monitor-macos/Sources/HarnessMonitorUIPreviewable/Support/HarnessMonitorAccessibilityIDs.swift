@@ -130,7 +130,7 @@ public enum HarnessMonitorAccessibility {
     "harness.settings.timeline.filter-persistence"
   public static let settingsPendingDecisionBannersToggle =
     "harness.settings.decisions.pending-banners"
-  public static let settingsPendingDecisionBannersFocusModeToggle =
+  public static let settingsPendingBannersFocusModeToggle =
     "harness.settings.decisions.pending-banners.focus-mode"
   public static let settingsMCPSection = "harness.settings.mcp"
   public static let settingsMCPRegistryHostToggle =

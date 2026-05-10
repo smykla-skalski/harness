@@ -175,7 +175,7 @@ enum HarnessMonitorUITestAccessibility {
   static let settingsCustomTimeZonePicker = "harness.settings.custom-time-zone"
   static let settingsPendingDecisionBannersToggle =
     "harness.settings.decisions.pending-banners"
-  static let settingsPendingDecisionBannersFocusModeToggle =
+  static let settingsPendingBannersFocusModeToggle =
     "harness.settings.decisions.pending-banners.focus-mode"
   static let settingsGeneralSection = "harness.settings.section.general"
   static let settingsFocusModeSection = "harness.settings.section.focusmode"

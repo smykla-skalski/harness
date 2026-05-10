@@ -133,7 +133,7 @@ class HarnessMonitorSettingsLayoutUITests: HarnessMonitorUITestCase {
     )
     let focusModeToggle = descendantElement(
       in: settingsRoot,
-      identifier: Accessibility.settingsPendingDecisionBannersFocusModeToggle
+      identifier: Accessibility.settingsPendingBannersFocusModeToggle
     )
     XCTAssertTrue(visibilityToggle.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertFalse(focusModeToggle.exists)
@@ -156,7 +156,7 @@ class HarnessMonitorSettingsLayoutUITests: HarnessMonitorUITestCase {
     )
     let focusModeToggle = descendantElement(
       in: settingsRoot,
-      identifier: Accessibility.settingsPendingDecisionBannersFocusModeToggle
+      identifier: Accessibility.settingsPendingBannersFocusModeToggle
     )
     XCTAssertTrue(focusModeToggle.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertFalse(visibilityToggle.exists)

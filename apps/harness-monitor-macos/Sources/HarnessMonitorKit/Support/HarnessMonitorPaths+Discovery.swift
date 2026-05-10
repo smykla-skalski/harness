@@ -68,7 +68,8 @@ extension HarnessMonitorPaths {
     if candidates.count > 1 {
       let pids = candidates.map { String($0.pid) }.joined(separator: ",")
       HarnessMonitorLogger.store.info(
-        "Multiple live daemons; picked pid \(chosen?.pid ?? -1, privacy: .public) from {\(pids, privacy: .public)}"
+        "Multiple live daemons; picked pid \(chosen?.pid ?? -1, privacy: .public) "
+          + "from {\(pids, privacy: .public)}"
       )
     }
     _ = now

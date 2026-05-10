@@ -66,8 +66,7 @@ struct HarnessMonitorJSONCodeBlock: View {
     .accessibilityElement(children: .contain)
   }
 
-  @ViewBuilder
-  private var codeContent: some View {
+  @ViewBuilder private var codeContent: some View {
     if wrapLongLines {
       Text(presentation.attributedText)
         .scaledFont(.caption.monospaced())
