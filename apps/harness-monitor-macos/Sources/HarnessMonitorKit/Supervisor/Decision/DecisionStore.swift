@@ -157,6 +157,25 @@ public actor DecisionStore {
     return result
   }
 
+  func previewUpsertOpen(_ draft: DecisionDraft) async throws -> UpsertResult {
+    try withReadContext { context in
+      if let decision = try fetchDecision(id: draft.id, context: context) {
+        guard !hasTerminalResolutionOutcome(decision) else {
+          return .unchanged
+        }
+        guard decision.statusRaw != Status.resolved else {
+          return .unchanged
+        }
+        return upsertResult(
+          draft,
+          for: decision,
+          reopen: shouldReopen(decision, now: now())
+        )
+      }
+      return .inserted
+    }
+  }
+
   nonisolated public func openDecisions() async throws -> [Decision] {
     try withReadContext { context in
       let descriptor = FetchDescriptor<Decision>(
@@ -316,48 +335,57 @@ public actor DecisionStore {
     to decision: Decision,
     reopen: Bool
   ) -> UpsertResult {
-    var changed = false
-    var reopened = false
+    let result = upsertResult(draft, for: decision, reopen: reopen)
+    guard result != .unchanged else {
+      return .unchanged
+    }
     if decision.severityRaw != draft.severity.rawValue {
       decision.severityRaw = draft.severity.rawValue
-      changed = true
     }
     if decision.ruleID != draft.ruleID {
       decision.ruleID = draft.ruleID
-      changed = true
     }
     if decision.sessionID != draft.sessionID {
       decision.sessionID = draft.sessionID
-      changed = true
     }
     if decision.agentID != draft.agentID {
       decision.agentID = draft.agentID
-      changed = true
     }
     if decision.taskID != draft.taskID {
       decision.taskID = draft.taskID
-      changed = true
     }
     if decision.summary != draft.summary {
       decision.summary = draft.summary
-      changed = true
     }
     if decision.contextJSON != draft.contextJSON {
       decision.contextJSON = draft.contextJSON
-      changed = true
     }
     if decision.suggestedActionsJSON != draft.suggestedActionsJSON {
       decision.suggestedActionsJSON = draft.suggestedActionsJSON
-      changed = true
     }
-    if reopen, decision.statusRaw != Status.open, !hasTerminalResolutionOutcome(decision) {
+    if result == .reopened {
       decision.statusRaw = Status.open
       decision.snoozedUntil = nil
       decision.resolutionJSON = nil
-      reopened = true
-      changed = true
     }
-    if reopened {
+    return result
+  }
+
+  nonisolated private func upsertResult(
+    _ draft: DecisionDraft,
+    for decision: Decision,
+    reopen: Bool
+  ) -> UpsertResult {
+    let changed =
+      decision.severityRaw != draft.severity.rawValue
+      || decision.ruleID != draft.ruleID
+      || decision.sessionID != draft.sessionID
+      || decision.agentID != draft.agentID
+      || decision.taskID != draft.taskID
+      || decision.summary != draft.summary
+      || decision.contextJSON != draft.contextJSON
+      || decision.suggestedActionsJSON != draft.suggestedActionsJSON
+    if reopen && decision.statusRaw != Status.open {
       return .reopened
     }
     return changed ? .updated : .unchanged

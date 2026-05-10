@@ -40,6 +40,7 @@ extension PolicyExecutorTests {
   func testQueueDecisionUpdatesExistingDecisionWithoutDuplicateNotification() async throws {
     let api = FakeAPIClient()
     let store = try DecisionStore.makeInMemory()
+    let audit = InMemoryAuditWriter()
     try await store.insert(
       DecisionDraft(
         id: "d1",
@@ -53,9 +54,9 @@ extension PolicyExecutorTests {
         suggestedActionsJSON: "[]"
       )
     )
-    let exec = PolicyExecutor(api: api, decisions: store, audit: InMemoryAuditWriter())
+    let exec = PolicyExecutor(api: api, decisions: store, audit: audit)
 
-    _ = await exec.execute(
+    let outcome = await exec.execute(
       .queueDecision(
         .init(
           id: "d1",
@@ -71,10 +72,60 @@ extension PolicyExecutorTests {
       )
     )
 
+    guard case .executed = outcome else {
+      XCTFail("updated open decision should execute, got \(outcome)")
+      return
+    }
     let decision = try await store.decision(id: "d1")
     XCTAssertEqual(decision?.summary, "new summary")
     XCTAssertEqual(decision?.agentID, "a1")
     XCTAssertTrue(api.notifyCalls.isEmpty)
+    let events = await audit.snapshot()
+    XCTAssertEqual(events.map(\.kind), ["actionDispatched", "actionExecuted"])
+  }
+
+  func testQueueDecisionStableOpenReplayAfterCooldownSkipsAudit() async throws {
+    let api = FakeAPIClient()
+    let clock = TestClock()
+    let store = try DecisionStore.makeInMemory(now: { clock.now() })
+    let audit = InMemoryAuditWriter()
+    let exec = PolicyExecutor(
+      api: api,
+      decisions: store,
+      audit: audit,
+      clock: clock,
+      cooldown: 1
+    )
+    let action = PolicyAction.queueDecision(
+      .init(
+        id: "idle-session:s1",
+        severity: .warn,
+        ruleID: "idle-session",
+        sessionID: "s1",
+        agentID: "a1",
+        taskID: nil,
+        summary: "Session s1 has had no activity for over 600s.",
+        contextJSON: #"{"agentID":"a1","sessionID":"s1"}"#,
+        suggestedActionsJSON: "[]"
+      )
+    )
+
+    let first = await exec.execute(action)
+    await clock.advance(by: .seconds(2))
+    let replay = await exec.execute(action)
+
+    guard case .executed = first else {
+      XCTFail("first queueDecision should execute, got \(first)")
+      return
+    }
+    guard case .skippedDuplicate(let key) = replay else {
+      XCTFail("stable open replay should skip after cooldown, got \(replay)")
+      return
+    }
+    XCTAssertEqual(key, action.actionKey)
+    let events = await audit.snapshot()
+    XCTAssertEqual(events.map(\.kind), ["actionDispatched", "actionExecuted"])
+    XCTAssertEqual(api.notifyCalls.map(\.decisionID), ["idle-session:s1"])
   }
 
   func testQueueDecisionReopensDismissedDecisionAndNotifies() async throws {
