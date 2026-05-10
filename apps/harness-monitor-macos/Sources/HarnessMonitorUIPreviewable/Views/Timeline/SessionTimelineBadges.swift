@@ -1,8 +1,8 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct SessionTimelineBadge: View {
-  enum Style {
+struct SessionTimelineBadge: View, Equatable {
+  enum Style: Equatable {
     case quiet
     case prominent
   }
