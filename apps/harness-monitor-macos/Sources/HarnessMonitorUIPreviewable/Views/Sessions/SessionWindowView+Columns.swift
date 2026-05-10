@@ -122,6 +122,7 @@ extension SessionWindowView {
         snapshot: snapshot,
         sessionCodexRuns: sessionCodexRuns,
         decisions: matchingDecisions,
+        statusModel: sessionStatusSummaryModel,
         state: stateCache
       )
       .navigationSplitViewColumnWidth(min: 190, ideal: sidebarWidth, max: 360)

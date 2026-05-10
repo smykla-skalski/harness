@@ -6,6 +6,7 @@ struct SessionSidebar: View {
   let snapshot: HarnessMonitorSessionWindowSnapshot?
   let sessionCodexRuns: [CodexRunSnapshot]
   let decisions: [Decision]
+  let statusModel: SessionStatusSummaryModel
   @Bindable var state: SessionWindowStateCache
   @Environment(\.harnessTextSizeIndex)
   private var textSizeIndex
@@ -14,6 +15,22 @@ struct SessionSidebar: View {
   @State private var currentModifiers: EventModifiers = []
   @State private var selectionDispatcher = SessionSidebarSelectionDispatcher()
   @State private var listSelection: Set<SessionSelection> = []
+
+  init(
+    store: HarnessMonitorStore,
+    snapshot: HarnessMonitorSessionWindowSnapshot?,
+    sessionCodexRuns: [CodexRunSnapshot],
+    decisions: [Decision],
+    statusModel: SessionStatusSummaryModel,
+    state: SessionWindowStateCache
+  ) {
+    self.store = store
+    self.snapshot = snapshot
+    self.sessionCodexRuns = sessionCodexRuns
+    self.decisions = decisions
+    self.statusModel = statusModel
+    self.state = state
+  }
 
   var body: some View {
     List(selection: selectionBinding) {
@@ -67,6 +84,9 @@ struct SessionSidebar: View {
     }
     .accessibilityValue(decisionSelectionAccessibilityValue)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowSidebar)
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      SessionSidebarFooter(model: statusModel)
+    }
   }
 
   private var sidebarRowSize: SidebarRowSize {

@@ -27,24 +27,43 @@ struct ToolbarTitleScalingContractTests {
     #expect(!sessionRootSource.contains(".navigationTitle(windowTitle)"))
   }
 
-  @Test("Session toolbar uses a static centerpiece and leaves glass to the system toolbar")
-  func sessionToolbarUsesStaticCenterpieceAndSystemToolbarGlass() throws {
-    let sessionSource = try previewableSourceFile(
+  @Test("Session status lives in the sidebar footer and uses a compact focus-mode fallback")
+  func sessionStatusLivesInSidebarFooterAndUsesCompactFocusModeFallback() throws {
+    let toolbarSource = try previewableSourceFile(
       named: "Views/Sessions/SessionWindowToolbar.swift"
     )
+    let sidebarSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionSidebar.swift"
+    )
+    let footerSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionSidebarFooter.swift"
+    )
 
-    #expect(sessionSource.contains("SessionToolbarCenterpiece("))
-    #expect(sessionSource.contains("SessionToolbarCenterpieceStatusStripState("))
-    #expect(sessionSource.contains("SessionToolbarCenterpieceSourceIcon(source: source)"))
-    #expect(sessionSource.contains("Spacer(minLength: 0)"))
-    #expect(sessionSource.contains("SessionToolbarCenterpieceStatusStrip("))
-    #expect(sessionSource.contains("SessionToolbarCenterpieceSeparator()"))
-    #expect(sessionSource.contains("ConnectionToolbarBadge(metrics: metrics)"))
-    #expect(!sessionSource.contains("HarnessMonitorGlassControlGroup"))
-    #expect(!sessionSource.contains("harnessFloatingControlGlass"))
-    #expect(!sessionSource.contains("Menu {"))
-    #expect(!sessionSource.contains(".buttonStyle(.glass)"))
-    #expect(!sessionSource.contains(".buttonStyle(.glassProminent)"))
+    #expect(sidebarSource.contains(".safeAreaInset(edge: .bottom, spacing: 0)"))
+    #expect(sidebarSource.contains("SessionSidebarFooter(model: statusModel)"))
+    #expect(footerSource.contains("struct SessionSidebarFooter"))
+    #expect(footerSource.contains("struct SessionToolbarStatusFallback"))
+    #expect(footerSource.contains("SessionStatusStripState"))
+    #expect(footerSource.contains("SessionStatusSourceIcon(source: source)"))
+    #expect(footerSource.contains("Spacer(minLength: 0)"))
+    #expect(footerSource.contains("SessionStatusStrip("))
+    #expect(footerSource.contains("SessionStatusSeparator()"))
+    #expect(footerSource.contains("ConnectionToolbarBadge(metrics: metrics)"))
+    #expect(footerSource.contains(".padding(.horizontal, footerOuterPadding)"))
+    #expect(footerSource.contains(".padding(.bottom, footerOuterPadding)"))
+    #expect(
+      footerSource.contains(
+        "RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)"
+      )
+    )
+    #expect(toolbarSource.contains("SessionToolbarStatusFallback(model: focusModeStatusModel)"))
+    #expect(!toolbarSource.contains("SessionToolbarCenterpiece("))
+    #expect(!footerSource.contains("Divider()"))
+    #expect(!footerSource.contains("HarnessMonitorGlassControlGroup"))
+    #expect(!footerSource.contains("harnessFloatingControlGlass"))
+    #expect(!footerSource.contains("Menu {"))
+    #expect(!footerSource.contains(".buttonStyle(.glass)"))
+    #expect(!footerSource.contains(".buttonStyle(.glassProminent)"))
   }
 
   @Test("Connection toolbar badge keeps compact text with the static status dot last")

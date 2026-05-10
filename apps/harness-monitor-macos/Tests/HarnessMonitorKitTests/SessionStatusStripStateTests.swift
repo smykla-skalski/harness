@@ -4,11 +4,11 @@ import Testing
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
-@Suite("SessionToolbarCenterpieceStatusStripState")
-struct SessionToolbarCenterpieceStatusStripStateTests {
+@Suite("SessionStatusStripState")
+struct SessionStatusStripStateTests {
   @Test("Managed daemon shows stopped bridge and unavailable MCP by default")
   func managedDaemonShowsStoppedBridgeAndUnavailableMCP() {
-    let state = SessionToolbarCenterpieceStatusStripState(
+    let state = SessionStatusStripState(
       daemonOwnership: .managed,
       bridgeRunning: false,
       mcpStatus: HarnessMonitorMCPStatusSnapshot(
@@ -28,7 +28,7 @@ struct SessionToolbarCenterpieceStatusStripStateTests {
 
   @Test("Healthy managed daemon shows green BRIDGE and MCP")
   func healthyManagedDaemonShowsSuccessTokens() {
-    let state = SessionToolbarCenterpieceStatusStripState(
+    let state = SessionStatusStripState(
       daemonOwnership: .managed,
       bridgeRunning: true,
       mcpStatus: HarnessMonitorMCPStatusSnapshot(
@@ -45,7 +45,7 @@ struct SessionToolbarCenterpieceStatusStripStateTests {
 
   @Test("External daemon hides BRIDGE and separator")
   func externalDaemonHidesBridge() {
-    let state = SessionToolbarCenterpieceStatusStripState(
+    let state = SessionStatusStripState(
       daemonOwnership: .external,
       bridgeRunning: true,
       mcpStatus: HarnessMonitorMCPStatusSnapshot(
@@ -63,7 +63,7 @@ struct SessionToolbarCenterpieceStatusStripStateTests {
 
   @Test("Disabled MCP setting hides MCP and separator")
   func disabledMCPSettingHidesMCPAndSeparator() {
-    let state = SessionToolbarCenterpieceStatusStripState(
+    let state = SessionStatusStripState(
       daemonOwnership: .managed,
       bridgeRunning: true,
       mcpStatus: HarnessMonitorMCPStatusSnapshot(

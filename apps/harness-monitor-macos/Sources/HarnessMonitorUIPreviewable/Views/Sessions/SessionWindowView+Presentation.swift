@@ -178,6 +178,7 @@ extension SessionWindowView {
     SessionWindowToolbar(
       store: store,
       model: sessionToolbarModel,
+      focusModeStatusModel: focusMode ? sessionStatusSummaryModel : nil,
       state: stateCache,
       focusMode: focusModeBinding
     )
@@ -185,6 +186,16 @@ extension SessionWindowView {
 
   var sessionToolbarModel: SessionWindowToolbarModel {
     let toolbar = store.contentUI.toolbar
+    return SessionWindowToolbarModel(
+      canNavigateBack: toolbar.canNavigateBack,
+      canNavigateForward: toolbar.canNavigateForward,
+      sleepPreventionPresentation: SleepPreventionToolbarPresentation(
+        isEnabled: toolbar.sleepPreventionEnabled
+      )
+    )
+  }
+
+  var sessionStatusSummaryModel: SessionStatusSummaryModel {
     let chrome = store.contentUI.chrome
     let metrics = store.connectionMetrics
     let sourceTitle: String =
@@ -195,7 +206,7 @@ extension SessionWindowView {
       } else {
         snapshot?.source.rawValue.capitalized ?? "Loading"
       }
-    let sourceTint: SessionToolbarSourceTint =
+    let sourceTint: SessionStatusSourceTint =
       if isLoading || snapshot?.source == nil {
         .tertiary
       } else {
@@ -216,17 +227,12 @@ extension SessionWindowView {
       } else {
         "Connection: \(connectionTitle)"
       }
-    return SessionWindowToolbarModel(
-      canNavigateBack: toolbar.canNavigateBack,
-      canNavigateForward: toolbar.canNavigateForward,
-      sleepPreventionPresentation: SleepPreventionToolbarPresentation(
-        isEnabled: toolbar.sleepPreventionEnabled
-      ),
-      connectionMetrics: metrics,
+    return SessionStatusSummaryModel(
+      metrics: metrics,
       sourceTitle: sourceTitle,
       sourceSystemImage: sourceSystemImage,
       sourceTint: sourceTint,
-      statusStripState: SessionToolbarCenterpieceStatusStripState(
+      statusStripState: SessionStatusStripState(
         daemonOwnership: store.daemonOwnership,
         bridgeRunning: store.daemonStatus?.manifest?.hostBridge.running == true,
         mcpStatus: chrome.mcpStatus,

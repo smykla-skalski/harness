@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-enum SessionToolbarCenterpieceStatusTone: Equatable {
+enum SessionStatusTone: Equatable {
   case success
   case muted
 
@@ -15,16 +15,16 @@ enum SessionToolbarCenterpieceStatusTone: Equatable {
   }
 }
 
-struct SessionToolbarCenterpieceStatusToken: Equatable {
+struct SessionStatusToken: Equatable {
   let label: String
-  let tone: SessionToolbarCenterpieceStatusTone
+  let tone: SessionStatusTone
   let accessibilityValue: String
   let help: String
 }
 
-struct SessionToolbarCenterpieceStatusStripState: Equatable {
-  let bridge: SessionToolbarCenterpieceStatusToken?
-  let mcp: SessionToolbarCenterpieceStatusToken?
+struct SessionStatusStripState: Equatable {
+  let bridge: SessionStatusToken?
+  let mcp: SessionStatusToken?
 
   init(
     daemonOwnership: DaemonOwnership,
@@ -33,7 +33,7 @@ struct SessionToolbarCenterpieceStatusStripState: Equatable {
     isMCPRegistryHostEnabled: Bool
   ) {
     if daemonOwnership == .managed {
-      bridge = SessionToolbarCenterpieceStatusToken(
+      bridge = SessionStatusToken(
         label: "BRIDGE",
         tone: bridgeRunning ? .success : .muted,
         accessibilityValue: bridgeRunning ? "Host bridge running" : "Host bridge stopped",
@@ -50,7 +50,7 @@ struct SessionToolbarCenterpieceStatusStripState: Equatable {
       } else {
         isMCPReady = false
       }
-      mcp = SessionToolbarCenterpieceStatusToken(
+      mcp = SessionStatusToken(
         label: "MCP",
         tone: isMCPReady ? .success : .muted,
         accessibilityValue: isMCPReady ? "MCP ready" : "MCP unavailable",
