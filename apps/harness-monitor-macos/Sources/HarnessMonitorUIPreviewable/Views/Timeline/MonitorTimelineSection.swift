@@ -88,10 +88,10 @@ struct SessionTimelineView: View {
         refreshStoredFilterDefaults()
       }
       .onChange(of: filters) { _, newValue in
-        persistFilters(newValue)
+        persistFilters(normalizedFilters(newValue))
       }
       .onChange(of: filterPersistenceModeRawValue) { _, _ in
-        persistFilters(filters)
+        persistFilters(normalizedFilters(filters))
       }
       .modifier(SessionTimelineSearchMirror(filterQuery: $filters.query))
   }
@@ -114,7 +114,7 @@ struct SessionTimelineView: View {
       lastDecisionID: decisions.last?.id,
       signalCount: store.selectedSessionSignals.count,
       isTimelineLoading: isTimelineLoading,
-      filterSignature: filters.signature,
+      filterSignature: normalizedFilters(filters).signature,
       reduceMotion: reduceMotion,
       textSizeIndex: textSizeIndex,
       dateTimeConfiguration: dateTimeConfiguration
@@ -150,6 +150,19 @@ struct SessionTimelineView: View {
 
   private var routeMetrics: SessionWindowRouteContentMetrics {
     SessionWindowRouteContentMetrics(fontScale: fontScale)
+  }
+
+  private var routePageTopPadding: CGFloat {
+    max(
+      HarnessMonitorTheme.spacingSM,
+      min(routeMetrics.contentPadding * 0.5, HarnessMonitorTheme.spacingLG)
+    )
+  }
+
+  private func normalizedFilters(_ state: SessionTimelineFilterState) -> SessionTimelineFilterState {
+    var copy = state
+    copy.searchScope = .all
+    return copy
   }
 
   @MainActor
@@ -198,7 +211,7 @@ struct SessionTimelineView: View {
       timelineWindow: timelineWindow,
       decisions: decisions,
       signals: store.selectedSessionSignals,
-      filters: filters,
+      filters: normalizedFilters(filters),
       isTimelineLoading: isTimelineLoading,
       reduceMotion: reduceMotion,
       textSizeIndex: textSizeIndex,
@@ -236,9 +249,33 @@ struct SessionTimelineView: View {
 
   private func routePageContent(for presentation: SessionTimelineSectionPresentation) -> some View {
     VStack(alignment: .leading, spacing: routeMetrics.overviewSpacing) {
-      Text("Timeline")
-        .scaledFont(.system(.title2, design: .rounded, weight: .semibold))
-        .accessibilityAddTraits(.isHeader)
+      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
+        Text("Timeline")
+          .scaledFont(.system(.title2, design: .rounded, weight: .semibold))
+          .accessibilityAddTraits(.isHeader)
+
+        Spacer(minLength: HarnessMonitorTheme.spacingLG)
+
+        if !presentation.showsEmptyState {
+          HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM * 2) {
+            SessionTimelineFilterActionButtons(
+              filters: $filters,
+              inventory: presentation.filterSnapshot.inventory,
+              showsClearButton: false
+            )
+            if presentation.navigation.showsNavigation {
+              SessionTimelineNavigationButtonRow(
+                presentation: presentation,
+                scrollCommandTargetID: scrollCommand?.targetID,
+                viewport: viewport,
+                performAction: { action in
+                  performNavigationAction(action, presentation: presentation)
+                }
+              )
+            }
+          }
+        }
+      }
 
       if presentation.showsEmptyState {
         ContentUnavailableView(
@@ -251,7 +288,8 @@ struct SessionTimelineView: View {
         SessionTimelineFilterControls(
           filters: $filters,
           inventory: presentation.filterSnapshot.inventory,
-          summary: presentation.filterSnapshot.summary
+          summary: presentation.filterSnapshot.summary,
+          layout: .chipsOnly
         )
 
         routeTimelineContent(for: presentation)
@@ -265,12 +303,15 @@ struct SessionTimelineView: View {
             viewport: viewport,
             performAction: { action in
               performNavigationAction(action, presentation: presentation)
-            }
+            },
+            showsButtons: false
           )
         }
       }
     }
-    .padding(routeMetrics.contentPadding)
+    .padding(.horizontal, routeMetrics.contentPadding)
+    .padding(.bottom, routeMetrics.contentPadding)
+    .padding(.top, routePageTopPadding)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .timelineLifecycle(for: presentation, host: self)
   }

@@ -147,15 +147,18 @@ struct SessionTimelineNavigationControls: View {
   let scrollCommandTargetID: String?
   let viewport: SessionTimelineViewportModel
   let performAction: (SessionTimelineWindowAction) -> Void
+  var showsButtons: Bool = true
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      SessionTimelineNavigationButtonRow(
-        presentation: presentation,
-        scrollCommandTargetID: scrollCommandTargetID,
-        viewport: viewport,
-        performAction: performAction
-      )
+      if showsButtons {
+        SessionTimelineNavigationButtonRow(
+          presentation: presentation,
+          scrollCommandTargetID: scrollCommandTargetID,
+          viewport: viewport,
+          performAction: performAction
+        )
+      }
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
         statusLabel
         SessionTimelineNavigationVisibilityDetail(
@@ -232,7 +235,7 @@ private struct SessionTimelineNavigationVisibilityDetail: View {
   }
 }
 
-private struct SessionTimelineNavigationButtonRow: View {
+struct SessionTimelineNavigationButtonRow: View {
   let presentation: SessionTimelineSectionPresentation
   let scrollCommandTargetID: String?
   let viewport: SessionTimelineViewportModel

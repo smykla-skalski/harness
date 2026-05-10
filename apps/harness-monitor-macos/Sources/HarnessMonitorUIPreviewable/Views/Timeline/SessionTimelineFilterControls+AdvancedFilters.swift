@@ -74,13 +74,18 @@ struct SessionTimelineAdvancedFiltersPopover: View {
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+        HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
           Text("Filters")
             .scaledFont(.headline)
             .accessibilityAddTraits(.isHeader)
-          Text("Narrow the timeline with event details and related data.")
-            .scaledFont(.caption)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          Spacer(minLength: HarnessMonitorTheme.spacingLG)
+          Button("Clear") {
+            filters.clear()
+          }
+          .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+          .harnessNativeFormControl()
+          .disabled(filters.isEmpty)
+          .accessibilityLabel("Clear filters")
         }
         toneSection
         eventTypeSection
