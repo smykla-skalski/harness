@@ -33,7 +33,7 @@ public actor DecisionStore {
     }
   }
 
-  private enum Status {
+  enum Status {
     static let open = "open"
     static let snoozed = "snoozed"
     static let resolved = "resolved"
