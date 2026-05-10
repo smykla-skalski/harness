@@ -172,6 +172,18 @@ extension HarnessMonitorStore {
       self.pendingConfirmation = nil
     }
 
+    if await handlePendingSessionConfirmation(pendingConfirmation) {
+      return
+    }
+    if await handlePendingTaskConfirmation(pendingConfirmation) {
+      return
+    }
+    await handlePendingAgentConfirmation(pendingConfirmation)
+  }
+
+  private func handlePendingSessionConfirmation(
+    _ pendingConfirmation: PendingConfirmation
+  ) async -> Bool {
     switch pendingConfirmation {
     case .endSession(let sessionID, let actorID):
       _ = await endSession(sessionID: sessionID, actorID: actorID)
@@ -192,6 +204,16 @@ extension HarnessMonitorStore {
         ]
       )
       _ = await removeSessions(sessionIDs: sessionIDs, actorID: actorID)
+    default:
+      return false
+    }
+    return true
+  }
+
+  private func handlePendingTaskConfirmation(
+    _ pendingConfirmation: PendingConfirmation
+  ) async -> Bool {
+    switch pendingConfirmation {
     case .deleteTask(let sessionID, let taskID, _, let actorID, let noteCount):
       _ = await deleteTask(
         sessionID: sessionID,
@@ -209,6 +231,16 @@ extension HarnessMonitorStore {
         ]
       )
       _ = await deleteTasks(sessionID: sessionID, taskIDs: taskIDs, actorID: actorID)
+    default:
+      return false
+    }
+    return true
+  }
+
+  private func handlePendingAgentConfirmation(
+    _ pendingConfirmation: PendingConfirmation
+  ) async {
+    switch pendingConfirmation {
     case .removeAgent(let sessionID, let agentID, let actorID):
       _ = await removeAgent(sessionID: sessionID, agentID: agentID, actorID: actorID)
     case .removeAgents(let sessionID, let agentIDs, let actorID):
@@ -223,6 +255,8 @@ extension HarnessMonitorStore {
       _ = await removeAgents(sessionID: sessionID, agentIDs: agentIDs, actorID: actorID)
     case .interruptCodexRun(let sessionID, let runID, _):
       _ = await interruptCodexRun(sessionID: sessionID, runID: runID)
+    default:
+      break
     }
   }
 
