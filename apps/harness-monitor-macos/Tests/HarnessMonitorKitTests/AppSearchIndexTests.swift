@@ -129,22 +129,43 @@ struct AppSearchIndexTests {
 
   // MARK: Top-K cap
 
-  @Test("Per-domain cap truncates results and flags the section")
-  func perDomainCapTruncates() async {
+  @Test("Primary domain uses larger cap and flags truncation")
+  func primaryDomainUsesPrimaryCap() async {
     let index = AppSearchIndex()
     let many = (0..<25).map { makeAgent(id: "a\($0)", name: "alpha \($0)") }
     await index.reindex(agents: many)
-    let results = await index.search(query: "alpha", primary: .agents, perDomainK: 5)
+    let results = await index.search(
+      query: "alpha",
+      primary: .agents,
+      primaryK: 15,
+      fallbackK: 5
+    )
     let section = results.sections.first
-    #expect(section?.hits.count == 5)
+    #expect(section?.hits.count == 15)
     #expect(section?.truncated == true)
+  }
+
+  @Test("Non-primary domain uses fallback cap")
+  func nonPrimaryDomainUsesFallbackCap() async {
+    let index = AppSearchIndex()
+    let many = (0..<25).map { makeAgent(id: "a\($0)", name: "alpha \($0)") }
+    await index.reindex(agents: many)
+    let results = await index.search(
+      query: "alpha",
+      primary: .timeline,
+      primaryK: 15,
+      fallbackK: 5
+    )
+    let agentsSection = results.sections.first { $0.domain == .agents }
+    #expect(agentsSection?.hits.count == 5)
+    #expect(agentsSection?.truncated == true)
   }
 
   @Test("Below-cap results are not flagged as truncated")
   func belowCapNotTruncated() async {
     let index = AppSearchIndex()
     await index.reindex(agents: (0..<3).map { makeAgent(id: "a\($0)", name: "alpha \($0)") })
-    let results = await index.search(query: "alpha", primary: .agents, perDomainK: 20)
+    let results = await index.search(query: "alpha", primary: .agents)
     #expect(results.sections.first?.truncated == false)
   }
 
