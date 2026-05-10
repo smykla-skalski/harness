@@ -14,8 +14,6 @@ struct HarnessMonitorAppCommands: Commands {
   private var openWindow
   @FocusedValue(\.harnessSessionSidebarSelection)
   private var sidebarSelectionFocus
-  @FocusedBinding(\.harnessSessionSearchPresented)
-  private var sessionSearchPresented: Bool?
   let store: HarnessMonitorStore
   let displayState: CommandsDisplayState
   let textSizeIndex: Int
@@ -62,23 +60,7 @@ struct HarnessMonitorAppCommands: Commands {
       .keyboardShortcut("s", modifiers: [.command, .shift])
       .disabled(!displayState.hasSelectedSession || displayState.isSessionReadOnly)
     }
-    findCommand
     sidebarSelectionCommands
-  }
-
-  /// Find (Cmd-F) — focuses the toolbar search field on the key session
-  /// window. macOS does not auto-bind Cmd-F to `.searchable`; this menu
-  /// item flips the published `isPresented` binding (via
-  /// `@FocusedBinding`) which the host's `.onChange` then converts into a
-  /// `.searchFocused` write.
-  @CommandsBuilder private var findCommand: some Commands {
-    CommandGroup(after: .textEditing) {
-      Button("Find") {
-        sessionSearchPresented = true
-      }
-      .keyboardShortcut("f", modifiers: .command)
-      .disabled(sessionSearchPresented == nil)
-    }
   }
 
   @CommandsBuilder private var sidebarSelectionCommands: some Commands {

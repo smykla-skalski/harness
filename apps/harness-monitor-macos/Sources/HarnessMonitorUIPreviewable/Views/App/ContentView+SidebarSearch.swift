@@ -63,15 +63,6 @@ extension FocusedValues {
   @Entry public var harnessSidebarSearchFocusAction: HarnessSidebarSearchFocus?
   @Entry public var harnessSidebarVisibilityRequest: HarnessSidebarVisibilityRequest?
   @Entry public var harnessSessionRouteFocus: HarnessSessionRouteFocus?
-  /// Binding to the session window's `.searchable` `isPresented` flag.
-  ///
-  /// Exposed so a Cmd-F menu command in another scene can flip it to
-  /// `true`. SwiftUI's `.searchable` does *not* auto-bind Cmd-F on macOS;
-  /// the command must reveal the field (toggle `isPresented`) and an
-  /// `.onChange` in the host moves the actual first responder via
-  /// `.searchFocused`. The Bool form keeps this idiomatic — no dispatcher
-  /// class, just a `@FocusedBinding` consumer.
-  @Entry public var harnessSessionSearchPresented: Binding<Bool>?
 }
 
 extension View {

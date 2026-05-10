@@ -57,12 +57,13 @@ public struct AppSearchHostModifier: ViewModifier {
   }
 
   public func body(content: Content) -> some View {
-    // Cmd-F path: a menu Button in another scene flips
-    // `harnessSessionSearchPresented` to `true` via `@FocusedBinding`.
-    // SwiftUI presents/reveals the field, the `.onChange` below moves
-    // the first responder via `.searchFocused`. macOS does not auto-bind
-    // Cmd-F to `.searchable` (Apple Developer Forums thread #688679);
-    // both `isPresented` *and* `.searchFocused` writes are required.
+    // Cmd-F path: a hidden `Button` co-located with the `.searchable`
+    // owns the shortcut and writes both `isSearchPresented` and
+    // `searchFieldFocused` directly. macOS does not auto-bind Cmd-F to
+    // `.searchable` (Apple Developer Forums thread #688679); the menu
+    // command + cross-scene `@FocusedBinding` route is documented as
+    // fragile (Apple Developer Forums thread #693580). Co-locating the
+    // shortcut with its target state is the canonical pure-SwiftUI fix.
     content
       .searchable(
         text: $query,
@@ -84,19 +85,25 @@ public struct AppSearchHostModifier: ViewModifier {
           routeAction: routeAction
         )
       }
+      .background {
+        Button("Find in Session", action: focusSearchField)
+          .keyboardShortcut("f", modifiers: .command)
+          .opacity(0)
+          .accessibilityHidden(true)
+      }
       .task(id: AppSearchTrigger(query: query, scope: scope)) {
         await runDebouncedSearch(for: query, scope: scope)
-      }
-      .onChange(of: isSearchPresented) { _, presented in
-        if presented {
-          searchFieldFocused = true
-        }
       }
       .onChange(of: model.results.totalHitCount) { _, newValue in
         announceResults(totalHitCount: newValue)
       }
-      .focusedSceneValue(\.harnessSessionSearchPresented, $isSearchPresented)
       .environment(\.appSearchModel, model)
+      .environment(\.harnessSearchActive, isSearchPresented)
+  }
+
+  private func focusSearchField() {
+    isSearchPresented = true
+    searchFieldFocused = true
   }
 
   private func runDebouncedSearch(

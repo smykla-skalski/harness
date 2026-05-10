@@ -12,10 +12,20 @@ private struct AppSearchDomainSignature: Hashable {
   let lastID: String?
 }
 
+/// Joint task-id key so re-indexing fires when the search field opens
+/// (cold start) and when an in-flight session adds new records while
+/// the user is searching.
+private struct AppSearchReindexTrigger: Hashable {
+  let active: Bool
+  let signature: AppSearchDomainSignature
+}
+
 /// Drives ``AppSearchIndex`` re-indexing from the four session-window
-/// data sources. Each domain's `.task(id: signature)` cancels and
-/// reschedules whenever its signature changes; an unchanged signature
-/// is a no-op so a scroll or selection change never triggers reindex.
+/// data sources. Each domain's `.task(id:)` cancels and reschedules
+/// whenever its signature OR the `harnessSearchActive` env value
+/// changes; reindexing is skipped when the search field is not
+/// presented so a session with thousands of incoming timeline events
+/// does not rebuild four corpora on every append.
 ///
 /// The decisions snapshot crosses the actor boundary as
 /// ``DecisionSearchProjection`` values built on the MainActor before
@@ -27,12 +37,17 @@ struct AppSearchIndexUpdater: ViewModifier {
   let tasks: [WorkItem]
   let events: [TimelineEntry]
 
+  @Environment(\.harnessSearchActive)
+  private var searchActive: Bool
+
   func body(content: Content) -> some View {
     content
-      .task(id: agentSignature) {
+      .task(id: AppSearchReindexTrigger(active: searchActive, signature: agentSignature)) {
+        guard searchActive else { return }
         await index.reindex(agents: agents)
       }
-      .task(id: decisionSignature) {
+      .task(id: AppSearchReindexTrigger(active: searchActive, signature: decisionSignature)) {
+        guard searchActive else { return }
         let projections = decisions.map { decision in
           DecisionSearchProjection(
             id: decision.id,
@@ -44,10 +59,12 @@ struct AppSearchIndexUpdater: ViewModifier {
         }
         await index.reindex(decisions: projections)
       }
-      .task(id: taskSignature) {
+      .task(id: AppSearchReindexTrigger(active: searchActive, signature: taskSignature)) {
+        guard searchActive else { return }
         await index.reindex(tasks: tasks)
       }
-      .task(id: eventSignature) {
+      .task(id: AppSearchReindexTrigger(active: searchActive, signature: eventSignature)) {
+        guard searchActive else { return }
         await index.reindex(events: events)
       }
   }
