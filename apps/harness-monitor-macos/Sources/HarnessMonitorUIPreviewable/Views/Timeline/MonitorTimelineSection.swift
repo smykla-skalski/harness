@@ -31,7 +31,7 @@ struct SessionTimelineView: View {
   @State private var scrollCommandGeneration = 0
   @State private var pendingNavigationAfterLoad: SessionTimelinePendingNavigation?
   @State private var pendingNavigationGeneration = 0
-  @State private var pendingEdgeLoadAction: SessionTimelineWindowAction?
+  @State private var pendingEdgeLoad: SessionTimelinePendingEdgeLoad?
   @State private var cachedPresentation = SessionTimelineSectionPresentation.empty
   @State private var cachedPresentationInput = SessionTimelinePresentationInput.empty
   @State private var viewport = SessionTimelineViewportModel()
@@ -358,10 +358,6 @@ struct SessionTimelineView: View {
     }
   }
 
-  var timelineNavigationAnchorID: String? {
-    viewport.visibleAnchorID ?? scrollCommand?.targetID
-  }
-
   var currentTimelineScrollCommand: SessionTimelineScrollCommand? {
     get { scrollCommand }
     nonmutating set { scrollCommand = newValue }
@@ -382,9 +378,9 @@ struct SessionTimelineView: View {
     nonmutating set { pendingNavigationGeneration = newValue }
   }
 
-  var currentPendingEdgeLoadAction: SessionTimelineWindowAction? {
-    get { pendingEdgeLoadAction }
-    nonmutating set { pendingEdgeLoadAction = newValue }
+  var currentPendingEdgeLoad: SessionTimelinePendingEdgeLoad? {
+    get { pendingEdgeLoad }
+    nonmutating set { pendingEdgeLoad = newValue }
   }
 
   var timelineViewport: SessionTimelineViewportModel {

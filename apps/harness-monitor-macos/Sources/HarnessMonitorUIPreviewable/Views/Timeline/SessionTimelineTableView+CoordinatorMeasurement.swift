@@ -208,6 +208,7 @@ extension SessionTimelineTableView.Coordinator {
     if isPinnedToLatestViewport() {
       _ = normalizePinnedLatestViewportIfNeeded()
     }
+    boundsDidChange()
   }
 
   private func changedIndexesAffectVisibleRows(_ changedIndexes: IndexSet) -> Bool {

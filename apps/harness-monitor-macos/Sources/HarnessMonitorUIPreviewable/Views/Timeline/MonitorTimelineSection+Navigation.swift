@@ -3,11 +3,11 @@ import SwiftUI
 
 extension SessionTimelineView {
   // navigationAnchorID is read only from non-body code paths (async Tasks
-  // and onChange/onAppear closures). Reading viewport.visibleAnchorID here
-  // therefore does NOT register a SwiftUI body dependency on the model and
+  // and onChange/onAppear closures). Reading the viewport's unobserved current
+  // anchor here does NOT register a SwiftUI body dependency on the model and
   // does not re-introduce the per-scroll re-eval loop.
   var navigationAnchorID: String? {
-    timelineNavigationAnchorID
+    timelineViewport.currentVisibleAnchorID() ?? currentTimelineScrollCommand?.targetID
   }
 
   func requestLatestWindowIfNeeded(_ presentation: SessionTimelineSectionPresentation) {
@@ -48,11 +48,16 @@ extension SessionTimelineView {
       return false
     }
     guard !isTimelineLoading else {
-      currentPendingEdgeLoadAction = .older
+      markPendingEdgeLoad(.older, presentation: presentation)
       return false
     }
     clearPendingEdgeLoadIfNeeded(.older)
-    Task { await loadOlderTimelineChunk(limit: limit) }
+    Task {
+      await loadOlderTimelineChunk(limit: limit)
+      await MainActor.run {
+        markPendingEdgeLoad(.older, presentation: presentation)
+      }
+    }
     return true
   }
 
@@ -93,20 +98,38 @@ extension SessionTimelineView {
     }
     guard !isTimelineLoading else {
       if deferIfLoading {
-        currentPendingEdgeLoadAction = action
+        markPendingEdgeLoad(action, presentation: presentation)
       }
       return false
     }
     clearPendingEdgeLoadIfNeeded(action)
-    Task { await loadWindow(request) }
+    Task {
+      await loadWindow(request)
+      if deferIfLoading {
+        await MainActor.run {
+          markPendingEdgeLoad(action, presentation: presentation)
+        }
+      }
+    }
     return true
   }
 
   @MainActor
   func retryPendingEdgeLoadIfNeeded(for presentation: SessionTimelineSectionPresentation) {
-    guard let action = currentPendingEdgeLoadAction, !isTimelineLoading else {
+    guard let pendingLoad = currentPendingEdgeLoad, !isTimelineLoading else {
       return
     }
+    guard pendingLoad.didAdvance(sessionID: sessionID, navigation: presentation.navigation) else {
+      if pendingLoad.isWaitingForFreshPresentation(
+        sessionID: sessionID,
+        navigation: presentation.navigation
+      ) {
+        return
+      }
+      currentPendingEdgeLoad = nil
+      return
+    }
+    let action = pendingLoad.action
     let isStillNearEdge =
       switch action {
       case .older:
@@ -117,7 +140,7 @@ extension SessionTimelineView {
         timelineViewport.isNearTopScrollEdge()
       }
     guard isStillNearEdge else {
-      currentPendingEdgeLoadAction = nil
+      currentPendingEdgeLoad = nil
       return
     }
     let limit = SessionTimelineEdgeLoadPolicy.retryLimit(
@@ -128,21 +151,34 @@ extension SessionTimelineView {
     case .older:
       requestOlderWindowIfNeeded(presentation, limit: limit)
     case .latest:
-      currentPendingEdgeLoadAction = nil
+      currentPendingEdgeLoad = nil
     case .newer:
       requestWindowIfNeeded(
         for: .newer,
         presentation: presentation,
         limit: limit,
-        deferIfLoading: false
+        deferIfLoading: true
       )
     }
   }
 
   @MainActor
+  private func markPendingEdgeLoad(
+    _ action: SessionTimelineWindowAction,
+    presentation: SessionTimelineSectionPresentation
+  ) {
+    currentPendingEdgeLoad = SessionTimelinePendingEdgeLoad(
+      sessionID: sessionID,
+      action: action,
+      baselineWindowStart: presentation.navigation.windowStart,
+      baselineWindowEnd: presentation.navigation.windowEnd
+    )
+  }
+
+  @MainActor
   private func clearPendingEdgeLoadIfNeeded(_ action: SessionTimelineWindowAction) {
-    if currentPendingEdgeLoadAction == action {
-      currentPendingEdgeLoadAction = nil
+    if currentPendingEdgeLoad?.action == action {
+      currentPendingEdgeLoad = nil
     }
   }
 
@@ -151,7 +187,7 @@ extension SessionTimelineView {
   ) -> SessionTimelineEdgeLoadContext {
     SessionTimelineEdgeLoadContext(
       navigation: presentation.navigation,
-      visibleRowCount: timelineViewport.visibilityStats.visibleRowCount,
+      visibleRowCount: timelineViewport.currentVisibleRowCount(),
       fallbackVisibleRowCount: presentation.fallbackVisibleRowCount
     )
   }

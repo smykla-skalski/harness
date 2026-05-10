@@ -229,11 +229,11 @@ extension SessionTimelineTableView.Coordinator {
     previousAnchor: SessionTimelineTableAnchor?
   ) {
     if !hasUnfulfilledScrollCommand && normalizePinnedLatestViewportIfNeeded() {
-      boundsDidChange()
+      boundsDidChange(forceObservedStats: true)
       return
     }
     if wasPinnedToLatest && !hasUnfulfilledScrollCommand {
-      boundsDidChange()
+      boundsDidChange(forceObservedStats: true)
       return
     }
     restore(anchor: previousAnchor)
@@ -290,76 +290,6 @@ extension SessionTimelineTableView.Coordinator {
 
   func tableView(_: NSTableView, shouldSelectRow _: Int) -> Bool {
     false
-  }
-
-  func boundsDidChange() {
-    refreshColumnWidthFromScrollViewIfNeeded()
-    guard !pendingPublish else { return }
-    pendingPublish = true
-    Task { @MainActor [weak self] in
-      guard let self else { return }
-      self.pendingPublish = false
-      self.publishViewportState()
-    }
-  }
-
-  private func resizeColumn(in scrollView: NSScrollView, columnWidth: CGFloat) {
-    guard let tableView, let column = tableView.tableColumns.first else { return }
-    guard columnWidth > 1 else { return }
-    let isFirstRealWidth = lastColumnWidth <= 1
-    let widthChanged =
-      !isFirstRealWidth && abs(columnWidth - lastColumnWidth) > Self.widthEqualityTolerance
-    if column.width != columnWidth {
-      column.width = columnWidth
-    }
-    guard isFirstRealWidth || widthChanged else { return }
-    lastColumnWidth = columnWidth
-    cancelMeasurement(reason: widthChanged ? "width_changed" : "first_real_width")
-    performWithoutTableAnimation {
-      tableView.noteHeightOfRows(withIndexesChanged: IndexSet(0..<rows.count))
-    }
-    scheduleIncrementalMeasurement(columnWidth: columnWidth)
-  }
-
-  private func resolvedColumnWidth(for request: SessionTimelineTableView.UpdateRequest) -> CGFloat {
-    if lastColumnWidth <= 1 {
-      request.scrollView.layoutSubtreeIfNeeded()
-    }
-    return SessionTimelineTableMetrics.resolvedColumnWidth(
-      proposedWidth: request.columnWidth,
-      visibleContentWidth: request.scrollView.contentSize.width
-    )
-  }
-
-  private func applyWidthOnlyUpdateIfNeeded(columnWidth: CGFloat) {
-    guard columnWidth > 1, let tableView, let column = tableView.tableColumns.first else {
-      return
-    }
-    guard abs(columnWidth - lastColumnWidth) >= Self.widthEqualityTolerance else {
-      return
-    }
-    if column.width != columnWidth {
-      column.width = columnWidth
-    }
-    lastColumnWidth = columnWidth
-    scheduleIncrementalMeasurement(
-      columnWidth: columnWidth,
-      debounceNanoseconds: Self.widthAnimationMeasurementDebounceNs
-    )
-  }
-
-  @discardableResult
-  private func refreshColumnWidthFromScrollViewIfNeeded() -> Bool {
-    guard let scrollView else {
-      return false
-    }
-    let columnWidth = SessionTimelineTableMetrics.resolvedColumnWidth(
-      proposedWidth: 0,
-      visibleContentWidth: scrollView.contentSize.width
-    )
-    let previousWidth = lastColumnWidth
-    applyWidthOnlyUpdateIfNeeded(columnWidth: columnWidth)
-    return abs(columnWidth - previousWidth) >= Self.widthEqualityTolerance
   }
 
   func scheduleIncrementalMeasurement(
