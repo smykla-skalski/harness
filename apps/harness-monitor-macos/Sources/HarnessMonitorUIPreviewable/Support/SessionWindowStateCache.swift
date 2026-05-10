@@ -11,6 +11,8 @@ public struct SessionPlainClickSignal: Equatable, Sendable {
 @Observable
 public final class SessionWindowStateCache {
   public let sessionID: String
+  public let appSearchIndex: AppSearchIndex
+  public let appSearchModel: AppSearchModel
   public var selection: SessionSelection
   public var sidebarOrdering = SessionSidebarOrderingState()
   public var sidebarSelection = SessionSidebarSelectionState()
@@ -42,6 +44,9 @@ public final class SessionWindowStateCache {
   public init(sessionID: String, selection: SessionSelection = .route(.overview)) {
     self.sessionID = sessionID
     self.selection = selection
+    let index = AppSearchIndex()
+    appSearchIndex = index
+    appSearchModel = AppSearchModel(index: index)
   }
 
   public func selectRoute(_ route: SessionWindowRoute) {

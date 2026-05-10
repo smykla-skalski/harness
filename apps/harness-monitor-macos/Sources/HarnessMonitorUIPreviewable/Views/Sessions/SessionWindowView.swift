@@ -338,6 +338,7 @@ public struct SessionWindowView: View {
       .toolbar {
         sessionToolbar
       }
+      .appSearchHost(model: stateCache.appSearchModel)
   }
 
   private var bodyContent: some View {
