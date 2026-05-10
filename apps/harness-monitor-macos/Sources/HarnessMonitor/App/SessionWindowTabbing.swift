@@ -57,6 +57,7 @@ private final class AccessorView: NSView {
     preference: .system
   )
   private var pendingTabbingTask: Task<Void, Never>?
+  private var notificationTokens: [NSObjectProtocol] = []
 
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
@@ -72,7 +73,11 @@ private final class AccessorView: NSView {
   override func viewWillMove(toWindow newWindow: NSWindow?) {
     super.viewWillMove(toWindow: newWindow)
     pendingTabbingTask?.cancel()
-    NotificationCenter.default.removeObserver(self)
+    tearDownWindowObservers()
+  }
+
+  deinit {
+    tearDownWindowObservers()
   }
 
   private func registerWindowObservers() {
@@ -84,19 +89,22 @@ private final class AccessorView: NSView {
       NSWindow.didEnterFullScreenNotification,
       NSWindow.didExitFullScreenNotification,
     ]
-    for name in names {
+    notificationTokens = names.map { name in
       center.addObserver(
-        self,
-        selector: #selector(reapplyWindowTabbingFromNotification(_:)),
-        name: name,
-        object: window
-      )
+        forName: name,
+        object: window,
+        queue: .main
+      ) { [weak self] _ in
+        Task { @MainActor [weak self] in
+          self?.scheduleWindowTabbingApplication()
+        }
+      }
     }
   }
 
-  @objc
-  private func reapplyWindowTabbingFromNotification(_ note: Notification) {
-    scheduleWindowTabbingApplication()
+  private func tearDownWindowObservers() {
+    notificationTokens.forEach(NotificationCenter.default.removeObserver)
+    notificationTokens.removeAll()
   }
 
   func scheduleWindowTabbingApplication() {

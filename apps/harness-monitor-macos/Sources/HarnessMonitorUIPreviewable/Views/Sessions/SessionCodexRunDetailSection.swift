@@ -145,13 +145,10 @@ struct SessionCodexRunDetailSection: View {
       }
     }
     .padding(metrics.terminalPadding)
-    .background(
-      .regularMaterial,
-      in: RoundedRectangle(cornerRadius: metrics.terminalCornerRadius, style: .continuous)
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: metrics.terminalCornerRadius, style: .continuous)
-        .stroke(.quaternary, lineWidth: 1)
+    .harnessFloatingControlGlass(
+      cornerRadius: metrics.terminalCornerRadius,
+      tint: nil,
+      prominence: .subdued
     )
   }
 

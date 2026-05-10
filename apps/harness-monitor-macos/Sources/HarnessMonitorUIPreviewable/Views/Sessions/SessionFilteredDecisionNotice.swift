@@ -43,21 +43,18 @@ struct SessionFilteredDecisionNotice: View {
       Button("Clear Filters") {
         filters.clear()
       }
-      .buttonStyle(.glass)
+      .harnessGlassButtonStyle()
       .tint(.secondary)
       .frame(minHeight: metrics.clearButtonMinHeight)
       .accessibilityHint("Shows the selected decision in the sidebar again.")
     }
     .padding(metrics.padding)
     .dynamicTypeSize(.xSmall ... .accessibility5)
-    .background {
-      RoundedRectangle(cornerRadius: metrics.cornerRadius, style: .continuous)
-        .fill(.regularMaterial)
-    }
-    .overlay {
-      RoundedRectangle(cornerRadius: metrics.cornerRadius, style: .continuous)
-        .stroke(.quaternary, lineWidth: 1)
-    }
+    .harnessFloatingControlGlass(
+      cornerRadius: metrics.cornerRadius,
+      tint: nil,
+      prominence: .subdued
+    )
     .accessibilityElement(children: .contain)
   }
 }
