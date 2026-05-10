@@ -223,6 +223,7 @@ private struct SessionTimelineNodeRow: View {
 
   private var kindBadge: some View {
     SessionTimelineBadge(label: node.kind.label, tint: typeTint, style: .quiet)
+      .equatable()
   }
 
   private var rightBadges: some View {
@@ -287,5 +288,6 @@ private struct SessionTimelineBadgeStrip: View {
 
   private func badgeView(_ badge: SessionTimelineStatusBadge) -> some View {
     SessionTimelineBadge(label: badge.label, tint: badge.tint, style: .prominent)
+      .equatable()
   }
 }
