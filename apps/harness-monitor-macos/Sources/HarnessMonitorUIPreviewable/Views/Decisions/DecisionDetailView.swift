@@ -160,9 +160,13 @@ public struct DecisionDetailView: View {
   }
 
   public var body: some View {
+    // The owning column already applies `.backgroundExtensionEffect()`
+    // at the detail-surface boundary. Adding another extension here
+    // duplicates the animatable glass surface — every frame of the
+    // toolbar/extension animation re-publishes through this layer too,
+    // and the cascade lands on every Text/StyledTextContent descendant.
     detailBody
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .backgroundExtensionEffect()
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.decisionDetail)
       .overlay {
