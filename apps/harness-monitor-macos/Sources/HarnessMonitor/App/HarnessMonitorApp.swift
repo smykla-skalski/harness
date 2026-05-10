@@ -250,12 +250,21 @@ struct HarnessMonitorApp: App {
   }
 
   private func scheduleInitialWindowRoutingIfNeeded(for phase: ScenePhase) {
+    _ = phase
     guard shouldHandleInitialWindowRouting else {
       return
     }
-    guard phase == .active, !hasScheduledInitialWindowRouting else {
+    guard !hasScheduledInitialWindowRouting else {
       return
     }
+    // The previous gate required `phase == .active`, but live launches set
+    // `defaultLaunchBehavior(.suppressed)` on every scene so no window opens
+    // automatically and the App-level scenePhase never advances past
+    // `.background`. That left routing parked until the user clicked the
+    // dock icon. Schedule on the first scenePhase callback regardless of
+    // value: `installMainWindowLauncherIfNeeded` runs in the same closure
+    // before us so the launcher's `openWindow` closure is captured, and the
+    // routed Task runs on MainActor where `openWindow` is valid.
     hasScheduledInitialWindowRouting = true
     Task { @MainActor in
       await routeInitialWindows()
