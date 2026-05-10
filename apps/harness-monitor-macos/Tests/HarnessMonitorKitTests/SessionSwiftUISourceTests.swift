@@ -5,7 +5,9 @@ import Testing
 
 @Suite("Session SwiftUI source contracts")
 struct SessionSwiftUISourceTests {
-  @Test("Task detail stays on the native form surface while session decisions reuse the rich shared detail")
+  @Test(
+    "Task detail stays on the native form surface while session decisions reuse the rich shared detail"
+  )
   func taskAndDecisionDetailSurfacesStayAlignedWithTheirSharedContainers() throws {
     let taskSource = try sourceFile(at: "Views/Sessions/SessionTaskDetailPane.swift")
     let decisionSource = try sourceFile(at: "Views/Sessions/SessionDecisionDetailPane.swift")
@@ -169,9 +171,12 @@ struct SessionSwiftUISourceTests {
     let agentDetailSource = try sourceFile(at: "Views/Sessions/SessionAgentDetailSection.swift")
 
     #expect(columnsSource.contains("detail: detail"))
-    #expect(columnsSource.contains("timeline: snapshot.timeline"))
+    #expect(
+      columnsSource.contains("let agentTimeline = snapshot.timelineEntriesByAgentID[agentID] ?? []")
+    )
+    #expect(columnsSource.contains("agentTimeline: agentTimeline"))
     #expect(agentDetailSource.contains("let detail: SessionDetail"))
-    #expect(agentDetailSource.contains("let timeline: [TimelineEntry]"))
+    #expect(agentDetailSource.contains("let agentTimeline: [TimelineEntry]"))
     #expect(agentDetailSource.contains("store.acpRuntimeState("))
     #expect(agentDetailSource.contains("sessionRegistrations: detail.agents"))
     #expect(agentDetailSource.contains("AgentDetailSummaryBand("))

@@ -10,6 +10,7 @@ public struct HarnessMonitorSessionWindowSnapshot: Equatable, Sendable {
   public let summary: SessionSummary
   public let detail: SessionDetail?
   public let timeline: [TimelineEntry]
+  public let timelineEntriesByAgentID: [String: [TimelineEntry]]
   public let timelineWindow: TimelineWindowResponse?
   public let source: HarnessMonitorSessionWindowSnapshotSource
 
@@ -23,7 +24,12 @@ public struct HarnessMonitorSessionWindowSnapshot: Equatable, Sendable {
     self.summary = summary
     self.detail = detail
     self.timeline = timeline
+    timelineEntriesByAgentID = timeline.partitionedByAgentID()
     self.timelineWindow = timelineWindow
     self.source = source
+  }
+
+  public func timeline(forAgent agentID: String) -> [TimelineEntry] {
+    timelineEntriesByAgentID[agentID] ?? []
   }
 }

@@ -49,6 +49,26 @@ struct HarnessMonitorStoreAgentTimelinePartitionTests {
     #expect(store.timeline(forAgent: "agent-alpha").map(\.entryId) == ["a-3", "a-1", "a-2"])
   }
 
+  @Test("session window snapshots reuse the partitioned agent slices")
+  func sessionWindowSnapshotReusesPartitionedSlices() {
+    let timeline = [
+      makeEntry(id: "a-1", agentId: "agent-alpha"),
+      makeEntry(id: "b-1", agentId: "agent-beta"),
+      makeEntry(id: "a-2", agentId: "agent-alpha"),
+    ]
+    let snapshot = HarnessMonitorSessionWindowSnapshot(
+      summary: PreviewFixtures.summary,
+      detail: nil,
+      timeline: timeline,
+      timelineWindow: nil,
+      source: .cache
+    )
+
+    #expect(snapshot.timeline(forAgent: "agent-alpha").map(\.entryId) == ["a-1", "a-2"])
+    #expect(snapshot.timeline(forAgent: "agent-beta").map(\.entryId) == ["b-1"])
+    #expect(snapshot.timeline(forAgent: "agent-missing").isEmpty)
+  }
+
   // Property check: the partition cache must agree with the linear-scan
   // reference on every agentId for any random timeline shape we hand it.
   // The linear scan IS the contract; the cache is the fast implementation.

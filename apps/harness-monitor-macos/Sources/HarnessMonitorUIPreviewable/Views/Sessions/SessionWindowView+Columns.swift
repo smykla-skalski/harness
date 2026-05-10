@@ -309,11 +309,12 @@ extension SessionWindowView {
         let detail = snapshot.detail,
         let agent = detail.agents.first(where: { $0.agentId == agentID })
       {
+        let agentTimeline = snapshot.timelineEntriesByAgentID[agentID] ?? []
         SessionAgentDetailSection(
           store: store,
           sessionID: token.sessionID,
           detail: detail,
-          timeline: snapshot.timeline,
+          agentTimeline: agentTimeline,
           agent: agent,
           tui: agentTui(for: agent),
           pendingPrompt: pendingUserPrompt(for: agent.agentId),
