@@ -66,6 +66,7 @@ struct SessionTimelineTableView: NSViewRepresentable {
   let rows: [SessionTimelineRow]
   let virtualization: SessionTimelineTableVirtualization
   let contentIdentity: SessionTimelineContentIdentity?
+  let horizontalContentInset: CGFloat
   let scrollCommand: SessionTimelineScrollCommand?
   let actionHandler: any DecisionActionHandler
   let onSignalTap: ((String) -> Void)?
@@ -74,6 +75,32 @@ struct SessionTimelineTableView: NSViewRepresentable {
   let scrollBoundaryChanged: SessionTimelineScrollBoundaryHandler
   @Environment(\.fontScale)
   private var fontScale
+
+  init(
+    columnWidth: CGFloat,
+    rows: [SessionTimelineRow],
+    virtualization: SessionTimelineTableVirtualization,
+    contentIdentity: SessionTimelineContentIdentity?,
+    horizontalContentInset: CGFloat = 0,
+    scrollCommand: SessionTimelineScrollCommand?,
+    actionHandler: any DecisionActionHandler,
+    onSignalTap: ((String) -> Void)?,
+    viewport: SessionTimelineViewportModel,
+    viewportChanged: @escaping SessionTimelineViewportHandler,
+    scrollBoundaryChanged: @escaping SessionTimelineScrollBoundaryHandler
+  ) {
+    self.columnWidth = columnWidth
+    self.rows = rows
+    self.virtualization = virtualization
+    self.contentIdentity = contentIdentity
+    self.horizontalContentInset = horizontalContentInset
+    self.scrollCommand = scrollCommand
+    self.actionHandler = actionHandler
+    self.onSignalTap = onSignalTap
+    self.viewport = viewport
+    self.viewportChanged = viewportChanged
+    self.scrollBoundaryChanged = scrollBoundaryChanged
+  }
 
   func makeCoordinator() -> Coordinator {
     Coordinator(
@@ -112,14 +139,26 @@ struct SessionTimelineTableView: NSViewRepresentable {
     tableView.delegate = context.coordinator
     tableView.dataSource = context.coordinator
 
-    scrollView.documentView = tableView
+    let documentView = SessionTimelineTableDocumentView()
+    documentView.addSubview(tableView)
+    scrollView.documentView = documentView
     scrollView.contentView.postsBoundsChangedNotifications = true
-    context.coordinator.configure(tableView: tableView, scrollView: scrollView)
+    context.coordinator.configure(
+      tableView: tableView,
+      scrollView: scrollView,
+      documentView: documentView
+    )
     return scrollView
   }
 
   func updateNSView(_ scrollView: NSScrollView, context: Context) {
-    context.coordinator.viewport = viewport
+    // Skip the viewport reassignment when the model reference matches.
+    // Closures must be reassigned each body invocation because they
+    // capture per-render presentation state; coordinator.update() does
+    // its own change-detection and short-circuits when inputs match.
+    if context.coordinator.viewport !== viewport {
+      context.coordinator.viewport = viewport
+    }
     context.coordinator.viewportChanged = viewportChanged
     context.coordinator.scrollBoundaryChanged = scrollBoundaryChanged
     context.coordinator.update(
@@ -132,6 +171,7 @@ struct SessionTimelineTableView: NSViewRepresentable {
       request: .init(
         scrollView: scrollView,
         columnWidth: columnWidth,
+        horizontalContentInset: horizontalContentInset,
         fontScale: fontScale
       )
     )
@@ -141,7 +181,7 @@ struct SessionTimelineTableView: NSViewRepresentable {
     coordinator.cancelMeasurement(reason: "dismantle")
     coordinator.cancelLiveScrollTracking()
     coordinator.persistHeightCache()
-    (scrollView.documentView as? NSTableView)?.delegate = nil
-    (scrollView.documentView as? NSTableView)?.dataSource = nil
+    coordinator.tableView?.delegate = nil
+    coordinator.tableView?.dataSource = nil
   }
 }
