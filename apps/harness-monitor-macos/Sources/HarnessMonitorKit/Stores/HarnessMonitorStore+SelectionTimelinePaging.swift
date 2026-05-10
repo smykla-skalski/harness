@@ -139,6 +139,14 @@ extension HarnessMonitorStore {
         loadedTimeline: resolvedTimeline
       )
     }
+    HarnessMonitorTimelineTrace.info(
+      """
+      store.apply_page response=\(HarnessMonitorTimelineTrace.windowSummary(response)) \
+      currentRevision=\(currentRevision ?? -1) oldLoaded=\(timeline.count) \
+      newLoaded=\(resolvedTimeline.count) \
+      resolved=\(HarnessMonitorTimelineTrace.windowSummary(resolvedTimelineWindow))
+      """
+    )
 
     withUISyncBatch {
       replaceSelectedTimelineSnapshot(
@@ -169,6 +177,13 @@ extension HarnessMonitorStore {
         TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
       })
     {
+      HarnessMonitorTimelineTrace.info(
+        """
+        store.fetch_prefix request=before:\(oldestCursor.entryId):limit=\(missingCount) \
+        session=\(sessionID) targetEnd=\(targetEnd) \
+        current=\(HarnessMonitorTimelineTrace.windowSummary(timelineWindow))
+        """
+      )
       let olderPrefix = try await Self.measureOperation {
         try await client.timelineWindow(
           sessionID: sessionID,
@@ -182,6 +197,12 @@ extension HarnessMonitorStore {
       recordRequestSuccess()
 
       if let currentRevision, olderPrefix.value.revision != currentRevision {
+        HarnessMonitorTimelineTrace.info(
+          """
+          store.fetch_prefix revision_drift current=\(currentRevision) \
+          response=\(olderPrefix.value.revision) refreshLimit=\(targetEnd)
+          """
+        )
         let refreshedPrefix = try await Self.measureOperation {
           try await client.timelineWindow(
             sessionID: sessionID,
@@ -195,6 +216,12 @@ extension HarnessMonitorStore {
       return olderPrefix.value
     }
 
+    HarnessMonitorTimelineTrace.info(
+      """
+      store.fetch_prefix request=latest:limit=\(targetEnd) session=\(sessionID) \
+      current=\(HarnessMonitorTimelineTrace.windowSummary(timelineWindow))
+      """
+    )
     let refreshedPrefix = try await Self.measureOperation {
       try await client.timelineWindow(
         sessionID: sessionID,

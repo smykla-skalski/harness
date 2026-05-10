@@ -207,11 +207,19 @@ extension SessionTimelineTableView.Coordinator {
       return
     }
     viewport?.recordScrollBoundaryState(boundaryState)
-    if boundaryState.enteredTopEdge(from: lastBoundaryState)
-      || boundaryState.enteredBottomEdge(from: lastBoundaryState)
-    {
+    let enteredTopEdge = boundaryState.enteredTopEdge(from: lastBoundaryState)
+    let enteredBottomEdge = boundaryState.enteredBottomEdge(from: lastBoundaryState)
+    if enteredTopEdge || enteredBottomEdge {
       let oldValue = lastBoundaryState
       lastBoundaryState = boundaryState
+      HarnessMonitorTimelineTrace.info(
+        """
+        viewport.edge top=\(enteredTopEdge) bottom=\(enteredBottomEdge) \
+        minY=\(Int(visibleRect.minY)) maxY=\(Int(visibleRect.maxY)) \
+        contentH=\(Int(tableView.bounds.height)) visibleRows=\(visibleRowCount) \
+        viewportRows=\(viewportRowCapacity) rows=\(rows.count)
+        """
+      )
       scrollBoundaryChanged(oldValue, boundaryState)
     } else if boundaryState.shouldTrack(from: lastBoundaryState) {
       lastBoundaryState = boundaryState
@@ -253,6 +261,7 @@ extension SessionTimelineTableView.Coordinator {
     guard abs(columnWidth - lastColumnWidth) >= Self.widthEqualityTolerance else {
       return
     }
+    cancelMeasurement(reason: "width_changed")
     if column.width != columnWidth {
       column.width = columnWidth
     }

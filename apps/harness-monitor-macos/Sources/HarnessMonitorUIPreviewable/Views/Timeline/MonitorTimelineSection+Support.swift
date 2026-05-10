@@ -29,6 +29,11 @@ struct MonitorTimelineSection: View {
   }
 }
 
+struct SessionTimelineLoading {
+  let loadOlderChunk: @MainActor (SessionTimelineSectionPresentation, Int) async -> Void
+  let loadWindow: @MainActor (TimelineWindowRequest) async -> Void
+}
+
 struct SessionTimelinePresentationInput: Equatable {
   let sessionID: String
   let timelineCount: Int
@@ -193,11 +198,22 @@ extension SessionTimelineView {
     SessionTimelineContentIdentity(sessionID: sessionID)
   }
 
-  func loadOlderTimelineChunk(limit: Int) async {
+  func loadOlderTimelineChunk(
+    presentation: SessionTimelineSectionPresentation,
+    limit: Int
+  ) async {
+    if let timelineLoading {
+      await timelineLoading.loadOlderChunk(presentation, limit)
+      return
+    }
     await store.appendSelectedTimelineOlderChunk(limit: limit)
   }
 
   func loadWindow(_ request: TimelineWindowRequest) async {
+    if let timelineLoading {
+      await timelineLoading.loadWindow(request)
+      return
+    }
     await store.loadSelectedTimelineWindow(request: request)
   }
 

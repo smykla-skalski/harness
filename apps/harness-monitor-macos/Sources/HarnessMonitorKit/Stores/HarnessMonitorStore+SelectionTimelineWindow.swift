@@ -5,11 +5,24 @@ extension HarnessMonitorStore {
     guard let sessionID = selectedSessionID, let selectedSession, connectionState == .online,
       let client
     else {
+      HarnessMonitorTimelineTrace.info(
+        """
+        store.window_skip reason=unavailable request=\(HarnessMonitorTimelineTrace.requestSummary(request)) \
+        session=\(selectedSessionID ?? "nil") selected=\(self.selectedSession != nil) \
+        state=\(String(describing: connectionState)) client=\(self.client != nil)
+        """
+      )
       return
     }
 
     let loadKey = SelectedTimelineWindowLoadKey(sessionID: sessionID, request: request)
     if let selectedTimelineWindowLoadTask, selectedTimelineWindowLoadKey == loadKey {
+      HarnessMonitorTimelineTrace.info(
+        """
+        store.window_join_existing session=\(sessionID) \
+        request=\(HarnessMonitorTimelineTrace.requestSummary(request))
+        """
+      )
       await selectedTimelineWindowLoadTask.value
       return
     }
@@ -23,6 +36,12 @@ extension HarnessMonitorStore {
     withUISyncBatch {
       isTimelineLoading = true
     }
+    HarnessMonitorTimelineTrace.info(
+      """
+      store.window_task_start session=\(sessionID) \
+      request=\(HarnessMonitorTimelineTrace.requestSummary(request))
+      """
+    )
     let task = Task { @MainActor [weak self] in
       guard let self else {
         return
@@ -36,10 +55,22 @@ extension HarnessMonitorStore {
           try await client.timelineWindow(sessionID: sessionID, request: request)
         }
         self.recordRequestSuccess()
+        HarnessMonitorTimelineTrace.info(
+          """
+          store.window_response session=\(sessionID) \
+          \(HarnessMonitorTimelineTrace.windowSummary(response.value))
+          """
+        )
         guard !Task.isCancelled else {
+          HarnessMonitorTimelineTrace.info(
+            "store.window_drop reason=cancelled session=\(sessionID)"
+          )
           return
         }
         guard self.isCurrentSelectedTimelineWindowLoad(token, key: loadKey) else {
+          HarnessMonitorTimelineTrace.info(
+            "store.window_drop reason=stale session=\(sessionID)"
+          )
           return
         }
         self.applySelectedTimelineWindowResponse(
@@ -48,6 +79,7 @@ extension HarnessMonitorStore {
           selectedSession: selectedSession
         )
       } catch is CancellationError {
+        HarnessMonitorTimelineTrace.info("store.window_cancelled session=\(sessionID)")
         return
       } catch {
         guard self.isCurrentSelectedTimelineWindowLoad(token, key: loadKey) else {
@@ -84,6 +116,13 @@ extension HarnessMonitorStore {
         response.metadataOnly,
         loadedTimeline: resolvedTimeline
       ) ?? response.metadataOnly
+    HarnessMonitorTimelineTrace.info(
+      """
+      store.apply_window response=\(HarnessMonitorTimelineTrace.windowSummary(response)) \
+      oldLoaded=\(timeline.count) newLoaded=\(resolvedTimeline.count) \
+      resolved=\(HarnessMonitorTimelineTrace.windowSummary(resolvedTimelineWindow))
+      """
+    )
 
     withUISyncBatch {
       resetToolCallTimelineBurstState()

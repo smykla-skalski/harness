@@ -112,6 +112,13 @@ extension SessionTimelineTableView.Coordinator {
     defer {
       Self.signposter.endInterval("session_timeline.update_rows_changed", updateInterval)
     }
+    HarnessMonitorTimelineTrace.info(
+      """
+      table.rows_changed oldRows=\(self.rows.count) newRows=\(rows.count) \
+      reuse=\(willReuseAny) invalidatedHeights=\(invalidatedHeightIDs.count) \
+      width=\(Int(resolvedColumnWidth))
+      """
+    )
 
     cancelMeasurement(reason: "rows_changed")
     reuseVisibleHeightsIfNeeded(

@@ -11,14 +11,12 @@ struct SessionWindowSnapshotRefreshTriggerTests {
     let baseline = SessionWindowSnapshotRefreshTrigger(
       sessionID: "sess-1",
       connectionState: .online,
-      lastPersistedSnapshotAt: Date(timeIntervalSince1970: 100),
       summaryUpdatedAt: "2026-05-09T12:00:00Z"
     )
 
     let candidate = SessionWindowSnapshotRefreshTrigger(
       sessionID: "sess-1",
       connectionState: .online,
-      lastPersistedSnapshotAt: Date(timeIntervalSince1970: 100),
       summaryUpdatedAt: "2026-05-09T12:00:00Z"
     )
 
@@ -30,37 +28,33 @@ struct SessionWindowSnapshotRefreshTriggerTests {
     let baseline = SessionWindowSnapshotRefreshTrigger(
       sessionID: "sess-1",
       connectionState: .connecting,
-      lastPersistedSnapshotAt: Date(timeIntervalSince1970: 100),
       summaryUpdatedAt: "2026-05-09T12:00:00Z"
     )
 
     let candidate = SessionWindowSnapshotRefreshTrigger(
       sessionID: "sess-1",
       connectionState: .online,
-      lastPersistedSnapshotAt: Date(timeIntervalSince1970: 100),
       summaryUpdatedAt: "2026-05-09T12:00:00Z"
     )
 
     #expect(candidate != baseline)
   }
 
-  @Test("persisted snapshot writes invalidate the trigger")
-  func persistedSnapshotWritesInvalidateTrigger() {
+  @Test("persisted snapshot writes do not invalidate the trigger")
+  func persistedSnapshotWritesDoNotInvalidateTrigger() {
     let baseline = SessionWindowSnapshotRefreshTrigger(
       sessionID: "sess-1",
       connectionState: .online,
-      lastPersistedSnapshotAt: Date(timeIntervalSince1970: 100),
       summaryUpdatedAt: "2026-05-09T12:00:00Z"
     )
 
     let candidate = SessionWindowSnapshotRefreshTrigger(
       sessionID: "sess-1",
       connectionState: .online,
-      lastPersistedSnapshotAt: Date(timeIntervalSince1970: 200),
       summaryUpdatedAt: "2026-05-09T12:00:00Z"
     )
 
-    #expect(candidate != baseline)
+    #expect(candidate == baseline)
   }
 
   @Test("catalog summary updates invalidate the trigger")
@@ -68,14 +62,12 @@ struct SessionWindowSnapshotRefreshTriggerTests {
     let baseline = SessionWindowSnapshotRefreshTrigger(
       sessionID: "sess-1",
       connectionState: .online,
-      lastPersistedSnapshotAt: Date(timeIntervalSince1970: 100),
       summaryUpdatedAt: "2026-05-09T12:00:00Z"
     )
 
     let candidate = SessionWindowSnapshotRefreshTrigger(
       sessionID: "sess-1",
       connectionState: .online,
-      lastPersistedSnapshotAt: Date(timeIntervalSince1970: 100),
       summaryUpdatedAt: "2026-05-09T12:05:00Z"
     )
 

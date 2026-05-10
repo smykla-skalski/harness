@@ -67,9 +67,12 @@ extension SessionTimelineTableView.Coordinator {
     generation: Int,
     totalOutstanding: Int
   ) async {
+    guard isMeasurementColumnWidthCurrent(columnWidth) else {
+      return
+    }
     var cursor = 0
     while cursor < outstanding.count {
-      if Task.isCancelled { return }
+      if Task.isCancelled || !isMeasurementColumnWidthCurrent(columnWidth) { return }
       let chunkInterval = Self.signposter.beginInterval(
         "session_timeline.measurement.chunk",
         id: Self.signposter.makeSignpostID(),
@@ -110,6 +113,9 @@ extension SessionTimelineTableView.Coordinator {
         }
       }
       if !changedIndexes.isEmpty {
+        guard isMeasurementColumnWidthCurrent(columnWidth) else {
+          return
+        }
         applyMeasuredHeights(changedIndexes)
       }
       let remaining = outstanding.count - cursor
@@ -120,13 +126,17 @@ extension SessionTimelineTableView.Coordinator {
       )
       await Task.yield()
     }
-    if !Task.isCancelled {
+    if !Task.isCancelled, isMeasurementColumnWidthCurrent(columnWidth) {
       completeMeasurementTask(
         generation: generation,
         totalOutstanding: totalOutstanding,
         columnWidth: columnWidth
       )
     }
+  }
+
+  func isMeasurementColumnWidthCurrent(_ columnWidth: CGFloat) -> Bool {
+    abs(columnWidth - lastColumnWidth) < Self.widthEqualityTolerance
   }
 
   func measureSynchronously(
@@ -194,38 +204,49 @@ extension SessionTimelineTableView.Coordinator {
 
   private func applyMeasuredHeights(_ changedIndexes: IndexSet) {
     guard !changedIndexes.isEmpty else { return }
-    let affectsVisibleRows = changedIndexesAffectVisibleRows(changedIndexes)
+    let viewportImpact = viewportImpact(forChangedIndexes: changedIndexes)
+    let wasPinnedToLatest = isPinnedToLatestViewport()
+    let anchor = wasPinnedToLatest ? nil : currentVisibleAnchor()
     performWithoutTableAnimation {
       tableView?.noteHeightOfRows(withIndexesChanged: changedIndexes)
-      if affectsVisibleRows {
+      if viewportImpact.affectsPosition {
         tableView?.layoutSubtreeIfNeeded()
         scrollView?.layoutSubtreeIfNeeded()
       }
     }
-    guard affectsVisibleRows else {
+    guard viewportImpact.affectsPosition else {
       return
     }
-    if isPinnedToLatestViewport() {
+    if wasPinnedToLatest {
       _ = normalizePinnedLatestViewportIfNeeded()
+      boundsDidChange(forceObservedStats: true)
+    } else {
+      restore(anchor: anchor)
     }
-    boundsDidChange()
   }
 
-  private func changedIndexesAffectVisibleRows(_ changedIndexes: IndexSet) -> Bool {
+  private func viewportImpact(forChangedIndexes changedIndexes: IndexSet) -> ViewportImpact {
     guard
       let tableView,
       let scrollView
     else {
-      return false
+      return .none
     }
     let visibleRows = tableView.rows(in: scrollView.contentView.bounds)
     guard visibleRows.location != NSNotFound, visibleRows.length > 0 else {
-      return false
+      return .none
     }
-    let visibleIndexes = IndexSet(
-      integersIn: visibleRows.location..<(visibleRows.location + visibleRows.length)
-    )
-    return !visibleIndexes.isDisjoint(with: changedIndexes)
+    let firstVisibleRow = visibleRows.location
+    let visibleUpperBound = visibleRows.location + visibleRows.length
+    for index in changedIndexes {
+      if index < visibleUpperBound {
+        return .affectsPosition
+      }
+      if index >= firstVisibleRow {
+        return .belowViewport
+      }
+    }
+    return .none
   }
 
   func visibleRowsNeedMeasurement(columnWidth: CGFloat) -> Bool {
@@ -251,5 +272,15 @@ extension SessionTimelineTableView.Coordinator {
       }
     }
     return false
+  }
+}
+
+private enum ViewportImpact {
+  case none
+  case belowViewport
+  case affectsPosition
+
+  var affectsPosition: Bool {
+    self == .affectsPosition
   }
 }

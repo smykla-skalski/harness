@@ -26,7 +26,7 @@ extension SessionTimelineView {
       return
     }
     Task {
-      await loadOlderTimelineChunk(limit: missingCount)
+      await loadOlderTimelineChunk(presentation: presentation, limit: missingCount)
     }
   }
 }

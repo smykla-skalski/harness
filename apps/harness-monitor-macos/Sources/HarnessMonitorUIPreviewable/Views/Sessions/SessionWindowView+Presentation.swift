@@ -4,7 +4,6 @@ import SwiftUI
 struct SessionWindowSnapshotRefreshTrigger: Equatable {
   let sessionID: String
   let connectionState: HarnessMonitorStore.ConnectionState
-  let lastPersistedSnapshotAt: Date?
   let summaryUpdatedAt: String?
 }
 
@@ -64,7 +63,6 @@ extension SessionWindowView {
     SessionWindowSnapshotRefreshTrigger(
       sessionID: token.sessionID,
       connectionState: store.connectionState,
-      lastPersistedSnapshotAt: store.lastPersistedSnapshotAt,
       summaryUpdatedAt: catalogSummary?.updatedAt
     )
   }
