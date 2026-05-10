@@ -35,6 +35,8 @@ public struct SessionWindowView: View {
   private var persistedDecisionID: String = ""
   @SceneStorage("session.decisionFilters.query")
   private var persistedDecisionQuery = ""
+  @SceneStorage("session.decision.detail-tab")
+  private var persistedDecisionDetailTabRawStorage = DecisionDetailTab.context.rawValue
   @SceneStorage("session.focusMode")
   private var focusModeStorage = false
   @SceneStorage("session.inspector.visible")
@@ -138,6 +140,18 @@ public struct SessionWindowView: View {
     $contentColumnWidthStorage
   }
 
+  var decisionDetailTab: DecisionDetailTab {
+    get { DecisionDetailTab(rawValue: persistedDecisionDetailTabRawStorage) ?? .context }
+    nonmutating set { persistedDecisionDetailTabRawStorage = newValue.rawValue }
+  }
+
+  var decisionDetailTabBinding: Binding<DecisionDetailTab> {
+    Binding(
+      get: { decisionDetailTab },
+      set: { decisionDetailTab = $0 }
+    )
+  }
+
   var columnVisibilityRaw: String {
     get { columnVisibilityRawStorage }
     nonmutating set { columnVisibilityRawStorage = newValue }
@@ -238,6 +252,36 @@ public struct SessionWindowView: View {
 
   var selectedDecisionHiddenByFilters: Bool {
     selectedDecisionVisibility == .hidden
+  }
+
+  var sessionDecisionObserver: ObserverSummary? {
+    snapshot?.detail?.observer
+  }
+
+  var sessionDecisionVisibleSnapshot: DecisionsSidebarViewModel.VisibleSnapshot {
+    let filters = stateCache.decisionFilters.decisionWorkspaceFilters
+    let signature = DecisionsSidebarViewModel.visibleSnapshot(
+      decisions: allSessionDecisionsCache,
+      filters: filters
+    ).signature
+    let groups =
+      matchingDecisionsCache.isEmpty
+      ? []
+      : [DecisionsSidebarViewModel.SessionGroup(sessionID: token.sessionID, decisions: matchingDecisionsCache)]
+    return DecisionsSidebarViewModel.VisibleSnapshot(
+      groups: groups,
+      decisionIDs: matchingDecisionsCache.map(\.id),
+      signature: signature
+    )
+  }
+
+  var sessionDecisionScope: DecisionWorkspaceScope {
+    DecisionWorkspaceScope(
+      decisions: allSessionDecisionsCache,
+      filters: stateCache.decisionFilters.decisionWorkspaceFilters,
+      visibleSnapshot: sessionDecisionVisibleSnapshot,
+      selectedDecisionID: stateCache.selection.decisionID
+    )
   }
 
   var inspectorContextDecision: Decision? {

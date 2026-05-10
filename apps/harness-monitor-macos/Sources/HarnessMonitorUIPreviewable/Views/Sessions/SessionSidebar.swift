@@ -294,7 +294,7 @@ struct SessionSidebar: View {
 
   private var routeSection: some View {
     Section {
-      ForEach([SessionWindowRoute.overview, .timeline, .terminal]) { route in
+      ForEach([SessionWindowRoute.overview, .decisions, .timeline, .terminal]) { route in
         let selection = SessionSelection.route(route)
         SessionSidebarRow(
           title: route.title,

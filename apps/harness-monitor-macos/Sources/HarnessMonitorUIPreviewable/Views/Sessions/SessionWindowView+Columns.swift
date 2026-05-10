@@ -7,6 +7,29 @@ public enum SessionWindowFocusModePolicy {
   }
 }
 
+public enum SessionDecisionAutoSelectionPolicy {
+  public static func preferredDecisionID(
+    selection: SessionSelection,
+    sessionID: String,
+    allDecisionIDs: Set<String>,
+    visibleDecisionIDs: [String]
+  ) -> String? {
+    guard let firstVisibleDecisionID = visibleDecisionIDs.first else {
+      return nil
+    }
+
+    switch selection {
+    case .route(.decisions):
+      return firstVisibleDecisionID
+    case .decision(let selectedSessionID, let decisionID)
+      where selectedSessionID == sessionID && !allDecisionIDs.contains(decisionID):
+      return firstVisibleDecisionID
+    default:
+      return nil
+    }
+  }
+}
+
 extension SessionWindowView {
   func pendingUserPrompt(for agentID: String) -> AgentPendingUserPrompt? {
     guard
@@ -51,12 +74,24 @@ extension SessionWindowView {
     await stateCache.decisionRuntime.waitForDecisionFilterIdle()
     guard !Task.isCancelled else { return }
     let matching = stateCache.decisionRuntime.filteredDecisions(from: all)
+    let matchingIDsInOrder = matching.map(\.id)
     let matchingIDs = Set(matching.map(\.id))
     if matching.map(\.id) != matchingDecisionsCache.map(\.id) {
       matchingDecisionsCache = matching
     }
     if matchingIDs != matchingDecisionIDsCache {
       matchingDecisionIDsCache = matchingIDs
+    }
+    stateCache.decisionRuntime.reloadAuditEvents(from: store.modelContext)
+    if
+      let autoSelectedDecisionID = SessionDecisionAutoSelectionPolicy.preferredDecisionID(
+        selection: stateCache.selection,
+        sessionID: token.sessionID,
+        allDecisionIDs: allIDs,
+        visibleDecisionIDs: matchingIDsInOrder
+      )
+    {
+      stateCache.autoSelectDecision(autoSelectedDecisionID)
     }
   }
 
@@ -294,21 +329,17 @@ extension SessionWindowView {
         }
       }
     case .decision(_, let decisionID):
-      if let decision = allSessionDecisionsCache.first(where: { $0.id == decisionID }) {
-        SessionDecisionDetailPane(
-          decision: decision,
-          runtime: stateCache.decisionRuntime,
-          filters: stateCache.decisionFilters,
-          showsFilteredNotice: !matchingDecisionIDsCache.contains(decisionID)
-        )
-      } else {
-        SessionDetailEmptySurface {
-          ContentUnavailableView(
-            "No Decision Selected",
-            systemImage: "exclamationmark.bubble"
-          )
-        }
-      }
+      SessionDecisionDetailPane(
+        decision: allSessionDecisionsCache.first(where: { $0.id == decisionID }),
+        store: store,
+        auditEvents: stateCache.decisionRuntime.auditEvents,
+        observer: sessionDecisionObserver,
+        decisionScope: sessionDecisionScope,
+        selectedTab: decisionDetailTabBinding,
+        filters: stateCache.decisionFilters,
+        showsFilteredNotice: allSessionDecisionIDsCache.contains(decisionID)
+          && !matchingDecisionIDsCache.contains(decisionID)
+      )
     case .task(_, let taskID):
       if let task = snapshot?.detail?.tasks.first(where: { $0.taskId == taskID }) {
         SessionTaskDetailPane(
@@ -347,6 +378,17 @@ extension SessionWindowView {
         state: stateCache,
         draft: draft,
         embedsRuntimeConfiguration: focusMode
+      )
+    case .route(.decisions):
+      SessionDecisionDetailPane(
+        decision: nil,
+        store: store,
+        auditEvents: stateCache.decisionRuntime.auditEvents,
+        observer: sessionDecisionObserver,
+        decisionScope: sessionDecisionScope,
+        selectedTab: decisionDetailTabBinding,
+        filters: nil,
+        showsFilteredNotice: false
       )
     case .route:
       SessionDetailEmptySurface {

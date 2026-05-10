@@ -76,6 +76,14 @@ public final class SessionDecisionFilterState {
     severities.removeAll()
     scope = .summary
   }
+
+  public var decisionWorkspaceFilters: DecisionsSidebarViewModel.FilterState {
+    DecisionsSidebarViewModel.FilterState(
+      query: query,
+      severities: severities,
+      scope: scope
+    )
+  }
 }
 
 @MainActor

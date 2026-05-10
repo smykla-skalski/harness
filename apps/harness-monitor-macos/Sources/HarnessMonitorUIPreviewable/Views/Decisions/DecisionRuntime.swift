@@ -1,5 +1,4 @@
 import HarnessMonitorKit
-import SwiftData
 import SwiftUI
 
 @MainActor
@@ -26,7 +25,7 @@ final class DecisionRuntime {
     }
 
     decisions = (try? await decisionStore.openDecisions()) ?? []
-    auditEvents = Self.loadAuditEvents(from: store.modelContext)
+    auditEvents = HarnessMonitorStore.loadSupervisorAuditEvents(from: store.modelContext)
     await refreshLiveTick(from: store)
   }
 
@@ -45,21 +44,5 @@ final class DecisionRuntime {
 
     await store.startSupervisor()
     return store.supervisorDecisionStore
-  }
-
-  private static func loadAuditEvents(from modelContext: ModelContext?) -> [SupervisorEvent] {
-    guard let modelContext else {
-      return []
-    }
-
-    do {
-      var descriptor = FetchDescriptor<SupervisorEvent>(
-        sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
-      )
-      descriptor.fetchLimit = 128
-      return try modelContext.fetch(descriptor)
-    } catch {
-      return []
-    }
   }
 }
