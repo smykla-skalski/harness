@@ -98,6 +98,42 @@ public struct DecisionDetailView: View {
     )
   }
 
+  // Single call site for callers that may not have a decision yet. Avoids the
+  // `_ConditionalContent<DecisionDetailView, DecisionDetailView>` structural
+  // diff that would tear down focus state every nil-flip.
+  public init(
+    decision: Decision?,
+    store: HarnessMonitorStore? = nil,
+    handler: any DecisionActionHandler = NullDecisionActionHandler(),
+    auditEvents: [SupervisorEvent] = [],
+    selectedTab: Binding<DecisionDetailTab> = .constant(.context),
+    observer: ObserverSummary? = nil,
+    decisionScope: DecisionWorkspaceScope? = nil,
+    primaryActionFocusDecisionID: String? = nil,
+    primaryActionFocusRequestTick: Int = 0
+  ) {
+    if let decision {
+      self.init(
+        viewModel: DecisionDetailViewModel(decision: decision, handler: handler),
+        store: store,
+        auditEvents: auditEvents,
+        selectedTab: selectedTab,
+        observer: observer,
+        decisionScope: decisionScope,
+        primaryActionFocusDecisionID: primaryActionFocusDecisionID,
+        primaryActionFocusRequestTick: primaryActionFocusRequestTick
+      )
+    } else {
+      self.init(
+        selectedTab: selectedTab,
+        observer: observer,
+        decisionScope: decisionScope,
+        primaryActionFocusDecisionID: primaryActionFocusDecisionID,
+        primaryActionFocusRequestTick: primaryActionFocusRequestTick
+      )
+    }
+  }
+
   public var body: some View {
     detailBody
       .frame(maxWidth: .infinity, maxHeight: .infinity)
