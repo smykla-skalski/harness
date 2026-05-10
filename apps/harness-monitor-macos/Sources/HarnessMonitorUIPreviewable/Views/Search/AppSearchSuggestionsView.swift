@@ -3,21 +3,20 @@ import SwiftUI
 
 /// Sectioned popover content rendered inside `.searchSuggestions { … }`.
 ///
-/// The first section is a multi-select filter list: an "All" row plus
-/// one row per ``AppSearchDomain``. Each row is a native `Button` —
-/// the only interactive primitive `.searchSuggestions` reliably
-/// hit-tests on macOS. A leading checkmark indicates selection.
-/// "All" clears the set; any combination of domain rows narrows the
-/// popover to those domains.
-///
-/// Below the filter section, each hit row is a `Button`. Pressing
-/// Return invokes `routeAction` and dismisses the search field via
+/// Each hit row is a native `Button`. Pressing Return invokes
+/// `routeAction` and dismisses the search field via
 /// `Environment(\.dismissSearch)`. `.searchCompletion(_:)` supplies
 /// the title as the keyboard completion so Tab pre-fills the query
 /// without leaving the field.
+///
+/// The multi-select filter rail lives outside this view (in
+/// ``AppSearchHostModifier`` via `.safeAreaInset(edge: .top)`) so
+/// `Toggle(.button)` chips remain clickable — `.searchSuggestions`
+/// content rows on macOS only hit-test reliably for Buttons that
+/// behave as suggestion completions.
 public struct AppSearchSuggestionsView: View {
   let results: AppSearchResults
-  @Binding var selectedDomains: Set<AppSearchDomain>
+  let selectedDomains: Set<AppSearchDomain>
   let routeAction: (AppSearchHit) -> Void
 
   @Environment(\.dismissSearch)
@@ -25,31 +24,15 @@ public struct AppSearchSuggestionsView: View {
 
   public init(
     results: AppSearchResults,
-    selectedDomains: Binding<Set<AppSearchDomain>>,
+    selectedDomains: Set<AppSearchDomain>,
     routeAction: @escaping (AppSearchHit) -> Void
   ) {
     self.results = results
-    self._selectedDomains = selectedDomains
+    self.selectedDomains = selectedDomains
     self.routeAction = routeAction
   }
 
   public var body: some View {
-    Section("Filter by") {
-      filterRow(
-        label: "All",
-        isSelected: selectedDomains.isEmpty
-      ) {
-        selectedDomains = []
-      }
-      ForEach(AppSearchDomain.allCases) { domain in
-        filterRow(
-          label: domain.label,
-          isSelected: selectedDomains.contains(domain)
-        ) {
-          toggle(domain)
-        }
-      }
-    }
     ForEach(visibleSections) { section in
       Section {
         ForEach(section.hits) { hit in
@@ -66,29 +49,6 @@ public struct AppSearchSuggestionsView: View {
       return results.sections
     }
     return results.sections.filter { selectedDomains.contains($0.domain) }
-  }
-
-  private func toggle(_ domain: AppSearchDomain) {
-    if selectedDomains.contains(domain) {
-      selectedDomains.remove(domain)
-    } else {
-      selectedDomains.insert(domain)
-    }
-  }
-
-  private func filterRow(
-    label: String,
-    isSelected: Bool,
-    action: @escaping () -> Void
-  ) -> some View {
-    Button(action: action) {
-      HStack(spacing: 8) {
-        Image(systemName: isSelected ? "checkmark" : "circle")
-          .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-          .frame(width: 18)
-        Text(label)
-      }
-    }
   }
 
   private func row(for hit: AppSearchHit) -> some View {
