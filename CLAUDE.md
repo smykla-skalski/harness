@@ -12,7 +12,13 @@ For the Harness Monitor macOS app (`apps/harness-monitor-macos`), see that direc
 
 ## Task closeout
 
-Finished tasks must be replayed onto `main` with clean, flat history. Rebase or cherry-pick; never create merge commits. Resolve conflicts by comparing current `main` behavior with the task intent, do not accept either side blindly, keep unrelated edits out of conflict resolution, and rerun the smallest relevant validation before handoff.
+Finished tasks must end with the final work in the local `main` checkout, not
+only in a temporary worktree or side branch. Use rebase or cherry-pick to
+replay the task onto local `main`; never create merge commits. Resolve
+conflicts by comparing current `main` behavior with the task intent, do not
+accept either side blindly, keep unrelated edits out of conflict resolution,
+rerun the smallest relevant validation from local `main`, and if the work is
+fully landed there remove the temporary worktree and branch afterward.
 
 Parallel Claude sessions that edit, generate, build, test, run daemons, or use XcodeBuildMCP need separate full git worktrees. Lanes and env vars isolate build/runtime side effects inside a worktree; they do not make concurrent write/build work in one checkout acceptable.
 

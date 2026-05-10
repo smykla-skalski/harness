@@ -33,6 +33,10 @@ full git worktree. Build/runtime lanes isolate caches, daemon state, ports,
 labels, and sockets inside a worktree; they are not a substitute for a separate
 checkout.
 
+Temporary worktrees are for isolation during the task, not for final landing.
+Once the work is complete, replay it into the local `main` checkout. If the work
+is fully present in local `main`, clean up the temporary worktree and its branch.
+
 ## UI test failures
 
 When UI tests are failing, run one failing test at a time using `XCODE_ONLY_TESTING`. Never run a broad suite or multiple failing tests together — XCUITest runs block the whole machine and the run time compounds fast. Fix one, verify it passes, then move to the next.
@@ -154,9 +158,12 @@ wait for the user.
 
 ## Closeout and versioning
 
-Every finished task must be integrated through `main` with clean, flat history.
-Update from `main`, replay the task changes, resolve conflicts deliberately, and
-rerun the smallest relevant validation.
+Every finished task must end with the final work present in the local `main`
+checkout with clean, flat history. Use a temporary worktree or branch for
+isolated development when needed, but before handoff update local `main`,
+replay the task changes there, resolve conflicts deliberately, and rerun the
+smallest relevant validation from local `main`. If the work is fully landed in
+local `main`, remove the temporary worktree and branch afterward.
 
 Every change must evaluate semver. Do not bump versions without explicit user approval.
 Docs-only changes normally require no version bump. If shipped `harness` or `aff`

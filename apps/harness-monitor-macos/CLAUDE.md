@@ -21,7 +21,13 @@ The Run scheme is lane-agnostic by contract (see `AGENTS.md` "Daemon discovery a
 
 ## Task Closeout
 
-Finished monitor tasks follow the repo-root rule: replay onto `main` with clean, flat history, never through merge commits. Resolve conflicts by triaging current `main` behavior against the monitor change intent, keep unrelated edits out, and rerun the smallest relevant monitor validation before handoff.
+Finished monitor tasks follow the repo-root rule: the final work must be in the
+local `main` checkout before handoff, not only in a temporary worktree or side
+branch. Replay onto local `main` with clean, flat history, never through merge
+commits. Resolve conflicts by triaging current `main` behavior against the
+monitor change intent, keep unrelated edits out, rerun the smallest relevant
+monitor validation from local `main`, and if the work is fully landed there
+remove the temporary worktree and branch afterward.
 
 ## Fast test reruns (chained selectors)
 
