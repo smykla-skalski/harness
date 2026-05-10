@@ -7,12 +7,12 @@ struct SessionSidebar: View {
   let sessionCodexRuns: [CodexRunSnapshot]
   let decisions: [Decision]
   let statusModel: SessionStatusSummaryModel
+  let currentModifiers: EventModifiers
   @Bindable var state: SessionWindowStateCache
   @Environment(\.harnessTextSizeIndex)
   private var textSizeIndex
   @Environment(\.undoManager)
   var undoManager
-  @State private var currentModifiers: EventModifiers = []
   @State private var selectionDispatcher = SessionSidebarSelectionDispatcher()
   @State private var listSelection: Set<SessionSelection> = []
 
@@ -22,6 +22,7 @@ struct SessionSidebar: View {
     sessionCodexRuns: [CodexRunSnapshot],
     decisions: [Decision],
     statusModel: SessionStatusSummaryModel,
+    currentModifiers: EventModifiers,
     state: SessionWindowStateCache
   ) {
     self.store = store
@@ -29,6 +30,7 @@ struct SessionSidebar: View {
     self.sessionCodexRuns = sessionCodexRuns
     self.decisions = decisions
     self.statusModel = statusModel
+    self.currentModifiers = currentModifiers
     self.state = state
   }
 
@@ -48,11 +50,6 @@ struct SessionSidebar: View {
     }
     .listStyle(.sidebar)
     .environment(\.sidebarRowSize, sidebarRowSize)
-    .background(
-      SessionSidebarModifierKeysMonitor(currentModifiers: $currentModifiers)
-        .frame(width: 0, height: 0)
-        .accessibilityHidden(true)
-    )
     .onChange(of: decisions.map(\.id)) { _, ids in
       state.sidebarSelection.prune(kind: .decision, visibleIDs: Set(ids))
       pruneListSelection(kind: .decision, visibleIDs: Set(ids))

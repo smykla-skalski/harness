@@ -80,6 +80,14 @@ public struct KeyboardShortcutDescriptor: Equatable, Sendable {
   }
 }
 
+extension KeyboardShortcutDescriptor {
+  static let toggleSidebar = KeyboardShortcutDescriptor(
+    modifiers: [.option, .command],
+    keyEquivalent: "s",
+    keyLabel: "S"
+  )
+}
+
 enum KeyboardShortcutRevealPolicy: Equatable, Sendable {
   case alwaysVisible
   case revealOnRelevantModifierHold

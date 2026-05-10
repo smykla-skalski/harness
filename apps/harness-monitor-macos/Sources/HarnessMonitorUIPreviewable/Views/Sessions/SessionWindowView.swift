@@ -42,6 +42,7 @@ public struct SessionWindowView: View {
   @State private var didLoadSnapshotStorage = false
   @State private var detailColumnWidthStorage: CGFloat = 0
   @State private var decisionCacheStorage = SessionWindowDecisionCacheStorage()
+  @State var currentModifiers: EventModifiers = []
 
   public init(store: HarnessMonitorStore, token: SessionWindowToken) {
     self.store = store
@@ -184,6 +185,14 @@ public struct SessionWindowView: View {
       .appSearchHost(model: stateCache.appSearchModel, routeAction: appSearchRouteAction)
       .modifier(SessionWindowSearchMirror(stateCache: stateCache))
       .modifier(appSearchIndexUpdaterModifier)
+      .overlay {
+        SessionWindowSidebarShortcutOverlay(currentModifiers: currentModifiers)
+      }
+      .background(
+        SessionWindowModifierKeysMonitor(currentModifiers: $currentModifiers)
+          .frame(width: 0, height: 0)
+          .accessibilityHidden(true)
+      )
   }
 
   private var bodyContent: some View {

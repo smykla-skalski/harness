@@ -123,6 +123,7 @@ extension SessionWindowView {
         sessionCodexRuns: sessionCodexRuns,
         decisions: allSessionDecisions,
         statusModel: sessionStatusSummaryModel,
+        currentModifiers: currentModifiers,
         state: stateCache
       )
       .navigationSplitViewColumnWidth(min: 190, ideal: sidebarWidth, max: 360)
@@ -147,11 +148,10 @@ extension SessionWindowView {
     case .sidebarContentDetail:
       SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding) {
         contentColumn
-          .backgroundExtensionEffect()
       } detail: {
         detailColumn
-          .backgroundExtensionEffect()
       }
+      .backgroundExtensionEffect()
     }
   }
 
