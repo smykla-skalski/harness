@@ -69,6 +69,11 @@ struct SessionTimelineView: View {
   // Updated via onChange when filters mutate.
   @State private var cachedFilterSignature: String =
     SessionTimelineFilterState().signature
+  // Drive the bridged column width from SwiftUI geometry. Without this the
+  // AppKit-side bounds-change notification is the only path that applies a
+  // real width after first render, and it does not always fire before the
+  // first paint, so cards render at the placeholder column width.
+  @State private var measuredTimelineWidth: CGFloat = 0
 
   var body: some View {
     let input = presentationInput
@@ -383,9 +388,12 @@ struct SessionTimelineView: View {
       // Closures are method references that read self.cachedPresentation
       // when fired, so the representable's identity does not depend on a
       // per-render presentation capture. Wrap in .equatable() so SwiftUI
-      // can skip updateNSView when no input changed.
+      // can skip updateNSView when no input changed. onGeometryChange
+      // refreshes measuredTimelineWidth when the surrounding frame resizes,
+      // which then breaks Equatable equality and re-applies the column width
+      // in updateNSView.
       SessionTimelineTableView(
-        columnWidth: 0,
+        columnWidth: measuredTimelineWidth,
         rows: presentation.rows,
         virtualization: presentation.tableVirtualization,
         contentIdentity: contentIdentity,
@@ -399,6 +407,13 @@ struct SessionTimelineView: View {
       )
       .equatable()
       .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .onGeometryChange(for: CGFloat.self) { proxy in
+        proxy.size.width
+      } action: { width in
+        if abs(width - measuredTimelineWidth) >= 0.5 {
+          measuredTimelineWidth = width
+        }
+      }
     }
   }
 
