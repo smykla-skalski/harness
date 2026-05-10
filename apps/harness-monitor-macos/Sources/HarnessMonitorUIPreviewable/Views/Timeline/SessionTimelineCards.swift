@@ -57,6 +57,19 @@ struct SessionTimelineNodeCluster: View {
   }
 }
 
+// Cells rebuild this cluster on every reconfigure even when the row
+// payload is unchanged. Skip the per-cell VStack + child body work via
+// a structural compare on the inputs (closure presence as a Bool so a
+// fresh-but-equivalent closure identity does not invalidate the cell).
+extension SessionTimelineNodeCluster: @MainActor Equatable {
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.row == rhs.row
+      && ObjectIdentifier(lhs.actionHandler as AnyObject)
+        == ObjectIdentifier(rhs.actionHandler as AnyObject)
+      && (lhs.onSignalTap == nil) == (rhs.onSignalTap == nil)
+  }
+}
+
 private struct SessionTimelineNodeRow: View {
   let row: SessionTimelineRow
   let actionHandler: any DecisionActionHandler

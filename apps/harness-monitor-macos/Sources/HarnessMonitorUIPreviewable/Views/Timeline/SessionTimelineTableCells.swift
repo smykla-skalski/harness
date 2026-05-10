@@ -214,6 +214,7 @@ private struct SessionTimelineHostedRow: View {
 
   private func populatedRow(_ row: SessionTimelineRow) -> some View {
     SessionTimelineNodeCluster(row: row, actionHandler: actionHandler, onSignalTap: onSignalTap)
+      .equatable()
       .padding(.trailing, HarnessMonitorTheme.spacingXS)
       .padding(.bottom, SessionTimelineTableMetrics.rowBottomPadding(for: row))
       .frame(maxWidth: .infinity, alignment: .leading)
