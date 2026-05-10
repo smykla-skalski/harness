@@ -32,6 +32,7 @@ struct SessionWindowRootView: View {
       windowID: windowID,
       windowTitle: windowTitle,
       scope: .session,
+      sessionID: token.sessionID,
       minimumSize: Self.minimumSize,
       accessibilityIdentifier: HarnessMonitorAccessibility.sessionWindowShell,
       keyWindowObserver: keyWindowObserver,

@@ -45,6 +45,7 @@ struct HarnessMonitorWindowShell<Content: View>: View {
   let windowID: String
   let windowTitle: String
   let scope: WindowNavigationScope
+  let sessionID: String?
   let minimumSize: CGSize
   let accessibilityIdentifier: String?
   let keyWindowObserver: KeyWindowObserver?
@@ -69,6 +70,7 @@ struct HarnessMonitorWindowShell<Content: View>: View {
     windowID: String,
     windowTitle: String,
     scope: WindowNavigationScope,
+    sessionID: String? = nil,
     minimumSize: CGSize,
     accessibilityIdentifier: String? = nil,
     keyWindowObserver: KeyWindowObserver? = nil,
@@ -84,6 +86,7 @@ struct HarnessMonitorWindowShell<Content: View>: View {
     self.windowID = windowID
     self.windowTitle = windowTitle
     self.scope = scope
+    self.sessionID = sessionID
     self.minimumSize = minimumSize
     self.accessibilityIdentifier = accessibilityIdentifier
     self.keyWindowObserver = keyWindowObserver
@@ -162,7 +165,8 @@ struct HarnessMonitorWindowShell<Content: View>: View {
     .modifier(
       WindowCommandScopeTrackingModifier(
         scope: scope,
-        routingState: windowCommandRouting
+        routingState: windowCommandRouting,
+        sessionID: sessionID
       )
     )
     .harnessMonitorMCPWindowCommands(registrar: mcpWindowCommandRegistrar)

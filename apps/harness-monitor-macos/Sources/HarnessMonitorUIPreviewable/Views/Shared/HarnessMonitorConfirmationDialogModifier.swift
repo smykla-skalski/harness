@@ -18,57 +18,53 @@ public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
 
   @ViewBuilder
   public func body(content: Content) -> some View {
-    if isEnabled {
-      content
-        .confirmationDialog(
-          title,
-          isPresented: Binding(
-            get: { shellUI.pendingConfirmation != nil },
-            set: { isPresented in
-              if !isPresented {
-                HarnessMonitorUITestTrace.record(
-                  component: "confirmation-dialog",
-                  event: "dismissed",
-                  details: [
-                    "pending_confirmation": shellUI.pendingConfirmation?.uiTestTraceLabel ?? "nil"
-                  ]
-                )
-                store.cancelConfirmation()
-              }
-            }
-          ),
-          titleVisibility: .visible
-        ) {
-          if let pendingConfirmation = shellUI.pendingConfirmation {
-            Button(confirmButtonTitle, role: .destructive) {
+    content
+      .confirmationDialog(
+        title,
+        isPresented: Binding(
+          get: { isEnabled && shellUI.pendingConfirmation != nil },
+          set: { isPresented in
+            if !isPresented && isEnabled && shellUI.pendingConfirmation != nil {
               HarnessMonitorUITestTrace.record(
                 component: "confirmation-dialog",
-                event: "confirm-tapped",
-                details: ["pending_confirmation": pendingConfirmation.uiTestTraceLabel]
+                event: "dismissed",
+                details: [
+                  "pending_confirmation": shellUI.pendingConfirmation?.uiTestTraceLabel ?? "nil"
+                ]
               )
-              Task { await store.confirmPendingAction(pendingConfirmation) }
+              store.cancelConfirmation()
             }
-          } else {
-            EmptyView()
           }
-          Button("Cancel", role: .cancel) {
+        ),
+        titleVisibility: .visible
+      ) {
+        if let pendingConfirmation = shellUI.pendingConfirmation {
+          Button(confirmButtonTitle, role: .destructive) {
             HarnessMonitorUITestTrace.record(
               component: "confirmation-dialog",
-              event: "cancel-tapped",
-              details: [
-                "pending_confirmation": shellUI.pendingConfirmation?.uiTestTraceLabel ?? "nil"
-              ]
+              event: "confirm-tapped",
+              details: ["pending_confirmation": pendingConfirmation.uiTestTraceLabel]
             )
-            store.cancelConfirmation()
+            Task { await store.confirmPendingAction(pendingConfirmation) }
           }
-        } message: {
-          if !message.isEmpty {
-            Text(message)
-          }
+        } else {
+          EmptyView()
         }
-    } else {
-      content
-    }
+        Button("Cancel", role: .cancel) {
+          HarnessMonitorUITestTrace.record(
+            component: "confirmation-dialog",
+            event: "cancel-tapped",
+            details: [
+              "pending_confirmation": shellUI.pendingConfirmation?.uiTestTraceLabel ?? "nil"
+            ]
+          )
+          store.cancelConfirmation()
+        }
+      } message: {
+        if !message.isEmpty {
+          Text(message)
+        }
+      }
   }
 
   private var title: String {

@@ -72,6 +72,8 @@ public enum SessionRouteSelection: Hashable, Sendable {
 
 public enum SessionRouteCreateEntryPoint: Hashable, Sendable {
   case agent
+  case task
+  case decision
 }
 
 @available(*, deprecated, renamed: "SessionRouteSelection")

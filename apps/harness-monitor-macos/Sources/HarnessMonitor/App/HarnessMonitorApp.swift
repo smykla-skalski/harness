@@ -226,6 +226,7 @@ struct HarnessMonitorApp: App {
   @CommandsBuilder private var mainWindowCommands: some Commands {
     HarnessMonitorMainCommandSet(
       store: store,
+      windowCommandRouting: windowCommandRouting,
       textSizeIndex: textSizeIndex,
       increaseTextSize: increaseTextSize,
       decreaseTextSize: decreaseTextSize,

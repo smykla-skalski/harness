@@ -47,29 +47,79 @@ final class WindowMenuCommandsTests: XCTestCase {
     let source = try harnessSourceFile(named: "Commands/NewSessionCommand.swift")
     let commandSetSource = try harnessSourceFile(named: "App/HarnessMonitorMainCommandSet.swift")
 
-    XCTAssertTrue(commandSetSource.contains("NewSessionCommand(store: store)"))
-    XCTAssertTrue(source.contains("@FocusedValue(\\.sessionCreateContext)"))
+    XCTAssertTrue(commandSetSource.contains("@FocusedValue(\\.sessionCreateContext)"))
+    XCTAssertTrue(
+      commandSetSource.contains("NewSessionCommand(store: store, sessionCreate: sessionCreate)")
+    )
     XCTAssertTrue(source.contains(".keyboardShortcut(\"n\", modifiers: [.command])"))
     XCTAssertTrue(source.contains("guard let kind = sessionCreate?.primaryKind"))
-    XCTAssertTrue(source.contains("case .agent: sessionCreate.createAgent()"))
-    XCTAssertTrue(source.contains("case .task: sessionCreate.createTask()"))
-    XCTAssertTrue(source.contains("case .decision: sessionCreate.createDecision()"))
+    XCTAssertTrue(source.contains("return sessionCreate.createAgent"))
+    XCTAssertTrue(source.contains("return sessionCreate.createTask"))
+    XCTAssertTrue(source.contains("return sessionCreate.createDecision"))
+    XCTAssertTrue(source.contains("guard store.connectionState == .online else"))
     XCTAssertTrue(source.contains("store.presentedSheet = .newSession"))
   }
 
   func testSessionCreateCommandsExposeMenuOnlyCodexAgentEntry() throws {
     let commandsSource = try harnessSourceFile(named: "Commands/SessionCreateCommands.swift")
+    let commandSetSource = try harnessSourceFile(named: "App/HarnessMonitorMainCommandSet.swift")
+    let routingStateSource = try uiPreviewableSourceFile(named: "Support/WindowNavigationState.swift")
+    let shellSource = try harnessSourceFile(named: "App/HarnessMonitorWindowSceneShell.swift")
     let focusedValuesSource = try uiPreviewableSourceFile(named: "Support/SessionFocusedValues.swift")
     let inspectorSource = try uiPreviewableSourceFile(named: "Views/Sessions/SessionWindowView+Inspector.swift")
     let sheetRouterSource = try uiPreviewableSourceFile(named: "Views/Shared/HarnessMonitorSheetRouter.swift")
     let storeEnumsSource = try kitSourceFile(named: "Stores/HarnessMonitorStore+Enums.swift")
+    let routeModelSource = try kitSourceFile(named: "Models/SessionRouteSelection.swift")
 
-    XCTAssertTrue(commandsSource.contains("Button(\"New Codex Agent\") { sessionCreate?.createCodexAgent() }"))
+    XCTAssertTrue(
+      commandSetSource.contains(
+        "SessionCreateCommands(\n      store: store,\n      windowCommandRouting: windowCommandRouting,\n      sessionCreate: sessionCreate"
+      )
+    )
+    XCTAssertTrue(commandsSource.contains("let createCodexAgent = createCodexAction"))
+    XCTAssertTrue(commandsSource.contains("Button(\"New Codex Agent\") { createCodexAgent?() }"))
+    XCTAssertTrue(commandsSource.contains("guard windowCommandRouting.activeScope == .session else"))
+    XCTAssertTrue(commandsSource.contains("return windowCommandRouting.activeSessionID"))
+    XCTAssertTrue(commandsSource.contains("store.presentedSheet = .newCodexAgent(sessionID: sessionID)"))
+    XCTAssertTrue(commandsSource.contains("store.requestSessionRouteCreate(kind.routeCreateEntryPoint"))
+    XCTAssertTrue(commandsSource.contains("return .task"))
+    XCTAssertTrue(commandsSource.contains("return .decision"))
     XCTAssertTrue(focusedValuesSource.contains("public let createCodexAgent: () -> Void"))
     XCTAssertTrue(inspectorSource.contains("createCodexAgent: { store.presentedSheet = .newCodexAgent(sessionID: token.sessionID) }"))
     XCTAssertTrue(sheetRouterSource.contains("case .newCodexAgent(let sessionID):"))
     XCTAssertTrue(sheetRouterSource.contains("NewCodexAgentSheet(store: store, sessionID: sessionID)"))
     XCTAssertTrue(storeEnumsSource.contains("case newCodexAgent(sessionID: String)"))
+    XCTAssertTrue(routingStateSource.contains("public private(set) var activeSessionID: String?"))
+    XCTAssertTrue(routingStateSource.contains("public func register(sessionID: String?, windowID: ObjectIdentifier)"))
+    XCTAssertTrue(shellSource.contains("let sessionID: String?"))
+    XCTAssertTrue(shellSource.contains("sessionID: sessionID"))
+    XCTAssertTrue(routeModelSource.contains("case task"))
+    XCTAssertTrue(routeModelSource.contains("case decision"))
+  }
+
+  func testSharedPresentationModifiersKeepBindingsMountedAcrossKeyWindowLoss() throws {
+    let sheetModifierSource = try uiPreviewableSourceFile(
+      named: "Views/Shared/HarnessMonitorSheetModifier.swift"
+    )
+    let confirmationModifierSource = try uiPreviewableSourceFile(
+      named: "Views/Shared/HarnessMonitorConfirmationDialogModifier.swift"
+    )
+
+    XCTAssertTrue(sheetModifierSource.contains("get: { isEnabled ? shellUI.presentedSheet : nil }"))
+    XCTAssertTrue(
+      sheetModifierSource.contains("if sheet == nil && isEnabled && shellUI.presentedSheet != nil")
+    )
+    XCTAssertFalse(sheetModifierSource.contains("if isEnabled {\n      content"))
+
+    XCTAssertTrue(
+      confirmationModifierSource.contains("get: { isEnabled && shellUI.pendingConfirmation != nil }")
+    )
+    XCTAssertTrue(
+      confirmationModifierSource.contains(
+        "if !isPresented && isEnabled && shellUI.pendingConfirmation != nil"
+      )
+    )
+    XCTAssertFalse(confirmationModifierSource.contains("if isEnabled {\n      content"))
   }
 
   func testSessionCreateCommandsHideThePrimaryDuplicateEntry() {

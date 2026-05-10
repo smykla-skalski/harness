@@ -4,14 +4,14 @@ import SwiftUI
 
 struct NewSessionCommand: Commands {
   let store: HarnessMonitorStore
-  @FocusedValue(\.sessionCreateContext)
-  private var sessionCreate
+  let sessionCreate: SessionCreateContext?
 
   var body: some Commands {
+    let action = primaryAction
     CommandGroup(after: .newItem) {
-      Button(menuTitle) { handle() }
+      Button(menuTitle) { action?() }
         .keyboardShortcut("n", modifiers: [.command])
-        .disabled(isDisabled)
+        .disabled(action == nil)
     }
   }
 
@@ -24,19 +24,20 @@ struct NewSessionCommand: Commands {
     }
   }
 
-  private func handle() {
+  private var primaryAction: (() -> Void)? {
     if let sessionCreate {
       switch sessionCreate.primaryKind {
-      case .agent: sessionCreate.createAgent()
-      case .task: sessionCreate.createTask()
-      case .decision: sessionCreate.createDecision()
+      case .agent:
+        return sessionCreate.createAgent
+      case .task:
+        return sessionCreate.createTask
+      case .decision:
+        return sessionCreate.createDecision
       }
-    } else {
-      store.presentedSheet = .newSession
     }
-  }
-
-  private var isDisabled: Bool {
-    sessionCreate == nil && store.connectionState != .online
+    guard store.connectionState == .online else {
+      return nil
+    }
+    return { store.presentedSheet = .newSession }
   }
 }
