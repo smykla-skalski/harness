@@ -30,6 +30,46 @@ extension HarnessMonitorStoreSelectionFlowTests {
     #expect(store.timelineWindow?.windowEnd == 17)
   }
 
+  // Append-only contract. Older fetches that pass `Int.max` must merge their
+  // response into the existing timeline, leave `windowStart` alone, and grow
+  // `windowEnd`. The view layer relies on this so the rolling slice never
+  // slides during scroll — sliding shifted topHeight / document origin and
+  // produced visible jumps. If a future change passes `nil` retainedLimit
+  // instead, `resolvedSelectedTimelineWindow` short-circuits past the rolling
+  // resolver and replaces the timeline with the response slice — this test
+  // catches that regression at the store boundary.
+  @Test("Older window fetch with Int.max retained limit appends without replacing")
+  func olderWindowFetchWithMaxRetainedLimitAppendsWithoutReplacing() async throws {
+    let fixture = makeRollingWindowFixture(
+      sessionID: "sess-window-append-only",
+      entryPrefix: "timeline-append-only",
+      count: 40
+    )
+    let store = await makeBootstrappedStore(client: fixture.client)
+    let middleRequest = TimelineWindowRequest(
+      scope: .summary,
+      limit: 12,
+      before: fixture.timeline[11].timelineCursor
+    )
+
+    await store.selectSession(fixture.summary.sessionId)
+    await store.loadSelectedTimelineWindow(request: middleRequest)
+    let initialWindow = try #require(store.timelineWindow)
+    let initialTimeline = store.timeline
+    let olderRequest = try #require(initialWindow.requestOlder(limit: 5))
+
+    await store.loadSelectedTimelineWindow(request: olderRequest, retainedLimit: .max)
+
+    let initialEntryIDs = initialTimeline.map(\.entryId)
+    let finalEntryIDs = store.timeline.map(\.entryId)
+    #expect(Set(initialEntryIDs).isSubset(of: Set(finalEntryIDs)))
+    #expect(store.timeline.count == initialTimeline.count + 5)
+    let finalWindow = try #require(store.timelineWindow)
+    #expect(finalWindow.windowStart == initialWindow.windowStart)
+    #expect(finalWindow.windowEnd == initialWindow.windowEnd + 5)
+    #expect(finalWindow.hasNewer == initialWindow.hasNewer)
+  }
+
   @Test("Rolling newer timeline window evicts older rows atomically")
   func rollingNewerTimelineWindowEvictsOlderRowsAtomically() async throws {
     let fixture = makeRollingWindowFixture(
@@ -109,15 +149,20 @@ private struct RollingWindowFixture {
   let client: RecordingHarnessClient
 }
 
-private extension TimelineEntry {
-  var timelineCursor: TimelineCursor {
+extension TimelineEntry {
+  fileprivate var timelineCursor: TimelineCursor {
     TimelineCursor(recordedAt: recordedAt, entryId: entryId)
   }
 }
 
-private extension TimelineWindowResponse {
-  func requestNewer(limit: Int) -> TimelineWindowRequest? {
+extension TimelineWindowResponse {
+  fileprivate func requestNewer(limit: Int) -> TimelineWindowRequest? {
     guard let newestCursor else { return nil }
     return TimelineWindowRequest(scope: .summary, limit: limit, after: newestCursor)
+  }
+
+  fileprivate func requestOlder(limit: Int) -> TimelineWindowRequest? {
+    guard let oldestCursor else { return nil }
+    return TimelineWindowRequest(scope: .summary, limit: limit, before: oldestCursor)
   }
 }

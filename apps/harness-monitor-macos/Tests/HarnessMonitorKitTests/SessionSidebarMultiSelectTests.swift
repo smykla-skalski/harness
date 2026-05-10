@@ -115,6 +115,7 @@ struct SessionSidebarMultiSelectTests {
         connectionSummaryText: "Connection: test",
         sessionStatusTitle: "Loading"
       ),
+      currentModifiers: [],
       state: state
     )
 
