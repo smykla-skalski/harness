@@ -1,24 +1,37 @@
 import AppKit
 import SwiftUI
 
-/// Re-arms the SwiftUI `.searchable` field's suggestion menu when the
-/// hosting window regains key state.
+/// Re-arms the SwiftUI `.searchable` field's suggestion menu when
+/// the hosting window regains key state OR the user clicks back into
+/// the field while it's still first responder.
 ///
 /// SwiftUI's `.searchSuggestions` is backed by the AppKit suggestion
-/// menu attached to `NSSearchField`. That menu dismisses when the
-/// window resigns key/active and does NOT reappear automatically when
-/// the window regains key. There is no SwiftUI-only API to force
-/// re-presentation. The community-documented fix
+/// menu attached to `NSSearchField`. That menu dismisses any time the
+/// window resigns key OR a different responder takes focus, and does
+/// NOT reappear automatically. There is no SwiftUI-only API to force
+/// re-presentation. The community-documented bridge
 /// (https://github.com/siteline/swiftui-introspect/discussions/397)
-/// is to bridge into AppKit, find the `NSSearchField` instance in the
-/// window's view hierarchy, and make that field first responder. The
-/// `beginSearchInteraction()` API lives on `NSSearchToolbarItem`, not
-/// `NSSearchField`, so field-backed SwiftUI search has to stay with the
-/// responder-chain bridge.
+/// is to find the `NSSearchField` in the window's view hierarchy and
+/// make it first responder. The `beginSearchInteraction()` API lives
+/// on `NSSearchToolbarItem`, not `NSSearchField`, so field-backed
+/// SwiftUI search has to stay with the responder-chain bridge.
 ///
-/// `shouldRebind` gates the rebinding so we only fire when the user
-/// has a non-empty query AND the search bar is still presented; the
-/// no-op case avoids re-arming an empty search.
+/// Two re-arm paths are needed because the dismissal modes don't
+/// share a notification:
+///
+/// 1. `NSWindow.didBecomeKeyNotification` — fires when the window
+///    transitions back to key (e.g. ⌘-tab into the app). Re-arm by
+///    cycling first responder off and back onto the search field so
+///    AppKit re-presents the menu even when the field never lost
+///    first-responder status across the resign/key flip.
+/// 2. `.leftMouseDown` local event monitor — fires when the user
+///    clicks anywhere in the window. If the click hit the search
+///    field while we have a non-empty query, the menu was almost
+///    certainly dismissed by an earlier focus event with no
+///    notification we could observe; force the same FR cycle.
+///
+/// `shouldRebind` gates both paths so we only fire when the user has
+/// a non-empty query AND the search bar is still presented.
 struct AppSearchFieldRebinder: NSViewRepresentable {
   let shouldRebind: Bool
 
@@ -55,7 +68,8 @@ struct AppSearchFieldRebinder: NSViewRepresentable {
   @MainActor
   final class Coordinator: NSObject {
     private weak var observedWindow: NSWindow?
-    private var observer: NSObjectProtocol?
+    private var keyObserver: NSObjectProtocol?
+    private var clickMonitor: Any?
     private var shouldRebind = false
 
     func update(shouldRebind newValue: Bool) {
@@ -67,7 +81,7 @@ struct AppSearchFieldRebinder: NSViewRepresentable {
       detach()
       observedWindow = window
       guard let window else { return }
-      observer = NotificationCenter.default.addObserver(
+      keyObserver = NotificationCenter.default.addObserver(
         forName: NSWindow.didBecomeKeyNotification,
         object: window,
         queue: .main
@@ -76,14 +90,36 @@ struct AppSearchFieldRebinder: NSViewRepresentable {
           self?.rearmIfNeeded(in: window)
         }
       }
+      clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown]) {
+        [weak self] event in
+        Task { @MainActor [weak self] in
+          self?.handleClick(event)
+        }
+        return event
+      }
     }
 
     func detach() {
-      if let observer {
-        NotificationCenter.default.removeObserver(observer)
+      if let keyObserver {
+        NotificationCenter.default.removeObserver(keyObserver)
       }
-      observer = nil
+      keyObserver = nil
+      if let clickMonitor {
+        NSEvent.removeMonitor(clickMonitor)
+      }
+      clickMonitor = nil
       observedWindow = nil
+    }
+
+    private func handleClick(_ event: NSEvent) {
+      guard shouldRebind else { return }
+      guard let window = observedWindow, event.window === window else {
+        return
+      }
+      guard let field = locateSearchField(in: window.contentView) else { return }
+      let pointInField = field.convert(event.locationInWindow, from: nil)
+      guard field.bounds.contains(pointInField) else { return }
+      rearm(field: field, in: window)
     }
 
     private func rearmIfNeeded(in window: NSWindow) {
@@ -91,8 +127,19 @@ struct AppSearchFieldRebinder: NSViewRepresentable {
       guard let field = locateSearchField(in: window.contentView) else {
         return
       }
-      window.makeFirstResponder(field)
-      field.selectText(nil)
+      rearm(field: field, in: window)
+    }
+
+    private func rearm(field: NSSearchField, in window: NSWindow) {
+      // AppKit's suggestion menu re-presents on a fresh
+      // becomeFirstResponder; if `field` is already first responder,
+      // `makeFirstResponder` is a no-op. Cycle off then back on to
+      // force the menu to reopen while keeping the typed query.
+      window.makeFirstResponder(nil)
+      Task { @MainActor in
+        window.makeFirstResponder(field)
+        field.selectText(nil)
+      }
     }
 
     private func locateSearchField(in view: NSView?) -> NSSearchField? {
