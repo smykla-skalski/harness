@@ -19,6 +19,7 @@ struct AgentDetailSendUpdateSection: View {
   @Binding var signalMessage: String
   @Binding var signalActionHint: String
   @FocusState private var focusedField: AgentDetailSendUpdateFocusField?
+  @State private var deadlineNow = Date.now
   @State private var isMoreOptionsExpanded = false
 
   init(
@@ -113,7 +114,7 @@ struct AgentDetailSendUpdateSection: View {
     guard let promptDeadlineDate else { return nil }
     return AcpRuntimeDeadlinePresentation.presentation(
       deadline: promptDeadlineDate,
-      now: store.acpRuntimeClockTick
+      now: deadlineNow
     )
   }
 
@@ -188,6 +189,27 @@ struct AgentDetailSendUpdateSection: View {
         actionHint: newValue
       ) {
         isMoreOptionsExpanded = true
+      }
+    }
+    .task(id: promptDeadlineDate) {
+      await runDeadlineClockIfNeeded()
+    }
+  }
+
+  @MainActor
+  private func runDeadlineClockIfNeeded() async {
+    guard promptDeadlineDate != nil else {
+      return
+    }
+
+    while !Task.isCancelled {
+      let now = AcpRuntimeDeadlineClock.now(store: store, localNow: Date.now)
+      deadlineNow = now
+      guard AcpRuntimeDeadlineClock.shouldTick(deadline: promptDeadlineDate, now: now) else {
+        return
+      }
+      guard await AcpRuntimeDeadlineClock.sleepUntilNextTick() else {
+        return
       }
     }
   }

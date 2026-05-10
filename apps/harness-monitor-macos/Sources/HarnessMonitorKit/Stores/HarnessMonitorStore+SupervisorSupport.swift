@@ -117,7 +117,7 @@ extension HarnessMonitorStore {
     }
   }
 
-  static func loadSupervisorAuditEvents(
+  public static func loadSupervisorAuditEvents(
     from modelContext: ModelContext?,
     limit: Int = 128
   ) -> [SupervisorEvent] {
