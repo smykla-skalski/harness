@@ -1,7 +1,7 @@
 import SwiftUI
 
 #Preview("Session sidebar row") {
-  @Previewable @State var selection: SessionSelection? = nil
+  @Previewable @State var selection: SessionSelection?
 
   SessionSidebarRowSelectionPreviewContent(selection: $selection)
     .frame(width: 260, height: 220)

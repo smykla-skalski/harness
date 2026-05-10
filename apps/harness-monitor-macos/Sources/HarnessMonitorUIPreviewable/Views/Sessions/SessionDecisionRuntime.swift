@@ -1,7 +1,7 @@
 import Foundation
 import HarnessMonitorKit
-import OSLog
 import Observation
+import OSLog
 import SwiftData
 
 public enum SessionDecisionInspectorTab: String, CaseIterable, Codable, Hashable, Sendable {

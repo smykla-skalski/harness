@@ -1,7 +1,7 @@
 import AppKit
 import HarnessMonitorUIPreviewable
-import SwiftUI
 import os
+import SwiftUI
 
 struct SessionWindowTabbing: ViewModifier {
   let isSessionWindow: Bool

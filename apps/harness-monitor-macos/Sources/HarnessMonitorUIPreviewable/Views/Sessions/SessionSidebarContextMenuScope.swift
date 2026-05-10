@@ -24,13 +24,13 @@ struct SessionSidebarContextMenuScope: Equatable {
     rowID: String,
     selectedIDs: Set<String>,
     orderedVisibleIDs: [String]
-  ) -> SessionSidebarContextMenuScope {
+  ) -> Self {
     if selectedIDs.contains(rowID), selectedIDs.count > 1 {
       let ordered = orderedVisibleIDs.filter { selectedIDs.contains($0) }
       let resolved = ordered.isEmpty ? Array(selectedIDs).sorted() : ordered
-      return SessionSidebarContextMenuScope(kind: kind, primaryID: rowID, ids: resolved)
+      return Self(kind: kind, primaryID: rowID, ids: resolved)
     }
-    return SessionSidebarContextMenuScope(kind: kind, primaryID: rowID, ids: [rowID])
+    return Self(kind: kind, primaryID: rowID, ids: [rowID])
   }
 
   static func resolve(

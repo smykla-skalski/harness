@@ -215,22 +215,6 @@ struct SessionWindowAgentCreateCatalogState: Equatable {
   public var personas: [AgentPersona] = []
   public var isLoading = false
   public var hasLoaded = false
-
-  init(
-    descriptors: [AcpAgentDescriptor] = [],
-    runtimeModelCatalogs: [RuntimeModelCatalog] = [],
-    capabilityOptions: [AgentCapabilityOption] = [],
-    personas: [AgentPersona] = [],
-    isLoading: Bool = false,
-    hasLoaded: Bool = false
-  ) {
-    self.descriptors = descriptors
-    self.runtimeModelCatalogs = runtimeModelCatalogs
-    self.capabilityOptions = capabilityOptions
-    self.personas = personas
-    self.isLoading = isLoading
-    self.hasLoaded = hasLoaded
-  }
 }
 
 @MainActor

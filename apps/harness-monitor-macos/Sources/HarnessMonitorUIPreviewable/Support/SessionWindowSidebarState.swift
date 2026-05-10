@@ -154,7 +154,7 @@ public enum SessionSidebarSelectionKind: Hashable, Sendable {
     agentCount: Int,
     taskCount: Int,
     decisionCount: Int
-  ) -> SessionSidebarSelectionKind? {
+  ) -> Self? {
     if agentCount > 0 { return .agent }
     if taskCount > 0 { return .task }
     if decisionCount > 0 { return .decision }
