@@ -42,6 +42,7 @@ public struct AppSearchHostModifier: ViewModifier {
   @State private var scope: AppSearchScope = .current
   @State private var lastAnnouncedHitCount = -1
   @State private var isSearchPresented: Bool = false
+  @FocusState private var searchFieldFocused: Bool
 
   public init(
     model: AppSearchModel,
@@ -56,10 +57,12 @@ public struct AppSearchHostModifier: ViewModifier {
   }
 
   public func body(content: Content) -> some View {
-    // `isPresented:` is the system-Find auto-wire: SwiftUI binds Cmd-F (the
-    // standard `TextEditingCommands` Find item) to this binding, so the same
-    // write that programmatic callers would make is what the keyboard
-    // shortcut already triggers natively. No custom dispatcher needed.
+    // Cmd-F path: a menu Button in another scene flips
+    // `harnessSessionSearchPresented` to `true` via `@FocusedBinding`.
+    // SwiftUI presents/reveals the field, the `.onChange` below moves
+    // the first responder via `.searchFocused`. macOS does not auto-bind
+    // Cmd-F to `.searchable` (Apple Developer Forums thread #688679);
+    // both `isPresented` *and* `.searchFocused` writes are required.
     content
       .searchable(
         text: $query,
@@ -67,6 +70,7 @@ public struct AppSearchHostModifier: ViewModifier {
         placement: .toolbar,
         prompt: prompt
       )
+      .searchFocused($searchFieldFocused)
       .searchPresentationToolbarBehavior(.avoidHidingContent)
       .harnessMinimizableSearchToolbar()
       .searchScopes($scope, activation: .onSearchPresentation) {
@@ -83,9 +87,15 @@ public struct AppSearchHostModifier: ViewModifier {
       .task(id: AppSearchTrigger(query: query, scope: scope)) {
         await runDebouncedSearch(for: query, scope: scope)
       }
+      .onChange(of: isSearchPresented) { _, presented in
+        if presented {
+          searchFieldFocused = true
+        }
+      }
       .onChange(of: model.results.totalHitCount) { _, newValue in
         announceResults(totalHitCount: newValue)
       }
+      .focusedSceneValue(\.harnessSessionSearchPresented, $isSearchPresented)
       .environment(\.appSearchModel, model)
   }
 
