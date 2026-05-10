@@ -2,19 +2,26 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct SessionTimelineFilterControls: View {
+  enum Layout {
+    case stacked
+    case chipsOnly
+  }
+
   @Binding private var filters: SessionTimelineFilterState
   private let inventory: SessionTimelineFilterInventory
   private let summary: SessionTimelineFilterSummary
-  @State private var showsAdvancedFilters = false
+  private let layout: Layout
 
   init(
     filters: Binding<SessionTimelineFilterState>,
     inventory: SessionTimelineFilterInventory,
-    summary: SessionTimelineFilterSummary
+    summary: SessionTimelineFilterSummary,
+    layout: Layout = .stacked
   ) {
     _filters = filters
     self.inventory = inventory
     self.summary = summary
+    self.layout = layout
   }
 
   private var quickTones: [SessionTimelineTone] {
@@ -52,99 +59,48 @@ struct SessionTimelineFilterControls: View {
     return chips
   }
 
-  private var moreFiltersSystemImage: String {
-    filters.activeAdvancedFilterCount > 0
-      ? "line.3.horizontal.decrease.circle.fill"
-      : "line.3.horizontal.decrease.circle"
-  }
-
   private var showsSignalPreset: Bool {
     inventory.signalCount > 0 || filters.signalPresetActive
   }
 
+  private var showsActionRow: Bool {
+    layout == .stacked
+  }
+
+  private var showsSupportingSections: Bool {
+    showsSignalPreset || !quickTones.isEmpty || !activeFacetChips.isEmpty
+  }
+
+  @ViewBuilder
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      filterActionRow
+    if showsActionRow || showsSupportingSections {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+        if showsActionRow {
+          filterActionRow
+        }
 
-      if showsSignalPreset || !quickTones.isEmpty {
-        presetAndToneChipsSection
-      }
+        if showsSignalPreset || !quickTones.isEmpty {
+          presetAndToneChipsSection
+        }
 
-      if !activeFacetChips.isEmpty {
-        activeFiltersSection
+        if !activeFacetChips.isEmpty {
+          activeFiltersSection
+        }
       }
-    }
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterBar)
-    .overlay {
-      AccessibilityTextMarker(
-        identifier: HarnessMonitorAccessibility.sessionTimelineFilterState,
-        text: summary.accessibilityState
-      )
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterBar)
+      .overlay {
+        AccessibilityTextMarker(
+          identifier: HarnessMonitorAccessibility.sessionTimelineFilterState,
+          text: summary.accessibilityState
+        )
+      }
     }
   }
 
   private var filterActionRow: some View {
-    HarnessMonitorWrapLayout(
-      spacing: HarnessMonitorTheme.spacingXS,
-      lineSpacing: HarnessMonitorTheme.spacingXS
-    ) {
-      scopeMenu
-      moreFiltersButton
-      clearFiltersButton
-    }
+    SessionTimelineFilterActionButtons(filters: $filters, inventory: inventory)
     .frame(maxWidth: .infinity, alignment: .leading)
-  }
-
-  private var scopeMenu: some View {
-    Menu {
-      ForEach(SessionTimelineSearchScope.allCases) { scope in
-        Button {
-          filters.searchScope = scope
-        } label: {
-          scopeMenuItem(scope)
-        }
-      }
-    } label: {
-      Label(filters.searchScope.label, systemImage: filters.searchScope.systemImage)
-        .labelStyle(.titleAndIcon)
-    }
-    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-    .harnessNativeFormControl()
-    .accessibilityLabel("Search scope — \(filters.searchScope.label)")
-    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterScopeMenu)
-  }
-
-  private func scopeMenuItem(_ scope: SessionTimelineSearchScope) -> some View {
-    HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      Image(systemName: filters.searchScope == scope ? "checkmark" : scope.systemImage)
-      Text(scope.label)
-    }
-  }
-
-  private var moreFiltersButton: some View {
-    Button("Filters", systemImage: moreFiltersSystemImage) {
-      showsAdvancedFilters = true
-    }
-    .harnessActionButtonStyle(
-      variant: .bordered,
-      tint: filters.activeAdvancedFilterCount > 0 ? nil : .secondary
-    )
-    .harnessNativeFormControl()
-    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterMoreButton)
-    .popover(isPresented: $showsAdvancedFilters, arrowEdge: .top) {
-      SessionTimelineAdvancedFiltersPopover(filters: $filters, inventory: inventory)
-    }
-  }
-
-  private var clearFiltersButton: some View {
-    Button("Clear") {
-      filters.clear()
-    }
-    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-    .harnessNativeFormControl()
-    .disabled(filters.isEmpty)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterClearButton)
   }
 
   private var presetAndToneChipsSection: some View {
@@ -237,5 +193,62 @@ struct SessionTimelineFilterControls: View {
       return false
     }
     return filters.semanticProperties.contains(property)
+  }
+}
+
+struct SessionTimelineFilterActionButtons: View {
+  @Binding private var filters: SessionTimelineFilterState
+  private let inventory: SessionTimelineFilterInventory
+  private let showsClearButton: Bool
+  @State private var showsAdvancedFilters = false
+
+  init(
+    filters: Binding<SessionTimelineFilterState>,
+    inventory: SessionTimelineFilterInventory,
+    showsClearButton: Bool = true
+  ) {
+    _filters = filters
+    self.inventory = inventory
+    self.showsClearButton = showsClearButton
+  }
+
+  private var moreFiltersSystemImage: String {
+    filters.activeAdvancedFilterCount > 0
+      ? "line.3.horizontal.decrease.circle.fill"
+      : "line.3.horizontal.decrease.circle"
+  }
+
+  var body: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingXS) {
+      moreFiltersButton
+      if showsClearButton {
+        clearFiltersButton
+      }
+    }
+  }
+
+  private var moreFiltersButton: some View {
+    Button("Filters", systemImage: moreFiltersSystemImage) {
+      showsAdvancedFilters = true
+    }
+    .harnessActionButtonStyle(
+      variant: .bordered,
+      tint: filters.activeAdvancedFilterCount > 0 ? nil : .secondary
+    )
+    .harnessNativeFormControl()
+    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterMoreButton)
+    .popover(isPresented: $showsAdvancedFilters, arrowEdge: .top) {
+      SessionTimelineAdvancedFiltersPopover(filters: $filters, inventory: inventory)
+    }
+  }
+
+  private var clearFiltersButton: some View {
+    Button("Clear") {
+      filters.clear()
+    }
+    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    .harnessNativeFormControl()
+    .disabled(filters.isEmpty)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineFilterClearButton)
   }
 }
