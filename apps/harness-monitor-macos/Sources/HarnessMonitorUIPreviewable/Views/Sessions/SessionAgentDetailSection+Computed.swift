@@ -2,27 +2,27 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension SessionAgentDetailSection {
-  private var hasRealLeader: Bool {
+  var hasRealLeader: Bool {
     Self.hasRealLeader(leaderID: leaderID, agents: detail.agents)
   }
 
-  private var isLeader: Bool {
+  var isLeader: Bool {
     agent.agentId == leaderID
   }
 
-  private var roleStateKey: String {
+  var roleStateKey: String {
     "\(agent.agentId)|\(agent.role.rawValue)|\(leaderID ?? "-")"
   }
 
-  private var rolePickerValues: [SessionRole] {
+  var rolePickerValues: [SessionRole] {
     AgentDetailSection.rolePickerOptions(for: agent.role)
   }
 
-  private var sessionActionUnavailableMessage: String? {
+  var sessionActionUnavailableMessage: String? {
     store.sessionActionUnavailableMessage(sessionID: sessionID)
   }
 
-  private var actionActorID: String? {
+  var actionActorID: String? {
     Self.resolvedActionActorID(
       preferredActorID: store.actionActorID,
       agents: detail.agents,
@@ -30,20 +30,20 @@ extension SessionAgentDetailSection {
     )
   }
 
-  private var signalActionUnavailableMessage: String? {
+  var signalActionUnavailableMessage: String? {
     sessionActionUnavailableMessage
       ?? (actionActorID == nil ? Self.noAvailableActionActorMessage : nil)
   }
 
-  private var roleActionsAvailable: Bool {
+  var roleActionsAvailable: Bool {
     sessionActionUnavailableMessage == nil && hasRealLeader && actionActorID != nil
   }
 
-  private var activity: AgentToolActivitySummary? {
+  var activity: AgentToolActivitySummary? {
     detail.agentActivity.first(where: { $0.agentId == agent.agentId })
   }
 
-  private var overviewFacts: [AgentDetailFact] {
+  var overviewFacts: [AgentDetailFact] {
     [
       .init(title: "Last Activity", value: formatTimestamp(agent.lastActivityAt)),
       .init(
@@ -53,7 +53,7 @@ extension SessionAgentDetailSection {
     ]
   }
 
-  private var runtimeLaneFacts: [AgentDetailFact] {
+  var runtimeLaneFacts: [AgentDetailFact] {
     [
       .init(
         title: "Transcript",
@@ -71,15 +71,15 @@ extension SessionAgentDetailSection {
     ]
   }
 
-  private var capabilityValues: [String] {
+  var capabilityValues: [String] {
     agent.capabilities.isEmpty ? ["No declared capabilities"] : agent.capabilities
   }
 
-  private var hookPoints: [HookIntegrationDescriptor] {
+  var hookPoints: [HookIntegrationDescriptor] {
     agent.runtimeCapabilities.hookPoints
   }
 
-  private var activityFacts: [AgentDetailFact] {
+  var activityFacts: [AgentDetailFact] {
     guard let activity else {
       return []
     }
@@ -100,11 +100,11 @@ extension SessionAgentDetailSection {
     ]
   }
 
-  private var assignedTasks: [WorkItem] {
+  var assignedTasks: [WorkItem] {
     detail.tasks.filter { $0.assignedTo == agent.agentId }
   }
 
-  private var currentTaskTitle: String {
+  var currentTaskTitle: String {
     guard
       let currentTaskID = agent.currentTaskId,
       let task = detail.tasks.first(where: { $0.taskId == currentTaskID })
@@ -114,7 +114,7 @@ extension SessionAgentDetailSection {
     return task.title
   }
 
-  private var agentTimelineEntries: [TimelineEntry] {
+  var agentTimelineEntries: [TimelineEntry] {
     Self.transcriptEntries(
       agent: agent,
       agentTimeline: agentTimeline,
@@ -122,15 +122,15 @@ extension SessionAgentDetailSection {
     )
   }
 
-  private var isSparseState: Bool {
+  var isSparseState: Bool {
     agentTimelineEntries.isEmpty && agent.persona == nil && assignedTasks.isEmpty
   }
 
-  private var pendingDecisionAttention: AcpDecisionAttention? {
+  var pendingDecisionAttention: AcpDecisionAttention? {
     store.acpDecisionAttention(for: agent.agentId, sessionID: sessionID)
   }
 
-  private var acpRuntimeState: AcpAgentRuntimeState? {
+  var acpRuntimeState: AcpAgentRuntimeState? {
     store.acpRuntimeState(
       for: agent.agentId,
       sessionID: sessionID,
@@ -138,7 +138,7 @@ extension SessionAgentDetailSection {
     )
   }
 
-  private var acpRuntimeInspectStatus: AcpRuntimeInspectStatus? {
+  var acpRuntimeInspectStatus: AcpRuntimeInspectStatus? {
     store.acpRuntimeInspectStatus(
       for: agent.agentId,
       sessionID: sessionID,
@@ -146,7 +146,7 @@ extension SessionAgentDetailSection {
     )
   }
 
-  private var showsTerminalBand: Bool {
+  var showsTerminalBand: Bool {
     agent.managedAgent?.kind == .tui || tui != nil || pendingPrompt != nil
   }
 }

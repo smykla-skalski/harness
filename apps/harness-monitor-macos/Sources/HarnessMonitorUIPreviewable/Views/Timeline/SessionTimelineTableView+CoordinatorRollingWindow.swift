@@ -54,23 +54,44 @@ enum SessionTimelineRollingRowChange: Equatable {
     return Array(suffixSource[overlapStart...])
       == Array(prefixSource[..<overlapCount])
   }
+
+  func restorationAnchor(
+    primary: SessionTimelineTableAnchor?,
+    visibleAnchors: [SessionTimelineTableAnchor],
+    nextRows: [SessionTimelineRow]
+  ) -> SessionTimelineTableAnchor? {
+    let nextIDs = Set(nextRows.map(\.id))
+    if let primary, nextIDs.contains(primary.rowID) {
+      return primary
+    }
+    let surviving = visibleAnchors.filter { nextIDs.contains($0.rowID) }
+    switch self {
+    case .older:
+      return surviving.first
+    case .newer:
+      return surviving.last
+    }
+  }
 }
 
 extension SessionTimelineTableView.Coordinator {
-  func currentScrollY() -> CGFloat? {
-    scrollView?.contentView.bounds.minY
-  }
-
-  func restoreScrollY(_ scrollY: CGFloat) {
-    guard let scrollView else {
-      return
+  func currentVisibleAnchors() -> [SessionTimelineTableAnchor] {
+    guard let tableView, let scrollView else {
+      return []
     }
-    tableView?.layoutSubtreeIfNeeded()
-    scrollView.layoutSubtreeIfNeeded()
-    let restoredY = clampedScrollY(scrollY, scrollView: scrollView)
-    scrollView.contentView.scroll(to: NSPoint(x: 0, y: restoredY))
-    scrollView.reflectScrolledClipView(scrollView.contentView)
-    syncBoundaryStateToCurrentViewport()
-    boundsDidChange(forceObservedStats: true)
+    let visibleRect = scrollView.contentView.bounds
+    guard let visibleRange = dataRowRange(forTableRows: tableView.rows(in: visibleRect)) else {
+      return []
+    }
+    return visibleRange.map { rowIndex in
+      guard let tableRow = tableRow(forDataIndex: rowIndex) else {
+        return SessionTimelineTableAnchor(rowID: rows[rowIndex].id, offsetY: 0)
+      }
+      let rowRect = tableView.rect(ofRow: tableRow)
+      return SessionTimelineTableAnchor(
+        rowID: rows[rowIndex].id,
+        offsetY: visibleRect.minY - rowRect.minY
+      )
+    }
   }
 }

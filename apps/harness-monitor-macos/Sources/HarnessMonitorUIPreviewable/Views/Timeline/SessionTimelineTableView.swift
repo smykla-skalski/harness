@@ -64,6 +64,7 @@ struct SessionTimelineTableAnchor {
 struct SessionTimelineTableView: NSViewRepresentable {
   let columnWidth: CGFloat
   let rows: [SessionTimelineRow]
+  let virtualization: SessionTimelineTableVirtualization
   let contentIdentity: SessionTimelineContentIdentity?
   let scrollCommand: SessionTimelineScrollCommand?
   let actionHandler: any DecisionActionHandler
@@ -123,6 +124,7 @@ struct SessionTimelineTableView: NSViewRepresentable {
     context.coordinator.scrollBoundaryChanged = scrollBoundaryChanged
     context.coordinator.update(
       rows: rows,
+      virtualization: virtualization,
       contentIdentity: contentIdentity,
       actionHandler: actionHandler,
       onSignalTap: onSignalTap,
@@ -137,6 +139,7 @@ struct SessionTimelineTableView: NSViewRepresentable {
 
   static func dismantleNSView(_ scrollView: NSScrollView, coordinator: Coordinator) {
     coordinator.cancelMeasurement(reason: "dismantle")
+    coordinator.cancelLiveScrollTracking()
     coordinator.persistHeightCache()
     (scrollView.documentView as? NSTableView)?.delegate = nil
     (scrollView.documentView as? NSTableView)?.dataSource = nil

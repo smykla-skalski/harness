@@ -7,6 +7,7 @@ import SwiftUI
 extension SessionTimelineTableView.Coordinator {
   func update(
     rows: [SessionTimelineRow],
+    virtualization: SessionTimelineTableVirtualization = .disabled,
     contentIdentity: SessionTimelineContentIdentity? = nil,
     actionHandler: any DecisionActionHandler,
     onSignalTap: ((String) -> Void)?,
@@ -33,8 +34,9 @@ extension SessionTimelineTableView.Coordinator {
     let fontSame = abs(request.fontScale - fontScale) < 0.001
     let scrollSame = scrollCommand == lastScrollCommand && pendingScrollCommand == nil
     let identitySame = contentIdentity == heightCacheIdentity
+    let virtualizationSame = virtualization == self.virtualization
 
-    if rowsLookSame, widthSame, fontSame, scrollSame, identitySame {
+    if rowsLookSame, widthSame, fontSame, scrollSame, identitySame, virtualizationSame {
       return
     }
 
@@ -43,19 +45,24 @@ extension SessionTimelineTableView.Coordinator {
     // and reschedule the measurement task (which auto-debounces by cancelling
     // its predecessor) without invalidating heights via noteHeightOfRows. The
     // per-tick noteHeightOfRows call was the source of the reveal stall.
-    if rowsLookSame, fontSame, scrollSame, identitySame {
+    if rowsLookSame, fontSame, scrollSame, identitySame, virtualizationSame {
       applyWidthOnlyUpdateIfNeeded(columnWidth: resolvedColumnWidth)
       return
     }
 
     let previousFontScale = fontScale
     let wasPinnedToLatest = isPinnedToLatestViewport()
-    let previousAnchor = wasPinnedToLatest ? nil : currentVisibleAnchor()
+    let previousAnchor = currentVisibleAnchor()
+    let previousVisibleAnchors = currentVisibleAnchors()
     let rollingRowChange = SessionTimelineRollingRowChange.detect(
       previousRows: self.rows,
       nextRows: rows
     )
-    let previousScrollY = rollingRowChange == nil ? nil : currentScrollY()
+    let rollingAnchor = rollingRowChange?.restorationAnchor(
+      primary: wasPinnedToLatest ? nil : previousAnchor,
+      visibleAnchors: previousVisibleAnchors,
+      nextRows: rows
+    )
     let nextSnapshot = SessionTimelineTableSnapshot(rows: rows)
     let restoredHeightCache = restoreHeightCacheIfNeeded(
       identity: contentIdentity,
@@ -69,12 +76,16 @@ extension SessionTimelineTableView.Coordinator {
       comparedTo: rowSnapshot,
       fontScaleChanged: fontScaleChanged
     )
-    let rowsChanged = rowSnapshot != nextSnapshot || fontScaleChanged
+    let rowsChanged = rowSnapshot != nextSnapshot || fontScaleChanged || !virtualizationSame
     if rowsChanged {
       applyRowChanges(
         rows: rows,
+        virtualization: virtualization,
         nextSnapshot: nextSnapshot,
         invalidatedHeightIDs: invalidatedHeightIDs,
+        priorIDs: Set(self.rows.map(\.id)),
+        restorationAnchorID: rollingAnchor?.rowID
+          ?? (wasPinnedToLatest ? nil : previousAnchor?.rowID),
         resolvedColumnWidth: resolvedColumnWidth,
         fontScaleChanged: fontScaleChanged
       )
@@ -93,15 +104,18 @@ extension SessionTimelineTableView.Coordinator {
         wasPinnedToLatest: wasPinnedToLatest,
         previousAnchor: previousAnchor,
         rollingRowChange: rollingRowChange,
-        previousScrollY: previousScrollY
+        rollingAnchor: rollingAnchor
       )
     }
   }
 
   private func applyRowChanges(
     rows: [SessionTimelineRow],
+    virtualization: SessionTimelineTableVirtualization,
     nextSnapshot: SessionTimelineTableSnapshot,
     invalidatedHeightIDs: Set<String>,
+    priorIDs: Set<String>,
+    restorationAnchorID: String?,
     resolvedColumnWidth: CGFloat,
     fontScaleChanged: Bool
   ) {
@@ -109,7 +123,6 @@ extension SessionTimelineTableView.Coordinator {
       return
     }
     let nextIDs = Set(rows.map(\.id))
-    let priorIDs = Set(self.rows.map(\.id))
     let willReuseAny = !fontScaleChanged && !nextIDs.isDisjoint(with: priorIDs)
     let updateInterval = beginRowChangeInterval(
       rowCount: rows.count,
@@ -120,18 +133,28 @@ extension SessionTimelineTableView.Coordinator {
       Self.signposter.endInterval("session_timeline.update_rows_changed", updateInterval)
     }
     cancelMeasurement(reason: "rows_changed")
-    reuseVisibleHeightsIfNeeded(
-      willReuseAny: willReuseAny,
-      nextIDs: nextIDs,
-      invalidatedHeightIDs: invalidatedHeightIDs,
-      tableView: tableView
-    )
     rowHeightCache = rowHeightCache.filter {
       nextIDs.contains($0.key) && !invalidatedHeightIDs.contains($0.key)
+        && $0.value.isMeasured
     }
+    prepareColumnForRowReload(columnWidth: resolvedColumnWidth)
+    premeasureRowsBeforeReload(
+      rows: rows,
+      priorIDs: priorIDs,
+      invalidatedHeightIDs: invalidatedHeightIDs,
+      restorationAnchorID: restorationAnchorID,
+      columnWidth: resolvedColumnWidth
+    )
+    let nextEventOffsets = eventOffsets(for: rows)
+    _ = refreshVirtualSpacers(
+      rows: rows,
+      eventOffsets: nextEventOffsets,
+      virtualization: virtualization,
+      columnWidth: resolvedColumnWidth
+    )
 
     self.rows = rows
-    eventOffsetsByRow = eventOffsets(for: rows)
+    eventOffsetsByRow = nextEventOffsets
     rowIndexByID = Dictionary(
       uniqueKeysWithValues: rows.enumerated().map { index, row in
         (row.id, index)
@@ -170,6 +193,7 @@ extension SessionTimelineTableView.Coordinator {
       persistHeightCache()
       heightCacheIdentity = identity
       rowHeightCache = [:]
+      knownEventHeights = [:]
       rowSnapshot = .empty
     }
     guard
@@ -198,67 +222,46 @@ extension SessionTimelineTableView.Coordinator {
     )
   }
 
-  private func reuseVisibleHeightsIfNeeded(
-    willReuseAny: Bool,
-    nextIDs: Set<String>,
-    invalidatedHeightIDs: Set<String>,
-    tableView: NSTableView
-  ) {
-    guard willReuseAny, let visibleRange = visibleRowIndexRange() else {
-      return
-    }
-    for rowIndex in visibleRange {
-      guard self.rows.indices.contains(rowIndex) else { continue }
-      let rowID = self.rows[rowIndex].id
-      guard nextIDs.contains(rowID), !invalidatedHeightIDs.contains(rowID) else {
-        continue
-      }
-      guard let cached = rowHeightCache[rowID] else {
-        continue
-      }
-      guard cached.isMeasured else {
-        rowHeightCache.removeValue(forKey: rowID)
-        continue
-      }
-      rowHeightCache[rowID] = CachedRowHeight(
-        width: lastColumnWidth,
-        height: tableView.rect(ofRow: rowIndex).height,
-        isMeasured: true
-      )
-    }
-  }
-
   private func restoreViewportAfterRowChange(
     hasUnfulfilledScrollCommand: Bool,
     wasPinnedToLatest: Bool,
     previousAnchor: SessionTimelineTableAnchor?,
     rollingRowChange: SessionTimelineRollingRowChange?,
-    previousScrollY: CGFloat?
+    rollingAnchor: SessionTimelineTableAnchor?
   ) {
-    if !hasUnfulfilledScrollCommand, rollingRowChange != nil, let previousScrollY {
-      restoreScrollY(previousScrollY)
-      return
-    }
-    if !hasUnfulfilledScrollCommand && normalizePinnedLatestViewportIfNeeded() {
-      boundsDidChange(forceObservedStats: true)
+    if !hasUnfulfilledScrollCommand, rollingRowChange != nil {
+      if let rollingAnchor {
+        restore(anchor: rollingAnchor)
+      } else {
+        boundsDidChange(forceObservedStats: true, suppressBoundaryCallbacks: true)
+      }
       return
     }
     if wasPinnedToLatest && !hasUnfulfilledScrollCommand {
-      boundsDidChange(forceObservedStats: true)
+      if !normalizePinnedLatestViewportIfNeeded() {
+        boundsDidChange(forceObservedStats: true, suppressBoundaryCallbacks: true)
+      }
       return
     }
-    restore(anchor: previousAnchor)
+    if let previousAnchor {
+      restore(anchor: previousAnchor)
+    } else {
+      boundsDidChange(forceObservedStats: true)
+    }
   }
 
   func numberOfRows(in _: NSTableView) -> Int {
-    rows.count
+    tableRowCount
   }
 
   func tableView(_: NSTableView, heightOfRow row: Int) -> CGFloat {
-    guard rows.indices.contains(row) else {
+    if let spacerHeight = virtualSpacerHeight(forTableRow: row) {
+      return spacerHeight
+    }
+    guard let dataIndex = dataIndex(forTableRow: row), rows.indices.contains(dataIndex) else {
       return SessionTimelineTableMetrics.estimatedBaseRowHeight
     }
-    let rowData = rows[row]
+    let rowData = rows[dataIndex]
     if let cached = rowHeightCache[rowData.id],
       cached.matches(width: lastColumnWidth, tolerance: Self.widthEqualityTolerance)
     {
@@ -272,7 +275,10 @@ extension SessionTimelineTableView.Coordinator {
     viewFor _: NSTableColumn?,
     row: Int
   ) -> NSView? {
-    guard rows.indices.contains(row) else {
+    if virtualSpacerHeight(forTableRow: row) != nil {
+      return makeSpacerCell(in: tableView)
+    }
+    guard let dataIndex = dataIndex(forTableRow: row), rows.indices.contains(dataIndex) else {
       return nil
     }
     let cell =
@@ -282,11 +288,11 @@ extension SessionTimelineTableView.Coordinator {
       ) as? SessionTimelineTableCellView
       ?? SessionTimelineTableCellView()
     let connectorVisibility = SessionTimelineTableMetrics.connectorVisibility(
-      rowIndex: row,
+      rowIndex: dataIndex,
       rowCount: rows.count
     )
     cell.update(
-      row: rows[row],
+      row: rows[dataIndex],
       actionHandler: actionHandler,
       onSignalTap: onSignalTap,
       fontScale: fontScale,
@@ -362,15 +368,8 @@ extension SessionTimelineTableView.Coordinator {
     measurementTask = task
   }
 
-  private func visibleRowIndexRange() -> Range<Int>? {
-    guard let tableView, let scrollView else { return nil }
-    let bounds = scrollView.contentView.bounds
-    guard bounds.height > 0 else { return nil }
-    let visibleRows = tableView.rows(in: bounds)
-    guard visibleRows.location != NSNotFound, visibleRows.length > 0 else { return nil }
-    let lower = max(0, visibleRows.location)
-    let upper = min(rows.count, lower + visibleRows.length)
-    return lower < upper ? lower..<upper : nil
+  func visibleRowIndexRange() -> Range<Int>? {
+    visibleDataRowRange()
   }
 
   nonisolated static let measurementPrefetchRowCount = 4

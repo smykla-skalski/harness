@@ -375,6 +375,7 @@ struct SessionTimelineView: View {
       SessionTimelineTableView(
         columnWidth: 0,
         rows: presentation.rows,
+        virtualization: presentation.tableVirtualization,
         contentIdentity: contentIdentity,
         scrollCommand: scrollCommand,
         actionHandler: actionHandler,

@@ -13,6 +13,7 @@ Native SwiftUI control deck for live harness daemon sessions. The Xcode project 
 From the repo root:
 
 ```bash
+mise run monitor
 mise run version:check
 mise run monitor:build
 mise run monitor:generate
@@ -47,6 +48,12 @@ When you need a raw local build command, prefer the lane-aware wrapper so concur
 
 ```bash
 mise run monitor:build
+```
+
+To build and immediately open the resulting app bundle from the resolved build lane, use:
+
+```bash
+mise run monitor
 ```
 
 The wrapper and repo scripts resolve `xcode-derived` at the git common root, so linked worktrees reuse one default CLI DerivedData tree instead of bloating each checkout. For an isolated CLI build/test lane, set `HARNESS_MONITOR_BUILD_LANE=<name>`; that moves the build root to `xcode-derived-lanes/<slug>` and gives the lane its own wrapper lock.

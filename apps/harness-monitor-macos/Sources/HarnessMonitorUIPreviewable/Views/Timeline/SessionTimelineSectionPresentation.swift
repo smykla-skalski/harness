@@ -147,6 +147,15 @@ struct SessionTimelineSectionPresentation {
     return max(minimumViewportHeight, availableViewportHeight)
   }
 
+  var tableVirtualization: SessionTimelineTableVirtualization {
+    SessionTimelineTableVirtualization(
+      totalCount: navigation.totalCount,
+      windowStart: navigation.windowStart,
+      windowEnd: navigation.windowEnd,
+      isFiltered: filterSnapshot.summary.isFiltered
+    )
+  }
+
   func canScrollOlder(from targetID: String?) -> Bool {
     nextOlderNodeID(from: targetID) != nil || navigation.hasOlder
   }

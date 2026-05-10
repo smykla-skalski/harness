@@ -18,12 +18,13 @@ extension SessionTimelineTableView.Coordinator {
     guard
       let tableView,
       let scrollView,
-      let index = rowIndexByID[rowID]
+      let index = rowIndexByID[rowID],
+      let tableRow = tableRow(forDataIndex: index)
     else {
       return false
     }
     tableView.layoutSubtreeIfNeeded()
-    let rowRect = tableView.rect(ofRow: index)
+    let rowRect = tableView.rect(ofRow: tableRow)
     let y = clampedScrollY(rowRect.minY, scrollView: scrollView)
     scrollView.contentView.scroll(to: NSPoint(x: 0, y: y))
     scrollView.reflectScrolledClipView(scrollView.contentView)
@@ -35,11 +36,12 @@ extension SessionTimelineTableView.Coordinator {
     guard let anchor,
       let tableView,
       let scrollView,
-      let index = rowIndexByID[anchor.rowID]
+      let index = rowIndexByID[anchor.rowID],
+      let tableRow = tableRow(forDataIndex: index)
     else {
       return
     }
-    let rowRect = tableView.rect(ofRow: index)
+    let rowRect = tableView.rect(ofRow: tableRow)
     let y = SessionTimelineTableMetrics.restoredScrollY(
       rowMinY: rowRect.minY,
       anchorOffsetY: anchor.offsetY,
@@ -49,7 +51,7 @@ extension SessionTimelineTableView.Coordinator {
     scrollView.contentView.scroll(to: NSPoint(x: 0, y: y))
     scrollView.reflectScrolledClipView(scrollView.contentView)
     syncBoundaryStateToCurrentViewport()
-    boundsDidChange(forceObservedStats: true)
+    boundsDidChange(forceObservedStats: true, suppressBoundaryCallbacks: true)
   }
 
   func clampedScrollY(_ y: CGFloat, scrollView: NSScrollView) -> CGFloat {
@@ -71,15 +73,16 @@ extension SessionTimelineTableView.Coordinator {
     guard visibleRect.height > 0, visibleRect.width > 0 else {
       return nil
     }
-    let visibleRows = tableView.rows(in: visibleRect)
-    guard visibleRows.location != NSNotFound,
-      rows.indices.contains(visibleRows.location)
+    guard
+      let visibleRange = dataRowRange(forTableRows: tableView.rows(in: visibleRect)),
+      let dataIndex = visibleRange.first,
+      let tableRow = tableRow(forDataIndex: dataIndex)
     else {
       return nil
     }
-    let rowRect = tableView.rect(ofRow: visibleRows.location)
+    let rowRect = tableView.rect(ofRow: tableRow)
     return SessionTimelineTableAnchor(
-      rowID: rows[visibleRows.location].id,
+      rowID: rows[dataIndex].id,
       offsetY: visibleRect.minY - rowRect.minY
     )
   }
@@ -92,11 +95,16 @@ extension SessionTimelineTableView.Coordinator {
     guard visibleRect.height > 0, visibleRect.width > 0 else {
       return false
     }
-    let visibleRows = tableView.rows(in: visibleRect)
-    let firstVisibleRowIndex = visibleRows.location == NSNotFound ? nil : visibleRows.location
+    guard
+      virtualSpacers.topHeight <= Self.widthEqualityTolerance,
+      let visibleRange = dataRowRange(forTableRows: tableView.rows(in: visibleRect)),
+      let dataIndex = visibleRange.first
+    else {
+      return false
+    }
     return SessionTimelineTableMetrics.shouldStickToLatestOnRowsChange(
       visibleMinY: visibleRect.minY,
-      firstVisibleRowIndex: firstVisibleRowIndex
+      firstVisibleRowIndex: dataIndex
     )
   }
 
@@ -109,11 +117,13 @@ extension SessionTimelineTableView.Coordinator {
       return false
     }
     let visibleMinY = scrollView.contentView.bounds.minY
-    let visibleRows = tableView.rows(in: scrollView.contentView.bounds)
+    let visibleRows = dataRowRange(
+      forTableRows: tableView.rows(in: scrollView.contentView.bounds)
+    )
     guard
       SessionTimelineTableMetrics.shouldNormalizeLatestViewport(
         visibleMinY: visibleMinY,
-        firstVisibleRowIndex: visibleRows.location == NSNotFound ? nil : visibleRows.location
+        firstVisibleRowIndex: visibleRows?.lowerBound
       )
     else {
       return false
@@ -121,22 +131,19 @@ extension SessionTimelineTableView.Coordinator {
     scrollView.contentView.scroll(to: .zero)
     scrollView.reflectScrolledClipView(scrollView.contentView)
     syncBoundaryStateToCurrentViewport()
+    boundsDidChange(forceObservedStats: true, suppressBoundaryCallbacks: true)
     return true
   }
 
   func currentBoundaryState() -> SessionTimelineScrollBoundaryState? {
-    guard let tableView, let scrollView else {
+    guard let scrollView else {
       return nil
     }
     let visibleRect = scrollView.contentView.bounds
     guard visibleRect.height > 0, visibleRect.width > 0 else {
       return nil
     }
-    return SessionTimelineScrollBoundaryState(
-      visibleMinY: visibleRect.minY,
-      visibleMaxY: visibleRect.maxY,
-      contentHeight: tableView.bounds.height
-    )
+    return loadedBoundaryState()
   }
 
   func syncBoundaryStateToCurrentViewport() {
@@ -151,21 +158,34 @@ extension SessionTimelineTableView.Coordinator {
     boundsDidChange(forceObservedStats: false)
   }
 
-  func boundsDidChange(forceObservedStats: Bool) {
+  func boundsDidChange(
+    forceObservedStats: Bool,
+    suppressBoundaryCallbacks: Bool = false
+  ) {
     refreshColumnWidthFromScrollViewIfNeeded()
     pendingPublishForcesObservedStats = pendingPublishForcesObservedStats || forceObservedStats
+    pendingPublishSuppressesBoundaryCallbacks =
+      pendingPublishSuppressesBoundaryCallbacks || suppressBoundaryCallbacks
     guard !pendingPublish else { return }
     pendingPublish = true
     Task { @MainActor [weak self] in
       guard let self else { return }
       let shouldForceObservedStats = self.pendingPublishForcesObservedStats
+      let shouldSuppressBoundaryCallbacks = self.pendingPublishSuppressesBoundaryCallbacks
       self.pendingPublish = false
       self.pendingPublishForcesObservedStats = false
-      self.publishViewportState(forceObservedStats: shouldForceObservedStats)
+      self.pendingPublishSuppressesBoundaryCallbacks = false
+      self.publishViewportState(
+        forceObservedStats: shouldForceObservedStats,
+        suppressBoundaryCallbacks: shouldSuppressBoundaryCallbacks
+      )
     }
   }
 
-  func publishViewportState(forceObservedStats: Bool = false) {
+  func publishViewportState(
+    forceObservedStats: Bool = false,
+    suppressBoundaryCallbacks: Bool = false
+  ) {
     guard let tableView, let scrollView else {
       return
     }
@@ -176,19 +196,22 @@ extension SessionTimelineTableView.Coordinator {
     guard visibleRect.height > 0, visibleRect.width > 0 else {
       return
     }
-    let visibleRows = tableView.rows(in: visibleRect)
-    let visibleRowCount = max(0, visibleRows.length)
+    let visibleRows = dataRowRange(forTableRows: tableView.rows(in: visibleRect))
+    let visibleRowCount = visibleRows?.count ?? 0
     let viewportRowCapacity = max(
       visibleRowCount,
       Int(ceil(visibleRect.height / SessionTimelineSectionPresentation.rowHeightEstimate))
     )
-    let visibleEventOffsets = visibleEventOffsets(for: visibleRows)
-    let visibleMatchOffsets = visibleMatchOffsets(for: visibleRows)
+    let visibleRowRange = visibleRows.map {
+      NSRange(location: $0.lowerBound, length: $0.count)
+    } ?? NSRange(location: NSNotFound, length: 0)
+    let visibleEventOffsets = visibleEventOffsets(for: visibleRowRange)
+    let visibleMatchOffsets = visibleMatchOffsets(for: visibleRowRange)
     let stats = SessionTimelineTableViewportStats(
       visibleRowCount: visibleRowCount,
       renderedRowCount: visibleRowCount,
       viewportRowCapacity: viewportRowCapacity,
-      anchorRowID: anchorRowID(for: visibleRows),
+      anchorRowID: anchorRowID(for: visibleRowRange),
       firstVisibleEventOffset: visibleEventOffsets?.lowerBound,
       lastVisibleEventOffset: visibleEventOffsets?.upperBound,
       firstVisibleMatchOffset: visibleMatchOffsets?.lowerBound,
@@ -197,7 +220,10 @@ extension SessionTimelineTableView.Coordinator {
     let previousStats = lastViewportStats
     if previousStats != stats {
       lastViewportStats = stats
-      viewport?.recordViewportStats(stats, publishImmediately: forceObservedStats)
+      viewport?.recordViewportStats(
+        stats,
+        publishImmediately: forceObservedStats || previousStats == nil
+      )
       if previousStats?.viewportRowCapacity != stats.viewportRowCapacity {
         viewportChanged(stats)
       }
@@ -210,6 +236,10 @@ extension SessionTimelineTableView.Coordinator {
       return
     }
     viewport?.recordScrollBoundaryState(boundaryState)
+    if suppressBoundaryCallbacks {
+      lastBoundaryState = boundaryState
+      return
+    }
     let enteredTopEdge = boundaryState.enteredTopEdge(from: lastBoundaryState)
     let enteredBottomEdge = boundaryState.enteredBottomEdge(from: lastBoundaryState)
     if enteredTopEdge || enteredBottomEdge {
@@ -236,7 +266,7 @@ extension SessionTimelineTableView.Coordinator {
     let invalidationIndexes = visibleMeasurementInvalidationIndexes()
     if !invalidationIndexes.isEmpty {
       performWithoutTableAnimation {
-        tableView.noteHeightOfRows(withIndexesChanged: invalidationIndexes)
+        tableView.noteHeightOfRows(withIndexesChanged: tableRows(forDataIndexes: invalidationIndexes))
       }
     }
     scheduleIncrementalMeasurement(columnWidth: columnWidth)
@@ -285,20 +315,7 @@ extension SessionTimelineTableView.Coordinator {
   }
 
   private func visibleMeasurementRange() -> Range<Int>? {
-    guard let tableView, let scrollView else {
-      return nil
-    }
-    let bounds = scrollView.contentView.bounds
-    guard bounds.height > 0 else {
-      return nil
-    }
-    let visibleRows = tableView.rows(in: bounds)
-    guard visibleRows.location != NSNotFound, visibleRows.length > 0 else {
-      return nil
-    }
-    let lowerBound = max(0, visibleRows.location)
-    let upperBound = min(rows.count, lowerBound + visibleRows.length)
-    return lowerBound < upperBound ? lowerBound..<upperBound : nil
+    visibleDataRowRange()
   }
 
   @discardableResult

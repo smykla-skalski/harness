@@ -300,7 +300,7 @@ extension SessionTimelineNavigationTests {
 
   @Test("Prepended updates do not carry provisional visible heights forward")
   @MainActor
-  func prependedUpdatesDoNotCarryProvisionalVisibleHeightsForward() {
+  func prependedUpdatesDoNotCarryProvisionalVisibleHeightsForward() throws {
     let viewport = SessionTimelineViewportModel()
     let coordinator = SessionTimelineTableView.Coordinator(
       viewport: viewport,
@@ -383,7 +383,8 @@ extension SessionTimelineNavigationTests {
       )
     )
 
-    #expect(coordinator.rowHeightCache[provisionalRow.id] == nil)
-    #expect(coordinator.measurementTask != nil)
+    let cachedHeight = try #require(coordinator.rowHeightCache[provisionalRow.id])
+    #expect(cachedHeight.isMeasured)
+    #expect(!coordinator.visibleRowsNeedMeasurement(columnWidth: 945))
   }
 }

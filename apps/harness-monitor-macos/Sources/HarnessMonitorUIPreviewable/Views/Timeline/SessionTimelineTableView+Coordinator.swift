@@ -23,11 +23,14 @@ extension SessionTimelineTableView {
 
     var heightCacheIdentity: SessionTimelineContentIdentity?
     var rowHeightCache: [String: CachedRowHeight] = [:]
+    var knownEventHeights: [Int: CGFloat] = [:]
     var lastColumnWidth: CGFloat = 0
     var rows: [SessionTimelineRow] = []
     var eventOffsetsByRow: [Int?] = []
     var rowIndexByID: [String: Int] = [:]
     var rowSnapshot = SessionTimelineTableSnapshot.empty
+    var virtualization = SessionTimelineTableVirtualization.disabled
+    var virtualSpacers = SessionTimelineTableVirtualSpacers.zero
     var actionHandler: any DecisionActionHandler = NullDecisionActionHandler()
     var onSignalTap: ((String) -> Void)?
     weak var tableView: NSTableView?
@@ -42,6 +45,9 @@ extension SessionTimelineTableView {
     )
     var pendingPublish = false
     var pendingPublishForcesObservedStats = false
+    var pendingPublishSuppressesBoundaryCallbacks = false
+    var isViewportMoving = false
+    var liveScrollEndTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
     var measurementTask: Task<Void, Never>?
     var measurementGeneration: Int = 0
@@ -84,6 +90,20 @@ extension SessionTimelineTableView {
         .receive(on: RunLoop.main)
         .sink { [weak self] _ in
           Task { @MainActor in self?.boundsDidChange() }
+        }
+        .store(in: &cancellables)
+      NotificationCenter.default
+        .publisher(for: NSScrollView.willStartLiveScrollNotification, object: scrollView)
+        .receive(on: RunLoop.main)
+        .sink { [weak self] _ in
+          Task { @MainActor in self?.beginLiveScroll() }
+        }
+        .store(in: &cancellables)
+      NotificationCenter.default
+        .publisher(for: NSScrollView.didEndLiveScrollNotification, object: scrollView)
+        .receive(on: RunLoop.main)
+        .sink { [weak self] _ in
+          Task { @MainActor in self?.endLiveScroll() }
         }
         .store(in: &cancellables)
     }
