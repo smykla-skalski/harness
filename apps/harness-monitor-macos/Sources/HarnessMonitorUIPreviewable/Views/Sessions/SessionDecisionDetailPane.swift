@@ -30,27 +30,22 @@ struct SessionDecisionDetailPane: View {
           .padding(.top, metrics.contentPadding)
           .padding(.horizontal, metrics.contentPadding)
       }
-      if let decision {
-        DecisionDetailView(
-          decision: decision,
-          store: store,
-          handler: actionHandler,
-          auditEvents: auditEvents,
-          selectedTab: $selectedTab,
-          observer: observer,
-          decisionScope: decisionScope,
-          primaryActionFocusDecisionID: store.supervisorPrimaryActionFocusDecisionID,
-          primaryActionFocusRequestTick: store.supervisorPrimaryActionFocusRequestTick
-        )
-      } else {
-        DecisionDetailView(
-          selectedTab: $selectedTab,
-          observer: observer,
-          decisionScope: decisionScope,
-          primaryActionFocusDecisionID: store.supervisorPrimaryActionFocusDecisionID,
-          primaryActionFocusRequestTick: store.supervisorPrimaryActionFocusRequestTick
-        )
-      }
+      // Single call site — passing optional Decision keeps the SwiftUI tree
+      // identity stable when decision flips between nil and non-nil. The two
+      // separate call sites previously produced
+      // `_ConditionalContent<DecisionDetailView, DecisionDetailView>` and
+      // tore down @FocusState / @AccessibilityFocusState on every flip.
+      DecisionDetailView(
+        decision: decision,
+        store: store,
+        handler: actionHandler,
+        auditEvents: auditEvents,
+        selectedTab: $selectedTab,
+        observer: observer,
+        decisionScope: decisionScope,
+        primaryActionFocusDecisionID: store.supervisorPrimaryActionFocusDecisionID,
+        primaryActionFocusRequestTick: store.supervisorPrimaryActionFocusRequestTick
+      )
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .dynamicTypeSize(.xSmall ... .accessibility5)
