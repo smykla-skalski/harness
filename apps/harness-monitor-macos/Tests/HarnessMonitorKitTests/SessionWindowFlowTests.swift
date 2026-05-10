@@ -47,6 +47,15 @@ struct SessionWindowFlowTests {
     )
   }
 
+  @Test("Session shortcut overlay preference defaults to enabled")
+  func sessionShortcutOverlayPreferenceDefaultsToEnabled() {
+    #expect(SessionWindowKeyboardShortcutOverlaySettings.defaultValue)
+    #expect(
+      SessionWindowKeyboardShortcutOverlaySettings.storageKey
+        == "harness.monitor.session-window.shortcut-overlays-enabled"
+    )
+  }
+
   @Test("Session tab opening honors app and system tabbing preferences")
   func sessionTabOpeningHonorsAppAndSystemPreferences() {
     #expect(
@@ -97,9 +106,10 @@ struct SessionWindowFlowTests {
   func sessionRoutesExposeStableSidebarOrder() {
     #expect(
       SessionWindowRoute.allCases.map(\.rawValue)
-        == ["overview", "agents", "tasks", "decisions", "timeline", "terminal"]
+        == ["overview", "agents", "tasks", "decisions", "timeline"]
     )
-    #expect(SessionWindowRoute.terminal.title == "Terminal/Runs")
+    #expect(SessionWindowRoute.agents.title == "Agents")
+    #expect(SessionWindowRoute.agents.systemImage == "person.2")
     #expect(SessionWindowRoute.decisions.systemImage == "exclamationmark.bubble")
   }
 
@@ -110,7 +120,6 @@ struct SessionWindowFlowTests {
     #expect(SessionWindowRoute.agents.layoutStyle == .sidebarContentDetail)
     #expect(SessionWindowRoute.tasks.layoutStyle == .sidebarContentDetail)
     #expect(SessionWindowRoute.decisions.layoutStyle == .sidebarContentDetail)
-    #expect(SessionWindowRoute.terminal.layoutStyle == .sidebarContentDetail)
   }
 
   @MainActor

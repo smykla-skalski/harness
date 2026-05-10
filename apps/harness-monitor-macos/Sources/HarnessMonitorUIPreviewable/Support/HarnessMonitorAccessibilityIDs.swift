@@ -87,7 +87,6 @@ public enum HarnessMonitorAccessibility {
   public static let sessionWindowStatusSurface = "harness.session.window.status"
   public static let sessionWindowToolbarSeparatorSuppressed =
     "harness.session.window.toolbar.separator-suppressed"
-  public static let sessionWindowSidebarToggleButton = "harness.session.window.toolbar.sidebar-toggle"
   public static let sessionWindowFocusModeButton = "harness.session.window.toolbar.focus-mode"
   public static let sessionWindowCreateProviderPane =
     "harness.session.window.create.provider-pane"
@@ -121,6 +120,8 @@ public enum HarnessMonitorAccessibility {
   public static let settingsTextSizePicker = "harness.settings.text-size"
   public static let settingsMenuBarStateColorsToggle =
     "harness.settings.menu-bar.state-colors"
+  public static let settingsSessionShortcutOverlaysToggle =
+    "harness.settings.session.shortcut-overlays"
   public static let settingsSessionTitleBlurToggle =
     "harness.settings.session.title-blur"
   public static let settingsSessionRowModePicker =

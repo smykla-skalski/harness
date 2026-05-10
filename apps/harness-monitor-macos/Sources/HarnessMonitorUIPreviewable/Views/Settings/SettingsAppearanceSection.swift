@@ -12,6 +12,9 @@ public struct SettingsAppearanceSection: View {
   @AppStorage(HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledKey)
   private var menuBarStateColorVariantsEnabled =
     HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledDefault
+  @AppStorage(SessionWindowKeyboardShortcutOverlaySettings.storageKey)
+  private var sessionShortcutOverlaysEnabled =
+    SessionWindowKeyboardShortcutOverlaySettings.defaultValue
   @AppStorage(HarnessMonitorSidebarSessionRowDisplayMode.storageKey)
   private var sidebarSessionRowDisplayModeRawValue =
     HarnessMonitorSidebarSessionRowDisplayMode.defaultMode.rawValue
@@ -74,6 +77,14 @@ public struct SettingsAppearanceSection: View {
           HarnessMonitorAccessibility.settingsSessionRowModePicker
         )
 
+        Toggle("Session shortcut overlays", isOn: $sessionShortcutOverlaysEnabled)
+          .accessibilityHint(
+            "Shows or hides the floating keyboard shortcut hints in session windows."
+          )
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.settingsSessionShortcutOverlaysToggle
+          )
+
         Picker("Backdrop", selection: $backdropModeRawValue) {
           ForEach(HarnessMonitorBackdropMode.allCases) { mode in
             Text(mode.label).tag(mode.rawValue)
@@ -114,6 +125,7 @@ public struct SettingsAppearanceSection: View {
   private var appearanceFooterText: String {
     var parts = [
       "Theme mode, text size, and sidebar session rows apply to every Harness Monitor window.",
+      "Session shortcut overlays control the floating shortcut hints in session sidebars and toolbars.",
       "Backdrop controls where the softened background image renders.",
       "The menu bar icon can follow app state colors or stay neutral.",
       "Choosing an image turns on the window backdrop if it is currently off.",

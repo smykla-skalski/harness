@@ -97,6 +97,28 @@ extension SessionWindowFlowTests {
     #expect(SessionCreateKind.decision.displayedCreateShortcut(primaryKind: .decision).hint == "⌘N")
   }
 
+  @Test("Agents route auto-selects the first visible agent")
+  func agentsRouteAutoSelectsTheFirstVisibleAgent() {
+    #expect(
+      SessionAgentAutoSelectionPolicy.preferredAgentID(
+        selection: .route(.agents),
+        visibleAgentIDs: ["agent-a", "agent-b"]
+      ) == "agent-a"
+    )
+    #expect(
+      SessionAgentAutoSelectionPolicy.preferredAgentID(
+        selection: .route(.agents),
+        visibleAgentIDs: []
+      ) == nil
+    )
+    #expect(
+      SessionAgentAutoSelectionPolicy.preferredAgentID(
+        selection: .route(.tasks),
+        visibleAgentIDs: ["agent-a"]
+      ) == nil
+    )
+  }
+
   @MainActor
   @Test("Session window decision visibility distinguishes visible hidden and missing states")
   func sessionWindowDecisionVisibilityDistinguishesStates() {

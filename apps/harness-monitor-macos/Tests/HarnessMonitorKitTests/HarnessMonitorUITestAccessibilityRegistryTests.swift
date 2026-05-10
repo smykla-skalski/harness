@@ -270,6 +270,10 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
       HarnessMonitorAccessibility.settingsMenuBarStateColorsToggle
         == "harness.settings.menu-bar.state-colors"
     )
+    #expect(
+      HarnessMonitorAccessibility.settingsSessionShortcutOverlaysToggle
+        == "harness.settings.session.shortcut-overlays"
+    )
   }
 
   @Test("New session capability identifiers match UI-test mirror")

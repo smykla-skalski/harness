@@ -9,6 +9,8 @@ struct SessionSidebar: View {
   let statusModel: SessionStatusSummaryModel
   let currentModifiers: EventModifiers
   @Bindable var state: SessionWindowStateCache
+  @AppStorage(SessionWindowKeyboardShortcutOverlaySettings.storageKey)
+  private var shortcutOverlaysEnabled = SessionWindowKeyboardShortcutOverlaySettings.defaultValue
   @Environment(\.harnessTextSizeIndex)
   private var textSizeIndex
   @Environment(\.undoManager)
@@ -45,8 +47,21 @@ struct SessionSidebar: View {
     List(selection: selectionBinding) {
       routeSection
       agentsSection
-      tasksSection
       decisionsSection
+      tasksSection
+    }
+    .coordinateSpace(name: SessionSidebarCreateButtonOverlayCoordinateSpace.name)
+    .overlayPreferenceValue(
+      SessionSidebarCreateButtonFramePreferenceKey.self,
+      alignment: .topLeading
+    ) { anchors in
+      if shortcutOverlaysEnabled {
+        SessionSidebarCreateButtonShortcutOverlays(
+          anchors: anchors,
+          currentModifiers: currentModifiers,
+          primaryKind: primaryCreateKind
+        )
+      }
     }
     .listStyle(.sidebar)
     .environment(\.sidebarRowSize, sidebarRowSize)
@@ -266,7 +281,7 @@ struct SessionSidebar: View {
   }
 
   private var routeSection: some View {
-    ForEach([SessionWindowRoute.overview, .decisions, .timeline, .terminal]) { route in
+    ForEach([SessionWindowRoute.overview, .timeline, .agents, .decisions]) { route in
       let selection = SessionSelection.route(route)
       SessionSidebarRow(
         title: route.title,

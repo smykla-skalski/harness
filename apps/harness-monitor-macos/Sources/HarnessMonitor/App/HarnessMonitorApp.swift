@@ -47,7 +47,9 @@ struct HarnessMonitorApp: App {
 
   init() {
     UserDefaults.standard.register(defaults: [
-      "NSUseAnimatedFocusRing": false
+      "NSUseAnimatedFocusRing": false,
+      SessionWindowKeyboardShortcutOverlaySettings.storageKey:
+        SessionWindowKeyboardShortcutOverlaySettings.defaultValue,
     ])
 
     let configuration = HarnessMonitorAppConfiguration.resolve()

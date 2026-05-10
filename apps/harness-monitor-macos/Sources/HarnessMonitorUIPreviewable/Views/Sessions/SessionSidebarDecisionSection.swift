@@ -71,8 +71,7 @@ extension SessionSidebar {
         state: state,
         kind: .decision,
         primaryKind: primaryCreateKind,
-        accessibilityLabel: "New Decision",
-        currentModifiers: shortcutRevealModifiers
+        accessibilityLabel: "New Decision"
       )
     }
   }

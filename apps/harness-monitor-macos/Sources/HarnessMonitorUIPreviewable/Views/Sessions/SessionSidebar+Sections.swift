@@ -13,6 +13,77 @@ extension VerticalAlignment {
   )
 }
 
+enum SessionSidebarCreateButtonOverlayCoordinateSpace {
+  static let name = "harness.session-sidebar-create-button-overlays"
+}
+
+struct SessionSidebarCreateButtonFramePreferenceKey: PreferenceKey {
+  static let defaultValue: [SessionCreateKind: Anchor<CGRect>] = [:]
+
+  static func reduce(
+    value: inout [SessionCreateKind: Anchor<CGRect>],
+    nextValue: () -> [SessionCreateKind: Anchor<CGRect>]
+  ) {
+    value.merge(nextValue(), uniquingKeysWith: { _, next in next })
+  }
+}
+
+private struct SessionSidebarCreateButtonFrameModifier: ViewModifier {
+  let kind: SessionCreateKind
+
+  func body(content: Content) -> some View {
+    content.anchorPreference(
+      key: SessionSidebarCreateButtonFramePreferenceKey.self,
+      value: .bounds
+    ) { anchor in
+      [kind: anchor]
+    }
+  }
+}
+
+struct SessionSidebarCreateButtonShortcutOverlays: View {
+  @ScaledMetric(relativeTo: .caption) private var shortcutKeySpacing = HarnessMonitorTheme.spacingXS - 1
+  @ScaledMetric(relativeTo: .caption) private var shortcutVerticalOffset = 8
+  @ScaledMetric(relativeTo: .caption) private var shortcutHorizontalAdjustment = 1
+
+  let anchors: [SessionCreateKind: Anchor<CGRect>]
+  let currentModifiers: EventModifiers
+  let primaryKind: SessionCreateKind
+
+  private var orderedKinds: [SessionCreateKind] {
+    [.agent, .task, .decision]
+  }
+
+  var body: some View {
+    GeometryReader { proxy in
+      ZStack(alignment: .topLeading) {
+        ForEach(orderedKinds, id: \.self) { kind in
+          if let anchor = anchors[kind] {
+            let frame = proxy[anchor]
+            let shortcut = kind.displayedCreateShortcut(primaryKind: primaryKind)
+            KeyboardShortcutLabel(
+              shortcut: shortcut,
+              activeModifiers: currentModifiers,
+              revealPolicy: .revealOnRelevantModifierHold,
+              keySpacing: shortcutKeySpacing
+            )
+            .fixedSize(horizontal: true, vertical: true)
+            .position(
+              x: frame.midX - shortcutHorizontalAdjustment,
+              y: frame.minY
+            )
+            .offset(y: -shortcutVerticalOffset)
+          }
+        }
+      }
+      .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
+    }
+    .allowsHitTesting(false)
+    .zIndex(1)
+    .accessibilityHidden(true)
+  }
+}
+
 extension SessionSidebar {
   @ViewBuilder var agentsSection: some View {
     Section {
@@ -240,8 +311,7 @@ extension SessionSidebar {
         state: state,
         kind: .agent,
         primaryKind: primaryCreateKind,
-        accessibilityLabel: "New Agent",
-        currentModifiers: shortcutRevealModifiers
+        accessibilityLabel: "New Agent"
       )
     }
   }
@@ -260,48 +330,34 @@ extension SessionSidebar {
         state: state,
         kind: .task,
         primaryKind: primaryCreateKind,
-        accessibilityLabel: "New Task",
-        currentModifiers: shortcutRevealModifiers
+        accessibilityLabel: "New Task"
       )
     }
   }
 }
 
 struct SessionSidebarHeaderCreateButton: View {
-  @ScaledMetric(relativeTo: .caption) private var shortcutKeySpacing = HarnessMonitorTheme.spacingXS - 1
-  @ScaledMetric(relativeTo: .caption) private var shortcutButtonGap = 1
-
   let state: SessionWindowStateCache
   let kind: SessionCreateKind
   let primaryKind: SessionCreateKind
   let accessibilityLabel: String
-  let currentModifiers: EventModifiers
 
   private var displayedShortcut: KeyboardShortcutDescriptor {
     kind.displayedCreateShortcut(primaryKind: primaryKind)
   }
 
   var body: some View {
-    VStack(alignment: .trailing, spacing: shortcutButtonGap) {
-      KeyboardShortcutLabel(
-        shortcut: displayedShortcut,
-        activeModifiers: currentModifiers,
-        revealPolicy: .revealOnRelevantModifierHold,
-        keySpacing: shortcutKeySpacing
-      )
-      .fixedSize(horizontal: true, vertical: true)
-
-      Button("+") {
-        state.selectCreate(kind)
-      }
-      .alignmentGuide(.sessionSidebarHeaderButtonCenter) { dimensions in
-        dimensions[VerticalAlignment.center]
-      }
-      .buttonStyle(.bordered)
-      .controlSize(.small)
-      .help("\(accessibilityLabel) (\(displayedShortcut.hint))")
-      .accessibilityLabel(accessibilityLabel)
+    Button("+") {
+      state.selectCreate(kind)
     }
+    .alignmentGuide(.sessionSidebarHeaderButtonCenter) { dimensions in
+      dimensions[VerticalAlignment.center]
+    }
+    .buttonStyle(.bordered)
+    .controlSize(.small)
+    .help("\(accessibilityLabel) (\(displayedShortcut.hint))")
+    .accessibilityLabel(accessibilityLabel)
+    .modifier(SessionSidebarCreateButtonFrameModifier(kind: kind))
     .padding(.trailing, HarnessMonitorTheme.spacingSM)
   }
 }

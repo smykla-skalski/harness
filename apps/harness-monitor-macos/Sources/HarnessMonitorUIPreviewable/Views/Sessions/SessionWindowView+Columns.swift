@@ -249,7 +249,6 @@ extension SessionWindowView {
         store: store,
         timelineLoading: sessionTimelineLoading
       )
-    case .terminal: SessionWindowRunsList(detail: snapshot.detail, state: stateCache)
     }
   }
 
@@ -305,29 +304,23 @@ extension SessionWindowView {
   private func detailFocusContent(for selection: SessionSelection) -> some View {
     switch selection {
     case .agent(_, let agentID):
-      if let snapshot,
-        let detail = snapshot.detail,
-        let agent = detail.agents.first(where: { $0.agentId == agentID })
-      {
-        let agentTimeline = snapshot.timelineEntriesByAgentID[agentID] ?? []
-        SessionAgentDetailSection(
-          store: store,
-          sessionID: token.sessionID,
-          detail: detail,
-          agentTimeline: agentTimeline,
-          agent: agent,
-          tui: agentTui(for: agent),
-          pendingPrompt: pendingUserPrompt(for: agent.agentId),
-          composerFocusRequestID: stateCache.agentComposerFocusRequestID
-        )
+      agentDetailContent(for: agentID)
+    case .route(.agents):
+      if let agentID = visibleSessionAgents.first?.agentId {
+        agentDetailContent(for: agentID)
       } else {
-        SessionDetailEmptySurface {
-          ContentUnavailableView(
-            "Agent \(agentID)",
-            systemImage: "person.crop.circle",
-            description: Text("Agent detail is not available.")
+        let hasQuery = !stateCache.appSearchModel.query
+          .trimmingCharacters(in: .whitespacesAndNewlines)
+          .isEmpty
+        unavailableDetailSurface(
+          hasQuery ? "No Matching Agents" : "No Agents",
+          systemImage: SessionWindowRoute.agents.systemImage,
+          description: Text(
+            hasQuery
+              ? "No agents match the current search."
+              : "This session does not have any agents."
           )
-        }
+        )
       }
     case .decision(_, let decisionID):
       SessionDecisionDetailPane(
@@ -411,5 +404,33 @@ extension SessionWindowView {
 
   private func decisionsByID(_ decision: Decision?, fallbackID: String) -> Decision? {
     decision ?? allSessionDecisionsCache.first { $0.id == fallbackID }
+  }
+
+  @ViewBuilder
+  private func agentDetailContent(for agentID: String) -> some View {
+    if let snapshot,
+      let detail = snapshot.detail,
+      let agent = detail.agents.first(where: { $0.agentId == agentID })
+    {
+      let agentTimeline = snapshot.timelineEntriesByAgentID[agentID] ?? []
+      SessionAgentDetailSection(
+        store: store,
+        sessionID: token.sessionID,
+        detail: detail,
+        agentTimeline: agentTimeline,
+        agent: agent,
+        tui: agentTui(for: agent),
+        pendingPrompt: pendingUserPrompt(for: agent.agentId),
+        composerFocusRequestID: stateCache.agentComposerFocusRequestID
+      )
+    } else {
+      SessionDetailEmptySurface {
+        ContentUnavailableView(
+          "Agent \(agentID)",
+          systemImage: "person.crop.circle",
+          description: Text("Agent detail is not available.")
+        )
+      }
+    }
   }
 }
