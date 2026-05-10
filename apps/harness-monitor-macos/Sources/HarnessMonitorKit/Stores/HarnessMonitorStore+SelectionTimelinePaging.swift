@@ -56,11 +56,14 @@ extension HarnessMonitorStore {
         return (latestTimeline, normalizedWindow)
       }
 
-      let mergedTimeline = mergeNewerTimelineEntries(deltaEntries, into: loadedTimeline)
-      let normalizedWindow =
-        normalizedTimelineWindow(deltaResponse.metadataOnly, loadedTimeline: mergedTimeline)
-        ?? deltaResponse.metadataOnly
-      return (mergedTimeline, normalizedWindow)
+      let merged = TimelineRollingWindowResolver.prependingNewer(
+        existingTimeline: loadedTimeline,
+        currentWindow: loadedWindow,
+        response: deltaResponse,
+        newerEntries: deltaEntries,
+        retainedLimit: limit
+      )
+      return (merged.timeline, merged.timelineWindow)
     }
 
     if deltaResponse.unchanged || deltaResponse.revision == loadedWindow.revision {
@@ -100,53 +103,16 @@ extension HarnessMonitorStore {
   func applySelectedTimelinePageResponse(
     _ response: TimelineWindowResponse,
     currentRevision: Int64?,
+    retainedLimit: Int? = nil,
     selectedSession: SessionDetail
   ) {
-    let resolvedTimeline: [TimelineEntry]
-    let resolvedTimelineWindow: TimelineWindowResponse?
-    if response.windowStart == 0 || response.revision != currentRevision {
-      // Revision drift refreshes the loaded latest-anchored prefix in one shot so
-      // the store can recover to a coherent window before incremental loads resume.
-      resolvedTimeline = response.entries ?? timeline
-      resolvedTimelineWindow = normalizedTimelineWindow(
-        response.metadataOnly,
-        loadedTimeline: resolvedTimeline
-      )
-    } else if let responseEntries = response.entries {
-      resolvedTimeline = mergeTimelinePrefix(timeline, olderEntries: responseEntries)
-      let currentWindowStart = timelineWindow?.windowStart ?? 0
-      let currentHasNewer = timelineWindow?.hasNewer ?? (currentWindowStart > 0)
-      resolvedTimelineWindow = TimelineWindowResponse(
-        revision: response.revision,
-        totalCount: max(response.totalCount, currentWindowStart + resolvedTimeline.count),
-        windowStart: currentWindowStart,
-        windowEnd: currentWindowStart + resolvedTimeline.count,
-        hasOlder: response.hasOlder,
-        hasNewer: currentHasNewer,
-        oldestCursor: resolvedTimeline.last.map {
-          TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
-        },
-        newestCursor: resolvedTimeline.first.map {
-          TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
-        },
-        entries: nil,
-        unchanged: response.unchanged
-      )
-    } else {
-      resolvedTimeline = timeline
-      resolvedTimelineWindow = normalizedTimelineWindow(
-        response.metadataOnly,
-        loadedTimeline: resolvedTimeline
-      )
-    }
-    HarnessMonitorTimelineTrace.info(
-      """
-      store.apply_page response=\(HarnessMonitorTimelineTrace.windowSummary(response)) \
-      currentRevision=\(currentRevision ?? -1) oldLoaded=\(timeline.count) \
-      newLoaded=\(resolvedTimeline.count) \
-      resolved=\(HarnessMonitorTimelineTrace.windowSummary(resolvedTimelineWindow))
-      """
+    let resolved = resolvedSelectedTimelinePage(
+      response,
+      currentRevision: currentRevision,
+      retainedLimit: retainedLimit
     )
+    let resolvedTimeline = resolved.timeline
+    let resolvedTimelineWindow = resolved.timelineWindow
 
     withUISyncBatch {
       replaceSelectedTimelineSnapshot(
@@ -170,6 +136,7 @@ extension HarnessMonitorStore {
     sessionID: String,
     targetEnd: Int,
     missingCount: Int,
+    retainedLimit: Int? = nil,
     currentRevision: Int64?
   ) async throws -> TimelineWindowResponse {
     if let oldestCursor = timelineWindow?.oldestCursor
@@ -177,13 +144,6 @@ extension HarnessMonitorStore {
         TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
       })
     {
-      HarnessMonitorTimelineTrace.info(
-        """
-        store.fetch_prefix request=before:\(oldestCursor.entryId):limit=\(missingCount) \
-        session=\(sessionID) targetEnd=\(targetEnd) \
-        current=\(HarnessMonitorTimelineTrace.windowSummary(timelineWindow))
-        """
-      )
       let olderPrefix = try await Self.measureOperation {
         try await client.timelineWindow(
           sessionID: sessionID,
@@ -197,16 +157,10 @@ extension HarnessMonitorStore {
       recordRequestSuccess()
 
       if let currentRevision, olderPrefix.value.revision != currentRevision {
-        HarnessMonitorTimelineTrace.info(
-          """
-          store.fetch_prefix revision_drift current=\(currentRevision) \
-          response=\(olderPrefix.value.revision) refreshLimit=\(targetEnd)
-          """
-        )
         let refreshedPrefix = try await Self.measureOperation {
           try await client.timelineWindow(
             sessionID: sessionID,
-            request: .latest(limit: targetEnd)
+            request: .latest(limit: retainedLimit ?? targetEnd)
           )
         }
         recordRequestSuccess()
@@ -216,12 +170,6 @@ extension HarnessMonitorStore {
       return olderPrefix.value
     }
 
-    HarnessMonitorTimelineTrace.info(
-      """
-      store.fetch_prefix request=latest:limit=\(targetEnd) session=\(sessionID) \
-      current=\(HarnessMonitorTimelineTrace.windowSummary(timelineWindow))
-      """
-    )
     let refreshedPrefix = try await Self.measureOperation {
       try await client.timelineWindow(
         sessionID: sessionID,
@@ -230,38 +178,6 @@ extension HarnessMonitorStore {
     }
     recordRequestSuccess()
     return refreshedPrefix.value
-  }
-
-  fileprivate func mergeTimelinePrefix(
-    _ existingEntries: [TimelineEntry],
-    olderEntries: [TimelineEntry]
-  ) -> [TimelineEntry] {
-    guard olderEntries.isEmpty == false else {
-      return existingEntries
-    }
-
-    var mergedEntries = existingEntries
-    var existingKeys = Set(existingEntries.map(\.timelineEntryKey))
-    for entry in olderEntries where existingKeys.insert(entry.timelineEntryKey).inserted {
-      mergedEntries.append(entry)
-    }
-    return mergedEntries
-  }
-
-  fileprivate func mergeNewerTimelineEntries(
-    _ newerEntries: [TimelineEntry],
-    into existingEntries: [TimelineEntry]
-  ) -> [TimelineEntry] {
-    guard newerEntries.isEmpty == false else {
-      return existingEntries
-    }
-
-    var mergedEntries = newerEntries
-    var existingKeys = Set(newerEntries.map(\.timelineEntryKey))
-    for entry in existingEntries where existingKeys.insert(entry.timelineEntryKey).inserted {
-      mergedEntries.append(entry)
-    }
-    return mergedEntries
   }
 
   fileprivate func canSafelyMergeNewerTimelineEntries(
@@ -276,12 +192,7 @@ extension HarnessMonitorStore {
     let sessionID: String
     let targetEnd: Int
     let pageSize: Int
+    let retainedLimit: Int?
     let revision: Int64?
-  }
-}
-
-extension TimelineEntry {
-  fileprivate var timelineEntryKey: String {
-    "\(recordedAt)|\(entryId)"
   }
 }

@@ -304,13 +304,20 @@ extension SessionTimelineNavigationTests {
       await store.loadSessionWindowTimeline(
         sessionID: summary.sessionId,
         snapshot: snapshot,
-        request: request
+        request: request,
+        retainedLimit: initialWindowSize
       )
     )
 
-    #expect(updatedSnapshot.timeline.count == initialWindowSize + 10)
-    #expect(updatedSnapshot.timelineWindow?.windowStart == 0)
+    #expect(
+      updatedSnapshot.timeline == Array(
+        fixture.fullTimeline[initialWindowSize..<(initialWindowSize + 10)]
+      )
+    )
+    #expect(updatedSnapshot.timeline.count == initialWindowSize)
+    #expect(updatedSnapshot.timelineWindow?.windowStart == initialWindowSize)
     #expect(updatedSnapshot.timelineWindow?.windowEnd == initialWindowSize + 10)
+    #expect(updatedSnapshot.timelineWindow?.hasNewer == true)
     #expect(updatedSnapshot.timelineWindow?.hasOlder == true)
     #expect(store.timeline.isEmpty)
     #expect(store.timelineWindow == nil)

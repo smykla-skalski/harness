@@ -12,12 +12,7 @@ extension HarnessMonitorStore {
     loadedTimeline: [TimelineEntry],
     timelineWindow: TimelineWindowResponse?
   ) -> Int {
-    let preferredLimit =
-      selectedTimelinePreferredWindowLimit ?? Self.initialSelectedTimelineWindowLimit
-    if loadedTimeline.isEmpty == false {
-      return max(preferredLimit, loadedTimeline.count)
-    }
-    return max(preferredLimit, timelineWindow?.pageSize ?? 0)
+    max(1, selectedTimelinePreferredWindowLimit ?? Self.initialSelectedTimelineWindowLimit)
   }
 
   public func updateSelectedTimelinePreferredWindowLimit(_ limit: Int?) {
