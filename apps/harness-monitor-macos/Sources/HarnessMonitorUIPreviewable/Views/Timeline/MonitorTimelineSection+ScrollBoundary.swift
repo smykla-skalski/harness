@@ -17,11 +17,13 @@ extension SessionTimelineView {
     )
   }
 
+  // Reads cachedPresentation from @State so the table-view callbacks can
+  // be assigned as stable method references.
   func handleScrollBoundaryChange(
     from oldValue: SessionTimelineScrollBoundaryState,
-    to newValue: SessionTimelineScrollBoundaryState,
-    presentation: SessionTimelineSectionPresentation
+    to newValue: SessionTimelineScrollBoundaryState
   ) {
+    let presentation = cachedPresentation
     let enteredTopEdge = newValue.enteredTopEdge(from: oldValue)
     let enteredBottomEdge = newValue.enteredBottomEdge(from: oldValue)
     if enteredTopEdge {

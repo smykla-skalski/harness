@@ -60,8 +60,8 @@ struct SessionTimelineView: View {
   @State var pendingNavigationAfterLoad: SessionTimelinePendingNavigation?
   @State var pendingNavigationGeneration = 0
   @State var pendingEdgeLoad: SessionTimelinePendingEdgeLoad?
-  @State private var cachedPresentation = SessionTimelineSectionPresentation.empty
-  @State private var cachedPresentationInput = SessionTimelinePresentationInput.empty
+  @State var cachedPresentation = SessionTimelineSectionPresentation.empty
+  @State var cachedPresentationInput = SessionTimelinePresentationInput.empty
   @State var viewport = SessionTimelineViewportModel()
   @State var filters = SessionTimelineFilterState()
   // Cache the normalized filter signature so presentationInput does not
@@ -380,6 +380,10 @@ struct SessionTimelineView: View {
       )
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     } else {
+      // Closures are method references that read self.cachedPresentation
+      // when fired, so the representable's identity does not depend on a
+      // per-render presentation capture. Wrap in .equatable() so SwiftUI
+      // can skip updateNSView when no input changed.
       SessionTimelineTableView(
         columnWidth: 0,
         rows: presentation.rows,
@@ -388,21 +392,12 @@ struct SessionTimelineView: View {
         horizontalContentInset: horizontalContentInset,
         scrollCommand: scrollCommand,
         actionHandler: actionHandler,
-        onSignalTap: { [store] signalID in
-          store.presentedSheet = .signalDetail(signalID: signalID)
-        },
+        onSignalTap: handleSignalTap,
         viewport: viewport,
-        viewportChanged: { stats in
-          handleViewportStatsChange(stats, presentation: presentation)
-        },
-        scrollBoundaryChanged: { oldValue, newValue in
-          handleScrollBoundaryChange(
-            from: oldValue,
-            to: newValue,
-            presentation: presentation
-          )
-        }
+        viewportChanged: handleViewportStatsChange,
+        scrollBoundaryChanged: handleScrollBoundaryChange
       )
+      .equatable()
       .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
   }
