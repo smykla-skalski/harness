@@ -126,8 +126,17 @@ public final class SessionDecisionRuntime {
     await filterTask?.value
   }
 
-  public func reloadAuditEvents(from modelContext: ModelContext?) {
-    auditEvents = HarnessMonitorStore.loadSupervisorAuditEvents(from: modelContext)
+  public func reloadAuditEvents(
+    from modelContext: ModelContext?,
+    sessionID: String,
+    decisions: [Decision]
+  ) {
+    let events = HarnessMonitorStore.loadSupervisorAuditEvents(from: modelContext, limit: 256)
+    auditEvents = DecisionDetailViewModel.explicitlySessionScopedAuditEvents(
+      from: events,
+      sessionID: sessionID,
+      decisions: decisions
+    )
   }
 
   public func contextRows(for decision: Decision) -> [SessionDecisionContextRow] {

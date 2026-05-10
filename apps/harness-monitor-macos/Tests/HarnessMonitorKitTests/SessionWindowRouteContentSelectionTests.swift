@@ -15,7 +15,7 @@ struct SessionWindowRouteContentSelectionTests {
     )
   }
 
-  @Test("Session decisions auto-select only when the route lacks a stable visible target")
+  @Test("Session decisions only auto-select when a selected item disappears and routes keep a stable detail target")
   func sessionDecisionAutoSelectionOnlyRunsWhenNeeded() {
     #expect(
       SessionDecisionAutoSelectionPolicy.preferredDecisionID(
@@ -23,7 +23,7 @@ struct SessionWindowRouteContentSelectionTests {
         sessionID: "sess-1",
         allDecisionIDs: ["dec-1", "dec-2"],
         visibleDecisionIDs: ["dec-2", "dec-1"]
-      ) == "dec-2"
+      ) == nil
     )
     #expect(
       SessionDecisionAutoSelectionPolicy.preferredDecisionID(
@@ -41,6 +41,27 @@ struct SessionWindowRouteContentSelectionTests {
         visibleDecisionIDs: ["dec-2"]
       ) == nil
     )
+    #expect(
+      SessionDecisionAutoSelectionPolicy.preferredRouteDetailDecisionID(
+        rememberedDecisionID: "dec-1",
+        allDecisionIDs: ["dec-1", "dec-2"],
+        visibleDecisionIDs: ["dec-2"]
+      ) == "dec-2"
+    )
+    #expect(
+      SessionDecisionAutoSelectionPolicy.preferredRouteDetailDecisionID(
+        rememberedDecisionID: nil,
+        allDecisionIDs: ["dec-1", "dec-2"],
+        visibleDecisionIDs: ["dec-2", "dec-1"]
+      ) == "dec-2"
+    )
+    #expect(
+      SessionDecisionAutoSelectionPolicy.preferredRouteDetailDecisionID(
+        rememberedDecisionID: "dec-1",
+        allDecisionIDs: ["dec-1", "dec-2"],
+        visibleDecisionIDs: []
+      ) == "dec-1"
+    )
   }
 
   @Test("Summary lists bind selection directly to the session window state")
@@ -50,6 +71,8 @@ struct SessionWindowRouteContentSelectionTests {
     #expect(source.contains("List(selection: selectedAgentID)"))
     #expect(source.contains("List(selection: selectedTaskID)"))
     #expect(source.contains("List(selection: selectedDecisionID)"))
+    #expect(source.contains("if case .route(.decisions) = state.selection"))
+    #expect(source.contains("state.setRouteDecisionID(decisionID)"))
     #expect(!source.contains("@State private var selectedAgentID"))
     #expect(!source.contains("@State private var selectedTaskID"))
     #expect(!source.contains("@State private var selectedDecisionID"))
@@ -106,12 +129,30 @@ struct SessionWindowRouteContentSelectionTests {
 
   @Test("Session decisions wire auto-selection into cache recomputation and detail rendering")
   func sessionDecisionsWireAutoSelectionIntoCacheRecomputationAndDetailRendering() throws {
+    let windowView = try sourceFile(named: "SessionWindowView.swift")
     let columns = try sourceFile(named: "SessionWindowView+Columns.swift")
 
     #expect(columns.contains("SessionDecisionAutoSelectionPolicy.preferredDecisionID"))
+    #expect(columns.contains("SessionDecisionAutoSelectionPolicy.preferredRouteDetailDecisionID"))
     #expect(columns.contains("stateCache.autoSelectDecision(autoSelectedDecisionID)"))
+    #expect(columns.contains("stateCache.setRouteDecisionID(routeDecisionID)"))
+    #expect(windowView.contains(".onChange(of: stateCache.sectionState.decisionID)"))
     #expect(columns.contains("case .route(.decisions):"))
     #expect(columns.contains("selectedTab: decisionDetailTabBinding"))
+  }
+
+  @Test("Pending route filter resets clear persisted decision query scope and severities")
+  func pendingRouteFilterResetClearsAllPersistedDecisionFilters() throws {
+    let windowView = try sourceFile(named: "SessionWindowView.swift")
+
+    #expect(windowView.contains("if request.resetDecisionFilters {"))
+    #expect(windowView.contains("persistedDecisionQuery = \"\""))
+    #expect(
+      windowView.contains(
+        "persistedDecisionScopeRawStorage = DecisionsSidebarSearchScope.summary.rawValue"
+      )
+    )
+    #expect(windowView.contains("persistedDecisionSeverityRawStorage = \"\""))
   }
 
   private func sourceFile(named name: String) throws -> String {

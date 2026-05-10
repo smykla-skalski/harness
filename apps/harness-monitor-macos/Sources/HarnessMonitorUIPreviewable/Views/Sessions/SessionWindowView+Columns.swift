@@ -19,14 +19,31 @@ public enum SessionDecisionAutoSelectionPolicy {
     }
 
     switch selection {
-    case .route(.decisions):
-      return firstVisibleDecisionID
-    case .decision(let selectedSessionID, let decisionID)
-      where selectedSessionID == sessionID && !allDecisionIDs.contains(decisionID):
+    case .decision(
+      let selectedSessionID,
+      let decisionID
+    ) where selectedSessionID == sessionID && !allDecisionIDs.contains(decisionID):
       return firstVisibleDecisionID
     default:
       return nil
     }
+  }
+
+  public static func preferredRouteDetailDecisionID(
+    rememberedDecisionID: String?,
+    allDecisionIDs: Set<String>,
+    visibleDecisionIDs: [String]
+  ) -> String? {
+    if let firstVisibleDecisionID = visibleDecisionIDs.first {
+      if let rememberedDecisionID, visibleDecisionIDs.contains(rememberedDecisionID) {
+        return rememberedDecisionID
+      }
+      return firstVisibleDecisionID
+    }
+    if let rememberedDecisionID, allDecisionIDs.contains(rememberedDecisionID) {
+      return rememberedDecisionID
+    }
+    return nil
   }
 }
 
@@ -57,6 +74,7 @@ extension SessionWindowView {
 
   func recomputeDecisionsCache() async {
     let all = store.supervisorOpenDecisions.filter { $0.sessionID == token.sessionID }
+    let decisionsByID = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
     let allIDs = Set(all.map(\.id))
     if all.map(\.id) != allSessionDecisionsCache.map(\.id) {
       allSessionDecisionsCache = all
@@ -82,17 +100,70 @@ extension SessionWindowView {
     if matchingIDs != matchingDecisionIDsCache {
       matchingDecisionIDsCache = matchingIDs
     }
-    stateCache.decisionRuntime.reloadAuditEvents(from: store.modelContext)
-    if
-      let autoSelectedDecisionID = SessionDecisionAutoSelectionPolicy.preferredDecisionID(
-        selection: stateCache.selection,
-        sessionID: token.sessionID,
-        allDecisionIDs: allIDs,
-        visibleDecisionIDs: matchingIDsInOrder
-      )
-    {
-      stateCache.autoSelectDecision(autoSelectedDecisionID)
+    let previousRouteDecisionID = stateCache.sectionState.decisionID
+    let routeDecisionID = SessionDecisionAutoSelectionPolicy.preferredRouteDetailDecisionID(
+      rememberedDecisionID: previousRouteDecisionID,
+      allDecisionIDs: allIDs,
+      visibleDecisionIDs: matchingIDsInOrder
+    )
+    if previousRouteDecisionID != routeDecisionID {
+      stateCache.setRouteDecisionID(routeDecisionID)
     }
+    stateCache.decisionRuntime.reloadAuditEvents(
+      from: store.modelContext,
+      sessionID: token.sessionID,
+      decisions: all
+    )
+    if let autoSelectedDecisionID = SessionDecisionAutoSelectionPolicy.preferredDecisionID(
+      selection: stateCache.selection,
+      sessionID: token.sessionID,
+      allDecisionIDs: allIDs,
+      visibleDecisionIDs: matchingIDsInOrder
+    ) {
+      stateCache.autoSelectDecision(autoSelectedDecisionID)
+      announceDecisionSelectionChange(
+        to: autoSelectedDecisionID,
+        decisionsByID: decisionsByID,
+        reason: .advancedToVisible
+      )
+    } else if case .route(.decisions) = stateCache.selection,
+      let routeDecisionID,
+      previousRouteDecisionID != routeDecisionID
+    {
+      announceDecisionSelectionChange(
+        to: routeDecisionID,
+        decisionsByID: decisionsByID,
+        reason: previousRouteDecisionID == nil ? .openedRoute : .advancedToVisible
+      )
+    }
+  }
+
+  private enum SessionDecisionSelectionAnnouncementReason {
+    case openedRoute
+    case advancedToVisible
+  }
+
+  private func announceDecisionSelectionChange(
+    to decisionID: String,
+    decisionsByID: [String: Decision],
+    reason: SessionDecisionSelectionAnnouncementReason
+  ) {
+    guard let decision = decisionsByID[decisionID] else {
+      return
+    }
+    let severity =
+      DecisionSeverity(rawValue: decision.severityRaw)?
+      .chipLabel
+      .lowercased()
+      ?? "decision"
+    let prefix: String
+    switch reason {
+    case .openedRoute:
+      prefix = "Showing first \(severity)."
+    case .advancedToVisible:
+      prefix = "Previous decision closed. Showing next \(severity)."
+    }
+    AccessibilityNotification.Announcement("\(prefix) \(decision.summary)").post()
   }
 
   @ViewBuilder var focusModeSurface: some View {
@@ -331,15 +402,14 @@ extension SessionWindowView {
       }
     case .decision(_, let decisionID):
       SessionDecisionDetailPane(
-        decision: allSessionDecisionsCache.first(where: { $0.id == decisionID }),
+        decision: decisionsByID(sessionDecisionDetail, fallbackID: decisionID),
         store: store,
         auditEvents: stateCache.decisionRuntime.auditEvents,
         observer: sessionDecisionObserver,
         decisionScope: sessionDecisionScope,
         selectedTab: decisionDetailTabBinding,
         filters: stateCache.decisionFilters,
-        showsFilteredNotice: allSessionDecisionIDsCache.contains(decisionID)
-          && !matchingDecisionIDsCache.contains(decisionID)
+        showsFilteredNotice: sessionDecisionDetailHiddenByFilters
       )
     case .task(_, let taskID):
       if let task = snapshot?.detail?.tasks.first(where: { $0.taskId == taskID }) {
@@ -382,14 +452,14 @@ extension SessionWindowView {
       )
     case .route(.decisions):
       SessionDecisionDetailPane(
-        decision: nil,
+        decision: sessionDecisionDetail,
         store: store,
         auditEvents: stateCache.decisionRuntime.auditEvents,
         observer: sessionDecisionObserver,
         decisionScope: sessionDecisionScope,
         selectedTab: decisionDetailTabBinding,
-        filters: nil,
-        showsFilteredNotice: false
+        filters: stateCache.decisionFilters,
+        showsFilteredNotice: sessionDecisionDetailHiddenByFilters
       )
     case .route:
       SessionDetailEmptySurface {
@@ -404,5 +474,9 @@ extension SessionWindowView {
 
   var sessionCodexRuns: [CodexRunSnapshot] {
     store.selectedCodexRuns.filter { $0.sessionId == token.sessionID }
+  }
+
+  private func decisionsByID(_ decision: Decision?, fallbackID: String) -> Decision? {
+    decision ?? allSessionDecisionsCache.first { $0.id == fallbackID }
   }
 }
