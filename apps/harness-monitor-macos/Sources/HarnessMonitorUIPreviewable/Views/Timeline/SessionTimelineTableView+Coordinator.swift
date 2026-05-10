@@ -8,7 +8,20 @@ extension SessionTimelineTableView {
   struct UpdateRequest {
     let scrollView: NSScrollView
     let columnWidth: CGFloat
+    let horizontalContentInset: CGFloat
     let fontScale: CGFloat
+
+    init(
+      scrollView: NSScrollView,
+      columnWidth: CGFloat,
+      horizontalContentInset: CGFloat = 0,
+      fontScale: CGFloat
+    ) {
+      self.scrollView = scrollView
+      self.columnWidth = columnWidth
+      self.horizontalContentInset = horizontalContentInset
+      self.fontScale = fontScale
+    }
   }
 
   // Coordinator pushes viewport state into `viewport` via methods only; it
@@ -25,16 +38,19 @@ extension SessionTimelineTableView {
     var rowHeightCache: [String: CachedRowHeight] = [:]
     var knownEventHeights: [Int: CGFloat] = [:]
     var lastColumnWidth: CGFloat = 0
+    var horizontalContentInset: CGFloat = 0
     var rows: [SessionTimelineRow] = []
     var eventOffsetsByRow: [Int?] = []
     var rowIndexByID: [String: Int] = [:]
     var rowSnapshot = SessionTimelineTableSnapshot.empty
     var virtualization = SessionTimelineTableVirtualization.disabled
     var virtualSpacers = SessionTimelineTableVirtualSpacers.zero
+    var pendingHeightInvalidationIndexes = IndexSet()
     var actionHandler: any DecisionActionHandler = NullDecisionActionHandler()
     var onSignalTap: ((String) -> Void)?
     weak var tableView: NSTableView?
     weak var scrollView: NSScrollView?
+    weak var tableDocumentView: SessionTimelineTableDocumentView?
     var lastScrollCommand: SessionTimelineScrollCommand?
     var pendingScrollCommand: SessionTimelineScrollCommand?
     var lastViewportStats: SessionTimelineTableViewportStats?
@@ -73,9 +89,14 @@ extension SessionTimelineTableView {
       measurementTask = nil
     }
 
-    func configure(tableView: NSTableView, scrollView: NSScrollView) {
+    func configure(
+      tableView: NSTableView,
+      scrollView: NSScrollView,
+      documentView: SessionTimelineTableDocumentView? = nil
+    ) {
       self.tableView = tableView
       self.scrollView = scrollView
+      self.tableDocumentView = documentView
       // Defensive: if a representable re-make calls configure twice, cancel
       // the prior subscription so we never double-observe boundsDidChange.
       cancellables.removeAll()

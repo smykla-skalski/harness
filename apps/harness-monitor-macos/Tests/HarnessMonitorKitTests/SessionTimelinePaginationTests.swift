@@ -360,6 +360,13 @@ struct SessionTimelineNavigationTests {
         visibleContentWidth: 0
       ) == 960
     )
+    #expect(
+      SessionTimelineTableMetrics.resolvedColumnWidth(
+        proposedWidth: 960,
+        visibleContentWidth: 945,
+        horizontalContentInset: 24
+      ) == 897
+    )
   }
 
   @Test("Connector visibility omits rail stubs for the first and last rows")

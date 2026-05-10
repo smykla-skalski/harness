@@ -80,7 +80,7 @@ extension SessionTimelineTableView.Coordinator {
       return []
     }
     let visibleRect = scrollView.contentView.bounds
-    guard let visibleRange = dataRowRange(forTableRows: tableView.rows(in: visibleRect)) else {
+    guard let visibleRange = visibleDataRowRange() else {
       return []
     }
     return visibleRange.map { rowIndex in
@@ -90,7 +90,7 @@ extension SessionTimelineTableView.Coordinator {
       let rowRect = tableView.rect(ofRow: tableRow)
       return SessionTimelineTableAnchor(
         rowID: rows[rowIndex].id,
-        offsetY: visibleRect.minY - rowRect.minY
+        offsetY: visibleRect.minY - virtualY(forTableRowMinY: rowRect.minY)
       )
     }
   }

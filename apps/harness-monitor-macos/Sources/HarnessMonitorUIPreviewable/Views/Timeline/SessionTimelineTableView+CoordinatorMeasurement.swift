@@ -283,23 +283,35 @@ extension SessionTimelineTableView.Coordinator {
 
   func applyMeasuredHeights(_ changedIndexes: IndexSet) {
     guard !changedIndexes.isEmpty else { return }
+    guard !isViewportMoving else {
+      pendingHeightInvalidationIndexes.formUnion(changedIndexes)
+      boundsDidChange(forceObservedStats: true, suppressBoundaryCallbacks: true)
+      return
+    }
+    applyMeasuredHeightInvalidations(changedIndexes)
+  }
+
+  func flushPendingHeightInvalidations() {
+    let indexes = pendingHeightInvalidationIndexes
+    pendingHeightInvalidationIndexes = []
+    applyMeasuredHeightInvalidations(indexes)
+  }
+
+  private func applyMeasuredHeightInvalidations(_ changedIndexes: IndexSet) {
+    guard !changedIndexes.isEmpty else { return }
     let viewportImpact = viewportImpact(forChangedIndexes: changedIndexes)
     let wasPinnedToLatest = isPinnedToLatestViewport()
     let anchor = wasPinnedToLatest ? nil : currentVisibleAnchor()
-    var tableIndexes = tableRows(forDataIndexes: changedIndexes)
-    tableIndexes.formUnion(refreshCurrentVirtualSpacers(columnWidth: lastColumnWidth))
+    let tableIndexes = tableRows(forDataIndexes: changedIndexes)
     performWithoutTableAnimation {
       tableView?.noteHeightOfRows(withIndexesChanged: tableIndexes)
+      refreshCurrentVirtualLayout(columnWidth: lastColumnWidth)
       if viewportImpact.affectsPosition {
         tableView?.layoutSubtreeIfNeeded()
         scrollView?.layoutSubtreeIfNeeded()
       }
     }
     guard viewportImpact.affectsPosition else {
-      return
-    }
-    if isViewportMoving {
-      boundsDidChange(forceObservedStats: true, suppressBoundaryCallbacks: true)
       return
     }
     if wasPinnedToLatest {
@@ -312,15 +324,7 @@ extension SessionTimelineTableView.Coordinator {
   }
 
   private func viewportImpact(forChangedIndexes changedIndexes: IndexSet) -> ViewportImpact {
-    guard
-      let tableView,
-      let scrollView
-    else {
-      return .none
-    }
-    guard let visibleRows = dataRowRange(
-      forTableRows: tableView.rows(in: scrollView.contentView.bounds)
-    ) else {
+    guard let visibleRows = visibleDataRowRange() else {
       return .none
     }
     let firstVisibleRow = visibleRows.lowerBound
@@ -337,16 +341,10 @@ extension SessionTimelineTableView.Coordinator {
   }
 
   func visibleRowsNeedMeasurement(columnWidth: CGFloat) -> Bool {
-    guard
-      let tableView,
-      let scrollView,
-      columnWidth > 1
-    else {
+    guard columnWidth > 1 else {
       return false
     }
-    guard let visibleRows = dataRowRange(
-      forTableRows: tableView.rows(in: scrollView.contentView.bounds)
-    ) else {
+    guard let visibleRows = visibleDataRowRange() else {
       return false
     }
     for rowIndex in visibleRows where rows.indices.contains(rowIndex) {

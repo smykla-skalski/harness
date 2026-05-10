@@ -90,8 +90,8 @@ private struct SessionTimelineNodeRow: View {
         .scaledFont(.caption.monospaced())
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .lineLimit(1)
-        .multilineTextAlignment(.trailing)
-        .frame(width: SessionTimelineLayout.timeColumnWidth, alignment: .trailing)
+        .multilineTextAlignment(.leading)
+        .frame(width: SessionTimelineLayout.timeColumnWidth, alignment: .leading)
         .accessibilityHidden(true)
 
       SessionTimelineDot(tint: cardTint)
