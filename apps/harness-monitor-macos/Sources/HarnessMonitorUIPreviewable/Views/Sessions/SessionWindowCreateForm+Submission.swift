@@ -76,10 +76,9 @@ extension SessionWindowCreateForm {
             catalog: $0,
             selectedModelID: pickerValue
           )
-        } ?? (
-          pickerValue == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag
-            ? SessionWindowCreateFormCatalogs.allEffortLevels : []
-        )
+        }
+        ?? (pickerValue == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag
+          ? SessionWindowCreateFormCatalogs.allEffortLevels : [])
       let trimmedEffort =
         draft.effortByRuntime[runtime.rawValue]?
         .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""

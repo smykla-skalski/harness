@@ -154,11 +154,10 @@ final class OpenRecentWindowUITests: HarnessMonitorUITestCase {
   ) -> XCUIApplication {
     launch(
       mode: "preview",
-      additionalEnvironment:
-        [
-          Self.previewScenarioKey: Self.dashboardLandingScenario
-        ]
-        .merging(additionalEnvironment) { _, newValue in newValue }
+      additionalEnvironment: [
+        Self.previewScenarioKey: Self.dashboardLandingScenario
+      ]
+      .merging(additionalEnvironment) { _, newValue in newValue }
     )
   }
 }

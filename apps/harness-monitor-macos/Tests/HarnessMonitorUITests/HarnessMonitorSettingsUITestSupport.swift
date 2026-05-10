@@ -210,7 +210,8 @@ extension HarnessMonitorUITestCase {
       return window(in: app, containing: settingsRoot)
     }
 
-    let genericSettingsRoot = element(in: app, identifier: HarnessMonitorUITestAccessibility.settingsRoot)
+    let genericSettingsRoot = element(
+      in: app, identifier: HarnessMonitorUITestAccessibility.settingsRoot)
     if genericSettingsRoot.exists {
       return window(in: app, containing: genericSettingsRoot)
     }

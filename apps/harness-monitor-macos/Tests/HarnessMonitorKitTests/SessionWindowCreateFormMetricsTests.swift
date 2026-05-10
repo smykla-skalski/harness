@@ -161,7 +161,8 @@ struct SessionWindowCreateFormMetricsTests {
     #expect(!source.contains("SessionWindowCreateAgentRuntimeContent("))
     #expect(!source.contains("DisclosureGroup(\""))
     #expect(!source.contains("SessionWindowCreateFieldBlock("))
-    #expect(source.contains(".contentMargins(.horizontal, metrics.formPadding, for: .scrollContent)"))
+    #expect(
+      source.contains(".contentMargins(.horizontal, metrics.formPadding, for: .scrollContent)"))
     #expect(source.contains(".contentMargins(.vertical, metrics.formPadding, for: .scrollContent)"))
     #expect(!source.contains(".padding(metrics.formPadding)"))
     #expect(source.contains("Picker(\"Provider\", selection: selectedProviderID)"))
@@ -171,7 +172,8 @@ struct SessionWindowCreateFormMetricsTests {
     #expect(source.contains("Text(\"Advanced overrides\")"))
     #expect(runtimePaneSource.contains("SessionWindowCreateProviderListRow"))
     #expect(runtimePaneSource.contains("HarnessMonitorColumnScrollView("))
-    #expect(runtimePaneSource.contains("SessionWindowCreateSidebarSectionHeader(title: \"Provider\")"))
+    #expect(
+      runtimePaneSource.contains("SessionWindowCreateSidebarSectionHeader(title: \"Provider\")"))
     #expect(runtimePaneSource.contains("\"New agent\""))
     #expect(!runtimePaneSource.contains("sessionWindowCreateModePicker"))
     #expect(!runtimePaneSource.contains("List(selection: selectedProviderID)"))
@@ -180,7 +182,9 @@ struct SessionWindowCreateFormMetricsTests {
     #expect(!runtimePaneSource.contains("providerDescription"))
     #expect(!runtimePaneSource.contains("minHeight: 36"))
     #expect(!runtimePaneSource.contains("Divider()"))
-    #expect(!runtimePaneSource.contains(".padding(.horizontal, embeddedInForm ? 0 : HarnessMonitorTheme.spacingXS)"))
+    #expect(
+      !runtimePaneSource.contains(
+        ".padding(.horizontal, embeddedInForm ? 0 : HarnessMonitorTheme.spacingXS)"))
     #expect(runtimePaneSource.contains(".truncationMode(.tail)"))
     #expect(!runtimePaneSource.contains(".padding(.horizontal, HarnessMonitorTheme.spacingMD)"))
     #expect(runtimePaneSource.contains(".padding(.vertical, HarnessMonitorTheme.spacingXS)"))
@@ -260,7 +264,8 @@ struct SessionWindowCreateFormMetricsTests {
       ).allowCustomModel
     )
     #expect(
-      SessionWindowCreateFormCatalogs.defaultEffortLevel(from: ["low", "medium", "high"]) == "medium"
+      SessionWindowCreateFormCatalogs.defaultEffortLevel(from: ["low", "medium", "high"])
+        == "medium"
     )
   }
 

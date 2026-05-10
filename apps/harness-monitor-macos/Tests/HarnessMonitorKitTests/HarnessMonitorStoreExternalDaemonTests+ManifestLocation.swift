@@ -158,7 +158,9 @@ extension HarnessMonitorStoreExternalDaemonTests {
   }
 }
 
-private actor RediscoveringExternalDaemonController: DaemonControlling, ExternalManifestLocationRefreshing {
+private actor RediscoveringExternalDaemonController: DaemonControlling,
+  ExternalManifestLocationRefreshing
+{
   private let client: any HarnessMonitorClientProtocol
   private let staleManifestPath: String
   private var liveManifestURL: URL?

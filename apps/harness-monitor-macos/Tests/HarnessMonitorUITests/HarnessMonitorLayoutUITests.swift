@@ -390,7 +390,8 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
         ]
       )
       if waitForElement(sessionWindow, timeout: Self.actionTimeout) == false {
-        recordDiagnosticsSnapshot(in: app, named: "session-create-mode-picker-session-window-missing")
+        recordDiagnosticsSnapshot(
+          in: app, named: "session-create-mode-picker-session-window-missing")
         XCTFail("Session window should open before entering create mode")
       }
     }

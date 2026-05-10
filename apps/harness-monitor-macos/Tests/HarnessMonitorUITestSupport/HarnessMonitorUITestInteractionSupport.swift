@@ -10,7 +10,8 @@ extension HarnessMonitorUITestCase {
     let presentedTarget = element(in: app, title: title)
     let ready = waitUntil(timeout: Self.fastActionTimeout) {
       (buttonTarget.exists && (buttonTarget.isHittable || !buttonTarget.frame.isEmpty))
-        || (presentedTarget.exists && (presentedTarget.isHittable || !presentedTarget.frame.isEmpty))
+        || (presentedTarget.exists
+          && (presentedTarget.isHittable || !presentedTarget.frame.isEmpty))
     }
     guard ready else {
       XCTFail("Failed to tap button titled \(title)")

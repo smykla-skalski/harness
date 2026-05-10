@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import HarnessMonitorUIPreviewable
 
 @Suite("Session window route content selection")
@@ -15,7 +16,9 @@ struct SessionWindowRouteContentSelectionTests {
     )
   }
 
-  @Test("Session decisions only auto-select when a selected item disappears and routes keep a stable detail target")
+  @Test(
+    "Session decisions only auto-select when a selected item disappears and routes keep a stable detail target"
+  )
   func sessionDecisionAutoSelectionOnlyRunsWhenNeeded() {
     #expect(
       SessionDecisionAutoSelectionPolicy.preferredDecisionID(
@@ -96,10 +99,13 @@ struct SessionWindowRouteContentSelectionTests {
     let windowView = try sourceFile(named: "SessionWindowView.swift")
     let columns = try sourceFile(named: "SessionWindowView+Columns.swift")
 
-    #expect(columns.contains("case .create(let draft) = stateCache.selection, draft.kind == .agent"))
+    #expect(
+      columns.contains("case .create(let draft) = stateCache.selection, draft.kind == .agent"))
     #expect(columns.contains("SessionWindowCreateAgentRuntimePane("))
     #expect(columns.contains("embedsRuntimeConfiguration: focusMode"))
-    #expect(windowView.contains("contentColumnWidth = SessionContentDetailSplitLayout.defaultContentWidth"))
+    #expect(
+      windowView.contains(
+        "contentColumnWidth = SessionContentDetailSplitLayout.defaultContentWidth"))
   }
 
   @Test("Timeline route uses the dedicated route page instead of the cockpit section wrapper")

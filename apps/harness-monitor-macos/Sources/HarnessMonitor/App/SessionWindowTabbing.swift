@@ -119,7 +119,8 @@ private final class AccessorView: NSView {
         preference: configuration.preference
       )
       guard window.tabbingIdentifier == SessionWindowTabbingSupport.tabbingIdentifier else {
-        Self.log.warning("Session tabbing identifier unavailable; falling back to standalone windows")
+        Self.log.warning(
+          "Session tabbing identifier unavailable; falling back to standalone windows")
         window.tabbingMode = .automatic
         return
       }

@@ -82,8 +82,8 @@ struct SessionCreateCommands: Commands {
   }
 }
 
-private extension SessionCreateKind {
-  var routeCreateEntryPoint: SessionRouteCreateEntryPoint {
+extension SessionCreateKind {
+  fileprivate var routeCreateEntryPoint: SessionRouteCreateEntryPoint {
     switch self {
     case .agent:
       return .agent

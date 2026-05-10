@@ -157,7 +157,8 @@ extension HarnessMonitorUITestCase {
       app.activate()
     }
 
-    guard waitForButtonReady(in: app, identifier: identifier, timeout: Self.fastActionTimeout) else {
+    guard waitForButtonReady(in: app, identifier: identifier, timeout: Self.fastActionTimeout)
+    else {
       XCTFail("Failed to tap button \(identifier)")
       return
     }

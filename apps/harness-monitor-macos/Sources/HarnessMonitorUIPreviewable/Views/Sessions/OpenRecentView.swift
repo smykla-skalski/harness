@@ -292,7 +292,8 @@ private struct OpenRecentStartPanelLayout: Layout {
     let fittedProposal = ProposedViewSize(width: width > 0 ? width : nil, height: nil)
     let headerSize = measuredSize(for: 0, subviews: subviews, proposal: fittedProposal)
     let contentSize = measuredSize(for: 1, subviews: subviews, proposal: fittedProposal)
-    let naturalHeight = topInset + headerSize.height + headerSpacing + contentSize.height + bottomInset
+    let naturalHeight =
+      topInset + headerSize.height + headerSpacing + contentSize.height + bottomInset
     return CGSize(
       width: width > 0 ? width : max(headerSize.width, contentSize.width),
       height: proposal.height ?? naturalHeight

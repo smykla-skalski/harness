@@ -297,7 +297,10 @@ public struct SessionWindowView: View {
     let groups =
       matchingDecisionsCache.isEmpty
       ? []
-      : [DecisionsSidebarViewModel.SessionGroup(sessionID: token.sessionID, decisions: matchingDecisionsCache)]
+      : [
+        DecisionsSidebarViewModel.SessionGroup(
+          sessionID: token.sessionID, decisions: matchingDecisionsCache)
+      ]
     return DecisionsSidebarViewModel.VisibleSnapshot(
       groups: groups,
       decisionIDs: matchingDecisionsCache.map(\.id),
@@ -627,7 +630,8 @@ public struct SessionWindowView: View {
   @MainActor
   private func applyPendingSessionRouteIfNeeded() async {
     let pendingRequest = store.pendingSessionRouteRequestSnapshot
-    guard let request = store.consumePendingSessionRouteRequest(forSessionID: token.sessionID) else {
+    guard let request = store.consumePendingSessionRouteRequest(forSessionID: token.sessionID)
+    else {
       if let pendingRequest {
         HarnessMonitorUITestTrace.record(
           component: "session.window.route",
@@ -635,7 +639,8 @@ public struct SessionWindowView: View {
           details: [
             "window_session_id": token.sessionID,
             "selection": routeSelectionTraceLabel(for: pendingRequest.selection),
-            "target_session_id": pendingRequest.selection.sessionID ?? pendingRequest.createSessionID
+            "target_session_id": pendingRequest.selection.sessionID ?? pendingRequest
+              .createSessionID
               ?? "nil",
             "request_id": String(store.pendingSessionRouteRequestID),
           ]
