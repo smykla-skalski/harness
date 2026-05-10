@@ -87,6 +87,14 @@ extension SessionWindowFlowTests {
     #expect(!controlShiftShortcut.isRevealed(by: [.option]))
   }
 
+  @Test("Keyboard shortcut labels align tokens on a shared baseline and use warm highlight tint")
+  func keyboardShortcutLabelsAlignTokensOnSharedBaseline() throws {
+    let supportSource = try previewableSourceFile(named: "Views/Sessions/OpenRecentView+Support.swift")
+
+    #expect(supportSource.contains("HStack(alignment: .firstTextBaseline, spacing: keySpacing)"))
+    #expect(supportSource.contains("return HarnessMonitorTheme.warmAccent"))
+  }
+
   @Test("Displayed create shortcut follows the primary create kind")
   func displayedCreateShortcutFollowsPrimaryCreateKind() {
     #expect(SessionSelection.route(.agents).primaryCreateKind == .agent)

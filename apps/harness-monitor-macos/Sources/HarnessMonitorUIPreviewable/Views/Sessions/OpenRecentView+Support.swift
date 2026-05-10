@@ -87,7 +87,7 @@ struct KeyboardShortcutLabel: View {
   }
 
   var body: some View {
-    HStack(spacing: keySpacing) {
+    HStack(alignment: .firstTextBaseline, spacing: keySpacing) {
       ForEach(Array(shortcut.displayParts.enumerated()), id: \.offset) { _, part in
         Text(part.text)
           .scaledFont(font(for: part))
@@ -101,7 +101,7 @@ struct KeyboardShortcutLabel: View {
 
   private func foregroundColor(for part: KeyboardShortcutDisplayPart) -> Color {
     if part.isHighlighted(with: activeModifiers) {
-      return HarnessMonitorTheme.accent
+      return HarnessMonitorTheme.warmAccent
     }
     return .secondary
   }
