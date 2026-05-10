@@ -40,6 +40,7 @@ extension SessionTimelineTableView {
       contentHeight: .greatestFiniteMagnitude
     )
     var pendingPublish = false
+    var pendingPublishForcesObservedStats = false
     private var cancellables = Set<AnyCancellable>()
     var measurementTask: Task<Void, Never>?
     var measurementGeneration: Int = 0

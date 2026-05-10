@@ -1,3 +1,4 @@
+import Dispatch
 import Observation
 import SwiftUI
 
@@ -8,24 +9,36 @@ import SwiftUI
 @MainActor
 @Observable
 final class SessionTimelineViewportModel {
+  private static let observedViewportPublishIntervalNs: UInt64 = 120_000_000
+
   var visibleAnchorID: String?
   private(set) var visibilityStats: SessionTimelineVisibilityStats = .empty
 
   @ObservationIgnored private var lastViewport = SessionTimelineTableViewportStats.initial(
     estimatedVisibleEvents: 0
   )
+  @ObservationIgnored private var latestVisibleAnchorID: String?
+  @ObservationIgnored private var lastObservedViewportPublishTime: UInt64 = 0
+  @ObservationIgnored private var pendingObservedViewportPublish: Task<Void, Never>?
   @ObservationIgnored private var presentationWindowStart = 0
   @ObservationIgnored private var presentationLoadedCount = 0
   @ObservationIgnored private var presentationTotalCount = 0
   @ObservationIgnored private var presentationFilteredMatchCount: Int?
   @ObservationIgnored private var lastScrollBoundaryState: SessionTimelineScrollBoundaryState?
 
-  func recordViewportStats(_ stats: SessionTimelineTableViewportStats) {
+  func recordViewportStats(
+    _ stats: SessionTimelineTableViewportStats,
+    publishImmediately: Bool = false
+  ) {
     lastViewport = stats
-    if let anchorID = stats.anchorRowID, visibleAnchorID != anchorID {
-      visibleAnchorID = anchorID
+    if let anchorID = stats.anchorRowID {
+      latestVisibleAnchorID = anchorID
     }
-    rebuildStats()
+    guard !publishImmediately else {
+      publishObservedViewportStats()
+      return
+    }
+    publishObservedViewportStatsIfNeeded()
   }
 
   func recordScrollBoundaryState(_ state: SessionTimelineScrollBoundaryState) {
@@ -40,7 +53,16 @@ final class SessionTimelineViewportModel {
     lastScrollBoundaryState?.isNearBottomEdge ?? false
   }
 
+  func currentVisibleAnchorID() -> String? {
+    latestVisibleAnchorID ?? visibleAnchorID
+  }
+
+  func currentVisibleRowCount() -> Int {
+    lastViewport.visibleRowCount
+  }
+
   func setAnchorID(_ id: String?) {
+    latestVisibleAnchorID = id
     if visibleAnchorID != id {
       visibleAnchorID = id
     }
@@ -69,27 +91,75 @@ final class SessionTimelineViewportModel {
     presentationLoadedCount = clampedLoaded
     presentationTotalCount = clampedTotal
     presentationFilteredMatchCount = clampedFilteredMatchCount
-    rebuildStats()
+    publishObservedViewportStats()
   }
 
   func recordInitialViewport(estimatedVisibleEvents: Int) {
     let stats = SessionTimelineTableViewportStats.initial(
       estimatedVisibleEvents: min(max(estimatedVisibleEvents, 0), presentationLoadedCount)
     )
-    recordViewportStats(stats)
+    lastViewport = stats
+    latestVisibleAnchorID = stats.anchorRowID
+    publishObservedViewportStats()
   }
 
   func clear() {
+    pendingObservedViewportPublish?.cancel()
+    pendingObservedViewportPublish = nil
     visibleAnchorID = nil
+    latestVisibleAnchorID = nil
     visibilityStats = .empty
     lastViewport = SessionTimelineTableViewportStats.initial(
       estimatedVisibleEvents: 0
     )
+    lastObservedViewportPublishTime = 0
     lastScrollBoundaryState = nil
     presentationWindowStart = 0
     presentationLoadedCount = 0
     presentationTotalCount = 0
     presentationFilteredMatchCount = nil
+  }
+
+  private func publishObservedViewportStatsIfNeeded() {
+    let now = DispatchTime.now().uptimeNanoseconds
+    guard lastObservedViewportPublishTime > 0 else {
+      publishObservedViewportStats(now: now)
+      return
+    }
+    let elapsed = now - lastObservedViewportPublishTime
+    guard elapsed >= Self.observedViewportPublishIntervalNs else {
+      scheduleObservedViewportPublish(after: Self.observedViewportPublishIntervalNs - elapsed)
+      return
+    }
+    publishObservedViewportStats(now: now)
+  }
+
+  private func scheduleObservedViewportPublish(after delayNanoseconds: UInt64) {
+    guard pendingObservedViewportPublish == nil else {
+      return
+    }
+    pendingObservedViewportPublish = Task { @MainActor [weak self] in
+      try? await Task.sleep(nanoseconds: delayNanoseconds)
+      guard let self, !Task.isCancelled else {
+        return
+      }
+      self.pendingObservedViewportPublish = nil
+      self.publishObservedViewportStats()
+    }
+  }
+
+  private func publishObservedViewportStats() {
+    publishObservedViewportStats(now: DispatchTime.now().uptimeNanoseconds)
+  }
+
+  private func publishObservedViewportStats(now: UInt64) {
+    pendingObservedViewportPublish?.cancel()
+    pendingObservedViewportPublish = nil
+    lastObservedViewportPublishTime = now
+    if visibleAnchorID != latestVisibleAnchorID {
+      visibleAnchorID = latestVisibleAnchorID
+    }
+    rebuildStats()
   }
 
   private func rebuildStats() {

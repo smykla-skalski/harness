@@ -222,6 +222,7 @@ extension View {
         host.timelineViewport.clear()
         host.currentTimelineScrollCommand = nil
         host.currentPendingNavigation = nil
+        host.currentPendingEdgeLoad = nil
       }
       host.requestLatestWindow()
     }

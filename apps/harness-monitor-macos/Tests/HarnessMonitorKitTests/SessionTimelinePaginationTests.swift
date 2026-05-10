@@ -216,6 +216,64 @@ struct SessionTimelineNavigationTests {
     #expect(limit == 8)
   }
 
+  @Test("Pending scroll edge load retries only after the window advances")
+  func pendingScrollEdgeLoadRetriesOnlyAfterTheWindowAdvances() {
+    let initialEntries = makeTimelineEntries(count: 12)
+    let initialNavigation = SessionTimelineWindowNavigation(
+      timeline: initialEntries,
+      timelineWindow: makeWindow(
+        entries: initialEntries,
+        windowStart: 0,
+        windowEnd: 12,
+        hasOlder: true,
+        hasNewer: false,
+        totalCount: 80
+      ),
+      isLoading: false
+    )
+    let pending = SessionTimelinePendingEdgeLoad(
+      sessionID: "sess-pagination",
+      action: .older,
+      baselineWindowStart: initialNavigation.windowStart,
+      baselineWindowEnd: initialNavigation.windowEnd
+    )
+    let unchangedNavigation = SessionTimelineWindowNavigation(
+      timeline: initialEntries,
+      timelineWindow: makeWindow(
+        entries: initialEntries,
+        windowStart: 0,
+        windowEnd: 12,
+        hasOlder: true,
+        hasNewer: false,
+        totalCount: 80
+      ),
+      isLoading: false
+    )
+    let advancedEntries = makeTimelineEntries(count: 22)
+    let advancedNavigation = SessionTimelineWindowNavigation(
+      timeline: advancedEntries,
+      timelineWindow: makeWindow(
+        entries: advancedEntries,
+        windowStart: 0,
+        windowEnd: 22,
+        hasOlder: true,
+        hasNewer: false,
+        totalCount: 80
+      ),
+      isLoading: false
+    )
+
+    #expect(!pending.didAdvance(sessionID: "other-session", navigation: advancedNavigation))
+    #expect(!pending.didAdvance(sessionID: "sess-pagination", navigation: unchangedNavigation))
+    #expect(
+      pending.isWaitingForFreshPresentation(
+        sessionID: "sess-pagination",
+        navigation: unchangedNavigation
+      )
+    )
+    #expect(pending.didAdvance(sessionID: "sess-pagination", navigation: advancedNavigation))
+  }
+
   @Test("Table row metrics reserve space for rich timeline rows")
   func tableRowMetricsReserveSpaceForRichTimelineRows() {
     let rows = makeTimelineRows(count: 13)

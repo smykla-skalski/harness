@@ -27,7 +27,7 @@ extension SessionTimelineTableView.Coordinator {
     let y = clampedScrollY(rowRect.minY, scrollView: scrollView)
     scrollView.contentView.scroll(to: NSPoint(x: 0, y: y))
     scrollView.reflectScrolledClipView(scrollView.contentView)
-    reseedBoundaryStateToCurrentViewport()
+    boundsDidChange(forceObservedStats: true)
     return true
   }
 
@@ -48,7 +48,8 @@ extension SessionTimelineTableView.Coordinator {
     )
     scrollView.contentView.scroll(to: NSPoint(x: 0, y: y))
     scrollView.reflectScrolledClipView(scrollView.contentView)
-    reseedBoundaryStateToCurrentViewport()
+    syncBoundaryStateToCurrentViewport()
+    boundsDidChange(forceObservedStats: true)
   }
 
   func clampedScrollY(_ y: CGFloat, scrollView: NSScrollView) -> CGFloat {
@@ -119,7 +120,7 @@ extension SessionTimelineTableView.Coordinator {
     }
     scrollView.contentView.scroll(to: .zero)
     scrollView.reflectScrolledClipView(scrollView.contentView)
-    reseedBoundaryStateToCurrentViewport()
+    syncBoundaryStateToCurrentViewport()
     return true
   }
 
@@ -138,14 +139,33 @@ extension SessionTimelineTableView.Coordinator {
     )
   }
 
-  func reseedBoundaryStateToCurrentViewport() {
+  func syncBoundaryStateToCurrentViewport() {
     guard let boundaryState = currentBoundaryState() else {
       return
     }
     lastBoundaryState = boundaryState
+    viewport?.recordScrollBoundaryState(boundaryState)
   }
 
-  func publishViewportState() {
+  func boundsDidChange() {
+    boundsDidChange(forceObservedStats: false)
+  }
+
+  func boundsDidChange(forceObservedStats: Bool) {
+    refreshColumnWidthFromScrollViewIfNeeded()
+    pendingPublishForcesObservedStats = pendingPublishForcesObservedStats || forceObservedStats
+    guard !pendingPublish else { return }
+    pendingPublish = true
+    Task { @MainActor [weak self] in
+      guard let self else { return }
+      let shouldForceObservedStats = self.pendingPublishForcesObservedStats
+      self.pendingPublish = false
+      self.pendingPublishForcesObservedStats = false
+      self.publishViewportState(forceObservedStats: shouldForceObservedStats)
+    }
+  }
+
+  func publishViewportState(forceObservedStats: Bool = false) {
     guard let tableView, let scrollView else {
       return
     }
@@ -168,7 +188,7 @@ extension SessionTimelineTableView.Coordinator {
     )
     if lastViewportStats != stats {
       lastViewportStats = stats
-      viewport?.recordViewportStats(stats)
+      viewport?.recordViewportStats(stats, publishImmediately: forceObservedStats)
     }
     if measurementTask == nil, visibleRowsNeedMeasurement(columnWidth: lastColumnWidth) {
       scheduleIncrementalMeasurement(columnWidth: lastColumnWidth)
@@ -187,6 +207,65 @@ extension SessionTimelineTableView.Coordinator {
     } else if boundaryState.shouldTrack(from: lastBoundaryState) {
       lastBoundaryState = boundaryState
     }
+  }
+
+  func resizeColumn(in scrollView: NSScrollView, columnWidth: CGFloat) {
+    guard let tableView, let column = tableView.tableColumns.first else { return }
+    guard columnWidth > 1 else { return }
+    let isFirstRealWidth = lastColumnWidth <= 1
+    let widthChanged =
+      !isFirstRealWidth && abs(columnWidth - lastColumnWidth) > Self.widthEqualityTolerance
+    if column.width != columnWidth {
+      column.width = columnWidth
+    }
+    guard isFirstRealWidth || widthChanged else { return }
+    lastColumnWidth = columnWidth
+    cancelMeasurement(reason: widthChanged ? "width_changed" : "first_real_width")
+    performWithoutTableAnimation {
+      tableView.noteHeightOfRows(withIndexesChanged: IndexSet(0..<rows.count))
+    }
+    scheduleIncrementalMeasurement(columnWidth: columnWidth)
+  }
+
+  func resolvedColumnWidth(for request: SessionTimelineTableView.UpdateRequest) -> CGFloat {
+    if lastColumnWidth <= 1 {
+      request.scrollView.layoutSubtreeIfNeeded()
+    }
+    return SessionTimelineTableMetrics.resolvedColumnWidth(
+      proposedWidth: request.columnWidth,
+      visibleContentWidth: request.scrollView.contentSize.width
+    )
+  }
+
+  func applyWidthOnlyUpdateIfNeeded(columnWidth: CGFloat) {
+    guard columnWidth > 1, let tableView, let column = tableView.tableColumns.first else {
+      return
+    }
+    guard abs(columnWidth - lastColumnWidth) >= Self.widthEqualityTolerance else {
+      return
+    }
+    if column.width != columnWidth {
+      column.width = columnWidth
+    }
+    lastColumnWidth = columnWidth
+    scheduleIncrementalMeasurement(
+      columnWidth: columnWidth,
+      debounceNanoseconds: Self.widthAnimationMeasurementDebounceNs
+    )
+  }
+
+  @discardableResult
+  func refreshColumnWidthFromScrollViewIfNeeded() -> Bool {
+    guard let scrollView else {
+      return false
+    }
+    let columnWidth = SessionTimelineTableMetrics.resolvedColumnWidth(
+      proposedWidth: 0,
+      visibleContentWidth: scrollView.contentSize.width
+    )
+    let previousWidth = lastColumnWidth
+    applyWidthOnlyUpdateIfNeeded(columnWidth: columnWidth)
+    return abs(columnWidth - previousWidth) >= Self.widthEqualityTolerance
   }
 
   func anchorRowID(for visibleRows: NSRange) -> String? {

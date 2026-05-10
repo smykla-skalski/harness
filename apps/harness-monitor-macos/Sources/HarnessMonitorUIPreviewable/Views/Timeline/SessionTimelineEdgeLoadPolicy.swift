@@ -1,6 +1,6 @@
 struct SessionTimelineEdgeLoadRetryInput: Equatable {
   let sessionID: String
-  let pendingAction: SessionTimelineWindowAction?
+  let pendingLoad: SessionTimelinePendingEdgeLoad?
   let isTimelineLoading: Bool
   let windowStart: Int
   let windowEnd: Int
@@ -8,6 +8,39 @@ struct SessionTimelineEdgeLoadRetryInput: Equatable {
   let totalCount: Int
   let hasOlder: Bool
   let hasNewer: Bool
+}
+
+struct SessionTimelinePendingEdgeLoad: Equatable {
+  let sessionID: String
+  let action: SessionTimelineWindowAction
+  let baselineWindowStart: Int
+  let baselineWindowEnd: Int
+
+  func didAdvance(
+    sessionID currentSessionID: String,
+    navigation: SessionTimelineWindowNavigation
+  ) -> Bool {
+    guard sessionID == currentSessionID else {
+      return false
+    }
+    switch action {
+    case .older:
+      return navigation.windowEnd > baselineWindowEnd || !navigation.hasOlder
+    case .latest:
+      return false
+    case .newer:
+      return navigation.windowStart < baselineWindowStart || !navigation.hasNewer
+    }
+  }
+
+  func isWaitingForFreshPresentation(
+    sessionID currentSessionID: String,
+    navigation: SessionTimelineWindowNavigation
+  ) -> Bool {
+    sessionID == currentSessionID
+      && navigation.windowStart == baselineWindowStart
+      && navigation.windowEnd == baselineWindowEnd
+  }
 }
 
 struct SessionTimelineEdgeLoadContext {
@@ -94,7 +127,7 @@ extension SessionTimelineView {
   ) -> SessionTimelineEdgeLoadRetryInput {
     SessionTimelineEdgeLoadRetryInput(
       sessionID: sessionID,
-      pendingAction: currentPendingEdgeLoadAction,
+      pendingLoad: currentPendingEdgeLoad,
       isTimelineLoading: isTimelineLoading || presentation.navigation.isLoading,
       windowStart: presentation.navigation.windowStart,
       windowEnd: presentation.navigation.windowEnd,
