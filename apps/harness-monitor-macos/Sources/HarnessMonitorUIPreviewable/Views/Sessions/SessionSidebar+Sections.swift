@@ -19,8 +19,13 @@ extension SessionSidebar {
         )
         .tag(selection)
         .contextMenu {
-          Button("Copy Run ID") {
-            HarnessMonitorClipboard.copy(run.runId)
+          if displayedSelectionSet.count > 1, displayedSelectionSet.contains(selection) {
+            Button(SessionSidebarContextMenuScope.mixedSelectionUnavailableLabel) {}
+              .disabled(true)
+          } else {
+            Button("Copy Run ID") {
+              HarnessMonitorClipboard.copy(run.runId)
+            }
           }
         }
       }
@@ -70,60 +75,69 @@ extension SessionSidebar {
       including: hasActiveMultiSelection ? .gesture : []
     )
     .contextMenu {
-      agentRowContextMenu(agent, orderedAgentIDs: orderedAgentIDs)
+      agentRowContextMenu(agent, selection: selection, orderedAgentIDs: orderedAgentIDs)
     }
   }
 
   @ViewBuilder
   private func agentRowContextMenu(
     _ agent: AgentRegistration,
+    selection: SessionSelection,
     orderedAgentIDs: [String]
   ) -> some View {
-    let scope = SessionSidebarContextMenuScope.resolve(
+    let resolution = SessionSidebarContextMenuScope.resolve(
       kind: .agent,
+      rowSelection: selection,
       rowID: agent.agentId,
+      listSelection: displayedSelectionSet,
       selectedIDs: state.sidebarSelection.selectedAgentIDs,
       orderedVisibleIDs: orderedAgentIDs
     )
-    if !scope.isMulti {
-      Menu("Move to...") {
-        Button("Top") {
+    switch resolution {
+    case .actionable(let scope):
+      if !scope.isMulti {
+        Menu("Move to...") {
+          Button("Top") {
+            state.sidebarOrdering.moveAgent(
+              agent.agentId,
+              before: state.sidebarOrdering.agentIDs.first,
+              undoManager: undoManager
+            )
+          }
+          Button("Bottom") {
+            state.sidebarOrdering.moveAgent(
+              agent.agentId,
+              before: nil,
+              undoManager: undoManager
+            )
+          }
+        }
+        Button("Move to Top") {
           state.sidebarOrdering.moveAgent(
             agent.agentId,
             before: state.sidebarOrdering.agentIDs.first,
             undoManager: undoManager
           )
         }
-        Button("Bottom") {
+        Button("Move to Bottom") {
           state.sidebarOrdering.moveAgent(
             agent.agentId,
             before: nil,
             undoManager: undoManager
           )
         }
+        Divider()
       }
-      Button("Move to Top") {
-        state.sidebarOrdering.moveAgent(
-          agent.agentId,
-          before: state.sidebarOrdering.agentIDs.first,
-          undoManager: undoManager
-        )
-      }
-      Button("Move to Bottom") {
-        state.sidebarOrdering.moveAgent(
-          agent.agentId,
-          before: nil,
-          undoManager: undoManager
-        )
+      Button(scope.copyIDsLabel) {
+        HarnessMonitorClipboard.copy(scope.clipboardText)
       }
       Divider()
-    }
-    Button(scope.copyIDsLabel) {
-      HarnessMonitorClipboard.copy(scope.clipboardText)
-    }
-    Divider()
-    Button(scope.destructiveLabel, role: .destructive) {
-      requestRemoveAgents(scope.ids)
+      Button(scope.destructiveLabel, role: .destructive) {
+        requestRemoveAgents(scope.ids)
+      }
+    case .unavailable(let message):
+      Button(message) {}
+        .disabled(true)
     }
   }
 
@@ -148,42 +162,51 @@ extension SessionSidebar {
       including: hasActiveMultiSelection ? .gesture : []
     )
     .contextMenu {
-      taskRowContextMenu(task, orderedTaskIDs: orderedTaskIDs)
+      taskRowContextMenu(task, selection: selection, orderedTaskIDs: orderedTaskIDs)
     }
   }
 
   @ViewBuilder
   private func taskRowContextMenu(
     _ task: WorkItem,
+    selection: SessionSelection,
     orderedTaskIDs: [String]
   ) -> some View {
-    let scope = SessionSidebarContextMenuScope.resolve(
+    let resolution = SessionSidebarContextMenuScope.resolve(
       kind: .task,
+      rowSelection: selection,
       rowID: task.taskId,
+      listSelection: displayedSelectionSet,
       selectedIDs: state.sidebarSelection.selectedTaskIDs,
       orderedVisibleIDs: orderedTaskIDs
     )
-    if !scope.isMulti {
-      Menu("Move to...") {
-        ForEach(decisions.prefix(10)) { decision in
-          Button(decision.summary) {
-            linkTask(task.taskId, to: decision.id)
+    switch resolution {
+    case .actionable(let scope):
+      if !scope.isMulti {
+        Menu("Move to...") {
+          ForEach(decisions.prefix(10)) { decision in
+            Button(decision.summary) {
+              linkTask(task.taskId, to: decision.id)
+            }
+          }
+          if decisions.isEmpty {
+            Text("No visible decisions")
+          }
+          if decisions.count > 10 {
+            Text("Filter decisions to show more")
           }
         }
-        if decisions.isEmpty {
-          Text("No visible decisions")
-        }
-        if decisions.count > 10 {
-          Text("Filter decisions to show more")
-        }
       }
-    }
-    Button(scope.copyIDsLabel) {
-      HarnessMonitorClipboard.copy(scope.clipboardText)
-    }
-    Divider()
-    Button(scope.destructiveLabel, role: .destructive) {
-      requestDeleteTasks(scope.ids)
+      Button(scope.copyIDsLabel) {
+        HarnessMonitorClipboard.copy(scope.clipboardText)
+      }
+      Divider()
+      Button(scope.destructiveLabel, role: .destructive) {
+        requestDeleteTasks(scope.ids)
+      }
+    case .unavailable(let message):
+      Button(message) {}
+        .disabled(true)
     }
   }
 

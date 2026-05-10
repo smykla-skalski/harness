@@ -28,18 +28,26 @@ extension SessionSidebar {
           including: hasActiveMultiSelection ? .gesture : []
         )
         .contextMenu {
-          let scope = SessionSidebarContextMenuScope.resolve(
+          let resolution = SessionSidebarContextMenuScope.resolve(
             kind: .decision,
+            rowSelection: selection,
             rowID: decision.id,
+            listSelection: displayedSelectionSet,
             selectedIDs: state.sidebarSelection.selectedDecisionIDs,
             orderedVisibleIDs: orderedDecisionIDs
           )
-          Button(scope.destructiveLabel) {
-            dismissDecisions(scope.ids)
-          }
-          Divider()
-          Button(scope.copyIDsLabel) {
-            HarnessMonitorClipboard.copy(scope.clipboardText)
+          switch resolution {
+          case .actionable(let scope):
+            Button(scope.destructiveLabel) {
+              dismissDecisions(scope.ids)
+            }
+            Divider()
+            Button(scope.copyIDsLabel) {
+              HarnessMonitorClipboard.copy(scope.clipboardText)
+            }
+          case .unavailable(let message):
+            Button(message) {}
+              .disabled(true)
           }
         }
       }

@@ -147,6 +147,15 @@ struct SessionSidebarMultiSelectTests {
     #expect(!source.contains(".simultaneousGesture("))
   }
 
+  @Test("Sidebar collapse helpers resync stored list selection")
+  func sidebarCollapseHelpersResyncStoredListSelection() throws {
+    let source = try sourceFile(named: "SessionSidebar.swift")
+
+    #expect(source.contains("setListSelection([selection])"))
+    #expect(source.contains("setListSelection([state.selection])"))
+    #expect(source.contains("state.sidebarSelection.syncRenderedSelectionCount(selection.count)"))
+  }
+
   @Test("Session sidebar search is availability gated")
   func sessionSidebarSearchIsAvailabilityGated() throws {
     let sidebarSource = try sourceFile(named: "SessionSidebar.swift")

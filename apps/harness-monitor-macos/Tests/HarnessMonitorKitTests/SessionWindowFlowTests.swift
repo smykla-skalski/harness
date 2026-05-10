@@ -354,16 +354,16 @@ struct SessionWindowFlowTests {
   func sessionDecisionFiltersUseTogglesAndLiveRegionIncludesVisibleCount() throws {
     let sidebarSource = try previewableSourceFile(named: "Views/Sessions/SessionSidebar.swift")
     let filterSource = try previewableSourceFile(named: "Views/Sessions/SessionSidebar+Filtering.swift")
-    let decisionSectionSource = try previewableSourceFile(
-      named: "Views/Sessions/SessionSidebarDecisionSection.swift"
+    let announcerSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionSidebarMultiSelectAnnouncer.swift"
     )
 
     #expect(filterSource.contains("Toggle(severity.rawValue.capitalized"))
     #expect(filterSource.contains("private func severityBinding"))
     #expect(sidebarSource.contains(".accessibilityValue(decisionSelectionAccessibilityValue)"))
-    #expect(sidebarSource.contains(#""\(count) of \(decisions.count) decisions selected""#))
-    #expect(sidebarSource.contains("visibleCount: decisions.count"))
-    #expect(decisionSectionSource.contains(#""\(count) of \(visibleCount) decisions selected""#))
+    #expect(sidebarSource.contains(#""\(count) of \(visible) \(anchor.kind.pluralNoun) selected""#))
+    #expect(sidebarSource.contains(#""\(displayedSelectionSet.count) items selected""#))
+    #expect(announcerSource.contains(#""\(count) of \(visibleCount) \(kind.pluralNoun) selected""#))
   }
 
   @MainActor

@@ -177,6 +177,7 @@ public final class SessionSidebarSelectionState {
   public private(set) var selectedTaskIDs: Set<String> = []
   public private(set) var selectedDecisionIDs: Set<String> = []
   public private(set) var anchor: SessionSidebarAnchor?
+  public private(set) var renderedSelectionCount = 1
 
   /// Bumped on every selection mutation. Forward-looking primitive — keep
   /// it stable so a future watcher (e.g. a per-window analytics probe, or
@@ -204,6 +205,11 @@ public final class SessionSidebarSelectionState {
     selectedAgentIDs.count > 1
       || selectedTaskIDs.count > 1
       || selectedDecisionIDs.count > 1
+      || renderedSelectionCount > 1
+  }
+
+  public func syncRenderedSelectionCount(_ count: Int) {
+    renderedSelectionCount = max(0, count)
   }
 
   public func clear() {

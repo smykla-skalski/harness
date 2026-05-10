@@ -11,10 +11,11 @@ struct SessionSidebar: View {
   @Environment(\.harnessTextSizeIndex) private var textSizeIndex
   @Environment(\.undoManager)
   var undoManager
-  @State var currentModifiers: EventModifiers = []
+  @State private var currentModifiers: EventModifiers = []
   @State private var searchPresentationState = SidebarSearchPresentationState()
   @State private var searchFocusDispatcher = HarnessSidebarSearchFocusDispatcher()
   @State private var selectionDispatcher = SessionSidebarSelectionDispatcher()
+  @State private var listSelection: Set<SessionSelection> = []
 
   var body: some View {
     @Bindable var filters = state.decisionFilters
@@ -28,12 +29,15 @@ struct SessionSidebar: View {
     .environment(\.sidebarRowSize, sidebarRowSize)
     .onChange(of: decisions.map(\.id)) { _, ids in
       state.sidebarSelection.prune(kind: .decision, visibleIDs: Set(ids))
+      pruneListSelection(kind: .decision, visibleIDs: Set(ids))
     }
     .onChange(of: (snapshot?.detail?.agents ?? []).map(\.agentId)) { _, ids in
       state.sidebarSelection.prune(kind: .agent, visibleIDs: Set(ids))
+      pruneListSelection(kind: .agent, visibleIDs: Set(ids))
     }
     .onChange(of: (snapshot?.detail?.tasks ?? []).map(\.taskId)) { _, ids in
       state.sidebarSelection.prune(kind: .task, visibleIDs: Set(ids))
+      pruneListSelection(kind: .task, visibleIDs: Set(ids))
     }
     .task(id: (snapshot?.detail?.agents ?? []).map(\.agentId)) {
       state.sidebarOrdering.reconcileAgentOrder(with: snapshot?.detail?.agents ?? [])
@@ -71,7 +75,11 @@ struct SessionSidebar: View {
     .onChange(of: canPresentSearch, initial: true) { _, canPresent in
       applySearchPresentationAvailability(canPresent)
     }
+    .onChange(of: state.selection) { _, _ in
+      setListSelection(renderedSelectionSet())
+    }
     .task(id: state.sessionID) {
+      setListSelection(renderedSelectionSet())
       bindSelectionDispatcher()
     }
     .onDisappear {
@@ -118,6 +126,9 @@ struct SessionSidebar: View {
       let visible = visibleCount(for: anchor.kind)
       return Text("\(count) of \(visible) \(anchor.kind.pluralNoun) selected")
     }
+    if displayedSelectionSet.count > 1 {
+      return Text("\(displayedSelectionSet.count) items selected")
+    }
     return Text("No multi-selection")
   }
 
@@ -131,9 +142,13 @@ struct SessionSidebar: View {
 
   private var selectionBinding: Binding<Set<SessionSelection>> {
     Binding(
-      get: { renderedSelectionSet() },
+      get: { displayedSelectionSet },
       set: { applyListSelection($0) }
     )
+  }
+
+  var displayedSelectionSet: Set<SessionSelection> {
+    listSelection.isEmpty ? renderedSelectionSet() : listSelection
   }
 
   private func renderedSelectionSet() -> Set<SessionSelection> {
@@ -153,12 +168,12 @@ struct SessionSidebar: View {
   }
 
   private func applyListSelection(_ new: Set<SessionSelection>) {
-    let old = renderedSelectionSet()
+    let old = displayedSelectionSet
     guard new != old else { return }
+    setListSelection(new)
 
     if new.isEmpty {
       state.sidebarSelection.clear()
-      state.selectFromSidebar(nil)
       return
     }
 
@@ -172,31 +187,21 @@ struct SessionSidebar: View {
       return
     }
 
-    guard let kind = multiSelectKind(of: pivotItem) else {
+    guard let actionableSelection = actionableMultiSelection(from: new) else {
       state.sidebarSelection.clear()
-      state.selectFromSidebar(pivotItem)
       return
     }
 
-    let oldHasSameKind = old.contains { multiSelectKind(of: $0) == kind }
-    guard oldHasSameKind else {
-      state.sidebarSelection.clear()
-      state.selectFromSidebar(pivotItem)
-      return
-    }
-
-    let filtered = new.filter { multiSelectKind(of: $0) == kind }
-    let ids = Set(filtered.compactMap { multiSelectID(of: $0) })
     let anchorID = multiSelectID(of: pivotItem) ?? state.sidebarSelection.anchor?.id
     state.sidebarSelection.applyChange(
-      kind: kind,
-      selectedIDs: ids,
+      kind: actionableSelection.kind,
+      selectedIDs: actionableSelection.ids,
       anchorID: anchorID
     )
     state.sidebarAnnouncer.announce(
-      kind: kind,
-      count: ids.count,
-      visibleCount: visibleCount(for: kind)
+      kind: actionableSelection.kind,
+      count: actionableSelection.ids.count,
+      visibleCount: visibleCount(for: actionableSelection.kind)
     )
   }
 
@@ -210,6 +215,7 @@ struct SessionSidebar: View {
     guard hasActiveMultiSelection else { return }
     state.sidebarSelection.clear()
     state.selectFromSidebar(selection)
+    setListSelection([selection])
   }
 
   /// Plain tap anywhere in the SessionWindow (outside the sidebar list).
@@ -220,12 +226,41 @@ struct SessionSidebar: View {
     guard blocking.isEmpty else { return }
     guard hasActiveMultiSelection else { return }
     state.sidebarSelection.clear()
+    setListSelection([state.selection])
   }
 
   var hasActiveMultiSelection: Bool {
-    state.sidebarSelection.selectedAgentIDs.count > 1
-      || state.sidebarSelection.selectedTaskIDs.count > 1
-      || state.sidebarSelection.selectedDecisionIDs.count > 1
+    state.sidebarSelection.hasActiveMultiSelection
+  }
+
+  private func setListSelection(_ selection: Set<SessionSelection>) {
+    listSelection = selection
+    state.sidebarSelection.syncRenderedSelectionCount(selection.count)
+  }
+
+  private func actionableMultiSelection(
+    from selection: Set<SessionSelection>
+  ) -> (kind: SessionSidebarSelectionKind, ids: Set<String>)? {
+    let kinds = Set(selection.compactMap { multiSelectKind(of: $0) })
+    guard kinds.count == 1, let kind = kinds.first else { return nil }
+    let ids = Set(selection.compactMap { multiSelectID(of: $0) })
+    guard ids.count == selection.count else { return nil }
+    return (kind, ids)
+  }
+
+  private func pruneListSelection(
+    kind: SessionSidebarSelectionKind,
+    visibleIDs: Set<String>
+  ) {
+    let current = displayedSelectionSet
+    let pruned = current.filter { selection in
+      guard multiSelectKind(of: selection) == kind else { return true }
+      guard let selectionID = multiSelectID(of: selection) else { return true }
+      return visibleIDs.contains(selectionID)
+    }
+    if pruned != current {
+      setListSelection(pruned)
+    }
   }
 
   private func multiSelectKind(of selection: SessionSelection) -> SessionSidebarSelectionKind? {
@@ -267,6 +302,10 @@ struct SessionSidebar: View {
         )
         .tag(selection)
         .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowRoute(route))
+        .contextMenu {
+          Button(SessionSidebarContextMenuScope.unavailableLabel) {}
+            .disabled(true)
+        }
       }
     } header: {
       Text("Routes")
@@ -275,7 +314,7 @@ struct SessionSidebar: View {
   }
 
   private var selectionFocus: SessionSidebarSelectionFocus {
-    let hasMulti = state.sidebarSelection.anchor != nil
+    let hasMulti = displayedSelectionSet.count > 1
     let canDelete: Bool = {
       guard let anchor = state.sidebarSelection.anchor else { return false }
       return state.sidebarSelection.count(of: anchor.kind) > 0
@@ -302,7 +341,7 @@ struct SessionSidebar: View {
       self.decisions.map(\.id)
     }
     selectionDispatcher.selectAll = {
-      [state, agentIDsProvider, taskIDsProvider, decisionIDsProvider] in
+      [self, state, agentIDsProvider, taskIDsProvider, decisionIDsProvider] in
       let agents = agentIDsProvider()
       let tasks = taskIDsProvider()
       let decisions = decisionIDsProvider()
@@ -319,6 +358,7 @@ struct SessionSidebar: View {
         tasks: tasks,
         decisions: decisions
       )
+      setListSelection(Set(visible.map { sidebarSelection(for: kind, id: $0) }))
       state.sidebarSelection.applyChange(
         kind: kind,
         selectedIDs: Set(visible),
@@ -333,6 +373,7 @@ struct SessionSidebar: View {
     selectionDispatcher.clearSelection = { [state] in
       let priorKind = state.sidebarSelection.anchor?.kind
       state.sidebarSelection.clear()
+      setListSelection([state.selection])
       if let priorKind {
         state.sidebarAnnouncer.announce(kind: priorKind, count: 0, visibleCount: 0)
       }
