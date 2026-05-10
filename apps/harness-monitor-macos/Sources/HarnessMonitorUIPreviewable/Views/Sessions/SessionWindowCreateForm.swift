@@ -445,13 +445,11 @@ extension SessionWindowCreateForm {
     )
   }
 
-  @ViewBuilder
-  private var agentConfigurationSections: some View {
+  @ViewBuilder private var agentConfigurationSections: some View {
     terminalConfigurationSections
   }
 
-  @ViewBuilder
-  private var embeddedAgentRuntimeSections: some View {
+  @ViewBuilder private var embeddedAgentRuntimeSections: some View {
     Section {
       if catalogState.isLoading && !catalogState.hasLoaded {
         Label("Checking available runtimes", systemImage: "clock")
@@ -484,16 +482,15 @@ extension SessionWindowCreateForm {
 
   private var embeddedProviderDescription: String {
     if let option = selectedCapabilityOption, let choice = selectedTransportChoice {
-      return
-        "\(SessionWindowCreateFormCatalogs.transportSummary(option: option, choice: choice)) "
-        + "Finish the remaining setup in the sections below."
+      let summary = SessionWindowCreateFormCatalogs.transportSummary(option: option, choice: choice)
+      return "\(summary) Finish the remaining setup in the sections below."
     }
     return
-      "Choose how this agent starts. The remaining form sections hold the configuration and advanced overrides."
+      "Choose how this agent starts. The remaining form sections hold the configuration "
+      + "and advanced overrides."
   }
 
-  @ViewBuilder
-  private var terminalConfigurationSections: some View {
+  @ViewBuilder private var terminalConfigurationSections: some View {
     if let option = selectedCapabilityOption, option.transportChoices.count > 1 {
       terminalTransportChoicesSection(option: option)
     } else if !embedsRuntimeConfiguration, selectedCapabilityOption == nil {
@@ -583,7 +580,8 @@ extension SessionWindowCreateForm {
       return "Set an optional project directory override for this agent."
     }
     return
-      "Set an optional project directory override. Use one argument per line for a command override; the first line is the executable."
+      "Set an optional project directory override. Use one argument per line for a "
+      + "command override; the first line is the executable."
   }
 
   @ViewBuilder
@@ -637,8 +635,7 @@ extension SessionWindowCreateForm {
     }
   }
 
-  @ViewBuilder
-  private var terminalRuntimeConfigurationSection: some View {
+  @ViewBuilder private var terminalRuntimeConfigurationSection: some View {
     let option = selectedCapabilityOption
     let choice = selectedTransportChoice
 

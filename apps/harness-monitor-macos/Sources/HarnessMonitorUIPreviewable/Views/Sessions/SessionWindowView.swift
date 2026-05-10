@@ -55,8 +55,7 @@ public struct SessionWindowView: View {
   private var contentColumnWidthStorage = SessionContentDetailSplitLayout.defaultContentWidth
   @SceneStorage("session.columnVisibility")
   private var columnVisibilityRawStorage = "automatic"
-  @AccessibilityFocusState
-  private var primaryContentAccessibilityFocused: Bool
+  @AccessibilityFocusState private var primaryContentAccessibilityFocused: Bool
   @AppStorage(HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
   private var mcpRegistryHostEnabled = HarnessMonitorMCPSettingsDefaults
     .registryHostEnabledDefault
@@ -355,8 +354,7 @@ public struct SessionWindowView: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowShell)
   }
 
-  @ViewBuilder
-  private var sessionWindowSurface: some View {
+  @ViewBuilder private var sessionWindowSurface: some View {
     if isUnknownSession {
       unknownSessionContent
     } else {
@@ -452,8 +450,7 @@ public struct SessionWindowView: View {
       .focusedSceneValue(\.sessionCreateContext, createContext)
   }
 
-  @ToolbarContentBuilder
-  private var sessionToolbar: some ToolbarContent {
+  @ToolbarContentBuilder private var sessionToolbar: some ToolbarContent {
     SessionWindowToolbar(
       store: store,
       model: sessionToolbarModel,

@@ -8,7 +8,8 @@ struct SessionSidebar: View {
   let decisions: [Decision]
   let canPresentSearch: Bool
   @Bindable var state: SessionWindowStateCache
-  @Environment(\.harnessTextSizeIndex) private var textSizeIndex
+  @Environment(\.harnessTextSizeIndex)
+  private var textSizeIndex
   @Environment(\.undoManager)
   var undoManager
   @State private var currentModifiers: EventModifiers = []
@@ -340,36 +341,36 @@ struct SessionSidebar: View {
     let decisionIDsProvider: () -> [String] = { [self] in
       self.decisions.map(\.id)
     }
-    selectionDispatcher.selectAll = {
-      [self, state, agentIDsProvider, taskIDsProvider, decisionIDsProvider] in
-      let agents = agentIDsProvider()
-      let tasks = taskIDsProvider()
-      let decisions = decisionIDsProvider()
-      let inferred = SessionSidebarSelectionKind.inferredAnchorKind(
-        agentCount: agents.count,
-        taskCount: tasks.count,
-        decisionCount: decisions.count
-      )
-      let kind = state.sidebarSelection.anchor?.kind ?? inferred
-      guard let kind else { return }
-      let visible = SessionSidebarSelectionKind.visibleIDs(
-        for: kind,
-        agents: agents,
-        tasks: tasks,
-        decisions: decisions
-      )
-      setListSelection(Set(visible.map { sidebarSelection(for: kind, id: $0) }))
-      state.sidebarSelection.applyChange(
-        kind: kind,
-        selectedIDs: Set(visible),
-        anchorID: visible.first
-      )
-      state.sidebarAnnouncer.announce(
-        kind: kind,
-        count: visible.count,
-        visibleCount: visible.count
-      )
-    }
+    selectionDispatcher.selectAll =
+      { [self, state, agentIDsProvider, taskIDsProvider, decisionIDsProvider] in
+        let agents = agentIDsProvider()
+        let tasks = taskIDsProvider()
+        let decisions = decisionIDsProvider()
+        let inferred = SessionSidebarSelectionKind.inferredAnchorKind(
+          agentCount: agents.count,
+          taskCount: tasks.count,
+          decisionCount: decisions.count
+        )
+        let kind = state.sidebarSelection.anchor?.kind ?? inferred
+        guard let kind else { return }
+        let visible = SessionSidebarSelectionKind.visibleIDs(
+          for: kind,
+          agents: agents,
+          tasks: tasks,
+          decisions: decisions
+        )
+        setListSelection(Set(visible.map { sidebarSelection(for: kind, id: $0) }))
+        state.sidebarSelection.applyChange(
+          kind: kind,
+          selectedIDs: Set(visible),
+          anchorID: visible.first
+        )
+        state.sidebarAnnouncer.announce(
+          kind: kind,
+          count: visible.count,
+          visibleCount: visible.count
+        )
+      }
     selectionDispatcher.clearSelection = { [state] in
       let priorKind = state.sidebarSelection.anchor?.kind
       state.sidebarSelection.clear()
@@ -378,24 +379,24 @@ struct SessionSidebar: View {
         state.sidebarAnnouncer.announce(kind: priorKind, count: 0, visibleCount: 0)
       }
     }
-    selectionDispatcher.deleteSelection = {
-      [agentIDsProvider, taskIDsProvider, decisionIDsProvider] in
-      guard let anchor = state.sidebarSelection.anchor else { return }
-      let ordered = SessionSidebarSelectionKind.visibleIDs(
-        for: anchor.kind,
-        agents: agentIDsProvider(),
-        tasks: taskIDsProvider(),
-        decisions: decisionIDsProvider()
-      )
-      let set = state.sidebarSelection.selectedIDs(of: anchor.kind)
-      let ids = ordered.filter { set.contains($0) }
-      guard !ids.isEmpty else { return }
-      switch anchor.kind {
-      case .agent: requestRemoveAgents(ids)
-      case .task: requestDeleteTasks(ids)
-      case .decision: dismissDecisions(ids)
+    selectionDispatcher.deleteSelection =
+      { [agentIDsProvider, taskIDsProvider, decisionIDsProvider] in
+        guard let anchor = state.sidebarSelection.anchor else { return }
+        let ordered = SessionSidebarSelectionKind.visibleIDs(
+          for: anchor.kind,
+          agents: agentIDsProvider(),
+          tasks: taskIDsProvider(),
+          decisions: decisionIDsProvider()
+        )
+        let set = state.sidebarSelection.selectedIDs(of: anchor.kind)
+        let ids = ordered.filter { set.contains($0) }
+        guard !ids.isEmpty else { return }
+        switch anchor.kind {
+        case .agent: requestRemoveAgents(ids)
+        case .task: requestDeleteTasks(ids)
+        case .decision: dismissDecisions(ids)
+        }
       }
-    }
   }
 }
 

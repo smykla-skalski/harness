@@ -210,8 +210,7 @@ extension SessionWindowView {
     )
   }
 
-  @ViewBuilder
-  private var standardSessionDetailSurface: some View {
+  @ViewBuilder private var standardSessionDetailSurface: some View {
     switch renderedRoute.layoutStyle {
     case .sidebarDetail:
       routeDetailColumn
@@ -226,8 +225,7 @@ extension SessionWindowView {
     }
   }
 
-  @ViewBuilder
-  private var routeDetailColumn: some View {
+  @ViewBuilder private var routeDetailColumn: some View {
     contentColumn
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       .backgroundExtensionEffect()
