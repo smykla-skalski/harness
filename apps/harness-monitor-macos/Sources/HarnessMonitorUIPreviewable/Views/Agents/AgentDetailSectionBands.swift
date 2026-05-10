@@ -56,6 +56,13 @@ struct AgentDetailActivityBand: View {
   let assignedTasks: [WorkItem]
   let prefersWideLayout: Bool
   let isSparseState: Bool
+  // Replaces ViewThatFits: a single deterministic if/else gated on a measured
+  // container width avoids the double-tree-build cost on every body update.
+  @State private var fitsHorizontally = true
+
+  private var horizontalMinWidth: CGFloat {
+    isSparseState ? 544 : 528
+  }
 
   var body: some View {
     AgentDetailPanel(title: timeline.isEmpty ? nil : "Activity") {
@@ -75,18 +82,12 @@ struct AgentDetailActivityBand: View {
 
         Divider()
 
-        if prefersWideLayout {
-          ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
-              runtimeLanePane
-                .frame(maxWidth: .infinity, alignment: .leading)
-              assignmentPane
-                .frame(maxWidth: isSparseState ? 248 : 232, alignment: .leading)
-            }
-            VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-              runtimeLanePane
-              assignmentPane
-            }
+        if prefersWideLayout && fitsHorizontally {
+          HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
+            runtimeLanePane
+              .frame(maxWidth: .infinity, alignment: .leading)
+            assignmentPane
+              .frame(maxWidth: isSparseState ? 248 : 232, alignment: .leading)
           }
         } else {
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
@@ -94,6 +95,14 @@ struct AgentDetailActivityBand: View {
             assignmentPane
           }
         }
+      }
+    }
+    .onGeometryChange(for: CGFloat.self) { proxy in
+      proxy.size.width
+    } action: { width in
+      let next = width >= horizontalMinWidth
+      if fitsHorizontally != next {
+        fitsHorizontally = next
       }
     }
   }
@@ -159,6 +168,8 @@ struct AgentDetailActionBand: View {
   @Binding var signalMessage: String
   @Binding var signalActionHint: String
   let prefersWideLayout: Bool
+  // Replaces ViewThatFits: deterministic if/else gated on measured width.
+  @State private var fitsHorizontally = true
 
   init(
     store: HarnessMonitorStore,
@@ -196,21 +207,19 @@ struct AgentDetailActionBand: View {
     self.prefersWideLayout = prefersWideLayout
   }
 
+  private var horizontalMinWidth: CGFloat {
+    roleActionsColumnWidth + HarnessMonitorTheme.spacingMD + 300
+  }
+
   var body: some View {
     AgentDetailPanel(title: "Actions") {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-        if prefersWideLayout {
-          ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
-              roleActionsPane
-                .frame(maxWidth: roleActionsColumnWidth, alignment: .leading)
-              sendUpdatePane
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-              roleActionsPane
-              sendUpdatePane
-            }
+        if prefersWideLayout && fitsHorizontally {
+          HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
+            roleActionsPane
+              .frame(maxWidth: roleActionsColumnWidth, alignment: .leading)
+            sendUpdatePane
+              .frame(maxWidth: .infinity, alignment: .leading)
           }
         } else {
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
@@ -218,6 +227,14 @@ struct AgentDetailActionBand: View {
             sendUpdatePane
           }
         }
+      }
+    }
+    .onGeometryChange(for: CGFloat.self) { proxy in
+      proxy.size.width
+    } action: { width in
+      let next = width >= horizontalMinWidth
+      if fitsHorizontally != next {
+        fitsHorizontally = next
       }
     }
   }
