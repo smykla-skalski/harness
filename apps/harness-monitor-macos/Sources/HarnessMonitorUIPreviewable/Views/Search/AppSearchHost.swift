@@ -64,7 +64,9 @@ public struct AppSearchHostModifier: ViewModifier {
     // fragile (Apple Developer Forums thread #693580). Co-locating the
     // shortcut with its target state is the canonical pure-SwiftUI fix.
     @Bindable var model = model
-    return content
+
+    return
+      content
       .searchable(
         text: $query,
         isPresented: $isSearchPresented,
