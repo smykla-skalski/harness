@@ -210,7 +210,7 @@ private struct SessionStatusTransportChrome: View {
   }
 
   var body: some View {
-    HStack(alignment: .center, spacing: 3) {
+    HStack(alignment: .center, spacing: 1) {
       Text(transportLabel)
         .font(Self.badgeFont)
         .foregroundStyle(statusTint)
