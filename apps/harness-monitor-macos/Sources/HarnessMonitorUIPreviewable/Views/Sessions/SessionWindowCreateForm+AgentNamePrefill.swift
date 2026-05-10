@@ -33,7 +33,7 @@ extension SessionWindowCreateForm {
   }
 
   private var agentNameRuntime: AgentTuiRuntime {
-    return draft.launchSelection.preferredRuntime
+    draft.launchSelection.preferredRuntime
   }
 
   private func existingAgentNamesInSession() -> [String] {

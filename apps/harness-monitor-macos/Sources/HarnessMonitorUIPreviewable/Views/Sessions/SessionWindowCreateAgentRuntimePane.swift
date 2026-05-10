@@ -141,7 +141,7 @@ struct SessionWindowCreateAgentRuntimeContent: View {
   }
 
   private var compactDescription: String {
-    return "Choose a provider below, then finish configuration in the form."
+    "Choose a provider below, then finish configuration in the form."
   }
 
   @ViewBuilder

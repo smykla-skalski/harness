@@ -25,7 +25,7 @@ struct HarnessMonitorApp: App {
   private let pendingDecisionsDockBadgeController: PendingDecisionsDockBadgeController
   private let perfScenario: HarnessMonitorPerfScenario?
   // App-internal access; helpers in HarnessMonitorApp+Helpers.swift use it.
-  @State var store: HarnessMonitorStore
+  @State private var store: HarnessMonitorStore
   @State private var menuBarStatusController: HarnessMonitorMenuBarStatusController
   @State private var sessionWindowPresenceTracker: SessionWindowPresenceTracker
   @State private var windowCommandRouting: WindowCommandRoutingState
