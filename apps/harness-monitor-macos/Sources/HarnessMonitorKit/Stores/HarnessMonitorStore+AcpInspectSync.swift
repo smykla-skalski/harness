@@ -69,6 +69,75 @@ extension HarnessMonitorStore {
     }
   }
 
+  public func acpRuntimeInspectStatus(
+    for agentID: String,
+    sessionID: String,
+    sessionRegistrations: [AgentRegistration]
+  ) -> AcpRuntimeInspectStatus? {
+    guard
+      let runtimeState = acpRuntimeState(
+        for: agentID,
+        sessionID: sessionID,
+        sessionRegistrations: sessionRegistrations
+      )
+    else {
+      return nil
+    }
+    let entry = selectedAcpInspectSyncEntries[runtimeState.identity]
+    let phase: AcpRuntimeInspectPhase =
+      if let entry, entry.phase != AcpRuntimeInspectPhase.ready {
+        entry.phase
+      } else if runtimeState.hasInspect {
+        AcpRuntimeInspectPhase.ready
+      } else {
+        AcpRuntimeInspectPhase.waiting
+      }
+    switch phase {
+    case .ready:
+      return AcpRuntimeInspectStatus(
+        phase: .ready,
+        shortLabel: "Ready",
+        detail: "ACP runtime telemetry available.",
+        accessibilityValue: "Runtime telemetry available"
+      )
+    case .waiting:
+      return AcpRuntimeInspectStatus(
+        phase: .waiting,
+        shortLabel: "Waiting",
+        detail: "Waiting for the first ACP runtime inspect snapshot.",
+        accessibilityValue: "Waiting for first runtime telemetry"
+      )
+    case .retrying:
+      let attemptCount = entry?.retryCount ?? 0
+      let detail =
+        if attemptCount > 1 {
+          "ACP runtime telemetry is still missing. Retrying inspect (attempt \(attemptCount))."
+        } else {
+          "ACP runtime telemetry is still missing. Retrying inspect now."
+        }
+      return AcpRuntimeInspectStatus(
+        phase: .retrying,
+        shortLabel: "Retrying",
+        detail: detail,
+        accessibilityValue: "Retrying runtime telemetry"
+      )
+    case .stalled:
+      return AcpRuntimeInspectStatus(
+        phase: .stalled,
+        shortLabel: "Stalled",
+        detail: "ACP runtime telemetry has not arrived yet. Use Refresh if this persists.",
+        accessibilityValue: "Runtime telemetry stalled"
+      )
+    case .unavailable:
+      return AcpRuntimeInspectStatus(
+        phase: .unavailable,
+        shortLabel: "Unavailable",
+        detail: acpInspectUnavailableMessage(for: entry),
+        accessibilityValue: "Runtime telemetry unavailable"
+      )
+    }
+  }
+
   func reconcileAcpInspectSyncState(
     sessionID: String,
     activeAgents: [AcpAgentSnapshot],

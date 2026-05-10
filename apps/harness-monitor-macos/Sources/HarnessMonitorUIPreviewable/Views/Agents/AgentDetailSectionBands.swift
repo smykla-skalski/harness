@@ -145,9 +145,13 @@ struct AgentDetailActionBand: View {
   let store: HarnessMonitorStore
   let sessionID: String
   let agentID: String
+  let agentName: String?
   let isLeader: Bool
   let roleActionsAvailable: Bool
+  let actionActorID: String?
+  let actionUnavailableMessage: String?
   let rolePickerValues: [SessionRole]
+  let runtimeState: AcpAgentRuntimeState?
 
   @Binding var rolePickerSelection: SessionRole
   @Binding var selectedSendAction: SendUpdateAction
@@ -155,6 +159,42 @@ struct AgentDetailActionBand: View {
   @Binding var signalMessage: String
   @Binding var signalActionHint: String
   let prefersWideLayout: Bool
+
+  init(
+    store: HarnessMonitorStore,
+    sessionID: String,
+    agentID: String,
+    agentName: String? = nil,
+    isLeader: Bool,
+    roleActionsAvailable: Bool,
+    actionActorID: String? = nil,
+    actionUnavailableMessage: String? = nil,
+    rolePickerValues: [SessionRole],
+    runtimeState: AcpAgentRuntimeState? = nil,
+    rolePickerSelection: Binding<SessionRole>,
+    selectedSendAction: Binding<SendUpdateAction>,
+    signalCommand: Binding<String>,
+    signalMessage: Binding<String>,
+    signalActionHint: Binding<String>,
+    prefersWideLayout: Bool
+  ) {
+    self.store = store
+    self.sessionID = sessionID
+    self.agentID = agentID
+    self.agentName = agentName
+    self.isLeader = isLeader
+    self.roleActionsAvailable = roleActionsAvailable
+    self.actionActorID = actionActorID
+    self.actionUnavailableMessage = actionUnavailableMessage
+    self.rolePickerValues = rolePickerValues
+    self.runtimeState = runtimeState
+    _rolePickerSelection = rolePickerSelection
+    _selectedSendAction = selectedSendAction
+    _signalCommand = signalCommand
+    _signalMessage = signalMessage
+    _signalActionHint = signalActionHint
+    self.prefersWideLayout = prefersWideLayout
+  }
 
   var body: some View {
     AgentDetailPanel(title: "Actions") {
@@ -188,6 +228,7 @@ struct AgentDetailActionBand: View {
         store: store,
         sessionID: sessionID,
         agentID: agentID,
+        actionActorID: actionActorID,
         isLeader: isLeader,
         roleActionsAvailable: roleActionsAvailable,
         rolePickerValues: rolePickerValues,
@@ -206,6 +247,10 @@ struct AgentDetailActionBand: View {
         store: store,
         sessionID: sessionID,
         agentID: agentID,
+        agentName: agentName,
+        actionActorID: actionActorID,
+        actionUnavailableMessage: actionUnavailableMessage,
+        runtimeState: runtimeState,
         selectedSendAction: $selectedSendAction,
         signalCommand: $signalCommand,
         signalMessage: $signalMessage,
@@ -215,7 +260,7 @@ struct AgentDetailActionBand: View {
   }
 }
 
-private struct AgentDetailPanel<Content: View>: View {
+struct AgentDetailPanel<Content: View>: View {
   let title: String?
   private let content: Content
 
@@ -241,7 +286,7 @@ private struct AgentDetailPanel<Content: View>: View {
   }
 }
 
-private struct AgentDetailInsetGroup<Content: View>: View {
+struct AgentDetailInsetGroup<Content: View>: View {
   let title: String
   private let content: Content
 

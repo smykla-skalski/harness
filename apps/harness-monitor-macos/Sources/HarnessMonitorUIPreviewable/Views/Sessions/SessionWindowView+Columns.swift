@@ -270,10 +270,15 @@ extension SessionWindowView {
   private func detailFocusContent(for selection: SessionSelection) -> some View {
     switch selection {
     case .agent(_, let agentID):
-      if let agent = snapshot?.detail?.agents.first(where: { $0.agentId == agentID }) {
+      if let snapshot,
+        let detail = snapshot.detail,
+        let agent = detail.agents.first(where: { $0.agentId == agentID })
+      {
         SessionAgentDetailSection(
           store: store,
           sessionID: token.sessionID,
+          detail: detail,
+          timeline: snapshot.timeline,
           agent: agent,
           tui: agentTui(for: agent),
           pendingPrompt: pendingUserPrompt(for: agent.agentId),

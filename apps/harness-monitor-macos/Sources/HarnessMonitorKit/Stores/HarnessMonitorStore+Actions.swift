@@ -87,6 +87,32 @@ extension HarnessMonitorStore {
   }
 
   @discardableResult
+  public func changeRole(
+    sessionID: String,
+    agentID: String,
+    role: SessionRole,
+    actorID: String
+  ) async -> Bool {
+    let actionName = "Change role"
+    guard let action = prepareSessionAction(named: actionName, sessionID: sessionID) else {
+      return false
+    }
+    return await mutateSelectedSession(
+      actionName: actionName,
+      actionID: ActionID.changeRole(sessionID: sessionID, agentID: agentID).key,
+      using: action.client,
+      sessionID: sessionID,
+      mutation: {
+        try await action.client.changeRole(
+          sessionID: sessionID,
+          agentID: agentID,
+          request: RoleChangeRequest(actor: actorID, role: role)
+        )
+      }
+    )
+  }
+
+  @discardableResult
   public func observeSelectedSession(actor: String = "harness-app") async -> Bool {
     let actionName = "Observe session"
     guard let action = prepareSelectedSessionAction(named: actionName) else { return false }
@@ -199,6 +225,40 @@ extension HarnessMonitorStore {
     } else {
       pendingConfirmation = .removeAgents(
         sessionID: action.sessionID,
+        agentIDs: normalized,
+        actorID: actorID
+      )
+    }
+  }
+
+  public func requestRemoveAgentConfirmation(
+    sessionID: String,
+    agentID: String,
+    actorID: String
+  ) {
+    requestRemoveAgentConfirmation(
+      sessionID: sessionID,
+      agentIDs: [agentID],
+      actorID: actorID
+    )
+  }
+
+  public func requestRemoveAgentConfirmation(
+    sessionID: String,
+    agentIDs: [String],
+    actorID: String
+  ) {
+    let normalized = orderedUniqueIDs(agentIDs)
+    guard !normalized.isEmpty else { return }
+    if normalized.count == 1 {
+      pendingConfirmation = .removeAgent(
+        sessionID: sessionID,
+        agentID: normalized[0],
+        actorID: actorID
+      )
+    } else {
+      pendingConfirmation = .removeAgents(
+        sessionID: sessionID,
         agentIDs: normalized,
         actorID: actorID
       )
