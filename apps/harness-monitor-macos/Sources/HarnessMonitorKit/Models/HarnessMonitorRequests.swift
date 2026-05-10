@@ -254,6 +254,20 @@ public struct SignalSendRequest: Codable, Equatable, Sendable {
   public let command: String
   public let message: String
   public let actionHint: String?
+
+  public init(
+    actor: String,
+    agentId: String,
+    command: String,
+    message: String,
+    actionHint: String?
+  ) {
+    self.actor = actor
+    self.agentId = agentId
+    self.command = command
+    self.message = message
+    self.actionHint = actionHint
+  }
 }
 
 public struct SignalCancelRequest: Codable, Equatable, Sendable {

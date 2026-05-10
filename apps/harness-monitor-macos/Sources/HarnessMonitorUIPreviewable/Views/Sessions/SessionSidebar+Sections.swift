@@ -87,9 +87,11 @@ extension SessionSidebar {
   ) -> some View {
     let resolution = SessionSidebarContextMenuScope.resolve(
       kind: .agent,
-      rowSelection: selection,
       rowID: agent.agentId,
-      listSelection: displayedSelectionSet,
+      selectionState: .init(
+        rowSelection: selection,
+        listSelection: displayedSelectionSet
+      ),
       selectedIDs: state.sidebarSelection.selectedAgentIDs,
       orderedVisibleIDs: orderedAgentIDs
     )
@@ -174,9 +176,11 @@ extension SessionSidebar {
   ) -> some View {
     let resolution = SessionSidebarContextMenuScope.resolve(
       kind: .task,
-      rowSelection: selection,
       rowID: task.taskId,
-      listSelection: displayedSelectionSet,
+      selectionState: .init(
+        rowSelection: selection,
+        listSelection: displayedSelectionSet
+      ),
       selectedIDs: state.sidebarSelection.selectedTaskIDs,
       orderedVisibleIDs: orderedTaskIDs
     )

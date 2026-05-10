@@ -31,9 +31,11 @@ extension SessionSidebar {
         .contextMenu {
           let resolution = SessionSidebarContextMenuScope.resolve(
             kind: .decision,
-            rowSelection: selection,
             rowID: decision.id,
-            listSelection: displayedSelectionSet,
+            selectionState: .init(
+              rowSelection: selection,
+              listSelection: displayedSelectionSet
+            ),
             selectedIDs: state.sidebarSelection.selectedDecisionIDs,
             orderedVisibleIDs: orderedDecisionIDs
           )

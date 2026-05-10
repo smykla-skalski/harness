@@ -6,6 +6,11 @@ enum SessionSidebarContextMenuResolution: Equatable {
 }
 
 struct SessionSidebarContextMenuScope: Equatable {
+  struct SelectionState: Equatable {
+    let rowSelection: SessionSelection
+    let listSelection: Set<SessionSelection>
+  }
+
   static let unavailableLabel = "No actions available"
   static let mixedSelectionUnavailableLabel = "No actions available for mixed selection"
 
@@ -35,15 +40,14 @@ struct SessionSidebarContextMenuScope: Equatable {
 
   static func resolve(
     kind: SessionSidebarSelectionKind,
-    rowSelection: SessionSelection,
     rowID: String,
-    listSelection: Set<SessionSelection>,
+    selectionState: SelectionState,
     selectedIDs: Set<String>,
     orderedVisibleIDs: [String]
   ) -> SessionSidebarContextMenuResolution {
-    if listSelection.count > 1,
-      listSelection.contains(rowSelection),
-      !listSelection.allSatisfy({ selectionKind(of: $0) == kind })
+    if selectionState.listSelection.count > 1,
+      selectionState.listSelection.contains(selectionState.rowSelection),
+      !selectionState.listSelection.allSatisfy({ selectionKind(of: $0) == kind })
     {
       return .unavailable(Self.mixedSelectionUnavailableLabel)
     }
