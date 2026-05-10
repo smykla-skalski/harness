@@ -10,7 +10,6 @@ struct SessionWindowToolbarModel: Equatable {
 struct SessionWindowToolbar: ToolbarContent {
   let store: HarnessMonitorStore
   let model: SessionWindowToolbarModel
-  let focusModeStatusModel: SessionStatusSummaryModel?
   let state: SessionWindowStateCache
   @Binding var focusMode: Bool
   @Environment(\.accessibilityReduceMotion)
@@ -70,11 +69,6 @@ struct SessionWindowToolbar: ToolbarContent {
       .accessibilityLabel("Focus mode")
       .accessibilityValue(focusMode ? "On" : "Off")
       .accessibilityHint("Shows or hides secondary session columns.")
-    }
-    if let focusModeStatusModel {
-      ToolbarItem(placement: .principal) {
-        SessionToolbarStatusFallback(model: focusModeStatusModel)
-      }
     }
     ToolbarItem(placement: .primaryAction) {
       SleepPreventionToolbarButton(

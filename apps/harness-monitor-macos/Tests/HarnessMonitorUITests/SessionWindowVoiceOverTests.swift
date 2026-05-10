@@ -12,7 +12,7 @@ final class SessionWindowVoiceOverTests: HarnessMonitorUITestCase {
   private static let previewSessionID = "sess1234"
   private static let decisionSummary = "Seeded session-window decision"
 
-  func testFocusModeKeepsRouteContentVisible() throws {
+  func testFocusModeKeepsRouteContentVisibleWithoutMirroringSidebarFooter() throws {
     let app = launch(
       mode: "preview",
       additionalEnvironment: [
@@ -41,6 +41,8 @@ final class SessionWindowVoiceOverTests: HarnessMonitorUITestCase {
 
     let sidebar = element(in: app, identifier: Accessibility.sessionWindowSidebar)
     XCTAssertTrue(waitForElement(in: app, sidebar, timeout: Self.actionTimeout))
+    let statusSurface = element(in: app, identifier: Accessibility.sessionWindowStatusSurface)
+    XCTAssertTrue(waitForElement(statusSurface, timeout: Self.actionTimeout))
 
     let overviewRoute = element(
       in: app,
@@ -59,10 +61,9 @@ final class SessionWindowVoiceOverTests: HarnessMonitorUITestCase {
       waitUntil(in: app, timeout: Self.actionTimeout) { !sidebar.exists },
       "Focus mode should replace the split-shell chrome with a single focused surface."
     )
-    let statusSurface = element(in: app, identifier: Accessibility.sessionWindowStatusSurface)
     XCTAssertTrue(
-      waitForElement(statusSurface, timeout: Self.actionTimeout),
-      "Focus mode should keep the compact session status fallback visible when the sidebar footer is hidden."
+      waitUntil(in: app, timeout: Self.actionTimeout) { !statusSurface.exists },
+      "Focus mode should not mirror the sidebar footer into the toolbar when the sidebar is hidden."
     )
 
     let openTasksMetric = staticText(in: app, containing: "Open tasks")
