@@ -8,7 +8,7 @@ extension SessionWindowRoute {
     switch self {
     case .overview, .timeline:
       .sidebarDetail
-    case .agents, .tasks, .decisions, .terminal:
+    case .agents, .tasks, .decisions:
       .sidebarContentDetail
     }
   }

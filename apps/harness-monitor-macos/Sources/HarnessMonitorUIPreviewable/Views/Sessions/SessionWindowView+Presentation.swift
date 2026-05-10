@@ -7,6 +7,11 @@ struct SessionWindowSnapshotRefreshTrigger: Equatable {
   let summaryUpdatedAt: String?
 }
 
+struct SessionWindowAgentsRouteAutoSelectionTrigger: Equatable {
+  let selection: SessionSelection
+  let visibleAgentIDs: [String]
+}
+
 struct SessionWindowDecisionCacheStorage {
   var allSessionDecisions: [Decision] = []
   var matchingDecisions: [Decision] = []
@@ -34,6 +39,9 @@ extension SessionWindowView {
       }
       .task(id: decisionsCacheTrigger) {
         await recomputeDecisionsCache()
+      }
+      .task(id: agentsRouteAutoSelectionTrigger) {
+        autoSelectFirstVisibleAgentIfNeeded()
       }
       .task(id: store.pendingSessionRouteRequestID) {
         await applyPendingSessionRouteIfNeeded()
@@ -73,6 +81,31 @@ extension SessionWindowView {
 
   var navigationSubtitleText: String {
     summary?.projectAndWorktreeDisplayLabel(separator: "·") ?? ""
+  }
+
+  var visibleSessionAgents: [AgentRegistration] {
+    SessionWindowAgentFilter.filteredAgents(
+      snapshot?.detail?.agents ?? [],
+      query: stateCache.appSearchModel.query
+    )
+  }
+
+  var agentsRouteAutoSelectionTrigger: SessionWindowAgentsRouteAutoSelectionTrigger {
+    SessionWindowAgentsRouteAutoSelectionTrigger(
+      selection: stateCache.selection,
+      visibleAgentIDs: visibleSessionAgents.map(\.agentId)
+    )
+  }
+
+  func autoSelectFirstVisibleAgentIfNeeded() {
+    guard let agentID = SessionAgentAutoSelectionPolicy.preferredAgentID(
+      selection: stateCache.selection,
+      visibleAgentIDs: visibleSessionAgents.map(\.agentId)
+    )
+    else {
+      return
+    }
+    stateCache.selectAgent(agentID)
   }
 
   var allSessionDecisions: [Decision] {
@@ -179,7 +212,8 @@ extension SessionWindowView {
       store: store,
       model: sessionToolbarModel,
       state: stateCache,
-      focusMode: focusModeBinding
+      focusMode: focusModeBinding,
+      currentModifiers: currentModifiers
     )
   }
 

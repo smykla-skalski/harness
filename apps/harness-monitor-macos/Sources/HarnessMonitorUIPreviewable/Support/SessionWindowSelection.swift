@@ -155,6 +155,18 @@ public struct SessionCreateDraft: Codable, Hashable, Sendable {
   }
 }
 
+enum SessionAgentAutoSelectionPolicy {
+  static func preferredAgentID(
+    selection: SessionSelection,
+    visibleAgentIDs: [String]
+  ) -> String? {
+    guard case .route(.agents) = selection else {
+      return nil
+    }
+    return visibleAgentIDs.first
+  }
+}
+
 public enum SessionSelection: Hashable, Sendable {
   case route(SessionWindowRoute)
   case agent(sessionID: String, agentID: String)
@@ -196,7 +208,7 @@ public enum SessionSelection: Hashable, Sendable {
   /// The cross-domain search domain implied by this selection, when one
   /// exists. Drilled-in selections (`.agent`, `.decision`, `.task`) imply
   /// their parent route's domain. `.codexRun` and `.create` and routes
-  /// without a search domain (`.overview`, `.terminal`) return `nil`.
+  /// without a search domain (`.overview`) return `nil`.
   public var routeDomain: AppSearchDomain? {
     switch self {
     case .agent: .agents
@@ -223,7 +235,7 @@ public enum SessionSelection: Hashable, Sendable {
         .task
       case .decisions:
         .decision
-      case .agents, .overview, .timeline, .terminal:
+      case .agents, .overview, .timeline:
         .agent
       }
     }

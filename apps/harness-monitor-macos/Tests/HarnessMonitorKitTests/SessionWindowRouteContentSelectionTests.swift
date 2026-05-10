@@ -11,7 +11,12 @@ struct SessionWindowRouteContentSelectionTests {
 
     #expect(
       sidebar.contains(
-        "ForEach([SessionWindowRoute.overview, .decisions, .timeline, .terminal])"
+        "ForEach([SessionWindowRoute.overview, .timeline, .agents, .decisions])"
+      )
+    )
+    #expect(
+      sidebar.contains(
+        "routeSection\n      agentsSection\n      decisionsSection\n      tasksSection"
       )
     )
     #expect(!sidebar.contains("Text(\"Routes\")"))
@@ -81,6 +86,17 @@ struct SessionWindowRouteContentSelectionTests {
     #expect(!source.contains("@State private var selectedAgentID"))
     #expect(!source.contains("@State private var selectedTaskID"))
     #expect(!source.contains("@State private var selectedDecisionID"))
+  }
+
+  @Test("Agents route auto-selects the first visible agent instead of showing an empty detail")
+  func agentsRouteAutoSelectsTheFirstVisibleAgent() throws {
+    let columns = try sourceFile(named: "SessionWindowView+Columns.swift")
+    let presentation = try sourceFile(named: "SessionWindowView+Presentation.swift")
+
+    #expect(presentation.contains(".task(id: agentsRouteAutoSelectionTrigger)"))
+    #expect(presentation.contains("SessionAgentAutoSelectionPolicy.preferredAgentID"))
+    #expect(columns.contains("case .route(.agents):"))
+    #expect(columns.contains("visibleSessionAgents.first?.agentId"))
   }
 
   @Test("Session layouts follow the rendered route when switching route-only surfaces")

@@ -12,8 +12,16 @@ struct SessionWindowToolbar: ToolbarContent {
   let model: SessionWindowToolbarModel
   let state: SessionWindowStateCache
   @Binding var focusMode: Bool
+  let currentModifiers: EventModifiers
+  @AppStorage(SessionWindowKeyboardShortcutOverlaySettings.storageKey)
+  private var shortcutOverlaysEnabled = SessionWindowKeyboardShortcutOverlaySettings.defaultValue
+  @ScaledMetric(relativeTo: .caption) private var sidebarShortcutKeySpacing = HarnessMonitorTheme.spacingXS - 1
+  @ScaledMetric(relativeTo: .caption) private var sidebarShortcutHorizontalOffset = 56
+  @ScaledMetric(relativeTo: .caption) private var sidebarShortcutVerticalOffset = 12
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
+
+  private let sidebarShortcut = KeyboardShortcutDescriptor.toggleSidebar
 
   var body: some ToolbarContent {
     ToolbarItemGroup(placement: .navigation) {
@@ -31,6 +39,23 @@ struct SessionWindowToolbar: ToolbarContent {
       .help("Go back")
       .accessibilityLabel("Back")
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionNavigateBackButton)
+      .overlay(alignment: .bottom) {
+        if shortcutOverlaysEnabled {
+          KeyboardShortcutLabel(
+            shortcut: sidebarShortcut,
+            activeModifiers: currentModifiers,
+            revealPolicy: .revealOnRelevantModifierHold,
+            keySpacing: sidebarShortcutKeySpacing
+          )
+          .fixedSize(horizontal: true, vertical: true)
+          .offset(x: -sidebarShortcutHorizontalOffset, y: sidebarShortcutVerticalOffset)
+          .allowsHitTesting(false)
+          .accessibilityHidden(true)
+        }
+      }
+      .zIndex(
+        shortcutOverlaysEnabled && sidebarShortcut.isRevealed(by: currentModifiers) ? 1 : 0
+      )
 
       Button {
         state.navigateForward()

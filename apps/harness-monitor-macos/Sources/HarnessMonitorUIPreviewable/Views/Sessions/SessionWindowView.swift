@@ -185,9 +185,6 @@ public struct SessionWindowView: View {
       .appSearchHost(model: stateCache.appSearchModel, routeAction: appSearchRouteAction)
       .modifier(SessionWindowSearchMirror(stateCache: stateCache))
       .modifier(appSearchIndexUpdaterModifier)
-      .overlay {
-        SessionWindowSidebarShortcutOverlay(currentModifiers: currentModifiers)
-      }
       .background(
         SessionWindowModifierKeysMonitor(currentModifiers: $currentModifiers)
           .frame(width: 0, height: 0)
@@ -343,8 +340,8 @@ public struct SessionWindowView: View {
       stateCache.selectRoute(.decisions)
     case .decision(_, let decisionID):
       stateCache.selectDecision(decisionID)
-    case .terminal:
-      stateCache.selectRoute(.terminal)
+    case .terminal(_, let terminalID):
+      stateCache.selectAgent(terminalID)
     case .codex(_, let runID):
       stateCache.select(.codexRun(sessionID: token.sessionID, runID: runID))
     case .agent(_, let agentID):
@@ -376,7 +373,7 @@ public struct SessionWindowView: View {
     case .decision(_, let decisionID):
       return "decision:\(decisionID)"
     case .terminal(_, let terminalID):
-      return "terminal:\(terminalID)"
+      return "terminal->agent:\(terminalID)"
     case .codex(_, let runID):
       return "codex:\(runID)"
     case .agent(_, let agentID):

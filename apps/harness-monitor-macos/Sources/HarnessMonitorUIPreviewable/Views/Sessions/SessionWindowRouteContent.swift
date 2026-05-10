@@ -73,6 +73,31 @@ struct SessionWindowOverview: View {
   }
 }
 
+enum SessionWindowAgentFilter {
+  static func filteredAgents(
+    _ agents: [AgentRegistration],
+    query: String
+  ) -> [AgentRegistration] {
+    let needle = query
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .lowercased()
+    guard !needle.isEmpty else { return agents }
+    return agents.filter { agent in
+      if agent.name.lowercased().contains(needle) { return true }
+      if let personaName = agent.persona?.name.lowercased(), personaName.contains(needle) {
+        return true
+      }
+      if let personaDescription = agent.persona?.description.lowercased(),
+        personaDescription.contains(needle)
+      {
+        return true
+      }
+      if agent.agentId.lowercased().contains(needle) { return true }
+      return false
+    }
+  }
+}
+
 struct SessionWindowAgentsList: View {
   let detail: SessionDetail?
   @Bindable var state: SessionWindowStateCache
@@ -95,27 +120,16 @@ struct SessionWindowAgentsList: View {
     )
   }
 
-  private var trimmedQuery: String {
-    (appSearchModel?.query ?? "")
-      .trimmingCharacters(in: .whitespacesAndNewlines)
-      .lowercased()
+  private var searchQuery: String {
+    appSearchModel?.query ?? ""
+  }
+
+  private var hasQuery: Bool {
+    !searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
   private var filteredAgents: [AgentRegistration] {
-    let agents = detail?.agents ?? []
-    let needle = trimmedQuery
-    guard !needle.isEmpty else { return agents }
-    return agents.filter { agent in
-      if agent.name.lowercased().contains(needle) { return true }
-      if let pname = agent.persona?.name.lowercased(), pname.contains(needle) {
-        return true
-      }
-      if let pdesc = agent.persona?.description.lowercased(), pdesc.contains(needle) {
-        return true
-      }
-      if agent.agentId.lowercased().contains(needle) { return true }
-      return false
-    }
+    SessionWindowAgentFilter.filteredAgents(detail?.agents ?? [], query: searchQuery)
   }
 
   var body: some View {
@@ -137,14 +151,14 @@ struct SessionWindowAgentsList: View {
             }
             .tag(agent.agentId)
           }
-        } else if !trimmedQuery.isEmpty {
+        } else if hasQuery {
           ContentUnavailableView(
             "No Matching Agents",
-            systemImage: "person.3",
+            systemImage: SessionWindowRoute.agents.systemImage,
             description: Text("No agents match the current search.")
           )
         } else {
-          ContentUnavailableView("No Agents", systemImage: "person.3")
+          ContentUnavailableView("No Agents", systemImage: SessionWindowRoute.agents.systemImage)
         }
       }
     }
@@ -327,37 +341,6 @@ struct SessionWindowDecisionsList: View {
 
   private func decisionSeverityLabel(for decision: Decision) -> String {
     DecisionSeverity(rawValue: decision.severityRaw)?.chipLabel ?? "Decision"
-  }
-}
-
-struct SessionWindowRunsList: View {
-  let detail: SessionDetail?
-  @Bindable var state: SessionWindowStateCache
-
-  private var selectedAgentID: Binding<String?> {
-    Binding(
-      get: { state.selection.agentID },
-      set: { agentID in
-        guard let agentID, agentID != state.selection.agentID else { return }
-        state.selectAgent(agentID)
-      }
-    )
-  }
-
-  var body: some View {
-    List(selection: selectedAgentID) {
-      Section("Terminal/Runs") {
-        if let agents = detail?.agents, !agents.isEmpty {
-          ForEach(agents) { agent in
-            Label(agent.name, systemImage: "terminal")
-              .tag(agent.agentId)
-          }
-        } else {
-          ContentUnavailableView("No Terminal Sessions", systemImage: "terminal")
-        }
-      }
-    }
-    .listStyle(.inset)
   }
 }
 

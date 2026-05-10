@@ -19,7 +19,6 @@ public enum SessionWindowRoute: String, CaseIterable, Codable, Hashable, Identif
   case tasks
   case decisions
   case timeline
-  case terminal
 
   public var id: String { rawValue }
 
@@ -30,18 +29,16 @@ public enum SessionWindowRoute: String, CaseIterable, Codable, Hashable, Identif
     case .tasks: "Tasks"
     case .decisions: "Decisions"
     case .timeline: "Timeline"
-    case .terminal: "Terminal/Runs"
     }
   }
 
   public var systemImage: String {
     switch self {
     case .overview: "rectangle.grid.2x2"
-    case .agents: "person.3"
+    case .agents: "person.2"
     case .tasks: "checklist"
     case .decisions: "exclamationmark.bubble"
     case .timeline: "clock"
-    case .terminal: "terminal"
     }
   }
 
@@ -51,7 +48,7 @@ public enum SessionWindowRoute: String, CaseIterable, Codable, Hashable, Identif
     case .decisions: .decisions
     case .tasks: .tasks
     case .timeline: .timeline
-    case .overview, .terminal: nil
+    case .overview: nil
     }
   }
 }
@@ -176,5 +173,17 @@ public enum SessionWindowTabbingPreference: String, CaseIterable, Codable, Hasha
 
   public static func resolved(rawValue: String?) -> Self {
     Self(rawValue: rawValue ?? "") ?? defaultValue
+  }
+}
+
+public enum SessionWindowKeyboardShortcutOverlaySettings {
+  public static let storageKey = "harness.monitor.session-window.shortcut-overlays-enabled"
+  public static let defaultValue = true
+
+  public static func read(userDefaults: UserDefaults = .standard) -> Bool {
+    if userDefaults.object(forKey: storageKey) == nil {
+      return defaultValue
+    }
+    return userDefaults.bool(forKey: storageKey)
   }
 }
