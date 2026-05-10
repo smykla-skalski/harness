@@ -307,7 +307,7 @@ struct SessionWindowFlowTests {
     selection.toggleDecisionMultiSelect()
     selection.toggleDecision("decision-a")
     selection.toggleDecision("decision-b")
-    selection.pruneDecisionSelection(to: ["decision-b", "decision-c"])
+    selection.prune(kind: .decision, visibleIDs: ["decision-b", "decision-c"])
 
     #expect(selection.isDecisionMultiSelectEnabled)
     #expect(selection.selectedDecisionIDs == ["decision-b"])
