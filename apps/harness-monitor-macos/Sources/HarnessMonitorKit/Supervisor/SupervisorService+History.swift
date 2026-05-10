@@ -20,17 +20,25 @@ extension SupervisorService {
     from context: ModelContext?,
     ruleIDs: [String] = []
   ) -> PolicyHistoryWindow {
-    guard let context else {
+    // Each tick fetches up to `globalEventHistoryLimit + perRuleEventHistoryLimit *
+    // ruleIDs.count` SupervisorEvent rows whose `payloadJSON` strings are several KB
+    // each. SwiftData's main `ModelContext` keeps every materialized row in its
+    // identity map for the lifetime of the context, so reusing the store's main
+    // context here causes the heap to grow ~6 MB per supervisor tick and never
+    // shrink. Use an ephemeral child context per call so the materialized rows
+    // are released as soon as we have copied the POD summary fields out.
+    guard let container = context?.container else {
       return PolicyHistoryWindow(recentEvents: [], recentDecisions: [])
     }
+    let ephemeralContext = ModelContext(container)
 
     do {
-      let recentEvents = try recentEventSummaries(in: context, ruleIDs: ruleIDs)
+      let recentEvents = try recentEventSummaries(in: ephemeralContext, ruleIDs: ruleIDs)
       var decisionDescriptor = FetchDescriptor<Decision>(
         sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
       )
       decisionDescriptor.fetchLimit = Self.decisionHistoryLimit
-      let decisions = try context.fetch(decisionDescriptor)
+      let decisions = try ephemeralContext.fetch(decisionDescriptor)
       let recentDecisions: [DecisionSummary] = decisions.compactMap { decision in
         guard let severity = DecisionSeverity(rawValue: decision.severityRaw) else {
           return nil
