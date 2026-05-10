@@ -56,11 +56,6 @@ struct SessionSidebar: View {
     .task(id: (snapshot?.detail?.agents ?? []).map(\.agentId)) {
       state.sidebarOrdering.reconcileAgentOrder(with: snapshot?.detail?.agents ?? [])
     }
-    .onChange(of: state.decisionBulkActions.reopenRequestedBatch) { _, ids in
-      guard let ids else { return }
-      Task { await reopenDecisionBatch(ids) }
-      state.decisionBulkActions.reopenRequestedBatch = nil
-    }
     .onModifierKeysChanged { _, newModifiers in
       if currentModifiers != newModifiers {
         currentModifiers = newModifiers
@@ -262,23 +257,18 @@ struct SessionSidebar: View {
   }
 
   private var routeSection: some View {
-    Section {
-      ForEach([SessionWindowRoute.overview, .decisions, .timeline, .terminal]) { route in
-        let selection = SessionSelection.route(route)
-        SessionSidebarRow(
-          title: route.title,
-          systemImage: route.systemImage
-        )
-        .tag(selection)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowRoute(route))
-        .contextMenu {
-          Button(SessionSidebarContextMenuScope.unavailableLabel) {}
-            .disabled(true)
-        }
+    ForEach([SessionWindowRoute.overview, .decisions, .timeline, .terminal]) { route in
+      let selection = SessionSelection.route(route)
+      SessionSidebarRow(
+        title: route.title,
+        systemImage: route.systemImage
+      )
+      .tag(selection)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowRoute(route))
+      .contextMenu {
+        Button(SessionSidebarContextMenuScope.unavailableLabel) {}
+          .disabled(true)
       }
-    } header: {
-      Text("Routes")
-        .padding(.top, HarnessMonitorTheme.spacingLG)
     }
   }
 
@@ -286,7 +276,13 @@ struct SessionSidebar: View {
     let hasMulti = displayedSelectionSet.count > 1
     let canDelete: Bool = {
       guard let anchor = state.sidebarSelection.anchor else { return false }
-      return state.sidebarSelection.count(of: anchor.kind) > 0
+      guard state.sidebarSelection.count(of: anchor.kind) > 0 else { return false }
+      switch anchor.kind {
+      case .agent, .task:
+        return true
+      case .decision:
+        return false
+      }
     }()
     return SessionSidebarSelectionFocus(
       hasMultiSelection: hasMulti,
@@ -362,7 +358,7 @@ struct SessionSidebar: View {
         switch anchor.kind {
         case .agent: requestRemoveAgents(ids)
         case .task: requestDeleteTasks(ids)
-        case .decision: dismissDecisions(ids)
+        case .decision: return
         }
       }
   }

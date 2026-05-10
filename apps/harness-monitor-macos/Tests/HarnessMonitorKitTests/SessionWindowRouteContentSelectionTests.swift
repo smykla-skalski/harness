@@ -14,6 +14,8 @@ struct SessionWindowRouteContentSelectionTests {
         "ForEach([SessionWindowRoute.overview, .decisions, .timeline, .terminal])"
       )
     )
+    #expect(!sidebar.contains("Text(\"Routes\")"))
+    #expect(!sidebar.contains(".padding(.top, HarnessMonitorTheme.spacingLG)"))
   }
 
   @Test(
@@ -147,18 +149,12 @@ struct SessionWindowRouteContentSelectionTests {
     #expect(columns.contains("selectedTab: decisionDetailTabBinding"))
   }
 
-  @Test("Pending route filter resets clear persisted decision query scope and severities")
-  func pendingRouteFilterResetClearsAllPersistedDecisionFilters() throws {
+  @Test("Pending route filter resets clear the persisted decision query")
+  func pendingRouteFilterResetClearsPersistedDecisionQuery() throws {
     let windowView = try sourceFile(named: "SessionWindowView.swift")
 
     #expect(windowView.contains("if request.resetDecisionFilters {"))
     #expect(windowView.contains("persistedDecisionQuery = \"\""))
-    #expect(
-      windowView.contains(
-        "persistedDecisionScopeRawStorage = DecisionsSidebarSearchScope.summary.rawValue"
-      )
-    )
-    #expect(windowView.contains("persistedDecisionSeverityRawStorage = \"\""))
   }
 
   private func sourceFile(named name: String) throws -> String {

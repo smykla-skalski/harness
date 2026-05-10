@@ -9,7 +9,6 @@ extension SessionWindowView {
       .focusedSceneValue(\.sessionNavigation, navigationCommand)
       .focusedSceneValue(\.sessionAttention, attentionFocus)
       .focusedSceneValue(\.sessionInspector, canPresentInspector ? inspectorCommand : nil)
-      .focusedSceneValue(\.sessionDecisionCommands, decisionCommand)
       .focusedSceneValue(\.sessionCreateContext, createContext)
       .focusedSceneValue(\.harnessSessionRouteFocus, sessionRouteFocus)
   }

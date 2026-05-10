@@ -367,10 +367,6 @@ extension SessionWindowView {
     didLoadSnapshot = true
   }
 
-  func encodedDecisionSeverities(_ severities: Set<DecisionSeverity>) -> String {
-    severities.map(\.rawValue).sorted().joined(separator: ",")
-  }
-
   func agentTui(for agent: AgentRegistration) -> AgentTuiSnapshot? {
     store.selectedAgentTuis.first { tui in
       tui.sessionId == token.sessionID

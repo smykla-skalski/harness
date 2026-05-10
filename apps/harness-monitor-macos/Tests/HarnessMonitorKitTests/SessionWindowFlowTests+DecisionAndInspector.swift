@@ -5,21 +5,35 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 extension SessionWindowFlowTests {
-  @Test("Session decision filters use toggles and live region includes visible count")
-  func sessionDecisionFiltersUseTogglesAndLiveRegionIncludesVisibleCount() throws {
+  @Test("Session sidebar live region includes visible count")
+  func sessionSidebarLiveRegionIncludesVisibleCount() throws {
     let sidebarSource = try previewableSourceFile(named: "Views/Sessions/SessionSidebar.swift")
-    let filterSource = try previewableSourceFile(
-      named: "Views/Sessions/SessionSidebar+Filtering.swift")
     let announcerSource = try previewableSourceFile(
       named: "Views/Sessions/SessionSidebarMultiSelectAnnouncer.swift"
     )
 
-    #expect(filterSource.contains("Toggle(severity.rawValue.capitalized"))
-    #expect(filterSource.contains("private func severityBinding"))
     #expect(sidebarSource.contains(".accessibilityValue(decisionSelectionAccessibilityValue)"))
     #expect(sidebarSource.contains(#""\(count) of \(visible) \(anchor.kind.pluralNoun) selected""#))
     #expect(sidebarSource.contains(#""\(displayedSelectionSet.count) items selected""#))
     #expect(announcerSource.contains(#""\(count) of \(visibleCount) \(kind.pluralNoun) selected""#))
+  }
+
+  @Test("Session sidebar decision section omits dismiss and filter controls")
+  func sessionSidebarDecisionSectionOmitsDismissAndFilterControls() throws {
+    let sectionSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionSidebarDecisionSection.swift"
+    )
+    let columnsSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+Columns.swift"
+    )
+    let sidebarSource = try previewableSourceFile(named: "Views/Sessions/SessionSidebar.swift")
+
+    #expect(!sectionSource.contains("Dismiss Selected"))
+    #expect(!sectionSource.contains("Dismiss All Visible"))
+    #expect(!sectionSource.contains("SessionDecisionFilterControls"))
+    #expect(columnsSource.contains("decisions: allSessionDecisions"))
+    #expect(sidebarSource.contains("case .decision:\n        return false"))
+    #expect(sidebarSource.contains("case .decision: return"))
   }
 
   @MainActor

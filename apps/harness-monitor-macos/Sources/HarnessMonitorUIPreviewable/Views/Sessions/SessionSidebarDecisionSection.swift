@@ -4,8 +4,6 @@ import SwiftUI
 extension SessionSidebar {
   @ViewBuilder var decisionsSection: some View {
     Section {
-      decisionFilterRow
-      undoToastRow
       let orderedDecisionIDs = decisions.map(\.id)
       ForEach(decisions) { decision in
         let selection = SessionSelection.decision(
@@ -41,10 +39,6 @@ extension SessionSidebar {
           )
           switch resolution {
           case .actionable(let scope):
-            Button(scope.destructiveLabel) {
-              dismissDecisions(scope.ids)
-            }
-            Divider()
             Button(scope.copyIDsLabel) {
               HarnessMonitorClipboard.copy(scope.clipboardText)
             }
@@ -74,27 +68,6 @@ extension SessionSidebar {
           .accessibilityLabel("Unsaved draft")
       }
       Spacer()
-      Menu {
-        Button("Dismiss Selected") {
-          dismissDecisions(Array(state.sidebarSelection.selectedDecisionIDs))
-        }
-        .disabled(state.sidebarSelection.selectedDecisionIDs.isEmpty)
-        Button("Dismiss All Visible") {
-          dismissDecisions(decisions.map(\.id))
-        }
-        .disabled(decisions.isEmpty)
-        .help(SessionDecisionBulkActionCopy.dismissVisibleHelp)
-        if !state.decisionBulkActions.lastDismissedBatch.isEmpty {
-          Button("Reopen Dismissed Batch") {
-            Task { await reopenDecisionBatch(state.decisionBulkActions.lastDismissedBatch) }
-          }
-        }
-      } label: {
-        Image(systemName: "ellipsis.circle")
-      }
-      .menuIndicator(.hidden)
-      .help("Decision Bulk Actions")
-      .accessibilityLabel("Decision Bulk Actions")
       Button {
         state.selectCreate(.decision)
       } label: {
@@ -106,48 +79,11 @@ extension SessionSidebar {
     }
   }
 
-  var decisionFilterRow: some View {
-    SessionDecisionFilterControls(filters: state.decisionFilters)
-  }
-
   private func sidebarDecisionAccessibilityLabel(
     for decision: Decision,
     severity: DecisionSeverity?
   ) -> String {
     let severityLabel = severity?.chipLabel ?? "Decision"
     return "\(severityLabel). \(decision.summary). \(decision.ruleID)"
-  }
-
-  @ViewBuilder var undoToastRow: some View {
-    if let toast = state.decisionBulkActions.undoToast {
-      HStack(spacing: HarnessMonitorTheme.spacingSM) {
-        Image(systemName: "arrow.uturn.backward.circle")
-          .foregroundStyle(.tint)
-        VStack(alignment: .leading, spacing: 1) {
-          Text(toast.dismissedCopy)
-            .lineLimit(1)
-          Text(SessionDecisionUndoToastState.commitBarrierCopy)
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-        }
-        Spacer(minLength: HarnessMonitorTheme.spacingSM)
-        Button("Undo") {
-          state.decisionBulkActions.requestUndoToastReopen()
-        }
-        .buttonStyle(.link)
-        .keyboardShortcut("z", modifiers: .command)
-      }
-      .font(.caption)
-      .padding(.vertical, HarnessMonitorTheme.spacingXS)
-      .accessibilityElement(children: .combine)
-      .accessibilityLabel(toast.accessibilityCopy)
-      .task(id: toast.id) {
-        let delay = max(0, Int((toast.expiresAt.timeIntervalSinceNow * 1000).rounded(.up)))
-        try? await Task.sleep(for: .milliseconds(delay))
-        await MainActor.run {
-          state.decisionBulkActions.clearExpiredUndoToast()
-        }
-      }
-    }
   }
 }

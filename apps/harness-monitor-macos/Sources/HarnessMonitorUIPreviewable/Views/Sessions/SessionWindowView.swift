@@ -9,8 +9,6 @@ public struct SessionWindowView: View {
   var dismiss
   @Environment(\.openWindow)
   var openWindow
-  @Environment(\.undoManager)
-  var undoManager
   @Environment(\.accessibilityReduceMotion)
   var reduceMotion: Bool
   @SceneStorage("session.route")
@@ -19,10 +17,6 @@ public struct SessionWindowView: View {
   private var persistedDecisionID: String = ""
   @SceneStorage("session.decisionFilters.query")
   private var persistedDecisionQuery = ""
-  @SceneStorage("session.decisionFilters.scope")
-  private var persistedDecisionScopeRawStorage = DecisionsSidebarSearchScope.summary.rawValue
-  @SceneStorage("session.decisionFilters.severities")
-  private var persistedDecisionSeverityRawStorage = ""
   @SceneStorage("session.decision.detail-tab")
   private var persistedDecisionDetailTabRawStorage = DecisionDetailTab.context.rawValue
   @SceneStorage("session.focusMode")
@@ -255,16 +249,6 @@ public struct SessionWindowView: View {
         guard persistedDecisionQuery != newValue else { return }
         persistedDecisionQuery = newValue
       }
-      .onChange(of: stateCache.decisionFilters.scope) { _, newValue in
-        let rawValue = newValue.rawValue
-        guard persistedDecisionScopeRawStorage != rawValue else { return }
-        persistedDecisionScopeRawStorage = rawValue
-      }
-      .onChange(of: stateCache.decisionFilters.severities) { _, newValue in
-        let encoded = encodedDecisionSeverities(newValue)
-        guard persistedDecisionSeverityRawStorage != encoded else { return }
-        persistedDecisionSeverityRawStorage = encoded
-      }
   }
 
   func hydrateSelectionFromPersistedStorage() {
@@ -282,19 +266,6 @@ public struct SessionWindowView: View {
   func hydrateDecisionFiltersFromPersistedStorage() {
     if stateCache.decisionFilters.query != persistedDecisionQuery {
       stateCache.decisionFilters.query = persistedDecisionQuery
-    }
-    let persistedScope =
-      DecisionsSidebarSearchScope(rawValue: persistedDecisionScopeRawStorage) ?? .summary
-    if stateCache.decisionFilters.scope != persistedScope {
-      stateCache.decisionFilters.scope = persistedScope
-    }
-    let persistedSeverities = Set(
-      persistedDecisionSeverityRawStorage
-        .split(separator: ",")
-        .compactMap { DecisionSeverity(rawValue: String($0)) }
-    )
-    if stateCache.decisionFilters.severities != persistedSeverities {
-      stateCache.decisionFilters.severities = persistedSeverities
     }
   }
 
@@ -355,8 +326,6 @@ public struct SessionWindowView: View {
     if request.resetDecisionFilters {
       stateCache.decisionFilters.clear()
       persistedDecisionQuery = ""
-      persistedDecisionScopeRawStorage = DecisionsSidebarSearchScope.summary.rawValue
-      persistedDecisionSeverityRawStorage = ""
     }
     switch request.selection {
     case .create:
