@@ -20,7 +20,7 @@ public struct AppSearchResults: Hashable, Sendable {
     self.sections = sections
   }
 
-  public static let empty = AppSearchResults(
+  public static let empty = Self(
     query: "",
     primaryDomain: nil,
     sections: []
