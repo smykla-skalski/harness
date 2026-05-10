@@ -166,6 +166,14 @@ struct SessionTimelineView: View {
     routeMetrics.contentPadding
   }
 
+  private var routeTimelineTopScrollEdgeBlurHeight: CGFloat {
+    min(max(routeMetrics.contentPadding * 2.1, 48), 72)
+  }
+
+  private var routeTimelineBottomScrollEdgeBlurHeight: CGFloat {
+    min(max(routeMetrics.contentPadding * 0.9, 18), 28)
+  }
+
   private func normalizedFilters(_ state: SessionTimelineFilterState) -> SessionTimelineFilterState {
     var copy = state
     copy.searchScope = .all
@@ -255,6 +263,28 @@ struct SessionTimelineView: View {
   }
 
   private func routePageContent(for presentation: SessionTimelineSectionPresentation) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      routePageHeader(for: presentation)
+
+      if presentation.showsEmptyState {
+        ContentUnavailableView(
+          "No Timeline Events",
+          systemImage: "clock.arrow.circlepath",
+          description: Text("This session has not recorded timeline activity yet.")
+        )
+        .padding(.horizontal, routeHeaderHorizontalPadding)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+      } else {
+        routeTimelineContent(for: presentation)
+      }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .timelineLifecycle(for: presentation, host: self)
+  }
+
+  private func routePageHeader(
+    for presentation: SessionTimelineSectionPresentation
+  ) -> some View {
     VStack(alignment: .leading, spacing: routeMetrics.overviewSpacing) {
       HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
         Text("Timeline")
@@ -294,15 +324,7 @@ struct SessionTimelineView: View {
       .padding(.horizontal, routeHeaderHorizontalPadding)
       .padding(.top, routePageTopPadding)
 
-      if presentation.showsEmptyState {
-        ContentUnavailableView(
-          "No Timeline Events",
-          systemImage: "clock.arrow.circlepath",
-          description: Text("This session has not recorded timeline activity yet.")
-        )
-        .padding(.horizontal, routeHeaderHorizontalPadding)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-      } else {
+      if !presentation.showsEmptyState {
         SessionTimelineFilterControls(
           filters: $filters,
           inventory: presentation.filterSnapshot.inventory,
@@ -310,12 +332,9 @@ struct SessionTimelineView: View {
           layout: .chipsOnly
         )
         .padding(.horizontal, routeHeaderHorizontalPadding)
-
-        routeTimelineContent(for: presentation)
       }
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .timelineLifecycle(for: presentation, host: self)
+    .frame(maxWidth: .infinity, alignment: .topLeading)
   }
 
   private func cockpitTimelineSurface(
@@ -364,7 +383,9 @@ struct SessionTimelineView: View {
   ) -> some View {
     timelineRows(
       for: presentation,
-      horizontalContentInset: routeTimelineHorizontalContentInset
+      horizontalContentInset: routeTimelineHorizontalContentInset,
+      topScrollEdgeBlurHeight: routeTimelineTopScrollEdgeBlurHeight,
+      bottomScrollEdgeBlurHeight: routeTimelineBottomScrollEdgeBlurHeight
     )
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
@@ -372,7 +393,9 @@ struct SessionTimelineView: View {
   @ViewBuilder
   private func timelineRows(
     for presentation: SessionTimelineSectionPresentation,
-    horizontalContentInset: CGFloat = 0
+    horizontalContentInset: CGFloat = 0,
+    topScrollEdgeBlurHeight: CGFloat = 0,
+    bottomScrollEdgeBlurHeight: CGFloat = 0
   ) -> some View {
     if presentation.showsFilteredEmptyState {
       SessionTimelineFilteredEmptyState(filters: $filters)
@@ -381,7 +404,8 @@ struct SessionTimelineView: View {
         presentation: presentation,
         actionHandler: actionHandler,
         contentIdentity: contentIdentity,
-        horizontalContentInset: horizontalContentInset
+        horizontalContentInset: horizontalContentInset,
+        showsScrollEdgeEffects: topScrollEdgeBlurHeight > 0 || bottomScrollEdgeBlurHeight > 0
       )
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     } else {
@@ -398,6 +422,8 @@ struct SessionTimelineView: View {
         virtualization: presentation.tableVirtualization,
         contentIdentity: contentIdentity,
         horizontalContentInset: horizontalContentInset,
+        topScrollEdgeBlurHeight: topScrollEdgeBlurHeight,
+        bottomScrollEdgeBlurHeight: bottomScrollEdgeBlurHeight,
         scrollCommand: scrollCommand,
         actionHandler: actionHandler,
         onSignalTap: handleSignalTap,
