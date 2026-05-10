@@ -41,7 +41,7 @@ public struct SessionWindowView: View {
   private var columnVisibilityRawStorage = "automatic"
   @AccessibilityFocusState private var primaryContentAccessibilityFocused: Bool
   @AppStorage(HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
-  private var mcpRegistryHostEnabled = HarnessMonitorMCPSettingsDefaults
+  var mcpRegistryHostEnabled = HarnessMonitorMCPSettingsDefaults
     .registryHostEnabledDefault
   @State private var snapshotStorage: HarnessMonitorSessionWindowSnapshot?
   @State private var isLoadingStorage = false
@@ -216,7 +216,6 @@ public struct SessionWindowView: View {
       }
     }
   }
-
   private func sessionWindowSelectionObservers<Content: View>(
     _ content: Content
   ) -> some View {
@@ -271,7 +270,7 @@ public struct SessionWindowView: View {
       }
   }
 
-  private func hydrateSelectionFromPersistedStorage() {
+  func hydrateSelectionFromPersistedStorage() {
     guard case .route(.overview) = stateCache.selection else { return }
     if persistedRoute == .decisions {
       stateCache.selectRoute(.decisions)
@@ -283,7 +282,7 @@ public struct SessionWindowView: View {
     }
   }
 
-  private func hydrateDecisionFiltersFromPersistedStorage() {
+  func hydrateDecisionFiltersFromPersistedStorage() {
     if stateCache.decisionFilters.query != persistedDecisionQuery {
       stateCache.decisionFilters.query = persistedDecisionQuery
     }
@@ -326,7 +325,7 @@ public struct SessionWindowView: View {
   }
 
   @MainActor
-  private func applyPendingSessionRouteIfNeeded() async {
+  func applyPendingSessionRouteIfNeeded() async {
     let pendingRequest = store.pendingSessionRouteRequestSnapshot
     guard let request = store.consumePendingSessionRouteRequest(forSessionID: token.sessionID)
     else {
@@ -412,7 +411,7 @@ public struct SessionWindowView: View {
     }
   }
 
-  private func requestPrimaryContentAccessibilityFocus() {
+  func requestPrimaryContentAccessibilityFocus() {
     guard !isUnknownSession else { return }
     primaryContentAccessibilityFocused = true
     let title = summary?.displayTitle ?? "Session"
