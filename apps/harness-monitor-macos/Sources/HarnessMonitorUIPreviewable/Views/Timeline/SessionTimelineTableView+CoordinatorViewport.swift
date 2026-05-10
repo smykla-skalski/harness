@@ -169,6 +169,9 @@ extension SessionTimelineTableView.Coordinator {
     guard let tableView, let scrollView else {
       return
     }
+    if eventOffsetsByRow.count != rows.count {
+      eventOffsetsByRow = eventOffsets(for: rows)
+    }
     let visibleRect = scrollView.contentView.bounds
     guard visibleRect.height > 0, visibleRect.width > 0 else {
       return
@@ -212,14 +215,6 @@ extension SessionTimelineTableView.Coordinator {
     if enteredTopEdge || enteredBottomEdge {
       let oldValue = lastBoundaryState
       lastBoundaryState = boundaryState
-      HarnessMonitorTimelineTrace.info(
-        """
-        viewport.edge top=\(enteredTopEdge) bottom=\(enteredBottomEdge) \
-        minY=\(Int(visibleRect.minY)) maxY=\(Int(visibleRect.maxY)) \
-        contentH=\(Int(tableView.bounds.height)) visibleRows=\(visibleRowCount) \
-        viewportRows=\(viewportRowCapacity) rows=\(rows.count)
-        """
-      )
       scrollBoundaryChanged(oldValue, boundaryState)
     } else if boundaryState.shouldTrack(from: lastBoundaryState) {
       lastBoundaryState = boundaryState

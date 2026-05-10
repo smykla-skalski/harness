@@ -24,11 +24,6 @@ extension SessionTimelineView {
   ) {
     let enteredTopEdge = newValue.enteredTopEdge(from: oldValue)
     let enteredBottomEdge = newValue.enteredBottomEdge(from: oldValue)
-    traceTimelineBoundary(
-      top: enteredTopEdge,
-      bottom: enteredBottomEdge,
-      presentation: presentation
-    )
     if enteredTopEdge {
       requestNewerWindowIfNeeded(presentation, from: oldValue, to: newValue)
     }

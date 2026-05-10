@@ -50,6 +50,9 @@ struct SessionTimelineEdgeLoadContext {
   let fallbackVisibleRowCount: Int
   let topEdgeBufferDeficitRows: Int
   let bottomEdgeBufferDeficitRows: Int
+  let firstVisibleEventOffset: Int?
+  let lastVisibleEventOffset: Int?
+  let retainedWindowLimit: Int?
 
   init(
     navigation: SessionTimelineWindowNavigation,
@@ -57,7 +60,10 @@ struct SessionTimelineEdgeLoadContext {
     viewportRowCapacity: Int = 0,
     fallbackVisibleRowCount: Int,
     topEdgeBufferDeficitRows: Int = 0,
-    bottomEdgeBufferDeficitRows: Int = 0
+    bottomEdgeBufferDeficitRows: Int = 0,
+    firstVisibleEventOffset: Int? = nil,
+    lastVisibleEventOffset: Int? = nil,
+    retainedWindowLimit: Int? = nil
   ) {
     self.navigation = navigation
     self.visibleRowCount = visibleRowCount
@@ -65,6 +71,9 @@ struct SessionTimelineEdgeLoadContext {
     self.fallbackVisibleRowCount = fallbackVisibleRowCount
     self.topEdgeBufferDeficitRows = topEdgeBufferDeficitRows
     self.bottomEdgeBufferDeficitRows = bottomEdgeBufferDeficitRows
+    self.firstVisibleEventOffset = firstVisibleEventOffset
+    self.lastVisibleEventOffset = lastVisibleEventOffset
+    self.retainedWindowLimit = retainedWindowLimit
   }
 
   func bufferDeficitRows(for action: SessionTimelineWindowAction) -> Int {
@@ -137,8 +146,37 @@ enum SessionTimelineEdgeLoadPolicy {
       max(0, edgeAdvanceRows),
       max(0, edgeBufferDeficitRows)
     )
-    let boundedLimit = min(maximumChunkLimit, desiredLimit)
+    let boundedLimit = min(
+      maximumChunkLimit,
+      desiredLimit,
+      anchorSafeLimit(for: action, context: context)
+    )
     return min(remaining, boundedLimit)
+  }
+
+  private static func anchorSafeLimit(
+    for action: SessionTimelineWindowAction,
+    context: SessionTimelineEdgeLoadContext
+  ) -> Int {
+    guard let retainedLimit = context.retainedWindowLimit else {
+      return maximumChunkLimit
+    }
+    let growthAllowance = max(0, retainedLimit - context.navigation.loadedCount)
+    switch action {
+    case .older:
+      guard let firstVisibleOffset = context.firstVisibleEventOffset else {
+        return maximumChunkLimit
+      }
+      return max(0, growthAllowance + firstVisibleOffset)
+    case .newer:
+      guard let lastVisibleOffset = context.lastVisibleEventOffset else {
+        return maximumChunkLimit
+      }
+      let rowsAfterVisible = max(0, context.navigation.loadedCount - lastVisibleOffset - 1)
+      return max(0, growthAllowance + rowsAfterVisible)
+    case .latest:
+      return maximumChunkLimit
+    }
   }
 
   private static func remainingEvents(

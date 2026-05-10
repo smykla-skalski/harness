@@ -30,8 +30,8 @@ struct MonitorTimelineSection: View {
 }
 
 struct SessionTimelineLoading {
-  let loadOlderChunk: @MainActor (SessionTimelineSectionPresentation, Int) async -> Void
-  let loadWindow: @MainActor (TimelineWindowRequest) async -> Void
+  let loadOlderChunk: @MainActor (SessionTimelineSectionPresentation, Int, Int) async -> Void
+  let loadWindow: @MainActor (TimelineWindowRequest, Int?) async -> Void
 }
 
 struct SessionTimelinePresentationInput: Equatable {
@@ -202,19 +202,20 @@ extension SessionTimelineView {
     presentation: SessionTimelineSectionPresentation,
     limit: Int
   ) async {
+    let retainedLimit = retainedTimelineWindowLimit()
     if let timelineLoading {
-      await timelineLoading.loadOlderChunk(presentation, limit)
+      await timelineLoading.loadOlderChunk(presentation, limit, retainedLimit)
       return
     }
-    await store.appendSelectedTimelineOlderChunk(limit: limit)
+    await store.appendSelectedTimelineOlderChunk(limit: limit, retainedLimit: retainedLimit)
   }
 
-  func loadWindow(_ request: TimelineWindowRequest) async {
+  func loadWindow(_ request: TimelineWindowRequest, retainedLimit: Int? = nil) async {
     if let timelineLoading {
-      await timelineLoading.loadWindow(request)
+      await timelineLoading.loadWindow(request, retainedLimit)
       return
     }
-    await store.loadSelectedTimelineWindow(request: request)
+    await store.loadSelectedTimelineWindow(request: request, retainedLimit: retainedLimit)
   }
 
   var actionHandler: any DecisionActionHandler {

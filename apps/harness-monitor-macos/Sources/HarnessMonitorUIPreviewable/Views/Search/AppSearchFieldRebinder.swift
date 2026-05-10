@@ -36,6 +36,10 @@ struct AppSearchFieldRebinder: NSViewRepresentable {
     Coordinator()
   }
 
+  static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+    coordinator.detach()
+  }
+
   /// Empty `NSView` that anchors the modifier into the SwiftUI tree.
   /// Its only job is to give the coordinator a `window` to attach
   /// notifications to.
@@ -74,7 +78,7 @@ struct AppSearchFieldRebinder: NSViewRepresentable {
       }
     }
 
-    private func detach() {
+    func detach() {
       if let observer {
         NotificationCenter.default.removeObserver(observer)
       }
@@ -102,12 +106,6 @@ struct AppSearchFieldRebinder: NSViewRepresentable {
         }
       }
       return nil
-    }
-
-    deinit {
-      if let observer {
-        NotificationCenter.default.removeObserver(observer)
-      }
     }
   }
 }

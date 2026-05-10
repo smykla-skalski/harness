@@ -131,8 +131,9 @@ extension SessionTimelineTableView.Coordinator {
         guard rowRequiresMeasurement(row, columnWidth: columnWidth) else {
           continue
         }
-        cacheMeasuredHeight(for: row, columnWidth: columnWidth)
-        changedIndexes.insert(rowIndex)
+        if cacheMeasuredHeight(for: row, columnWidth: columnWidth) {
+          changedIndexes.insert(rowIndex)
+        }
         measuredCount += 1
         if Self.elapsedMilliseconds(since: chunkStart) >= Self.measurementChunkBudgetMs {
           break
@@ -169,17 +170,28 @@ extension SessionTimelineTableView.Coordinator {
     return cached.requiresMeasurement(for: columnWidth, tolerance: Self.widthEqualityTolerance)
   }
 
-  private func cacheMeasuredHeight(for row: SessionTimelineRow, columnWidth: CGFloat) {
+  private func cacheMeasuredHeight(for row: SessionTimelineRow, columnWidth: CGFloat) -> Bool {
     let height = SessionTimelineTableCellView.measuredHeight(
       for: row,
       columnWidth: columnWidth,
       fontScale: fontScale
     )
+    let previousHeight = currentTableHeight(for: row, columnWidth: columnWidth)
     rowHeightCache[row.id] = CachedRowHeight(
       width: columnWidth,
       height: height,
       isMeasured: true
     )
+    return abs(previousHeight - height) > 0.5
+  }
+
+  private func currentTableHeight(for row: SessionTimelineRow, columnWidth: CGFloat) -> CGFloat {
+    guard let cached = rowHeightCache[row.id],
+      cached.matches(width: columnWidth, tolerance: Self.widthEqualityTolerance)
+    else {
+      return SessionTimelineTableMetrics.estimatedHeight(for: row, fontScale: fontScale)
+    }
+    return cached.height
   }
 
   private func pauseAfterMeasurementChunk(remaining: Int) async -> Bool {
@@ -232,17 +244,9 @@ extension SessionTimelineTableView.Coordinator {
         {
           continue
         }
-        let height = SessionTimelineTableCellView.measuredHeight(
-          for: row,
-          columnWidth: columnWidth,
-          fontScale: fontScale
-        )
-        self.rowHeightCache[row.id] = CachedRowHeight(
-          width: columnWidth,
-          height: height,
-          isMeasured: true
-        )
-        changedIndexes.insert(rowIndex)
+        if self.cacheMeasuredHeight(for: row, columnWidth: columnWidth) {
+          changedIndexes.insert(rowIndex)
+        }
       }
     }
     if !changedIndexes.isEmpty {

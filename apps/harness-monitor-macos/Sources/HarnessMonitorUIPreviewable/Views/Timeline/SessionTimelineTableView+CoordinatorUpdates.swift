@@ -51,6 +51,11 @@ extension SessionTimelineTableView.Coordinator {
     let previousFontScale = fontScale
     let wasPinnedToLatest = isPinnedToLatestViewport()
     let previousAnchor = wasPinnedToLatest ? nil : currentVisibleAnchor()
+    let rollingRowChange = SessionTimelineRollingRowChange.detect(
+      previousRows: self.rows,
+      nextRows: rows
+    )
+    let previousScrollY = rollingRowChange == nil ? nil : currentScrollY()
     let nextSnapshot = SessionTimelineTableSnapshot(rows: rows)
     let restoredHeightCache = restoreHeightCacheIfNeeded(
       identity: contentIdentity,
@@ -86,7 +91,9 @@ extension SessionTimelineTableView.Coordinator {
       restoreViewportAfterRowChange(
         hasUnfulfilledScrollCommand: hasUnfulfilledScrollCommand,
         wasPinnedToLatest: wasPinnedToLatest,
-        previousAnchor: previousAnchor
+        previousAnchor: previousAnchor,
+        rollingRowChange: rollingRowChange,
+        previousScrollY: previousScrollY
       )
     }
   }
@@ -112,14 +119,6 @@ extension SessionTimelineTableView.Coordinator {
     defer {
       Self.signposter.endInterval("session_timeline.update_rows_changed", updateInterval)
     }
-    HarnessMonitorTimelineTrace.info(
-      """
-      table.rows_changed oldRows=\(self.rows.count) newRows=\(rows.count) \
-      reuse=\(willReuseAny) invalidatedHeights=\(invalidatedHeightIDs.count) \
-      width=\(Int(resolvedColumnWidth))
-      """
-    )
-
     cancelMeasurement(reason: "rows_changed")
     reuseVisibleHeightsIfNeeded(
       willReuseAny: willReuseAny,
@@ -224,7 +223,7 @@ extension SessionTimelineTableView.Coordinator {
       rowHeightCache[rowID] = CachedRowHeight(
         width: lastColumnWidth,
         height: tableView.rect(ofRow: rowIndex).height,
-        isMeasured: false
+        isMeasured: true
       )
     }
   }
@@ -232,8 +231,14 @@ extension SessionTimelineTableView.Coordinator {
   private func restoreViewportAfterRowChange(
     hasUnfulfilledScrollCommand: Bool,
     wasPinnedToLatest: Bool,
-    previousAnchor: SessionTimelineTableAnchor?
+    previousAnchor: SessionTimelineTableAnchor?,
+    rollingRowChange: SessionTimelineRollingRowChange?,
+    previousScrollY: CGFloat?
   ) {
+    if !hasUnfulfilledScrollCommand, rollingRowChange != nil, let previousScrollY {
+      restoreScrollY(previousScrollY)
+      return
+    }
     if !hasUnfulfilledScrollCommand && normalizePinnedLatestViewportIfNeeded() {
       boundsDidChange(forceObservedStats: true)
       return

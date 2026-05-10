@@ -7,6 +7,19 @@ extension SessionTimelineView {
     )
   }
 
+  func retainedTimelineWindowLimit() -> Int {
+    preferredTimelineWindowLimit()
+  }
+
+  func retainedTimelineWindowLimit(for action: SessionTimelineWindowAction) -> Int? {
+    switch action {
+    case .older, .newer:
+      retainedTimelineWindowLimit()
+    case .latest:
+      nil
+    }
+  }
+
   func handleViewportStatsChange(
     _ stats: SessionTimelineTableViewportStats,
     presentation: SessionTimelineSectionPresentation

@@ -37,12 +37,6 @@ extension SessionTimelineView {
       from: oldValue,
       to: newValue
     )
-    traceTimelineEdge(
-      "older",
-      limit: limit,
-      advance: newValue.bottomEdgeAdvance(from: oldValue),
-      presentation: presentation
-    )
     return requestOlderWindowIfNeeded(presentation, limit: limit)
   }
 
@@ -52,22 +46,18 @@ extension SessionTimelineView {
     limit: Int
   ) -> Bool {
     guard limit > 0 else {
-      traceTimelineRequestSkip("older", reason: "limit", presentation: presentation)
       clearPendingEdgeLoadIfNeeded(.older)
       return false
     }
     guard presentation.navigation.hasOlder else {
-      traceTimelineRequestSkip("older", reason: "no_older", presentation: presentation)
       clearPendingEdgeLoadIfNeeded(.older)
       return false
     }
     guard !shouldDeferTimelineEdgeRequest(presentation) else {
-      traceTimelineRequestDefer("older", presentation: presentation)
       markPendingEdgeLoad(.older, presentation: presentation)
       return false
     }
     clearPendingEdgeLoadIfNeeded(.older)
-    traceTimelineOlderRequestStart(limit: limit, presentation: presentation)
     Task {
       await loadOlderTimelineChunk(presentation: presentation, limit: limit)
       await MainActor.run {
@@ -89,12 +79,6 @@ extension SessionTimelineView {
       from: oldValue,
       to: newValue
     )
-    traceTimelineEdge(
-      "newer",
-      limit: limit,
-      advance: newValue.topEdgeAdvance(from: oldValue),
-      presentation: presentation
-    )
     return requestWindowIfNeeded(
       for: .newer,
       presentation: presentation,
@@ -110,28 +94,23 @@ extension SessionTimelineView {
     limit: Int? = nil,
     deferIfLoading: Bool = false
   ) -> Bool {
-    let actionName = timelineTraceActionName(action)
     if let limit, limit <= 0 {
-      traceTimelineRequestSkip(actionName, reason: "limit", presentation: presentation)
       clearPendingEdgeLoadIfNeeded(action)
       return false
     }
     guard let request = presentation.navigation.request(for: action, limit: limit) else {
-      traceTimelineRequestSkip(actionName, reason: "no_request", presentation: presentation)
       clearPendingEdgeLoadIfNeeded(action)
       return false
     }
     guard !shouldDeferTimelineEdgeRequest(presentation) else {
-      traceTimelineRequestDefer(actionName, presentation: presentation)
       if deferIfLoading {
         markPendingEdgeLoad(action, presentation: presentation)
       }
       return false
     }
     clearPendingEdgeLoadIfNeeded(action)
-    traceTimelineWindowRequestStart(actionName, request: request, presentation: presentation)
     Task {
-      await loadWindow(request)
+      await loadWindow(request, retainedLimit: retainedTimelineWindowLimit(for: action))
       if deferIfLoading {
         await MainActor.run {
           markPendingEdgeLoad(action, presentation: presentation)
@@ -218,7 +197,10 @@ extension SessionTimelineView {
       viewportRowCapacity: timelineViewport.currentViewportRowCapacity(),
       fallbackVisibleRowCount: presentation.fallbackVisibleRowCount,
       topEdgeBufferDeficitRows: timelineViewport.currentTopEdgeBufferDeficitRows(),
-      bottomEdgeBufferDeficitRows: timelineViewport.currentBottomEdgeBufferDeficitRows()
+      bottomEdgeBufferDeficitRows: timelineViewport.currentBottomEdgeBufferDeficitRows(),
+      firstVisibleEventOffset: timelineViewport.currentFirstVisibleEventOffset(),
+      lastVisibleEventOffset: timelineViewport.currentLastVisibleEventOffset(),
+      retainedWindowLimit: retainedTimelineWindowLimit()
     )
   }
 
@@ -285,7 +267,7 @@ extension SessionTimelineView {
       request: request,
       baselineWindowStart: presentation.navigation.windowStart
     )
-    await loadWindow(request)
+    await loadWindow(request, retainedLimit: retainedTimelineWindowLimit(for: action))
     return true
   }
 

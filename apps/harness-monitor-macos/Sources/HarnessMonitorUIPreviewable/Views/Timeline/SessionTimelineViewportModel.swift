@@ -75,6 +75,14 @@ final class SessionTimelineViewportModel {
     lastViewport.viewportRowCapacity
   }
 
+  func currentFirstVisibleEventOffset() -> Int? {
+    lastViewport.firstVisibleEventOffset
+  }
+
+  func currentLastVisibleEventOffset() -> Int? {
+    lastViewport.lastVisibleEventOffset
+  }
+
   func setAnchorID(_ id: String?) {
     latestVisibleAnchorID = id
     if visibleAnchorID != id {
