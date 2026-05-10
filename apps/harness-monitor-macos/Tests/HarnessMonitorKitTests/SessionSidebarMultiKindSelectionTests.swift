@@ -49,6 +49,18 @@ struct SessionSidebarMultiKindSelectionTests {
   }
 
   @MainActor
+  @Test("Rendered selection count keeps mixed multi-selection active")
+  func renderedSelectionCountKeepsMixedMultiSelectionActive() {
+    let state = SessionSidebarSelectionState()
+
+    #expect(!state.hasActiveMultiSelection)
+    state.syncRenderedSelectionCount(2)
+    #expect(state.hasActiveMultiSelection)
+    state.syncRenderedSelectionCount(1)
+    #expect(!state.hasActiveMultiSelection)
+  }
+
+  @MainActor
   @Test("prune intersects with visible IDs and repairs anchor")
   func prunePerKind() {
     let state = SessionSidebarSelectionState()
@@ -98,6 +110,45 @@ struct SessionSidebarMultiKindSelectionTests {
       orderedVisibleIDs: ["d1", "d2"]
     )
     #expect(scope.destructiveLabel == "Dismiss 2 Decisions")
+  }
+
+  @Test("Mixed selection disables context menu actions on selected rows")
+  func mixedSelectionDisablesContextMenuActions() {
+    let selectedAgent = SessionSelection.agent(sessionID: "s1", agentID: "a2")
+    let resolution = SessionSidebarContextMenuScope.resolve(
+      kind: .agent,
+      rowSelection: selectedAgent,
+      rowID: "a2",
+      listSelection: [.route(.overview), selectedAgent],
+      selectedIDs: [],
+      orderedVisibleIDs: ["a1", "a2", "a3"]
+    )
+
+    #expect(
+      resolution == .unavailable(SessionSidebarContextMenuScope.mixedSelectionUnavailableLabel)
+    )
+  }
+
+  @Test("Same-kind selection keeps actionable context menu actions")
+  func sameKindSelectionKeepsActionableContextMenu() {
+    let first = SessionSelection.task(sessionID: "s1", taskID: "t1")
+    let second = SessionSelection.task(sessionID: "s1", taskID: "t2")
+    let resolution = SessionSidebarContextMenuScope.resolve(
+      kind: .task,
+      rowSelection: second,
+      rowID: "t2",
+      listSelection: [first, second],
+      selectedIDs: ["t1", "t2"],
+      orderedVisibleIDs: ["t1", "t2", "t3"]
+    )
+
+    guard case .actionable(let scope) = resolution else {
+      Issue.record("Expected the task multi-selection context menu to stay actionable")
+      return
+    }
+
+    #expect(scope.ids == ["t1", "t2"])
+    #expect(scope.copyIDsLabel == "Copy 2 Task IDs")
   }
 
   @MainActor

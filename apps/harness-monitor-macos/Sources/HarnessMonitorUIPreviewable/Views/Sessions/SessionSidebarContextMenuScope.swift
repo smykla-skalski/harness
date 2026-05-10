@@ -1,6 +1,14 @@
 import Foundation
 
+enum SessionSidebarContextMenuResolution: Equatable {
+  case actionable(SessionSidebarContextMenuScope)
+  case unavailable(String)
+}
+
 struct SessionSidebarContextMenuScope: Equatable {
+  static let unavailableLabel = "No actions available"
+  static let mixedSelectionUnavailableLabel = "No actions available for mixed selection"
+
   let kind: SessionSidebarSelectionKind
   let primaryID: String
   let ids: [String]
@@ -25,6 +33,31 @@ struct SessionSidebarContextMenuScope: Equatable {
     return SessionSidebarContextMenuScope(kind: kind, primaryID: rowID, ids: [rowID])
   }
 
+  static func resolve(
+    kind: SessionSidebarSelectionKind,
+    rowSelection: SessionSelection,
+    rowID: String,
+    listSelection: Set<SessionSelection>,
+    selectedIDs: Set<String>,
+    orderedVisibleIDs: [String]
+  ) -> SessionSidebarContextMenuResolution {
+    if listSelection.count > 1,
+      listSelection.contains(rowSelection),
+      !listSelection.allSatisfy({ selectionKind(of: $0) == kind })
+    {
+      return .unavailable(Self.mixedSelectionUnavailableLabel)
+    }
+
+    return .actionable(
+      resolve(
+        kind: kind,
+        rowID: rowID,
+        selectedIDs: selectedIDs,
+        orderedVisibleIDs: orderedVisibleIDs
+      )
+    )
+  }
+
   var copyIDsLabel: String {
     switch kind {
     case .agent: isMulti ? "Copy \(count) Agent IDs" : "Copy Agent ID"
@@ -43,5 +76,14 @@ struct SessionSidebarContextMenuScope: Equatable {
 
   var clipboardText: String {
     ids.joined(separator: "\n")
+  }
+
+  private static func selectionKind(of selection: SessionSelection) -> SessionSidebarSelectionKind? {
+    switch selection {
+    case .agent: .agent
+    case .task: .task
+    case .decision: .decision
+    case .route, .codexRun, .create: nil
+    }
   }
 }
