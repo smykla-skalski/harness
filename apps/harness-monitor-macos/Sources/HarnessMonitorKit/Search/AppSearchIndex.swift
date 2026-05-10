@@ -50,6 +50,11 @@ public actor AppSearchIndex {
     let lowercasedCorpus: String
   }
 
+  private struct ScoredRecord {
+    let score: Int
+    let record: Record
+  }
+
   private var agents: [Record] = []
   private var decisions: [Record] = []
   private var tasks: [Record] = []
@@ -179,14 +184,15 @@ public actor AppSearchIndex {
 
   /// Ranked fallback order for non-primary domains.
   ///
-  /// Decisions outrank Tasks, Tasks outrank Agents, Timeline trails. The
-  /// active route's domain (the `primary`) always anchors the head of the
-  /// returned list; remaining domains follow this fallback order.
+  /// Tasks lead, then Agents, then Timeline, with Decisions trailing.
+  /// The active route's domain (the `primary`) always anchors the head
+  /// of the returned list; remaining domains follow this fallback
+  /// order.
   private static let fallbackDomainOrder: [AppSearchDomain] = [
-    .decisions,
     .tasks,
     .agents,
     .timeline,
+    .decisions,
   ]
 
   private func orderedDomains(primary: AppSearchDomain?) -> [AppSearchDomain] {
@@ -215,24 +221,23 @@ public actor AppSearchIndex {
     perDomainK: Int
   ) -> AppSearchSection {
     let records = corpus(for: domain)
-    var scored: [(score: Int, record: Record)] = []
-    scored.reserveCapacity(min(perDomainK, records.count))
+    let limit = max(0, perDomainK)
+    var scored: [ScoredRecord] = []
+    scored.reserveCapacity(min(limit, records.count))
+    var matchCount = 0
     for record in records {
       guard let score = score(record: record, needle: needle) else {
         continue
       }
-      scored.append((score, record))
+      matchCount += 1
+      appendTopMatch(
+        ScoredRecord(score: score, record: record),
+        to: &scored,
+        limit: limit
+      )
     }
-    scored.sort { lhs, rhs in
-      if lhs.score != rhs.score {
-        return lhs.score < rhs.score
-      }
-      return lhs.record.title.localizedCompare(rhs.record.title) == .orderedAscending
-    }
-    let truncated = scored.count > perDomainK
-    if truncated {
-      scored = Array(scored.prefix(perDomainK))
-    }
+    scored.sort(by: sortsBefore)
+    let truncated = matchCount > limit
     let hits = scored.map { entry in
       AppSearchHit(
         domain: domain,
@@ -244,6 +249,31 @@ public actor AppSearchIndex {
       )
     }
     return AppSearchSection(domain: domain, hits: hits, truncated: truncated)
+  }
+
+  private func appendTopMatch(
+    _ candidate: ScoredRecord,
+    to scored: inout [ScoredRecord],
+    limit: Int
+  ) {
+    guard limit > 0 else { return }
+    guard scored.count >= limit else {
+      scored.append(candidate)
+      return
+    }
+    guard let worstIndex = scored.indices.max(by: { sortsBefore(scored[$0], scored[$1]) }) else {
+      return
+    }
+    if sortsBefore(candidate, scored[worstIndex]) {
+      scored[worstIndex] = candidate
+    }
+  }
+
+  private func sortsBefore(_ lhs: ScoredRecord, _ rhs: ScoredRecord) -> Bool {
+    if lhs.score != rhs.score {
+      return lhs.score < rhs.score
+    }
+    return lhs.record.title.localizedCompare(rhs.record.title) == .orderedAscending
   }
 
   /// Score: lower is better. Title matches outrank corpus matches; within a
