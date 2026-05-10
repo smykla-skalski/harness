@@ -71,7 +71,12 @@ extension SessionWindowView {
           .backgroundExtensionEffect()
       }
     }
-    .modifier(SessionWindowPlainTapRecorder(stateCache: stateCache))
+    .modifier(
+      SessionWindowPlainTapRecorder(
+        stateCache: stateCache,
+        isEnabled: stateCache.sidebarSelection.hasActiveMultiSelection
+      )
+    )
   }
 
   @ViewBuilder var standardSessionLayout: some View {
@@ -91,7 +96,12 @@ extension SessionWindowView {
       }
     }
     .navigationSplitViewStyle(.prominentDetail)
-    .modifier(SessionWindowPlainTapRecorder(stateCache: stateCache))
+    .modifier(
+      SessionWindowPlainTapRecorder(
+        stateCache: stateCache,
+        isEnabled: stateCache.sidebarSelection.hasActiveMultiSelection
+      )
+    )
   }
 
   @ViewBuilder
