@@ -23,8 +23,6 @@ XCODE_ONLY_TESTING="${XCODE_ONLY_TESTING:-}"
 BUILD_FOR_TESTING_SCRIPT="${BUILD_FOR_TESTING_SCRIPT:-$ROOT/Scripts/build-for-testing.sh}"
 TEST_RETRY_ITERATIONS="${HARNESS_MONITOR_TEST_RETRY_ITERATIONS:-0}"
 TEST_LOCK_WAIT_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS:-15}"
-REUSED_EXISTING_BUILD=0
-
 export XCODEBUILD_DERIVED_DATA_PATH="$DERIVED_DATA_PATH"
 
 test_lane_env() {
@@ -140,7 +138,6 @@ filter_monitor_test_console_output() {
 
 run_build_for_testing() {
   if should_reuse_existing_build_for_testing; then
-    REUSED_EXISTING_BUILD=1
     return 0
   fi
 
