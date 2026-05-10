@@ -84,3 +84,16 @@ struct SessionTimelineActionButtons: View {
     }
   }
 }
+
+// High-severity-events trace surfaced 7 instances of this view at 9-13ms
+// each: HarnessMonitorWrapLayout's per-body geometry pass is the cost.
+// The action set is stable per row; gate body via Equatable so unchanged
+// rows skip the layout work entirely. MainActor isolation matches the
+// View's implicit @MainActor on body.
+extension SessionTimelineActionButtons: @MainActor Equatable {
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.actions == rhs.actions
+      && ObjectIdentifier(lhs.handler as AnyObject)
+        == ObjectIdentifier(rhs.handler as AnyObject)
+  }
+}

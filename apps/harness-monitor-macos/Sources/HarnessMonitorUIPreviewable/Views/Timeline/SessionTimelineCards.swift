@@ -100,6 +100,7 @@ private struct SessionTimelineNodeRow: View {
         cardContent
         if !node.actions.isEmpty {
           SessionTimelineActionButtons(actions: node.actions, handler: actionHandler)
+            .equatable()
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
