@@ -102,7 +102,8 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       )
     )
     #expect(sidebarView.contains("HarnessMonitorAccessibility.sessionWindowSidebar"))
-    #expect(createRuntimeView.contains("HarnessMonitorAccessibility.sessionWindowCreateProviderPane"))
+    #expect(
+      createRuntimeView.contains("HarnessMonitorAccessibility.sessionWindowCreateProviderPane"))
     #expect(
       createRuntimeView.contains(
         ".accessibilityTestProbe(\n      HarnessMonitorAccessibility.sessionWindowCreateProviderPane"

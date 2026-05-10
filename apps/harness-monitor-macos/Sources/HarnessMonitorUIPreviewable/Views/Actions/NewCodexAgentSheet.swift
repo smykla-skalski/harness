@@ -250,14 +250,14 @@ struct NewCodexAgentSheet: View {
     let effort = normalizedEffort
 
     guard
-      let _ = await store.startCodexRunSnapshot(
+      await store.startCodexRunSnapshot(
         prompt: trimmedPrompt,
         mode: mode,
         model: modelSelection.id,
         effort: effort.isEmpty ? nil : effort,
         allowCustomModel: modelSelection.allowCustomModel,
         sessionID: sessionID
-      )
+      ) != nil
     else {
       return
     }

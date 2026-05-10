@@ -488,7 +488,8 @@ extension SessionWindowCreateForm {
         "\(SessionWindowCreateFormCatalogs.transportSummary(option: option, choice: choice)) "
         + "Finish the remaining setup in the sections below."
     }
-    return "Choose how this agent starts. The remaining form sections hold the configuration and advanced overrides."
+    return
+      "Choose how this agent starts. The remaining form sections hold the configuration and advanced overrides."
   }
 
   @ViewBuilder
@@ -581,7 +582,8 @@ extension SessionWindowCreateForm {
     if normalizedLaunchSelection.isAcp {
       return "Set an optional project directory override for this agent."
     }
-    return "Set an optional project directory override. Use one argument per line for a command override; the first line is the executable."
+    return
+      "Set an optional project directory override. Use one argument per line for a command override; the first line is the executable."
   }
 
   @ViewBuilder
@@ -732,7 +734,8 @@ extension SessionWindowCreateForm {
         title: option.installActionTitle,
         tint: HarnessMonitorTheme.caution,
         variant: .prominent,
-        accessibilityIdentifier: HarnessMonitorAccessibility.agentCapabilityInstallButton(option.id),
+        accessibilityIdentifier: HarnessMonitorAccessibility.agentCapabilityInstallButton(
+          option.id),
         fillsWidth: false
       ) {
         HarnessMonitorClipboard.copy(SessionWindowCreateFormCatalogs.installHintText(for: option))
@@ -878,7 +881,8 @@ extension SessionWindowCreateForm {
       get: { draft.customModelByRuntime[runtime.rawValue] ?? "" },
       set: {
         var next = draft
-        next.modelByRuntime[runtime.rawValue] = SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag
+        next.modelByRuntime[runtime.rawValue] =
+          SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag
         next.customModelByRuntime[runtime.rawValue] = $0
         state.updateCreateDraft(next)
       }

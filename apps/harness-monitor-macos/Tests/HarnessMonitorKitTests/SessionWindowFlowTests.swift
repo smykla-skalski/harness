@@ -353,7 +353,8 @@ struct SessionWindowFlowTests {
   @Test("Session decision filters use toggles and live region includes visible count")
   func sessionDecisionFiltersUseTogglesAndLiveRegionIncludesVisibleCount() throws {
     let sidebarSource = try previewableSourceFile(named: "Views/Sessions/SessionSidebar.swift")
-    let filterSource = try previewableSourceFile(named: "Views/Sessions/SessionSidebar+Filtering.swift")
+    let filterSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionSidebar+Filtering.swift")
     let announcerSource = try previewableSourceFile(
       named: "Views/Sessions/SessionSidebarMultiSelectAnnouncer.swift"
     )
@@ -430,8 +431,10 @@ struct SessionWindowFlowTests {
     let inspectorPolicySource = try previewableSourceFile(
       named: "Views/Sessions/SessionWindowView+Inspector.swift"
     )
-    let columnsSource = try previewableSourceFile(named: "Views/Sessions/SessionWindowView+Columns.swift")
-    let inspectorSource = try previewableSourceFile(named: "Views/Sessions/SessionWindowInspector.swift")
+    let columnsSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+Columns.swift")
+    let inspectorSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowInspector.swift")
 
     #expect(viewSource.contains("@SceneStorage(\"session.inspector.visible\")"))
     #expect(viewSource.contains("@SceneStorage(\"session.inspector.preferred\")"))
@@ -553,7 +556,8 @@ struct SessionWindowFlowTests {
       forKey: SessionPendingDecisionBannerSettings.focusModeEnabledKey
     )
     #expect(
-      !SessionPendingDecisionBannerSettings.readFocusModeEnabled(userDefaults: defaults.userDefaults)
+      !SessionPendingDecisionBannerSettings.readFocusModeEnabled(
+        userDefaults: defaults.userDefaults)
     )
     #expect(
       SessionPendingDecisionBannerSettings.focusModeEnabledKey
@@ -617,7 +621,9 @@ struct SessionWindowFlowTests {
   func openRecentDoesNotRenderCloseAfterPickCheckbox() throws {
     let source = try previewableSourceFile(named: "Views/Sessions/OpenRecentView.swift")
 
-    #expect(!source.contains("Toggle(\"Close Open Recent after picking a session\", isOn: $closeAfterPick)"))
+    #expect(
+      !source.contains(
+        "Toggle(\"Close Open Recent after picking a session\", isOn: $closeAfterPick)"))
     #expect(!source.contains(".onGeometryChange("))
     #expect(source.contains("OpenRecentStartPanelLayout("))
   }
@@ -703,7 +709,8 @@ struct SessionWindowFlowTests {
   @Test("Session inspector divider remains SwiftUI native")
   func sessionInspectorDividerRemainsSwiftUINative() throws {
     let viewSource = try previewableSourceFile(named: "Views/Sessions/SessionWindowView.swift")
-    let dividerSource = try previewableSourceFile(named: "Views/Sessions/SessionInspectorDivider.swift")
+    let dividerSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionInspectorDivider.swift")
 
     #expect(!viewSource.contains("import AppKit"))
     #expect(!dividerSource.contains("import AppKit"))
@@ -729,7 +736,8 @@ struct SessionWindowFlowTests {
     #expect(columnsSource.contains(".navigationSplitViewStyle(.prominentDetail)"))
     #expect(splitSource.contains("NSCursor.resizeLeftRight"))
     #expect(splitSource.contains("@State private var liveContentWidth"))
-    #expect(splitSource.contains("_liveContentWidth = State(wrappedValue: contentWidth.wrappedValue)"))
+    #expect(
+      splitSource.contains("_liveContentWidth = State(wrappedValue: contentWidth.wrappedValue)"))
     #expect(splitSource.contains(".accessibilityAdjustableAction"))
     #expect(splitSource.contains(".focusEffectDisabled()"))
     #expect(splitSource.contains(".focusable(interactions: .activate)"))
@@ -783,7 +791,8 @@ struct SessionWindowFlowTests {
       .deletingLastPathComponent()
       .deletingLastPathComponent()
 
-    return repoRoot
+    return
+      repoRoot
       .appendingPathComponent("apps/harness-monitor-macos/Sources/HarnessMonitor")
       .appendingPathComponent(relativePath)
   }

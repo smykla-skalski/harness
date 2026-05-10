@@ -63,15 +63,19 @@ public enum SessionWindowTabbingSupport {
   public static func visibleSessionTabTargetWindow(
     preference: SessionWindowTabbingPreference
   ) -> NSWindow? {
-    guard let window = NSApplication.shared.orderedWindows.first(where: {
-      $0.isVisible && !$0.isMiniaturized && $0.tabbingIdentifier == tabbingIdentifier
-    }) else {
+    guard
+      let window = NSApplication.shared.orderedWindows.first(where: {
+        $0.isVisible && !$0.isMiniaturized && $0.tabbingIdentifier == tabbingIdentifier
+      })
+    else {
       return nil
     }
-    guard shouldPreferTabbedOpen(
-      preference: preference,
-      targetIsFullScreen: window.styleMask.contains(.fullScreen)
-    ) else {
+    guard
+      shouldPreferTabbedOpen(
+        preference: preference,
+        targetIsFullScreen: window.styleMask.contains(.fullScreen)
+      )
+    else {
       return nil
     }
     return window

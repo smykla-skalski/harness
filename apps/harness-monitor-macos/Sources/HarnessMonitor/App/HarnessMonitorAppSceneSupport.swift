@@ -92,13 +92,13 @@ struct HarnessMonitorWindowRootView: View {
 
   @ViewBuilder private var liveContent: some View {
     OpenRecentView(store: store)
-    .modifier(
-      HarnessMonitorPerfScenarioModifier(
-        delegate: delegate,
-        store: store,
-        perfScenario: perfScenario
+      .modifier(
+        HarnessMonitorPerfScenarioModifier(
+          delegate: delegate,
+          store: store,
+          perfScenario: perfScenario
+        )
       )
-    )
   }
 
   @MainActor

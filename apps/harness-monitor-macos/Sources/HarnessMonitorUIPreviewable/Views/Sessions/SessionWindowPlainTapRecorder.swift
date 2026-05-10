@@ -30,8 +30,8 @@ struct SessionWindowPlainTapRecorder: ViewModifier {
         stateCache: stateCache,
         isEnabled: isEnabled
       )
-        .frame(width: 0, height: 0)
-        .accessibilityHidden(true)
+      .frame(width: 0, height: 0)
+      .accessibilityHidden(true)
     )
   }
 }

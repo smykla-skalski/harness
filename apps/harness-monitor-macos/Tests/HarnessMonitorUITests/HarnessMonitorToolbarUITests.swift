@@ -298,7 +298,8 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
       additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "cockpit"]
     )
     let refreshButton = toolbarButton(in: app, identifier: Accessibility.refreshButton)
-    let workspaceButton = toolbarButton(in: app, identifier: Accessibility.sessionAttentionToolbarButton)
+    let workspaceButton = toolbarButton(
+      in: app, identifier: Accessibility.sessionAttentionToolbarButton)
 
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) {

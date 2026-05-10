@@ -250,7 +250,8 @@ struct SessionWindowDecisionsList: View {
 
   private var emptyStateDescription: String {
     if hasActiveFilters {
-      return "Clear or broaden the current filters to bring this session's decisions back into view."
+      return
+        "Clear or broaden the current filters to bring this session's decisions back into view."
     }
     return "This session has no open decisions right now."
   }

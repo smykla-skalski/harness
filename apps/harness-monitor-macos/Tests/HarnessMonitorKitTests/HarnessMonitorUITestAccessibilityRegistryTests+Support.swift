@@ -6,9 +6,9 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     let repoRoot =
       testsDirectory
       .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
     let sourceRoots = [
       repoRoot.appendingPathComponent(
         "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views"

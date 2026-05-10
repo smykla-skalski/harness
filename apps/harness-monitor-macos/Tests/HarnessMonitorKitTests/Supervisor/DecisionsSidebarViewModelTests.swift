@@ -245,4 +245,3 @@ final class DecisionsSidebarViewModelTests: XCTestCase {
     )
   }
 }
-

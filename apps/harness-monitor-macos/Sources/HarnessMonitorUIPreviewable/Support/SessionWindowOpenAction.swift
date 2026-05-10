@@ -57,10 +57,12 @@ private enum SessionWindowTabMergeCoordinator {
     into targetWindow: NSWindow,
     preference: SessionWindowTabbingPreference
   ) async {
-    guard SessionWindowTabbingSupport.shouldPreferTabbedOpen(
-      preference: preference,
-      targetIsFullScreen: targetWindow.styleMask.contains(.fullScreen)
-    ) else {
+    guard
+      SessionWindowTabbingSupport.shouldPreferTabbedOpen(
+        preference: preference,
+        targetIsFullScreen: targetWindow.styleMask.contains(.fullScreen)
+      )
+    else {
       return
     }
 

@@ -11,7 +11,8 @@ private struct SessionPendingDecisionBannerPreferenceState: Equatable {
       showsPendingDecisionBanners: SessionPendingDecisionBannerSettings.readEnabled(
         userDefaults: userDefaults
       ),
-      showsPendingDecisionBannersInFocusMode: SessionPendingDecisionBannerSettings
+      showsPendingDecisionBannersInFocusMode:
+        SessionPendingDecisionBannerSettings
         .readFocusModeEnabled(userDefaults: userDefaults)
     )
   }

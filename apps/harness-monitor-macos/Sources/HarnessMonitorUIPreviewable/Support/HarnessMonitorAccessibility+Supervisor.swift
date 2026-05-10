@@ -3,7 +3,8 @@ import Foundation
 extension HarnessMonitorAccessibility {
   public static let sessionAttentionToolbarButton = "harness.toolbar.session-attention"
   public static let sessionAttentionToolbarButtonState = "harness.toolbar.session-attention.state"
-  public static let sessionAttentionToolbarForceTick = "harness.toolbar.session-attention.force-tick"
+  public static let sessionAttentionToolbarForceTick =
+    "harness.toolbar.session-attention.force-tick"
   public static let decisionsSidebar = "harness.decisions.sidebar"
   public static let decisionDetail = "harness.decisions.detail"
   public static let decisionDetailScrollView = "harness.decisions.detail.scroll"

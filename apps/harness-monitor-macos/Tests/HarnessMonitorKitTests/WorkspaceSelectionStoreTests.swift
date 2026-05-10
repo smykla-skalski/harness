@@ -57,7 +57,8 @@ struct SessionRouteSelectionStoreTests {
     store.requestSessionRoute(selection)
 
     #expect(store.consumePendingSessionRouteRequest(forSessionID: "sess-beta") == nil)
-    #expect(store.consumePendingSessionRouteRequest(forSessionID: "sess-alpha")?.selection == selection)
+    #expect(
+      store.consumePendingSessionRouteRequest(forSessionID: "sess-alpha")?.selection == selection)
   }
 
   @Test("Create requests target the matching session window")

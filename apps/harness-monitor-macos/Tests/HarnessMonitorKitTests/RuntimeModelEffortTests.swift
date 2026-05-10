@@ -51,4 +51,3 @@ struct RuntimeModelEffortTests {
     #expect(model.supportsEffort)
   }
 }
-

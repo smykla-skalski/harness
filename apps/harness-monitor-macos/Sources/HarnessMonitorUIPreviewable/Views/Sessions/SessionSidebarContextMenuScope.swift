@@ -78,7 +78,8 @@ struct SessionSidebarContextMenuScope: Equatable {
     ids.joined(separator: "\n")
   }
 
-  private static func selectionKind(of selection: SessionSelection) -> SessionSidebarSelectionKind? {
+  private static func selectionKind(of selection: SessionSelection) -> SessionSidebarSelectionKind?
+  {
     switch selection {
     case .agent: .agent
     case .task: .task

@@ -61,11 +61,13 @@ struct DaemonControllerExternalManifestLocationTests {
   @Test("warm-up switches from a stale root manifest to a live runtime-lane manifest")
   func warmUpSwitchesFromStaleRootManifestToLiveRuntimeLaneManifest() async throws {
     let homeDirectory = FileManager.default.temporaryDirectory
-      .appendingPathComponent("daemon-controller-cross-lane-\(UUID().uuidString)", isDirectory: true)
+      .appendingPathComponent(
+        "daemon-controller-cross-lane-\(UUID().uuidString)", isDirectory: true)
     defer { try? FileManager.default.removeItem(at: homeDirectory) }
 
     let appGroupRoot = externalAppGroupRoot(homeDirectory: homeDirectory)
-    let rootDaemonRoot = appGroupRoot
+    let rootDaemonRoot =
+      appGroupRoot
       .appendingPathComponent("harness", isDirectory: true)
       .appendingPathComponent("daemon", isDirectory: true)
     try FileManager.default.createDirectory(at: rootDaemonRoot, withIntermediateDirectories: true)
@@ -94,7 +96,8 @@ struct DaemonControllerExternalManifestLocationTests {
     async let laneManifestWriter: Void = withSignalIgnoringSleepProcessPID(durationSeconds: 60) {
       pid in
       try await Task.sleep(for: .milliseconds(250))
-      let laneDaemonRoot = appGroupRoot
+      let laneDaemonRoot =
+        appGroupRoot
         .appendingPathComponent("runtime-lanes", isDirectory: true)
         .appendingPathComponent("late-start", isDirectory: true)
         .appendingPathComponent("harness", isDirectory: true)
@@ -156,6 +159,7 @@ private func writeExternalManifestFixture(
     ],
     "revision": 0,
   ]
-  let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
+  let data = try JSONSerialization.data(
+    withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
   try data.write(to: manifestURL, options: .atomic)
 }

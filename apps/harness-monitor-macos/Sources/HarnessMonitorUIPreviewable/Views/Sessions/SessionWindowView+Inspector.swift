@@ -119,8 +119,9 @@ extension SessionWindowView {
     preferredBinding: Binding<Bool>,
     announce: Bool = true
   ) {
-    guard preferredBinding.wrappedValue != preferredVisible
-      || visibleBinding.wrappedValue != preferredVisible
+    guard
+      preferredBinding.wrappedValue != preferredVisible
+        || visibleBinding.wrappedValue != preferredVisible
     else { return }
     preferredBinding.wrappedValue = preferredVisible
     reconcileInspectorVisibility(
