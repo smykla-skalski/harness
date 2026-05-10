@@ -135,8 +135,96 @@ private struct SessionWindowPlainTapMonitor: NSViewRepresentable {
   }
 }
 
+struct SessionSidebarModifierKeysMonitor: NSViewRepresentable {
+  @Binding var currentModifiers: EventModifiers
+
+  func makeCoordinator() -> Coordinator {
+    Coordinator(update: { modifiers in
+      currentModifiers = modifiers
+    })
+  }
+
+  func makeNSView(context: Context) -> NSView {
+    let view = TrackingView()
+    view.coordinator = context.coordinator
+    context.coordinator.attach(to: view.window)
+    return view
+  }
+
+  func updateNSView(_ nsView: NSView, context: Context) {
+    guard let trackingView = nsView as? TrackingView else {
+      return
+    }
+    trackingView.coordinator = context.coordinator
+    context.coordinator.attach(to: trackingView.window)
+  }
+
+  static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+    if let trackingView = nsView as? TrackingView {
+      trackingView.coordinator = nil
+    }
+    Task { @MainActor in
+      coordinator.detach()
+    }
+  }
+
+  @MainActor
+  final class Coordinator {
+    private let update: (EventModifiers) -> Void
+    private weak var observedWindow: NSWindow?
+    private var monitor: Any?
+
+    init(update: @escaping (EventModifiers) -> Void) {
+      self.update = update
+    }
+
+    func attach(to window: NSWindow?) {
+      guard window !== observedWindow else { return }
+      detach()
+      observedWindow = window
+      guard let window else {
+        update([])
+        return
+      }
+
+      update(EventModifiers(nsModifiers: NSEvent.modifierFlags))
+      monitor = NSEvent.addLocalMonitorForEvents(
+        matching: [.flagsChanged]
+      ) { [weak self, weak window] event in
+        guard let self, let window, event.window === window else {
+          return event
+        }
+        update(EventModifiers(nsModifiers: event.modifierFlags))
+        return event
+      }
+    }
+
+    func detach() {
+      if let monitor {
+        NSEvent.removeMonitor(monitor)
+        self.monitor = nil
+      }
+      observedWindow = nil
+      update([])
+    }
+  }
+
+  final class TrackingView: NSView {
+    nonisolated(unsafe) var coordinator: Coordinator?
+
+    override func viewDidMoveToWindow() {
+      super.viewDidMoveToWindow()
+      let coordinator = coordinator
+      let attachedWindow = window
+      Task { @MainActor in
+        coordinator?.attach(to: attachedWindow)
+      }
+    }
+  }
+}
+
 extension EventModifiers {
-  fileprivate init(nsModifiers: NSEvent.ModifierFlags) {
+  init(nsModifiers: NSEvent.ModifierFlags) {
     var modifiers: EventModifiers = []
     if nsModifiers.contains(.command) { modifiers.insert(.command) }
     if nsModifiers.contains(.shift) { modifiers.insert(.shift) }

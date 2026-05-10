@@ -90,7 +90,7 @@ struct KeyboardShortcutLabel: View {
     HStack(spacing: keySpacing) {
       ForEach(Array(shortcut.displayParts.enumerated()), id: \.offset) { _, part in
         Text(part.text)
-          .scaledFont(.caption.monospaced())
+          .scaledFont(font(for: part))
           .foregroundStyle(foregroundColor(for: part))
       }
     }
@@ -101,9 +101,18 @@ struct KeyboardShortcutLabel: View {
 
   private func foregroundColor(for part: KeyboardShortcutDisplayPart) -> Color {
     if part.isHighlighted(with: activeModifiers) {
-      return HarnessMonitorTheme.secondaryInk
+      return HarnessMonitorTheme.accent
     }
     return .secondary
+  }
+
+  private func font(for part: KeyboardShortcutDisplayPart) -> Font {
+    switch part {
+    case .modifier:
+      .callout.monospaced()
+    case .key:
+      .caption.monospaced()
+    }
   }
 }
 
