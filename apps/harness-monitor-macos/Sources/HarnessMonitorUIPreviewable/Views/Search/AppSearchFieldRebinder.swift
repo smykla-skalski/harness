@@ -125,26 +125,26 @@ struct AppSearchFieldRebinder: NSViewRepresentable {
       guard let field = locateSearchField(in: window.contentView) else { return }
       let pointInField = field.convert(event.locationInWindow, from: nil)
       guard field.bounds.contains(pointInField) else { return }
-      rearm(field: field, in: window)
+      // Click path: drop first-responder synchronously (BEFORE the
+      // event reaches the field's mouseDown). AppKit's normal click
+      // handling will then re-promote the field to first responder
+      // via mouseDown → that's the same code path that auto-shows
+      // the suggestion menu when the user clicks an unfocused search
+      // field. No async restore — AppKit owns the second leg.
+      window.makeFirstResponder(nil)
     }
 
     private func rearmIfNeeded(in window: NSWindow) {
+      // Window-key path: no click is coming, so we drive the FR
+      // cycle ourselves. Resign synchronously, restore on the next
+      // runloop pass so AppKit fully propagates the
+      // resignFirstResponder before we re-promote — without the
+      // delay AppKit collapses the pair into a no-op and the menu
+      // stays dismissed.
       guard shouldRebind else { return }
       guard let field = locateSearchField(in: window.contentView) else {
         return
       }
-      rearm(field: field, in: window)
-    }
-
-    private func rearm(field: NSSearchField, in window: NSWindow) {
-      // AppKit's suggestion menu re-presents on a fresh
-      // becomeFirstResponder; if `field` is already first responder,
-      // `makeFirstResponder` is a no-op. Cycle off then back on to
-      // force the menu to reopen while keeping the typed query. The
-      // restore step is dispatched on the next main runloop pass so
-      // the resign-first-responder propagation completes before the
-      // field is asked to take responder status again — without that
-      // ordering, AppKit collapses the pair into a single no-op.
       window.makeFirstResponder(nil)
       DispatchQueue.main.async { [weak window] in
         guard let window else { return }
