@@ -112,10 +112,24 @@ struct SessionWindowAgentsList: View {
 
   private var selectedAgentID: Binding<String?> {
     Binding(
-      get: { state.selection.agentID },
+      get: {
+        if case .route(.agents) = state.selection {
+          return SessionAgentRouteSelectionPolicy.preferredRouteDetailAgentID(
+            rememberedAgentID: state.sectionState.agentID,
+            visibleAgentIDs: filteredAgents.map(\.agentId)
+          )
+        }
+        return state.selection.agentID
+      },
       set: { agentID in
-        guard let agentID, agentID != state.selection.agentID else { return }
-        state.selectAgent(agentID)
+        guard let agentID else { return }
+        if case .route(.agents) = state.selection {
+          guard agentID != state.sectionState.agentID else { return }
+          state.setRouteAgentID(agentID)
+        } else {
+          guard agentID != state.selection.agentID else { return }
+          state.selectAgent(agentID)
+        }
       }
     )
   }

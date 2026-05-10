@@ -93,6 +93,8 @@ extension SessionWindowFlowTests {
 
     #expect(supportSource.contains("HStack(alignment: .firstTextBaseline, spacing: keySpacing)"))
     #expect(supportSource.contains("return HarnessMonitorTheme.warmAccent"))
+    #expect(!supportSource.contains(".caption.monospaced()"))
+    #expect(supportSource.contains("case .key:\n      .callout.monospaced()"))
   }
 
   @Test("Displayed create shortcut follows the primary create kind")
@@ -105,24 +107,24 @@ extension SessionWindowFlowTests {
     #expect(SessionCreateKind.decision.displayedCreateShortcut(primaryKind: .decision).hint == "⌘N")
   }
 
-  @Test("Agents route auto-selects the first visible agent")
-  func agentsRouteAutoSelectsTheFirstVisibleAgent() {
+  @Test("Agents route detail prefers the remembered visible agent and otherwise falls back to the first visible one")
+  func agentsRouteDetailPrefersRememberedVisibleAgent() {
     #expect(
-      SessionAgentAutoSelectionPolicy.preferredAgentID(
-        selection: .route(.agents),
+      SessionAgentRouteSelectionPolicy.preferredRouteDetailAgentID(
+        rememberedAgentID: "agent-b",
+        visibleAgentIDs: ["agent-a", "agent-b"]
+      ) == "agent-b"
+    )
+    #expect(
+      SessionAgentRouteSelectionPolicy.preferredRouteDetailAgentID(
+        rememberedAgentID: "missing-agent",
         visibleAgentIDs: ["agent-a", "agent-b"]
       ) == "agent-a"
     )
     #expect(
-      SessionAgentAutoSelectionPolicy.preferredAgentID(
-        selection: .route(.agents),
+      SessionAgentRouteSelectionPolicy.preferredRouteDetailAgentID(
+        rememberedAgentID: "agent-b",
         visibleAgentIDs: []
-      ) == nil
-    )
-    #expect(
-      SessionAgentAutoSelectionPolicy.preferredAgentID(
-        selection: .route(.tasks),
-        visibleAgentIDs: ["agent-a"]
       ) == nil
     )
   }

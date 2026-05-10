@@ -306,7 +306,10 @@ extension SessionWindowView {
     case .agent(_, let agentID):
       agentDetailContent(for: agentID)
     case .route(.agents):
-      if let agentID = visibleSessionAgents.first?.agentId {
+      if let agentID = SessionAgentRouteSelectionPolicy.preferredRouteDetailAgentID(
+        rememberedAgentID: stateCache.sectionState.agentID,
+        visibleAgentIDs: visibleSessionAgents.map(\.agentId)
+      ) {
         agentDetailContent(for: agentID)
       } else {
         let hasQuery = !stateCache.appSearchModel.query
