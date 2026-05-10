@@ -52,6 +52,11 @@ class RunInstrumentsAuditFromRefScriptTests(unittest.TestCase):
         self.assertIn('--checkout-root "$CHECKOUT_ROOT"', self.script)
         self.assertIn('--worktree-root "$worktree_root"', self.script)
 
+    def test_forwarded_args_use_repeated_passthrough_flags(self) -> None:
+        self.assertIn('for arg in "${passthrough[@]}"; do', self.script)
+        self.assertIn('cmd+=("--passthrough=$arg")', self.script)
+        self.assertNotIn('cmd+=(--passthrough "${passthrough[@]}")', self.script)
+
 
 if __name__ == "__main__":
     unittest.main()

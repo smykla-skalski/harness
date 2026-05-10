@@ -68,7 +68,9 @@ cmd=(
   --worktree-root "$worktree_root"
 )
 if ((${#passthrough[@]} > 0)); then
-  cmd+=(--passthrough "${passthrough[@]}")
+  for arg in "${passthrough[@]}"; do
+    cmd+=("--passthrough=$arg")
+  done
 fi
 
 "${cmd[@]}"
