@@ -14,12 +14,11 @@ private let appSearchSignposter = OSSignposter(
   category: "perf"
 )
 
-/// Re-runs the search whenever the live query, the focused-route's
-/// resolved primary domain, or the user-selected filter set changes.
+/// Re-runs the search whenever the live query or the focused-route's
+/// resolved primary domain changes.
 private struct AppSearchTrigger: Equatable {
   let query: String
   let primary: AppSearchDomain?
-  let selectedDomains: Set<AppSearchDomain>
 }
 
 /// Toolbar-placed `.searchable` field that drives the cross-domain
@@ -28,10 +27,23 @@ private struct AppSearchTrigger: Equatable {
 /// The modifier owns one `@State` for the live query (the only main-actor
 /// write per keystroke). The primary domain at search time is resolved
 /// from the focused route, falling back to ``fallbackPrimaryDomain``.
-/// Domain filtering is multi-select and lives on the model's
-/// ``AppSearchModel/selectedDomains``; the suggestions view filters
-/// rendered sections to that set. Ranking work happens off-MainActor
-/// inside ``AppSearchIndex``.
+/// Ranking work happens off-MainActor inside ``AppSearchIndex``.
+///
+/// Suggestion-popover persistence: `.searchSuggestions` on macOS is
+/// backed by `NSSearchField`'s suggestion menu, which dismisses when
+/// the window resigns key/active state and does NOT auto-reopen when
+/// the window regains it. There is no SwiftUI-only API to force
+/// re-presentation of the menu (confirmed by the swiftui-introspect
+/// community recipe documented at
+/// https://github.com/siteline/swiftui-introspect/discussions/397
+/// and the Apple Developer Forums thread #704767, which has no
+/// SwiftUI workaround). The fix uses ``AppSearchFieldRebinder`` —
+/// an `NSViewRepresentable` that finds the underlying
+/// `NSSearchField` in the window hierarchy and calls
+/// `beginSearchInteraction()` (the same AppKit API
+/// `NSSearchToolbarItem` uses internally) on
+/// `NSWindow.didBecomeKeyNotification` while the user still has a
+/// query.
 public struct AppSearchHostModifier: ViewModifier {
   let model: AppSearchModel
   let prompt: LocalizedStringKey
@@ -82,14 +94,8 @@ public struct AppSearchHostModifier: ViewModifier {
       .searchSuggestions {
         AppSearchSuggestionsView(
           results: model.results,
-          selectedDomains: model.selectedDomains,
           routeAction: routeAction
         )
-      }
-      .safeAreaInset(edge: .top, spacing: 0) {
-        if model.isPresented {
-          AppSearchFilterRail(selectedDomains: $model.selectedDomains)
-        }
       }
       .background {
         Button("Find in Session", action: focusSearchField)
@@ -100,11 +106,15 @@ public struct AppSearchHostModifier: ViewModifier {
       .task(
         id: AppSearchTrigger(
           query: query,
-          primary: resolvedPrimaryDomain,
-          selectedDomains: model.selectedDomains
+          primary: resolvedPrimaryDomain
         )
       ) {
         await runDebouncedSearch(for: query)
+      }
+      .background {
+        AppSearchFieldRebinder(
+          shouldRebind: !query.isEmpty && model.isPresented
+        )
       }
       .onChange(of: isSearchPresented, initial: true) { _, newValue in
         model.isPresented = newValue

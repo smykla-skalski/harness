@@ -40,13 +40,6 @@ public final class AppSearchModel {
   /// and SwiftUI environment values flow downward only.
   public var isPresented: Bool = false
 
-  /// Domains the user has explicitly selected in the popover filter
-  /// chips. `[]` (empty) means "All" — every non-empty domain section
-  /// is shown. Otherwise only sections whose domain appears here are
-  /// rendered; the ranking and per-domain caps applied by
-  /// ``AppSearchIndex`` are unchanged.
-  public var selectedDomains: Set<AppSearchDomain> = []
-
   /// Closure-based seam so tests can inject a controllable provider.
   /// Production binding wraps an ``AppSearchIndex`` reference.
   private let searchProvider: (String, AppSearchDomain?) async -> AppSearchResults
