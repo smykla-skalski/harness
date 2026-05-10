@@ -2,21 +2,21 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension SessionWindowCreateForm {
-  private var title: Binding<String> {
+  var title: Binding<String> {
     Binding(
       get: { draft.title },
       set: { updateDraft(title: $0) }
     )
   }
 
-  private var prompt: Binding<String> {
+  var prompt: Binding<String> {
     Binding(
       get: { draft.prompt },
       set: { updateDraft(prompt: $0) }
     )
   }
 
-  private var taskSeverity: Binding<TaskSeverity> {
+  var taskSeverity: Binding<TaskSeverity> {
     Binding(
       get: { draft.taskSeverity },
       set: { updateDraft(taskSeverity: $0) }
@@ -30,35 +30,35 @@ extension SessionWindowCreateForm {
     )
   }
 
-  private var catalogState: SessionWindowAgentCreateCatalogState {
+  var catalogState: SessionWindowAgentCreateCatalogState {
     state.agentCreateCatalog
   }
 
-  private var activePersonas: [AgentPersona] {
+  var activePersonas: [AgentPersona] {
     catalogState.personas
   }
 
-  private var normalizedLaunchSelection: AgentLaunchSelection {
+  var normalizedLaunchSelection: AgentLaunchSelection {
     SessionWindowCreateFormCatalogs.normalizedLaunchSelection(
       draft: draft,
       options: activeAgentCapabilityOptions
     )
   }
 
-  private var selectedCapabilityOption: AgentCapabilityOption? {
+  var selectedCapabilityOption: AgentCapabilityOption? {
     SessionWindowCreateFormCatalogs.selectedCapabilityOption(
       selection: normalizedLaunchSelection,
       options: activeAgentCapabilityOptions
     )
   }
 
-  private var selectedTransportChoice: AgentCapabilityTransportChoice? {
+  var selectedTransportChoice: AgentCapabilityTransportChoice? {
     selectedCapabilityOption.map { option in
       option.transportChoice(for: normalizedLaunchSelection)
     }
   }
 
-  private var selectedProviderID: Binding<String> {
+  var selectedProviderID: Binding<String> {
     Binding(
       get: { selectedCapabilityOption?.id ?? "" },
       set: { newValue in
@@ -72,12 +72,12 @@ extension SessionWindowCreateForm {
     )
   }
 
-  private var selectedTerminalRuntime: AgentTuiRuntime? {
+  var selectedTerminalRuntime: AgentTuiRuntime? {
     guard case .tui(let runtime) = normalizedLaunchSelection else { return nil }
     return runtime
   }
 
-  private var selectedTerminalCatalog: RuntimeModelCatalog? {
+  var selectedTerminalCatalog: RuntimeModelCatalog? {
     guard let selectedTerminalRuntime else { return nil }
     return SessionWindowCreateFormCatalogs.selectedModelCatalog(
       selection: .tui(selectedTerminalRuntime),
@@ -85,18 +85,18 @@ extension SessionWindowCreateForm {
     )
   }
 
-  private var codexCatalog: RuntimeModelCatalog? {
+  var codexCatalog: RuntimeModelCatalog? {
     SessionWindowCreateFormCatalogs.codexModelCatalog(catalogState: catalogState)
   }
 
-  private var showsAcpFallbackRoleMenu: Bool {
+  var showsAcpFallbackRoleMenu: Bool {
     SessionWindowCreateFormCatalogs.shouldShowAcpFallbackRole(
       selection: normalizedLaunchSelection,
       role: draft.role
     )
   }
 
-  private var agentBridgeBannerKind: SessionCreateBridgeBannerKind? {
+  var agentBridgeBannerKind: SessionCreateBridgeBannerKind? {
     guard draft.kind == .agent else { return nil }
     if normalizedLaunchSelection.isAcp {
       return store.acpUnavailable ? .acp : nil
@@ -104,56 +104,56 @@ extension SessionWindowCreateForm {
     return store.agentTuiUnavailable ? .agentTui : nil
   }
 
-  private var launchSelection: Binding<AgentLaunchSelection> {
+  var launchSelection: Binding<AgentLaunchSelection> {
     Binding(
       get: { normalizedLaunchSelection },
       set: { updateDraft(runtime: $0.storageKey) }
     )
   }
 
-  private var selectedRole: Binding<SessionRole> {
+  var selectedRole: Binding<SessionRole> {
     Binding(
       get: { draft.role },
       set: { updateDraft(role: $0) }
     )
   }
 
-  private var selectedFallbackRole: Binding<SessionRole> {
+  var selectedFallbackRole: Binding<SessionRole> {
     Binding(
       get: { draft.fallbackRole },
       set: { updateDraft(fallbackRole: $0) }
     )
   }
 
-  private var selectedPersonaID: Binding<String> {
+  var selectedPersonaID: Binding<String> {
     Binding(
       get: { draft.personaID },
       set: { updateDraft(personaID: $0) }
     )
   }
 
-  private var projectDirOverride: Binding<String> {
+  var projectDirOverride: Binding<String> {
     Binding(
       get: { draft.projectDir },
       set: { updateDraft(projectDir: $0) }
     )
   }
 
-  private var argvOverrideText: Binding<String> {
+  var argvOverrideText: Binding<String> {
     Binding(
       get: { draft.argvOverride },
       set: { updateDraft(argvOverride: $0) }
     )
   }
 
-  private var codexMode: Binding<CodexRunMode> {
+  var codexMode: Binding<CodexRunMode> {
     Binding(
       get: { draft.codexMode },
       set: { updateDraft(codexMode: $0) }
     )
   }
 
-  private var codexModelPickerSelection: Binding<String> {
+  var codexModelPickerSelection: Binding<String> {
     Binding(
       get: {
         if draft.codexAllowCustomModel {
@@ -178,7 +178,7 @@ extension SessionWindowCreateForm {
     )
   }
 
-  private var codexCustomModel: Binding<String> {
+  var codexCustomModel: Binding<String> {
     Binding(
       get: { draft.codexAllowCustomModel ? draft.codexModel : "" },
       set: {
@@ -190,7 +190,7 @@ extension SessionWindowCreateForm {
     )
   }
 
-  private var codexEffortValues: [String] {
+  var codexEffortValues: [String] {
     guard let codexCatalog else {
       return codexModelPickerSelection.wrappedValue
         == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag
@@ -203,7 +203,7 @@ extension SessionWindowCreateForm {
     )
   }
 
-  private var codexEffortSelection: Binding<String> {
+  var codexEffortSelection: Binding<String> {
     Binding(
       get: {
         let current = draft.codexEffort.trimmingCharacters(in: .whitespacesAndNewlines)

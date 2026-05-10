@@ -2,12 +2,12 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension SessionWindowCreateForm {
-  private func selectProvider(_ option: AgentCapabilityOption) {
+  func selectProvider(_ option: AgentCapabilityOption) {
     launchSelection.wrappedValue = option.normalizedSelection(for: launchSelection.wrappedValue)
   }
 
   @ViewBuilder
-  private func terminalTransportNotice(
+  func terminalTransportNotice(
     option: AgentCapabilityOption,
     choice: AgentCapabilityTransportChoice
   ) -> some View {
@@ -52,7 +52,7 @@ extension SessionWindowCreateForm {
     }
   }
 
-  private var codexConfigurationSection: some View {
+  var codexConfigurationSection: some View {
     Section {
       Picker("Run mode", selection: codexMode) {
         ForEach(CodexRunMode.allCases) { mode in
@@ -114,14 +114,14 @@ extension SessionWindowCreateForm {
     }
   }
 
-  private var codexEffortText: Binding<String> {
+  var codexEffortText: Binding<String> {
     Binding(
       get: { draft.codexEffort },
       set: { updateDraft(codexEffort: $0) }
     )
   }
 
-  private func selectedTerminalModelMenuTitle(
+  func selectedTerminalModelMenuTitle(
     runtime: AgentTuiRuntime,
     catalog: RuntimeModelCatalog
   ) -> String {
@@ -137,7 +137,7 @@ extension SessionWindowCreateForm {
       ?? selectedModelID
   }
 
-  private func selectedCodexModelMenuTitle(catalog: RuntimeModelCatalog) -> String {
+  func selectedCodexModelMenuTitle(catalog: RuntimeModelCatalog) -> String {
     let selectedModelID = codexModelPickerSelection.wrappedValue
     if selectedModelID == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag {
       let customModelID = codexCustomModel.wrappedValue.trimmingCharacters(
@@ -151,7 +151,7 @@ extension SessionWindowCreateForm {
       ?? selectedModelID
   }
 
-  private func terminalModelPickerSelection(
+  func terminalModelPickerSelection(
     for runtime: AgentTuiRuntime,
     catalog: RuntimeModelCatalog
   ) -> Binding<String> {
@@ -173,7 +173,7 @@ extension SessionWindowCreateForm {
     )
   }
 
-  private func terminalCustomModel(
+  func terminalCustomModel(
     for runtime: AgentTuiRuntime
   ) -> Binding<String> {
     Binding(
@@ -188,7 +188,7 @@ extension SessionWindowCreateForm {
     )
   }
 
-  private func terminalEffortValues(
+  func terminalEffortValues(
     for runtime: AgentTuiRuntime,
     catalog: RuntimeModelCatalog
   ) -> [String] {
@@ -198,7 +198,7 @@ extension SessionWindowCreateForm {
     )
   }
 
-  private func terminalEffortSelection(
+  func terminalEffortSelection(
     for runtime: AgentTuiRuntime,
     values: [String]
   ) -> Binding<String> {
