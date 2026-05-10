@@ -117,9 +117,9 @@ struct SessionAgentDetailSection: View {
     .onChange(of: isTuiActive) { _, _ in
       promoteComposerFocusIfRequested()
     }
-    // Debounce TUI screen-text bursts (.task cancels on id change). Trace
-    // showed onChange firing per byte at ~60Hz; 80ms quiet window collapses
-    // a burst into one update without VoiceOver-perceptible lag.
+    // Debounce TUI screen-text bursts via .task(id:); each text change
+    // cancels the in-flight wait so a burst of bytes collapses into one
+    // update once the stream goes quiet for the threshold below.
     .task(id: tui?.screen.text ?? "") {
       try? await Task.sleep(for: .milliseconds(80))
       guard !Task.isCancelled else { return }

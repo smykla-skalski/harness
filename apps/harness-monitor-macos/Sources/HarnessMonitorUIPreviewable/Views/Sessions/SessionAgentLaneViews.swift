@@ -65,10 +65,9 @@ struct SessionAgentTuiViewport: View {
       .onDisappear {
         resizeState.cancelPending()
       }
-      // Debounce TUI bursts (.task cancels on id change). Trace measured
-      // 130,932 StyledTextContentView updates over 30s; a 30ms quiet window
-      // collapses byte-by-byte emissions into batches without perceptible
-      // text lag. Scroll throttle is preserved unchanged.
+      // Debounce TUI bursts via .task(id:); each text change cancels the
+      // in-flight wait so byte-by-byte emissions coalesce into batches.
+      // Scroll throttle is preserved unchanged.
       .task(id: tui?.screen.text ?? "") {
         try? await Task.sleep(for: .milliseconds(30))
         guard !Task.isCancelled else { return }
