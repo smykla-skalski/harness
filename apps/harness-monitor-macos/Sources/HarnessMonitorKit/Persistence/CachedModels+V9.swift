@@ -22,5 +22,3 @@ extension HarnessMonitorSchemaV9 {
     }
   }
 }
-
-typealias CachedSessionWindowState = HarnessMonitorSchemaV9.CachedSessionWindowState

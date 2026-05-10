@@ -156,28 +156,45 @@ extension SessionCacheService {
   func replaceSessionWindowsOpenAtQuit(
     sessionIDs: Set<String>
   ) async -> WriteResult {
+    await replaceSessionWindowsOpenAtQuit(
+      snapshot: HarnessMonitorStore.SessionWindowQuitSnapshot(sessionIDs: sessionIDs)
+    )
+  }
+
+  func replaceSessionWindowsOpenAtQuit(
+    snapshot: HarnessMonitorStore.SessionWindowQuitSnapshot
+  ) async -> WriteResult {
     let context = makeContext()
     let descriptor = FetchDescriptor<CachedSessionWindowState>()
     let existing = (try? context.fetch(descriptor)) ?? []
     let now = Date.now
+    let groupingByID = snapshot.groupingLookup()
     var seen: Set<String> = []
     for row in existing {
-      if sessionIDs.contains(row.sessionId) {
+      if snapshot.sessionIDs.contains(row.sessionId) {
         if !row.wasOpenAtQuit {
           row.wasOpenAtQuit = true
         }
         row.updatedAt = now
+        let placement = groupingByID[row.sessionId]
+        row.tabGroupOrdinal = placement?.ordinal
+        row.tabPosition = placement?.position
+        row.wasForegroundTab = placement?.isForeground
         seen.insert(row.sessionId)
       } else {
         context.delete(row)
       }
     }
-    for sessionID in sessionIDs where !seen.contains(sessionID) {
+    for sessionID in snapshot.sessionIDs where !seen.contains(sessionID) {
+      let placement = groupingByID[sessionID]
       context.insert(
         CachedSessionWindowState(
           sessionId: sessionID,
           wasOpenAtQuit: true,
-          updatedAt: now
+          updatedAt: now,
+          tabGroupOrdinal: placement?.ordinal,
+          tabPosition: placement?.position,
+          wasForegroundTab: placement?.isForeground
         )
       )
     }
@@ -186,5 +203,27 @@ extension SessionCacheService {
       operation: "replace session windows open at quit"
     )
     return WriteResult(didPersist: didPersist, metadataUpdate: .refresh)
+  }
+}
+
+extension HarnessMonitorStore.SessionWindowQuitSnapshot {
+  fileprivate struct TabPlacement {
+    let ordinal: Int
+    let position: Int
+    let isForeground: Bool
+  }
+
+  fileprivate func groupingLookup() -> [String: TabPlacement] {
+    var lookup: [String: TabPlacement] = [:]
+    for grouping in groupings {
+      for (position, sessionID) in grouping.sessionIDs.enumerated() {
+        lookup[sessionID] = TabPlacement(
+          ordinal: grouping.ordinal,
+          position: position,
+          isForeground: grouping.foregroundSessionID == sessionID
+        )
+      }
+    }
+    return lookup
   }
 }

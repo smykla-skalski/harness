@@ -197,6 +197,37 @@ extension SessionCacheService {
     return ids
   }
 
+  func sessionTabGroupsAtQuit() -> [HarnessMonitorStore.SessionTabGroupSnapshot] {
+    let context = makeContext()
+    var descriptor = FetchDescriptor<CachedSessionWindowState>(
+      predicate: #Predicate { row in
+        row.wasOpenAtQuit && row.tabGroupOrdinal != nil
+      }
+    )
+    descriptor.sortBy = [
+      SortDescriptor(\.tabGroupOrdinal),
+      SortDescriptor(\.tabPosition),
+    ]
+    let rows = (try? context.fetch(descriptor)) ?? []
+    var groupedByOrdinal: [Int: [CachedSessionWindowState]] = [:]
+    for row in rows {
+      guard let ordinal = row.tabGroupOrdinal else { continue }
+      groupedByOrdinal[ordinal, default: []].append(row)
+    }
+    return groupedByOrdinal.keys.sorted().map { ordinal in
+      let members = groupedByOrdinal[ordinal] ?? []
+      let sortedMembers = members.sorted {
+        ($0.tabPosition ?? Int.max) < ($1.tabPosition ?? Int.max)
+      }
+      return HarnessMonitorStore.SessionTabGroupSnapshot(
+        ordinal: ordinal,
+        sessionIDs: sortedMembers.map(\.sessionId),
+        foregroundSessionID: sortedMembers.first(where: { $0.wasForegroundTab == true })?
+          .sessionId
+      )
+    }
+  }
+
   func sessionWindowIDsOpenAtQuit(limit: Int? = nil) -> [String] {
     let startedAt = ContinuousClock.now
     let context = makeContext()

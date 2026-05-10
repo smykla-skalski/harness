@@ -22,6 +22,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var cachedNullActionHandler: NullDecisionActionHandler?
   @ObservationIgnored var openSessionWindowsByID: [ObjectIdentifier: String] = [:]
   @ObservationIgnored var pendingSessionWindowTerminationSnapshot: Set<String>?
+  @ObservationIgnored var pendingSessionWindowQuitSnapshot: SessionWindowQuitSnapshot?
 
   public var openFolderRequest = 0
   public var attachSessionRequest = 0

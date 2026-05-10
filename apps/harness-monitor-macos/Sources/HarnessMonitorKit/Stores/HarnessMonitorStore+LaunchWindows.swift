@@ -4,16 +4,57 @@ extension HarnessMonitorStore {
   public static let launchWindowBridgeFallbackKey =
     "harness.monitor.launch-window.bridge-fallback-done"
 
+  /// A snapshot of one tab group at quit. `sessionIDs` is ordered by the
+  /// tab position the user saw left-to-right; `foregroundSessionID` is the
+  /// selected tab if the group had one, otherwise nil (replay falls back
+  /// to the first session).
+  public struct SessionTabGroupSnapshot: Equatable, Sendable {
+    public let ordinal: Int
+    public let sessionIDs: [String]
+    public let foregroundSessionID: String?
+
+    public init(
+      ordinal: Int,
+      sessionIDs: [String],
+      foregroundSessionID: String? = nil
+    ) {
+      self.ordinal = ordinal
+      self.sessionIDs = sessionIDs
+      self.foregroundSessionID = foregroundSessionID
+    }
+  }
+
+  /// Snapshot of every session window observed at termination, with tab
+  /// grouping information so the launch path can re-merge tabs that were
+  /// grouped together. `groupings` only includes groups with >1 member;
+  /// standalone session windows live in `sessionIDs` without a grouping
+  /// entry.
+  public struct SessionWindowQuitSnapshot: Equatable, Sendable {
+    public let sessionIDs: Set<String>
+    public let groupings: [SessionTabGroupSnapshot]
+
+    public init(
+      sessionIDs: Set<String> = [],
+      groupings: [SessionTabGroupSnapshot] = []
+    ) {
+      self.sessionIDs = sessionIDs
+      self.groupings = groupings
+    }
+  }
+
   public struct LaunchWindowRestorePlan: Equatable, Sendable {
     public let sessionIDs: [String]
     public let usedBridgeFallback: Bool
+    public let tabGroupings: [SessionTabGroupSnapshot]
 
     public init(
       sessionIDs: [String] = [],
-      usedBridgeFallback: Bool = false
+      usedBridgeFallback: Bool = false,
+      tabGroupings: [SessionTabGroupSnapshot] = []
     ) {
       self.sessionIDs = sessionIDs
       self.usedBridgeFallback = usedBridgeFallback
+      self.tabGroupings = tabGroupings
     }
   }
 
@@ -22,7 +63,16 @@ extension HarnessMonitorStore {
   ) async -> LaunchWindowRestorePlan {
     let openAtQuit = await sessionWindowIDsOpenAtQuit()
     if !openAtQuit.isEmpty {
-      return LaunchWindowRestorePlan(sessionIDs: openAtQuit)
+      let groupings = await sessionTabGroupsAtQuit()
+      let knownSessionIDs = Set(openAtQuit)
+      let filteredGroupings = filterTabGroupings(
+        groupings,
+        knownSessionIDs: knownSessionIDs
+      )
+      return LaunchWindowRestorePlan(
+        sessionIDs: openAtQuit,
+        tabGroupings: filteredGroupings
+      )
     }
     let hasPriorWindowState = await rawSessionWindowsOpenAtQuitExist()
     if hasPriorWindowState || hasCompletedLaunchWindowBridgeFallback(userDefaults: userDefaults) {
@@ -34,6 +84,38 @@ extension HarnessMonitorStore {
       sessionIDs: bridgedIDs,
       usedBridgeFallback: true
     )
+  }
+
+  /// Tab grouping rows can outlive their referenced session catalog (e.g.
+  /// after a recent-sessions cleanup). Drop members that no longer have a
+  /// session in the active catalog and discard groups whose surviving
+  /// members would be <2 - those are effectively standalone now.
+  private func filterTabGroupings(
+    _ groupings: [SessionTabGroupSnapshot],
+    knownSessionIDs: Set<String>
+  ) -> [SessionTabGroupSnapshot] {
+    var filtered: [SessionTabGroupSnapshot] = []
+    for grouping in groupings {
+      let survivors = grouping.sessionIDs.filter { knownSessionIDs.contains($0) }
+      guard survivors.count > 1 else { continue }
+      let foreground =
+        survivors.contains(where: { $0 == grouping.foregroundSessionID })
+        ? grouping.foregroundSessionID
+        : nil
+      filtered.append(
+        SessionTabGroupSnapshot(
+          ordinal: grouping.ordinal,
+          sessionIDs: survivors,
+          foregroundSessionID: foreground
+        )
+      )
+    }
+    return filtered
+  }
+
+  private func sessionTabGroupsAtQuit() async -> [SessionTabGroupSnapshot] {
+    guard let cacheService else { return [] }
+    return await cacheService.sessionTabGroupsAtQuit()
   }
 
   public func completeLaunchWindowBridgeFallback(
@@ -70,15 +152,27 @@ extension HarnessMonitorStore {
     pendingSessionWindowTerminationSnapshot = openSessionWindowIDsSnapshot
   }
 
+  public func beginSessionWindowTerminationSnapshot(
+    quitSnapshot: SessionWindowQuitSnapshot
+  ) {
+    pendingSessionWindowTerminationSnapshot = quitSnapshot.sessionIDs
+    pendingSessionWindowQuitSnapshot = quitSnapshot
+  }
+
   public func flushSessionWindowsOpenAtQuit() async {
     await flushSessionWindowsOpenAtQuit(userDefaults: .standard)
   }
 
   func flushSessionWindowsOpenAtQuit(userDefaults: UserDefaults) async {
-    let snapshot = pendingSessionWindowTerminationSnapshot ?? openSessionWindowIDsSnapshot
+    let sessionIDs = pendingSessionWindowTerminationSnapshot ?? openSessionWindowIDsSnapshot
+    let pendingQuit = pendingSessionWindowQuitSnapshot
     pendingSessionWindowTerminationSnapshot = nil
+    pendingSessionWindowQuitSnapshot = nil
     guard let cacheService, persistenceError == nil else { return }
-    _ = await cacheService.replaceSessionWindowsOpenAtQuit(sessionIDs: snapshot)
+    let snapshot =
+      pendingQuit
+      ?? SessionWindowQuitSnapshot(sessionIDs: sessionIDs)
+    _ = await cacheService.replaceSessionWindowsOpenAtQuit(snapshot: snapshot)
     markLaunchWindowBridgeFallbackComplete(userDefaults: userDefaults)
   }
 

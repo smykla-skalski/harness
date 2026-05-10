@@ -1,10 +1,15 @@
 import HarnessMonitorKit
 import HarnessMonitorUIPreviewable
 
+#if canImport(AppKit)
+  import AppKit
+#endif
+
 @MainActor
 struct HarnessMonitorInitialWindowRouter {
   let store: HarnessMonitorStore
   let launchBehavior: HarnessMonitorLaunchBehavior
+  let tabbingPreference: SessionWindowTabbingPreference
   let openWelcomeWindow: () -> Void
   let openSessionWindow: (String) -> Void
 
@@ -13,6 +18,7 @@ struct HarnessMonitorInitialWindowRouter {
     if launchBehavior == .restoreSessionWindows {
       await store.prepareOpenRecentSessions()
       if hasVisibleSessionWindows() {
+        await replayTabGroupingsIfNeeded(in: restorePlan)
         return
       }
       restorePlan = await store.launchWindowRestorePlan()
@@ -25,6 +31,7 @@ struct HarnessMonitorInitialWindowRouter {
     // does not appear.
     if launchBehavior == .restoreSessionWindows, !restorePlan.sessionIDs.isEmpty {
       if await waitForVisibleSessionWindowDuringLaunch() {
+        await replayTabGroupingsIfNeeded(in: restorePlan)
         return
       }
     }
@@ -44,12 +51,90 @@ struct HarnessMonitorInitialWindowRouter {
       for sessionID in sessionIDs {
         openSessionWindow(sessionID)
       }
+      await waitForRestoredSessionWindowsToRegister(sessionIDs: sessionIDs)
+      await replayTabGroupingsIfNeeded(in: restorePlan)
     }
 
     if initialPlan.shouldMarkBridgeFallbackComplete {
       store.completeLaunchWindowBridgeFallback()
     }
   }
+
+  private func replayTabGroupingsIfNeeded(
+    in restorePlan: HarnessMonitorStore.LaunchWindowRestorePlan
+  ) async {
+    guard tabbingPreference != .never else { return }
+    guard !restorePlan.tabGroupings.isEmpty else { return }
+    #if canImport(AppKit)
+      // Bindings update on MainActor when each restored session window's
+      // SessionWindowAppKitBinding view moves into its NSWindow. The
+      // store-side openSessionWindowIDsSnapshot may briefly populate
+      // before the AppKit registry catches up with that scene mount, so
+      // give the registry a small budget to converge before merging.
+      for _ in 0..<30 {
+        if HarnessMonitorInitialWindowRouter.allWindowsBoundForGroupings(
+          restorePlan.tabGroupings
+        ) {
+          break
+        }
+        try? await Task.sleep(for: .milliseconds(50))
+      }
+      for grouping in restorePlan.tabGroupings {
+        Self.mergeTabGroup(grouping)
+      }
+    #endif
+  }
+
+  private func waitForRestoredSessionWindowsToRegister(sessionIDs: [String]) async {
+    let expected = Set(sessionIDs)
+    for _ in 0..<30 {
+      if expected.isSubset(of: store.openSessionWindowIDsSnapshot) {
+        return
+      }
+      try? await Task.sleep(for: .milliseconds(50))
+    }
+  }
+
+  #if canImport(AppKit)
+    private static func allWindowsBoundForGroupings(
+      _ groupings: [HarnessMonitorStore.SessionTabGroupSnapshot]
+    ) -> Bool {
+      let registry = SessionWindowAppKitRegistry.shared
+      for grouping in groupings {
+        for sessionID in grouping.sessionIDs {
+          if registry.window(forSessionID: sessionID) == nil {
+            return false
+          }
+        }
+      }
+      return true
+    }
+
+    private static func mergeTabGroup(
+      _ grouping: HarnessMonitorStore.SessionTabGroupSnapshot
+    ) {
+      let registry = SessionWindowAppKitRegistry.shared
+      let windows = grouping.sessionIDs.compactMap { sessionID in
+        registry.window(forSessionID: sessionID)
+      }
+      guard let anchor = windows.first, windows.count > 1 else { return }
+      for next in windows.dropFirst() {
+        guard next !== anchor else { continue }
+        // Skip if AppKit already merged them (matching tabbingIdentifier
+        // + user pref Always reaches us with a tab group already formed).
+        if let group = anchor.tabGroup, group === next.tabGroup {
+          continue
+        }
+        anchor.addTabbedWindow(next, ordered: .above)
+      }
+      if let foregroundID = grouping.foregroundSessionID,
+        let foregroundWindow = registry.window(forSessionID: foregroundID),
+        let tabGroup = foregroundWindow.tabGroup
+      {
+        tabGroup.selectedWindow = foregroundWindow
+      }
+    }
+  #endif
 
   private func waitForVisibleSessionWindowDuringLaunch() async -> Bool {
     guard !hasVisibleSessionWindows() else {

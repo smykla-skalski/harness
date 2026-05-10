@@ -217,6 +217,37 @@ public enum HarnessMonitorSchemaV9: VersionedSchema {
   }
 }
 
+/// V10 layers tab-grouping fields onto `CachedSessionWindowState` so windows
+/// that were tabbed together at quit can be re-merged at launch. The new
+/// fields (`tabGroupOrdinal`, `tabPosition`, `wasForegroundTab`) are optional
+/// or have safe defaults, so the V9->V10 stage is lightweight and existing
+/// rows migrate without data loss.
+public enum HarnessMonitorSchemaV10: VersionedSchema {
+  public static var versionIdentifier: Schema.Version { Schema.Version(10, 0, 0) }
+
+  public static var models: [any PersistentModel.Type] {
+    [
+      HarnessMonitorSchemaV6.CachedProject.self,
+      HarnessMonitorSchemaV6.CachedSession.self,
+      HarnessMonitorSchemaV6.CachedAgent.self,
+      HarnessMonitorSchemaV6.CachedWorkItem.self,
+      HarnessMonitorSchemaV6.CachedSignalRecord.self,
+      HarnessMonitorSchemaV6.CachedTimelineEntry.self,
+      HarnessMonitorSchemaV6.CachedObserver.self,
+      HarnessMonitorSchemaV6.CachedAgentActivity.self,
+      SessionBookmark.self,
+      UserNote.self,
+      RecentSearch.self,
+      ProjectFilterPreference.self,
+      Decision.self,
+      SupervisorEvent.self,
+      PolicyConfigRow.self,
+      HarnessMonitorSchemaV8.CachedTaskReviewMetadata.self,
+      Self.CachedSessionWindowState.self,
+    ]
+  }
+}
+
 public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
   public static var schemas: [any VersionedSchema.Type] {
     [
@@ -229,6 +260,7 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       HarnessMonitorSchemaV7.self,
       HarnessMonitorSchemaV8.self,
       HarnessMonitorSchemaV9.self,
+      HarnessMonitorSchemaV10.self,
     ]
   }
 
@@ -242,6 +274,7 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       migrateV6toV7,
       migrateV7toV8,
       migrateV8toV9,
+      migrateV9toV10,
     ]
   }
 
@@ -303,6 +336,15 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
     fromVersion: HarnessMonitorSchemaV8.self,
     toVersion: HarnessMonitorSchemaV9.self
   )
+
+  // V10 adds three optional/default fields to CachedSessionWindowState
+  // (tabGroupOrdinal, tabPosition, wasForegroundTab). Lightweight migration
+  // fills the new columns with nil/false on existing rows; the next quit
+  // populates them per current tab-group state.
+  static let migrateV9toV10 = MigrationStage.lightweight(
+    fromVersion: HarnessMonitorSchemaV9.self,
+    toVersion: HarnessMonitorSchemaV10.self
+  )
 }
 
-public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV9
+public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV10
