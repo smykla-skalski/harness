@@ -99,6 +99,10 @@ struct SessionSidebar: View {
     currentModifiers
   }
 
+  var primaryCreateKind: SessionCreateKind {
+    state.selection.primaryCreateKind
+  }
+
   private var decisionSelectionAccessibilityValue: Text {
     if let anchor = state.sidebarSelection.anchor {
       let count = state.sidebarSelection.count(of: anchor.kind)

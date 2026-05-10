@@ -104,6 +104,7 @@ final class WindowMenuCommandsTests: XCTestCase {
 
     XCTAssertTrue(selectionSource.contains("public var createShortcut: KeyboardShortcutDescriptor"))
     XCTAssertTrue(selectionSource.contains("public var createShortcutModifiers: EventModifiers"))
+    XCTAssertTrue(selectionSource.contains("public static let primaryCreateShortcut = KeyboardShortcutDescriptor("))
     XCTAssertTrue(
       selectionSource.contains(".init(modifiers: [.option, .command], keyEquivalent: \"a\", keyLabel: \"A\")")
     )
@@ -116,6 +117,8 @@ final class WindowMenuCommandsTests: XCTestCase {
     XCTAssertTrue(shortcutSource.contains("case .control: \"⌃\""))
     XCTAssertTrue(shortcutSource.contains("case .shift: \"⇧\""))
     XCTAssertTrue(shortcutSource.contains("public func isRevealed(by activeModifiers: EventModifiers) -> Bool"))
+    XCTAssertTrue(selectionSource.contains("public func displayedCreateShortcut(primaryKind: SessionCreateKind) -> KeyboardShortcutDescriptor"))
+    XCTAssertTrue(selectionSource.contains("public var primaryCreateKind: SessionCreateKind"))
     XCTAssertTrue(
       commandsSource.contains(
         "SessionCreateKind.agent.createShortcut.requiredEventModifiers"
@@ -128,7 +131,7 @@ final class WindowMenuCommandsTests: XCTestCase {
     )
     XCTAssertTrue(commandsSource.contains("SessionCreateKind.decision.createShortcut.requiredEventModifiers"))
     XCTAssertFalse(commandsSource.contains("modifiers: [.command, .option]"))
-    XCTAssertTrue(sidebarSource.contains("KeyboardShortcutLabel(\n        shortcut: kind.createShortcut"))
+    XCTAssertTrue(sidebarSource.contains("shortcut: displayedShortcut"))
   }
 
   func testSharedPresentationModifiersKeepBindingsMountedAcrossKeyWindowLoss() throws {
