@@ -212,9 +212,9 @@ extension SessionWindowView {
       } else {
         switch snapshot?.source {
         case .live:
-          .success
+          sessionStatusSourceTint(for: metrics)
         case .cache:
-          .disabledConnection
+          sessionStatusSourceTint(for: metrics)
         case .catalog:
           .tertiary
         case .none:
@@ -223,7 +223,17 @@ extension SessionWindowView {
       }
     let connectionSummaryText =
       if metrics.connectedSince != nil {
-        "Connection: \(metrics.transportKind.title)"
+        if let latency = metrics.transportLatencyMs {
+          "Connection: \(metrics.transportKind.title), transport latency \(latency) milliseconds"
+        } else if let requestLatency = metrics.requestLatencyMs {
+          [
+            "Connection: \(metrics.transportKind.title)",
+            "transport latency unavailable,",
+            "last request latency \(requestLatency) milliseconds",
+          ].joined(separator: " ")
+        } else {
+          "Connection: \(metrics.transportKind.title)"
+        }
       } else {
         "Connection: \(connectionTitle)"
       }
@@ -241,6 +251,28 @@ extension SessionWindowView {
       connectionSummaryText: connectionSummaryText,
       sessionStatusTitle: summary?.status.title ?? "Loading"
     )
+  }
+
+  private func sessionStatusSourceTint(for metrics: ConnectionMetrics) -> SessionStatusSourceTint {
+    if metrics.usesMutedConnectionChrome {
+      return .disabledConnection
+    }
+    let quality: ConnectionQuality =
+      if metrics.transportLatencyMs != nil {
+        metrics.transportQuality
+      } else if metrics.requestLatencyMs != nil {
+        metrics.requestQuality
+      } else {
+        .disconnected
+      }
+    switch quality {
+    case .excellent, .good:
+      return .success
+    case .degraded:
+      return .caution
+    case .poor, .disconnected:
+      return .danger
+    }
   }
 
   var columnVisibilityBinding: Binding<NavigationSplitViewVisibility> {
