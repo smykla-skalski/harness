@@ -33,6 +33,39 @@ extension HarnessMonitorStore {
   }
 
   @discardableResult
+  public func sendSignal(
+    sessionID: String,
+    agentID: String,
+    command: String,
+    message: String,
+    actionHint: String?,
+    actorID: String
+  ) async -> Bool {
+    let actionName = "Send signal"
+    guard let action = prepareSessionAction(named: actionName, sessionID: sessionID) else {
+      return false
+    }
+    return await mutateSelectedSession(
+      actionName: actionName,
+      actionID: ActionID.sendSignal(sessionID: sessionID, agentID: agentID).key,
+      using: action.client,
+      sessionID: sessionID,
+      mutation: {
+        try await action.client.sendSignal(
+          sessionID: sessionID,
+          request: SignalSendRequest(
+            actor: actorID,
+            agentId: agentID,
+            command: command,
+            message: message,
+            actionHint: actionHint
+          )
+        )
+      }
+    )
+  }
+
+  @discardableResult
   public func cancelSignal(
     signalID: String,
     agentID: String,

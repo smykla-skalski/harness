@@ -5,7 +5,7 @@ import Testing
 
 @Suite("Session SwiftUI source contracts")
 struct SessionSwiftUISourceTests {
-  @Test("Task and decision detail use native form sections while detail scroll surface stays shared")
+  @Test("Task and decision detail stay on native shared scroll surfaces")
   func taskAndDecisionDetailUseNativeFormSectionsWhileDetailScrollSurfaceStaysShared() throws {
     let taskSource = try sourceFile(at: "Views/Sessions/SessionTaskDetailPane.swift")
     let decisionSource = try sourceFile(at: "Views/Sessions/SessionDecisionDetailPane.swift")
@@ -17,8 +17,16 @@ struct SessionSwiftUISourceTests {
     #expect(taskSource.contains("SessionDetailScrollSurface(contentPadding: 0)"))
     #expect(taskSource.contains("Form {"))
     #expect(taskSource.contains(".harnessNativeFormContainer()"))
-    #expect(taskSource.contains(".contentMargins(.horizontal, metrics.contentPadding, for: .scrollContent)"))
-    #expect(taskSource.contains(".contentMargins(.vertical, metrics.contentPadding, for: .scrollContent)"))
+    #expect(
+      taskSource.contains(
+        ".contentMargins(.horizontal, metrics.contentPadding, for: .scrollContent)"
+      )
+    )
+    #expect(
+      taskSource.contains(
+        ".contentMargins(.vertical, metrics.contentPadding, for: .scrollContent)"
+      )
+    )
     #expect(taskSource.contains(".scrollDisabled(true)"))
     #expect(taskSource.contains(".scrollContentBackground(.hidden)"))
     #expect(!taskSource.contains("SessionDetailPanel("))
@@ -26,9 +34,21 @@ struct SessionSwiftUISourceTests {
     #expect(decisionSource.contains("SessionFilteredDecisionNotice("))
     #expect(decisionSource.contains("Form {"))
     #expect(decisionSource.contains(".harnessNativeFormContainer()"))
-    #expect(decisionSource.contains(".contentMargins(.horizontal, metrics.contentPadding, for: .scrollContent)"))
-    #expect(decisionSource.contains(".contentMargins(.top, formTopContentPadding, for: .scrollContent)"))
-    #expect(decisionSource.contains(".contentMargins(.bottom, metrics.contentPadding, for: .scrollContent)"))
+    #expect(
+      decisionSource.contains(
+        ".contentMargins(.horizontal, metrics.contentPadding, for: .scrollContent)"
+      )
+    )
+    #expect(
+      decisionSource.contains(
+        ".contentMargins(.top, formTopContentPadding, for: .scrollContent)"
+      )
+    )
+    #expect(
+      decisionSource.contains(
+        ".contentMargins(.bottom, metrics.contentPadding, for: .scrollContent)"
+      )
+    )
     #expect(decisionSource.contains(".scrollDisabled(true)"))
     #expect(decisionSource.contains(".scrollContentBackground(.hidden)"))
     #expect(!decisionSource.contains("SessionDetailPanel("))
@@ -94,8 +114,16 @@ struct SessionSwiftUISourceTests {
     #expect(!createFormSource.contains("Section(draft.kind.title)"))
     #expect(createFormSource.contains("embeddedAgentRuntimeSections"))
     #expect(createFormSource.contains("Picker(\"Provider\", selection: selectedProviderID)"))
-    #expect(createFormSource.contains(".contentMargins(.horizontal, metrics.formPadding, for: .scrollContent)"))
-    #expect(createFormSource.contains(".contentMargins(.vertical, metrics.formPadding, for: .scrollContent)"))
+    #expect(
+      createFormSource.contains(
+        ".contentMargins(.horizontal, metrics.formPadding, for: .scrollContent)"
+      )
+    )
+    #expect(
+      createFormSource.contains(
+        ".contentMargins(.vertical, metrics.formPadding, for: .scrollContent)"
+      )
+    )
     #expect(createFormSource.contains(".scrollContentBackground(.hidden)"))
     #expect(!createFormSource.contains(".padding(metrics.formPadding)"))
     #expect(!createFormSource.contains("DisclosureGroup(\""))
@@ -123,9 +151,21 @@ struct SessionSwiftUISourceTests {
       )
     )
     #expect(sessionWindowSource.contains("private var columnVisibilityRawStorage = \"automatic\""))
-    #expect(!sessionWindowSource.contains("@SceneStorage(\"session.focusMode\")\n  var focusMode = false"))
-    #expect(!sessionWindowSource.contains("@SceneStorage(\"session.inspector.visible\")\n  var inspectorVisible = false"))
-    #expect(!sessionWindowSource.contains("@SceneStorage(\"session.inspector.preferred\")\n  var inspectorPreferred = false"))
+    #expect(
+      !sessionWindowSource.contains(
+        "@SceneStorage(\"session.focusMode\")\n  var focusMode = false"
+      )
+    )
+    #expect(
+      !sessionWindowSource.contains(
+        "@SceneStorage(\"session.inspector.visible\")\n  var inspectorVisible = false"
+      )
+    )
+    #expect(
+      !sessionWindowSource.contains(
+        "@SceneStorage(\"session.inspector.preferred\")\n  var inspectorPreferred = false"
+      )
+    )
 
     #expect(createFormSource.contains("@State private var stateStorage"))
     #expect(createFormSource.contains("@FocusState private var focusedFieldStorage"))
@@ -139,6 +179,23 @@ struct SessionSwiftUISourceTests {
     let columnsSource = try sourceFile(at: "Views/Sessions/SessionWindowView+Columns.swift")
 
     #expect(columnsSource.contains(".backgroundExtensionEffect()"))
+  }
+
+  @Test("Session agent detail reuses the rich agent detail bands with session-scoped inputs")
+  func sessionAgentDetailReusesRichBandsWithSessionScopedInputs() throws {
+    let columnsSource = try sourceFile(at: "Views/Sessions/SessionWindowView+Columns.swift")
+    let agentDetailSource = try sourceFile(at: "Views/Sessions/SessionAgentDetailSection.swift")
+
+    #expect(columnsSource.contains("detail: detail"))
+    #expect(columnsSource.contains("timeline: snapshot.timeline"))
+    #expect(agentDetailSource.contains("let detail: SessionDetail"))
+    #expect(agentDetailSource.contains("let timeline: [TimelineEntry]"))
+    #expect(agentDetailSource.contains("store.acpRuntimeState("))
+    #expect(agentDetailSource.contains("sessionRegistrations: detail.agents"))
+    #expect(agentDetailSource.contains("AgentDetailSummaryBand("))
+    #expect(agentDetailSource.contains("AgentDetailActivityBand("))
+    #expect(agentDetailSource.contains("AgentDetailActionBand("))
+    #expect(agentDetailSource.contains("agent.managedAgent?.kind == .tui"))
   }
 
   @Test("Toast keeps its AppKit pointer shield while spinner stays pure SwiftUI")

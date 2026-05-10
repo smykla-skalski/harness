@@ -328,6 +328,19 @@ extension HarnessMonitorStore {
       inspectSample: selectedAcpInspectState
     )
   }
+
+  func acpIdentityCrosswalk(
+    sessionID: String,
+    sessionRegistrations: [AgentRegistration]
+  ) -> AcpAgentIdentityCrosswalk {
+    AcpAgentIdentityCrosswalk(
+      selectedSessionIdentity: HarnessSessionID(rawValue: sessionID),
+      descriptorsByID: acpAgentDescriptorsByID,
+      sessionRegistrations: sessionRegistrations,
+      snapshots: selectedAcpAgents.filter { $0.sessionId == sessionID },
+      inspectSample: selectedAcpInspectState?.sessionID == sessionID ? selectedAcpInspectState : nil
+    )
+  }
 }
 
 extension AcpEventBatchPayload {
@@ -384,6 +397,18 @@ extension HarnessMonitorStore {
   }
 
   public func acpRuntimeState(
+    for sessionAgentID: String,
+    sessionID: String,
+    sessionRegistrations: [AgentRegistration]
+  ) -> AcpAgentRuntimeState? {
+    acpRuntimeState(
+      for: SessionAgentID(rawValue: sessionAgentID),
+      sessionID: sessionID,
+      sessionRegistrations: sessionRegistrations
+    )
+  }
+
+  public func acpRuntimeState(
     for sessionAgentIdentity: SessionAgentID
   ) -> AcpAgentRuntimeState? {
     let linkage = acpIdentityCrosswalk().agentLinkage(
@@ -393,6 +418,24 @@ extension HarnessMonitorStore {
       snapshot: linkage?.snapshot,
       inspect: linkage?.inspect,
       inspectSampledAt: selectedAcpInspectState?.sampledAt
+    )
+  }
+
+  public func acpRuntimeState(
+    for sessionAgentIdentity: SessionAgentID,
+    sessionID: String,
+    sessionRegistrations: [AgentRegistration]
+  ) -> AcpAgentRuntimeState? {
+    let inspectSample =
+      selectedAcpInspectState?.sessionID == sessionID ? selectedAcpInspectState : nil
+    let linkage = acpIdentityCrosswalk(
+      sessionID: sessionID,
+      sessionRegistrations: sessionRegistrations
+    ).agentLinkage(forSessionAgentIdentity: sessionAgentIdentity)
+    return AcpAgentRuntimeState(
+      snapshot: linkage?.snapshot,
+      inspect: linkage?.inspect,
+      inspectSampledAt: inspectSample?.sampledAt
     )
   }
 

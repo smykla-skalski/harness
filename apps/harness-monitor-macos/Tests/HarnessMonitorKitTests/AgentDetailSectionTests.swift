@@ -148,6 +148,7 @@ struct AgentDetailSectionTests {
     #expect(
       AgentDetailSendUpdateSection.statusMessage(
         isSessionReadOnly: true,
+        actionUnavailableMessage: nil,
         trimmedCommand: SendUpdateAction.injectContext.rawCommand,
         trimmedMessage: "Follow up"
       ) == "Read-only session — open a writable session to send updates."
@@ -155,13 +156,15 @@ struct AgentDetailSectionTests {
     #expect(
       AgentDetailSendUpdateSection.statusMessage(
         isSessionReadOnly: false,
+        actionUnavailableMessage: "Leader unavailable",
         trimmedCommand: "",
         trimmedMessage: "Follow up"
-      ) == "Pick or type an update type."
+      ) == "Leader unavailable"
     )
     #expect(
       AgentDetailSendUpdateSection.statusMessage(
         isSessionReadOnly: false,
+        actionUnavailableMessage: nil,
         trimmedCommand: SendUpdateAction.injectContext.rawCommand,
         trimmedMessage: ""
       ) == "Type a message to send."
@@ -169,6 +172,7 @@ struct AgentDetailSectionTests {
     #expect(
       AgentDetailSendUpdateSection.statusMessage(
         isSessionReadOnly: false,
+        actionUnavailableMessage: nil,
         trimmedCommand: SendUpdateAction.injectContext.rawCommand,
         trimmedMessage: "Follow up"
       ) == nil

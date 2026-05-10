@@ -88,6 +88,10 @@ struct SessionAgentDetailSectionMetricsTests {
     let laneSource = try sourceFile(named: "SessionAgentLaneViews.swift")
     let composerSource = try sourceFile(named: "SessionAgentComposer.swift")
 
+    #expect(detailSource.contains("AgentDetailSummaryBand("))
+    #expect(detailSource.contains("AgentDetailActivityBand("))
+    #expect(detailSource.contains("AgentDetailActionBand("))
+    #expect(detailSource.contains("AgentDetailAwaitingDecisionRegion("))
     #expect(detailSource.contains("SessionAgentTuiViewport("))
     #expect(detailSource.contains("SessionAgentComposer("))
     #expect(detailSource.contains("@Environment(\\.accessibilityVoiceOverEnabled)"))
@@ -95,6 +99,80 @@ struct SessionAgentDetailSectionMetricsTests {
     #expect(laneSource.contains("accessibilityLabel(Text(latestOutput))"))
     #expect(composerSource.contains("GeometryReader"))
     #expect(composerSource.contains("SessionAgentComposerKeyLayout.rows"))
+  }
+
+  @Test("Session transcript helper prefers ACP transcript when available")
+  func sessionTranscriptHelperPrefersAcpTranscriptWhenAvailable() {
+    let nativeAgent = makeAgent(
+      agentID: "agent-native",
+      supportsNativeTranscript: true
+    )
+    let ledgerAgent = makeAgent(
+      agentID: "agent-ledger",
+      supportsNativeTranscript: false
+    )
+    let timeline = [
+      makeTimelineEntry(entryID: "timeline-native", agentID: "agent-native"),
+      makeTimelineEntry(entryID: "timeline-ledger", agentID: "agent-ledger"),
+    ]
+    let acpTranscript = [makeTimelineEntry(entryID: "acp-native", agentID: "agent-native")]
+
+    #expect(
+      SessionAgentDetailSection.transcriptEntries(
+        agent: nativeAgent,
+        timeline: timeline,
+        acpTranscript: acpTranscript
+      ).map(\.entryId) == ["acp-native"]
+    )
+    #expect(
+      SessionAgentDetailSection.transcriptEntries(
+        agent: ledgerAgent,
+        timeline: timeline,
+        acpTranscript: acpTranscript
+      ).map(\.entryId) == ["timeline-ledger"]
+    )
+  }
+
+  @Test("Session action actor helper stays within the session agent roster")
+  func sessionActionActorHelperStaysWithinSessionRoster() {
+    let leader = makeAgent(agentID: "leader-1")
+    let worker = makeAgent(agentID: "worker-1")
+    let idle = makeAgent(agentID: "idle-1", status: .idle)
+    let agents = [leader, worker, idle]
+
+    #expect(
+      SessionAgentDetailSection.resolvedActionActorID(
+        preferredActorID: "worker-1",
+        agents: agents,
+        leaderID: "leader-1"
+      ) == "worker-1"
+    )
+    #expect(
+      SessionAgentDetailSection.resolvedActionActorID(
+        preferredActorID: "missing",
+        agents: agents,
+        leaderID: "leader-1"
+      ) == "leader-1"
+    )
+    #expect(
+      SessionAgentDetailSection.resolvedActionActorID(
+        preferredActorID: nil,
+        agents: [idle],
+        leaderID: nil
+      ) == nil
+    )
+    #expect(
+      SessionAgentDetailSection.hasRealLeader(
+        leaderID: "leader-1",
+        agents: agents
+      )
+    )
+    #expect(
+      !SessionAgentDetailSection.hasRealLeader(
+        leaderID: "missing",
+        agents: agents
+      )
+    )
   }
 
   private func sourceFile(named relativePath: String) throws -> String {
@@ -112,5 +190,50 @@ struct SessionAgentDetailSectionMetricsTests {
       )
       .appendingPathComponent(relativePath)
     return try String(contentsOf: fileURL, encoding: .utf8)
+  }
+
+  private func makeAgent(
+    agentID: String,
+    supportsNativeTranscript: Bool = true,
+    status: AgentStatus = .active
+  ) -> AgentRegistration {
+    AgentRegistration(
+      agentId: agentID,
+      name: agentID,
+      runtime: "codex",
+      role: .worker,
+      capabilities: [],
+      joinedAt: "2026-05-10T09:00:00Z",
+      updatedAt: "2026-05-10T09:00:00Z",
+      status: status,
+      agentSessionId: nil,
+      lastActivityAt: nil,
+      currentTaskId: nil,
+      runtimeCapabilities: RuntimeCapabilities(
+        runtime: "codex",
+        supportsNativeTranscript: supportsNativeTranscript,
+        supportsSignalDelivery: true,
+        supportsContextInjection: true,
+        typicalSignalLatencySeconds: 1,
+        hookPoints: []
+      ),
+      persona: nil
+    )
+  }
+
+  private func makeTimelineEntry(
+    entryID: String,
+    agentID: String
+  ) -> TimelineEntry {
+    TimelineEntry(
+      entryId: entryID,
+      recordedAt: "2026-05-10T09:00:00Z",
+      kind: "agent.message",
+      sessionId: "sess-session-agent-detail",
+      agentId: agentID,
+      taskId: nil,
+      summary: entryID,
+      payload: .object([:])
+    )
   }
 }

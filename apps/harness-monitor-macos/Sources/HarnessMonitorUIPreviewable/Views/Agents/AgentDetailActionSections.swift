@@ -5,11 +5,32 @@ struct AgentDetailRoleActionsSection: View {
   let store: HarnessMonitorStore
   let sessionID: String
   let agentID: String
+  let actionActorID: String?
   let isLeader: Bool
   let roleActionsAvailable: Bool
   let rolePickerValues: [SessionRole]
 
   @Binding var rolePickerSelection: SessionRole
+
+  init(
+    store: HarnessMonitorStore,
+    sessionID: String,
+    agentID: String,
+    actionActorID: String? = nil,
+    isLeader: Bool,
+    roleActionsAvailable: Bool,
+    rolePickerValues: [SessionRole],
+    rolePickerSelection: Binding<SessionRole>
+  ) {
+    self.store = store
+    self.sessionID = sessionID
+    self.agentID = agentID
+    self.actionActorID = actionActorID
+    self.isLeader = isLeader
+    self.roleActionsAvailable = roleActionsAvailable
+    self.rolePickerValues = rolePickerValues
+    _rolePickerSelection = rolePickerSelection
+  }
 
   private var disabledReason: String {
     if isLeader {
@@ -62,7 +83,16 @@ struct AgentDetailRoleActionsSection: View {
             accessibilityIdentifier: HarnessMonitorAccessibility.agentDetailRoleChange,
             action: {
               Task {
-                _ = await store.changeRole(agentID: agentID, role: rolePickerSelection)
+                if let actionActorID {
+                  _ = await store.changeRole(
+                    sessionID: sessionID,
+                    agentID: agentID,
+                    role: rolePickerSelection,
+                    actorID: actionActorID
+                  )
+                } else {
+                  _ = await store.changeRole(agentID: agentID, role: rolePickerSelection)
+                }
               }
             }
           )
@@ -74,7 +104,17 @@ struct AgentDetailRoleActionsSection: View {
             tint: .red,
             isExternallyDisabled: false,
             accessibilityIdentifier: HarnessMonitorAccessibility.agentDetailRoleRemove,
-            action: { store.requestRemoveAgentConfirmation(agentID: agentID) }
+            action: {
+              if let actionActorID {
+                store.requestRemoveAgentConfirmation(
+                  sessionID: sessionID,
+                  agentID: agentID,
+                  actorID: actionActorID
+                )
+              } else {
+                store.requestRemoveAgentConfirmation(agentID: agentID)
+              }
+            }
           )
         }
       }

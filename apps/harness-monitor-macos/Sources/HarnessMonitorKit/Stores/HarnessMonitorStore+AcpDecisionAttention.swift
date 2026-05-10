@@ -25,6 +25,20 @@ extension HarnessMonitorStore {
     acpDecisionAttentionSnapshot.byAgentID[agentID]
   }
 
+  public func acpDecisionAttention(
+    for agentID: String,
+    sessionID: String
+  ) -> AcpDecisionAttention? {
+    guard
+      let snapshot = selectedAcpAgents.first(where: {
+        $0.sessionId == sessionID && $0.sessionAgentID == agentID
+      })
+    else {
+      return nil
+    }
+    return acpDecisionAttentionSummary(for: snapshot)?.attention
+  }
+
   func rebuildAcpDecisionAttentionCache() {
     var byAgentID: [String: AcpDecisionAttention] = [:]
     var events: [AcpPermissionAttentionEvent] = []

@@ -9,6 +9,10 @@ struct AgentDetailSendUpdateSection: View {
   let store: HarnessMonitorStore
   let sessionID: String
   let agentID: String
+  let agentName: String?
+  let actionActorID: String?
+  let actionUnavailableMessage: String?
+  let runtimeState: AcpAgentRuntimeState?
 
   @Binding var selectedSendAction: SendUpdateAction
   @Binding var signalCommand: String
@@ -16,6 +20,32 @@ struct AgentDetailSendUpdateSection: View {
   @Binding var signalActionHint: String
   @FocusState private var focusedField: AgentDetailSendUpdateFocusField?
   @State private var isMoreOptionsExpanded = false
+
+  init(
+    store: HarnessMonitorStore,
+    sessionID: String,
+    agentID: String,
+    agentName: String? = nil,
+    actionActorID: String? = nil,
+    actionUnavailableMessage: String? = nil,
+    runtimeState: AcpAgentRuntimeState? = nil,
+    selectedSendAction: Binding<SendUpdateAction>,
+    signalCommand: Binding<String>,
+    signalMessage: Binding<String>,
+    signalActionHint: Binding<String>
+  ) {
+    self.store = store
+    self.sessionID = sessionID
+    self.agentID = agentID
+    self.agentName = agentName
+    self.actionActorID = actionActorID
+    self.actionUnavailableMessage = actionUnavailableMessage
+    self.runtimeState = runtimeState
+    _selectedSendAction = selectedSendAction
+    _signalCommand = signalCommand
+    _signalMessage = signalMessage
+    _signalActionHint = signalActionHint
+  }
 
   private var trimmedCommand: String {
     signalCommand.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -27,11 +57,15 @@ struct AgentDetailSendUpdateSection: View {
 
   static func statusMessage(
     isSessionReadOnly: Bool,
+    actionUnavailableMessage: String?,
     trimmedCommand: String,
     trimmedMessage: String
   ) -> String? {
     if isSessionReadOnly {
       return "Read-only session — open a writable session to send updates."
+    }
+    if let actionUnavailableMessage {
+      return actionUnavailableMessage
     }
     if trimmedCommand.isEmpty {
       return "Pick or type an update type."
@@ -53,6 +87,7 @@ struct AgentDetailSendUpdateSection: View {
   private var statusMessage: String? {
     Self.statusMessage(
       isSessionReadOnly: store.isSessionReadOnly,
+      actionUnavailableMessage: actionUnavailableMessage,
       trimmedCommand: trimmedCommand,
       trimmedMessage: trimmedMessage
     )
@@ -65,7 +100,7 @@ struct AgentDetailSendUpdateSection: View {
 
   private var promptDeadlineDate: Date? {
     guard
-      let runtimeState = store.acpRuntimeState(for: agentID),
+      let runtimeState = runtimeState ?? store.acpRuntimeState(for: agentID),
       let observedAt = runtimeState.promptDeadlineAnchorAt,
       let remaining = runtimeState.promptDeadlineRemainingMs
     else {
@@ -327,19 +362,31 @@ struct AgentDetailSendUpdateSection: View {
     let dispatchedMessage = trimmedMessage
     let dispatchedActionHint = trimmedActionHint
     Task {
-      let success = await store.sendSignal(
-        agentID: agentID,
-        command: dispatchedCommand,
-        message: dispatchedMessage,
-        actionHint: dispatchedActionHint
-      )
+      let success =
+        if let actionActorID {
+          await store.sendSignal(
+            sessionID: sessionID,
+            agentID: agentID,
+            command: dispatchedCommand,
+            message: dispatchedMessage,
+            actionHint: dispatchedActionHint,
+            actorID: actionActorID
+          )
+        } else {
+          await store.sendSignal(
+            agentID: agentID,
+            command: dispatchedCommand,
+            message: dispatchedMessage,
+            actionHint: dispatchedActionHint
+          )
+        }
       if success {
+        let selectedSessionAgentName =
+          store.selectedSession?.agents.first(where: { $0.agentId == agentID })?.name
         let agentName =
-          store
-          .selectedSession?
-          .agents
-          .first(where: { $0.agentId == agentID })?
-          .name ?? agentID
+          agentName
+          ?? selectedSessionAgentName
+          ?? agentID
         let preview =
           dispatchedMessage.isEmpty
           ? dispatchedCommand
