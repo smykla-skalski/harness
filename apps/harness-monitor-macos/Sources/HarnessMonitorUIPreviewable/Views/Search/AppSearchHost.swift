@@ -14,21 +14,24 @@ private let appSearchSignposter = OSSignposter(
   category: "perf"
 )
 
-/// Joins live query + selected scope into a single `.task(id:)` key so a
-/// scope flip without keystrokes still re-runs the search.
+/// Re-runs the search whenever the live query, the focused-route's
+/// resolved primary domain, or the user-selected filter set changes.
 private struct AppSearchTrigger: Equatable {
   let query: String
-  let scope: AppSearchScope
+  let primary: AppSearchDomain?
+  let selectedDomains: Set<AppSearchDomain>
 }
 
 /// Toolbar-placed `.searchable` field that drives the cross-domain
 /// ``AppSearchModel`` after a 150 ms debounce.
 ///
 /// The modifier owns one `@State` for the live query (the only main-actor
-/// write per keystroke) and one `@State` for the explicit scope. The
-/// primary domain at search time is resolved as: explicit scope wins,
-/// otherwise the focused-route domain, otherwise `fallbackPrimaryDomain`.
-/// Ranking work happens off-MainActor inside ``AppSearchIndex``.
+/// write per keystroke). The primary domain at search time is resolved
+/// from the focused route, falling back to ``fallbackPrimaryDomain``.
+/// Domain filtering is multi-select and lives on the model's
+/// ``AppSearchModel/selectedDomains``; the suggestions view filters
+/// rendered sections to that set. Ranking work happens off-MainActor
+/// inside ``AppSearchIndex``.
 public struct AppSearchHostModifier: ViewModifier {
   let model: AppSearchModel
   let prompt: LocalizedStringKey
@@ -79,7 +82,7 @@ public struct AppSearchHostModifier: ViewModifier {
       .searchSuggestions {
         AppSearchSuggestionsView(
           results: model.results,
-          scope: $model.scope,
+          selectedDomains: $model.selectedDomains,
           routeAction: routeAction
         )
       }
@@ -89,8 +92,14 @@ public struct AppSearchHostModifier: ViewModifier {
           .opacity(0)
           .accessibilityHidden(true)
       }
-      .task(id: AppSearchTrigger(query: query, scope: model.scope)) {
-        await runDebouncedSearch(for: query, scope: model.scope)
+      .task(
+        id: AppSearchTrigger(
+          query: query,
+          primary: resolvedPrimaryDomain,
+          selectedDomains: model.selectedDomains
+        )
+      ) {
+        await runDebouncedSearch(for: query)
       }
       .onChange(of: isSearchPresented, initial: true) { _, newValue in
         model.isPresented = newValue
@@ -106,10 +115,11 @@ public struct AppSearchHostModifier: ViewModifier {
     searchFieldFocused = true
   }
 
-  private func runDebouncedSearch(
-    for liveQuery: String,
-    scope: AppSearchScope
-  ) async {
+  private var resolvedPrimaryDomain: AppSearchDomain {
+    routeFocus?.domain ?? fallbackPrimaryDomain
+  }
+
+  private func runDebouncedSearch(for liveQuery: String) async {
     do {
       try await Task.sleep(nanoseconds: appSearchDebounceNanoseconds)
     } catch {
@@ -118,7 +128,7 @@ public struct AppSearchHostModifier: ViewModifier {
     guard !Task.isCancelled else {
       return
     }
-    let primary = scope.explicitDomain ?? routeFocus?.domain ?? fallbackPrimaryDomain
+    let primary = resolvedPrimaryDomain
     let signpostID = appSearchSignposter.makeSignpostID()
     let state = appSearchSignposter.beginInterval(
       "app_search_query",

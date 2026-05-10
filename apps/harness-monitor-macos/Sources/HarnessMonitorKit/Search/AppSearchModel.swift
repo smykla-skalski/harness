@@ -40,11 +40,12 @@ public final class AppSearchModel {
   /// and SwiftUI environment values flow downward only.
   public var isPresented: Bool = false
 
-  /// User-selected scope. Owned by the model so the inline scope rail
-  /// (rendered below the window tab bar) and the host modifier (which
-  /// resolves the primary domain at search time) bind to the same
-  /// state.
-  public var scope: AppSearchScope = .current
+  /// Domains the user has explicitly selected in the popover filter
+  /// chips. `[]` (empty) means "All" — every non-empty domain section
+  /// is shown. Otherwise only sections whose domain appears here are
+  /// rendered; the ranking and per-domain caps applied by
+  /// ``AppSearchIndex`` are unchanged.
+  public var selectedDomains: Set<AppSearchDomain> = []
 
   /// Closure-based seam so tests can inject a controllable provider.
   /// Production binding wraps an ``AppSearchIndex`` reference.

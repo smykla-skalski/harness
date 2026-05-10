@@ -3,21 +3,20 @@ import SwiftUI
 
 /// Sectioned popover content rendered inside `.searchSuggestions { … }`.
 ///
-/// First row is a scope `Menu`; remaining sections are the per-domain
-/// search hits. `.current` shows every non-empty section in fallback
-/// order (primary first). Picking an explicit scope from the menu
-/// narrows the popover to just that domain.
+/// The first row is a multi-select filter rail: an "All" button plus
+/// one button per ``AppSearchDomain``. "All" clears the selection (=
+/// show every non-empty section); any combination of the four domain
+/// buttons narrows the popover to those domains.
 ///
-/// Each hit row is a `Button` that invokes `routeAction` and dismisses
-/// the search field via the environment action — explicit routing is
-/// what closes the popover, not the implicit completion path.
-///
-/// `.searchCompletion(_:)` on each row supplies the title as the
-/// keyboard completion so Tab/Enter pre-fills the query without leaving
-/// the field.
+/// Below the rail, each hit row is a native `Button` so SwiftUI's
+/// built-in arrow-key navigation in `.searchSuggestions` lands focus
+/// on it. Pressing Return invokes `routeAction` and dismisses the
+/// search field via the environment action. `.searchCompletion(_:)`
+/// supplies the title as the keyboard completion so Tab pre-fills
+/// the query without leaving the field.
 public struct AppSearchSuggestionsView: View {
   let results: AppSearchResults
-  @Binding var scope: AppSearchScope
+  @Binding var selectedDomains: Set<AppSearchDomain>
   let routeAction: (AppSearchHit) -> Void
 
   @Environment(\.dismissSearch)
@@ -25,16 +24,16 @@ public struct AppSearchSuggestionsView: View {
 
   public init(
     results: AppSearchResults,
-    scope: Binding<AppSearchScope>,
+    selectedDomains: Binding<Set<AppSearchDomain>>,
     routeAction: @escaping (AppSearchHit) -> Void
   ) {
     self.results = results
-    self._scope = scope
+    self._selectedDomains = selectedDomains
     self.routeAction = routeAction
   }
 
   public var body: some View {
-    scopeMenu
+    filterRail
     ForEach(visibleSections) { section in
       Section {
         ForEach(section.hits) { hit in
@@ -47,35 +46,51 @@ public struct AppSearchSuggestionsView: View {
   }
 
   private var visibleSections: [AppSearchSection] {
-    guard let domain = scope.explicitDomain else {
+    guard !selectedDomains.isEmpty else {
       return results.sections
     }
-    return results.sections.filter { $0.domain == domain }
+    return results.sections.filter { selectedDomains.contains($0.domain) }
   }
 
-  private var scopeMenu: some View {
-    Menu {
-      Picker("Search scope", selection: $scope) {
-        ForEach(AppSearchScope.allCases) { value in
-          Text(value.label).tag(value)
+  private var filterRail: some View {
+    HStack(spacing: 6) {
+      filterButton(
+        label: "All",
+        systemImage: "square.grid.2x2",
+        isSelected: selectedDomains.isEmpty
+      ) {
+        selectedDomains = []
+      }
+      ForEach(AppSearchDomain.allCases) { domain in
+        filterButton(
+          label: domain.label,
+          systemImage: domain.systemImage,
+          isSelected: selectedDomains.contains(domain)
+        ) {
+          if selectedDomains.contains(domain) {
+            selectedDomains.remove(domain)
+          } else {
+            selectedDomains.insert(domain)
+          }
         }
       }
-      .pickerStyle(.inline)
-      .labelsHidden()
-    } label: {
-      HStack(spacing: 8) {
-        Image(systemName: "line.3.horizontal.decrease.circle")
-          .foregroundStyle(.secondary)
-          .frame(width: 18)
-        Text("Search in: \(scope.label)")
-        Spacer(minLength: 4)
-        Image(systemName: "chevron.down")
-          .font(.caption)
-          .foregroundStyle(.secondary)
-      }
     }
-    .menuStyle(.borderlessButton)
-    .accessibilityIdentifier("app-search.scope-menu")
+    .padding(.vertical, 2)
+    .accessibilityIdentifier("app-search.filter-rail")
+  }
+
+  private func filterButton(
+    label: String,
+    systemImage: String,
+    isSelected: Bool,
+    action: @escaping () -> Void
+  ) -> some View {
+    Button(action: action) {
+      Label(label, systemImage: systemImage)
+        .labelStyle(.titleAndIcon)
+    }
+    .buttonStyle(.bordered)
+    .tint(isSelected ? .accentColor : .secondary)
   }
 
   private func row(for hit: AppSearchHit) -> some View {
@@ -97,7 +112,6 @@ public struct AppSearchSuggestionsView: View {
         }
       }
     }
-    .harnessPlainButtonStyle()
     .searchCompletion(hit.title)
   }
 

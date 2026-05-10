@@ -36,9 +36,14 @@ public struct DecisionSearchProjection: Hashable, Sendable {
 /// view layer; `search(...)` is a pure read against precomputed
 /// lowercased corpora so it never allocates for each keystroke.
 public actor AppSearchIndex {
-  /// Default cap on hits returned per domain. Keeps the popover under
-  /// ~80 rows so SwiftUI's `List` diffing stays trivial.
-  public static let defaultPerDomainK = 20
+  /// Cap on hits returned for the active route's primary domain.
+  /// More room for the section the user is most likely scanning.
+  public static let defaultPrimaryK = 15
+
+  /// Cap on hits returned for non-primary fallback domains. Smaller
+  /// so the popover surfaces matches across more domains at once
+  /// without scrolling.
+  public static let defaultFallbackK = 5
 
   /// Backing store for one indexed record. Lowercased corpora are
   /// precomputed so search avoids per-keystroke allocation.
@@ -139,7 +144,8 @@ public actor AppSearchIndex {
   public func search(
     query: String,
     primary: AppSearchDomain?,
-    perDomainK: Int = AppSearchIndex.defaultPerDomainK
+    primaryK: Int = AppSearchIndex.defaultPrimaryK,
+    fallbackK: Int = AppSearchIndex.defaultFallbackK
   ) -> AppSearchResults {
     let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else {
@@ -150,6 +156,7 @@ public actor AppSearchIndex {
     var sections: [AppSearchSection] = []
     sections.reserveCapacity(domainOrder.count)
     for domain in domainOrder {
+      let perDomainK = (domain == primary) ? primaryK : fallbackK
       let section = searchDomain(domain, needle: needle, perDomainK: perDomainK)
       guard !section.hits.isEmpty else {
         continue
