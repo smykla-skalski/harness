@@ -184,7 +184,7 @@ extension SessionTimelineNavigationTests {
       from: oldBoundaryState,
       to: newBoundaryState
     )
-    #expect(computedLimit == 10)
+    #expect(computedLimit == 2)
     let didRequest = view.requestOlderWindowIfNeeded(
       presentation,
       from: oldBoundaryState,
@@ -203,7 +203,7 @@ extension SessionTimelineNavigationTests {
       fixture.client.recordedTimelineWindowRequests(for: summary.sessionId).suffix(1) == [
         TimelineWindowRequest(
           scope: .summary,
-          limit: 10,
+          limit: 2,
           before: TimelineCursor(
             recordedAt: fixture.fullTimeline[initialWindowSize - 1].recordedAt,
             entryId: fixture.fullTimeline[initialWindowSize - 1].entryId

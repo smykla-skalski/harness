@@ -149,8 +149,8 @@ struct SessionTimelineNavigationTests {
     #expect(!reboundTopEntry.enteredTopEdge(from: deeperTopEntry))
   }
 
-  @Test("Scroll edge loading chooses an adaptive partial chunk")
-  func scrollEdgeLoadingChoosesAnAdaptivePartialChunk() {
+  @Test("Scroll edge loading chooses an atomic buffer chunk")
+  func scrollEdgeLoadingChoosesAnAtomicBufferChunk() {
     let entries = makeTimelineEntries(count: 12)
     let navigation = SessionTimelineWindowNavigation(
       timeline: entries,
@@ -186,11 +186,11 @@ struct SessionTimelineNavigationTests {
       to: firstBottomEntry
     )
 
-    #expect(limit == SessionTimelineWindowNavigation.defaultLimit)
+    #expect(limit == 1)
   }
 
-  @Test("Scroll edge loading scales with fast edge movement and clamps to remaining events")
-  func scrollEdgeLoadingScalesWithFastEdgeMovementAndClampsToRemainingEvents() {
+  @Test("Scroll edge loading scales with fast edge movement")
+  func scrollEdgeLoadingScalesWithFastEdgeMovement() {
     let entries = makeTimelineEntries(count: 22)
     let navigation = SessionTimelineWindowNavigation(
       timeline: entries,
@@ -226,11 +226,11 @@ struct SessionTimelineNavigationTests {
       to: fastBottomEntry
     )
 
-    #expect(limit == 8)
+    #expect(limit == 3)
   }
 
-  @Test("Scroll edge loading uses viewport capacity instead of a fixed page cap")
-  func scrollEdgeLoadingUsesViewportCapacityInsteadOfFixedPageCap() {
+  @Test("Scroll edge loading does not use viewport capacity as an edge page")
+  func scrollEdgeLoadingDoesNotUseViewportCapacityAsAnEdgePage() {
     let entries = makeTimelineEntries(count: 32)
     let navigation = SessionTimelineWindowNavigation(
       timeline: entries,
@@ -267,11 +267,7 @@ struct SessionTimelineNavigationTests {
       to: firstBottomEntry
     )
 
-    #expect(
-      limit
-        == 30 + SessionTimelineScrollBoundaryState.triggerBufferRowCount
-        + firstBottomEntry.bottomEdgeAdvance(from: outsideBottom)
-    )
+    #expect(limit == 1)
   }
 
   @Test("Pending scroll edge load retries only after the window advances")

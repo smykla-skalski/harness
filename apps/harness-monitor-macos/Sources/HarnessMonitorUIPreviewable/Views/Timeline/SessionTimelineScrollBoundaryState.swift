@@ -6,6 +6,8 @@ struct SessionTimelineScrollBoundaryState: Equatable {
 
   private let topBucket: Int?
   private let bottomBucket: Int?
+  private let topBufferDeficit: Int
+  private let bottomBufferDeficit: Int
 
   static var triggerBufferRowCount: Int {
     max(1, Int(ceil(triggerDistance / bucketSize)))
@@ -32,14 +34,23 @@ struct SessionTimelineScrollBoundaryState: Equatable {
     visibleMaxY: CGFloat,
     contentHeight: CGFloat
   ) {
-    topBucket =
-      visibleMinY <= Self.triggerDistance
-      ? Self.bucket(for: visibleMinY)
-      : nil
+    let topDistance = max(0, visibleMinY)
+    if visibleMinY <= Self.triggerDistance {
+      topBucket = Self.bucket(for: visibleMinY)
+      topBufferDeficit = Self.bufferDeficitRows(distanceFromEdge: topDistance)
+    } else {
+      topBucket = nil
+      topBufferDeficit = 0
+    }
+    let bottomDistance = max(0, contentHeight - visibleMaxY)
     bottomBucket =
-      contentHeight - visibleMaxY <= Self.triggerDistance
+      bottomDistance <= Self.triggerDistance
       ? Self.bucket(for: visibleMaxY)
       : nil
+    bottomBufferDeficit =
+      bottomDistance <= Self.triggerDistance
+      ? Self.bufferDeficitRows(distanceFromEdge: bottomDistance)
+      : 0
   }
 
   func enteredTopEdge(from oldValue: Self) -> Bool {
@@ -61,6 +72,14 @@ struct SessionTimelineScrollBoundaryState: Equatable {
 
   func bottomEdgeAdvance(from oldValue: Self) -> Int {
     edgeAdvance(bottomBucket, from: oldValue.bottomBucket, towardEdge: >)
+  }
+
+  func topEdgeBufferDeficitRows() -> Int {
+    topBufferDeficit
+  }
+
+  func bottomEdgeBufferDeficitRows() -> Int {
+    bottomBufferDeficit
   }
 
   private func enteredEdge(
@@ -111,5 +130,10 @@ struct SessionTimelineScrollBoundaryState: Equatable {
 
   private static func bucket(for offset: CGFloat) -> Int {
     Int((offset / bucketSize).rounded(.down))
+  }
+
+  private static func bufferDeficitRows(distanceFromEdge: CGFloat) -> Int {
+    let remainingRows = max(0, Int((distanceFromEdge / bucketSize).rounded(.down)))
+    return max(1, triggerBufferRowCount - remainingRows)
   }
 }

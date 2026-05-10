@@ -225,7 +225,7 @@ extension SessionTimelineTableView.Coordinator {
       rowHeightCache[rowID] = CachedRowHeight(
         width: lastColumnWidth,
         height: tableView.rect(ofRow: rowIndex).height,
-        isMeasured: true
+        isMeasured: false
       )
     }
   }
