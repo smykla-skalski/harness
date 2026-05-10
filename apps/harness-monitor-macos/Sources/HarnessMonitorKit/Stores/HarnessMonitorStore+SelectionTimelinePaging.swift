@@ -114,13 +114,15 @@ extension HarnessMonitorStore {
       )
     } else if let responseEntries = response.entries {
       resolvedTimeline = mergeTimelinePrefix(timeline, olderEntries: responseEntries)
+      let currentWindowStart = timelineWindow?.windowStart ?? 0
+      let currentHasNewer = timelineWindow?.hasNewer ?? (currentWindowStart > 0)
       resolvedTimelineWindow = TimelineWindowResponse(
         revision: response.revision,
-        totalCount: max(response.totalCount, resolvedTimeline.count),
-        windowStart: 0,
-        windowEnd: resolvedTimeline.count,
+        totalCount: max(response.totalCount, currentWindowStart + resolvedTimeline.count),
+        windowStart: currentWindowStart,
+        windowEnd: currentWindowStart + resolvedTimeline.count,
         hasOlder: response.hasOlder,
-        hasNewer: false,
+        hasNewer: currentHasNewer,
         oldestCursor: resolvedTimeline.last.map {
           TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
         },

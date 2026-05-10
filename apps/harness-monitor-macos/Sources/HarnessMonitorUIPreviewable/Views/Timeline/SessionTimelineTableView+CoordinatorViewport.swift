@@ -175,20 +175,29 @@ extension SessionTimelineTableView.Coordinator {
     }
     let visibleRows = tableView.rows(in: visibleRect)
     let visibleRowCount = max(0, visibleRows.length)
+    let viewportRowCapacity = max(
+      visibleRowCount,
+      Int(ceil(visibleRect.height / SessionTimelineSectionPresentation.rowHeightEstimate))
+    )
     let visibleEventOffsets = visibleEventOffsets(for: visibleRows)
     let visibleMatchOffsets = visibleMatchOffsets(for: visibleRows)
     let stats = SessionTimelineTableViewportStats(
       visibleRowCount: visibleRowCount,
       renderedRowCount: visibleRowCount,
+      viewportRowCapacity: viewportRowCapacity,
       anchorRowID: anchorRowID(for: visibleRows),
       firstVisibleEventOffset: visibleEventOffsets?.lowerBound,
       lastVisibleEventOffset: visibleEventOffsets?.upperBound,
       firstVisibleMatchOffset: visibleMatchOffsets?.lowerBound,
       lastVisibleMatchOffset: visibleMatchOffsets?.upperBound
     )
-    if lastViewportStats != stats {
+    let previousStats = lastViewportStats
+    if previousStats != stats {
       lastViewportStats = stats
       viewport?.recordViewportStats(stats, publishImmediately: forceObservedStats)
+      if previousStats?.viewportRowCapacity != stats.viewportRowCapacity {
+        viewportChanged(stats)
+      }
     }
     if measurementTask == nil, visibleRowsNeedMeasurement(columnWidth: lastColumnWidth) {
       scheduleIncrementalMeasurement(columnWidth: lastColumnWidth)

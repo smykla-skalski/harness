@@ -5,6 +5,7 @@ import SwiftUI
 struct SessionTimelineTableViewportStats: Equatable, Sendable {
   let visibleRowCount: Int
   let renderedRowCount: Int
+  let viewportRowCapacity: Int
   let anchorRowID: String?
   let firstVisibleEventOffset: Int?
   let lastVisibleEventOffset: Int?
@@ -14,6 +15,7 @@ struct SessionTimelineTableViewportStats: Equatable, Sendable {
   init(
     visibleRowCount: Int,
     renderedRowCount: Int,
+    viewportRowCapacity: Int? = nil,
     anchorRowID: String?,
     firstVisibleEventOffset: Int? = nil,
     lastVisibleEventOffset: Int? = nil,
@@ -22,6 +24,7 @@ struct SessionTimelineTableViewportStats: Equatable, Sendable {
   ) {
     self.visibleRowCount = visibleRowCount
     self.renderedRowCount = renderedRowCount
+    self.viewportRowCapacity = max(visibleRowCount, viewportRowCapacity ?? visibleRowCount)
     self.anchorRowID = anchorRowID
     self.firstVisibleEventOffset = firstVisibleEventOffset
     self.lastVisibleEventOffset = lastVisibleEventOffset
@@ -34,6 +37,7 @@ struct SessionTimelineTableViewportStats: Equatable, Sendable {
     return Self(
       visibleRowCount: count,
       renderedRowCount: count,
+      viewportRowCapacity: count,
       anchorRowID: nil,
       firstVisibleEventOffset: count == 0 ? nil : 0,
       lastVisibleEventOffset: count == 0 ? nil : count - 1,
@@ -50,6 +54,7 @@ struct SessionTimelineScrollCommand: Equatable, Sendable {
 
 typealias SessionTimelineScrollBoundaryHandler =
   (SessionTimelineScrollBoundaryState, SessionTimelineScrollBoundaryState) -> Void
+typealias SessionTimelineViewportHandler = (SessionTimelineTableViewportStats) -> Void
 
 struct SessionTimelineTableAnchor {
   let rowID: String
@@ -64,6 +69,7 @@ struct SessionTimelineTableView: NSViewRepresentable {
   let actionHandler: any DecisionActionHandler
   let onSignalTap: ((String) -> Void)?
   let viewport: SessionTimelineViewportModel
+  let viewportChanged: SessionTimelineViewportHandler
   let scrollBoundaryChanged: SessionTimelineScrollBoundaryHandler
   @Environment(\.fontScale)
   private var fontScale
@@ -71,6 +77,7 @@ struct SessionTimelineTableView: NSViewRepresentable {
   func makeCoordinator() -> Coordinator {
     Coordinator(
       viewport: viewport,
+      viewportChanged: viewportChanged,
       scrollBoundaryChanged: scrollBoundaryChanged
     )
   }
@@ -112,6 +119,7 @@ struct SessionTimelineTableView: NSViewRepresentable {
 
   func updateNSView(_ scrollView: NSScrollView, context: Context) {
     context.coordinator.viewport = viewport
+    context.coordinator.viewportChanged = viewportChanged
     context.coordinator.scrollBoundaryChanged = scrollBoundaryChanged
     context.coordinator.update(
       rows: rows,

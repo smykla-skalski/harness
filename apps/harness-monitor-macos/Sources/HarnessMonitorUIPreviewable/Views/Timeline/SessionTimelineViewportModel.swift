@@ -61,6 +61,10 @@ final class SessionTimelineViewportModel {
     lastViewport.visibleRowCount
   }
 
+  func currentViewportRowCapacity() -> Int {
+    lastViewport.viewportRowCapacity
+  }
+
   func setAnchorID(_ id: String?) {
     latestVisibleAnchorID = id
     if visibleAnchorID != id {

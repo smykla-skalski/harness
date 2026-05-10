@@ -46,12 +46,25 @@ struct SessionTimelinePendingEdgeLoad: Equatable {
 struct SessionTimelineEdgeLoadContext {
   let navigation: SessionTimelineWindowNavigation
   let visibleRowCount: Int
+  let viewportRowCapacity: Int
   let fallbackVisibleRowCount: Int
+
+  init(
+    navigation: SessionTimelineWindowNavigation,
+    visibleRowCount: Int,
+    viewportRowCapacity: Int = 0,
+    fallbackVisibleRowCount: Int
+  ) {
+    self.navigation = navigation
+    self.visibleRowCount = visibleRowCount
+    self.viewportRowCapacity = viewportRowCapacity
+    self.fallbackVisibleRowCount = fallbackVisibleRowCount
+  }
 }
 
 enum SessionTimelineEdgeLoadPolicy {
   static let minimumChunkLimit = 4
-  static let maximumChunkLimit = SessionTimelineWindowNavigation.defaultLimit
+  static let maximumChunkLimit = SessionTimelineWindowBudget.maximumLimit
 
   static func limit(
     for action: SessionTimelineWindowAction,
@@ -95,7 +108,12 @@ enum SessionTimelineEdgeLoadPolicy {
     guard remaining > 0 else {
       return 0
     }
-    let visibleRows = max(1, context.visibleRowCount, context.fallbackVisibleRowCount)
+    let visibleRows = max(
+      1,
+      context.visibleRowCount,
+      context.viewportRowCapacity,
+      context.fallbackVisibleRowCount
+    )
     let desiredLimit =
       visibleRows + SessionTimelineScrollBoundaryState.triggerBufferRowCount
       + max(0, edgeAdvanceRows)

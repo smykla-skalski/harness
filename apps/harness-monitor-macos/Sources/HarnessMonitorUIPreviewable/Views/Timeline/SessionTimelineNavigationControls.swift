@@ -43,7 +43,7 @@ struct SessionTimelinePendingNavigation: Equatable, Sendable {
 }
 
 struct SessionTimelineWindowNavigation: Equatable, Sendable {
-  static let defaultLimit = 24
+  static let defaultLimit = HarnessMonitorStore.initialSelectedTimelineWindowLimit
 
   let limit: Int
   let totalCount: Int
@@ -123,6 +123,20 @@ struct SessionTimelineWindowNavigation: Equatable, Sendable {
       }
       return TimelineWindowRequest(scope: .summary, limit: requestLimit, after: newestCursor)
     }
+  }
+}
+
+enum SessionTimelineWindowBudget {
+  static let maximumLimit = 200
+
+  static func limit(forViewportRowCapacity viewportRowCapacity: Int) -> Int {
+    let bufferedLimit =
+      max(1, viewportRowCapacity)
+      + SessionTimelineScrollBoundaryState.triggerBufferRowCount
+    return min(
+      maximumLimit,
+      max(SessionTimelineWindowNavigation.defaultLimit, bufferedLimit)
+    )
   }
 }
 
