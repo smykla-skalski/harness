@@ -83,25 +83,59 @@ private final class WindowNavigationHandlers {
 @Observable
 public final class WindowCommandRoutingState {
   public var activeScope: WindowNavigationScope?
+  public private(set) var activeSessionID: String?
   private var activeWindowID: ObjectIdentifier?
+  private var sessionIDsByWindowID: [ObjectIdentifier: String] = [:]
 
   public init(activeScope: WindowNavigationScope? = nil) {
     self.activeScope = activeScope
   }
 
   public func activate(scope: WindowNavigationScope?, windowID: ObjectIdentifier) {
-    guard activeScope != scope || activeWindowID != windowID else {
+    let nextSessionID = sessionIDsByWindowID[windowID]
+    guard
+      activeScope != scope
+        || activeWindowID != windowID
+        || activeSessionID != nextSessionID
+    else {
       return
     }
     activeScope = scope
     activeWindowID = windowID
+    activeSessionID = nextSessionID
   }
 
-  public func clear(windowID: ObjectIdentifier) {
+  public func register(sessionID: String?, windowID: ObjectIdentifier) {
+    // Short-circuit when nothing actually changes. `register` is called from
+    // `WindowCommandScopeTrackingView.updateNSView`, and writing to the
+    // `@Observable` storage on every invocation invalidates the SwiftUI graph,
+    // which re-runs view body, which re-invokes updateNSView — infinite loop
+    // and 100% CPU on launch.
+    let existing = sessionIDsByWindowID[windowID]
+    if existing != sessionID {
+      if let sessionID {
+        sessionIDsByWindowID[windowID] = sessionID
+      } else {
+        sessionIDsByWindowID.removeValue(forKey: windowID)
+      }
+    }
     guard activeWindowID == windowID else {
       return
     }
-    activeScope = nil
+    let next = sessionIDsByWindowID[windowID]
+    if activeSessionID != next {
+      activeSessionID = next
+    }
+  }
+
+  public func clear(windowID: ObjectIdentifier) {
+    let removed = sessionIDsByWindowID.removeValue(forKey: windowID) != nil
+    guard activeWindowID == windowID else {
+      _ = removed
+      return
+    }
+    if activeScope != nil { activeScope = nil }
     activeWindowID = nil
+    if activeSessionID != nil { activeSessionID = nil }
   }
 }

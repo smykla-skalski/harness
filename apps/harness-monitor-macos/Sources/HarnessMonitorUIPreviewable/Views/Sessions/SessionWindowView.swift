@@ -542,6 +542,10 @@ public struct SessionWindowView: View {
     switch request.createEntryPoint {
     case .agent, nil:
       return .agent
+    case .task:
+      return .task
+    case .decision:
+      return .decision
     }
   }
 

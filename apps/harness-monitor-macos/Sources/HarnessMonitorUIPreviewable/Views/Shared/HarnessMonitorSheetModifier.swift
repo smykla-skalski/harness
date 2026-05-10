@@ -18,22 +18,18 @@ public struct HarnessMonitorSheetModifier: ViewModifier {
 
   @ViewBuilder
   public func body(content: Content) -> some View {
-    if isEnabled {
-      content
-        .sheet(
-          item: Binding(
-            get: { shellUI.presentedSheet },
-            set: { sheet in
-              if sheet == nil {
-                store.dismissSheet()
-              }
+    content
+      .sheet(
+        item: Binding(
+          get: { isEnabled ? shellUI.presentedSheet : nil },
+          set: { sheet in
+            if sheet == nil && isEnabled && shellUI.presentedSheet != nil {
+              store.dismissSheet()
             }
-          )
-        ) { sheet in
-          HarnessMonitorSheetRouter(store: store, sheet: sheet)
-        }
-    } else {
-      content
-    }
+          }
+        )
+      ) { sheet in
+        HarnessMonitorSheetRouter(store: store, sheet: sheet)
+      }
   }
 }
