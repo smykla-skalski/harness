@@ -9,8 +9,8 @@ rules.
 | Work area | Start here |
 | --- | --- |
 | Tuist generation, build, test, lanes | This file |
-| Performance and Instruments work | `docs/agent-guides/monitor-reference.md` |
-| Daemon ownership modes | `docs/agent-guides/monitor-reference.md` |
+| Performance and Instruments work | `../../docs/agent-guides/monitor-reference.md` |
+| Daemon ownership modes | `../../docs/agent-guides/monitor-reference.md` |
 | Previewable SwiftUI structure | `Sources/HarnessMonitorUIPreviewable/AGENTS.md` |
 | SwiftUI/API/UX rule detail | The skills listed in this file, then `docs/research/` when rationale is needed |
 
@@ -27,7 +27,7 @@ compilation conditions belong in the manifests.
 Use:
 
 ```bash
-rtk mise run monitor:generate
+mise run monitor:generate
 ```
 
 The generated `HarnessMonitor.xcodeproj` and `HarnessMonitor.xcworkspace` are
@@ -84,11 +84,11 @@ silently routes IDE Run at an empty agent container.
 Run from the repo root:
 
 ```bash
-rtk mise run monitor:lint
-rtk mise run monitor:quality-gate
-rtk mise run monitor:build
-rtk mise run monitor:test
-rtk mise run monitor:xcodebuild -- -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace ...
+mise run monitor:lint
+mise run monitor:quality-gate
+mise run monitor:build
+mise run monitor:test
+mise run monitor:xcodebuild -- -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace ...
 ```
 
 Approved `-derivedDataPath` values:
@@ -98,9 +98,9 @@ Approved `-derivedDataPath` values:
 - `xcode-derived-instruments` for Instruments audit work.
 - `xcode-derived-lanes/<lane>` when `HARNESS_MONITOR_BUILD_LANE=<lane>` is set.
 
-`rtk mise run clean:stale` is the safe shared scrub and must not quit a live
+`mise run clean:stale` is the safe shared scrub and must not quit a live
 Harness Monitor session or stop live daemon work. Use
-`rtk mise run clean:stale:full` or `rtk mise run monitor:reset` only for an
+`mise run clean:stale:full` or `mise run monitor:reset` only for an
 explicit live reset.
 
 For local macOS `xcodebuild`, never use bare `-destination 'platform=macOS'`.
@@ -129,13 +129,13 @@ into one run:
 
 ```bash
 XCODE_ONLY_TESTING='HarnessMonitorKitTests/A/test1(),HarnessMonitorKitTests/A/test2()' \
-  HARNESS_MONITOR_BUILD_LANE=agent-<id> rtk mise run monitor:test
+  HARNESS_MONITOR_BUILD_LANE=agent-<id> mise run monitor:test
 ```
 
 If a UI test cannot find or tap a visually correct control, fix the test query
 or interaction path before changing product layout, copy, or semantics. New
 action-control helpers must mirror `HarnessMonitorUITestInteractionSupport.tapButton(...)`.
-See `docs/agent-guides/monitor-reference.md` for the full interaction contract.
+See `../../docs/agent-guides/monitor-reference.md` for the full interaction contract.
 
 ## SwiftUI and UX
 
@@ -145,7 +145,7 @@ button sizing and glass treatment stay consistent across screens.
 Liquid Glass summary: let `NavigationSplitView` sidebars use the system glass,
 extend detail content with `.backgroundExtensionEffect()`, apply glass to
 navigation/control surfaces only, and never stack glass on glass. See
-`docs/agent-guides/monitor-reference.md` for the full macOS 26 notes.
+`../../docs/agent-guides/monitor-reference.md` for the full macOS 26 notes.
 
 Use the relevant skill before writing or reviewing Swift code here:
 
@@ -167,7 +167,7 @@ proven cause only.
 For live `AttributeGraph: cycle detected through attribute` warnings:
 
 ```bash
-rtk mise run monitor:debug:attributegraph
+mise run monitor:debug:attributegraph
 ```
 
 The command attaches LLDB, breaks on `print_cycle`, prints all thread
@@ -178,12 +178,12 @@ backtraces, and leaves the app stopped for copy/paste inspection.
 Default local development uses the `HarnessMonitor (External Daemon)` scheme plus:
 
 ```bash
-rtk mise run monitor:daemon:dev
+mise run monitor:daemon:dev
 ```
 
 The default `HarnessMonitor` scheme validates the managed, sandboxed shipping
 path. Use it before release/distribution validation. Details and bridge behavior
-live in `docs/agent-guides/monitor-reference.md`.
+live in `../../docs/agent-guides/monitor-reference.md`.
 
 ## Preview authoring
 
@@ -206,4 +206,4 @@ or a targeted `monitor:build` / `monitor:test` lane for compile verification.
   `@MainActor` classes or SDK-overlay MainActor types under Swift 6 strict
   concurrency on macOS 26. Use nonisolated thread-safe cleanup and move
   MainActor-only work to representable dismantle hooks. Full rationale lives in
-  `docs/agent-guides/monitor-reference.md`.
+  `../../docs/agent-guides/monitor-reference.md`.

@@ -6,7 +6,7 @@ file keeps the longer macOS reference material out of the default prompt path.
 
 ## Generation details
 
-`rtk mise run monitor:generate` runs `Scripts/generate.sh`, which installs Tuist
+`mise run monitor:generate` runs `Scripts/generate.sh`, which installs Tuist
 dependencies when needed, generates the project, then runs
 `Scripts/post-generate.sh` for `buildServer.json` and version sync.
 
@@ -24,7 +24,7 @@ intentionally unset so normal Tuist generation and builds stay auth-free.
 Xcode's default `~/Library/Developer/Xcode/DerivedData/HarnessMonitor-*` is the
 Xcode UI private index/cache and holds fetched SPM `SourcePackages/`. CLI
 workflows pass `-derivedDataPath` explicitly and do not touch it. Regeneration
-and `rtk mise run clean:stale` leave that cache intact.
+and `mise run clean:stale` leave that cache intact.
 
 The `monitor:xcodebuild` wrapper resolves approved logical paths at the git
 common root, so linked worktrees share one default CLI DerivedData tree unless a
@@ -73,12 +73,12 @@ is fresher than every Swift source, project descriptor, SPM lockfile, and the
 cross-project `mcp-servers/` tree. Break-glass:
 `HARNESS_MONITOR_FORCE_BUILD_FOR_TESTING=1`.
 
-SwiftLint runs externally through `rtk mise run monitor:lint` and CI, not as an
+SwiftLint runs externally through `mise run monitor:lint` and CI, not as an
 Xcode build plugin or part of `monitor:test`. The lint lane checks generation,
 runs `swift format`, and runs SwiftLint without invoking daemon bundle logic.
 Config lives in `.swiftlint.yml`.
 
-`rtk mise run monitor:quality-gate` owns build-based sandbox and daemon
+`mise run monitor:quality-gate` owns build-based sandbox and daemon
 validation.
 
 ## Performance measurement
@@ -156,7 +156,7 @@ External daemon is the recommended local development workflow. Launch the app
 under `HarnessMonitor (External Daemon)` and run:
 
 ```bash
-rtk mise run monitor:daemon:dev
+mise run monitor:daemon:dev
 ```
 
 The dev daemon runs unsandboxed, writes its manifest into the
@@ -167,7 +167,7 @@ runtime lane, prefix daemon and bridge commands with
 `HARNESS_MONITOR_BUILD_LANE=<name>`.
 
 Debug the dev daemon with `lldb -- harness daemon dev` or
-`rtk cargo run --bin harness -- daemon dev`. The scheme sets
+`cargo run --bin harness -- daemon dev`. The scheme sets
 `HARNESS_MONITOR_EXTERNAL_DAEMON=1` and a 60s warm-up timeout. Starting the app
 before the daemon also works; the manifest watcher reconnects on first manifest
 write.
