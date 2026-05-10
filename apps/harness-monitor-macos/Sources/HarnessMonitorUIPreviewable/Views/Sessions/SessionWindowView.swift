@@ -339,6 +339,7 @@ public struct SessionWindowView: View {
         sessionToolbar
       }
       .appSearchHost(model: stateCache.appSearchModel)
+      .modifier(SessionWindowSearchMirror(stateCache: stateCache))
   }
 
   private var bodyContent: some View {
