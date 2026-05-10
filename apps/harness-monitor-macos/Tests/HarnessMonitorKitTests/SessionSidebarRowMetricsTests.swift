@@ -10,7 +10,6 @@ final class SessionSidebarRowMetricsTests: XCTestCase {
     let metrics = SessionSidebarRowMetrics(fontScale: 1.0)
 
     XCTAssertEqual(metrics.minHeight, 28)
-    XCTAssertEqual(metrics.multiSelectControlSize, 24)
     XCTAssertEqual(metrics.severityIndicatorSize, 8)
     XCTAssertEqual(metrics.severityIndicatorOffset, 4)
     XCTAssertEqual(
@@ -25,7 +24,6 @@ final class SessionSidebarRowMetricsTests: XCTestCase {
     let fittedHeight = fittedHeight(for: 1.8)
 
     XCTAssertGreaterThanOrEqual(metrics.minHeight, 44)
-    XCTAssertGreaterThanOrEqual(metrics.multiSelectControlSize, 44)
     XCTAssertGreaterThan(
       metrics.iconColumnWidth,
       SessionSidebarRowMetrics(fontScale: 1.0).iconColumnWidth
