@@ -207,10 +207,13 @@ public struct SessionWindowView: View {
   }
 
   @ViewBuilder private var sessionWindowSurface: some View {
-    if isUnknownSession {
-      unknownSessionContent
-    } else {
-      sessionSurface
+    VStack(spacing: 0) {
+      AppSearchScopeRail(model: stateCache.appSearchModel)
+      if isUnknownSession {
+        unknownSessionContent
+      } else {
+        sessionSurface
+      }
     }
   }
 

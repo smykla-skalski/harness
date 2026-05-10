@@ -6,6 +6,7 @@ extension SessionWindowView {
   /// in a single line.
   var appSearchIndexUpdaterModifier: AppSearchIndexUpdater {
     AppSearchIndexUpdater(
+      model: stateCache.appSearchModel,
       index: stateCache.appSearchIndex,
       agents: snapshot?.detail?.agents ?? [],
       decisions: allSessionDecisions,

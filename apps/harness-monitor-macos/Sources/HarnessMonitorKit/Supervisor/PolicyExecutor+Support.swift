@@ -35,7 +35,7 @@ private struct NoOpSupervisorAPIClient: SupervisorAPIClient {
 }
 
 extension PolicyAction {
-  fileprivate var auditTickID: String {
+  var auditTickID: String {
     switch self {
     case .nudgeAgent(let payload):
       payload.snapshotID
