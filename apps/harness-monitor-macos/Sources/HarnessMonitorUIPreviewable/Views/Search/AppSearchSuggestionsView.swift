@@ -54,43 +54,39 @@ public struct AppSearchSuggestionsView: View {
 
   private var filterRail: some View {
     HStack(spacing: 6) {
-      filterButton(
-        label: "All",
-        systemImage: "square.grid.2x2",
-        isSelected: selectedDomains.isEmpty
-      ) {
-        selectedDomains = []
+      Toggle(isOn: allModeBinding) {
+        Label("All", systemImage: "square.grid.2x2")
       }
       ForEach(AppSearchDomain.allCases) { domain in
-        filterButton(
-          label: domain.label,
-          systemImage: domain.systemImage,
-          isSelected: selectedDomains.contains(domain)
-        ) {
-          if selectedDomains.contains(domain) {
-            selectedDomains.remove(domain)
-          } else {
-            selectedDomains.insert(domain)
-          }
+        Toggle(isOn: domainBinding(for: domain)) {
+          Label(domain.label, systemImage: domain.systemImage)
         }
       }
     }
+    .toggleStyle(.button)
+    .controlSize(.small)
     .padding(.vertical, 2)
     .accessibilityIdentifier("app-search.filter-rail")
   }
 
-  private func filterButton(
-    label: String,
-    systemImage: String,
-    isSelected: Bool,
-    action: @escaping () -> Void
-  ) -> some View {
-    Button(action: action) {
-      Label(label, systemImage: systemImage)
-        .labelStyle(.titleAndIcon)
-    }
-    .buttonStyle(.bordered)
-    .tint(isSelected ? .accentColor : .secondary)
+  private var allModeBinding: Binding<Bool> {
+    Binding(
+      get: { selectedDomains.isEmpty },
+      set: { _ in selectedDomains = [] }
+    )
+  }
+
+  private func domainBinding(for domain: AppSearchDomain) -> Binding<Bool> {
+    Binding(
+      get: { selectedDomains.contains(domain) },
+      set: { isOn in
+        if isOn {
+          selectedDomains.insert(domain)
+        } else {
+          selectedDomains.remove(domain)
+        }
+      }
+    )
   }
 
   private func row(for hit: AppSearchHit) -> some View {
