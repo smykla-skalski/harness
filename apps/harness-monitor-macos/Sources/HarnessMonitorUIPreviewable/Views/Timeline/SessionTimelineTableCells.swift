@@ -213,11 +213,22 @@ private struct SessionTimelineHostedRow: View {
   }
 
   private func populatedRow(_ row: SessionTimelineRow) -> some View {
-    SessionTimelineNodeCluster(row: row, actionHandler: actionHandler, onSignalTap: onSignalTap)
-      .equatable()
-      .padding(.trailing, HarnessMonitorTheme.spacingXS)
-      .padding(.bottom, SessionTimelineTableMetrics.rowBottomPadding(for: row))
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .fixedSize(horizontal: false, vertical: true)
+    SessionTimelineNodeCluster(
+      row: row,
+      actionHandler: actionHandler,
+      onSignalTap: onSignalTap,
+      fontScale: fontScale
+    )
+    .equatable()
+    .padding(
+      EdgeInsets(
+        top: 0,
+        leading: 0,
+        bottom: SessionTimelineTableMetrics.rowBottomPadding(for: row),
+        trailing: HarnessMonitorTheme.spacingXS
+      )
+    )
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .fixedSize(horizontal: false, vertical: true)
   }
 }

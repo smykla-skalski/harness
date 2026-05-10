@@ -8,6 +8,8 @@ struct SessionTimelineCards: View {
   let showsShimmer: Bool
   let actionHandler: any DecisionActionHandler
   let onSignalTap: ((String) -> Void)?
+  @Environment(\.fontScale)
+  private var fontScale
 
   var body: some View {
     LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
@@ -15,7 +17,8 @@ struct SessionTimelineCards: View {
         SessionTimelineNodeCluster(
           row: row,
           actionHandler: actionHandler,
-          onSignalTap: onSignalTap
+          onSignalTap: onSignalTap,
+          fontScale: fontScale
         )
       }
 
@@ -41,6 +44,7 @@ struct SessionTimelineNodeCluster: View {
   let row: SessionTimelineRow
   let actionHandler: any DecisionActionHandler
   let onSignalTap: ((String) -> Void)?
+  let fontScale: CGFloat
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
@@ -50,7 +54,8 @@ struct SessionTimelineNodeCluster: View {
       SessionTimelineNodeRow(
         row: row,
         actionHandler: actionHandler,
-        onSignalTap: onSignalTap
+        onSignalTap: onSignalTap,
+        fontScale: fontScale
       )
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -64,6 +69,7 @@ struct SessionTimelineNodeCluster: View {
 extension SessionTimelineNodeCluster: @MainActor Equatable {
   static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.row == rhs.row
+      && lhs.fontScale == rhs.fontScale
       && ObjectIdentifier(lhs.actionHandler as AnyObject)
         == ObjectIdentifier(rhs.actionHandler as AnyObject)
       && (lhs.onSignalTap == nil) == (rhs.onSignalTap == nil)
@@ -75,18 +81,41 @@ private struct SessionTimelineNodeRow: View {
   let actionHandler: any DecisionActionHandler
   let onSignalTap: ((String) -> Void)?
   private let statusBadges: [SessionTimelineStatusBadge]
-  @Environment(\.fontScale)
-  private var fontScale
+  private let fontScale: CGFloat
+  private let timestampFont: Font
+  private let titleFont: Font
+  private let sourceFont: Font
+  private let detailFont: Font
+  private let compactSourceFont: Font
 
   init(
     row: SessionTimelineRow,
     actionHandler: any DecisionActionHandler,
-    onSignalTap: ((String) -> Void)? = nil
+    onSignalTap: ((String) -> Void)? = nil,
+    fontScale: CGFloat
   ) {
     self.row = row
     self.actionHandler = actionHandler
     self.onSignalTap = onSignalTap
+    self.fontScale = fontScale
     statusBadges = Self.makeStatusBadges(for: row.node)
+    timestampFont = HarnessMonitorTextSize.scaledFont(
+      .caption.monospaced(),
+      by: fontScale
+    )
+    titleFont = HarnessMonitorTextSize.scaledFont(
+      .system(.body, design: .rounded, weight: .semibold),
+      by: fontScale
+    )
+    sourceFont = HarnessMonitorTextSize.scaledFont(
+      .callout.monospaced(),
+      by: fontScale
+    )
+    detailFont = HarnessMonitorTextSize.scaledFont(.callout, by: fontScale)
+    compactSourceFont = HarnessMonitorTextSize.scaledFont(
+      .caption.monospaced(),
+      by: fontScale
+    )
   }
 
   private var node: SessionTimelineNode {
@@ -97,10 +126,17 @@ private struct SessionTimelineNodeRow: View {
     SessionTimelineTableMetrics.usesSimpleWideLayout(for: row)
   }
 
+  // Per-cell modifier-chain depth dominated `swift_conformsToProtocol`
+  // (87.7% of main-thread CPU during a 10s scroll). Each `.scaledFont(_:)`
+  // call expanded to `modifier(ScaledFontModifier)` plus a nested `.font(_:)`
+  // inside its body — two ModifiedContent layers per text label. Direct
+  // `.font(precomputedFont)` is one layer and skips the `@Environment(\.fontScale)`
+  // dependency edge that AG would otherwise wire from every label back to the
+  // row root.
   var body: some View {
     HStack(alignment: .sessionTimelineMarkerCenter, spacing: HarnessMonitorTheme.itemSpacing) {
       Text(row.timestampLabel)
-        .scaledFont(.caption.monospaced())
+        .font(timestampFont)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .lineLimit(1)
         .multilineTextAlignment(.leading)
@@ -117,8 +153,14 @@ private struct SessionTimelineNodeRow: View {
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.horizontal, HarnessMonitorTheme.cardPadding)
-      .padding(.vertical, HarnessMonitorTheme.spacingSM * max(1, fontScale))
+      .padding(
+        EdgeInsets(
+          top: HarnessMonitorTheme.spacingSM * max(1, fontScale),
+          leading: HarnessMonitorTheme.cardPadding,
+          bottom: HarnessMonitorTheme.spacingSM * max(1, fontScale),
+          trailing: HarnessMonitorTheme.cardPadding
+        )
+      )
       .background(SessionTimelineCardBackground(tint: cardTint))
       .alignmentGuide(.sessionTimelineMarkerCenter) { dimensions in
         dimensions[.sessionTimelineFirstLineCenter]
@@ -179,11 +221,11 @@ private struct SessionTimelineNodeRow: View {
             kindBadge
           }
           Text(node.title)
-            .scaledFont(.system(.body, design: .rounded, weight: .semibold))
+            .font(titleFont)
             .foregroundStyle(HarnessMonitorTheme.ink)
             .lineLimit(1)
           Text(node.sourceLabel)
-            .scaledFont(.callout.monospaced())
+            .font(sourceFont)
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             .lineLimit(1)
         }
@@ -192,7 +234,7 @@ private struct SessionTimelineNodeRow: View {
         }
         if let detail = node.detail {
           Text(detail)
-            .scaledFont(.callout)
+            .font(detailFont)
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             .lineLimit(1)
         }
@@ -210,7 +252,7 @@ private struct SessionTimelineNodeRow: View {
           kindBadge
         }
         Text(node.sourceLabel)
-          .scaledFont(.caption.monospaced())
+          .font(compactSourceFont)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .lineLimit(1)
         Spacer(minLength: HarnessMonitorTheme.spacingSM)
@@ -221,14 +263,14 @@ private struct SessionTimelineNodeRow: View {
       }
 
       Text(node.title)
-        .scaledFont(.system(.body, design: .rounded, weight: .semibold))
+        .font(titleFont)
         .foregroundStyle(HarnessMonitorTheme.ink)
         .lineLimit(2)
         .frame(maxWidth: .infinity, alignment: .leading)
 
       if let detail = node.detail {
         Text(detail)
-          .scaledFont(.callout)
+          .font(detailFont)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .lineLimit(2)
       }
