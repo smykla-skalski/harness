@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorKit
 
 public struct SessionWindowToken: Codable, Hashable, Sendable {
   public let sessionID: String
@@ -41,6 +42,16 @@ public enum SessionWindowRoute: String, CaseIterable, Codable, Hashable, Identif
     case .decisions: "exclamationmark.bubble"
     case .timeline: "clock"
     case .terminal: "terminal"
+    }
+  }
+
+  public var appSearchDomain: AppSearchDomain? {
+    switch self {
+    case .agents: .agents
+    case .decisions: .decisions
+    case .tasks: .tasks
+    case .timeline: .timeline
+    case .overview, .terminal: nil
     }
   }
 }

@@ -158,6 +158,20 @@ public enum SessionSelection: Hashable, Sendable {
     guard case .create(let draft) = self else { return nil }
     return draft
   }
+
+  /// The cross-domain search domain implied by this selection, when one
+  /// exists. Drilled-in selections (`.agent`, `.decision`, `.task`) imply
+  /// their parent route's domain. `.codexRun` and `.create` and routes
+  /// without a search domain (`.overview`, `.terminal`) return `nil`.
+  public var routeDomain: AppSearchDomain? {
+    switch self {
+    case .agent: .agents
+    case .decision: .decisions
+    case .task: .tasks
+    case .codexRun, .create: nil
+    case .route(let route): route.appSearchDomain
+    }
+  }
 }
 
 public enum SessionSelectionSource: Hashable, Sendable {

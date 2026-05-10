@@ -439,16 +439,6 @@ public struct SessionWindowView: View {
       }
   }
 
-  private func sessionWindowFocusedValues<Content: View>(
-    _ content: Content
-  ) -> some View {
-    content
-      .focusedSceneValue(\.sessionNavigation, navigationCommand)
-      .focusedSceneValue(\.sessionAttention, attentionFocus)
-      .focusedSceneValue(\.sessionInspector, canPresentInspector ? inspectorCommand : nil)
-      .focusedSceneValue(\.sessionDecisionCommands, decisionCommand)
-      .focusedSceneValue(\.sessionCreateContext, createContext)
-  }
 
   @ToolbarContentBuilder private var sessionToolbar: some ToolbarContent {
     SessionWindowToolbar(

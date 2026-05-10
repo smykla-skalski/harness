@@ -1,18 +1,21 @@
 import SwiftUI
 
-// Route-aware label for the Cmd-F menu item. Three callers use this type today
-// (main window, workspace decision route, workspace non-decision route).
-// When a fourth caller appears, widen the enum here.
+// Route-aware label for the Cmd-F menu item. Four callers use this type today
+// (main window, workspace decision route, workspace non-decision route, and
+// the unified session-window search). When a fifth caller appears, widen the
+// enum here.
 public enum HarnessSidebarSearchMenuLabel: Sendable, Equatable {
   case findInSessions
   case findInDecisions
   case findGeneric
+  case findInSession
 
   public var localizedTitle: LocalizedStringKey {
     switch self {
     case .findInSessions: "Find in Sessions"
     case .findInDecisions: "Find in Decisions"
     case .findGeneric: "Find"
+    case .findInSession: "Find in Session"
     }
   }
 }
@@ -56,9 +59,50 @@ public struct HarnessSidebarSearchFocus: Equatable {
   }
 }
 
+@MainActor
+public final class HarnessAppSearchActionDispatcher {
+  public var handler: (() -> Void)?
+
+  public init() {}
+
+  public func invoke() {
+    handler?()
+  }
+}
+
+public struct HarnessAppSearchAction: Equatable {
+  public let isAvailable: Bool
+  public let menuLabel: HarnessSidebarSearchMenuLabel
+  public let dispatcher: HarnessAppSearchActionDispatcher
+
+  public init(
+    isAvailable: Bool,
+    menuLabel: HarnessSidebarSearchMenuLabel,
+    dispatcher: HarnessAppSearchActionDispatcher
+  ) {
+    self.isAvailable = isAvailable
+    self.menuLabel = menuLabel
+    self.dispatcher = dispatcher
+  }
+
+  @MainActor
+  public func invoke() {
+    guard isAvailable else { return }
+    dispatcher.invoke()
+  }
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.isAvailable == rhs.isAvailable
+      && lhs.menuLabel == rhs.menuLabel
+      && lhs.dispatcher === rhs.dispatcher
+  }
+}
+
 extension FocusedValues {
   @Entry public var harnessSidebarSearchFocusAction: HarnessSidebarSearchFocus?
   @Entry public var harnessSidebarVisibilityRequest: HarnessSidebarVisibilityRequest?
+  @Entry public var harnessSessionRouteFocus: HarnessSessionRouteFocus?
+  @Entry public var harnessAppSearchAction: HarnessAppSearchAction?
 }
 
 extension View {
