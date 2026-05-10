@@ -56,6 +56,15 @@ public final class SessionWindowStateCache {
     updateSelection(.decision(sessionID: sessionID, decisionID: decisionID), source: .programmatic)
   }
 
+  public func autoSelectDecision(_ decisionID: String) {
+    updateSelection(
+      .decision(sessionID: sessionID, decisionID: decisionID),
+      source: .programmatic,
+      rememberCurrentSelection: false,
+      recordHistory: false
+    )
+  }
+
   public func selectTask(_ taskID: String) {
     updateSelection(.task(sessionID: sessionID, taskID: taskID), source: .programmatic)
   }

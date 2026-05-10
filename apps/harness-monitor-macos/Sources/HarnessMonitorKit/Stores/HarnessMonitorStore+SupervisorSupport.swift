@@ -117,6 +117,28 @@ extension HarnessMonitorStore {
     }
   }
 
+  static func loadSupervisorAuditEvents(
+    from modelContext: ModelContext?,
+    limit: Int = 128
+  ) -> [SupervisorEvent] {
+    guard let modelContext else {
+      return []
+    }
+
+    do {
+      var descriptor = FetchDescriptor<SupervisorEvent>(
+        sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+      )
+      descriptor.fetchLimit = limit
+      return try modelContext.fetch(descriptor)
+    } catch {
+      HarnessMonitorLogger.supervisorWarning(
+        "supervisor.audit_event_load_failed error=\(String(describing: error))"
+      )
+      return []
+    }
+  }
+
   static func decodeParameters(from json: String) -> [String: String] {
     guard
       let data = json.data(using: .utf8),

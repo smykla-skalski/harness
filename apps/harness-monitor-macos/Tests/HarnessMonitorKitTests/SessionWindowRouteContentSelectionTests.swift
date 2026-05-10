@@ -1,8 +1,48 @@
 import Foundation
 import Testing
+@testable import HarnessMonitorUIPreviewable
 
 @Suite("Session window route content selection")
 struct SessionWindowRouteContentSelectionTests {
+  @Test("Session sidebar routes include the session decisions queue")
+  func sessionSidebarRoutesIncludeSessionDecisionsQueue() throws {
+    let sidebar = try sourceFile(named: "SessionSidebar.swift")
+
+    #expect(
+      sidebar.contains(
+        "ForEach([SessionWindowRoute.overview, .decisions, .timeline, .terminal])"
+      )
+    )
+  }
+
+  @Test("Session decisions auto-select only when the route lacks a stable visible target")
+  func sessionDecisionAutoSelectionOnlyRunsWhenNeeded() {
+    #expect(
+      SessionDecisionAutoSelectionPolicy.preferredDecisionID(
+        selection: .route(.decisions),
+        sessionID: "sess-1",
+        allDecisionIDs: ["dec-1", "dec-2"],
+        visibleDecisionIDs: ["dec-2", "dec-1"]
+      ) == "dec-2"
+    )
+    #expect(
+      SessionDecisionAutoSelectionPolicy.preferredDecisionID(
+        selection: .decision(sessionID: "sess-1", decisionID: "missing"),
+        sessionID: "sess-1",
+        allDecisionIDs: ["dec-2"],
+        visibleDecisionIDs: ["dec-2"]
+      ) == "dec-2"
+    )
+    #expect(
+      SessionDecisionAutoSelectionPolicy.preferredDecisionID(
+        selection: .decision(sessionID: "sess-1", decisionID: "dec-1"),
+        sessionID: "sess-1",
+        allDecisionIDs: ["dec-1", "dec-2"],
+        visibleDecisionIDs: ["dec-2"]
+      ) == nil
+    )
+  }
+
   @Test("Summary lists bind selection directly to the session window state")
   func summaryListsBindSelectionDirectlyToSessionState() throws {
     let source = try sourceFile(named: "SessionWindowRouteContent.swift")
@@ -62,6 +102,16 @@ struct SessionWindowRouteContentSelectionTests {
 
     #expect(columns.contains("HarnessMonitorAccessibility.decisionRow(decision.id)"))
     #expect(columns.contains(".harnessMCPRow("))
+  }
+
+  @Test("Session decisions wire auto-selection into cache recomputation and detail rendering")
+  func sessionDecisionsWireAutoSelectionIntoCacheRecomputationAndDetailRendering() throws {
+    let columns = try sourceFile(named: "SessionWindowView+Columns.swift")
+
+    #expect(columns.contains("SessionDecisionAutoSelectionPolicy.preferredDecisionID"))
+    #expect(columns.contains("stateCache.autoSelectDecision(autoSelectedDecisionID)"))
+    #expect(columns.contains("case .route(.decisions):"))
+    #expect(columns.contains("selectedTab: decisionDetailTabBinding"))
   }
 
   private func sourceFile(named name: String) throws -> String {

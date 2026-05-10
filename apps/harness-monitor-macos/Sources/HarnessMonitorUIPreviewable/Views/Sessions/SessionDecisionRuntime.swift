@@ -2,6 +2,7 @@ import Foundation
 import HarnessMonitorKit
 import Observation
 import OSLog
+import SwiftData
 
 public enum SessionDecisionInspectorTab: String, CaseIterable, Codable, Hashable, Sendable {
   case context
@@ -42,6 +43,7 @@ public enum SessionInspectorVisibilityPolicy {
 @Observable
 public final class SessionDecisionRuntime {
   public var inspectorTab: SessionDecisionInspectorTab = .context
+  public private(set) var auditEvents: [SupervisorEvent] = []
   public private(set) var filteredDecisionIDs: [String] = []
   public private(set) var hasFilteredDecisions = false
   public private(set) var isFilteringDecisions = false
@@ -122,6 +124,10 @@ public final class SessionDecisionRuntime {
 
   public func waitForDecisionFilterIdle() async {
     await filterTask?.value
+  }
+
+  public func reloadAuditEvents(from modelContext: ModelContext?) {
+    auditEvents = HarnessMonitorStore.loadSupervisorAuditEvents(from: modelContext)
   }
 
   public func contextRows(for decision: Decision) -> [SessionDecisionContextRow] {

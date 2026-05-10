@@ -5,8 +5,8 @@ import Testing
 
 @Suite("Session SwiftUI source contracts")
 struct SessionSwiftUISourceTests {
-  @Test("Task and decision detail stay on native shared scroll surfaces")
-  func taskAndDecisionDetailUseNativeFormSectionsWhileDetailScrollSurfaceStaysShared() throws {
+  @Test("Task detail stays on the native form surface while session decisions reuse the rich shared detail")
+  func taskAndDecisionDetailSurfacesStayAlignedWithTheirSharedContainers() throws {
     let taskSource = try sourceFile(at: "Views/Sessions/SessionTaskDetailPane.swift")
     let decisionSource = try sourceFile(at: "Views/Sessions/SessionDecisionDetailPane.swift")
     let codexSource = try sourceFile(at: "Views/Sessions/SessionCodexRunDetailSection.swift")
@@ -30,28 +30,12 @@ struct SessionSwiftUISourceTests {
     #expect(taskSource.contains(".scrollDisabled(true)"))
     #expect(taskSource.contains(".scrollContentBackground(.hidden)"))
     #expect(!taskSource.contains("SessionDetailPanel("))
-    #expect(decisionSource.contains("SessionDetailScrollSurface(contentPadding: 0)"))
     #expect(decisionSource.contains("SessionFilteredDecisionNotice("))
-    #expect(decisionSource.contains("Form {"))
-    #expect(decisionSource.contains(".harnessNativeFormContainer()"))
-    #expect(
-      decisionSource.contains(
-        ".contentMargins(.horizontal, metrics.contentPadding, for: .scrollContent)"
-      )
-    )
-    #expect(
-      decisionSource.contains(
-        ".contentMargins(.top, formTopContentPadding, for: .scrollContent)"
-      )
-    )
-    #expect(
-      decisionSource.contains(
-        ".contentMargins(.bottom, metrics.contentPadding, for: .scrollContent)"
-      )
-    )
-    #expect(decisionSource.contains(".scrollDisabled(true)"))
-    #expect(decisionSource.contains(".scrollContentBackground(.hidden)"))
-    #expect(!decisionSource.contains("SessionDetailPanel("))
+    #expect(decisionSource.contains("DecisionDetailView("))
+    #expect(decisionSource.contains("handler: actionHandler"))
+    #expect(decisionSource.contains("auditEvents: auditEvents"))
+    #expect(!decisionSource.contains("HarnessMonitorJSONCodeBlock("))
+    #expect(!decisionSource.contains("Form {"))
     #expect(codexSource.contains("SessionDetailScrollSurface("))
     #expect(!codexSource.contains("ScrollView {"))
     #expect(!agentDetailSource.contains("SessionDetailScrollSurface("))
@@ -64,7 +48,6 @@ struct SessionSwiftUISourceTests {
     let themeSource = try sourceFile(at: "Theme/HarnessMonitorTextSize.swift")
     let sectionFiles = [
       "Views/Sessions/SessionTaskDetailPane.swift",
-      "Views/Sessions/SessionDecisionDetailPane.swift",
       "Views/Sessions/SessionWindowCreateForm.swift",
       "Views/Settings/SettingsConnectionCard.swift",
       "Views/Settings/SettingsCodexSection.swift",
@@ -84,7 +67,6 @@ struct SessionSwiftUISourceTests {
     ]
     let containerFiles = [
       "Views/Sessions/SessionTaskDetailPane.swift",
-      "Views/Sessions/SessionDecisionDetailPane.swift",
       "Views/Sessions/SessionWindowCreateForm.swift",
     ]
 
