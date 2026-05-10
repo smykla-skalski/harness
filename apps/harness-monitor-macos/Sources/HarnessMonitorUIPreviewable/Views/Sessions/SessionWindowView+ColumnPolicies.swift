@@ -46,6 +46,18 @@ public enum SessionDecisionAutoSelectionPolicy {
   }
 }
 
+public enum SessionAgentRouteSelectionPolicy {
+  public static func preferredRouteDetailAgentID(
+    rememberedAgentID: String?,
+    visibleAgentIDs: [String]
+  ) -> String? {
+    if let rememberedAgentID, visibleAgentIDs.contains(rememberedAgentID) {
+      return rememberedAgentID
+    }
+    return visibleAgentIDs.first
+  }
+}
+
 extension SessionWindowView {
   func pendingUserPrompt(for agentID: String) -> AgentPendingUserPrompt? {
     guard

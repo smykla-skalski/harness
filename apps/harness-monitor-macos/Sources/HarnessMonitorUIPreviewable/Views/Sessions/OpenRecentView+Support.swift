@@ -111,7 +111,7 @@ struct KeyboardShortcutLabel: View {
     case .modifier:
       .callout.monospaced()
     case .key:
-      .caption.monospaced()
+      .callout.monospaced()
     }
   }
 }

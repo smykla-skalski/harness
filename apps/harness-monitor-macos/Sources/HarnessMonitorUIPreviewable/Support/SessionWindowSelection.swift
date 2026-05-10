@@ -155,18 +155,6 @@ public struct SessionCreateDraft: Codable, Hashable, Sendable {
   }
 }
 
-enum SessionAgentAutoSelectionPolicy {
-  static func preferredAgentID(
-    selection: SessionSelection,
-    visibleAgentIDs: [String]
-  ) -> String? {
-    guard case .route(.agents) = selection else {
-      return nil
-    }
-    return visibleAgentIDs.first
-  }
-}
-
 public enum SessionSelection: Hashable, Sendable {
   case route(SessionWindowRoute)
   case agent(sessionID: String, agentID: String)

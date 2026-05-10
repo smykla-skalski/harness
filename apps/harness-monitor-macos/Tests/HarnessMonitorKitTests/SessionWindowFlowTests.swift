@@ -153,6 +153,11 @@ struct SessionWindowFlowTests {
   func sessionSidebarSelectionUsesNativeRowsWithoutComposerFocus() {
     let state = SessionWindowStateCache(sessionID: "sess-alpha")
 
+    state.selectFromSidebar(.route(.agents))
+    #expect(state.selection == .route(.agents))
+    #expect(state.selectionSource == .sidebar)
+    #expect(state.agentComposerFocusRequestID == 0)
+
     state.selectFromSidebar(.route(.timeline))
     #expect(state.selectionSource == .sidebar)
     #expect(state.agentComposerFocusRequestID == 0)
@@ -164,6 +169,19 @@ struct SessionWindowFlowTests {
 
     state.selectFromSidebar(.task(sessionID: "sess-alpha", taskID: "task-a"))
     #expect(state.agentComposerFocusRequestID == 0)
+  }
+
+  @MainActor
+  @Test("Route-level agent selection does not replace the agents route selection")
+  func routeLevelAgentSelectionDoesNotReplaceTheAgentsRouteSelection() {
+    let state = SessionWindowStateCache(sessionID: "sess-alpha")
+
+    state.selectFromSidebar(.route(.agents))
+    state.setRouteAgentID("agent-a")
+
+    #expect(state.selection == .route(.agents))
+    #expect(state.sectionState.agentID == "agent-a")
+    #expect(state.selectionSource == .sidebar)
   }
 
   @MainActor
