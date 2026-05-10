@@ -41,6 +41,10 @@ Full git worktrees are mandatory for parallel Monitor work. Any agent or user
 that edits Monitor files, regenerates Tuist projects, builds/tests, launches a
 daemon/bridge, or uses XcodeBuildMCP needs a separate checkout.
 
+Those worktrees are temporary isolation only. Finished Monitor work must be
+replayed into the local `main` checkout before handoff. If the work is fully in
+local `main`, remove the temporary worktree and branch afterward.
+
 Inside a worktree:
 
 - `HARNESS_MONITOR_BUILD_LANE=<name>` isolates DerivedData under
