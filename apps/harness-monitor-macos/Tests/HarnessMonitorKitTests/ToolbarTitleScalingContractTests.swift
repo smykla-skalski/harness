@@ -27,8 +27,8 @@ struct ToolbarTitleScalingContractTests {
     #expect(!sessionRootSource.contains(".navigationTitle(windowTitle)"))
   }
 
-  @Test("Session status lives in the sidebar footer and uses a compact focus-mode fallback")
-  func sessionStatusLivesInSidebarFooterAndUsesCompactFocusModeFallback() throws {
+  @Test("Session status lives only in the sidebar footer")
+  func sessionStatusLivesOnlyInSidebarFooter() throws {
     let toolbarSource = try previewableSourceFile(
       named: "Views/Sessions/SessionWindowToolbar.swift"
     )
@@ -42,7 +42,6 @@ struct ToolbarTitleScalingContractTests {
     #expect(sidebarSource.contains(".safeAreaInset(edge: .bottom, spacing: 0)"))
     #expect(sidebarSource.contains("SessionSidebarFooter(model: statusModel)"))
     #expect(footerSource.contains("struct SessionSidebarFooter"))
-    #expect(footerSource.contains("struct SessionToolbarStatusFallback"))
     #expect(footerSource.contains("SessionStatusStripState"))
     #expect(footerSource.contains("SessionStatusSourceIcon(source: source)"))
     #expect(footerSource.contains("SessionStatusTransportChrome(metrics: metrics)"))
@@ -60,7 +59,8 @@ struct ToolbarTitleScalingContractTests {
         "RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)"
       )
     )
-    #expect(toolbarSource.contains("SessionToolbarStatusFallback(model: focusModeStatusModel)"))
+    #expect(!toolbarSource.contains("SessionToolbarStatusFallback("))
+    #expect(!toolbarSource.contains("focusModeStatusModel"))
     #expect(!toolbarSource.contains("SessionToolbarCenterpiece("))
     #expect(!footerSource.contains("Divider()"))
     #expect(!footerSource.contains("HarnessMonitorGlassControlGroup"))

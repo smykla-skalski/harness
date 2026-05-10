@@ -102,29 +102,6 @@ struct SessionSidebarFooter: View {
   }
 }
 
-struct SessionToolbarStatusFallback: View {
-  let model: SessionStatusSummaryModel
-  @ScaledMetric(relativeTo: .caption)
-  private var horizontalPadding: CGFloat = 8
-
-  var body: some View {
-    SessionStatusSummary(
-      metrics: model.metrics,
-      source: model.sourcePresentation,
-      statusStripState: model.statusStripState,
-      usesFlexibleSpacer: false
-    )
-    .padding(.vertical, HarnessMonitorTheme.itemSpacing)
-    .padding(.horizontal, horizontalPadding)
-    .fixedSize(horizontal: true, vertical: false)
-    .help(model.helpText)
-    .accessibilityElement(children: .ignore)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowStatusSurface)
-    .accessibilityLabel("Session status")
-    .accessibilityValue(model.accessibilityValue)
-  }
-}
-
 private struct SessionStatusSummary: View {
   let metrics: ConnectionMetrics
   let source: SessionStatusSourcePresentation

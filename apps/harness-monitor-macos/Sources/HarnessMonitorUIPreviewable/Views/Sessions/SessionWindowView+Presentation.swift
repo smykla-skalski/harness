@@ -178,7 +178,6 @@ extension SessionWindowView {
     SessionWindowToolbar(
       store: store,
       model: sessionToolbarModel,
-      focusModeStatusModel: focusMode ? sessionStatusSummaryModel : nil,
       state: stateCache,
       focusMode: focusModeBinding
     )
