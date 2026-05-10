@@ -76,9 +76,19 @@ public struct AppSearchHostModifier: ViewModifier {
       .searchFocused($searchFieldFocused)
       .searchPresentationToolbarBehavior(.avoidHidingContent)
       .harnessMinimizableSearchToolbar()
-      .searchScopes($model.scope, activation: .onSearchPresentation) {
-        ForEach(AppSearchScope.allCases) { value in
-          Text(value.label).tag(value)
+      .toolbar {
+        ToolbarItem(placement: .primaryAction) {
+          Menu {
+            Picker("Search scope", selection: $model.scope) {
+              ForEach(AppSearchScope.allCases) { value in
+                Text(value.label).tag(value)
+              }
+            }
+          } label: {
+            Label(model.scope.label, systemImage: "line.3.horizontal.decrease.circle")
+          }
+          .help("Search scope")
+          .accessibilityIdentifier("app-search.scope-menu")
         }
       }
       .searchSuggestions {
