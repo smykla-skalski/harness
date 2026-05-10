@@ -86,6 +86,7 @@ public struct AppSearchHostModifier: ViewModifier {
           routeAction: routeAction
         )
       }
+      .searchSuggestions(.visible, for: .menu)
       .background {
         Button("Find in Session", action: focusSearchField)
           .keyboardShortcut("f", modifiers: .command)

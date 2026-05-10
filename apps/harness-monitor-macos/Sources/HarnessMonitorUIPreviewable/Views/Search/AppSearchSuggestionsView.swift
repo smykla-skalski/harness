@@ -3,17 +3,18 @@ import SwiftUI
 
 /// Sectioned popover content rendered inside `.searchSuggestions { … }`.
 ///
-/// The first row is a multi-select filter rail: an "All" button plus
-/// one button per ``AppSearchDomain``. "All" clears the selection (=
-/// show every non-empty section); any combination of the four domain
-/// buttons narrows the popover to those domains.
+/// The first section is a multi-select filter list: an "All" row plus
+/// one row per ``AppSearchDomain``. Each row is a native `Button` —
+/// the only interactive primitive `.searchSuggestions` reliably
+/// hit-tests on macOS. A leading checkmark indicates selection.
+/// "All" clears the set; any combination of domain rows narrows the
+/// popover to those domains.
 ///
-/// Below the rail, each hit row is a native `Button` so SwiftUI's
-/// built-in arrow-key navigation in `.searchSuggestions` lands focus
-/// on it. Pressing Return invokes `routeAction` and dismisses the
-/// search field via the environment action. `.searchCompletion(_:)`
-/// supplies the title as the keyboard completion so Tab pre-fills
-/// the query without leaving the field.
+/// Below the filter section, each hit row is a `Button`. Pressing
+/// Return invokes `routeAction` and dismisses the search field via
+/// `Environment(\.dismissSearch)`. `.searchCompletion(_:)` supplies
+/// the title as the keyboard completion so Tab pre-fills the query
+/// without leaving the field.
 public struct AppSearchSuggestionsView: View {
   let results: AppSearchResults
   @Binding var selectedDomains: Set<AppSearchDomain>
@@ -33,7 +34,22 @@ public struct AppSearchSuggestionsView: View {
   }
 
   public var body: some View {
-    filterRail
+    Section("Filter by") {
+      filterRow(
+        label: "All",
+        isSelected: selectedDomains.isEmpty
+      ) {
+        selectedDomains = []
+      }
+      ForEach(AppSearchDomain.allCases) { domain in
+        filterRow(
+          label: domain.label,
+          isSelected: selectedDomains.contains(domain)
+        ) {
+          toggle(domain)
+        }
+      }
+    }
     ForEach(visibleSections) { section in
       Section {
         ForEach(section.hits) { hit in
@@ -52,41 +68,27 @@ public struct AppSearchSuggestionsView: View {
     return results.sections.filter { selectedDomains.contains($0.domain) }
   }
 
-  private var filterRail: some View {
-    HStack(spacing: 6) {
-      Toggle(isOn: allModeBinding) {
-        Label("All", systemImage: "square.grid.2x2")
-      }
-      ForEach(AppSearchDomain.allCases) { domain in
-        Toggle(isOn: domainBinding(for: domain)) {
-          Label(domain.label, systemImage: domain.systemImage)
-        }
+  private func toggle(_ domain: AppSearchDomain) {
+    if selectedDomains.contains(domain) {
+      selectedDomains.remove(domain)
+    } else {
+      selectedDomains.insert(domain)
+    }
+  }
+
+  private func filterRow(
+    label: String,
+    isSelected: Bool,
+    action: @escaping () -> Void
+  ) -> some View {
+    Button(action: action) {
+      HStack(spacing: 8) {
+        Image(systemName: isSelected ? "checkmark" : "circle")
+          .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+          .frame(width: 18)
+        Text(label)
       }
     }
-    .toggleStyle(.button)
-    .controlSize(.small)
-    .padding(.vertical, 2)
-    .accessibilityIdentifier("app-search.filter-rail")
-  }
-
-  private var allModeBinding: Binding<Bool> {
-    Binding(
-      get: { selectedDomains.isEmpty },
-      set: { _ in selectedDomains = [] }
-    )
-  }
-
-  private func domainBinding(for domain: AppSearchDomain) -> Binding<Bool> {
-    Binding(
-      get: { selectedDomains.contains(domain) },
-      set: { isOn in
-        if isOn {
-          selectedDomains.insert(domain)
-        } else {
-          selectedDomains.remove(domain)
-        }
-      }
-    )
   }
 
   private func row(for hit: AppSearchHit) -> some View {
@@ -113,7 +115,6 @@ public struct AppSearchSuggestionsView: View {
 
   private func sectionHeader(_ section: AppSearchSection) -> some View {
     HStack(spacing: 6) {
-      Image(systemName: section.domain.systemImage)
       Text(section.domain.label)
       if section.truncated {
         Spacer(minLength: 4)
