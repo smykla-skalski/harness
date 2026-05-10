@@ -92,15 +92,6 @@ final class SessionTimelineTableCellView: NSTableCellView {
     wantsLayer = true
     layer?.backgroundColor = NSColor.clear.cgColor
     addSubview(connectorView)
-    // Default `preferredContentSize` re-runs `ViewGraph.sizeThatFits` on
-    // every scroll-driven layout pass — a `sample` of the scrolling app
-    // showed `NSHostingView.invalidateSizeConstraintsIfNecessary → minSize →
-    // sizeThatFits` accounting for ~35% of main-thread time on its own.
-    // The cell's hosting view is pinned to cell bounds via the four anchor
-    // constraints below; AppKit drives its size entirely, so SwiftUI does
-    // not need to propose anything back. Row-height measurement uses the
-    // separate `sizingHost` and is unaffected.
-    hostingView.sizingOptions = []
     hostingView.translatesAutoresizingMaskIntoConstraints = false
     addSubview(hostingView)
     NSLayoutConstraint.activate([
