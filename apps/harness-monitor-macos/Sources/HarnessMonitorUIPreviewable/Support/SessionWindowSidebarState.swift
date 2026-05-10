@@ -200,6 +200,12 @@ public final class SessionSidebarSelectionState {
     }
   }
 
+  public var hasActiveMultiSelection: Bool {
+    selectedAgentIDs.count > 1
+      || selectedTaskIDs.count > 1
+      || selectedDecisionIDs.count > 1
+  }
+
   public func clear() {
     selectedAgentIDs.removeAll()
     selectedTaskIDs.removeAll()

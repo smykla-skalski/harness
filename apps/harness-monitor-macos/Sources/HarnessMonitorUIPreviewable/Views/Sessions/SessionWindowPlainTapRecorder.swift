@@ -22,10 +22,14 @@ import SwiftUI
 ///   `feedback_native_swiftui_only.md`.
 struct SessionWindowPlainTapRecorder: ViewModifier {
   let stateCache: SessionWindowStateCache
+  let isEnabled: Bool
 
   func body(content: Content) -> some View {
     content.background(
-      SessionWindowPlainTapMonitor(stateCache: stateCache)
+      SessionWindowPlainTapMonitor(
+        stateCache: stateCache,
+        isEnabled: isEnabled
+      )
         .frame(width: 0, height: 0)
         .accessibilityHidden(true)
     )
@@ -34,6 +38,7 @@ struct SessionWindowPlainTapRecorder: ViewModifier {
 
 private struct SessionWindowPlainTapMonitor: NSViewRepresentable {
   let stateCache: SessionWindowStateCache
+  let isEnabled: Bool
 
   func makeCoordinator() -> Coordinator {
     Coordinator(stateCache: stateCache)
@@ -42,10 +47,19 @@ private struct SessionWindowPlainTapMonitor: NSViewRepresentable {
   func makeNSView(context: Context) -> NSView {
     let view = TrackingView()
     view.coordinator = context.coordinator
+    view.isEnabled = isEnabled
+    context.coordinator.setEnabled(isEnabled, for: view.window)
     return view
   }
 
-  func updateNSView(_: NSView, context _: Context) {}
+  func updateNSView(_ nsView: NSView, context: Context) {
+    guard let tracking = nsView as? TrackingView else {
+      return
+    }
+    tracking.coordinator = context.coordinator
+    tracking.isEnabled = isEnabled
+    context.coordinator.setEnabled(isEnabled, for: tracking.window)
+  }
 
   static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
     if let tracking = nsView as? TrackingView {
@@ -59,12 +73,26 @@ private struct SessionWindowPlainTapMonitor: NSViewRepresentable {
     let stateCache: SessionWindowStateCache
     private var monitor: Any?
     private weak var hostWindow: NSWindow?
+    private var isEnabled = false
 
     init(stateCache: SessionWindowStateCache) {
       self.stateCache = stateCache
     }
 
+    func setEnabled(_ enabled: Bool, for window: NSWindow?) {
+      isEnabled = enabled
+      guard enabled, let window else {
+        stop()
+        return
+      }
+      start(for: window)
+    }
+
     func start(for window: NSWindow) {
+      guard isEnabled else {
+        stop()
+        return
+      }
       guard hostWindow !== window else { return }
       stop()
       hostWindow = window
@@ -92,17 +120,15 @@ private struct SessionWindowPlainTapMonitor: NSViewRepresentable {
 
   final class TrackingView: NSView {
     nonisolated(unsafe) var coordinator: Coordinator?
+    var isEnabled = false
 
     override func viewDidMoveToWindow() {
       super.viewDidMoveToWindow()
       let coord = coordinator
       let attachedWindow = window
+      let enabled = isEnabled
       Task { @MainActor in
-        if let attachedWindow {
-          coord?.start(for: attachedWindow)
-        } else {
-          coord?.stop()
-        }
+        coord?.setEnabled(enabled, for: attachedWindow)
       }
     }
   }
