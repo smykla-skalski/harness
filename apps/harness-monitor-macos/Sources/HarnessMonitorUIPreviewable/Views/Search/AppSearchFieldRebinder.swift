@@ -2,35 +2,18 @@ import AppKit
 import SwiftUI
 
 /// Re-arms the SwiftUI `.searchable` field's suggestion menu when
-/// the hosting window regains key state OR the user clicks back into
-/// the field while it's still first responder.
+/// the hosting window regains key state.
 ///
 /// SwiftUI's `.searchSuggestions` is backed by the AppKit suggestion
-/// menu attached to `NSSearchField`. That menu dismisses any time the
-/// window resigns key OR a different responder takes focus, and does
-/// NOT reappear automatically. There is no SwiftUI-only API to force
-/// re-presentation. The community-documented bridge
+/// menu attached to `NSSearchField`. That menu dismisses when the
+/// window resigns key/active and does NOT reappear automatically when
+/// the window regains it. The community-documented bridge
 /// (https://github.com/siteline/swiftui-introspect/discussions/397)
 /// is to find the `NSSearchField` in the window's view hierarchy and
-/// make it first responder. The `beginSearchInteraction()` API lives
-/// on `NSSearchToolbarItem`, not `NSSearchField`, so field-backed
-/// SwiftUI search has to stay with the responder-chain bridge.
+/// cycle first-responder off and back on so AppKit re-presents the
+/// menu.
 ///
-/// Two re-arm paths are needed because the dismissal modes don't
-/// share a notification:
-///
-/// 1. `NSWindow.didBecomeKeyNotification` — fires when the window
-///    transitions back to key (e.g. ⌘-tab into the app). Re-arm by
-///    cycling first responder off and back onto the search field so
-///    AppKit re-presents the menu even when the field never lost
-///    first-responder status across the resign/key flip.
-/// 2. `.leftMouseDown` local event monitor — fires when the user
-///    clicks anywhere in the window. If the click hit the search
-///    field while we have a non-empty query, the menu was almost
-///    certainly dismissed by an earlier focus event with no
-///    notification we could observe; force the same FR cycle.
-///
-/// `shouldRebind` gates both paths so we only fire when the user has
+/// `shouldRebind` gates the cycle so we only fire when the user has
 /// a non-empty query AND the search bar is still presented.
 struct AppSearchFieldRebinder: NSViewRepresentable {
   let shouldRebind: Bool
@@ -69,7 +52,6 @@ struct AppSearchFieldRebinder: NSViewRepresentable {
   final class Coordinator: NSObject {
     private weak var observedWindow: NSWindow?
     private var keyObserver: NSObjectProtocol?
-    private var clickMonitor: Any?
     private var shouldRebind = false
 
     func update(shouldRebind newValue: Bool) {
@@ -90,19 +72,6 @@ struct AppSearchFieldRebinder: NSViewRepresentable {
           self?.rearmIfNeeded(in: window)
         }
       }
-      clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown]) {
-        [weak self] event in
-        // AppKit dispatches local mouse events on the main thread; we
-        // bridge synchronously so rearming happens BEFORE AppKit hands
-        // the click to the field. Going through Task { @MainActor }
-        // queues to the next runloop tick, by which point the field
-        // has already absorbed the click and the FR cycle becomes a
-        // visible flicker that doesn't reliably re-open the menu.
-        MainActor.assumeIsolated {
-          self?.handleClick(event)
-        }
-        return event
-      }
     }
 
     func detach() {
@@ -110,28 +79,7 @@ struct AppSearchFieldRebinder: NSViewRepresentable {
         NotificationCenter.default.removeObserver(keyObserver)
       }
       keyObserver = nil
-      if let clickMonitor {
-        NSEvent.removeMonitor(clickMonitor)
-      }
-      clickMonitor = nil
       observedWindow = nil
-    }
-
-    private func handleClick(_ event: NSEvent) {
-      guard shouldRebind else { return }
-      guard let window = observedWindow, event.window === window else {
-        return
-      }
-      guard let field = locateSearchField(in: window.contentView) else { return }
-      let pointInField = field.convert(event.locationInWindow, from: nil)
-      guard field.bounds.contains(pointInField) else { return }
-      // Click path: drop first-responder synchronously (BEFORE the
-      // event reaches the field's mouseDown). AppKit's normal click
-      // handling will then re-promote the field to first responder
-      // via mouseDown → that's the same code path that auto-shows
-      // the suggestion menu when the user clicks an unfocused search
-      // field. No async restore — AppKit owns the second leg.
-      window.makeFirstResponder(nil)
     }
 
     private func rearmIfNeeded(in window: NSWindow) {
