@@ -3,24 +3,20 @@ import SwiftUI
 
 /// Sectioned popover content rendered inside `.searchSuggestions { … }`.
 ///
-/// Each hit row is a native `Button`. Pressing Return invokes
-/// `routeAction` and dismisses the search field via
-/// `Environment(\.dismissSearch)`. `.searchCompletion(_:)` supplies
-/// the title as the keyboard completion so Tab pre-fills the query
-/// without leaving the field.
+/// Each row is a `Button`; Return and click both run `onPick`. The
+/// host wires `onPick` to a single route + clear-query + dismiss pass
+/// so the per-route list filter drops back to its unfiltered state
+/// after drilling into a hit.
 public struct AppSearchSuggestionsView: View {
   let results: AppSearchResults
-  let routeAction: (AppSearchHit) -> Void
-
-  @Environment(\.dismissSearch)
-  private var dismissSearch
+  let onPick: (AppSearchHit) -> Void
 
   public init(
     results: AppSearchResults,
-    routeAction: @escaping (AppSearchHit) -> Void
+    onPick: @escaping (AppSearchHit) -> Void
   ) {
     self.results = results
-    self.routeAction = routeAction
+    self.onPick = onPick
   }
 
   public var body: some View {
@@ -37,8 +33,7 @@ public struct AppSearchSuggestionsView: View {
 
   private func row(for hit: AppSearchHit) -> some View {
     Button {
-      routeAction(hit)
-      dismissSearch()
+      onPick(hit)
     } label: {
       HStack(spacing: 8) {
         Image(systemName: hit.systemImage)
@@ -54,7 +49,6 @@ public struct AppSearchSuggestionsView: View {
         }
       }
     }
-    .searchCompletion(hit.title)
   }
 
   private func sectionHeader(_ section: AppSearchSection) -> some View {
