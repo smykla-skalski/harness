@@ -4,7 +4,7 @@ import XCTest
 
 @MainActor
 final class DecisionDetailViewModelTests: XCTestCase {
-  private func makeDecision(
+  func makeDecision(
     id: String = "d1",
     severity: DecisionSeverity = .needsUser,
     ruleID: String = "stuck-agent",
@@ -28,7 +28,7 @@ final class DecisionDetailViewModelTests: XCTestCase {
     )
   }
 
-  private func encodedActions(_ actions: [SuggestedAction]) -> String {
+  func encodedActions(_ actions: [SuggestedAction]) -> String {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys]
     let data = (try? encoder.encode(actions)) ?? Data("[]".utf8)
@@ -99,72 +99,6 @@ final class DecisionDetailViewModelTests: XCTestCase {
     XCTAssertEqual(viewModel.contextSections.count, 1)
     XCTAssertEqual(viewModel.contextSections.first?.title, "Raw context")
     XCTAssertEqual(viewModel.contextSections.first?.lines, ["not json"])
-  }
-
-  func test_acceptInvokesResolveWithChosenAction() async {
-    let action = SuggestedAction(
-      id: "accept",
-      title: "Accept",
-      kind: .custom,
-      payloadJSON: "{\"approvalID\":\"ap-1\"}"
-    )
-    let decision = makeDecision(suggestedActionsJSON: encodedActions([action]))
-    let handler = RecordingDecisionActionHandler()
-    let viewModel = DecisionDetailViewModel(decision: decision, handler: handler)
-
-    await viewModel.invoke(action: action)
-
-    XCTAssertEqual(handler.resolvedCalls.count, 1)
-    XCTAssertEqual(handler.resolvedCalls.first?.decisionID, "d1")
-    XCTAssertEqual(handler.resolvedCalls.first?.outcome.chosenActionID, "accept")
-  }
-
-  func test_snoozeActionOpensSnoozeSheet() async {
-    let snooze = SuggestedAction(
-      id: "snooze-1h",
-      title: "Snooze 1h",
-      kind: .snooze,
-      payloadJSON: "{\"duration\":3600}"
-    )
-    let decision = makeDecision(suggestedActionsJSON: encodedActions([snooze]))
-    let handler = RecordingDecisionActionHandler()
-    let viewModel = DecisionDetailViewModel(decision: decision, handler: handler)
-
-    await viewModel.invoke(action: snooze)
-
-    XCTAssertNotNil(viewModel.snoozeRequest)
-    XCTAssertEqual(viewModel.snoozeRequest?.decisionID, "d1")
-    XCTAssertTrue(handler.resolvedCalls.isEmpty, "Snooze opens sheet, does not resolve directly")
-  }
-
-  func test_confirmSnoozeInvokesHandlerAndClearsSheet() async {
-    let decision = makeDecision()
-    let handler = RecordingDecisionActionHandler()
-    let viewModel = DecisionDetailViewModel(decision: decision, handler: handler)
-    viewModel.snoozeRequest = DecisionDetailViewModel.SnoozeRequest(decisionID: "d1")
-
-    await viewModel.confirmSnooze(duration: 3600)
-
-    XCTAssertNil(viewModel.snoozeRequest)
-    XCTAssertEqual(handler.snoozeCalls.count, 1)
-    XCTAssertEqual(handler.snoozeCalls.first?.decisionID, "d1")
-    XCTAssertEqual(handler.snoozeCalls.first?.duration, 3600)
-  }
-
-  func test_dismissActionInvokesHandler() async {
-    let dismiss = SuggestedAction(
-      id: "dismiss",
-      title: "Dismiss",
-      kind: .dismiss,
-      payloadJSON: "{}"
-    )
-    let decision = makeDecision(suggestedActionsJSON: encodedActions([dismiss]))
-    let handler = RecordingDecisionActionHandler()
-    let viewModel = DecisionDetailViewModel(decision: decision, handler: handler)
-
-    await viewModel.invoke(action: dismiss)
-
-    XCTAssertEqual(handler.dismissCalls, ["d1"])
   }
 
   func test_nonAcpDecisionInjectsDismissWhenPersistedActionsMissingDismiss() {
