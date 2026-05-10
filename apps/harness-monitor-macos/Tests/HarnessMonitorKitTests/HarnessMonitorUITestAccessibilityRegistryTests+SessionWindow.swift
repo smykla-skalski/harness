@@ -28,8 +28,8 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.session.window.sidebar"
     )
     #expect(
-      HarnessMonitorAccessibility.sessionWindowStatusMenu
-        == "harness.session.window.toolbar.status"
+      HarnessMonitorAccessibility.sessionWindowStatusSurface
+        == "harness.session.window.status"
     )
     #expect(
       HarnessMonitorAccessibility.sessionWindowToolbarSeparatorSuppressed
@@ -80,6 +80,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     let windowView = try sourceFile(named: "SessionWindowView.swift")
     let createRuntimeView = try sourceFile(named: "SessionWindowCreateAgentRuntimePane.swift")
     let sidebarView = try sourceFile(named: "SessionSidebar.swift")
+    let sidebarFooterView = try sourceFile(named: "SessionSidebarFooter.swift")
     let inspectorView = try sourceFile(named: "SessionWindowInspector.swift")
     let toolbarView = try sourceFile(named: "SessionWindowToolbar.swift")
 
@@ -102,6 +103,9 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       )
     )
     #expect(sidebarView.contains("HarnessMonitorAccessibility.sessionWindowSidebar"))
+    #expect(
+      sidebarFooterView.contains("HarnessMonitorAccessibility.sessionWindowStatusSurface")
+    )
     #expect(
       createRuntimeView.contains("HarnessMonitorAccessibility.sessionWindowCreateProviderPane"))
     #expect(

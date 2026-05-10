@@ -59,6 +59,11 @@ final class SessionWindowVoiceOverTests: HarnessMonitorUITestCase {
       waitUntil(in: app, timeout: Self.actionTimeout) { !sidebar.exists },
       "Focus mode should replace the split-shell chrome with a single focused surface."
     )
+    let statusSurface = element(in: app, identifier: Accessibility.sessionWindowStatusSurface)
+    XCTAssertTrue(
+      waitForElement(statusSurface, timeout: Self.actionTimeout),
+      "Focus mode should keep the compact session status fallback visible when the sidebar footer is hidden."
+    )
 
     let openTasksMetric = staticText(in: app, containing: "Open tasks")
     XCTAssertTrue(
@@ -108,14 +113,14 @@ final class SessionWindowVoiceOverTests: HarnessMonitorUITestCase {
     )
     XCTAssertTrue(waitForElement(focusModeToggle, timeout: Self.actionTimeout))
 
-    let statusSurface = element(in: app, identifier: Accessibility.sessionWindowStatusMenu)
+    let statusSurface = element(in: app, identifier: Accessibility.sessionWindowStatusSurface)
     XCTAssertTrue(waitForElement(statusSurface, timeout: Self.actionTimeout))
     XCTAssertTrue(statusSurface.label.contains("Session status"))
 
-    let filterField = mainWindow(in: app).searchFields["Filter decisions"].firstMatch
+    let filterField = mainWindow(in: app).searchFields.firstMatch
     XCTAssertTrue(
       waitForElement(filterField, timeout: Self.actionTimeout),
-      "Decision filtering should stay available from the session sidebar."
+      "The unified session search bar should stay available from the session window."
     )
 
     let inspector = element(in: app, identifier: Accessibility.sessionWindowInspector)

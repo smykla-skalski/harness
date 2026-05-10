@@ -92,11 +92,29 @@ struct SessionSidebarMultiSelectTests {
   @Test("Task move helper records the expected decision link")
   func taskMoveHelperRecordsDecisionLink() {
     let state = SessionWindowStateCache(sessionID: "session-1")
+    let store = HarnessMonitorStore(daemonController: PreviewDaemonController(mode: .empty))
     let sidebar = SessionSidebar(
-      store: HarnessMonitorStore(daemonController: PreviewDaemonController(mode: .empty)),
+      store: store,
       snapshot: nil,
       sessionCodexRuns: [],
       decisions: [],
+      statusModel: SessionStatusSummaryModel(
+        metrics: store.connectionMetrics,
+        sourceTitle: "Test",
+        sourceSystemImage: "circle",
+        sourceTint: .tertiary,
+        statusStripState: SessionStatusStripState(
+          daemonOwnership: store.daemonOwnership,
+          bridgeRunning: false,
+          mcpStatus: HarnessMonitorMCPStatusSnapshot(
+            runtimeState: .disabled,
+            recoveryStatus: nil
+          ),
+          isMCPRegistryHostEnabled: false
+        ),
+        connectionSummaryText: "Connection: test",
+        sessionStatusTitle: "Loading"
+      ),
       state: state
     )
 
