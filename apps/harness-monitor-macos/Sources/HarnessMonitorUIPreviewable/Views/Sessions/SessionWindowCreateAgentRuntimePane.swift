@@ -104,8 +104,7 @@ struct SessionWindowCreateAgentRuntimeContent: View {
     }
   }
 
-  @ViewBuilder
-  private var header: some View {
+  @ViewBuilder private var header: some View {
     if embeddedInForm {
       compactHeader
     } else {
@@ -144,8 +143,7 @@ struct SessionWindowCreateAgentRuntimeContent: View {
     "Choose a provider below, then finish configuration in the form."
   }
 
-  @ViewBuilder
-  private var availabilityNote: some View {
+  @ViewBuilder private var availabilityNote: some View {
     if catalogState.isLoading && !catalogState.hasLoaded {
       Label("Checking available runtimes", systemImage: "clock")
         .scaledFont(.caption)
@@ -153,8 +151,7 @@ struct SessionWindowCreateAgentRuntimeContent: View {
     }
   }
 
-  @ViewBuilder
-  private var providerSection: some View {
+  @ViewBuilder private var providerSection: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       SessionWindowCreateSidebarSectionHeader(title: "Provider")
       providerRows

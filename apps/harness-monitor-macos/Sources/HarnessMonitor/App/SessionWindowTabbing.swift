@@ -1,7 +1,7 @@
 import AppKit
 import HarnessMonitorUIPreviewable
+import OSLog
 import SwiftUI
-import os
 
 struct SessionWindowTabbing: ViewModifier {
   let isSessionWindow: Bool
@@ -94,7 +94,8 @@ private final class AccessorView: NSView {
     }
   }
 
-  @objc private func reapplyWindowTabbingFromNotification(_ note: Notification) {
+  @objc
+  private func reapplyWindowTabbingFromNotification(_ note: Notification) {
     scheduleWindowTabbingApplication()
   }
 

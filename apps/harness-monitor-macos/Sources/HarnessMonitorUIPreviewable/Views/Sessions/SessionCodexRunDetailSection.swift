@@ -43,8 +43,7 @@ struct SessionCodexRunDetailSection: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
-  @ViewBuilder
-  private var contentColumn: some View {
+  @ViewBuilder private var contentColumn: some View {
     VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
       header
       if let error = run.error, !error.isEmpty {

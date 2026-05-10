@@ -1,6 +1,7 @@
 import Foundation
 import HarnessMonitorKit
 import OSLog
+
 import Observation
 import SwiftData
 
@@ -48,18 +49,12 @@ public final class SessionDecisionRuntime {
   public private(set) var hasFilteredDecisions = false
   public private(set) var isFilteringDecisions = false
 
-  @ObservationIgnored
-  private var contextRowCache: [String: [SessionDecisionContextRow]] = [:]
-  @ObservationIgnored
-  private var contextRowKeyOrder: [String] = []
-  @ObservationIgnored
-  private var historyRowCache: [String: [SessionDecisionHistoryRow]] = [:]
-  @ObservationIgnored
-  private var historyRowKeyOrder: [String] = []
-  @ObservationIgnored
-  nonisolated(unsafe) private var filterTask: Task<Void, Never>?
-  @ObservationIgnored
-  private var latestFilterInput: SessionDecisionFilterInput?
+  @ObservationIgnored private var contextRowCache: [String: [SessionDecisionContextRow]] = [:]
+  @ObservationIgnored private var contextRowKeyOrder: [String] = []
+  @ObservationIgnored private var historyRowCache: [String: [SessionDecisionHistoryRow]] = [:]
+  @ObservationIgnored private var historyRowKeyOrder: [String] = []
+  @ObservationIgnored nonisolated(unsafe) private var filterTask: Task<Void, Never>?
+  @ObservationIgnored private var latestFilterInput: SessionDecisionFilterInput?
 
   private static let cacheLimit = 32
   private static let filterSignposter = OSSignposter(
