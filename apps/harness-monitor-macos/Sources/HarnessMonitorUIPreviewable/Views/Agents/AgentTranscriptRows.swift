@@ -8,6 +8,8 @@ import SwiftUI
 // surface only needs "stream the recent transcript for this agent" without
 // the cockpit's load-profile defenses.
 struct AgentTranscriptRows: View {
+  static let maximumPresentedEntries = 24
+
   let agentID: String
   let timeline: [TimelineEntry]
   let store: HarnessMonitorStore
@@ -19,10 +21,20 @@ struct AgentTranscriptRows: View {
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
 
+  // The detail pane only shows a short transcript excerpt; capping here avoids
+  // rebuilding the full timeline graph on every agent switch.
+  static func recentTimelineEntries(from timeline: [TimelineEntry]) -> [TimelineEntry] {
+    Array(timeline.suffix(Self.maximumPresentedEntries))
+  }
+
+  private var recentTimeline: [TimelineEntry] {
+    Self.recentTimelineEntries(from: timeline)
+  }
+
   private var presentation: SessionTimelineSectionPresentation {
     SessionTimelineSectionPresentation(
       sessionID: "agent:\(agentID)",
-      timeline: timeline,
+      timeline: recentTimeline,
       timelineWindow: nil,
       decisions: [],
       signals: [],

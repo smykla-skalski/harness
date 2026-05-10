@@ -311,4 +311,26 @@ struct AgentDetailSectionTests {
         == ["Cockpit timeline row"]
     )
   }
+
+  @Test("Recent transcript rows cap the rendered history slice")
+  func recentTranscriptRowsCapRenderedHistorySlice() {
+    let timeline = (0..<40).map { index in
+      TimelineEntry(
+        entryId: "entry-\(index)",
+        recordedAt: "2026-04-22T09:00:00Z",
+        kind: "assistant_text",
+        sessionId: "session-1",
+        agentId: "agent-1",
+        taskId: nil,
+        summary: "Entry \(index)",
+        payload: .object([:])
+      )
+    }
+
+    let rendered = AgentTranscriptRows.recentTimelineEntries(from: timeline)
+
+    #expect(rendered.count == AgentTranscriptRows.maximumPresentedEntries)
+    #expect(rendered.first?.entryId == "entry-16")
+    #expect(rendered.last?.entryId == "entry-39")
+  }
 }
