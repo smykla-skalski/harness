@@ -283,7 +283,10 @@ private struct SessionContentDetailDivider: View {
     }
     .frame(width: interactiveWidth)
     .contentShape(Rectangle())
-    .focusable(interactions: .activate)
+    // Keep pointer-down available for the drag gesture instead of treating the
+    // divider like an activating control.
+    .focusable()
+    .focusEffectDisabled()
     .focused($isKeyboardFocused)
     .help("Drag or use the arrow keys to resize the content and detail panes.")
     .gesture(dragGesture)

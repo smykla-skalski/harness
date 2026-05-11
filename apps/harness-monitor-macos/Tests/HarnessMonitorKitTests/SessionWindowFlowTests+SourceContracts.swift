@@ -132,7 +132,8 @@ extension SessionWindowFlowTests {
       splitSource.contains("_liveContentWidth = State(wrappedValue: contentWidth.wrappedValue)"))
     #expect(splitSource.contains(".accessibilityAdjustableAction"))
     #expect(splitSource.contains(".focused($isKeyboardFocused)"))
-    #expect(splitSource.contains(".focusable(interactions: .activate)"))
+    #expect(splitSource.contains(".focusable()"))
+    #expect(splitSource.contains(".focusEffectDisabled()"))
     #expect(splitSource.contains("if !isDragging {"))
     #expect(splitSource.contains(".onMoveCommand"))
     #expect(
