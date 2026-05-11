@@ -157,6 +157,16 @@ struct AgentDetailSection: View {
     store.acpRuntimeInspectStatus(for: agent.agentId)
   }
 
+  private var lifecyclePresentation: (label: String, visualStatus: AgentStatus) {
+    let lifecycle = store.agentLifecyclePresentation(
+      for: agent,
+      sessionID: sessionID,
+      sessionRegistrations: store.selectedSession?.agents ?? [agent],
+      tuiStatus: nil
+    )
+    return (lifecycle.label, lifecycle.visualStatus)
+  }
+
   var body: some View {
     Group {
       if runtimePresentation == .full {
@@ -286,7 +296,8 @@ struct AgentDetailSection: View {
       store: store,
       title: agent.name,
       runtimeLabel: runtimeDisplayLabel(agent.runtime),
-      status: agent.status,
+      status: lifecyclePresentation.visualStatus,
+      statusLabel: lifecyclePresentation.label,
       roleTitle: agent.role.title,
       currentTaskTitle: currentTaskTitle,
       overviewFacts: overviewFacts,

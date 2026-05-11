@@ -484,6 +484,57 @@ struct HarnessMonitorStoreTests {
     #expect(cachedPresentation.label == "Snapshot")
   }
 
+  @Test("Cached selected-session ACP agents render as disconnected")
+  func cachedSelectedSessionAcpAgentsRenderAsDisconnected() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    let capabilities = PreviewFixtures.agents[0].runtimeCapabilities
+    store.selectedSessionID = "sess-live"
+    store.isShowingCachedSelectedSession = true
+    store.selectedAcpAgents = [
+      makeAcpSnapshot(
+        acpID: "acp-worker-cached",
+        sessionID: "sess-live",
+        agentID: "worker-cached",
+        displayName: "Cached Worker",
+        pendingBatches: []
+      )
+    ]
+
+    let cachedAgent = AgentRegistration(
+      agentId: "worker-cached",
+      name: "Cached Worker",
+      runtime: "gemini",
+      role: .worker,
+      capabilities: ["general"],
+      joinedAt: "2026-04-15T17:00:00Z",
+      updatedAt: "2026-04-15T17:30:00Z",
+      status: .active,
+      agentSessionId: "worker-cached-session",
+      managedAgent: ManagedAgentRef(kind: .acp, id: "acp-worker-cached"),
+      lastActivityAt: "2026-04-15T17:30:00Z",
+      currentTaskId: nil,
+      runtimeCapabilities: capabilities,
+      persona: nil
+    )
+
+    let lifecycle = store.agentLifecyclePresentation(
+      for: cachedAgent,
+      sessionID: "sess-live",
+      sessionRegistrations: [cachedAgent],
+      tuiStatus: nil
+    )
+    let summary = store.agentRuntimeSummary(
+      sessionID: "sess-live",
+      sessionRegistrations: [cachedAgent],
+      tuiStatusByAgent: [:]
+    )
+
+    #expect(lifecycle.label == "Disconnected")
+    #expect(lifecycle.visualStatus == .disconnected)
+    #expect(summary.activeCount == 0)
+    #expect(summary.disconnectedCount == 1)
+  }
+
   @Test("Selected-session runtime summary counts stale ACP registrations separately")
   func selectedSessionRuntimeSummaryCountsStaleAcpRegistrationsSeparately() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())

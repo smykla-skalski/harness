@@ -337,12 +337,52 @@ extension HarnessMonitorStore {
     )
   }
 
+  // Selected-session ACP registrations can outlive the daemon/runtime that
+  // originally marked them active. When the selected session is cached or
+  // offline, prefer a truthful disconnected label over replaying persisted
+  // `.active` state.
+  private func unavailableSelectedAcpLifecyclePresentation(
+    for sessionID: String
+  ) -> AgentLifecyclePresentation {
+    if usesLiveRuntimePresentation(for: sessionID) {
+      return AgentLifecyclePresentation(
+        label: "Not Running",
+        accessibilityValue: "No live ACP runtime observed",
+        visualStatus: .disconnected
+      )
+    }
+
+    let accessibilityValue: String
+    switch sessionDataAvailability {
+    case .persisted:
+      accessibilityValue = "Showing cached data; live ACP runtime unavailable"
+    case .unavailable:
+      accessibilityValue = "Daemon offline; live ACP runtime unavailable"
+    case .live:
+      accessibilityValue = "No live ACP runtime observed"
+    }
+
+    return AgentLifecyclePresentation(
+      label: "Disconnected",
+      accessibilityValue: accessibilityValue,
+      visualStatus: .disconnected
+    )
+  }
+
   public func agentLifecyclePresentation(
     for agent: AgentRegistration,
     sessionID: String,
     sessionRegistrations: [AgentRegistration],
     tuiStatus: AgentTuiStatus?
   ) -> AgentLifecyclePresentation {
+    if agent.managedAgent?.kind == .acp,
+      agent.status == .active,
+      selectedSessionID == sessionID,
+      usesLiveRuntimePresentation(for: sessionID) == false
+    {
+      return unavailableSelectedAcpLifecyclePresentation(for: sessionID)
+    }
+
     guard usesLiveRuntimePresentation(for: sessionID) else {
       let label = agent.status.title
       return AgentLifecyclePresentation(
@@ -365,11 +405,7 @@ extension HarnessMonitorStore {
       agent.status == .active,
       acpRuntimeState == nil
     {
-      return AgentLifecyclePresentation(
-        label: "Not Running",
-        accessibilityValue: "No live ACP runtime observed",
-        visualStatus: .disconnected
-      )
+      return unavailableSelectedAcpLifecyclePresentation(for: sessionID)
     }
 
     if let acpRuntimeState,

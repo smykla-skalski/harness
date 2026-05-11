@@ -52,6 +52,7 @@ struct AgentDetailSummaryHeader: View {
   let title: String
   let runtimeLabel: String
   let status: AgentStatus
+  let statusLabel: String
   let roleTitle: String
   let currentTaskTitle: String
   let overviewFacts: [AgentDetailFact]
@@ -95,13 +96,13 @@ struct AgentDetailSummaryHeader: View {
         .scaledFont(.caption.weight(.semibold))
         .foregroundStyle(agentStatusColor(for: status))
         .accessibilityHidden(true)
-      Text(status.title)
+      Text(statusLabel)
         .scaledFont(.caption.weight(.semibold))
         .foregroundStyle(agentStatusColor(for: status))
     }
     .accessibilityElement(children: .combine)
     .accessibilityLabel("Status")
-    .accessibilityValue(status.title)
+    .accessibilityValue(statusLabel)
   }
 
   private var runtimeChip: some View {
