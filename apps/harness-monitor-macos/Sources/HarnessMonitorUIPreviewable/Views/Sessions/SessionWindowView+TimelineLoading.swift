@@ -3,12 +3,6 @@ import HarnessMonitorKit
 extension SessionWindowView {
   var sessionTimelineLoading: SessionTimelineLoading {
     SessionTimelineLoading(
-      loadOlderChunk: { presentation, limit, retainedLimit in
-        guard let request = presentation.navigation.request(for: .older, limit: limit) else {
-          return
-        }
-        await loadSessionWindowTimeline(request, retainedLimit: retainedLimit)
-      },
       loadWindow: { request, retainedLimit in
         await loadSessionWindowTimeline(request, retainedLimit: retainedLimit)
       }

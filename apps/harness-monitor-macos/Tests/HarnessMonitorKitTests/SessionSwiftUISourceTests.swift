@@ -165,61 +165,19 @@ struct SessionSwiftUISourceTests {
     #expect(columnsSource.contains(".backgroundExtensionEffect()"))
   }
 
-  @Test("Timeline route header keeps filter actions inline and removes search scope menu")
-  func timelineRouteHeaderKeepsFilterActionsInlineAndRemovesSearchScopeMenu() throws {
+  @Test("Timeline section renders on SwiftUI primitives without AppKit scroll machinery")
+  func timelineSectionRendersOnSwiftUIPrimitives() throws {
     let timelineSource = try sourceFile(at: "Views/Timeline/MonitorTimelineSection.swift")
-    let filterSource = try sourceFile(at: "Views/Timeline/SessionTimelineFilterControls.swift")
-    let advancedFilterSource = try sourceFile(at: "Views/Timeline/SessionTimelineFilterControls+AdvancedFilters.swift")
     let navigationSource = try sourceFile(at: "Views/Timeline/SessionTimelineNavigationControls.swift")
-    let cardsSource = try sourceFile(at: "Views/Timeline/SessionTimelineCards.swift")
-    let placeholderSource = try sourceFile(at: "Views/Timeline/SessionTimelinePlaceholderScrollView.swift")
-    let tableSource = try sourceFile(at: "Views/Timeline/SessionTimelineTableView.swift")
 
-    #expect(timelineSource.contains("SessionTimelineFilterActionButtons("))
-    #expect(timelineSource.contains("showsClearButton: false"))
-    #expect(timelineSource.contains("layout: .chipsOnly"))
-    #expect(timelineSource.contains("SessionTimelineNavigationButtonRow("))
-    #expect(timelineSource.contains("SessionTimelineNavigationVisibilityStatus("))
-    #expect(
-      timelineSource.contains(
-        "HarnessMonitorAccessibility.sessionTimelineNavigationStatus"
-      )
-    )
-    #expect(timelineSource.contains("private var routeHeaderHorizontalPadding"))
-    #expect(timelineSource.contains("var routeTimelineHorizontalContentInset"))
-    #expect(timelineSource.contains(".padding(.horizontal, routeHeaderHorizontalPadding)"))
-    #expect(!timelineSource.contains("showsButtons: false"))
-    #expect(!timelineSource.contains("spacing: HarnessMonitorTheme.spacingSM * 2"))
-    #expect(timelineSource.contains(".padding(.top, routePageTopPadding)"))
-    #expect(!timelineSource.contains(".padding(.bottom, routeMetrics.contentPadding)"))
-    #expect(timelineSource.contains("horizontalContentInset: routeTimelineHorizontalContentInset"))
-    #expect(timelineSource.contains("copy.searchScope = .all"))
-    #expect(filterSource.contains("enum Layout"))
-    #expect(filterSource.contains("case chipsOnly"))
-    #expect(filterSource.contains("let showsClearButton: Bool"))
-    #expect(!filterSource.contains("filters.clearTones()"))
-    #expect(!filterSource.contains("filters.toggleTone(tone)"))
-    #expect(!filterSource.contains("scopeMenu"))
-    #expect(!filterSource.contains("filters.searchScope = scope"))
-    #expect(!filterSource.contains("sessionTimelineFilterScopeMenu"))
-    #expect(advancedFilterSource.contains("Button(\"Clear\")"))
-    #expect(advancedFilterSource.contains("label: \"All levels\""))
-    #expect(advancedFilterSource.contains("filters.clearTones()"))
-    #expect(advancedFilterSource.contains("filters.toggleTone(tone)"))
-    #expect(!advancedFilterSource.contains("Narrow the timeline with event details and related data."))
-    #expect(navigationSource.contains("showsButtons: Bool = true"))
-    #expect(navigationSource.contains("struct SessionTimelineNavigationVisibilityStatus"))
-    #expect(
-      navigationSource.contains(
-        "accessibilityIdentifier: HarnessMonitorAccessibility.sessionTimelineVisibleStatus"
-      )
-    )
-    #expect(navigationSource.contains("if showsButtons {"))
-    #expect(cardsSource.contains(".multilineTextAlignment(.leading)"))
-    #expect(cardsSource.contains(".frame(width: SessionTimelineLayout.timeColumnWidth, alignment: .leading)"))
-    #expect(placeholderSource.contains(".contentMargins(.horizontal, horizontalContentInset, for: .scrollContent)"))
-    #expect(tableSource.contains("let horizontalContentInset: CGFloat"))
-    #expect(tableSource.contains("let scrollView = NSScrollView()"))
+    #expect(timelineSource.contains("ScrollView(.vertical)"))
+    #expect(timelineSource.contains("LazyVStack"))
+    #expect(!timelineSource.contains("SessionTimelineTableView"))
+    #expect(!timelineSource.contains("SessionTimelineViewportModel"))
+    #expect(!timelineSource.contains("NSScrollView"))
+    #expect(navigationSource.contains("struct SessionTimelineCountSummary"))
+    #expect(!navigationSource.contains("SessionTimelineNavigationButtonRow"))
+    #expect(!navigationSource.contains("SessionTimelineNavigationVisibilityStatus"))
   }
 
   @Test("Session agent detail reuses the rich agent detail bands with session-scoped inputs")
