@@ -57,6 +57,16 @@ extension SessionWindowView {
     preferredBinding: Binding<Bool>,
     announce: Bool = true
   ) {
+    guard shouldUpdateDetailColumnWidth(to: width) else { return }
+    detailColumnWidth = width
+    reconcileInspectorVisibility(
+      visibleBinding: visibleBinding,
+      preferredBinding: preferredBinding,
+      announce: announce
+    )
+  }
+
+  func shouldUpdateDetailColumnWidth(to width: CGFloat) -> Bool {
     // Only commit width changes that flip canPresentInspector. Continuous
     // geometry updates during the NSP sidebar reveal otherwise churn
     // focusedSceneValue(\.sessionInspector, …), which propagates through
@@ -68,13 +78,7 @@ extension SessionWindowView {
     let nextAllows =
       width > 0
       && SessionInspectorVisibilityPolicy.allowsInspector(width: width)
-    guard previousAllows != nextAllows || detailColumnWidth == 0 else { return }
-    detailColumnWidth = width
-    reconcileInspectorVisibility(
-      visibleBinding: visibleBinding,
-      preferredBinding: preferredBinding,
-      announce: announce
-    )
+    return previousAllows != nextAllows || detailColumnWidth == 0
   }
 
   func reconcileInspectorVisibility(

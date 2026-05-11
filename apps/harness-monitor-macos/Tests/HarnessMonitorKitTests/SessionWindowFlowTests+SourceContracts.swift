@@ -119,7 +119,9 @@ extension SessionWindowFlowTests {
     #expect(viewSource.contains("@SceneStorage(\"session.content-detail.width\")"))
     #expect(viewSource.contains("sessionSurface"))
     #expect(
-      columnsSource.contains("SessionContentDetailSplitView(contentWidth: $contentColumnWidth)")
+      columnsSource.contains(
+        "SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding)"
+      )
     )
     #expect(columnsSource.contains(".navigationSplitViewStyle(.prominentDetail)"))
     #expect(splitSource.contains("NSCursor.resizeLeftRight"))
@@ -127,10 +129,18 @@ extension SessionWindowFlowTests {
     #expect(
       splitSource.contains("_liveContentWidth = State(wrappedValue: contentWidth.wrappedValue)"))
     #expect(splitSource.contains(".accessibilityAdjustableAction"))
-    #expect(splitSource.contains(".focusEffectDisabled()"))
+    #expect(splitSource.contains(".focused($isKeyboardFocused)"))
     #expect(splitSource.contains(".focusable(interactions: .activate)"))
     #expect(splitSource.contains("if !isDragging {"))
     #expect(splitSource.contains(".onMoveCommand"))
+    #expect(
+      splitSource.contains("@State private var resizeState = SessionContentDetailResizeState()")
+    )
+    #expect(
+      splitSource.contains(
+        "Task.sleep(for: SessionContentDetailSplitLayout.resizeSettleDelay)"
+      )
+    )
   }
 
   @Test("Sidebar density keeps strict default and maps legacy values")

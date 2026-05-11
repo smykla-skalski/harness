@@ -1,5 +1,11 @@
 import AppKit
+import OSLog
 import SwiftUI
+
+private let sessionContentDetailResizeSignposter = OSSignposter(
+  subsystem: "io.harnessmonitor",
+  category: "perf/session-content-detail-resize"
+)
 
 enum SessionContentDetailSplitLayout {
   static let dividerWidth: CGFloat = 1
@@ -9,6 +15,8 @@ enum SessionContentDetailSplitLayout {
   static let minimumVisibleColumnWidth: CGFloat = 220
   static let keyboardAdjustmentStep: Double = 40
   static let dragWidthStep: Double = 2
+  static let widthChangeTolerance: Double = 0.5
+  static let resizeSettleDelay: Duration = .milliseconds(120)
 
   static func contentWidthRange(availableWidth: CGFloat) -> ClosedRange<Double> {
     let safeAvailable =
@@ -42,6 +50,7 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
   @Binding private var contentWidth: Double
   @State private var liveContentWidth = SessionContentDetailSplitLayout.defaultContentWidth
   @State private var isDragging = false
+  @State private var resizeState = SessionContentDetailResizeState()
   private let content: Content
   private let detail: Detail
 
@@ -87,45 +96,98 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
         }
       }
       .onChange(of: geometry.size.width, initial: true) { _, newWidth in
-        deferReclampLiveWidth(availableWidth: newWidth)
+        scheduleSettledGeometryReclamp(availableWidth: newWidth)
       }
       .onChange(of: liveContentWidth) { _, newValue in
         guard !isDragging else { return }
-        commitPersistedWidth(newValue)
+        _ = commitPersistedWidth(newValue)
       }
       .onChange(of: isDragging) { _, dragging in
-        guard !dragging else { return }
-        commitPersistedWidth(liveContentWidth)
+        if dragging {
+          resizeState.cancelPending()
+          return
+        }
+        _ = commitPersistedWidth(liveContentWidth)
+      }
+      .onDisappear {
+        resizeState.cancelPending()
       }
     }
   }
 
-  private func deferReclampLiveWidth(availableWidth: CGFloat) {
-    // Re-clamp on the next main-actor turn so startup geometry changes do not
-    // write width state back into the same frame.
-    Task { @MainActor in
-      await Task.yield()
-      reclampLiveWidth(availableWidth: availableWidth)
-    }
-  }
-
-  // No `onChange(of: contentWidth)` writer: paired listeners on the two widths
-  // ping-ponged into the SwiftUI multi-update-per-frame fault on window resize.
-  private func reclampLiveWidth(availableWidth: CGFloat) {
+  private func scheduleSettledGeometryReclamp(availableWidth: CGFloat) {
     let clamped = SessionContentDetailSplitLayout.clampedContentWidth(
       preferredWidth: liveContentWidth,
       availableWidth: availableWidth
     )
-    if abs(liveContentWidth - clamped) > 0.5 {
-      liveContentWidth = clamped
+    guard abs(liveContentWidth - clamped) > SessionContentDetailSplitLayout.widthChangeTolerance
+    else {
+      resizeState.cancelPending()
+      return
     }
-    guard !isDragging else { return }
-    commitPersistedWidth(clamped)
+    resizeState.cancelPending()
+    resizeState.settleTask = Task { @MainActor in
+      try? await Task.sleep(for: SessionContentDetailSplitLayout.resizeSettleDelay)
+      guard !Task.isCancelled else { return }
+      applySettledGeometryReclamp(availableWidth: availableWidth)
+      resizeState.settleTask = nil
+    }
   }
 
-  private func commitPersistedWidth(_ resolvedContentWidth: Double) {
-    guard abs(contentWidth - resolvedContentWidth) > 0.5 else { return }
+  // Keep live drag updates immediate, but settle geometry-driven persistence so
+  // a window resize does not write width state back into the hierarchy every frame.
+  private func applySettledGeometryReclamp(availableWidth: CGFloat) {
+    guard !isDragging else { return }
+    let signpostID = sessionContentDetailResizeSignposter.makeSignpostID()
+    let interval = sessionContentDetailResizeSignposter.beginInterval(
+      "session_content_detail_resize.settle",
+      id: signpostID,
+      "availableWidth=\(Int(availableWidth.rounded()), privacy: .public)"
+    )
+    var adjustedLiveWidth = false
+    var committedPersistedWidth = false
+    defer {
+      sessionContentDetailResizeSignposter.endInterval(
+        "session_content_detail_resize.settle",
+        interval,
+        "adjusted=\(adjustedLiveWidth ? 1 : 0, privacy: .public) persisted=\(committedPersistedWidth ? 1 : 0, privacy: .public)"
+      )
+    }
+    let clamped = SessionContentDetailSplitLayout.clampedContentWidth(
+      preferredWidth: liveContentWidth,
+      availableWidth: availableWidth
+    )
+    if abs(liveContentWidth - clamped) > SessionContentDetailSplitLayout.widthChangeTolerance {
+      liveContentWidth = clamped
+      adjustedLiveWidth = true
+    }
+    committedPersistedWidth = commitPersistedWidth(clamped)
+  }
+
+  private func commitPersistedWidth(_ resolvedContentWidth: Double) -> Bool {
+    guard
+      abs(contentWidth - resolvedContentWidth)
+        > SessionContentDetailSplitLayout.widthChangeTolerance
+    else {
+      return false
+    }
     contentWidth = resolvedContentWidth
+    return true
+  }
+}
+
+@MainActor
+private final class SessionContentDetailResizeState {
+  nonisolated(unsafe) var settleTask: Task<Void, Never>?
+
+  deinit {
+    settleTask?.cancel()
+    settleTask = nil
+  }
+
+  func cancelPending() {
+    settleTask?.cancel()
+    settleTask = nil
   }
 }
 

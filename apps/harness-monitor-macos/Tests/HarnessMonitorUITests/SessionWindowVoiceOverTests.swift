@@ -316,12 +316,12 @@ final class SessionWindowVoiceOverTests: HarnessMonitorUITestCase {
     let sessionWindow = element(in: app, identifier: Accessibility.sessionWindowShell)
     XCTAssertTrue(waitForElement(sessionWindow, timeout: Self.uiTimeout))
 
-    let terminalRoute = element(
+    let agentsRoute = element(
       in: app,
-      identifier: Accessibility.sessionWindowRoute("terminal")
+      identifier: Accessibility.sessionWindowRoute("agents")
     )
-    XCTAssertTrue(waitForElement(terminalRoute, timeout: Self.actionTimeout))
-    XCTAssertTrue(tapElementReliably(in: app, element: terminalRoute))
+    XCTAssertTrue(waitForElement(agentsRoute, timeout: Self.actionTimeout))
+    XCTAssertTrue(tapElementReliably(in: app, element: agentsRoute))
 
     let dividerFrame = element(
       in: app,
