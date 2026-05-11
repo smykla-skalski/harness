@@ -158,15 +158,15 @@ struct SessionSwiftUISourceTests {
     #expect(!createFormSource.contains("@FocusState var focusedField"))
   }
 
-  @Test("Session dense detail uses scroll edge instead of background extension")
-  func sessionDenseDetailUsesScrollEdgeInsteadOfBackgroundExtension() throws {
+  @Test("Session content columns extend behind toolbar glass")
+  func sessionContentColumnsExtendBehindToolbarGlass() throws {
     let columnsSource = try sourceFile(at: "Views/Sessions/SessionWindowView+Columns.swift")
     let surfaceSource = try sourceFile(at: "Views/Sessions/SessionDetailSurface.swift")
 
     #expect(!columnsSource.contains("SessionBackgroundExtensionSurface()"))
-    #expect(!columnsSource.contains(".backgroundExtensionEffect()"))
+    #expect(columnsSource.contains(".backgroundExtensionEffect()"))
     #expect(!surfaceSource.contains(".backgroundExtensionEffect()"))
-    #expect(surfaceSource.contains("topScrollEdgeEffect: .hard"))
+    #expect(surfaceSource.contains("topScrollEdgeEffect: .soft"))
   }
 
   @Test("Timeline section renders on SwiftUI primitives without AppKit scroll machinery")

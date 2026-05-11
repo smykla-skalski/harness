@@ -142,8 +142,9 @@ public struct DecisionDetailView: View {
   }
 
   public var body: some View {
-    // Dense text and controls stay in the content layer. Toolbar/sidebar
-    // separation comes from system Liquid Glass and the scroll-edge effect.
+    // The owning column applies `.backgroundExtensionEffect()` at the
+    // detail-surface boundary. Adding another extension here would duplicate
+    // the animatable glass surface across every detail descendant.
     detailBody
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .accessibilityElement(children: .contain)

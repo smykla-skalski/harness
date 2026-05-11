@@ -153,30 +153,32 @@ struct AgentDetailFactInlineRow: View {
   }
 
   private var factLine: some View {
-    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingMD) {
-      ForEach(Array(visibleFacts.enumerated()), id: \.element.id) { index, fact in
-        if index > 0 {
-          Text("·")
-            .scaledFont(.subheadline)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk.opacity(0.6))
-            .accessibilityHidden(true)
-        }
-        HStack(spacing: HarnessMonitorTheme.spacingXS) {
-          Text(fact.title)
-            .scaledFont(.caption)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          Text(fact.value)
-            .scaledFont(.system(.subheadline, design: .rounded, weight: .semibold))
-            .foregroundStyle(fact.tint ?? HarnessMonitorTheme.ink)
-            .lineLimit(1)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(fact.title)
-        .accessibilityValue(fact.value)
+    HarnessMonitorWrapLayout(
+      spacing: HarnessMonitorTheme.spacingMD,
+      lineSpacing: HarnessMonitorTheme.spacingXS
+    ) {
+      ForEach(visibleFacts) { fact in
+        factItem(fact)
       }
-      Spacer(minLength: 0)
     }
     .fixedSize(horizontal: false, vertical: true)
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private func factItem(_ fact: AgentDetailFact) -> some View {
+    HStack(spacing: HarnessMonitorTheme.spacingXS) {
+      Text(fact.title)
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .lineLimit(1)
+      Text(fact.value)
+        .scaledFont(.system(.subheadline, design: .rounded, weight: .semibold))
+        .foregroundStyle(fact.tint ?? HarnessMonitorTheme.ink)
+        .lineLimit(1)
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel(fact.title)
+    .accessibilityValue(fact.value)
   }
 }
 

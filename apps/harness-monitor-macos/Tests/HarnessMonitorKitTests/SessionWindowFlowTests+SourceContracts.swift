@@ -15,7 +15,7 @@ extension SessionWindowFlowTests {
     #expect(!source.contains(".onGeometryChange("))
     #expect(source.contains("OpenRecentStartPanelLayout("))
     #expect(!source.contains("SessionBackgroundExtensionSurface()"))
-    #expect(!source.contains(".backgroundExtensionEffect()"))
+    #expect(source.contains(".backgroundExtensionEffect()"))
   }
 
   @MainActor
@@ -75,18 +75,23 @@ extension SessionWindowFlowTests {
     #expect(appSource.contains("SessionWindowTabbing(isSessionWindow: false)"))
     #expect(commandsSource.contains("@Environment(\\.openWindow)"))
     #expect(commandsSource.contains("openHarnessSessionWindow"))
-    #expect(rootSource.contains("SessionWindowTabbing(isSessionWindow: true)"))
+    #expect(rootSource.contains("SessionWindowTabbing("))
+    #expect(rootSource.contains("isSessionWindow: true"))
     #expect(rootSource.contains("private var hostsSharedShellPresentation"))
     #expect(rootSource.contains("HarnessMonitorConfirmationDialogModifier("))
     #expect(rootSource.contains("HarnessMonitorSheetModifier("))
     #expect(rootSource.contains("isEnabled: hostsSharedShellPresentation"))
-    #expect(rootSource.contains("windowToolbarBackgroundVisibility: .visible"))
-    #expect(!rootSource.contains("suppressToolbarBaselineSeparator("))
+    #expect(rootSource.contains("CGSize(width: 920, height: 620)"))
+    #expect(
+      rootSource.contains(
+        "HarnessMonitorAccessibility.sessionWindowToolbarSeparatorSuppressed"
+      )
+    )
     #expect(tabbingSource.contains("scheduleWindowTabbingApplication()"))
     #expect(tabbingSource.contains("await Task.yield()"))
     #expect(tabbingSource.contains("guard window.toolbar != nil else"))
-    #expect(!tabbingSource.contains("titlebarSeparatorStyle"))
-    #expect(!tabbingSource.contains("titlebarAppearsTransparent"))
+    #expect(tabbingSource.contains("titlebarSeparatorStyle"))
+    #expect(tabbingSource.contains("titlebarAppearsTransparent"))
     #expect(routerSource.contains("waitForSessionWindowToolbars("))
     #expect(routerSource.contains("let tabReadyWindows = windows.filter { $0.toolbar != nil }"))
     #expect(tabbingSupportSource.contains("tabbingIdentifier"))
@@ -133,7 +138,7 @@ extension SessionWindowFlowTests {
         "SessionContentDetailSplitView(contentWidth: contentColumnWidth)"
       )
     )
-    #expect(columnsSource.contains(".navigationSplitViewStyle(.prominentDetail)"))
+    #expect(columnsSource.contains(".navigationSplitViewStyle(.balanced)"))
     #expect(splitSource.contains("HSplitView"))
     #expect(!splitSource.contains("NSCursor"))
     #expect(!splitSource.contains("DragGesture("))

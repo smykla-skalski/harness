@@ -133,7 +133,7 @@ public struct ContentView<CornerContent: View>: View {
     } detail: {
       detailColumn
     }
-    .navigationSplitViewStyle(.prominentDetail)
+    .navigationSplitViewStyle(.balanced)
     .toolbarBackgroundVisibility(contentWindowToolbarBackgroundVisibility, for: .windowToolbar)
     .toolbar {
       contentToolbarItems
