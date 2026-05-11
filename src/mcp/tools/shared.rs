@@ -17,7 +17,7 @@ use crate::mcp::registry::{
 };
 use crate::mcp::tool::ToolError;
 
-const WINDOW_SCOPED_LIST_ELEMENTS_RETRY_DELAYS: [Duration; 3] = [
+const EMPTY_LIST_ELEMENTS_RETRY_DELAYS: [Duration; 3] = [
     Duration::from_millis(100),
     Duration::from_millis(250),
     Duration::from_millis(500),
@@ -70,11 +70,12 @@ pub async fn resolve_list_elements(
 }
 
 /// Resolve `list_elements` from the registry first, then optionally enrich the
-/// first empty success with the AX helper. Fresh window-scoped, unfiltered
-/// queries are the only class that retries after an empty result, with an
-/// additional worst-case tail of 850 ms (100 + 250 + 500) before returning the
-/// final empty success. Follow-up attempts are registry-only so the helper cost
-/// is paid at most once per request.
+/// first empty success with the AX helper. Empty registry snapshots retry with
+/// an additional worst-case tail of 850 ms (100 + 250 + 500) before returning
+/// the final empty success. Kind-filtered misses first probe the same scope
+/// without the kind filter; if any elements exist, the filtered miss is treated
+/// as legitimate and returns without the retry tail. Follow-up attempts are
+/// registry-only so the helper cost is paid at most once per request.
 pub(crate) async fn resolve_list_elements_with<F, Fut>(
     client: &RegistryClient,
     window_id: Option<i64>,
@@ -92,16 +93,8 @@ where
     }
 }
 
-fn list_elements_retry_delays(
-    window_id: Option<i64>,
-    kind: Option<ElementKind>,
-) -> impl Iterator<Item = Option<Duration>> {
-    let retry_delays = if window_id.is_some() && kind.is_none() {
-        WINDOW_SCOPED_LIST_ELEMENTS_RETRY_DELAYS.as_slice()
-    } else {
-        &[]
-    };
-    once(None).chain(retry_delays.iter().copied().map(Some))
+fn list_elements_retry_delays() -> impl Iterator<Item = Option<Duration>> {
+    once(None).chain(EMPTY_LIST_ELEMENTS_RETRY_DELAYS.iter().copied().map(Some))
 }
 
 async fn resolve_list_elements_after_empty(
@@ -110,8 +103,12 @@ async fn resolve_list_elements_after_empty(
     kind: Option<ElementKind>,
     initial_empty: ListElementsResult,
 ) -> Result<ListElementsResult, ToolError> {
+    if !should_retry_empty_list_elements(client, window_id, kind).await {
+        return Ok(initial_empty);
+    }
+
     let mut last_empty_result = initial_empty;
-    for delay in list_elements_retry_delays(window_id, kind).skip(1) {
+    for delay in list_elements_retry_delays().skip(1) {
         if let Some(delay) = delay {
             sleep(delay).await;
         }
@@ -124,6 +121,24 @@ async fn resolve_list_elements_after_empty(
         }
     }
     Ok(last_empty_result)
+}
+
+async fn should_retry_empty_list_elements(
+    client: &RegistryClient,
+    window_id: Option<i64>,
+    kind: Option<ElementKind>,
+) -> bool {
+    if kind.is_none() {
+        return true;
+    }
+
+    // A kind-filtered empty result is only suspicious while the scope is
+    // otherwise empty. Once any element exists, a miss for this kind is a
+    // legitimate filtered query result and should not pay the retry tail.
+    match request_list_elements_from_registry(client, window_id, None).await {
+        Ok(unfiltered) => unfiltered.elements.is_empty(),
+        Err(_) => true,
+    }
 }
 
 async fn resolve_list_elements_once<F, Fut>(
