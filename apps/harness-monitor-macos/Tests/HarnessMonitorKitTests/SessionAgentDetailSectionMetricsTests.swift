@@ -135,6 +135,23 @@ struct SessionAgentDetailSectionMetricsTests {
     )
   }
 
+  @Test("Session transcript helper keeps native ACP transcripts even when empty")
+  func sessionTranscriptHelperKeepsEmptyNativeAcpTranscript() {
+    let nativeAgent = makeAgent(
+      agentID: "agent-native",
+      supportsNativeTranscript: true
+    )
+    let nativeTimeline = [makeTimelineEntry(entryID: "timeline-native", agentID: "agent-native")]
+
+    #expect(
+      SessionAgentDetailSection.transcriptEntries(
+        agent: nativeAgent,
+        agentTimeline: nativeTimeline,
+        acpTranscript: []
+      ).isEmpty
+    )
+  }
+
   @Test("Session action actor helper stays within the session agent roster")
   func sessionActionActorHelperStaysWithinSessionRoster() {
     let leader = makeAgent(agentID: "leader-1")

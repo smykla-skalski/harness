@@ -41,7 +41,10 @@ extension SessionWindowCreateForm {
   var normalizedLaunchSelection: AgentLaunchSelection {
     SessionWindowCreateFormCatalogs.normalizedLaunchSelection(
       draft: draft,
-      options: activeAgentCapabilityOptions
+      options: activeAgentCapabilityOptions,
+      didPickLaunchSelectionManually: state.didPickCreateLaunchSelectionManually(
+        for: draft.kind
+      )
     )
   }
 
@@ -107,7 +110,7 @@ extension SessionWindowCreateForm {
   var launchSelection: Binding<AgentLaunchSelection> {
     Binding(
       get: { normalizedLaunchSelection },
-      set: { updateDraft(runtime: $0.storageKey) }
+      set: { state.persistCreateLaunchSelection($0, for: draft) }
     )
   }
 

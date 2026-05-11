@@ -178,10 +178,48 @@ struct SessionAgentListSection: View {
   @Environment(\.openWindow)
   private var openWindow
 
+  private var agentRuntimeSummary: HarnessMonitorStore.AgentRuntimeSummary {
+    store.agentRuntimeSummary(
+      sessionID: sessionID,
+      sessionRegistrations: agents,
+      tuiStatusByAgent: tuiStatusByAgent
+    )
+  }
+
+  private var agentStateSummaryText: String {
+    guard store.usesLiveRuntimePresentation(for: sessionID) else {
+      return "\(agents.count) registered"
+    }
+
+    var segments: [String] = []
+    if agentRuntimeSummary.activeCount > 0 {
+      segments.append("\(agentRuntimeSummary.activeCount) active")
+    }
+    if agentRuntimeSummary.notRunningCount > 0 {
+      segments.append("\(agentRuntimeSummary.notRunningCount) not running")
+    }
+    if agentRuntimeSummary.disconnectedCount > 0 {
+      segments.append("\(agentRuntimeSummary.disconnectedCount) disconnected")
+    }
+    if agentRuntimeSummary.idleCount > 0 {
+      segments.append("\(agentRuntimeSummary.idleCount) idle")
+    }
+    if agentRuntimeSummary.awaitingReviewCount > 0 {
+      segments.append("\(agentRuntimeSummary.awaitingReviewCount) awaiting review")
+    }
+    if agentRuntimeSummary.removedCount > 0 {
+      segments.append("\(agentRuntimeSummary.removedCount) removed")
+    }
+    return segments.isEmpty ? "No agents" : segments.joined(separator: " · ")
+  }
+
   private var agentStateMarkerText: String {
     let agentIDs = agents.map(\.agentId).joined(separator: ",")
     let runtimes = Array(Set(agents.map(\.runtime))).sorted().joined(separator: ",")
-    return "agentCount=\(agents.count), agentIDs=\(agentIDs), runtimes=\(runtimes)"
+    return """
+      agentCount=\(agents.count), currentState=\(agentStateSummaryText), \
+      agentIDs=\(agentIDs), runtimes=\(runtimes)
+      """
   }
 
   var body: some View {
@@ -191,9 +229,16 @@ struct SessionAgentListSection: View {
         text: agentStateMarkerText
       )
       HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.itemSpacing) {
-        Text("Agents")
-          .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
-          .accessibilityAddTraits(.isHeader)
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+          Text("Agents")
+            .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
+            .accessibilityAddTraits(.isHeader)
+          if !agents.isEmpty {
+            Text(agentStateSummaryText)
+              .scaledFont(.caption)
+              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          }
+        }
         Spacer()
         newAgentButton
       }
@@ -225,6 +270,7 @@ struct SessionAgentListSection: View {
             SessionAgentSummaryCard(
               store: store,
               sessionID: sessionID,
+              sessionRegistrations: agents,
               agent: agent,
               queuedTasks: tasks.queued(for: agent.agentId),
               isSessionReadOnly: isSessionReadOnly,

@@ -264,12 +264,11 @@ struct AgentCapabilityPickerTests {
     #expect(normalizedSelection == .tui(.gemini))
   }
 
-  @Test("first launch selection uses the first rendered provider row")
-  func firstLaunchSelectionUsesFirstRenderedProviderRow() {
+  @Test("first launch selection prefers the first ACP-ready provider")
+  func firstLaunchSelectionPrefersFirstAcpReadyProvider() {
     let options = AgentCapabilityCatalog.options(
       acpAgents: [
-        descriptor(id: "copilot", displayName: "GitHub Copilot"),
-        descriptor(id: "gemini", displayName: "Gemini CLI"),
+        descriptor(id: "copilot", displayName: "GitHub Copilot")
       ],
       runtimeProbeResults: AcpRuntimeProbeResponse(
         probes: [
@@ -279,18 +278,12 @@ struct AgentCapabilityPickerTests {
             binaryPresent: true,
             authState: .ready
           ),
-          AcpRuntimeProbe(
-            agentId: "gemini",
-            displayName: "Gemini CLI",
-            binaryPresent: true,
-            authState: .ready
-          ),
         ],
         checkedAt: "2026-04-28T22:15:00Z"
       )
     )
 
-    #expect(AgentCapabilityCatalog.firstProviderLaunchSelection(options: options) == .tui(.codex))
+    #expect(AgentCapabilityCatalog.firstProviderLaunchSelection(options: options) == .acp("copilot"))
   }
 
   @Test("stored provider id defaults to ACP when that provider supports ACP")

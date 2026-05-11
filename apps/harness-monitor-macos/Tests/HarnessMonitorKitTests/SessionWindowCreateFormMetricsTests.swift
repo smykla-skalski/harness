@@ -90,6 +90,100 @@ struct SessionWindowCreateFormMetricsTests {
     #expect(draft.normalizedArgvOverride == ["codex", "--model", "gpt-5"])
   }
 
+  @MainActor
+  @Test("Fresh agent draft restores saved launch preset fields")
+  func freshAgentDraftRestoresSavedLaunchPresetFields() throws {
+    let defaults = UserDefaults(suiteName: #function)!
+    defaults.removePersistentDomain(forName: #function)
+    let snapshot = LaunchPresetSnapshot(
+      mode: .terminal,
+      providerStorageKey: AgentLaunchSelection.tui(.gemini).storageKey,
+      role: SessionRole.leader.rawValue,
+      fallbackRole: SessionRole.observer.rawValue,
+      personaID: "reviewer",
+      modelByRuntime: ["gemini": "gemini-2.5-pro"],
+      customModelByRuntime: ["claude": "claude-sonnet-custom"],
+      effortByRuntime: ["gemini": "high"],
+      codexMode: CodexRunMode.workspaceWrite.rawValue,
+      customCodexModel: "gpt-5.5-custom",
+      codexEffort: "medium"
+    )
+    guard let encodedSnapshot = LaunchPresetDefaults.encode(snapshot) else {
+      Issue.record("Expected launch preset snapshot to encode")
+      return
+    }
+    defaults.set(encodedSnapshot, forKey: LaunchPresetDefaults.storageKey)
+
+    let draft = SessionWindowStateCache.freshCreateDraft(
+      kind: .agent,
+      sessionID: "session-1",
+      userDefaults: defaults
+    )
+
+    #expect(draft.runtime == AgentLaunchSelection.tui(.gemini).storageKey)
+    #expect(draft.role == .leader)
+    #expect(draft.fallbackRole == .observer)
+    #expect(draft.personaID == "reviewer")
+    #expect(draft.modelByRuntime["gemini"] == "gemini-2.5-pro")
+    #expect(draft.customModelByRuntime["claude"] == "claude-sonnet-custom")
+    #expect(draft.effortByRuntime["gemini"] == "high")
+    #expect(draft.codexMode == .workspaceWrite)
+    #expect(draft.codexModel == "gpt-5.5-custom")
+    #expect(draft.codexAllowCustomModel)
+    #expect(draft.codexEffort == "medium")
+  }
+
+  @MainActor
+  @Test("Fresh agent normalization prefers ACP for the stored provider")
+  func freshAgentNormalizationPrefersAcpForStoredProvider() {
+    let defaults = UserDefaults(suiteName: #function)!
+    defaults.removePersistentDomain(forName: #function)
+    HarnessMonitorAgentLaunchDefaults.persist(.tui(.copilot), userDefaults: defaults)
+    let draft = SessionWindowStateCache.freshCreateDraft(
+      kind: .agent,
+      sessionID: "session-1",
+      userDefaults: defaults
+    )
+    let options = AgentCapabilityCatalog.options(
+      acpAgents: [descriptor(id: "copilot", displayName: "GitHub Copilot")],
+      runtimeProbeResults: readyProbeResults(for: ["copilot"])
+    )
+
+    #expect(
+      SessionWindowCreateFormCatalogs.normalizedLaunchSelection(
+        draft: draft,
+        options: options,
+        userDefaults: defaults
+      ) == .acp("copilot")
+    )
+  }
+
+  @MainActor
+  @Test("Manual selection keeps the chosen transport during normalization")
+  func manualSelectionKeepsChosenTransportDuringNormalization() {
+    let defaults = UserDefaults(suiteName: #function)!
+    defaults.removePersistentDomain(forName: #function)
+    HarnessMonitorAgentLaunchDefaults.persist(.acp("copilot"), userDefaults: defaults)
+    let draft = SessionCreateDraft(
+      kind: .agent,
+      runtime: AgentLaunchSelection.tui(.copilot).storageKey,
+      sessionID: "session-1"
+    )
+    let options = AgentCapabilityCatalog.options(
+      acpAgents: [descriptor(id: "copilot", displayName: "GitHub Copilot")],
+      runtimeProbeResults: readyProbeResults(for: ["copilot"])
+    )
+
+    #expect(
+      SessionWindowCreateFormCatalogs.normalizedLaunchSelection(
+        draft: draft,
+        options: options,
+        didPickLaunchSelectionManually: true,
+        userDefaults: defaults
+      ) == .tui(.copilot)
+    )
+  }
+
   @Test("Validation rejects unavailable selected capability")
   func validationRejectsUnavailableSelectedCapability() {
     let draft = SessionCreateDraft(
@@ -98,13 +192,13 @@ struct SessionWindowCreateFormMetricsTests {
       runtime: AgentLaunchSelection.acp("copilot").storageKey,
       sessionID: "session-1"
     )
-    let option = AgentCapabilityOption(
+      let option = AgentCapabilityOption(
       id: "copilot",
       title: "Copilot",
       transportChoices: [
         AgentCapabilityTransportChoice(
           id: .acp("copilot"),
-          title: "Project access",
+          title: "ACP",
           capabilities: ["workspace.read"]
         )
       ],
@@ -117,7 +211,7 @@ struct SessionWindowCreateFormMetricsTests {
 
     #expect(
       SessionWindowCreateFormValidation.message(for: draft, capabilityOptions: [option])
-        == "Turn on bridge access to use project access here"
+        == "Turn on bridge access to use ACP here"
     )
     #expect(
       SessionWindowCreateFormValidation.result(for: draft, capabilityOptions: [option])?.field
@@ -211,6 +305,7 @@ struct SessionWindowCreateFormMetricsTests {
     #expect(catalogSource.contains("fallbackAgentOptions"))
     #expect(catalogSource.contains("effectiveModelSelection"))
     #expect(catalogSource.contains("fetchPersonas()"))
+    #expect(catalogSource.contains("resolvedInitialLaunchSelection"))
     #expect(catalogSource.contains("selectedPersonaStateText"))
     #expect(formSource.contains("embeddedAgentRuntimeSections"))
     #expect(formSource.contains("terminalRuntimeConfigurationSection"))
@@ -232,9 +327,10 @@ struct SessionWindowCreateFormMetricsTests {
     #expect(submissionSource.contains("writeTerminalLaunchPreset("))
     #expect(submissionSource.contains("role: selectedRole"))
     #expect(submissionSource.contains("fallbackRole: fallbackRole"))
-    #expect(submissionSource.contains("projectDir: projectDir"))
-    #expect(submissionSource.contains("persona: personaID"))
+    #expect(submissionSource.contains("projectDir: context.projectDir"))
+    #expect(submissionSource.contains("persona: context.personaID"))
     #expect(submissionSource.contains("argv: draft.normalizedArgvOverride"))
+    #expect(submissionSource.contains("state.resetCreateDraft(.agent)"))
     #expect(!submissionSource.contains("createCodexRun(named:"))
     #expect(!submissionSource.contains("loadAgentCapabilitiesIfNeeded"))
     #expect(sharedCatalogSource.contains("enum AgentCapabilityCatalog"))
@@ -319,5 +415,32 @@ struct SessionWindowCreateFormMetricsTests {
       )
       .appendingPathComponent(relativePath)
     return try String(contentsOf: fileURL, encoding: .utf8)
+  }
+
+  private func descriptor(id: String, displayName: String) -> AcpAgentDescriptor {
+    AcpAgentDescriptor(
+      id: id,
+      displayName: displayName,
+      capabilities: ["fs.read", "terminal.spawn"],
+      launchCommand: id,
+      launchArgs: ["--acp"],
+      envPassthrough: [],
+      installHint: nil,
+      doctorProbe: AcpDoctorProbe(command: id, args: ["--version"])
+    )
+  }
+
+  private func readyProbeResults(for ids: [String]) -> AcpRuntimeProbeResponse {
+    AcpRuntimeProbeResponse(
+      probes: ids.map { id in
+        AcpRuntimeProbe(
+          agentId: id,
+          displayName: id,
+          binaryPresent: true,
+          authState: .ready
+        )
+      },
+      checkedAt: "2026-05-11T12:00:00Z"
+    )
   }
 }

@@ -84,7 +84,7 @@ extension SessionAgentDetailSection {
     agentTimeline: [TimelineEntry],
     acpTranscript: [TimelineEntry]
   ) -> [TimelineEntry] {
-    if agent.runtimeCapabilities.supportsNativeTranscript, !acpTranscript.isEmpty {
+    if agent.runtimeCapabilities.supportsNativeTranscript {
       return acpTranscript
     }
     return agentTimeline

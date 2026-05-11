@@ -4,6 +4,7 @@ import SwiftUI
 struct SessionAgentSummaryCard: View {
   let store: HarnessMonitorStore
   let sessionID: String
+  let sessionRegistrations: [AgentRegistration]
   let agent: AgentRegistration
   let queuedTasks: [WorkItem]
   let isSessionReadOnly: Bool
@@ -84,12 +85,27 @@ struct SessionAgentSummaryCard: View {
     )
   }
 
+  private var lifecyclePresentation: HarnessMonitorStore.AgentLifecyclePresentation {
+    store.agentLifecyclePresentation(
+      for: agent,
+      sessionID: sessionID,
+      sessionRegistrations: sessionRegistrations,
+      tuiStatus: tuiStatus
+    )
+  }
+
   private var activityPresentation: HarnessMonitorStore.AgentActivityPresentation {
     store.agentActivityPresentation(
       for: agent,
+      sessionID: sessionID,
+      sessionRegistrations: sessionRegistrations,
       queuedTasks: queuedTasks,
-      isSelectedSessionLive: store.sessionDataAvailability == .live
+      tuiStatus: tuiStatus
     )
+  }
+
+  private var shouldShowActivityBadge: Bool {
+    activityPresentation.label != lifecyclePresentation.label
   }
 
   var body: some View {
@@ -124,19 +140,27 @@ struct SessionAgentSummaryCard: View {
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             .lineLimit(1)
           Spacer(minLength: 0)
-          if let currentTaskId = agent.currentTaskId {
+          if lifecyclePresentation.visualStatus == .active,
+            let currentTaskId = agent.currentTaskId
+          {
             Text("Current \(currentTaskId)")
               .scaledFont(.caption.monospaced())
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
               .lineLimit(1)
           }
           HStack(spacing: HarnessMonitorTheme.itemSpacing) {
+            badge(
+              lifecyclePresentation.label,
+              accessibilityValue: lifecyclePresentation.accessibilityValue
+            )
+            if shouldShowActivityBadge {
+              badge(
+                activityPresentation.label,
+                accessibilityValue: activityPresentation.accessibilityValue
+              )
+            }
             badge(agent.runtimeCapabilities.supportsContextInjection ? "Context" : "Watch")
             badge("\(agent.runtimeCapabilities.typicalSignalLatencySeconds)s")
-            badge(
-              activityPresentation.label,
-              accessibilityValue: activityPresentation.accessibilityValue
-            )
           }
         }
         .frame(

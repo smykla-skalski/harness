@@ -191,7 +191,8 @@ extension SessionWindowCreateForm {
       return "\(summary) Finish the remaining setup in the sections below."
     }
     return
-      "Choose how this agent starts. The remaining form sections hold the configuration "
+      "Choose how this agent starts. ACP is preferred when available; the remaining "
+      + "form sections hold the configuration "
       + "and advanced overrides."
   }
 
@@ -334,7 +335,7 @@ extension SessionWindowCreateForm {
         Text("Start with")
           .harnessNativeFormSectionHeader()
       } footer: {
-        Text("Choose whether this provider opens in Terminal or joins with project access.")
+        Text("Choose whether this provider opens in Terminal or joins via ACP.")
           .harnessNativeFormSectionFooter()
       }
     }
@@ -380,7 +381,7 @@ extension SessionWindowCreateForm {
           .accessibilityLabel("Runtime effort")
         }
       } else if normalizedLaunchSelection.isAcp {
-        Text("Project access uses the provider's configured defaults.")
+        Text("ACP uses the provider's configured defaults.")
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .fixedSize(horizontal: false, vertical: true)
