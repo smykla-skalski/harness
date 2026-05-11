@@ -5,6 +5,7 @@ import SwiftUI
   SessionAgentSummaryCard(
     store: HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded),
     sessionID: PreviewFixtures.summary.sessionId,
+    sessionRegistrations: PreviewFixtures.agents,
     agent: PreviewFixtures.agents[1],
     queuedTasks: [],
     isSessionReadOnly: false,
@@ -19,6 +20,7 @@ import SwiftUI
   SessionAgentSummaryCard(
     store: HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded),
     sessionID: PreviewFixtures.summary.sessionId,
+    sessionRegistrations: PreviewFixtures.agents,
     agent: PreviewFixtures.agents[1],
     queuedTasks: [],
     isSessionReadOnly: false,

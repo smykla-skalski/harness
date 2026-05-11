@@ -19,7 +19,9 @@ struct SessionWindowRouteContentMetrics: Equatable {
 }
 
 struct SessionWindowOverview: View {
+  let store: HarnessMonitorStore
   let snapshot: HarnessMonitorSessionWindowSnapshot
+  let tuiStatusByAgent: [String: AgentTuiStatus]
   @Environment(\.fontScale)
   private var fontScale
 
@@ -48,7 +50,7 @@ struct SessionWindowOverview: View {
           metric("Status", snapshot.summary.status.title)
           metric("Project", snapshot.summary.projectName)
           metric("Worktree", snapshot.summary.worktreeDisplayName)
-          metric("Agents", "\(agentCount)")
+          metric("Agents", agentCountText)
           metric("Open tasks", "\(snapshot.summary.metrics.openTaskCount)")
           metric("Source", snapshot.source.rawValue)
         }
@@ -70,6 +72,27 @@ struct SessionWindowOverview: View {
 
   private var agentCount: Int {
     snapshot.detail?.agents.count ?? snapshot.summary.metrics.agentCount
+  }
+
+  private var agentCountText: String {
+    guard store.usesLiveRuntimePresentation(for: snapshot.summary.sessionId),
+      let detail = snapshot.detail
+    else {
+      return "\(agentCount)"
+    }
+
+    let summary = store.agentRuntimeSummary(
+      sessionID: snapshot.summary.sessionId,
+      sessionRegistrations: detail.agents,
+      tuiStatusByAgent: tuiStatusByAgent
+    )
+    guard summary.registeredCount > 0 else {
+      return "0"
+    }
+    guard summary.activeCount != summary.registeredCount else {
+      return "\(summary.activeCount) active"
+    }
+    return "\(summary.activeCount) active of \(summary.registeredCount)"
   }
 }
 
@@ -99,7 +122,9 @@ enum SessionWindowAgentFilter {
 }
 
 struct SessionWindowAgentsList: View {
+  let store: HarnessMonitorStore
   let detail: SessionDetail?
+  let tuiStatusByAgent: [String: AgentTuiStatus]
   @Bindable var state: SessionWindowStateCache
   @Environment(\.fontScale)
   private var fontScale
@@ -152,11 +177,17 @@ struct SessionWindowAgentsList: View {
       Section("Agents") {
         if !agents.isEmpty {
           ForEach(agents) { agent in
+            let lifecycle = store.agentLifecyclePresentation(
+              for: agent,
+              sessionID: state.sessionID,
+              sessionRegistrations: detail?.agents ?? [],
+              tuiStatus: tuiStatusByAgent[agent.agentId]
+            )
             Label {
               VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
                 Text(agent.name)
                   .scaledFont(.body)
-                Text("\(agent.role.title) - \(agent.runtime) - \(agent.agentId)")
+                Text("\(lifecycle.label) - \(agent.role.title) - \(agent.runtime) - \(agent.agentId)")
                   .scaledFont(.caption)
                   .foregroundStyle(.secondary)
               }

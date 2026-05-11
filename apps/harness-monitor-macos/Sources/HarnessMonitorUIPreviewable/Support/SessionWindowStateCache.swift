@@ -18,6 +18,7 @@ public final class SessionWindowStateCache {
   public var sidebarSelection = SessionSidebarSelectionState()
   public var sectionState = SessionWindowSectionState()
   var agentCreateCatalog = SessionWindowAgentCreateCatalogState()
+  var createDraftKindsWithManualLaunchSelection: Set<SessionCreateKind> = []
   public var decisionRuntime = SessionDecisionRuntime()
   public var decisionFilters = SessionDecisionFilterState()
   public var sidebarAnnouncer = SessionSidebarMultiSelectAnnouncer()
@@ -82,12 +83,35 @@ public final class SessionWindowStateCache {
   }
 
   public func selectCreate(_ kind: SessionCreateKind) {
-    let existing = sectionState.createDrafts[kind]
-    var draft = existing ?? SessionCreateDraft(kind: kind, sessionID: sessionID)
-    if kind == .agent {
-      draft.useCodex = false
+    let draft: SessionCreateDraft
+    if let existing = sectionState.createDrafts[kind] {
+      draft = existing
+    } else {
+      let freshDraft = Self.freshCreateDraft(kind: kind, sessionID: sessionID)
+      sectionState.createDrafts[kind] = freshDraft
+      setDidPickCreateLaunchSelectionManually(false, for: kind)
+      draft = freshDraft
     }
     updateSelection(.create(draft), source: .programmatic)
+  }
+
+  @MainActor
+  static func freshCreateDraft(
+    kind: SessionCreateKind,
+    sessionID: String,
+    userDefaults: UserDefaults = .standard
+  ) -> SessionCreateDraft {
+    var draft = SessionCreateDraft(kind: kind, sessionID: sessionID)
+    guard kind == .agent else {
+      return draft
+    }
+
+    draft.useCodex = false
+    draft.runtime = HarnessMonitorAgentLaunchDefaults.preferredSelection(
+      userDefaults: userDefaults
+    ).storageKey
+    applySavedAgentLaunchPreset(to: &draft, userDefaults: userDefaults)
+    return draft
   }
 
   public func select(_ selection: SessionSelection) {
@@ -113,7 +137,40 @@ public final class SessionWindowStateCache {
     selection = .create(draft)
   }
 
+  func didPickCreateLaunchSelectionManually(for kind: SessionCreateKind) -> Bool {
+    createDraftKindsWithManualLaunchSelection.contains(kind)
+  }
+
+  func setDidPickCreateLaunchSelectionManually(_ value: Bool, for kind: SessionCreateKind) {
+    if value {
+      createDraftKindsWithManualLaunchSelection.insert(kind)
+    } else {
+      createDraftKindsWithManualLaunchSelection.remove(kind)
+    }
+  }
+
+  func persistCreateLaunchSelection(
+    _ selection: AgentLaunchSelection,
+    for draft: SessionCreateDraft
+  ) {
+    HarnessMonitorAgentLaunchDefaults.persist(selection)
+    setDidPickCreateLaunchSelectionManually(true, for: draft.kind)
+    var next = draft
+    next.runtime = selection.storageKey
+    updateCreateDraft(next)
+  }
+
+  public func resetCreateDraft(_ kind: SessionCreateKind) {
+    setDidPickCreateLaunchSelectionManually(false, for: kind)
+    let freshDraft = Self.freshCreateDraft(kind: kind, sessionID: sessionID)
+    sectionState.createDrafts[kind] = freshDraft
+    if selection.createDraft?.kind == kind {
+      selection = .create(freshDraft)
+    }
+  }
+
   public func cancelCreateDraft(_ kind: SessionCreateKind) {
+    setDidPickCreateLaunchSelectionManually(false, for: kind)
     sectionState.createDrafts[kind] = nil
     updateSelection(
       .route(kind.route),
@@ -213,6 +270,67 @@ public final class SessionWindowStateCache {
 
   public func failAgentCreateCatalogLoading() {
     agentCreateCatalog.isLoading = false
+  }
+
+  @MainActor
+  private static func applySavedAgentLaunchPreset(
+    to draft: inout SessionCreateDraft,
+    userDefaults: UserDefaults
+  ) {
+    guard let snapshot = LaunchPresetDefaults.read(userDefaults: userDefaults) else {
+      return
+    }
+
+    if !HarnessMonitorAgentLaunchDefaults.hasExplicitPreferredProvider(
+      userDefaults: userDefaults
+    ),
+      let providerStorageKey = snapshot.providerStorageKey,
+      AgentLaunchSelection(storageKey: providerStorageKey) != nil
+    {
+      draft.runtime = providerStorageKey
+    }
+    if let role = snapshot.role.flatMap(SessionRole.init(rawValue:)) {
+      draft.role = role
+    }
+    if let fallbackRole = snapshot.fallbackRole.flatMap(SessionRole.init(rawValue:)) {
+      draft.fallbackRole = fallbackRole
+    }
+    if let personaID = snapshot.personaID, !personaID.isEmpty {
+      draft.personaID = personaID
+    }
+    if !snapshot.modelByRuntime.isEmpty {
+      draft.modelByRuntime = snapshot.modelByRuntime
+    }
+    if !snapshot.customModelByRuntime.isEmpty {
+      draft.customModelByRuntime = snapshot.customModelByRuntime
+    }
+    if !snapshot.effortByRuntime.isEmpty {
+      draft.effortByRuntime = snapshot.effortByRuntime
+    }
+    if let codexMode = snapshot.codexMode.flatMap(CodexRunMode.init(rawValue:)) {
+      draft.codexMode = codexMode
+    }
+
+    let trimmedCustomCodexModel = snapshot.customCodexModel?.trimmingCharacters(
+      in: .whitespacesAndNewlines
+    )
+    let trimmedCodexModel = snapshot.codexModel?.trimmingCharacters(
+      in: .whitespacesAndNewlines
+    )
+    if let trimmedCustomCodexModel, !trimmedCustomCodexModel.isEmpty {
+      draft.codexModel = trimmedCustomCodexModel
+      draft.codexAllowCustomModel = true
+    } else if let trimmedCodexModel, !trimmedCodexModel.isEmpty {
+      draft.codexModel = trimmedCodexModel
+      draft.codexAllowCustomModel = false
+    }
+    if let codexEffort = snapshot.codexEffort?.trimmingCharacters(
+      in: .whitespacesAndNewlines
+    ),
+      !codexEffort.isEmpty
+    {
+      draft.codexEffort = codexEffort
+    }
   }
 }
 

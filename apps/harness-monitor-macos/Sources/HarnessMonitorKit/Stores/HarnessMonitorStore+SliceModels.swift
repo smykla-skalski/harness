@@ -80,6 +80,50 @@ extension HarnessMonitorStore {
     }
   }
 
+  public struct AgentLifecyclePresentation: Equatable, Sendable {
+    public let label: String
+    public let accessibilityValue: String
+    public let visualStatus: AgentStatus
+
+    public init(
+      label: String,
+      accessibilityValue: String,
+      visualStatus: AgentStatus
+    ) {
+      self.label = label
+      self.accessibilityValue = accessibilityValue
+      self.visualStatus = visualStatus
+    }
+  }
+
+  public struct AgentRuntimeSummary: Equatable, Sendable {
+    public let registeredCount: Int
+    public let activeCount: Int
+    public let notRunningCount: Int
+    public let disconnectedCount: Int
+    public let idleCount: Int
+    public let awaitingReviewCount: Int
+    public let removedCount: Int
+
+    public init(
+      registeredCount: Int,
+      activeCount: Int,
+      notRunningCount: Int,
+      disconnectedCount: Int,
+      idleCount: Int,
+      awaitingReviewCount: Int,
+      removedCount: Int
+    ) {
+      self.registeredCount = registeredCount
+      self.activeCount = activeCount
+      self.notRunningCount = notRunningCount
+      self.disconnectedCount = disconnectedCount
+      self.idleCount = idleCount
+      self.awaitingReviewCount = awaitingReviewCount
+      self.removedCount = removedCount
+    }
+  }
+
   public enum SidebarEmptyState: Equatable, Sendable {
     case noSessions
     case noMatches
@@ -259,34 +303,100 @@ extension HarnessMonitorStore {
     )
   }
 
+  public func usesLiveRuntimePresentation(for sessionID: String) -> Bool {
+    selectedSessionID == sessionID && sessionDataAvailability == .live
+  }
+
+  public func agentLifecyclePresentation(
+    for agent: AgentRegistration,
+    sessionID: String,
+    sessionRegistrations: [AgentRegistration],
+    tuiStatus: AgentTuiStatus?
+  ) -> AgentLifecyclePresentation {
+    guard usesLiveRuntimePresentation(for: sessionID) else {
+      let label = agent.status.title
+      return AgentLifecyclePresentation(
+        label: label,
+        accessibilityValue: label,
+        visualStatus: agent.status
+      )
+    }
+
+    if agent.managedAgent?.kind == .acp,
+      agent.status == .active,
+      acpRuntimeState(
+        for: agent.agentId,
+        sessionID: sessionID,
+        sessionRegistrations: sessionRegistrations
+      ) == nil
+    {
+      return AgentLifecyclePresentation(
+        label: "Not Running",
+        accessibilityValue: "No live ACP runtime observed",
+        visualStatus: .disconnected
+      )
+    }
+
+    if let tuiStatus, agent.managedAgent?.kind == .tui, tuiStatus.isActive == false {
+      return AgentLifecyclePresentation(
+        label: tuiStatus.title,
+        accessibilityValue: tuiStatus.title,
+        visualStatus: .disconnected
+      )
+    }
+
+    let label = agent.status.title
+    return AgentLifecyclePresentation(
+      label: label,
+      accessibilityValue: label,
+      visualStatus: agent.status
+    )
+  }
+
   public func agentActivityPresentation(
     for agent: AgentRegistration,
+    sessionID: String,
+    sessionRegistrations: [AgentRegistration],
     queuedTasks: [WorkItem],
-    isSelectedSessionLive: Bool
+    tuiStatus: AgentTuiStatus?
   ) -> AgentActivityPresentation {
-    switch agent.status {
+    let lifecycle = agentLifecyclePresentation(
+      for: agent,
+      sessionID: sessionID,
+      sessionRegistrations: sessionRegistrations,
+      tuiStatus: tuiStatus
+    )
+
+    if lifecycle.label == "Not Running" {
+      return AgentActivityPresentation(
+        label: "No live ACP runtime",
+        accessibilityValue: "No live ACP runtime observed"
+      )
+    }
+
+    switch lifecycle.visualStatus {
     case .disconnected:
       return AgentActivityPresentation(
-        label: "Disconnected",
-        accessibilityValue: "Disconnected"
+        label: lifecycle.label,
+        accessibilityValue: lifecycle.accessibilityValue
       )
     case .removed:
       return AgentActivityPresentation(
-        label: "Removed",
-        accessibilityValue: "Removed"
+        label: lifecycle.label,
+        accessibilityValue: lifecycle.accessibilityValue
       )
     case .awaitingReview:
       return AgentActivityPresentation(
-        label: "Awaiting Review",
-        accessibilityValue: "Awaiting review"
+        label: lifecycle.label,
+        accessibilityValue: lifecycle.accessibilityValue
       )
     case .idle:
       return AgentActivityPresentation(
-        label: "Idle",
-        accessibilityValue: "Idle"
+        label: lifecycle.label,
+        accessibilityValue: lifecycle.accessibilityValue
       )
     case .active:
-      guard isSelectedSessionLive else {
+      guard usesLiveRuntimePresentation(for: sessionID) else {
         return AgentActivityPresentation(
           label: "Snapshot",
           accessibilityValue: "Estimated activity"
@@ -302,5 +412,56 @@ extension HarnessMonitorStore {
       let label = agent.currentTaskId == nil ? "Ready" : "Working"
       return AgentActivityPresentation(label: label, accessibilityValue: label)
     }
+  }
+
+  public func agentRuntimeSummary(
+    sessionID: String,
+    sessionRegistrations: [AgentRegistration],
+    tuiStatusByAgent: [String: AgentTuiStatus]
+  ) -> AgentRuntimeSummary {
+    var activeCount = 0
+    var notRunningCount = 0
+    var disconnectedCount = 0
+    var idleCount = 0
+    var awaitingReviewCount = 0
+    var removedCount = 0
+
+    for agent in sessionRegistrations {
+      let lifecycle = agentLifecyclePresentation(
+        for: agent,
+        sessionID: sessionID,
+        sessionRegistrations: sessionRegistrations,
+        tuiStatus: tuiStatusByAgent[agent.agentId]
+      )
+
+      switch lifecycle.label {
+      case "Not Running", AgentTuiStatus.stopped.title, AgentTuiStatus.exited.title,
+        AgentTuiStatus.failed.title:
+        notRunningCount += 1
+      default:
+        switch lifecycle.visualStatus {
+        case .active:
+          activeCount += 1
+        case .disconnected:
+          disconnectedCount += 1
+        case .idle:
+          idleCount += 1
+        case .awaitingReview:
+          awaitingReviewCount += 1
+        case .removed:
+          removedCount += 1
+        }
+      }
+    }
+
+    return AgentRuntimeSummary(
+      registeredCount: sessionRegistrations.count,
+      activeCount: activeCount,
+      notRunningCount: notRunningCount,
+      disconnectedCount: disconnectedCount,
+      idleCount: idleCount,
+      awaitingReviewCount: awaitingReviewCount,
+      removedCount: removedCount
+    )
   }
 }

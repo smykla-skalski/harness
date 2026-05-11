@@ -1,3 +1,4 @@
+import Foundation
 import HarnessMonitorKit
 
 enum SessionWindowCreateFormCatalogs {
@@ -83,11 +84,18 @@ enum SessionWindowCreateFormCatalogs {
     draft: SessionCreateDraft
   ) {
     let options = activeAgentOptions(catalogState: state.agentCreateCatalog, store: store)
-    let normalized = normalizedLaunchSelection(draft: draft, options: options)
-    guard normalized.storageKey != draft.launchSelection.storageKey else {
+    let currentDraft = state.sectionState.createDrafts[draft.kind] ?? draft
+    let normalized = normalizedLaunchSelection(
+      draft: currentDraft,
+      options: options,
+      didPickLaunchSelectionManually: state.didPickCreateLaunchSelectionManually(
+        for: currentDraft.kind
+      )
+    )
+    guard normalized.storageKey != currentDraft.launchSelection.storageKey else {
       return
     }
-    var next = draft
+    var next = currentDraft
     next.runtime = normalized.storageKey
     state.updateCreateDraft(next)
   }
@@ -107,22 +115,22 @@ enum SessionWindowCreateFormCatalogs {
     choice: AgentCapabilityTransportChoice
   ) -> String {
     if choice.id.isAcp {
-      return "Starts with project access."
+      return "Starts via ACP."
     }
 
     switch option.availabilityState {
     case .projectAccessAvailable:
-      return "Opens in Terminal. Project access is also available."
+      return "Opens in Terminal. ACP is also available."
     case .checkingAccess:
-      return "Opens in Terminal while project access is being checked."
+      return "Opens in Terminal while ACP is checked."
     case .setupRequired:
-      return "Opens in Terminal. Set up project access when you're ready."
+      return "Opens in Terminal. Set up ACP when you're ready."
     case .bridgeAccessRequired:
-      return "Opens in Terminal. Turn on bridge access to use project access."
+      return "Opens in Terminal. Turn on bridge access to use ACP."
     case .terminalOnly:
       return "Opens in Terminal."
     case .unavailable:
-      return option.projectAccessGuidanceText ?? "This provider isn't available here yet."
+      return option.projectAccessGuidanceText ?? "This provider isn't available yet."
     }
   }
 
@@ -145,17 +153,17 @@ enum SessionWindowCreateFormCatalogs {
     case .projectAccessAvailable:
       return nil
     case .checkingAccess:
-      return "Project access is still being checked."
+      return "ACP is still being checked."
     case .setupRequired:
-      return "Project access requires CLI setup. Copy install instructions below."
+      return "ACP requires CLI setup. Copy install instructions below."
     case .bridgeAccessRequired:
-      return "Project access requires bridge setup."
+      return "ACP requires bridge setup. Open setup details below."
     case .terminalOnly:
-      return "Project access isn't available for this provider yet."
+      return "ACP isn't available for this provider yet."
     case .unavailable:
       return
         option.projectAccessGuidanceText
-        ?? "Project access isn't available for this provider yet."
+        ?? "ACP isn't available for this provider yet."
     }
   }
 
@@ -188,15 +196,58 @@ enum SessionWindowCreateFormCatalogs {
     return "Using \(persona.name)."
   }
 
+  @MainActor
   static func normalizedLaunchSelection(
     draft: SessionCreateDraft,
-    options: [AgentCapabilityOption]
+    options: [AgentCapabilityOption],
+    didPickLaunchSelectionManually: Bool = false,
+    userDefaults: UserDefaults = .standard
   ) -> AgentLaunchSelection {
-    AgentCapabilityCatalog.normalizedLaunchSelection(
+    let selection: AgentLaunchSelection
+    if didPickLaunchSelectionManually {
+      selection = draft.launchSelection
+    } else {
+      selection = resolvedInitialLaunchSelection(
+        draft: draft,
+        options: options,
+        userDefaults: userDefaults
+      )
+    }
+    return AgentCapabilityCatalog.normalizedLaunchSelection(
       options: options,
-      selection: draft.launchSelection,
-      fallbackRuntime: draft.launchSelection.preferredRuntime
+      selection: selection,
+      fallbackRuntime: selection.preferredRuntime
     )
+  }
+
+  @MainActor
+  static func resolvedInitialLaunchSelection(
+    draft: SessionCreateDraft,
+    options: [AgentCapabilityOption],
+    userDefaults: UserDefaults = .standard
+  ) -> AgentLaunchSelection {
+    if let preferredProviderID = HarnessMonitorAgentLaunchDefaults.preferredProviderID(
+      userDefaults: userDefaults
+    ) {
+      return AgentCapabilityCatalog.defaultLaunchSelection(
+        providerID: preferredProviderID,
+        options: options,
+        fallback: draft.launchSelection
+      )
+    }
+
+    if let snapshot = LaunchPresetDefaults.read(userDefaults: userDefaults),
+      LaunchPresetDefaults.blocksInitialAcpDefault(snapshot),
+      let providerID = snapshot.providerID
+    {
+      return AgentCapabilityCatalog.defaultLaunchSelection(
+        providerID: providerID,
+        options: options,
+        fallback: draft.launchSelection
+      )
+    }
+
+    return AgentCapabilityCatalog.firstProviderLaunchSelection(options: options)
   }
 
   static func selectedCapabilityOption(

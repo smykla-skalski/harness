@@ -127,10 +127,10 @@ extension SessionCreateBridgeBannerKind {
         + "Enable it now or run this in a terminal:"
     case (.acp, .unavailable):
       return hostBridgeRunning
-        ? "The shared host bridge is running, but ACP project access is unavailable. "
+        ? "The shared host bridge is running, but ACP is unavailable. "
           + "Re-enable ACP or run this in a terminal:"
-        : "Harness Monitor runs sandboxed and needs the host bridge to grant ACP "
-          + "project access. Run this in a terminal:"
+        : "Harness Monitor runs sandboxed and needs the host bridge to grant ACP. "
+          + "Run this in a terminal:"
     case (.codex, .excluded):
       return "The shared host bridge is running without Codex enabled. "
         + "Enable it now or run this in a terminal:"

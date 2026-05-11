@@ -248,8 +248,19 @@ extension SessionWindowView {
     route: SessionWindowRoute
   ) -> some View {
     switch route {
-    case .overview: SessionWindowOverview(snapshot: snapshot)
-    case .agents: SessionWindowAgentsList(detail: snapshot.detail, state: stateCache)
+    case .overview:
+      SessionWindowOverview(
+        store: store,
+        snapshot: snapshot,
+        tuiStatusByAgent: store.contentUI.sessionDetail.tuiStatusByAgent
+      )
+    case .agents:
+      SessionWindowAgentsList(
+        store: store,
+        detail: snapshot.detail,
+        tuiStatusByAgent: store.contentUI.sessionDetail.tuiStatusByAgent,
+        state: stateCache
+      )
     case .tasks: SessionWindowTasksList(detail: snapshot.detail, state: stateCache)
     case .decisions:
       SessionWindowDecisionsList(decisions: matchingDecisions, state: stateCache)

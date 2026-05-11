@@ -34,7 +34,7 @@ enum AgentCapabilityCatalog {
           transportChoices: [
             AgentCapabilityTransportChoice(
               id: .acp(descriptor.id),
-              title: "Project access",
+              title: "ACP",
               capabilities: descriptor.capabilities
             )
           ],
@@ -75,7 +75,18 @@ enum AgentCapabilityCatalog {
     options: [AgentCapabilityOption],
     fallback: AgentLaunchSelection = HarnessMonitorAgentLaunchDefaults.startupFallbackSelection
   ) -> AgentLaunchSelection {
-    guard let firstOption = options.first,
+    if let firstAcpEnabledOption = options.first(where: { option in
+      guard let acpChoice = option.acpChoice else {
+        return false
+      }
+      return option.isEnabled(acpChoice)
+    }),
+      let firstChoice = firstAcpEnabledOption.transportChoices.first
+    {
+      return firstAcpEnabledOption.normalizedSelection(for: firstChoice.id)
+    }
+
+    guard let firstOption = options.first(where: \.isEnabled),
       let firstChoice = firstOption.transportChoices.first
     else {
       return fallback
@@ -105,7 +116,7 @@ enum AgentCapabilityCatalog {
       choices.append(
         AgentCapabilityTransportChoice(
           id: .acp(descriptor.id),
-          title: "Project access",
+          title: "ACP",
           capabilities: descriptor.capabilities
         )
       )

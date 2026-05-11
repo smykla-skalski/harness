@@ -142,12 +142,18 @@ extension SessionSidebar {
     _ agent: AgentRegistration,
     orderedAgentIDs: [String]
   ) -> some View {
+    let lifecycle = store.agentLifecyclePresentation(
+      for: agent,
+      sessionID: state.sessionID,
+      sessionRegistrations: snapshot?.detail?.agents ?? [],
+      tuiStatus: store.contentUI.sessionDetail.tuiStatusByAgent[agent.agentId]
+    )
     let selection = SessionSelection.agent(sessionID: state.sessionID, agentID: agent.agentId)
     SessionSidebarRow(
       title: agent.name,
       systemImage: "person.crop.circle",
-      severityShape: severityShape(for: agent.status),
-      severityTint: severityTint(for: agent.status)
+      severityShape: severityShape(for: lifecycle.visualStatus),
+      severityTint: severityTint(for: lifecycle.visualStatus)
     )
     .tag(selection)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarAgentRow(agent.agentId))

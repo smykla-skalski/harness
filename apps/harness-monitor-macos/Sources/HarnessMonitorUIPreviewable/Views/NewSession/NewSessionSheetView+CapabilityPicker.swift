@@ -260,27 +260,27 @@ extension AgentCapabilityOption {
     for selection: AgentLaunchSelection? = nil
   ) -> NewSessionCapabilityPresentation {
     let choice = selection.map(transportChoice(for:)) ?? transportChoices[0]
-    let startsWithProjectAccess = choice.id.isAcp && isEnabled(choice)
+    let startsWithAcp = choice.id.isAcp && isEnabled(choice)
 
     let launchText =
-      startsWithProjectAccess
-      ? "Starts with project access available."
+      startsWithAcp
+      ? "Starts via ACP."
       : "Opens in Terminal."
 
     let detail: String =
       switch availabilityState {
       case .projectAccessAvailable:
-        startsWithProjectAccess ? launchText : "\(launchText) Project access is also available."
+        startsWithAcp ? launchText : "\(launchText) ACP is also available."
       case .checkingAccess:
-        startsWithProjectAccess
-          ? "Project access is still being checked."
-          : "\(launchText) Project access is still being checked."
+        startsWithAcp
+          ? "ACP is still being checked."
+          : "\(launchText) ACP is still being checked."
       case .setupRequired:
-        startsWithProjectAccess
-          ? "Set up project access to launch this provider with project access."
-          : "\(launchText) Set up project access when you're ready."
+        startsWithAcp
+          ? "Set up ACP to launch this provider via ACP."
+          : "\(launchText) Set up ACP when you're ready."
       case .bridgeAccessRequired:
-        "Turn on bridge access to use project access while the daemon runs sandboxed."
+        "Turn on bridge access to use ACP while the daemon runs sandboxed."
       case .terminalOnly:
         "Opens in Terminal only."
       case .unavailable:

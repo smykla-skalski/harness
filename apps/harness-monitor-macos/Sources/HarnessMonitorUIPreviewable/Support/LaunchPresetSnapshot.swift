@@ -84,7 +84,6 @@ enum LaunchPresetDefaults {
     UserDefaults.standard.set(raw, forKey: storageKey)
   }
 
-  @MainActor
   static func read(userDefaults: UserDefaults = .standard) -> LaunchPresetSnapshot? {
     guard var snapshot = decode(from: userDefaults.string(forKey: storageKey)) else {
       return nil
@@ -98,7 +97,6 @@ enum LaunchPresetDefaults {
     return snapshot
   }
 
-  @MainActor
   static func blocksInitialAcpDefault(_ snapshot: LaunchPresetSnapshot) -> Bool {
     switch snapshot.mode {
     case .codex:

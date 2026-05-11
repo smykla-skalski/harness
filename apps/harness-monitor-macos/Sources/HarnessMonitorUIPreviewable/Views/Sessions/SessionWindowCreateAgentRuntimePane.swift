@@ -45,7 +45,10 @@ struct SessionWindowCreateAgentRuntimeContent: View {
   private var normalizedLaunchSelection: AgentLaunchSelection {
     SessionWindowCreateFormCatalogs.normalizedLaunchSelection(
       draft: draft,
-      options: activeAgentOptions
+      options: activeAgentOptions,
+      didPickLaunchSelectionManually: state.didPickCreateLaunchSelectionManually(
+        for: draft.kind
+      )
     )
   }
 
@@ -67,7 +70,7 @@ struct SessionWindowCreateAgentRuntimeContent: View {
   private var launchSelection: Binding<AgentLaunchSelection> {
     Binding(
       get: { normalizedLaunchSelection },
-      set: { updateDraft(runtime: $0.storageKey) }
+      set: { state.persistCreateLaunchSelection($0, for: draft) }
     )
   }
 
@@ -140,7 +143,7 @@ struct SessionWindowCreateAgentRuntimeContent: View {
   }
 
   private var compactDescription: String {
-    "Choose a provider below, then finish configuration in the form."
+    "Choose a provider below. ACP is preferred when available; finish configuration in the form."
   }
 
   @ViewBuilder private var availabilityNote: some View {
@@ -184,14 +187,6 @@ struct SessionWindowCreateAgentRuntimeContent: View {
 
   private func selectProvider(_ option: AgentCapabilityOption) {
     launchSelection.wrappedValue = option.normalizedSelection(for: launchSelection.wrappedValue)
-  }
-
-  private func updateDraft(runtime: String? = nil) {
-    var next = draft
-    if let runtime {
-      next.runtime = runtime
-    }
-    state.updateCreateDraft(next)
   }
 }
 
@@ -273,16 +268,16 @@ struct SessionWindowCreateProviderListRow: View {
   static func providerSubtitle(for option: AgentCapabilityOption) -> String {
     switch option.availabilityState {
     case .projectAccessAvailable:
-      return "Terminal and project access are available."
+      return "Terminal and ACP are available."
     case .checkingAccess:
-      return "Project access is still being checked."
+      return "ACP is still being checked."
     case .setupRequired:
-      return "Project access needs CLI setup."
+      return "ACP needs CLI setup."
     case .bridgeAccessRequired:
-      return "Project access needs bridge access."
+      return "ACP needs bridge access."
     case .terminalOnly:
       if option.acpChoice != nil {
-        return "Project access is not available here yet."
+        return "ACP is not available here yet."
       }
       return "This provider opens in Terminal only."
     case .unavailable:
@@ -329,7 +324,7 @@ struct SessionWindowCreateTransportChoiceButton: View {
   let unavailableReason: String?
 
   private var shortTitle: String {
-    choice.id.isAcp ? "Project access" : "Terminal"
+    choice.id.isAcp ? "ACP" : "Terminal"
   }
 
   var body: some View {

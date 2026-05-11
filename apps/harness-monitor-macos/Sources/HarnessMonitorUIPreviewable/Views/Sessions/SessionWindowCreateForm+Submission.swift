@@ -42,7 +42,10 @@ extension SessionWindowCreateForm {
   func createAgent(named name: String) async {
     let resolvedSelection = SessionWindowCreateFormCatalogs.normalizedLaunchSelection(
       draft: draft,
-      options: activeAgentCapabilityOptions
+      options: activeAgentCapabilityOptions,
+      didPickLaunchSelectionManually: state.didPickCreateLaunchSelectionManually(
+        for: draft.kind
+      )
     )
     let context = agentCreationContext(selection: resolvedSelection)
     switch resolvedSelection {
@@ -151,7 +154,7 @@ extension SessionWindowCreateForm {
       effortByRuntime: effort.isEmpty ? [:] : [runtime.rawValue: effort],
       personaID: context.personaID
     )
-    state.updateCreateDraft(SessionCreateDraft(kind: .agent, sessionID: draft.sessionID))
+    state.resetCreateDraft(.agent)
     state.selectAgent(created.agentId)
   }
 
@@ -184,7 +187,7 @@ extension SessionWindowCreateForm {
       fallbackRole: context.fallbackRole,
       personaID: context.personaID
     )
-    state.updateCreateDraft(SessionCreateDraft(kind: .agent, sessionID: draft.sessionID))
+    state.resetCreateDraft(.agent)
     state.selectAgent(created.agentId)
   }
 

@@ -192,12 +192,11 @@ extension SessionWindowView {
   }
 
   var sessionToolbarModel: SessionWindowToolbarModel {
-    let toolbar = store.contentUI.toolbar
     return SessionWindowToolbarModel(
-      canNavigateBack: toolbar.canNavigateBack,
-      canNavigateForward: toolbar.canNavigateForward,
+      canNavigateBack: stateCache.navigationHistory.canGoBack,
+      canNavigateForward: stateCache.navigationHistory.canGoForward,
       sleepPreventionPresentation: SleepPreventionToolbarPresentation(
-        isEnabled: toolbar.sleepPreventionEnabled
+        isEnabled: store.contentUI.toolbar.sleepPreventionEnabled
       )
     )
   }

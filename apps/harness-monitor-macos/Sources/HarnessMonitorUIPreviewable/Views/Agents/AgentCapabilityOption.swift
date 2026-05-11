@@ -12,7 +12,7 @@ enum AgentCapabilityAvailabilityState {
   var title: String {
     switch self {
     case .projectAccessAvailable:
-      "Project access available"
+      "ACP available"
     case .checkingAccess:
       "Checking access"
     case .setupRequired:
@@ -170,14 +170,14 @@ struct AgentCapabilityOption: Identifiable, Equatable {
     case .projectAccessAvailable:
       nil
     case .checkingAccess:
-      "Project access is still being checked"
+      "ACP is still being checked"
     case .setupRequired:
-      "Install the \(title) CLI to add project access here"
+      "Install the \(title) CLI to add ACP here"
     case .bridgeAccessRequired:
-      "Turn on bridge access to use project access here"
+      "Turn on bridge access to use ACP here"
     case .terminalOnly:
       transportChoices.contains(where: { $0.id.isAcp })
-        ? "Project access isn't available here yet"
+        ? "ACP isn't available here yet"
         : "This provider opens in Terminal only"
     case .unavailable:
       installHint ?? "This provider isn't available here yet"
