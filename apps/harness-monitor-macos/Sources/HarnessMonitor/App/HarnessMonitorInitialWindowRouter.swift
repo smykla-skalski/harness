@@ -89,6 +89,10 @@ struct HarnessMonitorInitialWindowRouter {
         satisfying: { sessionIDs in expectedSessionIDs.isSubset(of: sessionIDs) },
         timeout: Self.restorationWaitTimeout
       )
+      let toolbarsReady = await waitForSessionWindowToolbars(
+        sessionIDs: expectedSessionIDs,
+        registry: registry
+      )
 
       let boundSessionIDCount = expectedSessionIDs.reduce(into: 0) { count, sessionID in
         if registry.window(forSessionID: sessionID) != nil {
@@ -114,6 +118,7 @@ struct HarnessMonitorInitialWindowRouter {
         expected_members=\(expectedSessionIDs.count, privacy: .public) \
         bound_members=\(boundSessionIDCount, privacy: .public) \
         missed_members=\(expectedSessionIDs.count - boundSessionIDCount, privacy: .public) \
+        toolbars_ready=\(toolbarsReady, privacy: .public) \
         foreground_resolved=\(foregroundResolvedCount, privacy: .public)/\
         \(foregroundExpectedCount, privacy: .public) \
         converged=\(converged, privacy: .public)
@@ -125,6 +130,32 @@ struct HarnessMonitorInitialWindowRouter {
       }
     #endif
   }
+
+  #if canImport(AppKit)
+    private func waitForSessionWindowToolbars(
+      sessionIDs: Set<String>,
+      registry: SessionWindowAppKitRegistry
+    ) async -> Bool {
+      guard !sessionIDs.isEmpty else {
+        return true
+      }
+
+      let deadline = ContinuousClock.now + Self.restorationWaitTimeout
+      while ContinuousClock.now < deadline {
+        let allToolbarsReady = sessionIDs.allSatisfy { sessionID in
+          registry.window(forSessionID: sessionID)?.toolbar != nil
+        }
+        if allToolbarsReady {
+          return true
+        }
+        try? await Task.sleep(for: .milliseconds(50))
+      }
+
+      return sessionIDs.allSatisfy { sessionID in
+        registry.window(forSessionID: sessionID)?.toolbar != nil
+      }
+    }
+  #endif
 
   private func waitForRestoredSessionWindowsToRegister(sessionIDs: [String]) async {
     let expected = Set(sessionIDs)
@@ -159,8 +190,9 @@ struct HarnessMonitorInitialWindowRouter {
       let windows = grouping.sessionIDs.compactMap { sessionID in
         registry.window(forSessionID: sessionID)
       }
-      guard let anchor = windows.first, windows.count > 1 else { return }
-      for next in windows.dropFirst() {
+      let tabReadyWindows = windows.filter { $0.toolbar != nil }
+      guard let anchor = tabReadyWindows.first, tabReadyWindows.count > 1 else { return }
+      for next in tabReadyWindows.dropFirst() {
         guard next !== anchor else { continue }
         // Skip if AppKit already merged them (matching tabbingIdentifier
         // + user pref Always reaches us with a tab group already formed).

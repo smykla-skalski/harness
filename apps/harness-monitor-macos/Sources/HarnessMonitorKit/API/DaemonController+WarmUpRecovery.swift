@@ -5,10 +5,11 @@ extension DaemonController {
     manifest: DaemonManifest,
     state: inout WarmUpLoopState
   ) async throws -> WarmUpIterationOutcome {
+    let currentManifestURL = externalManifestLocator.manifestURL.standardizedFileURL
     let staleSignature = Self.managedStaleManifestSignature(for: manifest)
     let isFreshObservation = state.lastLoggedManifestSignature != staleSignature
     if isFreshObservation {
-      let manifestPath = externalManifestLocator.manifestURL.path
+      let manifestPath = currentManifestURL.path
       let pid = manifest.pid
       let tokenPath = manifest.tokenPath
       HarnessMonitorLogger.lifecycle.trace(
@@ -62,12 +63,65 @@ extension DaemonController {
       externalManifestLocator.rememberActiveManifestIfNeeded()
       return WarmUpIterationOutcome(liveClient: client, stop: true, progressed: true)
     }
+    if let alternateOutcome = try await bootstrapReachableAlternateExternalManifestIfNeeded(
+      currentManifestURL: currentManifestURL
+    ) {
+      state.sawUnreachableManifest = false
+      return alternateOutcome
+    }
     return try await handleStaleManifest(
       manifest: manifest,
       endpoint: endpoint,
       isFreshObservation: isFreshObservation,
       state: &state
     )
+  }
+
+  func bootstrapReachableAlternateExternalManifestIfNeeded(
+    currentManifestURL: URL
+  ) async throws -> WarmUpIterationOutcome? {
+    guard ownership == .external else {
+      return nil
+    }
+
+    var candidateManifestURLs = externalManifestLocator.candidateManifestURLs()
+      .map(\.standardizedFileURL)
+    appendExternalManifestCandidateURL(
+      HarnessMonitorPaths.manifestURL(using: environment).standardizedFileURL,
+      to: &candidateManifestURLs
+    )
+
+    for candidateManifestURL in candidateManifestURLs where candidateManifestURL != currentManifestURL {
+      do {
+        let candidateManifest = try loadManifest(at: candidateManifestURL, emitTrace: false)
+        let candidateConnection = try daemonConnection(from: candidateManifest, emitTrace: false)
+        if await endpointProbe(candidateConnection.endpoint) {
+          HarnessMonitorLogger.lifecycle.notice(
+            """
+            Warm-up switched from stale external manifest \
+            \(currentManifestURL.path, privacy: .public) to reachable manifest \
+            \(candidateManifestURL.path, privacy: .public)
+            """
+          )
+          let client = try await bootstrap(connection: candidateConnection)
+          externalManifestLocator.rememberActiveManifestIfNeeded()
+          return WarmUpIterationOutcome(liveClient: client, stop: true, progressed: true)
+        }
+      } catch {
+        // Ignore unreadable or stale alternates and keep looking.
+      }
+      externalManifestLocator.activate(currentManifestURL)
+    }
+
+    externalManifestLocator.activate(currentManifestURL)
+    return nil
+  }
+
+  func appendExternalManifestCandidateURL(_ manifestURL: URL, to manifestURLs: inout [URL]) {
+    guard manifestURLs.contains(manifestURL) == false else {
+      return
+    }
+    manifestURLs.append(manifestURL)
   }
 
   func handleManagedStaleManifest(

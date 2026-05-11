@@ -288,8 +288,11 @@ extension SessionCacheService {
     guard !rows.isEmpty else {
       return nil
     }
-    let uniqueSources = Set(rows.map(\.sourceRaw))
-    guard uniqueSources.count == 1, let sourceRaw = uniqueSources.first else {
+    let uniqueSources = Set(rows.compactMap(\.sourceRaw))
+    guard uniqueSources.count == 1,
+      uniqueSources.count == rows.count,
+      let sourceRaw = uniqueSources.first
+    else {
       return .cache
     }
     return HarnessMonitorSessionWindowTranscriptSource(rawValue: sourceRaw) ?? .cache

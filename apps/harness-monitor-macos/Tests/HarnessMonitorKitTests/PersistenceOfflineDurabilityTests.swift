@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 import Testing
+import XCTest
 
 @testable import HarnessMonitorKit
 
@@ -46,6 +47,12 @@ struct PersistenceOfflineDurabilityTests {
 
   private func makeV6Container(at url: URL) throws -> ModelContainer {
     let schema = Schema(versionedSchema: HarnessMonitorSchemaV6.self)
+    let config = ModelConfiguration("HarnessMonitorStore", schema: schema, url: url)
+    return try ModelContainer(for: schema, configurations: [config])
+  }
+
+  private func makeV11Container(at url: URL) throws -> ModelContainer {
+    let schema = Schema(versionedSchema: HarnessMonitorSchemaV11.self)
     let config = ModelConfiguration("HarnessMonitorStore", schema: schema, url: url)
     return try ModelContainer(for: schema, configurations: [config])
   }
@@ -124,6 +131,23 @@ struct PersistenceOfflineDurabilityTests {
 
     container.mainContext.insert(project)
     container.mainContext.insert(session)
+    try container.mainContext.save()
+  }
+
+  private func seedV11TranscriptStore(at url: URL) throws {
+    let container = try makeV11TranscriptStoreContainer(at: url)
+    let transcript = HarnessMonitorSchemaV11.CachedSessionTranscriptEntry(
+      sessionId: "sess-v11",
+      entryId: "entry-v11",
+      recordedAt: "2026-04-03T12:05:00Z",
+      kind: "assistant_message",
+      agentId: "agent-v11",
+      taskId: nil,
+      summary: "Cached transcript row",
+      payloadData: Data("{}".utf8)
+    )
+
+    container.mainContext.insert(transcript)
     try container.mainContext.save()
   }
 
@@ -374,4 +398,93 @@ struct PersistenceOfflineDurabilityTests {
     #expect(events.isEmpty)
     #expect(configs.isEmpty)
   }
+
+  @Test("Live SwiftData store migrates V11 transcript cache rows without source provenance")
+  func liveStoreMigratesV11TranscriptCacheRowsWithoutSourceProvenance() throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let environment = HarnessMonitorEnvironment(
+      values: ["XDG_DATA_HOME": root.path],
+      homeDirectory: root
+    )
+    let harnessRoot = HarnessMonitorPaths.harnessRoot(using: environment)
+    try FileManager.default.createDirectory(
+      at: harnessRoot,
+      withIntermediateDirectories: true,
+      attributes: nil
+    )
+
+    let storeURL = harnessRoot.appendingPathComponent("harness-cache.store")
+    try seedV11TranscriptStore(at: storeURL)
+
+    let container = try HarnessMonitorModelContainer.live(using: environment)
+    let transcriptRows = try container.mainContext.fetch(
+      FetchDescriptor<CachedSessionTranscriptEntry>()
+    )
+
+    #expect(transcriptRows.count == 1)
+    #expect(transcriptRows.first?.sessionId == "sess-v11")
+    #expect(transcriptRows.first?.entryId == "entry-v11")
+    #expect(transcriptRows.first?.sourceRaw == nil)
+  }
+}
+
+@MainActor
+final class PersistenceOfflineDurabilityXCTests: XCTestCase {
+  func testLiveStoreMigratesV11TranscriptCacheRowsWithoutSourceProvenance() throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let environment = HarnessMonitorEnvironment(
+      values: ["XDG_DATA_HOME": root.path],
+      homeDirectory: root
+    )
+    let harnessRoot = HarnessMonitorPaths.harnessRoot(using: environment)
+    try FileManager.default.createDirectory(
+      at: harnessRoot,
+      withIntermediateDirectories: true,
+      attributes: nil
+    )
+
+    let storeURL = harnessRoot.appendingPathComponent("harness-cache.store")
+    try seedV11TranscriptStoreFixture(at: storeURL)
+
+    let container = try HarnessMonitorModelContainer.live(using: environment)
+    let transcriptRows = try container.mainContext.fetch(
+      FetchDescriptor<CachedSessionTranscriptEntry>()
+    )
+
+    XCTAssertEqual(transcriptRows.count, 1)
+    XCTAssertEqual(transcriptRows.first?.sessionId, "sess-v11")
+    XCTAssertEqual(transcriptRows.first?.entryId, "entry-v11")
+    XCTAssertNil(transcriptRows.first?.sourceRaw)
+  }
+}
+
+@MainActor
+private func makeV11TranscriptStoreContainer(at url: URL) throws -> ModelContainer {
+  let schema = Schema(versionedSchema: HarnessMonitorSchemaV11.self)
+  let config = ModelConfiguration("HarnessMonitorStore", schema: schema, url: url)
+  return try ModelContainer(for: schema, configurations: [config])
+}
+
+@MainActor
+private func seedV11TranscriptStoreFixture(at url: URL) throws {
+  let container = try makeV11TranscriptStoreContainer(at: url)
+  let transcript = HarnessMonitorSchemaV11.CachedSessionTranscriptEntry(
+    sessionId: "sess-v11",
+    entryId: "entry-v11",
+    recordedAt: "2026-04-03T12:05:00Z",
+    kind: "assistant_message",
+    agentId: "agent-v11",
+    taskId: nil,
+    summary: "Cached transcript row",
+    payloadData: Data("{}".utf8)
+  )
+
+  container.mainContext.insert(transcript)
+  try container.mainContext.save()
 }

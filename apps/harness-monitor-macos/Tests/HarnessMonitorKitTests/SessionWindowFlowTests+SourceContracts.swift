@@ -80,6 +80,8 @@ extension SessionWindowFlowTests {
     #expect(tabbingSource.contains("scheduleWindowTabbingApplication()"))
     #expect(tabbingSource.contains("await Task.yield()"))
     #expect(tabbingSource.contains("guard window.toolbar != nil else"))
+    #expect(appSource.contains("waitForSessionWindowToolbars("))
+    #expect(appSource.contains("let tabReadyWindows = windows.filter { $0.toolbar != nil }"))
     #expect(tabbingSupportSource.contains("tabbingIdentifier"))
     #expect(tabbingSupportSource.contains("shouldPreferTabbedOpen"))
     #expect(tabbingSupportSource.contains("visibleSessionTabTargetWindow"))

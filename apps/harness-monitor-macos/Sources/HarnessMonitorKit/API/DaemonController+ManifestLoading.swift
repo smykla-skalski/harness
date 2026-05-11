@@ -267,7 +267,7 @@ extension DaemonController {
     return decoder
   }
 
-  private func loadManifest(
+  func loadManifest(
     at manifestURL: URL,
     emitTrace: Bool
   ) throws -> DaemonManifest {

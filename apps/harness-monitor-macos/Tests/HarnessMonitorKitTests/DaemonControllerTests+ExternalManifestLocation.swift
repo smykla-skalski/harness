@@ -1,6 +1,7 @@
 import Darwin
 import Foundation
 import Testing
+import XCTest
 
 @testable import HarnessMonitorKit
 
@@ -131,6 +132,163 @@ struct DaemonControllerExternalManifestLocationTests {
     try await laneManifestWriter
 
     #expect(client is PreviewHarnessClient)
+  }
+
+  @Test("warm-up switches away from a stale live root manifest once a live runtime-lane manifest appears")
+  func warmUpSwitchesFromStaleLiveRootManifestToLateRuntimeLaneManifest() async throws {
+    let homeDirectory = FileManager.default.temporaryDirectory
+      .appendingPathComponent(
+        "daemon-controller-live-root-cross-lane-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: homeDirectory) }
+
+    let appGroupRoot = externalAppGroupRoot(homeDirectory: homeDirectory)
+    let rootDaemonRoot =
+      appGroupRoot
+      .appendingPathComponent("harness", isDirectory: true)
+      .appendingPathComponent("daemon", isDirectory: true)
+    try FileManager.default.createDirectory(at: rootDaemonRoot, withIntermediateDirectories: true)
+
+    let rootTokenURL = rootDaemonRoot.appendingPathComponent("auth-token")
+    try writeTokenFixture(to: rootTokenURL)
+    let staleRootManifestURL = rootDaemonRoot.appendingPathComponent("manifest.json")
+
+    let environment = HarnessMonitorEnvironment(
+      values: [
+        DaemonOwnership.environmentKey: "1",
+        HarnessMonitorAppGroup.environmentKey: HarnessMonitorAppGroup.identifier,
+      ],
+      homeDirectory: homeDirectory
+    )
+
+    try await withSignalIgnoringSleepProcessPID(durationSeconds: 60) { pid in
+      try writeExternalManifestFixture(
+        at: staleRootManifestURL,
+        pid: Int(pid),
+        endpoint: "http://127.0.0.1:65530",
+        startedAt: "2026-04-11T12:00:00Z",
+        tokenPath: rootTokenURL.path
+      )
+
+      #expect(HarnessMonitorPaths.manifestURL(using: environment).path == staleRootManifestURL.path)
+
+      let liveEndpoint = "http://127.0.0.1:65531"
+      async let laneManifestWriter: Void = {
+        try await Task.sleep(for: .milliseconds(250))
+        let laneDaemonRoot =
+          appGroupRoot
+          .appendingPathComponent("runtime-lanes", isDirectory: true)
+          .appendingPathComponent("late-start", isDirectory: true)
+          .appendingPathComponent("harness", isDirectory: true)
+          .appendingPathComponent("daemon", isDirectory: true)
+        try FileManager.default.createDirectory(
+          at: laneDaemonRoot,
+          withIntermediateDirectories: true
+        )
+
+        let laneTokenURL = laneDaemonRoot.appendingPathComponent("auth-token")
+        try writeTokenFixture(to: laneTokenURL)
+        try writeExternalManifestFixture(
+          at: laneDaemonRoot.appendingPathComponent("manifest.json"),
+          pid: Int(getpid()),
+          endpoint: liveEndpoint,
+          startedAt: "2026-04-11T12:05:00Z",
+          tokenPath: laneTokenURL.path
+        )
+      }()
+
+      let controller = DaemonController(
+        environment: environment,
+        transportPreference: .http,
+        launchAgentManager: RecordingLaunchAgentManager(state: .notRegistered),
+        ownership: .external,
+        sessionFactory: { _ in PreviewHarnessClient() },
+        endpointProbe: { endpoint in endpoint.absoluteString == liveEndpoint }
+      )
+
+      let client = try await controller.awaitManifestWarmUp(timeout: .seconds(2))
+      try await laneManifestWriter
+
+      #expect(client is PreviewHarnessClient)
+    }
+  }
+}
+
+final class DaemonControllerExternalManifestLocationXCTests: XCTestCase {
+  func testWarmUpSwitchesFromStaleLiveRootManifestToLateRuntimeLaneManifest() async throws {
+    let homeDirectory = FileManager.default.temporaryDirectory
+      .appendingPathComponent(
+        "daemon-controller-live-root-cross-lane-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: homeDirectory) }
+
+    let appGroupRoot = externalAppGroupRoot(homeDirectory: homeDirectory)
+    let rootDaemonRoot =
+      appGroupRoot
+      .appendingPathComponent("harness", isDirectory: true)
+      .appendingPathComponent("daemon", isDirectory: true)
+    try FileManager.default.createDirectory(at: rootDaemonRoot, withIntermediateDirectories: true)
+
+    let rootTokenURL = rootDaemonRoot.appendingPathComponent("auth-token")
+    try writeTokenFixture(to: rootTokenURL)
+    let staleRootManifestURL = rootDaemonRoot.appendingPathComponent("manifest.json")
+
+    let environment = HarnessMonitorEnvironment(
+      values: [
+        DaemonOwnership.environmentKey: "1",
+        HarnessMonitorAppGroup.environmentKey: HarnessMonitorAppGroup.identifier,
+      ],
+      homeDirectory: homeDirectory
+    )
+
+    try await withSignalIgnoringSleepProcessPID(durationSeconds: 60) { pid in
+      try writeExternalManifestFixture(
+        at: staleRootManifestURL,
+        pid: Int(pid),
+        endpoint: "http://127.0.0.1:65530",
+        startedAt: "2026-04-11T12:00:00Z",
+        tokenPath: rootTokenURL.path
+      )
+
+      XCTAssertEqual(HarnessMonitorPaths.manifestURL(using: environment).path, staleRootManifestURL.path)
+
+      let liveEndpoint = "http://127.0.0.1:65531"
+      async let laneManifestWriter: Void = {
+        try await Task.sleep(for: .milliseconds(250))
+        let laneDaemonRoot =
+          appGroupRoot
+          .appendingPathComponent("runtime-lanes", isDirectory: true)
+          .appendingPathComponent("late-start", isDirectory: true)
+          .appendingPathComponent("harness", isDirectory: true)
+          .appendingPathComponent("daemon", isDirectory: true)
+        try FileManager.default.createDirectory(
+          at: laneDaemonRoot,
+          withIntermediateDirectories: true
+        )
+
+        let laneTokenURL = laneDaemonRoot.appendingPathComponent("auth-token")
+        try writeTokenFixture(to: laneTokenURL)
+        try writeExternalManifestFixture(
+          at: laneDaemonRoot.appendingPathComponent("manifest.json"),
+          pid: Int(getpid()),
+          endpoint: liveEndpoint,
+          startedAt: "2026-04-11T12:05:00Z",
+          tokenPath: laneTokenURL.path
+        )
+      }()
+
+      let controller = DaemonController(
+        environment: environment,
+        transportPreference: .http,
+        launchAgentManager: RecordingLaunchAgentManager(state: .notRegistered),
+        ownership: .external,
+        sessionFactory: { _ in PreviewHarnessClient() },
+        endpointProbe: { endpoint in endpoint.absoluteString == liveEndpoint }
+      )
+
+      let client = try await controller.awaitManifestWarmUp(timeout: .seconds(2))
+      try await laneManifestWriter
+
+      XCTAssertTrue(client is PreviewHarnessClient)
+    }
   }
 }
 
