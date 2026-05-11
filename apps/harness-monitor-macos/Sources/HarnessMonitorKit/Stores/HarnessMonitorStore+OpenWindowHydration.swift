@@ -19,10 +19,12 @@ extension HarnessMonitorStore {
     do {
       let detailScope = activeTransport == .webSocket ? "core" : nil
       let detail = try await client.sessionDetail(id: sessionID, scope: detailScope)
+      try Task.checkCancellation()
       let timelineResponse = try await client.timelineWindow(
         sessionID: sessionID,
         request: .latest(limit: Self.initialSelectedTimelineWindowLimit)
       )
+      try Task.checkCancellation()
       let timeline = timelineResponse.entries ?? []
       let timelineWindow = timelineResponse.metadataOnly
       await cacheSessionDetails(
@@ -35,6 +37,8 @@ extension HarnessMonitorStore {
         ],
         markViewed: false
       )
+    } catch is CancellationError {
+      return
     } catch {
       HarnessMonitorLogger.supervisorWarning(
         "supervisor.open_window_hydration_failed session=\(sessionID) "

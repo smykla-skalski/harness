@@ -14,19 +14,17 @@ struct SessionWindowLifecycleModifier: ViewModifier {
   func body(content: Content) -> some View {
     content
       .task(id: sessionID) { @MainActor in
-        activate()
+        register()
+        await store.ensureSessionDetailHydratedForOpenWindow(sessionID: sessionID)
       }
       .onDisappear {
         deactivate()
       }
   }
 
-  private func activate() {
+  private func register() {
     store.registerOpenSessionWindow(windowID: windowID, sessionID: sessionID)
     tracker.sessionWindowAppeared(windowID: windowID)
-    Task { @MainActor [store, sessionID] in
-      await store.ensureSessionDetailHydratedForOpenWindow(sessionID: sessionID)
-    }
   }
 
   private func deactivate() {
