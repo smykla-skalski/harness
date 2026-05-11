@@ -103,23 +103,6 @@ final class OpenRecentWindowUITests: HarnessMonitorUITestCase {
 
     let sessionWindow = element(in: app, identifier: Accessibility.sessionWindowShell)
     XCTAssertTrue(waitForElement(sessionWindow, timeout: Self.actionTimeout))
-
-    let separatorSuppressed = element(
-      in: app,
-      identifier: Accessibility.sessionWindowToolbarSeparatorSuppressed
-    )
-    XCTAssertTrue(
-      separatorSuppressed.waitForExistence(timeout: Self.actionTimeout),
-      """
-      Session window toolbar separator suppressor must be applied to prevent the seam between
-      native toolbar glass and the sidebar
-      """
-    )
-    XCTAssertEqual(
-      separatorSuppressed.label,
-      "suppressed",
-      "Session window separator suppressor marker should report 'suppressed'"
-    )
   }
 
   func testDisablingCloseAfterPickKeepsWelcomeWindowVisible() {

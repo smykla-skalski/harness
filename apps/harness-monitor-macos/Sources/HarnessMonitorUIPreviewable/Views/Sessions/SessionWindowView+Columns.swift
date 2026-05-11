@@ -295,7 +295,6 @@ extension SessionWindowView {
               idealWidth: CGFloat(max(220, min(inspectorWidth, 420))),
               maxWidth: 420
             )
-            .sessionPaneLeadingSeparator()
           }
         } else {
           detailFocus

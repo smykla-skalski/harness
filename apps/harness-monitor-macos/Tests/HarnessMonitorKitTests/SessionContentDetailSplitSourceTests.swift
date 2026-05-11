@@ -25,7 +25,6 @@ struct SessionContentDetailSplitSourceTests {
     #expect(!splitSource.contains("NSCursor"))
     #expect(!splitSource.contains("@State"))
     #expect(splitSource.contains("layoutPriority(1)"))
-    #expect(splitSource.contains("sessionPaneLeadingSeparator()"))
   }
 
   @Test("Session split keeps dense detail content out of background extension")
@@ -86,28 +85,6 @@ struct SessionContentDetailSplitSourceTests {
     #expect(!splitSource.contains("GeometryReader"))
     #expect(!splitSource.contains("resizeState"))
     #expect(!splitSource.contains("Task.sleep"))
-  }
-
-  @Test("Session split uses passive semantic pane separators")
-  func sessionSplitUsesPassiveSemanticPaneSeparators() throws {
-    let columnsSource = try previewableSourceFile(
-      named: "Views/Sessions/SessionWindowView+Columns.swift"
-    )
-    let splitSource = try previewableSourceFile(
-      named: "Views/Sessions/SessionContentDetailSplitView.swift"
-    )
-    let separatorSource = try previewableSourceFile(
-      named: "Views/Sessions/SessionPaneSeparator.swift"
-    )
-
-    #expect(splitSource.contains(".sessionPaneLeadingSeparator()"))
-    #expect(columnsSource.contains(".sessionPaneLeadingSeparator()"))
-    #expect(separatorSource.contains("Color(nsColor: .separatorColor)"))
-    #expect(separatorSource.contains("allowsHitTesting(false)"))
-    #expect(separatorSource.contains("accessibilityHidden(true)"))
-    #expect(!separatorSource.contains("DragGesture("))
-    #expect(!separatorSource.contains("@State"))
-    #expect(!separatorSource.contains("NSCursor"))
   }
 
   @Test("Session detail columns leave top padding to the owned views")

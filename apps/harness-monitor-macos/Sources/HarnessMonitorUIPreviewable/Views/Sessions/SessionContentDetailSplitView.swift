@@ -43,7 +43,6 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
           maxHeight: .infinity,
           alignment: .topLeading
         )
-        .sessionPaneLeadingSeparator()
         .layoutPriority(1)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
