@@ -32,10 +32,6 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.session.window.status"
     )
     #expect(
-      HarnessMonitorAccessibility.sessionWindowToolbarSeparatorSuppressed
-        == "harness.session.window.toolbar.separator-suppressed"
-    )
-    #expect(
       HarnessMonitorAccessibility.sessionWindowFocusModeButton
         == "harness.session.window.toolbar.focus-mode"
     )
@@ -98,10 +94,9 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     )
     #expect(windowView.contains("HarnessMonitorAccessibility.sessionWindowShell"))
     #expect(
-      rootView.contains(
-        "HarnessMonitorAccessibility.sessionWindowToolbarSeparatorSuppressed"
-      )
+      rootView.contains("windowToolbarBackgroundVisibility: .visible")
     )
+    #expect(!rootView.contains("suppressToolbarBaselineSeparator("))
     #expect(sidebarView.contains("HarnessMonitorAccessibility.sessionWindowSidebar"))
     #expect(
       sidebarFooterView.contains("HarnessMonitorAccessibility.sessionWindowStatusSurface")

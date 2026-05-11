@@ -55,6 +55,7 @@ extension SessionWindowFlowTests {
   @Test("Session tabs route through SwiftUI commands plus the tabbing accessor")
   func sessionTabsUseSwiftUISceneCommands() throws {
     let appSource = try harnessSourceFile(named: "App/HarnessMonitorApp.swift")
+    let routerSource = try harnessSourceFile(named: "App/HarnessMonitorInitialWindowRouter.swift")
     let rootSource = try harnessSourceFile(named: "App/SessionWindowRootView.swift")
     let commandsSource = try harnessSourceFile(named: "Commands/WindowMenuCommands.swift")
     let tabbingAccessorPath = harnessSourceURL(named: "App/SessionWindowTabbing.swift").path
@@ -79,11 +80,15 @@ extension SessionWindowFlowTests {
     #expect(rootSource.contains("HarnessMonitorConfirmationDialogModifier("))
     #expect(rootSource.contains("HarnessMonitorSheetModifier("))
     #expect(rootSource.contains("isEnabled: hostsSharedShellPresentation"))
+    #expect(rootSource.contains("windowToolbarBackgroundVisibility: .visible"))
+    #expect(!rootSource.contains("suppressToolbarBaselineSeparator("))
     #expect(tabbingSource.contains("scheduleWindowTabbingApplication()"))
     #expect(tabbingSource.contains("await Task.yield()"))
     #expect(tabbingSource.contains("guard window.toolbar != nil else"))
-    #expect(appSource.contains("waitForSessionWindowToolbars("))
-    #expect(appSource.contains("let tabReadyWindows = windows.filter { $0.toolbar != nil }"))
+    #expect(!tabbingSource.contains("titlebarSeparatorStyle"))
+    #expect(!tabbingSource.contains("titlebarAppearsTransparent"))
+    #expect(routerSource.contains("waitForSessionWindowToolbars("))
+    #expect(routerSource.contains("let tabReadyWindows = windows.filter { $0.toolbar != nil }"))
     #expect(tabbingSupportSource.contains("tabbingIdentifier"))
     #expect(tabbingSupportSource.contains("shouldPreferTabbedOpen"))
     #expect(tabbingSupportSource.contains("visibleSessionTabTargetWindow"))
@@ -106,7 +111,6 @@ extension SessionWindowFlowTests {
 
     #expect(!viewSource.contains("import AppKit"))
     #expect(columnsSource.contains("HSplitView"))
-    #expect(columnsSource.contains(".sessionPaneLeadingSeparator()"))
     #expect(!columnsSource.contains("SessionInspectorDivider("))
     #expect(!columnsSource.contains("DragGesture("))
     #expect(!columnsSource.contains("NSCursor"))
@@ -136,7 +140,6 @@ extension SessionWindowFlowTests {
     #expect(!splitSource.contains("@State"))
     #expect(!splitSource.contains("Task.sleep"))
     #expect(splitSource.contains("layoutPriority(1)"))
-    #expect(splitSource.contains("sessionPaneLeadingSeparator()"))
   }
 
   @Test("Sidebar density keeps strict default and maps legacy values")
