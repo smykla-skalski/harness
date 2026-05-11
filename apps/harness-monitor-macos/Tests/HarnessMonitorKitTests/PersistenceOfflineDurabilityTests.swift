@@ -58,6 +58,12 @@ struct PersistenceOfflineDurabilityTests {
     return try ModelContainer(for: schema, configurations: [config])
   }
 
+  private func makeUnknownVersionContainer(at url: URL) throws -> ModelContainer {
+    let schema = Schema(versionedSchema: HarnessMonitorUnknownModelVersionSchema.self)
+    let config = ModelConfiguration("HarnessMonitorStore", schema: schema, url: url)
+    return try ModelContainer(for: schema, configurations: [config])
+  }
+
   private func seedV1Store(
     at url: URL,
     metricsData: Data,
@@ -132,6 +138,12 @@ struct PersistenceOfflineDurabilityTests {
 
     container.mainContext.insert(project)
     container.mainContext.insert(session)
+    try container.mainContext.save()
+  }
+
+  private func seedUnknownVersionStore(at url: URL) throws {
+    let container = try makeUnknownVersionContainer(at: url)
+    container.mainContext.insert(UnknownCacheRecord(id: "unknown-version-record"))
     try container.mainContext.save()
   }
 
@@ -400,6 +412,46 @@ struct PersistenceOfflineDurabilityTests {
     #expect(configs.isEmpty)
   }
 
+  @Test("Live SwiftData store rebuilds incompatible cache stores with unknown model versions")
+  func liveStoreRebuildsIncompatibleCacheStoreWithUnknownModelVersion() throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let environment = HarnessMonitorEnvironment(
+      values: ["XDG_DATA_HOME": root.path],
+      homeDirectory: root
+    )
+    let harnessRoot = HarnessMonitorPaths.harnessRoot(using: environment)
+    try FileManager.default.createDirectory(
+      at: harnessRoot,
+      withIntermediateDirectories: true,
+      attributes: nil
+    )
+
+    let storeURL = harnessRoot.appendingPathComponent("harness-cache.store")
+    try seedUnknownVersionStore(at: storeURL)
+
+    let container = try HarnessMonitorModelContainer.live(using: environment)
+    let bookmarks = try container.mainContext.fetch(FetchDescriptor<SessionBookmark>())
+    let quarantineRoot = harnessRoot
+      .appendingPathComponent("incompatible-cache-stores", isDirectory: true)
+    let quarantinedStores = try FileManager.default.contentsOfDirectory(
+      at: quarantineRoot,
+      includingPropertiesForKeys: nil
+    )
+    let quarantinedFiles = try FileManager.default.contentsOfDirectory(
+      at: try #require(quarantinedStores.first),
+      includingPropertiesForKeys: nil
+    )
+    .map(\.lastPathComponent)
+
+    #expect(bookmarks.isEmpty)
+    #expect(FileManager.default.fileExists(atPath: storeURL.path))
+    #expect(quarantinedStores.count == 1)
+    #expect(quarantinedFiles.contains("harness-cache.store"))
+  }
+
   @Test("Live SwiftData store migrates V11 transcript cache rows without source provenance")
   func liveStoreMigratesV11TranscriptCacheRowsWithoutSourceProvenance() throws {
     let root = FileManager.default.temporaryDirectory
@@ -488,4 +540,21 @@ private func seedV11TranscriptStoreFixture(at url: URL) throws {
 
   container.mainContext.insert(transcript)
   try container.mainContext.save()
+}
+
+private enum HarnessMonitorUnknownModelVersionSchema: VersionedSchema {
+  static var versionIdentifier: Schema.Version { Schema.Version(999, 0, 0) }
+
+  static var models: [any PersistentModel.Type] {
+    [UnknownCacheRecord.self]
+  }
+}
+
+@Model
+private final class UnknownCacheRecord {
+  var id: String
+
+  init(id: String) {
+    self.id = id
+  }
 }
