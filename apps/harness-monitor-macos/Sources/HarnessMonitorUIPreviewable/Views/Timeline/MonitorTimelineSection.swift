@@ -300,6 +300,11 @@ private struct SessionTimelineList: View {
             }
           }
           .frame(maxWidth: .infinity, alignment: .leading)
+          .background(alignment: .topLeading) {
+            if !presentation.rows.isEmpty {
+              SessionTimelineRailBackground()
+            }
+          }
           .padding(.horizontal, horizontalContentInset)
         }
         .scrollIndicators(.visible)
