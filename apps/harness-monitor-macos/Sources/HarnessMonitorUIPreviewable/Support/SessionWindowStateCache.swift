@@ -18,7 +18,7 @@ public final class SessionWindowStateCache {
   public var sidebarSelection = SessionSidebarSelectionState()
   public var sectionState = SessionWindowSectionState()
   var agentCreateCatalog = SessionWindowAgentCreateCatalogState()
-  var createDraftKindsWithManualLaunchSelection: Set<SessionCreateKind> = []
+  var manualLaunchSelectionKinds: Set<SessionCreateKind> = []
   public var decisionRuntime = SessionDecisionRuntime()
   public var decisionFilters = SessionDecisionFilterState()
   public var sidebarAnnouncer = SessionSidebarMultiSelectAnnouncer()
@@ -139,14 +139,14 @@ public final class SessionWindowStateCache {
   }
 
   func didPickCreateLaunchSelectionManually(for kind: SessionCreateKind) -> Bool {
-    createDraftKindsWithManualLaunchSelection.contains(kind)
+    manualLaunchSelectionKinds.contains(kind)
   }
 
   func setDidPickCreateLaunchSelectionManually(_ value: Bool, for kind: SessionCreateKind) {
     if value {
-      createDraftKindsWithManualLaunchSelection.insert(kind)
+      manualLaunchSelectionKinds.insert(kind)
     } else {
-      createDraftKindsWithManualLaunchSelection.remove(kind)
+      manualLaunchSelectionKinds.remove(kind)
     }
   }
 
@@ -299,6 +299,14 @@ public final class SessionWindowStateCache {
     if let personaID = snapshot.personaID, !personaID.isEmpty {
       draft.personaID = personaID
     }
+    applyModelPreferences(snapshot: snapshot, to: &draft)
+    applyCodexPreferences(snapshot: snapshot, to: &draft)
+  }
+
+  private static func applyModelPreferences(
+    snapshot: LaunchPresetSnapshot,
+    to draft: inout SessionCreateDraft
+  ) {
     if !snapshot.modelByRuntime.isEmpty {
       draft.modelByRuntime = snapshot.modelByRuntime
     }
@@ -308,6 +316,12 @@ public final class SessionWindowStateCache {
     if !snapshot.effortByRuntime.isEmpty {
       draft.effortByRuntime = snapshot.effortByRuntime
     }
+  }
+
+  private static func applyCodexPreferences(
+    snapshot: LaunchPresetSnapshot,
+    to draft: inout SessionCreateDraft
+  ) {
     if let codexMode = snapshot.codexMode.flatMap(CodexRunMode.init(rawValue:)) {
       draft.codexMode = codexMode
     }

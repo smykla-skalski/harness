@@ -365,18 +365,6 @@ struct AgentDetailSection: View {
     )
   }
 
-  static func draftCommandKey(agentID: String) -> String {
-    "harness.workspace.agentDraft.\(agentID).command"
-  }
-
-  static func draftMessageKey(agentID: String) -> String {
-    "harness.workspace.agentDraft.\(agentID).message"
-  }
-
-  static func draftActionHintKey(agentID: String) -> String {
-    "harness.workspace.agentDraft.\(agentID).actionHint"
-  }
-
   private func announceLatestTimelineEntryIfNeeded() {
     guard let entry = agentTimelineEntries.last else { return }
     guard entry.entryId != lastAnnouncedTimelineEntryId else { return }
@@ -418,9 +406,5 @@ struct AgentDetailSection: View {
       inspectStatus: inspectStatus,
       presentation: runtimePresentation
     )
-  }
-
-  func humanizedHookLabel(for hook: HookIntegrationDescriptor) -> String {
-    Self.humanizedHookLabel(for: hook)
   }
 }

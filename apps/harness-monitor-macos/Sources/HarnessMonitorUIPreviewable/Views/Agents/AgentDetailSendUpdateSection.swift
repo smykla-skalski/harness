@@ -104,10 +104,6 @@ struct AgentDetailSendUpdateSection: View {
     return "Send"
   }
 
-  private var isSessionReadOnly: Bool {
-    store.isSessionReadOnly
-  }
-
   private var moreOptionsSummary: String? {
     switch (selectedSendAction == .custom, trimmedActionHint != nil) {
     case (true, true):
@@ -126,14 +122,6 @@ struct AgentDetailSendUpdateSection: View {
       return nil
     }
     return "Deadline \(deadlinePresentation.countdownLabel)"
-  }
-
-  private var statusTint: Color {
-    isSessionReadOnly ? HarnessMonitorTheme.secondaryInk : HarnessMonitorTheme.caution
-  }
-
-  private var statusSymbolName: String {
-    isSessionReadOnly ? "lock.fill" : "exclamationmark.circle"
   }
 
   var body: some View {
