@@ -377,7 +377,7 @@ enum SessionWindowCreateProviderMode: String, Identifiable {
 
   var id: String { rawValue }
 
-  var tint: Color {
+  var fill: Color {
     switch self {
     case .codex:
       HarnessMonitorTheme.success
@@ -387,43 +387,25 @@ enum SessionWindowCreateProviderMode: String, Identifiable {
       HarnessMonitorTheme.accent
     }
   }
+
+  var foreground: Color {
+    HarnessMonitorProminentButtonContrast.foreground(for: fill)
+  }
 }
 
 private struct SessionWindowCreateProviderModeBadge: View {
   let mode: SessionWindowCreateProviderMode
-  @Environment(\.accessibilityReduceTransparency)
-  private var reduceTransparency
-  @Environment(\.colorSchemeContrast)
-  private var colorSchemeContrast
-
-  private var fillOpacity: Double {
-    if reduceTransparency {
-      return colorSchemeContrast == .increased ? 0.34 : 0.26
-    }
-    return colorSchemeContrast == .increased ? 0.24 : 0.16
-  }
-
-  private var strokeOpacity: Double {
-    colorSchemeContrast == .increased ? 0.38 : 0.22
-  }
-
-  private var strokeWidth: CGFloat {
-    colorSchemeContrast == .increased ? 1.5 : 1
-  }
+  private let cornerRadius: CGFloat = 8
 
   var body: some View {
     Text(mode.rawValue)
       .font(.system(.caption2, design: .rounded, weight: .semibold))
-      .foregroundStyle(mode.tint)
+      .foregroundStyle(mode.foreground)
       .padding(.horizontal, HarnessMonitorTheme.pillPaddingH)
       .padding(.vertical, HarnessMonitorTheme.pillPaddingV)
       .background {
-        Capsule()
-          .fill(mode.tint.opacity(fillOpacity))
-      }
-      .overlay {
-        Capsule()
-          .strokeBorder(mode.tint.opacity(strokeOpacity), lineWidth: strokeWidth)
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+          .fill(mode.fill)
       }
       .accessibilityHidden(true)
   }
