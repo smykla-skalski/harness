@@ -41,6 +41,18 @@ extension AgentDetailSection {
     return "Runs \(hook.typicalLatencySeconds)s \(trigger)\(contextSuffix)"
   }
 
+  static func draftCommandKey(agentID: String) -> String {
+    "harness.workspace.agentDraft.\(agentID).command"
+  }
+
+  static func draftMessageKey(agentID: String) -> String {
+    "harness.workspace.agentDraft.\(agentID).message"
+  }
+
+  static func draftActionHintKey(agentID: String) -> String {
+    "harness.workspace.agentDraft.\(agentID).actionHint"
+  }
+
   func dispatchPendingDecision(
     attention: AcpDecisionAttention,
     actionID: String

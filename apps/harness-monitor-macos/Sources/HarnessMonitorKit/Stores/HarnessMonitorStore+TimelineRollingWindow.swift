@@ -111,14 +111,17 @@ enum TimelineRollingWindowResolver {
     let windowEnd = windowStart + retainedTimeline.count
     let totalCount = max(response.totalCount, max(currentWindow?.totalCount ?? 0, windowEnd))
     let hasNewer = (currentWindow?.hasNewer ?? (currentStart > 0)) || windowStart > 0
-    let resolvedWindow = window(
-      response: response,
+    let resolvedWindow = TimelineWindowResponse(
+      revision: response.revision,
       totalCount: totalCount,
       windowStart: windowStart,
       windowEnd: windowEnd,
       hasOlder: response.hasOlder || windowEnd < totalCount,
       hasNewer: hasNewer,
-      timeline: retainedTimeline
+      oldestCursor: retainedTimeline.last.map(makeCursor(entry:)),
+      newestCursor: retainedTimeline.first.map(makeCursor(entry:)),
+      entries: nil,
+      unchanged: response.unchanged
     )
     return TimelineRollingWindowResolution(
       timeline: retainedTimeline,
@@ -139,14 +142,17 @@ enum TimelineRollingWindowResolver {
     let windowEnd = windowStart + retainedTimeline.count
     let totalCount = max(response.totalCount, max(currentWindow?.totalCount ?? 0, windowEnd))
     let hasOlder = (currentWindow?.hasOlder ?? (windowEnd < totalCount)) || windowEnd < totalCount
-    let resolvedWindow = window(
-      response: response,
+    let resolvedWindow = TimelineWindowResponse(
+      revision: response.revision,
       totalCount: totalCount,
       windowStart: windowStart,
       windowEnd: windowEnd,
       hasOlder: hasOlder,
       hasNewer: response.hasNewer || windowStart > 0,
-      timeline: retainedTimeline
+      oldestCursor: retainedTimeline.last.map(makeCursor(entry:)),
+      newestCursor: retainedTimeline.first.map(makeCursor(entry:)),
+      entries: nil,
+      unchanged: response.unchanged
     )
     return TimelineRollingWindowResolution(
       timeline: retainedTimeline,
@@ -198,29 +204,6 @@ enum TimelineRollingWindowResolver {
     let overflow = entries.count - max(1, retainedLimit)
     guard overflow > 0 else { return entries }
     return Array(entries.dropLast(overflow))
-  }
-
-  private static func window(
-    response: TimelineWindowResponse,
-    totalCount: Int,
-    windowStart: Int,
-    windowEnd: Int,
-    hasOlder: Bool,
-    hasNewer: Bool,
-    timeline: [TimelineEntry]
-  ) -> TimelineWindowResponse {
-    TimelineWindowResponse(
-      revision: response.revision,
-      totalCount: totalCount,
-      windowStart: windowStart,
-      windowEnd: windowEnd,
-      hasOlder: hasOlder,
-      hasNewer: hasNewer,
-      oldestCursor: timeline.last.map(makeCursor(entry:)),
-      newestCursor: timeline.first.map(makeCursor(entry:)),
-      entries: nil,
-      unchanged: response.unchanged
-    )
   }
 
   private static func makeCursor(entry: TimelineEntry) -> TimelineCursor {

@@ -147,10 +147,12 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
     var adjustedLiveWidth = false
     var committedPersistedWidth = false
     defer {
+      let adjustedValue = adjustedLiveWidth ? 1 : 0
+      let persistedValue = committedPersistedWidth ? 1 : 0
       sessionContentDetailResizeSignposter.endInterval(
         "session_content_detail_resize.settle",
         interval,
-        "adjusted=\(adjustedLiveWidth ? 1 : 0, privacy: .public) persisted=\(committedPersistedWidth ? 1 : 0, privacy: .public)"
+        "adjusted=\(adjustedValue, privacy: .public) persisted=\(persistedValue, privacy: .public)"
       )
     }
     let clamped = SessionContentDetailSplitLayout.clampedContentWidth(
@@ -290,7 +292,7 @@ private struct SessionContentDetailDivider: View {
     // Keep pointer-down available for the drag gesture instead of treating the
     // divider like an activating control.
     .focusable()
-    .focusEffectDisabled()
+    .suppressNativeFocusRing()
     .focused($isKeyboardFocused)
     .help("Drag or use the arrow keys to resize the content and detail panes.")
     .gesture(dragGesture)
