@@ -4,7 +4,8 @@ use serde_json::{Value, json};
 use tokio::sync::mpsc;
 
 use crate::daemon::protocol::{
-    CodexApprovalDecision, CodexApprovalRequest, CodexRunSnapshot, CodexRunStatus,
+    CodexApprovalDecision, CodexApprovalRequest, CodexResolvedApproval, CodexRunEvent,
+    CodexRunSnapshot, CodexRunStatus,
 };
 use crate::daemon::state;
 use crate::errors::{CliError, CliErrorKind};
@@ -117,6 +118,7 @@ impl CodexRunWorker {
             })?;
         self.snapshot.thread_id = Some(thread_id.to_string());
         self.snapshot.latest_summary = Some(format!("Thread {thread_id} ready"));
+        self.record_event(method, format!("Codex thread {thread_id} ready"), &result);
         self.touch_and_save()?;
         Ok(())
     }
@@ -142,6 +144,11 @@ impl CodexRunWorker {
             .ok_or_else(|| CliErrorKind::workflow_parse("codex turn response missing turn.id"))?;
         self.snapshot.turn_id = Some(turn_id.to_string());
         self.snapshot.latest_summary = Some(format!("Turn {turn_id} started"));
+        self.record_event(
+            "turn/start",
+            format!("Codex turn {turn_id} started"),
+            &result,
+        );
         self.touch_and_save()?;
         Ok(())
     }
@@ -188,6 +195,7 @@ impl CodexRunWorker {
     }
 
     fn handle_notification(&mut self, method: &str, params: &Value) -> Result<bool, CliError> {
+        self.record_event(method, notification_summary(method, params), params);
         match method {
             "turn/started" => {
                 if let Some(turn_id) = params.pointer("/turn/id").and_then(Value::as_str) {
@@ -221,7 +229,7 @@ impl CodexRunWorker {
                 self.fail(message);
                 Ok(true)
             }
-            _ => Ok(false),
+            _ => self.touch_and_save().map(|()| false),
         }
     }
 
@@ -288,10 +296,21 @@ impl CodexRunWorker {
         let params = message.get("params").unwrap_or(&Value::Null);
         let Some(approval) = approval_from_request(method, value_id_string(&request_id), params)
         else {
+            self.record_event(
+                "server_request_unsupported",
+                format!("Unsupported codex server request {method}"),
+                message,
+            );
+            self.touch_and_save()?;
             tracing::warn!(method, "received unsupported codex server request");
             return Ok(());
         };
 
+        self.record_event(
+            method,
+            format!("Codex requested approval: {}", approval.title),
+            params,
+        );
         self.pending_approvals
             .entry(approval.approval_id.clone())
             .or_default()
@@ -344,8 +363,23 @@ impl CodexRunWorker {
         self.snapshot
             .pending_approvals
             .retain(|approval| approval.approval_id != approval_id);
+        self.snapshot
+            .resolved_approvals
+            .push(CodexResolvedApproval {
+                approval_id: approval_id.to_string(),
+                decision,
+                resolved_at: utc_now(),
+            });
         self.snapshot.status = CodexRunStatus::Running;
         self.snapshot.latest_summary = Some(format!("Approval {approval_id} resolved"));
+        self.record_event(
+            "approval/resolved",
+            format!("Approval {approval_id} resolved"),
+            &json!({
+                "approvalId": approval_id,
+                "decision": decision,
+            }),
+        );
         self.touch_and_save()
     }
 
@@ -363,6 +397,15 @@ impl CodexRunWorker {
             )
             .await?;
         self.snapshot.latest_summary = Some("Steering prompt sent".to_string());
+        self.record_event(
+            "turn/steer",
+            "Steering prompt sent".to_string(),
+            &json!({
+                "threadId": thread_id,
+                "turnId": turn_id,
+                "input": [{"type": "text", "text": prompt}],
+            }),
+        );
         self.touch_and_save()
     }
 
@@ -379,6 +422,14 @@ impl CodexRunWorker {
             )
             .await?;
         self.snapshot.latest_summary = Some("Interrupt requested".to_string());
+        self.record_event(
+            "turn/interrupt",
+            "Interrupt requested".to_string(),
+            &json!({
+                "threadId": thread_id,
+                "turnId": turn_id,
+            }),
+        );
         self.touch_and_save()
     }
 
@@ -450,6 +501,23 @@ impl CodexRunWorker {
         self.snapshot.updated_at = utc_now();
         self.controller.save_and_broadcast(&self.snapshot)
     }
+
+    fn record_event(&mut self, kind: &str, summary: String, payload: &Value) {
+        let sequence = u64::try_from(self.snapshot.events.len())
+            .unwrap_or(u64::MAX - 1)
+            .saturating_add(1);
+        self.snapshot.events.push(CodexRunEvent {
+            event_id: format!("{}-{sequence}", self.snapshot.run_id),
+            sequence,
+            recorded_at: utc_now(),
+            kind: kind.to_string(),
+            summary,
+            thread_id: event_thread_id(payload).or_else(|| self.snapshot.thread_id.clone()),
+            turn_id: event_turn_id(payload).or_else(|| self.snapshot.turn_id.clone()),
+            item_id: event_item_id(payload),
+            payload: payload.clone(),
+        });
+    }
 }
 
 pub(super) fn upsert_pending_approval(
@@ -472,4 +540,40 @@ fn value_id_string(value: &Value) -> String {
         Value::Number(value) => value.to_string(),
         _ => value.to_string(),
     }
+}
+
+fn notification_summary(method: &str, params: &Value) -> String {
+    if method == "item/agentMessage/delta" {
+        return params
+            .get("delta")
+            .and_then(Value::as_str)
+            .map(trim_summary)
+            .unwrap_or_else(|| "Agent message delta".to_string());
+    }
+    if let Some(item_type) = params.pointer("/item/type").and_then(Value::as_str) {
+        return format!("{method}: {item_type}");
+    }
+    if let Some(status) = params.pointer("/turn/status").and_then(Value::as_str) {
+        return format!("{method}: {status}");
+    }
+    method.to_string()
+}
+
+fn event_thread_id(payload: &Value) -> Option<String> {
+    string_pointer(payload, &["/thread/id", "/threadId"])
+}
+
+fn event_turn_id(payload: &Value) -> Option<String> {
+    string_pointer(payload, &["/turn/id", "/turnId"])
+}
+
+fn event_item_id(payload: &Value) -> Option<String> {
+    string_pointer(payload, &["/item/id", "/itemId"])
+}
+
+fn string_pointer(payload: &Value, paths: &[&str]) -> Option<String> {
+    paths
+        .iter()
+        .find_map(|path| payload.pointer(path).and_then(Value::as_str))
+        .map(ToString::to_string)
 }

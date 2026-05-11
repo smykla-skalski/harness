@@ -61,6 +61,9 @@ struct SessionWindowCreateAgentRuntimeContent: View {
 
   private var bridgeBannerKind: SessionCreateBridgeBannerKind? {
     guard draft.kind == .agent else { return nil }
+    if normalizedLaunchSelection.isCodexNative {
+      return store.codexUnavailable ? .codex : nil
+    }
     if normalizedLaunchSelection.isAcp {
       return store.acpUnavailable ? .acp : nil
     }
@@ -280,6 +283,19 @@ struct SessionWindowCreateProviderListRow: View {
   }
 
   static func providerSubtitle(for option: AgentCapabilityOption) -> String {
+    if option.codexChoice != nil {
+      switch option.availabilityState {
+      case .projectAccessAvailable:
+        return "Codex app server is available."
+      case .bridgeAccessRequired:
+        return "Codex needs bridge access."
+      case .terminalOnly:
+        return "Codex opens in Terminal only."
+      default:
+        return option.projectAccessGuidanceText ?? "Codex is not available here yet."
+      }
+    }
+
     switch option.availabilityState {
     case .projectAccessAvailable:
       return "Terminal and ACP are available."
@@ -309,6 +325,9 @@ struct SessionWindowCreateProviderListRow: View {
   static func availableModes(for option: AgentCapabilityOption) -> [SessionWindowCreateProviderMode] {
     option.transportChoices.compactMap { choice in
       guard option.isEnabled(choice) else { return nil }
+      if choice.id.isCodexNative {
+        return .codex
+      }
       return choice.id.isAcp ? .acp : .tui
     }
   }
@@ -352,6 +371,7 @@ struct SessionWindowCreateProviderListRow: View {
 }
 
 enum SessionWindowCreateProviderMode: String, Identifiable {
+  case codex = "Codex"
   case acp = "ACP"
   case tui = "TUI"
 
@@ -359,6 +379,8 @@ enum SessionWindowCreateProviderMode: String, Identifiable {
 
   var tint: Color {
     switch self {
+    case .codex:
+      HarnessMonitorTheme.success
     case .acp:
       HarnessMonitorTheme.success
     case .tui:
@@ -416,7 +438,10 @@ struct SessionWindowCreateTransportChoiceButton: View {
   let onSelect: () -> Void
 
   private var shortTitle: String {
-    choice.id.isAcp ? "ACP" : "Terminal"
+    if choice.id.isCodexNative {
+      return "Codex"
+    }
+    return choice.id.isAcp ? "ACP" : "Terminal"
   }
 
   var body: some View {

@@ -5,7 +5,8 @@ enum AgentCapabilityCatalog {
     acpAgents: [AcpAgentDescriptor],
     runtimeProbeResults: AcpRuntimeProbeResponse?,
     sandboxed: Bool = false,
-    acpHostBridgeReady: Bool = true
+    acpHostBridgeReady: Bool = true,
+    codexHostBridgeReady: Bool = true
   ) -> [AgentCapabilityOption] {
     var rows: [AgentCapabilityOption] = AgentTuiRuntime.allCases.map { runtime in
       let descriptor = acpAgents.first { representsSameCapability($0, as: runtime) }
@@ -20,7 +21,8 @@ enum AgentCapabilityCatalog {
         installHint: descriptor?.installHint,
         bundledWithHarness: descriptor?.bundledWithHarness ?? false,
         sandboxed: sandboxed,
-        acpHostBridgeReady: acpHostBridgeReady
+        acpHostBridgeReady: acpHostBridgeReady,
+        codexHostBridgeReady: codexHostBridgeReady
       )
     }
     for descriptor in acpAgents
@@ -45,7 +47,8 @@ enum AgentCapabilityCatalog {
           installHint: descriptor.installHint,
           bundledWithHarness: descriptor.bundledWithHarness,
           sandboxed: sandboxed,
-          acpHostBridgeReady: acpHostBridgeReady
+          acpHostBridgeReady: acpHostBridgeReady,
+          codexHostBridgeReady: codexHostBridgeReady
         )
       )
     }
@@ -117,6 +120,15 @@ enum AgentCapabilityCatalog {
     descriptor: AcpAgentDescriptor?
   ) -> [AgentCapabilityTransportChoice] {
     var choices: [AgentCapabilityTransportChoice] = []
+    if runtime == .codex {
+      choices.append(
+        AgentCapabilityTransportChoice(
+          id: .codex,
+          title: "Codex",
+          capabilities: ["streaming", "multi-turn", "approvals", "app-server"]
+        )
+      )
+    }
     if let descriptor {
       choices.append(
         AgentCapabilityTransportChoice(

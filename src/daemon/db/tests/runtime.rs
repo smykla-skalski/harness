@@ -1,4 +1,6 @@
 use super::*;
+use crate::daemon::protocol::CodexRunEvent;
+use serde_json::json;
 use tempfile::tempdir;
 
 #[test]
@@ -13,6 +15,19 @@ fn codex_runs_round_trip_and_list_newest_first() {
     let mut older = sample_codex_run("codex-run-1", "2026-04-09T10:00:00Z");
     older.status = CodexRunStatus::Completed;
     older.final_message = Some("Done.".into());
+    older.model = Some("gpt-5.5".into());
+    older.effort = Some("low".into());
+    older.events.push(CodexRunEvent {
+        event_id: "codex-run-1-1".into(),
+        sequence: 1,
+        recorded_at: "2026-04-09T10:00:01Z".into(),
+        kind: "turn/completed".into(),
+        summary: "Codex turn completed".into(),
+        thread_id: Some("thread-1".into()),
+        turn_id: Some("turn-1".into()),
+        item_id: None,
+        payload: json!({"turn": {"status": "completed"}}),
+    });
     db.save_codex_run(&older).expect("save older run");
 
     let newer = sample_codex_run("codex-run-2", "2026-04-09T11:00:00Z");
@@ -31,6 +46,11 @@ fn codex_runs_round_trip_and_list_newest_first() {
         .expect("present");
     assert_eq!(loaded.status, CodexRunStatus::Completed);
     assert_eq!(loaded.final_message.as_deref(), Some("Done."));
+    assert_eq!(loaded.session_agent_id.as_deref(), Some("codex-worker"));
+    assert_eq!(loaded.model.as_deref(), Some("gpt-5.5"));
+    assert_eq!(loaded.effort.as_deref(), Some("low"));
+    assert_eq!(loaded.events.len(), 1);
+    assert_eq!(loaded.events[0].kind, "turn/completed");
 }
 
 #[test]
@@ -82,6 +102,19 @@ async fn async_codex_runs_round_trip_and_list_newest_first() {
     let mut older = sample_codex_run("codex-run-1", "2026-04-09T10:00:00Z");
     older.status = CodexRunStatus::Completed;
     older.final_message = Some("Done.".into());
+    older.model = Some("gpt-5.5".into());
+    older.effort = Some("low".into());
+    older.events.push(CodexRunEvent {
+        event_id: "codex-run-1-1".into(),
+        sequence: 1,
+        recorded_at: "2026-04-09T10:00:01Z".into(),
+        kind: "turn/completed".into(),
+        summary: "Codex turn completed".into(),
+        thread_id: Some("thread-1".into()),
+        turn_id: Some("turn-1".into()),
+        item_id: None,
+        payload: json!({"turn": {"status": "completed"}}),
+    });
     async_db
         .save_codex_run(&older)
         .await
@@ -108,6 +141,11 @@ async fn async_codex_runs_round_trip_and_list_newest_first() {
         .expect("present");
     assert_eq!(loaded.status, CodexRunStatus::Completed);
     assert_eq!(loaded.final_message.as_deref(), Some("Done."));
+    assert_eq!(loaded.session_agent_id.as_deref(), Some("codex-worker"));
+    assert_eq!(loaded.model.as_deref(), Some("gpt-5.5"));
+    assert_eq!(loaded.effort.as_deref(), Some("low"));
+    assert_eq!(loaded.events.len(), 1);
+    assert_eq!(loaded.events[0].kind, "turn/completed");
 }
 
 #[tokio::test]

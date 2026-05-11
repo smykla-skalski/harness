@@ -208,7 +208,11 @@ extension SessionWindowCreateForm {
       }
     }
 
-    terminalRuntimeConfigurationSection
+    if normalizedLaunchSelection.isCodexNative {
+      codexConfigurationSection
+    } else {
+      terminalRuntimeConfigurationSection
+    }
     terminalSessionSection
     terminalAdvancedOverridesSection
   }
@@ -258,7 +262,7 @@ extension SessionWindowCreateForm {
   }
 
   @ViewBuilder private var terminalAdvancedOverridesSection: some View {
-    if !normalizedLaunchSelection.isAcp {
+    if !normalizedLaunchSelection.isManagedControlPlane {
       Section {
         TextEditor(text: argvOverrideText)
           .scaledFont(.body)
@@ -378,6 +382,9 @@ private struct SessionWindowCreateBridgeBannerSection: View {
   let selection: AgentLaunchSelection
 
   private var bannerKind: SessionCreateBridgeBannerKind? {
+    if selection.isCodexNative {
+      return store.codexUnavailable ? .codex : nil
+    }
     if selection.isAcp {
       return store.acpUnavailable ? .acp : nil
     }

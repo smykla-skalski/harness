@@ -272,6 +272,21 @@ pub struct CodexAgentStartArgs {
     /// Codex execution mode.
     #[arg(long, value_enum, default_value = "report")]
     pub mode: CodexRunMode,
+    /// Role to register the Codex app-server agent as.
+    #[arg(long, value_enum, default_value = "worker")]
+    pub role: SessionRole,
+    /// Fallback role to use when joining as leader and a leader already exists.
+    #[arg(long, value_enum)]
+    pub fallback_role: Option<SessionRole>,
+    /// Capability tag. May be repeated or comma-separated.
+    #[arg(long = "capability")]
+    pub capabilities: Vec<String>,
+    /// Human-readable agent display name.
+    #[arg(long)]
+    pub name: Option<String>,
+    /// Persona identifier to attach to the agent registration.
+    #[arg(long)]
+    pub persona: Option<String>,
     /// Resume an existing Codex thread instead of starting a new one.
     #[arg(long)]
     pub resume_thread_id: Option<String>,
@@ -295,6 +310,11 @@ impl Execute for CodexAgentStartArgs {
             actor: None,
             prompt: self.prompt.clone(),
             mode: self.mode,
+            role: self.role,
+            fallback_role: self.fallback_role,
+            capabilities: capability_args(&self.capabilities),
+            name: self.name.clone(),
+            persona: self.persona.clone(),
             resume_thread_id: self.resume_thread_id.clone(),
             model: self.model.clone(),
             effort: self.effort.clone(),

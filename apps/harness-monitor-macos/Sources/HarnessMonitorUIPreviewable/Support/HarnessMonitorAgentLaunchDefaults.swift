@@ -1,11 +1,12 @@
 import Foundation
+import HarnessMonitorKit
 
 enum HarnessMonitorAgentLaunchDefaults {
   static let preferredSelectionKey = "harness.agent-launch.preferred-selection"
   static let preferredProviderKey = "harness.agent-launch.preferred-provider"
   static let legacyTerminalCopilotExplicitKey =
     "harness.agent-launch.legacy-terminal-copilot-explicit"
-  static let startupFallbackSelection = AgentLaunchSelection.tui(.codex)
+  static let startupFallbackSelection = AgentLaunchSelection.codex
   private static let legacyTerminalCopilotStorageKey =
     AgentLaunchSelection.tui(.copilot).storageKey
 
@@ -57,6 +58,8 @@ enum HarnessMonitorAgentLaunchDefaults {
 
   static func providerID(for selection: AgentLaunchSelection) -> String {
     switch selection {
+    case .codex:
+      AgentTuiRuntime.codex.rawValue
     case .tui(let runtime):
       runtime.rawValue
     case .acp(let id):

@@ -191,7 +191,8 @@ struct NewSessionSheetView: View {
       acpAgents: availableAcpAgents,
       runtimeProbeResults: runtimeProbeResults,
       sandboxed: store.daemonStatus?.manifest?.sandboxed == true,
-      acpHostBridgeReady: store.hostBridgeCapabilityState(for: "acp") == .ready
+      acpHostBridgeReady: store.hostBridgeCapabilityState(for: "acp") == .ready,
+      codexHostBridgeReady: store.hostBridgeCapabilityState(for: "codex") == .ready
     )
   }
 

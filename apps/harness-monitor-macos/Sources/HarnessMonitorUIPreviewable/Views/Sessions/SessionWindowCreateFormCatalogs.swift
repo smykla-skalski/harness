@@ -14,7 +14,8 @@ enum SessionWindowCreateFormCatalogs {
     acpAgents: [AcpAgentDescriptor],
     runtimeProbeResults: AcpRuntimeProbeResponse?,
     sandboxed: Bool = false,
-    acpHostBridgeReady: Bool = true
+    acpHostBridgeReady: Bool = true,
+    codexHostBridgeReady: Bool = true
   ) -> [AgentCapabilityOption] {
     AgentCapabilityCatalog.options(
       acpAgents: acpAgents.filter {
@@ -22,7 +23,8 @@ enum SessionWindowCreateFormCatalogs {
       },
       runtimeProbeResults: runtimeProbeResults,
       sandboxed: sandboxed,
-      acpHostBridgeReady: acpHostBridgeReady
+      acpHostBridgeReady: acpHostBridgeReady,
+      codexHostBridgeReady: codexHostBridgeReady
     )
   }
 
@@ -32,7 +34,8 @@ enum SessionWindowCreateFormCatalogs {
       acpAgents: [],
       runtimeProbeResults: nil,
       sandboxed: store.daemonStatus?.manifest?.sandboxed == true,
-      acpHostBridgeReady: store.hostBridgeCapabilityState(for: "acp") == .ready
+      acpHostBridgeReady: store.hostBridgeCapabilityState(for: "acp") == .ready,
+      codexHostBridgeReady: store.hostBridgeCapabilityState(for: "codex") == .ready
     )
   }
 
@@ -57,7 +60,8 @@ enum SessionWindowCreateFormCatalogs {
         acpAgents: descriptors,
         runtimeProbeResults: probes,
         sandboxed: store.daemonStatus?.manifest?.sandboxed == true,
-        acpHostBridgeReady: store.hostBridgeCapabilityState(for: "acp") == .ready
+        acpHostBridgeReady: store.hostBridgeCapabilityState(for: "acp") == .ready,
+        codexHostBridgeReady: store.hostBridgeCapabilityState(for: "codex") == .ready
       ),
       personas: availablePersonas,
       isLoading: false,
@@ -131,6 +135,10 @@ enum SessionWindowCreateFormCatalogs {
     option: AgentCapabilityOption,
     choice: AgentCapabilityTransportChoice
   ) -> String {
+    if choice.id.isCodexNative {
+      return "Starts via Codex app server."
+    }
+
     if choice.id.isAcp {
       return "Starts via ACP."
     }
@@ -162,6 +170,12 @@ enum SessionWindowCreateFormCatalogs {
     for option: AgentCapabilityOption,
     choice: AgentCapabilityTransportChoice
   ) -> String? {
+    if choice.id.isCodexNative {
+      return option.requiresCodexBridgeAccess
+        ? "Codex requires bridge setup. Open setup details below."
+        : nil
+    }
+
     guard case .acp = choice.id else {
       return nil
     }
@@ -191,7 +205,7 @@ enum SessionWindowCreateFormCatalogs {
     selection: AgentLaunchSelection,
     role: SessionRole
   ) -> Bool {
-    selection.isAcp && role == .leader
+    selection.isManagedControlPlane && role == .leader
   }
 
   static func selectedPersona(
@@ -284,6 +298,8 @@ enum SessionWindowCreateFormCatalogs {
     catalogState: SessionWindowAgentCreateCatalogState
   ) -> RuntimeModelCatalog? {
     switch selection {
+    case .codex:
+      return codexModelCatalog(catalogState: catalogState)
     case .tui(let runtime):
       return catalogState.runtimeModelCatalogs.first { $0.runtime == runtime.rawValue }
     case .acp(let descriptorID):

@@ -14,15 +14,23 @@ struct SessionCodexRunDetailSection: View {
 
   private var isActive: Bool { run.status.isActive }
   private var isInterrupting: Bool { store.isInterruptCodexRunInFlight(run.runId) }
-  private var canSteer: Bool {
-    isActive
+  private var canSendPrompt: Bool {
+    run.threadId != nil
       && !contextDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       && !store.isSessionActionInFlight
+  }
+  private var canSteer: Bool {
+    isActive
+      && canSendPrompt
+  }
+  private var canFollowUp: Bool {
+    !isActive
+      && canSendPrompt
   }
 
   var body: some View {
     Group {
-      if isActive {
+      if isActive || run.threadId != nil {
         SessionDetailScrollSurface(
           contentPadding: metrics.sectionPadding,
           bottomInsetSpacing: metrics.sectionSpacing,
@@ -63,6 +71,9 @@ struct SessionCodexRunDetailSection: View {
       if !run.pendingApprovals.isEmpty {
         approvalsSection
       }
+      if !run.events.isEmpty {
+        eventsSection
+      }
     }
   }
 
@@ -72,7 +83,7 @@ struct SessionCodexRunDetailSection: View {
         Text(SessionCodexRunRowFormatter.title(for: run))
           .scaledFont(.title3.weight(.semibold))
           .lineLimit(2)
-        Text("Codex • \(run.mode.title) • \(run.status.title)")
+        Text(headerSubtitle)
           .scaledFont(.caption)
           .foregroundStyle(.secondary)
           .lineLimit(1)
@@ -88,6 +99,14 @@ struct SessionCodexRunDetailSection: View {
         .accessibilityLabel("Interrupt Codex run")
       }
     }
+  }
+
+  private var headerSubtitle: String {
+    let name = run.displayName ?? "Codex"
+    if let sessionAgentID = run.sessionAgentID {
+      return "\(name) • \(sessionAgentID) • \(run.mode.title) • \(run.status.title)"
+    }
+    return "\(name) • \(run.mode.title) • \(run.status.title)"
   }
 
   @ViewBuilder
@@ -121,6 +140,47 @@ struct SessionCodexRunDetailSection: View {
         approvalCard(approval)
       }
     }
+  }
+
+  private var eventsSection: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+      HStack(spacing: 6) {
+        Image(systemName: "list.bullet.rectangle")
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        Text("Activity")
+          .scaledFont(.caption.bold())
+          .foregroundStyle(.secondary)
+      }
+      ForEach(run.events.suffix(30)) { event in
+        eventRow(event)
+      }
+    }
+  }
+
+  private func eventRow(_ event: CodexRunEvent) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
+      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
+        Text(event.kind)
+          .scaledFont(.caption.weight(.semibold))
+          .foregroundStyle(HarnessMonitorTheme.ink)
+          .lineLimit(1)
+        Spacer(minLength: HarnessMonitorTheme.spacingSM)
+        Text("#\(event.sequence)")
+          .scaledFont(.caption2)
+          .foregroundStyle(.secondary)
+      }
+      Text(event.summary)
+        .scaledFont(.caption)
+        .foregroundStyle(.secondary)
+        .textSelection(.enabled)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    .padding(.horizontal, metrics.terminalPadding)
+    .padding(.vertical, HarnessMonitorTheme.spacingSM)
+    .background(
+      .quaternary.opacity(0.18),
+      in: RoundedRectangle(cornerRadius: metrics.terminalCornerRadius)
+    )
   }
 
   private func approvalCard(_ approval: CodexApprovalRequest) -> some View {
@@ -173,7 +233,7 @@ struct SessionCodexRunDetailSection: View {
 
   private var steerComposer: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Text("Send context")
+      Text(isActive ? "Send context" : "Send follow-up")
         .scaledFont(.caption.bold())
         .foregroundStyle(.secondary)
       TextEditor(text: $contextDraft)
@@ -192,11 +252,11 @@ struct SessionCodexRunDetailSection: View {
         .accessibilityLabel("Codex context")
       HStack {
         Spacer(minLength: 0)
-        Button("Send context") {
+        Button(isActive ? "Send context" : "Send follow-up") {
           steerWithDraft()
         }
         .keyboardShortcut(.return, modifiers: [.command])
-        .disabled(!canSteer)
+        .disabled(!(canSteer || canFollowUp))
       }
     }
   }

@@ -22,8 +22,11 @@ use crate::daemon::protocol::{
     CodexRunListResponse, CodexRunRequest, CodexRunSnapshot, CodexRunStatus, CodexSteerRequest,
     StreamEvent,
 };
+use crate::daemon::service as daemon_service;
 use crate::daemon::state;
 use crate::errors::{CliError, CliErrorKind};
+use crate::session::service as session_service;
+use crate::session::types::ManagedAgentRef;
 use crate::workspace::utc_now;
 
 use super::active_runs::{ActiveRun, ActiveRuns, CodexControlMessage};
@@ -199,10 +202,16 @@ impl CodexControllerHandle {
         self.preflight_websocket_probe(session_id)?;
 
         let project_dir = self.project_dir_for_session(session_id)?;
+        let run_id = format!("codex-{}", Uuid::new_v4());
+        let display_name = request.name.clone().unwrap_or_else(|| "Codex".to_string());
+        let session_agent_id =
+            self.register_orchestration_agent(session_id, &run_id, request, &display_name)?;
         let now = utc_now();
         let snapshot = CodexRunSnapshot {
-            run_id: format!("codex-{}", Uuid::new_v4()),
+            run_id,
             session_id: session_id.to_string(),
+            session_agent_id: Some(session_agent_id),
+            display_name: Some(display_name),
             project_dir,
             thread_id: request.resume_thread_id.clone(),
             turn_id: None,
@@ -216,6 +225,8 @@ impl CodexControllerHandle {
             final_message: None,
             error: None,
             pending_approvals: Vec::new(),
+            resolved_approvals: Vec::new(),
+            events: Vec::new(),
             created_at: now.clone(),
             updated_at: now,
             model: request.model.clone(),
@@ -300,14 +311,19 @@ impl CodexControllerHandle {
         if prompt.is_empty() {
             return Err(CliErrorKind::workflow_parse("codex steer prompt cannot be empty").into());
         }
-        let active = self.active_run(run_id)?;
-        active
-            .control_tx
-            .send(CodexControlMessage::Steer {
-                prompt: prompt.to_string(),
-            })
-            .map_err(|error| CliErrorKind::workflow_io(format!("queue codex steer: {error}")))?;
-        self.run(run_id)
+        if let Ok(active) = self.active_run(run_id) {
+            active
+                .control_tx
+                .send(CodexControlMessage::Steer {
+                    prompt: prompt.to_string(),
+                })
+                .map_err(|error| {
+                    CliErrorKind::workflow_io(format!("queue codex steer: {error}"))
+                })?;
+            return self.run(run_id);
+        }
+
+        self.start_follow_up_turn(run_id, prompt)
     }
 
     /// Interrupt an active Codex turn.
@@ -404,6 +420,136 @@ impl CodexControllerHandle {
         }
         self.broadcast("codex_run_updated", snapshot, snapshot);
         Ok(())
+    }
+
+    fn register_orchestration_agent(
+        &self,
+        session_id: &str,
+        run_id: &str,
+        request: &CodexRunRequest,
+        display_name: &str,
+    ) -> Result<String, CliError> {
+        let managed_agent = ManagedAgentRef::codex(run_id);
+        let runtime_name = "codex";
+        let session_id_owned = session_id.to_string();
+        let display_name_owned = display_name.to_string();
+        let managed_agent_async = managed_agent.clone();
+        let request_async = request.clone();
+        if let Some(result) = self.run_with_async_db(|async_db| async move {
+            let now = utc_now();
+            let joined_agent_id = async_db
+                .update_session_state_immediate(&session_id_owned, |state| {
+                    let joined_role = session_service::resolve_join_role(
+                        state,
+                        request_async.role,
+                        request_async.fallback_role,
+                    )?;
+                    session_service::apply_join_session(
+                        state,
+                        &display_name_owned,
+                        runtime_name,
+                        joined_role,
+                        &request_async.capabilities,
+                        None,
+                        &now,
+                        request_async.persona.as_deref(),
+                        Some(managed_agent_async),
+                    )
+                    .map(|agent_id| (agent_id, joined_role))
+                })
+                .await?;
+            async_db
+                .append_log_entry(&daemon_service::build_log_entry(
+                    &session_id_owned,
+                    session_service::log_agent_joined(
+                        &joined_agent_id.0,
+                        joined_agent_id.1,
+                        runtime_name,
+                    ),
+                    None,
+                    None,
+                ))
+                .await?;
+            async_db.bump_change(&session_id_owned).await?;
+            async_db.bump_change("global").await?;
+            Ok(joined_agent_id.0)
+        }) {
+            return result;
+        }
+
+        let db = self.db()?;
+        let db = lock_db(&db)?;
+        let Some(mut state) = db.load_session_state_for_mutation(session_id)? else {
+            return Err(daemon_service::session_not_found(session_id));
+        };
+        let now = utc_now();
+        let joined_role =
+            session_service::resolve_join_role(&state, request.role, request.fallback_role)?;
+        let agent_id = session_service::apply_join_session(
+            &mut state,
+            display_name,
+            runtime_name,
+            joined_role,
+            &request.capabilities,
+            None,
+            &now,
+            request.persona.as_deref(),
+            Some(managed_agent),
+        )?;
+        let project_id = db
+            .project_id_for_session(session_id)?
+            .ok_or_else(|| daemon_service::session_not_found(session_id))?;
+        db.save_session_state(&project_id, &state)?;
+        db.append_log_entry(&daemon_service::build_log_entry(
+            session_id,
+            session_service::log_agent_joined(&agent_id, joined_role, runtime_name),
+            None,
+            None,
+        ))?;
+        db.bump_change(session_id)?;
+        db.bump_change("global")?;
+        Ok(agent_id)
+    }
+
+    fn start_follow_up_turn(
+        &self,
+        run_id: &str,
+        prompt: &str,
+    ) -> Result<CodexRunSnapshot, CliError> {
+        let mut snapshot = self.run(run_id)?;
+        if snapshot.thread_id.is_none() {
+            return Err(CliErrorKind::session_not_active(format!(
+                "codex agent '{run_id}' has no thread to resume"
+            ))
+            .into());
+        }
+        if snapshot.status.is_active() {
+            return Err(CliErrorKind::session_agent_conflict(format!(
+                "codex agent '{run_id}' already has an active turn"
+            ))
+            .into());
+        }
+
+        self.preflight_websocket_probe(&snapshot.session_id)?;
+        snapshot.prompt = prompt.to_string();
+        snapshot.turn_id = None;
+        snapshot.status = CodexRunStatus::Queued;
+        snapshot.latest_summary = Some("Queued follow-up turn".to_string());
+        snapshot.final_message = None;
+        snapshot.error = None;
+        snapshot.pending_approvals.clear();
+        snapshot.updated_at = utc_now();
+        self.save_and_broadcast(&snapshot)?;
+
+        let (control_tx, control_rx) = mpsc::unbounded_channel();
+        self.state
+            .active_runs
+            .insert(snapshot.run_id.clone(), control_tx)?;
+        let worker = CodexRunWorker::new(self.clone(), snapshot.clone(), control_rx);
+        tokio::spawn(async move {
+            worker.run().await;
+        });
+        Ok(snapshot)
     }
 
     pub(super) fn broadcast_approval(

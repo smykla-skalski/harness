@@ -9,6 +9,7 @@ use super::{
     worker::upsert_pending_approval,
 };
 use crate::daemon::protocol::{CodexApprovalRequest, CodexRunMode, CodexRunRequest};
+use crate::session::types::SessionRole;
 
 #[test]
 fn start_run_rejects_empty_prompt_before_db_lookup() {
@@ -18,6 +19,11 @@ fn start_run_rejects_empty_prompt_before_db_lookup() {
         actor: None,
         prompt: "   ".to_string(),
         mode: CodexRunMode::Report,
+        role: SessionRole::Worker,
+        fallback_role: None,
+        capabilities: Vec::new(),
+        name: None,
+        persona: None,
         resume_thread_id: None,
         model: None,
         effort: None,
@@ -41,6 +47,11 @@ fn start_run_rejects_unknown_model_for_codex() {
         actor: None,
         prompt: "investigate".to_string(),
         mode: CodexRunMode::Report,
+        role: SessionRole::Worker,
+        fallback_role: None,
+        capabilities: Vec::new(),
+        name: None,
+        persona: None,
         resume_thread_id: None,
         model: Some("not-a-codex-model".to_string()),
         effort: None,
@@ -69,6 +80,11 @@ fn start_run_rejects_unknown_effort_value() {
         actor: None,
         prompt: "investigate".to_string(),
         mode: CodexRunMode::Report,
+        role: SessionRole::Worker,
+        fallback_role: None,
+        capabilities: Vec::new(),
+        name: None,
+        persona: None,
         resume_thread_id: None,
         model: Some("gpt-5.5".to_string()),
         effort: Some("extreme".to_string()),
@@ -90,6 +106,11 @@ fn start_run_accepts_custom_model_and_effort_when_opt_in() {
         actor: None,
         prompt: "explore".to_string(),
         mode: CodexRunMode::Report,
+        role: SessionRole::Worker,
+        fallback_role: None,
+        capabilities: Vec::new(),
+        name: None,
+        persona: None,
         resume_thread_id: None,
         model: Some("gpt-6-private".to_string()),
         effort: Some("maximum".to_string()),

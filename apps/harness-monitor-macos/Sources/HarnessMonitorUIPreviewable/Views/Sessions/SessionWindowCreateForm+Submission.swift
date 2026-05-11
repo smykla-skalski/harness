@@ -48,6 +48,12 @@ extension SessionWindowCreateForm {
     )
     let context = agentCreationContext(selection: resolvedSelection)
     switch resolvedSelection {
+    case .codex:
+      await createCodexAgent(
+        named: name,
+        selection: resolvedSelection,
+        context: context
+      )
     case .tui(let runtime):
       await createTuiAgent(
         named: name,
@@ -78,6 +84,63 @@ extension SessionWindowCreateForm {
       selectedRole: selectedRole,
       fallbackRole: fallbackRole
     )
+  }
+
+  @MainActor
+  private func createCodexAgent(
+    named name: String,
+    selection: AgentLaunchSelection,
+    context: AgentCreationContext
+  ) async {
+    let catalog = SessionWindowCreateFormCatalogs.codexModelCatalog(
+      catalogState: state.agentCreateCatalog
+    )
+    let pickerValue = codexModelPickerSelection.wrappedValue
+    let modelSelection = SessionWindowCreateFormCatalogs.effectiveModelSelection(
+      pickerValue: pickerValue,
+      customValue: codexCustomModel.wrappedValue,
+      catalogDefault: catalog?.default ?? ""
+    )
+    let effortValues = codexEffortValues
+    let trimmedEffort = draft.codexEffort.trimmingCharacters(in: .whitespacesAndNewlines)
+    let effort =
+      trimmedEffort.isEmpty
+      ? SessionWindowCreateFormCatalogs.defaultEffortLevel(from: effortValues)
+      : trimmedEffort
+    let capabilities = capabilities(for: selection)
+    guard
+      let created = await store.startCodexRunSnapshot(
+        prompt: draft.prompt,
+        mode: draft.codexMode,
+        role: context.selectedRole,
+        fallbackRole: context.fallbackRole,
+        capabilities: capabilities,
+        name: name,
+        persona: context.personaID,
+        model: modelSelection.id,
+        effort: effort.isEmpty ? nil : effort,
+        allowCustomModel: modelSelection.allowCustomModel,
+        sessionID: draft.sessionID
+      )
+    else {
+      return
+    }
+    writeCodexLaunchPreset(
+      selection: selection,
+      role: context.selectedRole,
+      mode: draft.codexMode,
+      model: modelSelection.allowCustomModel ? nil : modelSelection.id,
+      customModel: modelSelection.allowCustomModel ? modelSelection.id : nil,
+      effort: effort.isEmpty ? nil : effort,
+      fallbackRole: context.fallbackRole,
+      personaID: context.personaID
+    )
+    state.resetCreateDraft(.agent)
+    if let sessionAgentID = created.sessionAgentID {
+      state.selectAgent(sessionAgentID)
+    } else {
+      state.selectRoute(.agents)
+    }
   }
 
   @MainActor
@@ -219,6 +282,33 @@ extension SessionWindowCreateForm {
     )
     state.resetCreateDraft(.agent)
     state.selectAgent(created.agentId)
+  }
+
+  @MainActor
+  private func writeCodexLaunchPreset(
+    selection: AgentLaunchSelection,
+    role: SessionRole,
+    mode: CodexRunMode,
+    model: String? = nil,
+    customModel: String? = nil,
+    effort: String? = nil,
+    fallbackRole: SessionRole? = nil,
+    personaID: String? = nil
+  ) {
+    HarnessMonitorAgentLaunchDefaults.persist(selection)
+    LaunchPresetDefaults.write(
+      LaunchPresetSnapshot(
+        mode: .codex,
+        providerStorageKey: selection.storageKey,
+        role: role.rawValue,
+        fallbackRole: fallbackRole?.rawValue,
+        personaID: personaID,
+        codexMode: mode.rawValue,
+        codexModel: model,
+        customCodexModel: customModel,
+        codexEffort: effort
+      )
+    )
   }
 
   @MainActor

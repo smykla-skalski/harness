@@ -9,12 +9,16 @@ use crate::daemon::db::runtime::{
 };
 
 const UPSERT_CODEX_RUN_SQL: &str = "INSERT INTO codex_runs (
-    run_id, session_id, project_dir, thread_id, turn_id, mode,
+    run_id, session_id, session_agent_id, display_name,
+    project_dir, thread_id, turn_id, mode,
     status, prompt, latest_summary, final_message, error,
-    pending_approvals_json, created_at, updated_at
-) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+    pending_approvals_json, resolved_approvals_json, events_json,
+    created_at, updated_at, model, effort
+) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
 ON CONFLICT(run_id) DO UPDATE SET
     session_id = excluded.session_id,
+    session_agent_id = excluded.session_agent_id,
+    display_name = excluded.display_name,
     project_dir = excluded.project_dir,
     thread_id = excluded.thread_id,
     turn_id = excluded.turn_id,
@@ -25,16 +29,23 @@ ON CONFLICT(run_id) DO UPDATE SET
     final_message = excluded.final_message,
     error = excluded.error,
     pending_approvals_json = excluded.pending_approvals_json,
-    updated_at = excluded.updated_at";
-const CODEX_RUN_SQL: &str = "SELECT run_id, session_id, project_dir, thread_id, turn_id, mode,
+    resolved_approvals_json = excluded.resolved_approvals_json,
+    events_json = excluded.events_json,
+    updated_at = excluded.updated_at,
+    model = excluded.model,
+    effort = excluded.effort";
+const CODEX_RUN_SQL: &str = "SELECT run_id, session_id, session_agent_id, display_name,
+    project_dir, thread_id, turn_id, mode,
     status, prompt, latest_summary, final_message, error,
-    pending_approvals_json, created_at, updated_at
+    pending_approvals_json, resolved_approvals_json, events_json,
+    created_at, updated_at, model, effort
  FROM codex_runs
  WHERE run_id = ?1";
-const LIST_CODEX_RUNS_SQL: &str =
-    "SELECT run_id, session_id, project_dir, thread_id, turn_id, mode,
+const LIST_CODEX_RUNS_SQL: &str = "SELECT run_id, session_id, session_agent_id, display_name,
+    project_dir, thread_id, turn_id, mode,
     status, prompt, latest_summary, final_message, error,
-    pending_approvals_json, created_at, updated_at
+    pending_approvals_json, resolved_approvals_json, events_json,
+    created_at, updated_at, model, effort
  FROM codex_runs
  WHERE session_id = ?1
  ORDER BY updated_at DESC";
@@ -83,9 +94,17 @@ impl AsyncDaemonDb {
     pub(crate) async fn save_codex_run(&self, snapshot: &CodexRunSnapshot) -> Result<(), CliError> {
         let pending_approvals_json = serde_json::to_string(&snapshot.pending_approvals)
             .map_err(|error| db_error(format!("serialize async codex approvals: {error}")))?;
+        let resolved_approvals_json =
+            serde_json::to_string(&snapshot.resolved_approvals).map_err(|error| {
+                db_error(format!("serialize async codex resolved approvals: {error}"))
+            })?;
+        let events_json = serde_json::to_string(&snapshot.events)
+            .map_err(|error| db_error(format!("serialize async codex events: {error}")))?;
         query(UPSERT_CODEX_RUN_SQL)
             .bind(&snapshot.run_id)
             .bind(&snapshot.session_id)
+            .bind(&snapshot.session_agent_id)
+            .bind(&snapshot.display_name)
             .bind(&snapshot.project_dir)
             .bind(&snapshot.thread_id)
             .bind(&snapshot.turn_id)
@@ -96,8 +115,12 @@ impl AsyncDaemonDb {
             .bind(&snapshot.final_message)
             .bind(&snapshot.error)
             .bind(&pending_approvals_json)
+            .bind(&resolved_approvals_json)
+            .bind(&events_json)
             .bind(&snapshot.created_at)
             .bind(&snapshot.updated_at)
+            .bind(&snapshot.model)
+            .bind(&snapshot.effort)
             .execute(self.pool())
             .await
             .map_err(|error| db_error(format!("save async codex run: {error}")))?;
@@ -232,6 +255,8 @@ impl AsyncDaemonDb {
 struct AsyncCodexRunRow {
     run_id: String,
     session_id: String,
+    session_agent_id: Option<String>,
+    display_name: Option<String>,
     project_dir: String,
     thread_id: Option<String>,
     turn_id: Option<String>,
@@ -242,8 +267,12 @@ struct AsyncCodexRunRow {
     final_message: Option<String>,
     error: Option<String>,
     pending_approvals_json: String,
+    resolved_approvals_json: String,
+    events_json: String,
     created_at: String,
     updated_at: String,
+    model: Option<String>,
+    effort: Option<String>,
 }
 
 impl AsyncCodexRunRow {
@@ -251,6 +280,8 @@ impl AsyncCodexRunRow {
         Ok(CodexRunSnapshot {
             run_id: self.run_id,
             session_id: self.session_id,
+            session_agent_id: self.session_agent_id,
+            display_name: self.display_name,
             project_dir: self.project_dir,
             thread_id: self.thread_id,
             turn_id: self.turn_id,
@@ -264,12 +295,15 @@ impl AsyncCodexRunRow {
             error: self.error,
             pending_approvals: serde_json::from_str(&self.pending_approvals_json)
                 .map_err(|error| db_error(format!("parse async codex approvals: {error}")))?,
+            resolved_approvals: serde_json::from_str(&self.resolved_approvals_json).map_err(
+                |error| db_error(format!("parse async codex resolved approvals: {error}")),
+            )?,
+            events: serde_json::from_str(&self.events_json)
+                .map_err(|error| db_error(format!("parse async codex events: {error}")))?,
             created_at: self.created_at,
             updated_at: self.updated_at,
-            // Model and effort are intentionally not persisted; they are only
-            // used at thread/start and default to None after a reload.
-            model: None,
-            effort: None,
+            model: self.model,
+            effort: self.effort,
         })
     }
 }

@@ -65,6 +65,11 @@ public struct CodexRunRequest: Codable, Equatable, Sendable {
   public let actor: String?
   public let prompt: String
   public let mode: CodexRunMode
+  public let role: SessionRole?
+  public let fallbackRole: SessionRole?
+  public let capabilities: [String]?
+  public let name: String?
+  public let persona: String?
   public let resumeThreadId: String?
   public let model: String?
   public let effort: String?
@@ -74,6 +79,11 @@ public struct CodexRunRequest: Codable, Equatable, Sendable {
     actor: String?,
     prompt: String,
     mode: CodexRunMode,
+    role: SessionRole? = nil,
+    fallbackRole: SessionRole? = nil,
+    capabilities: [String]? = nil,
+    name: String? = nil,
+    persona: String? = nil,
     resumeThreadId: String? = nil,
     model: String? = nil,
     effort: String? = nil,
@@ -82,6 +92,11 @@ public struct CodexRunRequest: Codable, Equatable, Sendable {
     self.actor = actor
     self.prompt = prompt
     self.mode = mode
+    self.role = role
+    self.fallbackRole = fallbackRole
+    self.capabilities = capabilities
+    self.name = name
+    self.persona = persona
     self.resumeThreadId = resumeThreadId
     self.model = model
     self.effort = effort
@@ -117,9 +132,31 @@ public struct CodexApprovalRequest: Codable, Equatable, Identifiable, Sendable {
   public var id: String { approvalId }
 }
 
+public struct CodexResolvedApproval: Codable, Equatable, Sendable {
+  public let approvalId: String
+  public let decision: CodexApprovalDecision
+  public let resolvedAt: String
+}
+
+public struct CodexRunEvent: Codable, Equatable, Identifiable, Sendable {
+  public let eventId: String
+  public let sequence: UInt64
+  public let recordedAt: String
+  public let kind: String
+  public let summary: String
+  public let threadId: String?
+  public let turnId: String?
+  public let itemId: String?
+  public let payload: JSONValue
+
+  public var id: String { eventId }
+}
+
 public struct CodexRunSnapshot: Codable, Equatable, Identifiable, Sendable {
   public let runId: String
   public let sessionId: String
+  public let sessionAgentId: String?
+  public let displayName: String?
   public let projectDir: String
   public let threadId: String?
   public let turnId: String?
@@ -130,12 +167,109 @@ public struct CodexRunSnapshot: Codable, Equatable, Identifiable, Sendable {
   public let finalMessage: String?
   public let error: String?
   public let pendingApprovals: [CodexApprovalRequest]
+  public let resolvedApprovals: [CodexResolvedApproval]
+  public let events: [CodexRunEvent]
   public let createdAt: String
   public let updatedAt: String
+  public let model: String?
+  public let effort: String?
+
+  enum CodingKeys: String, CodingKey {
+    case runId
+    case sessionId
+    case sessionAgentId
+    case displayName
+    case projectDir
+    case threadId
+    case turnId
+    case mode
+    case status
+    case prompt
+    case latestSummary
+    case finalMessage
+    case error
+    case pendingApprovals
+    case resolvedApprovals
+    case events
+    case createdAt
+    case updatedAt
+    case model
+    case effort
+  }
+
+  public init(
+    runId: String,
+    sessionId: String,
+    sessionAgentId: String? = nil,
+    displayName: String? = nil,
+    projectDir: String,
+    threadId: String?,
+    turnId: String?,
+    mode: CodexRunMode,
+    status: CodexRunStatus,
+    prompt: String,
+    latestSummary: String?,
+    finalMessage: String?,
+    error: String?,
+    pendingApprovals: [CodexApprovalRequest],
+    resolvedApprovals: [CodexResolvedApproval] = [],
+    events: [CodexRunEvent] = [],
+    createdAt: String,
+    updatedAt: String,
+    model: String? = nil,
+    effort: String? = nil
+  ) {
+    self.runId = runId
+    self.sessionId = sessionId
+    self.sessionAgentId = sessionAgentId
+    self.displayName = displayName
+    self.projectDir = projectDir
+    self.threadId = threadId
+    self.turnId = turnId
+    self.mode = mode
+    self.status = status
+    self.prompt = prompt
+    self.latestSummary = latestSummary
+    self.finalMessage = finalMessage
+    self.error = error
+    self.pendingApprovals = pendingApprovals
+    self.resolvedApprovals = resolvedApprovals
+    self.events = events
+    self.createdAt = createdAt
+    self.updatedAt = updatedAt
+    self.model = model
+    self.effort = effort
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    runId = try container.decode(String.self, forKey: .runId)
+    sessionId = try container.decode(String.self, forKey: .sessionId)
+    sessionAgentId = try container.decodeIfPresent(String.self, forKey: .sessionAgentId)
+    displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+    projectDir = try container.decode(String.self, forKey: .projectDir)
+    threadId = try container.decodeIfPresent(String.self, forKey: .threadId)
+    turnId = try container.decodeIfPresent(String.self, forKey: .turnId)
+    mode = try container.decode(CodexRunMode.self, forKey: .mode)
+    status = try container.decode(CodexRunStatus.self, forKey: .status)
+    prompt = try container.decode(String.self, forKey: .prompt)
+    latestSummary = try container.decodeIfPresent(String.self, forKey: .latestSummary)
+    finalMessage = try container.decodeIfPresent(String.self, forKey: .finalMessage)
+    error = try container.decodeIfPresent(String.self, forKey: .error)
+    pendingApprovals =
+      try container.decodeIfPresent([CodexApprovalRequest].self, forKey: .pendingApprovals) ?? []
+    resolvedApprovals =
+      try container.decodeIfPresent([CodexResolvedApproval].self, forKey: .resolvedApprovals) ?? []
+    events = try container.decodeIfPresent([CodexRunEvent].self, forKey: .events) ?? []
+    createdAt = try container.decode(String.self, forKey: .createdAt)
+    updatedAt = try container.decode(String.self, forKey: .updatedAt)
+    model = try container.decodeIfPresent(String.self, forKey: .model)
+    effort = try container.decodeIfPresent(String.self, forKey: .effort)
+  }
 
   public var id: String { runId }
   public var managedAgentID: String { runId }
-  public var sessionAgentID: String? { nil }
+  public var sessionAgentID: String? { sessionAgentId }
 }
 
 public struct CodexApprovalRequestedPayload: Codable, Equatable, Sendable {

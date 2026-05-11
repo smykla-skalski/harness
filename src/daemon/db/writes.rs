@@ -404,6 +404,7 @@ fn replace_agents(
             .map(|managed| match managed.kind {
                 ManagedAgentKind::Tui => "tui",
                 ManagedAgentKind::Acp => "acp",
+                ManagedAgentKind::Codex => "codex",
             });
         let managed_agent_id = agent
             .managed_agent

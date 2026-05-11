@@ -13,10 +13,8 @@
 //! - UI-only row/disclosure identity must not be reused as any transport
 //!   identity.
 //!
-//! Codex is currently managed-only: it belongs to a `HarnessSessionId` and uses
-//! its managed run id as the control-plane identity, but it does not currently
-//! participate in the session-agent registration model and therefore has no
-//! `SessionAgentId`.
+//! Codex app-server agents use their managed run id as the control-plane
+//! identity and may also register as regular session agents.
 
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize, de};
@@ -55,6 +53,11 @@ impl ManagedAgentRef {
     }
 
     #[must_use]
+    pub fn codex(id: impl Into<ManagedAgentId>) -> Self {
+        Self::new(ManagedAgentKind::Codex, id)
+    }
+
+    #[must_use]
     pub fn managed_agent_id(&self) -> ManagedAgentId {
         ManagedAgentId::from(self.id.as_str())
     }
@@ -66,6 +69,7 @@ impl ManagedAgentRef {
 pub enum ManagedAgentKind {
     Tui,
     Acp,
+    Codex,
 }
 
 /// An agent registered in a multi-agent session.

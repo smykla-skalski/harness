@@ -316,6 +316,25 @@ fn fresh_schema_agents_table_includes_managed_agent_identity_columns() {
 }
 
 #[test]
+fn fresh_schema_codex_runs_table_includes_agent_parity_columns() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let columns = codex_run_columns(&db.conn);
+    for expected in [
+        "session_agent_id",
+        "display_name",
+        "model",
+        "effort",
+        "resolved_approvals_json",
+        "events_json",
+    ] {
+        assert!(
+            columns.iter().any(|column| column == expected),
+            "missing codex_runs column: {expected}"
+        );
+    }
+}
+
+#[test]
 fn migrates_v10_schema_adds_managed_agent_identity_columns_without_backfilling_rows() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let path = tmp.path().join("harness.db");
@@ -363,6 +382,70 @@ fn migrates_v10_schema_adds_managed_agent_identity_columns_without_backfilling_r
         session_key.as_deref(),
         Some("2a35c8f7-e812-5024-aed6-9f3b6318847e")
     );
+}
+
+#[test]
+fn migrates_v12_schema_adds_codex_agent_parity_columns_with_defaults() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let path = tmp.path().join("harness.db");
+
+    {
+        let db = DaemonDb::open(&path).expect("open fresh db");
+        let project = sample_project();
+        db.sync_project(&project).expect("sync project");
+        let state = sample_session_state();
+        db.sync_session(&project.project_id, &state)
+            .expect("sync session");
+        simulate_pre_v13_codex_runs_table(&db.conn);
+    }
+
+    let db = DaemonDb::open(&path).expect("open migrated db");
+    assert_eq!(db.schema_version().expect("version"), SCHEMA_VERSION);
+
+    let columns = codex_run_columns(&db.conn);
+    for expected in [
+        "session_agent_id",
+        "display_name",
+        "model",
+        "effort",
+        "resolved_approvals_json",
+        "events_json",
+    ] {
+        assert!(
+            columns.iter().any(|column| column == expected),
+            "missing codex_runs column after migration: {expected}"
+        );
+    }
+
+    let defaults: (
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        String,
+        String,
+    ) = db
+        .conn
+        .query_row(
+            "SELECT session_agent_id, display_name, model, effort,
+                    resolved_approvals_json, events_json
+             FROM codex_runs
+             WHERE run_id = 'codex-run-legacy'",
+            [],
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                    row.get(5)?,
+                ))
+            },
+        )
+        .expect("load migrated codex run");
+
+    assert_eq!(defaults, (None, None, None, None, "[]".into(), "[]".into()));
 }
 
 #[test]
@@ -495,4 +578,63 @@ fn open_migrates_v2_db_and_deduplicates_event_indexes() {
         .query_row("SELECT COUNT(*) FROM daemon_events", [], |row| row.get(0))
         .expect("count migrated daemon events");
     assert_eq!(daemon_count, 1);
+}
+
+fn codex_run_columns(conn: &Connection) -> Vec<String> {
+    conn.prepare("PRAGMA table_info(codex_runs)")
+        .expect("prepare codex_runs table info")
+        .query_map([], |row| row.get(1))
+        .expect("query codex_runs table info")
+        .collect::<Result<Vec<_>, _>>()
+        .expect("collect codex_runs table columns")
+}
+
+fn simulate_pre_v13_codex_runs_table(conn: &Connection) {
+    conn.execute_batch(
+        "DROP INDEX IF EXISTS idx_codex_runs_session_updated;
+         DROP INDEX IF EXISTS idx_codex_runs_status;
+         DROP TABLE codex_runs;
+         CREATE TABLE codex_runs (
+             run_id                 TEXT PRIMARY KEY,
+             session_id             TEXT NOT NULL REFERENCES sessions(session_id) ON DELETE CASCADE,
+             project_dir            TEXT NOT NULL,
+             thread_id              TEXT,
+             turn_id                TEXT,
+             mode                   TEXT NOT NULL,
+             status                 TEXT NOT NULL,
+             prompt                 TEXT NOT NULL,
+             latest_summary         TEXT,
+             final_message          TEXT,
+             error                  TEXT,
+             pending_approvals_json TEXT NOT NULL DEFAULT '[]',
+             created_at             TEXT NOT NULL,
+             updated_at             TEXT NOT NULL
+         ) WITHOUT ROWID;
+         CREATE INDEX idx_codex_runs_session_updated
+             ON codex_runs(session_id, updated_at DESC);
+         CREATE INDEX idx_codex_runs_status
+             ON codex_runs(status);
+         INSERT INTO codex_runs (
+             run_id, session_id, project_dir, thread_id, turn_id, mode, status,
+             prompt, latest_summary, final_message, error, pending_approvals_json,
+             created_at, updated_at
+         ) VALUES (
+             'codex-run-legacy',
+             'f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4',
+             '/tmp/harness',
+             'thread-legacy',
+             'turn-legacy',
+             'approval',
+             'completed',
+             'Investigate the suite.',
+             'Done',
+             'Fixed.',
+             NULL,
+             '[]',
+             '2026-04-09T09:00:00Z',
+             '2026-04-09T09:05:00Z'
+         );
+         UPDATE schema_meta SET value = '12' WHERE key = 'version';",
+    )
+    .expect("simulate pre-v13 codex_runs table");
 }
