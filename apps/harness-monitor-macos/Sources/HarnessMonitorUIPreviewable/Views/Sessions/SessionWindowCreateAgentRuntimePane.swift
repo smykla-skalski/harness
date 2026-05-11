@@ -217,6 +217,10 @@ struct SessionWindowCreateProviderListRow: View {
     isSelected ? HarnessMonitorTheme.accent.opacity(0.10) : .clear
   }
 
+  private var availableModes: [SessionWindowCreateProviderMode] {
+    Self.availableModes(for: option)
+  }
+
   private var statusTint: Color {
     option.availabilityState.tint
   }
@@ -240,13 +244,23 @@ struct SessionWindowCreateProviderListRow: View {
 
           Spacer(minLength: HarnessMonitorTheme.spacingSM)
 
-          Text(option.availabilityState.compactTitle)
-            .scaledFont(.caption.weight(.semibold))
-            .foregroundStyle(statusTint)
-            .multilineTextAlignment(.trailing)
-            .lineLimit(1)
-            .truncationMode(.tail)
+          if availableModes.isEmpty {
+            Text(option.availabilityState.compactTitle)
+              .scaledFont(.caption.weight(.semibold))
+              .foregroundStyle(statusTint)
+              .multilineTextAlignment(.trailing)
+              .lineLimit(1)
+              .truncationMode(.tail)
+              .fixedSize(horizontal: true, vertical: false)
+          } else {
+            HStack(spacing: HarnessMonitorTheme.spacingXS) {
+              ForEach(availableModes) { mode in
+                SessionWindowCreateProviderModeBadge(mode: mode)
+              }
+            }
             .fixedSize(horizontal: true, vertical: false)
+            .accessibilityHidden(true)
+          }
         }
 
         Text(Self.providerSubtitle(for: option))
@@ -292,6 +306,25 @@ struct SessionWindowCreateProviderListRow: View {
     providerSubtitle(for: option)
   }
 
+  static func availableModes(for option: AgentCapabilityOption) -> [SessionWindowCreateProviderMode] {
+    option.transportChoices.compactMap { choice in
+      guard option.isEnabled(choice) else { return nil }
+      return choice.id.isAcp ? .acp : .tui
+    }
+  }
+
+  static func modeSummary(for option: AgentCapabilityOption) -> String {
+    let modes = availableModes(for: option).map(\.rawValue)
+    switch modes.count {
+    case 0:
+      return option.availabilityState.compactTitle
+    case 1:
+      return "Mode \(modes[0])"
+    default:
+      return "Modes \(modes[0]) and \(modes[1])"
+    }
+  }
+
   static func providerIconName(for option: AgentCapabilityOption) -> String {
     switch option.id {
     case "codex":
@@ -312,9 +345,65 @@ struct SessionWindowCreateProviderListRow: View {
   }
 
   static func accessibilityLabel(for option: AgentCapabilityOption) -> String {
-    [option.title, providerSubtitle(for: option), option.availabilityState.compactTitle]
+    [option.title, modeSummary(for: option), providerSubtitle(for: option)]
       .compactMap { $0 }
       .joined(separator: ", ")
+  }
+}
+
+enum SessionWindowCreateProviderMode: String, Identifiable {
+  case acp = "ACP"
+  case tui = "TUI"
+
+  var id: String { rawValue }
+
+  var tint: Color {
+    switch self {
+    case .acp:
+      HarnessMonitorTheme.success
+    case .tui:
+      HarnessMonitorTheme.accent
+    }
+  }
+}
+
+private struct SessionWindowCreateProviderModeBadge: View {
+  let mode: SessionWindowCreateProviderMode
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
+
+  private var fillOpacity: Double {
+    if reduceTransparency {
+      return colorSchemeContrast == .increased ? 0.34 : 0.26
+    }
+    return colorSchemeContrast == .increased ? 0.24 : 0.16
+  }
+
+  private var strokeOpacity: Double {
+    colorSchemeContrast == .increased ? 0.38 : 0.22
+  }
+
+  private var strokeWidth: CGFloat {
+    colorSchemeContrast == .increased ? 1.5 : 1
+  }
+
+  var body: some View {
+    Text(mode.rawValue)
+      .font(.system(.caption2, design: .rounded, weight: .semibold))
+      .foregroundStyle(mode.tint)
+      .padding(.horizontal, HarnessMonitorTheme.pillPaddingH)
+      .padding(.vertical, HarnessMonitorTheme.pillPaddingV)
+      .background {
+        Capsule()
+          .fill(mode.tint.opacity(fillOpacity))
+      }
+      .overlay {
+        Capsule()
+          .strokeBorder(mode.tint.opacity(strokeOpacity), lineWidth: strokeWidth)
+      }
+      .accessibilityHidden(true)
   }
 }
 
