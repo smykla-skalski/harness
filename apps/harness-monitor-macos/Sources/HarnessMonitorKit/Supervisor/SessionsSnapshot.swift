@@ -71,21 +71,19 @@ public struct SessionsSnapshot: Sendable, Hashable {
     let (
       summaries,
       selectedSessionID,
-      selectedDetail,
-      selectedTimeline,
       selectedCodexRuns,
       codexRunsBySessionID,
-      cacheService
+      cacheService,
+      openSessionWindowIDs
     ) =
       await MainActor.run {
         (
           store.sessionIndex.sessions,
           store.selectedSessionID,
-          store.selectedSession,
-          store.timeline,
           store.selectedCodexRuns,
           store.codexRunsBySessionID,
-          store.cacheService
+          store.cacheService,
+          store.openSessionWindowIDsSnapshot
         )
       }
     let cachedByID: [String: SessionCacheService.CachedSessionSnapshot] =
@@ -96,27 +94,34 @@ public struct SessionsSnapshot: Sendable, Hashable {
       }
 
     return summaries.map { summary -> SessionSnapshot in
-      let detailSource: (detail: SessionDetail, timeline: [TimelineEntry])
-      if let selectedDetail, selectedSessionID == summary.sessionId {
-        detailSource = (selectedDetail, selectedTimeline)
-      } else if let cached = cachedByID[summary.sessionId] {
-        detailSource = (cached.detail, cached.timeline)
-      } else {
-        HarnessMonitorLogger.supervisorDebug(
-          "supervisor.snapshot summary_only session=\(summary.sessionId)"
-        )
+      guard let cached = cachedByID[summary.sessionId] else {
+        logMissingCache(sessionID: summary.sessionId, openSessionWindowIDs: openSessionWindowIDs)
         return SessionSnapshot.summaryOnly(summary: summary)
       }
-
       let sessionRuns =
         codexRunsBySessionID[summary.sessionId]
         ?? (selectedSessionID == summary.sessionId ? selectedCodexRuns : [])
       return SessionSnapshot.from(
-        detail: detailSource.detail,
+        detail: cached.detail,
         summary: summary,
-        timeline: detailSource.timeline,
+        timeline: cached.timeline,
         pendingCodexRuns: sessionRuns,
         now: now
+      )
+    }
+  }
+
+  private static func logMissingCache(
+    sessionID: String,
+    openSessionWindowIDs: Set<String>
+  ) {
+    if openSessionWindowIDs.contains(sessionID) {
+      HarnessMonitorLogger.supervisorWarning(
+        "supervisor.snapshot missing_cache_for_open_window session=\(sessionID)"
+      )
+    } else {
+      HarnessMonitorLogger.supervisorDebug(
+        "supervisor.snapshot summary_only session=\(sessionID)"
       )
     }
   }
