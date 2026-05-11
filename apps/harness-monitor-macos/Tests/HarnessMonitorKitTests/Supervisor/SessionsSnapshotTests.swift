@@ -89,6 +89,53 @@ final class SessionsSnapshotTests: XCTestCase {
     XCTAssertTrue(session.tasks.isEmpty)
   }
 
+  func test_snapshotReadsFromCacheNotInMemorySelectedSession() async throws {
+    // Cache and in-memory selectedSession can diverge for up to 250ms while the
+    // debounced cache write is in flight. The supervisor snapshot must use the
+    // cached state so multi-window scenarios stay consistent: only one session
+    // can be the singleton selectedSession at a time, but all open windows must
+    // surface to the supervisor with the same authority.
+    let store = try await HarnessMonitorStore.fixture(sessions: .twoActiveSessions)
+    let staleDetail = SessionDetail(
+      session: try XCTUnwrap(store.selectedSession?.session),
+      agents: [],
+      tasks: [],
+      signals: [],
+      observer: nil,
+      agentActivity: []
+    )
+    store.selectedSession = staleDetail
+
+    let snapshot = await SessionsSnapshot.build(from: store, now: .fixed)
+
+    let session = try XCTUnwrap(snapshot.sessions.first { $0.id == "sess-alpha" })
+    XCTAssertEqual(
+      session.agents.count,
+      2,
+      "Snapshot must source detail from the cache, not from in-memory selectedSession"
+    )
+    XCTAssertEqual(session.tasks.count, 1)
+  }
+
+  func test_openWindowSessionWithoutCacheReturnsSummaryOnly() async throws {
+    let store = HarnessMonitorStore.fixture()
+    let summary = makeSummary(sessionID: "sess-open-no-cache", status: .active)
+    store.sessionIndex.replaceSnapshot(projects: [], sessions: [summary])
+    store.registerOpenSessionWindow(
+      windowID: ObjectIdentifier(SessionsSnapshotWindowToken()),
+      sessionID: summary.sessionId
+    )
+
+    let snapshot = await SessionsSnapshot.build(from: store, now: .fixed)
+
+    let session = try XCTUnwrap(snapshot.sessions.first)
+    XCTAssertEqual(session.id, "sess-open-no-cache")
+    XCTAssertTrue(session.agents.isEmpty)
+    XCTAssertTrue(session.tasks.isEmpty)
+  }
+
+  private final class SessionsSnapshotWindowToken {}
+
   private func makeSummary(sessionID: String, status: SessionStatus) -> SessionSummary {
     SessionSummary(
       projectId: "project-fixture",

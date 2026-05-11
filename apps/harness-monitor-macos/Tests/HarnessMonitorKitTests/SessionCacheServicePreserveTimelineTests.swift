@@ -9,7 +9,7 @@ final class SessionCacheServicePreserveTimelineTests: XCTestCase {
     let harness = try PersistenceIntegrationTestHarness()
     let cacheService = SessionCacheService(modelContainer: harness.container)
 
-    let session = makeSession(.preserveTimelineActive)
+    let session = makeSession(makePreserveTimelineFixture())
     let originalDetail = makeSessionDetail(
       summary: session,
       workerID: "worker-preserve",
@@ -32,26 +32,24 @@ final class SessionCacheServicePreserveTimelineTests: XCTestCase {
       timeline: originalTimeline
     )
 
-    let updatedAgents = [
-      AgentRegistration(
-        agentId: "worker-preserve-new",
-        name: "Preserve Worker v2",
-        runtime: "codex",
-        role: .worker,
-        capabilities: ["general"],
-        joinedAt: session.createdAt,
-        updatedAt: "2026-05-11T13:00:00Z",
-        status: .active,
-        agentSessionId: "worker-preserve-new-session",
-        lastActivityAt: "2026-05-11T13:00:00Z",
-        currentTaskId: nil,
-        runtimeCapabilities: originalDetail.agents[0].runtimeCapabilities,
-        persona: nil
-      )
-    ]
+    let renamedWorker = AgentRegistration(
+      agentId: "worker-preserve-new",
+      name: "Preserve Worker v2",
+      runtime: "codex",
+      role: .worker,
+      capabilities: ["general"],
+      joinedAt: session.createdAt,
+      updatedAt: "2026-05-11T13:00:00Z",
+      status: .active,
+      agentSessionId: "worker-preserve-new-session",
+      lastActivityAt: "2026-05-11T13:00:00Z",
+      currentTaskId: nil,
+      runtimeCapabilities: originalDetail.agents[0].runtimeCapabilities,
+      persona: nil
+    )
     let updatedDetail = SessionDetail(
       session: originalDetail.session,
-      agents: updatedAgents,
+      agents: [renamedWorker],
       tasks: originalDetail.tasks,
       signals: originalDetail.signals,
       observer: originalDetail.observer,
@@ -84,7 +82,7 @@ final class SessionCacheServicePreserveTimelineTests: XCTestCase {
     let harness = try PersistenceIntegrationTestHarness()
     let cacheService = SessionCacheService(modelContainer: harness.container)
 
-    let session = makeSession(.preserveTimelineActive)
+    let session = makeSession(makePreserveTimelineFixture())
     let detail = makeSessionDetail(
       summary: session,
       workerID: "worker-overwrite",
@@ -114,17 +112,17 @@ final class SessionCacheServicePreserveTimelineTests: XCTestCase {
       "Default behaviour must replace the cached timeline with the supplied one"
     )
   }
-}
 
-private extension SessionFixture {
-  static let preserveTimelineActive = SessionFixture(
-    sessionId: "sess-preserve-timeline",
-    context: "Preserve timeline",
-    status: .active,
-    leaderId: "leader-preserve",
-    openTaskCount: 1,
-    inProgressTaskCount: 0,
-    blockedTaskCount: 0,
-    activeAgentCount: 2
-  )
+  private func makePreserveTimelineFixture() -> SessionFixture {
+    SessionFixture(
+      sessionId: "sess-preserve-timeline",
+      context: "Preserve timeline",
+      status: .active,
+      leaderId: "leader-preserve",
+      openTaskCount: 1,
+      inProgressTaskCount: 0,
+      blockedTaskCount: 0,
+      activeAgentCount: 2
+    )
+  }
 }
