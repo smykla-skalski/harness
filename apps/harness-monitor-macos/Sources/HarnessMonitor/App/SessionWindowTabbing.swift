@@ -5,6 +5,8 @@ import SwiftUI
 
 struct SessionWindowTabbing: ViewModifier {
   let isSessionWindow: Bool
+  var tabTitle: String = ""
+  var pendingDecisionCount: Int = 0
   @AppStorage(SessionWindowTabbingPreference.storageKey)
   private var preferenceRawValue = SessionWindowTabbingPreference.defaultValue.rawValue
 
@@ -17,7 +19,9 @@ struct SessionWindowTabbing: ViewModifier {
       SessionWindowTabbingAccessor(
         configuration: .init(
           isSessionWindow: isSessionWindow,
-          preference: preference
+          preference: preference,
+          tabTitle: tabTitle,
+          pendingDecisionCount: pendingDecisionCount
         )
       )
       .frame(width: 0, height: 0)
@@ -30,6 +34,8 @@ private struct SessionWindowTabbingAccessor: NSViewRepresentable {
   struct Configuration: Equatable {
     let isSessionWindow: Bool
     let preference: SessionWindowTabbingPreference
+    let tabTitle: String
+    let pendingDecisionCount: Int
   }
 
   let configuration: Configuration
@@ -58,7 +64,9 @@ private final class AccessorView: NSView {
 
   var configuration = SessionWindowTabbingAccessor.Configuration(
     isSessionWindow: false,
-    preference: .system
+    preference: .system,
+    tabTitle: "",
+    pendingDecisionCount: 0
   )
   private var pendingTabbingTask: Task<Void, Never>?
   private var notificationTokens: [NSObjectProtocol] = []
@@ -131,6 +139,7 @@ private final class AccessorView: NSView {
         window,
         preference: configuration.preference
       )
+      applyTabBadge(on: window)
       guard window.tabbingIdentifier == SessionWindowTabbingSupport.tabbingIdentifier else {
         Self.log.warning(
           "Session tabbing identifier unavailable; falling back to standalone windows")
@@ -141,5 +150,12 @@ private final class AccessorView: NSView {
       window.tabbingIdentifier = ""
       window.tabbingMode = .disallowed
     }
+  }
+
+  private func applyTabBadge(on window: NSWindow) {
+    window.tab.attributedTitle = SessionWindowTabBadge.attributedTitle(
+      base: configuration.tabTitle,
+      pendingDecisionCount: configuration.pendingDecisionCount
+    )
   }
 }

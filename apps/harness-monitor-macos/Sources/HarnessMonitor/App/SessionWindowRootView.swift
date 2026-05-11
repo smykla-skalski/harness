@@ -23,6 +23,12 @@ struct SessionWindowRootView: View {
     store.sessionIndex.sessionSummary(for: token.sessionID)?.displayTitle ?? "Session"
   }
 
+  private var pendingDecisionCount: Int {
+    store.supervisorOpenDecisions.reduce(into: 0) { count, decision in
+      if decision.sessionID == token.sessionID { count += 1 }
+    }
+  }
+
   private var hostsSharedShellPresentation: Bool {
     keyWindowObserver.isKey(windowID: windowID)
   }
@@ -53,7 +59,13 @@ struct SessionWindowRootView: View {
       )
     )
     .modifier(SessionWindowAppKitBinding(sessionID: token.sessionID))
-    .modifier(SessionWindowTabbing(isSessionWindow: true))
+    .modifier(
+      SessionWindowTabbing(
+        isSessionWindow: true,
+        tabTitle: windowTitle,
+        pendingDecisionCount: pendingDecisionCount
+      )
+    )
     .modifier(
       HarnessMonitorConfirmationDialogModifier(
         store: store,
