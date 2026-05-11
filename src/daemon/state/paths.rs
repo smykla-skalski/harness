@@ -28,6 +28,11 @@ pub struct ScopedDaemonRootOverride {
 
 impl ScopedDaemonRootOverride {
     #[must_use]
+    /// Install a process-local override and restore the previous value on drop.
+    ///
+    /// # Panics
+    /// Panics only if the internal mutex is poisoned, which indicates another
+    /// thread panicked while holding the override lock.
     pub fn set(path: Option<PathBuf>) -> Self {
         let mut override_root = DAEMON_ROOT_OVERRIDE
             .lock()
@@ -40,9 +45,10 @@ impl ScopedDaemonRootOverride {
 
 impl Drop for ScopedDaemonRootOverride {
     fn drop(&mut self) {
-        *DAEMON_ROOT_OVERRIDE
+        DAEMON_ROOT_OVERRIDE
             .lock()
-            .expect("daemon root override mutex poisoned") = self.previous.clone();
+            .expect("daemon root override mutex poisoned")
+            .clone_from(&self.previous);
     }
 }
 
