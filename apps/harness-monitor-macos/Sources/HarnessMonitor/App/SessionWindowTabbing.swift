@@ -1,4 +1,5 @@
 import AppKit
+import HarnessMonitorKit
 import HarnessMonitorUIPreviewable
 import OSLog
 import SwiftUI
@@ -7,6 +8,7 @@ struct SessionWindowTabbing: ViewModifier {
   let isSessionWindow: Bool
   var tabTitle: String = ""
   var pendingDecisionCount: Int = 0
+  var pendingDecisionSeverity: DecisionSeverity?
   @AppStorage(SessionWindowTabbingPreference.storageKey)
   private var preferenceRawValue = SessionWindowTabbingPreference.defaultValue.rawValue
 
@@ -21,7 +23,8 @@ struct SessionWindowTabbing: ViewModifier {
           isSessionWindow: isSessionWindow,
           preference: preference,
           tabTitle: tabTitle,
-          pendingDecisionCount: pendingDecisionCount
+          pendingDecisionCount: pendingDecisionCount,
+          pendingDecisionSeverity: pendingDecisionSeverity
         )
       )
       .frame(width: 0, height: 0)
@@ -36,6 +39,7 @@ private struct SessionWindowTabbingAccessor: NSViewRepresentable {
     let preference: SessionWindowTabbingPreference
     let tabTitle: String
     let pendingDecisionCount: Int
+    let pendingDecisionSeverity: DecisionSeverity?
   }
 
   let configuration: Configuration
@@ -66,7 +70,8 @@ private final class AccessorView: NSView {
     isSessionWindow: false,
     preference: .system,
     tabTitle: "",
-    pendingDecisionCount: 0
+    pendingDecisionCount: 0,
+    pendingDecisionSeverity: nil
   )
   private var pendingTabbingTask: Task<Void, Never>?
   private var notificationTokens: [NSObjectProtocol] = []
@@ -156,7 +161,8 @@ private final class AccessorView: NSView {
   private func applyTabBadge(on window: NSWindow) {
     window.tab.attributedTitle = SessionWindowTabBadge.attributedTitle(
       base: configuration.tabTitle,
-      pendingDecisionCount: configuration.pendingDecisionCount
+      pendingDecisionCount: configuration.pendingDecisionCount,
+      severity: configuration.pendingDecisionSeverity
     )
   }
 

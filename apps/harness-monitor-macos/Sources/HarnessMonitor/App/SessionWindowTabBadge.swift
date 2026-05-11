@@ -1,4 +1,5 @@
 import AppKit
+import HarnessMonitorKit
 import HarnessMonitorUIPreviewable
 
 @MainActor
@@ -8,14 +9,23 @@ enum SessionWindowTabBadge {
   static let cornerRadius: CGFloat = 4
   static let baselineOffset: CGFloat = -2
 
-  static func attributedTitle(base: String, pendingDecisionCount: Int) -> NSAttributedString? {
+  static func attributedTitle(
+    base: String,
+    pendingDecisionCount: Int,
+    severity: DecisionSeverity? = nil
+  ) -> NSAttributedString? {
     guard pendingDecisionCount > 0 else { return nil }
     let result = NSMutableAttributedString(string: base + leadingSpacing)
-    result.append(NSAttributedString(attachment: makeAttachment(count: pendingDecisionCount)))
+    result.append(
+      NSAttributedString(attachment: makeAttachment(count: pendingDecisionCount, severity: severity))
+    )
     return result
   }
 
-  static func makeAttachment(count: Int) -> NSTextAttachment {
+  static func makeAttachment(
+    count: Int,
+    severity: DecisionSeverity? = nil
+  ) -> NSTextAttachment {
     let text = "\(count)"
     let font = NSFont.systemFont(ofSize: 10, weight: .bold)
     let knockoutAttributes: [NSAttributedString.Key: Any] = [
@@ -27,7 +37,7 @@ enum SessionWindowTabBadge {
     let width = max(badgeHeight, textSize.width + horizontalPadding * 2)
     let image = NSImage(size: NSSize(width: width, height: badgeHeight), flipped: false) { rect in
       let path = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
-      badgeFillColor().setFill()
+      badgeFillColor(for: severity).setFill()
       path.fill()
       guard let context = NSGraphicsContext.current?.cgContext else { return true }
       context.saveGState()
@@ -49,8 +59,19 @@ enum SessionWindowTabBadge {
     return attachment
   }
 
-  static func badgeFillColor() -> NSColor {
-    NSColor(named: "HarnessMonitorAccent", bundle: HarnessMonitorUIAssets.bundle)
+  static func badgeFillColor(for severity: DecisionSeverity?) -> NSColor {
+    NSColor(named: assetName(for: severity), bundle: HarnessMonitorUIAssets.bundle)
       ?? NSColor.controlAccentColor
+  }
+
+  static func assetName(for severity: DecisionSeverity?) -> String {
+    switch severity {
+    case .critical:
+      "HarnessMonitorDanger"
+    case .warn, .needsUser:
+      "HarnessMonitorCaution"
+    case .info, nil:
+      "HarnessMonitorAccent"
+    }
   }
 }
