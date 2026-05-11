@@ -9,6 +9,7 @@ use super::{
     session_detail_from_daemon_db, session_not_found, session_service, state, thread, utc_now,
 };
 use crate::daemon::agent_acp::AcpWakePrompt;
+use crate::daemon::protocol::CodexSteerRequest;
 use tokio::sync::broadcast;
 
 mod tui_identity;
@@ -429,6 +430,14 @@ pub(crate) fn try_wake_started_workers(
                         agent_id: record.agent_id.clone(),
                     },
                 );
+            }
+            WakeRoute::Codex { run_id, controller } => {
+                let request = CodexSteerRequest {
+                    prompt: build_active_signal_prompt(&record.signal),
+                };
+                if let Err(error) = controller.steer(run_id, &request) {
+                    tracing::warn!(session_id, agent_id = %record.agent_id, signal_id = %record.signal.signal_id, %error, "wake skipped: codex steer failed");
+                }
             }
             WakeRoute::None { reason } => {
                 tracing::warn!(session_id, agent_id = %record.agent_id, signal_id = %record.signal.signal_id, reason = %reason, "wake skipped: signal stays file-only");

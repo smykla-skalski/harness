@@ -51,10 +51,7 @@ pub(super) async fn dispatch_task_assign(
                 &task_id,
                 &body,
                 db,
-                service::WakeDispatch::new(
-                    Some(&state.agent_tui_manager),
-                    Some(&state.acp_agent_manager),
-                ),
+                state.wake_dispatch(),
             )
             .map_err(Into::into)
         },
@@ -65,10 +62,7 @@ pub(super) async fn dispatch_task_assign(
                 &task_id,
                 &body,
                 &async_db,
-                service::WakeDispatch::new(
-                    Some(&state.agent_tui_manager),
-                    Some(&state.acp_agent_manager),
-                ),
+                state.wake_dispatch(),
             )
             .await
             .map_err(Into::into)
@@ -91,10 +85,7 @@ pub(super) async fn dispatch_task_delete(
                 &task_id,
                 &body,
                 db,
-                service::WakeDispatch::new(
-                    Some(&state.agent_tui_manager),
-                    Some(&state.acp_agent_manager),
-                ),
+                state.wake_dispatch(),
             )
             .map_err(Into::into)
         },
@@ -105,10 +96,7 @@ pub(super) async fn dispatch_task_delete(
                 &task_id,
                 &body,
                 &async_db,
-                service::WakeDispatch::new(
-                    Some(&state.agent_tui_manager),
-                    Some(&state.acp_agent_manager),
-                ),
+                state.wake_dispatch(),
             )
             .await
             .map_err(Into::into)
@@ -128,10 +116,7 @@ pub(super) async fn dispatch_task_drop(request: &WsRequest, state: &DaemonHttpSt
                 &task_id,
                 &body,
                 db,
-                service::WakeDispatch::new(
-                    Some(&state.agent_tui_manager),
-                    Some(&state.acp_agent_manager),
-                ),
+                state.wake_dispatch(),
             )
             .map_err(Into::into)
         },
@@ -142,10 +127,7 @@ pub(super) async fn dispatch_task_drop(request: &WsRequest, state: &DaemonHttpSt
                 &task_id,
                 &body,
                 &async_db,
-                service::WakeDispatch::new(
-                    Some(&state.agent_tui_manager),
-                    Some(&state.acp_agent_manager),
-                ),
+                state.wake_dispatch(),
             )
             .await
             .map_err(Into::into)
@@ -168,10 +150,7 @@ pub(super) async fn dispatch_task_queue_policy(
                 &task_id,
                 &body,
                 db,
-                service::WakeDispatch::new(
-                    Some(&state.agent_tui_manager),
-                    Some(&state.acp_agent_manager),
-                ),
+                state.wake_dispatch(),
             )
             .map_err(Into::into)
         },
@@ -182,10 +161,7 @@ pub(super) async fn dispatch_task_queue_policy(
                 &task_id,
                 &body,
                 &async_db,
-                service::WakeDispatch::new(
-                    Some(&state.agent_tui_manager),
-                    Some(&state.acp_agent_manager),
-                ),
+                state.wake_dispatch(),
             )
             .await
             .map_err(Into::into)
@@ -208,10 +184,7 @@ pub(super) async fn dispatch_task_update(
                 &task_id,
                 &body,
                 db,
-                service::WakeDispatch::new(
-                    Some(&state.agent_tui_manager),
-                    Some(&state.acp_agent_manager),
-                ),
+                state.wake_dispatch(),
             )
             .map_err(Into::into)
         },
@@ -222,10 +195,7 @@ pub(super) async fn dispatch_task_update(
                 &task_id,
                 &body,
                 &async_db,
-                service::WakeDispatch::new(
-                    Some(&state.agent_tui_manager),
-                    Some(&state.acp_agent_manager),
-                ),
+                state.wake_dispatch(),
             )
             .await
             .map_err(Into::into)

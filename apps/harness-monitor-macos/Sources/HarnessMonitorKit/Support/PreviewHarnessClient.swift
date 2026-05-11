@@ -246,6 +246,20 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     return await state.acpTranscript(sessionID: sessionID)
   }
 
+  public func codexInspect(sessionID: String?) async throws -> CodexAgentInspectResponse {
+    await state.codexInspect(sessionID: sessionID)
+  }
+
+  public func codexTranscript(sessionID: String) async throws -> CodexTranscriptResponse {
+    guard await state.containsSession(sessionID) else {
+      throw HarnessMonitorAPIError.server(
+        code: 404,
+        message: "Codex transcript unavailable."
+      )
+    }
+    return await state.codexTranscript(sessionID: sessionID)
+  }
+
   public func resolveCodexApproval(
     runID: String,
     approvalID: String,

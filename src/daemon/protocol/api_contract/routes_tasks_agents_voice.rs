@@ -243,6 +243,22 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Get,
+        path: http_paths::MANAGED_AGENTS_CODEX_INSPECT,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::MANAGED_AGENTS_CODEX_INSPECT,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
+        path: http_paths::MANAGED_AGENTS_CODEX_TRANSCRIPT,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::MANAGED_AGENTS_CODEX_TRANSCRIPT,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
         path: http_paths::MANAGED_AGENTS_ACP_INSPECT,
         parity: HttpRouteParity::Rpc {
             ws_method: ws_methods::MANAGED_AGENTS_ACP_INSPECT,

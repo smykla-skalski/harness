@@ -121,7 +121,12 @@ pub(super) async fn post_terminal_agent_stop(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = if state.acp_agent_manager.get(&managed_agent_id).is_ok() {
+    let result = if state.codex_controller.run(&managed_agent_id).is_ok() {
+        state
+            .codex_controller
+            .stop(&managed_agent_id)
+            .map(ManagedAgentSnapshot::Codex)
+    } else if state.acp_agent_manager.get(&managed_agent_id).is_ok() {
         state
             .acp_agent_manager
             .stop(&managed_agent_id)

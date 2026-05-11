@@ -90,6 +90,10 @@ extension HarnessMonitorStore {
         sessionID: sessionID,
         client: client
       )
+      async let codexTranscriptTask = loadSessionWindowCodexTranscriptResponse(
+        sessionID: sessionID,
+        client: client
+      )
 
       let detail = try await detailTask
       guard !Task.isCancelled else { return nil }
@@ -97,11 +101,13 @@ extension HarnessMonitorStore {
       let acpAgents = await acpAgentsTask
       let acpInspectSample = await acpInspectTask
       let transcriptResponse = await transcriptTask
+      let codexTranscriptResponse = await codexTranscriptTask
       guard !Task.isCancelled else { return nil }
       let transcript = resolvedSessionWindowTranscript(
         detail: detail,
         timeline: timelineWindow?.entries ?? [],
-        acpTranscript: transcriptResponse
+        acpTranscript: transcriptResponse,
+        codexTranscript: codexTranscriptResponse
       )
       let snapshot = HarnessMonitorSessionWindowSnapshot(
         summary: detail.session,
@@ -151,6 +157,27 @@ extension HarnessMonitorStore {
       HarnessMonitorLogger.store.debug(
         """
         session window transcript load failed \
+        sessionID=\(sessionID, privacy: .public) \
+        error=\(errorDescription, privacy: .public)
+        """
+      )
+      return nil
+    }
+  }
+
+  private func loadSessionWindowCodexTranscriptResponse(
+    sessionID: String,
+    client: any HarnessMonitorClientProtocol
+  ) async -> CodexTranscriptResponse? {
+    do {
+      return try await client.codexTranscript(sessionID: sessionID)
+    } catch is CancellationError {
+      return nil
+    } catch {
+      let errorDescription = String(describing: error)
+      HarnessMonitorLogger.store.debug(
+        """
+        session window Codex transcript load failed \
         sessionID=\(sessionID, privacy: .public) \
         error=\(errorDescription, privacy: .public)
         """
@@ -211,9 +238,11 @@ extension HarnessMonitorStore {
   private func resolvedSessionWindowTranscript(
     detail: SessionDetail,
     timeline: [TimelineEntry],
-    acpTranscript: AcpTranscriptResponse?
+    acpTranscript: AcpTranscriptResponse?,
+    codexTranscript: CodexTranscriptResponse?
   ) -> (entries: [TimelineEntry], source: HarnessMonitorSessionWindowTranscriptSource) {
-    let responseEntries = (acpTranscript?.entries ?? []).filter(\.isAcpTranscriptResponseEntry)
+    let responseEntries = ((acpTranscript?.entries ?? []) + (codexTranscript?.entries ?? []))
+      .filter(\.isManagedRuntimeTranscriptResponseEntry)
     if !responseEntries.isEmpty {
       return (
         normalizedSessionWindowTranscriptEntries(responseEntries, agents: detail.agents),

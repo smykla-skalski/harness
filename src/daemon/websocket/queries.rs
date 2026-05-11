@@ -83,6 +83,12 @@ async fn dispatch_session_read_query(
         ws_methods::MANAGED_AGENT_DETAIL => {
             Some(dispatch_managed_agent_detail_query(request, state))
         }
+        ws_methods::MANAGED_AGENTS_CODEX_INSPECT => {
+            Some(dispatch_codex_inspect_query(request, state))
+        }
+        ws_methods::MANAGED_AGENTS_CODEX_TRANSCRIPT => {
+            Some(dispatch_codex_transcript_query(request, state))
+        }
         ws_methods::MANAGED_AGENTS_ACP_INSPECT => Some(dispatch_acp_inspect_query(request, state)),
         ws_methods::MANAGED_AGENTS_ACP_TRANSCRIPT => {
             Some(dispatch_acp_transcript_query(request, state).await)
@@ -232,6 +238,21 @@ fn dispatch_acp_inspect_query(request: &WsRequest, state: &DaemonHttpState) -> W
         &request.id,
         ensure_acp_enabled().and_then(|()| acp_inspect_response(state, session_id.as_deref())),
     )
+}
+
+fn dispatch_codex_inspect_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    let session_id = extract_string_param(&request.params, "session_id");
+    dispatch_query_result(
+        &request.id,
+        state.codex_controller.inspect(session_id.as_deref()),
+    )
+}
+
+fn dispatch_codex_transcript_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    let Some(session_id) = extract_string_param(&request.params, "session_id") else {
+        return error_response(&request.id, "MISSING_PARAM", "missing session_id");
+    };
+    dispatch_query_result(&request.id, state.codex_controller.transcript(&session_id))
 }
 
 async fn dispatch_acp_transcript_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {

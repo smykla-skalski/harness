@@ -7,6 +7,7 @@ use std::thread;
 use std::time::Duration;
 
 use serde::Serialize;
+use serde_json::{Value, json};
 use tokio::runtime::{Builder, Handle, RuntimeFlavor};
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::block_in_place;
@@ -18,9 +19,10 @@ use crate::daemon::codex_transport::{self, CodexTransportKind};
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ensure_shared_db};
 use crate::daemon::index;
 use crate::daemon::protocol::{
-    CodexApprovalDecisionRequest, CodexApprovalRequest, CodexApprovalRequestedPayload,
-    CodexRunListResponse, CodexRunRequest, CodexRunSnapshot, CodexRunStatus, CodexSteerRequest,
-    StreamEvent,
+    CodexAgentInspectResponse, CodexAgentInspectSnapshot, CodexApprovalDecisionRequest,
+    CodexApprovalRequest, CodexApprovalRequestedPayload, CodexRunEvent, CodexRunListResponse,
+    CodexRunRequest, CodexRunSnapshot, CodexRunStatus, CodexSteerRequest,
+    CodexTranscriptResponse, StreamEvent, TimelineEntry,
 };
 use crate::daemon::service as daemon_service;
 use crate::daemon::state;
@@ -271,11 +273,15 @@ impl CodexControllerHandle {
                 runs: async_db.list_codex_runs(&session_id_owned).await?,
             })
         }) {
-            return result;
+            let mut response = result?;
+            response.runs = self.reconcile_stale_runs(response.runs)?;
+            return Ok(response);
         }
         let db = self.db()?;
         let runs = lock_db(&db)?.list_codex_runs(session_id)?;
-        Ok(CodexRunListResponse { runs })
+        Ok(CodexRunListResponse {
+            runs: self.reconcile_stale_runs(runs)?,
+        })
     }
 
     /// Load one Codex run snapshot.
@@ -341,6 +347,77 @@ impl CodexControllerHandle {
         self.run(run_id)
     }
 
+    /// Stop a managed Codex agent.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the run cannot be loaded or the stopped
+    /// snapshot cannot be persisted.
+    pub fn stop(&self, run_id: &str) -> Result<CodexRunSnapshot, CliError> {
+        let mut snapshot = self.run(run_id)?;
+        if !snapshot.status.is_active() {
+            return Ok(snapshot);
+        }
+        if let Ok(active) = self.active_run(run_id) {
+            let _ = active.control_tx.send(CodexControlMessage::Stop);
+        } else {
+            self.state.active_runs.remove(run_id);
+        }
+        snapshot.status = CodexRunStatus::Cancelled;
+        snapshot.latest_summary = Some("Codex agent stopped".to_string());
+        snapshot.error = None;
+        snapshot.pending_approvals.clear();
+        snapshot.updated_at = utc_now();
+        record_snapshot_event(
+            &mut snapshot,
+            "agent/stop",
+            "Codex agent stopped".to_string(),
+            &json!({
+                "runId": run_id,
+                "status": "cancelled",
+            }),
+        );
+        self.save_and_broadcast(&snapshot)?;
+        Ok(snapshot)
+    }
+
+    /// Inspect managed Codex agents, scoped to a session when supplied.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on database failures.
+    pub fn inspect(&self, session_id: Option<&str>) -> Result<CodexAgentInspectResponse, CliError> {
+        let runs = match session_id {
+            Some(session_id) => self.list_runs(session_id)?.runs,
+            None => self.list_active_runs()?,
+        };
+        Ok(CodexAgentInspectResponse {
+            agents: runs
+                .iter()
+                .map(|run| self.inspect_snapshot(run))
+                .collect(),
+            daemon_perceived_now: utc_now(),
+            available: true,
+            issue_message: None,
+        })
+    }
+
+    /// Build transcript entries for managed Codex agents in a session.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on database failures.
+    pub fn transcript(&self, session_id: &str) -> Result<CodexTranscriptResponse, CliError> {
+        let mut entries = Vec::new();
+        for run in self.list_runs(session_id)?.runs {
+            entries.extend(codex_transcript_entries(&run));
+        }
+        entries.sort_by(|left, right| {
+            right
+                .recorded_at
+                .cmp(&left.recorded_at)
+                .then_with(|| right.entry_id.cmp(&left.entry_id))
+        });
+        Ok(CodexTranscriptResponse { entries })
+    }
+
     /// Resolve a pending Codex approval prompt.
     ///
     /// # Errors
@@ -364,6 +441,76 @@ impl CodexControllerHandle {
 
     fn active_run(&self, run_id: &str) -> Result<ActiveRun, CliError> {
         self.state.active_runs.get(run_id)
+    }
+
+    fn list_active_runs(&self) -> Result<Vec<CodexRunSnapshot>, CliError> {
+        let mut runs = Vec::new();
+        for run_id in self.state.active_runs.ids()? {
+            if let Ok(run) = self.run(&run_id) {
+                runs.push(run);
+            }
+        }
+        runs.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
+        Ok(runs)
+    }
+
+    fn inspect_snapshot(&self, run: &CodexRunSnapshot) -> CodexAgentInspectSnapshot {
+        let attached = self.state.active_runs.contains(&run.run_id);
+        CodexAgentInspectSnapshot {
+            run_id: run.run_id.clone(),
+            session_id: run.session_id.clone(),
+            agent_id: run.session_agent_id.clone(),
+            display_name: run
+                .display_name
+                .clone()
+                .unwrap_or_else(|| "Codex".to_string()),
+            status: run.status,
+            project_dir: run.project_dir.clone(),
+            thread_id: run.thread_id.clone(),
+            turn_id: run.turn_id.clone(),
+            active: run.status.is_active(),
+            attached,
+            pending_approvals: run.pending_approvals.len(),
+            resolved_approvals: run.resolved_approvals.len(),
+            event_count: run.events.len(),
+            last_update_at: run.updated_at.clone(),
+            model: run.model.clone(),
+            effort: run.effort.clone(),
+            latest_summary: run.latest_summary.clone(),
+            error: run.error.clone(),
+        }
+    }
+
+    fn reconcile_stale_runs(
+        &self,
+        runs: Vec<CodexRunSnapshot>,
+    ) -> Result<Vec<CodexRunSnapshot>, CliError> {
+        runs.into_iter()
+            .map(|mut run| {
+                if run.status.is_active() && !self.state.active_runs.contains(&run.run_id) {
+                    run.status = CodexRunStatus::Failed;
+                    run.latest_summary =
+                        Some("Codex turn is no longer attached to this daemon".to_string());
+                    run.error =
+                        Some("Codex turn is no longer attached to this daemon".to_string());
+                    run.pending_approvals.clear();
+                    run.updated_at = utc_now();
+                    let payload = json!({
+                        "runId": run.run_id.clone(),
+                        "status": "failed",
+                        "reason": "active turn no longer attached to daemon",
+                    });
+                    record_snapshot_event(
+                        &mut run,
+                        "agent/reconciled",
+                        "Codex active turn marked stale".to_string(),
+                        &payload,
+                    );
+                    self.save_and_broadcast(&run)?;
+                }
+                Ok(run)
+            })
+            .collect()
     }
 
     fn project_dir_for_session(&self, session_id: &str) -> Result<String, CliError> {
@@ -603,6 +750,233 @@ impl CodexControllerHandle {
             },
             Err(_) => runtime.block_on(future),
         })
+    }
+}
+
+pub(super) fn record_snapshot_event(
+    snapshot: &mut CodexRunSnapshot,
+    kind: &str,
+    summary: String,
+    payload: &Value,
+) {
+    let sequence = u64::try_from(snapshot.events.len())
+        .unwrap_or(u64::MAX - 1)
+        .saturating_add(1);
+    snapshot.events.push(CodexRunEvent {
+        event_id: format!("{}-{sequence}", snapshot.run_id),
+        sequence,
+        recorded_at: utc_now(),
+        kind: kind.to_string(),
+        summary,
+        thread_id: event_string(payload, &["/thread/id", "/threadId"])
+            .or_else(|| snapshot.thread_id.clone()),
+        turn_id: event_string(payload, &["/turn/id", "/turnId"])
+            .or_else(|| snapshot.turn_id.clone()),
+        item_id: event_string(payload, &["/item/id", "/itemId"]),
+        payload: payload.clone(),
+    });
+}
+
+fn event_string(payload: &Value, paths: &[&str]) -> Option<String> {
+    paths
+        .iter()
+        .find_map(|path| payload.pointer(path).and_then(Value::as_str))
+        .map(ToString::to_string)
+}
+
+fn codex_transcript_entries(run: &CodexRunSnapshot) -> Vec<TimelineEntry> {
+    let mut entries = Vec::new();
+    entries.push(codex_timeline_entry(
+        run,
+        "prompt",
+        run.created_at.clone(),
+        "user_prompt",
+        trim_transcript_summary(&run.prompt, "Prompt submitted"),
+        json!({
+            "type": "user_prompt",
+            "content": run.prompt.clone(),
+        }),
+    ));
+    for event in &run.events {
+        if let Some(entry) = codex_event_timeline_entry(run, event) {
+            entries.push(entry);
+        }
+    }
+    if let Some(final_message) = run
+        .final_message
+        .as_deref()
+        .map(str::trim)
+        .filter(|message| !message.is_empty())
+    {
+        entries.push(codex_timeline_entry(
+            run,
+            "final",
+            run.updated_at.clone(),
+            "assistant_text",
+            trim_transcript_summary(final_message, "Assistant response"),
+            json!({
+                "type": "assistant_text",
+                "content": final_message,
+                "final": true,
+            }),
+        ));
+    }
+    entries
+}
+
+fn codex_event_timeline_entry(
+    run: &CodexRunSnapshot,
+    event: &CodexRunEvent,
+) -> Option<TimelineEntry> {
+    if event.kind == "turn/steer" {
+        let prompt = event
+            .payload
+            .pointer("/input/0/text")
+            .and_then(Value::as_str)
+            .unwrap_or(&event.summary);
+        return Some(codex_timeline_entry(
+            run,
+            &event.sequence.to_string(),
+            event.recorded_at.clone(),
+            "user_prompt",
+            trim_transcript_summary(prompt, "Steering prompt sent"),
+            json!({
+                "type": "user_prompt",
+                "content": prompt,
+                "source": "steer",
+                "event": event,
+            }),
+        ));
+    }
+    if let Some(entry) = codex_agent_message_entry(run, event) {
+        return Some(entry);
+    }
+    if event.kind.contains("requestApproval") {
+        return Some(codex_timeline_entry(
+            run,
+            &event.sequence.to_string(),
+            event.recorded_at.clone(),
+            "agent_permission_asked",
+            event.summary.clone(),
+            json!({
+                "type": "permission_asked",
+                "message": event.summary,
+                "event": event,
+            }),
+        ));
+    }
+    if event.kind == "error" {
+        return Some(codex_timeline_entry(
+            run,
+            &event.sequence.to_string(),
+            event.recorded_at.clone(),
+            "agent_error",
+            event.summary.clone(),
+            json!({
+                "type": "error",
+                "message": event.summary,
+                "event": event,
+            }),
+        ));
+    }
+    Some(codex_timeline_entry(
+        run,
+        &event.sequence.to_string(),
+        event.recorded_at.clone(),
+        "agent_state_change",
+        event.summary.clone(),
+        json!({
+            "type": "state_change",
+            "event": event,
+        }),
+    ))
+}
+
+fn codex_agent_message_entry(
+    run: &CodexRunSnapshot,
+    event: &CodexRunEvent,
+) -> Option<TimelineEntry> {
+    if event.kind == "item/agentMessage/delta" {
+        let delta = event.payload.get("delta").and_then(Value::as_str)?;
+        return Some(codex_timeline_entry(
+            run,
+            &event.sequence.to_string(),
+            event.recorded_at.clone(),
+            "assistant_text",
+            trim_transcript_summary(delta, "Assistant response"),
+            json!({
+                "type": "assistant_text",
+                "content": delta,
+                "delta": true,
+                "event": event,
+            }),
+        ));
+    }
+    if event.kind != "item/completed" {
+        return None;
+    }
+    let item = event.payload.get("item")?;
+    if item.get("type").and_then(Value::as_str) != Some("agentMessage") {
+        return None;
+    }
+    let text = item.get("text").and_then(Value::as_str)?;
+    Some(codex_timeline_entry(
+        run,
+        &event.sequence.to_string(),
+        event.recorded_at.clone(),
+        "assistant_text",
+        trim_transcript_summary(text, "Assistant response"),
+        json!({
+            "type": "assistant_text",
+            "content": text,
+            "event": event,
+        }),
+    ))
+}
+
+fn codex_timeline_entry(
+    run: &CodexRunSnapshot,
+    suffix: &str,
+    recorded_at: String,
+    kind: &str,
+    summary: String,
+    event: Value,
+) -> TimelineEntry {
+    let agent_id = run.session_agent_id.clone();
+    TimelineEntry {
+        entry_id: format!("codex-{}-{suffix}", run.run_id),
+        recorded_at,
+        kind: kind.to_string(),
+        session_id: run.session_id.clone(),
+        agent_id: agent_id.clone(),
+        task_id: None,
+        summary,
+        payload: json!({
+            "runtime": "codex",
+            "event": event,
+            "codex_timeline_identity": {
+                "run_id": run.run_id.clone(),
+                "agent_id": agent_id,
+                "agent_display_name": run.display_name.clone(),
+                "thread_id": run.thread_id.clone(),
+                "turn_id": run.turn_id.clone(),
+            },
+        }),
+    }
+}
+
+fn trim_transcript_summary(text: &str, fallback: &str) -> String {
+    let text = text.trim();
+    if text.is_empty() {
+        return fallback.to_string();
+    }
+    const MAX_CHARS: usize = 220;
+    let mut iter = text.chars();
+    let trimmed: String = iter.by_ref().take(MAX_CHARS).collect();
+    if iter.next().is_some() {
+        format!("{trimmed}...")
+    } else {
+        trimmed
     }
 }
 

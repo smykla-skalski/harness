@@ -32,6 +32,16 @@ impl ActiveRuns {
         })
     }
 
+    pub(super) fn contains(&self, run_id: &str) -> bool {
+        self.entries
+            .lock()
+            .is_ok_and(|entries| entries.contains_key(run_id))
+    }
+
+    pub(super) fn ids(&self) -> Result<Vec<String>, CliError> {
+        Ok(self.lock()?.keys().cloned().collect())
+    }
+
     pub(super) fn remove(&self, run_id: &str) {
         let Ok(mut entries) = self.entries.lock() else {
             return;
@@ -56,4 +66,5 @@ pub(super) enum CodexControlMessage {
         prompt: String,
     },
     Interrupt,
+    Stop,
 }

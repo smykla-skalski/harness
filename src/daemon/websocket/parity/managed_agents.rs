@@ -171,6 +171,18 @@ pub(crate) async fn dispatch_managed_agent_stop(
         return error_response(&request.id, "MISSING_PARAM", "missing managed_agent_id");
     };
     let result = if let Ok(session_id) = state
+        .codex_controller
+        .run(&agent_id)
+        .map(|snapshot| snapshot.session_id)
+    {
+        with_managed_agent_lock(state, &session_id, &agent_id, || {
+            state
+                .codex_controller
+                .stop(&agent_id)
+                .map(ManagedAgentSnapshot::Codex)
+        })
+        .await
+    } else if let Ok(session_id) = state
         .acp_agent_manager
         .get(&agent_id)
         .map(|snapshot| snapshot.session_id)

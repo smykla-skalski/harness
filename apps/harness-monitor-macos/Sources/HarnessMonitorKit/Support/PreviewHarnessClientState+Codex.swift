@@ -13,6 +13,46 @@ extension PreviewHarnessClientState {
       }
   }
 
+  func codexInspect(sessionID: String?) -> CodexAgentInspectResponse {
+    let sessions =
+      if let sessionID {
+        [sessionID]
+      } else {
+        Array(codexRunsBySessionID.keys)
+      }
+
+    let snapshots = sessions
+      .flatMap { codexRunsBySessionID[$0] ?? [] }
+      .map { run in
+        CodexAgentInspectSnapshot(
+          runId: run.runId,
+          sessionId: run.sessionId,
+          agentId: run.sessionAgentId,
+          displayName: run.displayName ?? "Codex",
+          status: run.status,
+          projectDir: run.projectDir,
+          threadId: run.threadId,
+          turnId: run.turnId,
+          active: run.status.isActive,
+          attached: run.status.isActive,
+          pendingApprovals: run.pendingApprovals.count,
+          resolvedApprovals: run.resolvedApprovals.count,
+          eventCount: run.events.count,
+          lastUpdateAt: run.updatedAt,
+          model: run.model,
+          effort: run.effort,
+          latestSummary: run.latestSummary,
+          error: run.error
+        )
+      }
+    return CodexAgentInspectResponse(agents: snapshots)
+  }
+
+  func codexTranscript(sessionID: String) -> CodexTranscriptResponse {
+    let entries = (codexRunsBySessionID[sessionID] ?? []).flatMap(Self.transcriptEntries)
+    return CodexTranscriptResponse(entries: entries)
+  }
+
   func startCodexRun(
     sessionID: String,
     request: CodexRunRequest
@@ -83,5 +123,47 @@ extension PreviewHarnessClientState {
       return updatedRun
     }
     return nil
+  }
+
+  private static func transcriptEntries(for run: CodexRunSnapshot) -> [TimelineEntry] {
+    var entries = [
+      TimelineEntry(
+        entryId: "codex-\(run.runId)-prompt",
+        recordedAt: run.createdAt,
+        kind: "user_prompt",
+        sessionId: run.sessionId,
+        agentId: run.sessionAgentId,
+        taskId: nil,
+        summary: run.prompt,
+        payload: .object([
+          "runtime": .string("codex"),
+          "event": .object([
+            "type": .string("user_prompt"),
+            "content": .string(run.prompt),
+          ]),
+        ])
+      )
+    ]
+    if let finalMessage = run.finalMessage {
+      entries.append(
+        TimelineEntry(
+          entryId: "codex-\(run.runId)-final",
+          recordedAt: run.updatedAt,
+          kind: "assistant_text",
+          sessionId: run.sessionId,
+          agentId: run.sessionAgentId,
+          taskId: nil,
+          summary: finalMessage,
+          payload: .object([
+            "runtime": .string("codex"),
+            "event": .object([
+              "type": .string("assistant_text"),
+              "content": .string(finalMessage),
+            ]),
+          ])
+        )
+      )
+    }
+    return entries
   }
 }

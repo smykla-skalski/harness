@@ -46,8 +46,12 @@ extension TimelineEntry {
     return true
   }
 
-  var isAcpTranscriptResponseEntry: Bool {
+  var isManagedRuntimeTranscriptResponseEntry: Bool {
     isAcpTranscriptEntry || isManagedRuntimeTranscriptEntry
+  }
+
+  var isAcpTranscriptResponseEntry: Bool {
+    isManagedRuntimeTranscriptResponseEntry
   }
 
   func matchesDerivedAcpTranscriptHistory(sessionAgentIDs: Set<String>) -> Bool {
