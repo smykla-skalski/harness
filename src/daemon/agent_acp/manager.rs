@@ -65,6 +65,9 @@ pub struct AcpAgentStartRequest {
     pub prompt: Option<String>,
     pub project_dir: Option<String>,
     pub persona: Option<String>,
+    pub model: Option<String>,
+    pub effort: Option<String>,
+    pub allow_custom_model: bool,
     pub record_permissions: bool,
 }
 
@@ -79,6 +82,9 @@ impl Default for AcpAgentStartRequest {
             prompt: None,
             project_dir: None,
             persona: None,
+            model: None,
+            effort: None,
+            allow_custom_model: false,
             record_permissions: false,
         }
     }

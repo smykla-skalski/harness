@@ -31,7 +31,7 @@ extension PreviewHarnessClient {
       launchCommand: "copilot",
       launchArgs: ["--acp", "--stdio"],
       envPassthrough: ["COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"],
-      modelCatalog: nil,
+      modelCatalog: copilotRuntimeModelCatalog(),
       installHint: "Install GitHub Copilot CLI and sign in.",
       doctorProbe: AcpDoctorProbe(command: "copilot", args: ["--version"])
     ),
@@ -62,7 +62,7 @@ extension PreviewHarnessClient {
         "GEMINI_CLI_HOME",
         "GEMINI_CLI_TRUST_WORKSPACE",
       ],
-      modelCatalog: nil,
+      modelCatalog: geminiRuntimeModelCatalog(),
       installHint: "Install an ACP-capable Gemini CLI and authenticate.",
       doctorProbe: AcpDoctorProbe(command: "gemini", args: ["--version"])
     ),

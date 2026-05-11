@@ -16,6 +16,7 @@ use crate::agents::acp::connection::SpawnConfig;
 use crate::agents::acp::permission::{PermissionMode, recording_log_path_for_session};
 use crate::agents::acp::supervision::{AcpSessionSupervisor, SupervisionConfig};
 use crate::agents::kind::DisconnectReason;
+use crate::agents::runtime::runtime_for_name;
 use crate::daemon::index;
 use crate::daemon::protocol::StreamEvent;
 use crate::errors::{CliError, CliErrorKind};
@@ -58,10 +59,37 @@ impl AcpAgentManagerHandle {
     ) -> Result<AcpAgentSnapshot, CliError> {
         let project_dir = self.resolve_project_dir(session_id, request.project_dir.as_deref())?;
         let acp_id = format!("agent-acp-{}", Uuid::new_v4());
+        let runtime = runtime_for_name(&descriptor.id);
+        let model = request
+            .model
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        let effort = request
+            .effort
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        let mut args = descriptor.launch_args.clone();
+        if let (Some(runtime), Some(model)) = (runtime, model) {
+            if let Some(flag) = runtime.model_flag() {
+                args.push(flag.to_string());
+                args.push(model.to_string());
+            }
+        }
+        if let (Some(runtime), Some(effort)) = (runtime, effort) {
+            args.extend(runtime.effort_args(effort));
+        }
+        let env_overrides = if let (Some(runtime), Some(effort)) = (runtime, effort) {
+            runtime.effort_env(effort)
+        } else {
+            Vec::new()
+        };
         let spawn = SpawnConfig {
             command: descriptor.launch_command.clone(),
-            args: descriptor.launch_args.clone(),
+            args,
             env_passthrough: descriptor.env_passthrough.clone(),
+            env_overrides,
             working_dir: project_dir.clone(),
         };
         let process_key = AcpProcessPoolKey::from_spawn_inputs(

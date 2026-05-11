@@ -59,6 +59,9 @@ final class AcpAgentDescriptorTests: XCTestCase {
       prompt: "Run the task",
       projectDir: "/tmp/harness",
       persona: "reviewer",
+      model: "gpt-5.4",
+      effort: "high",
+      allowCustomModel: true,
       recordPermissions: true
     )
 
@@ -74,6 +77,9 @@ final class AcpAgentDescriptorTests: XCTestCase {
     XCTAssertEqual(json?["capabilities"] as? [String], ["fs.read", "terminal.spawn"])
     XCTAssertEqual(json?["name"] as? String, "Copilot Reviewer")
     XCTAssertEqual(json?["persona"] as? String, "reviewer")
+    XCTAssertEqual(json?["model"] as? String, "gpt-5.4")
+    XCTAssertEqual(json?["effort"] as? String, "high")
+    XCTAssertEqual(json?["allow_custom_model"] as? Bool, true)
     XCTAssertEqual(json?["record_permissions"] as? Bool, true)
   }
 
@@ -84,6 +90,9 @@ final class AcpAgentDescriptorTests: XCTestCase {
         "descriptor_id": "copilot",
         "role": "reviewer",
         "fallback_role": "observer",
+        "model": "gpt-5.4",
+        "effort": "high",
+        "allow_custom_model": true,
         "record_permissions": true
       }
       """.utf8
@@ -96,6 +105,9 @@ final class AcpAgentDescriptorTests: XCTestCase {
     XCTAssertEqual(request.agent, "copilot")
     XCTAssertEqual(request.role, .reviewer)
     XCTAssertEqual(request.fallbackRole, .observer)
+    XCTAssertEqual(request.model, "gpt-5.4")
+    XCTAssertEqual(request.effort, "high")
+    XCTAssertTrue(request.allowCustomModel)
     XCTAssertTrue(request.recordPermissions)
   }
 

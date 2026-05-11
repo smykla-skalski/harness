@@ -346,8 +346,13 @@ extension SessionWindowCreateForm {
     let choice = selectedTransportChoice
 
     Section {
-      if let runtime = selectedTerminalRuntime, let catalog = selectedTerminalCatalog {
-        let modelSelection = terminalModelPickerSelection(for: runtime, catalog: catalog)
+      if let catalog = selectedRuntimeCatalog,
+        let runtimeKey = selectedModelCatalogRuntimeKey
+      {
+        let modelSelection = runtimeModelPickerSelection(
+          for: runtimeKey,
+          catalog: catalog
+        )
 
         Picker("Model", selection: modelSelection) {
           ForEach(catalog.models) { model in
@@ -363,15 +368,21 @@ extension SessionWindowCreateForm {
         if modelSelection.wrappedValue == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag {
           TextField(
             "Provider-specific model id",
-            text: terminalCustomModel(for: runtime)
+            text: runtimeCustomModel(for: runtimeKey)
           )
           .harnessNativeTextField()
           .accessibilityLabel("Custom runtime model")
         }
 
-        let effortValues = terminalEffortValues(for: runtime, catalog: catalog)
+        let effortValues = runtimeEffortValues(
+          for: runtimeKey,
+          catalog: catalog
+        )
         if !effortValues.isEmpty {
-          Picker("Effort", selection: terminalEffortSelection(for: runtime, values: effortValues)) {
+          Picker(
+            "Effort",
+            selection: runtimeEffortSelection(for: runtimeKey, values: effortValues)
+          ) {
             ForEach(effortValues, id: \.self) { level in
               Text(level.capitalized).tag(level)
             }

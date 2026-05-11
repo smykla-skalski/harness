@@ -21,6 +21,10 @@ impl AgentRuntime for CopilotRuntime {
         "copilot"
     }
 
+    fn effort_flag(&self) -> Option<&'static str> {
+        Some("--effort")
+    }
+
     fn discover_native_log(
         &self,
         session_id: &str,

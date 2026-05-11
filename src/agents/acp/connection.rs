@@ -4,6 +4,7 @@
 //! task. Implements fold + flush batching: reads until SDK reader returns Pending
 //! or accumulated 32 updates / 64 KiB / 5 ms, then sends one batch per channel.
 
+use std::collections::BTreeMap;
 use std::env;
 use std::io;
 use std::path::PathBuf;
@@ -329,6 +330,8 @@ pub struct SpawnConfig {
     pub args: Vec<String>,
     /// Environment variables to pass through.
     pub env_passthrough: Vec<String>,
+    /// Environment variables to override for this spawn.
+    pub env_overrides: Vec<(String, String)>,
     /// Working directory.
     pub working_dir: PathBuf,
 }
@@ -344,7 +347,11 @@ impl SpawnConfig {
 
     #[must_use]
     pub fn effective_env_for_identity(&self) -> Vec<(String, String)> {
-        let mut values = env::vars().collect::<Vec<_>>();
+        let mut values = env::vars().collect::<BTreeMap<_, _>>();
+        for (key, value) in &self.env_overrides {
+            values.insert(key.clone(), value.clone());
+        }
+        let mut values = values.into_iter().collect::<Vec<_>>();
         values.sort_by(|left, right| left.0.cmp(&right.0));
         values
     }
@@ -379,6 +386,9 @@ impl SpawnConfig {
                 cmd.env(var, val);
             }
         }
+        for (key, value) in &self.env_overrides {
+            cmd.env(key, value);
+        }
 
         // SAFETY: pre_exec closure runs between fork and exec; setsid is async-signal-safe.
         unsafe {
@@ -412,6 +422,9 @@ impl SpawnConfig {
             if let Ok(val) = env::var(var) {
                 cmd.env(var, val);
             }
+        }
+        for (key, value) in &self.env_overrides {
+            cmd.env(key, value);
         }
 
         cmd.spawn()
@@ -449,6 +462,7 @@ mod tests {
             command: "echo".to_string(),
             args: vec!["hello".to_string()],
             env_passthrough: vec![],
+            env_overrides: vec![],
             working_dir: std::env::current_dir().unwrap(),
         };
 

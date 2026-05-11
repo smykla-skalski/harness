@@ -114,6 +114,9 @@ public struct AcpAgentStartRequest: Codable, Equatable, Sendable {
   public let prompt: String?
   public let projectDir: String?
   public let persona: String?
+  public let model: String?
+  public let effort: String?
+  public let allowCustomModel: Bool
   public let recordPermissions: Bool
 
   public init(
@@ -125,6 +128,9 @@ public struct AcpAgentStartRequest: Codable, Equatable, Sendable {
     prompt: String? = nil,
     projectDir: String? = nil,
     persona: String? = nil,
+    model: String? = nil,
+    effort: String? = nil,
+    allowCustomModel: Bool = false,
     recordPermissions: Bool = false
   ) {
     self.agent = agent
@@ -135,6 +141,9 @@ public struct AcpAgentStartRequest: Codable, Equatable, Sendable {
     self.prompt = prompt
     self.projectDir = projectDir
     self.persona = persona
+    self.model = model
+    self.effort = effort
+    self.allowCustomModel = allowCustomModel
     self.recordPermissions = recordPermissions
   }
 
@@ -147,6 +156,9 @@ public struct AcpAgentStartRequest: Codable, Equatable, Sendable {
     case prompt
     case projectDir
     case persona
+    case model
+    case effort
+    case allowCustomModel
     case recordPermissions
   }
 
@@ -160,6 +172,10 @@ public struct AcpAgentStartRequest: Codable, Equatable, Sendable {
     prompt = try container.decodeIfPresent(String.self, forKey: .prompt)
     projectDir = try container.decodeIfPresent(String.self, forKey: .projectDir)
     persona = try container.decodeIfPresent(String.self, forKey: .persona)
+    model = try container.decodeIfPresent(String.self, forKey: .model)
+    effort = try container.decodeIfPresent(String.self, forKey: .effort)
+    allowCustomModel =
+      try container.decodeIfPresent(Bool.self, forKey: .allowCustomModel) ?? false
     recordPermissions =
       try container.decodeIfPresent(Bool.self, forKey: .recordPermissions) ?? false
   }
@@ -174,6 +190,9 @@ public struct AcpAgentStartRequest: Codable, Equatable, Sendable {
     try container.encodeIfPresent(prompt, forKey: .prompt)
     try container.encodeIfPresent(projectDir, forKey: .projectDir)
     try container.encodeIfPresent(persona, forKey: .persona)
+    try container.encodeIfPresent(model, forKey: .model)
+    try container.encodeIfPresent(effort, forKey: .effort)
+    try container.encode(allowCustomModel, forKey: .allowCustomModel)
     try container.encode(recordPermissions, forKey: .recordPermissions)
   }
 }

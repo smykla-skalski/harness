@@ -128,6 +128,15 @@ pub struct AcpAgentStartArgs {
     /// Persona identifier to attach to the agent registration.
     #[arg(long)]
     pub persona: Option<String>,
+    /// Model identifier to launch when the ACP runtime supports overrides.
+    #[arg(long)]
+    pub model: Option<String>,
+    /// Reasoning effort level when the ACP runtime supports overrides.
+    #[arg(long)]
+    pub effort: Option<String>,
+    /// Allow model identifiers outside the advertised catalog.
+    #[arg(long)]
+    pub allow_custom_model: bool,
     /// Record ACP permission decisions without granting permission requests.
     #[arg(long)]
     pub record_permissions: bool,
@@ -147,6 +156,9 @@ impl Execute for AcpAgentStartArgs {
                 .as_deref()
                 .map(|hint| resolve_project_dir(Some(hint))),
             persona: self.persona.clone(),
+            model: self.model.clone(),
+            effort: self.effort.clone(),
+            allow_custom_model: self.allow_custom_model,
             record_permissions: self.record_permissions,
         };
         let snapshot = daemon_client()?.start_acp_managed_agent(&self.session_id, &request)?;
@@ -378,6 +390,11 @@ mod tests {
             "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
             "--prompt",
             "hello",
+            "--model",
+            "gpt-5.4",
+            "--effort",
+            "high",
+            "--allow-custom-model",
             "--record-permissions",
         ])
         .expect("parse");
@@ -387,6 +404,9 @@ mod tests {
             "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc"
         );
         assert_eq!(parsed.args.prompt.as_deref(), Some("hello"));
+        assert_eq!(parsed.args.model.as_deref(), Some("gpt-5.4"));
+        assert_eq!(parsed.args.effort.as_deref(), Some("high"));
+        assert!(parsed.args.allow_custom_model);
         assert!(parsed.args.record_permissions);
     }
 
