@@ -1,0 +1,18 @@
+[package]
+name = "harness-codex-acp"
+version = "34.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+
+[dependencies]
+clap = { version = "4.6.0", features = ["derive"] }
+codex-acp = { git = "https://github.com/zed-industries/codex-acp", tag = "v0.14.0" }
+codex-arg0 = { git = "https://github.com/openai/codex", tag = "rust-v0.129.0" }
+codex-utils-cli = { git = "https://github.com/openai/codex", tag = "rust-v0.129.0" }
+
+[patch.crates-io]
+tokio-tungstenite = { git = "https://github.com/openai-oss-forks/tokio-tungstenite", rev = "132f5b39c862e3a970f731d709608b3e6276d5f6" }
+tungstenite = { git = "https://github.com/openai-oss-forks/tungstenite-rs", rev = "9200079d3b54a1ff51072e24d81fd354f085156f" }
+
+[workspace]

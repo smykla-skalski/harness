@@ -4,7 +4,7 @@ use std::process::Command;
 
 use tempfile::tempdir;
 
-use super::support::{run_harness_version, write_fake_harness_binary};
+use super::support::{run_harness_version, write_fake_harness_binary, write_fake_shell_tool};
 
 #[test]
 fn install_script_reconciles_shadowed_harness_binary_for_stale_shell_paths() {
@@ -59,6 +59,57 @@ fn install_script_reconciles_shadowed_harness_binary_for_stale_shell_paths() {
     assert!(
         !stderr.contains("run `rehash` or start a new shell"),
         "expected no shell-refresh warning after reconciliation: {stderr}"
+    );
+}
+
+#[test]
+fn install_script_installs_managed_codex_adapter_binary() {
+    let tmp = tempdir().expect("tempdir");
+    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let home = tmp.path().join("home");
+    let install_dir = home.join(".local/bin");
+    let target_dir = tmp.path().join("cargo-target");
+    let build_binary = target_dir.join("release/harness");
+    let build_codex_adapter = target_dir.join("release/harness-codex-acp");
+    let version = env!("CARGO_PKG_VERSION");
+
+    std::fs::create_dir_all(&install_dir).expect("create install dir");
+    write_fake_harness_binary(&build_binary, version);
+    write_fake_shell_tool(
+        &build_codex_adapter,
+        "#!/bin/sh\nif [ \"$1\" = \"--probe\" ]; then\n  exit 0\nfi\nexit 1\n",
+    );
+
+    let output = Command::new("/bin/bash")
+        .arg(repo.join("scripts/install-harness-release.sh"))
+        .current_dir(&repo)
+        .env("HOME", &home)
+        .env("CARGO_TARGET_DIR", &target_dir)
+        .env("HARNESS_INSTALL_SKIP_CODESIGN", "1")
+        .env("PATH", format!("{}:/usr/bin:/bin", install_dir.display()))
+        .output()
+        .expect("run install script");
+
+    assert!(
+        output.status.success(),
+        "script failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let installed = install_dir.join("harness-codex-acp");
+    assert!(
+        installed.exists(),
+        "expected managed Codex adapter to be installed"
+    );
+    let probe = Command::new(&installed)
+        .arg("--probe")
+        .output()
+        .expect("run installed codex adapter probe");
+    assert!(
+        probe.status.success(),
+        "expected installed codex adapter probe to succeed: stdout={} stderr={}",
+        String::from_utf8_lossy(&probe.stdout),
+        String::from_utf8_lossy(&probe.stderr)
     );
 }
 

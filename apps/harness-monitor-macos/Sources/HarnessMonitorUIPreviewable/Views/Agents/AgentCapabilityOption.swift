@@ -81,8 +81,31 @@ struct AgentCapabilityOption: Identifiable, Equatable {
   let doctorProbe: AcpDoctorProbe?
   let probe: AcpRuntimeProbe?
   let installHint: String?
+  let bundledWithHarness: Bool
   let sandboxed: Bool
   let acpHostBridgeReady: Bool
+
+  init(
+    id: String,
+    title: String,
+    transportChoices: [AgentCapabilityTransportChoice],
+    doctorProbe: AcpDoctorProbe?,
+    probe: AcpRuntimeProbe?,
+    installHint: String?,
+    bundledWithHarness: Bool = false,
+    sandboxed: Bool,
+    acpHostBridgeReady: Bool
+  ) {
+    self.id = id
+    self.title = title
+    self.transportChoices = transportChoices
+    self.doctorProbe = doctorProbe
+    self.probe = probe
+    self.installHint = installHint
+    self.bundledWithHarness = bundledWithHarness
+    self.sandboxed = sandboxed
+    self.acpHostBridgeReady = acpHostBridgeReady
+  }
 
   var isEnabled: Bool {
     transportChoices.contains(where: isEnabled)
@@ -102,6 +125,9 @@ struct AgentCapabilityOption: Identifiable, Equatable {
 
   var installAccessibilityHint: String? {
     guard showsInstallCTA else { return nil }
+    if bundledWithHarness {
+      return "Copies Harness install instructions for \(title)"
+    }
     return "Copies install instructions for \(title)"
   }
 
@@ -123,7 +149,7 @@ struct AgentCapabilityOption: Identifiable, Equatable {
   }
 
   var installActionTitle: String {
-    "Copy install instructions"
+    bundledWithHarness ? "Copy Harness install instructions" : "Copy install instructions"
   }
 
   var showsInstallCTA: Bool {
@@ -172,7 +198,11 @@ struct AgentCapabilityOption: Identifiable, Equatable {
     case .checkingAccess:
       "ACP is still being checked"
     case .setupRequired:
-      "Install the \(title) CLI to add ACP here"
+      if bundledWithHarness {
+        "This ACP adapter ships with Harness. Install or update Harness to enable it here."
+      } else {
+        "Install the \(title) CLI to add ACP here"
+      }
     case .bridgeAccessRequired:
       "Turn on bridge access to use ACP here"
     case .terminalOnly:

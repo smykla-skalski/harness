@@ -107,6 +107,7 @@ fn descriptor_with_session_configuration(
         },
         prompt_timeout_seconds: None,
         excluded_from_initial_default: false,
+        bundled_with_harness: false,
     }
 }
 

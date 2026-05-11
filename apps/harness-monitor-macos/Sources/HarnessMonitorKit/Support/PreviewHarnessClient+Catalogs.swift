@@ -25,6 +25,32 @@ extension PreviewHarnessClient {
 
   public static let previewAcpAgentDescriptors: [AcpAgentDescriptor] = [
     AcpAgentDescriptor(
+      id: "codex",
+      displayName: "Codex",
+      capabilities: [
+        "fs.read",
+        "fs.write",
+        "terminal.spawn",
+        "streaming",
+        "multi-turn",
+        "requires-network",
+      ],
+      launchCommand: "harness-codex-acp",
+      launchArgs: [],
+      envPassthrough: [
+        "CODEX_HOME",
+        "CODEX_API_KEY",
+        "OPENAI_API_KEY",
+        "OPENAI_ORGANIZATION",
+        "OPENAI_PROJECT",
+      ],
+      modelCatalog: codexRuntimeModelCatalog(),
+      installHint:
+        "Codex ACP ships with Harness. Install or update Harness to restore the bundled adapter, then authenticate Codex.",
+      doctorProbe: AcpDoctorProbe(command: "harness-codex-acp", args: ["--probe"]),
+      bundledWithHarness: true
+    ),
+    AcpAgentDescriptor(
       id: "copilot",
       displayName: "GitHub Copilot",
       capabilities: ["fs.read", "fs.write", "terminal.spawn", "streaming", "multi-turn"],
@@ -122,6 +148,13 @@ extension PreviewHarnessClient {
   ) -> AcpRuntimeProbeResponse {
     AcpRuntimeProbeResponse(
       probes: [
+        AcpRuntimeProbe(
+          agentId: "codex",
+          displayName: "Codex",
+          binaryPresent: !missingBinaryAgentIDs.contains("codex"),
+          authState: .unknown,
+          version: "preview"
+        ),
         AcpRuntimeProbe(
           agentId: "copilot",
           displayName: "GitHub Copilot",

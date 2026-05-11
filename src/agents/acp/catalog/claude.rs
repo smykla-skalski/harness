@@ -82,6 +82,7 @@ pub fn descriptor() -> AcpAgentDescriptor {
         },
         prompt_timeout_seconds: None,
         excluded_from_initial_default: true,
+        bundled_with_harness: false,
     }
 }
 

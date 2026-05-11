@@ -5,7 +5,8 @@ use crate::workspace::host_home_dir;
 
 #[must_use]
 pub(super) fn resolve_program(program: &str) -> Option<PathBuf> {
-    resolve_program_in_dirs(program, search_dirs())
+    resolve_current_harness_program(program)
+        .or_else(|| resolve_program_in_dirs(program, search_dirs()))
 }
 
 fn resolve_program_in_dirs(program: &str, search_dirs: Vec<PathBuf>) -> Option<PathBuf> {
@@ -18,6 +19,22 @@ fn resolve_program_in_dirs(program: &str, search_dirs: Vec<PathBuf>) -> Option<P
         let candidate = directory.join(program);
         is_executable(&candidate).then_some(candidate)
     })
+}
+
+fn resolve_current_harness_program(program: &str) -> Option<PathBuf> {
+    let current = env::current_exe().ok()?;
+    resolve_harness_program_from_current_exe(program, &current)
+}
+
+fn resolve_harness_program_from_current_exe(program: &str, current_exe: &Path) -> Option<PathBuf> {
+    if program == "harness" {
+        return is_executable(current_exe).then(|| current_exe.to_path_buf());
+    }
+    if !program.starts_with("harness-") {
+        return None;
+    }
+    let candidate = current_exe.parent()?.join(program);
+    is_executable(&candidate).then_some(candidate)
 }
 
 fn search_dirs() -> Vec<PathBuf> {
@@ -117,6 +134,31 @@ mod tests {
                     Some(binary.as_path())
                 );
             },
+        );
+    }
+
+    #[test]
+    fn resolve_program_uses_current_harness_binary_for_harness_command() {
+        let current = std::env::current_exe().expect("current executable");
+        assert_eq!(
+            resolve_current_harness_program("harness").as_deref(),
+            Some(current.as_path())
+        );
+    }
+
+    #[test]
+    fn resolve_program_uses_sibling_harness_binary_for_managed_tools() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let current = temp.path().join("harness");
+        let sibling = temp.path().join("harness-codex-acp");
+        fs_err::write(&current, "#!/bin/sh\nexit 0\n").expect("write current binary");
+        fs_err::write(&sibling, "#!/bin/sh\nexit 0\n").expect("write sibling binary");
+        make_executable(&current);
+        make_executable(&sibling);
+
+        assert_eq!(
+            resolve_harness_program_from_current_exe("harness-codex-acp", &current).as_deref(),
+            Some(sibling.as_path())
         );
     }
 

@@ -90,6 +90,21 @@ mod tests {
     }
 
     #[test]
+    fn build_config_payload_includes_codex_acp_descriptor() {
+        let payload = build_config_payload();
+        let codex = payload
+            .acp_agents
+            .iter()
+            .find(|descriptor| descriptor.id == "codex")
+            .expect("codex ACP descriptor in config payload");
+
+        assert_eq!(codex.display_name, "Codex");
+        assert_eq!(codex.launch_command, "harness-codex-acp");
+        assert_eq!(codex.doctor_probe.command, "harness-codex-acp");
+        assert_eq!(codex.doctor_probe.args, vec!["--probe"]);
+    }
+
+    #[test]
     fn build_config_push_frame_serializes_with_config_event_and_seq_zero() {
         let _guard = lock_probe_cache_for_tests();
         replace_probe_cache_for_tests(

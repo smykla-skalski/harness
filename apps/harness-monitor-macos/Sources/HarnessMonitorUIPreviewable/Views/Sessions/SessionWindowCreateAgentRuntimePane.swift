@@ -272,6 +272,9 @@ struct SessionWindowCreateProviderListRow: View {
     case .checkingAccess:
       return "ACP is still being checked."
     case .setupRequired:
+      if option.bundledWithHarness {
+        return "ACP ships with Harness."
+      }
       return "ACP needs CLI setup."
     case .bridgeAccessRequired:
       return "ACP needs bridge access."
