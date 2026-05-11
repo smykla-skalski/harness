@@ -143,8 +143,9 @@ Prefer shared layout and control primitives for density/readability work so
 button sizing and glass treatment stay consistent across screens.
 
 Liquid Glass summary: let `NavigationSplitView` sidebars use the system glass,
-extend detail content with `.backgroundExtensionEffect()`, apply glass to
-navigation/control surfaces only, and never stack glass on glass. See
+reserve `.backgroundExtensionEffect()` for expansive hero/media/tinted surfaces
+rather than dense text or controls, apply glass to navigation/control surfaces
+only, and never stack glass on glass. See
 `../../docs/agent-guides/monitor-reference.md` for the full macOS 26 notes.
 
 Use the relevant skill before writing or reviewing Swift code here:

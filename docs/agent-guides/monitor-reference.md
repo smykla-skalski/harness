@@ -137,10 +137,11 @@ Research backing lives under `apps/harness-monitor-macos/docs/research/`:
 
 ## Liquid Glass notes
 
-NavigationSplitView sidebar gets automatic Liquid Glass treatment. Use
-`.backgroundExtensionEffect()` on content columns so detail content extends
-behind the glass sidebar. Do not paint opaque sidebar backgrounds; use
-translucent tints so system glass shows through.
+NavigationSplitView sidebar gets automatic Liquid Glass treatment. Reserve
+`.backgroundExtensionEffect()` for expansive hero/media/tinted surfaces. Dense
+session detail, forms, logs, and tables should stay in the content layer and use
+the system scroll-edge effect for toolbar/sidebar separation. Do not paint
+opaque sidebar backgrounds; use translucent tints so system glass shows through.
 
 Use `.glassEffect(.regular.tint(color), in: shape)` for floating controls. Tint
 takes `Color`, not `LinearGradient`. Never stack glass on glass. Glass belongs
