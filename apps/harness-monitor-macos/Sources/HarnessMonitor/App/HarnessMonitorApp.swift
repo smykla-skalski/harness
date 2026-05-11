@@ -114,15 +114,16 @@ struct HarnessMonitorApp: App {
     pendingDecisionsDockBadgeController = PendingDecisionsDockBadgeController()
     perfScenario = configuration.perfScenario
     let store = configuration.store
+    HarnessMonitorApp.bindSupervisorSurfaces(
+      to: store,
+      notificationController: notificationController,
+      dockBadgeController: pendingDecisionsDockBadgeController,
+      menuBarStatusController: menuBarStatusController
+    )
     _store = State(initialValue: store)
     _menuBarStatusController = State(initialValue: menuBarStatusController)
     _sessionWindowPresenceTracker = State(
-      initialValue: SessionWindowPresenceTracker(
-        store: store,
-        notificationController: notificationController,
-        dockBadgeController: pendingDecisionsDockBadgeController,
-        menuBarStatusController: menuBarStatusController
-      )
+      initialValue: SessionWindowPresenceTracker()
     )
     _windowCommandRouting = State(initialValue: WindowCommandRoutingState())
     _mcpWindowCommandRegistrar = State(initialValue: HarnessMonitorMCPWindowCommandRegistrar())

@@ -5,64 +5,107 @@ import XCTest
 
 @MainActor
 final class SessionWindowPresenceTrackerTests: XCTestCase {
-  func testBindsOnFirstAppearanceAndUnbindsOnLastDisappearance() {
-    let store = makeStore()
-    let notifications = HarnessMonitorUserNotificationController.preview(environment: [:])
-    let tracker = makeTracker(store: store, notifications: notifications)
+  func testTrackerCountsActiveSessionWindows() {
+    let tracker = SessionWindowPresenceTracker()
     let firstWindow = NSObject()
     let secondWindow = NSObject()
     let firstWindowID = ObjectIdentifier(firstWindow)
     let secondWindowID = ObjectIdentifier(secondWindow)
 
     XCTAssertEqual(tracker.activeSessionWindowCount, 0)
+
+    tracker.sessionWindowAppeared(windowID: firstWindowID)
+    XCTAssertEqual(tracker.activeSessionWindowCount, 1)
+
+    tracker.sessionWindowAppeared(windowID: firstWindowID)
+    tracker.sessionWindowAppeared(windowID: secondWindowID)
+    XCTAssertEqual(tracker.activeSessionWindowCount, 2)
+
+    tracker.sessionWindowDisappeared(windowID: firstWindowID)
+    XCTAssertEqual(tracker.activeSessionWindowCount, 1)
+
+    tracker.sessionWindowDisappeared(windowID: secondWindowID)
+    XCTAssertEqual(tracker.activeSessionWindowCount, 0)
+  }
+
+  func testTrackerDoesNotOwnSupervisorBindings() {
+    let store = makeStore()
+    let tracker = SessionWindowPresenceTracker()
+    let window = NSObject()
+    let windowID = ObjectIdentifier(window)
+
     XCTAssertNil(store.supervisorBindings.notificationController)
     XCTAssertNil(store.supervisorBindings.pendingDecisionsBadgeSync)
     XCTAssertNil(store.supervisorBindings.pendingDecisionsStatusSync)
 
-    tracker.sessionWindowAppeared(windowID: firstWindowID)
+    tracker.sessionWindowAppeared(windowID: windowID)
+    tracker.sessionWindowDisappeared(windowID: windowID)
 
-    XCTAssertEqual(tracker.activeSessionWindowCount, 1)
-    XCTAssertTrue(store.supervisorBindings.notificationController === notifications)
-    XCTAssertNotNil(store.supervisorBindings.pendingDecisionsBadgeSync)
-    XCTAssertNotNil(store.supervisorBindings.pendingDecisionsStatusSync)
-
-    tracker.sessionWindowAppeared(windowID: firstWindowID)
-    tracker.sessionWindowAppeared(windowID: secondWindowID)
-    tracker.sessionWindowDisappeared(windowID: firstWindowID)
-
-    XCTAssertEqual(tracker.activeSessionWindowCount, 1)
-    XCTAssertTrue(store.supervisorBindings.notificationController === notifications)
-    XCTAssertNotNil(store.supervisorBindings.pendingDecisionsBadgeSync)
-    XCTAssertNotNil(store.supervisorBindings.pendingDecisionsStatusSync)
-
-    tracker.sessionWindowDisappeared(windowID: firstWindowID)
-    tracker.sessionWindowDisappeared(windowID: secondWindowID)
-
-    XCTAssertEqual(tracker.activeSessionWindowCount, 0)
     XCTAssertNil(store.supervisorBindings.notificationController)
     XCTAssertNil(store.supervisorBindings.pendingDecisionsBadgeSync)
     XCTAssertNil(store.supervisorBindings.pendingDecisionsStatusSync)
   }
 
-  func testUnbindingSessionWindowUIDoesNotStopRunningSupervisor() async {
+  func testAppLaunchBindsSupervisorSurfacesIndependentlyOfSessionWindows() {
     let store = makeStore()
-    let tracker = makeTracker(store: store)
+    let notifications = HarnessMonitorUserNotificationController.preview(environment: [:])
+    let dockBadge = PendingDecisionsDockBadgeController()
+    let menuBarStatus = HarnessMonitorMenuBarStatusController()
+
+    HarnessMonitorApp.bindSupervisorSurfaces(
+      to: store,
+      notificationController: notifications,
+      dockBadgeController: dockBadge,
+      menuBarStatusController: menuBarStatus
+    )
+
+    XCTAssertTrue(store.supervisorBindings.notificationController === notifications)
+    XCTAssertNotNil(store.supervisorBindings.pendingDecisionsBadgeSync)
+    XCTAssertNotNil(store.supervisorBindings.pendingDecisionsStatusSync)
+  }
+
+  func testSupervisorRunsWithBindingsAttachedFromAppLaunch() async {
+    let store = makeStore()
+    let notifications = HarnessMonitorUserNotificationController.preview(environment: [:])
+    HarnessMonitorApp.bindSupervisorSurfaces(
+      to: store,
+      notificationController: notifications,
+      dockBadgeController: PendingDecisionsDockBadgeController(),
+      menuBarStatusController: HarnessMonitorMenuBarStatusController()
+    )
+
+    await store.startSupervisor()
+    addTeardownBlock { await store.stopSupervisor() }
+
+    XCTAssertEqual(store.supervisorRuntimeState, .running)
+    XCTAssertTrue(store.supervisorBindings.notificationController === notifications)
+    XCTAssertNotNil(store.supervisorBindings.pendingDecisionsBadgeSync)
+    XCTAssertNotNil(store.supervisorBindings.pendingDecisionsStatusSync)
+  }
+
+  func testBindingsPersistAfterAllSessionWindowsClose() async {
+    let store = makeStore()
+    let notifications = HarnessMonitorUserNotificationController.preview(environment: [:])
+    HarnessMonitorApp.bindSupervisorSurfaces(
+      to: store,
+      notificationController: notifications,
+      dockBadgeController: PendingDecisionsDockBadgeController(),
+      menuBarStatusController: HarnessMonitorMenuBarStatusController()
+    )
+    let tracker = SessionWindowPresenceTracker()
     let window = NSObject()
     let windowID = ObjectIdentifier(window)
 
     await store.startSupervisor()
     addTeardownBlock { await store.stopSupervisor() }
-    XCTAssertEqual(store.supervisorRuntimeState, .running)
-    XCTAssertNotNil(store.supervisorDecisionStore)
 
     tracker.sessionWindowAppeared(windowID: windowID)
     tracker.sessionWindowDisappeared(windowID: windowID)
 
-    XCTAssertEqual(store.supervisorRuntimeState, .running)
-    XCTAssertNotNil(store.supervisorDecisionStore)
-    XCTAssertNil(store.supervisorBindings.notificationController)
-    XCTAssertNil(store.supervisorBindings.pendingDecisionsBadgeSync)
-    XCTAssertNil(store.supervisorBindings.pendingDecisionsStatusSync)
+    XCTAssertEqual(tracker.activeSessionWindowCount, 0)
+    XCTAssertTrue(store.supervisorBindings.notificationController === notifications)
+    XCTAssertNotNil(store.supervisorBindings.pendingDecisionsBadgeSync)
+    XCTAssertNotNil(store.supervisorBindings.pendingDecisionsStatusSync)
   }
 
   func testMenuBarSnapshotShowsExplicitIdleMonitoringState() {
@@ -83,18 +126,6 @@ final class SessionWindowPresenceTrackerTests: XCTestCase {
     XCTAssertEqual(snapshot.supervisorLabel, "Supervisor: Running in background")
   }
 
-  func testSupervisorCanRunWithoutSessionWindowBindings() async {
-    let store = makeStore()
-
-    await store.startSupervisor()
-    addTeardownBlock { await store.stopSupervisor() }
-
-    XCTAssertEqual(store.supervisorRuntimeState, .running)
-    XCTAssertNil(store.supervisorBindings.notificationController)
-    XCTAssertNil(store.supervisorBindings.pendingDecisionsBadgeSync)
-    XCTAssertNil(store.supervisorBindings.pendingDecisionsStatusSync)
-  }
-
   func testLifecycleModifierUsesNativeSwiftUILifecycle() throws {
     let source = try harnessSourceFile(named: "App/SessionWindowLifecycleModifier.swift")
 
@@ -105,26 +136,13 @@ final class SessionWindowPresenceTrackerTests: XCTestCase {
     XCTAssertFalse(source.contains("NSWindow"))
   }
 
-  func testAppInitDoesNotSeedSessionWindowBadgeBindings() throws {
-    let appSource = try harnessSourceFile(named: "App/HarnessMonitorApp.swift")
+  func testPresenceTrackerSourceDoesNotBindSupervisorSurfaces() throws {
     let trackerSource = try harnessSourceFile(named: "App/SessionWindowPresenceTracker.swift")
 
-    XCTAssertFalse(appSource.contains("pendingDecisionsDockBadgeController.sync(count: 0)"))
-    XCTAssertTrue(trackerSource.contains("dockBadgeController.sync(count: 0)"))
-    XCTAssertTrue(trackerSource.contains("unbindSessionWindowUI()"))
-  }
-
-  private func makeTracker(
-    store: HarnessMonitorStore,
-    notifications: HarnessMonitorUserNotificationController =
-      HarnessMonitorUserNotificationController.preview(environment: [:])
-  ) -> SessionWindowPresenceTracker {
-    SessionWindowPresenceTracker(
-      store: store,
-      notificationController: notifications,
-      dockBadgeController: PendingDecisionsDockBadgeController(),
-      menuBarStatusController: HarnessMonitorMenuBarStatusController()
-    )
+    XCTAssertFalse(trackerSource.contains("bindSupervisorNotifications"))
+    XCTAssertFalse(trackerSource.contains("bindPendingDecisionsBadgeSync"))
+    XCTAssertFalse(trackerSource.contains("bindPendingDecisionsStatusSync"))
+    XCTAssertFalse(trackerSource.contains("unbindSupervisorNotifications"))
   }
 
   private func makeStore() -> HarnessMonitorStore {
