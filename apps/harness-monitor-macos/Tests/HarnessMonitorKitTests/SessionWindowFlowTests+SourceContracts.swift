@@ -108,17 +108,16 @@ extension SessionWindowFlowTests {
     #expect(source.contains("openHarnessSessionWindow(sessionID: sessionID)"))
   }
 
-  @Test("Session inspector resize uses native SwiftUI split")
-  func sessionInspectorResizeUsesNativeSwiftUISplit() throws {
+  @Test("Session inspector divider remains SwiftUI native")
+  func sessionInspectorDividerRemainsSwiftUINative() throws {
     let viewSource = try previewableSourceFile(named: "Views/Sessions/SessionWindowView.swift")
-    let columnsSource = try previewableSourceFile(
-      named: "Views/Sessions/SessionWindowView+Columns.swift")
+    let dividerSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionInspectorDivider.swift")
 
     #expect(!viewSource.contains("import AppKit"))
-    #expect(columnsSource.contains("HSplitView"))
-    #expect(!columnsSource.contains("SessionInspectorDivider("))
-    #expect(!columnsSource.contains("DragGesture("))
-    #expect(!columnsSource.contains("NSCursor"))
+    #expect(!dividerSource.contains("import AppKit"))
+    #expect(dividerSource.contains("DragGesture("))
+    #expect(!dividerSource.contains("NSCursor"))
   }
 
   @Test("Session window owns the content-detail split UX")
@@ -135,16 +134,19 @@ extension SessionWindowFlowTests {
     #expect(viewSource.contains("sessionSurface"))
     #expect(
       columnsSource.contains(
-        "SessionContentDetailSplitView(contentWidth: contentColumnWidth)"
+        "SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding)"
       )
     )
-    #expect(columnsSource.contains(".navigationSplitViewStyle(.balanced)"))
-    #expect(splitSource.contains("HSplitView"))
-    #expect(!splitSource.contains("NSCursor"))
-    #expect(!splitSource.contains("DragGesture("))
-    #expect(!splitSource.contains("@State"))
-    #expect(!splitSource.contains("Task.sleep"))
-    #expect(splitSource.contains("layoutPriority(1)"))
+    #expect(columnsSource.contains(".navigationSplitViewStyle(.prominentDetail)"))
+    #expect(splitSource.contains("NSCursor.resizeLeftRight"))
+    #expect(splitSource.contains("@State private var liveContentWidth"))
+    #expect(
+      splitSource.contains("_liveContentWidth = State(wrappedValue: contentWidth.wrappedValue)"))
+    #expect(splitSource.contains(".accessibilityAdjustableAction"))
+    #expect(splitSource.contains(".focusEffectDisabled()"))
+    #expect(splitSource.contains(".focusable(interactions: .activate)"))
+    #expect(splitSource.contains("if !isDragging {"))
+    #expect(splitSource.contains(".onMoveCommand"))
   }
 
   @Test("Sidebar density keeps strict default and maps legacy values")

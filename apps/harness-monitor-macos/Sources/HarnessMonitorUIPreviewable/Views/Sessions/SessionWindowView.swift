@@ -28,7 +28,7 @@ public struct SessionWindowView: View {
   @SceneStorage("session.inspector.width")
   private var inspectorWidthStorage = 280.0
   @SceneStorage("session.sidebarWidth")
-  private var sidebarWidthStorage = 220.0
+  private var sidebarWidthStorage = 200.0
   @SceneStorage("session.content-detail.width")
   private var contentColumnWidthStorage = SessionContentDetailSplitLayout.defaultContentWidth
   @SceneStorage("session.columnVisibility")
@@ -41,7 +41,6 @@ public struct SessionWindowView: View {
   @State private var isLoadingStorage = false
   @State private var didLoadSnapshotStorage = false
   @State private var detailColumnWidthStorage: CGFloat = 0
-  @State private var detailColumnResizeStateStorage = SessionWindowDetailColumnResizeState()
   @State private var decisionCacheStorage = SessionWindowDecisionCacheStorage()
   @State private var currentModifiers: EventModifiers = []
 
@@ -71,10 +70,6 @@ public struct SessionWindowView: View {
   var detailColumnWidth: CGFloat {
     get { detailColumnWidthStorage }
     nonmutating set { detailColumnWidthStorage = newValue }
-  }
-
-  var detailColumnResizeState: SessionWindowDetailColumnResizeState {
-    detailColumnResizeStateStorage
   }
 
   var focusMode: Bool {
@@ -121,6 +116,10 @@ public struct SessionWindowView: View {
   var contentColumnWidth: Double {
     get { contentColumnWidthStorage }
     nonmutating set { contentColumnWidthStorage = newValue }
+  }
+
+  var contentColumnWidthBinding: Binding<Double> {
+    $contentColumnWidthStorage
   }
 
   var presentedModifiers: EventModifiers {
@@ -242,7 +241,6 @@ public struct SessionWindowView: View {
       }
       .onChange(of: renderedRoute) { _, newRoute in
         guard newRoute.layoutStyle == .sidebarDetail else { return }
-        detailColumnResizeState.cancelPending()
         detailColumnWidth = 0
       }
       .onChange(of: allSessionDecisions.map(\.id)) { _, _ in
@@ -394,20 +392,5 @@ public struct SessionWindowView: View {
     primaryContentAccessibilityFocused = true
     let title = summary?.displayTitle ?? "Session"
     AccessibilityNotification.Announcement("\(title) session window opened").post()
-  }
-}
-
-@MainActor
-final class SessionWindowDetailColumnResizeState {
-  nonisolated(unsafe) var settleTask: Task<Void, Never>?
-
-  deinit {
-    settleTask?.cancel()
-    settleTask = nil
-  }
-
-  func cancelPending() {
-    settleTask?.cancel()
-    settleTask = nil
   }
 }

@@ -14,18 +14,16 @@ struct SessionContentDetailSplitSourceTests {
 
     #expect(viewSource.contains("@SceneStorage(\"session.content-detail.width\")"))
     #expect(viewSource.contains("sessionSurface"))
-    #expect(!viewSource.contains(".windowToolbarContentBoundary()"))
     #expect(
       columnsSource.contains(
-        "SessionContentDetailSplitView(contentWidth: contentColumnWidth)"
+        "SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding)"
       )
     )
-    #expect(columnsSource.contains(".navigationSplitViewStyle(.balanced)"))
-    #expect(splitSource.contains("HSplitView"))
-    #expect(!splitSource.contains("DragGesture("))
-    #expect(!splitSource.contains("NSCursor"))
-    #expect(!splitSource.contains("@State"))
-    #expect(splitSource.contains("layoutPriority(1)"))
+    #expect(columnsSource.contains(".navigationSplitViewStyle(.prominentDetail)"))
+    #expect(splitSource.contains("NSCursor.resizeLeftRight"))
+    #expect(splitSource.contains("@State private var liveContentWidth"))
+    #expect(splitSource.contains(".accessibilityAdjustableAction"))
+    #expect(splitSource.contains(".onMoveCommand"))
   }
 
   @Test("Session split uses one stable background extension host")
@@ -33,25 +31,23 @@ struct SessionContentDetailSplitSourceTests {
     let columnsSource = try previewableSourceFile(
       named: "Views/Sessions/SessionWindowView+Columns.swift"
     )
-    let surfaceSource = try previewableSourceFile(
-      named: "Views/Sessions/SessionDetailSurface.swift"
-    )
 
     #expect(
       columnsSource.contains(
-        "SessionContentDetailSplitView(contentWidth: contentColumnWidth)"
+        """
+        SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding) {
+                contentColumn
+              } detail: {
+                detailColumn
+              }
+              .backgroundExtensionEffect()
+        """
       )
     )
-    #expect(columnsSource.contains("switch renderedRoute.layoutStyle"))
-    #expect(!columnsSource.contains("SessionBackgroundExtensionSurface()"))
-    #expect(!surfaceSource.contains("SessionBackgroundExtensionSurface"))
-    #expect(!surfaceSource.contains(".backgroundExtensionEffect()"))
-    #expect(surfaceSource.contains("topScrollEdgeEffect: .soft"))
-    #expect(columnsSource.contains(".backgroundExtensionEffect()"))
     #expect(
       !columnsSource.contains(
         """
-        SessionContentDetailSplitView(contentWidth: contentColumnWidth) {
+        SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding) {
                 contentColumn
                   .backgroundExtensionEffect()
         """
@@ -69,8 +65,8 @@ struct SessionContentDetailSplitSourceTests {
     )
   }
 
-  @Test("Session split layout delegates divider resize to native HSplitView")
-  func sessionSplitLayoutDelegatesDividerResizeToNativeHSplitView() throws {
+  @Test("Session split layout defers geometry-driven width writes")
+  func sessionSplitLayoutDefersGeometryDrivenWidthWrites() throws {
     let columnsSource = try previewableSourceFile(
       named: "Views/Sessions/SessionWindowView+Columns.swift"
     )
@@ -79,13 +75,11 @@ struct SessionContentDetailSplitSourceTests {
     )
 
     #expect(columnsSource.contains("deferDetailColumnWidthUpdate("))
-    #expect(columnsSource.contains("detailColumnResizeState.cancelPending()"))
-    #expect(columnsSource.contains("detailColumnResizeState.settleTask = Task { @MainActor in"))
-    #expect(columnsSource.contains("shouldUpdateDetailColumnWidth(to: width)"))
-    #expect(splitSource.contains("HSplitView"))
-    #expect(!splitSource.contains("GeometryReader"))
-    #expect(!splitSource.contains("resizeState"))
-    #expect(!splitSource.contains("Task.sleep"))
+    #expect(columnsSource.contains("Task { @MainActor in"))
+    #expect(columnsSource.contains("await Task.yield()"))
+    #expect(splitSource.contains("deferReclampLiveWidth(availableWidth: newWidth)"))
+    #expect(splitSource.contains("Task { @MainActor in"))
+    #expect(splitSource.contains("await Task.yield()"))
   }
 
   @Test("Session detail columns leave top padding to the owned views")
