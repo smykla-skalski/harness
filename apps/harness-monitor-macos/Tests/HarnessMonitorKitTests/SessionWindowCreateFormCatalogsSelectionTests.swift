@@ -73,6 +73,55 @@ struct SessionWindowCreateFormCatalogsSelectionTests {
     )
   }
 
+  @Test("Codex app server mode badge uses distinct label")
+  func codexAppServerModeBadgeUsesDistinctLabel() {
+    let option = AgentCapabilityOption(
+      id: "codex",
+      title: "Codex",
+      transportChoices: [
+        AgentCapabilityTransportChoice(
+          id: .codex,
+          title: "Codex",
+          capabilities: ["streaming", "multi-turn", "approvals", "app-server"]
+        ),
+        AgentCapabilityTransportChoice(
+          id: .acp("codex"),
+          title: "ACP",
+          capabilities: ["fs.read", "fs.write", "terminal.spawn"]
+        ),
+        AgentCapabilityTransportChoice(
+          id: .tui(.codex),
+          title: "Terminal screen",
+          capabilities: ["streaming", "multi-turn"]
+        ),
+      ],
+      doctorProbe: AcpDoctorProbe(command: "harness-codex-acp", args: ["--probe"]),
+      probe: AcpRuntimeProbe(
+        agentId: "codex",
+        displayName: "Codex",
+        binaryPresent: true,
+        authState: .ready
+      ),
+      installHint: nil,
+      bundledWithHarness: true,
+      sandboxed: false,
+      acpHostBridgeReady: true
+    )
+
+    #expect(
+      SessionWindowCreateProviderListRow.availableModes(for: option)
+        == [.codex, .acp, .tui]
+    )
+    #expect(
+      SessionWindowCreateProviderListRow.modeSummary(for: option)
+        == "Modes App Server, ACP, and TUI"
+    )
+    #expect(
+      SessionWindowCreateProviderListRow.accessibilityLabel(for: option)
+        == "Codex, Modes App Server, ACP, and TUI, Codex app server is available."
+    )
+  }
+
   @Test("Provider mode badges use static footer-style font and flat chrome")
   func providerModeBadgesUseStaticFooterStyleFontAndFlatChrome() throws {
     let source = try sessionSourceFile(named: "SessionWindowCreateAgentRuntimePane.swift")
@@ -83,6 +132,19 @@ struct SessionWindowCreateFormCatalogsSelectionTests {
       )
     )
     #expect(source.contains("private let cornerRadius: CGFloat = 8"))
+    #expect(source.contains("case codex = \"App Server\""))
+    #expect(
+      source.contains(
+        "case .codex:\n      HarnessMonitorTheme.warmAccent"
+      )
+    )
+    #expect(source.contains("private let horizontalPadding: CGFloat = 6"))
+    #expect(source.contains("private let verticalPadding: CGFloat = 2"))
+    #expect(source.contains(".padding(.horizontal, horizontalPadding)"))
+    #expect(source.contains(".padding(.vertical, verticalPadding)"))
+    #expect(source.contains("return \"App Server\""))
+    #expect(source.contains(".accessibilityLabel(\"\\(providerTitle), \\(shortTitle)\")"))
+    #expect(!source.contains("return \"Codex\""))
     #expect(
       source.contains(
         "RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)\n          .fill(mode.fill)"
