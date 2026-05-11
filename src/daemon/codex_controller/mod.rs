@@ -4,6 +4,7 @@ mod effort;
 mod events;
 mod handle;
 mod rpc;
+mod wire;
 mod worker;
 
 #[cfg(test)]

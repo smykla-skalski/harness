@@ -7,6 +7,23 @@ struct SessionWindowSnapshotRefreshTrigger: Equatable {
   let summaryUpdatedAt: String?
 }
 
+struct SessionWindowManagedTranscriptRefreshTrigger: Equatable {
+  let sessionID: String
+  let connectionState: HarnessMonitorStore.ConnectionState
+  let codexRuns: [SessionWindowCodexRunTranscriptRefreshKey]
+
+  var hasManagedRuntimeUpdates: Bool {
+    !codexRuns.isEmpty
+  }
+}
+
+struct SessionWindowCodexRunTranscriptRefreshKey: Equatable {
+  let runID: String
+  let status: CodexRunStatus
+  let updatedAt: String
+  let eventCount: Int
+}
+
 struct SessionWindowDecisionCacheStorage {
   var allSessionDecisions: [Decision] = []
   var matchingDecisions: [Decision] = []
@@ -23,6 +40,10 @@ extension SessionWindowView {
     content
       .navigationTitle(navigationTitleText)
       .navigationSubtitle(navigationSubtitleText)
+      .sessionTitleBlurChrome(
+        status: summary?.status ?? .awaitingLeader,
+        isStale: snapshot == nil
+      )
       .onChange(of: focusMode) { _, _ in
         reconcileInspectorVisibility(
           visibleBinding: inspectorVisibleBinding,
@@ -31,6 +52,9 @@ extension SessionWindowView {
       }
       .task(id: snapshotRefreshTrigger) {
         await refreshSnapshot(for: snapshotRefreshTrigger)
+      }
+      .task(id: managedTranscriptRefreshTrigger) {
+        await refreshManagedTranscript(for: managedTranscriptRefreshTrigger)
       }
       .task(id: decisionsCacheTrigger) {
         await recomputeDecisionsCache()
@@ -64,6 +88,21 @@ extension SessionWindowView {
       sessionID: token.sessionID,
       connectionState: store.connectionState,
       summaryUpdatedAt: catalogSummary?.updatedAt
+    )
+  }
+
+  var managedTranscriptRefreshTrigger: SessionWindowManagedTranscriptRefreshTrigger {
+    SessionWindowManagedTranscriptRefreshTrigger(
+      sessionID: token.sessionID,
+      connectionState: store.connectionState,
+      codexRuns: sessionCodexRuns.map {
+        SessionWindowCodexRunTranscriptRefreshKey(
+          runID: $0.runId,
+          status: $0.status,
+          updatedAt: $0.updatedAt,
+          eventCount: $0.events.count
+        )
+      }
     )
   }
 
@@ -317,6 +356,26 @@ extension SessionWindowView {
     } else {
       await performInitialLoad()
     }
+  }
+
+  @MainActor
+  func refreshManagedTranscript(for trigger: SessionWindowManagedTranscriptRefreshTrigger) async {
+    guard trigger.sessionID == token.sessionID else { return }
+    guard didLoadSnapshot, trigger.connectionState == .online else { return }
+    guard trigger.hasManagedRuntimeUpdates else { return }
+    try? await Task.sleep(for: .milliseconds(120))
+    guard !Task.isCancelled, let currentSnapshot = snapshot else { return }
+    guard
+      let nextSnapshot = await store.refreshSessionWindowManagedTranscript(
+        sessionID: token.sessionID,
+        snapshot: currentSnapshot
+      )
+    else {
+      return
+    }
+    guard !Task.isCancelled else { return }
+    snapshot = nextSnapshot
+    didLoadSnapshot = true
   }
 
   @MainActor

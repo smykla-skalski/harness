@@ -81,7 +81,7 @@ extension SessionWindowCreateForm {
         if codexModelPickerSelection.wrappedValue
           == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag
         {
-          SessionWindowCreateSplitInputRow("Custom model") {
+          LabeledContent("Custom model") {
             TextField("", text: codexCustomModel)
               .harnessNativeTextField()
               .accessibilityLabel("Custom Codex model")
@@ -99,13 +99,13 @@ extension SessionWindowCreateForm {
           .accessibilityLabel("Codex effort")
         }
       } else {
-        SessionWindowCreateSplitInputRow("Model (optional)") {
+        LabeledContent("Model (optional)") {
           TextField("", text: codexCustomModel)
             .harnessNativeTextField()
             .accessibilityLabel("Codex model")
         }
 
-        SessionWindowCreateSplitInputRow("Effort (optional)") {
+        LabeledContent("Effort (optional)") {
           TextField("", text: codexEffortText)
             .harnessNativeTextField()
             .accessibilityLabel("Codex effort")

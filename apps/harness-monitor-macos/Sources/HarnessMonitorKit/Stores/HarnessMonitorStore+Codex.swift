@@ -273,6 +273,10 @@ extension HarnessMonitorStore {
     assignCodexRuns(runs, selected: selected)
   }
 
+  public func codexRuns(forSessionID sessionID: String) -> [CodexRunSnapshot] {
+    codexRunsBySessionID[sessionID] ?? []
+  }
+
   func applyCodexApprovalRequested(_ payload: CodexApprovalRequestedPayload) {
     applyCodexRun(payload.run)
   }

@@ -310,6 +310,6 @@ extension SessionWindowView {
   }
 
   var sessionCodexRuns: [CodexRunSnapshot] {
-    store.selectedCodexRuns.filter { $0.sessionId == token.sessionID }
+    store.codexRuns(forSessionID: token.sessionID)
   }
 }

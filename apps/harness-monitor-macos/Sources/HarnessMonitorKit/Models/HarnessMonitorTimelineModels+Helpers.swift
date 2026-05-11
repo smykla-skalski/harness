@@ -93,6 +93,21 @@ extension TimelineEntry {
     )
   }
 
+  public func codexTimelineIdentityMetadata() -> CodexTimelineIdentityMetadata? {
+    guard let payloadMetadata = codexTimelinePayloadMetadata(),
+      let runID = payloadMetadata.stringValue(for: "run_id")
+    else {
+      return nil
+    }
+    return CodexTimelineIdentityMetadata(
+      runID: runID,
+      agentID: payloadMetadata.stringValue(for: "agent_id") ?? agentId,
+      agentDisplayName: payloadMetadata.stringValue(for: "agent_display_name"),
+      threadID: payloadMetadata.stringValue(for: "thread_id"),
+      turnID: payloadMetadata.stringValue(for: "turn_id")
+    )
+  }
+
   public func reattributedAcpTimelineEntry(
     sessionAgentID: String,
     displayName: String
@@ -126,6 +141,11 @@ extension TimelineEntry {
       metadata["agent_id"] = .string(sessionAgentID)
       metadata["agent_display_name"] = .string(displayName)
       payloadObject["tool_call_timeline"] = .object(metadata)
+    }
+    if case .object(var metadata)? = payloadObject["codex_timeline_identity"] {
+      metadata["agent_id"] = .string(sessionAgentID)
+      metadata["agent_display_name"] = .string(displayName)
+      payloadObject["codex_timeline_identity"] = .object(metadata)
     }
 
     return TimelineEntry(
@@ -195,6 +215,15 @@ extension TimelineEntry {
   private func acpTimelinePayloadMetadata() -> [String: JSONValue]? {
     guard case .object(let payload) = payload,
       case .object(let metadata)? = payload["acp_timeline_identity"]
+    else {
+      return nil
+    }
+    return metadata
+  }
+
+  private func codexTimelinePayloadMetadata() -> [String: JSONValue]? {
+    guard case .object(let payload) = payload,
+      case .object(let metadata)? = payload["codex_timeline_identity"]
     else {
       return nil
     }

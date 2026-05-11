@@ -66,6 +66,16 @@ final class SessionTitleBlurChromeTests: XCTestCase {
     XCTAssertFalse(source.contains("NSVisualEffectView"))
   }
 
+  func testSessionWindowAttachesTitleBlurChromeAtNavigationSurface() throws {
+    let source = try sourceFile(named: "SessionWindowView+Presentation.swift")
+
+    XCTAssertTrue(source.contains(".navigationTitle(navigationTitleText)"))
+    XCTAssertTrue(source.contains(".navigationSubtitle(navigationSubtitleText)"))
+    XCTAssertTrue(source.contains(".sessionTitleBlurChrome("))
+    XCTAssertTrue(source.contains("status: summary?.status ?? .awaitingLeader"))
+    XCTAssertTrue(source.contains("isStale: snapshot == nil"))
+  }
+
   private func configuration(
     status: SessionStatus,
     isStale: Bool = false

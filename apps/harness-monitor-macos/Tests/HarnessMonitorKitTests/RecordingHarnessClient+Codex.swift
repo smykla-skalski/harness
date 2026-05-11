@@ -25,6 +25,15 @@ extension RecordingHarnessClient {
     return CodexRunListResponse(runs: configuredCodexRuns(for: sessionID))
   }
 
+  func codexTranscript(sessionID: String) async throws -> CodexTranscriptResponse {
+    recordReadCall(.codexTranscript(sessionID))
+    if let response = configuredCodexTranscriptResponse(for: sessionID) {
+      return response
+    }
+    let entries = configuredCodexRuns(for: sessionID).flatMap(Self.codexTranscriptEntries)
+    return CodexTranscriptResponse(entries: entries)
+  }
+
   func codexRun(runID: String) async throws -> CodexRunSnapshot {
     if let run = configuredCodexRun(id: runID) {
       return run
@@ -124,6 +133,73 @@ extension RecordingHarnessClient {
     )
     recordCodexRun(updated)
     return updated
+  }
+
+  private static func codexTranscriptEntries(for run: CodexRunSnapshot) -> [TimelineEntry] {
+    var entries = [
+      codexTranscriptEntry(
+        run: run,
+        suffix: "prompt",
+        recordedAt: run.createdAt,
+        kind: "user_prompt",
+        summary: run.prompt,
+        event: .object([
+          "type": .string("user_prompt"),
+          "content": .string(run.prompt),
+        ])
+      )
+    ]
+    if let finalMessage = run.finalMessage {
+      entries.append(
+        codexTranscriptEntry(
+          run: run,
+          suffix: "final",
+          recordedAt: run.updatedAt,
+          kind: "assistant_text",
+          summary: finalMessage,
+          event: .object([
+            "type": .string("assistant_text"),
+            "content": .string(finalMessage),
+            "final": .bool(true),
+          ])
+        )
+      )
+    }
+    return entries
+  }
+
+  private static func codexTranscriptEntry(
+    run: CodexRunSnapshot,
+    suffix: String,
+    recordedAt: String,
+    kind: String,
+    summary: String,
+    event: JSONValue
+  ) -> TimelineEntry {
+    TimelineEntry(
+      entryId: "codex-\(run.runId)-\(suffix)",
+      recordedAt: recordedAt,
+      kind: kind,
+      sessionId: run.sessionId,
+      agentId: run.sessionAgentId,
+      taskId: nil,
+      summary: summary,
+      payload: .object([
+        "runtime": .string("codex"),
+        "event": event,
+        "codex_timeline_identity": .object([
+          "run_id": .string(run.runId),
+          "agent_id": optionalStringValue(run.sessionAgentId),
+          "agent_display_name": optionalStringValue(run.displayName),
+          "thread_id": optionalStringValue(run.threadId),
+          "turn_id": optionalStringValue(run.turnId),
+        ]),
+      ])
+    )
+  }
+
+  private static func optionalStringValue(_ value: String?) -> JSONValue {
+    value.map(JSONValue.string) ?? .null
   }
 
   func agentTuis(sessionID: String) async throws -> AgentTuiListResponse {

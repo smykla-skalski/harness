@@ -24,6 +24,8 @@ extension RecordingHarnessClient {
         timelineWindowCallCountsBySessionID[sessionID, default: 0] += 1
       case .acpTranscript(let sessionID):
         acpTranscriptCallCountsBySessionID[sessionID, default: 0] += 1
+      case .codexTranscript(let sessionID):
+        codexTranscriptCallCountsBySessionID[sessionID, default: 0] += 1
       }
     }
   }
@@ -49,6 +51,8 @@ extension RecordingHarnessClient {
         timelineWindowCallCountsBySessionID[sessionID, default: 0]
       case .acpTranscript(let sessionID):
         acpTranscriptCallCountsBySessionID[sessionID, default: 0]
+      case .codexTranscript(let sessionID):
+        codexTranscriptCallCountsBySessionID[sessionID, default: 0]
       }
     }
   }

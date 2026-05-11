@@ -40,36 +40,43 @@ struct SessionWindowCreateForm: View {
         embeddedAgentRuntimeSections
       }
       Section {
-        SessionWindowCreateSplitInputRow("Name") {
-          if draft.kind == .agent {
-            Button {
-              regenerateAgentName()
-            } label: {
-              Image(systemName: "arrow.clockwise")
+        LabeledContent("Name") {
+          HStack(spacing: HarnessMonitorTheme.spacingXS) {
+            TextField("", text: title)
+              .harnessNativeTextField()
+              .focused(focusedFieldBinding, equals: .name)
+              .accessibilityLabel("\(draft.kind.title) name")
+              .accessibilityHint(validationMessage(for: .name) ?? "")
+
+            if draft.kind == .agent {
+              Button {
+                regenerateAgentName()
+              } label: {
+                Image(systemName: "arrow.clockwise")
+              }
+              .buttonStyle(.borderless)
+              .help("Generate a new agent name")
+              .accessibilityLabel("Regenerate agent name")
             }
-            .buttonStyle(.borderless)
-            .help("Generate a new agent name")
-            .accessibilityLabel("Regenerate agent name")
           }
-        } content: {
-          TextField("", text: title)
-            .harnessNativeTextField()
-            .focused(focusedFieldBinding, equals: .name)
-            .accessibilityLabel("\(draft.kind.title) name")
-            .accessibilityHint(validationMessage(for: .name) ?? "")
-        }
-        SessionWindowCreateSplitInputRow("Prompt", verticalAlignment: .top) {
-          HarnessMonitorMultilineTextField(
-            placeholder: "",
-            text: prompt,
-            minHeight: metrics.promptMinHeight,
-            focusedField: focusedFieldBinding,
-            equals: .prompt,
-            accessibilityLabel: "Prompt"
-          )
+          .frame(maxWidth: .infinity, alignment: .leading)
         }
       } header: {
         Text(draft.kind.title)
+          .harnessNativeFormSectionHeader()
+      }
+
+      Section {
+        HarnessMonitorMultilineTextField(
+          placeholder: "",
+          text: prompt,
+          minHeight: metrics.promptMinHeight,
+          focusedField: focusedFieldBinding,
+          equals: .prompt,
+          accessibilityLabel: "Prompt"
+        )
+      } header: {
+        Text("Prompt")
           .harnessNativeFormSectionHeader()
       }
       if draft.kind == .agent {
@@ -151,6 +158,7 @@ struct SessionWindowCreateForm: View {
 enum SessionWindowCreateFormField: Hashable {
   case name
   case prompt
+  case commandOverride
 }
 
 extension SessionWindowCreateForm {
@@ -270,14 +278,14 @@ extension SessionWindowCreateForm {
   @ViewBuilder private var terminalAdvancedOverridesSection: some View {
     if !normalizedLaunchSelection.isManagedControlPlane {
       Section {
-        SessionWindowCreateSplitInputRow("Command override", verticalAlignment: .top) {
-          HarnessMonitorMultilineTextField<SessionWindowCreateFormField>(
-            placeholder: "",
-            text: argvOverrideText,
-            minHeight: 100,
-            accessibilityLabel: "Command override"
-          )
-        }
+        HarnessMonitorMultilineTextField<SessionWindowCreateFormField>(
+          placeholder: "",
+          text: argvOverrideText,
+          minHeight: 100,
+          focusedField: focusedFieldBinding,
+          equals: .commandOverride,
+          accessibilityLabel: "Command override"
+        )
       } header: {
         Text("Advanced overrides")
           .harnessNativeFormSectionHeader()
@@ -496,7 +504,7 @@ private struct SessionWindowCreateRuntimeCustomModelRow: View, Equatable {
   }
 
   var body: some View {
-    SessionWindowCreateSplitInputRow("Custom model") {
+    LabeledContent("Custom model") {
       TextField("", text: customModelBinding)
         .harnessNativeTextField()
         .accessibilityLabel("Custom runtime model")

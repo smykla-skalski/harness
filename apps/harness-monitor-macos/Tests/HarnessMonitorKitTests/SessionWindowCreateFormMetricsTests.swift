@@ -241,8 +241,10 @@ struct SessionWindowCreateFormMetricsTests {
     let source = try sourceFile(named: "SessionWindowCreateForm.swift")
     let submissionSource = try sourceFile(named: "SessionWindowCreateForm+Submission.swift")
     let runtimePaneSource = try sourceFile(named: "SessionWindowCreateAgentRuntimePane.swift")
-    let splitRowSource = try sourceFile(named: "SessionWindowCreateSplitInputRow.swift")
     let helperSource = try sourceFile(named: "SessionWindowCreateForm+Helpers.swift")
+    let multilineSource = try previewableSourceFile(
+      at: "Views/Shared/HarnessMonitorMultilineTextField.swift")
+    let themeSource = try previewableSourceFile(at: "Theme/HarnessMonitorTextSize.swift")
 
     #expect(source.contains("@FocusState"))
     #expect(source.contains("Button(\"Cancel\", role: .cancel)"))
@@ -250,23 +252,23 @@ struct SessionWindowCreateFormMetricsTests {
     #expect(source.contains("validationMessage(for: .name)"))
     #expect(source.contains("Validation error:"))
     #expect(submissionSource.contains("focusedField = .name"))
-    #expect(source.contains("SessionWindowCreateSplitInputRow(\"Name\")"))
-    #expect(source.contains("SessionWindowCreateSplitInputRow(\"Prompt\", verticalAlignment: .top)"))
-    #expect(
-      source.contains("SessionWindowCreateSplitInputRow(\"Command override\", verticalAlignment: .top)")
-    )
+    #expect(source.contains("LabeledContent(\"Name\")"))
+    #expect(source.contains("Text(\"Prompt\")\n          .harnessNativeFormSectionHeader()"))
     #expect(source.contains("TextField(\"\", text: title)"))
     #expect(source.contains("placeholder: \"\""))
+    #expect(source.contains("case commandOverride"))
+    #expect(source.contains("equals: .commandOverride"))
     #expect(!source.contains("TextEditor(text: prompt)"))
     #expect(!source.contains("TextEditor(text: argvOverrideText)"))
-    #expect(splitRowSource.contains("struct SessionWindowCreateSplitInputRow"))
-    #expect(splitRowSource.contains("struct SessionWindowCreateSplitInputRowLayout: Layout"))
-    #expect(splitRowSource.contains("let labelFraction: CGFloat = 0.30"))
-    #expect(splitRowSource.contains("let fieldFraction: CGFloat = 0.70"))
-    #expect(!splitRowSource.contains("GeometryReader"))
-    #expect(helperSource.contains("SessionWindowCreateSplitInputRow(\"Custom model\")"))
-    #expect(helperSource.contains("SessionWindowCreateSplitInputRow(\"Model (optional)\")"))
-    #expect(helperSource.contains("SessionWindowCreateSplitInputRow(\"Effort (optional)\")"))
+    #expect(!source.contains("SessionWindowCreateSplitInputRow("))
+    #expect(helperSource.contains("LabeledContent(\"Custom model\")"))
+    #expect(helperSource.contains("LabeledContent(\"Model (optional)\")"))
+    #expect(helperSource.contains("LabeledContent(\"Effort (optional)\")"))
+    #expect(themeSource.contains(".frame(maxWidth: .infinity, alignment: .leading)"))
+    #expect(themeSource.contains(".multilineTextAlignment(.leading)"))
+    #expect(themeSource.contains(".contentShape(Rectangle())"))
+    #expect(multilineSource.contains(".simultaneousGesture("))
+    #expect(multilineSource.contains("focusedField.wrappedValue = focusValue"))
     #expect(source.contains("embeddedAgentRuntimeSections"))
     #expect(source.contains("embedsRuntimeConfiguration"))
     #expect(source.contains("SessionWindowCreateTransportChoicesGroup("))
@@ -440,6 +442,10 @@ struct SessionWindowCreateFormMetricsTests {
   }
 
   private func sourceFile(named relativePath: String) throws -> String {
+    try previewableSourceFile(at: "Views/Sessions/\(relativePath)")
+  }
+
+  private func previewableSourceFile(at relativePath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
       testsDirectory
@@ -449,9 +455,7 @@ struct SessionWindowCreateFormMetricsTests {
       .deletingLastPathComponent()
     let fileURL =
       repoRoot
-      .appendingPathComponent(
-        "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Sessions"
-      )
+      .appendingPathComponent("apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable")
       .appendingPathComponent(relativePath)
     return try String(contentsOf: fileURL, encoding: .utf8)
   }

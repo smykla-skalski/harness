@@ -71,6 +71,22 @@ impl CodexJsonRpc {
         .await
     }
 
+    pub(super) async fn send_error(
+        &mut self,
+        request_id: Value,
+        code: i64,
+        message: &str,
+    ) -> Result<(), CliError> {
+        self.send(json!({
+            "id": request_id,
+            "error": {
+                "code": code,
+                "message": message,
+            },
+        }))
+        .await
+    }
+
     pub(super) async fn next_message(&mut self) -> Result<Option<Value>, CliError> {
         if let Some(message) = self.pending_messages.pop_front() {
             return Ok(Some(message));

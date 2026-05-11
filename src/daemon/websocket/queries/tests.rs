@@ -130,6 +130,45 @@ async fn dispatch_read_query_managed_agent_detail_returns_coded_snapshot() {
 }
 
 #[tokio::test]
+async fn dispatch_read_query_managed_agent_codex_transcript_returns_history() {
+    let state = test_http_state_with_db();
+    seed_sample_codex_run(&state, "run-3", "2026-04-13T19:15:00Z");
+    let request = WsRequest {
+        id: "req-codex-transcript".into(),
+        method: "managed_agent.codex_transcript".into(),
+        params: serde_json::json!({
+            "session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
+        }),
+        trace_context: None,
+    };
+
+    let response = dispatch_read_query(&request, &state).await;
+
+    assert_eq!(response.id, "req-codex-transcript");
+    assert!(response.error.is_none());
+    let result = response.result.expect("Codex transcript response");
+    let Value::Array(entries) = result["entries"].clone() else {
+        panic!("expected Codex transcript entries array");
+    };
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0]["kind"].as_str(), Some("user_prompt"));
+    assert_eq!(
+        entries[0]["session_id"].as_str(),
+        Some("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4")
+    );
+    assert_eq!(entries[0]["agent_id"].as_str(), Some("codex-worker"));
+    assert_eq!(
+        entries[0]["summary"].as_str(),
+        Some("User prompt: Investigate run-3")
+    );
+    assert_eq!(entries[0]["payload"]["runtime"].as_str(), Some("codex"));
+    assert_eq!(
+        entries[0]["payload"]["event"]["type"].as_str(),
+        Some("user_prompt")
+    );
+}
+
+#[tokio::test]
 async fn dispatch_read_query_managed_agent_detail_rejects_session_agent_id_alias() {
     let state = test_http_state_with_db();
     let request = WsRequest {

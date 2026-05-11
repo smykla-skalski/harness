@@ -66,6 +66,149 @@ struct HarnessMonitorStoreSessionWindowTranscriptTests {
       store.acpTranscript(forAgent: "worker-window-acp", sessionID: summary.sessionId).isEmpty)
   }
 
+  @Test("Session window maps Codex transcript run identity to session agent")
+  func sessionWindowSnapshotMapsCodexRunIdentityToSessionAgent() async throws {
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-window-codex-transcript",
+        context: "Session window Codex transcript lane",
+        status: .active,
+        leaderId: "leader-window-codex",
+        observeId: "observe-window-codex",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 2
+      )
+    )
+    let detail = codexSessionDetail(
+      summary: summary,
+      workerID: "worker-window-codex",
+      runID: "codex-run-window-codex"
+    )
+    let run = CodexRunSnapshot(
+      runId: "codex-run-window-codex",
+      sessionId: summary.sessionId,
+      displayName: "Codex Worker",
+      projectDir: summary.projectDir ?? summary.contextRoot,
+      threadId: "thread-window-codex",
+      turnId: "turn-window-codex",
+      mode: .workspaceWrite,
+      status: .completed,
+      prompt: "Investigate Codex transcript",
+      latestSummary: "Completed",
+      finalMessage: "Codex transcript response",
+      error: nil,
+      pendingApprovals: [],
+      createdAt: "2026-04-28T00:00:20Z",
+      updatedAt: "2026-04-28T00:00:30Z"
+    )
+    let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
+      summaries: [summary],
+      detailsByID: [summary.sessionId: detail],
+      timelinesBySessionID: [summary.sessionId: []],
+      detail: detail
+    )
+    client.configureCodexRuns([run], for: summary.sessionId)
+    let store = await makeBootstrappedStore(client: client)
+
+    let snapshot = try #require(await store.sessionWindowSnapshot(sessionID: summary.sessionId))
+
+    #expect(snapshot.source == .live)
+    #expect(snapshot.transcriptSource == .direct)
+    #expect(
+      snapshot.transcript(forAgent: "worker-window-codex").map(\.summary) == [
+        "Codex transcript response",
+        "Investigate Codex transcript",
+      ]
+    )
+    #expect(
+      snapshot.transcript(forAgent: "worker-window-codex").allSatisfy {
+        $0.agentId == "worker-window-codex"
+      }
+    )
+  }
+
+  @Test("Session window refresh pulls Codex transcript after run stream updates")
+  func sessionWindowRefreshPullsCodexTranscriptAfterRunStreamUpdates() async throws {
+    let summary = makeSession(
+      .init(
+        sessionId: "sess-window-codex-refresh",
+        context: "Session window Codex refresh lane",
+        status: .active,
+        leaderId: "leader-window-codex-refresh",
+        observeId: "observe-window-codex-refresh",
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 2
+      )
+    )
+    let runID = "codex-run-window-refresh"
+    let workerID = "worker-window-codex-refresh"
+    let detail = codexSessionDetail(
+      summary: summary,
+      workerID: workerID,
+      runID: runID
+    )
+    let client = HarnessMonitorStoreSelectionTestSupport.configuredClient(
+      summaries: [summary],
+      detailsByID: [summary.sessionId: detail],
+      timelinesBySessionID: [summary.sessionId: []],
+      detail: detail
+    )
+    client.configureCodexTranscriptResponse(
+      CodexTranscriptResponse(entries: []),
+      for: summary.sessionId
+    )
+    let store = await makeBootstrappedStore(client: client)
+
+    let snapshot = try #require(await store.sessionWindowSnapshot(sessionID: summary.sessionId))
+    #expect(snapshot.transcript(forAgent: workerID).isEmpty)
+
+    let codexTranscriptEntry = TimelineEntry(
+      entryId: "codex-refresh-response",
+      recordedAt: "2026-04-28T00:00:40Z",
+      kind: "assistant_text",
+      sessionId: summary.sessionId,
+      agentId: runID,
+      taskId: nil,
+      summary: "Fresh Codex response",
+      payload: .object([
+        "runtime": .string("codex"),
+        "event": .object([
+          "type": .string("assistant_text"),
+          "content": .string("Fresh Codex response"),
+        ]),
+        "codex_timeline_identity": .object([
+          "run_id": .string(runID),
+          "agent_id": .string(runID),
+          "agent_display_name": .string("Codex Worker"),
+          "thread_id": .string("thread-window-codex-refresh"),
+          "turn_id": .string("turn-window-codex-refresh"),
+        ]),
+      ])
+    )
+    client.configureCodexTranscriptResponse(
+      CodexTranscriptResponse(entries: [codexTranscriptEntry]),
+      for: summary.sessionId
+    )
+
+    let refreshed = try #require(
+      await store.refreshSessionWindowManagedTranscript(
+        sessionID: summary.sessionId,
+        snapshot: snapshot
+      )
+    )
+
+    #expect(refreshed.transcriptSource == .direct)
+    #expect(
+      refreshed.transcript(forAgent: workerID).map(\.summary) == ["Fresh Codex response"]
+    )
+    #expect(refreshed.transcript(forAgent: workerID).allSatisfy { $0.agentId == workerID })
+    #expect(client.readCallCount(.codexTranscript(summary.sessionId)) == 2)
+  }
+
   @Test(
     "Session window snapshot derives transcript fallback from timeline when ACP transcript load fails"
   )
@@ -255,4 +398,59 @@ struct HarnessMonitorStoreSessionWindowTranscriptTests {
     )
   }
   // swiftlint:enable function_body_length
+
+  private func codexSessionDetail(
+    summary: SessionSummary,
+    workerID: String,
+    runID: String
+  ) -> SessionDetail {
+    let leaderID = summary.leaderId ?? "leader-\(summary.sessionId)"
+    let runtimeCapabilities = RuntimeCapabilities(
+      runtime: "codex",
+      supportsNativeTranscript: true,
+      supportsSignalDelivery: true,
+      supportsContextInjection: true,
+      typicalSignalLatencySeconds: 5,
+      hookPoints: []
+    )
+    let leader = AgentRegistration(
+      agentId: leaderID,
+      name: "Leader \(summary.sessionId)",
+      runtime: "claude",
+      role: .leader,
+      capabilities: ["general"],
+      joinedAt: summary.createdAt,
+      updatedAt: summary.updatedAt,
+      status: .active,
+      agentSessionId: "\(leaderID)-session",
+      lastActivityAt: summary.lastActivityAt,
+      currentTaskId: nil,
+      runtimeCapabilities: runtimeCapabilities,
+      persona: nil
+    )
+    let worker = AgentRegistration(
+      agentId: workerID,
+      name: "Codex Worker",
+      runtime: "codex",
+      role: .worker,
+      capabilities: ["general"],
+      joinedAt: summary.createdAt,
+      updatedAt: summary.updatedAt,
+      status: .active,
+      agentSessionId: nil,
+      managedAgent: ManagedAgentRef(kind: .codex, id: runID),
+      lastActivityAt: summary.lastActivityAt,
+      currentTaskId: nil,
+      runtimeCapabilities: runtimeCapabilities,
+      persona: nil
+    )
+    return SessionDetail(
+      session: summary,
+      agents: [leader, worker],
+      tasks: [],
+      signals: [],
+      observer: nil,
+      agentActivity: []
+    )
+  }
 }

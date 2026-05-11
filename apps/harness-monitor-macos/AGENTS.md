@@ -148,8 +148,10 @@ cursor stacks, or per-drag width state unless a native split cannot express the
 behavior and the performance tradeoff is proven.
 
 Liquid Glass summary: let `NavigationSplitView` sidebars use the system glass,
-extend detail content with `.backgroundExtensionEffect()`, apply glass to
-navigation/control surfaces only, and never stack glass on glass. See
+use one stable `.backgroundExtensionEffect()` host per session surface, avoid
+duplicating that effect on individual content/detail panes, keep session scroll
+edges soft, apply glass to navigation/control surfaces only, and never stack
+glass on glass. See
 `../../docs/agent-guides/monitor-reference.md` for the full macOS 26 notes.
 
 Use the relevant skill before writing or reviewing Swift code here:

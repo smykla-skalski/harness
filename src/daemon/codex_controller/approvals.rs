@@ -98,6 +98,20 @@ pub(super) fn trim_summary(value: &str) -> String {
         .collect()
 }
 
+pub(super) fn upsert_pending_approval(
+    approvals: &mut Vec<CodexApprovalRequest>,
+    approval: CodexApprovalRequest,
+) {
+    if let Some(existing) = approvals
+        .iter_mut()
+        .find(|candidate| candidate.approval_id == approval.approval_id)
+    {
+        *existing = approval;
+    } else {
+        approvals.push(approval);
+    }
+}
+
 struct ApprovalTemplate<'a> {
     kind: &'a str,
     title: &'a str,

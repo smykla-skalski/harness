@@ -22,6 +22,31 @@ public struct AcpTimelineIdentityMetadata: Equatable, Sendable {
   }
 }
 
+public struct CodexTimelineIdentityMetadata: Equatable, Sendable {
+  public let runID: String
+  public let agentID: String?
+  public let agentDisplayName: String?
+  public let threadID: String?
+  public let turnID: String?
+
+  public var managedAgentID: String { runID }
+  public var sessionAgentID: String? { agentID }
+
+  public init(
+    runID: String,
+    agentID: String?,
+    agentDisplayName: String?,
+    threadID: String?,
+    turnID: String?
+  ) {
+    self.runID = runID
+    self.agentID = agentID
+    self.agentDisplayName = agentDisplayName
+    self.threadID = threadID
+    self.turnID = turnID
+  }
+}
+
 public struct ToolCallTimelineEntryMetadata: Equatable, Sendable {
   public let rowID: String
   public let phaseID: String
