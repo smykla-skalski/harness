@@ -1,4 +1,3 @@
-import Combine
 import HarnessMonitorKit
 import SwiftUI
 
@@ -34,19 +33,9 @@ struct SessionTimelineView: View {
     self.timelineLoading = timelineLoading
   }
 
-  @Environment(\.harnessDateTimeConfiguration)
-  private var dateTimeConfiguration
-  @Environment(\.fontScale)
-  private var fontScale
-  @Environment(\.harnessTextSizeIndex)
-  private var textSizeIndex
-  @Environment(\.accessibilityReduceMotion)
-  private var reduceMotion
-  // @AppStorage is keyed: SwiftUI only invalidates when the specific
-  // UserDefaults key changes. Switching from @State + a global
-  // UserDefaults.didChangeNotification observer eliminates the broadcast
-  // that fired on every keystroke when other parts of the app (e.g.
-  // agent-composer drafts) wrote unrelated UserDefaults keys.
+  @Environment(\.harnessDateTimeConfiguration) private var dateTimeConfiguration
+  @Environment(\.fontScale) private var fontScale
+
   @AppStorage(SessionTimelineFilterDefaults.persistenceModeKey)
   var filterPersistenceModeRawValue =
     SessionTimelineFilterDefaults.defaultPersistenceMode.rawValue
@@ -55,90 +44,19 @@ struct SessionTimelineView: View {
     SessionTimelineFilterDefaults.defaultAppStateRawValue
   @SceneStorage(SessionTimelineFilterDefaults.sceneRegistryKey)
   var sceneStoredFilterRegistryRawValue = ""
-  @State var scrollCommand: SessionTimelineScrollCommand?
-  @State var scrollCommandGeneration = 0
-  @State var pendingNavigationAfterLoad: SessionTimelinePendingNavigation?
-  @State var pendingNavigationGeneration = 0
-  @State var pendingEdgeLoad: SessionTimelinePendingEdgeLoad?
-  @State var cachedPresentation = SessionTimelineSectionPresentation.empty
-  @State var cachedPresentationInput = SessionTimelinePresentationInput.empty
-  @State var viewport = SessionTimelineViewportModel()
+
   @State var filters = SessionTimelineFilterState()
-  // Cache the normalized filter signature so presentationInput does not
-  // rebuild and serialize the signature String on every body invocation.
-  // Updated via onChange when filters mutate.
-  @State private var cachedFilterSignature: String =
-    SessionTimelineFilterState().signature
-  // Drive the bridged column width from SwiftUI geometry. Without this the
-  // AppKit-side bounds-change notification is the only path that applies a
-  // real width after first render, and it does not always fire before the
-  // first paint, so cards render at the placeholder column width.
-  @State var measuredTimelineWidth: CGFloat = 0
 
-  var body: some View {
-    let input = presentationInput
-    let displayPresentation = presentationForBody(input: input)
-    content(for: displayPresentation)
-      // Hop presentation writes out of the view-update phase so timeline bursts
-      // do not interleave @State and @Observable mutations during body eval.
-      .task(id: input) {
-        await Task.yield()
-        guard !Task.isCancelled else {
-          return
-        }
-        rebuildPresentationIfNeeded(for: input)
-      }
-      .task(id: filterHydrationInput) {
-        hydrateFilters(for: filterHydrationInput)
-      }
-      .task(id: edgeLoadRetryInput(for: displayPresentation)) {
-        await Task.yield()
-        guard !Task.isCancelled else {
-          return
-        }
-        retryPendingEdgeLoadIfNeeded(for: displayPresentation)
-      }
-      .onChange(of: filters) { _, newValue in
-        let normalized = normalizedFilters(newValue)
-        cachedFilterSignature = normalized.signature
-        persistFilters(normalized)
-      }
-      .onChange(of: filterPersistenceModeRawValue) { _, _ in
-        persistFilters(normalizedFilters(filters))
-      }
-      .modifier(SessionTimelineSearchMirror(filterQuery: $filters.query))
-  }
-
-  private var presentationInput: SessionTimelinePresentationInput {
-    SessionTimelinePresentationInput(
+  private var presentation: SessionTimelineSectionPresentation {
+    SessionTimelineSectionPresentation(
       sessionID: sessionID,
-      timelineCount: timeline.count,
-      firstTimelineEntryID: timeline.first?.entryId,
-      firstTimelineRecordedAt: timeline.first?.recordedAt,
-      lastTimelineEntryID: timeline.last?.entryId,
-      lastTimelineRecordedAt: timeline.last?.recordedAt,
-      timelineWindowRevision: timelineWindow?.revision,
-      timelineWindowStart: timelineWindow?.windowStart,
-      timelineWindowEnd: timelineWindow?.windowEnd,
-      timelineWindowHasOlder: timelineWindow?.hasOlder ?? false,
-      timelineWindowHasNewer: timelineWindow?.hasNewer ?? false,
-      decisionCount: decisions.count,
-      firstDecisionID: decisions.first?.id,
-      lastDecisionID: decisions.last?.id,
-      signalCount: store.selectedSessionSignals.count,
+      timeline: timeline,
+      timelineWindow: timelineWindow,
+      decisions: decisions,
+      signals: store.selectedSessionSignals,
+      filters: normalizedFilters(filters),
       isTimelineLoading: isTimelineLoading,
-      filterSignature: cachedFilterSignature,
-      reduceMotion: reduceMotion,
-      textSizeIndex: textSizeIndex,
       dateTimeConfiguration: dateTimeConfiguration
-    )
-  }
-
-  private var filterHydrationInput: SessionTimelineFilterHydrationInput {
-    SessionTimelineFilterHydrationInput(
-      sessionID: sessionID,
-      appStateRawValue: appStoredFilterStateRawValue,
-      sceneRegistryRawValue: sceneStoredFilterRegistryRawValue
     )
   }
 
@@ -151,92 +69,36 @@ struct SessionTimelineView: View {
     SessionWindowRouteContentMetrics(fontScale: fontScale)
   }
 
-  private var routePageTopPadding: CGFloat {
-    max(
-      HarnessMonitorTheme.spacingSM,
-      min(routeMetrics.contentPadding * 0.5, HarnessMonitorTheme.spacingLG)
-    )
+  var actionHandler: any DecisionActionHandler {
+    store.supervisorDecisionActionHandler()
   }
 
-  private var routeHeaderHorizontalPadding: CGFloat {
-    routeMetrics.contentPadding
-  }
-
-  var routeTimelineHorizontalContentInset: CGFloat {
-    routeMetrics.contentPadding
-  }
-
-  private func normalizedFilters(_ state: SessionTimelineFilterState) -> SessionTimelineFilterState {
-    var copy = state
-    copy.searchScope = .all
-    return copy
-  }
-
-  @MainActor
-  private func rebuildPresentationIfNeeded(
-    for input: SessionTimelinePresentationInput,
-    force: Bool = false
-  ) {
-    guard force || cachedPresentationInput != input else {
-      return
+  var body: some View {
+    let presentation = self.presentation
+    Group {
+      switch style {
+      case .cockpitSection:
+        cockpitContent(for: presentation)
+      case .routePage:
+        routePageContent(for: presentation)
+      }
     }
-    let nextPresentation = makePresentation()
-    cachedPresentation = SessionTimelinePresentationRetention.resolved(
-      previousPresentation: cachedPresentation,
-      previousInput: cachedPresentationInput,
-      nextPresentation: nextPresentation,
-      nextInput: input
-    )
-    cachedPresentationInput = input
-    viewport.updatePresentationCounts(
-      windowStart: cachedPresentation.navigation.windowStart,
-      loaded: cachedPresentation.navigation.loadedCount,
-      total: cachedPresentation.navigation.totalCount,
-      filteredMatchCount: cachedPresentation.filterMatchCountForVisibilityStats
-    )
-    viewport.recordInitialViewport(
-      estimatedVisibleEvents: min(
-        cachedPresentation.navigation.loadedCount,
-        cachedPresentation.fallbackVisibleRowCount
-      )
-    )
-  }
-
-  private func presentationForBody(
-    input: SessionTimelinePresentationInput
-  ) -> SessionTimelineSectionPresentation {
-    if cachedPresentationInput == .empty || cachedPresentationInput.sessionID != input.sessionID {
-      return makePresentation()
+    .task(id: filterHydrationInput) {
+      hydrateFilters(for: filterHydrationInput)
     }
-    return cachedPresentation
-  }
-
-  private func makePresentation() -> SessionTimelineSectionPresentation {
-    SessionTimelineSectionPresentation(
-      sessionID: sessionID,
-      timeline: timeline,
-      timelineWindow: timelineWindow,
-      decisions: decisions,
-      signals: store.selectedSessionSignals,
-      filters: normalizedFilters(filters),
-      isTimelineLoading: isTimelineLoading,
-      reduceMotion: reduceMotion,
-      textSizeIndex: textSizeIndex,
-      dateTimeConfiguration: dateTimeConfiguration
-    )
+    .onAppear { requestLatestWindowIfNeeded(presentation) }
+    .onChange(of: host.id) { _, _ in requestLatestWindow() }
+    .onChange(of: filters) { _, newValue in
+      persistFilters(normalizedFilters(newValue))
+    }
+    .onChange(of: filterPersistenceModeRawValue) { _, _ in
+      persistFilters(normalizedFilters(filters))
+    }
+    .modifier(SessionTimelineSearchMirror(filterQuery: $filters.query))
   }
 
   @ViewBuilder
-  private func content(for presentation: SessionTimelineSectionPresentation) -> some View {
-    switch style {
-    case .cockpitSection:
-      cockpitSectionContent(for: presentation)
-    case .routePage:
-      routePageContent(for: presentation)
-    }
-  }
-
-  private func cockpitSectionContent(
+  private func cockpitContent(
     for presentation: SessionTimelineSectionPresentation
   ) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
@@ -251,82 +113,6 @@ struct SessionTimelineView: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .timelineLifecycle(for: presentation, host: self)
-  }
-
-  private func routePageContent(for presentation: SessionTimelineSectionPresentation) -> some View {
-    VStack(alignment: .leading, spacing: routeMetrics.overviewSpacing) {
-      routePageHeader(for: presentation)
-
-      if presentation.showsEmptyState {
-        ContentUnavailableView(
-          "No Timeline Events",
-          systemImage: "clock.arrow.circlepath",
-          description: Text("This session has not recorded timeline activity yet.")
-        )
-        .padding(.horizontal, routeHeaderHorizontalPadding)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-      } else {
-        routeTimelineContent(for: presentation)
-      }
-    }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .timelineLifecycle(for: presentation, host: self)
-  }
-
-  private func routePageHeader(
-    for presentation: SessionTimelineSectionPresentation
-  ) -> some View {
-    VStack(alignment: .leading, spacing: routeMetrics.overviewSpacing) {
-      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
-        Text("Timeline")
-          .scaledFont(.system(.title2, design: .rounded, weight: .semibold))
-          .accessibilityAddTraits(.isHeader)
-
-        Spacer(minLength: HarnessMonitorTheme.spacingLG)
-
-        if !presentation.showsEmptyState {
-          HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
-            if presentation.navigation.showsNavigation {
-              SessionTimelineNavigationVisibilityStatus(
-                filterSummary: presentation.filterSnapshot.summary,
-                viewport: viewport,
-                accessibilityIdentifier:
-                  HarnessMonitorAccessibility.sessionTimelineNavigationStatus
-              )
-            }
-            SessionTimelineFilterActionButtons(
-              filters: $filters,
-              inventory: presentation.filterSnapshot.inventory,
-              showsClearButton: false
-            )
-            if presentation.navigation.showsNavigation {
-              SessionTimelineNavigationButtonRow(
-                presentation: presentation,
-                scrollCommandTargetID: scrollCommand?.targetID,
-                viewport: viewport,
-                performAction: { action in
-                  performNavigationAction(action, presentation: presentation)
-                }
-              )
-            }
-          }
-        }
-      }
-      .padding(.horizontal, routeHeaderHorizontalPadding)
-      .padding(.top, routePageTopPadding)
-
-      if !presentation.showsEmptyState {
-        SessionTimelineFilterControls(
-          filters: $filters,
-          inventory: presentation.filterSnapshot.inventory,
-          summary: presentation.filterSnapshot.summary,
-          layout: .chipsOnly
-        )
-        .padding(.horizontal, routeHeaderHorizontalPadding)
-      }
-    }
-    .frame(maxWidth: .infinity, alignment: .topLeading)
   }
 
   private func cockpitTimelineSurface(
@@ -339,20 +125,25 @@ struct SessionTimelineView: View {
         summary: presentation.filterSnapshot.summary
       )
 
-      timelineRows(for: presentation)
-        .frame(height: presentation.scrollViewportHeight)
+      SessionTimelineList(
+        presentation: presentation,
+        actionHandler: actionHandler,
+        onSignalTap: handleSignalTap,
+        fontScale: fontScale,
+        horizontalContentInset: 0,
+        filters: $filters
+      )
+      .frame(minHeight: 260, maxHeight: 470)
 
       if presentation.navigation.showsNavigation {
-        SessionTimelineNavigationControls(
+        SessionTimelineCountSummary(
           navigation: presentation.navigation,
-          presentation: presentation,
           filterSummary: presentation.filterSnapshot.summary,
-          scrollCommandTargetID: scrollCommand?.targetID,
-          viewport: viewport,
-          performAction: { action in
-            performNavigationAction(action, presentation: presentation)
-          }
+          filterMatchCount: presentation.filterMatchCountForVisibilityStats
         )
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Timeline navigation")
+        .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineNavigation)
       }
     }
     .padding(HarnessMonitorTheme.spacingLG)
@@ -370,4 +161,170 @@ struct SessionTimelineView: View {
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
+  private func routePageContent(
+    for presentation: SessionTimelineSectionPresentation
+  ) -> some View {
+    VStack(alignment: .leading, spacing: routeMetrics.overviewSpacing) {
+      routePageHeader(for: presentation)
+
+      if presentation.showsEmptyState {
+        ContentUnavailableView(
+          "No Timeline Events",
+          systemImage: "clock.arrow.circlepath",
+          description: Text("This session has not recorded timeline activity yet.")
+        )
+        .padding(.horizontal, routeMetrics.contentPadding)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+      } else {
+        SessionTimelineList(
+          presentation: presentation,
+          actionHandler: actionHandler,
+          onSignalTap: handleSignalTap,
+          fontScale: fontScale,
+          horizontalContentInset: routeMetrics.contentPadding,
+          filters: $filters
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+
+  @ViewBuilder
+  private func routePageHeader(
+    for presentation: SessionTimelineSectionPresentation
+  ) -> some View {
+    VStack(alignment: .leading, spacing: routeMetrics.overviewSpacing) {
+      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
+        Text("Timeline")
+          .scaledFont(.system(.title2, design: .rounded, weight: .semibold))
+          .accessibilityAddTraits(.isHeader)
+
+        Spacer(minLength: HarnessMonitorTheme.spacingLG)
+
+        if !presentation.showsEmptyState {
+          HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+            if presentation.navigation.showsNavigation {
+              SessionTimelineCountSummary(
+                navigation: presentation.navigation,
+                filterSummary: presentation.filterSnapshot.summary,
+                filterMatchCount: presentation.filterMatchCountForVisibilityStats
+              )
+            }
+            SessionTimelineFilterActionButtons(
+              filters: $filters,
+              inventory: presentation.filterSnapshot.inventory,
+              showsClearButton: false
+            )
+          }
+        }
+      }
+      .padding(.horizontal, routeMetrics.contentPadding)
+      .padding(.top, routePageTopPadding)
+
+      if !presentation.showsEmptyState {
+        SessionTimelineFilterControls(
+          filters: $filters,
+          inventory: presentation.filterSnapshot.inventory,
+          summary: presentation.filterSnapshot.summary,
+          layout: .chipsOnly
+        )
+        .padding(.horizontal, routeMetrics.contentPadding)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .topLeading)
+  }
+
+  private var routePageTopPadding: CGFloat {
+    max(
+      HarnessMonitorTheme.spacingSM,
+      min(routeMetrics.contentPadding * 0.5, HarnessMonitorTheme.spacingLG)
+    )
+  }
+
+  private func normalizedFilters(_ state: SessionTimelineFilterState) -> SessionTimelineFilterState {
+    var copy = state
+    copy.searchScope = .all
+    return copy
+  }
+
+  func handleSignalTap(_ signalID: String) {
+    store.presentedSheet = .signalDetail(signalID: signalID)
+  }
+}
+
+private struct SessionTimelineList: View {
+  let presentation: SessionTimelineSectionPresentation
+  let actionHandler: any DecisionActionHandler
+  let onSignalTap: ((String) -> Void)?
+  let fontScale: CGFloat
+  let horizontalContentInset: CGFloat
+  let filters: Binding<SessionTimelineFilterState>
+
+  init(
+    presentation: SessionTimelineSectionPresentation,
+    actionHandler: any DecisionActionHandler,
+    onSignalTap: ((String) -> Void)?,
+    fontScale: CGFloat,
+    horizontalContentInset: CGFloat,
+    filters: Binding<SessionTimelineFilterState>
+  ) {
+    self.presentation = presentation
+    self.actionHandler = actionHandler
+    self.onSignalTap = onSignalTap
+    self.fontScale = fontScale
+    self.horizontalContentInset = horizontalContentInset
+    self.filters = filters
+  }
+
+  var body: some View {
+    Group {
+      if presentation.showsFilteredEmptyState {
+        SessionTimelineFilteredEmptyState(filters: filters)
+      } else if presentation.rows.isEmpty && presentation.navigation.isLoading {
+        ProgressView()
+          .controlSize(.small)
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+      } else {
+        ScrollView(.vertical) {
+          LazyVStack(alignment: .leading, spacing: 0) {
+            ForEach(presentation.rows) { row in
+              SessionTimelineRowView(
+                row: row,
+                actionHandler: actionHandler,
+                onSignalTap: onSignalTap,
+                fontScale: fontScale
+              )
+              .equatable()
+              .id(row.id)
+            }
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.horizontal, horizontalContentInset)
+        }
+        .scrollIndicators(.visible)
+        .scrollBounceBehavior(.basedOnSize, axes: .vertical)
+      }
+    }
+  }
+}
+
+struct SessionTimelineFilteredEmptyState: View {
+  @Binding var filters: SessionTimelineFilterState
+
+  var body: some View {
+    VStack(spacing: HarnessMonitorTheme.spacingSM) {
+      Image(systemName: "line.3.horizontal.decrease.circle")
+        .font(.title2)
+        .foregroundStyle(.secondary)
+      Text("No timeline items match these filters")
+        .scaledFont(.body.weight(.semibold))
+      Button("Clear filters") {
+        filters.clear()
+      }
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .padding(HarnessMonitorTheme.spacingLG)
+  }
 }

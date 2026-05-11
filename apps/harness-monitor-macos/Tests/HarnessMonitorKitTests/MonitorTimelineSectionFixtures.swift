@@ -63,8 +63,7 @@ enum MonitorTimelineSectionFixtures {
   static func makePresentation(
     sessionID: String,
     timeline: [TimelineEntry],
-    isTimelineLoading: Bool,
-    textSizeIndex: Int = HarnessMonitorTextSize.defaultIndex
+    isTimelineLoading: Bool
   ) -> SessionTimelineSectionPresentation {
     SessionTimelineSectionPresentation(
       sessionID: sessionID,
@@ -74,37 +73,6 @@ enum MonitorTimelineSectionFixtures {
       signals: [],
       filters: .init(),
       isTimelineLoading: isTimelineLoading,
-      reduceMotion: false,
-      textSizeIndex: textSizeIndex,
-      dateTimeConfiguration: .default
-    )
-  }
-
-  static func makeInput(
-    sessionID: String,
-    timeline: [TimelineEntry],
-    isTimelineLoading: Bool
-  ) -> SessionTimelinePresentationInput {
-    SessionTimelinePresentationInput(
-      sessionID: sessionID,
-      timelineCount: timeline.count,
-      firstTimelineEntryID: timeline.first?.entryId,
-      firstTimelineRecordedAt: timeline.first?.recordedAt,
-      lastTimelineEntryID: timeline.last?.entryId,
-      lastTimelineRecordedAt: timeline.last?.recordedAt,
-      timelineWindowRevision: nil,
-      timelineWindowStart: nil,
-      timelineWindowEnd: nil,
-      timelineWindowHasOlder: false,
-      timelineWindowHasNewer: false,
-      decisionCount: 0,
-      firstDecisionID: nil,
-      lastDecisionID: nil,
-      signalCount: 0,
-      isTimelineLoading: isTimelineLoading,
-      filterSignature: "",
-      reduceMotion: false,
-      textSizeIndex: HarnessMonitorTextSize.defaultIndex,
       dateTimeConfiguration: .default
     )
   }

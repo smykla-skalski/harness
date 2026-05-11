@@ -15,71 +15,20 @@ struct MonitorTimelineSection: View {
   let store: HarnessMonitorStore
 
   var body: some View {
-    ViewBodySignposter.measure("MonitorTimelineSection") {
-      SessionTimelineView(
-        style: .cockpitSection,
-        host: host,
-        timeline: timeline,
-        timelineWindow: timelineWindow,
-        decisions: decisions,
-        isTimelineLoading: isTimelineLoading,
-        store: store
-      )
-    }
+    SessionTimelineView(
+      style: .cockpitSection,
+      host: host,
+      timeline: timeline,
+      timelineWindow: timelineWindow,
+      decisions: decisions,
+      isTimelineLoading: isTimelineLoading,
+      store: store
+    )
   }
 }
 
 struct SessionTimelineLoading {
-  let loadOlderChunk: @MainActor (SessionTimelineSectionPresentation, Int, Int) async -> Void
   let loadWindow: @MainActor (TimelineWindowRequest, Int?) async -> Void
-}
-
-struct SessionTimelinePresentationInput: Equatable {
-  let sessionID: String
-  let timelineCount: Int
-  let firstTimelineEntryID: String?
-  let firstTimelineRecordedAt: String?
-  let lastTimelineEntryID: String?
-  let lastTimelineRecordedAt: String?
-  let timelineWindowRevision: Int64?
-  let timelineWindowStart: Int?
-  let timelineWindowEnd: Int?
-  let timelineWindowHasOlder: Bool
-  let timelineWindowHasNewer: Bool
-  let decisionCount: Int
-  let firstDecisionID: String?
-  let lastDecisionID: String?
-  let signalCount: Int
-  let isTimelineLoading: Bool
-  let filterSignature: String
-  let reduceMotion: Bool
-  let textSizeIndex: Int
-  let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
-
-  static var empty: Self {
-    Self(
-      sessionID: "",
-      timelineCount: 0,
-      firstTimelineEntryID: nil,
-      firstTimelineRecordedAt: nil,
-      lastTimelineEntryID: nil,
-      lastTimelineRecordedAt: nil,
-      timelineWindowRevision: nil,
-      timelineWindowStart: nil,
-      timelineWindowEnd: nil,
-      timelineWindowHasOlder: false,
-      timelineWindowHasNewer: false,
-      decisionCount: 0,
-      firstDecisionID: nil,
-      lastDecisionID: nil,
-      signalCount: 0,
-      isTimelineLoading: false,
-      filterSignature: "",
-      reduceMotion: false,
-      textSizeIndex: HarnessMonitorTextSize.defaultIndex,
-      dateTimeConfiguration: .default
-    )
-  }
 }
 
 struct SessionTimelineFilterHydrationInput: Equatable {
@@ -139,44 +88,6 @@ enum SessionTimelineFilterPersistenceResolver {
   }
 }
 
-struct SessionTimelineContentIdentity: Hashable {
-  let sessionID: String
-}
-
-enum SessionTimelinePresentationRetention {
-  static func shouldRetainPreviousPresentation(
-    previousPresentation: SessionTimelineSectionPresentation,
-    previousInput: SessionTimelinePresentationInput,
-    nextPresentation: SessionTimelineSectionPresentation,
-    nextInput: SessionTimelinePresentationInput
-  ) -> Bool {
-    guard previousInput.sessionID == nextInput.sessionID else {
-      return false
-    }
-    guard !previousPresentation.rows.isEmpty, nextPresentation.rows.isEmpty else {
-      return false
-    }
-    return nextInput.isTimelineLoading || nextPresentation.showsEmptyState
-  }
-
-  static func resolved(
-    previousPresentation: SessionTimelineSectionPresentation,
-    previousInput: SessionTimelinePresentationInput,
-    nextPresentation: SessionTimelineSectionPresentation,
-    nextInput: SessionTimelinePresentationInput
-  ) -> SessionTimelineSectionPresentation {
-    if shouldRetainPreviousPresentation(
-      previousPresentation: previousPresentation,
-      previousInput: previousInput,
-      nextPresentation: nextPresentation,
-      nextInput: nextInput
-    ) {
-      return previousPresentation
-    }
-    return nextPresentation
-  }
-}
-
 enum SessionTimelinePlaceholderShimmer {
   static let cycleDuration: TimeInterval = 1.8
   static let restingPhase: CGFloat = -0.6
@@ -194,61 +105,51 @@ enum SessionTimelinePlaceholderShimmer {
 }
 
 extension SessionTimelineView {
-  var contentIdentity: SessionTimelineContentIdentity {
-    SessionTimelineContentIdentity(sessionID: sessionID)
+  var filterHydrationInput: SessionTimelineFilterHydrationInput {
+    SessionTimelineFilterHydrationInput(
+      sessionID: sessionID,
+      appStateRawValue: appStoredFilterStateRawValue,
+      sceneRegistryRawValue: sceneStoredFilterRegistryRawValue
+    )
   }
 
-  func loadOlderTimelineChunk(
-    presentation: SessionTimelineSectionPresentation,
-    limit: Int
-  ) async {
-    let retainedLimit = retainedTimelineWindowLimit()
+  func hydrateFilters(for input: SessionTimelineFilterHydrationInput) {
+    let hydrated = SessionTimelineFilterPersistenceResolver.hydrate(
+      mode: filterPersistenceMode,
+      input: input
+    )
+    if hydrated != filters {
+      filters = hydrated
+    }
+  }
+
+  func persistFilters(_ state: SessionTimelineFilterState) {
+    let snapshot = SessionTimelineFilterPersistenceResolver.persist(
+      mode: filterPersistenceMode,
+      state: state,
+      sessionID: sessionID,
+      appStateRawValue: appStoredFilterStateRawValue,
+      sceneRegistryRawValue: sceneStoredFilterRegistryRawValue
+    )
+    if snapshot.appStateRawValue != appStoredFilterStateRawValue {
+      appStoredFilterStateRawValue = snapshot.appStateRawValue
+    }
+    if snapshot.sceneRegistryRawValue != sceneStoredFilterRegistryRawValue {
+      sceneStoredFilterRegistryRawValue = snapshot.sceneRegistryRawValue
+    }
+  }
+
+  func requestLatestWindowIfNeeded(_ presentation: SessionTimelineSectionPresentation) {
+    guard timeline.isEmpty else { return }
+    requestLatestWindow()
+  }
+
+  func requestLatestWindow() {
+    let request = TimelineWindowRequest.latest(limit: 2000)
     if let timelineLoading {
-      await timelineLoading.loadOlderChunk(presentation, limit, retainedLimit)
+      Task { await timelineLoading.loadWindow(request, nil) }
       return
     }
-    await store.appendSelectedTimelineOlderChunk(limit: limit, retainedLimit: retainedLimit)
-  }
-
-  func loadWindow(_ request: TimelineWindowRequest, retainedLimit: Int? = nil) async {
-    if let timelineLoading {
-      await timelineLoading.loadWindow(request, retainedLimit)
-      return
-    }
-    await store.loadSelectedTimelineWindow(request: request, retainedLimit: retainedLimit)
-  }
-
-  var actionHandler: any DecisionActionHandler {
-    store.supervisorDecisionActionHandler()
-  }
-}
-
-extension View {
-  func timelineLifecycle(
-    for presentation: SessionTimelineSectionPresentation,
-    host: SessionTimelineView
-  ) -> some View {
-    onAppear {
-      host.deferOffViewUpdate {
-        host.reconcileTimelineAnchor(with: presentation.scrollNodeIDs)
-      }
-      host.requestLatestWindowIfNeeded(presentation)
-    }
-    .onChange(of: host.sessionID) { _, _ in
-      host.deferOffViewUpdate {
-        host.timelineViewport.clear()
-        host.currentTimelineScrollCommand = nil
-        host.currentPendingNavigation = nil
-        host.currentPendingEdgeLoad = nil
-      }
-      host.requestLatestWindow()
-    }
-    .onChange(of: presentation.scrollNodeIDs) { _, ids in
-      guard !ids.isEmpty else { return }
-      host.deferOffViewUpdate {
-        host.reconcileTimelineAnchor(with: ids)
-        host.completePendingNavigationIfNeeded(presentation)
-      }
-    }
+    Task { await store.loadSelectedTimelineWindow(request: request, retainedLimit: nil) }
   }
 }

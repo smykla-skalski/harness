@@ -243,25 +243,6 @@ struct SessionTimelineFilterTests {
     #expect(filters.activeAdvancedFilterCount == 0)
   }
 
-  @Test("Visibility stats switch to filtered match wording")
-  func visibilityStatsSwitchToFilteredMatchWording() {
-    let stats = SessionTimelineVisibilityStats(
-      visibleRowCount: 3,
-      renderedRowCount: 3,
-      loadedEventCount: 24,
-      totalEventCount: 321,
-      filteredMatchCount: 8,
-      firstVisibleMatchNumber: 2,
-      lastVisibleMatchNumber: 4
-    )
-
-    #expect(stats.statusText == "Showing 2-4 of 8 matches")
-    #expect(
-      stats.accessibilityStatusText
-        == "Showing matching timeline items 2 to 4 of 8"
-    )
-  }
-
   @Test("Stored filter registry round-trips by session")
   func storedFilterRegistryRoundTripsBySession() {
     let state = SessionTimelineFilterState(

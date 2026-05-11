@@ -40,8 +40,6 @@ struct AgentTranscriptRows: View {
       signals: [],
       filters: SessionTimelineFilterState(),
       isTimelineLoading: false,
-      reduceMotion: reduceMotion,
-      textSizeIndex: textSizeIndex,
       dateTimeConfiguration: dateTimeConfiguration
     )
   }
@@ -58,9 +56,6 @@ struct AgentTranscriptRows: View {
     } else {
       SessionTimelineCards(
         rows: presentation.rows,
-        placeholderCount: 0,
-        shimmerPhase: 0,
-        showsShimmer: false,
         actionHandler: store.supervisorDecisionActionHandler(),
         onSignalTap: nil
       )

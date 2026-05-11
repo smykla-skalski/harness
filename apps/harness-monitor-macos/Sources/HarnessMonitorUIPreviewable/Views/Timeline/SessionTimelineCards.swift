@@ -3,9 +3,6 @@ import SwiftUI
 
 struct SessionTimelineCards: View {
   let rows: [SessionTimelineRow]
-  let placeholderCount: Int
-  let shimmerPhase: CGFloat
-  let showsShimmer: Bool
   let actionHandler: any DecisionActionHandler
   let onSignalTap: ((String) -> Void)?
   @Environment(\.fontScale)
@@ -21,19 +18,10 @@ struct SessionTimelineCards: View {
           fontScale: fontScale
         )
       }
-
-      ForEach(0..<placeholderCount, id: \.self) { index in
-        SessionCockpitTimelinePlaceholderRow(
-          seed: index,
-          shimmerPhase: shimmerPhase,
-          showsShimmer: showsShimmer
-        )
-      }
     }
-    .scrollTargetLayout()
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(alignment: .topLeading) {
-      if !rows.isEmpty || placeholderCount > 0 {
+      if !rows.isEmpty {
         SessionTimelineRailBackground()
       }
     }
@@ -123,7 +111,7 @@ private struct SessionTimelineNodeRow: View {
   }
 
   private var usesSimpleWideLayout: Bool {
-    SessionTimelineTableMetrics.usesSimpleWideLayout(for: row)
+    SessionTimelineCardLayout.usesSimpleWideLayout(for: row)
   }
 
   // Per-cell modifier-chain depth dominated `swift_conformsToProtocol`
@@ -192,7 +180,7 @@ private struct SessionTimelineNodeRow: View {
 
   private var cardContent: some View {
     Group {
-      if SessionTimelineTableMetrics.prefersCompactLayout(for: row) {
+      if SessionTimelineCardLayout.prefersCompactLayout(for: row) {
         compactContent
       } else {
         wideContent
