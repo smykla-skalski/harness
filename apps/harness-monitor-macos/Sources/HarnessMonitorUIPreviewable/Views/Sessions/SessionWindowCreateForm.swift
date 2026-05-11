@@ -192,8 +192,7 @@ extension SessionWindowCreateForm {
     }
     return
       "Choose how this agent starts. ACP is preferred when available; the remaining "
-      + "form sections hold the configuration "
-      + "and advanced overrides."
+      + "form sections hold the configuration details."
   }
 
   @ViewBuilder private var terminalConfigurationSections: some View {
@@ -260,34 +259,25 @@ extension SessionWindowCreateForm {
     }
   }
 
-  private var terminalAdvancedOverridesSection: some View {
-    Section {
-      TextField("Optional project directory override", text: projectDirOverride)
-        .harnessNativeTextField()
-        .accessibilityLabel("Project directory override")
-
-      if !normalizedLaunchSelection.isAcp {
+  @ViewBuilder private var terminalAdvancedOverridesSection: some View {
+    if !normalizedLaunchSelection.isAcp {
+      Section {
         TextEditor(text: argvOverrideText)
           .scaledFont(.body)
           .frame(minHeight: 100)
           .accessibilityLabel("Command override")
+      } header: {
+        Text("Advanced overrides")
+          .harnessNativeFormSectionHeader()
+      } footer: {
+        Text(advancedOverridesDescription)
+          .harnessNativeFormSectionFooter()
       }
-    } header: {
-      Text("Advanced overrides")
-        .harnessNativeFormSectionHeader()
-    } footer: {
-      Text(advancedOverridesDescription)
-        .harnessNativeFormSectionFooter()
     }
   }
 
   private var advancedOverridesDescription: String {
-    if normalizedLaunchSelection.isAcp {
-      return "Set an optional project directory override for this agent."
-    }
-    return
-      "Set an optional project directory override. Use one argument per line for a "
-      + "command override; the first line is the executable."
+    "Use one argument per line for a command override; the first line is the executable."
   }
 
   @ViewBuilder
