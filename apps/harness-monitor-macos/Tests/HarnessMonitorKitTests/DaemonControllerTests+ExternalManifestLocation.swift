@@ -134,7 +134,9 @@ struct DaemonControllerExternalManifestLocationTests {
     #expect(client is PreviewHarnessClient)
   }
 
-  @Test("warm-up switches away from a stale live root manifest once a live runtime-lane manifest appears")
+  @Test(
+    "warm-up switches away from a stale live root manifest once a live runtime-lane manifest appears"
+  )
   func warmUpSwitchesFromStaleLiveRootManifestToLateRuntimeLaneManifest() async throws {
     let homeDirectory = FileManager.default.temporaryDirectory
       .appendingPathComponent(
@@ -248,7 +250,8 @@ final class DaemonControllerExternalManifestLocationXCTests: XCTestCase {
         tokenPath: rootTokenURL.path
       )
 
-      XCTAssertEqual(HarnessMonitorPaths.manifestURL(using: environment).path, staleRootManifestURL.path)
+      XCTAssertEqual(
+        HarnessMonitorPaths.manifestURL(using: environment).path, staleRootManifestURL.path)
 
       let liveEndpoint = "http://127.0.0.1:65531"
       async let laneManifestWriter: Void = {

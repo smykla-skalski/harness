@@ -210,7 +210,8 @@ extension HarnessMonitorSheetUITests {
     formatter.timeZone = .current
     formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
 
-    let predicateClauses = predicateNeedles
+    let predicateClauses =
+      predicateNeedles
       .map { "eventMessage CONTAINS \"\($0)\"" }
       .joined(separator: " OR ")
 

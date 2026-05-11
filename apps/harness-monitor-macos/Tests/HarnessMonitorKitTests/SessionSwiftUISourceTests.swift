@@ -168,7 +168,8 @@ struct SessionSwiftUISourceTests {
   @Test("Timeline section renders on SwiftUI primitives without AppKit scroll machinery")
   func timelineSectionRendersOnSwiftUIPrimitives() throws {
     let timelineSource = try sourceFile(at: "Views/Timeline/MonitorTimelineSection.swift")
-    let navigationSource = try sourceFile(at: "Views/Timeline/SessionTimelineNavigationControls.swift")
+    let navigationSource = try sourceFile(
+      at: "Views/Timeline/SessionTimelineNavigationControls.swift")
 
     #expect(timelineSource.contains("ScrollView(.vertical)"))
     #expect(timelineSource.contains("LazyVStack"))

@@ -94,7 +94,7 @@ struct SessionTimelineFilterControls: View {
 
   private var filterActionRow: some View {
     SessionTimelineFilterActionButtons(filters: $filters, inventory: inventory)
-    .frame(maxWidth: .infinity, alignment: .leading)
+      .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   private var signalPresetSection: some View {

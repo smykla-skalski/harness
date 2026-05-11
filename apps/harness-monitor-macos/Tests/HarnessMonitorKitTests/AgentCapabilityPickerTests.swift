@@ -277,13 +277,14 @@ struct AgentCapabilityPickerTests {
             displayName: "GitHub Copilot",
             binaryPresent: true,
             authState: .ready
-          ),
+          )
         ],
         checkedAt: "2026-04-28T22:15:00Z"
       )
     )
 
-    #expect(AgentCapabilityCatalog.firstProviderLaunchSelection(options: options) == .acp("copilot"))
+    #expect(
+      AgentCapabilityCatalog.firstProviderLaunchSelection(options: options) == .acp("copilot"))
   }
 
   @Test("stored provider id defaults to ACP when that provider supports ACP")

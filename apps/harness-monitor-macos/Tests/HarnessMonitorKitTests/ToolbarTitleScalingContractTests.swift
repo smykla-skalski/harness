@@ -51,7 +51,9 @@ struct ToolbarTitleScalingContractTests {
     #expect(footerSource.contains("Text(transportLabel)"))
     #expect(footerSource.contains("Text(latencyLabel)"))
     #expect(footerSource.contains("HStack(alignment: .center, spacing: 1)"))
-    #expect(!footerSource.contains(".scaledFont(.system(.caption2, design: .rounded, weight: .semibold))"))
+    #expect(
+      !footerSource.contains(".scaledFont(.system(.caption2, design: .rounded, weight: .semibold))")
+    )
     #expect(footerSource.contains(".padding(.horizontal, footerHorizontalPadding)"))
     #expect(footerSource.contains(".padding(.bottom, footerOuterPadding)"))
     #expect(

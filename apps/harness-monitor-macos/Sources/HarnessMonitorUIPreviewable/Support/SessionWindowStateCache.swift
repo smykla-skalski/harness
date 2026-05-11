@@ -107,9 +107,10 @@ public final class SessionWindowStateCache {
     }
 
     draft.useCodex = false
-    draft.runtime = HarnessMonitorAgentLaunchDefaults.preferredSelection(
-      userDefaults: userDefaults
-    ).storageKey
+    draft.runtime =
+      HarnessMonitorAgentLaunchDefaults.preferredSelection(
+        userDefaults: userDefaults
+      ).storageKey
     applySavedAgentLaunchPreset(to: &draft, userDefaults: userDefaults)
     return draft
   }

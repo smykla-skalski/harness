@@ -120,12 +120,15 @@ struct HarnessMonitorStoreSelectedTranscriptCacheTests {
     await store.restorePersistedSessionSelection(sessionID: summary.sessionId)
 
     #expect(
-      store.acpTranscript(forAgent: "worker-selected-transcript-restore", sessionID: summary.sessionId)
-        .map(\.summary) == ["Restored transcript row"]
+      store.acpTranscript(
+        forAgent: "worker-selected-transcript-restore", sessionID: summary.sessionId
+      )
+      .map(\.summary) == ["Restored transcript row"]
     )
   }
 
-  @Test("Cached derived transcript keeps its provenance through a later selected-session cache write")
+  @Test(
+    "Cached derived transcript keeps its provenance through a later selected-session cache write")
   func cachedDerivedTranscriptKeepsProvenanceThroughSelectedSessionRewrite() async throws {
     let container = try HarnessMonitorModelContainer.preview()
     let summary = makeSession(
@@ -180,7 +183,9 @@ struct HarnessMonitorStoreSelectedTranscriptCacheTests {
       timeline: [derivedTranscriptRow, cockpitRow],
       transcript: [derivedTranscriptRow],
       transcriptSource: .derived,
-      timelineWindow: TimelineWindowResponse.fallbackMetadata(for: [derivedTranscriptRow, cockpitRow])
+      timelineWindow: TimelineWindowResponse.fallbackMetadata(for: [
+        derivedTranscriptRow, cockpitRow,
+      ])
     )
 
     let store = HarnessMonitorStore(
@@ -301,11 +306,10 @@ struct HarnessMonitorStoreSelectedTranscriptCacheTests {
 
     await store.selectSession(summaryA.sessionId)
     for _ in 0..<20
-      where store.acpTranscript(
-        forAgent: "worker-selected-transcript-a",
-        sessionID: summaryA.sessionId
-      ).isEmpty
-    {
+    where store.acpTranscript(
+      forAgent: "worker-selected-transcript-a",
+      sessionID: summaryA.sessionId
+    ).isEmpty {
       try await Task.sleep(for: .milliseconds(20))
     }
     await store.selectSession(summaryB.sessionId)

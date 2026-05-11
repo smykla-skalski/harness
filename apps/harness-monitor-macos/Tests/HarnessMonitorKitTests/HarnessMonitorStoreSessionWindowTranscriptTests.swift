@@ -56,15 +56,19 @@ struct HarnessMonitorStoreSessionWindowTranscriptTests {
 
     #expect(snapshot.source == .live)
     #expect(snapshot.transcriptSource == .direct)
-    #expect(snapshot.timeline(forAgent: "worker-window-acp").map(\.summary) == ["Cockpit timeline row"])
+    #expect(
+      snapshot.timeline(forAgent: "worker-window-acp").map(\.summary) == ["Cockpit timeline row"])
     #expect(
       snapshot.transcript(forAgent: "worker-window-acp").map(\.summary)
         == ["Dedicated ACP transcript row"]
     )
-    #expect(store.acpTranscript(forAgent: "worker-window-acp", sessionID: summary.sessionId).isEmpty)
+    #expect(
+      store.acpTranscript(forAgent: "worker-window-acp", sessionID: summary.sessionId).isEmpty)
   }
 
-  @Test("Session window snapshot derives transcript fallback from timeline when ACP transcript load fails")
+  @Test(
+    "Session window snapshot derives transcript fallback from timeline when ACP transcript load fails"
+  )
   func sessionWindowSnapshotDerivesTranscriptFallbackFromTimeline() async throws {
     let summary = makeSession(
       .init(
@@ -130,10 +134,11 @@ struct HarnessMonitorStoreSessionWindowTranscriptTests {
       snapshot.transcript(forAgent: "worker-window-fallback").map(\.summary)
         == ["Managed native transcript row"]
     )
-    #expect(snapshot.timeline(forAgent: "worker-window-fallback").map(\.summary) == [
-      "Cockpit timeline row",
-      "Managed native transcript row",
-    ])
+    #expect(
+      snapshot.timeline(forAgent: "worker-window-fallback").map(\.summary) == [
+        "Cockpit timeline row",
+        "Managed native transcript row",
+      ])
   }
 
   @Test("Cached derived transcript re-derives after a later live timeline expansion")
@@ -222,7 +227,8 @@ struct HarnessMonitorStoreSessionWindowTranscriptTests {
       modelContainer: container
     )
 
-    let cachedSnapshot = try #require(await store.sessionWindowSnapshot(sessionID: summary.sessionId))
+    let cachedSnapshot = try #require(
+      await store.sessionWindowSnapshot(sessionID: summary.sessionId))
     #expect(cachedSnapshot.source == .cache)
     #expect(cachedSnapshot.transcriptSource == .derived)
     #expect(
