@@ -307,6 +307,36 @@ extension HarnessMonitorStore {
     selectedSessionID == sessionID && sessionDataAvailability == .live
   }
 
+  private func acpWatchdogLifecyclePresentation(
+    runtimeState: AcpAgentRuntimeState,
+    fallbackStatus: AgentStatus
+  ) -> AgentLifecyclePresentation? {
+    let normalized = runtimeState.watchdogState?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .lowercased()
+    let status: AgentStatus
+    let accessibilityValue: String
+    switch normalized {
+    case "active":
+      status = .active
+      accessibilityValue = "Active, ACP watchdog active"
+    case "paused":
+      status = .idle
+      accessibilityValue = "Idle, ACP watchdog paused"
+    default:
+      return nil
+    }
+    guard status != fallbackStatus else {
+      return nil
+    }
+    let label = status.title
+    return AgentLifecyclePresentation(
+      label: label,
+      accessibilityValue: accessibilityValue,
+      visualStatus: status
+    )
+  }
+
   public func agentLifecyclePresentation(
     for agent: AgentRegistration,
     sessionID: String,
@@ -322,19 +352,33 @@ extension HarnessMonitorStore {
       )
     }
 
-    if agent.managedAgent?.kind == .acp,
-      agent.status == .active,
-      acpRuntimeState(
+    let acpRuntimeState =
+      agent.managedAgent?.kind == .acp
+      ? acpRuntimeState(
         for: agent.agentId,
         sessionID: sessionID,
         sessionRegistrations: sessionRegistrations
-      ) == nil
+      )
+      : nil
+
+    if agent.managedAgent?.kind == .acp,
+      agent.status == .active,
+      acpRuntimeState == nil
     {
       return AgentLifecyclePresentation(
         label: "Not Running",
         accessibilityValue: "No live ACP runtime observed",
         visualStatus: .disconnected
       )
+    }
+
+    if let acpRuntimeState,
+      let runtimeLifecycle = acpWatchdogLifecyclePresentation(
+        runtimeState: acpRuntimeState,
+        fallbackStatus: agent.status
+      )
+    {
+      return runtimeLifecycle
     }
 
     if let tuiStatus, agent.managedAgent?.kind == .tui, tuiStatus.isActive == false {

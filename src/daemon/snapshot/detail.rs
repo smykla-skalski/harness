@@ -7,9 +7,7 @@ use super::signals::load_signals_for_resolved;
 use super::summaries::summary_from_resolved;
 use crate::daemon::db::DaemonDb;
 use crate::errors::CliError;
-use crate::session::types::{
-    AgentRegistration, AgentStatus, SessionSignalRecord, SessionState, WorkItem,
-};
+use crate::session::types::{AgentRegistration, SessionSignalRecord, SessionState, WorkItem};
 
 /// Build a rich session detail snapshot, then persist it into the daemon cache.
 ///
@@ -95,7 +93,6 @@ fn visible_session_agents(state: &SessionState) -> Vec<AgentRegistration> {
         .values()
         .filter(|agent| agent.status.is_alive())
         .cloned()
-        .map(normalize_protocol_agent_status)
         .collect()
 }
 
@@ -106,13 +103,6 @@ fn visible_session_tasks(state: &SessionState) -> Vec<WorkItem> {
         .filter(|task| !task.is_deleted())
         .cloned()
         .collect()
-}
-
-fn normalize_protocol_agent_status(mut agent: AgentRegistration) -> AgentRegistration {
-    if agent.status == AgentStatus::Idle {
-        agent.status = AgentStatus::Active;
-    }
-    agent
 }
 
 /// Build the expensive session detail extensions (signals, observer, activity).

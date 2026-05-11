@@ -294,6 +294,69 @@ impl AcpAgentManagerHandle {
             warn_disconnect_sync_failure(snapshot, &error);
         }
     }
+
+    pub(in crate::daemon::agent_acp) fn sync_orchestration_runtime_status(
+        &self,
+        snapshot: &AcpAgentSnapshot,
+    ) -> Result<bool, CliError> {
+        let status = match &snapshot.status {
+            AgentStatus::Active => AgentStatus::Active,
+            AgentStatus::Idle => AgentStatus::Idle,
+            AgentStatus::AwaitingReview
+            | AgentStatus::Disconnected { .. }
+            | AgentStatus::Removed => return Ok(false),
+        };
+        self.persist_orchestration_runtime_status(snapshot, status)
+    }
+
+    fn persist_orchestration_runtime_status(
+        &self,
+        snapshot: &AcpAgentSnapshot,
+        status: AgentStatus,
+    ) -> Result<bool, CliError> {
+        let db = self.db()?;
+        let db = Self::daemon_db_guard(&db)?;
+        let Some(mut state) = db.load_session_state_for_mutation(&snapshot.session_id)? else {
+            return Ok(false);
+        };
+        let now = utc_now();
+        {
+            let Some(agent) = state.agents.get_mut(&snapshot.agent_id) else {
+                return Ok(false);
+            };
+            if agent.managed_agent != Some(ManagedAgentRef::acp(snapshot.acp_id.as_str())) {
+                return Ok(false);
+            }
+            if agent.status == status {
+                return Ok(false);
+            }
+            agent.status = status;
+            agent.updated_at = now.clone();
+        }
+        orchestration_service::refresh_session(&mut state, &now);
+        let project_id = db
+            .project_id_for_session(&snapshot.session_id)?
+            .ok_or_else(|| service::session_not_found(&snapshot.session_id))?;
+        db.save_session_state(&project_id, &state)?;
+        db.bump_change(&snapshot.session_id)?;
+        db.bump_change("global")?;
+        Ok(true)
+    }
+
+    pub(in crate::daemon::agent_acp) fn sync_orchestration_runtime_status_best_effort(
+        &self,
+        snapshot: &AcpAgentSnapshot,
+    ) {
+        if let Err(error) = self.sync_orchestration_runtime_status(snapshot) {
+            tracing::warn!(
+                session_id = snapshot.session_id,
+                acp_id = snapshot.acp_id,
+                agent_id = snapshot.agent_id,
+                %error,
+                "failed to sync ACP runtime status into orchestration state"
+            );
+        }
+    }
 }
 
 fn disconnected_status_parts(

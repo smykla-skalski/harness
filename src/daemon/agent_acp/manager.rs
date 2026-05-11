@@ -460,11 +460,11 @@ impl AcpAgentManagerHandle {
         &self,
         session: &Arc<ActiveAcpSession>,
     ) -> Result<AcpAgentSnapshot, CliError> {
-        let (after, incidents, disconnected) = {
+        let (before_status, after, incidents, disconnected) = {
             let _lifecycle = self.process_lifecycle_guard()?;
-            let before = session.snapshot_with_live_counts();
-            if before.status.is_disconnected() {
-                return Ok(before);
+            let before_status = session.current_status();
+            if before_status.is_disconnected() {
+                return Ok(session.snapshot_with_live_counts());
             }
             session.refresh();
             let after = session.snapshot_with_live_counts();
@@ -475,8 +475,11 @@ impl AcpAgentManagerHandle {
                 } else {
                     Vec::new()
                 };
-            (after, incidents, disconnected)
+            (before_status, after, incidents, disconnected)
         };
+        if !disconnected && after.status != before_status {
+            self.sync_orchestration_runtime_status_best_effort(&after);
+        }
         if disconnected {
             self.sync_orchestration_disconnect_best_effort(&after);
         }

@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use tokio::task::JoinHandle;
 
-use crate::agents::acp::supervision::WatchdogEventEmitter;
+use crate::agents::acp::supervision::{WatchdogEventEmitter, WatchdogState};
 use crate::agents::kind::DisconnectReason;
 use crate::daemon::agent_acp::manager::{AcpAgentInspectSnapshot, AcpAgentSnapshot};
 use crate::daemon::agent_acp::permission_bridge::{
@@ -39,6 +39,10 @@ impl ActiveAcpSession {
 
     pub(in crate::daemon::agent_acp) fn process_key(&self) -> String {
         self.snapshot_guard().process_key.clone()
+    }
+
+    pub(in crate::daemon::agent_acp) fn current_status(&self) -> AgentStatus {
+        self.snapshot_guard().status.clone()
     }
 
     pub(in crate::daemon::agent_acp) fn process(&self) -> Arc<ActiveAcpProcess> {
@@ -111,11 +115,19 @@ impl ActiveAcpSession {
     }
 
     pub(in crate::daemon::agent_acp) fn snapshot_with_live_counts(&self) -> AcpAgentSnapshot {
-        let mut snapshot = self.snapshot_guard().clone();
+        let mut snapshot = self.snapshot_guard();
+        if let Some(status) =
+            live_status_for_watchdog(self.process.supervisor.watchdog_state(), &snapshot.status)
+        {
+            if snapshot.status != status {
+                snapshot.status = status;
+                snapshot.updated_at = utc_now();
+            }
+        }
         snapshot.pending_permissions = self.permissions.pending_permission_count();
         snapshot.permission_queue_depth = self.permissions.queue_depth();
         snapshot.pending_permission_batches = self.permissions.pending_batches();
-        snapshot
+        snapshot.clone()
     }
 
     pub(in crate::daemon::agent_acp) fn inspect_snapshot_for(
@@ -259,6 +271,23 @@ impl ActiveAcpSession {
 
     fn snapshot_guard(&self) -> MutexGuard<'_, AcpAgentSnapshot> {
         recover_lock(&self.snapshot, "ACP snapshot lock")
+    }
+}
+
+fn live_status_for_watchdog(
+    watchdog_state: WatchdogState,
+    current_status: &AgentStatus,
+) -> Option<AgentStatus> {
+    match current_status {
+        AgentStatus::Active | AgentStatus::Idle => {}
+        AgentStatus::AwaitingReview | AgentStatus::Disconnected { .. } | AgentStatus::Removed => {
+            return None;
+        }
+    }
+    match watchdog_state {
+        WatchdogState::Active => Some(AgentStatus::Active),
+        WatchdogState::Paused => Some(AgentStatus::Idle),
+        WatchdogState::Fired | WatchdogState::Done => None,
     }
 }
 
