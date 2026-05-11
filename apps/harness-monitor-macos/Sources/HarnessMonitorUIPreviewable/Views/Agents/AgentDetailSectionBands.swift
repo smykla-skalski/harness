@@ -6,6 +6,7 @@ struct AgentDetailSummaryBand: View {
   let title: String
   let runtimeLabel: String
   let status: AgentStatus
+  let statusLabel: String
   let roleTitle: String
   let currentTaskTitle: String
   let overviewFacts: [AgentDetailFact]
@@ -20,6 +21,7 @@ struct AgentDetailSummaryBand: View {
           title: title,
           runtimeLabel: runtimeLabel,
           status: status,
+          statusLabel: statusLabel,
           roleTitle: roleTitle,
           currentTaskTitle: currentTaskTitle,
           overviewFacts: overviewFacts

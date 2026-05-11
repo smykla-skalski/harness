@@ -146,6 +146,16 @@ extension SessionAgentDetailSection {
     )
   }
 
+  var lifecyclePresentation: (label: String, visualStatus: AgentStatus) {
+    let lifecycle = store.agentLifecyclePresentation(
+      for: agent,
+      sessionID: sessionID,
+      sessionRegistrations: detail.agents,
+      tuiStatus: tui?.status
+    )
+    return (lifecycle.label, lifecycle.visualStatus)
+  }
+
   var showsTerminalBand: Bool {
     agent.managedAgent?.kind == .tui || tui != nil || pendingPrompt != nil
   }
