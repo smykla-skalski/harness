@@ -84,8 +84,8 @@ final class HarnessMonitorStoreOpenWindowHydrationTests: XCTestCase {
   }
 }
 
-private extension SessionFixture {
-  static let unhydratedActive = SessionFixture(
+extension SessionFixture {
+  fileprivate static let unhydratedActive = SessionFixture(
     sessionId: "sess-open-window-hydration",
     context: "Open window hydration",
     status: .active,
