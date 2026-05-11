@@ -1,16 +1,27 @@
 import AppKit
+import HarnessMonitorUIPreviewable
 
 @MainActor
 enum SessionWindowTabBadge {
-  static let leadingSpacing = "  "
   static let badgeHeight: CGFloat = 13
-  static let cornerRadius: CGFloat = 3
+  static let cornerRadius: CGFloat = 5
   static let baselineOffset: CGFloat = -2
+  static let trailingTabStopLocation: CGFloat = 130
 
   static func attributedTitle(base: String, pendingDecisionCount: Int) -> NSAttributedString? {
     guard pendingDecisionCount > 0 else { return nil }
-    let result = NSMutableAttributedString(string: base + leadingSpacing)
+    let paragraphStyle = NSMutableParagraphStyle()
+    paragraphStyle.tabStops = [
+      NSTextTab(textAlignment: .right, location: trailingTabStopLocation, options: [:])
+    ]
+    paragraphStyle.lineBreakMode = .byClipping
+    let result = NSMutableAttributedString(string: base + "\t")
     result.append(NSAttributedString(attachment: makeAttachment(count: pendingDecisionCount)))
+    result.addAttribute(
+      .paragraphStyle,
+      value: paragraphStyle,
+      range: NSRange(location: 0, length: result.length)
+    )
     return result
   }
 
@@ -26,7 +37,7 @@ enum SessionWindowTabBadge {
     let width = max(badgeHeight, textSize.width + horizontalPadding * 2)
     let image = NSImage(size: NSSize(width: width, height: badgeHeight), flipped: false) { rect in
       let path = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
-      NSColor.systemRed.setFill()
+      badgeFillColor().setFill()
       path.fill()
       let textRect = NSRect(
         x: (rect.width - textSize.width) / 2,
@@ -41,5 +52,10 @@ enum SessionWindowTabBadge {
     attachment.image = image
     attachment.bounds = NSRect(x: 0, y: baselineOffset, width: width, height: badgeHeight)
     return attachment
+  }
+
+  static func badgeFillColor() -> NSColor {
+    NSColor(named: "HarnessMonitorAccent", bundle: HarnessMonitorUIAssets.bundle)
+      ?? NSColor.controlAccentColor
   }
 }
