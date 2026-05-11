@@ -278,8 +278,10 @@ mod tests {
             launch_command: command.to_string(),
             launch_args: Vec::new(),
             env_passthrough: Vec::new(),
+            spawn_configuration: Default::default(),
             model_catalog: None,
             install_hint: Some("install fake".to_string()),
+            session_configuration: Default::default(),
             doctor_probe: DoctorProbe {
                 command: command.to_string(),
                 args: args.iter().map(ToString::to_string).collect(),

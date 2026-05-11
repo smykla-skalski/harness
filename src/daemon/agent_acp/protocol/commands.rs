@@ -11,6 +11,10 @@ use agent_client_protocol::{Agent, ConnectionTo, Result as AcpResult};
 use tokio::sync::mpsc as tokio_mpsc;
 use tokio::time::timeout;
 
+use super::session_config::{
+    AcpSessionRequestConfig, advertised_session_configuration,
+    apply_requested_session_configuration,
+};
 use super::session_guard::{RouteTarget, SessionRouteGuard};
 use crate::agents::acp::supervision::AcpSessionSupervisor;
 use crate::daemon::agent_acp::prompt_gate::PromptLease;
@@ -28,12 +32,14 @@ pub(super) enum ProtocolCommand {
         acp_id: String,
         session_id: String,
         project_dir: PathBuf,
+        session_config: AcpSessionRequestConfig,
         response_tx: mpsc::SyncSender<ProtocolCommandResult<SessionId>>,
     },
     PromptSession {
         acp_id: String,
         session_id: String,
         project_dir: PathBuf,
+        session_config: AcpSessionRequestConfig,
         prompt: String,
         prompt_lease: PromptLease,
         response_tx: mpsc::SyncSender<ProtocolCommandResult<SessionId>>,
@@ -64,6 +70,7 @@ impl AcpProtocolHandle {
         acp_id: &str,
         session_id: &str,
         project_dir: PathBuf,
+        session_config: AcpSessionRequestConfig,
     ) -> ProtocolCommandResult<SessionId> {
         let (response_tx, response_rx) = mpsc::sync_channel(1);
         self.command_tx
@@ -71,6 +78,7 @@ impl AcpProtocolHandle {
                 acp_id: acp_id.to_string(),
                 session_id: session_id.to_string(),
                 project_dir,
+                session_config,
                 response_tx,
             })
             .map_err(|_| "ACP protocol command channel is closed".to_string())?;
@@ -82,6 +90,7 @@ impl AcpProtocolHandle {
         acp_id: &str,
         session_id: &str,
         project_dir: PathBuf,
+        session_config: AcpSessionRequestConfig,
         prompt: String,
         prompt_lease: PromptLease,
     ) -> ProtocolCommandResult<SessionId> {
@@ -91,6 +100,7 @@ impl AcpProtocolHandle {
                 acp_id: acp_id.to_string(),
                 session_id: session_id.to_string(),
                 project_dir,
+                session_config,
                 prompt,
                 prompt_lease,
                 response_tx,
@@ -167,6 +177,7 @@ async fn handle_protocol_command(
             acp_id,
             session_id,
             project_dir,
+            session_config,
             response_tx,
         } => {
             let result = attach_protocol_session(
@@ -176,6 +187,7 @@ async fn handle_protocol_command(
                 acp_id,
                 session_id,
                 project_dir,
+                &session_config,
             )
             .await;
             let _ = response_tx.send(result);
@@ -184,6 +196,7 @@ async fn handle_protocol_command(
             acp_id,
             session_id,
             project_dir,
+            session_config,
             prompt,
             prompt_lease,
             response_tx,
@@ -197,6 +210,7 @@ async fn handle_protocol_command(
                     acp_id,
                     session_id,
                     project_dir,
+                    session_config,
                     prompt,
                     prompt_lease,
                 },
@@ -221,6 +235,7 @@ async fn attach_protocol_session(
     acp_id: String,
     session_id: String,
     project_dir: PathBuf,
+    session_config: &AcpSessionRequestConfig,
 ) -> ProtocolCommandResult<SessionId> {
     let response = {
         let _guard = supervisor.enter_pending_request_with_reason(Some("session/new"));
@@ -230,8 +245,21 @@ async fn attach_protocol_session(
             .await
             .map_err(|error| error.to_string())?
     };
-    let protocol_session_id = response.session_id;
+    let protocol_session_id = response.session_id.clone();
     session_guard.start_session(&protocol_session_id, RouteTarget { acp_id, session_id });
+    if let Err(error) = apply_requested_session_configuration(
+        supervisor,
+        connection,
+        &protocol_session_id,
+        session_config,
+        advertised_session_configuration(&response),
+    )
+    .await
+    {
+        session_guard.stop_session(&protocol_session_id);
+        let _ = send_cancel_notification(connection, protocol_session_id.clone());
+        return Err(error.to_string());
+    }
     Ok(protocol_session_id)
 }
 
@@ -246,6 +274,7 @@ async fn attach_prompt_session(
         acp_id,
         session_id,
         project_dir,
+        session_config,
         prompt,
         prompt_lease,
     } = input;
@@ -256,6 +285,7 @@ async fn attach_prompt_session(
         acp_id,
         session_id,
         project_dir,
+        &session_config,
     )
     .await?;
     if let Err(error) = spawn_prompt_task(
@@ -277,6 +307,7 @@ struct AttachPromptInput {
     acp_id: String,
     session_id: String,
     project_dir: PathBuf,
+    session_config: AcpSessionRequestConfig,
     prompt: String,
     prompt_lease: PromptLease,
 }
@@ -347,4 +378,214 @@ fn send_cancel_notification(
     session_id: SessionId,
 ) -> AcpResult<()> {
     connection.send_notification(CancelNotification::new(session_id))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::process::Command;
+    use std::sync::{Arc, Mutex};
+
+    use agent_client_protocol::schema::{
+        AgentCapabilities, InitializeRequest, InitializeResponse, NewSessionRequest,
+        NewSessionResponse, PromptResponse, SessionConfigOption, SessionConfigOptionCategory,
+        SessionConfigSelectOption, SetSessionConfigOptionRequest, SetSessionConfigOptionResponse,
+        StopReason,
+    };
+    use agent_client_protocol::{Channel, Client};
+
+    use crate::agents::acp::catalog::{
+        AcpAgentDescriptor, AcpSessionConfigOptionBinding, AcpSessionConfiguration,
+        AcpSessionEffortTransport, DoctorProbe,
+    };
+    use crate::agents::acp::supervision::SupervisionConfig;
+    use crate::daemon::agent_acp::prompt_gate::{PromptGate, PromptOwner};
+
+    fn descriptor_with_session_configuration(
+        session_configuration: AcpSessionConfiguration,
+    ) -> AcpAgentDescriptor {
+        AcpAgentDescriptor {
+            id: "test-acp".to_string(),
+            display_name: "Test ACP".to_string(),
+            capabilities: Vec::new(),
+            launch_command: "test-acp".to_string(),
+            launch_args: Vec::new(),
+            env_passthrough: Vec::new(),
+            spawn_configuration: Default::default(),
+            model_catalog: None,
+            install_hint: None,
+            session_configuration,
+            doctor_probe: DoctorProbe {
+                command: "test-acp".to_string(),
+                args: vec!["--version".to_string()],
+            },
+            prompt_timeout_seconds: None,
+        }
+    }
+
+    #[tokio::test]
+    #[cfg(unix)]
+    async fn attach_prompt_session_reapplies_session_config_before_prompt() {
+        let mut supervisor_child = Command::new("sleep")
+            .arg("60")
+            .spawn()
+            .expect("spawn supervisor child");
+        let supervisor = Arc::new(AcpSessionSupervisor::new(
+            &supervisor_child,
+            SupervisionConfig {
+                initialize_timeout: Duration::from_secs(1),
+                prompt_timeout: Duration::from_secs(1),
+                ..SupervisionConfig::default()
+            },
+        ));
+        let operations = Arc::new(Mutex::new(Vec::<String>::new()));
+        let (client_transport, agent_transport) = Channel::duplex();
+        let agent_task = tokio::spawn(run_agent_recording_attach_config_order(
+            agent_transport,
+            Arc::clone(&operations),
+        ));
+        let session_guard = SessionRouteGuard::default();
+        let descriptor = descriptor_with_session_configuration(AcpSessionConfiguration {
+            model: Default::default(),
+            effort: AcpSessionEffortTransport::ConfigOption {
+                selector: AcpSessionConfigOptionBinding {
+                    option_id: Some("effort".to_string()),
+                    category: Some("effort".to_string()),
+                },
+            },
+        });
+        let request = crate::daemon::agent_acp::manager::AcpAgentStartRequest {
+            effort: Some("high".to_string()),
+            ..crate::daemon::agent_acp::manager::AcpAgentStartRequest::default()
+        };
+        let session_config = AcpSessionRequestConfig::from_request(&request, &descriptor);
+
+        let protocol_task = tokio::spawn(async move {
+            Client
+                .builder()
+                .name("harness-test")
+                .connect_with(client_transport, async move |connection| {
+                    let session_id = attach_prompt_session(
+                        Arc::clone(&supervisor),
+                        &connection,
+                        &session_guard,
+                        Duration::from_secs(1),
+                        AttachPromptInput {
+                            acp_id: "agent-acp-1".to_string(),
+                            session_id: "orchestration-1".to_string(),
+                            project_dir: PathBuf::from("/tmp/harness"),
+                            session_config,
+                            prompt: "resume work".to_string(),
+                            prompt_lease: PromptGate::default()
+                                .acquire(PromptOwner::new("agent-acp-1", "orchestration-1"))
+                                .expect("acquire prompt lease"),
+                        },
+                    )
+                    .await
+                    .expect("attach prompt session");
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    send_cancel_notification(&connection, session_id)
+                })
+                .await
+        });
+
+        protocol_task
+            .await
+            .expect("protocol task should not panic")
+            .expect("attach prompt session should complete");
+        assert_eq!(
+            operations.lock().expect("recorded operations").clone(),
+            vec!["set_config:effort:high".to_string(), "prompt".to_string()]
+        );
+
+        let _ = supervisor_child.kill();
+        let _ = supervisor_child.wait();
+        agent_task.abort();
+        let _ = agent_task.await;
+    }
+
+    async fn run_agent_recording_attach_config_order(
+        transport: Channel,
+        operations: Arc<Mutex<Vec<String>>>,
+    ) -> agent_client_protocol::Result<()> {
+        Agent
+            .builder()
+            .name("attach-config-agent")
+            .on_receive_request(
+                async move |initialize: InitializeRequest, responder, _connection| {
+                    responder.respond(
+                        InitializeResponse::new(initialize.protocol_version)
+                            .agent_capabilities(AgentCapabilities::new()),
+                    )
+                },
+                agent_client_protocol::on_receive_request!(),
+            )
+            .on_receive_request(
+                async move |_request: NewSessionRequest, responder, _connection| {
+                    responder.respond(NewSessionResponse::new("attached-session").config_options(
+                        vec![SessionConfigOption::select(
+                                "effort",
+                                "Effort",
+                                "medium",
+                                vec![
+                                    SessionConfigSelectOption::new("low", "Low"),
+                                    SessionConfigSelectOption::new("high", "High"),
+                                ],
+                            )
+                            .category(SessionConfigOptionCategory::Other(
+                                "effort".to_string(),
+                            ))],
+                    ))
+                },
+                agent_client_protocol::on_receive_request!(),
+            )
+            .on_receive_request(
+                {
+                    let operations = Arc::clone(&operations);
+                    async move |request: SetSessionConfigOptionRequest, responder, _connection| {
+                        operations
+                            .lock()
+                            .expect("record attach config")
+                            .push(format!(
+                                "set_config:{}:{}",
+                                request.config_id.0, request.value.0
+                            ));
+                        responder.respond(SetSessionConfigOptionResponse::new(vec![
+                            SessionConfigOption::select(
+                                "effort",
+                                "Effort",
+                                request.value.clone(),
+                                vec![
+                                    SessionConfigSelectOption::new("low", "Low"),
+                                    SessionConfigSelectOption::new("high", "High"),
+                                ],
+                            )
+                            .category(SessionConfigOptionCategory::Other("effort".to_string())),
+                        ]))
+                    }
+                },
+                agent_client_protocol::on_receive_request!(),
+            )
+            .on_receive_request(
+                {
+                    let operations = Arc::clone(&operations);
+                    async move |_request: PromptRequest, responder, _connection| {
+                        let recorded = operations.lock().expect("read attach config").clone();
+                        assert_eq!(recorded, vec!["set_config:effort:high".to_string()]);
+                        operations
+                            .lock()
+                            .expect("record prompt")
+                            .push("prompt".to_string());
+                        responder.respond(PromptResponse::new(StopReason::EndTurn))
+                    }
+                },
+                agent_client_protocol::on_receive_request!(),
+            )
+            .on_receive_notification(
+                async move |_cancel: CancelNotification, _connection| Ok(()),
+                agent_client_protocol::on_receive_notification!(),
+            )
+            .connect_to(transport)
+            .await
+    }
 }

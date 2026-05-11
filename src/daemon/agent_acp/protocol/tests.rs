@@ -4,11 +4,18 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use agent_client_protocol::Channel;
 use agent_client_protocol::schema::{
-    AgentCapabilities, ContentChunk, InitializeResponse, NewSessionResponse, PromptResponse,
-    SessionUpdate, StopReason,
+    AgentCapabilities, ContentChunk, InitializeResponse, ModelInfo, NewSessionRequest,
+    NewSessionResponse, PromptRequest, PromptResponse, SessionConfigKind, SessionConfigOption,
+    SessionConfigOptionCategory, SessionConfigSelect, SessionConfigSelectOption, SessionId,
+    SessionModelState, SessionUpdate, SetSessionConfigOptionRequest,
+    SetSessionConfigOptionResponse, SetSessionModelRequest, SetSessionModelResponse, StopReason,
 };
 use tokio::sync::broadcast;
 
+use crate::agents::acp::catalog::{
+    AcpAgentDescriptor, AcpSessionConfigOptionBinding, AcpSessionConfiguration,
+    AcpSessionEffortTransport, AcpSessionModelTransport, DoctorProbe,
+};
 use crate::agents::acp::supervision::{SupervisionConfig, WatchdogState};
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::db::DaemonDb;
@@ -80,6 +87,35 @@ fn protocol_manager(runtime_name: &str, acp_id: &str, session_id: &str) -> AcpAg
     AcpAgentManagerHandle::new(sender, db_slot)
 }
 
+fn descriptor_with_session_configuration(
+    session_configuration: AcpSessionConfiguration,
+) -> AcpAgentDescriptor {
+    AcpAgentDescriptor {
+        id: "test-acp".to_string(),
+        display_name: "Test ACP".to_string(),
+        capabilities: Vec::new(),
+        launch_command: "test-acp".to_string(),
+        launch_args: Vec::new(),
+        env_passthrough: Vec::new(),
+        spawn_configuration: Default::default(),
+        model_catalog: None,
+        install_hint: None,
+        session_configuration,
+        doctor_probe: DoctorProbe {
+            command: "test-acp".to_string(),
+            args: vec!["--version".to_string()],
+        },
+        prompt_timeout_seconds: None,
+    }
+}
+
+fn disabled_session_config() -> AcpSessionRequestConfig {
+    AcpSessionRequestConfig::from_request(
+        &AcpAgentStartRequest::default(),
+        &descriptor_with_session_configuration(Default::default()),
+    )
+}
+
 #[tokio::test]
 #[cfg(unix)]
 async fn prompt_turn_against_sdk_cookbook_style_agent_streams_events() {
@@ -128,6 +164,7 @@ async fn prompt_turn_against_sdk_cookbook_style_agent_streams_events() {
                     connection,
                     project_dir,
                     prompt: Some("smoke the second descriptor".to_string()),
+                    session_config: disabled_session_config(),
                     acp_id: "agent-acp-1".to_string(),
                     session_id: "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e".to_string(),
                     runtime_name: "fake".to_string(),
@@ -221,6 +258,7 @@ async fn protocol_rejects_notification_with_unknown_session_id() {
                     connection,
                     project_dir,
                     prompt: Some("trigger stale session".to_string()),
+                    session_config: disabled_session_config(),
                     acp_id: "agent-acp-1".to_string(),
                     session_id: "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e".to_string(),
                     runtime_name: "fake".to_string(),
@@ -248,6 +286,106 @@ async fn protocol_rejects_notification_with_unknown_session_id() {
     ok(
         protocol_result,
         "protocol should remain healthy after stale notification",
+    );
+
+    let _ = supervisor_child.kill();
+    let _ = supervisor_child.wait();
+    agent_task.abort();
+    let _ = agent_task.await;
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn run_connection_applies_session_configuration_before_first_prompt() {
+    let project = ok(tempfile::tempdir(), "project tempdir");
+    let mut supervisor_child = ok(
+        Command::new("sleep").arg("60").spawn(),
+        "spawn supervisor child",
+    );
+    let supervisor = Arc::new(AcpSessionSupervisor::new(
+        &supervisor_child,
+        SupervisionConfig {
+            initialize_timeout: Duration::from_secs(1),
+            prompt_timeout: Duration::from_secs(1),
+            ..SupervisionConfig::default()
+        },
+    ));
+    let operations = Arc::new(Mutex::new(Vec::<String>::new()));
+    let (client_transport, agent_transport) = Channel::duplex();
+    let agent_task = tokio::spawn(run_agent_recording_startup_config_order(
+        agent_transport,
+        Arc::clone(&operations),
+    ));
+    let (cancel_tx, cancel_rx) = mpsc::unbounded_channel();
+    let (_command_tx, command_rx) = mpsc::unbounded_channel();
+    let project_dir = project.path().to_path_buf();
+    let protocol_supervisor = Arc::clone(&supervisor);
+    let manager = protocol_manager(
+        "fake",
+        "agent-acp-1",
+        "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e",
+    );
+    let descriptor = descriptor_with_session_configuration(AcpSessionConfiguration {
+        model: AcpSessionModelTransport::SessionModel,
+        effort: AcpSessionEffortTransport::ConfigOption {
+            selector: AcpSessionConfigOptionBinding {
+                option_id: Some("effort".to_string()),
+                category: Some("effort".to_string()),
+            },
+        },
+    });
+    let request = AcpAgentStartRequest {
+        prompt: Some("configure then prompt".to_string()),
+        model: Some("model-a".to_string()),
+        effort: Some("high".to_string()),
+        ..AcpAgentStartRequest::default()
+    };
+
+    let protocol_task = tokio::spawn(async move {
+        Client
+            .builder()
+            .name("harness-test")
+            .connect_with(client_transport, async move |connection| {
+                run_connection(RunConnectionArgs {
+                    connection,
+                    project_dir,
+                    prompt: request.prompt.clone(),
+                    session_config: AcpSessionRequestConfig::from_request(&request, &descriptor),
+                    acp_id: "agent-acp-1".to_string(),
+                    session_id: "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e".to_string(),
+                    runtime_name: "fake".to_string(),
+                    supervisor: protocol_supervisor,
+                    initial_prompt_lease: None,
+                    cancel_rx,
+                    command_rx,
+                    session_guard: Arc::new(SessionRouteGuard::default()),
+                    manager,
+                })
+                .await
+            })
+            .await
+    });
+
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(cancel_tx.send(()).is_ok());
+    let protocol_result = ok(
+        ok(
+            tokio::time::timeout(Duration::from_secs(2), protocol_task).await,
+            "protocol should stop after cancel",
+        ),
+        "protocol task should not panic",
+    );
+    ok(
+        protocol_result,
+        "protocol should complete cleanly after startup configuration",
+    );
+    assert_eq!(
+        operations.lock().expect("recorded operations").clone(),
+        vec![
+            "set_model:model-a".to_string(),
+            "set_config:effort:high".to_string(),
+            "prompt".to_string(),
+        ]
     );
 
     let _ = supervisor_child.kill();
@@ -325,6 +463,120 @@ async fn run_agent_with_stale_notification(
                     ))),
                 ))?;
                 responder.respond(PromptResponse::new(StopReason::EndTurn))
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_notification(
+            async move |_cancel: CancelNotification, _connection| Ok(()),
+            agent_client_protocol::on_receive_notification!(),
+        )
+        .connect_to(transport)
+        .await
+}
+
+async fn run_agent_recording_startup_config_order(
+    transport: Channel,
+    operations: Arc<Mutex<Vec<String>>>,
+) -> agent_client_protocol::Result<()> {
+    Agent
+        .builder()
+        .name("startup-config-agent")
+        .on_receive_request(
+            async move |initialize: InitializeRequest, responder, _connection| {
+                responder.respond(
+                    InitializeResponse::new(initialize.protocol_version)
+                        .agent_capabilities(AgentCapabilities::new()),
+                )
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |_request: NewSessionRequest, responder, _connection| {
+                responder.respond(
+                    NewSessionResponse::new("acp-session-1")
+                        .models(SessionModelState::new(
+                            "baseline",
+                            vec![
+                                ModelInfo::new("baseline", "Baseline"),
+                                ModelInfo::new("model-a", "Model A"),
+                            ],
+                        ))
+                        .config_options(vec![
+                            SessionConfigOption::select(
+                                "effort",
+                                "Effort",
+                                "medium",
+                                vec![
+                                    SessionConfigSelectOption::new("low", "Low"),
+                                    SessionConfigSelectOption::new("high", "High"),
+                                ],
+                            )
+                            .category(SessionConfigOptionCategory::Other("effort".to_string())),
+                        ]),
+                )
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            {
+                let operations = Arc::clone(&operations);
+                async move |request: SetSessionModelRequest, responder, _connection| {
+                    operations
+                        .lock()
+                        .expect("record startup operation")
+                        .push(format!("set_model:{}", request.model_id.0));
+                    responder.respond(SetSessionModelResponse::new())
+                }
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            {
+                let operations = Arc::clone(&operations);
+                async move |request: SetSessionConfigOptionRequest, responder, _connection| {
+                    operations
+                        .lock()
+                        .expect("record startup operation")
+                        .push(format!(
+                            "set_config:{}:{}",
+                            request.config_id.0, request.value.0
+                        ));
+                    responder.respond(SetSessionConfigOptionResponse::new(vec![
+                        SessionConfigOption::new(
+                            "effort",
+                            "Effort",
+                            SessionConfigKind::Select(SessionConfigSelect::new(
+                                request.value.clone(),
+                                vec![
+                                    SessionConfigSelectOption::new("low", "Low"),
+                                    SessionConfigSelectOption::new("high", "High"),
+                                ],
+                            )),
+                        )
+                        .category(SessionConfigOptionCategory::Other("effort".to_string())),
+                    ]))
+                }
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            {
+                let operations = Arc::clone(&operations);
+                async move |_request: PromptRequest, responder, _connection| {
+                    let recorded = operations.lock().expect("read startup operations").clone();
+                    assert_eq!(
+                        recorded,
+                        vec![
+                            "set_model:model-a".to_string(),
+                            "set_config:effort:high".to_string(),
+                        ]
+                    );
+                    operations
+                        .lock()
+                        .expect("record prompt operation")
+                        .push("prompt".to_string());
+                    responder.respond(PromptResponse::new(StopReason::EndTurn))
+                }
             },
             agent_client_protocol::on_receive_request!(),
         )

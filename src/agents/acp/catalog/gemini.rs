@@ -4,7 +4,9 @@
 //! deliberately catalog-only: Gemini exercises the same supervision,
 //! permission, and filesystem policy paths as every other ACP agent.
 
-use super::{AcpAgentDescriptor, DoctorProbe, tags};
+use super::{
+    AcpAgentDescriptor, AcpSessionConfiguration, AcpSpawnConfiguration, DoctorProbe, tags,
+};
 use crate::agents::runtime::models;
 
 const GEMINI_ID: &str = "gemini";
@@ -46,6 +48,7 @@ pub fn descriptor() -> AcpAgentDescriptor {
             "GEMINI_CLI_HOME".to_owned(),
             "GEMINI_CLI_TRUST_WORKSPACE".to_owned(),
         ],
+        spawn_configuration: AcpSpawnConfiguration::DescriptorRuntime,
         model_catalog: Some(
             models::catalog_for(GEMINI_ID)
                 .expect("built-in Gemini descriptor must have a model catalog")
@@ -55,6 +58,7 @@ pub fn descriptor() -> AcpAgentDescriptor {
             "Install an ACP-capable Gemini CLI and authenticate: https://github.com/google-gemini/gemini-cli"
                 .to_owned(),
         ),
+        session_configuration: AcpSessionConfiguration::default(),
         doctor_probe: DoctorProbe {
             command: "gemini".to_owned(),
             args: vec!["--version".to_owned()],

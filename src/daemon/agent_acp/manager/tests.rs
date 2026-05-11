@@ -48,8 +48,10 @@ fn descriptor_with_id(command: &Path, id: &str) -> AcpAgentDescriptor {
         launch_command: command.display().to_string(),
         launch_args: Vec::new(),
         env_passthrough: Vec::new(),
+        spawn_configuration: Default::default(),
         model_catalog: None,
         install_hint: None,
+        session_configuration: Default::default(),
         doctor_probe: catalog::DoctorProbe {
             command: command.display().to_string(),
             args: Vec::new(),

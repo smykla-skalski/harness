@@ -35,6 +35,96 @@ pub struct DoctorProbe {
     pub args: Vec<String>,
 }
 
+/// How Harness should translate model/effort request fields into ACP child
+/// process startup arguments and environment.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum AcpSpawnConfiguration {
+    /// Reuse the native runtime adapter whose name matches the descriptor id.
+    #[default]
+    DescriptorRuntime,
+    /// Reuse a specific native runtime adapter even when the descriptor id
+    /// differs from the runtime contract.
+    Runtime { name: String },
+    /// Do not reuse any native runtime startup model/effort injection.
+    None,
+}
+
+impl AcpSpawnConfiguration {
+    #[must_use]
+    pub fn runtime_name<'a>(&'a self, descriptor_id: &'a str) -> Option<&'a str> {
+        match self {
+            Self::DescriptorRuntime => Some(descriptor_id),
+            Self::Runtime { name } => Some(name.as_str()),
+            Self::None => None,
+        }
+    }
+
+    fn is_descriptor_runtime(&self) -> bool {
+        matches!(self, Self::DescriptorRuntime)
+    }
+}
+
+/// Descriptor-provided selector hints for ACP-native config-option delivery.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct AcpSessionConfigOptionBinding {
+    /// Exact config-option id to target when the agent exposes one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub option_id: Option<String>,
+    /// Raw ACP config-option category string to match (for standard categories
+    /// like `model` / `thought_level` and custom ones like `effort`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+}
+
+/// How Harness should apply a requested ACP session model selection.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum AcpSessionModelTransport {
+    #[default]
+    Disabled,
+    /// Use ACP's unstable `session/set_model` request.
+    SessionModel,
+    /// Use ACP `session/set_config_option`, optionally narrowed by descriptor
+    /// metadata. When no selector is supplied, Harness falls back to the
+    /// standard ACP `model` category.
+    ConfigOption {
+        #[serde(flatten)]
+        selector: AcpSessionConfigOptionBinding,
+    },
+}
+
+/// How Harness should apply a requested ACP session effort/thinking selection.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum AcpSessionEffortTransport {
+    #[default]
+    Disabled,
+    /// Use ACP `session/set_config_option`, optionally narrowed by descriptor
+    /// metadata. When no selector is supplied, Harness falls back to the
+    /// standard ACP `thought_level` category.
+    ConfigOption {
+        #[serde(flatten)]
+        selector: AcpSessionConfigOptionBinding,
+    },
+}
+
+/// ACP-native session configuration delivery hooks declared by the descriptor.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct AcpSessionConfiguration {
+    #[serde(default)]
+    pub model: AcpSessionModelTransport,
+    #[serde(default)]
+    pub effort: AcpSessionEffortTransport,
+}
+
+impl AcpSessionConfiguration {
+    fn is_empty(&self) -> bool {
+        matches!(self.model, AcpSessionModelTransport::Disabled)
+            && matches!(self.effort, AcpSessionEffortTransport::Disabled)
+    }
+}
+
 /// Declarative description of an ACP agent the harness knows how to launch.
 ///
 /// One descriptor maps to one row in the New Session sheet. The shape stays
@@ -54,6 +144,13 @@ pub struct AcpAgentDescriptor {
     pub launch_args: Vec<String>,
     /// Names of environment variables forwarded to the agent process.
     pub env_passthrough: Vec<String>,
+    /// Descriptor-driven control over whether native runtime startup injection
+    /// should be reused for model/effort at process spawn time.
+    #[serde(
+        default,
+        skip_serializing_if = "AcpSpawnConfiguration::is_descriptor_runtime"
+    )]
+    pub spawn_configuration: AcpSpawnConfiguration,
     /// Optional model catalog exposed by this ACP agent.
     ///
     /// Copilot has a curated model catalog today. Other ACP agents may expose
@@ -66,6 +163,10 @@ pub struct AcpAgentDescriptor {
     /// can omit it.
     #[serde(default)]
     pub install_hint: Option<String>,
+    /// Descriptor-driven ACP-native model / effort application performed after
+    /// `session/new` and before the first prompt.
+    #[serde(default, skip_serializing_if = "AcpSessionConfiguration::is_empty")]
+    pub session_configuration: AcpSessionConfiguration,
     /// Probe used by `harness doctor` to test installation.
     pub doctor_probe: DoctorProbe,
     /// Maximum time allowed for a single `session/prompt` call. `None` uses the
@@ -185,6 +286,50 @@ mod tests {
         let parsed: AcpAgentDescriptor =
             serde_json::from_value(json).expect("deserialise descriptor without model catalog");
         assert_eq!(parsed.model_catalog, None);
+    }
+
+    #[test]
+    fn descriptor_defaults_spawn_configuration_to_descriptor_runtime() {
+        let json = serde_json::json!({
+            "id": "custom",
+            "display_name": "Custom ACP",
+            "capabilities": [],
+            "launch_command": "custom-acp",
+            "launch_args": [],
+            "env_passthrough": [],
+            "doctor_probe": {
+                "command": "custom-acp",
+                "args": ["--version"]
+            }
+        });
+        let parsed: AcpAgentDescriptor =
+            serde_json::from_value(json).expect("deserialise descriptor without model catalog");
+        assert_eq!(
+            parsed.spawn_configuration,
+            AcpSpawnConfiguration::DescriptorRuntime
+        );
+    }
+
+    #[test]
+    fn descriptor_defaults_session_configuration_to_disabled() {
+        let json = serde_json::json!({
+            "id": "custom",
+            "display_name": "Custom ACP",
+            "capabilities": [],
+            "launch_command": "custom-acp",
+            "launch_args": [],
+            "env_passthrough": [],
+            "doctor_probe": {
+                "command": "custom-acp",
+                "args": ["--version"]
+            }
+        });
+        let parsed: AcpAgentDescriptor = serde_json::from_value(json)
+            .expect("deserialise descriptor without session configuration");
+        assert_eq!(
+            parsed.session_configuration,
+            AcpSessionConfiguration::default()
+        );
     }
 
     #[test]
