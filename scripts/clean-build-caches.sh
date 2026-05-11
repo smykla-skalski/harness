@@ -131,7 +131,7 @@ remove_path 'golangci-lint cache'                   "$HOME/Library/Caches/golang
 section 'Tool caches'
 remove_path 'JetBrains caches'                      "$HOME/Library/Caches/JetBrains"
 remove_path 'ms-playwright cache'                   "$HOME/Library/Caches/ms-playwright"
-remove_path 'copilot cache'                         "$HOME/Library/Caches/copilot"
+# Keep Copilot warm state intact; clean:caches is meant to reclaim disposable build/test caches.
 if command -v brew >/dev/null 2>&1; then
   run_cmd 'brew cleanup --prune=all'                brew cleanup -s --prune=all
 fi
