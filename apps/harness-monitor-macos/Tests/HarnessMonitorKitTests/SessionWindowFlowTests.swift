@@ -27,10 +27,15 @@ struct SessionWindowFlowTests {
 
   @Test("Current schema includes session window restoration state")
   func currentSchemaIncludesSessionWindowRestorationState() {
-    #expect(HarnessMonitorCurrentSchema.versionString == "9.0.0")
+    #expect(HarnessMonitorCurrentSchema.versionString == "12.0.0")
     #expect(
-      HarnessMonitorSchemaV9.models.contains {
+      HarnessMonitorSchemaV12.models.contains {
         String(describing: $0) == "CachedSessionWindowState"
+      }
+    )
+    #expect(
+      HarnessMonitorSchemaV12.models.contains {
+        String(describing: $0) == "CachedSessionTranscriptEntry"
       }
     )
   }
@@ -69,7 +74,8 @@ struct SessionWindowFlowTests {
       currentModifiers: { globalModifiers },
       notificationCenter: NotificationCenter(),
       installFlagsChangedMonitor: { _ in nil },
-      removeFlagsChangedMonitor: { _ in }
+      removeFlagsChangedMonitor: { _ in },
+      scheduleUpdate: { $0() }
     )
     let window = NSWindow(
       contentRect: .init(x: 0, y: 0, width: 320, height: 240),
@@ -107,7 +113,8 @@ struct SessionWindowFlowTests {
       currentModifiers: { globalModifiers },
       notificationCenter: NotificationCenter(),
       installFlagsChangedMonitor: { _ in nil },
-      removeFlagsChangedMonitor: { _ in }
+      removeFlagsChangedMonitor: { _ in },
+      scheduleUpdate: { $0() }
     )
     let window = NSWindow(
       contentRect: .init(x: 0, y: 0, width: 320, height: 240),
@@ -133,6 +140,49 @@ struct SessionWindowFlowTests {
     applicationIsActive = true
     coordinator.applicationDidBecomeActive()
     #expect(lastReportedModifiers == [.command, .shift])
+  }
+
+  @MainActor
+  @Test("Session shortcut overlay defers and coalesces representable updates")
+  func sessionShortcutOverlayDefersAndCoalescesRepresentableUpdates() {
+    let applicationIsActive = true
+    var globalModifiers: EventModifiers = [.command]
+    var lastReportedModifiers: EventModifiers = []
+    var scheduledUpdates: [@MainActor () -> Void] = []
+    let coordinator = SessionWindowModifierKeysMonitor.Coordinator(
+      update: { lastReportedModifiers = $0 },
+      applicationIsActive: { applicationIsActive },
+      currentModifiers: { globalModifiers },
+      notificationCenter: NotificationCenter(),
+      installFlagsChangedMonitor: { _ in nil },
+      removeFlagsChangedMonitor: { _ in },
+      scheduleUpdate: { scheduledUpdates.append($0) }
+    )
+    let window = NSWindow(
+      contentRect: .init(x: 0, y: 0, width: 320, height: 240),
+      styleMask: [.titled],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer { coordinator.detach() }
+
+    coordinator.attach(to: window)
+    coordinator.windowDidBecomeKey()
+    globalModifiers = [.command, .option]
+    coordinator.handleFlagsChanged(globalModifiers)
+
+    #expect(lastReportedModifiers.isEmpty)
+    #expect(scheduledUpdates.count == 1)
+
+    let flushPendingUpdate = scheduledUpdates.removeFirst()
+    flushPendingUpdate()
+
+    #expect(lastReportedModifiers == [.command, .option])
+
+    coordinator.attach(to: window)
+    coordinator.handleFlagsChanged(globalModifiers)
+    #expect(scheduledUpdates.isEmpty)
   }
 
   @Test("Session tab opening honors app and system tabbing preferences")
