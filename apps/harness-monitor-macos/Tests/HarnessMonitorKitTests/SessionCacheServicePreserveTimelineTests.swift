@@ -62,9 +62,8 @@ final class SessionCacheServicePreserveTimelineTests: XCTestCase {
       preservesTimeline: true
     )
 
-    let cached = try XCTUnwrap(
-      cacheService.loadSessionDetail(sessionID: session.sessionId)
-    )
+    let loaded = await cacheService.loadSessionDetail(sessionID: session.sessionId)
+    let cached = try XCTUnwrap(loaded)
     XCTAssertEqual(
       cached.detail.agents.map(\.agentId),
       ["worker-preserve-new"],
@@ -104,9 +103,8 @@ final class SessionCacheServicePreserveTimelineTests: XCTestCase {
 
     _ = await cacheService.cacheSessionDetail(detail, timeline: [])
 
-    let cached = try XCTUnwrap(
-      cacheService.loadSessionDetail(sessionID: session.sessionId)
-    )
+    let loaded = await cacheService.loadSessionDetail(sessionID: session.sessionId)
+    let cached = try XCTUnwrap(loaded)
     XCTAssertTrue(
       cached.timeline.isEmpty,
       "Default behaviour must replace the cached timeline with the supplied one"
