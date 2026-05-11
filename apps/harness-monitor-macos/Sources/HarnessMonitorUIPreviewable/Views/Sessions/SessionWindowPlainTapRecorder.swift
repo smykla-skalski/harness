@@ -171,41 +171,164 @@ struct SessionWindowModifierKeysMonitor: NSViewRepresentable {
   @MainActor
   final class Coordinator {
     private let update: (EventModifiers) -> Void
+    private let applicationIsActive: () -> Bool
+    private let currentModifiers: () -> EventModifiers
+    private let notificationCenter: NotificationCenter
+    private let installFlagsChangedMonitor: (@escaping (NSEvent) -> NSEvent?) -> Any?
+    private let removeFlagsChangedMonitor: (Any) -> Void
     private weak var observedWindow: NSWindow?
     private var monitor: Any?
+    private var didBecomeKeyObserver: NSObjectProtocol?
+    private var didResignKeyObserver: NSObjectProtocol?
+    private var didBecomeActiveObserver: NSObjectProtocol?
+    private var didResignActiveObserver: NSObjectProtocol?
+    private var isObservedWindowKey = false
 
-    init(update: @escaping (EventModifiers) -> Void) {
+    init(
+      update: @escaping (EventModifiers) -> Void,
+      applicationIsActive: @escaping () -> Bool = { NSApplication.shared.isActive },
+      currentModifiers: @escaping () -> EventModifiers = {
+        EventModifiers(nsModifiers: NSEvent.modifierFlags)
+      },
+      notificationCenter: NotificationCenter = .default,
+      installFlagsChangedMonitor: @escaping (@escaping (NSEvent) -> NSEvent?) -> Any? = { handler in
+        NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged], handler: handler)
+      },
+      removeFlagsChangedMonitor: @escaping (Any) -> Void = { monitor in
+        NSEvent.removeMonitor(monitor)
+      }
+    ) {
       self.update = update
+      self.applicationIsActive = applicationIsActive
+      self.currentModifiers = currentModifiers
+      self.notificationCenter = notificationCenter
+      self.installFlagsChangedMonitor = installFlagsChangedMonitor
+      self.removeFlagsChangedMonitor = removeFlagsChangedMonitor
     }
 
     func attach(to window: NSWindow?) {
-      guard window !== observedWindow else { return }
+      guard window !== observedWindow else {
+        refreshDisplayedModifiers()
+        return
+      }
       detach()
       observedWindow = window
       guard let window else {
-        update([])
         return
       }
 
-      update(EventModifiers(nsModifiers: NSEvent.modifierFlags))
-      monitor = NSEvent.addLocalMonitorForEvents(
-        matching: [.flagsChanged]
-      ) { [weak self, weak window] event in
-        guard let self, let window, event.window === window else {
+      isObservedWindowKey = window.isKeyWindow
+      installWindowObservers(for: window)
+      installApplicationObservers()
+      refreshDisplayedModifiers()
+      monitor = installFlagsChangedMonitor { [weak self, weak window] event in
+        guard let self else {
           return event
         }
-        update(EventModifiers(nsModifiers: event.modifierFlags))
+        guard let window, event.window === window else {
+          self.refreshDisplayedModifiers()
+          return event
+        }
+        self.handleFlagsChanged(EventModifiers(nsModifiers: event.modifierFlags))
         return event
       }
     }
 
+    func handleFlagsChanged(_ modifiers: EventModifiers) {
+      update(displayedModifiers(for: modifiers))
+    }
+
+    func windowDidBecomeKey() {
+      isObservedWindowKey = true
+      refreshDisplayedModifiers()
+    }
+
+    func windowDidResignKey() {
+      isObservedWindowKey = false
+      update([])
+    }
+
+    func applicationDidBecomeActive() {
+      refreshDisplayedModifiers()
+    }
+
+    func applicationDidResignActive() {
+      update([])
+    }
+
     func detach() {
       if let monitor {
-        NSEvent.removeMonitor(monitor)
+        removeFlagsChangedMonitor(monitor)
         self.monitor = nil
       }
+      removeObserver(&didBecomeKeyObserver)
+      removeObserver(&didResignKeyObserver)
+      removeObserver(&didBecomeActiveObserver)
+      removeObserver(&didResignActiveObserver)
       observedWindow = nil
+      isObservedWindowKey = false
       update([])
+    }
+
+    private func installWindowObservers(for window: NSWindow) {
+      didBecomeKeyObserver = notificationCenter.addObserver(
+        forName: NSWindow.didBecomeKeyNotification,
+        object: window,
+        queue: nil
+      ) { [weak self] _ in
+        Task { @MainActor in
+          self?.windowDidBecomeKey()
+        }
+      }
+      didResignKeyObserver = notificationCenter.addObserver(
+        forName: NSWindow.didResignKeyNotification,
+        object: window,
+        queue: nil
+      ) { [weak self] _ in
+        Task { @MainActor in
+          self?.windowDidResignKey()
+        }
+      }
+    }
+
+    private func installApplicationObservers() {
+      didBecomeActiveObserver = notificationCenter.addObserver(
+        forName: NSApplication.didBecomeActiveNotification,
+        object: nil,
+        queue: nil
+      ) { [weak self] _ in
+        Task { @MainActor in
+          self?.applicationDidBecomeActive()
+        }
+      }
+      didResignActiveObserver = notificationCenter.addObserver(
+        forName: NSApplication.didResignActiveNotification,
+        object: nil,
+        queue: nil
+      ) { [weak self] _ in
+        Task { @MainActor in
+          self?.applicationDidResignActive()
+        }
+      }
+    }
+
+    private func displayedModifiers(for modifiers: EventModifiers) -> EventModifiers {
+      guard isObservedWindowKey, applicationIsActive() else {
+        return []
+      }
+      return modifiers
+    }
+
+    private func refreshDisplayedModifiers() {
+      update(displayedModifiers(for: currentModifiers()))
+    }
+
+    private func removeObserver(_ observer: inout NSObjectProtocol?) {
+      guard let currentObserver = observer else {
+        return
+      }
+      notificationCenter.removeObserver(currentObserver)
+      observer = nil
     }
   }
 

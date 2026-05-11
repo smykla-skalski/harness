@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import SwiftUI
 import Testing
 
 @testable import HarnessMonitorKit
@@ -54,6 +55,84 @@ struct SessionWindowFlowTests {
       SessionWindowKeyboardShortcutOverlaySettings.storageKey
         == "harness.monitor.session-window.shortcut-overlays-enabled"
     )
+  }
+
+  @MainActor
+  @Test("Session shortcut overlay hides when the session window resigns key")
+  func sessionShortcutOverlayHidesWhenSessionWindowResignsKey() {
+    let applicationIsActive = true
+    var globalModifiers: EventModifiers = [.command]
+    var lastReportedModifiers: EventModifiers = []
+    let coordinator = SessionWindowModifierKeysMonitor.Coordinator(
+      update: { lastReportedModifiers = $0 },
+      applicationIsActive: { applicationIsActive },
+      currentModifiers: { globalModifiers },
+      notificationCenter: NotificationCenter(),
+      installFlagsChangedMonitor: { _ in nil },
+      removeFlagsChangedMonitor: { _ in }
+    )
+    let window = NSWindow(
+      contentRect: .init(x: 0, y: 0, width: 320, height: 240),
+      styleMask: [.titled],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer { coordinator.detach() }
+
+    coordinator.attach(to: window)
+    coordinator.windowDidBecomeKey()
+    #expect(lastReportedModifiers == [.command])
+
+    coordinator.windowDidResignKey()
+    #expect(lastReportedModifiers.isEmpty)
+
+    globalModifiers = [.command, .option]
+    coordinator.handleFlagsChanged(globalModifiers)
+    #expect(lastReportedModifiers.isEmpty)
+
+    coordinator.windowDidBecomeKey()
+    #expect(lastReportedModifiers == [.command, .option])
+  }
+
+  @MainActor
+  @Test("Session shortcut overlay stays hidden while the app is inactive")
+  func sessionShortcutOverlayStaysHiddenWhileAppIsInactive() {
+    var applicationIsActive = true
+    var globalModifiers: EventModifiers = [.command]
+    var lastReportedModifiers: EventModifiers = []
+    let coordinator = SessionWindowModifierKeysMonitor.Coordinator(
+      update: { lastReportedModifiers = $0 },
+      applicationIsActive: { applicationIsActive },
+      currentModifiers: { globalModifiers },
+      notificationCenter: NotificationCenter(),
+      installFlagsChangedMonitor: { _ in nil },
+      removeFlagsChangedMonitor: { _ in }
+    )
+    let window = NSWindow(
+      contentRect: .init(x: 0, y: 0, width: 320, height: 240),
+      styleMask: [.titled],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer { coordinator.detach() }
+
+    coordinator.attach(to: window)
+    coordinator.windowDidBecomeKey()
+    #expect(lastReportedModifiers == [.command])
+
+    applicationIsActive = false
+    coordinator.applicationDidResignActive()
+    #expect(lastReportedModifiers.isEmpty)
+
+    globalModifiers = [.command, .shift]
+    coordinator.handleFlagsChanged(globalModifiers)
+    #expect(lastReportedModifiers.isEmpty)
+
+    applicationIsActive = true
+    coordinator.applicationDidBecomeActive()
+    #expect(lastReportedModifiers == [.command, .shift])
   }
 
   @Test("Session tab opening honors app and system tabbing preferences")
