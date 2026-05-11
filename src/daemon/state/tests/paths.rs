@@ -2,7 +2,9 @@ use tempfile::tempdir;
 
 use crate::workspace::harness_data_root;
 
-use super::super::{daemon_root, default_daemon_root, set_daemon_root_override};
+use super::super::{
+    ScopedDaemonRootOverride, daemon_root, default_daemon_root, set_daemon_root_override,
+};
 use super::reset_override_for_tests;
 
 #[test]
@@ -107,6 +109,31 @@ fn daemon_root_override_clears_when_set_to_none() {
             reset_override_for_tests();
             set_daemon_root_override(Some(tmp.path().join("ignored")));
             set_daemon_root_override(None);
+            assert_eq!(daemon_root(), default_daemon_root());
+            reset_override_for_tests();
+        },
+    );
+}
+
+#[test]
+fn scoped_daemon_root_override_restores_previous_value() {
+    let tmp = tempdir().expect("tempdir");
+    let override_root = tmp.path().join("forced");
+    temp_env::with_vars(
+        [
+            ("HARNESS_DAEMON_DATA_HOME", None::<&str>),
+            ("HARNESS_APP_GROUP_ID", None),
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            ),
+        ],
+        || {
+            reset_override_for_tests();
+            {
+                let _override = ScopedDaemonRootOverride::set(Some(override_root.clone()));
+                assert_eq!(daemon_root(), override_root);
+            }
             assert_eq!(daemon_root(), default_daemon_root());
             reset_override_for_tests();
         },

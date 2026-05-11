@@ -1,6 +1,5 @@
 use std::env::current_exe;
-use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus, Stdio};
+use std::path::PathBuf;
 use std::time::Duration;
 
 use clap::{Args, Subcommand};
@@ -9,15 +8,15 @@ use tokio::runtime::Runtime;
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
 use crate::feature_flags;
-use crate::workspace::normalized_env_value;
+use crate::workspace::{host_home_dir, normalized_env_value};
 
 use super::super::launchd;
 use super::super::service::{self, DaemonServeConfig};
 use super::super::snapshot;
 use super::super::state;
 use super::control::{
-    adopt_daemon_root_for_transport_command, exit_code_from_status, print_daemon_control_response,
-    print_json, resolve_current_exe_for, restart_daemon, stop_daemon,
+    adopt_daemon_root_for_transport_command, print_daemon_control_response, print_json,
+    restart_daemon, stop_daemon,
 };
 
 /// Local daemon commands used by the macOS Harness app.
@@ -147,30 +146,7 @@ pub struct DaemonServeArgs {
 
 impl Execute for DaemonServeArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let _acp_override = feature_flags::scoped_acp_enabled_override(self.acp_enabled_override());
-        let runtime = Runtime::new().map_err(|error| {
-            CliError::from(CliErrorKind::workflow_io(format!(
-                "create daemon tokio runtime: {error}"
-            )))
-        })?;
-        let sandboxed = self.sandboxed || service::sandboxed_from_env();
-        let codex_transport = match self.codex_ws_url.as_ref() {
-            Some(url) if !url.trim().is_empty() => {
-                super::super::codex_transport::CodexTransportKind::WebSocket {
-                    endpoint: url.trim().to_string(),
-                }
-            }
-            _ => service::codex_transport_from_env(sandboxed),
-        };
-        runtime.block_on(service::serve(DaemonServeConfig {
-            host: self.host.clone(),
-            port: self.port,
-            poll_interval: Duration::from_secs(self.refresh_seconds.max(1)),
-            observe_interval: Duration::from_secs(self.observe_seconds.max(1)),
-            sandboxed,
-            codex_transport,
-        }))?;
-        Ok(0)
+        execute_daemon_service(self.serve_config(), self.acp_enabled_override(), None)
     }
 }
 
@@ -183,6 +159,26 @@ impl DaemonServeArgs {
             Some(false)
         } else {
             None
+        }
+    }
+
+    fn serve_config(&self) -> DaemonServeConfig {
+        let sandboxed = self.sandboxed || service::sandboxed_from_env();
+        let codex_transport = match self.codex_ws_url.as_ref() {
+            Some(url) if !url.trim().is_empty() => {
+                super::super::codex_transport::CodexTransportKind::WebSocket {
+                    endpoint: url.trim().to_string(),
+                }
+            }
+            _ => service::codex_transport_from_env(sandboxed),
+        };
+        DaemonServeConfig {
+            host: self.host.clone(),
+            port: self.port,
+            poll_interval: Duration::from_secs(self.refresh_seconds.max(1)),
+            observe_interval: Duration::from_secs(self.observe_seconds.max(1)),
+            sandboxed,
+            codex_transport,
         }
     }
 }
@@ -210,22 +206,19 @@ pub struct DaemonDevArgs {
     /// which is the whole point of dev mode (no codex bridge required).
     #[arg(long, value_name = "URL")]
     pub codex_ws_url: Option<String>,
-    /// Enable ACP managed-agent routes for the spawned dev daemon.
+    /// Enable ACP managed-agent routes for the dev daemon.
     #[arg(long, conflicts_with = "disable_acp")]
     pub enable_acp: bool,
-    /// Disable ACP managed-agent routes for the spawned dev daemon.
+    /// Disable ACP managed-agent routes for the dev daemon.
     #[arg(long, conflicts_with = "enable_acp")]
     pub disable_acp: bool,
 }
 
-/// Describes how `harness daemon dev` should spawn the inner `daemon serve`
-/// child. Extracted so the command wiring can be unit-tested without
-/// actually spawning a process.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct DaemonDevSpawnPlan {
-    pub(super) args: Vec<String>,
-    pub(super) set_env: Vec<(String, String)>,
-    pub(super) unset_env: Vec<String>,
+/// Describes how `harness daemon dev` resolves its in-process daemon runtime.
+#[derive(Debug, Clone)]
+pub(super) struct DaemonDevExecutionPlan {
+    pub(super) daemon_root: PathBuf,
+    pub(super) serve_config: DaemonServeConfig,
     pub(super) log_effective_app_group: Option<String>,
 }
 
@@ -240,46 +233,44 @@ impl DaemonDevArgs {
         Ok(())
     }
 
-    pub(super) fn spawn_plan(&self) -> DaemonDevSpawnPlan {
-        let mut args = vec![
-            "daemon".to_string(),
-            "serve".to_string(),
-            "--host".to_string(),
-            self.host.clone(),
-            "--port".to_string(),
-            self.port.to_string(),
-        ];
-        if let Some(url) = self.codex_ws_url.as_deref().map(str::trim)
-            && !url.is_empty()
-        {
-            args.push("--codex-ws-url".to_string());
-            args.push(url.to_string());
-        }
-        if let Some(acp_enabled) = self.acp_enabled_override() {
-            args.push(if acp_enabled {
-                "--enable-acp".to_string()
-            } else {
-                "--disable-acp".to_string()
-            });
-        }
-
-        let mut set_env = Vec::new();
+    pub(super) fn execution_plan(&self) -> DaemonDevExecutionPlan {
         let mut log_effective_app_group = None;
         if normalized_env_value(state::APP_GROUP_ID_ENV).is_none() {
-            set_env.push((
-                "HARNESS_APP_GROUP_ID".to_string(),
-                self.app_group_id.clone(),
-            ));
             log_effective_app_group = Some(self.app_group_id.clone());
         }
 
-        #[cfg(feature = "tokio-console")]
-        set_env.push(("HARNESS_TOKIO_CONSOLE".to_string(), "1".to_string()));
+        let daemon_root = if let Some(value) = normalized_env_value(state::DAEMON_DATA_HOME_ENV) {
+            PathBuf::from(value).join("harness").join("daemon")
+        } else {
+            let effective_app_group = normalized_env_value(state::APP_GROUP_ID_ENV)
+                .unwrap_or_else(|| self.app_group_id.clone());
+            host_home_dir()
+                .join("Library")
+                .join("Group Containers")
+                .join(effective_app_group)
+                .join("harness")
+                .join("daemon")
+        };
 
-        DaemonDevSpawnPlan {
-            args,
-            set_env,
-            unset_env: vec!["HARNESS_SANDBOXED".to_string()],
+        let codex_transport = match self.codex_ws_url.as_deref().map(str::trim) {
+            Some(url) if !url.is_empty() => {
+                super::super::codex_transport::CodexTransportKind::WebSocket {
+                    endpoint: url.to_string(),
+                }
+            }
+            _ => service::codex_transport_from_env(false),
+        };
+
+        DaemonDevExecutionPlan {
+            daemon_root,
+            serve_config: DaemonServeConfig {
+                host: self.host.clone(),
+                port: self.port,
+                poll_interval: Duration::from_secs(2),
+                observe_interval: Duration::from_secs(5),
+                sandboxed: false,
+                codex_transport,
+            },
             log_effective_app_group,
         }
     }
@@ -301,15 +292,17 @@ impl DaemonDevArgs {
 impl Execute for DaemonDevArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         Self::ensure_not_sandboxed()?;
-        let binary = resolve_current_exe_for("dev daemon")?;
-        let plan = self.spawn_plan();
+        let plan = self.execution_plan();
         plan.log_effective_app_group();
-        let status = plan.spawn(&binary)?;
-        Ok(exit_code_from_status(status))
+        execute_daemon_service(
+            plan.serve_config,
+            self.acp_enabled_override(),
+            Some(plan.daemon_root),
+        )
     }
 }
 
-impl DaemonDevSpawnPlan {
+impl DaemonDevExecutionPlan {
     #[expect(
         clippy::cognitive_complexity,
         reason = "tracing macro expansion; tokio-rs/tracing#553"
@@ -323,27 +316,22 @@ impl DaemonDevSpawnPlan {
             "daemon dev: defaulted HARNESS_APP_GROUP_ID so sandboxed monitor app can read the manifest",
         );
     }
+}
 
-    fn spawn(&self, binary: &Path) -> Result<ExitStatus, CliError> {
-        let mut command = Command::new(binary);
-        command.args(&self.args);
-        for (key, value) in &self.set_env {
-            command.env(key, value);
-        }
-        for key in &self.unset_env {
-            command.env_remove(key);
-        }
-        command
-            .stdin(Stdio::inherit())
-            .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit());
-
-        command.status().map_err(|error| {
-            CliError::from(CliErrorKind::workflow_io(format!(
-                "spawn harness daemon serve for dev daemon: {error}"
-            )))
-        })
-    }
+fn execute_daemon_service(
+    config: DaemonServeConfig,
+    acp_enabled_override: Option<bool>,
+    daemon_root_override: Option<PathBuf>,
+) -> Result<i32, CliError> {
+    let _acp_override = feature_flags::scoped_acp_enabled_override(acp_enabled_override);
+    let _daemon_root_override = state::ScopedDaemonRootOverride::set(daemon_root_override);
+    let runtime = Runtime::new().map_err(|error| {
+        CliError::from(CliErrorKind::workflow_io(format!(
+            "create daemon tokio runtime: {error}"
+        )))
+    })?;
+    runtime.block_on(service::serve(config))?;
+    Ok(0)
 }
 
 #[derive(Debug, Clone, Args)]

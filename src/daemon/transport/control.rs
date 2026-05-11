@@ -1,7 +1,6 @@
-use std::env::current_exe;
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::{Child, Command, ExitStatus, Stdio};
+use std::path::Path;
+use std::process::{Child, Command, Stdio};
 use std::sync::LazyLock;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -50,32 +49,6 @@ pub(super) fn adopt_daemon_root_for_transport_command(command: &'static str) {
             );
         }
     }
-}
-
-pub(super) fn resolve_current_exe_for(context: &'static str) -> Result<PathBuf, CliError> {
-    current_exe().map_err(|error| {
-        CliError::from(CliErrorKind::workflow_io(format!(
-            "resolve current harness binary for {context}: {error}"
-        )))
-    })
-}
-
-pub(super) fn exit_code_from_status(status: ExitStatus) -> i32 {
-    if let Some(code) = status.code() {
-        return code;
-    }
-    signal_exit_code(status).unwrap_or(1)
-}
-
-#[cfg(unix)]
-fn signal_exit_code(status: ExitStatus) -> Option<i32> {
-    use std::os::unix::process::ExitStatusExt;
-    status.signal().map(|signal| 128 + signal)
-}
-
-#[cfg(not(unix))]
-fn signal_exit_code(_status: ExitStatus) -> Option<i32> {
-    None
 }
 
 pub(super) fn stop_daemon() -> Result<DaemonControlResponse, CliError> {

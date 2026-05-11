@@ -245,6 +245,93 @@ esac
             self.assertTrue(log_path.is_file())
             self.assertIn("fake daemon started", log_path.read_text(encoding="utf-8"))
 
+    def test_repeated_interrupt_reaches_same_child_and_cleans_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            fake_harness = temp_root / "fake-harness-interrupt-needs-second.py"
+            write_executable(
+                fake_harness,
+                """#!/usr/bin/env python3
+import os
+import signal
+import sys
+from pathlib import Path
+
+if sys.argv[1:] != ["daemon", "dev"]:
+    print(f"unexpected args: {' '.join(sys.argv[1:])}", file=sys.stderr)
+    raise SystemExit(64)
+
+manifest = Path(os.environ["HARNESS_DAEMON_DATA_HOME"]) / "harness" / "daemon" / "manifest.json"
+manifest.parent.mkdir(parents=True, exist_ok=True)
+manifest.write_text('{"pid":999}\\n', encoding="utf-8")
+print("fake daemon started", flush=True)
+state = {"interrupts": 0}
+
+def handle_signal(_signum, _frame):
+    state["interrupts"] += 1
+    if state["interrupts"] == 1:
+        print("fake daemon ignored first interrupt", flush=True)
+        return
+    manifest.unlink(missing_ok=True)
+    print("fake daemon cleaned manifest on second interrupt", flush=True)
+    raise SystemExit(130)
+
+for handled_signal in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+    signal.signal(handled_signal, handle_signal)
+
+while True:
+    signal.pause()
+""",
+            )
+
+            home_dir = temp_root / "home-monitor-daemon-second-interrupt"
+            home_dir.mkdir(parents=True, exist_ok=True)
+            log_dir = temp_root / "logs"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            manifest_path = self.lane_manifest_path(home_dir, "monitor-daemon-second-interrupt")
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "HOME": str(home_dir),
+                    "HARNESS_MONITOR_RUNTIME_LANE": "monitor-daemon-second-interrupt",
+                    "HARNESS_MONITOR_DAEMON_DEV_BIN": str(fake_harness),
+                    "HARNESS_MONITOR_DAEMON_DEV_LOG_DIR": str(log_dir),
+                    "TMPDIR": str(temp_root),
+                    "BASH_ENV": "/dev/null",
+                }
+            )
+
+            process = subprocess.Popen(
+                ["bash", str(SCRIPT_PATH)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                env=env,
+            )
+
+            assert process.stdout is not None
+            self.wait_for_path(manifest_path)
+            startup_line = self.wait_for_stream_line(process, process.stdout)
+            self.assertIn("fake daemon started", startup_line)
+
+            process.send_signal(signal.SIGINT)
+            first_interrupt_line = self.wait_for_stream_line(process, process.stdout)
+            self.assertIn("fake daemon ignored first interrupt", first_interrupt_line)
+
+            process.send_signal(signal.SIGINT)
+            stdout_tail, stderr = process.communicate(timeout=15)
+            stdout = startup_line + first_interrupt_line + stdout_tail
+
+            self.assertEqual(process.returncode, 0, stdout + stderr)
+            self.assertEqual(stderr, "")
+            self.assertFalse(manifest_path.exists(), "manifest should be removed after second interrupt")
+            self.assertIn("fake daemon cleaned manifest on second interrupt", stdout)
+            log_path = self.parse_log_path(stdout)
+            log_text = log_path.read_text(encoding="utf-8")
+            self.assertIn("fake daemon ignored first interrupt", log_text)
+            self.assertIn("fake daemon cleaned manifest on second interrupt", log_text)
+
     def test_supervisor_uses_new_session_and_process_group_forwarding(self) -> None:
         script = SUPERVISOR_PATH.read_text(encoding="utf-8")
 

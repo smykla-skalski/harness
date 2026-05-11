@@ -22,6 +22,30 @@ pub fn set_daemon_root_override(path: Option<PathBuf>) {
         .expect("daemon root override mutex poisoned") = path;
 }
 
+pub struct ScopedDaemonRootOverride {
+    previous: Option<PathBuf>,
+}
+
+impl ScopedDaemonRootOverride {
+    #[must_use]
+    pub fn set(path: Option<PathBuf>) -> Self {
+        let mut override_root = DAEMON_ROOT_OVERRIDE
+            .lock()
+            .expect("daemon root override mutex poisoned");
+        let previous = override_root.clone();
+        *override_root = path;
+        Self { previous }
+    }
+}
+
+impl Drop for ScopedDaemonRootOverride {
+    fn drop(&mut self) {
+        *DAEMON_ROOT_OVERRIDE
+            .lock()
+            .expect("daemon root override mutex poisoned") = self.previous.clone();
+    }
+}
+
 #[must_use]
 fn daemon_root_override() -> Option<PathBuf> {
     DAEMON_ROOT_OVERRIDE

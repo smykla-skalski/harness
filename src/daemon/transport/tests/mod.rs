@@ -100,30 +100,32 @@ fn daemon_transport_round_trip_smoke_covers_public_surface() {
     };
     assert_eq!(dev_args.app_group_id, "com.example.group");
     assert_eq!(HARNESS_MONITOR_APP_GROUP_ID, "Q498EB36N4.io.harnessmonitor");
-    temp_env::with_var("HARNESS_APP_GROUP_ID", Option::<&str>::None, || {
-        let plan = dev_args.spawn_plan();
-        assert_eq!(
-            plan.args,
-            vec![
-                "daemon".to_string(),
-                "serve".to_string(),
-                "--host".to_string(),
-                "127.0.0.1".to_string(),
-                "--port".to_string(),
-                "8123".to_string(),
-                "--codex-ws-url".to_string(),
-                "ws://127.0.0.1:7777".to_string(),
-            ]
-        );
-        assert_eq!(
-            plan.set_env,
-            vec![(
-                "HARNESS_APP_GROUP_ID".to_string(),
-                "com.example.group".to_string(),
-            )]
-        );
-        assert_eq!(plan.unset_env, vec!["HARNESS_SANDBOXED".to_string()]);
-    });
+    temp_env::with_vars(
+        [
+            ("HARNESS_APP_GROUP_ID", Option::<&str>::None),
+            ("HARNESS_DAEMON_DATA_HOME", Option::<&str>::None),
+            ("HOME", Some("/tmp/home")),
+            ("HARNESS_HOST_HOME", Some("/tmp/home")),
+        ],
+        || {
+            let plan = dev_args.execution_plan();
+            assert_eq!(plan.serve_config.host, "127.0.0.1");
+            assert_eq!(plan.serve_config.port, 8123);
+            assert_eq!(
+                plan.daemon_root,
+                PathBuf::from("/tmp/home")
+                    .join("Library")
+                    .join("Group Containers")
+                    .join("com.example.group")
+                    .join("harness")
+                    .join("daemon")
+            );
+            assert_eq!(
+                plan.log_effective_app_group.as_deref(),
+                Some("com.example.group")
+            );
+        },
+    );
 
     match stop {
         DaemonCommand::Stop(args) => assert!(args.json),
