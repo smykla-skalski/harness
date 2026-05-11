@@ -189,7 +189,7 @@ private struct HarnessMonitorSystemButtonChromeModifier: ViewModifier {
   }
 }
 
-private enum HarnessMonitorProminentButtonContrast {
+enum HarnessMonitorProminentButtonContrast {
   private static let darkForeground = Color.black.opacity(0.82)
   private static let lightForeground = HarnessMonitorTheme.onContrast
 

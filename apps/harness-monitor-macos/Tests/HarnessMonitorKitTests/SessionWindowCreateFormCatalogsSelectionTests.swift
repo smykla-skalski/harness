@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
@@ -81,8 +82,20 @@ struct SessionWindowCreateFormCatalogsSelectionTests {
         "Text(mode.rawValue)\n      .font(.system(.caption2, design: .rounded, weight: .semibold))"
       )
     )
-    #expect(source.contains("Capsule()\n          .fill(mode.tint.opacity(fillOpacity))"))
+    #expect(source.contains("private let cornerRadius: CGFloat = 8"))
+    #expect(
+      source.contains(
+        "RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)\n          .fill(mode.fill)"
+      )
+    )
+    #expect(
+      source.contains(
+        "var foreground: Color {\n    HarnessMonitorProminentButtonContrast.foreground(for: fill)\n  }"
+      )
+    )
     #expect(!source.contains("Text(mode.rawValue)\n      .scaledFont(.caption.weight(.semibold))"))
+    #expect(!source.contains("Capsule()"))
+    #expect(!source.contains(".strokeBorder("))
     #expect(!source.contains(".harnessContentPill(tint: mode.tint)"))
   }
 
