@@ -6,9 +6,10 @@ use std::time::Duration;
 
 use agent_client_protocol::schema::{
     CancelNotification, ContentBlock, CreateTerminalRequest, InitializeRequest,
-    KillTerminalRequest, NewSessionRequest, PromptRequest, ProtocolVersion, ReadTextFileRequest,
-    ReleaseTerminalRequest, RequestPermissionRequest, SessionId, SessionNotification,
-    TerminalOutputRequest, TextContent, WaitForTerminalExitRequest, WriteTextFileRequest,
+    KillTerminalRequest, NewSessionRequest, NewSessionResponse, PromptRequest, ProtocolVersion,
+    ReadTextFileRequest, ReleaseTerminalRequest, RequestPermissionRequest, SessionId,
+    SessionNotification, TerminalOutputRequest, TextContent, WaitForTerminalExitRequest,
+    WriteTextFileRequest,
 };
 use agent_client_protocol::{
     Agent, ByteStreams, Client, ConnectionTo, Error as AcpError, ErrorCode, Result as AcpResult,
@@ -35,11 +36,14 @@ use super::manager::{AcpAgentManagerHandle, AcpAgentStartRequest};
 mod commands;
 mod context;
 mod runtime_helpers;
+mod session_config;
 mod session_guard;
 mod session_start;
 pub(super) use commands::AcpProtocolHandle;
 use commands::{ProtocolCommand, run_protocol_command_loop};
 use context::{ProtocolContext, handle_permission_request, respond_client_result};
+pub(super) use session_config::AcpSessionRequestConfig;
+use session_config::{advertised_session_configuration, apply_requested_session_configuration};
 use session_guard::SessionRouteGuard;
 const ACP_DEADLINE_EXCEEDED: i32 = -32090;
 const SESSION_ROUTE_DRAIN_GRACE: Duration = Duration::from_millis(75);
@@ -54,6 +58,7 @@ pub(super) struct SpawnedAcpProtocol {
 
 pub(super) struct SpawnProtocolInput<'a> {
     pub request: &'a AcpAgentStartRequest,
+    pub session_config: AcpSessionRequestConfig,
     pub acp_id: &'a str,
     pub session_id: &'a str,
     pub agent_name: String,
@@ -71,6 +76,7 @@ pub(super) fn spawn_protocol_task(
 ) -> io::Result<SpawnedAcpProtocol> {
     let SpawnProtocolInput {
         request,
+        session_config,
         acp_id,
         session_id,
         agent_name,
@@ -123,6 +129,7 @@ pub(super) fn spawn_protocol_task(
         stdout,
         project_dir,
         prompt: request.prompt.clone(),
+        session_config,
         acp_id: acp_id.to_string(),
         session_id: session_id.to_string(),
         runtime_name,
@@ -151,6 +158,7 @@ struct RunProtocolArgs {
     stdout: ChildStdout,
     project_dir: PathBuf,
     prompt: Option<String>,
+    session_config: AcpSessionRequestConfig,
     acp_id: String,
     session_id: String,
     runtime_name: String,
@@ -175,6 +183,7 @@ async fn run_protocol(args: RunProtocolArgs) {
         stdout,
         project_dir,
         prompt,
+        session_config,
         acp_id,
         session_id,
         runtime_name,
@@ -280,6 +289,7 @@ async fn run_protocol(args: RunProtocolArgs) {
                 connection,
                 project_dir,
                 prompt,
+                session_config,
                 acp_id,
                 session_id,
                 runtime_name,
@@ -301,6 +311,7 @@ async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
         connection,
         project_dir,
         prompt,
+        session_config,
         acp_id,
         session_id,
         runtime_name,
@@ -316,7 +327,7 @@ async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
     // runtime's `new_session` response and the orchestration bind, so notifications fired
     // by the runtime during the bind window land on the route guard instead of being
     // dropped with `routing_not_initialized`.
-    let acp_session_id = initialize_and_bind_runtime_session(
+    let started_session = initialize_and_bind_runtime_session(
         &manager,
         &supervisor,
         &connection,
@@ -327,7 +338,16 @@ async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
         &session_guard,
     )
     .await?;
+    let acp_session_id = started_session.session_id.clone();
     let run_result = async {
+        apply_requested_session_configuration(
+            &supervisor,
+            &connection,
+            &acp_session_id,
+            &session_config,
+            advertised_session_configuration(&started_session.response),
+        )
+        .await?;
         if let Some(prompt) = prompt.filter(|value| !value.trim().is_empty()) {
             let cancelled = send_prompt_or_cancel(
                 &supervisor,
@@ -355,6 +375,9 @@ async fn run_connection(args: RunConnectionArgs) -> AcpResult<()> {
         .await
     }
     .await;
+    if run_result.is_err() {
+        let _ = send_cancel_notification(&connection, acp_session_id.clone());
+    }
     // Keep route validation active for a short grace window after we have
     // requested cancel so in-flight notifications are not immediately marked
     // stale while transport shutdown is still propagating.
@@ -368,6 +391,7 @@ struct RunConnectionArgs {
     connection: ConnectionTo<Agent>,
     project_dir: PathBuf,
     prompt: Option<String>,
+    session_config: AcpSessionRequestConfig,
     acp_id: String,
     session_id: String,
     runtime_name: String,
@@ -400,13 +424,12 @@ async fn send_new_session(
     supervisor: &AcpSessionSupervisor,
     connection: &ConnectionTo<Agent>,
     project_dir: PathBuf,
-) -> AcpResult<SessionId> {
+) -> AcpResult<NewSessionResponse> {
     let _guard = supervisor.enter_pending_request_with_reason(Some("session/new"));
-    let response = connection
+    connection
         .send_request(NewSessionRequest::new(project_dir))
         .block_task()
-        .await?;
-    Ok(response.session_id)
+        .await
 }
 
 async fn send_prompt_or_cancel(

@@ -5,7 +5,9 @@
 //! probe shape in Chunk 8; Chunk 1 captures only the fields a basic launch +
 //! installation check needs.
 
-use super::{AcpAgentDescriptor, DoctorProbe, tags};
+use super::{
+    AcpAgentDescriptor, AcpSessionConfiguration, AcpSpawnConfiguration, DoctorProbe, tags,
+};
 use crate::agents::runtime::models;
 
 const COPILOT_ID: &str = "copilot";
@@ -38,6 +40,7 @@ pub fn descriptor() -> AcpAgentDescriptor {
             "GH_TOKEN".to_owned(),
             "GITHUB_TOKEN".to_owned(),
         ],
+        spawn_configuration: AcpSpawnConfiguration::DescriptorRuntime,
         model_catalog: Some(
             models::catalog_for(COPILOT_ID)
                 .expect("built-in Copilot descriptor must have a model catalog")
@@ -46,6 +49,7 @@ pub fn descriptor() -> AcpAgentDescriptor {
         install_hint: Some(
             "Install GitHub Copilot CLI: https://github.com/github/copilot-cli".to_owned(),
         ),
+        session_configuration: AcpSessionConfiguration::default(),
         doctor_probe: DoctorProbe {
             command: "copilot".to_owned(),
             args: vec!["--version".to_owned()],

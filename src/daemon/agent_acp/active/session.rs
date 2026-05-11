@@ -9,6 +9,7 @@ use crate::daemon::agent_acp::manager::{AcpAgentInspectSnapshot, AcpAgentSnapsho
 use crate::daemon::agent_acp::permission_bridge::{
     AcpPermissionBatch, AcpPermissionDecision, PermissionBridgeHandle,
 };
+use crate::daemon::agent_acp::protocol::AcpSessionRequestConfig;
 use crate::session::types::AgentStatus;
 use crate::workspace::utc_now;
 
@@ -19,6 +20,7 @@ pub(in crate::daemon::agent_acp) struct ActiveAcpSession {
     snapshot: Mutex<AcpAgentSnapshot>,
     permissions: PermissionBridgeHandle,
     process: Arc<ActiveAcpProcess>,
+    session_config: AcpSessionRequestConfig,
 }
 
 impl ActiveAcpSession {
@@ -27,6 +29,7 @@ impl ActiveAcpSession {
         snapshot: AcpAgentSnapshot,
         permissions: PermissionBridgeHandle,
         process: Arc<ActiveAcpProcess>,
+        session_config: AcpSessionRequestConfig,
     ) -> Self {
         process.add_logical_session(&snapshot.acp_id);
         Self {
@@ -34,6 +37,7 @@ impl ActiveAcpSession {
             snapshot: Mutex::new(snapshot),
             permissions,
             process,
+            session_config,
         }
     }
 
@@ -61,8 +65,12 @@ impl ActiveAcpSession {
         session_id: &str,
         project_dir: PathBuf,
     ) -> Result<String, String> {
-        self.process
-            .attach_protocol_session(acp_id, session_id, project_dir)
+        self.process.attach_protocol_session(
+            acp_id,
+            session_id,
+            project_dir,
+            self.session_config.clone(),
+        )
     }
 
     pub(in crate::daemon::agent_acp) fn prompt_protocol_session(
@@ -72,8 +80,13 @@ impl ActiveAcpSession {
         project_dir: PathBuf,
         prompt: String,
     ) -> Result<String, String> {
-        self.process
-            .prompt_protocol_session(acp_id, session_id, project_dir, prompt)
+        self.process.prompt_protocol_session(
+            acp_id,
+            session_id,
+            project_dir,
+            self.session_config.clone(),
+            prompt,
+        )
     }
 
     pub(in crate::daemon::agent_acp) fn detach_protocol_session(

@@ -1,12 +1,17 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use agent_client_protocol::schema::SessionId;
+use agent_client_protocol::schema::{NewSessionResponse, SessionId};
 use agent_client_protocol::{Agent, ConnectionTo, Error as AcpError, Result as AcpResult};
 
 use super::session_guard::{RouteTarget, SessionRouteGuard};
 use super::{AcpAgentManagerHandle, AcpSessionSupervisor, send_initialize, send_new_session};
 use crate::errors::CliError;
+
+pub(super) struct InitializedRuntimeSession {
+    pub(super) session_id: SessionId,
+    pub(super) response: NewSessionResponse,
+}
 
 #[expect(
     clippy::too_many_arguments,
@@ -21,8 +26,9 @@ pub(super) async fn initialize_and_bind_runtime_session(
     acp_id: &str,
     runtime_name: &str,
     session_guard: &SessionRouteGuard,
-) -> AcpResult<SessionId> {
-    let acp_session_id = initialize_runtime_session(supervisor, connection, project_dir).await?;
+) -> AcpResult<InitializedRuntimeSession> {
+    let started_session = initialize_runtime_session(supervisor, connection, project_dir).await?;
+    let acp_session_id = started_session.session_id.clone();
     // Register the route the moment we know the runtime's session_id - the runtime
     // can fire `session/update` notifications immediately after `new_session` returns,
     // so any gap before `bind_runtime_session` finishes would silently drop them with
@@ -41,17 +47,21 @@ pub(super) async fn initialize_and_bind_runtime_session(
         session_guard.stop_session(&acp_session_id);
         return Err(error);
     }
-    Ok(acp_session_id)
+    Ok(started_session)
 }
 
 async fn initialize_runtime_session(
     supervisor: &Arc<AcpSessionSupervisor>,
     connection: &ConnectionTo<Agent>,
     project_dir: PathBuf,
-) -> AcpResult<SessionId> {
+) -> AcpResult<InitializedRuntimeSession> {
     let initialize_timeout = supervisor.config().initialize_timeout;
     send_initialize(supervisor, connection, initialize_timeout).await?;
-    send_new_session(supervisor, connection, project_dir).await
+    let response = send_new_session(supervisor, connection, project_dir).await?;
+    Ok(InitializedRuntimeSession {
+        session_id: response.session_id.clone(),
+        response,
+    })
 }
 
 async fn bind_runtime_session(

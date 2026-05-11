@@ -165,8 +165,10 @@ mod tests {
             launch_command: "copilot".to_string(),
             launch_args: vec!["--acp".to_string()],
             env_passthrough: Vec::new(),
+            spawn_configuration: Default::default(),
             model_catalog: None,
             install_hint: None,
+            session_configuration: Default::default(),
             doctor_probe: crate::agents::acp::catalog::DoctorProbe {
                 command: "copilot".to_string(),
                 args: vec!["--version".to_string()],

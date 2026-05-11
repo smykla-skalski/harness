@@ -9,6 +9,7 @@ use super::{
     AcpAgentManagerHandle, AcpAgentSnapshot, AcpOrchestrationRegistration, ActiveAcpSession,
     DescriptorStartInput, PermissionBridgeHandle, prompt_text,
 };
+use crate::daemon::agent_acp::protocol::AcpSessionRequestConfig;
 
 impl AcpAgentManagerHandle {
     pub(super) fn try_start_reused_session(
@@ -51,6 +52,7 @@ impl AcpAgentManagerHandle {
                 self.sender(),
             ),
             existing.process(),
+            AcpSessionRequestConfig::from_request(input.request, input.descriptor),
         ));
         if let Err(error) = self
             .sessions_guard()

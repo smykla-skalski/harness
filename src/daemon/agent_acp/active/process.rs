@@ -14,7 +14,7 @@ use crate::agents::kind::DisconnectReason;
 
 use super::SharedStderrTail;
 use crate::daemon::agent_acp::prompt_gate::{PromptGate, PromptOwner};
-use crate::daemon::agent_acp::protocol::AcpProtocolHandle;
+use crate::daemon::agent_acp::protocol::{AcpProtocolHandle, AcpSessionRequestConfig};
 
 const PROTOCOL_CANCEL_FLUSH_GRACE: Duration = Duration::from_millis(25);
 const PERMISSION_SHUTDOWN_FLUSH_GRACE: Duration = Duration::from_millis(25);
@@ -173,9 +173,10 @@ impl ActiveAcpProcess {
         acp_id: &str,
         session_id: &str,
         project_dir: PathBuf,
+        session_config: AcpSessionRequestConfig,
     ) -> Result<String, String> {
         self.protocol_handle
-            .attach_session(acp_id, session_id, project_dir)
+            .attach_session(acp_id, session_id, project_dir, session_config)
             .map(|session_id| session_id.to_string())
     }
 
@@ -184,6 +185,7 @@ impl ActiveAcpProcess {
         acp_id: &str,
         session_id: &str,
         project_dir: PathBuf,
+        session_config: AcpSessionRequestConfig,
         prompt: String,
     ) -> Result<String, String> {
         let lease = self
@@ -191,7 +193,14 @@ impl ActiveAcpProcess {
             .acquire(PromptOwner::new(acp_id, session_id))
             .map_err(|error| error.message())?;
         self.protocol_handle
-            .prompt_session(acp_id, session_id, project_dir, prompt, lease)
+            .prompt_session(
+                acp_id,
+                session_id,
+                project_dir,
+                session_config,
+                prompt,
+                lease,
+            )
             .map(|session_id| session_id.to_string())
     }
 
