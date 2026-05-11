@@ -193,6 +193,13 @@ extension HarnessMonitorStore {
           timelineWindow: TimelineWindowResponse.fallbackMetadata(for: timeline),
           markViewed: false
         )
+      } else {
+        scheduleSessionDetailCacheWrite(
+          detail,
+          timeline: [],
+          markViewed: false,
+          preservesTimeline: true
+        )
       }
       return
     }

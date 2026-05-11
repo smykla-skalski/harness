@@ -5,6 +5,7 @@ import SwiftData
 struct PendingSessionDetailCacheWrite: Sendable {
   let snapshot: SessionCacheService.CachedSessionSnapshot
   let markViewed: Bool
+  let preservesTimeline: Bool
 }
 
 @MainActor

@@ -149,7 +149,8 @@ extension HarnessMonitorStore {
     transcript: [TimelineEntry]? = nil,
     transcriptSource: HarnessMonitorSessionWindowTranscriptSource? = nil,
     timelineWindow: TimelineWindowResponse? = nil,
-    markViewed: Bool = true
+    markViewed: Bool = true,
+    preservesTimeline: Bool = false
   ) {
     guard cacheService != nil, persistenceError == nil else { return }
     pendingSessionDetailCacheWrites[detail.session.sessionId] = PendingSessionDetailCacheWrite(
@@ -160,7 +161,8 @@ extension HarnessMonitorStore {
         transcript: transcript,
         transcriptSource: transcriptSource
       ),
-      markViewed: markViewed
+      markViewed: markViewed,
+      preservesTimeline: preservesTimeline
     )
     cancelPendingSessionDetailCacheWriteTask()
     pendingSessionDetailCacheWriteTaskToken &+= 1
@@ -192,7 +194,8 @@ extension HarnessMonitorStore {
           transcript: write.snapshot.transcript,
           transcriptSource: write.snapshot.transcriptSource,
           timelineWindow: write.snapshot.timelineWindow,
-          markViewed: write.markViewed
+          markViewed: write.markViewed,
+          preservesTimeline: write.preservesTimeline
         )
         await self.applyPersistedCacheWriteResult(result)
       }
