@@ -4,9 +4,9 @@ import HarnessMonitorUIPreviewable
 @MainActor
 enum SessionWindowTabBadge {
   static let leadingSpacing = "  "
-  static let badgeHeight: CGFloat = 16
-  static let cornerRadius: CGFloat = 5
-  static let baselineOffset: CGFloat = -3
+  static let badgeHeight: CGFloat = 14
+  static let cornerRadius: CGFloat = 4
+  static let baselineOffset: CGFloat = -2
 
   static func attributedTitle(base: String, pendingDecisionCount: Int) -> NSAttributedString? {
     guard pendingDecisionCount > 0 else { return nil }
@@ -17,13 +17,13 @@ enum SessionWindowTabBadge {
 
   static func makeAttachment(count: Int) -> NSTextAttachment {
     let text = "\(count)"
-    let font = NSFont.systemFont(ofSize: 11, weight: .bold)
+    let font = NSFont.systemFont(ofSize: 10, weight: .bold)
     let knockoutAttributes: [NSAttributedString.Key: Any] = [
       .font: font,
       .foregroundColor: NSColor.black,
     ]
     let textSize = (text as NSString).size(withAttributes: knockoutAttributes)
-    let horizontalPadding: CGFloat = 6
+    let horizontalPadding: CGFloat = 5
     let width = max(badgeHeight, textSize.width + horizontalPadding * 2)
     let image = NSImage(size: NSSize(width: width, height: badgeHeight), flipped: false) { rect in
       let path = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
