@@ -1,7 +1,11 @@
 import Foundation
 import SwiftData
 
-extension HarnessMonitorSchemaV6 {
+/// V14 rebases the cached session graph onto a new schema generation so
+/// `CachedAgent` can persist managed-agent identity directly. Existing V13
+/// rows migrate lightweight: the new fields start nil and are rewritten on the
+/// next live session-detail refresh.
+extension HarnessMonitorSchemaV14 {
   @Model
   final class CachedProject {
     #Unique<CachedProject>([\.projectId])
@@ -150,6 +154,8 @@ extension HarnessMonitorSchemaV6 {
     var joinedAt: String
     var updatedAt: String
     var agentSessionId: String?
+    var managedAgentID: String?
+    var managedAgentKindRaw: String?
     var lastActivityAt: String?
     var currentTaskId: String?
     var capabilitiesData: Data
@@ -166,6 +172,8 @@ extension HarnessMonitorSchemaV6 {
       joinedAt: String,
       updatedAt: String,
       agentSessionId: String?,
+      managedAgentID: String?,
+      managedAgentKindRaw: String?,
       lastActivityAt: String?,
       currentTaskId: String?,
       capabilitiesData: Data,
@@ -179,6 +187,8 @@ extension HarnessMonitorSchemaV6 {
       self.joinedAt = joinedAt
       self.updatedAt = updatedAt
       self.agentSessionId = agentSessionId
+      self.managedAgentID = managedAgentID
+      self.managedAgentKindRaw = managedAgentKindRaw
       self.lastActivityAt = lastActivityAt
       self.currentTaskId = currentTaskId
       self.capabilitiesData = capabilitiesData
@@ -383,15 +393,3 @@ extension HarnessMonitorSchemaV6 {
     }
   }
 }
-
-// V14 adds managed-agent identity directly onto CachedAgent, so the canonical
-// Cached* models now live under HarnessMonitorSchemaV14. Keep these aliases in
-// one place so store/model-conversion call sites stay stable across schema bumps.
-typealias CachedProject = HarnessMonitorSchemaV14.CachedProject
-typealias CachedSession = HarnessMonitorSchemaV14.CachedSession
-typealias CachedAgent = HarnessMonitorSchemaV14.CachedAgent
-typealias CachedWorkItem = HarnessMonitorSchemaV14.CachedWorkItem
-typealias CachedSignalRecord = HarnessMonitorSchemaV14.CachedSignalRecord
-typealias CachedTimelineEntry = HarnessMonitorSchemaV14.CachedTimelineEntry
-typealias CachedObserver = HarnessMonitorSchemaV14.CachedObserver
-typealias CachedAgentActivity = HarnessMonitorSchemaV14.CachedAgentActivity

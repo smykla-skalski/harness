@@ -121,6 +121,27 @@ extension HarnessMonitorStore {
     )
   }
 
+  public func acpRuntimeState(
+    for sessionAgentIdentity: SessionAgentID,
+    sessionID: String,
+    sessionRegistrations: [AgentRegistration],
+    snapshots: [AcpAgentSnapshot],
+    inspectSample: AcpInspectSample?
+  ) -> AcpAgentRuntimeState? {
+    let linkage = AcpAgentIdentityCrosswalk(
+      selectedSessionIdentity: HarnessSessionID(rawValue: sessionID),
+      descriptorsByID: acpAgentDescriptorsByID,
+      sessionRegistrations: sessionRegistrations,
+      snapshots: snapshots,
+      inspectSample: inspectSample?.sessionID == sessionID ? inspectSample : nil
+    ).agentLinkage(forSessionAgentIdentity: sessionAgentIdentity)
+    return AcpAgentRuntimeState(
+      snapshot: linkage?.snapshot,
+      inspect: linkage?.inspect,
+      inspectSampledAt: inspectSample?.sampledAt
+    )
+  }
+
   func acpRuntimeState(
     forManagedAgentIdentity managedAgentIdentity: ManagedAgentID
   ) -> AcpAgentRuntimeState? {

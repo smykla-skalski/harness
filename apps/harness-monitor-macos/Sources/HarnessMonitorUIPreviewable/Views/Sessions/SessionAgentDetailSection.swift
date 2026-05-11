@@ -7,6 +7,7 @@ struct SessionAgentDetailSection: View {
   let store: HarnessMonitorStore
   let sessionID: String
   let detail: SessionDetail
+  let runtimePresentation: HarnessMonitorStore.AgentRuntimePresentationContext?
   let agentTimeline: [TimelineEntry]
   let agentTranscript: [TimelineEntry]
   let agent: AgentRegistration

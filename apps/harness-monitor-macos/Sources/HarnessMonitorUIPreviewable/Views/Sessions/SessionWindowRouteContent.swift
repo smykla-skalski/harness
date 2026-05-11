@@ -29,6 +29,21 @@ struct SessionWindowOverview: View {
     SessionWindowRouteContentMetrics(fontScale: fontScale)
   }
 
+  private var runtimePresentation: HarnessMonitorStore.AgentRuntimePresentationContext? {
+    switch snapshot.source {
+    case .live:
+      return HarnessMonitorStore.AgentRuntimePresentationContext(
+        availability: .live,
+        acpSnapshots: snapshot.acpAgents,
+        acpInspectSample: snapshot.acpInspectSample
+      )
+    case .cache:
+      return HarnessMonitorStore.AgentRuntimePresentationContext(availability: .persisted)
+    case .catalog:
+      return nil
+    }
+  }
+
   var body: some View {
     HarnessMonitorColumnScrollView(
       horizontalPadding: metrics.contentPadding,
@@ -75,7 +90,8 @@ struct SessionWindowOverview: View {
   }
 
   private var agentCountText: String {
-    guard store.usesLiveRuntimePresentation(for: snapshot.summary.sessionId),
+    guard
+      runtimePresentation?.availability == .live,
       let detail = snapshot.detail
     else {
       return "\(agentCount)"
@@ -84,7 +100,8 @@ struct SessionWindowOverview: View {
     let summary = store.agentRuntimeSummary(
       sessionID: snapshot.summary.sessionId,
       sessionRegistrations: detail.agents,
-      tuiStatusByAgent: tuiStatusByAgent
+      tuiStatusByAgent: tuiStatusByAgent,
+      runtimePresentation: runtimePresentation
     )
     guard summary.registeredCount > 0 else {
       return "0"
@@ -101,7 +118,8 @@ enum SessionWindowAgentFilter {
     _ agents: [AgentRegistration],
     query: String
   ) -> [AgentRegistration] {
-    let needle = query
+    let needle =
+      query
       .trimmingCharacters(in: .whitespacesAndNewlines)
       .lowercased()
     guard !needle.isEmpty else { return agents }
@@ -123,7 +141,7 @@ enum SessionWindowAgentFilter {
 
 struct SessionWindowAgentsList: View {
   let store: HarnessMonitorStore
-  let detail: SessionDetail?
+  let snapshot: HarnessMonitorSessionWindowSnapshot
   let tuiStatusByAgent: [String: AgentTuiStatus]
   @Bindable var state: SessionWindowStateCache
   @Environment(\.fontScale)
@@ -168,7 +186,22 @@ struct SessionWindowAgentsList: View {
   }
 
   private var filteredAgents: [AgentRegistration] {
-    SessionWindowAgentFilter.filteredAgents(detail?.agents ?? [], query: searchQuery)
+    SessionWindowAgentFilter.filteredAgents(snapshot.detail?.agents ?? [], query: searchQuery)
+  }
+
+  private var runtimePresentation: HarnessMonitorStore.AgentRuntimePresentationContext? {
+    switch snapshot.source {
+    case .live:
+      return HarnessMonitorStore.AgentRuntimePresentationContext(
+        availability: .live,
+        acpSnapshots: snapshot.acpAgents,
+        acpInspectSample: snapshot.acpInspectSample
+      )
+    case .cache:
+      return HarnessMonitorStore.AgentRuntimePresentationContext(availability: .persisted)
+    case .catalog:
+      return nil
+    }
   }
 
   var body: some View {
@@ -180,16 +213,19 @@ struct SessionWindowAgentsList: View {
             let lifecycle = store.agentLifecyclePresentation(
               for: agent,
               sessionID: state.sessionID,
-              sessionRegistrations: detail?.agents ?? [],
-              tuiStatus: tuiStatusByAgent[agent.agentId]
+              sessionRegistrations: snapshot.detail?.agents ?? [],
+              tuiStatus: tuiStatusByAgent[agent.agentId],
+              runtimePresentation: runtimePresentation
             )
             Label {
               VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
                 Text(agent.name)
                   .scaledFont(.body)
-                Text("\(lifecycle.label) - \(agent.role.title) - \(agent.runtime) - \(agent.agentId)")
-                  .scaledFont(.caption)
-                  .foregroundStyle(.secondary)
+                Text(
+                  "\(lifecycle.label) - \(agent.role.title) - \(agent.runtime) - \(agent.agentId)"
+                )
+                .scaledFont(.caption)
+                .foregroundStyle(.secondary)
               }
             } icon: {
               Image(systemName: "person.crop.circle")

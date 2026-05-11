@@ -308,6 +308,69 @@ public enum HarnessMonitorSchemaV12: VersionedSchema {
   }
 }
 
+/// Historical V13 adds a `CachedAgentManagedMetadata` side-table so cached
+/// session detail can retain managed-agent identity without rebasing the whole
+/// cached graph. Keep this exact schema available because stores created by the
+/// earlier V13 build must still be recognized by staged migration.
+public enum HarnessMonitorSchemaV13: VersionedSchema {
+  public static var versionIdentifier: Schema.Version { Schema.Version(13, 0, 0) }
+
+  public static var models: [any PersistentModel.Type] {
+    [
+      HarnessMonitorSchemaV6.CachedProject.self,
+      HarnessMonitorSchemaV6.CachedSession.self,
+      HarnessMonitorSchemaV6.CachedAgent.self,
+      HarnessMonitorSchemaV6.CachedWorkItem.self,
+      HarnessMonitorSchemaV6.CachedSignalRecord.self,
+      HarnessMonitorSchemaV6.CachedTimelineEntry.self,
+      HarnessMonitorSchemaV6.CachedObserver.self,
+      HarnessMonitorSchemaV6.CachedAgentActivity.self,
+      SessionBookmark.self,
+      UserNote.self,
+      RecentSearch.self,
+      ProjectFilterPreference.self,
+      Decision.self,
+      SupervisorEvent.self,
+      PolicyConfigRow.self,
+      HarnessMonitorSchemaV8.CachedTaskReviewMetadata.self,
+      HarnessMonitorSchemaV10.CachedSessionWindowState.self,
+      HarnessMonitorSchemaV12.CachedSessionTranscriptEntry.self,
+      Self.CachedAgentManagedMetadata.self,
+    ]
+  }
+}
+
+/// V14 rebases the cached session graph onto a new schema generation so
+/// `CachedAgent` can persist managed-agent identity directly via
+/// `managedAgentID` / `managedAgentKindRaw`. The relationship graph is
+/// otherwise unchanged, so the V13->V14 migration stays lightweight.
+public enum HarnessMonitorSchemaV14: VersionedSchema {
+  public static var versionIdentifier: Schema.Version { Schema.Version(14, 0, 0) }
+
+  public static var models: [any PersistentModel.Type] {
+    [
+      Self.CachedProject.self,
+      Self.CachedSession.self,
+      Self.CachedAgent.self,
+      Self.CachedWorkItem.self,
+      Self.CachedSignalRecord.self,
+      Self.CachedTimelineEntry.self,
+      Self.CachedObserver.self,
+      Self.CachedAgentActivity.self,
+      SessionBookmark.self,
+      UserNote.self,
+      RecentSearch.self,
+      ProjectFilterPreference.self,
+      Decision.self,
+      SupervisorEvent.self,
+      PolicyConfigRow.self,
+      HarnessMonitorSchemaV8.CachedTaskReviewMetadata.self,
+      HarnessMonitorSchemaV10.CachedSessionWindowState.self,
+      HarnessMonitorSchemaV12.CachedSessionTranscriptEntry.self,
+    ]
+  }
+}
+
 public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
   public static var schemas: [any VersionedSchema.Type] {
     [
@@ -323,6 +386,8 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       HarnessMonitorSchemaV10.self,
       HarnessMonitorSchemaV11.self,
       HarnessMonitorSchemaV12.self,
+      HarnessMonitorSchemaV13.self,
+      HarnessMonitorSchemaV14.self,
     ]
   }
 
@@ -339,6 +404,8 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       migrateV9toV10,
       migrateV10toV11,
       migrateV11toV12,
+      migrateV12toV13,
+      migrateV13toV14,
     ]
   }
 
@@ -426,6 +493,25 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
     fromVersion: HarnessMonitorSchemaV11.self,
     toVersion: HarnessMonitorSchemaV12.self
   )
+
+  // Historical V13 is purely additive: one managed-agent identity side-table keyed
+  // by `(sessionId, agentId)` with no relationship into the V6 cached session
+  // graph. Lightweight migration adds the table; V12 rows remain readable even
+  // before any managed-agent metadata has been written.
+  static let migrateV12toV13 = MigrationStage.lightweight(
+    fromVersion: HarnessMonitorSchemaV12.self,
+    toVersion: HarnessMonitorSchemaV13.self
+  )
+
+  // V14 moves managed-agent identity from the historical V13 side-table onto
+  // CachedAgent directly. The only live-entity storage change is two optional
+  // columns on CachedAgent (`managedAgentID`, `managedAgentKindRaw`), so staged
+  // migration from the known V13 side-table store to the V14 graph remains
+  // lightweight. The old side-table becomes orphaned SQLite data and is ignored.
+  static let migrateV13toV14 = MigrationStage.lightweight(
+    fromVersion: HarnessMonitorSchemaV13.self,
+    toVersion: HarnessMonitorSchemaV14.self
+  )
 }
 
-public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV12
+public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV14

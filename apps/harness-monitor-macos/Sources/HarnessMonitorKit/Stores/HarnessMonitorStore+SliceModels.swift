@@ -96,6 +96,28 @@ extension HarnessMonitorStore {
     }
   }
 
+  public enum AgentPresentationAvailability: Equatable, Sendable {
+    case live
+    case persisted
+    case unavailable
+  }
+
+  public struct AgentRuntimePresentationContext: Equatable, Sendable {
+    public let availability: AgentPresentationAvailability
+    public let acpSnapshots: [AcpAgentSnapshot]
+    public let acpInspectSample: AcpInspectSample?
+
+    public init(
+      availability: AgentPresentationAvailability,
+      acpSnapshots: [AcpAgentSnapshot] = [],
+      acpInspectSample: AcpInspectSample? = nil
+    ) {
+      self.availability = availability
+      self.acpSnapshots = acpSnapshots
+      self.acpInspectSample = acpInspectSample
+    }
+  }
+
   public struct AgentRuntimeSummary: Equatable, Sendable {
     public let registeredCount: Int
     public let activeCount: Int
@@ -307,6 +329,29 @@ extension HarnessMonitorStore {
     selectedSessionID == sessionID && sessionDataAvailability == .live
   }
 
+  private func agentPresentationAvailability(
+    for sessionID: String
+  ) -> AgentPresentationAvailability? {
+    guard selectedSessionID == sessionID else {
+      return nil
+    }
+    switch sessionDataAvailability {
+    case .live:
+      return .live
+    case .persisted:
+      return .persisted
+    case .unavailable:
+      return .unavailable
+    }
+  }
+
+  private func resolvedPresentationAvailability(
+    for sessionID: String,
+    runtimePresentation: AgentRuntimePresentationContext?
+  ) -> AgentPresentationAvailability? {
+    runtimePresentation?.availability ?? agentPresentationAvailability(for: sessionID)
+  }
+
   private func acpWatchdogLifecyclePresentation(
     runtimeState: AcpAgentRuntimeState,
     fallbackStatus: AgentStatus
@@ -342,9 +387,9 @@ extension HarnessMonitorStore {
   // offline, prefer a truthful disconnected label over replaying persisted
   // `.active` state.
   private func unavailableSelectedAcpLifecyclePresentation(
-    for sessionID: String
+    for availability: AgentPresentationAvailability
   ) -> AgentLifecyclePresentation {
-    if usesLiveRuntimePresentation(for: sessionID) {
+    if availability == .live {
       return AgentLifecyclePresentation(
         label: "Not Running",
         accessibilityValue: "No live ACP runtime observed",
@@ -353,7 +398,7 @@ extension HarnessMonitorStore {
     }
 
     let accessibilityValue: String
-    switch sessionDataAvailability {
+    switch availability {
     case .persisted:
       accessibilityValue = "Showing cached data; live ACP runtime unavailable"
     case .unavailable:
@@ -373,17 +418,46 @@ extension HarnessMonitorStore {
     for agent: AgentRegistration,
     sessionID: String,
     sessionRegistrations: [AgentRegistration],
-    tuiStatus: AgentTuiStatus?
+    tuiStatus: AgentTuiStatus?,
+    runtimePresentation: AgentRuntimePresentationContext? = nil
   ) -> AgentLifecyclePresentation {
+    let resolvedPresentationAvailability = resolvedPresentationAvailability(
+      for: sessionID,
+      runtimePresentation: runtimePresentation
+    )
+
     if agent.managedAgent?.kind == .acp,
       agent.status == .active,
-      selectedSessionID == sessionID,
-      usesLiveRuntimePresentation(for: sessionID) == false
+      let resolvedPresentationAvailability,
+      resolvedPresentationAvailability != .live
     {
-      return unavailableSelectedAcpLifecyclePresentation(for: sessionID)
+      return unavailableSelectedAcpLifecyclePresentation(for: resolvedPresentationAvailability)
     }
 
-    guard usesLiveRuntimePresentation(for: sessionID) else {
+    let liveAcpRuntimeState: AcpAgentRuntimeState? =
+      if agent.managedAgent?.kind == .acp,
+        resolvedPresentationAvailability == .live
+      {
+        if let runtimePresentation {
+          acpRuntimeState(
+            for: SessionAgentID(rawValue: agent.agentId),
+            sessionID: sessionID,
+            sessionRegistrations: sessionRegistrations,
+            snapshots: runtimePresentation.acpSnapshots,
+            inspectSample: runtimePresentation.acpInspectSample
+          )
+        } else {
+          acpRuntimeState(
+            for: agent.agentId,
+            sessionID: sessionID,
+            sessionRegistrations: sessionRegistrations
+          )
+        }
+      } else {
+        nil
+      }
+
+    guard resolvedPresentationAvailability == .live else {
       let label = agent.status.title
       return AgentLifecyclePresentation(
         label: label,
@@ -392,25 +466,16 @@ extension HarnessMonitorStore {
       )
     }
 
-    let acpRuntimeState =
-      agent.managedAgent?.kind == .acp
-      ? acpRuntimeState(
-        for: agent.agentId,
-        sessionID: sessionID,
-        sessionRegistrations: sessionRegistrations
-      )
-      : nil
-
     if agent.managedAgent?.kind == .acp,
       agent.status == .active,
-      acpRuntimeState == nil
+      liveAcpRuntimeState == nil
     {
-      return unavailableSelectedAcpLifecyclePresentation(for: sessionID)
+      return unavailableSelectedAcpLifecyclePresentation(for: .live)
     }
 
-    if let acpRuntimeState,
+    if let liveAcpRuntimeState,
       let runtimeLifecycle = acpWatchdogLifecyclePresentation(
-        runtimeState: acpRuntimeState,
+        runtimeState: liveAcpRuntimeState,
         fallbackStatus: agent.status
       )
     {
@@ -438,13 +503,15 @@ extension HarnessMonitorStore {
     sessionID: String,
     sessionRegistrations: [AgentRegistration],
     queuedTasks: [WorkItem],
-    tuiStatus: AgentTuiStatus?
+    tuiStatus: AgentTuiStatus?,
+    runtimePresentation: AgentRuntimePresentationContext? = nil
   ) -> AgentActivityPresentation {
     let lifecycle = agentLifecyclePresentation(
       for: agent,
       sessionID: sessionID,
       sessionRegistrations: sessionRegistrations,
-      tuiStatus: tuiStatus
+      tuiStatus: tuiStatus,
+      runtimePresentation: runtimePresentation
     )
 
     if lifecycle.label == "Not Running" {
@@ -476,7 +543,12 @@ extension HarnessMonitorStore {
         accessibilityValue: lifecycle.accessibilityValue
       )
     case .active:
-      guard usesLiveRuntimePresentation(for: sessionID) else {
+      guard
+        resolvedPresentationAvailability(
+          for: sessionID,
+          runtimePresentation: runtimePresentation
+        ) == .live
+      else {
         return AgentActivityPresentation(
           label: "Snapshot",
           accessibilityValue: "Estimated activity"
@@ -497,7 +569,8 @@ extension HarnessMonitorStore {
   public func agentRuntimeSummary(
     sessionID: String,
     sessionRegistrations: [AgentRegistration],
-    tuiStatusByAgent: [String: AgentTuiStatus]
+    tuiStatusByAgent: [String: AgentTuiStatus],
+    runtimePresentation: AgentRuntimePresentationContext? = nil
   ) -> AgentRuntimeSummary {
     var activeCount = 0
     var notRunningCount = 0
@@ -511,7 +584,8 @@ extension HarnessMonitorStore {
         for: agent,
         sessionID: sessionID,
         sessionRegistrations: sessionRegistrations,
-        tuiStatus: tuiStatusByAgent[agent.agentId]
+        tuiStatus: tuiStatusByAgent[agent.agentId],
+        runtimePresentation: runtimePresentation
       )
 
       switch lifecycle.label {

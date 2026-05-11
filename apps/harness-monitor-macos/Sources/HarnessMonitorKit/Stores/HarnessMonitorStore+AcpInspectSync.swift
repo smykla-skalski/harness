@@ -138,6 +138,42 @@ extension HarnessMonitorStore {
     }
   }
 
+  public func acpRuntimeInspectStatus(
+    for agentID: String,
+    sessionID: String,
+    sessionRegistrations: [AgentRegistration],
+    snapshots: [AcpAgentSnapshot],
+    inspectSample: AcpInspectSample?
+  ) -> AcpRuntimeInspectStatus? {
+    guard
+      let runtimeState = acpRuntimeState(
+        for: SessionAgentID(rawValue: agentID),
+        sessionID: sessionID,
+        sessionRegistrations: sessionRegistrations,
+        snapshots: snapshots,
+        inspectSample: inspectSample
+      )
+    else {
+      return nil
+    }
+
+    if runtimeState.hasInspect {
+      return AcpRuntimeInspectStatus(
+        phase: .ready,
+        shortLabel: "Ready",
+        detail: "ACP runtime telemetry available.",
+        accessibilityValue: "Runtime telemetry available"
+      )
+    }
+
+    return AcpRuntimeInspectStatus(
+      phase: .waiting,
+      shortLabel: "Waiting",
+      detail: "Waiting for the first ACP runtime inspect snapshot.",
+      accessibilityValue: "Waiting for first runtime telemetry"
+    )
+  }
+
   func reconcileAcpInspectSyncState(
     sessionID: String,
     activeAgents: [AcpAgentSnapshot],

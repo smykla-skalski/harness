@@ -126,6 +126,123 @@ final class HarnessMonitorStoreLifecyclePresentationTests: XCTestCase {
     XCTAssertEqual(summary.disconnectedCount, 1)
   }
 
+  func testSessionWindowCachedLifecycleMarksActiveAcpRegistrationAsDisconnected() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+
+    let cachedAgent = makeAgent(
+      agentID: "worker-window-cached",
+      name: "Window Cached Worker",
+      runtime: "gemini",
+      managedAgent: ManagedAgentRef(kind: .acp, id: "acp-worker-window-cached")
+    )
+
+    let lifecycle = store.agentLifecyclePresentation(
+      for: cachedAgent,
+      sessionID: "sess-window",
+      sessionRegistrations: [cachedAgent],
+      tuiStatus: nil,
+      runtimePresentation: HarnessMonitorStore.AgentRuntimePresentationContext(
+        availability: .persisted
+      )
+    )
+
+    XCTAssertEqual(lifecycle.label, "Disconnected")
+    XCTAssertEqual(lifecycle.visualStatus, .disconnected)
+  }
+
+  func testSessionWindowLiveLifecycleUsesExplicitAcpRuntimeContext() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+
+    let liveAgent = makeAgent(
+      agentID: "worker-window-live",
+      name: "Window Live Worker",
+      runtime: "gemini",
+      managedAgent: ManagedAgentRef(kind: .acp, id: "acp-worker-window-live")
+    )
+    let runtimePresentation = HarnessMonitorStore.AgentRuntimePresentationContext(
+      availability: .live,
+      acpSnapshots: [
+        makeAcpSnapshot(
+          acpID: "acp-worker-window-live",
+          sessionID: "sess-window",
+          agentID: "worker-window-live",
+          displayName: "Window Live Worker",
+          pendingBatches: []
+        )
+      ]
+    )
+
+    let lifecycle = store.agentLifecyclePresentation(
+      for: liveAgent,
+      sessionID: "sess-window",
+      sessionRegistrations: [liveAgent],
+      tuiStatus: nil,
+      runtimePresentation: runtimePresentation
+    )
+    let activity = store.agentActivityPresentation(
+      for: liveAgent,
+      sessionID: "sess-window",
+      sessionRegistrations: [liveAgent],
+      queuedTasks: [],
+      tuiStatus: nil,
+      runtimePresentation: runtimePresentation
+    )
+    let summary = store.agentRuntimeSummary(
+      sessionID: "sess-window",
+      sessionRegistrations: [liveAgent],
+      tuiStatusByAgent: [:],
+      runtimePresentation: runtimePresentation
+    )
+
+    XCTAssertEqual(lifecycle.label, "Active")
+    XCTAssertEqual(lifecycle.visualStatus, .active)
+    XCTAssertEqual(activity.label, "Ready")
+    XCTAssertEqual(summary.activeCount, 1)
+    XCTAssertEqual(summary.disconnectedCount, 0)
+  }
+
+  func testSessionWindowLiveLifecycleMarksMissingAcpRuntimeAsNotRunning() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+
+    let staleAgent = makeAgent(
+      agentID: "worker-window-stale",
+      name: "Window Stale Worker",
+      runtime: "gemini",
+      managedAgent: ManagedAgentRef(kind: .acp, id: "acp-worker-window-stale")
+    )
+    let runtimePresentation = HarnessMonitorStore.AgentRuntimePresentationContext(
+      availability: .live
+    )
+
+    let lifecycle = store.agentLifecyclePresentation(
+      for: staleAgent,
+      sessionID: "sess-window",
+      sessionRegistrations: [staleAgent],
+      tuiStatus: nil,
+      runtimePresentation: runtimePresentation
+    )
+    let activity = store.agentActivityPresentation(
+      for: staleAgent,
+      sessionID: "sess-window",
+      sessionRegistrations: [staleAgent],
+      queuedTasks: [],
+      tuiStatus: nil,
+      runtimePresentation: runtimePresentation
+    )
+    let summary = store.agentRuntimeSummary(
+      sessionID: "sess-window",
+      sessionRegistrations: [staleAgent],
+      tuiStatusByAgent: [:],
+      runtimePresentation: runtimePresentation
+    )
+
+    XCTAssertEqual(lifecycle.label, "Not Running")
+    XCTAssertEqual(lifecycle.visualStatus, .disconnected)
+    XCTAssertEqual(activity.label, "No live ACP runtime")
+    XCTAssertEqual(summary.activeCount, 0)
+    XCTAssertEqual(summary.notRunningCount, 1)
+  }
+
   func testUnavailableSelectedSessionMarksActiveAcpRegistrationAsDisconnected() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.selectedSessionID = "sess-live"
@@ -270,6 +387,28 @@ final class HarnessMonitorStoreLifecyclePresentationTests: XCTestCase {
     XCTAssertFalse(sessionAgentDetailSource.contains("status: agent.status"))
   }
 
+  func testSessionWindowCachedSurfacesPassSnapshotAvailabilityIntoLifecyclePresentation() throws {
+    let routeContent = try previewableSourceFile(
+      at: "Views/Sessions/SessionWindowRouteContent.swift"
+    )
+    let sidebarSource = try previewableSourceFile(
+      at: "Views/Sessions/SessionSidebar+Sections.swift"
+    )
+    let sessionAgentComputed = try previewableSourceFile(
+      at: "Views/Sessions/SessionAgentDetailSection+Computed.swift"
+    )
+    let columnsSource = try previewableSourceFile(
+      at: "Views/Sessions/SessionWindowView+Columns.swift"
+    )
+
+    XCTAssertTrue(routeContent.contains("acpSnapshots: snapshot.acpAgents"))
+    XCTAssertTrue(routeContent.contains("runtimePresentation: runtimePresentation"))
+    XCTAssertTrue(sidebarSource.contains("acpSnapshots: snapshot.acpAgents"))
+    XCTAssertTrue(sidebarSource.contains("runtimePresentation: runtimePresentation"))
+    XCTAssertTrue(sessionAgentComputed.contains("runtimePresentation: runtimePresentation"))
+    XCTAssertTrue(columnsSource.contains("acpSnapshots: snapshot.acpAgents"))
+  }
+
   func testDisconnectedAndCachedAgentsDoNotShowReadyActivity() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
 
@@ -333,7 +472,8 @@ final class HarnessMonitorStoreLifecyclePresentationTests: XCTestCase {
   private func previewableSourceFile(at relativePath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let appRoot = testsDirectory.deletingLastPathComponent().deletingLastPathComponent()
-    let sourceURL = appRoot
+    let sourceURL =
+      appRoot
       .appendingPathComponent("Sources/HarnessMonitorUIPreviewable")
       .appendingPathComponent(relativePath)
     return try String(contentsOf: sourceURL, encoding: .utf8)

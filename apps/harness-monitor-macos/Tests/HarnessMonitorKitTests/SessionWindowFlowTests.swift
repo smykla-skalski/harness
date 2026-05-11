@@ -27,14 +27,14 @@ struct SessionWindowFlowTests {
 
   @Test("Current schema includes session window restoration state")
   func currentSchemaIncludesSessionWindowRestorationState() {
-    #expect(HarnessMonitorCurrentSchema.versionString == "12.0.0")
+    #expect(HarnessMonitorCurrentSchema.versionString == "14.0.0")
     #expect(
-      HarnessMonitorSchemaV12.models.contains {
+      HarnessMonitorSchemaV14.models.contains {
         String(describing: $0) == "CachedSessionWindowState"
       }
     )
     #expect(
-      HarnessMonitorSchemaV12.models.contains {
+      HarnessMonitorSchemaV14.models.contains {
         String(describing: $0) == "CachedSessionTranscriptEntry"
       }
     )

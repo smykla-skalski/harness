@@ -42,7 +42,8 @@ private struct SessionSidebarCreateButtonFrameModifier: ViewModifier {
 }
 
 struct SessionSidebarCreateButtonShortcutOverlays: View {
-  @ScaledMetric(relativeTo: .caption) private var shortcutKeySpacing = HarnessMonitorTheme.spacingXS - 1
+  @ScaledMetric(relativeTo: .caption)
+  private var shortcutKeySpacing = HarnessMonitorTheme.spacingXS - 1
   @ScaledMetric(relativeTo: .caption) private var shortcutVerticalOffset = 8
   @ScaledMetric(relativeTo: .caption) private var shortcutHorizontalAdjustment = 1
 
@@ -84,6 +85,24 @@ struct SessionSidebarCreateButtonShortcutOverlays: View {
 }
 
 extension SessionSidebar {
+  private var runtimePresentation: HarnessMonitorStore.AgentRuntimePresentationContext? {
+    guard let snapshot else {
+      return nil
+    }
+    switch snapshot.source {
+    case .live:
+      return HarnessMonitorStore.AgentRuntimePresentationContext(
+        availability: .live,
+        acpSnapshots: snapshot.acpAgents,
+        acpInspectSample: snapshot.acpInspectSample
+      )
+    case .cache:
+      return HarnessMonitorStore.AgentRuntimePresentationContext(availability: .persisted)
+    case .catalog:
+      return nil
+    }
+  }
+
   @ViewBuilder var agentsSection: some View {
     Section {
       let orderedAgents = state.sidebarOrdering.orderedAgents(snapshot?.detail?.agents ?? [])
@@ -145,7 +164,8 @@ extension SessionSidebar {
       for: agent,
       sessionID: state.sessionID,
       sessionRegistrations: snapshot?.detail?.agents ?? [],
-      tuiStatus: store.contentUI.sessionDetail.tuiStatusByAgent[agent.agentId]
+      tuiStatus: store.contentUI.sessionDetail.tuiStatusByAgent[agent.agentId],
+      runtimePresentation: runtimePresentation
     )
     let selection = SessionSelection.agent(sessionID: state.sessionID, agentID: agent.agentId)
     SessionSidebarRow(

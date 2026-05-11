@@ -185,6 +185,7 @@ struct CachedModelsTests {
       updatedAt: "2026-03-28T14:00:00Z",
       status: .active,
       agentSessionId: "asess-1",
+      managedAgent: ManagedAgentRef(kind: .acp, id: "managed-agent-1"),
       lastActivityAt: "2026-03-28T14:00:00Z",
       currentTaskId: "task-5",
       runtimeCapabilities: RuntimeCapabilities(
