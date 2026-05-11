@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import select
 import signal
 import stat
 import subprocess
@@ -28,6 +29,30 @@ class RunDaemonDevScriptTests(unittest.TestCase):
                 return
             time.sleep(0.05)
         self.fail(f"timed out waiting for {path}")
+
+    def wait_for_stream_line(
+        self,
+        process: subprocess.Popen[str],
+        stream: object,
+        timeout_seconds: float = 5.0,
+    ) -> str:
+        deadline = time.monotonic() + timeout_seconds
+        while time.monotonic() < deadline:
+            remaining = deadline - time.monotonic()
+            ready, _, _ = select.select([stream], [], [], remaining)
+            if ready:
+                line = stream.readline()
+                if line:
+                    return line
+            if process.poll() is not None:
+                break
+        stderr_tail = ""
+        if process.stderr is not None:
+            stderr_tail = process.stderr.read()
+        self.fail(
+            "timed out waiting for live stdout from run-daemon-dev.sh"
+            + (f": {stderr_tail}" if stderr_tail else "")
+        )
 
     def lane_manifest_path(self, home_dir: Path, lane: str) -> Path:
         return (
@@ -66,6 +91,7 @@ case "$mode" in
     exit 23
     ;;
   interrupt-cleans)
+    printf 'fake daemon started\\n'
     printf '{"pid":999}\\n' >"$manifest"
     trap 'rm -f "$manifest"; printf "fake daemon cleaned manifest on interrupt\\n"; exit 130' INT TERM HUP
     while :; do
@@ -169,6 +195,55 @@ esac
             self.assertIn("fake daemon cleaned manifest on interrupt", stdout)
             log_path = self.parse_log_path(stdout)
             self.assertTrue(log_path.is_file())
+
+    def test_interrupt_cleanup_streams_startup_output_before_exit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            fake_harness = temp_root / "fake-harness-interrupt-streams.sh"
+            self.write_fake_harness(fake_harness, "interrupt-cleans")
+
+            home_dir = temp_root / "home-monitor-daemon-streams"
+            home_dir.mkdir(parents=True, exist_ok=True)
+            log_dir = temp_root / "logs"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            manifest_path = self.lane_manifest_path(home_dir, "monitor-daemon-streams")
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "HOME": str(home_dir),
+                    "HARNESS_MONITOR_RUNTIME_LANE": "monitor-daemon-streams",
+                    "HARNESS_MONITOR_DAEMON_DEV_BIN": str(fake_harness),
+                    "HARNESS_MONITOR_DAEMON_DEV_LOG_DIR": str(log_dir),
+                    "TMPDIR": str(temp_root),
+                    "BASH_ENV": "/dev/null",
+                }
+            )
+
+            process = subprocess.Popen(
+                ["bash", str(SCRIPT_PATH)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                env=env,
+            )
+
+            assert process.stdout is not None
+            self.wait_for_path(manifest_path)
+            startup_line = self.wait_for_stream_line(process, process.stdout)
+            self.assertIn("fake daemon started", startup_line)
+
+            process.send_signal(signal.SIGINT)
+            stdout_tail, stderr = process.communicate(timeout=15)
+            stdout = startup_line + stdout_tail
+
+            self.assertEqual(process.returncode, 0, stdout + stderr)
+            self.assertEqual(stderr, "")
+            self.assertFalse(manifest_path.exists(), "manifest should be removed on clean interrupt")
+            self.assertIn("fake daemon cleaned manifest on interrupt", stdout)
+            log_path = self.parse_log_path(stdout)
+            self.assertTrue(log_path.is_file())
+            self.assertIn("fake daemon started", log_path.read_text(encoding="utf-8"))
 
     def test_supervisor_uses_new_session_and_process_group_forwarding(self) -> None:
         script = SUPERVISOR_PATH.read_text(encoding="utf-8")

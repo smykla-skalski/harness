@@ -44,7 +44,14 @@ def pump_output(process: subprocess.Popen[bytes], log_file: object) -> threading
         nonlocal stdout_open
 
         assert process.stdout is not None
-        for chunk in iter(lambda: process.stdout.read(8192), b""):
+        stdout_fd = process.stdout.fileno()
+        while True:
+            try:
+                chunk = os.read(stdout_fd, 8192)
+            except InterruptedError:
+                continue
+            if not chunk:
+                break
             if stdout_open:
                 try:
                     os.write(sys.stdout.fileno(), chunk)
