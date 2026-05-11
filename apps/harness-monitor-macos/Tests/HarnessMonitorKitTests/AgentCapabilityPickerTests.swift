@@ -130,6 +130,44 @@ struct AgentCapabilityPickerTests {
     #expect(option.doctorProbeText == "Setup check: gemini --version · Setup required")
   }
 
+  @Test("bundled Harness adapters point setup copy at Harness, not a separate CLI")
+  func bundledHarnessAdapterUsesHarnessInstallCopy() {
+    let option = AgentCapabilityOption(
+      id: "codex",
+      title: "Codex",
+      transportChoices: [
+        AgentCapabilityTransportChoice(
+          id: .tui(.codex),
+          title: "Terminal screen",
+          capabilities: ["streaming", "multi-turn"]
+        ),
+        AgentCapabilityTransportChoice(
+          id: .acp("codex"),
+          title: "ACP",
+          capabilities: ["fs.read", "fs.write", "terminal.spawn"]
+        ),
+      ],
+      doctorProbe: AcpDoctorProbe(command: "harness-codex-acp", args: ["--probe"]),
+      probe: AcpRuntimeProbe(
+        agentId: "codex",
+        displayName: "Codex",
+        binaryPresent: false,
+        authState: .unavailable
+      ),
+      installHint: "Codex ACP ships with Harness.",
+      bundledWithHarness: true,
+      sandboxed: false,
+      acpHostBridgeReady: true
+    )
+
+    #expect(option.statusText == "Setup required")
+    #expect(option.installActionTitle == "Copy Harness install instructions")
+    #expect(option.installAccessibilityHint == "Copies Harness install instructions for Codex")
+    #expect(
+      option.projectAccessGuidanceText
+        == "This ACP adapter ships with Harness. Install or update Harness to enable it here.")
+  }
+
   @Test("sandboxed monitor disables ACP transport even when binary exists")
   func sandboxedMonitorDisablesAcpTransport() throws {
     let options = AgentCapabilityCatalog.options(
@@ -285,6 +323,29 @@ struct AgentCapabilityPickerTests {
 
     #expect(
       AgentCapabilityCatalog.firstProviderLaunchSelection(options: options) == .acp("copilot"))
+  }
+
+  @Test("first launch selection prefers Codex ACP when the managed adapter is ready")
+  func firstLaunchSelectionPrefersCodexAcpWhenReady() {
+    let options = AgentCapabilityCatalog.options(
+      acpAgents: [
+        descriptor(id: "codex", displayName: "Codex")
+      ],
+      runtimeProbeResults: AcpRuntimeProbeResponse(
+        probes: [
+          AcpRuntimeProbe(
+            agentId: "codex",
+            displayName: "Codex",
+            binaryPresent: true,
+            authState: .ready
+          )
+        ],
+        checkedAt: "2026-05-11T18:45:00Z"
+      )
+    )
+
+    #expect(
+      AgentCapabilityCatalog.firstProviderLaunchSelection(options: options) == .acp("codex"))
   }
 
   @Test("first launch selection skips ACP providers excluded from the initial default")

@@ -27,6 +27,7 @@ public struct AcpAgentDescriptor: Codable, Equatable, Identifiable, Sendable {
   public let doctorProbe: AcpDoctorProbe
   public let promptTimeoutSeconds: UInt64?
   public let excludedFromInitialDefault: Bool
+  public let bundledWithHarness: Bool
 
   public init(
     id: String,
@@ -39,7 +40,8 @@ public struct AcpAgentDescriptor: Codable, Equatable, Identifiable, Sendable {
     installHint: String? = nil,
     doctorProbe: AcpDoctorProbe,
     promptTimeoutSeconds: UInt64? = nil,
-    excludedFromInitialDefault: Bool = false
+    excludedFromInitialDefault: Bool = false,
+    bundledWithHarness: Bool = false
   ) {
     self.id = id
     self.displayName = displayName
@@ -52,6 +54,7 @@ public struct AcpAgentDescriptor: Codable, Equatable, Identifiable, Sendable {
     self.doctorProbe = doctorProbe
     self.promptTimeoutSeconds = promptTimeoutSeconds
     self.excludedFromInitialDefault = excludedFromInitialDefault
+    self.bundledWithHarness = bundledWithHarness
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -66,6 +69,7 @@ public struct AcpAgentDescriptor: Codable, Equatable, Identifiable, Sendable {
     case doctorProbe
     case promptTimeoutSeconds
     case excludedFromInitialDefault
+    case bundledWithHarness
   }
 
   public init(from decoder: any Decoder) throws {
@@ -85,6 +89,8 @@ public struct AcpAgentDescriptor: Codable, Equatable, Identifiable, Sendable {
     )
     excludedFromInitialDefault =
       try container.decodeIfPresent(Bool.self, forKey: .excludedFromInitialDefault) ?? false
+    bundledWithHarness =
+      try container.decodeIfPresent(Bool.self, forKey: .bundledWithHarness) ?? false
   }
 }
 

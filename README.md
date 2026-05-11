@@ -275,6 +275,8 @@ mise run aff:install
 
 Generated hooks call back into `harness agents session-start`, `session-stop`, and `prompt-submit`. They do not keep their own durable state. The shared agent ledger under the harness project directory is the runtime source of truth.
 
+Built-in ACP adapters currently ship for GitHub Copilot, Gemini CLI, Claude Code, and Codex. Codex ACP is installed as the harness-managed `harness-codex-acp` sibling binary, so `mise run install` gives harness its own adapter without requiring a separate global `codex-acp` install. The adapter still reads Codex-native auth and config (`~/.codex/config.toml`, `CODEX_HOME`, `CODEX_API_KEY`, `OPENAI_API_KEY`) while Harness applies the selected model and effort through ACP session configuration.
+
 ### Observing across agents
 
 ```bash

@@ -58,6 +58,7 @@ fn descriptor_with_id(command: &Path, id: &str) -> AcpAgentDescriptor {
         },
         prompt_timeout_seconds: None,
         excluded_from_initial_default: false,
+        bundled_with_harness: false,
     }
 }
 

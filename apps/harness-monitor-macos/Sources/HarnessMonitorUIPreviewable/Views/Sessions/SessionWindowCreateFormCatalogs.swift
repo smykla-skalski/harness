@@ -7,10 +7,28 @@ enum SessionWindowCreateFormCatalogs {
   }
 
   static let allEffortLevels: [String] = ["off", "low", "medium", "high", "xhigh"]
+  // Keep Claude ACP out of the New Agent form until the bundled Harness adapter lands.
+  private static let deferredAcpDescriptorIDsForNewAgentForm: Set<String> = ["claude"]
+
+  static func capabilityOptions(
+    acpAgents: [AcpAgentDescriptor],
+    runtimeProbeResults: AcpRuntimeProbeResponse?,
+    sandboxed: Bool = false,
+    acpHostBridgeReady: Bool = true
+  ) -> [AgentCapabilityOption] {
+    AgentCapabilityCatalog.options(
+      acpAgents: acpAgents.filter {
+        !deferredAcpDescriptorIDsForNewAgentForm.contains($0.id)
+      },
+      runtimeProbeResults: runtimeProbeResults,
+      sandboxed: sandboxed,
+      acpHostBridgeReady: acpHostBridgeReady
+    )
+  }
 
   @MainActor
   static func fallbackAgentOptions(store: HarnessMonitorStore) -> [AgentCapabilityOption] {
-    AgentCapabilityCatalog.options(
+    capabilityOptions(
       acpAgents: [],
       runtimeProbeResults: nil,
       sandboxed: store.daemonStatus?.manifest?.sandboxed == true,
@@ -35,7 +53,7 @@ enum SessionWindowCreateFormCatalogs {
     return SessionWindowAgentCreateCatalogState(
       descriptors: descriptors,
       runtimeModelCatalogs: runtimeModels,
-      capabilityOptions: AgentCapabilityCatalog.options(
+      capabilityOptions: capabilityOptions(
         acpAgents: descriptors,
         runtimeProbeResults: probes,
         sandboxed: store.daemonStatus?.manifest?.sandboxed == true,
@@ -154,6 +172,9 @@ enum SessionWindowCreateFormCatalogs {
     case .checkingAccess:
       return "ACP is still being checked."
     case .setupRequired:
+      if option.bundledWithHarness {
+        return "ACP ships with Harness. Install or update Harness to enable it here."
+      }
       return "ACP requires CLI setup. Copy install instructions below."
     case .bridgeAccessRequired:
       return "ACP requires bridge setup. Open setup details below."

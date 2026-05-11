@@ -18,6 +18,7 @@ enum AgentCapabilityCatalog {
           probeResult(for: $0, runtimeProbeResults: runtimeProbeResults)
         },
         installHint: descriptor?.installHint,
+        bundledWithHarness: descriptor?.bundledWithHarness ?? false,
         sandboxed: sandboxed,
         acpHostBridgeReady: acpHostBridgeReady
       )
@@ -42,6 +43,7 @@ enum AgentCapabilityCatalog {
           doctorProbe: descriptor.doctorProbe,
           probe: probeResult(for: descriptor, runtimeProbeResults: runtimeProbeResults),
           installHint: descriptor.installHint,
+          bundledWithHarness: descriptor.bundledWithHarness,
           sandboxed: sandboxed,
           acpHostBridgeReady: acpHostBridgeReady
         )

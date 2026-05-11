@@ -10,6 +10,7 @@
 //! shape is wrong; rework before merging.
 
 pub mod claude;
+pub mod codex;
 pub mod copilot;
 pub mod gemini;
 pub mod tags;
@@ -179,6 +180,11 @@ pub struct AcpAgentDescriptor {
     /// silently changing startup defaults for existing runtimes.
     #[serde(default, skip_serializing_if = "is_false")]
     pub excluded_from_initial_default: bool,
+    /// When true, this ACP adapter ships with Harness itself, so setup guidance
+    /// should point at installing or updating Harness rather than a separate
+    /// third-party CLI.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub bundled_with_harness: bool,
 }
 
 fn is_false(value: &bool) -> bool {
@@ -190,6 +196,7 @@ static BUILTIN_DESCRIPTORS: LazyLock<Vec<AcpAgentDescriptor>> = LazyLock::new(||
         copilot::descriptor(),
         gemini::descriptor(),
         claude::descriptor(),
+        codex::descriptor(),
     ]
 });
 
@@ -251,6 +258,18 @@ mod tests {
     }
 
     #[test]
+    fn catalog_contains_codex() {
+        let agents = acp_agents();
+        let codex = agents
+            .iter()
+            .find(|d| d.id == "codex")
+            .expect("codex descriptor in catalog");
+        assert_eq!(codex.display_name, "Codex");
+        assert_eq!(codex.launch_command, "harness-codex-acp");
+        assert!(codex.launch_args.is_empty());
+    }
+
+    #[test]
     fn catalog_returns_static_descriptor_references() {
         let agents = acp_agents();
         let copilot = agents
@@ -277,6 +296,12 @@ mod tests {
     fn find_builtin_returns_claude_descriptor() {
         let descriptor = find_builtin("claude").expect("found by id");
         assert_eq!(descriptor.id, "claude");
+    }
+
+    #[test]
+    fn find_builtin_returns_codex_descriptor() {
+        let descriptor = find_builtin("codex").expect("found by id");
+        assert_eq!(descriptor.id, "codex");
     }
 
     #[test]

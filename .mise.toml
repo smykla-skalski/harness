@@ -153,6 +153,7 @@ depends = ["harness:install", "aff:install"]
 description = "Build the harness binary, sign it, install it to ~/.local/bin, reconcile stale shadowed harness binaries on PATH, and validate the installed binary"
 run = [
   "./scripts/cargo-local.sh build --release --features tokio-console",
+  "./scripts/cargo-local.sh build --release --manifest-path crates/harness-codex-acp/Cargo.toml",
   "./scripts/install-harness-release.sh",
 ]
 
