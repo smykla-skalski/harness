@@ -56,7 +56,8 @@ struct SessionTimelineRailBackground: View {
 
 struct SessionTimelineDot: View {
   let tint: Color
-  @Environment(\.sessionTimelineRailRole) private var railRole
+  @Environment(\.sessionTimelineRailRole)
+  private var railRole
 
   var body: some View {
     ZStack {

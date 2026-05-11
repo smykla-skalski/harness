@@ -16,7 +16,7 @@ struct SessionTimelineCountSummaryTests {
       filterMatchCount: nil
     )
 
-    #expect(text == "")
+    #expect(text.isEmpty)
   }
 
   @Test("Fully loaded latest window renders an event count")
