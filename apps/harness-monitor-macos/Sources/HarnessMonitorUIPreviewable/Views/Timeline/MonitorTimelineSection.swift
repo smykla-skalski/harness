@@ -261,6 +261,8 @@ private struct SessionTimelineList: View {
   let horizontalContentInset: CGFloat
   let filters: Binding<SessionTimelineFilterState>
 
+  @State private var railEndpoints = SessionTimelineRailEndpoints()
+
   init(
     presentation: SessionTimelineSectionPresentation,
     actionHandler: any DecisionActionHandler,
@@ -286,31 +288,49 @@ private struct SessionTimelineList: View {
           .controlSize(.small)
           .frame(maxWidth: .infinity, maxHeight: .infinity)
       } else {
-        ScrollView(.vertical) {
-          LazyVStack(alignment: .leading, spacing: 0) {
-            ForEach(presentation.rows) { row in
-              SessionTimelineRowView(
-                row: row,
-                actionHandler: actionHandler,
-                onSignalTap: onSignalTap,
-                fontScale: fontScale
-              )
-              .equatable()
-              .id(row.id)
-            }
-          }
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .background(alignment: .topLeading) {
-            if !presentation.rows.isEmpty {
-              SessionTimelineRailBackground()
-            }
-          }
-          .padding(.horizontal, horizontalContentInset)
-        }
-        .scrollIndicators(.visible)
-        .scrollBounceBehavior(.basedOnSize, axes: .vertical)
+        timelineScroll
       }
     }
+  }
+
+  private var timelineScroll: some View {
+    let firstID = presentation.rows.first?.id
+    let lastID = presentation.rows.last?.id
+    return ScrollView(.vertical) {
+      LazyVStack(alignment: .leading, spacing: 0) {
+        ForEach(presentation.rows) { row in
+          SessionTimelineRowView(
+            row: row,
+            actionHandler: actionHandler,
+            onSignalTap: onSignalTap,
+            fontScale: fontScale,
+            railRole: SessionTimelineRailRole.role(
+              for: row.id,
+              firstID: firstID,
+              lastID: lastID
+            )
+          )
+          .equatable()
+          .id(row.id)
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .coordinateSpace(.named(SessionTimelineRailCoordinateSpace.name))
+      .background(alignment: .topLeading) {
+        if !presentation.rows.isEmpty {
+          SessionTimelineRailBackground(endpoints: railEndpoints)
+        }
+      }
+      .onPreferenceChange(SessionTimelineRailEndpointsKey.self) { newValue in
+        let merged = railEndpoints.merging(newValue)
+        if merged != railEndpoints {
+          railEndpoints = merged
+        }
+      }
+      .padding(.horizontal, horizontalContentInset)
+    }
+    .scrollIndicators(.visible)
+    .scrollBounceBehavior(.basedOnSize, axes: .vertical)
   }
 }
 

@@ -7,8 +7,11 @@ struct SessionTimelineCards: View {
   let onSignalTap: ((String) -> Void)?
   @Environment(\.fontScale)
   private var fontScale
+  @State private var railEndpoints = SessionTimelineRailEndpoints()
 
   var body: some View {
+    let firstID = rows.first?.id
+    let lastID = rows.last?.id
     LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
       ForEach(rows) { row in
         SessionTimelineNodeCluster(
@@ -17,12 +20,27 @@ struct SessionTimelineCards: View {
           onSignalTap: onSignalTap,
           fontScale: fontScale
         )
+        .environment(
+          \.sessionTimelineRailRole,
+          SessionTimelineRailRole.role(
+            for: row.id,
+            firstID: firstID,
+            lastID: lastID
+          )
+        )
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+    .coordinateSpace(.named(SessionTimelineRailCoordinateSpace.name))
     .background(alignment: .topLeading) {
       if !rows.isEmpty {
-        SessionTimelineRailBackground()
+        SessionTimelineRailBackground(endpoints: railEndpoints)
+      }
+    }
+    .onPreferenceChange(SessionTimelineRailEndpointsKey.self) { newValue in
+      let merged = railEndpoints.merging(newValue)
+      if merged != railEndpoints {
+        railEndpoints = merged
       }
     }
   }
