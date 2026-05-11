@@ -72,7 +72,7 @@ public struct KeyboardShortcutDescriptor: Equatable, Sendable {
   }
 
   public func isRevealed(by activeModifiers: EventModifiers) -> Bool {
-    !activeModifiers.intersection(requiredEventModifiers).isEmpty
+    !activeModifiers.isDisjoint(with: requiredEventModifiers)
   }
 
   var displayParts: [KeyboardShortcutDisplayPart] {

@@ -33,8 +33,10 @@ struct SessionTimelineView: View {
     self.timelineLoading = timelineLoading
   }
 
-  @Environment(\.harnessDateTimeConfiguration) private var dateTimeConfiguration
-  @Environment(\.fontScale) private var fontScale
+  @Environment(\.harnessDateTimeConfiguration)
+  private var dateTimeConfiguration
+  @Environment(\.fontScale)
+  private var fontScale
 
   @AppStorage(SessionTimelineFilterDefaults.persistenceModeKey)
   var filterPersistenceModeRawValue =
@@ -45,7 +47,7 @@ struct SessionTimelineView: View {
   @SceneStorage(SessionTimelineFilterDefaults.sceneRegistryKey)
   var sceneStoredFilterRegistryRawValue = ""
 
-  @State var filters = SessionTimelineFilterState()
+  @State private var filters = SessionTimelineFilterState()
 
   private var presentation: SessionTimelineSectionPresentation {
     SessionTimelineSectionPresentation(

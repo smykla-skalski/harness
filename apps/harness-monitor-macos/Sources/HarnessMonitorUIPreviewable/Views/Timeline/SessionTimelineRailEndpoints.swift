@@ -10,7 +10,7 @@ enum SessionTimelineRailRole: Equatable, Sendable {
     for id: ID,
     firstID: ID?,
     lastID: ID?
-  ) -> SessionTimelineRailRole {
+  ) -> Self {
     let isFirst = id == firstID
     let isLast = id == lastID
     switch (isFirst, isLast) {
@@ -29,7 +29,7 @@ struct SessionTimelineRailEndpoints: Equatable, Sendable {
   // Merges non-nil values from `other` over self. Keeps cached values when the
   // first/last row is deallocated by LazyVStack on scroll, so the rail does not
   // collapse when its endpoint rows leave the viewport.
-  func merging(_ other: SessionTimelineRailEndpoints) -> SessionTimelineRailEndpoints {
+  func merging(_ other: Self) -> Self {
     var merged = self
     if let y = other.firstDotY { merged.firstDotY = y }
     if let y = other.lastDotY { merged.lastDotY = y }

@@ -192,7 +192,7 @@ extension SessionWindowView {
   }
 
   var sessionToolbarModel: SessionWindowToolbarModel {
-    return SessionWindowToolbarModel(
+    SessionWindowToolbarModel(
       canNavigateBack: stateCache.navigationHistory.canGoBack,
       canNavigateForward: stateCache.navigationHistory.canGoForward,
       sleepPreventionPresentation: SleepPreventionToolbarPresentation(

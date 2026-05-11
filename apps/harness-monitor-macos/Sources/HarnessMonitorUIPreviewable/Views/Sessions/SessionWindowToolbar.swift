@@ -15,10 +15,13 @@ struct SessionWindowToolbar: ToolbarContent {
   let currentModifiers: EventModifiers
   @AppStorage(SessionWindowKeyboardShortcutOverlaySettings.storageKey)
   private var shortcutOverlaysEnabled = SessionWindowKeyboardShortcutOverlaySettings.defaultValue
-  @ScaledMetric(relativeTo: .caption) private var sidebarShortcutKeySpacing =
+  @ScaledMetric(relativeTo: .caption)
+  private var sidebarShortcutKeySpacing =
     HarnessMonitorTheme.spacingXS - 1
-  @ScaledMetric(relativeTo: .caption) private var sidebarShortcutHorizontalOffset = 56
-  @ScaledMetric(relativeTo: .caption) private var sidebarShortcutVerticalOffset = 12
+  @ScaledMetric(relativeTo: .caption)
+  private var sidebarShortcutHorizontalOffset = 56
+  @ScaledMetric(relativeTo: .caption)
+  private var sidebarShortcutVerticalOffset = 12
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
 

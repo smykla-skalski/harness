@@ -43,7 +43,7 @@ public struct SessionWindowView: View {
   @State private var detailColumnWidthStorage: CGFloat = 0
   @State private var detailColumnResizeStateStorage = SessionWindowDetailColumnResizeState()
   @State private var decisionCacheStorage = SessionWindowDecisionCacheStorage()
-  @State var currentModifiers: EventModifiers = []
+  @State private var currentModifiers: EventModifiers = []
 
   public init(store: HarnessMonitorStore, token: SessionWindowToken) {
     self.store = store

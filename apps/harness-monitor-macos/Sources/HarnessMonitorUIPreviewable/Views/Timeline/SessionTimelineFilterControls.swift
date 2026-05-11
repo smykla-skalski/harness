@@ -65,8 +65,7 @@ struct SessionTimelineFilterControls: View {
     showsSignalPreset || !activeFacetChips.isEmpty
   }
 
-  @ViewBuilder
-  var body: some View {
+  @ViewBuilder var body: some View {
     if showsActionRow || showsSupportingSections {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
         if showsActionRow {
