@@ -187,14 +187,12 @@ extension HarnessMonitorStore {
     guard sessionID == selectedSessionID else {
       applySessionSummaryUpdate(detail.session)
       if let timeline = payload.timeline {
-        scheduleCacheWrite { service in
-          await service.cacheSessionDetail(
-            detail,
-            timeline: timeline,
-            timelineWindow: TimelineWindowResponse.fallbackMetadata(for: timeline),
-            markViewed: false
-          )
-        }
+        scheduleSessionDetailCacheWrite(
+          detail,
+          timeline: timeline,
+          timelineWindow: TimelineWindowResponse.fallbackMetadata(for: timeline),
+          markViewed: false
+        )
       }
       return
     }
@@ -210,13 +208,11 @@ extension HarnessMonitorStore {
       cancelPendingTimelineRefresh: payload.timeline != nil
     )
     if let freshTimeline = payload.timeline {
-      scheduleCacheWrite { service in
-        await service.cacheSessionDetail(
-          detail,
-          timeline: freshTimeline,
-          timelineWindow: TimelineWindowResponse.fallbackMetadata(for: freshTimeline)
-        )
-      }
+      scheduleSelectedSessionCacheWrite(
+        detail,
+        timeline: freshTimeline,
+        timelineWindow: TimelineWindowResponse.fallbackMetadata(for: freshTimeline)
+      )
     } else if let client {
       scheduleSessionPushFallback(using: client, sessionID: sessionID)
     }
@@ -278,13 +274,11 @@ extension HarnessMonitorStore {
       cancelPendingTimelineRefresh: payload.timeline != nil
     )
     if let freshTimeline = payload.timeline {
-      scheduleCacheWrite { service in
-        await service.cacheSessionDetail(
-          detail,
-          timeline: freshTimeline,
-          timelineWindow: TimelineWindowResponse.fallbackMetadata(for: freshTimeline)
-        )
-      }
+      scheduleSelectedSessionCacheWrite(
+        detail,
+        timeline: freshTimeline,
+        timelineWindow: TimelineWindowResponse.fallbackMetadata(for: freshTimeline)
+      )
     } else if let client {
       scheduleSessionPushFallback(using: client, sessionID: sessionID)
     }

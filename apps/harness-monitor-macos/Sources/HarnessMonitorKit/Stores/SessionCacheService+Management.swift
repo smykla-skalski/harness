@@ -9,6 +9,7 @@ extension SessionCacheService {
     public let tasks: Int
     public let signals: Int
     public let timeline: Int
+    public let transcript: Int
     public let observers: Int
     public let activities: Int
 
@@ -19,6 +20,7 @@ extension SessionCacheService {
       tasks: 0,
       signals: 0,
       timeline: 0,
+      transcript: 0,
       observers: 0,
       activities: 0
     )
@@ -34,6 +36,7 @@ extension SessionCacheService {
         tasks: (try? ctx.fetchCount(FetchDescriptor<CachedWorkItem>())) ?? 0,
         signals: (try? ctx.fetchCount(FetchDescriptor<CachedSignalRecord>())) ?? 0,
         timeline: (try? ctx.fetchCount(FetchDescriptor<CachedTimelineEntry>())) ?? 0,
+        transcript: (try? ctx.fetchCount(FetchDescriptor<CachedSessionTranscriptEntry>())) ?? 0,
         observers: (try? ctx.fetchCount(FetchDescriptor<CachedObserver>())) ?? 0,
         activities: (try? ctx.fetchCount(FetchDescriptor<CachedAgentActivity>())) ?? 0
       )
@@ -55,6 +58,7 @@ extension SessionCacheService {
           "tasks": counts.tasks,
           "signals": counts.signals,
           "timeline": counts.timeline,
+          "transcript": counts.transcript,
           "observers": counts.observers,
           "activities": counts.activities,
         ]
@@ -68,6 +72,10 @@ extension SessionCacheService {
   func deleteAllCacheData() -> Bool {
     let deleteBody: () throws -> Bool = { [self] in
       let context = makeContext()
+      let transcriptEntries = try context.fetch(FetchDescriptor<CachedSessionTranscriptEntry>())
+      for entry in transcriptEntries {
+        context.delete(entry)
+      }
       let sessions = try context.fetch(FetchDescriptor<CachedSession>())
       for session in sessions {
         context.delete(session)

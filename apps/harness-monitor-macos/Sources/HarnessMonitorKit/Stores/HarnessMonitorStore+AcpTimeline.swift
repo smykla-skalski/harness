@@ -149,7 +149,8 @@ extension HarnessMonitorStore {
       mergedTimelineEntries(
         selectedAcpTranscriptHistoryEntries,
         with: selectedAcpTranscriptLiveEntries
-      )
+      ),
+      transcriptSource: selectedAcpTranscriptSource
     )
   }
 
@@ -179,6 +180,7 @@ extension HarnessMonitorStore {
     guard !entries.isEmpty else {
       return
     }
+    selectedAcpTranscriptSource = .direct
     replaceSelectedAcpTranscriptLiveIfNeeded(
       reattributedAcpEntries(
         mergedTimelineEntries(selectedAcpTranscriptLiveEntries, with: entries),
@@ -199,6 +201,7 @@ extension HarnessMonitorStore {
       using: selectedAcpAgents
     )
     let historyEntryIDs = Set(historyEntries.map(\.entryId))
+    selectedAcpTranscriptSource = .direct
     replaceSelectedAcpTranscriptHistoryIfNeeded(historyEntries)
     replaceSelectedAcpTranscriptLiveIfNeeded(
       selectedAcpTranscriptLiveEntries.filter { !historyEntryIDs.contains($0.entryId) }
@@ -272,20 +275,41 @@ extension HarnessMonitorStore {
     guard let selectedSession else {
       return
     }
-    scheduleCacheWrite { service in
-      await service.cacheSessionDetail(
-        selectedSession,
-        timeline: updatedTimeline,
-        timelineWindow: TimelineWindowResponse.fallbackMetadata(for: updatedTimeline)
-      )
-    }
+    scheduleSelectedSessionCacheWrite(
+      selectedSession,
+      timeline: updatedTimeline,
+      timelineWindow: TimelineWindowResponse.fallbackMetadata(for: updatedTimeline)
+    )
   }
 
-  private func replaceSelectedAcpTranscriptIfNeeded(_ updatedTimeline: [TimelineEntry]) {
-    guard updatedTimeline != selectedAcpTranscriptEntries else {
+  private func replaceSelectedAcpTranscriptIfNeeded(
+    _ updatedTimeline: [TimelineEntry],
+    transcriptSource: HarnessMonitorSessionWindowTranscriptSource?
+  ) {
+    let sourceDidChange = selectedAcpTranscriptSource != transcriptSource
+    guard updatedTimeline != selectedAcpTranscriptEntries || sourceDidChange else {
       return
     }
-    selectedAcpTranscriptEntries = updatedTimeline
+    selectedAcpTranscriptSource = transcriptSource
+    if updatedTimeline != selectedAcpTranscriptEntries {
+      selectedAcpTranscriptEntries = updatedTimeline
+    }
+    guard !suppressSelectedAcpTranscriptCacheWrite else {
+      return
+    }
+    guard let selectedSession else {
+      return
+    }
+    let currentTimeline = timeline
+    let currentTimelineWindow =
+      timelineWindow ?? TimelineWindowResponse.fallbackMetadata(for: currentTimeline)
+    scheduleSelectedSessionCacheWrite(
+      selectedSession,
+      timeline: currentTimeline,
+      transcript: updatedTimeline,
+      transcriptSource: transcriptSource,
+      timelineWindow: currentTimelineWindow
+    )
   }
 
   private func replaceSelectedAcpTranscriptHistoryIfNeeded(_ updatedTimeline: [TimelineEntry]) {

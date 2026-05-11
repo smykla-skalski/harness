@@ -11,7 +11,10 @@ extension SessionCacheService {
     let sessionMap = buildSessionMap(context: context)
     let incomingProjectIDs = Set(projects.map(\.projectId))
     let incomingSessionIDs = Set(sessions.map(\.sessionId))
+    let removedSessionIDs = Set(sessionMap.keys).subtracting(incomingSessionIDs)
     var insertedSessionCount = 0
+
+    deleteTranscriptEntries(sessionIDs: removedSessionIDs, context: context)
 
     for (sessionID, existing) in sessionMap where !incomingSessionIDs.contains(sessionID) {
       context.delete(existing)
@@ -46,6 +49,8 @@ extension SessionCacheService {
   func cacheSessionDetail(
     _ detail: SessionDetail,
     timeline: [TimelineEntry],
+    transcript: [TimelineEntry]? = nil,
+    transcriptSource: HarnessMonitorSessionWindowTranscriptSource? = nil,
     timelineWindow: TimelineWindowResponse? = nil,
     markViewed: Bool = true
   ) async -> WriteResult {
@@ -70,6 +75,12 @@ extension SessionCacheService {
     syncTasks(detail.tasks, on: cached, context: context)
     syncSignals(detail.signals, on: cached, context: context)
     syncTimeline(timeline, on: cached, context: context)
+    syncTranscript(
+      transcript,
+      transcriptSource: transcriptSource,
+      sessionID: detail.session.sessionId,
+      context: context
+    )
     syncTimelineWindow(timelineWindow, timelineIsEmpty: timeline.isEmpty, on: cached)
     syncActivity(detail.agentActivity, on: cached, context: context)
     syncObserver(detail.observer, on: cached, context: context)
@@ -106,6 +117,8 @@ extension SessionCacheService {
       let detail = entry.detail
       let timeline = entry.timeline
       let timelineWindow = entry.timelineWindow
+      let transcript = entry.transcript
+      let transcriptSource = entry.transcriptSource
       let cached: CachedSession
       if let existing = existingByID[detail.session.sessionId] {
         existing.update(from: detail.session)
@@ -124,6 +137,12 @@ extension SessionCacheService {
       syncTasks(detail.tasks, on: cached, context: context)
       syncSignals(detail.signals, on: cached, context: context)
       syncTimeline(timeline, on: cached, context: context)
+      syncTranscript(
+        transcript,
+        transcriptSource: transcriptSource,
+        sessionID: detail.session.sessionId,
+        context: context
+      )
       syncTimelineWindow(timelineWindow, timelineIsEmpty: timeline.isEmpty, on: cached)
       syncActivity(detail.agentActivity, on: cached, context: context)
       syncObserver(detail.observer, on: cached, context: context)

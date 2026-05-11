@@ -2,6 +2,11 @@ import Foundation
 import SwiftData
 
 extension SessionCacheService {
+  struct CachedTranscriptSnapshot: Sendable {
+    let entries: [TimelineEntry]
+    let source: HarnessMonitorSessionWindowTranscriptSource?
+  }
+
   func buildProjectMap(context: ModelContext) -> [String: CachedProject] {
     guard let projects = try? context.fetch(FetchDescriptor<CachedProject>()) else { return [:] }
     return Dictionary(uniqueKeysWithValues: projects.map { ($0.projectId, $0) })
@@ -18,6 +23,41 @@ extension SessionCacheService {
     )
     descriptor.fetchLimit = 1
     return try? context.fetch(descriptor).first
+  }
+
+  func fetchTranscriptEntries(
+    sessionID: String,
+    context: ModelContext
+  ) -> [CachedSessionTranscriptEntry] {
+    let descriptor = FetchDescriptor<CachedSessionTranscriptEntry>(
+      predicate: #Predicate { $0.sessionId == sessionID }
+    )
+    return (try? context.fetch(descriptor)) ?? []
+  }
+
+  func resolvedTranscriptSnapshot(
+    sessionID: String,
+    context: ModelContext
+  ) -> CachedTranscriptSnapshot {
+    let rows = fetchTranscriptEntries(sessionID: sessionID, context: context)
+    return CachedTranscriptSnapshot(
+      entries: sortedTimelineEntries(rows.map { $0.toTimelineEntry() }),
+      source: resolvedTranscriptSource(rows)
+    )
+  }
+
+  func deleteTranscriptEntries(
+    sessionIDs: Set<String>,
+    context: ModelContext
+  ) {
+    guard !sessionIDs.isEmpty else { return }
+    let descriptor = FetchDescriptor<CachedSessionTranscriptEntry>(
+      predicate: #Predicate { sessionIDs.contains($0.sessionId) }
+    )
+    let existingRows = (try? context.fetch(descriptor)) ?? []
+    for row in existingRows {
+      context.delete(row)
+    }
   }
 
   func upsertProject(_ project: ProjectSummary, context: ModelContext) {
@@ -224,13 +264,56 @@ extension SessionCacheService {
   }
 
   static let maxCachedTimelineEntries = 300
+  static let maxCachedTranscriptEntries = 300
+
+  func sortedTimelineEntries(_ entries: [TimelineEntry]) -> [TimelineEntry] {
+    entries.sorted { left, right in
+      if left.recordedAt != right.recordedAt {
+        return left.recordedAt > right.recordedAt
+      }
+      return left.entryId > right.entryId
+    }
+  }
+
+  func newestTimelineEntries(
+    _ entries: [TimelineEntry],
+    limit: Int
+  ) -> [TimelineEntry] {
+    Array(sortedTimelineEntries(entries).prefix(limit))
+  }
+
+  func resolvedTranscriptSource(
+    _ rows: [CachedSessionTranscriptEntry]
+  ) -> HarnessMonitorSessionWindowTranscriptSource? {
+    guard !rows.isEmpty else {
+      return nil
+    }
+    let uniqueSources = Set(rows.map(\.sourceRaw))
+    guard uniqueSources.count == 1, let sourceRaw = uniqueSources.first else {
+      return .cache
+    }
+    return HarnessMonitorSessionWindowTranscriptSource(rawValue: sourceRaw) ?? .cache
+  }
+
+  func resolvedTranscriptPersistenceSource(
+    entries: [TimelineEntry],
+    explicitSource: HarnessMonitorSessionWindowTranscriptSource?
+  ) -> HarnessMonitorSessionWindowTranscriptSource? {
+    guard !entries.isEmpty else {
+      return nil
+    }
+    return explicitSource ?? .direct
+  }
 
   func syncTimeline(
     _ entries: [TimelineEntry],
     on session: CachedSession,
     context: ModelContext
   ) {
-    let cappedEntries = Array(entries.suffix(Self.maxCachedTimelineEntries))
+    let cappedEntries = newestTimelineEntries(
+      entries,
+      limit: Self.maxCachedTimelineEntries
+    )
 
     let existingById = Dictionary(
       uniqueKeysWithValues: session.timelineEntries.map { ($0.entryId, $0) }
@@ -246,6 +329,52 @@ extension SessionCacheService {
     }
 
     for existing in session.timelineEntries where !incomingIds.contains(existing.entryId) {
+      context.delete(existing)
+    }
+  }
+
+  func syncTranscript(
+    _ entries: [TimelineEntry]?,
+    transcriptSource: HarnessMonitorSessionWindowTranscriptSource?,
+    sessionID: String,
+    context: ModelContext
+  ) {
+    // `nil` means "no new transcript snapshot was available; keep whatever is
+    // already cached". `[]` means "the current transcript resolved to empty";
+    // clear stale rows so later fallback/rendering uses the timeline instead.
+    guard let entries else { return }
+    let cappedEntries = newestTimelineEntries(
+      entries,
+      limit: Self.maxCachedTranscriptEntries
+    )
+    let existingRows = fetchTranscriptEntries(sessionID: sessionID, context: context)
+    let existingById = Dictionary(
+      uniqueKeysWithValues: existingRows.map { ($0.entryId, $0) }
+    )
+    let incomingIds = Set(cappedEntries.map(\.entryId))
+    let resolvedSource = resolvedTranscriptPersistenceSource(
+      entries: cappedEntries,
+      explicitSource: transcriptSource
+    )
+
+    for entry in cappedEntries {
+      if let existing = existingById[entry.entryId] {
+        if let resolvedSource {
+          existing.update(from: entry, transcriptSource: resolvedSource)
+        }
+      } else {
+        if let resolvedSource {
+          context.insert(
+            entry.toCachedSessionTranscriptEntry(
+              sessionID: sessionID,
+              transcriptSource: resolvedSource
+            )
+          )
+        }
+      }
+    }
+
+    for existing in existingRows where !incomingIds.contains(existing.entryId) {
       context.delete(existing)
     }
   }

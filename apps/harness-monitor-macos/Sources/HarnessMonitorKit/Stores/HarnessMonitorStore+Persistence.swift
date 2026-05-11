@@ -21,6 +21,8 @@ extension HarnessMonitorStore {
   func cacheSessionDetail(
     _ detail: SessionDetail,
     timeline: [TimelineEntry],
+    transcript: [TimelineEntry]? = nil,
+    transcriptSource: HarnessMonitorSessionWindowTranscriptSource? = nil,
     timelineWindow: TimelineWindowResponse? = nil,
     markViewed: Bool = true
   ) async {
@@ -29,6 +31,8 @@ extension HarnessMonitorStore {
     let result = await cacheService.cacheSessionDetail(
       detail,
       timeline: timeline,
+      transcript: transcript,
+      transcriptSource: transcriptSource,
       timelineWindow: timelineWindow,
       markViewed: markViewed
     )
@@ -120,7 +124,7 @@ extension HarnessMonitorStore {
     _ work: @escaping @MainActor (SessionCacheService) async -> SessionCacheService.WriteResult
   ) {
     guard let cacheService, persistenceError == nil else { return }
-    cancelPendingCacheWrite()
+    cancelPendingGenericCacheWrite()
     pendingCacheWriteTaskToken &+= 1
     let taskToken = pendingCacheWriteTaskToken
     pendingCacheWriteTask = Task { @MainActor [weak self] in
@@ -139,9 +143,95 @@ extension HarnessMonitorStore {
     }
   }
 
+  func scheduleSessionDetailCacheWrite(
+    _ detail: SessionDetail,
+    timeline: [TimelineEntry],
+    transcript: [TimelineEntry]? = nil,
+    transcriptSource: HarnessMonitorSessionWindowTranscriptSource? = nil,
+    timelineWindow: TimelineWindowResponse? = nil,
+    markViewed: Bool = true
+  ) {
+    guard cacheService != nil, persistenceError == nil else { return }
+    pendingSessionDetailCacheWrites[detail.session.sessionId] = PendingSessionDetailCacheWrite(
+      snapshot: SessionCacheService.CachedSessionSnapshot(
+        detail: detail,
+        timeline: timeline,
+        timelineWindow: timelineWindow,
+        transcript: transcript,
+        transcriptSource: transcriptSource
+      ),
+      markViewed: markViewed
+    )
+    cancelPendingSessionDetailCacheWriteTask()
+    pendingSessionDetailCacheWriteTaskToken &+= 1
+    let taskToken = pendingSessionDetailCacheWriteTaskToken
+    pendingSessionDetailCacheWriteTask = Task { @MainActor [weak self] in
+      guard let self else { return }
+      defer {
+        if self.pendingSessionDetailCacheWriteTaskToken == taskToken {
+          self.pendingSessionDetailCacheWriteTask = nil
+        }
+      }
+      try? await Task.sleep(for: .milliseconds(250))
+      guard
+        !Task.isCancelled,
+        self.pendingSessionDetailCacheWriteTaskToken == taskToken,
+        let cacheService = self.cacheService,
+        self.persistenceError == nil
+      else {
+        return
+      }
+      let writes = self.pendingSessionDetailCacheWrites
+        .sorted { $0.key < $1.key }
+        .map(\.value)
+      self.pendingSessionDetailCacheWrites.removeAll()
+      for write in writes {
+        let result = await cacheService.cacheSessionDetail(
+          write.snapshot.detail,
+          timeline: write.snapshot.timeline,
+          transcript: write.snapshot.transcript,
+          transcriptSource: write.snapshot.transcriptSource,
+          timelineWindow: write.snapshot.timelineWindow,
+          markViewed: write.markViewed
+        )
+        await self.applyPersistedCacheWriteResult(result)
+      }
+    }
+  }
+
+  func scheduleSelectedSessionCacheWrite(
+    _ detail: SessionDetail,
+    timeline: [TimelineEntry],
+    transcript: [TimelineEntry]? = nil,
+    transcriptSource: HarnessMonitorSessionWindowTranscriptSource? = nil,
+    timelineWindow: TimelineWindowResponse? = nil
+  ) {
+    // Selected-session transcript writes must preserve the provenance already
+    // carried by in-memory ACP state; the final `.direct` fallback is only a
+    // defensive bridge for older call sites that provide rows without source.
+    let resolvedTranscript =
+      transcript
+      ?? (selectedSessionID == detail.session.sessionId ? selectedAcpTranscriptEntries : nil)
+    let resolvedTranscriptSource =
+      transcriptSource
+      ?? (selectedSessionID == detail.session.sessionId ? selectedAcpTranscriptSource : nil)
+      ?? (resolvedTranscript?.isEmpty == false ? .direct : nil)
+    scheduleSessionDetailCacheWrite(
+      detail,
+      timeline: timeline,
+      transcript: resolvedTranscript,
+      transcriptSource: resolvedTranscriptSource,
+      timelineWindow: timelineWindow
+    )
+  }
+
   func flushPendingCacheWrite() async {
-    guard let task = pendingCacheWriteTask else { return }
-    await task.value
+    if let task = pendingSessionDetailCacheWriteTask {
+      await task.value
+    }
+    if let task = pendingCacheWriteTask {
+      await task.value
+    }
   }
 
   func updatePersistedSessionMetadataAfterSave(insertedSessionCount: Int) {
@@ -150,9 +240,21 @@ extension HarnessMonitorStore {
   }
 
   func cancelPendingCacheWrite() {
+    cancelPendingGenericCacheWrite()
+    cancelPendingSessionDetailCacheWriteTask()
+    pendingSessionDetailCacheWrites.removeAll()
+  }
+
+  private func cancelPendingGenericCacheWrite() {
     pendingCacheWriteTask?.cancel()
     pendingCacheWriteTask = nil
     pendingCacheWriteTaskToken &+= 1
+  }
+
+  private func cancelPendingSessionDetailCacheWriteTask() {
+    pendingSessionDetailCacheWriteTask?.cancel()
+    pendingSessionDetailCacheWriteTask = nil
+    pendingSessionDetailCacheWriteTaskToken &+= 1
   }
 
   private func applyPersistedCacheWriteResult(_ result: SessionCacheService.WriteResult) async {

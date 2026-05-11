@@ -56,10 +56,16 @@ struct HarnessMonitorStoreAgentTimelinePartitionTests {
       makeEntry(id: "b-1", agentId: "agent-beta"),
       makeEntry(id: "a-2", agentId: "agent-alpha"),
     ]
+    let transcript = [
+      makeEntry(id: "t-1", agentId: "agent-alpha"),
+      makeEntry(id: "t-2", agentId: "agent-beta"),
+    ]
     let snapshot = HarnessMonitorSessionWindowSnapshot(
       summary: PreviewFixtures.summary,
       detail: nil,
       timeline: timeline,
+      transcript: transcript,
+      transcriptSource: .direct,
       timelineWindow: nil,
       source: .cache
     )
@@ -67,6 +73,8 @@ struct HarnessMonitorStoreAgentTimelinePartitionTests {
     #expect(snapshot.timeline(forAgent: "agent-alpha").map(\.entryId) == ["a-1", "a-2"])
     #expect(snapshot.timeline(forAgent: "agent-beta").map(\.entryId) == ["b-1"])
     #expect(snapshot.timeline(forAgent: "agent-missing").isEmpty)
+    #expect(snapshot.transcript(forAgent: "agent-alpha").map(\.entryId) == ["t-1"])
+    #expect(snapshot.transcript(forAgent: "agent-beta").map(\.entryId) == ["t-2"])
   }
 
   // Property check: the partition cache must agree with the linear-scan

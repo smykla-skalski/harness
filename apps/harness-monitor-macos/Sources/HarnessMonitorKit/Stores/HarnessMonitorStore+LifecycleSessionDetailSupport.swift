@@ -117,12 +117,10 @@ extension HarnessMonitorStore {
 
     let currentTimeline = timeline
     let currentTimelineWindow = timelineWindow
-    scheduleCacheWrite { service in
-      await service.cacheSessionDetail(
-        merged,
-        timeline: currentTimeline,
-        timelineWindow: currentTimelineWindow
-      )
-    }
+    scheduleSelectedSessionCacheWrite(
+      merged,
+      timeline: currentTimeline,
+      timelineWindow: currentTimelineWindow
+    )
   }
 }

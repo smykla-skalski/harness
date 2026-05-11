@@ -118,7 +118,7 @@ extension SessionAgentDetailSection {
     Self.transcriptEntries(
       agent: agent,
       agentTimeline: agentTimeline,
-      acpTranscript: store.acpTranscript(forAgent: agent.agentId, sessionID: sessionID)
+      acpTranscript: agentTranscript
     )
   }
 

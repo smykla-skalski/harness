@@ -22,21 +22,31 @@ extension HarnessMonitorStore {
         request: request,
         retainedLimit: retainedLimit
       )
+      let nextTranscript =
+        if let detail = snapshot.detail,
+          snapshot.transcriptSource == .derived
+        {
+          derivedSessionWindowTranscriptEntries(detail: detail, timeline: resolved.timeline)
+        } else {
+          snapshot.transcript
+        }
       let nextSnapshot = HarnessMonitorSessionWindowSnapshot(
         summary: snapshot.summary,
         detail: snapshot.detail,
         timeline: resolved.timeline,
+        transcript: nextTranscript,
+        transcriptSource: snapshot.transcriptSource,
         timelineWindow: resolved.timelineWindow,
         source: .live
       )
       if let detail = snapshot.detail {
-        scheduleCacheWrite { service in
-          await service.cacheSessionDetail(
-            detail,
-            timeline: resolved.timeline,
-            timelineWindow: resolved.timelineWindow
-          )
-        }
+        scheduleSessionDetailCacheWrite(
+          detail,
+          timeline: resolved.timeline,
+          transcript: nextSnapshot.transcript,
+          transcriptSource: nextSnapshot.transcriptSource,
+          timelineWindow: resolved.timelineWindow
+        )
       }
       return nextSnapshot
     } catch is CancellationError {

@@ -79,13 +79,11 @@ extension HarnessMonitorStore {
       )
       finishTimelineLoadingGateIfCurrent(requestID: requestID, sessionID: sessionID)
       if !isExtensionsLoading {
-        scheduleCacheWrite { service in
-          await service.cacheSessionDetail(
-            detail,
-            timeline: resolvedTimeline.timeline,
-            timelineWindow: resolvedTimeline.timelineWindow
-          )
-        }
+        scheduleSelectedSessionCacheWrite(
+          detail,
+          timeline: resolvedTimeline.timeline,
+          timelineWindow: resolvedTimeline.timelineWindow
+        )
       }
       startSessionSecondaryHydration(
         using: client,

@@ -97,13 +97,11 @@ extension HarnessMonitorStore {
       timelineWindow = resolvedTimelineWindow
       isShowingCachedData = false
     }
-    scheduleCacheWrite { service in
-      await service.cacheSessionDetail(
-        selectedSession,
-        timeline: resolvedTimeline,
-        timelineWindow: resolvedTimelineWindow
-      )
-    }
+    scheduleSelectedSessionCacheWrite(
+      selectedSession,
+      timeline: resolvedTimeline,
+      timelineWindow: resolvedTimelineWindow
+    )
   }
 
   func isCurrentSelectedTimelineWindowLoad(

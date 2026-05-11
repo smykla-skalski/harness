@@ -30,17 +30,13 @@ extension SessionCacheService {
       context: context,
       sessionID: sessionID
     )
+    let transcript = resolvedTranscriptSnapshot(sessionID: sessionID, context: context)
     let result = CachedSessionSnapshot(
       detail: cached.toSessionDetail(reviewMetadataByTaskId: reviewMetadata),
-      timeline: cached.timelineEntries
-        .map { $0.toTimelineEntry() }
-        .sorted { left, right in
-          if left.recordedAt != right.recordedAt {
-            return left.recordedAt > right.recordedAt
-          }
-          return left.entryId > right.entryId
-        },
-      timelineWindow: cached.decodedTimelineWindow()
+      timeline: sortedTimelineEntries(cached.timelineEntries.map { $0.toTimelineEntry() }),
+      timelineWindow: cached.decodedTimelineWindow(),
+      transcript: transcript.entries,
+      transcriptSource: transcript.source
     )
     #if HARNESS_FEATURE_OTEL
       let durationMs = harnessMonitorDurationMilliseconds(startedAt.duration(to: .now))
@@ -91,19 +87,18 @@ extension SessionCacheService {
           context: context,
           sessionID: session.sessionId
         )
+        let transcript = resolvedTranscriptSnapshot(
+          sessionID: session.sessionId,
+          context: context
+        )
         return (
           session.sessionId,
           CachedSessionSnapshot(
             detail: session.toSessionDetail(reviewMetadataByTaskId: reviewMetadata),
-            timeline: session.timelineEntries
-              .map { $0.toTimelineEntry() }
-              .sorted { left, right in
-                if left.recordedAt != right.recordedAt {
-                  return left.recordedAt > right.recordedAt
-                }
-                return left.entryId > right.entryId
-              },
-            timelineWindow: session.decodedTimelineWindow()
+            timeline: sortedTimelineEntries(session.timelineEntries.map { $0.toTimelineEntry() }),
+            timelineWindow: session.decodedTimelineWindow(),
+            transcript: transcript.entries,
+            transcriptSource: transcript.source
           )
         )
       }

@@ -258,7 +258,10 @@ extension HarnessMonitorStore {
   }
 
   func resetSelectedAcpAgents() {
+    suppressSelectedAcpTranscriptCacheWrite = true
+    defer { suppressSelectedAcpTranscriptCacheWrite = false }
     selectedAcpAgents = []
+    selectedAcpTranscriptSource = nil
     selectedAcpTranscriptHistoryEntries = []
     selectedAcpTranscriptLiveEntries = []
     selectedAcpTranscriptEntries = []
