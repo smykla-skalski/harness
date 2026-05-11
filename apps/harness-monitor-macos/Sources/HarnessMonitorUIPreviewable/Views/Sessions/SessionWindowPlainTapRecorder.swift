@@ -140,7 +140,9 @@ struct SessionWindowModifierKeysMonitor: NSViewRepresentable {
 
   func makeCoordinator() -> Coordinator {
     Coordinator(update: { modifiers in
-      currentModifiers = modifiers
+      if currentModifiers != modifiers {
+        currentModifiers = modifiers
+      }
     })
   }
 
@@ -176,6 +178,7 @@ struct SessionWindowModifierKeysMonitor: NSViewRepresentable {
     private let notificationCenter: NotificationCenter
     private let installFlagsChangedMonitor: (@escaping (NSEvent) -> NSEvent?) -> Any?
     private let removeFlagsChangedMonitor: (Any) -> Void
+    private let scheduleUpdate: (@escaping @MainActor () -> Void) -> Void
     private weak var observedWindow: NSWindow?
     private var monitor: Any?
     private var didBecomeKeyObserver: NSObjectProtocol?
@@ -183,6 +186,9 @@ struct SessionWindowModifierKeysMonitor: NSViewRepresentable {
     private var didBecomeActiveObserver: NSObjectProtocol?
     private var didResignActiveObserver: NSObjectProtocol?
     private var isObservedWindowKey = false
+    private var deliveredModifiers: EventModifiers?
+    private var pendingDisplayedModifiers: EventModifiers?
+    private var hasScheduledDisplayUpdate = false
 
     init(
       update: @escaping (EventModifiers) -> Void,
@@ -196,6 +202,11 @@ struct SessionWindowModifierKeysMonitor: NSViewRepresentable {
       },
       removeFlagsChangedMonitor: @escaping (Any) -> Void = { monitor in
         NSEvent.removeMonitor(monitor)
+      },
+      scheduleUpdate: @escaping (@escaping @MainActor () -> Void) -> Void = { update in
+        DispatchQueue.main.async {
+          Task { @MainActor in update() }
+        }
       }
     ) {
       self.update = update
@@ -204,6 +215,7 @@ struct SessionWindowModifierKeysMonitor: NSViewRepresentable {
       self.notificationCenter = notificationCenter
       self.installFlagsChangedMonitor = installFlagsChangedMonitor
       self.removeFlagsChangedMonitor = removeFlagsChangedMonitor
+      self.scheduleUpdate = scheduleUpdate
     }
 
     func attach(to window: NSWindow?) {
@@ -235,7 +247,7 @@ struct SessionWindowModifierKeysMonitor: NSViewRepresentable {
     }
 
     func handleFlagsChanged(_ modifiers: EventModifiers) {
-      update(displayedModifiers(for: modifiers))
+      requestDisplayedModifiersUpdate(displayedModifiers(for: modifiers))
     }
 
     func windowDidBecomeKey() {
@@ -245,7 +257,7 @@ struct SessionWindowModifierKeysMonitor: NSViewRepresentable {
 
     func windowDidResignKey() {
       isObservedWindowKey = false
-      update([])
+      requestDisplayedModifiersUpdate([])
     }
 
     func applicationDidBecomeActive() {
@@ -253,7 +265,7 @@ struct SessionWindowModifierKeysMonitor: NSViewRepresentable {
     }
 
     func applicationDidResignActive() {
-      update([])
+      requestDisplayedModifiersUpdate([])
     }
 
     func detach() {
@@ -267,7 +279,7 @@ struct SessionWindowModifierKeysMonitor: NSViewRepresentable {
       removeObserver(&didResignActiveObserver)
       observedWindow = nil
       isObservedWindowKey = false
-      update([])
+      requestDisplayedModifiersUpdate([])
     }
 
     private func installWindowObservers(for window: NSWindow) {
@@ -320,7 +332,37 @@ struct SessionWindowModifierKeysMonitor: NSViewRepresentable {
     }
 
     private func refreshDisplayedModifiers() {
-      update(displayedModifiers(for: currentModifiers()))
+      requestDisplayedModifiersUpdate(displayedModifiers(for: currentModifiers()))
+    }
+
+    private func requestDisplayedModifiersUpdate(_ modifiers: EventModifiers) {
+      if pendingDisplayedModifiers == modifiers {
+        return
+      }
+      if !hasScheduledDisplayUpdate, deliveredModifiers == modifiers {
+        return
+      }
+      pendingDisplayedModifiers = modifiers
+      guard !hasScheduledDisplayUpdate else {
+        return
+      }
+      hasScheduledDisplayUpdate = true
+      scheduleUpdate { [weak self] in
+        self?.flushPendingDisplayedModifiers()
+      }
+    }
+
+    private func flushPendingDisplayedModifiers() {
+      hasScheduledDisplayUpdate = false
+      guard let pendingDisplayedModifiers else {
+        return
+      }
+      self.pendingDisplayedModifiers = nil
+      guard deliveredModifiers != pendingDisplayedModifiers else {
+        return
+      }
+      deliveredModifiers = pendingDisplayedModifiers
+      update(pendingDisplayedModifiers)
     }
 
     private func removeObserver(_ observer: inout NSObjectProtocol?) {
