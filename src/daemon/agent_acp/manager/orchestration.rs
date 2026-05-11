@@ -320,18 +320,8 @@ impl AcpAgentManagerHandle {
             return Ok(false);
         };
         let now = utc_now();
-        {
-            let Some(agent) = state.agents.get_mut(&snapshot.agent_id) else {
-                return Ok(false);
-            };
-            if agent.managed_agent != Some(ManagedAgentRef::acp(snapshot.acp_id.as_str())) {
-                return Ok(false);
-            }
-            if agent.status == status {
-                return Ok(false);
-            }
-            agent.status = status;
-            agent.updated_at = now.clone();
+        if !update_orchestration_runtime_status(&mut state, snapshot, status, &now) {
+            return Ok(false);
         }
         orchestration_service::refresh_session(&mut state, &now);
         let project_id = db
@@ -343,6 +333,10 @@ impl AcpAgentManagerHandle {
         Ok(true)
     }
 
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion in best-effort logging wrapper"
+    )]
     pub(in crate::daemon::agent_acp) fn sync_orchestration_runtime_status_best_effort(
         &self,
         snapshot: &AcpAgentSnapshot,
@@ -357,6 +351,26 @@ impl AcpAgentManagerHandle {
             );
         }
     }
+}
+
+fn update_orchestration_runtime_status(
+    state: &mut SessionState,
+    snapshot: &AcpAgentSnapshot,
+    status: AgentStatus,
+    now: &String,
+) -> bool {
+    let Some(agent) = state.agents.get_mut(&snapshot.agent_id) else {
+        return false;
+    };
+    if agent.managed_agent != Some(ManagedAgentRef::acp(snapshot.acp_id.as_str())) {
+        return false;
+    }
+    if agent.status == status {
+        return false;
+    }
+    agent.status = status;
+    agent.updated_at.clone_from(now);
+    true
 }
 
 fn disconnected_status_parts(
