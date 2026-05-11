@@ -1,5 +1,6 @@
 mod acp_inspect_publisher;
 mod binary_stamp;
+mod shutdown_signals;
 
 use super::{
     AgentTuiManagerHandle, Arc, CliError, CliErrorKind, CodexControllerHandle, CodexTransportKind,
@@ -71,6 +72,8 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         async_db: async_db.clone(),
     });
     let _ = SHUTDOWN_SIGNAL.set(shutdown_tx.clone());
+    let _shutdown_signal_guard =
+        shutdown_signals::ShutdownSignalGuard::install(shutdown_tx.clone())?;
     let replay_buffer = Arc::new(Mutex::new(ReplayBuffer::new(512)));
     let daemon_epoch = manifest.started_at.clone();
 
