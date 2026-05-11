@@ -1,6 +1,9 @@
 mod acp_inspect_publisher;
 mod binary_stamp;
+mod open_db;
 mod shutdown_signals;
+
+pub(crate) use open_db::{open_daemon_async_db, open_daemon_db};
 
 use super::{
     AgentTuiManagerHandle, Arc, CliError, CliErrorKind, CodexControllerHandle, CodexTransportKind,
@@ -502,22 +505,4 @@ pub(crate) async fn open_and_publish_async_db(
     let _ = async_db_slot.set(Arc::clone(&db));
     tracing::info!("async database pool ready");
     Ok(db)
-}
-
-pub(crate) fn open_daemon_db(path: &Path) -> Result<super::db::DaemonDb, CliError> {
-    super::db::DaemonDb::open(path).inspect_err(|error| {
-        let message = format!("failed to open daemon database: {error}");
-        let _ = state::append_event("warn", &message);
-    })
-}
-
-pub(crate) async fn open_daemon_async_db(
-    path: &Path,
-) -> Result<super::db::AsyncDaemonDb, CliError> {
-    super::db::AsyncDaemonDb::connect(path)
-        .await
-        .inspect_err(|error| {
-            let message = format!("failed to open daemon async database pool: {error}");
-            let _ = state::append_event("warn", &message);
-        })
 }

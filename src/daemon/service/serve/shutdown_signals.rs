@@ -35,7 +35,7 @@ impl ShutdownSignalGuard {
         let force_exit_armed = Arc::new(AtomicBool::new(false));
         let thread = thread::Builder::new()
             .name("daemon-signals".to_string())
-            .spawn(move || run_signal_loop(&mut signals, shutdown_tx, &force_exit_armed))
+            .spawn(move || run_signal_loop(&mut signals, &shutdown_tx, &force_exit_armed))
             .map_err(|error| {
                 CliErrorKind::workflow_io(format!("spawn daemon signal thread: {error}"))
             })?;
@@ -69,11 +69,11 @@ fn ignore_sigpipe() -> Result<(), CliError> {
 
 fn run_signal_loop(
     signals: &mut Signals,
-    shutdown_tx: tokio_watch::Sender<bool>,
+    shutdown_tx: &tokio_watch::Sender<bool>,
     force_exit_armed: &AtomicBool,
 ) {
     for signal in signals.forever() {
-        handle_signal(signal, &shutdown_tx, force_exit_armed);
+        handle_signal(signal, shutdown_tx, force_exit_armed);
     }
 }
 
@@ -84,7 +84,7 @@ fn handle_signal(
 ) {
     match shutdown_signal_action(force_exit_armed, signal) {
         ShutdownSignalAction::RequestGracefulShutdown => {
-            request_graceful_shutdown(signal, shutdown_tx)
+            request_graceful_shutdown(signal, shutdown_tx);
         }
         ShutdownSignalAction::ForceExit(exit_code) => force_exit(signal, exit_code),
     }
@@ -102,6 +102,10 @@ fn exit_code_for_signal(signal: i32) -> i32 {
     128_i32.saturating_add(signal)
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing and cleanup branches in shutdown signal helper"
+)]
 fn request_graceful_shutdown(signal: i32, shutdown_tx: &tokio_watch::Sender<bool>) {
     tracing::info!(
         signal,
@@ -123,6 +127,10 @@ fn notify_shutdown_request(
     shutdown_tx.send(true)
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing and cleanup branches in forced-exit helper"
+)]
 fn force_exit(signal: i32, exit_code: i32) -> ! {
     tracing::warn!(
         signal,

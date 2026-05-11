@@ -118,11 +118,10 @@ impl ActiveAcpSession {
         let mut snapshot = self.snapshot_guard();
         if let Some(status) =
             live_status_for_watchdog(self.process.supervisor.watchdog_state(), &snapshot.status)
+            && snapshot.status != status
         {
-            if snapshot.status != status {
-                snapshot.status = status;
-                snapshot.updated_at = utc_now();
-            }
+            snapshot.status = status;
+            snapshot.updated_at = utc_now();
         }
         snapshot.pending_permissions = self.permissions.pending_permission_count();
         snapshot.permission_queue_depth = self.permissions.queue_depth();
