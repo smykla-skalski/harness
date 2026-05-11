@@ -9,9 +9,10 @@
       environment: HarnessMonitorEnvironment,
       store: HarnessMonitorStore
     ) {
-      store.seedSupervisorScenarioForTesting(
-        named: environment.values[supervisorSeedEnvKey]
-      )
+      let scenarioName = environment.values[supervisorSeedEnvKey]
+      Task { @MainActor in
+        await store.seedSupervisorScenarioForTesting(named: scenarioName)
+      }
     }
   }
 #endif

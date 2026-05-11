@@ -111,7 +111,7 @@ extension SupervisorLifecycleTests {
   @MainActor
   func testSeededStuckAgentScenarioQueuesDecisionOnForcedTick() async throws {
     let store = try await HarnessMonitorStore.fixture(sessions: .twoActiveSessions)
-    store.seedSupervisorScenarioForTesting(named: "stuck-agent")
+    await store.seedSupervisorScenarioForTesting(named: "stuck-agent")
     await store.startSupervisor()
     addTeardownBlock { await store.stopSupervisor() }
 
