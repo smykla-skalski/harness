@@ -4,6 +4,8 @@ import Testing
 
 @testable import HarnessMonitorUIPreviewable
 
+// swiftlint:disable file_length
+// swiftlint:disable type_body_length
 @Suite("Session window create form metrics")
 struct SessionWindowCreateFormMetricsTests {
   @Test("Metrics scale form padding and preserve large submit hit target")
@@ -444,3 +446,4 @@ struct SessionWindowCreateFormMetricsTests {
     )
   }
 }
+// swiftlint:enable type_body_length

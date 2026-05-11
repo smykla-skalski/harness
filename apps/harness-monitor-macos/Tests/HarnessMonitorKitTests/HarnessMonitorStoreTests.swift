@@ -2,6 +2,8 @@ import Testing
 
 @testable import HarnessMonitorKit
 
+// swiftlint:disable file_length
+// swiftlint:disable type_body_length
 @MainActor
 @Suite("Harness Monitor store")
 struct HarnessMonitorStoreTests {
@@ -596,3 +598,4 @@ struct HarnessMonitorStoreTests {
     #expect(summary.disconnectedCount == 0)
   }
 }
+// swiftlint:enable type_body_length

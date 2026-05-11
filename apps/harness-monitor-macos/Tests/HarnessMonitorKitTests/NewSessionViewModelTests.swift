@@ -3,6 +3,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 
+// swiftlint:disable file_length
 @MainActor
 @Suite("NewSessionViewModel")
 struct NewSessionViewModelTests {
