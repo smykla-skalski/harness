@@ -235,14 +235,7 @@ run = "HARNESS_STALE_CLEANUP_ALLOW_LIVE_RESET=1 apps/harness-monitor-macos/Scrip
 [tasks."monitor:daemon:dev"]
 description = "Run `harness daemon dev` with the current Harness Monitor runtime lane"
 env = { RUST_LOG = "harness=trace,agent_client_protocol=trace,tokio_tungstenite=debug,info,runtime=warn,tokio=warn,pyroscope=warn,pyroscope_pprofrs=warn,h2=warn,hyper=warn,hyper_util=warn,tower=warn,reqwest=warn,sqlx=warn" }
-run = '''
-  mkdir -p tmp/logs
-  log="tmp/logs/$(date +%y%m%d%H%M)-monitor-daemon-dev.log"
-  apps/harness-monitor-macos/Scripts/monitor-runtime-env.sh \
-    ./scripts/cargo-local.sh run --quiet -- daemon dev \
-    2>&1 | tee "$log"
-  echo "$log"
-'''
+run = "apps/harness-monitor-macos/Scripts/run-daemon-dev.sh"
 
 [tasks."monitor:bridge:start"]
 description = "Run `harness bridge start` with the current Harness Monitor runtime lane"
