@@ -14,6 +14,8 @@ extension SessionWindowFlowTests {
         "Toggle(\"Close Open Recent after picking a session\", isOn: $closeAfterPick)"))
     #expect(!source.contains(".onGeometryChange("))
     #expect(source.contains("OpenRecentStartPanelLayout("))
+    #expect(!source.contains("SessionBackgroundExtensionSurface()"))
+    #expect(!source.contains(".backgroundExtensionEffect()"))
   }
 
   @MainActor
