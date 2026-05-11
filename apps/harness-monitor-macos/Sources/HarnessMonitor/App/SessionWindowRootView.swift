@@ -29,6 +29,19 @@ struct SessionWindowRootView: View {
     }
   }
 
+  private var pendingDecisionSeverity: DecisionSeverity? {
+    var seen: Set<DecisionSeverity> = []
+    for decision in store.supervisorOpenDecisions where decision.sessionID == token.sessionID {
+      if let severity = DecisionSeverity(rawValue: decision.severityRaw) {
+        seen.insert(severity)
+      }
+    }
+    for severity in DecisionSeverity.allCases.reversed() where seen.contains(severity) {
+      return severity
+    }
+    return nil
+  }
+
   private var hostsSharedShellPresentation: Bool {
     keyWindowObserver.isKey(windowID: windowID)
   }
@@ -65,7 +78,8 @@ struct SessionWindowRootView: View {
       SessionWindowTabbing(
         isSessionWindow: true,
         tabTitle: windowTitle,
-        pendingDecisionCount: pendingDecisionCount
+        pendingDecisionCount: pendingDecisionCount,
+        pendingDecisionSeverity: pendingDecisionSeverity
       )
     )
     .modifier(

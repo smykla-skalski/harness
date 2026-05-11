@@ -1,4 +1,5 @@
 import AppKit
+import HarnessMonitorKit
 import Testing
 
 @testable import HarnessMonitor
@@ -50,5 +51,22 @@ struct SessionWindowTabBadgeTests {
     let one = SessionWindowTabBadge.makeAttachment(count: 1).bounds.width
     let hundred = SessionWindowTabBadge.makeAttachment(count: 100).bounds.width
     #expect(hundred > one)
+  }
+
+  @Test("Critical severity selects the danger asset")
+  func criticalMapsToDanger() {
+    #expect(SessionWindowTabBadge.assetName(for: .critical) == "HarnessMonitorDanger")
+  }
+
+  @Test("Warn and needsUser severities map to the caution asset")
+  func warnAndNeedsUserMapToCaution() {
+    #expect(SessionWindowTabBadge.assetName(for: .warn) == "HarnessMonitorCaution")
+    #expect(SessionWindowTabBadge.assetName(for: .needsUser) == "HarnessMonitorCaution")
+  }
+
+  @Test("Info severity and nil fall back to the accent asset")
+  func infoAndNilMapToAccent() {
+    #expect(SessionWindowTabBadge.assetName(for: .info) == "HarnessMonitorAccent")
+    #expect(SessionWindowTabBadge.assetName(for: nil) == "HarnessMonitorAccent")
   }
 }
