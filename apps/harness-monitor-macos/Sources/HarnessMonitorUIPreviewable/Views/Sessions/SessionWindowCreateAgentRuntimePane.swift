@@ -428,7 +428,7 @@ struct SessionWindowCreateTransportChoiceButton: View {
 
   private var shortTitle: String {
     if choice.id.isCodexNative {
-      return "App Server"
+      return "Codex App Server"
     }
     return choice.id.isAcp ? "ACP" : "Terminal"
   }
