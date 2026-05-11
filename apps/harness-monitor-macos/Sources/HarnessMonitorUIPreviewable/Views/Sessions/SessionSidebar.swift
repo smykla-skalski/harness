@@ -58,8 +58,7 @@ struct SessionSidebar: View {
       if shortcutOverlaysEnabled {
         SessionSidebarCreateButtonShortcutOverlays(
           anchors: anchors,
-          currentModifiers: currentModifiers,
-          primaryKind: primaryCreateKind
+          currentModifiers: currentModifiers
         )
       }
     }
@@ -109,14 +108,6 @@ struct SessionSidebar: View {
     default:
       .large
     }
-  }
-
-  var shortcutRevealModifiers: EventModifiers {
-    currentModifiers
-  }
-
-  var primaryCreateKind: SessionCreateKind {
-    state.selection.primaryCreateKind
   }
 
   private var decisionSelectionAccessibilityValue: Text {

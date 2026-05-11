@@ -7,46 +7,32 @@ struct SessionCreateCommands: Commands {
   let windowCommandRouting: WindowCommandRoutingState
   let sessionCreate: SessionCreateContext?
 
-  static func shouldShowExplicitCommand(
-    for kind: SessionCreateKind,
-    primaryKind: SessionCreateKind?
-  ) -> Bool {
-    primaryKind != kind
-  }
-
   var body: some Commands {
-    let primaryKind = sessionCreate?.primaryKind
     let createAgent = createAction(for: .agent)
     let createCodexAgent = createCodexAction
     let createTask = createAction(for: .task)
     let createDecision = createAction(for: .decision)
     CommandGroup(after: .newItem) {
-      if Self.shouldShowExplicitCommand(for: .agent, primaryKind: primaryKind) {
-        Button("New Agent") { createAgent?() }
-          .keyboardShortcut(
-            SessionCreateKind.agent.createShortcut.keyEquivalent,
-            modifiers: SessionCreateKind.agent.createShortcut.requiredEventModifiers
-          )
-          .disabled(createAgent == nil)
-      }
+      Button("New Agent") { createAgent?() }
+        .keyboardShortcut(
+          SessionCreateKind.agent.createShortcut.keyEquivalent,
+          modifiers: SessionCreateKind.agent.createShortcut.requiredEventModifiers
+        )
+        .disabled(createAgent == nil)
       Button("New Codex Agent") { createCodexAgent?() }
         .disabled(createCodexAgent == nil)
-      if Self.shouldShowExplicitCommand(for: .task, primaryKind: primaryKind) {
-        Button("New Task") { createTask?() }
-          .keyboardShortcut(
-            SessionCreateKind.task.createShortcut.keyEquivalent,
-            modifiers: SessionCreateKind.task.createShortcut.requiredEventModifiers
-          )
-          .disabled(createTask == nil)
-      }
-      if Self.shouldShowExplicitCommand(for: .decision, primaryKind: primaryKind) {
-        Button("New Decision") { createDecision?() }
-          .keyboardShortcut(
-            SessionCreateKind.decision.createShortcut.keyEquivalent,
-            modifiers: SessionCreateKind.decision.createShortcut.requiredEventModifiers
-          )
-          .disabled(createDecision == nil)
-      }
+      Button("New Task") { createTask?() }
+        .keyboardShortcut(
+          SessionCreateKind.task.createShortcut.keyEquivalent,
+          modifiers: SessionCreateKind.task.createShortcut.requiredEventModifiers
+        )
+        .disabled(createTask == nil)
+      Button("New Decision") { createDecision?() }
+        .keyboardShortcut(
+          SessionCreateKind.decision.createShortcut.keyEquivalent,
+          modifiers: SessionCreateKind.decision.createShortcut.requiredEventModifiers
+        )
+        .disabled(createDecision == nil)
     }
   }
 

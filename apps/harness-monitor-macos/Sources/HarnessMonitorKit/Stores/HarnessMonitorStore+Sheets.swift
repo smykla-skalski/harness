@@ -267,16 +267,9 @@ extension HarnessMonitorStore {
       )
       return nil
     }
-    guard let client else {
-      HarnessMonitorLogger.store.warning(
-        "client is nil; cannot present New Session sheet"
-      )
-      return nil
-    }
     return NewSessionViewModel(
       store: self,
-      bookmarkStore: bookmarkStore,
-      client: client
+      bookmarkStore: bookmarkStore
     )
   }
 }

@@ -48,7 +48,6 @@ struct SessionSidebarCreateButtonShortcutOverlays: View {
 
   let anchors: [SessionCreateKind: Anchor<CGRect>]
   let currentModifiers: EventModifiers
-  let primaryKind: SessionCreateKind
 
   private var orderedKinds: [SessionCreateKind] {
     [.agent, .task, .decision]
@@ -60,7 +59,7 @@ struct SessionSidebarCreateButtonShortcutOverlays: View {
         ForEach(orderedKinds, id: \.self) { kind in
           if let anchor = anchors[kind] {
             let frame = proxy[anchor]
-            let shortcut = kind.displayedCreateShortcut(primaryKind: primaryKind)
+            let shortcut = kind.createShortcut
             KeyboardShortcutLabel(
               shortcut: shortcut,
               activeModifiers: currentModifiers,
@@ -316,7 +315,6 @@ extension SessionSidebar {
       SessionSidebarHeaderCreateButton(
         state: state,
         kind: .agent,
-        primaryKind: primaryCreateKind,
         accessibilityLabel: "New Agent"
       )
     }
@@ -335,7 +333,6 @@ extension SessionSidebar {
       SessionSidebarHeaderCreateButton(
         state: state,
         kind: .task,
-        primaryKind: primaryCreateKind,
         accessibilityLabel: "New Task"
       )
     }
@@ -345,11 +342,10 @@ extension SessionSidebar {
 struct SessionSidebarHeaderCreateButton: View {
   let state: SessionWindowStateCache
   let kind: SessionCreateKind
-  let primaryKind: SessionCreateKind
   let accessibilityLabel: String
 
   private var displayedShortcut: KeyboardShortcutDescriptor {
-    kind.displayedCreateShortcut(primaryKind: primaryKind)
+    kind.createShortcut
   }
 
   var body: some View {

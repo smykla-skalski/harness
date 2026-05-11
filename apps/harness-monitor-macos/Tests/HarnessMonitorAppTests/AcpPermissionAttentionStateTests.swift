@@ -29,6 +29,7 @@ struct AcpPermissionAttentionStateTests {
     )
     let application = AppTestWindowApplication(
       keyWindowIdentifier: nil,
+      keyWindowParentIdentifier: nil,
       isActive: false,
       isHidden: true,
       windowStates: []
@@ -87,6 +88,7 @@ struct AcpPermissionAttentionStateTests {
     )
     let application = AppTestWindowApplication(
       keyWindowIdentifier: nil,
+      keyWindowParentIdentifier: nil,
       isActive: true,
       isHidden: false,
       windowStates: []
@@ -139,17 +141,20 @@ struct AcpPermissionAttentionStateTests {
 @MainActor
 private final class AppTestWindowApplication: KeyWindowObservableApplication {
   var keyWindowIdentifier: String?
+  var keyWindowParentIdentifier: String?
   var isActive: Bool
   var isHidden: Bool
   var windowStates: [KeyWindowState]
 
   init(
     keyWindowIdentifier: String?,
+    keyWindowParentIdentifier: String?,
     isActive: Bool,
     isHidden: Bool,
     windowStates: [KeyWindowState]
   ) {
     self.keyWindowIdentifier = keyWindowIdentifier
+    self.keyWindowParentIdentifier = keyWindowParentIdentifier
     self.isActive = isActive
     self.isHidden = isHidden
     self.windowStates = windowStates

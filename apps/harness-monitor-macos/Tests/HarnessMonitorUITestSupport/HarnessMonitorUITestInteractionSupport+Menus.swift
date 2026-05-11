@@ -68,12 +68,12 @@ extension HarnessMonitorUITestCase {
     in app: XCUIApplication,
     failureMessage: String
   ) {
-    if let coordinate = preferredTapCoordinate(in: app, for: element) {
-      coordinate.click()
-      return
-    }
     if element.isHittable {
       element.click()
+      return
+    }
+    if let coordinate = preferredTapCoordinate(in: app, for: element) {
+      coordinate.click()
       return
     }
     XCTFail(failureMessage)

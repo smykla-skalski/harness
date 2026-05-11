@@ -49,7 +49,7 @@ func makeNewSessionDaemonStatus(sandboxed: Bool) -> DaemonStatusReport {
 func makeNewSessionViewModel(
   store: HarnessMonitorStore? = nil,
   bookmarkStore: BookmarkStore? = nil,
-  client: any HarnessMonitorClientProtocol = RecordingHarnessClient(),
+  client: (any HarnessMonitorClientProtocol)? = RecordingHarnessClient(),
   isSandboxed: @Sendable @escaping () -> Bool = { true },
   bookmarkResolver: NewSessionViewModel.BookmarkResolver? = nil,
   logSink: (any NewSessionLogSink)? = nil,

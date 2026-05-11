@@ -179,14 +179,15 @@ struct HarnessMonitorStoreSheetTests {
 
   // MARK: - makeNewSessionViewModel
 
-  @Test("makeNewSessionViewModel returns nil when client is nil")
-  func makeNewSessionViewModelReturnsNilWhenClientIsNil() {
-    // A freshly-constructed store has no client until bootstrap connects.
+  @Test("makeNewSessionViewModel returns a view model before bootstrap connects")
+  func makeNewSessionViewModelReturnsViewModelWhenClientIsNil() {
+    // A freshly-constructed store has no client until bootstrap connects, but
+    // the New Session form should still render and surface submit-time errors.
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
 
     let viewModel = store.makeNewSessionViewModel()
 
-    #expect(viewModel == nil)
+    #expect(viewModel != nil)
   }
 
   @Test("makeNewSessionViewModel returns a view model after bootstrap")

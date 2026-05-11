@@ -13,10 +13,7 @@ extension NewSessionSheetView {
           selection: preferredLaunchSelectionBinding
         )
       }
-
-      if !providerAttentionOptions.isEmpty {
-        NewSessionProviderDetailsDisclosure(options: providerAttentionOptions)
-      }
+      NewSessionProviderDetailsDisclosure(options: providerAttentionOptions)
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionCapabilityPickerSection)
   }
@@ -109,30 +106,34 @@ private struct NewSessionProviderDetailsDisclosure: View {
     }
   }
 
-  var body: some View {
-    DisclosureGroup(isExpanded: $isExpanded) {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-        ForEach(options) { option in
-          NewSessionProviderSetupRow(option: option)
+  @ViewBuilder var body: some View {
+    if options.isEmpty {
+      EmptyView()
+    } else {
+      DisclosureGroup(isExpanded: $isExpanded) {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+          ForEach(options) { option in
+            NewSessionProviderSetupRow(option: option)
+          }
         }
+        .padding(.top, HarnessMonitorTheme.spacingSM)
+      } label: {
+        HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
+          Text("Providers needing attention")
+            .scaledFont(.caption.bold())
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          Text(summary)
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
       }
-      .padding(.top, HarnessMonitorTheme.spacingSM)
-    } label: {
-      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-        Text("Providers needing attention")
-          .scaledFont(.caption.bold())
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        Text(summary)
-          .scaledFont(.caption)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .fixedSize(horizontal: false, vertical: true)
-      }
-      .accessibilityElement(children: .combine)
+      .animation(
+        reduceMotion ? nil : .easeOut(duration: 0.18),
+        value: isExpanded
+      )
     }
-    .animation(
-      reduceMotion ? nil : .easeOut(duration: 0.18),
-      value: isExpanded
-    )
   }
 }
 

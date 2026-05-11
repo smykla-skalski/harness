@@ -11,7 +11,8 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
 
     XCTAssertTrue(mainRoot.contains("HarnessMonitorWindowShell("))
     XCTAssertTrue(mainRoot.contains("WindowContentReadiness("))
-    XCTAssertTrue(mainRoot.contains("windowToolbarBackgroundVisibility: nil"))
+    XCTAssertTrue(mainRoot.contains("windowToolbarBackgroundVisibility: .hidden"))
+    XCTAssertTrue(mainRoot.contains(".toolbar {"))
     XCTAssertTrue(mainRoot.contains("private var hostsSharedShellPresentation"))
     XCTAssertTrue(mainRoot.contains("HarnessMonitorConfirmationDialogModifier("))
     XCTAssertTrue(mainRoot.contains("HarnessMonitorSheetModifier("))

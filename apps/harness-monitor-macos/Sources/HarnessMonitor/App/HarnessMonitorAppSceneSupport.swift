@@ -54,7 +54,7 @@ struct HarnessMonitorWindowRootView: View {
       mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
       themeMode: $themeMode,
       contentReadiness: contentReadiness,
-      windowToolbarBackgroundVisibility: nil,
+      windowToolbarBackgroundVisibility: .hidden,
       toast: store.toast
     ) {
       liveContent
@@ -99,6 +99,7 @@ struct HarnessMonitorWindowRootView: View {
           perfScenario: perfScenario
         )
       )
+      .toolbar {}
   }
 
   @MainActor
