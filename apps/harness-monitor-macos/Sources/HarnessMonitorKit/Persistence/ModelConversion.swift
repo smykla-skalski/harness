@@ -184,6 +184,15 @@ extension CachedAgent {
         typicalSignalLatencySeconds: 0,
         hookPoints: []
       )
+    let managedAgent: ManagedAgentRef?
+    if let managedAgentID,
+      let managedAgentKindRaw,
+      let kind = ManagedAgentKind(rawValue: managedAgentKindRaw)
+    {
+      managedAgent = ManagedAgentRef(kind: kind, id: managedAgentID)
+    } else {
+      managedAgent = nil
+    }
 
     return AgentRegistration(
       agentId: agentId,
@@ -195,6 +204,7 @@ extension CachedAgent {
       updatedAt: updatedAt,
       status: AgentStatus(rawValue: statusRaw) ?? .active,
       agentSessionId: agentSessionId,
+      managedAgent: managedAgent,
       lastActivityAt: lastActivityAt,
       currentTaskId: currentTaskId,
       runtimeCapabilities: runtimeCapabilities,
@@ -210,6 +220,8 @@ extension CachedAgent {
     joinedAt = registration.joinedAt
     updatedAt = registration.updatedAt
     agentSessionId = registration.agentSessionId
+    managedAgentID = registration.managedAgent?.managedAgentID
+    managedAgentKindRaw = registration.managedAgent?.kind.rawValue
     lastActivityAt = registration.lastActivityAt
     currentTaskId = registration.currentTaskId
     capabilitiesData = (try? Codecs.encoder.encode(registration.capabilities)) ?? Data()
@@ -229,6 +241,8 @@ extension AgentRegistration {
       joinedAt: joinedAt,
       updatedAt: updatedAt,
       agentSessionId: agentSessionId,
+      managedAgentID: managedAgent?.managedAgentID,
+      managedAgentKindRaw: managedAgent?.kind.rawValue,
       lastActivityAt: lastActivityAt,
       currentTaskId: currentTaskId,
       capabilitiesData: (try? Codecs.encoder.encode(capabilities)) ?? Data(),

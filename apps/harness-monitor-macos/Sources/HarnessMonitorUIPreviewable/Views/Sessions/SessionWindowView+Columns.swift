@@ -257,7 +257,7 @@ extension SessionWindowView {
     case .agents:
       SessionWindowAgentsList(
         store: store,
-        detail: snapshot.detail,
+        snapshot: snapshot,
         tuiStatusByAgent: store.contentUI.sessionDetail.tuiStatusByAgent,
         state: stateCache
       )
@@ -450,6 +450,20 @@ extension SessionWindowView {
         store: store,
         sessionID: token.sessionID,
         detail: detail,
+        runtimePresentation: {
+          switch snapshot.source {
+          case .live:
+            return HarnessMonitorStore.AgentRuntimePresentationContext(
+              availability: .live,
+              acpSnapshots: snapshot.acpAgents,
+              acpInspectSample: snapshot.acpInspectSample
+            )
+          case .cache:
+            return HarnessMonitorStore.AgentRuntimePresentationContext(availability: .persisted)
+          case .catalog:
+            return nil
+          }
+        }(),
         agentTimeline: agentTimeline,
         agentTranscript: agentTranscript,
         agent: agent,

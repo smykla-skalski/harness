@@ -15,6 +15,8 @@ public enum HarnessMonitorSessionWindowTranscriptSource: String, Sendable {
 public struct HarnessMonitorSessionWindowSnapshot: Equatable, Sendable {
   public let summary: SessionSummary
   public let detail: SessionDetail?
+  public let acpAgents: [AcpAgentSnapshot]
+  public let acpInspectSample: AcpInspectSample?
   public let timeline: [TimelineEntry]
   public let timelineEntriesByAgentID: [String: [TimelineEntry]]
   public let transcript: [TimelineEntry]
@@ -26,6 +28,8 @@ public struct HarnessMonitorSessionWindowSnapshot: Equatable, Sendable {
   public init(
     summary: SessionSummary,
     detail: SessionDetail?,
+    acpAgents: [AcpAgentSnapshot] = [],
+    acpInspectSample: AcpInspectSample? = nil,
     timeline: [TimelineEntry],
     transcript: [TimelineEntry] = [],
     transcriptSource: HarnessMonitorSessionWindowTranscriptSource = .derived,
@@ -34,6 +38,8 @@ public struct HarnessMonitorSessionWindowSnapshot: Equatable, Sendable {
   ) {
     self.summary = summary
     self.detail = detail
+    self.acpAgents = acpAgents
+    self.acpInspectSample = acpInspectSample
     self.timeline = timeline
     timelineEntriesByAgentID = timeline.partitionedByAgentID()
     self.transcript = transcript

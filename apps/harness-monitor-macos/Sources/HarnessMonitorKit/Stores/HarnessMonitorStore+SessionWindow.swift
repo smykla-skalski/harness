@@ -39,6 +39,8 @@ extension HarnessMonitorStore {
       return HarnessMonitorSessionWindowSnapshot(
         summary: cached.detail.session,
         detail: cached.detail,
+        acpAgents: [],
+        acpInspectSample: nil,
         timeline: cached.timeline,
         transcript: cachedTranscript,
         transcriptSource: cached.transcriptSource
@@ -55,6 +57,8 @@ extension HarnessMonitorStore {
     return HarnessMonitorSessionWindowSnapshot(
       summary: summary,
       detail: nil,
+      acpAgents: [],
+      acpInspectSample: nil,
       timeline: [],
       transcript: [],
       transcriptSource: .derived,
@@ -74,6 +78,14 @@ extension HarnessMonitorStore {
         sessionID: sessionID,
         request: .latest(limit: Self.initialSelectedTimelineWindowLimit)
       ) { _, _, _ in }
+      async let acpAgentsTask = loadSessionWindowAcpAgents(
+        sessionID: sessionID,
+        client: client
+      )
+      async let acpInspectTask = loadSessionWindowAcpInspectSample(
+        sessionID: sessionID,
+        client: client
+      )
       async let transcriptTask = loadSessionWindowTranscriptResponse(
         sessionID: sessionID,
         client: client
@@ -82,6 +94,8 @@ extension HarnessMonitorStore {
       let detail = try await detailTask
       guard !Task.isCancelled else { return nil }
       let timelineWindow = await timelineWindowTask
+      let acpAgents = await acpAgentsTask
+      let acpInspectSample = await acpInspectTask
       let transcriptResponse = await transcriptTask
       guard !Task.isCancelled else { return nil }
       let transcript = resolvedSessionWindowTranscript(
@@ -92,6 +106,8 @@ extension HarnessMonitorStore {
       let snapshot = HarnessMonitorSessionWindowSnapshot(
         summary: detail.session,
         detail: detail,
+        acpAgents: acpAgents,
+        acpInspectSample: acpInspectSample,
         timeline: timelineWindow?.entries ?? [],
         transcript: transcript.entries,
         transcriptSource: transcript.source,
@@ -143,6 +159,55 @@ extension HarnessMonitorStore {
     }
   }
 
+  private func loadSessionWindowAcpAgents(
+    sessionID: String,
+    client: any HarnessMonitorClientProtocol
+  ) async -> [AcpAgentSnapshot] {
+    do {
+      let response = try await client.managedAgents(sessionID: sessionID)
+      return response.agents.compactMap(\.acp)
+    } catch is CancellationError {
+      return []
+    } catch {
+      let errorDescription = String(describing: error)
+      HarnessMonitorLogger.store.debug(
+        """
+        session window ACP agents load failed \
+        sessionID=\(sessionID, privacy: .public) \
+        error=\(errorDescription, privacy: .public)
+        """
+      )
+      return []
+    }
+  }
+
+  private func loadSessionWindowAcpInspectSample(
+    sessionID: String,
+    client: any HarnessMonitorClientProtocol
+  ) async -> AcpInspectSample? {
+    do {
+      let response = try await client.acpInspect(sessionID: sessionID)
+      return AcpInspectSample(
+        sessionID: sessionID,
+        sampledAt: response.daemonPerceivedNowDate ?? .now,
+        receivedAt: .now,
+        agents: response.agents
+      )
+    } catch is CancellationError {
+      return nil
+    } catch {
+      let errorDescription = String(describing: error)
+      HarnessMonitorLogger.store.debug(
+        """
+        session window ACP inspect load failed \
+        sessionID=\(sessionID, privacy: .public) \
+        error=\(errorDescription, privacy: .public)
+        """
+      )
+      return nil
+    }
+  }
+
   private func resolvedSessionWindowTranscript(
     detail: SessionDetail,
     timeline: [TimelineEntry],
@@ -174,7 +239,8 @@ extension HarnessMonitorStore {
     agents: [AgentRegistration]
   ) -> [TimelineEntry] {
     let identitiesByManagedAgentID = Dictionary(
-      uniqueKeysWithValues: agents.compactMap { agent -> (String, (sessionAgentID: String, displayName: String))? in
+      uniqueKeysWithValues: agents.compactMap {
+        agent -> (String, (sessionAgentID: String, displayName: String))? in
         guard let managedAgentID = agent.managedAgentID else {
           return nil
         }

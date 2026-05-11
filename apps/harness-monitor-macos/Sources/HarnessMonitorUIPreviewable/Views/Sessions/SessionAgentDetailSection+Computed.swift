@@ -131,19 +131,39 @@ extension SessionAgentDetailSection {
   }
 
   var acpRuntimeState: AcpAgentRuntimeState? {
-    store.acpRuntimeState(
-      for: agent.agentId,
-      sessionID: sessionID,
-      sessionRegistrations: detail.agents
-    )
+    if let runtimePresentation {
+      store.acpRuntimeState(
+        for: SessionAgentID(rawValue: agent.agentId),
+        sessionID: sessionID,
+        sessionRegistrations: detail.agents,
+        snapshots: runtimePresentation.acpSnapshots,
+        inspectSample: runtimePresentation.acpInspectSample
+      )
+    } else {
+      store.acpRuntimeState(
+        for: agent.agentId,
+        sessionID: sessionID,
+        sessionRegistrations: detail.agents
+      )
+    }
   }
 
   var acpRuntimeInspectStatus: AcpRuntimeInspectStatus? {
-    store.acpRuntimeInspectStatus(
-      for: agent.agentId,
-      sessionID: sessionID,
-      sessionRegistrations: detail.agents
-    )
+    if let runtimePresentation {
+      store.acpRuntimeInspectStatus(
+        for: agent.agentId,
+        sessionID: sessionID,
+        sessionRegistrations: detail.agents,
+        snapshots: runtimePresentation.acpSnapshots,
+        inspectSample: runtimePresentation.acpInspectSample
+      )
+    } else {
+      store.acpRuntimeInspectStatus(
+        for: agent.agentId,
+        sessionID: sessionID,
+        sessionRegistrations: detail.agents
+      )
+    }
   }
 
   var lifecyclePresentation: (label: String, visualStatus: AgentStatus) {
@@ -151,7 +171,8 @@ extension SessionAgentDetailSection {
       for: agent,
       sessionID: sessionID,
       sessionRegistrations: detail.agents,
-      tuiStatus: tui?.status
+      tuiStatus: tui?.status,
+      runtimePresentation: runtimePresentation
     )
     return (lifecycle.label, lifecycle.visualStatus)
   }

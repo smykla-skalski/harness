@@ -33,6 +33,8 @@ extension HarnessMonitorStore {
       let nextSnapshot = HarnessMonitorSessionWindowSnapshot(
         summary: snapshot.summary,
         detail: snapshot.detail,
+        acpAgents: snapshot.acpAgents,
+        acpInspectSample: snapshot.acpInspectSample,
         timeline: resolved.timeline,
         transcript: nextTranscript,
         transcriptSource: snapshot.transcriptSource,
@@ -75,8 +77,7 @@ extension HarnessMonitorStore {
       response: response,
       request: request,
       retainedLimit: retainedLimit
-    )
-    {
+    ) {
       return (rollingResolution.timeline, rollingResolution.timelineWindow)
     }
 
