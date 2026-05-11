@@ -3,25 +3,15 @@ import HarnessMonitorUIPreviewable
 
 @MainActor
 enum SessionWindowTabBadge {
+  static let leadingSpacing = "  "
   static let badgeHeight: CGFloat = 13
   static let cornerRadius: CGFloat = 5
   static let baselineOffset: CGFloat = -2
-  static let trailingTabStopLocation: CGFloat = 130
 
   static func attributedTitle(base: String, pendingDecisionCount: Int) -> NSAttributedString? {
     guard pendingDecisionCount > 0 else { return nil }
-    let paragraphStyle = NSMutableParagraphStyle()
-    paragraphStyle.tabStops = [
-      NSTextTab(textAlignment: .right, location: trailingTabStopLocation, options: [:])
-    ]
-    paragraphStyle.lineBreakMode = .byClipping
-    let result = NSMutableAttributedString(string: base + "\t")
+    let result = NSMutableAttributedString(string: base + leadingSpacing)
     result.append(NSAttributedString(attachment: makeAttachment(count: pendingDecisionCount)))
-    result.addAttribute(
-      .paragraphStyle,
-      value: paragraphStyle,
-      range: NSRange(location: 0, length: result.length)
-    )
     return result
   }
 
