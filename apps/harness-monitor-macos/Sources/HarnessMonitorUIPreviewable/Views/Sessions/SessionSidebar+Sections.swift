@@ -44,8 +44,10 @@ private struct SessionSidebarCreateButtonFrameModifier: ViewModifier {
 struct SessionSidebarCreateButtonShortcutOverlays: View {
   @ScaledMetric(relativeTo: .caption)
   private var shortcutKeySpacing = HarnessMonitorTheme.spacingXS - 1
-  @ScaledMetric(relativeTo: .caption) private var shortcutVerticalOffset = 8
-  @ScaledMetric(relativeTo: .caption) private var shortcutHorizontalAdjustment = 1
+  @ScaledMetric(relativeTo: .caption)
+  private var shortcutVerticalOffset = 8
+  @ScaledMetric(relativeTo: .caption)
+  private var shortcutHorizontalAdjustment = 1
 
   let anchors: [SessionCreateKind: Anchor<CGRect>]
   let currentModifiers: EventModifiers
@@ -375,7 +377,7 @@ struct SessionSidebarHeaderCreateButton: View {
     .alignmentGuide(.sessionSidebarHeaderButtonCenter) { dimensions in
       dimensions[VerticalAlignment.center]
     }
-    .buttonStyle(.bordered)
+    .harnessActionButtonStyle(variant: .bordered, tint: nil)
     .controlSize(.small)
     .help("\(accessibilityLabel) (\(displayedShortcut.hint))")
     .accessibilityLabel(accessibilityLabel)

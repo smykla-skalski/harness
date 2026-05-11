@@ -2,6 +2,8 @@ import XCTest
 
 @testable import HarnessMonitorKit
 
+// swiftlint:disable file_length
+// swiftlint:disable type_body_length
 @MainActor
 final class HarnessMonitorStoreLifecyclePresentationTests: XCTestCase {
   func testSelectedSessionLifecycleMarksStaleAcpRegistrationsAsNotRunning() {
@@ -479,3 +481,4 @@ final class HarnessMonitorStoreLifecyclePresentationTests: XCTestCase {
     return try String(contentsOf: sourceURL, encoding: .utf8)
   }
 }
+// swiftlint:enable type_body_length
