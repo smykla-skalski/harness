@@ -24,22 +24,7 @@ struct SessionWindowTabBadgeTests {
       SessionWindowTabBadge.attributedTitle(base: "e2e", pendingDecisionCount: 3)
     )
     let plain = title.string
-    #expect(plain.hasPrefix("e2e\t"))
-  }
-
-  @Test("Applies a right-aligned paragraph tab stop so the badge anchors to the trailing edge")
-  func paragraphStyleAnchorsBadgeRight() throws {
-    let title = try #require(
-      SessionWindowTabBadge.attributedTitle(base: "session-A", pendingDecisionCount: 2)
-    )
-    let paragraphStyle = title.attribute(
-      .paragraphStyle,
-      at: 0,
-      effectiveRange: nil
-    ) as? NSParagraphStyle
-    let tabStop = try #require(paragraphStyle?.tabStops.first)
-    #expect(tabStop.alignment == .right)
-    #expect(tabStop.location == SessionWindowTabBadge.trailingTabStopLocation)
+    #expect(plain.hasPrefix("e2e" + SessionWindowTabBadge.leadingSpacing))
   }
 
   @Test("Embeds an NSTextAttachment after the leading base text")
