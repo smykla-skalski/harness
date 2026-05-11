@@ -28,9 +28,9 @@ pub use config::{
 pub use locks::{acquire_singleton_lock, daemon_lock_is_held, daemon_lock_is_held_at};
 pub use manifest::{clear_manifest_for_pid, load_manifest, load_running_manifest, write_manifest};
 pub use paths::{
-    auth_token_path, config_path, daemon_root, default_daemon_root, ensure_daemon_dirs,
-    events_path, launch_agent_path, legacy_launch_agent_path, lock_path, manifest_path,
-    set_daemon_root_override,
+    ScopedDaemonRootOverride, auth_token_path, config_path, daemon_root, default_daemon_root,
+    ensure_daemon_dirs, events_path, launch_agent_path, legacy_launch_agent_path, lock_path,
+    manifest_path, set_daemon_root_override,
 };
 
 pub(crate) use locks::{acquire_flock_exclusive, flock_is_held_at};

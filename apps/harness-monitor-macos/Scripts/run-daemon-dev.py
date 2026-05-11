@@ -80,6 +80,11 @@ def supervise(binary: Path, log_path: Path, manifest_path: Path) -> int:
             interrupted.set()
             try:
                 os.killpg(process.pid, signum)
+            except PermissionError:
+                try:
+                    process.send_signal(signum)
+                except ProcessLookupError:
+                    pass
             except ProcessLookupError:
                 pass
 
