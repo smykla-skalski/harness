@@ -97,8 +97,6 @@ extension SessionWindowView {
   }
 
   @ViewBuilder var focusModeSurface: some View {
-    // Keep one extension host across focus-mode branches so route flips do not
-    // tear down and rebuild the animatable glass surface.
     sessionBannerStack {
       Group {
         if SessionWindowFocusModePolicy.usesRouteContent(selection: stateCache.selection) {
@@ -135,7 +133,7 @@ extension SessionWindowView {
         standardSessionDetailSurface
       }
     }
-    .navigationSplitViewStyle(.balanced)
+    .navigationSplitViewStyle(.prominentDetail)
     .modifier(
       SessionWindowPlainTapRecorder(
         stateCache: stateCache,
@@ -145,14 +143,12 @@ extension SessionWindowView {
   }
 
   @ViewBuilder private var standardSessionDetailSurface: some View {
-    // Keep one extension host across both layout styles so route changes do not
-    // duplicate or rebuild the animatable glass surface.
     Group {
       switch renderedRoute.layoutStyle {
       case .sidebarDetail:
         routeDetailColumn
       case .sidebarContentDetail:
-        SessionContentDetailSplitView(contentWidth: contentColumnWidth) {
+        SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding) {
           contentColumn
         } detail: {
           detailColumn
@@ -189,23 +185,16 @@ extension SessionWindowView {
     preferredBinding: Binding<Bool>,
     announce: Bool = true
   ) {
-    guard shouldUpdateDetailColumnWidth(to: width) else {
-      detailColumnResizeState.cancelPending()
-      return
-    }
     // Delay layout-driven writes until after SwiftUI finishes the current
     // geometry pass; synchronous updates here trigger the startup CGFloat fault.
-    detailColumnResizeState.cancelPending()
-    detailColumnResizeState.settleTask = Task { @MainActor in
+    Task { @MainActor in
       await Task.yield()
-      guard !Task.isCancelled else { return }
       updateDetailColumnWidth(
         width,
         visibleBinding: visibleBinding,
         preferredBinding: preferredBinding,
         announce: announce
       )
-      detailColumnResizeState.settleTask = nil
     }
   }
 
@@ -282,29 +271,24 @@ extension SessionWindowView {
         inspectorContextDecision != nil
         && !focusMode
         && stateCache.decisionRuntime.allowsInspector(width: geometry.size.width)
-      Group {
+      HStack(spacing: 0) {
+        detailFocus
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
         if inspectorVisible, inspectorAllowed, let inspectorDecision = inspectorContextDecision {
-          HSplitView {
-            detailFocus
-              .frame(maxWidth: .infinity, maxHeight: .infinity)
-              .layoutPriority(1)
-            SessionWindowInspector(
-              decision: inspectorDecision,
-              isFilteredOut: selectedDecisionHiddenByFilters,
-              decisionFilters: stateCache.decisionFilters,
-              decisionRuntime: stateCache.decisionRuntime,
-              visible: inspectorVisibleBinding,
-              preferredVisible: inspectorPreferredBinding
-            )
-            .frame(
-              minWidth: 220,
-              idealWidth: CGFloat(max(220, min(inspectorWidth, 420))),
-              maxWidth: 420
-            )
-          }
-        } else {
-          detailFocus
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+          SessionInspectorDivider(
+            width: inspectorWidthBinding,
+            minWidth: 220,
+            maxWidth: 420
+          )
+          SessionWindowInspector(
+            decision: inspectorDecision,
+            isFilteredOut: selectedDecisionHiddenByFilters,
+            decisionFilters: stateCache.decisionFilters,
+            decisionRuntime: stateCache.decisionRuntime,
+            visible: inspectorVisibleBinding,
+            preferredVisible: inspectorPreferredBinding
+          )
+          .frame(width: max(220, min(inspectorWidth, 420)))
         }
       }
       .onAppear {
@@ -321,9 +305,6 @@ extension SessionWindowView {
           visibleBinding: inspectorVisibleBinding,
           preferredBinding: inspectorPreferredBinding
         )
-      }
-      .onDisappear {
-        detailColumnResizeState.cancelPending()
       }
     }
   }
