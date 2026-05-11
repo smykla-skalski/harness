@@ -210,6 +210,7 @@ struct HarnessMonitorStoreSelectedTranscriptCacheTests {
     #expect(cached.transcriptSource == .derived)
   }
 
+  // swiftlint:disable function_body_length
   @Test("Switching sessions before the transcript debounce flush keeps each cache row coherent")
   func switchingSessionsBeforeTranscriptFlushKeepsCacheRowsCoherent() async throws {
     let summaryA = makeSession(
@@ -324,4 +325,5 @@ struct HarnessMonitorStoreSelectedTranscriptCacheTests {
     #expect(cachedB.timeline.map(\.summary) == ["Timeline B"])
     #expect(cachedB.transcript?.map(\.summary) == ["Transcript B"])
   }
+  // swiftlint:enable function_body_length
 }

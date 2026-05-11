@@ -5,6 +5,7 @@ import XCTest
 
 @testable import HarnessMonitorKit
 
+// swiftlint:disable file_length
 @MainActor
 @Suite("Persistence offline durability")
 struct PersistenceOfflineDurabilityTests {

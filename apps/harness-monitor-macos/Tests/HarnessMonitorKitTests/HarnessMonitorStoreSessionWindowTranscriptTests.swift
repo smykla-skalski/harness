@@ -141,6 +141,7 @@ struct HarnessMonitorStoreSessionWindowTranscriptTests {
       ])
   }
 
+  // swiftlint:disable function_body_length
   @Test("Cached derived transcript re-derives after a later live timeline expansion")
   func cachedDerivedTranscriptRederivesAfterLiveTimelineExpansion() async throws {
     let summary = makeSession(
@@ -253,4 +254,5 @@ struct HarnessMonitorStoreSessionWindowTranscriptTests {
         == ["Derived transcript row B", "Derived transcript row A"]
     )
   }
+  // swiftlint:enable function_body_length
 }
