@@ -75,7 +75,11 @@ struct SessionTimelineCountSummary: View {
   let filterMatchCount: Int?
 
   var body: some View {
-    let text = statusText
+    let text = Self.statusText(
+      navigation: navigation,
+      filterSummary: filterSummary,
+      filterMatchCount: filterMatchCount
+    )
     if !text.isEmpty {
       Text(text)
         .scaledFont(.caption2)
@@ -87,7 +91,11 @@ struct SessionTimelineCountSummary: View {
     }
   }
 
-  private var statusText: String {
+  static func statusText(
+    navigation: SessionTimelineWindowNavigation,
+    filterSummary: SessionTimelineFilterSummary,
+    filterMatchCount: Int?
+  ) -> String {
     if filterSummary.isFiltered, let filterMatchCount {
       let filterLabel =
         filterSummary.activeFilterCount == 1
