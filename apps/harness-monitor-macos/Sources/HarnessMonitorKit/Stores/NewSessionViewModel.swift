@@ -57,7 +57,7 @@ public final class NewSessionViewModel {
 
   private let store: HarnessMonitorStore
   private let bookmarkStore: BookmarkStore
-  private let client: any HarnessMonitorClientProtocol
+  private let bootstrapClient: (any HarnessMonitorClientProtocol)?
   private let isSandboxedCheck: @Sendable () -> Bool
   private let bookmarkResolver: BookmarkResolver
   private let logSink: any NewSessionLogSink
@@ -66,7 +66,7 @@ public final class NewSessionViewModel {
   public init(
     store: HarnessMonitorStore,
     bookmarkStore: BookmarkStore,
-    client: any HarnessMonitorClientProtocol,
+    client: (any HarnessMonitorClientProtocol)? = nil,
     isSandboxed: @Sendable @escaping () -> Bool = NewSessionViewModel.liveIsSandboxed,
     bookmarkResolver: BookmarkResolver? = nil,
     logSink: any NewSessionLogSink = LiveNewSessionLogSink(),
@@ -74,7 +74,7 @@ public final class NewSessionViewModel {
   ) {
     self.store = store
     self.bookmarkStore = bookmarkStore
-    self.client = client
+    bootstrapClient = client
     self.isSandboxedCheck = isSandboxed
     self.bookmarkResolver =
       bookmarkResolver
@@ -97,6 +97,12 @@ public final class NewSessionViewModel {
       let error = SubmitError.validation(.projectRequired)
       lastError = error
       logSink.error("new-session submit failed kind=projectRequired")
+      return .failure(error)
+    }
+    guard let client = bootstrapClient ?? store.client else {
+      let error = SubmitError.daemonUnreachable
+      lastError = error
+      logSink.error("new-session submit failed kind=daemonUnreachable")
       return .failure(error)
     }
 

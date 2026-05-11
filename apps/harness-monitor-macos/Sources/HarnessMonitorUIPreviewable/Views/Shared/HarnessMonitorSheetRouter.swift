@@ -88,12 +88,12 @@ private struct NewSessionOfflinePlaceholder: View {
 
   var body: some View {
     VStack(spacing: 16) {
-      Image(systemName: "network.slash")
+      Image(systemName: "exclamationmark.triangle")
         .font(.system(size: 36))
         .foregroundStyle(.secondary)
-      Text("Harness daemon not connected.")
+      Text("New Session unavailable.")
         .font(.headline)
-      Text("Start the daemon and try again.")
+      Text("Harness Monitor could not load project bookmark access for this sheet.")
         .foregroundStyle(.secondary)
       Button("Dismiss") {
         store.dismissSheet()

@@ -45,7 +45,7 @@ extension HarnessMonitorSheetUITests {
     )
     XCTAssertTrue(
       waitForElement(
-        element(in: app, identifier: Accessibility.newSessionCapabilityRow("copilot")),
+        element(in: app, identifier: Accessibility.agentCapabilityRow("copilot")),
         timeout: Self.fastActionTimeout
       ),
       "New Session should render the shared capability row experience"
@@ -83,23 +83,23 @@ extension HarnessMonitorSheetUITests {
 
     RunLoop.current.run(until: Date.now.addingTimeInterval(Self.fastActionTimeout))
 
+    let toolbarErrors = appKitNilToolbarErrors(
+      since: logStart,
+      processID: processID
+    )
+    XCTAssertTrue(
+      toolbarErrors.isEmpty,
+      "Launching and opening New Session should not emit nil-toolbar AppKit errors.\n\(toolbarErrors)"
+    )
+
     let warnings = appKitLayoutRecursionWarningsForNewSession(
       since: logStart,
       processID: processID
     )
-    if !warnings.isEmpty {
-      XCTExpectFailure(
-        """
-        AppKit emits a non-deterministic WarnOnce layout recursion log in the UI test host.
-        Keep this assertion visible but non-blocking while sheet UX regressions are validated.
-        """
-      ) {
-        XCTAssertTrue(
-          warnings.isEmpty,
-          "Opening New Session should not emit the AppKit layout recursion warning.\n\(warnings)"
-        )
-      }
-    }
+    XCTAssertTrue(
+      warnings.isEmpty,
+      "Opening New Session should not emit the AppKit layout recursion warning.\n\(warnings)"
+    )
 
     dismissNewSessionSheet(in: app, sheetRoot: sheetRoot)
   }
@@ -167,10 +167,52 @@ extension HarnessMonitorSheetUITests {
     since startDate: Date,
     processID: pid_t
   ) -> String {
+    appKitWarnings(
+      since: startDate,
+      processID: processID,
+      predicateNeedles: [
+        "layoutSubtreeIfNeeded",
+        "already being laid out",
+      ],
+      filterNeedles: [
+        "layoutSubtreeIfNeeded",
+        "already being laid out",
+      ]
+    )
+  }
+
+  private func appKitNilToolbarErrors(
+    since startDate: Date,
+    processID: pid_t
+  ) -> String {
+    appKitWarnings(
+      since: startDate,
+      processID: processID,
+      predicateNeedles: [
+        "attempt to show a toolbar which is *nil*",
+        "_showToolbarWithAnimation",
+      ],
+      filterNeedles: [
+        "attempt to show a toolbar which is *nil*",
+        "_showToolbarWithAnimation",
+      ]
+    )
+  }
+
+  private func appKitWarnings(
+    since startDate: Date,
+    processID: pid_t,
+    predicateNeedles: [String],
+    filterNeedles: [String]
+  ) -> String {
     let formatter = DateFormatter()
     formatter.locale = Locale(identifier: "en_US_POSIX")
     formatter.timeZone = .current
     formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+
+    let predicateClauses = predicateNeedles
+      .map { "eventMessage CONTAINS \"\($0)\"" }
+      .joined(separator: " OR ")
 
     let output = Pipe()
     let errors = Pipe()
@@ -185,8 +227,7 @@ extension HarnessMonitorSheetUITests {
       "--predicate",
       """
       processID == \(processID) AND subsystem == "com.apple.AppKit" AND \
-      (eventMessage CONTAINS "layoutSubtreeIfNeeded" OR \
-      eventMessage CONTAINS "already being laid out")
+      (\(predicateClauses))
       """,
     ]
     process.standardOutput = output
@@ -218,8 +259,10 @@ extension HarnessMonitorSheetUITests {
       stdout
       .split(whereSeparator: \.isNewline)
       .map(String.init)
-      .filter {
-        $0.contains("layoutSubtreeIfNeeded") || $0.contains("already being laid out")
+      .filter { line in
+        filterNeedles.contains { needle in
+          line.contains(needle)
+        }
       }
     return matchingLines.joined(separator: "\n")
   }

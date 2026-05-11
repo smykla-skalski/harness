@@ -39,12 +39,6 @@ struct NewSessionSheetView: View {
       _ = await pickerCatalogRefresh
       normalizePreferredSelection()
     }
-    .onChange(of: availableAcpAgents) { _, _ in
-      normalizePreferredSelection()
-    }
-    .onChange(of: runtimeProbeResults) { _, _ in
-      normalizePreferredSelection()
-    }
     .fileImporter(
       isPresented: $showImporter,
       allowedContentTypes: [.folder],

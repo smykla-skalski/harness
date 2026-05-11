@@ -4,6 +4,7 @@ import SwiftUI
 
 struct HarnessMonitorMainCommandSet: Commands {
   let store: HarnessMonitorStore
+  let keyWindowObserver: KeyWindowObserver
   let windowCommandRouting: WindowCommandRoutingState
   let textSizeIndex: Int
   let increaseTextSize: () -> Void
@@ -23,7 +24,11 @@ struct HarnessMonitorMainCommandSet: Commands {
       resetTextSize: resetTextSize,
       refreshStore: refreshStore
     )
-    NewSessionCommand(store: store, sessionCreate: sessionCreate)
+    NewSessionCommand(
+      store: store,
+      keyWindowObserver: keyWindowObserver,
+      windowCommandRouting: windowCommandRouting
+    )
     SessionCreateCommands(
       store: store,
       windowCommandRouting: windowCommandRouting,

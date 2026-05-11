@@ -4,38 +4,37 @@ import SwiftUI
 
 struct NewSessionCommand: Commands {
   let store: HarnessMonitorStore
-  let sessionCreate: SessionCreateContext?
+  let keyWindowObserver: KeyWindowObserver
+  let windowCommandRouting: WindowCommandRoutingState
 
   var body: some Commands {
     let action = primaryAction
-    CommandGroup(after: .newItem) {
-      Button(menuTitle) { action?() }
+    CommandGroup(replacing: .newItem) {
+      Button("New Session") { action?() }
         .keyboardShortcut("n", modifiers: [.command])
         .disabled(action == nil)
     }
   }
 
-  private var menuTitle: String {
-    guard let kind = sessionCreate?.primaryKind else { return "New Session" }
-    switch kind {
-    case .agent: return "New Agent"
-    case .task: return "New Task"
-    case .decision: return "New Decision"
+  private var trackedKeyWindowIdentifier: String? {
+    let keyWindowIdentifier = keyWindowObserver.snapshot.keyWindowIdentifier
+    guard
+      keyWindowIdentifier == HarnessMonitorWindowID.openRecent
+        || keyWindowIdentifier?.hasPrefix("session-") == true
+    else {
+      return nil
     }
+    return keyWindowIdentifier
+  }
+
+  private var presentsOnTrackedWindow: Bool {
+    trackedKeyWindowIdentifier != nil
+      || windowCommandRouting.activeScope == .main
+      || windowCommandRouting.activeScope == .session
   }
 
   private var primaryAction: (() -> Void)? {
-    if let sessionCreate {
-      switch sessionCreate.primaryKind {
-      case .agent:
-        return sessionCreate.createAgent
-      case .task:
-        return sessionCreate.createTask
-      case .decision:
-        return sessionCreate.createDecision
-      }
-    }
-    guard store.connectionState == .online else {
+    guard presentsOnTrackedWindow else {
       return nil
     }
     return { store.presentedSheet = .newSession }

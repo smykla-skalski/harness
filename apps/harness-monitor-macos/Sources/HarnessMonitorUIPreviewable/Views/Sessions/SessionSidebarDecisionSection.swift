@@ -70,7 +70,6 @@ extension SessionSidebar {
       SessionSidebarHeaderCreateButton(
         state: state,
         kind: .decision,
-        primaryKind: primaryCreateKind,
         accessibilityLabel: "New Decision"
       )
     }

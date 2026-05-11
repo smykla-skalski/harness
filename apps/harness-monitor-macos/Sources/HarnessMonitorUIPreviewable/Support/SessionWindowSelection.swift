@@ -6,12 +6,6 @@ public enum SessionCreateKind: String, Codable, Hashable, Sendable {
   case task
   case decision
 
-  public static let primaryCreateShortcut = KeyboardShortcutDescriptor(
-    modifiers: [.command],
-    keyEquivalent: "n",
-    keyLabel: "N"
-  )
-
   public var createShortcut: KeyboardShortcutDescriptor {
     switch self {
     case .agent:
@@ -41,10 +35,6 @@ public enum SessionCreateKind: String, Codable, Hashable, Sendable {
 
   public var createShortcutHint: String {
     createShortcut.hint
-  }
-
-  public func displayedCreateShortcut(primaryKind: SessionCreateKind) -> KeyboardShortcutDescriptor {
-    self == primaryKind ? Self.primaryCreateShortcut : createShortcut
   }
 }
 

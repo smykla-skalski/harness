@@ -280,6 +280,10 @@ enum HarnessMonitorUITestAccessibility {
     "\(controlID).option.\(slug(option))"
   }
 
+  static func agentCapabilityRow(_ identifier: String) -> String {
+    "harness.agent.capability.\(slug(identifier))"
+  }
+
   static func slug(_ value: String) -> String {
     let lowercased = value.lowercased()
     return

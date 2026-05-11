@@ -42,21 +42,27 @@ final class WindowMenuCommandsTests: XCTestCase {
     XCTAssertFalse(commandSetSource.contains("DecisionCommands()"))
   }
 
-  func testCommandNUsesFocusedSessionCreateContext() throws {
+  func testCommandNAlwaysPresentsNewSessionSheetOnTrackedWindows() throws {
     let source = try harnessSourceFile(named: "Commands/NewSessionCommand.swift")
     let commandSetSource = try harnessSourceFile(named: "App/HarnessMonitorMainCommandSet.swift")
 
-    XCTAssertTrue(commandSetSource.contains("@FocusedValue(\\.sessionCreateContext)"))
     XCTAssertTrue(
-      commandSetSource.contains("NewSessionCommand(store: store, sessionCreate: sessionCreate)")
+      commandSetSource.contains(
+        "NewSessionCommand(\n      store: store,\n      keyWindowObserver: keyWindowObserver,\n      windowCommandRouting: windowCommandRouting"
+      )
     )
+    XCTAssertTrue(source.contains("Button(\"New Session\")"))
+    XCTAssertTrue(source.contains("CommandGroup(replacing: .newItem)"))
     XCTAssertTrue(source.contains(".keyboardShortcut(\"n\", modifiers: [.command])"))
-    XCTAssertTrue(source.contains("guard let kind = sessionCreate?.primaryKind"))
-    XCTAssertTrue(source.contains("return sessionCreate.createAgent"))
-    XCTAssertTrue(source.contains("return sessionCreate.createTask"))
-    XCTAssertTrue(source.contains("return sessionCreate.createDecision"))
-    XCTAssertTrue(source.contains("guard store.connectionState == .online else"))
+    XCTAssertTrue(source.contains("let keyWindowObserver: KeyWindowObserver"))
+    XCTAssertTrue(source.contains("keyWindowObserver.snapshot.keyWindowIdentifier"))
+    XCTAssertTrue(source.contains("keyWindowIdentifier == HarnessMonitorWindowID.openRecent"))
+    XCTAssertTrue(source.contains("keyWindowIdentifier?.hasPrefix(\"session-\") == true"))
+    XCTAssertTrue(source.contains("windowCommandRouting.activeScope == .main"))
+    XCTAssertTrue(source.contains("windowCommandRouting.activeScope == .session"))
     XCTAssertTrue(source.contains("store.presentedSheet = .newSession"))
+    XCTAssertFalse(source.contains("sessionCreate?.primaryKind"))
+    XCTAssertFalse(source.contains("guard store.connectionState == .online else"))
   }
 
   func testSessionCreateCommandsExposeMenuOnlyCodexAgentEntry() throws {
@@ -104,7 +110,6 @@ final class WindowMenuCommandsTests: XCTestCase {
 
     XCTAssertTrue(selectionSource.contains("public var createShortcut: KeyboardShortcutDescriptor"))
     XCTAssertTrue(selectionSource.contains("public var createShortcutModifiers: EventModifiers"))
-    XCTAssertTrue(selectionSource.contains("public static let primaryCreateShortcut = KeyboardShortcutDescriptor("))
     XCTAssertTrue(
       selectionSource.contains(".init(modifiers: [.option, .command], keyEquivalent: \"a\", keyLabel: \"A\")")
     )
@@ -117,7 +122,6 @@ final class WindowMenuCommandsTests: XCTestCase {
     XCTAssertTrue(shortcutSource.contains("case .control: \"⌃\""))
     XCTAssertTrue(shortcutSource.contains("case .shift: \"⇧\""))
     XCTAssertTrue(shortcutSource.contains("public func isRevealed(by activeModifiers: EventModifiers) -> Bool"))
-    XCTAssertTrue(selectionSource.contains("public func displayedCreateShortcut(primaryKind: SessionCreateKind) -> KeyboardShortcutDescriptor"))
     XCTAssertTrue(selectionSource.contains("public var primaryCreateKind: SessionCreateKind"))
     XCTAssertTrue(
       commandsSource.contains(
@@ -131,7 +135,10 @@ final class WindowMenuCommandsTests: XCTestCase {
     )
     XCTAssertTrue(commandsSource.contains("SessionCreateKind.decision.createShortcut.requiredEventModifiers"))
     XCTAssertFalse(commandsSource.contains("modifiers: [.command, .option]"))
-    XCTAssertTrue(sidebarSource.contains("shortcut: displayedShortcut"))
+    XCTAssertTrue(sidebarSource.contains("let shortcut = kind.createShortcut"))
+    XCTAssertTrue(sidebarSource.contains("kind.createShortcut"))
+    XCTAssertFalse(sidebarSource.contains("displayedCreateShortcut"))
+    XCTAssertTrue(sidebarSource.contains("displayedShortcut.hint"))
   }
 
   func testSharedPresentationModifiersKeepBindingsMountedAcrossKeyWindowLoss() throws {
@@ -159,22 +166,14 @@ final class WindowMenuCommandsTests: XCTestCase {
     XCTAssertFalse(confirmationModifierSource.contains("if isEnabled {\n      content"))
   }
 
-  func testSessionCreateCommandsHideThePrimaryDuplicateEntry() {
-    XCTAssertFalse(
-      SessionCreateCommands.shouldShowExplicitCommand(for: .agent, primaryKind: .agent)
-    )
-    XCTAssertFalse(
-      SessionCreateCommands.shouldShowExplicitCommand(for: .task, primaryKind: .task)
-    )
-    XCTAssertFalse(
-      SessionCreateCommands.shouldShowExplicitCommand(for: .decision, primaryKind: .decision)
-    )
-    XCTAssertTrue(
-      SessionCreateCommands.shouldShowExplicitCommand(for: .agent, primaryKind: .task)
-    )
-    XCTAssertTrue(
-      SessionCreateCommands.shouldShowExplicitCommand(for: .task, primaryKind: nil)
-    )
+  func testSessionCreateCommandsKeepExplicitEntriesVisible() throws {
+    let source = try harnessSourceFile(named: "Commands/SessionCreateCommands.swift")
+
+    XCTAssertTrue(source.contains("Button(\"New Agent\")"))
+    XCTAssertTrue(source.contains("Button(\"New Task\")"))
+    XCTAssertTrue(source.contains("Button(\"New Decision\")"))
+    XCTAssertFalse(source.contains("shouldShowExplicitCommand"))
+    XCTAssertFalse(source.contains("let primaryKind = sessionCreate?.primaryKind"))
   }
 
   func testGoCommandsUseSessionFocusedNavigationOnly() throws {

@@ -21,6 +21,7 @@ public struct KeyWindowState: Equatable, Sendable {
 @MainActor
 public protocol KeyWindowObservableApplication: AnyObject {
   var keyWindowIdentifier: String? { get }
+  var keyWindowParentIdentifier: String? { get }
   var isActive: Bool { get }
   var isHidden: Bool { get }
   var windowStates: [KeyWindowState] { get }
@@ -29,6 +30,10 @@ public protocol KeyWindowObservableApplication: AnyObject {
 extension NSApplication: KeyWindowObservableApplication {
   public var keyWindowIdentifier: String? {
     keyWindow?.identifier?.rawValue
+  }
+
+  public var keyWindowParentIdentifier: String? {
+    keyWindow?.sheetParent?.identifier?.rawValue
   }
 
   public var windowStates: [KeyWindowState] {
@@ -166,7 +171,7 @@ public final class KeyWindowObserver {
       window.isVisible && !window.isMiniaturized
     }
     return KeyWindowSnapshot(
-      keyWindowIdentifier: application.keyWindowIdentifier,
+      keyWindowIdentifier: application.keyWindowParentIdentifier ?? application.keyWindowIdentifier,
       isAppActive: application.isActive,
       appIsHidden: application.isHidden,
       hasVisibleNonMiniaturizedWindows: hasVisibleNonMiniaturizedWindows

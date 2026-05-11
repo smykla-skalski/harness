@@ -268,6 +268,22 @@ struct NewSessionViewModelTests {
     #expect(vm.lastError == .daemonUnreachable)
   }
 
+  @Test("missing daemon client maps to daemonUnreachable before submit")
+  func missingClientMapsToDaemonUnreachable() async {
+    let vm = makeNewSessionViewModel(
+      store: HarnessMonitorStore(daemonController: RecordingDaemonController()),
+      client: nil,
+      bookmarkResolver: stubBookmarkResolver(id: "B-x", path: "/tmp/x")
+    )
+    vm.title = "Test"
+    vm.selectedBookmarkId = "B-x"
+
+    let result = await vm.submit()
+
+    #expect(result == .failure(.daemonUnreachable))
+    #expect(vm.lastError == .daemonUnreachable)
+  }
+
   // MARK: - BookmarkStoreError mapping
 
   @Test("BookmarkStoreError.unresolvable maps to bookmarkRevoked")

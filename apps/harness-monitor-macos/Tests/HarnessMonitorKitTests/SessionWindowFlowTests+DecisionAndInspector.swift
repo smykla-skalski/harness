@@ -43,22 +43,24 @@ extension SessionWindowFlowTests {
     let decisionsSource = try previewableSourceFile(
       named: "Views/Sessions/SessionSidebarDecisionSection.swift"
     )
+    let sidebarSource = try previewableSourceFile(named: "Views/Sessions/SessionSidebar.swift")
 
     #expect(sectionsSource.contains("struct SessionSidebarHeaderCreateButton: View"))
     #expect(sectionsSource.contains("Button(\"+\")"))
     #expect(sectionsSource.contains("HStack(alignment: .sessionSidebarHeaderButtonCenter"))
     #expect(sectionsSource.contains(".buttonStyle(.bordered)"))
     #expect(sectionsSource.contains(".controlSize(.small)"))
-    #expect(sectionsSource.contains("VStack(alignment: .trailing"))
+    #expect(sectionsSource.contains("GeometryReader { proxy in"))
     #expect(sectionsSource.contains(".alignmentGuide(.sessionSidebarHeaderButtonCenter)"))
     #expect(sectionsSource.contains("private var displayedShortcut: KeyboardShortcutDescriptor"))
-    #expect(sectionsSource.contains("shortcut: displayedShortcut"))
+    #expect(sectionsSource.contains("displayedShortcut.hint"))
     #expect(sectionsSource.contains("revealPolicy: .revealOnRelevantModifierHold"))
     #expect(sectionsSource.contains(".padding(.trailing, HarnessMonitorTheme.spacingSM)"))
-    #expect(sectionsSource.contains("currentModifiers: shortcutRevealModifiers"))
-    #expect(sectionsSource.contains("SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .agent,\n        primaryKind: primaryCreateKind,\n        accessibilityLabel: \"New Agent\",\n        currentModifiers: shortcutRevealModifiers"))
-    #expect(sectionsSource.contains("SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .task,\n        primaryKind: primaryCreateKind,\n        accessibilityLabel: \"New Task\",\n        currentModifiers: shortcutRevealModifiers"))
-    #expect(decisionsSource.contains("SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .decision,\n        primaryKind: primaryCreateKind,\n        accessibilityLabel: \"New Decision\",\n        currentModifiers: shortcutRevealModifiers"))
+    #expect(sidebarSource.contains("currentModifiers: currentModifiers"))
+    #expect(sectionsSource.contains("let shortcut = kind.createShortcut"))
+    #expect(sectionsSource.contains("SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .agent,\n        accessibilityLabel: \"New Agent\""))
+    #expect(sectionsSource.contains("SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .task,\n        accessibilityLabel: \"New Task\""))
+    #expect(decisionsSource.contains("SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .decision,\n        accessibilityLabel: \"New Decision\""))
   }
 
   @Test("Keyboard shortcut descriptors support reveal across modifier families")
@@ -97,14 +99,14 @@ extension SessionWindowFlowTests {
     #expect(supportSource.contains("case .key:\n      .callout.monospaced()"))
   }
 
-  @Test("Displayed create shortcut follows the primary create kind")
-  func displayedCreateShortcutFollowsPrimaryCreateKind() {
+  @Test("Primary create kind tracks the selected route without claiming Command-N")
+  func primaryCreateKindTracksSelectedRouteWithoutClaimingCommandN() {
     #expect(SessionSelection.route(.agents).primaryCreateKind == .agent)
     #expect(SessionSelection.route(.tasks).primaryCreateKind == .task)
     #expect(SessionSelection.route(.decisions).primaryCreateKind == .decision)
-    #expect(SessionCreateKind.agent.displayedCreateShortcut(primaryKind: .agent).hint == "⌘N")
-    #expect(SessionCreateKind.task.displayedCreateShortcut(primaryKind: .agent).hint == "⌥⌘T")
-    #expect(SessionCreateKind.decision.displayedCreateShortcut(primaryKind: .decision).hint == "⌘N")
+    #expect(SessionCreateKind.agent.createShortcut.hint == "⌥⌘A")
+    #expect(SessionCreateKind.task.createShortcut.hint == "⌥⌘T")
+    #expect(SessionCreateKind.decision.createShortcut.hint == "⌥⌘D")
   }
 
   @Test("Agents route detail prefers the remembered visible agent and otherwise falls back to the first visible one")
