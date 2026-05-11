@@ -39,7 +39,8 @@ extension SessionWindowFlowTests {
 
   @Test("Session sidebar headers use inset bordered add buttons")
   func sessionSidebarHeadersUseInsetBorderedAddButtons() throws {
-    let sectionsSource = try previewableSourceFile(named: "Views/Sessions/SessionSidebar+Sections.swift")
+    let sectionsSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionSidebar+Sections.swift")
     let decisionsSource = try previewableSourceFile(
       named: "Views/Sessions/SessionSidebarDecisionSection.swift"
     )
@@ -58,9 +59,18 @@ extension SessionWindowFlowTests {
     #expect(sectionsSource.contains(".padding(.trailing, HarnessMonitorTheme.spacingSM)"))
     #expect(sidebarSource.contains("currentModifiers: currentModifiers"))
     #expect(sectionsSource.contains("let shortcut = kind.createShortcut"))
-    #expect(sectionsSource.contains("SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .agent,\n        accessibilityLabel: \"New Agent\""))
-    #expect(sectionsSource.contains("SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .task,\n        accessibilityLabel: \"New Task\""))
-    #expect(decisionsSource.contains("SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .decision,\n        accessibilityLabel: \"New Decision\""))
+    #expect(
+      sectionsSource.contains(
+        "SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .agent,\n        accessibilityLabel: \"New Agent\""
+      ))
+    #expect(
+      sectionsSource.contains(
+        "SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .task,\n        accessibilityLabel: \"New Task\""
+      ))
+    #expect(
+      decisionsSource.contains(
+        "SessionSidebarHeaderCreateButton(\n        state: state,\n        kind: .decision,\n        accessibilityLabel: \"New Decision\""
+      ))
   }
 
   @Test("Keyboard shortcut descriptors support reveal across modifier families")
@@ -91,7 +101,8 @@ extension SessionWindowFlowTests {
 
   @Test("Keyboard shortcut labels align tokens on a shared baseline and use warm highlight tint")
   func keyboardShortcutLabelsAlignTokensOnSharedBaseline() throws {
-    let supportSource = try previewableSourceFile(named: "Views/Sessions/OpenRecentView+Support.swift")
+    let supportSource = try previewableSourceFile(
+      named: "Views/Sessions/OpenRecentView+Support.swift")
 
     #expect(supportSource.contains("HStack(alignment: .firstTextBaseline, spacing: keySpacing)"))
     #expect(supportSource.contains("return HarnessMonitorTheme.warmAccent"))
@@ -109,7 +120,9 @@ extension SessionWindowFlowTests {
     #expect(SessionCreateKind.decision.createShortcut.hint == "⌥⌘D")
   }
 
-  @Test("Agents route detail prefers the remembered visible agent and otherwise falls back to the first visible one")
+  @Test(
+    "Agents route detail prefers the remembered visible agent and otherwise falls back to the first visible one"
+  )
   func agentsRouteDetailPrefersRememberedVisibleAgent() {
     #expect(
       SessionAgentRouteSelectionPolicy.preferredRouteDetailAgentID(

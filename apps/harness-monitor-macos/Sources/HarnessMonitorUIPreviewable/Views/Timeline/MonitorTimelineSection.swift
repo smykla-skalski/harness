@@ -242,7 +242,8 @@ struct SessionTimelineView: View {
     )
   }
 
-  private func normalizedFilters(_ state: SessionTimelineFilterState) -> SessionTimelineFilterState {
+  private func normalizedFilters(_ state: SessionTimelineFilterState) -> SessionTimelineFilterState
+  {
     var copy = state
     copy.searchScope = .all
     return copy

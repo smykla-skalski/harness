@@ -192,7 +192,7 @@ struct SessionWindowCreateFormMetricsTests {
       runtime: AgentLaunchSelection.acp("copilot").storageKey,
       sessionID: "session-1"
     )
-      let option = AgentCapabilityOption(
+    let option = AgentCapabilityOption(
       id: "copilot",
       title: "Copilot",
       transportChoices: [

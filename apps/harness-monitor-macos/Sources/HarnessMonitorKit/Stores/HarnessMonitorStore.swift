@@ -264,7 +264,8 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var pendingCacheWriteTaskToken: UInt64 = 0
   @ObservationIgnored var pendingSessionDetailCacheWriteTask: Task<Void, Never>?
   @ObservationIgnored var pendingSessionDetailCacheWriteTaskToken: UInt64 = 0
-  @ObservationIgnored var pendingSessionDetailCacheWrites: [String: PendingSessionDetailCacheWrite] = [:]
+  @ObservationIgnored var pendingSessionDetailCacheWrites:
+    [String: PendingSessionDetailCacheWrite] = [:]
   @ObservationIgnored var suppressSelectedAcpTranscriptCacheWrite = false
   @ObservationIgnored var agentTuiActionRefreshTask: Task<Void, Never>?
   var manifestWatcher: ManifestWatcher?

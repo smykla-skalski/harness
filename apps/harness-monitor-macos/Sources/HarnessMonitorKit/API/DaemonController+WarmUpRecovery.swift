@@ -91,7 +91,8 @@ extension DaemonController {
       to: &candidateManifestURLs
     )
 
-    for candidateManifestURL in candidateManifestURLs where candidateManifestURL != currentManifestURL {
+    for candidateManifestURL in candidateManifestURLs
+    where candidateManifestURL != currentManifestURL {
       do {
         let candidateManifest = try loadManifest(at: candidateManifestURL, emitTrace: false)
         let candidateConnection = try daemonConnection(from: candidateManifest, emitTrace: false)
