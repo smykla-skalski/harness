@@ -287,6 +287,7 @@ mod tests {
                 args: args.iter().map(ToString::to_string).collect(),
             },
             prompt_timeout_seconds: None,
+            excluded_from_initial_default: false,
         }
     }
 

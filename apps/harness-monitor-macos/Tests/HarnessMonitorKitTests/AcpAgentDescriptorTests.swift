@@ -29,6 +29,33 @@ final class AcpAgentDescriptorTests: XCTestCase {
     XCTAssertEqual(descriptor.displayName, "GitHub Copilot")
     XCTAssertEqual(descriptor.launchArgs, ["--acp", "--stdio"])
     XCTAssertEqual(descriptor.doctorProbe.command, "copilot")
+    XCTAssertFalse(descriptor.excludedFromInitialDefault)
+  }
+
+  func testDescriptorDecodesInitialDefaultExclusionWhenPresent() throws {
+    let json = Data(
+      """
+      {
+        "id": "claude",
+        "display_name": "Claude Code",
+        "capabilities": ["fs.read", "terminal.spawn"],
+        "launch_command": "claude-agent-acp",
+        "launch_args": [],
+        "env_passthrough": ["ANTHROPIC_API_KEY"],
+        "doctor_probe": {
+          "command": "claude-agent-acp",
+          "args": ["--cli", "auth", "status"]
+        },
+        "excluded_from_initial_default": true
+      }
+      """.utf8
+    )
+
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    let descriptor = try decoder.decode(AcpAgentDescriptor.self, from: json)
+
+    XCTAssertTrue(descriptor.excludedFromInitialDefault)
   }
 
   func testConfigurationDefaultsAcpFields() throws {

@@ -26,6 +26,7 @@ public struct AcpAgentDescriptor: Codable, Equatable, Identifiable, Sendable {
   public let installHint: String?
   public let doctorProbe: AcpDoctorProbe
   public let promptTimeoutSeconds: UInt64?
+  public let excludedFromInitialDefault: Bool
 
   public init(
     id: String,
@@ -37,7 +38,8 @@ public struct AcpAgentDescriptor: Codable, Equatable, Identifiable, Sendable {
     modelCatalog: RuntimeModelCatalog? = nil,
     installHint: String? = nil,
     doctorProbe: AcpDoctorProbe,
-    promptTimeoutSeconds: UInt64? = nil
+    promptTimeoutSeconds: UInt64? = nil,
+    excludedFromInitialDefault: Bool = false
   ) {
     self.id = id
     self.displayName = displayName
@@ -49,6 +51,40 @@ public struct AcpAgentDescriptor: Codable, Equatable, Identifiable, Sendable {
     self.installHint = installHint
     self.doctorProbe = doctorProbe
     self.promptTimeoutSeconds = promptTimeoutSeconds
+    self.excludedFromInitialDefault = excludedFromInitialDefault
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case id
+    case displayName
+    case capabilities
+    case launchCommand
+    case launchArgs
+    case envPassthrough
+    case modelCatalog
+    case installHint
+    case doctorProbe
+    case promptTimeoutSeconds
+    case excludedFromInitialDefault
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try decodeRequiredNonEmptyString(container, forKey: .id)
+    displayName = try decodeRequiredNonEmptyString(container, forKey: .displayName)
+    capabilities = try container.decodeIfPresent([String].self, forKey: .capabilities) ?? []
+    launchCommand = try decodeRequiredNonEmptyString(container, forKey: .launchCommand)
+    launchArgs = try container.decodeIfPresent([String].self, forKey: .launchArgs) ?? []
+    envPassthrough = try container.decodeIfPresent([String].self, forKey: .envPassthrough) ?? []
+    modelCatalog = try container.decodeIfPresent(RuntimeModelCatalog.self, forKey: .modelCatalog)
+    installHint = try container.decodeIfPresent(String.self, forKey: .installHint)
+    doctorProbe = try container.decode(AcpDoctorProbe.self, forKey: .doctorProbe)
+    promptTimeoutSeconds = try container.decodeIfPresent(
+      UInt64.self,
+      forKey: .promptTimeoutSeconds
+    )
+    excludedFromInitialDefault =
+      try container.decodeIfPresent(Bool.self, forKey: .excludedFromInitialDefault) ?? false
   }
 }
 

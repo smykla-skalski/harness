@@ -9,6 +9,7 @@
 //! registry entry below. If a second descriptor needs anything else, the
 //! shape is wrong; rework before merging.
 
+pub mod claude;
 pub mod copilot;
 pub mod gemini;
 pub mod tags;
@@ -173,10 +174,24 @@ pub struct AcpAgentDescriptor {
     /// default of 10 minutes. Per-descriptor override for long-running agents.
     #[serde(default)]
     pub prompt_timeout_seconds: Option<u64>,
+    /// When true, the UI must not auto-pick this ACP transport for the very
+    /// first provider selection. This keeps newly added ACP wrappers from
+    /// silently changing startup defaults for existing runtimes.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub excluded_from_initial_default: bool,
 }
 
-static BUILTIN_DESCRIPTORS: LazyLock<Vec<AcpAgentDescriptor>> =
-    LazyLock::new(|| vec![copilot::descriptor(), gemini::descriptor()]);
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
+static BUILTIN_DESCRIPTORS: LazyLock<Vec<AcpAgentDescriptor>> = LazyLock::new(|| {
+    vec![
+        copilot::descriptor(),
+        gemini::descriptor(),
+        claude::descriptor(),
+    ]
+});
 
 /// Return every built-in descriptor in stable order.
 ///
@@ -223,6 +238,19 @@ mod tests {
     }
 
     #[test]
+    fn catalog_contains_claude() {
+        let agents = acp_agents();
+        let claude = agents
+            .iter()
+            .find(|d| d.id == "claude")
+            .expect("claude descriptor in catalog");
+        assert_eq!(claude.display_name, "Claude Code");
+        assert_eq!(claude.launch_command, "claude-agent-acp");
+        assert!(claude.launch_args.is_empty());
+        assert!(claude.excluded_from_initial_default);
+    }
+
+    #[test]
     fn catalog_returns_static_descriptor_references() {
         let agents = acp_agents();
         let copilot = agents
@@ -243,6 +271,12 @@ mod tests {
     fn find_builtin_returns_second_descriptor() {
         let descriptor = find_builtin("gemini").expect("found by id");
         assert_eq!(descriptor.id, "gemini");
+    }
+
+    #[test]
+    fn find_builtin_returns_claude_descriptor() {
+        let descriptor = find_builtin("claude").expect("found by id");
+        assert_eq!(descriptor.id, "claude");
     }
 
     #[test]
@@ -286,6 +320,7 @@ mod tests {
         let parsed: AcpAgentDescriptor =
             serde_json::from_value(json).expect("deserialise descriptor without model catalog");
         assert_eq!(parsed.model_catalog, None);
+        assert!(!parsed.excluded_from_initial_default);
     }
 
     #[test]

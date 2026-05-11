@@ -576,6 +576,7 @@ mod tests {
                 args: vec!["--version".to_string()],
             },
             prompt_timeout_seconds: None,
+            excluded_from_initial_default: false,
         }
     }
 

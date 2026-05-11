@@ -4,6 +4,19 @@ struct AgentCapabilityTransportChoice: Identifiable, Hashable {
   let id: AgentLaunchSelection
   let title: String
   let capabilities: [String]
+  let excludedFromInitialDefault: Bool
+
+  init(
+    id: AgentLaunchSelection,
+    title: String,
+    capabilities: [String],
+    excludedFromInitialDefault: Bool = false
+  ) {
+    self.id = id
+    self.title = title
+    self.capabilities = capabilities
+    self.excludedFromInitialDefault = excludedFromInitialDefault
+  }
 
   var capabilityLabels: [String] {
     capabilities.map(Self.humanCapabilityLabel(for:))

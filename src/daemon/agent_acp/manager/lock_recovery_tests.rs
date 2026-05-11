@@ -27,6 +27,7 @@ fn descriptor(command: &Path) -> AcpAgentDescriptor {
             args: Vec::new(),
         },
         prompt_timeout_seconds: None,
+        excluded_from_initial_default: false,
     }
 }
 
