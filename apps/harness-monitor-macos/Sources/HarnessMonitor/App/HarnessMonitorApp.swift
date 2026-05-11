@@ -206,6 +206,7 @@ struct HarnessMonitorApp: App {
     }
     .windowToolbarStyle(.unified)
     .defaultSize(width: mainWindowDefaultSize.width, height: mainWindowDefaultSize.height)
+    .windowResizability(.contentMinSize)
     .restorationBehavior(.disabled)
     .defaultLaunchBehavior(shouldHandleInitialWindowRouting ? .suppressed : .automatic)
     .onChange(of: scenePhase, initial: true) { _, _ in
@@ -226,6 +227,7 @@ struct HarnessMonitorApp: App {
     }
     .windowToolbarStyle(.unified)
     .defaultSize(width: mainWindowDefaultSize.width, height: mainWindowDefaultSize.height)
+    .windowResizability(.contentMinSize)
     .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
     .defaultLaunchBehavior(shouldHandleInitialWindowRouting ? .suppressed : .automatic)
     .commandsRemoved()
