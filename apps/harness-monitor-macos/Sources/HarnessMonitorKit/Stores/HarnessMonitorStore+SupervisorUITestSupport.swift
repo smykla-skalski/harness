@@ -9,7 +9,7 @@
 
   @MainActor
   extension HarnessMonitorStore {
-    public func seedSupervisorScenarioForTesting(named rawValue: String?) {
+    public func seedSupervisorScenarioForTesting(named rawValue: String?) async {
       guard
         let rawValue = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines),
         let scenario = HarnessMonitorSupervisorUITestScenario(rawValue: rawValue)
@@ -18,7 +18,7 @@
       }
 
       do {
-        try applySupervisorUITestScenario(scenario)
+        try await applySupervisorUITestScenario(scenario)
       } catch {
         HarnessMonitorLogger.supervisorWarning(
           """
@@ -31,14 +31,14 @@
 
     private func applySupervisorUITestScenario(
       _ scenario: HarnessMonitorSupervisorUITestScenario
-    ) throws {
+    ) async throws {
       switch scenario {
       case .stuckAgent:
-        try seedStuckAgentSupervisorScenario()
+        try await seedStuckAgentSupervisorScenario()
       }
     }
 
-    private func seedStuckAgentSupervisorScenario() throws {
+    private func seedStuckAgentSupervisorScenario() async throws {
       let now = Date()
       let staleActivity = now.addingTimeInterval(-300)
       let createdAt = now.addingTimeInterval(-3600)
@@ -113,7 +113,7 @@
         agentActivity: []
       )
 
-      applySeededSupervisorSession(summary: summary, detail: detail)
+      await applySeededSupervisorSession(summary: summary, detail: detail)
 
       try upsertSupervisorPolicyConfig(
         ruleID: "stuck-agent",
@@ -126,7 +126,7 @@
     private func applySeededSupervisorSession(
       summary: SessionSummary,
       detail: SessionDetail
-    ) {
+    ) async {
       sessionIndex.replaceSnapshot(projects: [], sessions: [summary])
       selectedSessionID = summary.sessionId
       selectedSession = detail
@@ -136,6 +136,7 @@
       codexRunsBySessionID = [:]
       connectionState = .online
       activeTransport = .webSocket
+      await cacheSessionDetail(detail, timeline: [], markViewed: false)
     }
 
     private var stuckAgentPolicyParametersJSON: String {
