@@ -162,8 +162,8 @@ final class DaemonDisconnectRuleTests: XCTestCase {
     }
     XCTAssertEqual(payload.ruleID, rule.id)
     XCTAssertEqual(payload.severity, .critical)
+    XCTAssertEqual(payload.id, DaemonDisconnectRule.activeDecisionID)
     XCTAssertFalse(payload.summary.isEmpty)
-    XCTAssertFalse(payload.id.isEmpty)
   }
 
   func test_disconnectedPastEscalation_decisionIdIsStablePerEpisode() async {
@@ -292,6 +292,39 @@ final class DaemonDisconnectRuleTests: XCTestCase {
       XCTFail("expected both ticks to emit queueDecision")
       return
     }
+    XCTAssertEqual(first.id, second.id)
+  }
+
+  func test_disconnectedPastEscalation_usesSameDecisionIdWhenFallbackAnchorChanges() async {
+    let rule = DaemonDisconnectRule()
+    let firstCreatedAt = Date.fixed
+    let secondCreatedAt = firstCreatedAt.addingTimeInterval(120)
+
+    let firstActions = await rule.evaluate(
+      snapshot: makeSnapshot(
+        kind: "disconnected",
+        lastMessageAt: nil,
+        createdAt: firstCreatedAt
+      ),
+      context: makeContext(now: firstCreatedAt.addingTimeInterval(90))
+    )
+    let secondActions = await rule.evaluate(
+      snapshot: makeSnapshot(
+        kind: "disconnected",
+        lastMessageAt: nil,
+        createdAt: secondCreatedAt
+      ),
+      context: makeContext(now: secondCreatedAt.addingTimeInterval(90))
+    )
+
+    guard
+      case .queueDecision(let first) = firstActions.first,
+      case .queueDecision(let second) = secondActions.first
+    else {
+      XCTFail("expected both ticks to emit queueDecision")
+      return
+    }
+    XCTAssertEqual(first.id, DaemonDisconnectRule.activeDecisionID)
     XCTAssertEqual(first.id, second.id)
   }
 

@@ -62,6 +62,13 @@ extension HarnessMonitorStore {
         "supervisor.seed_decisions_failed error=\(String(describing: error))"
       )
     }
+    do {
+      try await repairRecoveredDaemonDisconnectDecision(decisionStore)
+    } catch {
+      HarnessMonitorLogger.supervisorWarning(
+        "supervisor.repair_daemon_disconnect_decisions_failed error=\(String(describing: error))"
+      )
+    }
     reconcileAcpPermissionDecisions()
     do {
       try await seedPendingAcpPermissionDecisionsIfNeeded(decisionStore)
@@ -128,7 +135,9 @@ extension HarnessMonitorStore {
   }
 
   private func refreshSupervisorDecisionSurfaces(decisions: DecisionStore) async {
-    let openDecisions = (try? await decisions.openDecisions()) ?? []
+    let openDecisions =
+      ((try? await decisions.openDecisions()) ?? [])
+      .filter { isSupervisorSurfaceDecision($0) }
     var counts: [DecisionSeverity: Int] = [:]
     for decision in openDecisions {
       guard let severity = DecisionSeverity(rawValue: decision.severityRaw) else {
@@ -166,5 +175,19 @@ extension HarnessMonitorStore {
     for payload in payloads {
       try await decisionStore.upsertOpen(payload.decisionDraft)
     }
+  }
+
+  private func repairRecoveredDaemonDisconnectDecision(
+    _ decisionStore: DecisionStore
+  ) async throws {
+    guard !connectionState.isSupervisorDisconnectedState else {
+      return
+    }
+    guard try await dismissActiveDaemonDisconnectDecision(decisionStore) else {
+      return
+    }
+    HarnessMonitorLogger.supervisorTrace(
+      "supervisor.repaired_daemon_disconnect_decision id=\(DaemonDisconnectRule.activeDecisionID)"
+    )
   }
 }

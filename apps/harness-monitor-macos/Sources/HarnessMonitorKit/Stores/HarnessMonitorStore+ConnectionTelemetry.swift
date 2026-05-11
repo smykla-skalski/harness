@@ -25,6 +25,9 @@ extension HarnessMonitorStore {
       guard oldValue != newValue else {
         return
       }
+      if newValue == .online {
+        dismissDaemonDisconnectDecisionsAfterReconnect()
+      }
       #if HARNESS_FEATURE_OTEL
         recordWebSocketConnectionGauge()
       #endif
@@ -182,12 +185,13 @@ extension HarnessMonitorStore {
     guard maintainsLiveDaemonObservation else {
       return
     }
+    let disconnectedSince = connectionMetrics.disconnectedSince
     activeTransport = transport
     connectionMetrics = .initial
     connectionMetrics.transportKind = transport
     connectionMetrics.isFallback = transport == .httpSSE
     if connectionState.isSupervisorDisconnectedState {
-      connectionMetrics.disconnectedSince = .now
+      connectionMetrics.disconnectedSince = disconnectedSince ?? .now
     }
     transportLatencySamplesMs.removeAll(keepingCapacity: true)
     requestLatencySamplesMs.removeAll(keepingCapacity: true)
@@ -203,6 +207,7 @@ extension HarnessMonitorStore {
     }
     connectionMetrics.connectedSince = recordedAt
     connectionMetrics.disconnectedSince = nil
+    dismissDaemonDisconnectDecisionsAfterReconnect()
     refreshExternalManifestDiscoveryTask()
   }
 
