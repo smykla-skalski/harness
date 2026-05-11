@@ -116,11 +116,10 @@ fn unexpected_output_drift(output: &PlannedOutput) -> Result<Vec<String>, CliErr
 }
 
 fn walkdir_err(error: &walkdir::Error, managed_root: &Path) -> CliError {
-    let failing_path = error
-        .path()
-        .map_or_else(|| managed_root.display().to_string(), |path| {
-            path.display().to_string()
-        });
+    let failing_path = error.path().map_or_else(
+        || managed_root.display().to_string(),
+        |path| path.display().to_string(),
+    );
     CliErrorKind::workflow_io(format!(
         "failed to scan generated root {} at {}: {error}",
         managed_root.display(),
