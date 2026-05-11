@@ -40,12 +40,7 @@ struct SessionWindowCreateForm: View {
         embeddedAgentRuntimeSections
       }
       Section {
-        HStack(spacing: 6) {
-          TextField("Name", text: title)
-            .scaledFont(.body)
-            .focused(focusedFieldBinding, equals: .name)
-            .accessibilityLabel("\(draft.kind.title) name")
-            .accessibilityHint(validationMessage(for: .name) ?? "")
+        SessionWindowCreateSplitInputRow("Name") {
           if draft.kind == .agent {
             Button {
               regenerateAgentName()
@@ -56,12 +51,23 @@ struct SessionWindowCreateForm: View {
             .help("Generate a new agent name")
             .accessibilityLabel("Regenerate agent name")
           }
+        } content: {
+          TextField("", text: title)
+            .harnessNativeTextField()
+            .focused(focusedFieldBinding, equals: .name)
+            .accessibilityLabel("\(draft.kind.title) name")
+            .accessibilityHint(validationMessage(for: .name) ?? "")
         }
-        TextEditor(text: prompt)
-          .scaledFont(.body)
-          .frame(minHeight: metrics.promptMinHeight)
-          .focused(focusedFieldBinding, equals: .prompt)
-          .accessibilityLabel("Prompt")
+        SessionWindowCreateSplitInputRow("Prompt", verticalAlignment: .top) {
+          HarnessMonitorMultilineTextField(
+            placeholder: "",
+            text: prompt,
+            minHeight: metrics.promptMinHeight,
+            focusedField: focusedFieldBinding,
+            equals: .prompt,
+            accessibilityLabel: "Prompt"
+          )
+        }
       } header: {
         Text(draft.kind.title)
           .harnessNativeFormSectionHeader()
@@ -264,10 +270,14 @@ extension SessionWindowCreateForm {
   @ViewBuilder private var terminalAdvancedOverridesSection: some View {
     if !normalizedLaunchSelection.isManagedControlPlane {
       Section {
-        TextEditor(text: argvOverrideText)
-          .scaledFont(.body)
-          .frame(minHeight: 100)
-          .accessibilityLabel("Command override")
+        SessionWindowCreateSplitInputRow("Command override", verticalAlignment: .top) {
+          HarnessMonitorMultilineTextField<SessionWindowCreateFormField>(
+            placeholder: "",
+            text: argvOverrideText,
+            minHeight: 100,
+            accessibilityLabel: "Command override"
+          )
+        }
       } header: {
         Text("Advanced overrides")
           .harnessNativeFormSectionHeader()
@@ -486,12 +496,11 @@ private struct SessionWindowCreateRuntimeCustomModelRow: View, Equatable {
   }
 
   var body: some View {
-    TextField(
-      "Provider-specific model id",
-      text: customModelBinding
-    )
-    .harnessNativeTextField()
-    .accessibilityLabel("Custom runtime model")
+    SessionWindowCreateSplitInputRow("Custom model") {
+      TextField("", text: customModelBinding)
+        .harnessNativeTextField()
+        .accessibilityLabel("Custom runtime model")
+    }
   }
 }
 
