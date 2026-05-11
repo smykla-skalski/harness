@@ -217,6 +217,10 @@ private struct SessionContentDetailDivider: View {
       .overlay(alignment: .center) {
         interactiveSurface
       }
+      // The widened hit target extends beyond the 1pt divider line. Keep the
+      // divider subtree above both neighboring panes so dragging works on both
+      // sides of the visual separator, not just over the leading pane.
+      .zIndex(1)
       .onDisappear {
         updateCursor(active: false)
       }
