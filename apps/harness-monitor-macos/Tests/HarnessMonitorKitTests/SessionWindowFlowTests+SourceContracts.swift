@@ -134,6 +134,7 @@ extension SessionWindowFlowTests {
     #expect(splitSource.contains(".focused($isKeyboardFocused)"))
     #expect(splitSource.contains(".focusable()"))
     #expect(splitSource.contains(".focusEffectDisabled()"))
+    #expect(splitSource.contains(".zIndex(1)"))
     #expect(splitSource.contains("if !isDragging {"))
     #expect(splitSource.contains(".onMoveCommand"))
     #expect(
