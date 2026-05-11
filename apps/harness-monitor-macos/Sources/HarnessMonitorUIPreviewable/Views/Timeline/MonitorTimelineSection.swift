@@ -67,6 +67,11 @@ struct SessionTimelineView: View {
       ?? SessionTimelineFilterDefaults.defaultPersistenceMode
   }
 
+  var filterState: SessionTimelineFilterState {
+    get { filters }
+    nonmutating set { filters = newValue }
+  }
+
   private var routeMetrics: SessionWindowRouteContentMetrics {
     SessionWindowRouteContentMetrics(fontScale: fontScale)
   }

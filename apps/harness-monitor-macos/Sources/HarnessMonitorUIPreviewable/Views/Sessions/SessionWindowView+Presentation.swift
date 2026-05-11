@@ -187,7 +187,7 @@ extension SessionWindowView {
       model: sessionToolbarModel,
       state: stateCache,
       focusMode: focusModeBinding,
-      currentModifiers: currentModifiers
+      currentModifiers: presentedModifiers
     )
   }
 
