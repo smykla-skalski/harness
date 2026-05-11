@@ -58,6 +58,19 @@ final class AcpAgentDescriptorTests: XCTestCase {
     XCTAssertTrue(descriptor.excludedFromInitialDefault)
   }
 
+  func testPreviewCatalogIncludesClaudeAcpDescriptor() throws {
+    let descriptor = try XCTUnwrap(
+      PreviewHarnessClient.previewAcpAgentDescriptors.first { $0.id == "claude" }
+    )
+
+    XCTAssertEqual(descriptor.displayName, "Claude Code")
+    XCTAssertEqual(descriptor.launchCommand, "claude-agent-acp")
+    XCTAssertEqual(descriptor.doctorProbe.command, "claude-agent-acp")
+    XCTAssertEqual(descriptor.doctorProbe.args, ["--cli", "auth", "status"])
+    XCTAssertEqual(descriptor.modelCatalog?.runtime, "claude")
+    XCTAssertTrue(descriptor.excludedFromInitialDefault)
+  }
+
   func testConfigurationDefaultsAcpFields() throws {
     let json = Data(
       """

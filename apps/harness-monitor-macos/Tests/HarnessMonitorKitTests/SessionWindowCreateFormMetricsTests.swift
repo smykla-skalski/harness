@@ -394,6 +394,12 @@ struct SessionWindowCreateFormMetricsTests {
         catalogState: catalogState
       )?.runtime == "gemini"
     )
+    #expect(
+      SessionWindowCreateFormCatalogs.selectedModelCatalog(
+        selection: .acp("claude"),
+        catalogState: catalogState
+      )?.runtime == "claude"
+    )
   }
 
   @Test("Catalog helper resolves selected persona state text")
