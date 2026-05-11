@@ -8,6 +8,7 @@ struct SessionAgentDetailSection: View {
   let sessionID: String
   let detail: SessionDetail
   let agentTimeline: [TimelineEntry]
+  let agentTranscript: [TimelineEntry]
   let agent: AgentRegistration
   let tui: AgentTuiSnapshot?
   let pendingPrompt: AgentPendingUserPrompt?

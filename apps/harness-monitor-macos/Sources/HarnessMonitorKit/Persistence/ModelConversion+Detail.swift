@@ -121,6 +121,63 @@ extension TimelineEntry {
   }
 }
 
+// MARK: - TimelineEntry <-> CachedSessionTranscriptEntry
+
+extension CachedSessionTranscriptEntry {
+  func toTimelineEntry() -> TimelineEntry {
+    let payload =
+      (try? Codecs.decoder.decode(
+        JSONValue.self,
+        from: payloadData
+      )) ?? .null
+
+    return TimelineEntry(
+      entryId: entryId,
+      recordedAt: recordedAt,
+      kind: kind,
+      sessionId: sessionId,
+      agentId: agentId,
+      taskId: taskId,
+      summary: summary,
+      payload: payload
+    )
+  }
+
+  func update(
+    from entry: TimelineEntry,
+    transcriptSource: HarnessMonitorSessionWindowTranscriptSource
+  ) {
+    sessionId = entry.sessionId
+    recordedAt = entry.recordedAt
+    kind = entry.kind
+    agentId = entry.agentId
+    taskId = entry.taskId
+    summary = entry.summary
+    payloadData = (try? Codecs.encoder.encode(entry.payload)) ?? Data()
+    sourceRaw = transcriptSource.rawValue
+    updatedAt = .now
+  }
+}
+
+extension TimelineEntry {
+  func toCachedSessionTranscriptEntry(
+    sessionID: String,
+    transcriptSource: HarnessMonitorSessionWindowTranscriptSource
+  ) -> CachedSessionTranscriptEntry {
+    CachedSessionTranscriptEntry(
+      sessionId: sessionID,
+      entryId: entryId,
+      recordedAt: recordedAt,
+      kind: kind,
+      agentId: agentId,
+      taskId: taskId,
+      summary: summary,
+      payloadData: (try? Codecs.encoder.encode(payload)) ?? Data(),
+      sourceRaw: transcriptSource.rawValue
+    )
+  }
+}
+
 // MARK: - ObserverSummary <-> CachedObserver
 
 struct ObserverDetailBlob: Codable {

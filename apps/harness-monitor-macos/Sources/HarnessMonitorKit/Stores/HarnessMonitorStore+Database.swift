@@ -43,6 +43,7 @@ public struct DatabaseStatistics: Sendable {
   public let taskCount: Int
   public let signalCount: Int
   public let timelineCount: Int
+  public let transcriptCount: Int
   public let observerCount: Int
   public let activityCount: Int
   public let bookmarkCount: Int
@@ -87,7 +88,7 @@ public struct DatabaseStatistics: Sendable {
 
   public var totalCacheRecords: Int {
     sessionCount + projectCount + agentCount + taskCount
-      + signalCount + timelineCount + observerCount + activityCount
+      + signalCount + timelineCount + transcriptCount + observerCount + activityCount
   }
 
   public var totalUserRecords: Int {
@@ -124,6 +125,7 @@ extension HarnessMonitorStore {
       taskCount: cacheCounts.tasks,
       signalCount: cacheCounts.signals,
       timelineCount: cacheCounts.timeline,
+      transcriptCount: cacheCounts.transcript,
       observerCount: cacheCounts.observers,
       activityCount: cacheCounts.activities,
       bookmarkCount: bookmarkCount,

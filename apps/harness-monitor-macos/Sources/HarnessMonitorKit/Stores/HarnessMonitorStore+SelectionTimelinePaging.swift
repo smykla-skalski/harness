@@ -122,13 +122,11 @@ extension HarnessMonitorStore {
       )
       isShowingCachedData = false
     }
-    scheduleCacheWrite { service in
-      await service.cacheSessionDetail(
-        selectedSession,
-        timeline: resolvedTimeline,
-        timelineWindow: resolvedTimelineWindow
-      )
-    }
+    scheduleSelectedSessionCacheWrite(
+      selectedSession,
+      timeline: resolvedTimeline,
+      timelineWindow: resolvedTimelineWindow
+    )
   }
 
   func fetchSelectedTimelinePrefix(

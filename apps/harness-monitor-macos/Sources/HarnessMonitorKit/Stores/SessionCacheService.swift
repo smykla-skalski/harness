@@ -40,6 +40,22 @@ public actor SessionCacheService {
     let detail: SessionDetail
     let timeline: [TimelineEntry]
     let timelineWindow: TimelineWindowResponse?
+    let transcript: [TimelineEntry]?
+    let transcriptSource: HarnessMonitorSessionWindowTranscriptSource?
+
+    init(
+      detail: SessionDetail,
+      timeline: [TimelineEntry],
+      timelineWindow: TimelineWindowResponse?,
+      transcript: [TimelineEntry]? = nil,
+      transcriptSource: HarnessMonitorSessionWindowTranscriptSource? = nil
+    ) {
+      self.detail = detail
+      self.timeline = timeline
+      self.timelineWindow = timelineWindow
+      self.transcript = transcript
+      self.transcriptSource = transcriptSource
+    }
   }
 
   func makeContext() -> ModelContext {

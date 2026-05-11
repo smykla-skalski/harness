@@ -35,10 +35,14 @@ extension HarnessMonitorStore {
 
     if let cached = await loadCachedSessionDetail(sessionID: sessionID) {
       guard !Task.isCancelled else { return nil }
+      let cachedTranscript = cached.transcript ?? []
       return HarnessMonitorSessionWindowSnapshot(
         summary: cached.detail.session,
         detail: cached.detail,
         timeline: cached.timeline,
+        transcript: cachedTranscript,
+        transcriptSource: cached.transcriptSource
+          ?? (cachedTranscript.isEmpty ? .derived : .cache),
         timelineWindow: cached.timelineWindow,
         source: .cache
       )
@@ -52,6 +56,8 @@ extension HarnessMonitorStore {
       summary: summary,
       detail: nil,
       timeline: [],
+      transcript: [],
+      transcriptSource: .derived,
       timelineWindow: nil,
       source: .catalog
     )
@@ -63,20 +69,43 @@ extension HarnessMonitorStore {
   ) async -> HarnessMonitorSessionWindowSnapshot? {
     do {
       let detailScope = activeTransport == .webSocket ? "core" : nil
-      let detail = try await client.sessionDetail(id: sessionID, scope: detailScope)
-      guard !Task.isCancelled else { return nil }
-      let timelineWindow = try? await client.timelineWindow(
+      async let detailTask = client.sessionDetail(id: sessionID, scope: detailScope)
+      async let timelineWindowTask = try? client.timelineWindow(
         sessionID: sessionID,
         request: .latest(limit: Self.initialSelectedTimelineWindowLimit)
       ) { _, _, _ in }
+      async let transcriptTask = loadSessionWindowTranscriptResponse(
+        sessionID: sessionID,
+        client: client
+      )
+
+      let detail = try await detailTask
       guard !Task.isCancelled else { return nil }
-      return HarnessMonitorSessionWindowSnapshot(
+      let timelineWindow = await timelineWindowTask
+      let transcriptResponse = await transcriptTask
+      guard !Task.isCancelled else { return nil }
+      let transcript = resolvedSessionWindowTranscript(
+        detail: detail,
+        timeline: timelineWindow?.entries ?? [],
+        acpTranscript: transcriptResponse
+      )
+      let snapshot = HarnessMonitorSessionWindowSnapshot(
         summary: detail.session,
         detail: detail,
         timeline: timelineWindow?.entries ?? [],
+        transcript: transcript.entries,
+        transcriptSource: transcript.source,
         timelineWindow: timelineWindow,
         source: .live
       )
+      scheduleSessionDetailCacheWrite(
+        detail,
+        timeline: snapshot.timeline,
+        transcript: snapshot.transcript,
+        transcriptSource: snapshot.transcriptSource,
+        timelineWindow: snapshot.timelineWindow
+      )
+      return snapshot
     } catch {
       guard !(error is CancellationError) else {
         return nil
@@ -91,5 +120,106 @@ extension HarnessMonitorStore {
       )
       return nil
     }
+  }
+
+  private func loadSessionWindowTranscriptResponse(
+    sessionID: String,
+    client: any HarnessMonitorClientProtocol
+  ) async -> AcpTranscriptResponse? {
+    do {
+      return try await client.acpTranscript(sessionID: sessionID)
+    } catch is CancellationError {
+      return nil
+    } catch {
+      let errorDescription = String(describing: error)
+      HarnessMonitorLogger.store.debug(
+        """
+        session window transcript load failed \
+        sessionID=\(sessionID, privacy: .public) \
+        error=\(errorDescription, privacy: .public)
+        """
+      )
+      return nil
+    }
+  }
+
+  private func resolvedSessionWindowTranscript(
+    detail: SessionDetail,
+    timeline: [TimelineEntry],
+    acpTranscript: AcpTranscriptResponse?
+  ) -> (entries: [TimelineEntry], source: HarnessMonitorSessionWindowTranscriptSource) {
+    let responseEntries = (acpTranscript?.entries ?? []).filter(\.isAcpTranscriptResponseEntry)
+    if !responseEntries.isEmpty {
+      return (
+        normalizedSessionWindowTranscriptEntries(responseEntries, agents: detail.agents),
+        .direct
+      )
+    }
+    return (derivedSessionWindowTranscriptEntries(detail: detail, timeline: timeline), .derived)
+  }
+
+  func derivedSessionWindowTranscriptEntries(
+    detail: SessionDetail,
+    timeline: [TimelineEntry]
+  ) -> [TimelineEntry] {
+    let sessionAgentIDs = Set(detail.agents.map(\.agentId))
+    let derivedEntries = timeline.filter {
+      $0.matchesDerivedAcpTranscriptHistory(sessionAgentIDs: sessionAgentIDs)
+    }
+    return normalizedSessionWindowTranscriptEntries(derivedEntries, agents: detail.agents)
+  }
+
+  private func normalizedSessionWindowTranscriptEntries(
+    _ entries: [TimelineEntry],
+    agents: [AgentRegistration]
+  ) -> [TimelineEntry] {
+    let identitiesByManagedAgentID = Dictionary(
+      uniqueKeysWithValues: agents.compactMap { agent -> (String, (sessionAgentID: String, displayName: String))? in
+        guard let managedAgentID = agent.managedAgentID else {
+          return nil
+        }
+        return (managedAgentID, (sessionAgentID: agent.agentId, displayName: agent.name))
+      }
+    )
+    let updatedEntries = entries.map { entry in
+      guard
+        let identity = sessionWindowTranscriptIdentity(
+          for: entry,
+          identitiesByManagedAgentID: identitiesByManagedAgentID
+        )
+      else {
+        return entry
+      }
+      let metadata = entry.acpTimelineIdentityMetadata()
+      let identityChanged =
+        entry.agentId != identity.sessionAgentID
+        || metadata?.agentID != identity.sessionAgentID
+        || metadata?.agentDisplayName != identity.displayName
+      guard identityChanged else {
+        return entry
+      }
+      return entry.reattributedAcpTimelineEntry(
+        sessionAgentID: identity.sessionAgentID,
+        displayName: identity.displayName
+      )
+    }
+    return mergedTimelineEntries([], with: updatedEntries)
+  }
+
+  private func sessionWindowTranscriptIdentity(
+    for entry: TimelineEntry,
+    identitiesByManagedAgentID: [String: (sessionAgentID: String, displayName: String)]
+  ) -> (sessionAgentID: String, displayName: String)? {
+    if let metadata = entry.acpTimelineIdentityMetadata(),
+      let identity = identitiesByManagedAgentID[metadata.acpAgentID]
+    {
+      return identity
+    }
+    if let agentID = entry.agentId,
+      let identity = identitiesByManagedAgentID[agentID]
+    {
+      return identity
+    }
+    return nil
   }
 }

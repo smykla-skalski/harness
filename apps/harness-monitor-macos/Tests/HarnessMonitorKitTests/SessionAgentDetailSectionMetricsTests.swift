@@ -135,8 +135,8 @@ struct SessionAgentDetailSectionMetricsTests {
     )
   }
 
-  @Test("Session transcript helper keeps native ACP transcripts even when empty")
-  func sessionTranscriptHelperKeepsEmptyNativeAcpTranscript() {
+  @Test("Session transcript helper falls back to timeline until ACP transcript arrives")
+  func sessionTranscriptHelperFallsBackToTimelineUntilAcpTranscriptArrives() {
     let nativeAgent = makeAgent(
       agentID: "agent-native",
       supportsNativeTranscript: true
@@ -148,7 +148,7 @@ struct SessionAgentDetailSectionMetricsTests {
         agent: nativeAgent,
         agentTimeline: nativeTimeline,
         acpTranscript: []
-      ).isEmpty
+      ).map(\.entryId) == ["timeline-native"]
     )
   }
 

@@ -97,13 +97,11 @@ extension HarnessMonitorStore {
         clearBurstState: true
       )
       if let selectedSession {
-        scheduleCacheWrite { service in
-          await service.cacheSessionDetail(
-            selectedSession,
-            timeline: resolvedTimeline,
-            timelineWindow: resolvedTimelineWindow
-          )
-        }
+        scheduleSelectedSessionCacheWrite(
+          selectedSession,
+          timeline: resolvedTimeline,
+          timelineWindow: resolvedTimelineWindow
+        )
       }
     } catch {
       // Background timer: log silently. The phantom "Daemon error" the

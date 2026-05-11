@@ -58,9 +58,21 @@ extension HarnessMonitorStoreDatabaseTests {
       agentID: "leader-drop",
       summary: "Drop me"
     )
+    let transcriptB = [
+      TimelineEntry(
+        entryId: "transcript-drop",
+        recordedAt: "2026-04-28T00:00:20Z",
+        kind: "assistant_message",
+        sessionId: sessionB.sessionId,
+        agentId: "worker-drop",
+        taskId: nil,
+        summary: "Drop transcript",
+        payload: .object(["runtime": .string("acp")])
+      )
+    ]
 
     await store.cacheSessionList([sessionA, sessionB], projects: [projectA, projectB])
-    await store.cacheSessionDetail(detailB, timeline: timelineB)
+    await store.cacheSessionDetail(detailB, timeline: timelineB, transcript: transcriptB)
 
     await store.cacheSessionList([sessionA], projects: [projectA])
 
@@ -69,6 +81,7 @@ extension HarnessMonitorStoreDatabaseTests {
     #expect(statsAfter.projectCount == 1)
     #expect(statsAfter.agentCount == 0)
     #expect(statsAfter.timelineCount == 0)
+    #expect(statsAfter.transcriptCount == 0)
     if case .some = await store.loadCachedSessionDetail(sessionID: sessionB.sessionId) {
       Issue.record("expected dropped session detail to be removed from cache")
     }
@@ -168,7 +181,22 @@ extension HarnessMonitorStoreDatabaseTests {
     )
 
     await store.cacheSessionList([session], projects: [project])
-    await store.cacheSessionDetail(detail, timeline: [])
+    await store.cacheSessionDetail(
+      detail,
+      timeline: [],
+      transcript: [
+        TimelineEntry(
+          entryId: "clear-all-transcript",
+          recordedAt: "2026-04-28T00:00:20Z",
+          kind: "assistant_message",
+          sessionId: session.sessionId,
+          agentId: "worker-all",
+          taskId: nil,
+          summary: "Gone transcript",
+          payload: .object(["runtime": .string("acp")])
+        )
+      ]
+    )
     store.toggleBookmark(sessionId: "sess-clear-all", projectId: "project-a")
     store.addNote(
       text: "Gone",
@@ -185,6 +213,7 @@ extension HarnessMonitorStoreDatabaseTests {
     #expect(statsAfter.sessionCount == 0)
     #expect(statsAfter.projectCount == 0)
     #expect(statsAfter.agentCount == 0)
+    #expect(statsAfter.transcriptCount == 0)
     #expect(statsAfter.bookmarkCount == 0)
     #expect(statsAfter.noteCount == 0)
     #expect(statsAfter.searchCount == 0)
@@ -212,6 +241,7 @@ extension HarnessMonitorStoreDatabaseTests {
       taskCount: 5,
       signalCount: 3,
       timelineCount: 50,
+      transcriptCount: 1,
       observerCount: 1,
       activityCount: 15,
       bookmarkCount: 3,
@@ -228,7 +258,7 @@ extension HarnessMonitorStoreDatabaseTests {
     #expect(!stats.appCacheSizeFormatted.isEmpty)
     #expect(!stats.daemonDatabaseSizeFormatted.isEmpty)
     #expect(stats.lastCachedFormatted == "Never")
-    #expect(stats.totalCacheRecords == 106)
+    #expect(stats.totalCacheRecords == 107)
     #expect(stats.totalUserRecords == 11)
   }
 
@@ -241,6 +271,7 @@ extension HarnessMonitorStoreDatabaseTests {
       taskCount: 0,
       signalCount: 0,
       timelineCount: 0,
+      transcriptCount: 0,
       observerCount: 0,
       activityCount: 0,
       bookmarkCount: 0,

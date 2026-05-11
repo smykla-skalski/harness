@@ -1,6 +1,37 @@
 import Foundation
 
 extension HarnessMonitorStore {
+  func restoreSelectedAcpTranscriptFromCache(
+    _ transcript: [TimelineEntry]?,
+    source: HarnessMonitorSessionWindowTranscriptSource?
+  ) {
+    suppressSelectedAcpTranscriptCacheWrite = true
+    defer { suppressSelectedAcpTranscriptCacheWrite = false }
+    selectedAcpTranscriptSource = source
+    selectedAcpTranscriptHistoryEntries = transcript ?? []
+    selectedAcpTranscriptLiveEntries = []
+  }
+
+  func applyCachedSelectedSessionSnapshot(
+    sessionID: String,
+    cached: SessionCacheService.CachedSessionSnapshot,
+    showingCachedData: Bool,
+    cancelPendingTimelineRefresh: Bool = true
+  ) {
+    restoreSelectedAcpTranscriptFromCache(
+      cached.transcript,
+      source: cached.transcriptSource
+    )
+    applySelectedSessionSnapshot(
+      sessionID: sessionID,
+      detail: cached.detail,
+      timeline: cached.timeline,
+      timelineWindow: cached.timelineWindow,
+      showingCachedData: showingCachedData,
+      cancelPendingTimelineRefresh: cancelPendingTimelineRefresh
+    )
+  }
+
   func restorePersistedSessionStateWhileConnecting() async {
     guard connectionState == .connecting else { return }
 
@@ -53,11 +84,9 @@ extension HarnessMonitorStore {
       guard connectionState == .connecting, selectedSessionID == sessionID else {
         return
       }
-      applySelectedSessionSnapshot(
+      applyCachedSelectedSessionSnapshot(
         sessionID: sessionID,
-        detail: cached.detail,
-        timeline: cached.timeline,
-        timelineWindow: cached.timelineWindow,
+        cached: cached,
         showingCachedData: true
       )
     } else if let summary = sessionIndex.sessionSummary(for: sessionID) {
@@ -96,11 +125,9 @@ extension HarnessMonitorStore {
       // fetch. The persistence banner must stay hidden so session switches do
       // not flash a stale-data warning between cache paint and live arrival;
       // the banner is only raised by the dedicated offline fallback paths.
-      applySelectedSessionSnapshot(
+      applyCachedSelectedSessionSnapshot(
         sessionID: sessionID,
-        detail: cached.detail,
-        timeline: cached.timeline,
-        timelineWindow: cached.timelineWindow,
+        cached: cached,
         showingCachedData: false,
         cancelPendingTimelineRefresh: false
       )
@@ -112,11 +139,9 @@ extension HarnessMonitorStore {
 
   func restorePersistedSessionSelection(sessionID: String) async {
     if let cached = await loadCachedSessionDetail(sessionID: sessionID) {
-      applySelectedSessionSnapshot(
+      applyCachedSelectedSessionSnapshot(
         sessionID: sessionID,
-        detail: cached.detail,
-        timeline: cached.timeline,
-        timelineWindow: cached.timelineWindow,
+        cached: cached,
         showingCachedData: true
       )
     } else if let summary = sessionIndex.sessionSummary(for: sessionID) {

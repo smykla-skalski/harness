@@ -248,6 +248,66 @@ public enum HarnessMonitorSchemaV10: VersionedSchema {
   }
 }
 
+/// V11 adds `CachedSessionTranscriptEntry`, an additive side-table for normalized ACP
+/// transcript rows keyed by `(sessionId, entryId)`. Existing cached sessions and
+/// timelines are unchanged, so the V10->V11 stage remains lightweight.
+public enum HarnessMonitorSchemaV11: VersionedSchema {
+  public static var versionIdentifier: Schema.Version { Schema.Version(11, 0, 0) }
+
+  public static var models: [any PersistentModel.Type] {
+    [
+      HarnessMonitorSchemaV6.CachedProject.self,
+      HarnessMonitorSchemaV6.CachedSession.self,
+      HarnessMonitorSchemaV6.CachedAgent.self,
+      HarnessMonitorSchemaV6.CachedWorkItem.self,
+      HarnessMonitorSchemaV6.CachedSignalRecord.self,
+      HarnessMonitorSchemaV6.CachedTimelineEntry.self,
+      HarnessMonitorSchemaV6.CachedObserver.self,
+      HarnessMonitorSchemaV6.CachedAgentActivity.self,
+      SessionBookmark.self,
+      UserNote.self,
+      RecentSearch.self,
+      ProjectFilterPreference.self,
+      Decision.self,
+      SupervisorEvent.self,
+      PolicyConfigRow.self,
+      HarnessMonitorSchemaV8.CachedTaskReviewMetadata.self,
+      HarnessMonitorSchemaV10.CachedSessionWindowState.self,
+      Self.CachedSessionTranscriptEntry.self,
+    ]
+  }
+}
+
+/// V12 keeps the V11 transcript side-table and adds `sourceRaw` provenance so cached
+/// transcript rows retain whether they came from the dedicated ACP transcript feed or
+/// from timeline-derived fallback reconstruction.
+public enum HarnessMonitorSchemaV12: VersionedSchema {
+  public static var versionIdentifier: Schema.Version { Schema.Version(12, 0, 0) }
+
+  public static var models: [any PersistentModel.Type] {
+    [
+      HarnessMonitorSchemaV6.CachedProject.self,
+      HarnessMonitorSchemaV6.CachedSession.self,
+      HarnessMonitorSchemaV6.CachedAgent.self,
+      HarnessMonitorSchemaV6.CachedWorkItem.self,
+      HarnessMonitorSchemaV6.CachedSignalRecord.self,
+      HarnessMonitorSchemaV6.CachedTimelineEntry.self,
+      HarnessMonitorSchemaV6.CachedObserver.self,
+      HarnessMonitorSchemaV6.CachedAgentActivity.self,
+      SessionBookmark.self,
+      UserNote.self,
+      RecentSearch.self,
+      ProjectFilterPreference.self,
+      Decision.self,
+      SupervisorEvent.self,
+      PolicyConfigRow.self,
+      HarnessMonitorSchemaV8.CachedTaskReviewMetadata.self,
+      HarnessMonitorSchemaV10.CachedSessionWindowState.self,
+      Self.CachedSessionTranscriptEntry.self,
+    ]
+  }
+}
+
 public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
   public static var schemas: [any VersionedSchema.Type] {
     [
@@ -261,6 +321,8 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       HarnessMonitorSchemaV8.self,
       HarnessMonitorSchemaV9.self,
       HarnessMonitorSchemaV10.self,
+      HarnessMonitorSchemaV11.self,
+      HarnessMonitorSchemaV12.self,
     ]
   }
 
@@ -275,6 +337,8 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       migrateV7toV8,
       migrateV8toV9,
       migrateV9toV10,
+      migrateV10toV11,
+      migrateV11toV12,
     ]
   }
 
@@ -345,6 +409,22 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
     fromVersion: HarnessMonitorSchemaV9.self,
     toVersion: HarnessMonitorSchemaV10.self
   )
+
+  // V11 is purely additive: one new transcript side-table with a `(sessionId, entryId)`
+  // key and no relationship back into the cached session graph. Lightweight migration adds
+  // the empty table; the cache sync path repopulates rows on the next refresh.
+  static let migrateV10toV11 = MigrationStage.lightweight(
+    fromVersion: HarnessMonitorSchemaV10.self,
+    toVersion: HarnessMonitorSchemaV11.self
+  )
+
+  // V12 adds one transcript provenance column (`sourceRaw`) to the V11 side-table.
+  // Lightweight migration fills existing rows with the model default (`cache`), and
+  // the next live refresh rewrites rows with direct/derived provenance.
+  static let migrateV11toV12 = MigrationStage.lightweight(
+    fromVersion: HarnessMonitorSchemaV11.self,
+    toVersion: HarnessMonitorSchemaV12.self
+  )
 }
 
-public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV10
+public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV12

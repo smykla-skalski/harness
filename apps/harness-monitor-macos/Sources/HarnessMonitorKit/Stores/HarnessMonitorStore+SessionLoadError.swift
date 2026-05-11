@@ -54,11 +54,9 @@ extension HarnessMonitorStore {
     guard selectedSession?.session.sessionId != sessionID else { return }
 
     if let cached = await loadCachedSessionDetail(sessionID: sessionID) {
-      applySelectedSessionSnapshot(
+      applyCachedSelectedSessionSnapshot(
         sessionID: sessionID,
-        detail: cached.detail,
-        timeline: cached.timeline,
-        timelineWindow: cached.timelineWindow,
+        cached: cached,
         showingCachedData: true
       )
     } else if let summary = sessionIndex.sessionSummary(for: sessionID) {

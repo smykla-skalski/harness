@@ -2,6 +2,11 @@ import Foundation
 import Observation
 import SwiftData
 
+struct PendingSessionDetailCacheWrite: Sendable {
+  let snapshot: SessionCacheService.CachedSessionSnapshot
+  let markViewed: Bool
+}
+
 @MainActor
 @Observable
 public final class HarnessMonitorStore {
@@ -122,6 +127,7 @@ public final class HarnessMonitorStore {
       rebuildAcpTranscriptPartition()
     }
   }
+  @ObservationIgnored var selectedAcpTranscriptSource: HarnessMonitorSessionWindowTranscriptSource?
   var acpTranscriptByAgentID: [String: [TimelineEntry]] = [:]
   /// Derived ACP attention for the currently selected session only.
   ///
@@ -256,6 +262,10 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var selectedTimelineWindowLoadSequence: UInt64 = 0
   var pendingCacheWriteTask: Task<Void, Never>?
   @ObservationIgnored var pendingCacheWriteTaskToken: UInt64 = 0
+  @ObservationIgnored var pendingSessionDetailCacheWriteTask: Task<Void, Never>?
+  @ObservationIgnored var pendingSessionDetailCacheWriteTaskToken: UInt64 = 0
+  @ObservationIgnored var pendingSessionDetailCacheWrites: [String: PendingSessionDetailCacheWrite] = [:]
+  @ObservationIgnored var suppressSelectedAcpTranscriptCacheWrite = false
   @ObservationIgnored var agentTuiActionRefreshTask: Task<Void, Never>?
   var manifestWatcher: ManifestWatcher?
   @ObservationIgnored var externalManifestDiscoveryTask: Task<Void, Never>?
