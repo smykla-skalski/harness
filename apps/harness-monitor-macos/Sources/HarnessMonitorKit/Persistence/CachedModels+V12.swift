@@ -3,8 +3,9 @@ import SwiftData
 
 /// V12 keeps the dedicated transcript side-table and adds persisted provenance so
 /// cache reloads can distinguish direct ACP transcript rows from timeline-derived
-/// fallbacks. Legacy V11 rows migrate with `.cache` provenance until a live refresh
-/// rewrites them with a stronger source.
+/// fallbacks. `sourceRaw` stays optional because SwiftData lightweight migration
+/// cannot backfill non-optional defaults on existing V11 transcript rows. The read
+/// path treats nil as `.cache` until a live refresh rewrites the entry.
 extension HarnessMonitorSchemaV12 {
   @Model
   final class CachedSessionTranscriptEntry {
@@ -19,7 +20,7 @@ extension HarnessMonitorSchemaV12 {
     var taskId: String?
     var summary: String
     var payloadData: Data
-    var sourceRaw: String
+    var sourceRaw: String?
     var updatedAt: Date
 
     init(
@@ -31,7 +32,7 @@ extension HarnessMonitorSchemaV12 {
       taskId: String?,
       summary: String,
       payloadData: Data,
-      sourceRaw: String = HarnessMonitorSessionWindowTranscriptSource.cache.rawValue,
+      sourceRaw: String? = nil,
       updatedAt: Date = .now
     ) {
       self.sessionId = sessionId

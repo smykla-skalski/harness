@@ -419,8 +419,9 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
   )
 
   // V12 adds one transcript provenance column (`sourceRaw`) to the V11 side-table.
-  // Lightweight migration fills existing rows with the model default (`cache`), and
-  // the next live refresh rewrites rows with direct/derived provenance.
+  // The field stays optional because SwiftData lightweight migration cannot fill
+  // non-optional defaults on existing rows. The read path treats nil as `.cache`,
+  // and the next live refresh rewrites rows with direct/derived provenance.
   static let migrateV11toV12 = MigrationStage.lightweight(
     fromVersion: HarnessMonitorSchemaV11.self,
     toVersion: HarnessMonitorSchemaV12.self
