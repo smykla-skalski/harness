@@ -150,15 +150,17 @@ public final class SessionWindowStateCache {
     }
   }
 
+  @discardableResult
   func persistCreateLaunchSelection(
     _ selection: AgentLaunchSelection,
     for draft: SessionCreateDraft
-  ) {
+  ) -> SessionCreateDraft {
     HarnessMonitorAgentLaunchDefaults.persist(selection)
     setDidPickCreateLaunchSelectionManually(true, for: draft.kind)
     var next = draft
     next.runtime = selection.storageKey
     updateCreateDraft(next)
+    return next
   }
 
   public func resetCreateDraft(_ kind: SessionCreateKind) {

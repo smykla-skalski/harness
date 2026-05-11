@@ -16,14 +16,16 @@ struct SessionContentDetailSplitSourceTests {
     #expect(viewSource.contains("sessionSurface"))
     #expect(
       columnsSource.contains(
-        "SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding)"
+        "SessionContentDetailSplitView(contentWidth: contentColumnWidth)"
       )
     )
     #expect(columnsSource.contains(".navigationSplitViewStyle(.prominentDetail)"))
-    #expect(splitSource.contains("NSCursor.resizeLeftRight"))
-    #expect(splitSource.contains("@State private var liveContentWidth"))
-    #expect(splitSource.contains(".accessibilityAdjustableAction"))
-    #expect(splitSource.contains(".onMoveCommand"))
+    #expect(splitSource.contains("HSplitView"))
+    #expect(!splitSource.contains("DragGesture("))
+    #expect(!splitSource.contains("NSCursor"))
+    #expect(!splitSource.contains("@State"))
+    #expect(splitSource.contains("layoutPriority(1)"))
+    #expect(splitSource.contains("sessionPaneLeadingSeparator()"))
   }
 
   @Test("Session split keeps dense detail content out of background extension")
@@ -37,7 +39,7 @@ struct SessionContentDetailSplitSourceTests {
 
     #expect(
       columnsSource.contains(
-        "SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding)"
+        "SessionContentDetailSplitView(contentWidth: contentColumnWidth)"
       )
     )
     #expect(columnsSource.contains("switch renderedRoute.layoutStyle"))
@@ -49,7 +51,7 @@ struct SessionContentDetailSplitSourceTests {
     #expect(
       !columnsSource.contains(
         """
-        SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding) {
+        SessionContentDetailSplitView(contentWidth: contentColumnWidth) {
                 contentColumn
                   .backgroundExtensionEffect()
         """
@@ -67,8 +69,8 @@ struct SessionContentDetailSplitSourceTests {
     )
   }
 
-  @Test("Session split layout defers geometry-driven width writes")
-  func sessionSplitLayoutDefersGeometryDrivenWidthWrites() throws {
+  @Test("Session split layout delegates divider resize to native HSplitView")
+  func sessionSplitLayoutDelegatesDividerResizeToNativeHSplitView() throws {
     let columnsSource = try previewableSourceFile(
       named: "Views/Sessions/SessionWindowView+Columns.swift"
     )
@@ -80,14 +82,32 @@ struct SessionContentDetailSplitSourceTests {
     #expect(columnsSource.contains("detailColumnResizeState.cancelPending()"))
     #expect(columnsSource.contains("detailColumnResizeState.settleTask = Task { @MainActor in"))
     #expect(columnsSource.contains("shouldUpdateDetailColumnWidth(to: width)"))
-    #expect(splitSource.contains("scheduleSettledGeometryReclamp(availableWidth: newWidth)"))
-    #expect(splitSource.contains("resizeState.cancelPending()"))
-    #expect(splitSource.contains("resizeState.settleTask = Task { @MainActor in"))
-    #expect(
-      splitSource.contains(
-        "Task.sleep(for: SessionContentDetailSplitLayout.resizeSettleDelay)"
-      )
+    #expect(splitSource.contains("HSplitView"))
+    #expect(!splitSource.contains("GeometryReader"))
+    #expect(!splitSource.contains("resizeState"))
+    #expect(!splitSource.contains("Task.sleep"))
+  }
+
+  @Test("Session split uses passive semantic pane separators")
+  func sessionSplitUsesPassiveSemanticPaneSeparators() throws {
+    let columnsSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+Columns.swift"
     )
+    let splitSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionContentDetailSplitView.swift"
+    )
+    let separatorSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionPaneSeparator.swift"
+    )
+
+    #expect(splitSource.contains(".sessionPaneLeadingSeparator()"))
+    #expect(columnsSource.contains(".sessionPaneLeadingSeparator()"))
+    #expect(separatorSource.contains("Color(nsColor: .separatorColor)"))
+    #expect(separatorSource.contains("allowsHitTesting(false)"))
+    #expect(separatorSource.contains("accessibilityHidden(true)"))
+    #expect(!separatorSource.contains("DragGesture("))
+    #expect(!separatorSource.contains("@State"))
+    #expect(!separatorSource.contains("NSCursor"))
   }
 
   @Test("Session detail columns leave top padding to the owned views")

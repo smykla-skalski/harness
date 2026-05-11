@@ -35,22 +35,6 @@ extension SessionWindowView {
     )
   }
 
-  var createContext: SessionCreateContext {
-    let cache = stateCache
-    return SessionCreateContext(
-      sessionID: token.sessionID,
-      primaryKind: primaryCreateKind,
-      createAgent: { cache.selectCreate(.agent) },
-      createCodexAgent: { store.presentedSheet = .newCodexAgent(sessionID: token.sessionID) },
-      createTask: { cache.selectCreate(.task) },
-      createDecision: { cache.selectCreate(.decision) }
-    )
-  }
-
-  var primaryCreateKind: SessionCreateKind {
-    stateCache.selection.primaryCreateKind
-  }
-
   func updateDetailColumnWidth(
     _ width: CGFloat,
     visibleBinding: Binding<Bool>,

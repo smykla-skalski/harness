@@ -147,7 +147,7 @@ extension SessionWindowView {
       case .sidebarDetail:
         routeDetailColumn
       case .sidebarContentDetail:
-        SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding) {
+        SessionContentDetailSplitView(contentWidth: contentColumnWidth) {
           contentColumn
         } detail: {
           detailColumn
@@ -276,24 +276,30 @@ extension SessionWindowView {
         inspectorContextDecision != nil
         && !focusMode
         && stateCache.decisionRuntime.allowsInspector(width: geometry.size.width)
-      HStack(spacing: 0) {
-        detailFocus
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
+      Group {
         if inspectorVisible, inspectorAllowed, let inspectorDecision = inspectorContextDecision {
-          SessionInspectorDivider(
-            width: inspectorWidthBinding,
-            minWidth: 220,
-            maxWidth: 420
-          )
-          SessionWindowInspector(
-            decision: inspectorDecision,
-            isFilteredOut: selectedDecisionHiddenByFilters,
-            decisionFilters: stateCache.decisionFilters,
-            decisionRuntime: stateCache.decisionRuntime,
-            visible: inspectorVisibleBinding,
-            preferredVisible: inspectorPreferredBinding
-          )
-          .frame(width: max(220, min(inspectorWidth, 420)))
+          HSplitView {
+            detailFocus
+              .frame(maxWidth: .infinity, maxHeight: .infinity)
+              .layoutPriority(1)
+            SessionWindowInspector(
+              decision: inspectorDecision,
+              isFilteredOut: selectedDecisionHiddenByFilters,
+              decisionFilters: stateCache.decisionFilters,
+              decisionRuntime: stateCache.decisionRuntime,
+              visible: inspectorVisibleBinding,
+              preferredVisible: inspectorPreferredBinding
+            )
+            .frame(
+              minWidth: 220,
+              idealWidth: CGFloat(max(220, min(inspectorWidth, 420))),
+              maxWidth: 420
+            )
+            .sessionPaneLeadingSeparator()
+          }
+        } else {
+          detailFocus
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
       }
       .onAppear {

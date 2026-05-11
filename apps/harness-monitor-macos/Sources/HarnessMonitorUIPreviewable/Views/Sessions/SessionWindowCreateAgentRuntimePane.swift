@@ -318,10 +318,10 @@ struct SessionWindowCreateProviderListRow: View {
 struct SessionWindowCreateTransportChoiceButton: View {
   let providerTitle: String
   let choice: AgentCapabilityTransportChoice
-  let selection: Binding<AgentLaunchSelection>
   let isSelected: Bool
   let isEnabled: Bool
   let unavailableReason: String?
+  let onSelect: () -> Void
 
   private var shortTitle: String {
     choice.id.isAcp ? "ACP" : "Terminal"
@@ -330,7 +330,7 @@ struct SessionWindowCreateTransportChoiceButton: View {
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       Button {
-        selection.wrappedValue = choice.id
+        onSelect()
       } label: {
         HStack(spacing: HarnessMonitorTheme.spacingXS) {
           Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")

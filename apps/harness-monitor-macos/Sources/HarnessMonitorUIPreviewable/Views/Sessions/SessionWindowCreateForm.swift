@@ -66,13 +66,11 @@ struct SessionWindowCreateForm: View {
         Text(draft.kind.title)
           .harnessNativeFormSectionHeader()
       }
-      if draft.kind == .agent, let agentBridgeBannerKind {
-        Section {
-          SessionCreateBridgeBanner(
-            store: store,
-            copy: agentBridgeBannerKind.copy(store: store)
-          )
-        }
+      if draft.kind == .agent {
+        SessionWindowCreateBridgeBannerSection(
+          store: store,
+          selection: normalizedLaunchSelection
+        )
       }
       if draft.kind == .agent {
         agentConfigurationSections
@@ -284,39 +282,13 @@ extension SessionWindowCreateForm {
   private func terminalTransportChoicesSection(option: AgentCapabilityOption) -> some View {
     if option.transportChoices.count > 1 {
       Section {
-        ViewThatFits(in: .horizontal) {
-          HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
-            ForEach(option.transportChoices) { transportChoice in
-              SessionWindowCreateTransportChoiceButton(
-                providerTitle: option.title,
-                choice: transportChoice,
-                selection: launchSelection,
-                isSelected: normalizedLaunchSelection == transportChoice.id,
-                isEnabled: option.isEnabled(transportChoice),
-                unavailableReason: SessionWindowCreateFormCatalogs.unavailableReason(
-                  for: option,
-                  choice: transportChoice
-                )
-              )
-            }
-          }
-
-          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-            ForEach(option.transportChoices) { transportChoice in
-              SessionWindowCreateTransportChoiceButton(
-                providerTitle: option.title,
-                choice: transportChoice,
-                selection: launchSelection,
-                isSelected: normalizedLaunchSelection == transportChoice.id,
-                isEnabled: option.isEnabled(transportChoice),
-                unavailableReason: SessionWindowCreateFormCatalogs.unavailableReason(
-                  for: option,
-                  choice: transportChoice
-                )
-              )
-            }
-          }
-        }
+        SessionWindowCreateTransportChoicesGroup(
+          option: option,
+          selectedSelection: normalizedLaunchSelection,
+          usesVerticalLayout: fontScale >= 1.35,
+          onSelectChoice: { launchSelection.wrappedValue = $0 }
+        )
+        .equatable()
 
         if let choice = selectedTransportChoice {
           terminalTransportNotice(option: option, choice: choice)
@@ -339,47 +311,39 @@ extension SessionWindowCreateForm {
       if let catalog = selectedRuntimeCatalog,
         let runtimeKey = selectedModelCatalogRuntimeKey
       {
-        let modelSelection = runtimeModelPickerSelection(
+        let modelPickerValue = currentRuntimeModelPickerValue(
           for: runtimeKey,
           catalog: catalog
         )
-
-        Picker("Model", selection: modelSelection) {
-          ForEach(catalog.models) { model in
-            Text(model.displayName).tag(model.id)
-          }
-          Text("Custom...")
-            .tag(SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag)
-        }
-        .pickerStyle(.menu)
-        .harnessNativeFormControl()
-        .accessibilityLabel("Runtime model")
-
-        if modelSelection.wrappedValue == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag {
-          TextField(
-            "Provider-specific model id",
-            text: runtimeCustomModel(for: runtimeKey)
-          )
-          .harnessNativeTextField()
-          .accessibilityLabel("Custom runtime model")
-        }
-
         let effortValues = runtimeEffortValues(
           for: runtimeKey,
           catalog: catalog
         )
+        SessionWindowCreateRuntimeModelPickerRow(
+          catalog: catalog,
+          modelPickerValue: modelPickerValue,
+          onModelChange: { updateRuntimeModelPickerSelection($0, for: runtimeKey) }
+        )
+        .equatable()
+
+        if modelPickerValue == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag {
+          SessionWindowCreateRuntimeCustomModelRow(
+            customModel: currentRuntimeCustomModel(for: runtimeKey),
+            onCustomModelChange: { updateRuntimeCustomModel($0, for: runtimeKey) }
+          )
+          .equatable()
+        }
+
         if !effortValues.isEmpty {
-          Picker(
-            "Effort",
-            selection: runtimeEffortSelection(for: runtimeKey, values: effortValues)
-          ) {
-            ForEach(effortValues, id: \.self) { level in
-              Text(level.capitalized).tag(level)
-            }
-          }
-          .pickerStyle(.segmented)
-          .harnessNativeFormControl()
-          .accessibilityLabel("Runtime effort")
+          SessionWindowCreateRuntimeEffortRow(
+            values: effortValues,
+            selectedEffort: resolvedRuntimeEffortSelection(
+              for: runtimeKey,
+              values: effortValues
+            ),
+            onEffortChange: { updateRuntimeEffort($0, for: runtimeKey) }
+          )
+          .equatable()
         }
       } else if normalizedLaunchSelection.isAcp {
         Text("ACP uses the provider's configured defaults.")
@@ -407,4 +371,148 @@ extension SessionWindowCreateForm {
     }
   }
 
+}
+
+private struct SessionWindowCreateBridgeBannerSection: View {
+  let store: HarnessMonitorStore
+  let selection: AgentLaunchSelection
+
+  private var bannerKind: SessionCreateBridgeBannerKind? {
+    if selection.isAcp {
+      return store.acpUnavailable ? .acp : nil
+    }
+    return store.agentTuiUnavailable ? .agentTui : nil
+  }
+
+  var body: some View {
+    if let bannerKind {
+      Section {
+        SessionCreateBridgeBanner(
+          store: store,
+          copy: bannerKind.copy(store: store)
+        )
+      }
+    }
+  }
+}
+
+private struct SessionWindowCreateTransportChoicesGroup: View, Equatable {
+  let option: AgentCapabilityOption
+  let selectedSelection: AgentLaunchSelection
+  let usesVerticalLayout: Bool
+  let onSelectChoice: (AgentLaunchSelection) -> Void
+
+  nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.option == rhs.option
+      && lhs.selectedSelection == rhs.selectedSelection
+      && lhs.usesVerticalLayout == rhs.usesVerticalLayout
+  }
+
+  var body: some View {
+    let layout =
+      usesVerticalLayout
+      ? AnyLayout(VStackLayout(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM))
+      : AnyLayout(HStackLayout(alignment: .top, spacing: HarnessMonitorTheme.spacingSM))
+
+    layout {
+      ForEach(option.transportChoices) { transportChoice in
+        SessionWindowCreateTransportChoiceButton(
+          providerTitle: option.title,
+          choice: transportChoice,
+          isSelected: selectedSelection == transportChoice.id,
+          isEnabled: option.isEnabled(transportChoice),
+          unavailableReason: SessionWindowCreateFormCatalogs.unavailableReason(
+            for: option,
+            choice: transportChoice
+          ),
+          onSelect: { onSelectChoice(transportChoice.id) }
+        )
+      }
+    }
+  }
+}
+
+private struct SessionWindowCreateRuntimeModelPickerRow: View, Equatable {
+  let catalog: RuntimeModelCatalog
+  let modelPickerValue: String
+  let onModelChange: (String) -> Void
+
+  nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.catalog == rhs.catalog
+      && lhs.modelPickerValue == rhs.modelPickerValue
+  }
+
+  private var modelSelection: Binding<String> {
+    Binding(
+      get: { modelPickerValue },
+      set: { onModelChange($0) }
+    )
+  }
+
+  var body: some View {
+    Picker("Model", selection: modelSelection) {
+      ForEach(catalog.models) { model in
+        Text(model.displayName).tag(model.id)
+      }
+      Text("Custom...")
+        .tag(SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag)
+    }
+    .pickerStyle(.menu)
+    .harnessNativeFormControl()
+    .accessibilityLabel("Runtime model")
+  }
+}
+
+private struct SessionWindowCreateRuntimeCustomModelRow: View, Equatable {
+  let customModel: String
+  let onCustomModelChange: (String) -> Void
+
+  nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.customModel == rhs.customModel
+  }
+
+  private var customModelBinding: Binding<String> {
+    Binding(
+      get: { customModel },
+      set: { onCustomModelChange($0) }
+    )
+  }
+
+  var body: some View {
+    TextField(
+      "Provider-specific model id",
+      text: customModelBinding
+    )
+    .harnessNativeTextField()
+    .accessibilityLabel("Custom runtime model")
+  }
+}
+
+private struct SessionWindowCreateRuntimeEffortRow: View, Equatable {
+  let values: [String]
+  let selectedEffort: String
+  let onEffortChange: (String) -> Void
+
+  nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.values == rhs.values
+      && lhs.selectedEffort == rhs.selectedEffort
+  }
+
+  private var effortSelection: Binding<String> {
+    Binding(
+      get: { selectedEffort },
+      set: { onEffortChange($0) }
+    )
+  }
+
+  var body: some View {
+    Picker("Effort", selection: effortSelection) {
+      ForEach(values, id: \.self) { level in
+        Text(level.capitalized).tag(level)
+      }
+    }
+    .pickerStyle(.segmented)
+    .harnessNativeFormControl()
+    .accessibilityLabel("Runtime effort")
+  }
 }

@@ -155,12 +155,12 @@ extension SessionWindowCreateForm {
     runtimeKey: String,
     catalog: RuntimeModelCatalog
   ) -> String {
-    let selectedModelID = runtimeModelPickerSelection(
+    let selectedModelID = currentRuntimeModelPickerValue(
       for: runtimeKey,
       catalog: catalog
-    ).wrappedValue
+    )
     if selectedModelID == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag {
-      let customModelID = runtimeCustomModel(for: runtimeKey).wrappedValue
+      let customModelID = currentRuntimeCustomModel(for: runtimeKey)
         .trimmingCharacters(in: .whitespacesAndNewlines)
       return customModelID.isEmpty ? "Custom model" : customModelID
     }
@@ -177,25 +177,35 @@ extension SessionWindowCreateForm {
     runtimeModelPickerSelection(for: runtime.rawValue, catalog: catalog)
   }
 
+  func currentRuntimeModelPickerValue(
+    for runtimeKey: String,
+    catalog: RuntimeModelCatalog
+  ) -> String {
+    if let stored = draft.modelByRuntime[runtimeKey], !stored.isEmpty {
+      return stored
+    }
+    return catalog.default
+  }
+
+  func updateRuntimeModelPickerSelection(
+    _ newValue: String,
+    for runtimeKey: String
+  ) {
+    var next = draft
+    next.modelByRuntime[runtimeKey] = newValue
+    if newValue != SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag {
+      next.customModelByRuntime[runtimeKey] = nil
+    }
+    state.updateCreateDraft(next)
+  }
+
   func runtimeModelPickerSelection(
     for runtimeKey: String,
     catalog: RuntimeModelCatalog
   ) -> Binding<String> {
     Binding(
-      get: {
-        if let stored = draft.modelByRuntime[runtimeKey], !stored.isEmpty {
-          return stored
-        }
-        return catalog.default
-      },
-      set: { newValue in
-        var next = draft
-        next.modelByRuntime[runtimeKey] = newValue
-        if newValue != SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag {
-          next.customModelByRuntime[runtimeKey] = nil
-        }
-        state.updateCreateDraft(next)
-      }
+      get: { currentRuntimeModelPickerValue(for: runtimeKey, catalog: catalog) },
+      set: { updateRuntimeModelPickerSelection($0, for: runtimeKey) }
     )
   }
 
@@ -209,15 +219,26 @@ extension SessionWindowCreateForm {
     for runtimeKey: String
   ) -> Binding<String> {
     Binding(
-      get: { draft.customModelByRuntime[runtimeKey] ?? "" },
-      set: {
-        var next = draft
-        next.modelByRuntime[runtimeKey] =
-          SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag
-        next.customModelByRuntime[runtimeKey] = $0
-        state.updateCreateDraft(next)
-      }
+      get: { currentRuntimeCustomModel(for: runtimeKey) },
+      set: { updateRuntimeCustomModel($0, for: runtimeKey) }
     )
+  }
+
+  func currentRuntimeCustomModel(
+    for runtimeKey: String
+  ) -> String {
+    draft.customModelByRuntime[runtimeKey] ?? ""
+  }
+
+  func updateRuntimeCustomModel(
+    _ value: String,
+    for runtimeKey: String
+  ) {
+    var next = draft
+    next.modelByRuntime[runtimeKey] =
+      SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag
+    next.customModelByRuntime[runtimeKey] = value
+    state.updateCreateDraft(next)
   }
 
   func terminalEffortValues(
@@ -233,10 +254,10 @@ extension SessionWindowCreateForm {
   ) -> [String] {
     SessionWindowCreateFormCatalogs.effortValues(
       catalog: catalog,
-      selectedModelID: runtimeModelPickerSelection(
+      selectedModelID: currentRuntimeModelPickerValue(
         for: runtimeKey,
         catalog: catalog
-      ).wrappedValue
+      )
     )
   }
 
@@ -252,17 +273,27 @@ extension SessionWindowCreateForm {
     values: [String]
   ) -> Binding<String> {
     Binding(
-      get: {
-        guard let current = draft.effortByRuntime[runtimeKey], values.contains(current) else {
-          return SessionWindowCreateFormCatalogs.defaultEffortLevel(from: values)
-        }
-        return current
-      },
-      set: {
-        var next = draft
-        next.effortByRuntime[runtimeKey] = $0
-        state.updateCreateDraft(next)
-      }
+      get: { resolvedRuntimeEffortSelection(for: runtimeKey, values: values) },
+      set: { updateRuntimeEffort($0, for: runtimeKey) }
     )
+  }
+
+  func resolvedRuntimeEffortSelection(
+    for runtimeKey: String,
+    values: [String]
+  ) -> String {
+    guard let current = draft.effortByRuntime[runtimeKey], values.contains(current) else {
+      return SessionWindowCreateFormCatalogs.defaultEffortLevel(from: values)
+    }
+    return current
+  }
+
+  func updateRuntimeEffort(
+    _ value: String,
+    for runtimeKey: String
+  ) {
+    var next = draft
+    next.effortByRuntime[runtimeKey] = value
+    state.updateCreateDraft(next)
   }
 }

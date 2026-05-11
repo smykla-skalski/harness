@@ -127,10 +127,6 @@ public struct SessionWindowView: View {
     currentModifiers
   }
 
-  var contentColumnWidthBinding: Binding<Double> {
-    $contentColumnWidthStorage
-  }
-
   var decisionDetailTab: DecisionDetailTab {
     get { DecisionDetailTab(rawValue: persistedDecisionDetailTabRawStorage) ?? .context }
     nonmutating set { persistedDecisionDetailTabRawStorage = newValue.rawValue }

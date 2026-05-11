@@ -142,6 +142,11 @@ See `../../docs/agent-guides/monitor-reference.md` for the full interaction cont
 Prefer shared layout and control primitives for density/readability work so
 button sizing and glass treatment stay consistent across screens.
 
+Use native SwiftUI split containers (`NavigationSplitView`, `HSplitView`) for
+resizable panes. Do not hand-roll pane dividers with `DragGesture`, manual
+cursor stacks, or per-drag width state unless a native split cannot express the
+behavior and the performance tradeoff is proven.
+
 Liquid Glass summary: let `NavigationSplitView` sidebars use the system glass,
 reserve `.backgroundExtensionEffect()` for expansive hero/media/tinted surfaces
 rather than dense text or controls, apply glass to navigation/control surfaces

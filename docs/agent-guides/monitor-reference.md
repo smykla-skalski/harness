@@ -149,6 +149,15 @@ on navigation/control layers, not content. SwiftUI materials blur behind the
 window, not sibling views. `GlassEffectContainer` groups glass elements with
 shared sampling; `spacing` controls morph threshold.
 
+## Session pane dividers
+
+Use native SwiftUI split containers for resizable session panes. The outer
+session shell owns navigation with `NavigationSplitView`; nested content/detail
+and inspector panes should use `HSplitView` so SwiftUI owns divider hit testing,
+cursor behavior, accessibility, and layout invalidation. Avoid custom
+`DragGesture` dividers, manual `NSCursor.push/pop`, and live per-drag width
+bindings unless a profiled platform gap proves they are necessary.
+
 ## Daemon modes
 
 Harness Monitor has two daemon ownership modes.

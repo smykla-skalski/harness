@@ -110,14 +110,6 @@ extension SessionWindowCreateForm {
     )
   }
 
-  var agentBridgeBannerKind: SessionCreateBridgeBannerKind? {
-    guard draft.kind == .agent else { return nil }
-    if normalizedLaunchSelection.isAcp {
-      return store.acpUnavailable ? .acp : nil
-    }
-    return store.agentTuiUnavailable ? .agentTui : nil
-  }
-
   var launchSelection: Binding<AgentLaunchSelection> {
     Binding(
       get: { normalizedLaunchSelection },
