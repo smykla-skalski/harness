@@ -151,22 +151,48 @@ extension SessionWindowCreateForm {
       ?? selectedModelID
   }
 
+  func selectedRuntimeModelMenuTitle(
+    runtimeKey: String,
+    catalog: RuntimeModelCatalog
+  ) -> String {
+    let selectedModelID = runtimeModelPickerSelection(
+      for: runtimeKey,
+      catalog: catalog
+    ).wrappedValue
+    if selectedModelID == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag {
+      let customModelID = runtimeCustomModel(for: runtimeKey).wrappedValue
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+      return customModelID.isEmpty ? "Custom model" : customModelID
+    }
+
+    return
+      catalog.models.first { $0.id == selectedModelID }?.displayName
+      ?? selectedModelID
+  }
+
   func terminalModelPickerSelection(
     for runtime: AgentTuiRuntime,
     catalog: RuntimeModelCatalog
   ) -> Binding<String> {
+    runtimeModelPickerSelection(for: runtime.rawValue, catalog: catalog)
+  }
+
+  func runtimeModelPickerSelection(
+    for runtimeKey: String,
+    catalog: RuntimeModelCatalog
+  ) -> Binding<String> {
     Binding(
       get: {
-        if let stored = draft.modelByRuntime[runtime.rawValue], !stored.isEmpty {
+        if let stored = draft.modelByRuntime[runtimeKey], !stored.isEmpty {
           return stored
         }
         return catalog.default
       },
       set: { newValue in
         var next = draft
-        next.modelByRuntime[runtime.rawValue] = newValue
+        next.modelByRuntime[runtimeKey] = newValue
         if newValue != SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag {
-          next.customModelByRuntime[runtime.rawValue] = nil
+          next.customModelByRuntime[runtimeKey] = nil
         }
         state.updateCreateDraft(next)
       }
@@ -176,13 +202,19 @@ extension SessionWindowCreateForm {
   func terminalCustomModel(
     for runtime: AgentTuiRuntime
   ) -> Binding<String> {
+    runtimeCustomModel(for: runtime.rawValue)
+  }
+
+  func runtimeCustomModel(
+    for runtimeKey: String
+  ) -> Binding<String> {
     Binding(
-      get: { draft.customModelByRuntime[runtime.rawValue] ?? "" },
+      get: { draft.customModelByRuntime[runtimeKey] ?? "" },
       set: {
         var next = draft
-        next.modelByRuntime[runtime.rawValue] =
+        next.modelByRuntime[runtimeKey] =
           SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag
-        next.customModelByRuntime[runtime.rawValue] = $0
+        next.customModelByRuntime[runtimeKey] = $0
         state.updateCreateDraft(next)
       }
     )
@@ -192,9 +224,19 @@ extension SessionWindowCreateForm {
     for runtime: AgentTuiRuntime,
     catalog: RuntimeModelCatalog
   ) -> [String] {
+    runtimeEffortValues(for: runtime.rawValue, catalog: catalog)
+  }
+
+  func runtimeEffortValues(
+    for runtimeKey: String,
+    catalog: RuntimeModelCatalog
+  ) -> [String] {
     SessionWindowCreateFormCatalogs.effortValues(
       catalog: catalog,
-      selectedModelID: terminalModelPickerSelection(for: runtime, catalog: catalog).wrappedValue
+      selectedModelID: runtimeModelPickerSelection(
+        for: runtimeKey,
+        catalog: catalog
+      ).wrappedValue
     )
   }
 
@@ -202,16 +244,23 @@ extension SessionWindowCreateForm {
     for runtime: AgentTuiRuntime,
     values: [String]
   ) -> Binding<String> {
+    runtimeEffortSelection(for: runtime.rawValue, values: values)
+  }
+
+  func runtimeEffortSelection(
+    for runtimeKey: String,
+    values: [String]
+  ) -> Binding<String> {
     Binding(
       get: {
-        guard let current = draft.effortByRuntime[runtime.rawValue], values.contains(current) else {
+        guard let current = draft.effortByRuntime[runtimeKey], values.contains(current) else {
           return SessionWindowCreateFormCatalogs.defaultEffortLevel(from: values)
         }
         return current
       },
       set: {
         var next = draft
-        next.effortByRuntime[runtime.rawValue] = $0
+        next.effortByRuntime[runtimeKey] = $0
         state.updateCreateDraft(next)
       }
     )

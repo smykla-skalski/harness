@@ -92,6 +92,9 @@ extension RecordingHarnessClient {
         prompt: request.prompt,
         projectDir: request.projectDir,
         persona: request.persona,
+        model: request.model,
+        effort: request.effort,
+        allowCustomModel: request.allowCustomModel,
         recordPermissions: request.recordPermissions
       )
     )

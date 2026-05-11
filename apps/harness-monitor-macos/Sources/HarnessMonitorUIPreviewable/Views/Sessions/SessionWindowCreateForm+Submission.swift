@@ -165,6 +165,35 @@ extension SessionWindowCreateForm {
     selection: AgentLaunchSelection,
     context: AgentCreationContext
   ) async {
+    let catalog = SessionWindowCreateFormCatalogs.selectedModelCatalog(
+      selection: selection,
+      catalogState: state.agentCreateCatalog
+    )
+    let runtimeKey = catalog?.runtime ?? descriptorID
+    let pickerValue = draft.modelByRuntime[runtimeKey] ?? catalog?.default ?? ""
+    let customValue = draft.customModelByRuntime[runtimeKey] ?? ""
+    let catalogDefault = catalog?.default ?? ""
+    let modelSelection = SessionWindowCreateFormCatalogs.effectiveModelSelection(
+      pickerValue: pickerValue,
+      customValue: customValue,
+      catalogDefault: catalogDefault
+    )
+    let effortValues =
+      catalog.map {
+        SessionWindowCreateFormCatalogs.effortValues(
+          catalog: $0,
+          selectedModelID: pickerValue
+        )
+      }
+      ?? (pickerValue == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag
+        ? SessionWindowCreateFormCatalogs.allEffortLevels : [])
+    let trimmedEffort =
+      draft.effortByRuntime[runtimeKey]?
+      .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    let effort =
+      trimmedEffort.isEmpty
+      ? SessionWindowCreateFormCatalogs.defaultEffortLevel(from: effortValues)
+      : trimmedEffort
     let capabilities = capabilities(for: .acp(descriptorID))
     guard
       let created = await store.startAcpAgent(
@@ -176,6 +205,9 @@ extension SessionWindowCreateForm {
         prompt: draft.prompt,
         projectDir: context.projectDir,
         persona: context.personaID,
+        model: modelSelection.id,
+        effort: effort.isEmpty ? nil : effort,
+        allowCustomModel: modelSelection.allowCustomModel,
         sessionID: draft.sessionID
       )
     else {
@@ -184,6 +216,9 @@ extension SessionWindowCreateForm {
     writeTerminalLaunchPreset(
       selection: selection,
       role: context.selectedRole,
+      modelByRuntime: pickerValue.isEmpty ? [:] : [runtimeKey: pickerValue],
+      customModelByRuntime: customValue.isEmpty ? [:] : [runtimeKey: customValue],
+      effortByRuntime: effort.isEmpty ? [:] : [runtimeKey: effort],
       fallbackRole: context.fallbackRole,
       personaID: context.personaID
     )

@@ -38,6 +38,9 @@ struct IdentityPayload {
     protocol_version: String,
     log_mode: String,
     permission_mode: String,
+    model: Option<String>,
+    effort: Option<String>,
+    allow_custom_model: bool,
     env_fingerprint: String,
 }
 
@@ -84,6 +87,9 @@ impl AcpProcessPoolKey {
             // Stage-1 ACP runtime emits text/event stream mode only.
             log_mode: "text".to_string(),
             permission_mode: mode.to_string(),
+            model: request.model.clone(),
+            effort: request.effort.clone(),
+            allow_custom_model: request.allow_custom_model,
             env_fingerprint,
         };
         let canonical = format!("acp-process-{}", hash_identity_payload(&payload));
@@ -148,5 +154,70 @@ mod tests {
         let first = hash_identity_environment(vec![("NOISE".to_string(), "a".to_string())], &[]);
         let second = hash_identity_environment(vec![("NOISE".to_string(), "b".to_string())], &[]);
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn process_key_changes_when_model_inputs_change() {
+        let descriptor = AcpAgentDescriptor {
+            id: "copilot".to_string(),
+            display_name: "Copilot".to_string(),
+            capabilities: Vec::new(),
+            launch_command: "copilot".to_string(),
+            launch_args: vec!["--acp".to_string()],
+            env_passthrough: Vec::new(),
+            model_catalog: None,
+            install_hint: None,
+            doctor_probe: crate::agents::acp::catalog::DoctorProbe {
+                command: "copilot".to_string(),
+                args: vec!["--version".to_string()],
+            },
+            prompt_timeout_seconds: None,
+        };
+        let spawn = SpawnConfig {
+            command: descriptor.launch_command.clone(),
+            args: descriptor.launch_args.clone(),
+            env_passthrough: Vec::new(),
+            env_overrides: Vec::new(),
+            working_dir: Path::new("/tmp").to_path_buf(),
+        };
+        let base = AcpAgentStartRequest {
+            agent: "copilot".to_string(),
+            model: Some("gpt-5.4".to_string()),
+            ..AcpAgentStartRequest::default()
+        };
+        let custom = AcpAgentStartRequest {
+            allow_custom_model: true,
+            model: Some("custom-model".to_string()),
+            ..base.clone()
+        };
+        let higher_effort = AcpAgentStartRequest {
+            effort: Some("high".to_string()),
+            ..base.clone()
+        };
+
+        let base_key = AcpProcessPoolKey::from_spawn_inputs(
+            &descriptor,
+            &base,
+            "session",
+            &spawn,
+            Path::new("/tmp"),
+        );
+        let custom_key = AcpProcessPoolKey::from_spawn_inputs(
+            &descriptor,
+            &custom,
+            "session",
+            &spawn,
+            Path::new("/tmp"),
+        );
+        let effort_key = AcpProcessPoolKey::from_spawn_inputs(
+            &descriptor,
+            &higher_effort,
+            "session",
+            &spawn,
+            Path::new("/tmp"),
+        );
+
+        assert_ne!(base_key.as_str(), custom_key.as_str());
+        assert_ne!(base_key.as_str(), effort_key.as_str());
     }
 }

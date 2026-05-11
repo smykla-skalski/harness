@@ -78,6 +78,9 @@ struct WorkspaceAcpSessionContextRecoveryTests {
             prompt: "Review the latest ACP wiring.",
             projectDir: "/tmp/ui-acp",
             persona: "reviewer",
+            model: nil,
+            effort: nil,
+            allowCustomModel: false,
             recordPermissions: false
           ),
           .reconfigureHostBridge(enable: ["acp"], disable: [], force: false),
@@ -97,6 +100,9 @@ struct WorkspaceAcpSessionContextRecoveryTests {
             prompt: "Review the latest ACP wiring.",
             projectDir: "/tmp/ui-acp",
             persona: "reviewer",
+            model: nil,
+            effort: nil,
+            allowCustomModel: false,
             recordPermissions: false
           ),
         ]
@@ -154,6 +160,9 @@ struct WorkspaceAcpSessionContextRecoveryTests {
             prompt: "Review the latest ACP wiring.",
             projectDir: "/tmp/ui-acp",
             persona: "reviewer",
+            model: nil,
+            effort: nil,
+            allowCustomModel: false,
             recordPermissions: false
           )
         ]
@@ -213,6 +222,9 @@ struct WorkspaceAcpSessionContextRecoveryTests {
             prompt: "Review the latest ACP wiring.",
             projectDir: "/tmp/ui-acp",
             persona: "reviewer",
+            model: nil,
+            effort: nil,
+            allowCustomModel: false,
             recordPermissions: false
           )
         ]

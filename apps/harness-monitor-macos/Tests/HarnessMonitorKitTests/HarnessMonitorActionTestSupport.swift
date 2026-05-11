@@ -100,6 +100,9 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       prompt: String?,
       projectDir: String?,
       persona: String?,
+      model: String?,
+      effort: String?,
+      allowCustomModel: Bool,
       recordPermissions: Bool
     )
     case sendAgentTuiInput(tuiID: String, request: AgentTuiInputRequest)

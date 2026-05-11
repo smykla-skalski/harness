@@ -88,6 +88,17 @@ extension SessionWindowCreateForm {
     )
   }
 
+  var selectedRuntimeCatalog: RuntimeModelCatalog? {
+    SessionWindowCreateFormCatalogs.selectedModelCatalog(
+      selection: normalizedLaunchSelection,
+      catalogState: catalogState
+    )
+  }
+
+  var selectedModelCatalogRuntimeKey: String? {
+    selectedRuntimeCatalog?.runtime
+  }
+
   var codexCatalog: RuntimeModelCatalog? {
     SessionWindowCreateFormCatalogs.codexModelCatalog(catalogState: catalogState)
   }

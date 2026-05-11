@@ -22,6 +22,12 @@ struct AcpAgentStartRequestDecode {
     project_dir: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     persona: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    effort: Option<String>,
+    #[serde(default)]
+    allow_custom_model: bool,
     #[serde(default)]
     record_permissions: bool,
 }
@@ -41,6 +47,11 @@ struct AcpAgentStartRequestEncode<'a> {
     project_dir: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     persona: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    model: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    effort: Option<&'a str>,
+    allow_custom_model: bool,
     record_permissions: bool,
 }
 
@@ -58,6 +69,9 @@ impl Serialize for AcpAgentStartRequest {
             prompt: self.prompt.as_deref(),
             project_dir: self.project_dir.as_deref(),
             persona: self.persona.as_deref(),
+            model: self.model.as_deref(),
+            effort: self.effort.as_deref(),
+            allow_custom_model: self.allow_custom_model,
             record_permissions: self.record_permissions,
         }
         .serialize(serializer)
@@ -82,6 +96,9 @@ impl<'de> Deserialize<'de> for AcpAgentStartRequest {
             prompt: decoded.prompt,
             project_dir: decoded.project_dir,
             persona: decoded.persona,
+            model: decoded.model,
+            effort: decoded.effort,
+            allow_custom_model: decoded.allow_custom_model,
             record_permissions: decoded.record_permissions,
         })
     }
@@ -96,12 +113,18 @@ mod tests {
         let request: AcpAgentStartRequest = serde_json::from_value(serde_json::json!({
             "descriptor_id": "copilot",
             "role": "reviewer",
+            "model": "gpt-5.4",
+            "effort": "high",
+            "allow_custom_model": true,
             "record_permissions": true
         }))
         .expect("decode request");
 
         assert_eq!(request.agent, "copilot");
         assert_eq!(request.role, crate::session::types::SessionRole::Reviewer);
+        assert_eq!(request.model.as_deref(), Some("gpt-5.4"));
+        assert_eq!(request.effort.as_deref(), Some("high"));
+        assert!(request.allow_custom_model);
         assert!(request.record_permissions);
     }
 
@@ -143,6 +166,9 @@ mod tests {
             prompt: Some("Run it".into()),
             project_dir: Some("/tmp/project".into()),
             persona: Some("reviewer".into()),
+            model: Some("gpt-5.4".into()),
+            effort: Some("high".into()),
+            allow_custom_model: true,
             record_permissions: true,
         };
 
@@ -151,6 +177,9 @@ mod tests {
         assert!(value.get("agent").is_none());
         assert_eq!(value["role"], "reviewer");
         assert_eq!(value["fallback_role"], "observer");
+        assert_eq!(value["model"], "gpt-5.4");
+        assert_eq!(value["effort"], "high");
+        assert_eq!(value["allow_custom_model"], true);
         assert_eq!(value["record_permissions"], true);
     }
 }

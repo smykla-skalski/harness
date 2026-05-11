@@ -331,6 +331,9 @@ struct SessionWindowCreateFormMetricsTests {
     #expect(submissionSource.contains("fallbackRole: fallbackRole"))
     #expect(submissionSource.contains("projectDir: context.projectDir"))
     #expect(submissionSource.contains("persona: context.personaID"))
+    #expect(submissionSource.contains("model: modelSelection.id"))
+    #expect(submissionSource.contains("effort: effort.isEmpty ? nil : effort"))
+    #expect(submissionSource.contains("allowCustomModel: modelSelection.allowCustomModel"))
     #expect(submissionSource.contains("argv: draft.normalizedArgvOverride"))
     #expect(submissionSource.contains("state.resetCreateDraft(.agent)"))
     #expect(!submissionSource.contains("createCodexRun(named:"))
@@ -364,6 +367,25 @@ struct SessionWindowCreateFormMetricsTests {
     #expect(
       SessionWindowCreateFormCatalogs.defaultEffortLevel(from: ["low", "medium", "high"])
         == "medium"
+    )
+  }
+
+  @Test("Catalog helper resolves ACP selections to runtime catalogs")
+  func catalogHelperResolvesAcpSelectionsToRuntimeCatalogs() {
+    let catalogState = SessionWindowAgentCreateCatalogState(
+      descriptors: PreviewHarnessClient.previewAcpAgentDescriptors,
+      runtimeModelCatalogs: PreviewHarnessClient.previewRuntimeModelCatalogs,
+      capabilityOptions: [],
+      personas: [],
+      isLoading: false,
+      hasLoaded: true
+    )
+
+    #expect(
+      SessionWindowCreateFormCatalogs.selectedModelCatalog(
+        selection: .acp("gemini"),
+        catalogState: catalogState
+      )?.runtime == "gemini"
     )
   }
 

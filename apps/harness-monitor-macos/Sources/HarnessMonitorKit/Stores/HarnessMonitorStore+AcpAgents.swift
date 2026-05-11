@@ -56,6 +56,9 @@ extension HarnessMonitorStore {
     prompt: String?,
     projectDir: String? = nil,
     persona: String? = nil,
+    model: String? = nil,
+    effort: String? = nil,
+    allowCustomModel: Bool = false,
     recordPermissions: Bool = false,
     sessionID: String? = nil
   ) async -> AcpAgentSnapshot? {
@@ -72,6 +75,8 @@ extension HarnessMonitorStore {
     let trimmedPrompt = prompt?.trimmingCharacters(in: .whitespacesAndNewlines)
     let trimmedProjectDir = projectDir?.trimmingCharacters(in: .whitespacesAndNewlines)
     let trimmedPersona = persona?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let trimmedModel = model?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let trimmedEffort = effort?.trimmingCharacters(in: .whitespacesAndNewlines)
     let normalizedCapabilities =
       capabilities
       .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -85,6 +90,9 @@ extension HarnessMonitorStore {
       prompt: trimmedPrompt?.isEmpty == false ? trimmedPrompt : nil,
       projectDir: trimmedProjectDir?.isEmpty == false ? trimmedProjectDir : nil,
       persona: trimmedPersona?.isEmpty == false ? trimmedPersona : nil,
+      model: trimmedModel?.isEmpty == false ? trimmedModel : nil,
+      effort: trimmedEffort?.isEmpty == false ? trimmedEffort : nil,
+      allowCustomModel: allowCustomModel,
       recordPermissions: recordPermissions
     )
 
@@ -149,6 +157,9 @@ extension HarnessMonitorStore {
     prompt: String?,
     projectDir: String? = nil,
     persona: String? = nil,
+    model: String? = nil,
+    effort: String? = nil,
+    allowCustomModel: Bool = false,
     recordPermissions: Bool = false,
     sessionID: String? = nil
   ) async -> AcpAgentSnapshot? {
@@ -161,6 +172,9 @@ extension HarnessMonitorStore {
       prompt: prompt,
       projectDir: projectDir,
       persona: persona,
+      model: model,
+      effort: effort,
+      allowCustomModel: allowCustomModel,
       recordPermissions: recordPermissions,
       sessionID: sessionID
     )
