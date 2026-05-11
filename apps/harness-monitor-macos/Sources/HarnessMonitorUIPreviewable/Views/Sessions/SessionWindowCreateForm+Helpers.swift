@@ -81,9 +81,11 @@ extension SessionWindowCreateForm {
         if codexModelPickerSelection.wrappedValue
           == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag
         {
-          TextField("Provider-specific model id", text: codexCustomModel)
-            .harnessNativeTextField()
-            .accessibilityLabel("Custom Codex model")
+          SessionWindowCreateSplitInputRow("Custom model") {
+            TextField("", text: codexCustomModel)
+              .harnessNativeTextField()
+              .accessibilityLabel("Custom Codex model")
+          }
         }
 
         if !codexEffortValues.isEmpty {
@@ -97,13 +99,17 @@ extension SessionWindowCreateForm {
           .accessibilityLabel("Codex effort")
         }
       } else {
-        TextField("Model (optional)", text: codexCustomModel)
-          .harnessNativeTextField()
-          .accessibilityLabel("Codex model")
+        SessionWindowCreateSplitInputRow("Model (optional)") {
+          TextField("", text: codexCustomModel)
+            .harnessNativeTextField()
+            .accessibilityLabel("Codex model")
+        }
 
-        TextField("Effort (optional)", text: codexEffortText)
-          .harnessNativeTextField()
-          .accessibilityLabel("Codex effort")
+        SessionWindowCreateSplitInputRow("Effort (optional)") {
+          TextField("", text: codexEffortText)
+            .harnessNativeTextField()
+            .accessibilityLabel("Codex effort")
+        }
       }
     } header: {
       Text("Codex")
