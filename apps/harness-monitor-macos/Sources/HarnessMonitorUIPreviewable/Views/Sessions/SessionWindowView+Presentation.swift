@@ -68,10 +68,7 @@ extension SessionWindowView {
   }
 
   var navigationTitleText: String {
-    SessionWindowTabTitleFormatter.decoratedTitle(
-      base: summary?.displayTitle ?? "Session",
-      pendingDecisionCount: allSessionDecisionsCache.count
-    )
+    summary?.displayTitle ?? "Session"
   }
 
   var navigationSubtitleText: String {
