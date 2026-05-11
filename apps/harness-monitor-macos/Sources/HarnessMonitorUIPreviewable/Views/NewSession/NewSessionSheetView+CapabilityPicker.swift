@@ -262,16 +262,17 @@ extension AgentCapabilityOption {
   ) -> NewSessionCapabilityPresentation {
     let choice = selection.map(transportChoice(for:)) ?? transportChoices[0]
     let startsWithAcp = choice.id.isAcp && isEnabled(choice)
+    let startsWithCodex = choice.id.isCodexNative && isEnabled(choice)
 
     let launchText =
-      startsWithAcp
-      ? "Starts via ACP."
-      : "Opens in Terminal."
+      startsWithCodex
+      ? "Starts via Codex app server."
+      : (startsWithAcp ? "Starts via ACP." : "Opens in Terminal.")
 
     let detail: String =
       switch availabilityState {
       case .projectAccessAvailable:
-        startsWithAcp ? launchText : "\(launchText) ACP is also available."
+        startsWithAcp || startsWithCodex ? launchText : "\(launchText) ACP is also available."
       case .checkingAccess:
         startsWithAcp
           ? "ACP is still being checked."
@@ -281,7 +282,9 @@ extension AgentCapabilityOption {
           ? "Set up ACP to launch this provider via ACP."
           : "\(launchText) Set up ACP when you're ready."
       case .bridgeAccessRequired:
-        "Turn on bridge access to use ACP while the daemon runs sandboxed."
+        requiresCodexBridgeAccess
+          ? "Turn on bridge access to use Codex while the daemon runs sandboxed."
+          : "Turn on bridge access to use ACP while the daemon runs sandboxed."
       case .terminalOnly:
         "Opens in Terminal only."
       case .unavailable:

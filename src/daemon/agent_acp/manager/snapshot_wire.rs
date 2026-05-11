@@ -230,7 +230,7 @@ where
 {
     match managed_agent_family {
         ManagedAgentKind::Acp => Ok(()),
-        other @ ManagedAgentKind::Tui => Err(E::custom(format!(
+        other => Err(E::custom(format!(
             "managed_agent_family must be 'acp', got '{other:?}'"
         ))),
     }

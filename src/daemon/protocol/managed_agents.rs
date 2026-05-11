@@ -38,7 +38,10 @@ impl ManagedAgentSnapshot {
     pub fn session_agent_id(&self) -> Option<SessionAgentId> {
         match self {
             Self::Terminal(snapshot) => Some(SessionAgentId::from(snapshot.agent_id.as_str())),
-            Self::Codex(_) => None,
+            Self::Codex(snapshot) => snapshot
+                .session_agent_id
+                .as_deref()
+                .map(SessionAgentId::from),
             Self::Acp(snapshot) => Some(SessionAgentId::from(snapshot.agent_id.as_str())),
         }
     }
@@ -121,6 +124,8 @@ mod tests {
         let codex = ManagedAgentSnapshot::Codex(CodexRunSnapshot {
             run_id: "run-1".into(),
             session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+            session_agent_id: Some("worker-codex".into()),
+            display_name: Some("Codex".into()),
             project_dir: "/tmp/project".into(),
             thread_id: None,
             turn_id: None,
@@ -131,13 +136,18 @@ mod tests {
             final_message: None,
             error: None,
             pending_approvals: Vec::new(),
+            resolved_approvals: Vec::new(),
+            events: Vec::new(),
             created_at: "2026-05-06T00:00:00Z".into(),
             updated_at: "2026-05-06T00:00:00Z".into(),
             model: None,
             effort: None,
         });
         assert_eq!(codex.managed_agent_id(), ManagedAgentId::from("run-1"));
-        assert_eq!(codex.session_agent_id(), None);
+        assert_eq!(
+            codex.session_agent_id(),
+            Some(SessionAgentId::from("worker-codex"))
+        );
         assert_eq!(
             codex.harness_session_id(),
             HarnessSessionId::from("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")

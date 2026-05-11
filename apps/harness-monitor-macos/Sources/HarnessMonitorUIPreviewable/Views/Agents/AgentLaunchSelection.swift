@@ -1,6 +1,7 @@
 import HarnessMonitorKit
 
 enum AgentLaunchSelection: Hashable, Sendable {
+  case codex
   case tui(AgentTuiRuntime)
   case acp(String)
 
@@ -11,8 +12,21 @@ enum AgentLaunchSelection: Hashable, Sendable {
     return false
   }
 
+  var isCodexNative: Bool {
+    if case .codex = self {
+      return true
+    }
+    return false
+  }
+
+  var isManagedControlPlane: Bool {
+    isAcp || isCodexNative
+  }
+
   var storageKey: String {
     switch self {
+    case .codex:
+      "codex"
     case .tui(let runtime):
       "tui:\(runtime.rawValue)"
     case .acp(let id):
@@ -26,6 +40,8 @@ enum AgentLaunchSelection: Hashable, Sendable {
 
   var preferredRuntime: AgentTuiRuntime {
     switch self {
+    case .codex:
+      .codex
     case .tui(let runtime):
       runtime
     case .acp(let id):
@@ -34,6 +50,11 @@ enum AgentLaunchSelection: Hashable, Sendable {
   }
 
   init?(storageKey: String) {
+    if storageKey == "codex" {
+      self = .codex
+      return
+    }
+
     let tuiRuntime = Self.parseTuiRuntime(storageKey: storageKey)
     if let runtime = tuiRuntime {
       self = .tui(runtime)

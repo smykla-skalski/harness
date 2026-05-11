@@ -11,9 +11,8 @@ import Foundation
 /// - `Identifiable.id` on UI models is a view identity, not a transport contract, unless the
 ///   model explicitly documents otherwise.
 ///
-/// Codex remains managed-only in the current architecture: it belongs to a harness session,
-/// but `sessionAgentID` is intentionally `nil` unless codex is later promoted into the
-/// session-agent orchestration model.
+/// Codex app-server agents use a daemon-owned managed ID and may also expose a regular
+/// session-agent ID when they are launched through the Harness-native agent flow.
 public struct HookIntegrationDescriptor: Codable, Equatable, Identifiable, Sendable {
   public let name: String
   public let typicalLatencySeconds: Int
@@ -34,6 +33,7 @@ public struct RuntimeCapabilities: Codable, Equatable, Sendable {
 public enum ManagedAgentKind: String, Codable, Sendable {
   case tui
   case acp
+  case codex
 }
 
 public struct ManagedAgentRef: Codable, Equatable, Sendable {

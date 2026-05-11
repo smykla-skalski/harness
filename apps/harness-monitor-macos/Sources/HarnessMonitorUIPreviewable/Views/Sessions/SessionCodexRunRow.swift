@@ -9,9 +9,10 @@ enum SessionCodexRunRowFormatter {
       .first
       .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
       ?? ""
-    let prompt = head.isEmpty ? "Codex run" : head
+    let fallback = run.displayName ?? "Codex agent"
+    let prompt = head.isEmpty ? fallback : head
     let clipped = prompt.count > 48 ? "\(prompt.prefix(48))…" : prompt
-    return "Codex · \(run.mode.title) · \(clipped)"
+    return "\(fallback) · \(run.mode.title) · \(clipped)"
   }
 
   static func severityShape(for status: CodexRunStatus) -> SessionSidebarSeverityShape {

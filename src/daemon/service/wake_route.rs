@@ -189,6 +189,12 @@ pub(crate) fn wake_route_for_registration<'a>(
             kind: ManagedAgentKind::Acp,
             id: acp_id,
         }) => acp_route(acp_id, dispatch.acp_agent),
+        Some(ManagedAgentRef {
+            kind: ManagedAgentKind::Codex,
+            ..
+        }) => WakeRoute::None {
+            reason: NoneReason::Unmanaged,
+        },
         None => WakeRoute::None {
             reason: NoneReason::Unmanaged,
         },

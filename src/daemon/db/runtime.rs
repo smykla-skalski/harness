@@ -25,15 +25,23 @@ impl DaemonDb {
     pub fn save_codex_run(&self, snapshot: &CodexRunSnapshot) -> Result<(), CliError> {
         let pending_approvals_json = serde_json::to_string(&snapshot.pending_approvals)
             .map_err(|error| db_error(format!("serialize codex approvals: {error}")))?;
+        let resolved_approvals_json = serde_json::to_string(&snapshot.resolved_approvals)
+            .map_err(|error| db_error(format!("serialize codex resolved approvals: {error}")))?;
+        let events_json = serde_json::to_string(&snapshot.events)
+            .map_err(|error| db_error(format!("serialize codex events: {error}")))?;
         self.conn
             .execute(
                 "INSERT INTO codex_runs (
-                    run_id, session_id, project_dir, thread_id, turn_id, mode,
+                    run_id, session_id, session_agent_id, display_name,
+                    project_dir, thread_id, turn_id, mode,
                     status, prompt, latest_summary, final_message, error,
-                    pending_approvals_json, created_at, updated_at
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+                    pending_approvals_json, resolved_approvals_json, events_json,
+                    created_at, updated_at, model, effort
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
                 ON CONFLICT(run_id) DO UPDATE SET
                     session_id = excluded.session_id,
+                    session_agent_id = excluded.session_agent_id,
+                    display_name = excluded.display_name,
                     project_dir = excluded.project_dir,
                     thread_id = excluded.thread_id,
                     turn_id = excluded.turn_id,
@@ -44,10 +52,16 @@ impl DaemonDb {
                     final_message = excluded.final_message,
                     error = excluded.error,
                     pending_approvals_json = excluded.pending_approvals_json,
-                    updated_at = excluded.updated_at",
+                    resolved_approvals_json = excluded.resolved_approvals_json,
+                    events_json = excluded.events_json,
+                    updated_at = excluded.updated_at,
+                    model = excluded.model,
+                    effort = excluded.effort",
                 rusqlite::params![
                     snapshot.run_id,
                     snapshot.session_id,
+                    snapshot.session_agent_id,
+                    snapshot.display_name,
                     snapshot.project_dir,
                     snapshot.thread_id,
                     snapshot.turn_id,
@@ -58,8 +72,12 @@ impl DaemonDb {
                     snapshot.final_message,
                     snapshot.error,
                     pending_approvals_json,
+                    resolved_approvals_json,
+                    events_json,
                     snapshot.created_at,
                     snapshot.updated_at,
+                    snapshot.model,
+                    snapshot.effort,
                 ],
             )
             .map_err(|error| db_error(format!("save codex run: {error}")))?;
@@ -72,9 +90,11 @@ impl DaemonDb {
     /// Returns [`CliError`] on SQL or parse failures.
     pub fn codex_run(&self, run_id: &str) -> Result<Option<CodexRunSnapshot>, CliError> {
         let result = self.conn.query_row(
-            "SELECT run_id, session_id, project_dir, thread_id, turn_id, mode,
+            "SELECT run_id, session_id, session_agent_id, display_name,
+                project_dir, thread_id, turn_id, mode,
                 status, prompt, latest_summary, final_message, error,
-                pending_approvals_json, created_at, updated_at
+                pending_approvals_json, resolved_approvals_json, events_json,
+                created_at, updated_at, model, effort
              FROM codex_runs
              WHERE run_id = ?1",
             [run_id],
@@ -95,9 +115,11 @@ impl DaemonDb {
         let mut statement = self
             .conn
             .prepare(
-                "SELECT run_id, session_id, project_dir, thread_id, turn_id, mode,
+                "SELECT run_id, session_id, session_agent_id, display_name,
+                    project_dir, thread_id, turn_id, mode,
                     status, prompt, latest_summary, final_message, error,
-                    pending_approvals_json, created_at, updated_at
+                    pending_approvals_json, resolved_approvals_json, events_json,
+                    created_at, updated_at, model, effort
                  FROM codex_runs
                  WHERE session_id = ?1
                  ORDER BY updated_at DESC",
@@ -251,29 +273,36 @@ impl DaemonDb {
 }
 
 fn codex_run_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<CodexRunSnapshot> {
-    let mode_raw: String = row.get(5)?;
-    let status_raw: String = row.get(6)?;
-    let pending_approvals_json: String = row.get(11)?;
+    let mode_raw: String = row.get(7)?;
+    let status_raw: String = row.get(8)?;
+    let pending_approvals_json: String = row.get(13)?;
+    let resolved_approvals_json: String = row.get(14)?;
+    let events_json: String = row.get(15)?;
     Ok(CodexRunSnapshot {
         run_id: row.get(0)?,
         session_id: row.get(1)?,
-        project_dir: row.get(2)?,
-        thread_id: row.get(3)?,
-        turn_id: row.get(4)?,
+        session_agent_id: row.get(2)?,
+        display_name: row.get(3)?,
+        project_dir: row.get(4)?,
+        thread_id: row.get(5)?,
+        turn_id: row.get(6)?,
         mode: codex_mode_from_str(&mode_raw).map_err(parse_error_to_sql)?,
         status: codex_status_from_str(&status_raw).map_err(parse_error_to_sql)?,
-        prompt: row.get(7)?,
-        latest_summary: row.get(8)?,
-        final_message: row.get(9)?,
-        error: row.get(10)?,
+        prompt: row.get(9)?,
+        latest_summary: row.get(10)?,
+        final_message: row.get(11)?,
+        error: row.get(12)?,
         pending_approvals: serde_json::from_str(&pending_approvals_json)
             .map_err(|error| parse_error_to_sql(format!("parse codex approvals: {error}")))?,
-        created_at: row.get(12)?,
-        updated_at: row.get(13)?,
-        // Model and effort are intentionally not persisted yet; they only
-        // matter at thread/start, never on resume from the database.
-        model: None,
-        effort: None,
+        resolved_approvals: serde_json::from_str(&resolved_approvals_json).map_err(|error| {
+            parse_error_to_sql(format!("parse codex resolved approvals: {error}"))
+        })?,
+        events: serde_json::from_str(&events_json)
+            .map_err(|error| parse_error_to_sql(format!("parse codex events: {error}")))?,
+        created_at: row.get(16)?,
+        updated_at: row.get(17)?,
+        model: row.get(18)?,
+        effort: row.get(19)?,
     })
 }
 

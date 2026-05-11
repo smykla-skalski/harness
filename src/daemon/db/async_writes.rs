@@ -383,6 +383,7 @@ async fn replace_agents(
                     .map(|managed| match managed.kind {
                         ManagedAgentKind::Tui => "tui",
                         ManagedAgentKind::Acp => "acp",
+                        ManagedAgentKind::Codex => "codex",
                     }),
             )
             .bind(

@@ -54,7 +54,8 @@ extension RecordingHarnessClient {
       sessionID: sessionID,
       mode: request.mode,
       status: .queued,
-      prompt: request.prompt
+      prompt: request.prompt,
+      displayName: request.name
     )
     recordCodexRun(run)
     return run
@@ -277,11 +278,14 @@ extension RecordingHarnessClient {
     latestSummary: String? = "Reading the session context.",
     finalMessage: String? = nil,
     error: String? = nil,
-    pendingApprovals: [CodexApprovalRequest] = []
+    pendingApprovals: [CodexApprovalRequest] = [],
+    displayName: String? = nil
   ) -> CodexRunSnapshot {
     CodexRunSnapshot(
       runId: runID,
       sessionId: sessionID,
+      sessionAgentId: "codex-worker",
+      displayName: displayName ?? "Codex",
       projectDir: PreviewFixtures.summary.projectDir ?? PreviewFixtures.summary.contextRoot,
       threadId: "thread-\(runID)",
       turnId: "turn-\(runID)",

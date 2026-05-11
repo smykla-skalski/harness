@@ -1,5 +1,8 @@
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+use crate::session::types::SessionRole;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
 #[serde(rename_all = "snake_case")]
@@ -20,6 +23,13 @@ pub enum CodexRunStatus {
     Cancelled,
 }
 
+impl CodexRunStatus {
+    #[must_use]
+    pub const fn is_active(self) -> bool {
+        matches!(self, Self::Queued | Self::Running | Self::WaitingApproval)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
 #[serde(rename_all = "snake_case")]
 pub enum CodexApprovalDecision {
@@ -35,6 +45,16 @@ pub struct CodexRunRequest {
     pub actor: Option<String>,
     pub prompt: String,
     pub mode: CodexRunMode,
+    #[serde(default = "default_codex_agent_role")]
+    pub role: SessionRole,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fallback_role: Option<SessionRole>,
+    #[serde(default)]
+    pub capabilities: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub persona: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub resume_thread_id: Option<String>,
     /// Optional model identifier validated against the codex catalog. `None`
@@ -51,6 +71,10 @@ pub struct CodexRunRequest {
     /// model's `effort_values`.
     #[serde(default, skip_serializing_if = "core::ops::Not::not")]
     pub allow_custom_model: bool,
+}
+
+fn default_codex_agent_role() -> SessionRole {
+    SessionRole::Worker
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -84,9 +108,33 @@ pub struct CodexApprovalRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CodexResolvedApproval {
+    pub approval_id: String,
+    pub decision: CodexApprovalDecision,
+    pub resolved_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CodexRunEvent {
+    pub event_id: String,
+    pub sequence: u64,
+    pub recorded_at: String,
+    pub kind: String,
+    pub summary: String,
+    pub thread_id: Option<String>,
+    pub turn_id: Option<String>,
+    pub item_id: Option<String>,
+    pub payload: Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodexRunSnapshot {
     pub run_id: String,
     pub session_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_agent_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
     pub project_dir: String,
     pub thread_id: Option<String>,
     pub turn_id: Option<String>,
@@ -97,15 +145,18 @@ pub struct CodexRunSnapshot {
     pub final_message: Option<String>,
     pub error: Option<String>,
     pub pending_approvals: Vec<CodexApprovalRequest>,
+    #[serde(default)]
+    pub resolved_approvals: Vec<CodexResolvedApproval>,
+    #[serde(default)]
+    pub events: Vec<CodexRunEvent>,
     pub created_at: String,
     pub updated_at: String,
     /// Optional model identifier passed to the codex app-server at thread
-    /// start. Not persisted yet; reloads from the database always populate
-    /// this with `None`.
+    /// start.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     /// Optional reasoning effort forwarded to the codex app-server at thread
-    /// start. Tracked on the in-memory snapshot only, matching `model`.
+    /// start.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effort: Option<String>,
 }

@@ -272,6 +272,8 @@ pub(super) fn sample_codex_run(run_id: &str, updated_at: &str) -> CodexRunSnapsh
     CodexRunSnapshot {
         run_id: run_id.into(),
         session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
+        session_agent_id: Some("codex-worker".into()),
+        display_name: Some("Codex".into()),
         project_dir: "/tmp/harness".into(),
         thread_id: Some("thread-1".into()),
         turn_id: Some("turn-1".into()),
@@ -282,6 +284,8 @@ pub(super) fn sample_codex_run(run_id: &str, updated_at: &str) -> CodexRunSnapsh
         final_message: None,
         error: None,
         pending_approvals: Vec::new(),
+        resolved_approvals: Vec::new(),
+        events: Vec::new(),
         created_at: "2026-04-09T09:00:00Z".into(),
         updated_at: updated_at.into(),
         model: None,

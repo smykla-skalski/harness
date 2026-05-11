@@ -84,6 +84,7 @@ struct AgentCapabilityOption: Identifiable, Equatable {
   let bundledWithHarness: Bool
   let sandboxed: Bool
   let acpHostBridgeReady: Bool
+  let codexHostBridgeReady: Bool
 
   init(
     id: String,
@@ -94,7 +95,8 @@ struct AgentCapabilityOption: Identifiable, Equatable {
     installHint: String?,
     bundledWithHarness: Bool = false,
     sandboxed: Bool,
-    acpHostBridgeReady: Bool
+    acpHostBridgeReady: Bool,
+    codexHostBridgeReady: Bool = true
   ) {
     self.id = id
     self.title = title
@@ -105,6 +107,7 @@ struct AgentCapabilityOption: Identifiable, Equatable {
     self.bundledWithHarness = bundledWithHarness
     self.sandboxed = sandboxed
     self.acpHostBridgeReady = acpHostBridgeReady
+    self.codexHostBridgeReady = codexHostBridgeReady
   }
 
   var isEnabled: Bool {
@@ -168,8 +171,20 @@ struct AgentCapabilityOption: Identifiable, Equatable {
     transportChoices.first { $0.id.isAcp }
   }
 
+  var codexChoice: AgentCapabilityTransportChoice? {
+    transportChoices.first { $0.id.isCodexNative }
+  }
+
   var requiresBridgeAccess: Bool {
+    requiresAcpBridgeAccess || requiresCodexBridgeAccess
+  }
+
+  var requiresAcpBridgeAccess: Bool {
     sandboxed && !acpHostBridgeReady && acpChoice != nil
+  }
+
+  var requiresCodexBridgeAccess: Bool {
+    sandboxed && !codexHostBridgeReady && codexChoice != nil
   }
 
   var availabilityState: AgentCapabilityAvailabilityState {
@@ -178,6 +193,9 @@ struct AgentCapabilityOption: Identifiable, Equatable {
     }
     if showsInstallCTA {
       return .setupRequired
+    }
+    if let codexChoice, isEnabled(codexChoice) {
+      return .projectAccessAvailable
     }
     if hasPendingAcpProbe {
       return .checkingAccess
@@ -204,7 +222,11 @@ struct AgentCapabilityOption: Identifiable, Equatable {
         "Install the \(title) CLI to add ACP here"
       }
     case .bridgeAccessRequired:
-      "Turn on bridge access to use ACP here"
+      if requiresCodexBridgeAccess {
+        "Turn on bridge access to use Codex here"
+      } else {
+        "Turn on bridge access to use ACP here"
+      }
     case .terminalOnly:
       transportChoices.contains(where: { $0.id.isAcp })
         ? "ACP isn't available here yet"
@@ -229,6 +251,11 @@ struct AgentCapabilityOption: Identifiable, Equatable {
   func isEnabled(_ choice: AgentCapabilityTransportChoice) -> Bool {
     switch choice.id {
     case .tui:
+      return true
+    case .codex:
+      if sandboxed {
+        return codexHostBridgeReady
+      }
       return true
     case .acp:
       if sandboxed {
