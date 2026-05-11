@@ -52,7 +52,8 @@ extension SessionCacheService {
     transcript: [TimelineEntry]? = nil,
     transcriptSource: HarnessMonitorSessionWindowTranscriptSource? = nil,
     timelineWindow: TimelineWindowResponse? = nil,
-    markViewed: Bool = true
+    markViewed: Bool = true,
+    preservesTimeline: Bool = false
   ) async -> WriteResult {
     let context = makeContext()
     let cached: CachedSession
@@ -74,14 +75,16 @@ extension SessionCacheService {
     syncAgents(detail.agents, on: cached, context: context)
     syncTasks(detail.tasks, on: cached, context: context)
     syncSignals(detail.signals, on: cached, context: context)
-    syncTimeline(timeline, on: cached, context: context)
+    if !preservesTimeline {
+      syncTimeline(timeline, on: cached, context: context)
+      syncTimelineWindow(timelineWindow, timelineIsEmpty: timeline.isEmpty, on: cached)
+    }
     syncTranscript(
       transcript,
       transcriptSource: transcriptSource,
       sessionID: detail.session.sessionId,
       context: context
     )
-    syncTimelineWindow(timelineWindow, timelineIsEmpty: timeline.isEmpty, on: cached)
     syncActivity(detail.agentActivity, on: cached, context: context)
     syncObserver(detail.observer, on: cached, context: context)
 
