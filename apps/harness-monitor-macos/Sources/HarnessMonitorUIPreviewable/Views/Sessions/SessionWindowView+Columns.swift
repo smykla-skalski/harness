@@ -191,16 +191,23 @@ extension SessionWindowView {
     preferredBinding: Binding<Bool>,
     announce: Bool = true
   ) {
+    guard shouldUpdateDetailColumnWidth(to: width) else {
+      detailColumnResizeState.cancelPending()
+      return
+    }
     // Delay layout-driven writes until after SwiftUI finishes the current
     // geometry pass; synchronous updates here trigger the startup CGFloat fault.
-    Task { @MainActor in
+    detailColumnResizeState.cancelPending()
+    detailColumnResizeState.settleTask = Task { @MainActor in
       await Task.yield()
+      guard !Task.isCancelled else { return }
       updateDetailColumnWidth(
         width,
         visibleBinding: visibleBinding,
         preferredBinding: preferredBinding,
         announce: announce
       )
+      detailColumnResizeState.settleTask = nil
     }
   }
 
@@ -300,6 +307,9 @@ extension SessionWindowView {
           visibleBinding: inspectorVisibleBinding,
           preferredBinding: inspectorPreferredBinding
         )
+      }
+      .onDisappear {
+        detailColumnResizeState.cancelPending()
       }
     }
   }

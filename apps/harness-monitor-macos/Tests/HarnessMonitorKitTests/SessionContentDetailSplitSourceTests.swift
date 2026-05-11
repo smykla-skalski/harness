@@ -34,16 +34,11 @@ struct SessionContentDetailSplitSourceTests {
 
     #expect(
       columnsSource.contains(
-        """
-        SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding) {
-                contentColumn
-              } detail: {
-                detailColumn
-              }
-              .backgroundExtensionEffect()
-        """
+        "SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding)"
       )
     )
+    #expect(columnsSource.contains("switch renderedRoute.layoutStyle"))
+    #expect(columnsSource.contains(".backgroundExtensionEffect()"))
     #expect(
       !columnsSource.contains(
         """
@@ -75,11 +70,17 @@ struct SessionContentDetailSplitSourceTests {
     )
 
     #expect(columnsSource.contains("deferDetailColumnWidthUpdate("))
-    #expect(columnsSource.contains("Task { @MainActor in"))
-    #expect(columnsSource.contains("await Task.yield()"))
-    #expect(splitSource.contains("deferReclampLiveWidth(availableWidth: newWidth)"))
-    #expect(splitSource.contains("Task { @MainActor in"))
-    #expect(splitSource.contains("await Task.yield()"))
+    #expect(columnsSource.contains("detailColumnResizeState.cancelPending()"))
+    #expect(columnsSource.contains("detailColumnResizeState.settleTask = Task { @MainActor in"))
+    #expect(columnsSource.contains("shouldUpdateDetailColumnWidth(to: width)"))
+    #expect(splitSource.contains("scheduleSettledGeometryReclamp(availableWidth: newWidth)"))
+    #expect(splitSource.contains("resizeState.cancelPending()"))
+    #expect(splitSource.contains("resizeState.settleTask = Task { @MainActor in"))
+    #expect(
+      splitSource.contains(
+        "Task.sleep(for: SessionContentDetailSplitLayout.resizeSettleDelay)"
+      )
+    )
   }
 
   @Test("Session detail columns leave top padding to the owned views")
