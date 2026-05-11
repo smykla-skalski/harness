@@ -322,7 +322,9 @@ struct SessionWindowCreateProviderListRow: View {
     providerSubtitle(for: option)
   }
 
-  static func availableModes(for option: AgentCapabilityOption) -> [SessionWindowCreateProviderMode] {
+  static func availableModes(
+    for option: AgentCapabilityOption
+  ) -> [SessionWindowCreateProviderMode] {
     option.transportChoices.compactMap { choice in
       guard option.isEnabled(choice) else { return nil }
       if choice.id.isCodexNative {
@@ -339,8 +341,11 @@ struct SessionWindowCreateProviderListRow: View {
       return option.availabilityState.compactTitle
     case 1:
       return "Mode \(modes[0])"
-    default:
+    case 2:
       return "Modes \(modes[0]) and \(modes[1])"
+    default:
+      let prefix = modes.dropLast().joined(separator: ", ")
+      return "Modes \(prefix), and \(modes[modes.count - 1])"
     }
   }
 
@@ -371,7 +376,7 @@ struct SessionWindowCreateProviderListRow: View {
 }
 
 enum SessionWindowCreateProviderMode: String, Identifiable {
-  case codex = "Codex"
+  case codex = "App Server"
   case acp = "ACP"
   case tui = "TUI"
 
@@ -380,7 +385,7 @@ enum SessionWindowCreateProviderMode: String, Identifiable {
   var fill: Color {
     switch self {
     case .codex:
-      HarnessMonitorTheme.success
+      HarnessMonitorTheme.warmAccent
     case .acp:
       HarnessMonitorTheme.success
     case .tui:
@@ -396,13 +401,15 @@ enum SessionWindowCreateProviderMode: String, Identifiable {
 private struct SessionWindowCreateProviderModeBadge: View {
   let mode: SessionWindowCreateProviderMode
   private let cornerRadius: CGFloat = 8
+  private let horizontalPadding: CGFloat = 6
+  private let verticalPadding: CGFloat = 2
 
   var body: some View {
     Text(mode.rawValue)
       .font(.system(.caption2, design: .rounded, weight: .semibold))
       .foregroundStyle(mode.foreground)
-      .padding(.horizontal, HarnessMonitorTheme.pillPaddingH)
-      .padding(.vertical, HarnessMonitorTheme.pillPaddingV)
+      .padding(.horizontal, horizontalPadding)
+      .padding(.vertical, verticalPadding)
       .background {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
           .fill(mode.fill)
@@ -421,7 +428,7 @@ struct SessionWindowCreateTransportChoiceButton: View {
 
   private var shortTitle: String {
     if choice.id.isCodexNative {
-      return "Codex"
+      return "App Server"
     }
     return choice.id.isAcp ? "ACP" : "Terminal"
   }
@@ -442,7 +449,7 @@ struct SessionWindowCreateTransportChoiceButton: View {
         tint: isSelected ? nil : .secondary
       )
       .disabled(!isEnabled)
-      .accessibilityLabel("\(providerTitle), \(choice.title)")
+      .accessibilityLabel("\(providerTitle), \(shortTitle)")
       .accessibilityValue(isSelected ? "Selected" : "")
       .accessibilityHint(
         isEnabled ? "" : (unavailableReason ?? "Unavailable")
