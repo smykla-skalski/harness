@@ -146,13 +146,6 @@ extension SessionWindowCreateForm {
     )
   }
 
-  var projectDirOverride: Binding<String> {
-    Binding(
-      get: { draft.projectDir },
-      set: { updateDraft(projectDir: $0) }
-    )
-  }
-
   var argvOverrideText: Binding<String> {
     Binding(
       get: { draft.argvOverride },

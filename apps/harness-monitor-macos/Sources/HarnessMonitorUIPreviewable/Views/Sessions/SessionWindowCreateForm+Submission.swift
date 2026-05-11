@@ -3,7 +3,6 @@ import SwiftUI
 
 extension SessionWindowCreateForm {
   private struct AgentCreationContext {
-    let projectDir: String?
     let personaID: String?
     let selectedRole: SessionRole
     let fallbackRole: SessionRole?
@@ -67,7 +66,6 @@ extension SessionWindowCreateForm {
   }
 
   private func agentCreationContext(selection: AgentLaunchSelection) -> AgentCreationContext {
-    let trimmedProjectDir = draft.projectDir.trimmingCharacters(in: .whitespacesAndNewlines)
     let trimmedPersonaID = draft.personaID.trimmingCharacters(in: .whitespacesAndNewlines)
     let selectedRole = draft.role
     let fallbackRole =
@@ -76,7 +74,6 @@ extension SessionWindowCreateForm {
         role: selectedRole
       ) ? draft.fallbackRole : nil
     return AgentCreationContext(
-      projectDir: trimmedProjectDir.isEmpty ? nil : trimmedProjectDir,
       personaID: trimmedPersonaID.isEmpty ? nil : trimmedPersonaID,
       selectedRole: selectedRole,
       fallbackRole: fallbackRole
@@ -133,7 +130,6 @@ extension SessionWindowCreateForm {
         role: context.selectedRole,
         name: name,
         prompt: draft.prompt,
-        projectDir: context.projectDir,
         persona: context.personaID,
         model: modelSelection.id,
         effort: effort.isEmpty ? nil : effort,
@@ -203,7 +199,6 @@ extension SessionWindowCreateForm {
         capabilities: capabilities,
         name: name,
         prompt: draft.prompt,
-        projectDir: context.projectDir,
         persona: context.personaID,
         model: modelSelection.id,
         effort: effort.isEmpty ? nil : effort,

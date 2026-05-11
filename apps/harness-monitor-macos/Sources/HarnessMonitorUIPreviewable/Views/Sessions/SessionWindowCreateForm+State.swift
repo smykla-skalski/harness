@@ -27,7 +27,6 @@ extension SessionWindowCreateForm {
     role: SessionRole? = nil,
     fallbackRole: SessionRole? = nil,
     personaID: String? = nil,
-    projectDir: String? = nil,
     argvOverride: String? = nil,
     taskSeverity: TaskSeverity? = nil,
     codexMode: CodexRunMode? = nil,
@@ -42,7 +41,6 @@ extension SessionWindowCreateForm {
     next.role = role ?? next.role
     next.fallbackRole = fallbackRole ?? next.fallbackRole
     next.personaID = personaID ?? next.personaID
-    next.projectDir = projectDir ?? next.projectDir
     next.argvOverride = argvOverride ?? next.argvOverride
     next.taskSeverity = taskSeverity ?? next.taskSeverity
     next.codexMode = codexMode ?? next.codexMode

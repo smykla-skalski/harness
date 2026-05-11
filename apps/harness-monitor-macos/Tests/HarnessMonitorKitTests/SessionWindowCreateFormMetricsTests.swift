@@ -82,13 +82,11 @@ struct SessionWindowCreateFormMetricsTests {
     draft.role = .leader
     draft.fallbackRole = .observer
     draft.personaID = "reviewer"
-    draft.projectDir = "/Users/example/Projects/harness"
     draft.argvOverride = "codex\n--model\ngpt-5\n\n"
 
     #expect(draft.roleRawValue == SessionRole.leader.rawValue)
     #expect(draft.fallbackRoleRawValue == SessionRole.observer.rawValue)
     #expect(draft.personaID == "reviewer")
-    #expect(draft.projectDir == "/Users/example/Projects/harness")
     #expect(draft.normalizedArgvOverride == ["codex", "--model", "gpt-5"])
   }
 
@@ -266,6 +264,7 @@ struct SessionWindowCreateFormMetricsTests {
     #expect(source.contains("Text(\"Runtime\")"))
     #expect(source.contains("Text(\"Session\")"))
     #expect(source.contains("Text(\"Advanced overrides\")"))
+    #expect(!source.contains("Optional project directory override"))
     #expect(runtimePaneSource.contains("SessionWindowCreateProviderListRow"))
     #expect(runtimePaneSource.contains("HarnessMonitorColumnScrollView("))
     #expect(
@@ -329,7 +328,7 @@ struct SessionWindowCreateFormMetricsTests {
     #expect(submissionSource.contains("writeTerminalLaunchPreset("))
     #expect(submissionSource.contains("role: selectedRole"))
     #expect(submissionSource.contains("fallbackRole: fallbackRole"))
-    #expect(submissionSource.contains("projectDir: context.projectDir"))
+    #expect(!submissionSource.contains("projectDir: context.projectDir"))
     #expect(submissionSource.contains("persona: context.personaID"))
     #expect(submissionSource.contains("model: modelSelection.id"))
     #expect(submissionSource.contains("effort: effort.isEmpty ? nil : effort"))
