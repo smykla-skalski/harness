@@ -238,13 +238,16 @@ extension HarnessMonitorStore {
     _ entries: [TimelineEntry],
     agents: [AgentRegistration]
   ) -> [TimelineEntry] {
+    typealias ManagedIdentity = (String, (sessionAgentID: String, displayName: String))
     let identitiesByManagedAgentID = Dictionary(
-      uniqueKeysWithValues:
-        agents.compactMap { agent -> (String, (sessionAgentID: String, displayName: String))? in
+      uniqueKeysWithValues: agents.compactMap { agent -> ManagedIdentity? in
         guard let managedAgentID = agent.managedAgentID else {
           return nil
         }
-        return (managedAgentID, (sessionAgentID: agent.agentId, displayName: agent.name))
+        return (
+          managedAgentID,
+          (sessionAgentID: agent.agentId, displayName: agent.name)
+        )
       }
     )
     let updatedEntries = entries.map { entry in

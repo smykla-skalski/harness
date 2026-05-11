@@ -123,6 +123,10 @@ public struct SessionWindowView: View {
     nonmutating set { contentColumnWidthStorage = newValue }
   }
 
+  var presentedModifiers: EventModifiers {
+    currentModifiers
+  }
+
   var contentColumnWidthBinding: Binding<Double> {
     $contentColumnWidthStorage
   }

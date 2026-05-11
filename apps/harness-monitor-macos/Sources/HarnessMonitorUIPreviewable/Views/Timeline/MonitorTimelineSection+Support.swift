@@ -118,8 +118,8 @@ extension SessionTimelineView {
       mode: filterPersistenceMode,
       input: input
     )
-    if hydrated != filters {
-      filters = hydrated
+    if hydrated != filterState {
+      filterState = hydrated
     }
   }
 
