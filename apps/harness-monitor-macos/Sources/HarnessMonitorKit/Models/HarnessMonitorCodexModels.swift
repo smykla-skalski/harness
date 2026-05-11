@@ -116,6 +116,71 @@ public struct CodexRunListResponse: Codable, Equatable, Sendable {
   public let runs: [CodexRunSnapshot]
 }
 
+public struct CodexAgentInspectResponse: Codable, Equatable, Sendable {
+  public let agents: [CodexAgentInspectSnapshot]
+  public let daemonPerceivedNow: String?
+  public let available: Bool
+  public let issueMessage: String?
+
+  public init(
+    agents: [CodexAgentInspectSnapshot],
+    daemonPerceivedNow: String? = nil,
+    available: Bool = true,
+    issueMessage: String? = nil
+  ) {
+    self.agents = agents
+    self.daemonPerceivedNow = daemonPerceivedNow
+    self.available = available
+    self.issueMessage = issueMessage
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case agents
+    case daemonPerceivedNow
+    case available
+    case issueMessage
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    agents = try container.decode([CodexAgentInspectSnapshot].self, forKey: .agents)
+    daemonPerceivedNow = try container.decodeIfPresent(String.self, forKey: .daemonPerceivedNow)
+    available = try container.decodeIfPresent(Bool.self, forKey: .available) ?? true
+    issueMessage = try container.decodeIfPresent(String.self, forKey: .issueMessage)
+  }
+}
+
+public struct CodexAgentInspectSnapshot: Codable, Equatable, Identifiable, Sendable {
+  public let runId: String
+  public let sessionId: String
+  public let agentId: String?
+  public let displayName: String
+  public let status: CodexRunStatus
+  public let projectDir: String
+  public let threadId: String?
+  public let turnId: String?
+  public let active: Bool
+  public let attached: Bool
+  public let pendingApprovals: Int
+  public let resolvedApprovals: Int
+  public let eventCount: Int
+  public let lastUpdateAt: String
+  public let model: String?
+  public let effort: String?
+  public let latestSummary: String?
+  public let error: String?
+
+  public var id: String { runId }
+}
+
+public struct CodexTranscriptResponse: Codable, Equatable, Sendable {
+  public let entries: [TimelineEntry]
+
+  public init(entries: [TimelineEntry]) {
+    self.entries = entries
+  }
+}
+
 public struct CodexApprovalRequest: Codable, Equatable, Identifiable, Sendable {
   public let approvalId: String
   public let requestId: String

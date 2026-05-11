@@ -160,6 +160,17 @@ pub struct DaemonHttpState {
     pub managed_agent_mutation_locks: ManagedAgentMutationLocks,
 }
 
+impl DaemonHttpState {
+    #[must_use]
+    pub(crate) fn wake_dispatch(&self) -> crate::daemon::service::WakeDispatch<'_> {
+        crate::daemon::service::WakeDispatch::new(
+            Some(&self.agent_tui_manager),
+            Some(&self.acp_agent_manager),
+        )
+        .with_codex(Some(&self.codex_controller))
+    }
+}
+
 type ManagedAgentMutationKey = (String, String);
 type ManagedAgentMutationLane = Arc<AsyncMutex<()>>;
 type ManagedAgentMutationMap = BTreeMap<ManagedAgentMutationKey, ManagedAgentMutationLane>;

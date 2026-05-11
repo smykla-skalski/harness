@@ -15,6 +15,7 @@ use super::{
     task_drop_effect_signal_records, write_task_start_signals,
 };
 use crate::daemon::agent_acp::AcpWakePrompt;
+use crate::daemon::protocol::CodexSteerRequest;
 
 mod agents;
 mod sessions;
@@ -181,6 +182,14 @@ async fn try_wake_started_workers_async(
                         agent_id: record.agent_id.clone(),
                     },
                 );
+            }
+            WakeRoute::Codex { run_id, controller } => {
+                let request = CodexSteerRequest {
+                    prompt: build_active_signal_prompt(&record.signal),
+                };
+                if let Err(error) = controller.steer(run_id, &request) {
+                    tracing::warn!(session_id, agent_id = %record.agent_id, signal_id = %record.signal.signal_id, %error, "wake skipped (async): codex steer failed");
+                }
             }
             WakeRoute::None { reason } => {
                 tracing::warn!(session_id, agent_id = %record.agent_id, signal_id = %record.signal.signal_id, reason = %reason, "wake skipped (async): signal stays file-only");

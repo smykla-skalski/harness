@@ -1,15 +1,22 @@
+use std::collections::BTreeMap;
 use std::path::Path;
-use std::sync::{Arc, OnceLock};
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex, OnceLock};
 
 use serde_json::json;
+use tempfile::{TempDir, tempdir};
 use tokio::sync::broadcast;
 
 use super::{
     CodexControllerHandle, approvals::approval_from_request, handle::preferred_codex_project_dir,
     worker::upsert_pending_approval,
 };
-use crate::daemon::protocol::{CodexApprovalRequest, CodexRunMode, CodexRunRequest};
-use crate::session::types::SessionRole;
+use crate::daemon::db::DaemonDb;
+use crate::daemon::index::DiscoveredProject;
+use crate::daemon::protocol::{
+    CodexApprovalRequest, CodexRunMode, CodexRunRequest, CodexRunSnapshot, CodexRunStatus,
+};
+use crate::session::types::{SessionMetrics, SessionRole, SessionState, SessionStatus};
 
 #[test]
 fn start_run_rejects_empty_prompt_before_db_lookup() {
@@ -207,6 +214,87 @@ fn upsert_pending_approval_replaces_existing_visible_row() {
     assert_eq!(approvals[0].detail, "updated command detail");
 }
 
+#[test]
+fn stop_marks_stale_active_codex_run_cancelled() {
+    let (controller, db, _tempdir) = controller_with_db();
+    {
+        let db = db.lock().expect("db lock");
+        db.save_codex_run(&codex_run_snapshot(CodexRunStatus::Running))
+            .expect("save codex run");
+    }
+
+    let stopped = controller.stop("codex-run-1").expect("stop codex run");
+
+    assert_eq!(stopped.status, CodexRunStatus::Cancelled);
+    assert!(stopped.pending_approvals.is_empty());
+    assert!(
+        stopped
+            .events
+            .iter()
+            .any(|event| event.kind == "agent/stop"),
+        "stop should record a lifecycle event"
+    );
+}
+
+#[test]
+fn list_runs_reconciles_stale_active_codex_run() {
+    let (controller, db, _tempdir) = controller_with_db();
+    {
+        let db = db.lock().expect("db lock");
+        db.save_codex_run(&codex_run_snapshot(CodexRunStatus::Running))
+            .expect("save codex run");
+    }
+
+    let listed = controller
+        .list_runs("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
+        .expect("list codex runs")
+        .runs;
+
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].status, CodexRunStatus::Failed);
+    assert_eq!(
+        listed[0].error.as_deref(),
+        Some("Codex turn is no longer attached to this daemon")
+    );
+    assert!(
+        listed[0]
+            .events
+            .iter()
+            .any(|event| event.kind == "agent/reconciled"),
+        "stale reconciliation should be visible in the event stream"
+    );
+}
+
+#[test]
+fn transcript_includes_codex_prompt_and_final_message() {
+    let (controller, db, _tempdir) = controller_with_db();
+    let mut run = codex_run_snapshot(CodexRunStatus::Completed);
+    run.final_message = Some("Done from Codex".into());
+    {
+        let db = db.lock().expect("db lock");
+        db.save_codex_run(&run).expect("save codex run");
+    }
+
+    let transcript = controller
+        .transcript("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
+        .expect("codex transcript");
+
+    assert!(
+        transcript
+            .entries
+            .iter()
+            .any(|entry| entry.kind == "user_prompt" && entry.summary == "Investigate"),
+        "prompt should be exposed as transcript history"
+    );
+    assert!(
+        transcript
+            .entries
+            .iter()
+            .any(|entry| entry.kind == "assistant_text" && entry.summary == "Done from Codex"),
+        "final response should be exposed as transcript history"
+    );
+}
+
 fn codex_approval_request(
     approval_id: &str,
     request_id: &str,
@@ -224,5 +312,96 @@ fn codex_approval_request(
         cwd: Some("/tmp/harness".to_string()),
         command: Some("rtk touch approved.txt".to_string()),
         file_path: None,
+    }
+}
+
+fn controller_with_db() -> (CodexControllerHandle, Arc<Mutex<DaemonDb>>, TempDir) {
+    let (sender, _) = broadcast::channel(8);
+    let tempdir = tempdir().expect("temp dir");
+    let db_path = tempdir.path().join("harness.db");
+    let db = Arc::new(Mutex::new(DaemonDb::open(&db_path).expect("open db")));
+    {
+        let db_guard = db.lock().expect("db lock");
+        db_guard
+            .sync_project(&sample_project())
+            .expect("sync project");
+        db_guard
+            .save_session_state("project-1", &sample_session_state())
+            .expect("save session");
+    }
+    let db_slot = Arc::new(OnceLock::new());
+    db_slot.set(db.clone()).expect("install db");
+    (
+        CodexControllerHandle::new(sender, db_slot, false),
+        db,
+        tempdir,
+    )
+}
+
+fn sample_project() -> DiscoveredProject {
+    DiscoveredProject {
+        project_id: "project-1".into(),
+        name: "harness".into(),
+        project_dir: Some(PathBuf::from("/tmp/harness")),
+        repository_root: Some(PathBuf::from("/tmp/harness")),
+        checkout_id: "checkout-1".into(),
+        checkout_name: "main".into(),
+        context_root: PathBuf::from("/tmp/harness/.harness"),
+        is_worktree: false,
+        worktree_name: None,
+    }
+}
+
+fn sample_session_state() -> SessionState {
+    SessionState {
+        schema_version: 3,
+        state_version: 1,
+        session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+        project_name: "harness".into(),
+        worktree_path: PathBuf::from("/tmp/harness/workspace"),
+        shared_path: PathBuf::from("/tmp/harness/shared"),
+        origin_path: PathBuf::from("/tmp/harness"),
+        branch_ref: "harness/eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+        title: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+        context: "codex controller test".into(),
+        status: SessionStatus::Active,
+        policy: Default::default(),
+        created_at: "2026-04-09T10:00:00Z".into(),
+        updated_at: "2026-04-09T10:00:01Z".into(),
+        agents: BTreeMap::new(),
+        tasks: BTreeMap::new(),
+        leader_id: None,
+        archived_at: None,
+        last_activity_at: Some("2026-04-09T10:00:01Z".into()),
+        observe_id: None,
+        pending_leader_transfer: None,
+        external_origin: None,
+        adopted_at: None,
+        metrics: SessionMetrics::default(),
+    }
+}
+
+fn codex_run_snapshot(status: CodexRunStatus) -> CodexRunSnapshot {
+    CodexRunSnapshot {
+        run_id: "codex-run-1".into(),
+        session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+        session_agent_id: Some("agent-1".into()),
+        display_name: Some("Codex Worker".into()),
+        project_dir: "/tmp/harness".into(),
+        thread_id: Some("thread-1".into()),
+        turn_id: Some("turn-1".into()),
+        mode: CodexRunMode::WorkspaceWrite,
+        status,
+        prompt: "Investigate".into(),
+        latest_summary: Some("Running".into()),
+        final_message: None,
+        error: None,
+        pending_approvals: vec![codex_approval_request("approval-1", "request-1", "Approve")],
+        resolved_approvals: Vec::new(),
+        events: Vec::new(),
+        created_at: "2026-04-09T10:00:00Z".into(),
+        updated_at: "2026-04-09T10:00:01Z".into(),
+        model: Some("gpt-5.5".into()),
+        effort: Some("high".into()),
     }
 }

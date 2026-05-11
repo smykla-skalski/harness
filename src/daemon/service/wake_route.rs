@@ -12,6 +12,7 @@ use std::fmt;
 
 use super::signals::managed_tui_id_for_registration;
 use super::{AcpAgentManagerHandle, AgentRegistration, AgentTuiManagerHandle, session_service};
+use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::state::append_event_best_effort;
 use crate::session::types::{ManagedAgentKind, ManagedAgentRef};
 
@@ -88,6 +89,7 @@ pub(crate) fn record_wake_event(
 pub struct WakeDispatch<'a> {
     pub agent_tui: Option<&'a AgentTuiManagerHandle>,
     pub acp_agent: Option<&'a AcpAgentManagerHandle>,
+    pub codex: Option<&'a CodexControllerHandle>,
 }
 
 impl<'a> WakeDispatch<'a> {
@@ -99,7 +101,14 @@ impl<'a> WakeDispatch<'a> {
         Self {
             agent_tui,
             acp_agent,
+            codex: None,
         }
+    }
+
+    #[must_use]
+    pub fn with_codex(mut self, codex: Option<&'a CodexControllerHandle>) -> Self {
+        self.codex = codex;
+        self
     }
 
     #[must_use]
@@ -107,6 +116,7 @@ impl<'a> WakeDispatch<'a> {
         Self {
             agent_tui: None,
             acp_agent: None,
+            codex: None,
         }
     }
 }
@@ -122,6 +132,10 @@ pub(crate) enum WakeRoute<'a> {
     Acp {
         acp_id: &'a str,
         manager: &'a AcpAgentManagerHandle,
+    },
+    Codex {
+        run_id: &'a str,
+        controller: &'a CodexControllerHandle,
     },
     None {
         reason: NoneReason,
@@ -149,6 +163,9 @@ pub(crate) enum NoneReason {
     /// Acp-managed agent but the daemon has no `AcpAgentManager` handle in
     /// the current dispatch context.
     NoAcpManager,
+    /// Codex-managed agent but the daemon has no `CodexController` handle in
+    /// the current dispatch context.
+    NoCodexController,
 }
 
 impl fmt::Display for NoneReason {
@@ -159,6 +176,7 @@ impl fmt::Display for NoneReason {
             Self::MissingTuiIdentity => "tui-managed agent missing managed-agent identity",
             Self::NoTuiManager => "tui-managed agent but no AgentTuiManager available",
             Self::NoAcpManager => "acp-managed agent but no AcpAgentManager available",
+            Self::NoCodexController => "codex-managed agent but no CodexController available",
         })
     }
 }
@@ -191,10 +209,8 @@ pub(crate) fn wake_route_for_registration<'a>(
         }) => acp_route(acp_id, dispatch.acp_agent),
         Some(ManagedAgentRef {
             kind: ManagedAgentKind::Codex,
-            ..
-        }) => WakeRoute::None {
-            reason: NoneReason::Unmanaged,
-        },
+            id: run_id,
+        }) => codex_route(run_id, dispatch.codex),
         None => WakeRoute::None {
             reason: NoneReason::Unmanaged,
         },
@@ -231,6 +247,18 @@ fn acp_route<'a>(
     }
 }
 
+fn codex_route<'a>(
+    run_id: &'a str,
+    codex_controller: Option<&'a CodexControllerHandle>,
+) -> WakeRoute<'a> {
+    match codex_controller {
+        Some(controller) => WakeRoute::Codex { run_id, controller },
+        None => WakeRoute::None {
+            reason: NoneReason::NoCodexController,
+        },
+    }
+}
+
 pub(crate) fn log_wake_attempt(
     session_id: &str,
     record: &session_service::TaskStartSignalRecord,
@@ -239,6 +267,7 @@ pub(crate) fn log_wake_attempt(
     let (managed_kind, route_target): (&str, Cow<'_, str>) = match route {
         WakeRoute::Tui { tui_id, .. } => ("tui", (*tui_id).into()),
         WakeRoute::Acp { acp_id, .. } => ("acp", (*acp_id).into()),
+        WakeRoute::Codex { run_id, .. } => ("codex", (*run_id).into()),
         WakeRoute::None { reason } => ("none", reason.to_string().into()),
     };
     record_wake_event(
@@ -301,6 +330,15 @@ mod tests {
     fn acp_handle() -> crate::daemon::agent_acp::AcpAgentManagerHandle {
         let (sender, _receiver) = broadcast::channel(1);
         crate::daemon::agent_acp::AcpAgentManagerHandle::new(sender, Arc::new(OnceLock::new()))
+    }
+
+    fn codex_handle() -> crate::daemon::codex_controller::CodexControllerHandle {
+        let (sender, _receiver) = broadcast::channel(1);
+        crate::daemon::codex_controller::CodexControllerHandle::new(
+            sender,
+            Arc::new(OnceLock::new()),
+            false,
+        )
     }
 
     fn assert_none_reason(route: &WakeRoute<'_>, expected: NoneReason) {
@@ -391,6 +429,27 @@ mod tests {
     }
 
     #[test]
+    fn returns_codex_for_codex_managed_with_handle() {
+        let reg = registration(vec![], Some(ManagedAgentRef::codex("codex-7")));
+        let codex = codex_handle();
+        let route = wake_route_for_registration(
+            Some(&reg),
+            WakeDispatch::new(None, None).with_codex(Some(&codex)),
+        );
+        match route {
+            WakeRoute::Codex { run_id, .. } => assert_eq!(run_id, "codex-7"),
+            other => panic!("expected Codex route, got {:?}", managed_kind_label(&other)),
+        }
+    }
+
+    #[test]
+    fn returns_none_when_codex_managed_without_handle() {
+        let reg = registration(vec![], Some(ManagedAgentRef::codex("codex-7")));
+        let route = wake_route_for_registration(Some(&reg), WakeDispatch::none());
+        assert_none_reason(&route, NoneReason::NoCodexController);
+    }
+
+    #[test]
     fn none_reason_display_is_stable() {
         assert_eq!(
             format!("{}", NoneReason::Unregistered),
@@ -412,6 +471,10 @@ mod tests {
             format!("{}", NoneReason::NoAcpManager),
             "acp-managed agent but no AcpAgentManager available"
         );
+        assert_eq!(
+            format!("{}", NoneReason::NoCodexController),
+            "codex-managed agent but no CodexController available"
+        );
     }
 
     #[test]
@@ -429,6 +492,7 @@ mod tests {
         match route {
             WakeRoute::Tui { .. } => "tui",
             WakeRoute::Acp { .. } => "acp",
+            WakeRoute::Codex { .. } => "codex",
             WakeRoute::None { .. } => "none",
         }
     }

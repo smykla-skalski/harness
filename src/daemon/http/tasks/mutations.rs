@@ -209,10 +209,7 @@ async fn task_assign_response(
             task_id,
             request,
             async_db.as_ref(),
-            service::WakeDispatch::new(
-                Some(&state.agent_tui_manager),
-                Some(&state.acp_agent_manager),
-            ),
+            state.wake_dispatch(),
         )
         .await;
     }
@@ -222,10 +219,7 @@ async fn task_assign_response(
         task_id,
         request,
         db_guard.as_deref(),
-        service::WakeDispatch::new(
-            Some(&state.agent_tui_manager),
-            Some(&state.acp_agent_manager),
-        ),
+        state.wake_dispatch(),
     )
 }
 
@@ -241,10 +235,7 @@ async fn task_delete_response(
             task_id,
             request,
             async_db.as_ref(),
-            service::WakeDispatch::new(
-                Some(&state.agent_tui_manager),
-                Some(&state.acp_agent_manager),
-            ),
+            state.wake_dispatch(),
         )
         .await;
     }
@@ -254,10 +245,7 @@ async fn task_delete_response(
         task_id,
         request,
         db_guard.as_deref(),
-        service::WakeDispatch::new(
-            Some(&state.agent_tui_manager),
-            Some(&state.acp_agent_manager),
-        ),
+        state.wake_dispatch(),
     )
 }
 
@@ -273,10 +261,7 @@ async fn task_drop_response(
             task_id,
             request,
             async_db.as_ref(),
-            service::WakeDispatch::new(
-                Some(&state.agent_tui_manager),
-                Some(&state.acp_agent_manager),
-            ),
+            state.wake_dispatch(),
         )
         .await;
     }
@@ -286,10 +271,7 @@ async fn task_drop_response(
         task_id,
         request,
         db_guard.as_deref(),
-        service::WakeDispatch::new(
-            Some(&state.agent_tui_manager),
-            Some(&state.acp_agent_manager),
-        ),
+        state.wake_dispatch(),
     )
 }
 
@@ -305,10 +287,7 @@ async fn task_queue_policy_response(
             task_id,
             request,
             async_db.as_ref(),
-            service::WakeDispatch::new(
-                Some(&state.agent_tui_manager),
-                Some(&state.acp_agent_manager),
-            ),
+            state.wake_dispatch(),
         )
         .await;
     }
@@ -318,10 +297,7 @@ async fn task_queue_policy_response(
         task_id,
         request,
         db_guard.as_deref(),
-        service::WakeDispatch::new(
-            Some(&state.agent_tui_manager),
-            Some(&state.acp_agent_manager),
-        ),
+        state.wake_dispatch(),
     )
 }
 
@@ -337,10 +313,7 @@ async fn task_update_response(
             task_id,
             request,
             async_db.as_ref(),
-            service::WakeDispatch::new(
-                Some(&state.agent_tui_manager),
-                Some(&state.acp_agent_manager),
-            ),
+            state.wake_dispatch(),
         )
         .await;
     }
@@ -350,10 +323,7 @@ async fn task_update_response(
         task_id,
         request,
         db_guard.as_deref(),
-        service::WakeDispatch::new(
-            Some(&state.agent_tui_manager),
-            Some(&state.acp_agent_manager),
-        ),
+        state.wake_dispatch(),
     )
 }
 

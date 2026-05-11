@@ -4,6 +4,8 @@ use serde_json::Value;
 
 use crate::session::types::SessionRole;
 
+use super::summaries::TimelineEntry;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
 #[serde(rename_all = "snake_case")]
 pub enum CodexRunMode {
@@ -90,6 +92,41 @@ pub struct CodexApprovalDecisionRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodexRunListResponse {
     pub runs: Vec<CodexRunSnapshot>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CodexAgentInspectResponse {
+    pub agents: Vec<CodexAgentInspectSnapshot>,
+    pub daemon_perceived_now: String,
+    pub available: bool,
+    pub issue_message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CodexAgentInspectSnapshot {
+    pub run_id: String,
+    pub session_id: String,
+    pub agent_id: Option<String>,
+    pub display_name: String,
+    pub status: CodexRunStatus,
+    pub project_dir: String,
+    pub thread_id: Option<String>,
+    pub turn_id: Option<String>,
+    pub active: bool,
+    pub attached: bool,
+    pub pending_approvals: usize,
+    pub resolved_approvals: usize,
+    pub event_count: usize,
+    pub last_update_at: String,
+    pub model: Option<String>,
+    pub effort: Option<String>,
+    pub latest_summary: Option<String>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CodexTranscriptResponse {
+    pub entries: Vec<TimelineEntry>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

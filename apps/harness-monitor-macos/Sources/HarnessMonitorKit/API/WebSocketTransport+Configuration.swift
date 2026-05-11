@@ -35,6 +35,23 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func codexInspect(sessionID: String?) async throws -> CodexAgentInspectResponse {
+    var params: [String: JSONValue] = [:]
+    if let sessionID {
+      params.merge(sessionScopeParams(sessionID: sessionID)) { _, newValue in newValue }
+    }
+    let value = try await rpc(method: .managedAgentCodexInspect, params: .object(params))
+    return try decode(value)
+  }
+
+  public func codexTranscript(sessionID: String) async throws -> CodexTranscriptResponse {
+    let value = try await rpc(
+      method: .managedAgentCodexTranscript,
+      params: .object(sessionScopeParams(sessionID: sessionID))
+    )
+    return try decode(value)
+  }
+
   public func configuration() async throws -> MonitorConfiguration {
     if let cached = cachedConfiguration {
       return cached

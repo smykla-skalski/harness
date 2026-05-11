@@ -107,6 +107,8 @@ enum WebSocketRPCMethod: String, CaseIterable, Equatable, Sendable {
   case managedAgentInterruptCodex = "managed_agent.interrupt_codex"
   case managedAgentResolveCodexApproval = "managed_agent.resolve_codex_approval"
   case managedAgentResolveAcpPermission = "managed_agent.resolve_acp_permission"
+  case managedAgentCodexInspect = "managed_agent.codex_inspect"
+  case managedAgentCodexTranscript = "managed_agent.codex_transcript"
   case managedAgentAcpInspect = "managed_agent.acp_inspect"
   case managedAgentAcpTranscript = "managed_agent.acp_transcript"
   case voiceStartSession = "voice.start_session"

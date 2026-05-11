@@ -97,6 +97,16 @@ extension HarnessMonitorClientProtocol {
     try await acpTranscript(sessionID: sessionID.rawValue)
   }
 
+  public func codexInspect(sessionID: HarnessSessionID?) async throws
+    -> CodexAgentInspectResponse
+  {
+    try await codexInspect(sessionID: sessionID?.rawValue)
+  }
+
+  public func codexTranscript(sessionID: HarnessSessionID) async throws -> CodexTranscriptResponse {
+    try await codexTranscript(sessionID: sessionID.rawValue)
+  }
+
   public func codexRuns(sessionID: HarnessSessionID) async throws -> CodexRunListResponse {
     try await codexRuns(sessionID: sessionID.rawValue)
   }

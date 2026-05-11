@@ -4,8 +4,8 @@ use serde_json::{Value, json};
 use tokio::sync::mpsc;
 
 use crate::daemon::protocol::{
-    CodexApprovalDecision, CodexApprovalRequest, CodexResolvedApproval, CodexRunEvent,
-    CodexRunSnapshot, CodexRunStatus,
+    CodexApprovalDecision, CodexApprovalRequest, CodexResolvedApproval, CodexRunSnapshot,
+    CodexRunStatus,
 };
 use crate::daemon::state;
 use crate::errors::{CliError, CliErrorKind};
@@ -16,7 +16,7 @@ use super::approvals::{
     approval_from_request, approval_policy, approval_result, mode_instructions, thread_sandbox,
     trim_summary, turn_sandbox_policy,
 };
-use super::handle::CodexControllerHandle;
+use super::handle::{CodexControllerHandle, record_snapshot_event};
 use super::rpc::CodexJsonRpc;
 
 pub(super) struct CodexRunWorker {
@@ -168,7 +168,9 @@ impl CodexRunWorker {
                     let Some(control) = maybe_control else {
                         continue;
                     };
-                    self.handle_control(rpc, control).await?;
+                    if self.handle_control(rpc, control).await? {
+                        return Ok(());
+                    }
                 }
             }
         }
@@ -333,14 +335,20 @@ impl CodexRunWorker {
         &mut self,
         rpc: &mut CodexJsonRpc,
         control: CodexControlMessage,
-    ) -> Result<(), CliError> {
+    ) -> Result<bool, CliError> {
         match control {
             CodexControlMessage::Approval {
                 approval_id,
                 decision,
-            } => self.resolve_approval(rpc, &approval_id, decision).await,
-            CodexControlMessage::Steer { prompt } => self.steer(rpc, &prompt).await,
-            CodexControlMessage::Interrupt => self.interrupt(rpc).await,
+            } => self
+                .resolve_approval(rpc, &approval_id, decision)
+                .await
+                .map(|()| false),
+            CodexControlMessage::Steer { prompt } => {
+                self.steer(rpc, &prompt).await.map(|()| false)
+            }
+            CodexControlMessage::Interrupt => self.interrupt(rpc).await.map(|()| false),
+            CodexControlMessage::Stop => self.stop(rpc).await.map(|()| true),
         }
     }
 
@@ -433,6 +441,43 @@ impl CodexRunWorker {
         self.touch_and_save()
     }
 
+    async fn stop(&mut self, rpc: &mut CodexJsonRpc) -> Result<(), CliError> {
+        let thread_id = self.snapshot.thread_id.clone();
+        let turn_id = self.snapshot.turn_id.clone();
+        let interrupt_result = match (&thread_id, &turn_id) {
+            (Some(thread_id), Some(turn_id)) => {
+                rpc.send_request(
+                    "turn/interrupt",
+                    json!({
+                        "threadId": thread_id,
+                        "turnId": turn_id,
+                    }),
+                )
+                .await
+                .map(|_| ())
+            }
+            _ => Ok(()),
+        };
+        let interrupt_error = interrupt_result.as_ref().err().map(ToString::to_string);
+        self.pending_approvals.clear();
+        self.snapshot.pending_approvals.clear();
+        record_snapshot_event(
+            &mut self.snapshot,
+            "agent/stop",
+            "Codex agent stopped".to_string(),
+            &json!({
+                "threadId": thread_id,
+                "turnId": turn_id,
+                "interruptError": interrupt_error,
+            }),
+        );
+        self.transition(
+            CodexRunStatus::Cancelled,
+            Some("Codex agent stopped"),
+            None,
+        )
+    }
+
     fn thread_id(&self) -> Result<String, CliError> {
         self.snapshot
             .thread_id
@@ -503,20 +548,7 @@ impl CodexRunWorker {
     }
 
     fn record_event(&mut self, kind: &str, summary: String, payload: &Value) {
-        let sequence = u64::try_from(self.snapshot.events.len())
-            .unwrap_or(u64::MAX - 1)
-            .saturating_add(1);
-        self.snapshot.events.push(CodexRunEvent {
-            event_id: format!("{}-{sequence}", self.snapshot.run_id),
-            sequence,
-            recorded_at: utc_now(),
-            kind: kind.to_string(),
-            summary,
-            thread_id: event_thread_id(payload).or_else(|| self.snapshot.thread_id.clone()),
-            turn_id: event_turn_id(payload).or_else(|| self.snapshot.turn_id.clone()),
-            item_id: event_item_id(payload),
-            payload: payload.clone(),
-        });
+        record_snapshot_event(&mut self.snapshot, kind, summary, payload);
     }
 }
 
@@ -557,23 +589,4 @@ fn notification_summary(method: &str, params: &Value) -> String {
         return format!("{method}: {status}");
     }
     method.to_string()
-}
-
-fn event_thread_id(payload: &Value) -> Option<String> {
-    string_pointer(payload, &["/thread/id", "/threadId"])
-}
-
-fn event_turn_id(payload: &Value) -> Option<String> {
-    string_pointer(payload, &["/turn/id", "/turnId"])
-}
-
-fn event_item_id(payload: &Value) -> Option<String> {
-    string_pointer(payload, &["/item/id", "/itemId"])
-}
-
-fn string_pointer(payload: &Value, paths: &[&str]) -> Option<String> {
-    paths
-        .iter()
-        .find_map(|path| payload.pointer(path).and_then(Value::as_str))
-        .map(ToString::to_string)
 }

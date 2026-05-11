@@ -13,6 +13,8 @@ mod acp_inspect;
 mod acp_start;
 mod acp_transcript;
 mod attach;
+mod codex_inspect;
+mod codex_transcript;
 mod lookup;
 mod mutations;
 pub(crate) mod reads;
@@ -84,6 +86,14 @@ pub(super) fn managed_agent_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::MANAGED_AGENT_ACP_PERMISSION,
             post(mutations::post_acp_permission),
+        )
+        .route(
+            http_paths::MANAGED_AGENTS_CODEX_INSPECT,
+            get(codex_inspect::get_codex_inspect),
+        )
+        .route(
+            http_paths::MANAGED_AGENTS_CODEX_TRANSCRIPT,
+            get(codex_transcript::get_codex_transcript),
         )
         .route(
             http_paths::MANAGED_AGENTS_ACP_INSPECT,
