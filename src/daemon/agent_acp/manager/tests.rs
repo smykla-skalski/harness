@@ -334,6 +334,61 @@ async fn start_list_stop_tracks_live_snapshot() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(unix)]
+async fn list_syncs_paused_acp_sessions_to_idle_status() {
+    temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
+        let Ok(temp) = TempDir::new() else {
+            unreachable!();
+        };
+        let script = temp.path().join("fake-agent.sh");
+        write_sleeping_acp_agent(&script);
+        let request = AcpAgentStartRequest {
+            agent: "fake".to_string(),
+            project_dir: Some(temp.path().display().to_string()),
+            ..AcpAgentStartRequest::default()
+        };
+        let manager = manager();
+        let descriptor = descriptor(&script);
+        let Ok(snapshot) = manager.start_descriptor(
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            &request,
+            &descriptor,
+        ) else {
+            unreachable!();
+        };
+
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            let Ok(listed) = manager.list("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc") else {
+                unreachable!();
+            };
+            if listed
+                .first()
+                .is_some_and(|agent| agent.status == AgentStatus::Idle)
+            {
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "timed out waiting for ACP session to idle"
+            );
+            std::thread::sleep(Duration::from_millis(50));
+        }
+
+        let state = load_session_state(&manager, "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc");
+        let agent = state
+            .agents
+            .get(&snapshot.agent_id)
+            .expect("persisted ACP agent registration");
+        assert_eq!(agent.status, AgentStatus::Idle);
+        assert_eq!(state.metrics.active_agent_count, 1);
+        assert_eq!(state.metrics.idle_agent_count, 1);
+
+        manager.stop(&snapshot.acp_id).expect("stop");
+    });
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[cfg(unix)]
 async fn abnormal_exit_populates_disconnect_reason_and_stderr_tail() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
         let Ok(temp) = TempDir::new() else {

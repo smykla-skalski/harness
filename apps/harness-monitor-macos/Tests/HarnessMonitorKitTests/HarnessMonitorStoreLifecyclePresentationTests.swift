@@ -87,6 +87,67 @@ final class HarnessMonitorStoreLifecyclePresentationTests: XCTestCase {
     XCTAssertEqual(summary.disconnectedCount, 0)
   }
 
+  func testSelectedSessionLifecycleUsesPausedAcpWatchdogAsIdle() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.selectedSessionID = "sess-live"
+
+    let liveAgent = makeAgent(
+      agentID: "worker-live",
+      name: "Live Worker",
+      runtime: "copilot",
+      managedAgent: ManagedAgentRef(kind: .acp, id: "acp-worker-live")
+    )
+    store.selectedAcpAgents = [
+      makeAcpSnapshot(
+        acpID: "acp-worker-live",
+        sessionID: "sess-live",
+        agentID: "worker-live",
+        displayName: "Live Worker",
+        pendingBatches: []
+      )
+    ]
+    store.selectedAcpInspectState = AcpInspectSample(
+      sessionID: "sess-live",
+      sampledAt: Date(timeIntervalSince1970: 0),
+      agents: [
+        AcpAgentInspectSnapshot(
+          acpId: "acp-worker-live",
+          sessionId: "sess-live",
+          agentId: "worker-live",
+          displayName: "Live Worker",
+          pid: 41_001,
+          pgid: 41_001,
+          uptimeMs: 93_000,
+          lastUpdateAt: "2026-04-28T00:00:40Z",
+          lastClientCallAt: "2026-04-28T00:00:35Z",
+          watchdogState: "paused",
+          permissionMode: "allow_edits",
+          pendingPermissions: 0,
+          permissionQueueDepth: 0,
+          terminalCount: 1,
+          promptDeadlineRemainingMs: 0
+        )
+      ]
+    )
+
+    let lifecycle = store.agentLifecyclePresentation(
+      for: liveAgent,
+      sessionID: "sess-live",
+      sessionRegistrations: [liveAgent],
+      tuiStatus: nil
+    )
+    let summary = store.agentRuntimeSummary(
+      sessionID: "sess-live",
+      sessionRegistrations: [liveAgent],
+      tuiStatusByAgent: [:]
+    )
+
+    XCTAssertEqual(lifecycle.label, "Idle")
+    XCTAssertEqual(lifecycle.visualStatus, .idle)
+    XCTAssertEqual(summary.activeCount, 0)
+    XCTAssertEqual(summary.idleCount, 1)
+  }
+
   func testDisconnectedAndCachedAgentsDoNotShowReadyActivity() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
 

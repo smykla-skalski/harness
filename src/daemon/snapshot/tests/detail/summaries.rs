@@ -12,7 +12,7 @@ use crate::session::service as session_service;
 use crate::session::storage;
 
 use crate::daemon::snapshot::tests::support::{sample_state, seed_snapshot_fixture, write_json};
-use crate::session::types::{AgentStatus, SessionRole, SessionStatus};
+use crate::session::types::{AgentStatus, SessionMetrics, SessionRole, SessionStatus};
 
 #[test]
 fn snapshot_round_trip_smoke_covers_public_surface() {
@@ -256,6 +256,38 @@ fn snapshot_summary_and_detail_preserve_adoption_metadata() {
                 detail_from_db.session.adopted_at.as_deref(),
                 Some("2026-04-20T02:03:04Z")
             );
+        },
+    );
+}
+
+#[test]
+fn session_detail_preserves_idle_agent_status() {
+    let tmp = tempdir().expect("tempdir");
+    temp_env::with_vars(
+        [(
+            "XDG_DATA_HOME",
+            Some(tmp.path().to_str().expect("utf8 path")),
+        )],
+        || {
+            let context_root = tmp.path().join("harness/projects/project-alpha");
+            let session_id = "9ffbd4b8-f504-5df4-a711-42e7ccbeefdb";
+            let state_path = context_root
+                .join("orchestration")
+                .join("sessions")
+                .join(session_id)
+                .join("state.json");
+            seed_snapshot_fixture(&context_root, session_id);
+
+            let mut state = sample_state(session_id);
+            state.agents.get_mut("codex-worker").expect("worker").status = AgentStatus::Idle;
+            state.metrics = SessionMetrics::recalculate(&state);
+            write_json(&state_path, &state);
+
+            let detail = session_detail(session_id).expect("session detail");
+            assert_eq!(detail.agents.len(), 1);
+            assert_eq!(detail.agents[0].status, AgentStatus::Idle);
+            assert_eq!(detail.session.metrics.active_agent_count, 0);
+            assert_eq!(detail.session.metrics.idle_agent_count, 1);
         },
     );
 }
