@@ -142,7 +142,7 @@ struct SessionWindowCreateFormCatalogsSelectionTests {
     #expect(source.contains("private let verticalPadding: CGFloat = 2"))
     #expect(source.contains(".padding(.horizontal, horizontalPadding)"))
     #expect(source.contains(".padding(.vertical, verticalPadding)"))
-    #expect(source.contains("return \"App Server\""))
+    #expect(source.contains("return \"Codex App Server\""))
     #expect(source.contains(".accessibilityLabel(\"\\(providerTitle), \\(shortTitle)\")"))
     #expect(!source.contains("return \"Codex\""))
     #expect(
