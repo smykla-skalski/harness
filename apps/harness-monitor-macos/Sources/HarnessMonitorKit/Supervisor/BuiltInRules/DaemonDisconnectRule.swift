@@ -6,11 +6,14 @@ import Foundation
 /// lasted longer than `disconnectEscalationSeconds`, escalate to a `.queueDecision` with
 /// `.critical` severity so the user can intervene.
 ///
-/// Duplicate suppression uses `PolicyContext.recentActionKeys`. The decision id is stable per
-/// disconnect episode: it anchors to `connection.disconnectedSince`, then `connection.lastMessageAt`,
-/// then `snapshot.createdAt` for synthetic tests.
+/// Duplicate suppression uses `PolicyContext.recentActionKeys`. The decision id is a singleton
+/// active-row id so reconnect churn, restarts, or missing disconnect anchors cannot leave many
+/// stale sessionless daemon-disconnect decisions inflating global attention badges.
 public struct DaemonDisconnectRule: PolicyRule {
-  public let id = "daemon-disconnect"
+  public static let ruleID = "daemon-disconnect"
+  public static let activeDecisionID = "daemon-disconnect:active"
+
+  public let id = Self.ruleID
   public let name = "Daemon Disconnect"
   public let version = 1
   public let parameters = PolicyParameterSchema(fields: [
@@ -106,11 +109,10 @@ public struct DaemonDisconnectRule: PolicyRule {
     anchor: Date,
     context: PolicyContext
   ) -> PolicyAction? {
-    let decisionID = "daemon-disconnect:\(Int(anchor.timeIntervalSince1970))"
     let elapsedSeconds = Int(context.now.timeIntervalSince(anchor).rounded())
     let summary = "Daemon has been disconnected for over \(elapsedSeconds)s"
     let payload = PolicyAction.DecisionPayload(
-      id: decisionID,
+      id: Self.activeDecisionID,
       severity: .critical,
       ruleID: id,
       sessionID: nil,

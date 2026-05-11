@@ -71,6 +71,57 @@ extension HarnessMonitorStore {
     supervisorBindings.pendingDecisionsStatusSync = nil
   }
 
+  func dismissDaemonDisconnectDecisionsAfterReconnect() {
+    guard let decisionStore = supervisorDecisionStore else {
+      return
+    }
+    Task { @MainActor [weak self, decisionStore] in
+      guard let self else {
+        return
+      }
+      do {
+        guard try await self.dismissActiveDaemonDisconnectDecision(decisionStore) else {
+          return
+        }
+        HarnessMonitorLogger.supervisorTrace(
+          "supervisor.dismissed_daemon_disconnect_decision id=\(DaemonDisconnectRule.activeDecisionID)"
+        )
+      } catch {
+        HarnessMonitorLogger.supervisorWarning(
+          "supervisor.dismiss_daemon_disconnect_decisions_failed error=\(String(describing: error))"
+        )
+      }
+    }
+  }
+
+  func dismissActiveDaemonDisconnectDecision(_ decisionStore: DecisionStore) async throws -> Bool {
+    guard let decision = try await decisionStore.decision(id: DaemonDisconnectRule.activeDecisionID)
+    else {
+      return false
+    }
+    guard decision.ruleID == DaemonDisconnectRule.ruleID else {
+      return false
+    }
+    guard
+      decision.statusRaw == DecisionStore.Status.open
+        || decision.statusRaw == DecisionStore.Status.snoozed
+    else {
+      return false
+    }
+    try await decisionStore.dismiss(id: DaemonDisconnectRule.activeDecisionID)
+    return true
+  }
+
+  func isSupervisorSurfaceDecision(_ decision: Decision) -> Bool {
+    guard decision.ruleID == DaemonDisconnectRule.ruleID else {
+      return true
+    }
+    guard decision.id == DaemonDisconnectRule.activeDecisionID else {
+      return false
+    }
+    return connectionState.isSupervisorDisconnectedState
+  }
+
   public func supervisorDecisionActionHandler() -> any DecisionActionHandler {
     if let stack = supervisorStack {
       return stack.actionHandler(for: self)
