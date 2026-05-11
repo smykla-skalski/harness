@@ -3,7 +3,8 @@ import AppKit
 @MainActor
 enum SessionWindowTabBadge {
   static let leadingSpacing = "  "
-  static let badgeHeight: CGFloat = 14
+  static let badgeHeight: CGFloat = 13
+  static let cornerRadius: CGFloat = 3
   static let baselineOffset: CGFloat = -2
 
   static func attributedTitle(base: String, pendingDecisionCount: Int) -> NSAttributedString? {
@@ -15,17 +16,16 @@ enum SessionWindowTabBadge {
 
   static func makeAttachment(count: Int) -> NSTextAttachment {
     let text = "\(count)"
-    let font = NSFont.systemFont(ofSize: 10, weight: .semibold)
+    let font = NSFont.systemFont(ofSize: 8, weight: .semibold)
     let textAttributes: [NSAttributedString.Key: Any] = [
       .font: font,
       .foregroundColor: NSColor.white,
     ]
     let textSize = (text as NSString).size(withAttributes: textAttributes)
-    let horizontalPadding: CGFloat = 5
+    let horizontalPadding: CGFloat = 4
     let width = max(badgeHeight, textSize.width + horizontalPadding * 2)
     let image = NSImage(size: NSSize(width: width, height: badgeHeight), flipped: false) { rect in
-      let radius = rect.height / 2
-      let path = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
+      let path = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
       NSColor.systemRed.setFill()
       path.fill()
       let textRect = NSRect(
