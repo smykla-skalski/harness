@@ -4,12 +4,6 @@ Read `AGENTS.md` first - it is the canonical cross-runtime guide and covers buil
 
 For the Harness Monitor macOS app (`apps/harness-monitor-macos`), see that directory's own `CLAUDE.md` (Claude-specific deltas) and `AGENTS.md` (canonical Monitor guide).
 
-## Command execution
-
-**Always use `rtk`** - it is the token-optimized proxy for shell commands and saves 60-90% on dev operations. Prefix every shell command with `rtk` (e.g. `rtk git status`, `rtk cargo test`). The Claude Code hook auto-rewrites commands transparently; do not fight it.
-
-**`rtk proxy` is last resort only.** It bypasses all output filters and leaks raw command output (4000+ line dumps), burning the context window. Use it only when filtered output hides information you genuinely need to debug a specific issue, and switch back to plain `rtk` immediately after.
-
 ## Task closeout
 
 Finished tasks must end with the final work in the local `main` checkout, not
