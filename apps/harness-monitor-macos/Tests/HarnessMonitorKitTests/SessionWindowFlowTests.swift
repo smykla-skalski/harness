@@ -6,6 +6,8 @@ import Testing
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
+// swiftlint:disable file_length
+// swiftlint:disable type_body_length
 @Suite("Session window flow contracts")
 struct SessionWindowFlowTests {
   @Test("Session window token encodes the session identity")
@@ -507,3 +509,4 @@ struct SessionWindowFlowTests {
   }
 
 }
+// swiftlint:enable type_body_length

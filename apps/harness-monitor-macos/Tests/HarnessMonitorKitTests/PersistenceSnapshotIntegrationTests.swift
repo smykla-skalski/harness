@@ -3,6 +3,8 @@ import Testing
 
 @testable import HarnessMonitorKit
 
+// swiftlint:disable file_length
+// swiftlint:disable type_body_length
 @MainActor
 @Suite("Persistence snapshot integration")
 struct PersistenceSnapshotIntegrationTests {
@@ -558,3 +560,4 @@ struct PersistenceSnapshotIntegrationTests {
     #expect(cached?.detail.agents.count == 2)
   }
 }
+// swiftlint:enable type_body_length

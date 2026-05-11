@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 
+// swiftlint:disable file_length
 private enum CacheWriteFailure: Error {
   case saveFailed
 }
