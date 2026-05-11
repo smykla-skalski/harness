@@ -24,6 +24,9 @@ struct SessionWindowLifecycleModifier: ViewModifier {
   private func activate() {
     store.registerOpenSessionWindow(windowID: windowID, sessionID: sessionID)
     tracker.sessionWindowAppeared(windowID: windowID)
+    Task { @MainActor [store, sessionID] in
+      await store.ensureSessionDetailHydratedForOpenWindow(sessionID: sessionID)
+    }
   }
 
   private func deactivate() {
