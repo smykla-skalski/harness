@@ -27,7 +27,7 @@ struct ConnectionModelsTests {
   @Test("ConnectionMetrics initial state has sensible defaults")
   func metricsInitial() {
     let metrics = ConnectionMetrics.initial
-    #expect(metrics.transportKind == .httpSSE)
+    #expect(metrics.transportKind == .webSocket)
     #expect(metrics.latencyMs == nil)
     #expect(metrics.transportLatencyMs == nil)
     #expect(metrics.requestLatencyMs == nil)

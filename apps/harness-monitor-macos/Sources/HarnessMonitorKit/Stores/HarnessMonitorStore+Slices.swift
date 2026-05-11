@@ -43,7 +43,7 @@ extension HarnessMonitorStore {
         onChanged?(.daemonActivity)
       }
     }
-    public var activeTransport: TransportKind = .httpSSE
+    public var activeTransport: TransportKind = .webSocket
     public var connectionMetrics: ConnectionMetrics = .initial {
       didSet {
         guard oldValue != connectionMetrics else { return }

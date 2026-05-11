@@ -128,7 +128,7 @@ struct SessionSwiftUISourceTests {
     #expect(sessionWindowSource.contains("private var inspectorVisibleStorage = false"))
     #expect(sessionWindowSource.contains("private var inspectorPreferredStorage = false"))
     #expect(sessionWindowSource.contains("private var inspectorWidthStorage = 280.0"))
-    #expect(sessionWindowSource.contains("private var sidebarWidthStorage = 220.0"))
+    #expect(sessionWindowSource.contains("private var sidebarWidthStorage = 200.0"))
     #expect(
       sessionWindowSource.contains(
         "private var contentColumnWidthStorage = SessionContentDetailSplitLayout.defaultContentWidth"
@@ -158,13 +158,13 @@ struct SessionSwiftUISourceTests {
     #expect(!createFormSource.contains("@FocusState var focusedField"))
   }
 
-  @Test("Session content columns extend behind toolbar glass")
-  func sessionContentColumnsExtendBehindToolbarGlass() throws {
+  @Test("Session content columns extend behind toolbar glass with soft scroll edge")
+  func sessionContentColumnsExtendBehindToolbarGlassWithSoftScrollEdge() throws {
     let columnsSource = try sourceFile(at: "Views/Sessions/SessionWindowView+Columns.swift")
     let surfaceSource = try sourceFile(at: "Views/Sessions/SessionDetailSurface.swift")
 
     #expect(!columnsSource.contains("SessionBackgroundExtensionSurface()"))
-    #expect(columnsSource.contains(".backgroundExtensionEffect()"))
+    #expect(columnsSource.components(separatedBy: ".backgroundExtensionEffect()").count - 1 == 2)
     #expect(!surfaceSource.contains(".backgroundExtensionEffect()"))
     #expect(surfaceSource.contains("topScrollEdgeEffect: .soft"))
   }
@@ -187,22 +187,24 @@ struct SessionSwiftUISourceTests {
 
   @Test("Session agent detail reuses the rich agent detail bands with session-scoped inputs")
   func sessionAgentDetailReusesRichBandsWithSessionScopedInputs() throws {
-    let columnsSource = try sourceFile(at: "Views/Sessions/SessionWindowView+Columns.swift")
+    let detailFocusSource = try sourceFile(at: "Views/Sessions/SessionWindowView+DetailFocus.swift")
     let agentDetailSource = try sourceFile(at: "Views/Sessions/SessionAgentDetailSection.swift")
+    let agentDetailComputedSource = try sourceFile(
+      at: "Views/Sessions/SessionAgentDetailSection+Computed.swift")
 
-    #expect(columnsSource.contains("detail: detail"))
+    #expect(detailFocusSource.contains("detail: detail"))
     #expect(
-      columnsSource.contains("let agentTimeline = snapshot.timelineEntriesByAgentID[agentID] ?? []")
+      detailFocusSource.contains("let agentTimeline = snapshot.timelineEntriesByAgentID[agentID] ?? []")
     )
-    #expect(columnsSource.contains("agentTimeline: agentTimeline"))
+    #expect(detailFocusSource.contains("agentTimeline: agentTimeline"))
     #expect(agentDetailSource.contains("let detail: SessionDetail"))
     #expect(agentDetailSource.contains("let agentTimeline: [TimelineEntry]"))
-    #expect(agentDetailSource.contains("store.acpRuntimeState("))
-    #expect(agentDetailSource.contains("sessionRegistrations: detail.agents"))
+    #expect(agentDetailComputedSource.contains("store.acpRuntimeState("))
+    #expect(agentDetailComputedSource.contains("sessionRegistrations: detail.agents"))
     #expect(agentDetailSource.contains("AgentDetailSummaryBand("))
     #expect(agentDetailSource.contains("AgentDetailActivityBand("))
     #expect(agentDetailSource.contains("AgentDetailActionBand("))
-    #expect(agentDetailSource.contains("agent.managedAgent?.kind == .tui"))
+    #expect(agentDetailComputedSource.contains("agent.managedAgent?.kind == .tui"))
   }
 
   @Test("Toast keeps its AppKit pointer shield while spinner stays pure SwiftUI")

@@ -4,8 +4,7 @@ use serde_json::{Value, json};
 use tokio::sync::mpsc;
 
 use crate::daemon::protocol::{
-    CodexApprovalDecision, CodexApprovalRequest, CodexResolvedApproval, CodexRunSnapshot,
-    CodexRunStatus,
+    CodexApprovalDecision, CodexResolvedApproval, CodexRunSnapshot, CodexRunStatus,
 };
 use crate::daemon::state;
 use crate::errors::{CliError, CliErrorKind};
@@ -14,10 +13,11 @@ use crate::workspace::utc_now;
 use super::active_runs::CodexControlMessage;
 use super::approvals::{
     approval_from_request, approval_policy, approval_result, mode_instructions, thread_sandbox,
-    trim_summary, turn_sandbox_policy,
+    trim_summary, turn_sandbox_policy, upsert_pending_approval,
 };
 use super::handle::{CodexControllerHandle, record_snapshot_event};
 use super::rpc::CodexJsonRpc;
+use super::wire::{self, AppServerNotification};
 
 pub(super) struct CodexRunWorker {
     controller: CodexControllerHandle,
@@ -71,51 +71,31 @@ impl CodexRunWorker {
     }
 
     async fn initialize(&self, rpc: &mut CodexJsonRpc) -> Result<(), CliError> {
-        let params = json!({
-            "clientInfo": {
-                "name": "harness-daemon",
-                "title": "Harness daemon",
-                "version": env!("CARGO_PKG_VERSION")
-            },
-            "capabilities": {
-                "experimentalApi": true
-            }
-        });
-        let _ = rpc.request("initialize", params).await?;
+        let params = wire::initialize_params(env!("CARGO_PKG_VERSION"))?;
+        let _ = rpc.request(wire::METHOD_INITIALIZE, params).await?;
         Ok(())
     }
 
     async fn start_or_resume_thread(&mut self, rpc: &mut CodexJsonRpc) -> Result<(), CliError> {
         let method = if self.snapshot.thread_id.is_some() {
-            "thread/resume"
+            wire::METHOD_THREAD_RESUME
         } else {
-            "thread/start"
+            wire::METHOD_THREAD_START
         };
-        let mut params = json!({
-            "cwd": self.snapshot.project_dir,
-            "sandbox": thread_sandbox(self.snapshot.mode),
-            "approvalPolicy": approval_policy(self.snapshot.mode),
-            "approvalsReviewer": "user",
-            "persistExtendedHistory": true,
-            "developerInstructions": mode_instructions(self.snapshot.mode),
-        });
-        if let Some(thread_id) = &self.snapshot.thread_id {
-            params["threadId"] = json!(thread_id);
-        }
-        if let Some(model) = &self.snapshot.model {
-            params["model"] = json!(model);
-        }
-        if let Some(effort) = &self.snapshot.effort {
-            params["reasoning"] = json!({ "effort": effort });
-        }
+        let params = wire::thread_params(wire::ThreadParamsInput {
+            cwd: &self.snapshot.project_dir,
+            sandbox: thread_sandbox(self.snapshot.mode),
+            approval_policy: approval_policy(self.snapshot.mode),
+            developer_instructions: mode_instructions(self.snapshot.mode),
+            thread_id: self.snapshot.thread_id.as_deref(),
+            model: self.snapshot.model.as_deref(),
+            effort: self.snapshot.effort.as_deref(),
+        })?;
 
         let result = rpc.request(method, params).await?;
-        let thread_id = result
-            .pointer("/thread/id")
-            .and_then(Value::as_str)
-            .ok_or_else(|| {
-                CliErrorKind::workflow_parse("codex thread response missing thread.id")
-            })?;
+        let thread_id = wire::thread_id_from_result(&result).ok_or_else(|| {
+            CliErrorKind::workflow_parse("codex thread response missing thread.id")
+        })?;
         self.snapshot.thread_id = Some(thread_id.to_string());
         self.snapshot.latest_summary = Some(format!("Thread {thread_id} ready"));
         self.record_event(method, format!("Codex thread {thread_id} ready"), &result);
@@ -125,27 +105,20 @@ impl CodexRunWorker {
 
     async fn start_turn(&mut self, rpc: &mut CodexJsonRpc) -> Result<(), CliError> {
         let thread_id = self.thread_id()?;
-        let result = rpc
-            .request(
-                "turn/start",
-                json!({
-                    "threadId": thread_id,
-                    "cwd": self.snapshot.project_dir,
-                    "input": [{"type": "text", "text": self.snapshot.prompt}],
-                    "approvalPolicy": approval_policy(self.snapshot.mode),
-                    "approvalsReviewer": "user",
-                    "sandboxPolicy": turn_sandbox_policy(self.snapshot.mode, &self.snapshot.project_dir),
-                }),
-            )
-            .await?;
-        let turn_id = result
-            .pointer("/turn/id")
-            .and_then(Value::as_str)
+        let params = wire::turn_start_params(
+            &thread_id,
+            &self.snapshot.project_dir,
+            &self.snapshot.prompt,
+            approval_policy(self.snapshot.mode),
+            turn_sandbox_policy(self.snapshot.mode, &self.snapshot.project_dir),
+        )?;
+        let result = rpc.request(wire::METHOD_TURN_START, params).await?;
+        let turn_id = wire::turn_id_from_result(&result)
             .ok_or_else(|| CliErrorKind::workflow_parse("codex turn response missing turn.id"))?;
         self.snapshot.turn_id = Some(turn_id.to_string());
         self.snapshot.latest_summary = Some(format!("Turn {turn_id} started"));
         self.record_event(
-            "turn/start",
+            wire::METHOD_TURN_START,
             format!("Codex turn {turn_id} started"),
             &result,
         );
@@ -160,7 +133,7 @@ impl CodexRunWorker {
                     let Some(message) = maybe_line? else {
                         return Err(CliErrorKind::workflow_io("codex app-server exited before turn completion").into());
                     };
-                    if self.handle_rpc_message(&message)? {
+                    if self.handle_rpc_message(rpc, &message).await? {
                         return Ok(());
                     }
                 }
@@ -176,7 +149,11 @@ impl CodexRunWorker {
         }
     }
 
-    fn handle_rpc_message(&mut self, message: &Value) -> Result<bool, CliError> {
+    async fn handle_rpc_message(
+        &mut self,
+        rpc: &mut CodexJsonRpc,
+        message: &Value,
+    ) -> Result<bool, CliError> {
         if message.get("error").is_some() {
             let error = message
                 .pointer("/error/message")
@@ -187,7 +164,7 @@ impl CodexRunWorker {
 
         if let Some(method) = message.get("method").and_then(Value::as_str) {
             if message.get("id").is_some() {
-                self.handle_server_request(message, method)?;
+                self.handle_server_request(rpc, message, method).await?;
                 return Ok(false);
             }
             return self.handle_notification(method, message.get("params").unwrap_or(&Value::Null));
@@ -197,66 +174,67 @@ impl CodexRunWorker {
     }
 
     fn handle_notification(&mut self, method: &str, params: &Value) -> Result<bool, CliError> {
-        self.record_event(method, notification_summary(method, params), params);
-        match method {
-            "turn/started" => {
-                if let Some(turn_id) = params.pointer("/turn/id").and_then(Value::as_str) {
+        let notification = wire::parse_notification(method, params);
+        self.record_event(method, wire::notification_summary(method, params), params);
+        match notification {
+            AppServerNotification::TurnStarted { turn_id } => {
+                if let Some(turn_id) = turn_id {
                     self.snapshot.turn_id = Some(turn_id.to_string());
                     self.snapshot.latest_summary = Some(format!("Turn {turn_id} is running"));
                     self.touch_and_save()?;
                 }
                 Ok(false)
             }
-            "item/agentMessage/delta" => {
-                if let Some(delta) = params.get("delta").and_then(Value::as_str) {
-                    self.agent_message_delta.push_str(delta);
+            AppServerNotification::AgentMessageDelta { delta } => {
+                if let Some(delta) = delta {
+                    self.agent_message_delta.push_str(&delta);
                     self.snapshot.latest_summary = Some(trim_summary(&self.agent_message_delta));
                     self.touch_and_save()?;
                 }
                 Ok(false)
             }
-            "item/completed" => {
-                self.handle_item_completed(params)?;
+            AppServerNotification::ItemCompleted { item } => {
+                self.handle_item_completed(&item)?;
                 Ok(false)
             }
-            "turn/completed" => {
-                self.handle_turn_completed(params)?;
+            AppServerNotification::TurnCompleted {
+                status,
+                error_message,
+            } => {
+                self.handle_turn_completed(status.as_deref(), error_message)?;
                 Ok(true)
             }
-            "error" => {
-                let message = params
-                    .get("message")
-                    .and_then(Value::as_str)
+            AppServerNotification::Error { message } => {
+                let message = message
+                    .as_deref()
                     .unwrap_or("codex app-server reported an error");
                 self.fail(message);
                 Ok(true)
             }
-            _ => self.touch_and_save().map(|()| false),
+            AppServerNotification::Other => self.touch_and_save().map(|()| false),
         }
     }
 
-    fn handle_item_completed(&mut self, params: &Value) -> Result<(), CliError> {
-        let Some(item) = params.get("item") else {
-            return Ok(());
-        };
-        if item.get("type").and_then(Value::as_str) != Some("agentMessage") {
+    fn handle_item_completed(&mut self, item: &wire::CompletedItem) -> Result<(), CliError> {
+        if item.kind.as_deref() != Some("agentMessage") {
             return Ok(());
         }
-        let Some(text) = item.get("text").and_then(Value::as_str) else {
+        let Some(text) = item.text.as_deref() else {
             return Ok(());
         };
         self.snapshot.latest_summary = Some(trim_summary(text));
-        if item.get("phase").and_then(Value::as_str) == Some("final_answer") {
+        if item.phase.as_deref() == Some("final_answer") {
             self.snapshot.final_message = Some(text.to_string());
         }
         self.touch_and_save()
     }
 
-    fn handle_turn_completed(&mut self, params: &Value) -> Result<(), CliError> {
-        let status = params
-            .pointer("/turn/status")
-            .and_then(Value::as_str)
-            .unwrap_or("completed");
+    fn handle_turn_completed(
+        &mut self,
+        status: Option<&str>,
+        error_message: Option<String>,
+    ) -> Result<(), CliError> {
+        let status = status.unwrap_or("completed");
         match status {
             "completed" => {
                 if self.snapshot.final_message.is_none() && !self.agent_message_delta.is_empty() {
@@ -274,11 +252,7 @@ impl CodexRunWorker {
                 None,
             ),
             "failed" => {
-                let message = params
-                    .pointer("/turn/error/message")
-                    .and_then(Value::as_str)
-                    .unwrap_or("codex turn failed")
-                    .to_string();
+                let message = error_message.unwrap_or_else(|| "codex turn failed".to_string());
                 let summary = message.clone();
                 self.transition(
                     CodexRunStatus::Failed,
@@ -290,13 +264,19 @@ impl CodexRunWorker {
         }
     }
 
-    fn handle_server_request(&mut self, message: &Value, method: &str) -> Result<(), CliError> {
+    async fn handle_server_request(
+        &mut self,
+        rpc: &mut CodexJsonRpc,
+        message: &Value,
+        method: &str,
+    ) -> Result<(), CliError> {
         let request_id = message
             .get("id")
             .cloned()
             .ok_or_else(|| CliErrorKind::workflow_parse("codex approval request missing id"))?;
         let params = message.get("params").unwrap_or(&Value::Null);
-        let Some(approval) = approval_from_request(method, value_id_string(&request_id), params)
+        let Some(approval) =
+            approval_from_request(method, wire::value_id_string(&request_id), params)
         else {
             self.record_event(
                 "server_request_unsupported",
@@ -305,6 +285,12 @@ impl CodexRunWorker {
             );
             self.touch_and_save()?;
             tracing::warn!(method, "received unsupported codex server request");
+            rpc.send_error(
+                request_id,
+                -32601,
+                &format!("Unsupported codex server request {method}"),
+            )
+            .await?;
             return Ok(());
         };
 
@@ -344,9 +330,7 @@ impl CodexRunWorker {
                 .resolve_approval(rpc, &approval_id, decision)
                 .await
                 .map(|()| false),
-            CodexControlMessage::Steer { prompt } => {
-                self.steer(rpc, &prompt).await.map(|()| false)
-            }
+            CodexControlMessage::Steer { prompt } => self.steer(rpc, &prompt).await.map(|()| false),
             CodexControlMessage::Interrupt => self.interrupt(rpc).await.map(|()| false),
             CodexControlMessage::Stop => self.stop(rpc).await.map(|()| true),
         }
@@ -394,25 +378,15 @@ impl CodexRunWorker {
     async fn steer(&mut self, rpc: &mut CodexJsonRpc, prompt: &str) -> Result<(), CliError> {
         let thread_id = self.thread_id()?;
         let turn_id = self.turn_id()?;
+        let params = wire::turn_steer_params(&thread_id, &turn_id, prompt)?;
         let _ = rpc
-            .send_request(
-                "turn/steer",
-                json!({
-                    "threadId": thread_id,
-                    "expectedTurnId": turn_id,
-                    "input": [{"type": "text", "text": prompt}],
-                }),
-            )
+            .send_request(wire::METHOD_TURN_STEER, params.clone())
             .await?;
         self.snapshot.latest_summary = Some("Steering prompt sent".to_string());
         self.record_event(
-            "turn/steer",
+            wire::METHOD_TURN_STEER,
             "Steering prompt sent".to_string(),
-            &json!({
-                "threadId": thread_id,
-                "turnId": turn_id,
-                "input": [{"type": "text", "text": prompt}],
-            }),
+            &params,
         );
         self.touch_and_save()
     }
@@ -420,23 +394,15 @@ impl CodexRunWorker {
     async fn interrupt(&mut self, rpc: &mut CodexJsonRpc) -> Result<(), CliError> {
         let thread_id = self.thread_id()?;
         let turn_id = self.turn_id()?;
+        let params = wire::turn_interrupt_params(&thread_id, &turn_id)?;
         let _ = rpc
-            .send_request(
-                "turn/interrupt",
-                json!({
-                    "threadId": thread_id,
-                    "turnId": turn_id,
-                }),
-            )
+            .send_request(wire::METHOD_TURN_INTERRUPT, params.clone())
             .await?;
         self.snapshot.latest_summary = Some("Interrupt requested".to_string());
         self.record_event(
-            "turn/interrupt",
+            wire::METHOD_TURN_INTERRUPT,
             "Interrupt requested".to_string(),
-            &json!({
-                "threadId": thread_id,
-                "turnId": turn_id,
-            }),
+            &params,
         );
         self.touch_and_save()
     }
@@ -446,15 +412,10 @@ impl CodexRunWorker {
         let turn_id = self.snapshot.turn_id.clone();
         let interrupt_result = match (&thread_id, &turn_id) {
             (Some(thread_id), Some(turn_id)) => {
-                rpc.send_request(
-                    "turn/interrupt",
-                    json!({
-                        "threadId": thread_id,
-                        "turnId": turn_id,
-                    }),
-                )
-                .await
-                .map(|_| ())
+                let params = wire::turn_interrupt_params(thread_id, turn_id)?;
+                rpc.send_request(wire::METHOD_TURN_INTERRUPT, params)
+                    .await
+                    .map(|_| ())
             }
             _ => Ok(()),
         };
@@ -471,11 +432,7 @@ impl CodexRunWorker {
                 "interruptError": interrupt_error,
             }),
         );
-        self.transition(
-            CodexRunStatus::Cancelled,
-            Some("Codex agent stopped"),
-            None,
-        )
+        self.transition(CodexRunStatus::Cancelled, Some("Codex agent stopped"), None)
     }
 
     fn thread_id(&self) -> Result<String, CliError> {
@@ -550,43 +507,4 @@ impl CodexRunWorker {
     fn record_event(&mut self, kind: &str, summary: String, payload: &Value) {
         record_snapshot_event(&mut self.snapshot, kind, summary, payload);
     }
-}
-
-pub(super) fn upsert_pending_approval(
-    approvals: &mut Vec<CodexApprovalRequest>,
-    approval: CodexApprovalRequest,
-) {
-    if let Some(existing) = approvals
-        .iter_mut()
-        .find(|candidate| candidate.approval_id == approval.approval_id)
-    {
-        *existing = approval;
-    } else {
-        approvals.push(approval);
-    }
-}
-
-fn value_id_string(value: &Value) -> String {
-    match value {
-        Value::String(value) => value.clone(),
-        Value::Number(value) => value.to_string(),
-        _ => value.to_string(),
-    }
-}
-
-fn notification_summary(method: &str, params: &Value) -> String {
-    if method == "item/agentMessage/delta" {
-        return params
-            .get("delta")
-            .and_then(Value::as_str)
-            .map(trim_summary)
-            .unwrap_or_else(|| "Agent message delta".to_string());
-    }
-    if let Some(item_type) = params.pointer("/item/type").and_then(Value::as_str) {
-        return format!("{method}: {item_type}");
-    }
-    if let Some(status) = params.pointer("/turn/status").and_then(Value::as_str) {
-        return format!("{method}: {status}");
-    }
-    method.to_string()
 }

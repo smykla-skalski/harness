@@ -8,8 +8,9 @@ use tempfile::{TempDir, tempdir};
 use tokio::sync::broadcast;
 
 use super::{
-    CodexControllerHandle, approvals::approval_from_request, handle::preferred_codex_project_dir,
-    worker::upsert_pending_approval,
+    CodexControllerHandle,
+    approvals::{approval_from_request, upsert_pending_approval},
+    handle::preferred_codex_project_dir,
 };
 use crate::daemon::db::DaemonDb;
 use crate::daemon::index::DiscoveredProject;

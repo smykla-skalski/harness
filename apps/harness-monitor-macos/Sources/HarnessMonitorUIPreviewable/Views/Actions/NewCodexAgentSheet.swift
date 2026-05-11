@@ -105,10 +105,15 @@ struct NewCodexAgentSheet: View {
         "Prompt",
         help: "Required. This starts a Codex run in the current session."
       ) {
-        TextEditor(text: $prompt)
-          .harnessNativeFormControl()
-          .frame(minHeight: 120)
-          .focused($focusedField, equals: .prompt)
+        HarnessMonitorMultilineTextField(
+          placeholder: "Prompt",
+          text: $prompt,
+          minHeight: 120,
+          focusedField: $focusedField,
+          equals: .prompt,
+          accessibilityLabel: "Prompt",
+          accessibilityHint: "Required. This starts a Codex run in the current session."
+        )
       }
 
       fieldBlock("Run mode") {

@@ -162,7 +162,7 @@ public struct ConnectionMetrics: Equatable, Sendable {
 
   public static let initial: Self = {
     Self(
-      transportKind: .httpSSE,
+      transportKind: .webSocket,
       latencyMs: nil,
       averageLatencyMs: nil,
       messagesReceived: 0,

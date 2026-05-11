@@ -78,6 +78,7 @@ struct DaemonControllerTests {
       let client = RecordingHarnessClient()
       let controller = DaemonController(
         environment: environment,
+        transportPreference: .http,
         launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
         ownership: .managed,
         sessionFactory: { _ in client },
@@ -92,8 +93,8 @@ struct DaemonControllerTests {
     }
   }
 
-  @Test("bootstrapClient shuts down the probe HTTP client after a WebSocket upgrade")
-  func bootstrapClientShutsDownProbeHTTPClientAfterWebSocketUpgrade() async throws {
+  @Test("bootstrapClient uses WebSocket by default without probing HTTP")
+  func bootstrapClientUsesWebSocketByDefaultWithoutProbingHTTP() async throws {
     try await withTempDaemonFixture(pid: UInt32(getpid())) { environment in
       let httpClient = RecordingHarnessClient()
       let webSocketClient = RecordingHarnessClient()
@@ -108,8 +109,8 @@ struct DaemonControllerTests {
       let client = try await controller.bootstrapClient()
 
       #expect(client as AnyObject === webSocketClient as AnyObject)
-      #expect(httpClient.readCallCount(.health) == 1)
-      #expect(httpClient.shutdownCallCount() == 1)
+      #expect(httpClient.readCallCount(.health) == 0)
+      #expect(httpClient.shutdownCallCount() == 0)
       #expect(webSocketClient.shutdownCallCount() == 0)
     }
   }
@@ -222,6 +223,7 @@ struct DaemonControllerTests {
       let client = PreviewHarnessClient()
       let controller = DaemonController(
         environment: environment,
+        transportPreference: .http,
         launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
         ownership: .managed,
         sessionFactory: { _ in client },
@@ -266,6 +268,7 @@ struct DaemonControllerTests {
       let capturedEndpoint = LockedEndpointBox()
       let controller = DaemonController(
         environment: environment,
+        transportPreference: .http,
         launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
         ownership: .managed,
         sessionFactory: { connection in

@@ -81,6 +81,10 @@ extension RecordingHarnessClient {
     lock.withLock { acpTranscriptResponsesBySessionID[sessionID] }
   }
 
+  func configuredCodexTranscriptResponse(for sessionID: String) -> CodexTranscriptResponse? {
+    lock.withLock { codexTranscriptResponsesBySessionID[sessionID] }
+  }
+
   func configuredAcpTranscriptDelay(for sessionID: String) -> Duration? {
     lock.withLock { acpTranscriptDelaysBySessionID[sessionID] }
   }

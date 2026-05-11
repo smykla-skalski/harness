@@ -51,7 +51,7 @@ public struct DaemonController: DaemonControlling {
 
   public init(
     environment: HarnessMonitorEnvironment = .current,
-    transportPreference: TransportPreference = .auto,
+    transportPreference: TransportPreference = .webSocket,
     launchAgentManager: any DaemonLaunchAgentManaging =
       ServiceManagementDaemonLaunchAgentManager(),
     ownership: DaemonOwnership = .managed,
@@ -159,6 +159,16 @@ public struct DaemonController: DaemonControlling {
   func bootstrap(
     connection: HarnessMonitorConnection
   ) async throws -> any HarnessMonitorClientProtocol {
+    if transportPreference == .webSocket {
+      if let wsClient = await webSocketBootstrapper(connection) {
+        HarnessMonitorLogger.lifecycle.trace(
+          "Connected daemon transport over WebSocket for \(connection.endpoint.absoluteString, privacy: .public)"
+        )
+        return wsClient
+      }
+      throw DaemonControlError.commandFailed("WebSocket connection failed")
+    }
+
     HarnessMonitorLogger.lifecycle.trace(
       "Probing daemon health over HTTP at \(connection.endpoint.absoluteString, privacy: .public)"
     )

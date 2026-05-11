@@ -186,6 +186,59 @@ extension HarnessMonitorStore {
     }
   }
 
+  public func refreshSessionWindowManagedTranscript(
+    sessionID: String,
+    snapshot: HarnessMonitorSessionWindowSnapshot
+  ) async -> HarnessMonitorSessionWindowSnapshot? {
+    guard connectionState == .online, let client, let detail = snapshot.detail else {
+      return nil
+    }
+
+    async let transcriptTask = loadSessionWindowTranscriptResponse(
+      sessionID: sessionID,
+      client: client
+    )
+    async let codexTranscriptTask = loadSessionWindowCodexTranscriptResponse(
+      sessionID: sessionID,
+      client: client
+    )
+
+    let transcriptResponse = await transcriptTask
+    let codexTranscriptResponse = await codexTranscriptTask
+    guard transcriptResponse != nil || codexTranscriptResponse != nil else {
+      return nil
+    }
+
+    let transcript = resolvedSessionWindowTranscript(
+      detail: detail,
+      timeline: snapshot.timeline,
+      acpTranscript: transcriptResponse,
+      codexTranscript: codexTranscriptResponse
+    )
+    let nextSnapshot = HarnessMonitorSessionWindowSnapshot(
+      summary: snapshot.summary,
+      detail: detail,
+      acpAgents: snapshot.acpAgents,
+      acpInspectSample: snapshot.acpInspectSample,
+      timeline: snapshot.timeline,
+      transcript: transcript.entries,
+      transcriptSource: transcript.source,
+      timelineWindow: snapshot.timelineWindow,
+      source: .live
+    )
+    guard nextSnapshot != snapshot else {
+      return nil
+    }
+    scheduleSessionDetailCacheWrite(
+      detail,
+      timeline: nextSnapshot.timeline,
+      transcript: nextSnapshot.transcript,
+      transcriptSource: nextSnapshot.transcriptSource,
+      timelineWindow: nextSnapshot.timelineWindow
+    )
+    return nextSnapshot
+  }
+
   private func loadSessionWindowAcpAgents(
     sessionID: String,
     client: any HarnessMonitorClientProtocol
@@ -288,11 +341,14 @@ extension HarnessMonitorStore {
       else {
         return entry
       }
-      let metadata = entry.acpTimelineIdentityMetadata()
+      let acpMetadata = entry.acpTimelineIdentityMetadata()
+      let codexMetadata = entry.codexTimelineIdentityMetadata()
       let identityChanged =
         entry.agentId != identity.sessionAgentID
-        || metadata?.agentID != identity.sessionAgentID
-        || metadata?.agentDisplayName != identity.displayName
+        || acpMetadata?.agentID != identity.sessionAgentID
+        || acpMetadata?.agentDisplayName != identity.displayName
+        || (codexMetadata != nil && codexMetadata?.agentID != identity.sessionAgentID)
+        || (codexMetadata != nil && codexMetadata?.agentDisplayName != identity.displayName)
       guard identityChanged else {
         return entry
       }
@@ -310,6 +366,11 @@ extension HarnessMonitorStore {
   ) -> (sessionAgentID: String, displayName: String)? {
     if let metadata = entry.acpTimelineIdentityMetadata(),
       let identity = identitiesByManagedAgentID[metadata.acpAgentID]
+    {
+      return identity
+    }
+    if let metadata = entry.codexTimelineIdentityMetadata(),
+      let identity = identitiesByManagedAgentID[metadata.runID]
     {
       return identity
     }

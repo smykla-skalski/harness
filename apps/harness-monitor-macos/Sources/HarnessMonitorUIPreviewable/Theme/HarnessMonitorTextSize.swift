@@ -148,6 +148,8 @@ private struct HarnessMonitorNativeTextFieldModifier: ViewModifier {
 
   func body(content: Content) -> some View {
     content
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .multilineTextAlignment(.leading)
       .font(font)
       .controlSize(controlSize)
       .textFieldStyle(.plain)
@@ -161,6 +163,7 @@ private struct HarnessMonitorNativeTextFieldModifier: ViewModifier {
         RoundedRectangle(cornerRadius: 8, style: .continuous)
           .stroke(HarnessMonitorTheme.controlBorder.opacity(0.7), lineWidth: 1)
       )
+      .contentShape(Rectangle())
   }
 }
 

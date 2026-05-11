@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
@@ -14,6 +15,26 @@ struct HarnessMonitorStoreMetricsTests {
     store.resetConnectionMetrics(for: .webSocket)
 
     #expect(store.connectionMetrics.connectedSince == nil)
+  }
+
+  @Test("Resetting metrics during reconnect preserves the disconnect anchor")
+  func resettingMetricsDuringReconnectPreservesDisconnectAnchor() {
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: RecordingHarnessClient())
+    )
+    let anchor = Date(timeIntervalSince1970: 1_700_000_000)
+
+    store.connectionState = .offline("lost connection")
+    var metrics = store.connectionMetrics
+    metrics.disconnectedSince = anchor
+    metrics.lastMessageAt = anchor.addingTimeInterval(30)
+    store.connectionMetrics = metrics
+
+    store.connectionState = .connecting
+    store.resetConnectionMetrics(for: .webSocket)
+
+    #expect(store.connectionMetrics.disconnectedSince == anchor)
+    #expect(store.connectionMetrics.lastMessageAt == nil)
   }
 
   @Test("Bootstrap records a latency sample without relying on transport ping")
