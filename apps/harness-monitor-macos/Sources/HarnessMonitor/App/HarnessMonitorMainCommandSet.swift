@@ -11,8 +11,6 @@ struct HarnessMonitorMainCommandSet: Commands {
   let decreaseTextSize: () -> Void
   let resetTextSize: () -> Void
   let refreshStore: () -> Void
-  @FocusedValue(\.sessionCreateContext)
-  private var sessionCreate
 
   var body: some Commands {
     HarnessMonitorAppCommands(
@@ -31,8 +29,7 @@ struct HarnessMonitorMainCommandSet: Commands {
     )
     SessionCreateCommands(
       store: store,
-      windowCommandRouting: windowCommandRouting,
-      sessionCreate: sessionCreate
+      windowCommandRouting: windowCommandRouting
     )
     OpenFolderCommand(store: store)
     RecentSessionsCommand(store: store)

@@ -54,35 +54,6 @@ public struct SessionInspectorCommand: Equatable, @unchecked Sendable {
   }
 }
 
-public struct SessionCreateContext: Equatable, @unchecked Sendable {
-  public let sessionID: String
-  public let primaryKind: SessionCreateKind
-  public let createAgent: () -> Void
-  public let createCodexAgent: () -> Void
-  public let createTask: () -> Void
-  public let createDecision: () -> Void
-
-  public init(
-    sessionID: String,
-    primaryKind: SessionCreateKind,
-    createAgent: @escaping () -> Void,
-    createCodexAgent: @escaping () -> Void,
-    createTask: @escaping () -> Void,
-    createDecision: @escaping () -> Void
-  ) {
-    self.sessionID = sessionID
-    self.primaryKind = primaryKind
-    self.createAgent = createAgent
-    self.createCodexAgent = createCodexAgent
-    self.createTask = createTask
-    self.createDecision = createDecision
-  }
-
-  public static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.sessionID == rhs.sessionID && lhs.primaryKind == rhs.primaryKind
-  }
-}
-
 private struct SessionNavigationFocusKey: FocusedValueKey {
   typealias Value = SessionNavigationCommand
 }
@@ -93,10 +64,6 @@ private struct SessionAttentionFocusKey: FocusedValueKey {
 
 private struct SessionInspectorFocusKey: FocusedValueKey {
   typealias Value = SessionInspectorCommand
-}
-
-private struct SessionCreateContextFocusKey: FocusedValueKey {
-  typealias Value = SessionCreateContext
 }
 
 extension FocusedValues {
@@ -113,11 +80,6 @@ extension FocusedValues {
   public var sessionInspector: SessionInspectorCommand? {
     get { self[SessionInspectorFocusKey.self] }
     set { self[SessionInspectorFocusKey.self] = newValue }
-  }
-
-  public var sessionCreateContext: SessionCreateContext? {
-    get { self[SessionCreateContextFocusKey.self] }
-    set { self[SessionCreateContextFocusKey.self] = newValue }
   }
 }
 

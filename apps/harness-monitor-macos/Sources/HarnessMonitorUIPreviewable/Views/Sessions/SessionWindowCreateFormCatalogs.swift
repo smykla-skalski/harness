@@ -92,12 +92,11 @@ enum SessionWindowCreateFormCatalogs {
         for: currentDraft.kind
       )
     )
-    guard normalized.storageKey != currentDraft.launchSelection.storageKey else {
-      return
+    if normalized.storageKey != currentDraft.launchSelection.storageKey {
+      var next = currentDraft
+      next.runtime = normalized.storageKey
+      state.updateCreateDraft(next)
     }
-    var next = currentDraft
-    next.runtime = normalized.storageKey
-    state.updateCreateDraft(next)
   }
 
   @MainActor

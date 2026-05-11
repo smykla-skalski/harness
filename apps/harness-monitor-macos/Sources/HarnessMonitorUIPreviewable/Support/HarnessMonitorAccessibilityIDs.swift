@@ -82,8 +82,6 @@ public enum HarnessMonitorAccessibility {
   public static let openRecentActionState = "harness.open.recent.action-state"
   public static let sessionWindowShell = "harness.session.window"
   public static let sessionWindowSidebar = "harness.session.window.sidebar"
-  public static let sessionWindowContentDetailDivider =
-    "harness.session.window.content-detail-divider"
   public static let sessionWindowStatusSurface = "harness.session.window.status"
   public static let sessionWindowToolbarSeparatorSuppressed =
     "harness.session.window.toolbar.separator-suppressed"

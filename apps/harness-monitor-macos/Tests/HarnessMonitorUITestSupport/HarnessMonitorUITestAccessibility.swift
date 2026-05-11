@@ -94,8 +94,6 @@ enum HarnessMonitorUITestAccessibility {
   static let previewSessionRowStatsFrame = "harness.sidebar.session.sess1234.stats.frame"
   static let previewSessionRowLastActivityFrame =
     "harness.sidebar.session.sess1234.last-activity.frame"
-  static let sessionWindowContentDetailDivider =
-    "harness.session.window.content-detail-divider"
   static let signalRegressionSecondarySessionRow = "harness.sidebar.session.sess-harness-secondary"
   static let previewSignalCard = "harness.session.signal.sig-ui-1"
   static let signalDetailSheet = "harness.signal.detail.sheet"

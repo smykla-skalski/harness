@@ -5,7 +5,6 @@ import SwiftUI
 struct SessionCreateCommands: Commands {
   let store: HarnessMonitorStore
   let windowCommandRouting: WindowCommandRoutingState
-  let sessionCreate: SessionCreateContext?
 
   var body: some Commands {
     let createAgent = createAction(for: .agent)
@@ -44,9 +43,6 @@ struct SessionCreateCommands: Commands {
   }
 
   private var createCodexAction: (() -> Void)? {
-    if let createCodexAgent = sessionCreate?.createCodexAgent {
-      return createCodexAgent
-    }
     guard let sessionID = activeSessionID else {
       return nil
     }
@@ -54,20 +50,6 @@ struct SessionCreateCommands: Commands {
   }
 
   private func createAction(for kind: SessionCreateKind) -> (() -> Void)? {
-    switch kind {
-    case .agent:
-      if let createAgent = sessionCreate?.createAgent {
-        return createAgent
-      }
-    case .task:
-      if let createTask = sessionCreate?.createTask {
-        return createTask
-      }
-    case .decision:
-      if let createDecision = sessionCreate?.createDecision {
-        return createDecision
-      }
-    }
     guard let sessionID = activeSessionID else {
       return nil
     }

@@ -71,14 +71,15 @@ final class WindowMenuCommandsTests: XCTestCase {
     let routingStateSource = try uiPreviewableSourceFile(named: "Support/WindowNavigationState.swift")
     let shellSource = try harnessSourceFile(named: "App/HarnessMonitorWindowSceneShell.swift")
     let focusedValuesSource = try uiPreviewableSourceFile(named: "Support/SessionFocusedValues.swift")
-    let inspectorSource = try uiPreviewableSourceFile(named: "Views/Sessions/SessionWindowView+Inspector.swift")
+    let sessionFocusedValuesSource = try uiPreviewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+FocusedValues.swift")
     let sheetRouterSource = try uiPreviewableSourceFile(named: "Views/Shared/HarnessMonitorSheetRouter.swift")
     let storeEnumsSource = try kitSourceFile(named: "Stores/HarnessMonitorStore+Enums.swift")
     let routeModelSource = try kitSourceFile(named: "Models/SessionRouteSelection.swift")
 
     XCTAssertTrue(
       commandSetSource.contains(
-        "SessionCreateCommands(\n      store: store,\n      windowCommandRouting: windowCommandRouting,\n      sessionCreate: sessionCreate"
+        "SessionCreateCommands(\n      store: store,\n      windowCommandRouting: windowCommandRouting"
       )
     )
     XCTAssertTrue(commandsSource.contains("let createCodexAgent = createCodexAction"))
@@ -89,8 +90,10 @@ final class WindowMenuCommandsTests: XCTestCase {
     XCTAssertTrue(commandsSource.contains("store.requestSessionRouteCreate(kind.routeCreateEntryPoint"))
     XCTAssertTrue(commandsSource.contains("return .task"))
     XCTAssertTrue(commandsSource.contains("return .decision"))
-    XCTAssertTrue(focusedValuesSource.contains("public let createCodexAgent: () -> Void"))
-    XCTAssertTrue(inspectorSource.contains("createCodexAgent: { store.presentedSheet = .newCodexAgent(sessionID: token.sessionID) }"))
+    XCTAssertFalse(commandSetSource.contains("@FocusedValue(\\.sessionCreateContext)"))
+    XCTAssertFalse(focusedValuesSource.contains("SessionCreateContext"))
+    XCTAssertFalse(focusedValuesSource.contains("sessionCreateContext"))
+    XCTAssertFalse(sessionFocusedValuesSource.contains("focusedSceneValue(\\.sessionCreateContext"))
     XCTAssertTrue(sheetRouterSource.contains("case .newCodexAgent(let sessionID):"))
     XCTAssertTrue(sheetRouterSource.contains("NewCodexAgentSheet(store: store, sessionID: sessionID)"))
     XCTAssertTrue(storeEnumsSource.contains("case newCodexAgent(sessionID: String)"))
