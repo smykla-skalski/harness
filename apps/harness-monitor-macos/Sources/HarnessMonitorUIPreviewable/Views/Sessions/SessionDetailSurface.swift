@@ -37,7 +37,7 @@ struct SessionDetailScrollSurface<Content: View, BottomInset: View>: View {
           verticalPadding: contentPadding,
           constrainContentWidth: false,
           readableWidth: false,
-          topScrollEdgeEffect: .hard,
+          topScrollEdgeEffect: .soft,
           bottomInsetSpacing: bottomInsetSpacing,
           bottomInset: {
             bottomInset
@@ -53,7 +53,7 @@ struct SessionDetailScrollSurface<Content: View, BottomInset: View>: View {
           verticalPadding: contentPadding,
           constrainContentWidth: false,
           readableWidth: false,
-          topScrollEdgeEffect: .hard
+          topScrollEdgeEffect: .soft
         ) {
           content
             .frame(maxWidth: .infinity, alignment: .topLeading)

@@ -9,6 +9,8 @@ extension HarnessMonitorUITestAccessibility {
   static let sessionNavigateForwardButton = "harness.session.window.toolbar.navigate-forward"
   static let sessionWindowFocusModeButton = "harness.session.window.toolbar.focus-mode"
   static let sessionWindowStatusSurface = "harness.session.window.status"
+  static let sessionWindowToolbarSeparatorSuppressed =
+    "harness.session.window.toolbar.separator-suppressed"
   static let sessionWindowCreateProviderPane =
     "harness.session.window.create.provider-pane"
   static let sessionWindowInspector = "harness.session.window.inspector"

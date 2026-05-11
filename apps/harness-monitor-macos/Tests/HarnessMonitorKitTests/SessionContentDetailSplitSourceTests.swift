@@ -14,12 +14,13 @@ struct SessionContentDetailSplitSourceTests {
 
     #expect(viewSource.contains("@SceneStorage(\"session.content-detail.width\")"))
     #expect(viewSource.contains("sessionSurface"))
+    #expect(!viewSource.contains(".windowToolbarContentBoundary()"))
     #expect(
       columnsSource.contains(
         "SessionContentDetailSplitView(contentWidth: contentColumnWidth)"
       )
     )
-    #expect(columnsSource.contains(".navigationSplitViewStyle(.prominentDetail)"))
+    #expect(columnsSource.contains(".navigationSplitViewStyle(.balanced)"))
     #expect(splitSource.contains("HSplitView"))
     #expect(!splitSource.contains("DragGesture("))
     #expect(!splitSource.contains("NSCursor"))
@@ -27,8 +28,8 @@ struct SessionContentDetailSplitSourceTests {
     #expect(splitSource.contains("layoutPriority(1)"))
   }
 
-  @Test("Session split keeps dense detail content out of background extension")
-  func sessionSplitKeepsDenseDetailContentOutOfBackgroundExtension() throws {
+  @Test("Session split uses one stable background extension host")
+  func sessionSplitUsesOneStableBackgroundExtensionHost() throws {
     let columnsSource = try previewableSourceFile(
       named: "Views/Sessions/SessionWindowView+Columns.swift"
     )
@@ -43,10 +44,10 @@ struct SessionContentDetailSplitSourceTests {
     )
     #expect(columnsSource.contains("switch renderedRoute.layoutStyle"))
     #expect(!columnsSource.contains("SessionBackgroundExtensionSurface()"))
-    #expect(!columnsSource.contains(".backgroundExtensionEffect()"))
     #expect(!surfaceSource.contains("SessionBackgroundExtensionSurface"))
     #expect(!surfaceSource.contains(".backgroundExtensionEffect()"))
-    #expect(surfaceSource.contains("topScrollEdgeEffect: .hard"))
+    #expect(surfaceSource.contains("topScrollEdgeEffect: .soft"))
+    #expect(columnsSource.contains(".backgroundExtensionEffect()"))
     #expect(
       !columnsSource.contains(
         """

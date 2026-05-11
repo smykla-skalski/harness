@@ -48,6 +48,7 @@ public struct OpenRecentView: View {
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       actionStateMarker
     }
+    .backgroundExtensionEffect()
     .task {
       guard !HarnessMonitorUITestEnvironment.isPerfScenarioActive else {
         return

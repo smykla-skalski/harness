@@ -97,6 +97,8 @@ extension SessionWindowView {
   }
 
   @ViewBuilder var focusModeSurface: some View {
+    // Keep one extension host across focus-mode branches so route flips do not
+    // tear down and rebuild the animatable glass surface.
     sessionBannerStack {
       Group {
         if SessionWindowFocusModePolicy.usesRouteContent(selection: stateCache.selection) {
@@ -106,6 +108,7 @@ extension SessionWindowView {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
       }
+      .backgroundExtensionEffect()
     }
     .modifier(
       SessionWindowPlainTapRecorder(
@@ -132,7 +135,7 @@ extension SessionWindowView {
         standardSessionDetailSurface
       }
     }
-    .navigationSplitViewStyle(.prominentDetail)
+    .navigationSplitViewStyle(.balanced)
     .modifier(
       SessionWindowPlainTapRecorder(
         stateCache: stateCache,
@@ -142,6 +145,8 @@ extension SessionWindowView {
   }
 
   @ViewBuilder private var standardSessionDetailSurface: some View {
+    // Keep one extension host across both layout styles so route changes do not
+    // duplicate or rebuild the animatable glass surface.
     Group {
       switch renderedRoute.layoutStyle {
       case .sidebarDetail:
@@ -154,6 +159,7 @@ extension SessionWindowView {
         }
       }
     }
+    .backgroundExtensionEffect()
   }
 
   @ViewBuilder private var routeDetailColumn: some View {

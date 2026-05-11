@@ -103,6 +103,70 @@ final class OpenRecentWindowUITests: HarnessMonitorUITestCase {
 
     let sessionWindow = element(in: app, identifier: Accessibility.sessionWindowShell)
     XCTAssertTrue(waitForElement(sessionWindow, timeout: Self.actionTimeout))
+
+    let separatorSuppressed = element(
+      in: app,
+      identifier: Accessibility.sessionWindowToolbarSeparatorSuppressed
+    )
+    XCTAssertTrue(
+      separatorSuppressed.waitForExistence(timeout: Self.actionTimeout),
+      """
+      Session window toolbar separator suppressor must be applied to prevent the seam between
+      native toolbar glass and the sidebar
+      """
+    )
+    XCTAssertEqual(
+      separatorSuppressed.label,
+      "suppressed",
+      "Session window separator suppressor marker should report 'suppressed'"
+    )
+  }
+
+  func testSessionWindowSplitColumnsStayInsideMinimumWindowWidth() {
+    let app = launchPreviewOpenRecent(
+      additionalEnvironment: [
+        "HARNESS_MONITOR_UI_MAIN_WINDOW_WIDTH": "920",
+        "HARNESS_MONITOR_UI_MAIN_WINDOW_HEIGHT": "620",
+      ]
+    )
+    let openRecentWindow = element(in: app, identifier: Accessibility.openRecentRoot)
+    XCTAssertTrue(waitForElement(openRecentWindow, timeout: Self.uiTimeout))
+
+    let sessionRowIdentifier = Accessibility.openRecentSessionRow(Self.previewSessionID)
+    XCTAssertTrue(
+      waitForButtonReady(
+        in: app,
+        identifier: sessionRowIdentifier,
+        timeout: Self.actionTimeout
+      )
+    )
+
+    tapButton(in: app, identifier: sessionRowIdentifier)
+
+    let sessionWindow = element(in: app, identifier: Accessibility.sessionWindowShell)
+    XCTAssertTrue(waitForElement(sessionWindow, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitUntil(timeout: Self.actionTimeout) { !openRecentWindow.exists })
+
+    let window = mainWindow(in: app)
+    let sidebar = element(in: app, identifier: Accessibility.sessionWindowSidebar)
+    XCTAssertTrue(waitForElement(sidebar, timeout: Self.fastActionTimeout))
+
+    let diagnostics = "window=\(window.frame) sidebar=\(sidebar.frame)"
+    XCTAssertGreaterThanOrEqual(sidebar.frame.minX, window.frame.minX - 2, diagnostics)
+    XCTAssertLessThanOrEqual(sidebar.frame.maxX, window.frame.maxX + 2, diagnostics)
+
+    let leaderRow = element(
+      in: app,
+      identifier: "harness.session.window.sidebar.agent.leader-claude"
+    )
+    XCTAssertTrue(waitForElement(leaderRow, timeout: Self.fastActionTimeout))
+    XCTAssertTrue(tapElementReliably(in: app, element: leaderRow))
+
+    let detail = element(in: app, identifier: "harness.agent.detail.scroll")
+    XCTAssertTrue(waitForElement(detail, timeout: Self.actionTimeout))
+    let detailDiagnostics = "window=\(window.frame) detail=\(detail.frame)"
+    XCTAssertGreaterThanOrEqual(detail.frame.minX, window.frame.minX - 2, detailDiagnostics)
+    XCTAssertLessThanOrEqual(detail.frame.maxX, window.frame.maxX + 2, detailDiagnostics)
   }
 
   func testDisablingCloseAfterPickKeepsWelcomeWindowVisible() {
