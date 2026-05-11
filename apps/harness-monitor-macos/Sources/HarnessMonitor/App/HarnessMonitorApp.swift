@@ -114,7 +114,7 @@ struct HarnessMonitorApp: App {
     pendingDecisionsDockBadgeController = PendingDecisionsDockBadgeController()
     perfScenario = configuration.perfScenario
     let store = configuration.store
-    HarnessMonitorApp.bindSupervisorSurfaces(
+    Self.bindSupervisorSurfaces(
       to: store,
       notificationController: notificationController,
       dockBadgeController: pendingDecisionsDockBadgeController,
