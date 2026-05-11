@@ -57,6 +57,7 @@ fn descriptor_with_id(command: &Path, id: &str) -> AcpAgentDescriptor {
             args: Vec::new(),
         },
         prompt_timeout_seconds: None,
+        excluded_from_initial_default: false,
     }
 }
 

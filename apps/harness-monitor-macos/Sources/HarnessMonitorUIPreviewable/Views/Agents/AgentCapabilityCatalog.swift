@@ -35,7 +35,8 @@ enum AgentCapabilityCatalog {
             AgentCapabilityTransportChoice(
               id: .acp(descriptor.id),
               title: "ACP",
-              capabilities: descriptor.capabilities
+              capabilities: descriptor.capabilities,
+              excludedFromInitialDefault: descriptor.excludedFromInitialDefault
             )
           ],
           doctorProbe: descriptor.doctorProbe,
@@ -76,7 +77,9 @@ enum AgentCapabilityCatalog {
     fallback: AgentLaunchSelection = HarnessMonitorAgentLaunchDefaults.startupFallbackSelection
   ) -> AgentLaunchSelection {
     if let firstAcpEnabledOption = options.first(where: { option in
-      guard let acpChoice = option.acpChoice else {
+      guard let acpChoice = option.acpChoice,
+        !acpChoice.excludedFromInitialDefault
+      else {
         return false
       }
       return option.isEnabled(acpChoice)
@@ -117,7 +120,8 @@ enum AgentCapabilityCatalog {
         AgentCapabilityTransportChoice(
           id: .acp(descriptor.id),
           title: "ACP",
-          capabilities: descriptor.capabilities
+          capabilities: descriptor.capabilities,
+          excludedFromInitialDefault: descriptor.excludedFromInitialDefault
         )
       )
     }

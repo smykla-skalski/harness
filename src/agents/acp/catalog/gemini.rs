@@ -64,6 +64,7 @@ pub fn descriptor() -> AcpAgentDescriptor {
             args: vec!["--version".to_owned()],
         },
         prompt_timeout_seconds: None,
+        excluded_from_initial_default: false,
     }
 }
 

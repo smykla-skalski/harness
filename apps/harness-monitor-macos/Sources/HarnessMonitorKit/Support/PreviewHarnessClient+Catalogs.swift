@@ -36,6 +36,55 @@ extension PreviewHarnessClient {
       doctorProbe: AcpDoctorProbe(command: "copilot", args: ["--version"])
     ),
     AcpAgentDescriptor(
+      id: "claude",
+      displayName: "Claude Code",
+      capabilities: [
+        "fs.read",
+        "fs.write",
+        "terminal.spawn",
+        "streaming",
+        "multi-turn",
+        "requires-network",
+      ],
+      launchCommand: "claude-agent-acp",
+      launchArgs: [],
+      envPassthrough: [
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN",
+        "ANTHROPIC_BASE_URL",
+        "ANTHROPIC_CUSTOM_HEADERS",
+        "ANTHROPIC_MODEL",
+        "CLAUDE_CONFIG_DIR",
+        "CLAUDE_CODE_EXECUTABLE",
+        "CLAUDE_CODE_REMOTE",
+        "CLAUDE_CODE_USE_BEDROCK",
+        "CLAUDE_CODE_USE_FOUNDRY",
+        "CLAUDE_CODE_USE_VERTEX",
+        "CLAUDE_MODEL_CONFIG",
+        "AWS_REGION",
+        "AWS_PROFILE",
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_SESSION_TOKEN",
+        "GOOGLE_CLOUD_PROJECT",
+        "GOOGLE_CLOUD_LOCATION",
+        "GOOGLE_APPLICATION_CREDENTIALS",
+        "MAX_THINKING_TOKENS",
+        "NO_BROWSER",
+        "SSH_CONNECTION",
+        "SSH_CLIENT",
+        "SSH_TTY",
+      ],
+      modelCatalog: claudeRuntimeModelCatalog(),
+      installHint:
+        "Install the official Claude ACP wrapper and authenticate Claude before using ACP.",
+      doctorProbe: AcpDoctorProbe(
+        command: "claude-agent-acp",
+        args: ["--cli", "auth", "status"]
+      ),
+      excludedFromInitialDefault: true
+    ),
+    AcpAgentDescriptor(
       id: "gemini",
       displayName: "Gemini CLI",
       capabilities: [
@@ -79,6 +128,13 @@ extension PreviewHarnessClient {
           binaryPresent: !missingBinaryAgentIDs.contains("copilot"),
           authState: .unknown,
           version: "preview",
+        ),
+        AcpRuntimeProbe(
+          agentId: "claude",
+          displayName: "Claude Code",
+          binaryPresent: !missingBinaryAgentIDs.contains("claude"),
+          authState: .unknown,
+          version: "preview"
         ),
         AcpRuntimeProbe(
           agentId: "gemini",

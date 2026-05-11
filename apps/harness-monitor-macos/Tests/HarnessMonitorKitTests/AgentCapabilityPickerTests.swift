@@ -287,6 +287,40 @@ struct AgentCapabilityPickerTests {
       AgentCapabilityCatalog.firstProviderLaunchSelection(options: options) == .acp("copilot"))
   }
 
+  @Test("first launch selection skips ACP providers excluded from the initial default")
+  func firstLaunchSelectionSkipsExcludedInitialDefaultProviders() {
+    let options = AgentCapabilityCatalog.options(
+      acpAgents: [
+        descriptor(
+          id: "claude",
+          displayName: "Claude Code",
+          excludedFromInitialDefault: true
+        ),
+        descriptor(id: "gemini", displayName: "Gemini CLI"),
+      ],
+      runtimeProbeResults: AcpRuntimeProbeResponse(
+        probes: [
+          AcpRuntimeProbe(
+            agentId: "claude",
+            displayName: "Claude Code",
+            binaryPresent: true,
+            authState: .ready
+          ),
+          AcpRuntimeProbe(
+            agentId: "gemini",
+            displayName: "Gemini CLI",
+            binaryPresent: true,
+            authState: .ready
+          ),
+        ],
+        checkedAt: "2026-05-11T12:00:00Z"
+      )
+    )
+
+    #expect(
+      AgentCapabilityCatalog.firstProviderLaunchSelection(options: options) == .acp("gemini"))
+  }
+
   @Test("stored provider id defaults to ACP when that provider supports ACP")
   func storedProviderDefaultsToAcpWhenAvailable() {
     let options = AgentCapabilityCatalog.options(
@@ -388,7 +422,11 @@ struct AgentCapabilityPickerTests {
     )
   }
 
-  private func descriptor(id: String, displayName: String) -> AcpAgentDescriptor {
+  private func descriptor(
+    id: String,
+    displayName: String,
+    excludedFromInitialDefault: Bool = false
+  ) -> AcpAgentDescriptor {
     AcpAgentDescriptor(
       id: id,
       displayName: displayName,
@@ -397,7 +435,8 @@ struct AgentCapabilityPickerTests {
       launchArgs: ["--acp"],
       envPassthrough: [],
       installHint: nil,
-      doctorProbe: AcpDoctorProbe(command: id, args: ["--version"])
+      doctorProbe: AcpDoctorProbe(command: id, args: ["--version"]),
+      excludedFromInitialDefault: excludedFromInitialDefault
     )
   }
 }
