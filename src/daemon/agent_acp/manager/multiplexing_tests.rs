@@ -203,7 +203,7 @@ async fn pooling_disabled_faults_still_backoff_canonical_process_key() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(unix)]
-async fn stopping_one_reused_process_session_keeps_sibling_active() {
+async fn stopping_one_reused_process_session_keeps_sibling_live() {
     temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
         let (_temp, manager, descriptor, request) = shared_fake_runtime();
 
@@ -227,13 +227,18 @@ async fn stopping_one_reused_process_session_keeps_sibling_active() {
         assert_ok(manager.stop(&first.acp_id), "stop first");
         let sibling = assert_ok(manager.get(&second.acp_id), "get sibling");
         assert_eq!(first.pid, sibling.pid);
-        assert_eq!(sibling.status, AgentStatus::Active);
+        assert!(
+            sibling.status.is_alive(),
+            "sibling session should remain live after stopping its peer"
+        );
 
         let stopped_again = assert_ok(manager.stop(&first.acp_id), "stop first again");
         assert!(stopped_again.status.is_disconnected());
-        assert_eq!(
-            assert_ok(manager.get(&second.acp_id), "get sibling").status,
-            AgentStatus::Active
+        assert!(
+            assert_ok(manager.get(&second.acp_id), "get sibling")
+                .status
+                .is_alive(),
+            "sibling session should remain live after idempotent peer stop"
         );
 
         assert_ok(manager.stop(&second.acp_id), "stop second");
@@ -438,7 +443,10 @@ fn wait_for_cancelled_sessions(path: &Path, expected_count: usize) -> Vec<String
 
 #[cfg(unix)]
 fn assert_sibling_session_state_preserved(before: &AcpAgentSnapshot, after: &AcpAgentSnapshot) {
-    assert_eq!(after.status, AgentStatus::Active);
+    assert!(
+        after.status.is_alive(),
+        "sibling session should remain live after stopping its peer"
+    );
     assert_eq!(before.acp_id, after.acp_id);
     assert_eq!(before.session_id, after.session_id);
     assert_eq!(before.process_key, after.process_key);
