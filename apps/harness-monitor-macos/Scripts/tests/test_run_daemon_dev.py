@@ -180,6 +180,69 @@ esac
             self.assertTrue(log_path.is_file())
             self.assertIn("fake daemon exited cleanly", log_path.read_text(encoding="utf-8"))
 
+    def test_strips_gatekeeper_xattrs_from_runtime_root_before_launch(self) -> None:
+        xattr = Path("/usr/bin/xattr")
+        if not os.access(xattr, os.X_OK):
+            self.skipTest("/usr/bin/xattr is unavailable")
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            lane = "monitor-daemon-xattr"
+            fake_harness = temp_root / "fake-harness-xattr.sh"
+            self.write_fake_harness(fake_harness, "success")
+
+            home_dir = temp_root / f"home-{lane}"
+            runtime_root = (
+                home_dir
+                / "Library"
+                / "Group Containers"
+                / "Q498EB36N4.io.harnessmonitor"
+                / "runtime-lanes"
+                / lane
+                / "harness"
+            )
+            child_path = runtime_root / "daemon" / "stale.db"
+            child_path.parent.mkdir(parents=True, exist_ok=True)
+            child_path.write_text("stale", encoding="utf-8")
+            for path in (runtime_root, child_path):
+                subprocess.run(
+                    [str(xattr), "-w", "com.apple.quarantine", "codex-test", str(path)],
+                    check=True,
+                )
+
+            log_dir = temp_root / "logs"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            env = os.environ.copy()
+            env.update(
+                {
+                    "HOME": str(home_dir),
+                    "HARNESS_MONITOR_RUNTIME_LANE": lane,
+                    "HARNESS_MONITOR_DAEMON_DEV_BIN": str(fake_harness),
+                    "HARNESS_MONITOR_DAEMON_DEV_LOG_DIR": str(log_dir),
+                    "TMPDIR": str(temp_root),
+                    "BASH_ENV": "/dev/null",
+                }
+            )
+
+            process = subprocess.run(
+                ["bash", str(SCRIPT_PATH)],
+                capture_output=True,
+                text=True,
+                env=env,
+                check=False,
+            )
+
+            self.assertEqual(process.returncode, 0, process.stdout + process.stderr)
+            self.assertEqual(process.stderr, "")
+            for path in (runtime_root, child_path):
+                result = subprocess.run(
+                    [str(xattr), "-p", "com.apple.quarantine", str(path)],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertNotEqual(result.returncode, 0, f"{path} still has quarantine xattr")
+
     def test_interrupt_cleanup_exits_zero_and_clears_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             process, stdout, stderr, manifest_path, _log_dir = self.run_script(
