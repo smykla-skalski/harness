@@ -106,7 +106,7 @@ extension SessionWindowView {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
       }
-      .backgroundExtensionEffect()
+      .sessionWindowBackgroundExtensionEffect()
     }
     .modifier(
       SessionWindowPlainTapRecorder(
@@ -161,7 +161,7 @@ extension SessionWindowView {
         }
       }
     }
-    .backgroundExtensionEffect()
+    .sessionWindowBackgroundExtensionEffect()
   }
 
   @ViewBuilder private var routeDetailColumn: some View {
