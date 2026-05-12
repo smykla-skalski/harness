@@ -10,15 +10,13 @@ pub(super) fn codex_transcript_entries(run: &CodexRunSnapshot) -> Vec<TimelineEn
         run.created_at.clone(),
         "user_prompt",
         trim_transcript_summary(&run.prompt, "Prompt submitted"),
-        json!({
+        &json!({
             "type": "user_prompt",
             "content": run.prompt.clone(),
         }),
     ));
     for event in &run.events {
-        if let Some(entry) = codex_event_timeline_entry(run, event) {
-            entries.push(entry);
-        }
+        entries.push(codex_event_timeline_entry(run, event));
     }
     if let Some(final_message) = run
         .final_message
@@ -33,7 +31,7 @@ pub(super) fn codex_transcript_entries(run: &CodexRunSnapshot) -> Vec<TimelineEn
             run.updated_at.clone(),
             "assistant_text",
             trim_transcript_summary(final_message, "Assistant response"),
-            json!({
+            &json!({
                 "type": "assistant_text",
                 "content": final_message,
                 "final": true,
@@ -43,72 +41,69 @@ pub(super) fn codex_transcript_entries(run: &CodexRunSnapshot) -> Vec<TimelineEn
     entries
 }
 
-fn codex_event_timeline_entry(
-    run: &CodexRunSnapshot,
-    event: &CodexRunEvent,
-) -> Option<TimelineEntry> {
+fn codex_event_timeline_entry(run: &CodexRunSnapshot, event: &CodexRunEvent) -> TimelineEntry {
     if event.kind == "turn/steer" {
         let prompt = event
             .payload
             .pointer("/input/0/text")
             .and_then(Value::as_str)
             .unwrap_or(&event.summary);
-        return Some(codex_timeline_entry(
+        return codex_timeline_entry(
             run,
             &event.sequence.to_string(),
             event.recorded_at.clone(),
             "user_prompt",
             trim_transcript_summary(prompt, "Steering prompt sent"),
-            json!({
+            &json!({
                 "type": "user_prompt",
                 "content": prompt,
                 "source": "steer",
                 "event": compact_codex_event_payload(event),
             }),
-        ));
+        );
     }
     if let Some(entry) = codex_agent_message_entry(run, event) {
-        return Some(entry);
+        return entry;
     }
     if event.kind.contains("requestApproval") {
-        return Some(codex_timeline_entry(
+        return codex_timeline_entry(
             run,
             &event.sequence.to_string(),
             event.recorded_at.clone(),
             "agent_permission_asked",
             event.summary.clone(),
-            json!({
+            &json!({
                 "type": "permission_asked",
                 "message": event.summary,
                 "event": compact_codex_event_payload(event),
             }),
-        ));
+        );
     }
     if event.kind == "error" {
-        return Some(codex_timeline_entry(
+        return codex_timeline_entry(
             run,
             &event.sequence.to_string(),
             event.recorded_at.clone(),
             "agent_error",
             event.summary.clone(),
-            json!({
+            &json!({
                 "type": "error",
                 "message": event.summary,
                 "event": compact_codex_event_payload(event),
             }),
-        ));
+        );
     }
-    Some(codex_timeline_entry(
+    codex_timeline_entry(
         run,
         &event.sequence.to_string(),
         event.recorded_at.clone(),
         "agent_state_change",
         event.summary.clone(),
-        json!({
+        &json!({
             "type": "state_change",
             "event": compact_codex_event_payload(event),
         }),
-    ))
+    )
 }
 
 fn codex_agent_message_entry(
@@ -122,7 +117,7 @@ fn codex_agent_message_entry(
         event.recorded_at.clone(),
         "assistant_text",
         trim_transcript_summary(text, "Assistant response"),
-        json!({
+        &json!({
             "type": "assistant_text",
             "content": text,
             "event": compact_codex_event_payload(event),
@@ -165,7 +160,7 @@ fn codex_timeline_entry(
     recorded_at: String,
     kind: &str,
     summary: String,
-    event: Value,
+    event: &Value,
 ) -> TimelineEntry {
     let agent_id = run.session_agent_id.clone();
     TimelineEntry {
@@ -191,11 +186,12 @@ fn codex_timeline_entry(
 }
 
 fn trim_transcript_summary(text: &str, fallback: &str) -> String {
+    const MAX_CHARS: usize = 220;
+
     let text = text.trim();
     if text.is_empty() {
         return fallback.to_string();
     }
-    const MAX_CHARS: usize = 220;
     let mut iter = text.chars();
     let trimmed: String = iter.by_ref().take(MAX_CHARS).collect();
     if iter.next().is_some() {

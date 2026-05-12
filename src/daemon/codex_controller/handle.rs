@@ -164,33 +164,7 @@ impl CodexControllerHandle {
         session_id: &str,
         request: &CodexRunRequest,
     ) -> Result<CodexRunSnapshot, CliError> {
-        let prompt = request.prompt.trim();
-        if prompt.is_empty() {
-            return Err(CliErrorKind::workflow_parse("codex prompt cannot be empty").into());
-        }
-
-        let requested_model = request.model.as_deref().filter(|value| !value.is_empty());
-        if let Some(model) = requested_model
-            && !request.allow_custom_model
-        {
-            validate_model("codex", model).map_err(|valid| {
-                let detail = if valid.is_empty() {
-                    "no codex model catalog available".to_string()
-                } else {
-                    format!("valid models: {}", valid.join(", "))
-                };
-                CliError::from(CliErrorKind::workflow_parse(format!(
-                    "model '{model}' is not valid for runtime 'codex': {detail}"
-                )))
-            })?;
-        }
-
-        if let Some(effort) = request.effort.as_deref().filter(|value| !value.is_empty())
-            && !request.allow_custom_model
-        {
-            validate_codex_effort(requested_model, effort)?;
-        }
-
+        let prompt = validate_run_request(request)?;
         self.preflight_websocket_probe(session_id)?;
 
         let project_dir = self.project_dir_for_session(session_id)?;
@@ -198,32 +172,15 @@ impl CodexControllerHandle {
         let display_name = request.name.clone().unwrap_or_else(|| "Codex".to_string());
         let session_agent_id =
             self.register_orchestration_agent(session_id, &run_id, request, &display_name)?;
-        let now = utc_now();
-        let snapshot = CodexRunSnapshot {
+        let snapshot = queued_run_snapshot(
+            session_id,
+            request,
             run_id,
-            session_id: session_id.to_string(),
-            session_agent_id: Some(session_agent_id),
-            display_name: Some(display_name),
             project_dir,
-            thread_id: request.resume_thread_id.clone(),
-            turn_id: None,
-            mode: request.mode,
-            status: CodexRunStatus::Queued,
-            prompt: prompt.to_string(),
-            latest_summary: request
-                .actor
-                .as_ref()
-                .map(|actor| format!("Queued by {actor}")),
-            final_message: None,
-            error: None,
-            pending_approvals: Vec::new(),
-            resolved_approvals: Vec::new(),
-            events: Vec::new(),
-            created_at: now.clone(),
-            updated_at: now,
-            model: request.model.clone(),
-            effort: request.effort.clone(),
-        };
+            prompt,
+            session_agent_id,
+            display_name,
+        );
         if let Err(error) = self.save_and_broadcast(&snapshot) {
             self.rollback_orchestration_agent_registration(
                 session_id,
@@ -252,23 +209,7 @@ impl CodexControllerHandle {
             .active_runs
             .insert(snapshot.run_id.clone(), control_tx)
         {
-            let mut failed = snapshot.clone();
-            failed.status = CodexRunStatus::Failed;
-            failed.latest_summary = Some("Codex worker could not attach to daemon".to_string());
-            failed.error = Some(error.to_string());
-            failed.updated_at = utc_now();
-            let payload = json!({
-                "runId": failed.run_id.clone(),
-                "status": "failed",
-                "reason": "active run registry failed",
-                "error": failed.error.clone(),
-            });
-            record_snapshot_event(
-                &mut failed,
-                "agent/reconciled",
-                "Codex worker could not attach to daemon".to_string(),
-                &payload,
-            );
+            let failed = active_run_attach_failure(snapshot, &error);
             let _ = self.save_and_broadcast(&failed);
             let _ = self.sync_orchestration_status_for_run(&failed);
             return Err(error);
@@ -351,6 +292,93 @@ impl CodexControllerHandle {
         });
         Ok(CodexTranscriptResponse { entries })
     }
+}
+
+fn validate_run_request(request: &CodexRunRequest) -> Result<&str, CliError> {
+    let prompt = request.prompt.trim();
+    if prompt.is_empty() {
+        return Err(CliErrorKind::workflow_parse("codex prompt cannot be empty").into());
+    }
+
+    let requested_model = request.model.as_deref().filter(|value| !value.is_empty());
+    if let Some(model) = requested_model
+        && !request.allow_custom_model
+    {
+        validate_model("codex", model).map_err(|valid| {
+            let detail = if valid.is_empty() {
+                "no codex model catalog available".to_string()
+            } else {
+                format!("valid models: {}", valid.join(", "))
+            };
+            CliError::from(CliErrorKind::workflow_parse(format!(
+                "model '{model}' is not valid for runtime 'codex': {detail}"
+            )))
+        })?;
+    }
+
+    if let Some(effort) = request.effort.as_deref().filter(|value| !value.is_empty())
+        && !request.allow_custom_model
+    {
+        validate_codex_effort(requested_model, effort)?;
+    }
+    Ok(prompt)
+}
+
+fn queued_run_snapshot(
+    session_id: &str,
+    request: &CodexRunRequest,
+    run_id: String,
+    project_dir: String,
+    prompt: &str,
+    session_agent_id: String,
+    display_name: String,
+) -> CodexRunSnapshot {
+    let now = utc_now();
+    CodexRunSnapshot {
+        run_id,
+        session_id: session_id.to_string(),
+        session_agent_id: Some(session_agent_id),
+        display_name: Some(display_name),
+        project_dir,
+        thread_id: request.resume_thread_id.clone(),
+        turn_id: None,
+        mode: request.mode,
+        status: CodexRunStatus::Queued,
+        prompt: prompt.to_string(),
+        latest_summary: request
+            .actor
+            .as_ref()
+            .map(|actor| format!("Queued by {actor}")),
+        final_message: None,
+        error: None,
+        pending_approvals: Vec::new(),
+        resolved_approvals: Vec::new(),
+        events: Vec::new(),
+        created_at: now.clone(),
+        updated_at: now,
+        model: request.model.clone(),
+        effort: request.effort.clone(),
+    }
+}
+
+fn active_run_attach_failure(mut failed: CodexRunSnapshot, error: &CliError) -> CodexRunSnapshot {
+    failed.status = CodexRunStatus::Failed;
+    failed.latest_summary = Some("Codex worker could not attach to daemon".to_string());
+    failed.error = Some(error.to_string());
+    failed.updated_at = utc_now();
+    let payload = json!({
+        "runId": failed.run_id.clone(),
+        "status": "failed",
+        "reason": "active run registry failed",
+        "error": failed.error.clone(),
+    });
+    record_snapshot_event(
+        &mut failed,
+        "agent/reconciled",
+        "Codex worker could not attach to daemon".to_string(),
+        &payload,
+    );
+    failed
 }
 
 pub(super) fn record_snapshot_event(
