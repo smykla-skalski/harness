@@ -19,16 +19,13 @@ struct AgentDetailSendUpdateSection: View {
   @Binding var signalMessage: String
   @Binding var signalActionHint: String
   @FocusState private var focusedField: AgentDetailSendUpdateFocusField?
-  @State private var deadlineNow = Date.now
   @State private var isMoreOptionsExpanded = false
   // Measured container width drives the deterministic horizontal/vertical pick
   // below. ViewThatFits would build both candidate trees on every body
   // invocation; here we measure once and only re-pick on threshold crossings.
   @State private var composerFitsHorizontally = true
-  @State private var statusFitsHorizontally = true
 
   private static let composerHorizontalMinWidth: CGFloat = 480
-  private static let statusHorizontalMinWidth: CGFloat = 360
 
   init(
     store: HarnessMonitorStore,
@@ -64,7 +61,7 @@ struct AgentDetailSendUpdateSection: View {
     signalMessage.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
-  private var statusMessage: String? {
+  var statusMessage: String? {
     Self.statusMessage(
       isSessionReadOnly: store.isSessionReadOnly,
       actionUnavailableMessage: actionUnavailableMessage,
@@ -78,7 +75,7 @@ struct AgentDetailSendUpdateSection: View {
     return trimmed.isEmpty ? nil : trimmed
   }
 
-  private var promptDeadlineDate: Date? {
+  var promptDeadlineDate: Date? {
     guard
       let runtimeState = runtimeState ?? store.acpRuntimeState(for: agentID),
       let observedAt = runtimeState.promptDeadlineAnchorAt,
@@ -87,21 +84,6 @@ struct AgentDetailSendUpdateSection: View {
       return nil
     }
     return observedAt.addingTimeInterval(TimeInterval(remaining) / 1000)
-  }
-
-  private var deadlinePresentation: AcpRuntimeDeadlinePresentation? {
-    guard let promptDeadlineDate else { return nil }
-    return AcpRuntimeDeadlinePresentation.presentation(
-      deadline: promptDeadlineDate,
-      now: deadlineNow
-    )
-  }
-
-  private var sendButtonTitle: String {
-    if let deadlinePresentation, deadlinePresentation.isUrgent {
-      return "Send · \(deadlinePresentation.countdownLabel)"
-    }
-    return "Send"
   }
 
   private var moreOptionsSummary: String? {
@@ -117,18 +99,11 @@ struct AgentDetailSendUpdateSection: View {
     }
   }
 
-  private var deadlineStatusLabel: String? {
-    guard let deadlinePresentation, !deadlinePresentation.isUrgent else {
-      return nil
-    }
-    return "Deadline \(deadlinePresentation.countdownLabel)"
-  }
-
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       compactComposer
       advancedOptionsDisclosure
-      if statusMessage != nil || deadlineStatusLabel != nil {
+      if statusMessage != nil || promptDeadlineDate != nil {
         composerStatusRow
       }
     }
@@ -156,27 +131,6 @@ struct AgentDetailSendUpdateSection: View {
         actionHint: newValue
       ) {
         isMoreOptionsExpanded = true
-      }
-    }
-    .task(id: promptDeadlineDate) {
-      await runDeadlineClockIfNeeded()
-    }
-  }
-
-  @MainActor
-  private func runDeadlineClockIfNeeded() async {
-    guard promptDeadlineDate != nil else {
-      return
-    }
-
-    while !Task.isCancelled {
-      let now = AcpRuntimeDeadlineClock.now(store: store, localNow: Date.now)
-      deadlineNow = now
-      guard AcpRuntimeDeadlineClock.shouldTick(deadline: promptDeadlineDate, now: now) else {
-        return
-      }
-      guard await AcpRuntimeDeadlineClock.sleepUntilNextTick() else {
-        return
       }
     }
   }
@@ -285,84 +239,15 @@ struct AgentDetailSendUpdateSection: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.agentDetailSignalDisclosure)
   }
 
-  @ViewBuilder private var composerStatusRow: some View {
-    Group {
-      if statusFitsHorizontally {
-        HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-          if let statusMessage {
-            composerStatusLabel(statusMessage)
-          }
-          Spacer(minLength: HarnessMonitorTheme.spacingMD)
-          if let deadlineStatusLabel {
-            composerDeadlineLabel(deadlineStatusLabel)
-          }
-        }
-      } else {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-          if let statusMessage {
-            composerStatusLabel(statusMessage)
-          }
-          if let deadlineStatusLabel {
-            composerDeadlineLabel(deadlineStatusLabel)
-          }
-        }
-      }
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .onGeometryChange(for: CGFloat.self) { proxy in
-      proxy.size.width
-    } action: { width in
-      let next = width >= Self.statusHorizontalMinWidth
-      if statusFitsHorizontally != next {
-        statusFitsHorizontally = next
-      }
-    }
-    .accessibilityIdentifier(HarnessMonitorAccessibility.agentDetailSignalStatus)
-  }
-
-  private func composerStatusLabel(_ label: String) -> some View {
-    Label {
-      Text(label)
-        .scaledFont(.caption)
-        .fixedSize(horizontal: false, vertical: true)
-    } icon: {
-      Image(systemName: statusSymbolName)
-        .scaledFont(.caption.weight(.semibold))
-        .accessibilityHidden(true)
-    }
-    .foregroundStyle(statusTint)
-    .accessibilityElement(children: .combine)
-  }
-
-  private func composerDeadlineLabel(_ label: String) -> some View {
-    Label {
-      Text(label)
-        .scaledFont(.caption)
-        .lineLimit(1)
-    } icon: {
-      Image(systemName: "clock")
-        .scaledFont(.caption.weight(.semibold))
-        .accessibilityHidden(true)
-    }
-    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-    .accessibilityElement(children: .combine)
-    .accessibilityLabel("Prompt deadline")
-    .accessibilityValue(deadlinePresentation?.accessibilityLabel ?? label)
-  }
-
   private var sendButton: some View {
-    HarnessInlineActionButton(
-      title: sendButtonTitle,
-      actionID: .sendSignal(sessionID: sessionID, agentID: agentID),
+    AgentDetailDeadlineSendButton(
       store: store,
-      variant: .prominent,
-      tint: nil,
-      isExternallyDisabled: statusMessage != nil,
-      accessibilityIdentifier: HarnessMonitorAccessibility.agentDetailSignalSend,
+      sessionID: sessionID,
+      agentID: agentID,
+      statusMessage: statusMessage,
+      promptDeadlineDate: promptDeadlineDate,
       action: dispatchSendUpdate
     )
-    .accessibilityLabel("Send Update")
-    .accessibilityValue(statusMessage ?? "")
   }
 
   private func dispatchSendUpdate() {
