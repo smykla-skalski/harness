@@ -72,14 +72,17 @@ public final class SessionWindowStateCache {
   }
 
   public func setRouteDecisionID(_ decisionID: String?) {
+    guard sectionState.decisionID != decisionID else { return }
     sectionState.decisionID = decisionID
   }
 
   public func setRouteAgentID(_ agentID: String?) {
+    guard sectionState.agentID != agentID else { return }
     sectionState.agentID = agentID
   }
 
   public func setRouteTaskID(_ taskID: String?) {
+    guard sectionState.taskID != taskID else { return }
     sectionState.taskID = taskID
   }
 
@@ -138,9 +141,13 @@ public final class SessionWindowStateCache {
   }
 
   public func updateCreateDraft(_ draft: SessionCreateDraft) {
-    sectionState.createDrafts[draft.kind] = draft
+    if sectionState.createDrafts[draft.kind] != draft {
+      sectionState.createDrafts[draft.kind] = draft
+    }
     guard selection.createDraft?.kind == draft.kind else { return }
-    selection = .create(draft)
+    let nextSelection = SessionSelection.create(draft)
+    guard selection != nextSelection else { return }
+    selection = nextSelection
   }
 
   func didPickCreateLaunchSelectionManually(for kind: SessionCreateKind) -> Bool {
@@ -149,8 +156,10 @@ public final class SessionWindowStateCache {
 
   func setDidPickCreateLaunchSelectionManually(_ value: Bool, for kind: SessionCreateKind) {
     if value {
+      guard !manualLaunchSelectionKinds.contains(kind) else { return }
       manualLaunchSelectionKinds.insert(kind)
     } else {
+      guard manualLaunchSelectionKinds.contains(kind) else { return }
       manualLaunchSelectionKinds.remove(kind)
     }
   }
@@ -246,7 +255,9 @@ public final class SessionWindowStateCache {
       }
       selection = nextSelection
     }
-    selectionSource = source
+    if selectionSource != source {
+      selectionSource = source
+    }
     if case .agent = nextSelection, source == .keyboard {
       agentComposerFocusRequestID += 1
     }
@@ -266,7 +277,7 @@ public final class SessionWindowStateCache {
     capabilityOptions: [AgentCapabilityOption],
     personas: [AgentPersona]
   ) {
-    agentCreateCatalog = SessionWindowAgentCreateCatalogState(
+    let nextCatalog = SessionWindowAgentCreateCatalogState(
       descriptors: descriptors,
       runtimeModelCatalogs: runtimeModelCatalogs,
       capabilityOptions: capabilityOptions,
@@ -274,9 +285,12 @@ public final class SessionWindowStateCache {
       isLoading: false,
       hasLoaded: true
     )
+    guard agentCreateCatalog != nextCatalog else { return }
+    agentCreateCatalog = nextCatalog
   }
 
   public func failAgentCreateCatalogLoading() {
+    guard agentCreateCatalog.isLoading else { return }
     agentCreateCatalog.isLoading = false
   }
 
@@ -363,40 +377,4 @@ struct SessionWindowAgentCreateCatalogState: Equatable {
   public var personas: [AgentPersona] = []
   public var isLoading = false
   public var hasLoaded = false
-}
-
-@MainActor
-@Observable
-public final class SessionWindowSectionState {
-  public var routeSelection: SessionWindowRoute = .overview
-  public var agentID: String?
-  public var codexRunID: String?
-  public var decisionID: String?
-  public var taskID: String?
-  public var createDrafts: [SessionCreateKind: SessionCreateDraft] = [:]
-
-  public init() {}
-
-  public func remember(_ selection: SessionSelection) {
-    switch selection {
-    case .route(let route):
-      routeSelection = route
-    case .agent(_, let agentID):
-      self.agentID = agentID
-    case .codexRun(_, let runID):
-      codexRunID = runID
-    case .decision(_, let decisionID):
-      self.decisionID = decisionID
-    case .task(_, let taskID):
-      self.taskID = taskID
-    case .create(let draft):
-      createDrafts[draft.kind] = draft
-    }
-  }
-
-  public func hasDraft(_ kind: SessionCreateKind) -> Bool {
-    guard let draft = createDrafts[kind] else { return false }
-    return !draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-      || !draft.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-  }
 }
