@@ -130,35 +130,44 @@ struct RefreshToolbarButton: View {
     }
   }
 
+  @ViewBuilder
   private var toolbarSymbol: some View {
-    TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !shouldSpin)) { context in
-      Image(systemName: showsSuccessFeedback ? "checkmark" : "arrow.clockwise")
-        .foregroundStyle(.primary)
-        .rotationEffect(.degrees(showsSuccessFeedback ? 0 : rotationDegrees(at: context.date)))
-        .contentTransition(
-          .symbolEffect(.replace, options: RefreshToolbarFeedbackTiming.replaceOptions)
-        )
-        .overlay {
-          if showsSuccessTint {
-            Image(systemName: "checkmark")
-              .foregroundStyle(.green)
-              .symbolEffect(
-                .bounce,
-                options: RefreshToolbarFeedbackTiming.bounceOptions,
-                value: successPopToken
-              )
-              .blendMode(.sourceAtop)
-              .accessibilityHidden(true)
-          }
-        }
-        .compositingGroup()
-        .animation(
-          reduceMotion ? nil : RefreshToolbarFeedbackTiming.transitionAnimation,
-          value: showsSuccessFeedback
-        )
-        .frame(width: 14, height: 14)
-        .accessibilityHidden(true)
+    if shouldSpin {
+      TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
+        toolbarSymbolImage(rotationDegrees: rotationDegrees(at: context.date))
+      }
+    } else {
+      toolbarSymbolImage(rotationDegrees: 0)
     }
+  }
+
+  private func toolbarSymbolImage(rotationDegrees: Double) -> some View {
+    Image(systemName: showsSuccessFeedback ? "checkmark" : "arrow.clockwise")
+      .foregroundStyle(.primary)
+      .rotationEffect(.degrees(showsSuccessFeedback ? 0 : rotationDegrees))
+      .contentTransition(
+        .symbolEffect(.replace, options: RefreshToolbarFeedbackTiming.replaceOptions)
+      )
+      .overlay {
+        if showsSuccessTint {
+          Image(systemName: "checkmark")
+            .foregroundStyle(.green)
+            .symbolEffect(
+              .bounce,
+              options: RefreshToolbarFeedbackTiming.bounceOptions,
+              value: successPopToken
+            )
+            .blendMode(.sourceAtop)
+            .accessibilityHidden(true)
+        }
+      }
+      .compositingGroup()
+      .animation(
+        reduceMotion ? nil : RefreshToolbarFeedbackTiming.transitionAnimation,
+        value: showsSuccessFeedback
+      )
+      .frame(width: 14, height: 14)
+      .accessibilityHidden(true)
   }
 
   private func rotationDegrees(at date: Date) -> Double {
