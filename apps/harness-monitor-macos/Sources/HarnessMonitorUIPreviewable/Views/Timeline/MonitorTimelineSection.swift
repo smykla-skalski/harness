@@ -48,9 +48,10 @@ struct SessionTimelineView: View {
   var sceneStoredFilterRegistryRawValue = ""
 
   @State private var filters = SessionTimelineFilterState()
+  @State private var presentationCache = SessionTimelineSectionPresentationCache()
 
   private var presentation: SessionTimelineSectionPresentation {
-    SessionTimelineSectionPresentation(
+    presentationCache.presentation(
       sessionID: sessionID,
       timeline: timeline,
       timelineWindow: timelineWindow,

@@ -35,7 +35,8 @@ struct SessionTimelineSectionPresentation {
     signals: [SessionSignalRecord],
     filters: SessionTimelineFilterState,
     isTimelineLoading: Bool,
-    dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
+    dateTimeConfiguration: HarnessMonitorDateTimeConfiguration,
+    now: Date = Date()
   ) {
     navigation = SessionTimelineWindowNavigation(
       timeline: timeline,
@@ -44,7 +45,7 @@ struct SessionTimelineSectionPresentation {
     )
     var signalsByID = [String: SessionSignalRecord]()
     for record in signals { signalsByID[record.signal.signalId] = record }
-    let context = TimelineFeatureContext(now: .now, signalsByID: signalsByID)
+    let context = TimelineFeatureContext(now: now, signalsByID: signalsByID)
     let sourceNodes = SessionTimelineNodeBuilder(
       sessionID: sessionID,
       entries: timeline,
