@@ -233,6 +233,7 @@ public enum ManifestBuilder {
         swiftui: [
             "open-recent-window",
             "open-session-window",
+            "open-session-window-visual-options-disabled",
             "agent-detail-form",
             "decision-detail-form",
             "task-detail-form",

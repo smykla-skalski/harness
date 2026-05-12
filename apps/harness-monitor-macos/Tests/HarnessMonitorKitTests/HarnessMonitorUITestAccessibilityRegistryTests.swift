@@ -274,6 +274,10 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
       HarnessMonitorAccessibility.settingsSessionShortcutOverlaysToggle
         == "harness.settings.session.shortcut-overlays"
     )
+    #expect(
+      HarnessMonitorAccessibility.settingsSessionTitleBlurToggle
+        == "harness.settings.session.title-blur"
+    )
   }
 
   @Test("New session capability identifiers match UI-test mirror")

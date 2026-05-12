@@ -68,48 +68,53 @@ enum HarnessMonitorPerfDriver {
     store: HarnessMonitorStore,
     openWindow: OpenWindowAction
   ) async -> ScenarioResult {
-    switch scenario {
-    case .openRecentWindow, .openSessionWindow, .offlineCachedOpen:
-      return await runWindowScenario(scenario, store: store, openWindow: openWindow)
-    case .agentDetailForm, .decisionDetailForm, .taskDetailForm, .permissionModal:
-      return await runDetailRoutingScenario(scenario, store: store, openWindow: openWindow)
-    case .sessionSearchFull, .timelineFilterForm, .timelineBurst, .toastOverlayChurn:
-      return await runSessionUtilityScenario(scenario, store: store, openWindow: openWindow)
-    case .settingsBackdropCycle, .settingsBackgroundCycle:
-      return await runSettingsScenario(scenario, openWindow: openWindow)
+    if let result = await runWindowScenario(scenario, store: store, openWindow: openWindow) {
+      return result
     }
+    if let result = await runDetailScenario(scenario, store: store, openWindow: openWindow) {
+      return result
+    }
+    if let result = await runSettingsScenario(scenario, openWindow: openWindow) {
+      return result
+    }
+    return await runActivityScenario(scenario, store: store, openWindow: openWindow)
   }
 
   private static func runWindowScenario(
     _ scenario: HarnessMonitorPerfScenario,
     store: HarnessMonitorStore,
     openWindow: OpenWindowAction
-  ) async -> ScenarioResult {
+  ) async -> ScenarioResult? {
     switch scenario {
     case .openRecentWindow:
       return await runOpenRecentWindowScenario(store: store)
-    case .openSessionWindow:
+    case .openSessionWindow,
+      .openSessionWindowVisualOptionsDisabled,
+      .offlineCachedOpen:
       return await openSessionWindow(
         sessionID: PreviewFixtures.summary.sessionId,
         store: store,
         openWindow: openWindow
       )
-    case .offlineCachedOpen:
-      return await openSessionWindow(
-        sessionID: PreviewFixtures.summary.sessionId,
-        store: store,
-        openWindow: openWindow
-      )
-    default:
-      return .failed("Unsupported window scenario \(scenario.rawValue)")
+    case .agentDetailForm,
+      .decisionDetailForm,
+      .taskDetailForm,
+      .sessionSearchFull,
+      .timelineFilterForm,
+      .permissionModal,
+      .settingsBackdropCycle,
+      .settingsBackgroundCycle,
+      .timelineBurst,
+      .toastOverlayChurn:
+      return nil
     }
   }
 
-  private static func runDetailRoutingScenario(
+  private static func runDetailScenario(
     _ scenario: HarnessMonitorPerfScenario,
     store: HarnessMonitorStore,
     openWindow: OpenWindowAction
-  ) async -> ScenarioResult {
+  ) async -> ScenarioResult? {
     switch scenario {
     case .agentDetailForm:
       return await routeAgentDetailFormScenario(store: store, openWindow: openWindow)
@@ -117,46 +122,75 @@ enum HarnessMonitorPerfDriver {
       return await routeDecisionDetailFormScenario(store: store, openWindow: openWindow)
     case .taskDetailForm:
       return await routeTaskDetailFormScenario(store: store, openWindow: openWindow)
+    case .sessionSearchFull:
+      return await runSessionSearchFullScenario(store: store, openWindow: openWindow)
+    case .timelineFilterForm:
+      return await runTimelineFilterFormScenario(store: store, openWindow: openWindow)
     case .permissionModal:
       return await routePermissionDecisionToWorkspace(
         store: store,
         openWindow: openWindow
       )
-    default:
-      return .failed("Unsupported detail routing scenario \(scenario.rawValue)")
-    }
-  }
-
-  private static func runSessionUtilityScenario(
-    _ scenario: HarnessMonitorPerfScenario,
-    store: HarnessMonitorStore,
-    openWindow: OpenWindowAction
-  ) async -> ScenarioResult {
-    switch scenario {
-    case .sessionSearchFull:
-      return await runSessionSearchFullScenario(store: store, openWindow: openWindow)
-    case .timelineFilterForm:
-      return await runTimelineFilterFormScenario(store: store, openWindow: openWindow)
-    case .timelineBurst:
-      return await runTimelineBurstScenario(store: store, openWindow: openWindow)
-    case .toastOverlayChurn:
-      return await runToastOverlayChurnScenario(store: store, openWindow: openWindow)
-    default:
-      return .failed("Unsupported session utility scenario \(scenario.rawValue)")
+    case .openRecentWindow,
+      .openSessionWindow,
+      .openSessionWindowVisualOptionsDisabled,
+      .settingsBackdropCycle,
+      .settingsBackgroundCycle,
+      .timelineBurst,
+      .toastOverlayChurn,
+      .offlineCachedOpen:
+      return nil
     }
   }
 
   private static func runSettingsScenario(
     _ scenario: HarnessMonitorPerfScenario,
     openWindow: OpenWindowAction
-  ) async -> ScenarioResult {
+  ) async -> ScenarioResult? {
     switch scenario {
     case .settingsBackdropCycle:
       return await runSettingsBackdropCycleScenario(openWindow: openWindow)
     case .settingsBackgroundCycle:
       return await runSettingsBackgroundCycleScenario(openWindow: openWindow)
-    default:
-      return .failed("Unsupported settings scenario \(scenario.rawValue)")
+    case .openRecentWindow,
+      .openSessionWindow,
+      .openSessionWindowVisualOptionsDisabled,
+      .agentDetailForm,
+      .decisionDetailForm,
+      .taskDetailForm,
+      .sessionSearchFull,
+      .timelineFilterForm,
+      .permissionModal,
+      .timelineBurst,
+      .toastOverlayChurn,
+      .offlineCachedOpen:
+      return nil
+    }
+  }
+
+  private static func runActivityScenario(
+    _ scenario: HarnessMonitorPerfScenario,
+    store: HarnessMonitorStore,
+    openWindow: OpenWindowAction
+  ) async -> ScenarioResult {
+    switch scenario {
+    case .timelineBurst:
+      return await runTimelineBurstScenario(store: store, openWindow: openWindow)
+    case .toastOverlayChurn:
+      return await runToastOverlayChurnScenario(store: store, openWindow: openWindow)
+    case .openRecentWindow,
+      .openSessionWindow,
+      .openSessionWindowVisualOptionsDisabled,
+      .agentDetailForm,
+      .decisionDetailForm,
+      .taskDetailForm,
+      .sessionSearchFull,
+      .timelineFilterForm,
+      .permissionModal,
+      .settingsBackdropCycle,
+      .settingsBackgroundCycle,
+      .offlineCachedOpen:
+      return .failed("unsupported-scenario")
     }
   }
 

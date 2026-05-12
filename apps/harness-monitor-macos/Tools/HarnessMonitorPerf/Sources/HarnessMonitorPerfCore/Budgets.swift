@@ -46,6 +46,10 @@ public enum Budgets {
             totalUpdates: 35_000, bodyUpdates: 3_500,
             maxUpdateGroupMilliseconds: 50, hitches: 0, potentialHangs: 0
         ),
+        "open-session-window-visual-options-disabled": SwiftUIBudget(
+            totalUpdates: 35_000, bodyUpdates: 3_500,
+            maxUpdateGroupMilliseconds: 50, hitches: 0, potentialHangs: 0
+        ),
         "agent-detail-form": SwiftUIBudget(
             totalUpdates: 35_000, bodyUpdates: 3_500,
             maxUpdateGroupMilliseconds: 50, hitches: 0, potentialHangs: 0

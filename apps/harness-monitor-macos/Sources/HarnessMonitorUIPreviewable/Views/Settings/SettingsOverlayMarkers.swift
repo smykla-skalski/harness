@@ -13,6 +13,14 @@ public struct SettingsOverlayMarkers: View {
   @AppStorage(HarnessMonitorSidebarSessionRowDisplayMode.storageKey)
   private var sidebarSessionRowDisplayModeRawValue =
     HarnessMonitorSidebarSessionRowDisplayMode.defaultMode.rawValue
+  @AppStorage(SessionWindowKeyboardShortcutOverlaySettings.storageKey)
+  private var sessionShortcutOverlaysEnabled =
+    SessionWindowKeyboardShortcutOverlaySettings.defaultValue
+  @AppStorage(HarnessMonitorSessionTitleBlurDefaults.enabledKey)
+  private var sessionTitleBlurEnabled = HarnessMonitorSessionTitleBlurDefaults.enabledDefault
+  @AppStorage(HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledKey)
+  private var menuBarStateColorVariantsEnabled =
+    HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledDefault
   @AppStorage(HarnessMonitorDateTimeConfiguration.timeZoneModeKey)
   private var timeZoneModeRawValue = HarnessMonitorDateTimeConfiguration.defaultTimeZoneModeRawValue
   @AppStorage(HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey)
@@ -47,10 +55,17 @@ public struct SettingsOverlayMarkers: View {
       "textSize=\(HarnessMonitorTextSize.label(for: textSizeIndex))",
       "controlSize=" + "\(HarnessMonitorTextSize.controlSizeLabel(at: textSizeIndex))",
       "sidebarRowMode=\(sidebarSessionRowDisplayMode.rawValue)",
+      "shortcutOverlays=\(boolLabel(sessionShortcutOverlaysEnabled))",
+      "titleBlur=\(boolLabel(sessionTitleBlurEnabled))",
+      "menuBarStateColors=\(boolLabel(menuBarStateColorVariantsEnabled))",
       "timeZoneMode=\(dateTimeConfiguration.timeZoneMode.rawValue)",
       "timeZone=\(dateTimeConfiguration.settingsStateValue)",
       "settingsChrome=native",
     ].joined(separator: ", ")
+  }
+
+  private func boolLabel(_ value: Bool) -> String {
+    value ? "enabled" : "disabled"
   }
 
   public var body: some View {
