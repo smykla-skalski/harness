@@ -84,6 +84,8 @@ final class BudgetEnforcerTests: XCTestCase {
             "permission-modal",
             "session-search-full",
             "session-search-full-visual-options-disabled",
+            "sidebar-toggle-rich-detail",
+            "sidebar-toggle-rich-detail-visual-options-disabled",
             "task-detail-form",
             "task-detail-form-visual-options-disabled",
             "timeline-burst",

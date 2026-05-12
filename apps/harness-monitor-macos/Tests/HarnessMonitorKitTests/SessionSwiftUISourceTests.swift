@@ -238,6 +238,11 @@ struct SessionSwiftUISourceTests {
         == "session-search-full"
     )
     #expect(
+      HarnessMonitorUITestEnvironment.basePerfScenario(
+        for: "sidebar-toggle-rich-detail-visual-options-disabled"
+      ) == "sidebar-toggle-rich-detail"
+    )
+    #expect(
       HarnessMonitorUITestEnvironment.disablesVisualOptions(
         for: "open-session-window-visual-options-disabled"
       )

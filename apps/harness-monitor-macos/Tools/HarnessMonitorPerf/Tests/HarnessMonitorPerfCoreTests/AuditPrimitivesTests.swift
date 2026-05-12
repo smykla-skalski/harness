@@ -464,6 +464,12 @@ final class AuditPrimitivesTests: XCTestCase {
         XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("task-detail-form-visual-options-disabled"))
         XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("session-search-full"))
         XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("session-search-full-visual-options-disabled"))
+        XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("sidebar-toggle-rich-detail"))
+        XCTAssertTrue(
+            ManifestBuilder.defaultTemplates.swiftui.contains(
+                "sidebar-toggle-rich-detail-visual-options-disabled"
+            )
+        )
         XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("timeline-filter-form"))
         XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("timeline-filter-form-visual-options-disabled"))
         XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("permission-modal"))

@@ -16,6 +16,8 @@ public enum ScenarioCatalog {
         "task-detail-form-visual-options-disabled",
         "session-search-full",
         "session-search-full-visual-options-disabled",
+        "sidebar-toggle-rich-detail",
+        "sidebar-toggle-rich-detail-visual-options-disabled",
         "timeline-filter-form",
         "timeline-filter-form-visual-options-disabled",
         "permission-modal",
@@ -38,6 +40,8 @@ public enum ScenarioCatalog {
         "task-detail-form-visual-options-disabled",
         "session-search-full",
         "session-search-full-visual-options-disabled",
+        "sidebar-toggle-rich-detail",
+        "sidebar-toggle-rich-detail-visual-options-disabled",
         "timeline-filter-form",
         "timeline-filter-form-visual-options-disabled",
         "permission-modal",
@@ -60,6 +64,7 @@ public enum ScenarioCatalog {
         case "decision-detail-form": return 8
         case "task-detail-form": return 8
         case "session-search-full": return 8
+        case "sidebar-toggle-rich-detail": return 8
         case "timeline-filter-form": return 8
         case "permission-modal": return 8
         case "settings-backdrop-cycle": return 9
@@ -75,6 +80,7 @@ public enum ScenarioCatalog {
         switch baseScenario(for: scenario) {
         case "open-recent-window", "open-session-window",
              "agent-detail-form", "task-detail-form", "session-search-full",
+             "sidebar-toggle-rich-detail",
              "timeline-filter-form", "timeline-burst", "toast-overlay-churn":
             return "dashboard-landing"
         case "decision-detail-form", "permission-modal":
