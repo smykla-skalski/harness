@@ -65,7 +65,7 @@ extension SessionWindowCreateForm {
 
       if let codexCatalog {
         Picker(
-          selectedCodexModelMenuTitle(catalog: codexCatalog),
+          "Model",
           selection: codexModelPickerSelection
         ) {
           ForEach(codexCatalog.models) { model in
@@ -135,20 +135,6 @@ extension SessionWindowCreateForm {
     if selectedModelID == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag {
       let customModelID = terminalCustomModel(for: runtime).wrappedValue
         .trimmingCharacters(in: .whitespacesAndNewlines)
-      return customModelID.isEmpty ? "Custom model" : customModelID
-    }
-
-    return
-      catalog.models.first { $0.id == selectedModelID }?.displayName
-      ?? selectedModelID
-  }
-
-  func selectedCodexModelMenuTitle(catalog: RuntimeModelCatalog) -> String {
-    let selectedModelID = codexModelPickerSelection.wrappedValue
-    if selectedModelID == SessionWindowCreateFormCatalogs.RuntimeCustomModel.tag {
-      let customModelID = codexCustomModel.wrappedValue.trimmingCharacters(
-        in: .whitespacesAndNewlines
-      )
       return customModelID.isEmpty ? "Custom model" : customModelID
     }
 
