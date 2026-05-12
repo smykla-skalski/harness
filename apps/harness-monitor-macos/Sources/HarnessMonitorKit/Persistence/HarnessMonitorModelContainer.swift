@@ -96,7 +96,8 @@ public enum HarnessMonitorModelContainer {
     fileManager: FileManager = .default,
     now: Date = .now
   ) throws -> URL? {
-    let quarantineRoot = storeURL
+    let quarantineRoot =
+      storeURL
       .deletingLastPathComponent()
       .appendingPathComponent("incompatible-cache-stores", isDirectory: true)
     try fileManager.createDirectory(
@@ -105,7 +106,8 @@ public enum HarnessMonitorModelContainer {
       attributes: nil
     )
     let stamp = String(Int(now.timeIntervalSince1970))
-    let destinationRoot = quarantineRoot
+    let destinationRoot =
+      quarantineRoot
       .appendingPathComponent("harness-cache.store-\(stamp)", isDirectory: true)
     try fileManager.createDirectory(
       at: destinationRoot,

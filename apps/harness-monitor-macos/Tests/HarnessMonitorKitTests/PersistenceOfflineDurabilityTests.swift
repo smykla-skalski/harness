@@ -434,7 +434,8 @@ struct PersistenceOfflineDurabilityTests {
 
     let container = try HarnessMonitorModelContainer.live(using: environment)
     let bookmarks = try container.mainContext.fetch(FetchDescriptor<SessionBookmark>())
-    let quarantineRoot = harnessRoot
+    let quarantineRoot =
+      harnessRoot
       .appendingPathComponent("incompatible-cache-stores", isDirectory: true)
     let quarantinedStores = try FileManager.default.contentsOfDirectory(
       at: quarantineRoot,
