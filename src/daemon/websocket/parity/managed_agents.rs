@@ -173,46 +173,7 @@ pub(crate) async fn dispatch_managed_agent_stop(
     let Some(agent_id) = extract_managed_agent_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing managed_agent_id");
     };
-    let result = match state.codex_controller.session_id_for_run(&agent_id) {
-        Ok(session_id) => {
-            with_managed_agent_lock(state, &session_id, &agent_id, || {
-                state
-                    .codex_controller
-                    .stop(&agent_id)
-                    .map(ManagedAgentSnapshot::Codex)
-            })
-            .await
-        }
-        Err(error) if error.code() == "KSRCLI090" => {
-            if let Ok(session_id) = state
-                .acp_agent_manager
-                .get(&agent_id)
-                .map(|snapshot| snapshot.session_id)
-            {
-                with_managed_agent_lock(state, &session_id, &agent_id, || {
-                    state
-                        .acp_agent_manager
-                        .stop(&agent_id)
-                        .map(ManagedAgentSnapshot::Acp)
-                })
-                .await
-            } else {
-                match terminal_session_id(state, &agent_id) {
-                    Ok(session_id) => {
-                        with_managed_agent_lock(state, &session_id, &agent_id, || {
-                            state
-                                .agent_tui_manager
-                                .stop(&agent_id)
-                                .map(ManagedAgentSnapshot::Terminal)
-                        })
-                        .await
-                    }
-                    Err(error) => Err(error),
-                }
-            }
-        }
-        Err(error) => Err(error),
-    };
+    let result = stop_any_managed_agent(state, &agent_id).await;
     dispatch_managed_agent_response(request, state, result).await
 }
 
@@ -401,6 +362,76 @@ async fn with_managed_agent_lock<T>(
         .lock(session_id, agent_id)
         .await;
     action()
+}
+
+async fn stop_any_managed_agent(
+    state: &DaemonHttpState,
+    agent_id: &str,
+) -> Result<ManagedAgentSnapshot, CliError> {
+    match state.codex_controller.session_id_for_run(agent_id) {
+        Ok(session_id) => stop_codex_managed_agent(state, &session_id, agent_id).await,
+        Err(error) if error.code() == "KSRCLI090" => {
+            stop_non_codex_managed_agent(state, agent_id).await
+        }
+        Err(error) => Err(error),
+    }
+}
+
+async fn stop_non_codex_managed_agent(
+    state: &DaemonHttpState,
+    agent_id: &str,
+) -> Result<ManagedAgentSnapshot, CliError> {
+    if let Ok(session_id) = state
+        .acp_agent_manager
+        .get(agent_id)
+        .map(|snapshot| snapshot.session_id)
+    {
+        return stop_acp_managed_agent(state, &session_id, agent_id).await;
+    }
+    let session_id = terminal_session_id(state, agent_id)?;
+    stop_terminal_managed_agent(state, &session_id, agent_id).await
+}
+
+async fn stop_codex_managed_agent(
+    state: &DaemonHttpState,
+    session_id: &str,
+    agent_id: &str,
+) -> Result<ManagedAgentSnapshot, CliError> {
+    with_managed_agent_lock(state, session_id, agent_id, || {
+        state
+            .codex_controller
+            .stop(agent_id)
+            .map(ManagedAgentSnapshot::Codex)
+    })
+    .await
+}
+
+async fn stop_acp_managed_agent(
+    state: &DaemonHttpState,
+    session_id: &str,
+    agent_id: &str,
+) -> Result<ManagedAgentSnapshot, CliError> {
+    with_managed_agent_lock(state, session_id, agent_id, || {
+        state
+            .acp_agent_manager
+            .stop(agent_id)
+            .map(ManagedAgentSnapshot::Acp)
+    })
+    .await
+}
+
+async fn stop_terminal_managed_agent(
+    state: &DaemonHttpState,
+    session_id: &str,
+    agent_id: &str,
+) -> Result<ManagedAgentSnapshot, CliError> {
+    with_managed_agent_lock(state, session_id, agent_id, || {
+        state
+            .agent_tui_manager
+            .stop(agent_id)
+            .map(ManagedAgentSnapshot::Terminal)
+    })
+    .await
 }
 
 fn terminal_session_id(state: &DaemonHttpState, agent_id: &str) -> Result<String, CliError> {

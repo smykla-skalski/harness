@@ -338,6 +338,10 @@ impl CodexRunWorker {
         Ok(())
     }
 
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "unsupported request handling records, persists, logs, and replies in one error path"
+    )]
     async fn reject_unsupported_server_request(
         &mut self,
         rpc: &mut CodexJsonRpc,

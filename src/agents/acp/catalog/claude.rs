@@ -55,11 +55,7 @@ pub fn descriptor() -> AcpAgentDescriptor {
             "SSH_TTY".to_owned(),
         ],
         spawn_configuration: AcpSpawnConfiguration::None,
-        model_catalog: Some(
-            models::catalog_for(CLAUDE_ID)
-                .expect("built-in Claude descriptor must have a model catalog")
-                .clone(),
-        ),
+        model_catalog: models::catalog_for(CLAUDE_ID).cloned(),
         install_hint: Some(
             "Install the official Claude ACP wrapper (`npm install -g @agentclientprotocol/claude-agent-acp`) and authenticate Claude (`claude login` or ANTHROPIC_API_KEY)."
                 .to_owned(),

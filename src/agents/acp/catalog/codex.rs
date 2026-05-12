@@ -34,11 +34,7 @@ pub fn descriptor() -> AcpAgentDescriptor {
             "OPENAI_PROJECT".to_owned(),
         ],
         spawn_configuration: AcpSpawnConfiguration::None,
-        model_catalog: Some(
-            models::catalog_for(CODEX_ID)
-                .expect("built-in Codex descriptor must have a model catalog")
-                .clone(),
-        ),
+        model_catalog: models::catalog_for(CODEX_ID).cloned(),
         install_hint: Some(
             "Codex ACP ships with Harness. Install or update Harness to restore the bundled `harness-codex-acp` adapter; no separate Codex ACP install is required. Then authenticate via ChatGPT login, CODEX_API_KEY, or OPENAI_API_KEY."
                 .to_owned(),
