@@ -1,6 +1,12 @@
 import HarnessMonitorKit
 import SwiftUI
 
+extension SessionWindowView {
+  var searchAutomation: AppSearchAutomationState? {
+    HarnessMonitorUITestEnvironment.isPerfScenarioActive ? stateCache.appSearchAutomation : nil
+  }
+}
+
 private struct SessionWindowPerfScenarioTrigger: Equatable {
   let rawValue: String?
   let sessionID: String
@@ -52,17 +58,20 @@ struct SessionWindowPerfScenarioScript: ViewModifier {
 
   private func runFullSessionSearchScript() async {
     stateCache.selectRoute(.agents)
-    stateCache.appSearchModel.setPresented(true)
+    stateCache.appSearchAutomation.present(query: "")
     await Task.yield()
-    try? await Task.sleep(for: .milliseconds(120))
+    try? await Task.sleep(for: .milliseconds(240))
 
     for step in searchSteps {
-      await stateCache.appSearchModel.runSearch(query: step.query, primary: step.primary)
+      stateCache.selectRoute(step.route)
+      await Task.yield()
       try? await Task.sleep(for: .milliseconds(80))
+      stateCache.appSearchAutomation.present(query: step.query)
+      try? await Task.sleep(for: .milliseconds(260))
     }
   }
 
-  private var searchSteps: [(query: String, primary: AppSearchDomain?)] {
+  private var searchSteps: [(query: String, route: SessionWindowRoute)] {
     [
       ("worker", .agents),
       ("routing", .tasks),

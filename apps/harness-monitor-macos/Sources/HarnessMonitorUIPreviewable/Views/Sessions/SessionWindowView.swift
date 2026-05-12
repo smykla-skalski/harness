@@ -198,10 +198,12 @@ public struct SessionWindowView: View {
 
   public var body: some View {
     bodyContent
-      .toolbar {
-        sessionToolbar
-      }
-      .appSearchHost(model: stateCache.appSearchModel, routeAction: appSearchRouteAction)
+      .toolbar { sessionToolbar }
+      .appSearchHost(
+        model: stateCache.appSearchModel,
+        automation: searchAutomation,
+        routeAction: appSearchRouteAction
+      )
       .modifier(
         SessionWindowPerfScenarioScript(
           stateCache: stateCache,
@@ -215,8 +217,7 @@ public struct SessionWindowView: View {
       .background(
         SessionWindowModifierKeysMonitor(currentModifiers: $currentModifiers)
           .frame(width: 0, height: 0)
-          .accessibilityHidden(true)
-      )
+          .accessibilityHidden(true))
   }
 
   private var bodyContent: some View {
