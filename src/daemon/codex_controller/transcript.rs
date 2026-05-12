@@ -131,9 +131,9 @@ fn codex_agent_message_entry(
 }
 
 fn run_has_agent_message_text(run: &CodexRunSnapshot, text: &str) -> bool {
-    run.events.iter().any(|event| {
-        agent_message_text(event).is_some_and(|candidate| candidate.trim() == text)
-    })
+    run.events
+        .iter()
+        .any(|event| agent_message_text(event).is_some_and(|candidate| candidate.trim() == text))
 }
 
 fn agent_message_text(event: &CodexRunEvent) -> Option<&str> {

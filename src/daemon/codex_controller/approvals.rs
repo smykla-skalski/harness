@@ -63,22 +63,13 @@ pub(super) fn approval_from_request(
     }
 }
 
-pub(super) fn approval_result(method: &str, decision: CodexApprovalDecision) -> Value {
+pub(super) fn approval_result(
+    method: &str,
+    decision: CodexApprovalDecision,
+    params: &Value,
+) -> Value {
     match method {
-        "item/permissions/requestApproval" => {
-            let scope = if decision == CodexApprovalDecision::AcceptForSession {
-                "session"
-            } else {
-                "turn"
-            };
-            json!({
-                "permissions": {
-                    "fileSystem": null,
-                    "network": null
-                },
-                "scope": scope,
-            })
-        }
+        "item/permissions/requestApproval" => permission_approval_result(decision, params),
         _ => json!({
             "decision": app_server_approval_decision(decision),
         }),
@@ -226,12 +217,36 @@ fn app_server_approval_decision(decision: CodexApprovalDecision) -> &'static str
     }
 }
 
+fn permission_approval_result(decision: CodexApprovalDecision, params: &Value) -> Value {
+    let (permissions, scope) = match decision {
+        CodexApprovalDecision::Accept => (
+            params
+                .get("permissions")
+                .cloned()
+                .unwrap_or_else(|| json!({})),
+            "turn",
+        ),
+        CodexApprovalDecision::AcceptForSession => (
+            params
+                .get("permissions")
+                .cloned()
+                .unwrap_or_else(|| json!({})),
+            "session",
+        ),
+        CodexApprovalDecision::Decline | CodexApprovalDecision::Cancel => (json!({}), "turn"),
+    };
+    json!({
+        "permissions": permissions,
+        "scope": scope,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
 
-    use super::{approval_policy, thread_sandbox, turn_sandbox_policy};
-    use crate::daemon::protocol::CodexRunMode;
+    use super::{approval_policy, approval_result, thread_sandbox, turn_sandbox_policy};
+    use crate::daemon::protocol::{CodexApprovalDecision, CodexRunMode};
 
     #[test]
     fn approval_mode_uses_read_only_thread_sandbox() {
@@ -249,5 +264,66 @@ mod tests {
                 "access": { "type": "fullAccess" }
             })
         );
+    }
+
+    #[test]
+    fn permissions_accept_grants_requested_subset_for_turn_or_session() {
+        let params = json!({
+            "permissions": {
+                "fileSystem": {
+                    "write": ["/tmp/project"]
+                },
+                "network": {
+                    "enabled": true
+                }
+            }
+        });
+
+        assert_eq!(
+            approval_result(
+                "item/permissions/requestApproval",
+                CodexApprovalDecision::Accept,
+                &params
+            ),
+            json!({
+                "permissions": params["permissions"],
+                "scope": "turn",
+            })
+        );
+        assert_eq!(
+            approval_result(
+                "item/permissions/requestApproval",
+                CodexApprovalDecision::AcceptForSession,
+                &params
+            ),
+            json!({
+                "permissions": params["permissions"],
+                "scope": "session",
+            })
+        );
+    }
+
+    #[test]
+    fn permissions_decline_and_cancel_grant_empty_subset() {
+        let params = json!({
+            "permissions": {
+                "fileSystem": {
+                    "write": ["/tmp/project"]
+                }
+            }
+        });
+
+        for decision in [
+            CodexApprovalDecision::Decline,
+            CodexApprovalDecision::Cancel,
+        ] {
+            assert_eq!(
+                approval_result("item/permissions/requestApproval", decision, &params),
+                json!({
+                    "permissions": {},
+                    "scope": "turn",
+                })
+            );
+        }
     }
 }
