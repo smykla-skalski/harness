@@ -169,6 +169,41 @@ struct AppSearchIndexTests {
     #expect(results.sections.first?.truncated == false)
   }
 
+  @Test("Default caps keep toolbar suggestions compact across domains")
+  func defaultCapsKeepToolbarSuggestionsCompact() async {
+    let index = AppSearchIndex()
+    let agents = (0..<25).map {
+      makeAgent(id: "a\($0)", name: "alpha agent \($0)")
+    }
+    let decisions = (0..<25).map {
+      makeDecisionProjection(id: "d\($0)", summary: "alpha decision \($0)")
+    }
+    let tasks = (0..<25).map {
+      makeTask(id: "t\($0)", title: "alpha task \($0)")
+    }
+    let events = (0..<25).map {
+      makeEvent(id: "e\($0)", summary: "alpha event \($0)")
+    }
+    await index.reindex(agents: agents)
+    await index.reindex(decisions: decisions)
+    await index.reindex(tasks: tasks)
+    await index.reindex(events: events)
+
+    let results = await index.search(query: "alpha", primary: .agents)
+    let agentHitCount = results.sections.first { $0.domain == .agents }?.hits.count
+    let taskHitCount = results.sections.first { $0.domain == .tasks }?.hits.count
+    let timelineHitCount = results.sections.first { $0.domain == .timeline }?.hits.count
+    let decisionHitCount = results.sections.first { $0.domain == .decisions }?.hits.count
+    let allTruncated = results.sections.allSatisfy(\.truncated)
+
+    #expect(results.totalHitCount == 8)
+    #expect(agentHitCount == 5)
+    #expect(taskHitCount == 1)
+    #expect(timelineHitCount == 1)
+    #expect(decisionHitCount == 1)
+    #expect(allTruncated)
+  }
+
   // MARK: Reindex behaviour
 
   @Test("Reindex replaces the previous corpus")

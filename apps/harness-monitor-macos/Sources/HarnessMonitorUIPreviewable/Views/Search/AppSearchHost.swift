@@ -171,16 +171,26 @@ private struct AppSearchSuggestionsHost: View {
   let model: AppSearchModel
   let onPick: (AppSearchHit) -> Void
 
+  @Environment(\.accessibilityVoiceOverEnabled)
+  private var voiceOverEnabled
   @State private var lastAnnouncedHitCount = -1
 
   var body: some View {
+    if voiceOverEnabled {
+      suggestions
+        .onChange(of: model.results.totalHitCount) { _, newValue in
+          announceResults(totalHitCount: newValue)
+        }
+    } else {
+      suggestions
+    }
+  }
+
+  private var suggestions: some View {
     AppSearchSuggestionsView(
       results: model.results,
       onPick: onPick
     )
-    .onChange(of: model.results.totalHitCount) { _, newValue in
-      announceResults(totalHitCount: newValue)
-    }
   }
 
   private func announceResults(totalHitCount: Int) {

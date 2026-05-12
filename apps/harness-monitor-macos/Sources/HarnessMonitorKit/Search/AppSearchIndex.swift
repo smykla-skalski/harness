@@ -37,13 +37,14 @@ public struct DecisionSearchProjection: Hashable, Sendable {
 /// lowercased corpora so it never allocates for each keystroke.
 public actor AppSearchIndex {
   /// Cap on hits returned for the active route's primary domain.
-  /// More room for the section the user is most likely scanning.
-  public static let defaultPrimaryK = 15
+  /// Keep the toolbar search popover compact; large suggestion lists rebuild
+  /// the AppKit-backed search field and dominate SwiftUI update cost.
+  public static let defaultPrimaryK = 5
 
   /// Cap on hits returned for non-primary fallback domains. Smaller
   /// so the popover surfaces matches across more domains at once
   /// without scrolling.
-  public static let defaultFallbackK = 5
+  public static let defaultFallbackK = 1
 
   /// Backing store for one indexed record. Lowercased corpora are
   /// precomputed so search avoids per-keystroke allocation.
