@@ -21,7 +21,6 @@ private struct ManifestWatcherState {
   var lastStartedAt: String?
   var lastRevision: UInt64
   var source: DispatchSourceFileSystemObject?
-  var fileDescriptor: Int32
 }
 
 /// Watches the daemon manifest file for changes using `DispatchSource` file
@@ -73,8 +72,7 @@ final class ManifestWatcher: Sendable {
         lastEndpoint: currentEndpoint,
         lastStartedAt: currentStartedAt,
         lastRevision: currentRevision,
-        source: nil,
-        fileDescriptor: -1
+        source: nil
       )
     )
   }
@@ -114,13 +112,12 @@ final class ManifestWatcher: Sendable {
     source.setEventHandler { [weak self] in
       self?.handleDirectoryChange()
     }
-    source.setCancelHandler { [weak self] in
-      self?.closeDescriptor()
+    source.setCancelHandler {
+      close(descriptor)
     }
 
     state.withLock { state in
       state.source = source
-      state.fileDescriptor = descriptor
     }
 
     source.resume()
@@ -137,19 +134,6 @@ final class ManifestWatcher: Sendable {
       return existing
     }
     source?.cancel()
-  }
-
-  /// Invoked from the dispatch source cancel handler. Closes the file
-  /// descriptor held in the state and resets it to -1.
-  private func closeDescriptor() {
-    let descriptor = state.withLock { state -> Int32 in
-      let fd = state.fileDescriptor
-      state.fileDescriptor = -1
-      return fd
-    }
-    if descriptor >= 0 {
-      close(descriptor)
-    }
   }
 
   private func handleDirectoryChange() {
