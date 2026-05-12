@@ -56,6 +56,7 @@ private let kitTarget: Target = .target(
 private let uiPreviewableTarget: Target = {
     var deps: [TargetDependency] = [
         .target(name: "HarnessMonitorKit"),
+        .external(name: "SwiftUIIntrospect"),
         .sdk(name: "SwiftData", type: .framework)
     ]
     deps.append(contentsOf: FeatureFlags.uiPreviewableAdditionalDependencies())

@@ -236,9 +236,14 @@ struct SessionCodexRunDetailSection: View {
       Text(isActive ? "Send context" : "Send follow-up")
         .scaledFont(.caption.bold())
         .foregroundStyle(.secondary)
-      TextEditor(text: $contextDraft)
-        .scaledFont(.body)
-        .frame(minHeight: 88, maxHeight: 220)
+      HarnessMonitorMultilineTextField<Never>(
+        placeholder: "",
+        text: $contextDraft,
+        minHeight: 88,
+        maxHeight: 220,
+        showsChrome: false,
+        accessibilityLabel: "Codex context"
+      )
         .padding(.horizontal, 4)
         .padding(.vertical, 4)
         .background(
@@ -249,7 +254,6 @@ struct SessionCodexRunDetailSection: View {
           RoundedRectangle(cornerRadius: metrics.terminalCornerRadius)
             .stroke(.quaternary, lineWidth: 1)
         )
-        .accessibilityLabel("Codex context")
       HStack {
         Spacer(minLength: 0)
         Button(isActive ? "Send context" : "Send follow-up") {

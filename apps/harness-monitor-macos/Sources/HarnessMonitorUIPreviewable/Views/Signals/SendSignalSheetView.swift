@@ -89,6 +89,7 @@ struct SendSignalSheetView: View {
         }
         TextField("Message", text: $message, axis: .vertical)
           .harnessNativeFormControl()
+          .harnessNativeVerticalTextField()
           .focused($focusedField, equals: .message)
           .lineLimit(4, reservesSpace: true)
           .submitLabel(.next)

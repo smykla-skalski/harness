@@ -267,9 +267,26 @@ struct SessionWindowCreateFormMetricsTests {
     #expect(themeSource.contains(".frame(maxWidth: .infinity, alignment: .leading)"))
     #expect(themeSource.contains(".multilineTextAlignment(.leading)"))
     #expect(themeSource.contains(".contentShape(Rectangle())"))
-    #expect(multilineSource.contains("TextEditor(text: $text)"))
-    #expect(multilineSource.contains(".scrollContentBackground(.hidden)"))
-    #expect(multilineSource.contains(".focused(focusedField, equals: focusValue)"))
+    #expect(themeSource.contains("static let horizontalPadding: CGFloat = 8"))
+    #expect(themeSource.contains("static let verticalPadding: CGFloat = 4"))
+    #expect(themeSource.contains("HarnessMonitorTextSize.nativeInputFont(at: textSizeIndex)"))
+    #expect(
+      themeSource.contains("HarnessMonitorTextSize.nativeInputControlSize(at: textSizeIndex)")
+    )
+    #expect(multilineSource.contains("NSViewRepresentable"))
+    #expect(multilineSource.contains("textContainerInset = NSSize("))
+    #expect(multilineSource.contains("lineFragmentPadding = 0"))
+    #expect(multilineSource.contains("HarnessMonitorTextSize.nativeInputFont(at: textSizeIndex)"))
+    #expect(
+      multilineSource.contains(
+        "HarnessMonitorTextSize.nativeInputControlSize(at: textSizeIndex)"
+      )
+    )
+    #expect(!multilineSource.contains("makeFirstResponder(nil)"))
+    #expect(
+      multilineSource.contains("HarnessMonitorNativeTextFieldChromeMetrics.horizontalPadding"))
+    #expect(
+      multilineSource.contains("HarnessMonitorNativeTextFieldChromeMetrics.verticalPadding * 2"))
     #expect(source.contains("embeddedAgentRuntimeSections"))
     #expect(source.contains("embedsRuntimeConfiguration"))
     #expect(source.contains("SessionWindowCreateTransportChoicesGroup("))

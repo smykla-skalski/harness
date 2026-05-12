@@ -201,6 +201,7 @@ struct TaskActionsSheet: View {
         )
         TextField("Update note", text: $statusNote, axis: .vertical)
           .harnessNativeFormControl()
+          .harnessNativeVerticalTextField()
           .lineLimit(2, reservesSpace: true)
           .submitLabel(.done)
       }
@@ -213,6 +214,7 @@ struct TaskActionsSheet: View {
       .scaledFont(.headline)
     TextField("Summary", text: $checkpointSummary, axis: .vertical)
       .harnessNativeFormControl()
+      .harnessNativeVerticalTextField()
       .lineLimit(3, reservesSpace: true)
       .submitLabel(.done)
     LabeledContent("Progress") {

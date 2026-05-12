@@ -26,6 +26,24 @@ struct SessionWindowFontScaleTests {
     )
   }
 
+  @Test("Native input sizing caps at the default text size")
+  func nativeInputSizingCapsAtDefaultTextSize() {
+    let largestIndex = HarnessMonitorTextSize.scales.count - 1
+
+    #expect(HarnessMonitorTextSize.nativeInputIndex(0) == 0)
+    #expect(
+      HarnessMonitorTextSize.nativeInputIndex(largestIndex) == HarnessMonitorTextSize.defaultIndex
+    )
+    #expect(
+      HarnessMonitorTextSize.nativeInputFont(at: largestIndex)
+        == HarnessMonitorTextSize.nativeInputFont(at: HarnessMonitorTextSize.defaultIndex)
+    )
+    #expect(
+      HarnessMonitorTextSize.nativeInputControlSize(at: largestIndex)
+        == HarnessMonitorTextSize.nativeInputControlSize(at: HarnessMonitorTextSize.defaultIndex)
+    )
+  }
+
   @MainActor
   @Test("Session font scale view modifier remains available to SwiftUI surfaces")
   func sessionFontScaleViewModifierCompilesForSwiftUISurfaces() {
