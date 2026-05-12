@@ -64,7 +64,7 @@ public actor BackgroundThumbnailCache {
     let priority = Self.imageGenerationPriority(for: Task.currentPriority)
     let task = Task.detached(priority: priority) { [self] in
       await predecessor?.value
-      generateThumbnail(key: key, selection: selection)
+      return generateThumbnail(key: key, selection: selection)
     }
     thumbnailTasks[key] = task
     thumbnailGenerationTail = Task { _ = await task.value }
