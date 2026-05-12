@@ -203,6 +203,31 @@ async fn dispatch_managed_agent_stop_acp_returns_acp_disabled_when_feature_flag_
 }
 
 #[tokio::test]
+async fn dispatch_managed_agent_stop_cancels_stale_codex_run_without_detail_reconcile() {
+    let state = super::super::test_support::test_http_state_with_db();
+    super::super::test_support::seed_sample_session(&state);
+    super::super::test_support::seed_sample_codex_run(
+        &state,
+        "codex-stale",
+        "2026-04-13T19:13:00Z",
+    );
+    let request = WsRequest {
+        id: "req-stop-stale-codex".into(),
+        method: "managed_agent.stop".into(),
+        params: json!({
+            "managed_agent_id": "codex-stale",
+        }),
+        trace_context: None,
+    };
+
+    let response = dispatch_managed_agent_stop(&request, &state).await;
+
+    let result = response.result.expect("stop response result");
+    assert_eq!(result["kind"].as_str(), Some("codex"));
+    assert_eq!(result["snapshot"]["status"].as_str(), Some("cancelled"));
+}
+
+#[tokio::test]
 async fn dispatch_managed_agent_resolve_acp_permission_returns_acp_disabled_when_feature_flag_off()
 {
     temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("0"))], async {
