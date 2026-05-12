@@ -180,6 +180,25 @@ struct SessionWindowCreateFormCatalogsSelectionTests {
     )
   }
 
+  @Test("Native Codex selections resolve the Codex runtime model catalog")
+  func nativeCodexSelectionsResolveCodexRuntimeModelCatalog() {
+    let catalogState = SessionWindowAgentCreateCatalogState(
+      descriptors: PreviewHarnessClient.previewAcpAgentDescriptors,
+      runtimeModelCatalogs: PreviewHarnessClient.previewRuntimeModelCatalogs,
+      capabilityOptions: [],
+      personas: [],
+      isLoading: false,
+      hasLoaded: true
+    )
+
+    #expect(
+      SessionWindowCreateFormCatalogs.selectedModelCatalog(
+        selection: .codex,
+        catalogState: catalogState
+      )?.runtime == "codex"
+    )
+  }
+
   private func descriptor(id: String, displayName: String) -> AcpAgentDescriptor {
     AcpAgentDescriptor(
       id: id,

@@ -153,9 +153,26 @@ extension WebSocketProtocolParityTests {
     #expect(objectValue(calls[3].params, key: "agent_id") == nil)
     #expect(objectValue(calls[3].params, key: "sequence") != nil)
     #expect(
+      objectValue(calls[6].params, key: "session_id") == .string(PreviewFixtures.summary.sessionId)
+    )
+    #expect(objectValue(calls[6].params, key: "prompt") == .string("Investigate"))
+    #expect(objectValue(calls[6].params, key: "mode") == .string("report"))
+    #expect(objectValue(calls[6].params, key: "actor") == .string("leader-1"))
+    #expect(
       objectValue(calls[7].params, key: "managed_agent_id") == .string(codexSnapshot.runId)
     )
+    #expect(objectValue(calls[7].params, key: "prompt") == .string("Continue"))
     #expect(objectValue(calls[7].params, key: "agent_id") == nil)
+    #expect(
+      objectValue(calls[8].params, key: "managed_agent_id") == .string(codexSnapshot.runId)
+    )
+    #expect(objectValue(calls[8].params, key: "agent_id") == nil)
+    #expect(
+      objectValue(calls[9].params, key: "managed_agent_id") == .string(codexSnapshot.runId)
+    )
+    #expect(objectValue(calls[9].params, key: "approval_id") == .string("approval-1"))
+    #expect(objectValue(calls[9].params, key: "decision") == .string("accept"))
+    #expect(objectValue(calls[9].params, key: "agent_id") == nil)
     #expect(
       objectValue(calls[10].params, key: "session_id")
         == .string(PreviewFixtures.summary.sessionId)
