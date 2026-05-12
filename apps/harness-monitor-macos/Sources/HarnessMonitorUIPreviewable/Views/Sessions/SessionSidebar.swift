@@ -222,7 +222,9 @@ struct SessionSidebar: View {
   }
 
   private func setListSelection(_ selection: Set<SessionSelection>) {
-    listSelection = selection
+    if listSelection != selection {
+      listSelection = selection
+    }
     state.sidebarSelection.syncRenderedSelectionCount(selection.count)
   }
 
