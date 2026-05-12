@@ -174,6 +174,58 @@ final class AuditPrimitivesTests: XCTestCase {
         }
     }
 
+    func testAuditDefaultEnvironmentPassesThroughLiveDaemonKeysOnly() {
+        let environment = AuditRunner.defaultEnvironment(
+            processEnvironment: [
+                "HARNESS_MONITOR_LAUNCH_MODE": " live ",
+                "HARNESS_MONITOR_EXTERNAL_DAEMON": "1",
+                "HARNESS_DAEMON_DATA_HOME": "/should/not/pass-through",
+                "HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard",
+                "UNRELATED": "value",
+            ]
+        )
+
+        XCTAssertEqual(environment["HARNESS_MONITOR_UI_TESTS"], "1")
+        XCTAssertEqual(environment["HARNESS_MONITOR_LAUNCH_MODE"], "live")
+        XCTAssertEqual(environment["HARNESS_MONITOR_EXTERNAL_DAEMON"], "1")
+        XCTAssertNil(environment["HARNESS_DAEMON_DATA_HOME"])
+        XCTAssertNil(environment["HARNESS_MONITOR_PREVIEW_SCENARIO"])
+        XCTAssertNil(environment["UNRELATED"])
+    }
+
+    func testAuditDaemonDataHomeDefaultsToPerRunScenarioDirectory() {
+        let runDir = URL(fileURLWithPath: "/tmp/audit-run", isDirectory: true)
+        let dataHome = AuditRunner.daemonDataHome(
+            runDir: runDir,
+            templateSlug: "swiftui",
+            scenario: "open-recent-window",
+            processEnvironment: [:]
+        )
+
+        XCTAssertEqual(
+            dataHome.path,
+            "/tmp/audit-run/app-data/swiftui/open-recent-window"
+        )
+    }
+
+    func testAuditDaemonDataHomeOverrideUsesExistingLiveDatabaseRoot() {
+        let runDir = URL(fileURLWithPath: "/tmp/audit-run", isDirectory: true)
+        let dataHome = AuditRunner.daemonDataHome(
+            runDir: runDir,
+            templateSlug: "swiftui",
+            scenario: "open-recent-window",
+            processEnvironment: [
+                AuditRunner.daemonDataHomeOverrideEnvironmentKey:
+                    " /Users/me/Library/Group Containers/Q498EB36N4.io.harnessmonitor/runtime-lanes/main "
+            ]
+        )
+
+        XCTAssertEqual(
+            dataHome.path,
+            "/Users/me/Library/Group Containers/Q498EB36N4.io.harnessmonitor/runtime-lanes/main"
+        )
+    }
+
     func testDaemonDataHomeProbeCapturesRealDatabaseEvidence() throws {
         let dataHome = workDir.appendingPathComponent("data-home", isDirectory: true)
         let daemonDir = dataHome.appendingPathComponent("harness/daemon", isDirectory: true)
