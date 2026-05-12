@@ -3,6 +3,7 @@ import XCTest
 
 @testable import HarnessMonitor
 import HarnessMonitorKit
+import HarnessMonitorUIPreviewable
 
 final class HarnessMonitorAppConfigurationTests: XCTestCase {
   @MainActor
@@ -48,6 +49,40 @@ final class HarnessMonitorAppConfigurationTests: XCTestCase {
     XCTAssertEqual(
       configuration.store.pendingAcpPermissionBatches.first?.batchId,
       "preview-acp-permission-1"
+    )
+  }
+
+  func testDetailPerfScenarioVisualOptionsDisabledDefaultsDisableChrome() {
+    let environment = HarnessMonitorEnvironment(
+      values: [
+        HarnessMonitorPerfScenario.environmentKey:
+          HarnessMonitorPerfScenario.decisionDetailFormVisualOptionsDisabled.rawValue,
+      ],
+      homeDirectory: FileManager.default.homeDirectoryForCurrentUser
+    )
+
+    let resolved = HarnessMonitorPerfScenario.decisionDetailFormVisualOptionsDisabled
+      .applyingDefaults(to: environment)
+
+    XCTAssertEqual(
+      resolved.values[HarnessMonitorAppConfiguration.sessionShortcutOverlaysOverrideKey],
+      "0"
+    )
+    XCTAssertEqual(
+      resolved.values[HarnessMonitorAppConfiguration.sessionTitleBlurOverrideKey],
+      "0"
+    )
+    XCTAssertEqual(
+      resolved.values[HarnessMonitorAppConfiguration.menuBarStateColorsOverrideKey],
+      "0"
+    )
+    XCTAssertEqual(
+      resolved.values["HARNESS_MONITOR_BACKDROP_MODE_OVERRIDE"],
+      HarnessMonitorBackdropMode.none.rawValue
+    )
+    XCTAssertEqual(
+      resolved.values["HARNESS_MONITOR_PREVIEW_ACP_PENDING"],
+      "1"
     )
   }
 

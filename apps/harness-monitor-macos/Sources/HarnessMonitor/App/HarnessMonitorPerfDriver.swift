@@ -97,10 +97,15 @@ enum HarnessMonitorPerfDriver {
         openWindow: openWindow
       )
     case .agentDetailForm,
+      .agentDetailFormVisualOptionsDisabled,
       .decisionDetailForm,
+      .decisionDetailFormVisualOptionsDisabled,
       .taskDetailForm,
+      .taskDetailFormVisualOptionsDisabled,
       .sessionSearchFull,
+      .sessionSearchFullVisualOptionsDisabled,
       .timelineFilterForm,
+      .timelineFilterFormVisualOptionsDisabled,
       .permissionModal,
       .settingsBackdropCycle,
       .settingsBackgroundCycle,
@@ -116,15 +121,20 @@ enum HarnessMonitorPerfDriver {
     openWindow: OpenWindowAction
   ) async -> ScenarioResult? {
     switch scenario {
-    case .agentDetailForm:
+    case .agentDetailForm,
+      .agentDetailFormVisualOptionsDisabled:
       return await routeAgentDetailFormScenario(store: store, openWindow: openWindow)
-    case .decisionDetailForm:
+    case .decisionDetailForm,
+      .decisionDetailFormVisualOptionsDisabled:
       return await routeDecisionDetailFormScenario(store: store, openWindow: openWindow)
-    case .taskDetailForm:
+    case .taskDetailForm,
+      .taskDetailFormVisualOptionsDisabled:
       return await routeTaskDetailFormScenario(store: store, openWindow: openWindow)
-    case .sessionSearchFull:
+    case .sessionSearchFull,
+      .sessionSearchFullVisualOptionsDisabled:
       return await runSessionSearchFullScenario(store: store, openWindow: openWindow)
-    case .timelineFilterForm:
+    case .timelineFilterForm,
+      .timelineFilterFormVisualOptionsDisabled:
       return await runTimelineFilterFormScenario(store: store, openWindow: openWindow)
     case .permissionModal:
       return await routePermissionDecisionToWorkspace(
@@ -156,10 +166,15 @@ enum HarnessMonitorPerfDriver {
       .openSessionWindow,
       .openSessionWindowVisualOptionsDisabled,
       .agentDetailForm,
+      .agentDetailFormVisualOptionsDisabled,
       .decisionDetailForm,
+      .decisionDetailFormVisualOptionsDisabled,
       .taskDetailForm,
+      .taskDetailFormVisualOptionsDisabled,
       .sessionSearchFull,
+      .sessionSearchFullVisualOptionsDisabled,
       .timelineFilterForm,
+      .timelineFilterFormVisualOptionsDisabled,
       .permissionModal,
       .timelineBurst,
       .toastOverlayChurn,
@@ -182,10 +197,15 @@ enum HarnessMonitorPerfDriver {
       .openSessionWindow,
       .openSessionWindowVisualOptionsDisabled,
       .agentDetailForm,
+      .agentDetailFormVisualOptionsDisabled,
       .decisionDetailForm,
+      .decisionDetailFormVisualOptionsDisabled,
       .taskDetailForm,
+      .taskDetailFormVisualOptionsDisabled,
       .sessionSearchFull,
+      .sessionSearchFullVisualOptionsDisabled,
       .timelineFilterForm,
+      .timelineFilterFormVisualOptionsDisabled,
       .permissionModal,
       .settingsBackdropCycle,
       .settingsBackgroundCycle,

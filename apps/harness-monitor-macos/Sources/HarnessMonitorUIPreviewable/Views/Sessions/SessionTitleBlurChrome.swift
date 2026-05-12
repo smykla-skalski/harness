@@ -71,8 +71,6 @@ public struct SessionTitleBlurChrome: View {
   private var reduceTransparency
   @Environment(\.colorSchemeContrast)
   private var colorSchemeContrast
-  @AppStorage(HarnessMonitorSessionTitleBlurDefaults.enabledKey)
-  private var isEnabled: Bool = HarnessMonitorSessionTitleBlurDefaults.enabledDefault
 
   public init(status: SessionStatus, isStale: Bool) {
     self.status = status
@@ -102,22 +100,18 @@ public struct SessionTitleBlurChrome: View {
   }
 
   public var body: some View {
-    Group {
-      if isEnabled {
-        titleTint
+    titleTint
+      .frame(height: SessionTitleBlurChromeConfiguration.height)
+      .frame(maxWidth: .infinity, alignment: .top)
+      .ignoresSafeArea(.container, edges: .top)
+      .allowsHitTesting(false)
+      .accessibilityHidden(true)
+      .accessibilityIdentifier(SessionTitleBlurChromeConfiguration.accessibilityIdentifier)
+      .transaction { transaction in
+        // The blurred opacity overlay spans the window chrome; keep it out
+        // of parent animation transactions to avoid invalidating the shell.
+        transaction.animation = nil
       }
-    }
-    .frame(height: SessionTitleBlurChromeConfiguration.height)
-    .frame(maxWidth: .infinity, alignment: .top)
-    .ignoresSafeArea(.container, edges: .top)
-    .allowsHitTesting(false)
-    .accessibilityHidden(true)
-    .accessibilityIdentifier(SessionTitleBlurChromeConfiguration.accessibilityIdentifier)
-    .transaction { transaction in
-      // The blurred opacity overlay spans the window chrome; keep it out
-      // of parent animation transactions to avoid invalidating the shell.
-      transaction.animation = nil
-    }
   }
 
   private var titleTint: some View {
@@ -137,10 +131,26 @@ public struct SessionTitleBlurChrome: View {
   }
 }
 
+private struct SessionTitleBlurChromeModifier: ViewModifier {
+  let status: SessionStatus
+  let isStale: Bool
+
+  @AppStorage(HarnessMonitorSessionTitleBlurDefaults.enabledKey)
+  private var isEnabled: Bool = HarnessMonitorSessionTitleBlurDefaults.enabledDefault
+
+  func body(content: Content) -> some View {
+    if isEnabled {
+      content.overlay(alignment: .top) {
+        SessionTitleBlurChrome(status: status, isStale: isStale)
+      }
+    } else {
+      content
+    }
+  }
+}
+
 extension View {
   public func sessionTitleBlurChrome(status: SessionStatus, isStale: Bool) -> some View {
-    overlay(alignment: .top) {
-      SessionTitleBlurChrome(status: status, isStale: isStale)
-    }
+    modifier(SessionTitleBlurChromeModifier(status: status, isStale: isStale))
   }
 }

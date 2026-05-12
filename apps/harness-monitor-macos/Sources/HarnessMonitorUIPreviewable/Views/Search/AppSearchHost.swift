@@ -115,7 +115,7 @@ public struct AppSearchHostModifier: ViewModifier {
         )
       }
       .onChange(of: isSearchPresented, initial: true) { _, newValue in
-        model.isPresented = newValue
+        model.setPresented(newValue)
       }
       .onChange(of: model.results.totalHitCount) { _, newValue in
         announceResults(totalHitCount: newValue)
@@ -124,8 +124,12 @@ public struct AppSearchHostModifier: ViewModifier {
   }
 
   private func focusSearchField() {
-    isSearchPresented = true
-    searchFieldFocused = true
+    if !isSearchPresented {
+      isSearchPresented = true
+    }
+    if !searchFieldFocused {
+      searchFieldFocused = true
+    }
   }
 
   /// Route to the hit, then clear the query and collapse the search
@@ -135,10 +139,16 @@ public struct AppSearchHostModifier: ViewModifier {
   /// the rest of the route.
   private func handleHit(_ hit: AppSearchHit) {
     routeAction(hit)
-    query = ""
+    if !query.isEmpty {
+      query = ""
+    }
     model.clear()
-    isSearchPresented = false
-    searchFieldFocused = false
+    if isSearchPresented {
+      isSearchPresented = false
+    }
+    if searchFieldFocused {
+      searchFieldFocused = false
+    }
   }
 
   private var resolvedPrimaryDomain: AppSearchDomain {

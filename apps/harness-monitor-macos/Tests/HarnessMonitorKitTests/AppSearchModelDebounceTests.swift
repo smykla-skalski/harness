@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import Testing
 
 @testable import HarnessMonitorKit
@@ -86,6 +87,27 @@ struct AppSearchModelDebounceTests {
     #expect(model.isSearching == false)
   }
 
+  @Test("setPresented ignores no-op presentation writes")
+  func setPresentedIgnoresNoOpWrites() {
+    let model = AppSearchModel(searchProvider: { query, _ in
+      Self.fixture(query: query)
+    })
+    let invalidations = InvalidationProbe()
+
+    withObservationTracking {
+      _ = model.isPresented
+    } onChange: {
+      invalidations.increment()
+    }
+
+    model.setPresented(false)
+    #expect(invalidations.isEmpty)
+
+    model.setPresented(true)
+    #expect(model.isPresented)
+    #expect(invalidations.count == 1)
+  }
+
   @Test("Provider receives the trimmed query and primary domain")
   func providerReceivesTrimmedInputs() async {
     let probe = ProviderProbe()
@@ -161,5 +183,28 @@ private actor ProviderProbe {
     callCount += 1
     lastQuery = query
     lastPrimary = primary
+  }
+}
+
+private final class InvalidationProbe: @unchecked Sendable {
+  private let lock = NSLock()
+  private var storage = 0
+
+  var count: Int {
+    lock.withLock {
+      storage
+    }
+  }
+
+  var isEmpty: Bool {
+    lock.withLock {
+      storage < 1
+    }
+  }
+
+  func increment() {
+    lock.withLock {
+      storage += 1
+    }
   }
 }

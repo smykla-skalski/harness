@@ -9,10 +9,15 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
   case openSessionWindow = "open-session-window"
   case openSessionWindowVisualOptionsDisabled = "open-session-window-visual-options-disabled"
   case agentDetailForm = "agent-detail-form"
+  case agentDetailFormVisualOptionsDisabled = "agent-detail-form-visual-options-disabled"
   case decisionDetailForm = "decision-detail-form"
+  case decisionDetailFormVisualOptionsDisabled = "decision-detail-form-visual-options-disabled"
   case taskDetailForm = "task-detail-form"
+  case taskDetailFormVisualOptionsDisabled = "task-detail-form-visual-options-disabled"
   case sessionSearchFull = "session-search-full"
+  case sessionSearchFullVisualOptionsDisabled = "session-search-full-visual-options-disabled"
   case timelineFilterForm = "timeline-filter-form"
+  case timelineFilterFormVisualOptionsDisabled = "timeline-filter-form-visual-options-disabled"
   case permissionModal = "permission-modal"
   case settingsBackdropCycle = "settings-backdrop-cycle"
   case settingsBackgroundCycle = "settings-background-cycle"
@@ -36,11 +41,17 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
       .openSessionWindow,
       .openSessionWindowVisualOptionsDisabled,
       .agentDetailForm,
+      .agentDetailFormVisualOptionsDisabled,
       .taskDetailForm,
+      .taskDetailFormVisualOptionsDisabled,
       .sessionSearchFull,
-      .timelineFilterForm:
+      .sessionSearchFullVisualOptionsDisabled,
+      .timelineFilterForm,
+      .timelineFilterFormVisualOptionsDisabled:
       return "dashboard-landing"
-    case .decisionDetailForm, .permissionModal:
+    case .decisionDetailForm,
+      .decisionDetailFormVisualOptionsDisabled,
+      .permissionModal:
       return "cockpit"
     case .settingsBackdropCycle,
       .settingsBackgroundCycle:
@@ -61,10 +72,15 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
       .openSessionWindow,
       .openSessionWindowVisualOptionsDisabled,
       .agentDetailForm,
+      .agentDetailFormVisualOptionsDisabled,
       .decisionDetailForm,
+      .decisionDetailFormVisualOptionsDisabled,
       .taskDetailForm,
+      .taskDetailFormVisualOptionsDisabled,
       .sessionSearchFull,
+      .sessionSearchFullVisualOptionsDisabled,
       .timelineFilterForm,
+      .timelineFilterFormVisualOptionsDisabled,
       .permissionModal,
       .timelineBurst,
       .toastOverlayChurn,
@@ -111,7 +127,12 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
 
   private var disablesVisualOptions: Bool {
     switch self {
-    case .openSessionWindowVisualOptionsDisabled:
+    case .openSessionWindowVisualOptionsDisabled,
+      .agentDetailFormVisualOptionsDisabled,
+      .decisionDetailFormVisualOptionsDisabled,
+      .taskDetailFormVisualOptionsDisabled,
+      .sessionSearchFullVisualOptionsDisabled,
+      .timelineFilterFormVisualOptionsDisabled:
       true
     case .openRecentWindow,
       .openSessionWindow,
@@ -132,14 +153,21 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
 
   private var needsPreviewAcpPermissionBatch: Bool {
     switch self {
-    case .decisionDetailForm, .sessionSearchFull, .permissionModal:
+    case .decisionDetailForm,
+      .decisionDetailFormVisualOptionsDisabled,
+      .sessionSearchFull,
+      .sessionSearchFullVisualOptionsDisabled,
+      .permissionModal:
       true
     case .openRecentWindow,
       .openSessionWindow,
       .openSessionWindowVisualOptionsDisabled,
       .agentDetailForm,
+      .agentDetailFormVisualOptionsDisabled,
       .taskDetailForm,
+      .taskDetailFormVisualOptionsDisabled,
       .timelineFilterForm,
+      .timelineFilterFormVisualOptionsDisabled,
       .settingsBackdropCycle,
       .settingsBackgroundCycle,
       .timelineBurst,
@@ -158,10 +186,15 @@ extension HarnessMonitorPerfScenario {
     case .openSessionWindow,
       .openSessionWindowVisualOptionsDisabled,
       .agentDetailForm,
+      .agentDetailFormVisualOptionsDisabled,
       .decisionDetailForm,
+      .decisionDetailFormVisualOptionsDisabled,
       .taskDetailForm,
+      .taskDetailFormVisualOptionsDisabled,
       .sessionSearchFull,
+      .sessionSearchFullVisualOptionsDisabled,
       .timelineFilterForm,
+      .timelineFilterFormVisualOptionsDisabled,
       .permissionModal,
       .settingsBackdropCycle,
       .settingsBackgroundCycle,
@@ -178,10 +211,15 @@ extension HarnessMonitorPerfScenario {
     case .openSessionWindow: "open-session-window"
     case .openSessionWindowVisualOptionsDisabled: "open-session-window-visual-options-disabled"
     case .agentDetailForm: "agent-detail-form"
+    case .agentDetailFormVisualOptionsDisabled: "agent-detail-form-visual-options-disabled"
     case .decisionDetailForm: "decision-detail-form"
+    case .decisionDetailFormVisualOptionsDisabled: "decision-detail-form-visual-options-disabled"
     case .taskDetailForm: "task-detail-form"
+    case .taskDetailFormVisualOptionsDisabled: "task-detail-form-visual-options-disabled"
     case .sessionSearchFull: "session-search-full"
+    case .sessionSearchFullVisualOptionsDisabled: "session-search-full-visual-options-disabled"
     case .timelineFilterForm: "timeline-filter-form"
+    case .timelineFilterFormVisualOptionsDisabled: "timeline-filter-form-visual-options-disabled"
     case .permissionModal: "permission-modal"
     case .settingsBackdropCycle: "settings-backdrop-cycle"
     case .settingsBackgroundCycle: "settings-background-cycle"
