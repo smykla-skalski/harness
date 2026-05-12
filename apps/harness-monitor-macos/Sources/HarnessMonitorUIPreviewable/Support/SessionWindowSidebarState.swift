@@ -122,8 +122,7 @@ public final class SessionSidebarSelectionState {
   /// it stable so a future watcher (e.g. a per-window analytics probe, or
   /// a virtualized row that wants a coarser invalidation key than four
   /// `@Observable` fields) can subscribe via `.onChange(of: state.sidebarSelection.revision)`
-  /// without hashing ID arrays. Bumps on no-op writes too — treat as an
-  /// "edit happened" signal, not a content hash.
+  /// without hashing ID arrays.
   public private(set) var revision: Int = 0
 
   public init() {}
@@ -148,10 +147,18 @@ public final class SessionSidebarSelectionState {
   }
 
   public func syncRenderedSelectionCount(_ count: Int) {
-    renderedSelectionCount = max(0, count)
+    let next = max(0, count)
+    guard renderedSelectionCount != next else { return }
+    renderedSelectionCount = next
   }
 
   public func clear() {
+    let hasSelection =
+      !selectedAgentIDs.isEmpty
+      || !selectedTaskIDs.isEmpty
+      || !selectedDecisionIDs.isEmpty
+      || anchor != nil
+    guard hasSelection else { return }
     selectedAgentIDs.removeAll()
     selectedTaskIDs.removeAll()
     selectedDecisionIDs.removeAll()
@@ -189,15 +196,26 @@ public final class SessionSidebarSelectionState {
     selectedIDs: Set<String>,
     anchorID: String?
   ) {
+    let nextAnchor: SessionSidebarAnchor?
+    if let anchorID {
+      nextAnchor = SessionSidebarAnchor(kind: kind, id: anchorID)
+    } else if anchor?.kind == kind {
+      nextAnchor = nil
+    } else {
+      nextAnchor = anchor
+    }
+    let switchesKind = anchor.map { $0.kind != kind } ?? false
+    let selectionChanged =
+      switchesKind
+      || self.selectedIDs(of: kind) != selectedIDs
+      || anchor != nextAnchor
+    guard selectionChanged else { return }
+
     if let existing = anchor, existing.kind != kind {
       switchActiveKind(to: kind)
     }
     write(ids: selectedIDs, of: kind)
-    if let anchorID {
-      anchor = SessionSidebarAnchor(kind: kind, id: anchorID)
-    } else if anchor?.kind == kind {
-      anchor = nil
-    }
+    anchor = nextAnchor
     revision &+= 1
   }
 
@@ -206,10 +224,17 @@ public final class SessionSidebarSelectionState {
     visibleIDs: Set<String>
   ) {
     let pruned = selectedIDs(of: kind).intersection(visibleIDs)
-    write(ids: pruned, of: kind)
+    let nextAnchor: SessionSidebarAnchor?
     if let current = anchor, current.kind == kind, !visibleIDs.contains(current.id) {
-      anchor = pruned.first.map { SessionSidebarAnchor(kind: kind, id: $0) }
+      nextAnchor = pruned.first.map { SessionSidebarAnchor(kind: kind, id: $0) }
+    } else {
+      nextAnchor = anchor
     }
+    guard pruned != selectedIDs(of: kind) || nextAnchor != anchor else {
+      return
+    }
+    write(ids: pruned, of: kind)
+    anchor = nextAnchor
     revision &+= 1
   }
 

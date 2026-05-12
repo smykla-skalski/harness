@@ -73,6 +73,34 @@ struct SessionSidebarMultiKindSelectionTests {
     #expect(anchor.map { ["t1", "t2"].contains($0.id) } == true)
   }
 
+  @MainActor
+  @Test("selection state skips no-op observable writes")
+  func selectionStateSkipsNoOpWrites() {
+    let state = SessionSidebarSelectionState()
+
+    state.clear()
+    #expect(state.revision == 0)
+    #expect(state.renderedSelectionCount == 1)
+
+    state.syncRenderedSelectionCount(1)
+    #expect(state.renderedSelectionCount == 1)
+
+    state.applyChange(kind: .agent, selectedIDs: ["a1"], anchorID: "a1")
+    #expect(state.revision == 1)
+
+    state.applyChange(kind: .agent, selectedIDs: ["a1"], anchorID: "a1")
+    #expect(state.revision == 1)
+
+    state.prune(kind: .agent, visibleIDs: ["a1", "a2"])
+    #expect(state.revision == 1)
+
+    state.clear()
+    #expect(state.revision == 2)
+
+    state.clear()
+    #expect(state.revision == 2)
+  }
+
   @Test("Context menu scope picks selection when row is part of it")
   func contextMenuScopePicksSelection() {
     let scope = SessionSidebarContextMenuScope.resolve(
