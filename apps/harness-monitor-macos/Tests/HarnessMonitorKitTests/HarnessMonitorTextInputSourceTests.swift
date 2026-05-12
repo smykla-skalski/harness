@@ -33,7 +33,8 @@ struct HarnessMonitorTextInputSourceTests {
 
   @Test("Shared text input helpers are used across migrated surfaces")
   func sharedTextInputHelpersAreUsedAcrossMigratedSurfaces() throws {
-    let newSessionSource = try previewableSourceFile(at: "Views/NewSession/NewSessionSheetView.swift")
+    let newSessionSource = try previewableSourceFile(
+      at: "Views/NewSession/NewSessionSheetView.swift")
     let composerSource = try previewableSourceFile(at: "Views/Sessions/SessionAgentComposer.swift")
     let codexRunSource = try previewableSourceFile(
       at: "Views/Sessions/SessionCodexRunDetailSection.swift")
@@ -69,7 +70,8 @@ struct HarnessMonitorTextInputSourceTests {
   }
 
   private func previewableSourceFile(at relativePath: String) throws -> String {
-    try repoFile(at: "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/\(relativePath)")
+    try repoFile(
+      at: "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/\(relativePath)")
   }
 
   private func repoFile(at relativePath: String) throws -> String {
