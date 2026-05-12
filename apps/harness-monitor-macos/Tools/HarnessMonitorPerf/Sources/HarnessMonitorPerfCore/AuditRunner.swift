@@ -103,6 +103,7 @@ public enum AuditRunner {
         )
         try AuditLock.acquire(at: lockDir, info: lockInfo)
         defer { AuditLock.release(at: lockDir) }
+        defer { cleanupHostProcesses() }
 
         try FileManager.default.createDirectory(at: tracesRoot, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: xctraceTempRoot, withIntermediateDirectories: true)
@@ -488,17 +489,24 @@ public enum AuditRunner {
 
     public static func cleanupHostProcesses() {
         let result = (try? ProcessRunner.run("/bin/ps", arguments: ["-Ao", "pid=,command="]))?.stdoutString ?? ""
-        for line in result.split(separator: "\n") {
+        cleanupHostProcesses(psOutput: result) { pid in
+            kill(pid, SIGKILL)
+        }
+    }
+
+    static func cleanupHostProcesses(psOutput: String, signal: (Int32) -> Void) {
+        for line in psOutput.split(separator: "\n") {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             guard let space = trimmed.firstIndex(of: " ") else { continue }
             let pidString = String(trimmed[..<space])
             let command = String(trimmed[trimmed.index(after: space)...])
             guard let pid = Int32(pidString) else { continue }
             if command.contains("Harness Monitor UI Testing.app/Contents/MacOS/Harness Monitor UI Testing")
+                || command.contains("Harness Monitor UI Testing Audit.app/Contents/MacOS/Harness Monitor UI Testing")
                 || command.contains("target/debug/harness daemon serve")
                 || command.contains("target/debug/harness bridge start")
                 || command.contains("/mock-codex") {
-                kill(pid, SIGKILL)
+                signal(pid)
             }
         }
     }
