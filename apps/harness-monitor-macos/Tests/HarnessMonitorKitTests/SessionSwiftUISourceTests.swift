@@ -221,6 +221,8 @@ struct SessionSwiftUISourceTests {
     #expect(toolbarSource.contains("if usesAnimatedSymbolEffects {"))
     #expect(toolbarSource.contains("private var simpleToolbarSymbol: some View"))
     #expect(toolbarSource.contains("private var animatedToolbarSymbol: some View"))
+    #expect(!toolbarSource.contains("shouldSpin"))
+    #expect(!toolbarSource.contains(".symbolEffect(.rotate"))
   }
 
   @Test("Timeline section renders on SwiftUI primitives without AppKit scroll machinery")
