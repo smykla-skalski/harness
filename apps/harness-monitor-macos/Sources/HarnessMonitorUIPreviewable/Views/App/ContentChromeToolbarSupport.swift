@@ -70,6 +70,10 @@ struct RefreshToolbarButton: View {
     }
   }
 
+  private var accessibilityHint: String {
+    model.isRefreshing ? "Refresh already in progress" : "Refresh sessions"
+  }
+
   private var shouldSpin: Bool {
     model.isRefreshing && !reduceMotion && !displaysSuccessFeedback
   }
@@ -91,6 +95,7 @@ struct RefreshToolbarButton: View {
 
   private var refreshButton: some View {
     Button {
+      guard !model.isRefreshing else { return }
       Task { await store.manualRefresh() }
     } label: {
       Label {
@@ -99,10 +104,9 @@ struct RefreshToolbarButton: View {
         toolbarSymbol
       }
     }
-    .disabled(model.isRefreshing)
     .help(helpText)
     .accessibilityLabel("Refresh")
-    .accessibilityHint("Refresh sessions")
+    .accessibilityHint(accessibilityHint)
     .accessibilityValue(accessibilityValue)
     .accessibilityIdentifier(HarnessMonitorAccessibility.refreshButton)
   }
