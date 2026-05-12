@@ -41,8 +41,7 @@ struct HarnessMonitorMultilineTextField<Field: Hashable>: View {
       .accessibilityHint(accessibilityHint)
   }
 
-  @ViewBuilder
-  private var multilineField: some View {
+  @ViewBuilder private var multilineField: some View {
     if let focusedField, let focusValue {
       baseField
         .focused(focusedField, equals: focusValue)
