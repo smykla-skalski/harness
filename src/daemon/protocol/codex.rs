@@ -64,9 +64,8 @@ pub struct CodexRunRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     /// Optional reasoning effort level (e.g. `low`, `medium`, `high`,
-    /// `xhigh`). Forwarded to the codex app-server thread payload as
-    /// `reasoning.effort` and ignored when the selected model does not support
-    /// reasoning.
+    /// `xhigh`). Forwarded to the codex app-server `turn/start` payload as
+    /// `effort` and ignored when the selected model does not support reasoning.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effort: Option<String>,
     /// When `true`, the `model` field is accepted as-is without catalog
@@ -189,12 +188,11 @@ pub struct CodexRunSnapshot {
     pub events: Vec<CodexRunEvent>,
     pub created_at: String,
     pub updated_at: String,
-    /// Optional model identifier passed to the codex app-server at thread
-    /// start.
+    /// Optional model identifier passed to the codex app-server for the thread
+    /// and turn context.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
-    /// Optional reasoning effort forwarded to the codex app-server at thread
-    /// start.
+    /// Optional reasoning effort forwarded to the codex app-server turn context.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effort: Option<String>,
 }
