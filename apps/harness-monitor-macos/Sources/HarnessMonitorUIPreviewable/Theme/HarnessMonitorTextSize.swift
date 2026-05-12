@@ -38,11 +38,11 @@ public enum HarnessMonitorTextSize {
   }
 
   public static func nativeInputIndex(_ index: Int) -> Int {
-    min(normalizedIndex(index), defaultIndex)
+    normalizedIndex(index)
   }
 
   public static func nativeInputFont(at index: Int) -> Font {
-    nativeFormControlFont(at: nativeInputIndex(index))
+    nativeFormControlFont(at: index)
   }
 
   public static func scaledFont(_ font: Font, by scale: CGFloat) -> Font {
@@ -61,7 +61,7 @@ public enum HarnessMonitorTextSize {
   }
 
   public static func nativeInputControlSize(at index: Int) -> ControlSize {
-    controlSize(at: nativeInputIndex(index))
+    controlSize(at: index)
   }
 
   public static func controlSizeLabel(at index: Int) -> String {
@@ -160,6 +160,13 @@ enum HarnessMonitorNativeTextFieldChromeMetrics {
   static let verticalPadding: CGFloat = 4
 }
 
+private enum HarnessMonitorNativeTextFieldConfiguration {
+  @MainActor
+  static func apply(to textField: NSTextField) {
+    textField.alignment = .left
+  }
+}
+
 private struct HarnessMonitorNativeTextFieldModifier: ViewModifier {
   @Environment(\.harnessTextSizeIndex)
   private var textSizeIndex
@@ -173,6 +180,9 @@ private struct HarnessMonitorNativeTextFieldModifier: ViewModifier {
       .textFieldStyle(.plain)
       .padding(.horizontal, HarnessMonitorNativeTextFieldChromeMetrics.horizontalPadding)
       .padding(.vertical, HarnessMonitorNativeTextFieldChromeMetrics.verticalPadding)
+      .introspect(.textField, on: .macOS(.v26)) { textField in
+        HarnessMonitorNativeTextFieldConfiguration.apply(to: textField)
+      }
       .background(
         RoundedRectangle(
           cornerRadius: HarnessMonitorNativeTextFieldChromeMetrics.cornerRadius,

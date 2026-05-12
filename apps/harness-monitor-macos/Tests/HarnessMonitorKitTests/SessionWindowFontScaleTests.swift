@@ -26,21 +26,19 @@ struct SessionWindowFontScaleTests {
     )
   }
 
-  @Test("Native input sizing caps at the default text size")
-  func nativeInputSizingCapsAtDefaultTextSize() {
+  @Test("Native input sizing follows the app text size")
+  func nativeInputSizingFollowsAppTextSize() {
     let largestIndex = HarnessMonitorTextSize.scales.count - 1
 
     #expect(HarnessMonitorTextSize.nativeInputIndex(0) == 0)
-    #expect(
-      HarnessMonitorTextSize.nativeInputIndex(largestIndex) == HarnessMonitorTextSize.defaultIndex
-    )
+    #expect(HarnessMonitorTextSize.nativeInputIndex(largestIndex) == largestIndex)
     #expect(
       HarnessMonitorTextSize.nativeInputFont(at: largestIndex)
-        == HarnessMonitorTextSize.nativeInputFont(at: HarnessMonitorTextSize.defaultIndex)
+        == HarnessMonitorTextSize.nativeFormControlFont(at: largestIndex)
     )
     #expect(
       HarnessMonitorTextSize.nativeInputControlSize(at: largestIndex)
-        == HarnessMonitorTextSize.nativeInputControlSize(at: HarnessMonitorTextSize.defaultIndex)
+        == HarnessMonitorTextSize.controlSize(at: largestIndex)
     )
   }
 
