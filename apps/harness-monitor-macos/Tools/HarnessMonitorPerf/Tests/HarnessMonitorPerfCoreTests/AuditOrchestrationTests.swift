@@ -28,12 +28,20 @@ final class ScenarioCatalogTests: XCTestCase {
 
     func testDurationsAreStable() {
         XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "open-recent-window"), 6)
+        XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "agent-detail-form"), 8)
+        XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "session-search-full"), 8)
+        XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "timeline-filter-form"), 8)
         XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "permission-modal"), 8)
         XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "unknown-scenario"), 8)
     }
 
     func testPreviewScenarioMapping() {
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "open-recent-window"), "dashboard-landing")
+        XCTAssertEqual(ScenarioCatalog.previewScenario(for: "agent-detail-form"), "dashboard-landing")
+        XCTAssertEqual(ScenarioCatalog.previewScenario(for: "decision-detail-form"), "cockpit")
+        XCTAssertEqual(ScenarioCatalog.previewScenario(for: "task-detail-form"), "dashboard-landing")
+        XCTAssertEqual(ScenarioCatalog.previewScenario(for: "session-search-full"), "dashboard-landing")
+        XCTAssertEqual(ScenarioCatalog.previewScenario(for: "timeline-filter-form"), "dashboard-landing")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "permission-modal"), "cockpit")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "offline-cached-open"), "offline-cached")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "anything-else"), "dashboard")
@@ -41,6 +49,11 @@ final class ScenarioCatalogTests: XCTestCase {
 
     func testTemplateRoutingMatchesCatalog() {
         XCTAssertTrue(ScenarioCatalog.swiftUI.contains("permission-modal"))
+        XCTAssertTrue(ScenarioCatalog.swiftUI.contains("agent-detail-form"))
+        XCTAssertTrue(ScenarioCatalog.swiftUI.contains("decision-detail-form"))
+        XCTAssertTrue(ScenarioCatalog.swiftUI.contains("task-detail-form"))
+        XCTAssertTrue(ScenarioCatalog.swiftUI.contains("session-search-full"))
+        XCTAssertTrue(ScenarioCatalog.swiftUI.contains("timeline-filter-form"))
         XCTAssertTrue(ScenarioCatalog.swiftUI.contains("toast-overlay-churn"))
         XCTAssertFalse(ScenarioCatalog.swiftUI.contains("settings-backdrop-cycle"))
         XCTAssertTrue(ScenarioCatalog.allocations.contains("settings-background-cycle"))

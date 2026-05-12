@@ -187,6 +187,14 @@ public struct SessionWindowView: View {
         sessionToolbar
       }
       .appSearchHost(model: stateCache.appSearchModel, routeAction: appSearchRouteAction)
+      .modifier(
+        SessionWindowPerfScenarioScript(
+          stateCache: stateCache,
+          store: store,
+          sessionID: token.sessionID,
+          snapshot: snapshot
+        )
+      )
       .modifier(SessionWindowSearchMirror(stateCache: stateCache))
       .modifier(appSearchIndexUpdaterModifier)
       .background(

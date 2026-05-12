@@ -93,6 +93,10 @@ struct SessionTimelineView: View {
     }
     .task(id: filterHydrationInput) {
       hydrateFilters(for: filterHydrationInput)
+      applyPerfScenarioFiltersIfNeeded()
+    }
+    .task(id: HarnessMonitorUITestEnvironment.perfScenarioRawValue ?? "") {
+      applyPerfScenarioFiltersIfNeeded()
     }
     .onAppear { requestLatestWindowIfNeeded(presentation) }
     .onChange(of: host.id) { _, _ in requestLatestWindow() }

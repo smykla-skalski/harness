@@ -231,6 +231,10 @@ enum HarnessMonitorUITestAccessibility {
   static let workerAgentTuiMarker = "harness.session.agent.worker-codex.tui-marker"
   static let sessionCockpitScrollView = "harness.session.cockpit.scroll"
   static let sessionAgentListState = "harness.session.agents.state"
+  static let agentDetailScrollView = "harness.agent.detail.scroll"
+  static let sessionTaskDetailScrollView = "harness.session.task.detail.scroll"
+  static let sessionTimelineFilterBar = "harness.session.timeline.filters"
+  static let sessionTimelineFilterState = "harness.session.timeline.filters.state"
 
   static func sessionAgentTuiMarker(_ agentID: String) -> String {
     "harness.session.agent.\(slug(agentID)).tui-marker"

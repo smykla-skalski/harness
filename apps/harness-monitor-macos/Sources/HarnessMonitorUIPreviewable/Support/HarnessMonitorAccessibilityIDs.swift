@@ -239,6 +239,7 @@ public enum HarnessMonitorAccessibility {
   public static let connectionCard = "harness.settings.connection-card"
   public static let agentTuiButton = "harness.session.agent-tui"
   public static let agentDetailScrollView = "harness.agent.detail.scroll"
+  public static let sessionTaskDetailScrollView = "harness.session.task.detail.scroll"
   public static let agentTuiSheet = "harness.sheet.agent-tui"
   public static let agentTuiState = "harness.sheet.agent-tui.state"
   public static let agentTuiCommandRoutingState = "harness.sheet.agent-tui.command-routing"

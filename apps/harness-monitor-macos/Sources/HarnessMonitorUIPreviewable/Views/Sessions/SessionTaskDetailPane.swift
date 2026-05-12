@@ -130,6 +130,7 @@ struct SessionTaskDetailPane: View {
       .scrollDisabled(true)
       .scrollContentBackground(.hidden)
     }
+    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTaskDetailScrollView)
     .dynamicTypeSize(.xSmall ... .accessibility5)
   }
 

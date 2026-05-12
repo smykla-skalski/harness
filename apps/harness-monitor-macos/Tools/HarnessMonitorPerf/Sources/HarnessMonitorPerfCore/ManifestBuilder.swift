@@ -233,6 +233,11 @@ public enum ManifestBuilder {
         swiftui: [
             "open-recent-window",
             "open-session-window",
+            "agent-detail-form",
+            "decision-detail-form",
+            "task-detail-form",
+            "session-search-full",
+            "timeline-filter-form",
             "permission-modal",
             "timeline-burst",
             "toast-overlay-churn",
