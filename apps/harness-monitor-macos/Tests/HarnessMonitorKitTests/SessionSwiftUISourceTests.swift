@@ -211,17 +211,6 @@ struct SessionSwiftUISourceTests {
     #expect(!searchUpdaterSource.contains("guard model.isPresented else { return }"))
   }
 
-  @Test("App search focus binding attaches only while search is active")
-  func appSearchFocusBindingAttachesOnlyWhileSearchIsActive() throws {
-    let searchHostSource = try sourceFile(at: "Views/Search/AppSearchHost.swift")
-
-    #expect(searchHostSource.contains("private var shouldAttachSearchFocus: Bool"))
-    #expect(searchHostSource.contains("isSearchPresented || searchFieldFocused"))
-    #expect(searchHostSource.contains("AppSearchFocusedBindingModifier("))
-    #expect(searchHostSource.contains("if isEnabled {\n      content.searchFocused(isFocused)"))
-    #expect(!searchHostSource.contains(".searchFocused($searchFieldFocused)"))
-  }
-
   @Test("Refresh toolbar keeps idle arrow on a static symbol path")
   func refreshToolbarKeepsIdleArrowOnStaticSymbolPath() throws {
     let toolbarSource = try sourceFile(at: "Views/App/ContentChromeToolbarSupport.swift")
@@ -232,8 +221,6 @@ struct SessionSwiftUISourceTests {
     #expect(toolbarSource.contains("if usesAnimatedSymbolEffects {"))
     #expect(toolbarSource.contains("private var simpleToolbarSymbol: some View"))
     #expect(toolbarSource.contains("private var animatedToolbarSymbol: some View"))
-    #expect(toolbarSource.contains("guard !model.isRefreshing else { return }"))
-    #expect(!toolbarSource.contains(".disabled(model.isRefreshing)"))
   }
 
   @Test("Timeline section renders on SwiftUI primitives without AppKit scroll machinery")

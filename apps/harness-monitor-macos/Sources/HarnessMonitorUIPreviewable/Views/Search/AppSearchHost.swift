@@ -56,10 +56,6 @@ public struct AppSearchHostModifier: ViewModifier {
   @State private var isSearchPresented: Bool = false
   @FocusState private var searchFieldFocused: Bool
 
-  private var shouldAttachSearchFocus: Bool {
-    isSearchPresented || searchFieldFocused
-  }
-
   public init(
     model: AppSearchModel,
     prompt: LocalizedStringKey = "Search session",
@@ -74,12 +70,12 @@ public struct AppSearchHostModifier: ViewModifier {
 
   public func body(content: Content) -> some View {
     // Cmd-F path: a hidden `Button` co-located with the `.searchable`
-    // owns the shortcut and writes `isSearchPresented` before promoting
-    // focus. macOS does not auto-bind Cmd-F to `.searchable` (Apple
-    // Developer Forums thread #688679); the menu command + cross-scene
-    // `@FocusedBinding` route is documented as fragile (Apple Developer
-    // Forums thread #693580). Co-locating the shortcut with its target
-    // state is the canonical pure-SwiftUI fix.
+    // owns the shortcut and writes both `isSearchPresented` and
+    // `searchFieldFocused` directly. macOS does not auto-bind Cmd-F to
+    // `.searchable` (Apple Developer Forums thread #688679); the menu
+    // command + cross-scene `@FocusedBinding` route is documented as
+    // fragile (Apple Developer Forums thread #693580). Co-locating the
+    // shortcut with its target state is the canonical pure-SwiftUI fix.
     @Bindable var model = model
 
     return
@@ -90,12 +86,7 @@ public struct AppSearchHostModifier: ViewModifier {
         placement: .toolbar,
         prompt: prompt
       )
-      .modifier(
-        AppSearchFocusedBindingModifier(
-          isEnabled: shouldAttachSearchFocus,
-          isFocused: $searchFieldFocused
-        )
-      )
+      .searchFocused($searchFieldFocused)
       .searchPresentationToolbarBehavior(.avoidHidingContent)
       .harnessMinimizableSearchToolbar()
       .searchSuggestions {
@@ -201,20 +192,6 @@ public struct AppSearchHostModifier: ViewModifier {
       message = "\(totalHitCount) results."
     }
     AccessibilityNotification.Announcement(message).post()
-  }
-}
-
-private struct AppSearchFocusedBindingModifier: ViewModifier {
-  let isEnabled: Bool
-  let isFocused: FocusState<Bool>.Binding
-
-  @ViewBuilder
-  func body(content: Content) -> some View {
-    if isEnabled {
-      content.searchFocused(isFocused)
-    } else {
-      content
-    }
   }
 }
 
