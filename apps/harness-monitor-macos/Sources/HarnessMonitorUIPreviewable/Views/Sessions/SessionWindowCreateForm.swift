@@ -40,15 +40,26 @@ struct SessionWindowCreateForm: View {
         embeddedAgentRuntimeSections
       }
       Section {
-        TextField("", text: title)
-          .harnessNativeTextField()
-          .focused(focusedFieldBinding, equals: .name)
-          .accessibilityLabel("\(draft.kind.title) name")
-          .accessibilityHint(validationMessage(for: .name) ?? "")
-          .frame(maxWidth: .infinity, alignment: .leading)
+        LabeledContent("Name") {
+          TextField("", text: title)
+            .harnessNativeTextField()
+            .focused(focusedFieldBinding, equals: .name)
+            .accessibilityLabel("\(draft.kind.title) name")
+            .accessibilityHint(validationMessage(for: .name) ?? "")
+        }
+        LabeledContent("Prompt") {
+          HarnessMonitorMultilineTextField(
+            placeholder: "",
+            text: prompt,
+            minHeight: metrics.promptMinHeight,
+            focusedField: focusedFieldBinding,
+            equals: .prompt,
+            accessibilityLabel: "Prompt"
+          )
+        }
       } header: {
         HStack(spacing: HarnessMonitorTheme.spacingXS) {
-          Text("Name")
+          Text(draft.kind.title)
             .harnessNativeFormSectionHeader()
           Spacer(minLength: 0)
 
@@ -65,20 +76,6 @@ struct SessionWindowCreateForm: View {
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-      }
-
-      Section {
-        HarnessMonitorMultilineTextField(
-          placeholder: "",
-          text: prompt,
-          minHeight: metrics.promptMinHeight,
-          focusedField: focusedFieldBinding,
-          equals: .prompt,
-          accessibilityLabel: "Prompt"
-        )
-      } header: {
-        Text("Prompt")
-          .harnessNativeFormSectionHeader()
       }
       if draft.kind == .agent {
         SessionWindowCreateBridgeBannerSection(

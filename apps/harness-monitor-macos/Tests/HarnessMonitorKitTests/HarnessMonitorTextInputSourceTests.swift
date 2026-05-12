@@ -25,13 +25,14 @@ struct HarnessMonitorTextInputSourceTests {
     #expect(!themeSource.contains("public func harnessNativeVerticalTextField() -> some View"))
 
     #expect(multilineSource.contains("private let maxHeightOverride: CGFloat?"))
-    #expect(multilineSource.contains("private let showsChrome: Bool"))
     #expect(multilineSource.contains("maxHeight: CGFloat? = nil"))
-    #expect(multilineSource.contains("showsChrome: Bool = true"))
-    #expect(multilineSource.contains("HarnessMonitorMultilineChromeModifier"))
-    #expect(multilineSource.contains("HarnessMonitorMultilineScrollView"))
-    #expect(multilineSource.contains("override func hitTest(_ point: NSPoint) -> NSView?"))
-    #expect(multilineSource.contains("return textView"))
+    #expect(multilineSource.contains("TextField(placeholder, text: $text, axis: .vertical)"))
+    #expect(multilineSource.contains(".textFieldStyle(.roundedBorder)"))
+    #expect(multilineSource.contains(".lineLimit(lineLimit)"))
+    #expect(!multilineSource.contains("import AppKit"))
+    #expect(!multilineSource.contains("NSViewRepresentable"))
+    #expect(!multilineSource.contains("HarnessMonitorMultilineChromeModifier"))
+    #expect(!multilineSource.contains("HarnessMonitorMultilineScrollView"))
   }
 
   @Test("Shared text input helpers are used across migrated surfaces")
@@ -56,14 +57,9 @@ struct HarnessMonitorTextInputSourceTests {
 
     #expect(composerSource.contains("HarnessMonitorMultilineTextField("))
     #expect(!composerSource.contains("TextEditor(text: $message)"))
-    #expect(!composerSource.contains("showsChrome: false"))
 
     #expect(codexRunSource.contains("HarnessMonitorMultilineTextField<Never>("))
     #expect(!codexRunSource.contains("TextEditor(text: $contextDraft)"))
-    #expect(!codexRunSource.contains("showsChrome: false"))
-    #expect(!codexRunSource.contains(".padding(.horizontal, 4)"))
-    #expect(!codexRunSource.contains(".padding(.vertical, 4)"))
-    #expect(!codexRunSource.contains(".quaternary.opacity(0.2)"))
 
     for source in [
       sendSignalSource,

@@ -152,30 +152,17 @@ private struct HarnessMonitorNativeFormControlModifier: ViewModifier {
   }
 }
 
-enum HarnessMonitorNativeTextFieldChromeMetrics {
-  static let cornerRadius: CGFloat = 6
-  static let horizontalPadding: CGFloat = 8
-  static let verticalPadding: CGFloat = 4
-  static let singleLineMinHeight: CGFloat = 28
-}
-
 private struct HarnessMonitorNativeTextFieldModifier: ViewModifier {
   @Environment(\.harnessTextSizeIndex)
   private var textSizeIndex
 
   func body(content: Content) -> some View {
     content
-      .frame(
-        maxWidth: .infinity,
-        minHeight: HarnessMonitorNativeTextFieldChromeMetrics.singleLineMinHeight,
-        alignment: .leading
-      )
       .multilineTextAlignment(.leading)
       .font(HarnessMonitorTextSize.nativeInputFont(at: textSizeIndex))
       .controlSize(HarnessMonitorTextSize.nativeInputControlSize(at: textSizeIndex))
       .textFieldStyle(.roundedBorder)
-      .clipShape(.rect(cornerRadius: HarnessMonitorNativeTextFieldChromeMetrics.cornerRadius))
-      .contentShape(Rectangle())
+      .frame(maxWidth: .infinity)
   }
 }
 
