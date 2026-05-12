@@ -1,4 +1,5 @@
 import HarnessMonitorKit
+import Observation
 import SwiftUI
 
 extension AgentDetailSendUpdateSection {
@@ -13,15 +14,32 @@ extension AgentDetailSendUpdateSection {
   var statusSymbolName: String {
     isSessionReadOnly ? "lock.fill" : "exclamationmark.circle"
   }
+}
 
-  var composerStatusRow: some View {
-    AgentDetailComposerStatusRow(
-      store: store,
-      statusMessage: statusMessage,
-      statusTint: statusTint,
-      statusSymbolName: statusSymbolName,
-      promptDeadlineDate: promptDeadlineDate
-    )
+@MainActor
+@Observable
+final class AgentDetailDeadlineClockState {
+  private var now = Date.now
+
+  func presentation(for deadline: Date?) -> AcpRuntimeDeadlinePresentation? {
+    guard let deadline else { return nil }
+    return AcpRuntimeDeadlinePresentation.presentation(deadline: deadline, now: now)
+  }
+
+  func run(store: HarnessMonitorStore, deadline: Date?) async {
+    guard deadline != nil else {
+      return
+    }
+
+    while !Task.isCancelled {
+      now = AcpRuntimeDeadlineClock.now(store: store, localNow: Date.now)
+      guard AcpRuntimeDeadlineClock.shouldTick(deadline: deadline, now: now) else {
+        return
+      }
+      guard await AcpRuntimeDeadlineClock.sleepUntilNextTick() else {
+        return
+      }
+    }
   }
 }
 
@@ -31,16 +49,11 @@ struct AgentDetailDeadlineSendButton: View {
   let agentID: String
   let statusMessage: String?
   let promptDeadlineDate: Date?
+  let deadlineClock: AgentDetailDeadlineClockState
   let action: HarnessInlineActionButton.Action
 
-  @State private var deadlineNow = Date.now
-
   private var deadlinePresentation: AcpRuntimeDeadlinePresentation? {
-    guard let promptDeadlineDate else { return nil }
-    return AcpRuntimeDeadlinePresentation.presentation(
-      deadline: promptDeadlineDate,
-      now: deadlineNow
-    )
+    deadlineClock.presentation(for: promptDeadlineDate)
   }
 
   private var title: String {
@@ -63,22 +76,10 @@ struct AgentDetailDeadlineSendButton: View {
     )
     .accessibilityLabel("Send Update")
     .accessibilityValue(statusMessage ?? "")
-    .task(id: promptDeadlineDate) {
-      await runDeadlineClockIfNeeded()
-    }
-  }
-
-  @MainActor
-  private func runDeadlineClockIfNeeded() async {
-    await AgentDetailDeadlineClock.run(
-      store: store,
-      deadline: promptDeadlineDate,
-      assignNow: { deadlineNow = $0 }
-    )
   }
 }
 
-private struct AgentDetailComposerStatusRow: View {
+struct AgentDetailComposerStatusRow: View {
   private static let horizontalMinWidth: CGFloat = 360
 
   let store: HarnessMonitorStore
@@ -86,16 +87,12 @@ private struct AgentDetailComposerStatusRow: View {
   let statusTint: Color
   let statusSymbolName: String
   let promptDeadlineDate: Date?
+  let deadlineClock: AgentDetailDeadlineClockState
 
-  @State private var deadlineNow = Date.now
   @State private var fitsHorizontally = true
 
   private var deadlinePresentation: AcpRuntimeDeadlinePresentation? {
-    guard let promptDeadlineDate else { return nil }
-    return AcpRuntimeDeadlinePresentation.presentation(
-      deadline: promptDeadlineDate,
-      now: deadlineNow
-    )
+    deadlineClock.presentation(for: promptDeadlineDate)
   }
 
   private var deadlineStatusLabel: String? {
@@ -118,9 +115,6 @@ private struct AgentDetailComposerStatusRow: View {
           }
         }
         .accessibilityIdentifier(HarnessMonitorAccessibility.agentDetailSignalStatus)
-        .task(id: promptDeadlineDate) {
-          await runDeadlineClockIfNeeded()
-        }
     }
   }
 
@@ -170,39 +164,6 @@ private struct AgentDetailComposerStatusRow: View {
       .accessibilityElement(children: .combine)
       .accessibilityLabel("Prompt deadline")
       .accessibilityValue(deadlinePresentation?.accessibilityLabel ?? deadlineStatusLabel)
-    }
-  }
-
-  @MainActor
-  private func runDeadlineClockIfNeeded() async {
-    await AgentDetailDeadlineClock.run(
-      store: store,
-      deadline: promptDeadlineDate,
-      assignNow: { deadlineNow = $0 }
-    )
-  }
-}
-
-private enum AgentDetailDeadlineClock {
-  @MainActor
-  static func run(
-    store: HarnessMonitorStore,
-    deadline: Date?,
-    assignNow: @escaping (Date) -> Void
-  ) async {
-    guard deadline != nil else {
-      return
-    }
-
-    while !Task.isCancelled {
-      let now = AcpRuntimeDeadlineClock.now(store: store, localNow: Date.now)
-      assignNow(now)
-      guard AcpRuntimeDeadlineClock.shouldTick(deadline: deadline, now: now) else {
-        return
-      }
-      guard await AcpRuntimeDeadlineClock.sleepUntilNextTick() else {
-        return
-      }
     }
   }
 }
