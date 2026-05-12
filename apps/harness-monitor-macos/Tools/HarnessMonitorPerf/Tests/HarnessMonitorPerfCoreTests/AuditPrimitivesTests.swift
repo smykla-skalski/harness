@@ -193,6 +193,55 @@ final class AuditPrimitivesTests: XCTestCase {
         XCTAssertNil(environment["UNRELATED"])
     }
 
+    func testAuditExternalDaemonReleaseOptInRequiresLiveExternalEnvironment() {
+        XCTAssertTrue(
+            AuditRunner.shouldAllowExternalDaemonAudit(
+                defaultEnvironment: [
+                    "HARNESS_MONITOR_LAUNCH_MODE": "live",
+                    "HARNESS_MONITOR_EXTERNAL_DAEMON": "1",
+                ]
+            )
+        )
+        XCTAssertFalse(
+            AuditRunner.shouldAllowExternalDaemonAudit(
+                defaultEnvironment: [
+                    "HARNESS_MONITOR_LAUNCH_MODE": "preview",
+                    "HARNESS_MONITOR_EXTERNAL_DAEMON": "1",
+                ]
+            )
+        )
+        XCTAssertFalse(
+            AuditRunner.shouldAllowExternalDaemonAudit(
+                defaultEnvironment: [
+                    "HARNESS_MONITOR_LAUNCH_MODE": "live",
+                    "HARNESS_MONITOR_EXTERNAL_DAEMON": "0",
+                ]
+            )
+        )
+    }
+
+    func testReleaseBuildSettingsGateAuditExternalDaemonCondition() {
+        let defaultSettings = BuildOrchestrator.releaseBuildSettings(
+            arch: "arm64",
+            allowExternalDaemonAudit: false
+        )
+        XCTAssertFalse(
+            defaultSettings.contains {
+                $0.contains("HARNESS_MONITOR_AUDIT_EXTERNAL_DAEMON")
+            }
+        )
+
+        let externalSettings = BuildOrchestrator.releaseBuildSettings(
+            arch: "arm64",
+            allowExternalDaemonAudit: true
+        )
+        XCTAssertTrue(
+            externalSettings.contains {
+                $0.contains("HARNESS_MONITOR_AUDIT_EXTERNAL_DAEMON")
+            }
+        )
+    }
+
     func testAuditDaemonDataHomeDefaultsToPerRunScenarioDirectory() {
         let runDir = URL(fileURLWithPath: "/tmp/audit-run", isDirectory: true)
         let dataHome = AuditRunner.daemonDataHome(
