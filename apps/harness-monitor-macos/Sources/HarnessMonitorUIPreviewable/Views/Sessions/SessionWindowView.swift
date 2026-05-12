@@ -195,7 +195,7 @@ public struct SessionWindowView: View {
           snapshot: snapshot
         )
       )
-      .modifier(SessionWindowSearchMirror(stateCache: stateCache))
+      .modifier(SessionWindowSearchMirror(stateCache: stateCache, renderedRoute: renderedRoute))
       .modifier(appSearchIndexUpdaterModifier)
       .background(
         SessionWindowModifierKeysMonitor(currentModifiers: $currentModifiers)

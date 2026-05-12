@@ -64,27 +64,41 @@ public final class AppSearchModel {
   public func runSearch(query rawQuery: String, primary: AppSearchDomain?) async {
     let trimmed = rawQuery.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else {
-      self.query = ""
-      results = .empty
-      isSearching = false
+      applySearchState(query: "", results: .empty, isSearching: false)
       return
     }
-    isSearching = true
+    setSearching(true)
     let next = await searchProvider(trimmed, primary)
     guard !Task.isCancelled else {
-      isSearching = false
+      setSearching(false)
       return
     }
-    self.query = trimmed
-    results = next
-    isSearching = false
+    applySearchState(query: trimmed, results: next, isSearching: false)
   }
 
   /// Reset query, results, and the in-flight flag. Call when the user
   /// dismisses the search field.
   public func clear() {
-    query = ""
-    results = .empty
-    isSearching = false
+    applySearchState(query: "", results: .empty, isSearching: false)
+  }
+
+  private func applySearchState(
+    query: String,
+    results: AppSearchResults,
+    isSearching: Bool
+  ) {
+    if self.query != query {
+      self.query = query
+    }
+    if self.results != results {
+      self.results = results
+    }
+    setSearching(isSearching)
+  }
+
+  private func setSearching(_ isSearching: Bool) {
+    if self.isSearching != isSearching {
+      self.isSearching = isSearching
+    }
   }
 }

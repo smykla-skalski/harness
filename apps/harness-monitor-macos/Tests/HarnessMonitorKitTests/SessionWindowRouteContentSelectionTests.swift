@@ -76,7 +76,7 @@ struct SessionWindowRouteContentSelectionTests {
 
   @Test("Summary lists bind selection directly to the session window state")
   func summaryListsBindSelectionDirectlyToSessionState() throws {
-    let source = try sourceFile(named: "SessionWindowRouteContent.swift")
+    let source = try sessionRouteContentSource()
 
     #expect(source.contains("List(selection: selectedAgentIDs)"))
     #expect(source.contains("List(selection: selectedTaskIDs)"))
@@ -105,7 +105,7 @@ struct SessionWindowRouteContentSelectionTests {
 
   @Test("Tasks route keeps the route selected while showing the route-selected task detail")
   func tasksRouteKeepsRouteSelectionWhileShowingTheFirstVisibleTaskDetail() throws {
-    let routeContent = try sourceFile(named: "SessionWindowRouteContent.swift")
+    let routeContent = try sessionRouteContentSource()
     let detailFocus = try sourceFile(named: "SessionWindowView+DetailFocus.swift")
 
     #expect(routeContent.contains("SessionTaskRouteSelectionPolicy.preferredRouteDetailTaskID"))
@@ -162,7 +162,7 @@ struct SessionWindowRouteContentSelectionTests {
 
   @Test("Session-window decision rows keep the shared accessibility contract")
   func decisionRowsKeepSharedAccessibilityContract() throws {
-    let columns = try sourceFile(named: "SessionWindowRouteContent.swift")
+    let columns = try sessionRouteContentSource()
 
     #expect(columns.contains("HarnessMonitorAccessibility.decisionRow(decision.id)"))
     #expect(columns.contains(".harnessMCPRow("))
@@ -170,7 +170,7 @@ struct SessionWindowRouteContentSelectionTests {
 
   @Test("Session-window agent and task rows expose stable identifiers")
   func agentAndTaskRowsExposeStableIdentifiers() throws {
-    let columns = try sourceFile(named: "SessionWindowRouteContent.swift")
+    let columns = try sessionRouteContentSource()
 
     #expect(columns.contains("HarnessMonitorAccessibility.sessionWindowAgentRow(agent.agentId)"))
     #expect(columns.contains("HarnessMonitorAccessibility.sessionWindowTaskRow(task.taskId)"))
@@ -197,6 +197,68 @@ struct SessionWindowRouteContentSelectionTests {
 
     #expect(windowView.contains("if request.resetDecisionFilters {"))
     #expect(windowView.contains("persistedDecisionQuery = \"\""))
+  }
+
+  @Test("Toolbar search only mirrors into decision filters when decisions consume the query")
+  func toolbarSearchMirrorIsDecisionRouteScoped() {
+    let agentsTrigger = SessionWindowSearchMirrorPolicy.trigger(
+      renderedRoute: .agents,
+      appSearchQuery: "worker"
+    )
+    #expect(agentsTrigger.shouldMirrorDecisionQuery == false)
+    #expect(agentsTrigger.query.isEmpty)
+    #expect(
+      SessionWindowSearchMirrorPolicy.decisionQueryUpdate(
+        from: .init(shouldMirrorDecisionQuery: false, query: ""),
+        to: agentsTrigger
+      ) == nil
+    )
+
+    let decisionsWithQuery = SessionWindowSearchMirrorPolicy.trigger(
+      renderedRoute: .decisions,
+      appSearchQuery: "worker"
+    )
+    #expect(decisionsWithQuery.shouldMirrorDecisionQuery)
+    #expect(decisionsWithQuery.query == "worker")
+    #expect(
+      SessionWindowSearchMirrorPolicy.decisionQueryUpdate(
+        from: agentsTrigger,
+        to: decisionsWithQuery
+      ) == "worker"
+    )
+
+    let decisionsEmptyOnEntry = SessionWindowSearchMirrorPolicy.trigger(
+      renderedRoute: .decisions,
+      appSearchQuery: ""
+    )
+    #expect(
+      SessionWindowSearchMirrorPolicy.decisionQueryUpdate(
+        from: agentsTrigger,
+        to: decisionsEmptyOnEntry
+      ) == nil
+    )
+    #expect(
+      SessionWindowSearchMirrorPolicy.decisionQueryUpdate(
+        from: decisionsWithQuery,
+        to: decisionsEmptyOnEntry
+      )?.isEmpty == true
+    )
+    #expect(
+      SessionWindowSearchMirrorPolicy.decisionQueryUpdate(
+        from: decisionsWithQuery,
+        to: agentsTrigger
+      )?.isEmpty == true
+    )
+  }
+
+  private func sessionRouteContentSource() throws -> String {
+    try [
+      "SessionWindowRouteContent.swift",
+      "SessionWindowRouteContent+Tasks.swift",
+      "SessionWindowRouteContent+Decisions.swift",
+    ]
+    .map { try sourceFile(named: $0) }
+    .joined(separator: "\n")
   }
 
   private func sourceFile(named name: String) throws -> String {
