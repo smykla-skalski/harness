@@ -7,6 +7,7 @@ use crate::errors::{CliError, CliErrorKind};
 use super::approvals::trim_summary;
 
 pub(super) const METHOD_INITIALIZE: &str = "initialize";
+pub(super) const METHOD_INITIALIZED: &str = "initialized";
 pub(super) const METHOD_THREAD_START: &str = "thread/start";
 pub(super) const METHOD_THREAD_RESUME: &str = "thread/resume";
 pub(super) const METHOD_TURN_START: &str = "turn/start";
@@ -57,6 +58,7 @@ pub(super) fn initialize_params(version: &str) -> Result<Value, CliError> {
     )
 }
 
+#[derive(Clone, Copy)]
 pub(super) struct ThreadParamsInput<'a> {
     pub(super) cwd: &'a str,
     pub(super) sandbox: &'a str,
@@ -178,8 +180,7 @@ pub(super) fn notification_summary(method: &str, params: &Value) -> String {
         return params
             .get("delta")
             .and_then(Value::as_str)
-            .map(trim_summary)
-            .unwrap_or_else(|| "Agent message delta".to_string());
+            .map_or_else(|| "Agent message delta".to_string(), trim_summary);
     }
     if let Some(item_type) = params.pointer("/item/type").and_then(Value::as_str) {
         return format!("{method}: {item_type}");

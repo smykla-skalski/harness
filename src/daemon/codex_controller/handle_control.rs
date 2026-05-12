@@ -35,9 +35,11 @@ impl CodexControllerHandle {
             return Err(CliErrorKind::workflow_parse("codex steer prompt cannot be empty").into());
         }
         if let Ok(active) = self.active_run(run_id) {
-            return self.send_control_and_wait(active, "steer", |ack| CodexControlMessage::Steer {
-                prompt: prompt.to_string(),
-                ack,
+            return self.send_control_and_wait(&active, "steer", |ack| {
+                CodexControlMessage::Steer {
+                    prompt: prompt.to_string(),
+                    ack,
+                }
             });
         }
 
@@ -50,7 +52,7 @@ impl CodexControllerHandle {
     /// Returns [`CliError`] when the run is inactive or the request cannot be queued.
     pub fn interrupt(&self, run_id: &str) -> Result<CodexRunSnapshot, CliError> {
         let active = self.active_run(run_id)?;
-        self.send_control_and_wait(active, "interrupt", |ack| CodexControlMessage::Interrupt {
+        self.send_control_and_wait(&active, "interrupt", |ack| CodexControlMessage::Interrupt {
             ack,
         })
     }
@@ -68,7 +70,7 @@ impl CodexControllerHandle {
         }
         if let Ok(active) = self.active_run(run_id) {
             return self
-                .send_control_and_wait(active, "stop", |ack| CodexControlMessage::Stop { ack });
+                .send_control_and_wait(&active, "stop", |ack| CodexControlMessage::Stop { ack });
         }
         self.state.active_runs.remove(run_id);
         snapshot.status = CodexRunStatus::Cancelled;
@@ -101,7 +103,7 @@ impl CodexControllerHandle {
         request: &CodexApprovalDecisionRequest,
     ) -> Result<CodexRunSnapshot, CliError> {
         let active = self.active_run(run_id)?;
-        self.send_control_and_wait(active, "approval", |ack| CodexControlMessage::Approval {
+        self.send_control_and_wait(&active, "approval", |ack| CodexControlMessage::Approval {
             approval_id: approval_id.to_string(),
             decision: request.decision,
             ack,
@@ -114,7 +116,7 @@ impl CodexControllerHandle {
 
     pub(super) fn send_control_and_wait(
         &self,
-        active: ActiveRun,
+        active: &ActiveRun,
         action: &str,
         build: impl FnOnce(CodexControlAck) -> CodexControlMessage,
     ) -> Result<CodexRunSnapshot, CliError> {

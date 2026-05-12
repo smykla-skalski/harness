@@ -94,6 +94,8 @@ impl CodexRunWorker {
     async fn initialize(&self, rpc: &mut CodexJsonRpc) -> Result<(), CliError> {
         let params = wire::initialize_params(env!("CARGO_PKG_VERSION"))?;
         let _ = startup_request(rpc, wire::METHOD_INITIALIZE, params, "initialize").await?;
+        rpc.send_notification(wire::METHOD_INITIALIZED, None)
+            .await?;
         Ok(())
     }
 
@@ -117,7 +119,7 @@ impl CodexRunWorker {
         let thread_id = wire::thread_id_from_result(&result).ok_or_else(|| {
             CliErrorKind::workflow_parse("codex thread response missing thread.id")
         })?;
-        self.snapshot.thread_id = Some(thread_id.to_string());
+        self.snapshot.thread_id = Some(thread_id.clone());
         self.snapshot.latest_summary = Some(format!("Thread {thread_id} ready"));
         self.record_event(method, format!("Codex thread {thread_id} ready"), &result);
         self.touch_and_save()?;
@@ -136,7 +138,7 @@ impl CodexRunWorker {
         let result = startup_request(rpc, wire::METHOD_TURN_START, params, "turn/start").await?;
         let turn_id = wire::turn_id_from_result(&result)
             .ok_or_else(|| CliErrorKind::workflow_parse("codex turn response missing turn.id"))?;
-        self.snapshot.turn_id = Some(turn_id.to_string());
+        self.snapshot.turn_id = Some(turn_id.clone());
         self.snapshot.latest_summary = Some(format!("Turn {turn_id} started"));
         self.record_event(
             wire::METHOD_TURN_START,
@@ -200,7 +202,7 @@ impl CodexRunWorker {
             AppServerNotification::TurnStarted { turn_id } => {
                 self.record_event(method, wire::notification_summary(method, params), params);
                 if let Some(turn_id) = turn_id {
-                    self.snapshot.turn_id = Some(turn_id.to_string());
+                    self.snapshot.turn_id = Some(turn_id.clone());
                     self.snapshot.latest_summary = Some(format!("Turn {turn_id} is running"));
                     self.touch_and_save()?;
                 }
@@ -307,19 +309,8 @@ impl CodexRunWorker {
         let Some(approval) =
             approval_from_request(method, wire::value_id_string(&request_id), params)
         else {
-            self.record_event(
-                "server_request_unsupported",
-                format!("Unsupported codex server request {method}"),
-                message,
-            );
-            self.touch_and_save()?;
-            tracing::warn!(method, "received unsupported codex server request");
-            rpc.send_error(
-                request_id,
-                -32601,
-                &format!("Unsupported codex server request {method}"),
-            )
-            .await?;
+            self.reject_unsupported_server_request(rpc, request_id, message, method)
+                .await?;
             return Ok(());
         };
 
@@ -345,6 +336,28 @@ impl CodexRunWorker {
         self.controller
             .broadcast_approval(&self.snapshot, &approval);
         Ok(())
+    }
+
+    async fn reject_unsupported_server_request(
+        &mut self,
+        rpc: &mut CodexJsonRpc,
+        request_id: Value,
+        message: &Value,
+        method: &str,
+    ) -> Result<(), CliError> {
+        self.record_event(
+            "server_request_unsupported",
+            format!("Unsupported codex server request {method}"),
+            message,
+        );
+        self.touch_and_save()?;
+        tracing::warn!(method, "received unsupported codex server request");
+        rpc.send_error(
+            request_id,
+            -32601,
+            &format!("Unsupported codex server request {method}"),
+        )
+        .await
     }
 
     pub(super) fn thread_id(&self) -> Result<String, CliError> {

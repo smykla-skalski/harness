@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
@@ -8,6 +9,39 @@ use super::*;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::codex_transport::CodexTransport;
 use crate::daemon::protocol::{CodexApprovalDecision, CodexRunMode, StreamEvent};
+
+#[tokio::test]
+async fn initialize_sends_initialized_notification_before_thread_requests() {
+    let (_control_tx, control_rx) = mpsc::unbounded_channel();
+    let worker = CodexRunWorker::new(
+        controller_without_db(),
+        running_snapshot_without_ids(),
+        control_rx,
+    );
+    let sent = Arc::new(Mutex::new(Vec::new()));
+    let recv = Arc::new(Mutex::new(VecDeque::from([json!({
+        "id": 1,
+        "result": {}
+    })
+    .to_string()])));
+    let mut rpc = CodexJsonRpc::new(Box::new(FakeTransport {
+        sent: Arc::clone(&sent),
+        recv,
+    }));
+
+    worker
+        .initialize(&mut rpc)
+        .await
+        .expect("initialize handshake should complete");
+
+    let frames = sent.lock().expect("sent frames");
+    let initialize: serde_json::Value =
+        serde_json::from_str(frames.first().expect("initialize frame")).expect("initialize json");
+    let initialized: serde_json::Value =
+        serde_json::from_str(frames.get(1).expect("initialized frame")).expect("initialized json");
+    assert_eq!(initialize["method"], json!(wire::METHOD_INITIALIZE));
+    assert_eq!(initialized, json!({ "method": wire::METHOD_INITIALIZED }));
+}
 
 #[tokio::test]
 async fn invalid_steer_ack_does_not_fail_worker_loop() {
@@ -80,6 +114,7 @@ async fn permission_approval_response_grants_requested_subset() {
     let sent = Arc::new(Mutex::new(Vec::new()));
     let mut rpc = CodexJsonRpc::new(Box::new(FakeTransport {
         sent: Arc::clone(&sent),
+        ..Default::default()
     }));
     let params = json!({
         "threadId": "thread-1",
@@ -204,6 +239,7 @@ fn running_snapshot_without_ids() -> CodexRunSnapshot {
 #[derive(Default)]
 struct FakeTransport {
     sent: Arc<Mutex<Vec<String>>>,
+    recv: Arc<Mutex<VecDeque<String>>>,
 }
 
 #[async_trait]
@@ -214,7 +250,7 @@ impl CodexTransport for FakeTransport {
     }
 
     async fn next_frame(&mut self) -> Result<Option<String>, CliError> {
-        Ok(None)
+        Ok(self.recv.lock().expect("recv lock").pop_front())
     }
 
     async fn shutdown(self: Box<Self>) -> Result<(), CliError> {

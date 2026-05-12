@@ -71,6 +71,24 @@ impl CodexJsonRpc {
         .await
     }
 
+    pub(super) async fn send_notification(
+        &mut self,
+        method: &str,
+        params: Option<Value>,
+    ) -> Result<(), CliError> {
+        let message = if let Some(params) = params {
+            json!({
+                "method": method,
+                "params": params,
+            })
+        } else {
+            json!({
+                "method": method,
+            })
+        };
+        self.send(message).await
+    }
+
     pub(super) async fn send_error(
         &mut self,
         request_id: Value,
