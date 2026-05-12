@@ -10,6 +10,12 @@ enum HarnessMonitorSettingsUITestKeys {
   static let resetBackgroundRecents = "HARNESS_MONITOR_RESET_BACKGROUND_RECENTS"
   static let openRecentCloseAfterPickOverride =
     "HARNESS_MONITOR_OPEN_RECENT_CLOSE_AFTER_PICK_OVERRIDE"
+  static let sessionShortcutOverlaysOverride =
+    "HARNESS_MONITOR_SESSION_SHORTCUT_OVERLAYS_OVERRIDE"
+  static let sessionTitleBlurOverride =
+    "HARNESS_MONITOR_SESSION_TITLE_BLUR_OVERRIDE"
+  static let menuBarStateColorsOverride =
+    "HARNESS_MONITOR_MENU_BAR_STATE_COLORS_OVERRIDE"
   static let voiceLocaleOverride = "HARNESS_MONITOR_VOICE_LOCALE_OVERRIDE"
   static let voiceInsertionModeOverride = "HARNESS_MONITOR_VOICE_INSERTION_MODE_OVERRIDE"
   static let voiceRemoteProcessorEnabledOverride =

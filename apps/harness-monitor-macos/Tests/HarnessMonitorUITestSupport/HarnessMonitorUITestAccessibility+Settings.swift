@@ -17,6 +17,10 @@ extension HarnessMonitorUITestAccessibility {
   static let settingsTextSizePicker = "harness.settings.text-size"
   static let settingsMenuBarStateColorsToggle =
     "harness.settings.menu-bar.state-colors"
+  static let settingsSessionShortcutOverlaysToggle =
+    "harness.settings.session.shortcut-overlays"
+  static let settingsSessionTitleBlurToggle =
+    "harness.settings.session.title-blur"
   static let settingsSessionRowModePicker =
     "harness.settings.sidebar-session-row-mode"
   static let settingsTimeZoneModePicker = "harness.settings.time-zone-mode"

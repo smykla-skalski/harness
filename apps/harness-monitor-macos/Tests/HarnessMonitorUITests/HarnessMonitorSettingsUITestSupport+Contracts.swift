@@ -8,6 +8,9 @@ struct SettingsStateSnapshot {
   let textSize: String
   let controlSize: String
   let sidebarRowMode: String
+  let shortcutOverlays: String
+  let titleBlur: String
+  let menuBarStateColors: String
   let timeZoneMode: String
   let timeZone: String
 
@@ -18,6 +21,9 @@ struct SettingsStateSnapshot {
     textSize: String = "Default",
     controlSize: String = "small",
     sidebarRowMode: String = "concise",
+    shortcutOverlays: String = "enabled",
+    titleBlur: String = "enabled",
+    menuBarStateColors: String = "enabled",
     timeZoneMode: String = "local",
     timeZone: String = "local"
   ) -> Self {
@@ -29,6 +35,9 @@ struct SettingsStateSnapshot {
       textSize: textSize,
       controlSize: controlSize,
       sidebarRowMode: sidebarRowMode,
+      shortcutOverlays: shortcutOverlays,
+      titleBlur: titleBlur,
+      menuBarStateColors: menuBarStateColors,
       timeZoneMode: timeZoneMode,
       timeZone: timeZone
     )
@@ -41,6 +50,9 @@ struct SettingsStateSnapshot {
     textSize: String = "Default",
     controlSize: String = "small",
     sidebarRowMode: String = "concise",
+    shortcutOverlays: String = "enabled",
+    titleBlur: String = "enabled",
+    menuBarStateColors: String = "enabled",
     timeZoneMode: String = "local",
     timeZone: String = "local"
   ) -> Self {
@@ -52,6 +64,9 @@ struct SettingsStateSnapshot {
       textSize: textSize,
       controlSize: controlSize,
       sidebarRowMode: sidebarRowMode,
+      shortcutOverlays: shortcutOverlays,
+      titleBlur: titleBlur,
+      menuBarStateColors: menuBarStateColors,
       timeZoneMode: timeZoneMode,
       timeZone: timeZone
     )
@@ -64,6 +79,9 @@ struct SettingsStateSnapshot {
     textSize: String = "Default",
     controlSize: String = "small",
     sidebarRowMode: String = "concise",
+    shortcutOverlays: String = "enabled",
+    titleBlur: String = "enabled",
+    menuBarStateColors: String = "enabled",
     timeZoneMode: String = "local",
     timeZone: String = "local"
   ) -> Self {
@@ -75,6 +93,9 @@ struct SettingsStateSnapshot {
       textSize: textSize,
       controlSize: controlSize,
       sidebarRowMode: sidebarRowMode,
+      shortcutOverlays: shortcutOverlays,
+      titleBlur: titleBlur,
+      menuBarStateColors: menuBarStateColors,
       timeZoneMode: timeZoneMode,
       timeZone: timeZone
     )
@@ -274,6 +295,9 @@ extension HarnessMonitorUITestCase {
       "textSize=\(snapshot.textSize)",
       "controlSize=\(snapshot.controlSize)",
       "sidebarRowMode=\(snapshot.sidebarRowMode)",
+      "shortcutOverlays=\(snapshot.shortcutOverlays)",
+      "titleBlur=\(snapshot.titleBlur)",
+      "menuBarStateColors=\(snapshot.menuBarStateColors)",
       "timeZoneMode=\(snapshot.timeZoneMode)",
       "timeZone=\(snapshot.timeZone)",
       "settingsChrome=native",

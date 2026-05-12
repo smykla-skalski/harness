@@ -15,6 +15,8 @@ public struct SettingsAppearanceSection: View {
   @AppStorage(SessionWindowKeyboardShortcutOverlaySettings.storageKey)
   private var sessionShortcutOverlaysEnabled =
     SessionWindowKeyboardShortcutOverlaySettings.defaultValue
+  @AppStorage(HarnessMonitorSessionTitleBlurDefaults.enabledKey)
+  private var sessionTitleBlurEnabled = HarnessMonitorSessionTitleBlurDefaults.enabledDefault
   @AppStorage(HarnessMonitorSidebarSessionRowDisplayMode.storageKey)
   private var sidebarSessionRowDisplayModeRawValue =
     HarnessMonitorSidebarSessionRowDisplayMode.defaultMode.rawValue
@@ -81,6 +83,14 @@ public struct SettingsAppearanceSection: View {
             HarnessMonitorAccessibility.settingsSessionShortcutOverlaysToggle
           )
 
+        Toggle("Session title blur", isOn: $sessionTitleBlurEnabled)
+          .accessibilityHint(
+            "Shows or hides the softened session status glow behind session window titles."
+          )
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.settingsSessionTitleBlurToggle
+          )
+
         Picker("Backdrop", selection: $backdropModeRawValue) {
           ForEach(HarnessMonitorBackdropMode.allCases) { mode in
             Text(mode.label).tag(mode.rawValue)
@@ -115,7 +125,7 @@ public struct SettingsAppearanceSection: View {
   private var appearanceFooterText: String {
     let parts = [
       "Theme mode, text size, and sidebar session rows apply to every Harness Monitor window.",
-      "Session shortcut overlays control the floating shortcut hints in session sidebars and toolbars.",
+      "Session shortcut overlays and title blur control optional session-window chrome.",
       "Backdrop controls where the softened background image renders.",
       "The menu bar icon can follow app state colors or stay neutral.",
       "Choosing an image turns on the window backdrop if it is currently off.",

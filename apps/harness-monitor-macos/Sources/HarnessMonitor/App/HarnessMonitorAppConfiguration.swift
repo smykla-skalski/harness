@@ -10,6 +10,12 @@ struct HarnessMonitorAppConfiguration {
   private static let resetBackgroundRecentsOverrideKey = "HARNESS_MONITOR_RESET_BACKGROUND_RECENTS"
   private static let openRecentCloseAfterPickOverrideKey =
     "HARNESS_MONITOR_OPEN_RECENT_CLOSE_AFTER_PICK_OVERRIDE"
+  static let sessionShortcutOverlaysOverrideKey =
+    "HARNESS_MONITOR_SESSION_SHORTCUT_OVERLAYS_OVERRIDE"
+  static let sessionTitleBlurOverrideKey =
+    "HARNESS_MONITOR_SESSION_TITLE_BLUR_OVERRIDE"
+  static let menuBarStateColorsOverrideKey =
+    "HARNESS_MONITOR_MENU_BAR_STATE_COLORS_OVERRIDE"
   private static let toastDismissOverrideKey = "HARNESS_MONITOR_TEST_TOAST_DISMISS_MS"
   private static let toastSeedKey = "HARNESS_MONITOR_TEST_SEED_TOASTS"
 
@@ -98,7 +104,10 @@ struct HarnessMonitorAppConfiguration {
         backdropMode: .none,
         backgroundImage: .defaultSelection,
         resetBackgroundRecents: false,
-        openRecentCloseAfterPick: OpenRecentCloseAfterPickDefaults.defaultValue
+        openRecentCloseAfterPick: OpenRecentCloseAfterPickDefaults.defaultValue,
+        sessionShortcutOverlays: SessionWindowKeyboardShortcutOverlaySettings.defaultValue,
+        sessionTitleBlur: HarnessMonitorSessionTitleBlurDefaults.enabledDefault,
+        menuBarStateColors: HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledDefault
       )
     }
     return UITestOverrides(
@@ -122,7 +131,16 @@ struct HarnessMonitorAppConfiguration {
       ) ?? false,
       openRecentCloseAfterPick: uiTestBoolOverride(
         from: environment.values[openRecentCloseAfterPickOverrideKey]
-      ) ?? OpenRecentCloseAfterPickDefaults.defaultValue
+      ) ?? OpenRecentCloseAfterPickDefaults.defaultValue,
+      sessionShortcutOverlays: uiTestBoolOverride(
+        from: environment.values[sessionShortcutOverlaysOverrideKey]
+      ) ?? SessionWindowKeyboardShortcutOverlaySettings.defaultValue,
+      sessionTitleBlur: uiTestBoolOverride(
+        from: environment.values[sessionTitleBlurOverrideKey]
+      ) ?? HarnessMonitorSessionTitleBlurDefaults.enabledDefault,
+      menuBarStateColors: uiTestBoolOverride(
+        from: environment.values[menuBarStateColorsOverrideKey]
+      ) ?? HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledDefault
     )
   }
 
@@ -144,6 +162,9 @@ struct HarnessMonitorAppConfiguration {
     let backgroundImage: HarnessMonitorBackgroundSelection
     let resetBackgroundRecents: Bool
     let openRecentCloseAfterPick: Bool
+    let sessionShortcutOverlays: Bool
+    let sessionTitleBlur: Bool
+    let menuBarStateColors: Bool
   }
 
   private static func uiTestSafeEnvironment(
@@ -257,7 +278,15 @@ struct HarnessMonitorAppConfiguration {
       overrides.openRecentCloseAfterPick,
       forKey: OpenRecentCloseAfterPickDefaults.storageKey
     )
-    applyMenuBarUITestDefaults()
+    UserDefaults.standard.set(
+      overrides.sessionShortcutOverlays,
+      forKey: SessionWindowKeyboardShortcutOverlaySettings.storageKey
+    )
+    UserDefaults.standard.set(
+      overrides.sessionTitleBlur,
+      forKey: HarnessMonitorSessionTitleBlurDefaults.enabledKey
+    )
+    applyMenuBarUITestDefaults(stateColorVariantsEnabled: overrides.menuBarStateColors)
     UserDefaults.standard.set(
       overrides.backdropMode.rawValue,
       forKey: HarnessMonitorBackdropDefaults.modeKey

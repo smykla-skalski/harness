@@ -17,7 +17,6 @@ struct SessionTitleBlurChromeConfiguration: Equatable {
   static let blurRadius: CGFloat = 56
   static let tintOpacity = 0.30
   static let reducedTransparencyOpacity = 0.82
-  static let animationDuration = 0.18
 
   enum Tone: String, Equatable {
     case idle
@@ -114,18 +113,11 @@ public struct SessionTitleBlurChrome: View {
     .allowsHitTesting(false)
     .accessibilityHidden(true)
     .accessibilityIdentifier(SessionTitleBlurChromeConfiguration.accessibilityIdentifier)
-    .animation(
-      .easeInOut(duration: SessionTitleBlurChromeConfiguration.animationDuration),
-      value: status
-    )
-    .animation(
-      .easeInOut(duration: SessionTitleBlurChromeConfiguration.animationDuration),
-      value: isStale
-    )
-    .animation(
-      .easeInOut(duration: SessionTitleBlurChromeConfiguration.animationDuration),
-      value: isEnabled
-    )
+    .transaction { transaction in
+      // The blurred opacity overlay spans the window chrome; keep it out
+      // of parent animation transactions to avoid invalidating the shell.
+      transaction.animation = nil
+    }
   }
 
   private var titleTint: some View {

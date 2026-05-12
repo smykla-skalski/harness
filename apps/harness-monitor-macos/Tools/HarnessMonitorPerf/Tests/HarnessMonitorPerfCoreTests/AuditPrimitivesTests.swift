@@ -174,6 +174,7 @@ final class AuditPrimitivesTests: XCTestCase {
 
     func testManifestTemplatesIncludeKnownScenarios() {
         XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("open-recent-window"))
+        XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("open-session-window-visual-options-disabled"))
         XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("agent-detail-form"))
         XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("session-search-full"))
         XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("timeline-filter-form"))

@@ -78,6 +78,7 @@ final class BudgetEnforcerTests: XCTestCase {
             "offline-cached-open",
             "open-recent-window",
             "open-session-window",
+            "open-session-window-visual-options-disabled",
             "permission-modal",
             "session-search-full",
             "task-detail-form",

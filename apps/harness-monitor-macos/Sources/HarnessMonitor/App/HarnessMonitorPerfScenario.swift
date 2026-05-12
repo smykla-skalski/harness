@@ -7,6 +7,7 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
 
   case openRecentWindow = "open-recent-window"
   case openSessionWindow = "open-session-window"
+  case openSessionWindowVisualOptionsDisabled = "open-session-window-visual-options-disabled"
   case agentDetailForm = "agent-detail-form"
   case decisionDetailForm = "decision-detail-form"
   case taskDetailForm = "task-detail-form"
@@ -33,6 +34,7 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
     switch self {
     case .openRecentWindow,
       .openSessionWindow,
+      .openSessionWindowVisualOptionsDisabled,
       .agentDetailForm,
       .taskDetailForm,
       .sessionSearchFull,
@@ -40,7 +42,8 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
       return "dashboard-landing"
     case .decisionDetailForm, .permissionModal:
       return "cockpit"
-    case .settingsBackdropCycle, .settingsBackgroundCycle:
+    case .settingsBackdropCycle,
+      .settingsBackgroundCycle:
       return "dashboard"
     case .timelineBurst, .toastOverlayChurn:
       return "dashboard-landing"
@@ -51,10 +54,12 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
 
   var initialSettingsSection: SettingsSection {
     switch self {
-    case .settingsBackdropCycle, .settingsBackgroundCycle:
+    case .settingsBackdropCycle,
+      .settingsBackgroundCycle:
       return .appearance
     case .openRecentWindow,
       .openSessionWindow,
+      .openSessionWindowVisualOptionsDisabled,
       .agentDetailForm,
       .decisionDetailForm,
       .taskDetailForm,
@@ -90,7 +95,39 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
     if needsPreviewAcpPermissionBatch, acpPendingOverrideIsEmpty {
       values["HARNESS_MONITOR_PREVIEW_ACP_PENDING"] = "1"
     }
+    applyVisualOptionDefaults(to: &values)
     return HarnessMonitorEnvironment(values: values, homeDirectory: environment.homeDirectory)
+  }
+
+  private func applyVisualOptionDefaults(to values: inout [String: String]) {
+    guard disablesVisualOptions else {
+      return
+    }
+    values[HarnessMonitorAppConfiguration.sessionShortcutOverlaysOverrideKey] = "0"
+    values[HarnessMonitorAppConfiguration.sessionTitleBlurOverrideKey] = "0"
+    values[HarnessMonitorAppConfiguration.menuBarStateColorsOverrideKey] = "0"
+    values["HARNESS_MONITOR_BACKDROP_MODE_OVERRIDE"] = HarnessMonitorBackdropMode.none.rawValue
+  }
+
+  private var disablesVisualOptions: Bool {
+    switch self {
+    case .openSessionWindowVisualOptionsDisabled:
+      true
+    case .openRecentWindow,
+      .openSessionWindow,
+      .agentDetailForm,
+      .decisionDetailForm,
+      .taskDetailForm,
+      .sessionSearchFull,
+      .timelineFilterForm,
+      .permissionModal,
+      .settingsBackdropCycle,
+      .settingsBackgroundCycle,
+      .timelineBurst,
+      .toastOverlayChurn,
+      .offlineCachedOpen:
+      false
+    }
   }
 
   private var needsPreviewAcpPermissionBatch: Bool {
@@ -99,6 +136,7 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
       true
     case .openRecentWindow,
       .openSessionWindow,
+      .openSessionWindowVisualOptionsDisabled,
       .agentDetailForm,
       .taskDetailForm,
       .timelineFilterForm,
@@ -118,6 +156,7 @@ extension HarnessMonitorPerfScenario {
     case .openRecentWindow:
       true
     case .openSessionWindow,
+      .openSessionWindowVisualOptionsDisabled,
       .agentDetailForm,
       .decisionDetailForm,
       .taskDetailForm,
@@ -137,6 +176,7 @@ extension HarnessMonitorPerfScenario {
     switch self {
     case .openRecentWindow: "open-recent-window"
     case .openSessionWindow: "open-session-window"
+    case .openSessionWindowVisualOptionsDisabled: "open-session-window-visual-options-disabled"
     case .agentDetailForm: "agent-detail-form"
     case .decisionDetailForm: "decision-detail-form"
     case .taskDetailForm: "task-detail-form"

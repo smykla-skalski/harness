@@ -5,6 +5,7 @@ public enum ScenarioCatalog {
     public static let all: [String] = [
         "open-recent-window",
         "open-session-window",
+        "open-session-window-visual-options-disabled",
         "agent-detail-form",
         "decision-detail-form",
         "task-detail-form",
@@ -21,6 +22,7 @@ public enum ScenarioCatalog {
     public static let swiftUI: Set<String> = [
         "open-recent-window",
         "open-session-window",
+        "open-session-window-visual-options-disabled",
         "agent-detail-form",
         "decision-detail-form",
         "task-detail-form",
@@ -42,6 +44,7 @@ public enum ScenarioCatalog {
         switch scenario {
         case "open-recent-window": return 6
         case "open-session-window": return 8
+        case "open-session-window-visual-options-disabled": return 8
         case "agent-detail-form": return 8
         case "decision-detail-form": return 8
         case "task-detail-form": return 8
@@ -59,13 +62,15 @@ public enum ScenarioCatalog {
 
     public static func previewScenario(for scenario: String) -> String {
         switch scenario {
-        case "open-recent-window", "open-session-window", "agent-detail-form",
+        case "open-recent-window", "open-session-window",
+             "open-session-window-visual-options-disabled", "agent-detail-form",
              "task-detail-form", "session-search-full", "timeline-filter-form",
              "timeline-burst", "toast-overlay-churn":
             return "dashboard-landing"
         case "decision-detail-form", "permission-modal":
             return "cockpit"
-        case "settings-backdrop-cycle", "settings-background-cycle": return "dashboard"
+        case "settings-backdrop-cycle", "settings-background-cycle":
+            return "dashboard"
         case "offline-cached-open": return "offline-cached"
         default: return "dashboard"
         }

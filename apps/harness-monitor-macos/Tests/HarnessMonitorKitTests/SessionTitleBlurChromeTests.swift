@@ -34,7 +34,7 @@ final class SessionTitleBlurChromeTests: XCTestCase {
     XCTAssertEqual(stale.assetName, "HarnessMonitorInk")
   }
 
-  func testGeometryAndAnimationConstantsStayStable() {
+  func testGeometryConstantsStayStable() {
     XCTAssertEqual(SessionTitleBlurChromeConfiguration.height, 160)
     XCTAssertEqual(SessionTitleBlurChromeConfiguration.titleLeadingPadding, 320)
     XCTAssertEqual(SessionTitleBlurChromeConfiguration.titleVerticalOffset, 56)
@@ -46,7 +46,6 @@ final class SessionTitleBlurChromeTests: XCTestCase {
       SessionTitleBlurChromeConfiguration.reducedTransparencyOpacity,
       0.82
     )
-    XCTAssertEqual(SessionTitleBlurChromeConfiguration.animationDuration, 0.18)
     XCTAssertEqual(
       SessionTitleBlurChromeConfiguration.accessibilityIdentifier,
       "harness.session.title-blur-chrome"
@@ -64,6 +63,14 @@ final class SessionTitleBlurChromeTests: XCTestCase {
     XCTAssertFalse(source.contains("import AppKit"))
     XCTAssertFalse(source.contains("NSViewRepresentable"))
     XCTAssertFalse(source.contains("NSVisualEffectView"))
+  }
+
+  func testTitleBlurChromeOptsOutOfImplicitAnimationChurn() throws {
+    let source = try sourceFile(named: "SessionTitleBlurChrome.swift")
+
+    XCTAssertFalse(source.contains(".animation("))
+    XCTAssertTrue(source.contains(".transaction { transaction in"))
+    XCTAssertTrue(source.contains("transaction.animation = nil"))
   }
 
   func testSessionWindowAttachesTitleBlurChromeAtNavigationSurface() throws {

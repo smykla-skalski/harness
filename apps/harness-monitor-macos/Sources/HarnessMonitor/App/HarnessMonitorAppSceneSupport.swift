@@ -136,6 +136,7 @@ private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
       "scenario=\(perfScenario.rawValue)",
       "status=\(perfScenarioStatus.rawValue)",
     ]
+    fields.append(contentsOf: visualSettingsStateFields())
     if let perfScenarioFailureReason {
       fields.append("reason=\(perfScenarioFailureReason)")
     }
@@ -144,6 +145,33 @@ private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
   private var shouldPublishPerfScenarioState: Bool {
     HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled
   }
+
+  private func visualSettingsStateFields() -> [String] {
+    let defaults = UserDefaults.standard
+    let backdrop =
+      defaults.string(forKey: HarnessMonitorBackdropDefaults.modeKey)
+      ?? HarnessMonitorBackdropMode.none.rawValue
+    let shortcutOverlays = boolLabel(
+      defaults.bool(forKey: SessionWindowKeyboardShortcutOverlaySettings.storageKey)
+    )
+    let titleBlur = boolLabel(
+      defaults.bool(forKey: HarnessMonitorSessionTitleBlurDefaults.enabledKey)
+    )
+    let menuBarStateColors = boolLabel(
+      defaults.bool(forKey: HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledKey)
+    )
+    return [
+      "backdrop=\(backdrop)",
+      "shortcutOverlays=\(shortcutOverlays)",
+      "titleBlur=\(titleBlur)",
+      "menuBarStateColors=\(menuBarStateColors)",
+    ]
+  }
+
+  private func boolLabel(_ value: Bool) -> String {
+    value ? "enabled" : "disabled"
+  }
+
   func body(content: Content) -> some View {
     content
       .modifier(PerfScenarioStateMarker(text: perfScenarioStateText))
