@@ -73,10 +73,15 @@ final class BudgetEnforcerTests: XCTestCase {
 
     func testCatalogParityWithAuditDefinitions() {
         XCTAssertEqual(Budgets.swiftUIByScenario.keys.sorted(), [
+            "agent-detail-form",
+            "decision-detail-form",
             "offline-cached-open",
             "open-recent-window",
             "open-session-window",
             "permission-modal",
+            "session-search-full",
+            "task-detail-form",
+            "timeline-filter-form",
             "timeline-burst",
             "toast-overlay-churn",
         ])

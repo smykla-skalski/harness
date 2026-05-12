@@ -53,6 +53,75 @@ extension HarnessMonitorPerfDriver {
     return .completed
   }
 
+  static func routeAgentDetailFormScenario(
+    store: HarnessMonitorStore,
+    openWindow: OpenWindowAction
+  ) async -> ScenarioResult {
+    await routePreviewSessionSelection(
+      .agent(
+        sessionID: PreviewFixtures.summary.sessionId,
+        agentID: PreviewFixtures.agents[1].agentId
+      ),
+      store: store,
+      openWindow: openWindow
+    )
+  }
+
+  static func routeDecisionDetailFormScenario(
+    store: HarnessMonitorStore,
+    openWindow: OpenWindowAction
+  ) async -> ScenarioResult {
+    await routePermissionDecisionToWorkspace(store: store, openWindow: openWindow)
+  }
+
+  static func routeTaskDetailFormScenario(
+    store: HarnessMonitorStore,
+    openWindow: OpenWindowAction
+  ) async -> ScenarioResult {
+    await routePreviewSessionSelection(
+      .task(
+        sessionID: PreviewFixtures.summary.sessionId,
+        taskID: PreviewFixtures.tasks[0].taskId
+      ),
+      store: store,
+      openWindow: openWindow
+    )
+  }
+
+  static func runSessionSearchFullScenario(
+    store: HarnessMonitorStore,
+    openWindow: OpenWindowAction
+  ) async -> ScenarioResult {
+    guard
+      await ensureSessionWindow(
+        sessionID: PreviewFixtures.summary.sessionId,
+        store: store,
+        openWindow: openWindow
+      )
+    else {
+      return .failed("session-window-timeout")
+    }
+    await settle(.milliseconds(1_400))
+    return .completed
+  }
+
+  static func runTimelineFilterFormScenario(
+    store: HarnessMonitorStore,
+    openWindow: OpenWindowAction
+  ) async -> ScenarioResult {
+    guard
+      await ensureSessionWindow(
+        sessionID: PreviewFixtures.summary.sessionId,
+        store: store,
+        openWindow: openWindow
+      )
+    else {
+      return .failed("session-window-timeout")
+    }
+    await settle(.milliseconds(1_000))
+    return .completed
+  }
+
   static func runToastOverlayChurnScenario(
     store: HarnessMonitorStore,
     openWindow: OpenWindowAction
@@ -84,6 +153,25 @@ extension HarnessMonitorPerfDriver {
     else {
       return .failed("session-window-timeout")
     }
+    return .completed
+  }
+
+  static func routePreviewSessionSelection(
+    _ selection: SessionRouteSelection,
+    store: HarnessMonitorStore,
+    openWindow: OpenWindowAction
+  ) async -> ScenarioResult {
+    store.requestSessionRoute(selection)
+    guard
+      await ensureSessionWindow(
+        sessionID: PreviewFixtures.summary.sessionId,
+        store: store,
+        openWindow: openWindow
+      )
+    else {
+      return .failed("session-window-timeout")
+    }
+    await settle()
     return .completed
   }
 

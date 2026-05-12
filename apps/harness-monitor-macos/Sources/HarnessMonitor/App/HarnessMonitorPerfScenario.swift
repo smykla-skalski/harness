@@ -7,6 +7,11 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
 
   case openRecentWindow = "open-recent-window"
   case openSessionWindow = "open-session-window"
+  case agentDetailForm = "agent-detail-form"
+  case decisionDetailForm = "decision-detail-form"
+  case taskDetailForm = "task-detail-form"
+  case sessionSearchFull = "session-search-full"
+  case timelineFilterForm = "timeline-filter-form"
   case permissionModal = "permission-modal"
   case settingsBackdropCycle = "settings-backdrop-cycle"
   case settingsBackgroundCycle = "settings-background-cycle"
@@ -26,9 +31,14 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
 
   var defaultPreviewScenario: String {
     switch self {
-    case .openRecentWindow, .openSessionWindow:
+    case .openRecentWindow,
+      .openSessionWindow,
+      .agentDetailForm,
+      .taskDetailForm,
+      .sessionSearchFull,
+      .timelineFilterForm:
       return "dashboard-landing"
-    case .permissionModal:
+    case .decisionDetailForm, .permissionModal:
       return "cockpit"
     case .settingsBackdropCycle, .settingsBackgroundCycle:
       return "dashboard"
@@ -45,6 +55,11 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
       return .appearance
     case .openRecentWindow,
       .openSessionWindow,
+      .agentDetailForm,
+      .decisionDetailForm,
+      .taskDetailForm,
+      .sessionSearchFull,
+      .timelineFilterForm,
       .permissionModal,
       .timelineBurst,
       .toastOverlayChurn,
@@ -72,10 +87,28 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
       values["HARNESS_MONITOR_PREVIEW_ACP_PENDING"]?
       .trimmingCharacters(in: .whitespacesAndNewlines)
       .isEmpty ?? true
-    if self == .permissionModal, acpPendingOverrideIsEmpty {
+    if needsPreviewAcpPermissionBatch, acpPendingOverrideIsEmpty {
       values["HARNESS_MONITOR_PREVIEW_ACP_PENDING"] = "1"
     }
     return HarnessMonitorEnvironment(values: values, homeDirectory: environment.homeDirectory)
+  }
+
+  private var needsPreviewAcpPermissionBatch: Bool {
+    switch self {
+    case .decisionDetailForm, .sessionSearchFull, .permissionModal:
+      true
+    case .openRecentWindow,
+      .openSessionWindow,
+      .agentDetailForm,
+      .taskDetailForm,
+      .timelineFilterForm,
+      .settingsBackdropCycle,
+      .settingsBackgroundCycle,
+      .timelineBurst,
+      .toastOverlayChurn,
+      .offlineCachedOpen:
+      false
+    }
   }
 }
 
@@ -85,6 +118,11 @@ extension HarnessMonitorPerfScenario {
     case .openRecentWindow:
       true
     case .openSessionWindow,
+      .agentDetailForm,
+      .decisionDetailForm,
+      .taskDetailForm,
+      .sessionSearchFull,
+      .timelineFilterForm,
       .permissionModal,
       .settingsBackdropCycle,
       .settingsBackgroundCycle,
@@ -99,6 +137,11 @@ extension HarnessMonitorPerfScenario {
     switch self {
     case .openRecentWindow: "open-recent-window"
     case .openSessionWindow: "open-session-window"
+    case .agentDetailForm: "agent-detail-form"
+    case .decisionDetailForm: "decision-detail-form"
+    case .taskDetailForm: "task-detail-form"
+    case .sessionSearchFull: "session-search-full"
+    case .timelineFilterForm: "timeline-filter-form"
     case .permissionModal: "permission-modal"
     case .settingsBackdropCycle: "settings-backdrop-cycle"
     case .settingsBackgroundCycle: "settings-background-cycle"

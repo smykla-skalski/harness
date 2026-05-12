@@ -77,6 +77,16 @@ enum HarnessMonitorPerfDriver {
         store: store,
         openWindow: openWindow
       )
+    case .agentDetailForm:
+      return await routeAgentDetailFormScenario(store: store, openWindow: openWindow)
+    case .decisionDetailForm:
+      return await routeDecisionDetailFormScenario(store: store, openWindow: openWindow)
+    case .taskDetailForm:
+      return await routeTaskDetailFormScenario(store: store, openWindow: openWindow)
+    case .sessionSearchFull:
+      return await runSessionSearchFullScenario(store: store, openWindow: openWindow)
+    case .timelineFilterForm:
+      return await runTimelineFilterFormScenario(store: store, openWindow: openWindow)
     case .permissionModal:
       return await routePermissionDecisionToWorkspace(
         store: store,

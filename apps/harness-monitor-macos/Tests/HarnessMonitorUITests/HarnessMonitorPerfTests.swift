@@ -32,6 +32,35 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     measureScenario("open-session-window")
   }
 
+  func testAgentDetailFormHitchRate() {
+    measureScenario("agent-detail-form")
+  }
+
+  func testDecisionDetailFormHitchRate() {
+    measureScenario("decision-detail-form")
+  }
+
+  func testTaskDetailFormHitchRate() {
+    measureScenario("task-detail-form")
+  }
+
+  func testSessionSearchFullHitchRate() {
+    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+    let options = XCTMeasureOptions()
+    options.iterationCount = 3
+
+    measure(metrics: [XCTHitchMetric(application: app)], options: options) {
+      let launched = launchForPerf(app: app, scenario: "session-search-full")
+      waitForScenarioCompletion(app: launched, scenario: "session-search-full")
+      exerciseSessionSearch(in: launched, query: "worker")
+      launched.terminate()
+    }
+  }
+
+  func testTimelineFilterFormHitchRate() {
+    measureScenario("timeline-filter-form")
+  }
+
   func testPermissionModalHitchRate() {
     measureScenario("permission-modal")
   }
@@ -188,6 +217,114 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     launched.terminate()
   }
 
+  func testAgentDetailFormScenarioState() {
+    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+    let launched = launchForPerf(app: app, scenario: "agent-detail-form")
+    let sessionWindow = element(in: launched, identifier: Accessibility.sessionWindowShell)
+    let agentDetail = element(in: launched, identifier: Accessibility.agentDetailScrollView)
+
+    waitForScenarioCompletion(app: launched, scenario: "agent-detail-form")
+
+    XCTAssertTrue(sessionWindow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(
+      waitForElement(agentDetail, timeout: Self.uiTimeout),
+      "Agent detail perf scenario did not render the current agent detail pane"
+    )
+    XCTAssertTrue(
+      launched.staticTexts["Codex Worker"].firstMatch.waitForExistence(timeout: Self.actionTimeout)
+    )
+
+    launched.terminate()
+  }
+
+  func testDecisionDetailFormScenarioState() {
+    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+    let launched = launchForPerf(app: app, scenario: "decision-detail-form")
+    let sessionWindow = element(in: launched, identifier: Accessibility.sessionWindowShell)
+    let decisionDetail = element(in: launched, identifier: Accessibility.decisionDetailScrollView)
+
+    waitForScenarioCompletion(app: launched, scenario: "decision-detail-form")
+
+    XCTAssertTrue(sessionWindow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(
+      waitForElement(decisionDetail, timeout: Self.uiTimeout),
+      "Decision detail perf scenario did not render the current decision detail pane"
+    )
+    XCTAssertTrue(
+      launched.staticTexts.containing(NSPredicate(format: "label CONTAINS 'requested'"))
+        .firstMatch
+        .waitForExistence(timeout: Self.actionTimeout)
+    )
+
+    launched.terminate()
+  }
+
+  func testTaskDetailFormScenarioState() {
+    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+    let launched = launchForPerf(app: app, scenario: "task-detail-form")
+    let sessionWindow = element(in: launched, identifier: Accessibility.sessionWindowShell)
+    let taskDetail = element(in: launched, identifier: Accessibility.sessionTaskDetailScrollView)
+
+    waitForScenarioCompletion(app: launched, scenario: "task-detail-form")
+
+    XCTAssertTrue(sessionWindow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(
+      waitForElement(taskDetail, timeout: Self.uiTimeout),
+      "Task detail perf scenario did not render the current task detail pane"
+    )
+    XCTAssertTrue(
+      launched.buttons["Task Actions"].firstMatch.waitForExistence(timeout: Self.actionTimeout)
+    )
+
+    launched.terminate()
+  }
+
+  func testSessionSearchFullScenarioState() {
+    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+    let launched = launchForPerf(app: app, scenario: "session-search-full")
+    let sessionWindow = element(in: launched, identifier: Accessibility.sessionWindowShell)
+    let searchField = mainWindow(in: launched).searchFields.firstMatch
+
+    waitForScenarioCompletion(app: launched, scenario: "session-search-full")
+
+    XCTAssertTrue(sessionWindow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(
+      waitForElement(searchField, timeout: Self.uiTimeout),
+      "Session search perf scenario should expose the native toolbar search field"
+    )
+    exerciseSessionSearch(in: launched, query: "worker")
+    XCTAssertTrue(
+      launched.staticTexts["Codex Worker"].firstMatch.waitForExistence(timeout: Self.actionTimeout)
+    )
+
+    launched.terminate()
+  }
+
+  func testTimelineFilterFormScenarioState() {
+    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+    let launched = launchForPerf(app: app, scenario: "timeline-filter-form")
+    let sessionWindow = element(in: launched, identifier: Accessibility.sessionWindowShell)
+    let filterBar = element(in: launched, identifier: Accessibility.sessionTimelineFilterBar)
+    let filterState = element(in: launched, identifier: Accessibility.sessionTimelineFilterState)
+
+    waitForScenarioCompletion(app: launched, scenario: "timeline-filter-form")
+
+    XCTAssertTrue(sessionWindow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(waitForElement(filterBar, timeout: Self.uiTimeout))
+    XCTAssertTrue(waitForElement(filterState, timeout: Self.uiTimeout))
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        let text = self.markerText(filterState)
+        return text.contains("query=worker")
+          && text.contains("agents=worker-codex")
+          && text.contains("tasks=task-ui")
+      },
+      "Timeline filter perf scenario did not seed the expected active filters"
+    )
+
+    launched.terminate()
+  }
+
   func testPermissionModalScenarioState() {
     let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
     let launched = launchForPerf(app: app, scenario: "permission-modal")
@@ -294,6 +431,17 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     )
   }
 
+  private func exerciseSessionSearch(in app: XCUIApplication, query: String) {
+    let searchField = mainWindow(in: app).searchFields.firstMatch
+    guard waitForElement(searchField, timeout: Self.actionTimeout) else {
+      XCTFail("Expected native session search field before typing \(query)")
+      return
+    }
+    searchField.tap()
+    app.typeKey("a", modifierFlags: .command)
+    searchField.typeText(query)
+  }
+
   private func assertAuditBuildState(in app: XCUIApplication, scenario: String) {
     let auditBuildState = element(in: app, identifier: Accessibility.auditBuildState)
 
@@ -360,9 +508,11 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
 
   private func expectedPreviewScenario(for scenario: String) -> String {
     switch scenario {
-    case "open-recent-window", "open-session-window", "timeline-burst", "toast-overlay-churn":
+    case "open-recent-window", "open-session-window", "agent-detail-form",
+      "task-detail-form", "session-search-full", "timeline-filter-form",
+      "timeline-burst", "toast-overlay-churn":
       "dashboard-landing"
-    case "permission-modal":
+    case "decision-detail-form", "permission-modal":
       "cockpit"
     case "offline-cached-open": "offline-cached"
     default: "dashboard"

@@ -123,6 +123,20 @@ extension SessionTimelineView {
     }
   }
 
+  func applyPerfScenarioFiltersIfNeeded() {
+    guard HarnessMonitorUITestEnvironment.perfScenarioRawValue == "timeline-filter-form" else {
+      return
+    }
+    var seeded = SessionTimelineFilterState()
+    seeded.query = "worker"
+    seeded.toggleSignalPreset()
+    seeded.toggleAgent(PreviewFixtures.agents[1].agentId)
+    seeded.toggleTask(PreviewFixtures.tasks[0].taskId)
+    seeded.toggleSemanticProperty(.toolCall)
+    guard filterState != seeded else { return }
+    filterState = seeded
+  }
+
   func persistFilters(_ state: SessionTimelineFilterState) {
     let snapshot = SessionTimelineFilterPersistenceResolver.persist(
       mode: filterPersistenceMode,
