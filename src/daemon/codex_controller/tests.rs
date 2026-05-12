@@ -44,7 +44,7 @@ fn preferred_codex_project_dir_falls_back_when_worktree_is_empty() {
 }
 
 #[test]
-fn command_approval_uses_item_id_as_stable_ui_key() {
+fn command_approval_uses_callback_approval_id_when_present() {
     let first = approval_from_request(
         "item/commandExecution/requestApproval",
         "request-1".to_string(),
@@ -68,8 +68,27 @@ fn command_approval_uses_item_id_as_stable_ui_key() {
     )
     .expect("command approval should be parsed");
 
-    assert_eq!(first.approval_id, "item-1");
-    assert_eq!(second.approval_id, "item-1");
+    assert_eq!(first.approval_id, "approval-1");
+    assert_eq!(second.approval_id, "approval-2");
+    assert_eq!(first.item_id.as_deref(), Some("item-1"));
+    assert_eq!(second.item_id.as_deref(), Some("item-1"));
+}
+
+#[test]
+fn command_approval_falls_back_to_item_id_without_callback_id() {
+    let approval = approval_from_request(
+        "item/commandExecution/requestApproval",
+        "request-1".to_string(),
+        &json!({
+            "itemId": "item-1",
+            "cwd": "/tmp/harness",
+            "command": "rtk touch approved.txt",
+        }),
+    )
+    .expect("command approval should be parsed");
+
+    assert_eq!(approval.approval_id, "item-1");
+    assert_eq!(approval.item_id.as_deref(), Some("item-1"));
 }
 
 #[test]
