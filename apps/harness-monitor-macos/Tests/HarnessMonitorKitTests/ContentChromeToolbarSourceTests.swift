@@ -8,9 +8,8 @@ struct ContentChromeToolbarSourceTests {
     let source = try sourceFile(at: "Views/App/ContentChromeToolbarSupport.swift")
 
     #expect(source.contains("var body: some View {\n    Button {"))
-    #expect(!source.contains("var body: some View {\n    TimelineView"))
-    #expect(source.contains("if shouldSpin {\n      TimelineView(.animation(minimumInterval: 1.0 / 30.0))"))
-    #expect(source.contains("} else {\n      toolbarSymbolImage(rotationDegrees: 0)"))
+    #expect(!source.contains("TimelineView"))
+    #expect(source.contains(".symbolEffect(.rotate, options: .repeating, isActive: shouldSpin)"))
     #expect(!source.contains("paused:"))
   }
 

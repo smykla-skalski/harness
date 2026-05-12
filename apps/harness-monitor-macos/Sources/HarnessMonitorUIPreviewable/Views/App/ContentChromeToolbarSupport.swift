@@ -130,21 +130,10 @@ struct RefreshToolbarButton: View {
     }
   }
 
-  @ViewBuilder
   private var toolbarSymbol: some View {
-    if shouldSpin {
-      TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
-        toolbarSymbolImage(rotationDegrees: rotationDegrees(at: context.date))
-      }
-    } else {
-      toolbarSymbolImage(rotationDegrees: 0)
-    }
-  }
-
-  private func toolbarSymbolImage(rotationDegrees: Double) -> some View {
     Image(systemName: showsSuccessFeedback ? "checkmark" : "arrow.clockwise")
       .foregroundStyle(.primary)
-      .rotationEffect(.degrees(showsSuccessFeedback ? 0 : rotationDegrees))
+      .symbolEffect(.rotate, options: .repeating, isActive: shouldSpin)
       .contentTransition(
         .symbolEffect(.replace, options: RefreshToolbarFeedbackTiming.replaceOptions)
       )
@@ -168,14 +157,5 @@ struct RefreshToolbarButton: View {
       )
       .frame(width: 14, height: 14)
       .accessibilityHidden(true)
-  }
-
-  private func rotationDegrees(at date: Date) -> Double {
-    guard shouldSpin else {
-      return 0
-    }
-    let cyclePosition = (date.timeIntervalSinceReferenceDate / 0.9)
-      .truncatingRemainder(dividingBy: 1)
-    return cyclePosition * 360
   }
 }
