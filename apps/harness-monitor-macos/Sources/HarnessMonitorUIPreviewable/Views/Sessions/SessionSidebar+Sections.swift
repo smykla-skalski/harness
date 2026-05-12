@@ -205,52 +205,12 @@ extension SessionSidebar {
       selectedIDs: state.sidebarSelection.selectedAgentIDs,
       orderedVisibleIDs: orderedAgentIDs
     )
-    switch resolution {
-    case .actionable(let scope):
-      if !scope.isMulti {
-        Menu("Move to...") {
-          Button("Top") {
-            state.sidebarOrdering.moveAgent(
-              agent.agentId,
-              before: state.sidebarOrdering.agentIDs.first,
-              undoManager: undoManager
-            )
-          }
-          Button("Bottom") {
-            state.sidebarOrdering.moveAgent(
-              agent.agentId,
-              before: nil,
-              undoManager: undoManager
-            )
-          }
-        }
-        Button("Move to Top") {
-          state.sidebarOrdering.moveAgent(
-            agent.agentId,
-            before: state.sidebarOrdering.agentIDs.first,
-            undoManager: undoManager
-          )
-        }
-        Button("Move to Bottom") {
-          state.sidebarOrdering.moveAgent(
-            agent.agentId,
-            before: nil,
-            undoManager: undoManager
-          )
-        }
-        Divider()
-      }
-      Button(scope.copyIDsLabel) {
-        HarnessMonitorClipboard.copy(scope.clipboardText)
-      }
-      Divider()
-      Button(scope.destructiveLabel, role: .destructive) {
-        requestRemoveAgents(scope.ids)
-      }
-    case .unavailable(let message):
-      Button(message) {}
-        .disabled(true)
-    }
+    SessionAgentContextMenuActions(
+      store: store,
+      state: state,
+      agent: agent,
+      resolution: resolution
+    )
   }
 
   @ViewBuilder
@@ -294,34 +254,14 @@ extension SessionSidebar {
       selectedIDs: state.sidebarSelection.selectedTaskIDs,
       orderedVisibleIDs: orderedTaskIDs
     )
-    switch resolution {
-    case .actionable(let scope):
-      if !scope.isMulti {
-        Menu("Move to...") {
-          ForEach(decisions.prefix(10)) { decision in
-            Button(decision.summary) {
-              linkTask(task.taskId, to: decision.id)
-            }
-          }
-          if decisions.isEmpty {
-            Text("No visible decisions")
-          }
-          if decisions.count > 10 {
-            Text("Filter decisions to show more")
-          }
-        }
-      }
-      Button(scope.copyIDsLabel) {
-        HarnessMonitorClipboard.copy(scope.clipboardText)
-      }
-      Divider()
-      Button(scope.destructiveLabel, role: .destructive) {
-        requestDeleteTasks(scope.ids)
-      }
-    case .unavailable(let message):
-      Button(message) {}
-        .disabled(true)
-    }
+    SessionTaskContextMenuActions(
+      store: store,
+      state: state,
+      task: task,
+      tasks: snapshot?.detail?.tasks ?? [],
+      decisions: decisions,
+      resolution: resolution
+    )
   }
 
   private var agentsSectionHeader: some View {

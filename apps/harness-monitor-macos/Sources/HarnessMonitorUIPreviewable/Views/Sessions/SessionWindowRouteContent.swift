@@ -100,36 +100,35 @@ struct SessionWindowAgentsList: View {
   let store: HarnessMonitorStore
   let snapshot: HarnessMonitorSessionWindowSnapshot
   let tuiStatusByAgent: [String: AgentTuiStatus]
+  let currentModifiers: EventModifiers
   @Bindable var state: SessionWindowStateCache
   @Environment(\.fontScale)
   private var fontScale
   @Environment(\.appSearchModel)
   private var appSearchModel: AppSearchModel?
+  @State private var routeSelection = SessionRouteListSelectionState()
 
   private var metrics: SessionWindowRouteContentMetrics {
     SessionWindowRouteContentMetrics(fontScale: fontScale)
   }
 
-  private var selectedAgentID: Binding<String?> {
+  private var preferredRouteDetailAgentID: String? {
+    if case .route(.agents) = state.selection {
+      return SessionAgentRouteSelectionPolicy.preferredRouteDetailAgentID(
+        rememberedAgentID: state.sectionState.agentID,
+        visibleAgentIDs: orderedFilteredAgents.map(\.agentId)
+      )
+    }
+    return state.selection.agentID
+  }
+
+  private var selectedAgentIDs: Binding<Set<String>> {
     Binding(
       get: {
-        if case .route(.agents) = state.selection {
-          return SessionAgentRouteSelectionPolicy.preferredRouteDetailAgentID(
-            rememberedAgentID: state.sectionState.agentID,
-            visibleAgentIDs: filteredAgents.map(\.agentId)
-          )
-        }
-        return state.selection.agentID
+        routeSelection.displayedSelection(fallbackPrimaryID: preferredRouteDetailAgentID)
       },
-      set: { agentID in
-        guard let agentID else { return }
-        if case .route(.agents) = state.selection {
-          guard agentID != state.sectionState.agentID else { return }
-          state.setRouteAgentID(agentID)
-        } else {
-          guard agentID != state.selection.agentID else { return }
-          state.selectAgent(agentID)
-        }
+      set: { newSelection in
+        applyAgentSelection(newSelection)
       }
     )
   }
@@ -144,6 +143,10 @@ struct SessionWindowAgentsList: View {
 
   private var filteredAgents: [AgentRegistration] {
     SessionWindowAgentFilter.filteredAgents(snapshot.detail?.agents ?? [], query: searchQuery)
+  }
+
+  private var orderedFilteredAgents: [AgentRegistration] {
+    state.sidebarOrdering.orderedAgents(filteredAgents)
   }
 
   private var runtimePresentation: HarnessMonitorStore.AgentRuntimePresentationContext? {
@@ -162,8 +165,8 @@ struct SessionWindowAgentsList: View {
   }
 
   var body: some View {
-    let agents = filteredAgents
-    List(selection: selectedAgentID) {
+    let agents = orderedFilteredAgents
+    List(selection: selectedAgentIDs) {
       Section("Agents") {
         if !agents.isEmpty {
           ForEach(agents) { agent in
@@ -188,6 +191,30 @@ struct SessionWindowAgentsList: View {
               Image(systemName: "person.crop.circle")
             }
             .tag(agent.agentId)
+            .simultaneousGesture(
+              SpatialTapGesture().onEnded { _ in
+                collapseToRowFromPlainTap(agent.agentId)
+              },
+              including: hasActiveMultiSelection ? .gesture : []
+            )
+            .accessibilityIdentifier(
+              HarnessMonitorAccessibility.sessionWindowAgentRow(agent.agentId)
+            )
+            .contextMenu {
+              SessionAgentContextMenuActions(
+                store: store,
+                state: state,
+                agent: agent,
+                resolution: .actionable(
+                  SessionSidebarContextMenuScope.resolve(
+                    kind: .agent,
+                    rowID: agent.agentId,
+                    selectedIDs: selectedAgentIDs.wrappedValue,
+                    orderedVisibleIDs: agents.map(\.agentId)
+                  )
+                )
+              )
+            }
           }
         } else if hasQuery {
           ContentUnavailableView(
@@ -201,27 +228,106 @@ struct SessionWindowAgentsList: View {
       }
     }
     .listStyle(.inset)
+    .onChange(of: filteredAgents.map(\.agentId)) { _, ids in
+      let primaryID = routeSelection.prune(
+        visibleIDs: Set(ids),
+        fallbackPrimaryID: preferredRouteDetailAgentID
+      )
+      syncPrimaryAgentSelection(primaryID)
+    }
+    .onChange(of: preferredRouteDetailAgentID) { _, primaryID in
+      guard !hasActiveMultiSelection else { return }
+      routeSelection.collapse(to: primaryID)
+    }
+    .onChange(of: state.lastPlainClick) { _, signal in
+      collapseSelectionFromApplicationTap(signal)
+    }
+  }
+
+  private var hasActiveMultiSelection: Bool {
+    routeSelection.hasActiveMultiSelection(fallbackPrimaryID: preferredRouteDetailAgentID)
+  }
+
+  private func applyAgentSelection(_ newSelection: Set<String>) {
+    let primaryID = routeSelection.applySelection(
+      newSelection,
+      fallbackPrimaryID: preferredRouteDetailAgentID
+    )
+    syncPrimaryAgentSelection(primaryID)
+  }
+
+  private func syncPrimaryAgentSelection(_ primaryID: String?) {
+    if routeSelection.hasActiveMultiSelection(fallbackPrimaryID: preferredRouteDetailAgentID) {
+      state.selectRoute(.agents)
+      state.setRouteAgentID(primaryID)
+      return
+    }
+
+    guard let primaryID else {
+      if case .route(.agents) = state.selection {
+        state.setRouteAgentID(nil)
+      }
+      return
+    }
+
+    if case .route(.agents) = state.selection {
+      guard primaryID != state.sectionState.agentID else { return }
+      state.setRouteAgentID(primaryID)
+    } else {
+      guard primaryID != state.selection.agentID else { return }
+      state.selectAgent(primaryID)
+    }
+  }
+
+  private func collapseToRowFromPlainTap(_ agentID: String) {
+    let blocking = currentModifiers.intersection([.command, .shift, .control, .option])
+    guard blocking.isEmpty else { return }
+    guard hasActiveMultiSelection else { return }
+    routeSelection.collapse(to: agentID)
+    syncPrimaryAgentSelection(agentID)
+  }
+
+  private func collapseSelectionFromApplicationTap(_ signal: SessionPlainClickSignal) {
+    let blocking = signal.modifiers.intersection([.command, .shift, .control, .option])
+    guard blocking.isEmpty else { return }
+    guard hasActiveMultiSelection else { return }
+    routeSelection.collapse(to: preferredRouteDetailAgentID)
   }
 }
 
 struct SessionWindowTasksList: View {
+  let store: HarnessMonitorStore
   let detail: SessionDetail?
+  let decisions: [Decision]
+  let currentModifiers: EventModifiers
   @Bindable var state: SessionWindowStateCache
   @Environment(\.fontScale)
   private var fontScale
   @Environment(\.appSearchModel)
   private var appSearchModel: AppSearchModel?
+  @State private var routeSelection = SessionRouteListSelectionState()
 
   private var metrics: SessionWindowRouteContentMetrics {
     SessionWindowRouteContentMetrics(fontScale: fontScale)
   }
 
-  private var selectedTaskID: Binding<String?> {
+  private var preferredRouteDetailTaskID: String? {
+    if case .route(.tasks) = state.selection {
+      return SessionTaskRouteSelectionPolicy.preferredRouteDetailTaskID(
+        rememberedTaskID: state.sectionState.taskID,
+        visibleTaskIDs: filteredTasks.map(\.taskId)
+      )
+    }
+    return state.selection.taskID
+  }
+
+  private var selectedTaskIDs: Binding<Set<String>> {
     Binding(
-      get: { state.selection.taskID },
-      set: { taskID in
-        guard let taskID, taskID != state.selection.taskID else { return }
-        state.selectTask(taskID)
+      get: {
+        routeSelection.displayedSelection(fallbackPrimaryID: preferredRouteDetailTaskID)
+      },
+      set: { newSelection in
+        applyTaskSelection(newSelection)
       }
     )
   }
@@ -251,7 +357,7 @@ struct SessionWindowTasksList: View {
 
   var body: some View {
     let tasks = filteredTasks
-    List(selection: selectedTaskID) {
+    List(selection: selectedTaskIDs) {
       Section("Tasks") {
         if !tasks.isEmpty {
           ForEach(tasks) { task in
@@ -267,6 +373,30 @@ struct SessionWindowTasksList: View {
               Image(systemName: "checklist")
             }
             .tag(task.taskId)
+            .simultaneousGesture(
+              SpatialTapGesture().onEnded { _ in
+                collapseToRowFromPlainTap(task.taskId)
+              },
+              including: hasActiveMultiSelection ? .gesture : []
+            )
+            .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowTaskRow(task.taskId))
+            .contextMenu {
+              SessionTaskContextMenuActions(
+                store: store,
+                state: state,
+                task: task,
+                tasks: detail?.tasks ?? [],
+                decisions: decisions,
+                resolution: .actionable(
+                  SessionSidebarContextMenuScope.resolve(
+                    kind: .task,
+                    rowID: task.taskId,
+                    selectedIDs: selectedTaskIDs.wrappedValue,
+                    orderedVisibleIDs: tasks.map(\.taskId)
+                  )
+                )
+              )
+            }
           }
         } else if !trimmedQuery.isEmpty {
           ContentUnavailableView(
@@ -280,42 +410,109 @@ struct SessionWindowTasksList: View {
       }
     }
     .listStyle(.inset)
+    .onChange(of: filteredTasks.map(\.taskId)) { _, ids in
+      let primaryID = routeSelection.prune(
+        visibleIDs: Set(ids),
+        fallbackPrimaryID: preferredRouteDetailTaskID
+      )
+      syncPrimaryTaskSelection(primaryID)
+    }
+    .onChange(of: preferredRouteDetailTaskID) { _, primaryID in
+      guard !hasActiveMultiSelection else { return }
+      routeSelection.collapse(to: primaryID)
+    }
+    .onChange(of: state.lastPlainClick) { _, signal in
+      collapseSelectionFromApplicationTap(signal)
+    }
+  }
+
+  private var hasActiveMultiSelection: Bool {
+    routeSelection.hasActiveMultiSelection(fallbackPrimaryID: preferredRouteDetailTaskID)
+  }
+
+  private func applyTaskSelection(_ newSelection: Set<String>) {
+    let primaryID = routeSelection.applySelection(
+      newSelection,
+      fallbackPrimaryID: preferredRouteDetailTaskID
+    )
+    syncPrimaryTaskSelection(primaryID)
+  }
+
+  private func syncPrimaryTaskSelection(_ primaryID: String?) {
+    if routeSelection.hasActiveMultiSelection(fallbackPrimaryID: preferredRouteDetailTaskID) {
+      state.selectRoute(.tasks)
+      state.setRouteTaskID(primaryID)
+      return
+    }
+
+    guard let primaryID else {
+      if case .route(.tasks) = state.selection {
+        state.setRouteTaskID(nil)
+      }
+      return
+    }
+
+    if case .route(.tasks) = state.selection {
+      guard primaryID != state.sectionState.taskID else { return }
+      state.setRouteTaskID(primaryID)
+    } else {
+      guard primaryID != state.selection.taskID else { return }
+      state.selectTask(primaryID)
+    }
+  }
+
+  private func collapseToRowFromPlainTap(_ taskID: String) {
+    let blocking = currentModifiers.intersection([.command, .shift, .control, .option])
+    guard blocking.isEmpty else { return }
+    guard hasActiveMultiSelection else { return }
+    routeSelection.collapse(to: taskID)
+    syncPrimaryTaskSelection(taskID)
+  }
+
+  private func collapseSelectionFromApplicationTap(_ signal: SessionPlainClickSignal) {
+    let blocking = signal.modifiers.intersection([.command, .shift, .control, .option])
+    guard blocking.isEmpty else { return }
+    guard hasActiveMultiSelection else { return }
+    routeSelection.collapse(to: preferredRouteDetailTaskID)
   }
 }
 
 struct SessionWindowDecisionsList: View {
   let decisions: [Decision]
+  let currentModifiers: EventModifiers
   @Bindable var state: SessionWindowStateCache
   @Environment(\.fontScale)
   private var fontScale
+  @State private var routeSelection = SessionRouteListSelectionState()
 
   private var metrics: SessionWindowRouteContentMetrics {
     SessionWindowRouteContentMetrics(fontScale: fontScale)
   }
 
-  private var selectedDecisionID: Binding<String?> {
+  private var preferredRouteDetailDecisionID: String? {
+    if case .route(.decisions) = state.selection {
+      return SessionDecisionAutoSelectionPolicy.preferredRouteDetailDecisionID(
+        rememberedDecisionID: state.sectionState.decisionID,
+        allDecisionIDs: Set(decisions.map(\.id)),
+        visibleDecisionIDs: decisions.map(\.id)
+      )
+    }
+    return state.selection.decisionID
+  }
+
+  private var selectedDecisionIDs: Binding<Set<String>> {
     Binding(
       get: {
-        if case .route(.decisions) = state.selection {
-          return state.sectionState.decisionID
-        }
-        return state.selection.decisionID
+        routeSelection.displayedSelection(fallbackPrimaryID: preferredRouteDetailDecisionID)
       },
-      set: { decisionID in
-        guard let decisionID else { return }
-        if case .route(.decisions) = state.selection {
-          guard decisionID != state.sectionState.decisionID else { return }
-          state.setRouteDecisionID(decisionID)
-        } else {
-          guard decisionID != state.selection.decisionID else { return }
-          state.selectDecision(decisionID)
-        }
+      set: { newSelection in
+        applyDecisionSelection(newSelection)
       }
     )
   }
 
   var body: some View {
-    List(selection: selectedDecisionID) {
+    List(selection: selectedDecisionIDs) {
       if decisions.isEmpty {
         ContentUnavailableView(
           emptyStateTitle,
@@ -334,26 +531,55 @@ struct SessionWindowDecisionsList: View {
           }
           .tag(decision.id)
           .contentShape(Rectangle())
+          .simultaneousGesture(
+            SpatialTapGesture().onEnded { _ in
+              collapseToRowFromPlainTap(decision.id)
+            },
+            including: hasActiveMultiSelection ? .gesture : []
+          )
           .accessibilityElement(children: .combine)
           .accessibilityAddTraits(.isButton)
           .accessibilityLabel(decisionAccessibilityLabel(for: decision))
           .accessibilityIdentifier(HarnessMonitorAccessibility.decisionRow(decision.id))
+          .contextMenu {
+            SessionDecisionContextMenuActions(
+              resolution: .actionable(
+                SessionSidebarContextMenuScope.resolve(
+                  kind: .decision,
+                  rowID: decision.id,
+                  selectedIDs: selectedDecisionIDs.wrappedValue,
+                  orderedVisibleIDs: decisions.map(\.id)
+                )
+              )
+            )
+          }
           .harnessMCPRow(
             HarnessMonitorAccessibility.decisionRow(decision.id),
             label: decisionAccessibilityLabel(for: decision),
-            value: selectedDecisionID.wrappedValue == decision.id ? "selected" : "not selected",
+            value:
+              selectedDecisionIDs.wrappedValue.contains(decision.id) ? "selected" : "not selected",
             pressAction: {
-              if case .route(.decisions) = state.selection {
-                state.setRouteDecisionID(decision.id)
-              } else {
-                state.selectDecision(decision.id)
-              }
+              applyDecisionSelection([decision.id])
             }
           )
         }
       }
     }
     .listStyle(.inset)
+    .onChange(of: decisions.map(\.id)) { _, ids in
+      let primaryID = routeSelection.prune(
+        visibleIDs: Set(ids),
+        fallbackPrimaryID: preferredRouteDetailDecisionID
+      )
+      syncPrimaryDecisionSelection(primaryID)
+    }
+    .onChange(of: preferredRouteDetailDecisionID) { _, primaryID in
+      guard !hasActiveMultiSelection else { return }
+      routeSelection.collapse(to: primaryID)
+    }
+    .onChange(of: state.lastPlainClick) { _, signal in
+      collapseSelectionFromApplicationTap(signal)
+    }
   }
 
   private func decisionAccessibilityLabel(for decision: Decision) -> String {
@@ -379,6 +605,56 @@ struct SessionWindowDecisionsList: View {
 
   private func decisionSeverityLabel(for decision: Decision) -> String {
     DecisionSeverity(rawValue: decision.severityRaw)?.chipLabel ?? "Decision"
+  }
+
+  private var hasActiveMultiSelection: Bool {
+    routeSelection.hasActiveMultiSelection(fallbackPrimaryID: preferredRouteDetailDecisionID)
+  }
+
+  private func applyDecisionSelection(_ newSelection: Set<String>) {
+    let primaryID = routeSelection.applySelection(
+      newSelection,
+      fallbackPrimaryID: preferredRouteDetailDecisionID
+    )
+    syncPrimaryDecisionSelection(primaryID)
+  }
+
+  private func syncPrimaryDecisionSelection(_ primaryID: String?) {
+    if routeSelection.hasActiveMultiSelection(fallbackPrimaryID: preferredRouteDetailDecisionID) {
+      state.selectRoute(.decisions)
+      state.setRouteDecisionID(primaryID)
+      return
+    }
+
+    guard let primaryID else {
+      if case .route(.decisions) = state.selection {
+        state.setRouteDecisionID(nil)
+      }
+      return
+    }
+
+    if case .route(.decisions) = state.selection {
+      guard primaryID != state.sectionState.decisionID else { return }
+      state.setRouteDecisionID(primaryID)
+    } else {
+      guard primaryID != state.selection.decisionID else { return }
+      state.selectDecision(primaryID)
+    }
+  }
+
+  private func collapseToRowFromPlainTap(_ decisionID: String) {
+    let blocking = currentModifiers.intersection([.command, .shift, .control, .option])
+    guard blocking.isEmpty else { return }
+    guard hasActiveMultiSelection else { return }
+    routeSelection.collapse(to: decisionID)
+    syncPrimaryDecisionSelection(decisionID)
+  }
+
+  private func collapseSelectionFromApplicationTap(_ signal: SessionPlainClickSignal) {
+    let blocking = signal.modifiers.intersection([.command, .shift, .control, .option])
+    guard blocking.isEmpty else { return }
+    guard hasActiveMultiSelection else { return }
+    routeSelection.collapse(to: preferredRouteDetailDecisionID)
   }
 }
 

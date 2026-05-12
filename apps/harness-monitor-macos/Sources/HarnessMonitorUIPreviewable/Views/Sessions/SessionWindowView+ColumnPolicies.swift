@@ -58,6 +58,18 @@ public enum SessionAgentRouteSelectionPolicy {
   }
 }
 
+public enum SessionTaskRouteSelectionPolicy {
+  public static func preferredRouteDetailTaskID(
+    rememberedTaskID: String?,
+    visibleTaskIDs: [String]
+  ) -> String? {
+    if let rememberedTaskID, visibleTaskIDs.contains(rememberedTaskID) {
+      return rememberedTaskID
+    }
+    return visibleTaskIDs.first
+  }
+}
+
 extension SessionWindowView {
   func pendingUserPrompt(for agentID: String) -> AgentPendingUserPrompt? {
     guard

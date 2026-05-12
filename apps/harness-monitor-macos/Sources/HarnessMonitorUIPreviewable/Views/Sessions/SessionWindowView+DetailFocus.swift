@@ -65,6 +65,8 @@ extension SessionWindowView {
         filters: stateCache.decisionFilters,
         showsFilteredNotice: sessionDecisionDetailHiddenByFilters
       )
+    case .route(.tasks):
+      routeTaskDetailContent()
     case .route:
       unavailableDetailSurface(
         "Select an Item",
@@ -92,6 +94,34 @@ extension SessionWindowView {
           hasQuery
             ? "No agents match the current search."
             : "This session does not have any agents."
+        )
+      )
+    }
+  }
+
+  @ViewBuilder
+  private func routeTaskDetailContent() -> some View {
+    if let taskID = SessionTaskRouteSelectionPolicy.preferredRouteDetailTaskID(
+      rememberedTaskID: stateCache.sectionState.taskID,
+      visibleTaskIDs: visibleSessionTasks.map(\.taskId)
+    ),
+      let task = snapshot?.detail?.tasks.first(where: { $0.taskId == taskID })
+    {
+      SessionTaskDetailPane(
+        task: task,
+        openActions: { presentTaskActions(for: task.taskId) }
+      )
+    } else {
+      let hasQuery = !stateCache.appSearchModel.query
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .isEmpty
+      unavailableDetailSurface(
+        hasQuery ? "No Matching Tasks" : "No Tasks",
+        systemImage: SessionWindowRoute.tasks.systemImage,
+        description: Text(
+          hasQuery
+            ? "No tasks match the current search."
+            : "This session does not have any tasks."
         )
       )
     }

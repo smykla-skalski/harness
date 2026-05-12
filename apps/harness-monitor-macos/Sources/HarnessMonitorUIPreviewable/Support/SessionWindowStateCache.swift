@@ -78,6 +78,10 @@ public final class SessionWindowStateCache {
     sectionState.agentID = agentID
   }
 
+  public func setRouteTaskID(_ taskID: String?) {
+    sectionState.taskID = taskID
+  }
+
   public func selectTask(_ taskID: String) {
     updateSelection(.task(sessionID: sessionID, taskID: taskID), source: .programmatic)
   }

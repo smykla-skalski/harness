@@ -37,15 +37,7 @@ extension SessionSidebar {
             selectedIDs: state.sidebarSelection.selectedDecisionIDs,
             orderedVisibleIDs: orderedDecisionIDs
           )
-          switch resolution {
-          case .actionable(let scope):
-            Button(scope.copyIDsLabel) {
-              HarnessMonitorClipboard.copy(scope.clipboardText)
-            }
-          case .unavailable(let message):
-            Button(message) {}
-              .disabled(true)
-          }
+          SessionDecisionContextMenuActions(resolution: resolution)
         }
       }
       if decisions.isEmpty {

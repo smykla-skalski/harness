@@ -72,6 +72,14 @@ public enum HarnessMonitorAccessibility {
     "harness.session.window.route.\(slug(route.rawValue))"
   }
 
+  public static func sessionWindowAgentRow(_ agentID: String) -> String {
+    "harness.session.window.agents.row.\(slug(agentID))"
+  }
+
+  public static func sessionWindowTaskRow(_ taskID: String) -> String {
+    "harness.session.window.tasks.row.\(slug(taskID))"
+  }
+
   public static let sessionsBoardRoot = "harness.board.root"
   public static let sessionsBoardScrollView = "harness.board.scroll"
   public static let recentSessionsCard = "harness.board.recent-sessions-card"
