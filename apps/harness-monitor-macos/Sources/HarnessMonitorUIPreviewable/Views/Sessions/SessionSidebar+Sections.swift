@@ -30,13 +30,19 @@ struct SessionSidebarCreateButtonFramePreferenceKey: PreferenceKey {
 
 private struct SessionSidebarCreateButtonFrameModifier: ViewModifier {
   let kind: SessionCreateKind
+  let isEnabled: Bool
 
+  @ViewBuilder
   func body(content: Content) -> some View {
-    content.anchorPreference(
-      key: SessionSidebarCreateButtonFramePreferenceKey.self,
-      value: .bounds
-    ) { anchor in
-      [kind: anchor]
+    if isEnabled {
+      content.anchorPreference(
+        key: SessionSidebarCreateButtonFramePreferenceKey.self,
+        value: .bounds
+      ) { anchor in
+        [kind: anchor]
+      }
+    } else {
+      content
     }
   }
 }
@@ -277,7 +283,8 @@ extension SessionSidebar {
       SessionSidebarHeaderCreateButton(
         state: state,
         kind: .agent,
-        accessibilityLabel: "New Agent"
+        accessibilityLabel: "New Agent",
+        tracksShortcutFrame: shouldRenderShortcutOverlays
       )
     }
   }
@@ -295,7 +302,8 @@ extension SessionSidebar {
       SessionSidebarHeaderCreateButton(
         state: state,
         kind: .task,
-        accessibilityLabel: "New Task"
+        accessibilityLabel: "New Task",
+        tracksShortcutFrame: shouldRenderShortcutOverlays
       )
     }
   }
@@ -305,6 +313,7 @@ struct SessionSidebarHeaderCreateButton: View {
   let state: SessionWindowStateCache
   let kind: SessionCreateKind
   let accessibilityLabel: String
+  let tracksShortcutFrame: Bool
 
   private var displayedShortcut: KeyboardShortcutDescriptor {
     kind.createShortcut
@@ -321,7 +330,9 @@ struct SessionSidebarHeaderCreateButton: View {
     .controlSize(.small)
     .help("\(accessibilityLabel) (\(displayedShortcut.hint))")
     .accessibilityLabel(accessibilityLabel)
-    .modifier(SessionSidebarCreateButtonFrameModifier(kind: kind))
+    .modifier(
+      SessionSidebarCreateButtonFrameModifier(kind: kind, isEnabled: tracksShortcutFrame)
+    )
     .padding(.trailing, HarnessMonitorTheme.spacingSM)
   }
 }

@@ -31,6 +31,10 @@ struct SessionWindowToolbar: ToolbarContent {
     shortcutOverlaysEnabled && !HarnessMonitorUITestEnvironment.disablesVisualOptions
   }
 
+  private var shouldRenderShortcutOverlay: Bool {
+    shouldShowShortcutOverlays && sidebarShortcut.isRevealed(by: currentModifiers)
+  }
+
   var body: some ToolbarContent {
     ToolbarItemGroup(placement: .navigation) {
       Button {
@@ -54,7 +58,7 @@ struct SessionWindowToolbar: ToolbarContent {
         pressAction: { state.navigateBack() }
       )
       .overlay(alignment: .bottom) {
-        if shouldShowShortcutOverlays {
+        if shouldRenderShortcutOverlay {
           KeyboardShortcutLabel(
             shortcut: sidebarShortcut,
             activeModifiers: currentModifiers,
@@ -68,7 +72,7 @@ struct SessionWindowToolbar: ToolbarContent {
         }
       }
       .zIndex(
-        shouldShowShortcutOverlays && sidebarShortcut.isRevealed(by: currentModifiers) ? 1 : 0
+        shouldRenderShortcutOverlay ? 1 : 0
       )
 
       Button {
