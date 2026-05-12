@@ -207,4 +207,19 @@ final class AuditPrimitivesTests: XCTestCase {
             "io.harnessmonitor.app.ui-testing.audit"
         )
     }
+
+    func testCleanupHostProcessesIncludesStagedAuditHost() {
+        let psOutput = """
+          111 /tmp/perf/harness-monitor-instruments/staged-host/Harness Monitor UI Testing Audit.app/Contents/MacOS/Harness Monitor UI Testing -ApplePersistenceIgnoreState YES
+          222 /tmp/perf/harness-monitor-instruments/staged-host/Harness Monitor UI Testing.app/Contents/MacOS/Harness Monitor UI Testing -ApplePersistenceIgnoreState YES
+          333 /Applications/Other.app/Contents/MacOS/Other
+        """
+        var signalled: [Int32] = []
+
+        AuditRunner.cleanupHostProcesses(psOutput: psOutput) { pid in
+            signalled.append(pid)
+        }
+
+        XCTAssertEqual(signalled, [111, 222])
+    }
 }
