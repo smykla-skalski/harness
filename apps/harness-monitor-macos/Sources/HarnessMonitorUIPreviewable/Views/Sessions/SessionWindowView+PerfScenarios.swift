@@ -10,13 +10,11 @@ extension SessionWindowView {
 private struct SessionWindowPerfScenarioTrigger: Equatable {
   let rawValue: String?
   let sessionID: String
-  let hasDetail: Bool
-  let decisionCount: Int
+  let hasSearchCorpus: Bool
 }
 
 struct SessionWindowPerfScenarioScript: ViewModifier {
   let stateCache: SessionWindowStateCache
-  let store: HarnessMonitorStore
   let sessionID: String
   let snapshot: HarnessMonitorSessionWindowSnapshot?
 
@@ -26,9 +24,15 @@ struct SessionWindowPerfScenarioScript: ViewModifier {
     SessionWindowPerfScenarioTrigger(
       rawValue: HarnessMonitorUITestEnvironment.perfScenarioRawValue,
       sessionID: sessionID,
-      hasDetail: snapshot?.detail != nil,
-      decisionCount: store.supervisorOpenDecisions.count
+      hasSearchCorpus: hasSearchCorpus
     )
+  }
+
+  private var hasSearchCorpus: Bool {
+    guard let snapshot, let detail = snapshot.detail else {
+      return false
+    }
+    return !detail.agents.isEmpty || !detail.tasks.isEmpty || !snapshot.timeline.isEmpty
   }
 
   func body(content: Content) -> some View {
@@ -45,7 +49,7 @@ struct SessionWindowPerfScenarioScript: ViewModifier {
 
     switch HarnessMonitorUITestEnvironment.basePerfScenario(for: scenario) {
     case "session-search-full":
-      guard trigger.hasDetail, trigger.decisionCount > 0 else { return }
+      guard trigger.hasSearchCorpus else { return }
       appliedScenarioRawValue = scenario
       await runFullSessionSearchScript()
     case "timeline-burst", "timeline-filter-form":
