@@ -2,7 +2,7 @@ use super::*;
 
 /// Minimal `projects` + `sessions` DDL that the v6 -> v7 migration expects to
 /// exist before it can seed the timeline ledger.
-const PROJECTS_AND_SESSIONS_V6_SCHEMA: &str = "CREATE TABLE IF NOT EXISTS projects (
+pub(super) const PROJECTS_AND_SESSIONS_V6_SCHEMA: &str = "CREATE TABLE IF NOT EXISTS projects (
         project_id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         project_dir TEXT,
