@@ -34,7 +34,6 @@ struct SessionAgentComposer: View {
         text: $message,
         minHeight: metrics.composerMinHeight,
         maxHeight: metrics.composerMaxHeight,
-        showsChrome: false,
         focusedField: focusedField,
         equals: .composer,
         accessibilityLabel: "Agent message"
