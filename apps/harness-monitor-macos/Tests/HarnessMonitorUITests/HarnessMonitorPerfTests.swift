@@ -242,6 +242,7 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     let launched = launchForPerf(app: app, scenario: "decision-detail-form")
     let sessionWindow = element(in: launched, identifier: Accessibility.sessionWindowShell)
     let decisionDetail = element(in: launched, identifier: Accessibility.decisionDetailScrollView)
+    let acpPanel = element(in: launched, identifier: Accessibility.decisionAcpPanel)
 
     waitForScenarioCompletion(app: launched, scenario: "decision-detail-form")
 
@@ -251,9 +252,8 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
       "Decision detail perf scenario did not render the current decision detail pane"
     )
     XCTAssertTrue(
-      launched.staticTexts.containing(NSPredicate(format: "label CONTAINS 'requested'"))
-        .firstMatch
-        .waitForExistence(timeout: Self.actionTimeout)
+      waitForElement(acpPanel, timeout: Self.actionTimeout),
+      "Decision detail perf scenario did not render the ACP decision form"
     )
 
     launched.terminate()
