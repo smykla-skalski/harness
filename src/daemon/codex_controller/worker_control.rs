@@ -133,8 +133,7 @@ impl CodexRunWorker {
             _ => Ok(()),
         };
         let interrupt_error = interrupt_result.as_ref().err().map(ToString::to_string);
-        self.pending_approvals.clear();
-        self.snapshot.pending_approvals.clear();
+        self.clear_pending_approvals();
         self.record_event(
             "agent/stop",
             "Codex agent stopped".to_string(),
