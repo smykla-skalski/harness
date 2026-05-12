@@ -36,6 +36,21 @@ final class BackgroundAssetBundleTests: XCTestCase {
       .medium
     )
   }
+
+  func testThumbnailGenerationSerializesColdDecodes() throws {
+    let source = try String(
+      contentsOf: repoRoot()
+        .appendingPathComponent(
+          "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Support/BackgroundThumbnailCache.swift"
+        ),
+      encoding: .utf8
+    )
+
+    XCTAssertTrue(source.contains("private var thumbnailGenerationTail: Task<Void, Never>?"))
+    XCTAssertTrue(source.contains("let predecessor = thumbnailGenerationTail"))
+    XCTAssertTrue(source.contains("await predecessor?.value"))
+    XCTAssertTrue(source.contains("thumbnailGenerationTail = Task { _ = await task.value }"))
+  }
 }
 
 @Suite("Background thumbnail cache")
