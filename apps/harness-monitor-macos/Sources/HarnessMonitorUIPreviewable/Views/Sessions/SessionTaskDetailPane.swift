@@ -12,68 +12,44 @@ struct SessionTaskDetailPane: View {
   }
 
   var body: some View {
-    SessionDetailScrollSurface(contentPadding: 0) {
-      Form {
-        Section {
-          LabeledContent("Title", value: task.title)
-          LabeledContent("Status", value: task.status.title)
-          LabeledContent("Severity", value: task.severity.title)
-          LabeledContent("Source", value: task.source.title)
-          LabeledContent("Assignment", value: task.assignmentSummary)
-          LabeledContent("Queue Policy", value: task.queuePolicy.title)
+    SessionDetailScrollSurface(contentPadding: metrics.contentPadding) {
+      VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
+        SessionDetailPanel(title: "Task") {
+          SessionDetailFactsGrid(
+            facts: [
+              SessionDetailFact("Title", value: task.title),
+              SessionDetailFact("Status", value: task.status.title),
+              SessionDetailFact("Severity", value: task.severity.title),
+              SessionDetailFact("Source", value: task.source.title),
+              SessionDetailFact("Assignment", value: task.assignmentSummary),
+              SessionDetailFact("Queue Policy", value: task.queuePolicy.title),
+            ]
+          )
           Button("Task Actions", action: openActions)
             .harnessNativeFormControl()
             .accessibilityHint("Opens assignment, status, and checkpoint actions for this task")
-        } header: {
-          Text("Task")
-            .harnessNativeFormSectionHeader()
         }
-
         if let context = task.context, !context.isEmpty {
-          Section {
+          SessionDetailPanel(title: "Context") {
             detailText(context)
-          } header: {
-            Text("Context")
-              .harnessNativeFormSectionHeader()
           }
         }
-
         if let suggestedFix = task.suggestedFix, !suggestedFix.isEmpty {
-          Section {
+          SessionDetailPanel(title: "Suggested Fix") {
             detailText(suggestedFix)
-          } header: {
-            Text("Suggested Fix")
-              .harnessNativeFormSectionHeader()
           }
         }
-
-        Section {
-          LabeledContent("Created", value: task.createdAt)
-          LabeledContent("Updated", value: task.updatedAt)
-          if let completedAt = task.completedAt {
-            LabeledContent("Completed", value: completedAt)
-          }
-        } header: {
-          Text("Timing")
-            .harnessNativeFormSectionHeader()
+        SessionDetailPanel(title: "Timing") {
+          SessionDetailFactsGrid(facts: timingFacts)
         }
-
         if let checkpoint = task.checkpointSummary {
-          Section {
-            LabeledContent("Progress", value: "\(checkpoint.progress)%")
-            LabeledContent("Recorded", value: checkpoint.recordedAt)
-            if let actorID = checkpoint.actorId {
-              LabeledContent("Actor", value: actorID)
-            }
+          SessionDetailPanel(title: "Latest Checkpoint") {
+            SessionDetailFactsGrid(facts: checkpointFacts(checkpoint))
             detailText(checkpoint.summary)
-          } header: {
-            Text("Latest Checkpoint")
-              .harnessNativeFormSectionHeader()
           }
         }
-
         if !task.notes.isEmpty {
-          Section {
+          SessionDetailPanel(title: "Notes") {
             ForEach(task.notes) { note in
               VStack(alignment: .leading, spacing: metrics.noteSpacing) {
                 detailText(note.text)
@@ -87,51 +63,75 @@ struct SessionTaskDetailPane: View {
                 .foregroundStyle(.secondary)
               }
             }
-          } header: {
-            Text("Notes")
-              .harnessNativeFormSectionHeader()
           }
         }
-
         if task.reviewRound > 0 || task.awaitingReview != nil || task.reviewClaim != nil {
-          Section {
-            LabeledContent("Round", value: "\(task.reviewRound)")
+          SessionDetailPanel(title: "Review") {
+            SessionDetailFactsGrid(facts: reviewFacts)
             if let awaitingReview = task.awaitingReview {
-              LabeledContent("Submitter", value: awaitingReview.submitterAgentId)
-              LabeledContent("Required Consensus", value: "\(awaitingReview.requiredConsensus)")
               if let summary = awaitingReview.summary {
                 detailText(summary)
               }
             }
-            if let reviewClaim = task.reviewClaim {
-              LabeledContent("Reviewers", value: "\(reviewClaim.reviewers.count)")
-            }
-          } header: {
-            Text("Review")
-              .harnessNativeFormSectionHeader()
           }
         }
-
         if let arbitration = task.arbitration {
-          Section {
-            LabeledContent("Arbiter", value: arbitration.arbiterAgentId)
-            LabeledContent("Verdict", value: arbitration.verdict.title)
-            LabeledContent("Recorded", value: arbitration.recordedAt)
+          SessionDetailPanel(title: "Arbitration") {
+            SessionDetailFactsGrid(facts: arbitrationFacts(arbitration))
             detailText(arbitration.summary)
-          } header: {
-            Text("Arbitration")
-              .harnessNativeFormSectionHeader()
           }
         }
       }
-      .harnessNativeFormContainer()
-      .contentMargins(.horizontal, metrics.contentPadding, for: .scrollContent)
-      .contentMargins(.vertical, metrics.contentPadding, for: .scrollContent)
-      .scrollDisabled(true)
-      .scrollContentBackground(.hidden)
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTaskDetailScrollView)
     .dynamicTypeSize(.xSmall ... .accessibility5)
+  }
+
+  private var timingFacts: [SessionDetailFact] {
+    var facts = [
+      SessionDetailFact("Created", value: task.createdAt),
+      SessionDetailFact("Updated", value: task.updatedAt),
+    ]
+    if let completedAt = task.completedAt {
+      facts.append(SessionDetailFact("Completed", value: completedAt))
+    }
+    return facts
+  }
+
+  private func checkpointFacts(_ checkpoint: TaskCheckpointSummary) -> [SessionDetailFact] {
+    var facts = [
+      SessionDetailFact("Progress", value: "\(checkpoint.progress)%"),
+      SessionDetailFact("Recorded", value: checkpoint.recordedAt),
+    ]
+    if let actorID = checkpoint.actorId {
+      facts.append(SessionDetailFact("Actor", value: actorID))
+    }
+    return facts
+  }
+
+  private var reviewFacts: [SessionDetailFact] {
+    var facts = [SessionDetailFact("Round", value: "\(task.reviewRound)")]
+    if let awaitingReview = task.awaitingReview {
+      facts.append(SessionDetailFact("Submitter", value: awaitingReview.submitterAgentId))
+      facts.append(
+        SessionDetailFact(
+          "Required Consensus",
+          value: "\(awaitingReview.requiredConsensus)"
+        )
+      )
+    }
+    if let reviewClaim = task.reviewClaim {
+      facts.append(SessionDetailFact("Reviewers", value: "\(reviewClaim.reviewers.count)"))
+    }
+    return facts
+  }
+
+  private func arbitrationFacts(_ arbitration: ArbitrationOutcome) -> [SessionDetailFact] {
+    [
+      SessionDetailFact("Arbiter", value: arbitration.arbiterAgentId),
+      SessionDetailFact("Verdict", value: arbitration.verdict.title),
+      SessionDetailFact("Recorded", value: arbitration.recordedAt),
+    ]
   }
 
   private func detailText(_ value: String) -> some View {
@@ -143,12 +143,14 @@ struct SessionTaskDetailPane: View {
 
 struct SessionTaskDetailPaneMetrics: Equatable {
   let contentPadding: CGFloat
+  let sectionSpacing: CGFloat
   let noteSpacing: CGFloat
   let metaSpacing: CGFloat
 
   init(fontScale: CGFloat) {
     let scale = SessionWindowFontScale.metricsScale(for: fontScale)
     contentPadding = max(24, 24 * min(scale, 1.35))
+    sectionSpacing = max(16, 16 * min(scale, 1.35))
     noteSpacing = max(4, 4 * min(scale, 1.45))
     metaSpacing = max(6, 6 * min(scale, 1.35))
   }

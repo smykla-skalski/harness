@@ -9,6 +9,8 @@ struct HarnessMonitorWrapLayout: Layout {
   struct Signature: Equatable {
     let intrinsicSizes: [CGSize]
     let maxWidth: CGFloat
+    let spacing: CGFloat
+    let lineSpacing: CGFloat
   }
 
   let spacing: CGFloat
@@ -23,8 +25,9 @@ struct HarnessMonitorWrapLayout: Layout {
     Cache()
   }
 
-  func updateCache(_ cache: inout Cache, subviews _: Subviews) {
-    cache = Cache()
+  func updateCache(_: inout Cache, subviews _: Subviews) {
+    // Keep the previous row map. `arrangedRows` compares the current subview
+    // sizes and width before reuse, so resetting here only defeats the cache.
   }
 
   func sizeThatFits(
@@ -98,7 +101,9 @@ struct HarnessMonitorWrapLayout: Layout {
     let intrinsicSizes = subviews.map { $0.sizeThatFits(.unspecified) }
     let signature = Signature(
       intrinsicSizes: intrinsicSizes,
-      maxWidth: clampedWidth
+      maxWidth: clampedWidth,
+      spacing: spacing,
+      lineSpacing: lineSpacing
     )
     if cache.signature == signature {
       return cache.rows

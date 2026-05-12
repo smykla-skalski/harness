@@ -251,6 +251,31 @@ struct SessionWindowRouteContentSelectionTests {
     )
   }
 
+  @Test("Task detail pane avoids nested grouped Form inside the session scroll surface")
+  func taskDetailPaneAvoidsNestedGroupedForm() throws {
+    let taskDetail = try sourceFile(named: "SessionTaskDetailPane.swift")
+
+    #expect(
+      taskDetail.contains("SessionDetailScrollSurface(contentPadding: metrics.contentPadding)")
+    )
+    #expect(taskDetail.contains("SessionDetailPanel(title: \"Task\")"))
+    #expect(taskDetail.contains("SessionDetailFactsGrid("))
+    #expect(!taskDetail.contains("Form {"))
+    #expect(!taskDetail.contains(".harnessNativeFormContainer()"))
+    #expect(!taskDetail.contains(".scrollDisabled(true)"))
+  }
+
+  @Test("Wrap layout preserves its cache across unchanged subview updates")
+  func wrapLayoutPreservesCacheAcrossUnchangedSubviews() throws {
+    let wrapLayout = try sourceFile(named: "../Shared/HarnessMonitorWrapLayout.swift")
+
+    #expect(wrapLayout.contains("func updateCache(_: inout Cache, subviews _: Subviews)"))
+    #expect(wrapLayout.contains("resetting here only defeats the cache"))
+    #expect(wrapLayout.contains("let spacing: CGFloat"))
+    #expect(wrapLayout.contains("let lineSpacing: CGFloat"))
+    #expect(!wrapLayout.contains("cache = Cache()"))
+  }
+
   private func sessionRouteContentSource() throws -> String {
     try [
       "SessionWindowRouteContent.swift",
