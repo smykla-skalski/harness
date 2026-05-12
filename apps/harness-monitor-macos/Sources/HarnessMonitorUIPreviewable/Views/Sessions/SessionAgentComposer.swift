@@ -39,9 +39,9 @@ struct SessionAgentComposer: View {
         equals: .composer,
         accessibilityLabel: "Agent message"
       )
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityLabel("Agent message")
-        .accessibilityIdentifier(HarnessMonitorAccessibility.sessionAgentComposer(agentID))
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .accessibilityLabel("Agent message")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionAgentComposer(agentID))
 
       keyPad
     }

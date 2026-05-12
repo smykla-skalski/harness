@@ -162,7 +162,8 @@ struct NewSessionSheetView: View {
           focusedField: $focusedField,
           equals: .context,
           accessibilityLabel: "Context",
-          accessibilityHint: "Optional goals, links, or handoff notes. Multiline input stays enabled."
+          accessibilityHint:
+            "Optional goals, links, or handoff notes. Multiline input stays enabled."
         )
         .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionContext)
       }
