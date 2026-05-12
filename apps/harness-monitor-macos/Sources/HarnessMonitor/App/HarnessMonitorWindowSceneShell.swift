@@ -166,7 +166,8 @@ struct HarnessMonitorWindowShell<Content: View>: View {
       WindowCommandScopeTrackingModifier(
         scope: scope,
         routingState: windowCommandRouting,
-        sessionID: sessionID
+        sessionID: sessionID,
+        windowID: windowID
       )
     )
     .harnessMonitorMCPWindowCommands(registrar: mcpWindowCommandRegistrar)

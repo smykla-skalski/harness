@@ -341,12 +341,12 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
   }
 
   public func removeAgent(
-    sessionID _: String,
-    agentID _: String,
+    sessionID: String,
+    agentID: String,
     request _: AgentRemoveRequest
   ) async throws -> SessionDetail {
     try await performActionDelay()
-    return try await sessionDetail(id: "")
+    return try await state.removeAgent(sessionID: sessionID, agentID: agentID)
   }
 
   public func transferLeader(

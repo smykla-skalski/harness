@@ -17,10 +17,18 @@ enum SessionItemContextMenuActionSupport {
 
   static func requestRemoveAgents(
     store: HarnessMonitorStore,
+    sessionID: String,
+    leaderID: String?,
+    agents: [AgentRegistration],
     agentIDs: [String]
   ) {
     guard !agentIDs.isEmpty else { return }
-    store.requestRemoveAgentConfirmation(agentIDs: agentIDs)
+    store.requestRemoveAgentConfirmation(
+      sessionID: sessionID,
+      agentIDs: agentIDs,
+      leaderID: leaderID,
+      agents: agents
+    )
   }
 
   static func requestDeleteTasks(
@@ -45,7 +53,8 @@ enum SessionItemContextMenuActionSupport {
 struct SessionAgentContextMenuActions: View {
   let store: HarnessMonitorStore
   let state: SessionWindowStateCache
-  let agent: AgentRegistration
+  let leaderID: String?
+  let sessionAgents: [AgentRegistration]
   let resolution: SessionSidebarContextMenuResolution
   @Environment(\.undoManager)
   private var undoManager
@@ -57,14 +66,14 @@ struct SessionAgentContextMenuActions: View {
         Menu("Move to...") {
           Button("Top") {
             state.sidebarOrdering.moveAgent(
-              agent.agentId,
+              scope.primaryID,
               before: state.sidebarOrdering.agentIDs.first,
               undoManager: undoManager
             )
           }
           Button("Bottom") {
             state.sidebarOrdering.moveAgent(
-              agent.agentId,
+              scope.primaryID,
               before: nil,
               undoManager: undoManager
             )
@@ -72,14 +81,14 @@ struct SessionAgentContextMenuActions: View {
         }
         Button("Move to Top") {
           state.sidebarOrdering.moveAgent(
-            agent.agentId,
+            scope.primaryID,
             before: state.sidebarOrdering.agentIDs.first,
             undoManager: undoManager
           )
         }
         Button("Move to Bottom") {
           state.sidebarOrdering.moveAgent(
-            agent.agentId,
+            scope.primaryID,
             before: nil,
             undoManager: undoManager
           )
@@ -93,6 +102,9 @@ struct SessionAgentContextMenuActions: View {
       Button(scope.destructiveLabel, role: .destructive) {
         SessionItemContextMenuActionSupport.requestRemoveAgents(
           store: store,
+          sessionID: state.sessionID,
+          leaderID: leaderID,
+          agents: sessionAgents,
           agentIDs: scope.ids
         )
       }
@@ -106,7 +118,6 @@ struct SessionAgentContextMenuActions: View {
 struct SessionTaskContextMenuActions: View {
   let store: HarnessMonitorStore
   let state: SessionWindowStateCache
-  let task: WorkItem
   let tasks: [WorkItem]
   let decisions: [Decision]
   let resolution: SessionSidebarContextMenuResolution
@@ -120,7 +131,7 @@ struct SessionTaskContextMenuActions: View {
             Button(decision.summary) {
               SessionItemContextMenuActionSupport.linkTask(
                 state: state,
-                taskID: task.taskId,
+                taskID: scope.primaryID,
                 to: decision.id
               )
             }

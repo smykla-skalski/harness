@@ -3,7 +3,7 @@ import Foundation
 extension WorkItem {
   func replacingAssignment(
     status: TaskStatus,
-    assignedTo: String,
+    assignedTo: String?,
     queuePolicy: TaskQueuePolicy,
     queuedAt: String?,
     updatedAt: String

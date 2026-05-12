@@ -27,6 +27,13 @@ extension HarnessMonitorStore {
     """
   }
 
+  private struct UnavailableSessionActionContext {
+    let sessionID: String?
+    let leaderID: String?
+    let actorID: String?
+    let availableActors: [AgentRegistration]
+  }
+
   public func sessionActionUnavailableMessage(sessionID: String?) -> String? {
     if isSessionReadOnly {
       return readOnlySessionAccessMessage
@@ -89,16 +96,33 @@ extension HarnessMonitorStore {
     _ actionName: String,
     message: String
   ) {
-    let sessionID = selectedSessionID ?? "none"
-    let leaderID = selectedSession?.session.leaderId ?? "none"
-    let actorID = actionActorID ?? "none"
-    let activeActors = availableActionActors.map(\.agentId).joined(separator: ",")
+    reportUnavailableSessionAction(
+      actionName,
+      context: UnavailableSessionActionContext(
+        sessionID: selectedSessionID,
+        leaderID: selectedSession?.session.leaderId,
+        actorID: actionActorID,
+        availableActors: availableActionActors
+      ),
+      message: message
+    )
+  }
+
+  private func reportUnavailableSessionAction(
+    _ actionName: String,
+    context: UnavailableSessionActionContext,
+    message: String
+  ) {
+    let resolvedSessionID = context.sessionID ?? "none"
+    let resolvedLeaderID = context.leaderID ?? "none"
+    let resolvedActorID = context.actorID ?? "none"
+    let resolvedActors = context.availableActors.map(\.agentId).joined(separator: ",")
     HarnessMonitorLogger.store.warning(
       """
       Session action unavailable: \(actionName, privacy: .public); reason=\
-      \(message, privacy: .public); sessionID=\(sessionID, privacy: .public); \
-      leaderID=\(leaderID, privacy: .public); actorID=\(actorID, privacy: .public); \
-      activeActors=\(activeActors, privacy: .public)
+      \(message, privacy: .public); sessionID=\(resolvedSessionID, privacy: .public); \
+      leaderID=\(resolvedLeaderID, privacy: .public); actorID=\(resolvedActorID, privacy: .public); \
+      availableActors=\(resolvedActors, privacy: .public)
       """
     )
     presentFailureFeedback(message)
@@ -142,6 +166,39 @@ extension HarnessMonitorStore {
       return nil
     }
     return prepareSessionAction(named: actionName, sessionID: sessionID as String)
+  }
+
+  func sessionLeaderActionActor(
+    sessionID: String,
+    leaderID: String?,
+    agents: [AgentRegistration],
+    actionName: String = "Session action"
+  ) -> String? {
+    if let actionActorID,
+      !actionActorID.isEmpty,
+      agents.contains(where: { $0.agentId == actionActorID })
+    {
+      return actionActorID
+    }
+
+    guard let leaderID,
+      !leaderID.isEmpty,
+      agents.contains(where: { $0.agentId == leaderID })
+    else {
+      reportUnavailableSessionAction(
+        actionName,
+        context: UnavailableSessionActionContext(
+          sessionID: sessionID,
+          leaderID: leaderID,
+          actorID: actionActorID,
+          availableActors: agents
+        ),
+        message: noSelectedLeaderMessage
+      )
+      return nil
+    }
+
+    return leaderID
   }
 
   private var selectedSessionHasRealLeader: Bool {

@@ -309,4 +309,62 @@ actor PreviewHarnessClientState {
     }
     return updatedDetail
   }
+
+  func removeAgent(
+    sessionID: String,
+    agentID: String
+  ) throws -> SessionDetail {
+    guard let detail = detail(for: sessionID, scope: nil) else {
+      throw HarnessMonitorAPIError.server(
+        code: 404,
+        message: "No preview session detail available."
+      )
+    }
+
+    guard let agentIndex = detail.agents.firstIndex(where: { $0.agentId == agentID }) else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "No preview agent available.")
+    }
+
+    let removedAgent = detail.agents[agentIndex]
+    guard removedAgent.role != .leader else {
+      throw HarnessMonitorAPIError.server(code: 409, message: "Preview leader cannot be removed.")
+    }
+
+    var agents = detail.agents
+    agents.remove(at: agentIndex)
+
+    let tasks = detail.tasks.map { task in
+      guard task.assignedTo == agentID else {
+        return task
+      }
+
+      return task.replacingAssignment(
+        status: .open,
+        assignedTo: nil,
+        queuePolicy: task.queuePolicy,
+        queuedAt: nil,
+        updatedAt: Self.mutationTimestamp
+      )
+    }
+
+    let managedAgentID = removedAgent.managedAgentID
+    agentTuisBySessionID[sessionID]?.removeAll { snapshot in
+      snapshot.sessionAgentID == agentID || snapshot.managedAgentID == managedAgentID
+    }
+    acpAgentsBySessionID[sessionID]?.removeAll { snapshot in
+      snapshot.sessionAgentID == agentID || snapshot.managedAgentID == managedAgentID
+    }
+
+    let updatedDetail = SessionDetail(
+      session: detail.session.replacing(tasks: tasks, agents: agents),
+      agents: agents,
+      tasks: tasks,
+      signals: detail.signals,
+      observer: detail.observer,
+      agentActivity: detail.agentActivity
+    )
+
+    storeMutatedSessionDetail(updatedDetail)
+    return updatedDetail
+  }
 }

@@ -214,6 +214,43 @@ struct HarnessMonitorStoreConfirmationTests {
     )
   }
 
+  @Test("Session-scoped remove-agent confirmation does not require the global selected session")
+  func sessionScopedRemoveAgentConfirmationUsesExplicitWindowContext() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    #expect(store.selectedSessionID == nil)
+
+    store.requestRemoveAgentConfirmation(
+      sessionID: PreviewFixtures.summary.sessionId,
+      agentIDs: [PreviewFixtures.agents[1].agentId],
+      leaderID: PreviewFixtures.detail.session.leaderId,
+      agents: PreviewFixtures.detail.agents
+    )
+
+    #expect(
+      store.pendingConfirmation
+        == .removeAgent(
+          sessionID: PreviewFixtures.summary.sessionId,
+          agentID: PreviewFixtures.agents[1].agentId,
+          actorID: PreviewFixtures.agents[0].agentId
+        )
+    )
+
+    await store.confirmPendingAction()
+
+    #expect(store.pendingConfirmation == nil)
+    #expect(
+      client.recordedCalls()
+        == [
+          .removeAgent(
+            sessionID: PreviewFixtures.summary.sessionId,
+            agentID: PreviewFixtures.agents[1].agentId,
+            actor: PreviewFixtures.agents[0].agentId
+          )
+        ]
+    )
+  }
+
   @Test("Default task actions keep the control-plane actor")
   func defaultTaskActionsKeepTheControlPlaneActor() async {
     let client = RecordingHarnessClient()

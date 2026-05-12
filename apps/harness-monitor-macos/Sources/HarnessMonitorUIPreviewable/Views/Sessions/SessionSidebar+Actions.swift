@@ -13,6 +13,9 @@ extension SessionSidebar {
   func requestRemoveAgents(_ agentIDs: [String]) {
     SessionItemContextMenuActionSupport.requestRemoveAgents(
       store: store,
+      sessionID: state.sessionID,
+      leaderID: snapshot?.detail?.session.leaderId,
+      agents: snapshot?.detail?.agents ?? [],
       agentIDs: agentIDs
     )
   }
