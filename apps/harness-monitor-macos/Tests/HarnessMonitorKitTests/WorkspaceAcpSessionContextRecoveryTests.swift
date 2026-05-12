@@ -68,43 +68,15 @@ struct WorkspaceAcpSessionContextRecoveryTests {
     #expect(
       staleClient.recordedCalls()
         == [
-          .startAcpAgent(
-            sessionID: PreviewFixtures.summary.sessionId,
-            agentID: "copilot",
-            role: .worker,
-            fallbackRole: nil,
-            capabilities: ["fs.read", "terminal.spawn"],
-            name: "Copilot Reviewer",
-            prompt: "Review the latest ACP wiring.",
-            projectDir: "/tmp/ui-acp",
-            persona: "reviewer",
-            model: nil,
-            effort: nil,
-            allowCustomModel: false,
-            recordPermissions: false
-          ),
-          .reconfigureHostBridge(enable: ["acp"], disable: [], force: false),
+          expectedAcpStartCall(),
+          expectedHostBridgeReconfigureCall(),
         ]
     )
     #expect(
       recoveredClient.recordedCalls()
         == [
-          .reconfigureHostBridge(enable: ["acp"], disable: [], force: false),
-          .startAcpAgent(
-            sessionID: PreviewFixtures.summary.sessionId,
-            agentID: "copilot",
-            role: .worker,
-            fallbackRole: nil,
-            capabilities: ["fs.read", "terminal.spawn"],
-            name: "Copilot Reviewer",
-            prompt: "Review the latest ACP wiring.",
-            projectDir: "/tmp/ui-acp",
-            persona: "reviewer",
-            model: nil,
-            effort: nil,
-            allowCustomModel: false,
-            recordPermissions: false
-          ),
+          expectedHostBridgeReconfigureCall(),
+          expectedAcpStartCall(),
         ]
     )
     #expect(await daemon.recordedOperations() == ["warm-up", "stop", "register", "warm-up"])
@@ -147,26 +119,7 @@ struct WorkspaceAcpSessionContextRecoveryTests {
     )
 
     #expect(started == nil)
-    #expect(
-      client.recordedCalls()
-        == [
-          .startAcpAgent(
-            sessionID: PreviewFixtures.summary.sessionId,
-            agentID: "copilot",
-            role: .worker,
-            fallbackRole: nil,
-            capabilities: ["fs.read", "terminal.spawn"],
-            name: "Copilot Reviewer",
-            prompt: "Review the latest ACP wiring.",
-            projectDir: "/tmp/ui-acp",
-            persona: "reviewer",
-            model: nil,
-            effort: nil,
-            allowCustomModel: false,
-            recordPermissions: false
-          )
-        ]
-    )
+    #expect(client.recordedCalls() == [expectedAcpStartCall()])
     #expect(store.hostBridgeCapabilityIssues["acp"] == nil)
     #expect(
       store.currentFailureFeedbackMessage
@@ -209,30 +162,33 @@ struct WorkspaceAcpSessionContextRecoveryTests {
     )
 
     #expect(started == nil)
-    #expect(
-      client.recordedCalls()
-        == [
-          .startAcpAgent(
-            sessionID: PreviewFixtures.summary.sessionId,
-            agentID: "copilot",
-            role: .worker,
-            fallbackRole: nil,
-            capabilities: ["fs.read", "terminal.spawn"],
-            name: "Copilot Reviewer",
-            prompt: "Review the latest ACP wiring.",
-            projectDir: "/tmp/ui-acp",
-            persona: "reviewer",
-            model: nil,
-            effort: nil,
-            allowCustomModel: false,
-            recordPermissions: false
-          )
-        ]
-    )
+    #expect(client.recordedCalls() == [expectedAcpStartCall()])
     #expect(store.hostBridgeCapabilityIssues["acp"] == nil)
     #expect(
       store.currentFailureFeedbackMessage
         == "ACP access is limited to the active session. Switch to the matching session and try again."
     )
+  }
+
+  private func expectedAcpStartCall() -> RecordingHarnessClient.Call {
+    .startAcpAgent(
+      sessionID: PreviewFixtures.summary.sessionId,
+      agentID: "copilot",
+      role: .worker,
+      fallbackRole: nil,
+      capabilities: ["fs.read", "terminal.spawn"],
+      name: "Copilot Reviewer",
+      prompt: "Review the latest ACP wiring.",
+      projectDir: "/tmp/ui-acp",
+      persona: "reviewer",
+      model: nil,
+      effort: nil,
+      allowCustomModel: false,
+      recordPermissions: false
+    )
+  }
+
+  private func expectedHostBridgeReconfigureCall() -> RecordingHarnessClient.Call {
+    .reconfigureHostBridge(enable: ["acp"], disable: [], force: false)
   }
 }
