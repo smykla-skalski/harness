@@ -31,25 +31,12 @@ pub(super) fn build_spawn_config(
 
     let mut args = descriptor.launch_args.clone();
     if !session_config.model_via_session() {
-        if let (Some(runtime), Some(model)) = (runtime, model) {
-            if let Some(flag) = runtime.model_flag() {
-                args.push(flag.to_string());
-                args.push(model.to_string());
-            }
-        }
+        push_model_args(&mut args, runtime, model);
     }
     if !session_config.effort_via_session() {
-        if let (Some(runtime), Some(effort)) = (runtime, effort) {
-            args.extend(runtime.effort_args(effort));
-        }
+        push_effort_args(&mut args, runtime, effort);
     }
-    let env_overrides = if session_config.effort_via_session() {
-        Vec::new()
-    } else if let (Some(runtime), Some(effort)) = (runtime, effort) {
-        runtime.effort_env(effort)
-    } else {
-        Vec::new()
-    };
+    let env_overrides = effort_env_overrides(session_config, runtime, effort);
 
     Ok(SpawnConfig {
         command: descriptor.launch_command.clone(),
@@ -58,6 +45,45 @@ pub(super) fn build_spawn_config(
         env_overrides,
         working_dir: project_dir.to_path_buf(),
     })
+}
+
+fn push_model_args(
+    args: &mut Vec<String>,
+    runtime: Option<&dyn AgentRuntime>,
+    model: Option<&str>,
+) {
+    let (Some(runtime), Some(model)) = (runtime, model) else {
+        return;
+    };
+    let Some(flag) = runtime.model_flag() else {
+        return;
+    };
+    args.push(flag.to_string());
+    args.push(model.to_string());
+}
+
+fn push_effort_args(
+    args: &mut Vec<String>,
+    runtime: Option<&dyn AgentRuntime>,
+    effort: Option<&str>,
+) {
+    if let (Some(runtime), Some(effort)) = (runtime, effort) {
+        args.extend(runtime.effort_args(effort));
+    }
+}
+
+fn effort_env_overrides(
+    session_config: &AcpSessionRequestConfig,
+    runtime: Option<&dyn AgentRuntime>,
+    effort: Option<&str>,
+) -> Vec<(String, String)> {
+    if session_config.effort_via_session() {
+        return Vec::new();
+    }
+    match (runtime, effort) {
+        (Some(runtime), Some(effort)) => runtime.effort_env(effort),
+        _ => Vec::new(),
+    }
 }
 
 fn resolve_spawn_runtime(

@@ -23,6 +23,7 @@ use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, canonical_db_unavailable};
 use crate::daemon::protocol::StreamEvent;
+use crate::daemon::service::WakeDispatch;
 use crate::daemon::state::DaemonManifest;
 use crate::daemon::websocket::ReplayBuffer;
 use crate::errors::{CliError, CliErrorKind};
@@ -162,12 +163,9 @@ pub struct DaemonHttpState {
 
 impl DaemonHttpState {
     #[must_use]
-    pub(crate) fn wake_dispatch(&self) -> crate::daemon::service::WakeDispatch<'_> {
-        crate::daemon::service::WakeDispatch::new(
-            Some(&self.agent_tui_manager),
-            Some(&self.acp_agent_manager),
-        )
-        .with_codex(Some(&self.codex_controller))
+    pub(crate) fn wake_dispatch(&self) -> WakeDispatch<'_> {
+        WakeDispatch::new(Some(&self.agent_tui_manager), Some(&self.acp_agent_manager))
+            .with_codex(Some(&self.codex_controller))
     }
 }
 

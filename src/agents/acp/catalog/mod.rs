@@ -187,6 +187,10 @@ pub struct AcpAgentDescriptor {
     pub bundled_with_harness: bool,
 }
 
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde skip_serializing_if callbacks receive field references"
+)]
 fn is_false(value: &bool) -> bool {
     !*value
 }

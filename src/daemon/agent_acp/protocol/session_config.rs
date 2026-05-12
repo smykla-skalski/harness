@@ -70,9 +70,9 @@ pub(super) struct SessionConfigurationAdvertisement<'a> {
 }
 
 #[must_use]
-pub(super) fn advertised_session_configuration<'a>(
-    response: &'a NewSessionResponse,
-) -> SessionConfigurationAdvertisement<'a> {
+pub(super) fn advertised_session_configuration(
+    response: &NewSessionResponse,
+) -> SessionConfigurationAdvertisement<'_> {
     SessionConfigurationAdvertisement {
         models: response.models.as_ref(),
         config_options: response.config_options.as_deref().unwrap_or(&[]),
@@ -135,18 +135,18 @@ async fn apply_model_configuration(
             .await
         }
         AcpSessionModelTransport::SessionModel => {
-            if !session_config.allow_custom_model {
-                if let Some(models) = advertised.models {
-                    let available = models
-                        .available_models
-                        .iter()
-                        .any(|candidate| candidate.model_id.0.as_ref() == model);
-                    if !available {
-                        return Err(AcpError::new(
-                            -32603,
-                            format!("ACP session model '{model}' is not advertised"),
-                        ));
-                    }
+            if !session_config.allow_custom_model
+                && let Some(models) = advertised.models
+            {
+                let available = models
+                    .available_models
+                    .iter()
+                    .any(|candidate| candidate.model_id.0.as_ref() == model);
+                if !available {
+                    return Err(AcpError::new(
+                        -32603,
+                        format!("ACP session model '{model}' is not advertised"),
+                    ));
                 }
             }
             send_set_model(supervisor, connection, session_id, model).await
@@ -180,6 +180,10 @@ async fn apply_effort_configuration(
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "ACP config option updates need shared session, selector, value, and diagnostics context"
+)]
 async fn apply_config_option_value(
     supervisor: &AcpSessionSupervisor,
     connection: &ConnectionTo<Agent>,

@@ -51,7 +51,7 @@ impl CodexControllerHandle {
         status: AgentStatus,
     ) -> Option<Result<bool, CliError>> {
         let session_id_async = run.session_id.clone();
-        Some(self.run_with_async_db(|async_db| async move {
+        self.run_with_async_db(|async_db| async move {
             let Some(resolved) = async_db.resolve_session(&session_id_async).await? else {
                 return Ok(false);
             };
@@ -85,7 +85,7 @@ impl CodexControllerHandle {
                 async_db.bump_change("global").await?;
             }
             Ok(changed)
-        })?)
+        })
     }
 
     fn persist_orchestration_status_sync(
@@ -103,8 +103,8 @@ impl CodexControllerHandle {
         let now = utc_now();
         if !update_codex_orchestration_status(
             &mut state,
-            &session_agent_id,
-            &managed_agent,
+            session_agent_id,
+            managed_agent,
             status,
             &now,
         ) {
@@ -120,6 +120,10 @@ impl CodexControllerHandle {
         Ok(true)
     }
 
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "best-effort broadcast deliberately falls through async and sync delivery paths"
+    )]
     fn broadcast_session_snapshot_best_effort(&self, session_id: &str) {
         if self.spawn_async_session_snapshot_broadcast(session_id) {
             return;
@@ -249,6 +253,10 @@ impl CodexControllerHandle {
         Ok(agent_id)
     }
 
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "rollback keeps async and sync session-state paths together for identical logging"
+    )]
     pub(super) fn rollback_orchestration_agent_registration(
         &self,
         session_id: &str,
@@ -275,6 +283,10 @@ impl CodexControllerHandle {
         }
     }
 
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "async rollback handles optional async database availability and change bumping"
+    )]
     fn rollback_orchestration_agent_registration_async(
         &self,
         session_id: &str,
