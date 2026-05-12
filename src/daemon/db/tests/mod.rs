@@ -19,6 +19,7 @@ mod reconcile;
 mod runtime;
 mod schema;
 mod schema_backfill;
+mod schema_migrations;
 mod signals;
 mod sync;
 
