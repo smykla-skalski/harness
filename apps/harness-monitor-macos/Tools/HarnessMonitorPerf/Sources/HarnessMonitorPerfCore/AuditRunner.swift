@@ -89,7 +89,14 @@ public enum AuditRunner {
         let scenarios = try ScenarioCatalog.resolve(inputs.scenarioSelection)
         let gitCommit = try gitRevParseHead(inputs.checkoutRoot)
         let gitDirty = try gitDirtyFlag(inputs.checkoutRoot)
-        let workspaceFingerprint = try WorkspaceFingerprint.compute(variant: .audit, projectDir: inputs.appRoot)
+        let workspaceFingerprint = try WorkspaceFingerprint.compute(
+            variant: .audit,
+            projectDir: inputs.appRoot
+        )
+        let defaultRuntimeEnv = defaultEnvironment()
+        let allowExternalDaemonAudit = shouldAllowExternalDaemonAudit(
+            defaultEnvironment: defaultRuntimeEnv
+        )
 
         let timestamp = utcCompactTimestamp()
         let labelSlug = inputs.label.replacingOccurrences(
@@ -125,15 +132,24 @@ public enum AuditRunner {
 
         cleanupHostProcesses()
 
+        let canReuseReleaseProducts =
+            !allowExternalDaemonAudit
+            && !inputs.forceClean
+            && BuildOrchestrator.releaseProductsCurrent(
+                hostAppPath: hostAppPath,
+                hostBinaryPath: hostBinaryPath,
+                shippingAppPath: shippingAppPath,
+                shippingBinaryPath: shippingBinaryPath,
+                buildShipping: inputs.buildShipping,
+                gitCommit: gitCommit,
+                gitDirty: gitDirty,
+                workspaceFingerprint: workspaceFingerprint
+            )
+
         var buildStartedAtUTC = ""
         if inputs.skipBuild {
             // honor existing bundle - read started_at from plist below
-        } else if !inputs.forceClean && BuildOrchestrator.releaseProductsCurrent(
-            hostAppPath: hostAppPath, hostBinaryPath: hostBinaryPath,
-            shippingAppPath: shippingAppPath, shippingBinaryPath: shippingBinaryPath,
-            buildShipping: inputs.buildShipping,
-            gitCommit: gitCommit, gitDirty: gitDirty, workspaceFingerprint: workspaceFingerprint
-        ) {
+        } else if canReuseReleaseProducts {
             buildStartedAtUTC = BuildOrchestrator.bundleProvenanceValue(
                 bundle: hostAppPath, key: BuildOrchestrator.buildStartedAtUTCKey
             )
@@ -156,7 +172,8 @@ public enum AuditRunner {
                 daemonCargoTargetDir: inputs.auditDaemonCargoTargetDir,
                 gitCommit: gitCommit, gitDirty: gitDirty,
                 workspaceFingerprint: workspaceFingerprint,
-                buildStartedAtUTC: buildStartedAtUTC
+                buildStartedAtUTC: buildStartedAtUTC,
+                allowExternalDaemonAudit: allowExternalDaemonAudit
             ))
         }
 
@@ -208,7 +225,7 @@ public enum AuditRunner {
             "HARNESS_MONITOR_AUDIT_WORKSPACE_FINGERPRINT": workspaceFingerprint,
             "HARNESS_MONITOR_AUDIT_BUILD_STARTED_AT_UTC": buildStartedAtUTC,
         ]
-        let combinedDefaultEnv = defaultEnvironment()
+        let combinedDefaultEnv = defaultRuntimeEnv
             .merging(baseAuditEnv) { _, audit in audit }
 
         var captureRecords: [ManifestBuilder.CaptureRecord] = []
@@ -257,7 +274,8 @@ public enum AuditRunner {
             skipDaemonBundle: inputs.skipDaemonBundle,
             daemonCargoTargetDir: inputs.auditDaemonCargoTargetDir,
             captureRecords: captureRecords,
-            selectedScenarios: scenarios
+            selectedScenarios: scenarios,
+            defaultEnvironment: defaultRuntimeEnv
         )
         let manifestPath = runDir.appendingPathComponent("manifest.json")
         try ManifestBuilder.write(manifest, to: manifestPath)
@@ -366,7 +384,8 @@ public enum AuditRunner {
         staged: HostStager.Result,
         buildShipping: Bool, skipDaemonBundle: Bool, daemonCargoTargetDir: URL,
         captureRecords: [ManifestBuilder.CaptureRecord],
-        selectedScenarios: [String]
+        selectedScenarios: [String],
+        defaultEnvironment: [String: String]
     ) throws -> ManifestBuilder.Manifest {
         let xcodeVersion = try toolVersion("/usr/bin/xcodebuild", arguments: ["-version"])
         let xctraceVersion = try toolVersion("/usr/bin/xcrun", arguments: ["xctrace", "version"])
@@ -434,11 +453,18 @@ public enum AuditRunner {
                 stagedHostBundleID: staged.stagedBundleID
             ),
             buildProvenance: buildProv,
-            defaultEnvironment: defaultEnvironment(),
+            defaultEnvironment: defaultEnvironment,
             launchArguments: persistenceArguments,
             selectedScenarios: selectedScenarios,
             captureRecords: captureRecords
         ))
+    }
+
+    public static func shouldAllowExternalDaemonAudit(
+        defaultEnvironment: [String: String]
+    ) -> Bool {
+        defaultEnvironment["HARNESS_MONITOR_LAUNCH_MODE"] == "live"
+            && defaultEnvironment["HARNESS_MONITOR_EXTERNAL_DAEMON"] == "1"
     }
 
     public static func defaultEnvironment(

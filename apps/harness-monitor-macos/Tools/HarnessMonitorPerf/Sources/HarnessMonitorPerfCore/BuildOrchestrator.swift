@@ -32,6 +32,7 @@ public enum BuildOrchestrator {
         public var gitDirty: String
         public var workspaceFingerprint: String
         public var buildStartedAtUTC: String
+        public var allowExternalDaemonAudit: Bool
 
         public init(
             xcodebuildRunner: URL, workspacePath: URL, derivedDataPath: URL,
@@ -39,7 +40,8 @@ public enum BuildOrchestrator {
             buildShipping: Bool, forceClean: Bool, skipDaemonBundle: Bool,
             daemonCargoTargetDir: URL,
             gitCommit: String, gitDirty: String,
-            workspaceFingerprint: String, buildStartedAtUTC: String
+            workspaceFingerprint: String, buildStartedAtUTC: String,
+            allowExternalDaemonAudit: Bool = false
         ) {
             self.xcodebuildRunner = xcodebuildRunner
             self.workspacePath = workspacePath
@@ -56,6 +58,7 @@ public enum BuildOrchestrator {
             self.gitDirty = gitDirty
             self.workspaceFingerprint = workspaceFingerprint
             self.buildStartedAtUTC = buildStartedAtUTC
+            self.allowExternalDaemonAudit = allowExternalDaemonAudit
         }
     }
 
@@ -115,14 +118,10 @@ public enum BuildOrchestrator {
     }
 
     public static func buildReleaseTargets(_ inputs: BuildInputs) throws {
-        let common = [
-            "ARCHS=\(inputs.arch)",
-            "ONLY_ACTIVE_ARCH=YES",
-            "ENABLE_CODE_COVERAGE=NO",
-            "CLANG_COVERAGE_MAPPING=NO",
-            "GCC_GENERATE_TEST_COVERAGE_FILES=NO",
-            "COMPILER_INDEX_STORE_ENABLE=NO",
-        ]
+        let common = releaseBuildSettings(
+            arch: inputs.arch,
+            allowExternalDaemonAudit: inputs.allowExternalDaemonAudit
+        )
         let daemonBundleEnv: [String]
         if inputs.skipDaemonBundle {
             daemonBundleEnv = ["HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE=1"]
@@ -135,15 +134,59 @@ public enum BuildOrchestrator {
 
         if inputs.forceClean {
             if inputs.buildShipping {
-                try invokeXcodebuild(inputs, scheme: inputs.shippingScheme, action: "clean", common: common, daemonBundleEnv: nil)
+                try invokeXcodebuild(
+                    inputs,
+                    scheme: inputs.shippingScheme,
+                    action: "clean",
+                    common: common,
+                    daemonBundleEnv: nil
+                )
             }
-            try invokeXcodebuild(inputs, scheme: inputs.hostScheme, action: "clean", common: common, daemonBundleEnv: nil)
+            try invokeXcodebuild(
+                inputs,
+                scheme: inputs.hostScheme,
+                action: "clean",
+                common: common,
+                daemonBundleEnv: nil
+            )
         }
 
         if inputs.buildShipping {
-            try invokeXcodebuild(inputs, scheme: inputs.shippingScheme, action: "build", common: common, daemonBundleEnv: daemonBundleEnv)
+            try invokeXcodebuild(
+                inputs,
+                scheme: inputs.shippingScheme,
+                action: "build",
+                common: common,
+                daemonBundleEnv: daemonBundleEnv
+            )
         }
-        try invokeXcodebuild(inputs, scheme: inputs.hostScheme, action: "build", common: common, daemonBundleEnv: daemonBundleEnv)
+        try invokeXcodebuild(
+            inputs,
+            scheme: inputs.hostScheme,
+            action: "build",
+            common: common,
+            daemonBundleEnv: daemonBundleEnv
+        )
+    }
+
+    public static func releaseBuildSettings(
+        arch: String,
+        allowExternalDaemonAudit: Bool
+    ) -> [String] {
+        var settings = [
+            "ARCHS=\(arch)",
+            "ONLY_ACTIVE_ARCH=YES",
+            "ENABLE_CODE_COVERAGE=NO",
+            "CLANG_COVERAGE_MAPPING=NO",
+            "GCC_GENERATE_TEST_COVERAGE_FILES=NO",
+            "COMPILER_INDEX_STORE_ENABLE=NO",
+        ]
+        if allowExternalDaemonAudit {
+            settings.append(
+                "SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) HARNESS_MONITOR_AUDIT_EXTERNAL_DAEMON"
+            )
+        }
+        return settings
     }
 
     private static func invokeXcodebuild(
