@@ -22,18 +22,23 @@ use crate::daemon::protocol::{
     CodexAgentInspectResponse, CodexAgentInspectSnapshot, CodexApprovalDecisionRequest,
     CodexApprovalRequest, CodexApprovalRequestedPayload, CodexRunEvent, CodexRunListResponse,
     CodexRunRequest, CodexRunSnapshot, CodexRunStatus, CodexSteerRequest, CodexTranscriptResponse,
-    StreamEvent, TimelineEntry,
+    StreamEvent,
 };
 use crate::daemon::service as daemon_service;
 use crate::daemon::state;
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::service as session_service;
-use crate::session::types::{AgentStatus, ManagedAgentRef, SessionState};
+use crate::session::types::{AgentStatus, ManagedAgentRef};
 use crate::workspace::utc_now;
 
 use super::active_runs::{ActiveRun, ActiveRuns, CodexControlAck, CodexControlMessage};
 use super::effort::validate_codex_effort;
 use super::events::codex_event;
+use super::orchestration::{
+    codex_orchestration_status_needs_update, orchestration_status_for_codex_run,
+    remove_registered_codex_agent, update_codex_orchestration_status,
+};
+use super::transcript::codex_transcript_entries;
 use super::worker::CodexRunWorker;
 
 #[derive(Clone)]
@@ -1024,76 +1029,6 @@ impl CodexControllerHandle {
     }
 }
 
-const fn orchestration_status_for_codex_run(status: CodexRunStatus) -> AgentStatus {
-    match status {
-        CodexRunStatus::Queued | CodexRunStatus::Running | CodexRunStatus::WaitingApproval => {
-            AgentStatus::Active
-        }
-        CodexRunStatus::Completed | CodexRunStatus::Failed | CodexRunStatus::Cancelled => {
-            AgentStatus::Idle
-        }
-    }
-}
-
-fn update_codex_orchestration_status(
-    state: &mut SessionState,
-    session_agent_id: &str,
-    managed_agent: &ManagedAgentRef,
-    status: AgentStatus,
-    now: &str,
-) -> bool {
-    if !codex_orchestration_status_needs_update(state, session_agent_id, managed_agent, &status) {
-        return false;
-    }
-    let agent = state
-        .agents
-        .get_mut(session_agent_id)
-        .expect("codex orchestration status precheck resolved agent");
-    agent.status = status;
-    agent.updated_at = now.to_string();
-    agent.last_activity_at = Some(now.to_string());
-    true
-}
-
-fn remove_registered_codex_agent(
-    state: &mut SessionState,
-    session_agent_id: &str,
-    managed_agent: &ManagedAgentRef,
-    now: &str,
-) -> bool {
-    if state
-        .agents
-        .get(session_agent_id)
-        .is_none_or(|agent| !agent.matches_managed_agent(managed_agent))
-    {
-        return false;
-    }
-    state.agents.remove(session_agent_id);
-    session_service::refresh_session(state, now);
-    true
-}
-
-fn codex_orchestration_status_needs_update(
-    state: &SessionState,
-    session_agent_id: &str,
-    managed_agent: &ManagedAgentRef,
-    status: &AgentStatus,
-) -> bool {
-    if !state.status.is_liveness_eligible() {
-        return false;
-    }
-    let Some(agent) = state.agents.get(session_agent_id) else {
-        return false;
-    };
-    if !agent.matches_managed_agent(managed_agent) {
-        return false;
-    }
-    !matches!(
-        agent.status,
-        AgentStatus::AwaitingReview | AgentStatus::Removed
-    ) && agent.status != *status
-}
-
 pub(super) fn record_snapshot_event(
     snapshot: &mut CodexRunSnapshot,
     kind: &str,
@@ -1123,201 +1058,6 @@ fn event_string(payload: &Value, paths: &[&str]) -> Option<String> {
         .iter()
         .find_map(|path| payload.pointer(path).and_then(Value::as_str))
         .map(ToString::to_string)
-}
-
-fn codex_transcript_entries(run: &CodexRunSnapshot) -> Vec<TimelineEntry> {
-    let mut entries = Vec::new();
-    entries.push(codex_timeline_entry(
-        run,
-        "prompt",
-        run.created_at.clone(),
-        "user_prompt",
-        trim_transcript_summary(&run.prompt, "Prompt submitted"),
-        json!({
-            "type": "user_prompt",
-            "content": run.prompt.clone(),
-        }),
-    ));
-    for event in &run.events {
-        if let Some(entry) = codex_event_timeline_entry(run, event) {
-            entries.push(entry);
-        }
-    }
-    if let Some(final_message) = run
-        .final_message
-        .as_deref()
-        .map(str::trim)
-        .filter(|message| !message.is_empty())
-    {
-        entries.push(codex_timeline_entry(
-            run,
-            "final",
-            run.updated_at.clone(),
-            "assistant_text",
-            trim_transcript_summary(final_message, "Assistant response"),
-            json!({
-                "type": "assistant_text",
-                "content": final_message,
-                "final": true,
-            }),
-        ));
-    }
-    entries
-}
-
-fn codex_event_timeline_entry(
-    run: &CodexRunSnapshot,
-    event: &CodexRunEvent,
-) -> Option<TimelineEntry> {
-    if event.kind == "turn/steer" {
-        let prompt = event
-            .payload
-            .pointer("/input/0/text")
-            .and_then(Value::as_str)
-            .unwrap_or(&event.summary);
-        return Some(codex_timeline_entry(
-            run,
-            &event.sequence.to_string(),
-            event.recorded_at.clone(),
-            "user_prompt",
-            trim_transcript_summary(prompt, "Steering prompt sent"),
-            json!({
-                "type": "user_prompt",
-                "content": prompt,
-                "source": "steer",
-                "event": compact_codex_event_payload(event),
-            }),
-        ));
-    }
-    if let Some(entry) = codex_agent_message_entry(run, event) {
-        return Some(entry);
-    }
-    if event.kind.contains("requestApproval") {
-        return Some(codex_timeline_entry(
-            run,
-            &event.sequence.to_string(),
-            event.recorded_at.clone(),
-            "agent_permission_asked",
-            event.summary.clone(),
-            json!({
-                "type": "permission_asked",
-                "message": event.summary,
-                "event": compact_codex_event_payload(event),
-            }),
-        ));
-    }
-    if event.kind == "error" {
-        return Some(codex_timeline_entry(
-            run,
-            &event.sequence.to_string(),
-            event.recorded_at.clone(),
-            "agent_error",
-            event.summary.clone(),
-            json!({
-                "type": "error",
-                "message": event.summary,
-                "event": compact_codex_event_payload(event),
-            }),
-        ));
-    }
-    Some(codex_timeline_entry(
-        run,
-        &event.sequence.to_string(),
-        event.recorded_at.clone(),
-        "agent_state_change",
-        event.summary.clone(),
-        json!({
-            "type": "state_change",
-            "event": compact_codex_event_payload(event),
-        }),
-    ))
-}
-
-fn codex_agent_message_entry(
-    run: &CodexRunSnapshot,
-    event: &CodexRunEvent,
-) -> Option<TimelineEntry> {
-    if event.kind == "item/agentMessage/delta" {
-        return None;
-    }
-    if event.kind != "item/completed" {
-        return None;
-    }
-    let item = event.payload.get("item")?;
-    if item.get("type").and_then(Value::as_str) != Some("agentMessage") {
-        return None;
-    }
-    let text = item.get("text").and_then(Value::as_str)?;
-    Some(codex_timeline_entry(
-        run,
-        &event.sequence.to_string(),
-        event.recorded_at.clone(),
-        "assistant_text",
-        trim_transcript_summary(text, "Assistant response"),
-        json!({
-            "type": "assistant_text",
-            "content": text,
-            "event": compact_codex_event_payload(event),
-        }),
-    ))
-}
-
-fn compact_codex_event_payload(event: &CodexRunEvent) -> Value {
-    json!({
-        "event_id": event.event_id.clone(),
-        "sequence": event.sequence,
-        "kind": event.kind.clone(),
-        "summary": event.summary.clone(),
-        "thread_id": event.thread_id.clone(),
-        "turn_id": event.turn_id.clone(),
-        "item_id": event.item_id.clone(),
-    })
-}
-
-fn codex_timeline_entry(
-    run: &CodexRunSnapshot,
-    suffix: &str,
-    recorded_at: String,
-    kind: &str,
-    summary: String,
-    event: Value,
-) -> TimelineEntry {
-    let agent_id = run.session_agent_id.clone();
-    TimelineEntry {
-        entry_id: format!("codex-{}-{suffix}", run.run_id),
-        recorded_at,
-        kind: kind.to_string(),
-        session_id: run.session_id.clone(),
-        agent_id: agent_id.clone(),
-        task_id: None,
-        summary,
-        payload: json!({
-            "runtime": "codex",
-            "event": event,
-            "codex_timeline_identity": {
-                "run_id": run.run_id.clone(),
-                "agent_id": agent_id,
-                "agent_display_name": run.display_name.clone(),
-                "thread_id": run.thread_id.clone(),
-                "turn_id": run.turn_id.clone(),
-            },
-        }),
-    }
-}
-
-fn trim_transcript_summary(text: &str, fallback: &str) -> String {
-    let text = text.trim();
-    if text.is_empty() {
-        return fallback.to_string();
-    }
-    const MAX_CHARS: usize = 220;
-    let mut iter = text.chars();
-    let trimmed: String = iter.by_ref().take(MAX_CHARS).collect();
-    if iter.next().is_some() {
-        format!("{trimmed}...")
-    } else {
-        trimmed
-    }
 }
 
 pub(super) fn preferred_codex_project_dir(
