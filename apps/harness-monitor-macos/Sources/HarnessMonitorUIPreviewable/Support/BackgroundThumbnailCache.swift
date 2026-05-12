@@ -23,6 +23,7 @@ public actor BackgroundThumbnailCache {
   private var fullImageAccessOrder: [String] = []
   private var thumbnailTasks: [String: Task<CGImage?, Never>] = [:]
   private var fullImageTasks: [String: Task<CGImage?, Never>] = [:]
+  private var thumbnailGenerationTail: Task<Void, Never>?
 
   static let allowedPathPrefixes = ["/System/Library/", "/Library/"]
   static let allowedExtensions: Set<String> = ["heic", "jpg", "jpeg", "png", "tiff"]
@@ -59,11 +60,14 @@ public actor BackgroundThumbnailCache {
       return await task.value
     }
 
+    let predecessor = thumbnailGenerationTail
     let priority = Self.imageGenerationPriority(for: Task.currentPriority)
     let task = Task.detached(priority: priority) { [self] in
+      await predecessor?.value
       generateThumbnail(key: key, selection: selection)
     }
     thumbnailTasks[key] = task
+    thumbnailGenerationTail = Task { _ = await task.value }
     let generated = await task.value
     thumbnailTasks[key] = nil
 
