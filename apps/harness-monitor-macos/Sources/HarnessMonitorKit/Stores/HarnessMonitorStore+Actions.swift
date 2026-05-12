@@ -233,6 +233,31 @@ extension HarnessMonitorStore {
 
   public func requestRemoveAgentConfirmation(
     sessionID: String,
+    agentIDs: [String],
+    leaderID: String?,
+    agents: [AgentRegistration]
+  ) {
+    let normalized = orderedUniqueIDs(agentIDs)
+    guard !normalized.isEmpty else { return }
+    let actionName = "Remove agent"
+    guard prepareSessionAction(named: actionName, sessionID: sessionID) != nil else { return }
+    guard
+      let actorID = sessionLeaderActionActor(
+        sessionID: sessionID,
+        leaderID: leaderID,
+        agents: agents,
+        actionName: actionName
+      )
+    else { return }
+    requestRemoveAgentConfirmation(
+      sessionID: sessionID,
+      agentIDs: normalized,
+      actorID: actorID
+    )
+  }
+
+  public func requestRemoveAgentConfirmation(
+    sessionID: String,
     agentID: String,
     actorID: String
   ) {

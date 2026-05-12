@@ -7,13 +7,15 @@ struct WindowCommandScopeTrackingModifier: ViewModifier {
   let scope: WindowNavigationScope?
   let routingState: WindowCommandRoutingState
   let sessionID: String?
+  let windowID: String
 
   func body(content: Content) -> some View {
     content.background(
       WindowCommandScopeTrackingView(
         scope: scope,
         routingState: routingState,
-        sessionID: sessionID
+        sessionID: sessionID,
+        windowID: windowID
       )
     )
   }
@@ -23,17 +25,28 @@ private struct WindowCommandScopeTrackingView: NSViewRepresentable {
   let scope: WindowNavigationScope?
   let routingState: WindowCommandRoutingState
   let sessionID: String?
+  let windowID: String
 
   func makeNSView(context: Context) -> WindowCommandScopeTrackingNSView {
     let view = WindowCommandScopeTrackingNSView()
     view.alphaValue = 0
     view.setAccessibilityHidden(true)
-    view.configure(scope: scope, routingState: routingState, sessionID: sessionID)
+    view.configure(
+      scope: scope,
+      routingState: routingState,
+      sessionID: sessionID,
+      windowID: windowID
+    )
     return view
   }
 
   func updateNSView(_ nsView: WindowCommandScopeTrackingNSView, context: Context) {
-    nsView.configure(scope: scope, routingState: routingState, sessionID: sessionID)
+    nsView.configure(
+      scope: scope,
+      routingState: routingState,
+      sessionID: sessionID,
+      windowID: windowID
+    )
   }
 
   static func dismantleNSView(_ nsView: WindowCommandScopeTrackingNSView, coordinator: ()) {
@@ -49,6 +62,7 @@ private final class WindowCommandScopeTrackingNSView: NSView {
   private var scope: WindowNavigationScope?
   private weak var routingState: WindowCommandRoutingState?
   private var sessionID: String?
+  private var logicalWindowID = ""
   private var observedWindow: NSWindow?
   // nonisolated(unsafe) so deinit (which can fire off the MainActor when ARC
   // releases on com.apple.SwiftUI.DisplayLink during dashboard <-> cockpit
@@ -72,11 +86,13 @@ private final class WindowCommandScopeTrackingNSView: NSView {
   func configure(
     scope: WindowNavigationScope?,
     routingState: WindowCommandRoutingState,
-    sessionID: String?
+    sessionID: String?,
+    windowID: String
   ) {
     self.scope = scope
     self.routingState = routingState
     self.sessionID = sessionID
+    logicalWindowID = windowID
     if let window {
       beginObserving(window: window)
     }
@@ -89,6 +105,7 @@ private final class WindowCommandScopeTrackingNSView: NSView {
 
   private func beginObserving(window: NSWindow?) {
     guard observedWindow !== window else {
+      synchronizeWindowIdentifier(window)
       registerSessionID(window: window)
       updateRoutingState()
       return
@@ -101,6 +118,7 @@ private final class WindowCommandScopeTrackingNSView: NSView {
       return
     }
 
+    synchronizeWindowIdentifier(window)
     registerSessionID(window: window)
 
     let notificationCenter = NotificationCenter.default
@@ -145,10 +163,22 @@ private final class WindowCommandScopeTrackingNSView: NSView {
     guard let window = observedWindow else {
       return
     }
+    synchronizeWindowIdentifier(window)
     registerSessionID(window: window)
     if window.isKeyWindow {
       activate(window: window)
     }
+  }
+
+  private func synchronizeWindowIdentifier(_ window: NSWindow?) {
+    guard let window, !logicalWindowID.isEmpty else {
+      return
+    }
+    let expectedIdentifier = NSUserInterfaceItemIdentifier(logicalWindowID)
+    guard window.identifier != expectedIdentifier else {
+      return
+    }
+    window.identifier = expectedIdentifier
   }
 
   private func registerSessionID(window: NSWindow?) {

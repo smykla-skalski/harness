@@ -149,6 +149,41 @@ struct HarnessMonitorStoreActionScopeTests {
     #expect(store.inFlightActionID == nil)
   }
 
+  @Test("Non-selected session mutations still publish updated summaries")
+  func nonSelectedSessionMutationsStillPublishUpdatedSummaries() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    let sessionID = PreviewFixtures.summary.sessionId
+    let updatedDetail = SessionDetail(
+      session: PreviewFixtures.detail.session.replacing(
+        tasks: PreviewFixtures.detail.tasks,
+        agents: PreviewFixtures.detail.agents
+      ),
+      agents: PreviewFixtures.detail.agents,
+      tasks: PreviewFixtures.detail.tasks,
+      signals: PreviewFixtures.detail.signals,
+      observer: PreviewFixtures.detail.observer,
+      agentActivity: PreviewFixtures.detail.agentActivity
+    )
+    store.primeSessionSelection(nil)
+
+    let didMutate = await store.mutateSelectedSession(
+      actionName: "Remove agent",
+      actionID: ActionID.removeAgent(sessionID: sessionID, agentID: "worker-codex").key,
+      using: client,
+      sessionID: sessionID,
+      mutation: { updatedDetail }
+    )
+
+    #expect(didMutate)
+    #expect(store.selectedSessionID == nil)
+    #expect(
+      store.sessionIndex.sessionSummary(for: sessionID)?.updatedAt
+        == updatedDetail.session.updatedAt
+    )
+    #expect(store.currentSuccessFeedbackMessage == "Remove agent")
+  }
+
   @Test("Mutating inFlightActionID does not invalidate timeline observers")
   func mutatingInFlightDoesNotInvalidateTimeline() async {
     let store = await makeBootstrappedStore()

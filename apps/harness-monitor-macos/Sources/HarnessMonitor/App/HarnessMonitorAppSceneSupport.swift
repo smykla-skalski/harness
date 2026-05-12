@@ -286,7 +286,8 @@ struct HarnessMonitorSettingsRootView: View {
       WindowCommandScopeTrackingModifier(
         scope: nil,
         routingState: windowCommandRouting,
-        sessionID: nil
+        sessionID: nil,
+        windowID: HarnessMonitorWindowID.settings
       )
     )
     .harnessMonitorMCPWindowCommands(registrar: mcpWindowCommandRegistrar)

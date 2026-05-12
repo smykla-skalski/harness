@@ -36,6 +36,44 @@ final class SessionWindowRouteContextMenuUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(deleteTasksItem.waitForExistence(timeout: Self.fastActionTimeout))
   }
 
+  func testAgentRouteContextMenuTargetsRightClickedRowWhenAnotherAgentIsOpen() {
+    let app = launchPreviewSessionWindow()
+
+    let agentsRoute = element(in: app, identifier: Accessibility.sessionWindowRoute("agents"))
+    XCTAssertTrue(waitForElement(agentsRoute, timeout: Self.actionTimeout))
+    XCTAssertTrue(tapElementReliably(in: app, element: agentsRoute))
+
+    let primaryRow = element(
+      in: app,
+      identifier: Accessibility.sessionWindowAgentRow("leader-claude")
+    )
+    let secondaryRow = element(
+      in: app,
+      identifier: Accessibility.sessionWindowAgentRow("worker-codex")
+    )
+    XCTAssertTrue(waitForElement(primaryRow, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(secondaryRow, timeout: Self.actionTimeout))
+    XCTAssertTrue(tapElementReliably(in: app, element: primaryRow))
+
+    XCTAssertTrue(
+      rightClickElementReliably(in: app, element: secondaryRow),
+      "Expected the middle-column agent row to expose the shared context menu"
+    )
+
+    let removeAgentItem = app.menuItems["Remove Agent"].firstMatch
+    XCTAssertTrue(removeAgentItem.waitForExistence(timeout: Self.fastActionTimeout))
+    activatePresentedMenuItem(in: app, item: removeAgentItem, title: "Remove Agent")
+
+    let confirmButton = confirmationDialogButton(in: app, title: "Remove Agent Now")
+    XCTAssertTrue(confirmButton.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(tapElementReliably(in: app, element: confirmButton))
+    XCTAssertTrue(
+      waitUntil(in: app, timeout: Self.actionTimeout) { !secondaryRow.exists },
+      "Expected the right-clicked agent row to disappear after confirmation"
+    )
+    XCTAssertTrue(primaryRow.exists)
+  }
+
   private func launchPreviewSessionWindow() -> XCUIApplication {
     let app = launch(
       mode: "preview",
@@ -62,6 +100,22 @@ final class SessionWindowRouteContextMenuUITests: HarnessMonitorUITestCase {
   }
 
   #if os(macOS)
+    private func activatePresentedMenuItem(
+      in app: XCUIApplication,
+      item: XCUIElement,
+      title: String
+    ) {
+      if item.isHittable {
+        item.click()
+        return
+      }
+      if let coordinate = preferredTapCoordinate(in: app, for: item) {
+        coordinate.click()
+        return
+      }
+      XCTFail("Failed to activate presented menu item \(title)")
+    }
+
     private func modifierClickElement(
       in app: XCUIApplication,
       element: XCUIElement,

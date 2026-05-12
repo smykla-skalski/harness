@@ -208,7 +208,8 @@ extension SessionSidebar {
     SessionAgentContextMenuActions(
       store: store,
       state: state,
-      agent: agent,
+      leaderID: snapshot?.detail?.session.leaderId,
+      sessionAgents: snapshot?.detail?.agents ?? [],
       resolution: resolution
     )
   }
@@ -257,7 +258,6 @@ extension SessionSidebar {
     SessionTaskContextMenuActions(
       store: store,
       state: state,
-      task: task,
       tasks: snapshot?.detail?.tasks ?? [],
       decisions: decisions,
       resolution: resolution

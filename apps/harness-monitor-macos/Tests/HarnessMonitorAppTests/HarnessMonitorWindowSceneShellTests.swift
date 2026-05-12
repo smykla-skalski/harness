@@ -35,6 +35,16 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
     XCTAssertTrue(shell.contains("WindowContentReadinessGate("))
     XCTAssertTrue(shell.contains(".environment(\\.windowSurfaceContext"))
     XCTAssertTrue(shell.contains("HarnessMonitorAccessibility.windowShellState(windowID)"))
+    XCTAssertTrue(shell.contains("windowID: windowID"))
+  }
+
+  func testWindowCommandTrackingPinsLogicalWindowIdentifiers() throws {
+    let source = try appSourceFile(named: "HarnessMonitorAppWindowCommandSupport.swift")
+
+    XCTAssertTrue(source.contains("let windowID: String"))
+    XCTAssertTrue(source.contains("private var logicalWindowID = \"\""))
+    XCTAssertTrue(source.contains("window.identifier = expectedIdentifier"))
+    XCTAssertTrue(source.contains("NSUserInterfaceItemIdentifier(logicalWindowID)"))
   }
 
   func testPerfScenarioStateMarkerIsNotInstalledWhenDisabled() throws {

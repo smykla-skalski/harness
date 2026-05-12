@@ -138,13 +138,15 @@ extension HarnessMonitorStore {
       let body: () async throws -> Bool = { [self] in
         let measuredMutation = try await Self.measureOperation { try await mutation() }
         recordRequestSuccess()
-        guard selectedSessionID == sessionID else {
-          return true
-        }
         let detail = sessionDetailPreservingFresherSelectedSummary(
           sessionID: sessionID,
           detail: measuredMutation.value
         )
+        _ = sessionIndex.applySessionSummary(detail.session)
+        guard selectedSessionID == sessionID else {
+          presentSuccessFeedback(actionName)
+          return true
+        }
         applySelectedSessionSnapshot(
           sessionID: sessionID,
           detail: detail,
@@ -154,7 +156,6 @@ extension HarnessMonitorStore {
           showingCachedData: isShowingCachedData,
           cancelPendingTimelineRefresh: false
         )
-        _ = sessionIndex.applySessionSummary(detail.session)
         scheduleSessionPushFallback(using: client, sessionID: sessionID)
         presentSuccessFeedback(actionName)
         return true

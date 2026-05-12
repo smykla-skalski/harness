@@ -204,7 +204,8 @@ struct SessionWindowAgentsList: View {
               SessionAgentContextMenuActions(
                 store: store,
                 state: state,
-                agent: agent,
+                leaderID: snapshot.detail?.session.leaderId,
+                sessionAgents: snapshot.detail?.agents ?? [],
                 resolution: .actionable(
                   SessionSidebarContextMenuScope.resolve(
                     kind: .agent,
@@ -384,7 +385,6 @@ struct SessionWindowTasksList: View {
               SessionTaskContextMenuActions(
                 store: store,
                 state: state,
-                task: task,
                 tasks: detail?.tasks ?? [],
                 decisions: decisions,
                 resolution: .actionable(
