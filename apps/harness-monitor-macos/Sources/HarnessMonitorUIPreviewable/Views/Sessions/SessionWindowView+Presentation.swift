@@ -268,7 +268,9 @@ extension SessionWindowView {
       set: { newValue in
         let storedVisibility: NavigationSplitViewVisibility =
           newValue == .all ? .doubleColumn : newValue
-        columnVisibilityRaw = SessionColumnVisibilityCodec.encode(storedVisibility)
+        let encodedVisibility = SessionColumnVisibilityCodec.encode(storedVisibility)
+        guard columnVisibilityRaw != encodedVisibility else { return }
+        columnVisibilityRaw = encodedVisibility
       }
     )
   }

@@ -40,6 +40,31 @@ struct SidebarSearchPresentationStateTests {
     #expect(state.hasPendingFocusRequest == false)
   }
 
+  @Test("request ignores already presented search field")
+  func requestIgnoresAlreadyPresentedSearchField() {
+    var state = SidebarSearchPresentationState()
+    _ = state.requestPresentation(canPresent: true)
+
+    let didPresent = state.requestPresentation(canPresent: true)
+
+    #expect(didPresent == false)
+    #expect(state.isPresented == true)
+    #expect(state.hasPendingFocusRequest == false)
+  }
+
+  @Test("pending request clears without presenting twice")
+  func pendingRequestClearsWithoutPresentingTwice() {
+    var state = SidebarSearchPresentationState()
+    _ = state.requestPresentation(canPresent: false)
+    state.isPresented = true
+
+    let didPresent = state.applyPendingPresentationIfNeeded(canPresent: true)
+
+    #expect(didPresent == false)
+    #expect(state.isPresented == true)
+    #expect(state.hasPendingFocusRequest == false)
+  }
+
   @MainActor
   @Test("filter visibility treats entered search text as active filtering")
   func filterVisibilityTreatsSearchTextAsActiveFilter() {

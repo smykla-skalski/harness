@@ -174,6 +174,29 @@ struct SessionSwiftUISourceTests {
     #expect(surfaceSource.contains("topScrollEdgeEffect: .soft"))
   }
 
+  @Test("Session split view and search bindings ignore redundant writes")
+  func sessionSplitViewAndSearchBindingsIgnoreRedundantWrites() throws {
+    let sessionWindowSource = try sourceFile(at: "Views/Sessions/SessionWindowView.swift")
+    let presentationSource = try sourceFile(
+      at: "Views/Sessions/SessionWindowView+Presentation.swift")
+    let sidebarSearchSource = try sourceFile(at: "Views/Sidebar/SidebarSearchHost.swift")
+
+    #expect(presentationSource.contains("let encodedVisibility ="))
+    #expect(presentationSource.contains("guard columnVisibilityRaw != encodedVisibility else"))
+    #expect(sessionWindowSource.contains("if focusModeStorage != $0"))
+    #expect(sessionWindowSource.contains("if inspectorVisibleStorage != $0"))
+    #expect(sessionWindowSource.contains("if inspectorPreferredStorage != $0"))
+    #expect(sessionWindowSource.contains("if inspectorWidthStorage != $0"))
+    #expect(sessionWindowSource.contains("if contentColumnWidthStorage != $0"))
+    #expect(sidebarSearchSource.contains("guard store.searchText != newValue else { return }"))
+    #expect(
+      sidebarSearchSource.contains(
+        "guard searchPresentationState.isPresented != newValue else { return }"
+      )
+    )
+    #expect(!sidebarSearchSource.contains("private var mcpRegistryHostEnabled"))
+  }
+
   @Test("Timeline section renders on SwiftUI primitives without AppKit scroll machinery")
   func timelineSectionRendersOnSwiftUIPrimitives() throws {
     let timelineSource = try sourceFile(at: "Views/Timeline/MonitorTimelineSection.swift")

@@ -78,7 +78,10 @@ public struct SessionWindowView: View {
   }
 
   var focusModeBinding: Binding<Bool> {
-    $focusModeStorage
+    Binding(
+      get: { focusModeStorage },
+      set: { if focusModeStorage != $0 { focusModeStorage = $0 } }
+    )
   }
 
   var inspectorVisible: Bool {
@@ -87,7 +90,10 @@ public struct SessionWindowView: View {
   }
 
   var inspectorVisibleBinding: Binding<Bool> {
-    $inspectorVisibleStorage
+    Binding(
+      get: { inspectorVisibleStorage },
+      set: { if inspectorVisibleStorage != $0 { inspectorVisibleStorage = $0 } }
+    )
   }
 
   var inspectorPreferred: Bool {
@@ -96,7 +102,10 @@ public struct SessionWindowView: View {
   }
 
   var inspectorPreferredBinding: Binding<Bool> {
-    $inspectorPreferredStorage
+    Binding(
+      get: { inspectorPreferredStorage },
+      set: { if inspectorPreferredStorage != $0 { inspectorPreferredStorage = $0 } }
+    )
   }
 
   var inspectorWidth: Double {
@@ -105,7 +114,10 @@ public struct SessionWindowView: View {
   }
 
   var inspectorWidthBinding: Binding<Double> {
-    $inspectorWidthStorage
+    Binding(
+      get: { inspectorWidthStorage },
+      set: { if inspectorWidthStorage != $0 { inspectorWidthStorage = $0 } }
+    )
   }
 
   var sidebarWidth: Double {
@@ -119,7 +131,10 @@ public struct SessionWindowView: View {
   }
 
   var contentColumnWidthBinding: Binding<Double> {
-    $contentColumnWidthStorage
+    Binding(
+      get: { contentColumnWidthStorage },
+      set: { if contentColumnWidthStorage != $0 { contentColumnWidthStorage = $0 } }
+    )
   }
 
   var presentedModifiers: EventModifiers {
@@ -134,7 +149,7 @@ public struct SessionWindowView: View {
   var decisionDetailTabBinding: Binding<DecisionDetailTab> {
     Binding(
       get: { decisionDetailTab },
-      set: { decisionDetailTab = $0 }
+      set: { if decisionDetailTab != $0 { decisionDetailTab = $0 } }
     )
   }
 
