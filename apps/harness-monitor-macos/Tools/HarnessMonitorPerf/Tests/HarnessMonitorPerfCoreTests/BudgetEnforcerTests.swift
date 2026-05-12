@@ -81,8 +81,8 @@ final class BudgetEnforcerTests: XCTestCase {
             "permission-modal",
             "session-search-full",
             "task-detail-form",
-            "timeline-filter-form",
             "timeline-burst",
+            "timeline-filter-form",
             "toast-overlay-churn",
         ])
         XCTAssertEqual(Budgets.allocationsByScenario.keys.sorted(), [
