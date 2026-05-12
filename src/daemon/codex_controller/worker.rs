@@ -1,28 +1,25 @@
 use std::collections::HashMap;
-use std::future::Future;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use serde_json::Value;
 use tokio::sync::mpsc;
-use tokio::time::timeout;
 
 use crate::daemon::codex_transport::CodexTransport;
 use crate::daemon::protocol::{CodexRunSnapshot, CodexRunStatus};
-use crate::daemon::state;
 use crate::errors::{CliError, CliErrorKind};
-use crate::workspace::utc_now;
 
 use super::active_runs::CodexControlMessage;
 use super::approvals::{
     approval_from_request, approval_policy, mode_instructions, thread_sandbox, trim_summary,
     turn_sandbox_policy, upsert_pending_approval,
 };
-use super::handle::{CodexControllerHandle, record_snapshot_event};
+use super::handle::CodexControllerHandle;
 use super::rpc::CodexJsonRpc;
 use super::wire::{self, AppServerNotification};
+use super::worker_startup::startup_request;
 
-const STARTUP_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
-const DELTA_PERSIST_INTERVAL: Duration = Duration::from_millis(750);
+#[cfg(test)]
+pub(super) use super::worker_startup::{STARTUP_REQUEST_TIMEOUT, with_startup_timeout};
 
 pub(super) struct CodexRunWorker {
     pub(super) controller: CodexControllerHandle,
@@ -112,7 +109,6 @@ impl CodexRunWorker {
             developer_instructions: mode_instructions(self.snapshot.mode),
             thread_id: self.snapshot.thread_id.as_deref(),
             model: self.snapshot.model.as_deref(),
-            effort: self.snapshot.effort.as_deref(),
         })?;
 
         let result = startup_request(rpc, method, params, method).await?;
@@ -134,6 +130,8 @@ impl CodexRunWorker {
             &self.snapshot.prompt,
             approval_policy(self.snapshot.mode),
             turn_sandbox_policy(self.snapshot.mode, &self.snapshot.project_dir),
+            self.snapshot.model.as_deref(),
+            self.snapshot.effort.as_deref(),
         )?;
         let result = startup_request(rpc, wire::METHOD_TURN_START, params, "turn/start").await?;
         let turn_id = wire::turn_id_from_result(&result)
@@ -363,128 +361,6 @@ impl CodexRunWorker {
         )
         .await
     }
-
-    pub(super) fn thread_id(&self) -> Result<String, CliError> {
-        self.snapshot
-            .thread_id
-            .clone()
-            .ok_or_else(|| CliErrorKind::workflow_io("codex thread id is not ready").into())
-    }
-
-    pub(super) fn turn_id(&self) -> Result<String, CliError> {
-        self.snapshot
-            .turn_id
-            .clone()
-            .ok_or_else(|| CliErrorKind::workflow_io("codex turn id is not ready").into())
-    }
-
-    pub(super) fn transition(
-        &mut self,
-        status: CodexRunStatus,
-        latest_summary: Option<&str>,
-        error: Option<String>,
-    ) -> Result<(), CliError> {
-        self.snapshot.status = status;
-        if let Some(summary) = latest_summary {
-            self.snapshot.latest_summary = Some(summary.to_string());
-        }
-        self.snapshot.error = error;
-        self.touch_and_save()?;
-        self.controller
-            .sync_orchestration_status_for_run(&self.snapshot)
-    }
-
-    fn fail(&mut self, message: &str) {
-        self.mark_failed(message);
-        self.persist_failure(message);
-    }
-
-    fn mark_failed(&mut self, message: &str) {
-        let message = message.to_string();
-        self.snapshot.status = CodexRunStatus::Failed;
-        self.snapshot.latest_summary = Some(message.clone());
-        self.snapshot.error = Some(message);
-        self.snapshot.updated_at = utc_now();
-    }
-
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "tracing macro expansion; tokio-rs/tracing#553"
-    )]
-    fn persist_failure(&self, message: &str) {
-        if let Err(error) = self.controller.save_and_broadcast(&self.snapshot) {
-            tracing::warn!(%error, "failed to persist codex failure");
-        }
-        if let Err(error) = self
-            .controller
-            .sync_orchestration_status_for_run(&self.snapshot)
-        {
-            tracing::warn!(%error, "failed to sync codex failure status to session agent");
-        }
-        tracing::error!(
-            session_id = %self.snapshot.session_id,
-            run_id = %self.snapshot.run_id,
-            error_message = message,
-            "codex run failed"
-        );
-        state::append_event_best_effort(
-            "warn",
-            &format!(
-                "codex run failed for session {} run {}: {message}",
-                self.snapshot.session_id, self.snapshot.run_id
-            ),
-        );
-    }
-
-    fn touch_and_save(&mut self) -> Result<(), CliError> {
-        self.snapshot.updated_at = utc_now();
-        self.controller.save_and_broadcast(&self.snapshot)
-    }
-
-    pub(super) fn touch_save_and_sync_orchestration(&mut self) -> Result<(), CliError> {
-        self.touch_and_save()?;
-        self.controller
-            .sync_orchestration_status_for_run(&self.snapshot)
-    }
-
-    pub(super) fn record_event(&mut self, kind: &str, summary: String, payload: &Value) {
-        record_snapshot_event(&mut self.snapshot, kind, summary, payload);
-    }
-
-    fn should_persist_delta_update(&mut self) -> bool {
-        let now = Instant::now();
-        if self
-            .last_delta_persist_at
-            .is_some_and(|last| now.duration_since(last) < DELTA_PERSIST_INTERVAL)
-        {
-            return false;
-        }
-        self.last_delta_persist_at = Some(now);
-        true
-    }
-}
-
-async fn startup_request(
-    rpc: &mut CodexJsonRpc,
-    method: &'static str,
-    params: Value,
-    label: &'static str,
-) -> Result<Value, CliError> {
-    with_startup_timeout(label, rpc.request(method, params)).await
-}
-
-async fn with_startup_timeout<T, Fut>(label: &'static str, future: Fut) -> Result<T, CliError>
-where
-    Fut: Future<Output = Result<T, CliError>>,
-{
-    timeout(STARTUP_REQUEST_TIMEOUT, future)
-        .await
-        .map_err(|_| {
-            CliErrorKind::workflow_io(format!(
-                "codex app-server {label} did not respond within {}s",
-                STARTUP_REQUEST_TIMEOUT.as_secs()
-            ))
-        })?
 }
 
 #[cfg(test)]
