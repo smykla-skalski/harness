@@ -12,20 +12,12 @@ private struct AppSearchDomainSignature: Hashable {
   let lastID: String?
 }
 
-/// Joint task-id key so re-indexing fires when the search field opens
-/// (cold start) and when an in-flight session adds new records while
-/// the user is searching.
-private struct AppSearchReindexTrigger: Hashable {
-  let active: Bool
-  let signature: AppSearchDomainSignature
-}
-
 /// Drives ``AppSearchIndex`` re-indexing from the four session-window
-/// data sources. Each domain's `.task(id:)` cancels and reschedules
-/// whenever its signature OR the model's ``AppSearchModel/isPresented``
-/// flag changes; reindexing is skipped when the search field is not
-/// presented so a session with thousands of incoming timeline events
-/// does not rebuild four corpora on every append.
+/// data sources. Each domain's `.task(id:)` is attached only while the
+/// search field is visible, then cancels and reschedules whenever its
+/// signature changes. Closed search keeps these task-state modifiers out
+/// of the session window tree so startup and timeline churn do not create
+/// no-op reindex task transactions.
 ///
 /// The active-flag is read directly from the shared
 /// ``AppSearchModel`` rather than `@Environment`. The host modifier
@@ -45,33 +37,34 @@ struct AppSearchIndexUpdater: ViewModifier {
   let tasks: [WorkItem]
   let events: [TimelineEntry]
 
+  @ViewBuilder
   func body(content: Content) -> some View {
-    content
-      .task(id: AppSearchReindexTrigger(active: model.isPresented, signature: agentSignature)) {
-        guard model.isPresented else { return }
-        await index.reindex(agents: agents)
-      }
-      .task(id: AppSearchReindexTrigger(active: model.isPresented, signature: decisionSignature)) {
-        guard model.isPresented else { return }
-        let projections = decisions.map { decision in
-          DecisionSearchProjection(
-            id: decision.id,
-            summary: decision.summary,
-            ruleID: decision.ruleID,
-            agentID: decision.agentID,
-            taskID: decision.taskID
-          )
+    if model.isPresented {
+      content
+        .task(id: agentSignature) {
+          await index.reindex(agents: agents)
         }
-        await index.reindex(decisions: projections)
-      }
-      .task(id: AppSearchReindexTrigger(active: model.isPresented, signature: taskSignature)) {
-        guard model.isPresented else { return }
-        await index.reindex(tasks: tasks)
-      }
-      .task(id: AppSearchReindexTrigger(active: model.isPresented, signature: eventSignature)) {
-        guard model.isPresented else { return }
-        await index.reindex(events: events)
-      }
+        .task(id: decisionSignature) {
+          let projections = decisions.map { decision in
+            DecisionSearchProjection(
+              id: decision.id,
+              summary: decision.summary,
+              ruleID: decision.ruleID,
+              agentID: decision.agentID,
+              taskID: decision.taskID
+            )
+          }
+          await index.reindex(decisions: projections)
+        }
+        .task(id: taskSignature) {
+          await index.reindex(tasks: tasks)
+        }
+        .task(id: eventSignature) {
+          await index.reindex(events: events)
+        }
+    } else {
+      content
+    }
   }
 
   private var agentSignature: AppSearchDomainSignature {
