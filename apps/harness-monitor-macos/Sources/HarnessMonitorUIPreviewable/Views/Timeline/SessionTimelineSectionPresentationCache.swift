@@ -8,6 +8,50 @@ final class SessionTimelineSectionPresentationCache {
   private(set) var rebuildCount = 0
 
   func presentation(
+    _ input: SessionTimelineSectionPresentationInput
+  ) -> SessionTimelineSectionPresentation {
+    let key = SessionTimelineSectionPresentationCacheKey(
+      sessionID: input.sessionID,
+      timeline: input.timeline,
+      timelineWindow: input.timelineWindow,
+      decisions: input.decisions,
+      signals: input.signals,
+      filters: input.filters,
+      isTimelineLoading: input.isTimelineLoading,
+      dateTimeConfiguration: input.dateTimeConfiguration,
+      now: input.now
+    )
+    if key != cachedKey {
+      cachedKey = key
+      cachedPresentation = SessionTimelineSectionPresentation(
+        sessionID: input.sessionID,
+        timeline: input.timeline,
+        timelineWindow: input.timelineWindow,
+        decisions: input.decisions,
+        signals: input.signals,
+        filters: input.filters,
+        isTimelineLoading: input.isTimelineLoading,
+        dateTimeConfiguration: input.dateTimeConfiguration,
+        now: input.now
+      )
+      rebuildCount += 1
+    }
+    return cachedPresentation
+  }
+}
+
+struct SessionTimelineSectionPresentationInput {
+  let sessionID: String
+  let timeline: [TimelineEntry]
+  let timelineWindow: TimelineWindowResponse?
+  let decisions: [Decision]
+  let signals: [SessionSignalRecord]
+  let filters: SessionTimelineFilterState
+  let isTimelineLoading: Bool
+  let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
+  let now: Date
+
+  init(
     sessionID: String,
     timeline: [TimelineEntry],
     timelineWindow: TimelineWindowResponse?,
@@ -17,34 +61,16 @@ final class SessionTimelineSectionPresentationCache {
     isTimelineLoading: Bool,
     dateTimeConfiguration: HarnessMonitorDateTimeConfiguration,
     now: Date = Date()
-  ) -> SessionTimelineSectionPresentation {
-    let key = SessionTimelineSectionPresentationCacheKey(
-      sessionID: sessionID,
-      timeline: timeline,
-      timelineWindow: timelineWindow,
-      decisions: decisions,
-      signals: signals,
-      filters: filters,
-      isTimelineLoading: isTimelineLoading,
-      dateTimeConfiguration: dateTimeConfiguration,
-      now: now
-    )
-    if key != cachedKey {
-      cachedKey = key
-      cachedPresentation = SessionTimelineSectionPresentation(
-        sessionID: sessionID,
-        timeline: timeline,
-        timelineWindow: timelineWindow,
-        decisions: decisions,
-        signals: signals,
-        filters: filters,
-        isTimelineLoading: isTimelineLoading,
-        dateTimeConfiguration: dateTimeConfiguration,
-        now: now
-      )
-      rebuildCount += 1
-    }
-    return cachedPresentation
+  ) {
+    self.sessionID = sessionID
+    self.timeline = timeline
+    self.timelineWindow = timelineWindow
+    self.decisions = decisions
+    self.signals = signals
+    self.filters = filters
+    self.isTimelineLoading = isTimelineLoading
+    self.dateTimeConfiguration = dateTimeConfiguration
+    self.now = now
   }
 }
 

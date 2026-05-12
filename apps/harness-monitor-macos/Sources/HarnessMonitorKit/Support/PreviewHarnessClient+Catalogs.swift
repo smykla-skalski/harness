@@ -45,8 +45,10 @@ extension PreviewHarnessClient {
         "OPENAI_PROJECT",
       ],
       modelCatalog: codexRuntimeModelCatalog(),
-      installHint:
-        "Codex ACP ships with Harness. Install or update Harness to restore the bundled adapter, then authenticate Codex.",
+      installHint: [
+        "Codex ACP ships with Harness. Install or update Harness to restore the bundled adapter, ",
+        "then authenticate Codex.",
+      ].joined(),
       doctorProbe: AcpDoctorProbe(command: "harness-codex-acp", args: ["--probe"]),
       bundledWithHarness: true
     ),

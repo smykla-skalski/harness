@@ -161,8 +161,9 @@ public struct DaemonController: DaemonControlling {
   ) async throws -> any HarnessMonitorClientProtocol {
     if transportPreference == .webSocket {
       if let wsClient = await webSocketBootstrapper(connection) {
+        let endpoint = connection.endpoint.absoluteString
         HarnessMonitorLogger.lifecycle.trace(
-          "Connected daemon transport over WebSocket for \(connection.endpoint.absoluteString, privacy: .public)"
+          "Connected daemon transport over WebSocket for \(endpoint, privacy: .public)"
         )
         return wsClient
       }

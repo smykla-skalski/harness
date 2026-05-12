@@ -41,7 +41,8 @@ final class BackgroundAssetBundleTests: XCTestCase {
     let source = try String(
       contentsOf: repoRoot()
         .appendingPathComponent(
-          "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Support/BackgroundThumbnailCache.swift"
+          "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Support/"
+            + "BackgroundThumbnailCache.swift"
         ),
       encoding: .utf8
     )
