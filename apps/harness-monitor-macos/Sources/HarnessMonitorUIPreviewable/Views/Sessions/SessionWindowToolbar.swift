@@ -27,6 +27,10 @@ struct SessionWindowToolbar: ToolbarContent {
 
   private let sidebarShortcut = KeyboardShortcutDescriptor.toggleSidebar
 
+  private var shouldShowShortcutOverlays: Bool {
+    shortcutOverlaysEnabled && !HarnessMonitorUITestEnvironment.disablesVisualOptions
+  }
+
   var body: some ToolbarContent {
     ToolbarItemGroup(placement: .navigation) {
       Button {
@@ -44,7 +48,7 @@ struct SessionWindowToolbar: ToolbarContent {
       .accessibilityLabel("Back")
       .accessibilityIdentifier(HarnessMonitorAccessibility.sessionNavigateBackButton)
       .overlay(alignment: .bottom) {
-        if shortcutOverlaysEnabled {
+        if shouldShowShortcutOverlays {
           KeyboardShortcutLabel(
             shortcut: sidebarShortcut,
             activeModifiers: currentModifiers,
@@ -58,7 +62,7 @@ struct SessionWindowToolbar: ToolbarContent {
         }
       }
       .zIndex(
-        shortcutOverlaysEnabled && sidebarShortcut.isRevealed(by: currentModifiers) ? 1 : 0
+        shouldShowShortcutOverlays && sidebarShortcut.isRevealed(by: currentModifiers) ? 1 : 0
       )
 
       Button {
