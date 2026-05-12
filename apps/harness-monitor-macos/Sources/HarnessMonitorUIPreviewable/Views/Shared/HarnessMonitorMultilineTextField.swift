@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct HarnessMonitorMultilineTextField<Field: Hashable>: View {
+  @Environment(\.harnessNativeFormControlFont)
+  private var font
   let placeholder: String
   @Binding private var text: String
   private let minHeight: CGFloat
@@ -30,30 +32,63 @@ struct HarnessMonitorMultilineTextField<Field: Hashable>: View {
     self.accessibilityHint = accessibilityHint
   }
 
-  @ViewBuilder
   var body: some View {
-    // Keep multiline create-form inputs in the surrounding scroll view; the old
-    // agent-create flow used TextField(axis: .vertical) rather than nested
-    // TextEditor scroll views, and we restore that here.
-    let field =
-      TextField(placeholder, text: $text, axis: .vertical)
-      .harnessNativeTextField()
-      .lineLimit(lineLimit)
-      .frame(minHeight: minHeight, alignment: .topLeading)
+    multilineEditor
+  }
+
+  private var multilineEditor: some View {
+    ZStack(alignment: .topLeading) {
+      if text.isEmpty, !placeholder.isEmpty {
+        Text(placeholder)
+          .font(font)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .padding(.horizontal, HarnessMonitorTheme.spacingSM)
+          .padding(.vertical, HarnessMonitorTheme.spacingXS)
+          .allowsHitTesting(false)
+      }
+
+      textEditor
+    }
+    .background(
+      RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .fill(HarnessMonitorTheme.ink.opacity(0.10))
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .stroke(HarnessMonitorTheme.controlBorder.opacity(0.7), lineWidth: 1)
+    )
+    .contentShape(Rectangle())
+  }
+
+  @ViewBuilder
+  private var textEditor: some View {
+    if let focusedField, let focusValue {
+      baseTextEditor
+        .focused(focusedField, equals: focusValue)
+    } else {
+      baseTextEditor
+    }
+  }
+
+  private var baseTextEditor: some View {
+    TextEditor(text: $text)
+      .font(font)
+      .scrollContentBackground(.hidden)
+      .frame(
+        maxWidth: .infinity,
+        minHeight: minHeight,
+        maxHeight: maxHeight,
+        alignment: .topLeading
+      )
       .accessibilityLabel(accessibilityLabel)
       .accessibilityHint(accessibilityHint)
+  }
 
-    if let focusedField, let focusValue {
-      field
-        .focused(focusedField, equals: focusValue)
-        .simultaneousGesture(
-          TapGesture().onEnded {
-            focusedField.wrappedValue = focusValue
-          }
-        )
-    } else {
-      field
-    }
+  private var maxHeight: CGFloat {
+    let estimatedLineHeight: CGFloat = 22
+    let paddingAllowance = HarnessMonitorTheme.spacingLG
+    let preferredHeight = CGFloat(lineLimit.upperBound) * estimatedLineHeight + paddingAllowance
+    return max(minHeight, preferredHeight)
   }
 
   private static func recommendedLineLimit(for minHeight: CGFloat) -> ClosedRange<Int> {
