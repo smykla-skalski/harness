@@ -11,6 +11,7 @@ use crate::daemon::protocol::{
     CodexApprovalDecisionRequest, CodexRunRequest, CodexSteerRequest, ManagedAgentSnapshot,
     http_paths,
 };
+use crate::errors::CliError;
 
 use super::super::DaemonHttpState;
 use super::super::auth::{authorize_control_request, require_auth};
@@ -52,10 +53,13 @@ pub(super) async fn post_codex_agent_start(
     if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
-    let result = state
-        .codex_controller
-        .start_run(&session_id, &request)
-        .map(ManagedAgentSnapshot::Codex);
+    let result = with_managed_agent_lock(&state, &session_id, "codex:start", || {
+        state
+            .codex_controller
+            .start_run(&session_id, &request)
+            .map(ManagedAgentSnapshot::Codex)
+    })
+    .await;
     timed_json(
         "POST",
         http_paths::SESSION_MANAGED_AGENTS_CODEX,
@@ -121,11 +125,14 @@ pub(super) async fn post_terminal_agent_stop(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = if state.codex_controller.run(&managed_agent_id).is_ok() {
-        state
-            .codex_controller
-            .stop(&managed_agent_id)
-            .map(ManagedAgentSnapshot::Codex)
+    let result = if let Ok(run) = state.codex_controller.run(&managed_agent_id) {
+        with_managed_agent_lock(&state, &run.session_id, &managed_agent_id, || {
+            state
+                .codex_controller
+                .stop(&managed_agent_id)
+                .map(ManagedAgentSnapshot::Codex)
+        })
+        .await
     } else if state.acp_agent_manager.get(&managed_agent_id).is_ok() {
         state
             .acp_agent_manager
@@ -178,9 +185,18 @@ pub(super) async fn post_codex_agent_steer(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = ensure_codex_agent(&state, &managed_agent_id)
-        .and_then(|()| state.codex_controller.steer(&managed_agent_id, &request))
-        .map(ManagedAgentSnapshot::Codex);
+    let result = match codex_session_id(&state, &managed_agent_id) {
+        Ok(session_id) => {
+            with_managed_agent_lock(&state, &session_id, &managed_agent_id, || {
+                state
+                    .codex_controller
+                    .steer(&managed_agent_id, &request)
+                    .map(ManagedAgentSnapshot::Codex)
+            })
+            .await
+        }
+        Err(error) => Err(error),
+    };
     timed_json(
         "POST",
         http_paths::MANAGED_AGENT_STEER,
@@ -200,9 +216,18 @@ pub(super) async fn post_codex_agent_interrupt(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = ensure_codex_agent(&state, &agent_id)
-        .and_then(|()| state.codex_controller.interrupt(&agent_id))
-        .map(ManagedAgentSnapshot::Codex);
+    let result = match codex_session_id(&state, &agent_id) {
+        Ok(session_id) => {
+            with_managed_agent_lock(&state, &session_id, &agent_id, || {
+                state
+                    .codex_controller
+                    .interrupt(&agent_id)
+                    .map(ManagedAgentSnapshot::Codex)
+            })
+            .await
+        }
+        Err(error) => Err(error),
+    };
     timed_json(
         "POST",
         http_paths::MANAGED_AGENT_INTERRUPT,
@@ -223,13 +248,18 @@ pub(super) async fn post_codex_agent_approval(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = ensure_codex_agent(&state, &agent_id)
-        .and_then(|()| {
-            state
-                .codex_controller
-                .resolve_approval(&agent_id, &approval_id, &request)
-        })
-        .map(ManagedAgentSnapshot::Codex);
+    let result = match codex_session_id(&state, &agent_id) {
+        Ok(session_id) => {
+            with_managed_agent_lock(&state, &session_id, &agent_id, || {
+                state
+                    .codex_controller
+                    .resolve_approval(&agent_id, &approval_id, &request)
+                    .map(ManagedAgentSnapshot::Codex)
+            })
+            .await
+        }
+        Err(error) => Err(error),
+    };
     timed_json(
         "POST",
         http_paths::MANAGED_AGENT_APPROVAL,
@@ -237,6 +267,24 @@ pub(super) async fn post_codex_agent_approval(
         start,
         result,
     )
+}
+
+async fn with_managed_agent_lock<T>(
+    state: &DaemonHttpState,
+    session_id: &str,
+    agent_id: &str,
+    action: impl FnOnce() -> Result<T, CliError>,
+) -> Result<T, CliError> {
+    let _guard = state
+        .managed_agent_mutation_locks
+        .lock(session_id, agent_id)
+        .await;
+    action()
+}
+
+fn codex_session_id(state: &DaemonHttpState, agent_id: &str) -> Result<String, CliError> {
+    ensure_codex_agent(state, agent_id)?;
+    Ok(state.codex_controller.run(agent_id)?.session_id)
 }
 
 pub(super) async fn post_acp_permission(
