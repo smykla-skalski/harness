@@ -22,6 +22,7 @@ public enum TraceRecorder {
         public var tocURL: URL
         public var logURL: URL
         public var daemonDataHome: URL
+        public var daemonDataHomeProbe: URL?
         public var xctraceTempRoot: URL
 
         public init(
@@ -29,6 +30,7 @@ public enum TraceRecorder {
             durationSeconds: Int, hostAppPath: URL, hostBinaryPath: URL,
             launchArguments: [String], environment: [String: String],
             traceURL: URL, tocURL: URL, logURL: URL, daemonDataHome: URL,
+            daemonDataHomeProbe: URL? = nil,
             xctraceTempRoot: URL
         ) {
             self.scenario = scenario
@@ -43,6 +45,7 @@ public enum TraceRecorder {
             self.tocURL = tocURL
             self.logURL = logURL
             self.daemonDataHome = daemonDataHome
+            self.daemonDataHomeProbe = daemonDataHomeProbe
             self.xctraceTempRoot = xctraceTempRoot
         }
     }
@@ -146,7 +149,9 @@ public enum TraceRecorder {
             previewScenario: inputs.previewScenario,
             launchedProcessPath: launchedProcessPath,
             daemonDataHome: inputs.daemonDataHome.path,
-            daemonDataHomeProbe: DaemonDataHomeProbe.capture(dataHome: inputs.daemonDataHome)
+            daemonDataHomeProbe: DaemonDataHomeProbe.capture(
+                dataHome: inputs.daemonDataHomeProbe ?? inputs.daemonDataHome
+            )
         )
         return Capture(record: captureRecord, endReason: endReason, launchedProcessPath: launchedProcessPath)
     }

@@ -85,6 +85,18 @@ public enum AuditRunner {
         public var comparisonPath: URL?
     }
 
+    public struct AuditDaemonDataHome: Equatable {
+        public var launchDataHome: URL
+        public var probeDataHome: URL
+        public var mirroredManifest: Bool
+
+        public init(launchDataHome: URL, probeDataHome: URL, mirroredManifest: Bool) {
+            self.launchDataHome = launchDataHome
+            self.probeDataHome = probeDataHome
+            self.mirroredManifest = mirroredManifest
+        }
+    }
+
     public static func run(_ inputs: Inputs) throws -> RunOutcome {
         let scenarios = try ScenarioCatalog.resolve(inputs.scenarioSelection)
         let gitCommit = try gitRevParseHead(inputs.checkoutRoot)
@@ -315,10 +327,11 @@ public enum AuditRunner {
     ) throws -> TraceRecorder.Capture {
         let templateSlug = template.lowercased().replacingOccurrences(of: " ", with: "-")
         let templateDir = tracesRoot.appendingPathComponent(templateSlug, isDirectory: true)
-        let dataHome = daemonDataHome(
+        let dataHome = try auditDaemonDataHome(
             runDir: runDir,
             templateSlug: templateSlug,
-            scenario: scenario
+            scenario: scenario,
+            defaultEnvironment: defaultEnv
         )
         let logURL = runDir.appendingPathComponent("logs", isDirectory: true)
             .appendingPathComponent("\(templateSlug)-\(scenario).log")
@@ -326,7 +339,7 @@ public enum AuditRunner {
         let tocURL = templateDir.appendingPathComponent("\(scenario).toc.xml")
 
         var env = defaultEnv
-        env["HARNESS_DAEMON_DATA_HOME"] = dataHome.path
+        env["HARNESS_DAEMON_DATA_HOME"] = dataHome.launchDataHome.path
         env["HARNESS_MONITOR_PERF_SCENARIO"] = scenario
         env["HARNESS_MONITOR_PREVIEW_SCENARIO"] = ScenarioCatalog.previewScenario(for: scenario)
 
@@ -345,7 +358,8 @@ public enum AuditRunner {
             launchArguments: persistenceArguments,
             environment: env,
             traceURL: traceURL, tocURL: tocURL, logURL: logURL,
-            daemonDataHome: dataHome,
+            daemonDataHome: dataHome.launchDataHome,
+            daemonDataHomeProbe: dataHome.probeDataHome,
             xctraceTempRoot: xctraceTempRoot
         )
         let capture = try TraceRecorder.record(inputs) {
@@ -490,6 +504,119 @@ public enum AuditRunner {
             .appendingPathComponent("app-data", isDirectory: true)
             .appendingPathComponent(templateSlug, isDirectory: true)
             .appendingPathComponent(scenario, isDirectory: true)
+    }
+
+    public static func auditDaemonDataHome(
+        runDir: URL,
+        templateSlug: String,
+        scenario: String,
+        defaultEnvironment: [String: String],
+        processEnvironment: [String: String] = ProcessInfo.processInfo.environment,
+        fileManager: FileManager = .default
+    ) throws -> AuditDaemonDataHome {
+        let sourceDataHome = daemonDataHome(
+            runDir: runDir,
+            templateSlug: templateSlug,
+            scenario: scenario,
+            processEnvironment: processEnvironment
+        )
+        guard
+            shouldAllowExternalDaemonAudit(defaultEnvironment: defaultEnvironment),
+            trimmedNonEmpty(processEnvironment[daemonDataHomeOverrideEnvironmentKey]) != nil
+        else {
+            return AuditDaemonDataHome(
+                launchDataHome: sourceDataHome,
+                probeDataHome: sourceDataHome,
+                mirroredManifest: false
+            )
+        }
+
+        let mirrorDataHome = runDir
+            .appendingPathComponent("app-data-mirrors", isDirectory: true)
+            .appendingPathComponent(templateSlug, isDirectory: true)
+            .appendingPathComponent(scenario, isDirectory: true)
+        try prepareAuditDaemonDataHomeMirror(
+            sourceDataHome: sourceDataHome,
+            mirrorDataHome: mirrorDataHome,
+            fileManager: fileManager
+        )
+        return AuditDaemonDataHome(
+            launchDataHome: mirrorDataHome,
+            probeDataHome: sourceDataHome,
+            mirroredManifest: true
+        )
+    }
+
+    public static func prepareAuditDaemonDataHomeMirror(
+        sourceDataHome: URL,
+        mirrorDataHome: URL,
+        fileManager: FileManager = .default
+    ) throws {
+        let sourceManifestURL = sourceDataHome
+            .appendingPathComponent("harness", isDirectory: true)
+            .appendingPathComponent("daemon", isDirectory: true)
+            .appendingPathComponent("manifest.json")
+        guard fileManager.fileExists(atPath: sourceManifestURL.path) else {
+            throw Failure(
+                message: "External audit daemon manifest missing at \(sourceManifestURL.path)"
+            )
+        }
+
+        let manifestData = try Data(contentsOf: sourceManifestURL)
+        let rawManifest = try JSONSerialization.jsonObject(with: manifestData)
+        guard var manifest = rawManifest as? [String: Any] else {
+            throw Failure(
+                message: "External audit daemon manifest must be a JSON object at \(sourceManifestURL.path)"
+            )
+        }
+
+        let tokenPathKey: String
+        if manifest["token_path"] != nil {
+            tokenPathKey = "token_path"
+        } else if manifest["tokenPath"] != nil {
+            tokenPathKey = "tokenPath"
+        } else {
+            throw Failure(
+                message: "External audit daemon manifest has no token path at \(sourceManifestURL.path)"
+            )
+        }
+
+        guard
+            let sourceTokenPath = manifest[tokenPathKey] as? String,
+            (sourceTokenPath as NSString).isAbsolutePath
+        else {
+            throw Failure(
+                message: "External audit daemon manifest token path must be absolute at \(sourceManifestURL.path)"
+            )
+        }
+
+        let sourceTokenURL = URL(fileURLWithPath: sourceTokenPath).standardizedFileURL
+        guard fileManager.fileExists(atPath: sourceTokenURL.path) else {
+            throw Failure(
+                message: "External audit daemon token missing at \(sourceTokenURL.path)"
+            )
+        }
+
+        let mirrorDaemonRoot = mirrorDataHome
+            .appendingPathComponent("harness", isDirectory: true)
+            .appendingPathComponent("daemon", isDirectory: true)
+        try fileManager.createDirectory(at: mirrorDaemonRoot, withIntermediateDirectories: true)
+
+        let mirrorTokenURL = mirrorDaemonRoot.appendingPathComponent("auth-token")
+        let mirrorManifestURL = mirrorDaemonRoot.appendingPathComponent("manifest.json")
+        let tokenData = try Data(contentsOf: sourceTokenURL)
+        try tokenData.write(to: mirrorTokenURL, options: .atomic)
+        try fileManager.setAttributes(
+            [.posixPermissions: NSNumber(value: 0o600)],
+            ofItemAtPath: mirrorTokenURL.path
+        )
+
+        manifest[tokenPathKey] = mirrorTokenURL.path
+        let mirroredManifestData = try JSONSerialization.data(
+            withJSONObject: manifest,
+            options: [.prettyPrinted, .sortedKeys]
+        )
+        try mirroredManifestData.write(to: mirrorManifestURL, options: .atomic)
     }
 
     private static func passThroughEnvironment(
