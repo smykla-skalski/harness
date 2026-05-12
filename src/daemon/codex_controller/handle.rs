@@ -11,6 +11,7 @@ use serde_json::{Value, json};
 use tokio::runtime::{Builder, Handle, RuntimeFlavor};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::task::block_in_place;
+use tokio::time::timeout;
 use uuid::Uuid;
 
 use crate::agents::runtime::models::validate_model;
@@ -491,7 +492,14 @@ impl CodexControllerHandle {
     ) -> Result<CodexRunSnapshot, CliError> {
         let action = action.to_string();
         self.block_on_controller_future(async move {
-            receiver.await.map_err(|error| {
+            let result = timeout(Duration::from_secs(30), receiver)
+                .await
+                .map_err(|_| {
+                    CliErrorKind::workflow_io(format!(
+                        "codex {action} worker did not acknowledge within 30s"
+                    ))
+                })?;
+            result.map_err(|error| {
                 CliErrorKind::workflow_io(format!(
                     "codex {action} worker dropped before acknowledgement: {error}"
                 ))
