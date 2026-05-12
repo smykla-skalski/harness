@@ -33,37 +33,17 @@ extension HarnessMonitorStoreSessionWindowTranscriptTests {
       summary: "Derived cockpit row",
       payload: .object([:])
     )
-    let transcriptRowA = TimelineEntry(
+    let transcriptRowA = makeDerivedTranscriptRow(
       entryId: "derived-transcript-a",
       recordedAt: "2026-04-28T00:00:20Z",
-      kind: "assistant_text",
       sessionId: summary.sessionId,
-      agentId: "worker-window-derived-cache",
-      taskId: nil,
-      summary: "Derived transcript row A",
-      payload: .object([
-        "runtime": .string("gemini"),
-        "event": .object([
-          "type": .string("assistant_text"),
-          "content": .string("Derived transcript row A"),
-        ]),
-      ])
+      summary: "Derived transcript row A"
     )
-    let transcriptRowB = TimelineEntry(
+    let transcriptRowB = makeDerivedTranscriptRow(
       entryId: "derived-transcript-b",
       recordedAt: "2026-04-28T00:00:30Z",
-      kind: "assistant_text",
       sessionId: summary.sessionId,
-      agentId: "worker-window-derived-cache",
-      taskId: nil,
-      summary: "Derived transcript row B",
-      payload: .object([
-        "runtime": .string("gemini"),
-        "event": .object([
-          "type": .string("assistant_text"),
-          "content": .string("Derived transcript row B"),
-        ]),
-      ])
+      summary: "Derived transcript row B"
     )
     let container = try HarnessMonitorModelContainer.preview()
     let seedStore = HarnessMonitorStore(
@@ -113,6 +93,30 @@ extension HarnessMonitorStoreSessionWindowTranscriptTests {
     #expect(
       refreshed.transcript(forAgent: "worker-window-derived-cache").map(\.summary)
         == ["Derived transcript row B", "Derived transcript row A"]
+    )
+  }
+
+  private func makeDerivedTranscriptRow(
+    entryId: String,
+    recordedAt: String,
+    sessionId: String,
+    summary: String
+  ) -> TimelineEntry {
+    TimelineEntry(
+      entryId: entryId,
+      recordedAt: recordedAt,
+      kind: "assistant_text",
+      sessionId: sessionId,
+      agentId: "worker-window-derived-cache",
+      taskId: nil,
+      summary: summary,
+      payload: .object([
+        "runtime": .string("gemini"),
+        "event": .object([
+          "type": .string("assistant_text"),
+          "content": .string(summary),
+        ]),
+      ])
     )
   }
 }
