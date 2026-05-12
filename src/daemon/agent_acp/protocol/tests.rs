@@ -3,7 +3,9 @@ use std::process::Command;
 use std::sync::{Arc, Mutex, OnceLock};
 
 use agent_client_protocol::Channel;
-use agent_client_protocol::schema::{ContentBlock, SessionId, SessionUpdate};
+use agent_client_protocol::schema::{
+    ContentBlock, ContentChunk, SessionId, SessionUpdate, TextContent,
+};
 use tokio::sync::broadcast;
 
 use crate::agents::acp::catalog::{
