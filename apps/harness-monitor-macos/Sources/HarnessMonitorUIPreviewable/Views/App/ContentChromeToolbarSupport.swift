@@ -75,23 +75,21 @@ struct RefreshToolbarButton: View {
   }
 
   var body: some View {
-    TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !shouldSpin)) { context in
-      Button {
-        Task { await store.manualRefresh() }
-      } label: {
-        Label {
-          Text("Refresh")
-        } icon: {
-          toolbarSymbol(at: context.date)
-        }
+    Button {
+      Task { await store.manualRefresh() }
+    } label: {
+      Label {
+        Text("Refresh")
+      } icon: {
+        toolbarSymbol
       }
-      .disabled(model.isRefreshing)
-      .help(helpText)
-      .accessibilityLabel("Refresh")
-      .accessibilityHint("Refresh sessions")
-      .accessibilityValue(accessibilityValue)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.refreshButton)
     }
+    .disabled(model.isRefreshing)
+    .help(helpText)
+    .accessibilityLabel("Refresh")
+    .accessibilityHint("Refresh sessions")
+    .accessibilityValue(accessibilityValue)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.refreshButton)
     .task(id: model.manualRefreshSuccessToken) {
       guard model.manualRefreshSuccessToken > 0 else {
         return
@@ -132,33 +130,35 @@ struct RefreshToolbarButton: View {
     }
   }
 
-  private func toolbarSymbol(at date: Date) -> some View {
-    Image(systemName: showsSuccessFeedback ? "checkmark" : "arrow.clockwise")
-      .foregroundStyle(.primary)
-      .rotationEffect(.degrees(showsSuccessFeedback ? 0 : rotationDegrees(at: date)))
-      .contentTransition(
-        .symbolEffect(.replace, options: RefreshToolbarFeedbackTiming.replaceOptions)
-      )
-      .overlay {
-        if showsSuccessTint {
-          Image(systemName: "checkmark")
-            .foregroundStyle(.green)
-            .symbolEffect(
-              .bounce,
-              options: RefreshToolbarFeedbackTiming.bounceOptions,
-              value: successPopToken
-            )
-            .blendMode(.sourceAtop)
-            .accessibilityHidden(true)
+  private var toolbarSymbol: some View {
+    TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !shouldSpin)) { context in
+      Image(systemName: showsSuccessFeedback ? "checkmark" : "arrow.clockwise")
+        .foregroundStyle(.primary)
+        .rotationEffect(.degrees(showsSuccessFeedback ? 0 : rotationDegrees(at: context.date)))
+        .contentTransition(
+          .symbolEffect(.replace, options: RefreshToolbarFeedbackTiming.replaceOptions)
+        )
+        .overlay {
+          if showsSuccessTint {
+            Image(systemName: "checkmark")
+              .foregroundStyle(.green)
+              .symbolEffect(
+                .bounce,
+                options: RefreshToolbarFeedbackTiming.bounceOptions,
+                value: successPopToken
+              )
+              .blendMode(.sourceAtop)
+              .accessibilityHidden(true)
+          }
         }
-      }
-      .compositingGroup()
-      .animation(
-        reduceMotion ? nil : RefreshToolbarFeedbackTiming.transitionAnimation,
-        value: showsSuccessFeedback
-      )
-      .frame(width: 14, height: 14)
-      .accessibilityHidden(true)
+        .compositingGroup()
+        .animation(
+          reduceMotion ? nil : RefreshToolbarFeedbackTiming.transitionAnimation,
+          value: showsSuccessFeedback
+        )
+        .frame(width: 14, height: 14)
+        .accessibilityHidden(true)
+    }
   }
 
   private func rotationDegrees(at date: Date) -> Double {
