@@ -171,8 +171,8 @@ mise run monitor:daemon:dev
 
 The dev daemon runs unsandboxed, writes its manifest into the
 `Q498EB36N4.io.harnessmonitor` app group container, and spawns Codex as its own
-stdio child. No `harness codex-bridge` process is required. For an isolated
-runtime lane, prefix daemon and bridge commands with
+stdio child. No host bridge is required unless you explicitly test the
+WebSocket path. For an isolated runtime lane, prefix daemon and bridge commands with
 `HARNESS_MONITOR_RUNTIME_LANE=<name>`. For isolated CLI builds/tests, use
 `HARNESS_MONITOR_BUILD_LANE=<name>`.
 
@@ -182,9 +182,10 @@ Debug the dev daemon with `lldb -- harness daemon dev` or
 before the daemon also works; the manifest watcher reconnects on first manifest
 write.
 
-If `harness codex-bridge` is already running, stop it before using dev mode. The
-`HARNESS_MONITOR_EXTERNAL_DAEMON` flag is gated behind `#if DEBUG`, so release
-builds always use managed mode.
+If a `harness bridge start` process is already running for the same runtime
+lane, stop it before using dev mode unless you are intentionally testing the
+WebSocket bridge path. The `HARNESS_MONITOR_EXTERNAL_DAEMON` flag is gated
+behind `#if DEBUG`, so release builds always use managed mode.
 
 Managed daemon is the release/distribution path. Use the default
 `HarnessMonitor` scheme. The daemon runs under the macOS App Sandbox through
@@ -195,10 +196,11 @@ agent gets a lane-specific label plus matching daemon data home and Codex bridge
 port env.
 
 Codex threads inside Agents use WebSocket transport when sandboxed. The daemon
-connects to an externally managed `codex app-server` on loopback. Users start
-the bridge with `harness codex-bridge start` or install it as a login item with
-`harness codex-bridge install-launch-agent`. The bridge writes
-`codex-endpoint.json`; the daemon watches it and updates the manifest live.
+connects to a Codex capability published by the unified host bridge. Users start
+the bridge with `harness bridge start` or install it as a login item with
+`harness bridge install-launch-agent`. The bridge publishes capability state in
+the daemon manifest; the Monitor app and daemon use that state to reconfigure
+and surface recovery hints.
 
 When no Codex bridge is running in managed mode,
 `POST /v1/sessions/{id}/managed-agents/codex` returns 503 with
