@@ -51,7 +51,6 @@ public struct SessionWindowView: View {
   }
 
   var stateCache: SessionWindowStateCache { stateCacheStorage }
-
   var snapshot: HarnessMonitorSessionWindowSnapshot? {
     get { snapshotStorage }
     nonmutating set { snapshotStorage = newValue }
@@ -207,8 +206,10 @@ public struct SessionWindowView: View {
       .modifier(
         SessionWindowPerfScenarioScript(
           stateCache: stateCache,
+          columnVisibility: columnVisibilityBinding,
           sessionID: token.sessionID,
-          snapshot: snapshot
+          snapshot: snapshot,
+          decisionIDs: allSessionDecisions.map(\.id)
         )
       )
       .modifier(SessionWindowSearchMirror(stateCache: stateCache, renderedRoute: renderedRoute))

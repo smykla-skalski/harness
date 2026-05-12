@@ -39,6 +39,13 @@ final class ScenarioCatalogTests: XCTestCase {
             ScenarioCatalog.durationSeconds(for: "session-search-full-visual-options-disabled"),
             8
         )
+        XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "sidebar-toggle-rich-detail"), 8)
+        XCTAssertEqual(
+            ScenarioCatalog.durationSeconds(
+                for: "sidebar-toggle-rich-detail-visual-options-disabled"
+            ),
+            8
+        )
         XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "timeline-filter-form"), 8)
         XCTAssertEqual(
             ScenarioCatalog.durationSeconds(for: "timeline-filter-form-visual-options-disabled"),
@@ -59,6 +66,16 @@ final class ScenarioCatalogTests: XCTestCase {
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "task-detail-form-visual-options-disabled"), "dashboard-landing")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "session-search-full"), "dashboard-landing")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "session-search-full-visual-options-disabled"), "dashboard-landing")
+        XCTAssertEqual(
+            ScenarioCatalog.previewScenario(for: "sidebar-toggle-rich-detail"),
+            "dashboard-landing"
+        )
+        XCTAssertEqual(
+            ScenarioCatalog.previewScenario(
+                for: "sidebar-toggle-rich-detail-visual-options-disabled"
+            ),
+            "dashboard-landing"
+        )
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "timeline-filter-form"), "dashboard-landing")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "timeline-filter-form-visual-options-disabled"), "dashboard-landing")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "permission-modal"), "cockpit")
@@ -77,6 +94,10 @@ final class ScenarioCatalogTests: XCTestCase {
         XCTAssertTrue(ScenarioCatalog.swiftUI.contains("task-detail-form-visual-options-disabled"))
         XCTAssertTrue(ScenarioCatalog.swiftUI.contains("session-search-full"))
         XCTAssertTrue(ScenarioCatalog.swiftUI.contains("session-search-full-visual-options-disabled"))
+        XCTAssertTrue(ScenarioCatalog.swiftUI.contains("sidebar-toggle-rich-detail"))
+        XCTAssertTrue(
+            ScenarioCatalog.swiftUI.contains("sidebar-toggle-rich-detail-visual-options-disabled")
+        )
         XCTAssertTrue(ScenarioCatalog.swiftUI.contains("timeline-filter-form"))
         XCTAssertTrue(ScenarioCatalog.swiftUI.contains("timeline-filter-form-visual-options-disabled"))
         XCTAssertTrue(ScenarioCatalog.swiftUI.contains("toast-overlay-churn"))

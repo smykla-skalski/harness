@@ -270,6 +270,8 @@ public enum ManifestBuilder {
             "task-detail-form-visual-options-disabled",
             "session-search-full",
             "session-search-full-visual-options-disabled",
+            "sidebar-toggle-rich-detail",
+            "sidebar-toggle-rich-detail-visual-options-disabled",
             "timeline-filter-form",
             "timeline-filter-form-visual-options-disabled",
             "permission-modal",

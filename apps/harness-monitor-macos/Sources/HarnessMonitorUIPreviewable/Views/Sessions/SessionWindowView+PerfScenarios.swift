@@ -11,12 +11,15 @@ private struct SessionWindowPerfScenarioTrigger: Equatable {
   let rawValue: String?
   let sessionID: String
   let hasSearchCorpus: Bool
+  let sidebarToggleTargets: [SessionSidebarToggleTarget]
 }
 
 struct SessionWindowPerfScenarioScript: ViewModifier {
   let stateCache: SessionWindowStateCache
+  @Binding var columnVisibility: NavigationSplitViewVisibility
   let sessionID: String
   let snapshot: HarnessMonitorSessionWindowSnapshot?
+  let decisionIDs: [String]
 
   @State private var appliedScenarioRawValue: String?
 
@@ -24,7 +27,8 @@ struct SessionWindowPerfScenarioScript: ViewModifier {
     SessionWindowPerfScenarioTrigger(
       rawValue: HarnessMonitorUITestEnvironment.perfScenarioRawValue,
       sessionID: sessionID,
-      hasSearchCorpus: hasSearchCorpus
+      hasSearchCorpus: hasSearchCorpus,
+      sidebarToggleTargets: sidebarToggleTargets
     )
   }
 
@@ -33,6 +37,26 @@ struct SessionWindowPerfScenarioScript: ViewModifier {
       return false
     }
     return !detail.agents.isEmpty || !detail.tasks.isEmpty || !snapshot.timeline.isEmpty
+  }
+
+  private var sidebarToggleTargets: [SessionSidebarToggleTarget] {
+    guard let snapshot, let detail = snapshot.detail else {
+      return []
+    }
+    var targets: [SessionSidebarToggleTarget] = []
+    if let agentID = detail.agents.first?.agentId {
+      targets.append(.agent(agentID))
+    }
+    if let taskID = detail.tasks.first?.taskId {
+      targets.append(.task(taskID))
+    }
+    if let decisionID = decisionIDs.first {
+      targets.append(.decision(decisionID))
+    }
+    if !snapshot.timeline.isEmpty {
+      targets.append(.route(.timeline))
+    }
+    return targets
   }
 
   func body(content: Content) -> some View {
@@ -52,6 +76,10 @@ struct SessionWindowPerfScenarioScript: ViewModifier {
       guard trigger.hasSearchCorpus else { return }
       appliedScenarioRawValue = scenario
       await runFullSessionSearchScript()
+    case "sidebar-toggle-rich-detail":
+      guard !trigger.sidebarToggleTargets.isEmpty else { return }
+      appliedScenarioRawValue = scenario
+      await runSidebarToggleRichDetailScript(targets: trigger.sidebarToggleTargets)
     case "timeline-burst", "timeline-filter-form":
       appliedScenarioRawValue = scenario
       stateCache.selectRoute(.timeline)
@@ -84,4 +112,42 @@ struct SessionWindowPerfScenarioScript: ViewModifier {
       ("worker", .agents),
     ]
   }
+
+  private func runSidebarToggleRichDetailScript(
+    targets: [SessionSidebarToggleTarget]
+  ) async {
+    columnVisibility = .doubleColumn
+    await Task.yield()
+    try? await Task.sleep(for: .milliseconds(180))
+
+    for target in targets {
+      selectSidebarToggleTarget(target)
+      await Task.yield()
+      try? await Task.sleep(for: .milliseconds(180))
+      columnVisibility = .detailOnly
+      try? await Task.sleep(for: .milliseconds(180))
+      columnVisibility = .doubleColumn
+      try? await Task.sleep(for: .milliseconds(220))
+    }
+  }
+
+  private func selectSidebarToggleTarget(_ target: SessionSidebarToggleTarget) {
+    switch target {
+    case .agent(let agentID):
+      stateCache.selectAgent(agentID)
+    case .task(let taskID):
+      stateCache.selectTask(taskID)
+    case .decision(let decisionID):
+      stateCache.selectDecision(decisionID)
+    case .route(let route):
+      stateCache.selectRoute(route)
+    }
+  }
+}
+
+private enum SessionSidebarToggleTarget: Equatable {
+  case agent(String)
+  case task(String)
+  case decision(String)
+  case route(SessionWindowRoute)
 }

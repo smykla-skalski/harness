@@ -190,6 +190,24 @@ extension SessionWindowFlowTests {
     #expect(!source.contains("appSearchModel.setPresented(true)"))
   }
 
+  @Test("Session sidebar toggle perf script drives split view column visibility")
+  func sessionSidebarTogglePerfScriptUsesColumnVisibility() throws {
+    let source = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+PerfScenarios.swift"
+    )
+    let viewSource = try previewableSourceFile(named: "Views/Sessions/SessionWindowView.swift")
+
+    #expect(source.contains("case \"sidebar-toggle-rich-detail\""))
+    #expect(source.contains("guard !trigger.sidebarToggleTargets.isEmpty else { return }"))
+    #expect(source.contains("await runSidebarToggleRichDetailScript("))
+    #expect(source.contains("stateCache.selectAgent(agentID)"))
+    #expect(source.contains("stateCache.selectTask(taskID)"))
+    #expect(source.contains("stateCache.selectDecision(decisionID)"))
+    #expect(source.contains("columnVisibility = .detailOnly"))
+    #expect(source.contains("columnVisibility = .doubleColumn"))
+    #expect(viewSource.contains("columnVisibility: columnVisibilityBinding"))
+  }
+
   @Test("Agent detail deadline clock stays out of text field form state")
   func agentDetailDeadlineClockStaysOutOfTextFieldFormState() throws {
     let sectionSource = try previewableSourceFile(
