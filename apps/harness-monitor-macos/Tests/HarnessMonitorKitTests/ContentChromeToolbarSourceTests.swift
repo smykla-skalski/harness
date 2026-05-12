@@ -9,7 +9,9 @@ struct ContentChromeToolbarSourceTests {
 
     #expect(source.contains("var body: some View {\n    Button {"))
     #expect(!source.contains("var body: some View {\n    TimelineView"))
-    #expect(source.contains("private var toolbarSymbol: some View {\n    TimelineView"))
+    #expect(source.contains("if shouldSpin {\n      TimelineView(.animation(minimumInterval: 1.0 / 30.0))"))
+    #expect(source.contains("} else {\n      toolbarSymbolImage(rotationDegrees: 0)"))
+    #expect(!source.contains("paused:"))
   }
 
   private func sourceFile(at relativePath: String) throws -> String {
