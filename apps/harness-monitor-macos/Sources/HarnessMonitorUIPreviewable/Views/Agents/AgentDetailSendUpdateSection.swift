@@ -19,6 +19,7 @@ struct AgentDetailSendUpdateSection: View {
   @Binding var signalMessage: String
   @Binding var signalActionHint: String
   @FocusState private var focusedField: AgentDetailSendUpdateFocusField?
+  @State private var deadlineClock = AgentDetailDeadlineClockState()
   @State private var isMoreOptionsExpanded = false
   // Measured container width drives the deterministic horizontal/vertical pick
   // below. ViewThatFits would build both candidate trees on every body
@@ -133,6 +134,9 @@ struct AgentDetailSendUpdateSection: View {
         isMoreOptionsExpanded = true
       }
     }
+    .task(id: promptDeadlineDate) {
+      await deadlineClock.run(store: store, deadline: promptDeadlineDate)
+    }
   }
 
   @ViewBuilder private var compactComposer: some View {
@@ -246,7 +250,19 @@ struct AgentDetailSendUpdateSection: View {
       agentID: agentID,
       statusMessage: statusMessage,
       promptDeadlineDate: promptDeadlineDate,
+      deadlineClock: deadlineClock,
       action: dispatchSendUpdate
+    )
+  }
+
+  private var composerStatusRow: some View {
+    AgentDetailComposerStatusRow(
+      store: store,
+      statusMessage: statusMessage,
+      statusTint: statusTint,
+      statusSymbolName: statusSymbolName,
+      promptDeadlineDate: promptDeadlineDate,
+      deadlineClock: deadlineClock
     )
   }
 

@@ -197,11 +197,15 @@ extension SessionWindowFlowTests {
     )
 
     #expect(!sectionSource.contains("@State private var deadlineNow"))
-    #expect(!sectionSource.contains(".task(id: promptDeadlineDate)"))
+    #expect(sectionSource.contains("@State private var deadlineClock"))
+    #expect(
+      sectionSource.contains("await deadlineClock.run(store: store, deadline: promptDeadlineDate)")
+    )
     #expect(sectionSource.contains("AgentDetailDeadlineSendButton("))
+    #expect(presentationSource.contains("final class AgentDetailDeadlineClockState"))
     #expect(presentationSource.contains("struct AgentDetailDeadlineSendButton: View"))
-    #expect(presentationSource.contains("private struct AgentDetailComposerStatusRow: View"))
-    #expect(presentationSource.contains("private enum AgentDetailDeadlineClock"))
+    #expect(presentationSource.contains("struct AgentDetailComposerStatusRow: View"))
+    #expect(!presentationSource.contains("@State private var deadlineNow"))
   }
 
   @Test("Sidebar density keeps strict default and maps legacy values")
