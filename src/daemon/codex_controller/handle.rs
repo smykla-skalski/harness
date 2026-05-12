@@ -744,6 +744,11 @@ impl CodexControllerHandle {
         self.state.active_runs.remove(run_id);
     }
 
+    #[cfg(test)]
+    pub(super) fn poison_active_runs_for_test(&self) {
+        self.state.active_runs.poison_for_test();
+    }
+
     pub(super) fn save_and_broadcast(&self, snapshot: &CodexRunSnapshot) -> Result<(), CliError> {
         let persisted = snapshot.clone();
         if let Some(result) = self
@@ -938,9 +943,33 @@ impl CodexControllerHandle {
         self.sync_orchestration_status_for_run(&snapshot)?;
 
         let (control_tx, control_rx) = mpsc::unbounded_channel();
-        self.state
+        if let Err(error) = self
+            .state
             .active_runs
-            .insert(snapshot.run_id.clone(), control_tx)?;
+            .insert(snapshot.run_id.clone(), control_tx)
+        {
+            let mut failed = snapshot.clone();
+            failed.status = CodexRunStatus::Failed;
+            failed.latest_summary =
+                Some("Codex worker could not attach follow-up turn to daemon".to_string());
+            failed.error = Some(error.to_string());
+            failed.updated_at = utc_now();
+            let payload = json!({
+                "runId": failed.run_id.clone(),
+                "status": "failed",
+                "reason": "active run registry failed",
+                "error": failed.error.clone(),
+            });
+            record_snapshot_event(
+                &mut failed,
+                "agent/reconciled",
+                "Codex follow-up worker could not attach to daemon".to_string(),
+                &payload,
+            );
+            let _ = self.save_and_broadcast(&failed);
+            let _ = self.sync_orchestration_status_for_run(&failed);
+            return Err(error);
+        }
         let worker = CodexRunWorker::new(self.clone(), snapshot.clone(), control_rx);
         tokio::spawn(async move {
             worker.run().await;

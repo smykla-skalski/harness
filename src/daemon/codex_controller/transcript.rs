@@ -25,6 +25,7 @@ pub(super) fn codex_transcript_entries(run: &CodexRunSnapshot) -> Vec<TimelineEn
         .as_deref()
         .map(str::trim)
         .filter(|message| !message.is_empty())
+        .filter(|message| !run_has_agent_message_text(run, message))
     {
         entries.push(codex_timeline_entry(
             run,
@@ -114,17 +115,7 @@ fn codex_agent_message_entry(
     run: &CodexRunSnapshot,
     event: &CodexRunEvent,
 ) -> Option<TimelineEntry> {
-    if event.kind == "item/agentMessage/delta" {
-        return None;
-    }
-    if event.kind != "item/completed" {
-        return None;
-    }
-    let item = event.payload.get("item")?;
-    if item.get("type").and_then(Value::as_str) != Some("agentMessage") {
-        return None;
-    }
-    let text = item.get("text").and_then(Value::as_str)?;
+    let text = agent_message_text(event)?;
     Some(codex_timeline_entry(
         run,
         &event.sequence.to_string(),
@@ -137,6 +128,23 @@ fn codex_agent_message_entry(
             "event": compact_codex_event_payload(event),
         }),
     ))
+}
+
+fn run_has_agent_message_text(run: &CodexRunSnapshot, text: &str) -> bool {
+    run.events.iter().any(|event| {
+        agent_message_text(event).is_some_and(|candidate| candidate.trim() == text)
+    })
+}
+
+fn agent_message_text(event: &CodexRunEvent) -> Option<&str> {
+    if event.kind != "item/completed" {
+        return None;
+    }
+    let item = event.payload.get("item")?;
+    if item.get("type").and_then(Value::as_str) != Some("agentMessage") {
+        return None;
+    }
+    item.get("text").and_then(Value::as_str)
 }
 
 fn compact_codex_event_payload(event: &CodexRunEvent) -> Value {

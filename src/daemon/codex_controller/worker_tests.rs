@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
+use serde_json::json;
 use tokio::sync::{broadcast, mpsc, oneshot};
 
 use super::*;
@@ -67,6 +68,48 @@ async fn unknown_approval_ack_does_not_fail_worker_loop() {
         "unknown approval should report an action error"
     );
     assert_eq!(worker.snapshot.status, CodexRunStatus::WaitingApproval);
+}
+
+#[test]
+fn agent_message_delta_updates_summary_without_event_row_when_throttled() {
+    let (_control_tx, control_rx) = mpsc::unbounded_channel();
+    let mut worker = CodexRunWorker::new(
+        controller_without_db(),
+        running_snapshot_without_ids(),
+        control_rx,
+    );
+    worker.last_delta_persist_at = Some(std::time::Instant::now());
+
+    let should_stop = worker
+        .handle_notification("item/agentMessage/delta", &json!({ "delta": "hello" }))
+        .expect("delta notification should be handled");
+
+    assert!(!should_stop);
+    assert_eq!(worker.snapshot.latest_summary.as_deref(), Some("hello"));
+    assert!(
+        worker.snapshot.events.is_empty(),
+        "delta streaming should not append persisted event rows"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn startup_request_times_out_when_app_server_does_not_answer() {
+    let task = tokio::spawn(with_startup_timeout("initialize", async {
+        std::future::pending::<Result<(), CliError>>().await
+    }));
+
+    tokio::time::advance(STARTUP_REQUEST_TIMEOUT).await;
+    let error = task
+        .await
+        .expect("timeout task should join")
+        .expect_err("startup request should time out");
+
+    assert!(
+        error
+            .to_string()
+            .contains("codex app-server initialize did not respond within 30s"),
+        "unexpected timeout error: {error}"
+    );
 }
 
 fn controller_without_db() -> CodexControllerHandle {
