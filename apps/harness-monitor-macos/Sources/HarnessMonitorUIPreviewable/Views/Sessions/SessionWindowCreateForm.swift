@@ -40,30 +40,31 @@ struct SessionWindowCreateForm: View {
         embeddedAgentRuntimeSections
       }
       Section {
-        LabeledContent("Name") {
-          HStack(spacing: HarnessMonitorTheme.spacingXS) {
-            TextField("", text: title)
-              .harnessNativeTextField()
-              .focused(focusedFieldBinding, equals: .name)
-              .accessibilityLabel("\(draft.kind.title) name")
-              .accessibilityHint(validationMessage(for: .name) ?? "")
-
-            if draft.kind == .agent {
-              Button {
-                regenerateAgentName()
-              } label: {
-                Image(systemName: "arrow.clockwise")
-              }
-              .buttonStyle(.borderless)
-              .help("Generate a new agent name")
-              .accessibilityLabel("Regenerate agent name")
-            }
-          }
+        TextField("", text: title)
+          .harnessNativeTextField()
+          .focused(focusedFieldBinding, equals: .name)
+          .accessibilityLabel("\(draft.kind.title) name")
+          .accessibilityHint(validationMessage(for: .name) ?? "")
           .frame(maxWidth: .infinity, alignment: .leading)
-        }
       } header: {
-        Text(draft.kind.title)
-          .harnessNativeFormSectionHeader()
+        HStack(spacing: HarnessMonitorTheme.spacingXS) {
+          Text("Name")
+            .harnessNativeFormSectionHeader()
+          Spacer(minLength: 0)
+
+          if draft.kind == .agent {
+            Button {
+              regenerateAgentName()
+            } label: {
+              Image(systemName: "arrow.clockwise")
+            }
+            .buttonStyle(.borderless)
+            .controlSize(.mini)
+            .help("Generate a new agent name")
+            .accessibilityLabel("Regenerate agent name")
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
 
       Section {
