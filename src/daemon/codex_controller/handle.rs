@@ -326,8 +326,11 @@ impl CodexControllerHandle {
     /// Returns [`CliError`] on database failures or when the run is missing.
     pub fn run(&self, run_id: &str) -> Result<CodexRunSnapshot, CliError> {
         let run = self.load_run(run_id)?;
-        self.sync_orchestration_status_for_run(&run)?;
-        Ok(run)
+        self.reconcile_run(run)
+    }
+
+    pub(crate) fn session_id_for_run(&self, run_id: &str) -> Result<String, CliError> {
+        Ok(self.load_run(run_id)?.session_id)
     }
 
     fn load_run(&self, run_id: &str) -> Result<CodexRunSnapshot, CliError> {
@@ -386,8 +389,9 @@ impl CodexControllerHandle {
     /// Returns [`CliError`] when the run cannot be loaded or the stopped
     /// snapshot cannot be persisted.
     pub fn stop(&self, run_id: &str) -> Result<CodexRunSnapshot, CliError> {
-        let mut snapshot = self.run(run_id)?;
+        let mut snapshot = self.load_run(run_id)?;
         if !snapshot.status.is_active() {
+            self.sync_orchestration_status_for_run(&snapshot)?;
             return Ok(snapshot);
         }
         if let Ok(active) = self.active_run(run_id) {
@@ -550,31 +554,33 @@ impl CodexControllerHandle {
         runs: Vec<CodexRunSnapshot>,
     ) -> Result<Vec<CodexRunSnapshot>, CliError> {
         runs.into_iter()
-            .map(|mut run| {
-                if run.status.is_active() && !self.state.active_runs.contains(&run.run_id) {
-                    run.status = CodexRunStatus::Failed;
-                    run.latest_summary =
-                        Some("Codex turn is no longer attached to this daemon".to_string());
-                    run.error = Some("Codex turn is no longer attached to this daemon".to_string());
-                    run.pending_approvals.clear();
-                    run.updated_at = utc_now();
-                    let payload = json!({
-                        "runId": run.run_id.clone(),
-                        "status": "failed",
-                        "reason": "active turn no longer attached to daemon",
-                    });
-                    record_snapshot_event(
-                        &mut run,
-                        "agent/reconciled",
-                        "Codex active turn marked stale".to_string(),
-                        &payload,
-                    );
-                    self.save_and_broadcast(&run)?;
-                }
-                self.sync_orchestration_status_for_run(&run)?;
-                Ok(run)
-            })
+            .map(|run| self.reconcile_run(run))
             .collect()
+    }
+
+    fn reconcile_run(&self, mut run: CodexRunSnapshot) -> Result<CodexRunSnapshot, CliError> {
+        if run.status.is_active() && !self.state.active_runs.contains(&run.run_id) {
+            run.status = CodexRunStatus::Failed;
+            run.latest_summary =
+                Some("Codex turn is no longer attached to this daemon".to_string());
+            run.error = Some("Codex turn is no longer attached to this daemon".to_string());
+            run.pending_approvals.clear();
+            run.updated_at = utc_now();
+            let payload = json!({
+                "runId": run.run_id.clone(),
+                "status": "failed",
+                "reason": "active turn no longer attached to daemon",
+            });
+            record_snapshot_event(
+                &mut run,
+                "agent/reconciled",
+                "Codex active turn marked stale".to_string(),
+                &payload,
+            );
+            self.save_and_broadcast(&run)?;
+        }
+        self.sync_orchestration_status_for_run(&run)?;
+        Ok(run)
     }
 
     pub(super) fn sync_orchestration_status_for_run(

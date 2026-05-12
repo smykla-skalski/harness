@@ -125,23 +125,29 @@ pub(super) async fn post_terminal_agent_stop(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = if let Ok(run) = state.codex_controller.run(&managed_agent_id) {
-        with_managed_agent_lock(&state, &run.session_id, &managed_agent_id, || {
-            state
-                .codex_controller
-                .stop(&managed_agent_id)
-                .map(ManagedAgentSnapshot::Codex)
-        })
-        .await
-    } else if state.acp_agent_manager.get(&managed_agent_id).is_ok() {
-        state
-            .acp_agent_manager
-            .stop(&managed_agent_id)
-            .map(ManagedAgentSnapshot::Acp)
-    } else {
-        ensure_terminal_agent(&state, &managed_agent_id)
-            .and_then(|()| state.agent_tui_manager.stop(&managed_agent_id))
-            .map(ManagedAgentSnapshot::Terminal)
+    let result = match state.codex_controller.session_id_for_run(&managed_agent_id) {
+        Ok(session_id) => {
+            with_managed_agent_lock(&state, &session_id, &managed_agent_id, || {
+                state
+                    .codex_controller
+                    .stop(&managed_agent_id)
+                    .map(ManagedAgentSnapshot::Codex)
+            })
+            .await
+        },
+        Err(error) if error.code() == "KSRCLI090" => {
+            if state.acp_agent_manager.get(&managed_agent_id).is_ok() {
+                state
+                    .acp_agent_manager
+                    .stop(&managed_agent_id)
+                    .map(ManagedAgentSnapshot::Acp)
+            } else {
+                ensure_terminal_agent(&state, &managed_agent_id)
+                    .and_then(|()| state.agent_tui_manager.stop(&managed_agent_id))
+                    .map(ManagedAgentSnapshot::Terminal)
+            }
+        }
+        Err(error) => Err(error),
     };
     timed_json(
         "POST",

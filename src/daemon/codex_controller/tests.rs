@@ -270,6 +270,31 @@ fn list_runs_reconciles_stale_active_codex_run() {
 }
 
 #[test]
+fn run_reconciles_stale_active_codex_run() {
+    let (controller, db, _tempdir) = controller_with_db();
+    {
+        let db = db.lock().expect("db lock");
+        db.save_codex_run(&codex_run_snapshot(CodexRunStatus::Running))
+            .expect("save codex run");
+    }
+
+    let run = controller.run("codex-run-1").expect("load codex run");
+
+    assert_eq!(run.status, CodexRunStatus::Failed);
+    assert_eq!(
+        run.error.as_deref(),
+        Some("Codex turn is no longer attached to this daemon")
+    );
+    let persisted = db
+        .lock()
+        .expect("db lock")
+        .codex_run("codex-run-1")
+        .expect("load persisted run")
+        .expect("persisted run");
+    assert_eq!(persisted.status, CodexRunStatus::Failed);
+}
+
+#[test]
 fn list_runs_repairs_disconnected_codex_orchestration_agent() {
     let (controller, db, _tempdir) = controller_with_session_state(
         sample_session_state_with_codex_agent(AgentStatus::disconnected_unknown()),
