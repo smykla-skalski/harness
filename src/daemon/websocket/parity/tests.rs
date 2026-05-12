@@ -10,6 +10,8 @@ use super::*;
 use crate::daemon::protocol::WsRequest;
 use crate::session::types::CURRENT_VERSION;
 
+mod codex;
+
 fn write_valid_session(root: &std::path::Path, sid: &str, origin: &str) {
     fs::create_dir_all(root.join("workspace")).expect("create workspace");
     fs::create_dir_all(root.join("memory")).expect("create memory");
