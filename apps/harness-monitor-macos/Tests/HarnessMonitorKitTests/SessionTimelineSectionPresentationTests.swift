@@ -101,6 +101,74 @@ struct SessionTimelineSectionPresentationTests {
     #expect(presentation.rows.count == presentation.filterSnapshot.rows.count)
   }
 
+  @Test("Presentation cache reuses derived graph for stable inputs")
+  func presentationCacheReusesDerivedGraphForStableInputs() {
+    let cache = SessionTimelineSectionPresentationCache()
+    let timeline = timelineEntries(count: 5)
+    let now = Date(timeIntervalSince1970: 1_780_000_000)
+
+    let first = cache.presentation(
+      sessionID: "session-presentation-tests",
+      timeline: timeline,
+      timelineWindow: nil,
+      decisions: [],
+      signals: [],
+      filters: SessionTimelineFilterState(),
+      isTimelineLoading: false,
+      dateTimeConfiguration: .default,
+      now: now
+    )
+    let second = cache.presentation(
+      sessionID: "session-presentation-tests",
+      timeline: timeline,
+      timelineWindow: nil,
+      decisions: [],
+      signals: [],
+      filters: SessionTimelineFilterState(),
+      isTimelineLoading: false,
+      dateTimeConfiguration: .default,
+      now: now.addingTimeInterval(30)
+    )
+
+    #expect(cache.rebuildCount == 1)
+    #expect(first.rows == second.rows)
+  }
+
+  @Test("Presentation cache rebuilds when filters change")
+  func presentationCacheRebuildsWhenFiltersChange() {
+    let cache = SessionTimelineSectionPresentationCache()
+    let timeline = timelineEntries(count: 5)
+    let now = Date(timeIntervalSince1970: 1_780_000_000)
+
+    _ = cache.presentation(
+      sessionID: "session-presentation-tests",
+      timeline: timeline,
+      timelineWindow: nil,
+      decisions: [],
+      signals: [],
+      filters: SessionTimelineFilterState(),
+      isTimelineLoading: false,
+      dateTimeConfiguration: .default,
+      now: now
+    )
+    var filters = SessionTimelineFilterState()
+    filters.query = "Presentation event 3"
+    let filtered = cache.presentation(
+      sessionID: "session-presentation-tests",
+      timeline: timeline,
+      timelineWindow: nil,
+      decisions: [],
+      signals: [],
+      filters: filters,
+      isTimelineLoading: false,
+      dateTimeConfiguration: .default,
+      now: now
+    )
+
+    #expect(cache.rebuildCount == 2)
+    #expect(filtered.rows.count == 1)
+  }
+
   private func makePresentation(
     timeline: [TimelineEntry],
     timelineWindow: TimelineWindowResponse?,
