@@ -13,6 +13,7 @@ public final class SessionWindowStateCache {
   public let sessionID: String
   public let appSearchIndex: AppSearchIndex
   public let appSearchModel: AppSearchModel
+  public let appSearchAutomation = AppSearchAutomationState()
   public var selection: SessionSelection
   public var sidebarOrdering = SessionSidebarOrderingState()
   public var sidebarSelection = SessionSidebarSelectionState()

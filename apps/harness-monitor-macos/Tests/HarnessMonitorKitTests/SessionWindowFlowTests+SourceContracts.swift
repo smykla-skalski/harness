@@ -162,6 +162,8 @@ extension SessionWindowFlowTests {
     #expect(source.contains("private struct AppSearchSuggestionsHost: View"))
     #expect(source.contains("results: model.results"))
     #expect(source.contains(".onChange(of: model.results.totalHitCount)"))
+    #expect(source.contains("let automation: AppSearchAutomationState?"))
+    #expect(source.contains(".task(id: automationCommand)"))
     #expect(source.contains("@Environment(\\.accessibilityVoiceOverEnabled)"))
     #expect(source.contains("if voiceOverEnabled"))
     #expect(!source.contains("@Bindable var model = model"))
@@ -169,6 +171,20 @@ extension SessionWindowFlowTests {
       "AppSearchFieldRebinder(\n          shouldRebind: !query.isEmpty && model.isPresented"
     #expect(!source.contains(staleRebinderDependency))
     #expect(source.contains("shouldRebind: !query.isEmpty && isSearchPresented"))
+  }
+
+  @Test("Session search perf script drives the real searchable binding")
+  func sessionSearchPerfScriptUsesSearchFieldAutomation() throws {
+    let source = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+PerfScenarios.swift"
+    )
+
+    #expect(source.contains("stateCache.appSearchAutomation.present(query: \"\")"))
+    #expect(source.contains("stateCache.appSearchAutomation.present(query: step.query)"))
+    #expect(source.contains("stateCache.selectRoute(step.route)"))
+    #expect(source.contains("try? await Task.sleep(for: .milliseconds(260))"))
+    #expect(!source.contains("appSearchModel.runSearch(query: step.query"))
+    #expect(!source.contains("appSearchModel.setPresented(true)"))
   }
 
   @Test("Sidebar density keeps strict default and maps legacy values")

@@ -46,6 +46,7 @@ public struct AppSearchHostModifier: ViewModifier {
   let model: AppSearchModel
   let prompt: LocalizedStringKey
   let fallbackPrimaryDomain: AppSearchDomain
+  let automation: AppSearchAutomationState?
   let routeAction: (AppSearchHit) -> Void
 
   @FocusedValue(\.harnessSessionRouteFocus)
@@ -59,11 +60,13 @@ public struct AppSearchHostModifier: ViewModifier {
     model: AppSearchModel,
     prompt: LocalizedStringKey = "Search session",
     fallbackPrimaryDomain: AppSearchDomain = .timeline,
+    automation: AppSearchAutomationState? = nil,
     routeAction: @escaping (AppSearchHit) -> Void = { _ in }
   ) {
     self.model = model
     self.prompt = prompt
     self.fallbackPrimaryDomain = fallbackPrimaryDomain
+    self.automation = automation
     self.routeAction = routeAction
   }
 
@@ -110,6 +113,11 @@ public struct AppSearchHostModifier: ViewModifier {
       .onChange(of: isSearchPresented, initial: true) { _, newValue in
         model.setPresented(newValue)
       }
+      .task(id: automationCommand) {
+        let command = automationCommand
+        guard let command else { return }
+        applyAutomationCommand(command)
+      }
       .environment(\.appSearchModel, model)
   }
 
@@ -143,6 +151,22 @@ public struct AppSearchHostModifier: ViewModifier {
 
   private var resolvedPrimaryDomain: AppSearchDomain {
     routeFocus?.domain ?? fallbackPrimaryDomain
+  }
+
+  private var automationCommand: AppSearchAutomationCommand? {
+    automation?.command
+  }
+
+  private func applyAutomationCommand(_ command: AppSearchAutomationCommand) {
+    if isSearchPresented != command.isPresented {
+      isSearchPresented = command.isPresented
+    }
+    if searchFieldFocused != command.isFocused {
+      searchFieldFocused = command.isFocused
+    }
+    if query != command.query {
+      query = command.query
+    }
   }
 
   private func runDebouncedSearch(for liveQuery: String) async {
@@ -219,6 +243,7 @@ extension View {
     model: AppSearchModel,
     prompt: LocalizedStringKey = "Search session",
     fallbackPrimaryDomain: AppSearchDomain = .timeline,
+    automation: AppSearchAutomationState? = nil,
     routeAction: @escaping (AppSearchHit) -> Void = { _ in }
   ) -> some View {
     modifier(
@@ -226,6 +251,7 @@ extension View {
         model: model,
         prompt: prompt,
         fallbackPrimaryDomain: fallbackPrimaryDomain,
+        automation: automation,
         routeAction: routeAction
       )
     )
