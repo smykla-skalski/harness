@@ -237,7 +237,6 @@ public enum HarnessMonitorAccessibility {
   public static let sessionTimelineLatestButton = "harness.session.timeline.navigation.latest"
   public static let sessionTimelineNewerButton = "harness.session.timeline.navigation.newer"
   public static let connectionCard = "harness.settings.connection-card"
-  public static let cornerOverlay = "harness.corner-overlay"
   public static let agentTuiButton = "harness.session.agent-tui"
   public static let agentDetailScrollView = "harness.agent.detail.scroll"
   public static let agentTuiSheet = "harness.sheet.agent-tui"

@@ -18,10 +18,6 @@ public struct SettingsAppearanceSection: View {
   @AppStorage(HarnessMonitorSidebarSessionRowDisplayMode.storageKey)
   private var sidebarSessionRowDisplayModeRawValue =
     HarnessMonitorSidebarSessionRowDisplayMode.defaultMode.rawValue
-  #if HARNESS_FEATURE_LOTTIE
-    @AppStorage(HarnessMonitorCornerAnimationDefaults.enabledKey)
-    private var cornerAnimationEnabled = false
-  #endif
   @State private var selectedBackgroundTab: BackgroundCollectionTab = .featured
 
   public init(themeMode: Binding<HarnessMonitorThemeMode>) {
@@ -101,12 +97,6 @@ public struct SettingsAppearanceSection: View {
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.settingsMenuBarStateColorsToggle
           )
-
-        #if HARNESS_FEATURE_LOTTIE
-          Toggle("Corner animation", isOn: $cornerAnimationEnabled)
-            .accessibilityHint("Shows a dancing llama during activity")
-            .accessibilityIdentifier("harness.settings.appearance.cornerAnimation")
-        #endif
       } header: {
         Text("Appearance")
       } footer: {
@@ -123,16 +113,13 @@ public struct SettingsAppearanceSection: View {
   }
 
   private var appearanceFooterText: String {
-    var parts = [
+    let parts = [
       "Theme mode, text size, and sidebar session rows apply to every Harness Monitor window.",
       "Session shortcut overlays control the floating shortcut hints in session sidebars and toolbars.",
       "Backdrop controls where the softened background image renders.",
       "The menu bar icon can follow app state colors or stay neutral.",
       "Choosing an image turns on the window backdrop if it is currently off.",
     ]
-    #if HARNESS_FEATURE_LOTTIE
-      parts.append("Corner animation shows a dancing llama during activity.")
-    #endif
     return parts.joined(separator: " ")
   }
 

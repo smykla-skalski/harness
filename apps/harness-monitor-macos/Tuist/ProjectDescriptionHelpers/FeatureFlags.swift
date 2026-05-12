@@ -2,7 +2,6 @@ import Foundation
 import ProjectDescription
 
 public enum FeatureFlag: String, CaseIterable, Sendable {
-    case lottie = "HARNESS_FEATURE_LOTTIE"
     case otel = "HARNESS_FEATURE_OTEL"
     case textual = "HARNESS_FEATURE_TEXTUAL"
 
@@ -28,22 +27,13 @@ public enum FeatureFlags {
         return .string(conditions.joined(separator: " "))
     }
 
-    public static func appAdditionalSourceGlobs(target: String) -> [SourceFileGlob] {
-        enabled.flatMap { flag -> [SourceFileGlob] in
-            switch flag {
-            case .lottie:
-                return [.glob("Sources/\(target)/Features/Lottie/**/*.swift")]
-            case .otel, .textual:
-                return []
-            }
-        }
+    public static func appAdditionalSourceGlobs(target _: String) -> [SourceFileGlob] {
+        []
     }
 
     public static func uiPreviewableAdditionalSourceGlobs() -> [SourceFileGlob] {
         enabled.flatMap { flag -> [SourceFileGlob] in
             switch flag {
-            case .lottie:
-                return [.glob("Sources/HarnessMonitorUIPreviewable/Features/Lottie/**/*.swift")]
             case .otel:
                 return []
             case .textual:
@@ -55,7 +45,7 @@ public enum FeatureFlags {
     public static func kitAdditionalSourceGlobs() -> [SourceFileGlob] {
         enabled.flatMap { flag -> [SourceFileGlob] in
             switch flag {
-            case .lottie, .textual:
+            case .textual:
                 return []
             case .otel:
                 return [.glob("Sources/HarnessMonitorKit/Features/Otel/**/*.swift")]
@@ -66,7 +56,7 @@ public enum FeatureFlags {
     public static func kitTestsAdditionalSourceGlobs() -> [SourceFileGlob] {
         enabled.flatMap { flag -> [SourceFileGlob] in
             switch flag {
-            case .lottie, .textual:
+            case .textual:
                 return []
             case .otel:
                 return [.glob("Tests/HarnessMonitorKitTests/Features/Otel/**/*.swift")]
@@ -75,20 +65,13 @@ public enum FeatureFlags {
     }
 
     public static func appAdditionalDependencies() -> [TargetDependency] {
-        enabled.flatMap { flag -> [TargetDependency] in
-            switch flag {
-            case .lottie:
-                return [.external(name: "Lottie")]
-            case .otel, .textual:
-                return []
-            }
-        }
+        []
     }
 
     public static func uiPreviewableAdditionalDependencies() -> [TargetDependency] {
         enabled.flatMap { flag -> [TargetDependency] in
             switch flag {
-            case .lottie, .otel:
+            case .otel:
                 return []
             case .textual:
                 return [.external(name: "Textual")]
@@ -99,7 +82,7 @@ public enum FeatureFlags {
     public static func kitAdditionalDependencies() -> [TargetDependency] {
         enabled.flatMap { flag -> [TargetDependency] in
             switch flag {
-            case .lottie, .textual:
+            case .textual:
                 return []
             case .otel:
                 return [
