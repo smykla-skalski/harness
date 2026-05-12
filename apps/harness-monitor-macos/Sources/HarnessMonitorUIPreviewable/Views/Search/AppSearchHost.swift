@@ -52,7 +52,6 @@ public struct AppSearchHostModifier: ViewModifier {
   private var routeFocus: HarnessSessionRouteFocus?
 
   @State private var query: String = ""
-  @State private var lastAnnouncedHitCount = -1
   @State private var isSearchPresented: Bool = false
   @FocusState private var searchFieldFocused: Bool
 
@@ -76,10 +75,7 @@ public struct AppSearchHostModifier: ViewModifier {
     // command + cross-scene `@FocusedBinding` route is documented as
     // fragile (Apple Developer Forums thread #693580). Co-locating the
     // shortcut with its target state is the canonical pure-SwiftUI fix.
-    @Bindable var model = model
-
-    return
-      content
+    content
       .searchable(
         text: $query,
         isPresented: $isSearchPresented,
@@ -90,10 +86,7 @@ public struct AppSearchHostModifier: ViewModifier {
       .searchPresentationToolbarBehavior(.avoidHidingContent)
       .harnessMinimizableSearchToolbar()
       .searchSuggestions {
-        AppSearchSuggestionsView(
-          results: model.results,
-          onPick: handleHit
-        )
+        AppSearchSuggestionsHost(model: model, onPick: handleHit)
       }
       .background {
         Button("Find in Session", action: focusSearchField)
@@ -111,14 +104,11 @@ public struct AppSearchHostModifier: ViewModifier {
       }
       .background {
         AppSearchFieldRebinder(
-          shouldRebind: !query.isEmpty && model.isPresented
+          shouldRebind: !query.isEmpty && isSearchPresented
         )
       }
       .onChange(of: isSearchPresented, initial: true) { _, newValue in
         model.setPresented(newValue)
-      }
-      .onChange(of: model.results.totalHitCount) { _, newValue in
-        announceResults(totalHitCount: newValue)
       }
       .environment(\.appSearchModel, model)
   }
@@ -173,6 +163,24 @@ public struct AppSearchHostModifier: ViewModifier {
     )
     await model.runSearch(query: liveQuery, primary: primary)
     appSearchSignposter.endInterval("app_search_query", state)
+  }
+
+}
+
+private struct AppSearchSuggestionsHost: View {
+  let model: AppSearchModel
+  let onPick: (AppSearchHit) -> Void
+
+  @State private var lastAnnouncedHitCount = -1
+
+  var body: some View {
+    AppSearchSuggestionsView(
+      results: model.results,
+      onPick: onPick
+    )
+    .onChange(of: model.results.totalHitCount) { _, newValue in
+      announceResults(totalHitCount: newValue)
+    }
   }
 
   private func announceResults(totalHitCount: Int) {

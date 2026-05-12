@@ -154,6 +154,21 @@ extension SessionWindowFlowTests {
     #expect(splitSource.contains(".onMoveCommand"))
   }
 
+  @Test("Session search results stay out of the toolbar search host body")
+  func sessionSearchResultsDoNotInvalidateSearchFieldHost() throws {
+    let source = try previewableSourceFile(named: "Views/Search/AppSearchHost.swift")
+
+    #expect(source.contains("AppSearchSuggestionsHost(model: model, onPick: handleHit)"))
+    #expect(source.contains("private struct AppSearchSuggestionsHost: View"))
+    #expect(source.contains("results: model.results"))
+    #expect(source.contains(".onChange(of: model.results.totalHitCount)"))
+    #expect(!source.contains("@Bindable var model = model"))
+    let staleRebinderDependency =
+      "AppSearchFieldRebinder(\n          shouldRebind: !query.isEmpty && model.isPresented"
+    #expect(!source.contains(staleRebinderDependency))
+    #expect(source.contains("shouldRebind: !query.isEmpty && isSearchPresented"))
+  }
+
   @Test("Sidebar density keeps strict default and maps legacy values")
   func sidebarDensityResolvesStrictDefaultAndLegacyValues() {
     #expect(HarnessMonitorSidebarSessionRowDisplayMode.defaultMode == .strict)
