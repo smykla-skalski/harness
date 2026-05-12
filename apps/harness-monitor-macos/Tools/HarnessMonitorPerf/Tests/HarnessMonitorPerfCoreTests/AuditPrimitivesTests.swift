@@ -174,6 +174,70 @@ final class AuditPrimitivesTests: XCTestCase {
         }
     }
 
+    func testManifestBuilderCanSeparateLaunchDataHomeFromProbeEvidence() {
+        let probe = DaemonDataHomeProbe(
+            dataHome: "/Users/me/Library/Group Containers/Q498EB36N4.io.harnessmonitor/runtime-lanes/main",
+            exists: true,
+            regularFileCount: 4,
+            totalBytes: 42,
+            containsDaemonManifest: true,
+            containsSQLiteDatabase: true,
+            containsSQLiteWAL: true,
+            containsSQLiteSHM: true
+        )
+        let inputs = ManifestBuilder.Inputs(
+            label: "perf",
+            runID: "run-1",
+            createdAtUTC: "2026-04-25T00:00:00Z",
+            git: .init(commit: "deadbeef", dirty: false, workspaceFingerprint: "abc", buildStartedAtUTC: "2026-04-25T00:00:00Z"),
+            system: .init(xcodeVersion: "16.0", xctraceVersion: "1.0", macosVersion: "14", macosBuild: "23A", arch: "arm64"),
+            targets: .init(
+                project: "/p", shippingScheme: "S", hostScheme: "H",
+                shippingAppPath: "/s.app", hostAppPath: "/h.app",
+                hostBundleID: "io.example.host",
+                stagedHostAppPath: "/staged.app",
+                stagedHostBinaryPath: "/staged.app/MacOS/Bin",
+                stagedHostBundleID: "io.example.staged"
+            ),
+            buildProvenance: .init(
+                auditDaemonBundle: .init(requestedSkip: false, mode: "rebuild", cargoTargetDir: "/t"),
+                host: .init(
+                    embeddedCommit: "x", embeddedDirty: "false",
+                    embeddedWorkspaceFingerprint: "wf",
+                    embeddedStartedAtUTC: "2026", binarySHA256: "bs",
+                    bundleSHA256: "us", binaryMtimeUTC: "m"
+                ),
+                shipping: .init(
+                    built: false, embeddedCommit: "", embeddedDirty: "",
+                    embeddedWorkspaceFingerprint: "", embeddedStartedAtUTC: "",
+                    binarySHA256: "", bundleSHA256: "", binaryMtimeUTC: ""
+                )
+            ),
+            defaultEnvironment: ["HARNESS_MONITOR_UI_TESTS": "1"],
+            launchArguments: [],
+            selectedScenarios: ["open-session-window"],
+            captureRecords: [
+                .init(
+                    scenario: "open-session-window", template: "SwiftUI",
+                    durationSeconds: 8, traceRelpath: "traces/open-session-window.trace",
+                    exitStatus: 0, endReason: "completed",
+                    previewScenario: "dashboard-landing",
+                    launchedProcessPath: "/staged.app/MacOS/Bin",
+                    daemonDataHome: "/tmp/run-1/app-data-mirrors/swiftui/open-session-window",
+                    daemonDataHomeProbe: probe
+                ),
+            ]
+        )
+
+        let capture = ManifestBuilder.build(inputs).captures[0]
+        XCTAssertEqual(
+            capture.environment["HARNESS_DAEMON_DATA_HOME"],
+            "/tmp/run-1/app-data-mirrors/swiftui/open-session-window"
+        )
+        XCTAssertEqual(capture.daemonDataHomeProbe?.dataHome, probe.dataHome)
+        XCTAssertTrue(capture.daemonDataHomeProbe?.containsSQLiteDatabase ?? false)
+    }
+
     func testAuditDefaultEnvironmentPassesThroughLiveDaemonKeysOnly() {
         let environment = AuditRunner.defaultEnvironment(
             processEnvironment: [
@@ -273,6 +337,64 @@ final class AuditPrimitivesTests: XCTestCase {
             dataHome.path,
             "/Users/me/Library/Group Containers/Q498EB36N4.io.harnessmonitor/runtime-lanes/main"
         )
+    }
+
+    func testAuditDaemonDataHomeMirrorsExternalManifestForLaunch() throws {
+        let sourceDataHome = workDir.appendingPathComponent("source-data-home", isDirectory: true)
+        let sourceDaemonRoot = sourceDataHome
+            .appendingPathComponent("harness", isDirectory: true)
+            .appendingPathComponent("daemon", isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceDaemonRoot, withIntermediateDirectories: true)
+        let sourceTokenURL = sourceDaemonRoot.appendingPathComponent("auth-token")
+        try Data("secret-token".utf8).write(to: sourceTokenURL)
+        let sourceManifestURL = sourceDaemonRoot.appendingPathComponent("manifest.json")
+        try Data("""
+        {
+          "endpoint": "http://127.0.0.1:60385",
+          "pid": 123,
+          "started_at": "2026-05-12T15:45:43Z",
+          "token_path": "\(sourceTokenURL.path)",
+          "version": "34.1.0"
+        }
+        """.utf8).write(to: sourceManifestURL)
+
+        let runDir = workDir.appendingPathComponent("audit-run", isDirectory: true)
+        let dataHome = try AuditRunner.auditDaemonDataHome(
+            runDir: runDir,
+            templateSlug: "swiftui",
+            scenario: "open-session-window",
+            defaultEnvironment: [
+                "HARNESS_MONITOR_LAUNCH_MODE": "live",
+                "HARNESS_MONITOR_EXTERNAL_DAEMON": "1",
+            ],
+            processEnvironment: [
+                AuditRunner.daemonDataHomeOverrideEnvironmentKey: sourceDataHome.path,
+            ]
+        )
+
+        XCTAssertTrue(dataHome.mirroredManifest)
+        XCTAssertEqual(dataHome.probeDataHome.path, sourceDataHome.path)
+        XCTAssertEqual(
+            dataHome.launchDataHome.path,
+            runDir.appendingPathComponent("app-data-mirrors/swiftui/open-session-window").path
+        )
+
+        let mirrorDaemonRoot = dataHome.launchDataHome
+            .appendingPathComponent("harness", isDirectory: true)
+            .appendingPathComponent("daemon", isDirectory: true)
+        let mirrorManifestURL = mirrorDaemonRoot.appendingPathComponent("manifest.json")
+        let mirrorTokenURL = mirrorDaemonRoot.appendingPathComponent("auth-token")
+        let mirrorManifestData = try Data(contentsOf: mirrorManifestURL)
+        let mirrorManifest = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: mirrorManifestData) as? [String: Any]
+        )
+        XCTAssertEqual(mirrorManifest["endpoint"] as? String, "http://127.0.0.1:60385")
+        XCTAssertEqual(mirrorManifest["token_path"] as? String, mirrorTokenURL.path)
+        XCTAssertEqual(try String(contentsOf: mirrorTokenURL, encoding: .utf8), "secret-token")
+
+        let permissions = try FileManager.default
+            .attributesOfItem(atPath: mirrorTokenURL.path)[.posixPermissions] as? NSNumber
+        XCTAssertEqual(permissions?.intValue ?? 0, 0o600)
     }
 
     func testDaemonDataHomeProbeCapturesRealDatabaseEvidence() throws {
