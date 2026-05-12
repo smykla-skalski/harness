@@ -7,7 +7,13 @@ struct SidebarSearchPresentationState {
 
   mutating func requestPresentation(canPresent: Bool) -> Bool {
     guard canPresent else {
-      hasPendingFocusRequest = true
+      if !hasPendingFocusRequest {
+        hasPendingFocusRequest = true
+      }
+      return false
+    }
+    guard !isPresented else {
+      hasPendingFocusRequest = false
       return false
     }
     isPresented = true
@@ -19,6 +25,9 @@ struct SidebarSearchPresentationState {
       return false
     }
     hasPendingFocusRequest = false
+    guard !isPresented else {
+      return false
+    }
     isPresented = true
     return true
   }
@@ -38,9 +47,6 @@ struct SidebarSearchHost: View {
   let collapsedCheckoutKeys: Set<String>
   let setCheckoutCollapsed: (String, Bool) -> Void
 
-  @AppStorage(HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
-  private var mcpRegistryHostEnabled = HarnessMonitorMCPSettingsDefaults
-    .registryHostEnabledDefault
   @State private var searchPresentationState = SidebarSearchPresentationState()
   @State private var searchFocusDispatcher = HarnessSidebarSearchFocusDispatcher()
 
@@ -58,14 +64,20 @@ struct SidebarSearchHost: View {
   private var searchText: Binding<String> {
     Binding(
       get: { store.searchText },
-      set: { store.searchText = $0 }
+      set: { newValue in
+        guard store.searchText != newValue else { return }
+        store.searchText = newValue
+      }
     )
   }
 
   private var searchPresentation: Binding<Bool> {
     Binding(
       get: { searchPresentationState.isPresented },
-      set: { searchPresentationState.isPresented = $0 }
+      set: { newValue in
+        guard searchPresentationState.isPresented != newValue else { return }
+        searchPresentationState.isPresented = newValue
+      }
     )
   }
 
