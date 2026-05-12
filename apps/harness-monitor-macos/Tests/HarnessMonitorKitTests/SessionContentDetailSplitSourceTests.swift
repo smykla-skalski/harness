@@ -33,23 +33,15 @@ struct SessionContentDetailSplitSourceTests {
     )
 
     #expect(
-      columnsSource.contains(
-        """
-        SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding) {
-                contentColumn
-              } detail: {
-                detailColumn
-              }
-              .backgroundExtensionEffect()
-        """
-      )
+      columnsSource.components(separatedBy: ".sessionWindowBackgroundExtensionEffect()").count
+        - 1 == 2
     )
     #expect(
       !columnsSource.contains(
         """
         SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding) {
                 contentColumn
-                  .backgroundExtensionEffect()
+                  .sessionWindowBackgroundExtensionEffect()
         """
       )
     )
@@ -58,7 +50,7 @@ struct SessionContentDetailSplitSourceTests {
         """
               } detail: {
                 detailColumn
-                  .backgroundExtensionEffect()
+                  .sessionWindowBackgroundExtensionEffect()
               }
         """
       )

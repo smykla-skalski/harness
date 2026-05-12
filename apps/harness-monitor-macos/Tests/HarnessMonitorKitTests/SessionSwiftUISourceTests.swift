@@ -6,7 +6,7 @@ import Testing
 @Suite("Session SwiftUI source contracts")
 struct SessionSwiftUISourceTests {
   @Test(
-    "Task detail stays on the native form surface while session decisions reuse the rich shared detail"
+    "Task detail avoids nested forms while session decisions reuse the rich shared detail"
   )
   func taskAndDecisionDetailSurfacesStayAlignedWithTheirSharedContainers() throws {
     let taskSource = try sourceFile(at: "Views/Sessions/SessionTaskDetailPane.swift")
@@ -16,22 +16,17 @@ struct SessionSwiftUISourceTests {
     let agentViewportSource = try sourceFile(at: "Views/Sessions/SessionAgentLaneViews.swift")
     let columnsSource = try sourceFile(at: "Views/Sessions/SessionWindowView+Columns.swift")
 
-    #expect(taskSource.contains("SessionDetailScrollSurface(contentPadding: 0)"))
-    #expect(taskSource.contains("Form {"))
-    #expect(taskSource.contains(".harnessNativeFormContainer()"))
     #expect(
-      taskSource.contains(
-        ".contentMargins(.horizontal, metrics.contentPadding, for: .scrollContent)"
-      )
+      taskSource.contains("SessionDetailScrollSurface(contentPadding: metrics.contentPadding)")
     )
-    #expect(
-      taskSource.contains(
-        ".contentMargins(.vertical, metrics.contentPadding, for: .scrollContent)"
-      )
-    )
-    #expect(taskSource.contains(".scrollDisabled(true)"))
-    #expect(taskSource.contains(".scrollContentBackground(.hidden)"))
-    #expect(!taskSource.contains("SessionDetailPanel("))
+    #expect(taskSource.contains("VStack(alignment: .leading, spacing: metrics.sectionSpacing)"))
+    #expect(taskSource.contains("SessionDetailPanel(title: \"Task\")"))
+    #expect(taskSource.contains("SessionDetailFactsGrid("))
+    #expect(taskSource.contains(".harnessNativeFormControl()"))
+    #expect(!taskSource.contains("Form {"))
+    #expect(!taskSource.contains(".harnessNativeFormContainer()"))
+    #expect(!taskSource.contains(".contentMargins("))
+    #expect(!taskSource.contains(".scrollContentBackground(.hidden)"))
     #expect(decisionSource.contains("SessionFilteredDecisionNotice("))
     #expect(decisionSource.contains("DecisionDetailView("))
     #expect(decisionSource.contains("handler: actionHandler"))
@@ -49,7 +44,6 @@ struct SessionSwiftUISourceTests {
   func formSectionsUseSharedFontScalingHelpers() throws {
     let themeSource = try sourceFile(at: "Theme/HarnessMonitorTextSize.swift")
     let sectionFiles = [
-      "Views/Sessions/SessionTaskDetailPane.swift",
       "Views/Sessions/SessionWindowCreateForm.swift",
       "Views/Settings/SettingsConnectionCard.swift",
       "Views/Settings/SettingsCodexSection.swift",
@@ -68,8 +62,7 @@ struct SessionSwiftUISourceTests {
       "Views/Settings/Supervisor/SettingsSupervisorBackgroundPane.swift",
     ]
     let containerFiles = [
-      "Views/Sessions/SessionTaskDetailPane.swift",
-      "Views/Sessions/SessionWindowCreateForm.swift",
+      "Views/Sessions/SessionWindowCreateForm.swift"
     ]
 
     #expect(themeSource.contains("func harnessNativeFormSectionHeader()"))
@@ -161,10 +154,22 @@ struct SessionSwiftUISourceTests {
   @Test("Session content columns extend behind toolbar glass with soft scroll edge")
   func sessionContentColumnsExtendBehindToolbarGlassWithSoftScrollEdge() throws {
     let columnsSource = try sourceFile(at: "Views/Sessions/SessionWindowView+Columns.swift")
+    let extensionEffectSource = try sourceFile(
+      at: "Views/Sessions/SessionWindowBackgroundExtensionEffect.swift"
+    )
     let surfaceSource = try sourceFile(at: "Views/Sessions/SessionDetailSurface.swift")
 
     #expect(!columnsSource.contains("SessionBackgroundExtensionSurface()"))
-    #expect(columnsSource.components(separatedBy: ".backgroundExtensionEffect()").count - 1 == 2)
+    #expect(
+      columnsSource.components(separatedBy: ".sessionWindowBackgroundExtensionEffect()").count
+        - 1 == 2
+    )
+    #expect(
+      extensionEffectSource.contains("@AppStorage(HarnessMonitorBackdropDefaults.modeKey)")
+    )
+    #expect(extensionEffectSource.contains("@Environment(\\.accessibilityReduceTransparency)"))
+    #expect(extensionEffectSource.contains("if reduceTransparency || backdropMode == .none"))
+    #expect(extensionEffectSource.contains("content.backgroundExtensionEffect()"))
     #expect(!surfaceSource.contains(".backgroundExtensionEffect()"))
     #expect(surfaceSource.contains("topScrollEdgeEffect: .soft"))
   }
