@@ -9,8 +9,13 @@ struct SessionWindowCreateFormCodexSourceTests {
   func codexFormUsesStaticModelLabel() throws {
     let source = try previewableSourceFile(
       at: "Views/Sessions/SessionWindowCreateForm+Helpers.swift")
+    let staticModelPickerSource = [
+      "Picker(",
+      "          \"Model\",",
+      "          selection: codexModelPickerSelection",
+    ].joined(separator: "\n")
 
-    #expect(source.contains("Picker(\n          \"Model\",\n          selection: codexModelPickerSelection"))
+    #expect(source.contains(staticModelPickerSource))
     #expect(!source.contains("selectedCodexModelMenuTitle(catalog: codexCatalog)"))
     #expect(!source.contains("func selectedCodexModelMenuTitle"))
   }
