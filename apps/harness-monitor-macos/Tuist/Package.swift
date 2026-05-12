@@ -6,6 +6,7 @@ import ProjectDescription
 
 let packageSettings = PackageSettings(
     productTypes: [
+        "SwiftUIIntrospect": .framework,
         "Textual": .framework
     ],
     baseSettings: .settings(
@@ -37,13 +38,21 @@ let packageSettings = PackageSettings(
             ]),
             .release(name: "Release")
         ]
-    )
+    ),
+    targetSettings: [
+        "SwiftUIIntrospect": .settings(
+            base: [
+                "MACOSX_DEPLOYMENT_TARGET": "26.0"
+            ]
+        )
+    ]
 )
 #endif
 
 let package = Package(
     name: "HarnessMonitorDeps",
     dependencies: [
+        .package(url: "https://github.com/siteline/swiftui-introspect", exact: "26.0.1"),
         .package(url: "https://github.com/open-telemetry/opentelemetry-swift", exact: "2.3.0"),
         .package(url: "https://github.com/open-telemetry/opentelemetry-swift-core", exact: "2.4.1"),
         .package(url: "https://github.com/grpc/grpc-swift", exact: "1.27.0"),

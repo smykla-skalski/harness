@@ -155,21 +155,16 @@ struct NewSessionSheetView: View {
         "Context",
         help: "Optional goals, links, or handoff notes. Multiline input stays enabled."
       ) {
-        ZStack(alignment: .topLeading) {
-          if viewModel.context.isEmpty {
-            Text("Optional goals, links, or handoff notes")
-              .scaledFont(.body)
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-              .padding(.horizontal, HarnessMonitorTheme.spacingSM)
-              .padding(.vertical, HarnessMonitorTheme.spacingXS)
-              .allowsHitTesting(false)
-          }
-          TextEditor(text: $viewModel.context)
-            .harnessNativeFormControl()
-            .focused($focusedField, equals: .context)
-            .frame(minHeight: 84)
-            .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionContext)
-        }
+        HarnessMonitorMultilineTextField(
+          placeholder: "Optional goals, links, or handoff notes",
+          text: $viewModel.context,
+          minHeight: 84,
+          focusedField: $focusedField,
+          equals: .context,
+          accessibilityLabel: "Context",
+          accessibilityHint: "Optional goals, links, or handoff notes. Multiline input stays enabled."
+        )
+        .accessibilityIdentifier(HarnessMonitorAccessibility.newSessionContext)
       }
     }
   }

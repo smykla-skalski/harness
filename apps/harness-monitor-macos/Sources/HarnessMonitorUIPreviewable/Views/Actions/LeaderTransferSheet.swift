@@ -132,6 +132,7 @@ struct LeaderTransferSheet: View {
       }
       TextField("Reason", text: $transferReason, axis: .vertical)
         .harnessNativeFormControl()
+        .harnessNativeVerticalTextField()
         .lineLimit(3, reservesSpace: true)
         .submitLabel(.done)
       HarnessInlineActionButton(

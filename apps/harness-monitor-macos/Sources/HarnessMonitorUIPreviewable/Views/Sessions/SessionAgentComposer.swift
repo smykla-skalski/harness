@@ -29,10 +29,17 @@ struct SessionAgentComposer: View {
 
   var body: some View {
     HStack(alignment: .bottom, spacing: metrics.composerSpacing) {
-      TextEditor(text: $message)
-        .scaledFont(.body)
-        .frame(minHeight: metrics.composerMinHeight, maxHeight: metrics.composerMaxHeight)
-        .focused(focusedField, equals: .composer)
+      HarnessMonitorMultilineTextField(
+        placeholder: "",
+        text: $message,
+        minHeight: metrics.composerMinHeight,
+        maxHeight: metrics.composerMaxHeight,
+        showsChrome: false,
+        focusedField: focusedField,
+        equals: .composer,
+        accessibilityLabel: "Agent message"
+      )
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityLabel("Agent message")
         .accessibilityIdentifier(HarnessMonitorAccessibility.sessionAgentComposer(agentID))
 

@@ -1,5 +1,7 @@
+import AppKit
 import Foundation
 import SwiftUI
+import SwiftUIIntrospect
 
 // MARK: - Scale levels
 
@@ -35,6 +37,14 @@ public enum HarnessMonitorTextSize {
     return scaledFont(font, by: scale(at: index))
   }
 
+  public static func nativeInputIndex(_ index: Int) -> Int {
+    min(normalizedIndex(index), defaultIndex)
+  }
+
+  public static func nativeInputFont(at index: Int) -> Font {
+    nativeFormControlFont(at: nativeInputIndex(index))
+  }
+
   public static func scaledFont(_ font: Font, by scale: CGFloat) -> Font {
     scale == 1.0 ? font : font.scaled(by: scale)
   }
@@ -48,6 +58,10 @@ public enum HarnessMonitorTextSize {
     default:
       .large
     }
+  }
+
+  public static func nativeInputControlSize(at index: Int) -> ControlSize {
+    controlSize(at: nativeInputIndex(index))
   }
 
   public static func controlSizeLabel(at index: Int) -> String {
@@ -140,30 +154,65 @@ private struct HarnessMonitorNativeFormControlModifier: ViewModifier {
   }
 }
 
+enum HarnessMonitorNativeTextFieldChromeMetrics {
+  static let cornerRadius: CGFloat = 8
+  static let horizontalPadding: CGFloat = 8
+  static let verticalPadding: CGFloat = 4
+}
+
 private struct HarnessMonitorNativeTextFieldModifier: ViewModifier {
-  @Environment(\.harnessNativeFormControlFont)
-  private var font
-  @Environment(\.harnessNativeFormControlSize)
-  private var controlSize
+  @Environment(\.harnessTextSizeIndex)
+  private var textSizeIndex
 
   func body(content: Content) -> some View {
     content
       .frame(maxWidth: .infinity, alignment: .leading)
       .multilineTextAlignment(.leading)
-      .font(font)
-      .controlSize(controlSize)
+      .font(HarnessMonitorTextSize.nativeInputFont(at: textSizeIndex))
+      .controlSize(HarnessMonitorTextSize.nativeInputControlSize(at: textSizeIndex))
       .textFieldStyle(.plain)
-      .padding(.horizontal, 10)
-      .padding(.vertical, 8)
+      .padding(.horizontal, HarnessMonitorNativeTextFieldChromeMetrics.horizontalPadding)
+      .padding(.vertical, HarnessMonitorNativeTextFieldChromeMetrics.verticalPadding)
       .background(
-        RoundedRectangle(cornerRadius: 8, style: .continuous)
-          .fill(HarnessMonitorTheme.ink.opacity(0.10))
+        RoundedRectangle(
+          cornerRadius: HarnessMonitorNativeTextFieldChromeMetrics.cornerRadius,
+          style: .continuous
+        )
+        .fill(HarnessMonitorTheme.ink.opacity(0.10))
       )
       .overlay(
-        RoundedRectangle(cornerRadius: 8, style: .continuous)
-          .stroke(HarnessMonitorTheme.controlBorder.opacity(0.7), lineWidth: 1)
+        RoundedRectangle(
+          cornerRadius: HarnessMonitorNativeTextFieldChromeMetrics.cornerRadius,
+          style: .continuous
+        )
+        .stroke(HarnessMonitorTheme.controlBorder.opacity(0.7), lineWidth: 1)
       )
       .contentShape(Rectangle())
+  }
+}
+
+private enum HarnessMonitorNativeVerticalTextFieldConfiguration {
+  @MainActor
+  static func apply(to textField: NSTextField) {
+    textField.alignment = .left
+    textField.maximumNumberOfLines = 0
+    textField.lineBreakMode = .byWordWrapping
+
+    if let cell = textField.cell as? NSTextFieldCell {
+      cell.wraps = true
+      cell.usesSingleLineMode = false
+      cell.lineBreakMode = .byWordWrapping
+    }
+  }
+}
+
+private struct HarnessMonitorNativeVerticalTextFieldModifier: ViewModifier {
+  func body(content: Content) -> some View {
+    content
+      .multilineTextAlignment(.leading)
+      .introspect(.textField(axis: .vertical), on: .macOS(.v26)) { textField in
+        HarnessMonitorNativeVerticalTextFieldConfiguration.apply(to: textField)
+      }
   }
 }
 
@@ -208,6 +257,10 @@ extension View {
 
   public func harnessNativeTextField() -> some View {
     modifier(HarnessMonitorNativeTextFieldModifier())
+  }
+
+  public func harnessNativeVerticalTextField() -> some View {
+    modifier(HarnessMonitorNativeVerticalTextFieldModifier())
   }
 
   public func harnessNativeFormSectionHeader() -> some View {
