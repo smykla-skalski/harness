@@ -25,28 +25,9 @@ extension SessionWindowView {
         showsFilteredNotice: sessionDecisionDetailHiddenByFilters
       )
     case .task(_, let taskID):
-      if let task = snapshot?.detail?.tasks.first(where: { $0.taskId == taskID }) {
-        SessionTaskDetailPane(
-          task: task,
-          openActions: { presentTaskActions(for: task.taskId) }
-        )
-      } else {
-        unavailableDetailSurface(
-          "Task Not Available",
-          systemImage: "checklist",
-          description: Text(taskID)
-        )
-      }
+      taskDetailContent(for: taskID)
     case .codexRun(_, let runID):
-      if let run = sessionCodexRuns.first(where: { $0.runId == runID }) {
-        SessionCodexRunDetailSection(store: store, run: run)
-      } else {
-        unavailableDetailSurface(
-          "Codex Run Not Available",
-          systemImage: "wand.and.stars",
-          description: Text(runID)
-        )
-      }
+      codexRunDetailContent(for: runID)
     case .create(let draft):
       SessionWindowCreateForm(
         store: store,
@@ -72,6 +53,35 @@ extension SessionWindowView {
         "Select an Item",
         systemImage: "sidebar.right",
         description: Text("Pick an agent, decision, or task in the sidebar.")
+      )
+    }
+  }
+
+  @ViewBuilder
+  private func taskDetailContent(for taskID: String) -> some View {
+    if let task = snapshot?.detail?.tasks.first(where: { $0.taskId == taskID }) {
+      SessionTaskDetailPane(
+        task: task,
+        openActions: { presentTaskActions(for: task.taskId) }
+      )
+    } else {
+      unavailableDetailSurface(
+        "Task Not Available",
+        systemImage: "checklist",
+        description: Text(taskID)
+      )
+    }
+  }
+
+  @ViewBuilder
+  private func codexRunDetailContent(for runID: String) -> some View {
+    if let run = sessionCodexRuns.first(where: { $0.runId == runID }) {
+      SessionCodexRunDetailSection(store: store, run: run)
+    } else {
+      unavailableDetailSurface(
+        "Codex Run Not Available",
+        systemImage: "wand.and.stars",
+        description: Text(runID)
       )
     }
   }
