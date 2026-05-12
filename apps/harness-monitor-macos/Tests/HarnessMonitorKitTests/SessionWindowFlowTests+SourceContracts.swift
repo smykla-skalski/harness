@@ -15,7 +15,12 @@ extension SessionWindowFlowTests {
     #expect(!source.contains(".onGeometryChange("))
     #expect(source.contains("OpenRecentStartPanelLayout("))
     #expect(!source.contains("SessionBackgroundExtensionSurface()"))
-    #expect(source.contains(".backgroundExtensionEffect()"))
+    #expect(source.contains(".harnessMonitorBackgroundExtensionEffect()"))
+    #expect(!source.contains(".backgroundExtensionEffect()"))
+    #expect(source.contains("store.sessionIndex.catalog.recentSessions.prefix(8).map"))
+    #expect(!source.contains("OpenRecentProjectGroup"))
+    #expect(source.contains("OpenRecentSessionStatusDot(status:"))
+    #expect(!source.contains("sessionStatusSymbol("))
   }
 
   @MainActor
@@ -143,7 +148,7 @@ extension SessionWindowFlowTests {
     #expect(
       splitSource.contains("_liveContentWidth = State(wrappedValue: contentWidth.wrappedValue)"))
     #expect(splitSource.contains(".accessibilityAdjustableAction"))
-    #expect(splitSource.contains(".focusEffectDisabled()"))
+    #expect(!splitSource.contains(".focusEffectDisabled()"))
     #expect(splitSource.contains(".focusable(interactions: .activate)"))
     #expect(splitSource.contains("if !isDragging {"))
     #expect(splitSource.contains(".onMoveCommand"))

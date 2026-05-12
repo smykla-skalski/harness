@@ -116,16 +116,6 @@ struct KeyboardShortcutLabel: View {
   }
 }
 
-func sessionStatusSymbol(_ status: SessionStatus) -> String {
-  switch status {
-  case .active: "play.circle"
-  case .awaitingLeader: "person.crop.circle.badge.clock"
-  case .leaderlessDegraded: "exclamationmark.triangle"
-  case .paused: "pause.circle"
-  case .ended: "checkmark.circle"
-  }
-}
-
 enum OpenRecentCloseAfterPickMotionPolicy {
   static let animatedDismissDuration: Double = 0.16
 
@@ -139,34 +129,6 @@ enum OpenRecentCloseAfterPickMotionPolicy {
 
   static func dismissDelay(reduceMotion: Bool) -> Duration {
     reduceMotion ? .zero : .milliseconds(Int(animatedDismissDuration * 1000))
-  }
-}
-
-struct OpenRecentProjectGroup: Identifiable {
-  let id: String
-  let projectName: String
-  let sessions: [OpenRecentSessionItem]
-
-  static func groups(
-    from sessions: [SessionSummary],
-    bookmarkedSessionIDs: Set<String>
-  ) -> [Self] {
-    let grouped = Dictionary(grouping: sessions) { $0.projectId }
-    return grouped.values.map { projectSessions in
-      let sortedSessions = projectSessions.map {
-        OpenRecentSessionItem(
-          session: $0,
-          isBookmarked: bookmarkedSessionIDs.contains($0.sessionId)
-        )
-      }
-      let first = projectSessions[0]
-      return Self(
-        id: first.projectId,
-        projectName: first.projectName,
-        sessions: sortedSessions
-      )
-    }
-    .sorted { $0.projectName.localizedCaseInsensitiveCompare($1.projectName) == .orderedAscending }
   }
 }
 
