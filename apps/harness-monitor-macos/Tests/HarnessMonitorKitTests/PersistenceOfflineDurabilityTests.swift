@@ -412,6 +412,9 @@ struct PersistenceOfflineDurabilityTests {
     #expect(configs.isEmpty)
   }
 
+}
+
+extension PersistenceOfflineDurabilityTests {
   @Test("Live SwiftData store rebuilds incompatible cache stores with unknown model versions")
   func liveStoreRebuildsIncompatibleCacheStoreWithUnknownModelVersion() throws {
     let root = FileManager.default.temporaryDirectory
