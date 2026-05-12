@@ -20,14 +20,12 @@ pub(super) fn turn_sandbox_policy(mode: CodexRunMode, project_dir: &str) -> Valu
     match mode {
         CodexRunMode::Report | CodexRunMode::Approval => json!({
             "type": "readOnly",
-            "networkAccess": false,
-            "access": { "type": "fullAccess" }
+            "networkAccess": false
         }),
         CodexRunMode::WorkspaceWrite => json!({
             "type": "workspaceWrite",
             "networkAccess": false,
-            "writableRoots": [project_dir],
-            "readOnlyAccess": { "type": "fullAccess" }
+            "writableRoots": [project_dir]
         }),
     }
 }
@@ -260,8 +258,19 @@ mod tests {
             turn_sandbox_policy(CodexRunMode::Approval, "/tmp/project"),
             json!({
                 "type": "readOnly",
+                "networkAccess": false
+            })
+        );
+    }
+
+    #[test]
+    fn workspace_write_turn_sandbox_uses_current_app_server_shape() {
+        assert_eq!(
+            turn_sandbox_policy(CodexRunMode::WorkspaceWrite, "/tmp/project"),
+            json!({
+                "type": "workspaceWrite",
                 "networkAccess": false,
-                "access": { "type": "fullAccess" }
+                "writableRoots": ["/tmp/project"]
             })
         );
     }
