@@ -222,7 +222,6 @@ private struct SessionContentDetailDivider: View {
     .frame(width: interactiveWidth)
     .contentShape(Rectangle())
     .focusable(interactions: .activate)
-    .focusEffectDisabled()
     .focused($isKeyboardFocused)
     .help("Drag or use the arrow keys to resize the content and detail panes.")
     .gesture(dragGesture)
