@@ -17,7 +17,10 @@ use crate::daemon::index::DiscoveredProject;
 use crate::daemon::protocol::{
     CodexApprovalRequest, CodexRunMode, CodexRunRequest, CodexRunSnapshot, CodexRunStatus,
 };
-use crate::session::types::{SessionMetrics, SessionRole, SessionState, SessionStatus};
+use crate::session::types::{
+    AgentRegistration, AgentStatus, ManagedAgentRef, SessionMetrics, SessionRole, SessionState,
+    SessionStatus,
+};
 
 #[test]
 fn start_run_rejects_empty_prompt_before_db_lookup() {
@@ -267,6 +270,35 @@ fn list_runs_reconciles_stale_active_codex_run() {
 }
 
 #[test]
+fn list_runs_repairs_disconnected_codex_orchestration_agent() {
+    let (controller, db, _tempdir) = controller_with_session_state(
+        sample_session_state_with_codex_agent(AgentStatus::disconnected_unknown()),
+    );
+    {
+        let db = db.lock().expect("db lock");
+        db.save_codex_run(&codex_run_snapshot(CodexRunStatus::Completed))
+            .expect("save codex run");
+    }
+
+    let listed = controller
+        .list_runs("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
+        .expect("list codex runs")
+        .runs;
+
+    assert_eq!(listed.len(), 1);
+    let state = db
+        .lock()
+        .expect("db lock")
+        .load_session_state_for_mutation("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
+        .expect("load session")
+        .expect("session");
+    let agent = state.agents.get("agent-1").expect("codex agent");
+    assert_eq!(agent.status, AgentStatus::Idle);
+    assert_eq!(state.metrics.agent_count, 1);
+    assert_eq!(state.metrics.idle_agent_count, 1);
+}
+
+#[test]
 fn transcript_includes_codex_prompt_and_final_message() {
     let (controller, db, _tempdir) = controller_with_db();
     let mut run = codex_run_snapshot(CodexRunStatus::Completed);
@@ -317,6 +349,12 @@ fn codex_approval_request(
 }
 
 fn controller_with_db() -> (CodexControllerHandle, Arc<Mutex<DaemonDb>>, TempDir) {
+    controller_with_session_state(sample_session_state())
+}
+
+fn controller_with_session_state(
+    state: SessionState,
+) -> (CodexControllerHandle, Arc<Mutex<DaemonDb>>, TempDir) {
     let (sender, _) = broadcast::channel(8);
     let tempdir = tempdir().expect("temp dir");
     let db_path = tempdir.path().join("harness.db");
@@ -327,7 +365,7 @@ fn controller_with_db() -> (CodexControllerHandle, Arc<Mutex<DaemonDb>>, TempDir
             .sync_project(&sample_project())
             .expect("sync project");
         db_guard
-            .save_session_state("project-1", &sample_session_state())
+            .save_session_state("project-1", &state)
             .expect("save session");
     }
     let db_slot = Arc::new(OnceLock::new());
@@ -380,6 +418,31 @@ fn sample_session_state() -> SessionState {
         adopted_at: None,
         metrics: SessionMetrics::default(),
     }
+}
+
+fn sample_session_state_with_codex_agent(status: AgentStatus) -> SessionState {
+    let mut state = sample_session_state();
+    state.agents.insert(
+        "agent-1".into(),
+        AgentRegistration {
+            agent_id: "agent-1".into(),
+            name: "Codex Worker".into(),
+            runtime: "codex".into(),
+            role: SessionRole::Worker,
+            capabilities: Vec::new(),
+            joined_at: "2026-04-09T10:00:00Z".into(),
+            updated_at: "2026-04-09T10:00:01Z".into(),
+            status,
+            agent_session_id: None,
+            managed_agent: Some(ManagedAgentRef::codex("codex-run-1")),
+            last_activity_at: Some("2026-04-09T10:00:01Z".into()),
+            current_task_id: None,
+            runtime_capabilities: Default::default(),
+            persona: None,
+        },
+    );
+    state.metrics = SessionMetrics::recalculate(&state);
+    state
 }
 
 fn codex_run_snapshot(status: CodexRunStatus) -> CodexRunSnapshot {

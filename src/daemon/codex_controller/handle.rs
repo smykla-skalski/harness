@@ -28,7 +28,7 @@ use crate::daemon::service as daemon_service;
 use crate::daemon::state;
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::service as session_service;
-use crate::session::types::ManagedAgentRef;
+use crate::session::types::{AgentStatus, ManagedAgentRef, SessionState};
 use crate::workspace::utc_now;
 
 use super::active_runs::{ActiveRun, ActiveRuns, CodexControlMessage};
@@ -377,6 +377,7 @@ impl CodexControllerHandle {
             }),
         );
         self.save_and_broadcast(&snapshot)?;
+        self.sync_orchestration_status_for_run(&snapshot)?;
         Ok(snapshot)
     }
 
@@ -508,9 +509,125 @@ impl CodexControllerHandle {
                     );
                     self.save_and_broadcast(&run)?;
                 }
+                self.sync_orchestration_status_for_run(&run)?;
                 Ok(run)
             })
             .collect()
+    }
+
+    pub(super) fn sync_orchestration_status_for_run(
+        &self,
+        run: &CodexRunSnapshot,
+    ) -> Result<(), CliError> {
+        let status = orchestration_status_for_codex_run(run.status);
+        if self.persist_orchestration_status_for_run(run, status)? {
+            self.broadcast_session_snapshot_best_effort(&run.session_id);
+        }
+        Ok(())
+    }
+
+    fn persist_orchestration_status_for_run(
+        &self,
+        run: &CodexRunSnapshot,
+        status: AgentStatus,
+    ) -> Result<bool, CliError> {
+        let Some(session_agent_id) = run.session_agent_id.clone() else {
+            return Ok(false);
+        };
+        let managed_agent = ManagedAgentRef::codex(run.run_id.as_str());
+        let session_id_async = run.session_id.clone();
+        let session_agent_id_async = session_agent_id.clone();
+        let managed_agent_async = managed_agent.clone();
+        let status_async = status.clone();
+        if let Some(result) = self.run_with_async_db(|async_db| async move {
+            let Some(resolved) = async_db.resolve_session(&session_id_async).await? else {
+                return Ok(false);
+            };
+            if !codex_orchestration_status_needs_update(
+                &resolved.state,
+                &session_agent_id_async,
+                &managed_agent_async,
+                &status_async,
+            ) {
+                return Ok(false);
+            }
+            let now = utc_now();
+            let status_for_update = status_async.clone();
+            let changed = async_db
+                .update_session_state_immediate(&session_id_async, |state| {
+                    Ok(update_codex_orchestration_status(
+                        state,
+                        &session_agent_id_async,
+                        &managed_agent_async,
+                        status_for_update,
+                        &now,
+                    ))
+                })
+                .await?;
+            if changed {
+                async_db.bump_change(&session_id_async).await?;
+                async_db.bump_change("global").await?;
+            }
+            Ok(changed)
+        }) {
+            return result;
+        }
+
+        let db = self.db()?;
+        let db = lock_db(&db)?;
+        let Some(mut state) = db.load_session_state_for_mutation(&run.session_id)? else {
+            return Ok(false);
+        };
+        let now = utc_now();
+        if !update_codex_orchestration_status(
+            &mut state,
+            &session_agent_id,
+            &managed_agent,
+            status,
+            &now,
+        ) {
+            return Ok(false);
+        }
+        session_service::refresh_session(&mut state, &now);
+        let project_id = db
+            .project_id_for_session(&run.session_id)?
+            .ok_or_else(|| daemon_service::session_not_found(&run.session_id))?;
+        db.save_session_state(&project_id, &state)?;
+        db.bump_change(&run.session_id)?;
+        db.bump_change("global")?;
+        Ok(true)
+    }
+
+    fn broadcast_session_snapshot_best_effort(&self, session_id: &str) {
+        if let Some(async_db) = self.state.async_db.get().cloned()
+            && let Some(runtime) = self.state.runtime.clone()
+        {
+            let sender = self.state.sender.clone();
+            let session_id = session_id.to_string();
+            runtime.spawn(async move {
+                daemon_service::broadcast_session_snapshot_async(
+                    &sender,
+                    &session_id,
+                    Some(async_db.as_ref()),
+                )
+                .await;
+            });
+            return;
+        }
+        if let Err(error) = self.broadcast_session_snapshot(session_id) {
+            tracing::warn!(
+                %error,
+                session_id,
+                "failed to broadcast codex orchestration status update"
+            );
+        }
+    }
+
+    fn broadcast_session_snapshot(&self, session_id: &str) -> Result<(), CliError> {
+        let db = self.db()?;
+        let db = lock_db(&db)?;
+        daemon_service::broadcast_session_snapshot(&self.state.sender, session_id, Some(&db));
+        Ok(())
     }
 
     fn project_dir_for_session(&self, session_id: &str) -> Result<String, CliError> {
@@ -687,6 +804,7 @@ impl CodexControllerHandle {
         snapshot.pending_approvals.clear();
         snapshot.updated_at = utc_now();
         self.save_and_broadcast(&snapshot)?;
+        self.sync_orchestration_status_for_run(&snapshot)?;
 
         let (control_tx, control_rx) = mpsc::unbounded_channel();
         self.state
@@ -751,6 +869,58 @@ impl CodexControllerHandle {
             Err(_) => runtime.block_on(future),
         })
     }
+}
+
+const fn orchestration_status_for_codex_run(status: CodexRunStatus) -> AgentStatus {
+    match status {
+        CodexRunStatus::Queued | CodexRunStatus::Running | CodexRunStatus::WaitingApproval => {
+            AgentStatus::Active
+        }
+        CodexRunStatus::Completed | CodexRunStatus::Failed | CodexRunStatus::Cancelled => {
+            AgentStatus::Idle
+        }
+    }
+}
+
+fn update_codex_orchestration_status(
+    state: &mut SessionState,
+    session_agent_id: &str,
+    managed_agent: &ManagedAgentRef,
+    status: AgentStatus,
+    now: &str,
+) -> bool {
+    if !codex_orchestration_status_needs_update(state, session_agent_id, managed_agent, &status) {
+        return false;
+    }
+    let agent = state
+        .agents
+        .get_mut(session_agent_id)
+        .expect("codex orchestration status precheck resolved agent");
+    agent.status = status;
+    agent.updated_at = now.to_string();
+    agent.last_activity_at = Some(now.to_string());
+    true
+}
+
+fn codex_orchestration_status_needs_update(
+    state: &SessionState,
+    session_agent_id: &str,
+    managed_agent: &ManagedAgentRef,
+    status: &AgentStatus,
+) -> bool {
+    if !state.status.is_liveness_eligible() {
+        return false;
+    }
+    let Some(agent) = state.agents.get(session_agent_id) else {
+        return false;
+    };
+    if !agent.matches_managed_agent(managed_agent) {
+        return false;
+    }
+    !matches!(
+        agent.status,
+        AgentStatus::AwaitingReview | AgentStatus::Removed
+    ) && agent.status != *status
 }
 
 pub(super) fn record_snapshot_event(

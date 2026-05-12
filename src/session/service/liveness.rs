@@ -151,11 +151,12 @@ pub(crate) fn compute_agent_transition(
     if agent.status == AgentStatus::AwaitingReview {
         return None;
     }
-    if agent
-        .managed_agent
-        .as_ref()
-        .is_some_and(|managed_agent| managed_agent.kind == ManagedAgentKind::Acp)
-    {
+    if agent.managed_agent.as_ref().is_some_and(|managed_agent| {
+        matches!(
+            managed_agent.kind,
+            ManagedAgentKind::Acp | ManagedAgentKind::Codex
+        )
+    }) {
         return None;
     }
 
