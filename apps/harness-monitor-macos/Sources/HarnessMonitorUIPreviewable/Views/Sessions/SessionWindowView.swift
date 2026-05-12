@@ -207,7 +207,6 @@ public struct SessionWindowView: View {
       .modifier(
         SessionWindowPerfScenarioScript(
           stateCache: stateCache,
-          store: store,
           sessionID: token.sessionID,
           snapshot: snapshot
         )
