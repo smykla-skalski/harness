@@ -2,22 +2,20 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::time::{Duration, Instant};
 
-use serde_json::{Value, json};
+use serde_json::Value;
 use tokio::sync::mpsc;
 use tokio::time::timeout;
 
 use crate::daemon::codex_transport::CodexTransport;
-use crate::daemon::protocol::{
-    CodexApprovalDecision, CodexResolvedApproval, CodexRunSnapshot, CodexRunStatus,
-};
+use crate::daemon::protocol::{CodexRunSnapshot, CodexRunStatus};
 use crate::daemon::state;
 use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 use super::active_runs::CodexControlMessage;
 use super::approvals::{
-    approval_from_request, approval_policy, approval_result, mode_instructions, thread_sandbox,
-    trim_summary, turn_sandbox_policy, upsert_pending_approval,
+    approval_from_request, approval_policy, mode_instructions, thread_sandbox, trim_summary,
+    turn_sandbox_policy, upsert_pending_approval,
 };
 use super::handle::{CodexControllerHandle, record_snapshot_event};
 use super::rpc::CodexJsonRpc;
@@ -27,17 +25,18 @@ const STARTUP_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const DELTA_PERSIST_INTERVAL: Duration = Duration::from_millis(750);
 
 pub(super) struct CodexRunWorker {
-    controller: CodexControllerHandle,
-    snapshot: CodexRunSnapshot,
-    control_rx: mpsc::UnboundedReceiver<CodexControlMessage>,
-    pending_approvals: HashMap<String, Vec<PendingApproval>>,
-    agent_message_delta: String,
-    last_delta_persist_at: Option<Instant>,
+    pub(super) controller: CodexControllerHandle,
+    pub(super) snapshot: CodexRunSnapshot,
+    pub(super) control_rx: mpsc::UnboundedReceiver<CodexControlMessage>,
+    pub(super) pending_approvals: HashMap<String, Vec<PendingApproval>>,
+    pub(super) agent_message_delta: String,
+    pub(super) last_delta_persist_at: Option<Instant>,
 }
 
-struct PendingApproval {
-    request_id: Value,
-    method: String,
+pub(super) struct PendingApproval {
+    pub(super) request_id: Value,
+    pub(super) method: String,
+    pub(super) params: Value,
 }
 
 impl CodexRunWorker {
@@ -335,6 +334,7 @@ impl CodexRunWorker {
             .push(PendingApproval {
                 request_id,
                 method: method.to_string(),
+                params: params.clone(),
             });
         upsert_pending_approval(&mut self.snapshot.pending_approvals, approval.clone());
         self.transition(
@@ -347,160 +347,21 @@ impl CodexRunWorker {
         Ok(())
     }
 
-    async fn handle_control(
-        &mut self,
-        rpc: &mut CodexJsonRpc,
-        control: CodexControlMessage,
-    ) -> Result<bool, CliError> {
-        match control {
-            CodexControlMessage::Approval {
-                approval_id,
-                decision,
-                ack,
-            } => {
-                let result = self
-                    .resolve_approval(rpc, &approval_id, decision)
-                    .await
-                    .map(|()| self.snapshot.clone());
-                let _ = ack.send(result);
-                Ok(false)
-            }
-            CodexControlMessage::Steer { prompt, ack } => {
-                let result = self
-                    .steer(rpc, &prompt)
-                    .await
-                    .map(|()| self.snapshot.clone());
-                let _ = ack.send(result);
-                Ok(false)
-            }
-            CodexControlMessage::Interrupt { ack } => {
-                let result = self.interrupt(rpc).await.map(|()| self.snapshot.clone());
-                let _ = ack.send(result);
-                Ok(false)
-            }
-            CodexControlMessage::Stop { ack } => {
-                let result = self.stop(rpc).await.map(|()| self.snapshot.clone());
-                let should_stop = result.is_ok();
-                let _ = ack.send(result);
-                Ok(should_stop)
-            }
-        }
-    }
-
-    async fn resolve_approval(
-        &mut self,
-        rpc: &mut CodexJsonRpc,
-        approval_id: &str,
-        decision: CodexApprovalDecision,
-    ) -> Result<(), CliError> {
-        let Some(pending_requests) = self.pending_approvals.remove(approval_id) else {
-            return Err(CliErrorKind::session_not_active(format!(
-                "codex approval '{approval_id}' is not pending"
-            ))
-            .into());
-        };
-        for pending in pending_requests {
-            let result = approval_result(&pending.method, decision);
-            rpc.send_response(pending.request_id, result).await?;
-        }
-        self.snapshot
-            .pending_approvals
-            .retain(|approval| approval.approval_id != approval_id);
-        self.snapshot
-            .resolved_approvals
-            .push(CodexResolvedApproval {
-                approval_id: approval_id.to_string(),
-                decision,
-                resolved_at: utc_now(),
-            });
-        self.snapshot.status = CodexRunStatus::Running;
-        self.snapshot.latest_summary = Some(format!("Approval {approval_id} resolved"));
-        self.record_event(
-            "approval/resolved",
-            format!("Approval {approval_id} resolved"),
-            &json!({
-                "approvalId": approval_id,
-                "decision": decision,
-            }),
-        );
-        self.touch_save_and_sync_orchestration()
-    }
-
-    async fn steer(&mut self, rpc: &mut CodexJsonRpc, prompt: &str) -> Result<(), CliError> {
-        let thread_id = self.thread_id()?;
-        let turn_id = self.turn_id()?;
-        let params = wire::turn_steer_params(&thread_id, &turn_id, prompt)?;
-        let _ = rpc
-            .send_request(wire::METHOD_TURN_STEER, params.clone())
-            .await?;
-        self.snapshot.latest_summary = Some("Steering prompt sent".to_string());
-        self.record_event(
-            wire::METHOD_TURN_STEER,
-            "Steering prompt sent".to_string(),
-            &params,
-        );
-        self.touch_save_and_sync_orchestration()
-    }
-
-    async fn interrupt(&mut self, rpc: &mut CodexJsonRpc) -> Result<(), CliError> {
-        let thread_id = self.thread_id()?;
-        let turn_id = self.turn_id()?;
-        let params = wire::turn_interrupt_params(&thread_id, &turn_id)?;
-        let _ = rpc
-            .send_request(wire::METHOD_TURN_INTERRUPT, params.clone())
-            .await?;
-        self.snapshot.latest_summary = Some("Interrupt requested".to_string());
-        self.record_event(
-            wire::METHOD_TURN_INTERRUPT,
-            "Interrupt requested".to_string(),
-            &params,
-        );
-        self.touch_save_and_sync_orchestration()
-    }
-
-    async fn stop(&mut self, rpc: &mut CodexJsonRpc) -> Result<(), CliError> {
-        let thread_id = self.snapshot.thread_id.clone();
-        let turn_id = self.snapshot.turn_id.clone();
-        let interrupt_result = match (&thread_id, &turn_id) {
-            (Some(thread_id), Some(turn_id)) => {
-                let params = wire::turn_interrupt_params(thread_id, turn_id)?;
-                rpc.send_request(wire::METHOD_TURN_INTERRUPT, params)
-                    .await
-                    .map(|_| ())
-            }
-            _ => Ok(()),
-        };
-        let interrupt_error = interrupt_result.as_ref().err().map(ToString::to_string);
-        self.pending_approvals.clear();
-        self.snapshot.pending_approvals.clear();
-        record_snapshot_event(
-            &mut self.snapshot,
-            "agent/stop",
-            "Codex agent stopped".to_string(),
-            &json!({
-                "threadId": thread_id,
-                "turnId": turn_id,
-                "interruptError": interrupt_error,
-            }),
-        );
-        self.transition(CodexRunStatus::Cancelled, Some("Codex agent stopped"), None)
-    }
-
-    fn thread_id(&self) -> Result<String, CliError> {
+    pub(super) fn thread_id(&self) -> Result<String, CliError> {
         self.snapshot
             .thread_id
             .clone()
             .ok_or_else(|| CliErrorKind::workflow_io("codex thread id is not ready").into())
     }
 
-    fn turn_id(&self) -> Result<String, CliError> {
+    pub(super) fn turn_id(&self) -> Result<String, CliError> {
         self.snapshot
             .turn_id
             .clone()
             .ok_or_else(|| CliErrorKind::workflow_io("codex turn id is not ready").into())
     }
 
-    fn transition(
+    pub(super) fn transition(
         &mut self,
         status: CodexRunStatus,
         latest_summary: Option<&str>,
@@ -563,13 +424,13 @@ impl CodexRunWorker {
         self.controller.save_and_broadcast(&self.snapshot)
     }
 
-    fn touch_save_and_sync_orchestration(&mut self) -> Result<(), CliError> {
+    pub(super) fn touch_save_and_sync_orchestration(&mut self) -> Result<(), CliError> {
         self.touch_and_save()?;
         self.controller
             .sync_orchestration_status_for_run(&self.snapshot)
     }
 
-    fn record_event(&mut self, kind: &str, summary: String, payload: &Value) {
+    pub(super) fn record_event(&mut self, kind: &str, summary: String, payload: &Value) {
         record_snapshot_event(&mut self.snapshot, kind, summary, payload);
     }
 

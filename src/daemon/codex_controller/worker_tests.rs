@@ -7,7 +7,7 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 use super::*;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::codex_transport::CodexTransport;
-use crate::daemon::protocol::{CodexRunMode, StreamEvent};
+use crate::daemon::protocol::{CodexApprovalDecision, CodexRunMode, StreamEvent};
 
 #[tokio::test]
 async fn invalid_steer_ack_does_not_fail_worker_loop() {
@@ -68,6 +68,65 @@ async fn unknown_approval_ack_does_not_fail_worker_loop() {
         "unknown approval should report an action error"
     );
     assert_eq!(worker.snapshot.status, CodexRunStatus::WaitingApproval);
+}
+
+#[tokio::test]
+async fn permission_approval_response_grants_requested_subset() {
+    let (_control_tx, control_rx) = mpsc::unbounded_channel();
+    let mut snapshot = running_snapshot_without_ids();
+    snapshot.thread_id = Some("thread-1".to_string());
+    snapshot.turn_id = Some("turn-1".to_string());
+    let mut worker = CodexRunWorker::new(controller_without_db(), snapshot, control_rx);
+    let sent = Arc::new(Mutex::new(Vec::new()));
+    let mut rpc = CodexJsonRpc::new(Box::new(FakeTransport {
+        sent: Arc::clone(&sent),
+    }));
+    let params = json!({
+        "threadId": "thread-1",
+        "turnId": "turn-1",
+        "itemId": "permission-1",
+        "permissions": {
+            "fileSystem": {
+                "write": ["/tmp/project"]
+            }
+        }
+    });
+    worker.pending_approvals.insert(
+        "permission-1".to_string(),
+        vec![PendingApproval {
+            request_id: json!(41),
+            method: "item/permissions/requestApproval".to_string(),
+            params,
+        }],
+    );
+    let (ack, receiver) = oneshot::channel();
+    worker
+        .handle_control(
+            &mut rpc,
+            CodexControlMessage::Approval {
+                approval_id: "permission-1".to_string(),
+                decision: CodexApprovalDecision::AcceptForSession,
+                ack,
+            },
+        )
+        .await
+        .expect("approval should be sent");
+
+    let _ = receiver.await.expect("approval ack");
+    let frames = sent.lock().expect("sent frames");
+    let response: serde_json::Value =
+        serde_json::from_str(frames.last().expect("approval response frame"))
+            .expect("json response");
+    assert_eq!(response["id"], json!(41));
+    assert_eq!(response["result"]["scope"], json!("session"));
+    assert_eq!(
+        response["result"]["permissions"],
+        json!({
+            "fileSystem": {
+                "write": ["/tmp/project"]
+            }
+        })
+    );
 }
 
 #[test]

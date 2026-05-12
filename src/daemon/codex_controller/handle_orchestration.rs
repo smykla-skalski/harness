@@ -1,0 +1,281 @@
+use crate::daemon::protocol::{CodexRunRequest, CodexRunSnapshot};
+use crate::daemon::service as daemon_service;
+use crate::errors::CliError;
+use crate::session::service as session_service;
+use crate::session::types::{AgentStatus, ManagedAgentRef};
+use crate::workspace::utc_now;
+
+use super::handle::{CodexControllerHandle, lock_db};
+use super::orchestration::{
+    codex_orchestration_status_needs_update, orchestration_status_for_codex_run,
+    remove_registered_codex_agent, update_codex_orchestration_status,
+};
+
+impl CodexControllerHandle {
+    pub(super) fn sync_orchestration_status_for_run(
+        &self,
+        run: &CodexRunSnapshot,
+    ) -> Result<(), CliError> {
+        let status = orchestration_status_for_codex_run(run.status);
+        if self.persist_orchestration_status_for_run(run, status)? {
+            self.broadcast_session_snapshot_best_effort(&run.session_id);
+        }
+        Ok(())
+    }
+
+    fn persist_orchestration_status_for_run(
+        &self,
+        run: &CodexRunSnapshot,
+        status: AgentStatus,
+    ) -> Result<bool, CliError> {
+        let Some(session_agent_id) = run.session_agent_id.clone() else {
+            return Ok(false);
+        };
+        let managed_agent = ManagedAgentRef::codex(run.run_id.as_str());
+        let session_id_async = run.session_id.clone();
+        let session_agent_id_async = session_agent_id.clone();
+        let managed_agent_async = managed_agent.clone();
+        let status_async = status.clone();
+        if let Some(result) = self.run_with_async_db(|async_db| async move {
+            let Some(resolved) = async_db.resolve_session(&session_id_async).await? else {
+                return Ok(false);
+            };
+            if !codex_orchestration_status_needs_update(
+                &resolved.state,
+                &session_agent_id_async,
+                &managed_agent_async,
+                &status_async,
+            ) {
+                return Ok(false);
+            }
+            let now = utc_now();
+            let status_for_update = status_async.clone();
+            let changed = async_db
+                .update_session_state_immediate(&session_id_async, |state| {
+                    let changed = update_codex_orchestration_status(
+                        state,
+                        &session_agent_id_async,
+                        &managed_agent_async,
+                        status_for_update,
+                        &now,
+                    );
+                    if changed {
+                        session_service::refresh_session(state, &now);
+                    }
+                    Ok(changed)
+                })
+                .await?;
+            if changed {
+                async_db.bump_change(&session_id_async).await?;
+                async_db.bump_change("global").await?;
+            }
+            Ok(changed)
+        }) {
+            return result;
+        }
+
+        let db = self.db()?;
+        let db = lock_db(&db)?;
+        let Some(mut state) = db.load_session_state_for_mutation(&run.session_id)? else {
+            return Ok(false);
+        };
+        let now = utc_now();
+        if !update_codex_orchestration_status(
+            &mut state,
+            &session_agent_id,
+            &managed_agent,
+            status,
+            &now,
+        ) {
+            return Ok(false);
+        }
+        session_service::refresh_session(&mut state, &now);
+        let project_id = db
+            .project_id_for_session(&run.session_id)?
+            .ok_or_else(|| daemon_service::session_not_found(&run.session_id))?;
+        db.save_session_state(&project_id, &state)?;
+        db.bump_change(&run.session_id)?;
+        db.bump_change("global")?;
+        Ok(true)
+    }
+
+    fn broadcast_session_snapshot_best_effort(&self, session_id: &str) {
+        if let Some(async_db) = self.state.async_db.get().cloned()
+            && let Some(runtime) = self.state.runtime.clone()
+        {
+            let sender = self.state.sender.clone();
+            let session_id = session_id.to_string();
+            runtime.spawn(async move {
+                daemon_service::broadcast_session_snapshot_async(
+                    &sender,
+                    &session_id,
+                    Some(async_db.as_ref()),
+                )
+                .await;
+            });
+            return;
+        }
+        if let Err(error) = self.broadcast_session_snapshot(session_id) {
+            tracing::warn!(
+                %error,
+                session_id,
+                "failed to broadcast codex orchestration status update"
+            );
+        }
+    }
+
+    fn broadcast_session_snapshot(&self, session_id: &str) -> Result<(), CliError> {
+        let db = self.db()?;
+        let db = lock_db(&db)?;
+        daemon_service::broadcast_session_snapshot(&self.state.sender, session_id, Some(&db));
+        Ok(())
+    }
+
+    pub(super) fn register_orchestration_agent(
+        &self,
+        session_id: &str,
+        run_id: &str,
+        request: &CodexRunRequest,
+        display_name: &str,
+    ) -> Result<String, CliError> {
+        let managed_agent = ManagedAgentRef::codex(run_id);
+        let runtime_name = "codex";
+        let session_id_owned = session_id.to_string();
+        let display_name_owned = display_name.to_string();
+        let managed_agent_async = managed_agent.clone();
+        let request_async = request.clone();
+        if let Some(result) = self.run_with_async_db(|async_db| async move {
+            let now = utc_now();
+            let joined_agent_id = async_db
+                .update_session_state_immediate(&session_id_owned, |state| {
+                    let joined_role = session_service::resolve_join_role(
+                        &*state,
+                        request_async.role,
+                        request_async.fallback_role,
+                    )?;
+                    session_service::apply_join_session(
+                        &mut *state,
+                        &display_name_owned,
+                        runtime_name,
+                        joined_role,
+                        &request_async.capabilities,
+                        None,
+                        &now,
+                        request_async.persona.as_deref(),
+                        Some(managed_agent_async),
+                    )
+                    .map(|agent_id| (agent_id, joined_role))
+                })
+                .await?;
+            async_db
+                .append_log_entry(&daemon_service::build_log_entry(
+                    &session_id_owned,
+                    session_service::log_agent_joined(
+                        &joined_agent_id.0,
+                        joined_agent_id.1,
+                        runtime_name,
+                    ),
+                    None,
+                    None,
+                ))
+                .await?;
+            async_db.bump_change(&session_id_owned).await?;
+            async_db.bump_change("global").await?;
+            Ok(joined_agent_id.0)
+        }) {
+            return result;
+        }
+
+        let db = self.db()?;
+        let db = lock_db(&db)?;
+        let Some(mut state) = db.load_session_state_for_mutation(session_id)? else {
+            return Err(daemon_service::session_not_found(session_id));
+        };
+        let now = utc_now();
+        let joined_role =
+            session_service::resolve_join_role(&state, request.role, request.fallback_role)?;
+        let agent_id = session_service::apply_join_session(
+            &mut state,
+            display_name,
+            runtime_name,
+            joined_role,
+            &request.capabilities,
+            None,
+            &now,
+            request.persona.as_deref(),
+            Some(managed_agent),
+        )?;
+        let project_id = db
+            .project_id_for_session(session_id)?
+            .ok_or_else(|| daemon_service::session_not_found(session_id))?;
+        db.save_session_state(&project_id, &state)?;
+        db.append_log_entry(&daemon_service::build_log_entry(
+            session_id,
+            session_service::log_agent_joined(&agent_id, joined_role, runtime_name),
+            None,
+            None,
+        ))?;
+        db.bump_change(session_id)?;
+        db.bump_change("global")?;
+        Ok(agent_id)
+    }
+
+    pub(super) fn rollback_orchestration_agent_registration(
+        &self,
+        session_id: &str,
+        session_agent_id: Option<&str>,
+        managed_agent: &ManagedAgentRef,
+    ) {
+        let Some(session_agent_id) = session_agent_id else {
+            return;
+        };
+        let session_id_async = session_id.to_string();
+        let session_agent_id_async = session_agent_id.to_string();
+        let managed_agent_async = managed_agent.clone();
+        if let Some(result) = self.run_with_async_db(|async_db| async move {
+            let now = utc_now();
+            let removed = async_db
+                .update_session_state_immediate(&session_id_async, |state| {
+                    Ok(remove_registered_codex_agent(
+                        state,
+                        &session_agent_id_async,
+                        &managed_agent_async,
+                        &now,
+                    ))
+                })
+                .await?;
+            if removed {
+                async_db.bump_change(&session_id_async).await?;
+                async_db.bump_change("global").await?;
+            }
+            Ok(removed)
+        }) {
+            if let Err(error) = result {
+                tracing::warn!(%error, session_id, session_agent_id, "failed to roll back codex orchestration agent registration");
+            }
+            return;
+        }
+
+        let result = (|| {
+            let db = self.db()?;
+            let db = lock_db(&db)?;
+            let Some(mut state) = db.load_session_state_for_mutation(session_id)? else {
+                return Ok(false);
+            };
+            let now = utc_now();
+            if !remove_registered_codex_agent(&mut state, session_agent_id, managed_agent, &now) {
+                return Ok(false);
+            }
+            let project_id = db
+                .project_id_for_session(session_id)?
+                .ok_or_else(|| daemon_service::session_not_found(session_id))?;
+            db.save_session_state(&project_id, &state)?;
+            db.bump_change(session_id)?;
+            db.bump_change("global")?;
+            Ok::<bool, CliError>(true)
+        })();
+        if let Err(error) = result {
+            tracing::warn!(%error, session_id, session_agent_id, "failed to roll back codex orchestration agent registration");
+        }
+    }
+}
