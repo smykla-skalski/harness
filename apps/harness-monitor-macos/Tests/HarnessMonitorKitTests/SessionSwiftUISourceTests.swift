@@ -169,6 +169,7 @@ struct SessionSwiftUISourceTests {
     )
     #expect(extensionEffectSource.contains("@Environment(\\.accessibilityReduceTransparency)"))
     #expect(extensionEffectSource.contains("if reduceTransparency || backdropMode == .none"))
+    #expect(extensionEffectSource.contains("func harnessMonitorBackgroundExtensionEffect()"))
     #expect(extensionEffectSource.contains("content.backgroundExtensionEffect()"))
     #expect(!surfaceSource.contains(".backgroundExtensionEffect()"))
     #expect(surfaceSource.contains("topScrollEdgeEffect: .soft"))

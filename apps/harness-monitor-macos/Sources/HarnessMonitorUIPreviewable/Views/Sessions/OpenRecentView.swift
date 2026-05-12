@@ -23,11 +23,14 @@ public struct OpenRecentView: View {
     self.store = store
   }
 
-  private var groups: [OpenRecentProjectGroup] {
-    OpenRecentProjectGroup.groups(
-      from: store.sessionIndex.catalog.recentSessions,
-      bookmarkedSessionIDs: store.sidebarUI.bookmarkedSessionIds
-    )
+  private var recentSessions: [OpenRecentSessionItem] {
+    let bookmarkedSessionIDs = store.sidebarUI.bookmarkedSessionIds
+    return store.sessionIndex.catalog.recentSessions.prefix(8).map {
+      OpenRecentSessionItem(
+        session: $0,
+        isBookmarked: bookmarkedSessionIDs.contains($0.sessionId)
+      )
+    }
   }
 
   public var body: some View {
@@ -36,7 +39,7 @@ public struct OpenRecentView: View {
       Group {
         if showsStartPanel {
           OpenRecentStartPanel(
-            groups: groups,
+            recentSessions: recentSessions,
             dateTimeConfiguration: dateTimeConfiguration,
             openFolder: openFolderAction,
             newSession: newSessionAction,
@@ -48,7 +51,7 @@ public struct OpenRecentView: View {
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       actionStateMarker
     }
-    .backgroundExtensionEffect()
+    .harnessMonitorBackgroundExtensionEffect()
     .task {
       guard !HarnessMonitorUITestEnvironment.isPerfScenarioActive else {
         return
@@ -117,17 +120,13 @@ public struct OpenRecentView: View {
 }
 
 private struct OpenRecentStartPanel: View {
-  let groups: [OpenRecentProjectGroup]
+  let recentSessions: [OpenRecentSessionItem]
   let dateTimeConfiguration: HarnessMonitorDateTimeConfiguration
   let openFolder: () -> Void
   let newSession: () -> Void
   let openSession: (String) -> Void
   @Environment(\.fontScale)
   private var fontScale
-
-  private var recentSessions: [OpenRecentSessionItem] {
-    Array(groups.flatMap(\.sessions).prefix(8))
-  }
 
   var body: some View {
     OpenRecentStartPanelLayout(
@@ -290,9 +289,7 @@ private struct OpenRecentSessionRow: View {
       openSession(item.session.sessionId)
     } label: {
       HStack(alignment: .firstTextBaseline, spacing: 10 * layoutScale) {
-        Image(systemName: sessionStatusSymbol(item.session.status))
-          .scaledFont(.body)
-          .foregroundStyle(statusColor(for: item.session.status))
+        OpenRecentSessionStatusDot(status: item.session.status)
           .frame(width: 18 * layoutScale)
         VStack(alignment: .leading, spacing: 3) {
           HStack(alignment: .firstTextBaseline) {
@@ -345,5 +342,22 @@ private struct OpenRecentSessionRow: View {
 
   private var layoutScale: CGFloat {
     min(max(fontScale, 0.88), 1.18)
+  }
+}
+
+private struct OpenRecentSessionStatusDot: View {
+  let status: SessionStatus
+  @Environment(\.fontScale)
+  private var fontScale
+
+  var body: some View {
+    Circle()
+      .fill(statusColor(for: status))
+      .frame(width: dotSize, height: dotSize)
+      .accessibilityHidden(true)
+  }
+
+  private var dotSize: CGFloat {
+    8 * min(max(fontScale, 0.88), 1.18)
   }
 }

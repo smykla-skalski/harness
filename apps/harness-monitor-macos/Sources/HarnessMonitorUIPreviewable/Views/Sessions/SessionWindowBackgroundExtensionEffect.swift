@@ -1,6 +1,6 @@
 import SwiftUI
 
-private struct SessionWindowBackgroundExtensionEffectModifier: ViewModifier {
+private struct HarnessMonitorBackgroundExtensionEffectModifier: ViewModifier {
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
   private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
   @Environment(\.accessibilityReduceTransparency)
@@ -20,7 +20,11 @@ private struct SessionWindowBackgroundExtensionEffectModifier: ViewModifier {
 }
 
 extension View {
+  func harnessMonitorBackgroundExtensionEffect() -> some View {
+    modifier(HarnessMonitorBackgroundExtensionEffectModifier())
+  }
+
   func sessionWindowBackgroundExtensionEffect() -> some View {
-    modifier(SessionWindowBackgroundExtensionEffectModifier())
+    harnessMonitorBackgroundExtensionEffect()
   }
 }
