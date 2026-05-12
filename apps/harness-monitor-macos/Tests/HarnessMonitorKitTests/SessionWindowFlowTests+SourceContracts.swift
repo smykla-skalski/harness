@@ -218,6 +218,22 @@ extension SessionWindowFlowTests {
     #expect(!source.contains("pendingDecisionCount: matchingDecisions.count"))
   }
 
+  @Test("Session window state cache skips redundant observable writes")
+  func sessionWindowStateCacheSkipsRedundantObservableWrites() throws {
+    let source = try previewableSourceFile(named: "Support/SessionWindowStateCache.swift")
+    let sectionSource = try previewableSourceFile(named: "Support/SessionWindowSectionState.swift")
+
+    #expect(source.contains("guard sectionState.decisionID != decisionID else { return }"))
+    #expect(source.contains("guard sectionState.agentID != agentID else { return }"))
+    #expect(source.contains("guard sectionState.taskID != taskID else { return }"))
+    #expect(source.contains("if selectionSource != source"))
+    #expect(source.contains("guard agentCreateCatalog != nextCatalog else { return }"))
+    #expect(source.contains("guard agentCreateCatalog.isLoading else { return }"))
+    #expect(sectionSource.contains("assign(\\.routeSelection, route)"))
+    #expect(sectionSource.contains("guard self[keyPath: keyPath] != value else { return }"))
+    #expect(sectionSource.contains("guard createDrafts[draft.kind] != draft else { return }"))
+  }
+
   @Test("Sidebar density keeps strict default and maps legacy values")
   func sidebarDensityResolvesStrictDefaultAndLegacyValues() {
     #expect(HarnessMonitorSidebarSessionRowDisplayMode.defaultMode == .strict)
