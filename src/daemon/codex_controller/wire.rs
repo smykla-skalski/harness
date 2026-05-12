@@ -66,7 +66,6 @@ pub(super) struct ThreadParamsInput<'a> {
     pub(super) developer_instructions: &'a str,
     pub(super) thread_id: Option<&'a str>,
     pub(super) model: Option<&'a str>,
-    pub(super) effort: Option<&'a str>,
 }
 
 pub(super) fn thread_params(input: ThreadParamsInput<'_>) -> Result<Value, CliError> {
@@ -77,11 +76,9 @@ pub(super) fn thread_params(input: ThreadParamsInput<'_>) -> Result<Value, CliEr
             sandbox: input.sandbox,
             approval_policy: input.approval_policy,
             approvals_reviewer: "user",
-            persist_extended_history: true,
             developer_instructions: input.developer_instructions,
             thread_id: input.thread_id,
             model: input.model,
-            reasoning: input.effort.map(|effort| ReasoningParams { effort }),
         },
     )
 }
@@ -92,6 +89,8 @@ pub(super) fn turn_start_params(
     prompt: &str,
     approval_policy: &str,
     sandbox_policy: Value,
+    model: Option<&str>,
+    effort: Option<&str>,
 ) -> Result<Value, CliError> {
     to_value(
         "codex turn start params",
@@ -102,6 +101,8 @@ pub(super) fn turn_start_params(
             approval_policy,
             approvals_reviewer: "user",
             sandbox_policy,
+            model,
+            effort,
         },
     )
 }
@@ -235,19 +236,11 @@ struct ThreadParams<'a> {
     sandbox: &'a str,
     approval_policy: &'a str,
     approvals_reviewer: &'a str,
-    persist_extended_history: bool,
     developer_instructions: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
     thread_id: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     model: Option<&'a str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    reasoning: Option<ReasoningParams<'a>>,
-}
-
-#[derive(Serialize)]
-struct ReasoningParams<'a> {
-    effort: &'a str,
 }
 
 #[derive(Serialize)]
@@ -259,6 +252,10 @@ struct TurnStartParams<'a> {
     approval_policy: &'a str,
     approvals_reviewer: &'a str,
     sandbox_policy: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    model: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    effort: Option<&'a str>,
 }
 
 #[derive(Serialize)]
@@ -332,124 +329,5 @@ struct ErrorParams {
 }
 
 #[cfg(test)]
-mod tests {
-    use serde_json::json;
-
-    use super::{
-        AppServerNotification, CompletedItem, ThreadParamsInput, initialize_params,
-        parse_notification, thread_id_from_result, thread_params, turn_start_params,
-    };
-
-    #[test]
-    fn thread_params_serialize_harness_owned_app_server_shape() {
-        let value = thread_params(ThreadParamsInput {
-            cwd: "/tmp/project",
-            sandbox: "read-only",
-            approval_policy: "on-request",
-            developer_instructions: "follow harness mode",
-            thread_id: Some("thread-1"),
-            model: Some("gpt-5.5"),
-            effort: Some("high"),
-        })
-        .expect("thread params serialize");
-
-        assert_eq!(
-            value,
-            json!({
-                "cwd": "/tmp/project",
-                "sandbox": "read-only",
-                "approvalPolicy": "on-request",
-                "approvalsReviewer": "user",
-                "persistExtendedHistory": true,
-                "developerInstructions": "follow harness mode",
-                "threadId": "thread-1",
-                "model": "gpt-5.5",
-                "reasoning": { "effort": "high" },
-            })
-        );
-    }
-
-    #[test]
-    fn turn_start_params_serialize_text_input_and_sandbox_policy() {
-        let value = turn_start_params(
-            "thread-1",
-            "/tmp/project",
-            "hello",
-            "never",
-            json!({ "type": "readOnly" }),
-        )
-        .expect("turn params serialize");
-
-        assert_eq!(
-            value,
-            json!({
-                "threadId": "thread-1",
-                "cwd": "/tmp/project",
-                "input": [{ "type": "text", "text": "hello" }],
-                "approvalPolicy": "never",
-                "approvalsReviewer": "user",
-                "sandboxPolicy": { "type": "readOnly" },
-            })
-        );
-    }
-
-    #[test]
-    fn notification_parser_extracts_handled_shapes_tolerantly() {
-        assert_eq!(
-            parse_notification("turn/started", &json!({ "turn": { "id": "turn-1" } })),
-            AppServerNotification::TurnStarted {
-                turn_id: Some("turn-1".to_string())
-            }
-        );
-        assert_eq!(
-            parse_notification(
-                "item/completed",
-                &json!({
-                    "item": {
-                        "type": "agentMessage",
-                        "text": "done",
-                        "phase": "final_answer"
-                    }
-                })
-            ),
-            AppServerNotification::ItemCompleted {
-                item: CompletedItem {
-                    kind: Some("agentMessage".to_string()),
-                    text: Some("done".to_string()),
-                    phase: Some("final_answer".to_string()),
-                }
-            }
-        );
-        assert_eq!(
-            parse_notification("turn/completed", &json!({ "turn": { "status": "failed" } })),
-            AppServerNotification::TurnCompleted {
-                status: Some("failed".to_string()),
-                error_message: None,
-            }
-        );
-    }
-
-    #[test]
-    fn result_parsers_extract_ids_from_app_server_responses() {
-        assert_eq!(
-            thread_id_from_result(&json!({ "thread": { "id": "thread-1" } })),
-            Some("thread-1".to_string())
-        );
-    }
-
-    #[test]
-    fn initialize_params_enable_experimental_api() {
-        let value = initialize_params("34.1.0").expect("initialize params serialize");
-        assert_eq!(
-            value,
-            json!({
-                "clientInfo": {
-                    "name": "harness-daemon",
-                    "title": "Harness daemon",
-                    "version": "34.1.0"
-                },
-                "capabilities": { "experimentalApi": true }
-            })
-        );
-    }
-}
+#[path = "wire_tests.rs"]
+mod tests;
