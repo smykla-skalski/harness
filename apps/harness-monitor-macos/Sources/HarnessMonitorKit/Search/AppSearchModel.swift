@@ -38,7 +38,7 @@ public final class AppSearchModel {
   /// Lives on the model (not in `@Environment`) because the index
   /// updater modifier sits OUTSIDE the host modifier in the view tree
   /// and SwiftUI environment values flow downward only.
-  public var isPresented: Bool = false
+  public private(set) var isPresented: Bool = false
 
   /// Closure-based seam so tests can inject a controllable provider.
   /// Production binding wraps an ``AppSearchIndex`` reference.
@@ -80,6 +80,11 @@ public final class AppSearchModel {
   /// dismisses the search field.
   public func clear() {
     applySearchState(query: "", results: .empty, isSearching: false)
+  }
+
+  public func setPresented(_ isPresented: Bool) {
+    guard self.isPresented != isPresented else { return }
+    self.isPresented = isPresented
   }
 
   private func applySearchState(

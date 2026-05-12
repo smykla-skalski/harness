@@ -73,6 +73,22 @@ final class SessionTitleBlurChromeTests: XCTestCase {
     XCTAssertTrue(source.contains("transaction.animation = nil"))
   }
 
+  func testDisabledPreferenceSkipsInstallingOverlayChrome() throws {
+    let source = try sourceFile(named: "SessionTitleBlurChrome.swift")
+    let parts = source.components(separatedBy: "private struct SessionTitleBlurChromeModifier")
+    let chromeViewSource = try XCTUnwrap(parts.first)
+    let modifierSource = try XCTUnwrap(parts.dropFirst().first)
+
+    XCTAssertFalse(chromeViewSource.contains("@AppStorage"))
+    XCTAssertTrue(modifierSource.contains(": ViewModifier"))
+    XCTAssertTrue(
+      modifierSource.contains("@AppStorage(HarnessMonitorSessionTitleBlurDefaults.enabledKey)")
+    )
+    XCTAssertTrue(modifierSource.contains("if isEnabled {"))
+    XCTAssertTrue(modifierSource.contains("content.overlay(alignment: .top)"))
+    XCTAssertTrue(modifierSource.contains("} else {\n      content\n    }"))
+  }
+
   func testSessionWindowAttachesTitleBlurChromeAtNavigationSurface() throws {
     let source = try sourceFile(named: "SessionWindowView+Presentation.swift")
 

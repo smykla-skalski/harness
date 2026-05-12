@@ -8,6 +8,17 @@ private struct SessionWindowPerfScenarioTrigger: Equatable {
   let decisionCount: Int
 }
 
+private enum SessionWindowPerfScenarioRouteScript {
+  private static let visualOptionsSuffix = "-visual-options-disabled"
+
+  static func baseScenario(for rawValue: String) -> String {
+    guard rawValue.hasSuffix(visualOptionsSuffix) else {
+      return rawValue
+    }
+    return String(rawValue.dropLast(visualOptionsSuffix.count))
+  }
+}
+
 struct SessionWindowPerfScenarioScript: ViewModifier {
   let stateCache: SessionWindowStateCache
   let store: HarnessMonitorStore
@@ -37,7 +48,7 @@ struct SessionWindowPerfScenarioScript: ViewModifier {
     guard trigger.sessionID == PreviewFixtures.summary.sessionId else { return }
     guard appliedScenarioRawValue != scenario else { return }
 
-    switch scenario {
+    switch SessionWindowPerfScenarioRouteScript.baseScenario(for: scenario) {
     case "session-search-full":
       guard trigger.hasDetail, trigger.decisionCount > 0 else { return }
       appliedScenarioRawValue = scenario
@@ -52,7 +63,7 @@ struct SessionWindowPerfScenarioScript: ViewModifier {
 
   private func runFullSessionSearchScript() async {
     stateCache.selectRoute(.agents)
-    stateCache.appSearchModel.isPresented = true
+    stateCache.appSearchModel.setPresented(true)
     await Task.yield()
     try? await Task.sleep(for: .milliseconds(120))
 

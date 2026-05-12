@@ -3,6 +3,15 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 extension HarnessMonitorPerfTests {
+  private static let visualOptionsDisabledScenarios = [
+    "open-session-window-visual-options-disabled",
+    "agent-detail-form-visual-options-disabled",
+    "decision-detail-form-visual-options-disabled",
+    "task-detail-form-visual-options-disabled",
+    "session-search-full-visual-options-disabled",
+    "timeline-filter-form-visual-options-disabled",
+  ]
+
   func testOpenSessionWindowVisualOptionsDisabledHitchRate() {
     measureScenario("open-session-window-visual-options-disabled")
   }
@@ -29,19 +38,32 @@ extension HarnessMonitorPerfTests {
     launched.terminate()
   }
 
+  func testVisualOptionsDisabledScenarioPreviewRouting() {
+    for scenario in Self.visualOptionsDisabledScenarios {
+      let expected = scenario.contains("decision-detail-form") ? "cockpit" : "dashboard-landing"
+
+      XCTAssertEqual(expectedPreviewScenario(for: scenario), expected)
+    }
+  }
+
   func expectedPreviewScenario(for scenario: String) -> String {
-    switch scenario {
+    let visualOptionsSuffix = "-visual-options-disabled"
+    let baseScenario =
+      scenario.hasSuffix(visualOptionsSuffix)
+      ? String(scenario.dropLast(visualOptionsSuffix.count))
+      : scenario
+
+    switch baseScenario {
     case "open-recent-window", "open-session-window",
-      "open-session-window-visual-options-disabled", "agent-detail-form",
-      "task-detail-form", "session-search-full", "timeline-filter-form",
-      "timeline-burst", "toast-overlay-churn":
-      "dashboard-landing"
+      "agent-detail-form", "task-detail-form", "session-search-full",
+      "timeline-filter-form", "timeline-burst", "toast-overlay-churn":
+      return "dashboard-landing"
     case "decision-detail-form", "permission-modal":
-      "cockpit"
+      return "cockpit"
     case "offline-cached-open":
-      "offline-cached"
+      return "offline-cached"
     default:
-      "dashboard"
+      return "dashboard"
     }
   }
 

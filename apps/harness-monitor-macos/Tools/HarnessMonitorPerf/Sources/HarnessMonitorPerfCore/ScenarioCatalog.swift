@@ -2,15 +2,22 @@ import Foundation
 
 /// Static scenario catalog shared by the audit CLI, manifest writer, and tests.
 public enum ScenarioCatalog {
+    private static let visualOptionsSuffix = "-visual-options-disabled"
+
     public static let all: [String] = [
         "open-recent-window",
         "open-session-window",
         "open-session-window-visual-options-disabled",
         "agent-detail-form",
+        "agent-detail-form-visual-options-disabled",
         "decision-detail-form",
+        "decision-detail-form-visual-options-disabled",
         "task-detail-form",
+        "task-detail-form-visual-options-disabled",
         "session-search-full",
+        "session-search-full-visual-options-disabled",
         "timeline-filter-form",
+        "timeline-filter-form-visual-options-disabled",
         "permission-modal",
         "settings-backdrop-cycle",
         "settings-background-cycle",
@@ -24,10 +31,15 @@ public enum ScenarioCatalog {
         "open-session-window",
         "open-session-window-visual-options-disabled",
         "agent-detail-form",
+        "agent-detail-form-visual-options-disabled",
         "decision-detail-form",
+        "decision-detail-form-visual-options-disabled",
         "task-detail-form",
+        "task-detail-form-visual-options-disabled",
         "session-search-full",
+        "session-search-full-visual-options-disabled",
         "timeline-filter-form",
+        "timeline-filter-form-visual-options-disabled",
         "permission-modal",
         "timeline-burst",
         "toast-overlay-churn",
@@ -41,10 +53,9 @@ public enum ScenarioCatalog {
     ]
 
     public static func durationSeconds(for scenario: String) -> Int {
-        switch scenario {
+        switch baseScenario(for: scenario) {
         case "open-recent-window": return 6
         case "open-session-window": return 8
-        case "open-session-window-visual-options-disabled": return 8
         case "agent-detail-form": return 8
         case "decision-detail-form": return 8
         case "task-detail-form": return 8
@@ -61,11 +72,10 @@ public enum ScenarioCatalog {
     }
 
     public static func previewScenario(for scenario: String) -> String {
-        switch scenario {
+        switch baseScenario(for: scenario) {
         case "open-recent-window", "open-session-window",
-             "open-session-window-visual-options-disabled", "agent-detail-form",
-             "task-detail-form", "session-search-full", "timeline-filter-form",
-             "timeline-burst", "toast-overlay-churn":
+             "agent-detail-form", "task-detail-form", "session-search-full",
+             "timeline-filter-form", "timeline-burst", "toast-overlay-churn":
             return "dashboard-landing"
         case "decision-detail-form", "permission-modal":
             return "cockpit"
@@ -74,6 +84,13 @@ public enum ScenarioCatalog {
         case "offline-cached-open": return "offline-cached"
         default: return "dashboard"
         }
+    }
+
+    private static func baseScenario(for scenario: String) -> String {
+        guard scenario.hasSuffix(visualOptionsSuffix) else {
+            return scenario
+        }
+        return String(scenario.dropLast(visualOptionsSuffix.count))
     }
 
     public struct Failure: Error, CustomStringConvertible {

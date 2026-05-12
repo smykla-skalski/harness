@@ -176,8 +176,13 @@ final class AuditPrimitivesTests: XCTestCase {
         XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("open-recent-window"))
         XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("open-session-window-visual-options-disabled"))
         XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("agent-detail-form"))
+        XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("agent-detail-form-visual-options-disabled"))
+        XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("decision-detail-form-visual-options-disabled"))
+        XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("task-detail-form-visual-options-disabled"))
         XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("session-search-full"))
+        XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("session-search-full-visual-options-disabled"))
         XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("timeline-filter-form"))
+        XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("timeline-filter-form-visual-options-disabled"))
         XCTAssertTrue(ManifestBuilder.defaultTemplates.swiftui.contains("permission-modal"))
         XCTAssertTrue(ManifestBuilder.defaultTemplates.allocations.contains("offline-cached-open"))
     }

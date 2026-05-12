@@ -54,7 +54,15 @@ public enum Budgets {
             totalUpdates: 35_000, bodyUpdates: 3_500,
             maxUpdateGroupMilliseconds: 50, hitches: 0, potentialHangs: 0
         ),
+        "agent-detail-form-visual-options-disabled": SwiftUIBudget(
+            totalUpdates: 35_000, bodyUpdates: 3_500,
+            maxUpdateGroupMilliseconds: 50, hitches: 0, potentialHangs: 0
+        ),
         "decision-detail-form": SwiftUIBudget(
+            totalUpdates: 35_000, bodyUpdates: 3_500,
+            maxUpdateGroupMilliseconds: 50, hitches: 0, potentialHangs: 0
+        ),
+        "decision-detail-form-visual-options-disabled": SwiftUIBudget(
             totalUpdates: 35_000, bodyUpdates: 3_500,
             maxUpdateGroupMilliseconds: 50, hitches: 0, potentialHangs: 0
         ),
@@ -62,11 +70,23 @@ public enum Budgets {
             totalUpdates: 35_000, bodyUpdates: 3_500,
             maxUpdateGroupMilliseconds: 50, hitches: 0, potentialHangs: 0
         ),
+        "task-detail-form-visual-options-disabled": SwiftUIBudget(
+            totalUpdates: 35_000, bodyUpdates: 3_500,
+            maxUpdateGroupMilliseconds: 50, hitches: 0, potentialHangs: 0
+        ),
         "session-search-full": SwiftUIBudget(
             totalUpdates: 35_000, bodyUpdates: 3_500,
             maxUpdateGroupMilliseconds: 50, hitches: 0, potentialHangs: 0
         ),
+        "session-search-full-visual-options-disabled": SwiftUIBudget(
+            totalUpdates: 35_000, bodyUpdates: 3_500,
+            maxUpdateGroupMilliseconds: 50, hitches: 0, potentialHangs: 0
+        ),
         "timeline-filter-form": SwiftUIBudget(
+            totalUpdates: 35_000, bodyUpdates: 3_500,
+            maxUpdateGroupMilliseconds: 50, hitches: 0, potentialHangs: 0
+        ),
+        "timeline-filter-form-visual-options-disabled": SwiftUIBudget(
             totalUpdates: 35_000, bodyUpdates: 3_500,
             maxUpdateGroupMilliseconds: 50, hitches: 0, potentialHangs: 0
         ),

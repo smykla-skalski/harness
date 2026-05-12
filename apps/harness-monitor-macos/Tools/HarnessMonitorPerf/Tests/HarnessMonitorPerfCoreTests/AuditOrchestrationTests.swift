@@ -30,8 +30,20 @@ final class ScenarioCatalogTests: XCTestCase {
         XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "open-recent-window"), 6)
         XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "open-session-window-visual-options-disabled"), 8)
         XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "agent-detail-form"), 8)
+        XCTAssertEqual(
+            ScenarioCatalog.durationSeconds(for: "agent-detail-form-visual-options-disabled"),
+            8
+        )
         XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "session-search-full"), 8)
+        XCTAssertEqual(
+            ScenarioCatalog.durationSeconds(for: "session-search-full-visual-options-disabled"),
+            8
+        )
         XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "timeline-filter-form"), 8)
+        XCTAssertEqual(
+            ScenarioCatalog.durationSeconds(for: "timeline-filter-form-visual-options-disabled"),
+            8
+        )
         XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "permission-modal"), 8)
         XCTAssertEqual(ScenarioCatalog.durationSeconds(for: "unknown-scenario"), 8)
     }
@@ -40,10 +52,15 @@ final class ScenarioCatalogTests: XCTestCase {
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "open-recent-window"), "dashboard-landing")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "open-session-window-visual-options-disabled"), "dashboard-landing")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "agent-detail-form"), "dashboard-landing")
+        XCTAssertEqual(ScenarioCatalog.previewScenario(for: "agent-detail-form-visual-options-disabled"), "dashboard-landing")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "decision-detail-form"), "cockpit")
+        XCTAssertEqual(ScenarioCatalog.previewScenario(for: "decision-detail-form-visual-options-disabled"), "cockpit")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "task-detail-form"), "dashboard-landing")
+        XCTAssertEqual(ScenarioCatalog.previewScenario(for: "task-detail-form-visual-options-disabled"), "dashboard-landing")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "session-search-full"), "dashboard-landing")
+        XCTAssertEqual(ScenarioCatalog.previewScenario(for: "session-search-full-visual-options-disabled"), "dashboard-landing")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "timeline-filter-form"), "dashboard-landing")
+        XCTAssertEqual(ScenarioCatalog.previewScenario(for: "timeline-filter-form-visual-options-disabled"), "dashboard-landing")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "permission-modal"), "cockpit")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "offline-cached-open"), "offline-cached")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "anything-else"), "dashboard")
@@ -53,10 +70,15 @@ final class ScenarioCatalogTests: XCTestCase {
         XCTAssertTrue(ScenarioCatalog.swiftUI.contains("permission-modal"))
         XCTAssertTrue(ScenarioCatalog.swiftUI.contains("open-session-window-visual-options-disabled"))
         XCTAssertTrue(ScenarioCatalog.swiftUI.contains("agent-detail-form"))
+        XCTAssertTrue(ScenarioCatalog.swiftUI.contains("agent-detail-form-visual-options-disabled"))
         XCTAssertTrue(ScenarioCatalog.swiftUI.contains("decision-detail-form"))
+        XCTAssertTrue(ScenarioCatalog.swiftUI.contains("decision-detail-form-visual-options-disabled"))
         XCTAssertTrue(ScenarioCatalog.swiftUI.contains("task-detail-form"))
+        XCTAssertTrue(ScenarioCatalog.swiftUI.contains("task-detail-form-visual-options-disabled"))
         XCTAssertTrue(ScenarioCatalog.swiftUI.contains("session-search-full"))
+        XCTAssertTrue(ScenarioCatalog.swiftUI.contains("session-search-full-visual-options-disabled"))
         XCTAssertTrue(ScenarioCatalog.swiftUI.contains("timeline-filter-form"))
+        XCTAssertTrue(ScenarioCatalog.swiftUI.contains("timeline-filter-form-visual-options-disabled"))
         XCTAssertTrue(ScenarioCatalog.swiftUI.contains("toast-overlay-churn"))
         XCTAssertFalse(ScenarioCatalog.swiftUI.contains("settings-backdrop-cycle"))
         XCTAssertTrue(ScenarioCatalog.allocations.contains("settings-background-cycle"))
