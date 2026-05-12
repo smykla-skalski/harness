@@ -33,11 +33,9 @@ private struct AppSearchTrigger: Equatable {
 /// backed by `NSSearchField`'s suggestion menu, which dismisses when
 /// the window resigns key/active state and does NOT auto-reopen when
 /// the window regains it. There is no SwiftUI-only API to force
-/// re-presentation of the menu (confirmed by the swiftui-introspect
-/// community recipe documented at
-/// https://github.com/siteline/swiftui-introspect/discussions/397
-/// and the Apple Developer Forums thread #704767, which has no
-/// SwiftUI workaround). The fix uses `AppSearchFieldRebinder` -
+/// re-presentation of the menu (confirmed by Apple Developer Forums
+/// thread #704767, which has no SwiftUI workaround). The fix uses
+/// `AppSearchFieldRebinder` -
 /// an `NSViewRepresentable` that finds the underlying
 /// `NSSearchField` in the window hierarchy and calls
 /// `beginSearchInteraction()` (the same AppKit API
