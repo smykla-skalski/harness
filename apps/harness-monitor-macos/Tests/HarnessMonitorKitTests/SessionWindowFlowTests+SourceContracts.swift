@@ -162,6 +162,8 @@ extension SessionWindowFlowTests {
     #expect(source.contains("private struct AppSearchSuggestionsHost: View"))
     #expect(source.contains("results: model.results"))
     #expect(source.contains(".onChange(of: model.results.totalHitCount)"))
+    #expect(source.contains("@Environment(\\.accessibilityVoiceOverEnabled)"))
+    #expect(source.contains("if voiceOverEnabled"))
     #expect(!source.contains("@Bindable var model = model"))
     let staleRebinderDependency =
       "AppSearchFieldRebinder(\n          shouldRebind: !query.isEmpty && model.isPresented"
