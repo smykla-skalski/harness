@@ -55,6 +55,7 @@ mod rebuild;
 mod review_writes;
 mod runtime;
 mod schema;
+mod schema_migrations;
 mod schema_repairs;
 mod schema_sql;
 mod schema_v10;
