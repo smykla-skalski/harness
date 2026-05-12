@@ -150,21 +150,30 @@ async fn dispatch_read_query_managed_agent_codex_transcript_returns_history() {
     let Value::Array(entries) = result["entries"].clone() else {
         panic!("expected Codex transcript entries array");
     };
-    assert_eq!(entries.len(), 1);
-    assert_eq!(entries[0]["kind"].as_str(), Some("user_prompt"));
+    assert_eq!(entries.len(), 2);
+    let prompt_entry = entries
+        .iter()
+        .find(|entry| entry["kind"].as_str() == Some("user_prompt"))
+        .expect("prompt entry");
     assert_eq!(
-        entries[0]["session_id"].as_str(),
+        prompt_entry["session_id"].as_str(),
         Some("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4")
     );
-    assert_eq!(entries[0]["agent_id"].as_str(), Some("codex-worker"));
+    assert_eq!(prompt_entry["agent_id"].as_str(), Some("codex-worker"));
     assert_eq!(
-        entries[0]["summary"].as_str(),
-        Some("User prompt: Investigate run-3")
+        prompt_entry["summary"].as_str(),
+        Some("Investigate run-3")
     );
-    assert_eq!(entries[0]["payload"]["runtime"].as_str(), Some("codex"));
+    assert_eq!(prompt_entry["payload"]["runtime"].as_str(), Some("codex"));
     assert_eq!(
-        entries[0]["payload"]["event"]["type"].as_str(),
+        prompt_entry["payload"]["event"]["type"].as_str(),
         Some("user_prompt")
+    );
+    assert!(
+        entries
+            .iter()
+            .all(|entry| entry["payload"]["event"]["delta"].as_bool() != Some(true)),
+        "transcript should not emit one row per agent-message delta"
     );
 }
 
