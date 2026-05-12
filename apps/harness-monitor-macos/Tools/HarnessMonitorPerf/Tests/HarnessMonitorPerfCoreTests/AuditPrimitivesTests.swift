@@ -156,6 +156,8 @@ final class AuditPrimitivesTests: XCTestCase {
         XCTAssertEqual(capture.environment["HARNESS_MONITOR_PERF_SCENARIO"], "open-recent-window")
         XCTAssertEqual(capture.environment["HARNESS_MONITOR_PREVIEW_SCENARIO"], "dashboard-landing")
         XCTAssertEqual(capture.launchArguments, ["-ApplePersistenceIgnoreState", "YES"])
+        XCTAssertEqual(capture.daemonDataHomeProbe?.dataHome, "/tmp/run-1/dh")
+        XCTAssertFalse(capture.daemonDataHomeProbe?.containsSQLiteDatabase ?? true)
 
         let url = workDir.appendingPathComponent("manifest.json")
         try ManifestBuilder.write(manifest, to: url)
@@ -170,6 +172,26 @@ final class AuditPrimitivesTests: XCTestCase {
         {
             XCTAssertLessThan(buildIndex.lowerBound, capturesIndex.lowerBound)
         }
+    }
+
+    func testDaemonDataHomeProbeCapturesRealDatabaseEvidence() throws {
+        let dataHome = workDir.appendingPathComponent("data-home", isDirectory: true)
+        let daemonDir = dataHome.appendingPathComponent("harness/daemon", isDirectory: true)
+        try FileManager.default.createDirectory(at: daemonDir, withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: daemonDir.appendingPathComponent("manifest.json"))
+        try Data("db".utf8).write(to: daemonDir.appendingPathComponent("harness.db"))
+        try Data("wal".utf8).write(to: daemonDir.appendingPathComponent("harness.db-wal"))
+        try Data("shm".utf8).write(to: daemonDir.appendingPathComponent("harness.db-shm"))
+
+        let probe = DaemonDataHomeProbe.capture(dataHome: dataHome)
+
+        XCTAssertTrue(probe.exists)
+        XCTAssertEqual(probe.regularFileCount, 4)
+        XCTAssertEqual(probe.totalBytes, 10)
+        XCTAssertTrue(probe.containsDaemonManifest)
+        XCTAssertTrue(probe.containsSQLiteDatabase)
+        XCTAssertTrue(probe.containsSQLiteWAL)
+        XCTAssertTrue(probe.containsSQLiteSHM)
     }
 
     func testManifestTemplatesIncludeKnownScenarios() {

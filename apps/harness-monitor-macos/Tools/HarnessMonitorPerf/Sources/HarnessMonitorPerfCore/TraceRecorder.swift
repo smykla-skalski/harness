@@ -145,7 +145,8 @@ public enum TraceRecorder {
             endReason: endReason,
             previewScenario: inputs.previewScenario,
             launchedProcessPath: launchedProcessPath,
-            daemonDataHome: inputs.daemonDataHome.path
+            daemonDataHome: inputs.daemonDataHome.path,
+            daemonDataHomeProbe: DaemonDataHomeProbe.capture(dataHome: inputs.daemonDataHome)
         )
         return Capture(record: captureRecord, endReason: endReason, launchedProcessPath: launchedProcessPath)
     }

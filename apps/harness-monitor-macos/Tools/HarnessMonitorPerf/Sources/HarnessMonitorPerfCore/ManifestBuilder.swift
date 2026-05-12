@@ -137,6 +137,32 @@ public enum ManifestBuilder {
         public var previewScenario: String
         public var launchedProcessPath: String
         public var daemonDataHome: String
+        public var daemonDataHomeProbe: DaemonDataHomeProbe?
+
+        public init(
+            scenario: String,
+            template: String,
+            durationSeconds: Int,
+            traceRelpath: String,
+            exitStatus: Int,
+            endReason: String,
+            previewScenario: String,
+            launchedProcessPath: String,
+            daemonDataHome: String,
+            daemonDataHomeProbe: DaemonDataHomeProbe? = nil
+        ) {
+            self.scenario = scenario
+            self.template = template
+            self.durationSeconds = durationSeconds
+            self.traceRelpath = traceRelpath
+            self.exitStatus = exitStatus
+            self.endReason = endReason
+            self.previewScenario = previewScenario
+            self.launchedProcessPath = launchedProcessPath
+            self.daemonDataHome = daemonDataHome
+            self.daemonDataHomeProbe =
+                daemonDataHomeProbe ?? .unknown(dataHome: daemonDataHome)
+        }
     }
 
     public struct Capture: Codable, Equatable {
@@ -150,6 +176,7 @@ public enum ManifestBuilder {
         public var launchedProcessPath: String
         public var environment: [String: String]
         public var launchArguments: [String]
+        public var daemonDataHomeProbe: DaemonDataHomeProbe?
 
         enum CodingKeys: String, CodingKey {
             case scenario
@@ -162,6 +189,7 @@ public enum ManifestBuilder {
             case launchedProcessPath = "launched_process_path"
             case environment
             case launchArguments = "launch_arguments"
+            case daemonDataHomeProbe = "daemon_data_home_probe"
         }
     }
 
@@ -272,7 +300,8 @@ public enum ManifestBuilder {
                 previewScenario: record.previewScenario,
                 launchedProcessPath: record.launchedProcessPath,
                 environment: environment,
-                launchArguments: inputs.launchArguments
+                launchArguments: inputs.launchArguments,
+                daemonDataHomeProbe: record.daemonDataHomeProbe
             )
         }
 
