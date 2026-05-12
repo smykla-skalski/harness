@@ -52,10 +52,13 @@ pub(crate) async fn dispatch_managed_agent_start_codex(
             );
         }
     };
-    let result = state
-        .codex_controller
-        .start_run(&session_id, &body)
-        .map(ManagedAgentSnapshot::Codex);
+    let result = with_managed_agent_lock(state, &session_id, "codex:start", || {
+        state
+            .codex_controller
+            .start_run(&session_id, &body)
+            .map(ManagedAgentSnapshot::Codex)
+    })
+    .await;
     dispatch_managed_agent_response(request, state, result).await
 }
 

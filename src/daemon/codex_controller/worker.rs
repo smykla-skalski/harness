@@ -1,7 +1,10 @@
 use std::collections::HashMap;
+use std::future::Future;
+use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 use tokio::sync::mpsc;
+use tokio::time::timeout;
 
 use crate::daemon::codex_transport::CodexTransport;
 use crate::daemon::protocol::{
@@ -20,12 +23,16 @@ use super::handle::{CodexControllerHandle, record_snapshot_event};
 use super::rpc::CodexJsonRpc;
 use super::wire::{self, AppServerNotification};
 
+const STARTUP_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+const DELTA_PERSIST_INTERVAL: Duration = Duration::from_millis(750);
+
 pub(super) struct CodexRunWorker {
     controller: CodexControllerHandle,
     snapshot: CodexRunSnapshot,
     control_rx: mpsc::UnboundedReceiver<CodexControlMessage>,
     pending_approvals: HashMap<String, Vec<PendingApproval>>,
     agent_message_delta: String,
+    last_delta_persist_at: Option<Instant>,
 }
 
 struct PendingApproval {
@@ -45,6 +52,7 @@ impl CodexRunWorker {
             control_rx,
             pending_approvals: HashMap::new(),
             agent_message_delta: String::new(),
+            last_delta_persist_at: None,
         }
     }
 
@@ -86,7 +94,7 @@ impl CodexRunWorker {
 
     async fn initialize(&self, rpc: &mut CodexJsonRpc) -> Result<(), CliError> {
         let params = wire::initialize_params(env!("CARGO_PKG_VERSION"))?;
-        let _ = rpc.request(wire::METHOD_INITIALIZE, params).await?;
+        let _ = startup_request(rpc, wire::METHOD_INITIALIZE, params, "initialize").await?;
         Ok(())
     }
 
@@ -106,7 +114,7 @@ impl CodexRunWorker {
             effort: self.snapshot.effort.as_deref(),
         })?;
 
-        let result = rpc.request(method, params).await?;
+        let result = startup_request(rpc, method, params, method).await?;
         let thread_id = wire::thread_id_from_result(&result).ok_or_else(|| {
             CliErrorKind::workflow_parse("codex thread response missing thread.id")
         })?;
@@ -126,7 +134,7 @@ impl CodexRunWorker {
             approval_policy(self.snapshot.mode),
             turn_sandbox_policy(self.snapshot.mode, &self.snapshot.project_dir),
         )?;
-        let result = rpc.request(wire::METHOD_TURN_START, params).await?;
+        let result = startup_request(rpc, wire::METHOD_TURN_START, params, "turn/start").await?;
         let turn_id = wire::turn_id_from_result(&result)
             .ok_or_else(|| CliErrorKind::workflow_parse("codex turn response missing turn.id"))?;
         self.snapshot.turn_id = Some(turn_id.to_string());
@@ -189,9 +197,9 @@ impl CodexRunWorker {
 
     fn handle_notification(&mut self, method: &str, params: &Value) -> Result<bool, CliError> {
         let notification = wire::parse_notification(method, params);
-        self.record_event(method, wire::notification_summary(method, params), params);
         match notification {
             AppServerNotification::TurnStarted { turn_id } => {
+                self.record_event(method, wire::notification_summary(method, params), params);
                 if let Some(turn_id) = turn_id {
                     self.snapshot.turn_id = Some(turn_id.to_string());
                     self.snapshot.latest_summary = Some(format!("Turn {turn_id} is running"));
@@ -203,11 +211,14 @@ impl CodexRunWorker {
                 if let Some(delta) = delta {
                     self.agent_message_delta.push_str(&delta);
                     self.snapshot.latest_summary = Some(trim_summary(&self.agent_message_delta));
-                    self.touch_and_save()?;
+                    if self.should_persist_delta_update() {
+                        self.touch_and_save()?;
+                    }
                 }
                 Ok(false)
             }
             AppServerNotification::ItemCompleted { item } => {
+                self.record_event(method, wire::notification_summary(method, params), params);
                 self.handle_item_completed(&item)?;
                 Ok(false)
             }
@@ -215,17 +226,22 @@ impl CodexRunWorker {
                 status,
                 error_message,
             } => {
+                self.record_event(method, wire::notification_summary(method, params), params);
                 self.handle_turn_completed(status.as_deref(), error_message)?;
                 Ok(true)
             }
             AppServerNotification::Error { message } => {
+                self.record_event(method, wire::notification_summary(method, params), params);
                 let message = message
                     .as_deref()
                     .unwrap_or("codex app-server reported an error");
                 self.fail(message);
                 Ok(true)
             }
-            AppServerNotification::Other => self.touch_and_save().map(|()| false),
+            AppServerNotification::Other => {
+                self.record_event(method, wire::notification_summary(method, params), params);
+                self.touch_and_save().map(|()| false)
+            }
         }
     }
 
@@ -556,6 +572,41 @@ impl CodexRunWorker {
     fn record_event(&mut self, kind: &str, summary: String, payload: &Value) {
         record_snapshot_event(&mut self.snapshot, kind, summary, payload);
     }
+
+    fn should_persist_delta_update(&mut self) -> bool {
+        let now = Instant::now();
+        if self
+            .last_delta_persist_at
+            .is_some_and(|last| now.duration_since(last) < DELTA_PERSIST_INTERVAL)
+        {
+            return false;
+        }
+        self.last_delta_persist_at = Some(now);
+        true
+    }
+}
+
+async fn startup_request(
+    rpc: &mut CodexJsonRpc,
+    method: &'static str,
+    params: Value,
+    label: &'static str,
+) -> Result<Value, CliError> {
+    with_startup_timeout(label, rpc.request(method, params)).await
+}
+
+async fn with_startup_timeout<T, Fut>(label: &'static str, future: Fut) -> Result<T, CliError>
+where
+    Fut: Future<Output = Result<T, CliError>>,
+{
+    timeout(STARTUP_REQUEST_TIMEOUT, future)
+        .await
+        .map_err(|_| {
+            CliErrorKind::workflow_io(format!(
+                "codex app-server {label} did not respond within {}s",
+                STARTUP_REQUEST_TIMEOUT.as_secs()
+            ))
+        })?
 }
 
 #[cfg(test)]

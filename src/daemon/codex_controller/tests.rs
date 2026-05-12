@@ -10,7 +10,7 @@ use tokio::sync::broadcast;
 use super::{
     CodexControllerHandle,
     approvals::{approval_from_request, upsert_pending_approval},
-    handle::preferred_codex_project_dir,
+    handle::{preferred_codex_project_dir, record_snapshot_event},
 };
 use crate::daemon::db::DaemonDb;
 use crate::daemon::index::DiscoveredProject;
@@ -295,6 +295,43 @@ fn run_reconciles_stale_active_codex_run() {
 }
 
 #[test]
+fn follow_up_attach_failure_marks_run_failed() {
+    let (controller, db, _tempdir) = controller_with_db();
+    let mut run = codex_run_snapshot(CodexRunStatus::Completed);
+    run.thread_id = Some("thread-1".into());
+    {
+        let db = db.lock().expect("db lock");
+        db.save_codex_run(&run).expect("save codex run");
+    }
+    controller.poison_active_runs_for_test();
+
+    let error = controller
+        .steer(
+            "codex-run-1",
+            &crate::daemon::protocol::CodexSteerRequest {
+                prompt: "follow up".into(),
+            },
+        )
+        .expect_err("active run attach should fail");
+
+    assert!(
+        error.to_string().contains("codex active run lock poisoned"),
+        "unexpected error: {error}"
+    );
+    let persisted = db
+        .lock()
+        .expect("db lock")
+        .codex_run("codex-run-1")
+        .expect("load persisted run")
+        .expect("persisted run");
+    assert_eq!(persisted.status, CodexRunStatus::Failed);
+    assert_eq!(
+        persisted.latest_summary.as_deref(),
+        Some("Codex worker could not attach follow-up turn to daemon")
+    );
+}
+
+#[test]
 fn list_runs_repairs_disconnected_codex_orchestration_agent() {
     let (controller, db, _tempdir) = controller_with_session_state(
         sample_session_state_with_codex_agent(AgentStatus::disconnected_unknown()),
@@ -377,6 +414,40 @@ fn transcript_includes_codex_prompt_and_final_message() {
             .any(|entry| entry.kind == "assistant_text" && entry.summary == "Done from Codex"),
         "final response should be exposed as transcript history"
     );
+}
+
+#[test]
+fn transcript_deduplicates_final_message_from_completed_item_event() {
+    let (controller, db, _tempdir) = controller_with_db();
+    let mut run = codex_run_snapshot(CodexRunStatus::Completed);
+    run.final_message = Some("Done from Codex".into());
+    record_snapshot_event(
+        &mut run,
+        "item/completed",
+        "item/completed: agentMessage".to_string(),
+        &json!({
+            "item": {
+                "type": "agentMessage",
+                "text": "Done from Codex",
+                "phase": "final_answer"
+            }
+        }),
+    );
+    {
+        let db = db.lock().expect("db lock");
+        db.save_codex_run(&run).expect("save codex run");
+    }
+
+    let transcript = controller
+        .transcript("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
+        .expect("codex transcript");
+
+    let assistant_entries = transcript
+        .entries
+        .iter()
+        .filter(|entry| entry.kind == "assistant_text" && entry.summary == "Done from Codex")
+        .count();
+    assert_eq!(assistant_entries, 1);
 }
 
 fn codex_approval_request(

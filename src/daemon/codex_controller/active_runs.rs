@@ -51,6 +51,16 @@ impl ActiveRuns {
         entries.remove(run_id);
     }
 
+    #[cfg(test)]
+    pub(super) fn poison_for_test(&self) {
+        let entries = Arc::clone(&self.entries);
+        let _ = std::thread::spawn(move || {
+            let _guard = entries.lock().expect("active runs lock");
+            panic!("poison active runs for test");
+        })
+        .join();
+    }
+
     fn lock(&self) -> Result<MutexGuard<'_, HashMap<String, ActiveRun>>, CliError> {
         self.entries.lock().map_err(|error| {
             CliErrorKind::workflow_io(format!("codex active run lock poisoned: {error}")).into()
