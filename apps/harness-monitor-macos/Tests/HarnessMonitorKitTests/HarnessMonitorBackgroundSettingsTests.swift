@@ -16,6 +16,20 @@ final class BackgroundAssetBundleTests: XCTestCase {
     }
   }
 
+  func testWindowBackdropUsesBoundedThumbnailWithoutLiveBlur() throws {
+    let source = try String(
+      contentsOf: repoRoot()
+        .appendingPathComponent(
+          "apps/harness-monitor-macos/Sources/HarnessMonitor/App/HarnessMonitorWindowBackdrop.swift"
+        ),
+      encoding: .utf8
+    )
+
+    XCTAssertTrue(source.contains("BackgroundThumbnailCache.shared.thumbnail("))
+    XCTAssertFalse(source.contains("BackgroundThumbnailCache.shared.fullImage("))
+    XCTAssertFalse(source.contains(".blur("))
+  }
+
   func testThumbnailGenerationCapsInheritedUIPriority() {
     XCTAssertEqual(
       BackgroundThumbnailCache.imageGenerationPriority(for: .userInitiated),

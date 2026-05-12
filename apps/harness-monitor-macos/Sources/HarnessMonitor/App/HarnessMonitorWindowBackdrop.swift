@@ -70,10 +70,6 @@ struct HarnessMonitorWindowBackdropView: View {
     return colorScheme == .dark ? 0.94 : 0.86
   }
 
-  private var blurRadius: CGFloat {
-    reduceTransparency ? 0 : 10
-  }
-
   var body: some View {
     ZStack {
       if let loadedImage {
@@ -86,7 +82,6 @@ struct HarnessMonitorWindowBackdropView: View {
           .saturation(colorScheme == .dark ? 1.0 : 0.9)
           .contrast(colorScheme == .dark ? 1.02 : 0.98)
           .opacity(imageOpacity)
-          .blur(radius: blurRadius)
       }
 
       LinearGradient(
@@ -138,7 +133,7 @@ struct HarnessMonitorWindowBackdropView: View {
     .task(id: backgroundImage.storageValue) {
       loadedImage = nil
       guard
-        let cgImage = await BackgroundThumbnailCache.shared.fullImage(
+        let cgImage = await BackgroundThumbnailCache.shared.thumbnail(
           for: backgroundImage
         )
       else {
