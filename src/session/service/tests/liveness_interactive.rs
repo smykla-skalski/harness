@@ -272,3 +272,68 @@ fn sync_liveness_skips_disconnect_for_acp_managed_gemini_agents() {
         );
     });
 }
+
+#[test]
+fn sync_liveness_skips_disconnect_for_codex_managed_agents() {
+    with_temp_project(|project| {
+        start_active_session(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-000000000037"),
+        )
+        .expect("start");
+
+        temp_env::with_var("CODEX_SESSION_ID", Some("native-codex-worker"), || {
+            join_session(
+                "00000000-0000-4002-8000-000000000037",
+                SessionRole::Worker,
+                "codex",
+                &[],
+                None,
+                project,
+                None,
+            )
+            .expect("join worker");
+        });
+
+        let state =
+            session_status("00000000-0000-4002-8000-000000000037", project).expect("status");
+        let worker_id = find_agent_by_runtime(&state, "codex").agent_id.clone();
+        let layout =
+            storage::layout_from_project_dir(project, "00000000-0000-4002-8000-000000000037")
+                .expect("layout");
+        storage::update_state(&layout, |state| {
+            let worker = state.agents.get_mut(&worker_id).expect("worker");
+            worker.managed_agent =
+                Some(crate::session::types::ManagedAgentRef::codex("codex-run-1"));
+            worker.agent_session_id = None;
+            Ok(())
+        })
+        .expect("bind codex worker");
+        age_agent_activity(
+            project,
+            "00000000-0000-4002-8000-000000000037",
+            &worker_id,
+            1_200,
+        );
+        write_agent_log_file(project, "claude", "test-service");
+
+        let result =
+            sync_agent_liveness("00000000-0000-4002-8000-000000000037", project).expect("sync");
+
+        assert!(
+            result.disconnected.is_empty(),
+            "Codex-managed agents should stay connected after their app-server turn completes"
+        );
+        assert!(result.idled.is_empty());
+
+        let updated =
+            session_status("00000000-0000-4002-8000-000000000037", project).expect("updated");
+        assert_eq!(
+            updated.agents.get(&worker_id).expect("worker").status,
+            AgentStatus::Active
+        );
+    });
+}

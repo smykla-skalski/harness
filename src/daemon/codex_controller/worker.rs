@@ -460,7 +460,9 @@ impl CodexRunWorker {
             self.snapshot.latest_summary = Some(summary.to_string());
         }
         self.snapshot.error = error;
-        self.touch_and_save()
+        self.touch_and_save()?;
+        self.controller
+            .sync_orchestration_status_for_run(&self.snapshot)
     }
 
     fn fail(&mut self, message: &str) {
@@ -483,6 +485,12 @@ impl CodexRunWorker {
     fn persist_failure(&self, message: &str) {
         if let Err(error) = self.controller.save_and_broadcast(&self.snapshot) {
             tracing::warn!(%error, "failed to persist codex failure");
+        }
+        if let Err(error) = self
+            .controller
+            .sync_orchestration_status_for_run(&self.snapshot)
+        {
+            tracing::warn!(%error, "failed to sync codex failure status to session agent");
         }
         tracing::error!(
             session_id = %self.snapshot.session_id,
