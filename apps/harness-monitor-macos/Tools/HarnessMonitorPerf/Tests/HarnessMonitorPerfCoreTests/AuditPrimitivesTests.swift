@@ -257,6 +257,18 @@ final class AuditPrimitivesTests: XCTestCase {
         XCTAssertNil(environment["UNRELATED"])
     }
 
+    func testAuditDefaultEnvironmentInfersLiveExternalModeForAuditDataHomeOverride() {
+        let environment = AuditRunner.defaultEnvironment(
+            processEnvironment: [
+                AuditRunner.daemonDataHomeOverrideEnvironmentKey: "/protected/live-data-home",
+            ]
+        )
+
+        XCTAssertEqual(environment["HARNESS_MONITOR_LAUNCH_MODE"], "live")
+        XCTAssertEqual(environment["HARNESS_MONITOR_EXTERNAL_DAEMON"], "1")
+        XCTAssertNil(environment["HARNESS_DAEMON_DATA_HOME"])
+    }
+
     func testAuditExternalDaemonReleaseOptInRequiresLiveExternalEnvironment() {
         XCTAssertTrue(
             AuditRunner.shouldAllowExternalDaemonAudit(
@@ -337,6 +349,32 @@ final class AuditPrimitivesTests: XCTestCase {
             dataHome.path,
             "/Users/me/Library/Group Containers/Q498EB36N4.io.harnessmonitor/runtime-lanes/main"
         )
+    }
+
+    func testAuditDaemonDataHomeRejectsUnsafeExternalOverrideBeforeLaunch() throws {
+        let runDir = URL(fileURLWithPath: "/tmp/audit-run", isDirectory: true)
+
+        XCTAssertThrowsError(
+            try AuditRunner.auditDaemonDataHome(
+                runDir: runDir,
+                templateSlug: "swiftui",
+                scenario: "open-session-window",
+                defaultEnvironment: [
+                    "HARNESS_MONITOR_LAUNCH_MODE": "preview",
+                    "HARNESS_MONITOR_EXTERNAL_DAEMON": "0",
+                ],
+                processEnvironment: [
+                    AuditRunner.daemonDataHomeOverrideEnvironmentKey:
+                        "/Users/me/Library/Group Containers/Q498EB36N4.io.harnessmonitor/runtime-lanes/main",
+                ]
+            )
+        ) { error in
+            XCTAssertTrue(
+                String(describing: error).contains(
+                    "HARNESS_MONITOR_AUDIT_DAEMON_DATA_HOME requires"
+                )
+            )
+        }
     }
 
     func testAuditDaemonDataHomeMirrorsExternalManifestForLaunch() throws {

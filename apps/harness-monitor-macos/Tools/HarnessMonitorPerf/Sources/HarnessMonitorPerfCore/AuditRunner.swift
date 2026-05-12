@@ -484,9 +484,20 @@ public enum AuditRunner {
     public static func defaultEnvironment(
         processEnvironment: [String: String] = ProcessInfo.processInfo.environment
     ) -> [String: String] {
-        baseEnvironment.merging(passThroughEnvironment(processEnvironment)) { _, override in
+        var environment = baseEnvironment.merging(
+            passThroughEnvironment(processEnvironment)
+        ) { _, override in
             override
         }
+        if trimmedNonEmpty(processEnvironment[daemonDataHomeOverrideEnvironmentKey]) != nil {
+            if trimmedNonEmpty(environment["HARNESS_MONITOR_LAUNCH_MODE"]) == nil {
+                environment["HARNESS_MONITOR_LAUNCH_MODE"] = "live"
+            }
+            if trimmedNonEmpty(environment["HARNESS_MONITOR_EXTERNAL_DAEMON"]) == nil {
+                environment["HARNESS_MONITOR_EXTERNAL_DAEMON"] = "1"
+            }
+        }
+        return environment
     }
 
     public static func daemonDataHome(
@@ -520,14 +531,21 @@ public enum AuditRunner {
             scenario: scenario,
             processEnvironment: processEnvironment
         )
-        guard
-            shouldAllowExternalDaemonAudit(defaultEnvironment: defaultEnvironment),
-            trimmedNonEmpty(processEnvironment[daemonDataHomeOverrideEnvironmentKey]) != nil
-        else {
+        guard trimmedNonEmpty(processEnvironment[daemonDataHomeOverrideEnvironmentKey]) != nil else {
             return AuditDaemonDataHome(
                 launchDataHome: sourceDataHome,
                 probeDataHome: sourceDataHome,
                 mirroredManifest: false
+            )
+        }
+        guard shouldAllowExternalDaemonAudit(defaultEnvironment: defaultEnvironment) else {
+            throw Failure(
+                message: """
+                HARNESS_MONITOR_AUDIT_DAEMON_DATA_HOME requires \
+                HARNESS_MONITOR_LAUNCH_MODE=live and HARNESS_MONITOR_EXTERNAL_DAEMON=1 \
+                so the audit runner can mirror daemon credentials before launching \
+                Harness Monitor UI Testing Audit.app.
+                """
             )
         }
 
