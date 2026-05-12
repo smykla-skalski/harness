@@ -62,7 +62,8 @@ extension SessionSidebar {
       SessionSidebarHeaderCreateButton(
         state: state,
         kind: .decision,
-        accessibilityLabel: "New Decision"
+        accessibilityLabel: "New Decision",
+        tracksShortcutFrame: shouldRenderShortcutOverlays
       )
     }
   }

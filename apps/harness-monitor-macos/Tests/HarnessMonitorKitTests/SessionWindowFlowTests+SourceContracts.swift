@@ -234,6 +234,31 @@ extension SessionWindowFlowTests {
     #expect(sectionSource.contains("guard createDrafts[draft.kind] != draft else { return }"))
   }
 
+  @Test("Session shortcut overlays render only while relevant modifiers are held")
+  func sessionShortcutOverlaysRenderOnlyWhileRelevantModifiersAreHeld() throws {
+    let toolbarSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowToolbar.swift"
+    )
+    let sidebarSource = try previewableSourceFile(named: "Views/Sessions/SessionSidebar.swift")
+    let sectionsSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionSidebar+Sections.swift"
+    )
+    let decisionSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionSidebarDecisionSection.swift"
+    )
+
+    #expect(toolbarSource.contains("private var shouldRenderShortcutOverlay"))
+    #expect(toolbarSource.contains("if shouldRenderShortcutOverlay"))
+    #expect(toolbarSource.contains("shouldRenderShortcutOverlay ? 1 : 0"))
+    #expect(sidebarSource.contains("var shouldRenderShortcutOverlays"))
+    #expect(sidebarSource.contains("createShortcut.isRevealed(by: currentModifiers)"))
+    #expect(sidebarSource.contains("if shouldRenderShortcutOverlays"))
+    #expect(sectionsSource.contains("let isEnabled: Bool"))
+    #expect(sectionsSource.contains("if isEnabled"))
+    #expect(sectionsSource.contains("tracksShortcutFrame: shouldRenderShortcutOverlays"))
+    #expect(decisionSource.contains("tracksShortcutFrame: shouldRenderShortcutOverlays"))
+  }
+
   @Test("Sidebar density keeps strict default and maps legacy values")
   func sidebarDensityResolvesStrictDefaultAndLegacyValues() {
     #expect(HarnessMonitorSidebarSessionRowDisplayMode.defaultMode == .strict)
