@@ -3,13 +3,17 @@ import Testing
 
 @Suite("Content chrome toolbar source contracts")
 struct ContentChromeToolbarSourceTests {
-  @Test("Refresh animation clock stays scoped to the symbol subtree")
-  func refreshAnimationClockStaysScopedToSymbol() throws {
+  @Test("Refresh startup state stays on the static symbol path")
+  func refreshStartupStateStaysOnStaticSymbolPath() throws {
     let source = try sourceFile(at: "Views/App/ContentChromeToolbarSupport.swift")
 
-    #expect(source.contains("var body: some View {\n    Button {"))
+    #expect(source.contains("private var refreshButton: some View"))
+    #expect(source.contains("Button {\n      Task { await store.manualRefresh() }"))
     #expect(!source.contains("TimelineView"))
-    #expect(source.contains(".symbolEffect(.rotate, options: .repeating, isActive: shouldSpin)"))
+    #expect(!source.contains("shouldSpin"))
+    #expect(!source.contains(".symbolEffect(.rotate"))
+    #expect(source.contains("!reduceMotion && (showsSuccessFeedback || showsSuccessTint)"))
+    #expect(source.contains(".contentTransition("))
     #expect(!source.contains("paused:"))
   }
 

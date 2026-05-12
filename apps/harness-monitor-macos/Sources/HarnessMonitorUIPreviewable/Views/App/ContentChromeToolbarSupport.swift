@@ -70,12 +70,8 @@ struct RefreshToolbarButton: View {
     }
   }
 
-  private var shouldSpin: Bool {
-    model.isRefreshing && !reduceMotion && !displaysSuccessFeedback
-  }
-
   private var usesAnimatedSymbolEffects: Bool {
-    shouldSpin || (!reduceMotion && (showsSuccessFeedback || showsSuccessTint))
+    !reduceMotion && (showsSuccessFeedback || showsSuccessTint)
   }
 
   var body: some View {
@@ -125,7 +121,6 @@ struct RefreshToolbarButton: View {
   private var animatedToolbarSymbol: some View {
     Image(systemName: showsSuccessFeedback ? "checkmark" : "arrow.clockwise")
       .foregroundStyle(.primary)
-      .symbolEffect(.rotate, options: .repeating, isActive: shouldSpin)
       .contentTransition(
         .symbolEffect(.replace, options: RefreshToolbarFeedbackTiming.replaceOptions)
       )
