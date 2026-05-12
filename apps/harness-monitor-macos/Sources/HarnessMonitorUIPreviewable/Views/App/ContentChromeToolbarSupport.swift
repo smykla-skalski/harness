@@ -12,7 +12,7 @@ private enum RefreshToolbarFeedbackTiming {
 
 struct ContentNavigationToolbar: ToolbarContent {
   let store: HarnessMonitorStore
-  let model: ContentWindowToolbarModel
+  let model: ContentWindowNavigationToolbarModel
 
   var body: some ToolbarContent {
     ToolbarItemGroup(placement: .navigation) {
@@ -39,7 +39,7 @@ struct ContentNavigationToolbar: ToolbarContent {
 
 struct RefreshToolbarButton: View {
   let store: HarnessMonitorStore
-  let model: ContentWindowToolbarModel
+  let model: ContentPrimaryToolbarModel
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
   @State private var showsSuccessFeedback = false
