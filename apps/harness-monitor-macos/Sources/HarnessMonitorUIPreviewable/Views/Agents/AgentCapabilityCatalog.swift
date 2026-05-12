@@ -89,9 +89,9 @@ enum AgentCapabilityCatalog {
       }
       return option.isEnabled(acpChoice)
     }),
-      let firstChoice = firstAcpEnabledOption.transportChoices.first
+      let acpChoice = firstAcpEnabledOption.acpChoice
     {
-      return firstAcpEnabledOption.normalizedSelection(for: firstChoice.id)
+      return firstAcpEnabledOption.normalizedSelection(for: acpChoice.id)
     }
 
     guard let firstOption = options.first(where: \.isEnabled),
