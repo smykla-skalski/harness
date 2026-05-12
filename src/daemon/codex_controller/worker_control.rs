@@ -94,9 +94,7 @@ impl CodexRunWorker {
         let thread_id = self.thread_id()?;
         let turn_id = self.turn_id()?;
         let params = wire::turn_steer_params(&thread_id, &turn_id, prompt)?;
-        let _ = rpc
-            .send_request(wire::METHOD_TURN_STEER, params.clone())
-            .await?;
+        let _ = rpc.request(wire::METHOD_TURN_STEER, params.clone()).await?;
         self.snapshot.latest_summary = Some("Steering prompt sent".to_string());
         self.record_event(
             wire::METHOD_TURN_STEER,
@@ -111,7 +109,7 @@ impl CodexRunWorker {
         let turn_id = self.turn_id()?;
         let params = wire::turn_interrupt_params(&thread_id, &turn_id)?;
         let _ = rpc
-            .send_request(wire::METHOD_TURN_INTERRUPT, params.clone())
+            .request(wire::METHOD_TURN_INTERRUPT, params.clone())
             .await?;
         self.snapshot.latest_summary = Some("Interrupt requested".to_string());
         self.record_event(

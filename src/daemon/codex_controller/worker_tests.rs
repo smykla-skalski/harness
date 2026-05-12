@@ -105,6 +105,47 @@ async fn unknown_approval_ack_does_not_fail_worker_loop() {
 }
 
 #[tokio::test]
+async fn steer_ack_reports_app_server_error_without_failing_worker_loop() {
+    let (_control_tx, control_rx) = mpsc::unbounded_channel();
+    let mut snapshot = running_snapshot_without_ids();
+    snapshot.thread_id = Some("thread-1".to_string());
+    snapshot.turn_id = Some("turn-1".to_string());
+    let mut worker = CodexRunWorker::new(controller_without_db(), snapshot, control_rx);
+    let recv = Arc::new(Mutex::new(VecDeque::from([json!({
+        "id": 1,
+        "error": {
+            "code": -32602,
+            "message": "turn is not steerable"
+        }
+    })
+    .to_string()])));
+    let mut rpc = CodexJsonRpc::new(Box::new(FakeTransport {
+        recv,
+        ..Default::default()
+    }));
+    let (ack, receiver) = oneshot::channel();
+
+    let should_stop = worker
+        .handle_control(
+            &mut rpc,
+            CodexControlMessage::Steer {
+                prompt: "more context".to_string(),
+                ack,
+            },
+        )
+        .await
+        .expect("control handling should not fail the worker");
+
+    assert!(!should_stop);
+    let error = receiver
+        .await
+        .expect("ack")
+        .expect_err("app-server steer error should be reported to caller");
+    assert!(error.to_string().contains("turn is not steerable"));
+    assert_eq!(worker.snapshot.status, CodexRunStatus::Running);
+}
+
+#[tokio::test]
 async fn permission_approval_response_grants_requested_subset() {
     let (_control_tx, control_rx) = mpsc::unbounded_channel();
     let mut snapshot = running_snapshot_without_ids();
