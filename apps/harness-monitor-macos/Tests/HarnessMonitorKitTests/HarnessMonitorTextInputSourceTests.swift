@@ -3,26 +3,26 @@ import Testing
 
 @Suite("Harness Monitor text input sources")
 struct HarnessMonitorTextInputSourceTests {
-  @Test("SwiftUI Introspect is wired into the previewable target")
-  func swiftUIIntrospectIsWiredIntoPreviewableTarget() throws {
+  @Test("Previewable target does not depend on SwiftUI Introspect")
+  func previewableTargetDoesNotDependOnSwiftUIIntrospect() throws {
     let packageSource = try repoFile(at: "apps/harness-monitor-macos/Tuist/Package.swift")
     let projectSource = try repoFile(at: "apps/harness-monitor-macos/Project.swift")
 
-    #expect(packageSource.contains("https://github.com/siteline/swiftui-introspect"))
-    #expect(packageSource.contains("\"SwiftUIIntrospect\": .framework"))
-    #expect(projectSource.contains(".external(name: \"SwiftUIIntrospect\")"))
+    #expect(!packageSource.contains("https://github.com/siteline/swiftui-introspect"))
+    #expect(!packageSource.contains("\"SwiftUIIntrospect\": .framework"))
+    #expect(!projectSource.contains(".external(name: \"SwiftUIIntrospect\")"))
   }
 
-  @Test("Shared text input helpers own the new vertical and multiline behavior")
-  func sharedTextInputHelpersOwnTheNewVerticalAndMultilineBehavior() throws {
+  @Test("Shared text input helpers keep multiline ownership without Introspect")
+  func sharedTextInputHelpersKeepMultilineOwnershipWithoutIntrospect() throws {
     let themeSource = try previewableSourceFile(at: "Theme/HarnessMonitorTextSize.swift")
     let multilineSource = try previewableSourceFile(
       at: "Views/Shared/HarnessMonitorMultilineTextField.swift")
 
-    #expect(themeSource.contains("import SwiftUIIntrospect"))
-    #expect(themeSource.contains("HarnessMonitorNativeVerticalTextFieldConfiguration"))
-    #expect(themeSource.contains(".introspect(.textField(axis: .vertical), on: .macOS(.v26))"))
-    #expect(themeSource.contains("public func harnessNativeVerticalTextField() -> some View"))
+    #expect(!themeSource.contains("import SwiftUIIntrospect"))
+    #expect(!themeSource.contains("HarnessMonitorNativeVerticalTextFieldConfiguration"))
+    #expect(!themeSource.contains(".introspect("))
+    #expect(!themeSource.contains("public func harnessNativeVerticalTextField() -> some View"))
 
     #expect(multilineSource.contains("private let maxHeightOverride: CGFloat?"))
     #expect(multilineSource.contains("private let showsChrome: Bool"))
@@ -73,7 +73,8 @@ struct HarnessMonitorTextInputSourceTests {
       taskActionsSource,
       notificationsSource,
     ] {
-      #expect(source.contains(".harnessNativeVerticalTextField()"))
+      #expect(source.contains("axis: .vertical"))
+      #expect(!source.contains(".harnessNativeVerticalTextField()"))
     }
   }
 

@@ -142,7 +142,6 @@ public struct SettingsNotificationsSection: View {
           .textFieldStyle(.roundedBorder)
           .controlSize(.small)
           .scaledFont(.subheadline)
-          .harnessNativeVerticalTextField()
           .lineLimit(3...8)
           .frame(width: contentFieldWidth > 0 ? contentFieldWidth : nil)
       }

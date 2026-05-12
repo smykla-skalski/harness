@@ -227,7 +227,6 @@ struct AgentDetailSendUpdateSection: View {
   private var messageField: some View {
     TextField("Tell this agent what to do next", text: $signalMessage, axis: .vertical)
       .harnessNativeFormControl()
-      .harnessNativeVerticalTextField()
       .lineLimit(1...3)
       .accessibilityIdentifier(HarnessMonitorAccessibility.agentDetailSignalMessage)
       .accessibilityLabel("Message")

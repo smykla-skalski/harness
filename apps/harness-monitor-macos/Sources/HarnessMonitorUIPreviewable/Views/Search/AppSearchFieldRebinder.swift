@@ -8,7 +8,6 @@ import SwiftUI
 /// menu attached to `NSSearchField`. That menu dismisses when the
 /// window resigns key/active and does NOT reappear automatically when
 /// the window regains it. The community-documented bridge
-/// (https://github.com/siteline/swiftui-introspect/discussions/397)
 /// is to find the `NSSearchField` in the window's view hierarchy and
 /// cycle first-responder off and back on so AppKit re-presents the
 /// menu.

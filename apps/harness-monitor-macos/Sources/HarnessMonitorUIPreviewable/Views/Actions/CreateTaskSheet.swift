@@ -40,7 +40,6 @@ struct CreateTaskSheet: View {
             .accessibilityIdentifier(HarnessMonitorAccessibility.createTaskTitleField)
           TextField("Context", text: $createContext, axis: .vertical)
             .harnessNativeFormControl()
-            .harnessNativeVerticalTextField()
             .focused($focusedField, equals: .context)
             .lineLimit(4, reservesSpace: true)
             .submitLabel(.done)

@@ -58,8 +58,8 @@ struct SessionWindowCreateForm: View {
             } label: {
               Image(systemName: "arrow.clockwise")
             }
-            .buttonStyle(.borderless)
-            .controlSize(.mini)
+            .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+            .controlSize(HarnessMonitorControlMetrics.compactControlSize)
             .help("Generate a new agent name")
             .accessibilityLabel("Regenerate agent name")
           }
