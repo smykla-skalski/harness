@@ -6,8 +6,8 @@
 //! the Codex controller selects WebSocket transport instead of stdio.
 //!
 //! The daemon serves HTTP + WebSocket on loopback, reads/writes the app group
-//! container, and dispatches Codex runs to an externally-managed
-//! `codex app-server` endpoint discovered via `codex-endpoint.json`.
+//! container, and dispatches sandboxed Codex runs through the unified host
+//! bridge's Codex capability.
 //!
 //! Minimum codex version for WebSocket transport: `rust-v0.102.0+`.
 //!

@@ -64,8 +64,9 @@ pub struct CodexRunRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     /// Optional reasoning effort level (e.g. `low`, `medium`, `high`,
-    /// `xhigh`). Forwarded to the codex app-server as `reasoning_effort` and
-    /// ignored when the selected model does not support reasoning.
+    /// `xhigh`). Forwarded to the codex app-server thread payload as
+    /// `reasoning.effort` and ignored when the selected model does not support
+    /// reasoning.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effort: Option<String>,
     /// When `true`, the `model` field is accepted as-is without catalog
