@@ -211,6 +211,18 @@ struct SessionSwiftUISourceTests {
     #expect(!searchUpdaterSource.contains("guard model.isPresented else { return }"))
   }
 
+  @Test("Refresh toolbar keeps idle arrow on a static symbol path")
+  func refreshToolbarKeepsIdleArrowOnStaticSymbolPath() throws {
+    let toolbarSource = try sourceFile(at: "Views/App/ContentChromeToolbarSupport.swift")
+
+    #expect(toolbarSource.contains("if model.manualRefreshSuccessToken > 0 {"))
+    #expect(toolbarSource.contains(".task(id: model.manualRefreshSuccessToken)"))
+    #expect(toolbarSource.contains("private var usesAnimatedSymbolEffects: Bool"))
+    #expect(toolbarSource.contains("if usesAnimatedSymbolEffects {"))
+    #expect(toolbarSource.contains("private var simpleToolbarSymbol: some View"))
+    #expect(toolbarSource.contains("private var animatedToolbarSymbol: some View"))
+  }
+
   @Test("Timeline section renders on SwiftUI primitives without AppKit scroll machinery")
   func timelineSectionRendersOnSwiftUIPrimitives() throws {
     let timelineSource = try sourceFile(at: "Views/Timeline/MonitorTimelineSection.swift")

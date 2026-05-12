@@ -74,7 +74,22 @@ struct RefreshToolbarButton: View {
     model.isRefreshing && !reduceMotion && !displaysSuccessFeedback
   }
 
+  private var usesAnimatedSymbolEffects: Bool {
+    shouldSpin || (!reduceMotion && (showsSuccessFeedback || showsSuccessTint))
+  }
+
   var body: some View {
+    if model.manualRefreshSuccessToken > 0 {
+      refreshButton
+        .task(id: model.manualRefreshSuccessToken) {
+          await runSuccessFeedback()
+        }
+    } else {
+      refreshButton
+    }
+  }
+
+  private var refreshButton: some View {
     Button {
       Task { await store.manualRefresh() }
     } label: {
@@ -90,47 +105,24 @@ struct RefreshToolbarButton: View {
     .accessibilityHint("Refresh sessions")
     .accessibilityValue(accessibilityValue)
     .accessibilityIdentifier(HarnessMonitorAccessibility.refreshButton)
-    .task(id: model.manualRefreshSuccessToken) {
-      guard model.manualRefreshSuccessToken > 0 else {
-        return
-      }
-      if showsSuccessFeedback || showsSuccessTint {
-        showsSuccessFeedback = false
-        showsSuccessTint = false
-        await Task.yield()
-      }
-      showsSuccessFeedback = true
-      showsSuccessTint = true
-      guard !reduceMotion else {
-        try? await Task.sleep(for: RefreshToolbarFeedbackTiming.reduceMotionDuration)
-        guard !Task.isCancelled else {
-          showsSuccessFeedback = false
-          showsSuccessTint = false
-          return
-        }
-        showsSuccessFeedback = false
-        showsSuccessTint = false
-        return
-      }
-      await Task.yield()
-      successPopToken += 1
-      try? await Task.sleep(for: RefreshToolbarFeedbackTiming.successDuration)
-      guard !Task.isCancelled else {
-        showsSuccessFeedback = false
-        showsSuccessTint = false
-        return
-      }
-      showsSuccessFeedback = false
-      try? await Task.sleep(for: RefreshToolbarFeedbackTiming.successTintFadeDuration)
-      guard !Task.isCancelled else {
-        showsSuccessTint = false
-        return
-      }
-      showsSuccessTint = false
+  }
+
+  @ViewBuilder private var toolbarSymbol: some View {
+    if usesAnimatedSymbolEffects {
+      animatedToolbarSymbol
+    } else {
+      simpleToolbarSymbol
     }
   }
 
-  private var toolbarSymbol: some View {
+  private var simpleToolbarSymbol: some View {
+    Image(systemName: showsSuccessFeedback ? "checkmark" : "arrow.clockwise")
+      .foregroundStyle(showsSuccessTint ? .green : .primary)
+      .frame(width: 14, height: 14)
+      .accessibilityHidden(true)
+  }
+
+  private var animatedToolbarSymbol: some View {
     Image(systemName: showsSuccessFeedback ? "checkmark" : "arrow.clockwise")
       .foregroundStyle(.primary)
       .symbolEffect(.rotate, options: .repeating, isActive: shouldSpin)
@@ -157,5 +149,41 @@ struct RefreshToolbarButton: View {
       )
       .frame(width: 14, height: 14)
       .accessibilityHidden(true)
+  }
+
+  private func runSuccessFeedback() async {
+    if showsSuccessFeedback || showsSuccessTint {
+      showsSuccessFeedback = false
+      showsSuccessTint = false
+      await Task.yield()
+    }
+    showsSuccessFeedback = true
+    showsSuccessTint = true
+    guard !reduceMotion else {
+      try? await Task.sleep(for: RefreshToolbarFeedbackTiming.reduceMotionDuration)
+      guard !Task.isCancelled else {
+        showsSuccessFeedback = false
+        showsSuccessTint = false
+        return
+      }
+      showsSuccessFeedback = false
+      showsSuccessTint = false
+      return
+    }
+    await Task.yield()
+    successPopToken += 1
+    try? await Task.sleep(for: RefreshToolbarFeedbackTiming.successDuration)
+    guard !Task.isCancelled else {
+      showsSuccessFeedback = false
+      showsSuccessTint = false
+      return
+    }
+    showsSuccessFeedback = false
+    try? await Task.sleep(for: RefreshToolbarFeedbackTiming.successTintFadeDuration)
+    guard !Task.isCancelled else {
+      showsSuccessTint = false
+      return
+    }
+    showsSuccessTint = false
   }
 }
