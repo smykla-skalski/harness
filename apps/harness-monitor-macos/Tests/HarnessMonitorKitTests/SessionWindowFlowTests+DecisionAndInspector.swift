@@ -49,7 +49,7 @@ extension SessionWindowFlowTests {
     #expect(sectionsSource.contains("struct SessionSidebarHeaderCreateButton: View"))
     #expect(sectionsSource.contains("Button(\"+\")"))
     #expect(sectionsSource.contains("HStack(alignment: .sessionSidebarHeaderButtonCenter"))
-    #expect(sectionsSource.contains(".buttonStyle(.bordered)"))
+    #expect(sectionsSource.contains(".harnessActionButtonStyle(variant: .bordered, tint: nil)"))
     #expect(sectionsSource.contains(".controlSize(.small)"))
     #expect(sectionsSource.contains("GeometryReader { proxy in"))
     #expect(sectionsSource.contains(".alignmentGuide(.sessionSidebarHeaderButtonCenter)"))
@@ -218,7 +218,7 @@ extension SessionWindowFlowTests {
     #expect(viewSource.contains("@SceneStorage(\"session.inspector.visible\")"))
     #expect(viewSource.contains("@SceneStorage(\"session.inspector.preferred\")"))
     #expect(inspectorPolicySource.contains("preferredVisible: preferredBinding.wrappedValue"))
-    #expect(columnsSource.contains("preferredVisible: $inspectorPreferred"))
+    #expect(columnsSource.contains("preferredVisible: inspectorPreferredBinding"))
     #expect(inspectorSource.contains("@Binding var preferredVisible"))
   }
 }

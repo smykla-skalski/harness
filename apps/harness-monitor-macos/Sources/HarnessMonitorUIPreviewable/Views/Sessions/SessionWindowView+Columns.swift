@@ -112,6 +112,9 @@ extension SessionWindowView {
       SessionWindowPlainTapRecorder(
         stateCache: stateCache,
         isEnabled: stateCache.sidebarSelection.hasActiveMultiSelection
+          || renderedRoute == .agents
+          || renderedRoute == .tasks
+          || renderedRoute == .decisions
       )
     )
   }
@@ -138,6 +141,9 @@ extension SessionWindowView {
       SessionWindowPlainTapRecorder(
         stateCache: stateCache,
         isEnabled: stateCache.sidebarSelection.hasActiveMultiSelection
+          || renderedRoute == .agents
+          || renderedRoute == .tasks
+          || renderedRoute == .decisions
       )
     )
   }
@@ -246,11 +252,23 @@ extension SessionWindowView {
         store: store,
         snapshot: snapshot,
         tuiStatusByAgent: store.contentUI.sessionDetail.tuiStatusByAgent,
+        currentModifiers: presentedModifiers,
         state: stateCache
       )
-    case .tasks: SessionWindowTasksList(detail: snapshot.detail, state: stateCache)
+    case .tasks:
+      SessionWindowTasksList(
+        store: store,
+        detail: snapshot.detail,
+        decisions: matchingDecisions,
+        currentModifiers: presentedModifiers,
+        state: stateCache
+      )
     case .decisions:
-      SessionWindowDecisionsList(decisions: matchingDecisions, state: stateCache)
+      SessionWindowDecisionsList(
+        decisions: matchingDecisions,
+        currentModifiers: presentedModifiers,
+        state: stateCache
+      )
     case .timeline:
       SessionTimelineView(
         style: .routePage,

@@ -77,6 +77,19 @@ enum HarnessMonitorUITestAccessibility {
   static func decisionAction(_ id: String) -> String {
     "harness.decisions.action.\(slug(id))"
   }
+
+  static func sessionWindowAgentRow(_ agentID: String) -> String {
+    "harness.session.window.agents.row.\(slug(agentID))"
+  }
+
+  static func sessionWindowTaskRow(_ taskID: String) -> String {
+    "harness.session.window.tasks.row.\(slug(taskID))"
+  }
+
+  static func sidebarTaskRow(_ taskID: String) -> String {
+    "harness.session.window.sidebar.task.\(slug(taskID))"
+  }
+
   static let sessionHeaderCard = "harness.session.header"
   static let sessionHeaderCardFrame = "harness.session.header.frame"
   static let sidebarRoot = "harness.sidebar.root"

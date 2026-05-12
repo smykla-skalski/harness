@@ -316,6 +316,19 @@ struct SessionWindowFlowTests {
   }
 
   @MainActor
+  @Test("Route-level task selection does not replace the tasks route selection")
+  func routeLevelTaskSelectionDoesNotReplaceTheTasksRouteSelection() {
+    let state = SessionWindowStateCache(sessionID: "sess-alpha")
+
+    state.selectFromSidebar(.route(.tasks))
+    state.setRouteTaskID("task-a")
+
+    #expect(state.selection == .route(.tasks))
+    #expect(state.sectionState.taskID == "task-a")
+    #expect(state.selectionSource == .sidebar)
+  }
+
+  @MainActor
   @Test("Session sidebar legacy pointer seam preserves native selection behavior")
   func sessionSidebarLegacyPointerSeamPreservesNativeSelectionBehavior() {
     let state = SessionWindowStateCache(sessionID: "sess-alpha")

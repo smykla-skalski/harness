@@ -3,29 +3,27 @@ import SwiftUI
 
 extension SessionSidebar {
   func linkTask(_ taskID: String, to decisionID: String) {
-    state.lastTaskDecisionLink = SessionTaskDecisionLink(
-      sessionID: state.sessionID,
+    SessionItemContextMenuActionSupport.linkTask(
+      state: state,
       taskID: taskID,
-      decisionID: decisionID
+      to: decisionID
     )
   }
 
   func requestRemoveAgents(_ agentIDs: [String]) {
-    guard !agentIDs.isEmpty else { return }
-    store.requestRemoveAgentConfirmation(agentIDs: agentIDs)
+    SessionItemContextMenuActionSupport.requestRemoveAgents(
+      store: store,
+      agentIDs: agentIDs
+    )
   }
 
   func requestDeleteTasks(_ taskIDs: [String]) {
-    guard !taskIDs.isEmpty else { return }
-    let titlesByID = Dictionary(
-      uniqueKeysWithValues: (snapshot?.detail?.tasks ?? []).map { ($0.taskId, $0.title) }
-    )
-    store.requestDeleteTaskConfirmation(
-      sessionID: state.sessionID,
+    SessionItemContextMenuActionSupport.requestDeleteTasks(
+      store: store,
+      state: state,
+      tasks: snapshot?.detail?.tasks ?? [],
       taskIDs: taskIDs
-    ) { taskID in
-      titlesByID[taskID] ?? taskID
-    }
+    )
   }
 
   func sidebarSelection(

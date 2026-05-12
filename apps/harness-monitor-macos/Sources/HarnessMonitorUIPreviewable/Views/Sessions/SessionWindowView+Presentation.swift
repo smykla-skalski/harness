@@ -121,6 +121,25 @@ extension SessionWindowView {
     )
   }
 
+  var visibleSessionTasks: [WorkItem] {
+    let tasks = snapshot?.detail?.tasks ?? []
+    let needle = stateCache.appSearchModel.query
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .lowercased()
+    guard !needle.isEmpty else { return tasks }
+    return tasks.filter { task in
+      if task.title.lowercased().contains(needle) { return true }
+      if let context = task.context?.lowercased(), context.contains(needle) {
+        return true
+      }
+      if let fix = task.suggestedFix?.lowercased(), fix.contains(needle) {
+        return true
+      }
+      if task.taskId.lowercased().contains(needle) { return true }
+      return false
+    }
+  }
+
   var allSessionDecisions: [Decision] {
     allSessionDecisionsCache
   }

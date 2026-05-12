@@ -78,13 +78,15 @@ struct SessionWindowRouteContentSelectionTests {
   func summaryListsBindSelectionDirectlyToSessionState() throws {
     let source = try sourceFile(named: "SessionWindowRouteContent.swift")
 
-    #expect(source.contains("List(selection: selectedAgentID)"))
-    #expect(source.contains("List(selection: selectedTaskID)"))
-    #expect(source.contains("List(selection: selectedDecisionID)"))
+    #expect(source.contains("List(selection: selectedAgentIDs)"))
+    #expect(source.contains("List(selection: selectedTaskIDs)"))
+    #expect(source.contains("List(selection: selectedDecisionIDs)"))
     #expect(source.contains("if case .route(.agents) = state.selection"))
-    #expect(source.contains("state.setRouteAgentID(agentID)"))
+    #expect(source.contains("state.setRouteAgentID(primaryID)"))
+    #expect(source.contains("if case .route(.tasks) = state.selection"))
+    #expect(source.contains("state.setRouteTaskID(primaryID)"))
     #expect(source.contains("if case .route(.decisions) = state.selection"))
-    #expect(source.contains("state.setRouteDecisionID(decisionID)"))
+    #expect(source.contains("state.setRouteDecisionID(primaryID)"))
     #expect(!source.contains("@State private var selectedAgentID"))
     #expect(!source.contains("@State private var selectedTaskID"))
     #expect(!source.contains("@State private var selectedDecisionID"))
@@ -92,13 +94,24 @@ struct SessionWindowRouteContentSelectionTests {
 
   @Test("Agents route keeps the route selected while showing the route-selected agent detail")
   func agentsRouteKeepsRouteSelectionWhileShowingTheFirstVisibleAgentDetail() throws {
-    let columns = try sourceFile(named: "SessionWindowView+Columns.swift")
+    let detailFocus = try sourceFile(named: "SessionWindowView+DetailFocus.swift")
     let presentation = try sourceFile(named: "SessionWindowView+Presentation.swift")
 
     #expect(!presentation.contains("agentsRouteAutoSelectionTrigger"))
     #expect(!presentation.contains("autoSelectFirstVisibleAgentIfNeeded"))
-    #expect(columns.contains("case .route(.agents):"))
-    #expect(columns.contains("SessionAgentRouteSelectionPolicy.preferredRouteDetailAgentID"))
+    #expect(detailFocus.contains("case .route(.agents):"))
+    #expect(detailFocus.contains("SessionAgentRouteSelectionPolicy.preferredRouteDetailAgentID"))
+  }
+
+  @Test("Tasks route keeps the route selected while showing the route-selected task detail")
+  func tasksRouteKeepsRouteSelectionWhileShowingTheFirstVisibleTaskDetail() throws {
+    let routeContent = try sourceFile(named: "SessionWindowRouteContent.swift")
+    let detailFocus = try sourceFile(named: "SessionWindowView+DetailFocus.swift")
+
+    #expect(routeContent.contains("SessionTaskRouteSelectionPolicy.preferredRouteDetailTaskID"))
+    #expect(routeContent.contains("state.selectRoute(.tasks)"))
+    #expect(detailFocus.contains("case .route(.tasks):"))
+    #expect(detailFocus.contains("routeTaskDetailContent()"))
   }
 
   @Test("Session layouts follow the rendered route when switching route-only surfaces")
@@ -118,11 +131,12 @@ struct SessionWindowRouteContentSelectionTests {
   func createAgentSelectionSwapsTheMiddlePaneToRuntimeConfiguration() throws {
     let windowView = try sourceFile(named: "SessionWindowView.swift")
     let columns = try sourceFile(named: "SessionWindowView+Columns.swift")
+    let detailFocus = try sourceFile(named: "SessionWindowView+DetailFocus.swift")
 
     #expect(
       columns.contains("case .create(let draft) = stateCache.selection, draft.kind == .agent"))
     #expect(columns.contains("SessionWindowCreateAgentRuntimePane("))
-    #expect(columns.contains("embedsRuntimeConfiguration: focusMode"))
+    #expect(detailFocus.contains("embedsRuntimeConfiguration: focusMode"))
     #expect(
       windowView.contains(
         "contentColumnWidth = SessionContentDetailSplitLayout.defaultContentWidth"))
@@ -140,8 +154,9 @@ struct SessionWindowRouteContentSelectionTests {
   @Test("Session windows consume pending store route requests")
   func sessionWindowConsumesPendingStoreRouteRequests() throws {
     let windowView = try sourceFile(named: "SessionWindowView.swift")
+    let presentation = try sourceFile(named: "SessionWindowView+Presentation.swift")
 
-    #expect(windowView.contains(".task(id: store.pendingSessionRouteRequestID)"))
+    #expect(presentation.contains(".task(id: store.pendingSessionRouteRequestID)"))
     #expect(windowView.contains("consumePendingSessionRouteRequest(forSessionID: token.sessionID)"))
   }
 
@@ -153,18 +168,27 @@ struct SessionWindowRouteContentSelectionTests {
     #expect(columns.contains(".harnessMCPRow("))
   }
 
+  @Test("Session-window agent and task rows expose stable identifiers")
+  func agentAndTaskRowsExposeStableIdentifiers() throws {
+    let columns = try sourceFile(named: "SessionWindowRouteContent.swift")
+
+    #expect(columns.contains("HarnessMonitorAccessibility.sessionWindowAgentRow(agent.agentId)"))
+    #expect(columns.contains("HarnessMonitorAccessibility.sessionWindowTaskRow(task.taskId)"))
+  }
+
   @Test("Session decisions wire auto-selection into cache recomputation and detail rendering")
   func sessionDecisionsWireAutoSelectionIntoCacheRecomputationAndDetailRendering() throws {
     let windowView = try sourceFile(named: "SessionWindowView.swift")
     let columns = try sourceFile(named: "SessionWindowView+Columns.swift")
+    let detailFocus = try sourceFile(named: "SessionWindowView+DetailFocus.swift")
 
     #expect(columns.contains("SessionDecisionAutoSelectionPolicy.preferredDecisionID"))
     #expect(columns.contains("SessionDecisionAutoSelectionPolicy.preferredRouteDetailDecisionID"))
     #expect(columns.contains("stateCache.autoSelectDecision(autoSelectedDecisionID)"))
     #expect(columns.contains("stateCache.setRouteDecisionID(routeDecisionID)"))
     #expect(windowView.contains(".onChange(of: stateCache.sectionState.decisionID)"))
-    #expect(columns.contains("case .route(.decisions):"))
-    #expect(columns.contains("selectedTab: decisionDetailTabBinding"))
+    #expect(detailFocus.contains("case .route(.decisions):"))
+    #expect(detailFocus.contains("selectedTab: decisionDetailTabBinding"))
   }
 
   @Test("Pending route filter resets clear the persisted decision query")

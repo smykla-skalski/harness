@@ -13,8 +13,6 @@ struct SessionSidebar: View {
   private var shortcutOverlaysEnabled = SessionWindowKeyboardShortcutOverlaySettings.defaultValue
   @Environment(\.harnessTextSizeIndex)
   private var textSizeIndex
-  @Environment(\.undoManager)
-  var undoManager
   @State private var selectionDispatcher = SessionSidebarSelectionDispatcher()
   @State private var listSelection: Set<SessionSelection> = []
 

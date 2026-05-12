@@ -108,26 +108,30 @@ struct SessionTimelineSectionPresentationTests {
     let now = Date(timeIntervalSince1970: 1_780_000_000)
 
     let first = cache.presentation(
-      sessionID: "session-presentation-tests",
-      timeline: timeline,
-      timelineWindow: nil,
-      decisions: [],
-      signals: [],
-      filters: SessionTimelineFilterState(),
-      isTimelineLoading: false,
-      dateTimeConfiguration: .default,
-      now: now
+      .init(
+        sessionID: "session-presentation-tests",
+        timeline: timeline,
+        timelineWindow: nil,
+        decisions: [],
+        signals: [],
+        filters: SessionTimelineFilterState(),
+        isTimelineLoading: false,
+        dateTimeConfiguration: .default,
+        now: now
+      )
     )
     let second = cache.presentation(
-      sessionID: "session-presentation-tests",
-      timeline: timeline,
-      timelineWindow: nil,
-      decisions: [],
-      signals: [],
-      filters: SessionTimelineFilterState(),
-      isTimelineLoading: false,
-      dateTimeConfiguration: .default,
-      now: now.addingTimeInterval(30)
+      .init(
+        sessionID: "session-presentation-tests",
+        timeline: timeline,
+        timelineWindow: nil,
+        decisions: [],
+        signals: [],
+        filters: SessionTimelineFilterState(),
+        isTimelineLoading: false,
+        dateTimeConfiguration: .default,
+        now: now.addingTimeInterval(30)
+      )
     )
 
     #expect(cache.rebuildCount == 1)
@@ -141,28 +145,32 @@ struct SessionTimelineSectionPresentationTests {
     let now = Date(timeIntervalSince1970: 1_780_000_000)
 
     _ = cache.presentation(
-      sessionID: "session-presentation-tests",
-      timeline: timeline,
-      timelineWindow: nil,
-      decisions: [],
-      signals: [],
-      filters: SessionTimelineFilterState(),
-      isTimelineLoading: false,
-      dateTimeConfiguration: .default,
-      now: now
+      .init(
+        sessionID: "session-presentation-tests",
+        timeline: timeline,
+        timelineWindow: nil,
+        decisions: [],
+        signals: [],
+        filters: SessionTimelineFilterState(),
+        isTimelineLoading: false,
+        dateTimeConfiguration: .default,
+        now: now
+      )
     )
     var filters = SessionTimelineFilterState()
     filters.query = "Presentation event 3"
     let filtered = cache.presentation(
-      sessionID: "session-presentation-tests",
-      timeline: timeline,
-      timelineWindow: nil,
-      decisions: [],
-      signals: [],
-      filters: filters,
-      isTimelineLoading: false,
-      dateTimeConfiguration: .default,
-      now: now
+      .init(
+        sessionID: "session-presentation-tests",
+        timeline: timeline,
+        timelineWindow: nil,
+        decisions: [],
+        signals: [],
+        filters: filters,
+        isTimelineLoading: false,
+        dateTimeConfiguration: .default,
+        now: now
+      )
     )
 
     #expect(cache.rebuildCount == 2)

@@ -132,7 +132,7 @@ struct SessionSidebarMultiSelectTests {
 
   @Test("Sidebar task rows expose Move to context menus")
   func taskRowsExposeMoveToContextMenus() throws {
-    let source = try sourceFile(named: "SessionSidebar+Sections.swift")
+    let source = try sourceFile(named: "SessionItemContextMenus.swift")
 
     #expect(source.contains("Menu(\"Move to...\")"))
     #expect(source.contains("No visible decisions"))
