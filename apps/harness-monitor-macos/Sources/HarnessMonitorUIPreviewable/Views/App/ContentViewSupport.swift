@@ -71,11 +71,8 @@ public struct ContentDetailColumn: View {
     contentSessionDetail.presentedSessionDetail?.session.status.title.uppercased()
   }
 
-  private var contentToolbarModel: ContentWindowToolbarModel {
-    ContentWindowToolbarModel(
-      canNavigateBack: false,
-      canNavigateForward: false,
-      canCreateTask: false,
+  private var contentToolbarModel: ContentPrimaryToolbarModel {
+    ContentPrimaryToolbarModel(
       isRefreshing: store.contentUI.toolbar.isRefreshing,
       sleepPreventionEnabled: store.contentUI.toolbar.sleepPreventionEnabled,
       manualRefreshSuccessToken: store.contentUI.toolbar.manualRefreshSuccessToken

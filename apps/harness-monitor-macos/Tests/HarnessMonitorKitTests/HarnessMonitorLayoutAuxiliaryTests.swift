@@ -149,22 +149,16 @@ private struct AdaptiveGridHeightProbeTile: View {
   }
 }
 
-@Suite("Content window toolbar model")
-struct ContentWindowToolbarModelTests {
+@Suite("Content primary toolbar model")
+struct ContentPrimaryToolbarModelTests {
   @Test("Sleep prevention presentation follows enabled state")
   func sleepPreventionPresentationFollowsEnabledState() {
-    let enabled = ContentWindowToolbarModel(
-      canNavigateBack: false,
-      canNavigateForward: false,
-      canCreateTask: false,
+    let enabled = ContentPrimaryToolbarModel(
       isRefreshing: false,
       sleepPreventionEnabled: true,
       manualRefreshSuccessToken: 0
     )
-    let disabled = ContentWindowToolbarModel(
-      canNavigateBack: false,
-      canNavigateForward: false,
-      canCreateTask: false,
+    let disabled = ContentPrimaryToolbarModel(
       isRefreshing: false,
       sleepPreventionEnabled: false,
       manualRefreshSuccessToken: 0

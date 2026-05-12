@@ -1,10 +1,13 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct ContentWindowToolbarModel: Equatable {
+struct ContentWindowNavigationToolbarModel: Equatable {
   let canNavigateBack: Bool
   let canNavigateForward: Bool
   let canCreateTask: Bool
+}
+
+struct ContentPrimaryToolbarModel: Equatable {
   let isRefreshing: Bool
   let sleepPreventionEnabled: Bool
   let manualRefreshSuccessToken: Int
@@ -16,9 +19,9 @@ struct ContentWindowToolbarModel: Equatable {
 
 struct ContentWindowToolbarItems: ToolbarContent {
   let store: HarnessMonitorStore
-  let model: ContentWindowToolbarModel
+  let model: ContentWindowNavigationToolbarModel
 
-  init(store: HarnessMonitorStore, model: ContentWindowToolbarModel) {
+  init(store: HarnessMonitorStore, model: ContentWindowNavigationToolbarModel) {
     self.store = store
     self.model = model
   }
@@ -34,7 +37,7 @@ struct ContentWindowToolbarItems: ToolbarContent {
 
 struct ContentPrimaryToolbarItems: ToolbarContent {
   let store: HarnessMonitorStore
-  let model: ContentWindowToolbarModel
+  let model: ContentPrimaryToolbarModel
 
   var body: some ToolbarContent {
     ToolbarItem(placement: .primaryAction) {

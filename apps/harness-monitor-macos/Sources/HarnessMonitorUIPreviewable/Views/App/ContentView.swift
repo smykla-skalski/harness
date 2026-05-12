@@ -170,21 +170,18 @@ public struct ContentView: View {
     }
   }
 
-  private var contentToolbarModel: ContentWindowToolbarModel {
-    ContentWindowToolbarModel(
+  private var contentNavigationToolbarModel: ContentWindowNavigationToolbarModel {
+    ContentWindowNavigationToolbarModel(
       canNavigateBack: store.contentUI.toolbar.canNavigateBack,
       canNavigateForward: store.contentUI.toolbar.canNavigateForward,
-      canCreateTask: store.areSelectedSessionActionsAvailable,
-      isRefreshing: store.contentUI.toolbar.isRefreshing,
-      sleepPreventionEnabled: store.contentUI.toolbar.sleepPreventionEnabled,
-      manualRefreshSuccessToken: store.contentUI.toolbar.manualRefreshSuccessToken
+      canCreateTask: store.areSelectedSessionActionsAvailable
     )
   }
 
   @ToolbarContentBuilder private var contentToolbarItems: some ToolbarContent {
     ContentWindowToolbarItems(
       store: store,
-      model: contentToolbarModel
+      model: contentNavigationToolbarModel
     )
   }
 
