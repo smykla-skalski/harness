@@ -15,7 +15,7 @@ extension SessionWindowView {
   var attentionFocus: SessionAttentionFocus {
     SessionAttentionFocus(
       sessionID: token.sessionID,
-      pendingDecisionCount: matchingDecisions.count
+      pendingDecisionCount: allSessionDecisionsCache.count
     )
   }
 

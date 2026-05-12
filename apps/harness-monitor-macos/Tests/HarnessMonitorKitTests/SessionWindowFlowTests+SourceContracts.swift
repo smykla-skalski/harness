@@ -208,6 +208,16 @@ extension SessionWindowFlowTests {
     #expect(!presentationSource.contains("@State private var deadlineNow"))
   }
 
+  @Test("Session attention focus count ignores route filters")
+  func sessionAttentionFocusCountIgnoresRouteFilters() throws {
+    let source = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+Inspector.swift"
+    )
+
+    #expect(source.contains("pendingDecisionCount: allSessionDecisionsCache.count"))
+    #expect(!source.contains("pendingDecisionCount: matchingDecisions.count"))
+  }
+
   @Test("Sidebar density keeps strict default and maps legacy values")
   func sidebarDensityResolvesStrictDefaultAndLegacyValues() {
     #expect(HarnessMonitorSidebarSessionRowDisplayMode.defaultMode == .strict)
