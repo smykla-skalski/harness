@@ -3,6 +3,7 @@ import SwiftUI
 public enum HarnessMonitorUITestEnvironment {
   public static let environmentKey = "HARNESS_MONITOR_UI_TESTS"
   public static let perfScenarioEnvironmentKey = "HARNESS_MONITOR_PERF_SCENARIO"
+  public static let visualOptionsDisabledSuffix = "-visual-options-disabled"
   public static let hostBundleIdentifier = "io.harnessmonitor.app.ui-testing"
   public static let isHostBundle = Bundle.main.bundleIdentifier == hostBundleIdentifier
   public static let isEnabled =
@@ -20,6 +21,11 @@ public enum HarnessMonitorUITestEnvironment {
     }
     return rawScenario
   }()
+  public static let perfScenarioBaseValue = perfScenarioRawValue.map {
+    basePerfScenario(for: $0)
+  }
+  public static let disablesVisualOptions =
+    disablesVisualOptions(for: perfScenarioRawValue)
   public static let isPerfScenarioActive = perfScenarioRawValue != nil
   public static let accessibilityMarkersEnabled: Bool = {
     guard isEnabled else {
@@ -37,6 +43,17 @@ public enum HarnessMonitorUITestEnvironment {
     return perfScenarioRawValue == nil
   }()
   public static let selectionMarkersEnabled = generalMarkersEnabled
+
+  public static func basePerfScenario(for rawValue: String) -> String {
+    guard rawValue.hasSuffix(visualOptionsDisabledSuffix) else {
+      return rawValue
+    }
+    return String(rawValue.dropLast(visualOptionsDisabledSuffix.count))
+  }
+
+  public static func disablesVisualOptions(for rawValue: String?) -> Bool {
+    rawValue?.hasSuffix(visualOptionsDisabledSuffix) == true
+  }
 }
 
 private struct AccessibilityFrameMarker: View {

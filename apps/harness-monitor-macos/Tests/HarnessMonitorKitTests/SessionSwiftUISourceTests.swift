@@ -225,6 +225,45 @@ struct SessionSwiftUISourceTests {
     #expect(!toolbarSource.contains(".symbolEffect(.rotate"))
   }
 
+  @Test("Disabled visual perf variants reuse base routes and skip optional session chrome")
+  func disabledVisualPerfVariantsReuseBaseRoutesAndSkipOptionalSessionChrome() throws {
+    #expect(
+      HarnessMonitorUITestEnvironment.basePerfScenario(
+        for: "timeline-filter-form-visual-options-disabled"
+      ) == "timeline-filter-form"
+    )
+    #expect(
+      HarnessMonitorUITestEnvironment.basePerfScenario(for: "session-search-full")
+        == "session-search-full"
+    )
+    #expect(
+      HarnessMonitorUITestEnvironment.disablesVisualOptions(
+        for: "open-session-window-visual-options-disabled"
+      )
+    )
+    #expect(!HarnessMonitorUITestEnvironment.disablesVisualOptions(for: "open-session-window"))
+    #expect(!HarnessMonitorUITestEnvironment.disablesVisualOptions(for: nil))
+
+    let supportSource = try sourceFile(at: "Support/HarnessMonitorAccessibilitySupport.swift")
+    let titleBlurSource = try sourceFile(at: "Views/Sessions/SessionTitleBlurChrome.swift")
+    let toolbarSource = try sourceFile(at: "Views/Sessions/SessionWindowToolbar.swift")
+    let sidebarSource = try sourceFile(at: "Views/Sessions/SessionSidebar.swift")
+    let timelineSupportSource = try sourceFile(
+      at: "Views/Timeline/MonitorTimelineSection+Support.swift"
+    )
+
+    #expect(supportSource.contains("visualOptionsDisabledSuffix"))
+    #expect(supportSource.contains("perfScenarioBaseValue"))
+    #expect(titleBlurSource.contains("private var shouldShowTitleBlur"))
+    #expect(titleBlurSource.contains("!HarnessMonitorUITestEnvironment.disablesVisualOptions"))
+    #expect(toolbarSource.contains("private var shouldShowShortcutOverlays"))
+    #expect(toolbarSource.contains("!HarnessMonitorUITestEnvironment.disablesVisualOptions"))
+    #expect(sidebarSource.contains("private var shouldShowShortcutOverlays"))
+    #expect(sidebarSource.contains("!HarnessMonitorUITestEnvironment.disablesVisualOptions"))
+    #expect(timelineSupportSource.contains("perfScenarioBaseValue == \"timeline-filter-form\""))
+    #expect(!timelineSupportSource.contains("perfScenarioRawValue == \"timeline-filter-form\""))
+  }
+
   @Test("Timeline section renders on SwiftUI primitives without AppKit scroll machinery")
   func timelineSectionRendersOnSwiftUIPrimitives() throws {
     let timelineSource = try sourceFile(at: "Views/Timeline/MonitorTimelineSection.swift")

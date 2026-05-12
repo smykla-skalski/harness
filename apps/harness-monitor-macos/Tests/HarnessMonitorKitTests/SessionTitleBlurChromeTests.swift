@@ -84,7 +84,11 @@ final class SessionTitleBlurChromeTests: XCTestCase {
     XCTAssertTrue(
       modifierSource.contains("@AppStorage(HarnessMonitorSessionTitleBlurDefaults.enabledKey)")
     )
-    XCTAssertTrue(modifierSource.contains("if isEnabled {"))
+    XCTAssertTrue(modifierSource.contains("private var shouldShowTitleBlur"))
+    XCTAssertTrue(
+      modifierSource.contains("!HarnessMonitorUITestEnvironment.disablesVisualOptions")
+    )
+    XCTAssertTrue(modifierSource.contains("if shouldShowTitleBlur {"))
     XCTAssertTrue(modifierSource.contains("content.overlay(alignment: .top)"))
     XCTAssertTrue(modifierSource.contains("} else {\n      content\n    }"))
   }

@@ -124,7 +124,7 @@ extension SessionTimelineView {
   }
 
   func applyPerfScenarioFiltersIfNeeded() {
-    guard HarnessMonitorUITestEnvironment.perfScenarioRawValue == "timeline-filter-form" else {
+    guard HarnessMonitorUITestEnvironment.perfScenarioBaseValue == "timeline-filter-form" else {
       return
     }
     var seeded = SessionTimelineFilterState()

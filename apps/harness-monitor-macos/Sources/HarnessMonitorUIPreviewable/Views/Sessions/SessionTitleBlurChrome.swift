@@ -138,8 +138,12 @@ private struct SessionTitleBlurChromeModifier: ViewModifier {
   @AppStorage(HarnessMonitorSessionTitleBlurDefaults.enabledKey)
   private var isEnabled: Bool = HarnessMonitorSessionTitleBlurDefaults.enabledDefault
 
+  private var shouldShowTitleBlur: Bool {
+    isEnabled && !HarnessMonitorUITestEnvironment.disablesVisualOptions
+  }
+
   func body(content: Content) -> some View {
-    if isEnabled {
+    if shouldShowTitleBlur {
       content.overlay(alignment: .top) {
         SessionTitleBlurChrome(status: status, isStale: isStale)
       }

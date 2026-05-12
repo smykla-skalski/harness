@@ -41,6 +41,10 @@ struct SessionSidebar: View {
       }
   }
 
+  private var shouldShowShortcutOverlays: Bool {
+    shortcutOverlaysEnabled && !HarnessMonitorUITestEnvironment.disablesVisualOptions
+  }
+
   private var sidebarList: some View {
     List(selection: selectionBinding) {
       routeSection
@@ -53,7 +57,7 @@ struct SessionSidebar: View {
       SessionSidebarCreateButtonFramePreferenceKey.self,
       alignment: .topLeading
     ) { anchors in
-      if shortcutOverlaysEnabled {
+      if shouldShowShortcutOverlays {
         SessionSidebarCreateButtonShortcutOverlays(
           anchors: anchors,
           currentModifiers: currentModifiers
