@@ -211,7 +211,7 @@ WebSocket transport: `rust-v0.102.0+`.
 All `#Preview` blocks live in `HarnessMonitorUIPreviewable`. Previews render
 through the dedicated `HarnessMonitorPreviewHost` app target via the
 `HarnessMonitorUIPreviews` scheme. The host links only `HarnessMonitorKit` and
-`HarnessMonitorUIPreviewable`; it has no Lottie, daemon signaling, or main-app
+`HarnessMonitorUIPreviewable`; it has no daemon signaling or main-app
 dependencies.
 
 Previewable views must not take closure properties such as

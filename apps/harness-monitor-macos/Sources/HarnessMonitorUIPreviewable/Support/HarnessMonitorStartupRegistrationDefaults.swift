@@ -23,9 +23,6 @@ public enum HarnessMonitorStartupRegistrationDefaults {
     ]
     dict.merge(SessionPendingDecisionBannerSettings.registrationDefaults()) { _, new in new }
     dict.merge(HarnessMonitorLoggerDefaults.registrationDefaults()) { _, new in new }
-    #if HARNESS_FEATURE_LOTTIE
-      dict[HarnessMonitorCornerAnimationDefaults.enabledKey] = false
-    #endif
     dict.merge(HarnessMonitorMenuBarDefaults.registrationDefaults()) { _, new in new }
     dict.merge(HarnessMonitorSessionTitleBlurDefaults.registrationDefaults()) { _, new in new }
     dict.merge(HarnessMonitorVoiceSettings.registrationDefaults()) { _, new in new }

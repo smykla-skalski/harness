@@ -30,11 +30,9 @@ final class ContentInteractionRelay {
   }
 }
 
-public struct ContentView<CornerContent: View>: View {
+public struct ContentView: View {
   let store: HarnessMonitorStore
   let keyWindowObserver: KeyWindowObserver?
-  let showsCornerAnimation: Bool
-  let cornerAnimationContent: CornerContent
   let contentShell: HarnessMonitorStore.ContentShellSlice
   let contentChrome: HarnessMonitorStore.ContentChromeSlice
   let contentSession: HarnessMonitorStore.ContentSessionSlice
@@ -94,14 +92,10 @@ public struct ContentView<CornerContent: View>: View {
   @MainActor
   public init(
     store: HarnessMonitorStore,
-    keyWindowObserver: KeyWindowObserver? = nil,
-    showsCornerAnimation: Bool = true,
-    @ViewBuilder cornerAnimationContent: () -> CornerContent
+    keyWindowObserver: KeyWindowObserver? = nil
   ) {
     self.store = store
     self.keyWindowObserver = keyWindowObserver
-    self.showsCornerAnimation = showsCornerAnimation
-    self.cornerAnimationContent = cornerAnimationContent()
     self.contentShell = store.contentUI.shell
     self.contentChrome = store.contentUI.chrome
     self.contentSession = store.contentUI.session
@@ -113,17 +107,7 @@ public struct ContentView<CornerContent: View>: View {
 
   public var body: some View {
     ViewBodySignposter.trace(Self.self, "ContentView", attributes: profilingAttributes) {
-      #if HARNESS_FEATURE_LOTTIE
-        baseContent
-          .modifier(
-            ContentCornerOverlayModifier(
-              isPresented: showsCornerAnimation,
-              cornerAnimationContent: cornerAnimationContent
-            )
-          )
-      #else
-        baseContent
-      #endif
+      baseContent
     }
   }
 
@@ -270,19 +254,5 @@ public struct ContentView<CornerContent: View>: View {
       return
     }
     isStartupFocusParticipationEnabled = true
-  }
-}
-
-extension ContentView where CornerContent == EmptyView {
-  @MainActor
-  public init(
-    store: HarnessMonitorStore,
-    keyWindowObserver: KeyWindowObserver? = nil
-  ) {
-    self.init(
-      store: store,
-      keyWindowObserver: keyWindowObserver,
-      showsCornerAnimation: false
-    ) { EmptyView() }
   }
 }

@@ -19,10 +19,6 @@ struct HarnessMonitorWindowRootView: View {
   let defersInitialContentUntilBootstrap: Bool
   @Environment(\.openWindow)
   private var openWindow
-  #if HARNESS_FEATURE_LOTTIE
-    @AppStorage(HarnessMonitorCornerAnimationDefaults.enabledKey)
-    private var cornerAnimationEnabled = false
-  #endif
   @State private var completedInitialBootstrap = false
   @State private var handledSettingsOpenRequestID = 0
 
