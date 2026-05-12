@@ -187,6 +187,23 @@ extension SessionWindowFlowTests {
     #expect(!source.contains("appSearchModel.setPresented(true)"))
   }
 
+  @Test("Agent detail deadline clock stays out of text field form state")
+  func agentDetailDeadlineClockStaysOutOfTextFieldFormState() throws {
+    let sectionSource = try previewableSourceFile(
+      named: "Views/Agents/AgentDetailSendUpdateSection.swift"
+    )
+    let presentationSource = try previewableSourceFile(
+      named: "Views/Agents/AgentDetailSendUpdateSection+Presentation.swift"
+    )
+
+    #expect(!sectionSource.contains("@State private var deadlineNow"))
+    #expect(!sectionSource.contains(".task(id: promptDeadlineDate)"))
+    #expect(sectionSource.contains("AgentDetailDeadlineSendButton("))
+    #expect(presentationSource.contains("struct AgentDetailDeadlineSendButton: View"))
+    #expect(presentationSource.contains("private struct AgentDetailComposerStatusRow: View"))
+    #expect(presentationSource.contains("private enum AgentDetailDeadlineClock"))
+  }
+
   @Test("Sidebar density keeps strict default and maps legacy values")
   func sidebarDensityResolvesStrictDefaultAndLegacyValues() {
     #expect(HarnessMonitorSidebarSessionRowDisplayMode.defaultMode == .strict)
