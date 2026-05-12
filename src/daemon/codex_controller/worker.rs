@@ -263,6 +263,7 @@ impl CodexRunWorker {
         status: Option<&str>,
         error_message: Option<String>,
     ) -> Result<(), CliError> {
+        self.clear_pending_approvals();
         let status = status.unwrap_or("completed");
         match status {
             "completed" => {
@@ -291,6 +292,11 @@ impl CodexRunWorker {
             }
             _ => self.transition(CodexRunStatus::Completed, Some("Codex turn finished"), None),
         }
+    }
+
+    pub(super) fn clear_pending_approvals(&mut self) {
+        self.pending_approvals.clear();
+        self.snapshot.pending_approvals.clear();
     }
 
     async fn handle_server_request(

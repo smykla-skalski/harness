@@ -8,7 +8,9 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 use super::*;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::codex_transport::CodexTransport;
-use crate::daemon::protocol::{CodexApprovalDecision, CodexRunMode, StreamEvent};
+use crate::daemon::protocol::{
+    CodexApprovalDecision, CodexApprovalRequest, CodexRunMode, StreamEvent,
+};
 
 #[tokio::test]
 async fn initialize_sends_initialized_notification_before_thread_requests() {
@@ -143,6 +145,40 @@ async fn steer_ack_reports_app_server_error_without_failing_worker_loop() {
         .expect_err("app-server steer error should be reported to caller");
     assert!(error.to_string().contains("turn is not steerable"));
     assert_eq!(worker.snapshot.status, CodexRunStatus::Running);
+}
+
+#[test]
+fn turn_completed_clears_pending_approval_state() {
+    let (_control_tx, control_rx) = mpsc::unbounded_channel();
+    let mut snapshot = running_snapshot_without_ids();
+    snapshot.status = CodexRunStatus::WaitingApproval;
+    snapshot.pending_approvals.push(CodexApprovalRequest {
+        approval_id: "approval-1".to_string(),
+        request_id: "request-1".to_string(),
+        kind: "command".to_string(),
+        title: "Command approval requested".to_string(),
+        detail: "Approve command".to_string(),
+        thread_id: Some("thread-1".to_string()),
+        turn_id: Some("turn-1".to_string()),
+        item_id: Some("item-1".to_string()),
+        cwd: Some("/tmp/harness".to_string()),
+        command: Some("rtk touch approved.txt".to_string()),
+        file_path: None,
+    });
+    let mut worker = CodexRunWorker::new(controller_without_db(), snapshot, control_rx);
+    worker.pending_approvals.insert(
+        "approval-1".to_string(),
+        vec![PendingApproval {
+            request_id: json!(41),
+            method: "item/commandExecution/requestApproval".to_string(),
+            params: json!({ "itemId": "item-1" }),
+        }],
+    );
+
+    let _ = worker.handle_turn_completed(Some("interrupted"), None);
+
+    assert!(worker.snapshot.pending_approvals.is_empty());
+    assert!(worker.pending_approvals.is_empty());
 }
 
 #[tokio::test]
