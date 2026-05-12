@@ -9,7 +9,7 @@ use std::time::Duration;
 use serde::Serialize;
 use serde_json::{Value, json};
 use tokio::runtime::{Builder, Handle, RuntimeFlavor};
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::task::block_in_place;
 use uuid::Uuid;
 
@@ -21,8 +21,8 @@ use crate::daemon::index;
 use crate::daemon::protocol::{
     CodexAgentInspectResponse, CodexAgentInspectSnapshot, CodexApprovalDecisionRequest,
     CodexApprovalRequest, CodexApprovalRequestedPayload, CodexRunEvent, CodexRunListResponse,
-    CodexRunRequest, CodexRunSnapshot, CodexRunStatus, CodexSteerRequest,
-    CodexTranscriptResponse, StreamEvent, TimelineEntry,
+    CodexRunRequest, CodexRunSnapshot, CodexRunStatus, CodexSteerRequest, CodexTranscriptResponse,
+    StreamEvent, TimelineEntry,
 };
 use crate::daemon::service as daemon_service;
 use crate::daemon::state;
@@ -31,7 +31,7 @@ use crate::session::service as session_service;
 use crate::session::types::{AgentStatus, ManagedAgentRef, SessionState};
 use crate::workspace::utc_now;
 
-use super::active_runs::{ActiveRun, ActiveRuns, CodexControlMessage};
+use super::active_runs::{ActiveRun, ActiveRuns, CodexControlAck, CodexControlMessage};
 use super::effort::validate_codex_effort;
 use super::events::codex_event;
 use super::worker::CodexRunWorker;
@@ -234,7 +234,14 @@ impl CodexControllerHandle {
             model: request.model.clone(),
             effort: request.effort.clone(),
         };
-        self.save_and_broadcast(&snapshot)?;
+        if let Err(error) = self.save_and_broadcast(&snapshot) {
+            self.rollback_orchestration_agent_registration(
+                session_id,
+                snapshot.session_agent_id.as_deref(),
+                &ManagedAgentRef::codex(snapshot.run_id.as_str()),
+            );
+            return Err(error);
+        }
         tracing::info!(
             session_id,
             run_id = %snapshot.run_id,
@@ -250,9 +257,32 @@ impl CodexControllerHandle {
         );
 
         let (control_tx, control_rx) = mpsc::unbounded_channel();
-        self.state
+        if let Err(error) = self
+            .state
             .active_runs
-            .insert(snapshot.run_id.clone(), control_tx)?;
+            .insert(snapshot.run_id.clone(), control_tx)
+        {
+            let mut failed = snapshot.clone();
+            failed.status = CodexRunStatus::Failed;
+            failed.latest_summary = Some("Codex worker could not attach to daemon".to_string());
+            failed.error = Some(error.to_string());
+            failed.updated_at = utc_now();
+            let payload = json!({
+                "runId": failed.run_id.clone(),
+                "status": "failed",
+                "reason": "active run registry failed",
+                "error": failed.error.clone(),
+            });
+            record_snapshot_event(
+                &mut failed,
+                "agent/reconciled",
+                "Codex worker could not attach to daemon".to_string(),
+                &payload,
+            );
+            let _ = self.save_and_broadcast(&failed);
+            let _ = self.sync_orchestration_status_for_run(&failed);
+            return Err(error);
+        }
 
         let worker = CodexRunWorker::new(self.clone(), snapshot.clone(), control_rx);
         tokio::spawn(async move {
@@ -289,6 +319,12 @@ impl CodexControllerHandle {
     /// # Errors
     /// Returns [`CliError`] on database failures or when the run is missing.
     pub fn run(&self, run_id: &str) -> Result<CodexRunSnapshot, CliError> {
+        let run = self.load_run(run_id)?;
+        self.sync_orchestration_status_for_run(&run)?;
+        Ok(run)
+    }
+
+    fn load_run(&self, run_id: &str) -> Result<CodexRunSnapshot, CliError> {
         let run_id_owned = run_id.to_string();
         if let Some(result) = self.run_with_async_db(|async_db| async move {
             async_db.codex_run(&run_id_owned).await?.ok_or_else(|| {
@@ -318,15 +354,10 @@ impl CodexControllerHandle {
             return Err(CliErrorKind::workflow_parse("codex steer prompt cannot be empty").into());
         }
         if let Ok(active) = self.active_run(run_id) {
-            active
-                .control_tx
-                .send(CodexControlMessage::Steer {
-                    prompt: prompt.to_string(),
-                })
-                .map_err(|error| {
-                    CliErrorKind::workflow_io(format!("queue codex steer: {error}"))
-                })?;
-            return self.run(run_id);
+            return self.send_control_and_wait(active, "steer", |ack| CodexControlMessage::Steer {
+                prompt: prompt.to_string(),
+                ack,
+            });
         }
 
         self.start_follow_up_turn(run_id, prompt)
@@ -338,13 +369,9 @@ impl CodexControllerHandle {
     /// Returns [`CliError`] when the run is inactive or the request cannot be queued.
     pub fn interrupt(&self, run_id: &str) -> Result<CodexRunSnapshot, CliError> {
         let active = self.active_run(run_id)?;
-        active
-            .control_tx
-            .send(CodexControlMessage::Interrupt)
-            .map_err(|error| {
-                CliErrorKind::workflow_io(format!("queue codex interrupt: {error}"))
-            })?;
-        self.run(run_id)
+        self.send_control_and_wait(active, "interrupt", |ack| CodexControlMessage::Interrupt {
+            ack,
+        })
     }
 
     /// Stop a managed Codex agent.
@@ -358,10 +385,10 @@ impl CodexControllerHandle {
             return Ok(snapshot);
         }
         if let Ok(active) = self.active_run(run_id) {
-            let _ = active.control_tx.send(CodexControlMessage::Stop);
-        } else {
-            self.state.active_runs.remove(run_id);
+            return self
+                .send_control_and_wait(active, "stop", |ack| CodexControlMessage::Stop { ack });
         }
+        self.state.active_runs.remove(run_id);
         snapshot.status = CodexRunStatus::Cancelled;
         snapshot.latest_summary = Some("Codex agent stopped".to_string());
         snapshot.error = None;
@@ -391,10 +418,7 @@ impl CodexControllerHandle {
             None => self.list_active_runs()?,
         };
         Ok(CodexAgentInspectResponse {
-            agents: runs
-                .iter()
-                .map(|run| self.inspect_snapshot(run))
-                .collect(),
+            agents: runs.iter().map(|run| self.inspect_snapshot(run)).collect(),
             daemon_perceived_now: utc_now(),
             available: true,
             issue_message: None,
@@ -430,18 +454,44 @@ impl CodexControllerHandle {
         request: &CodexApprovalDecisionRequest,
     ) -> Result<CodexRunSnapshot, CliError> {
         let active = self.active_run(run_id)?;
-        active
-            .control_tx
-            .send(CodexControlMessage::Approval {
-                approval_id: approval_id.to_string(),
-                decision: request.decision,
-            })
-            .map_err(|error| CliErrorKind::workflow_io(format!("queue codex approval: {error}")))?;
-        self.run(run_id)
+        self.send_control_and_wait(active, "approval", |ack| CodexControlMessage::Approval {
+            approval_id: approval_id.to_string(),
+            decision: request.decision,
+            ack,
+        })
     }
 
     fn active_run(&self, run_id: &str) -> Result<ActiveRun, CliError> {
         self.state.active_runs.get(run_id)
+    }
+
+    fn send_control_and_wait(
+        &self,
+        active: ActiveRun,
+        action: &str,
+        build: impl FnOnce(CodexControlAck) -> CodexControlMessage,
+    ) -> Result<CodexRunSnapshot, CliError> {
+        let (ack, receiver) = oneshot::channel();
+        active
+            .control_tx
+            .send(build(ack))
+            .map_err(|error| CliErrorKind::workflow_io(format!("queue codex {action}: {error}")))?;
+        self.wait_for_control_ack(action, receiver)
+    }
+
+    fn wait_for_control_ack(
+        &self,
+        action: &str,
+        receiver: oneshot::Receiver<Result<CodexRunSnapshot, CliError>>,
+    ) -> Result<CodexRunSnapshot, CliError> {
+        let action = action.to_string();
+        self.block_on_controller_future(async move {
+            receiver.await.map_err(|error| {
+                CliErrorKind::workflow_io(format!(
+                    "codex {action} worker dropped before acknowledgement: {error}"
+                ))
+            })?
+        })
     }
 
     fn list_active_runs(&self) -> Result<Vec<CodexRunSnapshot>, CliError> {
@@ -492,8 +542,7 @@ impl CodexControllerHandle {
                     run.status = CodexRunStatus::Failed;
                     run.latest_summary =
                         Some("Codex turn is no longer attached to this daemon".to_string());
-                    run.error =
-                        Some("Codex turn is no longer attached to this daemon".to_string());
+                    run.error = Some("Codex turn is no longer attached to this daemon".to_string());
                     run.pending_approvals.clear();
                     run.updated_at = utc_now();
                     let payload = json!({
@@ -555,13 +604,17 @@ impl CodexControllerHandle {
             let status_for_update = status_async.clone();
             let changed = async_db
                 .update_session_state_immediate(&session_id_async, |state| {
-                    Ok(update_codex_orchestration_status(
+                    let changed = update_codex_orchestration_status(
                         state,
                         &session_agent_id_async,
                         &managed_agent_async,
                         status_for_update,
                         &now,
-                    ))
+                    );
+                    if changed {
+                        session_service::refresh_session(state, &now);
+                    }
+                    Ok(changed)
                 })
                 .await?;
             if changed {
@@ -775,6 +828,65 @@ impl CodexControllerHandle {
         Ok(agent_id)
     }
 
+    fn rollback_orchestration_agent_registration(
+        &self,
+        session_id: &str,
+        session_agent_id: Option<&str>,
+        managed_agent: &ManagedAgentRef,
+    ) {
+        let Some(session_agent_id) = session_agent_id else {
+            return;
+        };
+        let session_id_async = session_id.to_string();
+        let session_agent_id_async = session_agent_id.to_string();
+        let managed_agent_async = managed_agent.clone();
+        if let Some(result) = self.run_with_async_db(|async_db| async move {
+            let now = utc_now();
+            let removed = async_db
+                .update_session_state_immediate(&session_id_async, |state| {
+                    Ok(remove_registered_codex_agent(
+                        state,
+                        &session_agent_id_async,
+                        &managed_agent_async,
+                        &now,
+                    ))
+                })
+                .await?;
+            if removed {
+                async_db.bump_change(&session_id_async).await?;
+                async_db.bump_change("global").await?;
+            }
+            Ok(removed)
+        }) {
+            if let Err(error) = result {
+                tracing::warn!(%error, session_id, session_agent_id, "failed to roll back codex orchestration agent registration");
+            }
+            return;
+        }
+
+        let result = (|| {
+            let db = self.db()?;
+            let db = lock_db(&db)?;
+            let Some(mut state) = db.load_session_state_for_mutation(session_id)? else {
+                return Ok(false);
+            };
+            let now = utc_now();
+            if !remove_registered_codex_agent(&mut state, session_agent_id, managed_agent, &now) {
+                return Ok(false);
+            }
+            let project_id = db
+                .project_id_for_session(session_id)?
+                .ok_or_else(|| daemon_service::session_not_found(session_id))?;
+            db.save_session_state(&project_id, &state)?;
+            db.bump_change(session_id)?;
+            db.bump_change("global")?;
+            Ok::<bool, CliError>(true)
+        })();
+        if let Err(error) = result {
+            tracing::warn!(%error, session_id, session_agent_id, "failed to roll back codex orchestration agent registration");
+        }
+    }
+
     fn start_follow_up_turn(
         &self,
         run_id: &str,
@@ -869,6 +981,47 @@ impl CodexControllerHandle {
             Err(_) => runtime.block_on(future),
         })
     }
+
+    fn block_on_controller_future<T, Fut>(&self, future: Fut) -> Result<T, CliError>
+    where
+        Fut: Future<Output = Result<T, CliError>> + Send + 'static,
+        T: Send + 'static,
+    {
+        if let Some(runtime) = self.state.runtime.clone() {
+            return match Handle::try_current() {
+                Ok(current) => match current.runtime_flavor() {
+                    RuntimeFlavor::MultiThread => block_in_place(|| runtime.block_on(future)),
+                    RuntimeFlavor::CurrentThread => thread::spawn(move || {
+                        Builder::new_current_thread()
+                            .enable_all()
+                            .build()
+                            .map_err(|error| {
+                                CliError::from(CliErrorKind::workflow_io(format!(
+                                    "build codex control runtime: {error}"
+                                )))
+                            })?
+                            .block_on(future)
+                    })
+                    .join()
+                    .map_err(|_| {
+                        CliError::from(CliErrorKind::workflow_io("join codex control thread"))
+                    })
+                    .and_then(identity),
+                    _ => runtime.block_on(future),
+                },
+                Err(_) => runtime.block_on(future),
+            };
+        }
+        Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|error| {
+                CliError::from(CliErrorKind::workflow_io(format!(
+                    "build codex control runtime: {error}"
+                )))
+            })?
+            .block_on(future)
+    }
 }
 
 const fn orchestration_status_for_codex_run(status: CodexRunStatus) -> AgentStatus {
@@ -899,6 +1052,24 @@ fn update_codex_orchestration_status(
     agent.status = status;
     agent.updated_at = now.to_string();
     agent.last_activity_at = Some(now.to_string());
+    true
+}
+
+fn remove_registered_codex_agent(
+    state: &mut SessionState,
+    session_agent_id: &str,
+    managed_agent: &ManagedAgentRef,
+    now: &str,
+) -> bool {
+    if state
+        .agents
+        .get(session_agent_id)
+        .is_none_or(|agent| !agent.matches_managed_agent(managed_agent))
+    {
+        return false;
+    }
+    state.agents.remove(session_agent_id);
+    session_service::refresh_session(state, now);
     true
 }
 
@@ -1014,7 +1185,7 @@ fn codex_event_timeline_entry(
                 "type": "user_prompt",
                 "content": prompt,
                 "source": "steer",
-                "event": event,
+                "event": compact_codex_event_payload(event),
             }),
         ));
     }
@@ -1031,7 +1202,7 @@ fn codex_event_timeline_entry(
             json!({
                 "type": "permission_asked",
                 "message": event.summary,
-                "event": event,
+                "event": compact_codex_event_payload(event),
             }),
         ));
     }
@@ -1045,7 +1216,7 @@ fn codex_event_timeline_entry(
             json!({
                 "type": "error",
                 "message": event.summary,
-                "event": event,
+                "event": compact_codex_event_payload(event),
             }),
         ));
     }
@@ -1057,7 +1228,7 @@ fn codex_event_timeline_entry(
         event.summary.clone(),
         json!({
             "type": "state_change",
-            "event": event,
+            "event": compact_codex_event_payload(event),
         }),
     ))
 }
@@ -1067,20 +1238,7 @@ fn codex_agent_message_entry(
     event: &CodexRunEvent,
 ) -> Option<TimelineEntry> {
     if event.kind == "item/agentMessage/delta" {
-        let delta = event.payload.get("delta").and_then(Value::as_str)?;
-        return Some(codex_timeline_entry(
-            run,
-            &event.sequence.to_string(),
-            event.recorded_at.clone(),
-            "assistant_text",
-            trim_transcript_summary(delta, "Assistant response"),
-            json!({
-                "type": "assistant_text",
-                "content": delta,
-                "delta": true,
-                "event": event,
-            }),
-        ));
+        return None;
     }
     if event.kind != "item/completed" {
         return None;
@@ -1099,9 +1257,21 @@ fn codex_agent_message_entry(
         json!({
             "type": "assistant_text",
             "content": text,
-            "event": event,
+            "event": compact_codex_event_payload(event),
         }),
     ))
+}
+
+fn compact_codex_event_payload(event: &CodexRunEvent) -> Value {
+    json!({
+        "event_id": event.event_id.clone(),
+        "sequence": event.sequence,
+        "kind": event.kind.clone(),
+        "summary": event.summary.clone(),
+        "thread_id": event.thread_id.clone(),
+        "turn_id": event.turn_id.clone(),
+        "item_id": event.item_id.clone(),
+    })
 }
 
 fn codex_timeline_entry(

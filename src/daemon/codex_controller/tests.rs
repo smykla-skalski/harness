@@ -299,6 +299,32 @@ fn list_runs_repairs_disconnected_codex_orchestration_agent() {
 }
 
 #[test]
+fn run_repairs_disconnected_codex_orchestration_agent() {
+    let (controller, db, _tempdir) = controller_with_session_state(
+        sample_session_state_with_codex_agent(AgentStatus::disconnected_unknown()),
+    );
+    {
+        let db = db.lock().expect("db lock");
+        db.save_codex_run(&codex_run_snapshot(CodexRunStatus::Completed))
+            .expect("save codex run");
+    }
+
+    let run = controller.run("codex-run-1").expect("load codex run");
+
+    assert_eq!(run.status, CodexRunStatus::Completed);
+    let state = db
+        .lock()
+        .expect("db lock")
+        .load_session_state_for_mutation("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")
+        .expect("load session")
+        .expect("session");
+    let agent = state.agents.get("agent-1").expect("codex agent");
+    assert_eq!(agent.status, AgentStatus::Idle);
+    assert_eq!(state.metrics.agent_count, 1);
+    assert_eq!(state.metrics.idle_agent_count, 1);
+}
+
+#[test]
 fn transcript_includes_codex_prompt_and_final_message() {
     let (controller, db, _tempdir) = controller_with_db();
     let mut run = codex_run_snapshot(CodexRunStatus::Completed);

@@ -109,4 +109,8 @@ impl CodexJsonRpc {
             CliErrorKind::workflow_parse(format!("parse codex app-server JSON: {error}")).into()
         })
     }
+
+    pub(super) async fn shutdown(self) -> Result<(), CliError> {
+        self.transport.shutdown().await
+    }
 }

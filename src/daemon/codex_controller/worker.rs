@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use serde_json::{Value, json};
 use tokio::sync::mpsc;
 
+use crate::daemon::codex_transport::CodexTransport;
 use crate::daemon::protocol::{
     CodexApprovalDecision, CodexResolvedApproval, CodexRunSnapshot, CodexRunStatus,
 };
@@ -63,11 +64,24 @@ impl CodexRunWorker {
             None,
         )?;
         let transport = self.controller.current_transport_kind().connect().await?;
+        self.run_with_transport(transport).await
+    }
+
+    async fn run_with_transport(
+        &mut self,
+        transport: Box<dyn CodexTransport>,
+    ) -> Result<(), CliError> {
         let mut rpc = CodexJsonRpc::new(transport);
-        self.initialize(&mut rpc).await?;
-        self.start_or_resume_thread(&mut rpc).await?;
-        self.start_turn(&mut rpc).await?;
-        self.event_loop(&mut rpc).await
+        let result = async {
+            self.initialize(&mut rpc).await?;
+            self.start_or_resume_thread(&mut rpc).await?;
+            self.start_turn(&mut rpc).await?;
+            self.event_loop(&mut rpc).await
+        }
+        .await;
+        let shutdown_result = rpc.shutdown().await;
+        result?;
+        shutdown_result
     }
 
     async fn initialize(&self, rpc: &mut CodexJsonRpc) -> Result<(), CliError> {
@@ -326,13 +340,34 @@ impl CodexRunWorker {
             CodexControlMessage::Approval {
                 approval_id,
                 decision,
-            } => self
-                .resolve_approval(rpc, &approval_id, decision)
-                .await
-                .map(|()| false),
-            CodexControlMessage::Steer { prompt } => self.steer(rpc, &prompt).await.map(|()| false),
-            CodexControlMessage::Interrupt => self.interrupt(rpc).await.map(|()| false),
-            CodexControlMessage::Stop => self.stop(rpc).await.map(|()| true),
+                ack,
+            } => {
+                let result = self
+                    .resolve_approval(rpc, &approval_id, decision)
+                    .await
+                    .map(|()| self.snapshot.clone());
+                let _ = ack.send(result);
+                Ok(false)
+            }
+            CodexControlMessage::Steer { prompt, ack } => {
+                let result = self
+                    .steer(rpc, &prompt)
+                    .await
+                    .map(|()| self.snapshot.clone());
+                let _ = ack.send(result);
+                Ok(false)
+            }
+            CodexControlMessage::Interrupt { ack } => {
+                let result = self.interrupt(rpc).await.map(|()| self.snapshot.clone());
+                let _ = ack.send(result);
+                Ok(false)
+            }
+            CodexControlMessage::Stop { ack } => {
+                let result = self.stop(rpc).await.map(|()| self.snapshot.clone());
+                let should_stop = result.is_ok();
+                let _ = ack.send(result);
+                Ok(should_stop)
+            }
         }
     }
 
@@ -372,7 +407,7 @@ impl CodexRunWorker {
                 "decision": decision,
             }),
         );
-        self.touch_and_save()
+        self.touch_save_and_sync_orchestration()
     }
 
     async fn steer(&mut self, rpc: &mut CodexJsonRpc, prompt: &str) -> Result<(), CliError> {
@@ -388,7 +423,7 @@ impl CodexRunWorker {
             "Steering prompt sent".to_string(),
             &params,
         );
-        self.touch_and_save()
+        self.touch_save_and_sync_orchestration()
     }
 
     async fn interrupt(&mut self, rpc: &mut CodexJsonRpc) -> Result<(), CliError> {
@@ -404,7 +439,7 @@ impl CodexRunWorker {
             "Interrupt requested".to_string(),
             &params,
         );
-        self.touch_and_save()
+        self.touch_save_and_sync_orchestration()
     }
 
     async fn stop(&mut self, rpc: &mut CodexJsonRpc) -> Result<(), CliError> {
@@ -512,7 +547,138 @@ impl CodexRunWorker {
         self.controller.save_and_broadcast(&self.snapshot)
     }
 
+    fn touch_save_and_sync_orchestration(&mut self) -> Result<(), CliError> {
+        self.touch_and_save()?;
+        self.controller
+            .sync_orchestration_status_for_run(&self.snapshot)
+    }
+
     fn record_event(&mut self, kind: &str, summary: String, payload: &Value) {
         record_snapshot_event(&mut self.snapshot, kind, summary, payload);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{Arc, Mutex};
+
+    use async_trait::async_trait;
+    use tokio::sync::{broadcast, mpsc, oneshot};
+
+    use super::*;
+    use crate::daemon::codex_controller::CodexControllerHandle;
+    use crate::daemon::codex_transport::CodexTransport;
+    use crate::daemon::protocol::{CodexRunMode, StreamEvent};
+
+    #[tokio::test]
+    async fn invalid_steer_ack_does_not_fail_worker_loop() {
+        let (_control_tx, control_rx) = mpsc::unbounded_channel();
+        let mut worker = CodexRunWorker::new(
+            controller_without_db(),
+            running_snapshot_without_ids(),
+            control_rx,
+        );
+        let mut rpc = CodexJsonRpc::new(Box::new(FakeTransport::default()));
+        let (ack, receiver) = oneshot::channel();
+
+        let should_stop = worker
+            .handle_control(
+                &mut rpc,
+                CodexControlMessage::Steer {
+                    prompt: "more context".to_string(),
+                    ack,
+                },
+            )
+            .await
+            .expect("control handling should not fail the worker");
+
+        assert!(!should_stop);
+        assert!(
+            receiver.await.expect("ack").is_err(),
+            "invalid steer should report an action error"
+        );
+        assert_eq!(worker.snapshot.status, CodexRunStatus::Running);
+    }
+
+    #[tokio::test]
+    async fn unknown_approval_ack_does_not_fail_worker_loop() {
+        let (_control_tx, control_rx) = mpsc::unbounded_channel();
+        let mut snapshot = running_snapshot_without_ids();
+        snapshot.thread_id = Some("thread-1".to_string());
+        snapshot.turn_id = Some("turn-1".to_string());
+        snapshot.status = CodexRunStatus::WaitingApproval;
+        let mut worker = CodexRunWorker::new(controller_without_db(), snapshot, control_rx);
+        let mut rpc = CodexJsonRpc::new(Box::new(FakeTransport::default()));
+        let (ack, receiver) = oneshot::channel();
+
+        let should_stop = worker
+            .handle_control(
+                &mut rpc,
+                CodexControlMessage::Approval {
+                    approval_id: "missing-approval".to_string(),
+                    decision: CodexApprovalDecision::Accept,
+                    ack,
+                },
+            )
+            .await
+            .expect("control handling should not fail the worker");
+
+        assert!(!should_stop);
+        assert!(
+            receiver.await.expect("ack").is_err(),
+            "unknown approval should report an action error"
+        );
+        assert_eq!(worker.snapshot.status, CodexRunStatus::WaitingApproval);
+    }
+
+    fn controller_without_db() -> CodexControllerHandle {
+        let (sender, _) = broadcast::channel::<StreamEvent>(8);
+        CodexControllerHandle::new(sender, Arc::new(std::sync::OnceLock::new()), false)
+    }
+
+    fn running_snapshot_without_ids() -> CodexRunSnapshot {
+        CodexRunSnapshot {
+            run_id: "codex-run-test".to_string(),
+            session_id: "session-test".to_string(),
+            session_agent_id: None,
+            display_name: Some("Codex".to_string()),
+            project_dir: "/tmp/harness".to_string(),
+            thread_id: None,
+            turn_id: None,
+            mode: CodexRunMode::Approval,
+            status: CodexRunStatus::Running,
+            prompt: "Investigate".to_string(),
+            latest_summary: None,
+            final_message: None,
+            error: None,
+            pending_approvals: Vec::new(),
+            resolved_approvals: Vec::new(),
+            events: Vec::new(),
+            created_at: "2026-04-09T10:00:00Z".to_string(),
+            updated_at: "2026-04-09T10:00:00Z".to_string(),
+            model: None,
+            effort: None,
+        }
+    }
+
+    #[derive(Default)]
+    struct FakeTransport {
+        sent: Arc<Mutex<Vec<String>>>,
+    }
+
+    #[async_trait]
+    impl CodexTransport for FakeTransport {
+        async fn send(&mut self, frame: String) -> Result<(), CliError> {
+            self.sent.lock().expect("sent lock").push(frame);
+            Ok(())
+        }
+
+        async fn next_frame(&mut self) -> Result<Option<String>, CliError> {
+            Ok(None)
+        }
+
+        async fn shutdown(self: Box<Self>) -> Result<(), CliError> {
+            Ok(())
+        }
     }
 }

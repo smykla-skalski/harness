@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 
-use crate::daemon::protocol::CodexApprovalDecision;
+use crate::daemon::protocol::{CodexApprovalDecision, CodexRunSnapshot};
 use crate::errors::{CliError, CliErrorKind};
+
+pub(super) type CodexControlAck = oneshot::Sender<Result<CodexRunSnapshot, CliError>>;
 
 #[derive(Clone)]
 pub(super) struct ActiveRun {
@@ -61,10 +63,16 @@ pub(super) enum CodexControlMessage {
     Approval {
         approval_id: String,
         decision: CodexApprovalDecision,
+        ack: CodexControlAck,
     },
     Steer {
         prompt: String,
+        ack: CodexControlAck,
     },
-    Interrupt,
-    Stop,
+    Interrupt {
+        ack: CodexControlAck,
+    },
+    Stop {
+        ack: CodexControlAck,
+    },
 }
