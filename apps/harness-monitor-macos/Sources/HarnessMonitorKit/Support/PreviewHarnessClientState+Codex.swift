@@ -21,7 +21,8 @@ extension PreviewHarnessClientState {
         Array(codexRunsBySessionID.keys)
       }
 
-    let snapshots = sessions
+    let snapshots =
+      sessions
       .flatMap { codexRunsBySessionID[$0] ?? [] }
       .map { run in
         CodexAgentInspectSnapshot(

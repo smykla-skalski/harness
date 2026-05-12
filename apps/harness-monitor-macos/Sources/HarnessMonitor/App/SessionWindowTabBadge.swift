@@ -16,8 +16,12 @@ enum SessionWindowTabBadge {
   ) -> NSAttributedString? {
     guard pendingDecisionCount > 0 else { return nil }
     let result = NSMutableAttributedString(string: base + leadingSpacing)
+    let attachment = makeAttachment(
+      count: pendingDecisionCount,
+      severity: severity
+    )
     result.append(
-      NSAttributedString(attachment: makeAttachment(count: pendingDecisionCount, severity: severity))
+      NSAttributedString(attachment: attachment)
     )
     return result
   }

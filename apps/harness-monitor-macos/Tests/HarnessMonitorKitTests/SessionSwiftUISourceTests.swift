@@ -191,11 +191,11 @@ struct SessionSwiftUISourceTests {
     let agentDetailSource = try sourceFile(at: "Views/Sessions/SessionAgentDetailSection.swift")
     let agentDetailComputedSource = try sourceFile(
       at: "Views/Sessions/SessionAgentDetailSection+Computed.swift")
+    let expectedAgentTimeline =
+      "let agentTimeline = snapshot.timelineEntriesByAgentID[agentID] ?? []"
 
     #expect(detailFocusSource.contains("detail: detail"))
-    #expect(
-      detailFocusSource.contains("let agentTimeline = snapshot.timelineEntriesByAgentID[agentID] ?? []")
-    )
+    #expect(detailFocusSource.contains(expectedAgentTimeline))
     #expect(detailFocusSource.contains("agentTimeline: agentTimeline"))
     #expect(agentDetailSource.contains("let detail: SessionDetail"))
     #expect(agentDetailSource.contains("let agentTimeline: [TimelineEntry]"))
