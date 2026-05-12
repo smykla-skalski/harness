@@ -127,6 +127,23 @@ private struct HarnessMonitorMultilineChromeModifier: ViewModifier {
   }
 }
 
+private final class HarnessMonitorMultilineScrollView: NSScrollView {
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    let hit = super.hitTest(point)
+    guard
+      let textView = documentView as? NSTextView,
+      contentView.frame.contains(point),
+      hit === self || hit === contentView
+    else {
+      return hit
+    }
+
+    // Treat scroll-view-only gutter hits as editor hits so the visible field
+    // remains focusable across its full bounds.
+    return textView
+  }
+}
+
 private struct HarnessMonitorAppKitMultilineTextEditor: NSViewRepresentable {
   @Binding var text: String
   let textSizeIndex: Int
@@ -137,7 +154,7 @@ private struct HarnessMonitorAppKitMultilineTextEditor: NSViewRepresentable {
   }
 
   func makeNSView(context: Context) -> NSScrollView {
-    let scrollView = NSScrollView()
+    let scrollView = HarnessMonitorMultilineScrollView()
     scrollView.borderType = .noBorder
     scrollView.drawsBackground = false
     scrollView.hasHorizontalScroller = false

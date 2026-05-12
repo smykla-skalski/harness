@@ -241,18 +241,7 @@ struct SessionCodexRunDetailSection: View {
         text: $contextDraft,
         minHeight: 88,
         maxHeight: 220,
-        showsChrome: false,
         accessibilityLabel: "Codex context"
-      )
-      .padding(.horizontal, 4)
-      .padding(.vertical, 4)
-      .background(
-        .quaternary.opacity(0.2),
-        in: RoundedRectangle(cornerRadius: metrics.terminalCornerRadius)
-      )
-      .overlay(
-        RoundedRectangle(cornerRadius: metrics.terminalCornerRadius)
-          .stroke(.quaternary, lineWidth: 1)
       )
       HStack {
         Spacer(minLength: 0)
