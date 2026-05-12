@@ -52,14 +52,16 @@ struct SessionTimelineView: View {
 
   private var presentation: SessionTimelineSectionPresentation {
     presentationCache.presentation(
-      sessionID: sessionID,
-      timeline: timeline,
-      timelineWindow: timelineWindow,
-      decisions: decisions,
-      signals: store.selectedSessionSignals,
-      filters: normalizedFilters(filters),
-      isTimelineLoading: isTimelineLoading,
-      dateTimeConfiguration: dateTimeConfiguration
+      SessionTimelineSectionPresentationInput(
+        sessionID: sessionID,
+        timeline: timeline,
+        timelineWindow: timelineWindow,
+        decisions: decisions,
+        signals: store.selectedSessionSignals,
+        filters: normalizedFilters(filters),
+        isTimelineLoading: isTimelineLoading,
+        dateTimeConfiguration: dateTimeConfiguration
+      )
     )
   }
 
