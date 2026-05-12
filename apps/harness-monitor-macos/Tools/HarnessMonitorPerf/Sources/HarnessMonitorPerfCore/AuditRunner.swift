@@ -9,6 +9,12 @@ public enum AuditRunner {
     public static let hostBundleID = "io.harnessmonitor.app.ui-testing"
     public static let stagedHostSuffix = ".audit"
     public static let persistenceArguments = ["-ApplePersistenceIgnoreState", "YES"]
+    public static let daemonDataHomeOverrideEnvironmentKey =
+        "HARNESS_MONITOR_AUDIT_DAEMON_DATA_HOME"
+    public static let passThroughEnvironmentKeys: Set<String> = [
+        "HARNESS_MONITOR_EXTERNAL_DAEMON",
+        "HARNESS_MONITOR_LAUNCH_MODE",
+    ]
 
     public static let baseEnvironment: [String: String] = [
         "HARNESS_MONITOR_UI_TESTS": "1",
@@ -202,7 +208,8 @@ public enum AuditRunner {
             "HARNESS_MONITOR_AUDIT_WORKSPACE_FINGERPRINT": workspaceFingerprint,
             "HARNESS_MONITOR_AUDIT_BUILD_STARTED_AT_UTC": buildStartedAtUTC,
         ]
-        let combinedDefaultEnv = baseEnvironment.merging(baseAuditEnv) { _, audit in audit }
+        let combinedDefaultEnv = defaultEnvironment()
+            .merging(baseAuditEnv) { _, audit in audit }
 
         var captureRecords: [ManifestBuilder.CaptureRecord] = []
         for scenario in scenarios {
@@ -290,10 +297,11 @@ public enum AuditRunner {
     ) throws -> TraceRecorder.Capture {
         let templateSlug = template.lowercased().replacingOccurrences(of: " ", with: "-")
         let templateDir = tracesRoot.appendingPathComponent(templateSlug, isDirectory: true)
-        let dataHome = runDir
-            .appendingPathComponent("app-data", isDirectory: true)
-            .appendingPathComponent(templateSlug, isDirectory: true)
-            .appendingPathComponent(scenario, isDirectory: true)
+        let dataHome = daemonDataHome(
+            runDir: runDir,
+            templateSlug: templateSlug,
+            scenario: scenario
+        )
         let logURL = runDir.appendingPathComponent("logs", isDirectory: true)
             .appendingPathComponent("\(templateSlug)-\(scenario).log")
         let traceURL = templateDir.appendingPathComponent("\(scenario).trace", isDirectory: true)
@@ -426,11 +434,54 @@ public enum AuditRunner {
                 stagedHostBundleID: staged.stagedBundleID
             ),
             buildProvenance: buildProv,
-            defaultEnvironment: baseEnvironment,
+            defaultEnvironment: defaultEnvironment(),
             launchArguments: persistenceArguments,
             selectedScenarios: selectedScenarios,
             captureRecords: captureRecords
         ))
+    }
+
+    public static func defaultEnvironment(
+        processEnvironment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> [String: String] {
+        baseEnvironment.merging(passThroughEnvironment(processEnvironment)) { _, override in
+            override
+        }
+    }
+
+    public static func daemonDataHome(
+        runDir: URL,
+        templateSlug: String,
+        scenario: String,
+        processEnvironment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> URL {
+        if let override = trimmedNonEmpty(
+            processEnvironment[daemonDataHomeOverrideEnvironmentKey]
+        ) {
+            return URL(fileURLWithPath: override, isDirectory: true)
+        }
+        return runDir
+            .appendingPathComponent("app-data", isDirectory: true)
+            .appendingPathComponent(templateSlug, isDirectory: true)
+            .appendingPathComponent(scenario, isDirectory: true)
+    }
+
+    private static func passThroughEnvironment(
+        _ processEnvironment: [String: String]
+    ) -> [String: String] {
+        processEnvironment.reduce(into: [:]) { result, item in
+            guard passThroughEnvironmentKeys.contains(item.key),
+                  let value = trimmedNonEmpty(item.value)
+            else {
+                return
+            }
+            result[item.key] = value
+        }
+    }
+
+    private static func trimmedNonEmpty(_ value: String?) -> String? {
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     public static func validateProvenance(

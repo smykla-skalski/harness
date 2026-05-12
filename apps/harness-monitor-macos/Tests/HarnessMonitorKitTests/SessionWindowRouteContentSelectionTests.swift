@@ -251,6 +251,52 @@ struct SessionWindowRouteContentSelectionTests {
     )
   }
 
+  @Test("Toolbar search only mirrors into timeline filters on the timeline route")
+  func toolbarSearchMirrorIsTimelineRouteScoped() {
+    let cockpitTrigger = SessionTimelineSearchMirrorPolicy.trigger(
+      isEnabled: false,
+      appSearchQuery: "signal"
+    )
+    #expect(cockpitTrigger.isEnabled == false)
+    #expect(cockpitTrigger.query.isEmpty)
+    #expect(
+      SessionTimelineSearchMirrorPolicy.filterQueryUpdate(
+        from: .init(isEnabled: false, query: ""),
+        to: cockpitTrigger
+      ) == nil
+    )
+
+    let timelineWithQuery = SessionTimelineSearchMirrorPolicy.trigger(
+      isEnabled: true,
+      appSearchQuery: "signal"
+    )
+    #expect(timelineWithQuery.isEnabled)
+    #expect(timelineWithQuery.query == "signal")
+    #expect(
+      SessionTimelineSearchMirrorPolicy.filterQueryUpdate(
+        from: cockpitTrigger,
+        to: timelineWithQuery
+      ) == "signal"
+    )
+
+    let timelineEmptyOnEntry = SessionTimelineSearchMirrorPolicy.trigger(
+      isEnabled: true,
+      appSearchQuery: ""
+    )
+    #expect(
+      SessionTimelineSearchMirrorPolicy.filterQueryUpdate(
+        from: cockpitTrigger,
+        to: timelineEmptyOnEntry
+      )?.isEmpty == true
+    )
+    #expect(
+      SessionTimelineSearchMirrorPolicy.filterQueryUpdate(
+        from: timelineWithQuery,
+        to: cockpitTrigger
+      )?.isEmpty == true
+    )
+  }
+
   @Test("Task detail pane avoids nested grouped Form inside the session scroll surface")
   func taskDetailPaneAvoidsNestedGroupedForm() throws {
     let taskDetail = try sourceFile(named: "SessionTaskDetailPane.swift")

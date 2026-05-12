@@ -108,7 +108,12 @@ struct SessionTimelineView: View {
     .onChange(of: filterPersistenceModeRawValue) { _, _ in
       persistFilters(normalizedFilters(filters))
     }
-    .modifier(SessionTimelineSearchMirror(filterQuery: $filters.query))
+    .modifier(
+      SessionTimelineSearchMirror(
+        filterQuery: $filters.query,
+        isEnabled: style == .routePage
+      )
+    )
   }
 
   @ViewBuilder
