@@ -197,6 +197,20 @@ struct SessionSwiftUISourceTests {
     #expect(!sidebarSearchSource.contains("private var mcpRegistryHostEnabled"))
   }
 
+  @Test("App search reindex tasks attach only while search is visible")
+  func appSearchReindexTasksAttachOnlyWhileSearchIsVisible() throws {
+    let searchUpdaterSource = try sourceFile(at: "Views/Search/AppSearchIndexUpdater.swift")
+
+    #expect(searchUpdaterSource.contains("@ViewBuilder\n  func body(content: Content)"))
+    #expect(searchUpdaterSource.contains("if model.isPresented {"))
+    #expect(searchUpdaterSource.contains(".task(id: agentSignature)"))
+    #expect(searchUpdaterSource.contains(".task(id: decisionSignature)"))
+    #expect(searchUpdaterSource.contains(".task(id: taskSignature)"))
+    #expect(searchUpdaterSource.contains(".task(id: eventSignature)"))
+    #expect(!searchUpdaterSource.contains("AppSearchReindexTrigger(active:"))
+    #expect(!searchUpdaterSource.contains("guard model.isPresented else { return }"))
+  }
+
   @Test("Timeline section renders on SwiftUI primitives without AppKit scroll machinery")
   func timelineSectionRendersOnSwiftUIPrimitives() throws {
     let timelineSource = try sourceFile(at: "Views/Timeline/MonitorTimelineSection.swift")
