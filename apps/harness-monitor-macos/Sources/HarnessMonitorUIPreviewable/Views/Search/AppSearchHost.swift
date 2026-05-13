@@ -43,6 +43,7 @@ public struct AppSearchHost: View {
   let prompt: LocalizedStringKey
   let primaryDomainProvider: @MainActor () -> AppSearchDomain?
   let fallbackPrimaryDomain: AppSearchDomain
+  let isEnabled: Bool
   let automation: AppSearchAutomationState?
   let routeAction: (AppSearchHit) -> Void
 
@@ -56,6 +57,7 @@ public struct AppSearchHost: View {
     prompt: LocalizedStringKey = "Search session",
     primaryDomainProvider: @escaping @MainActor () -> AppSearchDomain? = { nil },
     fallbackPrimaryDomain: AppSearchDomain = .timeline,
+    isEnabled: Bool = true,
     automation: AppSearchAutomationState? = nil,
     routeAction: @escaping (AppSearchHit) -> Void = { _ in }
   ) {
@@ -63,6 +65,7 @@ public struct AppSearchHost: View {
     self.prompt = prompt
     self.primaryDomainProvider = primaryDomainProvider
     self.fallbackPrimaryDomain = fallbackPrimaryDomain
+    self.isEnabled = isEnabled
     self.automation = automation
     self.routeAction = routeAction
   }
@@ -74,6 +77,7 @@ public struct AppSearchHost: View {
         prompt: prompt,
         suggestionRows: suggestionSnapshot.rows,
         isFocused: $isSearchFocused,
+        isEnabled: isEnabled,
         onSubmit: submitSearch
       )
       .equatable()
@@ -109,8 +113,11 @@ public struct AppSearchHost: View {
     }
   }
 
-  private var searchFocusAction: HarnessSidebarSearchFocus {
-    HarnessSidebarSearchFocus(
+  private var searchFocusAction: HarnessSidebarSearchFocus? {
+    guard isEnabled else {
+      return nil
+    }
+    return HarnessSidebarSearchFocus(
       isAvailable: true,
       menuLabel: .findInSession,
       dispatcher: searchFocusDispatcher
@@ -118,15 +125,18 @@ public struct AppSearchHost: View {
   }
 
   private func focusSearchField() {
+    guard isEnabled else { return }
     guard !isSearchFocused else { return }
     isSearchFocused = true
   }
 
   private var shouldKeepSearchIndexActive: Bool {
-    isSearchFocused || hasSearchQuery
+    guard isEnabled else { return false }
+    return isSearchFocused || hasSearchQuery
   }
 
   private func submitSearch() {
+    guard isEnabled else { return }
     let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return }
     let hit =
@@ -163,8 +173,8 @@ public struct AppSearchHost: View {
   }
 
   private var searchTrigger: AppSearchTrigger {
-    guard hasSearchQuery else {
-      return AppSearchTrigger(query: query, primary: nil)
+    guard isEnabled, hasSearchQuery else {
+      return AppSearchTrigger(query: "", primary: nil)
     }
     return AppSearchTrigger(query: query, primary: resolvedPrimaryDomain)
   }
@@ -229,52 +239,65 @@ private struct AppSearchFieldSurface: View, Equatable {
   let prompt: LocalizedStringKey
   let suggestionRows: [AppSearchSuggestionRow]
   let isFocused: FocusState<Bool>.Binding
+  let isEnabled: Bool
   let onSubmit: () -> Void
   private let queryValue: String
   private let isFocusedValue: Bool
+  private let isEnabledValue: Bool
 
   init(
     query: Binding<String>,
     prompt: LocalizedStringKey,
     suggestionRows: [AppSearchSuggestionRow],
     isFocused: FocusState<Bool>.Binding,
+    isEnabled: Bool,
     onSubmit: @escaping () -> Void
   ) {
     _query = query
     self.prompt = prompt
     self.suggestionRows = suggestionRows
     self.isFocused = isFocused
+    self.isEnabled = isEnabled
     self.onSubmit = onSubmit
     queryValue = query.wrappedValue
     isFocusedValue = isFocused.wrappedValue
+    isEnabledValue = isEnabled
   }
 
   nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.queryValue == rhs.queryValue
       && lhs.isFocusedValue == rhs.isFocusedValue
       && lhs.suggestionRows == rhs.suggestionRows
+      && lhs.isEnabledValue == rhs.isEnabledValue
   }
 
+  @ViewBuilder
   var body: some View {
-    Color.clear
-      .frame(width: 0, height: 0)
-      .allowsHitTesting(false)
-      .searchable(
-        text: $query,
-        placement: .toolbar,
-        prompt: prompt
-      )
-      .searchSuggestions {
-        ForEach(suggestionRows) { row in
-          Text(verbatim: row.displayTitle)
-            .searchCompletion(row.displayTitle)
+    if isEnabled {
+      Color.clear
+        .frame(width: 0, height: 0)
+        .allowsHitTesting(false)
+        .searchable(
+          text: $query,
+          placement: .toolbar,
+          prompt: prompt
+        )
+        .searchSuggestions {
+          ForEach(suggestionRows) { row in
+            Text(verbatim: row.displayTitle)
+              .searchCompletion(row.displayTitle)
+          }
         }
-      }
-      .searchFocused(isFocused)
-      .harnessMinimizableSearchToolbar()
-      .onSubmit(of: .search) {
-        onSubmit()
-      }
+        .searchFocused(isFocused)
+        .harnessMinimizableSearchToolbar()
+        .onSubmit(of: .search) {
+          onSubmit()
+        }
+    } else {
+      Color.clear
+        .frame(width: 0, height: 0)
+        .allowsHitTesting(false)
+    }
   }
 }
 
@@ -301,6 +324,7 @@ public struct AppSearchHostModifier: ViewModifier {
   let prompt: LocalizedStringKey
   let primaryDomainProvider: @MainActor () -> AppSearchDomain?
   let fallbackPrimaryDomain: AppSearchDomain
+  let isEnabled: Bool
   let automation: AppSearchAutomationState?
   let routeAction: (AppSearchHit) -> Void
 
@@ -311,6 +335,7 @@ public struct AppSearchHostModifier: ViewModifier {
         prompt: prompt,
         primaryDomainProvider: primaryDomainProvider,
         fallbackPrimaryDomain: fallbackPrimaryDomain,
+        isEnabled: isEnabled,
         automation: automation,
         routeAction: routeAction
       )
@@ -325,6 +350,7 @@ extension View {
     prompt: LocalizedStringKey = "Search session",
     primaryDomainProvider: @escaping @MainActor () -> AppSearchDomain? = { nil },
     fallbackPrimaryDomain: AppSearchDomain = .timeline,
+    isEnabled: Bool = true,
     automation: AppSearchAutomationState? = nil,
     routeAction: @escaping (AppSearchHit) -> Void = { _ in }
   ) -> some View {
@@ -334,6 +360,7 @@ extension View {
         prompt: prompt,
         primaryDomainProvider: primaryDomainProvider,
         fallbackPrimaryDomain: fallbackPrimaryDomain,
+        isEnabled: isEnabled,
         automation: automation,
         routeAction: routeAction
       )

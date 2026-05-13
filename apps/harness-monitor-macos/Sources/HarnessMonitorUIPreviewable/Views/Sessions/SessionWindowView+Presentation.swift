@@ -299,6 +299,7 @@ extension SessionWindowView {
       preferredBinding: inspectorPreferredBinding,
       announce: false
     )
+    enableStartupSearchParticipation()
   }
 
   func loadSnapshot() async {

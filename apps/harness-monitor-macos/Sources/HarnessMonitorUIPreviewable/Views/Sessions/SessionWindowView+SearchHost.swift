@@ -6,6 +6,7 @@ extension SessionWindowView {
     AppSearchHost(
       model: stateCache.appSearchModel,
       primaryDomainProvider: { stateCache.selection.routeDomain },
+      isEnabled: isStartupSearchParticipationEnabled,
       automation: searchAutomation,
       routeAction: appSearchRouteAction
     )

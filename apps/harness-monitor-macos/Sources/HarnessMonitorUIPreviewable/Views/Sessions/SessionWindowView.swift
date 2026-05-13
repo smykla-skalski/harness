@@ -44,6 +44,7 @@ public struct SessionWindowView: View {
   @State private var perfContentDividerWidthStorage: Double?
   @State private var decisionCacheStorage = SessionWindowDecisionCacheStorage()
   @State private var currentModifiers: EventModifiers = []
+  @State private var startupSearchParticipationEnabledStorage = HarnessMonitorUITestEnvironment.isEnabled
 
   public init(store: HarnessMonitorStore, token: SessionWindowToken) {
     self.store = store
@@ -148,6 +149,16 @@ public struct SessionWindowView: View {
 
   var presentedModifiers: EventModifiers {
     currentModifiers
+  }
+
+  var isStartupSearchParticipationEnabled: Bool {
+    get { startupSearchParticipationEnabledStorage }
+    nonmutating set { startupSearchParticipationEnabledStorage = newValue }
+  }
+
+  func enableStartupSearchParticipation() {
+    guard !isStartupSearchParticipationEnabled else { return }
+    isStartupSearchParticipationEnabled = true
   }
 
   var decisionDetailTab: DecisionDetailTab {
