@@ -166,6 +166,8 @@ extension SessionWindowFlowTests {
     #expect(source.contains(".task(id: automationCommand)"))
     #expect(source.contains("HarnessSidebarSearchFocusDispatcher()"))
     #expect(source.contains(".harnessFocusedSceneValue(\\.harnessSidebarSearchFocusAction"))
+    #expect(source.contains(".task(id: isSearchPresented)"))
+    #expect(!source.contains(".onChange(of: isSearchPresented"))
     #expect(!source.contains("Button(\"Find in Session\""))
     #expect(!source.contains(".searchPresentationToolbarBehavior(.avoidHidingContent)"))
     #expect(source.contains("@Environment(\\.accessibilityVoiceOverEnabled)"))
