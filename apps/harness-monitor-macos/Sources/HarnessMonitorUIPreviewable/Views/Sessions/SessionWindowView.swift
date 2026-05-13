@@ -12,11 +12,11 @@ public struct SessionWindowView: View {
   @Environment(\.accessibilityReduceMotion)
   var reduceMotion: Bool
   @SceneStorage("session.route")
-  private var persistedRoute: SessionWindowRoute = .overview
+  var persistedRoute: SessionWindowRoute = .overview
   @SceneStorage("session.decisionID")
-  private var persistedDecisionID: String = ""
+  var persistedDecisionID: String = ""
   @SceneStorage("session.decisionFilters.query")
-  private var persistedDecisionQuery = ""
+  var persistedDecisionQuery = ""
   @SceneStorage("session.decision.detail-tab")
   private var persistedDecisionDetailTabRawStorage = DecisionDetailTab.context.rawValue
   @SceneStorage("session.focusMode")
@@ -281,47 +281,6 @@ public struct SessionWindowView: View {
       }
   }
 
-  func hydrateSelectionFromPersistedStorage() {
-    guard case .route(.overview) = stateCache.selection else { return }
-    if persistedRoute == .decisions {
-      stateCache.selectRoute(.decisions)
-      stateCache.setRouteDecisionID(persistedDecisionID.isEmpty ? nil : persistedDecisionID)
-    } else if !persistedDecisionID.isEmpty {
-      stateCache.selectDecision(persistedDecisionID)
-    } else if persistedRoute != .overview {
-      stateCache.selectRoute(persistedRoute)
-    }
-  }
-
-  func hydrateDecisionFiltersFromPersistedStorage() {
-    if stateCache.decisionFilters.query != persistedDecisionQuery {
-      stateCache.decisionFilters.query = persistedDecisionQuery
-    }
-  }
-
-  private func syncPersistedStorage(from selection: SessionSelection) {
-    switch selection {
-    case .route(let route):
-      persistedRoute = route
-      persistedDecisionID = route == .decisions ? (stateCache.sectionState.decisionID ?? "") : ""
-    case .agent:
-      persistedRoute = .agents
-      persistedDecisionID = ""
-    case .codexRun:
-      persistedRoute = .agents
-      persistedDecisionID = ""
-    case .decision(_, let decisionID):
-      persistedRoute = .decisions
-      persistedDecisionID = decisionID
-    case .task:
-      persistedRoute = .tasks
-      persistedDecisionID = ""
-    case .create:
-      persistedRoute = .agents
-      persistedDecisionID = ""
-    }
-  }
-
   @MainActor
   func applyPendingSessionRouteIfNeeded() async {
     let pendingRequest = store.pendingSessionRouteRequestSnapshot
@@ -355,7 +314,7 @@ public struct SessionWindowView: View {
     )
     if request.resetDecisionFilters {
       stateCache.decisionFilters.clear()
-      persistedDecisionQuery = ""
+      clearPersistedDecisionQueryIfNeeded()
     }
     switch request.selection {
     case .create:
