@@ -164,6 +164,8 @@ extension SessionWindowFlowTests {
     #expect(source.contains(".onChange(of: model.results.totalHitCount)"))
     #expect(source.contains("let automation: AppSearchAutomationState?"))
     #expect(source.contains(".task(id: automationCommand)"))
+    #expect(source.contains("await applyAutomationCommand(command)"))
+    #expect(source.contains("await Task.yield()"))
     #expect(source.contains("HarnessSidebarSearchFocusDispatcher()"))
     #expect(source.contains(".harnessFocusedSceneValue(\\.harnessSidebarSearchFocusAction"))
     #expect(source.contains(".task(id: isSearchPresented)"))
