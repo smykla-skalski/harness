@@ -3,6 +3,8 @@ import SwiftUI
 
 struct SessionWindowStandardLayout<Sidebar: View, Detail: View>: View {
   let stateCache: SessionWindowStateCache
+  let contentDetailBaseWidth: Double
+  let perfContentDividerWidth: Binding<Double?>
   let sessionID: String
   let snapshot: HarnessMonitorSessionWindowSnapshot?
   let decisionIDs: [String]
@@ -15,6 +17,8 @@ struct SessionWindowStandardLayout<Sidebar: View, Detail: View>: View {
 
   init(
     stateCache: SessionWindowStateCache,
+    contentDetailBaseWidth: Double,
+    perfContentDividerWidth: Binding<Double?>,
     sessionID: String,
     snapshot: HarnessMonitorSessionWindowSnapshot?,
     decisionIDs: [String],
@@ -24,6 +28,8 @@ struct SessionWindowStandardLayout<Sidebar: View, Detail: View>: View {
     @ViewBuilder detail: () -> Detail
   ) {
     self.stateCache = stateCache
+    self.contentDetailBaseWidth = contentDetailBaseWidth
+    self.perfContentDividerWidth = perfContentDividerWidth
     self.sessionID = sessionID
     self.snapshot = snapshot
     self.decisionIDs = decisionIDs
@@ -51,6 +57,8 @@ struct SessionWindowStandardLayout<Sidebar: View, Detail: View>: View {
       SessionWindowPerfScenarioScript(
         stateCache: stateCache,
         columnVisibility: columnVisibilityBinding,
+        contentDetailBaseWidth: contentDetailBaseWidth,
+        contentDetailDividerWidth: perfContentDividerWidth,
         sessionID: sessionID,
         snapshot: snapshot,
         decisionIDs: decisionIDs

@@ -185,6 +185,7 @@
           "template": { "type": "string" },
           "duration_seconds": { "type": "integer" },
           "trace_relpath": { "type": "string" },
+          "app_trace_relpath": { "type": ["string", "null"] },
           "exit_status": { "type": "integer" },
           "end_reason": { "type": "string" },
           "preview_scenario": { "type": "string" },

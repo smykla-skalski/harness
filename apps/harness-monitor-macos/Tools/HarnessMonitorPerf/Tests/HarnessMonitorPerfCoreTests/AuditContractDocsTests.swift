@@ -38,6 +38,9 @@ final class AuditContractDocsTests: XCTestCase {
         XCTAssertTrue(readme.contains("`build_provenance`"))
         XCTAssertTrue(readme.contains("`launched_process_path`"))
         XCTAssertTrue(readme.contains("`daemon_data_home_probe`"))
+        XCTAssertTrue(readme.contains("`app_trace_relpath`"))
+        XCTAssertTrue(readme.contains("`app_trace`"))
+        XCTAssertTrue(readme.contains("`findings`"))
         XCTAssertTrue(readme.contains("`debug-retention.json`"))
     }
 
@@ -69,14 +72,19 @@ final class AuditContractDocsTests: XCTestCase {
         XCTAssertTrue(manifest.contains("\"staged_host_bundle_id\""))
         XCTAssertTrue(manifest.contains("\"launched_process_path\""))
         XCTAssertTrue(manifest.contains("\"daemon_data_home_probe\""))
+        XCTAssertTrue(manifest.contains("\"app_trace_relpath\""))
 
         XCTAssertTrue(summary.contains("\"metrics\""))
         XCTAssertTrue(summary.contains("\"launch_metrics\""))
         XCTAssertTrue(summary.contains("\"metric_tiers\""))
+        XCTAssertTrue(summary.contains("\"app_trace\""))
+        XCTAssertTrue(summary.contains("\"findings\""))
 
         XCTAssertTrue(comparison.contains("\"missing_from_current\""))
         XCTAssertTrue(comparison.contains("\"shared_metrics\""))
         XCTAssertTrue(comparison.contains("\"top_frames\""))
+        XCTAssertTrue(comparison.contains("\"new_findings\""))
+        XCTAssertTrue(comparison.contains("\"resolved_findings\""))
     }
 
     private var repoRootURL: URL {

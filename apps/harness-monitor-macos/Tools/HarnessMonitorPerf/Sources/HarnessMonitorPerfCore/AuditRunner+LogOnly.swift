@@ -101,6 +101,10 @@ extension AuditRunner {
             defaultEnvironment: defaultEnv,
             processIsLive: externalDaemonProcessIsLive
         )
+        let appTraceRelpath = AuditArtifactPaths.appTraceRelpath(
+            scenario: scenario,
+            templateSlug: LogProbeRecorder.templateSlug
+        )
         let logRoot = runDir.appendingPathComponent("logs", isDirectory: true)
         let logURL = logRoot.appendingPathComponent("log-only-\(scenario).log")
         let stdoutURL = logRoot.appendingPathComponent("log-only-\(scenario).stdout.log")
@@ -110,6 +114,13 @@ extension AuditRunner {
         env["HARNESS_DAEMON_DATA_HOME"] = dataHome.launchDataHome.path
         env["HARNESS_MONITOR_PERF_SCENARIO"] = scenario
         env["HARNESS_MONITOR_PREVIEW_SCENARIO"] = ScenarioCatalog.previewScenario(for: scenario)
+        env[AuditArtifactPaths.perfArtifactsDirectoryKey] = AuditArtifactPaths
+            .appTraceDirectory(
+                runDir: runDir,
+                scenario: scenario,
+                templateSlug: LogProbeRecorder.templateSlug
+            )
+            .path
 
         try assertSourceUnchanged(
             checkpoint: "before log-only launch / \(scenario)",
@@ -132,7 +143,8 @@ extension AuditRunner {
             stderrURL: stderrURL,
             daemonDataHome: dataHome.launchDataHome,
             daemonDataHomeProbe: dataHome.probeDataHome,
-            runDir: runDir
+            runDir: runDir,
+            appTraceRelpath: appTraceRelpath
         )
         let capture = try LogProbeRecorder.record(inputs)
         cleanupHostProcesses()

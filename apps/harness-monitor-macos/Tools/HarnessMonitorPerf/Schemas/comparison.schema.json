@@ -64,6 +64,22 @@
               }
             }
           },
+          "baseline_findings": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/finding" }
+          },
+          "current_findings": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/finding" }
+          },
+          "new_findings": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/finding" }
+          },
+          "resolved_findings": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/finding" }
+          },
           "top_frames": {
             "type": "object",
             "additionalProperties": false,
@@ -111,6 +127,18 @@
       "properties": {
         "name": { "type": "string" },
         "samples": { "type": "integer" }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "category", "headline"],
+      "properties": {
+        "key": { "type": "string" },
+        "category": { "type": "string" },
+        "headline": { "type": "string" },
+        "detail": { "type": ["string", "null"] },
+        "count": { "type": ["integer", "null"] }
       }
     }
   }

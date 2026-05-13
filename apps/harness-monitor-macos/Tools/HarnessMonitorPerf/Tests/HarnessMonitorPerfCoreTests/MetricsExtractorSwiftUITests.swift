@@ -92,4 +92,18 @@ final class MetricsExtractorSwiftUITests: XCTestCase {
         XCTAssertEqual(result.topFrames[0].name, "DashboardView.body")
         XCTAssertEqual(result.topFrames[0].samples, 2)
     }
+
+    func testUpdateGroupFindingsPreferAppOwnedFramesAndCountsMatches() throws {
+        let document = try XctraceQueryDocument(path: try fixtureURL("swiftui-update-groups-findings"))
+        let findings = MetricsExtractor.parseUpdateGroupFindings(document)
+
+        XCTAssertEqual(findings.count, 2)
+        XCTAssertEqual(
+            findings[0].headline,
+            "Transaction for unknown action via AgentDetailSection.debouncePersist(value:key:defaults:)"
+        )
+        XCTAssertEqual(findings[0].count, 2)
+        XCTAssertEqual(findings[0].detail, "UserDefaultObserver -> AgentDetailSection.debouncePersist(value:key:defaults:)")
+        XCTAssertEqual(findings[0].category, "swiftui-update-group")
+    }
 }

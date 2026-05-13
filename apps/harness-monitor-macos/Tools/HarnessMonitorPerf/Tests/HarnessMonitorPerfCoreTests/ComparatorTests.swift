@@ -39,6 +39,9 @@ final class ComparatorTests: XCTestCase {
                 "hard_budget": ["launch_app_init_to_ready_ms", "total_updates", "body_updates", "max_update_group_ms", "hitches", "potential_hangs"],
                 "investigative": ["p95_update_ms", "max_update_ms", "update_group_p95_ms", "top_frames"]
               },
+              "findings": [
+                {"key": "cause:state:dashboardview:sidebarrow", "category": "swiftui-cause", "headline": "@State: DashboardView -> SidebarRow", "count": 2}
+              ],
               "metrics": {
                 "swiftui_updates": {"total_count": 10000, "body_update_count": 1000, "duration_ms_p95": 10.0, "duration_ns_max": 12000000},
                 "swiftui_update_groups": {"duration_ms_p95": 8.0, "duration_ns_max": 20000000},
@@ -87,6 +90,10 @@ final class ComparatorTests: XCTestCase {
                 "hard_budget": ["launch_app_init_to_ready_ms", "total_updates", "body_updates", "max_update_group_ms", "hitches", "potential_hangs"],
                 "investigative": ["p95_update_ms", "max_update_ms", "update_group_p95_ms", "top_frames"]
               },
+              "findings": [
+                {"key": "cause:state:dashboardview:sidebarrow", "category": "swiftui-cause", "headline": "@State: DashboardView -> SidebarRow", "count": 2},
+                {"key": "update-group:transaction-for-unknown-action:agentdetailsection", "category": "swiftui-update-group", "headline": "Transaction for unknown action via AgentDetailSection.debouncePersist(value:key:defaults:)", "count": 5}
+              ],
               "metrics": {
                 "swiftui_updates": {"total_count": 11000, "body_update_count": 1100, "duration_ms_p95": 11.5, "duration_ns_max": 15000000},
                 "swiftui_update_groups": {"duration_ms_p95": 9.0, "duration_ns_max": 24000000},
@@ -164,6 +171,11 @@ final class ComparatorTests: XCTestCase {
             swiftui.sharedMetrics?[MetricName.launchAppInitToReadyMs]?.delta.description,
             "40"
         )
+        XCTAssertEqual(swiftui.newFindings?.count, 1)
+        XCTAssertEqual(
+            swiftui.newFindings?.first?.category,
+            "swiftui-update-group"
+        )
 
         let allocations = try XCTUnwrap(comparison.comparisons.first { $0.template == "Allocations" })
         guard case .allocations(let byCategory) = allocations.metrics else {
@@ -187,6 +199,8 @@ final class ComparatorTests: XCTestCase {
         XCTAssertTrue(markdown.contains("| total_updates | 10000 | 11000 | 1000 |"))
         XCTAssertTrue(markdown.contains("| All Heap Allocations | total_bytes | 100 | 120 | 20 |"))
         XCTAssertTrue(markdown.contains("Baseline hot frames: DashboardView.body"))
+        XCTAssertTrue(markdown.contains("### New findings"))
+        XCTAssertTrue(markdown.contains("Transaction for unknown action via AgentDetailSection.debouncePersist"))
     }
 
     func testCompareWithNoOverlapEmitsExplainerInMarkdown() throws {

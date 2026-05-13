@@ -132,6 +132,7 @@ public enum ManifestBuilder {
         public var template: String
         public var durationSeconds: Int
         public var traceRelpath: String
+        public var appTraceRelpath: String?
         public var exitStatus: Int
         public var endReason: String
         public var previewScenario: String
@@ -145,6 +146,7 @@ public enum ManifestBuilder {
             template: String,
             durationSeconds: Int,
             traceRelpath: String,
+            appTraceRelpath: String? = nil,
             exitStatus: Int,
             endReason: String,
             previewScenario: String,
@@ -157,6 +159,7 @@ public enum ManifestBuilder {
             self.template = template
             self.durationSeconds = durationSeconds
             self.traceRelpath = traceRelpath
+            self.appTraceRelpath = appTraceRelpath
             self.exitStatus = exitStatus
             self.endReason = endReason
             self.previewScenario = previewScenario
@@ -173,6 +176,7 @@ public enum ManifestBuilder {
         public var template: String
         public var durationSeconds: Int
         public var traceRelpath: String
+        public var appTraceRelpath: String?
         public var exitStatus: Int
         public var endReason: String
         public var previewScenario: String
@@ -188,6 +192,7 @@ public enum ManifestBuilder {
             case template
             case durationSeconds = "duration_seconds"
             case traceRelpath = "trace_relpath"
+            case appTraceRelpath = "app_trace_relpath"
             case exitStatus = "exit_status"
             case endReason = "end_reason"
             case previewScenario = "preview_scenario"
@@ -280,6 +285,7 @@ public enum ManifestBuilder {
                 template: record.template,
                 durationSeconds: record.durationSeconds,
                 traceRelpath: record.traceRelpath,
+                appTraceRelpath: record.appTraceRelpath,
                 exitStatus: record.exitStatus,
                 endReason: record.endReason,
                 previewScenario: record.previewScenario,

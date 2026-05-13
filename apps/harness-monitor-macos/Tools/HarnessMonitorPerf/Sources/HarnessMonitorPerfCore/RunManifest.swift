@@ -30,10 +30,13 @@ public struct RunManifest: Codable, Equatable {
         public var template: String
         public var durationSeconds: Double?
         public var traceRelpath: String?
+        public var appTraceRelpath: String?
         public var exitStatus: Int?
         public var endReason: String?
         /// Present in summary.json (filled by Summarizer); absent in manifest.json.
         public var metrics: JSONValue?
+        public var appTrace: CaptureAppTrace?
+        public var findings: [CaptureFinding]?
         public var warnings: [String]?
         public var launchMetrics: CaptureLaunchMetrics?
         public var metricTiers: CaptureMetricTiers?
@@ -43,9 +46,12 @@ public struct RunManifest: Codable, Equatable {
             case template
             case durationSeconds = "duration_seconds"
             case traceRelpath = "trace_relpath"
+            case appTraceRelpath = "app_trace_relpath"
             case exitStatus = "exit_status"
             case endReason = "end_reason"
             case metrics
+            case appTrace = "app_trace"
+            case findings
             case warnings
             case launchMetrics = "launch_metrics"
             case metricTiers = "metric_tiers"

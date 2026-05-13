@@ -41,6 +41,7 @@ public struct SessionWindowView: View {
   @State private var detailColumnWidthStorage: CGFloat = 0
   @State private var liveInspectorWidthStorage: Double?
   @State private var liveContentColumnWidthStorage: Double?
+  @State private var perfContentDividerWidthStorage: Double?
   @State private var decisionCacheStorage = SessionWindowDecisionCacheStorage()
   @State private var currentModifiers: EventModifiers = []
 
@@ -126,6 +127,18 @@ public struct SessionWindowView: View {
   var liveContentColumnWidthDraft: Double? {
     get { liveContentColumnWidthStorage }
     nonmutating set { liveContentColumnWidthStorage = newValue }
+  }
+
+  var perfContentDividerWidth: Double? {
+    get { perfContentDividerWidthStorage }
+    nonmutating set { perfContentDividerWidthStorage = newValue }
+  }
+
+  var perfContentDividerWidthBinding: Binding<Double?> {
+    Binding(
+      get: { perfContentDividerWidth },
+      set: { perfContentDividerWidth = $0 }
+    )
   }
 
   var sidebarWidth: Double {

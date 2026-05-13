@@ -36,6 +36,7 @@ final class SummarizerTests: XCTestCase {
               "template": "SwiftUI",
               "duration_seconds": 4.5,
               "trace_relpath": "traces/swiftui/open-recent-window.trace",
+              "app_trace_relpath": "app-traces/open-recent-window/swiftui/app-trace.jsonl",
               "exit_status": 0,
               "end_reason": "completed",
               "launch_metrics": {
@@ -68,6 +69,7 @@ final class SummarizerTests: XCTestCase {
           "swiftui_updates": {"total_count": 1234, "body_update_count": 100, "duration_ms_p95": 12.5, "duration_ns_max": 25000000},
           "swiftui_update_groups": {"duration_ms_p95": 8.0, "label_counts": {"Dashboard": 50, "Sidebar": 10}},
           "swiftui_causes": {"source_node_counts": {"DashboardView": 30}},
+          "findings": [{"key": "cause:state:dashboardview:sidebarrow", "category": "swiftui-cause", "headline": "@State: DashboardView -> SidebarRow", "count": 30}],
           "hitches": {"count": 1},
           "potential_hangs": {"count": 0}
         }
@@ -75,6 +77,15 @@ final class SummarizerTests: XCTestCase {
         try writeJSON(
             swiftuiMetrics,
             to: runDir.appendingPathComponent("metrics/open-recent-window/swiftui.json")
+        )
+
+        let appTrace = """
+        {"timestamp":"2026-04-25T12:00:01.000Z","component":"perf.scenario","event":"step","details":{"scenario":"open-recent-window","step":"route.agents"}}
+        {"timestamp":"2026-04-25T12:00:01.100Z","component":"perf.scenario","event":"step","details":{"scenario":"open-recent-window","step":"search.present"}}
+        """
+        try writeJSON(
+            appTrace,
+            to: runDir.appendingPathComponent("app-traces/open-recent-window/swiftui/app-trace.jsonl")
         )
 
         let allocationsMetrics = """
@@ -100,6 +111,9 @@ final class SummarizerTests: XCTestCase {
         XCTAssertEqual(manifest.label, "step3")
         XCTAssertEqual(manifest.captures.count, 2)
         XCTAssertNotNil(manifest.captures[0].metrics)
+        XCTAssertEqual(manifest.captures[0].appTrace?.eventCount, 2)
+        XCTAssertEqual(manifest.captures[0].appTrace?.orderedSteps, ["route.agents", "search.present"])
+        XCTAssertEqual(manifest.captures[0].findings?.first?.category, "swiftui-cause")
 
         let summaryURL = runDir.appendingPathComponent("summary.json")
         let csvURL = runDir.appendingPathComponent("summary.csv")
@@ -111,6 +125,8 @@ final class SummarizerTests: XCTestCase {
         XCTAssertTrue(summaryString.contains("\"label\" : \"step3\""))
         XCTAssertTrue(summaryString.contains("\"launch_metrics\""))
         XCTAssertTrue(summaryString.contains("\"total_count\" : 1234"))
+        XCTAssertTrue(summaryString.contains("\"app_trace\""))
+        XCTAssertTrue(summaryString.contains("\"findings\""))
 
         let csv = try String(contentsOf: csvURL, encoding: .utf8)
         let lines = csv.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
@@ -146,6 +162,22 @@ final class SummarizerTests: XCTestCase {
         XCTAssertEqual(manifest.captures[0].warnings?.count, 1)
         XCTAssertTrue(manifest.captures[0].warnings?.first?.contains("metrics file missing") == true)
         XCTAssertEqual(manifest.warnings?.count, 1)
+    }
+
+    func testSummarizeWarnsWhenAppTraceMissing() throws {
+        try seedRun()
+        let appTraceURL = runDir.appendingPathComponent(
+            "app-traces/open-recent-window/swiftui/app-trace.jsonl"
+        )
+        try FileManager.default.removeItem(at: appTraceURL)
+
+        let manifest = try Summarizer.summarize(runDir: runDir)
+
+        XCTAssertNil(manifest.captures[0].appTrace)
+        XCTAssertTrue(
+            manifest.captures[0].warnings?.contains(where: { $0.contains("app-trace file missing") })
+                == true
+        )
     }
 
     func testTemplateSlugMatchesPython() {

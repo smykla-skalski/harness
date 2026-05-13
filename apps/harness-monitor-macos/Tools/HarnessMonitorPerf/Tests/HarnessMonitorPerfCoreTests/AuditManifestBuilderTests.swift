@@ -40,6 +40,7 @@ final class AuditManifestBuilderTests: AuditTempDirectoryTestCase {
                 .init(
                     scenario: "open-recent-window", template: "SwiftUI",
                     durationSeconds: 5, traceRelpath: "traces/open-recent-window.trace",
+                    appTraceRelpath: "app-traces/open-recent-window/swiftui/app-trace.jsonl",
                     exitStatus: 0, endReason: "completed",
                     previewScenario: "dashboard-landing",
                     launchedProcessPath: "/staged.app/MacOS/Bin",
@@ -66,6 +67,7 @@ final class AuditManifestBuilderTests: AuditTempDirectoryTestCase {
         XCTAssertEqual(capture.daemonDataHomeProbe?.dataHome, "/tmp/run-1/dh")
         XCTAssertFalse(capture.daemonDataHomeProbe?.containsSQLiteDatabase ?? true)
         XCTAssertEqual(capture.launchMetrics?.appInitToReadyMilliseconds, 350)
+        XCTAssertEqual(capture.appTraceRelpath, "app-traces/open-recent-window/swiftui/app-trace.jsonl")
         XCTAssertTrue(
             capture.metricTiers?.hardBudget.contains(MetricName.launchAppInitToReadyMs) == true
         )

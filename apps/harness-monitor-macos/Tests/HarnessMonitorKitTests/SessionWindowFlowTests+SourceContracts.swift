@@ -131,6 +131,9 @@ extension SessionWindowFlowTests {
     let columnsSource = try previewableSourceFile(
       named: "Views/Sessions/SessionWindowView+Columns.swift"
     )
+    let layoutSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowStandardLayout.swift"
+    )
     let splitSource = try previewableSourceFile(
       named: "Views/Sessions/SessionContentDetailSplitView.swift"
     )
@@ -142,11 +145,12 @@ extension SessionWindowFlowTests {
         """
         SessionContentDetailSplitView(
                   contentWidth: contentColumnWidthBinding,
+                  perfOverrideContentWidth: perfContentDividerWidthBinding,
                   commitContentWidth: commitContentColumnWidth
         """
       )
     )
-    #expect(columnsSource.contains(".navigationSplitViewStyle(.prominentDetail)"))
+    #expect(layoutSource.contains(".navigationSplitViewStyle(.prominentDetail)"))
     #expect(splitSource.contains("NSCursor.resizeLeftRight"))
     #expect(splitSource.contains("@State private var liveContentWidth"))
     #expect(
@@ -323,12 +327,12 @@ extension SessionWindowFlowTests {
     #expect(source.contains("stateCache.selectAgent(agentID)"))
     #expect(source.contains("stateCache.selectTask(taskID)"))
     #expect(source.contains("stateCache.selectDecision(decisionID)"))
-    #expect(!source.contains("driveContentDetailDividerSweep"))
-    #expect(!source.contains("contentColumnWidth = width"))
+    #expect(source.contains("driveContentDetailDividerSweep"))
+    #expect(source.contains("contentDetailDividerWidth = width"))
     #expect(source.contains("columnVisibility = .detailOnly"))
     #expect(source.contains("columnVisibility = .doubleColumn"))
     #expect(layoutSource.contains("columnVisibility: columnVisibilityBinding"))
-    #expect(!layoutSource.contains("contentColumnWidth: contentColumnWidthBinding"))
+    #expect(layoutSource.contains("contentDetailDividerWidth: perfContentDividerWidth"))
   }
 
   @Test("Agent detail deadline clock stays out of text field form state")

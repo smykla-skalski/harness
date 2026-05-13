@@ -31,15 +31,32 @@ public enum Summarizer {
                 .appendingPathComponent(capture.scenario)
                 .appendingPathComponent("\(templateSlug).json")
             var enriched = capture
-            guard FileManager.default.fileExists(atPath: metricsURL.path) else {
+            var warnings: [String] = enriched.warnings ?? []
+            if FileManager.default.fileExists(atPath: metricsURL.path) {
+                let metrics = try JSONValue.fromFile(metricsURL)
+                enriched.metrics = metrics
+                enriched.findings = decode(metrics["findings"], as: [CaptureFinding].self)
+            } else {
                 let warning = "metrics file missing: \(metricsURL.path)"
-                enriched.warnings = [warning]
+                warnings.append(warning)
                 manifestWarnings.append("\(capture.scenario) (\(capture.template)): \(warning)")
-                enrichedCaptures.append(enriched)
-                continue
             }
-            let metrics = try JSONValue.fromFile(metricsURL)
-            enriched.metrics = metrics
+
+            if let appTraceRelpath = capture.appTraceRelpath {
+                let appTraceURL = AuditArtifactPaths.appTraceURL(runDir: runDir, relpath: appTraceRelpath)
+                if FileManager.default.fileExists(atPath: appTraceURL.path) {
+                    enriched.appTrace = try AppTraceParser.summarize(
+                        fileURL: appTraceURL,
+                        relpath: appTraceRelpath
+                    )
+                } else {
+                    let warning = "app-trace file missing: \(appTraceRelpath)"
+                    warnings.append(warning)
+                    manifestWarnings.append("\(capture.scenario) (\(capture.template)): \(warning)")
+                }
+            }
+
+            enriched.warnings = warnings.isEmpty ? nil : warnings
             enrichedCaptures.append(enriched)
         }
         manifest.captures = enrichedCaptures
@@ -174,6 +191,18 @@ public enum Summarizer {
             return "\"\(escaped)\""
         }
         return value
+    }
+
+    private static func decode<T: Decodable>(_ value: JSONValue?, as type: T.Type) -> T? {
+        guard let value else { return nil }
+        let encoder = JSONEncoder()
+        guard
+            let data = try? encoder.encode(value),
+            let decoded = try? JSONDecoder().decode(type, from: data)
+        else {
+            return nil
+        }
+        return decoded
     }
 }
 

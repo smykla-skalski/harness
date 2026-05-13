@@ -40,6 +40,7 @@ enum SessionContentDetailSplitLayout {
 
 struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
   @Binding private var contentWidth: Double
+  @Binding private var perfOverrideContentWidth: Double?
   @State private var liveContentWidth = SessionContentDetailSplitLayout.defaultContentWidth
   @State private var isDragging = false
   private let commitContentWidth: (Double) -> Void
@@ -48,11 +49,13 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
 
   init(
     contentWidth: Binding<Double>,
+    perfOverrideContentWidth: Binding<Double?> = .constant(nil),
     commitContentWidth: @escaping (Double) -> Void,
     @ViewBuilder content: () -> Content,
     @ViewBuilder detail: () -> Detail
   ) {
     _contentWidth = contentWidth
+    _perfOverrideContentWidth = perfOverrideContentWidth
     _liveContentWidth = State(wrappedValue: contentWidth.wrappedValue)
     self.commitContentWidth = commitContentWidth
     self.content = content()
@@ -90,6 +93,12 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
           transaction.animation = nil
         }
       }
+      .onChange(of: perfOverrideContentWidth, initial: true) { _, newWidth in
+        syncLiveWidth(
+          preferredWidth: newWidth ?? contentWidth,
+          availableWidth: geometry.size.width
+        )
+      }
       .onChange(of: geometry.size.width, initial: true) { _, newWidth in
         deferReclampLiveWidth(availableWidth: newWidth)
       }
@@ -108,8 +117,18 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
   // No `onChange(of: contentWidth)` writer: paired listeners on the two widths
   // ping-ponged into the SwiftUI multi-update-per-frame fault on window resize.
   private func reclampLiveWidth(availableWidth: CGFloat) {
-    let clamped = SessionContentDetailSplitLayout.clampedContentWidth(
+    syncLiveWidth(
       preferredWidth: liveContentWidth,
+      availableWidth: availableWidth
+    )
+  }
+
+  private func syncLiveWidth(
+    preferredWidth: Double,
+    availableWidth: CGFloat
+  ) {
+    let clamped = SessionContentDetailSplitLayout.clampedContentWidth(
+      preferredWidth: preferredWidth,
       availableWidth: availableWidth
     )
     if abs(liveContentWidth - clamped) > 0.5 {
