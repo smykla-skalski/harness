@@ -35,8 +35,9 @@ private struct AppSearchTrigger: Equatable {
 /// the session window graph.
 ///
 /// Suggestions are rendered from a compact value snapshot in an app-owned
-/// overlay. The search field itself stays native `.searchable`, while the
-/// suggestion view avoids SwiftUI's toolbar search-suggestion combobox path.
+/// overlay. The search field itself stays native `.searchable` without an
+/// `isPresented` binding; Instruments showed that binding fans toolbar
+/// search presentation through the expensive AppKit text-field path.
 public struct AppSearchHostModifier: ViewModifier {
   let model: AppSearchModel
   let prompt: LocalizedStringKey
@@ -73,7 +74,6 @@ public struct AppSearchHostModifier: ViewModifier {
       }
       .searchable(
         text: $query,
-        isPresented: $isSearchPresented,
         placement: .toolbar,
         prompt: prompt
       )
@@ -89,8 +89,8 @@ public struct AppSearchHostModifier: ViewModifier {
       ) {
         await runDebouncedSearch(for: query)
       }
-      .task(id: isSearchPresented) {
-        model.setPresented(isSearchPresented)
+      .task(id: shouldKeepSearchIndexActive) {
+        model.setPresented(shouldKeepSearchIndexActive)
       }
       .task {
         automation?.handler = { command in
@@ -134,9 +134,12 @@ public struct AppSearchHostModifier: ViewModifier {
   }
 
   private var shouldShowSuggestionOverlay: Bool {
-    isSearchPresented
-      && !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    shouldKeepSearchIndexActive
       && !suggestionSnapshot.rows.isEmpty
+  }
+
+  private var shouldKeepSearchIndexActive: Bool {
+    isSearchPresented || !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
   private func submitSearch() {
