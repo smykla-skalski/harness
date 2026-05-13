@@ -61,12 +61,14 @@ extension SessionWindowView {
     if previousRouteDecisionID != routeDecisionID {
       stateCache.setRouteDecisionID(routeDecisionID)
     }
-    if let autoSelectedDecisionID = SessionDecisionAutoSelectionPolicy.preferredDecisionID(
-      selection: stateCache.selection,
-      sessionID: token.sessionID,
-      allDecisionIDs: allIDs,
-      visibleDecisionIDs: matchingIDsInOrder
-    ) {
+    if didLoadSnapshot,
+      let autoSelectedDecisionID = SessionDecisionAutoSelectionPolicy.preferredDecisionID(
+        selection: stateCache.selection,
+        sessionID: token.sessionID,
+        allDecisionIDs: allIDs,
+        visibleDecisionIDs: matchingIDsInOrder
+      )
+    {
       stateCache.autoSelectDecision(autoSelectedDecisionID)
       announceDecisionSelectionChange(
         to: autoSelectedDecisionID,

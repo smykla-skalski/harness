@@ -193,6 +193,15 @@ struct SessionWindowRouteContentSelectionTests {
     #expect(detailFocus.contains("selectedTab: decisionDetailTabBinding"))
   }
 
+  @Test("Session decision auto-selection waits until the first snapshot finishes loading")
+  func sessionDecisionAutoSelectionWaitsForInitialSnapshot() throws {
+    let columns = try sourceFile(named: "SessionWindowView+Columns.swift")
+
+    #expect(columns.contains("if didLoadSnapshot,"))
+    #expect(columns.contains("SessionDecisionAutoSelectionPolicy.preferredDecisionID"))
+    #expect(columns.contains("stateCache.autoSelectDecision(autoSelectedDecisionID)"))
+  }
+
   @Test("Pending route filter resets clear the persisted decision query")
   func pendingRouteFilterResetClearsPersistedDecisionQuery() throws {
     let windowView = try sourceFile(named: "SessionWindowView.swift")
