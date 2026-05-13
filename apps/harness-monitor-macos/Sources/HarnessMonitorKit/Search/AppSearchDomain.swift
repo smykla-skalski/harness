@@ -3,8 +3,8 @@ import Foundation
 /// One of the four searchable corpora indexed by ``AppSearchIndex``.
 ///
 /// `AppSearchDomain` is a pure model identity. It does not carry "current"
-/// route resolution; the UI layer maps the active route to a domain via
-/// ``HarnessSessionRouteFocus`` and hands the resolved value to the index.
+/// route resolution; the session window maps the active route to a domain and
+/// hands the resolved value to the index.
 public enum AppSearchDomain: String, CaseIterable, Codable, Hashable, Identifiable, Sendable {
   case agents
   case decisions

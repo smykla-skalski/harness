@@ -62,7 +62,6 @@ public struct HarnessSidebarSearchFocus: Equatable {
 extension FocusedValues {
   @Entry public var harnessSidebarSearchFocusAction: HarnessSidebarSearchFocus?
   @Entry public var harnessSidebarVisibilityRequest: HarnessSidebarVisibilityRequest?
-  @Entry public var harnessSessionRouteFocus: HarnessSessionRouteFocus?
 }
 
 extension View {

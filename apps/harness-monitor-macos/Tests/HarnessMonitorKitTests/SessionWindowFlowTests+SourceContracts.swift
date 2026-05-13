@@ -254,7 +254,9 @@ extension SessionWindowFlowTests {
     #expect(anchorSource.contains("SessionWindowModifierKeysMonitor"))
     #expect(searchHostSource.contains("AppSearchHost("))
     #expect(searchHostSource.contains("model: stateCache.appSearchModel"))
+    #expect(searchHostSource.contains("primaryDomain: stateCache.selection.routeDomain"))
     #expect(searchHostSource.contains("automation: searchAutomation"))
+    #expect(!searchHostSource.contains("harnessSessionRouteFocus"))
     #expect(columnsSource.contains(".environment(\\.appSearchModel, stateCache.appSearchModel)"))
   }
 
