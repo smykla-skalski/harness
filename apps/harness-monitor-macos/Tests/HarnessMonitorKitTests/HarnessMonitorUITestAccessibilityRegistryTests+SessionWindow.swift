@@ -106,6 +106,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(
       sidebarFooterView.contains("HarnessMonitorAccessibility.sessionWindowStatusSurface")
     )
+    #expect(sidebarFooterView.contains(".harnessMCPText("))
     #expect(
       createRuntimeView.contains("HarnessMonitorAccessibility.sessionWindowCreateProviderPane"))
     #expect(
@@ -114,6 +115,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       )
     )
     #expect(!createRuntimeView.contains("sessionWindowCreateModePicker"))
+    #expect(toolbarView.contains(".harnessMCPButton("))
     #expect(toolbarView.contains("HarnessMonitorAccessibility.sessionWindowFocusModeButton"))
     #expect(toolbarView.contains("HarnessMonitorAccessibility.sessionNavigateBackButton"))
     #expect(toolbarView.contains("HarnessMonitorAccessibility.sessionNavigateForwardButton"))

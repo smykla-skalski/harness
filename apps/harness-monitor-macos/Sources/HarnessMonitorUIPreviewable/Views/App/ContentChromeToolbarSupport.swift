@@ -23,7 +23,15 @@ struct ContentNavigationToolbar: ToolbarContent {
       }
       .disabled(!model.canNavigateBack)
       .help("Go back")
-      .accessibilityIdentifier(HarnessMonitorAccessibility.navigateBackButton)
+      .harnessMCPButton(
+        HarnessMonitorAccessibility.navigateBackButton,
+        label: "Back",
+        hint: "Go back",
+        enabled: model.canNavigateBack,
+        pressAction: {
+          Task { await store.navigateBack() }
+        }
+      )
 
       Button {
         Task { await store.navigateForward() }
@@ -32,7 +40,15 @@ struct ContentNavigationToolbar: ToolbarContent {
       }
       .disabled(!model.canNavigateForward)
       .help("Go forward")
-      .accessibilityIdentifier(HarnessMonitorAccessibility.navigateForwardButton)
+      .harnessMCPButton(
+        HarnessMonitorAccessibility.navigateForwardButton,
+        label: "Forward",
+        hint: "Go forward",
+        enabled: model.canNavigateForward,
+        pressAction: {
+          Task { await store.navigateForward() }
+        }
+      )
     }
   }
 }
@@ -100,7 +116,16 @@ struct RefreshToolbarButton: View {
     .accessibilityLabel("Refresh")
     .accessibilityHint("Refresh sessions")
     .accessibilityValue(accessibilityValue)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.refreshButton)
+    .harnessMCPButton(
+      HarnessMonitorAccessibility.refreshButton,
+      label: "Refresh",
+      value: accessibilityValue.isEmpty ? nil : accessibilityValue,
+      hint: "Refresh sessions",
+      enabled: !model.isRefreshing,
+      pressAction: {
+        Task { await store.manualRefresh() }
+      }
+    )
   }
 
   @ViewBuilder private var toolbarSymbol: some View {

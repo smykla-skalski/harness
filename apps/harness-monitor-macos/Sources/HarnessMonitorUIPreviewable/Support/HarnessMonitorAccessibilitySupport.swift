@@ -1,3 +1,4 @@
+import HarnessMonitorKit
 import SwiftUI
 
 public enum HarnessMonitorUITestEnvironment {
@@ -78,7 +79,11 @@ private struct AccessibilityProbe: View {
       .accessibilityElement()
       .accessibilityLabel(label ?? "")
       .accessibilityValue(value ?? "")
-      .accessibilityIdentifier(identifier)
+      .harnessMCPText(
+        identifier,
+        label: label,
+        value: value
+      )
   }
 }
 

@@ -46,7 +46,13 @@ struct SessionWindowToolbar: ToolbarContent {
       .disabled(!model.canNavigateBack)
       .help("Go back")
       .accessibilityLabel("Back")
-      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionNavigateBackButton)
+      .harnessMCPButton(
+        HarnessMonitorAccessibility.sessionNavigateBackButton,
+        label: "Back",
+        hint: "Go back",
+        enabled: model.canNavigateBack,
+        pressAction: { state.navigateBack() }
+      )
       .overlay(alignment: .bottom) {
         if shouldShowShortcutOverlays {
           KeyboardShortcutLabel(
@@ -78,7 +84,13 @@ struct SessionWindowToolbar: ToolbarContent {
       .disabled(!model.canNavigateForward)
       .help("Go forward")
       .accessibilityLabel("Forward")
-      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionNavigateForwardButton)
+      .harnessMCPButton(
+        HarnessMonitorAccessibility.sessionNavigateForwardButton,
+        label: "Forward",
+        hint: "Go forward",
+        enabled: model.canNavigateForward,
+        pressAction: { state.navigateForward() }
+      )
     }
     ToolbarItem(placement: .automatic) {
       Button {
@@ -98,10 +110,16 @@ struct SessionWindowToolbar: ToolbarContent {
         }
       }
       .help(focusMode ? "Exit focus mode" : "Enter focus mode")
-      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowFocusModeButton)
       .accessibilityLabel("Focus mode")
       .accessibilityValue(focusMode ? "On" : "Off")
       .accessibilityHint("Shows or hides secondary session columns.")
+      .harnessMCPButton(
+        HarnessMonitorAccessibility.sessionWindowFocusModeButton,
+        label: "Focus mode",
+        value: focusMode ? "On" : "Off",
+        hint: "Shows or hides secondary session columns.",
+        pressAction: { toggleFocusMode() }
+      )
     }
     ToolbarItem(placement: .primaryAction) {
       SleepPreventionToolbarButton(

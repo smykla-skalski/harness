@@ -27,10 +27,16 @@ public struct SessionAttentionToolbarButton: View {
       }
     )
     .help(helpText(count: slice.count))
-    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionAttentionToolbarButton)
     .accessibilityLabel("Session")
     .accessibilityValue(
       attentionAccessibilityValue(count: slice.count, maxSeverity: slice.maxSeverity)
+    )
+    .harnessMCPButton(
+      HarnessMonitorAccessibility.sessionAttentionToolbarButton,
+      label: "Session",
+      value: attentionAccessibilityValue(count: slice.count, maxSeverity: slice.maxSeverity),
+      hint: helpText(count: slice.count),
+      pressAction: { openSessionWindow(focusesDecisions: slice.count > .zero) }
     )
     .harnessUITestValue(
       buttonStateLabel(count: slice.count, maxSeverity: slice.maxSeverity)
