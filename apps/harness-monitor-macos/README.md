@@ -41,6 +41,32 @@ Audit runs now persist per-capture `launch_metrics` in the manifest/summary,
 surface `launch_app_init_to_ready_ms` in `summary.csv`, and render comparison
 markdown with separate hard-budget and investigative metric sections.
 
+The audit artifact contract is:
+
+| Artifact | Guaranteed fields / purpose |
+| --- | --- |
+| `manifest.json` | run provenance for the staged build, including `git`, `system`, `targets`, `build_provenance`, selected scenarios, default launch env, per-capture `preview_scenario`, `launched_process_path`, and `daemon_data_home_probe` |
+| `summary.json` | `manifest.json` plus per-capture extracted `metrics`, `warnings`, `launch_metrics`, and `metric_tiers` |
+| `summary.csv` | flat regression sheet with launch, SwiftUI, hitch/hang, and allocation summary columns |
+| `comparison.json` / `comparison.md` | baseline/current diff, missing-capture reporting, missing-metric reporting, and hard-vs-investigative metric grouping |
+| `debug-retention.json` | explicit sentinel that a regression/debug run preserved raw traces, exported XML, and extraction intermediates |
+
+For provenance checks, treat `targets.staged_host_bundle_id`,
+`targets.staged_host_binary_path`, `build_provenance.host`,
+`build_provenance.shipping`, capture-level `launched_process_path`, and
+capture-level `daemon_data_home_probe` as the minimum trust surface before using
+the numbers in a regression review.
+
+Field telemetry should use the same vocabulary as the local audit:
+
+| Local audit signal | Field telemetry source |
+| --- | --- |
+| `launch_app_init_to_ready_ms` | MetricKit app launch metrics and Organizer launch summaries |
+| `hitches` / frame pacing regressions | MetricKit animation hitch metrics and Organizer hang/hitch views |
+| `potential_hangs` | MetricKit hang diagnostics plus Organizer hang-rate rollups |
+| allocation growth in `summary.csv` / `comparison.json` | Organizer memory footprint trends and MetricKit memory diagnostics |
+| scenario-specific regressions confirmed locally | App Store Connect Performance API or Organizer release-over-release comparisons |
+
 When you only need part of the graph, use the manifest tags for focused generation, for example:
 
 ```bash

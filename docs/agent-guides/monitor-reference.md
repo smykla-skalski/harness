@@ -124,6 +124,35 @@ optional comparison reports. The summary model now carries per-capture
 `launch_metrics`, `summary.csv` includes `launch_app_init_to_ready_ms`, and
 comparison markdown separates hard-budget metrics from investigative metrics.
 
+Treat those files as a stable contract:
+
+| Artifact | Guaranteed fields / purpose |
+| --- | --- |
+| `manifest.json` | run provenance for the staged build: `git`, `system`, `targets`, `build_provenance`, selected scenarios, default launch env, and per-capture `preview_scenario`, `launched_process_path`, `daemon_data_home_probe` |
+| `summary.json` | `manifest.json` plus extracted per-capture `metrics`, `warnings`, `launch_metrics`, and `metric_tiers` |
+| `summary.csv` | flat regression sheet for launch, SwiftUI, hitch/hang, and allocation metrics |
+| `comparison.json` / `comparison.md` | baseline/current diff with missing-capture, missing-metric, and hard-vs-investigative sections |
+| `debug-retention.json` | sentinel proving the run intentionally retained raw traces, exported XML, and extraction intermediates |
+
+Before trusting a regression result, verify at least:
+
+- `targets.staged_host_bundle_id`
+- `targets.staged_host_binary_path`
+- `build_provenance.host`
+- `build_provenance.shipping`
+- capture `launched_process_path`
+- capture `daemon_data_home_probe`
+
+For release validation, align local and field telemetry with the same labels:
+
+| Local audit signal | Field telemetry source |
+| --- | --- |
+| `launch_app_init_to_ready_ms` | MetricKit launch metrics and Organizer launch summaries |
+| `hitches` / frame pacing | MetricKit animation hitch metrics and Organizer hitch dashboards |
+| `potential_hangs` | MetricKit hang diagnostics and Organizer hang-rate summaries |
+| allocation growth in audit outputs | Organizer memory trends and MetricKit memory diagnostics |
+| scenario-specific regressions | App Store Connect Performance API / Organizer release-over-release comparisons |
+
 ## SwiftUI rules and research
 
 Rule content lives in skills under `.claude/skills/`, loaded on demand:
