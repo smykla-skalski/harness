@@ -32,9 +32,9 @@ public final class AppSearchModel {
   /// returns its result (or the search is cancelled mid-flight).
   public private(set) var isSearching: Bool = false
 
-  /// `true` while the toolbar `.searchable` field is presented. Drives
-  /// lazy reindexing so the four corpora are not rebuilt on every
-  /// incoming timeline event when the search popover is closed.
+  /// `true` while the toolbar search UI is active or a query is live.
+  /// Drives lazy reindexing so the four corpora are not rebuilt on every
+  /// incoming timeline event when search is idle.
   /// Lives on the model (not in `@Environment`) because the index
   /// updater modifier sits OUTSIDE the host modifier in the view tree
   /// and SwiftUI environment values flow downward only.

@@ -189,7 +189,7 @@ extension SessionWindowFlowTests {
     )
 
     #expect(source.contains(".searchable("))
-    #expect(source.contains("isPresented: $isSearchPresented"))
+    #expect(!source.contains("isPresented: $isSearchPresented"))
     #expect(!source.contains(".searchSuggestions"))
     #expect(source.contains(".overlay(alignment: .topTrailing)"))
     #expect(
@@ -206,7 +206,8 @@ extension SessionWindowFlowTests {
     #expect(source.contains("await Task.yield()"))
     #expect(source.contains("HarnessSidebarSearchFocusDispatcher()"))
     #expect(source.contains(".harnessFocusedSceneValue(\\.harnessSidebarSearchFocusAction"))
-    #expect(source.contains(".task(id: isSearchPresented)"))
+    #expect(source.contains(".task(id: shouldKeepSearchIndexActive)"))
+    #expect(source.contains("model.setPresented(shouldKeepSearchIndexActive)"))
     #expect(!source.contains(".onChange(of: isSearchPresented"))
     #expect(!source.contains("Button(\"Find in Session\""))
     #expect(!source.contains(".searchPresentationToolbarBehavior(.avoidHidingContent)"))

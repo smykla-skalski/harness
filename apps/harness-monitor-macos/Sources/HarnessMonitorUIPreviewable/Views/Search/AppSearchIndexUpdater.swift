@@ -13,8 +13,8 @@ private struct AppSearchDomainSignature: Hashable {
 }
 
 /// Drives ``AppSearchIndex`` re-indexing from the four session-window
-/// data sources. Each domain's `.task(id:)` is attached only while the
-/// search field is visible, then cancels and reschedules whenever its
+/// data sources. Each domain's `.task(id:)` is attached only while search
+/// is active, then cancels and reschedules whenever its
 /// signature changes. Closed search keeps these task-state modifiers out
 /// of the session window tree so startup and timeline churn do not create
 /// no-op reindex task transactions.
