@@ -302,8 +302,7 @@ private struct SessionTimelineList: View {
       if presentation.showsFilteredEmptyState {
         SessionTimelineFilteredEmptyState(filters: filters)
       } else if presentation.rows.isEmpty && presentation.navigation.isLoading {
-        ProgressView()
-          .controlSize(.small)
+        HarnessMonitorSpinner(size: 14)
           .frame(maxWidth: .infinity, maxHeight: .infinity)
       } else {
         timelineScroll
