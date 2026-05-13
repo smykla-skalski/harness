@@ -214,7 +214,11 @@ public enum LogProbeRecorder {
         processID: Int32,
         windowSeconds: Int
     ) -> (command: String, arguments: [String]) {
-        (
+        let predicate = [
+            "processID == \(processID)",
+            "!((subsystem == \"com.apple.corespotlight\") && (eventMessage CONTAINS[c] \"MailCS\"))",
+        ].joined(separator: " && ")
+        return (
             "/usr/bin/log",
             [
                 "show",
@@ -222,7 +226,7 @@ public enum LogProbeRecorder {
                 "--style", "compact",
                 "--info",
                 "--debug",
-                "--predicate", "processID == \(processID)",
+                "--predicate", predicate,
             ]
         )
     }

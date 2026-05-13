@@ -228,4 +228,16 @@ final class LogProbeRecorderTests: XCTestCase {
         XCTAssertEqual(summary.appDataPromptHints, 1)
         XCTAssertEqual(summary.duplicateRuntimeClassWarnings, 1)
     }
+
+    func testLogShowCommandFiltersKnownAppleCoreSpotlightNoise() {
+        let (_, arguments) = LogProbeRecorder.logShowCommand(processID: 123, windowSeconds: 45)
+
+        XCTAssertEqual(arguments.suffix(2).first, "--predicate")
+        XCTAssertEqual(
+            arguments.last,
+            """
+            processID == 123 && !((subsystem == "com.apple.corespotlight") && (eventMessage CONTAINS[c] "MailCS"))
+            """
+        )
+    }
 }
