@@ -137,7 +137,14 @@ extension SessionWindowView {
   }
 
   @ViewBuilder var standardSessionLayout: some View {
-    NavigationSplitView(columnVisibility: columnVisibilityBinding) {
+    SessionWindowStandardLayout(
+      stateCache: stateCache,
+      sessionID: token.sessionID,
+      snapshot: snapshot,
+      decisionIDs: allSessionDecisions.map(\.id),
+      sidebarWidth: sidebarWidth,
+      recordsPlainTaps: recordsPlainTaps
+    ) {
       SessionSidebar(
         store: store,
         snapshot: snapshot,
@@ -147,22 +154,18 @@ extension SessionWindowView {
         currentModifiers: presentedModifiers,
         state: stateCache
       )
-      .navigationSplitViewColumnWidth(min: 190, ideal: sidebarWidth, max: 360)
     } detail: {
       sessionBannerStack {
         standardSessionDetailSurface
       }
     }
-    .navigationSplitViewStyle(.prominentDetail)
-    .modifier(
-      SessionWindowPlainTapRecorder(
-        stateCache: stateCache,
-        isEnabled: stateCache.sidebarSelection.hasActiveMultiSelection
-          || renderedRoute == .agents
-          || renderedRoute == .tasks
-          || renderedRoute == .decisions
-      )
-    )
+  }
+
+  private var recordsPlainTaps: Bool {
+    stateCache.sidebarSelection.hasActiveMultiSelection
+      || renderedRoute == .agents
+      || renderedRoute == .tasks
+      || renderedRoute == .decisions
   }
 
   @ViewBuilder private var standardSessionDetailSurface: some View {

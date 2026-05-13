@@ -124,7 +124,7 @@ struct ToolbarTitleScalingContractTests {
     #expect(!sessionSource.contains("withAnimation(animation)"))
     #expect(!sessionSource.contains(".animation(.default, value: focusMode)"))
     #expect(
-      columnsSource.contains("NavigationSplitView(columnVisibility: columnVisibilityBinding)")
+      columnsSource.contains("SessionWindowStandardLayout(")
     )
     #expect(columnsSource.contains("if focusMode {\n      focusModeSurface"))
     #expect(
