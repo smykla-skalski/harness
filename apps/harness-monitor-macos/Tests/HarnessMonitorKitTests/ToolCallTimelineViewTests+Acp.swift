@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
@@ -91,6 +92,18 @@ extension ToolCallTimelineViewTests {
         capabilityTags: []
       ) == "Copilot"
     )
+  }
+
+  @Test("Timeline section header keeps duplicate capability tags off self identity")
+  func sectionHeaderKeepsDuplicateCapabilityTagsOffSelfIdentity() throws {
+    let source = try sourceFile(
+      named: "Sources/HarnessMonitorUIPreviewable/Views/Timeline/"
+        + "ToolCallTimelineView+Components.swift"
+    )
+
+    #expect(source.contains("private var indexedCapabilityTags"))
+    #expect(source.contains("ForEach(indexedCapabilityTags, id: \\.offset)"))
+    #expect(!source.contains("ForEach(capabilityTags, id: \\.self)"))
   }
 
   @Test("Timeline exposes polite live-region accessibility marker text")
@@ -205,5 +218,20 @@ extension ToolCallTimelineViewTests {
       agent: toolName.lowercased(),
       sessionId: "session-1"
     )
+  }
+
+  private func sourceFile(named relativePath: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent("apps/harness-monitor-macos")
+      .appendingPathComponent(relativePath)
+    return try String(contentsOf: fileURL, encoding: .utf8)
   }
 }
