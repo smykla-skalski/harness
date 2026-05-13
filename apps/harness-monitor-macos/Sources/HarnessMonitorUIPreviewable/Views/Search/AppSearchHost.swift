@@ -271,8 +271,7 @@ private struct AppSearchFieldSurface: View, Equatable {
       && lhs.isEnabledValue == rhs.isEnabledValue
   }
 
-  @ViewBuilder
-  var body: some View {
+  @ViewBuilder var body: some View {
     if isEnabled {
       Color.clear
         .frame(width: 0, height: 0)
