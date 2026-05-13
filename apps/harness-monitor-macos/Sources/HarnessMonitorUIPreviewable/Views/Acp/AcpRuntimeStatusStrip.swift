@@ -13,7 +13,7 @@ struct AcpRuntimeStatusStrip: View {
   let inspectStatus: AcpRuntimeInspectStatus
   let presentation: AcpRuntimePresentation
 
-  @State private var deadlineNow = Date.now
+  @State private var deadlineClock = AcpRuntimeDeadlineClockState()
   @State private var lastWatchdogAnnouncement: AcpRuntimeWatchdogAnnouncement?
 
   private var promptDeadlineDate: Date? {
@@ -57,17 +57,6 @@ struct AcpRuntimeStatusStrip: View {
     ].joined(separator: " ")
   }
 
-  private var edgeAccentTint: Color? {
-    AcpRuntimeStatusEdgeAccent.tint(
-      for: AcpRuntimeStatusEdgeAccent.classify(
-        watchdogDisplayState: runtimeState.watchdogDisplayState,
-        pendingPermissions: runtimeState.pendingPermissions,
-        promptDeadline: promptDeadlineDate,
-        now: deadlineNow
-      )
-    )
-  }
-
   var body: some View {
     VStack(
       alignment: .leading,
@@ -97,14 +86,12 @@ struct AcpRuntimeStatusStrip: View {
         .fill(HarnessMonitorTheme.ink.opacity(presentation == .full ? 0.05 : 0.04))
     )
     .overlay(alignment: .leading) {
-      if let edgeAccentTint {
-        RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-          .fill(edgeAccentTint)
-          .frame(width: 3)
-          .padding(.vertical, HarnessMonitorTheme.spacingXS)
-          .padding(.leading, 1)
-          .accessibilityHidden(true)
-      }
+      AcpRuntimeStatusEdgeAccentView(
+        deadlineClock: deadlineClock,
+        watchdogDisplayState: runtimeState.watchdogDisplayState,
+        pendingPermissions: runtimeState.pendingPermissions,
+        promptDeadline: promptDeadlineDate
+      )
     }
     .overlay {
       RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
@@ -139,7 +126,7 @@ struct AcpRuntimeStatusStrip: View {
       )
     }
     .task(id: promptDeadlineDate) {
-      await runDeadlineClockIfNeeded()
+      await deadlineClock.run(store: store, deadline: promptDeadlineDate)
     }
   }
 
@@ -191,10 +178,13 @@ struct AcpRuntimeStatusStrip: View {
     }
 
     if let promptDeadlineDate {
-      AcpRuntimeDeadlineChip(deadline: promptDeadlineDate, now: deadlineNow)
-        .accessibilityIdentifier(
-          HarnessMonitorAccessibility.agentRuntimeDeadline(runtimeState.agentId)
-        )
+      AcpRuntimeDeadlineChip(
+        deadlineClock: deadlineClock,
+        deadline: promptDeadlineDate
+      )
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.agentRuntimeDeadline(runtimeState.agentId)
+      )
     }
   }
 
@@ -213,24 +203,6 @@ struct AcpRuntimeStatusStrip: View {
       // 10-second polite throttle applies. The strip seeds last-state for
       // its own debounce but does not post a second NSAccessibility event.
       lastWatchdogAnnouncement = announcement
-    }
-  }
-
-  @MainActor
-  private func runDeadlineClockIfNeeded() async {
-    guard promptDeadlineDate != nil else {
-      return
-    }
-
-    while !Task.isCancelled {
-      let now = AcpRuntimeDeadlineClock.now(store: store, localNow: Date.now)
-      deadlineNow = now
-      guard AcpRuntimeDeadlineClock.shouldTick(deadline: promptDeadlineDate, now: now) else {
-        return
-      }
-      guard await AcpRuntimeDeadlineClock.sleepUntilNextTick() else {
-        return
-      }
     }
   }
 }
