@@ -121,6 +121,8 @@ struct SessionSwiftUISourceTests {
   @Test("Session view state wrappers stay private")
   func sessionViewStateWrappersStayPrivate() throws {
     let sessionWindowSource = try sourceFile(at: "Views/Sessions/SessionWindowView.swift")
+    let standardLayoutSource = try sourceFile(
+      at: "Views/Sessions/SessionWindowStandardLayout.swift")
     let createFormSource = try sourceFile(at: "Views/Sessions/SessionWindowCreateForm.swift")
 
     #expect(sessionWindowSource.contains("@State private var decisionCacheStorage"))
@@ -142,7 +144,8 @@ struct SessionSwiftUISourceTests {
         "private var contentColumnWidthStorage = SessionContentDetailSplitLayout.defaultContentWidth"
       )
     )
-    #expect(sessionWindowSource.contains("private var columnVisibilityRawStorage = \"automatic\""))
+    #expect(!sessionWindowSource.contains("private var columnVisibilityRawStorage"))
+    #expect(standardLayoutSource.contains("private var columnVisibilityRawStorage = \"automatic\""))
     #expect(
       !sessionWindowSource.contains(
         "@SceneStorage(\"session.focusMode\")\n  var focusMode = false"
@@ -198,10 +201,13 @@ struct SessionSwiftUISourceTests {
     )
     let presentationSource = try sourceFile(
       at: "Views/Sessions/SessionWindowView+Presentation.swift")
+    let standardLayoutSource = try sourceFile(
+      at: "Views/Sessions/SessionWindowStandardLayout.swift")
     let sidebarSearchSource = try sourceFile(at: "Views/Sidebar/SidebarSearchHost.swift")
 
-    #expect(presentationSource.contains("let encodedVisibility ="))
-    #expect(presentationSource.contains("guard columnVisibilityRaw != encodedVisibility else"))
+    #expect(!presentationSource.contains("let encodedVisibility ="))
+    #expect(standardLayoutSource.contains("let encodedVisibility ="))
+    #expect(standardLayoutSource.contains("guard columnVisibilityRaw != encodedVisibility else"))
     #expect(sessionWindowSource.contains("if focusModeStorage != $0"))
     #expect(sessionWindowSource.contains("if inspectorVisibleStorage != $0"))
     #expect(sessionWindowSource.contains("if inspectorPreferredStorage != $0"))

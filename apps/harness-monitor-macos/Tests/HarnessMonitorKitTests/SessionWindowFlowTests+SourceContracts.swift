@@ -312,7 +312,8 @@ extension SessionWindowFlowTests {
     let source = try previewableSourceFile(
       named: "Views/Sessions/SessionWindowView+PerfScenarios.swift"
     )
-    let viewSource = try previewableSourceFile(named: "Views/Sessions/SessionWindowView.swift")
+    let layoutSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowStandardLayout.swift")
 
     #expect(source.contains("case \"sidebar-toggle-rich-detail\""))
     #expect(source.contains("guard !trigger.sidebarToggleTargets.isEmpty else { return }"))
@@ -324,8 +325,8 @@ extension SessionWindowFlowTests {
     #expect(!source.contains("contentColumnWidth = width"))
     #expect(source.contains("columnVisibility = .detailOnly"))
     #expect(source.contains("columnVisibility = .doubleColumn"))
-    #expect(viewSource.contains("columnVisibility: columnVisibilityBinding"))
-    #expect(!viewSource.contains("contentColumnWidth: contentColumnWidthBinding"))
+    #expect(layoutSource.contains("columnVisibility: columnVisibilityBinding"))
+    #expect(!layoutSource.contains("contentColumnWidth: contentColumnWidthBinding"))
   }
 
   @Test("Agent detail deadline clock stays out of text field form state")

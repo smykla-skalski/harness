@@ -31,8 +31,6 @@ public struct SessionWindowView: View {
   private var sidebarWidthStorage = 200.0
   @SceneStorage("session.content-detail.width")
   private var contentColumnWidthStorage = SessionContentDetailSplitLayout.defaultContentWidth
-  @SceneStorage("session.columnVisibility")
-  private var columnVisibilityRawStorage = "automatic"
   @AccessibilityFocusState private var primaryContentAccessibilityFocused: Bool
   @AppStorage(HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
   var mcpRegistryHostEnabled = HarnessMonitorMCPSettingsDefaults
@@ -151,11 +149,6 @@ public struct SessionWindowView: View {
     )
   }
 
-  var columnVisibilityRaw: String {
-    get { columnVisibilityRawStorage }
-    nonmutating set { columnVisibilityRawStorage = newValue }
-  }
-
   var allSessionDecisionsCache: [Decision] {
     get { decisionCacheStorage.allSessionDecisions }
     nonmutating set { decisionCacheStorage.allSessionDecisions = newValue }
@@ -200,15 +193,6 @@ public struct SessionWindowView: View {
       sessionSearchHost
     }
     .toolbar { sessionToolbar }
-    .modifier(
-      SessionWindowPerfScenarioScript(
-        stateCache: stateCache,
-        columnVisibility: columnVisibilityBinding,
-        sessionID: token.sessionID,
-        snapshot: snapshot,
-        decisionIDs: allSessionDecisions.map(\.id)
-      )
-    )
     .background {
       sessionWindowBackgroundAnchors(currentModifiers: $currentModifiers)
     }

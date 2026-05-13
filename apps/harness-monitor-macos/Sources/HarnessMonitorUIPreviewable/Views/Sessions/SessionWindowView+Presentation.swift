@@ -252,36 +252,6 @@ extension SessionWindowView {
     )
   }
 
-  var columnVisibilityBinding: Binding<NavigationSplitViewVisibility> {
-    Binding(
-      get: {
-        let decodedVisibility = SessionColumnVisibilityCodec.decode(columnVisibilityRaw)
-        return decodedVisibility == .all ? .doubleColumn : decodedVisibility
-      },
-      set: { newValue in
-        let storedVisibility: NavigationSplitViewVisibility =
-          newValue == .all ? .doubleColumn : newValue
-        let encodedVisibility = SessionColumnVisibilityCodec.encode(storedVisibility)
-        guard columnVisibilityRaw != encodedVisibility else { return }
-        columnVisibilityRaw = encodedVisibility
-      }
-    )
-  }
-
-  var focusModeColumnVisibilityBinding: Binding<NavigationSplitViewVisibility> {
-    Binding(
-      get: {
-        focusMode
-          ? .detailOnly
-          : columnVisibilityBinding.wrappedValue
-      },
-      set: { newValue in
-        guard !focusMode else { return }
-        columnVisibilityBinding.wrappedValue = newValue
-      }
-    )
-  }
-
   @MainActor
   func refreshSnapshot(for trigger: SessionWindowSnapshotRefreshTrigger) async {
     guard trigger.sessionID == token.sessionID else { return }

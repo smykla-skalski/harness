@@ -1,0 +1,81 @@
+import HarnessMonitorKit
+import SwiftUI
+
+struct SessionWindowStandardLayout<Sidebar: View, Detail: View>: View {
+  let stateCache: SessionWindowStateCache
+  let sessionID: String
+  let snapshot: HarnessMonitorSessionWindowSnapshot?
+  let decisionIDs: [String]
+  let sidebarWidth: Double
+  let recordsPlainTaps: Bool
+  private let sidebar: Sidebar
+  private let detail: Detail
+  @SceneStorage("session.columnVisibility")
+  private var columnVisibilityRawStorage = "automatic"
+
+  init(
+    stateCache: SessionWindowStateCache,
+    sessionID: String,
+    snapshot: HarnessMonitorSessionWindowSnapshot?,
+    decisionIDs: [String],
+    sidebarWidth: Double,
+    recordsPlainTaps: Bool,
+    @ViewBuilder sidebar: () -> Sidebar,
+    @ViewBuilder detail: () -> Detail
+  ) {
+    self.stateCache = stateCache
+    self.sessionID = sessionID
+    self.snapshot = snapshot
+    self.decisionIDs = decisionIDs
+    self.sidebarWidth = sidebarWidth
+    self.recordsPlainTaps = recordsPlainTaps
+    self.sidebar = sidebar()
+    self.detail = detail()
+  }
+
+  var body: some View {
+    NavigationSplitView(columnVisibility: columnVisibilityBinding) {
+      sidebar
+        .navigationSplitViewColumnWidth(min: 190, ideal: sidebarWidth, max: 360)
+    } detail: {
+      detail
+    }
+    .navigationSplitViewStyle(.prominentDetail)
+    .modifier(
+      SessionWindowPlainTapRecorder(
+        stateCache: stateCache,
+        isEnabled: recordsPlainTaps
+      )
+    )
+    .modifier(
+      SessionWindowPerfScenarioScript(
+        stateCache: stateCache,
+        columnVisibility: columnVisibilityBinding,
+        sessionID: sessionID,
+        snapshot: snapshot,
+        decisionIDs: decisionIDs
+      )
+    )
+  }
+
+  private var columnVisibilityRaw: String {
+    get { columnVisibilityRawStorage }
+    nonmutating set { columnVisibilityRawStorage = newValue }
+  }
+
+  private var columnVisibilityBinding: Binding<NavigationSplitViewVisibility> {
+    Binding(
+      get: {
+        let decodedVisibility = SessionColumnVisibilityCodec.decode(columnVisibilityRaw)
+        return decodedVisibility == .all ? .doubleColumn : decodedVisibility
+      },
+      set: { newValue in
+        let storedVisibility: NavigationSplitViewVisibility =
+          newValue == .all ? .doubleColumn : newValue
+        let encodedVisibility = SessionColumnVisibilityCodec.encode(storedVisibility)
+        guard columnVisibilityRaw != encodedVisibility else { return }
+        columnVisibilityRaw = encodedVisibility
+      }
+    )
+  }
+}
