@@ -116,6 +116,12 @@ final class HarnessMonitorAppConfigurationTests: XCTestCase {
     )
   }
 
+  func testPerfScenarioSignpostNamesMatchScenarioIDs() {
+    for scenario in HarnessMonitorPerfScenario.allCases {
+      XCTAssertEqual(String(describing: scenario.signpostName), scenario.rawValue)
+    }
+  }
+
   func testAppDelegateDetectsHostedXCTestLaunches() {
     XCTAssertTrue(
       HarnessMonitorAppDelegate.isTestHarnessRun(

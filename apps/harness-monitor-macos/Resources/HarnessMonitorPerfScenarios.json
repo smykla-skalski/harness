@@ -1,0 +1,377 @@
+{
+  "scenarios": [
+    {
+      "id": "open-recent-window",
+      "signpostName": "open-recent-window",
+      "defaultPreviewScenario": "dashboard-landing",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": false,
+      "needsPreviewAcpPermissionBatch": false,
+      "includesBootstrapInMeasurement": true,
+      "durationSeconds": 6,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 25000,
+        "bodyUpdates": 2500,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0
+      }
+    },
+    {
+      "id": "open-session-window",
+      "signpostName": "open-session-window",
+      "defaultPreviewScenario": "dashboard-landing",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": false,
+      "needsPreviewAcpPermissionBatch": false,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 8,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 35000,
+        "bodyUpdates": 3500,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0
+      }
+    },
+    {
+      "id": "open-session-window-visual-options-disabled",
+      "signpostName": "open-session-window-visual-options-disabled",
+      "defaultPreviewScenario": "dashboard-landing",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": true,
+      "needsPreviewAcpPermissionBatch": false,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 8,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 35000,
+        "bodyUpdates": 3500,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0
+      }
+    },
+    {
+      "id": "agent-detail-form",
+      "signpostName": "agent-detail-form",
+      "defaultPreviewScenario": "dashboard-landing",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": false,
+      "needsPreviewAcpPermissionBatch": false,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 8,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 35000,
+        "bodyUpdates": 3500,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0
+      }
+    },
+    {
+      "id": "agent-detail-form-visual-options-disabled",
+      "signpostName": "agent-detail-form-visual-options-disabled",
+      "defaultPreviewScenario": "dashboard-landing",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": true,
+      "needsPreviewAcpPermissionBatch": false,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 8,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 35000,
+        "bodyUpdates": 3500,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0
+      }
+    },
+    {
+      "id": "decision-detail-form",
+      "signpostName": "decision-detail-form",
+      "defaultPreviewScenario": "cockpit",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": false,
+      "needsPreviewAcpPermissionBatch": true,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 8,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 35000,
+        "bodyUpdates": 3500,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0
+      }
+    },
+    {
+      "id": "decision-detail-form-visual-options-disabled",
+      "signpostName": "decision-detail-form-visual-options-disabled",
+      "defaultPreviewScenario": "cockpit",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": true,
+      "needsPreviewAcpPermissionBatch": true,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 8,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 35000,
+        "bodyUpdates": 3500,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0
+      }
+    },
+    {
+      "id": "task-detail-form",
+      "signpostName": "task-detail-form",
+      "defaultPreviewScenario": "dashboard-landing",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": false,
+      "needsPreviewAcpPermissionBatch": false,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 8,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 35000,
+        "bodyUpdates": 3500,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0
+      }
+    },
+    {
+      "id": "task-detail-form-visual-options-disabled",
+      "signpostName": "task-detail-form-visual-options-disabled",
+      "defaultPreviewScenario": "dashboard-landing",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": true,
+      "needsPreviewAcpPermissionBatch": false,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 8,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 35000,
+        "bodyUpdates": 3500,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0
+      }
+    },
+    {
+      "id": "session-search-full",
+      "signpostName": "session-search-full",
+      "defaultPreviewScenario": "dashboard-landing",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": false,
+      "needsPreviewAcpPermissionBatch": true,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 8,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 35000,
+        "bodyUpdates": 3500,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0
+      }
+    },
+    {
+      "id": "session-search-full-visual-options-disabled",
+      "signpostName": "session-search-full-visual-options-disabled",
+      "defaultPreviewScenario": "dashboard-landing",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": true,
+      "needsPreviewAcpPermissionBatch": true,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 8,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 35000,
+        "bodyUpdates": 3500,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0
+      }
+    },
+    {
+      "id": "sidebar-toggle-rich-detail",
+      "signpostName": "sidebar-toggle-rich-detail",
+      "defaultPreviewScenario": "dashboard-landing",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": false,
+      "needsPreviewAcpPermissionBatch": false,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 8,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 35000,
+        "bodyUpdates": 3500,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0
+      }
+    },
+    {
+      "id": "sidebar-toggle-rich-detail-visual-options-disabled",
+      "signpostName": "sidebar-toggle-rich-detail-visual-options-disabled",
+      "defaultPreviewScenario": "dashboard-landing",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": true,
+      "needsPreviewAcpPermissionBatch": false,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 8,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 35000,
+        "bodyUpdates": 3500,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0
+      }
+    },
+    {
+      "id": "timeline-filter-form",
+      "signpostName": "timeline-filter-form",
+      "defaultPreviewScenario": "dashboard-landing",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": false,
+      "needsPreviewAcpPermissionBatch": false,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 8,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 35000,
+        "bodyUpdates": 3500,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0
+      }
+    },
+    {
+      "id": "timeline-filter-form-visual-options-disabled",
+      "signpostName": "timeline-filter-form-visual-options-disabled",
+      "defaultPreviewScenario": "dashboard-landing",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": true,
+      "needsPreviewAcpPermissionBatch": false,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 8,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 35000,
+        "bodyUpdates": 3500,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0
+      }
+    },
+    {
+      "id": "permission-modal",
+      "signpostName": "permission-modal",
+      "defaultPreviewScenario": "cockpit",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": false,
+      "needsPreviewAcpPermissionBatch": true,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 8,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 35000,
+        "bodyUpdates": 3500,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0
+      }
+    },
+    {
+      "id": "settings-backdrop-cycle",
+      "signpostName": "settings-backdrop-cycle",
+      "defaultPreviewScenario": "dashboard",
+      "initialSettingsSection": "appearance",
+      "disablesVisualOptions": false,
+      "needsPreviewAcpPermissionBatch": false,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 9,
+      "templates": ["allocations"],
+      "allocationsBudget": {
+        "heapTotalBytes": 367001600
+      }
+    },
+    {
+      "id": "settings-background-cycle",
+      "signpostName": "settings-background-cycle",
+      "defaultPreviewScenario": "dashboard",
+      "initialSettingsSection": "appearance",
+      "disablesVisualOptions": false,
+      "needsPreviewAcpPermissionBatch": false,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 10,
+      "templates": ["allocations"],
+      "allocationsBudget": {
+        "heapTotalBytes": 367001600
+      }
+    },
+    {
+      "id": "timeline-burst",
+      "signpostName": "timeline-burst",
+      "defaultPreviewScenario": "dashboard-landing",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": false,
+      "needsPreviewAcpPermissionBatch": false,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 8,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 30000,
+        "bodyUpdates": 3000,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0
+      }
+    },
+    {
+      "id": "toast-overlay-churn",
+      "signpostName": "toast-overlay-churn",
+      "defaultPreviewScenario": "dashboard-landing",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": false,
+      "needsPreviewAcpPermissionBatch": false,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 8,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 35000,
+        "bodyUpdates": 3500,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0
+      }
+    },
+    {
+      "id": "offline-cached-open",
+      "signpostName": "offline-cached-open",
+      "defaultPreviewScenario": "offline-cached",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": false,
+      "needsPreviewAcpPermissionBatch": false,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 7,
+      "templates": ["swiftui", "allocations"],
+      "swiftUIBudget": {
+        "totalUpdates": 30000,
+        "bodyUpdates": 3000,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0
+      },
+      "allocationsBudget": {
+        "heapTotalBytes": 314572800
+      }
+    }
+  ]
+}

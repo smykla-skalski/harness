@@ -162,6 +162,7 @@ private let monitorAppTarget: Target = .target(
     sources: monitorAppSources,
     resources: [
         "Sources/HarnessMonitor/Assets.xcassets",
+        "Resources/HarnessMonitorPerfScenarios.json",
         "Resources/PrivacyInfo.xcprivacy",
     ],
     entitlements: .file(path: xcodeVisibleAppEntitlementsPath),
@@ -202,6 +203,7 @@ private let uiTestHostTarget: Target = .target(
     sources: monitorAppSources,
     resources: [
         "Sources/HarnessMonitor/Assets.xcassets",
+        "Resources/HarnessMonitorPerfScenarios.json",
         "Resources/PrivacyInfo.xcprivacy",
     ],
     entitlements: .file(path: xcodeVisibleAppEntitlementsPath),
@@ -286,6 +288,7 @@ private let uiTestsTarget: Target = .target(
         "Tests/HarnessMonitorUITestSupport/**/*.swift",
         "Tests/HarnessMonitorUITests/**/*.swift"
     ],
+    resources: ["Resources/HarnessMonitorPerfScenarios.json"],
     scripts: [BuildPhases.stripTestBundleXattrs()],
     dependencies: [
         .target(name: "HarnessMonitorUITestHost")
