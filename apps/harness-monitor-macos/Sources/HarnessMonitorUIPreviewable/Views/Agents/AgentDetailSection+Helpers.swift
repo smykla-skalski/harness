@@ -2,13 +2,30 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension AgentDetailSection {
-  static func debouncePersist(value: String, key: String) async {
+  nonisolated static func debouncePersist(
+    value: String,
+    key: String,
+    defaults: UserDefaults = .standard,
+    delay: Duration = .milliseconds(300)
+  ) async {
     do {
-      try await Task.sleep(for: .milliseconds(300))
+      try await Task.sleep(for: delay)
     } catch {
       return
     }
-    UserDefaults.standard.set(value, forKey: key)
+    guard !Task.isCancelled else { return }
+    persistDraftIfNeeded(value: value, key: key, defaults: defaults)
+  }
+
+  @discardableResult
+  nonisolated static func persistDraftIfNeeded(
+    value: String,
+    key: String,
+    defaults: UserDefaults = .standard
+  ) -> Bool {
+    guard defaults.string(forKey: key) != value else { return false }
+    defaults.set(value, forKey: key)
+    return true
   }
 
   static func transcriptEntries(
