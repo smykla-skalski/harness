@@ -233,13 +233,18 @@ extension SessionWindowFlowTests {
     let anchorSource = try previewableSourceFile(
       named: "Views/Sessions/SessionWindowView+BackgroundAnchors.swift"
     )
+    let searchHostSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+SearchHost.swift"
+    )
     let columnsSource = try previewableSourceFile(
       named: "Views/Sessions/SessionWindowView+Columns.swift"
     )
 
+    #expect(rootSource.contains("ZStack {\n      bodyContent\n      sessionSearchHost\n    }"))
+    #expect(!rootSource.contains(".appSearchHost("))
     #expect(
       rootSource.contains(
-        ".background {\n        sessionWindowBackgroundAnchors(currentModifiers: $currentModifiers)\n      }"
+        ".background {\n      sessionWindowBackgroundAnchors(currentModifiers: $currentModifiers)\n    }"
       )
     )
     #expect(!rootSource.contains(".modifier(SessionWindowSearchMirror"))
@@ -247,6 +252,9 @@ extension SessionWindowFlowTests {
     #expect(anchorSource.contains("SessionWindowSearchMirror(stateCache: stateCache"))
     #expect(anchorSource.contains("appSearchIndexUpdaterAnchor"))
     #expect(anchorSource.contains("SessionWindowModifierKeysMonitor"))
+    #expect(searchHostSource.contains("AppSearchHost("))
+    #expect(searchHostSource.contains("model: stateCache.appSearchModel"))
+    #expect(searchHostSource.contains("automation: searchAutomation"))
     #expect(columnsSource.contains(".environment(\\.appSearchModel, stateCache.appSearchModel)"))
   }
 
