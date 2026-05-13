@@ -41,7 +41,7 @@ struct SessionCockpitHeaderCard: View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       HStack(alignment: .top) {
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-          Text(detail.session.displayTitle)
+          Text(verbatim: detail.session.displayTitle)
             .scaledFont(.system(.largeTitle, design: .rounded, weight: .black))
             .italic(detail.session.title.isEmpty)
             .foregroundStyle(
@@ -50,11 +50,11 @@ struct SessionCockpitHeaderCard: View {
                 : HarnessMonitorTheme.ink
             )
             .lineLimit(2)
-          Text(sessionHeaderMetadata(detail.session))
+          Text(verbatim: sessionHeaderMetadata(detail.session))
             .scaledFont(.system(.subheadline, design: .rounded, weight: .medium))
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           Text(
-            sessionLeaderAndActivityLine(
+            verbatim: sessionLeaderAndActivityLine(
               detail.session,
               configuration: dateTimeConfiguration
             )
@@ -66,7 +66,7 @@ struct SessionCockpitHeaderCard: View {
             !detail.session.context.isEmpty
             && detail.session.context != detail.session.displayTitle
           if shouldShowContext {
-            Text(detail.session.context)
+            Text(verbatim: detail.session.context)
               .scaledFont(.system(.body, design: .rounded, weight: .medium))
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
               .lineLimit(3)
@@ -164,7 +164,7 @@ struct SessionCockpitHeaderCard: View {
 
   private func awaitingLeaderSummary(_ message: String) -> some View {
     Label {
-      Text(message)
+      Text(verbatim: message)
         .scaledFont(.system(.body, design: .rounded, weight: .medium))
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     } icon: {
@@ -210,13 +210,13 @@ struct SessionCockpitHeaderCard: View {
           }
         }
         if let openIssues = observer.openIssues, !openIssues.isEmpty {
-          Text(openIssues.prefix(2).map(\.summary).joined(separator: " · "))
+          Text(verbatim: openIssues.prefix(2).map(\.summary).joined(separator: " · "))
             .scaledFont(.caption)
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             .lineLimit(1)
         }
         if let mutedCodes = observer.mutedCodes, !mutedCodes.isEmpty {
-          Text("Muted: \(mutedCodes.prefix(3).joined(separator: ", "))")
+          Text(verbatim: "Muted: \(mutedCodes.prefix(3).joined(separator: ", "))")
             .scaledFont(.caption)
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             .lineLimit(1)
@@ -237,18 +237,23 @@ struct SessionCockpitHeaderCard: View {
         Label("Pending Leader Transfer", systemImage: "arrow.left.arrow.right")
           .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
         Spacer()
-        Text(formatTimestamp(pendingTransfer.requestedAt, configuration: dateTimeConfiguration))
-          .scaledFont(.caption.monospaced())
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        Text(
+          verbatim: formatTimestamp(
+            pendingTransfer.requestedAt,
+            configuration: dateTimeConfiguration
+          )
+        )
+        .scaledFont(.caption.monospaced())
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
       let requested = pendingTransfer.requestedBy
       let newLeader = pendingTransfer.newLeaderId
       let current = pendingTransfer.currentLeaderId
-      Text("\(requested) requested \(newLeader) to replace \(current).")
+      Text(verbatim: "\(requested) requested \(newLeader) to replace \(current).")
         .scaledFont(.system(.body, design: .rounded, weight: .medium))
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       if let reason = pendingTransfer.reason, !reason.isEmpty {
-        Text(reason)
+        Text(verbatim: reason)
           .scaledFont(.system(.footnote, design: .rounded, weight: .semibold))
           .foregroundStyle(HarnessMonitorTheme.warmAccent)
       }
@@ -265,11 +270,11 @@ struct SessionCockpitHeaderCard: View {
 
   private func summaryLabel(_ title: String, value: String) -> some View {
     VStack(alignment: .leading, spacing: 2) {
-      Text(title.uppercased())
+      Text(verbatim: title.uppercased())
         .scaledFont(.caption2.weight(.bold))
         .tracking(HarnessMonitorTheme.uppercaseTracking)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      Text(value)
+      Text(verbatim: value)
         .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
     }
   }

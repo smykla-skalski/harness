@@ -266,13 +266,13 @@ struct SessionTaskCompactSummaryContent: View {
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.itemSpacing) {
-        Text(task.title)
+        Text(verbatim: task.title)
           .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
           .lineLimit(1)
           .truncationMode(.tail)
           .layoutPriority(1)
         Spacer(minLength: HarnessMonitorTheme.spacingXS)
-        Text(task.severity.title)
+        Text(verbatim: task.severity.title)
           .scaledFont(.caption.bold())
           .lineLimit(1)
           .fixedSize(horizontal: true, vertical: false)
@@ -290,13 +290,13 @@ struct SessionTaskCompactSummaryContent: View {
               .lineLimit(1)
           }
         } else {
-          Text(task.assignmentStateTitle)
+          Text(verbatim: task.assignmentStateTitle)
             .scaledFont(.caption.weight(.bold))
             .foregroundStyle(task.assignmentStateColor)
             .lineLimit(1)
         }
         Spacer(minLength: HarnessMonitorTheme.spacingXS)
-        Text(isDelivering ? "Updating assignment" : task.assignmentSummary)
+        Text(verbatim: isDelivering ? "Updating assignment" : task.assignmentSummary)
           .scaledFont(.caption.monospaced())
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .lineLimit(1)
@@ -314,12 +314,12 @@ struct TaskDragPreviewCard: View {
       Image(systemName: "list.bullet.clipboard")
         .imageScale(.small)
         .foregroundStyle(HarnessMonitorTheme.accent)
-      Text(task.title)
+      Text(verbatim: task.title)
         .scaledFont(.caption.weight(.bold))
         .lineLimit(1)
         .truncationMode(.tail)
         .layoutPriority(1)
-      Text(task.severity.title)
+      Text(verbatim: task.severity.title)
         .scaledFont(.caption2.bold())
         .harnessPillPadding()
         .background(severityColor(for: task.severity), in: Capsule())
