@@ -164,6 +164,10 @@ extension SessionWindowFlowTests {
     #expect(source.contains(".onChange(of: model.results.totalHitCount)"))
     #expect(source.contains("let automation: AppSearchAutomationState?"))
     #expect(source.contains(".task(id: automationCommand)"))
+    #expect(source.contains("HarnessSidebarSearchFocusDispatcher()"))
+    #expect(source.contains(".harnessFocusedSceneValue(\\.harnessSidebarSearchFocusAction"))
+    #expect(!source.contains("Button(\"Find in Session\""))
+    #expect(!source.contains(".searchPresentationToolbarBehavior(.avoidHidingContent)"))
     #expect(source.contains("@Environment(\\.accessibilityVoiceOverEnabled)"))
     #expect(source.contains("if voiceOverEnabled"))
     #expect(!source.contains("@Bindable var model = model"))
@@ -181,6 +185,7 @@ extension SessionWindowFlowTests {
 
     #expect(source.contains("stateCache.appSearchAutomation.present(query: \"\")"))
     #expect(source.contains("stateCache.appSearchAutomation.present(query: step.query)"))
+    #expect(source.contains("stateCache.appSearchAutomation.dismiss()"))
     #expect(source.contains("stateCache.selectRoute(step.route)"))
     #expect(source.contains("let hasSearchCorpus: Bool"))
     #expect(source.contains("guard trigger.hasSearchCorpus else { return }"))
@@ -188,6 +193,17 @@ extension SessionWindowFlowTests {
     #expect(source.contains("try? await Task.sleep(for: .milliseconds(260))"))
     #expect(!source.contains("appSearchModel.runSearch(query: step.query"))
     #expect(!source.contains("appSearchModel.setPresented(true)"))
+  }
+
+  @Test("Search command is owned by app commands instead of a hidden session button")
+  func searchCommandUsesFocusedDispatcher() throws {
+    let commandsSource = try harnessSourceFile(named: "App/HarnessMonitorAppCommands.swift")
+
+    #expect(commandsSource.contains("@FocusedValue(\\.harnessSidebarSearchFocusAction)"))
+    #expect(commandsSource.contains("Button(searchCommandTitle)"))
+    #expect(commandsSource.contains(".keyboardShortcut(\"f\", modifiers: .command)"))
+    #expect(commandsSource.contains("searchFocusAction?.invoke()"))
+    #expect(commandsSource.contains(".disabled(searchFocusAction?.isAvailable != true)"))
   }
 
   @Test("Session sidebar toggle perf script drives split view column visibility")

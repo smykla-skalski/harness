@@ -12,6 +12,8 @@ struct HarnessMonitorAppCommands: Commands {
 
   @Environment(\.openWindow)
   private var openWindow
+  @FocusedValue(\.harnessSidebarSearchFocusAction)
+  private var searchFocusAction
   @FocusedValue(\.harnessSessionSidebarSelection)
   private var sidebarSelectionFocus
   let store: HarnessMonitorStore
@@ -28,6 +30,10 @@ struct HarnessMonitorAppCommands: Commands {
 
   private var canDecreaseTextSize: Bool {
     HarnessMonitorTextSize.canDecrease(textSizeIndex)
+  }
+
+  private var searchCommandTitle: LocalizedStringKey {
+    searchFocusAction?.menuLabel.localizedTitle ?? "Find"
   }
 
   var body: some Commands {
@@ -60,7 +66,18 @@ struct HarnessMonitorAppCommands: Commands {
       .keyboardShortcut("s", modifiers: [.command, .shift])
       .disabled(!displayState.hasSelectedSession || displayState.isSessionReadOnly)
     }
+    searchCommands
     sidebarSelectionCommands
+  }
+
+  @CommandsBuilder private var searchCommands: some Commands {
+    CommandGroup(after: .pasteboard) {
+      Button(searchCommandTitle) {
+        searchFocusAction?.invoke()
+      }
+      .keyboardShortcut("f", modifiers: .command)
+      .disabled(searchFocusAction?.isAvailable != true)
+    }
   }
 
   @CommandsBuilder private var sidebarSelectionCommands: some Commands {
