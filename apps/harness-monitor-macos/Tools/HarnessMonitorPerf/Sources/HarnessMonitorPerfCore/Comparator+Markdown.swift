@@ -35,6 +35,7 @@ extension Comparator {
             case .swiftUI:
                 appendSwiftUISections(item, to: &lines)
                 appendTopFrames(item, to: &lines)
+                appendAppTraceSection(item, to: &lines)
             case .allocations:
                 appendAllocationsSections(item, to: &lines)
             }
@@ -94,6 +95,25 @@ extension Comparator {
         lines.append("")
         lines.append("- Baseline hot frames: \(baselineNames.isEmpty ? "n/a" : baselineNames)")
         lines.append("- Current hot frames: \(currentNames.isEmpty ? "n/a" : currentNames)")
+    }
+
+    private static func appendAppTraceSection(
+        _ item: CaptureComparison,
+        to lines: inout [String]
+    ) {
+        guard let appTrace = item.appTrace else { return }
+
+        lines.append("### App trace")
+        lines.append("")
+        lines.append("- Baseline events: \(appTrace.baseline?.eventCount.description ?? "n/a")")
+        lines.append("- Current events: \(appTrace.current?.eventCount.description ?? "n/a")")
+        lines.append("- Baseline components: \(formatComponents(appTrace.baseline?.components ?? []))")
+        lines.append("- Current components: \(formatComponents(appTrace.current?.components ?? []))")
+        lines.append("- Baseline ordered steps: \(formatSteps(appTrace.baseline?.orderedSteps))")
+        lines.append("- Current ordered steps: \(formatSteps(appTrace.current?.orderedSteps))")
+        lines.append("- New steps: \(formatSteps(appTrace.newSteps))")
+        lines.append("- Resolved steps: \(formatSteps(appTrace.resolvedSteps))")
+        lines.append("")
     }
 
     private static func appendSwiftUISections(
@@ -261,5 +281,21 @@ extension Comparator {
             )
         }
         lines.append("")
+    }
+
+    private static func formatComponents(
+        _ components: [CaptureAppTrace.ComponentCount]
+    ) -> String {
+        guard !components.isEmpty else { return "n/a" }
+        return components
+            .map { "\($0.component) (\($0.count))" }
+            .joined(separator: ", ")
+    }
+
+    private static func formatSteps(
+        _ steps: [String]?
+    ) -> String {
+        guard let steps, !steps.isEmpty else { return "n/a" }
+        return steps.joined(separator: " -> ")
     }
 }

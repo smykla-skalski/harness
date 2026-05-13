@@ -35,13 +35,21 @@ final class ComparatorTests: XCTestCase {
                 "window_id": "open-recent",
                 "includes_bootstrap_in_scenario_measurement": true
               },
-              "metric_tiers": {
-                "hard_budget": ["launch_app_init_to_ready_ms", "total_updates", "body_updates", "max_update_group_ms", "hitches", "potential_hangs"],
-                "investigative": ["p95_update_ms", "max_update_ms", "update_group_p95_ms", "top_frames"]
-              },
-              "findings": [
-                {"key": "cause:state:dashboardview:sidebarrow", "category": "swiftui-cause", "headline": "@State: DashboardView -> SidebarRow", "count": 2}
-              ],
+               "metric_tiers": {
+                 "hard_budget": ["launch_app_init_to_ready_ms", "total_updates", "body_updates", "max_update_group_ms", "hitches", "potential_hangs"],
+                 "investigative": ["p95_update_ms", "max_update_ms", "update_group_p95_ms", "top_frames"]
+               },
+               "app_trace": {
+                 "relpath": "app-traces/open-recent-window/swiftui/app-trace.jsonl",
+                 "event_count": 2,
+                 "components": [
+                   {"component": "perf.scenario", "count": 2}
+                 ],
+                 "ordered_steps": ["route.agents", "search.present"]
+               },
+               "findings": [
+                 {"key": "cause:state:dashboardview:sidebarrow", "category": "swiftui-cause", "headline": "@State: DashboardView -> SidebarRow", "count": 2}
+               ],
               "metrics": {
                 "swiftui_updates": {"total_count": 10000, "body_update_count": 1000, "duration_ms_p95": 10.0, "duration_ns_max": 12000000},
                 "swiftui_update_groups": {"duration_ms_p95": 8.0, "duration_ns_max": 20000000},
@@ -86,18 +94,26 @@ final class ComparatorTests: XCTestCase {
                 "window_id": "open-recent",
                 "includes_bootstrap_in_scenario_measurement": true
               },
-              "metric_tiers": {
-                "hard_budget": ["launch_app_init_to_ready_ms", "total_updates", "body_updates", "max_update_group_ms", "hitches", "potential_hangs"],
-                "investigative": ["p95_update_ms", "max_update_ms", "update_group_p95_ms", "top_frames"]
-              },
+               "metric_tiers": {
+                 "hard_budget": ["launch_app_init_to_ready_ms", "total_updates", "body_updates", "max_update_group_ms", "hitches", "potential_hangs"],
+                 "investigative": ["p95_update_ms", "max_update_ms", "update_group_p95_ms", "top_frames"]
+               },
+               "app_trace": {
+                 "relpath": "app-traces/open-recent-window/swiftui/app-trace.jsonl",
+                 "event_count": 3,
+                 "components": [
+                   {"component": "perf.scenario", "count": 3}
+                 ],
+                 "ordered_steps": ["route.agents", "search.present", "route.tasks"]
+               },
                "findings": [
                  {"key": "cause:state:dashboardview:sidebarrow", "category": "swiftui-cause", "headline": "@State: DashboardView -> SidebarRow", "count": 2},
                  {"key": "cause:creation:viewcreation:preferencelist", "category": "swiftui-cause", "headline": "Creation: View Creation -> Preference List", "count": 3},
                  {"key": "update-group:transaction-for-unknown-action:agentdetailsection", "category": "swiftui-update-group", "headline": "Transaction for unknown action via AgentDetailSection.debouncePersist(value:key:defaults:)", "count": 5}
                ],
-              "metrics": {
-                "swiftui_updates": {"total_count": 11000, "body_update_count": 1100, "duration_ms_p95": 11.5, "duration_ns_max": 15000000},
-                "swiftui_update_groups": {"duration_ms_p95": 9.0, "duration_ns_max": 24000000},
+               "metrics": {
+                 "swiftui_updates": {"total_count": 11000, "body_update_count": 1100, "duration_ms_p95": 11.5, "duration_ns_max": 15000000},
+                 "swiftui_update_groups": {"duration_ms_p95": 9.0, "duration_ns_max": 24000000},
                 "hitches": {"count": 1},
                 "potential_hangs": {"count": 0},
                 "top_frames": [{"name": "DashboardView.body", "samples": 110}, {"name": "SidebarRow.body", "samples": 30}]
@@ -172,6 +188,10 @@ final class ComparatorTests: XCTestCase {
             swiftui.sharedMetrics?[MetricName.launchAppInitToReadyMs]?.delta.description,
             "40"
         )
+        XCTAssertEqual(swiftui.appTrace?.baseline?.eventCount, 2)
+        XCTAssertEqual(swiftui.appTrace?.current?.eventCount, 3)
+        XCTAssertEqual(swiftui.appTrace?.newSteps, ["route.tasks"])
+        XCTAssertEqual(swiftui.appTrace?.resolvedSteps, [])
         XCTAssertEqual(swiftui.newFindings?.count, 2)
         XCTAssertEqual(
             swiftui.newFindings?.first?.category,
@@ -190,6 +210,10 @@ final class ComparatorTests: XCTestCase {
         let json = try Data(contentsOf: outputDir.appendingPathComponent("comparison.json"))
         let jsonString = try XCTUnwrap(String(data: json, encoding: .utf8))
         XCTAssertTrue(jsonString.contains("\"baseline_label\" : \"baseline\""))
+        XCTAssertTrue(jsonString.contains("\"app_trace\""))
+        let decoded = try JSONDecoder().decode(Comparator.Comparison.self, from: json)
+        let decodedSwiftUI = try XCTUnwrap(decoded.comparisons.first { $0.template == "SwiftUI" })
+        XCTAssertEqual(decodedSwiftUI.appTrace?.current?.orderedSteps.last, "route.tasks")
 
         let markdown = try String(contentsOf: outputDir.appendingPathComponent("comparison.md"), encoding: .utf8)
         XCTAssertTrue(markdown.contains("Instruments Comparison: baseline -> current"))
@@ -201,6 +225,14 @@ final class ComparatorTests: XCTestCase {
         XCTAssertTrue(markdown.contains("| total_updates | 10000 | 11000 | 1000 |"))
         XCTAssertTrue(markdown.contains("| All Heap Allocations | total_bytes | 100 | 120 | 20 |"))
         XCTAssertTrue(markdown.contains("Baseline hot frames: DashboardView.body"))
+        XCTAssertTrue(markdown.contains("### App trace"))
+        XCTAssertTrue(markdown.contains("Baseline ordered steps: route.agents -> search.present"))
+        XCTAssertTrue(
+            markdown.contains(
+                "Current ordered steps: route.agents -> search.present -> route.tasks"
+            )
+        )
+        XCTAssertTrue(markdown.contains("New steps: route.tasks"))
         XCTAssertTrue(markdown.contains("### New findings"))
         XCTAssertTrue(markdown.contains("Transaction for unknown action via AgentDetailSection.debouncePersist"))
         let updateGroupIndex = try XCTUnwrap(
@@ -214,6 +246,45 @@ final class ComparatorTests: XCTestCase {
             )?.lowerBound
         )
         XCTAssertLessThan(updateGroupIndex, causeIndex)
+    }
+
+    func testCompareAppTraceHandlesAsymmetricPresence() throws {
+        let baseline = try writeSummary(
+            """
+            {
+              "label": "baseline",
+              "created_at_utc": "2026-04-01T00:00:00Z",
+              "captures": [
+                {
+                  "scenario": "open-recent-window",
+                  "template": "SwiftUI",
+                  "metrics": {
+                    "swiftui_updates": {"total_count": 1, "body_update_count": 1, "duration_ms_p95": 1.0, "duration_ns_max": 1000000},
+                    "swiftui_update_groups": {"duration_ms_p95": 1.0, "duration_ns_max": 1000000},
+                    "hitches": {"count": 0},
+                    "potential_hangs": {"count": 0}
+                  }
+                }
+              ]
+            }
+            """,
+            name: "baseline-asymmetric.json"
+        )
+        let current = try writeSummary(Self.currentPayload, name: "current-asymmetric.json")
+        let outputDir = workDir.appendingPathComponent("out-asymmetric")
+
+        let comparison = try Comparator.compare(.init(
+            current: current, baseline: baseline, outputDir: outputDir
+        ))
+        let swiftui = try XCTUnwrap(comparison.comparisons.first { $0.template == "SwiftUI" })
+
+        XCTAssertNil(swiftui.appTrace?.baseline)
+        XCTAssertEqual(swiftui.appTrace?.current?.eventCount, 3)
+        XCTAssertEqual(
+            swiftui.appTrace?.newSteps,
+            ["route.agents", "search.present", "route.tasks"]
+        )
+        XCTAssertEqual(swiftui.appTrace?.resolvedSteps, [])
     }
 
     func testCompareWithNoOverlapEmitsExplainerInMarkdown() throws {

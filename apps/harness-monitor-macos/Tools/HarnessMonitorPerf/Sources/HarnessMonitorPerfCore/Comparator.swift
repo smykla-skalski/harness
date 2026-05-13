@@ -150,6 +150,10 @@ public enum Comparator {
             current: current.findings ?? [],
             baseline: baseline.findings ?? []
         )
+        let appTrace = appTraceComparison(
+            current: current.appTrace,
+            baseline: baseline.appTrace
+        )
 
         let metrics: [String: DeltaBlock] = [
             MetricName.totalUpdates: deltaInt(
@@ -196,6 +200,7 @@ public enum Comparator {
             currentFindings: orderedFindings(current.findings),
             newFindings: findingsDiff.new,
             resolvedFindings: findingsDiff.resolved,
+            appTrace: appTrace,
             topFrames: TopFramesPair(
                 baseline: framesPrefix(bm["top_frames"], limit: 5),
                 current: framesPrefix(cm["top_frames"], limit: 5)
@@ -324,6 +329,44 @@ public enum Comparator {
         default:
             2
         }
+    }
+
+    private static func appTraceComparison(
+        current: CaptureAppTrace?,
+        baseline: CaptureAppTrace?
+    ) -> AppTraceComparison? {
+        guard current != nil || baseline != nil else { return nil }
+
+        let baselineSummary = baseline.map(comparableAppTrace(from:))
+        let currentSummary = current.map(comparableAppTrace(from:))
+        let baselineSteps = uniqueOrderedSteps(baseline?.orderedSteps ?? [])
+        let currentSteps = uniqueOrderedSteps(current?.orderedSteps ?? [])
+        let baselineStepSet = Set(baselineSteps)
+        let currentStepSet = Set(currentSteps)
+
+        return AppTraceComparison(
+            baseline: baselineSummary,
+            current: currentSummary,
+            newSteps: currentSteps.filter { !baselineStepSet.contains($0) },
+            resolvedSteps: baselineSteps.filter { !currentStepSet.contains($0) }
+        )
+    }
+
+    private static func comparableAppTrace(
+        from trace: CaptureAppTrace
+    ) -> AppTraceSummary {
+        AppTraceSummary(
+            eventCount: trace.eventCount,
+            components: trace.components,
+            orderedSteps: trace.orderedSteps
+        )
+    }
+
+    private static func uniqueOrderedSteps(
+        _ steps: [String]
+    ) -> [String] {
+        var seen: Set<String> = []
+        return steps.filter { seen.insert($0).inserted }
     }
 
     private static func missingCapture(from capture: RunManifest.Capture) -> MissingCapture {

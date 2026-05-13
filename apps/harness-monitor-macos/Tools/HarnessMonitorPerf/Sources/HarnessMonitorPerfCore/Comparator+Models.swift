@@ -41,6 +41,7 @@ extension Comparator {
         public var currentFindings: [CaptureFinding]?
         public var newFindings: [CaptureFinding]?
         public var resolvedFindings: [CaptureFinding]?
+        public var appTrace: AppTraceComparison?
         public var topFrames: TopFramesPair?
 
         enum CodingKeys: String, CodingKey {
@@ -51,6 +52,7 @@ extension Comparator {
             case currentFindings = "current_findings"
             case newFindings = "new_findings"
             case resolvedFindings = "resolved_findings"
+            case appTrace = "app_trace"
             case topFrames = "top_frames"
         }
 
@@ -68,6 +70,7 @@ extension Comparator {
             try container.encodeIfPresent(currentFindings, forKey: .currentFindings)
             try container.encodeIfPresent(newFindings, forKey: .newFindings)
             try container.encodeIfPresent(resolvedFindings, forKey: .resolvedFindings)
+            try container.encodeIfPresent(appTrace, forKey: .appTrace)
             try container.encodeIfPresent(topFrames, forKey: .topFrames)
         }
 
@@ -99,6 +102,10 @@ extension Comparator {
                 [CaptureFinding].self,
                 forKey: .resolvedFindings
             )
+            appTrace = try container.decodeIfPresent(
+                AppTraceComparison.self,
+                forKey: .appTrace
+            )
             topFrames = try container.decodeIfPresent(TopFramesPair.self, forKey: .topFrames)
             if template == "Allocations" {
                 metrics = .allocations(
@@ -119,6 +126,7 @@ extension Comparator {
             currentFindings: [CaptureFinding]? = nil,
             newFindings: [CaptureFinding]? = nil,
             resolvedFindings: [CaptureFinding]? = nil,
+            appTrace: AppTraceComparison? = nil,
             topFrames: TopFramesPair?
         ) {
             self.scenario = scenario
@@ -130,6 +138,7 @@ extension Comparator {
             self.currentFindings = currentFindings
             self.newFindings = newFindings
             self.resolvedFindings = resolvedFindings
+            self.appTrace = appTrace
             self.topFrames = topFrames
         }
     }
@@ -187,6 +196,32 @@ extension Comparator {
     public struct TopFramesPair: Codable, Equatable {
         public var baseline: [Frame]
         public var current: [Frame]
+    }
+
+    public struct AppTraceSummary: Codable, Equatable {
+        public var eventCount: Int
+        public var components: [CaptureAppTrace.ComponentCount]
+        public var orderedSteps: [String]
+
+        enum CodingKeys: String, CodingKey {
+            case eventCount = "event_count"
+            case components
+            case orderedSteps = "ordered_steps"
+        }
+    }
+
+    public struct AppTraceComparison: Codable, Equatable {
+        public var baseline: AppTraceSummary?
+        public var current: AppTraceSummary?
+        public var newSteps: [String]
+        public var resolvedSteps: [String]
+
+        enum CodingKeys: String, CodingKey {
+            case baseline
+            case current
+            case newSteps = "new_steps"
+            case resolvedSteps = "resolved_steps"
+        }
     }
 
     public struct Frame: Codable, Equatable {
