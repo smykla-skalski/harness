@@ -18,7 +18,7 @@ private let appSearchSignposter = OSSignposter(
 /// changes.
 private struct AppSearchTrigger: Equatable {
   let query: String
-  let primary: AppSearchDomain?
+  let primary: AppSearchDomain
 }
 
 /// Toolbar-placed `.searchable` field that drives the cross-domain
@@ -69,48 +69,40 @@ public struct AppSearchHost: View {
   }
 
   public var body: some View {
-    Color.clear
-      .allowsHitTesting(false)
-      .overlay(alignment: .topTrailing) {
-        suggestionOverlay
-      }
-      .searchable(
-        text: $query,
-        placement: .toolbar,
-        prompt: prompt
+    ZStack(alignment: .topTrailing) {
+      AppSearchFieldSurface(
+        query: $query,
+        prompt: prompt,
+        isFocused: $isSearchFocused,
+        onSubmit: submitSearch
       )
-      .searchFocused($isSearchFocused)
-      .harnessMinimizableSearchToolbar()
-      .onSubmit(of: .search) {
-        submitSearch()
-      }
-      .task(
-        id: AppSearchTrigger(
-          query: query,
-          primary: resolvedPrimaryDomain
-        )
-      ) {
-        await runDebouncedSearch(for: query)
-      }
-      .task(id: shouldKeepSearchIndexActive) {
-        model.setPresented(shouldKeepSearchIndexActive)
-      }
-      .task {
-        automation?.handler = { command in
-          Task { @MainActor in
-            await applyAutomationCommand(command)
-          }
+
+      suggestionOverlay
+
+      AppSearchTaskAnchor(
+        trigger: AppSearchTrigger(query: query, primary: resolvedPrimaryDomain),
+        shouldKeepSearchIndexActive: shouldKeepSearchIndexActive,
+        runSearch: runDebouncedSearch,
+        setPresented: model.setPresented
+      )
+      .allowsHitTesting(false)
+    }
+    .task {
+      automation?.handler = { command in
+        Task { @MainActor in
+          await applyAutomationCommand(command)
         }
       }
-      .onDisappear {
-        automation?.handler = nil
+    }
+    .onDisappear {
+      automation?.handler = nil
+    }
+    .harnessFocusedSceneValue(\.harnessSidebarSearchFocusAction, searchFocusAction)
+    .task {
+      searchFocusDispatcher.handler = {
+        focusSearchField()
       }
-      .harnessFocusedSceneValue(\.harnessSidebarSearchFocusAction, searchFocusAction)
-      .task {
-        searchFocusDispatcher.handler = {
-          focusSearchField()
-        }
-      }
+    }
   }
 
   private var searchFocusAction: HarnessSidebarSearchFocus {
@@ -191,7 +183,7 @@ public struct AppSearchHost: View {
     }
   }
 
-  private func runDebouncedSearch(for liveQuery: String) async {
+  private func runDebouncedSearch(for trigger: AppSearchTrigger) async {
     do {
       try await Task.sleep(nanoseconds: appSearchDebounceNanoseconds)
     } catch {
@@ -200,7 +192,8 @@ public struct AppSearchHost: View {
     guard !Task.isCancelled else {
       return
     }
-    let primary = resolvedPrimaryDomain
+    let liveQuery = trigger.query
+    let primary = trigger.primary
     let signpostID = appSearchSignposter.makeSignpostID()
     let state = appSearchSignposter.beginInterval(
       "app_search_query",
@@ -220,6 +213,45 @@ public struct AppSearchHost: View {
     suggestionSnapshot = snapshot
   }
 
+}
+
+private struct AppSearchFieldSurface: View {
+  @Binding var query: String
+  let prompt: LocalizedStringKey
+  let isFocused: FocusState<Bool>.Binding
+  let onSubmit: () -> Void
+
+  var body: some View {
+    Color.clear
+      .allowsHitTesting(false)
+      .searchable(
+        text: $query,
+        placement: .toolbar,
+        prompt: prompt
+      )
+      .searchFocused(isFocused)
+      .harnessMinimizableSearchToolbar()
+      .onSubmit(of: .search) {
+        onSubmit()
+      }
+  }
+}
+
+private struct AppSearchTaskAnchor: View {
+  let trigger: AppSearchTrigger
+  let shouldKeepSearchIndexActive: Bool
+  let runSearch: (AppSearchTrigger) async -> Void
+  let setPresented: (Bool) -> Void
+
+  var body: some View {
+    Color.clear
+      .task(id: trigger) {
+        await runSearch(trigger)
+      }
+      .task(id: shouldKeepSearchIndexActive) {
+        setPresented(shouldKeepSearchIndexActive)
+      }
+  }
 }
 
 public struct AppSearchHostModifier: ViewModifier {
