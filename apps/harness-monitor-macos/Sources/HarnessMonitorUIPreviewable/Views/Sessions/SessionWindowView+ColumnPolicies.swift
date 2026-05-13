@@ -83,11 +83,14 @@ extension SessionWindowView {
     return prompt
   }
 
-  var decisionsCacheTrigger: SessionDecisionFilterKey {
-    SessionDecisionFilterKey(
+  var decisionsRefreshTrigger: SessionDecisionDataKey {
+    SessionDecisionDataKey(
       sessionID: token.sessionID,
-      decisions: store.supervisorOpenDecisions.filter { $0.sessionID == token.sessionID },
-      filters: stateCache.decisionFilters
+      decisions: store.supervisorOpenDecisions.filter { $0.sessionID == token.sessionID }
     )
+  }
+
+  @MainActor var decisionFilterTrigger: SessionDecisionFilterSnapshot {
+    SessionDecisionFilterSnapshot(filters: stateCache.decisionFilters)
   }
 }

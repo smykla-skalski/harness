@@ -158,6 +158,29 @@ extension SessionWindowFlowTests {
     #expect(splitSource.contains(".onMoveCommand"))
   }
 
+  @Test("Session decisions split data refresh from filter-only churn")
+  func sessionDecisionsSplitDataRefreshFromFilterOnlyChurn() throws {
+    let policySource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+ColumnPolicies.swift"
+    )
+    let presentationSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+Presentation.swift"
+    )
+    let columnsSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+Columns.swift"
+    )
+
+    #expect(policySource.contains("var decisionsRefreshTrigger: SessionDecisionDataKey"))
+    #expect(policySource.contains("var decisionFilterTrigger: SessionDecisionFilterSnapshot"))
+    #expect(presentationSource.contains(".task(id: decisionsRefreshTrigger)"))
+    #expect(presentationSource.contains("await refreshDecisionsCache()"))
+    #expect(presentationSource.contains(".task(id: decisionFilterTrigger)"))
+    #expect(presentationSource.contains("await refilterDecisionsCache()"))
+    #expect(columnsSource.contains("func refreshDecisionsCache() async"))
+    #expect(columnsSource.contains("stateCache.decisionRuntime.reloadAuditEvents("))
+    #expect(columnsSource.contains("func refilterDecisionsCache() async"))
+  }
+
   @Test("Session search results stay out of the toolbar search host body")
   func sessionSearchResultsDoNotInvalidateSearchFieldHost() throws {
     let source = try previewableSourceFile(named: "Views/Search/AppSearchHost.swift")

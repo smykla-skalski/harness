@@ -2,9 +2,9 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension SessionWindowView {
-  func recomputeDecisionsCache() async {
+  @MainActor
+  func refreshDecisionsCache() async {
     let all = store.supervisorOpenDecisions.filter { $0.sessionID == token.sessionID }
-    let decisionsByID = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
     let allIDs = Set(all.map(\.id))
     if all.map(\.id) != allSessionDecisionsCache.map(\.id) {
       allSessionDecisionsCache = all
@@ -12,6 +12,28 @@ extension SessionWindowView {
     if allIDs != allSessionDecisionIDsCache {
       allSessionDecisionIDsCache = allIDs
     }
+    stateCache.decisionRuntime.reloadAuditEvents(
+      from: store.modelContext,
+      sessionID: token.sessionID,
+      decisions: all
+    )
+    await refilterDecisionsCache(decisions: all, allDecisionIDs: allIDs)
+  }
+
+  @MainActor
+  func refilterDecisionsCache() async {
+    await refilterDecisionsCache(
+      decisions: allSessionDecisionsCache,
+      allDecisionIDs: allSessionDecisionIDsCache
+    )
+  }
+
+  @MainActor
+  private func refilterDecisionsCache(
+    decisions all: [Decision],
+    allDecisionIDs allIDs: Set<String>
+  ) async {
+    let decisionsByID = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
     stateCache.decisionRuntime.updateFilteredDecisions(
       input: SessionDecisionFilterInput(
         sessionID: token.sessionID,
@@ -39,11 +61,6 @@ extension SessionWindowView {
     if previousRouteDecisionID != routeDecisionID {
       stateCache.setRouteDecisionID(routeDecisionID)
     }
-    stateCache.decisionRuntime.reloadAuditEvents(
-      from: store.modelContext,
-      sessionID: token.sessionID,
-      decisions: all
-    )
     if let autoSelectedDecisionID = SessionDecisionAutoSelectionPolicy.preferredDecisionID(
       selection: stateCache.selection,
       sessionID: token.sessionID,

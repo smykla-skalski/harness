@@ -108,6 +108,38 @@ struct SessionDecisionRuntimeTests {
     #expect(firstKey != secondKey)
   }
 
+  @Test("Filter key changes when filter query changes")
+  func filterKeyChangesWhenFilterQueryChanges() {
+    let firstFilters = SessionDecisionFilterState()
+    let secondFilters = SessionDecisionFilterState()
+    secondFilters.query = "Escalate"
+    let decisions = [makeDecision(id: "d1", summary: "Escalate")]
+
+    let firstKey = SessionDecisionFilterKey(
+      sessionID: "s1",
+      decisions: decisions,
+      filters: firstFilters
+    )
+    let secondKey = SessionDecisionFilterKey(
+      sessionID: "s1",
+      decisions: decisions,
+      filters: secondFilters
+    )
+
+    #expect(firstKey != secondKey)
+  }
+
+  @Test("Decision data key changes when decision searchable fields change")
+  func decisionDataKeyChangesWhenDecisionSearchableFieldsChange() {
+    let first = makeDecision(id: "d1", summary: "Old summary")
+    let second = makeDecision(id: "d1", summary: "New summary")
+
+    let firstKey = SessionDecisionDataKey(sessionID: "s1", decisions: [first])
+    let secondKey = SessionDecisionDataKey(sessionID: "s1", decisions: [second])
+
+    #expect(firstKey != secondKey)
+  }
+
   @Test("Filter runtime emits apply signpost for the performance budget")
   func filterRuntimeEmitsApplySignpostForPerformanceBudget() throws {
     let source = try sourceFile(named: "SessionDecisionRuntime.swift")
