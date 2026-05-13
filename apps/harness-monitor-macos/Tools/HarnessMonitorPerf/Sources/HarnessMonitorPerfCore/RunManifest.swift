@@ -11,6 +11,7 @@ public struct RunManifest: Codable, Equatable {
     public var system: JSONValue?
     public var targets: JSONValue?
     public var selectedScenarios: [String]?
+    public var warnings: [String]?
     public var captures: [Capture]
 
     enum CodingKeys: String, CodingKey {
@@ -20,6 +21,7 @@ public struct RunManifest: Codable, Equatable {
         case system
         case targets
         case selectedScenarios = "selected_scenarios"
+        case warnings
         case captures
     }
 
@@ -32,6 +34,7 @@ public struct RunManifest: Codable, Equatable {
         public var endReason: String?
         /// Present in summary.json (filled by Summarizer); absent in manifest.json.
         public var metrics: JSONValue?
+        public var warnings: [String]?
 
         enum CodingKeys: String, CodingKey {
             case scenario
@@ -41,6 +44,7 @@ public struct RunManifest: Codable, Equatable {
             case exitStatus = "exit_status"
             case endReason = "end_reason"
             case metrics
+            case warnings
         }
     }
 
@@ -51,6 +55,7 @@ public struct RunManifest: Codable, Equatable {
         system: JSONValue? = nil,
         targets: JSONValue? = nil,
         selectedScenarios: [String]? = nil,
+        warnings: [String]? = nil,
         captures: [Capture] = []
     ) {
         self.label = label
@@ -59,6 +64,7 @@ public struct RunManifest: Codable, Equatable {
         self.system = system
         self.targets = targets
         self.selectedScenarios = selectedScenarios
+        self.warnings = warnings
         self.captures = captures
     }
 }

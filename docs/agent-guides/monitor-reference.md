@@ -91,6 +91,12 @@ Layer 1 is the XCTest performance test suite in
 - `XCTApplicationLaunchMetric(waitUntilResponsive:)`.
 - `XCTMemoryMetric(application:)` for backdrop/background/offline scenarios.
 
+Audit-backed scenarios live in `HarnessMonitorPerfScenario` plus
+`Tools/HarnessMonitorPerf/.../ScenarioCatalog.swift`. The
+`settings-database-scroll` hitch test is intentionally UI-test-only until the
+app-side perf driver can script that settings-window scroll path without
+runtime event injection.
+
 The perf driver in `HarnessMonitorAppSceneSupport.swift` uses
 `OSSignposter.beginAnimationInterval` / `endInterval` to mark scenario
 boundaries.

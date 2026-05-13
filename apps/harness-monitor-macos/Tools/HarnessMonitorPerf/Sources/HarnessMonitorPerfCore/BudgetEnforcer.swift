@@ -39,7 +39,9 @@ public enum BudgetEnforcer {
 
     private static func swiftUIFailures(_ capture: [String: Any]) -> [String] {
         guard let scenario = capture["scenario"] as? String else { return [] }
-        let metrics = capture["metrics"] as? [String: Any] ?? [:]
+        guard let metrics = capture["metrics"] as? [String: Any] else {
+            return ["\(scenario) SwiftUI metrics missing from summary"]
+        }
         let budget = Budgets.swiftUIByScenario[scenario] ?? Budgets.defaultSwiftUI
 
         let totalUpdates = number(metrics, "swiftui_updates", "total_count")
@@ -68,7 +70,9 @@ public enum BudgetEnforcer {
             let budget = Budgets.allocationsByScenario[scenario]
         else { return [] }
 
-        let metrics = capture["metrics"] as? [String: Any] ?? [:]
+        guard let metrics = capture["metrics"] as? [String: Any] else {
+            return ["\(scenario) Allocations metrics missing from summary"]
+        }
         let allocations = metrics["allocations"] as? [String: Any] ?? [:]
         let summaryRows = allocations["summary_rows"] as? [String: Any] ?? [:]
         let heap = summaryRows["All Heap Allocations"] as? [String: Any] ?? [:]

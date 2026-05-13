@@ -30,13 +30,43 @@ public enum Comparator {
         let baselineIndex = Dictionary(uniqueKeysWithValues:
             baseline.captures.map { (CaptureKey(scenario: $0.scenario, template: $0.template), $0) }
         )
+        let currentIndex = Dictionary(uniqueKeysWithValues:
+            current.captures.map { (CaptureKey(scenario: $0.scenario, template: $0.template), $0) }
+        )
 
         var comparisons: [CaptureComparison] = []
-        for capture in current.captures {
-            let key = CaptureKey(scenario: capture.scenario, template: capture.template)
-            guard let baselineCapture = baselineIndex[key] else { continue }
-            let entry = try compareCapture(current: capture, baseline: baselineCapture)
-            comparisons.append(entry)
+        var missingFromCurrent: [MissingCapture] = []
+        var missingFromBaseline: [MissingCapture] = []
+        var currentMissingMetrics: [MissingCapture] = []
+        var baselineMissingMetrics: [MissingCapture] = []
+
+        let allKeys = Set(currentIndex.keys).union(baselineIndex.keys).sorted {
+            ($0.scenario, $0.template) < ($1.scenario, $1.template)
+        }
+
+        for key in allKeys {
+            switch (currentIndex[key], baselineIndex[key]) {
+            case let (.some(currentCapture), .some(baselineCapture)):
+                let currentHasMetrics = currentCapture.metrics != nil
+                let baselineHasMetrics = baselineCapture.metrics != nil
+                if !currentHasMetrics {
+                    currentMissingMetrics.append(missingCapture(from: currentCapture))
+                }
+                if !baselineHasMetrics {
+                    baselineMissingMetrics.append(missingCapture(from: baselineCapture))
+                }
+                guard currentHasMetrics, baselineHasMetrics else {
+                    continue
+                }
+                let entry = try compareCapture(current: currentCapture, baseline: baselineCapture)
+                comparisons.append(entry)
+            case let (.some(currentCapture), .none):
+                missingFromBaseline.append(missingCapture(from: currentCapture))
+            case let (.none, .some(baselineCapture)):
+                missingFromCurrent.append(missingCapture(from: baselineCapture))
+            case (.none, .none):
+                continue
+            }
         }
 
         let comparison = Comparison(
@@ -44,6 +74,10 @@ public enum Comparator {
             baselineLabel: baseline.label,
             currentCreatedAtUTC: current.createdAtUTC,
             baselineCreatedAtUTC: baseline.createdAtUTC,
+            missingFromCurrent: missingFromCurrent,
+            missingFromBaseline: missingFromBaseline,
+            currentMissingMetrics: currentMissingMetrics,
+            baselineMissingMetrics: baselineMissingMetrics,
             comparisons: comparisons
         )
 
@@ -178,11 +212,37 @@ public enum Comparator {
         lines.append("- Current: `\(comparison.currentCreatedAtUTC ?? "")`")
         lines.append("")
 
-        if comparison.comparisons.isEmpty {
+        if comparison.comparisons.isEmpty
+            && comparison.missingFromCurrent.isEmpty
+            && comparison.missingFromBaseline.isEmpty
+            && comparison.currentMissingMetrics.isEmpty
+            && comparison.baselineMissingMetrics.isEmpty
+        {
             lines.append("No overlapping scenario/template captures were found between the two runs.")
             lines.append("")
             return lines.joined(separator: "\n")
         }
+
+        appendMissingSection(
+            title: "Missing from current",
+            items: comparison.missingFromCurrent,
+            to: &lines
+        )
+        appendMissingSection(
+            title: "Missing from baseline",
+            items: comparison.missingFromBaseline,
+            to: &lines
+        )
+        appendMissingSection(
+            title: "Current captures without metrics",
+            items: comparison.currentMissingMetrics,
+            to: &lines
+        )
+        appendMissingSection(
+            title: "Baseline captures without metrics",
+            items: comparison.baselineMissingMetrics,
+            to: &lines
+        )
 
         for item in comparison.comparisons {
             lines.append("## \(item.scenario) (\(item.template))")
@@ -220,6 +280,21 @@ public enum Comparator {
         return lines.joined(separator: "\n")
     }
 
+    private static func appendMissingSection(
+        title: String,
+        items: [MissingCapture],
+        to lines: inout [String]
+    ) {
+        guard !items.isEmpty else { return }
+        lines.append("## \(title)")
+        lines.append("")
+        for item in items {
+            let reasonSuffix = item.reason.map { " - \($0)" } ?? ""
+            lines.append("- `\(item.scenario)` (\(item.template))\(reasonSuffix)")
+        }
+        lines.append("")
+    }
+
     private static let swiftUIMetricOrder = [
         "total_updates", "body_updates", "p95_update_ms", "max_update_ms", "hitches", "potential_hangs",
     ]
@@ -230,6 +305,10 @@ public enum Comparator {
         public var baselineLabel: String?
         public var currentCreatedAtUTC: String?
         public var baselineCreatedAtUTC: String?
+        public var missingFromCurrent: [MissingCapture]
+        public var missingFromBaseline: [MissingCapture]
+        public var currentMissingMetrics: [MissingCapture]
+        public var baselineMissingMetrics: [MissingCapture]
         public var comparisons: [CaptureComparison]
 
         enum CodingKeys: String, CodingKey {
@@ -237,8 +316,18 @@ public enum Comparator {
             case baselineLabel = "baseline_label"
             case currentCreatedAtUTC = "current_created_at_utc"
             case baselineCreatedAtUTC = "baseline_created_at_utc"
+            case missingFromCurrent = "missing_from_current"
+            case missingFromBaseline = "missing_from_baseline"
+            case currentMissingMetrics = "current_missing_metrics"
+            case baselineMissingMetrics = "baseline_missing_metrics"
             case comparisons
         }
+    }
+
+    public struct MissingCapture: Codable, Equatable {
+        public var scenario: String
+        public var template: String
+        public var reason: String?
     }
 
     public struct CaptureComparison: Codable, Equatable {
@@ -290,6 +379,14 @@ public enum Comparator {
     public enum MetricsBlock: Equatable {
         case swiftUI([String: DeltaBlock])
         case allocations([String: [String: DeltaBlock]])
+    }
+
+    private static func missingCapture(from capture: RunManifest.Capture) -> MissingCapture {
+        MissingCapture(
+            scenario: capture.scenario,
+            template: capture.template,
+            reason: capture.warnings?.joined(separator: "; ")
+        )
     }
 
     public struct DeltaBlock: Codable, Equatable {

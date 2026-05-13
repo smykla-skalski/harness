@@ -16,6 +16,9 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
   case taskDetailFormVisualOptionsDisabled = "task-detail-form-visual-options-disabled"
   case sessionSearchFull = "session-search-full"
   case sessionSearchFullVisualOptionsDisabled = "session-search-full-visual-options-disabled"
+  case sidebarToggleRichDetail = "sidebar-toggle-rich-detail"
+  case sidebarToggleRichDetailVisualsOff =
+    "sidebar-toggle-rich-detail-visual-options-disabled"
   case timelineFilterForm = "timeline-filter-form"
   case timelineFilterFormVisualOptionsDisabled = "timeline-filter-form-visual-options-disabled"
   case permissionModal = "permission-modal"
@@ -46,6 +49,8 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
       .taskDetailFormVisualOptionsDisabled,
       .sessionSearchFull,
       .sessionSearchFullVisualOptionsDisabled,
+      .sidebarToggleRichDetail,
+      .sidebarToggleRichDetailVisualsOff,
       .timelineFilterForm,
       .timelineFilterFormVisualOptionsDisabled:
       return "dashboard-landing"
@@ -79,6 +84,8 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
       .taskDetailFormVisualOptionsDisabled,
       .sessionSearchFull,
       .sessionSearchFullVisualOptionsDisabled,
+      .sidebarToggleRichDetail,
+      .sidebarToggleRichDetailVisualsOff,
       .timelineFilterForm,
       .timelineFilterFormVisualOptionsDisabled,
       .permissionModal,
@@ -132,6 +139,7 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
       .decisionDetailFormVisualOptionsDisabled,
       .taskDetailFormVisualOptionsDisabled,
       .sessionSearchFullVisualOptionsDisabled,
+      .sidebarToggleRichDetailVisualsOff,
       .timelineFilterFormVisualOptionsDisabled:
       true
     case .openRecentWindow,
@@ -140,6 +148,7 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
       .decisionDetailForm,
       .taskDetailForm,
       .sessionSearchFull,
+      .sidebarToggleRichDetail,
       .timelineFilterForm,
       .permissionModal,
       .settingsBackdropCycle,
@@ -168,6 +177,8 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
       .taskDetailFormVisualOptionsDisabled,
       .timelineFilterForm,
       .timelineFilterFormVisualOptionsDisabled,
+      .sidebarToggleRichDetail,
+      .sidebarToggleRichDetailVisualsOff,
       .settingsBackdropCycle,
       .settingsBackgroundCycle,
       .timelineBurst,
@@ -193,6 +204,8 @@ extension HarnessMonitorPerfScenario {
       .taskDetailFormVisualOptionsDisabled,
       .sessionSearchFull,
       .sessionSearchFullVisualOptionsDisabled,
+      .sidebarToggleRichDetail,
+      .sidebarToggleRichDetailVisualsOff,
       .timelineFilterForm,
       .timelineFilterFormVisualOptionsDisabled,
       .permissionModal,
@@ -218,6 +231,9 @@ extension HarnessMonitorPerfScenario {
     case .taskDetailFormVisualOptionsDisabled: "task-detail-form-visual-options-disabled"
     case .sessionSearchFull: "session-search-full"
     case .sessionSearchFullVisualOptionsDisabled: "session-search-full-visual-options-disabled"
+    case .sidebarToggleRichDetail: "sidebar-toggle-rich-detail"
+    case .sidebarToggleRichDetailVisualsOff:
+      "sidebar-toggle-rich-detail-visual-options-disabled"
     case .timelineFilterForm: "timeline-filter-form"
     case .timelineFilterFormVisualOptionsDisabled: "timeline-filter-form-visual-options-disabled"
     case .permissionModal: "permission-modal"

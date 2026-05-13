@@ -9,11 +9,16 @@ extension HarnessMonitorPerfTests {
     "decision-detail-form-visual-options-disabled",
     "task-detail-form-visual-options-disabled",
     "session-search-full-visual-options-disabled",
+    "sidebar-toggle-rich-detail-visual-options-disabled",
     "timeline-filter-form-visual-options-disabled",
   ]
 
   func testOpenSessionWindowVisualOptionsDisabledHitchRate() {
     measureScenario("open-session-window-visual-options-disabled")
+  }
+
+  func testSidebarToggleRichDetailVisualOptionsDisabledHitchRate() {
+    measureScenario("sidebar-toggle-rich-detail-visual-options-disabled")
   }
 
   func testOpenSessionWindowVisualOptionsDisabledScenarioState() {
@@ -38,6 +43,33 @@ extension HarnessMonitorPerfTests {
     launched.terminate()
   }
 
+  func testSidebarToggleRichDetailVisualOptionsDisabledScenarioState() {
+    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+    let launched = launchForPerf(
+      app: app,
+      scenario: "sidebar-toggle-rich-detail-visual-options-disabled"
+    )
+    let sessionWindow = element(in: launched, identifier: Accessibility.sessionWindowShell)
+    let timelineFilterBar = element(
+      in: launched,
+      identifier: Accessibility.sessionTimelineFilterBar
+    )
+
+    waitForScenarioCompletion(
+      app: launched,
+      scenario: "sidebar-toggle-rich-detail-visual-options-disabled"
+    )
+
+    XCTAssertTrue(sessionWindow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(waitForElement(timelineFilterBar, timeout: Self.uiTimeout))
+    assertPerfVisualOptionsDisabled(
+      in: launched,
+      scenario: "sidebar-toggle-rich-detail-visual-options-disabled"
+    )
+
+    launched.terminate()
+  }
+
   func testVisualOptionsDisabledScenarioPreviewRouting() {
     for scenario in Self.visualOptionsDisabledScenarios {
       let expected = scenario.contains("decision-detail-form") ? "cockpit" : "dashboard-landing"
@@ -56,6 +88,7 @@ extension HarnessMonitorPerfTests {
     switch baseScenario {
     case "open-recent-window", "open-session-window",
       "agent-detail-form", "task-detail-form", "session-search-full",
+      "sidebar-toggle-rich-detail",
       "timeline-filter-form", "timeline-burst", "toast-overlay-churn":
       return "dashboard-landing"
     case "decision-detail-form", "permission-modal":

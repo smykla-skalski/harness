@@ -46,6 +46,11 @@ final class ComparatorTests: XCTestCase {
               }
             }
           }
+        },
+        {
+          "scenario": "baseline-only-scenario",
+          "template": "SwiftUI",
+          "warnings": ["metrics file missing: /tmp/baseline-only.json"]
         }
       ]
     }
@@ -100,6 +105,26 @@ final class ComparatorTests: XCTestCase {
         XCTAssertEqual(comparison.baselineLabel, "baseline")
         // Only overlapping (scenario, template) pairs survive: 2 captures.
         XCTAssertEqual(comparison.comparisons.count, 2)
+        XCTAssertEqual(
+            comparison.missingFromCurrent,
+            [
+                .init(
+                    scenario: "baseline-only-scenario",
+                    template: "SwiftUI",
+                    reason: "metrics file missing: /tmp/baseline-only.json"
+                ),
+            ]
+        )
+        XCTAssertEqual(
+            comparison.missingFromBaseline,
+            [
+                .init(
+                    scenario: "scenario-not-in-baseline",
+                    template: "SwiftUI",
+                    reason: nil
+                ),
+            ]
+        )
 
         let swiftui = try XCTUnwrap(comparison.comparisons.first { $0.template == "SwiftUI" })
         guard case .swiftUI(let metrics) = swiftui.metrics else {
@@ -125,6 +150,8 @@ final class ComparatorTests: XCTestCase {
 
         let markdown = try String(contentsOf: outputDir.appendingPathComponent("comparison.md"), encoding: .utf8)
         XCTAssertTrue(markdown.contains("Instruments Comparison: baseline -> current"))
+        XCTAssertTrue(markdown.contains("## Missing from current"))
+        XCTAssertTrue(markdown.contains("## Missing from baseline"))
         XCTAssertTrue(markdown.contains("## open-recent-window (SwiftUI)"))
         XCTAssertTrue(markdown.contains("| total_updates | 10000 | 11000 | 1000 |"))
         XCTAssertTrue(markdown.contains("| All Heap Allocations | total_bytes | 100 | 120 | 20 |"))
@@ -151,6 +178,49 @@ final class ComparatorTests: XCTestCase {
         XCTAssertTrue(markdown.contains("No overlapping scenario/template captures"))
     }
 
+    func testCompareReportsCapturesWithoutMetrics() throws {
+        let baseline = try writeSummary(
+            """
+            {
+              "label": "baseline",
+              "created_at_utc": "2026-04-01T00:00:00Z",
+              "captures": [
+                {
+                  "scenario": "open-recent-window",
+                  "template": "SwiftUI",
+                  "warnings": ["metrics file missing: /tmp/baseline.json"]
+                }
+              ]
+            }
+            """,
+            name: "baseline-missing.json"
+        )
+        let current = try writeSummary(Self.currentPayload, name: "current-missing.json")
+        let outputDir = workDir.appendingPathComponent("out-missing")
+
+        let comparison = try Comparator.compare(.init(
+            current: current, baseline: baseline, outputDir: outputDir
+        ))
+
+        XCTAssertTrue(comparison.comparisons.isEmpty)
+        XCTAssertEqual(
+            comparison.baselineMissingMetrics,
+            [
+                .init(
+                    scenario: "open-recent-window",
+                    template: "SwiftUI",
+                    reason: "metrics file missing: /tmp/baseline.json"
+                ),
+            ]
+        )
+        XCTAssertTrue(comparison.missingFromBaseline.contains { $0.scenario == "offline-cached-open" })
+        XCTAssertTrue(comparison.missingFromBaseline.contains { $0.scenario == "scenario-not-in-baseline" })
+
+        let markdown = try String(contentsOf: outputDir.appendingPathComponent("comparison.md"), encoding: .utf8)
+        XCTAssertTrue(markdown.contains("## Baseline captures without metrics"))
+        XCTAssertTrue(markdown.contains("metrics file missing"))
+    }
+
     func testCompareLoadsSummaryFromDirectory() throws {
         let runDir = workDir.appendingPathComponent("baseline-run")
         try FileManager.default.createDirectory(at: runDir, withIntermediateDirectories: true)
@@ -159,7 +229,7 @@ final class ComparatorTests: XCTestCase {
         )
         let manifest = try Comparator.loadSummary(runDir)
         XCTAssertEqual(manifest.label, "baseline")
-        XCTAssertEqual(manifest.captures.count, 2)
+        XCTAssertEqual(manifest.captures.count, 3)
     }
 
     func testCompareThrowsWhenSummaryMissing() {

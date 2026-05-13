@@ -244,7 +244,7 @@ private struct OpenRecentStartPanel: View {
       .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
     .scaledFont(.body)
-    .harnessPlainButtonStyle()
+    .harnessActionButtonStyle(variant: .borderless)
     .foregroundStyle(.secondary)
     .background {
       RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -317,7 +317,7 @@ private struct OpenRecentSessionRow: View {
       .frame(maxWidth: .infinity, minHeight: 28 * layoutScale, alignment: .leading)
       .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
-    .harnessPlainButtonStyle()
+    .harnessActionButtonStyle(variant: .borderless)
     .foregroundStyle(.secondary)
     .background {
       RoundedRectangle(cornerRadius: 8, style: .continuous)

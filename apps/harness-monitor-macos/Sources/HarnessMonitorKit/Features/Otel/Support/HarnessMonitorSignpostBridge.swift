@@ -16,17 +16,31 @@ public final class HarnessMonitorSignpostBridge: @unchecked Sendable {
 
   public func beginInterval(name: StaticString) -> (OSSignpostIntervalState, any Span) {
     let state = signposter.beginInterval(name, id: .exclusive)
-    let nameString = "\(name)"
-    let span = HarnessMonitorTelemetry.shared.startSpan(
-      name: "perf.\(nameString)",
-      kind: .internal,
-      attributes: ["perf.signpost.name": .string(nameString)]
-    )
+    let span = startSpan(for: name)
     let key = ObjectIdentifier(state as AnyObject)
     lock.withLock {
       activeIntervals[key] = span
     }
     return (state, span)
+  }
+
+  public func beginAnimationInterval(name: StaticString) -> (OSSignpostIntervalState, any Span) {
+    let state = signposter.beginAnimationInterval(name, id: .exclusive)
+    let span = startSpan(for: name)
+    let key = ObjectIdentifier(state as AnyObject)
+    lock.withLock {
+      activeIntervals[key] = span
+    }
+    return (state, span)
+  }
+
+  private func startSpan(for name: StaticString) -> any Span {
+    let nameString = "\(name)"
+    return HarnessMonitorTelemetry.shared.startSpan(
+      name: "perf.\(nameString)",
+      kind: .internal,
+      attributes: ["perf.signpost.name": .string(nameString)]
+    )
   }
 
   public func endInterval(name: StaticString, state: OSSignpostIntervalState) {
@@ -45,6 +59,22 @@ public final class HarnessMonitorSignpostBridge: @unchecked Sendable {
     _ operation: @MainActor () async throws -> T
   ) async rethrows -> T {
     let (state, _) = beginInterval(name: name)
+    defer {
+      if flushOnCompletion {
+        HarnessMonitorTelemetry.shared.forceFlush()
+      }
+    }
+    defer { endInterval(name: name, state: state) }
+    return try await operation()
+  }
+
+  @MainActor
+  public func withAnimationInterval<T>(
+    name: StaticString,
+    flushOnCompletion: Bool = false,
+    _ operation: @MainActor () async throws -> T
+  ) async rethrows -> T {
+    let (state, _) = beginAnimationInterval(name: name)
     defer {
       if flushOnCompletion {
         HarnessMonitorTelemetry.shared.forceFlush()

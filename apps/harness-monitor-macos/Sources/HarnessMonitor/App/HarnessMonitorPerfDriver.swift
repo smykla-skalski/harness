@@ -49,14 +49,14 @@ enum HarnessMonitorPerfDriver {
   ) async -> ScenarioResult {
     let result: ScenarioResult
     #if HARNESS_FEATURE_OTEL
-      result = await signpostBridge.withInterval(
+      result = await signpostBridge.withAnimationInterval(
         name: scenario.signpostName,
         flushOnCompletion: true
       ) {
         await runScenario(scenario, store: store, openWindow: openWindow)
       }
     #else
-      let state = signposter.beginInterval(scenario.signpostName, id: .exclusive)
+      let state = signposter.beginAnimationInterval(scenario.signpostName, id: .exclusive)
       defer { signposter.endInterval(scenario.signpostName, state) }
       result = await runScenario(scenario, store: store, openWindow: openWindow)
     #endif
@@ -96,6 +96,19 @@ enum HarnessMonitorPerfDriver {
         store: store,
         openWindow: openWindow
       )
+    case .sidebarToggleRichDetail,
+      .sidebarToggleRichDetailVisualsOff:
+      guard
+        await ensureSessionWindow(
+          sessionID: PreviewFixtures.summary.sessionId,
+          store: store,
+          openWindow: openWindow
+        )
+      else {
+        return .failed("session-window-timeout")
+      }
+      await settle(.milliseconds(2_800))
+      return .completed
     case .agentDetailForm,
       .agentDetailFormVisualOptionsDisabled,
       .decisionDetailForm,
@@ -144,6 +157,8 @@ enum HarnessMonitorPerfDriver {
     case .openRecentWindow,
       .openSessionWindow,
       .openSessionWindowVisualOptionsDisabled,
+      .sidebarToggleRichDetail,
+      .sidebarToggleRichDetailVisualsOff,
       .settingsBackdropCycle,
       .settingsBackgroundCycle,
       .timelineBurst,
@@ -173,6 +188,8 @@ enum HarnessMonitorPerfDriver {
       .taskDetailFormVisualOptionsDisabled,
       .sessionSearchFull,
       .sessionSearchFullVisualOptionsDisabled,
+      .sidebarToggleRichDetail,
+      .sidebarToggleRichDetailVisualsOff,
       .timelineFilterForm,
       .timelineFilterFormVisualOptionsDisabled,
       .permissionModal,
@@ -204,6 +221,8 @@ enum HarnessMonitorPerfDriver {
       .taskDetailFormVisualOptionsDisabled,
       .sessionSearchFull,
       .sessionSearchFullVisualOptionsDisabled,
+      .sidebarToggleRichDetail,
+      .sidebarToggleRichDetailVisualsOff,
       .timelineFilterForm,
       .timelineFilterFormVisualOptionsDisabled,
       .permissionModal,

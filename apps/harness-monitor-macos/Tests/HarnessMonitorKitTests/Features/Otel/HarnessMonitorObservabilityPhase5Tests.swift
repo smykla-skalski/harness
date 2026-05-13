@@ -78,8 +78,8 @@ struct HarnessMonitorObservabilityPhase5Tests {
     #expect(!span.isRecording)
   }
 
-  @Test("Signpost bridge measures an async interval and exports the scenario span")
-  func signpostBridgeMeasuresAsyncIntervalAndExportsScenarioSpan() async throws {
+  @Test("Signpost bridge measures an async animation interval and exports the scenario span")
+  func signpostBridgeMeasuresAsyncAnimationIntervalAndExportsScenarioSpan() async throws {
     let collector = try GRPCCollectorServer()
     defer {
       collector.shutdown()
@@ -93,7 +93,7 @@ struct HarnessMonitorObservabilityPhase5Tests {
     HarnessMonitorTelemetry.shared.bootstrap(using: environment)
 
     let bridge = HarnessMonitorSignpostBridge()
-    let result = await bridge.withInterval(name: "open-recent-window") {
+    let result = await bridge.withAnimationInterval(name: "open-recent-window") {
       "measured"
     }
     #expect(result == "measured")
@@ -124,7 +124,7 @@ struct HarnessMonitorObservabilityPhase5Tests {
     HarnessMonitorTelemetry.shared.bootstrap(using: environment)
 
     let bridge = HarnessMonitorSignpostBridge()
-    await bridge.withInterval(
+    await bridge.withAnimationInterval(
       name: "open-recent-window",
       flushOnCompletion: true
     ) {

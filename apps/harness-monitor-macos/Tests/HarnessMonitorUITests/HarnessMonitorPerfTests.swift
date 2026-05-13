@@ -144,6 +144,26 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     launched.terminate()
   }
 
+  func testSidebarToggleRichDetailScenarioState() {
+    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+    let launched = launchForPerf(app: app, scenario: "sidebar-toggle-rich-detail")
+    let sessionWindow = element(in: launched, identifier: Accessibility.sessionWindowShell)
+    let timelineFilterBar = element(
+      in: launched,
+      identifier: Accessibility.sessionTimelineFilterBar
+    )
+
+    waitForScenarioCompletion(app: launched, scenario: "sidebar-toggle-rich-detail")
+
+    XCTAssertTrue(sessionWindow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(
+      waitForElement(timelineFilterBar, timeout: Self.uiTimeout),
+      "Sidebar toggle perf scenario should finish on the timeline surface"
+    )
+
+    launched.terminate()
+  }
+
   func testTimelineFilterFormScenarioState() {
     let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
     let launched = launchForPerf(app: app, scenario: "timeline-filter-form")
