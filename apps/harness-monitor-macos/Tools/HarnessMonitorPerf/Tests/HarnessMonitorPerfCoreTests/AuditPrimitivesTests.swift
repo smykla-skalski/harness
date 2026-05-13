@@ -103,6 +103,17 @@ final class AuditPrimitivesTests: AuditTempDirectoryTestCase {
         XCTAssertLessThan(Date().timeIntervalSince(start), 2)
     }
 
+    func testProcessRunnerReturnsStdoutWhenTimeoutIsUnused() throws {
+        let result = try ProcessRunner.run(
+            "/bin/sh",
+            arguments: ["-c", "printf 'ready'"],
+            timeoutSeconds: 5
+        )
+        XCTAssertEqual(result.exitStatus, 0)
+        XCTAssertEqual(result.stdoutString, "ready")
+        XCTAssertFalse(result.timedOut)
+    }
+
     // MARK: - HostStager
 
     func testHostStagerUsesUniqueAuditBundleName() throws {
