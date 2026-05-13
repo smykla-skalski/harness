@@ -136,6 +136,7 @@ Treat those files as a stable contract:
 
 Machine-readable schema snapshots for the JSON outputs live under
 `apps/harness-monitor-macos/Tools/HarnessMonitorPerf/Schemas/`.
+Regenerate them with `mise run monitor:tools:generate:schemas`.
 
 Before trusting a regression result, verify at least:
 
@@ -155,6 +156,12 @@ For release validation, align local and field telemetry with the same labels:
 | `potential_hangs` | MetricKit hang diagnostics and Organizer hang-rate summaries |
 | allocation growth in audit outputs | Organizer memory trends and MetricKit memory diagnostics |
 | scenario-specific regressions | App Store Connect Performance API / Organizer release-over-release comparisons |
+
+Normalize those sources into audit-vocabulary outputs with:
+
+```bash
+mise run monitor:tools:field-telemetry -- --input <field-telemetry-input.json> --output-dir <dir>
+```
 
 ## SwiftUI rules and research
 

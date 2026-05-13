@@ -1,4 +1,5 @@
 import XCTest
+@testable import HarnessMonitorPerfCore
 
 final class AuditContractDocsTests: XCTestCase {
     private func readRepoFile(_ relativePath: String) throws -> String {
@@ -12,6 +13,8 @@ final class AuditContractDocsTests: XCTestCase {
         let mise = try readRepoFile(".mise.toml")
         XCTAssertTrue(mise.contains(#"[tasks."monitor:test:scripts"]"#))
         XCTAssertTrue(mise.contains(#"[tasks."monitor:tools:test:perf"]"#))
+        XCTAssertTrue(mise.contains(#"[tasks."monitor:tools:generate:schemas"]"#))
+        XCTAssertTrue(mise.contains(#"[tasks."monitor:tools:field-telemetry"]"#))
         XCTAssertTrue(mise.contains(#"[tasks."monitor:audit"]"#))
         XCTAssertTrue(mise.contains(#"[tasks."monitor:audit:from-ref"]"#))
     }
@@ -42,6 +45,8 @@ final class AuditContractDocsTests: XCTestCase {
         XCTAssertTrue(readme.contains("`app_trace`"))
         XCTAssertTrue(readme.contains("`findings`"))
         XCTAssertTrue(readme.contains("app-trace pair/diff"))
+        XCTAssertTrue(readme.contains("monitor:tools:generate:schemas"))
+        XCTAssertTrue(readme.contains("monitor:tools:field-telemetry"))
         XCTAssertTrue(readme.contains("`debug-retention.json`"))
     }
 
@@ -52,6 +57,8 @@ final class AuditContractDocsTests: XCTestCase {
         XCTAssertTrue(guide.contains("App Store Connect Performance API"))
         XCTAssertTrue(guide.contains("launch_app_init_to_ready_ms"))
         XCTAssertTrue(guide.contains("potential_hangs"))
+        XCTAssertTrue(guide.contains("monitor:tools:generate:schemas"))
+        XCTAssertTrue(guide.contains("monitor:tools:field-telemetry"))
     }
 
     func testAuditOutputSchemasExistAndStayMachineReadable() throws {
@@ -68,6 +75,29 @@ final class AuditContractDocsTests: XCTestCase {
         XCTAssertNoThrow(try jsonObject(from: manifest))
         XCTAssertNoThrow(try jsonObject(from: summary))
         XCTAssertNoThrow(try jsonObject(from: comparison))
+
+        let generatedDir = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent("perf-schema-snapshots-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: generatedDir) }
+        try SchemaSnapshots.write(to: generatedDir)
+
+        let generatedManifest = try String(
+            contentsOf: generatedDir.appendingPathComponent("manifest.schema.json"),
+            encoding: .utf8
+        )
+        let generatedSummary = try String(
+            contentsOf: generatedDir.appendingPathComponent("summary.schema.json"),
+            encoding: .utf8
+        )
+        let generatedComparison = try String(
+            contentsOf: generatedDir.appendingPathComponent("comparison.schema.json"),
+            encoding: .utf8
+        )
+        let regenerationHint =
+            "Run `mise run monitor:tools:generate:schemas` and commit the updated snapshots."
+        XCTAssertEqual(manifest, generatedManifest, regenerationHint)
+        XCTAssertEqual(summary, generatedSummary, regenerationHint)
+        XCTAssertEqual(comparison, generatedComparison, regenerationHint)
 
         XCTAssertTrue(manifest.contains("\"build_provenance\""))
         XCTAssertTrue(manifest.contains("\"staged_host_bundle_id\""))

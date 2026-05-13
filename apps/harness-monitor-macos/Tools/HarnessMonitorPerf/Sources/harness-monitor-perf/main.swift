@@ -11,6 +11,7 @@ struct HarnessMonitorPerf: ParsableCommand {
             Audit.self,
             AuditFromRef.self,
             Compare.self,
+            FieldTelemetryReportCommand.self,
             Summarize.self,
             Extract.self,
             Recap.self,
@@ -20,6 +21,7 @@ struct HarnessMonitorPerf: ParsableCommand {
             WriteManifest.self,
             VerifyManifest.self,
             MeasurePreviewLatency.self,
+            WriteSchemas.self,
         ],
         defaultSubcommand: nil
     )
@@ -74,6 +76,34 @@ struct Compare: ParsableCommand {
             _ = try HarnessMonitorPerfCore.Comparator.compare(inputs)
         } catch let failure as HarnessMonitorPerfCore.Comparator.Failure {
             FileHandle.standardError.write(Data((failure.message + "\n").utf8))
+            throw ExitCode(1)
+        }
+    }
+}
+
+struct FieldTelemetryReportCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "field-telemetry-report",
+        abstract: "Normalize field telemetry inputs into audit-vocabulary JSON and markdown."
+    )
+
+    @Option(name: .long, help: "Input JSON with metric_kit / organizer / app_store_connect_performance_api sections.")
+    var input: String
+
+    @Option(name: .long, help: "Output directory for field-telemetry.{json,md}.")
+    var outputDir: String
+
+    func run() throws {
+        do {
+            let data = try Data(contentsOf: URL(fileURLWithPath: input))
+            let inputs = try JSONDecoder().decode(FieldTelemetryReportWriter.Inputs.self, from: data)
+            let report = FieldTelemetryReportWriter.build(inputs: inputs)
+            try FieldTelemetryReportWriter.write(
+                report: report,
+                to: URL(fileURLWithPath: outputDir)
+            )
+        } catch {
+            FileHandle.standardError.write(Data(("unable to write field telemetry report: \(error)\n").utf8))
             throw ExitCode(1)
         }
     }
@@ -150,6 +180,25 @@ struct Extract: ParsableCommand {
             _ = try ExtractorOrchestrator.extract(runDir: url, exporter: exporter)
         } catch let failure as ExtractorOrchestrator.Failure {
             FileHandle.standardError.write(Data((failure.message + "\n").utf8))
+            throw ExitCode(1)
+        }
+    }
+}
+
+struct WriteSchemas: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "write-schemas",
+        abstract: "Write the generated audit JSON schema snapshots."
+    )
+
+    @Option(name: .long, help: "Output directory for manifest/summary/comparison schema snapshots.")
+    var outputDir: String
+
+    func run() throws {
+        do {
+            try SchemaSnapshots.write(to: URL(fileURLWithPath: outputDir))
+        } catch {
+            FileHandle.standardError.write(Data(("unable to write schemas: \(error)\n").utf8))
             throw ExitCode(1)
         }
     }
