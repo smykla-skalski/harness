@@ -45,6 +45,8 @@ struct HarnessMonitorApp: App {
     HarnessMonitorLaunchBehavior.defaultValue.rawValue
 
   init() {
+    HarnessMonitorPerfLaunchMetricsRecorder.bootstrap()
+
     UserDefaults.standard.register(defaults: [
       "NSUseAnimatedFocusRing": false,
       SessionWindowKeyboardShortcutOverlaySettings.storageKey:

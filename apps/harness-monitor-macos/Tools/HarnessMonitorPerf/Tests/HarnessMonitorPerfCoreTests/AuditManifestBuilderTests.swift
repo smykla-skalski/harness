@@ -43,7 +43,14 @@ final class AuditManifestBuilderTests: AuditTempDirectoryTestCase {
                     exitStatus: 0, endReason: "completed",
                     previewScenario: "dashboard-landing",
                     launchedProcessPath: "/staged.app/MacOS/Bin",
-                    daemonDataHome: "/tmp/run-1/dh"
+                    daemonDataHome: "/tmp/run-1/dh",
+                    launchMetrics: .init(
+                        appInitToReadyMilliseconds: 350,
+                        measuredFrom: "app_init",
+                        stateLabel: "running",
+                        windowID: "open-recent",
+                        includesBootstrapInScenarioMeasurement: true
+                    )
                 ),
             ]
         )
@@ -58,6 +65,10 @@ final class AuditManifestBuilderTests: AuditTempDirectoryTestCase {
         XCTAssertEqual(capture.launchArguments, ["-ApplePersistenceIgnoreState", "YES"])
         XCTAssertEqual(capture.daemonDataHomeProbe?.dataHome, "/tmp/run-1/dh")
         XCTAssertFalse(capture.daemonDataHomeProbe?.containsSQLiteDatabase ?? true)
+        XCTAssertEqual(capture.launchMetrics?.appInitToReadyMilliseconds, 350)
+        XCTAssertTrue(
+            capture.metricTiers?.hardBudget.contains(MetricName.launchAppInitToReadyMs) == true
+        )
 
         let url = workDir.appendingPathComponent("manifest.json")
         try ManifestBuilder.write(manifest, to: url)

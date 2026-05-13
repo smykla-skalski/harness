@@ -138,6 +138,7 @@ public enum ManifestBuilder {
         public var launchedProcessPath: String
         public var daemonDataHome: String
         public var daemonDataHomeProbe: DaemonDataHomeProbe?
+        public var launchMetrics: CaptureLaunchMetrics?
 
         public init(
             scenario: String,
@@ -149,7 +150,8 @@ public enum ManifestBuilder {
             previewScenario: String,
             launchedProcessPath: String,
             daemonDataHome: String,
-            daemonDataHomeProbe: DaemonDataHomeProbe? = nil
+            daemonDataHomeProbe: DaemonDataHomeProbe? = nil,
+            launchMetrics: CaptureLaunchMetrics? = nil
         ) {
             self.scenario = scenario
             self.template = template
@@ -162,6 +164,7 @@ public enum ManifestBuilder {
             self.daemonDataHome = daemonDataHome
             self.daemonDataHomeProbe =
                 daemonDataHomeProbe ?? .unknown(dataHome: daemonDataHome)
+            self.launchMetrics = launchMetrics
         }
     }
 
@@ -177,6 +180,8 @@ public enum ManifestBuilder {
         public var environment: [String: String]
         public var launchArguments: [String]
         public var daemonDataHomeProbe: DaemonDataHomeProbe?
+        public var launchMetrics: CaptureLaunchMetrics?
+        public var metricTiers: CaptureMetricTiers?
 
         enum CodingKeys: String, CodingKey {
             case scenario
@@ -190,6 +195,8 @@ public enum ManifestBuilder {
             case environment
             case launchArguments = "launch_arguments"
             case daemonDataHomeProbe = "daemon_data_home_probe"
+            case launchMetrics = "launch_metrics"
+            case metricTiers = "metric_tiers"
         }
     }
 
@@ -279,7 +286,12 @@ public enum ManifestBuilder {
                 launchedProcessPath: record.launchedProcessPath,
                 environment: environment,
                 launchArguments: inputs.launchArguments,
-                daemonDataHomeProbe: record.daemonDataHomeProbe
+                daemonDataHomeProbe: record.daemonDataHomeProbe,
+                launchMetrics: record.launchMetrics,
+                metricTiers: MetricTierCatalog.tiers(
+                    for: record.scenario,
+                    template: record.template
+                )
             )
         }
 

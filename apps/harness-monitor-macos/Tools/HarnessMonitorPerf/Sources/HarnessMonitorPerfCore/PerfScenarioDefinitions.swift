@@ -18,6 +18,7 @@ struct PerfScenarioDefinition: Decodable, Sendable, Equatable {
     let needsPreviewAcpPermissionBatch: Bool
     let includesBootstrapInMeasurement: Bool
     let durationSeconds: Int
+    let launchBudgetMilliseconds: Double?
     let templates: [PerfScenarioTemplate]
     let swiftUIBudget: Budgets.SwiftUIBudget?
     let allocationsBudget: Budgets.AllocationsBudget?

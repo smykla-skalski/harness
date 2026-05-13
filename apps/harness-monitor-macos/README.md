@@ -36,6 +36,10 @@ mise run monitor:audit -- --label after-fix --compare-to tmp/perf/harness-monito
 mise run monitor:audit:from-ref -- --ref <sha-or-ref> --label baseline
 ```
 
+Audit runs now persist per-capture `launch_metrics` in the manifest/summary,
+surface `launch_app_init_to_ready_ms` in `summary.csv`, and render comparison
+markdown with separate hard-budget and investigative metric sections.
+
 When you only need part of the graph, use the manifest tags for focused generation, for example:
 
 ```bash

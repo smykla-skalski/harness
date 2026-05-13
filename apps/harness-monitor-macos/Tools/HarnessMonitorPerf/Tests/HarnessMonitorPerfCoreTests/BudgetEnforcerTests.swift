@@ -18,7 +18,8 @@ final class BudgetEnforcerTests: XCTestCase {
     func testSwiftUIBudgetsFlagAllOverages() throws {
         let data = try fixtureData("summary-fail-swiftui")
         let failures = BudgetEnforcer.collectFailures(summaryJSON: data)
-        XCTAssertEqual(failures.count, 5)
+        XCTAssertEqual(failures.count, 6)
+        XCTAssertTrue(failures.contains { $0.contains(MetricName.launchAppInitToReadyMs) })
         XCTAssertTrue(failures.contains { $0.contains("total_updates exceeded") })
         XCTAssertTrue(failures.contains { $0.contains("body_updates exceeded") })
         XCTAssertTrue(failures.contains { $0.contains("max_update_group_ms exceeded") })
@@ -86,7 +87,8 @@ final class BudgetEnforcerTests: XCTestCase {
         ]
         let data = try! JSONSerialization.data(withJSONObject: payload)
         let failures = BudgetEnforcer.collectFailures(summaryJSON: data)
-        XCTAssertEqual(failures.count, 2)
+        XCTAssertEqual(failures.count, 3)
+        XCTAssertTrue(failures.contains("open-recent-window Launch metrics missing from summary"))
         XCTAssertTrue(failures.contains("open-recent-window SwiftUI metrics missing from summary"))
         XCTAssertTrue(failures.contains("offline-cached-open Allocations metrics missing from summary"))
     }
@@ -94,6 +96,7 @@ final class BudgetEnforcerTests: XCTestCase {
     func testCatalogParityWithAuditDefinitions() {
         XCTAssertEqual(Set(Budgets.swiftUIByScenario.keys), ScenarioCatalog.swiftUI)
         XCTAssertEqual(Set(Budgets.allocationsByScenario.keys), ScenarioCatalog.allocations)
+        XCTAssertEqual(Set(Budgets.launchByScenario.keys), ["open-recent-window"])
         XCTAssertEqual(Budgets.defaultSwiftUI.totalUpdates, 35_000)
         XCTAssertEqual(Budgets.retainedRunSizeKiB, 10_240)
     }
