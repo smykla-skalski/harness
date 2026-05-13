@@ -102,8 +102,8 @@ public struct AppSearchHostModifier: ViewModifier {
           shouldRebind: !query.isEmpty && isSearchPresented
         )
       }
-      .onChange(of: isSearchPresented, initial: true) { _, newValue in
-        model.setPresented(newValue)
+      .task(id: isSearchPresented) {
+        model.setPresented(isSearchPresented)
       }
       .task(id: automationCommand) {
         let command = automationCommand
