@@ -235,12 +235,15 @@ struct SessionSwiftUISourceTests {
     #expect(!rowSource.contains("deadlineStatus("))
   }
 
-  @Test("App search reindex tasks attach only while search is visible")
-  func appSearchReindexTasksAttachOnlyWhileSearchIsVisible() throws {
+  @Test("App search reindex tasks attach from a tiny active-search anchor")
+  func appSearchReindexTasksAttachFromTinyActiveSearchAnchor() throws {
     let searchUpdaterSource = try sourceFile(at: "Views/Search/AppSearchIndexUpdater.swift")
 
-    #expect(searchUpdaterSource.contains("@ViewBuilder\n  func body(content: Content)"))
+    #expect(searchUpdaterSource.contains("struct AppSearchIndexUpdater: View"))
+    #expect(searchUpdaterSource.contains("@ViewBuilder var body: some View"))
     #expect(searchUpdaterSource.contains("if model.isPresented {"))
+    #expect(searchUpdaterSource.contains("Color.clear"))
+    #expect(searchUpdaterSource.contains(".frame(width: 0, height: 0)"))
     #expect(searchUpdaterSource.contains(".task(id: agentSignature)"))
     #expect(searchUpdaterSource.contains(".task(id: decisionSignature)"))
     #expect(searchUpdaterSource.contains(".task(id: taskSignature)"))

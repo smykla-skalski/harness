@@ -212,12 +212,9 @@ public struct SessionWindowView: View {
           decisionIDs: allSessionDecisions.map(\.id)
         )
       )
-      .modifier(SessionWindowSearchMirror(stateCache: stateCache, renderedRoute: renderedRoute))
-      .modifier(appSearchIndexUpdaterModifier)
-      .background(
-        SessionWindowModifierKeysMonitor(currentModifiers: $currentModifiers)
-          .frame(width: 0, height: 0)
-          .accessibilityHidden(true))
+      .background {
+        sessionWindowBackgroundAnchors(currentModifiers: $currentModifiers)
+      }
   }
 
   private var bodyContent: some View {
@@ -241,6 +238,7 @@ public struct SessionWindowView: View {
       sessionSurface
     }
   }
+
   private func sessionWindowSelectionObservers<Content: View>(
     _ content: Content
   ) -> some View {

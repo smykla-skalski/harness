@@ -12,12 +12,12 @@ private struct AppSearchDomainSignature: Hashable {
   let lastID: String?
 }
 
-/// Drives ``AppSearchIndex`` re-indexing from the four session-window
-/// data sources. Each domain's `.task(id:)` is attached only while search
-/// is active, then cancels and reschedules whenever its
-/// signature changes. Closed search keeps these task-state modifiers out
-/// of the session window tree so startup and timeline churn do not create
-/// no-op reindex task transactions.
+/// Drives ``AppSearchIndex`` re-indexing from a zero-size anchor rather
+/// than wrapping the full session window. Each domain's `.task(id:)` is
+/// attached only while search is active, then cancels and reschedules
+/// whenever its signature changes. Closed search keeps these task-state
+/// nodes out of the expensive session layout graph so startup, sidebar,
+/// and timeline churn do not create no-op reindex transactions.
 ///
 /// The active-flag is read directly from the shared
 /// ``AppSearchModel`` rather than `@Environment`. The host modifier
@@ -29,7 +29,7 @@ private struct AppSearchDomainSignature: Hashable {
 /// The decisions snapshot crosses the actor boundary as
 /// ``DecisionSearchProjection`` values built on the MainActor before
 /// the actor hop. `Decision` is an `@Model` class and is not Sendable.
-struct AppSearchIndexUpdater: ViewModifier {
+struct AppSearchIndexUpdater: View {
   let model: AppSearchModel
   let index: AppSearchIndex
   let agents: [AgentRegistration]
@@ -37,10 +37,11 @@ struct AppSearchIndexUpdater: ViewModifier {
   let tasks: [WorkItem]
   let events: [TimelineEntry]
 
-  @ViewBuilder
-  func body(content: Content) -> some View {
+  @ViewBuilder var body: some View {
     if model.isPresented {
-      content
+      Color.clear
+        .frame(width: 0, height: 0)
+        .accessibilityHidden(true)
         .task(id: agentSignature) {
           await index.reindex(agents: agents)
         }
@@ -63,7 +64,9 @@ struct AppSearchIndexUpdater: ViewModifier {
           await index.reindex(events: events)
         }
     } else {
-      content
+      Color.clear
+        .frame(width: 0, height: 0)
+        .accessibilityHidden(true)
     }
   }
 
