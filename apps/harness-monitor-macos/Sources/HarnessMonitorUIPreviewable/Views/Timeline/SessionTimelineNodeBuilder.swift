@@ -256,7 +256,10 @@ private struct SessionTimelineDecisionIndex {
   let decisionsBySessionID: [String: [SessionTimelineDecisionSnapshot]]
 
   init(decisions: [Decision]) {
-    let snapshots = decisions.map(SessionTimelineDecisionSnapshot.init(decision:))
+    let actionsDecoder = JSONDecoder()
+    let snapshots = decisions.map {
+      SessionTimelineDecisionSnapshot(decision: $0, actionsDecoder: actionsDecoder)
+    }
     decisionsByID = Dictionary(uniqueKeysWithValues: snapshots.map { ($0.id, $0) })
     let pairs = snapshots.compactMap { snapshot in
       snapshot.sessionID.map { (sessionID: $0, snapshot: snapshot) }
