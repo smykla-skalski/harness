@@ -9,6 +9,5 @@ extension SessionWindowView {
       automation: searchAutomation,
       routeAction: appSearchRouteAction
     )
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
   }
 }
