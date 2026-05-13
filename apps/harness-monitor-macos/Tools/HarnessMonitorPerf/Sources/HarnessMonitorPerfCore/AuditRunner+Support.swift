@@ -215,11 +215,13 @@ extension AuditRunner {
     }
 
     public static func cleanupHostProcesses() {
-        let result = (try? ProcessRunner.run(
+        guard let result = try? ProcessRunner.run(
             "/bin/ps",
-            arguments: ["-Ao", "pid=,command="]
-        ))?.stdoutString ?? ""
-        cleanupHostProcesses(psOutput: result) { pid in
+            arguments: ["-Ao", "pid=,command="],
+            timeoutSeconds: 5,
+            terminationGraceSeconds: 1
+        ), !result.timedOut else { return }
+        cleanupHostProcesses(psOutput: result.stdoutString) { pid in
             kill(pid, SIGKILL)
         }
     }

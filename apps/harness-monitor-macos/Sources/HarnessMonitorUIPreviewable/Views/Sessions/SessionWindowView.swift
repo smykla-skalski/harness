@@ -44,7 +44,8 @@ public struct SessionWindowView: View {
   @State private var perfContentDividerWidthStorage: Double?
   @State private var decisionCacheStorage = SessionWindowDecisionCacheStorage()
   @State private var currentModifiers: EventModifiers = []
-  @State private var startupSearchParticipationEnabledStorage = HarnessMonitorUITestEnvironment.isEnabled
+  @State private var startupSearchParticipationEnabledStorage =
+    HarnessMonitorUITestEnvironment.isEnabled
 
   public init(store: HarnessMonitorStore, token: SessionWindowToken) {
     self.store = store
