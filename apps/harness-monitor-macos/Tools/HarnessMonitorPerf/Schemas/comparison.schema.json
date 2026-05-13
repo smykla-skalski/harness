@@ -1,200 +1,341 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/smykla-skalski/harness/apps/harness-monitor-macos/Tools/HarnessMonitorPerf/Schemas/comparison.schema.json",
-  "title": "Harness Monitor audit comparison",
-  "type": "object",
-  "additionalProperties": false,
-  "required": [
+  "$defs" : {
+    "appTraceComparison" : {
+      "additionalProperties" : false,
+      "properties" : {
+        "baseline" : {
+          "oneOf" : [
+            {
+              "$ref" : "#\/$defs\/appTraceSummary"
+            },
+            {
+              "type" : "null"
+            }
+          ]
+        },
+        "current" : {
+          "oneOf" : [
+            {
+              "$ref" : "#\/$defs\/appTraceSummary"
+            },
+            {
+              "type" : "null"
+            }
+          ]
+        },
+        "new_steps" : {
+          "items" : {
+            "type" : "string"
+          },
+          "type" : "array"
+        },
+        "resolved_steps" : {
+          "items" : {
+            "type" : "string"
+          },
+          "type" : "array"
+        }
+      },
+      "required" : [
+        "new_steps",
+        "resolved_steps"
+      ],
+      "type" : "object"
+    },
+    "appTraceSummary" : {
+      "additionalProperties" : false,
+      "properties" : {
+        "components" : {
+          "items" : {
+            "$ref" : "#\/$defs\/componentCount"
+          },
+          "type" : "array"
+        },
+        "event_count" : {
+          "type" : "integer"
+        },
+        "ordered_steps" : {
+          "items" : {
+            "type" : "string"
+          },
+          "type" : "array"
+        }
+      },
+      "required" : [
+        "event_count",
+        "components",
+        "ordered_steps"
+      ],
+      "type" : "object"
+    },
+    "componentCount" : {
+      "additionalProperties" : false,
+      "properties" : {
+        "component" : {
+          "type" : "string"
+        },
+        "count" : {
+          "type" : "integer"
+        }
+      },
+      "required" : [
+        "component",
+        "count"
+      ],
+      "type" : "object"
+    },
+    "deltaBlock" : {
+      "additionalProperties" : false,
+      "properties" : {
+        "baseline" : {
+          "type" : "number"
+        },
+        "current" : {
+          "type" : "number"
+        },
+        "delta" : {
+          "type" : "number"
+        }
+      },
+      "required" : [
+        "baseline",
+        "current",
+        "delta"
+      ],
+      "type" : "object"
+    },
+    "finding" : {
+      "additionalProperties" : false,
+      "properties" : {
+        "category" : {
+          "type" : "string"
+        },
+        "count" : {
+          "type" : [
+            "integer",
+            "null"
+          ]
+        },
+        "detail" : {
+          "type" : [
+            "string",
+            "null"
+          ]
+        },
+        "headline" : {
+          "type" : "string"
+        },
+        "key" : {
+          "type" : "string"
+        }
+      },
+      "required" : [
+        "key",
+        "category",
+        "headline"
+      ],
+      "type" : "object"
+    },
+    "frame" : {
+      "additionalProperties" : false,
+      "properties" : {
+        "name" : {
+          "type" : "string"
+        },
+        "samples" : {
+          "type" : "integer"
+        }
+      },
+      "required" : [
+        "name",
+        "samples"
+      ],
+      "type" : "object"
+    },
+    "missingCapture" : {
+      "additionalProperties" : false,
+      "properties" : {
+        "reason" : {
+          "type" : [
+            "string",
+            "null"
+          ]
+        },
+        "scenario" : {
+          "type" : "string"
+        },
+        "template" : {
+          "type" : "string"
+        }
+      },
+      "required" : [
+        "scenario",
+        "template"
+      ],
+      "type" : "object"
+    }
+  },
+  "$id" : "https:\/\/github.com\/smykla-skalski\/harness\/apps\/harness-monitor-macos\/Tools\/HarnessMonitorPerf\/Schemas\/comparison.schema.json",
+  "$schema" : "https:\/\/json-schema.org\/draft\/2020-12\/schema",
+  "additionalProperties" : false,
+  "properties" : {
+    "baseline_created_at_utc" : {
+      "type" : [
+        "string",
+        "null"
+      ]
+    },
+    "baseline_label" : {
+      "type" : [
+        "string",
+        "null"
+      ]
+    },
+    "baseline_missing_metrics" : {
+      "items" : {
+        "$ref" : "#\/$defs\/missingCapture"
+      },
+      "type" : "array"
+    },
+    "comparisons" : {
+      "items" : {
+        "additionalProperties" : false,
+        "properties" : {
+          "app_trace" : {
+            "$ref" : "#\/$defs\/appTraceComparison"
+          },
+          "baseline_findings" : {
+            "items" : {
+              "$ref" : "#\/$defs\/finding"
+            },
+            "type" : "array"
+          },
+          "current_findings" : {
+            "items" : {
+              "$ref" : "#\/$defs\/finding"
+            },
+            "type" : "array"
+          },
+          "metric_tiers" : {
+            "additionalProperties" : false,
+            "properties" : {
+              "hard_budget" : {
+                "items" : {
+                  "type" : "string"
+                },
+                "type" : "array"
+              },
+              "investigative" : {
+                "items" : {
+                  "type" : "string"
+                },
+                "type" : "array"
+              }
+            },
+            "required" : [
+              "hard_budget",
+              "investigative"
+            ],
+            "type" : "object"
+          },
+          "metrics" : {
+            "description" : "SwiftUI comparisons encode a flat metric->delta block map; allocations encode category->metric->delta block.",
+            "type" : "object"
+          },
+          "new_findings" : {
+            "items" : {
+              "$ref" : "#\/$defs\/finding"
+            },
+            "type" : "array"
+          },
+          "resolved_findings" : {
+            "items" : {
+              "$ref" : "#\/$defs\/finding"
+            },
+            "type" : "array"
+          },
+          "scenario" : {
+            "type" : "string"
+          },
+          "shared_metrics" : {
+            "additionalProperties" : {
+              "$ref" : "#\/$defs\/deltaBlock"
+            },
+            "type" : "object"
+          },
+          "template" : {
+            "type" : "string"
+          },
+          "top_frames" : {
+            "additionalProperties" : false,
+            "properties" : {
+              "baseline" : {
+                "items" : {
+                  "$ref" : "#\/$defs\/frame"
+                },
+                "type" : "array"
+              },
+              "current" : {
+                "items" : {
+                  "$ref" : "#\/$defs\/frame"
+                },
+                "type" : "array"
+              }
+            },
+            "required" : [
+              "baseline",
+              "current"
+            ],
+            "type" : "object"
+          }
+        },
+        "required" : [
+          "scenario",
+          "template",
+          "metrics"
+        ],
+        "type" : "object"
+      },
+      "type" : "array"
+    },
+    "current_created_at_utc" : {
+      "type" : [
+        "string",
+        "null"
+      ]
+    },
+    "current_label" : {
+      "type" : [
+        "string",
+        "null"
+      ]
+    },
+    "current_missing_metrics" : {
+      "items" : {
+        "$ref" : "#\/$defs\/missingCapture"
+      },
+      "type" : "array"
+    },
+    "missing_from_baseline" : {
+      "items" : {
+        "$ref" : "#\/$defs\/missingCapture"
+      },
+      "type" : "array"
+    },
+    "missing_from_current" : {
+      "items" : {
+        "$ref" : "#\/$defs\/missingCapture"
+      },
+      "type" : "array"
+    }
+  },
+  "required" : [
     "missing_from_current",
     "missing_from_baseline",
     "current_missing_metrics",
     "baseline_missing_metrics",
     "comparisons"
   ],
-  "properties": {
-    "current_label": { "type": ["string", "null"] },
-    "baseline_label": { "type": ["string", "null"] },
-    "current_created_at_utc": { "type": ["string", "null"] },
-    "baseline_created_at_utc": { "type": ["string", "null"] },
-    "missing_from_current": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/missingCapture" }
-    },
-    "missing_from_baseline": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/missingCapture" }
-    },
-    "current_missing_metrics": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/missingCapture" }
-    },
-    "baseline_missing_metrics": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/missingCapture" }
-    },
-    "comparisons": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["scenario", "template", "metrics"],
-        "properties": {
-          "scenario": { "type": "string" },
-          "template": { "type": "string" },
-          "metrics": {
-            "description": "SwiftUI comparisons encode a flat metric->delta block map; allocations encode category->metric->delta block.",
-            "type": "object"
-          },
-          "shared_metrics": {
-            "type": "object",
-            "additionalProperties": { "$ref": "#/$defs/deltaBlock" }
-          },
-          "metric_tiers": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["hard_budget", "investigative"],
-            "properties": {
-              "hard_budget": {
-                "type": "array",
-                "items": { "type": "string" }
-              },
-              "investigative": {
-                "type": "array",
-                "items": { "type": "string" }
-              }
-            }
-          },
-          "baseline_findings": {
-            "type": "array",
-            "items": { "$ref": "#/$defs/finding" }
-          },
-          "current_findings": {
-            "type": "array",
-            "items": { "$ref": "#/$defs/finding" }
-          },
-          "new_findings": {
-            "type": "array",
-            "items": { "$ref": "#/$defs/finding" }
-          },
-          "resolved_findings": {
-            "type": "array",
-            "items": { "$ref": "#/$defs/finding" }
-          },
-          "app_trace": {
-            "$ref": "#/$defs/appTraceComparison"
-          },
-          "top_frames": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["baseline", "current"],
-            "properties": {
-              "baseline": {
-                "type": "array",
-                "items": { "$ref": "#/$defs/frame" }
-              },
-              "current": {
-                "type": "array",
-                "items": { "$ref": "#/$defs/frame" }
-              }
-            }
-          }
-        }
-      }
-    }
-  },
-  "$defs": {
-    "missingCapture": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["scenario", "template"],
-      "properties": {
-        "scenario": { "type": "string" },
-        "template": { "type": "string" },
-        "reason": { "type": ["string", "null"] }
-      }
-    },
-    "deltaBlock": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["baseline", "current", "delta"],
-      "properties": {
-        "baseline": { "type": "number" },
-        "current": { "type": "number" },
-        "delta": { "type": "number" }
-      }
-    },
-    "componentCount": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["component", "count"],
-      "properties": {
-        "component": { "type": "string" },
-        "count": { "type": "integer" }
-      }
-    },
-    "appTraceSummary": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["event_count", "components", "ordered_steps"],
-      "properties": {
-        "event_count": { "type": "integer" },
-        "components": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/componentCount" }
-        },
-        "ordered_steps": {
-          "type": "array",
-          "items": { "type": "string" }
-        }
-      }
-    },
-    "appTraceComparison": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["new_steps", "resolved_steps"],
-      "properties": {
-        "baseline": {
-          "oneOf": [
-            { "$ref": "#/$defs/appTraceSummary" },
-            { "type": "null" }
-          ]
-        },
-        "current": {
-          "oneOf": [
-            { "$ref": "#/$defs/appTraceSummary" },
-            { "type": "null" }
-          ]
-        },
-        "new_steps": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "resolved_steps": {
-          "type": "array",
-          "items": { "type": "string" }
-        }
-      }
-    },
-    "frame": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["name", "samples"],
-      "properties": {
-        "name": { "type": "string" },
-        "samples": { "type": "integer" }
-      }
-    },
-    "finding": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["key", "category", "headline"],
-      "properties": {
-        "key": { "type": "string" },
-        "category": { "type": "string" },
-        "headline": { "type": "string" },
-        "detail": { "type": ["string", "null"] },
-        "count": { "type": ["integer", "null"] }
-      }
-    }
-  }
+  "title" : "Harness Monitor audit comparison",
+  "type" : "object"
 }

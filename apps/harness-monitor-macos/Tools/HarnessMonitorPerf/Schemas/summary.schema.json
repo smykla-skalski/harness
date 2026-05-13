@@ -1,129 +1,260 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/smykla-skalski/harness/apps/harness-monitor-macos/Tools/HarnessMonitorPerf/Schemas/summary.schema.json",
-  "title": "Harness Monitor audit summary",
-  "type": "object",
-  "additionalProperties": true,
-  "required": [
-    "captures"
-  ],
-  "properties": {
-    "label": { "type": ["string", "null"] },
-    "created_at_utc": { "type": ["string", "null"] },
-    "git": {},
-    "system": {},
-    "targets": {},
-    "selected_scenarios": {
-      "type": ["array", "null"],
-      "items": { "type": "string" }
+  "$defs" : {
+    "componentCount" : {
+      "additionalProperties" : false,
+      "properties" : {
+        "component" : {
+          "type" : "string"
+        },
+        "count" : {
+          "type" : "integer"
+        }
+      },
+      "required" : [
+        "component",
+        "count"
+      ],
+      "type" : "object"
     },
-    "warnings": {
-      "type": ["array", "null"],
-      "items": { "type": "string" }
-    },
-    "captures": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": true,
-        "required": [
-          "scenario",
-          "template"
-        ],
-        "properties": {
-          "scenario": { "type": "string" },
-          "template": { "type": "string" },
-          "duration_seconds": { "type": ["number", "null"] },
-          "trace_relpath": { "type": ["string", "null"] },
-          "app_trace_relpath": { "type": ["string", "null"] },
-          "exit_status": { "type": ["integer", "null"] },
-          "end_reason": { "type": ["string", "null"] },
-          "warnings": {
-            "type": ["array", "null"],
-            "items": { "type": "string" }
+    "finding" : {
+      "additionalProperties" : false,
+      "properties" : {
+        "category" : {
+          "type" : "string"
+        },
+        "count" : {
+          "type" : [
+            "integer",
+            "null"
+          ]
+        },
+        "detail" : {
+          "type" : [
+            "string",
+            "null"
+          ]
+        },
+        "headline" : {
+          "type" : "string"
+        },
+        "key" : {
+          "type" : "string"
+        }
+      },
+      "required" : [
+        "key",
+        "category",
+        "headline"
+      ],
+      "type" : "object"
+    }
+  },
+  "$id" : "https:\/\/github.com\/smykla-skalski\/harness\/apps\/harness-monitor-macos\/Tools\/HarnessMonitorPerf\/Schemas\/summary.schema.json",
+  "$schema" : "https:\/\/json-schema.org\/draft\/2020-12\/schema",
+  "additionalProperties" : true,
+  "properties" : {
+    "captures" : {
+      "items" : {
+        "additionalProperties" : true,
+        "properties" : {
+          "app_trace" : {
+            "additionalProperties" : false,
+            "properties" : {
+              "components" : {
+                "items" : {
+                  "$ref" : "#\/$defs\/componentCount"
+                },
+                "type" : "array"
+              },
+              "event_count" : {
+                "type" : "integer"
+              },
+              "ordered_steps" : {
+                "items" : {
+                  "type" : "string"
+                },
+                "type" : "array"
+              },
+              "relpath" : {
+                "type" : "string"
+              }
+            },
+            "required" : [
+              "relpath",
+              "event_count",
+              "components",
+              "ordered_steps"
+            ],
+            "type" : [
+              "object",
+              "null"
+            ]
           },
-          "launch_metrics": {
-            "type": ["object", "null"],
-            "additionalProperties": false,
-            "required": [
+          "app_trace_relpath" : {
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "duration_seconds" : {
+            "type" : [
+              "number",
+              "null"
+            ]
+          },
+          "end_reason" : {
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "exit_status" : {
+            "type" : [
+              "integer",
+              "null"
+            ]
+          },
+          "findings" : {
+            "items" : {
+              "$ref" : "#\/$defs\/finding"
+            },
+            "type" : [
+              "array",
+              "null"
+            ]
+          },
+          "launch_metrics" : {
+            "additionalProperties" : false,
+            "properties" : {
+              "app_init_to_ready_ms" : {
+                "type" : "number"
+              },
+              "includes_bootstrap_in_scenario_measurement" : {
+                "type" : "boolean"
+              },
+              "measured_from" : {
+                "type" : "string"
+              },
+              "state_label" : {
+                "type" : "string"
+              },
+              "window_id" : {
+                "type" : "string"
+              }
+            },
+            "required" : [
               "app_init_to_ready_ms",
               "measured_from",
               "state_label",
               "window_id",
               "includes_bootstrap_in_scenario_measurement"
             ],
-            "properties": {
-              "app_init_to_ready_ms": { "type": "number" },
-              "measured_from": { "type": "string" },
-              "state_label": { "type": "string" },
-              "window_id": { "type": "string" },
-              "includes_bootstrap_in_scenario_measurement": { "type": "boolean" }
-            }
+            "type" : [
+              "object",
+              "null"
+            ]
           },
-          "metric_tiers": {
-            "type": ["object", "null"],
-            "additionalProperties": false,
-            "required": ["hard_budget", "investigative"],
-            "properties": {
-              "hard_budget": {
-                "type": "array",
-                "items": { "type": "string" }
+          "metric_tiers" : {
+            "additionalProperties" : false,
+            "properties" : {
+              "hard_budget" : {
+                "items" : {
+                  "type" : "string"
+                },
+                "type" : "array"
               },
-              "investigative": {
-                "type": "array",
-                "items": { "type": "string" }
+              "investigative" : {
+                "items" : {
+                  "type" : "string"
+                },
+                "type" : "array"
               }
-            }
+            },
+            "required" : [
+              "hard_budget",
+              "investigative"
+            ],
+            "type" : [
+              "object",
+              "null"
+            ]
           },
-          "app_trace": {
-            "type": ["object", "null"],
-            "additionalProperties": false,
-            "required": ["relpath", "event_count", "components", "ordered_steps"],
-            "properties": {
-              "relpath": { "type": "string" },
-              "event_count": { "type": "integer" },
-              "components": {
-                "type": "array",
-                "items": { "$ref": "#/$defs/componentCount" }
-              },
-              "ordered_steps": {
-                "type": "array",
-                "items": { "type": "string" }
-              }
-            }
+          "metrics" : {
+            "description" : "Free-form extracted metrics payload keyed by template-specific extractor output."
           },
-          "findings": {
-            "type": ["array", "null"],
-            "items": { "$ref": "#/$defs/finding" }
+          "scenario" : {
+            "type" : "string"
           },
-          "metrics": {
-            "description": "Free-form extracted metrics payload keyed by template-specific extractor output."
+          "template" : {
+            "type" : "string"
+          },
+          "trace_relpath" : {
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "warnings" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : [
+              "array",
+              "null"
+            ]
           }
-        }
-      }
+        },
+        "required" : [
+          "scenario",
+          "template"
+        ],
+        "type" : "object"
+      },
+      "type" : "array"
+    },
+    "created_at_utc" : {
+      "type" : [
+        "string",
+        "null"
+      ]
+    },
+    "git" : {
+
+    },
+    "label" : {
+      "type" : [
+        "string",
+        "null"
+      ]
+    },
+    "selected_scenarios" : {
+      "items" : {
+        "type" : "string"
+      },
+      "type" : [
+        "array",
+        "null"
+      ]
+    },
+    "system" : {
+
+    },
+    "targets" : {
+
+    },
+    "warnings" : {
+      "items" : {
+        "type" : "string"
+      },
+      "type" : [
+        "array",
+        "null"
+      ]
     }
   },
-  "$defs": {
-    "componentCount": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["component", "count"],
-      "properties": {
-        "component": { "type": "string" },
-        "count": { "type": "integer" }
-      }
-    },
-    "finding": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["key", "category", "headline"],
-      "properties": {
-        "key": { "type": "string" },
-        "category": { "type": "string" },
-        "headline": { "type": "string" },
-        "detail": { "type": ["string", "null"] },
-        "count": { "type": ["integer", "null"] }
-      }
-    }
-  }
+  "required" : [
+    "captures"
+  ],
+  "title" : "Harness Monitor audit summary",
+  "type" : "object"
 }

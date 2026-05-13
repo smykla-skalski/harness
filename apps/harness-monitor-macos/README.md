@@ -53,6 +53,7 @@ The audit artifact contract is:
 
 Machine-readable schema snapshots for those JSON outputs live under
 `Tools/HarnessMonitorPerf/Schemas/`.
+Regenerate them with `mise run monitor:tools:generate:schemas`.
 
 For provenance checks, treat `targets.staged_host_bundle_id`,
 `targets.staged_host_binary_path`, `build_provenance.host`,
@@ -69,6 +70,12 @@ Field telemetry should use the same vocabulary as the local audit:
 | `potential_hangs` | MetricKit hang diagnostics plus Organizer hang-rate rollups |
 | allocation growth in `summary.csv` / `comparison.json` | Organizer memory footprint trends and MetricKit memory diagnostics |
 | scenario-specific regressions confirmed locally | App Store Connect Performance API or Organizer release-over-release comparisons |
+
+Normalize release telemetry into those audit labels with:
+
+```bash
+mise run monitor:tools:field-telemetry -- --input <field-telemetry-input.json> --output-dir <dir>
+```
 
 When you only need part of the graph, use the manifest tags for focused generation, for example:
 
