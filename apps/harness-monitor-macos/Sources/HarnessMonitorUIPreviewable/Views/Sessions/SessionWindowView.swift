@@ -51,7 +51,6 @@ public struct SessionWindowView: View {
     self.token = token
     _stateCacheStorage = State(wrappedValue: SessionWindowStateCache(sessionID: token.sessionID))
   }
-
   var stateCache: SessionWindowStateCache {
     stateCacheStorage
   }
@@ -207,6 +206,7 @@ public struct SessionWindowView: View {
         SessionWindowPerfScenarioScript(
           stateCache: stateCache,
           columnVisibility: columnVisibilityBinding,
+          contentColumnWidth: contentColumnWidthBinding,
           sessionID: token.sessionID,
           snapshot: snapshot,
           decisionIDs: allSessionDecisions.map(\.id)
