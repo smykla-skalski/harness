@@ -195,26 +195,24 @@ public struct SessionWindowView: View {
   }
 
   public var body: some View {
-    bodyContent
-      .toolbar { sessionToolbar }
-      .appSearchHost(
-        model: stateCache.appSearchModel,
-        automation: searchAutomation,
-        routeAction: appSearchRouteAction
+    ZStack {
+      bodyContent
+      sessionSearchHost
+    }
+    .toolbar { sessionToolbar }
+    .modifier(
+      SessionWindowPerfScenarioScript(
+        stateCache: stateCache,
+        columnVisibility: columnVisibilityBinding,
+        contentColumnWidth: contentColumnWidthBinding,
+        sessionID: token.sessionID,
+        snapshot: snapshot,
+        decisionIDs: allSessionDecisions.map(\.id)
       )
-      .modifier(
-        SessionWindowPerfScenarioScript(
-          stateCache: stateCache,
-          columnVisibility: columnVisibilityBinding,
-          contentColumnWidth: contentColumnWidthBinding,
-          sessionID: token.sessionID,
-          snapshot: snapshot,
-          decisionIDs: allSessionDecisions.map(\.id)
-        )
-      )
-      .background {
-        sessionWindowBackgroundAnchors(currentModifiers: $currentModifiers)
-      }
+    )
+    .background {
+      sessionWindowBackgroundAnchors(currentModifiers: $currentModifiers)
+    }
   }
 
   private var bodyContent: some View {
