@@ -16,6 +16,8 @@ From the repo root:
 mise run monitor
 mise run version:check
 mise run monitor:build
+mise run monitor:build:release
+mise run monitor:release:external
 mise run monitor:generate
 mise run monitor:lint
 mise run monitor:quality-gate
@@ -48,13 +50,20 @@ When you need a raw local build command, prefer the lane-aware wrapper so concur
 
 ```bash
 mise run monitor:build
+mise run monitor:build:release
 ```
 
 To build and immediately open the resulting app bundle from the resolved build lane, use:
 
 ```bash
 mise run monitor
+mise run monitor:release:external
 ```
+
+`monitor:release:external` regenerates the project, builds the signed Release
+bundle, persists `HarnessMonitor.DaemonOwnership=external`, and opens the built
+app with `open -na` so the exact Release bundle launches even if another
+Harness Monitor instance is already running.
 
 The wrapper and repo scripts resolve `xcode-derived` at the git common root, so linked worktrees reuse one default CLI DerivedData tree instead of bloating each checkout. For an isolated CLI build/test lane, set `HARNESS_MONITOR_BUILD_LANE=<name>`; that moves the build root to `xcode-derived-lanes/<slug>` and gives the lane its own wrapper lock.
 
@@ -102,6 +111,14 @@ mise run monitor:reset
 ```
 
 If you explicitly want the broader destructive shared reset, use `mise run clean:stale:full`.
+
+Production builds support both managed and external daemon ownership. The app
+defaults to managed mode; switch future launches to external mode in
+**Settings > General > Startup daemon mode**, or set
+`HARNESS_MONITOR_EXTERNAL_DAEMON=1` before launch. For sandboxed production
+external mode, prefer `HARNESS_MONITOR_RUNTIME_LANE`,
+`HARNESS_DAEMON_DATA_HOME`, or a daemon started through `mise run monitor:daemon:dev`
+so the manifest stays inside the shared app-group runtime roots.
 
 Common runtime-lane commands:
 

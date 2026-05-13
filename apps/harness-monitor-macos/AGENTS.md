@@ -87,6 +87,8 @@ Run from the repo root:
 mise run monitor:lint
 mise run monitor:quality-gate
 mise run monitor:build
+mise run monitor:build:release
+mise run monitor:release:external
 mise run monitor:test
 mise run monitor:xcodebuild -- -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace ...
 ```
@@ -182,15 +184,20 @@ backtraces, and leaves the app stopped for copy/paste inspection.
 
 ## Daemon modes
 
-Default local development uses the `HarnessMonitor (External Daemon)` scheme plus:
+Harness Monitor supports both managed and external daemon ownership in
+production builds. For the external-daemon path, the fastest local workflow
+uses the `HarnessMonitor (External Daemon)` scheme plus:
 
 ```bash
 mise run monitor:daemon:dev
 ```
 
-The default `HarnessMonitor` scheme validates the managed, sandboxed shipping
-path. Use it before release/distribution validation. Details and bridge behavior
-live in `../../docs/agent-guides/monitor-reference.md`.
+Production external launches should keep the daemon in an app-group runtime
+root (for example via `HARNESS_MONITOR_RUNTIME_LANE`,
+`HARNESS_DAEMON_DATA_HOME`, or the `monitor:daemon:dev` wrapper) so the
+sandboxed app can resolve the manifest. The default `HarnessMonitor` scheme
+keeps managed mode enabled and is still the shipping validation lane. Details
+and bridge behavior live in `../../docs/agent-guides/monitor-reference.md`.
 
 ## Preview authoring
 
