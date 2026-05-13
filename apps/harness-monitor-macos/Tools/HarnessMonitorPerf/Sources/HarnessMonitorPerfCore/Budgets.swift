@@ -57,6 +57,16 @@ public enum Budgets {
         uniquingKeysWith: { existing, _ in existing }
     )
 
+    public static let launchByScenario: [String: Double] = Dictionary(
+        PerfScenarioDefinitions.all.compactMap { definition in
+            guard let budget = definition.launchBudgetMilliseconds else {
+                return nil
+            }
+            return (definition.id, budget)
+        },
+        uniquingKeysWith: { existing, _ in existing }
+    )
+
     /// Maximum size of a retained run directory under tmp/perf/harness-monitor-instruments/runs/.
     public static let retainedRunSizeKiB: Int = 10_240
 }

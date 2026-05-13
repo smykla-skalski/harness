@@ -67,6 +67,11 @@ public enum Summarizer {
         "duration_seconds",
         "exit_status",
         "end_reason",
+        MetricName.launchAppInitToReadyMs,
+        "launch_measured_from",
+        "launch_state_label",
+        "launch_window_id",
+        "launch_includes_bootstrap_in_scenario_measurement",
         "swiftui_total_updates",
         "swiftui_body_updates",
         "swiftui_p95_ms",
@@ -99,6 +104,7 @@ public enum Summarizer {
         let allocations = metrics["allocations"]?["summary_rows"] ?? .object([:])
         let heapVM = allocations["All Heap & Anonymous VM"] ?? .object([:])
         let vmRegions = allocations["All VM Regions"] ?? .object([:])
+        let launchMetrics = capture.launchMetrics
 
         let topGroupLabel = firstKey(in: updateGroups["label_counts"]) ?? ""
         let topCauseSource = firstKey(in: causes["source_node_counts"]) ?? ""
@@ -112,6 +118,11 @@ public enum Summarizer {
             string(capture.durationSeconds),
             string(capture.exitStatus),
             csvEscape(capture.endReason ?? ""),
+            string(launchMetrics?.appInitToReadyMilliseconds),
+            csvEscape(launchMetrics?.measuredFrom ?? ""),
+            csvEscape(launchMetrics?.stateLabel ?? ""),
+            csvEscape(launchMetrics?.windowID ?? ""),
+            string(launchMetrics?.includesBootstrapInScenarioMeasurement),
             string(swiftui["total_count"]?.intValue),
             string(swiftui["body_update_count"]?.intValue),
             string(swiftui["duration_ms_p95"]?.doubleValue),
@@ -137,6 +148,11 @@ public enum Summarizer {
     private static func string(_ value: Double?) -> String {
         guard let value else { return "" }
         return formatDouble(value)
+    }
+
+    private static func string(_ value: Bool?) -> String {
+        guard let value else { return "" }
+        return value ? "true" : "false"
     }
 
     private static func formatDouble(_ value: Double) -> String {

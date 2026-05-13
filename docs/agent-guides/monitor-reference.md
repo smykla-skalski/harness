@@ -118,7 +118,9 @@ mise run monitor:test:scripts
 
 Artifacts land in `tmp/perf/harness-monitor-instruments/runs/` with
 `manifest.json`, `summary.json`, `summary.csv`, per-scenario metrics, and
-optional comparison reports.
+optional comparison reports. The summary model now carries per-capture
+`launch_metrics`, `summary.csv` includes `launch_app_init_to_ready_ms`, and
+comparison markdown separates hard-budget metrics from investigative metrics.
 
 ## SwiftUI rules and research
 

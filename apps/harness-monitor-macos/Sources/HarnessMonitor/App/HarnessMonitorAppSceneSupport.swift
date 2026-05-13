@@ -215,6 +215,13 @@ private struct HarnessMonitorPerfScenarioModifier: ViewModifier {
       return
     }
     perfScenarioStatus = status
+    if status == .running, let perfScenario {
+      HarnessMonitorPerfLaunchMetricsRecorder.recordScenarioReady(
+        windowID: HarnessMonitorWindowID.openRecent,
+        stateLabel: status.rawValue,
+        includesBootstrapInScenarioMeasurement: perfScenario.includesBootstrapInMeasurement
+      )
+    }
     if status != .failed {
       perfScenarioFailureReason = nil
     }

@@ -37,7 +37,18 @@ final class SummarizerTests: XCTestCase {
               "duration_seconds": 4.5,
               "trace_relpath": "traces/swiftui/open-recent-window.trace",
               "exit_status": 0,
-              "end_reason": "completed"
+              "end_reason": "completed",
+              "launch_metrics": {
+                "app_init_to_ready_ms": 350,
+                "measured_from": "app_init",
+                "state_label": "running",
+                "window_id": "open-recent",
+                "includes_bootstrap_in_scenario_measurement": true
+              },
+              "metric_tiers": {
+                "hard_budget": ["launch_app_init_to_ready_ms", "total_updates", "body_updates"],
+                "investigative": ["p95_update_ms", "max_update_ms"]
+              }
             },
             {
               "scenario": "offline-cached-open",
@@ -98,14 +109,20 @@ final class SummarizerTests: XCTestCase {
         let summaryData = try Data(contentsOf: summaryURL)
         let summaryString = try XCTUnwrap(String(data: summaryData, encoding: .utf8))
         XCTAssertTrue(summaryString.contains("\"label\" : \"step3\""))
+        XCTAssertTrue(summaryString.contains("\"launch_metrics\""))
         XCTAssertTrue(summaryString.contains("\"total_count\" : 1234"))
 
         let csv = try String(contentsOf: csvURL, encoding: .utf8)
         let lines = csv.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
         XCTAssertEqual(lines.count, 3)
         XCTAssertEqual(lines[0], Summarizer.csvHeader.joined(separator: ","))
-        XCTAssertTrue(lines[1].hasPrefix("open-recent-window,SwiftUI,4.5,0,completed,1234,100,12.5,25,8,"))
-        XCTAssertTrue(lines[2].hasPrefix("offline-cached-open,Allocations,3,0,completed,,,,,,,,,,250000,500000,60000,120000"))
+        XCTAssertTrue(
+            lines[1].hasPrefix(
+                "open-recent-window,SwiftUI,4.5,0,completed,350,app_init,running,open-recent,true,1234,100,12.5,25,8,"
+            )
+        )
+        XCTAssertTrue(lines[2].hasPrefix("offline-cached-open,Allocations,3,0,completed,"))
+        XCTAssertTrue(lines[2].contains(",250000,500000,60000,120000"))
     }
 
     func testSummarizeFailsWhenManifestMissing() {

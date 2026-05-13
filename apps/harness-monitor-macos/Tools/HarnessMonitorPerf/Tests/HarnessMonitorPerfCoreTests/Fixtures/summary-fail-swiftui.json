@@ -3,6 +3,13 @@
     {
       "scenario": "open-recent-window",
       "template": "SwiftUI",
+      "launch_metrics": {
+        "app_init_to_ready_ms": 550,
+        "measured_from": "app_init",
+        "state_label": "running",
+        "window_id": "open-recent",
+        "includes_bootstrap_in_scenario_measurement": true
+      },
       "metrics": {
         "swiftui_updates": {"total_count": 30000, "body_update_count": 4000},
         "swiftui_update_groups": {"duration_ns_max": 75000000},

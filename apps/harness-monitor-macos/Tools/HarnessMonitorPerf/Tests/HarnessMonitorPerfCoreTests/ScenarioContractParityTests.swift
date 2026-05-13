@@ -16,6 +16,12 @@ final class ScenarioContractParityTests: XCTestCase {
         XCTAssertEqual(Set(ScenarioCatalog.all), ScenarioCatalog.swiftUI.union(ScenarioCatalog.allocations))
         XCTAssertEqual(Set(Budgets.swiftUIByScenario.keys), ScenarioCatalog.swiftUI)
         XCTAssertEqual(Set(Budgets.allocationsByScenario.keys), ScenarioCatalog.allocations)
+        XCTAssertEqual(
+            Set(Budgets.launchByScenario.keys),
+            Set(PerfScenarioDefinitions.all.compactMap { definition in
+                definition.launchBudgetMilliseconds == nil ? nil : definition.id
+            })
+        )
         XCTAssertEqual(Set(ManifestBuilder.defaultTemplates.swiftui), ScenarioCatalog.swiftUI)
         XCTAssertEqual(Set(ManifestBuilder.defaultTemplates.allocations), ScenarioCatalog.allocations)
     }

@@ -9,6 +9,7 @@
       "needsPreviewAcpPermissionBatch": false,
       "includesBootstrapInMeasurement": true,
       "durationSeconds": 6,
+      "launchBudgetMilliseconds": 400,
       "templates": ["swiftui"],
       "swiftUIBudget": {
         "totalUpdates": 25000,

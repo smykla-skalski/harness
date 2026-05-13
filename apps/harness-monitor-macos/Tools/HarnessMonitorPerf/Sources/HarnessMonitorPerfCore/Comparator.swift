@@ -109,45 +109,85 @@ public enum Comparator {
     private static func compareCapture(
         current: RunManifest.Capture, baseline: RunManifest.Capture
     ) throws -> CaptureComparison {
+        let sharedMetrics = sharedMetricComparisons(current: current, baseline: baseline)
+        let metricTiers = current.metricTiers ?? MetricTierCatalog.tiers(
+            for: current.scenario,
+            template: current.template
+        )
         switch current.template {
         case "SwiftUI":
-            return swiftUIComparison(current: current, baseline: baseline)
+            return swiftUIComparison(
+                current: current,
+                baseline: baseline,
+                sharedMetrics: sharedMetrics,
+                metricTiers: metricTiers
+            )
         case "Allocations":
-            return allocationsComparison(current: current, baseline: baseline)
+            return allocationsComparison(
+                current: current,
+                baseline: baseline,
+                sharedMetrics: sharedMetrics,
+                metricTiers: metricTiers
+            )
         default:
             throw Failure(message: "Unsupported template \(current.template)")
         }
     }
 
     private static func swiftUIComparison(
-        current: RunManifest.Capture, baseline: RunManifest.Capture
+        current: RunManifest.Capture,
+        baseline: RunManifest.Capture,
+        sharedMetrics: [String: DeltaBlock],
+        metricTiers: CaptureMetricTiers
     ) -> CaptureComparison {
         let cm = current.metrics ?? .object([:])
         let bm = baseline.metrics ?? .object([:])
         let cur = cm["swiftui_updates"] ?? .object([:])
         let base = bm["swiftui_updates"] ?? .object([:])
+        let currentGroups = cm["swiftui_update_groups"] ?? .object([:])
+        let baselineGroups = bm["swiftui_update_groups"] ?? .object([:])
 
         let metrics: [String: DeltaBlock] = [
-            "total_updates": deltaInt(cur["total_count"]?.intValue ?? 0,
-                                      base["total_count"]?.intValue ?? 0),
-            "body_updates": deltaInt(cur["body_update_count"]?.intValue ?? 0,
-                                     base["body_update_count"]?.intValue ?? 0),
-            "p95_update_ms": deltaDouble(cur["duration_ms_p95"]?.doubleValue ?? 0,
-                                         base["duration_ms_p95"]?.doubleValue ?? 0),
-            "max_update_ms": deltaDouble(
+            MetricName.totalUpdates: deltaInt(
+                cur["total_count"]?.intValue ?? 0,
+                base["total_count"]?.intValue ?? 0
+            ),
+            MetricName.bodyUpdates: deltaInt(
+                cur["body_update_count"]?.intValue ?? 0,
+                base["body_update_count"]?.intValue ?? 0
+            ),
+            MetricName.p95UpdateMs: deltaDouble(
+                cur["duration_ms_p95"]?.doubleValue ?? 0,
+                base["duration_ms_p95"]?.doubleValue ?? 0
+            ),
+            MetricName.maxUpdateMs: deltaDouble(
                 MetricsExtractor.nsToMs(cur["duration_ns_max"]?.intValue ?? 0),
                 MetricsExtractor.nsToMs(base["duration_ns_max"]?.intValue ?? 0)
             ),
-            "hitches": deltaInt(cm["hitches"]?["count"]?.intValue ?? 0,
-                                bm["hitches"]?["count"]?.intValue ?? 0),
-            "potential_hangs": deltaInt(cm["potential_hangs"]?["count"]?.intValue ?? 0,
-                                        bm["potential_hangs"]?["count"]?.intValue ?? 0),
+            MetricName.maxUpdateGroupMs: deltaDouble(
+                MetricsExtractor.nsToMs(currentGroups["duration_ns_max"]?.intValue ?? 0),
+                MetricsExtractor.nsToMs(baselineGroups["duration_ns_max"]?.intValue ?? 0)
+            ),
+            MetricName.updateGroupP95Ms: deltaDouble(
+                currentGroups["duration_ms_p95"]?.doubleValue ?? 0,
+                baselineGroups["duration_ms_p95"]?.doubleValue ?? 0
+            ),
+            MetricName.hitches: deltaInt(
+                cm["hitches"]?["count"]?.intValue ?? 0,
+                bm["hitches"]?["count"]?.intValue ?? 0
+            ),
+            MetricName.potentialHangs: deltaInt(
+                cm["potential_hangs"]?["count"]?.intValue ?? 0,
+                bm["potential_hangs"]?["count"]?.intValue ?? 0
+            ),
         ]
 
         return CaptureComparison(
             scenario: current.scenario,
             template: current.template,
             metrics: .swiftUI(metrics),
+            sharedMetrics: sharedMetrics,
+            metricTiers: metricTiers,
             topFrames: TopFramesPair(
                 baseline: framesPrefix(bm["top_frames"], limit: 5),
                 current: framesPrefix(cm["top_frames"], limit: 5)
@@ -156,7 +196,10 @@ public enum Comparator {
     }
 
     private static func allocationsComparison(
-        current: RunManifest.Capture, baseline: RunManifest.Capture
+        current: RunManifest.Capture,
+        baseline: RunManifest.Capture,
+        sharedMetrics: [String: DeltaBlock],
+        metricTiers: CaptureMetricTiers
     ) -> CaptureComparison {
         let cm = current.metrics ?? .object([:])
         let bm = baseline.metrics ?? .object([:])
@@ -179,8 +222,25 @@ public enum Comparator {
             scenario: current.scenario,
             template: current.template,
             metrics: .allocations(byCategory),
+            sharedMetrics: sharedMetrics,
+            metricTiers: metricTiers,
             topFrames: nil
         )
+    }
+
+    private static func sharedMetricComparisons(
+        current: RunManifest.Capture,
+        baseline: RunManifest.Capture
+    ) -> [String: DeltaBlock] {
+        guard
+            let currentLaunch = current.launchMetrics?.appInitToReadyMilliseconds,
+            let baselineLaunch = baseline.launchMetrics?.appInitToReadyMilliseconds
+        else {
+            return [:]
+        }
+        return [
+            MetricName.launchAppInitToReadyMs: deltaDouble(currentLaunch, baselineLaunch)
+        ]
     }
 
     static func framesPrefix(_ value: JSONValue?, limit: Int) -> [Frame] {
@@ -248,32 +308,15 @@ public enum Comparator {
             lines.append("## \(item.scenario) (\(item.template))")
             lines.append("")
             switch item.metrics {
-            case .swiftUI(let metrics):
-                lines.append("| Metric | Baseline | Current | Delta |")
-                lines.append("| --- | ---: | ---: | ---: |")
-                for name in swiftUIMetricOrder where metrics[name] != nil {
-                    let values = metrics[name]!
-                    lines.append(
-                        "| \(name) | \(values.baseline) | \(values.current) | \(values.delta) |"
-                    )
-                }
+            case .swiftUI:
+                appendSwiftUISections(item, to: &lines)
                 let baselineNames = item.topFrames?.baseline.map(\.name).joined(separator: ", ") ?? ""
                 let currentNames = item.topFrames?.current.map(\.name).joined(separator: ", ") ?? ""
                 lines.append("")
                 lines.append("- Baseline hot frames: \(baselineNames.isEmpty ? "n/a" : baselineNames)")
                 lines.append("- Current hot frames: \(currentNames.isEmpty ? "n/a" : currentNames)")
-            case .allocations(let byCategory):
-                lines.append("| Category | Metric | Baseline | Current | Delta |")
-                lines.append("| --- | --- | ---: | ---: | ---: |")
-                for category in MetricsExtractor.allocationsSummaryCategories {
-                    guard let metrics = byCategory[category] else { continue }
-                    for metricName in allocationsMetricOrder where metrics[metricName] != nil {
-                        let values = metrics[metricName]!
-                        lines.append(
-                            "| \(category) | \(metricName) | \(values.baseline) | \(values.current) | \(values.delta) |"
-                        )
-                    }
-                }
+            case .allocations:
+                appendAllocationsSections(item, to: &lines)
             }
             lines.append("")
         }
@@ -295,9 +338,133 @@ public enum Comparator {
         lines.append("")
     }
 
-    private static let swiftUIMetricOrder = [
-        "total_updates", "body_updates", "p95_update_ms", "max_update_ms", "hitches", "potential_hangs",
-    ]
+    private static func appendSwiftUISections(
+        _ item: CaptureComparison,
+        to lines: inout [String]
+    ) {
+        guard case .swiftUI(let metrics) = item.metrics else { return }
+        let combined = (item.sharedMetrics ?? [:]).merging(metrics) { current, _ in current }
+        let tiers = item.metricTiers ?? MetricTierCatalog.tiers(
+            for: item.scenario,
+            template: item.template
+        )
+        appendMetricTable(
+            title: "Hard budget metrics",
+            metricNames: tiers.hardBudget,
+            metrics: combined,
+            to: &lines
+        )
+        appendMetricTable(
+            title: "Investigative metrics",
+            metricNames: tiers.investigative,
+            metrics: combined,
+            to: &lines
+        )
+    }
+
+    private static func appendAllocationsSections(
+        _ item: CaptureComparison,
+        to lines: inout [String]
+    ) {
+        guard case .allocations(let byCategory) = item.metrics else { return }
+        let tiers = item.metricTiers ?? MetricTierCatalog.tiers(
+            for: item.scenario,
+            template: item.template
+        )
+        let hardRows = allocationsHardBudgetRows(
+            sharedMetrics: item.sharedMetrics ?? [:],
+            byCategory: byCategory,
+            hardMetricNames: Set(tiers.hardBudget)
+        )
+        appendMetricRowsTable(
+            title: "Hard budget metrics",
+            rows: hardRows,
+            to: &lines
+        )
+
+        let investigativeLaunchRows: [(String, DeltaBlock)] = {
+            guard
+                tiers.investigative.contains(MetricName.launchAppInitToReadyMs),
+                let launch = item.sharedMetrics?[MetricName.launchAppInitToReadyMs]
+            else {
+                return []
+            }
+            return [(MetricName.launchAppInitToReadyMs, launch)]
+        }()
+        appendMetricRowsTable(
+            title: "Investigative metrics",
+            rows: investigativeLaunchRows,
+            to: &lines
+        )
+
+        lines.append("### Investigative allocations")
+        lines.append("")
+        lines.append("| Category | Metric | Baseline | Current | Delta |")
+        lines.append("| --- | --- | ---: | ---: | ---: |")
+        for category in MetricsExtractor.allocationsSummaryCategories {
+            guard let metrics = byCategory[category] else { continue }
+            for metricName in allocationsMetricOrder where metrics[metricName] != nil {
+                let values = metrics[metricName]!
+                lines.append(
+                    "| \(category) | \(metricName) | \(values.baseline) | \(values.current) | \(values.delta) |"
+                )
+            }
+        }
+        lines.append("")
+    }
+
+    private static func appendMetricTable(
+        title: String,
+        metricNames: [String],
+        metrics: [String: DeltaBlock],
+        to lines: inout [String]
+    ) {
+        let rows = metricNames.compactMap { name -> (String, DeltaBlock)? in
+            guard let values = metrics[name] else { return nil }
+            return (name, values)
+        }
+        appendMetricRowsTable(title: title, rows: rows, to: &lines)
+    }
+
+    private static func appendMetricRowsTable(
+        title: String,
+        rows: [(String, DeltaBlock)],
+        to lines: inout [String]
+    ) {
+        guard !rows.isEmpty else { return }
+        lines.append("### \(title)")
+        lines.append("")
+        lines.append("| Metric | Baseline | Current | Delta |")
+        lines.append("| --- | ---: | ---: | ---: |")
+        for (name, values) in rows {
+            lines.append(
+                "| \(name) | \(values.baseline) | \(values.current) | \(values.delta) |"
+            )
+        }
+        lines.append("")
+    }
+
+    private static func allocationsHardBudgetRows(
+        sharedMetrics: [String: DeltaBlock],
+        byCategory: [String: [String: DeltaBlock]],
+        hardMetricNames: Set<String>
+    ) -> [(String, DeltaBlock)] {
+        var rows: [(String, DeltaBlock)] = []
+        if
+            hardMetricNames.contains(MetricName.launchAppInitToReadyMs),
+            let launch = sharedMetrics[MetricName.launchAppInitToReadyMs]
+        {
+            rows.append((MetricName.launchAppInitToReadyMs, launch))
+        }
+        if
+            hardMetricNames.contains(MetricName.heapTotalBytes),
+            let heap = byCategory["All Heap Allocations"]?["total_bytes"]
+        {
+            rows.append((MetricName.heapTotalBytes, heap))
+        }
+        return rows
+    }
+
     private static let allocationsMetricOrder = ["persistent_bytes", "total_bytes", "count_events"]
 
     public struct Comparison: Codable, Equatable {
@@ -334,10 +501,14 @@ public enum Comparator {
         public var scenario: String
         public var template: String
         public var metrics: MetricsBlock
+        public var sharedMetrics: [String: DeltaBlock]?
+        public var metricTiers: CaptureMetricTiers?
         public var topFrames: TopFramesPair?
 
         enum CodingKeys: String, CodingKey {
             case scenario, template, metrics
+            case sharedMetrics = "shared_metrics"
+            case metricTiers = "metric_tiers"
             case topFrames = "top_frames"
         }
 
@@ -349,6 +520,8 @@ public enum Comparator {
             case .swiftUI(let map): try container.encode(map, forKey: .metrics)
             case .allocations(let map): try container.encode(map, forKey: .metrics)
             }
+            try container.encodeIfPresent(sharedMetrics, forKey: .sharedMetrics)
+            try container.encodeIfPresent(metricTiers, forKey: .metricTiers)
             try container.encodeIfPresent(topFrames, forKey: .topFrames)
         }
 
@@ -356,6 +529,14 @@ public enum Comparator {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             scenario = try container.decode(String.self, forKey: .scenario)
             template = try container.decode(String.self, forKey: .template)
+            sharedMetrics = try container.decodeIfPresent(
+                [String: DeltaBlock].self,
+                forKey: .sharedMetrics
+            )
+            metricTiers = try container.decodeIfPresent(
+                CaptureMetricTiers.self,
+                forKey: .metricTiers
+            )
             topFrames = try container.decodeIfPresent(TopFramesPair.self, forKey: .topFrames)
             if template == "Allocations" {
                 metrics = .allocations(
@@ -367,11 +548,18 @@ public enum Comparator {
         }
 
         public init(
-            scenario: String, template: String, metrics: MetricsBlock, topFrames: TopFramesPair?
+            scenario: String,
+            template: String,
+            metrics: MetricsBlock,
+            sharedMetrics: [String: DeltaBlock]? = nil,
+            metricTiers: CaptureMetricTiers? = nil,
+            topFrames: TopFramesPair?
         ) {
             self.scenario = scenario
             self.template = template
             self.metrics = metrics
+            self.sharedMetrics = sharedMetrics
+            self.metricTiers = metricTiers
             self.topFrames = topFrames
         }
     }

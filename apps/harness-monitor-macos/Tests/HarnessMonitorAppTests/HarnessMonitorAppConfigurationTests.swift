@@ -122,6 +122,71 @@ final class HarnessMonitorAppConfigurationTests: XCTestCase {
     }
   }
 
+  @MainActor
+  func testLaunchMetricsRecorderWritesScenarioReadySample() throws {
+    let outputURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("harness-monitor-launch-metrics-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: outputURL) }
+    let recorder = HarnessMonitorPerfLaunchMetricsRecorder(
+      outputPath: outputURL.path,
+      startSystemUptime: 100
+    )
+
+    recorder.recordScenarioReady(
+      windowID: HarnessMonitorWindowID.openRecent,
+      stateLabel: "running",
+      includesBootstrapInScenarioMeasurement: false,
+      currentSystemUptime: 100.25
+    )
+
+    let data = try Data(contentsOf: outputURL)
+    let sample = try JSONDecoder().decode(
+      HarnessMonitorPerfLaunchMetricSample.self,
+      from: data
+    )
+
+    XCTAssertEqual(sample.measuredFrom, "app_init")
+    XCTAssertEqual(sample.stateLabel, "running")
+    XCTAssertEqual(sample.windowID, HarnessMonitorWindowID.openRecent)
+    XCTAssertEqual(sample.includesBootstrapInScenarioMeasurement, false)
+    XCTAssertEqual(sample.appInitToReadyMilliseconds, 250, accuracy: 0.001)
+  }
+
+  @MainActor
+  func testLaunchMetricsRecorderOnlyWritesFirstReadySample() throws {
+    let outputURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("harness-monitor-launch-metrics-once-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: outputURL) }
+    let recorder = HarnessMonitorPerfLaunchMetricsRecorder(
+      outputPath: outputURL.path,
+      startSystemUptime: 50
+    )
+
+    recorder.recordScenarioReady(
+      windowID: HarnessMonitorWindowID.openRecent,
+      stateLabel: "running",
+      includesBootstrapInScenarioMeasurement: true,
+      currentSystemUptime: 50.1
+    )
+    recorder.recordScenarioReady(
+      windowID: HarnessMonitorWindowID.settings,
+      stateLabel: "completed",
+      includesBootstrapInScenarioMeasurement: false,
+      currentSystemUptime: 50.9
+    )
+
+    let data = try Data(contentsOf: outputURL)
+    let sample = try JSONDecoder().decode(
+      HarnessMonitorPerfLaunchMetricSample.self,
+      from: data
+    )
+
+    XCTAssertEqual(sample.windowID, HarnessMonitorWindowID.openRecent)
+    XCTAssertEqual(sample.stateLabel, "running")
+    XCTAssertEqual(sample.includesBootstrapInScenarioMeasurement, true)
+    XCTAssertEqual(sample.appInitToReadyMilliseconds, 100, accuracy: 0.001)
+  }
+
   func testAppDelegateDetectsHostedXCTestLaunches() {
     XCTAssertTrue(
       HarnessMonitorAppDelegate.isTestHarnessRun(

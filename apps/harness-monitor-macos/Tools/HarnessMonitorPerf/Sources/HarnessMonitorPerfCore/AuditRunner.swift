@@ -11,6 +11,8 @@ public enum AuditRunner {
     public static let persistenceArguments = ["-ApplePersistenceIgnoreState", "YES"]
     public static let daemonDataHomeOverrideEnvironmentKey =
         "HARNESS_MONITOR_AUDIT_DAEMON_DATA_HOME"
+    public static let launchMetricsPathEnvironmentKey =
+        "HARNESS_MONITOR_PERF_LAUNCH_METRICS_PATH"
     public static let passThroughEnvironmentKeys: Set<String> = [
         "HARNESS_MONITOR_EXTERNAL_DAEMON",
         "HARNESS_MONITOR_LAUNCH_MODE",

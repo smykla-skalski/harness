@@ -16,6 +16,13 @@ final class RecapTests: XCTestCase {
             {
               "scenario": "open-recent-window",
               "template": "SwiftUI",
+              "launch_metrics": {
+                "app_init_to_ready_ms": 350,
+                "measured_from": "app_init",
+                "state_label": "running",
+                "window_id": "open-recent",
+                "includes_bootstrap_in_scenario_measurement": true
+              },
               "metrics": {
                 "swiftui_updates": {"total_count": 1234, "body_update_count": 100, "duration_ms_p95": 12.5, "duration_ns_max": 25000000},
                 "hitches": {"count": 1},
@@ -33,7 +40,8 @@ final class RecapTests: XCTestCase {
         XCTAssertTrue(text.contains("- label=perf"))
         XCTAssertTrue(text.contains("- run_id=2026-04-25T00:00:00Z"))
         XCTAssertTrue(text.contains("- commit=abcdef0 dirty=False"))
-        XCTAssertTrue(text.contains("open-recent-window [SwiftUI]: total_updates=1234 body_updates=100"))
+        XCTAssertTrue(text.contains("open-recent-window [SwiftUI]: launch_ms=350.0000"))
+        XCTAssertTrue(text.contains("total_updates=1234 body_updates=100"))
         XCTAssertTrue(text.contains("p95_ms=12.5000"))
         XCTAssertTrue(text.contains("max_ms=25.0000"))
         XCTAssertTrue(text.contains("hitches=1 potential_hangs=0"))
@@ -60,6 +68,9 @@ final class RecapTests: XCTestCase {
         {"comparisons": [{
           "scenario": "open-recent-window",
           "template": "SwiftUI",
+          "shared_metrics": {
+            "launch_app_init_to_ready_ms": {"baseline": 310, "current": 350, "delta": 40}
+          },
           "metrics": {
             "total_updates": {"baseline": 1000, "current": 1100, "delta": 100},
             "body_updates": {"baseline": 100, "current": 110, "delta": 10},
@@ -69,6 +80,7 @@ final class RecapTests: XCTestCase {
         }]}
         """)
         let text = Recap.render(summary: summary, comparison: comparison, topCount: 0)
+        XCTAssertTrue(text.contains("d_launch_ms=40"))
         XCTAssertTrue(text.contains("d_total_updates=100"))
         XCTAssertTrue(text.contains("d_body_updates=10"))
         XCTAssertTrue(text.contains("d_hitches=1"))
@@ -77,18 +89,26 @@ final class RecapTests: XCTestCase {
     func testAllocationsRecapIncludesSelectedCategories() throws {
         let summary = try decode("""
         {
-          "captures": [{
-            "scenario": "offline-cached-open",
-            "template": "Allocations",
-            "metrics": {"allocations": {"summary_rows": {
-              "All Heap & Anonymous VM": {"persistent_bytes": 100, "total_bytes": 200},
-              "All VM Regions": {"persistent_bytes": 50, "total_bytes": 80}
-            }}}
-          }]
+            "captures": [{
+              "scenario": "offline-cached-open",
+              "template": "Allocations",
+              "launch_metrics": {
+                "app_init_to_ready_ms": 420,
+                "measured_from": "app_init",
+                "state_label": "running",
+                "window_id": "open-recent",
+                "includes_bootstrap_in_scenario_measurement": false
+              },
+              "metrics": {"allocations": {"summary_rows": {
+                "All Heap & Anonymous VM": {"persistent_bytes": 100, "total_bytes": 200},
+                "All VM Regions": {"persistent_bytes": 50, "total_bytes": 80}
+              }}}
+            }]
         }
         """)
         let text = Recap.render(summary: summary, comparison: nil, topCount: 0)
         XCTAssertTrue(text.contains("offline-cached-open [Allocations]:"))
+        XCTAssertTrue(text.contains("launch_ms=420.0000"))
         XCTAssertTrue(text.contains("All Heap & Anonymous VM: persistent_bytes=100 total_bytes=200"))
         XCTAssertTrue(text.contains("All VM Regions: persistent_bytes=50 total_bytes=80"))
     }

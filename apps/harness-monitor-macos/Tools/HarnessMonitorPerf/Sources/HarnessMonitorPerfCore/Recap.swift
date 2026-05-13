@@ -77,9 +77,13 @@ public enum Recap {
         let hitches = metrics["hitches"]?["count"]?.intValue ?? 0
         let hangs = metrics["potential_hangs"]?["count"]?.intValue ?? 0
         let maxMs = nsToMs(swiftui["duration_ns_max"]?.intValue ?? 0)
+        let launchMs = capture["launch_metrics"]?["app_init_to_ready_ms"]?.doubleValue
         let scenario = capture["scenario"]?.stringValue ?? "unknown"
 
         var line = "- \(scenario) [SwiftUI]: "
+        if let launchMs {
+            line += "launch_ms=\(formatFloat(launchMs)) "
+        }
         line += "total_updates=\(swiftui["total_count"]?.intValue ?? 0) "
         line += "body_updates=\(swiftui["body_update_count"]?.intValue ?? 0) "
         line += "p95_ms=\(formatFloat(swiftui["duration_ms_p95"]?.doubleValue ?? 0)) "
@@ -89,6 +93,10 @@ public enum Recap {
 
         if let comparison {
             let deltaMetrics = comparison["metrics"] ?? .object([:])
+            let sharedMetrics = comparison["shared_metrics"] ?? .object([:])
+            if let launchDelta = sharedMetrics[MetricName.launchAppInitToReadyMs] {
+                line += " d_launch_ms=\(deltaValue(launchDelta))"
+            }
             line += " d_total_updates=\(deltaValue(deltaMetrics["total_updates"]))"
             line += " d_body_updates=\(deltaValue(deltaMetrics["body_updates"]))"
             line += " d_hitches=\(deltaValue(deltaMetrics["hitches"]))"
@@ -115,6 +123,9 @@ public enum Recap {
         let rows = metrics["allocations"]?["summary_rows"] ?? .object([:])
         let selectedCategories = ["All Heap & Anonymous VM", "All VM Regions"]
         var parts: [String] = []
+        if let launchMs = capture["launch_metrics"]?["app_init_to_ready_ms"]?.doubleValue {
+            parts.append("launch_ms=\(formatFloat(launchMs))")
+        }
         for category in selectedCategories {
             let row = rows[category] ?? .object([:])
             guard case .object(let dict) = row, !dict.isEmpty else { continue }

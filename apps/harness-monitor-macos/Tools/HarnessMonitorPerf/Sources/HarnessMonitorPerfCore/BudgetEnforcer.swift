@@ -24,6 +24,7 @@ public enum BudgetEnforcer {
 
         var failures: [String] = []
         for capture in captures {
+            failures.append(contentsOf: launchFailures(capture))
             let template = capture["template"] as? String
             switch template {
             case "SwiftUI":
@@ -35,6 +36,25 @@ public enum BudgetEnforcer {
             }
         }
         return failures
+    }
+
+    private static func launchFailures(_ capture: [String: Any]) -> [String] {
+        guard
+            let scenario = capture["scenario"] as? String,
+            let budget = Budgets.launchByScenario[scenario]
+        else { return [] }
+
+        guard let launchMetrics = capture["launch_metrics"] as? [String: Any] else {
+            return ["\(scenario) Launch metrics missing from summary"]
+        }
+        guard let value = (launchMetrics["app_init_to_ready_ms"] as? NSNumber)?.doubleValue else {
+            return ["\(scenario) Launch \(MetricName.launchAppInitToReadyMs) missing from summary"]
+        }
+        guard value > budget else { return [] }
+        return [
+            "\(scenario) Launch \(MetricName.launchAppInitToReadyMs) exceeded budget: "
+                + "\(format(value)) > \(format(budget))"
+        ]
     }
 
     private static func swiftUIFailures(_ capture: [String: Any]) -> [String] {

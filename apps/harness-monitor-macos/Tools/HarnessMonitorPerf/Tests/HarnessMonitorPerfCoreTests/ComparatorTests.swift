@@ -21,18 +21,30 @@ final class ComparatorTests: XCTestCase {
     }
 
     private static let baselinePayload = """
-    {
-      "label": "baseline",
-      "created_at_utc": "2026-04-01T00:00:00Z",
-      "captures": [
         {
-          "scenario": "open-recent-window",
-          "template": "SwiftUI",
-          "metrics": {
-            "swiftui_updates": {"total_count": 10000, "body_update_count": 1000, "duration_ms_p95": 10.0, "duration_ns_max": 12000000},
-            "hitches": {"count": 0},
-            "potential_hangs": {"count": 0},
-            "top_frames": [{"name": "DashboardView.body", "samples": 100}]
+          "label": "baseline",
+          "created_at_utc": "2026-04-01T00:00:00Z",
+          "captures": [
+            {
+              "scenario": "open-recent-window",
+              "template": "SwiftUI",
+              "launch_metrics": {
+                "app_init_to_ready_ms": 320,
+                "measured_from": "app_init",
+                "state_label": "running",
+                "window_id": "open-recent",
+                "includes_bootstrap_in_scenario_measurement": true
+              },
+              "metric_tiers": {
+                "hard_budget": ["launch_app_init_to_ready_ms", "total_updates", "body_updates", "max_update_group_ms", "hitches", "potential_hangs"],
+                "investigative": ["p95_update_ms", "max_update_ms", "update_group_p95_ms", "top_frames"]
+              },
+              "metrics": {
+                "swiftui_updates": {"total_count": 10000, "body_update_count": 1000, "duration_ms_p95": 10.0, "duration_ns_max": 12000000},
+                "swiftui_update_groups": {"duration_ms_p95": 8.0, "duration_ns_max": 20000000},
+                "hitches": {"count": 0},
+                "potential_hangs": {"count": 0},
+                "top_frames": [{"name": "DashboardView.body", "samples": 100}]
           }
         },
         {
@@ -57,18 +69,30 @@ final class ComparatorTests: XCTestCase {
     """
 
     private static let currentPayload = """
-    {
-      "label": "current",
-      "created_at_utc": "2026-04-25T00:00:00Z",
-      "captures": [
         {
-          "scenario": "open-recent-window",
-          "template": "SwiftUI",
-          "metrics": {
-            "swiftui_updates": {"total_count": 11000, "body_update_count": 1100, "duration_ms_p95": 11.5, "duration_ns_max": 15000000},
-            "hitches": {"count": 1},
-            "potential_hangs": {"count": 0},
-            "top_frames": [{"name": "DashboardView.body", "samples": 110}, {"name": "SidebarRow.body", "samples": 30}]
+          "label": "current",
+          "created_at_utc": "2026-04-25T00:00:00Z",
+          "captures": [
+            {
+              "scenario": "open-recent-window",
+              "template": "SwiftUI",
+              "launch_metrics": {
+                "app_init_to_ready_ms": 360,
+                "measured_from": "app_init",
+                "state_label": "running",
+                "window_id": "open-recent",
+                "includes_bootstrap_in_scenario_measurement": true
+              },
+              "metric_tiers": {
+                "hard_budget": ["launch_app_init_to_ready_ms", "total_updates", "body_updates", "max_update_group_ms", "hitches", "potential_hangs"],
+                "investigative": ["p95_update_ms", "max_update_ms", "update_group_p95_ms", "top_frames"]
+              },
+              "metrics": {
+                "swiftui_updates": {"total_count": 11000, "body_update_count": 1100, "duration_ms_p95": 11.5, "duration_ns_max": 15000000},
+                "swiftui_update_groups": {"duration_ms_p95": 9.0, "duration_ns_max": 24000000},
+                "hitches": {"count": 1},
+                "potential_hangs": {"count": 0},
+                "top_frames": [{"name": "DashboardView.body", "samples": 110}, {"name": "SidebarRow.body", "samples": 30}]
           }
         },
         {
@@ -133,8 +157,13 @@ final class ComparatorTests: XCTestCase {
         XCTAssertEqual(metrics["total_updates"]?.delta.description, "1000")
         XCTAssertEqual(metrics["hitches"]?.delta.description, "1")
         XCTAssertEqual(metrics["p95_update_ms"]?.delta.description, "1.5")
+        XCTAssertEqual(metrics["max_update_group_ms"]?.delta.description, "4")
         XCTAssertEqual(swiftui.topFrames?.current.count, 2)
         XCTAssertEqual(swiftui.topFrames?.current.first?.name, "DashboardView.body")
+        XCTAssertEqual(
+            swiftui.sharedMetrics?[MetricName.launchAppInitToReadyMs]?.delta.description,
+            "40"
+        )
 
         let allocations = try XCTUnwrap(comparison.comparisons.first { $0.template == "Allocations" })
         guard case .allocations(let byCategory) = allocations.metrics else {
@@ -153,6 +182,8 @@ final class ComparatorTests: XCTestCase {
         XCTAssertTrue(markdown.contains("## Missing from current"))
         XCTAssertTrue(markdown.contains("## Missing from baseline"))
         XCTAssertTrue(markdown.contains("## open-recent-window (SwiftUI)"))
+        XCTAssertTrue(markdown.contains("### Hard budget metrics"))
+        XCTAssertTrue(markdown.contains("| launch_app_init_to_ready_ms | 320 | 360 | 40 |"))
         XCTAssertTrue(markdown.contains("| total_updates | 10000 | 11000 | 1000 |"))
         XCTAssertTrue(markdown.contains("| All Heap Allocations | total_bytes | 100 | 120 | 20 |"))
         XCTAssertTrue(markdown.contains("Baseline hot frames: DashboardView.body"))

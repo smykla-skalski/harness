@@ -19,6 +19,9 @@ extension AuditRunner {
         )
         let logURL = runDir.appendingPathComponent("logs", isDirectory: true)
             .appendingPathComponent("\(templateSlug)-\(scenario).log")
+        let launchMetricsURL = runDir.appendingPathComponent("launch-metrics", isDirectory: true)
+            .appendingPathComponent(scenario, isDirectory: true)
+            .appendingPathComponent("\(templateSlug).json")
         let traceURL = templateDir.appendingPathComponent("\(scenario).trace", isDirectory: true)
         let tocURL = templateDir.appendingPathComponent("\(scenario).toc.xml")
 
@@ -26,6 +29,7 @@ extension AuditRunner {
         env["HARNESS_DAEMON_DATA_HOME"] = dataHome.launchDataHome.path
         env["HARNESS_MONITOR_PERF_SCENARIO"] = scenario
         env["HARNESS_MONITOR_PREVIEW_SCENARIO"] = ScenarioCatalog.previewScenario(for: scenario)
+        env[AuditRunner.launchMetricsPathEnvironmentKey] = launchMetricsURL.path
 
         try assertSourceUnchanged(
             checkpoint: "before recording \(template) / \(scenario)",
@@ -46,7 +50,7 @@ extension AuditRunner {
             daemonDataHomeProbe: dataHome.probeDataHome,
             xctraceTempRoot: xctraceTempRoot
         )
-        return try TraceRecorder.record(inputs) {
+        var capture = try TraceRecorder.record(inputs) {
             cleanupHostProcesses()
             try assertSourceUnchanged(
                 checkpoint: "after recording \(template) / \(scenario)",
@@ -54,6 +58,8 @@ extension AuditRunner {
                 gitCommit: gitCommit, workspaceFingerprint: workspaceFingerprint
             )
         }
+        capture.record.launchMetrics = try loadLaunchMetrics(from: launchMetricsURL)
+        return capture
     }
 
     static func appendCaptureTSV(_ url: URL, capture: TraceRecorder.Capture) throws {
@@ -70,6 +76,15 @@ extension AuditRunner {
         defer { try? handle.close() }
         try handle.seekToEnd()
         try handle.write(contentsOf: Data(line.utf8))
+    }
+
+    private static func loadLaunchMetrics(
+        from url: URL
+    ) throws -> CaptureLaunchMetrics? {
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            return nil
+        }
+        return try CaptureLaunchMetrics.fromFile(url)
     }
 
     static func buildManifest(

@@ -35,6 +35,8 @@ public struct RunManifest: Codable, Equatable {
         /// Present in summary.json (filled by Summarizer); absent in manifest.json.
         public var metrics: JSONValue?
         public var warnings: [String]?
+        public var launchMetrics: CaptureLaunchMetrics?
+        public var metricTiers: CaptureMetricTiers?
 
         enum CodingKeys: String, CodingKey {
             case scenario
@@ -45,6 +47,8 @@ public struct RunManifest: Codable, Equatable {
             case endReason = "end_reason"
             case metrics
             case warnings
+            case launchMetrics = "launch_metrics"
+            case metricTiers = "metric_tiers"
         }
     }
 
