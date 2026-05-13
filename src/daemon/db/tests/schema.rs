@@ -1,5 +1,5 @@
-use super::*;
 use super::schema_migrations::PROJECTS_AND_SESSIONS_V6_SCHEMA;
+use super::*;
 use std::sync::{Arc, Barrier};
 use std::thread;
 

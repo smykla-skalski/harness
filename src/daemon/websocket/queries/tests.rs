@@ -160,10 +160,7 @@ async fn dispatch_read_query_managed_agent_codex_transcript_returns_history() {
         Some("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4")
     );
     assert_eq!(prompt_entry["agent_id"].as_str(), Some("codex-worker"));
-    assert_eq!(
-        prompt_entry["summary"].as_str(),
-        Some("Investigate run-3")
-    );
+    assert_eq!(prompt_entry["summary"].as_str(), Some("Investigate run-3"));
     assert_eq!(prompt_entry["payload"]["runtime"].as_str(), Some("codex"));
     assert_eq!(
         prompt_entry["payload"]["event"]["type"].as_str(),
