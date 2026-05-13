@@ -124,7 +124,7 @@ private struct SessionTimelineNodeRow: View {
   // row root.
   var body: some View {
     HStack(alignment: .sessionTimelineMarkerCenter, spacing: HarnessMonitorTheme.itemSpacing) {
-      Text(row.timestampLabel)
+      Text(verbatim: row.timestampLabel)
         .font(timestampFont)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .lineLimit(1)
@@ -209,11 +209,11 @@ private struct SessionTimelineNodeRow: View {
           if node.kind != .event {
             kindBadge
           }
-          Text(node.title)
+          Text(verbatim: node.title)
             .font(titleFont)
             .foregroundStyle(HarnessMonitorTheme.ink)
             .lineLimit(1)
-          Text(node.sourceLabel)
+          Text(verbatim: node.sourceLabel)
             .font(sourceFont)
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             .lineLimit(1)
@@ -222,7 +222,7 @@ private struct SessionTimelineNodeRow: View {
           dimensions[VerticalAlignment.center]
         }
         if let detail = node.detail {
-          Text(detail)
+          Text(verbatim: detail)
             .font(detailFont)
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             .lineLimit(1)
@@ -240,7 +240,7 @@ private struct SessionTimelineNodeRow: View {
         if node.kind != .event {
           kindBadge
         }
-        Text(node.sourceLabel)
+        Text(verbatim: node.sourceLabel)
           .font(compactSourceFont)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .lineLimit(1)
@@ -251,14 +251,14 @@ private struct SessionTimelineNodeRow: View {
         dimensions[VerticalAlignment.center]
       }
 
-      Text(node.title)
+      Text(verbatim: node.title)
         .font(titleFont)
         .foregroundStyle(HarnessMonitorTheme.ink)
         .lineLimit(2)
         .frame(maxWidth: .infinity, alignment: .leading)
 
       if let detail = node.detail {
-        Text(detail)
+        Text(verbatim: detail)
           .font(detailFont)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .lineLimit(2)
