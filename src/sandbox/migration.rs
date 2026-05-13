@@ -114,7 +114,7 @@ fn acknowledge_split(
     if split_marker_matches(new_root, old_root, &old_root_digest)? {
         return Ok(MigrationOutcome::SplitAlreadyAcknowledged);
     }
-    warn!(old = %old_root.display(), new = %new_root.display(), "{message}");
+    info!(old = %old_root.display(), new = %new_root.display(), "{message}");
     write_split_marker(new_root, old_root, &old_root_digest)?;
     Ok(MigrationOutcome::SplitAcknowledged)
 }
