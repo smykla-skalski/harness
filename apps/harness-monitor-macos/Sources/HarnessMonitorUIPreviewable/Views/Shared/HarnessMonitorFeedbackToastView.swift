@@ -289,8 +289,8 @@ private struct HarnessMonitorFeedbackToastRow: View {
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
-      ForEach(details.rows, id: \.self) { row in
-        HarnessMonitorFeedbackToastDetailRow(row: row)
+      ForEach(details.rows.indices, id: \.self) { rowIndex in
+        HarnessMonitorFeedbackToastDetailRow(row: details.rows[rowIndex])
       }
       if let command = details.command {
         CopyableCommandBox(

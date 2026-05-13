@@ -251,10 +251,6 @@ extension View {
     modifier(HarnessMonitorSystemButtonChromeModifier(style: .borderless, tint: nil))
   }
 
-  public func harnessPlainButtonStyle() -> some View {
-    buttonStyle(.plain)
-  }
-
   public func harnessToastDismissButtonLabelStyle() -> some View {
     modifier(HarnessMonitorToastDismissLabelStyle())
   }

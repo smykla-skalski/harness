@@ -71,33 +71,29 @@ final class BudgetEnforcerTests: XCTestCase {
         XCTAssertTrue(BudgetEnforcer.collectFailures(summaryJSON: data).isEmpty)
     }
 
+    func testMissingMetricsFailBudgetEnforcement() {
+        let payload: [String: Any] = [
+            "captures": [
+                [
+                    "scenario": "open-recent-window",
+                    "template": "SwiftUI",
+                ],
+                [
+                    "scenario": "offline-cached-open",
+                    "template": "Allocations",
+                ],
+            ],
+        ]
+        let data = try! JSONSerialization.data(withJSONObject: payload)
+        let failures = BudgetEnforcer.collectFailures(summaryJSON: data)
+        XCTAssertEqual(failures.count, 2)
+        XCTAssertTrue(failures.contains("open-recent-window SwiftUI metrics missing from summary"))
+        XCTAssertTrue(failures.contains("offline-cached-open Allocations metrics missing from summary"))
+    }
+
     func testCatalogParityWithAuditDefinitions() {
-        XCTAssertEqual(Budgets.swiftUIByScenario.keys.sorted(), [
-            "agent-detail-form",
-            "agent-detail-form-visual-options-disabled",
-            "decision-detail-form",
-            "decision-detail-form-visual-options-disabled",
-            "offline-cached-open",
-            "open-recent-window",
-            "open-session-window",
-            "open-session-window-visual-options-disabled",
-            "permission-modal",
-            "session-search-full",
-            "session-search-full-visual-options-disabled",
-            "sidebar-toggle-rich-detail",
-            "sidebar-toggle-rich-detail-visual-options-disabled",
-            "task-detail-form",
-            "task-detail-form-visual-options-disabled",
-            "timeline-burst",
-            "timeline-filter-form",
-            "timeline-filter-form-visual-options-disabled",
-            "toast-overlay-churn",
-        ])
-        XCTAssertEqual(Budgets.allocationsByScenario.keys.sorted(), [
-            "offline-cached-open",
-            "settings-backdrop-cycle",
-            "settings-background-cycle",
-        ])
+        XCTAssertEqual(Set(Budgets.swiftUIByScenario.keys), ScenarioCatalog.swiftUI)
+        XCTAssertEqual(Set(Budgets.allocationsByScenario.keys), ScenarioCatalog.allocations)
         XCTAssertEqual(Budgets.defaultSwiftUI.totalUpdates, 35_000)
         XCTAssertEqual(Budgets.retainedRunSizeKiB, 10_240)
     }

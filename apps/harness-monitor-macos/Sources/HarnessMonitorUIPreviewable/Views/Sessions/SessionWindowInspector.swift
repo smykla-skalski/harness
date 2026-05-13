@@ -72,7 +72,7 @@ struct SessionWindowInspector: View {
           .scaledFont(.title3)
           .foregroundStyle(.secondary)
       }
-      .harnessPlainButtonStyle()
+      .harnessDismissButtonStyle()
       .frame(minWidth: metrics.closeButtonMinSize, minHeight: metrics.closeButtonMinSize)
       .focused($closeButtonFocused)
       .keyboardShortcut(.cancelAction)

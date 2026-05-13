@@ -10,8 +10,9 @@ public enum Summarizer {
         public var description: String { message }
     }
 
-    /// Drive the full summary write for `runDir`. `runDir/manifest.json` must exist and
-    /// `runDir/metrics/{scenario}/{template-slug}.json` must exist for every capture.
+    /// Drive the full summary write for `runDir`. `runDir/manifest.json` must exist. Missing
+    /// metrics files are preserved as warnings in the summary so compare/budget steps can still
+    /// explain what was captured before failing on the incomplete run.
     @discardableResult
     public static func summarize(runDir: URL) throws -> RunManifest {
         let manifestURL = runDir.appendingPathComponent("manifest.json")
@@ -23,20 +24,26 @@ public enum Summarizer {
 
         let metricsRoot = runDir.appendingPathComponent("metrics")
         var enrichedCaptures: [RunManifest.Capture] = []
+        var manifestWarnings: [String] = manifest.warnings ?? []
         for capture in manifest.captures {
             let templateSlug = templateSlug(capture.template)
             let metricsURL = metricsRoot
                 .appendingPathComponent(capture.scenario)
                 .appendingPathComponent("\(templateSlug).json")
+            var enriched = capture
             guard FileManager.default.fileExists(atPath: metricsURL.path) else {
-                throw Failure(message: "metrics file missing: \(metricsURL.path)")
+                let warning = "metrics file missing: \(metricsURL.path)"
+                enriched.warnings = [warning]
+                manifestWarnings.append("\(capture.scenario) (\(capture.template)): \(warning)")
+                enrichedCaptures.append(enriched)
+                continue
             }
             let metrics = try JSONValue.fromFile(metricsURL)
-            var enriched = capture
             enriched.metrics = metrics
             enrichedCaptures.append(enriched)
         }
         manifest.captures = enrichedCaptures
+        manifest.warnings = manifestWarnings.isEmpty ? nil : manifestWarnings
 
         try writeSummaryJSON(manifest: manifest, to: runDir.appendingPathComponent("summary.json"))
         try writeSummaryCSV(captures: enrichedCaptures, to: runDir.appendingPathComponent("summary.csv"))

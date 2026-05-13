@@ -118,17 +118,17 @@ final class SummarizerTests: XCTestCase {
         }
     }
 
-    func testSummarizeFailsWhenMetricsFileMissing() throws {
+    func testSummarizePreservesWarningsWhenMetricsFileMissing() throws {
         try seedRun()
         let metricsURL = runDir.appendingPathComponent("metrics/open-recent-window/swiftui.json")
         try FileManager.default.removeItem(at: metricsURL)
-        XCTAssertThrowsError(try Summarizer.summarize(runDir: runDir)) { error in
-            guard let failure = error as? Summarizer.Failure else {
-                XCTFail("expected Summarizer.Failure, got \(error)")
-                return
-            }
-            XCTAssertTrue(failure.message.contains("metrics file missing"))
-        }
+        let manifest = try Summarizer.summarize(runDir: runDir)
+
+        XCTAssertEqual(manifest.captures.count, 2)
+        XCTAssertNil(manifest.captures[0].metrics)
+        XCTAssertEqual(manifest.captures[0].warnings?.count, 1)
+        XCTAssertTrue(manifest.captures[0].warnings?.first?.contains("metrics file missing") == true)
+        XCTAssertEqual(manifest.warnings?.count, 1)
     }
 
     func testTemplateSlugMatchesPython() {

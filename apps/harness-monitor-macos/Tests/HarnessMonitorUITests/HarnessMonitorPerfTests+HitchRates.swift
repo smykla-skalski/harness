@@ -54,6 +54,10 @@ extension HarnessMonitorPerfTests {
     }
   }
 
+  func testSidebarToggleRichDetailHitchRate() {
+    measureScenario("sidebar-toggle-rich-detail")
+  }
+
   func testTimelineFilterFormHitchRate() {
     measureScenario("timeline-filter-form")
   }
@@ -71,6 +75,8 @@ extension HarnessMonitorPerfTests {
   }
 
   func testSettingsDatabaseScrollHitchRate() {
+    // UI-test-only coverage: this flow depends on real settings-window scrolling,
+    // so it intentionally stays outside the xctrace audit scenario catalog.
     let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
     let options = XCTMeasureOptions()
     options.iterationCount = 3
