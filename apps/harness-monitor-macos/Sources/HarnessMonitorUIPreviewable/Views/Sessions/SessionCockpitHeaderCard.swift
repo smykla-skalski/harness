@@ -10,18 +10,6 @@ struct SessionCockpitHeaderCard: View {
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
 
-  private struct SupplementalSummaryVisibility: Equatable {
-    let hasObserver: Bool
-    let hasPendingLeaderTransfer: Bool
-  }
-
-  private var supplementalSummaryVisibility: SupplementalSummaryVisibility {
-    SupplementalSummaryVisibility(
-      hasObserver: detail.observer != nil,
-      hasPendingLeaderTransfer: detail.session.pendingLeaderTransfer != nil
-    )
-  }
-
   private var areSessionActionsAvailable: Bool {
     store.areSelectedSessionActionsAvailable
   }
@@ -99,21 +87,17 @@ struct SessionCockpitHeaderCard: View {
 
       if let observer = detail.observer {
         observerSummary(observer)
-          .transition(.opacity)
       }
 
       if let awaitingLeaderMessage {
         awaitingLeaderSummary(awaitingLeaderMessage)
-          .transition(.opacity)
       }
 
       if let pendingTransfer = detail.session.pendingLeaderTransfer {
         pendingTransferSummary(pendingTransfer)
-          .transition(.opacity)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .animation(.spring(duration: 0.3), value: supplementalSummaryVisibility)
     .accessibilityTestProbe(HarnessMonitorAccessibility.sessionHeaderCard)
     .accessibilityFrameMarker(HarnessMonitorAccessibility.sessionHeaderCardFrame)
   }

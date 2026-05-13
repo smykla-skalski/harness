@@ -14,9 +14,6 @@ public struct HarnessInlineActionButton: View {
   public let help: String
   public let action: Action
 
-  @Environment(\.accessibilityReduceMotion)
-  private var reduceMotion
-
   public init(
     title: String,
     actionID: ActionID,
@@ -52,16 +49,11 @@ public struct HarnessInlineActionButton: View {
       HStack(spacing: HarnessMonitorTheme.itemSpacing) {
         if isLoading {
           HarnessMonitorSpinner()
-            .transition(.opacity)
         }
         Text(title)
           .lineLimit(1)
       }
       .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
-      .animation(
-        reduceMotion ? .easeOut(duration: 0.15) : .spring(duration: 0.2),
-        value: isLoading
-      )
     }
     .harnessActionButtonStyle(variant: variant, tint: tint)
     .controlSize(HarnessMonitorControlMetrics.compactControlSize)
