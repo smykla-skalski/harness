@@ -42,5 +42,7 @@ struct AppSearchSuggestionSnapshotTests {
     #expect(snapshot.firstHit == workerHit)
     #expect(snapshot.hit(matchingCompletion: " Codex Worker ") == workerHit)
     #expect(snapshot.hit(matchingCompletion: "UI Performance (Tasks)") == taskHit)
+    #expect(snapshot.hit(matchingDisplayTitle: " Codex Worker (Agents) ") == workerHit)
+    #expect(snapshot.hit(matchingDisplayTitle: "Codex Worker") == nil)
   }
 }

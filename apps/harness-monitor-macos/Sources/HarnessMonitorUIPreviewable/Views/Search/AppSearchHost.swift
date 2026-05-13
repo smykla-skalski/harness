@@ -34,10 +34,10 @@ private struct AppSearchTrigger: Equatable {
 /// app commands and avoids leaving an always-present opacity renderer in
 /// the session window graph.
 ///
-/// Suggestions are rendered from a compact value snapshot in an app-owned
-/// overlay. The search field itself stays native `.searchable` without an
-/// `isPresented` binding; Instruments showed that binding fans toolbar
-/// search presentation through the expensive AppKit text-field path.
+/// Suggestions stay on SwiftUI's native `.searchSuggestions` path, fed by a
+/// compact value snapshot. The search field avoids an `isPresented` binding;
+/// Instruments showed that binding fans toolbar search presentation through
+/// the expensive AppKit text-field path.
 public struct AppSearchHost: View {
   let model: AppSearchModel
   let prompt: LocalizedStringKey
@@ -72,12 +72,11 @@ public struct AppSearchHost: View {
       AppSearchFieldSurface(
         query: $query,
         prompt: prompt,
+        suggestionRows: suggestionSnapshot.rows,
         isFocused: $isSearchFocused,
         onSubmit: submitSearch
       )
       .equatable()
-
-      suggestionOverlay
 
       AppSearchTaskAnchor(
         trigger: searchTrigger,
@@ -98,6 +97,9 @@ public struct AppSearchHost: View {
     }
     .onDisappear {
       automation?.handler = nil
+    }
+    .onChange(of: query) { oldValue, newValue in
+      routeNativeSuggestionCompletion(from: oldValue, to: newValue)
     }
     .harnessFocusedSceneValue(\.harnessSidebarSearchFocusAction, searchFocusAction)
     .task {
@@ -120,25 +122,6 @@ public struct AppSearchHost: View {
     isSearchFocused = true
   }
 
-  @ViewBuilder private var suggestionOverlay: some View {
-    if shouldShowSuggestionOverlay {
-      AppSearchSuggestionsView(snapshot: suggestionSnapshot, onPick: handleHit)
-        .padding(.top, 8)
-        .padding(.trailing, 16)
-        .zIndex(10)
-        .allowsHitTesting(true)
-    } else {
-      Color.clear
-        .frame(width: 0, height: 0)
-        .allowsHitTesting(false)
-    }
-  }
-
-  private var shouldShowSuggestionOverlay: Bool {
-    shouldKeepSearchIndexActive
-      && !suggestionSnapshot.rows.isEmpty
-  }
-
   private var shouldKeepSearchIndexActive: Bool {
     isSearchFocused || hasSearchQuery
   }
@@ -151,6 +134,14 @@ public struct AppSearchHost: View {
       ?? suggestionSnapshot.firstHit
       ?? model.results.sections.first?.hits.first
     guard let hit else { return }
+    handleHit(hit)
+  }
+
+  private func routeNativeSuggestionCompletion(from oldValue: String, to newValue: String) {
+    let oldTrimmed = oldValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard trimmed != oldTrimmed else { return }
+    guard let hit = suggestionSnapshot.hit(matchingDisplayTitle: trimmed) else { return }
     handleHit(hit)
   }
 
@@ -236,6 +227,7 @@ public struct AppSearchHost: View {
 private struct AppSearchFieldSurface: View, Equatable {
   @Binding var query: String
   let prompt: LocalizedStringKey
+  let suggestionRows: [AppSearchSuggestionRow]
   let isFocused: FocusState<Bool>.Binding
   let onSubmit: () -> Void
   private let queryValue: String
@@ -244,11 +236,13 @@ private struct AppSearchFieldSurface: View, Equatable {
   init(
     query: Binding<String>,
     prompt: LocalizedStringKey,
+    suggestionRows: [AppSearchSuggestionRow],
     isFocused: FocusState<Bool>.Binding,
     onSubmit: @escaping () -> Void
   ) {
     _query = query
     self.prompt = prompt
+    self.suggestionRows = suggestionRows
     self.isFocused = isFocused
     self.onSubmit = onSubmit
     queryValue = query.wrappedValue
@@ -258,6 +252,7 @@ private struct AppSearchFieldSurface: View, Equatable {
   nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.queryValue == rhs.queryValue
       && lhs.isFocusedValue == rhs.isFocusedValue
+      && lhs.suggestionRows == rhs.suggestionRows
   }
 
   var body: some View {
@@ -269,6 +264,16 @@ private struct AppSearchFieldSurface: View, Equatable {
         placement: .toolbar,
         prompt: prompt
       )
+      .searchSuggestions {
+        ForEach(suggestionRows) { row in
+          Label {
+            Text(verbatim: row.displayTitle)
+          } icon: {
+            Image(systemName: row.hit.systemImage)
+          }
+          .searchCompletion(row.displayTitle)
+        }
+      }
       .searchFocused(isFocused)
       .harnessMinimizableSearchToolbar()
       .onSubmit(of: .search) {

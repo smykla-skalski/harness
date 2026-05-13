@@ -33,6 +33,13 @@ public struct AppSearchSuggestionSnapshot: Equatable, Sendable {
       row.completion == trimmed || row.displayTitle == trimmed
     }?.hit
   }
+
+  public func hit(matchingDisplayTitle displayTitle: String) -> AppSearchHit? {
+    let trimmed = displayTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+    return rows.first { row in
+      row.displayTitle == trimmed
+    }?.hit
+  }
 }
 
 public struct AppSearchSuggestionRow: Identifiable, Equatable, Sendable {

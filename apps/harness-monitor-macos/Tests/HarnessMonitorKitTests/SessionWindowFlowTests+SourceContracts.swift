@@ -184,11 +184,10 @@ extension SessionWindowFlowTests {
   @Test("Session search keeps the field native and suggestions snapshot-backed")
   func sessionSearchKeepsFieldNativeAndSuggestionsSnapshotBacked() throws {
     let source = try previewableSourceFile(named: "Views/Search/AppSearchHost.swift")
-    let suggestionsSource = try previewableSourceFile(
-      named: "Views/Search/AppSearchSuggestionsView.swift"
-    )
 
     #expect(source.contains(".searchable("))
+    #expect(source.contains(".searchSuggestions"))
+    #expect(source.contains(".searchCompletion(row.displayTitle)"))
     #expect(source.contains("public struct AppSearchHost: View"))
     #expect(source.contains("public struct AppSearchHostModifier: ViewModifier"))
     #expect(source.contains("private struct AppSearchFieldSurface: View"))
@@ -199,13 +198,11 @@ extension SessionWindowFlowTests {
     #expect(source.contains(".equatable()"))
     #expect(source.contains("lhs.queryValue == rhs.queryValue"))
     #expect(source.contains("lhs.isFocusedValue == rhs.isFocusedValue"))
+    #expect(source.contains("lhs.suggestionRows == rhs.suggestionRows"))
     #expect(source.contains(".searchFocused(isFocused)"))
     #expect(!source.contains("isPresented: $isSearchPresented"))
-    #expect(!source.contains(".searchSuggestions"))
     #expect(source.contains("ZStack(alignment: .topTrailing)"))
-    #expect(
-      source.contains("AppSearchSuggestionsView(snapshot: suggestionSnapshot, onPick: handleHit)")
-    )
+    #expect(source.contains("suggestionRows: suggestionSnapshot.rows"))
     #expect(source.contains("@State private var suggestionSnapshot"))
     #expect(
       source.contains("updateSuggestionSnapshot(AppSearchSuggestionSnapshot(results: results))")
@@ -226,11 +223,13 @@ extension SessionWindowFlowTests {
     #expect(!source.contains("@Environment(\\.accessibilityVoiceOverEnabled)"))
     #expect(!source.contains("results: model.results"))
     #expect(!source.contains(".onChange(of: model.results.totalHitCount)"))
+    #expect(source.contains("routeNativeSuggestionCompletion(from: oldValue, to: newValue)"))
+    #expect(source.contains("suggestionSnapshot.hit(matchingDisplayTitle: trimmed)"))
+    #expect(!source.contains("AppSearchSuggestionsView"))
     #expect(!source.contains("AppSearchFieldRebinder"))
     #expect(!source.contains("NSSearchField"))
-    #expect(suggestionsSource.contains("Text(verbatim: row.displayTitle)"))
-    #expect(!suggestionsSource.contains(".searchCompletion"))
-    #expect(!suggestionsSource.contains("Section {"))
+    #expect(source.contains("Text(verbatim: row.displayTitle)"))
+    #expect(!source.contains("Section {"))
     #expect(!source.contains("@Bindable var model = model"))
   }
 

@@ -128,6 +128,7 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     let launched = launchForPerf(app: app, scenario: "session-search-full")
     let sessionWindow = element(in: launched, identifier: Accessibility.sessionWindowShell)
     let searchField = mainWindow(in: launched).searchFields.firstMatch
+    let agentDetail = element(in: launched, identifier: Accessibility.agentDetailScrollView)
 
     waitForScenarioCompletion(app: launched, scenario: "session-search-full")
 
@@ -139,6 +140,11 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     exerciseSessionSearch(in: launched, query: "worker")
     XCTAssertTrue(
       launched.staticTexts["Codex Worker"].firstMatch.waitForExistence(timeout: Self.actionTimeout)
+    )
+    acceptFirstNativeSearchSuggestion(in: launched)
+    XCTAssertTrue(
+      waitForElement(agentDetail, timeout: Self.actionTimeout),
+      "Keyboard acceptance of the native search suggestion should route to agent detail"
     )
 
     launched.terminate()
@@ -304,6 +310,11 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     searchField.tap()
     app.typeKey("a", modifierFlags: .command)
     searchField.typeText(query)
+  }
+
+  func acceptFirstNativeSearchSuggestion(in app: XCUIApplication) {
+    app.typeKey(.downArrow, modifierFlags: [])
+    app.typeKey(.return, modifierFlags: [])
   }
 
   private func assertAuditBuildState(in app: XCUIApplication, scenario: String) {
