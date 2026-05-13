@@ -67,6 +67,7 @@ final class AuditPrimitivesTests: AuditTempDirectoryTestCase {
         let result = try ProcessRunner.run("/bin/echo", arguments: ["hello", "world"])
         XCTAssertEqual(result.exitStatus, 0)
         XCTAssertEqual(result.stdoutString, "hello world\n")
+        XCTAssertFalse(result.timedOut)
     }
 
     func testRunCheckedThrowsOnNonZeroExit() {
@@ -88,6 +89,18 @@ final class AuditPrimitivesTests: AuditTempDirectoryTestCase {
             environmentOverrides: ["PERF_TEST_KEY": "abc123"]
         )
         XCTAssertEqual(result.stdoutString, "abc123")
+    }
+
+    func testProcessRunnerTerminatesTimedOutProcess() throws {
+        let start = Date()
+        let result = try ProcessRunner.run(
+            "/bin/sleep",
+            arguments: ["5"],
+            timeoutSeconds: 0.1,
+            terminationGraceSeconds: 0.1
+        )
+        XCTAssertTrue(result.timedOut)
+        XCTAssertLessThan(Date().timeIntervalSince(start), 2)
     }
 
     // MARK: - HostStager

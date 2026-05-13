@@ -94,11 +94,19 @@ public enum TraceRecorder {
         let (command, arguments) = recordCommand(inputs)
         let recordResult = try ProcessRunner.run(
             command, arguments: arguments,
-            environmentOverrides: ["TMPDIR": inputs.xctraceTempRoot.path + "/"]
+            environmentOverrides: ["TMPDIR": inputs.xctraceTempRoot.path + "/"],
+            timeoutSeconds: TimeInterval(inputs.durationSeconds + 90)
         )
 
         try? appendLog(inputs.logURL, label: "[record stdout]", data: recordResult.stdout)
         try? appendLog(inputs.logURL, label: "[record stderr]", data: recordResult.stderr)
+
+        if recordResult.timedOut {
+            throw Failure(
+                message: "xctrace record timed out for \(inputs.template) / \(inputs.scenario) "
+                    + "after \(inputs.durationSeconds + 90)s"
+            )
+        }
 
         guard fm.fileExists(atPath: inputs.traceURL.path) else {
             throw Failure(message: "Trace bundle missing for \(inputs.template) / \(inputs.scenario)")
