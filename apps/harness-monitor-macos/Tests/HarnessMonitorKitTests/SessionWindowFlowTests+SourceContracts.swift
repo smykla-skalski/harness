@@ -181,16 +181,24 @@ extension SessionWindowFlowTests {
     #expect(columnsSource.contains("func refilterDecisionsCache() async"))
   }
 
-  @Test("Session search results stay out of the toolbar search host body")
-  func sessionSearchResultsDoNotInvalidateSearchFieldHost() throws {
+  @Test("Session search suggestions stay native and snapshot-backed")
+  func sessionSearchSuggestionsStayNativeAndSnapshotBacked() throws {
     let source = try previewableSourceFile(named: "Views/Search/AppSearchHost.swift")
+    let suggestionsSource = try previewableSourceFile(
+      named: "Views/Search/AppSearchSuggestionsView.swift"
+    )
 
-    #expect(source.contains("AppSearchSuggestionsHost(model: model, onPick: handleHit)"))
+    #expect(source.contains(".searchable("))
+    #expect(source.contains(".searchSuggestions {"))
+    #expect(source.contains("AppSearchSuggestionsHost(snapshot: suggestionSnapshot)"))
     #expect(source.contains("private struct AppSearchSuggestionsHost: View"))
-    #expect(source.contains("results: model.results"))
-    #expect(source.contains(".onChange(of: model.results.totalHitCount)"))
+    #expect(source.contains("@State private var suggestionSnapshot"))
+    #expect(
+      source.contains("updateSuggestionSnapshot(AppSearchSuggestionSnapshot(results: results))")
+    )
+    #expect(source.contains(".onSubmit(of: .search)"))
+    #expect(source.contains("submitSearch()"))
     #expect(source.contains("let automation: AppSearchAutomationState?"))
-    #expect(source.contains(".task(id: automationCommand)"))
     #expect(source.contains("await applyAutomationCommand(command)"))
     #expect(source.contains("await Task.yield()"))
     #expect(source.contains("HarnessSidebarSearchFocusDispatcher()"))
@@ -199,8 +207,13 @@ extension SessionWindowFlowTests {
     #expect(!source.contains(".onChange(of: isSearchPresented"))
     #expect(!source.contains("Button(\"Find in Session\""))
     #expect(!source.contains(".searchPresentationToolbarBehavior(.avoidHidingContent)"))
-    #expect(source.contains("@Environment(\\.accessibilityVoiceOverEnabled)"))
-    #expect(source.contains("if voiceOverEnabled"))
+    #expect(!source.contains("@Environment(\\.accessibilityVoiceOverEnabled)"))
+    #expect(!source.contains("results: model.results"))
+    #expect(!source.contains(".onChange(of: model.results.totalHitCount)"))
+    #expect(suggestionsSource.contains("Text(verbatim: row.displayTitle)"))
+    #expect(suggestionsSource.contains(".searchCompletion(row.completion)"))
+    #expect(!suggestionsSource.contains("Button {"))
+    #expect(!suggestionsSource.contains("Section {"))
     #expect(!source.contains("@Bindable var model = model"))
     let staleRebinderDependency =
       "AppSearchFieldRebinder(\n          shouldRebind: !query.isEmpty && model.isPresented"

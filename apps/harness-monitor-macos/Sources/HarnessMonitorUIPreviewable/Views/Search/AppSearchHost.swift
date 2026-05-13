@@ -34,19 +34,10 @@ private struct AppSearchTrigger: Equatable {
 /// app commands and avoids leaving an always-present opacity renderer in
 /// the session window graph.
 ///
-/// Suggestion-popover persistence: `.searchSuggestions` on macOS is
-/// backed by `NSSearchField`'s suggestion menu, which dismisses when
-/// the window resigns key/active state and does NOT auto-reopen when
-/// the window regains it. There is no SwiftUI-only API to force
-/// re-presentation of the menu (confirmed by Apple Developer Forums
-/// thread #704767, which has no SwiftUI workaround). The fix uses
-/// `AppSearchFieldRebinder` -
-/// an `NSViewRepresentable` that finds the underlying
-/// `NSSearchField` in the window hierarchy and calls
-/// `beginSearchInteraction()` (the same AppKit API
-/// `NSSearchToolbarItem` uses internally) on
-/// `NSWindow.didBecomeKeyNotification` while the user still has a
-/// query.
+/// Suggestions are native search completions backed by a compact value
+/// snapshot. The suggestion view never reads the observable
+/// `AppSearchModel` in `body`, keeping result churn out of the toolbar
+/// search field's dependency graph.
 public struct AppSearchHostModifier: ViewModifier {
   let model: AppSearchModel
   let prompt: LocalizedStringKey
@@ -59,6 +50,7 @@ public struct AppSearchHostModifier: ViewModifier {
 
   @State private var query: String = ""
   @State private var isSearchPresented: Bool = false
+  @State private var suggestionSnapshot = AppSearchSuggestionSnapshot.empty
   @State private var searchFocusRequestID: UInt64 = 0
   @State private var searchFocusDispatcher = HarnessSidebarSearchFocusDispatcher()
 
@@ -85,7 +77,11 @@ public struct AppSearchHostModifier: ViewModifier {
       )
       .harnessMinimizableSearchToolbar()
       .searchSuggestions {
-        AppSearchSuggestionsHost(model: model, onPick: handleHit)
+        AppSearchSuggestionsHost(snapshot: suggestionSnapshot)
+          .searchSuggestions(.hidden, for: .content)
+      }
+      .onSubmit(of: .search) {
+        submitSearch()
       }
       .task(
         id: AppSearchTrigger(
@@ -138,6 +134,17 @@ public struct AppSearchHostModifier: ViewModifier {
     searchFocusRequestID &+= 1
   }
 
+  private func submitSearch() {
+    let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    let hit =
+      suggestionSnapshot.hit(matchingCompletion: trimmed)
+      ?? suggestionSnapshot.firstHit
+      ?? model.results.sections.first?.hits.first
+    guard let hit else { return }
+    handleHit(hit)
+  }
+
   /// Route to the hit, then clear the query and collapse the search
   /// field as one atomic step. Without the clear, the per-route list
   /// (which mirrors `appSearchModel.query`) keeps its filter applied
@@ -149,6 +156,7 @@ public struct AppSearchHostModifier: ViewModifier {
       query = ""
     }
     model.clear()
+    updateSuggestionSnapshot(.empty)
     if isSearchPresented {
       isSearchPresented = false
     }
@@ -161,6 +169,9 @@ public struct AppSearchHostModifier: ViewModifier {
   private func applyAutomationCommand(_ command: AppSearchAutomationCommand) async {
     if query != command.query {
       query = command.query
+      if command.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        updateSuggestionSnapshot(.empty)
+      }
       await Task.yield()
     }
     guard !Task.isCancelled else { return }
@@ -192,55 +203,26 @@ public struct AppSearchHostModifier: ViewModifier {
       id: signpostID,
       "primary=\(primary.rawValue)"
     )
-    await model.runSearch(query: liveQuery, primary: primary)
+    let results = await model.runSearch(query: liveQuery, primary: primary)
     appSearchSignposter.endInterval("app_search_query", state)
+    guard !Task.isCancelled else {
+      return
+    }
+    updateSuggestionSnapshot(AppSearchSuggestionSnapshot(results: results))
+  }
+
+  private func updateSuggestionSnapshot(_ snapshot: AppSearchSuggestionSnapshot) {
+    guard suggestionSnapshot != snapshot else { return }
+    suggestionSnapshot = snapshot
   }
 
 }
 
 private struct AppSearchSuggestionsHost: View {
-  let model: AppSearchModel
-  let onPick: (AppSearchHit) -> Void
-
-  @Environment(\.accessibilityVoiceOverEnabled)
-  private var voiceOverEnabled
-  @State private var lastAnnouncedHitCount = -1
+  let snapshot: AppSearchSuggestionSnapshot
 
   var body: some View {
-    if voiceOverEnabled {
-      suggestions
-        .onChange(of: model.results.totalHitCount) { _, newValue in
-          announceResults(totalHitCount: newValue)
-        }
-    } else {
-      suggestions
-    }
-  }
-
-  private var suggestions: some View {
-    AppSearchSuggestionsView(
-      results: model.results,
-      onPick: onPick
-    )
-  }
-
-  private func announceResults(totalHitCount: Int) {
-    guard totalHitCount > 0, totalHitCount != lastAnnouncedHitCount else {
-      lastAnnouncedHitCount = totalHitCount
-      return
-    }
-    lastAnnouncedHitCount = totalHitCount
-    let sectionCount = model.results.sections.count
-    let primaryLabel = model.results.sections.first?.domain.label.lowercased() ?? ""
-    let message: String
-    if sectionCount > 1, !primaryLabel.isEmpty {
-      message = "\(totalHitCount) results across \(sectionCount) sections, \(primaryLabel) first."
-    } else if !primaryLabel.isEmpty {
-      message = "\(totalHitCount) \(primaryLabel) results."
-    } else {
-      message = "\(totalHitCount) results."
-    }
-    AccessibilityNotification.Announcement(message).post()
+    AppSearchSuggestionsView(snapshot: snapshot)
   }
 }
 
