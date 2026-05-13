@@ -39,7 +39,7 @@ public actor AppSearchIndex {
   /// Cap on hits returned for the active route's primary domain.
   /// Keep the toolbar search popover compact; large suggestion lists rebuild
   /// the AppKit-backed search field and dominate SwiftUI update cost.
-  public static let defaultPrimaryK = 5
+  public static let defaultPrimaryK = 3
 
   /// Cap on hits returned for non-primary fallback domains. Smaller
   /// so the popover surfaces matches across more domains at once

@@ -13,8 +13,6 @@ struct SessionWindowToolbar: ToolbarContent {
   let state: SessionWindowStateCache
   @Binding var focusMode: Bool
   let currentModifiers: EventModifiers
-  @AppStorage(SessionWindowKeyboardShortcutOverlaySettings.storageKey)
-  private var shortcutOverlaysEnabled = SessionWindowKeyboardShortcutOverlaySettings.defaultValue
   @ScaledMetric(relativeTo: .caption)
   private var sidebarShortcutKeySpacing =
     HarnessMonitorTheme.spacingXS - 1
@@ -28,7 +26,8 @@ struct SessionWindowToolbar: ToolbarContent {
   private let sidebarShortcut = KeyboardShortcutDescriptor.toggleSidebar
 
   private var shouldShowShortcutOverlays: Bool {
-    shortcutOverlaysEnabled && !HarnessMonitorUITestEnvironment.disablesVisualOptions
+    !HarnessMonitorUITestEnvironment.disablesVisualOptions
+      && SessionWindowKeyboardShortcutOverlaySettings.read()
   }
 
   private var shouldRenderShortcutOverlay: Bool {

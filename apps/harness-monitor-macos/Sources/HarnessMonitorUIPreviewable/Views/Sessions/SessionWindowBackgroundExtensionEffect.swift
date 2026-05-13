@@ -20,10 +20,16 @@ private struct HarnessMonitorBackgroundExtensionEffectModifier: ViewModifier {
 }
 
 extension View {
+  @ViewBuilder
   func harnessMonitorBackgroundExtensionEffect() -> some View {
-    modifier(HarnessMonitorBackgroundExtensionEffectModifier())
+    if HarnessMonitorUITestEnvironment.disablesVisualOptions {
+      self
+    } else {
+      modifier(HarnessMonitorBackgroundExtensionEffectModifier())
+    }
   }
 
+  @ViewBuilder
   func sessionWindowBackgroundExtensionEffect() -> some View {
     harnessMonitorBackgroundExtensionEffect()
   }

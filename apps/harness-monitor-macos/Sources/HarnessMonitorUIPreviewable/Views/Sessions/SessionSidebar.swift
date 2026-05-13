@@ -9,8 +9,6 @@ struct SessionSidebar: View {
   let statusModel: SessionStatusSummaryModel
   let currentModifiers: EventModifiers
   @Bindable var state: SessionWindowStateCache
-  @AppStorage(SessionWindowKeyboardShortcutOverlaySettings.storageKey)
-  private var shortcutOverlaysEnabled = SessionWindowKeyboardShortcutOverlaySettings.defaultValue
   @Environment(\.harnessTextSizeIndex)
   private var textSizeIndex
   @State private var selectionDispatcher = SessionSidebarSelectionDispatcher()
@@ -45,7 +43,8 @@ struct SessionSidebar: View {
   }
 
   private var shouldShowShortcutOverlays: Bool {
-    shortcutOverlaysEnabled && !HarnessMonitorUITestEnvironment.disablesVisualOptions
+    !HarnessMonitorUITestEnvironment.disablesVisualOptions
+      && SessionWindowKeyboardShortcutOverlaySettings.read()
   }
 
   var shouldRenderShortcutOverlays: Bool {

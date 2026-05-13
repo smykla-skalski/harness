@@ -266,12 +266,8 @@ private struct AppSearchFieldSurface: View, Equatable {
       )
       .searchSuggestions {
         ForEach(suggestionRows) { row in
-          Label {
-            Text(verbatim: row.displayTitle)
-          } icon: {
-            Image(systemName: row.hit.systemImage)
-          }
-          .searchCompletion(row.displayTitle)
+          Text(verbatim: row.displayTitle)
+            .searchCompletion(row.displayTitle)
         }
       }
       .searchFocused(isFocused)

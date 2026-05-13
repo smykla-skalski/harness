@@ -196,8 +196,8 @@ struct AppSearchIndexTests {
     let decisionHitCount = results.sections.first { $0.domain == .decisions }?.hits.count
     let allTruncated = results.sections.allSatisfy(\.truncated)
 
-    #expect(results.totalHitCount == 8)
-    #expect(agentHitCount == 5)
+    #expect(results.totalHitCount == 6)
+    #expect(agentHitCount == 3)
     #expect(taskHitCount == 1)
     #expect(timelineHitCount == 1)
     #expect(decisionHitCount == 1)
