@@ -117,6 +117,15 @@ struct SessionDecisionRuntimeTests {
     #expect(source.contains("session_decision_filter.apply"))
   }
 
+  @Test("Audit payload presentations are cached alongside scoped audit events")
+  func auditPayloadPresentationsAreCachedAlongsideScopedAuditEvents() throws {
+    let source = try sourceFile(named: "SessionDecisionRuntime.swift")
+
+    #expect(source.contains("private(set) var auditEventPayloadPresentations"))
+    #expect(source.contains("guard auditEvents != scopedEvents else { return }"))
+    #expect(source.contains("DecisionAuditTrailPayloadPresentation(payloadJSON: $0.payloadJSON)"))
+  }
+
   private func makeDecision(
     id: String = "d1",
     severity: DecisionSeverity = .needsUser,

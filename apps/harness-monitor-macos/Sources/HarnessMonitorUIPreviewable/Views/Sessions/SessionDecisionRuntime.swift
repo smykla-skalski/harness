@@ -57,6 +57,8 @@ public enum SessionInspectorVisibilityPolicy {
 public final class SessionDecisionRuntime {
   public var inspectorTab: SessionDecisionInspectorTab = .context
   public private(set) var auditEvents: [SupervisorEvent] = []
+  private(set) var auditEventPayloadPresentations: [String: DecisionAuditTrailPayloadPresentation] =
+    [:]
   public private(set) var filteredDecisionIDs: [String] = []
   public private(set) var hasFilteredDecisions = false
   public private(set) var isFilteringDecisions = false
@@ -138,11 +140,18 @@ public final class SessionDecisionRuntime {
     sessionID: String,
     decisions: [Decision]
   ) {
-    let events = HarnessMonitorStore.loadSupervisorAuditEvents(from: modelContext, limit: 256)
-    auditEvents = DecisionDetailViewModel.explicitlySessionScopedAuditEvents(
-      from: events,
+    let loadedEvents = HarnessMonitorStore.loadSupervisorAuditEvents(from: modelContext, limit: 256)
+    let scopedEvents = DecisionDetailViewModel.explicitlySessionScopedAuditEvents(
+      from: loadedEvents,
       sessionID: sessionID,
       decisions: decisions
+    )
+    guard auditEvents != scopedEvents else { return }
+    auditEvents = scopedEvents
+    auditEventPayloadPresentations = Dictionary(
+      uniqueKeysWithValues: scopedEvents.map {
+        ($0.id, DecisionAuditTrailPayloadPresentation(payloadJSON: $0.payloadJSON))
+      }
     )
   }
 
