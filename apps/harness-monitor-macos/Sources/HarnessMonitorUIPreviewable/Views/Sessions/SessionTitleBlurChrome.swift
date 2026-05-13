@@ -167,7 +167,12 @@ private struct SessionTitleBlurChromeModifier: ViewModifier {
 }
 
 extension View {
+  @ViewBuilder
   public func sessionTitleBlurChrome(status: SessionStatus, isStale: Bool) -> some View {
-    modifier(SessionTitleBlurChromeModifier(status: status, isStale: isStale))
+    if HarnessMonitorUITestEnvironment.disablesVisualOptions {
+      self
+    } else {
+      modifier(SessionTitleBlurChromeModifier(status: status, isStale: isStale))
+    }
   }
 }

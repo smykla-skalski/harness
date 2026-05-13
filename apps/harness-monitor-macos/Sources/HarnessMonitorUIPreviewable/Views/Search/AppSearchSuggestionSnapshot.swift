@@ -6,16 +6,18 @@ import HarnessMonitorKit
 /// suggestion view does not read the observable `AppSearchModel` in its body.
 public struct AppSearchSuggestionSnapshot: Equatable, Sendable {
   public static let empty = Self(rows: [])
+  public static let maxNativeSuggestionRows = 6
 
   public let rows: [AppSearchSuggestionRow]
 
   public init(results: AppSearchResults) {
-    self.init(
-      rows: results.sections.flatMap { section in
-        section.hits.map { hit in
-          AppSearchSuggestionRow(sectionDomain: section.domain, hit: hit)
-        }
+    let rows = results.sections.flatMap { section in
+      section.hits.map { hit in
+        AppSearchSuggestionRow(sectionDomain: section.domain, hit: hit)
       }
+    }
+    self.init(
+      rows: Array(rows.prefix(Self.maxNativeSuggestionRows))
     )
   }
 

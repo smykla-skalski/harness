@@ -45,4 +45,28 @@ struct AppSearchSuggestionSnapshotTests {
     #expect(snapshot.hit(matchingDisplayTitle: " Codex Worker (Agents) ") == workerHit)
     #expect(snapshot.hit(matchingDisplayTitle: "Codex Worker") == nil)
   }
+
+  @Test("Snapshot caps rows rendered into native suggestions")
+  func snapshotCapsRowsRenderedIntoNativeSuggestions() {
+    let hits = (0..<10).map { index in
+      AppSearchHit(
+        domain: .agents,
+        id: "agent-\(index)",
+        title: "Agent \(index)",
+        subtitle: nil,
+        systemImage: AppSearchDomain.agents.systemImage,
+        score: index
+      )
+    }
+    let results = AppSearchResults(
+      query: "agent",
+      primaryDomain: .agents,
+      sections: [AppSearchSection(domain: .agents, hits: hits, truncated: true)]
+    )
+
+    let snapshot = AppSearchSuggestionSnapshot(results: results)
+
+    #expect(snapshot.rows.count == AppSearchSuggestionSnapshot.maxNativeSuggestionRows)
+    #expect(snapshot.rows.last?.id == "agents:agent-5")
+  }
 }
