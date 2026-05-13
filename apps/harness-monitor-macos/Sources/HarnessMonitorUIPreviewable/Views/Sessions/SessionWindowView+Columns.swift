@@ -234,7 +234,9 @@ extension SessionWindowView {
 
   @ViewBuilder var contentColumn: some View {
     if isLoading && snapshot == nil {
-      ProgressView("Loading session")
+      Label("Loading session", systemImage: "hourglass")
+        .scaledFont(.body.weight(.medium))
+        .foregroundStyle(.secondary)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     } else if case .create(let draft) = stateCache.selection, draft.kind == .agent {
       SessionWindowCreateAgentRuntimePane(
