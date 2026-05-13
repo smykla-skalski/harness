@@ -155,7 +155,12 @@ struct SessionDecisionRuntimeTests {
 
     #expect(source.contains("private(set) var auditEventPayloadPresentations"))
     #expect(source.contains("guard auditEvents != scopedEvents else { return }"))
-    #expect(source.contains("DecisionAuditTrailPayloadPresentation(payloadJSON: $0.payloadJSON)"))
+    #expect(source.contains("let decoder = JSONDecoder()"))
+    #expect(
+      source.contains(
+        "DecisionAuditTrailPayloadPresentation(payloadJSON: $0.payloadJSON, decoder: decoder)"
+      )
+    )
   }
 
   private func makeDecision(
