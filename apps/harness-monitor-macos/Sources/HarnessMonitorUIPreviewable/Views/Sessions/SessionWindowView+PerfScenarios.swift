@@ -101,6 +101,8 @@ struct SessionWindowPerfScenarioScript: ViewModifier {
       stateCache.appSearchAutomation.present(query: step.query)
       try? await Task.sleep(for: .milliseconds(260))
     }
+
+    stateCache.appSearchAutomation.dismiss()
   }
 
   private var searchSteps: [(query: String, route: SessionWindowRoute)] {

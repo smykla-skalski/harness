@@ -56,7 +56,7 @@ extension MetricsExtractor {
                 !category.isEmpty
             else { continue }
             var entry: [String: Int] = [:]
-            for case let attribute as XMLNode in row.attributes ?? [] {
+            for attribute in row.attributes ?? [] {
                 guard
                     let name = attribute.name,
                     name != "category",

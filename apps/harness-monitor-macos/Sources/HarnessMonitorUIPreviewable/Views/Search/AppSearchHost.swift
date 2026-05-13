@@ -29,6 +29,11 @@ private struct AppSearchTrigger: Equatable {
 /// from the focused route, falling back to `fallbackPrimaryDomain`.
 /// Ranking work happens off-MainActor inside `AppSearchIndex`.
 ///
+/// Cmd-F focus is published through the shared focused-command dispatcher
+/// instead of a hidden view-local Button. That keeps keyboard ownership in
+/// app commands and avoids leaving an always-present opacity renderer in
+/// the session window graph.
+///
 /// Suggestion-popover persistence: `.searchSuggestions` on macOS is
 /// backed by `NSSearchField`'s suggestion menu, which dismisses when
 /// the window resigns key/active state and does NOT auto-reopen when
@@ -54,6 +59,7 @@ public struct AppSearchHostModifier: ViewModifier {
 
   @State private var query: String = ""
   @State private var isSearchPresented: Bool = false
+  @State private var searchFocusDispatcher = HarnessSidebarSearchFocusDispatcher()
   @FocusState private var searchFieldFocused: Bool
 
   public init(
@@ -71,13 +77,6 @@ public struct AppSearchHostModifier: ViewModifier {
   }
 
   public func body(content: Content) -> some View {
-    // Cmd-F path: a hidden `Button` co-located with the `.searchable`
-    // owns the shortcut and writes both `isSearchPresented` and
-    // `searchFieldFocused` directly. macOS does not auto-bind Cmd-F to
-    // `.searchable` (Apple Developer Forums thread #688679); the menu
-    // command + cross-scene `@FocusedBinding` route is documented as
-    // fragile (Apple Developer Forums thread #693580). Co-locating the
-    // shortcut with its target state is the canonical pure-SwiftUI fix.
     content
       .searchable(
         text: $query,
@@ -86,16 +85,9 @@ public struct AppSearchHostModifier: ViewModifier {
         prompt: prompt
       )
       .searchFocused($searchFieldFocused)
-      .searchPresentationToolbarBehavior(.avoidHidingContent)
       .harnessMinimizableSearchToolbar()
       .searchSuggestions {
         AppSearchSuggestionsHost(model: model, onPick: handleHit)
-      }
-      .background {
-        Button("Find in Session", action: focusSearchField)
-          .keyboardShortcut("f", modifiers: .command)
-          .opacity(0)
-          .accessibilityHidden(true)
       }
       .task(
         id: AppSearchTrigger(
@@ -118,7 +110,21 @@ public struct AppSearchHostModifier: ViewModifier {
         guard let command else { return }
         applyAutomationCommand(command)
       }
+      .harnessFocusedSceneValue(\.harnessSidebarSearchFocusAction, searchFocusAction)
+      .task {
+        searchFocusDispatcher.handler = {
+          focusSearchField()
+        }
+      }
       .environment(\.appSearchModel, model)
+  }
+
+  private var searchFocusAction: HarnessSidebarSearchFocus {
+    HarnessSidebarSearchFocus(
+      isAvailable: true,
+      menuLabel: .findInSession,
+      dispatcher: searchFocusDispatcher
+    )
   }
 
   private func focusSearchField() {
