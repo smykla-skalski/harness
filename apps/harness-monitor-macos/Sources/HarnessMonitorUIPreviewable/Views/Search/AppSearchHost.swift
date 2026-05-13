@@ -108,7 +108,7 @@ public struct AppSearchHostModifier: ViewModifier {
       .task(id: automationCommand) {
         let command = automationCommand
         guard let command else { return }
-        applyAutomationCommand(command)
+        await applyAutomationCommand(command)
       }
       .harnessFocusedSceneValue(\.harnessSidebarSearchFocusAction, searchFocusAction)
       .task {
@@ -163,15 +163,28 @@ public struct AppSearchHostModifier: ViewModifier {
     automation?.command
   }
 
-  private func applyAutomationCommand(_ command: AppSearchAutomationCommand) {
-    if isSearchPresented != command.isPresented {
-      isSearchPresented = command.isPresented
+  private func applyAutomationCommand(_ command: AppSearchAutomationCommand) async {
+    if query != command.query {
+      query = command.query
+    }
+    if command.isPresented {
+      if isSearchPresented != command.isPresented {
+        isSearchPresented = command.isPresented
+        await Task.yield()
+      }
+      guard !Task.isCancelled else { return }
+      if searchFieldFocused != command.isFocused {
+        searchFieldFocused = command.isFocused
+      }
+      return
     }
     if searchFieldFocused != command.isFocused {
       searchFieldFocused = command.isFocused
+      await Task.yield()
     }
-    if query != command.query {
-      query = command.query
+    guard !Task.isCancelled else { return }
+    if isSearchPresented != command.isPresented {
+      isSearchPresented = command.isPresented
     }
   }
 
