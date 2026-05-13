@@ -32,6 +32,24 @@ final class AuditContractDocsTests: XCTestCase {
         XCTAssertFalse(skill.contains("9. `ManifestBuilder.defaultTemplates`"))
     }
 
+    func testReadmeDocumentsAuditOutputTrustSurface() throws {
+        let readme = try readRepoFile("apps/harness-monitor-macos/README.md")
+        XCTAssertTrue(readme.contains("`manifest.json`"))
+        XCTAssertTrue(readme.contains("`build_provenance`"))
+        XCTAssertTrue(readme.contains("`launched_process_path`"))
+        XCTAssertTrue(readme.contains("`daemon_data_home_probe`"))
+        XCTAssertTrue(readme.contains("`debug-retention.json`"))
+    }
+
+    func testMonitorReferenceDocumentsFieldTelemetryPlaybook() throws {
+        let guide = try readRepoFile("docs/agent-guides/monitor-reference.md")
+        XCTAssertTrue(guide.contains("MetricKit"))
+        XCTAssertTrue(guide.contains("Organizer"))
+        XCTAssertTrue(guide.contains("App Store Connect Performance API"))
+        XCTAssertTrue(guide.contains("launch_app_init_to_ready_ms"))
+        XCTAssertTrue(guide.contains("potential_hangs"))
+    }
+
     private var repoRootURL: URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
