@@ -51,11 +51,11 @@ public struct SettingsGeneralOverviewState {
 
     switch store.daemonOwnership {
     case .managed:
-      daemonModeLabel = "Managed (SMAppService)"
+      daemonModeLabel = store.daemonOwnership.settingsLabel
       isExternalDaemon = false
       showsLaunchAgent = true
     case .external:
-      daemonModeLabel = "External (CLI)"
+      daemonModeLabel = store.daemonOwnership.settingsLabel
       isExternalDaemon = true
       showsLaunchAgent = false
     }
@@ -85,6 +85,8 @@ public struct SettingsGeneralSection: View {
   private var closeOpenRecentAfterPick = OpenRecentCloseAfterPickDefaults.defaultValue
   @AppStorage(SessionWindowTabbingPreference.storageKey)
   private var sessionWindowTabbingRawValue = SessionWindowTabbingPreference.defaultValue.rawValue
+  @AppStorage(DaemonOwnership.preferenceKey)
+  private var preferredDaemonModeRawValue = DaemonOwnership.managed.rawValue
   @State private var isRemoveLaunchAgentConfirmationPresented = false
 
   public init(store: HarnessMonitorStore, overview: SettingsGeneralOverviewState) {
@@ -106,6 +108,20 @@ public struct SettingsGeneralSection: View {
       }
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsMetricCard("Daemon Mode"))
+    Picker("Startup daemon mode", selection: $preferredDaemonModeRawValue) {
+      ForEach(DaemonOwnership.allCases, id: \.rawValue) { ownership in
+        Text(ownership.settingsLabel).tag(ownership.rawValue)
+      }
+    }
+    .harnessNativeFormControl()
+    .accessibilityHint(
+      "Choose which daemon ownership mode Harness Monitor should use the next time it launches."
+    )
+    if preferredDaemonMode != store.daemonOwnership {
+      Text("Relaunch Harness Monitor to switch to \(preferredDaemonMode.settingsLabel).")
+        .scaledFont(.caption)
+        .foregroundStyle(.secondary)
+    }
     if overview.isExternalDaemon {
       LabeledContent("Dev manifest") {
         Text(overview.externalDaemonManifestPath)
@@ -150,6 +166,10 @@ public struct SettingsGeneralSection: View {
 
   private var sessionWindowTabbingPreference: SessionWindowTabbingPreference {
     SessionWindowTabbingPreference.resolved(rawValue: sessionWindowTabbingRawValue)
+  }
+
+  private var preferredDaemonMode: DaemonOwnership {
+    DaemonOwnership(rawValue: preferredDaemonModeRawValue) ?? .managed
   }
 
   public var body: some View {

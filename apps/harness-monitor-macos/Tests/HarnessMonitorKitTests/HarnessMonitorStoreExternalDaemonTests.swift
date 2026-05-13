@@ -83,31 +83,45 @@ struct HarnessMonitorStoreExternalDaemonTests {
 
   @Test("Ownership init reads HARNESS_MONITOR_EXTERNAL_DAEMON")
   func ownershipInitReadsEnvironmentFlag() {
-    #if DEBUG
-      #expect(DaemonOwnership(environment: [:]) == .managed)
-      #expect(
-        DaemonOwnership(environment: [DaemonOwnership.environmentKey: "1"])
-          == .external
-      )
-      #expect(
-        DaemonOwnership(environment: [DaemonOwnership.environmentKey: "true"])
-          == .external
-      )
-      #expect(
-        DaemonOwnership(environment: [DaemonOwnership.environmentKey: "0"])
-          == .managed
-      )
-      #expect(
-        DaemonOwnership(environment: [DaemonOwnership.environmentKey: "false"])
-          == .managed
-      )
-    #else
-      // Release builds ignore the flag entirely.
-      #expect(
-        DaemonOwnership(environment: [DaemonOwnership.environmentKey: "1"])
-          == .managed
-      )
-    #endif
+    #expect(DaemonOwnership(environment: [:]) == .managed)
+    #expect(
+      DaemonOwnership(environment: [DaemonOwnership.environmentKey: "1"])
+        == .external
+    )
+    #expect(
+      DaemonOwnership(environment: [DaemonOwnership.environmentKey: "true"])
+        == .external
+    )
+    #expect(
+      DaemonOwnership(environment: [DaemonOwnership.environmentKey: "external"])
+        == .external
+    )
+    #expect(
+      DaemonOwnership(environment: [DaemonOwnership.environmentKey: "0"])
+        == .managed
+    )
+    #expect(
+      DaemonOwnership(environment: [DaemonOwnership.environmentKey: "false"])
+        == .managed
+    )
+    #expect(
+      DaemonOwnership(environment: [DaemonOwnership.environmentKey: "managed"])
+        == .managed
+    )
+  }
+
+  @Test("Ownership reads persisted startup preference")
+  func ownershipReadsPersistedStartupPreference() throws {
+    let suiteName = "io.harnessmonitor.tests.daemon-ownership.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    #expect(DaemonOwnership.persistedPreference(defaults: defaults) == nil)
+
+    defaults.set(DaemonOwnership.external.rawValue, forKey: DaemonOwnership.preferenceKey)
+    #expect(DaemonOwnership.persistedPreference(defaults: defaults) == .external)
+
+    defaults.set(DaemonOwnership.managed.rawValue, forKey: DaemonOwnership.preferenceKey)
+    #expect(DaemonOwnership.persistedPreference(defaults: defaults) == .managed)
   }
 
   @Test("External daemon offline error uses short user-facing copy")

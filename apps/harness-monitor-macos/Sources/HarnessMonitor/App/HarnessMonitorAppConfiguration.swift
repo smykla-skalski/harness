@@ -37,7 +37,9 @@ struct HarnessMonitorAppConfiguration {
   ) -> Self {
     HarnessMonitorStartupRegistrationDefaults.register(on: defaults)
 
-    let environment = uiTestSafeEnvironment(base: baseEnvironment)
+    let environment = uiTestSafeEnvironment(
+      base: daemonOwnershipPreferenceEnvironment(base: baseEnvironment, defaults: defaults)
+    )
     let perfScenario = HarnessMonitorPerfScenario(environment: environment)
     let resolvedEnvironment = perfScenario?.applyingDefaults(to: environment) ?? environment
     let isUITesting = resolvedEnvironment.values[uiTestsEnvironmentKey] == "1"
@@ -192,7 +194,30 @@ struct HarnessMonitorAppConfiguration {
       )
     }
 
-    return HarnessMonitorEnvironment(values: values, homeDirectory: environment.homeDirectory)
+    return HarnessMonitorEnvironment(
+      values: values,
+      homeDirectory: environment.homeDirectory,
+      bundleURL: environment.bundleURL
+    )
+  }
+
+  private static func daemonOwnershipPreferenceEnvironment(
+    base: HarnessMonitorEnvironment = .current,
+    defaults: UserDefaults = .standard
+  ) -> HarnessMonitorEnvironment {
+    guard isBlank(base.values[DaemonOwnership.environmentKey]),
+      let preferredOwnership = DaemonOwnership.persistedPreference(defaults: defaults)
+    else {
+      return base
+    }
+
+    var values = base.values
+    values[DaemonOwnership.environmentKey] = preferredOwnership.rawValue
+    return HarnessMonitorEnvironment(
+      values: values,
+      homeDirectory: base.homeDirectory,
+      bundleURL: base.bundleURL
+    )
   }
 
   private static func defaultUITestDataHomePath(bundleIdentifier: String?) -> String {
@@ -234,11 +259,7 @@ struct HarnessMonitorAppConfiguration {
     guard HarnessMonitorLaunchMode(environment: values) == .live else {
       return false
     }
-
-    let rawValue = values[DaemonOwnership.environmentKey]?
-      .trimmingCharacters(in: .whitespacesAndNewlines)
-      .lowercased()
-    return rawValue == "1" || rawValue == "true" || rawValue == "yes" || rawValue == "on"
+    return DaemonOwnership(environment: values) == .external
   }
 
   @MainActor

@@ -160,10 +160,11 @@ bindings unless a profiled platform gap proves they are necessary.
 
 ## Daemon modes
 
-Harness Monitor has two daemon ownership modes.
+Harness Monitor has two daemon ownership modes, and both are supported in
+production builds.
 
-External daemon is the recommended local development workflow. Launch the app
-under `HarnessMonitor (External Daemon)` and run:
+External daemon is the fastest local workflow and remains available in shipping
+builds. Launch the app under `HarnessMonitor (External Daemon)` and run:
 
 ```bash
 mise run monitor:daemon:dev
@@ -180,14 +181,18 @@ Debug the dev daemon with `lldb -- harness daemon dev` or
 `cargo run --bin harness -- daemon dev`. The scheme sets
 `HARNESS_MONITOR_EXTERNAL_DAEMON=1` and a 60s warm-up timeout. Starting the app
 before the daemon also works; the manifest watcher reconnects on first manifest
-write.
+write. Production builds can also switch future launches to external mode in
+**Settings > General > Startup daemon mode**, or by setting
+`HARNESS_MONITOR_EXTERNAL_DAEMON=1` before launch.
 
 If a `harness bridge start` process is already running for the same runtime
 lane, stop it before using dev mode unless you are intentionally testing the
-WebSocket bridge path. The `HARNESS_MONITOR_EXTERNAL_DAEMON` flag is gated
-behind `#if DEBUG`, so release builds always use managed mode.
+WebSocket bridge path. In sandboxed production builds, keep external daemons in
+an app-group-accessible runtime root by using `HARNESS_MONITOR_RUNTIME_LANE`,
+`HARNESS_DAEMON_DATA_HOME`, or the `monitor:daemon:dev` wrapper so manifest
+discovery stays on the shared container roots.
 
-Managed daemon is the release/distribution path. Use the default
+Managed daemon is the default release/distribution path. Use the default
 `HarnessMonitor` scheme. The daemon runs under the macOS App Sandbox through
 `SMAppService`, and the launch agent plist sets `HARNESS_SANDBOXED=1` and
 `HARNESS_APP_GROUP_ID=Q498EB36N4.io.harnessmonitor`. With

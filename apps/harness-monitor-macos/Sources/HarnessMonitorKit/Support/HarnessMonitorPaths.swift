@@ -124,9 +124,14 @@ public enum HarnessMonitorPaths {
   ///    without baking a lane into the scheme.
   /// 4. Native group-container resolution for the configured or default app group id.
   /// 5. Home-relative app-group fallback via `HARNESS_APP_GROUP_ID`.
-  /// 6. External-daemon bypass (`HARNESS_MONITOR_EXTERNAL_DAEMON=1`, debug builds only):
-  ///    returns `~/Library/Application Support` directly so dev mode skips the
-  ///    group-container lookup and stays symmetric with the pre-Task-11 behaviour.
+  /// 6. External-daemon legacy bypass (`HARNESS_MONITOR_EXTERNAL_DAEMON=1` or a
+  ///    persisted external-mode preference injected into the environment):
+  ///    returns `~/Library/Application Support` directly so explicit external
+  ///    launches can stay symmetric with the legacy CLI-only layout after all
+  ///    app-group and runtime-lane roots have been exhausted. Production
+  ///    external launches should normally resolve earlier through
+  ///    `HARNESS_MONITOR_RUNTIME_LANE`, `HARNESS_DAEMON_DATA_HOME`, or
+  ///    app-group cross-lane discovery.
   ///    Only evaluated when `preferExternalDaemon` is true.
   ///
   /// Returns `nil` when none of the above resolves — callers decide how to handle that.
@@ -258,7 +263,8 @@ public enum HarnessMonitorPaths {
       fatalError("group container unavailable in managed build — check app group entitlement")
     }
 
-    // Debug or external-daemon fallback: the app is unsandboxed, so the legacy path is accessible.
+    // Best-effort legacy fallback for explicit external-daemon launches after
+    // every shared runtime/app-group root was unavailable.
     HarnessMonitorLogger.store.warning(
       "App group container unavailable; falling back to ~/Library/Application Support/harness"
     )
