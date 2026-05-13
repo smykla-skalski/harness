@@ -34,10 +34,9 @@ private struct AppSearchTrigger: Equatable {
 /// app commands and avoids leaving an always-present opacity renderer in
 /// the session window graph.
 ///
-/// Suggestions are native search completions backed by a compact value
-/// snapshot. The suggestion view never reads the observable
-/// `AppSearchModel` in `body`, keeping result churn out of the toolbar
-/// search field's dependency graph.
+/// Suggestions are rendered from a compact value snapshot in an app-owned
+/// overlay. The search field itself stays native `.searchable`, while the
+/// suggestion view avoids SwiftUI's toolbar search-suggestion combobox path.
 public struct AppSearchHostModifier: ViewModifier {
   let model: AppSearchModel
   let prompt: LocalizedStringKey
@@ -51,7 +50,6 @@ public struct AppSearchHostModifier: ViewModifier {
   @State private var query: String = ""
   @State private var isSearchPresented: Bool = false
   @State private var suggestionSnapshot = AppSearchSuggestionSnapshot.empty
-  @State private var searchFocusRequestID: UInt64 = 0
   @State private var searchFocusDispatcher = HarnessSidebarSearchFocusDispatcher()
 
   public init(
@@ -70,16 +68,16 @@ public struct AppSearchHostModifier: ViewModifier {
 
   public func body(content: Content) -> some View {
     content
+      .overlay(alignment: .topTrailing) {
+        suggestionOverlay
+      }
       .searchable(
         text: $query,
+        isPresented: $isSearchPresented,
         placement: .toolbar,
         prompt: prompt
       )
       .harnessMinimizableSearchToolbar()
-      .searchSuggestions {
-        AppSearchSuggestionsHost(snapshot: suggestionSnapshot)
-          .searchSuggestions(.hidden, for: .content)
-      }
       .onSubmit(of: .search) {
         submitSearch()
       }
@@ -90,12 +88,6 @@ public struct AppSearchHostModifier: ViewModifier {
         )
       ) {
         await runDebouncedSearch(for: query)
-      }
-      .background {
-        AppSearchFieldRebinder(
-          shouldRebind: !query.isEmpty && isSearchPresented,
-          focusRequestID: searchFocusRequestID
-        )
       }
       .task(id: isSearchPresented) {
         model.setPresented(isSearchPresented)
@@ -128,10 +120,23 @@ public struct AppSearchHostModifier: ViewModifier {
   }
 
   private func focusSearchField() {
-    if !isSearchPresented {
-      isSearchPresented = true
+    guard !isSearchPresented else { return }
+    isSearchPresented = true
+  }
+
+  @ViewBuilder private var suggestionOverlay: some View {
+    if shouldShowSuggestionOverlay {
+      AppSearchSuggestionsView(snapshot: suggestionSnapshot, onPick: handleHit)
+        .padding(.top, 8)
+        .padding(.trailing, 16)
+        .zIndex(10)
     }
-    searchFocusRequestID &+= 1
+  }
+
+  private var shouldShowSuggestionOverlay: Bool {
+    isSearchPresented
+      && !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      && !suggestionSnapshot.rows.isEmpty
   }
 
   private func submitSearch() {
@@ -175,13 +180,6 @@ public struct AppSearchHostModifier: ViewModifier {
       await Task.yield()
     }
     guard !Task.isCancelled else { return }
-    if command.isPresented {
-      if isSearchPresented != command.isPresented {
-        isSearchPresented = command.isPresented
-        searchFocusRequestID &+= 1
-      }
-      return
-    }
     if isSearchPresented != command.isPresented {
       isSearchPresented = command.isPresented
     }
@@ -216,14 +214,6 @@ public struct AppSearchHostModifier: ViewModifier {
     suggestionSnapshot = snapshot
   }
 
-}
-
-private struct AppSearchSuggestionsHost: View {
-  let snapshot: AppSearchSuggestionSnapshot
-
-  var body: some View {
-    AppSearchSuggestionsView(snapshot: snapshot)
-  }
 }
 
 extension View {
