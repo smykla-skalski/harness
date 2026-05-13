@@ -269,6 +269,10 @@ struct SessionSwiftUISourceTests {
 
     #expect(supportSource.contains("visualOptionsDisabledSuffix"))
     #expect(supportSource.contains("perfScenarioBaseValue"))
+    #expect(supportSource.contains("generalMarkersEnabled"))
+    #expect(
+      supportSource.contains("if HarnessMonitorUITestEnvironment.generalMarkersEnabled")
+    )
     #expect(titleBlurSource.contains("private var shouldShowTitleBlur"))
     #expect(titleBlurSource.contains("!HarnessMonitorUITestEnvironment.disablesVisualOptions"))
     #expect(toolbarSource.contains("private var shouldShowShortcutOverlays"))

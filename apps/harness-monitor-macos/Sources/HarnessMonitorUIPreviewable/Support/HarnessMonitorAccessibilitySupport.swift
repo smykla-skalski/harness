@@ -118,7 +118,7 @@ private struct AccessibilityFrameMarkerModifier: ViewModifier {
 
   @ViewBuilder
   func body(content: Content) -> some View {
-    if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
+    if HarnessMonitorUITestEnvironment.generalMarkersEnabled {
       content.overlay {
         AccessibilityFrameMarker(identifier: identifier)
       }
@@ -135,7 +135,7 @@ private struct AccessibilityProbeModifier: ViewModifier {
 
   @ViewBuilder
   func body(content: Content) -> some View {
-    if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
+    if HarnessMonitorUITestEnvironment.generalMarkersEnabled {
       content.overlay {
         AccessibilityProbe(
           identifier: identifier,
