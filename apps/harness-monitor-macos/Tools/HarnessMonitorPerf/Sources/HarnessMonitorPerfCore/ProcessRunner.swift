@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 /// Thin wrapper around `Foundation.Process` for one-shot subprocess invocations.
@@ -6,6 +7,7 @@ public enum ProcessRunner {
         public var exitStatus: Int32
         public var stdout: Data
         public var stderr: Data
+        public var timedOut: Bool
         public var stdoutString: String { String(data: stdout, encoding: .utf8) ?? "" }
         public var stderrString: String { String(data: stderr, encoding: .utf8) ?? "" }
     }
@@ -27,7 +29,9 @@ public enum ProcessRunner {
         _ command: String,
         arguments: [String] = [],
         environmentOverrides: [String: String] = [:],
-        workingDirectory: URL? = nil
+        workingDirectory: URL? = nil,
+        timeoutSeconds: TimeInterval? = nil,
+        terminationGraceSeconds: TimeInterval = 5
     ) throws -> Result {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: command)
@@ -45,14 +49,19 @@ public enum ProcessRunner {
 
         try process.run()
 
+        let timedOut = waitForExit(
+            process,
+            timeoutSeconds: timeoutSeconds,
+            terminationGraceSeconds: terminationGraceSeconds
+        )
         let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
         let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
 
         return Result(
             exitStatus: process.terminationStatus,
             stdout: stdoutData,
-            stderr: stderrData
+            stderr: stderrData,
+            timedOut: timedOut
         )
     }
 
@@ -62,11 +71,14 @@ public enum ProcessRunner {
         _ command: String,
         arguments: [String] = [],
         environmentOverrides: [String: String] = [:],
-        workingDirectory: URL? = nil
+        workingDirectory: URL? = nil,
+        timeoutSeconds: TimeInterval? = nil,
+        terminationGraceSeconds: TimeInterval = 5
     ) throws -> Result {
         let result = try run(
             command, arguments: arguments,
-            environmentOverrides: environmentOverrides, workingDirectory: workingDirectory
+            environmentOverrides: environmentOverrides, workingDirectory: workingDirectory,
+            timeoutSeconds: timeoutSeconds, terminationGraceSeconds: terminationGraceSeconds
         )
         guard result.exitStatus == 0 else {
             throw Failure(
@@ -77,5 +89,33 @@ public enum ProcessRunner {
             )
         }
         return result
+    }
+
+    private static func waitForExit(
+        _ process: Process,
+        timeoutSeconds: TimeInterval?,
+        terminationGraceSeconds: TimeInterval
+    ) -> Bool {
+        guard let timeoutSeconds else {
+            process.waitUntilExit()
+            return false
+        }
+
+        let deadline = Date().addingTimeInterval(timeoutSeconds)
+        while process.isRunning && Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        guard process.isRunning else { return false }
+
+        process.terminate()
+        let graceDeadline = Date().addingTimeInterval(terminationGraceSeconds)
+        while process.isRunning && Date() < graceDeadline {
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        if process.isRunning {
+            kill(process.processIdentifier, SIGKILL)
+            process.waitUntilExit()
+        }
+        return true
     }
 }

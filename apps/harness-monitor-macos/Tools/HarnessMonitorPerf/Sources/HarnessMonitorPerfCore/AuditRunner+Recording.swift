@@ -57,14 +57,22 @@ extension AuditRunner {
             daemonDataHomeProbe: dataHome.probeDataHome,
             xctraceTempRoot: xctraceTempRoot
         )
-        var capture = try TraceRecorder.record(inputs) {
+        cleanupHostProcesses()
+        let captureResult: TraceRecorder.Capture
+        do {
+            captureResult = try TraceRecorder.record(inputs) {
+                cleanupHostProcesses()
+                try assertSourceUnchanged(
+                    checkpoint: "after recording \(template) / \(scenario)",
+                    checkoutRoot: checkoutRoot, appRoot: appRoot,
+                    gitCommit: gitCommit, workspaceFingerprint: workspaceFingerprint
+                )
+            }
+        } catch {
             cleanupHostProcesses()
-            try assertSourceUnchanged(
-                checkpoint: "after recording \(template) / \(scenario)",
-                checkoutRoot: checkoutRoot, appRoot: appRoot,
-                gitCommit: gitCommit, workspaceFingerprint: workspaceFingerprint
-            )
+            throw error
         }
+        var capture = captureResult
         capture.record.appTraceRelpath = appTraceRelpath
         capture.record.launchMetrics = try loadLaunchMetrics(from: launchMetricsURL)
         return capture
