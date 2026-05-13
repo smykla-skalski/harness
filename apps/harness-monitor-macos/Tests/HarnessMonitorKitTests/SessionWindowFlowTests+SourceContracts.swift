@@ -239,6 +239,12 @@ extension SessionWindowFlowTests {
     let columnsSource = try previewableSourceFile(
       named: "Views/Sessions/SessionWindowView+Columns.swift"
     )
+    let presentationSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+Presentation.swift"
+    )
+    let detailFocusSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+DetailFocus.swift"
+    )
 
     #expect(rootSource.contains("ZStack {\n      bodyContent\n      sessionSearchHost\n    }"))
     #expect(!rootSource.contains(".appSearchHost("))
@@ -258,6 +264,11 @@ extension SessionWindowFlowTests {
     #expect(searchHostSource.contains("automation: searchAutomation"))
     #expect(!searchHostSource.contains("harnessSessionRouteFocus"))
     #expect(columnsSource.contains(".environment(\\.appSearchModel, stateCache.appSearchModel)"))
+    #expect(!presentationSource.contains("appSearchModel.query"))
+    #expect(!detailFocusSource.contains("stateCache.appSearchModel.query"))
+    #expect(detailFocusSource.contains("SessionRouteAgentDetailFocus"))
+    #expect(detailFocusSource.contains("SessionRouteTaskDetailFocus"))
+    #expect(detailFocusSource.contains("@Environment(\\.appSearchModel)"))
   }
 
   @Test("Session search perf script drives the real searchable binding")

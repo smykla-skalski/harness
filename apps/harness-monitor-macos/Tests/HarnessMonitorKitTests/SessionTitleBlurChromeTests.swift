@@ -71,6 +71,8 @@ final class SessionTitleBlurChromeTests: XCTestCase {
     XCTAssertFalse(source.contains(".animation("))
     XCTAssertTrue(source.contains(".transaction { transaction in"))
     XCTAssertTrue(source.contains("transaction.animation = nil"))
+    XCTAssertTrue(source.contains("private struct SessionTitleBlurChromeShape: View, Equatable"))
+    XCTAssertTrue(source.contains(".equatable()"))
   }
 
   func testDisabledPreferenceSkipsInstallingOverlayChrome() throws {

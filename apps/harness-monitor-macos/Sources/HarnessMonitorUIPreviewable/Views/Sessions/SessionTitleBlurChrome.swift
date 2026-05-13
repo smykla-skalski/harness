@@ -85,6 +85,19 @@ public struct SessionTitleBlurChrome: View {
     )
   }
 
+  public var body: some View {
+    SessionTitleBlurChromeShape(
+      configuration: configuration,
+      hasIncreasedContrast: colorSchemeContrast == .increased
+    )
+    .equatable()
+  }
+}
+
+private struct SessionTitleBlurChromeShape: View, Equatable {
+  let configuration: SessionTitleBlurChromeConfiguration
+  let hasIncreasedContrast: Bool
+
   private var tint: Color {
     Color(configuration.assetName, bundle: HarnessMonitorUIAssets.bundle)
   }
@@ -94,12 +107,12 @@ public struct SessionTitleBlurChrome: View {
       configuration.reduceTransparency
       ? SessionTitleBlurChromeConfiguration.reducedTransparencyOpacity * 0.35
       : SessionTitleBlurChromeConfiguration.tintOpacity
-    return colorSchemeContrast == .increased
+    return hasIncreasedContrast
       ? baseOpacity * 1.45
       : baseOpacity
   }
 
-  public var body: some View {
+  var body: some View {
     titleTint
       .frame(height: SessionTitleBlurChromeConfiguration.height)
       .frame(maxWidth: .infinity, alignment: .top)
