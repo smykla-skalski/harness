@@ -22,8 +22,10 @@ struct AcpPermissionDeadlineStatusView: View {
       ) {
         identifiedStatusLabel(status)
       }
-    } else if payload.expiresAtDate != nil {
-      TimelineView(.periodic(from: .now, by: 1)) { context in
+    } else if let expiresAt = payload.expiresAtDate,
+      AcpPermissionDeadlineTimelineSchedule.shouldTick(expiresAt: expiresAt, now: .now)
+    {
+      TimelineView(AcpPermissionDeadlineTimelineSchedule(expiresAt: expiresAt)) { context in
         if let status = payload.deadlineStatus(
           now: context.date,
           lastMessageAt: lastMessageAt
@@ -31,6 +33,8 @@ struct AcpPermissionDeadlineStatusView: View {
           identifiedStatusLabel(status)
         }
       }
+    } else if let status = payload.deadlineStatus(now: .now, lastMessageAt: lastMessageAt) {
+      identifiedStatusLabel(status)
     }
   }
 
@@ -93,5 +97,46 @@ struct AcpPermissionDeadlineStatusView: View {
     case .expired:
       HarnessMonitorTheme.danger
     }
+  }
+}
+
+struct AcpPermissionDeadlineTimelineSchedule: TimelineSchedule {
+  let expiresAt: Date
+
+  func entries(
+    from startDate: Date,
+    mode: TimelineScheduleMode
+  ) -> AcpPermissionDeadlineTimelineEntries {
+    AcpPermissionDeadlineTimelineEntries(startDate: startDate, expiresAt: expiresAt)
+  }
+
+  static func shouldTick(expiresAt: Date, now: Date) -> Bool {
+    expiresAt > now
+  }
+}
+
+struct AcpPermissionDeadlineTimelineEntries: Sequence, IteratorProtocol {
+  private var nextDate: Date
+  private let expiresAt: Date
+  private var emittedExpiry = false
+
+  init(startDate: Date, expiresAt: Date) {
+    nextDate = startDate
+    self.expiresAt = expiresAt
+  }
+
+  mutating func next() -> Date? {
+    guard !emittedExpiry else {
+      return nil
+    }
+
+    guard nextDate < expiresAt else {
+      emittedExpiry = true
+      return expiresAt
+    }
+
+    let current = nextDate
+    nextDate = Swift.min(nextDate.addingTimeInterval(1), expiresAt)
+    return current
   }
 }

@@ -60,8 +60,10 @@ struct DecisionRow<Selection: Equatable>: View {
   }
 
   @ViewBuilder var body: some View {
-    if acpPayload?.expiresAtDate != nil {
-      TimelineView(.periodic(from: .now, by: 1)) { context in
+    if let expiresAt = acpPayload?.expiresAtDate,
+      AcpPermissionDeadlineTimelineSchedule.shouldTick(expiresAt: expiresAt, now: .now)
+    {
+      TimelineView(AcpPermissionDeadlineTimelineSchedule(expiresAt: expiresAt)) { context in
         rowButton(referenceDate: context.date)
       }
     } else {
