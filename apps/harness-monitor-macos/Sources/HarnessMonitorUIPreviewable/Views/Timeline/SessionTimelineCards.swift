@@ -17,6 +17,7 @@ struct SessionTimelineCards: View {
           onSignalTap: onSignalTap,
           fontScale: fontScale
         )
+        .equatable()
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)

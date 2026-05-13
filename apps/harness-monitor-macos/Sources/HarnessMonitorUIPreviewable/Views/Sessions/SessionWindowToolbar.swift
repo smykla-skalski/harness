@@ -104,12 +104,6 @@ struct SessionWindowToolbar: ToolbarContent {
           Text(focusMode ? "Exit focus mode" : "Enter focus mode")
         } icon: {
           Image(systemName: focusMode ? "moon.fill" : "moon")
-            .contentTransition(
-              .symbolEffect(
-                .replace.magic(fallback: .downUp.wholeSymbol),
-                options: .nonRepeating
-              )
-            )
             .frame(width: 14, height: 14)
         }
       }
@@ -134,13 +128,6 @@ struct SessionWindowToolbar: ToolbarContent {
   }
 
   private func toggleFocusMode() {
-    let animation = SessionFocusModeMotionPolicy.animation(reduceMotion: reduceMotion)
-    if let animation {
-      withAnimation(animation) {
-        focusMode.toggle()
-      }
-    } else {
-      focusMode.toggle()
-    }
+    focusMode.toggle()
   }
 }
