@@ -186,8 +186,7 @@ struct ReconnectionProgressView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
       HStack(spacing: HarnessMonitorTheme.itemSpacing) {
-        ProgressView()
-          .controlSize(.small)
+        HarnessMonitorSpinner(size: 14)
         Text("Reconnecting")
           .scaledFont(.system(.footnote, design: .rounded, weight: .semibold))
         Spacer()

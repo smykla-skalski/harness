@@ -74,8 +74,7 @@ private struct SessionCockpitLoadingSurface: View {
       Text("Loading session details")
         .font(.callout)
         .foregroundStyle(.secondary)
-      ProgressView()
-        .controlSize(.small)
+      HarnessMonitorSpinner(size: 16)
     }
     .padding(HarnessMonitorTheme.spacingLG)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
