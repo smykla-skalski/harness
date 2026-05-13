@@ -233,15 +233,12 @@ The driver uses `beginAnimationInterval` (not `beginInterval`). The animation va
 When adding a case to `HarnessMonitorPerfScenario`, update all of these:
 
 1. The enum case and `rawValue` in `Sources/HarnessMonitor/App/HarnessMonitorPerfScenario.swift`
-2. `defaultPreviewScenario` and `initialSettingsSection` on that enum
-3. `signpostName` in `Sources/HarnessMonitor/App/HarnessMonitorPerfDriver.swift` (must return a `StaticString` matching the raw value exactly)
+2. The shared definition in `Resources/HarnessMonitorPerfScenarios.json` (preview routing, settings section, templates, duration, budgets, and visual-options behavior)
+3. `signpostName` in `Sources/HarnessMonitor/App/HarnessMonitorPerfScenario.swift` (must return a `StaticString` matching the raw value exactly)
 4. The scenario's execution branch in `HarnessMonitorPerfDriver.run(scenario:store:openWindow:)`
 5. The relevant hitch-rate or state assertions in `Tests/HarnessMonitorUITests/HarnessMonitorPerfTests.swift`
-6. `expectedPreviewScenario(for:)` in `HarnessMonitorPerfTests.swift`
-7. `ScenarioCatalog.swift` in `Tools/HarnessMonitorPerf`
-8. `Budgets.swift` in `Tools/HarnessMonitorPerf`
-9. `ManifestBuilder.defaultTemplates` in `Tools/HarnessMonitorPerf`
-10. Any affected fixtures and golden tests under `Tools/HarnessMonitorPerf/Tests/`
+6. Any affected fixtures and golden tests under `Tools/HarnessMonitorPerf/Tests/`
+7. `ScenarioContractParityTests` must still pass, because the tool catalog, budgets, manifest templates, and UI-test metadata now derive from the shared JSON catalog
 
 Missing any of these causes silent failures - the test runs but captures no signpost data, or the xctrace pipeline skips the scenario.
 
@@ -316,9 +313,11 @@ Leaving audit worktrees behind is not acceptable. If cleanup fails because a pro
 
 The Python scripts under `apps/harness-monitor-macos/Scripts/` parse Instruments XML exports. They must stay compatible with the xctrace export format, which uses ref-based deduplication for elements. The `dereference` function in `extract-instruments-metrics.py` handles transitive refs (ref -> ref -> element).
 
-When modifying the extractor or comparator, run the parser regression tests:
+When modifying the extractor, comparator, or audit contracts, run the perf tool
+tests and the parser regression tests:
 
 ```
+GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.bareRepository GIT_CONFIG_VALUE_0=all mise run monitor:tools:test:perf
 mise run monitor:test:scripts
 ```
 

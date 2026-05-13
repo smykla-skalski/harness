@@ -113,7 +113,9 @@ Layer 2 is the Instruments `xctrace` pipeline:
 ```bash
 mise run monitor:audit -- --label baseline
 mise run monitor:audit -- --label after-fix --compare-to tmp/perf/harness-monitor-instruments/runs/<baseline-dir>
+mise run monitor:audit -- --label regression --debug-retention
 mise run monitor:test:scripts
+mise run monitor:tools:test:perf
 ```
 
 Artifacts land in `tmp/perf/harness-monitor-instruments/runs/` with

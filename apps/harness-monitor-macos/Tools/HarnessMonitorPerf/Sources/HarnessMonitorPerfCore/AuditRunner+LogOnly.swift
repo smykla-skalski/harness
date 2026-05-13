@@ -20,7 +20,8 @@ extension AuditRunner {
         daemonCargoTargetDir: URL,
         label: String,
         runID: String,
-        createdAtUTC: String
+        createdAtUTC: String,
+        debugRetention: Bool
     ) throws -> RunOutcome {
         var captureRecords: [ManifestBuilder.CaptureRecord] = []
         var reports: [LogProbeRecorder.Report] = []
@@ -72,7 +73,14 @@ extension AuditRunner {
             .init(mode: "log-only", captures: reports),
             to: summaryPath
         )
-        try RunPruner.prune(runDir: runDir, keepTraces: false)
+        if debugRetention {
+            try writeDebugRetentionManifest(to: runDir, keepTraces: false)
+        }
+        try RunPruner.prune(
+            runDir: runDir,
+            keepTraces: false,
+            debugRetention: debugRetention
+        )
         return RunOutcome(runDir: runDir, summaryPath: summaryPath, comparisonPath: nil)
     }
 

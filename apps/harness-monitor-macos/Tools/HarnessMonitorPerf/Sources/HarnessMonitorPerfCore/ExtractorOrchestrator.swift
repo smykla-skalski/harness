@@ -68,7 +68,8 @@ public enum ExtractorOrchestrator {
     @discardableResult
     public static func extract(
         runDir: URL,
-        exporter: XctraceExporting
+        exporter: XctraceExporting,
+        debugExportsRoot: URL? = nil
     ) throws -> RunManifest {
         let manifestURL = runDir.appendingPathComponent("manifest.json")
         guard FileManager.default.fileExists(atPath: manifestURL.path) else {
@@ -86,7 +87,15 @@ public enum ExtractorOrchestrator {
             guard let traceRelpath = capture.traceRelpath else { continue }
             let tracePath = runDir.appendingPathComponent(traceRelpath)
             let metrics = try extractCaptureMetrics(
-                capture: capture, tracePath: tracePath, exporter: exporter
+                capture: capture,
+                tracePath: tracePath,
+                exporter: exporter,
+                debugExportsRoot: debugExportsRoot?
+                    .appendingPathComponent(capture.scenario, isDirectory: true)
+                    .appendingPathComponent(
+                        Summarizer.templateSlug(capture.template),
+                        isDirectory: true
+                    )
             )
             let scenarioRoot = metricsRoot.appendingPathComponent(capture.scenario, isDirectory: true)
             try FileManager.default.createDirectory(at: scenarioRoot, withIntermediateDirectories: true)
@@ -112,7 +121,8 @@ public enum ExtractorOrchestrator {
     public static func extractCaptureMetrics(
         capture: RunManifest.Capture,
         tracePath: URL,
-        exporter: XctraceExporting
+        exporter: XctraceExporting,
+        debugExportsRoot: URL? = nil
     ) throws -> JSONValue {
         let tocData = try exporter.exportTOC(tracePath: tracePath)
         let toc = try XctraceTOC(data: tocData)
@@ -125,13 +135,15 @@ public enum ExtractorOrchestrator {
             return try extractSwiftUI(
                 tracePath: tracePath, exporter: exporter,
                 availableSchemas: availableSchemas,
-                maximumValidDurationNs: maximumValidDurationNs
+                maximumValidDurationNs: maximumValidDurationNs,
+                debugExportsRoot: debugExportsRoot
             )
         case "Allocations":
             return try extractAllocations(
                 tracePath: tracePath, exporter: exporter,
                 availableAllocDetails: availableAllocDetails,
-                availableSchemas: availableSchemas
+                availableSchemas: availableSchemas,
+                debugExportsRoot: debugExportsRoot
             )
         default:
             throw Failure(message: "Unsupported template \(capture.template)")
@@ -140,12 +152,18 @@ public enum ExtractorOrchestrator {
 
     private static func extractSwiftUI(
         tracePath: URL, exporter: XctraceExporting, availableSchemas: Set<String>,
-        maximumValidDurationNs: Int
+        maximumValidDurationNs: Int,
+        debugExportsRoot: URL?
     ) throws -> JSONValue {
         var documents: [String: XctraceQueryDocument] = [:]
         for schema in swiftUISchemaXPaths {
             guard availableSchemas.contains(schema.name) else { continue }
             let data = try exporter.exportQuery(tracePath: tracePath, xpath: schema.xpath)
+            try retainDebugExportIfNeeded(
+                data,
+                root: debugExportsRoot,
+                filename: "\(schema.name).xml"
+            )
             documents[schema.name] = try XctraceQueryDocument(data: data)
         }
 
@@ -181,11 +199,18 @@ public enum ExtractorOrchestrator {
 
     private static func extractAllocations(
         tracePath: URL, exporter: XctraceExporting,
-        availableAllocDetails: Set<String>, availableSchemas: Set<String>
+        availableAllocDetails: Set<String>,
+        availableSchemas: Set<String>,
+        debugExportsRoot: URL?
     ) throws -> JSONValue {
         var rootObject: [String: JSONValue] = [:]
         if availableAllocDetails.contains("Statistics") {
             let data = try exporter.exportQuery(tracePath: tracePath, xpath: allocationsXPath)
+            try retainDebugExportIfNeeded(
+                data,
+                root: debugExportsRoot,
+                filename: "allocations-statistics.xml"
+            )
             let parsed = try MetricsExtractor.parseAllocationsStatistics(data: data)
             rootObject["allocations"] = encodeJSON(parsed.allocations)
             rootObject["top_offenders"] = encodeJSON(parsed.topOffenders)
@@ -217,6 +242,19 @@ public enum ExtractorOrchestrator {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(value)
         try data.write(to: url, options: .atomic)
+    }
+
+    private static func retainDebugExportIfNeeded(
+        _ data: Data,
+        root: URL?,
+        filename: String
+    ) throws {
+        guard let root else { return }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try data.write(
+            to: root.appendingPathComponent(filename),
+            options: .atomic
+        )
     }
 
     private static func maximumValidDurationNs(for capture: RunManifest.Capture) -> Int {

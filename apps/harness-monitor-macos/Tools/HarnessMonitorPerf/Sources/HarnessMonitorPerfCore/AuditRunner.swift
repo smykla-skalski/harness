@@ -41,6 +41,7 @@ public enum AuditRunner {
         public var compareTo: URL?
         public var scenarioSelection: String
         public var keepTraces: Bool
+        public var debugRetention: Bool
         public var checkoutRoot: URL
         public var commonRepoRoot: URL
         public var appRoot: URL
@@ -59,6 +60,7 @@ public enum AuditRunner {
 
         public init(
             label: String, compareTo: URL?, scenarioSelection: String, keepTraces: Bool,
+            debugRetention: Bool,
             checkoutRoot: URL, commonRepoRoot: URL, appRoot: URL,
             xcodebuildRunner: URL, derivedDataPath: URL,
             runsRoot: URL, stagedHostStageRoot: URL, auditDaemonCargoTargetDir: URL,
@@ -70,6 +72,7 @@ public enum AuditRunner {
             self.compareTo = compareTo
             self.scenarioSelection = scenarioSelection
             self.keepTraces = keepTraces
+            self.debugRetention = debugRetention
             self.checkoutRoot = checkoutRoot
             self.commonRepoRoot = commonRepoRoot
             self.appRoot = appRoot
@@ -107,6 +110,7 @@ public enum AuditRunner {
     }
 
     public static func run(_ inputs: Inputs) throws -> RunOutcome {
+        let effectiveKeepTraces = inputs.keepTraces || inputs.debugRetention
         let scenarios = try ScenarioCatalog.resolve(inputs.scenarioSelection)
         let gitCommit = try gitRevParseHead(inputs.checkoutRoot)
         let gitDirty = try gitDirtyFlag(inputs.checkoutRoot)
@@ -269,7 +273,8 @@ public enum AuditRunner {
                 daemonCargoTargetDir: inputs.auditDaemonCargoTargetDir,
                 label: inputs.label,
                 runID: runID,
-                createdAtUTC: timestamp
+                createdAtUTC: timestamp,
+                debugRetention: inputs.debugRetention
             )
         }
 
@@ -330,7 +335,19 @@ public enum AuditRunner {
             arguments: ["xctrace"],
             tempRoot: xctraceTempRoot
         )
-        _ = try ExtractorOrchestrator.extract(runDir: runDir, exporter: exporter)
+        _ = try ExtractorOrchestrator.extract(
+            runDir: runDir,
+            exporter: exporter,
+            debugExportsRoot: inputs.debugRetention
+                ? runDir.appendingPathComponent("exports", isDirectory: true)
+                : nil
+        )
+        if inputs.debugRetention {
+            try writeDebugRetentionManifest(
+                to: runDir,
+                keepTraces: effectiveKeepTraces
+            )
+        }
         let summaryPath = runDir.appendingPathComponent("summary.json")
         let summaryData = try Data(contentsOf: summaryPath)
         try BudgetEnforcer.enforce(summaryJSON: summaryData)
@@ -341,13 +358,35 @@ public enum AuditRunner {
             comparisonPath = runDir.appendingPathComponent("comparison.md")
         }
 
-        if !inputs.keepTraces {
+        if !effectiveKeepTraces {
             try? FileManager.default.removeItem(at: tracesRoot)
         }
-        try RunPruner.prune(runDir: runDir, keepTraces: inputs.keepTraces)
+        try RunPruner.prune(
+            runDir: runDir,
+            keepTraces: effectiveKeepTraces,
+            debugRetention: inputs.debugRetention
+        )
 
         return RunOutcome(runDir: runDir, summaryPath: summaryPath, comparisonPath: comparisonPath)
     }
 
     // MARK: - Internals
+
+    static func writeDebugRetentionManifest(
+        to runDir: URL,
+        keepTraces: Bool
+    ) throws {
+        let url = runDir.appendingPathComponent("debug-retention.json")
+        let payload: [String: Any] = [
+            "enabled": true,
+            "keeps_traces": keepTraces,
+            "exports_directory": "exports",
+            "launch_metrics_directory": "launch-metrics",
+        ]
+        let data = try JSONSerialization.data(
+            withJSONObject: payload,
+            options: [.prettyPrinted, .sortedKeys]
+        )
+        try data.write(to: url, options: .atomic)
+    }
 }

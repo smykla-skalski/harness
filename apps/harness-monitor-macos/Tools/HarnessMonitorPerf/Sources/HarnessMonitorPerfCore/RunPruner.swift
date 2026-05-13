@@ -11,10 +11,14 @@ public enum RunPruner {
 
     public static let retainedRunSizeBudgetKiB = 10_240
 
-    public static func retain(relativePath: String, keepTraces: Bool) -> Bool {
+    public static func retain(
+        relativePath: String,
+        keepTraces: Bool,
+        debugRetention: Bool = false
+    ) -> Bool {
         switch relativePath {
         case "manifest.json", "summary.json", "summary.csv", "log-only-summary.json",
-             "captures.tsv", "comparison.json", "comparison.md":
+             "captures.tsv", "comparison.json", "comparison.md", "debug-retention.json":
             return true
         default:
             break
@@ -31,30 +35,53 @@ public enum RunPruner {
             if relativePath.hasSuffix("/comparison.json") { return true }
             if relativePath.hasSuffix("/comparison.md") { return true }
         }
-        if relativePath.hasPrefix("traces/") { return keepTraces }
+        if relativePath.hasPrefix("launch-metrics/") { return debugRetention }
+        if relativePath.hasPrefix("exports/") { return debugRetention }
+        if relativePath.hasPrefix("traces/") { return keepTraces || debugRetention }
         return false
     }
 
-    public static func prune(runDir: URL, keepTraces: Bool) throws {
+    public static func prune(
+        runDir: URL,
+        keepTraces: Bool,
+        debugRetention: Bool = false
+    ) throws {
         let fm = FileManager.default
-        for relative in ["exports", "launch-host", "app-data", "xctrace-tmp"] {
+        for relative in ["launch-host", "app-data", "xctrace-tmp"] {
             let url = runDir.appendingPathComponent(relative)
             if fm.fileExists(atPath: url.path) {
                 try? fm.removeItem(at: url)
             }
         }
+        if !debugRetention {
+            let exportsURL = runDir.appendingPathComponent("exports")
+            if fm.fileExists(atPath: exportsURL.path) {
+                try? fm.removeItem(at: exportsURL)
+            }
+        }
 
         let tracesRoot = runDir.appendingPathComponent("traces", isDirectory: true)
-        if !keepTraces, fm.fileExists(atPath: tracesRoot.path) {
+        if !keepTraces, !debugRetention, fm.fileExists(atPath: tracesRoot.path) {
             try? fm.removeItem(at: tracesRoot)
         }
 
-        try pruneUnretainedFiles(runDir: runDir, keepTraces: keepTraces)
-        try assertRetainedSize(runDir: runDir, keepTraces: keepTraces)
+        try pruneUnretainedFiles(
+            runDir: runDir,
+            keepTraces: keepTraces,
+            debugRetention: debugRetention
+        )
+        try assertRetainedSize(
+            runDir: runDir,
+            keepTraces: keepTraces || debugRetention
+        )
         try removeEmptyDirectories(runDir: runDir)
     }
 
-    private static func pruneUnretainedFiles(runDir: URL, keepTraces: Bool) throws {
+    private static func pruneUnretainedFiles(
+        runDir: URL,
+        keepTraces: Bool,
+        debugRetention: Bool
+    ) throws {
         let fm = FileManager.default
         guard let enumerator = fm.enumerator(
             at: runDir, includingPropertiesForKeys: [.isRegularFileKey],
@@ -68,7 +95,11 @@ public enum RunPruner {
             let path = url.standardizedFileURL.path
             guard path.hasPrefix(basePath + "/") else { continue }
             let relative = String(path.dropFirst(basePath.count + 1))
-            if !retain(relativePath: relative, keepTraces: keepTraces) {
+            if !retain(
+                relativePath: relative,
+                keepTraces: keepTraces,
+                debugRetention: debugRetention
+            ) {
                 try? fm.removeItem(at: url)
             }
         }
