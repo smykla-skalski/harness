@@ -12,7 +12,24 @@ extension SessionWindowView {
     case .agent(_, let agentID):
       agentDetailContent(for: agentID)
     case .route(.agents):
-      routeAgentDetailContent()
+      SessionRouteAgentDetailFocus(
+        agents: snapshot?.detail?.agents ?? [],
+        state: stateCache,
+        detail: { agentID in
+          agentDetailContent(for: agentID)
+        },
+        empty: { hasQuery in
+          unavailableDetailSurface(
+            hasQuery ? "No Matching Agents" : "No Agents",
+            systemImage: SessionWindowRoute.agents.systemImage,
+            description: Text(
+              hasQuery
+                ? "No agents match the current search."
+                : "This session does not have any agents."
+            )
+          )
+        }
+      )
     case .decision(_, let decisionID):
       SessionDecisionDetailPane(
         decision: decisionsByID(sessionDecisionDetail, fallbackID: decisionID),
@@ -49,7 +66,24 @@ extension SessionWindowView {
         showsFilteredNotice: sessionDecisionDetailHiddenByFilters
       )
     case .route(.tasks):
-      routeTaskDetailContent()
+      SessionRouteTaskDetailFocus(
+        tasks: snapshot?.detail?.tasks ?? [],
+        state: stateCache,
+        detail: { taskID in
+          taskDetailContent(for: taskID)
+        },
+        empty: { hasQuery in
+          unavailableDetailSurface(
+            hasQuery ? "No Matching Tasks" : "No Tasks",
+            systemImage: SessionWindowRoute.tasks.systemImage,
+            description: Text(
+              hasQuery
+                ? "No tasks match the current search."
+                : "This session does not have any tasks."
+            )
+          )
+        }
+      )
     case .route:
       unavailableDetailSurface(
         "Select an Item",
@@ -84,57 +118,6 @@ extension SessionWindowView {
         "Codex Run Not Available",
         systemImage: "wand.and.stars",
         description: Text(runID)
-      )
-    }
-  }
-
-  @ViewBuilder
-  private func routeAgentDetailContent() -> some View {
-    if let agentID = SessionAgentRouteSelectionPolicy.preferredRouteDetailAgentID(
-      rememberedAgentID: stateCache.sectionState.agentID,
-      visibleAgentIDs: visibleSessionAgents.map(\.agentId)
-    ) {
-      agentDetailContent(for: agentID)
-    } else {
-      let hasQuery = !stateCache.appSearchModel.query
-        .trimmingCharacters(in: .whitespacesAndNewlines)
-        .isEmpty
-      unavailableDetailSurface(
-        hasQuery ? "No Matching Agents" : "No Agents",
-        systemImage: SessionWindowRoute.agents.systemImage,
-        description: Text(
-          hasQuery
-            ? "No agents match the current search."
-            : "This session does not have any agents."
-        )
-      )
-    }
-  }
-
-  @ViewBuilder
-  private func routeTaskDetailContent() -> some View {
-    if let taskID = SessionTaskRouteSelectionPolicy.preferredRouteDetailTaskID(
-      rememberedTaskID: stateCache.sectionState.taskID,
-      visibleTaskIDs: visibleSessionTasks.map(\.taskId)
-    ),
-      let task = snapshot?.detail?.tasks.first(where: { $0.taskId == taskID })
-    {
-      SessionTaskDetailPane(
-        task: task,
-        openActions: { presentTaskActions(for: task.taskId) }
-      )
-    } else {
-      let hasQuery = !stateCache.appSearchModel.query
-        .trimmingCharacters(in: .whitespacesAndNewlines)
-        .isEmpty
-      unavailableDetailSurface(
-        hasQuery ? "No Matching Tasks" : "No Tasks",
-        systemImage: SessionWindowRoute.tasks.systemImage,
-        description: Text(
-          hasQuery
-            ? "No tasks match the current search."
-            : "This session does not have any tasks."
-        )
       )
     }
   }
@@ -199,6 +182,111 @@ extension SessionWindowView {
           description: Text("Agent detail is not available.")
         )
       }
+    }
+  }
+}
+
+private struct SessionRouteAgentDetailFocus<Detail: View, Empty: View>: View {
+  let agents: [AgentRegistration]
+  @Bindable var state: SessionWindowStateCache
+  let detail: (String) -> Detail
+  let empty: (Bool) -> Empty
+  @Environment(\.appSearchModel)
+  private var appSearchModel: AppSearchModel?
+
+  init(
+    agents: [AgentRegistration],
+    state: SessionWindowStateCache,
+    @ViewBuilder detail: @escaping (String) -> Detail,
+    @ViewBuilder empty: @escaping (Bool) -> Empty
+  ) {
+    self.agents = agents
+    self.state = state
+    self.detail = detail
+    self.empty = empty
+  }
+
+  private var query: String {
+    appSearchModel?.query ?? ""
+  }
+
+  private var hasQuery: Bool {
+    !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
+  private var visibleAgentIDs: [String] {
+    SessionWindowAgentFilter.filteredAgents(agents, query: query).map(\.agentId)
+  }
+
+  var body: some View {
+    if let agentID = SessionAgentRouteSelectionPolicy.preferredRouteDetailAgentID(
+      rememberedAgentID: state.sectionState.agentID,
+      visibleAgentIDs: visibleAgentIDs
+    ) {
+      detail(agentID)
+    } else {
+      empty(hasQuery)
+    }
+  }
+}
+
+private struct SessionRouteTaskDetailFocus<Detail: View, Empty: View>: View {
+  let tasks: [WorkItem]
+  @Bindable var state: SessionWindowStateCache
+  let detail: (String) -> Detail
+  let empty: (Bool) -> Empty
+  @Environment(\.appSearchModel)
+  private var appSearchModel: AppSearchModel?
+
+  init(
+    tasks: [WorkItem],
+    state: SessionWindowStateCache,
+    @ViewBuilder detail: @escaping (String) -> Detail,
+    @ViewBuilder empty: @escaping (Bool) -> Empty
+  ) {
+    self.tasks = tasks
+    self.state = state
+    self.detail = detail
+    self.empty = empty
+  }
+
+  private var trimmedQuery: String {
+    (appSearchModel?.query ?? "")
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .lowercased()
+  }
+
+  private var hasQuery: Bool {
+    !trimmedQuery.isEmpty
+  }
+
+  private var visibleTaskIDs: [String] {
+    filteredTasks.map(\.taskId)
+  }
+
+  private var filteredTasks: [WorkItem] {
+    guard !trimmedQuery.isEmpty else { return tasks }
+    return tasks.filter { task in
+      if task.title.lowercased().contains(trimmedQuery) { return true }
+      if let context = task.context?.lowercased(), context.contains(trimmedQuery) {
+        return true
+      }
+      if let fix = task.suggestedFix?.lowercased(), fix.contains(trimmedQuery) {
+        return true
+      }
+      if task.taskId.lowercased().contains(trimmedQuery) { return true }
+      return false
+    }
+  }
+
+  var body: some View {
+    if let taskID = SessionTaskRouteSelectionPolicy.preferredRouteDetailTaskID(
+      rememberedTaskID: state.sectionState.taskID,
+      visibleTaskIDs: visibleTaskIDs
+    ) {
+      detail(taskID)
+    } else {
+      empty(hasQuery)
     }
   }
 }
