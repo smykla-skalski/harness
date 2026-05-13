@@ -192,4 +192,42 @@ struct AcpRuntimeViewTests {
       ) == nil
     )
   }
+
+  @Test("Runtime strip keeps deadline clock state out of the strip body")
+  func runtimeStripKeepsDeadlineClockStateOutOfTheStripBody() throws {
+    let stripSource = try previewableSourceFile(named: "Views/Acp/AcpRuntimeStatusStrip.swift")
+    let supportSource = try previewableSourceFile(
+      named: "Views/Acp/AcpRuntimeStatusStripSupport.swift"
+    )
+
+    #expect(!stripSource.contains("@State private var deadlineNow"))
+    #expect(stripSource.contains("@State private var deadlineClock"))
+    let deadlineClockRunCall =
+      "await deadlineClock.run(store: store, deadline: promptDeadlineDate)"
+    #expect(stripSource.contains(deadlineClockRunCall))
+    #expect(stripSource.contains("AcpRuntimeStatusEdgeAccentView("))
+    #expect(
+      stripSource.contains(
+        "AcpRuntimeDeadlineChip(\n        deadlineClock: deadlineClock,\n        deadline: promptDeadlineDate"
+      )
+    )
+    #expect(!stripSource.contains("runDeadlineClockIfNeeded"))
+    #expect(supportSource.contains("final class AcpRuntimeDeadlineClockState"))
+    #expect(supportSource.contains("struct AcpRuntimeStatusEdgeAccentView: View"))
+  }
+
+  private func previewableSourceFile(named relativePath: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent("apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable")
+      .appendingPathComponent(relativePath)
+    return try String(contentsOf: fileURL, encoding: .utf8)
+  }
 }

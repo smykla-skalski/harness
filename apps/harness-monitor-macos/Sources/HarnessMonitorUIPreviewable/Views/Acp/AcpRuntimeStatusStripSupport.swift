@@ -199,15 +199,43 @@ enum AcpRuntimeDeadlineClock {
   }
 }
 
+@MainActor
+@Observable
+final class AcpRuntimeDeadlineClockState {
+  private var now = Date.now
+
+  var currentDate: Date {
+    now
+  }
+
+  func presentation(for deadline: Date?) -> AcpRuntimeDeadlinePresentation? {
+    guard let deadline else { return nil }
+    return AcpRuntimeDeadlinePresentation.presentation(deadline: deadline, now: now)
+  }
+
+  func run(store: HarnessMonitorStore, deadline: Date?) async {
+    guard deadline != nil else {
+      return
+    }
+
+    while !Task.isCancelled {
+      now = AcpRuntimeDeadlineClock.now(store: store, localNow: Date.now)
+      guard AcpRuntimeDeadlineClock.shouldTick(deadline: deadline, now: now) else {
+        return
+      }
+      guard await AcpRuntimeDeadlineClock.sleepUntilNextTick() else {
+        return
+      }
+    }
+  }
+}
+
 struct AcpRuntimeDeadlineChip: View {
+  let deadlineClock: AcpRuntimeDeadlineClockState
   let deadline: Date
-  let now: Date
 
   var body: some View {
-    if let presentation = AcpRuntimeDeadlinePresentation.presentation(
-      deadline: deadline,
-      now: now
-    ) {
+    if let presentation = deadlineClock.presentation(for: deadline) {
       AcpRuntimeChip(
         title: "Prompt deadline",
         value: presentation.countdownLabel,
@@ -216,6 +244,35 @@ struct AcpRuntimeDeadlineChip: View {
         accessibilityLabel: "Prompt deadline",
         accessibilityValue: presentation.accessibilityLabel
       )
+    }
+  }
+}
+
+struct AcpRuntimeStatusEdgeAccentView: View {
+  let deadlineClock: AcpRuntimeDeadlineClockState
+  let watchdogDisplayState: String
+  let pendingPermissions: Int
+  let promptDeadline: Date?
+
+  private var edgeAccentTint: Color? {
+    AcpRuntimeStatusEdgeAccent.tint(
+      for: AcpRuntimeStatusEdgeAccent.classify(
+        watchdogDisplayState: watchdogDisplayState,
+        pendingPermissions: pendingPermissions,
+        promptDeadline: promptDeadline,
+        now: deadlineClock.currentDate
+      )
+    )
+  }
+
+  var body: some View {
+    if let edgeAccentTint {
+      RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+        .fill(edgeAccentTint)
+        .frame(width: 3)
+        .padding(.vertical, HarnessMonitorTheme.spacingXS)
+        .padding(.leading, 1)
+        .accessibilityHidden(true)
     }
   }
 }
