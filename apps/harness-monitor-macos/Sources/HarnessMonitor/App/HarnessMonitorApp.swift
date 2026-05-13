@@ -1,6 +1,5 @@
 import AppKit
 import HarnessMonitorKit
-import HarnessMonitorRegistry
 import HarnessMonitorUIPreviewable
 import SwiftData
 import SwiftUI
@@ -126,7 +125,11 @@ struct HarnessMonitorApp: App {
       initialValue: SessionWindowPresenceTracker()
     )
     _windowCommandRouting = State(initialValue: WindowCommandRoutingState())
-    _mcpWindowCommandRegistrar = State(initialValue: HarnessMonitorMCPWindowCommandRegistrar())
+    _mcpWindowCommandRegistrar = State(
+      initialValue: HarnessMonitorMCPWindowCommandRegistrar(
+        descriptors: HarnessMonitorMCPWindowCommandDescriptors.all
+      )
+    )
     _settingsSelectedSection = State(initialValue: configuration.settingsInitialSection)
     delegate.bind(store: store)
   }
@@ -177,7 +180,7 @@ struct HarnessMonitorApp: App {
         sessionWindowPresenceTracker: sessionWindowPresenceTracker,
         themeMode: $themeMode
       )
-      .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
+      .harnessTrackMCPWindow()
     } else {
       Color.clear.accessibilityHidden(true)
     }
@@ -187,7 +190,7 @@ struct HarnessMonitorApp: App {
     if rendersLiveSceneContent {
       openRecentWindowContent
         .modifier(SessionWindowTabbing(isSessionWindow: false))
-        .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
+        .harnessTrackMCPWindow()
     } else {
       Color.clear.accessibilityHidden(true)
     }
@@ -310,7 +313,7 @@ struct HarnessMonitorApp: App {
         themeMode: $themeMode,
         selectedSection: $settingsSelectedSection
       )
-      .trackWindow(registry: HarnessMonitorMCPAccessibilityService.shared.registry)
+      .harnessTrackMCPWindow()
     } else {
       Color.clear.accessibilityHidden(true)
     }

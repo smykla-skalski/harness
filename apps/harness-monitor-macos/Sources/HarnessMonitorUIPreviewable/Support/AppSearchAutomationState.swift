@@ -4,13 +4,11 @@ public struct AppSearchAutomationCommand: Equatable, Sendable {
   public var generation: UInt64
   public var query: String
   public var isPresented: Bool
-  public var isFocused: Bool
 
   public static let idle = Self(
     generation: 0,
     query: "",
-    isPresented: false,
-    isFocused: false
+    isPresented: false
   )
 }
 
@@ -18,23 +16,24 @@ public struct AppSearchAutomationCommand: Equatable, Sendable {
 @Observable
 public final class AppSearchAutomationState {
   public private(set) var command = AppSearchAutomationCommand.idle
+  @ObservationIgnored public var handler: ((AppSearchAutomationCommand) -> Void)?
 
   public init() {}
 
-  public func present(query: String, focused: Bool = true) {
-    update(query: query, isPresented: true, isFocused: focused)
+  public func present(query: String) {
+    update(query: query, isPresented: true)
   }
 
   public func dismiss() {
-    update(query: "", isPresented: false, isFocused: false)
+    update(query: "", isPresented: false)
   }
 
-  private func update(query: String, isPresented: Bool, isFocused: Bool) {
+  private func update(query: String, isPresented: Bool) {
     command = AppSearchAutomationCommand(
       generation: command.generation &+ 1,
       query: query,
-      isPresented: isPresented,
-      isFocused: isFocused
+      isPresented: isPresented
     )
+    handler?(command)
   }
 }

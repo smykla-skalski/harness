@@ -105,9 +105,9 @@ public enum WorkspaceFingerprint {
 
     private static func collectFiles(under url: URL) throws -> [URL] {
         let fm = FileManager.default
-        var isDir: ObjCBool = false
-        guard fm.fileExists(atPath: url.path, isDirectory: &isDir) else { return [] }
-        if !isDir.boolValue { return [url] }
+        guard fm.fileExists(atPath: url.path) else { return [] }
+        let values = try? url.resourceValues(forKeys: [.isDirectoryKey])
+        if values?.isDirectory != true { return [url] }
 
         var files: [URL] = []
         guard let enumerator = fm.enumerator(

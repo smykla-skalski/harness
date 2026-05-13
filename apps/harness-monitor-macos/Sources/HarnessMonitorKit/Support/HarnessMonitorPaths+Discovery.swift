@@ -49,11 +49,8 @@ extension HarnessMonitorPaths {
         includingPropertiesForKeys: nil
       )) ?? []
     for laneEntry in laneEntries {
-      var isDirectory: ObjCBool = false
-      guard
-        fileManager.fileExists(atPath: laneEntry.path, isDirectory: &isDirectory),
-        isDirectory.boolValue
-      else { continue }
+      let values = try? laneEntry.resourceValues(forKeys: [.isDirectoryKey])
+      guard values?.isDirectory == true else { continue }
       if let candidate = liveDaemonCandidate(
         atDataHome: laneEntry,
         fileManager: fileManager,

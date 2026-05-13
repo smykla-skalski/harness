@@ -13,7 +13,7 @@ public enum RunPruner {
 
     public static func retain(relativePath: String, keepTraces: Bool) -> Bool {
         switch relativePath {
-        case "manifest.json", "summary.json", "summary.csv",
+        case "manifest.json", "summary.json", "summary.csv", "log-only-summary.json",
              "captures.tsv", "comparison.json", "comparison.md":
             return true
         default:

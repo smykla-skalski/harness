@@ -281,8 +281,6 @@ private struct SessionTimelineList: View {
   let horizontalContentInset: CGFloat
   let filters: Binding<SessionTimelineFilterState>
 
-  @State private var railEndpoints = SessionTimelineRailEndpoints()
-
   init(
     presentation: SessionTimelineSectionPresentation,
     actionHandler: any DecisionActionHandler,
@@ -314,21 +312,14 @@ private struct SessionTimelineList: View {
   }
 
   private var timelineScroll: some View {
-    let firstID = presentation.rows.first?.id
-    let lastID = presentation.rows.last?.id
-    return ScrollView(.vertical) {
+    ScrollView(.vertical) {
       LazyVStack(alignment: .leading, spacing: 0) {
         ForEach(presentation.rows) { row in
           SessionTimelineRowView(
             row: row,
             actionHandler: actionHandler,
             onSignalTap: onSignalTap,
-            fontScale: fontScale,
-            railRole: SessionTimelineRailRole.role(
-              for: row.id,
-              firstID: firstID,
-              lastID: lastID
-            )
+            fontScale: fontScale
           )
           .equatable()
           .id(row.id)
@@ -338,13 +329,7 @@ private struct SessionTimelineList: View {
       .coordinateSpace(.named(SessionTimelineRailCoordinateSpace.name))
       .background(alignment: .topLeading) {
         if !presentation.rows.isEmpty {
-          SessionTimelineRailBackground(endpoints: railEndpoints)
-        }
-      }
-      .onPreferenceChange(SessionTimelineRailEndpointsKey.self) { newValue in
-        let merged = railEndpoints.merging(newValue)
-        if merged != railEndpoints {
-          railEndpoints = merged
+          SessionTimelineRailBackground()
         }
       }
       .padding(.horizontal, horizontalContentInset)

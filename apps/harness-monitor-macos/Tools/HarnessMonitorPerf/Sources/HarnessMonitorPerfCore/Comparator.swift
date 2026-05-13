@@ -61,9 +61,8 @@ public enum Comparator {
 
     public static func loadSummary(_ url: URL) throws -> RunManifest {
         var resolved = url
-        var isDir: ObjCBool = false
-        FileManager.default.fileExists(atPath: resolved.path, isDirectory: &isDir)
-        if isDir.boolValue {
+        let values = try? resolved.resourceValues(forKeys: [.isDirectoryKey])
+        if values?.isDirectory == true {
             resolved = resolved.appendingPathComponent("summary.json")
         }
         guard FileManager.default.fileExists(atPath: resolved.path) else {

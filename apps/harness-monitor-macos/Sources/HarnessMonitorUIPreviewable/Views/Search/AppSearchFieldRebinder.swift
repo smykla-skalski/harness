@@ -16,6 +16,7 @@ import SwiftUI
 /// a non-empty query AND the search bar is still presented.
 struct AppSearchFieldRebinder: NSViewRepresentable, Equatable {
   let shouldRebind: Bool
+  let focusRequestID: UInt64
 
   func makeNSView(context: Context) -> NSView {
     let view = AnchorView()
@@ -23,13 +24,21 @@ struct AppSearchFieldRebinder: NSViewRepresentable, Equatable {
     return view
   }
 
-  // The Equatable conformance + this short-circuit make every
-  // representable diff cheap so updateNSView only forwards when the bool
-  // actually flipped. Without the gate, every parent body invocation
-  // forwards a fresh value into the coordinator even when nothing changed.
+  // The Equatable conformance + this short-circuit make every representable
+  // diff cheap so updateNSView only forwards when the rebind or focus request
+  // actually changed.
   func updateNSView(_ nsView: NSView, context: Context) {
-    guard context.coordinator.shouldRebind != shouldRebind else { return }
-    context.coordinator.update(shouldRebind: shouldRebind)
+    guard
+      context.coordinator.shouldRebind != shouldRebind
+        || context.coordinator.focusRequestID != focusRequestID
+    else {
+      return
+    }
+    context.coordinator.update(
+      shouldRebind: shouldRebind,
+      focusRequestID: focusRequestID,
+      window: nsView.window
+    )
   }
 
   func makeCoordinator() -> Coordinator {
@@ -57,9 +66,19 @@ struct AppSearchFieldRebinder: NSViewRepresentable, Equatable {
     private weak var observedWindow: NSWindow?
     private var keyObserver: NSObjectProtocol?
     fileprivate var shouldRebind = false
+    fileprivate var focusRequestID: UInt64 = 0
 
-    func update(shouldRebind newValue: Bool) {
+    func update(
+      shouldRebind newValue: Bool,
+      focusRequestID newRequestID: UInt64,
+      window: NSWindow?
+    ) {
+      let shouldFocus = newRequestID != focusRequestID
       shouldRebind = newValue
+      focusRequestID = newRequestID
+      if shouldFocus {
+        focusSearchField(in: window ?? observedWindow)
+      }
     }
 
     func attach(to window: NSWindow?) {
@@ -75,6 +94,9 @@ struct AppSearchFieldRebinder: NSViewRepresentable, Equatable {
         Task { @MainActor [weak self] in
           self?.rearmIfNeeded(in: window)
         }
+      }
+      if focusRequestID > 0 {
+        focusSearchField(in: window)
       }
     }
 
@@ -103,6 +125,14 @@ struct AppSearchFieldRebinder: NSViewRepresentable, Equatable {
         window.makeFirstResponder(field)
         field.selectText(nil)
       }
+    }
+
+    private func focusSearchField(in window: NSWindow?) {
+      guard let window, let field = locateSearchField(in: window.contentView) else {
+        return
+      }
+      window.makeFirstResponder(field)
+      field.selectText(nil)
     }
 
     private func locateSearchField(in view: NSView?) -> NSSearchField? {
