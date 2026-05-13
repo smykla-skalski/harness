@@ -15,6 +15,7 @@ public struct DecisionDetailView: View {
   private let viewModel: DecisionDetailViewModel?
   private let store: HarnessMonitorStore?
   private let auditEvents: [SupervisorEvent]
+  private let auditEventPayloadPresentations: [String: DecisionAuditTrailPayloadPresentation]
   private let observer: ObserverSummary?
   private let decisionScope: DecisionWorkspaceScope?
   private let primaryActionFocusDecisionID: String?
@@ -30,6 +31,7 @@ public struct DecisionDetailView: View {
     viewModel = nil
     store = nil
     auditEvents = []
+    auditEventPayloadPresentations = [:]
     self.observer = observer
     self.decisionScope = decisionScope
     self.primaryActionFocusDecisionID = primaryActionFocusDecisionID
@@ -37,31 +39,7 @@ public struct DecisionDetailView: View {
     _selectedTab = selectedTab
   }
 
-  public init(
-    viewModel: DecisionDetailViewModel,
-    store: HarnessMonitorStore? = nil,
-    auditEvents: [SupervisorEvent] = [],
-    selectedTab: Binding<DecisionDetailTab> = .constant(.context),
-    observer: ObserverSummary? = nil,
-    decisionScope: DecisionWorkspaceScope? = nil,
-    primaryActionFocusDecisionID: String? = nil,
-    primaryActionFocusRequestTick: Int = 0
-  ) {
-    self.viewModel = viewModel
-    self.store = store
-    self.auditEvents = auditEvents
-    self.observer = observer
-    self.decisionScope = decisionScope
-    self.primaryActionFocusDecisionID = primaryActionFocusDecisionID
-    self.primaryActionFocusRequestTick = primaryActionFocusRequestTick
-    _selectedTab = selectedTab
-  }
-
-  // Optional viewModel form. Callers that own a long-lived viewModel via
-  // `@State` keyed on decision.id pass nil here when there's no selection.
-  // This keeps the SwiftUI tree identity stable across nil flips without
-  // forcing the view to allocate a fresh `@Observable` instance per parent
-  // body invocation (which would thrash every ForEach evictor downstream).
+  // Optional viewModel form keeps tree identity stable when selection flips nil/non-nil.
   public init(
     viewModel: DecisionDetailViewModel?,
     store: HarnessMonitorStore? = nil,
@@ -72,31 +50,11 @@ public struct DecisionDetailView: View {
     primaryActionFocusDecisionID: String? = nil,
     primaryActionFocusRequestTick: Int = 0
   ) {
-    self.viewModel = viewModel
-    self.store = store
-    self.auditEvents = auditEvents
-    self.observer = observer
-    self.decisionScope = decisionScope
-    self.primaryActionFocusDecisionID = primaryActionFocusDecisionID
-    self.primaryActionFocusRequestTick = primaryActionFocusRequestTick
-    _selectedTab = selectedTab
-  }
-
-  public init(
-    decision: Decision,
-    store: HarnessMonitorStore? = nil,
-    handler: any DecisionActionHandler = NullDecisionActionHandler(),
-    auditEvents: [SupervisorEvent] = [],
-    selectedTab: Binding<DecisionDetailTab> = .constant(.context),
-    observer: ObserverSummary? = nil,
-    decisionScope: DecisionWorkspaceScope? = nil,
-    primaryActionFocusDecisionID: String? = nil,
-    primaryActionFocusRequestTick: Int = 0
-  ) {
     self.init(
-      viewModel: DecisionDetailViewModel(decision: decision, handler: handler),
+      viewModel: viewModel,
       store: store,
       auditEvents: auditEvents,
+      auditEventPayloadPresentations: [:],
       selectedTab: selectedTab,
       observer: observer,
       decisionScope: decisionScope,
@@ -105,9 +63,29 @@ public struct DecisionDetailView: View {
     )
   }
 
-  // Single call site for callers that may not have a decision yet. Avoids the
-  // `_ConditionalContent<DecisionDetailView, DecisionDetailView>` structural
-  // diff that would tear down focus state every nil-flip.
+  init(
+    viewModel: DecisionDetailViewModel?,
+    store: HarnessMonitorStore? = nil,
+    auditEvents: [SupervisorEvent] = [],
+    auditEventPayloadPresentations: [String: DecisionAuditTrailPayloadPresentation] = [:],
+    selectedTab: Binding<DecisionDetailTab> = .constant(.context),
+    observer: ObserverSummary? = nil,
+    decisionScope: DecisionWorkspaceScope? = nil,
+    primaryActionFocusDecisionID: String? = nil,
+    primaryActionFocusRequestTick: Int = 0
+  ) {
+    self.viewModel = viewModel
+    self.store = store
+    self.auditEvents = auditEvents
+    self.auditEventPayloadPresentations = auditEventPayloadPresentations
+    self.observer = observer
+    self.decisionScope = decisionScope
+    self.primaryActionFocusDecisionID = primaryActionFocusDecisionID
+    self.primaryActionFocusRequestTick = primaryActionFocusRequestTick
+    _selectedTab = selectedTab
+  }
+
+  // Optional-decision entry point avoids conditional tree churn across nil flips.
   public init(
     decision: Decision?,
     store: HarnessMonitorStore? = nil,
@@ -124,6 +102,7 @@ public struct DecisionDetailView: View {
         viewModel: DecisionDetailViewModel(decision: decision, handler: handler),
         store: store,
         auditEvents: auditEvents,
+        auditEventPayloadPresentations: [:],
         selectedTab: selectedTab,
         observer: observer,
         decisionScope: decisionScope,
@@ -142,9 +121,7 @@ public struct DecisionDetailView: View {
   }
 
   public var body: some View {
-    // The owning column applies `.backgroundExtensionEffect()` at the
-    // detail-surface boundary. Adding another extension here would duplicate
-    // the animatable glass surface across every detail descendant.
+    // The owning column already applies `.backgroundExtensionEffect()`.
     detailBody
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .accessibilityElement(children: .contain)
@@ -157,9 +134,7 @@ public struct DecisionDetailView: View {
           )
         }
       }
-      .onAppear {
-        applyPrimaryActionFocusIfNeeded()
-      }
+      .onAppear(perform: applyPrimaryActionFocusIfNeeded)
       .onChange(of: primaryActionFocusRequestTick) { _, _ in
         applyPrimaryActionFocusIfNeeded()
       }
@@ -327,7 +302,10 @@ public struct DecisionDetailView: View {
         contextSections: viewModel.contextSections
       )
     case .audit:
-      DecisionAuditTrailTab(events: viewModel.scopedAuditTrail(from: auditEvents))
+      DecisionAuditTrailTab(
+        events: viewModel.scopedAuditTrail(from: auditEvents),
+        payloadPresentations: auditEventPayloadPresentations
+      )
     }
   }
 

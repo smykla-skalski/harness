@@ -16,6 +16,16 @@ struct HarnessMonitorJSONCodeBlock: View {
   private let wrapLongLines: Bool
 
   init(
+    presentation: HarnessMonitorJSONPresentation,
+    chrome: Chrome = .card,
+    wrapLongLines: Bool = false
+  ) {
+    self.chrome = chrome
+    self.presentation = presentation
+    self.wrapLongLines = wrapLongLines
+  }
+
+  init(
     rawJSON: String,
     chrome: Chrome = .card,
     wrapLongLines: Bool = false
@@ -131,9 +141,29 @@ struct HarnessMonitorJSONCodeBlock: View {
 struct HarnessMonitorJSONPresentation: Equatable {
   let displayText: String
   let tokens: [HarnessMonitorJSONToken]
+  let attributedText: AttributedString
   let errorMessage: String?
 
-  var attributedText: AttributedString {
+  init(
+    displayText: String,
+    tokens: [HarnessMonitorJSONToken],
+    errorMessage: String?
+  ) {
+    self.displayText = displayText
+    self.tokens = tokens
+    attributedText = Self.makeAttributedText(from: tokens)
+    self.errorMessage = errorMessage
+  }
+
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.displayText == rhs.displayText
+      && lhs.tokens == rhs.tokens
+      && lhs.errorMessage == rhs.errorMessage
+  }
+
+  private static func makeAttributedText(
+    from tokens: [HarnessMonitorJSONToken]
+  ) -> AttributedString {
     tokens.reduce(into: AttributedString()) { result, token in
       var fragment = AttributedString(token.text)
       fragment.foregroundColor = token.kind.color

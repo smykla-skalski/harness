@@ -15,6 +15,7 @@ struct SessionSwiftUISourceTests {
     let agentDetailSource = try sourceFile(at: "Views/Sessions/SessionAgentDetailSection.swift")
     let agentViewportSource = try sourceFile(at: "Views/Sessions/SessionAgentLaneViews.swift")
     let columnsSource = try sourceFile(at: "Views/Sessions/SessionWindowView+Columns.swift")
+    let detailFocusSource = try sourceFile(at: "Views/Sessions/SessionWindowView+DetailFocus.swift")
 
     #expect(
       taskSource.contains("SessionDetailScrollSurface(contentPadding: metrics.contentPadding)")
@@ -31,6 +32,11 @@ struct SessionSwiftUISourceTests {
     #expect(decisionSource.contains("DecisionDetailView("))
     #expect(decisionSource.contains("handler: actionHandler"))
     #expect(decisionSource.contains("auditEvents: auditEvents"))
+    #expect(
+      decisionSource.contains(
+        "auditEventPayloadPresentations: auditEventPayloadPresentations"
+      )
+    )
     #expect(!decisionSource.contains("HarnessMonitorJSONCodeBlock("))
     #expect(!decisionSource.contains("Form {"))
     #expect(codexSource.contains("SessionDetailScrollSurface("))
@@ -38,6 +44,11 @@ struct SessionSwiftUISourceTests {
     #expect(!agentDetailSource.contains("SessionDetailScrollSurface("))
     #expect(agentViewportSource.contains(".scrollBounceBehavior(.always, axes: .vertical)"))
     #expect(columnsSource.contains("SessionDetailEmptySurface {"))
+    #expect(
+      detailFocusSource.contains(
+        "auditEventPayloadPresentations: stateCache.decisionRuntime.auditEventPayloadPresentations"
+      )
+    )
   }
 
   @Test("Form sections use shared font scaling helpers")

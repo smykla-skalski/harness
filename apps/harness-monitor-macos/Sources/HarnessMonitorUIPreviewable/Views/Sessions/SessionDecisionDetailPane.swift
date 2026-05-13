@@ -7,6 +7,7 @@ struct SessionDecisionDetailPane: View {
   let decision: Decision?
   let store: HarnessMonitorStore
   let auditEvents: [SupervisorEvent]
+  let auditEventPayloadPresentations: [String: DecisionAuditTrailPayloadPresentation]
   let observer: ObserverSummary?
   let decisionScope: DecisionWorkspaceScope
   @Binding var selectedTab: DecisionDetailTab
@@ -45,6 +46,7 @@ struct SessionDecisionDetailPane: View {
         viewModel: cachedViewModel,
         store: store,
         auditEvents: auditEvents,
+        auditEventPayloadPresentations: auditEventPayloadPresentations,
         selectedTab: $selectedTab,
         observer: observer,
         decisionScope: decisionScope,

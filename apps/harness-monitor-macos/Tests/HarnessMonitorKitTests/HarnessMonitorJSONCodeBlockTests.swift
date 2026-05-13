@@ -65,4 +65,35 @@ struct HarnessMonitorJSONCodeBlockTests {
     #expect(presentation.displayText.contains(#""path" : "/tmp/logs/latest.log""#))
     #expect(!presentation.displayText.contains(#"\/tmp\/logs\/latest.log"#))
   }
+
+  @Test("Audit trail payload presentation reuses the shared JSON formatter")
+  func auditTrailPayloadPresentationReusesTheSharedJSONFormatter() {
+    let payload = DecisionAuditTrailPayloadPresentation(
+      payloadJSON: #"{"message":"Escalate","metadata":{"path":"/tmp/logs/latest.log"}}"#
+    )
+
+    #expect(payload.summary == "Escalate")
+    guard case .json(let presentation)? = payload.details else {
+      Issue.record("Expected structured JSON details")
+      return
+    }
+
+    #expect(presentation.displayText.contains(#""path" : "/tmp/logs/latest.log""#))
+    #expect(!presentation.displayText.contains(#"\/tmp\/logs\/latest.log"#))
+  }
+
+  @Test("Audit trail payload presentation preserves invalid payloads as raw text")
+  func auditTrailPayloadPresentationPreservesInvalidPayloadsAsRawText() {
+    let payload = DecisionAuditTrailPayloadPresentation(
+      payloadJSON: #" {"message":"broken" "payload":1} "#
+    )
+
+    #expect(payload.summary == nil)
+    guard case .raw(let rawPayload)? = payload.details else {
+      Issue.record("Expected raw payload fallback")
+      return
+    }
+
+    #expect(rawPayload == #"{"message":"broken" "payload":1}"#)
+  }
 }

@@ -8,9 +8,18 @@ public struct DecisionAuditTrailTab: View {
   private var dateTimeConfiguration
 
   private let events: [SupervisorEvent]
+  private let payloadPresentations: [String: DecisionAuditTrailPayloadPresentation]
 
   public init(events: [SupervisorEvent] = []) {
+    self.init(events: events, payloadPresentations: [:])
+  }
+
+  init(
+    events: [SupervisorEvent],
+    payloadPresentations: [String: DecisionAuditTrailPayloadPresentation]
+  ) {
     self.events = events
+    self.payloadPresentations = payloadPresentations
   }
 
   public var body: some View {
@@ -19,12 +28,9 @@ public struct DecisionAuditTrailTab: View {
         emptyState
       } else {
         ForEach(Array(events.enumerated()), id: \.element.id) { index, event in
-          // Skip the per-row body (and its two JSON-parse passes for
-          // payloadSummary + formattedPayload) when the event and the
-          // formatted timestamp are unchanged across parent body
-          // invocations.
           AuditTrailTimelineRow(
             event: event,
+            payloadPresentation: payloadPresentation(for: event),
             timestamp: formatTimestamp(event.createdAt, configuration: dateTimeConfiguration)
           )
           .equatable()
@@ -58,10 +64,18 @@ public struct DecisionAuditTrailTab: View {
         .fill(HarnessMonitorTheme.ink.opacity(0.04))
     }
   }
+
+  private func payloadPresentation(
+    for event: SupervisorEvent
+  ) -> DecisionAuditTrailPayloadPresentation {
+    payloadPresentations[event.id]
+      ?? DecisionAuditTrailPayloadPresentation(payloadJSON: event.payloadJSON)
+  }
 }
 
 private struct AuditTrailTimelineRow: View {
   let event: SupervisorEvent
+  let payloadPresentation: DecisionAuditTrailPayloadPresentation
   let timestamp: String
 
   var body: some View {
@@ -92,19 +106,14 @@ private struct AuditTrailTimelineRow: View {
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           }
         }
-        if let summary = payloadSummary(event.payloadJSON) {
+        if let summary = payloadPresentation.summary {
           Text(summary)
             .scaledFont(.subheadline)
             .fixedSize(horizontal: false, vertical: true)
         }
-        if let prettyPayload = formattedPayload(event.payloadJSON) {
+        if let payloadDetails = payloadPresentation.details {
           DisclosureGroup("Details") {
-            Text(verbatim: prettyPayload)
-              .scaledFont(.caption.monospaced())
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-              .frame(maxWidth: .infinity, alignment: .leading)
-              .textSelection(.enabled)
-              .padding(.top, HarnessMonitorTheme.spacingXS)
+            payloadDetailsView(for: payloadDetails)
           }
           .scaledFont(.caption)
         }
@@ -135,63 +144,92 @@ private struct AuditTrailTimelineRow: View {
     humanizedWorkspaceLabel(kind)
   }
 
-  private func payloadSummary(_ payloadJSON: String) -> String? {
-    guard let data = payloadJSON.data(using: .utf8) else {
-      return nil
+  @ViewBuilder
+  private func payloadDetailsView(
+    for payloadDetails: DecisionAuditTrailPayloadDetails
+  ) -> some View {
+    switch payloadDetails {
+    case .json(let payloadPresentation):
+      HarnessMonitorJSONCodeBlock(
+        presentation: payloadPresentation,
+        chrome: .plain,
+        wrapLongLines: true
+      )
+      .padding(.top, HarnessMonitorTheme.spacingXS)
+    case .raw(let rawPayload):
+      Text(verbatim: rawPayload)
+        .scaledFont(.caption.monospaced())
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .textSelection(.enabled)
+        .padding(.top, HarnessMonitorTheme.spacingXS)
     }
-    let object = try? JSONSerialization.jsonObject(with: data)
-    return firstString(forKeys: ["summary", "message", "action", "mode"], in: object)
   }
+}
 
-  private func firstString(forKeys keys: [String], in object: Any?) -> String? {
-    guard let object else {
-      return nil
-    }
-    if let dictionary = object as? [String: Any] {
-      for key in keys {
-        if let value = dictionary[key] as? String,
-          !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        {
-          return value
-        }
-      }
-      for value in dictionary.values {
-        if let nested = firstString(forKeys: keys, in: value) {
-          return nested
-        }
-      }
-    } else if let array = object as? [Any] {
-      for value in array {
-        if let nested = firstString(forKeys: keys, in: value) {
-          return nested
-        }
-      }
-    }
-    return nil
-  }
+enum DecisionAuditTrailPayloadDetails: Equatable {
+  case json(HarnessMonitorJSONPresentation)
+  case raw(String)
+}
 
-  private func formattedPayload(_ payloadJSON: String) -> String? {
+struct DecisionAuditTrailPayloadPresentation: Equatable {
+  let summary: String?
+  let details: DecisionAuditTrailPayloadDetails?
+
+  init(payloadJSON: String) {
     let trimmed = payloadJSON.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty, trimmed != "{}", trimmed != "[]" else {
+      summary = nil
+      details = nil
+      return
+    }
+
+    guard let data = trimmed.data(using: .utf8),
+      let jsonValue = try? JSONDecoder().decode(JSONValue.self, from: data)
+    else {
+      summary = nil
+      details = .raw(trimmed)
+      return
+    }
+
+    summary = Self.firstString(
+      forKeys: ["summary", "message", "action", "mode"],
+      in: jsonValue
+    )
+    details = .json(.formatted(jsonValue: jsonValue))
+  }
+
+  private static func firstString(
+    forKeys keys: [String],
+    in value: JSONValue
+  ) -> String? {
+    switch value {
+    case .object(let dictionary):
+      for key in keys {
+        guard case .string(let candidate)? = dictionary[key] else {
+          continue
+        }
+        let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+          return candidate
+        }
+      }
+      for nestedValue in dictionary.values {
+        if let nested = firstString(forKeys: keys, in: nestedValue) {
+          return nested
+        }
+      }
+    case .array(let values):
+      for nestedValue in values {
+        if let nested = firstString(forKeys: keys, in: nestedValue) {
+          return nested
+        }
+      }
+    case .bool, .null, .number, .string:
       return nil
     }
-    guard let data = payloadJSON.data(using: .utf8) else {
-      return trimmed
-    }
-    let object = try? JSONSerialization.jsonObject(with: data)
-    guard JSONSerialization.isValidJSONObject(object as Any) else {
-      return trimmed
-    }
-    guard
-      let prettyData = try? JSONSerialization.data(
-        withJSONObject: object as Any,
-        options: [.prettyPrinted, .sortedKeys]
-      ),
-      let pretty = String(data: prettyData, encoding: .utf8)
-    else {
-      return trimmed
-    }
-    return pretty
+
+    return nil
   }
 }
 
