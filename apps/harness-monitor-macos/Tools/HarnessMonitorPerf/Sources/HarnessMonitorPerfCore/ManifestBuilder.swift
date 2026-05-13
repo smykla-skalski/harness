@@ -258,32 +258,8 @@ public enum ManifestBuilder {
     }
 
     public static let defaultTemplates = Templates(
-        swiftui: [
-            "open-recent-window",
-            "open-session-window",
-            "open-session-window-visual-options-disabled",
-            "agent-detail-form",
-            "agent-detail-form-visual-options-disabled",
-            "decision-detail-form",
-            "decision-detail-form-visual-options-disabled",
-            "task-detail-form",
-            "task-detail-form-visual-options-disabled",
-            "session-search-full",
-            "session-search-full-visual-options-disabled",
-            "sidebar-toggle-rich-detail",
-            "sidebar-toggle-rich-detail-visual-options-disabled",
-            "timeline-filter-form",
-            "timeline-filter-form-visual-options-disabled",
-            "permission-modal",
-            "timeline-burst",
-            "toast-overlay-churn",
-            "offline-cached-open",
-        ],
-        allocations: [
-            "settings-backdrop-cycle",
-            "settings-background-cycle",
-            "offline-cached-open",
-        ]
+        swiftui: ScenarioCatalog.all.filter { ScenarioCatalog.swiftUI.contains($0) },
+        allocations: ScenarioCatalog.all.filter { ScenarioCatalog.allocations.contains($0) }
     )
 
     public static func build(_ inputs: Inputs) -> Manifest {

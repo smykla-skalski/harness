@@ -3,15 +3,8 @@ import XCTest
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 extension HarnessMonitorPerfTests {
-  private static let visualOptionsDisabledScenarios = [
-    "open-session-window-visual-options-disabled",
-    "agent-detail-form-visual-options-disabled",
-    "decision-detail-form-visual-options-disabled",
-    "task-detail-form-visual-options-disabled",
-    "session-search-full-visual-options-disabled",
-    "sidebar-toggle-rich-detail-visual-options-disabled",
-    "timeline-filter-form-visual-options-disabled",
-  ]
+  private static let visualOptionsDisabledScenarios =
+    HarnessMonitorUITestPerfScenarioCatalog.visualOptionsDisabledScenarios
 
   func testOpenSessionWindowVisualOptionsDisabledHitchRate() {
     measureScenario("open-session-window-visual-options-disabled")
@@ -79,25 +72,7 @@ extension HarnessMonitorPerfTests {
   }
 
   func expectedPreviewScenario(for scenario: String) -> String {
-    let visualOptionsSuffix = "-visual-options-disabled"
-    let baseScenario =
-      scenario.hasSuffix(visualOptionsSuffix)
-      ? String(scenario.dropLast(visualOptionsSuffix.count))
-      : scenario
-
-    switch baseScenario {
-    case "open-recent-window", "open-session-window",
-      "agent-detail-form", "task-detail-form", "session-search-full",
-      "sidebar-toggle-rich-detail",
-      "timeline-filter-form", "timeline-burst", "toast-overlay-churn":
-      return "dashboard-landing"
-    case "decision-detail-form", "permission-modal":
-      return "cockpit"
-    case "offline-cached-open":
-      return "offline-cached"
-    default:
-      return "dashboard"
-    }
+    HarnessMonitorUITestPerfScenarioCatalog.expectedPreviewScenario(for: scenario)
   }
 
   private func assertPerfVisualOptionsDisabled(

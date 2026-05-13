@@ -39,61 +39,11 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
   }
 
   var defaultPreviewScenario: String {
-    switch self {
-    case .openRecentWindow,
-      .openSessionWindow,
-      .openSessionWindowVisualOptionsDisabled,
-      .agentDetailForm,
-      .agentDetailFormVisualOptionsDisabled,
-      .taskDetailForm,
-      .taskDetailFormVisualOptionsDisabled,
-      .sessionSearchFull,
-      .sessionSearchFullVisualOptionsDisabled,
-      .sidebarToggleRichDetail,
-      .sidebarToggleRichDetailVisualsOff,
-      .timelineFilterForm,
-      .timelineFilterFormVisualOptionsDisabled:
-      return "dashboard-landing"
-    case .decisionDetailForm,
-      .decisionDetailFormVisualOptionsDisabled,
-      .permissionModal:
-      return "cockpit"
-    case .settingsBackdropCycle,
-      .settingsBackgroundCycle:
-      return "dashboard"
-    case .timelineBurst, .toastOverlayChurn:
-      return "dashboard-landing"
-    case .offlineCachedOpen:
-      return "offline-cached"
-    }
+    definition.defaultPreviewScenario
   }
 
   var initialSettingsSection: SettingsSection {
-    switch self {
-    case .settingsBackdropCycle,
-      .settingsBackgroundCycle:
-      return .appearance
-    case .openRecentWindow,
-      .openSessionWindow,
-      .openSessionWindowVisualOptionsDisabled,
-      .agentDetailForm,
-      .agentDetailFormVisualOptionsDisabled,
-      .decisionDetailForm,
-      .decisionDetailFormVisualOptionsDisabled,
-      .taskDetailForm,
-      .taskDetailFormVisualOptionsDisabled,
-      .sessionSearchFull,
-      .sessionSearchFullVisualOptionsDisabled,
-      .sidebarToggleRichDetail,
-      .sidebarToggleRichDetailVisualsOff,
-      .timelineFilterForm,
-      .timelineFilterFormVisualOptionsDisabled,
-      .permissionModal,
-      .timelineBurst,
-      .toastOverlayChurn,
-      .offlineCachedOpen:
-      return .general
-    }
+    definition.settingsSection
   }
 
   func applyingDefaults(to environment: HarnessMonitorEnvironment) -> HarnessMonitorEnvironment {
@@ -133,89 +83,21 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
   }
 
   private var disablesVisualOptions: Bool {
-    switch self {
-    case .openSessionWindowVisualOptionsDisabled,
-      .agentDetailFormVisualOptionsDisabled,
-      .decisionDetailFormVisualOptionsDisabled,
-      .taskDetailFormVisualOptionsDisabled,
-      .sessionSearchFullVisualOptionsDisabled,
-      .sidebarToggleRichDetailVisualsOff,
-      .timelineFilterFormVisualOptionsDisabled:
-      true
-    case .openRecentWindow,
-      .openSessionWindow,
-      .agentDetailForm,
-      .decisionDetailForm,
-      .taskDetailForm,
-      .sessionSearchFull,
-      .sidebarToggleRichDetail,
-      .timelineFilterForm,
-      .permissionModal,
-      .settingsBackdropCycle,
-      .settingsBackgroundCycle,
-      .timelineBurst,
-      .toastOverlayChurn,
-      .offlineCachedOpen:
-      false
-    }
+    definition.disablesVisualOptions
   }
 
   private var needsPreviewAcpPermissionBatch: Bool {
-    switch self {
-    case .decisionDetailForm,
-      .decisionDetailFormVisualOptionsDisabled,
-      .sessionSearchFull,
-      .sessionSearchFullVisualOptionsDisabled,
-      .permissionModal:
-      true
-    case .openRecentWindow,
-      .openSessionWindow,
-      .openSessionWindowVisualOptionsDisabled,
-      .agentDetailForm,
-      .agentDetailFormVisualOptionsDisabled,
-      .taskDetailForm,
-      .taskDetailFormVisualOptionsDisabled,
-      .timelineFilterForm,
-      .timelineFilterFormVisualOptionsDisabled,
-      .sidebarToggleRichDetail,
-      .sidebarToggleRichDetailVisualsOff,
-      .settingsBackdropCycle,
-      .settingsBackgroundCycle,
-      .timelineBurst,
-      .toastOverlayChurn,
-      .offlineCachedOpen:
-      false
-    }
+    definition.needsPreviewAcpPermissionBatch
   }
 }
 
 extension HarnessMonitorPerfScenario {
+  private var definition: HarnessMonitorPerfScenarioDefinition {
+    HarnessMonitorPerfScenarioCatalog.definition(for: self)
+  }
+
   var includesBootstrapInMeasurement: Bool {
-    switch self {
-    case .openRecentWindow:
-      true
-    case .openSessionWindow,
-      .openSessionWindowVisualOptionsDisabled,
-      .agentDetailForm,
-      .agentDetailFormVisualOptionsDisabled,
-      .decisionDetailForm,
-      .decisionDetailFormVisualOptionsDisabled,
-      .taskDetailForm,
-      .taskDetailFormVisualOptionsDisabled,
-      .sessionSearchFull,
-      .sessionSearchFullVisualOptionsDisabled,
-      .sidebarToggleRichDetail,
-      .sidebarToggleRichDetailVisualsOff,
-      .timelineFilterForm,
-      .timelineFilterFormVisualOptionsDisabled,
-      .permissionModal,
-      .settingsBackdropCycle,
-      .settingsBackgroundCycle,
-      .timelineBurst,
-      .toastOverlayChurn,
-      .offlineCachedOpen:
-      false
-    }
+    definition.includesBootstrapInMeasurement
   }
 
   var signpostName: StaticString {

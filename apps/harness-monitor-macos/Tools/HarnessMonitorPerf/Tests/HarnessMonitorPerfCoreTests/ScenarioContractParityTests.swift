@@ -3,10 +3,13 @@ import XCTest
 @testable import HarnessMonitorPerfCore
 
 final class ScenarioContractParityTests: XCTestCase {
-    func testScenarioCatalogMatchesAppPerfEnum() throws {
+    func testSharedScenarioSourceMatchesAppPerfEnumAndToolCatalog() throws {
+        let sourceOfTruth = PerfScenarioDefinitions.all.map(\.id)
         let rawValues = try appPerfScenarioRawValues()
-        XCTAssertEqual(rawValues, ScenarioCatalog.all)
-        XCTAssertEqual(Set(rawValues).count, rawValues.count)
+
+        XCTAssertEqual(sourceOfTruth, rawValues)
+        XCTAssertEqual(sourceOfTruth, ScenarioCatalog.all)
+        XCTAssertEqual(Set(sourceOfTruth).count, sourceOfTruth.count)
     }
 
     func testCatalogPartitionsRemainAligned() {
@@ -15,6 +18,16 @@ final class ScenarioContractParityTests: XCTestCase {
         XCTAssertEqual(Set(Budgets.allocationsByScenario.keys), ScenarioCatalog.allocations)
         XCTAssertEqual(Set(ManifestBuilder.defaultTemplates.swiftui), ScenarioCatalog.swiftUI)
         XCTAssertEqual(Set(ManifestBuilder.defaultTemplates.allocations), ScenarioCatalog.allocations)
+    }
+
+    func testSharedScenarioSourceKeepsNamingContractsConsistent() {
+        for definition in PerfScenarioDefinitions.all {
+            XCTAssertEqual(definition.signpostName, definition.id)
+            XCTAssertEqual(
+                definition.disablesVisualOptions,
+                definition.id.hasSuffix("-visual-options-disabled")
+            )
+        }
     }
 
     private func appPerfScenarioRawValues() throws -> [String] {
