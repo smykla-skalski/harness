@@ -51,6 +51,9 @@ The audit artifact contract is:
 | `comparison.json` / `comparison.md` | baseline/current diff, missing-capture reporting, missing-metric reporting, and hard-vs-investigative metric grouping |
 | `debug-retention.json` | explicit sentinel that a regression/debug run preserved raw traces, exported XML, and extraction intermediates |
 
+Machine-readable schema snapshots for those JSON outputs live under
+`Tools/HarnessMonitorPerf/Schemas/`.
+
 For provenance checks, treat `targets.staged_host_bundle_id`,
 `targets.staged_host_binary_path`, `build_provenance.host`,
 `build_provenance.shipping`, capture-level `launched_process_path`, and
