@@ -140,8 +140,8 @@ async fn run_agent_recording_attach_config_order(
         )
         .on_receive_request(
             async move |_request: NewSessionRequest, responder, _connection| {
-                responder.respond(NewSessionResponse::new("attached-session").config_options(
-                    vec![
+                responder.respond(
+                    NewSessionResponse::new("attached-session").config_options(vec![
                         SessionConfigOption::select(
                             "effort",
                             "Effort",
@@ -152,8 +152,8 @@ async fn run_agent_recording_attach_config_order(
                             ],
                         )
                         .category(SessionConfigOptionCategory::Other("effort".to_string())),
-                    ],
-                ))
+                    ]),
+                )
             },
             agent_client_protocol::on_receive_request!(),
         )

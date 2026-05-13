@@ -134,7 +134,7 @@ pub(super) async fn post_terminal_agent_stop(
                     .map(ManagedAgentSnapshot::Codex)
             })
             .await
-        },
+        }
         Err(error) if error.code() == "KSRCLI090" => {
             if state.acp_agent_manager.get(&managed_agent_id).is_ok() {
                 state

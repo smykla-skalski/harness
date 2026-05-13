@@ -1,10 +1,7 @@
 use super::schema_sql::{AGENT_TUIS_SCHEMA, CODEX_RUNS_SCHEMA};
 use super::{CliError, Connection, db_error};
 
-pub(super) fn run_pre_v7_migrations(
-    conn: &Connection,
-    version: &str,
-) -> Result<bool, CliError> {
+pub(super) fn run_pre_v7_migrations(conn: &Connection, version: &str) -> Result<bool, CliError> {
     match version {
         "1" => {
             conn.execute_batch(
