@@ -54,6 +54,10 @@ struct ToolCallTimelineSectionHeader: View {
   let title: String
   let capabilityTags: [String]
 
+  private var indexedCapabilityTags: [(offset: Int, element: String)] {
+    Array(capabilityTags.enumerated())
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       Text(title)
@@ -62,7 +66,7 @@ struct ToolCallTimelineSectionHeader: View {
         .lineLimit(1)
       if !capabilityTags.isEmpty {
         HStack(spacing: HarnessMonitorTheme.spacingXS) {
-          ForEach(capabilityTags, id: \.self) { tag in
+          ForEach(indexedCapabilityTags, id: \.offset) { _, tag in
             Text(tag)
               .scaledFont(.caption2.weight(.semibold))
               .foregroundStyle(HarnessMonitorTheme.accent)
