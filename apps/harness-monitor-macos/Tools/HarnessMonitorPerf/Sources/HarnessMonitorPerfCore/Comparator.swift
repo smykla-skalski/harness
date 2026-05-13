@@ -192,8 +192,8 @@ public enum Comparator {
             metrics: .swiftUI(metrics),
             sharedMetrics: sharedMetrics,
             metricTiers: metricTiers,
-            baselineFindings: baseline.findings,
-            currentFindings: current.findings,
+            baselineFindings: orderedFindings(baseline.findings),
+            currentFindings: orderedFindings(current.findings),
             newFindings: findingsDiff.new,
             resolvedFindings: findingsDiff.resolved,
             topFrames: TopFramesPair(
@@ -285,13 +285,45 @@ public enum Comparator {
 
         let new = currentKeys
             .subtracting(baselineKeys)
-            .sorted()
             .compactMap { currentByKey[$0] }
         let resolved = baselineKeys
             .subtracting(currentKeys)
-            .sorted()
             .compactMap { baselineByKey[$0] }
-        return (new, resolved)
+        return (orderedFindings(new), orderedFindings(resolved))
+    }
+
+    private static func orderedFindings(
+        _ findings: [CaptureFinding]?
+    ) -> [CaptureFinding]? {
+        guard let findings else { return nil }
+        return orderedFindings(findings)
+    }
+
+    private static func orderedFindings(
+        _ findings: [CaptureFinding]
+    ) -> [CaptureFinding] {
+        findings.sorted { lhs, rhs in
+            let lhsPriority = findingsCategoryPriority(lhs.category)
+            let rhsPriority = findingsCategoryPriority(rhs.category)
+            if lhsPriority != rhsPriority {
+                return lhsPriority < rhsPriority
+            }
+            if (lhs.count ?? 0) != (rhs.count ?? 0) {
+                return (lhs.count ?? 0) > (rhs.count ?? 0)
+            }
+            return lhs.key < rhs.key
+        }
+    }
+
+    private static func findingsCategoryPriority(_ category: String) -> Int {
+        switch category {
+        case "swiftui-update-group":
+            0
+        case "swiftui-cause":
+            1
+        default:
+            2
+        }
     }
 
     private static func missingCapture(from capture: RunManifest.Capture) -> MissingCapture {
