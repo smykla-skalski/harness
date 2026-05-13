@@ -10,6 +10,8 @@ extension SessionWindowFlowTests {
 
     #expect(source.contains(".searchable("))
     #expect(source.contains(".frame(width: 0, height: 0)"))
+    #expect(source.contains("} else {\n      Color.clear"))
+    #expect(source.contains(".allowsHitTesting(false)"))
     #expect(!source.contains(".frame(maxWidth: .infinity, maxHeight: .infinity"))
     #expect(!sessionHostSource.contains(".frame(maxWidth: .infinity, maxHeight: .infinity"))
   }

@@ -127,6 +127,10 @@ public struct AppSearchHost: View {
         .padding(.trailing, 16)
         .zIndex(10)
         .allowsHitTesting(true)
+    } else {
+      Color.clear
+        .frame(width: 0, height: 0)
+        .allowsHitTesting(false)
     }
   }
 
