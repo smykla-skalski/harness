@@ -287,18 +287,8 @@ extension SessionWindowView {
     hydrateSelectionFromPersistedStorage()
     hydrateDecisionFiltersFromPersistedStorage()
     await applyPendingSessionRouteIfNeeded()
-    reconcileInspectorVisibility(
-      visibleBinding: inspectorVisibleBinding,
-      preferredBinding: inspectorPreferredBinding,
-      announce: false
-    )
     await loadSnapshot()
     requestPrimaryContentAccessibilityFocus()
-    reconcileInspectorVisibility(
-      visibleBinding: inspectorVisibleBinding,
-      preferredBinding: inspectorPreferredBinding,
-      announce: false
-    )
     enableStartupSearchParticipation()
   }
 
