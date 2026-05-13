@@ -61,7 +61,7 @@ struct Compare: ParsableCommand {
     @Option(name: .long, help: "Path to baseline run directory or summary.json")
     var baseline: String
 
-    @Option(name: [.long, .customLong("output-dir")], help: "Output directory for comparison.{json,md}")
+    @Option(name: .long, help: "Output directory for comparison.{json,md}")
     var outputDir: String
 
     func run() throws {
