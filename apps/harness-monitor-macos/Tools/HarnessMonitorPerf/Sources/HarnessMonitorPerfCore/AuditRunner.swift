@@ -14,6 +14,10 @@ public enum AuditRunner {
     public static let passThroughEnvironmentKeys: Set<String> = [
         "HARNESS_MONITOR_EXTERNAL_DAEMON",
         "HARNESS_MONITOR_LAUNCH_MODE",
+        "HARNESS_MONITOR_BACKDROP_MODE_OVERRIDE",
+        "HARNESS_MONITOR_MENU_BAR_STATE_COLORS_OVERRIDE",
+        "HARNESS_MONITOR_SESSION_SHORTCUT_OVERLAYS_OVERRIDE",
+        "HARNESS_MONITOR_SESSION_TITLE_BLUR_OVERRIDE",
     ]
 
     public static let baseEnvironment: [String: String] = [
@@ -49,6 +53,7 @@ public enum AuditRunner {
         public var skipDaemonBundle: Bool
         public var forceClean: Bool
         public var buildShipping: Bool
+        public var logOnly: Bool
 
         public init(
             label: String, compareTo: URL?, scenarioSelection: String, keepTraces: Bool,
@@ -56,7 +61,8 @@ public enum AuditRunner {
             xcodebuildRunner: URL, derivedDataPath: URL,
             runsRoot: URL, stagedHostStageRoot: URL, auditDaemonCargoTargetDir: URL,
             arch: String, destination: String,
-            skipBuild: Bool, skipDaemonBundle: Bool, forceClean: Bool, buildShipping: Bool
+            skipBuild: Bool, skipDaemonBundle: Bool, forceClean: Bool, buildShipping: Bool,
+            logOnly: Bool
         ) {
             self.label = label
             self.compareTo = compareTo
@@ -76,6 +82,7 @@ public enum AuditRunner {
             self.skipDaemonBundle = skipDaemonBundle
             self.forceClean = forceClean
             self.buildShipping = buildShipping
+            self.logOnly = logOnly
         }
     }
 
@@ -240,6 +247,30 @@ public enum AuditRunner {
         let combinedDefaultEnv = defaultRuntimeEnv
             .merging(baseAuditEnv) { _, audit in audit }
 
+        if inputs.logOnly {
+            return try runLogOnlyScenarios(
+                scenarios: scenarios,
+                runDir: runDir,
+                staged: staged,
+                defaultEnv: combinedDefaultEnv,
+                checkoutRoot: inputs.checkoutRoot,
+                appRoot: inputs.appRoot,
+                gitCommit: gitCommit,
+                gitDirty: gitDirty,
+                workspaceFingerprint: workspaceFingerprint,
+                buildStartedAtUTC: buildStartedAtUTC,
+                arch: inputs.arch,
+                hostAppPath: hostAppPath,
+                shippingAppPath: shippingAppPath,
+                buildShipping: inputs.buildShipping,
+                skipDaemonBundle: inputs.skipDaemonBundle,
+                daemonCargoTargetDir: inputs.auditDaemonCargoTargetDir,
+                label: inputs.label,
+                runID: runID,
+                createdAtUTC: timestamp
+            )
+        }
+
         var captureRecords: [ManifestBuilder.CaptureRecord] = []
         for scenario in scenarios {
             if ScenarioCatalog.swiftUI.contains(scenario) {
@@ -317,433 +348,4 @@ public enum AuditRunner {
     }
 
     // MARK: - Internals
-
-    private static func recordOne(
-        template: String, scenario: String, runDir: URL,
-        tracesRoot: URL, xctraceTempRoot: URL,
-        staged: HostStager.Result, defaultEnv: [String: String],
-        checkoutRoot: URL, appRoot: URL,
-        gitCommit: String, workspaceFingerprint: String
-    ) throws -> TraceRecorder.Capture {
-        let templateSlug = template.lowercased().replacingOccurrences(of: " ", with: "-")
-        let templateDir = tracesRoot.appendingPathComponent(templateSlug, isDirectory: true)
-        let dataHome = try auditDaemonDataHome(
-            runDir: runDir,
-            templateSlug: templateSlug,
-            scenario: scenario,
-            defaultEnvironment: defaultEnv
-        )
-        let logURL = runDir.appendingPathComponent("logs", isDirectory: true)
-            .appendingPathComponent("\(templateSlug)-\(scenario).log")
-        let traceURL = templateDir.appendingPathComponent("\(scenario).trace", isDirectory: true)
-        let tocURL = templateDir.appendingPathComponent("\(scenario).toc.xml")
-
-        var env = defaultEnv
-        env["HARNESS_DAEMON_DATA_HOME"] = dataHome.launchDataHome.path
-        env["HARNESS_MONITOR_PERF_SCENARIO"] = scenario
-        env["HARNESS_MONITOR_PREVIEW_SCENARIO"] = ScenarioCatalog.previewScenario(for: scenario)
-
-        try assertSourceUnchanged(
-            checkpoint: "before recording \(template) / \(scenario)",
-            checkoutRoot: checkoutRoot, appRoot: appRoot,
-            gitCommit: gitCommit, workspaceFingerprint: workspaceFingerprint
-        )
-
-        let inputs = TraceRecorder.ScenarioInputs(
-            scenario: scenario, template: template,
-            previewScenario: ScenarioCatalog.previewScenario(for: scenario),
-            durationSeconds: ScenarioCatalog.durationSeconds(for: scenario),
-            hostAppPath: staged.stagedAppPath,
-            hostBinaryPath: staged.stagedBinaryPath,
-            launchArguments: persistenceArguments,
-            environment: env,
-            traceURL: traceURL, tocURL: tocURL, logURL: logURL,
-            daemonDataHome: dataHome.launchDataHome,
-            daemonDataHomeProbe: dataHome.probeDataHome,
-            xctraceTempRoot: xctraceTempRoot
-        )
-        let capture = try TraceRecorder.record(inputs) {
-            cleanupHostProcesses()
-            try assertSourceUnchanged(
-                checkpoint: "after recording \(template) / \(scenario)",
-                checkoutRoot: checkoutRoot, appRoot: appRoot,
-                gitCommit: gitCommit, workspaceFingerprint: workspaceFingerprint
-            )
-        }
-        return capture
-    }
-
-    private static func appendCaptureTSV(_ url: URL, capture: TraceRecorder.Capture) throws {
-        let record = capture.record
-        let line = [
-            record.scenario, record.template, "\(record.durationSeconds)",
-            record.traceRelpath, "\(record.exitStatus)", record.endReason,
-            record.previewScenario, record.launchedProcessPath, record.daemonDataHome,
-        ].joined(separator: "\t") + "\n"
-        guard let handle = try? FileHandle(forWritingTo: url) else {
-            try Data(line.utf8).write(to: url, options: .atomic)
-            return
-        }
-        defer { try? handle.close() }
-        try handle.seekToEnd()
-        try handle.write(contentsOf: Data(line.utf8))
-    }
-
-    private static func buildManifest(
-        label: String, runID: String, createdAtUTC: String,
-        gitCommit: String, gitDirty: String,
-        workspaceFingerprint: String, buildStartedAtUTC: String,
-        arch: String, project: URL,
-        hostAppPath: URL, shippingAppPath: URL,
-        staged: HostStager.Result,
-        buildShipping: Bool, skipDaemonBundle: Bool, daemonCargoTargetDir: URL,
-        captureRecords: [ManifestBuilder.CaptureRecord],
-        selectedScenarios: [String],
-        defaultEnvironment: [String: String]
-    ) throws -> ManifestBuilder.Manifest {
-        let xcodeVersion = try toolVersion("/usr/bin/xcodebuild", arguments: ["-version"])
-        let xctraceVersion = try toolVersion("/usr/bin/xcrun", arguments: ["xctrace", "version"])
-        let macosVersion = try toolVersion("/usr/bin/sw_vers", arguments: ["-productVersion"])
-        let macosBuild = try toolVersion("/usr/bin/sw_vers", arguments: ["-buildVersion"])
-
-        let hostBinary = hostAppPath.appendingPathComponent("Contents/MacOS/Harness Monitor UI Testing")
-        let host = ManifestBuilder.BinaryProvenance(
-            embeddedCommit: BuildOrchestrator.bundleProvenanceValue(bundle: hostAppPath, key: BuildOrchestrator.buildCommitKey),
-            embeddedDirty: BuildOrchestrator.bundleProvenanceValue(bundle: hostAppPath, key: BuildOrchestrator.buildDirtyKey),
-            embeddedWorkspaceFingerprint: BuildOrchestrator.bundleProvenanceValue(bundle: hostAppPath, key: BuildOrchestrator.buildWorkspaceFingerprintKey),
-            embeddedStartedAtUTC: BuildOrchestrator.bundleProvenanceValue(bundle: hostAppPath, key: BuildOrchestrator.buildStartedAtUTCKey),
-            binarySHA256: try BuildOrchestrator.binarySHA256(hostBinary),
-            bundleSHA256: try WorkspaceFingerprint.directorySHA256(hostAppPath),
-            binaryMtimeUTC: try BuildOrchestrator.binaryMtimeUTC(hostBinary)
-        )
-
-        var shipping = ManifestBuilder.ShippingProvenance(
-            built: buildShipping,
-            embeddedCommit: "", embeddedDirty: "", embeddedWorkspaceFingerprint: "",
-            embeddedStartedAtUTC: "", binarySHA256: "", bundleSHA256: "", binaryMtimeUTC: ""
-        )
-        if buildShipping {
-            let shippingBinary = shippingAppPath.appendingPathComponent("Contents/MacOS/Harness Monitor")
-            shipping = ManifestBuilder.ShippingProvenance(
-                built: true,
-                embeddedCommit: BuildOrchestrator.bundleProvenanceValue(bundle: shippingAppPath, key: BuildOrchestrator.buildCommitKey),
-                embeddedDirty: BuildOrchestrator.bundleProvenanceValue(bundle: shippingAppPath, key: BuildOrchestrator.buildDirtyKey),
-                embeddedWorkspaceFingerprint: BuildOrchestrator.bundleProvenanceValue(bundle: shippingAppPath, key: BuildOrchestrator.buildWorkspaceFingerprintKey),
-                embeddedStartedAtUTC: BuildOrchestrator.bundleProvenanceValue(bundle: shippingAppPath, key: BuildOrchestrator.buildStartedAtUTCKey),
-                binarySHA256: try BuildOrchestrator.binarySHA256(shippingBinary),
-                bundleSHA256: try WorkspaceFingerprint.directorySHA256(shippingAppPath),
-                binaryMtimeUTC: try BuildOrchestrator.binaryMtimeUTC(shippingBinary)
-            )
-        }
-
-        let buildProv = ManifestBuilder.BuildProvenance(
-            auditDaemonBundle: ManifestBuilder.AuditDaemonBundle(
-                requestedSkip: skipDaemonBundle,
-                mode: skipDaemonBundle ? "skipped" : "shared-cargo-target",
-                cargoTargetDir: daemonCargoTargetDir.path
-            ),
-            host: host,
-            shipping: shipping
-        )
-
-        return ManifestBuilder.build(.init(
-            label: label, runID: runID, createdAtUTC: createdAtUTC,
-            git: ManifestBuilder.GitProvenance(
-                commit: gitCommit, dirty: gitDirty == "true",
-                workspaceFingerprint: workspaceFingerprint,
-                buildStartedAtUTC: buildStartedAtUTC
-            ),
-            system: ManifestBuilder.SystemInfo(
-                xcodeVersion: xcodeVersion, xctraceVersion: xctraceVersion,
-                macosVersion: macosVersion, macosBuild: macosBuild, arch: arch
-            ),
-            targets: ManifestBuilder.Targets(
-                project: project.path,
-                shippingScheme: shippingScheme, hostScheme: hostScheme,
-                shippingAppPath: shippingAppPath.path, hostAppPath: hostAppPath.path,
-                hostBundleID: hostBundleID,
-                stagedHostAppPath: staged.stagedAppPath.path,
-                stagedHostBinaryPath: staged.stagedBinaryPath.path,
-                stagedHostBundleID: staged.stagedBundleID
-            ),
-            buildProvenance: buildProv,
-            defaultEnvironment: defaultEnvironment,
-            launchArguments: persistenceArguments,
-            selectedScenarios: selectedScenarios,
-            captureRecords: captureRecords
-        ))
-    }
-
-    public static func shouldAllowExternalDaemonAudit(
-        defaultEnvironment: [String: String]
-    ) -> Bool {
-        defaultEnvironment["HARNESS_MONITOR_LAUNCH_MODE"] == "live"
-            && defaultEnvironment["HARNESS_MONITOR_EXTERNAL_DAEMON"] == "1"
-    }
-
-    public static func defaultEnvironment(
-        processEnvironment: [String: String] = ProcessInfo.processInfo.environment
-    ) -> [String: String] {
-        var environment = baseEnvironment.merging(
-            passThroughEnvironment(processEnvironment)
-        ) { _, override in
-            override
-        }
-        if trimmedNonEmpty(processEnvironment[daemonDataHomeOverrideEnvironmentKey]) != nil {
-            if trimmedNonEmpty(environment["HARNESS_MONITOR_LAUNCH_MODE"]) == nil {
-                environment["HARNESS_MONITOR_LAUNCH_MODE"] = "live"
-            }
-            if trimmedNonEmpty(environment["HARNESS_MONITOR_EXTERNAL_DAEMON"]) == nil {
-                environment["HARNESS_MONITOR_EXTERNAL_DAEMON"] = "1"
-            }
-        }
-        return environment
-    }
-
-    public static func daemonDataHome(
-        runDir: URL,
-        templateSlug: String,
-        scenario: String,
-        processEnvironment: [String: String] = ProcessInfo.processInfo.environment
-    ) -> URL {
-        if let override = trimmedNonEmpty(
-            processEnvironment[daemonDataHomeOverrideEnvironmentKey]
-        ) {
-            return URL(fileURLWithPath: override, isDirectory: true)
-        }
-        return runDir
-            .appendingPathComponent("app-data", isDirectory: true)
-            .appendingPathComponent(templateSlug, isDirectory: true)
-            .appendingPathComponent(scenario, isDirectory: true)
-    }
-
-    public static func auditDaemonDataHome(
-        runDir: URL,
-        templateSlug: String,
-        scenario: String,
-        defaultEnvironment: [String: String],
-        processEnvironment: [String: String] = ProcessInfo.processInfo.environment,
-        fileManager: FileManager = .default
-    ) throws -> AuditDaemonDataHome {
-        let sourceDataHome = daemonDataHome(
-            runDir: runDir,
-            templateSlug: templateSlug,
-            scenario: scenario,
-            processEnvironment: processEnvironment
-        )
-        guard trimmedNonEmpty(processEnvironment[daemonDataHomeOverrideEnvironmentKey]) != nil else {
-            return AuditDaemonDataHome(
-                launchDataHome: sourceDataHome,
-                probeDataHome: sourceDataHome,
-                mirroredManifest: false
-            )
-        }
-        guard shouldAllowExternalDaemonAudit(defaultEnvironment: defaultEnvironment) else {
-            throw Failure(
-                message: """
-                HARNESS_MONITOR_AUDIT_DAEMON_DATA_HOME requires \
-                HARNESS_MONITOR_LAUNCH_MODE=live and HARNESS_MONITOR_EXTERNAL_DAEMON=1 \
-                so the audit runner can mirror daemon credentials before launching \
-                Harness Monitor UI Testing Audit.app.
-                """
-            )
-        }
-
-        let mirrorDataHome = runDir
-            .appendingPathComponent("app-data-mirrors", isDirectory: true)
-            .appendingPathComponent(templateSlug, isDirectory: true)
-            .appendingPathComponent(scenario, isDirectory: true)
-        try prepareAuditDaemonDataHomeMirror(
-            sourceDataHome: sourceDataHome,
-            mirrorDataHome: mirrorDataHome,
-            fileManager: fileManager
-        )
-        return AuditDaemonDataHome(
-            launchDataHome: mirrorDataHome,
-            probeDataHome: sourceDataHome,
-            mirroredManifest: true
-        )
-    }
-
-    public static func prepareAuditDaemonDataHomeMirror(
-        sourceDataHome: URL,
-        mirrorDataHome: URL,
-        fileManager: FileManager = .default
-    ) throws {
-        let sourceManifestURL = sourceDataHome
-            .appendingPathComponent("harness", isDirectory: true)
-            .appendingPathComponent("daemon", isDirectory: true)
-            .appendingPathComponent("manifest.json")
-        guard fileManager.fileExists(atPath: sourceManifestURL.path) else {
-            throw Failure(
-                message: "External audit daemon manifest missing at \(sourceManifestURL.path)"
-            )
-        }
-
-        let manifestData = try Data(contentsOf: sourceManifestURL)
-        let rawManifest = try JSONSerialization.jsonObject(with: manifestData)
-        guard var manifest = rawManifest as? [String: Any] else {
-            throw Failure(
-                message: "External audit daemon manifest must be a JSON object at \(sourceManifestURL.path)"
-            )
-        }
-
-        let tokenPathKey: String
-        if manifest["token_path"] != nil {
-            tokenPathKey = "token_path"
-        } else if manifest["tokenPath"] != nil {
-            tokenPathKey = "tokenPath"
-        } else {
-            throw Failure(
-                message: "External audit daemon manifest has no token path at \(sourceManifestURL.path)"
-            )
-        }
-
-        guard
-            let sourceTokenPath = manifest[tokenPathKey] as? String,
-            (sourceTokenPath as NSString).isAbsolutePath
-        else {
-            throw Failure(
-                message: "External audit daemon manifest token path must be absolute at \(sourceManifestURL.path)"
-            )
-        }
-
-        let sourceTokenURL = URL(fileURLWithPath: sourceTokenPath).standardizedFileURL
-        guard fileManager.fileExists(atPath: sourceTokenURL.path) else {
-            throw Failure(
-                message: "External audit daemon token missing at \(sourceTokenURL.path)"
-            )
-        }
-
-        let mirrorDaemonRoot = mirrorDataHome
-            .appendingPathComponent("harness", isDirectory: true)
-            .appendingPathComponent("daemon", isDirectory: true)
-        try fileManager.createDirectory(at: mirrorDaemonRoot, withIntermediateDirectories: true)
-
-        let mirrorTokenURL = mirrorDaemonRoot.appendingPathComponent("auth-token")
-        let mirrorManifestURL = mirrorDaemonRoot.appendingPathComponent("manifest.json")
-        let tokenData = try Data(contentsOf: sourceTokenURL)
-        try tokenData.write(to: mirrorTokenURL, options: .atomic)
-        try fileManager.setAttributes(
-            [.posixPermissions: NSNumber(value: 0o600)],
-            ofItemAtPath: mirrorTokenURL.path
-        )
-
-        manifest[tokenPathKey] = mirrorTokenURL.path
-        let mirroredManifestData = try JSONSerialization.data(
-            withJSONObject: manifest,
-            options: [.prettyPrinted, .sortedKeys]
-        )
-        try mirroredManifestData.write(to: mirrorManifestURL, options: .atomic)
-    }
-
-    private static func passThroughEnvironment(
-        _ processEnvironment: [String: String]
-    ) -> [String: String] {
-        processEnvironment.reduce(into: [:]) { result, item in
-            guard passThroughEnvironmentKeys.contains(item.key),
-                  let value = trimmedNonEmpty(item.value)
-            else {
-                return
-            }
-            result[item.key] = value
-        }
-    }
-
-    private static func trimmedNonEmpty(_ value: String?) -> String? {
-        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return trimmed.isEmpty ? nil : trimmed
-    }
-
-    public static func validateProvenance(
-        bundle: URL, label: String,
-        gitCommit: String, gitDirty: String, workspaceFingerprint: String,
-        allowMismatch: Bool
-    ) throws {
-        let commit = BuildOrchestrator.bundleProvenanceValue(bundle: bundle, key: BuildOrchestrator.buildCommitKey)
-        let dirty = BuildOrchestrator.bundleProvenanceValue(bundle: bundle, key: BuildOrchestrator.buildDirtyKey)
-        let fp = BuildOrchestrator.bundleProvenanceValue(bundle: bundle, key: BuildOrchestrator.buildWorkspaceFingerprintKey)
-        if commit == gitCommit && dirty == gitDirty && fp == workspaceFingerprint { return }
-        let detail = "expected commit=\(gitCommit) dirty=\(gitDirty) fingerprint=\(workspaceFingerprint) "
-            + "but bundle reports commit=\(commit) dirty=\(dirty) fingerprint=\(fp)"
-        if allowMismatch {
-            FileHandle.standardError.write(Data("\(label) build provenance mismatch: \(detail). Continuing because skip-build is set.\n".utf8))
-            return
-        }
-        throw Failure(message: "\(label) build provenance mismatch: \(detail)")
-    }
-
-    public static func assertSourceUnchanged(
-        checkpoint: String, checkoutRoot: URL, appRoot: URL,
-        gitCommit: String, workspaceFingerprint: String
-    ) throws {
-        let currentCommit = try gitRevParseHead(checkoutRoot)
-        let currentFingerprint = try WorkspaceFingerprint.compute(variant: .audit, projectDir: appRoot)
-        if currentCommit == gitCommit && currentFingerprint == workspaceFingerprint { return }
-        throw Failure(
-            message: "Audit source changed during \(checkpoint). Built commit=\(gitCommit) fingerprint=\(workspaceFingerprint); current commit=\(currentCommit) fingerprint=\(currentFingerprint). Rerun the audit so Instruments measures the current checkout."
-        )
-    }
-
-    public static func gitRevParseHead(_ root: URL) throws -> String {
-        try gitOutput(root: root, arguments: ["rev-parse", "HEAD"])
-    }
-
-    public static func gitDirtyFlag(_ root: URL) throws -> String {
-        let result = try ProcessRunner.run("/usr/bin/git", arguments: ["-C", root.path, "status", "--short"])
-        return result.stdoutString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "false" : "true"
-    }
-
-    private static func gitOutput(root: URL, arguments: [String]) throws -> String {
-        let result = try ProcessRunner.runChecked(
-            "/usr/bin/git",
-            arguments: ["-C", root.path] + arguments
-        )
-        return result.stdoutString.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private static func toolVersion(_ command: String, arguments: [String]) throws -> String {
-        let result = try ProcessRunner.run(command, arguments: arguments)
-        return result.stdoutString
-            .replacingOccurrences(of: "\n", with: ";")
-            .trimmingCharacters(in: CharacterSet(charactersIn: ";"))
-    }
-
-    public static func cleanupHostProcesses() {
-        let result = (try? ProcessRunner.run("/bin/ps", arguments: ["-Ao", "pid=,command="]))?.stdoutString ?? ""
-        cleanupHostProcesses(psOutput: result) { pid in
-            kill(pid, SIGKILL)
-        }
-    }
-
-    static func cleanupHostProcesses(psOutput: String, signal: (Int32) -> Void) {
-        for line in psOutput.split(separator: "\n") {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            guard let space = trimmed.firstIndex(of: " ") else { continue }
-            let pidString = String(trimmed[..<space])
-            let command = String(trimmed[trimmed.index(after: space)...])
-            guard let pid = Int32(pidString) else { continue }
-            if command.contains("Harness Monitor UI Testing.app/Contents/MacOS/Harness Monitor UI Testing")
-                || command.contains("Harness Monitor UI Testing Audit.app/Contents/MacOS/Harness Monitor UI Testing")
-                || command.contains("target/debug/harness daemon serve")
-                || command.contains("target/debug/harness bridge start")
-                || command.contains("/mock-codex") {
-                signal(pid)
-            }
-        }
-    }
-
-    private static func utcCompactTimestamp() -> String {
-        let formatter = DateFormatter()
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        formatter.dateFormat = "yyyyMMdd'T'HHmmss'Z'"
-        return formatter.string(from: Date())
-    }
-
-    private static func utcExtendedTimestamp() -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        return formatter.string(from: Date())
-    }
 }

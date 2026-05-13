@@ -128,8 +128,8 @@ public struct SessionDiscoveryProbe: Sendable {
   }
 
   private static func requireDirectory(_ url: URL, reason: String) throws {
-    var isDir: ObjCBool = false
-    guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue
+    let values = try? url.resourceValues(forKeys: [.isDirectoryKey])
+    guard values?.isDirectory == true
     else {
       throw Failure.notAHarnessSession(reason: reason)
     }

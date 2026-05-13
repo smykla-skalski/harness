@@ -93,6 +93,22 @@ struct SessionSidebarCreateButtonShortcutOverlays: View {
 }
 
 extension SessionSidebar {
+  var routeSection: some View {
+    ForEach([SessionWindowRoute.overview, .timeline, .agents, .decisions]) { route in
+      let selection = SessionSelection.route(route)
+      SessionSidebarRow(
+        title: route.title,
+        systemImage: route.systemImage
+      )
+      .tag(selection)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowRoute(route))
+      .contextMenu {
+        Button(SessionSidebarContextMenuScope.unavailableLabel) {}
+          .disabled(true)
+      }
+    }
+  }
+
   private var runtimePresentation: HarnessMonitorStore.AgentRuntimePresentationContext? {
     guard let snapshot else {
       return nil

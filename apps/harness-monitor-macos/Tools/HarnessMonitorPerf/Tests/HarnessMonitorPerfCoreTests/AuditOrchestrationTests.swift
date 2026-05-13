@@ -112,6 +112,7 @@ final class RunPrunerTests: XCTestCase {
         XCTAssertTrue(RunPruner.retain(relativePath: "manifest.json", keepTraces: false))
         XCTAssertTrue(RunPruner.retain(relativePath: "summary.json", keepTraces: false))
         XCTAssertTrue(RunPruner.retain(relativePath: "summary.csv", keepTraces: false))
+        XCTAssertTrue(RunPruner.retain(relativePath: "log-only-summary.json", keepTraces: false))
         XCTAssertTrue(RunPruner.retain(relativePath: "captures.tsv", keepTraces: false))
     }
 
@@ -178,5 +179,53 @@ final class TraceRecorderCommandTests: XCTestCase {
         }
         XCTAssertEqual(arguments[separator..<arguments.count],
                        ["--launch", "--", "/staged.app", "-X"])
+    }
+}
+
+final class LogProbeRecorderTests: XCTestCase {
+    func testOpenCommandSortsEnvironmentAndPassesLaunchArguments() {
+        let inputs = LogProbeRecorder.ScenarioInputs(
+            scenario: "session-search-full",
+            previewScenario: "dashboard-landing",
+            durationSeconds: 8,
+            hostAppPath: URL(fileURLWithPath: "/staged.app"),
+            hostBinaryPath: URL(fileURLWithPath: "/staged.app/Contents/MacOS/App"),
+            launchArguments: ["-ApplePersistenceIgnoreState", "YES"],
+            environment: ["Z": "last", "A": "first"],
+            logURL: URL(fileURLWithPath: "/log.log"),
+            stdoutURL: URL(fileURLWithPath: "/stdout.log"),
+            stderrURL: URL(fileURLWithPath: "/stderr.log"),
+            daemonDataHome: URL(fileURLWithPath: "/dh"),
+            runDir: URL(fileURLWithPath: "/run")
+        )
+
+        let (_, arguments) = LogProbeRecorder.openCommand(inputs)
+        let envArguments = zip(arguments.dropLast(), arguments.dropFirst())
+            .filter { $0.0 == "--env" }
+            .map { $0.1 }
+        XCTAssertEqual(envArguments, ["A=first", "Z=last"])
+        XCTAssertEqual(
+            Array(arguments.suffix(4)),
+            ["/staged.app", "--args", "-ApplePersistenceIgnoreState", "YES"]
+        )
+    }
+
+    func testWarningSummaryCountsKnownRuntimeWarnings() {
+        let summary = LogProbeRecorder.warningSummary(in: """
+        onChange(of:) action tried to update multiple times per frame.
+        Application performed a reentrant operation in its NSTableView delegate.
+        AttributeGraph: cycle detected through attribute 123.
+        error returned from database: unable to open database file
+        Harness Monitor UI Testing Audit.app would like to access data from other apps.
+        Class _TtC22HarnessMonitorRegistry is implemented in both A and B.
+        Class _TtC22HarnessMonitorRegistry is implemented in both A and B.
+        """)
+
+        XCTAssertEqual(summary.swiftUIFrameUpdateWarnings, 1)
+        XCTAssertEqual(summary.tableViewReentrantWarnings, 1)
+        XCTAssertEqual(summary.attributeGraphCycleWarnings, 1)
+        XCTAssertEqual(summary.databaseOpenWarnings, 1)
+        XCTAssertEqual(summary.appDataPromptHints, 1)
+        XCTAssertEqual(summary.duplicateRuntimeClassWarnings, 1)
     }
 }

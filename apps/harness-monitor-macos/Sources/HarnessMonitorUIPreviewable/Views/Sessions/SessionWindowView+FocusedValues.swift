@@ -6,10 +6,10 @@ extension SessionWindowView {
     _ content: Content
   ) -> some View {
     content
-      .focusedSceneValue(\.sessionNavigation, navigationCommand)
-      .focusedSceneValue(\.sessionAttention, attentionFocus)
-      .focusedSceneValue(\.sessionInspector, canPresentInspector ? inspectorCommand : nil)
-      .focusedSceneValue(\.harnessSessionRouteFocus, sessionRouteFocus)
+      .harnessFocusedSceneValue(\.sessionNavigation, navigationCommand)
+      .harnessFocusedSceneValue(\.sessionAttention, attentionFocus)
+      .harnessFocusedSceneValue(\.sessionInspector, canPresentInspector ? inspectorCommand : nil)
+      .harnessFocusedSceneValue(\.harnessSessionRouteFocus, sessionRouteFocus)
   }
 
   var sessionRouteFocus: HarnessSessionRouteFocus? {

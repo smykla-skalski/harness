@@ -59,8 +59,8 @@ public struct AppSearchHostModifier: ViewModifier {
 
   @State private var query: String = ""
   @State private var isSearchPresented: Bool = false
+  @State private var searchFocusRequestID: UInt64 = 0
   @State private var searchFocusDispatcher = HarnessSidebarSearchFocusDispatcher()
-  @FocusState private var searchFieldFocused: Bool
 
   public init(
     model: AppSearchModel,
@@ -80,11 +80,9 @@ public struct AppSearchHostModifier: ViewModifier {
     content
       .searchable(
         text: $query,
-        isPresented: $isSearchPresented,
         placement: .toolbar,
         prompt: prompt
       )
-      .searchFocused($searchFieldFocused)
       .harnessMinimizableSearchToolbar()
       .searchSuggestions {
         AppSearchSuggestionsHost(model: model, onPick: handleHit)
@@ -99,16 +97,22 @@ public struct AppSearchHostModifier: ViewModifier {
       }
       .background {
         AppSearchFieldRebinder(
-          shouldRebind: !query.isEmpty && isSearchPresented
+          shouldRebind: !query.isEmpty && isSearchPresented,
+          focusRequestID: searchFocusRequestID
         )
       }
       .task(id: isSearchPresented) {
         model.setPresented(isSearchPresented)
       }
-      .task(id: automationCommand) {
-        let command = automationCommand
-        guard let command else { return }
-        await applyAutomationCommand(command)
+      .task {
+        automation?.handler = { command in
+          Task { @MainActor in
+            await applyAutomationCommand(command)
+          }
+        }
+      }
+      .onDisappear {
+        automation?.handler = nil
       }
       .harnessFocusedSceneValue(\.harnessSidebarSearchFocusAction, searchFocusAction)
       .task {
@@ -131,9 +135,7 @@ public struct AppSearchHostModifier: ViewModifier {
     if !isSearchPresented {
       isSearchPresented = true
     }
-    if !searchFieldFocused {
-      searchFieldFocused = true
-    }
+    searchFocusRequestID &+= 1
   }
 
   /// Route to the hit, then clear the query and collapse the search
@@ -150,39 +152,25 @@ public struct AppSearchHostModifier: ViewModifier {
     if isSearchPresented {
       isSearchPresented = false
     }
-    if searchFieldFocused {
-      searchFieldFocused = false
-    }
   }
 
   private var resolvedPrimaryDomain: AppSearchDomain {
     routeFocus?.domain ?? fallbackPrimaryDomain
   }
 
-  private var automationCommand: AppSearchAutomationCommand? {
-    automation?.command
-  }
-
   private func applyAutomationCommand(_ command: AppSearchAutomationCommand) async {
     if query != command.query {
       query = command.query
-    }
-    if command.isPresented {
-      if isSearchPresented != command.isPresented {
-        isSearchPresented = command.isPresented
-        await Task.yield()
-      }
-      guard !Task.isCancelled else { return }
-      if searchFieldFocused != command.isFocused {
-        searchFieldFocused = command.isFocused
-      }
-      return
-    }
-    if searchFieldFocused != command.isFocused {
-      searchFieldFocused = command.isFocused
       await Task.yield()
     }
     guard !Task.isCancelled else { return }
+    if command.isPresented {
+      if isSearchPresented != command.isPresented {
+        isSearchPresented = command.isPresented
+        searchFocusRequestID &+= 1
+      }
+      return
+    }
     if isSearchPresented != command.isPresented {
       isSearchPresented = command.isPresented
     }
