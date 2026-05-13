@@ -215,6 +215,13 @@ struct SessionSwiftUISourceTests {
         "guard searchPresentationState.isPresented != newValue else { return }"
       )
     )
+    #expect(sidebarSearchSource.contains("SidebarSearchableModifier("))
+    #expect(sidebarSearchSource.contains(".task(id: canPresentSearch)"))
+    #expect(
+      sidebarSearchSource.contains(
+        "requestPresentation(canPresent: canPresentSearch)"
+      )
+    )
     #expect(!sidebarSearchSource.contains("private var mcpRegistryHostEnabled"))
   }
 
