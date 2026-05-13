@@ -1,6 +1,6 @@
 import HarnessMonitorKit
 
-/// Compact value snapshot rendered by the native `.searchSuggestions` menu.
+/// Compact value snapshot rendered by the session search suggestion overlay.
 ///
 /// The toolbar host builds this once per debounced result set so the
 /// suggestion view does not read the observable `AppSearchModel` in its body.

@@ -181,17 +181,20 @@ extension SessionWindowFlowTests {
     #expect(columnsSource.contains("func refilterDecisionsCache() async"))
   }
 
-  @Test("Session search suggestions stay native and snapshot-backed")
-  func sessionSearchSuggestionsStayNativeAndSnapshotBacked() throws {
+  @Test("Session search keeps the field native and suggestions snapshot-backed")
+  func sessionSearchKeepsFieldNativeAndSuggestionsSnapshotBacked() throws {
     let source = try previewableSourceFile(named: "Views/Search/AppSearchHost.swift")
     let suggestionsSource = try previewableSourceFile(
       named: "Views/Search/AppSearchSuggestionsView.swift"
     )
 
     #expect(source.contains(".searchable("))
-    #expect(source.contains(".searchSuggestions {"))
-    #expect(source.contains("AppSearchSuggestionsHost(snapshot: suggestionSnapshot)"))
-    #expect(source.contains("private struct AppSearchSuggestionsHost: View"))
+    #expect(source.contains("isPresented: $isSearchPresented"))
+    #expect(!source.contains(".searchSuggestions"))
+    #expect(source.contains(".overlay(alignment: .topTrailing)"))
+    #expect(
+      source.contains("AppSearchSuggestionsView(snapshot: suggestionSnapshot, onPick: handleHit)")
+    )
     #expect(source.contains("@State private var suggestionSnapshot"))
     #expect(
       source.contains("updateSuggestionSnapshot(AppSearchSuggestionSnapshot(results: results))")
@@ -210,15 +213,12 @@ extension SessionWindowFlowTests {
     #expect(!source.contains("@Environment(\\.accessibilityVoiceOverEnabled)"))
     #expect(!source.contains("results: model.results"))
     #expect(!source.contains(".onChange(of: model.results.totalHitCount)"))
+    #expect(!source.contains("AppSearchFieldRebinder"))
+    #expect(!source.contains("NSSearchField"))
     #expect(suggestionsSource.contains("Text(verbatim: row.displayTitle)"))
-    #expect(suggestionsSource.contains(".searchCompletion(row.completion)"))
-    #expect(!suggestionsSource.contains("Button {"))
+    #expect(!suggestionsSource.contains(".searchCompletion"))
     #expect(!suggestionsSource.contains("Section {"))
     #expect(!source.contains("@Bindable var model = model"))
-    let staleRebinderDependency =
-      "AppSearchFieldRebinder(\n          shouldRebind: !query.isEmpty && model.isPresented"
-    #expect(!source.contains(staleRebinderDependency))
-    #expect(source.contains("shouldRebind: !query.isEmpty && isSearchPresented"))
   }
 
   @Test("Session search perf script drives the real searchable binding")
