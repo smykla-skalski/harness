@@ -94,6 +94,29 @@ struct MonitorTimelineSectionTests {
     #expect(handler.dismissed == ["decision-actions"])
   }
 
+  @Test("Decision index reuses one decoder while building timeline snapshots")
+  func decisionIndexReusesOneDecoderWhileBuildingTimelineSnapshots() throws {
+    let nodeBuilderSource = try timelineSourceFile(named: "SessionTimelineNodeBuilder.swift")
+    let snapshotSource = try timelineSourceFile(named: "SessionTimelineDecisionSnapshot.swift")
+
+    #expect(nodeBuilderSource.contains("let actionsDecoder = JSONDecoder()"))
+    #expect(
+      nodeBuilderSource.contains(
+        "SessionTimelineDecisionSnapshot(decision: $0, actionsDecoder: actionsDecoder)"
+      )
+    )
+    #expect(
+      snapshotSource.contains(
+        "init(decision: Decision, actionsDecoder: JSONDecoder = JSONDecoder())"
+      )
+    )
+    #expect(
+      snapshotSource.contains(
+        "let parsedActions = parseActions(from: decision.suggestedActionsJSON, decoder: decoder)"
+      )
+    )
+  }
+
   @Test("Entries link to decisions only through explicit payload decision ids")
   func entriesLinkToDecisionsOnlyThroughExplicitPayloadDecisionIDs() {
     let decision = MonitorTimelineSectionFixtures.makeDecision(id: "decision-explicit")
@@ -163,6 +186,23 @@ struct MonitorTimelineSectionTests {
     host.frame = CGRect(x: 0, y: 0, width: width, height: 200)
     host.layoutSubtreeIfNeeded()
     return host.fittingSize.height
+  }
+
+  private func timelineSourceFile(named fileName: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent(
+        "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Timeline"
+      )
+      .appendingPathComponent(fileName)
+    return try String(contentsOf: fileURL, encoding: .utf8)
   }
 }
 

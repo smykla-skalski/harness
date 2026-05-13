@@ -133,7 +133,7 @@ struct SessionTimelineDecisionSnapshot: Identifiable, Equatable, Sendable {
   let createdAt: Date
   let actions: [SessionTimelineAction]
 
-  init(decision: Decision) {
+  init(decision: Decision, actionsDecoder: JSONDecoder = JSONDecoder()) {
     id = decision.id
     severity = DecisionSeverity(rawValue: decision.severityRaw) ?? .info
     ruleID = decision.ruleID
@@ -142,7 +142,7 @@ struct SessionTimelineDecisionSnapshot: Identifiable, Equatable, Sendable {
     taskID = decision.taskID
     summary = decision.summary
     createdAt = decision.createdAt
-    actions = Self.actions(for: decision)
+    actions = Self.actions(for: decision, decoder: actionsDecoder)
   }
 
   var severityLabel: String {
@@ -158,8 +158,11 @@ struct SessionTimelineDecisionSnapshot: Identifiable, Equatable, Sendable {
     }
   }
 
-  private static func actions(for decision: Decision) -> [SessionTimelineAction] {
-    let parsedActions = parseActions(from: decision.suggestedActionsJSON)
+  private static func actions(
+    for decision: Decision,
+    decoder: JSONDecoder
+  ) -> [SessionTimelineAction] {
+    let parsedActions = parseActions(from: decision.suggestedActionsJSON, decoder: decoder)
     let effectiveActions = effectiveActions(for: decision, parsedActions: parsedActions)
     let primaryActionID =
       effectiveActions.first(where: isProminentActionCandidate)?.id ?? effectiveActions.first?.id
@@ -175,9 +178,9 @@ struct SessionTimelineDecisionSnapshot: Identifiable, Equatable, Sendable {
     }
   }
 
-  private static func parseActions(from json: String) -> [SuggestedAction] {
+  private static func parseActions(from json: String, decoder: JSONDecoder) -> [SuggestedAction] {
     guard let data = json.data(using: .utf8),
-      let actions = try? JSONDecoder().decode([SuggestedAction].self, from: data)
+      let actions = try? decoder.decode([SuggestedAction].self, from: data)
     else {
       return []
     }
