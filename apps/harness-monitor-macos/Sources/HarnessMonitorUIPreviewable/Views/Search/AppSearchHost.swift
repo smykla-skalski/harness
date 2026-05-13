@@ -75,6 +75,7 @@ public struct AppSearchHost: View {
         isFocused: $isSearchFocused,
         onSubmit: submitSearch
       )
+      .equatable()
 
       suggestionOverlay
 
@@ -228,11 +229,32 @@ public struct AppSearchHost: View {
 
 }
 
-private struct AppSearchFieldSurface: View {
+private struct AppSearchFieldSurface: View, Equatable {
   @Binding var query: String
   let prompt: LocalizedStringKey
   let isFocused: FocusState<Bool>.Binding
   let onSubmit: () -> Void
+  private let queryValue: String
+  private let isFocusedValue: Bool
+
+  init(
+    query: Binding<String>,
+    prompt: LocalizedStringKey,
+    isFocused: FocusState<Bool>.Binding,
+    onSubmit: @escaping () -> Void
+  ) {
+    _query = query
+    self.prompt = prompt
+    self.isFocused = isFocused
+    self.onSubmit = onSubmit
+    queryValue = query.wrappedValue
+    isFocusedValue = isFocused.wrappedValue
+  }
+
+  nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.queryValue == rhs.queryValue
+      && lhs.isFocusedValue == rhs.isFocusedValue
+  }
 
   var body: some View {
     Color.clear
