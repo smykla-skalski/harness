@@ -25,24 +25,8 @@ struct DropTargetPulseBorder: View {
   var body: some View {
     RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
       .stroke(HarnessMonitorTheme.success, lineWidth: 1.5)
-      .modifier(PulseOpacityModifier(reduceMotion: reduceMotion))
+      .opacity(reduceMotion ? 0.6 : 0.35)
       .allowsHitTesting(false)
       .accessibilityHidden(true)
-  }
-}
-
-struct PulseOpacityModifier: ViewModifier {
-  let reduceMotion: Bool
-
-  func body(content: Content) -> some View {
-    if reduceMotion {
-      content.opacity(0.6)
-    } else {
-      content.phaseAnimator([0.25, 0.7]) { border, opacity in
-        border.opacity(opacity)
-      } animation: { _ in
-        .easeInOut(duration: 1.1)
-      }
-    }
   }
 }

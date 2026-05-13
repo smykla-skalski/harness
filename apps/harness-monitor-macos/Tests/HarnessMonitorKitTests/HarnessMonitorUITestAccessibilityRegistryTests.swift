@@ -395,4 +395,13 @@ struct HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(sessionAttentionToolbarButton.contains(".harnessMCPButton("))
   }
 
+  @Test("Passive task-drop borders stay static while targeted feedback owns animation")
+  func passiveTaskDropBordersStayStaticWhileTargetedFeedbackOwnsAnimation() throws {
+    let laneSupport = try sourceFile(named: "SessionAgentLaneSupport.swift")
+
+    #expect(laneSupport.contains("struct DropTargetPulseBorder: View"))
+    #expect(laneSupport.contains(".opacity(reduceMotion ? 0.6 : 0.35)"))
+    #expect(!laneSupport.contains("phaseAnimator"))
+  }
+
 }
