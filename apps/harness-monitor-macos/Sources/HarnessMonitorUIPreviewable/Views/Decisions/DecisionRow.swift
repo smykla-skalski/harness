@@ -59,25 +59,12 @@ struct DecisionRow<Selection: Equatable>: View {
     return parts.joined(separator: " · ")
   }
 
-  @ViewBuilder var body: some View {
-    if let expiresAt = acpPayload?.expiresAtDate,
-      AcpPermissionDeadlineTimelineSchedule.shouldTick(expiresAt: expiresAt, now: .now)
-    {
-      TimelineView(AcpPermissionDeadlineTimelineSchedule(expiresAt: expiresAt)) { context in
-        rowButton(referenceDate: context.date)
-      }
-    } else {
-      rowButton(referenceDate: .now)
-    }
+  var body: some View {
+    rowButton()
   }
 
-  private func rowButton(
-    referenceDate: Date
-  ) -> some View {
-    let deadlineStatus = acpPayload?.deadlineStatus(
-      now: referenceDate,
-      lastMessageAt: lastMessageAt
-    )
+  private func rowButton() -> some View {
+    let showsDeadline = acpPayload?.expiresAtDate != nil
 
     return Button {
       selection = selectionValue
@@ -109,7 +96,7 @@ struct DecisionRow<Selection: Equatable>: View {
               lastMessageAt: lastMessageAt,
               style: .row,
               accessibilityIdentifier: HarnessMonitorAccessibility.decisionDeadline(decision.id),
-              referenceDate: referenceDate
+              referenceDate: nil
             )
           }
         }
@@ -134,29 +121,26 @@ struct DecisionRow<Selection: Equatable>: View {
       extraHoverHint: isSelected
     )
     .accessibilityElement(children: .combine)
-    .accessibilityLabel(accessibilityLabelText(deadlineStatus: deadlineStatus))
+    .accessibilityLabel(accessibilityLabelText(showsDeadline: showsDeadline))
     .harnessMCPRow(
       HarnessMonitorAccessibility.decisionRow(decision.id),
-      label: accessibilityLabelText(deadlineStatus: deadlineStatus),
-      value: accessibilityValueText(deadlineStatus: deadlineStatus),
+      label: accessibilityLabelText(showsDeadline: showsDeadline),
+      value: accessibilityValueText(),
       pressAction: { selection = selectionValue }
     )
   }
 
   private func accessibilityLabelText(
-    deadlineStatus: AcpPermissionDeadlineStatus?
+    showsDeadline: Bool
   ) -> String {
     var parts = ["\(severity.chipLabel). \(decision.summary). \(metaLine)"]
-    if deadlineStatus != nil {
+    if showsDeadline {
       parts.append("deadline shown below")
     }
     return parts.joined(separator: ". ")
   }
 
-  private func accessibilityValueText(
-    deadlineStatus: AcpPermissionDeadlineStatus?
-  ) -> String {
-    _ = deadlineStatus
-    return isSelected ? "selected" : "not selected"
+  private func accessibilityValueText() -> String {
+    isSelected ? "selected" : "not selected"
   }
 }

@@ -218,6 +218,16 @@ struct SessionSwiftUISourceTests {
     #expect(!sidebarSearchSource.contains("private var mcpRegistryHostEnabled"))
   }
 
+  @Test("Decision rows keep deadline churn scoped to the deadline chip")
+  func decisionRowsKeepTimelineTicksOutOfTheRowBody() throws {
+    let rowSource = try sourceFile(at: "Views/Decisions/DecisionRow.swift")
+
+    #expect(!rowSource.contains("TimelineView("))
+    #expect(rowSource.contains("let showsDeadline = acpPayload?.expiresAtDate != nil"))
+    #expect(rowSource.contains("referenceDate: nil"))
+    #expect(!rowSource.contains("deadlineStatus("))
+  }
+
   @Test("App search reindex tasks attach only while search is visible")
   func appSearchReindexTasksAttachOnlyWhileSearchIsVisible() throws {
     let searchUpdaterSource = try sourceFile(at: "Views/Search/AppSearchIndexUpdater.swift")
