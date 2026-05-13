@@ -84,8 +84,10 @@ public struct AppSearchHost: View {
         runSearch: runDebouncedSearch,
         setPresented: model.setPresented
       )
+      .frame(width: 0, height: 0)
       .allowsHitTesting(false)
     }
+    .fixedSize()
     .task {
       automation?.handler = { command in
         Task { @MainActor in
@@ -234,6 +236,7 @@ private struct AppSearchFieldSurface: View {
 
   var body: some View {
     Color.clear
+      .frame(width: 0, height: 0)
       .allowsHitTesting(false)
       .searchable(
         text: $query,
@@ -256,6 +259,7 @@ private struct AppSearchTaskAnchor: View {
 
   var body: some View {
     Color.clear
+      .frame(width: 0, height: 0)
       .task(id: trigger) {
         await runSearch(trigger)
       }
@@ -283,7 +287,6 @@ public struct AppSearchHostModifier: ViewModifier {
         automation: automation,
         routeAction: routeAction
       )
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
     }
   }
 }
