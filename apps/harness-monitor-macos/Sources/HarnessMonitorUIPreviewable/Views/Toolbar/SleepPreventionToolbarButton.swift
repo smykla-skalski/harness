@@ -60,9 +60,15 @@ struct SleepPreventionToolbarButton: View {
     .animation(.default, value: presentation.isEnabled)
     .tint(presentation.isEnabled ? .orange : nil)
     .help(presentation.helpText)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.sleepPreventionButton)
     .accessibilityLabel("Sleep prevention")
     .accessibilityValue(presentation.accessibilityValue)
     .accessibilityHint(presentation.accessibilityHint)
+    .harnessMCPButton(
+      HarnessMonitorAccessibility.sleepPreventionButton,
+      label: "Sleep prevention",
+      value: presentation.accessibilityValue,
+      hint: presentation.accessibilityHint,
+      pressAction: { store.sleepPreventionEnabled.toggle() }
+    )
   }
 }

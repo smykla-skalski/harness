@@ -81,6 +81,23 @@ extension View {
     )
   }
 
+  public func harnessMCPText(
+    _ identifier: String,
+    label: String? = nil,
+    value: String? = nil,
+    hint: String? = nil,
+    enabled: Bool = true
+  ) -> some View {
+    harnessTrackMCPElement(
+      identifier,
+      kind: .text,
+      label: label,
+      value: value,
+      hint: hint,
+      enabled: enabled
+    )
+  }
+
   public func harnessMCPRow(
     _ identifier: String,
     label: String? = nil,

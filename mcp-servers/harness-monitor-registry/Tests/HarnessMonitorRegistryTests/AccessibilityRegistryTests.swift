@@ -622,6 +622,35 @@ struct AccessibilityRegistryTests {
     #expect(identifiers == ["hybrid.child"])
   }
 
+  @MainActor
+  @Test("window element sync harvests window-level accessibility children when contentView exists")
+  func windowElementSyncHarvestsWindowLevelAccessibilityChildren() async {
+    let registry = AccessibilityRegistry()
+    let controller = WindowElementRegistrySyncController(
+      registry: registry,
+      minimumReplacementInterval: .zero
+    )
+    let window = WindowAccessibilityChildHost(
+      contentRect: NSRect(x: 120, y: 180, width: 420, height: 320),
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+    let root = NSView(frame: NSRect(x: 0, y: 0, width: 420, height: 320))
+    root.setAccessibilityIdentifier("window.content.root")
+    window.contentView = root
+    window.layoutIfNeeded()
+    root.layoutSubtreeIfNeeded()
+
+    let generation = controller.beginTracking(windowID: window.windowNumber)
+    controller.sync(window: window, generation: generation)
+    await controller.waitForIdle()
+
+    let elements = await registry.allElements(windowID: window.windowNumber)
+    #expect(elements.map(\.identifier) == ["window.content.root", "window.toolbar.button"])
+    #expect(elements.first(where: { $0.identifier == "window.toolbar.button" })?.kind == .button)
+  }
+
 
   @MainActor
   @Test("stale tracker teardown does not clear replacement harvested elements for the same window")
@@ -882,5 +911,22 @@ private final class HybridAccessibilityChildrenHostView: NSView {
 
   override func accessibilityChildren() -> [Any]? {
     [hybridChild]
+  }
+}
+
+@MainActor
+private final class WindowAccessibilityChildHost: NSWindow {
+  private let toolbarButton = AccessibilityNavigationChildView(
+    frame: NSRect(x: 24, y: 280, width: 120, height: 32),
+    identifier: "window.toolbar.button",
+    label: "Toolbar button"
+  )
+
+  override func accessibilityChildren() -> [Any]? {
+    [toolbarButton]
+  }
+
+  override func accessibilityChildrenInNavigationOrder() -> [any NSAccessibilityElementProtocol]? {
+    nil
   }
 }

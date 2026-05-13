@@ -95,8 +95,13 @@ struct SessionSidebarFooter: View {
     .padding(.top, HarnessMonitorTheme.spacingXS)
     .padding(.bottom, footerOuterPadding)
     .help(model.helpText)
+    .harnessMCPText(
+      HarnessMonitorAccessibility.sessionWindowStatusSurface,
+      label: "Session status",
+      value: model.accessibilityValue,
+      hint: model.helpText
+    )
     .accessibilityElement(children: .ignore)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowStatusSurface)
     .accessibilityLabel("Session status")
     .accessibilityValue(model.accessibilityValue)
   }

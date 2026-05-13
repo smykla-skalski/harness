@@ -58,6 +58,51 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
   }
 
   @MainActor
+  @Test("Harness MCP text helper registers text elements in the shared runtime registry")
+  func harnessTrackedTextElementsRegisterInRuntimeRegistry() async {
+    let registry = HarnessMonitorMCPAccessibilityService.shared.registry
+    let identifier = "harness.test.runtime-text"
+
+    await registry.unregisterElement(identifier: identifier)
+
+    let host = NSHostingView(
+      rootView: Text("Runtime status")
+        .harnessMCPText(
+          identifier,
+          label: "Runtime status",
+          value: "Ready"
+        )
+    )
+    let window = NSWindow(
+      contentRect: CGRect(x: 0, y: 0, width: 320, height: 120),
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    host.frame = CGRect(x: 0, y: 0, width: 320, height: 120)
+    window.contentView = host
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+
+    #expect(
+      await waitUntil {
+        await registry.element(identifier: identifier)?.kind == .text
+      }
+    )
+
+    let element = await registry.element(identifier: identifier)
+    #expect(element?.label == "Runtime status")
+    #expect(element?.value == "Ready")
+    #expect(element?.kind == .text)
+  }
+
+  @MainActor
   @Test("Harness MCP tracked press actions execute through the shared runtime service")
   func harnessTrackedPressActionsExecuteThroughTheSharedRuntimeService() async {
     let service = HarnessMonitorMCPAccessibilityService.shared

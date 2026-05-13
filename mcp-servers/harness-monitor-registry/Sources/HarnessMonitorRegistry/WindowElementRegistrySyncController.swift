@@ -196,12 +196,7 @@ private enum WindowAccessibilityElementSnapshotter {
   private static let maximumVisitedNodes = 700
 
   static func elements(in window: NSWindow) -> [RegistryElement] {
-    var queue: [any NSAccessibilityProtocol] = []
-    if let contentView = window.contentView {
-      queue.append(contentView)
-    } else {
-      queue.append(window)
-    }
+    var queue: [any NSAccessibilityProtocol] = [window]
     var index = 0
     var visited: Set<ObjectIdentifier> = []
     var harvested: [String: RegistryElement] = [:]
@@ -232,21 +227,19 @@ private enum WindowAccessibilityElementSnapshotter {
     var children: [any NSAccessibilityProtocol] = []
     var seen: Set<ObjectIdentifier> = []
 
-    if let view = node as? NSView {
-      let initialCount = children.count
-      if shouldTraversePublishedAccessibilityChildren(of: view) {
-        WindowAccessibilityChildNodeCollector.append(
-          contentsOf: view.accessibilityChildrenInNavigationOrder(),
-          to: &children,
-          seen: &seen
-        )
-        WindowAccessibilityChildNodeCollector.append(
-          contentsOf: view.accessibilityChildren(),
-          to: &children,
-          seen: &seen
-        )
+    if let window = node as? NSWindow {
+      appendPublishedAccessibilityChildren(of: window, to: &children, seen: &seen)
+      if let contentView = window.contentView {
+        WindowAccessibilityChildNodeCollector.append(contentView, to: &children, seen: &seen)
       }
-      if children.count == initialCount {
+      return children
+    }
+
+    if let view = node as? NSView {
+      if shouldTraversePublishedAccessibilityChildren(of: view) {
+        appendPublishedAccessibilityChildren(of: view, to: &children, seen: &seen)
+      }
+      if children.isEmpty {
         WindowAccessibilityChildNodeCollector.append(
           contentsOf: view.subviews,
           to: &children,
@@ -256,29 +249,41 @@ private enum WindowAccessibilityElementSnapshotter {
       return children
     }
 
-    if let window = node as? NSWindow, let contentView = window.contentView {
-      children.append(contentView)
-      return children
-    }
+    appendPublishedAccessibilityChildren(of: node, to: &children, seen: &seen)
+    return children
+  }
 
-    let object = node as AnyObject
-    if shouldTraversePublishedAccessibilityChildren(of: object) {
+  private static func shouldTraversePublishedAccessibilityChildren(of object: AnyObject) -> Bool {
+    let bundle = Bundle(for: type(of: object))
+    if bundle == .main {
+      return true
+    }
+    if let bundleIdentifier = bundle.bundleIdentifier {
+      return bundleIdentifier.hasPrefix("io.harnessmonitor") || bundleIdentifier.hasSuffix(".xctest")
+    }
+    return bundle.bundleURL.pathExtension == "xctest"
+  }
+
+  private static func appendPublishedAccessibilityChildren(
+    of node: any NSAccessibilityProtocol,
+    to children: inout [any NSAccessibilityProtocol],
+    seen: inout Set<ObjectIdentifier>
+  ) {
+    if canBridgeNavigationOrderChildren(of: node as AnyObject) {
       WindowAccessibilityChildNodeCollector.append(
         contentsOf: node.accessibilityChildrenInNavigationOrder(),
         to: &children,
         seen: &seen
       )
-      WindowAccessibilityChildNodeCollector.append(
-        contentsOf: node.accessibilityChildren(),
-        to: &children,
-        seen: &seen
-      )
     }
-
-    return children
+    WindowAccessibilityChildNodeCollector.append(
+      contentsOf: node.accessibilityChildren(),
+      to: &children,
+      seen: &seen
+    )
   }
 
-  private static func shouldTraversePublishedAccessibilityChildren(of object: AnyObject) -> Bool {
+  private static func canBridgeNavigationOrderChildren(of object: AnyObject) -> Bool {
     let bundle = Bundle(for: type(of: object))
     if bundle == .main {
       return true

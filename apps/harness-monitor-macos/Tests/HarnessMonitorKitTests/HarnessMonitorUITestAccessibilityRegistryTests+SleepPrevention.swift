@@ -14,14 +14,11 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     let contentToolbar = try sourceFile(named: "ContentToolbarItems.swift")
     let sessionToolbar = try sourceFile(named: "SessionWindowToolbar.swift")
 
-    #expect(
-      sleepToolbarButton.contains(
-        ".accessibilityIdentifier(HarnessMonitorAccessibility.sleepPreventionButton)"
-      )
-    )
+    #expect(sleepToolbarButton.contains("HarnessMonitorAccessibility.sleepPreventionButton"))
     #expect(sleepToolbarButton.contains("cup.and.heat.waves.fill"))
     #expect(sleepToolbarButton.contains("cup.and.heat.waves"))
     #expect(sleepToolbarButton.contains(".contentTransition("))
+    #expect(sleepToolbarButton.contains(".harnessMCPButton("))
     #expect(
       sleepToolbarButton.contains(
         ".replace.magic(fallback: .downUp.wholeSymbol)"
