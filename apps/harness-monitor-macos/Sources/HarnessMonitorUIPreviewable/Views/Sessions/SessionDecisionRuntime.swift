@@ -147,10 +147,17 @@ public final class SessionDecisionRuntime {
       decisions: decisions
     )
     guard auditEvents != scopedEvents else { return }
+    let decoder = JSONDecoder()
     auditEvents = scopedEvents
     auditEventPayloadPresentations = Dictionary(
       uniqueKeysWithValues: scopedEvents.map {
-        ($0.id, DecisionAuditTrailPayloadPresentation(payloadJSON: $0.payloadJSON))
+        (
+          $0.id,
+          DecisionAuditTrailPayloadPresentation(
+            payloadJSON: $0.payloadJSON,
+            decoder: decoder
+          )
+        )
       }
     )
   }

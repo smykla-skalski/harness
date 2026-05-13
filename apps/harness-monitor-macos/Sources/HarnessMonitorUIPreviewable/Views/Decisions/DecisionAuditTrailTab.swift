@@ -176,7 +176,7 @@ struct DecisionAuditTrailPayloadPresentation: Equatable {
   let summary: String?
   let details: DecisionAuditTrailPayloadDetails?
 
-  init(payloadJSON: String) {
+  init(payloadJSON: String, decoder: JSONDecoder = JSONDecoder()) {
     let trimmed = payloadJSON.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty, trimmed != "{}", trimmed != "[]" else {
       summary = nil
@@ -185,7 +185,7 @@ struct DecisionAuditTrailPayloadPresentation: Equatable {
     }
 
     guard let data = trimmed.data(using: .utf8),
-      let jsonValue = try? JSONDecoder().decode(JSONValue.self, from: data)
+      let jsonValue = try? decoder.decode(JSONValue.self, from: data)
     else {
       summary = nil
       details = .raw(trimmed)
