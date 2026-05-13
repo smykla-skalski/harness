@@ -41,6 +41,8 @@ public struct SessionWindowView: View {
   @State private var isLoadingStorage = false
   @State private var didLoadSnapshotStorage = false
   @State private var detailColumnWidthStorage: CGFloat = 0
+  @State private var liveInspectorWidthStorage: Double?
+  @State private var liveContentColumnWidthStorage: Double?
   @State private var decisionCacheStorage = SessionWindowDecisionCacheStorage()
   @State private var currentModifiers: EventModifiers = []
 
@@ -50,7 +52,9 @@ public struct SessionWindowView: View {
     _stateCacheStorage = State(wrappedValue: SessionWindowStateCache(sessionID: token.sessionID))
   }
 
-  var stateCache: SessionWindowStateCache { stateCacheStorage }
+  var stateCache: SessionWindowStateCache {
+    stateCacheStorage
+  }
   var snapshot: HarnessMonitorSessionWindowSnapshot? {
     get { snapshotStorage }
     nonmutating set { snapshotStorage = newValue }
@@ -107,33 +111,29 @@ public struct SessionWindowView: View {
     )
   }
 
-  var inspectorWidth: Double {
+  var storedInspectorWidth: Double {
     get { inspectorWidthStorage }
     nonmutating set { inspectorWidthStorage = newValue }
   }
 
-  var inspectorWidthBinding: Binding<Double> {
-    Binding(
-      get: { inspectorWidthStorage },
-      set: { if inspectorWidthStorage != $0 { inspectorWidthStorage = $0 } }
-    )
+  var liveInspectorWidthDraft: Double? {
+    get { liveInspectorWidthStorage }
+    nonmutating set { liveInspectorWidthStorage = newValue }
+  }
+
+  var storedContentColumnWidth: Double {
+    get { contentColumnWidthStorage }
+    nonmutating set { contentColumnWidthStorage = newValue }
+  }
+
+  var liveContentColumnWidthDraft: Double? {
+    get { liveContentColumnWidthStorage }
+    nonmutating set { liveContentColumnWidthStorage = newValue }
   }
 
   var sidebarWidth: Double {
     get { sidebarWidthStorage }
     nonmutating set { sidebarWidthStorage = newValue }
-  }
-
-  var contentColumnWidth: Double {
-    get { contentColumnWidthStorage }
-    nonmutating set { contentColumnWidthStorage = newValue }
-  }
-
-  var contentColumnWidthBinding: Binding<Double> {
-    Binding(
-      get: { contentColumnWidthStorage },
-      set: { if contentColumnWidthStorage != $0 { contentColumnWidthStorage = $0 } }
-    )
   }
 
   var presentedModifiers: EventModifiers {
@@ -254,7 +254,7 @@ public struct SessionWindowView: View {
         detailRenderedSelection = newSelection
         contentRenderedRoute = route(for: newSelection)
         if case .create(let draft) = newSelection, draft.kind == .agent {
-          contentColumnWidth = SessionContentDetailSplitLayout.defaultContentWidth
+          commitContentColumnWidth(SessionContentDetailSplitLayout.defaultContentWidth)
         }
       }
       .onChange(of: stateCache.sectionState.decisionID) { _, newDecisionID in

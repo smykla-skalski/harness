@@ -122,6 +122,10 @@ struct SessionSwiftUISourceTests {
     #expect(sessionWindowSource.contains("private var inspectorPreferredStorage = false"))
     #expect(sessionWindowSource.contains("private var inspectorWidthStorage = 280.0"))
     #expect(sessionWindowSource.contains("private var sidebarWidthStorage = 200.0"))
+    #expect(sessionWindowSource.contains("@State private var liveInspectorWidthStorage: Double?"))
+    #expect(
+      sessionWindowSource.contains("@State private var liveContentColumnWidthStorage: Double?")
+    )
     #expect(
       sessionWindowSource.contains(
         "private var contentColumnWidthStorage = SessionContentDetailSplitLayout.defaultContentWidth"
@@ -178,6 +182,9 @@ struct SessionSwiftUISourceTests {
   @Test("Session split view and search bindings ignore redundant writes")
   func sessionSplitViewAndSearchBindingsIgnoreRedundantWrites() throws {
     let sessionWindowSource = try sourceFile(at: "Views/Sessions/SessionWindowView.swift")
+    let widthPersistenceSource = try sourceFile(
+      at: "Views/Sessions/SessionWindowView+WidthPersistence.swift"
+    )
     let presentationSource = try sourceFile(
       at: "Views/Sessions/SessionWindowView+Presentation.swift")
     let sidebarSearchSource = try sourceFile(at: "Views/Sidebar/SidebarSearchHost.swift")
@@ -187,8 +194,10 @@ struct SessionSwiftUISourceTests {
     #expect(sessionWindowSource.contains("if focusModeStorage != $0"))
     #expect(sessionWindowSource.contains("if inspectorVisibleStorage != $0"))
     #expect(sessionWindowSource.contains("if inspectorPreferredStorage != $0"))
-    #expect(sessionWindowSource.contains("if inspectorWidthStorage != $0"))
-    #expect(sessionWindowSource.contains("if contentColumnWidthStorage != $0"))
+    #expect(widthPersistenceSource.contains("guard abs(inspectorWidth - newValue) > 0.5 else"))
+    #expect(
+      widthPersistenceSource.contains("guard abs(contentColumnWidth - newValue) > 0.5 else")
+    )
     #expect(sidebarSearchSource.contains("guard store.searchText != newValue else { return }"))
     #expect(
       sidebarSearchSource.contains(

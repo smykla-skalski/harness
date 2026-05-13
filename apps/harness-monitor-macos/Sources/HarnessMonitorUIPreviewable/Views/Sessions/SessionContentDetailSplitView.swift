@@ -42,16 +42,19 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
   @Binding private var contentWidth: Double
   @State private var liveContentWidth = SessionContentDetailSplitLayout.defaultContentWidth
   @State private var isDragging = false
+  private let commitContentWidth: (Double) -> Void
   private let content: Content
   private let detail: Detail
 
   init(
     contentWidth: Binding<Double>,
+    commitContentWidth: @escaping (Double) -> Void,
     @ViewBuilder content: () -> Content,
     @ViewBuilder detail: () -> Detail
   ) {
     _contentWidth = contentWidth
     _liveContentWidth = State(wrappedValue: contentWidth.wrappedValue)
+    self.commitContentWidth = commitContentWidth
     self.content = content()
     self.detail = detail()
   }
@@ -74,6 +77,7 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
         SessionContentDetailDivider(
           contentWidth: $liveContentWidth,
           isDragging: $isDragging,
+          commitContentWidth: commitContentWidth,
           widthRange: contentRange
         )
 
@@ -88,14 +92,6 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
       }
       .onChange(of: geometry.size.width, initial: true) { _, newWidth in
         deferReclampLiveWidth(availableWidth: newWidth)
-      }
-      .onChange(of: liveContentWidth) { _, newValue in
-        guard !isDragging else { return }
-        commitPersistedWidth(newValue)
-      }
-      .onChange(of: isDragging) { _, dragging in
-        guard !dragging else { return }
-        commitPersistedWidth(liveContentWidth)
       }
     }
   }
@@ -119,19 +115,13 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
     if abs(liveContentWidth - clamped) > 0.5 {
       liveContentWidth = clamped
     }
-    guard !isDragging else { return }
-    commitPersistedWidth(clamped)
-  }
-
-  private func commitPersistedWidth(_ resolvedContentWidth: Double) {
-    guard abs(contentWidth - resolvedContentWidth) > 0.5 else { return }
-    contentWidth = resolvedContentWidth
   }
 }
 
 private struct SessionContentDetailDivider: View {
   @Binding var contentWidth: Double
   @Binding var isDragging: Bool
+  let commitContentWidth: (Double) -> Void
   let widthRange: ClosedRange<Double>
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
@@ -266,6 +256,7 @@ private struct SessionContentDetailDivider: View {
       }
       .onEnded { value in
         updateContentWidth(for: value, quantized: false)
+        commitContentWidth(contentWidth)
         dragStartWidth = nil
         isDragging = false
         updateCursor(active: isHovered)
@@ -306,6 +297,7 @@ private struct SessionContentDetailDivider: View {
   private func adjustContentWidth(by delta: Double) {
     let next = contentWidth + delta
     contentWidth = min(max(next, widthRange.lowerBound), widthRange.upperBound)
+    commitContentWidth(contentWidth)
   }
 
   private func updateCursor(active: Bool) {

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SessionInspectorDivider: View {
   @Binding var width: Double
+  let commitWidth: (Double) -> Void
   let minWidth: Double
   let maxWidth: Double
   @State private var dragStartWidth: Double?
@@ -22,7 +23,10 @@ struct SessionInspectorDivider: View {
                 let next = (dragStartWidth ?? width) - delta
                 width = max(minWidth, min(next, maxWidth))
               }
-              .onEnded { _ in dragStartWidth = nil }
+              .onEnded { _ in
+                commitWidth(width)
+                dragStartWidth = nil
+              }
           )
       }
       .accessibilityHidden(true)

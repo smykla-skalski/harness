@@ -222,3 +222,42 @@ extension SessionWindowFlowTests {
     #expect(inspectorSource.contains("@Binding var preferredVisible"))
   }
 }
+
+@Suite("Session inspector visibility policy")
+struct SessionInspectorVisibilityPolicyTests {
+  @Test("Startup inspector reconciliation waits for a concrete layout width")
+  func startupInspectorReconciliationWaitsForConcreteLayoutWidth() {
+    #expect(
+      SessionInspectorVisibilityPolicy.shouldDeferVisibilityReconciliation(
+        preferredVisible: true,
+        hasInspectorContext: true,
+        detailColumnWidth: 0,
+        focusMode: false
+      )
+    )
+    #expect(
+      !SessionInspectorVisibilityPolicy.shouldDeferVisibilityReconciliation(
+        preferredVisible: true,
+        hasInspectorContext: true,
+        detailColumnWidth: 1100,
+        focusMode: false
+      )
+    )
+    #expect(
+      !SessionInspectorVisibilityPolicy.shouldDeferVisibilityReconciliation(
+        preferredVisible: true,
+        hasInspectorContext: false,
+        detailColumnWidth: 0,
+        focusMode: false
+      )
+    )
+    #expect(
+      !SessionInspectorVisibilityPolicy.shouldDeferVisibilityReconciliation(
+        preferredVisible: true,
+        hasInspectorContext: true,
+        detailColumnWidth: 0,
+        focusMode: true
+      )
+    )
+  }
+}

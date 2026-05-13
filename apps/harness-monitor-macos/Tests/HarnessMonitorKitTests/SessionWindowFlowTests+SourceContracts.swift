@@ -139,7 +139,11 @@ extension SessionWindowFlowTests {
     #expect(viewSource.contains("sessionSurface"))
     #expect(
       columnsSource.contains(
-        "SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding)"
+        """
+        SessionContentDetailSplitView(
+                  contentWidth: contentColumnWidthBinding,
+                  commitContentWidth: commitContentColumnWidth
+        """
       )
     )
     #expect(columnsSource.contains(".navigationSplitViewStyle(.prominentDetail)"))

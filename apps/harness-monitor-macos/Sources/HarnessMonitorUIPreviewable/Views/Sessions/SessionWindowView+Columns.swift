@@ -154,7 +154,10 @@ extension SessionWindowView {
       case .sidebarDetail:
         routeDetailColumn
       case .sidebarContentDetail:
-        SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding) {
+        SessionContentDetailSplitView(
+          contentWidth: contentColumnWidthBinding,
+          commitContentWidth: commitContentColumnWidth
+        ) {
           contentColumn
         } detail: {
           detailColumn
@@ -295,6 +298,7 @@ extension SessionWindowView {
         if inspectorVisible, inspectorAllowed, let inspectorDecision = inspectorContextDecision {
           SessionInspectorDivider(
             width: inspectorWidthBinding,
+            commitWidth: commitInspectorWidth,
             minWidth: 220,
             maxWidth: 420
           )
