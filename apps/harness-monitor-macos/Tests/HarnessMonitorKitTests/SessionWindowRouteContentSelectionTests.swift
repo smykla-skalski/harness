@@ -8,9 +8,10 @@ struct SessionWindowRouteContentSelectionTests {
   @Test("Session sidebar routes include the session decisions queue")
   func sessionSidebarRoutesIncludeSessionDecisionsQueue() throws {
     let sidebar = try sourceFile(named: "SessionSidebar.swift")
+    let sections = try sourceFile(named: "SessionSidebar+Sections.swift")
 
     #expect(
-      sidebar.contains(
+      sections.contains(
         "ForEach([SessionWindowRoute.overview, .timeline, .agents, .decisions])"
       )
     )
