@@ -14,8 +14,8 @@ private let appSearchSignposter = OSSignposter(
   category: "perf"
 )
 
-/// Re-runs the search whenever the live query or the focused-route's
-/// resolved primary domain changes.
+/// Re-runs the search whenever the live query or resolved primary domain
+/// changes.
 private struct AppSearchTrigger: Equatable {
   let query: String
   let primary: AppSearchDomain?
@@ -25,8 +25,9 @@ private struct AppSearchTrigger: Equatable {
 /// `AppSearchModel` after a 150 ms debounce.
 ///
 /// The modifier owns one `@State` for the live query (the only main-actor
-/// write per keystroke). The primary domain at search time is resolved
-/// from the focused route, falling back to `fallbackPrimaryDomain`.
+/// write per keystroke). The primary domain is injected by the session
+/// window so route changes do not flow through `FocusedValues` into the
+/// native search field.
 /// Ranking work happens off-MainActor inside `AppSearchIndex`.
 ///
 /// Cmd-F focus is published through the shared focused-command dispatcher
@@ -41,12 +42,10 @@ private struct AppSearchTrigger: Equatable {
 public struct AppSearchHost: View {
   let model: AppSearchModel
   let prompt: LocalizedStringKey
+  let primaryDomain: AppSearchDomain?
   let fallbackPrimaryDomain: AppSearchDomain
   let automation: AppSearchAutomationState?
   let routeAction: (AppSearchHit) -> Void
-
-  @FocusedValue(\.harnessSessionRouteFocus)
-  private var routeFocus: HarnessSessionRouteFocus?
 
   @State private var query: String = ""
   @State private var suggestionSnapshot = AppSearchSuggestionSnapshot.empty
@@ -56,12 +55,14 @@ public struct AppSearchHost: View {
   public init(
     model: AppSearchModel,
     prompt: LocalizedStringKey = "Search session",
+    primaryDomain: AppSearchDomain? = nil,
     fallbackPrimaryDomain: AppSearchDomain = .timeline,
     automation: AppSearchAutomationState? = nil,
     routeAction: @escaping (AppSearchHit) -> Void = { _ in }
   ) {
     self.model = model
     self.prompt = prompt
+    self.primaryDomain = primaryDomain
     self.fallbackPrimaryDomain = fallbackPrimaryDomain
     self.automation = automation
     self.routeAction = routeAction
@@ -173,7 +174,7 @@ public struct AppSearchHost: View {
   }
 
   private var resolvedPrimaryDomain: AppSearchDomain {
-    routeFocus?.domain ?? fallbackPrimaryDomain
+    primaryDomain ?? fallbackPrimaryDomain
   }
 
   private func applyAutomationCommand(_ command: AppSearchAutomationCommand) async {
@@ -224,6 +225,7 @@ public struct AppSearchHost: View {
 public struct AppSearchHostModifier: ViewModifier {
   let model: AppSearchModel
   let prompt: LocalizedStringKey
+  let primaryDomain: AppSearchDomain?
   let fallbackPrimaryDomain: AppSearchDomain
   let automation: AppSearchAutomationState?
   let routeAction: (AppSearchHit) -> Void
@@ -233,6 +235,7 @@ public struct AppSearchHostModifier: ViewModifier {
       AppSearchHost(
         model: model,
         prompt: prompt,
+        primaryDomain: primaryDomain,
         fallbackPrimaryDomain: fallbackPrimaryDomain,
         automation: automation,
         routeAction: routeAction
@@ -247,6 +250,7 @@ extension View {
   public func appSearchHost(
     model: AppSearchModel,
     prompt: LocalizedStringKey = "Search session",
+    primaryDomain: AppSearchDomain? = nil,
     fallbackPrimaryDomain: AppSearchDomain = .timeline,
     automation: AppSearchAutomationState? = nil,
     routeAction: @escaping (AppSearchHit) -> Void = { _ in }
@@ -255,6 +259,7 @@ extension View {
       AppSearchHostModifier(
         model: model,
         prompt: prompt,
+        primaryDomain: primaryDomain,
         fallbackPrimaryDomain: fallbackPrimaryDomain,
         automation: automation,
         routeAction: routeAction
