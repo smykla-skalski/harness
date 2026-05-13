@@ -21,6 +21,12 @@ struct Audit: ParsableCommand {
     @Flag(name: [.long, .customLong("keep-traces")], help: "Keep raw .trace bundles.")
     var keepTraces: Bool = false
 
+    @Flag(
+        name: [.long, .customLong("debug-retention")],
+        help: "Keep traces, launch sidecars, and raw export XML for diagnosis."
+    )
+    var debugRetention: Bool = false
+
     @Option(name: [.long, .customLong("checkout-root")], help: "Repo checkout root.")
     var checkoutRoot: String
 
@@ -88,6 +94,7 @@ struct Audit: ParsableCommand {
             compareTo: compareTo.map { URL(fileURLWithPath: $0) },
             scenarioSelection: scenarios,
             keepTraces: keepTraces,
+            debugRetention: debugRetention,
             checkoutRoot: URL(fileURLWithPath: checkoutRoot),
             commonRepoRoot: URL(fileURLWithPath: commonRepoRoot),
             appRoot: URL(fileURLWithPath: appRoot),

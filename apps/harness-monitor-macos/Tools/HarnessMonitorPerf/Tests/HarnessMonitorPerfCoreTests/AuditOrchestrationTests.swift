@@ -114,6 +114,7 @@ final class RunPrunerTests: XCTestCase {
         XCTAssertTrue(RunPruner.retain(relativePath: "summary.csv", keepTraces: false))
         XCTAssertTrue(RunPruner.retain(relativePath: "log-only-summary.json", keepTraces: false))
         XCTAssertTrue(RunPruner.retain(relativePath: "captures.tsv", keepTraces: false))
+        XCTAssertTrue(RunPruner.retain(relativePath: "debug-retention.json", keepTraces: false))
     }
 
     func testRetainScopedMetricsAndLogs() {
@@ -126,11 +127,42 @@ final class RunPrunerTests: XCTestCase {
     func testTracesGatedByKeepFlag() {
         XCTAssertFalse(RunPruner.retain(relativePath: "traces/swiftui/launch.trace", keepTraces: false))
         XCTAssertTrue(RunPruner.retain(relativePath: "traces/swiftui/launch.trace", keepTraces: true))
+        XCTAssertTrue(
+            RunPruner.retain(
+                relativePath: "traces/swiftui/launch.trace",
+                keepTraces: false,
+                debugRetention: true
+            )
+        )
     }
 
     func testNestedComparisonRetained() {
         XCTAssertTrue(RunPruner.retain(relativePath: "comparison-baseline/comparison.json", keepTraces: false))
         XCTAssertTrue(RunPruner.retain(relativePath: "comparison-baseline/comparison.md", keepTraces: false))
+    }
+
+    func testDebugRetentionKeepsExportsAndLaunchMetrics() {
+        XCTAssertTrue(
+            RunPruner.retain(
+                relativePath: "exports/open-recent-window/swiftui/swiftui-updates.xml",
+                keepTraces: false,
+                debugRetention: true
+            )
+        )
+        XCTAssertTrue(
+            RunPruner.retain(
+                relativePath: "launch-metrics/open-recent-window/swiftui.json",
+                keepTraces: false,
+                debugRetention: true
+            )
+        )
+        XCTAssertFalse(
+            RunPruner.retain(
+                relativePath: "exports/open-recent-window/swiftui/swiftui-updates.xml",
+                keepTraces: false,
+                debugRetention: false
+            )
+        )
     }
 }
 

@@ -93,6 +93,56 @@ final class ExtractorOrchestratorTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: runDir.appendingPathComponent("summary.json").path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: runDir.appendingPathComponent("summary.csv").path))
     }
+
+    func testExtractRetainsDebugQueryExports() throws {
+        let manifest = """
+        {
+          "label": "perf",
+          "created_at_utc": "2026-04-25T00:00:00Z",
+          "captures": [
+            {"scenario": "open-recent-window", "template": "SwiftUI", "trace_relpath": "traces/open-recent-window.trace", "duration_seconds": 5, "exit_status": 0, "end_reason": "completed"}
+          ]
+        }
+        """
+        try Data(manifest.utf8).write(
+            to: runDir.appendingPathComponent("manifest.json"),
+            options: .atomic
+        )
+
+        let exporter = FixtureExporter(
+            toc: try fixtureData("toc-minimal"),
+            swiftUIQueries: [
+                "swiftui-updates": try fixtureData("swiftui-updates-minimal"),
+                "swiftui-update-groups": try fixtureData("swiftui-update-groups-minimal"),
+                "swiftui-causes": try fixtureData("swiftui-causes-minimal"),
+                "hitches": try fixtureData("hitches-minimal"),
+                "potential-hangs": try fixtureData("hitches-minimal"),
+                "time-profile": try fixtureData("time-profile-minimal"),
+            ]
+        )
+
+        let debugRoot = runDir.appendingPathComponent("exports", isDirectory: true)
+        _ = try ExtractorOrchestrator.extract(
+            runDir: runDir,
+            exporter: exporter,
+            debugExportsRoot: debugRoot
+        )
+
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: debugRoot
+                    .appendingPathComponent("open-recent-window/swiftui/swiftui-updates.xml")
+                    .path
+            )
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: debugRoot
+                    .appendingPathComponent("open-recent-window/swiftui/time-profile.xml")
+                    .path
+            )
+        )
+    }
 }
 
 final class AuditLockTests: XCTestCase {

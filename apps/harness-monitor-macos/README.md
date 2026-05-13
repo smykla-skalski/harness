@@ -34,6 +34,7 @@ Focused task entrypoints (run `mise run monitor:generate` first if the workspace
 mise run monitor:xcodebuild -- -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace ...
 mise run monitor:audit -- --label after-fix --compare-to tmp/perf/harness-monitor-instruments/runs/<baseline-dir>
 mise run monitor:audit:from-ref -- --ref <sha-or-ref> --label baseline
+mise run monitor:audit -- --label regression --debug-retention
 ```
 
 Audit runs now persist per-capture `launch_metrics` in the manifest/summary,
