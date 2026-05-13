@@ -35,6 +35,7 @@
           "template": { "type": "string" },
           "duration_seconds": { "type": ["number", "null"] },
           "trace_relpath": { "type": ["string", "null"] },
+          "app_trace_relpath": { "type": ["string", "null"] },
           "exit_status": { "type": ["integer", "null"] },
           "end_reason": { "type": ["string", "null"] },
           "warnings": {
@@ -74,10 +75,54 @@
               }
             }
           },
+          "app_trace": {
+            "type": ["object", "null"],
+            "additionalProperties": false,
+            "required": ["relpath", "event_count", "components", "ordered_steps"],
+            "properties": {
+              "relpath": { "type": "string" },
+              "event_count": { "type": "integer" },
+              "components": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/componentCount" }
+              },
+              "ordered_steps": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          },
+          "findings": {
+            "type": ["array", "null"],
+            "items": { "$ref": "#/$defs/finding" }
+          },
           "metrics": {
             "description": "Free-form extracted metrics payload keyed by template-specific extractor output."
           }
         }
+      }
+    }
+  },
+  "$defs": {
+    "componentCount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "count"],
+      "properties": {
+        "component": { "type": "string" },
+        "count": { "type": "integer" }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "category", "headline"],
+      "properties": {
+        "key": { "type": "string" },
+        "category": { "type": "string" },
+        "headline": { "type": "string" },
+        "detail": { "type": ["string", "null"] },
+        "count": { "type": ["integer", "null"] }
       }
     }
   }

@@ -83,6 +83,7 @@ final class ExtractorOrchestratorTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: swiftUIPath.path))
         let swiftUIData = try Data(contentsOf: swiftUIPath)
         XCTAssertTrue(String(data: swiftUIData, encoding: .utf8)!.contains("\"swiftui_updates\""))
+        XCTAssertTrue(String(data: swiftUIData, encoding: .utf8)!.contains("\"findings\""))
 
         let allocationsPath = runDir.appendingPathComponent("metrics/offline-cached-open/allocations.json")
         XCTAssertTrue(FileManager.default.fileExists(atPath: allocationsPath.path))

@@ -7,14 +7,18 @@ import Testing
 extension SessionWindowFlowTests {
   @Test("Session sidebar live region includes visible count")
   func sessionSidebarLiveRegionIncludesVisibleCount() throws {
-    let sidebarSource = try previewableSourceFile(named: "Views/Sessions/SessionSidebar.swift")
+    let selectionSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionSidebar+Selection.swift"
+    )
     let announcerSource = try previewableSourceFile(
       named: "Views/Sessions/SessionSidebarMultiSelectAnnouncer.swift"
     )
 
-    #expect(sidebarSource.contains(".accessibilityValue(decisionSelectionAccessibilityValue)"))
-    #expect(sidebarSource.contains(#""\(count) of \(visible) \(anchor.kind.pluralNoun) selected""#))
-    #expect(sidebarSource.contains(#""\(displayedSelectionSet.count) items selected""#))
+    #expect(selectionSource.contains("var decisionSelectionAccessibilityValue: Text"))
+    #expect(
+      selectionSource.contains(#""\(count) of \(visible) \(anchor.kind.pluralNoun) selected""#)
+    )
+    #expect(selectionSource.contains(#""\(displayedSelection.count) items selected""#))
     #expect(announcerSource.contains(#""\(count) of \(visibleCount) \(kind.pluralNoun) selected""#))
   }
 
@@ -26,15 +30,17 @@ extension SessionWindowFlowTests {
     let columnsSource = try previewableSourceFile(
       named: "Views/Sessions/SessionWindowView+Columns.swift"
     )
-    let sidebarSource = try previewableSourceFile(named: "Views/Sessions/SessionSidebar.swift")
+    let selectionDispatcherSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionSidebar+SelectionDispatcher.swift"
+    )
 
     #expect(!sectionSource.contains("Dismiss Selected"))
     #expect(!sectionSource.contains("Dismiss All Visible"))
     #expect(!sectionSource.contains("SessionDecisionFilterControls"))
     #expect(!sectionSource.contains(".badge(Text(\"\\(decisions.count) pending\"))"))
     #expect(columnsSource.contains("decisions: allSessionDecisions"))
-    #expect(sidebarSource.contains("case .decision:\n        return false"))
-    #expect(sidebarSource.contains("case .decision: return"))
+    #expect(selectionDispatcherSource.contains("case .decision: return"))
+    #expect(selectionDispatcherSource.contains("case .decision: decisions"))
   }
 
   @Test("Session sidebar headers use inset bordered add buttons")

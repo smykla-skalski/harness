@@ -17,6 +17,8 @@ private struct SessionWindowPerfScenarioTrigger: Equatable {
 struct SessionWindowPerfScenarioScript: ViewModifier {
   let stateCache: SessionWindowStateCache
   @Binding var columnVisibility: NavigationSplitViewVisibility
+  let contentDetailBaseWidth: Double
+  @Binding var contentDetailDividerWidth: Double?
   let sessionID: String
   let snapshot: HarnessMonitorSessionWindowSnapshot?
   let decisionIDs: [String]
@@ -71,7 +73,16 @@ struct SessionWindowPerfScenarioScript: ViewModifier {
     guard trigger.sessionID == PreviewFixtures.summary.sessionId else { return }
     guard appliedScenarioRawValue != scenario else { return }
 
-    switch HarnessMonitorUITestEnvironment.basePerfScenario(for: scenario) {
+    let baseScenario = HarnessMonitorUITestEnvironment.basePerfScenario(for: scenario)
+    HarnessMonitorPerfTrace.recordScenarioEvent(
+      event: "script.begin",
+      details: [
+        "base_scenario": baseScenario,
+        "session_id": sessionID,
+      ]
+    )
+
+    switch baseScenario {
     case "session-search-full":
       guard trigger.hasSearchCorpus else { return }
       appliedScenarioRawValue = scenario
@@ -83,26 +94,46 @@ struct SessionWindowPerfScenarioScript: ViewModifier {
     case "timeline-burst", "timeline-filter-form":
       appliedScenarioRawValue = scenario
       stateCache.selectRoute(.timeline)
+      HarnessMonitorPerfTrace.recordStep(
+        "route.timeline",
+        details: ["base_scenario": baseScenario]
+      )
     default:
       return
     }
+
+    HarnessMonitorPerfTrace.recordScenarioEvent(
+      event: "script.complete",
+      details: [
+        "base_scenario": baseScenario,
+        "session_id": sessionID,
+      ]
+    )
   }
 
   private func runFullSessionSearchScript() async {
     stateCache.selectRoute(.agents)
+    HarnessMonitorPerfTrace.recordStep("route.agents")
     stateCache.appSearchAutomation.present(query: "")
+    HarnessMonitorPerfTrace.recordStep("search.present")
     await Task.yield()
     try? await Task.sleep(for: .milliseconds(240))
 
     for step in searchSteps {
       stateCache.selectRoute(step.route)
+      HarnessMonitorPerfTrace.recordStep("route.\(step.route.rawValue)")
       await Task.yield()
       try? await Task.sleep(for: .milliseconds(80))
       stateCache.appSearchAutomation.present(query: step.query)
+      HarnessMonitorPerfTrace.recordStep(
+        "query.\(step.query)",
+        details: ["route": step.route.rawValue]
+      )
       try? await Task.sleep(for: .milliseconds(260))
     }
 
     stateCache.appSearchAutomation.dismiss()
+    HarnessMonitorPerfTrace.recordStep("search.dismiss")
   }
 
   private var searchSteps: [(query: String, route: SessionWindowRoute)] {
@@ -118,19 +149,53 @@ struct SessionWindowPerfScenarioScript: ViewModifier {
   private func runSidebarToggleRichDetailScript(
     targets: [SessionSidebarToggleTarget]
   ) async {
+    defer { contentDetailDividerWidth = nil }
     columnVisibility = .doubleColumn
+    HarnessMonitorPerfTrace.recordStep("column.double-column")
     await Task.yield()
     try? await Task.sleep(for: .milliseconds(180))
 
     for target in targets {
       selectSidebarToggleTarget(target)
+      HarnessMonitorPerfTrace.recordStep(target.selectionStep)
       await Task.yield()
       try? await Task.sleep(for: .milliseconds(180))
       columnVisibility = .detailOnly
+      HarnessMonitorPerfTrace.recordStep("column.detail-only")
       try? await Task.sleep(for: .milliseconds(180))
       columnVisibility = .doubleColumn
+      HarnessMonitorPerfTrace.recordStep("column.double-column")
+      if target.supportsContentDetailDivider {
+        await driveContentDetailDividerSweep()
+      }
       try? await Task.sleep(for: .milliseconds(220))
     }
+  }
+
+  private func driveContentDetailDividerSweep() async {
+    let widths: [(String, Double)] = [
+      (
+        "divider.narrow",
+        max(
+          contentDetailBaseWidth - 120,
+          Double(SessionContentDetailSplitLayout.minimumContentWidth)
+        )
+      ),
+      ("divider.wide", contentDetailBaseWidth + 140),
+      ("divider.restore", contentDetailBaseWidth),
+    ]
+
+    for (step, width) in widths {
+      contentDetailDividerWidth = width
+      HarnessMonitorPerfTrace.recordStep(
+        step,
+        details: ["requested_width": String(Int(width.rounded()))]
+      )
+      await Task.yield()
+      try? await Task.sleep(for: .milliseconds(180))
+    }
+
+    contentDetailDividerWidth = nil
   }
 
   private func selectSidebarToggleTarget(_ target: SessionSidebarToggleTarget) {
@@ -152,4 +217,26 @@ private enum SessionSidebarToggleTarget: Equatable {
   case task(String)
   case decision(String)
   case route(SessionWindowRoute)
+
+  var selectionStep: String {
+    switch self {
+    case .agent:
+      "selection.agent"
+    case .task:
+      "selection.task"
+    case .decision:
+      "selection.decision"
+    case .route(let route):
+      "selection.route.\(route.rawValue)"
+    }
+  }
+
+  var supportsContentDetailDivider: Bool {
+    switch self {
+    case .agent, .task, .decision:
+      true
+    case .route:
+      false
+    }
+  }
 }

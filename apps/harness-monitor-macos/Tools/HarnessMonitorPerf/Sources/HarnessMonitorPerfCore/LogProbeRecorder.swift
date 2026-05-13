@@ -26,12 +26,14 @@ public enum LogProbeRecorder {
         public var daemonDataHome: URL
         public var daemonDataHomeProbe: URL?
         public var runDir: URL
+        public var appTraceRelpath: String?
 
         public init(
             scenario: String, previewScenario: String, durationSeconds: Int,
             hostAppPath: URL, hostBinaryPath: URL, launchArguments: [String],
             environment: [String: String], logURL: URL, stdoutURL: URL, stderrURL: URL,
-            daemonDataHome: URL, daemonDataHomeProbe: URL? = nil, runDir: URL
+            daemonDataHome: URL, daemonDataHomeProbe: URL? = nil, runDir: URL,
+            appTraceRelpath: String? = nil
         ) {
             self.scenario = scenario
             self.previewScenario = previewScenario
@@ -46,6 +48,7 @@ public enum LogProbeRecorder {
             self.daemonDataHome = daemonDataHome
             self.daemonDataHomeProbe = daemonDataHomeProbe
             self.runDir = runDir
+            self.appTraceRelpath = appTraceRelpath
         }
     }
 
@@ -77,7 +80,10 @@ public enum LogProbeRecorder {
         public var logRelpath: String
         public var stdoutRelpath: String
         public var stderrRelpath: String
+        public var appTraceRelpath: String?
+        public var appTrace: CaptureAppTrace?
         public var warnings: WarningSummary
+        public var diagnosticsWarnings: [String]?
 
         enum CodingKeys: String, CodingKey {
             case scenario
@@ -89,7 +95,10 @@ public enum LogProbeRecorder {
             case logRelpath = "log_relpath"
             case stdoutRelpath = "stdout_relpath"
             case stderrRelpath = "stderr_relpath"
+            case appTraceRelpath = "app_trace_relpath"
+            case appTrace = "app_trace"
             case warnings
+            case diagnosticsWarnings = "diagnostics_warnings"
         }
     }
 
@@ -166,6 +175,21 @@ public enum LogProbeRecorder {
         let stdoutRelpath = relativePath(from: inputs.runDir, to: inputs.stdoutURL)
         let stderrRelpath = relativePath(from: inputs.runDir, to: inputs.stderrURL)
         let exitStatus = logResult.exitStatus == 0 ? Int32(0) : logResult.exitStatus
+        var diagnosticsWarnings: [String] = []
+        let appTrace: CaptureAppTrace? = {
+            guard let appTraceRelpath = inputs.appTraceRelpath else { return nil }
+            let appTraceURL = AuditArtifactPaths.appTraceURL(runDir: inputs.runDir, relpath: appTraceRelpath)
+            guard FileManager.default.fileExists(atPath: appTraceURL.path) else {
+                diagnosticsWarnings.append("app-trace file missing: \(appTraceRelpath)")
+                return nil
+            }
+            do {
+                return try AppTraceParser.summarize(fileURL: appTraceURL, relpath: appTraceRelpath)
+            } catch {
+                diagnosticsWarnings.append("app-trace parse failed: \(appTraceRelpath)")
+                return nil
+            }
+        }()
         let report = Report(
             scenario: inputs.scenario,
             durationSeconds: inputs.durationSeconds,
@@ -176,13 +200,17 @@ public enum LogProbeRecorder {
             logRelpath: logRelpath,
             stdoutRelpath: stdoutRelpath,
             stderrRelpath: stderrRelpath,
-            warnings: warnings
+            appTraceRelpath: inputs.appTraceRelpath,
+            appTrace: appTrace,
+            warnings: warnings,
+            diagnosticsWarnings: diagnosticsWarnings.isEmpty ? nil : diagnosticsWarnings
         )
         let captureRecord = ManifestBuilder.CaptureRecord(
             scenario: inputs.scenario,
             template: templateName,
             durationSeconds: inputs.durationSeconds,
             traceRelpath: logRelpath,
+            appTraceRelpath: inputs.appTraceRelpath,
             exitStatus: Int(report.exitStatus),
             endReason: report.endReason,
             previewScenario: inputs.previewScenario,

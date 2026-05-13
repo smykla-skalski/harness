@@ -10,6 +10,10 @@ extension AuditRunner {
     ) throws -> TraceRecorder.Capture {
         let templateSlug = template.lowercased().replacingOccurrences(of: " ", with: "-")
         let templateDir = tracesRoot.appendingPathComponent(templateSlug, isDirectory: true)
+        let appTraceRelpath = AuditArtifactPaths.appTraceRelpath(
+            scenario: scenario,
+            templateSlug: templateSlug
+        )
         let dataHome = try auditDaemonDataHome(
             runDir: runDir,
             templateSlug: templateSlug,
@@ -30,6 +34,9 @@ extension AuditRunner {
         env["HARNESS_MONITOR_PERF_SCENARIO"] = scenario
         env["HARNESS_MONITOR_PREVIEW_SCENARIO"] = ScenarioCatalog.previewScenario(for: scenario)
         env[AuditRunner.launchMetricsPathEnvironmentKey] = launchMetricsURL.path
+        env[AuditArtifactPaths.perfArtifactsDirectoryKey] = AuditArtifactPaths
+            .appTraceDirectory(runDir: runDir, scenario: scenario, templateSlug: templateSlug)
+            .path
 
         try assertSourceUnchanged(
             checkpoint: "before recording \(template) / \(scenario)",
@@ -58,6 +65,7 @@ extension AuditRunner {
                 gitCommit: gitCommit, workspaceFingerprint: workspaceFingerprint
             )
         }
+        capture.record.appTraceRelpath = appTraceRelpath
         capture.record.launchMetrics = try loadLaunchMetrics(from: launchMetricsURL)
         return capture
     }

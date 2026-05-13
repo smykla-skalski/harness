@@ -139,6 +139,8 @@ extension SessionWindowView {
   @ViewBuilder var standardSessionLayout: some View {
     SessionWindowStandardLayout(
       stateCache: stateCache,
+      contentDetailBaseWidth: contentColumnWidth,
+      perfContentDividerWidth: perfContentDividerWidthBinding,
       sessionID: token.sessionID,
       snapshot: snapshot,
       decisionIDs: allSessionDecisions.map(\.id),
@@ -176,6 +178,7 @@ extension SessionWindowView {
       case .sidebarContentDetail:
         SessionContentDetailSplitView(
           contentWidth: contentColumnWidthBinding,
+          perfOverrideContentWidth: perfContentDividerWidthBinding,
           commitContentWidth: commitContentColumnWidth
         ) {
           contentColumn

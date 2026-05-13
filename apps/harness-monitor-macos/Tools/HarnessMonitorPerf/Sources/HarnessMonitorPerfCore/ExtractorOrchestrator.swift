@@ -181,6 +181,10 @@ public enum ExtractorOrchestrator {
             MetricsExtractor.parseEventTable($0, maximumValidDurationNs: maximumValidDurationNs)
         }
         let profile = documents["time-profile"].map { MetricsExtractor.parseTimeProfile($0) }
+        let findings = MetricsExtractor.deriveSwiftUIFindings(
+            updateGroupsDocument: documents["swiftui-update-groups"],
+            causes: causes
+        )
 
         var root: [String: JSONValue] = [:]
         root["swiftui_updates"] = updates.map { encodeJSON($0.summary) } ?? .object([:])
@@ -193,6 +197,7 @@ public enum ExtractorOrchestrator {
         root["top_update_groups"] = updateGroups.map { encodeJSON($0.topGroups) } ?? .array([])
         root["top_causes"] = causes.map { encodeJSON($0.topCauses) } ?? .array([])
         root["top_frames"] = profile.map { encodeJSON($0.topFrames) } ?? .array([])
+        root["findings"] = encodeJSON(findings)
         root["available_schemas"] = .array(availableSchemas.sorted().map(JSONValue.string))
         return .object(root)
     }

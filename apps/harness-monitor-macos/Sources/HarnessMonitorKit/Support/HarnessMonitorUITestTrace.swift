@@ -8,7 +8,8 @@ private struct HarnessMonitorUITestTraceRecord: Codable {
 }
 
 public enum HarnessMonitorUITestTrace {
-  private static let artifactsDirectoryKey = "HARNESS_MONITOR_UI_TEST_ARTIFACTS_DIR"
+  private static let uiArtifactsDirectoryKey = "HARNESS_MONITOR_UI_TEST_ARTIFACTS_DIR"
+  public static let perfArtifactsDirectoryKey = "HARNESS_MONITOR_PERF_ARTIFACTS_DIR"
   private static let fileName = "app-trace.jsonl"
   private static let preservedDirectoryName = "HarnessMonitorUITestPreservedArtifacts"
   private static let lock = NSLock()
@@ -17,15 +18,12 @@ public enum HarnessMonitorUITestTrace {
     encoder.outputFormatting = [.sortedKeys]
     return encoder
   }()
-
   public static var isEnabled: Bool {
-    guard
-      let artifactsDirectory = ProcessInfo.processInfo.environment[artifactsDirectoryKey]?
-        .trimmingCharacters(in: .whitespacesAndNewlines)
-    else {
-      return false
-    }
-    return artifactsDirectory.isEmpty == false
+    hasArtifactsDirectory(for: uiArtifactsDirectoryKey)
+  }
+
+  public static var isPerfEnabled: Bool {
+    hasArtifactsDirectory(for: perfArtifactsDirectoryKey)
   }
 
   public static func record(
@@ -33,7 +31,40 @@ public enum HarnessMonitorUITestTrace {
     event: String,
     details: [String: String] = [:]
   ) {
-    let fileURLs = traceFileURLs()
+    record(
+      component: component,
+      event: event,
+      details: details,
+      artifactsDirectoryKey: uiArtifactsDirectoryKey,
+      includePreservedTrace: true
+    )
+  }
+
+  public static func recordPerf(
+    component: String,
+    event: String,
+    details: [String: String] = [:]
+  ) {
+    record(
+      component: component,
+      event: event,
+      details: details,
+      artifactsDirectoryKey: perfArtifactsDirectoryKey,
+      includePreservedTrace: false
+    )
+  }
+
+  private static func record(
+    component: String,
+    event: String,
+    details: [String: String],
+    artifactsDirectoryKey: String,
+    includePreservedTrace: Bool
+  ) {
+    let fileURLs = traceFileURLs(
+      artifactsDirectoryKey: artifactsDirectoryKey,
+      includePreservedTrace: includePreservedTrace
+    )
     guard !fileURLs.isEmpty else {
       return
     }
@@ -70,25 +101,43 @@ public enum HarnessMonitorUITestTrace {
     }
   }
 
-  private static func traceFileURLs() -> [URL] {
+  private static func traceFileURLs(
+    artifactsDirectoryKey: String,
+    includePreservedTrace: Bool
+  ) -> [URL] {
     var urls: [URL] = []
-    guard
-      let artifactsDirectory = ProcessInfo.processInfo.environment[artifactsDirectoryKey]?
-        .trimmingCharacters(in: .whitespacesAndNewlines),
-      artifactsDirectory.isEmpty == false
-    else {
-      return urls
+    if let traceURL = traceURL(for: artifactsDirectoryKey) {
+      urls.append(traceURL)
     }
-    urls.append(
-      URL(fileURLWithPath: artifactsDirectory, isDirectory: true)
-        .appendingPathComponent(fileName)
-    )
+    guard includePreservedTrace else { return urls }
     urls.append(
       FileManager.default.temporaryDirectory
         .appendingPathComponent(preservedDirectoryName, isDirectory: true)
         .appendingPathComponent(preservedTraceFileName)
     )
     return urls
+  }
+
+  private static func traceURL(for artifactsDirectoryKey: String) -> URL? {
+    guard
+      let artifactsDirectory = ProcessInfo.processInfo.environment[artifactsDirectoryKey]?
+        .trimmingCharacters(in: .whitespacesAndNewlines),
+      artifactsDirectory.isEmpty == false
+    else {
+      return nil
+    }
+    return URL(fileURLWithPath: artifactsDirectory, isDirectory: true)
+      .appendingPathComponent(fileName)
+  }
+
+  private static func hasArtifactsDirectory(for artifactsDirectoryKey: String) -> Bool {
+    guard
+      let artifactsDirectory = ProcessInfo.processInfo.environment[artifactsDirectoryKey]?
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    else {
+      return false
+    }
+    return artifactsDirectory.isEmpty == false
   }
 
   private static func timestamp() -> String {

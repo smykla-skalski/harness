@@ -180,7 +180,7 @@ extension HarnessMonitorPerfDriver {
     openWindow: OpenWindowAction
   ) async -> ScenarioResult {
     await settle()
-    HarnessMonitorUITestTrace.record(
+    HarnessMonitorPerfTrace.recordScenarioEvent(
       component: "perf.permission-modal",
       event: "route.inspect",
       details: [
@@ -194,7 +194,7 @@ extension HarnessMonitorPerfDriver {
         .flatMap(\.pendingPermissionBatches)
         .first
     else {
-      HarnessMonitorUITestTrace.record(
+      HarnessMonitorPerfTrace.recordScenarioEvent(
         component: "perf.permission-modal",
         event: "route.missing-batch",
         details: [
@@ -211,7 +211,7 @@ extension HarnessMonitorPerfDriver {
     // The roadmap still calls this path "permission-modal", but the live app now
     // routes ACP prompts straight into Workspace decisions instead of showing a sheet.
     let decisionID = AcpPermissionDecisionPayload.decisionID(for: batch.batchId)
-    HarnessMonitorUITestTrace.record(
+    HarnessMonitorPerfTrace.recordScenarioEvent(
       component: "perf.permission-modal",
       event: "route.begin",
       details: [
@@ -224,7 +224,7 @@ extension HarnessMonitorPerfDriver {
     store.presentingAcpPermissionBatch = batch
     openWindow.openHarnessDecisionSession(decisionID: decisionID, store: store)
     guard await waitForRoutedWorkspaceDecision(decisionID: decisionID, store: store) else {
-      HarnessMonitorUITestTrace.record(
+      HarnessMonitorPerfTrace.recordScenarioEvent(
         component: "perf.permission-modal",
         event: "route.timeout",
         details: [
@@ -239,7 +239,7 @@ extension HarnessMonitorPerfDriver {
       await settle(.milliseconds(1_000))
       return .failed("route-timeout")
     }
-    HarnessMonitorUITestTrace.record(
+    HarnessMonitorPerfTrace.recordScenarioEvent(
       component: "perf.permission-modal",
       event: "route.ready",
       details: [
