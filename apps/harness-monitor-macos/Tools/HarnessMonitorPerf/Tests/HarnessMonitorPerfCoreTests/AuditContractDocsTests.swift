@@ -50,6 +50,35 @@ final class AuditContractDocsTests: XCTestCase {
         XCTAssertTrue(guide.contains("potential_hangs"))
     }
 
+    func testAuditOutputSchemasExistAndStayMachineReadable() throws {
+        let manifest = try readRepoFile(
+            "apps/harness-monitor-macos/Tools/HarnessMonitorPerf/Schemas/manifest.schema.json"
+        )
+        let summary = try readRepoFile(
+            "apps/harness-monitor-macos/Tools/HarnessMonitorPerf/Schemas/summary.schema.json"
+        )
+        let comparison = try readRepoFile(
+            "apps/harness-monitor-macos/Tools/HarnessMonitorPerf/Schemas/comparison.schema.json"
+        )
+
+        XCTAssertNoThrow(try jsonObject(from: manifest))
+        XCTAssertNoThrow(try jsonObject(from: summary))
+        XCTAssertNoThrow(try jsonObject(from: comparison))
+
+        XCTAssertTrue(manifest.contains("\"build_provenance\""))
+        XCTAssertTrue(manifest.contains("\"staged_host_bundle_id\""))
+        XCTAssertTrue(manifest.contains("\"launched_process_path\""))
+        XCTAssertTrue(manifest.contains("\"daemon_data_home_probe\""))
+
+        XCTAssertTrue(summary.contains("\"metrics\""))
+        XCTAssertTrue(summary.contains("\"launch_metrics\""))
+        XCTAssertTrue(summary.contains("\"metric_tiers\""))
+
+        XCTAssertTrue(comparison.contains("\"missing_from_current\""))
+        XCTAssertTrue(comparison.contains("\"shared_metrics\""))
+        XCTAssertTrue(comparison.contains("\"top_frames\""))
+    }
+
     private var repoRootURL: URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -59,5 +88,10 @@ final class AuditContractDocsTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+    }
+
+    private func jsonObject(from source: String) throws -> Any {
+        let data = try XCTUnwrap(source.data(using: .utf8))
+        return try JSONSerialization.jsonObject(with: data)
     }
 }
