@@ -61,19 +61,24 @@ public final class AppSearchModel {
   ///
   /// Empty / whitespace-only input short-circuits to ``AppSearchResults/empty``
   /// without crossing the actor boundary.
-  public func runSearch(query rawQuery: String, primary: AppSearchDomain?) async {
+  @discardableResult
+  public func runSearch(
+    query rawQuery: String,
+    primary: AppSearchDomain?
+  ) async -> AppSearchResults {
     let trimmed = rawQuery.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else {
       applySearchState(query: "", results: .empty, isSearching: false)
-      return
+      return .empty
     }
     setSearching(true)
     let next = await searchProvider(trimmed, primary)
     guard !Task.isCancelled else {
       setSearching(false)
-      return
+      return results
     }
     applySearchState(query: trimmed, results: next, isSearching: false)
+    return next
   }
 
   /// Reset query, results, and the in-flight flag. Call when the user
