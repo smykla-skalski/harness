@@ -37,9 +37,9 @@ enum SessionWindowSearchMirrorPolicy {
 
 /// Mirrors the unified ``AppSearchModel/query`` (post-debounce) into the
 /// session decisions filter only while the rendered route consumes decision
-/// filtering. Agent/task route searches use the app-search model directly and
-/// must not invalidate the decisions cache on every query change.
-struct SessionWindowSearchMirror: ViewModifier {
+/// filtering. This is a zero-size anchor so query changes do not wrap and
+/// invalidate the full session window surface.
+struct SessionWindowSearchMirror: View {
   let stateCache: SessionWindowStateCache
   let renderedRoute: SessionWindowRoute
 
@@ -51,18 +51,21 @@ struct SessionWindowSearchMirror: ViewModifier {
     )
   }
 
-  func body(content: Content) -> some View {
-    content.onChange(of: trigger) { oldTrigger, newTrigger in
-      guard
-        let decisionQuery = SessionWindowSearchMirrorPolicy.decisionQueryUpdate(
-          from: oldTrigger,
-          to: newTrigger
-        )
-      else {
-        return
+  var body: some View {
+    Color.clear
+      .frame(width: 0, height: 0)
+      .accessibilityHidden(true)
+      .onChange(of: trigger) { oldTrigger, newTrigger in
+        guard
+          let decisionQuery = SessionWindowSearchMirrorPolicy.decisionQueryUpdate(
+            from: oldTrigger,
+            to: newTrigger
+          )
+        else {
+          return
+        }
+        guard stateCache.decisionFilters.query != decisionQuery else { return }
+        stateCache.decisionFilters.query = decisionQuery
       }
-      guard stateCache.decisionFilters.query != decisionQuery else { return }
-      stateCache.decisionFilters.query = decisionQuery
-    }
   }
 }

@@ -189,6 +189,10 @@ extension SessionWindowFlowTests {
     )
 
     #expect(source.contains(".searchable("))
+    #expect(source.contains("public struct AppSearchHost: View"))
+    #expect(source.contains("public struct AppSearchHostModifier: ViewModifier"))
+    #expect(source.contains("Color.clear"))
+    #expect(source.contains(".searchFocused($isSearchFocused)"))
     #expect(!source.contains("isPresented: $isSearchPresented"))
     #expect(!source.contains(".searchSuggestions"))
     #expect(source.contains(".overlay(alignment: .topTrailing)"))
@@ -206,6 +210,7 @@ extension SessionWindowFlowTests {
     #expect(source.contains("await Task.yield()"))
     #expect(source.contains("HarnessSidebarSearchFocusDispatcher()"))
     #expect(source.contains(".harnessFocusedSceneValue(\\.harnessSidebarSearchFocusAction"))
+    #expect(!source.contains(".environment(\\.appSearchModel, model)"))
     #expect(source.contains(".task(id: shouldKeepSearchIndexActive)"))
     #expect(source.contains("model.setPresented(shouldKeepSearchIndexActive)"))
     #expect(!source.contains(".onChange(of: isSearchPresented"))
@@ -220,6 +225,29 @@ extension SessionWindowFlowTests {
     #expect(!suggestionsSource.contains(".searchCompletion"))
     #expect(!suggestionsSource.contains("Section {"))
     #expect(!source.contains("@Bindable var model = model"))
+  }
+
+  @Test("Session search dependencies are anchored outside the root window graph")
+  func sessionSearchDependenciesAreAnchoredOutsideRootWindowGraph() throws {
+    let rootSource = try previewableSourceFile(named: "Views/Sessions/SessionWindowView.swift")
+    let anchorSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+BackgroundAnchors.swift"
+    )
+    let columnsSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+Columns.swift"
+    )
+
+    #expect(
+      rootSource.contains(
+        ".background {\n        sessionWindowBackgroundAnchors(currentModifiers: $currentModifiers)\n      }"
+      )
+    )
+    #expect(!rootSource.contains(".modifier(SessionWindowSearchMirror"))
+    #expect(!rootSource.contains(".modifier(appSearchIndexUpdater"))
+    #expect(anchorSource.contains("SessionWindowSearchMirror(stateCache: stateCache"))
+    #expect(anchorSource.contains("appSearchIndexUpdaterAnchor"))
+    #expect(anchorSource.contains("SessionWindowModifierKeysMonitor"))
+    #expect(columnsSource.contains(".environment(\\.appSearchModel, stateCache.appSearchModel)"))
   }
 
   @Test("Session search perf script drives the real searchable binding")

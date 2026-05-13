@@ -244,6 +244,7 @@ extension SessionWindowView {
       )
     } else if let snapshot {
       contentColumnBody(snapshot: snapshot, route: renderedRoute)
+        .environment(\.appSearchModel, stateCache.appSearchModel)
     } else {
       SessionDetailEmptySurface {
         ContentUnavailableView(

@@ -38,7 +38,7 @@ private struct AppSearchTrigger: Equatable {
 /// overlay. The search field itself stays native `.searchable` without an
 /// `isPresented` binding; Instruments showed that binding fans toolbar
 /// search presentation through the expensive AppKit text-field path.
-public struct AppSearchHostModifier: ViewModifier {
+public struct AppSearchHost: View {
   let model: AppSearchModel
   let prompt: LocalizedStringKey
   let fallbackPrimaryDomain: AppSearchDomain
@@ -49,9 +49,9 @@ public struct AppSearchHostModifier: ViewModifier {
   private var routeFocus: HarnessSessionRouteFocus?
 
   @State private var query: String = ""
-  @State private var isSearchPresented: Bool = false
   @State private var suggestionSnapshot = AppSearchSuggestionSnapshot.empty
   @State private var searchFocusDispatcher = HarnessSidebarSearchFocusDispatcher()
+  @FocusState private var isSearchFocused: Bool
 
   public init(
     model: AppSearchModel,
@@ -67,8 +67,9 @@ public struct AppSearchHostModifier: ViewModifier {
     self.routeAction = routeAction
   }
 
-  public func body(content: Content) -> some View {
-    content
+  public var body: some View {
+    Color.clear
+      .allowsHitTesting(false)
       .overlay(alignment: .topTrailing) {
         suggestionOverlay
       }
@@ -77,6 +78,7 @@ public struct AppSearchHostModifier: ViewModifier {
         placement: .toolbar,
         prompt: prompt
       )
+      .searchFocused($isSearchFocused)
       .harnessMinimizableSearchToolbar()
       .onSubmit(of: .search) {
         submitSearch()
@@ -108,7 +110,6 @@ public struct AppSearchHostModifier: ViewModifier {
           focusSearchField()
         }
       }
-      .environment(\.appSearchModel, model)
   }
 
   private var searchFocusAction: HarnessSidebarSearchFocus {
@@ -120,8 +121,8 @@ public struct AppSearchHostModifier: ViewModifier {
   }
 
   private func focusSearchField() {
-    guard !isSearchPresented else { return }
-    isSearchPresented = true
+    guard !isSearchFocused else { return }
+    isSearchFocused = true
   }
 
   @ViewBuilder private var suggestionOverlay: some View {
@@ -130,6 +131,7 @@ public struct AppSearchHostModifier: ViewModifier {
         .padding(.top, 8)
         .padding(.trailing, 16)
         .zIndex(10)
+        .allowsHitTesting(true)
     }
   }
 
@@ -139,7 +141,7 @@ public struct AppSearchHostModifier: ViewModifier {
   }
 
   private var shouldKeepSearchIndexActive: Bool {
-    isSearchPresented || !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    isSearchFocused || !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
   private func submitSearch() {
@@ -165,8 +167,8 @@ public struct AppSearchHostModifier: ViewModifier {
     }
     model.clear()
     updateSuggestionSnapshot(.empty)
-    if isSearchPresented {
-      isSearchPresented = false
+    if isSearchFocused {
+      isSearchFocused = false
     }
   }
 
@@ -183,8 +185,8 @@ public struct AppSearchHostModifier: ViewModifier {
       await Task.yield()
     }
     guard !Task.isCancelled else { return }
-    if isSearchPresented != command.isPresented {
-      isSearchPresented = command.isPresented
+    if isSearchFocused != command.isPresented {
+      isSearchFocused = command.isPresented
     }
   }
 
@@ -217,6 +219,27 @@ public struct AppSearchHostModifier: ViewModifier {
     suggestionSnapshot = snapshot
   }
 
+}
+
+public struct AppSearchHostModifier: ViewModifier {
+  let model: AppSearchModel
+  let prompt: LocalizedStringKey
+  let fallbackPrimaryDomain: AppSearchDomain
+  let automation: AppSearchAutomationState?
+  let routeAction: (AppSearchHit) -> Void
+
+  public func body(content: Content) -> some View {
+    content.overlay(alignment: .topTrailing) {
+      AppSearchHost(
+        model: model,
+        prompt: prompt,
+        fallbackPrimaryDomain: fallbackPrimaryDomain,
+        automation: automation,
+        routeAction: routeAction
+      )
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+    }
+  }
 }
 
 extension View {
