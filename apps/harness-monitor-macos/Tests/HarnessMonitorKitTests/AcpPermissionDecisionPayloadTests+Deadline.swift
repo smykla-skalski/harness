@@ -2,6 +2,7 @@ import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
+@testable import HarnessMonitorUIPreviewable
 
 extension AcpPermissionDecisionPayloadTests {
   @Test("ACP deadlines show a live countdown while traffic is fresh")
@@ -89,6 +90,44 @@ extension AcpPermissionDecisionPayloadTests {
     #expect(status?.label == "expires soon")
     #expect(status?.symbolName == "clock.badge.exclamationmark")
     #expect(status?.accessibilityValue == "expires soon, daemon status stale")
+  }
+
+  @Test("ACP deadline timeline emits expiry once then stops")
+  func deadlineTimelineStopsAfterExpiry() {
+    let start = Date(timeIntervalSince1970: 1_000)
+    let expiresAt = start.addingTimeInterval(2.4)
+    let entries = Array(
+      AcpPermissionDeadlineTimelineSchedule(expiresAt: expiresAt)
+        .entries(from: start, mode: .normal)
+    )
+
+    #expect(
+      entries == [
+        start,
+        start.addingTimeInterval(1),
+        start.addingTimeInterval(2),
+        expiresAt,
+      ]
+    )
+    #expect(entries.allSatisfy { $0 <= expiresAt })
+  }
+
+  @Test("ACP deadline timeline is inactive after expiry")
+  func deadlineTimelineShouldTickOnlyBeforeExpiry() {
+    let now = Date(timeIntervalSince1970: 1_000)
+
+    #expect(
+      AcpPermissionDeadlineTimelineSchedule.shouldTick(
+        expiresAt: now.addingTimeInterval(1),
+        now: now
+      )
+    )
+    #expect(
+      !AcpPermissionDeadlineTimelineSchedule.shouldTick(
+        expiresAt: now,
+        now: now
+      )
+    )
   }
 
   private func isoString(_ date: Date) -> String {
