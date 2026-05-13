@@ -79,6 +79,23 @@ public struct SessionDecisionFilterKey: Hashable, Sendable {
   @MainActor
   public init(sessionID: String, decisions: [Decision], filters: SessionDecisionFilterState) {
     self.sessionID = sessionID
+    decisionFingerprint = SessionDecisionFingerprint.hash(decisions: decisions)
+    self.filters = SessionDecisionFilterSnapshot(filters: filters)
+  }
+}
+
+public struct SessionDecisionDataKey: Hashable, Sendable {
+  public let sessionID: String
+  public let decisionFingerprint: Int
+
+  public init(sessionID: String, decisions: [Decision]) {
+    self.sessionID = sessionID
+    decisionFingerprint = SessionDecisionFingerprint.hash(decisions: decisions)
+  }
+}
+
+private enum SessionDecisionFingerprint {
+  static func hash(decisions: [Decision]) -> Int {
     var hasher = Hasher()
     hasher.combine(decisions.count)
     for decision in decisions {
@@ -89,8 +106,7 @@ public struct SessionDecisionFilterKey: Hashable, Sendable {
       hasher.combine(decision.agentID)
       hasher.combine(decision.taskID)
     }
-    decisionFingerprint = hasher.finalize()
-    self.filters = SessionDecisionFilterSnapshot(filters: filters)
+    return hasher.finalize()
   }
 }
 

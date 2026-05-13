@@ -64,8 +64,11 @@ extension SessionWindowView {
       .task(id: managedTranscriptRefreshTrigger) {
         await refreshManagedTranscript(for: managedTranscriptRefreshTrigger)
       }
-      .task(id: decisionsCacheTrigger) {
-        await recomputeDecisionsCache()
+      .task(id: decisionsRefreshTrigger) {
+        await refreshDecisionsCache()
+      }
+      .task(id: decisionFilterTrigger) {
+        await refilterDecisionsCache()
       }
       .task(id: routeTrigger) {
         guard routeTrigger.didLoadSnapshot else { return }
