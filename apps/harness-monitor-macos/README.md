@@ -48,7 +48,7 @@ The audit artifact contract is:
 | `manifest.json` | run provenance for the staged build, including `git`, `system`, `targets`, `build_provenance`, selected scenarios, default launch env, per-capture `preview_scenario`, `launched_process_path`, `daemon_data_home_probe`, and `app_trace_relpath` |
 | `summary.json` | `manifest.json` plus per-capture extracted `metrics`, `warnings`, `launch_metrics`, `metric_tiers`, parsed `app_trace`, and normalized `findings` |
 | `summary.csv` | flat regression sheet with launch, SwiftUI, hitch/hang, and allocation summary columns |
-| `comparison.json` / `comparison.md` | baseline/current diff, missing-capture reporting, missing-metric reporting, hard-vs-investigative metric grouping, and first-class findings deltas |
+| `comparison.json` / `comparison.md` | baseline/current diff, missing-capture reporting, missing-metric reporting, hard-vs-investigative metric grouping, first-class findings deltas, and an app-trace pair/diff section |
 | `debug-retention.json` | explicit sentinel that a regression/debug run preserved raw traces, exported XML, and extraction intermediates |
 
 Machine-readable schema snapshots for those JSON outputs live under

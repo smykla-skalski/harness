@@ -41,6 +41,7 @@ final class AuditContractDocsTests: XCTestCase {
         XCTAssertTrue(readme.contains("`app_trace_relpath`"))
         XCTAssertTrue(readme.contains("`app_trace`"))
         XCTAssertTrue(readme.contains("`findings`"))
+        XCTAssertTrue(readme.contains("app-trace pair/diff"))
         XCTAssertTrue(readme.contains("`debug-retention.json`"))
     }
 
@@ -83,6 +84,7 @@ final class AuditContractDocsTests: XCTestCase {
         XCTAssertTrue(comparison.contains("\"missing_from_current\""))
         XCTAssertTrue(comparison.contains("\"shared_metrics\""))
         XCTAssertTrue(comparison.contains("\"top_frames\""))
+        XCTAssertTrue(comparison.contains("\"app_trace\""))
         XCTAssertTrue(comparison.contains("\"new_findings\""))
         XCTAssertTrue(comparison.contains("\"resolved_findings\""))
     }

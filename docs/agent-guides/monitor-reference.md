@@ -131,7 +131,7 @@ Treat those files as a stable contract:
 | `manifest.json` | run provenance for the staged build: `git`, `system`, `targets`, `build_provenance`, selected scenarios, default launch env, and per-capture `preview_scenario`, `launched_process_path`, `daemon_data_home_probe`, `app_trace_relpath` |
 | `summary.json` | `manifest.json` plus extracted per-capture `metrics`, `warnings`, `launch_metrics`, `metric_tiers`, parsed `app_trace`, and normalized `findings` |
 | `summary.csv` | flat regression sheet for launch, SwiftUI, hitch/hang, and allocation metrics |
-| `comparison.json` / `comparison.md` | baseline/current diff with missing-capture, missing-metric, hard-vs-investigative sections, and findings deltas |
+| `comparison.json` / `comparison.md` | baseline/current diff with missing-capture, missing-metric, hard-vs-investigative sections, findings deltas, and an app-trace pair/diff section |
 | `debug-retention.json` | sentinel proving the run intentionally retained raw traces, exported XML, and extraction intermediates |
 
 Machine-readable schema snapshots for the JSON outputs live under

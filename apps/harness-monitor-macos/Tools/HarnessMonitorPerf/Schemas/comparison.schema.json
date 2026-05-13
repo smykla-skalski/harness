@@ -80,6 +80,9 @@
             "type": "array",
             "items": { "$ref": "#/$defs/finding" }
           },
+          "app_trace": {
+            "$ref": "#/$defs/appTraceComparison"
+          },
           "top_frames": {
             "type": "object",
             "additionalProperties": false,
@@ -118,6 +121,58 @@
         "baseline": { "type": "number" },
         "current": { "type": "number" },
         "delta": { "type": "number" }
+      }
+    },
+    "componentCount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "count"],
+      "properties": {
+        "component": { "type": "string" },
+        "count": { "type": "integer" }
+      }
+    },
+    "appTraceSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_count", "components", "ordered_steps"],
+      "properties": {
+        "event_count": { "type": "integer" },
+        "components": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/componentCount" }
+        },
+        "ordered_steps": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "appTraceComparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["new_steps", "resolved_steps"],
+      "properties": {
+        "baseline": {
+          "oneOf": [
+            { "$ref": "#/$defs/appTraceSummary" },
+            { "type": "null" }
+          ]
+        },
+        "current": {
+          "oneOf": [
+            { "$ref": "#/$defs/appTraceSummary" },
+            { "type": "null" }
+          ]
+        },
+        "new_steps": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "resolved_steps": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
       }
     },
     "frame": {
