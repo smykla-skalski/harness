@@ -66,6 +66,14 @@ extension SessionWindowView {
     preferredBinding: Binding<Bool>,
     announce: Bool = true
   ) {
+    if SessionInspectorVisibilityPolicy.shouldDeferVisibilityReconciliation(
+      preferredVisible: preferredBinding.wrappedValue,
+      hasInspectorContext: inspectorContextDecision != nil,
+      detailColumnWidth: detailColumnWidth,
+      focusMode: focusMode
+    ) {
+      return
+    }
     setInspectorVisibility(
       SessionInspectorVisibilityPolicy.resolvedVisible(
         preferredVisible: preferredBinding.wrappedValue,

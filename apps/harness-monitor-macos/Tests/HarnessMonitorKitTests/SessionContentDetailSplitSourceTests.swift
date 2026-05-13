@@ -16,7 +16,11 @@ struct SessionContentDetailSplitSourceTests {
     #expect(viewSource.contains("sessionSurface"))
     #expect(
       columnsSource.contains(
-        "SessionContentDetailSplitView(contentWidth: contentColumnWidthBinding)"
+        """
+        SessionContentDetailSplitView(
+                  contentWidth: contentColumnWidthBinding,
+                  commitContentWidth: commitContentColumnWidth
+        """
       )
     )
     #expect(columnsSource.contains(".navigationSplitViewStyle(.prominentDetail)"))
@@ -72,6 +76,7 @@ struct SessionContentDetailSplitSourceTests {
     #expect(splitSource.contains("deferReclampLiveWidth(availableWidth: newWidth)"))
     #expect(splitSource.contains("Task { @MainActor in"))
     #expect(splitSource.contains("await Task.yield()"))
+    #expect(splitSource.contains("commitContentWidth(contentWidth)"))
   }
 
   @Test("Session detail columns leave top padding to the owned views")

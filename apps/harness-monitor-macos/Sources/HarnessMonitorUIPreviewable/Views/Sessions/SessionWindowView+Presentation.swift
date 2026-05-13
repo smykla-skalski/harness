@@ -17,6 +17,11 @@ struct SessionWindowManagedTranscriptRefreshTrigger: Equatable {
   }
 }
 
+struct SessionWindowPendingRouteTrigger: Equatable {
+  let requestID: Int
+  let didLoadSnapshot: Bool
+}
+
 struct SessionWindowCodexRunTranscriptRefreshKey: Equatable {
   let runID: String
   let status: CodexRunStatus
@@ -37,7 +42,10 @@ extension SessionWindowView {
   func sessionWindowLifecycleModifiers<Content: View>(
     _ content: Content
   ) -> some View {
-    content
+    let routeTrigger = pendingRouteTrigger
+
+    return
+      content
       .navigationTitle(navigationTitleText)
       .navigationSubtitle(navigationSubtitleText)
       .sessionTitleBlurChrome(
@@ -59,7 +67,8 @@ extension SessionWindowView {
       .task(id: decisionsCacheTrigger) {
         await recomputeDecisionsCache()
       }
-      .task(id: store.pendingSessionRouteRequestID) {
+      .task(id: routeTrigger) {
+        guard routeTrigger.didLoadSnapshot else { return }
         await applyPendingSessionRouteIfNeeded()
       }
   }
@@ -103,6 +112,13 @@ extension SessionWindowView {
           eventCount: $0.events.count
         )
       }
+    )
+  }
+
+  var pendingRouteTrigger: SessionWindowPendingRouteTrigger {
+    SessionWindowPendingRouteTrigger(
+      requestID: store.pendingSessionRouteRequestID,
+      didLoadSnapshot: didLoadSnapshot
     )
   }
 

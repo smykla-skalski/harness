@@ -35,6 +35,18 @@ public enum SessionInspectorVisibilityPolicy {
     width >= collapseThreshold
   }
 
+  public static func shouldDeferVisibilityReconciliation(
+    preferredVisible: Bool,
+    hasInspectorContext: Bool,
+    detailColumnWidth: CGFloat,
+    focusMode: Bool
+  ) -> Bool {
+    preferredVisible
+      && hasInspectorContext
+      && !focusMode
+      && detailColumnWidth == 0
+  }
+
   public static func resolvedVisible(preferredVisible: Bool, canPresent: Bool) -> Bool {
     preferredVisible && canPresent
   }
