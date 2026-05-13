@@ -105,7 +105,10 @@ public enum ProcessRunner {
         while process.isRunning && Date() < deadline {
             Thread.sleep(forTimeInterval: 0.05)
         }
-        guard process.isRunning else { return false }
+        guard process.isRunning else {
+            process.waitUntilExit()
+            return false
+        }
 
         process.terminate()
         let graceDeadline = Date().addingTimeInterval(terminationGraceSeconds)
@@ -114,8 +117,8 @@ public enum ProcessRunner {
         }
         if process.isRunning {
             kill(process.processIdentifier, SIGKILL)
-            process.waitUntilExit()
         }
+        process.waitUntilExit()
         return true
     }
 }
