@@ -122,19 +122,20 @@ struct SidebarSearchHost: View {
           )
         }
       }
-      .searchable(
-        text: searchText,
-        isPresented: searchPresentation,
-        placement: .sidebar,
-        prompt: Text("Search sessions, projects, leaders")
+      .modifier(
+        SidebarSearchableModifier(
+          isEnabled: canPresentSearch,
+          text: searchText,
+          isPresented: searchPresentation
+        )
       )
       .toolbar {
         SidebarToolbarFilterToolbarItem(store: store, controls: controls)
       }
       .harnessFocusedSceneValue(\.harnessSidebarSearchFocusAction, searchFocusAction)
-      .task {
+      .task(id: canPresentSearch) {
         searchFocusDispatcher.handler = {
-          _ = searchPresentationState.requestPresentation(canPresent: true)
+          _ = searchPresentationState.requestPresentation(canPresent: canPresentSearch)
         }
       }
       .onChange(of: canPresentSearch, initial: true) { _, canPresent in
@@ -156,5 +157,25 @@ struct SidebarSearchHost: View {
       return
     }
     _ = store.recordSearch(store.searchText)
+  }
+}
+
+private struct SidebarSearchableModifier: ViewModifier {
+  let isEnabled: Bool
+  let text: Binding<String>
+  let isPresented: Binding<Bool>
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if isEnabled {
+      content.searchable(
+        text: text,
+        isPresented: isPresented,
+        placement: .sidebar,
+        prompt: Text("Search sessions, projects, leaders")
+      )
+    } else {
+      content
+    }
   }
 }
