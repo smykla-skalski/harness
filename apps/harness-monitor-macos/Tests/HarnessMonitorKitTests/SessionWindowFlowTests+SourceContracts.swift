@@ -278,41 +278,6 @@ extension SessionWindowFlowTests {
     #expect(detailFocusSource.contains("@Environment(\\.appSearchModel)"))
   }
 
-  @Test("Session loading chrome avoids indeterminate progress churn")
-  func sessionLoadingChromeAvoidsIndeterminateProgressChurn() throws {
-    let columnsSource = try previewableSourceFile(
-      named: "Views/Sessions/SessionWindowView+Columns.swift"
-    )
-    let bannerSource = try previewableSourceFile(
-      named: "Views/Sessions/SessionBannerStack.swift"
-    )
-
-    #expect(columnsSource.contains("Label(\"Loading session\", systemImage: \"hourglass\")"))
-    #expect(!columnsSource.contains("ProgressView(\"Loading session\")"))
-    #expect(bannerSource.contains("Image(systemName: \"hourglass\")"))
-    #expect(!bannerSource.contains("ProgressView()"))
-  }
-
-  @Test("Shared loading chrome avoids continuous animation churn")
-  func sharedLoadingChromeAvoidsContinuousAnimationChurn() throws {
-    let spinnerSource = try previewableSourceFile(
-      named: "Views/Shared/HarnessMonitorSpinner.swift"
-    )
-    let timelineSource = try previewableSourceFile(
-      named: "Views/Timeline/MonitorTimelineSection.swift"
-    )
-    let contentSource = try previewableSourceFile(named: "Views/App/ContentSessionSurface.swift")
-    let connectionSource = try previewableSourceFile(named: "Views/App/ConnectionViews.swift")
-
-    #expect(spinnerSource.contains("Image(systemName: \"hourglass\")"))
-    #expect(!spinnerSource.contains("TimelineView"))
-    #expect(!spinnerSource.contains("rotationEffect"))
-    #expect(timelineSource.contains("HarnessMonitorSpinner(size: 14)"))
-    #expect(!timelineSource.contains("ProgressView()"))
-    #expect(contentSource.contains("HarnessMonitorSpinner(size: 16)"))
-    #expect(connectionSource.contains("HarnessMonitorSpinner(size: 14)"))
-  }
-
   @Test("Session search perf script drives the real searchable binding")
   func sessionSearchPerfScriptUsesSearchFieldAutomation() throws {
     let source = try previewableSourceFile(

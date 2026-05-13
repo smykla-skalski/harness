@@ -77,8 +77,6 @@ public struct HarnessMonitorAsyncActionButton: View {
   private let keyboardFocusValue: String?
   public let action: Action
   @State private var runningTask: Task<Void, Never>?
-  @Environment(\.accessibilityReduceMotion)
-  private var reduceMotion
   @Environment(\.isEnabled)
   private var isEnabled
 
@@ -174,14 +172,12 @@ public struct HarnessMonitorAsyncActionButton: View {
       HStack(spacing: HarnessMonitorTheme.itemSpacing) {
         if isLoading {
           HarnessMonitorSpinner()
-            .transition(.opacity)
         }
         Text(isLoading ? "Cancel" : title)
           .lineLimit(1)
       }
       .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
       .frame(maxWidth: fillsWidth ? .infinity : nil)
-      .animation(reduceMotion ? nil : .spring(duration: 0.2), value: isLoading)
     }
     .contentShape(Rectangle())
   }
