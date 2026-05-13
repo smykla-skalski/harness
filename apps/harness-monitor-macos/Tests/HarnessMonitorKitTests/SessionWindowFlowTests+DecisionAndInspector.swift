@@ -227,6 +227,61 @@ extension SessionWindowFlowTests {
     #expect(columnsSource.contains("preferredVisible: inspectorPreferredBinding"))
     #expect(inspectorSource.contains("@Binding var preferredVisible"))
   }
+
+  @Test("Session startup does not force inspector visibility before geometry exists")
+  func sessionStartupLeavesInspectorVisibilityToReactiveLayoutPasses() throws {
+    let presentationSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+Presentation.swift"
+    )
+
+    #expect(
+      presentationSource.contains(
+        """
+          func performInitialLoad() async {
+            hydrateSelectionFromPersistedStorage()
+            hydrateDecisionFiltersFromPersistedStorage()
+            await applyPendingSessionRouteIfNeeded()
+            await loadSnapshot()
+            requestPrimaryContentAccessibilityFocus()
+            enableStartupSearchParticipation()
+          }
+        """
+      )
+    )
+  }
+
+  @Test("Session focused values wait until startup hydration completes")
+  func sessionFocusedValuesWaitForStartupParticipation() throws {
+    let focusedValuesSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+FocusedValues.swift"
+    )
+
+    #expect(focusedValuesSource.contains("let navigation ="))
+    #expect(
+      focusedValuesSource.contains(
+        "isStartupSearchParticipationEnabled ? navigationCommand : nil"
+      )
+    )
+    #expect(focusedValuesSource.contains("let attention ="))
+    #expect(
+      focusedValuesSource.contains(
+        "isStartupSearchParticipationEnabled ? attentionFocus : nil"
+      )
+    )
+    #expect(
+      focusedValuesSource.contains(
+        "var focusedInspectorCommand: SessionInspectorCommand?"
+      )
+    )
+    #expect(
+      focusedValuesSource.contains(
+        "guard isStartupSearchParticipationEnabled else { return nil }"
+      )
+    )
+    #expect(focusedValuesSource.contains("guard canPresentInspector else { return nil }"))
+    #expect(focusedValuesSource.contains("return inspectorCommand"))
+    #expect(focusedValuesSource.contains("let inspector = focusedInspectorCommand"))
+  }
 }
 
 @Suite("Session inspector visibility policy")
