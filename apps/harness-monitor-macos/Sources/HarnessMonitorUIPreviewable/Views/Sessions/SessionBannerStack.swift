@@ -201,7 +201,8 @@ private struct SessionLoadingBanner: View {
 
   var body: some View {
     HStack(alignment: .center, spacing: metrics.itemSpacing) {
-      ProgressView()
+      Image(systemName: "hourglass")
+        .scaledFont(.caption)
         .controlSize(.small)
         .accessibilityHidden(true)
       Text("Loading session detail from daemon.")

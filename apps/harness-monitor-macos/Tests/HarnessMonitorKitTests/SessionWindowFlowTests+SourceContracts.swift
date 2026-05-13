@@ -271,6 +271,21 @@ extension SessionWindowFlowTests {
     #expect(detailFocusSource.contains("@Environment(\\.appSearchModel)"))
   }
 
+  @Test("Session loading chrome avoids indeterminate progress churn")
+  func sessionLoadingChromeAvoidsIndeterminateProgressChurn() throws {
+    let columnsSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionWindowView+Columns.swift"
+    )
+    let bannerSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionBannerStack.swift"
+    )
+
+    #expect(columnsSource.contains("Label(\"Loading session\", systemImage: \"hourglass\")"))
+    #expect(!columnsSource.contains("ProgressView(\"Loading session\")"))
+    #expect(bannerSource.contains("Image(systemName: \"hourglass\")"))
+    #expect(!bannerSource.contains("ProgressView()"))
+  }
+
   @Test("Session search perf script drives the real searchable binding")
   func sessionSearchPerfScriptUsesSearchFieldAutomation() throws {
     let source = try previewableSourceFile(
