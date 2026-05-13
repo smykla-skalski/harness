@@ -204,7 +204,6 @@ public struct SessionWindowView: View {
       SessionWindowPerfScenarioScript(
         stateCache: stateCache,
         columnVisibility: columnVisibilityBinding,
-        contentColumnWidth: contentColumnWidthBinding,
         sessionID: token.sessionID,
         snapshot: snapshot,
         decisionIDs: allSessionDecisions.map(\.id)

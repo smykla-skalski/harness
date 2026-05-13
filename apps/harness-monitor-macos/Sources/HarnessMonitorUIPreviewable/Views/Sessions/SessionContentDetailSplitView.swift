@@ -123,8 +123,6 @@ private struct SessionContentDetailDivider: View {
   @Binding var isDragging: Bool
   let commitContentWidth: (Double) -> Void
   let widthRange: ClosedRange<Double>
-  @Environment(\.accessibilityReduceMotion)
-  private var reduceMotion
   @FocusState private var isKeyboardFocused: Bool
   @ScaledMetric(relativeTo: .body)
   private var interactiveWidth = 24.0
@@ -191,10 +189,6 @@ private struct SessionContentDetailDivider: View {
     return handleHeight
   }
 
-  private var animationDuration: Double {
-    reduceMotion ? 0.01 : 0.12
-  }
-
   private var dividerValue: String {
     "Content width \(Int(contentWidth.rounded())) points"
   }
@@ -238,8 +232,6 @@ private struct SessionContentDetailDivider: View {
     .accessibilityFrameMarker(
       "\(HarnessMonitorAccessibility.sessionWindowContentDetailDivider).frame"
     )
-    .animation(.easeOut(duration: animationDuration), value: isHovered)
-    .animation(.easeOut(duration: animationDuration), value: isDragging)
   }
 
   private var dragGesture: some Gesture {

@@ -17,7 +17,6 @@ private struct SessionWindowPerfScenarioTrigger: Equatable {
 struct SessionWindowPerfScenarioScript: ViewModifier {
   let stateCache: SessionWindowStateCache
   @Binding var columnVisibility: NavigationSplitViewVisibility
-  @Binding var contentColumnWidth: Double
   let sessionID: String
   let snapshot: HarnessMonitorSessionWindowSnapshot?
   let decisionIDs: [String]
@@ -127,27 +126,11 @@ struct SessionWindowPerfScenarioScript: ViewModifier {
       selectSidebarToggleTarget(target)
       await Task.yield()
       try? await Task.sleep(for: .milliseconds(180))
-      if target.usesThreePaneLayout {
-        await driveContentDetailDividerSweep()
-      }
       columnVisibility = .detailOnly
       try? await Task.sleep(for: .milliseconds(180))
       columnVisibility = .doubleColumn
       try? await Task.sleep(for: .milliseconds(220))
     }
-  }
-
-  private func driveContentDetailDividerSweep() async {
-    for width in contentDetailDividerSweepWidths {
-      contentColumnWidth = width
-      await Task.yield()
-      try? await Task.sleep(for: .milliseconds(140))
-    }
-  }
-
-  private var contentDetailDividerSweepWidths: [Double] {
-    let defaultWidth = SessionContentDetailSplitLayout.defaultContentWidth
-    return [defaultWidth - 96, defaultWidth + 120, defaultWidth]
   }
 
   private func selectSidebarToggleTarget(_ target: SessionSidebarToggleTarget) {
@@ -169,13 +152,4 @@ private enum SessionSidebarToggleTarget: Equatable {
   case task(String)
   case decision(String)
   case route(SessionWindowRoute)
-
-  var usesThreePaneLayout: Bool {
-    switch self {
-    case .agent, .task, .decision:
-      true
-    case .route(let route):
-      route.layoutStyle == .sidebarContentDetail
-    }
-  }
 }

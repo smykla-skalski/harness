@@ -77,6 +77,7 @@ struct SessionContentDetailSplitSourceTests {
     #expect(splitSource.contains("Task { @MainActor in"))
     #expect(splitSource.contains("await Task.yield()"))
     #expect(splitSource.contains("commitContentWidth(contentWidth)"))
+    #expect(!splitSource.contains(".animation(.easeOut(duration: animationDuration)"))
   }
 
   @Test("Session detail columns leave top padding to the owned views")

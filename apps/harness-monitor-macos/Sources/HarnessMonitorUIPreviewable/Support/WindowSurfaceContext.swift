@@ -1,6 +1,6 @@
 import SwiftUI
 
-public struct WindowSurfaceContext: Sendable {
+public struct WindowSurfaceContext: Equatable, Sendable {
   public let windowID: String
   public let isKeyWindow: Bool
   public let navigationScope: WindowNavigationScope?
@@ -21,6 +21,12 @@ public struct WindowSurfaceContext: Sendable {
   @MainActor
   public func openMainWindow() {
     openWindow(HarnessMonitorWindowID.openRecent)
+  }
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.windowID == rhs.windowID
+      && lhs.isKeyWindow == rhs.isKeyWindow
+      && lhs.navigationScope == rhs.navigationScope
   }
 }
 
