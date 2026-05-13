@@ -134,6 +134,9 @@ Treat those files as a stable contract:
 | `comparison.json` / `comparison.md` | baseline/current diff with missing-capture, missing-metric, and hard-vs-investigative sections |
 | `debug-retention.json` | sentinel proving the run intentionally retained raw traces, exported XML, and extraction intermediates |
 
+Machine-readable schema snapshots for the JSON outputs live under
+`apps/harness-monitor-macos/Tools/HarnessMonitorPerf/Schemas/`.
+
 Before trusting a regression result, verify at least:
 
 - `targets.staged_host_bundle_id`
