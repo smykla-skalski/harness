@@ -17,14 +17,9 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(sleepToolbarButton.contains("HarnessMonitorAccessibility.sleepPreventionButton"))
     #expect(sleepToolbarButton.contains("cup.and.heat.waves.fill"))
     #expect(sleepToolbarButton.contains("cup.and.heat.waves"))
-    #expect(sleepToolbarButton.contains(".contentTransition("))
+    #expect(!sleepToolbarButton.contains(".contentTransition("))
+    #expect(!sleepToolbarButton.contains(".animation(.default"))
     #expect(sleepToolbarButton.contains(".harnessMCPButton("))
-    #expect(
-      sleepToolbarButton.contains(
-        ".replace.magic(fallback: .downUp.wholeSymbol)"
-      )
-    )
-    #expect(sleepToolbarButton.contains("options: .nonRepeating"))
     #expect(sleepToolbarButton.contains("SleepPreventionToolbarSymbolLayout.size"))
     #expect(contentToolbar.contains("SleepPreventionToolbarButton("))
     #expect(sessionToolbar.contains("SleepPreventionToolbarButton("))

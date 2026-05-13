@@ -146,7 +146,6 @@ struct SessionTaskSummaryCard: View {
     .overlay {
       if isDragging {
         TaskDraggingOverlay()
-          .transition(.opacity)
       }
     }
     .clipShape(
@@ -159,7 +158,6 @@ struct SessionTaskSummaryCard: View {
           lineWidth: highlightsTaskCard ? 2 : 0
         )
     }
-    .opacity(isDragging ? 0.82 : 1)
     .scaleEffect(isDragging ? 0.985 : 1)
     .draggable(dragPayload) {
       TaskDragPreviewCard(task: task)
@@ -200,7 +198,6 @@ struct SessionTaskSummaryCard: View {
     }
     .accessibilityValue(taskCardAccessibilityValue ?? "")
     .accessibilityFrameMarker("\(HarnessMonitorAccessibility.sessionTaskCard(task.taskId)).frame")
-    .animation(.easeOut(duration: 0.10), value: highlightsTaskCard)
     .onDisappear {
       if isDragging {
         store.contentUI.session.isTaskDragActive = false

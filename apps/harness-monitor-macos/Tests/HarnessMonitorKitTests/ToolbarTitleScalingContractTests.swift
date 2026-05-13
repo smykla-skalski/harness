@@ -96,8 +96,8 @@ struct ToolbarTitleScalingContractTests {
     #expect(connectionSource.contains(".animation(.easeOut(duration: 0.3), value: isActive)"))
   }
 
-  @Test("Session focus mode toolbar button uses animated moon symbols")
-  func sessionFocusModeToolbarButtonUsesAnimatedMoonSymbols() throws {
+  @Test("Session focus mode toolbar button avoids hot-window symbol transitions")
+  func sessionFocusModeToolbarButtonAvoidsHotWindowSymbolTransitions() throws {
     let sessionSource = try previewableSourceFile(
       named: "Views/Sessions/SessionWindowToolbar.swift"
     )
@@ -112,20 +112,16 @@ struct ToolbarTitleScalingContractTests {
     #expect(
       sessionSource.contains("Image(systemName: focusMode ? \"moon.fill\" : \"moon\")")
     )
-    #expect(sessionSource.contains(".contentTransition("))
-    #expect(sessionSource.contains(".replace.magic(fallback: .downUp.wholeSymbol)"))
-    #expect(sessionSource.contains("options: .nonRepeating"))
+    #expect(!sessionSource.contains(".contentTransition("))
+    #expect(!sessionSource.contains(".replace.magic(fallback: .downUp.wholeSymbol)"))
+    #expect(!sessionSource.contains("options: .nonRepeating"))
     #expect(sessionSource.contains(".frame(width: 14, height: 14)"))
     #expect(
       sessionSource.contains(".help(focusMode ? \"Exit focus mode\" : \"Enter focus mode\")")
     )
     #expect(sessionSource.contains("toggleFocusMode()"))
-    #expect(
-      sessionSource.contains(
-        "SessionFocusModeMotionPolicy.animation(reduceMotion: reduceMotion)"
-      )
-    )
-    #expect(sessionSource.contains("withAnimation(animation)"))
+    #expect(!sessionSource.contains("SessionFocusModeMotionPolicy.animation(reduceMotion:"))
+    #expect(!sessionSource.contains("withAnimation(animation)"))
     #expect(!sessionSource.contains(".animation(.default, value: focusMode)"))
     #expect(
       columnsSource.contains("NavigationSplitView(columnVisibility: columnVisibilityBinding)")

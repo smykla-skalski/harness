@@ -45,19 +45,12 @@ struct SleepPreventionToolbarButton: View {
         Text(presentation.title)
       } icon: {
         Image(systemName: presentation.systemImage)
-          .contentTransition(
-            .symbolEffect(
-              .replace.magic(fallback: .downUp.wholeSymbol),
-              options: .nonRepeating
-            )
-          )
           .frame(
             width: SleepPreventionToolbarSymbolLayout.size,
             height: SleepPreventionToolbarSymbolLayout.size
           )
       }
     }
-    .animation(.default, value: presentation.isEnabled)
     .tint(presentation.isEnabled ? .orange : nil)
     .help(presentation.helpText)
     .accessibilityLabel("Sleep prevention")

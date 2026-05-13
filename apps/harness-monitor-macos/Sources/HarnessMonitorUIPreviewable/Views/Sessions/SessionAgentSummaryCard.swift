@@ -115,11 +115,11 @@ struct SessionAgentSummaryCard: View {
       } label: {
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
           HStack(alignment: .top) {
-            Text(agent.name)
+            Text(verbatim: agent.name)
               .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
               .lineLimit(2)
             Spacer()
-            Text(agent.role.title)
+            Text(verbatim: agent.role.title)
               .scaledFont(.caption.bold())
               .harnessPillPadding()
               .background(roleTint, in: Capsule())
@@ -128,14 +128,14 @@ struct SessionAgentSummaryCard: View {
           if let persona = agent.persona {
             HStack(spacing: HarnessMonitorTheme.spacingXS) {
               PersonaSymbolView(symbol: persona.symbol, size: 14)
-              Text(persona.name)
+              Text(verbatim: persona.name)
                 .scaledFont(.caption.weight(.semibold))
             }
             .foregroundStyle(personaTint)
             .accessibilityLabel("Persona: \(persona.name)")
             .accessibilityIdentifier(HarnessMonitorAccessibility.agentRowPersonaChip(agent.agentId))
           }
-          Text(metadataLine)
+          Text(verbatim: metadataLine)
             .scaledFont(.caption.monospaced())
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             .lineLimit(1)
@@ -143,7 +143,7 @@ struct SessionAgentSummaryCard: View {
           if lifecyclePresentation.visualStatus == .active,
             let currentTaskId = agent.currentTaskId
           {
-            Text("Current \(currentTaskId)")
+            Text(verbatim: "Current \(currentTaskId)")
               .scaledFont(.caption.monospaced())
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
               .lineLimit(1)
@@ -232,7 +232,6 @@ struct SessionAgentSummaryCard: View {
       )
       if showPulseBorder {
         DropTargetPulseBorder()
-          .transition(.opacity.animation(.easeInOut(duration: 0.2)))
       }
       if let feedback = taskDropFeedback {
         ZStack {
@@ -243,18 +242,11 @@ struct SessionAgentSummaryCard: View {
               label: feedback.accessibilityLabel
             )
         }
-        .transition(
-          .opacity
-            .combined(with: .scale(scale: 0.98))
-            .animation(.easeInOut(duration: 0.12))
-        )
       }
     }
     .contentShape(.rect)
     .dropDestination(for: TaskDragPayload.self, action: handleTaskDrop) { targeted in
-      withAnimation(.easeInOut(duration: 0.12)) {
-        isDropTargeted = targeted
-      }
+      isDropTargeted = targeted
     }
   }
 
@@ -311,7 +303,7 @@ struct SessionAgentSummaryCard: View {
     _ value: String,
     accessibilityValue: String? = nil
   ) -> some View {
-    Text(value)
+    Text(verbatim: value)
       .scaledFont(.caption.weight(.semibold))
       .lineLimit(1)
       .harnessPillPadding()
