@@ -42,8 +42,6 @@ private struct SessionWindowAppKitBindingAccessor: NSViewRepresentable {
 final class SessionWindowAppKitBindingNSView: NSView {
   fileprivate var sessionID: String
 
-  private static let placeholderToolbarIdentifier = "io.harnessmonitor.session.placeholder"
-
   init(sessionID: String) {
     self.sessionID = sessionID
     super.init(frame: .zero)
@@ -54,7 +52,6 @@ final class SessionWindowAppKitBindingNSView: NSView {
 
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
-    installPlaceholderToolbarIfNeeded()
     refreshBinding()
   }
 
@@ -68,18 +65,5 @@ final class SessionWindowAppKitBindingNSView: NSView {
   fileprivate func refreshBinding() {
     guard let window else { return }
     SessionWindowAppKitRegistry.shared.bind(window: window, sessionID: sessionID)
-  }
-
-  // AppKit's NSWindowStackController syncs toolbars across tabbed siblings
-  // whenever any sibling's toolbar changes. During SwiftUI's initial
-  // setToolbar: on the active window, the sibling restored from the saved
-  // tab group may still have `window.toolbar == nil`, which makes
-  // -[NSThemeFrame _showToolbarWithAnimation:] log "attempt to show a
-  // toolbar which is *nil*". Installing an empty placeholder here ensures
-  // every session window has a non-nil toolbar before AppKit's tab sync
-  // runs; SwiftUI's later setToolbar: replaces this atomically.
-  private func installPlaceholderToolbarIfNeeded() {
-    guard let window, window.toolbar == nil else { return }
-    window.toolbar = NSToolbar(identifier: Self.placeholderToolbarIdentifier)
   }
 }
