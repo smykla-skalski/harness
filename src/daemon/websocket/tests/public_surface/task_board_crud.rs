@@ -59,6 +59,18 @@ fn websocket_task_board_crud_sync_audit_and_orchestrator_routes_use_real_state()
             )
             .await;
             assert_eq!(listed["items"].as_array().map(Vec::len), Some(1));
+            let listed_without_params = call(
+                &state,
+                &connection,
+                "req-crud-list-defaults",
+                ws_methods::TASK_BOARD_LIST,
+                Value::Null,
+            )
+            .await;
+            assert_eq!(
+                listed_without_params["items"].as_array().map(Vec::len),
+                Some(1)
+            );
 
             let sync = call(
                 &state,
@@ -103,6 +115,21 @@ fn websocket_task_board_crud_sync_audit_and_orchestrator_routes_use_real_state()
             )
             .await;
             assert_eq!(audit["total"].as_u64(), Some(1));
+            let audit_request: WsRequest = serde_json::from_value(json!({
+                "id": "req-crud-audit-defaults",
+                "method": ws_methods::TASK_BOARD_AUDIT
+            }))
+            .expect("request with default params");
+            let audit_without_params = dispatch(&audit_request, &state, &connection).await;
+            assert!(
+                audit_without_params.error.is_none(),
+                "unexpected error: {:?}",
+                audit_without_params.error
+            );
+            assert_eq!(
+                audit_without_params.result.expect("websocket result")["total"].as_u64(),
+                Some(1)
+            );
 
             assert_eq!(
                 call(
