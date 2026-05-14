@@ -14,7 +14,9 @@ use crate::run::{
 };
 use crate::session::transport::{SessionCommand, SessionObserveArgs};
 use crate::setup::{CapabilitiesArgs, ClusterArgs, GatewayArgs, KumaSetupCommand};
-use crate::task_board::transport::{TaskBoardCommand, TaskBoardOrchestratorCommand};
+use crate::task_board::transport::{
+    TaskBoardCommand, TaskBoardOrchestratorCommand,
+};
 use crate::task_board::types::{ExternalRefProvider, TaskBoardStatus, TaskBoardWorkflowStatus};
 
 #[path = "tests/create.rs"]
@@ -336,6 +338,52 @@ fn parse_task_board_operational_subcommands() {
             (TaskBoardCommand::Machine(args), "machine") => assert!(args.json),
             _ => panic!("expected TaskBoard {expected}"),
         }
+    }
+}
+
+#[test]
+fn parse_task_board_planning_transitions() {
+    let begin = Cli::try_parse_from(["harness", "task-board", "begin", "task-1"]).unwrap();
+    match task_board_command(begin.command) {
+        TaskBoardCommand::Begin(args) => assert_eq!(args.id, "task-1"),
+        _ => panic!("expected TaskBoard Begin"),
+    }
+
+    let submit = Cli::try_parse_from([
+        "harness",
+        "task-board",
+        "submit",
+        "task-1",
+        "--summary",
+        "Use the documented approach.",
+    ])
+    .unwrap();
+    match task_board_command(submit.command) {
+        TaskBoardCommand::Submit(args) => {
+            assert_eq!(args.id, "task-1");
+            assert_eq!(args.summary, "Use the documented approach.");
+        }
+        _ => panic!("expected TaskBoard Submit"),
+    }
+
+    let approve = Cli::try_parse_from([
+        "harness",
+        "task-board",
+        "approve",
+        "task-1",
+        "--approved-by",
+        "lead",
+        "--approved-at",
+        "2026-05-14T02:00:00Z",
+    ])
+    .unwrap();
+    match task_board_command(approve.command) {
+        TaskBoardCommand::Approve(args) => {
+            assert_eq!(args.id, "task-1");
+            assert_eq!(args.approved_by, "lead");
+            assert_eq!(args.approved_at.as_deref(), Some("2026-05-14T02:00:00Z"));
+        }
+        _ => panic!("expected TaskBoard Approve"),
     }
 }
 

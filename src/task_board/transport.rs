@@ -23,11 +23,13 @@ mod dispatch;
 mod evaluate;
 mod item_args;
 mod orchestrator;
+mod planning;
 mod sync;
 
 pub use evaluate::TaskBoardEvaluateArgs;
 use item_args::TaskBoardItemFieldArgs;
 pub use orchestrator::TaskBoardOrchestratorCommand;
+pub use planning::{TaskBoardPlanApproveArgs, TaskBoardPlanBeginArgs, TaskBoardPlanSubmitArgs};
 
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]
@@ -42,6 +44,12 @@ pub enum TaskBoardCommand {
     Update(TaskBoardUpdateArgs),
     /// Tombstone one board task.
     Delete(TaskBoardDeleteArgs),
+    /// Move an item into planning and clear any approval.
+    Begin(TaskBoardPlanBeginArgs),
+    /// Submit a plan summary for review.
+    Submit(TaskBoardPlanSubmitArgs),
+    /// Approve a submitted plan and move it to ready work.
+    Approve(TaskBoardPlanApproveArgs),
     /// Run external synchronization.
     Sync(TaskBoardSyncArgs),
     /// Dispatch ready work into sessions.
@@ -214,6 +222,9 @@ impl Execute for TaskBoardCommand {
             Self::Get(args) => args.execute(context),
             Self::Update(args) => args.execute(context),
             Self::Delete(args) => args.execute(context),
+            Self::Begin(args) => args.execute(context),
+            Self::Submit(args) => args.execute(context),
+            Self::Approve(args) => args.execute(context),
             Self::Sync(args) => args.execute(context),
             Self::Dispatch(args) => args.execute(context),
             Self::Evaluate(args) => args.execute(context),
