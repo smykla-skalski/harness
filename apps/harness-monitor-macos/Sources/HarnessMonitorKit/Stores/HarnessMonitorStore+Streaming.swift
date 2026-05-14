@@ -204,12 +204,14 @@ extension HarnessMonitorStore {
       return
     }
     let timeline = payload.timeline ?? self.timeline
+    let resolvedTimelineWindow = mergedTimelineWindowAfterPush(
+      payloadTimeline: payload.timeline
+    )
     applySelectedSessionSnapshot(
       sessionID: sessionID,
       detail: detail,
       timeline: timeline,
-      timelineWindow: payload.timeline.map(TimelineWindowResponse.fallbackMetadata(for:))
-        ?? timelineWindow,
+      timelineWindow: resolvedTimelineWindow,
       clearBurstState: payload.timeline != nil,
       showingCachedData: false,
       cancelPendingTimelineRefresh: payload.timeline != nil
@@ -218,7 +220,8 @@ extension HarnessMonitorStore {
       scheduleSelectedSessionCacheWrite(
         detail,
         timeline: freshTimeline,
-        timelineWindow: TimelineWindowResponse.fallbackMetadata(for: freshTimeline)
+        timelineWindow: resolvedTimelineWindow
+          ?? TimelineWindowResponse.fallbackMetadata(for: freshTimeline)
       )
     } else if let client {
       scheduleSessionPushFallback(using: client, sessionID: sessionID)
@@ -270,12 +273,14 @@ extension HarnessMonitorStore {
       isExtensionsLoading = false
     }
     let timeline = payload.timeline ?? self.timeline
+    let resolvedTimelineWindow = mergedTimelineWindowAfterPush(
+      payloadTimeline: payload.timeline
+    )
     applySelectedSessionSnapshot(
       sessionID: sessionID,
       detail: detail,
       timeline: timeline,
-      timelineWindow: payload.timeline.map(TimelineWindowResponse.fallbackMetadata(for:))
-        ?? timelineWindow,
+      timelineWindow: resolvedTimelineWindow,
       clearBurstState: payload.timeline != nil,
       showingCachedData: false,
       cancelPendingTimelineRefresh: payload.timeline != nil
@@ -284,7 +289,8 @@ extension HarnessMonitorStore {
       scheduleSelectedSessionCacheWrite(
         detail,
         timeline: freshTimeline,
-        timelineWindow: TimelineWindowResponse.fallbackMetadata(for: freshTimeline)
+        timelineWindow: resolvedTimelineWindow
+          ?? TimelineWindowResponse.fallbackMetadata(for: freshTimeline)
       )
     } else if let client {
       scheduleSessionPushFallback(using: client, sessionID: sessionID)
