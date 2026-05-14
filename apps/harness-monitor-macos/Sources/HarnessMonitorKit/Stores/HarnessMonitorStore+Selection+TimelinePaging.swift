@@ -13,37 +13,18 @@ extension HarnessMonitorStore {
   }
 
   public func appendSelectedTimelineOlderChunk(limit: Int, retainedLimit: Int? = nil) async {
-    HarnessMonitorLogger.timelinePaging.info(
-      """
-      store.append.enter limit=\(limit, privacy: .public) \
-      windowLoadTaskInFlight=\(self.selectedTimelineWindowLoadTask != nil, privacy: .public) \
-      hasOlder=\(self.timelineWindow?.hasOlder == true, privacy: .public) \
-      windowEnd=\(self.timelineWindow?.windowEnd ?? -1, privacy: .public) \
-      totalCount=\(self.timelineWindow?.totalCount ?? -1, privacy: .public) \
-      timelineCount=\(self.timeline.count, privacy: .public)
-      """
-    )
     guard limit > 0 else {
-      HarnessMonitorLogger.timelinePaging.debug("store.append.guard limit<=0")
       return
     }
     guard selectedTimelineWindowLoadTask == nil else {
-      HarnessMonitorLogger.timelinePaging.debug("store.append.guard window-load in flight")
       return
     }
     guard timelineWindow?.hasOlder == true else {
-      HarnessMonitorLogger.timelinePaging.debug("store.append.guard hasOlder=false")
       return
     }
     let currentWindowEnd = timelineWindow?.windowEnd ?? timeline.count
     let totalCount = max(currentWindowEnd, timeline.count, timelineWindow?.totalCount ?? 0)
     let targetEnd = min(totalCount, currentWindowEnd + limit)
-    HarnessMonitorLogger.timelinePaging.info(
-      """
-      store.append.dispatch currentWindowEnd=\(currentWindowEnd, privacy: .public) \
-      totalCount=\(totalCount, privacy: .public) targetEnd=\(targetEnd, privacy: .public)
-      """
-    )
     await loadSelectedTimelinePrefix(
       targetEnd: targetEnd,
       pageSize: limit,
@@ -70,17 +51,7 @@ extension HarnessMonitorStore {
       max(targetEnd, 0),
       max(currentWindowEnd, timeline.count, timelineWindow?.totalCount ?? 0)
     )
-    HarnessMonitorLogger.timelinePaging.info(
-      """
-      store.prefix.enter currentWindowEnd=\(currentWindowEnd, privacy: .public) \
-      clampedTargetEnd=\(clampedTargetEnd, privacy: .public) \
-      pageSize=\(pageSize, privacy: .public)
-      """
-    )
     guard clampedTargetEnd > 0, currentWindowEnd < clampedTargetEnd else {
-      HarnessMonitorLogger.timelinePaging.debug(
-        "store.prefix.guard clampedTargetEnd<=currentWindowEnd"
-      )
       return
     }
 

@@ -106,18 +106,6 @@ extension HarnessMonitorStore {
     retainedLimit: Int? = nil,
     selectedSession: SessionDetail
   ) {
-    HarnessMonitorLogger.timelinePaging.info(
-      """
-      store.apply.response windowStart=\(response.windowStart, privacy: .public) \
-      windowEnd=\(response.windowEnd, privacy: .public) \
-      totalCount=\(response.totalCount, privacy: .public) \
-      hasOlder=\(response.hasOlder, privacy: .public) \
-      entriesCount=\(response.entries?.count ?? -1, privacy: .public) \
-      revision=\(response.revision, privacy: .public) \
-      currentRevision=\(currentRevision ?? -1, privacy: .public) \
-      retainedLimit=\(retainedLimit ?? -1, privacy: .public)
-      """
-    )
     let resolved = resolvedSelectedTimelinePage(
       response,
       currentRevision: currentRevision,
@@ -125,14 +113,6 @@ extension HarnessMonitorStore {
     )
     let resolvedTimeline = resolved.timeline
     let resolvedTimelineWindow = resolved.timelineWindow
-    HarnessMonitorLogger.timelinePaging.info(
-      """
-      store.apply.resolved timelineCount=\(resolvedTimeline.count, privacy: .public) \
-      windowEnd=\(resolvedTimelineWindow?.windowEnd ?? -1, privacy: .public) \
-      totalCount=\(resolvedTimelineWindow?.totalCount ?? -1, privacy: .public) \
-      hasOlder=\(resolvedTimelineWindow?.hasOlder ?? false, privacy: .public)
-      """
-    )
 
     withUISyncBatch {
       replaceSelectedTimelineSnapshot(
@@ -157,19 +137,11 @@ extension HarnessMonitorStore {
     retainedLimit: Int? = nil,
     currentRevision: Int64?
   ) async throws -> TimelineWindowResponse {
-    let oldestCursor =
-      timelineWindow?.oldestCursor
+    if let oldestCursor = timelineWindow?.oldestCursor
       ?? timeline.last.map({
         TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId)
       })
-    HarnessMonitorLogger.timelinePaging.info(
-      """
-      store.fetch.enter hasOldestCursor=\(oldestCursor != nil, privacy: .public) \
-      missingCount=\(missingCount, privacy: .public) \
-      targetEnd=\(targetEnd, privacy: .public)
-      """
-    )
-    if let oldestCursor {
+    {
       let olderPrefix = try await Self.measureOperation {
         try await client.timelineWindow(
           sessionID: sessionID,
@@ -181,20 +153,8 @@ extension HarnessMonitorStore {
         )
       }
       recordRequestSuccess()
-      HarnessMonitorLogger.timelinePaging.info(
-        """
-        store.fetch.before-resp entries=\(olderPrefix.value.entries?.count ?? -1, privacy: .public) \
-        revision=\(olderPrefix.value.revision, privacy: .public) \
-        currentRevision=\(currentRevision ?? -1, privacy: .public) \
-        windowStart=\(olderPrefix.value.windowStart, privacy: .public) \
-        windowEnd=\(olderPrefix.value.windowEnd, privacy: .public)
-        """
-      )
 
       if let currentRevision, olderPrefix.value.revision != currentRevision {
-        HarnessMonitorLogger.timelinePaging.info(
-          "store.fetch.revision-drift refetching latest"
-        )
         let refreshedPrefix = try await Self.measureOperation {
           try await client.timelineWindow(
             sessionID: sessionID,
@@ -208,7 +168,6 @@ extension HarnessMonitorStore {
       return olderPrefix.value
     }
 
-    HarnessMonitorLogger.timelinePaging.info("store.fetch.no-cursor refreshing latest")
     let refreshedPrefix = try await Self.measureOperation {
       try await client.timelineWindow(
         sessionID: sessionID,

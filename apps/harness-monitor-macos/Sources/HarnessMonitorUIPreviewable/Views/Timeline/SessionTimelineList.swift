@@ -70,25 +70,13 @@ struct SessionTimelineList: View {
       for: SessionTimelineNearBottomState.self,
       of: SessionTimelineNearBottomState.init(geometry:)
     ) { oldValue, newValue in
-      let nav = presentation.navigation
-      HarnessMonitorLogger.timelinePaging.debug(
-        """
-        view.scrollGeometry distance=\(newValue.distanceFromBottom, privacy: .public) \
-        measured=\(newValue.contentMeasured, privacy: .public) \
-        offset=\(newValue.contentOffsetY, privacy: .public) \
-        offsetPrev=\(oldValue.contentOffsetY, privacy: .public) \
-        hasOlder=\(nav.hasOlder, privacy: .public) \
-        windowEnd=\(nav.windowEnd, privacy: .public) totalCount=\(nav.totalCount, privacy: .public)
-        """
-      )
       guard newValue.contentMeasured else { return }
-      // Only react to user-driven scrolls (offset changed). Skip content-size-only
-      // changes, otherwise an older-load that grows the timeline would itself
+      // Only react to user-driven scrolls (offset changed). Content-size-only
+      // changes (from an older-load growing the timeline) would otherwise
       // chain-trigger another load while the user sits still.
       guard newValue.contentOffsetY != oldValue.contentOffsetY else { return }
       guard newValue.distanceFromBottom <= SessionTimelineNearBottomState.threshold else { return }
-      guard nav.hasOlder else { return }
-      HarnessMonitorLogger.timelinePaging.info("view.scrollGeometry FIRE")
+      guard presentation.navigation.hasOlder else { return }
       onRequestLoadOlder?()
     }
   }
