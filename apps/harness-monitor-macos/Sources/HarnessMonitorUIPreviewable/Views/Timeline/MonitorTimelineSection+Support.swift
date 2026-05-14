@@ -153,7 +153,7 @@ extension SessionTimelineView {
     }
   }
 
-  static let initialPageLimit = 25
+  static let initialPageLimit = 10
 
   func requestLatestWindowIfNeeded(_ presentation: SessionTimelineSectionPresentation) {
     if timeline.isEmpty {

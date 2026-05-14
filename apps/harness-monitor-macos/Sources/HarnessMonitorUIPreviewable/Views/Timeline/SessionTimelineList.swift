@@ -69,43 +69,26 @@ struct SessionTimelineList: View {
     .onScrollGeometryChange(
       for: SessionTimelineNearBottomState.self,
       of: SessionTimelineNearBottomState.init(geometry:)
-    ) { _, newValue in
+    ) { oldValue, newValue in
       let nav = presentation.navigation
       HarnessMonitorLogger.timelinePaging.debug(
         """
         view.scrollGeometry distance=\(newValue.distanceFromBottom, privacy: .public) \
         measured=\(newValue.contentMeasured, privacy: .public) \
+        offset=\(newValue.contentOffsetY, privacy: .public) \
+        offsetPrev=\(oldValue.contentOffsetY, privacy: .public) \
         hasOlder=\(nav.hasOlder, privacy: .public) \
         windowEnd=\(nav.windowEnd, privacy: .public) totalCount=\(nav.totalCount, privacy: .public)
         """
       )
       guard newValue.contentMeasured else { return }
+      // Only react to user-driven scrolls (offset changed). Skip content-size-only
+      // changes, otherwise an older-load that grows the timeline would itself
+      // chain-trigger another load while the user sits still.
+      guard newValue.contentOffsetY != oldValue.contentOffsetY else { return }
       guard newValue.distanceFromBottom <= SessionTimelineNearBottomState.threshold else { return }
       guard nav.hasOlder else { return }
       HarnessMonitorLogger.timelinePaging.info("view.scrollGeometry FIRE")
-      onRequestLoadOlder?()
-    }
-    .task(id: SessionTimelineLoadOlderTaskKey(navigation: presentation.navigation)) {
-      let nav = presentation.navigation
-      HarnessMonitorLogger.timelinePaging.debug(
-        """
-        view.task enter hasOlder=\(nav.hasOlder, privacy: .public) \
-        windowEnd=\(nav.windowEnd, privacy: .public) \
-        totalCount=\(nav.totalCount, privacy: .public)
-        """
-      )
-      guard nav.hasOlder else { return }
-      try? await Task.sleep(for: .milliseconds(80))
-      guard !Task.isCancelled, presentation.navigation.hasOlder else {
-        HarnessMonitorLogger.timelinePaging.debug(
-          """
-          view.task post-sleep guard fail cancelled=\(Task.isCancelled, privacy: .public) \
-          hasOlder=\(presentation.navigation.hasOlder, privacy: .public)
-          """
-        )
-        return
-      }
-      HarnessMonitorLogger.timelinePaging.info("view.task FIRE")
       onRequestLoadOlder?()
     }
   }
@@ -116,6 +99,7 @@ struct SessionTimelineNearBottomState: Equatable {
 
   let distanceFromBottom: CGFloat
   let contentMeasured: Bool
+  let contentOffsetY: CGFloat
 
   init(geometry: ScrollGeometry) {
     let measured = geometry.contentSize.height > 0
@@ -123,24 +107,17 @@ struct SessionTimelineNearBottomState: Equatable {
       0,
       geometry.contentSize.height - geometry.contentOffset.y - geometry.visibleRect.height
     )
-    self.init(distanceFromBottom: distance, contentMeasured: measured)
+    self.init(
+      distanceFromBottom: distance,
+      contentMeasured: measured,
+      contentOffsetY: geometry.contentOffset.y
+    )
   }
 
-  init(distanceFromBottom: CGFloat, contentMeasured: Bool) {
+  init(distanceFromBottom: CGFloat, contentMeasured: Bool, contentOffsetY: CGFloat = 0) {
     self.distanceFromBottom = distanceFromBottom
     self.contentMeasured = contentMeasured
-  }
-}
-
-struct SessionTimelineLoadOlderTaskKey: Hashable {
-  let windowEnd: Int
-  let totalCount: Int
-  let hasOlder: Bool
-
-  init(navigation: SessionTimelineWindowNavigation) {
-    windowEnd = navigation.windowEnd
-    totalCount = navigation.totalCount
-    hasOlder = navigation.hasOlder
+    self.contentOffsetY = contentOffsetY
   }
 }
 

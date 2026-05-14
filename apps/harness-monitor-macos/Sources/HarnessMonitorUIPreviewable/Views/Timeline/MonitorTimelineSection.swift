@@ -276,7 +276,7 @@ struct SessionTimelineView: View {
     store.presentedSheet = .signalDetail(signalID: signalID)
   }
 
-  static let loadOlderChunkSize = 25
+  static let loadOlderChunkSize = 10
 
   func requestLoadOlderTimelineChunk() {
     let oldestCursor =
