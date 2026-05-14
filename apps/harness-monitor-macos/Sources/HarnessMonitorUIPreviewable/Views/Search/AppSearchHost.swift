@@ -290,33 +290,38 @@ private struct AppSearchFieldSurface: View, Equatable {
       && lhs.isEnabledValue == rhs.isEnabledValue
   }
 
-  @ViewBuilder var body: some View {
-    if isEnabled {
-      Color.clear
-        .frame(width: 0, height: 0)
-        .allowsHitTesting(false)
-        .searchable(
-          text: $query,
-          placement: .toolbar,
-          prompt: prompt
-        )
-        .searchSuggestions {
-          ForEach(suggestionRows) { row in
-            Text(verbatim: row.displayTitle)
-              .searchCompletion(row.displayTitle)
-          }
-          .searchSuggestions(.hidden, for: .content)
+  // The `.searchable(placement: .toolbar)` modifier always mounts so AppKit
+  // installs `NSSearchToolbarItemView` during the window's first layout pass.
+  // Gating the mount on `isEnabled` adds the toolbar item later, after the
+  // first display cycle, which triggers
+  // `-[NSSearchToolbarItemView _updateMinWidthConstraints:]` →
+  // `-[NSToolbar animateToolbarUpdatesWithDuration:changes:]` →
+  // `layoutSubtreeIfNeeded` while the toolbar is already laying out, hitting
+  // `_NSDetectedLayoutRecursion`. Startup deferral is preserved by the
+  // behavioral gates in `AppSearchHost` (index activation, focus action
+  // publication, submit/trigger short-circuits) — only the toolbar item's
+  // mount is eager.
+  var body: some View {
+    Color.clear
+      .frame(width: 0, height: 0)
+      .allowsHitTesting(false)
+      .searchable(
+        text: $query,
+        placement: .toolbar,
+        prompt: prompt
+      )
+      .searchSuggestions {
+        ForEach(suggestionRows) { row in
+          Text(verbatim: row.displayTitle)
+            .searchCompletion(row.displayTitle)
         }
-        .searchFocused(isFocused)
-        .harnessMinimizableSearchToolbar()
-        .onSubmit(of: .search) {
-          onSubmit()
-        }
-    } else {
-      Color.clear
-        .frame(width: 0, height: 0)
-        .allowsHitTesting(false)
-    }
+        .searchSuggestions(.hidden, for: .content)
+      }
+      .searchFocused(isFocused)
+      .harnessMinimizableSearchToolbar()
+      .onSubmit(of: .search) {
+        onSubmit()
+      }
   }
 }
 

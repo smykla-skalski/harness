@@ -73,7 +73,7 @@ extension SessionWindowFlowTests {
     #expect(!sessionHostSource.contains(".frame(maxWidth: .infinity, maxHeight: .infinity"))
   }
 
-  @Test("Session search waits until startup load enables the toolbar field")
+  @Test("Session search defers index and focus work but mounts the toolbar field eagerly")
   func sessionSearchDefersToolbarFieldUntilStartupSettles() throws {
     let hostSource = try previewableSourceFile(named: "Views/Search/AppSearchHost.swift")
     let sessionWindowSource = try previewableSourceFile(
@@ -89,7 +89,11 @@ extension SessionWindowFlowTests {
     #expect(hostSource.contains("let isEnabled: Bool"))
     #expect(hostSource.contains("guard isEnabled else {\n      return nil\n    }"))
     #expect(hostSource.contains("guard isEnabled, hasSearchQuery else {"))
-    #expect(hostSource.contains("if isEnabled {"))
+    // The `.searchable(placement: .toolbar)` modifier must not be wrapped in
+    // an `if isEnabled` branch — deferring the toolbar-item mount past the
+    // window's first layout pass triggers an AppKit layout recursion warning
+    // when `NSSearchToolbarItemView` first computes its min-width constraint.
+    #expect(!hostSource.contains("if isEnabled {"))
     #expect(
       sessionWindowSource.contains(
         """
