@@ -239,11 +239,15 @@ extension HarnessMonitorUITestCase {
       let window = self.mainWindow(in: app)
       let appChrome = self.appChromeRoot(in: app)
       let openRecent = self.openRecentRoot(in: app)
+      let sessionWindow = self.element(
+        in: app,
+        identifier: HarnessMonitorUITestAccessibility.sessionWindowShell
+      )
       return
         window.exists
         && window.frame.width > 0
         && window.frame.height > 0
-        && (appChrome.exists || openRecent.exists)
+        && (appChrome.exists || openRecent.exists || sessionWindow.exists)
     }
     if !contentReady {
       recordDiagnosticsTrace(
@@ -253,6 +257,12 @@ extension HarnessMonitorUITestCase {
           "mode": mode,
           "app_chrome_exists": String(appChromeRoot(in: app).exists),
           "open_recent_exists": String(openRecentRoot(in: app).exists),
+          "session_window_exists": String(
+            element(
+              in: app,
+              identifier: HarnessMonitorUITestAccessibility.sessionWindowShell
+            ).exists
+          ),
         ]
       )
     }

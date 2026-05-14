@@ -7,6 +7,7 @@ extension HarnessMonitorPreviewStoreFactory {
       .dashboardLanding: dashboardLandingConfiguration,
       .dashboardLoaded: dashboardConfiguration,
       .cockpitLoaded: cockpitConfiguration,
+      .policyCanvas: cockpitConfiguration,
       .emptyCockpit: emptyCockpitConfiguration,
       .toolbarCountRegression: toolbarCountRegressionConfiguration,
       .codexApprovalUnification: codexApprovalUnificationConfiguration,

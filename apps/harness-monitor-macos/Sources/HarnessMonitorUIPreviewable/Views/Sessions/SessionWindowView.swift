@@ -48,10 +48,19 @@ public struct SessionWindowView: View {
   @State private var startupSearchParticipationEnabledStorage =
     HarnessMonitorUITestEnvironment.isEnabled
 
-  public init(store: HarnessMonitorStore, token: SessionWindowToken) {
+  public init(
+    store: HarnessMonitorStore,
+    token: SessionWindowToken,
+    initialRoute: SessionWindowRoute? = nil
+  ) {
     self.store = store
     self.token = token
-    _stateCacheStorage = State(wrappedValue: SessionWindowStateCache(sessionID: token.sessionID))
+    _stateCacheStorage = State(
+      wrappedValue: SessionWindowStateCache(
+        sessionID: token.sessionID,
+        selection: .route(initialRoute ?? .overview)
+      )
+    )
     _policyCanvasViewModelStorage = State(wrappedValue: .sample())
   }
   var stateCache: SessionWindowStateCache {

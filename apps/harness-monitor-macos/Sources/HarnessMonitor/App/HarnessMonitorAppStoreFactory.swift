@@ -37,6 +37,7 @@ enum HarnessMonitorAppStoreFactory {
     case dashboardLanding = "dashboard-landing"
     case dashboard
     case cockpit
+    case policyCanvas = "policy-canvas"
     case emptyCockpit = "empty-cockpit"
     case toolbarCountRegression = "toolbar-count-regression"
     case codexApprovalUnification = "codex-approval-unification"
@@ -65,6 +66,8 @@ enum HarnessMonitorAppStoreFactory {
         .dashboardLoaded
       case .cockpit:
         .cockpitLoaded
+      case .policyCanvas:
+        .policyCanvas
       case .emptyCockpit:
         .emptyCockpit
       case .toolbarCountRegression:

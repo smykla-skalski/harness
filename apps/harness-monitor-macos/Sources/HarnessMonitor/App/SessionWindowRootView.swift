@@ -13,6 +13,7 @@ struct SessionWindowRootView: View {
   let windowCommandRouting: WindowCommandRoutingState
   let mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   let sessionWindowPresenceTracker: SessionWindowPresenceTracker
+  let initialRoute: SessionWindowRoute?
   @Binding var themeMode: HarnessMonitorThemeMode
 
   private var windowID: String {
@@ -61,7 +62,7 @@ struct SessionWindowRootView: View {
       appliesPreferredColorScheme: true,
       toast: store.toast
     ) {
-      SessionWindowView(store: store, token: token)
+      SessionWindowView(store: store, token: token, initialRoute: initialRoute)
     }
     .suppressToolbarBaselineSeparator(
       markedAs: HarnessMonitorAccessibility.sessionWindowToolbarSeparatorSuppressed
