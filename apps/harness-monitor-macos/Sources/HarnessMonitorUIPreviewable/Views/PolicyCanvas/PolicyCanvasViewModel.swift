@@ -138,6 +138,34 @@ final class PolicyCanvasViewModel {
   /// state into `statusLine`.
   var lastAutosaveOutcome: PolicyCanvasAutosaveOutcome
 
+  /// Count of consecutive autosave failures since the last successful save.
+  /// `@ObservationIgnored` because views subscribe through
+  /// `lastAutosaveOutcome` (which flips to `.disabled` at the ceiling) — they
+  /// do not need to invalidate on every increment. Cleared by
+  /// `markAutosaveSucceeded()` and `clearAutosaveDecompensation()`.
+  @ObservationIgnored var consecutiveAutosaveFailures: Int
+
+  /// Maximum consecutive autosave rejects before the subsystem flips to
+  /// `.disabled(reason:)`. Three is enough to ride out a brief daemon hiccup
+  /// without burying the user under a stack of "Autosave rejected" toasts
+  /// that each restore work they were still typing.
+  static let autosaveFailureCeiling: Int = 3
+
+  /// Snapshot of in-progress edits captured at the moment a daemon round-trip
+  /// rejects. The chrome surfaces a "Recover" affordance the user can press
+  /// to swap the rolled-back state back to the recovery snapshot — letting
+  /// them keep edits they typed during the 200-2000ms round-trip window.
+  /// `@ObservationIgnored` because the chrome only reads the presence bit
+  /// `hasRecoverableEdits` to flip the affordance on; the snapshot payload
+  /// itself is consumed lazily by `recoverRejectedEdits()`.
+  @ObservationIgnored var lastRejectedRecovery: PolicyCanvasSnapshot?
+
+  /// Observed presence-bit mirror for `lastRejectedRecovery`. Views that need
+  /// to show the "Recover" affordance subscribe here instead of through the
+  /// snapshot itself; flipping the bit is a single observer notification per
+  /// reject (vs. per-field deep-equality on the snapshot payload).
+  var hasRecoverableEdits: Bool
+
   init(
     selectedTab: PolicyCanvasTab = .draft,
     nodes: [PolicyCanvasNode],
@@ -168,6 +196,9 @@ final class PolicyCanvasViewModel {
     self.isPromoting = false
     self.autosaveSuppressed = false
     self.lastAutosaveOutcome = .idle
+    self.consecutiveAutosaveFailures = 0
+    self.lastRejectedRecovery = nil
+    self.hasRecoverableEdits = false
     self.nextNodeNumber = nextNodeNumber
     reconcileGroupFrames()
   }
@@ -365,14 +396,21 @@ final class PolicyCanvasViewModel {
   }
 
   /// Single funnel that mutation sites use to mark the document dirty. Sets
-  /// `documentDirty = true` and fires the autosave trigger (no-op when the
-  /// host has not wired one, which keeps unit-test paths quiet). Funneling
-  /// through here keeps autosave scheduling in lock-step with dirty
-  /// transitions; before this funnel, autosave wiring had to grep through
-  /// 8+ mutation sites for `documentDirty = true` and audit each one.
+  /// `documentDirty = true` and fires the autosave trigger on the clean→dirty
+  /// edge. Coalescing to the edge is load-bearing on drag paths: drag
+  /// callbacks fire `markDocumentDirty()` per gesture tick (~60Hz), so a
+  /// per-tick trigger would call `scheduleAutosave` 60 times per second and
+  /// spawn-then-cancel a `Task` on every tick. Trailing-edge debounce already
+  /// coalesces the actual saves, but the cancellation churn and `Task.isCancelled`
+  /// checks add up; the edge gate drops them to a single trigger per dirty
+  /// window. Subsequent `markDocumentDirty()` calls within the same dirty
+  /// window flow into the already-scheduled debounce.
   func markDocumentDirty() {
+    let wasClean = !documentDirty
     documentDirty = true
-    autosaveTrigger?()
+    if wasClean {
+      autosaveTrigger?()
+    }
   }
 
 }

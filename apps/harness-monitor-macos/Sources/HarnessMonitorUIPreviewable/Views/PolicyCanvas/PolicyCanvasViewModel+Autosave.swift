@@ -35,6 +35,9 @@ extension PolicyCanvasViewModel {
   /// Save button; the view-model knows nothing about the daemon directly.
   ///
   /// Suppression cases (all return without scheduling):
+  /// - `lastAutosaveOutcome == .disabled`: the failure ceiling has fired. The
+  ///   chrome shows the sticky affordance; only a successful manual save
+  ///   reactivates the scheduler.
   /// - `autosaveSuppressed`: a rollback just fired. Reset the flag and let
   ///   the next dirty flip schedule afresh.
   /// - `backingDocument == nil`: the canvas is showing the sample document
@@ -48,14 +51,7 @@ extension PolicyCanvasViewModel {
   /// — if the user manually saved during the window, the flag is false and
   /// we exit without firing a redundant save.
   func scheduleAutosave(performSave: @escaping @MainActor () async -> Void) {
-    if autosaveSuppressed {
-      autosaveSuppressed = false
-      return
-    }
-    guard backingDocument != nil else {
-      return
-    }
-    guard !isSavingDraft else {
+    guard shouldScheduleAutosave() else {
       return
     }
     let interval = Self.autosaveDebounceMilliseconds
@@ -64,34 +60,120 @@ extension PolicyCanvasViewModel {
       try? await Task.sleep(for: .milliseconds(Int(interval)))
       guard let self else { return }
       guard !Task.isCancelled else { return }
-      // Re-check the suppression flag in case a reject landed during the
-      // sleep window. The flag is one-shot: consume it here just like the
-      // entry check above.
-      if self.autosaveSuppressed {
-        self.autosaveSuppressed = false
-        return
-      }
-      guard self.documentDirty else { return }
-      guard self.backingDocument != nil else { return }
-      guard !self.isSavingDraft else { return }
+      guard self.shouldRunDebouncedAutosave() else { return }
       self.lastAutosaveOutcome = .pending
       await performSave()
     }
   }
 
-  /// Mark the most recent autosave attempt successful. Called from the
-  /// host view after the daemon round-trip returns `true`. Surface side
-  /// effect: tells the chrome "Autosave succeeded {time}".
-  func markAutosaveSucceeded(at date: Date = Date()) {
-    lastAutosaveOutcome = .succeeded(at: date)
+  /// Pre-task entry guard: returns true when the scheduler may spawn a new
+  /// debounce Task. Consumes the one-shot `autosaveSuppressed` flag on a
+  /// rollback-armed call.
+  ///
+  /// Split out of `scheduleAutosave` so the call site stays under the
+  /// cyclomatic-complexity ceiling; behavior is identical to the inline
+  /// gate it replaces.
+  private func shouldScheduleAutosave() -> Bool {
+    if case .disabled = lastAutosaveOutcome {
+      return false
+    }
+    if autosaveSuppressed {
+      autosaveSuppressed = false
+      return false
+    }
+    guard backingDocument != nil else {
+      return false
+    }
+    guard !isSavingDraft else {
+      return false
+    }
+    return true
   }
 
-  /// Mark the most recent autosave attempt failed. Called from the host
-  /// view after the daemon round-trip returns `false` (rejected). The
+  /// Post-sleep wake guard: returns true when the debounce Task should
+  /// actually run the supplied `performSave` closure. Re-checks every
+  /// suppression case in case the world changed during the 1.5s sleep
+  /// (user manually saved, a reject landed and armed suppression, or the
+  /// outcome flipped to `.disabled`).
+  private func shouldRunDebouncedAutosave() -> Bool {
+    if autosaveSuppressed {
+      autosaveSuppressed = false
+      return false
+    }
+    if case .disabled = lastAutosaveOutcome {
+      return false
+    }
+    guard documentDirty else { return false }
+    guard backingDocument != nil else { return false }
+    guard !isSavingDraft else { return false }
+    return true
+  }
+
+  /// Mark the most recent autosave attempt successful. Clears the consecutive
+  /// failure counter — a successful save proves the daemon is healthy again,
+  /// so a future hiccup gets a fresh three-strike window before the ceiling
+  /// fires. Also drops any in-flight recovery buffer; the prior reject's
+  /// stashed edits are no longer relevant once a save lands clean.
+  func markAutosaveSucceeded(at date: Date = Date()) {
+    consecutiveAutosaveFailures = 0
+    lastAutosaveOutcome = .succeeded(at: date)
+    clearRecoveryBuffer()
+  }
+
+  /// Mark the most recent autosave attempt failed. Increments the consecutive
+  /// failure counter; if it crosses `autosaveFailureCeiling`, flip the
+  /// outcome to `.disabled(reason:)` and stop scheduling new autosaves. The
   /// host MUST also call `suppressAutosaveOnce()` before calling
   /// `restoreState(_:)` to break the retry loop — without that, the
   /// rollback's dirty-write would re-trigger autosave next mutation.
   func markAutosaveFailed(at date: Date = Date()) {
-    lastAutosaveOutcome = .failed(at: date)
+    consecutiveAutosaveFailures += 1
+    if consecutiveAutosaveFailures >= Self.autosaveFailureCeiling {
+      lastAutosaveOutcome = .disabled(reason: Self.autosaveDisabledReason)
+      cancelAutosave()
+    } else {
+      lastAutosaveOutcome = .failed(at: date)
+    }
+  }
+
+  /// Sticky affordance copy when autosave self-disables after the ceiling.
+  /// Stored as a constant so the chrome and the disabled-state assertion in
+  /// tests stay in lock-step.
+  static let autosaveDisabledReason = "Autosave paused - save manually to retry"
+
+  /// Reset the decompensation state. Called from `markManualSaveSucceeded`
+  /// (re-arm autosave on the next dirty flip) and exposed so tests can drop
+  /// straight into a known-good state without manually flipping internals.
+  func clearAutosaveDecompensation() {
+    consecutiveAutosaveFailures = 0
+    if case .disabled = lastAutosaveOutcome {
+      lastAutosaveOutcome = .idle
+    }
+  }
+
+  /// Called from the host view after a foreground manual save succeeds. Clears
+  /// the consecutive-failure counter and exits the `.disabled` state so the
+  /// next dirty flip can schedule autosave again. Also drops any in-flight
+  /// recovery buffer — the user just saved, the prior reject's stash is
+  /// moot.
+  func markManualSaveSucceeded() {
+    clearAutosaveDecompensation()
+    clearRecoveryBuffer()
+  }
+
+  /// Synchronous helper the host view calls BEFORE spawning its save Task.
+  /// Setting `isSavingDraft = true` inside the Task body leaves a race window
+  /// between `cancelAutosave()` and the flag flip during which an autosave
+  /// wake could fire and run a second save in parallel; doing it
+  /// synchronously closes the window.
+  func beginForegroundSave() {
+    cancelAutosave()
+    isSavingDraft = true
+  }
+
+  /// Companion to `beginForegroundSave`. Use in a `defer` after the
+  /// foreground save Task completes.
+  func endForegroundSave() {
+    isSavingDraft = false
   }
 }

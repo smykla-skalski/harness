@@ -307,11 +307,18 @@ enum PolicyCanvasCoordinateSpaces {
 /// resolve (`failed`). `idle` is the cold-start state before any autosave
 /// has fired, and stays in place after a manual save reload (autosave isn't
 /// the most recent attempt anymore).
+///
+/// `.disabled(reason:)` is the decompensation state: after the consecutive
+/// failure ceiling fires (see `PolicyCanvasViewModel.autosaveFailureCeiling`),
+/// the autosave scheduler refuses to fire and the chrome shows a sticky
+/// affordance telling the user to save manually. A successful manual save
+/// clears the failure counter and flips back to `succeeded(at:)`.
 enum PolicyCanvasAutosaveOutcome: Equatable {
   case idle
   case pending
   case succeeded(at: Date)
   case failed(at: Date)
+  case disabled(reason: String)
 }
 
 enum PolicyCanvasLayout {

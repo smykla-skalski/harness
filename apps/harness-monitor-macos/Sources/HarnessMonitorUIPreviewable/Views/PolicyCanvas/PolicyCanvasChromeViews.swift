@@ -8,8 +8,28 @@ struct PolicyCanvasTopBar: View {
   let save: @MainActor () -> Void
   let simulate: @MainActor () -> Void
   let promote: @MainActor () -> Void
+  let recoverEdits: @MainActor () -> Void
 
   var body: some View {
+    VStack(spacing: 0) {
+      mainRow
+      PolicyCanvasAutosaveDisabledBanner(viewModel: viewModel, retry: save)
+      PolicyCanvasRecoveryBanner(
+        viewModel: viewModel,
+        recover: recoverEdits,
+        dismiss: { viewModel.clearRecoveryBuffer() }
+      )
+    }
+    .background(Color(red: 0.08, green: 0.09, blue: 0.12).opacity(0.98))
+    .overlay(alignment: .bottom) {
+      Rectangle()
+        .fill(Color.white.opacity(0.08))
+        .frame(height: 1)
+    }
+    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasTopBar)
+  }
+
+  private var mainRow: some View {
     HStack(spacing: 12) {
       Label("Configurable Policy Canvas", systemImage: "rectangle.3.group.bubble")
         .scaledFont(.headline.weight(.semibold))
@@ -93,13 +113,101 @@ struct PolicyCanvasTopBar: View {
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 10)
-    .background(Color(red: 0.08, green: 0.09, blue: 0.12).opacity(0.98))
-    .overlay(alignment: .bottom) {
-      Rectangle()
-        .fill(Color.white.opacity(0.08))
-        .frame(height: 1)
+  }
+}
+
+/// Sticky affordance the chrome shows when consecutive autosave failures cross
+/// the ceiling and the subsystem flips to `.disabled`. Click to retry runs a
+/// manual save on the same path as the toolbar Save button; on success the
+/// view-model clears the failure counter and the affordance vanishes.
+private struct PolicyCanvasAutosaveDisabledBanner: View {
+  let viewModel: PolicyCanvasViewModel
+  let retry: @MainActor () -> Void
+
+  var body: some View {
+    if case .disabled(let reason) = viewModel.lastAutosaveOutcome {
+      HStack(spacing: 8) {
+        Image(systemName: "exclamationmark.triangle.fill")
+          .foregroundStyle(.orange)
+        Text(reason)
+          .scaledFont(.caption.weight(.semibold))
+          .foregroundStyle(.white)
+          .lineLimit(1)
+        Spacer(minLength: 8)
+        Button {
+          retry()
+        } label: {
+          Label("Save now", systemImage: "arrow.clockwise")
+            .scaledFont(.caption.weight(.semibold))
+            .lineLimit(1)
+        }
+        .harnessActionButtonStyle(variant: .bordered, tint: .orange)
+        .controlSize(.small)
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.policyCanvasAutosaveDisabledRetryButton
+        )
+      }
+      .padding(.horizontal, 14)
+      .padding(.vertical, 6)
+      .background(Color.orange.opacity(0.12))
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.policyCanvasAutosaveDisabledAffordance
+      )
     }
-    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasTopBar)
+  }
+}
+
+/// Recovery banner shown after a daemon reject when the user typed during the
+/// round-trip. The reject path captures those edits into a buffer the user can
+/// restore here before they hit Save again. Dismiss drops the buffer; Recover
+/// applies it (and marks dirty so the next save attempt covers the recovered
+/// state).
+private struct PolicyCanvasRecoveryBanner: View {
+  let viewModel: PolicyCanvasViewModel
+  let recover: @MainActor () -> Void
+  let dismiss: @MainActor () -> Void
+
+  var body: some View {
+    if viewModel.hasRecoverableEdits {
+      HStack(spacing: 8) {
+        Image(systemName: "tray.and.arrow.up")
+          .foregroundStyle(.cyan)
+        Text("Unsaved edits captured before reject")
+          .scaledFont(.caption.weight(.semibold))
+          .foregroundStyle(.white)
+          .lineLimit(1)
+        Spacer(minLength: 8)
+        Button {
+          recover()
+        } label: {
+          Label("Recover", systemImage: "arrow.uturn.backward")
+            .scaledFont(.caption.weight(.semibold))
+            .lineLimit(1)
+        }
+        .harnessActionButtonStyle(variant: .bordered, tint: .cyan)
+        .controlSize(.small)
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.policyCanvasRecoveryButton
+        )
+        Button {
+          dismiss()
+        } label: {
+          Image(systemName: "xmark")
+            .scaledFont(.caption.weight(.semibold))
+        }
+        .harnessActionButtonStyle(variant: .borderless)
+        .controlSize(.small)
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.policyCanvasRecoveryDismissButton
+        )
+      }
+      .padding(.horizontal, 14)
+      .padding(.vertical, 6)
+      .background(Color.cyan.opacity(0.10))
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.policyCanvasRecoveryAffordance
+      )
+    }
   }
 }
 

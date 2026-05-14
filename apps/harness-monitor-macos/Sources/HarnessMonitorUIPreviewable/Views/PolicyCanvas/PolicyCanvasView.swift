@@ -38,21 +38,21 @@ public struct PolicyCanvasView: View {
   @Environment(\.undoManager) var undoManager
 
   /// Scene-scoped storage for viewport state (zoom, selection, scroll
-  /// position). Restored on first appear when the canvas's
-  /// `pipelineIdentity` matches the previously stored ID; otherwise the
-  /// scene is opening a different pipeline and we ignore prior state.
-  /// `pipelineIdentity == nil` (no document yet) skips restoration entirely
-  /// — two trace-less pipelines must not share viewport state through a
-  /// shared sentinel key.
+  /// position) keyed by pipeline identity. Before this commit each viewport
+  /// field had its own `@SceneStorage` key (`policyCanvas.zoom`,
+  /// `policyCanvas.selectionRaw`, ...) — but those keys are scene-scoped,
+  /// NOT pipeline-scoped, so two windows on the same scene viewing
+  /// different pipelines would stomp each other's last-write. The single
+  /// JSON-encoded map below is keyed by `pipelineIdentity`, so each pipeline
+  /// gets its own slot.
   ///
-  /// Module-internal access so `PolicyCanvasView+SceneStorage.swift` can
-  /// read/write the storage from its extension; the host view struct is
-  /// only constructable from the same module so this is not API surface.
-  @SceneStorage("policyCanvas.pipelineID") var storedPipelineID: String = ""
-  @SceneStorage("policyCanvas.zoom") var storedZoom: Double = 1.0
-  @SceneStorage("policyCanvas.selectionRaw") var storedSelectionRaw: String = ""
-  @SceneStorage("policyCanvas.scrollX") var storedScrollX: Double = 0
-  @SceneStorage("policyCanvas.scrollY") var storedScrollY: Double = 0
+  /// `pipelineIdentity == nil` (no document yet) skips persistence entirely
+  /// - two trace-less pipelines must not share viewport state through a
+  /// shared sentinel key. Module-internal access so
+  /// `PolicyCanvasView+SceneStorage.swift` can read/write the storage from
+  /// its extension; the host view struct is only constructable from the same
+  /// module so this is not API surface.
+  @SceneStorage("policyCanvas.byPipeline") var storedPipelineStateRaw: String = ""
   let store: HarnessMonitorStore?
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice?
 
@@ -94,7 +94,8 @@ public struct PolicyCanvasView: View {
         canPromote: viewModel.canPromote,
         save: saveDraft,
         simulate: simulate,
-        promote: requestPromote
+        promote: requestPromote,
+        recoverEdits: recoverRejectedEdits
       )
 
       PolicyCanvasValidationPanel(
@@ -164,17 +165,13 @@ public struct PolicyCanvasView: View {
     .onChange(of: undoManager) { _, newValue in
       viewModel.attachUndoManager(newValue)
     }
-    .onChange(of: viewModel.pipelineIdentity) { _, newIdentity in
+    .onChange(of: viewModel.pipelineIdentity) { _, _ in
       // First time the pipeline identity becomes known, try to restore the
       // scene storage. Subsequent same-id republishes leave the stored
-      // viewport alone — the user's in-window state always wins.
+      // viewport alone - the user's in-window state always wins. The
+      // by-pipeline JSON map is keyed by identity, so there's no separate
+      // stamp to apply - lookups happen at read time.
       restoreSceneStorageIfNeeded()
-      // Also stamp the stored pipeline id so a subsequent identity-flip
-      // doesn't blindly restore a stale zoom/selection captured under a
-      // different pipeline.
-      if let newIdentity {
-        storedPipelineID = newIdentity
-      }
     }
     .onChange(of: viewModel.zoom) { _, newZoom in
       persistSceneStorageIfNeeded(zoom: Double(newZoom))
@@ -188,9 +185,23 @@ public struct PolicyCanvasView: View {
     // rubber-band curve / port highlight / group highlight stay painted.
     // Enumerating every interruption surface is brittle; clear eagerly on
     // every transition off .active instead.
+    //
+    // .background specifically (window closed/hidden, app moving to back)
+    // also tears down any pending autosave Task with the scene - the last
+    // 1.5s of edits would otherwise vanish silently. Flush them by spawning
+    // a save Task synchronously so the daemon round-trip starts before the
+    // scene actually drops. macOS gives the app a short window to do work
+    // when entering .background; the Task may not complete before the scene
+    // dies, but starting it is the most we can do without a dedicated
+    // app-level lifecycle hook.
     .onChange(of: scenePhase) { _, newPhase in
       if newPhase != .active {
         viewModel.clearTransientGestureState()
+      }
+      if newPhase == .background, viewModel.documentDirty,
+        viewModel.autosaveTask != nil
+      {
+        flushPendingAutosaveBeforeBackground()
       }
     }
     .confirmationDialog(
