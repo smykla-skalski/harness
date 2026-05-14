@@ -229,6 +229,67 @@ enum PolicyCanvasSelection: Hashable {
   case edge(String)
 }
 
+/// A single search hit produced by `PolicyCanvasViewModel.searchHits(query:)`.
+/// Each variant carries the matched component's id, its rendered title (the
+/// eye-readable original, not the diacritic-folded copy used for the match),
+/// the matched range expressed in the folded title's indices plus a stable
+/// score used for ranking.
+///
+/// The range is in the folded title's indices, not the original. The palette
+/// renders the original title; the matched substring length is the same in the
+/// folded copy because `folding(options: .diacriticInsensitive)` preserves
+/// index alignment for the alphabetic characters this search targets. Edge
+/// labels and group titles use the same convention. For titles whose length
+/// changes under folding (rare in this app's policy domain), callers must skip
+/// the highlight rather than risking an index mismatch.
+enum PolicyCanvasSearchHit: Equatable {
+  case node(id: String, displayTitle: String, matchedRange: Range<String.Index>?, score: Int)
+  case edge(id: String, displayTitle: String, matchedRange: Range<String.Index>?, score: Int)
+  case group(id: String, displayTitle: String, matchedRange: Range<String.Index>?, score: Int)
+
+  var sortScore: Int {
+    switch self {
+    case .node(_, _, _, let score),
+      .edge(_, _, _, let score),
+      .group(_, _, _, let score):
+      return score
+    }
+  }
+
+  var sortKey: String {
+    switch self {
+    case .node(let id, _, _, _),
+      .edge(let id, _, _, _),
+      .group(let id, _, _, _):
+      return id
+    }
+  }
+
+  var displayTitle: String {
+    switch self {
+    case .node(_, let title, _, _),
+      .edge(_, let title, _, _),
+      .group(_, let title, _, _):
+      return title
+    }
+  }
+
+  /// Convert the hit into a `PolicyCanvasSelection` payload for the view model.
+  /// Single source of truth so the palette and any future call site (peer
+  /// "jump to" surfaces, validation drilldowns) cannot drift on how a hit
+  /// maps onto a selection.
+  var selection: PolicyCanvasSelection {
+    switch self {
+    case .node(let id, _, _, _):
+      return .node(id)
+    case .edge(let id, _, _, _):
+      return .edge(id)
+    case .group(let id, _, _, _):
+      return .group(id)
+    }
+  }
+}
+
 /// Identifier for the inspector text field that currently owns keyboard focus.
 /// `PolicyCanvasView` holds a `@FocusState<PolicyCanvasFocusedField?>` and
 /// gates the canvas-wide Delete/Backspace/Escape shortcut buttons on

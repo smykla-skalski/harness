@@ -10,6 +10,11 @@ struct PolicyCanvasNodeLayer: View {
   // distinct binding types and SwiftUI does not auto-bridge between them.
   @FocusState private var focusedNodeID: String?
   @AccessibilityFocusState private var accessibilityFocusedNodeID: String?
+  /// Parent-pushed VO focus anchor for cross-pane shifts from the Cmd+F
+  /// search palette (3J). Coexists with the local rotor-driven anchor above:
+  /// both `.accessibilityFocused(...)` modifiers apply; whichever binding
+  /// flips first wins on a given tick and the other is benign.
+  let focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
 
   var body: some View {
     let severityMap = viewModel.nodeSeverityMap
@@ -29,6 +34,7 @@ struct PolicyCanvasNodeLayer: View {
       .focusable()
       .focused($focusedNodeID, equals: node.id)
       .accessibilityFocused($accessibilityFocusedNodeID, equals: node.id)
+      .accessibilityFocused(focusedComponent, equals: .node(node.id))
       .gesture(
         DragGesture(minimumDistance: 3)
           .onChanged { value in
