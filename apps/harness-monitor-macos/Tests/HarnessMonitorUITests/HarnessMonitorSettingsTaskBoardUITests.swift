@@ -18,10 +18,9 @@ final class HarnessMonitorSettingsTaskBoardUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(saveButton.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(reloadButton.exists)
     XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
-        ownerField.exists || status.exists
-      },
-      "Task Board settings should load editable fields or surface a status message"
+      ownerField.waitForExistence(timeout: Self.actionTimeout),
+      "Task Board settings should load editable fields"
     )
+    XCTAssertFalse(status.exists, "Task Board preview should not settle on a status error")
   }
 }

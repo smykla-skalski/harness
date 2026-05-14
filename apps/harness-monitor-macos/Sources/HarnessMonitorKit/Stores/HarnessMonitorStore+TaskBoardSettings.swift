@@ -4,9 +4,7 @@ extension HarnessMonitorStore {
   private static let taskBoardGitHubCredentialStore = TaskBoardGitHubCredentialStore()
 
   public func taskBoardGitSettingsSnapshot() async throws -> TaskBoardGitSettingsSnapshot {
-    guard let client else {
-      throw HarnessMonitorAPIError.server(code: 503, message: "Task board unavailable.")
-    }
+    let client = try await taskBoardSettingsClient()
 
     async let orchestratorSettings = client.taskBoardOrchestratorSettings()
     async let runtimeConfig = client.taskBoardGitRuntimeConfig()
@@ -34,13 +32,11 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func updateTaskBoardGitSettings(snapshot: TaskBoardGitSettingsSnapshot) async -> Bool {
-    guard let client else {
-      return false
-    }
     isDaemonActionInFlight = true
     defer { isDaemonActionInFlight = false }
 
     do {
+      let client = try await taskBoardSettingsClient()
       let materializedSnapshot = try await materializeTaskBoardGitSettings(snapshot)
       async let updatedOrchestrator = client.updateTaskBoardOrchestratorSettings(
         request: Self.orchestratorSettingsUpdateRequest(from: materializedSnapshot.orchestratorSettings)
@@ -74,6 +70,16 @@ extension HarnessMonitorStore {
       presentFailureFeedback(error.localizedDescription)
       return false
     }
+  }
+
+  private func taskBoardSettingsClient() async throws -> any HarnessMonitorClientProtocol {
+    if let client {
+      return client
+    }
+
+    let bootstrappedClient = try await daemonController.bootstrapClient()
+    self.client = bootstrappedClient
+    return bootstrappedClient
   }
 
   func syncStoredTaskBoardGitHubCredentials(using client: any HarnessMonitorClientProtocol) async {
