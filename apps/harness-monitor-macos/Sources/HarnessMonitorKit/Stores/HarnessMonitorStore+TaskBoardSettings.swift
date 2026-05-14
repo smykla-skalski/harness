@@ -185,6 +185,15 @@ extension HarnessMonitorStore {
     } else {
       nil
     }
+    let signingGPGPrivateKeyPath: String? = if signing.mode == .gpg {
+      try await materializeTaskBoardPath(
+        signing.gpgPrivateKeyPath,
+        kind: .taskBoardKeyFile,
+        isDirectory: false
+      )
+    } else {
+      nil
+    }
 
     return TaskBoardGitRuntimeProfile(
       authorName: profile.authorName,
@@ -197,7 +206,9 @@ extension HarnessMonitorStore {
       signing: TaskBoardGitSigningConfig(
         mode: signing.mode,
         sshKeyPath: signingSSHKeyPath,
-        gpgKeyId: signing.gpgKeyId
+        gpgKeyId: signing.gpgKeyId,
+        gpgPrivateKeyPath: signingGPGPrivateKeyPath,
+        gpgPrivateKeyPassphrase: signing.mode == .gpg ? signing.gpgPrivateKeyPassphrase : nil
       )
     )
   }

@@ -13,6 +13,10 @@ extension HarnessMonitorAccessibility {
   public static let settingsTaskBoardSigningSSHKeyPathField =
     "harness.settings.task-board.signing-ssh-key-path"
   public static let settingsTaskBoardGPGKeyIDField = "harness.settings.task-board.gpg-key-id"
+  public static let settingsTaskBoardGPGPrivateKeyPathField =
+    "harness.settings.task-board.gpg-private-key-path"
+  public static let settingsTaskBoardGPGPassphraseField =
+    "harness.settings.task-board.gpg-private-key-passphrase"
   public static let settingsTaskBoardGlobalTokenField = "harness.settings.task-board.global-token"
   public static let settingsTaskBoardAddOverrideButton = "harness.settings.task-board.override.add"
 
@@ -54,6 +58,14 @@ extension HarnessMonitorAccessibility {
 
   public static func settingsTaskBoardRepositoryOverrideSigningSSHKeyField(_ index: Int) -> String {
     "harness.settings.task-board.override.\(index).signing-ssh-key-path"
+  }
+
+  public static func settingsTaskBoardRepositoryOverrideGPGPrivateKeyField(_ index: Int) -> String {
+    "harness.settings.task-board.override.\(index).gpg-private-key-path"
+  }
+
+  public static func settingsTaskBoardRepositoryOverrideGPGPassphraseField(_ index: Int) -> String {
+    "harness.settings.task-board.override.\(index).gpg-private-key-passphrase"
   }
 
   public static func segmentedOption(_ controlID: String, option: String) -> String {

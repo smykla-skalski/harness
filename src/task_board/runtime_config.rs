@@ -86,6 +86,10 @@ pub struct TaskBoardGitSigningConfig {
     pub ssh_key_path: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gpg_key_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gpg_private_key_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gpg_private_key_passphrase: Option<String>,
 }
 
 impl TaskBoardGitSigningConfig {
@@ -94,6 +98,8 @@ impl TaskBoardGitSigningConfig {
         self.mode == TaskBoardGitSigningMode::None
             && self.ssh_key_path.is_none()
             && self.gpg_key_id.is_none()
+            && self.gpg_private_key_path.is_none()
+            && self.gpg_private_key_passphrase.is_none()
     }
 
     #[must_use]
@@ -102,6 +108,10 @@ impl TaskBoardGitSigningConfig {
             mode: self.mode,
             ssh_key_path: normalize_optional_value(self.ssh_key_path.as_deref()),
             gpg_key_id: normalize_optional_value(self.gpg_key_id.as_deref()),
+            gpg_private_key_path: normalize_optional_value(self.gpg_private_key_path.as_deref()),
+            gpg_private_key_passphrase: normalize_optional_value(
+                self.gpg_private_key_passphrase.as_deref(),
+            ),
         }
     }
 }
@@ -215,6 +225,8 @@ mod tests {
                     mode: TaskBoardGitSigningMode::Gpg,
                     ssh_key_path: None,
                     gpg_key_id: Some("GLOBAL".into()),
+                    gpg_private_key_path: Some("/tmp/global-gpg.asc".into()),
+                    gpg_private_key_passphrase: Some("global-passphrase".into()),
                 },
             },
             repository_overrides: vec![TaskBoardGitRepositoryOverride {
@@ -227,6 +239,8 @@ mod tests {
                         mode: TaskBoardGitSigningMode::Ssh,
                         ssh_key_path: Some("/tmp/sign".into()),
                         gpg_key_id: None,
+                        gpg_private_key_path: None,
+                        gpg_private_key_passphrase: None,
                     },
                 },
             }],
@@ -239,5 +253,7 @@ mod tests {
         assert_eq!(resolved.signing.mode, TaskBoardGitSigningMode::Ssh);
         assert_eq!(resolved.signing.ssh_key_path.as_deref(), Some("/tmp/sign"));
         assert!(resolved.signing.gpg_key_id.is_none());
+        assert!(resolved.signing.gpg_private_key_path.is_none());
+        assert!(resolved.signing.gpg_private_key_passphrase.is_none());
     }
 }

@@ -36,15 +36,21 @@ public struct TaskBoardGitSigningConfig: Codable, Equatable, Sendable {
   public let mode: TaskBoardGitSigningMode
   public let sshKeyPath: String?
   public let gpgKeyId: String?
+  public let gpgPrivateKeyPath: String?
+  public let gpgPrivateKeyPassphrase: String?
 
   public init(
     mode: TaskBoardGitSigningMode = .none,
     sshKeyPath: String? = nil,
-    gpgKeyId: String? = nil
+    gpgKeyId: String? = nil,
+    gpgPrivateKeyPath: String? = nil,
+    gpgPrivateKeyPassphrase: String? = nil
   ) {
     self.mode = mode
     self.sshKeyPath = sshKeyPath
     self.gpgKeyId = gpgKeyId
+    self.gpgPrivateKeyPath = gpgPrivateKeyPath
+    self.gpgPrivateKeyPassphrase = gpgPrivateKeyPassphrase
   }
 }
 
