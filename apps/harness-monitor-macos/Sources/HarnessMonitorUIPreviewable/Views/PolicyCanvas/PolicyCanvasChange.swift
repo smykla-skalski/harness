@@ -152,6 +152,69 @@ enum PolicyCanvasChange {
     restoreSecondaries: Set<PolicyCanvasSelection>
   )
 
+  /// Commit a node's title edit via the inspector commit-on-Enter pathway.
+  /// Coexists with `renameNode`: `renameNode` is fired by the inline
+  /// PolicyCanvasInspectorRenameField (legacy 4J path), `setNodeTitle` by
+  /// the unified PolicyCanvasInspectorCommitTextField wrapper.
+  case setNodeTitle(id: String, from: String, to: String)
+
+  /// Commit a node's `PolicyCanvasNodeKind` swap. Carries the edges that the
+  /// kind change would prune (ports of a new kind do not match the old ports,
+  /// so dangling edges must be removed) so the inverse can restore both the
+  /// prior kind and every pruned edge in one undo step. Without this, a kind
+  /// switch silently dropped every incident edge and Cmd-Z left the user with
+  /// the old kind back but no connections.
+  case setNodeKind(
+    id: String,
+    from: PolicyCanvasNodeKind,
+    to: PolicyCanvasNodeKind,
+    fromSubtitle: String,
+    toSubtitle: String,
+    fromPolicyKind: TaskBoardPolicyPipelineNodeKind?,
+    toPolicyKind: TaskBoardPolicyPipelineNodeKind?,
+    removedEdges: [PolicyCanvasEdge]
+  )
+
+  /// Commit a node's group-membership change. `nil` means "no group". Inverse
+  /// swaps `from` and `to`. Picker writes route through this so the user can
+  /// Cmd-Z a drop-into-group misclick without re-dragging the node.
+  case setNodeGroup(id: String, from: String?, to: String?)
+
+  /// Commit a node's subtitle edit. Registered on Enter/focus-loss from the
+  /// inspector's subtitle field — per-keystroke writes stay local @State,
+  /// only the commit lands here so the undo stack carries one entry per
+  /// committed edit, not one per character.
+  case setNodeSubtitle(id: String, from: String, to: String)
+
+  /// Commit a node's `policyKind` (daemon-side `TaskBoardPolicyPipelineNodeKind`)
+  /// replacement. Inverse swaps `from` and `to`. Inspector picker writes go
+  /// through this so the user can Cmd-Z a kind switch without re-typing the
+  /// surrounding policy fields.
+  case setNodePolicyKind(
+    id: String,
+    from: TaskBoardPolicyPipelineNodeKind?,
+    to: TaskBoardPolicyPipelineNodeKind?
+  )
+
+  /// Commit an edge's free-form condition string edit. Registered on
+  /// Enter/focus-loss from the inspector's condition field.
+  case setEdgeCondition(id: String, from: String, to: String)
+
+  /// Commit an edge's label edit. Routes through the commit funnel so the
+  /// inspector commit-on-Enter+blur produces one undo entry per committed
+  /// label, not one per character.
+  case setEdgeLabel(id: String, from: String, to: String)
+
+  /// Commit a group's title edit. Same per-commit funnel rule as
+  /// `setEdgeLabel` — inspector text fields keep local @State for keystrokes
+  /// and route to this case only on commit.
+  case setGroupTitle(id: String, from: String, to: String)
+
+  /// Commit a group's tone replacement (intake/evaluation/release). Inverse
+  /// swaps `from` and `to`. Inspector picker writes land here so the user
+  /// sees a single Cmd-Z entry per tone change.
+  case setGroupTone(id: String, from: PolicyCanvasGroupTone, to: PolicyCanvasGroupTone)
+
   /// Human-readable label surfaced by the system menu's "Undo X" / "Redo X"
   /// affordance. Matches the casing of menu-bar action names on macOS.
   var actionName: String {
@@ -180,6 +243,24 @@ enum PolicyCanvasChange {
       return "Paste"
     case .bulkRemove:
       return "Remove Items"
+    case .setNodeTitle:
+      return "Rename Node"
+    case .setNodeKind:
+      return "Change Node Kind"
+    case .setNodeGroup:
+      return "Change Node Group"
+    case .setNodeSubtitle:
+      return "Edit Subtitle"
+    case .setNodePolicyKind:
+      return "Edit Node Binding"
+    case .setEdgeCondition:
+      return "Edit Condition"
+    case .setEdgeLabel:
+      return "Edit Label"
+    case .setGroupTitle:
+      return "Rename Group"
+    case .setGroupTone:
+      return "Edit Tone"
     }
   }
 }

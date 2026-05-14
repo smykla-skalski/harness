@@ -19,6 +19,15 @@ final class PolicyCanvasViewModel {
   var secondarySelections: Set<PolicyCanvasSelection>
   var zoom: CGFloat
   var highlightedGroupID: String?
+  /// Group id that just received a successful node drop. The workspace's
+  /// group region reads this to render an "acceptance flash" — a brief
+  /// opacity bump + accent stroke gating on `accessibilityReduceMotion`
+  /// (Wave 4K P36). Auto-cleared after `groupAcceptanceFlashDuration` so the
+  /// flash has a finite lifetime even if the view tree never observes a
+  /// follow-up gesture. Reduce-motion clients skip the visual but still see
+  /// the bit flip — VoiceOver announcements can hook into this signal in a
+  /// later wave.
+  var groupAcceptanceFlashID: String?
   var highlightedInput: PolicyCanvasPortEndpoint?
   var backingDocument: TaskBoardPolicyPipelineDocument?
   var latestSimulation: TaskBoardPolicyPipelineSimulationResult?
@@ -164,6 +173,20 @@ final class PolicyCanvasViewModel {
   /// that each restore work they were still typing.
   static let autosaveFailureCeiling: Int = 3
 
+  /// Acceptance-flash lifetime for the group drop affordance (Wave 4K P36).
+  /// 600ms is the upper bound on a "this just happened" affordance — long
+  /// enough for the user to register the visual confirmation, short enough
+  /// to fade before the next gesture begins. The flash auto-clears after
+  /// this interval via `triggerGroupAcceptanceFlash`.
+  static let groupAcceptanceFlashDuration: Duration = .milliseconds(600)
+
+  /// Auto-clear task armed by `triggerGroupAcceptanceFlash`. Kept off the
+  /// @Observable graph because views read the flash via
+  /// `groupAcceptanceFlashID`, not via task identity. Cancelled on every new
+  /// flash so a rapid drop-drop sequence shows one continuous accent rather
+  /// than overlapping fades.
+  @ObservationIgnored var groupAcceptanceFlashTask: Task<Void, Never>?
+
   /// Snapshot of in-progress edits captured at the moment a daemon round-trip
   /// rejects. The chrome surfaces a "Recover" affordance the user can press
   /// to swap the rolled-back state back to the recovery snapshot — letting
@@ -221,6 +244,7 @@ final class PolicyCanvasViewModel {
     self.consecutiveAutosaveFailures = 0
     self.lastRejectedRecovery = nil
     self.hasRecoverableEdits = false
+    self.groupAcceptanceFlashID = nil
     self.nextNodeNumber = nextNodeNumber
     reconcileGroupFrames()
   }
@@ -286,25 +310,6 @@ final class PolicyCanvasViewModel {
     return nil
   }
 
-  func createNode(kind: PolicyCanvasNodeKind, at point: CGPoint) {
-    let number = nextNodeNumber
-    nextNodeNumber += 1
-    var node = PolicyCanvasNode(
-      id: "\(kind.rawValue)-\(number)",
-      title: "\(kind.title) \(number)",
-      kind: kind,
-      position: snapped(
-        CGPoint(
-          x: point.x - PolicyCanvasLayout.nodeSize.width / 2,
-          y: point.y - PolicyCanvasLayout.nodeSize.height / 2
-        )
-      )
-    )
-    node.groupID = containingGroupID(for: nodeCenter(node))
-    node.policyKind = taskBoardPolicyNodeKind(for: kind)
-    let priorSelection = selection
-    mutate(.addNode(node, restoreSelection: priorSelection))
-  }
 
   /// Single funnel that mutation sites use to mark the document dirty. Sets
   /// `documentDirty = true` and fires the autosave trigger on the clean→dirty

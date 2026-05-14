@@ -221,6 +221,27 @@ struct PolicyCanvasEdge: Identifiable, Hashable {
   var source: PolicyCanvasPortEndpoint
   var target: PolicyCanvasPortEndpoint
   var label: String
+  /// Free-form condition string surfaced by the inspector for user editing.
+  /// Defaults to `"always"` to match the daemon's wire shape; the document
+  /// round-trip preserves any other `TaskBoardPolicyPipelineEdgeCondition`
+  /// fields (actions, reasonCode) through the `originalEdgeConditions` cache
+  /// on `exportDocument()`, overriding only the `condition` string the user
+  /// edited here.
+  var condition: String
+
+  init(
+    id: String,
+    source: PolicyCanvasPortEndpoint,
+    target: PolicyCanvasPortEndpoint,
+    label: String,
+    condition: String = "always"
+  ) {
+    self.id = id
+    self.source = source
+    self.target = target
+    self.label = label
+    self.condition = condition
+  }
 }
 
 enum PolicyCanvasSelection: Hashable {
@@ -299,8 +320,10 @@ enum PolicyCanvasSearchHit: Equatable {
 /// the character in the field).
 enum PolicyCanvasFocusedField: Hashable {
   case nodeTitle
+  case nodeSubtitle
   case groupTitle
   case edgeLabel
+  case edgeCondition
   case reasonCode
   case ruleID
 }

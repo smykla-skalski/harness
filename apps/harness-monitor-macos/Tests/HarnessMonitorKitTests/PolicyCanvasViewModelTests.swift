@@ -135,10 +135,10 @@ struct PolicyCanvasViewModelTests {
     viewModel.load(document: policyDocument(revision: 11), simulation: nil, audit: nil)
 
     viewModel.select(.node("node-intake"))
-    viewModel.updateSelectedNodeTitle("Dispatch gate")
-    viewModel.updateSelectedPolicyAction(.mergePr)
+    viewModel.commitSelectedNodeTitle("Dispatch gate")
+    viewModel.commitSelectedPolicyAction(.mergePr)
     viewModel.select(.edge("edge-intake-supervisor"))
-    viewModel.updateSelectedEdgeLabel("approved policy")
+    viewModel.commitSelectedEdgeLabel("approved policy")
 
     let exported = viewModel.exportDocument()
     let node = exported.nodes.first { $0.id == "node-intake" }
