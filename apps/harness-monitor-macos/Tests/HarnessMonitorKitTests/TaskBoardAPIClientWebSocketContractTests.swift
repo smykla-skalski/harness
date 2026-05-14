@@ -18,6 +18,28 @@ extension TaskBoardAPIClientTests {
       }
     )
 
+    try await performWebSocketItemCalls(transport)
+    let workflow = try await performWebSocketWorkflowCalls(transport)
+    let orchestrator = try await performWebSocketOrchestratorCalls(transport)
+    let settings = try await performWebSocketSettingsCalls(transport)
+    let tokenSync = try await performWebSocketGitHubTokenCalls(transport)
+    try await performWebSocketDiscoveryCalls(transport)
+
+    let calls = await probe.calls
+    return TaskBoardWebSocketContractResult(
+      calls: calls,
+      sync: workflow.sync,
+      dispatch: workflow.dispatch,
+      evaluation: workflow.evaluation,
+      status: orchestrator.status,
+      runOnce: orchestrator.runOnce,
+      runtimeConfig: settings.runtimeConfig,
+      updatedRuntimeConfig: settings.updatedRuntimeConfig,
+      tokenSync: tokenSync
+    )
+  }
+
+  private func performWebSocketItemCalls(_ transport: WebSocketTransport) async throws {
     _ = try await transport.taskBoardItems(status: TaskBoardStatus.todo)
     _ = try await transport.taskBoardItem(id: "board-1")
     _ = try await transport.createTaskBoardItem(
@@ -27,6 +49,11 @@ extension TaskBoardAPIClientTests {
       request: TaskBoardUpdateItemRequest(status: .done)
     )
     _ = try await transport.deleteTaskBoardItem(id: "board-1")
+  }
+
+  private func performWebSocketWorkflowCalls(
+    _ transport: WebSocketTransport
+  ) async throws -> TaskBoardWebSocketWorkflowResult {
     let sync = try await transport.syncTaskBoard(
       request: TaskBoardSyncRequest(
         status: .todo,
@@ -51,10 +78,22 @@ extension TaskBoardAPIClientTests {
       )
     )
     _ = try await transport.auditTaskBoard(status: TaskBoardStatus.blocked)
+    return TaskBoardWebSocketWorkflowResult(sync: sync, dispatch: dispatch, evaluation: evaluation)
+  }
+
+  private func performWebSocketOrchestratorCalls(
+    _ transport: WebSocketTransport
+  ) async throws -> TaskBoardWebSocketOrchestratorResult {
     let status = try await transport.taskBoardOrchestratorStatus()
     _ = try await transport.startTaskBoardOrchestrator()
     _ = try await transport.stopTaskBoardOrchestrator()
     let runOnce = try await transport.runTaskBoardOrchestratorOnce()
+    return TaskBoardWebSocketOrchestratorResult(status: status, runOnce: runOnce)
+  }
+
+  private func performWebSocketSettingsCalls(
+    _ transport: WebSocketTransport
+  ) async throws -> TaskBoardWebSocketSettingsResult {
     _ = try await transport.taskBoardOrchestratorSettings()
     _ = try await transport.updateTaskBoardOrchestratorSettings(
       request: TaskBoardOrchestratorSettingsUpdateRequest(
@@ -73,30 +112,18 @@ extension TaskBoardAPIClientTests {
     )
     let runtimeConfig = try await transport.taskBoardGitRuntimeConfig()
     let updatedRuntimeConfig = try await transport.updateTaskBoardGitRuntimeConfig(
-      request: TaskBoardGitRuntimeConfig(
-        global: TaskBoardGitRuntimeProfile(
-          authorName: "Harness Bot",
-          authorEmail: "bot@example.com",
-          sshKeyPath: "/Users/test/.ssh/id_ed25519",
-          signing: TaskBoardGitSigningConfig(
-            mode: .ssh,
-            sshKeyPath: "/Users/test/.ssh/id_signing"
-          )
-        ),
-        repositoryOverrides: [
-          TaskBoardGitRepositoryOverride(
-            repository: "kong/harness",
-            profile: TaskBoardGitRuntimeProfile(
-              authorName: "Repo Bot",
-              authorEmail: "repo@example.com",
-              sshKeyPath: "/Users/test/.ssh/id_repo",
-              signing: TaskBoardGitSigningConfig(mode: .gpg, gpgKeyId: "ABC123")
-            )
-          )
-        ]
-      )
+      request: taskBoardRuntimeConfigUpdateRequest()
     )
-    let tokenSync = try await transport.syncTaskBoardGitHubTokens(
+    return TaskBoardWebSocketSettingsResult(
+      runtimeConfig: runtimeConfig,
+      updatedRuntimeConfig: updatedRuntimeConfig
+    )
+  }
+
+  private func performWebSocketGitHubTokenCalls(
+    _ transport: WebSocketTransport
+  ) async throws -> TaskBoardGitHubTokensSyncResponse {
+    try await transport.syncTaskBoardGitHubTokens(
       request: TaskBoardGitHubTokensSyncRequest(
         globalToken: "ghu_global",
         repositoryTokens: [
@@ -104,21 +131,11 @@ extension TaskBoardAPIClientTests {
         ]
       )
     )
+  }
+
+  private func performWebSocketDiscoveryCalls(_ transport: WebSocketTransport) async throws {
     _ = try await transport.taskBoardProjects(status: .todo)
     _ = try await transport.taskBoardMachines(status: .todo)
-
-    let calls = await probe.calls
-    return TaskBoardWebSocketContractResult(
-      calls: calls,
-      sync: sync,
-      dispatch: dispatch,
-      evaluation: evaluation,
-      status: status,
-      runOnce: runOnce,
-      runtimeConfig: runtimeConfig,
-      updatedRuntimeConfig: updatedRuntimeConfig,
-      tokenSync: tokenSync
-    )
   }
 
   func assertWebSocketRPCContract(_ calls: [RPCProbe.Call]) {
@@ -194,7 +211,8 @@ extension TaskBoardAPIClientTests {
     #expect(calls[15].params == nil)
     #expect(objectValue(calls[16].params, key: "global") != nil)
     #expect(objectValue(calls[17].params, key: "global_token") == .string("ghu_global"))
-    if case .array(let repositoryTokens)? = objectValue(calls[17].params, key: "repository_tokens") {
+    if case .array(let repositoryTokens)? = objectValue(calls[17].params, key: "repository_tokens")
+    {
       if case .object(let token)? = repositoryTokens.first {
         #expect(token["repository"] == .string("kong/harness"))
         #expect(token["token"] == .string("ghu_repo"))
@@ -244,4 +262,20 @@ struct TaskBoardWebSocketContractResult {
   let runtimeConfig: TaskBoardGitRuntimeConfig
   let updatedRuntimeConfig: TaskBoardGitRuntimeConfig
   let tokenSync: TaskBoardGitHubTokensSyncResponse
+}
+
+private struct TaskBoardWebSocketWorkflowResult {
+  let sync: TaskBoardSyncSummary
+  let dispatch: TaskBoardDispatchSummary
+  let evaluation: TaskBoardEvaluationSummary
+}
+
+private struct TaskBoardWebSocketOrchestratorResult {
+  let status: TaskBoardOrchestratorStatus
+  let runOnce: TaskBoardOrchestratorRunOnceResponse
+}
+
+private struct TaskBoardWebSocketSettingsResult {
+  let runtimeConfig: TaskBoardGitRuntimeConfig
+  let updatedRuntimeConfig: TaskBoardGitRuntimeConfig
 }

@@ -62,6 +62,7 @@ struct SessionWindowOverview: View {
           isActionInFlight: store.contentUI.dashboard.isBusy,
           onOpenItem: openTaskActions,
           onOpenTaskBoardItem: openTaskBoardItem,
+          onMoveInboxItem: moveInboxItem,
           onMoveTaskBoardItem: moveTaskBoardItem,
           onOpenDecision: openDecision,
           onEvaluateTaskBoard: evaluateTaskBoard,
@@ -157,6 +158,16 @@ struct SessionWindowOverview: View {
   private func moveTaskBoardItem(_ itemID: String, status: TaskBoardStatus) {
     Task { @MainActor in
       await store.updateTaskBoardItemStatus(id: itemID, status: status)
+    }
+  }
+
+  private func moveInboxItem(_ item: TaskBoardInboxItem, status: TaskStatus) {
+    Task { @MainActor in
+      await store.updateTaskStatus(
+        taskID: item.task.taskId,
+        status: status,
+        sessionID: item.session.sessionId
+      )
     }
   }
 

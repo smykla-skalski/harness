@@ -18,10 +18,12 @@ struct TaskBoardItemManagementPanel: View {
         Spacer(minLength: HarnessMonitorTheme.spacingSM)
         Button(action: onClose) {
           Image(systemName: "xmark")
+            .accessibilityHidden(true)
         }
         .buttonStyle(.borderless)
         .frame(minWidth: metrics.iconControlMinWidth, minHeight: metrics.controlMinHeight)
         .help("Close board item")
+        .accessibilityLabel("Close item panel")
       }
 
       Text(item.title)
@@ -67,10 +69,12 @@ struct TaskBoardItemManagementPanel: View {
           onRefresh?()
         } label: {
           Image(systemName: "arrow.clockwise")
+            .accessibilityHidden(true)
         }
         .frame(minWidth: metrics.iconControlMinWidth, minHeight: metrics.controlMinHeight)
         .disabled(isActionInFlight || onRefresh == nil)
         .help("Refresh task board")
+        .accessibilityLabel("Refresh board")
       }
     }
     .padding(HarnessMonitorTheme.spacingMD)
