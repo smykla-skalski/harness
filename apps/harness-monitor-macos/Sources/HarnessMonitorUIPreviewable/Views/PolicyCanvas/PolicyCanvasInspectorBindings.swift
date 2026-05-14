@@ -9,16 +9,16 @@ import SwiftUI
 extension PolicyCanvasInspector {
   static let noneGroupTag = "__none__"
 
-  var selectedNodeKindBinding: Binding<PolicyCanvasNodeKind> {
+  func selectedNodeKindBinding(_ node: PolicyCanvasNode) -> Binding<PolicyCanvasNodeKind> {
     Binding(
-      get: { viewModel.selectedNode?.kind ?? .condition },
+      get: { node.kind },
       set: { viewModel.commitSelectedNodeKind($0) }
     )
   }
 
-  var selectedNodeGroupBinding: Binding<String> {
+  func selectedNodeGroupBinding(_ node: PolicyCanvasNode) -> Binding<String> {
     Binding(
-      get: { viewModel.selectedNode?.groupID ?? Self.noneGroupTag },
+      get: { node.groupID ?? Self.noneGroupTag },
       set: { viewModel.commitSelectedNodeGroup($0 == Self.noneGroupTag ? nil : $0) }
     )
   }
