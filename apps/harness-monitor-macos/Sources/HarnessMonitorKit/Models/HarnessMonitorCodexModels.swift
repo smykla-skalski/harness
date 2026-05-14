@@ -71,6 +71,9 @@ public struct CodexRunRequest: Codable, Equatable, Sendable {
   public let name: String?
   public let persona: String?
   public let resumeThreadId: String?
+  public let taskID: String?
+  public let boardItemID: String?
+  public let workflowExecutionID: String?
   public let model: String?
   public let effort: String?
   public let allowCustomModel: Bool
@@ -85,6 +88,9 @@ public struct CodexRunRequest: Codable, Equatable, Sendable {
     name: String? = nil,
     persona: String? = nil,
     resumeThreadId: String? = nil,
+    taskID: String? = nil,
+    boardItemID: String? = nil,
+    workflowExecutionID: String? = nil,
     model: String? = nil,
     effort: String? = nil,
     allowCustomModel: Bool = false
@@ -98,9 +104,30 @@ public struct CodexRunRequest: Codable, Equatable, Sendable {
     self.name = name
     self.persona = persona
     self.resumeThreadId = resumeThreadId
+    self.taskID = taskID
+    self.boardItemID = boardItemID
+    self.workflowExecutionID = workflowExecutionID
     self.model = model
     self.effort = effort
     self.allowCustomModel = allowCustomModel
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case actor
+    case prompt
+    case mode
+    case role
+    case fallbackRole
+    case capabilities
+    case name
+    case persona
+    case resumeThreadId
+    case taskID = "taskId"
+    case boardItemID = "boardItemId"
+    case workflowExecutionID = "workflowExecutionId"
+    case model
+    case effort
+    case allowCustomModel
   }
 }
 

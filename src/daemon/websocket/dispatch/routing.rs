@@ -39,7 +39,7 @@ pub(super) async fn dispatch_known_method(
     state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
 ) -> Option<WsResponse> {
-    if let Some(response) = dispatch_task_board_method(request, state) {
+    if let Some(response) = dispatch_task_board_method(request, state).await {
         return Some(response);
     }
     if let Some(response) = dispatch_core_method(request, state, connection).await {

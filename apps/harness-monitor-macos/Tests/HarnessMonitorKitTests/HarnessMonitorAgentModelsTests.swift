@@ -221,6 +221,47 @@ struct HarnessMonitorAgentModelsTests {
     #expect(denyAll["decision"] as? String == "deny_all")
   }
 
+  @Test("Managed-agent start requests encode task binding fields")
+  func managedAgentStartRequestsEncodeTaskBindingFields() throws {
+    let codex = try encodedJSONObject(
+      CodexRunRequest(
+        actor: nil,
+        prompt: "Investigate",
+        mode: .report,
+        taskID: "task-1",
+        boardItemID: "board-item-1",
+        workflowExecutionID: "workflow-1"
+      )
+    )
+    #expect(codex["task_id"] as? String == "task-1")
+    #expect(codex["board_item_id"] as? String == "board-item-1")
+    #expect(codex["workflow_execution_id"] as? String == "workflow-1")
+
+    let tui = try encodedJSONObject(
+      AgentTuiStartRequest(
+        runtime: "codex",
+        taskID: "task-1",
+        boardItemID: "board-item-1",
+        workflowExecutionID: "workflow-1"
+      )
+    )
+    #expect(tui["task_id"] as? String == "task-1")
+    #expect(tui["board_item_id"] as? String == "board-item-1")
+    #expect(tui["workflow_execution_id"] as? String == "workflow-1")
+
+    let acp = try encodedJSONObject(
+      AcpAgentStartRequest(
+        agent: "copilot",
+        taskID: "task-1",
+        boardItemID: "board-item-1",
+        workflowExecutionID: "workflow-1"
+      )
+    )
+    #expect(acp["task_id"] as? String == "task-1")
+    #expect(acp["board_item_id"] as? String == "board-item-1")
+    #expect(acp["workflow_execution_id"] as? String == "workflow-1")
+  }
+
   @Test("AgentStatus encodes idle snake case")
   func agentStatusEncodesIdle() throws {
     let data = try encoder.encode(AgentStatus.awaitingReview)

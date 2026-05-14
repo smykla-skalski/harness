@@ -86,6 +86,7 @@ extension HarnessMonitorStore {
         sessionID: sessionID,
         client: client
       )
+      async let taskBoardItemsTask = loadSessionWindowTaskBoardItems(client: client)
       async let transcriptTask = loadSessionWindowTranscriptResponse(
         sessionID: sessionID,
         client: client
@@ -100,6 +101,7 @@ extension HarnessMonitorStore {
       let timelineWindow = await timelineWindowTask
       let acpAgents = await acpAgentsTask
       let acpInspectSample = await acpInspectTask
+      let taskBoardItems = await taskBoardItemsTask
       let transcriptResponse = await transcriptTask
       let codexTranscriptResponse = await codexTranscriptTask
       guard !Task.isCancelled else { return nil }
@@ -114,6 +116,7 @@ extension HarnessMonitorStore {
         detail: detail,
         acpAgents: acpAgents,
         acpInspectSample: acpInspectSample,
+        taskBoardItems: taskBoardItems,
         timeline: timelineWindow?.entries ?? [],
         transcript: transcript.entries,
         transcriptSource: transcript.source,
@@ -139,6 +142,22 @@ extension HarnessMonitorStore {
         sessionID=\(sessionID, privacy: .public) \
         error=\(errorDescription, privacy: .public)
         """
+      )
+      return nil
+    }
+  }
+
+  private func loadSessionWindowTaskBoardItems(
+    client: any HarnessMonitorClientProtocol
+  ) async -> [TaskBoardItem]? {
+    do {
+      return try await client.taskBoardItems(status: nil)
+    } catch is CancellationError {
+      return nil
+    } catch {
+      let errorDescription = String(describing: error)
+      HarnessMonitorLogger.store.debug(
+        "session window task board load failed error=\(errorDescription, privacy: .public)"
       )
       return nil
     }
@@ -220,6 +239,7 @@ extension HarnessMonitorStore {
       detail: detail,
       acpAgents: snapshot.acpAgents,
       acpInspectSample: snapshot.acpInspectSample,
+      taskBoardItems: snapshot.taskBoardItems,
       timeline: snapshot.timeline,
       transcript: transcript.entries,
       transcriptSource: transcript.source,

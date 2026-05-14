@@ -1,219 +1,174 @@
 # Task Board Workflow
 
-Harness task boards are session work items managed through
-`harness session task`. Use this guide when a session needs visible ownership,
-review handoffs, or progress checkpoints across multiple agents.
+Harness task boards are cross-project work items managed through
+`harness task-board`. Use this guide for backlog intake, planning review,
+dispatch readiness, and overview reporting.
 
 ## Contract
 
 - Treat the task board as Harness state. Read and mutate it only through
-  `harness session ...` commands.
-- Use `--json` for machine-readable reads. Do not parse state files directly.
-- Pass `--actor <agent-id>` on every mutating task command.
-- Keep task titles short and imperative. Put constraints, acceptance criteria,
-  file paths, and known risks in `--context`.
-- Use `--suggested-fix` only for a concrete implementation hint. Do not use it
-  as a second task description.
+  `harness task-board ...` commands.
+- Use `--json` for machine-readable reads. Do not parse board files directly.
+- Keep titles short and imperative. Put scope, constraints, acceptance
+  criteria, and verification notes in `--body`.
+- Use `--project-id` when the work belongs to a known project. Use `--tag` for
+  routing labels.
+- Use `--board-root <path>` only for isolated tests or recovery work.
 
-## Roles
+## Command Surface
 
-| Role | Board responsibility |
+| Command | Purpose |
 | --- | --- |
-| Leader | Starts the session, creates the initial task set, assigns work, resolves arbitration. |
-| Observer | Creates tasks from confirmed observations and keeps findings triaged. |
-| Worker | Executes assigned work, records checkpoints, submits finished work for review. |
-| Reviewer | Claims review work, records verdicts, and routes fixes back through the board. |
-| Improver | Handles improvement follow-ups and can move tasks through the same review flow. |
+| `create` | Create a new board task. |
+| `list` | List active board tasks, optionally filtered by status. |
+| `get` | Show one board task. |
+| `update` | Change task fields, status, priority, project, tags, or planning state. |
+| `delete` | Tombstone one board task. |
+| `sync` | Print external synchronization readiness. |
+| `dispatch` | Print session dispatch plans for board tasks. |
+| `audit` | Print task-board totals, ready count, blocked count, and status counts. |
+| `project` | Print project overview counts. |
+| `machine` | Print worker-mode overview counts. |
+
+Common read flags: `--json`, `--board-root <path>`.
 
 ## Work Item Shape
 
 Each task carries:
 
-- `task_id`, `title`, `context`, `severity`
-- `status`: `open`, `in_progress`, `awaiting_review`, `in_review`, `blocked`, `done`
-- `assigned_to`, `queue_policy`, `source`, optional `suggested_fix`
-- latest `checkpoint_summary` plus append-only checkpoint history
-- review metadata once the task enters the review path
+- `id`, `title`, `body`
+- `status`: `new`, `planning`, `plan_review`, `todo`, `in_progress`,
+  `in_review`, `done`, `blocked`
+- `priority`: `low`, `medium`, `high`, `critical`
+- `agent_mode`: `headless`, `interactive`, `planning`, `evaluate`
+- `tags`, optional `project_id`, external refs, planning metadata, and optional
+  session/work-item links
 
-Use severity to order attention:
+Priority maps to dispatch severity when session plans are built:
 
-| Severity | Use for |
+| Priority | Use for |
 | --- | --- |
 | `critical` | Session-blocking correctness or safety issue. |
-| `high` | Important work needed before the session can close. |
+| `high` | Important work needed before closeout. |
 | `medium` | Normal implementation, verification, or cleanup item. |
 | `low` | Opportunistic polish or non-blocking follow-up. |
 
 ## Status Flow
 
 ```text
-open -> in_progress -> awaiting_review -> in_review -> done
-                            ^                |
-                            |                v
-                        in_progress <- request_changes
+new -> planning -> plan_review -> todo -> in_progress -> in_review -> done
+           |                         |          |
+           v                         v          v
+        blocked                   blocked    blocked
 ```
 
-`blocked` means the task cannot proceed without new input, a dependency, or
-leader arbitration.
+`blocked` means the task cannot proceed without new input, an external
+dependency, or a planning/review decision.
 
-Generic status updates handle `open`, `in_progress`, `blocked`, and `done`.
-Review-only states use the review commands:
+Dispatch readiness requires:
 
-- `awaiting_review`: worker runs `submit-for-review`.
-- `in_review`: reviewer runs `claim-review`.
+- status is `todo`
+- `planning.summary` is present
+- `planning.approved_by` and `planning.approved_at` are present
+- the item is not deleted and is not already linked to a session work item
 
-## Leader Flow
+The CLI sets `approved_at` when `--approved-by` is provided.
 
-1. Start or identify the session.
+## Intake And Planning
 
-   ```bash
-   harness session start --context "<goal>" --title "<short title>"
-   harness session join <session-id> --role leader --runtime <runtime>
-   harness session status <session-id> --json
-   ```
-
-2. Create the initial board from the goal.
+1. Create the board item.
 
    ```bash
-   harness session task create <session-id> \
+   harness task-board create \
      --title "Implement focused fix" \
-     --context "Scope, files, acceptance criteria, and verification." \
-     --severity high \
-     --actor <leader-agent-id>
+     --body "Scope, files, acceptance criteria, and verification." \
+     --priority high \
+     --project-id <project-id> \
+     --tag backend
    ```
 
-3. List available work before assigning.
+2. Move it into planning.
 
    ```bash
-   harness session task list <session-id> --status open --json
+   harness task-board update <task-id> --status planning
    ```
 
-4. Assign one task per available worker.
+3. Submit the plan for review.
 
    ```bash
-   harness session task assign <session-id> <task-id> <worker-agent-id> \
-     --actor <leader-agent-id>
+   harness task-board update <task-id> \
+     --status plan_review \
+     --planning-summary "Cause, fix shape, verification, and rollback notes."
    ```
 
-5. Monitor by status and checkpoint.
+4. Approve the plan and make it dispatchable.
 
    ```bash
-   harness session task list <session-id> --json
-   harness session status <session-id> --json
+   harness task-board update <task-id> \
+     --status todo \
+     --approved-by <reviewer-or-leader-id>
    ```
 
-6. Keep the board small enough to act on. Split vague tasks before assignment;
-   close or block stale tasks with a note.
+## Worker And Review Loop
 
-## Worker Flow
-
-1. Join or confirm registration, then inspect assigned work.
+1. Find ready work.
 
    ```bash
-   harness session task list <session-id> --json
+   harness task-board list --status todo --json
+   harness task-board dispatch --json
    ```
 
-2. Start only the assigned task. A delivered task-start signal moves the task to
-   `in_progress`; if needed, update explicitly.
+2. Mark active work explicitly.
 
    ```bash
-   harness session task update <session-id> <task-id> \
-     --status in_progress \
-     --actor <worker-agent-id>
+   harness task-board update <task-id> --status in_progress
    ```
 
-3. Record checkpoints at useful boundaries.
+3. Move finished work to review.
 
    ```bash
-   harness session task checkpoint <session-id> <task-id> \
-     --summary "Cause proven; patch underway" \
-     --progress 50 \
-     --actor <worker-agent-id>
+   harness task-board update <task-id> --status in_review
    ```
 
-4. When ready for review, submit through the review flow instead of marking the
-   task done directly.
+4. Close or block after review.
 
    ```bash
-   harness session task submit-for-review <session-id> <task-id> \
-     --summary "Implemented fix and ran focused verification" \
-     --actor <worker-agent-id>
+   harness task-board update <task-id> --status done
+   harness task-board update <task-id> --status blocked
    ```
 
-5. If blocked, use a status update with a note that names the missing input or
-   dependency.
+Use the task body, tags, and planning summary for review context. If the plan
+changes materially, return to `planning` or `plan_review` before dispatching
+again.
 
-   ```bash
-   harness session task update <session-id> <task-id> \
-     --status blocked \
-     --note "Waiting for <specific input>" \
-     --actor <worker-agent-id>
-   ```
+## Overview Integration
 
-## Review Flow
+Use overview commands instead of reading task-board files:
 
-1. Find work ready for review.
+```bash
+harness task-board audit --json
+harness task-board project --json
+harness task-board machine --json
+harness task-board sync --json
+harness task-board dispatch --json
+```
 
-   ```bash
-   harness session task list <session-id> --status awaiting_review --json
-   ```
-
-2. Claim a review slot.
-
-   ```bash
-   harness session task claim-review <session-id> <task-id> \
-     --actor <reviewer-agent-id>
-   ```
-
-3. Submit a verdict.
-
-   ```bash
-   harness session task submit-review <session-id> <task-id> \
-     --verdict approve \
-     --summary "Verified focused behavior and tests" \
-     --actor <reviewer-agent-id>
-   ```
-
-   Verdicts are `approve`, `request_changes`, or `reject`.
-
-4. For requested changes, include review points as JSON so the worker can
-   answer each point.
-
-   ```bash
-   harness session task submit-review <session-id> <task-id> \
-     --verdict request_changes \
-     --summary "Needs one scoped correction" \
-     --points '[{"point_id":"p1","text":"Update the focused test."}]' \
-     --actor <reviewer-agent-id>
-   ```
-
-5. Worker response must cover every consensus point.
-
-   ```bash
-   harness session task respond-review <session-id> <task-id> \
-     --agreed p1 \
-     --note "Test updated" \
-     --actor <worker-agent-id>
-   ```
-
-6. If the review cycle reaches arbitration, the leader resolves it.
-
-   ```bash
-   harness session task arbitrate <session-id> <task-id> \
-     --verdict request_changes \
-     --summary "Return to worker for the listed fix" \
-     --actor <leader-agent-id>
-   ```
+- `audit` gives total, ready, blocked, and by-status counts.
+- `project` groups local items by `project_id` and ready count.
+- `machine` groups local items by `agent_mode` and ready count.
+- `sync` reports external-provider configuration, linked, pushable, and blocked
+  counts.
+- `dispatch` reports the session, worker, reviewer, and evaluator intent for
+  each board item, including readiness block reasons.
 
 ## Operating Rules
 
-- Prefer many small tasks over one broad task. Each task should have a clear
-  owner and close condition.
-- Do not assign new execution work to a worker whose task is in
-  `awaiting_review`; that worker may need to answer review points.
-- Do not use generic `update` to enter review-only states. Use
-  `submit-for-review` and `claim-review`.
-- Mark work `done` only after required review completes or the leader closes an
-  explicitly low-risk task.
-- Use `blocked` only when the next action is outside the current agent's
-  control; otherwise keep the task moving with checkpoints.
+- Prefer many small tasks over one broad task. Each task needs one clear close
+  condition.
+- Do not dispatch `new`, `planning`, `plan_review`, `in_progress`,
+  `in_review`, `done`, or `blocked` items.
+- Do not bypass the planning/review gate by setting `todo` without
+  `--planning-summary` and `--approved-by`.
+- Use `delete` for tombstones, not manual file removal.
+- Keep `audit`, `project`, `machine`, and `dispatch` output in closeout notes
+  when coordinating multiple projects or worker modes.

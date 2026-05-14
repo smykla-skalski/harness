@@ -3,6 +3,7 @@ mod input_worker;
 mod live_refresh;
 mod manager;
 mod process_exit;
+mod request_wire;
 mod sandboxed;
 mod spawn;
 mod support;
@@ -73,6 +74,9 @@ fn manager_starts_registers_steers_and_stops_tui() {
                     prompt: None,
                     project_dir: None,
                     persona: None,
+                    task_id: None,
+                    board_item_id: None,
+                    workflow_execution_id: None,
                     argv: vec!["sh".into(), "-c".into(), "printf 'ready\\n'; cat".into()],
                     rows: 5,
                     cols: 40,

@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 
+use crate::task_board::types::TaskBoardWorkflowState;
 use crate::task_board::{
-    AgentMode, ExternalRef, PlanningState, TaskBoardItem, TaskBoardPriority, TaskBoardStatus,
+    AgentMode, DispatchExecutionSummary, ExternalRef, PlanningState, TaskBoardAuditSummary,
+    TaskBoardItem, TaskBoardPriority, TaskBoardStatus, TaskBoardSyncSummary,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,6 +23,8 @@ pub struct TaskBoardCreateItemRequest {
     pub external_refs: Vec<ExternalRef>,
     #[serde(default)]
     pub planning: PlanningState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workflow: Option<TaskBoardWorkflowState>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -63,6 +67,8 @@ pub struct TaskBoardUpdateItemRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub planning: Option<PlanningState>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workflow: Option<TaskBoardWorkflowState>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
     #[serde(default)]
     pub clear_session_id: bool,
@@ -82,9 +88,30 @@ pub struct TaskBoardListItemsResponse {
     pub items: Vec<TaskBoardItem>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskBoardCapabilityStatus {
-    pub installed: bool,
-    pub status: String,
-    pub message: String,
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TaskBoardSyncRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<TaskBoardStatus>,
 }
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TaskBoardDispatchRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<TaskBoardStatus>,
+    #[serde(default)]
+    pub dry_run: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_dir: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actor: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TaskBoardAuditRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<TaskBoardStatus>,
+}
+
+pub type TaskBoardSyncResponse = TaskBoardSyncSummary;
+pub type TaskBoardDispatchResponse = DispatchExecutionSummary;
+pub type TaskBoardAuditResponse = TaskBoardAuditSummary;

@@ -19,7 +19,7 @@ Parse `$ARGUMENTS`:
 | `observe` | Session observation pipeline |
 
 Read [references/session-commands.md](references/session-commands.md) for `harness session` subcommands.
-Read [references/task-board-workflow.md](references/task-board-workflow.md) before coordinating session tasks across agents.
+Read [references/task-board-workflow.md](references/task-board-workflow.md) before coordinating task-board work.
 Read [references/observe-commands.md](references/observe-commands.md) for `harness observe` subcommands.
 
 ## Contract
@@ -71,13 +71,14 @@ digraph session_start {
 1. Start the session: `harness session start --context "<goal>"` (or `--session-id <id>` for explicit ID)
 2. Note session ID from output
 3. Join as leader: `harness session join <session-id> --role leader --runtime <runtime>`
-4. Break goal into discrete tasks
-5. Create tasks: `harness session task create <session-id> --title "..." --context "..." --actor <agent-id>`
-6. Tell user to spawn workers: `/harness:harness session join <session-id> --role worker`
-7. Poll status until workers join: `harness session status <session-id> --json`
-8. Assign tasks: `harness session task assign <session-id> <task-id> <agent-id> --actor <agent-id>`
-9. Monitor: `harness session task list <session-id> --json`
-10. End when done: `harness session end <session-id> --actor <agent-id>`
+4. Break goal into discrete board items
+5. Create items: `harness task-board create --title "..." --body "..." --priority medium`
+6. Add planning summary and approval before dispatch: `harness task-board update <task-id> --status todo --planning-summary "..." --approved-by <agent-id>`
+7. Tell user to spawn workers: `/harness:harness session join <session-id> --role worker`
+8. Poll status until workers join: `harness session status <session-id> --json`
+9. Check dispatch readiness: `harness task-board dispatch --json`
+10. Monitor overview: `harness task-board audit --json`
+11. End when done: `harness session end <session-id> --actor <agent-id>`
 
 Read [references/signals.md](references/signals.md) for signal protocol when redirecting agents.
 Read [references/session-commands.md](references/session-commands.md) for exact command syntax.
@@ -122,11 +123,11 @@ Read [references/roles-and-permissions.md](references/roles-and-permissions.md) 
 ### Worker workflow
 
 1. Join: `harness session join <session-id> --role worker --runtime <runtime>`
-2. Check assigned tasks: `harness session task list <session-id> --json`
-3. Start task if needed: `harness session task update <session-id> <task-id> --status in_progress --actor <agent-id>`
+2. Check ready board tasks: `harness task-board list --status todo --json`
+3. Start task if needed: `harness task-board update <task-id> --status in_progress`
 4. Do the work following project conventions
-5. Report progress: `harness session task checkpoint <session-id> <task-id> --summary "..." --progress 50 --actor <agent-id>`
-6. Submit for review: `harness session task submit-for-review <session-id> <task-id> --summary "..." --actor <agent-id>`
+5. Update task body or tags if material context changes
+6. Submit for review: `harness task-board update <task-id> --status in_review`
 7. Respond to review feedback if requested, then check for more work or signals
 
 ### Observer workflow
@@ -136,18 +137,18 @@ As observer you do not execute tasks. Monitor and triage only.
 1. Join: `harness session join <session-id> --role observer --runtime <runtime>`
 2. Run baseline scan: `harness observe --agent <agent> scan <session-id> --json --summary`
 3. Triage findings by severity and category
-4. Create tasks from issues: `harness session task create <session-id> --title "..." --context "..." --actor <agent-id>`
+4. Create tasks from issues: `harness task-board create --title "..." --body "..." --priority <priority>`
 5. For continuous monitoring: `harness observe watch <session-id> --poll-interval 3 --timeout 90 --json`
 
 Read [references/issue-taxonomy.md](references/issue-taxonomy.md) for category ownership and fix routing.
 
 ### Reviewer / Improver workflow
 
-1. Check tasks needing review: `harness session task list <session-id> --status awaiting_review --json`
-2. Claim review: `harness session task claim-review <session-id> <task-id> --actor <agent-id>`
+1. Check tasks needing review: `harness task-board list --status in_review --json`
+2. Inspect context: `harness task-board get <task-id> --json`
 3. Review changed files, run checks, verify acceptance criteria
-4. If needs fixes: `harness session task submit-review <session-id> <task-id> --verdict request_changes --summary "..." --actor <agent-id>`
-5. If approved: `harness session task submit-review <session-id> <task-id> --verdict approve --summary "..." --actor <agent-id>`
+4. If needs fixes: `harness task-board update <task-id> --status in_progress`
+5. If approved: `harness task-board update <task-id> --status done`
 
 ---
 
@@ -238,7 +239,7 @@ Read [agents/deep-analyst.md](agents/deep-analyst.md) for agent descriptor.
 - Pass `--actor <agent-id>` for mutating operations
 - Use `--json` for machine-readable output when parsing results
 - Leader cannot end session with in-progress tasks
-- Workers: update status to `in_progress` before starting, `blocked` if stuck, `submit-for-review` when finished
+- Workers: update status to `in_progress` before starting, `blocked` if stuck, `in_review` when finished
 - Workers: do not modify files another agent is actively working on
 - Observers: do not edit files or execute tasks
 - Add `--project-hint` only if KSRCLI085 error (ambiguous session)
@@ -279,6 +280,6 @@ Observe a session for issues:
 <example>
 List tasks in a session:
 ```
-/harness:harness session task list abc123 --status open --json
+/harness:harness task-board list --status todo --json
 ```
 </example>

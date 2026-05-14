@@ -306,6 +306,9 @@ public struct AgentTuiStartRequest: Codable, Equatable, Sendable {
   public let prompt: String?
   public let projectDir: String?
   public let persona: String?
+  public let taskID: String?
+  public let boardItemID: String?
+  public let workflowExecutionID: String?
   public let model: String?
   public let effort: String?
   public let allowCustomModel: Bool
@@ -321,6 +324,9 @@ public struct AgentTuiStartRequest: Codable, Equatable, Sendable {
     prompt: String? = nil,
     projectDir: String? = nil,
     persona: String? = nil,
+    taskID: String? = nil,
+    boardItemID: String? = nil,
+    workflowExecutionID: String? = nil,
     model: String? = nil,
     effort: String? = nil,
     allowCustomModel: Bool = false,
@@ -335,12 +341,34 @@ public struct AgentTuiStartRequest: Codable, Equatable, Sendable {
     self.prompt = prompt
     self.projectDir = projectDir
     self.persona = persona
+    self.taskID = taskID
+    self.boardItemID = boardItemID
+    self.workflowExecutionID = workflowExecutionID
     self.model = model
     self.effort = effort
     self.allowCustomModel = allowCustomModel
     self.argv = argv
     self.rows = rows
     self.cols = cols
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case runtime
+    case role
+    case capabilities
+    case name
+    case prompt
+    case projectDir
+    case persona
+    case taskID = "taskId"
+    case boardItemID = "boardItemId"
+    case workflowExecutionID = "workflowExecutionId"
+    case model
+    case effort
+    case allowCustomModel
+    case argv
+    case rows
+    case cols
   }
 }
 

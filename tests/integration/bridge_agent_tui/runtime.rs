@@ -398,6 +398,9 @@ fn sandboxed_agent_tui_publishes_live_refresh_over_bridge() {
                         name: Some("Sandboxed live refresh".into()),
                         prompt: None,
                         project_dir: Some(project.to_string_lossy().into_owned()),
+                        task_id: None,
+                        board_item_id: None,
+                        workflow_execution_id: None,
                         argv: vec![
                             "sh".into(),
                             "-c".into(),

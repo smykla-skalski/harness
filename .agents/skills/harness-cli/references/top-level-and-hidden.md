@@ -11,10 +11,11 @@
 | `agents` | Shared harness-managed agent lifecycle commands |
 | `observe` | Observe and classify harness-managed agent session logs |
 | `session` | Multi-agent session orchestration |
+| `task-board` | Cross-project task board |
 | `daemon` | Local daemon for the Harness app |
 | `bridge` | Supervise host capabilities for sandboxed Codex and terminal agent flows |
 
-Sources: `cargo run --quiet -- --help`; `src/app/cli.rs:96-158`.
+Sources: `cargo run --quiet -- --help`; `cargo run --quiet -- task-board --help`; `src/app/cli.rs:96-158`; `src/task_board/transport.rs:25-47`.
 
 ## Hidden top-level commands
 

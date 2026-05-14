@@ -61,6 +61,9 @@ fn manager_publishes_terminal_output_without_manual_refresh() {
                     prompt: None,
                     project_dir: None,
                     persona: None,
+                    task_id: None,
+                    board_item_id: None,
+                    workflow_execution_id: None,
                     argv: vec![
                         "sh".into(),
                         "-c".into(),

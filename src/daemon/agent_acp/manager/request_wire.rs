@@ -23,6 +23,12 @@ struct AcpAgentStartRequestDecode {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     persona: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    task_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    board_item_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    workflow_execution_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     model: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     effort: Option<String>,
@@ -48,6 +54,12 @@ struct AcpAgentStartRequestEncode<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     persona: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    task_id: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    board_item_id: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    workflow_execution_id: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     model: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     effort: Option<&'a str>,
@@ -69,6 +81,9 @@ impl Serialize for AcpAgentStartRequest {
             prompt: self.prompt.as_deref(),
             project_dir: self.project_dir.as_deref(),
             persona: self.persona.as_deref(),
+            task_id: self.task_id.as_deref(),
+            board_item_id: self.board_item_id.as_deref(),
+            workflow_execution_id: self.workflow_execution_id.as_deref(),
             model: self.model.as_deref(),
             effort: self.effort.as_deref(),
             allow_custom_model: self.allow_custom_model,
@@ -96,6 +111,9 @@ impl<'de> Deserialize<'de> for AcpAgentStartRequest {
             prompt: decoded.prompt,
             project_dir: decoded.project_dir,
             persona: decoded.persona,
+            task_id: decoded.task_id,
+            board_item_id: decoded.board_item_id,
+            workflow_execution_id: decoded.workflow_execution_id,
             model: decoded.model,
             effort: decoded.effort,
             allow_custom_model: decoded.allow_custom_model,
@@ -113,6 +131,9 @@ mod tests {
         let request: AcpAgentStartRequest = serde_json::from_value(serde_json::json!({
             "descriptor_id": "copilot",
             "role": "reviewer",
+            "task_id": "task-1",
+            "board_item_id": "board-item-1",
+            "workflow_execution_id": "workflow-1",
             "model": "gpt-5.4",
             "effort": "high",
             "allow_custom_model": true,
@@ -122,6 +143,9 @@ mod tests {
 
         assert_eq!(request.agent, "copilot");
         assert_eq!(request.role, crate::session::types::SessionRole::Reviewer);
+        assert_eq!(request.task_id.as_deref(), Some("task-1"));
+        assert_eq!(request.board_item_id.as_deref(), Some("board-item-1"));
+        assert_eq!(request.workflow_execution_id.as_deref(), Some("workflow-1"));
         assert_eq!(request.model.as_deref(), Some("gpt-5.4"));
         assert_eq!(request.effort.as_deref(), Some("high"));
         assert!(request.allow_custom_model);
@@ -166,6 +190,9 @@ mod tests {
             prompt: Some("Run it".into()),
             project_dir: Some("/tmp/project".into()),
             persona: Some("reviewer".into()),
+            task_id: Some("task-1".into()),
+            board_item_id: Some("board-item-1".into()),
+            workflow_execution_id: Some("workflow-1".into()),
             model: Some("gpt-5.4".into()),
             effort: Some("high".into()),
             allow_custom_model: true,
@@ -177,6 +204,9 @@ mod tests {
         assert!(value.get("agent").is_none());
         assert_eq!(value["role"], "reviewer");
         assert_eq!(value["fallback_role"], "observer");
+        assert_eq!(value["task_id"], "task-1");
+        assert_eq!(value["board_item_id"], "board-item-1");
+        assert_eq!(value["workflow_execution_id"], "workflow-1");
         assert_eq!(value["model"], "gpt-5.4");
         assert_eq!(value["effort"], "high");
         assert_eq!(value["allow_custom_model"], true);

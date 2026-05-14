@@ -1,36 +1,69 @@
 import Foundation
 
+@frozen
 public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
-  case blocked
+  case needsYou = "needs_you"
+  case ready
+  case running
   case review
-  case active
-  case open
+  case blocked
+  case backlog
+
+  public static var allCases: [TaskBoardInboxLane] {
+    [.needsYou, .ready, .running, .review, .blocked, .backlog]
+  }
+
+  public static var active: Self { .running }
+  public static var open: Self { .backlog }
 
   public var id: String { rawValue }
 
   public var title: String {
     switch self {
-    case .blocked:
-      "Blocked"
+    case .needsYou:
+      "Needs You"
+    case .ready:
+      "Ready"
+    case .running:
+      "Running"
     case .review:
       "Review"
-    case .active:
-      "Active"
-    case .open:
-      "Open"
+    case .blocked:
+      "Blocked"
+    case .backlog:
+      "Backlog"
     }
   }
 
   public var systemImage: String {
     switch self {
-    case .blocked:
-      "exclamationmark.triangle"
+    case .needsYou:
+      "person.crop.circle.badge.exclamationmark"
+    case .ready:
+      "tray.and.arrow.down"
+    case .running:
+      "arrow.triangle.2.circlepath"
     case .review:
       "checkmark.seal"
-    case .active:
-      "arrow.triangle.2.circlepath"
-    case .open:
+    case .blocked:
+      "exclamationmark.triangle"
+    case .backlog:
       "tray"
+    }
+  }
+
+  public init?(task: WorkItem) {
+    switch task.status {
+    case .blocked:
+      self = .blocked
+    case .awaitingReview, .inReview:
+      self = .review
+    case .inProgress:
+      self = .running
+    case .open:
+      self = task.assignedTo != nil || task.queuedAt != nil ? .ready : .backlog
+    case .done:
+      return nil
     }
   }
 
@@ -41,9 +74,32 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
     case .awaitingReview, .inReview:
       self = .review
     case .inProgress:
-      self = .active
+      self = .running
     case .open:
-      self = .open
+      self = .backlog
+    case .done:
+      return nil
+    }
+  }
+
+  public init?(taskBoardItem item: TaskBoardItem) {
+    self.init(status: item.status)
+  }
+
+  public init?(status: TaskBoardStatus) {
+    switch status {
+    case .planReview:
+      self = .needsYou
+    case .blocked:
+      self = .blocked
+    case .todo:
+      self = .ready
+    case .inProgress:
+      self = .running
+    case .inReview:
+      self = .review
+    case .new, .planning:
+      self = .backlog
     case .done:
       return nil
     }
@@ -61,7 +117,7 @@ public struct TaskBoardInboxItem: Equatable, Identifiable, Sendable {
     session: SessionSummary,
     task: WorkItem
   ) {
-    guard let lane = TaskBoardInboxLane(status: task.status) else {
+    guard let lane = TaskBoardInboxLane(task: task) else {
       return nil
     }
     self.session = session
@@ -141,7 +197,15 @@ public struct TaskBoardInboxSnapshot: Equatable, Sendable {
   }
 
   public var openItemCount: Int {
-    items.count { $0.lane != .blocked }
+    visibleItemCount
+  }
+
+  public var visibleItemCount: Int {
+    items.count
+  }
+
+  public var needsYouItemCount: Int {
+    items.count { $0.lane == .needsYou }
   }
 
   public var blockedItemCount: Int {
@@ -184,14 +248,18 @@ public struct TaskBoardInboxSnapshot: Equatable, Sendable {
 
   private static func lanePriority(_ lane: TaskBoardInboxLane) -> Int {
     switch lane {
-    case .blocked:
+    case .needsYou:
       0
-    case .review:
+    case .ready:
       1
-    case .active:
+    case .running:
       2
-    case .open:
+    case .review:
       3
+    case .blocked:
+      4
+    case .backlog:
+      5
     }
   }
 

@@ -10,6 +10,8 @@ fn env_config_prefers_harness_github_token() {
     let config = with_vars(
         [
             (HARNESS_GITHUB_TOKEN_ENV, Some(" harness-token ")),
+            (HARNESS_GITHUB_REPOSITORY_ENV, Some(" owner/repo ")),
+            (GITHUB_REPOSITORY_ENV, Some("fallback/repo")),
             (GH_TOKEN_ENV, Some("gh-token")),
             (HARNESS_TODOIST_TOKEN_ENV, Some("todoist-token")),
         ],
@@ -24,6 +26,7 @@ fn env_config_prefers_harness_github_token() {
         config.token_for(ExternalProvider::Todoist),
         Some("todoist-token")
     );
+    assert_eq!(config.github_repository.as_deref(), Some("owner/repo"));
 }
 
 #[test]
@@ -31,6 +34,8 @@ fn env_config_falls_back_to_gh_token() {
     let config = with_vars(
         [
             (HARNESS_GITHUB_TOKEN_ENV, None::<&str>),
+            (HARNESS_GITHUB_REPOSITORY_ENV, None::<&str>),
+            (GITHUB_REPOSITORY_ENV, None::<&str>),
             (GH_TOKEN_ENV, Some("gh-token")),
             (HARNESS_TODOIST_TOKEN_ENV, None::<&str>),
         ],
@@ -45,13 +50,24 @@ fn env_config_falls_back_to_gh_token() {
 fn config_debug_redacts_tokens() {
     let config = ExternalSyncConfig {
         github_token: Some("secret".to_owned()),
+        github_repository: Some("owner/repo".to_owned()),
         todoist_token: None,
     };
 
     let debug = format!("{config:?}");
     assert!(debug.contains("<redacted>"));
     assert!(debug.contains("<unset>"));
+    assert!(debug.contains("owner/repo"));
     assert!(!debug.contains("secret"));
+}
+
+#[test]
+fn github_constructor_validates_default_repository() {
+    let err = GitHubSyncClient::new_with_repository("token", Some("invalid"))
+        .expect_err("invalid repository should fail")
+        .message();
+
+    assert!(err.contains("owner/repo"));
 }
 
 #[test]

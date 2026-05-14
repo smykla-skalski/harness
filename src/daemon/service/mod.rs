@@ -289,9 +289,10 @@ pub use status::{
     diagnostics_report, get_log_level, health_response, record_telemetry, request_shutdown,
     set_log_level, status_report,
 };
+pub(crate) use task_board::dispatch_task_board_async;
 pub use task_board::{
-    create_task_board_item, delete_task_board_item, get_task_board_item, list_task_board_items,
-    task_board_not_configured, update_task_board_item,
+    audit_task_board, create_task_board_item, delete_task_board_item, dispatch_task_board,
+    get_task_board_item, list_task_board_items, sync_task_board, update_task_board_item,
 };
 pub use wake_route::WakeDispatch;
 pub(crate) use wake_route::{WakeEventLevel, record_wake_event};

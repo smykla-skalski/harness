@@ -24,6 +24,8 @@ pub struct TaskBoardItem {
     pub external_refs: Vec<ExternalRef>,
     #[serde(default)]
     pub planning: PlanningState,
+    #[serde(default, skip_serializing_if = "TaskBoardWorkflowState::is_default")]
+    pub workflow: TaskBoardWorkflowState,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -51,6 +53,7 @@ impl TaskBoardItem {
             agent_mode: AgentMode::Headless,
             external_refs: Vec::new(),
             planning: PlanningState::default(),
+            workflow: TaskBoardWorkflowState::default(),
             session_id: None,
             work_item_id: None,
             usage: TaskUsage::default(),
@@ -64,6 +67,48 @@ impl TaskBoardItem {
     pub const fn is_deleted(&self) -> bool {
         self.deleted_at.is_some()
     }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskBoardWorkflowState {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_id: Option<String>,
+    #[serde(default)]
+    pub status: TaskBoardWorkflowStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_step_id: Option<String>,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub attempts: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub branch: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worktree: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pr_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_error: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub policy_trace_ids: Vec<String>,
+}
+
+impl TaskBoardWorkflowState {
+    #[must_use]
+    pub fn is_default(&self) -> bool {
+        self == &Self::default()
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
+#[value(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum TaskBoardWorkflowStatus {
+    #[default]
+    Idle,
+    Running,
+    Paused,
+    Completed,
+    Failed,
+    Cancelled,
 }
 
 #[derive(
@@ -144,4 +189,8 @@ pub struct TaskUsage {
     pub output_tokens: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cost_usd: Option<f64>,
+}
+
+const fn is_zero(value: &u32) -> bool {
+    *value == 0
 }

@@ -55,6 +55,79 @@ fn config_route_is_swift_exposed_rpc() {
 }
 
 #[test]
+fn task_board_routes_have_complete_ws_parity() {
+    let task_board_routes = super::routes_task_board::ROUTES;
+    let actual: Vec<_> = task_board_routes
+        .iter()
+        .map(|route| {
+            let ws_method = route
+                .parity
+                .ws_method()
+                .expect("task-board route should map to websocket");
+            (
+                route.method,
+                route.path,
+                ws_method,
+                route.swift_client_exposed,
+            )
+        })
+        .collect();
+    assert_eq!(
+        actual,
+        vec![
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_ITEMS,
+                ws_methods::TASK_BOARD_CREATE,
+                true,
+            ),
+            (
+                HttpRouteMethod::Get,
+                http_paths::TASK_BOARD_ITEMS,
+                ws_methods::TASK_BOARD_LIST,
+                true,
+            ),
+            (
+                HttpRouteMethod::Get,
+                http_paths::TASK_BOARD_ITEM,
+                ws_methods::TASK_BOARD_GET,
+                true,
+            ),
+            (
+                HttpRouteMethod::Put,
+                http_paths::TASK_BOARD_ITEM,
+                ws_methods::TASK_BOARD_UPDATE,
+                true,
+            ),
+            (
+                HttpRouteMethod::Delete,
+                http_paths::TASK_BOARD_ITEM,
+                ws_methods::TASK_BOARD_DELETE,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_SYNC,
+                ws_methods::TASK_BOARD_SYNC,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_DISPATCH,
+                ws_methods::TASK_BOARD_DISPATCH,
+                true,
+            ),
+            (
+                HttpRouteMethod::Get,
+                http_paths::TASK_BOARD_AUDIT,
+                ws_methods::TASK_BOARD_AUDIT,
+                true,
+            ),
+        ]
+    );
+}
+
+#[test]
 fn mapped_ws_methods_are_unique() {
     let methods = mapped_ws_methods();
     let unique: BTreeSet<_> = methods.iter().copied().collect();
