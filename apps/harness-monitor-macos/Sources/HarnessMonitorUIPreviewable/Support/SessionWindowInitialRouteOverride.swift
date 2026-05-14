@@ -19,9 +19,13 @@ public enum SessionWindowInitialRouteOverride {
   }
 
   private static func normalize(_ value: String) -> String {
-    value
-      .trimmingCharacters(in: .whitespacesAndNewlines)
-      .filter(\.isLetterOrNumber)
+    String(
+      value
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .filter { character in
+          character.isLetter || character.isNumber
+        }
+    )
       .lowercased()
   }
 }
