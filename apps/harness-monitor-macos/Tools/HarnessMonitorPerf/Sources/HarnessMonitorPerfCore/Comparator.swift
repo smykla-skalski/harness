@@ -249,15 +249,50 @@ public enum Comparator {
         current: RunManifest.Capture,
         baseline: RunManifest.Capture
     ) -> [String: DeltaBlock] {
-        guard
+        var sharedMetrics: [String: DeltaBlock] = [:]
+
+        if
             let currentLaunch = current.launchMetrics?.appInitToReadyMilliseconds,
             let baselineLaunch = baseline.launchMetrics?.appInitToReadyMilliseconds
-        else {
-            return [:]
+        {
+            sharedMetrics[MetricName.launchAppInitToReadyMs] = deltaDouble(
+                currentLaunch,
+                baselineLaunch
+            )
         }
-        return [
-            MetricName.launchAppInitToReadyMs: deltaDouble(currentLaunch, baselineLaunch)
-        ]
+
+        let currentTimeProfile = current.metrics?["time_profile"] ?? .object([:])
+        let baselineTimeProfile = baseline.metrics?["time_profile"] ?? .object([:])
+        appendSharedIntMetric(
+            named: MetricName.timeProfileSampleCount,
+            current: currentTimeProfile["sample_count"]?.intValue,
+            baseline: baselineTimeProfile["sample_count"]?.intValue,
+            into: &sharedMetrics
+        )
+        appendSharedIntMetric(
+            named: MetricName.timeProfileAppOwnedFrameCount,
+            current: currentTimeProfile["app_owned_frame_count"]?.intValue,
+            baseline: baselineTimeProfile["app_owned_frame_count"]?.intValue,
+            into: &sharedMetrics
+        )
+        appendSharedIntMetric(
+            named: MetricName.timeProfileFallbackSymbolicFrameCount,
+            current: currentTimeProfile["fallback_symbolic_frame_count"]?.intValue,
+            baseline: baselineTimeProfile["fallback_symbolic_frame_count"]?.intValue,
+            into: &sharedMetrics
+        )
+
+        return sharedMetrics
+    }
+
+    private static func appendSharedIntMetric(
+        named name: String,
+        current: Int?,
+        baseline: Int?,
+        into metrics: inout [String: DeltaBlock]
+    ) {
+        guard let current, let baseline else { return }
+        metrics[name] = deltaInt(current, baseline)
     }
 
     static func framesPrefix(_ value: JSONValue?, limit: Int) -> [Frame] {

@@ -79,6 +79,7 @@ public enum Recap {
         let maxMs = nsToMs(swiftui["duration_ns_max"]?.intValue ?? 0)
         let launchMs = capture["launch_metrics"]?["app_init_to_ready_ms"]?.doubleValue
         let scenario = capture["scenario"]?.stringValue ?? "unknown"
+        let timeProfile = metrics["time_profile"] ?? .object([:])
 
         var line = "- \(scenario) [SwiftUI]: "
         if let launchMs {
@@ -88,6 +89,11 @@ public enum Recap {
         line += "body_updates=\(swiftui["body_update_count"]?.intValue ?? 0) "
         line += "p95_ms=\(formatFloat(swiftui["duration_ms_p95"]?.doubleValue ?? 0)) "
         line += "max_ms=\(formatFloat(maxMs)) "
+        if case .object(let dict) = timeProfile, !dict.isEmpty {
+            line += "\(MetricName.timeProfileSampleCount)=\(timeProfile["sample_count"]?.intValue ?? 0) "
+            line += "\(MetricName.timeProfileAppOwnedFrameCount)=\(timeProfile["app_owned_frame_count"]?.intValue ?? 0) "
+            line += "\(MetricName.timeProfileFallbackSymbolicFrameCount)=\(timeProfile["fallback_symbolic_frame_count"]?.intValue ?? 0) "
+        }
         line += "hitches=\(hitches) "
         line += "potential_hangs=\(hangs)"
 
@@ -96,6 +102,15 @@ public enum Recap {
             let sharedMetrics = comparison["shared_metrics"] ?? .object([:])
             if let launchDelta = sharedMetrics[MetricName.launchAppInitToReadyMs] {
                 line += " d_launch_ms=\(deltaValue(launchDelta))"
+            }
+            if let sampleDelta = sharedMetrics[MetricName.timeProfileSampleCount] {
+                line += " d_\(MetricName.timeProfileSampleCount)=\(deltaValue(sampleDelta))"
+            }
+            if let appOwnedDelta = sharedMetrics[MetricName.timeProfileAppOwnedFrameCount] {
+                line += " d_\(MetricName.timeProfileAppOwnedFrameCount)=\(deltaValue(appOwnedDelta))"
+            }
+            if let fallbackDelta = sharedMetrics[MetricName.timeProfileFallbackSymbolicFrameCount] {
+                line += " d_\(MetricName.timeProfileFallbackSymbolicFrameCount)=\(deltaValue(fallbackDelta))"
             }
             line += " d_total_updates=\(deltaValue(deltaMetrics["total_updates"]))"
             line += " d_body_updates=\(deltaValue(deltaMetrics["body_updates"]))"

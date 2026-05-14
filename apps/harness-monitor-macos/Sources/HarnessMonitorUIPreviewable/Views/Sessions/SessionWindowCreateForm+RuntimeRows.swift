@@ -111,7 +111,7 @@ struct SessionWindowCreateRuntimeEffortRow: View, Equatable {
 
   var body: some View {
     Picker("Effort", selection: effortSelection) {
-      ForEach(values, id: \.self) { level in
+      ForEach(Array(values.enumerated()), id: \.offset) { _, level in
         Text(level.capitalized).tag(level)
       }
     }

@@ -14,16 +14,10 @@ struct SessionContentDetailSplitSourceTests {
 
     #expect(viewSource.contains("@SceneStorage(\"session.content-detail.width\")"))
     #expect(viewSource.contains("sessionSurface"))
-    #expect(
-      columnsSource.contains(
-        """
-        SessionContentDetailSplitView(
-                  contentWidth: contentColumnWidthBinding,
-                  commitContentWidth: commitContentColumnWidth
-        """
-      )
-    )
-    #expect(columnsSource.contains(".navigationSplitViewStyle(.prominentDetail)"))
+    #expect(columnsSource.contains("SessionContentDetailSplitView("))
+    #expect(columnsSource.contains("contentWidth: contentColumnWidthBinding"))
+    #expect(columnsSource.contains("perfOverrideContentWidth: perfContentDividerWidthBinding"))
+    #expect(columnsSource.contains("commitContentWidth: commitContentColumnWidth"))
     #expect(splitSource.contains("NSCursor.resizeLeftRight"))
     #expect(splitSource.contains("@State private var liveContentWidth"))
     #expect(splitSource.contains(".accessibilityAdjustableAction"))
@@ -71,11 +65,12 @@ struct SessionContentDetailSplitSourceTests {
     )
 
     #expect(columnsSource.contains("deferDetailColumnWidthUpdate("))
+    #expect(columnsSource.contains("SessionGeometryWritebackDeferral.nextMainActorTurn()"))
     #expect(columnsSource.contains("Task { @MainActor in"))
-    #expect(columnsSource.contains("await Task.yield()"))
-    #expect(splitSource.contains("deferReclampLiveWidth(availableWidth: newWidth)"))
-    #expect(splitSource.contains("Task { @MainActor in"))
+    #expect(splitSource.contains("enum SessionGeometryWritebackDeferral"))
     #expect(splitSource.contains("await Task.yield()"))
+    #expect(splitSource.contains("deferReclampLiveWidth(availableWidth: newWidth)"))
+    #expect(splitSource.contains("SessionGeometryWritebackDeferral.nextMainActorTurn()"))
     #expect(splitSource.contains("commitContentWidth(contentWidth)"))
     #expect(!splitSource.contains(".animation(.easeOut(duration: animationDuration)"))
   }

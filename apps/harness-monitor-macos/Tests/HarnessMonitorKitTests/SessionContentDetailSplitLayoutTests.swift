@@ -39,4 +39,24 @@ struct SessionContentDetailSplitLayoutTests {
         <= 720
     )
   }
+
+  @MainActor
+  @Test("Geometry writeback deferral waits until the next main-actor turn")
+  func geometryWritebackDeferralWaitsUntilTheNextMainActorTurn() async {
+    var events: [String] = []
+
+    Task { @MainActor in
+      events.append("scheduled")
+      await SessionGeometryWritebackDeferral.nextMainActorTurn()
+      events.append("ran")
+    }
+
+    #expect(events.isEmpty)
+    await Task.yield()
+    #expect(events == ["scheduled"])
+    for _ in 0..<8 where events.count < 2 {
+      await Task.yield()
+    }
+    #expect(events == ["scheduled", "ran"])
+  }
 }

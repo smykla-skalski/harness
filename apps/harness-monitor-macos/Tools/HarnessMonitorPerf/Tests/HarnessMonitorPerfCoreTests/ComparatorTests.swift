@@ -37,26 +37,27 @@ final class ComparatorTests: XCTestCase {
               },
                "metric_tiers": {
                  "hard_budget": ["launch_app_init_to_ready_ms", "total_updates", "body_updates", "max_update_group_ms", "hitches", "potential_hangs"],
-                 "investigative": ["p95_update_ms", "max_update_ms", "update_group_p95_ms", "top_frames"]
-               },
-               "app_trace": {
-                 "relpath": "app-traces/open-recent-window/swiftui/app-trace.jsonl",
-                 "event_count": 2,
-                 "components": [
+                 "investigative": ["p95_update_ms", "max_update_ms", "update_group_p95_ms", "time_profile_sample_count", "time_profile_app_owned_frame_count", "time_profile_fallback_symbolic_frame_count", "top_frames"]
+                },
+                "app_trace": {
+                  "relpath": "app-traces/open-recent-window/swiftui/app-trace.jsonl",
+                  "event_count": 2,
+                  "components": [
                    {"component": "perf.scenario", "count": 2}
                  ],
                  "ordered_steps": ["route.agents", "search.present"]
                },
                "findings": [
                  {"key": "cause:state:dashboardview:sidebarrow", "category": "swiftui-cause", "headline": "@State: DashboardView -> SidebarRow", "count": 2}
-               ],
-              "metrics": {
-                "swiftui_updates": {"total_count": 10000, "body_update_count": 1000, "duration_ms_p95": 10.0, "duration_ns_max": 12000000},
-                "swiftui_update_groups": {"duration_ms_p95": 8.0, "duration_ns_max": 20000000},
-                "hitches": {"count": 0},
-                "potential_hangs": {"count": 0},
-                "top_frames": [{"name": "DashboardView.body", "samples": 100}]
-          }
+                ],
+               "metrics": {
+                 "swiftui_updates": {"total_count": 10000, "body_update_count": 1000, "duration_ms_p95": 10.0, "duration_ns_max": 12000000},
+                 "swiftui_update_groups": {"duration_ms_p95": 8.0, "duration_ns_max": 20000000},
+                 "time_profile": {"sample_count": 120, "app_owned_frame_count": 90, "fallback_symbolic_frame_count": 30},
+                 "hitches": {"count": 0},
+                 "potential_hangs": {"count": 0},
+                 "top_frames": [{"name": "DashboardView.body", "samples": 100}]
+           }
         },
         {
           "scenario": "offline-cached-open",
@@ -96,12 +97,12 @@ final class ComparatorTests: XCTestCase {
               },
                "metric_tiers": {
                  "hard_budget": ["launch_app_init_to_ready_ms", "total_updates", "body_updates", "max_update_group_ms", "hitches", "potential_hangs"],
-                 "investigative": ["p95_update_ms", "max_update_ms", "update_group_p95_ms", "top_frames"]
-               },
-               "app_trace": {
-                 "relpath": "app-traces/open-recent-window/swiftui/app-trace.jsonl",
-                 "event_count": 3,
-                 "components": [
+                 "investigative": ["p95_update_ms", "max_update_ms", "update_group_p95_ms", "time_profile_sample_count", "time_profile_app_owned_frame_count", "time_profile_fallback_symbolic_frame_count", "top_frames"]
+                },
+                "app_trace": {
+                  "relpath": "app-traces/open-recent-window/swiftui/app-trace.jsonl",
+                  "event_count": 3,
+                  "components": [
                    {"component": "perf.scenario", "count": 3}
                  ],
                  "ordered_steps": ["route.agents", "search.present", "route.tasks"]
@@ -110,14 +111,15 @@ final class ComparatorTests: XCTestCase {
                  {"key": "cause:state:dashboardview:sidebarrow", "category": "swiftui-cause", "headline": "@State: DashboardView -> SidebarRow", "count": 2},
                  {"key": "cause:creation:viewcreation:preferencelist", "category": "swiftui-cause", "headline": "Creation: View Creation -> Preference List", "count": 3},
                  {"key": "update-group:transaction-for-unknown-action:agentdetailsection", "category": "swiftui-update-group", "headline": "Transaction for unknown action via AgentDetailSection.debouncePersist(value:key:defaults:)", "count": 5}
-               ],
-               "metrics": {
-                 "swiftui_updates": {"total_count": 11000, "body_update_count": 1100, "duration_ms_p95": 11.5, "duration_ns_max": 15000000},
-                 "swiftui_update_groups": {"duration_ms_p95": 9.0, "duration_ns_max": 24000000},
-                "hitches": {"count": 1},
-                "potential_hangs": {"count": 0},
-                "top_frames": [{"name": "DashboardView.body", "samples": 110}, {"name": "SidebarRow.body", "samples": 30}]
-          }
+                ],
+                "metrics": {
+                  "swiftui_updates": {"total_count": 11000, "body_update_count": 1100, "duration_ms_p95": 11.5, "duration_ns_max": 15000000},
+                  "swiftui_update_groups": {"duration_ms_p95": 9.0, "duration_ns_max": 24000000},
+                  "time_profile": {"sample_count": 140, "app_owned_frame_count": 100, "fallback_symbolic_frame_count": 40},
+                 "hitches": {"count": 1},
+                 "potential_hangs": {"count": 0},
+                 "top_frames": [{"name": "DashboardView.body", "samples": 110}, {"name": "SidebarRow.body", "samples": 30}]
+           }
         },
         {
           "scenario": "offline-cached-open",
@@ -188,6 +190,18 @@ final class ComparatorTests: XCTestCase {
             swiftui.sharedMetrics?[MetricName.launchAppInitToReadyMs]?.delta.description,
             "40"
         )
+        XCTAssertEqual(
+            swiftui.sharedMetrics?[MetricName.timeProfileSampleCount]?.delta.description,
+            "20"
+        )
+        XCTAssertEqual(
+            swiftui.sharedMetrics?[MetricName.timeProfileAppOwnedFrameCount]?.delta.description,
+            "10"
+        )
+        XCTAssertEqual(
+            swiftui.sharedMetrics?[MetricName.timeProfileFallbackSymbolicFrameCount]?.delta.description,
+            "10"
+        )
         XCTAssertEqual(swiftui.appTrace?.baseline?.eventCount, 2)
         XCTAssertEqual(swiftui.appTrace?.current?.eventCount, 3)
         XCTAssertEqual(swiftui.appTrace?.newSteps, ["route.tasks"])
@@ -222,6 +236,7 @@ final class ComparatorTests: XCTestCase {
         XCTAssertTrue(markdown.contains("## open-recent-window (SwiftUI)"))
         XCTAssertTrue(markdown.contains("### Hard budget metrics"))
         XCTAssertTrue(markdown.contains("| launch_app_init_to_ready_ms | 320 | 360 | 40 |"))
+        XCTAssertTrue(markdown.contains("| time_profile_sample_count | 120 | 140 | 20 |"))
         XCTAssertTrue(markdown.contains("| total_updates | 10000 | 11000 | 1000 |"))
         XCTAssertTrue(markdown.contains("| All Heap Allocations | total_bytes | 100 | 120 | 20 |"))
         XCTAssertTrue(markdown.contains("Baseline hot frames: DashboardView.body"))

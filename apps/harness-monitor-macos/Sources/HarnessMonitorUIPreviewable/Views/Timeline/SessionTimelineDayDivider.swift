@@ -15,82 +15,63 @@ struct SessionTimelineRow: Identifiable, Equatable {
     for nodes: [SessionTimelineNode],
     configuration: HarnessMonitorDateTimeConfiguration
   ) -> [Self] {
-    let formatter = SessionTimelineRowFormatter(configuration: configuration)
     var previousDay: Date?
     return nodes.map { node in
-      let day = formatter.timelineDayStart(for: node.timestamp)
+      let day = timelineDayStart(for: node.timestamp, configuration: configuration)
       let label =
         previousDay != nil && previousDay != day
-        ? formatter.dayDividerLabel(for: node.timestamp)
+        ? formatTimelineDayDivider(node.timestamp, configuration: configuration)
         : nil
       previousDay = day
       return Self(
         node: node,
         dayDividerLabel: label,
-        timestampLabel: formatter.timeLabel(for: node),
-        accessibilityTimestampLabel: formatter.timestampLabel(for: node),
-        accessibilityLabel: formatter.accessibilityLabel(for: node)
+        timestampLabel: resolvedTimeLabel(for: node, configuration: configuration),
+        accessibilityTimestampLabel: resolvedTimestampLabel(
+          for: node,
+          configuration: configuration
+        ),
+        accessibilityLabel: resolvedAccessibilityLabel(
+          for: node,
+          configuration: configuration
+        )
       )
     }
   }
-}
 
-private final class SessionTimelineRowFormatter {
-  private let calendar: Calendar
-  private let now: Date
-  private let timeFormatter: DateFormatter
-  private let sameYearTimestampFormatter: DateFormatter
-  private let crossYearTimestampFormatter: DateFormatter
-  private let sameYearDayFormatter: DateFormatter
-  private let crossYearDayFormatter: DateFormatter
-
-  init(configuration: HarnessMonitorDateTimeConfiguration, now: Date = .now) {
-    let timeZone = configuration.effectiveTimeZone
-    var calendar = Calendar.autoupdatingCurrent
-    calendar.timeZone = timeZone
-    self.calendar = calendar
-    self.now = now
-    timeFormatter = Self.makeFormatter(
-      dateFormat: "HH:mm:ss", timeZone: timeZone, calendar: calendar)
-    sameYearTimestampFormatter = Self.makeFormatter(
-      dateFormat: "d MMM HH:mm:ss", timeZone: timeZone, calendar: calendar)
-    crossYearTimestampFormatter = Self.makeFormatter(
-      dateFormat: "d MMM yyyy HH:mm:ss", timeZone: timeZone, calendar: calendar)
-    sameYearDayFormatter = Self.makeFormatter(
-      dateFormat: "d MMM", timeZone: timeZone, calendar: calendar)
-    crossYearDayFormatter = Self.makeFormatter(
-      dateFormat: "d MMM yyyy", timeZone: timeZone, calendar: calendar)
-  }
-
-  func timelineDayStart(for date: Date) -> Date {
-    calendar.startOfDay(for: date)
-  }
-
-  func dayDividerLabel(for date: Date) -> String {
-    dayFormatter(for: date).string(from: date)
-  }
-
-  func timeLabel(for node: SessionTimelineNode) -> String {
+  @MainActor
+  private static func resolvedTimeLabel(
+    for node: SessionTimelineNode,
+    configuration: HarnessMonitorDateTimeConfiguration
+  ) -> String {
     guard isParsedTimestamp(node) else {
       return node.rawTimestamp ?? "n/a"
     }
-    return timeFormatter.string(from: node.timestamp)
+    return formatTimelineTime(node.timestamp, configuration: configuration)
   }
 
-  func timestampLabel(for node: SessionTimelineNode) -> String {
+  @MainActor
+  private static func resolvedTimestampLabel(
+    for node: SessionTimelineNode,
+    configuration: HarnessMonitorDateTimeConfiguration
+  ) -> String {
     guard isParsedTimestamp(node) else {
       return node.rawTimestamp ?? "n/a"
     }
-    return timestampFormatter(for: node.timestamp).string(from: node.timestamp)
+    return formatTimelineTimestamp(node.timestamp, configuration: configuration)
   }
 
-  func accessibilityLabel(for node: SessionTimelineNode) -> String {
+  @MainActor
+  private static func resolvedAccessibilityLabel(
+    for node: SessionTimelineNode,
+    configuration: HarnessMonitorDateTimeConfiguration
+  ) -> String {
     if let override = node.voiceOverLabelOverride {
       return override
     }
     var parts = [
       node.kind.label,
-      timestampLabel(for: node),
+      resolvedTimestampLabel(for: node, configuration: configuration),
       "Source \(node.sourceLabel)",
     ]
     if let eventTone = node.eventTone {
@@ -107,31 +88,8 @@ private final class SessionTimelineRowFormatter {
     return parts.joined(separator: ", ")
   }
 
-  private func isParsedTimestamp(_ node: SessionTimelineNode) -> Bool {
+  private static func isParsedTimestamp(_ node: SessionTimelineNode) -> Bool {
     node.rawTimestamp == nil || node.timestamp != .distantPast
-  }
-
-  private func timestampFormatter(for date: Date) -> DateFormatter {
-    calendar.isDate(date, equalTo: now, toGranularity: .year)
-      ? sameYearTimestampFormatter
-      : crossYearTimestampFormatter
-  }
-
-  private func dayFormatter(for date: Date) -> DateFormatter {
-    calendar.isDate(date, equalTo: now, toGranularity: .year)
-      ? sameYearDayFormatter
-      : crossYearDayFormatter
-  }
-
-  private static func makeFormatter(
-    dateFormat: String, timeZone: TimeZone, calendar: Calendar
-  ) -> DateFormatter {
-    let formatter = DateFormatter()
-    formatter.locale = .autoupdatingCurrent
-    formatter.dateFormat = dateFormat
-    formatter.timeZone = timeZone
-    formatter.calendar = calendar
-    return formatter
   }
 }
 

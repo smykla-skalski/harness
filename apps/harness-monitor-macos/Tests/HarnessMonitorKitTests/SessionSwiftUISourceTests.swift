@@ -133,6 +133,19 @@ struct SessionSwiftUISourceTests {
     #expect(!parameterRowSource.contains("ForEach(allowedValues, id: \\.self)"))
   }
 
+  @Test("Session runtime strings and composer rows avoid self identity")
+  func sessionRuntimeStringsAndComposerRowsAvoidSelfIdentity() throws {
+    let runtimeRowsSource = try sourceFile(at: "Views/Sessions/SessionWindowCreateForm+RuntimeRows.swift")
+    let composerSource = try sourceFile(at: "Views/Sessions/SessionAgentComposer.swift")
+
+    #expect(runtimeRowsSource.contains("ForEach(Array(values.enumerated()), id: \\.offset)"))
+    #expect(!runtimeRowsSource.contains("ForEach(values, id: \\.self)"))
+    #expect(
+      composerSource.contains("ForEach(Array(SessionAgentComposerKeyLayout.rows.enumerated()), id: \\.offset)")
+    )
+    #expect(!composerSource.contains("ForEach(SessionAgentComposerKeyLayout.rows, id: \\.self)"))
+  }
+
   @Test("Session view state wrappers stay private")
   func sessionViewStateWrappersStayPrivate() throws {
     let sessionWindowSource = try sourceFile(at: "Views/Sessions/SessionWindowView.swift")
@@ -263,6 +276,21 @@ struct SessionSwiftUISourceTests {
     #expect(source.contains("private var indexedRuleIDs"))
     #expect(source.contains("ForEach(indexedRuleIDs, id: \\.offset)"))
     #expect(!source.contains("ForEach(ruleIDs, id: \\.self)"))
+  }
+
+  @Test("Timeline rows reuse shared formatter helpers instead of allocating local formatter banks")
+  func timelineRowsReuseSharedFormatterHelpers() throws {
+    let source = try sourceFile(at: "Views/Timeline/SessionTimelineDayDivider.swift")
+
+    #expect(source.contains("timelineDayStart(for: node.timestamp, configuration: configuration)"))
+    #expect(source.contains("formatTimelineDayDivider(node.timestamp, configuration: configuration)"))
+    #expect(source.contains("formatTimelineTime(node.timestamp, configuration: configuration)"))
+    #expect(source.contains("formatTimelineTimestamp(node.timestamp, configuration: configuration)"))
+    #expect(source.contains("private static func resolvedTimeLabel"))
+    #expect(source.contains("private static func resolvedTimestampLabel"))
+    #expect(source.contains("private static func resolvedAccessibilityLabel"))
+    #expect(!source.contains("private final class SessionTimelineRowFormatter"))
+    #expect(!source.contains("DateFormatter()"))
   }
 
   @Test("App search reindex tasks attach from a tiny active-search anchor")
