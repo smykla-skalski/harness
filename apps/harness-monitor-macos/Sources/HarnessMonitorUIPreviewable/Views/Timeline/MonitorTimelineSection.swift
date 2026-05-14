@@ -301,25 +301,26 @@ struct SessionTimelineView: View {
   }
 
   func requestLoadOlderTimelineChunk() {
-    let oldestCursor =
-      timelineWindow?.oldestCursor
-      ?? timeline.last.map { TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId) }
-    let limit = pageSize
-    if let timelineLoading, let oldestCursor {
-      if loadOlderInFlight { return }
-      loadOlderInFlight = true
-      let request = TimelineWindowRequest(
-        scope: .summary,
-        limit: limit,
-        before: oldestCursor
-      )
-      Task { @MainActor in
+    Task { @MainActor in
+      // Escape the scroll-geometry callback before mutating SwiftUI state.
+      await Task.yield()
+
+      let oldestCursor =
+        timelineWindow?.oldestCursor
+        ?? timeline.last.map { TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId) }
+      let limit = pageSize
+      if let timelineLoading, let oldestCursor {
+        if loadOlderInFlight { return }
+        loadOlderInFlight = true
+        let request = TimelineWindowRequest(
+          scope: .summary,
+          limit: limit,
+          before: oldestCursor
+        )
         defer { loadOlderInFlight = false }
         await timelineLoading.loadWindow(request, nil)
+        return
       }
-      return
-    }
-    Task { @MainActor in
       await store.appendSelectedTimelineOlderChunk(
         limit: limit,
         retainedLimit: nil
