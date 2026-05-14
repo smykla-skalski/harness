@@ -50,6 +50,7 @@ struct SessionTimelineView: View {
   @State private var filters = SessionTimelineFilterState()
   @State private var presentationCache = SessionTimelineSectionPresentationCache()
   @State private var loadOlderInFlight = false
+  @State var didInitialFreshFetch = false
 
   private var presentation: SessionTimelineSectionPresentation {
     presentationCache.presentation(
@@ -275,7 +276,7 @@ struct SessionTimelineView: View {
     store.presentedSheet = .signalDetail(signalID: signalID)
   }
 
-  static let loadOlderChunkSize = 200
+  static let loadOlderChunkSize = 25
 
   func requestLoadOlderTimelineChunk() {
     let oldestCursor =

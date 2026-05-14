@@ -153,13 +153,23 @@ extension SessionTimelineView {
     }
   }
 
+  static let initialPageLimit = 25
+
   func requestLatestWindowIfNeeded(_ presentation: SessionTimelineSectionPresentation) {
-    guard timeline.isEmpty else { return }
+    if timeline.isEmpty {
+      requestLatestWindow()
+      return
+    }
+    guard timelineLoading != nil, !didInitialFreshFetch else { return }
+    didInitialFreshFetch = true
+    HarnessMonitorLogger.timelinePaging.info(
+      "section.refresh forcing latest=\(Self.initialPageLimit, privacy: .public) on first appear"
+    )
     requestLatestWindow()
   }
 
   func requestLatestWindow() {
-    let request = TimelineWindowRequest.latest(limit: 2000)
+    let request = TimelineWindowRequest.latest(limit: Self.initialPageLimit)
     if let timelineLoading {
       Task { await timelineLoading.loadWindow(request, nil) }
       return
