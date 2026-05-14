@@ -1,8 +1,12 @@
 import SwiftUI
 
 extension PolicyCanvasViewModel {
+  /// Single-click selection: replaces the primary selection and drops any
+  /// secondary picks. Shift-click goes through `extendSelection(_:)` instead
+  /// to layer onto the existing set.
   func select(_ newSelection: PolicyCanvasSelection?) {
     selection = newSelection
+    secondarySelections = []
   }
 
   /// Drops the current selection and any in-flight gesture highlights. Wired
@@ -11,6 +15,7 @@ extension PolicyCanvasViewModel {
   /// state. No document-side mutation, so `documentDirty` is untouched.
   func clearSelection() {
     selection = nil
+    secondarySelections = []
     clearTransientGestureState()
   }
 

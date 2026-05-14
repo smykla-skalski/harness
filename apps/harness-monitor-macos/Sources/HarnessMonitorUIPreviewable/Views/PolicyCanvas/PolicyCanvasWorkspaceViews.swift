@@ -174,7 +174,7 @@ private struct PolicyCanvasGroupLayer: View {
     ForEach(viewModel.groups) { group in
       PolicyCanvasGroupRegion(
         group: group,
-        isSelected: viewModel.selection == .group(group.id),
+        isSelected: viewModel.isSelected(.group(group.id)),
         isHighlighted: viewModel.highlightedGroupID == group.id
       )
       .offset(x: group.frame.minX, y: group.frame.minY)
@@ -186,6 +186,13 @@ private struct PolicyCanvasGroupLayer: View {
           }
           .onEnded { value in
             viewModel.endGroupDrag(group.id, translation: value.translation)
+          }
+      )
+      .simultaneousGesture(
+        TapGesture()
+          .modifiers(.shift)
+          .onEnded {
+            viewModel.extendSelection(.group(group.id))
           }
       )
       .onTapGesture {
@@ -303,6 +310,13 @@ private struct PolicyCanvasEdgeLabelLayer: View {
           }
           .harnessPlainButtonStyle()
           .position(route.labelPosition)
+          .simultaneousGesture(
+            TapGesture()
+              .modifiers(.shift)
+              .onEnded {
+                viewModel.extendSelection(.edge(edge.id))
+              }
+          )
           .accessibilityFocused(focusedComponent, equals: .edge(edge.id))
           .accessibilityLabel(viewModel.accessibilityLabel(for: edge))
           .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEdge(edge.id))

@@ -65,15 +65,24 @@ struct PolicyCanvasInspector: View {
     }
   }
 
+  @ViewBuilder
   private var nodeTitleField: some View {
     PolicyCanvasInspectorField(label: "Name") {
-      TextField("Node name", text: selectedNodeTitleBinding)
-        .textFieldStyle(.roundedBorder)
-        .scaledFont(.callout)
-        .focused($focusedField, equals: .nodeTitle)
-        .accessibilityIdentifier(
-          HarnessMonitorAccessibility.policyCanvasInspectorField("node-title")
+      if let node = viewModel.selectedNode {
+        PolicyCanvasInspectorRenameField(
+          viewModel: viewModel,
+          nodeID: node.id,
+          originalTitle: node.title,
+          focusedField: $focusedField
         )
+      } else {
+        // Selection is stale (node was deleted under us). Render a
+        // placeholder so the inspector row still renders something while
+        // the next selection change resolves the empty state.
+        Text("—")
+          .scaledFont(.callout)
+          .foregroundStyle(.white.opacity(0.5))
+      }
     }
   }
 
@@ -260,13 +269,6 @@ struct PolicyCanvasInspector: View {
   }
 
   private static let noneGroupTag = "__none__"
-
-  private var selectedNodeTitleBinding: Binding<String> {
-    Binding(
-      get: { viewModel.selectedNode?.title ?? "" },
-      set: { viewModel.updateSelectedNodeTitle($0) }
-    )
-  }
 
   private var selectedNodeKindBinding: Binding<PolicyCanvasNodeKind> {
     Binding(

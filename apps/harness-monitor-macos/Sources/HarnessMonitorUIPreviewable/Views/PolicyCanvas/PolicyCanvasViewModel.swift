@@ -10,6 +10,13 @@ final class PolicyCanvasViewModel {
   var groups: [PolicyCanvasGroup]
   var edges: [PolicyCanvasEdge]
   var selection: PolicyCanvasSelection?
+  /// Additional shift-click selections layered on top of `selection`. The
+  /// primary `selection` field stays the canonical "what is being edited" for
+  /// inspector binding and selectionless-aware paths; `secondarySelections`
+  /// only exists for power-edit operations (multi-delete, multi-copy,
+  /// multi-nudge). Empty set means single-select behavior, which is the
+  /// vast majority of the time and keeps the rest of the canvas untouched.
+  var secondarySelections: Set<PolicyCanvasSelection>
   var zoom: CGFloat
   var highlightedGroupID: String?
   var highlightedInput: PolicyCanvasPortEndpoint?
@@ -79,6 +86,12 @@ final class PolicyCanvasViewModel {
   /// optional so unit-test paths (which never bind it) skip autosave
   /// entirely.
   @ObservationIgnored var autosaveTrigger: (@MainActor () -> Void)?
+
+  /// In-memory clipboard captured by `copySelectionToClipboard()` and
+  /// replayed by `pasteFromClipboard()`. Held off the @Observable graph
+  /// because views never visualize the buffer itself; the only consumer is
+  /// the paste command which reads it once per invocation.
+  @ObservationIgnored var clipboard: PolicyCanvasClipboard?
 
   @ObservationIgnored var nextNodeNumber: Int
   @ObservationIgnored var loadedDocumentRevision: UInt64?
@@ -188,6 +201,7 @@ final class PolicyCanvasViewModel {
     self.groups = groups
     self.edges = edges
     self.selection = selection
+    self.secondarySelections = []
     self.zoom = zoom
     self.backingDocument = nil
     self.latestSimulation = nil
@@ -272,17 +286,6 @@ final class PolicyCanvasViewModel {
     return nil
   }
 
-  func dropPalettePayloads(_ payloads: [String], at point: CGPoint) -> Bool {
-    guard
-      let payload = payloads.first,
-      let kind = parsePalettePayload(payload)
-    else {
-      return false
-    }
-    createNode(kind: kind, at: point)
-    return true
-  }
-
   func createNode(kind: PolicyCanvasNodeKind, at point: CGPoint) {
     let number = nextNodeNumber
     nextNodeNumber += 1
@@ -301,106 +304,6 @@ final class PolicyCanvasViewModel {
     node.policyKind = taskBoardPolicyNodeKind(for: kind)
     let priorSelection = selection
     mutate(.addNode(node, restoreSelection: priorSelection))
-  }
-
-  func setInputTargeted(
-    _ targeted: Bool,
-    nodeID: String,
-    portID: String,
-    side: PolicyCanvasPortSide? = nil
-  ) {
-    if targeted {
-      highlightedInput = PolicyCanvasPortEndpoint(
-        nodeID: nodeID,
-        portID: portID,
-        kind: .input,
-        side: side
-      )
-    } else {
-      highlightedInput = nil
-    }
-  }
-
-  func connectDroppedPortPayloads(
-    _ payloads: [String],
-    targetNodeID: String,
-    targetPortID: String,
-    targetSide: PolicyCanvasPortSide? = nil
-  ) -> Bool {
-    guard let source = payloads.compactMap(parseOutputPortPayload).first else {
-      clearPendingEdge()
-      return false
-    }
-    guard source.nodeID != targetNodeID else {
-      clearPendingEdge()
-      return false
-    }
-    let target = PolicyCanvasPortEndpoint(
-      nodeID: targetNodeID,
-      portID: targetPortID,
-      kind: .input,
-      side: targetSide
-    )
-    guard !edges.contains(where: { $0.source == source && $0.target == target }) else {
-      clearPendingEdge()
-      return true
-    }
-    let edge = PolicyCanvasEdge(
-      id: "edge-\(source.nodeID)-\(source.portID)-\(target.nodeID)-\(target.portID)",
-      source: source,
-      target: target,
-      label: edgeLabel(source: source, target: target)
-    )
-    let priorSelection = selection
-    clearPendingEdge()
-    mutate(.addEdge(edge, restoreSelection: priorSelection))
-    return true
-  }
-
-  private func parsePalettePayload(_ payload: String) -> PolicyCanvasNodeKind? {
-    let parts = payload.split(separator: "|").map(String.init)
-    guard parts.count == 2, parts[0] == "policy-canvas-palette" else {
-      return nil
-    }
-    return PolicyCanvasNodeKind(rawValue: parts[1])
-  }
-
-  private func parseOutputPortPayload(_ payload: String) -> PolicyCanvasPortEndpoint? {
-    let parts = payload.split(separator: "|").map(String.init)
-    guard (parts.count == 3 || parts.count == 4), parts[0] == "policy-canvas-port" else {
-      return nil
-    }
-    let side = parts.count == 4 ? PolicyCanvasPortSide(rawValue: parts[3]) : nil
-    return PolicyCanvasPortEndpoint(
-      nodeID: parts[1],
-      portID: parts[2],
-      kind: .output,
-      side: side
-    )
-  }
-
-  private func edgeLabel(
-    source: PolicyCanvasPortEndpoint,
-    target: PolicyCanvasPortEndpoint
-  ) -> String {
-    let sourcePort = node(source.nodeID)?.outputPorts.first { $0.id == source.portID }
-    let targetPort = node(target.nodeID)?.inputPorts.first { $0.id == target.portID }
-    return [sourcePort?.title, targetPort?.title]
-      .compactMap { $0 }
-      .joined(separator: " -> ")
-  }
-
-  func markNodeEdited(_ nodeID: String) {
-    cleanEphemeralNodeIDs.remove(nodeID)
-  }
-
-  func markEdgeEdited(_ edgeID: String) {
-    cleanEphemeralEdgeIDs.remove(edgeID)
-  }
-
-  func resetCleanEphemeralComponents() {
-    cleanEphemeralNodeIDs.removeAll()
-    cleanEphemeralEdgeIDs.removeAll()
   }
 
   /// Single funnel that mutation sites use to mark the document dirty. Sets
