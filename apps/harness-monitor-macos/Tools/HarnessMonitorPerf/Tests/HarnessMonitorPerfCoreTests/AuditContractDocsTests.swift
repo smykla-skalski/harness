@@ -17,6 +17,9 @@ final class AuditContractDocsTests: XCTestCase {
         XCTAssertTrue(mise.contains(#"[tasks."monitor:tools:field-telemetry"]"#))
         XCTAssertTrue(mise.contains(#"[tasks."monitor:audit"]"#))
         XCTAssertTrue(mise.contains(#"[tasks."monitor:audit:from-ref"]"#))
+        let bisectTask = try readRepoFile("mise-tasks/monitor/audit/bisect")
+        XCTAssertTrue(bisectTask.contains(#"depends=["monitor:tools:build:perf"]"#))
+        XCTAssertTrue(bisectTask.contains("run-instruments-audit-bisect.sh"))
     }
 
     func testPerfSkillUsesAnimationIntervalContract() throws {
