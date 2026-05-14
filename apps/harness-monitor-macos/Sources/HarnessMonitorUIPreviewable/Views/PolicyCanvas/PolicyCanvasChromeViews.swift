@@ -60,18 +60,33 @@ struct PolicyCanvasTopBar: View {
         }
       )
 
-      PolicyCanvasActionButton(
-        title: "Promote",
-        systemImage: "arrow.up.right.circle",
-        tint: Color.green,
-        isDisabled: !canPromote,
-        disabledReason: viewModel.promoteDisabledReason,
-        accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasPromoteButton,
-        action: {
-          viewModel.promote()
-          promote()
+      VStack(alignment: .trailing, spacing: 2) {
+        PolicyCanvasActionButton(
+          title: "Promote",
+          systemImage: "arrow.up.right.circle",
+          tint: Color.green,
+          isDisabled: !canPromote,
+          disabledReason: viewModel.promoteDisabledReason,
+          accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasPromoteButton,
+          action: {
+            viewModel.promote()
+            promote()
+          }
+        )
+
+        if let reason = viewModel.promoteDisabledReason {
+          // White at 78% opacity reads ~5.6:1 on the top bar backdrop
+          // `#14171F` — clears WCAG AA for small text without competing with
+          // the action button glyph color.
+          Text(reason)
+            .scaledFont(.caption2.weight(.medium))
+            .foregroundStyle(.white.opacity(0.78))
+            .lineLimit(1)
+            .accessibilityIdentifier(
+              HarnessMonitorAccessibility.policyCanvasPromoteDisabledReason
+            )
         }
-      )
+      }
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 10)

@@ -98,6 +98,7 @@ extension PolicyCanvasViewModel {
     reconcileGroupFrames()
     documentDirty = true
     clearTransientGestureState()
+    invalidateValidationCache()
     notifyStatus("Deleted \(title)")
   }
 
@@ -115,6 +116,7 @@ extension PolicyCanvasViewModel {
     }
     documentDirty = true
     clearTransientGestureState()
+    invalidateValidationCache()
     notifyStatus("Deleted \(label) connection")
   }
 
@@ -136,6 +138,7 @@ extension PolicyCanvasViewModel {
     reconcileGroupFrames()
     documentDirty = true
     clearTransientGestureState()
+    invalidateValidationCache()
     notifyStatus("Deleted \(title)")
   }
 
