@@ -8,9 +8,10 @@ import Testing
 /// Covers the per-node simulation-outcome map that feeds the canvas
 /// simulation overlay. Two contracts matter:
 ///   1. The derivation maps `TaskBoardPolicyPipelineSimulatedDecision`
-///      visited node ids onto allowed / denied / unreached / indeterminate
-///      with denied dominating allowed when a node appears in mismatched
-///      decisions.
+///      visited node ids onto allowed / denied / unreached, with denied
+///      dominating allowed when a node appears in mismatched decisions.
+///      Unclassifiable verdict strings leave their visited nodes absent
+///      from the map (no badge rendered).
 ///   2. The cache uses an `@ObservationIgnored` storage slot keyed on a
 ///      simulation-shape token, so unrelated mutations (selection, drag
 ///      ticks) do not invalidate it.
@@ -122,6 +123,35 @@ struct PolicyCanvasSimulationOutcomeTests {
     }
   }
 
+  @Test("denied dominates allowed regardless of decision order")
+  func deniedDominatesAllowedReverseOrder() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    // Same as deniedDominatesAllowed but deny first, allow second — the
+    // dominance rule must be insensitive to decision order.
+    viewModel.latestSimulation = makeSimulation(
+      succeeded: true,
+      decisions: [
+        decision(
+          verdict: "deny",
+          reasonCode: "merge_risk_high",
+          visited: ["policy-source", "risk-score"]
+        ),
+        decision(
+          verdict: "allow",
+          reasonCode: "default_allow",
+          visited: ["policy-source", "context-map"]
+        ),
+      ]
+    )
+
+    let map = viewModel.simulationOutcomeMap()
+
+    guard case .denied = map["policy-source"] else {
+      Issue.record("policy-source must stay denied even when allow lands second")
+      return
+    }
+  }
+
   @Test("nodes never visited by any decision are reported as unreached")
   func unreachedFillsInUnvisitedNodes() {
     let viewModel = PolicyCanvasViewModel.sample()
@@ -145,8 +175,8 @@ struct PolicyCanvasSimulationOutcomeTests {
     #expect(map["promote-release"] == .unreached)
   }
 
-  @Test("unknown decision string falls through to indeterminate")
-  func unknownDecisionIsIndeterminate() {
+  @Test("unknown decision string leaves visited nodes absent from the map")
+  func unknownDecisionIsAbsent() {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.latestSimulation = makeSimulation(
       succeeded: true,
@@ -161,10 +191,42 @@ struct PolicyCanvasSimulationOutcomeTests {
 
     let map = viewModel.simulationOutcomeMap()
 
-    #expect(map["review-gate"] == .indeterminate)
-    // Sibling nodes still get .unreached fill-in even when only an
-    // indeterminate decision exists.
-    #expect(map["policy-source"] == .unreached)
+    // The visited node is absent from the map (no entry, no badge).
+    #expect(map["review-gate"] == nil)
+    // No classifiable decisions at all — the entire map is empty;
+    // sibling nodes do NOT get an .unreached fill-in.
+    #expect(map.isEmpty)
+  }
+
+  @Test("classifiable decision alongside unknown lets unknown stay absent")
+  func unknownDecisionAlongsideClassifiableIsAbsent() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.latestSimulation = makeSimulation(
+      succeeded: true,
+      decisions: [
+        decision(
+          verdict: "allow",
+          reasonCode: "default_allow",
+          visited: ["policy-source", "risk-score"]
+        ),
+        decision(
+          verdict: "defer",
+          reasonCode: "defer_to_next",
+          visited: ["review-gate"]
+        ),
+      ]
+    )
+
+    let map = viewModel.simulationOutcomeMap()
+
+    #expect(map["policy-source"] == .allowed)
+    #expect(map["risk-score"] == .allowed)
+    // The unknown ("defer") decision didn't seed review-gate. Because at
+    // least one classifiable decision exists, the unreached fill-in
+    // marks every document node not seeded by a classifiable decision —
+    // including review-gate.
+    #expect(map["review-gate"] == .unreached)
+    #expect(map["context-map"] == .unreached)
   }
 
   @Test("nil simulation yields an empty map with no errors")
