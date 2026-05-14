@@ -49,6 +49,7 @@ struct SessionTimelineView: View {
 
   @State private var filters = SessionTimelineFilterState()
   @State private var presentationCache = SessionTimelineSectionPresentationCache()
+  @State private var loadOlderInFlight = false
 
   private var presentation: SessionTimelineSectionPresentation {
     presentationCache.presentation(
@@ -277,12 +278,36 @@ struct SessionTimelineView: View {
   static let loadOlderChunkSize = 200
 
   func requestLoadOlderTimelineChunk() {
+    let oldestCursor =
+      timelineWindow?.oldestCursor
+      ?? timeline.last.map { TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId) }
+    let route: String =
+      if timelineLoading != nil { "per-window" } else { "global-selected" }
     HarnessMonitorLogger.timelinePaging.info(
       """
       section.request limit=\(Self.loadOlderChunkSize, privacy: .public) \
-      sessionID=\(store.selectedSessionID ?? "nil", privacy: .public)
+      sessionID=\(sessionID, privacy: .public) \
+      route=\(route, privacy: .public) \
+      hasOldestCursor=\(oldestCursor != nil, privacy: .public)
       """
     )
+    if let timelineLoading, let oldestCursor {
+      if loadOlderInFlight {
+        HarnessMonitorLogger.timelinePaging.debug("section.request guard in-flight")
+        return
+      }
+      loadOlderInFlight = true
+      let request = TimelineWindowRequest(
+        scope: .summary,
+        limit: Self.loadOlderChunkSize,
+        before: oldestCursor
+      )
+      Task { @MainActor in
+        defer { loadOlderInFlight = false }
+        await timelineLoading.loadWindow(request, nil)
+      }
+      return
+    }
     Task { @MainActor in
       await store.appendSelectedTimelineOlderChunk(
         limit: Self.loadOlderChunkSize,
