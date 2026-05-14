@@ -132,7 +132,7 @@ fn runtime_config_round_trips_task_board_git_runtime_config() {
                         ssh_key_path: None,
                         gpg_key_id: Some("ABC123".into()),
                         gpg_private_key_path: Some("/tmp/private.asc".into()),
-                        gpg_private_key_passphrase: Some("secret".into()),
+                        gpg_private_key_passphrase: None,
                     },
                 },
                 repository_overrides: vec![],

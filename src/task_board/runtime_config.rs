@@ -29,6 +29,18 @@ impl TaskBoardGitRuntimeConfig {
         }
         profile
     }
+
+    #[must_use]
+    pub fn without_secrets(&self) -> Self {
+        Self {
+            global: self.global.without_secrets(),
+            repository_overrides: self
+                .repository_overrides
+                .iter()
+                .map(TaskBoardGitRepositoryOverride::without_secrets)
+                .collect(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -76,6 +88,16 @@ impl TaskBoardGitRuntimeProfile {
             signing: self.signing.normalized(),
         }
     }
+
+    #[must_use]
+    pub fn without_secrets(&self) -> Self {
+        Self {
+            author_name: self.author_name.clone(),
+            author_email: self.author_email.clone(),
+            ssh_key_path: self.ssh_key_path.clone(),
+            signing: self.signing.without_secrets(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -114,6 +136,17 @@ impl TaskBoardGitSigningConfig {
             ),
         }
     }
+
+    #[must_use]
+    pub fn without_secrets(&self) -> Self {
+        Self {
+            mode: self.mode,
+            ssh_key_path: self.ssh_key_path.clone(),
+            gpg_key_id: self.gpg_key_id.clone(),
+            gpg_private_key_path: self.gpg_private_key_path.clone(),
+            gpg_private_key_passphrase: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -140,6 +173,14 @@ impl TaskBoardGitRepositoryOverride {
             repository,
             profile: self.profile.normalized(),
         })
+    }
+
+    #[must_use]
+    pub fn without_secrets(&self) -> Self {
+        Self {
+            repository: self.repository.clone(),
+            profile: self.profile.without_secrets(),
+        }
     }
 }
 
