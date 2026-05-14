@@ -1,7 +1,7 @@
 use tempfile::tempdir;
 
 use crate::task_board::store::{TaskBoardItemPatch, TaskBoardStore};
-use crate::task_board::types::{AgentMode, TaskBoardItem, TaskBoardStatus};
+use crate::task_board::types::{AgentMode, PlanningState, TaskBoardItem, TaskBoardStatus};
 
 #[test]
 fn create_get_list_update_delete_round_trips_markdown() {
@@ -61,4 +61,39 @@ fn create_rejects_duplicate_id() {
 
     let err = store.create("Title", "Body", item).expect_err("duplicate");
     assert!(err.message().contains("already exists"));
+}
+
+#[test]
+fn update_with_approver_only_preserves_planning_summary() {
+    let temp = tempdir().expect("tempdir");
+    let store = TaskBoardStore::new(temp.path().join("board"));
+    let mut item = TaskBoardItem::new(
+        "task-1".into(),
+        "Plan".into(),
+        String::new(),
+        "2026-05-14T00:00:00Z".into(),
+    );
+    item.planning.summary = Some("Keep this plan".into());
+    store.create("Plan", "", item).expect("create");
+
+    let updated = store
+        .update(
+            "task-1",
+            TaskBoardItemPatch {
+                planning: Some(PlanningState {
+                    summary: None,
+                    approved_by: Some("lead".into()),
+                    approved_at: Some("2026-05-14T01:00:00Z".into()),
+                }),
+                ..TaskBoardItemPatch::default()
+            },
+        )
+        .expect("update item");
+
+    assert_eq!(updated.planning.summary.as_deref(), Some("Keep this plan"));
+    assert_eq!(updated.planning.approved_by.as_deref(), Some("lead"));
+    assert_eq!(
+        updated.planning.approved_at.as_deref(),
+        Some("2026-05-14T01:00:00Z")
+    );
 }

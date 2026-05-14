@@ -1,6 +1,8 @@
+use std::path::Path;
+
 use serde::{Deserialize, Serialize};
 
-use super::dispatch::{DispatchPlan, build_dispatch_plans};
+use super::dispatch::{DispatchPlan, build_dispatch_plans, build_dispatch_plans_with_policy_root};
 use super::external::{ExternalProvider, ExternalSyncConfig, ExternalSyncOperation};
 use super::types::{AgentMode, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 
@@ -82,6 +84,14 @@ pub fn build_sync_summary(
 #[must_use]
 pub fn build_dispatch_summary(items: &[TaskBoardItem]) -> Vec<DispatchPlan> {
     build_dispatch_plans(items)
+}
+
+#[must_use]
+pub fn build_dispatch_summary_with_policy_root(
+    items: &[TaskBoardItem],
+    policy_root: &Path,
+) -> Vec<DispatchPlan> {
+    build_dispatch_plans_with_policy_root(items, policy_root)
 }
 
 #[must_use]

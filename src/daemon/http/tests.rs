@@ -37,6 +37,7 @@ mod shutdown;
 mod support;
 mod task_board;
 mod task_board_crud;
+mod task_board_parity;
 mod task_review;
 mod telemetry;
 

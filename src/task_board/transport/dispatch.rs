@@ -10,7 +10,7 @@ use crate::task_board::dispatch::{
     DispatchAppliedTask, DispatchExecutionSummary, DispatchPlan, DispatchReadiness, SessionIntent,
 };
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch, TaskBoardStore};
-use crate::task_board::summary::build_dispatch_summary;
+use crate::task_board::summary::build_dispatch_summary_with_policy_root;
 use crate::task_board::types::{TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowStatus};
 
 use super::{
@@ -21,7 +21,7 @@ impl Execute for TaskBoardDispatchArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let board = store(self.board_root.clone());
         let items = self.selected_items(&board)?;
-        let plans = build_dispatch_summary(&items);
+        let plans = build_dispatch_summary_with_policy_root(&items, board.root());
         let summary = if self.dry_run {
             DispatchExecutionSummary::dry_run(plans)
         } else {

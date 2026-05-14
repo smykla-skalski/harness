@@ -8,7 +8,8 @@ use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::{
     DispatchAppliedTask, DispatchExecutionSummary, DispatchPlan, SessionIntent, TaskBoardItem,
-    TaskBoardStatus, TaskBoardStore, TaskBoardWorkflowStatus, build_dispatch_summary,
+    TaskBoardStatus, TaskBoardStore, TaskBoardWorkflowStatus,
+    build_dispatch_summary_with_policy_root,
 };
 
 use super::super::{
@@ -25,7 +26,7 @@ pub fn dispatch_task_board(
     board: &TaskBoardStore,
 ) -> Result<TaskBoardDispatchResponse, CliError> {
     let items = selected_dispatch_items(board, request)?;
-    let plans = build_dispatch_summary(&items);
+    let plans = build_dispatch_summary_with_policy_root(&items, board.root());
     if request.dry_run {
         return Ok(DispatchExecutionSummary::dry_run(plans));
     }
@@ -47,7 +48,7 @@ pub async fn dispatch_task_board_async(
     board: &TaskBoardStore,
 ) -> Result<TaskBoardDispatchResponse, CliError> {
     let items = selected_dispatch_items(board, request)?;
-    let plans = build_dispatch_summary(&items);
+    let plans = build_dispatch_summary_with_policy_root(&items, board.root());
     if request.dry_run {
         return Ok(DispatchExecutionSummary::dry_run(plans));
     }

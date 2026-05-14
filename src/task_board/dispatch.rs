@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use serde::{Deserialize, Serialize};
 
 use crate::session::types::{TaskSeverity, TaskSource};
@@ -123,7 +125,15 @@ impl DispatchExecutionSummary {
 
 #[must_use]
 pub fn build_dispatch_plan(item: &TaskBoardItem) -> DispatchPlan {
-    let policy = dispatch_policy(item);
+    build_dispatch_plan_with_policy_root(item, &default_board_root())
+}
+
+#[must_use]
+pub fn build_dispatch_plan_with_policy_root(
+    item: &TaskBoardItem,
+    policy_root: &Path,
+) -> DispatchPlan {
+    let policy = dispatch_policy(item, policy_root);
     DispatchPlan {
         board_item_id: item.id.clone(),
         readiness: readiness(item, &policy),
@@ -141,6 +151,17 @@ pub fn build_dispatch_plan(item: &TaskBoardItem) -> DispatchPlan {
 #[must_use]
 pub fn build_dispatch_plans(items: &[TaskBoardItem]) -> Vec<DispatchPlan> {
     items.iter().map(build_dispatch_plan).collect()
+}
+
+#[must_use]
+pub fn build_dispatch_plans_with_policy_root(
+    items: &[TaskBoardItem],
+    policy_root: &Path,
+) -> Vec<DispatchPlan> {
+    items
+        .iter()
+        .map(|item| build_dispatch_plan_with_policy_root(item, policy_root))
+        .collect()
 }
 
 fn readiness(item: &TaskBoardItem, policy: &PolicyDecision) -> DispatchReadiness {
@@ -168,7 +189,7 @@ fn readiness(item: &TaskBoardItem, policy: &PolicyDecision) -> DispatchReadiness
     DispatchReadiness::Ready
 }
 
-fn dispatch_policy(item: &TaskBoardItem) -> PolicyDecision {
+fn dispatch_policy(item: &TaskBoardItem, policy_root: &Path) -> PolicyDecision {
     let mut input = PolicyInput::new(PolicyAction::SpawnAgent);
     input.subject = PolicySubject {
         task_board_item_id: Some(item.id.clone()),
@@ -176,7 +197,7 @@ fn dispatch_policy(item: &TaskBoardItem) -> PolicyDecision {
         repository: item.project_id.clone(),
         ..PolicySubject::default()
     };
-    if let Ok(document) = PolicyPipelineStore::new(default_board_root()).load_or_seed()
+    if let Ok(document) = PolicyPipelineStore::new(policy_root.to_path_buf()).load_or_seed()
         && document.mode != PolicyPipelineMode::Draft
     {
         return GraphPolicyGate::new(document).evaluate(&input);
@@ -246,7 +267,13 @@ fn non_empty(value: &str) -> Option<String> {
 mod tests {
     use super::*;
     use crate::task_board::planning::{approve_plan, submit_plan};
+    use crate::task_board::policy::PolicyAction;
+    use crate::task_board::policy_graph::{
+        PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphMode, PolicyGraphNodeKind,
+        PolicyPipelinePromoteRequest,
+    };
     use crate::task_board::types::ExternalRefProvider;
+    use tempfile::tempdir;
 
     fn ready_item() -> TaskBoardItem {
         let item = TaskBoardItem::new(
@@ -330,5 +357,57 @@ mod tests {
                 session_id: "session-1".into()
             }
         );
+    }
+
+    #[test]
+    fn dispatch_policy_uses_supplied_board_root_pipeline() {
+        let temp = tempdir().expect("tempdir");
+        let board_root = temp.path().join("custom-board");
+        let store = PolicyPipelineStore::new(board_root.clone());
+        let mut document = store.load_or_seed().expect("seed policy graph");
+        document.edges.iter_mut().for_each(|edge| {
+            if edge.id == "edge:default"
+                && let PolicyGraphEdgeCondition::ActionIn { actions } = &mut edge.condition
+            {
+                actions.retain(|action| *action != PolicyAction::SpawnAgent);
+            }
+        });
+        document.edges.push(PolicyGraphEdge {
+            id: "edge:spawn-needs-human".to_string(),
+            from_node: "action:router".to_string(),
+            from_port: "default".to_string(),
+            to_node: "human:unsafe-action".to_string(),
+            to_port: "in".to_string(),
+            label: None,
+            condition: PolicyGraphEdgeCondition::ActionIn {
+                actions: vec![PolicyAction::SpawnAgent],
+            },
+        });
+        document.mode = PolicyGraphMode::Draft;
+        assert!(
+            document
+                .nodes
+                .iter()
+                .any(|node| matches!(node.kind, PolicyGraphNodeKind::HumanGate { .. }))
+        );
+        let saved = store.save_draft(document).expect("save policy graph");
+        store
+            .simulate(Some(saved.document.clone()))
+            .expect("simulate policy graph");
+        store
+            .promote(&PolicyPipelinePromoteRequest {
+                revision: saved.document.revision,
+                actor: None,
+            })
+            .expect("promote policy graph");
+
+        let plan = build_dispatch_plan_with_policy_root(&ready_item(), &board_root);
+
+        assert!(matches!(
+            plan.readiness,
+            DispatchReadiness::Blocked {
+                reason: DispatchBlockReason::Policy { .. }
+            }
+        ));
     }
 }

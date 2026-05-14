@@ -132,6 +132,11 @@ impl TaskBoardStore {
     }
 
     #[must_use]
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
+    #[must_use]
     pub fn tasks_dir(&self) -> PathBuf {
         self.root.join("tasks")
     }
@@ -263,8 +268,24 @@ fn apply_core_patch(item: &mut TaskBoardItem, patch: &TaskBoardItemPatch) {
     assign_copy_if_some(&mut item.agent_mode, patch.agent_mode);
     assign_if_some(&mut item.tags, patch.tags.as_ref());
     assign_if_some(&mut item.external_refs, patch.external_refs.as_ref());
-    assign_if_some(&mut item.planning, patch.planning.as_ref());
+    apply_planning_patch(&mut item.planning, patch.planning.as_ref());
     assign_if_some(&mut item.workflow, patch.workflow.as_ref());
+}
+
+fn apply_planning_patch(target: &mut PlanningState, patch: Option<&PlanningState>) {
+    let Some(patch) = patch else {
+        return;
+    };
+    if patch.summary.is_some() {
+        target.summary.clone_from(&patch.summary);
+        target.approved_by.clone_from(&patch.approved_by);
+        target.approved_at.clone_from(&patch.approved_at);
+        return;
+    }
+    if patch.approved_by.is_some() {
+        target.approved_by.clone_from(&patch.approved_by);
+        target.approved_at.clone_from(&patch.approved_at);
+    }
 }
 
 fn apply_link_patch(item: &mut TaskBoardItem, patch: TaskBoardItemPatch) {
