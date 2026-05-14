@@ -82,7 +82,7 @@ struct SupervisorRuleParameterRow: View {
       HStack(spacing: 0) {
         Spacer(minLength: 0)
         Picker("", selection: enumerationBinding(allowedValues: allowedValues)) {
-          ForEach(allowedValues, id: \.self) { value in
+          ForEach(Array(allowedValues.enumerated()), id: \.offset) { _, value in
             Text(Self.enumerationDisplayName(value)).tag(value)
           }
         }
