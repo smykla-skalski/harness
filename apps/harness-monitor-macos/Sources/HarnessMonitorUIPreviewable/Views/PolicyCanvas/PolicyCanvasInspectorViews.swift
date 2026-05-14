@@ -283,8 +283,6 @@ struct PolicyCanvasInspector: View {
     )
   }
 
-  fileprivate static let noneGroupTag = "__none__"
-
   /// Discrete policy-kind options surfaced by the picker. Order matches the
   /// daemon's enum walk: trigger -> action gate -> evidence -> risk -> human
   /// -> consensus -> dry-run -> supervisor. Tag identity is the kind string
