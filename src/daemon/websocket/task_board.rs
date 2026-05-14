@@ -5,6 +5,7 @@ use crate::daemon::protocol::{
     TaskBoardSyncRequest, TaskBoardUpdateItemRequest, WsRequest, WsResponse, ws_methods,
 };
 use crate::daemon::service;
+use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use serde::de::DeserializeOwned;
 
 use super::frames::error_response;
@@ -76,7 +77,7 @@ async fn dispatch_task_board_dispatch(request: &WsRequest, state: &DaemonHttpSta
     let Ok(mut body) = parse_params::<TaskBoardDispatchRequest>(request) else {
         return invalid_params(request);
     };
-    body.actor = Some(crate::session::types::CONTROL_PLANE_ACTOR_ID.to_string());
+    body.actor = Some(CONTROL_PLANE_ACTOR_ID.to_string());
     let result = if let Some(async_db) = state.async_db.get() {
         let result = service::dispatch_task_board_async(&body, async_db.as_ref()).await;
         if result

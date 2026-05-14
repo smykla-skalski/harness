@@ -9,7 +9,7 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
   case blocked
   case backlog
 
-  public static var allCases: [TaskBoardInboxLane] {
+  public static var allCases: [Self] {
     [.needsYou, .ready, .running, .review, .blocked, .backlog]
   }
 

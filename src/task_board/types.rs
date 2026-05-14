@@ -191,6 +191,7 @@ pub struct TaskUsage {
     pub cost_usd: Option<f64>,
 }
 
-const fn is_zero(value: &u32) -> bool {
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_zero(value: &u32) -> bool {
     *value == 0
 }

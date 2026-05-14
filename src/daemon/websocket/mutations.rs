@@ -32,20 +32,20 @@ impl ActorBinding {
 fn task_mutation_request_parts(
     request: &WsRequest,
     actor_binding: ActorBinding,
-) -> Result<(String, String, Value), WsResponse> {
+) -> Result<(String, String, Value), Box<WsResponse>> {
     let Some(session_id) = extract_session_id(&request.params) else {
-        return Err(error_response(
+        return Err(Box::new(error_response(
             &request.id,
             "MISSING_PARAM",
             "missing session_id",
-        ));
+        )));
     };
     let Some(task_id) = extract_string_param(&request.params, "task_id") else {
-        return Err(error_response(
+        return Err(Box::new(error_response(
             &request.id,
             "MISSING_PARAM",
             "missing task_id",
-        ));
+        )));
     };
     let mut params = request.params.clone();
     actor_binding.apply(&mut params);
@@ -270,7 +270,7 @@ fn dispatch_mutation_with_task_with_actor_binding(
     let db_ref = db_guard.as_deref();
     let (session_id, task_id, params) = match task_mutation_request_parts(request, actor_binding) {
         Ok(parts) => parts,
-        Err(response) => return response,
+        Err(response) => return *response,
     };
 
     match handler(session_id.clone(), task_id, params, db_ref) {
@@ -368,7 +368,7 @@ where
     };
     let (session_id, task_id, params) = match task_mutation_request_parts(request, actor_binding) {
         Ok(parts) => parts,
-        Err(response) => return response,
+        Err(response) => return *response,
     };
 
     match async_handler(session_id.clone(), task_id, params, async_db.clone()).await {

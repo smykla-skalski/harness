@@ -2,12 +2,13 @@ use uuid::Uuid;
 
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::protocol::{
-    SessionStartRequest, TaskBoardAuditRequest, TaskBoardAuditResponse, TaskBoardCreateItemRequest,
-    TaskBoardDeleteItemRequest, TaskBoardDispatchRequest, TaskBoardDispatchResponse,
-    TaskBoardGetItemRequest, TaskBoardListItemsRequest, TaskBoardListItemsResponse,
-    TaskBoardSyncRequest, TaskBoardSyncResponse, TaskBoardUpdateItemRequest, TaskCreateRequest,
+    SessionDetail, SessionStartRequest, TaskBoardAuditRequest, TaskBoardAuditResponse,
+    TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardDispatchRequest,
+    TaskBoardDispatchResponse, TaskBoardGetItemRequest, TaskBoardListItemsRequest,
+    TaskBoardListItemsResponse, TaskBoardSyncRequest, TaskBoardSyncResponse,
+    TaskBoardUpdateItemRequest, TaskCreateRequest,
 };
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::{
@@ -265,14 +266,14 @@ fn dispatch_actor(request: &TaskBoardDispatchRequest) -> &str {
 
 fn required_dispatch_project_dir(request: &TaskBoardDispatchRequest) -> Result<String, CliError> {
     request.project_dir.clone().ok_or_else(|| {
-        crate::errors::CliErrorKind::workflow_io(
+        CliErrorKind::workflow_io(
             "task-board dispatch requires project_dir when a session must be created",
         )
         .into()
     })
 }
 
-fn newest_task_id(detail: crate::daemon::protocol::SessionDetail) -> Result<String, CliError> {
+fn newest_task_id(detail: SessionDetail) -> Result<String, CliError> {
     detail
         .tasks
         .into_iter()
@@ -283,9 +284,7 @@ fn newest_task_id(detail: crate::daemon::protocol::SessionDetail) -> Result<Stri
                 .then_with(|| left.task_id.cmp(&right.task_id))
         })
         .map(|task| task.task_id)
-        .ok_or_else(|| {
-            crate::errors::CliErrorKind::workflow_io("created empty session task list").into()
-        })
+        .ok_or_else(|| CliErrorKind::workflow_io("created empty session task list").into())
 }
 
 fn link_dispatched_item(
