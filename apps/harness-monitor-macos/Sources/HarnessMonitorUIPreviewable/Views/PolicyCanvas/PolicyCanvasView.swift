@@ -28,6 +28,7 @@ public struct PolicyCanvasView: View {
   @State private var isShowingPromoteConfirmation = false
   @State private var pendingDeletionRequest: PolicyCanvasDeletionRequest?
   @State private var statusLine: String = "No pending changes"
+  @FocusState private var focusedField: PolicyCanvasFocusedField?
   private let store: HarnessMonitorStore?
   private let dashboardUI: HarnessMonitorStore.ContentDashboardSlice?
 
@@ -78,8 +79,12 @@ public struct PolicyCanvasView: View {
         PolicyCanvasViewport(viewModel: viewModel)
           .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-        PolicyCanvasInspector(viewModel: viewModel, statusLine: statusLine)
-          .frame(width: 280)
+        PolicyCanvasInspector(
+          viewModel: viewModel,
+          statusLine: statusLine,
+          focusedField: $focusedField
+        )
+        .frame(width: 280)
       }
     }
     // Reset the canvas subview tree (gesture origins, hover, focus) only when
@@ -135,17 +140,32 @@ public struct PolicyCanvasView: View {
     }
   }
 
+  // Gated on `focusedField == nil`: when the user is editing an inline
+  // TextField in the inspector (rename node, group title, edge label, reason
+  // code, rule id), Delete/Backspace should target the character in the field,
+  // not the selected canvas component; Escape should commit/dismiss the
+  // TextField, not clear the canvas selection mid-typing. SwiftUI's text-field
+  // first responder consumes these keys natively, so disabling the overlay
+  // buttons hands the chord back to the field without an alternate route.
   private var deletionShortcutButtons: some View {
     Group {
       Button("Delete selected policy component") {
         requestDeleteSelectedComponent()
       }
       .keyboardShortcut(.delete, modifiers: [])
+      .disabled(focusedField != nil)
 
       Button("Forward delete selected policy component") {
         requestDeleteSelectedComponent()
       }
       .keyboardShortcut(.deleteForward, modifiers: [])
+      .disabled(focusedField != nil)
+
+      Button("Clear policy canvas selection") {
+        clearSelectionAndDragState()
+      }
+      .keyboardShortcut(.escape, modifiers: [])
+      .disabled(focusedField != nil)
     }
     .opacity(0)
     .frame(width: 0, height: 0)
@@ -198,6 +218,7 @@ public struct PolicyCanvasView: View {
   }
 
   private func saveDraft() {
+    let snapshot = viewModel.snapshotState()
     let document = viewModel.exportDocument()
     Task { @MainActor in
       let saved = await store?.saveTaskBoardPolicyPipelineDraft(document: document) ?? false
@@ -210,19 +231,25 @@ public struct PolicyCanvasView: View {
         // backingDocument on its own clean-incoming branch.
         await forceReloadPolicyPipeline()
       } else {
-        statusLine = "Save blocked by validation"
+        // Daemon rejected the save; roll local state back to the pre-save
+        // snapshot so the chrome and graph reflect what the daemon still
+        // believes is the truth. restoreState funnels the status string
+        // through one notify call so the inspector line is not racing a
+        // second-write override that distorts the user-visible reason.
+        viewModel.restoreState(snapshot, reason: "Save rejected, restored previous canvas")
       }
     }
   }
 
   private func simulate() {
+    let snapshot = viewModel.snapshotState()
     let document = viewModel.exportDocument()
     Task { @MainActor in
       let simulated = await store?.simulateTaskBoardPolicyPipeline(document: document) ?? false
       if simulated {
         await forceReloadPolicyPipeline()
       } else {
-        statusLine = "Simulation failed"
+        viewModel.restoreState(snapshot, reason: "Simulation rejected, restored previous canvas")
       }
     }
   }
@@ -253,6 +280,19 @@ public struct PolicyCanvasView: View {
 
   private func requestDeleteSelectedComponent() {
     pendingDeletionRequest = viewModel.deleteSelectedComponent()
+  }
+
+  /// Escape handler. Cancels any pending deletion confirmation, then clears
+  /// the editor's selection and any in-flight drag highlight so the canvas
+  /// returns to a quiet idle state. Document-side state is untouched —
+  /// `documentDirty` survives Escape because the user's edits are still
+  /// pending for the next save.
+  private func clearSelectionAndDragState() {
+    if pendingDeletionRequest != nil {
+      pendingDeletionRequest = nil
+      return
+    }
+    viewModel.clearSelection()
   }
 
   private func forceReloadPolicyPipeline() async {

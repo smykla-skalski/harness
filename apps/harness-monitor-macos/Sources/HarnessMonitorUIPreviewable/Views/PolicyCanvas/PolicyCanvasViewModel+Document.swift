@@ -114,6 +114,60 @@ extension PolicyCanvasViewModel {
     load(document: document, simulation: simulation, audit: audit)
   }
 
+  /// Capture the editable graph (nodes, groups, edges, selection, latest
+  /// simulation) into a value-typed snapshot. Callers stash the result before
+  /// any daemon round-trip that might reject the export, then call
+  /// `restoreState(_:)` on rejection so in-memory state never silently diverges
+  /// from the saved `backingDocument`. The snapshot intentionally omits
+  /// viewport-side state (zoom, `viewportDirty`) and document-side dirty flags
+  /// — see `PolicyCanvasSnapshot` for the membership contract.
+  ///
+  /// Side effect: clears `highlightedInput` / `highlightedGroupID` so a port or
+  /// group drag that was in flight when the round-trip starts does not leave
+  /// stale tints lit across the daemon await. Transient gesture state is
+  /// view-local and never part of the saved pipeline, so dropping it here
+  /// matches the round-trip boundary semantics.
+  func snapshotState() -> PolicyCanvasSnapshot {
+    clearTransientGestureState()
+    return PolicyCanvasSnapshot(
+      nodes: nodes,
+      groups: groups,
+      edges: edges,
+      selection: selection,
+      latestSimulation: latestSimulation
+    )
+  }
+
+  /// Replace the editable graph with a previously captured snapshot. Used by
+  /// save/simulate/promote rejection paths to roll local state back to the
+  /// pre-attempt graph. The default `markDirty: true` keeps the rejection-path
+  /// contract: a follow-up retry will still consider the local copy dirty so
+  /// the user can resave; clearing dirty there would leave the view in a
+  /// "clean but unsynced" state if the daemon rejects the same payload again.
+  /// Pass `markDirty: false` for "discard local edits" flows where the caller
+  /// has separately validated that the restored snapshot matches what the
+  /// daemon believes is the truth.
+  ///
+  /// The `reason` parameter funnels the human-readable status string through a
+  /// single notify call, so callers do not need to second-write `statusLine`
+  /// afterward — the second write wins by ordering luck and creates a
+  /// distinct-message-per-event mismatch (save reject vs. simulate reject).
+  func restoreState(
+    _ snapshot: PolicyCanvasSnapshot,
+    markDirty: Bool = true,
+    reason: String = "Save rejected, restored previous canvas"
+  ) {
+    nodes = snapshot.nodes
+    groups = snapshot.groups
+    edges = snapshot.edges
+    selection = snapshot.selection
+    latestSimulation = snapshot.latestSimulation
+    reconcileGroupFrames()
+    documentDirty = markDirty
+    clearTransientGestureState()
+    notifyStatus(reason)
+  }
+
   func exportDocument() -> TaskBoardPolicyPipelineDocument {
     reconcileGroupFrames()
     let originalNodeKinds =

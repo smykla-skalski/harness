@@ -221,6 +221,21 @@ enum PolicyCanvasSelection: Hashable {
   case edge(String)
 }
 
+/// Identifier for the inspector text field that currently owns keyboard focus.
+/// `PolicyCanvasView` holds a `@FocusState<PolicyCanvasFocusedField?>` and
+/// gates the canvas-wide Delete/Backspace/Escape shortcut buttons on
+/// `focusedField == nil` — without that gate the shortcut buttons fire while
+/// the user is still typing in a TextField (e.g. Escape clears selection
+/// mid-rename, Delete deletes the selected node from the canvas instead of
+/// the character in the field).
+enum PolicyCanvasFocusedField: Hashable {
+  case nodeTitle
+  case groupTitle
+  case edgeLabel
+  case reasonCode
+  case ruleID
+}
+
 struct PolicyCanvasDeletionRequest: Identifiable, Equatable {
   let selection: PolicyCanvasSelection
   let title: String
@@ -228,6 +243,32 @@ struct PolicyCanvasDeletionRequest: Identifiable, Equatable {
   let confirmationTitle: String
 
   var id: PolicyCanvasSelection { selection }
+}
+
+/// Value-typed snapshot of the editable canvas graph (nodes, groups, edges,
+/// selection, latest simulation). Captured by
+/// `PolicyCanvasViewModel.snapshotState()` before any daemon round-trip that
+/// might reject the export, and re-applied via `restoreState(_:)` on rejection
+/// so local state never silently diverges from `backingDocument`.
+///
+/// Snapshot membership is intentionally narrow: zoom and viewport-dirty state
+/// belong to `viewportDirty` (window-scoped) and stay outside this struct so
+/// rollback never resets the user's pan or zoom. `documentDirty` is also
+/// excluded — `restoreState(_:markDirty:reason:)` lets the caller decide
+/// whether the restored state should be dirty (default `true` for retry flows,
+/// `false` for "discard local edits" flows).
+///
+/// `latestSimulation` is captured so a save-reject + rollback restores the
+/// validation panel to the pre-attempt simulation; without it, the daemon's
+/// failed-simulation issues stay attached to a graph shape that no longer
+/// matches them (e.g. an issue references an edge id that has been rolled
+/// back out of `edges`).
+struct PolicyCanvasSnapshot {
+  let nodes: [PolicyCanvasNode]
+  let groups: [PolicyCanvasGroup]
+  let edges: [PolicyCanvasEdge]
+  let selection: PolicyCanvasSelection?
+  let latestSimulation: TaskBoardPolicyPipelineSimulationResult?
 }
 
 enum PolicyCanvasLayout {
