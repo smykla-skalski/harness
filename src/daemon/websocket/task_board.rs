@@ -88,7 +88,7 @@ fn dispatch_task_board_create(request: &WsRequest) -> WsResponse {
 }
 
 fn dispatch_task_board_list(request: &WsRequest) -> WsResponse {
-    let Ok(body) = parse_params::<TaskBoardListItemsRequest>(request) else {
+    let Ok(body) = parse_params_or_default::<TaskBoardListItemsRequest>(request) else {
         return invalid_params(request);
     };
     dispatch_query_result(&request.id, service::list_task_board_items(&body))
@@ -177,7 +177,7 @@ async fn dispatch_task_board_evaluate(request: &WsRequest, state: &DaemonHttpSta
 }
 
 fn dispatch_task_board_audit(request: &WsRequest) -> WsResponse {
-    let Ok(body) = parse_params::<TaskBoardAuditRequest>(request) else {
+    let Ok(body) = parse_params_or_default::<TaskBoardAuditRequest>(request) else {
         return invalid_params(request);
     };
     dispatch_query_result(&request.id, service::audit_task_board(&body))
