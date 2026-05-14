@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use clap::{Args, Subcommand};
 use serde::Serialize;
+use tokio::runtime::Builder as TokioRuntimeBuilder;
 use uuid::Uuid;
 
 use crate::app::command_context::{AppContext, Execute};
@@ -340,7 +341,7 @@ pub(super) fn print_json<T: Serialize>(value: &T) -> Result<(), CliError> {
 pub(super) fn run_blocking<T>(
     future: impl Future<Output = Result<T, CliError>>,
 ) -> Result<T, CliError> {
-    tokio::runtime::Builder::new_current_thread()
+    TokioRuntimeBuilder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|error| CliErrorKind::workflow_io(format!("create task-board runtime: {error}")))?

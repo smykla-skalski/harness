@@ -55,8 +55,16 @@ struct SessionWindowOverview: View {
         TaskBoardOverviewView(
           snapshot: taskBoardSnapshot,
           taskBoardItems: linkedTaskBoardItems,
+          orchestratorStatus: store.contentUI.dashboard.taskBoardOrchestratorStatus,
+          evaluationSummary: store.contentUI.dashboard.taskBoardEvaluationSummary,
+          isActionInFlight: store.contentUI.dashboard.isBusy,
           onOpenItem: openTaskActions,
-          onOpenTaskBoardItem: openTaskBoardItem
+          onOpenTaskBoardItem: openTaskBoardItem,
+          onEvaluateTaskBoard: evaluateTaskBoard,
+          onRefreshTaskBoard: refreshTaskBoard,
+          onStartTaskBoardOrchestrator: startTaskBoardOrchestrator,
+          onStopTaskBoardOrchestrator: stopTaskBoardOrchestrator,
+          onRunTaskBoardOrchestratorOnce: runTaskBoardOrchestratorOnce
         )
       }
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -137,6 +145,36 @@ struct SessionWindowOverview: View {
       sessionID: snapshot.summary.sessionId,
       taskID: workItemId
     )
+  }
+
+  private func evaluateTaskBoard() {
+    Task { @MainActor in
+      await store.evaluateTaskBoard()
+    }
+  }
+
+  private func refreshTaskBoard() {
+    Task { @MainActor in
+      await store.refreshTaskBoardDashboard()
+    }
+  }
+
+  private func startTaskBoardOrchestrator() {
+    Task { @MainActor in
+      await store.startTaskBoardOrchestrator()
+    }
+  }
+
+  private func stopTaskBoardOrchestrator() {
+    Task { @MainActor in
+      await store.stopTaskBoardOrchestrator()
+    }
+  }
+
+  private func runTaskBoardOrchestratorOnce(_ request: TaskBoardOrchestratorRunOnceRequest) {
+    Task { @MainActor in
+      await store.runTaskBoardOrchestratorOnce(request: request)
+    }
   }
 }
 

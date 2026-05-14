@@ -210,6 +210,8 @@ struct WebSocketProtocolTests {
     #expect(WebSocketRPCMethod.taskBoardDispatch.rawValue == "task_board.dispatch")
     #expect(WebSocketRPCMethod.taskBoardEvaluate.rawValue == "task_board.evaluate")
     #expect(WebSocketRPCMethod.taskBoardAudit.rawValue == "task_board.audit")
+    #expect(WebSocketRPCMethod.taskBoardProjects.rawValue == "task_board.projects")
+    #expect(WebSocketRPCMethod.taskBoardMachines.rawValue == "task_board.machines")
     #expect(
       WebSocketRPCMethod.taskBoardOrchestratorStatus.rawValue
         == "task_board.orchestrator_status"
@@ -229,6 +231,26 @@ struct WebSocketProtocolTests {
     #expect(
       WebSocketRPCMethod.taskBoardOrchestratorSettingsUpdate.rawValue
         == "task_board.orchestrator_settings_update"
+    )
+    #expect(
+      WebSocketRPCMethod.taskBoardPolicyPipelineGet.rawValue
+        == "task_board.policy_pipeline_get"
+    )
+    #expect(
+      WebSocketRPCMethod.taskBoardPolicyPipelineSaveDraft.rawValue
+        == "task_board.policy_pipeline_save_draft"
+    )
+    #expect(
+      WebSocketRPCMethod.taskBoardPolicyPipelineSimulate.rawValue
+        == "task_board.policy_pipeline_simulate"
+    )
+    #expect(
+      WebSocketRPCMethod.taskBoardPolicyPipelinePromote.rawValue
+        == "task_board.policy_pipeline_promote"
+    )
+    #expect(
+      WebSocketRPCMethod.taskBoardPolicyPipelineAudit.rawValue
+        == "task_board.policy_pipeline_audit"
     )
     #expect(WebSocketRPCMethod.taskSubmitForReview.rawValue == "task.submit_for_review")
     #expect(WebSocketRPCMethod.taskClaimReview.rawValue == "task.claim_review")

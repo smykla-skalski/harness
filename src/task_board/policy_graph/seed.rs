@@ -354,6 +354,8 @@ fn group(id: &str, label: &str, node_ids: Vec<&str>) -> PolicyGraphGroup {
     PolicyGraphGroup {
         id: id.to_string(),
         label: label.to_string(),
+        color: None,
+        frame: super::PolicyCanvasRect::default(),
         node_ids: node_ids.into_iter().map(str::to_string).collect(),
     }
 }
@@ -417,7 +419,7 @@ fn merge_trace_for(decision: &PolicyDecision) -> Vec<&'static str> {
         PolicyReasonCode::MissingMergeEvidence => trace.push("human:missing-merge-evidence"),
         PolicyReasonCode::ProtectedPathTouched => trace.push("consensus:protected-path"),
         PolicyReasonCode::RiskAboveThreshold => {
-            trace.extend(["risk:merge", "dry_run:high-risk-merge"])
+            trace.extend(["risk:merge", "dry_run:high-risk-merge"]);
         }
         PolicyReasonCode::AutoMergeAllowed => trace.extend(["risk:merge", "supervisor:auto-merge"]),
         _ => trace.push("supervisor:merge-deny"),

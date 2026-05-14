@@ -168,6 +168,9 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       clearProjectDir: Bool,
       clearDispatchStatusFilter: Bool
     )
+    case saveTaskBoardPolicyPipelineDraft(revision: UInt64)
+    case simulateTaskBoardPolicyPipeline
+    case promoteTaskBoardPolicyPipeline(revision: UInt64)
     case updateTaskQueuePolicy(
       sessionID: String,
       taskID: String,
@@ -196,6 +199,8 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     case codexTranscript(String)
     case taskBoardOrchestratorStatus
     case taskBoardOrchestratorSettings
+    case taskBoardPolicyPipeline
+    case taskBoardPolicyPipelineAudit
   }
 
   let lock = NSLock()

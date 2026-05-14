@@ -5,6 +5,7 @@ struct SessionsBoardView: View {
   let store: HarnessMonitorStore
   let sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
+  @State private var selectedSurface: SessionsBoardSurface = .taskBoard
 
   init(
     store: HarnessMonitorStore,
@@ -17,6 +18,41 @@ struct SessionsBoardView: View {
   }
 
   var body: some View {
+    VStack(spacing: 0) {
+      Picker("Dashboard surface", selection: $selectedSurface) {
+        ForEach(SessionsBoardSurface.allCases) { surface in
+          Text(surface.title).tag(surface)
+        }
+      }
+      .pickerStyle(.segmented)
+      .frame(width: 300)
+      .padding(.horizontal, 24)
+      .padding(.vertical, 12)
+      .frame(maxWidth: .infinity, alignment: .leading)
+
+      switch selectedSurface {
+      case .taskBoard:
+        taskBoardSurface
+      case .policyCanvas:
+        PolicyCanvasView(store: store, dashboardUI: dashboardUI)
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+      }
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionsBoardRoot)
+    .task {
+      HarnessMonitorUITestTrace.record(
+        component: "sessions.board",
+        event: "mounted",
+        details: [
+          "recent_session_count": String(sessionCatalog.recentSessions.count),
+          "selected_session_id": store.selectedSessionID ?? "nil",
+        ]
+      )
+    }
+  }
+
+  private var taskBoardSurface: some View {
     HarnessMonitorColumnScrollView(
       horizontalPadding: 24,
       verticalPadding: 24,
@@ -40,7 +76,10 @@ struct SessionsBoardView: View {
           onOpenTaskBoardItem: openTaskBoardItem,
           onOpenDecision: openDecision,
           onEvaluateTaskBoard: evaluateTaskBoard,
-          onRefreshTaskBoard: refreshTaskBoard
+          onRefreshTaskBoard: refreshTaskBoard,
+          onStartTaskBoardOrchestrator: startTaskBoardOrchestrator,
+          onStopTaskBoardOrchestrator: stopTaskBoardOrchestrator,
+          onRunTaskBoardOrchestratorOnce: runTaskBoardOrchestratorOnce
         )
         SessionsBoardRecentSessionsSection(
           store: store,
@@ -49,24 +88,10 @@ struct SessionsBoardView: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionsBoardRoot)
-    .task {
-      HarnessMonitorUITestTrace.record(
-        component: "sessions.board",
-        event: "mounted",
-        details: [
-          "recent_session_count": String(sessionCatalog.recentSessions.count),
-          "selected_session_id": store.selectedSessionID ?? "nil",
-        ]
-      )
-    }
   }
 
   private func openTaskBoardItem(_ item: TaskBoardItem) {
-    guard let sessionID = item.sessionId else {
-      return
-    }
+    guard let sessionID = item.sessionId else { return }
     Task { @MainActor in
       await store.selectSession(sessionID)
       if let workItemID = item.workItemId {
@@ -97,4 +122,38 @@ struct SessionsBoardView: View {
     }
   }
 
+  private func startTaskBoardOrchestrator() {
+    Task { @MainActor in
+      await store.startTaskBoardOrchestrator()
+    }
+  }
+
+  private func stopTaskBoardOrchestrator() {
+    Task { @MainActor in
+      await store.stopTaskBoardOrchestrator()
+    }
+  }
+
+  private func runTaskBoardOrchestratorOnce(_ request: TaskBoardOrchestratorRunOnceRequest) {
+    Task { @MainActor in
+      await store.runTaskBoardOrchestratorOnce(request: request)
+    }
+  }
+
+}
+
+private enum SessionsBoardSurface: String, CaseIterable, Identifiable {
+  case taskBoard
+  case policyCanvas
+
+  var id: String { rawValue }
+
+  var title: String {
+    switch self {
+    case .taskBoard:
+      "Task Board"
+    case .policyCanvas:
+      "Policy Canvas"
+    }
+  }
 }

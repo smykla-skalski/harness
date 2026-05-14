@@ -6,6 +6,7 @@ use crate::daemon::protocol::{
 };
 use crate::daemon::service;
 use crate::errors::CliError;
+use crate::task_board::TaskBoardOrchestratorStatus;
 use crate::task_board::types::TaskBoardStatus;
 
 use super::print_json;
@@ -156,10 +157,7 @@ fn dry_run_override(dry_run: bool, apply: bool) -> Option<bool> {
     }
 }
 
-fn print_status(
-    status: &crate::task_board::TaskBoardOrchestratorStatus,
-    json: bool,
-) -> Result<i32, CliError> {
+fn print_status(status: &TaskBoardOrchestratorStatus, json: bool) -> Result<i32, CliError> {
     if json {
         print_json(status)?;
     } else {

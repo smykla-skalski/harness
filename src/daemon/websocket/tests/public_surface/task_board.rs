@@ -114,6 +114,92 @@ fn websocket_task_board_dispatch_evaluate_and_run_once_use_real_state() {
     });
 }
 
+#[test]
+fn websocket_task_board_policy_pipeline_routes_round_trip() {
+    let sandbox = tempdir().expect("tempdir");
+    with_isolated_harness_env(sandbox.path(), || {
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(async {
+            let state =
+                test_websocket_state_with_empty_async_db(&sandbox.path().join("daemon.sqlite"))
+                    .await;
+            let connection = Arc::new(Mutex::new(ConnectionState::new()));
+
+            let get_response = dispatch(
+                &request(
+                    "req-policy-get",
+                    ws_methods::TASK_BOARD_POLICY_PIPELINE_GET,
+                    json!({}),
+                ),
+                &state,
+                &connection,
+            )
+            .await;
+            let pipeline = response_result(&get_response);
+            assert_eq!(pipeline["schema_version"].as_u64(), Some(2));
+
+            let save_response = dispatch(
+                &request(
+                    "req-policy-save",
+                    ws_methods::TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT,
+                    json!({ "document": pipeline.clone() }),
+                ),
+                &state,
+                &connection,
+            )
+            .await;
+            let save = response_result(&save_response);
+            let saved_revision = save["document"]["revision"]
+                .as_u64()
+                .expect("saved revision");
+
+            let simulation_response = dispatch(
+                &request(
+                    "req-policy-simulate",
+                    ws_methods::TASK_BOARD_POLICY_PIPELINE_SIMULATE,
+                    json!({ "document": save["document"].clone() }),
+                ),
+                &state,
+                &connection,
+            )
+            .await;
+            let simulation = response_result(&simulation_response);
+            assert_eq!(simulation["revision"].as_u64(), Some(saved_revision));
+            assert_eq!(simulation["succeeded"].as_bool(), Some(true));
+
+            let promote_response = dispatch(
+                &request(
+                    "req-policy-promote",
+                    ws_methods::TASK_BOARD_POLICY_PIPELINE_PROMOTE,
+                    json!({ "revision": saved_revision }),
+                ),
+                &state,
+                &connection,
+            )
+            .await;
+            let promote = response_result(&promote_response);
+            assert_eq!(promote["document"]["mode"].as_str(), Some("enforced"));
+
+            let audit_response = dispatch(
+                &request(
+                    "req-policy-audit",
+                    ws_methods::TASK_BOARD_POLICY_PIPELINE_AUDIT,
+                    json!({}),
+                ),
+                &state,
+                &connection,
+            )
+            .await;
+            let audit = response_result(&audit_response);
+            assert_eq!(audit["active_revision"].as_u64(), Some(saved_revision));
+            assert_eq!(
+                audit["latest_simulation"]["revision"].as_u64(),
+                Some(saved_revision)
+            );
+        });
+    });
+}
+
 async fn join_leader(
     state: &crate::daemon::http::DaemonHttpState,
     session_id: &str,

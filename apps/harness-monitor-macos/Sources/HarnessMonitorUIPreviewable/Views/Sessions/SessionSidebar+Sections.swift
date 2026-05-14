@@ -94,7 +94,7 @@ struct SessionSidebarCreateButtonShortcutOverlays: View {
 
 extension SessionSidebar {
   var routeSection: some View {
-    ForEach([SessionWindowRoute.overview, .timeline, .agents, .decisions]) { route in
+    ForEach([SessionWindowRoute.overview, .policyCanvas, .timeline, .agents, .decisions]) { route in
       let selection = SessionSelection.route(route)
       SessionSidebarRow(
         title: route.title,

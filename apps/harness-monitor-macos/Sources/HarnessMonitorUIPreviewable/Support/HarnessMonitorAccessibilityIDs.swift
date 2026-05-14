@@ -324,6 +324,40 @@ public enum HarnessMonitorAccessibility {
   public static let settingsAuthorizedFoldersEmpty =
     "harness.settings.authorized-folders.empty"
 
+  public static let policyCanvasRoot = "harness.policy-canvas.root"
+  public static let policyCanvasViewport = "harness.policy-canvas.viewport"
+  public static let policyCanvasTabs = "harness.policy-canvas.tabs"
+  public static let policyCanvasToolRail = "harness.policy-canvas.tool-rail"
+  public static let policyCanvasSaveButton = "harness.policy-canvas.action.save"
+  public static let policyCanvasSimulateButton = "harness.policy-canvas.action.simulate"
+  public static let policyCanvasPromoteButton = "harness.policy-canvas.action.promote"
+  public static let policyCanvasZoomControls = "harness.policy-canvas.zoom"
+  public static let policyCanvasZoomOutButton = "harness.policy-canvas.zoom.out"
+  public static let policyCanvasZoomInButton = "harness.policy-canvas.zoom.in"
+  public static let policyCanvasZoomResetButton = "harness.policy-canvas.zoom.reset"
+  public static let policyCanvasZoomValue = "harness.policy-canvas.zoom.value"
+  public static let policyCanvasInspector = "harness.policy-canvas.inspector"
+
+  public static func policyCanvasNode(_ nodeID: String) -> String {
+    "harness.policy-canvas.node.\(slug(nodeID))"
+  }
+
+  public static func policyCanvasGroup(_ groupID: String) -> String {
+    "harness.policy-canvas.group.\(slug(groupID))"
+  }
+
+  public static func policyCanvasPort(_ nodeID: String, _ portID: String) -> String {
+    "\(policyCanvasNode(nodeID)).port.\(slug(portID))"
+  }
+
+  public static func policyCanvasEdge(_ edgeID: String) -> String {
+    "harness.policy-canvas.edge.\(slug(edgeID))"
+  }
+
+  public static func policyCanvasPaletteItem(_ kind: String) -> String {
+    "harness.policy-canvas.palette.\(slug(kind))"
+  }
+
   public static func settingsAuthorizedFolderRow(_ id: String) -> String {
     "harness.settings.authorized-folders.row.\(id)"
   }

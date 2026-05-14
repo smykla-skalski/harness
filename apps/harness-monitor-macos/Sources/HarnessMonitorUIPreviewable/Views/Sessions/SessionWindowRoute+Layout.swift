@@ -6,7 +6,7 @@ enum SessionWindowRouteLayoutStyle {
 extension SessionWindowRoute {
   var layoutStyle: SessionWindowRouteLayoutStyle {
     switch self {
-    case .overview, .timeline:
+    case .overview, .policyCanvas, .timeline:
       .sidebarDetail
     case .agents, .tasks, .decisions:
       .sidebarContentDetail

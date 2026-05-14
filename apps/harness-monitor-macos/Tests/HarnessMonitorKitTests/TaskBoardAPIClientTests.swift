@@ -127,6 +127,8 @@ struct TaskBoardAPIClientTests {
         policyVersion: "task-board-policy-v3"
       )
     )
+    _ = try await client.taskBoardProjects(status: .todo)
+    _ = try await client.taskBoardMachines(status: .todo)
 
     return TaskBoardHTTPContractResult(
       dispatch: dispatch,
@@ -142,7 +144,7 @@ struct TaskBoardAPIClientTests {
       records.map(\.method)
         == [
           "GET", "GET", "POST", "PUT", "DELETE", "POST", "POST", "POST", "GET", "GET", "POST",
-          "POST", "POST", "GET", "PUT",
+          "POST", "POST", "GET", "PUT", "GET", "GET",
         ]
     )
     #expect(
@@ -163,6 +165,8 @@ struct TaskBoardAPIClientTests {
           "/v1/task-board/orchestrator/run-once",
           "/v1/task-board/orchestrator/settings",
           "/v1/task-board/orchestrator/settings",
+          "/v1/task-board/projects",
+          "/v1/task-board/machines",
         ]
     )
   }
@@ -201,6 +205,8 @@ struct TaskBoardAPIClientTests {
     let enabledAutomations = githubProject?["enabled_automations"] as? [String: Any]
     #expect(enabledAutomations?["enabled"] as? [String] == ["sync_task_board", "auto_merge"])
     #expect(records[14].body?["policy_version"] as? String == "task-board-policy-v3")
+    #expect(records[15].query == "status=todo")
+    #expect(records[16].query == "status=todo")
   }
 
   private func assertHTTPClientResults(_ result: TaskBoardHTTPContractResult) {
@@ -274,6 +280,8 @@ struct TaskBoardAPIClientTests {
         policyVersion: "task-board-policy-v3"
       )
     )
+    _ = try await transport.taskBoardProjects(status: .todo)
+    _ = try await transport.taskBoardMachines(status: .todo)
 
     let calls = await probe.calls
     return TaskBoardWebSocketContractResult(
@@ -304,6 +312,8 @@ struct TaskBoardAPIClientTests {
           .taskBoardOrchestratorRunOnce,
           .taskBoardOrchestratorSettingsGet,
           .taskBoardOrchestratorSettingsUpdate,
+          .taskBoardProjects,
+          .taskBoardMachines,
         ]
     )
   }
@@ -344,6 +354,8 @@ struct TaskBoardAPIClientTests {
       Issue.record("Expected github_project object in websocket settings update")
     }
     #expect(objectValue(calls[14].params, key: "policy_version") == .string("task-board-policy-v3"))
+    #expect(objectValue(calls[15].params, key: "status") == .string("todo"))
+    #expect(objectValue(calls[16].params, key: "status") == .string("todo"))
   }
 
   private func assertWebSocketResults(_ result: TaskBoardWebSocketContractResult) {

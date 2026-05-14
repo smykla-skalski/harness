@@ -7,6 +7,7 @@ use super::policy::{
     PolicyInput, PolicyReasonCode, TASK_BOARD_POLICY_VERSION,
 };
 
+mod evaluation;
 mod seed;
 mod store;
 mod validation;
@@ -154,30 +155,35 @@ pub struct PolicyGraphEdge {
     pub condition: PolicyGraphEdgeCondition,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "condition", rename_all = "snake_case")]
 pub enum PolicyGraphEdgeCondition {
+    #[default]
     Always,
-    ActionIn { actions: Vec<PolicyAction> },
+    ActionIn {
+        actions: Vec<PolicyAction>,
+    },
     EvidencePass,
-    EvidenceFailure { reason_code: PolicyReasonCode },
-    EvidenceConsensus { reason_code: PolicyReasonCode },
+    EvidenceFailure {
+        reason_code: PolicyReasonCode,
+    },
+    EvidenceConsensus {
+        reason_code: PolicyReasonCode,
+    },
     EvidenceMissing,
     RiskHigh,
     RiskLowOrEqual,
     RiskMissing,
 }
 
-impl Default for PolicyGraphEdgeCondition {
-    fn default() -> Self {
-        Self::Always
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolicyGraphGroup {
     pub id: String,
     pub label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    #[serde(default)]
+    pub frame: PolicyCanvasRect,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub node_ids: Vec<String>,
 }
@@ -316,10 +322,14 @@ impl PolicyGraph {
 
     #[must_use]
     pub fn simulate(&self, input: &PolicyInput) -> PolicyGraphSimulation {
-        let decision = BuiltInPolicyGate::new(self.auto_merge_risk_threshold()).evaluate(input);
+        let (decision, visited_node_ids) = self.evaluate_graph(input).unwrap_or_else(|| {
+            let decision = BuiltInPolicyGate::new(self.auto_merge_risk_threshold()).evaluate(input);
+            let visited_node_ids = seed::trace_for(self, input, &decision);
+            (decision, visited_node_ids)
+        });
         PolicyGraphSimulation {
             mode: self.mode,
-            visited_node_ids: seed::trace_for(self, input, &decision),
+            visited_node_ids,
             policy_trace_ids: self.policy_trace_ids.clone(),
             decision,
         }

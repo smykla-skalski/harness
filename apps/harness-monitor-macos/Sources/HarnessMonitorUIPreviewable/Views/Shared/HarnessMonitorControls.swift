@@ -243,6 +243,10 @@ extension View {
     buttonStyle(HarnessMonitorFlatActionButtonStyle(tint: tint))
   }
 
+  public func harnessPlainButtonStyle() -> some View {
+    buttonStyle(.plain)
+  }
+
   public func harnessFilterChipButtonStyle(isSelected: Bool) -> some View {
     modifier(HarnessMonitorFilterChipStyle(isSelected: isSelected))
   }
