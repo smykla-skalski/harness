@@ -347,6 +347,15 @@ public enum HarnessMonitorAccessibility {
   public static let policyCanvasPromoteDisabledReason =
     "harness.policy-canvas.action.promote.reason"
   public static let policyCanvasEmptyState = "harness.policy-canvas.empty-state"
+  public static let policyCanvasSearchPalette = "harness.policy-canvas.search.palette"
+  public static let policyCanvasSearchField = "harness.policy-canvas.search.field"
+  public static let policyCanvasSearchDismissButton = "harness.policy-canvas.search.dismiss"
+  public static let policyCanvasSearchEmptyHint = "harness.policy-canvas.search.empty"
+  public static let policyCanvasSearchNoMatch = "harness.policy-canvas.search.no-match"
+
+  public static func policyCanvasSearchResult(_ hitID: String) -> String {
+    "harness.policy-canvas.search.result.\(slug(hitID))"
+  }
 
   public static func policyCanvasInspectorField(_ fieldID: String) -> String {
     "harness.policy-canvas.inspector.\(slug(fieldID))"
