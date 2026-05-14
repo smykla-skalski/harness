@@ -24,7 +24,8 @@ extension SessionWindowFlowTests {
     #expect(source.contains(".searchFocused(isFocused)"))
     #expect(!source.contains("isPresented: $isSearchPresented"))
     #expect(source.contains("ZStack(alignment: .topTrailing)"))
-    #expect(source.contains("suggestionRows: suggestionSnapshot.rows"))
+    #expect(source.contains("suggestionRows: visibleSuggestionRows"))
+    #expect(source.contains("HarnessMonitorPerfIsolation.disablesSearchSuggestions"))
     #expect(source.contains("@State private var suggestionSnapshot"))
     #expect(
       source.contains("updateSuggestionSnapshot(AppSearchSuggestionSnapshot(results: results))")

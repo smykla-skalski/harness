@@ -75,7 +75,7 @@ public struct AppSearchHost: View {
       AppSearchFieldSurface(
         query: $query,
         prompt: prompt,
-        suggestionRows: suggestionSnapshot.rows,
+        suggestionRows: visibleSuggestionRows,
         isFocused: $isSearchFocused,
         isEnabled: isEnabled,
         onSubmit: submitSearch
@@ -124,6 +124,10 @@ public struct AppSearchHost: View {
     )
   }
 
+  private var visibleSuggestionRows: [AppSearchSuggestionRow] {
+    HarnessMonitorPerfIsolation.disablesSearchSuggestions ? [] : suggestionSnapshot.rows
+  }
+
   private func focusSearchField() {
     guard isEnabled else { return }
     guard !isSearchFocused else { return }
@@ -151,6 +155,11 @@ public struct AppSearchHost: View {
     let oldTrimmed = oldValue.trimmingCharacters(in: .whitespacesAndNewlines)
     let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
     guard trimmed != oldTrimmed else { return }
+    HarnessMonitorPerfTrace.recordScenarioEvent(
+      component: "perf.search",
+      event: "query.write",
+      details: ["characters": String(trimmed.count)]
+    )
     guard let hit = suggestionSnapshot.hit(matchingDisplayTitle: trimmed) else { return }
     handleHit(hit)
   }
@@ -229,6 +238,16 @@ public struct AppSearchHost: View {
 
   private func updateSuggestionSnapshot(_ snapshot: AppSearchSuggestionSnapshot) {
     guard suggestionSnapshot != snapshot else { return }
+    HarnessMonitorPerfTrace.recordScenarioEvent(
+      component: "perf.search",
+      event: "suggestions.update",
+      details: [
+        "rows": String(snapshot.rows.count),
+        "visible_rows": String(
+          HarnessMonitorPerfIsolation.disablesSearchSuggestions ? 0 : snapshot.rows.count
+        ),
+      ]
+    )
     suggestionSnapshot = snapshot
   }
 

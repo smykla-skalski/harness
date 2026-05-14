@@ -271,46 +271,50 @@ extension SessionWindowView {
     snapshot: HarnessMonitorSessionWindowSnapshot,
     route: SessionWindowRoute
   ) -> some View {
-    switch route {
-    case .overview:
-      SessionWindowOverview(
-        store: store,
-        snapshot: snapshot,
-        tuiStatusByAgent: store.contentUI.sessionDetail.tuiStatusByAgent
-      )
-    case .agents:
-      SessionWindowAgentsList(
-        store: store,
-        snapshot: snapshot,
-        tuiStatusByAgent: store.contentUI.sessionDetail.tuiStatusByAgent,
-        currentModifiers: presentedModifiers,
-        state: stateCache
-      )
-    case .tasks:
-      SessionWindowTasksList(
-        store: store,
-        detail: snapshot.detail,
-        decisions: matchingDecisions,
-        currentModifiers: presentedModifiers,
-        state: stateCache
-      )
-    case .decisions:
-      SessionWindowDecisionsList(
-        decisions: matchingDecisions,
-        currentModifiers: presentedModifiers,
-        state: stateCache
-      )
-    case .timeline:
-      SessionTimelineView(
-        style: .routePage,
-        host: .session(snapshot.summary.sessionId),
-        timeline: snapshot.timeline,
-        timelineWindow: snapshot.timelineWindow,
-        decisions: matchingDecisions,
-        isTimelineLoading: isLoading,
-        store: store,
-        timelineLoading: sessionTimelineLoading
-      )
+    if HarnessMonitorPerfIsolation.usesStaticDetail {
+      SessionPerfStaticDetailSurface(route: route, selection: stateCache.selection)
+    } else {
+      switch route {
+      case .overview:
+        SessionWindowOverview(
+          store: store,
+          snapshot: snapshot,
+          tuiStatusByAgent: store.contentUI.sessionDetail.tuiStatusByAgent
+        )
+      case .agents:
+        SessionWindowAgentsList(
+          store: store,
+          snapshot: snapshot,
+          tuiStatusByAgent: store.contentUI.sessionDetail.tuiStatusByAgent,
+          currentModifiers: presentedModifiers,
+          state: stateCache
+        )
+      case .tasks:
+        SessionWindowTasksList(
+          store: store,
+          detail: snapshot.detail,
+          decisions: matchingDecisions,
+          currentModifiers: presentedModifiers,
+          state: stateCache
+        )
+      case .decisions:
+        SessionWindowDecisionsList(
+          decisions: matchingDecisions,
+          currentModifiers: presentedModifiers,
+          state: stateCache
+        )
+      case .timeline:
+        SessionTimelineView(
+          style: .routePage,
+          host: .session(snapshot.summary.sessionId),
+          timeline: snapshot.timeline,
+          timelineWindow: snapshot.timelineWindow,
+          decisions: matchingDecisions,
+          isTimelineLoading: isLoading,
+          store: store,
+          timelineLoading: sessionTimelineLoading
+        )
+      }
     }
   }
 

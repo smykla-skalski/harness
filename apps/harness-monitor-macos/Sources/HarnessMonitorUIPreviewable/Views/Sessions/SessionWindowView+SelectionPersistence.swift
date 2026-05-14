@@ -21,7 +21,7 @@ extension SessionWindowView {
   }
 
   func syncPersistedStorage(from selection: SessionSelection) {
-    guard !HarnessMonitorUITestEnvironment.isPerfScenarioActive else {
+    guard HarnessMonitorPerfIsolation.allowsSceneRestorationWrites else {
       return
     }
     let targetRoute: SessionWindowRoute
@@ -50,7 +50,7 @@ extension SessionWindowView {
   }
 
   func clearPersistedDecisionQueryIfNeeded() {
-    guard !HarnessMonitorUITestEnvironment.isPerfScenarioActive else {
+    guard HarnessMonitorPerfIsolation.allowsSceneRestorationWrites else {
       return
     }
     if !persistedDecisionQuery.isEmpty {
@@ -60,9 +60,19 @@ extension SessionWindowView {
 
   private func updatePersistedSelection(route: SessionWindowRoute, decisionID: String) {
     if persistedRoute != route {
+      HarnessMonitorPerfTrace.recordScenarioEvent(
+        component: "perf.scene-storage",
+        event: "route.write",
+        details: ["route": route.rawValue]
+      )
       persistedRoute = route
     }
     if persistedDecisionID != decisionID {
+      HarnessMonitorPerfTrace.recordScenarioEvent(
+        component: "perf.scene-storage",
+        event: "selection-decision.write",
+        details: ["has_decision": String(!decisionID.isEmpty)]
+      )
       persistedDecisionID = decisionID
     }
   }

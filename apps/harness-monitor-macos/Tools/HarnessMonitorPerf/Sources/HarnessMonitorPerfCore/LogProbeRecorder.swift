@@ -59,6 +59,10 @@ public enum LogProbeRecorder {
         public var databaseOpenWarnings: Int
         public var appDataPromptHints: Int
         public var duplicateRuntimeClassWarnings: Int
+        public var stateMutationWarnings: Int
+        public var mainThreadCheckerWarnings: Int
+        public var sandboxDenials: Int
+        public var sqliteWarnings: Int
 
         enum CodingKeys: String, CodingKey {
             case swiftUIFrameUpdateWarnings = "swiftui_frame_update_warnings"
@@ -67,6 +71,10 @@ public enum LogProbeRecorder {
             case databaseOpenWarnings = "database_open_warnings"
             case appDataPromptHints = "app_data_prompt_hints"
             case duplicateRuntimeClassWarnings = "duplicate_runtime_class_warnings"
+            case stateMutationWarnings = "state_mutation_warnings"
+            case mainThreadCheckerWarnings = "main_thread_checker_warnings"
+            case sandboxDenials = "sandbox_denials"
+            case sqliteWarnings = "sqlite_warnings"
         }
     }
 
@@ -273,50 +281,7 @@ public enum LogProbeRecorder {
     }
 
     public static func warningSummary(in logText: String) -> WarningSummary {
-        var summary = WarningSummary(
-            swiftUIFrameUpdateWarnings: 0,
-            tableViewReentrantWarnings: 0,
-            attributeGraphCycleWarnings: 0,
-            databaseOpenWarnings: 0,
-            appDataPromptHints: 0,
-            duplicateRuntimeClassWarnings: 0
-        )
-        var sawTableViewReentrancy = false
-        var duplicateRuntimeClasses: Set<String> = []
-        for line in logText.split(separator: "\n", omittingEmptySubsequences: false) {
-            let lowercased = line.lowercased()
-            if lowercased.contains("multiple times per frame") {
-                summary.swiftUIFrameUpdateWarnings += 1
-            }
-            if lowercased.contains("nstableview delegate")
-                || lowercased.contains("reentrant operation") {
-                sawTableViewReentrancy = true
-            }
-            if lowercased.contains("attributegraph: cycle") {
-                summary.attributeGraphCycleWarnings += 1
-            }
-            if lowercased.contains("unable to open database file") {
-                summary.databaseOpenWarnings += 1
-            }
-            if lowercased.contains("would like to access data from other apps")
-                || lowercased.contains("app data") {
-                summary.appDataPromptHints += 1
-            }
-            if let className = duplicateRuntimeClassName(in: String(line)) {
-                duplicateRuntimeClasses.insert(className)
-            }
-        }
-        summary.tableViewReentrantWarnings = sawTableViewReentrancy ? 1 : 0
-        summary.duplicateRuntimeClassWarnings = duplicateRuntimeClasses.count
-        return summary
-    }
-
-    private static func duplicateRuntimeClassName(in line: String) -> String? {
-        guard line.contains(" is implemented in both ") else { return nil }
-        guard let classRange = line.range(of: "Class ") else { return line }
-        let remainder = line[classRange.upperBound...]
-        guard let end = remainder.firstIndex(of: " ") else { return String(remainder) }
-        return String(remainder[..<end])
+        LogWarningClassifier.summary(in: logText)
     }
 
     public static func writeSummary(_ summary: Summary, to url: URL) throws {

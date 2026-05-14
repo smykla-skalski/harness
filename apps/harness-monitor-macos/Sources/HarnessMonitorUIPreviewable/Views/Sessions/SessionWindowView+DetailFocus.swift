@@ -8,88 +8,92 @@ extension SessionWindowView {
 
   @ViewBuilder
   private func detailFocusContent(for selection: SessionSelection) -> some View {
-    switch selection {
-    case .agent(_, let agentID):
-      agentDetailContent(for: agentID)
-    case .route(.agents):
-      SessionRouteAgentDetailFocus(
-        agents: snapshot?.detail?.agents ?? [],
-        state: stateCache,
-        detail: { agentID in
-          agentDetailContent(for: agentID)
-        },
-        empty: { hasQuery in
-          unavailableDetailSurface(
-            hasQuery ? "No Matching Agents" : "No Agents",
-            systemImage: SessionWindowRoute.agents.systemImage,
-            description: Text(
-              hasQuery
-                ? "No agents match the current search."
-                : "This session does not have any agents."
+    if HarnessMonitorPerfIsolation.usesStaticDetail {
+      SessionPerfStaticDetailSurface(route: route(for: selection), selection: selection)
+    } else {
+      switch selection {
+      case .agent(_, let agentID):
+        agentDetailContent(for: agentID)
+      case .route(.agents):
+        SessionRouteAgentDetailFocus(
+          agents: snapshot?.detail?.agents ?? [],
+          state: stateCache,
+          detail: { agentID in
+            agentDetailContent(for: agentID)
+          },
+          empty: { hasQuery in
+            unavailableDetailSurface(
+              hasQuery ? "No Matching Agents" : "No Agents",
+              systemImage: SessionWindowRoute.agents.systemImage,
+              description: Text(
+                hasQuery
+                  ? "No agents match the current search."
+                  : "This session does not have any agents."
+              )
             )
-          )
-        }
-      )
-    case .decision(_, let decisionID):
-      SessionDecisionDetailPane(
-        decision: decisionsByID(sessionDecisionDetail, fallbackID: decisionID),
-        store: store,
-        auditEvents: stateCache.decisionRuntime.auditEvents,
-        auditEventPayloadPresentations: stateCache.decisionRuntime.auditEventPayloadPresentations,
-        observer: sessionDecisionObserver,
-        decisionScope: sessionDecisionScope,
-        selectedTab: decisionDetailTabBinding,
-        filters: stateCache.decisionFilters,
-        showsFilteredNotice: sessionDecisionDetailHiddenByFilters
-      )
-    case .task(_, let taskID):
-      taskDetailContent(for: taskID)
-    case .codexRun(_, let runID):
-      codexRunDetailContent(for: runID)
-    case .create(let draft):
-      SessionWindowCreateForm(
-        store: store,
-        state: stateCache,
-        draft: draft,
-        embedsRuntimeConfiguration: focusMode
-      )
-    case .route(.decisions):
-      SessionDecisionDetailPane(
-        decision: sessionDecisionDetail,
-        store: store,
-        auditEvents: stateCache.decisionRuntime.auditEvents,
-        auditEventPayloadPresentations: stateCache.decisionRuntime.auditEventPayloadPresentations,
-        observer: sessionDecisionObserver,
-        decisionScope: sessionDecisionScope,
-        selectedTab: decisionDetailTabBinding,
-        filters: stateCache.decisionFilters,
-        showsFilteredNotice: sessionDecisionDetailHiddenByFilters
-      )
-    case .route(.tasks):
-      SessionRouteTaskDetailFocus(
-        tasks: snapshot?.detail?.tasks ?? [],
-        state: stateCache,
-        detail: { taskID in
-          taskDetailContent(for: taskID)
-        },
-        empty: { hasQuery in
-          unavailableDetailSurface(
-            hasQuery ? "No Matching Tasks" : "No Tasks",
-            systemImage: SessionWindowRoute.tasks.systemImage,
-            description: Text(
-              hasQuery
-                ? "No tasks match the current search."
-                : "This session does not have any tasks."
+          }
+        )
+      case .decision(_, let decisionID):
+        SessionDecisionDetailPane(
+          decision: decisionsByID(sessionDecisionDetail, fallbackID: decisionID),
+          store: store,
+          auditEvents: stateCache.decisionRuntime.auditEvents,
+          auditEventPayloadPresentations: stateCache.decisionRuntime.auditEventPayloadPresentations,
+          observer: sessionDecisionObserver,
+          decisionScope: sessionDecisionScope,
+          selectedTab: decisionDetailTabBinding,
+          filters: stateCache.decisionFilters,
+          showsFilteredNotice: sessionDecisionDetailHiddenByFilters
+        )
+      case .task(_, let taskID):
+        taskDetailContent(for: taskID)
+      case .codexRun(_, let runID):
+        codexRunDetailContent(for: runID)
+      case .create(let draft):
+        SessionWindowCreateForm(
+          store: store,
+          state: stateCache,
+          draft: draft,
+          embedsRuntimeConfiguration: focusMode
+        )
+      case .route(.decisions):
+        SessionDecisionDetailPane(
+          decision: sessionDecisionDetail,
+          store: store,
+          auditEvents: stateCache.decisionRuntime.auditEvents,
+          auditEventPayloadPresentations: stateCache.decisionRuntime.auditEventPayloadPresentations,
+          observer: sessionDecisionObserver,
+          decisionScope: sessionDecisionScope,
+          selectedTab: decisionDetailTabBinding,
+          filters: stateCache.decisionFilters,
+          showsFilteredNotice: sessionDecisionDetailHiddenByFilters
+        )
+      case .route(.tasks):
+        SessionRouteTaskDetailFocus(
+          tasks: snapshot?.detail?.tasks ?? [],
+          state: stateCache,
+          detail: { taskID in
+            taskDetailContent(for: taskID)
+          },
+          empty: { hasQuery in
+            unavailableDetailSurface(
+              hasQuery ? "No Matching Tasks" : "No Tasks",
+              systemImage: SessionWindowRoute.tasks.systemImage,
+              description: Text(
+                hasQuery
+                  ? "No tasks match the current search."
+                  : "This session does not have any tasks."
+              )
             )
-          )
-        }
-      )
-    case .route:
-      unavailableDetailSurface(
-        "Select an Item",
-        systemImage: "sidebar.right",
-        description: Text("Pick an agent, decision, or task in the sidebar.")
-      )
+          }
+        )
+      case .route:
+        unavailableDetailSurface(
+          "Select an Item",
+          systemImage: "sidebar.right",
+          description: Text("Pick an agent, decision, or task in the sidebar.")
+        )
+      }
     }
   }
 

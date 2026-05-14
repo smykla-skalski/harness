@@ -18,6 +18,12 @@ struct Audit: ParsableCommand {
     @Option(name: .long, help: "Scenario selection: all or comma list. Default: all")
     var scenarios: String = "all"
 
+    @Option(name: .long, help: "Single audit isolation variant to apply.")
+    var variant: String?
+
+    @Option(name: .long, help: "Comma list of isolation variants to audit as a matrix.")
+    var variants: String?
+
     @Flag(name: [.long, .customLong("keep-traces")], help: "Keep raw .trace bundles.")
     var keepTraces: Bool = false
 
@@ -74,9 +80,25 @@ struct Audit: ParsableCommand {
     @Flag(name: .long, help: "Launch scenarios and capture unified logs without xctrace metrics.")
     var logOnly: Bool = false
 
+    @Flag(name: .long, help: "Write metrics without failing on budget overages.")
+    var skipBudgetEnforcement: Bool = false
+
     func run() throws {
         do {
-            let outcome = try AuditRunner.run(inputs())
+            if variant != nil && variants != nil {
+                throw ValidationError("--variant and --variants cannot be combined")
+            }
+            if let variants {
+                let outcome = try AuditMatrixRunner.run(
+                    try inputs(),
+                    variants: try AuditVariant.resolve(variants)
+                )
+                print("Matrix artifacts written to \(outcome.matrixDir.path)")
+                print("Matrix summary: \(outcome.summaryPath.path)")
+                print("Matrix markdown: \(outcome.markdownPath.path)")
+                return
+            }
+            let outcome = try AuditRunner.run(try inputs())
             print("Artifacts written to \(outcome.runDir.path)")
             print("Summary: \(outcome.summaryPath.path)")
             if let comparisonPath = outcome.comparisonPath {
@@ -88,7 +110,7 @@ struct Audit: ParsableCommand {
         }
     }
 
-    private func inputs() -> AuditRunner.Inputs {
+    private func inputs() throws -> AuditRunner.Inputs {
         AuditRunner.Inputs(
             label: label,
             compareTo: compareTo.map { URL(fileURLWithPath: $0) },
@@ -109,8 +131,21 @@ struct Audit: ParsableCommand {
             skipDaemonBundle: skipDaemonBundle,
             forceClean: forceClean,
             buildShipping: buildShipping,
-            logOnly: logOnly
+            logOnly: logOnly,
+            enforceBudgets: !skipBudgetEnforcement,
+            environmentOverrides: try variantEnvironment()
         )
+    }
+
+    private func variantEnvironment() throws -> [String: String] {
+        guard let variant else {
+            return [:]
+        }
+        let resolved = try AuditVariant.resolve(variant)
+        guard resolved.count == 1, let first = resolved.first else {
+            throw ValidationError("--variant expects exactly one variant")
+        }
+        return first.environment
     }
 
     private static func unameMachine() -> String {

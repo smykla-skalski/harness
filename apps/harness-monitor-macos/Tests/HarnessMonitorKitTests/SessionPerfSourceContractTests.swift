@@ -41,14 +41,50 @@ struct SessionPerfSourceContractTests {
     )
 
     #expect(
-      persistenceSource.contains("guard !HarnessMonitorUITestEnvironment.isPerfScenarioActive")
+      persistenceSource.contains("guard HarnessMonitorPerfIsolation.allowsSceneRestorationWrites")
     )
     #expect(
-      windowSource.contains("guard !HarnessMonitorUITestEnvironment.isPerfScenarioActive")
+      windowSource.contains("guard HarnessMonitorPerfIsolation.allowsSceneRestorationWrites")
     )
     #expect(layoutSource.contains("@State private var perfColumnVisibilityStorage"))
-    #expect(layoutSource.contains("if HarnessMonitorUITestEnvironment.isPerfScenarioActive"))
+    #expect(layoutSource.contains("if !HarnessMonitorPerfIsolation.allowsSceneRestorationWrites"))
     #expect(layoutSource.contains("perfColumnVisibilityStorage = storedVisibility"))
+  }
+
+  @Test("Perf isolation variants gate search and static detail from env flags")
+  func perfIsolationVariantsGateSearchAndStaticDetailFromEnvFlags() throws {
+    let isolationSource = try previewableSourceFile(
+      at: "Support/HarnessMonitorPerfIsolation.swift"
+    )
+    let windowSource = try previewableSourceFile(
+      at: "Views/Sessions/SessionWindowView.swift"
+    )
+    let searchSource = try previewableSourceFile(
+      at: "Views/Search/AppSearchHost.swift"
+    )
+    let columnsSource = try previewableSourceFile(
+      at: "Views/Sessions/SessionWindowView+Columns.swift"
+    )
+
+    #expect(isolationSource.contains("HARNESS_MONITOR_PERF_DISABLE_SEARCH_HOST"))
+    #expect(isolationSource.contains("HARNESS_MONITOR_PERF_DISABLE_SEARCH_SUGGESTIONS"))
+    #expect(isolationSource.contains("HARNESS_MONITOR_PERF_ENABLE_SCENE_WRITES"))
+    #expect(isolationSource.contains("HARNESS_MONITOR_PERF_STATIC_DETAIL"))
+    #expect(windowSource.contains("!HarnessMonitorPerfIsolation.disablesSearchHost"))
+    #expect(searchSource.contains("HarnessMonitorPerfIsolation.disablesSearchSuggestions"))
+    #expect(columnsSource.contains("HarnessMonitorPerfIsolation.usesStaticDetail"))
+  }
+
+  @Test("Perf scripts emit measured step boundaries")
+  func perfScriptsEmitMeasuredStepBoundaries() throws {
+    let source = try previewableSourceFile(
+      at: "Views/Sessions/SessionWindowView+PerfScenarios.swift"
+    )
+
+    #expect(source.contains("HarnessMonitorPerfTrace.beginStep"))
+    #expect(source.contains("HarnessMonitorPerfTrace.endStep"))
+    #expect(source.contains("runMeasuredStep(\"search.present\")"))
+    #expect(source.contains("runMeasuredStep(\"column.detail-only\")"))
   }
 
   private func appSourceFile(at relativePath: String) throws -> String {

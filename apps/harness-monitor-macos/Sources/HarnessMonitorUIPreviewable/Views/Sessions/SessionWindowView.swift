@@ -215,7 +215,9 @@ public struct SessionWindowView: View {
   public var body: some View {
     ZStack {
       bodyContent
-      sessionSearchHost
+      if !HarnessMonitorPerfIsolation.disablesSearchHost {
+        sessionSearchHost
+      }
     }
     .toolbar { sessionToolbar }
     .background {
@@ -262,10 +264,14 @@ public struct SessionWindowView: View {
         }
       }
       .onChange(of: stateCache.sectionState.decisionID) { _, newDecisionID in
-        guard !HarnessMonitorUITestEnvironment.isPerfScenarioActive else { return }
+        guard HarnessMonitorPerfIsolation.allowsSceneRestorationWrites else { return }
         guard case .route(.decisions) = stateCache.selection else { return }
         let storedDecisionID = newDecisionID ?? ""
         guard persistedDecisionID != storedDecisionID else { return }
+        HarnessMonitorPerfTrace.recordScenarioEvent(
+          component: "perf.scene-storage",
+          event: "decision-id.write"
+        )
         persistedDecisionID = storedDecisionID
       }
       .onChange(of: renderedRoute) { _, newRoute in
@@ -285,8 +291,13 @@ public struct SessionWindowView: View {
   ) -> some View {
     content
       .onChange(of: stateCache.decisionFilters.query) { _, newValue in
-        guard !HarnessMonitorUITestEnvironment.isPerfScenarioActive else { return }
+        guard HarnessMonitorPerfIsolation.allowsSceneRestorationWrites else { return }
         guard persistedDecisionQuery != newValue else { return }
+        HarnessMonitorPerfTrace.recordScenarioEvent(
+          component: "perf.scene-storage",
+          event: "decision-query.write",
+          details: ["characters": String(newValue.count)]
+        )
         persistedDecisionQuery = newValue
       }
   }
