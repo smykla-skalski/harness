@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 
 use crate::task_board::github::{
-    GitHubAutomationClient, GitHubBranchProtectionEvidence, GitHubCheckEvidence,
+    GitHubAutomationClient, GitHubBranchProtectionEvidence, GitHubBranchState, GitHubCheckEvidence,
     GitHubCreatePullRequest, GitHubMergeEvidence, GitHubMergeMethod, GitHubProjectConfig,
     GitHubPullRequestEvidence, GitHubPullRequestHandle, GitHubReviewEvidence,
 };
@@ -17,12 +18,40 @@ struct FakeGitHubClient {
     pull_request: GitHubPullRequestHandle,
     evidence: GitHubMergeEvidence,
     create_calls: std::sync::Mutex<usize>,
+    publish_calls: std::sync::Mutex<usize>,
     ready_calls: std::sync::Mutex<usize>,
     merge_calls: std::sync::Mutex<usize>,
 }
 
 #[async_trait::async_trait]
 impl GitHubAutomationClient for FakeGitHubClient {
+    async fn get_branch_state(
+        &self,
+        config: &GitHubProjectConfig,
+        branch: &str,
+    ) -> Result<Option<GitHubBranchState>, crate::errors::CliError> {
+        let remote = remote_repo_path(config.checkout_path.as_path());
+        let reference = format!("refs/heads/{branch}");
+        if !git_ref_exists(&remote, &reference) {
+            return Ok(None);
+        }
+        Ok(Some(GitHubBranchState {
+            commit_sha: git_ref(&remote, &reference),
+            tree_sha: git_tree(&remote, &reference),
+        }))
+    }
+
+    async fn publish_branch_from_worktree(
+        &self,
+        _config: &GitHubProjectConfig,
+        worktree: &Path,
+        branch: &str,
+    ) -> Result<(), crate::errors::CliError> {
+        *self.publish_calls.lock().expect("publish calls") += 1;
+        run_git(worktree, &["push", "origin", &format!("HEAD:{branch}")]);
+        Ok(())
+    }
+
     async fn pull_request_merge_evidence(
         &self,
         _config: &GitHubProjectConfig,
@@ -150,6 +179,7 @@ async fn automation_opens_reviews_and_merges_prs() {
             },
         },
         create_calls: std::sync::Mutex::new(0),
+        publish_calls: std::sync::Mutex::new(0),
         ready_calls: std::sync::Mutex::new(0),
         merge_calls: std::sync::Mutex::new(0),
     };
@@ -161,7 +191,6 @@ async fn automation_opens_reviews_and_merges_prs() {
         dry_run: false,
         item: &item,
         session_worktrees: &BTreeMap::new(),
-        github_token: None,
         client: &client,
     })
     .await;
@@ -169,6 +198,7 @@ async fn automation_opens_reviews_and_merges_prs() {
     assert_eq!(workflow.branch.as_deref(), Some("c/task-1"));
     assert_eq!(workflow.pr_number, Some(42));
     assert_eq!(workflow.current_step_id.as_deref(), Some(STEP_MERGED));
+    assert_eq!(*client.publish_calls.lock().expect("publish calls"), 1);
     assert_eq!(*client.create_calls.lock().expect("create calls"), 1);
     assert_eq!(*client.ready_calls.lock().expect("ready calls"), 1);
     assert_eq!(*client.merge_calls.lock().expect("merge calls"), 1);
@@ -237,6 +267,7 @@ async fn automation_waits_for_review_when_merge_evidence_is_not_approved() {
             },
         },
         create_calls: std::sync::Mutex::new(0),
+        publish_calls: std::sync::Mutex::new(0),
         ready_calls: std::sync::Mutex::new(0),
         merge_calls: std::sync::Mutex::new(0),
     };
@@ -248,7 +279,6 @@ async fn automation_waits_for_review_when_merge_evidence_is_not_approved() {
         dry_run: false,
         item: &item,
         session_worktrees: &BTreeMap::new(),
-        github_token: None,
         client: &client,
     })
     .await;
@@ -257,7 +287,84 @@ async fn automation_waits_for_review_when_merge_evidence_is_not_approved() {
         workflow.current_step_id.as_deref(),
         Some(STEP_WAITING_FOR_REVIEW)
     );
+    assert_eq!(*client.publish_calls.lock().expect("publish calls"), 0);
     assert_eq!(*client.merge_calls.lock().expect("merge calls"), 0);
+}
+
+#[tokio::test]
+async fn automation_waits_for_commits_before_opening_a_pull_request() {
+    let temp = tempdir().expect("tempdir");
+    let repo = temp.path().join("repo");
+    let remote = temp.path().join("remote.git");
+    init_repo(&repo);
+    run_git(
+        temp.path(),
+        &["init", "--bare", remote.to_string_lossy().as_ref()],
+    );
+    run_git(
+        &repo,
+        &["remote", "add", "origin", remote.to_string_lossy().as_ref()],
+    );
+    run_git(&repo, &["push", "-u", "origin", "HEAD:main"]);
+
+    let config = GitHubProjectConfig::new("owner", "repo", repo.clone());
+    let mut item = TaskBoardItem::new(
+        "task-3".to_string(),
+        "Task".to_string(),
+        String::new(),
+        "2026-05-14T00:00:00Z".to_string(),
+    );
+    item.status = TaskBoardStatus::Done;
+    item.project_id = Some("owner/repo".to_string());
+    item.workflow.worktree = Some(repo.to_string_lossy().into_owned());
+    let client = FakeGitHubClient {
+        pull_request: GitHubPullRequestHandle {
+            number: 99,
+            html_url: Some("https://example.test/pull/99".to_string()),
+            draft: true,
+            merged: false,
+            head_sha: "abc123".to_string(),
+        },
+        evidence: GitHubMergeEvidence {
+            pull_request: GitHubPullRequestEvidence {
+                number: 99,
+                html_url: Some("https://example.test/pull/99".to_string()),
+                base_branch: "main".to_string(),
+                head_branch: "c/task-3".to_string(),
+                draft: true,
+                changed_paths: vec![],
+            },
+            checks: vec![],
+            reviews: vec![],
+            branch_protection: GitHubBranchProtectionEvidence {
+                enabled: true,
+                merge_allowed: true,
+                required_checks: vec![],
+            },
+        },
+        create_calls: std::sync::Mutex::new(0),
+        publish_calls: std::sync::Mutex::new(0),
+        ready_calls: std::sync::Mutex::new(0),
+        merge_calls: std::sync::Mutex::new(0),
+    };
+
+    let workflow = automate_item(AutomationRequest {
+        board_root: temp.path(),
+        config: &config,
+        project_dir: Some(repo.to_string_lossy().as_ref()),
+        dry_run: false,
+        item: &item,
+        session_worktrees: &BTreeMap::new(),
+        client: &client,
+    })
+    .await;
+
+    assert_eq!(
+        workflow.current_step_id.as_deref(),
+        Some("github_waiting_for_commits")
+    );
+    assert_eq!(*client.publish_calls.lock().expect("publish calls"), 0);
+    assert_eq!(*client.create_calls.lock().expect("create calls"), 0);
 }
 
 fn init_repo(path: &Path) {
@@ -302,6 +409,44 @@ fn git_ref(dir: &Path, reference: &str) -> String {
     assert!(
         output.status.success(),
         "git rev-parse failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8_lossy(&output.stdout).trim().to_string()
+}
+
+fn git_tree(dir: &Path, reference: &str) -> String {
+    git_ref(dir, &format!("{reference}^{{tree}}"))
+}
+
+fn git_ref_exists(dir: &Path, reference: &str) -> bool {
+    let mut command = Command::new("git");
+    if dir.join("HEAD").is_file() && dir.join("objects").is_dir() && !dir.join(".git").exists() {
+        command.args(["--git-dir"]).arg(dir);
+    } else {
+        command.args(["-C"]).arg(dir);
+    }
+    command
+        .args(["rev-parse", "--verify", "--quiet", reference])
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+fn remote_repo_path(repo: &Path) -> PathBuf {
+    PathBuf::from(git_stdout(repo, &["config", "--get", "remote.origin.url"]))
+}
+
+fn git_stdout(dir: &Path, args: &[&str]) -> String {
+    let output = Command::new("git")
+        .args(["-C"])
+        .arg(dir)
+        .args(args)
+        .output()
+        .expect("run git");
+    assert!(
+        output.status.success(),
+        "git {:?} failed: {}",
+        args,
         String::from_utf8_lossy(&output.stderr)
     );
     String::from_utf8_lossy(&output.stdout).trim().to_string()

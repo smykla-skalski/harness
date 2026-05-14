@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use async_trait::async_trait;
 
 use crate::errors::{CliError, CliErrorKind};
@@ -6,6 +8,7 @@ use crate::task_board::policy::PolicyInput;
 mod client;
 mod config;
 mod evidence;
+mod publication;
 mod risk;
 
 pub use client::{GitHubApiAutomationClient, GitHubCreatePullRequest, GitHubPullRequestHandle};
@@ -17,10 +20,40 @@ pub use evidence::{
     GitHubBranchProtectionEvidence, GitHubCheckConclusion, GitHubCheckEvidence, GitHubCheckStatus,
     GitHubMergeEvidence, GitHubPullRequestEvidence, GitHubReviewEvidence, GitHubReviewState,
 };
+pub use publication::GitHubBranchState;
 pub use risk::{GitHubRiskClassification, GitHubRiskReason, classify_github_merge_risk};
 
 #[async_trait]
 pub trait GitHubAutomationClient: Send + Sync {
+    /// Load the remote state for one managed branch.
+    ///
+    /// # Errors
+    /// Returns provider or transport errors surfaced by the implementation.
+    async fn get_branch_state(
+        &self,
+        _config: &GitHubProjectConfig,
+        _branch: &str,
+    ) -> Result<Option<GitHubBranchState>, CliError> {
+        Err(CliError::from(CliErrorKind::workflow_io(
+            "task-board github get_branch_state is unsupported",
+        )))
+    }
+
+    /// Publish the committed HEAD snapshot from `worktree` onto `branch`.
+    ///
+    /// # Errors
+    /// Returns provider or transport errors surfaced by the implementation.
+    async fn publish_branch_from_worktree(
+        &self,
+        _config: &GitHubProjectConfig,
+        _worktree: &Path,
+        _branch: &str,
+    ) -> Result<(), CliError> {
+        Err(CliError::from(CliErrorKind::workflow_io(
+            "task-board github publish_branch_from_worktree is unsupported",
+        )))
+    }
+
     /// Load merge-policy evidence for one pull request.
     ///
     /// # Errors

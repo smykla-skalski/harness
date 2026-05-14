@@ -30,7 +30,6 @@ pub(super) async fn automate_item(request: AutomationRequest<'_>) -> TaskBoardWo
         board_root: request.board_root,
         config: request.config,
         item: request.item,
-        github_token: request.github_token,
         client: request.client,
     };
     let mut prepared = match prepare_item(
@@ -81,7 +80,6 @@ struct AutomationContext<'a> {
     board_root: &'a Path,
     config: &'a GitHubProjectConfig,
     item: &'a TaskBoardItem,
-    github_token: Option<&'a str>,
     client: &'a dyn GitHubAutomationClient,
 }
 
@@ -156,6 +154,7 @@ async fn publish_branch(
     prepared: &mut PreparedItem,
 ) -> AutomationFlow<()> {
     let publication = match branch_publication_async(
+        context.client,
         prepared.worktree.clone(),
         context.config.clone(),
         prepared.branch.clone(),
@@ -189,10 +188,10 @@ async fn publish_branch(
         ));
     }
     if let Err(error) = push_branch_async(
+        context.client,
+        context.config,
         prepared.worktree.clone(),
-        publication.remote,
         prepared.branch.clone(),
-        context.github_token.map(ToOwned::to_owned),
     )
     .await
     {
