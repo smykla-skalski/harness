@@ -42,11 +42,16 @@ extension PolicyCanvasViewModel {
     edges incomingEdges: [PolicyCanvasEdge],
     groups incomingGroups: [PolicyCanvasGroup],
     restoreSelection: PolicyCanvasSelection?,
+    restoreSecondaries: Set<PolicyCanvasSelection>,
     primarySelection: PolicyCanvasSelection?
   ) -> PolicyCanvasChange {
     var insertedNodeIDs: [String] = []
     var insertedEdgeIDs: [String] = []
     var insertedGroupIDs: [String] = []
+    // Precompute the live-node id set once before the edge loop. The
+    // previous version rebuilt the set inside the loop, walking `nodes` per
+    // edge for an O(edges x nodes) cost; one pass before the loop is
+    // O(edges + nodes).
     for group in incomingGroups where !groups.contains(where: { $0.id == group.id }) {
       groups.append(group)
       insertedGroupIDs.append(group.id)
@@ -56,12 +61,12 @@ extension PolicyCanvasViewModel {
       cleanEphemeralNodeIDs.insert(node.id)
       insertedNodeIDs.append(node.id)
     }
+    let liveNodeIDs = Set(nodes.map(\.id))
     for edge in incomingEdges where !edges.contains(where: { $0.id == edge.id }) {
       // Only insert edges whose endpoints exist after the node insert pass.
       // Edges in the clipboard whose endpoint nodes were dropped at copy
       // time (selection boundary cut) never reach here, but a stale
       // re-paste might. Filter rather than crash.
-      let liveNodeIDs = Set(nodes.map(\.id))
       guard
         liveNodeIDs.contains(edge.source.nodeID),
         liveNodeIDs.contains(edge.target.nodeID)
@@ -91,7 +96,8 @@ extension PolicyCanvasViewModel {
       nodeIDs: insertedNodeIDs,
       edgeIDs: insertedEdgeIDs,
       groupIDs: insertedGroupIDs,
-      restoreSelection: restoreSelection
+      restoreSelection: restoreSelection,
+      restoreSecondaries: restoreSecondaries
     )
   }
 
@@ -99,7 +105,8 @@ extension PolicyCanvasViewModel {
     nodeIDs: [String],
     edgeIDs: [String],
     groupIDs: [String],
-    restoreSelection: PolicyCanvasSelection?
+    restoreSelection: PolicyCanvasSelection?,
+    restoreSecondaries: Set<PolicyCanvasSelection>
   ) -> PolicyCanvasChange {
     // Capture the displaced payload before any removal so the inverse can
     // rehydrate the exact insertion (including order-stable bulk-add).
@@ -139,15 +146,58 @@ extension PolicyCanvasViewModel {
     reconcileGroupFrames()
     clearTransientGestureState()
     let inverseSelection = selection
+    let inverseSecondaries = secondarySelections
     selection = restoreSelection
-    secondarySelections = []
+    secondarySelections = restoreSecondaries.filter { isSelectionLive($0) }
     return .bulkAdd(
       nodes: displacedNodes,
       edges: displacedEdges,
       groups: displacedGroups,
       restoreSelection: inverseSelection,
+      restoreSecondaries: inverseSecondaries,
       primarySelection: nil
     )
+  }
+
+  /// Apply a coalesced multi-element move. Returns the inverse `.bulkMove`
+  /// so each held-arrow burst collapses to one undo step regardless of how
+  /// many nodes or groups were under the cursor.
+  func applyBulkMove(
+    nodeMoves: [PolicyCanvasNodeMove],
+    groupMoves: [PolicyCanvasGroupMove]
+  ) -> PolicyCanvasChange {
+    var nodeMoveIndex: [String: Int] = [:]
+    for index in nodes.indices {
+      nodeMoveIndex[nodes[index].id] = index
+    }
+    for move in nodeMoves {
+      guard let index = nodeMoveIndex[move.id] else { continue }
+      nodes[index].position = move.to
+    }
+    for move in groupMoves {
+      if let index = groups.firstIndex(where: { $0.id == move.id }) {
+        groups[index].frame.origin = move.toOrigin
+      }
+      for nodeIndex in nodes.indices where nodes[nodeIndex].groupID == move.id {
+        if let destination = move.memberDestinations[nodes[nodeIndex].id] {
+          nodes[nodeIndex].position = destination
+        }
+      }
+    }
+    reconcileGroupFrames()
+    let inverseNodeMoves = nodeMoves.map { move in
+      PolicyCanvasNodeMove(id: move.id, from: move.to, to: move.from)
+    }
+    let inverseGroupMoves = groupMoves.map { move in
+      PolicyCanvasGroupMove(
+        id: move.id,
+        fromOrigin: move.toOrigin,
+        toOrigin: move.fromOrigin,
+        memberOrigins: move.memberDestinations,
+        memberDestinations: move.memberOrigins
+      )
+    }
+    return .bulkMove(nodeMoves: inverseNodeMoves, groupMoves: inverseGroupMoves)
   }
 }
 
@@ -233,13 +283,15 @@ extension PolicyCanvasViewModel {
   /// node/edge/group payload for `remove*` operations (the forward change
   /// only carries the id, since the entity has already been removed from
   /// the live graph by the time we read it).
+  ///
+  /// Single exhaustive switch over every `PolicyCanvasChange` case so the
+  /// compiler catches future cases. The earlier two-switch shape silently
+  /// fell through to "Canvas updated" when the new-case branch returned nil,
+  /// which masked missing strings on power-edit cases.
   func statusMessage(
     for change: PolicyCanvasChange,
     inverse: PolicyCanvasChange
   ) -> String {
-    if let extras = powerEditStatusMessage(for: change, inverse: inverse) {
-      return extras
-    }
     switch change {
     case .addNode(let node, _):
       return "\(node.kind.title) node added"
@@ -252,6 +304,12 @@ extension PolicyCanvasViewModel {
       return "Deleted node"
     case .moveNode:
       return "Node moved"
+    case .bulkMove(let nodeMoves, let groupMoves):
+      let count = nodeMoves.count + groupMoves.count
+      if count <= 1 {
+        return "Moved selection"
+      }
+      return "Moved \(count) items"
     case .addEdge:
       return "Edge created"
     case .restoreEdge(let edge, _, _):
@@ -270,23 +328,6 @@ extension PolicyCanvasViewModel {
         return "Deleted \(group.title)"
       }
       return "Deleted group"
-    case .renameNode, .removeNodeFromGroup, .bulkAdd, .bulkRemove:
-      // Handled by powerEditStatusMessage above; this case satisfies
-      // exhaustiveness without duplicating the string table.
-      return "Canvas updated"
-    }
-  }
-}
-
-/// Status-line helpers for the Wave 4J `PolicyCanvasChange` cases. The
-/// parent funnel's `statusMessage(for:inverse:)` switch routes through here
-/// for the new cases so it stays exhaustive without ballooning.
-extension PolicyCanvasViewModel {
-  func powerEditStatusMessage(
-    for change: PolicyCanvasChange,
-    inverse: PolicyCanvasChange
-  ) -> String? {
-    switch change {
     case .renameNode(_, _, let to):
       return "Renamed to \(to)"
     case .removeNodeFromGroup(_, _, let toGroupID):
@@ -294,18 +335,42 @@ extension PolicyCanvasViewModel {
         return "Removed from group"
       }
       return "Moved to group"
-    case .bulkAdd(let nodes, _, _, _, _):
-      if nodes.count == 1 {
-        return "Pasted 1 node"
-      }
-      return "Pasted \(nodes.count) nodes"
+    case .bulkAdd(let nodes, let edges, let groups, _, _, _):
+      return pasteSummaryMessage(
+        nodeCount: nodes.count,
+        edgeCount: edges.count,
+        groupCount: groups.count
+      )
     case .bulkRemove:
-      if case .bulkAdd(let nodes, _, _, _, _) = inverse, nodes.count > 0 {
+      if case .bulkAdd(let nodes, _, _, _, _, _) = inverse, !nodes.isEmpty {
         return "Removed \(nodes.count) item\(nodes.count == 1 ? "" : "s")"
       }
       return "Removed items"
-    default:
-      return nil
     }
+  }
+
+  /// Compact "Pasted N node(s), M edge(s), K group(s)" summary used by the
+  /// post-paste status surface (norman feedback loop). The string omits
+  /// zero-count parts so a paste of a single node reads "Pasted 1 node"
+  /// instead of "Pasted 1 node, 0 edges, 0 groups".
+  func pasteSummaryMessage(
+    nodeCount: Int,
+    edgeCount: Int,
+    groupCount: Int
+  ) -> String {
+    var parts: [String] = []
+    if nodeCount > 0 {
+      parts.append("\(nodeCount) node\(nodeCount == 1 ? "" : "s")")
+    }
+    if edgeCount > 0 {
+      parts.append("\(edgeCount) edge\(edgeCount == 1 ? "" : "s")")
+    }
+    if groupCount > 0 {
+      parts.append("\(groupCount) group\(groupCount == 1 ? "" : "s")")
+    }
+    guard !parts.isEmpty else {
+      return "Pasted"
+    }
+    return "Pasted \(parts.joined(separator: ", "))"
   }
 }

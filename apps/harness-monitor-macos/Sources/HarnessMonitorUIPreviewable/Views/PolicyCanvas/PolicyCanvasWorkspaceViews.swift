@@ -64,6 +64,10 @@ struct PolicyCanvasViewport: View {
           PolicyCanvasZoomControls(viewModel: viewModel)
             .padding(14)
         }
+        .overlay(alignment: .bottomTrailing) {
+          PolicyCanvasShortcutsDisclosure()
+            .padding(14)
+        }
         .simultaneousGesture(magnifyGesture)
         .onAppear {
           centerViewportIfNeeded(scrollProxy)

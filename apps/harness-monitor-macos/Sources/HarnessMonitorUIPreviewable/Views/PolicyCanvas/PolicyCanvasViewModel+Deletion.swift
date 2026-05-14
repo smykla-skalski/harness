@@ -6,11 +6,46 @@ extension PolicyCanvasViewModel {
       notifyStatus("Select a node, group, or edge to delete")
       return nil
     }
+    // If the user has a multi-selection (shift-click or Cmd+A then
+    // Delete), route through a single `.bulkRemove` covering every
+    // selected id so the entire delete collapses into one undo step.
+    // Single-selection keeps the prior per-kind funnel so existing
+    // confirmation flow (incident-edge counts, group-warning copy) still
+    // fires.
+    if !secondarySelections.isEmpty {
+      bulkDeleteSelection()
+      return nil
+    }
     if canDeleteImmediately(selection) {
       delete(selection)
       return nil
     }
     return deletionRequest(for: selection)
+  }
+
+  /// Route the current primary + secondary selection through one
+  /// `.bulkRemove`. Group ids picked alongside node ids are honored: the
+  /// `applyBulkRemove` path clears `groupID` on any survivor node that
+  /// referenced a removed group, so the multi-delete never strands a
+  /// dangling group membership.
+  private func bulkDeleteSelection() {
+    let ids = selectionIDSets()
+    guard !ids.isEmpty else {
+      return
+    }
+    let nodeIDs = nodes.compactMap { ids.nodeIDs.contains($0.id) ? $0.id : nil }
+    let edgeIDs = edges.compactMap { ids.edgeIDs.contains($0.id) ? $0.id : nil }
+    let groupIDs = groups.compactMap { ids.groupIDs.contains($0.id) ? $0.id : nil }
+    let priorSelection = selection
+    let priorSecondaries = secondarySelections
+    mutate(
+      .bulkRemove(
+        nodeIDs: nodeIDs,
+        edgeIDs: edgeIDs,
+        groupIDs: groupIDs,
+        restoreSelection: priorSelection,
+        restoreSecondaries: priorSecondaries
+      ))
   }
 
   func confirmDelete(_ request: PolicyCanvasDeletionRequest) {

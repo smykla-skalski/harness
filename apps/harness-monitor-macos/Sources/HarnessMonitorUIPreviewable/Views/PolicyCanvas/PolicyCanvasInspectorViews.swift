@@ -39,7 +39,14 @@ struct PolicyCanvasInspector: View {
   }
 
   @ViewBuilder private var selectionDetails: some View {
-    if let node = viewModel.selectedNode {
+    if !viewModel.secondarySelections.isEmpty {
+      // Multi-selection: surface the count explicitly so the inspector
+      // does not pretend it is editing a single primary while the user
+      // has many nodes lit. The single-node editor below this branch
+      // would otherwise pick a non-deterministic head and the secondary
+      // selections would be silently ignored on inspector-side actions.
+      multiSelectionSection
+    } else if let node = viewModel.selectedNode {
       nodeSection(node)
       PolicyCanvasInspectorIssuesSection(viewModel: viewModel, selection: .node(node.id))
     } else if let group = viewModel.selectedGroup {
@@ -49,6 +56,32 @@ struct PolicyCanvasInspector: View {
       PolicyCanvasInspectorIssuesSection(viewModel: viewModel, selection: .edge(edge.id))
     } else {
       canvasSection
+    }
+  }
+
+  /// Inspector readout shown when the user has more than one element
+  /// selected. Names each element kind separately because the rotor-aware
+  /// "N items selected" string would lose the breakdown VO users need to
+  /// reason about a multi-delete. The section is intentionally inert —
+  /// inspector-side property edits make no sense on a mixed selection.
+  private var multiSelectionSection: some View {
+    let nodeCount = viewModel.selectedNodeIDs.count
+    let edgeCount = viewModel.selectedEdgeIDs.count
+    let groupCount = viewModel.selectedGroupIDs.count
+    return PolicyCanvasInspectorSection(title: "Multiple selected") {
+      PolicyCanvasInspectorRow(
+        label: "Total",
+        value: "\(nodeCount + edgeCount + groupCount)"
+      )
+      if nodeCount > 0 {
+        PolicyCanvasInspectorRow(label: "Nodes", value: "\(nodeCount)")
+      }
+      if edgeCount > 0 {
+        PolicyCanvasInspectorRow(label: "Edges", value: "\(edgeCount)")
+      }
+      if groupCount > 0 {
+        PolicyCanvasInspectorRow(label: "Groups", value: "\(groupCount)")
+      }
     }
   }
 
@@ -268,126 +301,4 @@ struct PolicyCanvasInspector: View {
     }
   }
 
-  private static let noneGroupTag = "__none__"
-
-  private var selectedNodeKindBinding: Binding<PolicyCanvasNodeKind> {
-    Binding(
-      get: { viewModel.selectedNode?.kind ?? .condition },
-      set: { viewModel.updateSelectedNodeKind($0) }
-    )
-  }
-
-  private var selectedNodeGroupBinding: Binding<String> {
-    Binding(
-      get: { viewModel.selectedNode?.groupID ?? Self.noneGroupTag },
-      set: { viewModel.updateSelectedNodeGroup($0 == Self.noneGroupTag ? nil : $0) }
-    )
-  }
-
-  private var selectedGroupTitleBinding: Binding<String> {
-    Binding(
-      get: { viewModel.selectedGroup?.title ?? "" },
-      set: { viewModel.updateSelectedGroupTitle($0) }
-    )
-  }
-
-  private var selectedEdgeLabelBinding: Binding<String> {
-    Binding(
-      get: { viewModel.selectedEdge?.label ?? "" },
-      set: { viewModel.updateSelectedEdgeLabel($0) }
-    )
-  }
-
-  private func selectedPolicyActionBinding(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> Binding<TaskBoardPolicyAction> {
-    Binding(
-      get: { policyKind.actions.first ?? policyKind.action ?? .spawnAgent },
-      set: { viewModel.updateSelectedPolicyAction($0) }
-    )
-  }
-
-  private func selectedEvidenceFieldBinding(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> Binding<TaskBoardPolicyEvidenceField> {
-    Binding(
-      get: { policyKind.checks.first?.field ?? policyKind.field ?? .checksGreen },
-      set: { viewModel.updateSelectedEvidenceField($0) }
-    )
-  }
-
-  private func selectedRiskThresholdBinding(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> Binding<Int> {
-    Binding(
-      get: { Int(policyKind.threshold ?? 0) },
-      set: { viewModel.updateSelectedRiskThreshold($0) }
-    )
-  }
-
-  private func selectedReasonCodeBinding(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> Binding<String> {
-    Binding(
-      get: { policyKind.reasonCode ?? policyKind.reasonCodes.first ?? "" },
-      set: { viewModel.updateSelectedReasonCode($0) }
-    )
-  }
-
-  private func selectedRuleIDBinding(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> Binding<String> {
-    Binding(
-      get: { policyKind.ruleId ?? "" },
-      set: { viewModel.updateSelectedRuleID($0) }
-    )
-  }
-
-  private func selectedDecisionBinding(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> Binding<String> {
-    Binding(
-      get: { policyKind.decision ?? "allow" },
-      set: { viewModel.updateSelectedDecision($0) }
-    )
-  }
-
-  private var canvasMetrics: some View {
-    PolicyCanvasInspectorSection(title: "Policy") {
-      PolicyCanvasInspectorRow(label: "Summary", value: viewModel.policySummary)
-      PolicyCanvasInspectorRow(
-        label: "Zoom",
-        value: "\(Int((viewModel.zoom * 100).rounded()))%"
-      )
-      PolicyCanvasInspectorRow(
-        label: "Promote",
-        value: viewModel.promoteDisabledReason ?? "Ready"
-      )
-      PolicyCanvasInspectorRow(
-        label: "Validation",
-        value: validationSummary
-      )
-    }
-  }
-
-  /// Validation summary surfaced in the inspector footer. Reports the full
-  /// daemon + local issue count so the user sees how many issues exist
-  /// without expanding the chrome panel. Stays "OK" when both producers are
-  /// clean, distinct from "No data" before a simulation has been run.
-  private var validationSummary: String {
-    let issues = viewModel.allValidationIssues
-    if issues.isEmpty {
-      return viewModel.latestSimulation == nil ? "No data" : "OK"
-    }
-    let errors = issues.filter { $0.severity == .error }.count
-    let warnings = issues.filter { $0.severity == .warning }.count
-    var parts: [String] = []
-    if errors > 0 {
-      parts.append("\(errors) error\(errors == 1 ? "" : "s")")
-    }
-    if warnings > 0 {
-      parts.append("\(warnings) warning\(warnings == 1 ? "" : "s")")
-    }
-    return parts.joined(separator: ", ")
-  }
 }

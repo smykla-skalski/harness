@@ -59,16 +59,32 @@ struct PolicyCanvasNodeLayer: View {
       .contextMenu {
         if let groupID = node.groupID, viewModel.group(groupID) != nil {
           Button("Remove from group") {
+            // Single-node operation; "Remove from group" only makes
+            // sense for the row clicked, so it always targets this node.
             viewModel.select(.node(node.id))
             viewModel.removeNodeFromGroup(node.id)
           }
         }
         Button("Duplicate") {
-          viewModel.select(.node(node.id))
+          // Preserve a multi-selection that already includes the
+          // right-clicked node: demoting to a single primary would drop
+          // the rest of the shift-selected set silently. The duplicate
+          // funnel picks up whatever `allSelections` already covers.
+          if !viewModel.isSelected(.node(node.id)) {
+            viewModel.select(.node(node.id))
+          }
           viewModel.duplicateSelection()
         }
         Button("Delete", role: .destructive) {
-          viewModel.deleteNode(node.id)
+          if viewModel.isSelected(.node(node.id)),
+            !viewModel.secondarySelections.isEmpty
+          {
+            // Same rationale as Duplicate above: do not demote a
+            // multi-selection to drop the other shift-selected nodes.
+            _ = viewModel.deleteSelectedComponent()
+          } else {
+            viewModel.deleteNode(node.id)
+          }
         }
       }
     }
@@ -268,6 +284,7 @@ private struct PolicyCanvasNodeAccessibilityActions: ViewModifier {
 
   func body(content: Content) -> some View {
     let connectTargets = viewModel.accessibilityConnectableNamedTargets(fromNodeID: nodeID)
+    let canPaste = viewModel.clipboard != nil
     return
       content
       .accessibilityAction(named: Text("Delete")) {
@@ -280,6 +297,49 @@ private struct PolicyCanvasNodeAccessibilityActions: ViewModifier {
       .accessibilityAction(named: Text("Open inspector")) {
         viewModel.accessibilityOpenInspector(forNodeID: nodeID)
       }
+      .accessibilityAction(named: Text("Copy")) {
+        // Targets the multi-selection if one exists, otherwise picks this
+        // node so VO users get the same behavior as Cmd+C on the canvas.
+        if !viewModel.isSelected(.node(nodeID)) {
+          viewModel.select(.node(nodeID))
+        }
+        _ = viewModel.copySelectionToClipboard()
+      }
+      .accessibilityAction(named: Text("Rename")) {
+        viewModel.accessibilityOpenInspector(forNodeID: nodeID)
+      }
+      // Plain nudge actions reuse the 10pt shift step the keyboard
+      // shortcut surfaces; a 2pt bare-arrow step would be below the JND
+      // for VO users who only get audio feedback "moved" without seeing
+      // motion. The action set stays compact (4 directions) — finer
+      // movement still routes through the rename / position field path.
+      .accessibilityAction(named: Text("Nudge Up")) {
+        if !viewModel.isSelected(.node(nodeID)) {
+          viewModel.select(.node(nodeID))
+        }
+        _ = viewModel.nudgeSelection(by: CGSize(width: 0, height: -10))
+      }
+      .accessibilityAction(named: Text("Nudge Down")) {
+        if !viewModel.isSelected(.node(nodeID)) {
+          viewModel.select(.node(nodeID))
+        }
+        _ = viewModel.nudgeSelection(by: CGSize(width: 0, height: 10))
+      }
+      .accessibilityAction(named: Text("Nudge Left")) {
+        if !viewModel.isSelected(.node(nodeID)) {
+          viewModel.select(.node(nodeID))
+        }
+        _ = viewModel.nudgeSelection(by: CGSize(width: -10, height: 0))
+      }
+      .accessibilityAction(named: Text("Nudge Right")) {
+        if !viewModel.isSelected(.node(nodeID)) {
+          viewModel.select(.node(nodeID))
+        }
+        _ = viewModel.nudgeSelection(by: CGSize(width: 10, height: 0))
+      }
+      .modifier(
+        PolicyCanvasNodePasteAccessibilityAction(viewModel: viewModel, canPaste: canPaste)
+      )
       .accessibilityActions {
         ForEach(connectTargets) { target in
           Button("Connect to \(target.displayName)") {
@@ -287,5 +347,24 @@ private struct PolicyCanvasNodeAccessibilityActions: ViewModifier {
           }
         }
       }
+  }
+}
+
+/// Per-node Paste action, gated on a non-empty clipboard. Built as a
+/// separate ViewModifier so the action is only stamped when there is
+/// something to paste — VO users do not see a "Paste" rotor entry that
+/// does nothing.
+private struct PolicyCanvasNodePasteAccessibilityAction: ViewModifier {
+  let viewModel: PolicyCanvasViewModel
+  let canPaste: Bool
+
+  func body(content: Content) -> some View {
+    if canPaste {
+      content.accessibilityAction(named: Text("Paste")) {
+        _ = viewModel.pasteFromClipboard()
+      }
+    } else {
+      content
+    }
   }
 }

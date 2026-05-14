@@ -83,8 +83,16 @@ extension PolicyCanvasViewModel {
         cleanEphemeralEdgeIDs: cleanEphemeralEdgeIDs,
         restoreSelection: restoreSelection
       )
-    case .moveNode(let id, let from, let to):
-      return applyMoveNode(id: id, from: from, to: to)
+    case .moveNode(let id, let from, let to, let fromGroupID, let toGroupID):
+      return applyMoveNode(
+        id: id,
+        from: from,
+        to: to,
+        fromGroupID: fromGroupID,
+        toGroupID: toGroupID
+      )
+    case .bulkMove(let nodeMoves, let groupMoves):
+      return applyBulkMove(nodeMoves: nodeMoves, groupMoves: groupMoves)
     case .addEdge(let edge, let restoreSelection):
       return applyAddEdge(edge, restoreSelection: restoreSelection)
     case .removeEdge(let id, let priorSelection):
@@ -116,6 +124,7 @@ extension PolicyCanvasViewModel {
       let edges,
       let groups,
       let restoreSelection,
+      let restoreSecondaries,
       let primarySelection
     ):
       return applyBulkAdd(
@@ -123,14 +132,22 @@ extension PolicyCanvasViewModel {
         edges: edges,
         groups: groups,
         restoreSelection: restoreSelection,
+        restoreSecondaries: restoreSecondaries,
         primarySelection: primarySelection
       )
-    case .bulkRemove(let nodeIDs, let edgeIDs, let groupIDs, let restoreSelection):
+    case .bulkRemove(
+      let nodeIDs,
+      let edgeIDs,
+      let groupIDs,
+      let restoreSelection,
+      let restoreSecondaries
+    ):
       return applyBulkRemove(
         nodeIDs: nodeIDs,
         edgeIDs: edgeIDs,
         groupIDs: groupIDs,
-        restoreSelection: restoreSelection
+        restoreSelection: restoreSelection,
+        restoreSecondaries: restoreSecondaries
       )
     }
   }
@@ -225,13 +242,30 @@ extension PolicyCanvasViewModel {
   private func applyMoveNode(
     id: String,
     from: CGPoint,
-    to: CGPoint
+    to: CGPoint,
+    fromGroupID: String?,
+    toGroupID: String?
   ) -> PolicyCanvasChange {
     guard let index = nodes.firstIndex(where: { $0.id == id }) else {
-      return .moveNode(id: id, from: to, to: to)
+      return .moveNode(
+        id: id,
+        from: to,
+        to: to,
+        fromGroupID: toGroupID,
+        toGroupID: fromGroupID
+      )
     }
     nodes[index].position = to
-    if let groupID = containingGroupID(
+    // Replay the caller-supplied group membership when present (undo path),
+    // otherwise compute auto-attach from the destination position the same
+    // way drag-end and arrow-nudge do. Capturing the prior membership lets
+    // the inverse restore it even when the destination is itself outside
+    // any group (which the original implementation could only express as
+    // an implicit clear).
+    let previousGroupID = nodes[index].groupID
+    if let toGroupID {
+      nodes[index].groupID = toGroupID
+    } else if let groupID = containingGroupID(
       for: nodeCenter(nodes[index]),
       excluding: nodes[index].groupID
     ) {
@@ -240,7 +274,13 @@ extension PolicyCanvasViewModel {
       nodes[index].groupID = containingGroupID(for: nodeCenter(nodes[index]))
     }
     reconcileGroupFrames()
-    return .moveNode(id: id, from: to, to: from)
+    return .moveNode(
+      id: id,
+      from: to,
+      to: from,
+      fromGroupID: nodes[index].groupID,
+      toGroupID: fromGroupID ?? previousGroupID
+    )
   }
 
   // MARK: - Edge lifecycle
