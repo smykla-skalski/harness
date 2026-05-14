@@ -63,6 +63,56 @@ struct SessionWindowRouteContentMetricsTests {
     )
   }
 
+  @Test("Task board lane metrics scale card and lane geometry")
+  func taskBoardLaneMetricsScaleCardAndLaneGeometry() {
+    let regular = TaskBoardLaneMetrics(fontScale: 1.0)
+    let large = TaskBoardLaneMetrics(fontScale: 1.8)
+
+    #expect(large.laneWidth > regular.laneWidth)
+    #expect(large.laneMinHeight > regular.laneMinHeight)
+    #expect(large.laneBodyMinHeight > regular.laneBodyMinHeight)
+    #expect(large.cardMinHeight > regular.cardMinHeight)
+    #expect(large.cardPadding > regular.cardPadding)
+    #expect(large.pillHorizontalPadding > regular.pillHorizontalPadding)
+    #expect(large.headerIconWidth > regular.headerIconWidth)
+    #expect(
+      TaskBoardLaneMetrics(fontScale: 0.1)
+        == TaskBoardLaneMetrics(fontScale: 0.85)
+    )
+    #expect(
+      TaskBoardLaneMetrics(fontScale: 9.0)
+        == TaskBoardLaneMetrics(fontScale: 1.8)
+    )
+  }
+
+  @Test("Task board lane drop policy moves only cross-lane payloads")
+  func taskBoardLaneDropPolicyMovesOnlyCrossLanePayloads() {
+    var moves: [String] = []
+    let readyPayload = TaskBoardItemDragPayload(itemID: "item-1", status: .todo)
+
+    #expect(
+      !TaskBoardLaneDropPolicy.moveFirstPayload([], to: .ready) { itemID, lane in
+        moves.append("\(itemID):\(lane.rawValue)")
+        return true
+      }
+    )
+    #expect(
+      !TaskBoardLaneDropPolicy.moveFirstPayload([readyPayload], to: .ready) { itemID, lane in
+        moves.append("\(itemID):\(lane.rawValue)")
+        return true
+      }
+    )
+    #expect(moves.isEmpty)
+
+    #expect(
+      TaskBoardLaneDropPolicy.moveFirstPayload([readyPayload], to: .running) { itemID, lane in
+        moves.append("\(itemID):\(lane.rawValue)")
+        return true
+      }
+    )
+    #expect(moves == ["item-1:running"])
+  }
+
   @Test("Task selection renders a real detail pane")
   func taskSelectionRendersARealDetailPane() throws {
     let detailFocusSource = try sourceFile(named: "SessionWindowView+DetailFocus.swift")
@@ -132,12 +182,14 @@ struct SessionWindowRouteContentMetricsTests {
   func taskBoardLanesExposeCardDragAndLaneDrop() throws {
     let overviewSource = try taskBoardSourceFile(named: "TaskBoardOverviewView.swift")
     let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
+    let laneSupportSource = try taskBoardSourceFile(named: "TaskBoardLaneSupport.swift")
     let needsYouSource = try taskBoardSourceFile(named: "TaskBoardNeedsYouLaneViews.swift")
 
     #expect(overviewSource.contains("lane.taskBoardDropStatus"))
     #expect(laneSource.contains("TaskBoardItemDragPayload"))
     #expect(laneSource.contains("let status: TaskBoardStatus"))
-    #expect(laneSource.contains("payload.sourceLane != section.lane"))
+    #expect(laneSource.contains("TaskBoardLaneDropPolicy.moveFirstPayload("))
+    #expect(laneSupportSource.contains("payload.sourceLane != destination"))
     #expect(needsYouSource.contains("payload.sourceLane != .needsYou"))
     #expect(laneSource.contains(".draggable(dragPayload)"))
     #expect(laneSource.contains(".dropDestination(for: TaskBoardItemDragPayload.self"))
