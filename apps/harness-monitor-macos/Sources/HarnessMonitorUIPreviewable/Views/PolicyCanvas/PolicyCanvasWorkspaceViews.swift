@@ -63,7 +63,35 @@ struct PolicyCanvasViewport: View {
         }
       }
     }
+    // P57: `.contain` is paired only with `.accessibilityIdentifier` here (no
+    // parent label) so the rotor + children stay exposed without the
+    // VoiceOver "stops on every child of a labelled element" footgun. Two
+    // rotors live below: "Nodes" walks the visual focus order so VO users
+    // can hop across the graph; "Edges" lists every wired connection.
     .accessibilityElement(children: .contain)
+    .accessibilityRotor("Nodes") {
+      // P25: rotor entries built lazily from the focus-order id list; we map
+      // ids to labels per-iteration so the rotor content closure never
+      // captures live node values across frames. Anchoring the rotor entry
+      // on the node's identifier delegates ring focus to the
+      // `.accessibilityFocused` modifier on the matching node card.
+      ForEach(viewModel.accessibilityNodeFocusOrder(), id: \.self) { nodeID in
+        if let node = viewModel.node(nodeID) {
+          AccessibilityRotorEntry(
+            viewModel.accessibilityLabel(for: node),
+            id: nodeID
+          )
+        }
+      }
+    }
+    .accessibilityRotor("Edges") {
+      ForEach(viewModel.edges, id: \.id) { edge in
+        AccessibilityRotorEntry(
+          viewModel.accessibilityLabel(for: edge),
+          id: edge.id
+        )
+      }
+    }
     .accessibilityFrameMarker(HarnessMonitorAccessibility.policyCanvasViewport)
   }
 
@@ -277,7 +305,6 @@ private struct PolicyCanvasEdgeLabelLayer: View {
   private func edgeColor(for edge: PolicyCanvasEdge) -> Color {
     viewModel.node(edge.source.nodeID)?.kind.accentColor ?? Color.cyan
   }
-
 }
 
 private struct PolicyCanvasEdgeLabelMetrics {
