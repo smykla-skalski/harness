@@ -7,24 +7,23 @@ import SwiftUI
 @main
 @MainActor
 struct HarnessMonitorApp: App {
-  @NSApplicationDelegateAdaptor private var delegate: HarnessMonitorAppDelegate
+  @NSApplicationDelegateAdaptor var delegate: HarnessMonitorAppDelegate
   @Environment(\.openWindow)
-  private var openWindow
+  var openWindow
   @Environment(\.scenePhase)
-  private var scenePhase
-  private let container: ModelContainer?
-  private let isUITesting: Bool
-  private let isTestRun: Bool
-  private let launchMode: HarnessMonitorLaunchMode
-  private let defersInitialMainWindowUntilBootstrap: Bool
-  private let mainWindowDefaultSize: CGSize
-  private let notificationController: HarnessMonitorUserNotificationController
-  private let keyWindowObserver: KeyWindowObserver
-  private let acpAttentionState: AcpPermissionAttentionState
+  var scenePhase
+  let container: ModelContainer?
+  let isUITesting: Bool
+  let isTestRun: Bool
+  let launchMode: HarnessMonitorLaunchMode
+  let defersInitialMainWindowUntilBootstrap: Bool
+  let mainWindowDefaultSize: CGSize
+  let notificationController: HarnessMonitorUserNotificationController
+  let keyWindowObserver: KeyWindowObserver
+  let acpAttentionState: AcpPermissionAttentionState
   private let pendingDecisionsDockBadgeController: PendingDecisionsDockBadgeController
-  private let perfScenario: HarnessMonitorPerfScenario?
-  private let initialSessionWindowRoute: SessionWindowRoute?
-  // App-internal access; helpers in HarnessMonitorApp+Helpers.swift use it.
+  let perfScenario: HarnessMonitorPerfScenario?
+  let initialSessionWindowRoute: SessionWindowRoute?
   @State private var store: HarnessMonitorStore
   @State private var menuBarStatusController: HarnessMonitorMenuBarStatusController
   @State private var sessionWindowPresenceTracker: SessionWindowPresenceTracker
@@ -35,14 +34,13 @@ struct HarnessMonitorApp: App {
   @State private var hasScheduledInitialWindowRouting = false
   @AppStorage(HarnessMonitorThemeDefaults.modeKey)
   private var themeMode: HarnessMonitorThemeMode = .auto
-  // App-internal access; text-size helpers live in HarnessMonitorApp+Helpers.swift.
   @AppStorage(HarnessMonitorTextSize.storageKey)
   var textSizeIndex = HarnessMonitorTextSize.defaultIndex
   @AppStorage(HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledKey)
-  private var menuBarStateColorVariantsEnabled =
+  var menuBarStateColorVariantsEnabled =
     HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledDefault
   @AppStorage(HarnessMonitorLaunchBehavior.storageKey)
-  private var sessionWindowLaunchModeRawValue =
+  var sessionWindowLaunchModeRawValue =
     HarnessMonitorLaunchBehavior.defaultValue.rawValue
 
   init() {
@@ -148,264 +146,53 @@ struct HarnessMonitorApp: App {
     menuBarExtraScene
   }
 
-  // The Xcode preview shell injects the canvas view directly into an
-  // NSPreviewTargetWindow; mounting the live root content from the App's
-  // WindowGroups also lights up `.trackWindow`, SwiftData-backed children,
-  // and notification observers, all of which dispatch main-actor work that
-  // the preview agent reaps off-main and crashes with `BUG IN CLIENT OF
-  // LIBDISPATCH`. The UI-test host also launches in `.preview`, but it still
-  // needs the full scene tree so XCUITest can exercise the app.
-  private var rendersLiveSceneContent: Bool {
-    launchMode == .live || isUITesting
-  }
-
-  private var rendersMenuBarExtraContent: Bool {
-    (launchMode == .live && !isTestRun) || isUITesting
-  }
-
-  private var allowsWindowRestoration: Bool {
-    launchMode == .live && !isTestRun
-  }
-
-  private var launchBehavior: HarnessMonitorLaunchBehavior {
-    HarnessMonitorLaunchBehavior.resolved(rawValue: sessionWindowLaunchModeRawValue)
-  }
-
-  @ViewBuilder
-  private func sessionWindowSceneContent(
-    token: Binding<SessionWindowToken?>
-  ) -> some View {
-    if rendersLiveSceneContent, let tokenValue = token.wrappedValue {
-      SessionWindowRootView(
-        token: tokenValue,
-        store: store,
-        notifications: notificationController,
-        acpAttentionState: acpAttentionState,
-        keyWindowObserver: keyWindowObserver,
-        windowCommandRouting: windowCommandRouting,
-        mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
-        sessionWindowPresenceTracker: sessionWindowPresenceTracker,
-        initialRoute: initialSessionWindowRoute,
-        themeMode: $themeMode
-      )
-      .harnessTrackMCPWindow()
-    } else {
-      Color.clear.accessibilityHidden(true)
-    }
-  }
-
-  @ViewBuilder private var openRecentWindowSceneContent: some View {
-    if rendersLiveSceneContent {
-      openRecentWindowContent
-        .modifier(SessionWindowTabbing(isSessionWindow: false))
-        .harnessTrackMCPWindow()
-    } else {
-      Color.clear.accessibilityHidden(true)
-    }
-  }
-
   var appStore: HarnessMonitorStore {
     store
   }
 
-  private var openRecentWindowScene: some Scene {
-    Window(
-      "Open Recent Session",
-      id: HarnessMonitorWindowID.openRecent
-    ) {
-      openRecentWindowSceneContent
-    }
-    .windowToolbarStyle(.unified)
-    .defaultSize(width: mainWindowDefaultSize.width, height: mainWindowDefaultSize.height)
-    .windowResizability(.contentMinSize)
-    .restorationBehavior(.disabled)
-    .defaultLaunchBehavior(shouldHandleInitialWindowRouting ? .suppressed : .automatic)
-    .onChange(of: scenePhase, initial: true) { _, _ in
-      installMainWindowLauncherIfNeeded()
-      scheduleInitialWindowRoutingIfNeeded()
-    }
-    .commands {
-      mainWindowCommands
-    }
+  var appDelegate: HarnessMonitorAppDelegate {
+    delegate
   }
 
-  private var sessionWindowScene: some Scene {
-    WindowGroup(
-      id: HarnessMonitorWindowID.sessionScene,
-      for: SessionWindowToken.self
-    ) { token in
-      sessionWindowSceneContent(token: token)
-    }
-    .windowToolbarStyle(.unified)
-    .defaultSize(width: mainWindowDefaultSize.width, height: mainWindowDefaultSize.height)
-    .windowResizability(.contentMinSize)
-    .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
-    .defaultLaunchBehavior(shouldHandleInitialWindowRouting ? .suppressed : .automatic)
-    .commandsRemoved()
+  var appMenuBarStatusController: HarnessMonitorMenuBarStatusController {
+    menuBarStatusController
   }
 
-  @CommandsBuilder private var mainWindowCommands: some Commands {
-    HarnessMonitorMainCommandSet(
-      store: store,
-      keyWindowObserver: keyWindowObserver,
-      windowCommandRouting: windowCommandRouting,
-      textSizeIndex: textSizeIndex,
-      increaseTextSize: increaseTextSize,
-      decreaseTextSize: decreaseTextSize,
-      resetTextSize: resetTextSize,
-      refreshStore: refreshStore
-    )
+  var appSessionWindowPresenceTracker: SessionWindowPresenceTracker {
+    sessionWindowPresenceTracker
   }
 
-  private func installMainWindowLauncherIfNeeded() {
-    guard !hasInstalledMainWindowLauncher else {
-      return
+  var appWindowCommandRouting: WindowCommandRoutingState {
+    windowCommandRouting
+  }
+
+  var appMCPWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar {
+    mcpWindowCommandRegistrar
+  }
+
+  var themeModeBinding: Binding<HarnessMonitorThemeMode> {
+    $themeMode
+  }
+
+  var settingsSelectedSectionBinding: Binding<SettingsSection> {
+    $settingsSelectedSection
+  }
+
+  var hasInstalledMainWindowLauncherFlag: Bool {
+    get {
+      hasInstalledMainWindowLauncher
     }
-    hasInstalledMainWindowLauncher = true
-    HarnessMonitorMainWindowLauncher.shared.installOpenMainWindow {
-      openWindow(id: HarnessMonitorWindowID.openRecent)
+    nonmutating set {
+      hasInstalledMainWindowLauncher = newValue
     }
   }
 
-  private var shouldHandleInitialWindowRouting: Bool {
-    (launchMode == .live && !isTestRun) || initialSessionWindowRoute != nil
-  }
-
-  private func scheduleInitialWindowRoutingIfNeeded() {
-    guard shouldHandleInitialWindowRouting else {
-      return
+  var hasScheduledInitialWindowRoutingFlag: Bool {
+    get {
+      hasScheduledInitialWindowRouting
     }
-    guard !hasScheduledInitialWindowRouting else {
-      return
-    }
-    // Live launches set `defaultLaunchBehavior(.suppressed)` on every scene,
-    // so no window opens automatically and the App-level scenePhase never
-    // advances past `.background`. Routing therefore fires on the first
-    // scenePhase callback regardless of its value:
-    // `installMainWindowLauncherIfNeeded` runs in the same closure first so
-    // the launcher's `openWindow` closure is already captured, and the
-    // routed Task runs on MainActor where `openWindow` is valid.
-    hasScheduledInitialWindowRouting = true
-    Task { @MainActor in
-      await routeInitialWindows()
+    nonmutating set {
+      hasScheduledInitialWindowRouting = newValue
     }
   }
-
-  @MainActor
-  private func routeInitialWindows() async {
-    if let initialSessionWindowRoute {
-      let sessionID = store.selectedSessionID ?? store.sessions.first?.sessionId
-      HarnessMonitorUITestTrace.record(
-        component: "app.startup",
-        event: "preview-session-route",
-        details: [
-          "route": initialSessionWindowRoute.rawValue,
-          "has_session": String(sessionID != nil),
-        ]
-      )
-      openWindow.openHarnessSessionWindow(sessionID: sessionID)
-      return
-    }
-
-    let tabbingPreference = SessionWindowTabbingPreference.resolved(
-      rawValue: UserDefaults.standard.string(forKey: SessionWindowTabbingPreference.storageKey)
-    )
-    let router = HarnessMonitorInitialWindowRouter(
-      store: store,
-      launchBehavior: launchBehavior,
-      tabbingPreference: tabbingPreference,
-      openWelcomeWindow: {
-        openWindow(id: HarnessMonitorWindowID.openRecent)
-      },
-      openSessionWindow: { sessionID in
-        openWindow.openHarnessSessionWindow(sessionID: sessionID)
-      }
-    )
-    await router.route()
-  }
-
-  @ViewBuilder private var settingsSceneContent: some View {
-    if rendersLiveSceneContent {
-      HarnessMonitorSettingsRootView(
-        store: store,
-        notifications: notificationController,
-        acpAttentionState: acpAttentionState,
-        windowCommandRouting: windowCommandRouting,
-        mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
-        themeMode: $themeMode,
-        selectedSection: $settingsSelectedSection
-      )
-      .harnessTrackMCPWindow()
-    } else {
-      Color.clear.accessibilityHidden(true)
-    }
-  }
-
-  private var settingsWindowScene: some Scene {
-    Window("Settings", id: HarnessMonitorWindowID.settings) {
-      settingsSceneContent
-    }
-    .windowStyle(.titleBar)
-    .defaultSize(width: 860, height: 620)
-    .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
-  }
-
-  private var menuBarExtraScene: some Scene {
-    // SwiftUI owns the status-item scene; keep dynamic state to asset-catalog
-    // image names so the inserted MenuBarExtra stays stable.
-    MenuBarExtra(
-      isInserted: .constant(rendersMenuBarExtraContent)
-    ) {
-      HarnessMonitorMenuBarExtraContent(
-        store: store,
-        activeSessionWindowCount: sessionWindowPresenceTracker.activeSessionWindowCount
-      )
-    } label: {
-      Label(HarnessMonitorMenuBarSnapshot.statusItemTitle, image: menuBarStatusItemImageName)
-        .help(menuBarStatusItemHelpText)
-        .accessibilityLabel(menuBarStatusItemAccessibilityLabel)
-    }
-    .menuBarExtraStyle(.menu)
-  }
-
-  private var menuBarStatusItemImageName: String {
-    menuBarStatusController.presentation.statusItemAssetName(
-      activeSessionWindowCount: sessionWindowPresenceTracker.activeSessionWindowCount,
-      showsStateColorVariants: menuBarStateColorVariantsEnabled
-    )
-  }
-
-  private var menuBarStatusItemHelpText: String {
-    HarnessMonitorMenuBarSnapshot.statusItemHelpText(
-      activeSessionWindowCount: sessionWindowPresenceTracker.activeSessionWindowCount
-    )
-  }
-
-  private var menuBarStatusItemAccessibilityLabel: String {
-    HarnessMonitorMenuBarSnapshot.statusItemAccessibilityLabel(
-      activeSessionWindowCount: sessionWindowPresenceTracker.activeSessionWindowCount
-    )
-  }
-
-  @ViewBuilder private var openRecentWindowContent: some View {
-    HarnessMonitorOpenRecentWindowContent(
-      delegate: delegate,
-      store: store,
-      notifications: notificationController,
-      keyWindowObserver: keyWindowObserver,
-      acpAttentionState: acpAttentionState,
-      windowCommandRouting: windowCommandRouting,
-      mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
-      themeMode: $themeMode,
-      settingsSelectedSection: $settingsSelectedSection,
-      perfScenario: perfScenario,
-      defersInitialContentUntilBootstrap: defersInitialMainWindowUntilBootstrap,
-      container: container
-    )
-    .onChange(of: store.openFolderRequest) { _, _ in
-      presentOpenFolder()
-    }
-    .attachExternalSessionImporter(store: store)
-  }
-
 }
