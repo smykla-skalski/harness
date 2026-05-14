@@ -200,7 +200,13 @@ private struct PolicyCanvasPortView: View {
       )
       .contentShape(Circle().inset(by: -PolicyCanvasLayout.portHitTestExtension))
       .help(port.title)
-      .accessibilityLabel("\(node.title) \(port.title)")
+      // Role suffix ("output port" / "input port") tells the VoiceOver user
+      // which side of an edge this circle sits on — without it the label is
+      // ambiguous ("Policy intake source") between a draggable output and a
+      // drop-target input, and the only visual distinguisher is fill color.
+      .accessibilityLabel(
+        "\(node.title) \(port.title) \(port.kind == .output ? "output port" : "input port")"
+      )
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.policyCanvasPort(
           node.id,

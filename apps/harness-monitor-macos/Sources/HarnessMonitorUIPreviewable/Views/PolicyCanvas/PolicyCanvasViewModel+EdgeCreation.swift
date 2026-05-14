@@ -59,15 +59,10 @@ extension PolicyCanvasViewModel {
   }
 
   /// Drop the rubber-band preview. Called on a successful or rejected drop,
-  /// and on gesture cancel. Idempotent.
-  ///
-  // CHERRY-PICK NOTE: When merging on top of Wave 2D, extend
-  // clearTransientGestureState() in PolicyCanvasViewModel+Commands.swift to
-  // also call clearPendingEdge() so Escape during a rubber-band drag clears
-  // the curve. Wave 2D's helper currently only knows about
-  // highlightedInput/highlightedGroupID; the pendingEdgePreview field is
-  // added in Wave 2F and the unified helper below (clearTransientGestureState)
-  // is the post-merge name to consolidate on.
+  /// and on gesture cancel. The unified Escape/scenePhase clear path lives in
+  /// `clearTransientGestureState()` (PolicyCanvasViewModel+Commands.swift)
+  /// and routes through this helper to keep the `hasPendingEdge` presence-bit
+  /// in sync. Idempotent.
   func clearPendingEdge() {
     setPendingEdge(nil)
     highlightedInput = nil
