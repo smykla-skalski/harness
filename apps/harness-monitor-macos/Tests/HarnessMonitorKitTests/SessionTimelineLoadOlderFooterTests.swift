@@ -75,7 +75,7 @@ struct SessionTimelineLoadOlderTriggerTests {
     #expect(
       listSource.contains("newValue.contentOffsetY != oldValue.contentOffsetY")
     )
-    #expect(listSource.contains("nav.hasOlder"))
+    #expect(listSource.contains("presentation.navigation.hasOlder"))
     #expect(listSource.contains("onRequestLoadOlder?()"))
     // The .task(id:) auto-trigger must stay removed: it chain-fired on every
     // navigation update and re-loaded all pages without user interaction.
@@ -138,6 +138,15 @@ struct SessionTimelineLoadOlderTriggerTests {
     #expect(sectionSource.contains("if let timelineLoading, let oldestCursor {"))
     #expect(sectionSource.contains("await timelineLoading.loadWindow("))
     #expect(sectionSource.contains("before: oldestCursor"))
+  }
+
+  @Test("Section defers scroll-triggered older loads out of the geometry callback")
+  func sectionDefersScrollTriggeredOlderLoads() throws {
+    let sectionSource = try timelineSource(named: "MonitorTimelineSection.swift")
+
+    #expect(sectionSource.contains("Task { @MainActor in"))
+    #expect(sectionSource.contains("await Task.yield()"))
+    #expect(sectionSource.contains("loadOlderInFlight = true"))
   }
 
   private func timelineSource(named fileName: String) throws -> String {
