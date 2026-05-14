@@ -61,7 +61,7 @@ final class PolicyCanvasUITests: HarnessMonitorUITestCase {
   func testPolicyCanvasNodeDragMovesPreviewNode() throws {
     let app = openPolicyCanvasSessionRoute()
 
-    let node = element(in: app, identifier: Accessibility.policyCanvasNode("risk-score"))
+    let node = element(in: app, identifier: Accessibility.policyCanvasNode("risk:merge"))
     XCTAssertTrue(node.waitForExistence(timeout: Self.actionTimeout))
 
     let originalFrame = node.frame
