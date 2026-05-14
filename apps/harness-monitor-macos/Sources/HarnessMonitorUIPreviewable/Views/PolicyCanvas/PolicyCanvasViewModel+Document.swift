@@ -1,14 +1,80 @@
 import HarnessMonitorKit
 import SwiftUI
 
+/// Snapshot of a dashboard-side policy pipeline update deferred while the user
+/// has unsaved local edits. Held by `PolicyCanvasViewModel` until the caller
+/// invokes `applyPendingUpdate()` (typically after a user-driven "reload"
+/// affordance in the canvas chrome).
+struct PolicyCanvasPendingUpdate: Equatable {
+  let document: TaskBoardPolicyPipelineDocument?
+  let simulation: TaskBoardPolicyPipelineSimulationResult?
+  let audit: TaskBoardPolicyPipelineAuditSummary?
+}
+
 extension PolicyCanvasViewModel {
   func load(
     document: TaskBoardPolicyPipelineDocument?,
     simulation: TaskBoardPolicyPipelineSimulationResult?,
     audit: TaskBoardPolicyPipelineAuditSummary?
   ) {
+    // Three incoming shapes hit this seam; the dirty-gate branch handles one,
+    // the rest fall through to applyDocument:
+    //
+    //   1. Different-revision document + documentDirty=true → stage as
+    //      pendingDocumentUpdate, return early (this branch).
+    //   2. Same-revision document (with or without dirty) → fall through;
+    //      applyDocument short-circuits inside before rewriting nodes/groups/
+    //      edges, only updating latestSimulation. Local edits survive.
+    //   3. Nil document (audit-only / simulation-only) → fall through;
+    //      applyDocument's `guard let document` updates latestSimulation and
+    //      returns. Local edits survive.
+    //
+    // Compare revision (UInt64) rather than the full document — the daemon
+    // increments it on every persisted change, so a one-cycle compare replaces
+    // a deep walk over nodes/edges/groups/actions/checks on every dashboard
+    // publish.
+    let incomingDiffers = document != nil && document?.revision != backingDocument?.revision
+    if documentDirty && incomingDiffers {
+      setPendingUpdate(
+        PolicyCanvasPendingUpdate(
+          document: document,
+          simulation: simulation,
+          audit: audit
+        )
+      )
+      return
+    }
+    applyDocument(document: document, simulation: simulation, audit: audit)
+  }
+
+  /// Applies a dashboard payload unconditionally, bypassing the dirty-protect
+  /// gate in `load()`. Used by `applyPendingUpdate()` to commit a previously
+  /// staged update; same code path otherwise produces a "clean and stale"
+  /// state if a manual `documentDirty = false` were paired with a separate
+  /// `load(...)` call that early-returns mid-flight.
+  func applyDocument(
+    document: TaskBoardPolicyPipelineDocument?,
+    simulation: TaskBoardPolicyPipelineSimulationResult?,
+    audit: TaskBoardPolicyPipelineAuditSummary?
+  ) {
+    // On document-preserving paths (nil incoming doc, same-revision republish)
+    // only overwrite latestSimulation when the incoming payload actually
+    // carries one. A nil-republish must not nil out a sim that still matches
+    // the current revision — otherwise promoteDisabledReason flips back to
+    // "Run simulation first" after a harmless audit-only push.
     guard let document else {
-      latestSimulation = simulation ?? audit?.latestSimulation
+      if let incoming = simulation ?? audit?.latestSimulation {
+        latestSimulation = incoming
+      }
+      return
+    }
+    // Same-revision republish: the daemon emitted no document change, only
+    // simulation/audit. Keep local nodes/groups/edges as-is and update the
+    // attached sim/audit slots silently.
+    if let backing = backingDocument, backing.revision == document.revision {
+      if let incoming = simulation ?? audit?.latestSimulation {
+        latestSimulation = incoming
+      }
       return
     }
     backingDocument = document
@@ -29,8 +95,10 @@ extension PolicyCanvasViewModel {
     resetNextNodeNumber()
     markLoadedDocumentRevision(document.revision)
     resetCleanEphemeralComponents()
-    isDirty = false
-    lastActionSummary = "Loaded revision \(document.revision)"
+    documentDirty = false
+    viewportDirty = false
+    setPendingUpdate(nil)
+    notifyStatus("Loaded revision \(document.revision)")
   }
 
   func loadIfChanged(
@@ -76,6 +144,72 @@ extension PolicyCanvasViewModel {
       ),
       policyTraceIds: backingDocument?.policyTraceIds ?? []
     )
+  }
+
+  /// Apply any pending dashboard update, overwriting local edits. The
+  /// underlying `applyDocument(...)` clears `documentDirty` and the pending
+  /// storage itself on the clean path, so this method does no pre-apply state
+  /// writes — pre-clearing would leave state "clean but stale" if
+  /// `applyDocument` ever short-circuits mid-execution.
+  func applyPendingUpdate() {
+    guard let pending = pendingDocumentUpdate else {
+      return
+    }
+    applyDocument(
+      document: pending.document,
+      simulation: pending.simulation,
+      audit: pending.audit
+    )
+  }
+
+  /// Stable identifier for the currently loaded pipeline, or nil before any
+  /// document is loaded. Today the daemon does not carry a dedicated pipeline
+  /// id, so we derive one from the first policy trace id (stable across saves
+  /// of the same pipeline). View identity changes only when the underlying
+  /// pipeline switches, not on every revision bump.
+  ///
+  /// Returning nil instead of a sentinel "default" prevents two distinct
+  /// trace-less pipelines from sharing the same `.id()` — callers must skip
+  /// the `.id()` modifier entirely when this is nil. The host view does so
+  /// via `optionalID(_:)` in `PolicyCanvasView`.
+  var pipelineIdentity: String? {
+    backingDocument?.policyTraceIds.first
+  }
+
+  /// Single writer that keeps the @ObservationIgnored `pendingDocumentUpdate`
+  /// storage and the observed `hasPendingDocumentUpdate` flag in sync. Internal
+  /// callers must always go through this — direct writes to
+  /// `pendingDocumentUpdate` would leave the chrome's "Remote changes
+  /// available" affordance stuck on its previous value.
+  func setPendingUpdate(_ value: PolicyCanvasPendingUpdate?) {
+    pendingDocumentUpdate = value
+    hasPendingDocumentUpdate = value != nil
+  }
+
+  func resetNextNodeNumber() {
+    nextNodeNumber = nodes.count + 1
+  }
+
+  func markInitialRemoteLoadRequested() -> Bool {
+    guard !hasRequestedInitialRemoteLoad else {
+      return false
+    }
+    hasRequestedInitialRemoteLoad = true
+    return true
+  }
+
+  func shouldApplyExternalDocument(_ document: TaskBoardPolicyPipelineDocument?) -> Bool {
+    guard let document else {
+      return false
+    }
+    guard !documentDirty else {
+      return false
+    }
+    return loadedDocumentRevision != document.revision || backingDocument?.mode != document.mode
+  }
+
+  func markLoadedDocumentRevision(_ revision: UInt64?) {
+    loadedDocumentRevision = revision
   }
 
   private func assignGroupMembership(

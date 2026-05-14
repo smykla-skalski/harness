@@ -334,6 +334,7 @@ public enum HarnessMonitorAccessibility {
   public static let policyCanvasSaveButton = "harness.policy-canvas.action.save"
   public static let policyCanvasSimulateButton = "harness.policy-canvas.action.simulate"
   public static let policyCanvasPromoteButton = "harness.policy-canvas.action.promote"
+  public static let policyCanvasReloadButton = "harness.policy-canvas.action.reload"
   public static let policyCanvasZoomControls = "harness.policy-canvas.zoom"
   public static let policyCanvasZoomOutButton = "harness.policy-canvas.zoom.out"
   public static let policyCanvasZoomInButton = "harness.policy-canvas.zoom.in"
