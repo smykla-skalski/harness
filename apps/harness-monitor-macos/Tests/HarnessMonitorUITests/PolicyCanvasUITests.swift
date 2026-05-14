@@ -48,8 +48,8 @@ final class PolicyCanvasUITests: HarnessMonitorUITestCase {
       XCTAssertFalse(group.frame.intersects(topBar.frame), "Policy group overlaps top bar")
       XCTAssertFalse(group.frame.intersects(toolRail.frame), "Policy group overlaps tool rail")
       XCTAssertTrue(
-        canvasFrame.insetBy(dx: -1, dy: -1).contains(group.frame),
-        "Policy group should start fully inside the canvas viewport"
+        canvasFrame.insetBy(dx: -1, dy: -1).contains(group.frame.origin),
+        "Policy group should start inside the visible canvas viewport"
       )
     }
 

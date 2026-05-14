@@ -116,25 +116,25 @@ struct PolicyCanvasViewModelTests {
     let entry = PolicyCanvasGroup(
       id: "entry",
       title: "Action routing",
-      frame: CGRect(x: 36, y: 72, width: 256, height: 200),
+      frame: CGRect(x: 140, y: 160, width: 256, height: 220),
       tone: .intake
     )
     let merge = PolicyCanvasGroup(
       id: "merge",
       title: "Merge checks",
-      frame: CGRect(x: 316, y: 72, width: 256, height: 380),
+      frame: CGRect(x: 540, y: 160, width: 256, height: 420),
       tone: .evaluation
     )
     let terminal = PolicyCanvasGroup(
       id: "terminal",
       title: "Terminal decisions",
-      frame: CGRect(x: 676, y: 72, width: 476, height: 620),
+      frame: CGRect(x: 980, y: 160, width: 256, height: 1_220),
       tone: .release
     )
 
     let route = PolicyCanvasEdgeRoute(
-      source: CGPoint(x: 248, y: 172),
-      target: CGPoint(x: 720, y: 172),
+      source: CGPoint(x: 352, y: 260),
+      target: CGPoint(x: 1_024, y: 260),
       lane: 0,
       groups: [entry, merge, terminal],
       sourceGroupID: "entry",
@@ -143,6 +143,70 @@ struct PolicyCanvasViewModelTests {
 
     #expect(!route.segmentsIntersect(rect: merge.frame))
     #expect(route.labelPosition.y == route.points[2].y)
+  }
+
+  @Test("blocked routes reserve separate label lanes")
+  func blockedRoutesReserveSeparateLabelLanes() {
+    let entry = PolicyCanvasGroup(
+      id: "entry",
+      title: "Action routing",
+      frame: CGRect(x: 140, y: 160, width: 256, height: 220),
+      tone: .intake
+    )
+    let merge = PolicyCanvasGroup(
+      id: "merge",
+      title: "Merge checks",
+      frame: CGRect(x: 540, y: 160, width: 256, height: 420),
+      tone: .evaluation
+    )
+    let terminal = PolicyCanvasGroup(
+      id: "terminal",
+      title: "Terminal decisions",
+      frame: CGRect(x: 980, y: 160, width: 256, height: 1_220),
+      tone: .release
+    )
+
+    let labels = (0..<3).map { lane in
+      PolicyCanvasEdgeRoute(
+        source: CGPoint(x: 352, y: 236 + CGFloat(lane * 24)),
+        target: CGPoint(x: 1_024, y: 260 + CGFloat(lane * 140)),
+        lane: lane,
+        groups: [entry, merge, terminal],
+        sourceGroupID: "entry",
+        targetGroupID: "terminal"
+      ).labelPosition
+    }
+
+    #expect(Set(labels.map { Int($0.y.rounded()) }).count == labels.count)
+  }
+
+  @Test("adjacent group routes use gap corridor")
+  func adjacentGroupRoutesUseGapCorridor() {
+    let merge = PolicyCanvasGroup(
+      id: "merge",
+      title: "Merge checks",
+      frame: CGRect(x: 540, y: 160, width: 256, height: 420),
+      tone: .evaluation
+    )
+    let terminal = PolicyCanvasGroup(
+      id: "terminal",
+      title: "Terminal decisions",
+      frame: CGRect(x: 980, y: 160, width: 256, height: 1_220),
+      tone: .release
+    )
+
+    let route = PolicyCanvasEdgeRoute(
+      source: CGPoint(x: 752, y: 260),
+      target: CGPoint(x: 1_024, y: 912),
+      lane: 8,
+      groups: [merge, terminal],
+      sourceGroupID: "merge",
+      targetGroupID: "terminal"
+    )
+
+    let verticalCorridorX = route.points[1].x
+    #expect(verticalCorridorX > merge.frame.maxX)
+    #expect(verticalCorridorX < terminal.frame.minX)
   }
 
   @Test("group frame follows dragged member node")

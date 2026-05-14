@@ -346,23 +346,23 @@ extension CGRect {
 }
 
 private let defaultPolicyCanvasGroupFrames: [String: CGRect] = [
-  "entry": CGRect(x: 36, y: 72, width: 256, height: 200),
-  "merge": CGRect(x: 316, y: 72, width: 256, height: 380),
-  "terminal": CGRect(x: 676, y: 72, width: 476, height: 620),
+  "entry": CGRect(x: 140, y: 160, width: 256, height: 220),
+  "merge": CGRect(x: 540, y: 160, width: 256, height: 420),
+  "terminal": CGRect(x: 980, y: 160, width: 256, height: 1_220),
 ]
 
 private let defaultPolicyCanvasNodePositions: [String: CGPoint] = [
-  "action:router": CGPoint(x: 80, y: 124),
-  "evidence:merge": CGPoint(x: 360, y: 124),
-  "risk:merge": CGPoint(x: 360, y: 304),
-  "supervisor:default-allow": CGPoint(x: 720, y: 124),
-  "dry_run:mutate_repo": CGPoint(x: 940, y: 124),
-  "human:unsafe-action": CGPoint(x: 720, y: 264),
-  "human:missing-merge-evidence": CGPoint(x: 940, y: 264),
-  "consensus:protected-path": CGPoint(x: 720, y: 404),
-  "dry_run:high-risk-merge": CGPoint(x: 940, y: 404),
-  "supervisor:merge-deny": CGPoint(x: 720, y: 544),
-  "supervisor:auto-merge": CGPoint(x: 940, y: 544),
+  "action:router": CGPoint(x: 184, y: 212),
+  "evidence:merge": CGPoint(x: 584, y: 212),
+  "risk:merge": CGPoint(x: 584, y: 392),
+  "supervisor:default-allow": CGPoint(x: 1_024, y: 212),
+  "dry_run:mutate_repo": CGPoint(x: 1_024, y: 352),
+  "human:unsafe-action": CGPoint(x: 1_024, y: 492),
+  "human:missing-merge-evidence": CGPoint(x: 1_024, y: 632),
+  "consensus:protected-path": CGPoint(x: 1_024, y: 772),
+  "dry_run:high-risk-merge": CGPoint(x: 1_024, y: 912),
+  "supervisor:merge-deny": CGPoint(x: 1_024, y: 1_052),
+  "supervisor:auto-merge": CGPoint(x: 1_024, y: 1_192),
 ]
 
 private func policyCanvasEdgeLabel(_ edge: TaskBoardPolicyPipelineEdge) -> String {

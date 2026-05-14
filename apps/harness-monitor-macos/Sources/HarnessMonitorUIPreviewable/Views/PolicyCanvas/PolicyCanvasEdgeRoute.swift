@@ -12,8 +12,10 @@ struct PolicyCanvasEdgeRoute {
     sourceGroupID: String? = nil,
     targetGroupID: String? = nil
   ) {
-    let laneOffset = CGFloat(lane % 8) * 12
+    let laneOffset = CGFloat(lane % 12) * 16
     let horizontalDistance = target.x - source.x
+    let sourceGroupFrame = Self.groupFrame(sourceGroupID, in: groups)
+    let targetGroupFrame = Self.groupFrame(targetGroupID, in: groups)
     let blockers = Self.blockingGroups(
       source: source,
       target: target,
@@ -26,12 +28,26 @@ struct PolicyCanvasEdgeRoute {
         source: source,
         target: target,
         blockers: blockers,
+        lane: lane,
         laneOffset: laneOffset
+      )
+    } else if sourceGroupID != targetGroupID,
+      let sourceGroupFrame,
+      let targetGroupFrame,
+      target.x > source.x
+    {
+      (points, labelPosition) = Self.interGroupRoute(
+        source: source,
+        target: target,
+        sourceGroupFrame: sourceGroupFrame,
+        targetGroupFrame: targetGroupFrame,
+        lane: lane
       )
     } else if horizontalDistance > 260, abs(source.y - target.y) < 96 {
       (points, labelPosition) = Self.wideRoute(
         source: source,
         target: target,
+        lane: lane,
         laneOffset: laneOffset
       )
     } else {
@@ -39,9 +55,17 @@ struct PolicyCanvasEdgeRoute {
         source: source,
         target: target,
         horizontalDistance: horizontalDistance,
+        lane: lane,
         laneOffset: laneOffset
       )
     }
+  }
+
+  private static func groupFrame(_ id: String?, in groups: [PolicyCanvasGroup]) -> CGRect? {
+    guard let id else {
+      return nil
+    }
+    return groups.first { $0.id == id }?.frame
   }
 
   private static func blockingGroups(
@@ -88,28 +112,55 @@ struct PolicyCanvasEdgeRoute {
     source: CGPoint,
     target: CGPoint,
     blockers: [CGRect],
+    lane: Int,
     laneOffset: CGFloat
   ) -> ([CGPoint], CGPoint) {
     let sourceRunX = source.x + 48 + laneOffset
     let targetRunX = target.x - 48 - laneOffset
-    let topLaneY = max(
-      18,
-      (blockers.map(\.minY).min() ?? PolicyCanvasLayout.initialContentOrigin.y) - 34 - laneOffset
-    )
+    let topBase = (blockers.map(\.minY).min() ?? PolicyCanvasLayout.initialContentOrigin.y) - 34
+    let topLaneY = topBase - laneOffset
+    let bottomLaneY =
+      (blockers.map(\.maxY).max() ?? PolicyCanvasLayout.initialContentOrigin.y) + 42 + laneOffset
+    let routedY = topLaneY >= 18 ? topLaneY : bottomLaneY
     let points = [
       source,
       CGPoint(x: sourceRunX, y: source.y),
-      CGPoint(x: sourceRunX, y: topLaneY),
-      CGPoint(x: targetRunX, y: topLaneY),
+      CGPoint(x: sourceRunX, y: routedY),
+      CGPoint(x: targetRunX, y: routedY),
       CGPoint(x: targetRunX, y: target.y),
       target,
     ]
-    return (points, labelPosition(for: points))
+    return (points, labelPosition(for: points, lane: lane))
+  }
+
+  private static func interGroupRoute(
+    source: CGPoint,
+    target: CGPoint,
+    sourceGroupFrame: CGRect,
+    targetGroupFrame: CGRect,
+    lane: Int
+  ) -> ([CGPoint], CGPoint) {
+    let gapMinX = sourceGroupFrame.maxX + 34
+    let gapMaxX = targetGroupFrame.minX - 34
+    let laneOffset = CGFloat((lane % 5) - 2) * 12
+    let preferredBusX = ((gapMinX + gapMaxX) / 2) + laneOffset
+    let busX =
+      gapMinX < gapMaxX
+      ? min(gapMaxX, max(gapMinX, preferredBusX))
+      : source.x + max(72, (target.x - source.x) * 0.46)
+    let points = [
+      source,
+      CGPoint(x: busX, y: source.y),
+      CGPoint(x: busX, y: target.y),
+      target,
+    ]
+    return (points, labelPosition(for: points, lane: lane))
   }
 
   private static func wideRoute(
     source: CGPoint,
     target: CGPoint,
+    lane: Int,
     laneOffset: CGFloat
   ) -> ([CGPoint], CGPoint) {
     let sourceRunX = source.x + 54 + laneOffset
@@ -126,13 +177,14 @@ struct PolicyCanvasEdgeRoute {
       CGPoint(x: targetRunX, y: target.y),
       target,
     ]
-    return (points, labelPosition(for: points))
+    return (points, labelPosition(for: points, lane: lane))
   }
 
   private static func defaultRoute(
     source: CGPoint,
     target: CGPoint,
     horizontalDistance: CGFloat,
+    lane: Int,
     laneOffset: CGFloat
   ) -> ([CGPoint], CGPoint) {
     let midX =
@@ -145,10 +197,10 @@ struct PolicyCanvasEdgeRoute {
       CGPoint(x: midX, y: target.y),
       target,
     ]
-    return (points, labelPosition(for: points))
+    return (points, labelPosition(for: points, lane: lane))
   }
 
-  private static func labelPosition(for points: [CGPoint]) -> CGPoint {
+  private static func labelPosition(for points: [CGPoint], lane: Int) -> CGPoint {
     let segments = zip(points, points.dropFirst())
     let preferred =
       segments
@@ -166,9 +218,12 @@ struct PolicyCanvasEdgeRoute {
     guard let segment else {
       return points.first ?? .zero
     }
+    let horizontal = abs(segment.1.x - segment.0.x) >= abs(segment.1.y - segment.0.y)
+    let laneT = min(0.78, max(0.22, 0.38 + CGFloat(lane % 6) * 0.07))
+    let t = horizontal ? laneT : 0.5
     return CGPoint(
-      x: (segment.0.x + segment.1.x) / 2,
-      y: (segment.0.y + segment.1.y) / 2
+      x: segment.0.x + ((segment.1.x - segment.0.x) * t),
+      y: segment.0.y + ((segment.1.y - segment.0.y) * t)
     )
   }
 

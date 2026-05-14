@@ -78,7 +78,7 @@ struct PolicyCanvasTopBar: View {
     .background(Color(red: 0.08, green: 0.09, blue: 0.12).opacity(0.98))
     .overlay(alignment: .bottom) {
       Rectangle()
-        .fill(.white.opacity(0.08))
+        .fill(Color.white.opacity(0.08))
         .frame(height: 1)
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasTopBar)
@@ -193,10 +193,10 @@ struct PolicyCanvasZoomControls: View {
     .controlSize(.small)
     .padding(.horizontal, 10)
     .padding(.vertical, 7)
-    .background(.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 8))
+    .background(Color.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 8))
     .overlay {
       RoundedRectangle(cornerRadius: 8)
-        .stroke(.white.opacity(0.12), lineWidth: 1)
+        .stroke(Color.white.opacity(0.12), lineWidth: 1)
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasZoomControls)
