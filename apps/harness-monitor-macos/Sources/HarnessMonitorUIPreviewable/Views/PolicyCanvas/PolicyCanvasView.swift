@@ -30,6 +30,7 @@ public struct PolicyCanvasView: View {
   @State private var statusLine: String = "No pending changes"
   @FocusState private var focusedField: PolicyCanvasFocusedField?
   @Environment(\.scenePhase) private var scenePhase
+  @Environment(\.undoManager) private var undoManager
   private let store: HarnessMonitorStore?
   private let dashboardUI: HarnessMonitorStore.ContentDashboardSlice?
 
@@ -115,10 +116,18 @@ public struct PolicyCanvasView: View {
     }
     .task {
       bindStatusLine()
+      viewModel.attachUndoManager(undoManager)
       await loadPolicyPipeline()
     }
     .onChange(of: dashboardSnapshot) { _, _ in
       applyDashboardSnapshot()
+    }
+    // `@Environment(\.undoManager)` is window-scoped and may flip when the
+    // canvas is reparented (e.g. focus moves between session windows). Re-
+    // attach on every change so subsequent `mutate(_:)` calls register
+    // against the live manager. Reads inside `.onChange` see the new value.
+    .onChange(of: undoManager) { _, newValue in
+      viewModel.attachUndoManager(newValue)
     }
     // When the scene leaves .active (Mission Control, Cmd-Tab to another
     // app, modal sheet presentation, window minimize) the in-flight gesture
