@@ -7,7 +7,7 @@ struct WorkspaceToolbarUITestForceTickModifier: ViewModifier {
 
   @ViewBuilder
   func body(content: Content) -> some View {
-    if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
+    if HarnessMonitorUITestEnvironment.generalMarkersEnabled {
       content
         .overlay(alignment: .bottomTrailing) {
           Button("Force Workspace Attention Tick") {

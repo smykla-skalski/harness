@@ -74,25 +74,20 @@ struct SessionWindowPerfScenarioScript: ViewModifier {
     guard appliedScenarioRawValue != scenario else { return }
 
     let baseScenario = HarnessMonitorUITestEnvironment.basePerfScenario(for: scenario)
-    HarnessMonitorPerfTrace.recordScenarioEvent(
-      event: "script.begin",
-      details: [
-        "base_scenario": baseScenario,
-        "session_id": sessionID,
-      ]
-    )
-
     switch baseScenario {
     case "session-search-full":
       guard trigger.hasSearchCorpus else { return }
       appliedScenarioRawValue = scenario
+      recordScriptBegin(baseScenario: baseScenario, sessionID: sessionID)
       await runFullSessionSearchScript()
     case "sidebar-toggle-rich-detail":
       guard !trigger.sidebarToggleTargets.isEmpty else { return }
       appliedScenarioRawValue = scenario
+      recordScriptBegin(baseScenario: baseScenario, sessionID: sessionID)
       await runSidebarToggleRichDetailScript(targets: trigger.sidebarToggleTargets)
     case "timeline-burst", "timeline-filter-form":
       appliedScenarioRawValue = scenario
+      recordScriptBegin(baseScenario: baseScenario, sessionID: sessionID)
       stateCache.selectRoute(.timeline)
       HarnessMonitorPerfTrace.recordStep(
         "route.timeline",
@@ -104,6 +99,16 @@ struct SessionWindowPerfScenarioScript: ViewModifier {
 
     HarnessMonitorPerfTrace.recordScenarioEvent(
       event: "script.complete",
+      details: [
+        "base_scenario": baseScenario,
+        "session_id": sessionID,
+      ]
+    )
+  }
+
+  private func recordScriptBegin(baseScenario: String, sessionID: String) {
+    HarnessMonitorPerfTrace.recordScenarioEvent(
+      event: "script.begin",
       details: [
         "base_scenario": baseScenario,
         "session_id": sessionID,

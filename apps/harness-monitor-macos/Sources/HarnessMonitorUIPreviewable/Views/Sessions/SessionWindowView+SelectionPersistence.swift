@@ -21,6 +21,9 @@ extension SessionWindowView {
   }
 
   func syncPersistedStorage(from selection: SessionSelection) {
+    guard !HarnessMonitorUITestEnvironment.isPerfScenarioActive else {
+      return
+    }
     let targetRoute: SessionWindowRoute
     let targetDecisionID: String
     switch selection {
@@ -47,6 +50,9 @@ extension SessionWindowView {
   }
 
   func clearPersistedDecisionQueryIfNeeded() {
+    guard !HarnessMonitorUITestEnvironment.isPerfScenarioActive else {
+      return
+    }
     if !persistedDecisionQuery.isEmpty {
       persistedDecisionQuery = ""
     }

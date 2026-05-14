@@ -1,5 +1,7 @@
 import Testing
 
+@testable import HarnessMonitorUIPreviewable
+
 extension SessionWindowFlowTests {
   @Test("Sidebar density keeps strict default and maps legacy values")
   func sidebarDensityResolvesStrictDefaultAndLegacyValues() {
