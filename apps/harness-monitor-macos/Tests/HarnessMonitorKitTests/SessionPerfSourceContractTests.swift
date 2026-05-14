@@ -30,6 +30,9 @@ struct SessionPerfSourceContractTests {
 
   @Test("Perf sidebar and route scripts avoid restoration writeback churn")
   func perfScriptsAvoidRestorationWritebackChurn() throws {
+    let windowSource = try previewableSourceFile(
+      at: "Views/Sessions/SessionWindowView.swift"
+    )
     let persistenceSource = try previewableSourceFile(
       at: "Views/Sessions/SessionWindowView+SelectionPersistence.swift"
     )
@@ -39,6 +42,9 @@ struct SessionPerfSourceContractTests {
 
     #expect(
       persistenceSource.contains("guard !HarnessMonitorUITestEnvironment.isPerfScenarioActive")
+    )
+    #expect(
+      windowSource.contains("guard !HarnessMonitorUITestEnvironment.isPerfScenarioActive")
     )
     #expect(layoutSource.contains("@State private var perfColumnVisibilityStorage"))
     #expect(layoutSource.contains("if HarnessMonitorUITestEnvironment.isPerfScenarioActive"))

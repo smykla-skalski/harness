@@ -262,6 +262,7 @@ public struct SessionWindowView: View {
         }
       }
       .onChange(of: stateCache.sectionState.decisionID) { _, newDecisionID in
+        guard !HarnessMonitorUITestEnvironment.isPerfScenarioActive else { return }
         guard case .route(.decisions) = stateCache.selection else { return }
         let storedDecisionID = newDecisionID ?? ""
         guard persistedDecisionID != storedDecisionID else { return }
@@ -284,6 +285,7 @@ public struct SessionWindowView: View {
   ) -> some View {
     content
       .onChange(of: stateCache.decisionFilters.query) { _, newValue in
+        guard !HarnessMonitorUITestEnvironment.isPerfScenarioActive else { return }
         guard persistedDecisionQuery != newValue else { return }
         persistedDecisionQuery = newValue
       }
