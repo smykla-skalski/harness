@@ -70,87 +70,15 @@ public struct TaskBoardPolicyPipelineValidationIssue: Codable, Equatable, Sendab
     case code
     case message
     case id
-    case nodeId
-    case edgeId
-    case nodeIds
+    case nodeId = "node_id"
+    case edgeId = "edge_id"
+    case nodeIds = "node_ids"
     case expected
     case actual
     case port
     case direction
     case action
     case location
-
-    init?(stringValue: String) {
-      switch stringValue {
-      case "issue":
-        self = .issue
-      case "code":
-        self = .code
-      case "message":
-        self = .message
-      case "id":
-        self = .id
-      case "node_id", "nodeId":
-        self = .nodeId
-      case "edge_id", "edgeId":
-        self = .edgeId
-      case "node_ids", "nodeIds":
-        self = .nodeIds
-      case "expected":
-        self = .expected
-      case "actual":
-        self = .actual
-      case "port":
-        self = .port
-      case "direction":
-        self = .direction
-      case "action":
-        self = .action
-      case "location":
-        self = .location
-      default:
-        return nil
-      }
-    }
-
-    var stringValue: String {
-      switch self {
-      case .issue:
-        "issue"
-      case .code:
-        "code"
-      case .message:
-        "message"
-      case .id:
-        "id"
-      case .nodeId:
-        "node_id"
-      case .edgeId:
-        "edge_id"
-      case .nodeIds:
-        "node_ids"
-      case .expected:
-        "expected"
-      case .actual:
-        "actual"
-      case .port:
-        "port"
-      case .direction:
-        "direction"
-      case .action:
-        "action"
-      case .location:
-        "location"
-      }
-    }
-
-    init?(intValue: Int) {
-      return nil
-    }
-
-    var intValue: Int? {
-      nil
-    }
   }
 
   public init(from decoder: Decoder) throws {
@@ -169,21 +97,10 @@ public struct TaskBoardPolicyPipelineValidationIssue: Codable, Equatable, Sendab
     direction = try container.decodeIfPresent(String.self, forKey: .direction)
     action = try container.decodeIfPresent(TaskBoardPolicyAction.self, forKey: .action)
     location = try container.decodeIfPresent(String.self, forKey: .location)
-    message =
-      try container.decodeIfPresent(String.self, forKey: .message)
-      ?? Self.defaultMessage(
-        code: code,
-        id: id,
-        nodeId: nodeId,
-        edgeId: edgeId,
-        nodeIds: nodeIds,
-        expected: expected,
-        actual: actual,
-        port: port,
-        direction: direction,
-        action: action,
-        location: location
-      )
+    message = try container.decodeIfPresent(String.self, forKey: .message) ?? code
+    if message == code {
+      message = synthesizedMessage
+    }
   }
 
   public func encode(to encoder: Encoder) throws {
@@ -206,19 +123,7 @@ public struct TaskBoardPolicyPipelineValidationIssue: Codable, Equatable, Sendab
     try container.encodeIfPresent(location, forKey: .location)
   }
 
-  private static func defaultMessage(
-    code: String,
-    id: String?,
-    nodeId: String?,
-    edgeId: String?,
-    nodeIds: [String],
-    expected: UInt16?,
-    actual: UInt16?,
-    port: String?,
-    direction: String?,
-    action: TaskBoardPolicyAction?,
-    location: String?
-  ) -> String {
+  private var synthesizedMessage: String {
     switch code {
     case "unsupported_schema_version":
       let expectedText = expected.map(String.init) ?? "current"

@@ -126,7 +126,8 @@ struct PolicyCanvasViewModelTests {
 
   @Test("validation issues preserve daemon fields")
   func validationIssuesPreserveDaemonFields() throws {
-    let payload = """
+    let payload = Data(
+      """
       {
         "issues": [
           {
@@ -156,7 +157,8 @@ struct PolicyCanvasViewModelTests {
           }
         ]
       }
-      """.data(using: .utf8)!
+      """.utf8
+    )
 
     let validation = try JSONDecoder().decode(TaskBoardPolicyPipelineValidation.self, from: payload)
 
