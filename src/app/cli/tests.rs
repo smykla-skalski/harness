@@ -14,6 +14,7 @@ use crate::run::{
 };
 use crate::session::transport::{SessionCommand, SessionObserveArgs};
 use crate::setup::{CapabilitiesArgs, ClusterArgs, GatewayArgs, KumaSetupCommand};
+use crate::task_board::transport::TaskBoardCommand;
 
 #[path = "tests/create.rs"]
 mod create;
@@ -94,6 +95,7 @@ fn all_expected_subcommands_registered() {
         "session-start",
         "session-stop",
         "setup",
+        "task-board",
     ] {
         assert!(names.contains(&expected), "missing subcommand: {expected}");
     }
@@ -172,5 +174,35 @@ fn parse_session_observe_with_poll() {
             assert!(args.json);
         }
         _ => panic!("expected Session Observe"),
+    }
+}
+
+#[test]
+fn parse_task_board_create() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "task-board",
+        "create",
+        "--title",
+        "Add inbox",
+        "--body",
+        "Track cross-project work",
+        "--priority",
+        "high",
+        "--agent-mode",
+        "interactive",
+        "--tag",
+        "monitor",
+    ])
+    .unwrap();
+    match cli.command {
+        Command::TaskBoard {
+            command: TaskBoardCommand::Create(args),
+        } => {
+            assert_eq!(args.title, "Add inbox");
+            assert_eq!(args.body, "Track cross-project work");
+            assert_eq!(args.tag, ["monitor"]);
+        }
+        _ => panic!("expected TaskBoard Create"),
     }
 }

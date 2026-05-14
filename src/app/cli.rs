@@ -27,6 +27,7 @@ use crate::setup::{
     AgentsSetupCommand, BootstrapArgs, CapabilitiesArgs, GatewayArgs, KumaSetupArgs,
     PreCompactArgs, SessionStartArgs, SessionStopArgs,
 };
+use crate::task_board::transport::TaskBoardCommand;
 use crate::telemetry::{current_trace_id, runtime_service_from_current_process};
 
 /// Harness CLI.
@@ -148,6 +149,12 @@ pub enum Command {
         command: SessionCommand,
     },
 
+    /// Cross-project task board.
+    TaskBoard {
+        #[command(subcommand)]
+        command: TaskBoardCommand,
+    },
+
     /// Local daemon for the Harness app.
     Daemon {
         #[command(subcommand)]
@@ -190,6 +197,7 @@ pub fn dispatch(command: &Command) -> Result<i32, CliError> {
         Command::PreCompact(args) => args.execute(&ctx),
         Command::Observe(args) => args.execute(&ctx),
         Command::Session { command } => command.execute(&ctx),
+        Command::TaskBoard { command } => command.execute(&ctx),
         Command::Daemon { command } => command.execute(&ctx),
         Command::Bridge { command } => command.execute(&ctx),
         Command::Mcp { command } => command.execute(&ctx),
@@ -208,6 +216,7 @@ fn command_name(command: &Command) -> &'static str {
         Command::PreCompact(_) => "pre-compact",
         Command::Observe(_) => "observe",
         Command::Session { .. } => "session",
+        Command::TaskBoard { .. } => "task-board",
         Command::Daemon { .. } => "daemon",
         Command::Bridge { .. } => "bridge",
         Command::Mcp { .. } => "mcp",
