@@ -42,10 +42,18 @@ harness session task assign <session-id> <task-id> <agent-id> --actor <agent-id>
 harness session task list <session-id> [--status <status>] [--json]
 harness session task update <session-id> <task-id> --status <status> [--note "..."] --actor <agent-id>
 harness session task checkpoint <session-id> <task-id> --summary "..." --progress <0-100> --actor <agent-id>
+harness session task submit-for-review <session-id> <task-id> --actor <agent-id> [--summary "..."] [--suggested-persona "..."]
+harness session task claim-review <session-id> <task-id> --actor <agent-id>
+harness session task submit-review <session-id> <task-id> --actor <agent-id> --verdict <verdict> --summary "..." [--points <json>]
+harness session task respond-review <session-id> <task-id> --actor <agent-id> [--agreed <id,id>] [--disputed <id,id>] [--note "..."]
+harness session task arbitrate <session-id> <task-id> --actor <agent-id> --verdict <verdict> --summary "..."
 ```
 
-Task statuses: `open`, `in-progress`, `in-review`, `blocked`, `done`.
+Task statuses: `open`, `in_progress`, `awaiting_review`, `in_review`, `blocked`, `done`.
 Task severities: `low`, `medium`, `high`, `critical`.
+Review verdicts: `approve`, `request_changes`, `reject`.
+
+Read [task-board-workflow.md](task-board-workflow.md) for the task-board operating flow and review-state rules.
 
 ## Signals
 

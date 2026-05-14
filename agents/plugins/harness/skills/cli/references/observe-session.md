@@ -53,7 +53,7 @@ Sources: `cargo run --quiet -- observe scan --help`; `cargo run --quiet -- obser
 | `status` | Show current session status |
 | `list` | List sessions |
 
-Nested families currently expose: `session task {create, assign, list, update, checkpoint}`, `session signal {send, list}`, and `session agents {start, attach, list, show, input, resize, stop, steer, interrupt, approve}`.
+Nested families currently expose: `session task {create, assign, list, update, checkpoint, submit-for-review, claim-review, submit-review, respond-review, arbitrate}`, `session signal {send, list}`, and `session agents {start, attach, list, show, input, resize, stop, steer, interrupt, approve}`.
 
 Sources: `cargo run --quiet -- session --help`; `cargo run --quiet -- session task --help`; `cargo run --quiet -- session signal --help`; `cargo run --quiet -- session agents --help`; `src/session/transport/mod.rs:25-170`.
 
