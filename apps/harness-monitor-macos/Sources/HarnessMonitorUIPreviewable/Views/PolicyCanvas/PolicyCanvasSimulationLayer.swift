@@ -4,7 +4,7 @@ import SwiftUI
 ///   - `.allowed` → green checkmark badge top-right
 ///   - `.denied(reason)` → red X badge top-right; hover tooltip carries reason
 ///   - `.unreached` → 50% opacity dim overlay on the node body
-///   - `.indeterminate` → no overlay (silence beats lying)
+///   - absent from map → no overlay (no opinion / unclassifiable verdict)
 ///
 /// The map is read from the view model's `simulationOutcomeMap()` cache so
 /// per-row lookups stay O(1) and don't re-walk decisions per frame. Hoisting
@@ -14,8 +14,9 @@ import SwiftUI
 /// This layer renders ABOVE `PolicyCanvasNodeLayer` in the workspace ZStack
 /// so badges sit on top of nodes; the `.unreached` dim uses a translucent
 /// overlay over the node's rendered footprint without touching the node
-/// card view itself (3G owns the a11y framework, and 3M owns the node-card
-/// tests — this layer stays out of those territories).
+/// card view itself (the parent node-card framework owns title a11y, and
+/// the node-card tests own card rendering — this layer stays out of those
+/// territories).
 struct PolicyCanvasSimulationLayer: View {
   let viewModel: PolicyCanvasViewModel
 
@@ -67,16 +68,16 @@ private struct PolicyCanvasSimulationNodeOverlay: View {
       return .allowed
     case .denied(let reason):
       return .denied(reason: reason)
-    case .unreached, .indeterminate:
+    case .unreached:
       return nil
     }
   }
 }
 
 /// Visual variant for the corner badge. Pulled into its own type so the
-/// badge view stays free of the outcome enum's `.unreached`/`.indeterminate`
-/// branches that don't render a badge — keeps the view body a single switch
-/// over rendered states.
+/// badge view stays free of the outcome enum's `.unreached` branch — which
+/// doesn't render a badge — and keeps the view body a single switch over
+/// rendered states.
 enum PolicyCanvasSimulationBadgeKind: Equatable {
   case allowed
   case denied(reason: String)
@@ -117,6 +118,19 @@ enum PolicyCanvasSimulationBadgeKind: Equatable {
     }
     return nil
   }
+
+  /// VoiceOver label for the badge. Deliberately short and node-title free:
+  /// the parent node card already exposes the node title via its own
+  /// `accessibilityValue`, so including the title here would make VO read
+  /// the node identity twice (once on the card, once on this sibling).
+  /// The badge contributes only the verdict and the reason code (when
+  /// present) so a deny isn't a black-box "denied".
+  var accessibilityLabel: String {
+    if let reason, !reason.isEmpty {
+      return "\(verdictLabel): \(reason)"
+    }
+    return verdictLabel
+  }
 }
 
 /// Top-right corner badge. Geometry mirrors the validation severity badge in
@@ -146,24 +160,12 @@ private struct PolicyCanvasSimulationBadge: View {
           }
           .offset(x: 8, y: -8)
           .help(kind.reason ?? kind.verdictLabel)
-          .accessibilityLabel(accessibilityLabel)
+          .accessibilityLabel(kind.accessibilityLabel)
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.policyCanvasSimulationBadge(node.id)
           )
       }
       Spacer()
     }
-  }
-
-  /// Read by VoiceOver when the rotor lands on the badge. Includes the node
-  /// title so the user knows which component carries the verdict without
-  /// chasing context, and the reason code when present so a deny isn't a
-  /// black-box "denied".
-  private var accessibilityLabel: String {
-    let base = "Node \(node.title): \(kind.verdictLabel)"
-    if let reason = kind.reason, !reason.isEmpty {
-      return "\(base) - \(reason)"
-    }
-    return base
   }
 }

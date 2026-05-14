@@ -8,6 +8,12 @@ import SwiftUI
 /// Nodes outside any decision's visited set are `.unreached`. When no
 /// simulation has run (or the simulation failed end-to-end) the map is empty
 /// and the canvas renders without overlays.
+///
+/// Three real verdicts only: allowed, denied, unreached. A decision string
+/// the daemon emits but we don't know how to classify is a parse failure,
+/// not a verdict; we model that as "no entry in the map" (i.e. absence),
+/// keeping the enum free of an "unknown classification" case that conflated
+/// two concepts in earlier revisions.
 enum PolicyCanvasSimulationOutcome: Equatable {
   /// Visited by a decision branch that terminated with `decision == "allow"`.
   case allowed
@@ -19,9 +25,6 @@ enum PolicyCanvasSimulationOutcome: Equatable {
   /// Rendered as a 50% opacity dim overlay so dead branches stay visually
   /// quiet but remain legible for the user.
   case unreached
-  /// Visited but the decision branch terminated with a value we cannot
-  /// classify. No badge is drawn — silence beats lying.
-  case indeterminate
 }
 
 /// Cached output of `derivePerNodeOutcomes`. Mirrors the Wave 2E severity-map
@@ -88,13 +91,16 @@ extension PolicyCanvasViewModel {
   ///   2. Earlier visited nodes carry the same verdict — the simulation
   ///      reached them on the way to the terminal.
   ///   3. When a node appears in multiple decisions with mismatched verdicts
-  ///      we keep the most informative one in this order: denied > allowed >
-  ///      indeterminate. Denied dominates because a deny anywhere along a
-  ///      node's lineage is the signal a user most cares about.
-  ///   4. Nodes that exist in `nodes` but never appear in any decision's
-  ///      `visitedNodeIds` are `.unreached` — the simulation succeeded but
-  ///      this branch was dead from the start.
-  ///   5. When `succeeded == false` or there are no decisions, we return an
+  ///      the dominance rule is `denied > allowed`. A node with no decision
+  ///      mention is absent from the map (no opinion to express).
+  ///   4. Nodes that exist in `nodes` but never appear in any classifiable
+  ///      decision's `visitedNodeIds` are `.unreached` — the simulation
+  ///      succeeded but this branch was dead from the start.
+  ///   5. Decision strings the daemon emits but we cannot classify
+  ///      (anything other than `allow` / `deny` / `require_human`) are a
+  ///      parse failure, not a verdict. We leave their visited nodes out of
+  ///      the map entirely; the overlay renders no badge for them.
+  ///   6. When `succeeded == false` or there are no decisions, we return an
   ///      empty map. Drawing badges on a failed sim would mislead.
   func derivePerNodeOutcomes() -> [String: PolicyCanvasSimulationOutcome] {
     guard let simulation = latestSimulation, simulation.succeeded else {
@@ -104,11 +110,20 @@ extension PolicyCanvasViewModel {
       return [:]
     }
     var outcomes: [String: PolicyCanvasSimulationOutcome] = [:]
+    var classifiedAny = false
     for decision in simulation.decisions {
-      let verdict = outcome(for: decision.decision)
+      guard let verdict = outcome(for: decision.decision) else {
+        // Unclassifiable verdict string — leave visited nodes absent.
+        continue
+      }
+      classifiedAny = true
       for nodeID in decision.visitedNodeIds {
         outcomes[nodeID] = preferred(existing: outcomes[nodeID], incoming: verdict)
       }
+    }
+    guard classifiedAny else {
+      // No classifiable decisions at all — render no overlays.
+      return [:]
     }
     let documentNodeIDs = Set(nodes.map(\.id))
     for nodeID in documentNodeIDs where outcomes[nodeID] == nil {
@@ -119,26 +134,27 @@ extension PolicyCanvasViewModel {
 
   /// Classify a terminal decision string into the canvas verdict.
   /// `"allow"` → `.allowed`, `"deny"` and `"require_human"` →
-  /// `.denied(reason)`, anything else → `.indeterminate`. The daemon emits
-  /// these strings; until it ships a typed enum (P11 shim territory) we map
-  /// here.
+  /// `.denied(reason)`, anything else → `nil` (absent from the outcome map).
+  /// The daemon emits these strings; until it ships a typed enum (P11 shim
+  /// territory) we map here. Returning `nil` for unrecognized strings keeps
+  /// "we don't know how to classify" out of the verdict enum.
   private func outcome(
     for decision: TaskBoardPolicyDecision
-  ) -> PolicyCanvasSimulationOutcome {
+  ) -> PolicyCanvasSimulationOutcome? {
     switch decision.decision {
     case "allow":
       return .allowed
     case "deny", "require_human":
       return .denied(reason: decision.reasonCode)
     default:
-      return .indeterminate
+      return nil
     }
   }
 
   /// Choose the more informative outcome when a node appears in two
-  /// decisions. Priority: denied > allowed > indeterminate. `.unreached` is
-  /// never seeded by `derivePerNodeOutcomes` from this path (it's a fill-in
-  /// for nodes absent from every decision), so it doesn't appear here.
+  /// decisions. Dominance: denied > allowed. `.unreached` never appears
+  /// here — it's a fill-in for nodes absent from every classifiable
+  /// decision and is applied after the per-decision walk.
   private func preferred(
     existing: PolicyCanvasSimulationOutcome?,
     incoming: PolicyCanvasSimulationOutcome
@@ -146,18 +162,11 @@ extension PolicyCanvasViewModel {
     guard let existing else {
       return incoming
     }
-    // Denied dominates everything else.
+    // Denied dominates allowed; otherwise keep the first seen.
     if case .denied = existing {
       return existing
     }
     if case .denied = incoming {
-      return incoming
-    }
-    // Allowed beats indeterminate.
-    if existing == .allowed {
-      return existing
-    }
-    if incoming == .allowed {
       return incoming
     }
     return existing
