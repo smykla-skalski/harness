@@ -44,6 +44,22 @@ short_hash() {
   printf '%s\n' "${digest:0:16}"
 }
 
+sweep_dead_sccache_sockets() {
+  local dir="$1"
+  local live_sockets sock
+  [[ -d "$dir" ]] || return 0
+
+  live_sockets="$(lsof -U -F n 2>/dev/null | awk '/^n\// {print substr($0,2)}' | sort -u || true)"
+
+  for sock in "$dir"/*.sock; do
+    [[ -e "$sock" ]] || continue
+    if [[ -n "$live_sockets" ]] && grep -qxF "$sock" <<<"$live_sockets"; then
+      continue
+    fi
+    rm -f "$sock"
+  done
+}
+
 configure_sccache_socket() {
   local socket_root socket_id safe_user
 
@@ -64,9 +80,16 @@ configure_sccache_socket() {
     return 1
   fi
 
+  sweep_dead_sccache_sockets "$socket_root"
+  safe_user="${safe_user:-$(sanitize_segment "${USER:-user}")}"
+  if [[ "$socket_root" != "/tmp/harness-sccache-$safe_user" ]]; then
+    sweep_dead_sccache_sockets "/tmp/harness-sccache-$safe_user"
+  fi
+
   socket_id="$(short_hash "$COMMON_REPO_ROOT:$target_segment")"
   export SCCACHE_SERVER_UDS="$socket_root/$socket_id.sock"
-  export SCCACHE_IDLE_TIMEOUT="${SCCACHE_IDLE_TIMEOUT:-120}"
+  export SCCACHE_IDLE_TIMEOUT="${SCCACHE_IDLE_TIMEOUT:-1800}"
+  export SCCACHE_CACHE_SIZE="${SCCACHE_CACHE_SIZE:-30G}"
 }
 
 cargo_bin_usable() {
@@ -241,6 +264,8 @@ if [[ "${1:-}" == "--print-env" ]]; then
   fi
   printf 'TMPDIR=%s\n' "${TMPDIR:-}"
   printf 'SCCACHE_SERVER_UDS=%s\n' "${SCCACHE_SERVER_UDS:-}"
+  printf 'SCCACHE_IDLE_TIMEOUT=%s\n' "${SCCACHE_IDLE_TIMEOUT:-}"
+  printf 'SCCACHE_CACHE_SIZE=%s\n' "${SCCACHE_CACHE_SIZE:-}"
   printf 'RUSTC_WRAPPER=%s\n' "${RUSTC_WRAPPER:-}"
   if [[ -n "${RUSTC_WRAPPER:-}" ]]; then
     printf 'CACHE_MODE=sccache\n'
