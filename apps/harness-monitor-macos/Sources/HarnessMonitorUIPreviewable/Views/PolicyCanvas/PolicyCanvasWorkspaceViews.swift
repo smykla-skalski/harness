@@ -13,10 +13,12 @@ struct PolicyCanvasViewport: View {
           ZStack(alignment: .topLeading) {
             PolicyCanvasGroupLayer(viewModel: viewModel)
             PolicyCanvasEdgeLayer(viewModel: viewModel)
+            PolicyCanvasRubberBandLayer(viewModel: viewModel)
             PolicyCanvasNodeLayer(viewModel: viewModel)
             PolicyCanvasEdgeLabelLayer(viewModel: viewModel)
           }
           .scaleEffect(viewModel.zoom, anchor: .topLeading)
+          .coordinateSpace(name: PolicyCanvasCoordinateSpaces.canvas)
         }
         .frame(
           width: max(proxy.size.width, viewModel.canvasContentSize.width * viewModel.zoom),
@@ -32,6 +34,10 @@ struct PolicyCanvasViewport: View {
         }
         .onTapGesture {
           viewModel.select(nil)
+        }
+        .overlay {
+          PolicyCanvasEmptyStatePlaceholder(viewModel: viewModel)
+            .allowsHitTesting(false)
         }
       }
       .scrollIndicators(.visible)
@@ -120,6 +126,14 @@ private struct PolicyCanvasGroupLayer: View {
       )
       .onTapGesture {
         viewModel.select(.group(group.id))
+      }
+      .dropDestination(for: String.self) { payloads, _ in
+        viewModel.dropPalettePayloads(
+          payloads,
+          at: CGPoint(x: group.frame.midX, y: group.frame.midY)
+        )
+      } isTargeted: { targeted in
+        viewModel.setGroupDropTargeted(targeted, groupID: group.id)
       }
     }
   }

@@ -183,6 +183,53 @@ struct PolicyCanvasArchitectureFoundationTests {
     #expect(viewModel.latestSimulation == simulation)
   }
 
+  @Test("same-revision republish clears in-flight rubber-band and highlights")
+  func sameRevisionRepublishClearsTransientGestureState() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    let document = archDocument(revision: 80)
+    viewModel.load(document: document, simulation: nil, audit: nil)
+
+    // Simulate an in-flight rubber-band drag plus highlighted port and group.
+    viewModel.beginPendingEdge(
+      sourceNodeID: "arch-node-intake",
+      sourcePortID: "default"
+    )
+    viewModel.setInputTargeted(true, nodeID: "arch-node-decision", portID: "in")
+    viewModel.setGroupDropTargeted(true, groupID: "arch-group-dispatch")
+    #expect(viewModel.hasPendingEdge == true)
+    #expect(viewModel.highlightedInput != nil)
+    #expect(viewModel.highlightedGroupID != nil)
+
+    // Daemon emits an audit-only republish at the same revision (no document
+    // change). The transient affordances must clear — their anchors may not
+    // point at the same screen position after layout reconciles.
+    viewModel.load(document: document, simulation: nil, audit: nil)
+
+    #expect(viewModel.pendingEdgePreview == nil)
+    #expect(viewModel.hasPendingEdge == false)
+    #expect(viewModel.highlightedInput == nil)
+    #expect(viewModel.highlightedGroupID == nil)
+  }
+
+  @Test("same-revision republish rewinds the palette drop cursor")
+  func sameRevisionRepublishRewindsPaletteAnchor() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    let document = archDocument(revision: 90)
+    viewModel.load(document: document, simulation: nil, audit: nil)
+    // Advance the palette cursor away from the initial anchor. The returned
+    // point depends on which slots the arch-doc nodes occupy, so the
+    // post-advance ANCHOR is the invariant we check, not the returned point.
+    _ = viewModel.nextPaletteDropCenter()
+    _ = viewModel.nextPaletteDropCenter()
+    #expect(viewModel.nextPaletteDropAnchor != PolicyCanvasLayout.initialPaletteDropAnchor)
+
+    // Same-revision republish must reset the diagonal cursor; otherwise an
+    // audit-only restore leaves the next click landing on a drifting offset.
+    viewModel.load(document: document, simulation: nil, audit: nil)
+
+    #expect(viewModel.nextPaletteDropAnchor == PolicyCanvasLayout.initialPaletteDropAnchor)
+  }
+
   private func archDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
     TaskBoardPolicyPipelineDocument(
       schemaVersion: 2,

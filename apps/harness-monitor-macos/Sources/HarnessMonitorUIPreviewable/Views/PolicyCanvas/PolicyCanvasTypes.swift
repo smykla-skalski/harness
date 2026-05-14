@@ -271,6 +271,28 @@ struct PolicyCanvasSnapshot {
   let latestSimulation: TaskBoardPolicyPipelineSimulationResult?
 }
 
+/// In-flight rubber-band edge preview while the user drags from an output
+/// port. Holds the source endpoint plus its anchor point so callers can render
+/// a Bézier curve from the port to the live cursor location. The cursor is
+/// updated in canvas coordinates (`viewModel.canvasPoint(for:)`); the source
+/// anchor stays fixed for the duration of the drag. Cleared on drop or cancel.
+struct PolicyCanvasPendingEdgePreview: Equatable {
+  let source: PolicyCanvasPortEndpoint
+  let sourceAnchor: CGPoint
+  var cursor: CGPoint
+}
+
+/// Named coordinate spaces used by gesture-coordinate translations within the
+/// policy canvas. The workspace declares each space on the appropriate view
+/// so DragGesture(coordinateSpace:) reads positions relative to the right
+/// container regardless of the surrounding chrome layout.
+enum PolicyCanvasCoordinateSpaces {
+  /// Pre-scaling canvas content stack. Position values are in canvas units
+  /// (before the workspace `scaleEffect`). Use `viewModel.canvasPoint(for:)`
+  /// when the value is captured in scaled coordinates.
+  static let canvas = "policy-canvas.workspace"
+}
+
 enum PolicyCanvasLayout {
   static let gridSize: CGFloat = 20
   static let nodeSize = CGSize(width: 168, height: 96)
@@ -288,6 +310,14 @@ enum PolicyCanvasLayout {
   static let minimumCanvasSize = CGSize(width: 2_400, height: 2_160)
   static let canvasTrailingPadding: CGFloat = 760
   static let canvasBottomPadding: CGFloat = 760
+  /// First center used when the user clicks a palette button. Subsequent
+  /// clicks step away from this anchor by `paletteDropStep` so identical
+  /// clicks don't pile on top of each other.
+  static let initialPaletteDropAnchor = CGPoint(x: 260, y: 220)
+  /// Per-click advance offset for palette button drops. 40pt = 2x grid step
+  /// so the next drop lands cleanly on the grid and stays clear of the prior
+  /// node frame.
+  static let paletteDropStep: CGFloat = 40
 
   static func portY(index: Int, count: Int) -> CGFloat {
     guard count > 1 else {

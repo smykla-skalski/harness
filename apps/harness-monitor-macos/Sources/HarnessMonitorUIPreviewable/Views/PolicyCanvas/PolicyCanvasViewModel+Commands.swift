@@ -23,6 +23,7 @@ extension PolicyCanvasViewModel {
   func clearTransientGestureState() {
     highlightedInput = nil
     highlightedGroupID = nil
+    clearPendingEdge()
   }
 
   func save() {

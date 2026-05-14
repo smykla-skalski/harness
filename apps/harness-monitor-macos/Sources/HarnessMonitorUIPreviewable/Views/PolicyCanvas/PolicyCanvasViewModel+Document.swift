@@ -72,11 +72,20 @@ extension PolicyCanvasViewModel {
     // Same-revision republish: the daemon emitted no document change, only
     // simulation/audit. Keep local nodes/groups/edges as-is and update the
     // attached sim/audit slots silently.
+    //
+    // Transient gesture state (rubber-band preview, port/group highlights,
+    // palette drop cursor) is anchored to specific nodes/ports that, while
+    // node identity is preserved by this branch, may move once layout
+    // reconciles around an audit-driven republish. Clearing here keeps the
+    // affordances honest: a rubber-band drag that started before the
+    // republish drops on the next gesture, not on a stale anchor.
     if let backing = backingDocument, backing.revision == document.revision {
       if let incoming = simulation ?? audit?.latestSimulation {
         latestSimulation = incoming
         invalidateValidationCache()
       }
+      clearTransientGestureState()
+      resetPaletteDropPlacement()
       return
     }
     backingDocument = document
@@ -97,6 +106,8 @@ extension PolicyCanvasViewModel {
     resetNextNodeNumber()
     markLoadedDocumentRevision(document.revision)
     resetCleanEphemeralComponents()
+    resetPaletteDropPlacement()
+    clearTransientGestureState()
     documentDirty = false
     viewportDirty = false
     setPendingUpdate(nil)
@@ -168,6 +179,8 @@ extension PolicyCanvasViewModel {
     reconcileGroupFrames()
     documentDirty = markDirty
     clearTransientGestureState()
+    resetPaletteDropPlacement()
+    invalidateValidationCache()
     notifyStatus(reason)
   }
 
