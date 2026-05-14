@@ -92,20 +92,44 @@ struct SessionTimelineLoadOlderTriggerTests {
     #expect(!sourceFile.contains("if presentation.navigation.hasOlder {"))
   }
 
-  @Test("Section wires older-chunk appender")
+  @Test("Section wires older-chunk appender with dynamic page size")
   func sectionWiresStoreAppender() throws {
     let sectionSource = try timelineSource(named: "MonitorTimelineSection.swift")
 
-    #expect(sectionSource.contains("static let loadOlderChunkSize = 10"))
+    #expect(sectionSource.contains("static let fallbackPageSize = 10"))
+    #expect(sectionSource.contains("static let estimatedRowHeight: CGFloat = 56"))
+    #expect(sectionSource.contains("var pageSize: Int"))
+    #expect(sectionSource.contains("let limit = pageSize"))
     #expect(sectionSource.contains("await store.appendSelectedTimelineOlderChunk("))
     #expect(sectionSource.contains("retainedLimit: nil"))
   }
 
-  @Test("Section refresh uses paginated limit")
+  @Test("Section refresh uses dynamic page size from measured container")
   func sectionRefreshLimit() throws {
+    let sectionSource = try timelineSource(named: "MonitorTimelineSection.swift")
     let supportSource = try timelineSource(named: "MonitorTimelineSection+Support.swift")
-    #expect(supportSource.contains("static let initialPageLimit = 10"))
-    #expect(supportSource.contains("TimelineWindowRequest.latest(limit: Self.initialPageLimit)"))
+    #expect(sectionSource.contains(".onGeometryChange(for: CGFloat.self, of: \\.size.height)"))
+    #expect(sectionSource.contains("updateMeasuredContainerHeight"))
+    #expect(supportSource.contains("TimelineWindowRequest.latest(limit: pageSize)"))
+  }
+
+  @Test("pageSize defaults to fallback when container unmeasured")
+  func pageSizeFallback() {
+    let fallback = 10
+    let estimated: CGFloat = 56
+    let unmeasured: CGFloat = 0
+    let height: CGFloat = 720
+
+    func compute(measured: CGFloat) -> Int {
+      guard measured > 0 else { return fallback }
+      let rows = Int((measured / estimated).rounded(.up))
+      return max(fallback, rows)
+    }
+
+    #expect(compute(measured: unmeasured) == fallback)
+    #expect(compute(measured: 200) == fallback)
+    #expect(compute(measured: height) == Int((height / estimated).rounded(.up)))
+    #expect(compute(measured: 1200) > fallback)
   }
 
   @Test("Section routes older-load through per-window snapshot when timelineLoading set")

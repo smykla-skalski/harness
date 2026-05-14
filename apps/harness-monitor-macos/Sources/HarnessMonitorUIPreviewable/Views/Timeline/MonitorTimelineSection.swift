@@ -50,7 +50,22 @@ struct SessionTimelineView: View {
   @State private var filters = SessionTimelineFilterState()
   @State private var presentationCache = SessionTimelineSectionPresentationCache()
   @State private var loadOlderInFlight = false
-  @State var didInitialFreshFetch = false
+  @State private var didInitialFreshFetch = false
+  @State private var measuredContainerHeight: CGFloat = 0
+
+  static let fallbackPageSize = 10
+  static let estimatedRowHeight: CGFloat = 56
+
+  var pageSize: Int {
+    guard measuredContainerHeight > 0 else { return Self.fallbackPageSize }
+    let rows = Int((measuredContainerHeight / Self.estimatedRowHeight).rounded(.up))
+    return max(Self.fallbackPageSize, rows)
+  }
+
+  func updateMeasuredContainerHeight(_ height: CGFloat) {
+    guard height >= 0, measuredContainerHeight != height else { return }
+    measuredContainerHeight = height
+  }
 
   private var presentation: SessionTimelineSectionPresentation {
     presentationCache.presentation(
@@ -75,6 +90,12 @@ struct SessionTimelineView: View {
   var filterState: SessionTimelineFilterState {
     get { filters }
     nonmutating set { filters = newValue }
+  }
+
+  func markInitialFreshFetchRequested() -> Bool {
+    guard !didInitialFreshFetch else { return false }
+    didInitialFreshFetch = true
+    return true
   }
 
   private var routeMetrics: SessionWindowRouteContentMetrics {
@@ -103,6 +124,9 @@ struct SessionTimelineView: View {
       applyPerfScenarioFiltersIfNeeded()
     }
     .onAppear { requestLatestWindowIfNeeded(presentation) }
+    .onGeometryChange(for: CGFloat.self, of: \.size.height) { _, height in
+      updateMeasuredContainerHeight(height)
+    }
     .onChange(of: host.id) { _, _ in requestLatestWindow() }
     .onChange(of: filters) { _, newValue in
       persistFilters(normalizedFilters(newValue))
@@ -276,31 +300,17 @@ struct SessionTimelineView: View {
     store.presentedSheet = .signalDetail(signalID: signalID)
   }
 
-  static let loadOlderChunkSize = 10
-
   func requestLoadOlderTimelineChunk() {
     let oldestCursor =
       timelineWindow?.oldestCursor
       ?? timeline.last.map { TimelineCursor(recordedAt: $0.recordedAt, entryId: $0.entryId) }
-    let route: String =
-      if timelineLoading != nil { "per-window" } else { "global-selected" }
-    HarnessMonitorLogger.timelinePaging.info(
-      """
-      section.request limit=\(Self.loadOlderChunkSize, privacy: .public) \
-      sessionID=\(sessionID, privacy: .public) \
-      route=\(route, privacy: .public) \
-      hasOldestCursor=\(oldestCursor != nil, privacy: .public)
-      """
-    )
+    let limit = pageSize
     if let timelineLoading, let oldestCursor {
-      if loadOlderInFlight {
-        HarnessMonitorLogger.timelinePaging.debug("section.request guard in-flight")
-        return
-      }
+      if loadOlderInFlight { return }
       loadOlderInFlight = true
       let request = TimelineWindowRequest(
         scope: .summary,
-        limit: Self.loadOlderChunkSize,
+        limit: limit,
         before: oldestCursor
       )
       Task { @MainActor in
@@ -311,7 +321,7 @@ struct SessionTimelineView: View {
     }
     Task { @MainActor in
       await store.appendSelectedTimelineOlderChunk(
-        limit: Self.loadOlderChunkSize,
+        limit: limit,
         retainedLimit: nil
       )
     }
