@@ -16,6 +16,7 @@ pub use dispatch::{
     DispatchAppliedTask, DispatchBlockReason, DispatchExecutionSummary, DispatchPlan,
     DispatchReadiness, EvaluatorIntent, FollowUpPhase, ReviewerIntent, SessionIntent,
     TaskCreationIntent, WorkerIntent, build_dispatch_plan, build_dispatch_plans,
+    build_dispatch_plans_with_policy_root,
 };
 pub use evaluation::{
     TaskBoardEvaluationDecision, TaskBoardEvaluationOutcome, TaskBoardEvaluationRecord,
@@ -68,7 +69,8 @@ pub use store::{TaskBoardStore, default_board_root};
 pub use summary::{
     TaskBoardAuditSummary, TaskBoardMachineSummary, TaskBoardProjectSummary,
     TaskBoardProviderSyncSummary, TaskBoardStatusCount, TaskBoardSyncSummary, build_audit_summary,
-    build_dispatch_summary, build_machine_summaries, build_project_summaries, build_sync_summary,
+    build_dispatch_summary, build_dispatch_summary_with_policy_root, build_machine_summaries,
+    build_project_summaries, build_sync_summary,
 };
 pub use types::{
     AgentMode, ExternalRef, ExternalRefProvider, PlanningState, TaskBoardItem, TaskBoardPriority,
