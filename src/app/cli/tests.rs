@@ -14,9 +14,7 @@ use crate::run::{
 };
 use crate::session::transport::{SessionCommand, SessionObserveArgs};
 use crate::setup::{CapabilitiesArgs, ClusterArgs, GatewayArgs, KumaSetupCommand};
-use crate::task_board::transport::{
-    TaskBoardCommand, TaskBoardOrchestratorCommand,
-};
+use crate::task_board::transport::{TaskBoardCommand, TaskBoardOrchestratorCommand};
 use crate::task_board::types::{ExternalRefProvider, TaskBoardStatus, TaskBoardWorkflowStatus};
 
 #[path = "tests/create.rs"]
