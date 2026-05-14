@@ -89,6 +89,22 @@ struct PolicyCanvasNodeCard: View {
         viewModel: viewModel
       )
 
+      PolicyCanvasPortColumn(
+        node: node,
+        ports: node.inputPorts,
+        alignment: .top,
+        viewModel: viewModel,
+        isAuxiliary: true
+      )
+
+      PolicyCanvasPortColumn(
+        node: node,
+        ports: node.outputPorts,
+        alignment: .bottom,
+        viewModel: viewModel,
+        isAuxiliary: true
+      )
+
       if let severity {
         severityBadge(for: severity)
       }

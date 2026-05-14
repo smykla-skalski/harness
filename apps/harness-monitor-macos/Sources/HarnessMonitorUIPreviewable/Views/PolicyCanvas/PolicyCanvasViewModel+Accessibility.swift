@@ -48,9 +48,10 @@ extension PolicyCanvasViewModel {
     let targetPiece = [targetNode?.title, targetPort?.title]
       .compactMap { $0 }
       .joined(separator: " ")
+    let edgeName = edge.label.isEmpty ? "connection" : edge.label
     if sourcePiece.isEmpty || targetPiece.isEmpty {
-      return "Edge \(edge.label)"
+      return "Edge \(edgeName)"
     }
-    return "Edge \(edge.label), from \(sourcePiece) to \(targetPiece)"
+    return "Edge \(edgeName), from \(sourcePiece) to \(targetPiece)"
   }
 }

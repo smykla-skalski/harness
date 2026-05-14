@@ -125,6 +125,13 @@ enum PolicyCanvasPortKind: String {
   case output
 }
 
+enum PolicyCanvasPortSide: String, Hashable {
+  case leading
+  case trailing
+  case top
+  case bottom
+}
+
 struct PolicyCanvasPort: Identifiable, Hashable {
   let id: String
   let title: String
@@ -206,6 +213,7 @@ struct PolicyCanvasPortEndpoint: Hashable {
   let nodeID: String
   let portID: String
   let kind: PolicyCanvasPortKind
+  var side: PolicyCanvasPortSide? = nil
 }
 
 struct PolicyCanvasEdge: Identifiable, Hashable {
@@ -300,20 +308,23 @@ enum PolicyCanvasLayout {
   static let portHitTestExtension: CGFloat = 8
   static let groupCornerRadius: CGFloat = 8
   static let edgeLabelHeight: CGFloat = 28
-  static let edgeLabelMaxWidth: CGFloat = 260
-  static let edgeLabelLaneSpacing: CGFloat = 42
-  static let edgeLabelNodeClearance: CGFloat = 18
-  static let initialContentOrigin = CGPoint(x: 360, y: 260)
+  static let edgeLabelMaxWidth: CGFloat = 220
+  static let edgeLabelLaneSpacing: CGFloat = 46
+  static let edgeBusLaneSpacing: CGFloat = 38
+  static let edgeLabelNodeClearance: CGFloat = 24
+  static let edgeLabelHorizontalMargin: CGFloat = 14
+  static let initialContentOrigin = CGPoint(x: 520, y: 480)
   static let groupHorizontalPadding: CGFloat = 44
   static let groupVerticalPadding: CGFloat = 52
   static let minimumGroupSize = CGSize(width: 220, height: 180)
-  static let minimumCanvasSize = CGSize(width: 2_400, height: 2_160)
-  static let canvasTrailingPadding: CGFloat = 760
-  static let canvasBottomPadding: CGFloat = 760
+  static let minimumCanvasSize = CGSize(width: 3_800, height: 3_000)
+  static let canvasTrailingPadding: CGFloat = 1_200
+  static let canvasBottomPadding: CGFloat = 1_200
+  static let initialViewportAnchorID = "policy-canvas-initial-viewport-anchor"
   /// First center used when the user clicks a palette button. Subsequent
   /// clicks step away from this anchor by `paletteDropStep` so identical
   /// clicks don't pile on top of each other.
-  static let initialPaletteDropAnchor = CGPoint(x: 260, y: 220)
+  static let initialPaletteDropAnchor = CGPoint(x: 640, y: 620)
   /// Per-click advance offset for palette button drops. 40pt = 2x grid step
   /// so the next drop lands cleanly on the grid and stays clear of the prior
   /// node frame.
@@ -326,5 +337,14 @@ enum PolicyCanvasLayout {
     let step = min(CGFloat(24), nodeSize.height / CGFloat(count + 1))
     let top = (nodeSize.height - (step * CGFloat(count - 1))) / 2
     return top + (CGFloat(index) * step)
+  }
+
+  static func portX(index: Int, count: Int) -> CGFloat {
+    guard count > 1 else {
+      return nodeSize.width / 2
+    }
+    let step = min(CGFloat(32), nodeSize.width / CGFloat(count + 1))
+    let leading = (nodeSize.width - (step * CGFloat(count - 1))) / 2
+    return leading + (CGFloat(index) * step)
   }
 }

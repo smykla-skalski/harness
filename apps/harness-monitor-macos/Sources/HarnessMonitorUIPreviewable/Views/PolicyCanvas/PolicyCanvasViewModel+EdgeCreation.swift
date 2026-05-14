@@ -18,11 +18,16 @@ extension PolicyCanvasViewModel {
   /// resolvable or is not an output. The initial cursor sits at the source
   /// anchor so the curve is collapsed until the gesture provides a real
   /// translation.
-  func beginPendingEdge(sourceNodeID: String, sourcePortID: String) {
+  func beginPendingEdge(
+    sourceNodeID: String,
+    sourcePortID: String,
+    side: PolicyCanvasPortSide? = nil
+  ) {
     let endpoint = PolicyCanvasPortEndpoint(
       nodeID: sourceNodeID,
       portID: sourcePortID,
-      kind: .output
+      kind: .output,
+      side: side
     )
     guard
       let node = node(sourceNodeID),
@@ -66,19 +71,6 @@ extension PolicyCanvasViewModel {
   func clearPendingEdge() {
     setPendingEdge(nil)
     highlightedInput = nil
-  }
-
-  /// Drop every piece of in-flight gesture state in one call: the rubber-band
-  /// edge preview, the highlighted input port stroke, and the highlighted
-  /// drop-target group. Use this from interruption surfaces (scenePhase
-  /// transitions, Escape keypress, document republish) where the canvas needs
-  /// to return to a resting state regardless of which gesture was mid-flight.
-  ///
-  /// Idempotent — every write is to optional storage that may already be nil.
-  func clearTransientGestureState() {
-    setPendingEdge(nil)
-    highlightedInput = nil
-    highlightedGroupID = nil
   }
 
   /// Single writer that keeps `pendingEdgePreview` and the observed

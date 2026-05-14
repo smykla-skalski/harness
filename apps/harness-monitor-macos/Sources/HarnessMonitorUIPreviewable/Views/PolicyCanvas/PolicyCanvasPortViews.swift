@@ -3,6 +3,8 @@ import SwiftUI
 enum PolicyCanvasPortColumnAlignment {
   case leading
   case trailing
+  case top
+  case bottom
 }
 
 struct PolicyCanvasPortColumn: View {
@@ -10,6 +12,7 @@ struct PolicyCanvasPortColumn: View {
   let ports: [PolicyCanvasPort]
   let alignment: PolicyCanvasPortColumnAlignment
   let viewModel: PolicyCanvasViewModel
+  var isAuxiliary = false
 
   var body: some View {
     ZStack(alignment: stackAlignment) {
@@ -17,12 +20,11 @@ struct PolicyCanvasPortColumn: View {
         PolicyCanvasPortView(
           node: node,
           port: port,
-          viewModel: viewModel
+          side: portSide,
+          viewModel: viewModel,
+          isAuxiliary: isAuxiliary
         )
-        .offset(
-          y: PolicyCanvasLayout.portY(index: index, count: ports.count)
-            - PolicyCanvasLayout.portDiameter / 2
-        )
+        .offset(offset(index: index, count: ports.count))
       }
     }
     .frame(
@@ -31,22 +33,75 @@ struct PolicyCanvasPortColumn: View {
       alignment: stackAlignment
     )
     .offset(
-      x: alignment == .leading
-        ? -PolicyCanvasLayout.portDiameter / 2
-        : PolicyCanvasLayout.portDiameter / 2,
-      y: 0
+      x: frameOffset.width,
+      y: frameOffset.height
     )
+    .accessibilityHidden(isAuxiliary)
   }
 
   private var stackAlignment: Alignment {
-    alignment == .leading ? .topLeading : .topTrailing
+    switch alignment {
+    case .leading:
+      .topLeading
+    case .trailing:
+      .topTrailing
+    case .top:
+      .topLeading
+    case .bottom:
+      .bottomLeading
+    }
+  }
+
+  private var portSide: PolicyCanvasPortSide {
+    switch alignment {
+    case .leading:
+      .leading
+    case .trailing:
+      .trailing
+    case .top:
+      .top
+    case .bottom:
+      .bottom
+    }
+  }
+
+  private var frameOffset: CGSize {
+    switch alignment {
+    case .leading:
+      CGSize(width: -PolicyCanvasLayout.portDiameter / 2, height: 0)
+    case .trailing:
+      CGSize(width: PolicyCanvasLayout.portDiameter / 2, height: 0)
+    case .top:
+      CGSize(width: 0, height: -PolicyCanvasLayout.portDiameter / 2)
+    case .bottom:
+      CGSize(width: 0, height: PolicyCanvasLayout.portDiameter / 2)
+    }
+  }
+
+  private func offset(index: Int, count: Int) -> CGSize {
+    switch alignment {
+    case .leading, .trailing:
+      CGSize(
+        width: 0,
+        height: PolicyCanvasLayout.portY(index: index, count: count)
+          - PolicyCanvasLayout.portDiameter / 2
+      )
+    case .top, .bottom:
+      CGSize(
+        width: PolicyCanvasLayout.portX(index: index, count: count)
+          - PolicyCanvasLayout.portDiameter / 2,
+        height: 0
+      )
+    }
   }
 }
 
 private struct PolicyCanvasPortView: View {
   let node: PolicyCanvasNode
   let port: PolicyCanvasPort
+  let side: PolicyCanvasPortSide
   let viewModel: PolicyCanvasViewModel
+  let isAuxiliary: Bool
 
   var body: some View {
     if port.kind == .output {
@@ -78,7 +133,7 @@ private struct PolicyCanvasPortView: View {
       //    so the scenePhase guard in `PolicyCanvasView` is the belt-and-
       //    braces fallback for OS-level interruption.
       portMarker
-        .draggable(viewModel.portDragPayload(nodeID: node.id, portID: port.id))
+        .draggable(viewModel.portDragPayload(nodeID: node.id, portID: port.id, side: side))
         .simultaneousGesture(rubberBandGesture)
     } else {
       portMarker
@@ -86,13 +141,15 @@ private struct PolicyCanvasPortView: View {
           viewModel.connectDroppedPortPayloads(
             payloads,
             targetNodeID: node.id,
-            targetPortID: port.id
+            targetPortID: port.id,
+            targetSide: side
           )
         } isTargeted: { targeted in
           viewModel.setInputTargeted(
             targeted,
             nodeID: node.id,
-            portID: port.id
+            portID: port.id,
+            side: side
           )
         }
     }
@@ -107,7 +164,7 @@ private struct PolicyCanvasPortView: View {
     DragGesture(minimumDistance: 3, coordinateSpace: .named(PolicyCanvasCoordinateSpaces.canvas))
       .onChanged { value in
         if viewModel.pendingEdgePreview == nil {
-          viewModel.beginPendingEdge(sourceNodeID: node.id, sourcePortID: port.id)
+          viewModel.beginPendingEdge(sourceNodeID: node.id, sourcePortID: port.id, side: side)
         }
         viewModel.updatePendingEdgeCursor(
           viewModel.canvasPoint(for: value.location)
@@ -125,7 +182,8 @@ private struct PolicyCanvasPortView: View {
     let endpoint = PolicyCanvasPortEndpoint(
       nodeID: node.id,
       portID: port.id,
-      kind: port.kind
+      kind: port.kind,
+      side: side
     )
     return Circle()
       .fill(port.kind == .output ? node.kind.accentColor : Color.white.opacity(0.92))
@@ -149,5 +207,6 @@ private struct PolicyCanvasPortView: View {
           port.id
         )
       )
+      .accessibilityHidden(isAuxiliary)
   }
 }

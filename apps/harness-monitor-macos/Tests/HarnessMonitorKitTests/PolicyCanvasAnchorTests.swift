@@ -101,4 +101,35 @@ struct PolicyCanvasAnchorTests {
     #expect(anchor?.x == expectedX)
     #expect(anchor?.y == expectedY)
   }
+
+  @Test("top and bottom anchors use horizontal port spacing")
+  func verticalPortAnchorsMatchLayoutMath() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    guard let node = viewModel.node("risk-score") else {
+      Issue.record("expected risk-score node")
+      return
+    }
+
+    let topAnchor = viewModel.portAnchor(
+      for: PolicyCanvasPortEndpoint(
+        nodeID: node.id,
+        portID: "input-event",
+        kind: .input,
+        side: .top
+      )
+    )
+    let bottomAnchor = viewModel.portAnchor(
+      for: PolicyCanvasPortEndpoint(
+        nodeID: node.id,
+        portID: "output-pass",
+        kind: .output,
+        side: .bottom
+      )
+    )
+
+    #expect(topAnchor?.x == node.position.x + PolicyCanvasLayout.portX(index: 0, count: 1))
+    #expect(topAnchor?.y == node.position.y)
+    #expect(bottomAnchor?.x == node.position.x + PolicyCanvasLayout.portX(index: 0, count: 2))
+    #expect(bottomAnchor?.y == node.position.y + PolicyCanvasLayout.nodeSize.height)
+  }
 }

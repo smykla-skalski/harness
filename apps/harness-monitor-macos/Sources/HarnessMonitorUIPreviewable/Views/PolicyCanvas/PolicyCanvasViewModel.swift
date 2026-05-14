@@ -18,6 +18,7 @@ final class PolicyCanvasViewModel {
   var documentDirty: Bool
   var viewportDirty: Bool
   var hasRequestedInitialRemoteLoad: Bool
+  var viewportCenteringGeneration: UInt64
 
   /// Observed flag the chrome reads to surface the "Remote changes available"
   /// affordance. Kept separate from the underlying `PolicyCanvasPendingUpdate`
@@ -66,6 +67,7 @@ final class PolicyCanvasViewModel {
 
   @ObservationIgnored var nextNodeNumber: Int
   @ObservationIgnored var loadedDocumentRevision: UInt64?
+  @ObservationIgnored var centeredViewportGeneration: UInt64 = 0
   @ObservationIgnored private var nodeDragOrigins: [String: CGPoint] = [:]
   @ObservationIgnored var groupDragOrigins: [String: CGRect] = [:]
   @ObservationIgnored var groupNodeDragOrigins: [String: [String: CGPoint]] = [:]
@@ -82,7 +84,7 @@ final class PolicyCanvasViewModel {
   /// `nodeSeverityMap` / `edgeSeverityMap` would re-run on cache write
   /// (which itself is triggered by the same body reading the map) and the
   /// cache would defeat itself. Writes go through `cachedSeverityMaps()`.
-  @ObservationIgnored var validationCacheStorage: ValidationCacheEntry?
+  @ObservationIgnored var validationCacheStorage: PolicyCanvasValidationCacheEntry?
 
   /// Bumped by `invalidateValidationCache()` from every mutation site that
   /// can change validator output without touching the count-style token
@@ -111,6 +113,7 @@ final class PolicyCanvasViewModel {
     self.documentDirty = false
     self.viewportDirty = false
     self.hasRequestedInitialRemoteLoad = false
+    self.viewportCenteringGeneration = 0
     self.hasPendingDocumentUpdate = false
     self.pendingDocumentUpdate = nil
     self.pendingEdgePreview = nil
@@ -299,13 +302,15 @@ final class PolicyCanvasViewModel {
   func setInputTargeted(
     _ targeted: Bool,
     nodeID: String,
-    portID: String
+    portID: String,
+    side: PolicyCanvasPortSide? = nil
   ) {
     if targeted {
       highlightedInput = PolicyCanvasPortEndpoint(
         nodeID: nodeID,
         portID: portID,
-        kind: .input
+        kind: .input,
+        side: side
       )
     } else {
       highlightedInput = nil
@@ -315,7 +320,8 @@ final class PolicyCanvasViewModel {
   func connectDroppedPortPayloads(
     _ payloads: [String],
     targetNodeID: String,
-    targetPortID: String
+    targetPortID: String,
+    targetSide: PolicyCanvasPortSide? = nil
   ) -> Bool {
     guard let source = payloads.compactMap(parseOutputPortPayload).first else {
       clearPendingEdge()
@@ -328,7 +334,8 @@ final class PolicyCanvasViewModel {
     let target = PolicyCanvasPortEndpoint(
       nodeID: targetNodeID,
       portID: targetPortID,
-      kind: .input
+      kind: .input,
+      side: targetSide
     )
     guard !edges.contains(where: { $0.source == source && $0.target == target }) else {
       clearPendingEdge()
@@ -360,10 +367,16 @@ final class PolicyCanvasViewModel {
 
   private func parseOutputPortPayload(_ payload: String) -> PolicyCanvasPortEndpoint? {
     let parts = payload.split(separator: "|").map(String.init)
-    guard parts.count == 3, parts[0] == "policy-canvas-port" else {
+    guard (parts.count == 3 || parts.count == 4), parts[0] == "policy-canvas-port" else {
       return nil
     }
-    return PolicyCanvasPortEndpoint(nodeID: parts[1], portID: parts[2], kind: .output)
+    let side = parts.count == 4 ? PolicyCanvasPortSide(rawValue: parts[3]) : nil
+    return PolicyCanvasPortEndpoint(
+      nodeID: parts[1],
+      portID: parts[2],
+      kind: .output,
+      side: side
+    )
   }
 
   private func edgeLabel(
