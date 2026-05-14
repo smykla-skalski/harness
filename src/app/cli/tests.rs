@@ -202,10 +202,8 @@ fn parse_task_board_create() {
         "work-1",
     ])
     .unwrap();
-    match cli.command {
-        Command::TaskBoard {
-            command: TaskBoardCommand::Create(args),
-        } => {
+    match task_board_command(cli.command) {
+        TaskBoardCommand::Create(args) => {
             assert_eq!(args.title, "Add inbox");
             assert_eq!(args.body, "Track cross-project work");
             assert_eq!(args.tag, ["monitor"]);
@@ -242,10 +240,8 @@ fn parse_task_board_update_planning_fields() {
         "--clear-work-item",
     ])
     .unwrap();
-    match cli.command {
-        Command::TaskBoard {
-            command: TaskBoardCommand::Update(args),
-        } => {
+    match task_board_command(cli.command) {
+        TaskBoardCommand::Update(args) => {
             assert_eq!(args.id, "task-1");
             assert_eq!(args.status, Some(TaskBoardStatus::Todo));
             assert_eq!(
@@ -257,8 +253,8 @@ fn parse_task_board_update_planning_fields() {
                 args.fields.workflow_status,
                 Some(TaskBoardWorkflowStatus::Running)
             );
-            assert!(args.clear_session);
-            assert!(args.clear_work_item);
+            assert!(args.clear_links.clear_session);
+            assert!(args.clear_links.clear_work_item);
         }
         _ => panic!("expected TaskBoard Update"),
     }
@@ -282,17 +278,17 @@ fn parse_task_board_orchestrator_runtime_config_and_tokens() {
         "--json",
     ])
     .unwrap();
-    match runtime_config.command {
-        Command::TaskBoard {
-            command:
-                TaskBoardCommand::Orchestrator {
-                    command: TaskBoardOrchestratorCommand::RuntimeConfig(args),
-                },
+    match task_board_command(runtime_config.command) {
+        TaskBoardCommand::Orchestrator {
+            command: TaskBoardOrchestratorCommand::RuntimeConfig(args),
         } => {
             assert_eq!(args.repository.as_deref(), Some("owner/repo"));
-            assert_eq!(args.author_email.as_deref(), Some("repo@example.com"));
-            assert!(args.signing_mode.is_some());
-            assert_eq!(args.gpg_key_id.as_deref(), Some("ABC123"));
+            assert_eq!(
+                args.identity.author_email.as_deref(),
+                Some("repo@example.com")
+            );
+            assert!(args.signing.signing_mode.is_some());
+            assert_eq!(args.signing.gpg_key_id.as_deref(), Some("ABC123"));
             assert!(args.json);
         }
         _ => panic!("expected TaskBoard Orchestrator RuntimeConfig"),
@@ -309,12 +305,9 @@ fn parse_task_board_orchestrator_runtime_config_and_tokens() {
         "owner/repo=HARNESS_REPO_TOKEN",
     ])
     .unwrap();
-    match tokens.command {
-        Command::TaskBoard {
-            command:
-                TaskBoardCommand::Orchestrator {
-                    command: TaskBoardOrchestratorCommand::GithubTokens(args),
-                },
+    match task_board_command(tokens.command) {
+        TaskBoardCommand::Orchestrator {
+            command: TaskBoardOrchestratorCommand::GithubTokens(args),
         } => {
             assert_eq!(args.global_token_env.as_deref(), Some("HARNESS_TOKEN"));
             assert_eq!(args.repository_token_env, ["owner/repo=HARNESS_REPO_TOKEN"]);
@@ -334,43 +327,13 @@ fn parse_task_board_operational_subcommands() {
         (["harness", "task-board", "machine", "--json"], "machine"),
     ] {
         let cli = Cli::try_parse_from(argv).unwrap();
-        match (cli.command, expected) {
-            (
-                Command::TaskBoard {
-                    command: TaskBoardCommand::Sync(args),
-                },
-                "sync",
-            ) => assert!(args.json),
-            (
-                Command::TaskBoard {
-                    command: TaskBoardCommand::Dispatch(args),
-                },
-                "dispatch",
-            ) => assert!(args.json),
-            (
-                Command::TaskBoard {
-                    command: TaskBoardCommand::Evaluate(args),
-                },
-                "evaluate",
-            ) => assert!(args.json),
-            (
-                Command::TaskBoard {
-                    command: TaskBoardCommand::Audit(args),
-                },
-                "audit",
-            ) => assert!(args.json),
-            (
-                Command::TaskBoard {
-                    command: TaskBoardCommand::Project(args),
-                },
-                "project",
-            ) => assert!(args.json),
-            (
-                Command::TaskBoard {
-                    command: TaskBoardCommand::Machine(args),
-                },
-                "machine",
-            ) => assert!(args.json),
+        match (task_board_command(cli.command), expected) {
+            (TaskBoardCommand::Sync(args), "sync") => assert!(args.json),
+            (TaskBoardCommand::Dispatch(args), "dispatch") => assert!(args.json),
+            (TaskBoardCommand::Evaluate(args), "evaluate") => assert!(args.json),
+            (TaskBoardCommand::Audit(args), "audit") => assert!(args.json),
+            (TaskBoardCommand::Project(args), "project") => assert!(args.json),
+            (TaskBoardCommand::Machine(args), "machine") => assert!(args.json),
             _ => panic!("expected TaskBoard {expected}"),
         }
     }
@@ -389,10 +352,8 @@ fn parse_task_board_item_scoped_operations() {
         "--json",
     ])
     .unwrap();
-    match dispatch.command {
-        Command::TaskBoard {
-            command: TaskBoardCommand::Dispatch(args),
-        } => {
+    match task_board_command(dispatch.command) {
+        TaskBoardCommand::Dispatch(args) => {
             assert_eq!(args.item_id.as_deref(), Some("task-1"));
             assert_eq!(args.status, Some(TaskBoardStatus::Todo));
             assert!(args.json);
@@ -402,10 +363,8 @@ fn parse_task_board_item_scoped_operations() {
 
     let evaluate =
         Cli::try_parse_from(["harness", "task-board", "evaluate", "--id", "task-2"]).unwrap();
-    match evaluate.command {
-        Command::TaskBoard {
-            command: TaskBoardCommand::Evaluate(args),
-        } => {
+    match task_board_command(evaluate.command) {
+        TaskBoardCommand::Evaluate(args) => {
             assert_eq!(args.item_id.as_deref(), Some("task-2"));
         }
         _ => panic!("expected TaskBoard Evaluate"),
@@ -429,12 +388,9 @@ fn parse_task_board_orchestrator_controls() {
         "--json",
     ])
     .unwrap();
-    match cli.command {
-        Command::TaskBoard {
-            command:
-                TaskBoardCommand::Orchestrator {
-                    command: TaskBoardOrchestratorCommand::RunOnce(args),
-                },
+    match task_board_command(cli.command) {
+        TaskBoardCommand::Orchestrator {
+            command: TaskBoardOrchestratorCommand::RunOnce(args),
         } => {
             assert!(args.apply);
             assert_eq!(args.item_id.as_deref(), Some("task-1"));
@@ -443,5 +399,12 @@ fn parse_task_board_orchestrator_controls() {
             assert!(args.json);
         }
         _ => panic!("expected TaskBoard Orchestrator RunOnce"),
+    }
+}
+
+fn task_board_command(command: Command) -> TaskBoardCommand {
+    match command {
+        Command::TaskBoard { command } => *command,
+        _ => panic!("expected TaskBoard command"),
     }
 }

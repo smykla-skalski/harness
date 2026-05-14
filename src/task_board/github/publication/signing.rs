@@ -142,8 +142,9 @@ pub(super) fn validate_rest_publication_signature_support(
     signature: Option<&LocalCommitSignature>,
 ) -> Result<(), CliError> {
     match (profile.signing.mode, signature) {
-        (TaskBoardGitSigningMode::Ssh, _) => Err(unsupported_ssh_signing_error()),
-        (_, Some(LocalCommitSignature::Ssh)) => Err(unsupported_ssh_signing_error()),
+        (TaskBoardGitSigningMode::Ssh, _) | (_, Some(LocalCommitSignature::Ssh)) => {
+            Err(unsupported_ssh_signing_error())
+        }
         (_, Some(LocalCommitSignature::Unsupported)) => {
             Err(CliError::from(CliErrorKind::workflow_io(
                 "task-board github commit contains an unsupported signature type",

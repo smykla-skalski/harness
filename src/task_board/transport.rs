@@ -13,7 +13,9 @@ use crate::task_board::store::{
     OptionalFieldPatch, TaskBoardItemPatch, TaskBoardStore, default_board_root,
 };
 use crate::task_board::summary::build_audit_summary;
-use crate::task_board::types::{AgentMode, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
+use crate::task_board::types::{
+    AgentMode, ExternalRef, TaskBoardItem, TaskBoardPriority, TaskBoardStatus,
+};
 use crate::workspace::utc_now;
 
 mod catalog;
@@ -117,22 +119,34 @@ pub struct TaskBoardUpdateArgs {
     pub tag: Vec<String>,
     #[arg(long)]
     pub project_id: Option<String>,
-    #[arg(long)]
-    pub clear_project: bool,
     #[command(flatten)]
     pub fields: TaskBoardItemFieldArgs,
+    #[command(flatten)]
+    pub clear_links: TaskBoardUpdateClearLinkArgs,
+    #[command(flatten)]
+    pub clear_state: TaskBoardUpdateClearStateArgs,
+    #[arg(long)]
+    pub board_root: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct TaskBoardUpdateClearLinkArgs {
+    #[arg(long)]
+    pub clear_project: bool,
+    #[arg(long)]
+    pub clear_session: bool,
+    #[arg(long)]
+    pub clear_work_item: bool,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct TaskBoardUpdateClearStateArgs {
     #[arg(long)]
     pub clear_external_refs: bool,
     #[arg(long)]
     pub clear_planning: bool,
     #[arg(long)]
     pub clear_workflow: bool,
-    #[arg(long)]
-    pub clear_session: bool,
-    #[arg(long)]
-    pub clear_work_item: bool,
-    #[arg(long)]
-    pub board_root: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -295,17 +309,16 @@ impl TaskBoardUpdateArgs {
             agent_mode: self.agent_mode,
             external_refs: self.external_refs_patch(),
             planning: self.fields.planning(),
-            clear_planning: self.clear_planning,
+            clear_planning: self.clear_state.clear_planning,
             workflow: self.fields.workflow(current.map(|item| &item.workflow)),
-            clear_workflow: self.clear_workflow,
+            clear_workflow: self.clear_state.clear_workflow,
             session_id: self.session_patch(),
             work_item_id: self.work_item_patch(),
-            ..TaskBoardItemPatch::default()
         }
     }
 
     fn project_patch(&self) -> OptionalFieldPatch<String> {
-        if self.clear_project {
+        if self.clear_links.clear_project {
             return OptionalFieldPatch::Clear;
         }
         self.project_id
@@ -313,8 +326,8 @@ impl TaskBoardUpdateArgs {
             .map_or(OptionalFieldPatch::Unchanged, OptionalFieldPatch::Set)
     }
 
-    fn external_refs_patch(&self) -> Option<Vec<crate::task_board::types::ExternalRef>> {
-        if self.clear_external_refs {
+    fn external_refs_patch(&self) -> Option<Vec<ExternalRef>> {
+        if self.clear_state.clear_external_refs {
             Some(Vec::new())
         } else {
             self.fields
@@ -324,7 +337,7 @@ impl TaskBoardUpdateArgs {
     }
 
     fn session_patch(&self) -> OptionalFieldPatch<String> {
-        if self.clear_session {
+        if self.clear_links.clear_session {
             return OptionalFieldPatch::Clear;
         }
         self.fields
@@ -334,7 +347,7 @@ impl TaskBoardUpdateArgs {
     }
 
     fn work_item_patch(&self) -> OptionalFieldPatch<String> {
-        if self.clear_work_item {
+        if self.clear_links.clear_work_item {
             return OptionalFieldPatch::Clear;
         }
         self.fields

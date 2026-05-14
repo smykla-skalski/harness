@@ -83,6 +83,14 @@ pub struct TaskBoardOrchestratorRuntimeConfigArgs {
     pub json: bool,
     #[arg(long)]
     pub repository: Option<String>,
+    #[command(flatten)]
+    pub identity: TaskBoardRuntimeIdentityArgs,
+    #[command(flatten)]
+    pub signing: TaskBoardRuntimeSigningArgs,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct TaskBoardRuntimeIdentityArgs {
     #[arg(long)]
     pub author_name: Option<String>,
     #[arg(long)]
@@ -95,6 +103,10 @@ pub struct TaskBoardOrchestratorRuntimeConfigArgs {
     pub ssh_key_path: Option<String>,
     #[arg(long)]
     pub clear_ssh_key_path: bool,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct TaskBoardRuntimeSigningArgs {
     #[arg(long, value_enum)]
     pub signing_mode: Option<TaskBoardGitSigningModeArg>,
     #[arg(long)]
@@ -235,18 +247,7 @@ impl Execute for TaskBoardOrchestratorRuntimeConfigArgs {
 
 impl TaskBoardOrchestratorRuntimeConfigArgs {
     fn has_update(&self) -> bool {
-        self.author_name.is_some()
-            || self.clear_author_name
-            || self.author_email.is_some()
-            || self.clear_author_email
-            || self.ssh_key_path.is_some()
-            || self.clear_ssh_key_path
-            || self.signing_mode.is_some()
-            || self.signing_ssh_key_path.is_some()
-            || self.gpg_key_id.is_some()
-            || self.gpg_private_key_path.is_some()
-            || self.gpg_private_key_passphrase_env.is_some()
-            || self.clear_signing
+        self.identity.has_update() || self.signing.has_update()
     }
 
     fn apply_update(&self, config: &mut TaskBoardGitRuntimeConfig) -> Result<(), CliError> {
@@ -269,18 +270,18 @@ impl TaskBoardOrchestratorRuntimeConfigArgs {
     ) -> Result<(), CliError> {
         apply_optional_string(
             &mut profile.author_name,
-            self.author_name.as_ref(),
-            self.clear_author_name,
+            self.identity.author_name.as_ref(),
+            self.identity.clear_author_name,
         );
         apply_optional_string(
             &mut profile.author_email,
-            self.author_email.as_ref(),
-            self.clear_author_email,
+            self.identity.author_email.as_ref(),
+            self.identity.clear_author_email,
         );
         apply_optional_string(
             &mut profile.ssh_key_path,
-            self.ssh_key_path.as_ref(),
-            self.clear_ssh_key_path,
+            self.identity.ssh_key_path.as_ref(),
+            self.identity.clear_ssh_key_path,
         );
         self.apply_signing_update(&mut profile.signing)
     }
@@ -289,27 +290,53 @@ impl TaskBoardOrchestratorRuntimeConfigArgs {
         &self,
         signing: &mut TaskBoardGitSigningConfig,
     ) -> Result<(), CliError> {
-        if self.clear_signing {
+        if self.signing.clear_signing {
             *signing = TaskBoardGitSigningConfig::default();
         }
-        if let Some(mode) = self.signing_mode {
+        if let Some(mode) = self.signing.signing_mode {
             signing.mode = TaskBoardGitSigningMode::from(mode);
         }
         apply_optional_string(
             &mut signing.ssh_key_path,
-            self.signing_ssh_key_path.as_ref(),
+            self.signing.signing_ssh_key_path.as_ref(),
             false,
         );
-        apply_optional_string(&mut signing.gpg_key_id, self.gpg_key_id.as_ref(), false);
+        apply_optional_string(
+            &mut signing.gpg_key_id,
+            self.signing.gpg_key_id.as_ref(),
+            false,
+        );
         apply_optional_string(
             &mut signing.gpg_private_key_path,
-            self.gpg_private_key_path.as_ref(),
+            self.signing.gpg_private_key_path.as_ref(),
             false,
         );
-        if let Some(name) = &self.gpg_private_key_passphrase_env {
+        if let Some(name) = &self.signing.gpg_private_key_passphrase_env {
             signing.gpg_private_key_passphrase = Some(read_secret_env(name)?);
         }
         Ok(())
+    }
+}
+
+impl TaskBoardRuntimeIdentityArgs {
+    fn has_update(&self) -> bool {
+        self.author_name.is_some()
+            || self.clear_author_name
+            || self.author_email.is_some()
+            || self.clear_author_email
+            || self.ssh_key_path.is_some()
+            || self.clear_ssh_key_path
+    }
+}
+
+impl TaskBoardRuntimeSigningArgs {
+    fn has_update(&self) -> bool {
+        self.signing_mode.is_some()
+            || self.signing_ssh_key_path.is_some()
+            || self.gpg_key_id.is_some()
+            || self.gpg_private_key_path.is_some()
+            || self.gpg_private_key_passphrase_env.is_some()
+            || self.clear_signing
     }
 }
 
