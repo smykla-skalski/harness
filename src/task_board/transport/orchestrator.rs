@@ -1,13 +1,20 @@
-use clap::{Args, Subcommand};
+use std::env;
+
+use clap::{Args, Subcommand, ValueEnum};
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::protocol::{
     TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
 };
 use crate::daemon::service;
-use crate::errors::CliError;
-use crate::task_board::TaskBoardOrchestratorStatus;
+use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::types::TaskBoardStatus;
+use crate::task_board::{
+    TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
+    TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig, TaskBoardGitRuntimeProfile,
+    TaskBoardGitSigningConfig, TaskBoardGitSigningMode, TaskBoardOrchestratorStatus,
+    normalize_repository_slug,
+};
 
 use super::print_json;
 
@@ -24,6 +31,10 @@ pub enum TaskBoardOrchestratorCommand {
     RunOnce(TaskBoardOrchestratorRunOnceArgs),
     /// Read or update durable orchestrator settings.
     Settings(TaskBoardOrchestratorSettingsArgs),
+    /// Read or update git runtime config.
+    RuntimeConfig(TaskBoardOrchestratorRuntimeConfigArgs),
+    /// Sync process-local GitHub tokens from environment variables.
+    GithubTokens(TaskBoardOrchestratorGithubTokensArgs),
 }
 
 #[derive(Debug, Clone, Args)]
@@ -66,6 +77,58 @@ pub struct TaskBoardOrchestratorSettingsArgs {
     pub clear_project_dir: bool,
 }
 
+#[derive(Debug, Clone, Args)]
+pub struct TaskBoardOrchestratorRuntimeConfigArgs {
+    #[arg(long)]
+    pub json: bool,
+    #[arg(long)]
+    pub repository: Option<String>,
+    #[arg(long)]
+    pub author_name: Option<String>,
+    #[arg(long)]
+    pub clear_author_name: bool,
+    #[arg(long)]
+    pub author_email: Option<String>,
+    #[arg(long)]
+    pub clear_author_email: bool,
+    #[arg(long)]
+    pub ssh_key_path: Option<String>,
+    #[arg(long)]
+    pub clear_ssh_key_path: bool,
+    #[arg(long, value_enum)]
+    pub signing_mode: Option<TaskBoardGitSigningModeArg>,
+    #[arg(long)]
+    pub signing_ssh_key_path: Option<String>,
+    #[arg(long)]
+    pub gpg_key_id: Option<String>,
+    #[arg(long)]
+    pub gpg_private_key_path: Option<String>,
+    #[arg(long)]
+    pub gpg_private_key_passphrase_env: Option<String>,
+    #[arg(long)]
+    pub clear_signing: bool,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct TaskBoardOrchestratorGithubTokensArgs {
+    #[arg(long)]
+    pub json: bool,
+    #[arg(long)]
+    pub clear: bool,
+    #[arg(long)]
+    pub global_token_env: Option<String>,
+    #[arg(long)]
+    pub repository_token_env: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+#[value(rename_all = "snake_case")]
+pub enum TaskBoardGitSigningModeArg {
+    None,
+    Ssh,
+    Gpg,
+}
+
 impl Execute for TaskBoardOrchestratorCommand {
     fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
         match self {
@@ -74,6 +137,8 @@ impl Execute for TaskBoardOrchestratorCommand {
             Self::Stop(args) => args.execute_stop(context),
             Self::RunOnce(args) => args.execute(context),
             Self::Settings(args) => args.execute(context),
+            Self::RuntimeConfig(args) => args.execute(context),
+            Self::GithubTokens(args) => args.execute(context),
         }
     }
 }
@@ -150,6 +215,156 @@ impl TaskBoardOrchestratorSettingsArgs {
     }
 }
 
+impl Execute for TaskBoardOrchestratorRuntimeConfigArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let config = if self.has_update() {
+            let mut config = service::task_board_git_runtime_config()?;
+            self.apply_update(&mut config)?;
+            service::update_task_board_git_runtime_config(&config)?
+        } else {
+            service::task_board_git_runtime_config()?
+        };
+        if self.json {
+            print_json(&config)?;
+        } else {
+            print_runtime_config_summary(&config);
+        }
+        Ok(0)
+    }
+}
+
+impl TaskBoardOrchestratorRuntimeConfigArgs {
+    fn has_update(&self) -> bool {
+        self.author_name.is_some()
+            || self.clear_author_name
+            || self.author_email.is_some()
+            || self.clear_author_email
+            || self.ssh_key_path.is_some()
+            || self.clear_ssh_key_path
+            || self.signing_mode.is_some()
+            || self.signing_ssh_key_path.is_some()
+            || self.gpg_key_id.is_some()
+            || self.gpg_private_key_path.is_some()
+            || self.gpg_private_key_passphrase_env.is_some()
+            || self.clear_signing
+    }
+
+    fn apply_update(&self, config: &mut TaskBoardGitRuntimeConfig) -> Result<(), CliError> {
+        if let Some(repository) = &self.repository {
+            let repository = normalize_repository_slug(Some(repository)).ok_or_else(|| {
+                CliErrorKind::workflow_parse(format!(
+                    "invalid task-board repository override '{repository}', expected owner/repo"
+                ))
+            })?;
+            let profile = repository_profile_mut(config, &repository);
+            self.apply_profile_update(profile)?;
+            return Ok(());
+        }
+        self.apply_profile_update(&mut config.global)
+    }
+
+    fn apply_profile_update(
+        &self,
+        profile: &mut TaskBoardGitRuntimeProfile,
+    ) -> Result<(), CliError> {
+        apply_optional_string(
+            &mut profile.author_name,
+            self.author_name.as_ref(),
+            self.clear_author_name,
+        );
+        apply_optional_string(
+            &mut profile.author_email,
+            self.author_email.as_ref(),
+            self.clear_author_email,
+        );
+        apply_optional_string(
+            &mut profile.ssh_key_path,
+            self.ssh_key_path.as_ref(),
+            self.clear_ssh_key_path,
+        );
+        self.apply_signing_update(&mut profile.signing)
+    }
+
+    fn apply_signing_update(
+        &self,
+        signing: &mut TaskBoardGitSigningConfig,
+    ) -> Result<(), CliError> {
+        if self.clear_signing {
+            *signing = TaskBoardGitSigningConfig::default();
+        }
+        if let Some(mode) = self.signing_mode {
+            signing.mode = TaskBoardGitSigningMode::from(mode);
+        }
+        apply_optional_string(
+            &mut signing.ssh_key_path,
+            self.signing_ssh_key_path.as_ref(),
+            false,
+        );
+        apply_optional_string(&mut signing.gpg_key_id, self.gpg_key_id.as_ref(), false);
+        apply_optional_string(
+            &mut signing.gpg_private_key_path,
+            self.gpg_private_key_path.as_ref(),
+            false,
+        );
+        if let Some(name) = &self.gpg_private_key_passphrase_env {
+            signing.gpg_private_key_passphrase = Some(read_secret_env(name)?);
+        }
+        Ok(())
+    }
+}
+
+impl Execute for TaskBoardOrchestratorGithubTokensArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        if !self.clear && self.global_token_env.is_none() && self.repository_token_env.is_empty() {
+            return Err(CliErrorKind::workflow_parse(
+                "provide --clear, --global-token-env, or --repository-token-env",
+            )
+            .into());
+        }
+        let request = self.sync_request()?;
+        let response = service::sync_task_board_github_tokens(&request)?;
+        if self.json {
+            print_json(&response)?;
+        } else {
+            println!(
+                "task-board github tokens: global_configured={}, repository_count={}",
+                response.global_token_configured, response.repository_token_count
+            );
+        }
+        Ok(0)
+    }
+}
+
+impl TaskBoardOrchestratorGithubTokensArgs {
+    fn sync_request(&self) -> Result<TaskBoardGitHubTokensSyncRequest, CliError> {
+        if self.clear {
+            return Ok(TaskBoardGitHubTokensSyncRequest::default());
+        }
+        Ok(TaskBoardGitHubTokensSyncRequest {
+            global_token: self
+                .global_token_env
+                .as_deref()
+                .map(read_secret_env)
+                .transpose()?,
+            repository_tokens: self
+                .repository_token_env
+                .iter()
+                .map(|value| repository_token_from_env(value))
+                .collect::<Result<Vec<_>, _>>()?,
+        })
+    }
+}
+
+impl From<TaskBoardGitSigningModeArg> for TaskBoardGitSigningMode {
+    fn from(value: TaskBoardGitSigningModeArg) -> Self {
+        match value {
+            TaskBoardGitSigningModeArg::None => Self::None,
+            TaskBoardGitSigningModeArg::Ssh => Self::Ssh,
+            TaskBoardGitSigningModeArg::Gpg => Self::Gpg,
+        }
+    }
+}
+
 fn dry_run_override(dry_run: bool, apply: bool) -> Option<bool> {
     if dry_run {
         Some(true)
@@ -172,4 +387,72 @@ fn print_status(status: &TaskBoardOrchestratorStatus, json: bool) -> Result<i32,
         );
     }
     Ok(0)
+}
+
+fn repository_profile_mut<'a>(
+    config: &'a mut TaskBoardGitRuntimeConfig,
+    repository: &str,
+) -> &'a mut TaskBoardGitRuntimeProfile {
+    if let Some(index) = config
+        .repository_overrides
+        .iter()
+        .position(|override_config| override_config.repository == repository)
+    {
+        return &mut config.repository_overrides[index].profile;
+    }
+    config
+        .repository_overrides
+        .push(TaskBoardGitRepositoryOverride {
+            repository: repository.to_string(),
+            profile: TaskBoardGitRuntimeProfile::default(),
+        });
+    &mut config
+        .repository_overrides
+        .last_mut()
+        .expect("override")
+        .profile
+}
+
+fn apply_optional_string(target: &mut Option<String>, value: Option<&String>, clear: bool) {
+    if clear {
+        *target = None;
+    } else if let Some(value) = value {
+        *target = Some(value.clone());
+    }
+}
+
+fn read_secret_env(name: &str) -> Result<String, CliError> {
+    let value = env::var(name).map_err(|_| {
+        CliErrorKind::workflow_parse(format!("environment variable '{name}' is not set"))
+    })?;
+    if value.trim().is_empty() {
+        return Err(CliErrorKind::workflow_parse(format!(
+            "environment variable '{name}' is empty"
+        ))
+        .into());
+    }
+    Ok(value)
+}
+
+fn repository_token_from_env(value: &str) -> Result<TaskBoardGitHubRepositoryToken, CliError> {
+    let (repository, env_name) = value.split_once('=').ok_or_else(|| {
+        CliErrorKind::workflow_parse("repository token env must be owner/repo=ENV_VAR")
+    })?;
+    let repository = normalize_repository_slug(Some(repository)).ok_or_else(|| {
+        CliErrorKind::workflow_parse(format!(
+            "invalid task-board repository token override '{repository}', expected owner/repo"
+        ))
+    })?;
+    Ok(TaskBoardGitHubRepositoryToken {
+        repository,
+        token: read_secret_env(env_name.trim())?,
+    })
+}
+
+fn print_runtime_config_summary(config: &TaskBoardGitRuntimeConfig) {
+    println!(
+        "task-board runtime config: global_configured={}, repository_overrides={}",
+        !config.global.is_empty(),
+        config.repository_overrides.len()
+    );
 }

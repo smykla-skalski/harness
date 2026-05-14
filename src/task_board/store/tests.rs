@@ -1,7 +1,9 @@
 use tempfile::tempdir;
 
 use crate::task_board::store::{TaskBoardItemPatch, TaskBoardStore};
-use crate::task_board::types::{AgentMode, PlanningState, TaskBoardItem, TaskBoardStatus};
+use crate::task_board::types::{
+    AgentMode, PlanningState, TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowStatus,
+};
 
 #[test]
 fn create_get_list_update_delete_round_trips_markdown() {
@@ -45,6 +47,45 @@ fn create_get_list_update_delete_round_trips_markdown() {
 
     store.delete("task-1").expect("delete item");
     assert!(store.list(None).expect("list active").is_empty());
+}
+
+#[test]
+fn update_clears_links_planning_and_workflow() {
+    let temp = tempdir().expect("tempdir");
+    let store = TaskBoardStore::new(temp.path().join("board"));
+    let mut item = TaskBoardItem::new(
+        "task-1".into(),
+        "Linked".into(),
+        String::new(),
+        "2026-05-14T00:00:00Z".into(),
+    );
+    item.project_id = Some("project-1".into());
+    item.session_id = Some("session-1".into());
+    item.work_item_id = Some("work-1".into());
+    item.planning.summary = Some("Plan".into());
+    item.workflow.status = TaskBoardWorkflowStatus::Running;
+    item.workflow.branch = Some("feature/task-1".into());
+    store.create("Linked", "", item).expect("create");
+
+    let updated = store
+        .update(
+            "task-1",
+            TaskBoardItemPatch {
+                project_id: super::OptionalFieldPatch::Clear,
+                session_id: super::OptionalFieldPatch::Clear,
+                work_item_id: super::OptionalFieldPatch::Clear,
+                clear_planning: true,
+                clear_workflow: true,
+                ..TaskBoardItemPatch::default()
+            },
+        )
+        .expect("update item");
+
+    assert!(updated.project_id.is_none());
+    assert!(updated.session_id.is_none());
+    assert!(updated.work_item_id.is_none());
+    assert_eq!(updated.planning, PlanningState::default());
+    assert!(updated.workflow.is_default());
 }
 
 #[test]

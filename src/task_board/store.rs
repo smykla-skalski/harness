@@ -28,7 +28,9 @@ pub struct TaskBoardItemPatch {
     pub agent_mode: Option<AgentMode>,
     pub external_refs: Option<Vec<ExternalRef>>,
     pub planning: Option<PlanningState>,
+    pub clear_planning: bool,
     pub workflow: Option<TaskBoardWorkflowState>,
+    pub clear_workflow: bool,
     pub session_id: OptionalFieldPatch<String>,
     pub work_item_id: OptionalFieldPatch<String>,
 }
@@ -268,8 +270,16 @@ fn apply_core_patch(item: &mut TaskBoardItem, patch: &TaskBoardItemPatch) {
     assign_copy_if_some(&mut item.agent_mode, patch.agent_mode);
     assign_if_some(&mut item.tags, patch.tags.as_ref());
     assign_if_some(&mut item.external_refs, patch.external_refs.as_ref());
-    apply_planning_patch(&mut item.planning, patch.planning.as_ref());
-    assign_if_some(&mut item.workflow, patch.workflow.as_ref());
+    if patch.clear_planning {
+        item.planning = PlanningState::default();
+    } else {
+        apply_planning_patch(&mut item.planning, patch.planning.as_ref());
+    }
+    if patch.clear_workflow {
+        item.workflow = TaskBoardWorkflowState::default();
+    } else {
+        assign_if_some(&mut item.workflow, patch.workflow.as_ref());
+    }
 }
 
 fn apply_planning_patch(target: &mut PlanningState, patch: Option<&PlanningState>) {
