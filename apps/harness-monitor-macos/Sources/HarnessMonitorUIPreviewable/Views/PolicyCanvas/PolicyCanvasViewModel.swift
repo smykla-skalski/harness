@@ -13,14 +13,32 @@ final class PolicyCanvasViewModel {
   var zoom: CGFloat
   var highlightedGroupID: String?
   var highlightedInput: PolicyCanvasPortEndpoint?
-  var lastActionSummary: String
   var backingDocument: TaskBoardPolicyPipelineDocument?
   var latestSimulation: TaskBoardPolicyPipelineSimulationResult?
-  var isDirty: Bool
+  var documentDirty: Bool
+  var viewportDirty: Bool
   var hasRequestedInitialRemoteLoad: Bool
 
-  @ObservationIgnored private var nextNodeNumber: Int
-  @ObservationIgnored private var loadedDocumentRevision: UInt64?
+  /// Observed flag the chrome reads to surface the "Remote changes available"
+  /// affordance. Kept separate from the underlying `PolicyCanvasPendingUpdate`
+  /// storage so the payload struct stays off the @Observable graph — only the
+  /// presence bit drives view invalidation. Writes go through
+  /// `setPendingUpdate(_:)` to keep this and `pendingDocumentUpdate` in sync.
+  var hasPendingDocumentUpdate: Bool
+
+  /// Staged dashboard payload deferred while the user has unsaved local edits.
+  /// `@ObservationIgnored` so updates here don't churn observers; write only
+  /// via `setPendingUpdate(_:)` to keep the observed presence bit in sync.
+  @ObservationIgnored var pendingDocumentUpdate: PolicyCanvasPendingUpdate?
+
+  /// Notified whenever the view model emits a human-readable status update.
+  /// Set by the host view, which mirrors the value into a `@State` line that
+  /// the chrome reads. Kept off the @Observable storage so log strings do not
+  /// pollute the document state graph or future undo register.
+  @ObservationIgnored var statusCallback: (@MainActor (String) -> Void)?
+
+  @ObservationIgnored var nextNodeNumber: Int
+  @ObservationIgnored var loadedDocumentRevision: UInt64?
   @ObservationIgnored private var nodeDragOrigins: [String: CGPoint] = [:]
   @ObservationIgnored var groupDragOrigins: [String: CGRect] = [:]
   @ObservationIgnored var groupNodeDragOrigins: [String: [String: CGPoint]] = [:]
@@ -42,11 +60,13 @@ final class PolicyCanvasViewModel {
     self.edges = edges
     self.selection = selection
     self.zoom = zoom
-    self.lastActionSummary = "No pending changes"
     self.backingDocument = nil
     self.latestSimulation = nil
-    self.isDirty = false
+    self.documentDirty = false
+    self.viewportDirty = false
     self.hasRequestedInitialRemoteLoad = false
+    self.hasPendingDocumentUpdate = false
+    self.pendingDocumentUpdate = nil
     self.nextNodeNumber = nextNodeNumber
     reconcileGroupFrames()
   }
@@ -97,7 +117,7 @@ final class PolicyCanvasViewModel {
     guard let backingDocument else {
       return "Save a draft first"
     }
-    if isDirty {
+    if documentDirty {
       return "Save draft changes first"
     }
     guard let latestSimulation else {
@@ -110,32 +130,6 @@ final class PolicyCanvasViewModel {
       return "Run simulation for saved revision"
     }
     return nil
-  }
-
-  func resetNextNodeNumber() {
-    nextNodeNumber = nodes.count + 1
-  }
-
-  func markInitialRemoteLoadRequested() -> Bool {
-    guard !hasRequestedInitialRemoteLoad else {
-      return false
-    }
-    hasRequestedInitialRemoteLoad = true
-    return true
-  }
-
-  func shouldApplyExternalDocument(_ document: TaskBoardPolicyPipelineDocument?) -> Bool {
-    guard let document else {
-      return false
-    }
-    guard !isDirty else {
-      return false
-    }
-    return loadedDocumentRevision != document.revision || backingDocument?.mode != document.mode
-  }
-
-  func markLoadedDocumentRevision(_ revision: UInt64?) {
-    loadedDocumentRevision = revision
   }
 
   func dropPalettePayloads(_ payloads: [String], at point: CGPoint) -> Bool {
@@ -169,8 +163,8 @@ final class PolicyCanvasViewModel {
     cleanEphemeralNodeIDs.insert(node.id)
     reconcileGroupFrames()
     selection = .node(node.id)
-    isDirty = true
-    lastActionSummary = "\(kind.title) node added"
+    documentDirty = true
+    notifyStatus("\(kind.title) node added")
   }
 
   func dragNode(_ nodeID: String, translation: CGSize) {
@@ -193,7 +187,7 @@ final class PolicyCanvasViewModel {
       ?? nodes[index].groupID
     reconcileGroupFrames()
     selection = .node(nodeID)
-    isDirty = true
+    documentDirty = true
   }
 
   func endNodeDrag(_ nodeID: String, translation: CGSize) {
@@ -235,7 +229,7 @@ final class PolicyCanvasViewModel {
     reconcileGroupFrames()
     highlightedGroupID = groupID
     selection = .group(groupID)
-    isDirty = true
+    documentDirty = true
   }
 
   func endGroupDrag(_ groupID: String, translation: CGSize) {
@@ -292,8 +286,8 @@ final class PolicyCanvasViewModel {
     cleanEphemeralEdgeIDs.insert(edge.id)
     selection = .edge(edge.id)
     highlightedInput = nil
-    isDirty = true
-    lastActionSummary = "Edge created"
+    documentDirty = true
+    notifyStatus("Edge created")
     return true
   }
 

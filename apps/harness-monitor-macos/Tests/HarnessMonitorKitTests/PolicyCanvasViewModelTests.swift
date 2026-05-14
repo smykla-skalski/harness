@@ -21,7 +21,7 @@ struct PolicyCanvasViewModelTests {
     let y = node?.position.y ?? -1
     #expect(x.truncatingRemainder(dividingBy: PolicyCanvasLayout.gridSize) == 0)
     #expect(y.truncatingRemainder(dividingBy: PolicyCanvasLayout.gridSize) == 0)
-    #expect(viewModel.isDirty)
+    #expect(viewModel.documentDirty)
 
     let exported = viewModel.exportDocument()
     let layout = exported.layout.nodes.first { $0.nodeId == nodeID }
@@ -42,7 +42,7 @@ struct PolicyCanvasViewModelTests {
     #expect(created)
     #expect(viewModel.nodes.count == before + 1)
     #expect(viewModel.nodes.last?.groupID == "group-intake")
-    #expect(viewModel.isDirty)
+    #expect(viewModel.documentDirty)
   }
 
   @Test("port drag creates valid edges and rejects self edges")

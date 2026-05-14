@@ -3,6 +3,7 @@ import SwiftUI
 
 struct PolicyCanvasInspector: View {
   let viewModel: PolicyCanvasViewModel
+  let statusLine: String
 
   var body: some View {
     ScrollView {
@@ -29,7 +30,7 @@ struct PolicyCanvasInspector: View {
         .scaledFont(.headline.weight(.semibold))
         .foregroundStyle(.white)
 
-      Text(viewModel.lastActionSummary)
+      Text(statusLine)
         .scaledFont(.caption)
         .foregroundStyle(.white.opacity(0.62))
         .lineLimit(1)

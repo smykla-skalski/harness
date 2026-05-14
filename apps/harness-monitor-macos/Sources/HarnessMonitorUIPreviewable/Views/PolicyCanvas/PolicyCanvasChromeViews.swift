@@ -26,6 +26,20 @@ struct PolicyCanvasTopBar: View {
 
       Spacer(minLength: 16)
 
+      if viewModel.hasPendingDocumentUpdate {
+        Button {
+          viewModel.applyPendingUpdate()
+        } label: {
+          Label("Remote changes available - reload?", systemImage: "arrow.triangle.2.circlepath")
+            .font(.caption.weight(.semibold))
+            .lineLimit(1)
+        }
+        .harnessActionButtonStyle(variant: .bordered, tint: .orange)
+        .controlSize(.small)
+        .help("Apply the latest pipeline from the dashboard and discard local edits.")
+        .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasReloadButton)
+      }
+
       PolicyCanvasActionButton(
         title: "Save",
         systemImage: "square.and.arrow.down",

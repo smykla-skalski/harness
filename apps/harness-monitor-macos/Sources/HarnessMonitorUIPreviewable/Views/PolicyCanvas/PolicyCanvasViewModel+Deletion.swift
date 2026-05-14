@@ -3,7 +3,7 @@ import SwiftUI
 extension PolicyCanvasViewModel {
   func deleteSelectedComponent() -> PolicyCanvasDeletionRequest? {
     guard let selection else {
-      lastActionSummary = "Select a node, group, or edge to delete"
+      notifyStatus("Select a node, group, or edge to delete")
       return nil
     }
     if canDeleteImmediately(selection) {
@@ -76,7 +76,7 @@ extension PolicyCanvasViewModel {
     }
     self.selection = nil
     reconcileGroupFrames()
-    isDirty = true
+    documentDirty = true
   }
 
   private func deleteNode(_ id: String) {
@@ -92,7 +92,7 @@ extension PolicyCanvasViewModel {
     cleanEphemeralEdgeIDs = cleanEphemeralEdgeIDs.filter { edgeID in
       edges.contains { $0.id == edgeID }
     }
-    lastActionSummary = "Deleted \(title)"
+    notifyStatus("Deleted \(title)")
   }
 
   private func deleteEdge(_ id: String) {
@@ -102,7 +102,7 @@ extension PolicyCanvasViewModel {
     let label = edges[edgeIndex].label
     edges.remove(at: edgeIndex)
     cleanEphemeralEdgeIDs.remove(id)
-    lastActionSummary = "Deleted \(label) connection"
+    notifyStatus("Deleted \(label) connection")
   }
 
   private func deleteGroup(_ id: String) {
@@ -114,7 +114,7 @@ extension PolicyCanvasViewModel {
     for index in nodes.indices where nodes[index].groupID == id {
       nodes[index].groupID = nil
     }
-    lastActionSummary = "Deleted \(title)"
+    notifyStatus("Deleted \(title)")
   }
 
   private func incidentEdges(for nodeID: String) -> [PolicyCanvasEdge] {

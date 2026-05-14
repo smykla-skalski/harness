@@ -1,10 +1,33 @@
 import HarnessMonitorKit
 import SwiftUI
 
+private struct DashboardCanvasSnapshot: Equatable {
+  let document: TaskBoardPolicyPipelineDocument?
+  let simulation: TaskBoardPolicyPipelineSimulationResult?
+  let audit: TaskBoardPolicyPipelineAuditSummary?
+}
+
+extension View {
+  /// Apply `.id(_:)` only when `value` is non-nil. The branch fires exactly
+  /// once per pipeline load (nil to id), which is the intended identity reset
+  /// point. Same-id re-renders share identity; nil-to-nil renders never break
+  /// it. Do not use this for ids that flip mid-session — that would tear down
+  /// local @State on every flip.
+  @ViewBuilder
+  fileprivate func optionalID<ID: Hashable>(_ value: ID?) -> some View {
+    if let value {
+      self.id(value)
+    } else {
+      self
+    }
+  }
+}
+
 public struct PolicyCanvasView: View {
   @State private var viewModel: PolicyCanvasViewModel
   @State private var isShowingPromoteConfirmation = false
   @State private var pendingDeletionRequest: PolicyCanvasDeletionRequest?
+  @State private var statusLine: String = "No pending changes"
   private let store: HarnessMonitorStore?
   private let dashboardUI: HarnessMonitorStore.ContentDashboardSlice?
 
@@ -55,10 +78,21 @@ public struct PolicyCanvasView: View {
         PolicyCanvasViewport(viewModel: viewModel)
           .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-        PolicyCanvasInspector(viewModel: viewModel)
+        PolicyCanvasInspector(viewModel: viewModel, statusLine: statusLine)
           .frame(width: 280)
       }
     }
+    // Reset the canvas subview tree (gesture origins, hover, focus) only when
+    // the underlying pipeline switches. Same-pipeline re-renders preserve
+    // local @State; the host PolicyCanvasView's @State (viewModel, statusLine)
+    // is owned one level up and survives across pipeline switches.
+    //
+    // Before any pipeline loads, `pipelineIdentity` is nil and `optionalID`
+    // skips the `.id()` modifier entirely. This avoids collapsing two distinct
+    // trace-less pipelines onto a shared "default" id (which would blow
+    // gesture state across pipelines). The single nil→non-nil flip on first
+    // load resets local @State once, matching the load semantics.
+    .optionalID(viewModel.pipelineIdentity)
     .frame(minWidth: 980, minHeight: 620)
     .background(Color(red: 0.05, green: 0.06, blue: 0.08))
     .accessibilityElement(children: .contain)
@@ -67,21 +101,11 @@ public struct PolicyCanvasView: View {
       deletionShortcutButtons
     }
     .task {
+      bindStatusLine()
       await loadPolicyPipeline()
     }
-    .onChange(of: dashboardUI?.taskBoardPolicyPipeline) { _, newValue in
-      viewModel.loadIfChanged(
-        document: newValue,
-        simulation: dashboardUI?.taskBoardPolicySimulation,
-        audit: dashboardUI?.taskBoardPolicyAudit
-      )
-    }
-    .onChange(of: dashboardUI?.taskBoardPolicySimulation) { _, newValue in
-      viewModel.loadIfChanged(
-        document: dashboardUI?.taskBoardPolicyPipeline,
-        simulation: newValue,
-        audit: dashboardUI?.taskBoardPolicyAudit
-      )
+    .onChange(of: dashboardSnapshot) { _, _ in
+      applyDashboardSnapshot()
     }
     .confirmationDialog(
       "Promote policy pipeline?",
@@ -143,23 +167,33 @@ public struct PolicyCanvasView: View {
     guard let store else {
       return
     }
-    if let cachedDocument = dashboardUI?.taskBoardPolicyPipeline {
-      viewModel.loadIfChanged(
-        document: cachedDocument,
-        simulation: dashboardUI?.taskBoardPolicySimulation,
-        audit: dashboardUI?.taskBoardPolicyAudit
-      )
+    if dashboardUI?.taskBoardPolicyPipeline != nil {
+      applyDashboardSnapshot()
       return
     }
     guard viewModel.markInitialRemoteLoadRequested() else {
       return
     }
     await store.refreshTaskBoardPolicyPipeline()
-    viewModel.loadIfChanged(
+    applyDashboardSnapshot()
+  }
+
+  /// Hashable snapshot of the dashboard slices that feed the canvas. Changing
+  /// any of the three fields triggers a single `.onChange` instead of two
+  /// separate `.onChange` blocks that both clobbered local edits.
+  private var dashboardSnapshot: DashboardCanvasSnapshot {
+    DashboardCanvasSnapshot(
       document: dashboardUI?.taskBoardPolicyPipeline,
       simulation: dashboardUI?.taskBoardPolicySimulation,
-      audit: dashboardUI?.taskBoardPolicyAudit,
-      force: true
+      audit: dashboardUI?.taskBoardPolicyAudit
+    )
+  }
+
+  private func applyDashboardSnapshot() {
+    viewModel.load(
+      document: dashboardUI?.taskBoardPolicyPipeline,
+      simulation: dashboardUI?.taskBoardPolicySimulation,
+      audit: dashboardUI?.taskBoardPolicyAudit
     )
   }
 
@@ -168,9 +202,15 @@ public struct PolicyCanvasView: View {
     Task { @MainActor in
       let saved = await store?.saveTaskBoardPolicyPipelineDraft(document: document) ?? false
       if saved {
+        // Don't pre-clear documentDirty across the upcoming await. MainActor
+        // serializes turns, not the gap between awaits: a dashboard publish
+        // running between the clear and the refresh's return would take the
+        // clean branch and clobber edits the user made during the save. Let
+        // load() clear dirty when the post-save refresh applies the new
+        // backingDocument on its own clean-incoming branch.
         await forceReloadPolicyPipeline()
       } else {
-        viewModel.lastActionSummary = "Save blocked by validation"
+        statusLine = "Save blocked by validation"
       }
     }
   }
@@ -182,23 +222,23 @@ public struct PolicyCanvasView: View {
       if simulated {
         await forceReloadPolicyPipeline()
       } else {
-        viewModel.lastActionSummary = "Simulation failed"
+        statusLine = "Simulation failed"
       }
     }
   }
 
   private func requestPromote() {
     guard viewModel.canPromote, let revision = viewModel.backingDocument?.revision else {
-      viewModel.lastActionSummary = "Promote requires a saved matching simulation"
+      statusLine = "Promote requires a saved matching simulation"
       return
     }
-    viewModel.lastActionSummary = "Confirm promotion for revision \(revision)"
+    statusLine = "Confirm promotion for revision \(revision)"
     isShowingPromoteConfirmation = true
   }
 
   private func confirmPromote() {
     guard viewModel.canPromote, let revision = viewModel.backingDocument?.revision else {
-      viewModel.lastActionSummary = "Promote requires a saved matching simulation"
+      statusLine = "Promote requires a saved matching simulation"
       return
     }
     Task { @MainActor in
@@ -206,7 +246,7 @@ public struct PolicyCanvasView: View {
       if promoted {
         await forceReloadPolicyPipeline()
       } else {
-        viewModel.lastActionSummary = "Promotion blocked"
+        statusLine = "Promotion blocked"
       }
     }
   }
@@ -220,11 +260,15 @@ public struct PolicyCanvasView: View {
       return
     }
     await store.refreshTaskBoardPolicyPipeline()
-    viewModel.loadIfChanged(
-      document: dashboardUI?.taskBoardPolicyPipeline,
-      simulation: dashboardUI?.taskBoardPolicySimulation,
-      audit: dashboardUI?.taskBoardPolicyAudit,
-      force: true
-    )
+    applyDashboardSnapshot()
+  }
+
+  /// Bind the view model's status callback to the local `@State` status line.
+  /// Captured `_statusLine` is reference-backed by SwiftUI, so closure writes
+  /// land in the same storage even though the view struct is a value.
+  private func bindStatusLine() {
+    viewModel.statusCallback = { @MainActor newStatus in
+      statusLine = newStatus
+    }
   }
 }

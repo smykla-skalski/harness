@@ -5,7 +5,7 @@ extension PolicyCanvasViewModel {
     updateSelectedNode { node in
       node.title = title
     }
-    lastActionSummary = "Node title updated"
+    notifyStatus("Node title updated")
   }
 
   func updateSelectedNodeKind(_ kind: PolicyCanvasNodeKind) {
@@ -20,7 +20,7 @@ extension PolicyCanvasViewModel {
       node.policyKind = taskBoardPolicyNodeKind(for: kind)
     }
     pruneDanglingEdges()
-    lastActionSummary = "Node kind updated"
+    notifyStatus("Node kind updated")
   }
 
   func updateSelectedNodeGroup(_ groupID: String?) {
@@ -28,7 +28,7 @@ extension PolicyCanvasViewModel {
       node.groupID = groupID
     }
     reconcileGroupFrames()
-    lastActionSummary = "Node group updated"
+    notifyStatus("Node group updated")
   }
 
   func updateSelectedGroupTitle(_ title: String) {
@@ -38,8 +38,8 @@ extension PolicyCanvasViewModel {
       return
     }
     groups[index].title = title
-    isDirty = true
-    lastActionSummary = "Group title updated"
+    documentDirty = true
+    notifyStatus("Group title updated")
   }
 
   func updateSelectedEdgeLabel(_ label: String) {
@@ -50,8 +50,8 @@ extension PolicyCanvasViewModel {
     }
     edges[index].label = label
     markEdgeEdited(id)
-    isDirty = true
-    lastActionSummary = "Edge label updated"
+    documentDirty = true
+    notifyStatus("Edge label updated")
   }
 
   func updateSelectedPolicyAction(_ action: TaskBoardPolicyAction) {
@@ -60,7 +60,7 @@ extension PolicyCanvasViewModel {
       kind.action = action
       kind.actions = [action]
     }
-    lastActionSummary = "Policy action updated"
+    notifyStatus("Policy action updated")
   }
 
   func updateSelectedRiskThreshold(_ threshold: Int) {
@@ -71,7 +71,7 @@ extension PolicyCanvasViewModel {
       kind.highRiskReasonCode = kind.highRiskReasonCode ?? "risk_above_threshold"
       kind.missingReasonCode = kind.missingReasonCode ?? "risk_missing"
     }
-    lastActionSummary = "Risk threshold updated"
+    notifyStatus("Risk threshold updated")
   }
 
   func updateSelectedEvidenceField(_ field: TaskBoardPolicyEvidenceField) {
@@ -86,7 +86,7 @@ extension PolicyCanvasViewModel {
         )
       ]
     }
-    lastActionSummary = "Evidence field updated"
+    notifyStatus("Evidence field updated")
   }
 
   func updateSelectedReasonCode(_ reasonCode: String) {
@@ -96,7 +96,7 @@ extension PolicyCanvasViewModel {
         kind.reasonCodes = [reasonCode]
       }
     }
-    lastActionSummary = "Reason code updated"
+    notifyStatus("Reason code updated")
   }
 
   func updateSelectedRuleID(_ ruleID: String) {
@@ -104,7 +104,7 @@ extension PolicyCanvasViewModel {
       kind.kind = "supervisor_rule"
       kind.ruleId = ruleID
     }
-    lastActionSummary = "Supervisor rule updated"
+    notifyStatus("Supervisor rule updated")
   }
 
   func updateSelectedDecision(_ decision: String) {
@@ -112,7 +112,7 @@ extension PolicyCanvasViewModel {
       kind.kind = "supervisor_rule"
       kind.decision = decision
     }
-    lastActionSummary = "Gate behavior updated"
+    notifyStatus("Gate behavior updated")
   }
 
   private func updateSelectedNode(_ update: (inout PolicyCanvasNode) -> Void) {
@@ -123,7 +123,7 @@ extension PolicyCanvasViewModel {
     }
     markNodeEdited(id)
     update(&nodes[index])
-    isDirty = true
+    documentDirty = true
   }
 
   private func updateSelectedPolicyKind(

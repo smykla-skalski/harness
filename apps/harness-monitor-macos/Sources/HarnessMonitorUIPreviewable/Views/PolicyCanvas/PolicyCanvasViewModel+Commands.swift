@@ -6,17 +6,17 @@ extension PolicyCanvasViewModel {
   }
 
   func save() {
-    lastActionSummary = "Draft saved"
+    notifyStatus("Draft saved")
   }
 
   func simulate() {
     selectedTab = .simulation
-    lastActionSummary = "Simulation queued"
+    notifyStatus("Simulation queued")
   }
 
   func promote() {
     selectedTab = .promotion
-    lastActionSummary = "Promotion requested"
+    notifyStatus("Promotion requested")
   }
 
   func zoomIn() {
@@ -31,9 +31,11 @@ extension PolicyCanvasViewModel {
     setZoom(1)
   }
 
+  /// Updates the canvas zoom and marks the viewport (not the document) dirty.
+  /// Viewport state is window-scoped layout, not part of the saved pipeline.
   func setZoom(_ nextZoom: CGFloat) {
     zoom = min(1.4, max(0.6, nextZoom))
-    isDirty = true
+    viewportDirty = true
   }
 
   func palettePayload(for kind: PolicyCanvasNodeKind) -> String {
