@@ -37,7 +37,7 @@ extension PolicyCanvasViewModel {
       backingDocument.map { document in
         Dictionary(uniqueKeysWithValues: document.edges.map { ($0.id, $0.condition) })
       } ?? [:]
-    TaskBoardPolicyPipelineDocument(
+    return TaskBoardPolicyPipelineDocument(
       schemaVersion: backingDocument?.schemaVersion ?? 2,
       revision: backingDocument?.revision ?? 1,
       mode: .draft,
