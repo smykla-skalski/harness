@@ -5,6 +5,19 @@ import Testing
 
 @Suite("Task-board daemon API client", .serialized)
 struct TaskBoardAPIClientTests {
+  @Test("Git runtime config decodes daemon default payload")
+  func gitRuntimeConfigDecodesDaemonDefaultPayload() throws {
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    let data = Data(#"{"global":{"signing":{"mode":"none"}}}"#.utf8)
+
+    let config = try decoder.decode(TaskBoardGitRuntimeConfig.self, from: data)
+
+    #expect(config.global.signing.mode == .none)
+    #expect(config.global.authorName == nil)
+    #expect(config.repositoryOverrides.isEmpty)
+  }
+
   @Test("HTTP client uses task-board route contract")
   func httpClientUsesTaskBoardRoutes() async throws {
     let result = try await performHTTPClientContractCalls()
