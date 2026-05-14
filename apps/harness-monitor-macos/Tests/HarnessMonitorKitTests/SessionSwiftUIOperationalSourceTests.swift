@@ -55,6 +55,19 @@ struct SessionSwiftUIOperationalSourceTests {
     #expect(!toolbarSource.contains(".symbolEffect(.rotate"))
   }
 
+  @Test("Session sidebar keeps static routes visible while deferred rows load")
+  func sessionSidebarKeepsStaticRoutesVisibleWhileDeferredRowsLoad() throws {
+    let sidebarSource = try sourceFile(at: "Views/Sessions/SessionSidebar.swift")
+
+    #expect(sidebarSource.contains("private var pendingSidebarList: some View"))
+    #expect(sidebarSource.contains("private var pendingRouteSection: some View"))
+    #expect(sidebarSource.contains("selectPendingRoute(route)"))
+    #expect(sidebarSource.contains("ProgressView()"))
+    #expect(sidebarSource.contains("\"Loading session items\""))
+    #expect(sidebarSource.contains("sessionWindowSidebarDeferredLoader"))
+    #expect(sidebarSource.contains("Agents, decisions, and tasks will appear shortly."))
+  }
+
   @Test("Disabled visual perf variants reuse base routes and skip optional session chrome")
   func disabledVisualPerfVariantsReuseBaseRoutesAndSkipOptionalSessionChrome() throws {
     #expect(
