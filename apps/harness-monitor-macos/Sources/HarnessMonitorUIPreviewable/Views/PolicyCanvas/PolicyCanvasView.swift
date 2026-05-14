@@ -375,14 +375,6 @@ public struct PolicyCanvasView: View {
     viewModel.clearSelection()
   }
 
-  private func forceReloadPolicyPipeline() async {
-    guard let store else {
-      return
-    }
-    await store.refreshTaskBoardPolicyPipeline()
-    applyDashboardSnapshot()
-  }
-
   /// True when there is a simulation result the user could view. Toggle is
   /// disabled when this is false — there's nothing to show.
   private var simulationOverlayAvailable: Bool {
