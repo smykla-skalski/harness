@@ -305,6 +305,9 @@ extension HarnessMonitorStore {
     public var isBusy = false
     public var isRefreshing = false
     public var isLaunchAgentInstalled = false
+    public var taskBoardItems: [TaskBoardItem] = []
+    public var taskBoardOrchestratorStatus: TaskBoardOrchestratorStatus?
+    public var taskBoardEvaluationSummary: TaskBoardEvaluationSummary?
 
     public init() {}
 
@@ -320,6 +323,15 @@ extension HarnessMonitorStore {
       }
       if isLaunchAgentInstalled != state.isLaunchAgentInstalled {
         isLaunchAgentInstalled = state.isLaunchAgentInstalled
+      }
+      if taskBoardItems != state.taskBoardItems {
+        taskBoardItems = state.taskBoardItems
+      }
+      if taskBoardOrchestratorStatus != state.taskBoardOrchestratorStatus {
+        taskBoardOrchestratorStatus = state.taskBoardOrchestratorStatus
+      }
+      if taskBoardEvaluationSummary != state.taskBoardEvaluationSummary {
+        taskBoardEvaluationSummary = state.taskBoardEvaluationSummary
       }
     }
   }

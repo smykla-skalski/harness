@@ -5,55 +5,13 @@ import Foundation
 extension RecordingHarnessClient {
   func recordReadCall(_ call: ReadCall) {
     lock.withLock {
-      switch call {
-      case .health:
-        recordedHealthCallCount += 1
-      case .transportLatency:
-        recordedTransportLatencyCallCount += 1
-      case .diagnostics:
-        recordedDiagnosticsCallCount += 1
-      case .projects:
-        recordedProjectsCallCount += 1
-      case .sessions:
-        recordedSessionsCallCount += 1
-      case .sessionDetail(let sessionID):
-        sessionDetailCallCountsBySessionID[sessionID, default: 0] += 1
-      case .timeline(let sessionID):
-        timelineCallCountsBySessionID[sessionID, default: 0] += 1
-      case .timelineWindow(let sessionID):
-        timelineWindowCallCountsBySessionID[sessionID, default: 0] += 1
-      case .acpTranscript(let sessionID):
-        acpTranscriptCallCountsBySessionID[sessionID, default: 0] += 1
-      case .codexTranscript(let sessionID):
-        codexTranscriptCallCountsBySessionID[sessionID, default: 0] += 1
-      }
+      readCallCountsByKey[call.countKey, default: 0] += 1
     }
   }
 
   func readCallCount(_ call: ReadCall) -> Int {
     lock.withLock {
-      switch call {
-      case .health:
-        recordedHealthCallCount
-      case .transportLatency:
-        recordedTransportLatencyCallCount
-      case .diagnostics:
-        recordedDiagnosticsCallCount
-      case .projects:
-        recordedProjectsCallCount
-      case .sessions:
-        recordedSessionsCallCount
-      case .sessionDetail(let sessionID):
-        sessionDetailCallCountsBySessionID[sessionID, default: 0]
-      case .timeline(let sessionID):
-        timelineCallCountsBySessionID[sessionID, default: 0]
-      case .timelineWindow(let sessionID):
-        timelineWindowCallCountsBySessionID[sessionID, default: 0]
-      case .acpTranscript(let sessionID):
-        acpTranscriptCallCountsBySessionID[sessionID, default: 0]
-      case .codexTranscript(let sessionID):
-        codexTranscriptCallCountsBySessionID[sessionID, default: 0]
-      }
+      readCallCountsByKey[call.countKey, default: 0]
     }
   }
 
@@ -123,5 +81,36 @@ extension RecordingHarnessClient {
     tuis.insert(snapshot, at: 0)
     agentTuisBySessionID[snapshot.sessionId] = tuis
     return snapshot
+  }
+}
+
+extension RecordingHarnessClient.ReadCall {
+  var countKey: String {
+    switch self {
+    case .health:
+      "health"
+    case .transportLatency:
+      "transport-latency"
+    case .diagnostics:
+      "diagnostics"
+    case .projects:
+      "projects"
+    case .sessions:
+      "sessions"
+    case .sessionDetail(let sessionID):
+      "session-detail:\(sessionID)"
+    case .timeline(let sessionID):
+      "timeline:\(sessionID)"
+    case .timelineWindow(let sessionID):
+      "timeline-window:\(sessionID)"
+    case .acpTranscript(let sessionID):
+      "acp-transcript:\(sessionID)"
+    case .codexTranscript(let sessionID):
+      "codex-transcript:\(sessionID)"
+    case .taskBoardOrchestratorStatus:
+      "task-board-orchestrator-status"
+    case .taskBoardOrchestratorSettings:
+      "task-board-orchestrator-settings"
+    }
   }
 }

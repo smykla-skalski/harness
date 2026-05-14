@@ -27,6 +27,10 @@ use crate::task_board::types::{
 };
 use crate::workspace::utc_now;
 
+mod evaluate;
+
+pub use evaluate::TaskBoardEvaluateArgs;
+
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]
 pub enum TaskBoardCommand {
@@ -44,6 +48,8 @@ pub enum TaskBoardCommand {
     Sync(TaskBoardSyncArgs),
     /// Dispatch ready work into sessions.
     Dispatch(TaskBoardDispatchArgs),
+    /// Evaluate linked session work and update board workflow state.
+    Evaluate(TaskBoardEvaluateArgs),
     /// Print task-board audit data.
     Audit(TaskBoardAuditArgs),
     /// Manage known projects.
@@ -173,6 +179,7 @@ impl Execute for TaskBoardCommand {
             Self::Delete(args) => args.execute(context),
             Self::Sync(args) => args.execute(context),
             Self::Dispatch(args) => args.execute(context),
+            Self::Evaluate(args) => args.execute(context),
             Self::Audit(args) => args.execute(context),
             Self::Project(args) => args.execute_project(context),
             Self::Machine(args) => args.execute_machine(context),

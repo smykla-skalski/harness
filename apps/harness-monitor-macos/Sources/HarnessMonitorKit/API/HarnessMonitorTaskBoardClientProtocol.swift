@@ -11,7 +11,19 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
   func deleteTaskBoardItem(id: String) async throws -> TaskBoardItem
   func syncTaskBoard(status: TaskBoardStatus?) async throws -> TaskBoardSyncSummary
   func dispatchTaskBoard(request: TaskBoardDispatchRequest) async throws -> TaskBoardDispatchSummary
+  func evaluateTaskBoard(request: TaskBoardEvaluateRequest) async throws
+    -> TaskBoardEvaluationSummary
   func auditTaskBoard(status: TaskBoardStatus?) async throws -> TaskBoardAuditSummary
+  func taskBoardOrchestratorStatus() async throws -> TaskBoardOrchestratorStatus
+  func startTaskBoardOrchestrator() async throws -> TaskBoardOrchestratorStatus
+  func stopTaskBoardOrchestrator() async throws -> TaskBoardOrchestratorStatus
+  func runTaskBoardOrchestratorOnce(
+    request: TaskBoardOrchestratorRunOnceRequest
+  ) async throws -> TaskBoardOrchestratorRunOnceResponse
+  func taskBoardOrchestratorSettings() async throws -> TaskBoardOrchestratorSettings
+  func updateTaskBoardOrchestratorSettings(
+    request: TaskBoardOrchestratorSettingsUpdateRequest
+  ) async throws -> TaskBoardOrchestratorSettings
 }
 
 extension HarnessMonitorTaskBoardClientProtocol {
@@ -50,6 +62,12 @@ extension HarnessMonitorTaskBoardClientProtocol {
     throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable.")
   }
 
+  public func evaluateTaskBoard(request _: TaskBoardEvaluateRequest) async throws
+    -> TaskBoardEvaluationSummary
+  {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable.")
+  }
+
   public func dispatchTaskBoard(
     status: TaskBoardStatus? = nil,
     dryRun: Bool = true,
@@ -60,7 +78,46 @@ extension HarnessMonitorTaskBoardClientProtocol {
     )
   }
 
+  public func evaluateTaskBoard(
+    status: TaskBoardStatus? = nil,
+    dryRun: Bool = false
+  ) async throws -> TaskBoardEvaluationSummary {
+    try await evaluateTaskBoard(request: TaskBoardEvaluateRequest(status: status, dryRun: dryRun))
+  }
+
   public func auditTaskBoard(status _: TaskBoardStatus?) async throws -> TaskBoardAuditSummary {
     throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable.")
+  }
+
+  public func taskBoardOrchestratorStatus() async throws -> TaskBoardOrchestratorStatus {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable.")
+  }
+
+  public func startTaskBoardOrchestrator() async throws -> TaskBoardOrchestratorStatus {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable.")
+  }
+
+  public func stopTaskBoardOrchestrator() async throws -> TaskBoardOrchestratorStatus {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable.")
+  }
+
+  public func runTaskBoardOrchestratorOnce(
+    request _: TaskBoardOrchestratorRunOnceRequest
+  ) async throws -> TaskBoardOrchestratorRunOnceResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable.")
+  }
+
+  public func taskBoardOrchestratorSettings() async throws -> TaskBoardOrchestratorSettings {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable.")
+  }
+
+  public func updateTaskBoardOrchestratorSettings(
+    request _: TaskBoardOrchestratorSettingsUpdateRequest
+  ) async throws -> TaskBoardOrchestratorSettings {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable.")
+  }
+
+  public func runTaskBoardOrchestratorOnce() async throws -> TaskBoardOrchestratorRunOnceResponse {
+    try await runTaskBoardOrchestratorOnce(request: TaskBoardOrchestratorRunOnceRequest())
   }
 }

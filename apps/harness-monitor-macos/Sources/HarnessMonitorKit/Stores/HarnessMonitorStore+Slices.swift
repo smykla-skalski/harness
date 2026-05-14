@@ -343,6 +343,9 @@ extension HarnessMonitorStore {
     public var isBusy = false
     public var isRefreshing = false
     public var isLaunchAgentInstalled = false
+    public var taskBoardItems: [TaskBoardItem] = []
+    public var taskBoardOrchestratorStatus: TaskBoardOrchestratorStatus?
+    public var taskBoardEvaluationSummary: TaskBoardEvaluationSummary?
   }
 
   public struct SidebarUIState: Equatable {

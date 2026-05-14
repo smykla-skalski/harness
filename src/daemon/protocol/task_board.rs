@@ -3,7 +3,13 @@ use serde::{Deserialize, Serialize};
 use crate::task_board::types::TaskBoardWorkflowState;
 use crate::task_board::{
     AgentMode, DispatchExecutionSummary, ExternalRef, PlanningState, TaskBoardAuditSummary,
-    TaskBoardItem, TaskBoardPriority, TaskBoardStatus, TaskBoardSyncSummary,
+    TaskBoardEvaluationSummary, TaskBoardItem, TaskBoardPriority, TaskBoardStatus,
+    TaskBoardSyncSummary,
+};
+
+pub use crate::task_board::{
+    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettings,
+    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorStatus,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -107,6 +113,14 @@ pub struct TaskBoardDispatchRequest {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TaskBoardEvaluateRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<TaskBoardStatus>,
+    #[serde(default)]
+    pub dry_run: bool,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TaskBoardAuditRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status: Option<TaskBoardStatus>,
@@ -114,4 +128,8 @@ pub struct TaskBoardAuditRequest {
 
 pub type TaskBoardSyncResponse = TaskBoardSyncSummary;
 pub type TaskBoardDispatchResponse = DispatchExecutionSummary;
+pub type TaskBoardEvaluationResponse = TaskBoardEvaluationSummary;
 pub type TaskBoardAuditResponse = TaskBoardAuditSummary;
+pub type TaskBoardOrchestratorStatusResponse = TaskBoardOrchestratorStatus;
+pub type TaskBoardOrchestratorRunOnceResponse = TaskBoardOrchestratorStatus;
+pub type TaskBoardOrchestratorSettingsResponse = TaskBoardOrchestratorSettings;

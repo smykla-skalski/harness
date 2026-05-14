@@ -208,7 +208,28 @@ struct WebSocketProtocolTests {
     #expect(WebSocketRPCMethod.taskBoardDelete.rawValue == "task_board.delete")
     #expect(WebSocketRPCMethod.taskBoardSync.rawValue == "task_board.sync")
     #expect(WebSocketRPCMethod.taskBoardDispatch.rawValue == "task_board.dispatch")
+    #expect(WebSocketRPCMethod.taskBoardEvaluate.rawValue == "task_board.evaluate")
     #expect(WebSocketRPCMethod.taskBoardAudit.rawValue == "task_board.audit")
+    #expect(
+      WebSocketRPCMethod.taskBoardOrchestratorStatus.rawValue
+        == "task_board.orchestrator_status"
+    )
+    #expect(
+      WebSocketRPCMethod.taskBoardOrchestratorStart.rawValue == "task_board.orchestrator_start"
+    )
+    #expect(WebSocketRPCMethod.taskBoardOrchestratorStop.rawValue == "task_board.orchestrator_stop")
+    #expect(
+      WebSocketRPCMethod.taskBoardOrchestratorRunOnce.rawValue
+        == "task_board.orchestrator_run_once"
+    )
+    #expect(
+      WebSocketRPCMethod.taskBoardOrchestratorSettingsGet.rawValue
+        == "task_board.orchestrator_settings_get"
+    )
+    #expect(
+      WebSocketRPCMethod.taskBoardOrchestratorSettingsUpdate.rawValue
+        == "task_board.orchestrator_settings_update"
+    )
     #expect(WebSocketRPCMethod.taskSubmitForReview.rawValue == "task.submit_for_review")
     #expect(WebSocketRPCMethod.taskClaimReview.rawValue == "task.claim_review")
     #expect(WebSocketRPCMethod.taskSubmitReview.rawValue == "task.submit_review")

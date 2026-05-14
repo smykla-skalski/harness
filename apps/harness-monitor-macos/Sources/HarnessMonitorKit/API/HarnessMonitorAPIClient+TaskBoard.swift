@@ -40,11 +40,47 @@ extension HarnessMonitorAPIClient {
     try await post("/v1/task-board/dispatch", body: request)
   }
 
+  public func evaluateTaskBoard(request: TaskBoardEvaluateRequest) async throws
+    -> TaskBoardEvaluationSummary
+  {
+    try await post("/v1/task-board/evaluate", body: request)
+  }
+
   public func auditTaskBoard(status: TaskBoardStatus? = nil) async throws -> TaskBoardAuditSummary {
     try await get(
       "/v1/task-board/audit",
       queryItems: taskBoardQueryItems(status: status)
     )
+  }
+
+  public func taskBoardOrchestratorStatus() async throws -> TaskBoardOrchestratorStatus {
+    try await get("/v1/task-board/orchestrator/status")
+  }
+
+  public func startTaskBoardOrchestrator() async throws -> TaskBoardOrchestratorStatus {
+    try await post("/v1/task-board/orchestrator/start", body: EmptyBody())
+  }
+
+  public func stopTaskBoardOrchestrator() async throws -> TaskBoardOrchestratorStatus {
+    try await post("/v1/task-board/orchestrator/stop", body: EmptyBody())
+  }
+
+  public func runTaskBoardOrchestratorOnce(
+    request: TaskBoardOrchestratorRunOnceRequest = TaskBoardOrchestratorRunOnceRequest()
+  ) async throws
+    -> TaskBoardOrchestratorRunOnceResponse
+  {
+    try await post("/v1/task-board/orchestrator/run-once", body: request)
+  }
+
+  public func taskBoardOrchestratorSettings() async throws -> TaskBoardOrchestratorSettings {
+    try await get("/v1/task-board/orchestrator/settings")
+  }
+
+  public func updateTaskBoardOrchestratorSettings(
+    request: TaskBoardOrchestratorSettingsUpdateRequest
+  ) async throws -> TaskBoardOrchestratorSettings {
+    try await put("/v1/task-board/orchestrator/settings", body: request)
   }
 
   private func taskBoardQueryItems(status: TaskBoardStatus?) -> [URLQueryItem] {

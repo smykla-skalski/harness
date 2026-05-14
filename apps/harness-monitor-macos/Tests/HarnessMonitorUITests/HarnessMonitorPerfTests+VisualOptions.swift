@@ -66,7 +66,8 @@ extension HarnessMonitorPerfTests {
       scenario: "decision-detail-form-visual-options-disabled",
       requiredElement: decisionDetail,
       requiredElementDescription:
-        "Decision detail visual-options-disabled perf scenario did not render the current decision detail pane"
+        "Decision detail visual-options-disabled perf scenario did not render "
+        + "the current decision detail pane"
     )
   }
 
