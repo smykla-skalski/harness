@@ -28,6 +28,23 @@ extension RecordingHarnessClient {
     }
   }
 
+  func syncTaskBoard(request: TaskBoardSyncRequest) async throws -> TaskBoardSyncSummary {
+    calls.append(
+      .syncTaskBoard(
+        direction: request.direction,
+        dryRun: request.dryRun,
+        status: request.status,
+        provider: request.provider
+      )
+    )
+    return lock.withLock {
+      if let importedItems = taskBoardItemsAfterSyncStorage {
+        taskBoardItemsStorage = importedItems
+      }
+      return taskBoardSyncSummaryStorage
+    }
+  }
+
   func taskBoardOrchestratorStatus() async throws -> TaskBoardOrchestratorStatus {
     recordReadCall(.taskBoardOrchestratorStatus)
     return sampleTaskBoardOrchestratorStatus()

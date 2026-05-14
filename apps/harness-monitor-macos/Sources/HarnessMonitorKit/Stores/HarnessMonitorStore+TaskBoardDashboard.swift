@@ -1,6 +1,11 @@
 import Foundation
 
 extension HarnessMonitorStore {
+  private static let taskBoardDashboardSyncRequest = TaskBoardSyncRequest(
+    direction: .pull,
+    dryRun: false
+  )
+
   nonisolated static func loadTaskBoardItemsSnapshot(
     using client: any HarnessMonitorClientProtocol
   ) async -> MeasuredOperation<[TaskBoardItem]> {
@@ -38,7 +43,9 @@ extension HarnessMonitorStore {
     guard let client else {
       return
     }
-    await refreshTaskBoardDashboardSnapshot(using: client)
+    isDaemonActionInFlight = true
+    defer { isDaemonActionInFlight = false }
+    _ = await syncAndRefreshTaskBoardDashboard(using: client)
   }
 
   @discardableResult
@@ -158,6 +165,30 @@ extension HarnessMonitorStore {
     withUISyncBatch {
       globalTaskBoardItems = measuredItems.value
       globalTaskBoardOrchestratorStatus = measuredStatus.value ?? fallbackStatus
+    }
+  }
+
+  @discardableResult
+  func syncAndRefreshTaskBoardDashboard(
+    using client: any HarnessMonitorClientProtocol,
+    failureMessagePrefix: String? = nil
+  ) async -> Bool {
+    do {
+      _ = try await Self.measureOperation {
+        try await client.syncTaskBoard(request: Self.taskBoardDashboardSyncRequest)
+      }
+      recordRequestSuccess()
+      await refreshTaskBoardDashboardSnapshot(using: client)
+      return true
+    } catch {
+      await refreshTaskBoardDashboardSnapshot(using: client)
+      let failureDescription = if let failureMessagePrefix {
+        "\(failureMessagePrefix): \(error.localizedDescription)"
+      } else {
+        error.localizedDescription
+      }
+      presentFailureFeedback(failureDescription)
+      return false
     }
   }
 

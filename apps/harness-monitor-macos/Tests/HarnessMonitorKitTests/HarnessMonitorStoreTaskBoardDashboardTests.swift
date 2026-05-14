@@ -5,15 +5,38 @@ import Testing
 @MainActor
 @Suite("Harness Monitor task-board dashboard")
 struct HarnessMonitorStoreTaskBoardDashboardTests {
-  @Test("Refresh task board dashboard hydrates board items")
-  func refreshTaskBoardDashboardHydratesBoardItems() async {
+  @Test("Refresh task board dashboard imports external items with applied pull sync")
+  func refreshTaskBoardDashboardImportsExternalItemsWithAppliedPullSync() async {
     let client = RecordingHarnessClient()
-    client.configureTaskBoardItems([sampleTaskBoardItem()])
+    client.configureTaskBoardItems([])
+    client.configureTaskBoardSync(
+      summary: TaskBoardSyncSummary(
+        total: 1,
+        providers: [],
+        operations: [
+          TaskBoardExternalSyncOperation(
+            provider: .gitHub,
+            action: .pull,
+            boardItemId: "board-1",
+            externalId: "123",
+            url: "https://example.invalid/issues/123",
+            dryRun: false,
+            applied: true
+          )
+        ]
+      ),
+      importedItems: [sampleTaskBoardItem()]
+    )
     let store = await makeBootstrappedStore(client: client)
     let baselineCalls = client.readCallCount(.taskBoardItems(nil))
 
     await store.refreshTaskBoardDashboard()
 
+    #expect(
+      client.recordedCalls().contains(
+        .syncTaskBoard(direction: .pull, dryRun: false, status: nil, provider: nil)
+      )
+    )
     #expect(client.readCallCount(.taskBoardItems(nil)) == baselineCalls + 1)
     #expect(store.globalTaskBoardItems.first?.id == "board-1")
     #expect(store.globalTaskBoardItems.first?.externalRefs.first?.provider == .gitHub)

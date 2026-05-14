@@ -179,6 +179,12 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       globalTokenConfigured: Bool,
       repositoryTokenCount: Int
     )
+    case syncTaskBoard(
+      direction: TaskBoardExternalSyncDirection,
+      dryRun: Bool,
+      status: TaskBoardStatus?,
+      provider: TaskBoardExternalProvider?
+    )
     case saveTaskBoardPolicyPipelineDraft(revision: UInt64)
     case simulateTaskBoardPolicyPipeline
     case promoteTaskBoardPolicyPipeline(revision: UInt64)
@@ -235,6 +241,8 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var projectSummariesStorage: [ProjectSummary]?
   var sessionSummariesStorage: [SessionSummary]?
   var taskBoardItemsStorage: [TaskBoardItem] = []
+  var taskBoardItemsAfterSyncStorage: [TaskBoardItem]?
+  var taskBoardSyncSummaryStorage = TaskBoardSyncSummary(total: 0, providers: [])
   var sessionDetailsByID: [String: SessionDetail] = [:]
   var detailDelaysBySessionID: [String: Duration] = [:]
   var sessionDetailErrorsByID: [String: any Error] = [:]
