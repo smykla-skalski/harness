@@ -161,9 +161,56 @@ struct SessionSidebar: View {
   }
 
   private var pendingSidebarList: some View {
-    Color.clear
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .accessibilityHidden(true)
+    List {
+      pendingRouteSection
+      pendingSidebarLoadingSection
+    }
+    .listStyle(.sidebar)
+  }
+
+  private var pendingRouteSection: some View {
+    ForEach(sidebarRoutes) { route in
+      let selection = SessionSelection.route(route)
+      let isSelected = displayedSelectionSet.contains(selection)
+      Button {
+        selectPendingRoute(route)
+      } label: {
+        SessionSidebarRow(
+          title: route.title,
+          systemImage: route.systemImage
+        )
+        .background {
+          RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .fill(.selection)
+            .opacity(isSelected ? 0.18 : 0)
+        }
+        .harnessSelectionOutline(isSelected: isSelected, cornerRadius: 8)
+      }
+      .buttonStyle(.borderless)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowRoute(route))
+      .accessibilityValue(isSelected ? "selected" : "not selected")
+    }
+  }
+
+  private var pendingSidebarLoadingSection: some View {
+    Section {
+      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+        ProgressView()
+          .controlSize(.small)
+          .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+          Text("Loading session items")
+            .scaledFont(.body.weight(.medium))
+          Text("Agents, decisions, and tasks will appear shortly.")
+            .scaledFont(.footnote)
+            .foregroundStyle(.secondary)
+        }
+      }
+      .padding(.vertical, HarnessMonitorTheme.spacingXS)
+      .accessibilityElement(children: .combine)
+      .accessibilityLabel("Loading session items")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowSidebarDeferredLoader)
+    }
   }
 
   private var sidebarRowSize: SidebarRowSize {

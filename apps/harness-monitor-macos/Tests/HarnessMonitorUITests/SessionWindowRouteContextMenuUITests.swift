@@ -8,6 +8,34 @@ final class SessionWindowRouteContextMenuUITests: HarnessMonitorUITestCase {
   private static let dashboardLandingScenario = "dashboard-landing"
   private static let previewSessionID = "sess1234"
 
+  func testSidebarShowsRoutesWhileDeferredSectionsLoad() {
+    let app = launchPreviewSessionWindow()
+
+    let overviewRoute = element(in: app, identifier: Accessibility.sessionWindowRoute("overview"))
+    let deferredLoader = element(
+      in: app,
+      identifier: Accessibility.sessionWindowSidebarDeferredLoader
+    )
+    let taskRow = element(in: app, identifier: Accessibility.sidebarTaskRow("task-ui"))
+
+    XCTAssertTrue(
+      waitForElement(in: app, overviewRoute, timeout: Self.fastActionTimeout),
+      "Expected static route rows to appear before deferred sidebar content finishes mounting"
+    )
+    XCTAssertTrue(
+      waitForElement(in: app, deferredLoader, timeout: Self.fastActionTimeout),
+      "Expected a visible loader while deferred sidebar sections are still hidden"
+    )
+    XCTAssertTrue(
+      waitForElement(in: app, taskRow, timeout: Self.actionTimeout),
+      "Expected deferred sidebar rows to appear once the native list mounts"
+    )
+    XCTAssertTrue(
+      waitUntil(in: app, timeout: Self.actionTimeout) { !deferredLoader.exists },
+      "Expected the deferred sidebar loader to disappear after the native list mounts"
+    )
+  }
+
   func testTasksRouteContextMenuUsesBatchLabelsForMiddleColumnSelection() {
     let app = launchPreviewSessionWindow()
 

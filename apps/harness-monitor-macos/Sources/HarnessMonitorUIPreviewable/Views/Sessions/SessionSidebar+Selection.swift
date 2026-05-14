@@ -82,6 +82,13 @@ extension SessionSidebar {
     setListSelection([state.selection])
   }
 
+  func selectPendingRoute(_ route: SessionWindowRoute) {
+    let selection = SessionSelection.route(route)
+    state.sidebarSelection.clear()
+    state.selectFromSidebar(selection)
+    setListSelection([selection])
+  }
+
   var hasActiveMultiSelection: Bool {
     state.sidebarSelection.hasActiveMultiSelection
   }
