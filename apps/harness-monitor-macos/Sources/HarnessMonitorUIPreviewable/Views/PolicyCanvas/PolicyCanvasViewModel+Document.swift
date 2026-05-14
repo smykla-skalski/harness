@@ -115,6 +115,11 @@ extension PolicyCanvasViewModel {
     setPendingUpdate(nil)
     invalidateValidationCache()
     requestViewportCentering()
+    // Cross-revision load replaces the editable graph wholesale. The undo
+    // stack from the previous revision references node/group/edge ids that
+    // may no longer exist; replaying an inverse against the freshly loaded
+    // graph would either crash on missing ids or restore stale state.
+    clearUndoStack()
     notifyStatus("Loaded revision \(document.revision)")
   }
 
@@ -184,6 +189,11 @@ extension PolicyCanvasViewModel {
     clearTransientGestureState()
     resetPaletteDropPlacement()
     invalidateValidationCache()
+    // Discard the rejected attempt's history. The user's mental model on a
+    // daemon-reject restore is "throw away that try" — keeping the rejected
+    // mutations in the undo stack would let Cmd+Z replay edits the daemon
+    // already refused, which is more confusing than a clean break.
+    clearUndoStack()
     notifyStatus(reason)
   }
 

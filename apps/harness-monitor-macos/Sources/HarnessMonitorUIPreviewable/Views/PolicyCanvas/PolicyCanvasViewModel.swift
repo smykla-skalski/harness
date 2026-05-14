@@ -65,10 +65,18 @@ final class PolicyCanvasViewModel {
   /// pollute the document state graph or future undo register.
   @ObservationIgnored var statusCallback: (@MainActor (String) -> Void)?
 
+  /// `@Environment(\.undoManager)` from the host view, bridged in via
+  /// `attachUndoManager(_:)`. Held weakly so a window-close that tears down
+  /// the environment does not keep a dead pointer alive. Read by the
+  /// `mutate(_:)` funnel in `PolicyCanvasViewModel+UndoFunnel.swift`; direct
+  /// access from other sites is forbidden — every undoable mutation must
+  /// route through the funnel.
+  @ObservationIgnored weak var undoManager: UndoManager?
+
   @ObservationIgnored var nextNodeNumber: Int
   @ObservationIgnored var loadedDocumentRevision: UInt64?
   @ObservationIgnored var centeredViewportGeneration: UInt64 = 0
-  @ObservationIgnored private var nodeDragOrigins: [String: CGPoint] = [:]
+  @ObservationIgnored var nodeDragOrigins: [String: CGPoint] = [:]
   @ObservationIgnored var groupDragOrigins: [String: CGRect] = [:]
   @ObservationIgnored var groupNodeDragOrigins: [String: [String: CGPoint]] = [:]
   @ObservationIgnored var cleanEphemeralNodeIDs: Set<String> = []
@@ -210,93 +218,8 @@ final class PolicyCanvasViewModel {
     )
     node.groupID = containingGroupID(for: nodeCenter(node))
     node.policyKind = taskBoardPolicyNodeKind(for: kind)
-    nodes.append(node)
-    cleanEphemeralNodeIDs.insert(node.id)
-    reconcileGroupFrames()
-    selection = .node(node.id)
-    documentDirty = true
-    invalidateValidationCache()
-    notifyStatus("\(kind.title) node added")
-  }
-
-  func dragNode(_ nodeID: String, translation: CGSize) {
-    guard let index = nodes.firstIndex(where: { $0.id == nodeID }) else {
-      return
-    }
-    if nodeDragOrigins[nodeID] == nil {
-      nodeDragOrigins[nodeID] = nodes[index].position
-    }
-    markNodeEdited(nodeID)
-    let origin = nodeDragOrigins[nodeID] ?? nodes[index].position
-    nodes[index].position = snapped(
-      CGPoint(
-        x: origin.x + translation.width / zoom,
-        y: origin.y + translation.height / zoom
-      )
-    )
-    highlightedGroupID =
-      containingGroupID(for: nodeCenter(nodes[index]), excluding: nodes[index].groupID)
-      ?? nodes[index].groupID
-    reconcileGroupFrames()
-    selection = .node(nodeID)
-    documentDirty = true
-  }
-
-  func endNodeDrag(_ nodeID: String, translation: CGSize) {
-    dragNode(nodeID, translation: translation)
-    if let index = nodes.firstIndex(where: { $0.id == nodeID }) {
-      let targetGroupID = containingGroupID(
-        for: nodeCenter(nodes[index]),
-        excluding: nodes[index].groupID
-      )
-      if let targetGroupID {
-        nodes[index].groupID = targetGroupID
-      } else if nodes[index].groupID == nil {
-        nodes[index].groupID = containingGroupID(for: nodeCenter(nodes[index]))
-      }
-    }
-    reconcileGroupFrames()
-    nodeDragOrigins[nodeID] = nil
-    highlightedGroupID = nil
-    // Drag-only mutation: token count fields don't change, but orphan
-    // grouping changes can flip the validator. Bump generation here, not
-    // in `dragNode` — pinging the cache 60 times during a drag would
-    // shadow the very rebuild we're trying to avoid.
-    invalidateValidationCache()
-  }
-
-  func dragGroup(_ groupID: String, translation: CGSize) {
-    guard let index = groups.firstIndex(where: { $0.id == groupID }) else {
-      return
-    }
-    seedGroupDrag(groupID: groupID, group: groups[index])
-    let origin = groupDragOrigins[groupID] ?? groups[index].frame
-    let nextOrigin = snapped(
-      CGPoint(
-        x: origin.origin.x + translation.width / zoom,
-        y: origin.origin.y + translation.height / zoom
-      )
-    )
-    let delta = CGSize(
-      width: nextOrigin.x - origin.origin.x,
-      height: nextOrigin.y - origin.origin.y
-    )
-    groups[index].frame.origin = nextOrigin
-    moveNodes(in: groupID, by: delta)
-    reconcileGroupFrames()
-    highlightedGroupID = groupID
-    selection = .group(groupID)
-    documentDirty = true
-  }
-
-  func endGroupDrag(_ groupID: String, translation: CGSize) {
-    dragGroup(groupID, translation: translation)
-    groupDragOrigins[groupID] = nil
-    groupNodeDragOrigins[groupID] = nil
-    highlightedGroupID = nil
-    // Group drag moves nodes inside the group; same rationale as
-    // `endNodeDrag` — bump on the end-of-gesture, not every tick.
-    invalidateValidationCache()
+    let priorSelection = selection
+    mutate(.addNode(node, restoreSelection: priorSelection))
   }
 
   func setInputTargeted(
@@ -347,13 +270,9 @@ final class PolicyCanvasViewModel {
       target: target,
       label: edgeLabel(source: source, target: target)
     )
-    edges.append(edge)
-    cleanEphemeralEdgeIDs.insert(edge.id)
-    selection = .edge(edge.id)
+    let priorSelection = selection
     clearPendingEdge()
-    documentDirty = true
-    invalidateValidationCache()
-    notifyStatus("Edge created")
+    mutate(.addEdge(edge, restoreSelection: priorSelection))
     return true
   }
 
