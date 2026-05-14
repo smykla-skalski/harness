@@ -153,6 +153,37 @@ public struct TaskBoardWorkflowState: Codable, Equatable, Sendable {
   }
 }
 
+extension TaskBoardWorkflowState {
+  enum CodingKeys: String, CodingKey {
+    case executionId
+    case status
+    case currentStepId
+    case attempts
+    case branch
+    case worktree
+    case prNumber
+    case prUrl
+    case lastError
+    case policyTraceIds
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      executionId: try container.decodeIfPresent(String.self, forKey: .executionId),
+      status: try container.decodeIfPresent(TaskBoardWorkflowStatus.self, forKey: .status) ?? .idle,
+      currentStepId: try container.decodeIfPresent(String.self, forKey: .currentStepId),
+      attempts: try container.decodeIfPresent(UInt32.self, forKey: .attempts) ?? 0,
+      branch: try container.decodeIfPresent(String.self, forKey: .branch),
+      worktree: try container.decodeIfPresent(String.self, forKey: .worktree),
+      prNumber: try container.decodeIfPresent(UInt64.self, forKey: .prNumber),
+      prUrl: try container.decodeIfPresent(String.self, forKey: .prUrl),
+      lastError: try container.decodeIfPresent(String.self, forKey: .lastError),
+      policyTraceIds: try container.decodeIfPresent([String].self, forKey: .policyTraceIds) ?? []
+    )
+  }
+}
+
 public struct TaskBoardUsage: Codable, Equatable, Sendable {
   public let inputTokens: UInt64?
   public let outputTokens: UInt64?
@@ -184,6 +215,52 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
   public let createdAt: String
   public let updatedAt: String
   public let deletedAt: String?
+}
+
+extension TaskBoardItem {
+  enum CodingKeys: String, CodingKey {
+    case schemaVersion
+    case id
+    case title
+    case body
+    case status
+    case priority
+    case tags
+    case projectId
+    case agentMode
+    case externalRefs
+    case planning
+    case workflow
+    case sessionId
+    case workItemId
+    case usage
+    case createdAt
+    case updatedAt
+    case deletedAt
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.schemaVersion = try container.decode(UInt32.self, forKey: .schemaVersion)
+    self.id = try container.decode(String.self, forKey: .id)
+    self.title = try container.decode(String.self, forKey: .title)
+    self.body = try container.decode(String.self, forKey: .body)
+    self.status = try container.decode(TaskBoardStatus.self, forKey: .status)
+    self.priority = try container.decode(TaskBoardPriority.self, forKey: .priority)
+    self.tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
+    self.projectId = try container.decodeIfPresent(String.self, forKey: .projectId)
+    self.agentMode = try container.decode(TaskBoardAgentMode.self, forKey: .agentMode)
+    self.externalRefs =
+      try container.decodeIfPresent([TaskBoardExternalRef].self, forKey: .externalRefs) ?? []
+    self.planning = try container.decode(TaskBoardPlanningState.self, forKey: .planning)
+    self.workflow = try container.decodeIfPresent(TaskBoardWorkflowState.self, forKey: .workflow)
+    self.sessionId = try container.decodeIfPresent(String.self, forKey: .sessionId)
+    self.workItemId = try container.decodeIfPresent(String.self, forKey: .workItemId)
+    self.usage = try container.decode(TaskBoardUsage.self, forKey: .usage)
+    self.createdAt = try container.decode(String.self, forKey: .createdAt)
+    self.updatedAt = try container.decode(String.self, forKey: .updatedAt)
+    self.deletedAt = try container.decodeIfPresent(String.self, forKey: .deletedAt)
+  }
 }
 
 public struct TaskBoardCreateItemRequest: Codable, Equatable, Sendable {

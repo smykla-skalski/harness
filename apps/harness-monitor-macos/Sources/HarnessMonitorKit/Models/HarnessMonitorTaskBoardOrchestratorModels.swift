@@ -164,6 +164,42 @@ public struct TaskBoardOrchestratorRunSummary: Codable, Equatable, Sendable {
   }
 }
 
+extension TaskBoardOrchestratorRunSummary {
+  enum CodingKeys: String, CodingKey {
+    case runId
+    case startedAt
+    case completedAt
+    case status
+    case dryRun
+    case sync
+    case audit
+    case dispatch
+    case evaluation
+    case error
+    case policyTraceIds
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      runId: try container.decode(String.self, forKey: .runId),
+      startedAt: try container.decode(String.self, forKey: .startedAt),
+      completedAt: try container.decode(String.self, forKey: .completedAt),
+      status: try container.decode(TaskBoardOrchestratorRunStatus.self, forKey: .status),
+      dryRun: try container.decode(Bool.self, forKey: .dryRun),
+      sync: try container.decode(TaskBoardSyncSummary.self, forKey: .sync),
+      audit: try container.decode(TaskBoardAuditSummary.self, forKey: .audit),
+      dispatch: try container.decodeIfPresent(TaskBoardDispatchSummary.self, forKey: .dispatch),
+      evaluation: try container.decodeIfPresent(
+        TaskBoardEvaluationSummary.self,
+        forKey: .evaluation
+      ),
+      error: try container.decodeIfPresent(String.self, forKey: .error),
+      policyTraceIds: try container.decodeIfPresent([String].self, forKey: .policyTraceIds) ?? []
+    )
+  }
+}
+
 public struct TaskBoardWorkflowExecutionCount: Codable, Equatable, Sendable {
   public let status: TaskBoardWorkflowStatus
   public let count: Int

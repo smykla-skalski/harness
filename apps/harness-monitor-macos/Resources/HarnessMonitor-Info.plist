@@ -53,7 +53,31 @@
 			<string>Harness Monitor Task</string>
 			<key>UTTypeConformsTo</key>
 			<array>
-				<string>public.data</string>
+				<string>public.json</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict/>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>io.harnessmonitor.task-board-item</string>
+			<key>UTTypeDescription</key>
+			<string>Harness Monitor Task Board Item</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict/>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>io.harnessmonitor.task-board-inbox-item</string>
+			<key>UTTypeDescription</key>
+			<string>Harness Monitor Task Board Inbox Item</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
 			</array>
 			<key>UTTypeTagSpecification</key>
 			<dict/>
