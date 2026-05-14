@@ -3,7 +3,7 @@ members = [".", "aff", "testkit"]
 
 [package]
 name = "harness"
-version = "34.2.0"
+version = "34.3.0"
 edition = "2024"
 rust-version = "1.94"
 include = [
@@ -85,6 +85,7 @@ libc = "0.2"
 nix = { version = "0.31", features = ["signal"] }
 signal-hook = "0.4"
 agent-client-protocol = { version = "=0.11.1", features = ["unstable_session_model"] }
+octocrab = "0.50.0"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = "3"
