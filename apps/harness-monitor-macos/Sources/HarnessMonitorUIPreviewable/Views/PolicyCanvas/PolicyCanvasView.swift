@@ -57,6 +57,9 @@ public struct PolicyCanvasView: View {
   @AccessibilityFocusState var focusedComponent: PolicyCanvasSelection?
   @Environment(\.scenePhase) var scenePhase
   @Environment(\.undoManager) var undoManager
+  /// P19 root-side system reduce-motion read; rebound onto
+  /// `\.policyCanvasReducedMotion` for nested layers (Wave 4K).
+  @Environment(\.accessibilityReduceMotion) var systemReduceMotion
 
   /// Scene-scoped storage for viewport state (zoom, selection, scroll
   /// position) keyed by pipeline identity. Before this commit each viewport
@@ -162,6 +165,9 @@ public struct PolicyCanvasView: View {
     .background(Color(red: 0.05, green: 0.06, blue: 0.08))
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasRoot)
+    // P19: rebind to a canvas-scoped key so nested layers (incl. 4K) read
+    // one handle. See `PolicyCanvasMotion.swift` for the helper contract.
+    .environment(\.policyCanvasReducedMotion, systemReduceMotion)
     .overlay(alignment: .topLeading) {
       deletionShortcutButtons
     }
@@ -278,6 +284,11 @@ public struct PolicyCanvasView: View {
       Text(request.message)
     }
   }
+
+  // `deletionShortcutButtons`, `searchShortcutButtons`,
+  // `requestDeleteSelectedComponent`, and `clearSelectionAndDragState` live
+  // in `PolicyCanvasView+Shortcuts.swift` to keep this file under the
+  // 420-line cap.
 
   private var deletionConfirmationPresented: Binding<Bool> {
     Binding(

@@ -225,56 +225,6 @@ private struct PolicyCanvasRecoveryBanner: View {
   }
 }
 
-private struct PolicyCanvasActionButton: View {
-  let title: String
-  let systemImage: String
-  var tint = Color.cyan
-  var isDisabled = false
-  var disabledReason: String?
-  var isBusy = false
-  let accessibilityIdentifier: String
-  let action: @MainActor () -> Void
-
-  var body: some View {
-    Button(action: action) {
-      HStack(spacing: 6) {
-        if isBusy {
-          // Replace the leading icon with a small spinner while a daemon
-          // round-trip is in flight. The label text stays — keyboard
-          // navigation and VoiceOver still announce the action — but the
-          // user sees the action is committed and pending.
-          ProgressView()
-            .controlSize(.mini)
-            .progressViewStyle(.circular)
-            .tint(.white.opacity(0.78))
-          Text(title)
-            .scaledFont(.callout.weight(.semibold))
-            .lineLimit(1)
-        } else {
-          Label(title, systemImage: systemImage)
-            .scaledFont(.callout.weight(.semibold))
-            .lineLimit(1)
-        }
-      }
-    }
-    .harnessActionButtonStyle(variant: .bordered, tint: tint.opacity(0.85))
-    .controlSize(.small)
-    .disabled(isDisabled || isBusy)
-    .help(helpText)
-    .accessibilityIdentifier(accessibilityIdentifier)
-  }
-
-  private var helpText: String {
-    if isBusy {
-      return "\(title) in progress"
-    }
-    if isDisabled {
-      return disabledReason ?? title
-    }
-    return title
-  }
-}
-
 /// Topbar toggle for the simulation-result overlay. The icon flips between
 /// an empty waveform and a filled waveform to mirror "off"/"on" the same
 /// way the validation panel's filter chips do; disabled rendering kicks in

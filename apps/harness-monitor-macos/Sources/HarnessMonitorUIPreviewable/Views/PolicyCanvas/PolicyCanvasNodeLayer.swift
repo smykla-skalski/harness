@@ -15,6 +15,16 @@ struct PolicyCanvasNodeLayer: View {
   /// both `.accessibilityFocused(...)` modifiers apply; whichever binding
   /// flips first wins on a given tick and the other is benign.
   let focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
+  /// P19 reduce-motion handle; mirrors the canvas-root system flag so the
+  /// drop-end spring (P18) collapses to instant when the user has the
+  /// system-wide reduce-motion accessibility setting on. The canvas-scoped
+  /// override is optional with system fallback; see `PolicyCanvasMotion`.
+  @Environment(\.policyCanvasReducedMotion) private var canvasReducedMotion
+  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+
+  private var reducedMotion: Bool {
+    canvasReducedMotion ?? systemReduceMotion
+  }
 
   var body: some View {
     let severityMap = viewModel.nodeSeverityMap
@@ -41,7 +51,15 @@ struct PolicyCanvasNodeLayer: View {
             viewModel.dragNode(node.id, translation: value.translation)
           }
           .onEnded { value in
-            viewModel.endNodeDrag(node.id, translation: value.translation)
+            // P18 drop-end spring. The tick-rate `dragNode` writes during the
+            // gesture are direct assignments (no animation — they already
+            // follow the cursor); only the final position write through
+            // `endNodeDrag` lands inside a `withAnimation` block so the
+            // snap-to-grid step reads as a deliberate settle. Reduce-motion
+            // collapses to a `nil` animation via `PolicyCanvasMotion.spring`.
+            withAnimation(PolicyCanvasMotion.spring(reducedMotion: reducedMotion)) {
+              viewModel.endNodeDrag(node.id, translation: value.translation)
+            }
           }
       )
       .simultaneousGesture(
@@ -97,6 +115,16 @@ struct PolicyCanvasNodeCard: View {
   let isFocused: Bool
   let severity: PolicyCanvasIssueSeverity?
   let viewModel: PolicyCanvasViewModel
+  /// P19 reduce-motion handle for the P18 selection-mark transition. Pulled
+  /// from the environment so the animation gating uses the same root-seeded
+  /// bit the rest of the canvas reads. Canvas-scoped override is optional
+  /// with system fallback; see `PolicyCanvasMotion`.
+  @Environment(\.policyCanvasReducedMotion) private var canvasReducedMotion
+  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+
+  private var reducedMotion: Bool {
+    canvasReducedMotion ?? systemReduceMotion
+  }
 
   var body: some View {
     ZStack {
@@ -105,6 +133,15 @@ struct PolicyCanvasNodeCard: View {
         .overlay {
           RoundedRectangle(cornerRadius: 8)
             .stroke(strokeColor, lineWidth: severity == nil ? 1.2 : 1.8)
+            // P18 selection-mark: a short ease-out fade on the stroke color
+            // when `isSelected` flips. Keyed on `isSelected` only — the
+            // stroke also varies with severity (validation), but severity
+            // changes already animate through the validation-cache
+            // invalidation path; double-animating that surface would stack
+            // two transitions on the same stroke. The wrapper hoists the
+            // `Animation?` value out of the body so the per-frame
+            // construction collapses to a `static let` lookup.
+            .policyCanvasSelectionMark(value: isSelected, reducedMotion: reducedMotion)
         }
         .overlay {
           // P27 focus ring: 1.5pt accent stroke when keyboard focus lands on

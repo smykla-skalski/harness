@@ -8,6 +8,12 @@ import SwiftUI
 struct PolicyCanvasGroupLayer: View {
   let viewModel: PolicyCanvasViewModel
   let focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
+  @Environment(\.policyCanvasReducedMotion) private var canvasReducedMotion
+  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+
+  private var reducedMotion: Bool {
+    canvasReducedMotion ?? systemReduceMotion
+  }
 
   var body: some View {
     ForEach(viewModel.groups) { group in
@@ -25,7 +31,9 @@ struct PolicyCanvasGroupLayer: View {
             viewModel.dragGroup(group.id, translation: value.translation)
           }
           .onEnded { value in
-            viewModel.endGroupDrag(group.id, translation: value.translation)
+            withAnimation(PolicyCanvasMotion.spring(reducedMotion: reducedMotion)) {
+              viewModel.endGroupDrag(group.id, translation: value.translation)
+            }
           }
       )
       .simultaneousGesture(
@@ -59,15 +67,14 @@ struct PolicyCanvasGroupRegion: View {
   /// View-only: the model state lives in `PolicyCanvasViewModel`'s observed
   /// `groupAcceptanceFlashID`. The reduce-motion gate is below in `body`.
   let isFlashing: Bool
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @Environment(\.policyCanvasReducedMotion) private var canvasReducedMotion
+  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+
+  private var reducedMotion: Bool {
+    canvasReducedMotion ?? systemReduceMotion
+  }
 
   var body: some View {
-    // Drag-over without drop: thicken the dashed stroke from 1.6→2.4pt and
-    // saturate the fill from .16/.24 baseline. Acceptance flash piles on
-    // top — extra fill opacity + a solid accent stroke that overlays the
-    // dashed one. Both signals respect reduce-motion: with motion reduced,
-    // we keep the static visual difference (thicker stroke, accent overlay)
-    // but skip the implicit `withAnimation` so the transition is instant.
     let dropFill = group.tone.color.opacity(
       isFlashing ? 0.32 : (isHighlighted ? 0.26 : 0.16)
     )
@@ -90,20 +97,17 @@ struct PolicyCanvasGroupRegion: View {
               group.tone.color.opacity(baselineStrokeOpacity),
               style: StrokeStyle(lineWidth: dashedLineWidth, dash: [6, 5])
             )
+            .policyCanvasSelectionMark(value: isSelected, reducedMotion: reducedMotion)
         }
         .overlay {
-          // Acceptance-flash overlay: a solid accent ring on top of the
-          // dashed border, snapped on instantly under reduced motion and
-          // eased in/out otherwise. The ring fades out via the binding
-          // flipping back to false after `groupAcceptanceFlashDuration`.
           if isFlashing {
             RoundedRectangle(cornerRadius: PolicyCanvasLayout.groupCornerRadius)
               .stroke(group.tone.color.opacity(0.95), lineWidth: 2.4)
-              .transition(reduceMotion ? .identity : .opacity)
+              .transition(reducedMotion ? .identity : .opacity)
           }
         }
         .animation(
-          reduceMotion ? nil : .easeOut(duration: 0.22),
+          reducedMotion ? nil : .easeOut(duration: 0.22),
           value: isFlashing
         )
 
