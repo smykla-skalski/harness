@@ -41,6 +41,11 @@ pub const SESSION_TASK_RESPOND_REVIEW: &str =
     "/v1/sessions/{session_id}/tasks/{task_id}/respond-review";
 pub const SESSION_TASK_ARBITRATE: &str = "/v1/sessions/{session_id}/tasks/{task_id}/arbitrate";
 pub const SESSION_IMPROVER_APPLY: &str = "/v1/sessions/{session_id}/improver/apply";
+pub const TASK_BOARD_ITEMS: &str = "/v1/task-board/items";
+pub const TASK_BOARD_ITEM: &str = "/v1/task-board/items/{item_id}";
+pub const TASK_BOARD_SYNC: &str = "/v1/task-board/sync";
+pub const TASK_BOARD_DISPATCH: &str = "/v1/task-board/dispatch";
+pub const TASK_BOARD_AUDIT: &str = "/v1/task-board/audit";
 pub const SESSION_AGENT_ROLE: &str = "/v1/sessions/{session_id}/agents/{session_agent_id}/role";
 pub const SESSION_AGENT_REMOVE: &str = "/v1/sessions/{session_id}/agents/{session_agent_id}/remove";
 pub const SESSION_LEADER_TRANSFER: &str = "/v1/sessions/{session_id}/leader";

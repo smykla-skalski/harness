@@ -237,6 +237,7 @@ mod signals_async;
 mod signals_async_send;
 mod status;
 mod sync_support;
+mod task_board;
 mod wake_route;
 
 pub use adopt::adopt_session_record;
@@ -287,6 +288,10 @@ pub use signals::{cancel_signal, send_signal};
 pub use status::{
     diagnostics_report, get_log_level, health_response, record_telemetry, request_shutdown,
     set_log_level, status_report,
+};
+pub use task_board::{
+    create_task_board_item, delete_task_board_item, get_task_board_item, list_task_board_items,
+    task_board_not_configured, update_task_board_item,
 };
 pub use wake_route::WakeDispatch;
 pub(crate) use wake_route::{WakeEventLevel, record_wake_event};

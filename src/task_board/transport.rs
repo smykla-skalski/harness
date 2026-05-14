@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
+use crate::task_board::dispatch::{DispatchReadiness, build_dispatch_plans};
 use crate::task_board::store::{
     OptionalFieldPatch, TaskBoardItemPatch, TaskBoardStore, default_board_root,
 };
@@ -30,9 +31,9 @@ pub enum TaskBoardCommand {
     /// Run external synchronization.
     Sync(TaskBoardNoopArgs),
     /// Dispatch ready work into sessions.
-    Dispatch(TaskBoardNoopArgs),
+    Dispatch(TaskBoardDispatchArgs),
     /// Print task-board audit data.
-    Audit(TaskBoardNoopArgs),
+    Audit(TaskBoardAuditArgs),
     /// Manage known projects.
     Project(TaskBoardNoopArgs),
     /// Manage known worker machines.
@@ -118,6 +119,37 @@ pub struct TaskBoardNoopArgs {
     pub json: bool,
 }
 
+#[derive(Debug, Clone, Args)]
+pub struct TaskBoardDispatchArgs {
+    #[arg(long)]
+    pub json: bool,
+    #[arg(long)]
+    pub board_root: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct TaskBoardAuditArgs {
+    #[arg(long)]
+    pub json: bool,
+    #[arg(long)]
+    pub board_root: Option<PathBuf>,
+}
+
+#[derive(Debug, Serialize)]
+struct TaskBoardAuditSummary {
+    total: usize,
+    ready: usize,
+    blocked: usize,
+    deleted: usize,
+    by_status: Vec<TaskBoardStatusCount>,
+}
+
+#[derive(Debug, Serialize)]
+struct TaskBoardStatusCount {
+    status: TaskBoardStatus,
+    count: usize,
+}
+
 impl Execute for TaskBoardCommand {
     fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
         match self {
@@ -126,11 +158,9 @@ impl Execute for TaskBoardCommand {
             Self::Get(args) => args.execute(context),
             Self::Update(args) => args.execute(context),
             Self::Delete(args) => args.execute(context),
-            Self::Sync(args)
-            | Self::Dispatch(args)
-            | Self::Audit(args)
-            | Self::Project(args)
-            | Self::Machine(args) => args.execute(context),
+            Self::Sync(args) | Self::Project(args) | Self::Machine(args) => args.execute(context),
+            Self::Dispatch(args) => args.execute(context),
+            Self::Audit(args) => args.execute(context),
         }
     }
 }
@@ -252,6 +282,48 @@ impl Execute for TaskBoardNoopArgs {
     }
 }
 
+impl Execute for TaskBoardDispatchArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let items = store(self.board_root.clone()).list(None)?;
+        let plans = build_dispatch_plans(&items);
+        if self.json {
+            print_json(&plans)?;
+        } else {
+            for plan in plans {
+                println!(
+                    "[{}] {}",
+                    dispatch_readiness_label(&plan.readiness),
+                    plan.board_item_id
+                );
+            }
+        }
+        Ok(0)
+    }
+}
+
+impl Execute for TaskBoardAuditArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let items = store(self.board_root.clone()).list(None)?;
+        let plans = build_dispatch_plans(&items);
+        let summary = TaskBoardAuditSummary {
+            total: items.len(),
+            ready: plans.iter().filter(|plan| plan.is_ready()).count(),
+            blocked: plans.iter().filter(|plan| !plan.is_ready()).count(),
+            deleted: items.iter().filter(|item| item.is_deleted()).count(),
+            by_status: status_counts(&items),
+        };
+        if self.json {
+            print_json(&summary)?;
+        } else {
+            println!(
+                "task-board: {} total, {} ready, {} blocked",
+                summary.total, summary.ready, summary.blocked
+            );
+        }
+        Ok(0)
+    }
+}
+
 fn store(root: Option<PathBuf>) -> TaskBoardStore {
     TaskBoardStore::new(root.unwrap_or_else(default_board_root))
 }
@@ -265,4 +337,32 @@ fn print_json<T: Serialize>(value: &T) -> Result<(), CliError> {
         .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?;
     println!("{json}");
     Ok(())
+}
+
+fn dispatch_readiness_label(readiness: &DispatchReadiness) -> &'static str {
+    match readiness {
+        DispatchReadiness::Ready => "ready",
+        DispatchReadiness::Blocked { .. } => "blocked",
+    }
+}
+
+fn status_counts(items: &[TaskBoardItem]) -> Vec<TaskBoardStatusCount> {
+    let statuses = [
+        TaskBoardStatus::New,
+        TaskBoardStatus::Planning,
+        TaskBoardStatus::PlanReview,
+        TaskBoardStatus::Todo,
+        TaskBoardStatus::InProgress,
+        TaskBoardStatus::InReview,
+        TaskBoardStatus::Done,
+        TaskBoardStatus::Blocked,
+    ];
+    statuses
+        .into_iter()
+        .map(|status| TaskBoardStatusCount {
+            status,
+            count: items.iter().filter(|item| item.status == status).count(),
+        })
+        .filter(|entry| entry.count > 0)
+        .collect()
 }

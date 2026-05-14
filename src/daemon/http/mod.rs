@@ -41,6 +41,7 @@ mod sessions_adopt;
 mod sessions_mutations;
 mod signals;
 mod stream;
+mod task_board;
 mod tasks;
 #[cfg(test)]
 mod tests;
@@ -272,6 +273,7 @@ fn daemon_http_router() -> Router<DaemonHttpState> {
     Router::new()
         .merge(core::core_routes())
         .merge(sessions::session_routes())
+        .merge(task_board::task_board_routes())
         .merge(tasks::task_routes())
         .merge(improver::improver_routes())
         .merge(agents::agent_routes())
