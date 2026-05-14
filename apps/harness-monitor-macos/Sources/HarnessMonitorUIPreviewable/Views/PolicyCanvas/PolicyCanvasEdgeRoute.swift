@@ -3,7 +3,6 @@ import SwiftUI
 struct PolicyCanvasEdgeRoute {
   let points: [CGPoint]
   let labelPosition: CGPoint
-  private static let labelLaneSpacing: CGFloat = 32
 
   init(
     source: CGPoint,
@@ -13,7 +12,7 @@ struct PolicyCanvasEdgeRoute {
     sourceGroupID: String? = nil,
     targetGroupID: String? = nil
   ) {
-    let laneOffset = CGFloat(lane % 12) * Self.labelLaneSpacing
+    let laneOffset = CGFloat(lane % 12) * PolicyCanvasLayout.edgeLabelLaneSpacing
     let horizontalDistance = target.x - source.x
     let sourceGroupFrame = Self.groupFrame(sourceGroupID, in: groups)
     let targetGroupFrame = Self.groupFrame(targetGroupID, in: groups)
@@ -42,6 +41,16 @@ struct PolicyCanvasEdgeRoute {
         target: target,
         sourceGroupFrame: sourceGroupFrame,
         targetGroupFrame: targetGroupFrame,
+        lane: lane
+      )
+    } else if sourceGroupID == targetGroupID,
+      let sourceGroupFrame,
+      target.x <= source.x
+    {
+      (points, labelPosition) = Self.sameGroupReturnRoute(
+        source: source,
+        target: target,
+        groupFrame: sourceGroupFrame,
         lane: lane
       )
     } else if horizontalDistance > 260, abs(source.y - target.y) < 96 {
@@ -143,8 +152,10 @@ struct PolicyCanvasEdgeRoute {
   ) -> ([CGPoint], CGPoint) {
     let gapMinX = sourceGroupFrame.maxX + 34
     let gapMaxX = targetGroupFrame.minX - 34
-    let laneOffset = CGFloat((lane % 5) - 2) * 12
-    let laneYOffset = CGFloat((lane % 5) - 2) * Self.labelLaneSpacing
+    let busLaneSlot = CGFloat((lane % 5) - 2)
+    let labelLaneSlot = CGFloat(lane % 6)
+    let laneOffset = busLaneSlot * 18
+    let laneYOffset = labelLaneSlot * PolicyCanvasLayout.edgeLabelLaneSpacing
     let preferredBusX = ((gapMinX + gapMaxX) / 2) + laneOffset
     let busX =
       gapMinX < gapMaxX
@@ -164,6 +175,32 @@ struct PolicyCanvasEdgeRoute {
       target,
     ]
     let labelPosition = CGPoint(x: (sourceExitX + busX) / 2, y: routedSourceY)
+    return (points, labelPosition)
+  }
+
+  private static func sameGroupReturnRoute(
+    source: CGPoint,
+    target: CGPoint,
+    groupFrame: CGRect,
+    lane: Int
+  ) -> ([CGPoint], CGPoint) {
+    let laneSlot = CGFloat(lane % 4)
+    let sourceExitX = groupFrame.maxX + 60
+    let busX = groupFrame.maxX + 340 + (laneSlot * 24)
+    let targetRunY = target.y
+    let labelY = min(
+      groupFrame.maxY - 38,
+      max(groupFrame.minY + 38, source.y + (laneSlot * PolicyCanvasLayout.edgeLabelLaneSpacing))
+    )
+    let points = [
+      source,
+      CGPoint(x: sourceExitX, y: source.y),
+      CGPoint(x: sourceExitX, y: labelY),
+      CGPoint(x: busX, y: labelY),
+      CGPoint(x: busX, y: targetRunY),
+      target,
+    ]
+    let labelPosition = CGPoint(x: (sourceExitX + busX) / 2, y: labelY)
     return (points, labelPosition)
   }
 
