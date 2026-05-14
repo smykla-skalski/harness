@@ -49,6 +49,7 @@ extension PolicyCanvasViewModel {
       return
     }
     edges[index].label = label
+    markEdgeEdited(id)
     isDirty = true
     lastActionSummary = "Edge label updated"
   }
@@ -120,6 +121,7 @@ extension PolicyCanvasViewModel {
     else {
       return
     }
+    markNodeEdited(id)
     update(&nodes[index])
     isDirty = true
   }

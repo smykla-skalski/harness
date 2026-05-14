@@ -221,6 +221,15 @@ enum PolicyCanvasSelection: Hashable {
   case edge(String)
 }
 
+struct PolicyCanvasDeletionRequest: Identifiable, Equatable {
+  let selection: PolicyCanvasSelection
+  let title: String
+  let message: String
+  let confirmationTitle: String
+
+  var id: PolicyCanvasSelection { selection }
+}
+
 enum PolicyCanvasLayout {
   static let gridSize: CGFloat = 20
   static let nodeSize = CGSize(width: 168, height: 96)
@@ -230,6 +239,9 @@ enum PolicyCanvasLayout {
   static let groupHorizontalPadding: CGFloat = 44
   static let groupVerticalPadding: CGFloat = 52
   static let minimumGroupSize = CGSize(width: 220, height: 180)
+  static let minimumCanvasSize = CGSize(width: 1_420, height: 960)
+  static let canvasTrailingPadding: CGFloat = 360
+  static let canvasBottomPadding: CGFloat = 360
 
   static func portY(index: Int, count: Int) -> CGFloat {
     guard count > 1 else {

@@ -28,6 +28,7 @@ extension PolicyCanvasViewModel {
     reconcileGroupFrames()
     resetNextNodeNumber()
     markLoadedDocumentRevision(document.revision)
+    resetCleanEphemeralComponents()
     isDirty = false
     lastActionSummary = "Loaded revision \(document.revision)"
   }
