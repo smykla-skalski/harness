@@ -33,6 +33,7 @@ public struct PolicyCanvasView: View {
   @State var isShowingPromoteConfirmation = false
   @State var pendingDeletionRequest: PolicyCanvasDeletionRequest?
   @State var statusLine: String = "No pending changes"
+  @State var searchPaletteVisible: Bool = false
   @FocusState var focusedField: PolicyCanvasFocusedField?
   @Environment(\.scenePhase) var scenePhase
   @Environment(\.undoManager) var undoManager
@@ -136,6 +137,17 @@ public struct PolicyCanvasView: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasRoot)
     .overlay(alignment: .topLeading) {
       deletionShortcutButtons
+    }
+    .overlay(alignment: .topLeading) {
+      searchShortcutButtons
+    }
+    .overlay(alignment: .topTrailing) {
+      if searchPaletteVisible {
+        PolicyCanvasSearchPalette(
+          viewModel: viewModel,
+          isVisible: $searchPaletteVisible
+        )
+      }
     }
     // Bind to `pipelineIdentity` so the closure re-fires only when the
     // identity actually flips (nil on first mount, then again when the
@@ -259,6 +271,23 @@ public struct PolicyCanvasView: View {
       .keyboardShortcut(.escape, modifiers: [])
       .disabled(focusedField != nil)
     }
+    .opacity(0)
+    .frame(width: 0, height: 0)
+    .accessibilityHidden(true)
+  }
+
+  /// Hidden Cmd+F button that toggles the search palette. Same gating
+  /// convention as the deletion shortcuts: when an inspector text field
+  /// already owns first-responder, the shortcut is suppressed so a rename
+  /// or label edit can still receive its own Cmd+F if a future field opts
+  /// into one. The palette itself takes focus via `@FocusState` on appear
+  /// and routes Esc back to dismiss through its own Cancel button.
+  private var searchShortcutButtons: some View {
+    Button("Toggle policy canvas search palette") {
+      searchPaletteVisible.toggle()
+    }
+    .keyboardShortcut("f", modifiers: .command)
+    .disabled(focusedField != nil)
     .opacity(0)
     .frame(width: 0, height: 0)
     .accessibilityHidden(true)
