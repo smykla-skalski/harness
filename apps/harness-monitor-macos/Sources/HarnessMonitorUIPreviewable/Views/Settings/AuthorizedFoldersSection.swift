@@ -108,7 +108,9 @@ public struct AuthorizedFoldersSection: View {
       records = []
       return
     }
-    records = await bookmarkStore.all()
+    records = await bookmarkStore.all().filter {
+      $0.kind == .projectRoot || $0.kind == .sessionDirectory
+    }
   }
 
   private func remove(_ record: BookmarkStore.Record) async {

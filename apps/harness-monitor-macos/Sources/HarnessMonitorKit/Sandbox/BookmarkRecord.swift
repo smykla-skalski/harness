@@ -5,6 +5,8 @@ extension BookmarkStore {
     public enum Kind: String, Codable, Sendable {
       case projectRoot = "project-root"
       case sessionDirectory = "session-directory"
+      case taskBoardDirectory = "task-board-directory"
+      case taskBoardKeyFile = "task-board-key-file"
     }
 
     public let id: String

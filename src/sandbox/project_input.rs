@@ -1,4 +1,4 @@
-//! Resolve a `project_dir` request input that may be either a filesystem path
+//! Resolve a sandbox-authorized path input that may be either a filesystem path
 //! or, on macOS in a sandboxed process, a security-scoped bookmark id.
 //!
 //! Returns a guard whose `path()` is valid to read while the guard lives.
@@ -37,18 +37,21 @@ impl ProjectInputScope {
     }
 }
 
-/// Resolve `input` to a usable project directory path.
+/// Resolve `input` to a usable path.
 ///
 /// macOS sandboxed callers may pass a bookmark id (the `id` field of a record
 /// in `bookmarks.json` shared with the Monitor app); when the id matches a
 /// stored bookmark, the resolver fetches and activates the security scope.
-/// Every other path (non-macOS, non-sandboxed, or bookmark id miss) treats
-/// the input as a filesystem path and canonicalizes it.
+/// Sandboxed callers may also pass a stored path string; when that path matches
+/// a bookmark record's `lastResolvedPath`, the resolver reuses the bookmark so
+/// the scope stays active for the duration of the operation. Every other path
+/// (non-macOS, non-sandboxed, or bookmark miss) is treated as a filesystem path
+/// and canonicalized.
 ///
 /// # Errors
 /// Returns `CliError` when canonicalization fails or, on macOS, when a
 /// matching bookmark cannot be resolved by Core Foundation.
-pub fn resolve_project_input(input: &str) -> Result<ProjectInputScope, CliError> {
+pub fn resolve_path_input(input: &str) -> Result<ProjectInputScope, CliError> {
     #[cfg(target_os = "macos")]
     {
         if super::resolver::is_sandboxed()
@@ -59,7 +62,7 @@ pub fn resolve_project_input(input: &str) -> Result<ProjectInputScope, CliError>
     }
     let path = fs::canonicalize(input).map_err(|error| -> CliError {
         CliErrorKind::workflow_io(format!(
-            "session start could not canonicalize project_dir '{input}': {error}"
+            "sandbox path resolution could not canonicalize '{input}': {error}"
         ))
         .into()
     })?;
@@ -70,8 +73,24 @@ pub fn resolve_project_input(input: &str) -> Result<ProjectInputScope, CliError>
     })
 }
 
+/// Resolve a project-dir argument to a usable path.
+///
+/// # Errors
+/// Returns `CliError` when `resolve_path_input` cannot canonicalize the path
+/// or, on macOS, cannot resolve a matching security-scoped bookmark.
+pub fn resolve_project_input(input: &str) -> Result<ProjectInputScope, CliError> {
+    resolve_path_input(input)
+}
+
 #[cfg(test)]
 mod tests;
+
+#[cfg(target_os = "macos")]
+#[derive(Clone)]
+struct BookmarkLookup {
+    id: String,
+    record: super::bookmarks::Record,
+}
 
 #[cfg(target_os = "macos")]
 fn try_resolve_bookmark(input: &str) -> Result<Option<ProjectInputScope>, CliError> {
@@ -84,24 +103,26 @@ fn try_resolve_bookmark(input: &str) -> Result<Option<ProjectInputScope>, CliErr
 #[cfg(target_os = "macos")]
 fn resolve_helper_bookmark(input: &str) -> Result<Option<ProjectInputScope>, CliError> {
     let helper_path = helper_bookmark_store_path();
-    let Some(record) = find_bookmark_record(&helper_path, input)? else {
+    let Some(candidate) = find_bookmark_record(&helper_path, input)? else {
         return Ok(None);
     };
-    Ok(resolve_helper_bookmark_record(input, &helper_path, &record))
+    Ok(resolve_helper_bookmark_record(
+        &candidate.id,
+        &helper_path,
+        &candidate.record,
+    ))
 }
 
 #[cfg(target_os = "macos")]
 fn resolve_shared_bookmark(input: &str) -> Result<Option<ProjectInputScope>, CliError> {
-    use super::bookmarks;
-
     let shared_path = shared_bookmark_store_path();
     let shared_store = load_bookmark_store(&shared_path)?;
-    let Some(record) = bookmarks::find(&shared_store, input) else {
+    let Some(candidate) = find_bookmark_candidate(&shared_store, input) else {
         return Ok(None);
     };
 
-    let plain_path = resolve_shared_bookmark_path(input, record)?;
-    if let Some(scope) = seed_helper_bookmark(input, record, &plain_path)? {
+    let plain_path = resolve_shared_bookmark_path(&candidate.id, &candidate.record)?;
+    if let Some(scope) = seed_helper_bookmark(&candidate.id, &candidate.record, &plain_path)? {
         return Ok(Some(scope));
     }
     Ok(Some(ProjectInputScope {
@@ -142,21 +163,35 @@ fn load_bookmark_store(path: &Path) -> Result<super::bookmarks::PersistedStore, 
 fn find_bookmark_record(
     store_path: &Path,
     input: &str,
-) -> Result<Option<super::bookmarks::Record>, CliError> {
+) -> Result<Option<BookmarkLookup>, CliError> {
+    let store = load_bookmark_store(store_path)?;
+    Ok(find_bookmark_candidate(&store, input))
+}
+
+#[cfg(target_os = "macos")]
+fn find_bookmark_candidate(
+    store: &super::bookmarks::PersistedStore,
+    input: &str,
+) -> Option<BookmarkLookup> {
     use super::bookmarks;
 
-    let store = load_bookmark_store(store_path)?;
-    Ok(bookmarks::find(&store, input).cloned())
+    bookmarks::find(store, input)
+        .or_else(|| bookmarks::find_by_path(store, input))
+        .cloned()
+        .map(|record| BookmarkLookup {
+            id: record.id.clone(),
+            record,
+        })
 }
 
 #[cfg(target_os = "macos")]
 fn resolve_helper_bookmark_record(
-    input: &str,
+    bookmark_id: &str,
     helper_path: &Path,
     record: &super::bookmarks::Record,
 ) -> Option<ProjectInputScope> {
     Some(scope_with_bookmark(try_resolve_helper_scope(
-        input,
+        bookmark_id,
         helper_path,
         record,
     )?))
@@ -168,7 +203,7 @@ fn resolve_helper_bookmark_record(
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
 fn try_resolve_helper_scope(
-    input: &str,
+    bookmark_id: &str,
     helper_path: &Path,
     record: &super::bookmarks::Record,
 ) -> Option<ResolvedBookmark> {
@@ -177,7 +212,7 @@ fn try_resolve_helper_scope(
         Err(error) => {
             warn!(
                 %error,
-                bookmark_id = input,
+                bookmark_id,
                 store = %helper_path.display(),
                 "helper-local bookmark resolution failed; attempting shared-store bootstrap"
             );
@@ -188,25 +223,25 @@ fn try_resolve_helper_scope(
 
 #[cfg(target_os = "macos")]
 fn seed_helper_bookmark(
-    input: &str,
+    bookmark_id: &str,
     record: &super::bookmarks::Record,
     path: &Path,
 ) -> Result<Option<ProjectInputScope>, CliError> {
     let helper_path = helper_bookmark_store_path();
-    let Some(helper_record) = create_helper_bookmark_record(input, record, path) else {
+    let Some(helper_record) = create_helper_bookmark_record(bookmark_id, record, path) else {
         return Ok(None);
     };
-    persist_helper_bookmark_record(input, &helper_path, &helper_record)?;
-    resolve_helper_scope(input, &helper_record).map(Some)
+    persist_helper_bookmark_record(bookmark_id, &helper_path, &helper_record)?;
+    resolve_helper_scope(bookmark_id, &helper_record).map(Some)
 }
 
 #[cfg(target_os = "macos")]
 fn create_helper_bookmark_record(
-    input: &str,
+    bookmark_id: &str,
     record: &super::bookmarks::Record,
     path: &Path,
 ) -> Option<super::bookmarks::Record> {
-    let bookmark_data = create_helper_bookmark_data(input, path)?;
+    let bookmark_data = create_helper_bookmark_data(bookmark_id, path)?;
     Some(helper_bookmark_record(record, path, bookmark_data))
 }
 
@@ -251,7 +286,7 @@ fn helper_bookmark_record(
 
 #[cfg(target_os = "macos")]
 fn persist_helper_bookmark_record(
-    input: &str,
+    bookmark_id: &str,
     helper_path: &Path,
     helper_record: &super::bookmarks::Record,
 ) -> Result<(), CliError> {
@@ -261,7 +296,7 @@ fn persist_helper_bookmark_record(
     if let Some(existing) = helper_store
         .bookmarks
         .iter_mut()
-        .find(|existing| existing.id == input)
+        .find(|existing| existing.id == bookmark_id)
     {
         *existing = helper_record.clone();
     } else {
@@ -278,12 +313,12 @@ fn persist_helper_bookmark_record(
 
 #[cfg(target_os = "macos")]
 fn resolve_helper_scope(
-    input: &str,
+    bookmark_id: &str,
     helper_record: &super::bookmarks::Record,
 ) -> Result<ProjectInputScope, CliError> {
     let resolved =
         super::resolver::resolve(&helper_record.bookmark_data).map_err(|error| -> CliError {
-            CliErrorKind::workflow_io(format!("resolve bookmark '{input}': {error}")).into()
+            CliErrorKind::workflow_io(format!("resolve bookmark '{bookmark_id}': {error}")).into()
         })?;
     Ok(scope_with_bookmark(resolved))
 }
