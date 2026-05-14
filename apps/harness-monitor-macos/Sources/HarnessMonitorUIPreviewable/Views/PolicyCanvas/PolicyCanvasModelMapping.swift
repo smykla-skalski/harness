@@ -72,7 +72,7 @@ func policyCanvasEdge(_ edge: TaskBoardPolicyPipelineEdge) -> PolicyCanvasEdge {
       portID: edge.toPort,
       kind: .input
     ),
-    label: edge.label ?? "policy"
+    label: policyCanvasEdgeLabel(edge)
   )
 }
 
@@ -364,3 +364,16 @@ private let defaultPolicyCanvasNodePositions: [String: CGPoint] = [
   "supervisor:merge-deny": CGPoint(x: 720, y: 544),
   "supervisor:auto-merge": CGPoint(x: 940, y: 544),
 ]
+
+private func policyCanvasEdgeLabel(_ edge: TaskBoardPolicyPipelineEdge) -> String {
+  if let label = edge.label?.trimmingCharacters(in: .whitespacesAndNewlines),
+    !label.isEmpty,
+    label != "policy"
+  {
+    return label
+  }
+  if edge.condition.condition != "always" {
+    return edge.condition.condition.replacingOccurrences(of: "_", with: " ")
+  }
+  return edge.fromPort.replacingOccurrences(of: "_", with: " ")
+}

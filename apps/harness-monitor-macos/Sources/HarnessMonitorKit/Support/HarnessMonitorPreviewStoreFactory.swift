@@ -118,6 +118,9 @@ public enum HarnessMonitorPreviewStoreFactory {
     store.selectedSessionID = configuration.selectedSessionID
     store.selectedSession = configuration.selectedDetail
     store.timeline = configuration.timeline
+    if scenario == .policyCanvas {
+      seedPolicyCanvasState(store: store)
+    }
     seedSelectedSessionState(
       store: store,
       configuration: configuration,
@@ -195,6 +198,13 @@ public enum HarnessMonitorPreviewStoreFactory {
       store.presentingAcpPermissionBatch = pendingBatch
     }
     store.reconcileAcpPermissionDecisions()
+  }
+
+  private static func seedPolicyCanvasState(store: HarnessMonitorStore) {
+    let document = PreviewFixtures.policyCanvasPipelineDocument()
+    store.globalTaskBoardPolicyPipeline = document
+    store.globalTaskBoardPolicyAudit = PreviewFixtures.policyCanvasAudit(for: document)
+    store.globalTaskBoardPolicySimulation = nil
   }
 
   private static func seedAcpBridgeOutageIfNeeded(
