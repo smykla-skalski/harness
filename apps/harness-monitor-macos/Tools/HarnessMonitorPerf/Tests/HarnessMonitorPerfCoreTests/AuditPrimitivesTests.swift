@@ -114,6 +114,21 @@ final class AuditPrimitivesTests: AuditTempDirectoryTestCase {
         XCTAssertFalse(result.timedOut)
     }
 
+    func testProcessRunnerDrainsLargeStdoutWhileProcessRuns() throws {
+        let result = try ProcessRunner.run(
+            "/bin/sh",
+            arguments: [
+                "-c",
+                "i=0; while [ $i -lt 20000 ]; do printf 1234567890; i=$((i + 1)); done",
+            ],
+            timeoutSeconds: 2,
+            terminationGraceSeconds: 0.1
+        )
+        XCTAssertEqual(result.exitStatus, 0)
+        XCTAssertEqual(result.stdout.count, 200_000)
+        XCTAssertFalse(result.timedOut)
+    }
+
     // MARK: - HostStager
 
     func testHostStagerUsesUniqueAuditBundleName() throws {

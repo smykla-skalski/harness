@@ -46,6 +46,10 @@ public enum ProcessRunner {
         let stderrPipe = Pipe()
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
+        let stdoutCapture = PipeCapture(pipe: stdoutPipe)
+        let stderrCapture = PipeCapture(pipe: stderrPipe)
+        stdoutCapture.start()
+        stderrCapture.start()
 
         try process.run()
 
@@ -54,8 +58,8 @@ public enum ProcessRunner {
             timeoutSeconds: timeoutSeconds,
             terminationGraceSeconds: terminationGraceSeconds
         )
-        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+        let stdoutData = stdoutCapture.finish()
+        let stderrData = stderrCapture.finish()
 
         return Result(
             exitStatus: process.terminationStatus,
@@ -120,5 +124,60 @@ public enum ProcessRunner {
         }
         process.waitUntilExit()
         return true
+    }
+
+    private final class PipeCapture: @unchecked Sendable {
+        private let pipe: Pipe
+        private let lock = NSLock()
+        private var captured = Data()
+
+        init(pipe: Pipe) {
+            self.pipe = pipe
+        }
+
+        func start() {
+            pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
+                let data = handle.availableData
+                guard !data.isEmpty else { return }
+                self?.append(data)
+            }
+        }
+
+        func finish() -> Data {
+            let handle = pipe.fileHandleForReading
+            handle.readabilityHandler = nil
+            drainAvailableData(from: handle.fileDescriptor)
+            return snapshot()
+        }
+
+        private func append(_ data: Data) {
+            lock.lock()
+            captured.append(data)
+            lock.unlock()
+        }
+
+        private func snapshot() -> Data {
+            lock.lock()
+            defer { lock.unlock() }
+            return captured
+        }
+
+        private func drainAvailableData(from fileDescriptor: Int32) {
+            let flags = fcntl(fileDescriptor, F_GETFL)
+            guard flags >= 0 else { return }
+            _ = fcntl(fileDescriptor, F_SETFL, flags | O_NONBLOCK)
+            defer { _ = fcntl(fileDescriptor, F_SETFL, flags) }
+
+            var buffer = [UInt8](repeating: 0, count: 64 * 1024)
+            while true {
+                let readCount = read(fileDescriptor, &buffer, buffer.count)
+                if readCount > 0 {
+                    append(Data(buffer.prefix(readCount)))
+                    continue
+                }
+                if readCount == 0 || errno == EAGAIN || errno == EWOULDBLOCK { return }
+                return
+            }
+        }
     }
 }
