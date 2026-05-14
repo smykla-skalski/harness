@@ -14,13 +14,19 @@ extension PolicyCanvasView {
   func saveDraft() {
     // Foreground save races autosave when both fire close together (e.g.
     // user types, autosave schedules, user clicks Save before the 1.5s
-    // window elapses). Cancel the pending autosave task first so its
-    // delayed save doesn't land after our reload with a stale revision.
-    viewModel.cancelAutosave()
+    // window elapses). `beginForegroundSave()` cancels the pending autosave
+    // task AND flips `isSavingDraft` synchronously so an autosave wake
+    // landing between this call and the Task body's first await bails at
+    // the in-flight guard. The defer in `performSave` calls
+    // `endForegroundSave()` to clear the flag.
     performSave(reason: .manualSave)
   }
 
   func simulate() {
+    // `beginForegroundSave` is autosave-specific; simulate uses its own
+    // in-flight flag but should still cancel the pending autosave for the
+    // same race-window reason. Set `isSimulating` synchronously here
+    // (before the Task spawns) for symmetry with the save path.
     viewModel.cancelAutosave()
     let snapshot = viewModel.snapshotState()
     let document = viewModel.exportDocument()
@@ -38,19 +44,34 @@ extension PolicyCanvasView {
 
   func performSave(reason: SaveReason) {
     // Local pre-flight runs before snapshot so the user gets fast feedback on
-    // cycles + orphans. Soft warning only — daemon is authoritative, and the
+    // cycles + orphans. Soft warning only - daemon is authoritative, and the
     // snapshot/restore frame around exportDocument() handles rollback on
     // daemon rejection.
     _ = viewModel.runLocalPreflight()
     let snapshot = viewModel.snapshotState()
     let document = viewModel.exportDocument()
-    viewModel.isSavingDraft = true
+    // Deferred (tracking-id P3I.3): saveTaskBoardPolicyPipelineDraft returns
+    // Bool, which conflates transport failure (IPC error / daemon process
+    // died) with semantic rejection (daemon parsed and said no). Both flow
+    // into the same restoreState path here. Transport failures should retry
+    // with exponential backoff and preserve local state; semantic rejections
+    // should restore as today. The store interface lives in HarnessMonitorKit
+    // and is shared with other surfaces, so widening it to a typed
+    // AutosaveOutcome (accepted / rejected(reason:) / transportFailure) is
+    // deferred to a follow-up wave. Until then, the failure ceiling (item 1)
+    // bounds the worst-case decompensation: three rejects of any kind flip
+    // the subsystem to .disabled and surface a sticky affordance.
+    viewModel.beginForegroundSave()
     Task { @MainActor in
-      defer { viewModel.isSavingDraft = false }
+      defer { viewModel.endForegroundSave() }
       let saved = await store?.saveTaskBoardPolicyPipelineDraft(document: document) ?? false
       if saved {
         if reason == .autosave {
           viewModel.markAutosaveSucceeded()
+        } else {
+          // Manual save clears the consecutive-failure counter and exits the
+          // .disabled state so the next dirty flip can resume autosave.
+          viewModel.markManualSaveSucceeded()
         }
         // Don't pre-clear documentDirty across the upcoming await. MainActor
         // serializes turns, not the gap between awaits: a dashboard publish
@@ -60,6 +81,11 @@ extension PolicyCanvasView {
         // backingDocument on its own clean-incoming branch.
         await forceReloadPolicyPipeline()
       } else {
+        // Capture in-progress edits the user may have typed during the
+        // 200-2000ms round-trip BEFORE restoring to the pre-save snapshot
+        // - otherwise the rollback below silently throws those edits away
+        // and the user re-discovers them missing the next time they look.
+        viewModel.captureRecoveryBuffer()
         if reason == .autosave {
           viewModel.markAutosaveFailed()
         }
@@ -119,5 +145,27 @@ extension PolicyCanvasView {
       simulation: dashboardUI?.taskBoardPolicySimulation,
       audit: dashboardUI?.taskBoardPolicyAudit
     )
+  }
+
+  /// Kick off a save when the scene is about to drop to background. macOS does
+  /// not guarantee the save completes before the scene tears down, but the
+  /// Task spawns on the MainActor synchronously and starts the daemon
+  /// round-trip before scenePhase finishes its transition. The defer in
+  /// `performSave` keeps `isSavingDraft` correct even if the scene dies
+  /// mid-await. Suppression: do not flush when `lastAutosaveOutcome ==
+  /// .disabled` (the user has already been asked to save manually, surprising
+  /// them with a background save on top would compete with their next manual
+  /// attempt).
+  func flushPendingAutosaveBeforeBackground() {
+    if case .disabled = viewModel.lastAutosaveOutcome {
+      return
+    }
+    performSave(reason: .autosave)
+  }
+
+  /// User clicked the "Recover" toast button. Apply the recovery buffer
+  /// captured at the last reject. No-op when there is nothing to recover.
+  func recoverRejectedEdits() {
+    _ = viewModel.recoverRejectedEdits()
   }
 }

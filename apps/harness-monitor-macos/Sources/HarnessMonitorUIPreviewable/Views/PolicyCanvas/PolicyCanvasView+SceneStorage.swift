@@ -1,11 +1,20 @@
+import Foundation
 import SwiftUI
 
+/// Per-pipeline viewport state persisted in `policyCanvas.byPipeline`. Holds
+/// zoom + selection so each pipeline carries its own slot, instead of all
+/// pipelines stomping a shared `policyCanvas.zoom` / `policyCanvas.selectionRaw`
+/// key. Codable so the JSON encode/decode round-trip is straightforward.
+struct PolicyCanvasPipelineSceneState: Codable, Equatable {
+  var zoom: Double
+  var selectionRaw: String
+}
+
 extension PolicyCanvasView {
-  /// Restore zoom + selection from SceneStorage, but only when the current
-  /// `pipelineIdentity` matches the stored ID. `nil` identity means no
-  /// document has loaded yet (or the daemon has no policy trace id) — skip
-  /// restoration entirely so two trace-less pipelines do not share state
-  /// through a shared sentinel key.
+  /// Restore zoom + selection from SceneStorage, keyed by the current
+  /// `pipelineIdentity`. `nil` identity means no document has loaded yet (or
+  /// the daemon has no policy trace id) - skip restoration entirely so two
+  /// trace-less pipelines do not share state through a shared sentinel key.
   ///
   /// Idempotent: called from `.task` (initial mount) and from
   /// `.onChange(of: viewModel.pipelineIdentity)` (load completes after
@@ -14,20 +23,22 @@ extension PolicyCanvasView {
     guard let identity = viewModel.pipelineIdentity else {
       return
     }
-    guard !storedPipelineID.isEmpty, storedPipelineID == identity else {
+    let map = PolicyCanvasView.decodePipelineStateMap(storedPipelineStateRaw)
+    guard let state = map[identity] else {
       return
     }
-    viewModel.zoom = CGFloat(storedZoom)
-    if let restoredSelection = PolicyCanvasView.decodeSelection(storedSelectionRaw) {
+    viewModel.zoom = CGFloat(state.zoom)
+    if let restoredSelection = PolicyCanvasView.decodeSelection(state.selectionRaw) {
       viewModel.selection = restoredSelection
-    } else if storedSelectionRaw.isEmpty {
+    } else if state.selectionRaw.isEmpty {
       viewModel.selection = nil
     }
   }
 
-  /// Persist viewport state to SceneStorage. Writes are no-ops when
-  /// `pipelineIdentity` is nil (don't pollute trace-less keys) or when the
-  /// stored id is for a different pipeline (a restore is still pending).
+  /// Persist viewport state to SceneStorage under the current
+  /// `pipelineIdentity` slot. Writes are no-ops when identity is nil (don't
+  /// pollute trace-less keys). Read-modify-write the JSON map so concurrent
+  /// pipelines in other windows preserve their own slots.
   func persistSceneStorageIfNeeded(
     zoom: Double? = nil,
     selection: PolicyCanvasSelection?? = nil
@@ -35,15 +46,21 @@ extension PolicyCanvasView {
     guard let identity = viewModel.pipelineIdentity else {
       return
     }
-    if storedPipelineID != identity {
-      storedPipelineID = identity
-    }
+    var map = PolicyCanvasView.decodePipelineStateMap(storedPipelineStateRaw)
+    var state =
+      map[identity]
+      ?? PolicyCanvasPipelineSceneState(
+        zoom: Double(viewModel.zoom),
+        selectionRaw: ""
+      )
     if let zoom {
-      storedZoom = zoom
+      state.zoom = zoom
     }
     if let selection {
-      storedSelectionRaw = PolicyCanvasView.encodeSelection(selection)
+      state.selectionRaw = PolicyCanvasView.encodeSelection(selection)
     }
+    map[identity] = state
+    storedPipelineStateRaw = PolicyCanvasView.encodePipelineStateMap(map)
   }
 
   /// Encode the optional selection enum into a SceneStorage-friendly
@@ -85,5 +102,37 @@ extension PolicyCanvasView {
     default:
       return nil
     }
+  }
+
+  /// Decode the JSON-encoded `pipelineID -> PolicyCanvasPipelineSceneState`
+  /// map from SceneStorage. Returns an empty map on empty input or decode
+  /// failure - this is best-effort persistence, a corrupted slot loses its
+  /// scene state but does not crash or wedge the canvas.
+  static func decodePipelineStateMap(_ raw: String)
+    -> [String: PolicyCanvasPipelineSceneState]
+  {
+    guard !raw.isEmpty, let data = raw.data(using: .utf8) else {
+      return [:]
+    }
+    return
+      (try? JSONDecoder().decode(
+        [String: PolicyCanvasPipelineSceneState].self,
+        from: data
+      )) ?? [:]
+  }
+
+  /// Encode the per-pipeline scene state map into a JSON string. Returns
+  /// empty string on encode failure so SceneStorage holds a quiescent
+  /// default rather than partial garbage.
+  static func encodePipelineStateMap(
+    _ map: [String: PolicyCanvasPipelineSceneState]
+  ) -> String {
+    guard
+      let data = try? JSONEncoder().encode(map),
+      let raw = String(data: data, encoding: .utf8)
+    else {
+      return ""
+    }
+    return raw
   }
 }
