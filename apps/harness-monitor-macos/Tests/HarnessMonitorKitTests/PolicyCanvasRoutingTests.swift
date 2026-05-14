@@ -1,6 +1,7 @@
 import SwiftUI
 import Testing
 
+@testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
 @Suite("Policy canvas routing")
@@ -10,7 +11,7 @@ struct PolicyCanvasRoutingTests {
   func interGroupEdgeRouteAvoidsMiddleGroup() {
     let route = PolicyCanvasEdgeRoute(
       source: CGPoint(x: 572, y: 360),
-      target: CGPoint(x: 1_484, y: 360),
+      target: CGPoint(x: 1_944, y: 580),
       lane: 0,
       groups: defaultGroups,
       sourceGroupID: "entry",
@@ -26,7 +27,7 @@ struct PolicyCanvasRoutingTests {
     let labels = (0..<3).map { lane in
       PolicyCanvasEdgeRoute(
         source: CGPoint(x: 572, y: 336 + CGFloat(lane * 24)),
-        target: CGPoint(x: 1_484, y: 360 + CGFloat(lane * 140)),
+        target: CGPoint(x: 1_944, y: 580 + CGFloat(lane * 140)),
         lane: lane,
         groups: defaultGroups,
         sourceGroupID: "entry",
@@ -43,7 +44,7 @@ struct PolicyCanvasRoutingTests {
   func adjacentGroupRoutesUseGapCorridor() {
     let route = PolicyCanvasEdgeRoute(
       source: CGPoint(x: 972, y: 360),
-      target: CGPoint(x: 1_484, y: 1_012),
+      target: CGPoint(x: 1_944, y: 1_012),
       lane: 8,
       groups: [mergeGroup, terminalGroup],
       sourceGroupID: "merge",
@@ -60,7 +61,7 @@ struct PolicyCanvasRoutingTests {
     let labelYs = (0..<3).map { lane in
       PolicyCanvasEdgeRoute(
         source: CGPoint(x: 972, y: 360),
-        target: CGPoint(x: 1_484, y: 1_012),
+        target: CGPoint(x: 1_944, y: 1_012),
         lane: lane,
         groups: [mergeGroup, terminalGroup],
         sourceGroupID: "merge",
@@ -89,6 +90,66 @@ struct PolicyCanvasRoutingTests {
     #expect(route.labelPosition.x > sourceNode.maxX)
   }
 
+  @Test("same-column group route uses top and bottom ports")
+  func sameColumnGroupRouteUsesTopAndBottomPorts() {
+    let document = PreviewFixtures.policyCanvasPipelineDocument()
+    let viewModel = PolicyCanvasViewModel.sample()
+
+    viewModel.load(document: document, simulation: nil, audit: nil)
+
+    guard let edge = viewModel.edges.first(where: { $0.id == "edge:evidence-pass" }),
+      let source = viewModel.portAnchor(for: edge.source),
+      let target = viewModel.portAnchor(for: edge.target)
+    else {
+      Issue.record("expected evidence-pass edge anchors")
+      return
+    }
+    let route = PolicyCanvasEdgeRoute(
+      source: source,
+      target: target,
+      lane: viewModel.edgeRouteLanes[edge.id, default: 0],
+      groups: viewModel.groups,
+      sourceGroupID: viewModel.node(edge.source.nodeID)?.groupID,
+      targetGroupID: viewModel.node(edge.target.nodeID)?.groupID
+    )
+
+    #expect(edge.source.side == .bottom)
+    #expect(edge.target.side == .top)
+    #expect(!edgeLabelFrame(route.labelPosition).intersects(nodeFrame("evidence:merge", in: viewModel)))
+    #expect(!edgeLabelFrame(route.labelPosition).intersects(nodeFrame("risk:merge", in: viewModel)))
+  }
+
+  @Test("default graph edge labels do not overlap nodes")
+  func defaultGraphEdgeLabelsDoNotOverlapNodes() {
+    let document = PreviewFixtures.policyCanvasPipelineDocument()
+    let viewModel = PolicyCanvasViewModel.sample()
+
+    viewModel.load(document: document, simulation: nil, audit: nil)
+
+    let nodeFrames = viewModel.nodes.map {
+      CGRect(origin: $0.position, size: PolicyCanvasLayout.nodeSize)
+    }
+    let lanes = viewModel.edgeRouteLanes
+    for edge in viewModel.edges where !edge.label.isEmpty {
+      guard let source = viewModel.portAnchor(for: edge.source),
+        let target = viewModel.portAnchor(for: edge.target)
+      else {
+        Issue.record("missing anchors for \(edge.id)")
+        return
+      }
+      let route = PolicyCanvasEdgeRoute(
+        source: source,
+        target: target,
+        lane: lanes[edge.id, default: 0],
+        groups: viewModel.groups,
+        sourceGroupID: viewModel.node(edge.source.nodeID)?.groupID,
+        targetGroupID: viewModel.node(edge.target.nodeID)?.groupID
+      )
+      let labelFrame = edgeLabelFrame(route.labelPosition)
+      #expect(!nodeFrames.contains(where: { $0.intersects(labelFrame) }))
+    }
+  }
+
   private var defaultGroups: [PolicyCanvasGroup] {
     [entryGroup, mergeGroup, terminalGroup]
   }
@@ -115,7 +176,7 @@ struct PolicyCanvasRoutingTests {
     PolicyCanvasGroup(
       id: "terminal",
       title: "Terminal decisions",
-      frame: CGRect(x: 1_440, y: 260, width: 256, height: 1_220),
+      frame: CGRect(x: 1_900, y: 480, width: 256, height: 1_220),
       tone: .release
     )
   }
@@ -133,5 +194,12 @@ struct PolicyCanvasRoutingTests {
       width: PolicyCanvasLayout.edgeLabelMaxWidth,
       height: PolicyCanvasLayout.edgeLabelHeight
     )
+  }
+
+  private func nodeFrame(_ nodeID: String, in viewModel: PolicyCanvasViewModel) -> CGRect {
+    guard let node = viewModel.node(nodeID) else {
+      return .null
+    }
+    return CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize)
   }
 }

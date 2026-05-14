@@ -100,7 +100,9 @@ extension PolicyCanvasViewModel {
     let cleanLayout = policyCanvasCleanInitialLayout(nodes: loadedNodes, groups: loadedGroups)
     nodes = cleanLayout.nodes
     groups = cleanLayout.groups
-    edges = document.edges.map(policyCanvasEdge)
+    edges = document.edges.map { edge in
+      policyCanvasEdge(edge, nodes: cleanLayout.nodes)
+    }
     zoom = CGFloat(document.layout.zoom)
     reconcileGroupFrames()
     resetNextNodeNumber()
@@ -112,6 +114,7 @@ extension PolicyCanvasViewModel {
     viewportDirty = false
     setPendingUpdate(nil)
     invalidateValidationCache()
+    requestViewportCentering()
     notifyStatus("Loaded revision \(document.revision)")
   }
 

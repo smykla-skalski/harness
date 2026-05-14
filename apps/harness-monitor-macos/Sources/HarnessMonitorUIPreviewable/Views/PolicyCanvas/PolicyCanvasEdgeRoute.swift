@@ -12,7 +12,7 @@ struct PolicyCanvasEdgeRoute {
     sourceGroupID: String? = nil,
     targetGroupID: String? = nil
   ) {
-    let laneOffset = CGFloat(lane % 12) * PolicyCanvasLayout.edgeLabelLaneSpacing
+    let laneOffset = CGFloat(lane % 12) * PolicyCanvasLayout.edgeBusLaneSpacing
     let horizontalDistance = target.x - source.x
     let sourceGroupFrame = Self.groupFrame(sourceGroupID, in: groups)
     let targetGroupFrame = Self.groupFrame(targetGroupID, in: groups)
@@ -41,6 +41,17 @@ struct PolicyCanvasEdgeRoute {
         target: target,
         sourceGroupFrame: sourceGroupFrame,
         targetGroupFrame: targetGroupFrame,
+        lane: lane
+      )
+    } else if sourceGroupID == targetGroupID,
+      let sourceGroupFrame,
+      abs(horizontalDistance) <= PolicyCanvasLayout.nodeSize.width,
+      abs(target.y - source.y) > PolicyCanvasLayout.nodeSize.height
+    {
+      (points, labelPosition) = Self.verticalStackRoute(
+        source: source,
+        target: target,
+        groupFrame: sourceGroupFrame,
         lane: lane
       )
     } else if sourceGroupID == targetGroupID,
@@ -127,10 +138,12 @@ struct PolicyCanvasEdgeRoute {
   ) -> ([CGPoint], CGPoint) {
     let sourceRunX = source.x + 48 + laneOffset
     let targetRunX = target.x - 48 - laneOffset
-    let topBase = (blockers.map(\.minY).min() ?? PolicyCanvasLayout.initialContentOrigin.y) - 34
-    let topLaneY = topBase - laneOffset
+    let topBase = (blockers.map(\.minY).min() ?? PolicyCanvasLayout.initialContentOrigin.y) - 58
+    let topLaneY = topBase - (CGFloat(lane % 6) * PolicyCanvasLayout.edgeLabelLaneSpacing)
     let bottomLaneY =
-      (blockers.map(\.maxY).max() ?? PolicyCanvasLayout.initialContentOrigin.y) + 42 + laneOffset
+      (blockers.map(\.maxY).max() ?? PolicyCanvasLayout.initialContentOrigin.y)
+      + 64
+      + (CGFloat(lane % 6) * PolicyCanvasLayout.edgeLabelLaneSpacing)
     let routedY = topLaneY >= 18 ? topLaneY : bottomLaneY
     let points = [
       source,
@@ -150,22 +163,25 @@ struct PolicyCanvasEdgeRoute {
     targetGroupFrame: CGRect,
     lane: Int
   ) -> ([CGPoint], CGPoint) {
-    let gapMinX = sourceGroupFrame.maxX + 34
-    let gapMaxX = targetGroupFrame.minX - 34
-    let busLaneSlot = CGFloat((lane % 5) - 2)
-    let labelLaneSlot = CGFloat(lane % 6)
-    let laneOffset = busLaneSlot * 18
-    let laneYOffset = labelLaneSlot * PolicyCanvasLayout.edgeLabelLaneSpacing
-    let preferredBusX = ((gapMinX + gapMaxX) / 2) + laneOffset
+    let gapMinX = sourceGroupFrame.maxX + PolicyCanvasLayout.edgeLabelNodeClearance
+    let gapMaxX = targetGroupFrame.minX - PolicyCanvasLayout.edgeLabelNodeClearance
+    let labelHalfWidth =
+      (PolicyCanvasLayout.edgeLabelMaxWidth / 2) + PolicyCanvasLayout.edgeLabelHorizontalMargin
+    let labelX = min(
+      gapMaxX - labelHalfWidth,
+      max(
+        gapMinX + labelHalfWidth,
+        sourceGroupFrame.maxX + labelHalfWidth + PolicyCanvasLayout.edgeLabelHorizontalMargin
+      )
+    )
+    let busStartX = labelX + labelHalfWidth + PolicyCanvasLayout.edgeLabelHorizontalMargin
+    let preferredBusX = busStartX + (CGFloat(lane) * PolicyCanvasLayout.edgeBusLaneSpacing)
     let busX =
       gapMinX < gapMaxX
       ? min(gapMaxX, max(gapMinX, preferredBusX))
       : source.x + max(72, (target.x - source.x) * 0.46)
-    let sourceExitX = min(busX, sourceGroupFrame.maxX + 18)
-    let routedSourceY = min(
-      sourceGroupFrame.maxY - 38,
-      max(sourceGroupFrame.minY + 38, source.y + laneYOffset)
-    )
+    let sourceExitX = min(busX, sourceGroupFrame.maxX + PolicyCanvasLayout.edgeLabelNodeClearance)
+    let routedSourceY = source.y + (CGFloat(lane) * PolicyCanvasLayout.edgeLabelLaneSpacing)
     let points = [
       source,
       CGPoint(x: sourceExitX, y: source.y),
@@ -174,7 +190,33 @@ struct PolicyCanvasEdgeRoute {
       CGPoint(x: busX, y: target.y),
       target,
     ]
-    let labelPosition = CGPoint(x: (sourceExitX + busX) / 2, y: routedSourceY)
+    let labelPosition = CGPoint(
+      x: min(max(labelX, sourceExitX), busX),
+      y: routedSourceY
+    )
+    return (points, labelPosition)
+  }
+
+  private static func verticalStackRoute(
+    source: CGPoint,
+    target: CGPoint,
+    groupFrame: CGRect,
+    lane: Int
+  ) -> ([CGPoint], CGPoint) {
+    let laneSlot = CGFloat(lane % 6)
+    let labelY = (source.y + target.y) / 2
+    let busX = groupFrame.maxX + 220 + (laneSlot * PolicyCanvasLayout.edgeBusLaneSpacing)
+    let points = [
+      source,
+      CGPoint(x: source.x, y: labelY),
+      CGPoint(x: busX, y: labelY),
+      CGPoint(x: busX, y: target.y),
+      target,
+    ]
+    let labelPosition = CGPoint(
+      x: (source.x + busX) / 2,
+      y: labelY
+    )
     return (points, labelPosition)
   }
 
@@ -184,9 +226,9 @@ struct PolicyCanvasEdgeRoute {
     groupFrame: CGRect,
     lane: Int
   ) -> ([CGPoint], CGPoint) {
-    let laneSlot = CGFloat(lane % 4)
+    let laneSlot = CGFloat(lane % 6)
     let sourceExitX = groupFrame.maxX + 60
-    let busX = groupFrame.maxX + 340 + (laneSlot * 24)
+    let busX = groupFrame.maxX + 340 + (laneSlot * PolicyCanvasLayout.edgeBusLaneSpacing)
     let targetRunY = target.y
     let labelY = min(
       groupFrame.maxY - 38,

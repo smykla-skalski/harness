@@ -63,11 +63,30 @@ extension PolicyCanvasViewModel {
     "policy-canvas-palette|\(kind.rawValue)"
   }
 
-  func portDragPayload(nodeID: String, portID: String) -> String {
-    "policy-canvas-port|\(nodeID)|\(portID)"
+  func portDragPayload(
+    nodeID: String,
+    portID: String,
+    side: PolicyCanvasPortSide? = nil
+  ) -> String {
+    if let side {
+      return "policy-canvas-port|\(nodeID)|\(portID)|\(side.rawValue)"
+    }
+    return "policy-canvas-port|\(nodeID)|\(portID)"
   }
 
   func canvasPoint(for viewportPoint: CGPoint) -> CGPoint {
     CGPoint(x: viewportPoint.x / zoom, y: viewportPoint.y / zoom)
+  }
+
+  func requestViewportCentering() {
+    viewportCenteringGeneration += 1
+  }
+
+  func consumeViewportCenteringRequest() -> Bool {
+    guard centeredViewportGeneration != viewportCenteringGeneration else {
+      return false
+    }
+    centeredViewportGeneration = viewportCenteringGeneration
+    return true
   }
 }

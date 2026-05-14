@@ -216,7 +216,12 @@ struct PolicyCanvasViewModelTests {
 
     let groupFrames = Dictionary(uniqueKeysWithValues: viewModel.groups.map { ($0.id, $0.frame) })
     #expect(groupFrames["entry"]?.minX == PolicyCanvasLayout.initialContentOrigin.x)
-    #expect(groupFrames["entry"]?.minY == PolicyCanvasLayout.initialContentOrigin.y)
+    #expect(
+      groupFrames.values.allSatisfy { frame in
+        frame.minX >= PolicyCanvasLayout.initialContentOrigin.x
+          && frame.minY >= PolicyCanvasLayout.initialContentOrigin.y
+      }
+    )
     #expect(!intersects(groupFrames["entry"], groupFrames["merge"]))
     #expect(!intersects(groupFrames["merge"], groupFrames["terminal"]))
     #expect(!intersects(groupFrames["entry"], groupFrames["terminal"]))
@@ -229,6 +234,42 @@ struct PolicyCanvasViewModelTests {
         return frame.contains(CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize))
       }
     )
+  }
+
+  @Test("loaded default graph starts centered in large canvas space")
+  func loadedDefaultGraphStartsCenteredInLargeCanvasSpace() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(document: PreviewFixtures.policyCanvasPipelineDocument(), simulation: nil, audit: nil)
+
+    #expect(viewModel.initialViewportAnchorPoint.x == viewModel.canvasContentBounds.midX)
+    #expect(viewModel.initialViewportAnchorPoint.y == viewModel.canvasContentBounds.midY)
+    #expect(viewModel.canvasContentSize.width - viewModel.canvasContentBounds.maxX >= 1_000)
+    #expect(viewModel.canvasContentSize.height - viewModel.canvasContentBounds.maxY >= 1_000)
+  }
+
+  @Test("generic policy edge labels are hidden")
+  func genericPolicyEdgeLabelsAreHidden() {
+    let edge = TaskBoardPolicyPipelineEdge(
+      id: "edge-policy-label",
+      fromNodeId: "source",
+      fromPort: "policy",
+      toNodeId: "target",
+      toPort: "in",
+      label: "policy"
+    )
+
+    #expect(policyCanvasEdge(edge).label.isEmpty)
+  }
+
+  @Test("tool rail spacing scales with font scale")
+  func toolRailSpacingScalesWithFontScale() {
+    let regular = PolicyCanvasToolRailMetrics(fontScale: 1)
+    let larger = PolicyCanvasToolRailMetrics(fontScale: 1.5)
+
+    #expect(larger.railWidth > regular.railWidth)
+    #expect(larger.buttonWidth > regular.buttonWidth)
+    #expect(larger.buttonHeight > regular.buttonHeight)
+    #expect(larger.chipHorizontalPadding > regular.chipHorizontalPadding)
   }
 
   @Test("validation issues preserve daemon fields")

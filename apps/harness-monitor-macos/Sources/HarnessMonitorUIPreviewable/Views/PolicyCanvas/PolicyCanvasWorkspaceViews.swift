@@ -6,51 +6,75 @@ struct PolicyCanvasViewport: View {
 
   var body: some View {
     GeometryReader { proxy in
-      ScrollView([.horizontal, .vertical]) {
-        ZStack(alignment: .topLeading) {
-          PolicyCanvasDottedGrid(spacing: PolicyCanvasLayout.gridSize * viewModel.zoom)
-
+      ScrollViewReader { scrollProxy in
+        ScrollView([.horizontal, .vertical]) {
           ZStack(alignment: .topLeading) {
-            PolicyCanvasGroupLayer(viewModel: viewModel)
-            PolicyCanvasEdgeLayer(viewModel: viewModel)
-            PolicyCanvasRubberBandLayer(viewModel: viewModel)
-            PolicyCanvasNodeLayer(viewModel: viewModel)
-            PolicyCanvasEdgeLabelLayer(viewModel: viewModel)
+            PolicyCanvasDottedGrid(spacing: PolicyCanvasLayout.gridSize * viewModel.zoom)
+
+            Color.clear
+              .frame(width: 1, height: 1)
+              .position(viewModel.initialViewportAnchorPoint)
+              .id(PolicyCanvasLayout.initialViewportAnchorID)
+              .accessibilityHidden(true)
+
+            ZStack(alignment: .topLeading) {
+              PolicyCanvasGroupLayer(viewModel: viewModel)
+              PolicyCanvasEdgeLayer(viewModel: viewModel)
+              PolicyCanvasRubberBandLayer(viewModel: viewModel)
+              PolicyCanvasNodeLayer(viewModel: viewModel)
+              PolicyCanvasEdgeLabelLayer(viewModel: viewModel)
+            }
+            .scaleEffect(viewModel.zoom, anchor: .topLeading)
+            .coordinateSpace(.named(PolicyCanvasCoordinateSpaces.canvas))
           }
-          .scaleEffect(viewModel.zoom, anchor: .topLeading)
-          .coordinateSpace(name: PolicyCanvasCoordinateSpaces.canvas)
-        }
-        .frame(
-          width: max(proxy.size.width, viewModel.canvasContentSize.width * viewModel.zoom),
-          height: max(proxy.size.height, viewModel.canvasContentSize.height * viewModel.zoom),
-          alignment: .topLeading
-        )
-        .contentShape(Rectangle())
-        .dropDestination(for: String.self) { payloads, location in
-          viewModel.dropPalettePayloads(
-            payloads,
-            at: viewModel.canvasPoint(for: location)
+          .frame(
+            width: max(proxy.size.width, viewModel.canvasContentSize.width * viewModel.zoom),
+            height: max(proxy.size.height, viewModel.canvasContentSize.height * viewModel.zoom),
+            alignment: .topLeading
           )
+          .contentShape(Rectangle())
+          .dropDestination(for: String.self) { payloads, location in
+            viewModel.dropPalettePayloads(
+              payloads,
+              at: viewModel.canvasPoint(for: location)
+            )
+          }
+          .onTapGesture {
+            viewModel.select(nil)
+          }
+          .overlay {
+            PolicyCanvasEmptyStatePlaceholder(viewModel: viewModel)
+              .allowsHitTesting(false)
+          }
         }
-        .onTapGesture {
-          viewModel.select(nil)
+        .scrollIndicators(.visible)
+        .background(Color(red: 0.03, green: 0.04, blue: 0.06))
+        .clipShape(Rectangle())
+        .overlay(alignment: .bottomLeading) {
+          PolicyCanvasZoomControls(viewModel: viewModel)
+            .padding(14)
         }
-        .overlay {
-          PolicyCanvasEmptyStatePlaceholder(viewModel: viewModel)
-            .allowsHitTesting(false)
+        .simultaneousGesture(magnifyGesture)
+        .onAppear {
+          centerViewportIfNeeded(scrollProxy)
+        }
+        .onChange(of: viewModel.viewportCenteringGeneration, initial: false) {
+          centerViewportIfNeeded(scrollProxy)
         }
       }
-      .scrollIndicators(.visible)
-      .background(Color(red: 0.03, green: 0.04, blue: 0.06))
-      .clipShape(Rectangle())
-      .overlay(alignment: .bottomLeading) {
-        PolicyCanvasZoomControls(viewModel: viewModel)
-          .padding(14)
-      }
-      .simultaneousGesture(magnifyGesture)
     }
     .accessibilityElement(children: .contain)
     .accessibilityFrameMarker(HarnessMonitorAccessibility.policyCanvasViewport)
+  }
+
+  private func centerViewportIfNeeded(_ scrollProxy: ScrollViewProxy) {
+    guard viewModel.consumeViewportCenteringRequest() else {
+      return
+    }
+    Task { @MainActor in
+      await Task.yield()
+      scrollProxy.scrollTo(PolicyCanvasLayout.initialViewportAnchorID, anchor: .center)
+    }
   }
 
   private var magnifyGesture: some Gesture {
@@ -144,15 +168,16 @@ private struct PolicyCanvasEdgeLayer: View {
 
   var body: some View {
     let severityMap = viewModel.edgeSeverityMap
+    let edgeLanes = viewModel.edgeRouteLanes
     ZStack(alignment: .topLeading) {
-      ForEach(Array(viewModel.edges.enumerated()), id: \.element.id) { offset, edge in
+      ForEach(viewModel.edges) { edge in
         if let source = viewModel.portAnchor(for: edge.source),
           let target = viewModel.portAnchor(for: edge.target)
         {
           let route = PolicyCanvasEdgeRoute(
             source: source,
             target: target,
-            lane: offset,
+            lane: edgeLanes[edge.id, default: 0],
             groups: viewModel.groups,
             sourceGroupID: viewModel.node(edge.source.nodeID)?.groupID,
             targetGroupID: viewModel.node(edge.target.nodeID)?.groupID
@@ -176,21 +201,41 @@ private struct PolicyCanvasEdgeLayer: View {
   private func edgeColor(for edge: PolicyCanvasEdge) -> Color {
     viewModel.node(edge.source.nodeID)?.kind.accentColor ?? Color.cyan
   }
+
+  /// Severity-aware stroke color. When the edge has at least one resolved
+  /// validation issue the stroke flips to the issue's accent tone (red for
+  /// errors, yellow for warnings) so the inline mark stays in sync with the
+  /// panel. Selection still bumps opacity for affordance feedback. Pulls
+  /// severity from the body-local map so per-edge lookups stay O(1).
+  private func strokeColor(
+    for edge: PolicyCanvasEdge,
+    severity: PolicyCanvasIssueSeverity?
+  ) -> Color {
+    let selected = viewModel.selection == .edge(edge.id)
+    if let severity {
+      return severity.accentColor.opacity(selected ? 0.98 : 0.82)
+    }
+    return edgeColor(for: edge).opacity(selected ? 0.95 : 0.62)
+  }
 }
 
 private struct PolicyCanvasEdgeLabelLayer: View {
   let viewModel: PolicyCanvasViewModel
+  @Environment(\.fontScale) private var fontScale
 
   var body: some View {
+    let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
+    let edgeLanes = viewModel.edgeRouteLanes
     ZStack(alignment: .topLeading) {
-      ForEach(Array(viewModel.edges.enumerated()), id: \.element.id) { offset, edge in
-        if let source = viewModel.portAnchor(for: edge.source),
+      ForEach(viewModel.edges) { edge in
+        if !edge.label.isEmpty,
+          let source = viewModel.portAnchor(for: edge.source),
           let target = viewModel.portAnchor(for: edge.target)
         {
           let route = PolicyCanvasEdgeRoute(
             source: source,
             target: target,
-            lane: offset,
+            lane: edgeLanes[edge.id, default: 0],
             groups: viewModel.groups,
             sourceGroupID: viewModel.node(edge.source.nodeID)?.groupID,
             targetGroupID: viewModel.node(edge.target.nodeID)?.groupID
@@ -202,9 +247,13 @@ private struct PolicyCanvasEdgeLabelLayer: View {
               .scaledFont(.caption2.weight(.semibold))
               .foregroundStyle(.white.opacity(0.92))
               .lineLimit(1)
-              .fixedSize(horizontal: true, vertical: false)
-              .padding(.horizontal, 10)
-              .frame(height: PolicyCanvasLayout.edgeLabelHeight)
+              .truncationMode(.middle)
+              .padding(.horizontal, metrics.horizontalPadding)
+              .frame(
+                minWidth: metrics.minWidth,
+                maxWidth: PolicyCanvasLayout.edgeLabelMaxWidth,
+                minHeight: metrics.height
+              )
               .background(Color(red: 0.04, green: 0.05, blue: 0.08).opacity(0.96), in: Capsule())
               .overlay {
                 Capsule()
@@ -212,7 +261,6 @@ private struct PolicyCanvasEdgeLabelLayer: View {
               }
           }
           .harnessPlainButtonStyle()
-          .frame(maxWidth: PolicyCanvasLayout.edgeLabelMaxWidth)
           .position(route.labelPosition)
           .accessibilityLabel(viewModel.accessibilityLabel(for: edge))
           .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEdge(edge.id))
@@ -230,20 +278,21 @@ private struct PolicyCanvasEdgeLabelLayer: View {
     viewModel.node(edge.source.nodeID)?.kind.accentColor ?? Color.cyan
   }
 
-  /// Severity-aware stroke color. When the edge has at least one resolved
-  /// validation issue the stroke flips to the issue's accent tone (red for
-  /// errors, yellow for warnings) so the inline mark stays in sync with the
-  /// panel. Selection still bumps opacity for affordance feedback. Pulls
-  /// severity from the body-local map so per-edge lookups stay O(1).
-  private func strokeColor(
-    for edge: PolicyCanvasEdge,
-    severity: PolicyCanvasIssueSeverity?
-  ) -> Color {
-    let selected = viewModel.selection == .edge(edge.id)
-    if let severity {
-      return severity.accentColor.opacity(selected ? 0.98 : 0.82)
-    }
-    return edgeColor(for: edge).opacity(selected ? 0.95 : 0.62)
+}
+
+private struct PolicyCanvasEdgeLabelMetrics {
+  let horizontalPadding: CGFloat
+  let minWidth: CGFloat
+  let height: CGFloat
+
+  init(fontScale: CGFloat) {
+    let scale = min(SessionWindowFontScale.metricsScale(for: fontScale), 1.45)
+    horizontalPadding = (12 * scale).rounded(.up)
+    minWidth = (88 * scale).rounded(.up)
+    height = max(
+      PolicyCanvasLayout.edgeLabelHeight,
+      (PolicyCanvasLayout.edgeLabelHeight * scale).rounded(.up)
+    )
   }
 }
 
@@ -295,4 +344,3 @@ private struct PolicyCanvasGroupRegion: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasGroup(group.id))
   }
 }
-

@@ -59,19 +59,25 @@ func policyCanvasCleanInitialLayout(
   return policyCanvasNormalizeMinimumOrigin(nodes: cleanNodes, groups: cleanGroups)
 }
 
-func policyCanvasEdge(_ edge: TaskBoardPolicyPipelineEdge) -> PolicyCanvasEdge {
-  PolicyCanvasEdge(
+func policyCanvasEdge(
+  _ edge: TaskBoardPolicyPipelineEdge,
+  nodes: [PolicyCanvasNode] = []
+) -> PolicyCanvasEdge {
+  var source = PolicyCanvasPortEndpoint(
+    nodeID: edge.fromNodeId,
+    portID: edge.fromPort,
+    kind: .output
+  )
+  var target = PolicyCanvasPortEndpoint(
+    nodeID: edge.toNodeId,
+    portID: edge.toPort,
+    kind: .input
+  )
+  policyCanvasAssignPreferredPortSides(source: &source, target: &target, nodes: nodes)
+  return PolicyCanvasEdge(
     id: edge.id,
-    source: PolicyCanvasPortEndpoint(
-      nodeID: edge.fromNodeId,
-      portID: edge.fromPort,
-      kind: .output
-    ),
-    target: PolicyCanvasPortEndpoint(
-      nodeID: edge.toNodeId,
-      portID: edge.toPort,
-      kind: .input
-    ),
+    source: source,
+    target: target,
     label: policyCanvasEdgeLabel(edge)
   )
 }
@@ -346,34 +352,80 @@ extension CGRect {
 }
 
 private let defaultPolicyCanvasGroupFrames: [String: CGRect] = [
-  "entry": CGRect(x: 360, y: 260, width: 256, height: 220),
-  "merge": CGRect(x: 760, y: 260, width: 256, height: 420),
-  "terminal": CGRect(x: 1_440, y: 260, width: 256, height: 1_220),
+  "entry": CGRect(x: 520, y: 520, width: 256, height: 220),
+  "merge": CGRect(x: 1_060, y: 520, width: 256, height: 480),
+  "terminal": CGRect(x: 2_140, y: 480, width: 256, height: 1_220),
 ]
 
 private let defaultPolicyCanvasNodePositions: [String: CGPoint] = [
-  "action:router": CGPoint(x: 404, y: 312),
-  "evidence:merge": CGPoint(x: 804, y: 312),
-  "risk:merge": CGPoint(x: 804, y: 492),
-  "supervisor:default-allow": CGPoint(x: 1_484, y: 312),
-  "dry_run:mutate_repo": CGPoint(x: 1_484, y: 452),
-  "human:unsafe-action": CGPoint(x: 1_484, y: 592),
-  "human:missing-merge-evidence": CGPoint(x: 1_484, y: 732),
-  "consensus:protected-path": CGPoint(x: 1_484, y: 872),
-  "dry_run:high-risk-merge": CGPoint(x: 1_484, y: 1_012),
-  "supervisor:merge-deny": CGPoint(x: 1_484, y: 1_152),
-  "supervisor:auto-merge": CGPoint(x: 1_484, y: 1_292),
+  "action:router": CGPoint(x: 564, y: 572),
+  "evidence:merge": CGPoint(x: 1_104, y: 572),
+  "risk:merge": CGPoint(x: 1_104, y: 852),
+  "supervisor:default-allow": CGPoint(x: 2_184, y: 532),
+  "dry_run:mutate_repo": CGPoint(x: 2_184, y: 672),
+  "human:unsafe-action": CGPoint(x: 2_184, y: 812),
+  "human:missing-merge-evidence": CGPoint(x: 2_184, y: 952),
+  "consensus:protected-path": CGPoint(x: 2_184, y: 1_092),
+  "dry_run:high-risk-merge": CGPoint(x: 2_184, y: 1_232),
+  "supervisor:merge-deny": CGPoint(x: 2_184, y: 1_372),
+  "supervisor:auto-merge": CGPoint(x: 2_184, y: 1_512),
 ]
 
 private func policyCanvasEdgeLabel(_ edge: TaskBoardPolicyPipelineEdge) -> String {
   if let label = edge.label?.trimmingCharacters(in: .whitespacesAndNewlines),
-    !label.isEmpty,
-    label != "policy"
+    !label.isEmpty
   {
-    return label
+    let normalized = policyCanvasNormalizedEdgeLabel(label)
+    if !policyCanvasIsGenericEdgeLabel(normalized) {
+      return normalized
+    }
   }
   if edge.condition.condition != "always" {
     return edge.condition.condition.replacingOccurrences(of: "_", with: " ")
   }
-  return edge.fromPort.replacingOccurrences(of: "_", with: " ")
+  let fallback = policyCanvasNormalizedEdgeLabel(edge.fromPort)
+  return policyCanvasIsGenericEdgeLabel(fallback) ? "" : fallback
+}
+
+private func policyCanvasNormalizedEdgeLabel(_ label: String) -> String {
+  label
+    .replacingOccurrences(of: "_", with: " ")
+    .trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
+private func policyCanvasIsGenericEdgeLabel(_ label: String) -> Bool {
+  switch label.lowercased() {
+  case "", "in", "input", "policy", "input policy":
+    true
+  default:
+    false
+  }
+}
+
+private func policyCanvasAssignPreferredPortSides(
+  source: inout PolicyCanvasPortEndpoint,
+  target: inout PolicyCanvasPortEndpoint,
+  nodes: [PolicyCanvasNode]
+) {
+  guard
+    let sourceNode = nodes.first(where: { $0.id == source.nodeID }),
+    let targetNode = nodes.first(where: { $0.id == target.nodeID }),
+    sourceNode.groupID == targetNode.groupID
+  else {
+    return
+  }
+  let horizontalDelta = abs(sourceNode.position.x - targetNode.position.x)
+  let verticalDelta = abs(sourceNode.position.y - targetNode.position.y)
+  guard verticalDelta > horizontalDelta,
+    verticalDelta >= PolicyCanvasLayout.nodeSize.height
+  else {
+    return
+  }
+  if sourceNode.position.y < targetNode.position.y {
+    source.side = .bottom
+    target.side = .top
+  } else {
+    source.side = .top
+    target.side = .bottom
+  }
 }

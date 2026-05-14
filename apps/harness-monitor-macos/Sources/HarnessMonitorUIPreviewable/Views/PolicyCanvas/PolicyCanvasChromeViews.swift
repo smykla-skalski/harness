@@ -125,18 +125,20 @@ private struct PolicyCanvasActionButton: View {
 
 struct PolicyCanvasToolRail: View {
   let viewModel: PolicyCanvasViewModel
+  @Environment(\.fontScale) private var fontScale
 
   var body: some View {
-    VStack(spacing: 10) {
+    let metrics = PolicyCanvasToolRailMetrics(fontScale: fontScale)
+    VStack(spacing: metrics.itemSpacing) {
       ForEach(PolicyCanvasNodeKind.allCases) { kind in
-        PolicyCanvasPaletteButton(viewModel: viewModel, kind: kind)
+        PolicyCanvasPaletteButton(viewModel: viewModel, kind: kind, metrics: metrics)
       }
 
       Spacer(minLength: 0)
     }
-    .padding(.vertical, 14)
-    .padding(.horizontal, 8)
-    .frame(width: 84)
+    .padding(.vertical, metrics.verticalPadding)
+    .padding(.horizontal, metrics.horizontalPadding)
+    .frame(width: metrics.railWidth)
     .background(Color(red: 0.07, green: 0.08, blue: 0.11))
     .overlay(alignment: .trailing) {
       Rectangle()
@@ -148,9 +150,36 @@ struct PolicyCanvasToolRail: View {
   }
 }
 
+struct PolicyCanvasToolRailMetrics: Equatable {
+  let scale: CGFloat
+  let railWidth: CGFloat
+  let itemSpacing: CGFloat
+  let verticalPadding: CGFloat
+  let horizontalPadding: CGFloat
+  let buttonWidth: CGFloat
+  let buttonHeight: CGFloat
+  let iconSize: CGFloat
+  let chipHorizontalPadding: CGFloat
+  let chipVerticalPadding: CGFloat
+
+  init(fontScale: CGFloat) {
+    scale = min(SessionWindowFontScale.metricsScale(for: fontScale), 1.45)
+    railWidth = (84 * scale).rounded(.up)
+    itemSpacing = (10 * scale).rounded(.up)
+    verticalPadding = (14 * scale).rounded(.up)
+    horizontalPadding = (8 * scale).rounded(.up)
+    buttonWidth = (64 * scale).rounded(.up)
+    buttonHeight = (52 * scale).rounded(.up)
+    iconSize = (15 * scale).rounded(.up)
+    chipHorizontalPadding = (10 * scale).rounded(.up)
+    chipVerticalPadding = (7 * scale).rounded(.up)
+  }
+}
+
 private struct PolicyCanvasPaletteButton: View {
   let viewModel: PolicyCanvasViewModel
   let kind: PolicyCanvasNodeKind
+  let metrics: PolicyCanvasToolRailMetrics
 
   var body: some View {
     Button {
@@ -158,13 +187,13 @@ private struct PolicyCanvasPaletteButton: View {
     } label: {
       VStack(spacing: 5) {
         Image(systemName: kind.symbolName)
-          .scaledFont(.system(size: 15, weight: .semibold))
+          .scaledFont(.system(size: metrics.iconSize, weight: .semibold))
         Text(kind.title)
           .scaledFont(.caption2.weight(.semibold))
           .lineLimit(1)
       }
       .foregroundStyle(kind.accentColor)
-      .frame(width: 64, height: 52)
+      .frame(width: metrics.buttonWidth, height: metrics.buttonHeight)
       .background(kind.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
       .overlay {
         RoundedRectangle(cornerRadius: 8)
@@ -173,7 +202,7 @@ private struct PolicyCanvasPaletteButton: View {
     }
     .harnessPlainButtonStyle()
     .draggable(viewModel.palettePayload(for: kind)) {
-      PolicyCanvasPaletteDragChip(kind: kind)
+      PolicyCanvasPaletteDragChip(kind: kind, metrics: metrics)
     }
     .help("Drag onto the canvas, or click to drop near the center.")
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasPaletteItem(kind.rawValue))
@@ -186,11 +215,12 @@ private struct PolicyCanvasPaletteButton: View {
 /// ends (handled by `.draggable(preview:)`).
 private struct PolicyCanvasPaletteDragChip: View {
   let kind: PolicyCanvasNodeKind
+  let metrics: PolicyCanvasToolRailMetrics
 
   var body: some View {
     HStack(spacing: 8) {
       Image(systemName: kind.symbolName)
-        .scaledFont(.system(size: 14, weight: .semibold))
+        .scaledFont(.system(size: max(14, metrics.iconSize - 1), weight: .semibold))
         .foregroundStyle(kind.accentColor)
         .frame(width: 22, height: 22)
         .background(kind.accentColor.opacity(0.18), in: RoundedRectangle(cornerRadius: 5))
@@ -200,8 +230,8 @@ private struct PolicyCanvasPaletteDragChip: View {
         .foregroundStyle(.white)
         .lineLimit(1)
     }
-    .padding(.horizontal, 10)
-    .padding(.vertical, 7)
+    .padding(.horizontal, metrics.chipHorizontalPadding)
+    .padding(.vertical, metrics.chipVerticalPadding)
     .background(Color(red: 0.08, green: 0.09, blue: 0.13).opacity(0.94), in: Capsule())
     .overlay {
       Capsule()
