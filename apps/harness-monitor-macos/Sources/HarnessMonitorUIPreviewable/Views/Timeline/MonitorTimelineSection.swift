@@ -277,6 +277,12 @@ struct SessionTimelineView: View {
   static let loadOlderChunkSize = 200
 
   func requestLoadOlderTimelineChunk() {
+    HarnessMonitorLogger.timelinePaging.info(
+      """
+      section.request limit=\(Self.loadOlderChunkSize, privacy: .public) \
+      sessionID=\(store.selectedSessionID ?? "nil", privacy: .public)
+      """
+    )
     Task { @MainActor in
       await store.appendSelectedTimelineOlderChunk(
         limit: Self.loadOlderChunkSize,

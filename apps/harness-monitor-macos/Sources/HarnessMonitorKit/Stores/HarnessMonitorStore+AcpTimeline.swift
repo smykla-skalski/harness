@@ -271,14 +271,19 @@ extension HarnessMonitorStore {
       return
     }
     timeline = updatedTimeline
-    timelineWindow = normalizedTimelineWindow(timelineWindow, loadedTimeline: updatedTimeline)
+    let resolvedWindow = normalizedTimelineWindow(
+      timelineWindow,
+      loadedTimeline: updatedTimeline
+    )
+    timelineWindow = resolvedWindow
     guard let selectedSession else {
       return
     }
     scheduleSelectedSessionCacheWrite(
       selectedSession,
       timeline: updatedTimeline,
-      timelineWindow: TimelineWindowResponse.fallbackMetadata(for: updatedTimeline)
+      timelineWindow: resolvedWindow
+        ?? TimelineWindowResponse.fallbackMetadata(for: updatedTimeline)
     )
   }
 

@@ -70,15 +70,42 @@ struct SessionTimelineList: View {
       for: SessionTimelineNearBottomState.self,
       of: SessionTimelineNearBottomState.init(geometry:)
     ) { _, newValue in
+      let nav = presentation.navigation
+      HarnessMonitorLogger.timelinePaging.debug(
+        """
+        view.scrollGeometry distance=\(newValue.distanceFromBottom, privacy: .public) \
+        measured=\(newValue.contentMeasured, privacy: .public) \
+        hasOlder=\(nav.hasOlder, privacy: .public) \
+        windowEnd=\(nav.windowEnd, privacy: .public) totalCount=\(nav.totalCount, privacy: .public)
+        """
+      )
       guard newValue.contentMeasured else { return }
       guard newValue.distanceFromBottom <= SessionTimelineNearBottomState.threshold else { return }
-      guard presentation.navigation.hasOlder else { return }
+      guard nav.hasOlder else { return }
+      HarnessMonitorLogger.timelinePaging.info("view.scrollGeometry FIRE")
       onRequestLoadOlder?()
     }
     .task(id: SessionTimelineLoadOlderTaskKey(navigation: presentation.navigation)) {
-      guard presentation.navigation.hasOlder else { return }
+      let nav = presentation.navigation
+      HarnessMonitorLogger.timelinePaging.debug(
+        """
+        view.task enter hasOlder=\(nav.hasOlder, privacy: .public) \
+        windowEnd=\(nav.windowEnd, privacy: .public) \
+        totalCount=\(nav.totalCount, privacy: .public)
+        """
+      )
+      guard nav.hasOlder else { return }
       try? await Task.sleep(for: .milliseconds(80))
-      guard !Task.isCancelled, presentation.navigation.hasOlder else { return }
+      guard !Task.isCancelled, presentation.navigation.hasOlder else {
+        HarnessMonitorLogger.timelinePaging.debug(
+          """
+          view.task post-sleep guard fail cancelled=\(Task.isCancelled, privacy: .public) \
+          hasOlder=\(presentation.navigation.hasOlder, privacy: .public)
+          """
+        )
+        return
+      }
+      HarnessMonitorLogger.timelinePaging.info("view.task FIRE")
       onRequestLoadOlder?()
     }
   }
