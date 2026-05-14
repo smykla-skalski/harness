@@ -235,13 +235,13 @@ enum PolicyCanvasLayout {
   static let nodeSize = CGSize(width: 168, height: 96)
   static let portDiameter: CGFloat = 12
   static let groupCornerRadius: CGFloat = 8
-  static let initialContentOrigin = CGPoint(x: 36, y: 72)
+  static let initialContentOrigin = CGPoint(x: 140, y: 160)
   static let groupHorizontalPadding: CGFloat = 44
   static let groupVerticalPadding: CGFloat = 52
   static let minimumGroupSize = CGSize(width: 220, height: 180)
-  static let minimumCanvasSize = CGSize(width: 1_420, height: 960)
-  static let canvasTrailingPadding: CGFloat = 360
-  static let canvasBottomPadding: CGFloat = 360
+  static let minimumCanvasSize = CGSize(width: 2_400, height: 2_160)
+  static let canvasTrailingPadding: CGFloat = 760
+  static let canvasBottomPadding: CGFloat = 760
 
   static func portY(index: Int, count: Int) -> CGFloat {
     guard count > 1 else {
