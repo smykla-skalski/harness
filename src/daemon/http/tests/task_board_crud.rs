@@ -60,10 +60,23 @@ async fn run_flow() {
         &client,
         &base_url,
         http_paths::TASK_BOARD_SYNC,
-        json!({ "status": "todo", "dry_run": true }),
+        json!({ "status": "todo", "direction": "push", "dry_run": true }),
     )
     .await;
     assert_eq!(sync["total"].as_u64(), Some(1));
+    let (sync_status, sync_error) = post_json_with_status(
+        &client,
+        &base_url,
+        http_paths::TASK_BOARD_SYNC,
+        json!({ "provider": "todoist", "direction": "pull", "dry_run": true }),
+    )
+    .await;
+    assert_eq!(sync_status, StatusCode::BAD_REQUEST);
+    assert!(
+        sync_error["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("external sync token missing"))
+    );
     let audit = get_json(
         &client,
         &base_url,
@@ -101,6 +114,13 @@ async fn run_flow() {
     )
     .await;
     assert_eq!(settings["dry_run_default"].as_bool(), Some(false));
+    let loaded_settings = get_json(
+        &client,
+        &base_url,
+        http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
+    )
+    .await;
+    assert_eq!(loaded_settings["dry_run_default"].as_bool(), Some(false));
     assert_eq!(
         post_json(
             &client,
@@ -136,6 +156,15 @@ async fn post_json(client: &reqwest::Client, base_url: &str, path: &str, body: V
     json_request(client.post(format!("{base_url}{path}")).json(&body), path).await
 }
 
+async fn post_json_with_status(
+    client: &reqwest::Client,
+    base_url: &str,
+    path: &str,
+    body: Value,
+) -> (StatusCode, Value) {
+    json_request_with_status(client.post(format!("{base_url}{path}")).json(&body)).await
+}
+
 async fn put_json(client: &reqwest::Client, base_url: &str, path: &str, body: Value) -> Value {
     json_request(client.put(format!("{base_url}{path}")).json(&body), path).await
 }
@@ -149,6 +178,12 @@ async fn delete_json(client: &reqwest::Client, base_url: &str, path: &str) -> Va
 }
 
 async fn json_request(builder: reqwest::RequestBuilder, path: &str) -> Value {
+    let (status, value) = json_request_with_status(builder).await;
+    assert_eq!(status, StatusCode::OK, "{path} returned {value}");
+    value
+}
+
+async fn json_request_with_status(builder: reqwest::RequestBuilder) -> (StatusCode, Value) {
     let response = builder
         .bearer_auth("token")
         .send()
@@ -156,6 +191,5 @@ async fn json_request(builder: reqwest::RequestBuilder, path: &str) -> Value {
         .expect("send request");
     let status = response.status();
     let value = response.json::<Value>().await.expect("json response");
-    assert_eq!(status, StatusCode::OK, "{path} returned {value}");
-    value
+    (status, value)
 }

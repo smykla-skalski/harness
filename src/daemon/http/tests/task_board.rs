@@ -95,7 +95,7 @@ async fn run_task_board_http_item_scope_flow(
         base_url,
         http_paths::TASK_BOARD_EVALUATE,
         json!({
-            "item_id": "board-http-dispatch",
+            "id": "board-http-dispatch",
             "status": "in_progress",
             "dry_run": false,
         }),
@@ -127,7 +127,7 @@ async fn run_task_board_http_run_once_flow(
         base_url,
         http_paths::TASK_BOARD_ORCHESTRATOR_RUN_ONCE,
         json!({
-            "item_id": "board-http-run-once",
+            "id": "board-http-run-once",
             "status": "todo",
             "dry_run": false,
             "project_dir": project_dir,
@@ -170,7 +170,7 @@ async fn dispatch_http_item(
         base_url,
         http_paths::TASK_BOARD_DISPATCH,
         json!({
-            "item_id": item_id,
+            "id": item_id,
             "status": "todo",
             "dry_run": false,
             "project_dir": project_dir,

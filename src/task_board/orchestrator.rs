@@ -158,6 +158,17 @@ impl TaskBoardOrchestrator {
         })
     }
 
+    /// Load the board items selected by one prepared dispatch input.
+    ///
+    /// # Errors
+    /// Returns `CliError` when selected board items cannot be read.
+    pub(crate) fn items_for_input(
+        &self,
+        input: &TaskBoardOrchestratorDispatchInput,
+    ) -> Result<Vec<TaskBoardItem>, CliError> {
+        run_items(&self.board, input.item_id.as_deref(), input.status)
+    }
+
     /// Persist a phase transition for an in-flight prepared tick.
     ///
     /// # Errors

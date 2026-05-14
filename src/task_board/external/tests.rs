@@ -5,7 +5,9 @@ use temp_env::with_vars;
 use tempfile::tempdir;
 
 use super::*;
+use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::store::TaskBoardStore;
+use crate::task_board::{ExternalRefProvider, build_dispatch_plan};
 
 #[test]
 fn env_config_prefers_harness_github_token() {
@@ -216,8 +218,19 @@ async fn sync_external_tasks_dry_run_does_not_write_board() {
     .await
     .expect("sync external tasks");
 
-    assert_eq!(operations.len(), 1);
+    assert_eq!(operations.len(), 2);
     assert!(operations.iter().all(|operation| !operation.applied));
+    assert!(operations.iter().any(|operation| {
+        operation.action == ExternalSyncAction::Pull
+            && operation.board_item_id.as_deref() == Some("todoist-remote-2")
+            && operation.external_id.as_deref() == Some("remote-2")
+            && operation.dry_run
+    }));
+    assert!(operations.iter().any(|operation| {
+        operation.action == ExternalSyncAction::Push
+            && operation.board_item_id.as_deref() == Some("local-1")
+            && operation.dry_run
+    }));
     assert!(board.get("todoist-remote-2").is_err());
     assert!(
         board
@@ -242,6 +255,64 @@ fn provider_constructors_require_tokens_without_network() {
     assert!(github_error.contains(HARNESS_GITHUB_TOKEN_ENV));
     assert!(github_error.contains(GH_TOKEN_ENV));
     assert!(todoist_error.contains(HARNESS_TODOIST_TOKEN_ENV));
+}
+
+#[test]
+fn github_repository_fallback_is_used_only_when_env_is_missing() {
+    let from_fallback =
+        ExternalSyncConfig::default().with_github_repository_fallback(Some(" owner/repo "));
+    let from_env = ExternalSyncConfig {
+        github_token: None,
+        github_repository: Some("env/repo".to_string()),
+        todoist_token: None,
+    }
+    .with_github_repository_fallback(Some("owner/repo"));
+
+    assert_eq!(from_fallback.github_repository(), Some("owner/repo"));
+    assert_eq!(from_env.github_repository(), Some("env/repo"));
+}
+
+#[tokio::test]
+async fn sync_external_tasks_imports_github_tasks_as_dispatch_ready_items() {
+    let temp = tempdir().expect("tempdir");
+    let board = TaskBoardStore::new(temp.path().join("board"));
+    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient {
+        provider: ExternalProvider::GitHub,
+        tasks: vec![github_external_task("7", "Remote issue", "owner/repo")],
+        pushed: Mutex::new(Vec::new()),
+    })];
+
+    let operations = sync_external_tasks(
+        &board,
+        ExternalSyncOptions {
+            provider: Some(ExternalProvider::GitHub),
+            direction: ExternalSyncDirection::Pull,
+            dry_run: false,
+            status: None,
+        },
+        &clients,
+    )
+    .await
+    .expect("sync external tasks");
+
+    assert_eq!(operations.len(), 1);
+    let item = board.get("github-7").expect("load imported github task");
+    assert_eq!(item.project_id.as_deref(), Some("owner/repo"));
+    assert_eq!(
+        item.planning.approved_by.as_deref(),
+        Some(CONTROL_PLANE_ACTOR_ID)
+    );
+    assert!(item.planning.approved_at.is_some());
+    assert!(
+        item.planning
+            .summary
+            .as_deref()
+            .is_some_and(|summary| summary.contains("Remote issue"))
+    );
+    assert!(item.external_refs.iter().any(|reference| {
+        reference.provider == ExternalRefProvider::GitHub && reference.external_id == "7"
+    }));
+    assert!(build_dispatch_plan(&item).is_ready());
 }
 
 struct FakeSyncClient {
@@ -275,6 +346,19 @@ fn external_task(external_id: &str, title: &str) -> ExternalTask {
         title: title.to_owned(),
         body: String::new(),
         status: TaskBoardStatus::Todo,
+        project_id: None,
         updated_at: None,
+    }
+}
+
+fn github_external_task(external_id: &str, title: &str, project_id: &str) -> ExternalTask {
+    ExternalTask {
+        reference: ExternalTaskRef::new(ExternalProvider::GitHub, external_id)
+            .with_url(format!("https://example.test/issues/{external_id}")),
+        title: title.to_owned(),
+        body: "Investigate the linked issue.".to_owned(),
+        status: TaskBoardStatus::Todo,
+        project_id: Some(project_id.to_owned()),
+        updated_at: Some("2026-05-14T03:00:00Z".to_string()),
     }
 }

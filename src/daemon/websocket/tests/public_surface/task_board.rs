@@ -57,7 +57,7 @@ async fn run_websocket_task_board_item_scope_flow(
             "req-task-board-evaluate",
             ws_methods::TASK_BOARD_EVALUATE,
             json!({
-                "item_id": "board-ws-dispatch",
+                "id": "board-ws-dispatch",
                 "status": "in_progress",
                 "dry_run": false,
             }),
@@ -89,7 +89,7 @@ async fn run_websocket_task_board_run_once_flow(
             "req-task-board-run-once",
             ws_methods::TASK_BOARD_ORCHESTRATOR_RUN_ONCE,
             json!({
-                "item_id": "board-ws-run-once",
+                "id": "board-ws-run-once",
                 "status": "todo",
                 "dry_run": false,
                 "project_dir": project_dir,
@@ -137,7 +137,7 @@ async fn dispatch_ws_item(
             "req-task-board-dispatch",
             ws_methods::TASK_BOARD_DISPATCH,
             json!({
-                "item_id": item_id,
+                "id": item_id,
                 "status": "todo",
                 "dry_run": false,
                 "project_dir": project_dir,

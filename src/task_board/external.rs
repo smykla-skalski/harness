@@ -124,6 +124,8 @@ pub struct ExternalTask {
     pub body: String,
     pub status: TaskBoardStatus,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<String>,
 }
 
@@ -153,6 +155,25 @@ impl ExternalSyncConfig {
             ExternalProvider::GitHub => self.github_token.as_deref(),
             ExternalProvider::Todoist => self.todoist_token.as_deref(),
         }
+    }
+
+    #[must_use]
+    pub fn github_repository(&self) -> Option<&str> {
+        self.github_repository
+            .as_deref()
+            .map(str::trim)
+            .filter(|repository| !repository.is_empty())
+    }
+
+    #[must_use]
+    pub fn with_github_repository_fallback(mut self, repository: Option<&str>) -> Self {
+        if self.github_repository().is_none() {
+            self.github_repository = repository
+                .map(str::trim)
+                .filter(|repository| !repository.is_empty())
+                .map(ToOwned::to_owned);
+        }
+        self
     }
 
     /// Return the configured token for a provider.
@@ -274,6 +295,7 @@ impl ExternalSyncClient for GitHubSyncClient {
 
     async fn pull_tasks(&self) -> Result<Vec<ExternalTask>, CliError> {
         let repository = self.repository_for(None)?;
+        let project_id = repository.slug();
         let page = self
             .octocrab()
             .issues(repository.owner.as_str(), repository.repo.as_str())
@@ -283,8 +305,12 @@ impl ExternalSyncClient for GitHubSyncClient {
             .send()
             .await
             .map_err(github_sync_error)?;
-        Ok(page
-            .items
+        let issues = self
+            .octocrab()
+            .all_pages(page)
+            .await
+            .map_err(github_sync_error)?;
+        Ok(issues
             .into_iter()
             .filter(|issue| issue.pull_request.is_none())
             .map(|issue| ExternalTask {
@@ -293,6 +319,7 @@ impl ExternalSyncClient for GitHubSyncClient {
                 title: issue.title,
                 body: issue.body.unwrap_or_default(),
                 status: TaskBoardStatus::Todo,
+                project_id: Some(project_id.clone()),
                 updated_at: Some(issue.updated_at.to_rfc3339()),
             })
             .collect())
@@ -319,6 +346,12 @@ impl ExternalSyncClient for GitHubSyncClient {
 struct GitHubRepository {
     owner: String,
     repo: String,
+}
+
+impl GitHubRepository {
+    fn slug(&self) -> String {
+        format!("{}/{}", self.owner, self.repo)
+    }
 }
 
 fn first_present_env(names: &[&str]) -> Option<String> {

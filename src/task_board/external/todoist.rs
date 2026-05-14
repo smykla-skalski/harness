@@ -158,6 +158,7 @@ impl From<TodoistTask> for ExternalTask {
             title: task.content,
             body: task.description,
             status: TaskBoardStatus::Todo,
+            project_id: None,
             updated_at: None,
         }
     }
