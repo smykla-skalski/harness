@@ -166,6 +166,14 @@ final class PolicyCanvasViewModel {
   /// reject (vs. per-field deep-equality on the snapshot payload).
   var hasRecoverableEdits: Bool
 
+  /// Cache slot for the per-node simulation outcome map. `@ObservationIgnored`
+  /// for the same reason as `validationCacheStorage` — observed storage would
+  /// make every body that reads the map invalidate on its own cache write.
+  /// Token keyed on simulation revision + decisions count (see
+  /// `SimulationOutcomeCacheToken`); writes flow through
+  /// `simulationOutcomeMap()`.
+  @ObservationIgnored var simulationOutcomeCacheStorage: PolicyCanvasSimulationOutcomeCacheEntry?
+
   init(
     selectedTab: PolicyCanvasTab = .draft,
     nodes: [PolicyCanvasNode],

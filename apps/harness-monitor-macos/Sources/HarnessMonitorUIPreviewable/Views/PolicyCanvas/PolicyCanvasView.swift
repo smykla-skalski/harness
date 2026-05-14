@@ -34,6 +34,18 @@ public struct PolicyCanvasView: View {
   @State var pendingDeletionRequest: PolicyCanvasDeletionRequest?
   @State var statusLine: String = "No pending changes"
   @State var searchPaletteVisible: Bool = false
+  /// User-facing override for the simulation overlay. Defaults to nil
+  /// (auto-show whenever a simulation exists and the user is on the
+  /// simulation tab); the chrome toggle in the top bar flips this to
+  /// `true`/`false` so the user can hide noise while staying on the
+  /// simulation tab, or pin the overlay while reviewing the draft tab.
+  ///
+  /// Simulation visibility is purely view state — never marks
+  /// `documentDirty`. Holding the override in @State (not in the view
+  /// model) keeps document state separate from per-window viewport
+  /// preferences, matching how the rest of the canvas treats zoom and
+  /// inspector visibility.
+  @State var simulationOverlayOverride: Bool?
   @FocusState var focusedField: PolicyCanvasFocusedField?
   /// VoiceOver focus anchor for the canvas surface. The search palette writes
   /// the just-selected component into this binding after dismiss so VO lands
@@ -101,6 +113,9 @@ public struct PolicyCanvasView: View {
       PolicyCanvasTopBar(
         viewModel: viewModel,
         canPromote: viewModel.canPromote,
+        simulationOverlayAvailable: simulationOverlayAvailable,
+        simulationOverlayVisible: simulationOverlayResolved,
+        toggleSimulationOverlay: toggleSimulationOverlay,
         save: saveDraft,
         simulate: simulate,
         promote: requestPromote,
@@ -119,7 +134,8 @@ public struct PolicyCanvasView: View {
 
         PolicyCanvasViewport(
           viewModel: viewModel,
-          focusedComponent: $focusedComponent
+          focusedComponent: $focusedComponent,
+          showSimulationOverlay: simulationOverlayResolved
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -358,6 +374,47 @@ public struct PolicyCanvasView: View {
     }
     viewModel.clearSelection()
   }
+
+  private func forceReloadPolicyPipeline() async {
+    guard let store else {
+      return
+    }
+    await store.refreshTaskBoardPolicyPipeline()
+    applyDashboardSnapshot()
+  }
+
+  /// True when there is a simulation result the user could view. Toggle is
+  /// disabled when this is false — there's nothing to show.
+  private var simulationOverlayAvailable: Bool {
+    viewModel.latestSimulation != nil
+  }
+
+  /// Effective overlay visibility. The user's explicit override wins when
+  /// set; otherwise auto-show whenever the user is on the simulation tab
+  /// and a simulation is available. The default-on-simulation-tab heuristic
+  /// makes the overlay self-explaining: the user clicks Simulate, the tab
+  /// flips to Simulation, and the canvas immediately shows verdicts. The
+  /// override path lets advanced users pin or hide the overlay across tab
+  /// switches.
+  private var simulationOverlayResolved: Bool {
+    guard simulationOverlayAvailable else {
+      return false
+    }
+    if let override = simulationOverlayOverride {
+      return override
+    }
+    return viewModel.selectedTab == .simulation
+  }
+
+  /// Flip the explicit override. We don't try to be clever about returning
+  /// to the auto path — the user clicked, so they want a sticky choice.
+  /// They can drop the override by re-running a simulation (which clears it
+  /// implicitly via `applyDashboardSnapshot` -> dropOverride is not yet
+  /// auto-driven; we keep the override sticky on purpose for now).
+  private func toggleSimulationOverlay() {
+    simulationOverlayOverride = !simulationOverlayResolved
+  }
+
 
   /// Bind the view model's status callback to the local `@State` status line.
   /// Captured `_statusLine` is reference-backed by SwiftUI, so closure writes

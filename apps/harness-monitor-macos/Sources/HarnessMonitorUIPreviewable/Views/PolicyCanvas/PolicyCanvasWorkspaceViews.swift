@@ -3,6 +3,12 @@ import SwiftUI
 struct PolicyCanvasViewport: View {
   let viewModel: PolicyCanvasViewModel
   let focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
+  /// View-only flag from the host. The host (`PolicyCanvasView`) auto-flips
+  /// this on when a simulation is available and the user is on the
+  /// simulation tab; the chrome toggle in the top bar lets the user hide
+  /// the overlay even when both conditions hold. Simulation visibility is
+  /// purely viewport state — never set `documentDirty` from this seam.
+  var showSimulationOverlay: Bool = false
   @State private var magnifyStartZoom: CGFloat?
 
   var body: some View {
@@ -23,6 +29,9 @@ struct PolicyCanvasViewport: View {
               PolicyCanvasEdgeLayer(viewModel: viewModel)
               PolicyCanvasRubberBandLayer(viewModel: viewModel)
               PolicyCanvasNodeLayer(viewModel: viewModel, focusedComponent: focusedComponent)
+              if showSimulationOverlay {
+                PolicyCanvasSimulationLayer(viewModel: viewModel)
+              }
               PolicyCanvasEdgeLabelLayer(viewModel: viewModel, focusedComponent: focusedComponent)
             }
             .scaleEffect(viewModel.zoom, anchor: .topLeading)
