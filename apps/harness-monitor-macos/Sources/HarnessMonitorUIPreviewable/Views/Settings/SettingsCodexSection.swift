@@ -54,7 +54,7 @@ public struct SettingsHostBridgeSection: View {
       }
 
       Section {
-        ForEach(capabilityNames, id: \.self) { name in
+        ForEach(Array(capabilityNames.enumerated()), id: \.offset) { _, name in
           capabilityRow(name: name)
         }
       } header: {

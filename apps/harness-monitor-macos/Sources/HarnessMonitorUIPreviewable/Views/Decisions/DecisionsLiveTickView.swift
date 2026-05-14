@@ -90,15 +90,19 @@ private struct LiveTickMetricCell: View {
 private struct FlowQuarantinedRules: View {
   let ruleIDs: [String]
 
+  private var indexedRuleIDs: [(offset: Int, element: String)] {
+    Array(ruleIDs.enumerated())
+  }
+
   var body: some View {
     ViewThatFits(in: .vertical) {
       HStack(spacing: HarnessMonitorTheme.spacingXS) {
-        ForEach(ruleIDs, id: \.self) { ruleID in
+        ForEach(indexedRuleIDs, id: \.offset) { _, ruleID in
           ruleBadge(ruleID)
         }
       }
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-        ForEach(ruleIDs, id: \.self) { ruleID in
+        ForEach(indexedRuleIDs, id: \.offset) { _, ruleID in
           ruleBadge(ruleID)
         }
       }

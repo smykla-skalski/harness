@@ -118,6 +118,21 @@ struct SessionSwiftUISourceTests {
     #expect(!createFormSource.contains("SessionWindowCreateFieldBlock("))
   }
 
+  @Test("Settings string pickers and capability lists keep duplicate values off self identity")
+  func settingsStringCollectionsAvoidSelfIdentity() throws {
+    let codexSource = try sourceFile(at: "Views/Settings/SettingsCodexSection.swift")
+    let parameterRowSource = try sourceFile(
+      at: "Views/Settings/Supervisor/SettingsSupervisorRulesPane+ParameterRow.swift"
+    )
+
+    #expect(codexSource.contains("ForEach(Array(capabilityNames.enumerated()), id: \\.offset)"))
+    #expect(!codexSource.contains("ForEach(capabilityNames, id: \\.self)"))
+    #expect(
+      parameterRowSource.contains("ForEach(Array(allowedValues.enumerated()), id: \\.offset)")
+    )
+    #expect(!parameterRowSource.contains("ForEach(allowedValues, id: \\.self)"))
+  }
+
   @Test("Session view state wrappers stay private")
   func sessionViewStateWrappersStayPrivate() throws {
     let sessionWindowSource = try sourceFile(at: "Views/Sessions/SessionWindowView.swift")
@@ -239,6 +254,15 @@ struct SessionSwiftUISourceTests {
     #expect(rowSource.contains("let showsDeadline = acpPayload?.expiresAtDate != nil"))
     #expect(rowSource.contains("referenceDate: nil"))
     #expect(!rowSource.contains("deadlineStatus("))
+  }
+
+  @Test("Decision live tick keeps duplicate quarantined rules off self identity")
+  func decisionLiveTickKeepsDuplicateRuleIDsOffSelfIdentity() throws {
+    let source = try sourceFile(at: "Views/Decisions/DecisionsLiveTickView.swift")
+
+    #expect(source.contains("private var indexedRuleIDs"))
+    #expect(source.contains("ForEach(indexedRuleIDs, id: \\.offset)"))
+    #expect(!source.contains("ForEach(ruleIDs, id: \\.self)"))
   }
 
   @Test("App search reindex tasks attach from a tiny active-search anchor")
