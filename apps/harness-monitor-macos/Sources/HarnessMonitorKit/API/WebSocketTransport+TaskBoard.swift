@@ -69,6 +69,22 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func taskBoardProjects(status: TaskBoardStatus? = nil) async throws
+    -> [TaskBoardProjectSummary]
+  {
+    let params = try encodeParams(TaskBoardStatusFilterRequest(status: status), extra: [:])
+    let value = try await rpc(method: .taskBoardProjects, params: params)
+    return try decode(value)
+  }
+
+  public func taskBoardMachines(status: TaskBoardStatus? = nil) async throws
+    -> [TaskBoardMachineSummary]
+  {
+    let params = try encodeParams(TaskBoardStatusFilterRequest(status: status), extra: [:])
+    let value = try await rpc(method: .taskBoardMachines, params: params)
+    return try decode(value)
+  }
+
   public func taskBoardOrchestratorStatus() async throws -> TaskBoardOrchestratorStatus {
     let value = try await rpc(method: .taskBoardOrchestratorStatus)
     return try decode(value)
@@ -104,6 +120,40 @@ extension WebSocketTransport {
   ) async throws -> TaskBoardOrchestratorSettings {
     let params = try encodeParams(request, extra: [:])
     let value = try await rpc(method: .taskBoardOrchestratorSettingsUpdate, params: params)
+    return try decode(value)
+  }
+
+  public func taskBoardPolicyPipeline() async throws -> TaskBoardPolicyPipelineDocument {
+    let value = try await rpc(method: .taskBoardPolicyPipelineGet)
+    return try decode(value)
+  }
+
+  public func saveTaskBoardPolicyPipelineDraft(
+    request: TaskBoardPolicyPipelineSaveDraftRequest
+  ) async throws -> TaskBoardPolicyPipelineSaveDraftResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .taskBoardPolicyPipelineSaveDraft, params: params)
+    return try decode(value)
+  }
+
+  public func simulateTaskBoardPolicyPipeline(
+    request: TaskBoardPolicyPipelineSimulateRequest
+  ) async throws -> TaskBoardPolicyPipelineSimulationResult {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .taskBoardPolicyPipelineSimulate, params: params)
+    return try decode(value)
+  }
+
+  public func promoteTaskBoardPolicyPipeline(
+    request: TaskBoardPolicyPipelinePromoteRequest
+  ) async throws -> TaskBoardPolicyPipelinePromoteResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .taskBoardPolicyPipelinePromote, params: params)
+    return try decode(value)
+  }
+
+  public func taskBoardPolicyPipelineAudit() async throws -> TaskBoardPolicyPipelineAuditSummary {
+    let value = try await rpc(method: .taskBoardPolicyPipelineAudit)
     return try decode(value)
   }
 }

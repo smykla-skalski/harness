@@ -346,6 +346,9 @@ extension HarnessMonitorStore {
     public var taskBoardItems: [TaskBoardItem] = []
     public var taskBoardOrchestratorStatus: TaskBoardOrchestratorStatus?
     public var taskBoardEvaluationSummary: TaskBoardEvaluationSummary?
+    public var taskBoardPolicyPipeline: TaskBoardPolicyPipelineDocument?
+    public var taskBoardPolicySimulation: TaskBoardPolicyPipelineSimulationResult?
+    public var taskBoardPolicyAudit: TaskBoardPolicyPipelineAuditSummary?
   }
 
   public struct SidebarUIState: Equatable {

@@ -120,8 +120,7 @@ impl PolicyPipelineStore {
     ) -> Result<PolicyPipelineSaveResponse, CliError> {
         let current_revision = self
             .load_or_seed()
-            .map(|current| current.revision)
-            .unwrap_or(document.revision);
+            .map_or(document.revision, |current| current.revision);
         document.revision = current_revision.max(document.revision).saturating_add(1);
         document.mode = PolicyGraphMode::Draft;
         let validation = document.validate();
@@ -163,7 +162,7 @@ impl PolicyPipelineStore {
             succeeded: validation.is_valid(),
             validation,
             decisions,
-            policy_trace_ids: document.policy_trace_ids.clone(),
+            policy_trace_ids: document.policy_trace_ids,
         };
         write_json_pretty(&self.simulation_path(), &result)?;
         Ok(result)
@@ -197,7 +196,7 @@ impl PolicyPipelineStore {
         }
         let document = document
             .promoted(PolicyGraphMode::Enforced, request.revision)
-            .map_err(validation_error)?;
+            .map_err(|report| validation_error(&report))?;
         write_json_pretty(&self.document_path(), &document)?;
         Ok(PolicyPipelinePromoteResponse {
             document,
@@ -240,7 +239,7 @@ impl PolicyPipelineStore {
     }
 }
 
-fn validation_error(report: PolicyGraphValidationReport) -> CliError {
+fn validation_error(report: &PolicyGraphValidationReport) -> CliError {
     CliErrorKind::invalid_transition(format!(
         "policy graph validation failed with {} issue(s)",
         report.issues.len()

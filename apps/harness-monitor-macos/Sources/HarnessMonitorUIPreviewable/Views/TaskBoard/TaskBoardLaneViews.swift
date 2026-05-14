@@ -138,18 +138,12 @@ struct TaskBoardItemRow: View {
       .padding(HarnessMonitorTheme.spacingSM)
     }
     .harnessInteractiveCardButtonStyle(cornerRadius: 8)
-    .disabled(!isOpenable)
-    .opacity(isOpenable ? 1 : 0.74)
     .background(.background.opacity(0.45), in: .rect(cornerRadius: 8))
     .overlay(
       RoundedRectangle(cornerRadius: 8)
         .stroke(HarnessMonitorTheme.controlBorder.opacity(0.55), lineWidth: 1)
     )
     .accessibilityIdentifier("harness.task-board.api-item.\(item.id)")
-  }
-
-  private var isOpenable: Bool {
-    item.sessionId != nil
   }
 
   private func taskPill(_ label: String, color: Color) -> some View {
@@ -219,7 +213,7 @@ struct TaskBoardInboxItemRow: View {
   }
 }
 
-private func priorityColor(for priority: TaskBoardPriority) -> Color {
+func priorityColor(for priority: TaskBoardPriority) -> Color {
   switch priority {
   case .critical:
     HarnessMonitorTheme.danger
@@ -232,7 +226,7 @@ private func priorityColor(for priority: TaskBoardPriority) -> Color {
   }
 }
 
-private func taskBoardStatusColor(for status: TaskBoardStatus) -> Color {
+func taskBoardStatusColor(for status: TaskBoardStatus) -> Color {
   switch status {
   case .blocked:
     HarnessMonitorTheme.danger

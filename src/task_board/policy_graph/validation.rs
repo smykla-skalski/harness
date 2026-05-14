@@ -109,7 +109,7 @@ fn cycle_issues(
     let mut visited = HashSet::new();
     let mut stack = Vec::new();
     for node in nodes_by_id.keys() {
-        if find_cycle(*node, graph, &mut visiting, &mut visited, &mut stack) {
+        if find_cycle(node, graph, &mut visiting, &mut visited, &mut stack) {
             return vec![PolicyGraphValidationIssue::Cycle { node_ids: stack }];
         }
     }
@@ -181,7 +181,7 @@ fn edge_condition_contains_action(edge: &super::PolicyGraphEdge, action: PolicyA
     matches!(
         &edge.condition,
         PolicyGraphEdgeCondition::ActionIn { actions } if actions.contains(&action)
-    )
+    ) || matches!(edge.condition, PolicyGraphEdgeCondition::Always)
 }
 
 fn can_reach_human_or_consensus(

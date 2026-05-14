@@ -4,16 +4,51 @@ import SwiftUI
 struct TaskBoardOrchestratorSummaryView: View {
   let status: TaskBoardOrchestratorStatus
   let latestEvaluation: TaskBoardEvaluationSummary?
+  let isActionInFlight: Bool
+  let onStart: (() -> Void)?
+  let onStop: (() -> Void)?
+  let onRunOnce: (() -> Void)?
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var metrics: TaskBoardOverviewMetrics {
+    TaskBoardOverviewMetrics(fontScale: fontScale)
+  }
 
   init(
     status: TaskBoardOrchestratorStatus,
-    latestEvaluation: TaskBoardEvaluationSummary? = nil
+    latestEvaluation: TaskBoardEvaluationSummary? = nil,
+    isActionInFlight: Bool = false,
+    onStart: (() -> Void)? = nil,
+    onStop: (() -> Void)? = nil,
+    onRunOnce: (() -> Void)? = nil
   ) {
     self.status = status
     self.latestEvaluation = latestEvaluation
+    self.isActionInFlight = isActionInFlight
+    self.onStart = onStart
+    self.onStop = onStop
+    self.onRunOnce = onRunOnce
   }
 
   var body: some View {
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: HarnessMonitorTheme.spacingMD) {
+        summaryContent
+        Spacer(minLength: HarnessMonitorTheme.spacingMD)
+        controls
+      }
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+        summaryContent
+        controls
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("harness.task-board.orchestrator-summary")
+  }
+
+  private var summaryContent: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
       summaryPill("Status", stateTitle, tint: stateTint)
       if let currentTick = status.currentTick {
@@ -36,9 +71,46 @@ struct TaskBoardOrchestratorSummaryView: View {
         )
       }
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .accessibilityElement(children: .combine)
-    .accessibilityIdentifier("harness.task-board.orchestrator-summary")
+  }
+
+  private var controls: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      if status.running {
+        if let onStop {
+          Button {
+            onStop()
+          } label: {
+            Label("Stop", systemImage: "stop.circle")
+          }
+          .frame(minHeight: metrics.controlMinHeight)
+          .disabled(isActionInFlight)
+          .help("Stop task-board orchestrator")
+          .accessibilityIdentifier("harness.task-board.orchestrator.stop")
+        }
+      } else if let onStart {
+        Button {
+          onStart()
+        } label: {
+          Label("Start", systemImage: "play.circle")
+        }
+        .frame(minHeight: metrics.controlMinHeight)
+        .disabled(isActionInFlight)
+        .help("Start task-board orchestrator")
+        .accessibilityIdentifier("harness.task-board.orchestrator.start")
+      }
+
+      if let onRunOnce {
+        Button {
+          onRunOnce()
+        } label: {
+          Label("Run Once", systemImage: "playpause")
+        }
+        .frame(minHeight: metrics.controlMinHeight)
+        .disabled(isActionInFlight)
+        .help("Run one task-board orchestrator tick")
+        .accessibilityIdentifier("harness.task-board.orchestrator.run-once")
+      }
+    }
   }
 
   @ViewBuilder

@@ -213,7 +213,7 @@ public enum SessionSelection: Hashable, Sendable {
         .task
       case .decisions:
         .decision
-      case .agents, .overview, .timeline:
+      case .agents, .overview, .policyCanvas, .timeline:
         .agent
       }
     }

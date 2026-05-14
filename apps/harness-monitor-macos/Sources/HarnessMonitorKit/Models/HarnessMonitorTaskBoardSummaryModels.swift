@@ -32,6 +32,22 @@ public struct TaskBoardAuditSummary: Codable, Equatable, Sendable {
   public let byStatus: [TaskBoardStatusCount]
 }
 
+public struct TaskBoardProjectSummary: Codable, Equatable, Identifiable, Sendable {
+  public let projectId: String
+  public let itemCount: Int
+  public let readyCount: Int
+
+  public var id: String { projectId }
+}
+
+public struct TaskBoardMachineSummary: Codable, Equatable, Identifiable, Sendable {
+  public let mode: TaskBoardAgentMode
+  public let itemCount: Int
+  public let readyCount: Int
+
+  public var id: TaskBoardAgentMode { mode }
+}
+
 public struct TaskBoardDispatchPlan: Codable, Equatable, Identifiable, Sendable {
   public let boardItemId: String
   public let readiness: TaskBoardDispatchReadiness

@@ -48,7 +48,11 @@ struct HarnessMonitorTextInputSourceTests {
     let leaderTransferSource = try previewableSourceFile(
       at: "Views/Actions/LeaderTransferSheet.swift")
     let createTaskSource = try previewableSourceFile(at: "Views/Actions/CreateTaskSheet.swift")
-    let taskActionsSource = try previewableSourceFile(at: "Views/Actions/TaskActionsSheet.swift")
+    let taskActionsSource = try [
+      previewableSourceFile(at: "Views/Actions/TaskActionsSheet.swift"),
+      previewableSourceFile(at: "Views/Actions/TaskActionsFormSections.swift"),
+      previewableSourceFile(at: "Views/Actions/TaskActionsWorkflowSections.swift"),
+    ].joined(separator: "\n")
     let notificationsSource = try previewableSourceFile(
       at: "Views/Settings/SettingsNotificationsSection.swift")
 

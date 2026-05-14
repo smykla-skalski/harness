@@ -53,6 +53,24 @@ extension HarnessMonitorAPIClient {
     )
   }
 
+  public func taskBoardProjects(status: TaskBoardStatus? = nil) async throws
+    -> [TaskBoardProjectSummary]
+  {
+    try await get(
+      "/v1/task-board/projects",
+      queryItems: taskBoardQueryItems(status: status)
+    )
+  }
+
+  public func taskBoardMachines(status: TaskBoardStatus? = nil) async throws
+    -> [TaskBoardMachineSummary]
+  {
+    try await get(
+      "/v1/task-board/machines",
+      queryItems: taskBoardQueryItems(status: status)
+    )
+  }
+
   public func taskBoardOrchestratorStatus() async throws -> TaskBoardOrchestratorStatus {
     try await get("/v1/task-board/orchestrator/status")
   }
@@ -81,6 +99,32 @@ extension HarnessMonitorAPIClient {
     request: TaskBoardOrchestratorSettingsUpdateRequest
   ) async throws -> TaskBoardOrchestratorSettings {
     try await put("/v1/task-board/orchestrator/settings", body: request)
+  }
+
+  public func taskBoardPolicyPipeline() async throws -> TaskBoardPolicyPipelineDocument {
+    try await get("/v1/task-board/policy/pipeline")
+  }
+
+  public func saveTaskBoardPolicyPipelineDraft(
+    request: TaskBoardPolicyPipelineSaveDraftRequest
+  ) async throws -> TaskBoardPolicyPipelineSaveDraftResponse {
+    try await put("/v1/task-board/policy/pipeline", body: request)
+  }
+
+  public func simulateTaskBoardPolicyPipeline(
+    request: TaskBoardPolicyPipelineSimulateRequest
+  ) async throws -> TaskBoardPolicyPipelineSimulationResult {
+    try await post("/v1/task-board/policy/simulate", body: request)
+  }
+
+  public func promoteTaskBoardPolicyPipeline(
+    request: TaskBoardPolicyPipelinePromoteRequest
+  ) async throws -> TaskBoardPolicyPipelinePromoteResponse {
+    try await post("/v1/task-board/policy/promote", body: request)
+  }
+
+  public func taskBoardPolicyPipelineAudit() async throws -> TaskBoardPolicyPipelineAuditSummary {
+    try await get("/v1/task-board/policy/audit")
   }
 
   private func taskBoardQueryItems(status: TaskBoardStatus?) -> [URLQueryItem] {

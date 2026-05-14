@@ -11,7 +11,7 @@ use crate::task_board::dispatch::{
 };
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch, TaskBoardStore};
 use crate::task_board::summary::build_dispatch_summary;
-use crate::task_board::types::{TaskBoardStatus, TaskBoardWorkflowStatus};
+use crate::task_board::types::{TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowStatus};
 
 use super::{
     TaskBoardDispatchArgs, new_policy_trace_id, new_workflow_execution_id, print_json, store,
@@ -70,7 +70,7 @@ impl TaskBoardDispatchArgs {
             actor,
             &project,
         )?;
-        let item = self.link_item(board, plan, &session_id, &task.task_id)?;
+        let item = Self::link_item(board, plan, &session_id, &task.task_id)?;
         Ok(DispatchAppliedTask {
             board_item_id: plan.board_item_id.clone(),
             session_id,
@@ -80,12 +80,11 @@ impl TaskBoardDispatchArgs {
     }
 
     fn link_item(
-        &self,
         board: &TaskBoardStore,
         plan: &DispatchPlan,
         session_id: &str,
         work_item_id: &str,
-    ) -> Result<crate::task_board::TaskBoardItem, CliError> {
+    ) -> Result<TaskBoardItem, CliError> {
         let current = board.get(&plan.board_item_id)?;
         let mut workflow = current.workflow;
         if workflow.execution_id.is_none() {

@@ -56,6 +56,24 @@ public final class HarnessMonitorStore {
       scheduleUISync([.contentDashboard])
     }
   }
+  public var globalTaskBoardPolicyPipeline: TaskBoardPolicyPipelineDocument? {
+    didSet {
+      guard oldValue != globalTaskBoardPolicyPipeline else { return }
+      scheduleUISync([.contentDashboard])
+    }
+  }
+  public var globalTaskBoardPolicySimulation: TaskBoardPolicyPipelineSimulationResult? {
+    didSet {
+      guard oldValue != globalTaskBoardPolicySimulation else { return }
+      scheduleUISync([.contentDashboard])
+    }
+  }
+  public var globalTaskBoardPolicyAudit: TaskBoardPolicyPipelineAuditSummary? {
+    didSet {
+      guard oldValue != globalTaskBoardPolicyAudit else { return }
+      scheduleUISync([.contentDashboard])
+    }
+  }
   public var supervisorObserverFocusTick: Int = 0
   public var supervisorPrimaryActionFocusDecisionID: String?
   public var supervisorPrimaryActionFocusRequestTick: Int = 0
@@ -391,11 +409,11 @@ public final class HarnessMonitorStore {
     syncAllUI()
   }
 
+}
+
+extension HarnessMonitorStore {
   func setSupervisorRuntimeState(_ state: SupervisorRuntimeState) {
-    guard supervisorRuntimeState != state else {
-      return
-    }
+    guard supervisorRuntimeState != state else { return }
     supervisorRuntimeState = state
   }
-
 }

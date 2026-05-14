@@ -1,3 +1,4 @@
+use tokio::runtime::Builder as TokioRuntimeBuilder;
 use uuid::Uuid;
 
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
@@ -458,7 +459,7 @@ fn policy_store() -> PolicyPipelineStore {
 fn run_task_board_sync_blocking(
     request: &TaskBoardSyncRequest,
 ) -> Result<TaskBoardSyncResponse, CliError> {
-    tokio::runtime::Builder::new_current_thread()
+    TokioRuntimeBuilder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|error| {

@@ -3,7 +3,7 @@ use crate::errors::CliError;
 use crate::task_board::external::{
     ExternalSyncConfig, ExternalSyncOptions, configured_sync_clients, sync_external_tasks,
 };
-use crate::task_board::summary::build_sync_summary;
+use crate::task_board::summary::{TaskBoardSyncSummary, build_sync_summary};
 
 use super::{TaskBoardSyncArgs, print_json, run_blocking, store};
 
@@ -31,7 +31,7 @@ impl Execute for TaskBoardSyncArgs {
     }
 }
 
-fn print_sync_summary(payload: &crate::task_board::TaskBoardSyncSummary) {
+fn print_sync_summary(payload: &TaskBoardSyncSummary) {
     let mode = if payload.operations.iter().any(|operation| operation.applied) {
         "applied"
     } else {

@@ -291,6 +291,40 @@ enum HarnessMonitorUITestAccessibility {
     "\(dashboardSessionCard(sessionID)).frame"
   }
 
+  static let policyCanvasRoot = "harness.policy-canvas.root"
+  static let policyCanvasViewport = "harness.policy-canvas.viewport"
+  static let policyCanvasTabs = "harness.policy-canvas.tabs"
+  static let policyCanvasToolRail = "harness.policy-canvas.tool-rail"
+  static let policyCanvasSaveButton = "harness.policy-canvas.action.save"
+  static let policyCanvasSimulateButton = "harness.policy-canvas.action.simulate"
+  static let policyCanvasPromoteButton = "harness.policy-canvas.action.promote"
+  static let policyCanvasZoomControls = "harness.policy-canvas.zoom"
+  static let policyCanvasZoomOutButton = "harness.policy-canvas.zoom.out"
+  static let policyCanvasZoomInButton = "harness.policy-canvas.zoom.in"
+  static let policyCanvasZoomResetButton = "harness.policy-canvas.zoom.reset"
+  static let policyCanvasZoomValue = "harness.policy-canvas.zoom.value"
+  static let policyCanvasInspector = "harness.policy-canvas.inspector"
+
+  static func policyCanvasNode(_ nodeID: String) -> String {
+    "harness.policy-canvas.node.\(slug(nodeID))"
+  }
+
+  static func policyCanvasGroup(_ groupID: String) -> String {
+    "harness.policy-canvas.group.\(slug(groupID))"
+  }
+
+  static func policyCanvasPort(_ nodeID: String, _ portID: String) -> String {
+    "\(policyCanvasNode(nodeID)).port.\(slug(portID))"
+  }
+
+  static func policyCanvasEdge(_ edgeID: String) -> String {
+    "harness.policy-canvas.edge.\(slug(edgeID))"
+  }
+
+  static func policyCanvasPaletteItem(_ kind: String) -> String {
+    "harness.policy-canvas.palette.\(slug(kind))"
+  }
+
   static func segmentedOption(_ controlID: String, option: String) -> String {
     "\(controlID).option.\(slug(option))"
   }

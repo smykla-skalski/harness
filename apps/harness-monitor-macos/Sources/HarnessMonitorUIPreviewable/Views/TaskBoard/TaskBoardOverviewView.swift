@@ -11,8 +11,18 @@ public struct TaskBoardOverviewView: View {
   private let onOpenItem: (TaskBoardInboxItem) -> Void
   private let onOpenTaskBoardItem: (TaskBoardItem) -> Void
   private let onOpenDecision: (Decision) -> Void
-  private let onEvaluateTaskBoard: () -> Void
-  private let onRefreshTaskBoard: () -> Void
+  private let onEvaluateTaskBoard: (() -> Void)?
+  private let onRefreshTaskBoard: (() -> Void)?
+  private let onStartTaskBoardOrchestrator: (() -> Void)?
+  private let onStopTaskBoardOrchestrator: (() -> Void)?
+  private let onRunTaskBoardOrchestratorOnce: ((TaskBoardOrchestratorRunOnceRequest) -> Void)?
+  @Environment(\.fontScale)
+  private var fontScale
+  @State private var selectedTaskBoardItemID: String?
+
+  private var metrics: TaskBoardOverviewMetrics {
+    TaskBoardOverviewMetrics(fontScale: fontScale)
+  }
 
   public init(
     snapshot: TaskBoardInboxSnapshot,
@@ -24,8 +34,11 @@ public struct TaskBoardOverviewView: View {
     onOpenItem: @escaping (TaskBoardInboxItem) -> Void = { _ in },
     onOpenTaskBoardItem: @escaping (TaskBoardItem) -> Void = { _ in },
     onOpenDecision: @escaping (Decision) -> Void = { _ in },
-    onEvaluateTaskBoard: @escaping () -> Void = {},
-    onRefreshTaskBoard: @escaping () -> Void = {}
+    onEvaluateTaskBoard: (() -> Void)? = nil,
+    onRefreshTaskBoard: (() -> Void)? = nil,
+    onStartTaskBoardOrchestrator: (() -> Void)? = nil,
+    onStopTaskBoardOrchestrator: (() -> Void)? = nil,
+    onRunTaskBoardOrchestratorOnce: ((TaskBoardOrchestratorRunOnceRequest) -> Void)? = nil
   ) {
     self.snapshot = snapshot
     self.taskBoardItems = Self.sortedTaskBoardItems(taskBoardItems)
@@ -38,6 +51,9 @@ public struct TaskBoardOverviewView: View {
     self.onOpenDecision = onOpenDecision
     self.onEvaluateTaskBoard = onEvaluateTaskBoard
     self.onRefreshTaskBoard = onRefreshTaskBoard
+    self.onStartTaskBoardOrchestrator = onStartTaskBoardOrchestrator
+    self.onStopTaskBoardOrchestrator = onStopTaskBoardOrchestrator
+    self.onRunTaskBoardOrchestratorOnce = onRunTaskBoardOrchestratorOnce
   }
 
   public var body: some View {
@@ -51,13 +67,28 @@ public struct TaskBoardOverviewView: View {
         if let orchestratorStatus {
           TaskBoardOrchestratorSummaryView(
             status: orchestratorStatus,
-            latestEvaluation: evaluationSummary
+            latestEvaluation: evaluationSummary,
+            isActionInFlight: isActionInFlight,
+            onStart: onStartTaskBoardOrchestrator,
+            onStop: onStopTaskBoardOrchestrator,
+            onRunOnce: runOrchestratorOnce
           )
         } else if let evaluationSummary {
           evaluationSummaryRow(evaluationSummary)
         }
         if !taskBoardItems.isEmpty || !decisions.isEmpty {
           taskBoard
+        }
+        if let selectedTaskBoardItem {
+          TaskBoardItemManagementPanel(
+            item: selectedTaskBoardItem,
+            metrics: metrics,
+            isActionInFlight: isActionInFlight,
+            onRunOnce: runOrchestratorOnceForItem,
+            onEvaluate: evaluateSelectedTaskBoardItem,
+            onRefresh: onRefreshTaskBoard,
+            onClose: clearSelectedTaskBoardItem
+          )
         }
         if !snapshot.isEmpty {
           sessionTaskBoard
@@ -70,37 +101,59 @@ public struct TaskBoardOverviewView: View {
   }
 
   private var header: some View {
-    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingMD) {
-      Label("Task Board", systemImage: "rectangle.3.group")
-        .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
-      Spacer(minLength: HarnessMonitorTheme.spacingMD)
-      HStack(spacing: HarnessMonitorTheme.spacingSM) {
+    ViewThatFits(in: .horizontal) {
+      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingMD) {
+        headerTitle
+        Spacer(minLength: HarnessMonitorTheme.spacingMD)
+        headerActionsAndCounts
+      }
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+        headerTitle
+        headerActionsAndCounts
+      }
+    }
+    .accessibilityAddTraits(.isHeader)
+  }
+
+  private var headerTitle: some View {
+    Label("Task Board", systemImage: "rectangle.3.group")
+      .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
+  }
+
+  private var headerActionsAndCounts: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      if let onEvaluateTaskBoard {
         Button {
           onEvaluateTaskBoard()
         } label: {
           Label("Evaluate", systemImage: "checkmark.seal")
         }
+        .frame(minHeight: metrics.controlMinHeight)
         .disabled(isActionInFlight)
         .help("Evaluate board state")
+        .accessibilityIdentifier("harness.task-board.evaluate")
+      }
 
+      if let onRefreshTaskBoard {
         Button {
           onRefreshTaskBoard()
         } label: {
           Image(systemName: "arrow.clockwise")
         }
+        .frame(minWidth: metrics.iconControlMinWidth, minHeight: metrics.controlMinHeight)
         .disabled(isActionInFlight)
         .help("Refresh task board")
-
-        countPill(
-          "\(taskBoardNeedsYouCount + snapshot.needsYouItemCount + decisions.count)",
-          label: "Needs You"
-        )
-        countPill("\(taskBoardItems.count + snapshot.items.count + decisions.count)", label: "Open")
-        countPill("\(taskBoardReviewCount + snapshot.reviewItemCount)", label: "Review")
-        countPill("\(taskBoardBlockedCount + snapshot.blockedItemCount)", label: "Blocked")
+        .accessibilityIdentifier("harness.task-board.refresh")
       }
+
+      countPill(
+        "\(taskBoardNeedsYouCount + snapshot.needsYouItemCount + decisions.count)",
+        label: "Needs You"
+      )
+      countPill("\(taskBoardItems.count + snapshot.items.count + decisions.count)", label: "Open")
+      countPill("\(taskBoardReviewCount + snapshot.reviewItemCount)", label: "Review")
+      countPill("\(taskBoardBlockedCount + snapshot.blockedItemCount)", label: "Blocked")
     }
-    .accessibilityAddTraits(.isHeader)
   }
 
   private func evaluationSummaryRow(_ summary: TaskBoardEvaluationSummary) -> some View {
@@ -129,13 +182,13 @@ public struct TaskBoardOverviewView: View {
               TaskBoardNeedsYouLaneColumn(
                 section: section,
                 decisions: decisions,
-                onOpenItem: onOpenTaskBoardItem,
+                onOpenItem: openTaskBoardItem,
                 onOpenDecision: onOpenDecision
               )
             } else {
               TaskBoardItemLaneColumn(
                 section: section,
-                onOpenItem: onOpenTaskBoardItem
+                onOpenItem: openTaskBoardItem
               )
             }
           }
@@ -189,6 +242,39 @@ public struct TaskBoardOverviewView: View {
     .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     .harnessPillPadding()
     .harnessControlPill(tint: HarnessMonitorTheme.secondaryInk)
+  }
+
+  private var selectedTaskBoardItem: TaskBoardItem? {
+    guard let selectedTaskBoardItemID else { return nil }
+    return taskBoardItems.first { $0.id == selectedTaskBoardItemID }
+  }
+
+  private func openTaskBoardItem(_ item: TaskBoardItem) {
+    if !item.hasLinkedSessionTask {
+      selectedTaskBoardItemID = item.id
+    } else if selectedTaskBoardItemID == item.id {
+      selectedTaskBoardItemID = nil
+    }
+    onOpenTaskBoardItem(item)
+  }
+
+  private func clearSelectedTaskBoardItem() {
+    selectedTaskBoardItemID = nil
+  }
+
+  private func runOrchestratorOnce() {
+    onRunTaskBoardOrchestratorOnce?(TaskBoardOrchestratorRunOnceRequest())
+  }
+
+  private func runOrchestratorOnceForItem(_ item: TaskBoardItem) {
+    onRunTaskBoardOrchestratorOnce?(
+      TaskBoardOrchestratorRunOnceRequest(status: item.status)
+    )
+  }
+
+  private func evaluateSelectedTaskBoardItem(_ item: TaskBoardItem) {
+    onEvaluateTaskBoard?()
+    selectedTaskBoardItemID = item.id
   }
 
   private var taskBoardSections: [TaskBoardItemSection] {
@@ -269,4 +355,25 @@ struct TaskBoardItemSection: Identifiable {
   let items: [TaskBoardItem]
 
   var id: TaskBoardInboxLane { lane }
+}
+
+struct TaskBoardOverviewMetrics: Equatable {
+  let controlMinHeight: CGFloat
+  let iconControlMinWidth: CGFloat
+  let managementPanelMinHeight: CGFloat
+  let managementPanelSpacing: CGFloat
+
+  init(fontScale: CGFloat) {
+    let scale = SessionWindowFontScale.metricsScale(for: fontScale)
+    controlMinHeight = max(28, 28 * min(scale, 1.35))
+    iconControlMinWidth = max(30, 30 * min(scale, 1.35))
+    managementPanelMinHeight = max(132, 132 * min(scale, 1.25))
+    managementPanelSpacing = max(8, 8 * min(scale, 1.35))
+  }
+}
+
+extension TaskBoardItem {
+  var hasLinkedSessionTask: Bool {
+    sessionId != nil && workItemId != nil
+  }
 }

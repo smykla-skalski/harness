@@ -281,6 +281,11 @@ extension SessionWindowView {
           snapshot: snapshot,
           tuiStatusByAgent: store.contentUI.sessionDetail.tuiStatusByAgent
         )
+      case .policyCanvas:
+        PolicyCanvasView(
+          store: store,
+          dashboardUI: store.contentUI.dashboard
+        )
       case .agents:
         SessionWindowAgentsList(
           store: store,

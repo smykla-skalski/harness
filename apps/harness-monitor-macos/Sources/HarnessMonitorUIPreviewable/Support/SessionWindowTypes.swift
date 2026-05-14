@@ -17,6 +17,7 @@ public enum SessionWindowRoute: String, CaseIterable, Codable, Hashable, Identif
   case overview
   case agents
   case tasks
+  case policyCanvas
   case decisions
   case timeline
 
@@ -27,6 +28,7 @@ public enum SessionWindowRoute: String, CaseIterable, Codable, Hashable, Identif
     case .overview: "Overview"
     case .agents: "Agents"
     case .tasks: "Tasks"
+    case .policyCanvas: "Policy Canvas"
     case .decisions: "Decisions"
     case .timeline: "Timeline"
     }
@@ -37,6 +39,7 @@ public enum SessionWindowRoute: String, CaseIterable, Codable, Hashable, Identif
     case .overview: "rectangle.grid.2x2"
     case .agents: "person.2"
     case .tasks: "checklist"
+    case .policyCanvas: "slider.horizontal.2.square"
     case .decisions: "exclamationmark.bubble"
     case .timeline: "clock"
     }
@@ -48,7 +51,7 @@ public enum SessionWindowRoute: String, CaseIterable, Codable, Hashable, Identif
     case .decisions: .decisions
     case .tasks: .tasks
     case .timeline: .timeline
-    case .overview: nil
+    case .overview, .policyCanvas: nil
     }
   }
 }

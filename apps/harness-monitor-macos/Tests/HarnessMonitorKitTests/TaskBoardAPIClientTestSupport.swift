@@ -40,12 +40,31 @@ private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
     "deleted": .number(0),
     "by_status": .array([]),
   ]),
+  .taskBoardProjects: .array([
+    .object([
+      "project_id": .string("project-1"),
+      "item_count": .number(1),
+      "ready_count": .number(1),
+    ])
+  ]),
+  .taskBoardMachines: .array([
+    .object([
+      "mode": .string("interactive"),
+      "item_count": .number(1),
+      "ready_count": .number(1),
+    ])
+  ]),
   .taskBoardOrchestratorStatus: .object(sampleTaskBoardOrchestratorStatusJSON),
   .taskBoardOrchestratorStart: .object(sampleTaskBoardOrchestratorStatusJSON),
   .taskBoardOrchestratorStop: .object(sampleTaskBoardOrchestratorStatusJSON),
   .taskBoardOrchestratorRunOnce: .object(sampleTaskBoardOrchestratorRunOnceJSON),
   .taskBoardOrchestratorSettingsGet: .object(sampleTaskBoardOrchestratorSettingsJSON),
   .taskBoardOrchestratorSettingsUpdate: .object(sampleTaskBoardOrchestratorSettingsJSON),
+  .taskBoardPolicyPipelineGet: .object(samplePolicyPipelineJSON),
+  .taskBoardPolicyPipelineSaveDraft: .object(samplePolicySaveDraftJSON),
+  .taskBoardPolicyPipelineSimulate: .object(samplePolicySimulationJSON),
+  .taskBoardPolicyPipelinePromote: .object(samplePolicyPromotionJSON),
+  .taskBoardPolicyPipelineAudit: .object(samplePolicyAuditJSON),
 ]
 
 final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
@@ -56,8 +75,38 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
     let body: [String: Any]?
   }
 
+  private struct Route: Hashable {
+    let path: String
+    let method: String?
+
+    init(_ path: String, method: String? = nil) {
+      self.path = path
+      self.method = method
+    }
+  }
+
   private static let lock = NSLock()
   nonisolated(unsafe) private static var recordedRequests: [RecordedRequest] = []
+  private static let responseBodies: [Route: String] = [
+    Route("/v1/task-board/items", method: "GET"): #"{"items":[\#(sampleTaskBoardItemJSONString)]}"#,
+    Route("/v1/task-board/sync"): #"{"total":1,"providers":[]}"#,
+    Route("/v1/task-board/dispatch"): sampleTaskBoardDispatchSummaryJSONString,
+    Route("/v1/task-board/evaluate"): sampleTaskBoardEvaluationSummaryText,
+    Route("/v1/task-board/audit"): #"{"total":1,"ready":1,"blocked":0,"deleted":0,"by_status":[]}"#,
+    Route("/v1/task-board/projects"):
+      #"[{"project_id":"project-1","item_count":1,"ready_count":1}]"#,
+    Route("/v1/task-board/machines"): #"[{"mode":"interactive","item_count":1,"ready_count":1}]"#,
+    Route("/v1/task-board/orchestrator/status"): sampleOrchestratorStatusText,
+    Route("/v1/task-board/orchestrator/start"): sampleOrchestratorStatusText,
+    Route("/v1/task-board/orchestrator/stop"): sampleOrchestratorStatusText,
+    Route("/v1/task-board/orchestrator/run-once"): sampleOrchestratorRunOnceText,
+    Route("/v1/task-board/orchestrator/settings"): sampleOrchestratorSettingsText,
+    Route("/v1/task-board/policy/pipeline", method: "GET"): samplePolicyPipelineText,
+    Route("/v1/task-board/policy/pipeline", method: "PUT"): samplePolicySaveDraftText,
+    Route("/v1/task-board/policy/simulate"): samplePolicySimulationText,
+    Route("/v1/task-board/policy/promote"): samplePolicyPromotionText,
+    Route("/v1/task-board/policy/audit"): samplePolicyAuditText,
+  ]
 
   static var records: [RecordedRequest] {
     lock.withLock { recordedRequests }
@@ -111,37 +160,9 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
   override func stopLoading() {}
 
   private static func responseBody(for path: String, method: String) -> String {
-    if path == "/v1/task-board/items", method == "GET" {
-      return #"{"items":[\#(sampleTaskBoardItemJSONString)]}"#
-    }
-    if path == "/v1/task-board/sync" {
-      return #"{"total":1,"providers":[]}"#
-    }
-    if path == "/v1/task-board/dispatch" {
-      return sampleTaskBoardDispatchSummaryJSONString
-    }
-    if path == "/v1/task-board/evaluate" {
-      return sampleTaskBoardEvaluationSummaryText
-    }
-    if path == "/v1/task-board/audit" {
-      return #"{"total":1,"ready":1,"blocked":0,"deleted":0,"by_status":[]}"#
-    }
-    if path == "/v1/task-board/orchestrator/status" {
-      return sampleOrchestratorStatusText
-    }
-    if path == "/v1/task-board/orchestrator/start" {
-      return sampleOrchestratorStatusText
-    }
-    if path == "/v1/task-board/orchestrator/stop" {
-      return sampleOrchestratorStatusText
-    }
-    if path == "/v1/task-board/orchestrator/run-once" {
-      return sampleOrchestratorRunOnceText
-    }
-    if path == "/v1/task-board/orchestrator/settings" {
-      return sampleOrchestratorSettingsText
-    }
-    return sampleTaskBoardItemJSONString
+    responseBodies[Route(path, method: method)]
+      ?? responseBodies[Route(path)]
+      ?? sampleTaskBoardItemJSONString
   }
 
   private static func jsonBody(for request: URLRequest) -> [String: Any]? {

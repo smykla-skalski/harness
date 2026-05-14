@@ -45,6 +45,24 @@ struct SessionWindowRouteContentMetricsTests {
     )
   }
 
+  @Test("Task board overview metrics scale and preserve button hit targets")
+  func taskBoardOverviewMetricsScaleAndPreserveButtonHitTargets() {
+    let regular = TaskBoardOverviewMetrics(fontScale: 1.0)
+    let large = TaskBoardOverviewMetrics(fontScale: 1.8)
+
+    #expect(regular.controlMinHeight >= 28)
+    #expect(regular.iconControlMinWidth >= 30)
+    #expect(large.managementPanelMinHeight > regular.managementPanelMinHeight)
+    #expect(
+      TaskBoardOverviewMetrics(fontScale: 0.1)
+        == TaskBoardOverviewMetrics(fontScale: 0.85)
+    )
+    #expect(
+      TaskBoardOverviewMetrics(fontScale: 9.0)
+        == TaskBoardOverviewMetrics(fontScale: 1.8)
+    )
+  }
+
   @Test("Task selection renders a real detail pane")
   func taskSelectionRendersARealDetailPane() throws {
     let detailFocusSource = try sourceFile(named: "SessionWindowView+DetailFocus.swift")
@@ -72,7 +90,45 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(boardSource.contains("decisions: store.supervisorOpenDecisions"))
   }
 
+  @Test("Overview and dashboard expose task board orchestrator controls")
+  func overviewAndDashboardExposeTaskBoardOrchestratorControls() throws {
+    let routeContentSource = try sourceFile(named: "SessionWindowRouteContent.swift")
+    let boardSource = try sourceFile(named: "SessionsBoardView.swift")
+
+    for source in [routeContentSource, boardSource] {
+      #expect(source.contains("onStartTaskBoardOrchestrator: startTaskBoardOrchestrator"))
+      #expect(source.contains("onStopTaskBoardOrchestrator: stopTaskBoardOrchestrator"))
+      #expect(source.contains("onRunTaskBoardOrchestratorOnce: runTaskBoardOrchestratorOnce"))
+    }
+
+    #expect(routeContentSource.contains("store.contentUI.dashboard.taskBoardOrchestratorStatus"))
+    #expect(boardSource.contains("dashboardUI.taskBoardOrchestratorStatus"))
+  }
+
+  @Test("Board-only task board items have a management surface")
+  func boardOnlyTaskBoardItemsHaveManagementSurface() throws {
+    let overviewSource = try taskBoardSourceFile(named: "TaskBoardOverviewView.swift")
+    let managementPanelSource = try taskBoardSourceFile(named: "TaskBoardItemManagementPanel.swift")
+    let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
+
+    #expect(overviewSource.contains("TaskBoardItemManagementPanel("))
+    #expect(managementPanelSource.contains("harness.task-board.manage-item"))
+    #expect(overviewSource.contains("TaskBoardOrchestratorRunOnceRequest(status: item.status)"))
+    #expect(managementPanelSource.contains("Session Task"))
+    #expect(managementPanelSource.contains("Board Only"))
+    #expect(!laneSource.contains(".disabled(!isOpenable)"))
+    #expect(!laneSource.contains("private var isOpenable"))
+  }
+
   private func sourceFile(named relativePath: String) throws -> String {
+    try previewableSourceFile(domain: "Sessions", named: relativePath)
+  }
+
+  private func taskBoardSourceFile(named relativePath: String) throws -> String {
+    try previewableSourceFile(domain: "TaskBoard", named: relativePath)
+  }
+
+  private func previewableSourceFile(domain: String, named relativePath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
       testsDirectory
@@ -83,7 +139,8 @@ struct SessionWindowRouteContentMetricsTests {
     let fileURL =
       repoRoot
       .appendingPathComponent("apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable")
-      .appendingPathComponent("Views/Sessions")
+      .appendingPathComponent("Views")
+      .appendingPathComponent(domain)
       .appendingPathComponent(relativePath)
     return try String(contentsOf: fileURL, encoding: .utf8)
   }

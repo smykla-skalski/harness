@@ -23,6 +23,7 @@ XCODE_ONLY_TESTING="${XCODE_ONLY_TESTING:-}"
 BUILD_FOR_TESTING_SCRIPT="${BUILD_FOR_TESTING_SCRIPT:-$ROOT/Scripts/build-for-testing.sh}"
 TEST_RETRY_ITERATIONS="${HARNESS_MONITOR_TEST_RETRY_ITERATIONS:-0}"
 TEST_LOCK_WAIT_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS:-15}"
+CODE_SIGNING_ALLOWED_SETTING=""
 export XCODEBUILD_DERIVED_DATA_PATH="$DERIVED_DATA_PATH"
 
 test_lane_env() {
@@ -63,6 +64,22 @@ run_stale_preflight() {
   else
     "$STALE_CHECK_SCRIPT"
   fi
+}
+
+resolve_code_signing_allowed() {
+  if [[ -n "${HARNESS_MONITOR_CODE_SIGNING_ALLOWED:-}" ]]; then
+    printf '%s\n' "$HARNESS_MONITOR_CODE_SIGNING_ALLOWED"
+    return 0
+  fi
+
+  case "$XCODE_ONLY_TESTING" in
+    *HarnessMonitorUITests*|*HarnessMonitorAgentsE2ETests*)
+      printf 'YES\n'
+      ;;
+    *)
+      printf 'NO\n'
+      ;;
+  esac
 }
 
 run_test_action() {
@@ -347,6 +364,7 @@ if [ ! -x "${BUILD_FOR_TESTING_SCRIPT}" ]; then
   exit 1
 fi
 
+CODE_SIGNING_ALLOWED_SETTING="$(resolve_code_signing_allowed)"
 run_stale_preflight
 
 trap 'cleanup_script_descendants $?' EXIT
@@ -366,7 +384,7 @@ BASE_TEST_ARGS=(
   -scheme "HarnessMonitor" \
   -destination "$DESTINATION" \
   -derivedDataPath "$DERIVED_DATA_PATH" \
-  CODE_SIGNING_ALLOWED=NO \
+  CODE_SIGNING_ALLOWED="$CODE_SIGNING_ALLOWED_SETTING" \
   test-without-building
 )
 TEST_ARGS=("${BASE_TEST_ARGS[@]}")

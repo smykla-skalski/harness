@@ -19,6 +19,7 @@ CANONICAL_XCODEBUILD_RUNNER="$ROOT/Scripts/monitor-xcodebuild.sh"
 XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$CANONICAL_XCODEBUILD_RUNNER}"
 GENERATE_PROJECT_SCRIPT="${GENERATE_PROJECT_SCRIPT:-$ROOT/Scripts/generate.sh}"
 LOCK_WAIT_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS:-15}"
+CODE_SIGNING_ALLOWED_SETTING=""
 
 export XCODEBUILD_DERIVED_DATA_PATH="$DERIVED_DATA_PATH"
 
@@ -40,6 +41,22 @@ run_stale_preflight() {
   fi
 
   "$STALE_CHECK_SCRIPT"
+}
+
+resolve_code_signing_allowed() {
+  if [[ -n "${HARNESS_MONITOR_CODE_SIGNING_ALLOWED:-}" ]]; then
+    printf '%s\n' "$HARNESS_MONITOR_CODE_SIGNING_ALLOWED"
+    return 0
+  fi
+
+  case "${XCODE_ONLY_TESTING:-}" in
+    *HarnessMonitorUITests*|*HarnessMonitorAgentsE2ETests*)
+      printf 'YES\n'
+      ;;
+    *)
+      printf 'NO\n'
+      ;;
+  esac
 }
 
 # Unit and app-test builds exercise Swift code and do not need the embedded
@@ -75,6 +92,7 @@ trap 'cleanup_script_descendants 143' TERM
 trap 'cleanup_script_descendants 129' HUP
 
 "$GENERATE_PROJECT_SCRIPT"
+CODE_SIGNING_ALLOWED_SETTING="$(resolve_code_signing_allowed)"
 
 exec env \
   HARNESS_SKIP_STALE_CHECK=1 \
@@ -84,7 +102,7 @@ exec env \
   -scheme "HarnessMonitor" \
   -destination "$DESTINATION" \
   -derivedDataPath "$DERIVED_DATA_PATH" \
-  CODE_SIGNING_ALLOWED=NO \
+  CODE_SIGNING_ALLOWED="$CODE_SIGNING_ALLOWED_SETTING" \
   HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUILD="$DAEMON_AGENT_BUILD_SKIP" \
   HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE="$DAEMON_AGENT_BUNDLE_SKIP" \
   build-for-testing
