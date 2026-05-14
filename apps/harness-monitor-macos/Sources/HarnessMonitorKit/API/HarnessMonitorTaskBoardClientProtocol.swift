@@ -87,19 +87,28 @@ extension HarnessMonitorTaskBoardClientProtocol {
 
   public func dispatchTaskBoard(
     status: TaskBoardStatus? = nil,
+    itemId: String? = nil,
     dryRun: Bool = true,
     projectDir: String? = nil
   ) async throws -> TaskBoardDispatchSummary {
     try await dispatchTaskBoard(
-      request: TaskBoardDispatchRequest(status: status, dryRun: dryRun, projectDir: projectDir)
+      request: TaskBoardDispatchRequest(
+        status: status,
+        itemId: itemId,
+        dryRun: dryRun,
+        projectDir: projectDir
+      )
     )
   }
 
   public func evaluateTaskBoard(
     status: TaskBoardStatus? = nil,
+    itemId: String? = nil,
     dryRun: Bool = false
   ) async throws -> TaskBoardEvaluationSummary {
-    try await evaluateTaskBoard(request: TaskBoardEvaluateRequest(status: status, dryRun: dryRun))
+    try await evaluateTaskBoard(
+      request: TaskBoardEvaluateRequest(status: status, itemId: itemId, dryRun: dryRun)
+    )
   }
 
   public func auditTaskBoard(status _: TaskBoardStatus?) async throws -> TaskBoardAuditSummary {

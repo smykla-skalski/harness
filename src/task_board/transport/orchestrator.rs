@@ -40,6 +40,8 @@ pub struct TaskBoardOrchestratorRunOnceArgs {
     pub dry_run: bool,
     #[arg(long)]
     pub apply: bool,
+    #[arg(long = "item-id", visible_alias = "id")]
+    pub item_id: Option<String>,
     #[arg(long, value_enum)]
     pub status: Option<TaskBoardStatus>,
     #[arg(long)]
@@ -96,7 +98,7 @@ impl TaskBoardOrchestratorJsonArgs {
 impl Execute for TaskBoardOrchestratorRunOnceArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let request = TaskBoardOrchestratorRunOnceRequest {
-            item_id: None,
+            item_id: self.item_id.clone(),
             dry_run: dry_run_override(self.dry_run, self.apply),
             status: self.status,
             project_dir: self.project_dir.clone(),

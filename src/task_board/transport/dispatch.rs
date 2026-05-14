@@ -20,7 +20,7 @@ use super::{
 impl Execute for TaskBoardDispatchArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let board = store(self.board_root.clone());
-        let items = board.list(None)?;
+        let items = self.selected_items(&board)?;
         let plans = build_dispatch_summary(&items);
         let summary = if self.dry_run {
             DispatchExecutionSummary::dry_run(plans)
@@ -37,6 +37,13 @@ impl Execute for TaskBoardDispatchArgs {
 }
 
 impl TaskBoardDispatchArgs {
+    fn selected_items(&self, board: &TaskBoardStore) -> Result<Vec<TaskBoardItem>, CliError> {
+        self.item_id.as_deref().map_or_else(
+            || board.list(self.status),
+            |item_id| board.get(item_id).map(|item| vec![item]),
+        )
+    }
+
     fn apply_plans(
         &self,
         board: &TaskBoardStore,

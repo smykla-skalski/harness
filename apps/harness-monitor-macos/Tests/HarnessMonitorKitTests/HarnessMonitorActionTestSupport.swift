@@ -155,13 +155,15 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     case startTaskBoardOrchestrator
     case stopTaskBoardOrchestrator
     case runTaskBoardOrchestratorOnce(
+      itemID: String?,
       dryRun: Bool?,
       status: TaskBoardStatus?,
       projectDir: String?
     )
     case evaluateTaskBoard(
       dryRun: Bool,
-      status: TaskBoardStatus?
+      status: TaskBoardStatus?,
+      itemID: String?
     )
     case updateTaskBoardItem(
       id: String,

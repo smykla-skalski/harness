@@ -56,11 +56,12 @@ struct TaskBoardItemManagementPanel: View {
         Button {
           onEvaluate?(item)
         } label: {
-          Label("Evaluate", systemImage: "checkmark.seal")
+          Label("Evaluate Item", systemImage: "checkmark.seal")
             .scaledFont(.caption.weight(.semibold))
         }
         .frame(minHeight: metrics.controlMinHeight)
         .disabled(isActionInFlight || onEvaluate == nil)
+        .help("Evaluate this board item")
 
         Button {
           onRefresh?()

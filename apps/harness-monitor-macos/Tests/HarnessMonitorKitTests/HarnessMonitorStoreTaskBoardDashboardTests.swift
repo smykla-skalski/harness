@@ -30,12 +30,32 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
     #expect(success)
     #expect(
       client.recordedCalls().contains(
-        .evaluateTaskBoard(dryRun: true, status: .inProgress)
+        .evaluateTaskBoard(dryRun: true, status: .inProgress, itemID: nil)
       )
     )
     #expect(store.globalTaskBoardEvaluationSummary?.updated == 1)
     #expect(store.contentUI.dashboard.taskBoardEvaluationSummary?.updated == 1)
     #expect(store.currentSuccessFeedbackMessage == "Evaluated task board")
+  }
+
+  @Test("Evaluate task board can target one board item")
+  func evaluateTaskBoardCanTargetOneBoardItem() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+
+    let success = await store.evaluateTaskBoard(
+      status: .todo,
+      itemID: "board-1",
+      dryRun: false
+    )
+
+    #expect(success)
+    #expect(
+      client.recordedCalls().contains(
+        .evaluateTaskBoard(dryRun: false, status: .todo, itemID: "board-1")
+      )
+    )
+    #expect(store.globalTaskBoardEvaluationSummary?.records.first?.boardItemId == "board-1")
   }
 
   @Test("Moving a task board item updates status through the daemon")
@@ -74,6 +94,7 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
     #expect(
       client.recordedCalls().contains(
         .runTaskBoardOrchestratorOnce(
+          itemID: nil,
           dryRun: false,
           status: .todo,
           projectDir: "/tmp/harness"

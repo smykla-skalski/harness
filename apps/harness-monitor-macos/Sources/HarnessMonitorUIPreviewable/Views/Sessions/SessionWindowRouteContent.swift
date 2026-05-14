@@ -62,6 +62,7 @@ struct SessionWindowOverview: View {
           onOpenTaskBoardItem: openTaskBoardItem,
           onMoveTaskBoardItem: moveTaskBoardItem,
           onEvaluateTaskBoard: evaluateTaskBoard,
+          onEvaluateTaskBoardItem: evaluateTaskBoardItem,
           onRefreshTaskBoard: refreshTaskBoard,
           onStartTaskBoardOrchestrator: startTaskBoardOrchestrator,
           onStopTaskBoardOrchestrator: stopTaskBoardOrchestrator,
@@ -133,7 +134,9 @@ struct SessionWindowOverview: View {
   }
 
   private var linkedTaskBoardItems: [TaskBoardItem] {
-    (snapshot.taskBoardItems ?? []).filter { item in
+    let dashboardItems = store.contentUI.dashboard.taskBoardItems
+    let sourceItems = dashboardItems.isEmpty ? snapshot.taskBoardItems ?? [] : dashboardItems
+    return sourceItems.filter { item in
       item.sessionId == snapshot.summary.sessionId
     }
   }
@@ -157,6 +160,12 @@ struct SessionWindowOverview: View {
   private func evaluateTaskBoard() {
     Task { @MainActor in
       await store.evaluateTaskBoard()
+    }
+  }
+
+  private func evaluateTaskBoardItem(_ item: TaskBoardItem) {
+    Task { @MainActor in
+      await store.evaluateTaskBoard(status: item.status, itemID: item.id)
     }
   }
 

@@ -77,6 +77,7 @@ struct SessionsBoardView: View {
           onMoveTaskBoardItem: moveTaskBoardItem,
           onOpenDecision: openDecision,
           onEvaluateTaskBoard: evaluateTaskBoard,
+          onEvaluateTaskBoardItem: evaluateTaskBoardItem,
           onRefreshTaskBoard: refreshTaskBoard,
           onStartTaskBoardOrchestrator: startTaskBoardOrchestrator,
           onStopTaskBoardOrchestrator: stopTaskBoardOrchestrator,
@@ -120,6 +121,12 @@ struct SessionsBoardView: View {
   private func evaluateTaskBoard() {
     Task { @MainActor in
       await store.evaluateTaskBoard()
+    }
+  }
+
+  private func evaluateTaskBoardItem(_ item: TaskBoardItem) {
+    Task { @MainActor in
+      await store.evaluateTaskBoard(status: item.status, itemID: item.id)
     }
   }
 

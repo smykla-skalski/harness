@@ -29,6 +29,7 @@ struct TaskBoardNeedsYouLaneColumn: View {
             ForEach(section.items.prefix(5)) { item in
               TaskBoardItemRow(item: item, onOpenItem: onOpenItem)
             }
+            TaskBoardLaneOverflowRow(hiddenCount: hiddenItemCount)
           }
         }
       }
@@ -46,7 +47,14 @@ struct TaskBoardNeedsYouLaneColumn: View {
     guard let payload = payloads.first else {
       return false
     }
+    guard payload.sourceLane != .needsYou else {
+      return false
+    }
     return onMoveItem(payload.itemID, .needsYou)
+  }
+
+  private var hiddenItemCount: Int {
+    max(0, decisions.count - 4) + max(0, section.items.count - 5)
   }
 }
 

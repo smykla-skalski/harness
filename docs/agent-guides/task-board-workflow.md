@@ -185,11 +185,11 @@ Use overview commands instead of reading task-board files:
 
 ```bash
 harness task-board audit --json
-harness task-board project --json
-harness task-board machine --json
-harness task-board sync --json
-harness task-board dispatch --dry-run --json
-harness task-board evaluate --json
+harness task-board project --json [--status <status>]
+harness task-board machine --json [--status <status>]
+harness task-board sync --json [--provider <provider>] [--direction <pull|push|both>] [--apply]
+harness task-board dispatch --dry-run --json [--item-id <id>] [--status <status>]
+harness task-board evaluate --json [--item-id <id>] [--status <status>]
 harness task-board orchestrator status --json
 harness task-board orchestrator settings --json
 ```
@@ -198,11 +198,12 @@ harness task-board orchestrator settings --json
 - `project` groups local items by `project_id` and ready count.
 - `machine` groups local items by `agent_mode` and ready count.
 - `sync` reports external-provider configuration, linked, pushable, and blocked
-  counts.
+  counts. `--provider` narrows the provider, `--direction` narrows pull/push
+  intent, and `--apply` persists external changes instead of previewing them.
 - `dispatch` reports the session, worker, reviewer, and evaluator intent for
-  each board item, including readiness block reasons.
+  each selected board item, including readiness block reasons.
 - `evaluate` reports evaluated, updated, skipped, completed, running,
-  reviewing, blocked, and failed counts.
+  reviewing, blocked, and failed counts for the selected status or item.
 - `orchestrator status` reports enabled/running intent, current tick, last run,
   workflow-state counts, settings, dispatch results, evaluation results, and
   policy trace IDs.

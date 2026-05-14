@@ -2,10 +2,16 @@ import Foundation
 
 public struct TaskBoardEvaluateRequest: Codable, Equatable, Sendable {
   public let status: TaskBoardStatus?
+  public let itemId: String?
   public let dryRun: Bool
 
-  public init(status: TaskBoardStatus? = nil, dryRun: Bool = false) {
+  public init(
+    status: TaskBoardStatus? = nil,
+    itemId: String? = nil,
+    dryRun: Bool = false
+  ) {
     self.status = status
+    self.itemId = itemId
     self.dryRun = dryRun
   }
 }

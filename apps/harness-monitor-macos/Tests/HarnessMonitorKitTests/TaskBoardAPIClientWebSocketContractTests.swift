@@ -36,13 +36,19 @@ extension TaskBoardAPIClientTests {
       )
     )
     let dispatch = try await transport.dispatchTaskBoard(
-      status: TaskBoardStatus.todo,
-      dryRun: false,
-      projectDir: "/tmp/harness"
+      request: TaskBoardDispatchRequest(
+        status: TaskBoardStatus.todo,
+        itemId: "board-1",
+        dryRun: false,
+        projectDir: "/tmp/harness"
+      )
     )
     let evaluation = try await transport.evaluateTaskBoard(
-      status: TaskBoardStatus.inProgress,
-      dryRun: false
+      request: TaskBoardEvaluateRequest(
+        status: TaskBoardStatus.inProgress,
+        itemId: "board-1",
+        dryRun: false
+      )
     )
     _ = try await transport.auditTaskBoard(status: TaskBoardStatus.blocked)
     let status = try await transport.taskBoardOrchestratorStatus()
@@ -114,9 +120,11 @@ extension TaskBoardAPIClientTests {
     #expect(objectValue(calls[5].params, key: "direction") == .string("push"))
     #expect(objectValue(calls[5].params, key: "dry_run") == .bool(false))
     #expect(objectValue(calls[6].params, key: "status") == .string("todo"))
+    #expect(objectValue(calls[6].params, key: "item_id") == .string("board-1"))
     #expect(objectValue(calls[6].params, key: "dry_run") == .bool(false))
     #expect(objectValue(calls[6].params, key: "project_dir") == .string("/tmp/harness"))
     #expect(objectValue(calls[7].params, key: "status") == .string("in_progress"))
+    #expect(objectValue(calls[7].params, key: "item_id") == .string("board-1"))
     #expect(objectValue(calls[7].params, key: "dry_run") == .bool(false))
     #expect(objectValue(calls[8].params, key: "status") == .string("blocked"))
     #expect(calls[9].params == nil)

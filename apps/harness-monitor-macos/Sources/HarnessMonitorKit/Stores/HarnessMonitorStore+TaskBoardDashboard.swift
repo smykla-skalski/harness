@@ -93,6 +93,7 @@ extension HarnessMonitorStore {
   @discardableResult
   public func evaluateTaskBoard(
     status: TaskBoardStatus? = nil,
+    itemID: String? = nil,
     dryRun: Bool = false
   ) async -> Bool {
     guard let client else {
@@ -103,7 +104,9 @@ extension HarnessMonitorStore {
 
     do {
       let measuredSummary = try await Self.measureOperation {
-        try await client.evaluateTaskBoard(status: status, dryRun: dryRun)
+        try await client.evaluateTaskBoard(
+          request: TaskBoardEvaluateRequest(status: status, itemId: itemID, dryRun: dryRun)
+        )
       }
       recordRequestSuccess()
       globalTaskBoardEvaluationSummary = measuredSummary.value

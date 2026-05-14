@@ -56,7 +56,12 @@ struct TaskBoardAPIClientTests {
       client.calls == [
         .startTaskBoardOrchestrator,
         .stopTaskBoardOrchestrator,
-        .runTaskBoardOrchestratorOnce(dryRun: false, status: .todo, projectDir: "/tmp/harness"),
+        .runTaskBoardOrchestratorOnce(
+          itemID: nil,
+          dryRun: false,
+          status: .todo,
+          projectDir: "/tmp/harness"
+        ),
         .updateTaskBoardOrchestratorSettings(
           policyVersion: "task-board-policy-v3",
           clearProjectDir: true,

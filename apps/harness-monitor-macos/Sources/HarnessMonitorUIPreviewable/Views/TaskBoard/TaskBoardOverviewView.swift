@@ -13,6 +13,7 @@ public struct TaskBoardOverviewView: View {
   private let onMoveTaskBoardItem: ((String, TaskBoardStatus) -> Void)?
   private let onOpenDecision: (Decision) -> Void
   private let onEvaluateTaskBoard: (() -> Void)?
+  private let onEvaluateTaskBoardItem: ((TaskBoardItem) -> Void)?
   private let onRefreshTaskBoard: (() -> Void)?
   private let onStartTaskBoardOrchestrator: (() -> Void)?
   private let onStopTaskBoardOrchestrator: (() -> Void)?
@@ -37,6 +38,7 @@ public struct TaskBoardOverviewView: View {
     onMoveTaskBoardItem: ((String, TaskBoardStatus) -> Void)? = nil,
     onOpenDecision: @escaping (Decision) -> Void = { _ in },
     onEvaluateTaskBoard: (() -> Void)? = nil,
+    onEvaluateTaskBoardItem: ((TaskBoardItem) -> Void)? = nil,
     onRefreshTaskBoard: (() -> Void)? = nil,
     onStartTaskBoardOrchestrator: (() -> Void)? = nil,
     onStopTaskBoardOrchestrator: (() -> Void)? = nil,
@@ -53,6 +55,7 @@ public struct TaskBoardOverviewView: View {
     self.onMoveTaskBoardItem = onMoveTaskBoardItem
     self.onOpenDecision = onOpenDecision
     self.onEvaluateTaskBoard = onEvaluateTaskBoard
+    self.onEvaluateTaskBoardItem = onEvaluateTaskBoardItem
     self.onRefreshTaskBoard = onRefreshTaskBoard
     self.onStartTaskBoardOrchestrator = onStartTaskBoardOrchestrator
     self.onStopTaskBoardOrchestrator = onStopTaskBoardOrchestrator
@@ -88,7 +91,7 @@ public struct TaskBoardOverviewView: View {
             metrics: metrics,
             isActionInFlight: isActionInFlight,
             onRunOnce: runOrchestratorOnceForItem,
-            onEvaluate: evaluateSelectedTaskBoardItem,
+            onEvaluate: selectedTaskBoardItemEvaluateAction,
             onRefresh: onRefreshTaskBoard,
             onClose: clearSelectedTaskBoardItem
           )
@@ -266,6 +269,13 @@ public struct TaskBoardOverviewView: View {
     guard let onMoveTaskBoardItem else {
       return false
     }
+    guard
+      let item = taskBoardItems.first(where: { $0.id == itemID }),
+      let currentLane = TaskBoardInboxLane(status: item.status),
+      currentLane != lane
+    else {
+      return false
+    }
     onMoveTaskBoardItem(itemID, lane.taskBoardDropStatus)
     return true
   }
@@ -284,8 +294,19 @@ public struct TaskBoardOverviewView: View {
     )
   }
 
+  private var selectedTaskBoardItemEvaluateAction: ((TaskBoardItem) -> Void)? {
+    guard onEvaluateTaskBoardItem != nil || onEvaluateTaskBoard != nil else {
+      return nil
+    }
+    return evaluateSelectedTaskBoardItem
+  }
+
   private func evaluateSelectedTaskBoardItem(_ item: TaskBoardItem) {
-    onEvaluateTaskBoard?()
+    if let onEvaluateTaskBoardItem {
+      onEvaluateTaskBoardItem(item)
+    } else {
+      onEvaluateTaskBoard?()
+    }
     selectedTaskBoardItemID = item.id
   }
 
@@ -358,53 +379,6 @@ public struct TaskBoardOverviewView: View {
       1
     case .info, nil:
       0
-    }
-  }
-}
-
-struct TaskBoardItemSection: Identifiable {
-  let lane: TaskBoardInboxLane
-  let items: [TaskBoardItem]
-
-  var id: TaskBoardInboxLane { lane }
-}
-
-struct TaskBoardOverviewMetrics: Equatable {
-  let controlMinHeight: CGFloat
-  let iconControlMinWidth: CGFloat
-  let managementPanelMinHeight: CGFloat
-  let managementPanelSpacing: CGFloat
-
-  init(fontScale: CGFloat) {
-    let scale = SessionWindowFontScale.metricsScale(for: fontScale)
-    controlMinHeight = max(30, 30 * min(scale, 1.35))
-    iconControlMinWidth = max(32, 32 * min(scale, 1.35))
-    managementPanelMinHeight = max(132, 132 * min(scale, 1.25))
-    managementPanelSpacing = max(8, 8 * min(scale, 1.35))
-  }
-}
-
-extension TaskBoardItem {
-  var hasLinkedSessionTask: Bool {
-    sessionId != nil && workItemId != nil
-  }
-}
-
-extension TaskBoardInboxLane {
-  fileprivate var taskBoardDropStatus: TaskBoardStatus {
-    switch self {
-    case .needsYou:
-      .planReview
-    case .ready:
-      .todo
-    case .running:
-      .inProgress
-    case .review:
-      .inReview
-    case .blocked:
-      .blocked
-    case .backlog:
-      .new
     }
   }
 }

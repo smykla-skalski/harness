@@ -20,111 +20,159 @@ fn websocket_task_board_dispatch_evaluate_and_run_once_use_real_state() {
                     .await;
             let connection = Arc::new(Mutex::new(ConnectionState::new()));
 
-            seed_ready_board_item("board-ws-dispatch", "WS dispatch item");
-            seed_ready_board_item("board-ws-dispatch-other", "WS dispatch other item");
-            let dispatch_response = dispatch(
-                &request(
-                    "req-task-board-dispatch",
-                    ws_methods::TASK_BOARD_DISPATCH,
-                    json!({
-                        "item_id": "board-ws-dispatch",
-                        "status": "todo",
-                        "dry_run": false,
-                        "project_dir": project_dir,
-                    }),
-                ),
-                &state,
-                &connection,
-            )
-            .await;
-            let dispatch_result = response_result(&dispatch_response);
-            let applied = first_applied(dispatch_result);
-            let session_id = required_string(applied, "session_id");
-            let work_item_id = required_string(applied, "work_item_id");
-            assert_eq!(applied["board_item_id"].as_str(), Some("board-ws-dispatch"));
-            assert_eq!(applied["item"]["status"].as_str(), Some("in_progress"));
-            assert_board_item_unlinked("board-ws-dispatch-other");
-            join_leader(&state, &session_id, &project_dir).await;
-
-            assert_ok(
-                dispatch(
-                    &request(
-                        "req-task-board-task-update",
-                        ws_methods::TASK_UPDATE,
-                        json!({
-                            "session_id": session_id,
-                            "task_id": work_item_id,
-                            "actor": "spoofed-client",
-                            "status": "done",
-                            "note": "completed by test",
-                        }),
-                    ),
-                    &state,
-                    &connection,
-                )
-                .await,
-            );
-            let evaluation_response = dispatch(
-                &request(
-                    "req-task-board-evaluate",
-                    ws_methods::TASK_BOARD_EVALUATE,
-                    json!({
-                        "status": "in_progress",
-                        "dry_run": false,
-                    }),
-                ),
-                &state,
-                &connection,
-            )
-            .await;
-            let evaluation_result = response_result(&evaluation_response);
-            assert_eq!(evaluation_result["updated"].as_u64(), Some(1));
-            assert_eq!(evaluation_result["completed"].as_u64(), Some(1));
-
-            seed_ready_board_item("board-ws-run-once", "WS run once item");
-            seed_ready_board_item("board-ws-run-once-other", "WS run once other item");
-            let run_once_response = dispatch(
-                &request(
-                    "req-task-board-run-once",
-                    ws_methods::TASK_BOARD_ORCHESTRATOR_RUN_ONCE,
-                    json!({
-                        "item_id": "board-ws-run-once",
-                        "status": "todo",
-                        "dry_run": false,
-                        "project_dir": project_dir,
-                    }),
-                ),
-                &state,
-                &connection,
-            )
-            .await;
-            let run_once_result = response_result(&run_once_response);
-            assert_eq!(
-                run_once_result["last_run"]["status"].as_str(),
-                Some("completed")
-            );
-            assert_eq!(
-                run_once_result["last_run"]["dispatch"]["applied"]
-                    .as_array()
-                    .map(Vec::len),
-                Some(1)
-            );
-            assert_eq!(
-                run_once_result["last_run"]["dispatch"]["applied"][0]["board_item_id"].as_str(),
-                Some("board-ws-run-once")
-            );
-            assert!(
-                run_once_result["last_run"]["evaluation"]["evaluated"]
-                    .as_u64()
-                    .is_some_and(|count| count >= 1)
-            );
-            assert!(evaluation_records_contain(
-                run_once_result,
-                "board-ws-run-once"
-            ));
-            assert_board_item_unlinked("board-ws-run-once-other");
+            run_websocket_task_board_item_scope_flow(&state, &connection, &project_dir).await;
+            run_websocket_task_board_run_once_flow(&state, &connection, &project_dir).await;
         });
     });
+}
+
+async fn run_websocket_task_board_item_scope_flow(
+    state: &DaemonHttpState,
+    connection: &Arc<Mutex<ConnectionState>>,
+    project_dir: &std::path::Path,
+) {
+    seed_ready_board_item("board-ws-dispatch", "WS dispatch item");
+    seed_ready_board_item("board-ws-dispatch-other", "WS dispatch other item");
+    let dispatch_response =
+        dispatch_ws_item(state, connection, "board-ws-dispatch", project_dir).await;
+    let applied = first_applied(response_result(&dispatch_response));
+    let session_id = required_string(applied, "session_id");
+    let work_item_id = required_string(applied, "work_item_id");
+    assert_eq!(applied["board_item_id"].as_str(), Some("board-ws-dispatch"));
+    assert_eq!(applied["item"]["status"].as_str(), Some("in_progress"));
+    assert_board_item_unlinked("board-ws-dispatch-other");
+
+    let other_dispatch =
+        dispatch_ws_item(state, connection, "board-ws-dispatch-other", project_dir).await;
+    let other_applied = first_applied(response_result(&other_dispatch));
+    let other_session_id = required_string(other_applied, "session_id");
+    let other_work_item_id = required_string(other_applied, "work_item_id");
+    join_leader(state, &session_id, project_dir).await;
+    join_leader(state, &other_session_id, project_dir).await;
+
+    mark_ws_task_done(state, connection, &session_id, &work_item_id).await;
+    mark_ws_task_done(state, connection, &other_session_id, &other_work_item_id).await;
+    let evaluation_response = dispatch(
+        &request(
+            "req-task-board-evaluate",
+            ws_methods::TASK_BOARD_EVALUATE,
+            json!({
+                "item_id": "board-ws-dispatch",
+                "status": "in_progress",
+                "dry_run": false,
+            }),
+        ),
+        state,
+        connection,
+    )
+    .await;
+    let evaluation_result = response_result(&evaluation_response);
+    assert_eq!(evaluation_result["updated"].as_u64(), Some(1));
+    assert_eq!(evaluation_result["completed"].as_u64(), Some(1));
+    assert_eq!(
+        evaluation_result["records"][0]["board_item_id"].as_str(),
+        Some("board-ws-dispatch")
+    );
+    assert_board_item_status("board-ws-dispatch", TaskBoardStatus::Done);
+    assert_board_item_status("board-ws-dispatch-other", TaskBoardStatus::InProgress);
+}
+
+async fn run_websocket_task_board_run_once_flow(
+    state: &DaemonHttpState,
+    connection: &Arc<Mutex<ConnectionState>>,
+    project_dir: &std::path::Path,
+) {
+    seed_ready_board_item("board-ws-run-once", "WS run once item");
+    seed_ready_board_item("board-ws-run-once-other", "WS run once other item");
+    let run_once_response = dispatch(
+        &request(
+            "req-task-board-run-once",
+            ws_methods::TASK_BOARD_ORCHESTRATOR_RUN_ONCE,
+            json!({
+                "item_id": "board-ws-run-once",
+                "status": "todo",
+                "dry_run": false,
+                "project_dir": project_dir,
+            }),
+        ),
+        state,
+        connection,
+    )
+    .await;
+    let run_once_result = response_result(&run_once_response);
+    assert_eq!(
+        run_once_result["last_run"]["status"].as_str(),
+        Some("completed")
+    );
+    assert_eq!(
+        run_once_result["last_run"]["dispatch"]["applied"]
+            .as_array()
+            .map(Vec::len),
+        Some(1)
+    );
+    assert_eq!(
+        run_once_result["last_run"]["dispatch"]["applied"][0]["board_item_id"].as_str(),
+        Some("board-ws-run-once")
+    );
+    assert!(
+        run_once_result["last_run"]["evaluation"]["evaluated"]
+            .as_u64()
+            .is_some_and(|count| count >= 1)
+    );
+    assert!(evaluation_records_contain(
+        run_once_result,
+        "board-ws-run-once"
+    ));
+    assert_board_item_unlinked("board-ws-run-once-other");
+}
+
+async fn dispatch_ws_item(
+    state: &DaemonHttpState,
+    connection: &Arc<Mutex<ConnectionState>>,
+    item_id: &str,
+    project_dir: &std::path::Path,
+) -> WsResponse {
+    dispatch(
+        &request(
+            "req-task-board-dispatch",
+            ws_methods::TASK_BOARD_DISPATCH,
+            json!({
+                "item_id": item_id,
+                "status": "todo",
+                "dry_run": false,
+                "project_dir": project_dir,
+            }),
+        ),
+        state,
+        connection,
+    )
+    .await
+}
+
+async fn mark_ws_task_done(
+    state: &DaemonHttpState,
+    connection: &Arc<Mutex<ConnectionState>>,
+    session_id: &str,
+    work_item_id: &str,
+) {
+    assert_ok(
+        dispatch(
+            &request(
+                "req-task-board-task-update",
+                ws_methods::TASK_UPDATE,
+                json!({
+                    "session_id": session_id,
+                    "task_id": work_item_id,
+                    "actor": "spoofed-client",
+                    "status": "done",
+                    "note": "completed by test",
+                }),
+            ),
+            state,
+            connection,
+        )
+        .await,
+    );
 }
 
 #[test]
@@ -431,6 +479,13 @@ fn assert_board_item_unlinked(id: &str) {
         .expect("load board item");
     assert_eq!(item.status, TaskBoardStatus::Todo);
     assert!(item.work_item_id.is_none());
+}
+
+fn assert_board_item_status(id: &str, status: TaskBoardStatus) {
+    let item = TaskBoardStore::new(default_board_root())
+        .get(id)
+        .expect("load board item");
+    assert_eq!(item.status, status);
 }
 
 fn required_string(value: &Value, key: &str) -> String {
