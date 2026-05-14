@@ -109,6 +109,7 @@ async fn run_task_board_orchestrator_parity() {
         json!({}),
     )
     .await;
+    assert_run_once_routes_match(&client, &base_url).await;
     assert_settings_routes_match(&client, &base_url).await;
     assert_runtime_config_routes_match(&client, &base_url).await;
     assert_http_ws_put_match(
@@ -128,6 +129,39 @@ async fn run_task_board_orchestrator_parity() {
         http_paths::TASK_BOARD_ORCHESTRATOR_STOP,
         ws_methods::TASK_BOARD_ORCHESTRATOR_STOP,
         json!({}),
+    )
+    .await;
+
+    server.abort();
+    let _ = server.await;
+}
+
+#[test]
+fn task_board_http_and_ws_catalog_routes_match() {
+    let sandbox = tempdir().expect("tempdir");
+    harness_testkit::with_isolated_harness_env(sandbox.path(), || {
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(run_task_board_catalog_parity());
+    });
+}
+
+async fn run_task_board_catalog_parity() {
+    let state = super::test_http_state_with_db();
+    let (base_url, server) = serve_http(state).await;
+    let client = reqwest::Client::new();
+
+    assert_http_ws_get_match(
+        &client,
+        &base_url,
+        http_paths::TASK_BOARD_PROJECTS,
+        ws_methods::TASK_BOARD_PROJECTS,
+    )
+    .await;
+    assert_http_ws_get_match(
+        &client,
+        &base_url,
+        http_paths::TASK_BOARD_MACHINES,
+        ws_methods::TASK_BOARD_MACHINES,
     )
     .await;
 
@@ -281,6 +315,63 @@ async fn assert_http_ws_put_match(
     let http = put_json(client, base_url, http_path, payload.clone()).await;
     let ws = ws_result(base_url, &format!("req-{ws_method}"), ws_method, payload).await;
     assert_eq!(http, ws);
+}
+
+async fn assert_http_ws_get_match(
+    client: &reqwest::Client,
+    base_url: &str,
+    http_path: &str,
+    ws_method: &str,
+) {
+    let http = get_json(client, base_url, http_path).await;
+    let ws = ws_result(base_url, &format!("req-{ws_method}"), ws_method, json!({})).await;
+    assert_eq!(http, ws);
+}
+
+async fn assert_run_once_routes_match(client: &reqwest::Client, base_url: &str) {
+    seed_ready_board_item("parity-run-once-http", "Run once HTTP parity item");
+    let http = post_json(
+        client,
+        base_url,
+        http_paths::TASK_BOARD_ORCHESTRATOR_RUN_ONCE,
+        json!({
+            "dry_run": true,
+            "input": {
+                "dispatch_status": "todo",
+                "sync_direction": "pull",
+                "sync_dry_run": true
+            }
+        }),
+    )
+    .await;
+
+    seed_ready_board_item("parity-run-once-ws", "Run once WS parity item");
+    let ws = ws_result(
+        base_url,
+        "req-task-board-orchestrator-run-once",
+        ws_methods::TASK_BOARD_ORCHESTRATOR_RUN_ONCE,
+        json!({
+            "dry_run": true,
+            "input": {
+                "dispatch_status": "todo",
+                "sync_direction": "pull",
+                "sync_dry_run": true
+            }
+        }),
+    )
+    .await;
+    assert_run_once_parity(http, ws);
+}
+
+fn assert_run_once_parity(http: Value, ws: Value) {
+    assert_eq!(http["dry_run"], ws["dry_run"]);
+    assert_eq!(http["sync"]["operations"], ws["sync"]["operations"]);
+    assert_eq!(
+        http["dispatch"]["plans"].as_array().map(Vec::len),
+        ws["dispatch"]["plans"].as_array().map(Vec::len)
+    );
+    assert_eq!(http["dispatch"]["applied"], ws["dispatch"]["applied"]);
+    assert_eq!(http["evaluation"]["updated"], ws["evaluation"]["updated"]);
 }
 
 async fn assert_settings_routes_match(client: &reqwest::Client, base_url: &str) {
