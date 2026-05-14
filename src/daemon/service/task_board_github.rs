@@ -27,7 +27,6 @@ pub(super) struct AutomationRequest<'a> {
     pub dry_run: bool,
     pub item: &'a TaskBoardItem,
     pub session_worktrees: &'a BTreeMap<String, String>,
-    pub github_token: Option<&'a str>,
     pub client: &'a dyn GitHubAutomationClient,
 }
 
@@ -42,14 +41,13 @@ pub(crate) fn run_task_board_github_automation(
         return Ok(());
     };
     let session_worktrees = load_session_worktrees(items, db)?;
-    let client = GitHubApiAutomationClient::new(token.clone())?;
+    let client = GitHubApiAutomationClient::new(token.as_str())?;
     run_blocking(run_task_board_github_automation_with_client(
         board_root,
         &config,
         input,
         items,
         &session_worktrees,
-        Some(token.as_str()),
         &client,
     ))
 }
@@ -65,14 +63,13 @@ pub(crate) async fn run_task_board_github_automation_async(
         return Ok(());
     };
     let session_worktrees = load_session_worktrees_async(items, async_db).await?;
-    let client = GitHubApiAutomationClient::new(token.clone())?;
+    let client = GitHubApiAutomationClient::new(token.as_str())?;
     run_task_board_github_automation_with_client(
         board_root,
         &config,
         input,
         items,
         &session_worktrees,
-        Some(token.as_str()),
         &client,
     )
     .await
@@ -84,7 +81,6 @@ async fn run_task_board_github_automation_with_client(
     input: &TaskBoardOrchestratorDispatchInput,
     items: &[TaskBoardItem],
     session_worktrees: &BTreeMap<String, String>,
-    github_token: Option<&str>,
     client: &dyn GitHubAutomationClient,
 ) -> Result<(), CliError> {
     let board = TaskBoardStore::new(board_root.to_path_buf());
@@ -96,7 +92,6 @@ async fn run_task_board_github_automation_with_client(
             session_worktrees,
             project_dir: input.project_dir.as_deref(),
             dry_run: input.dry_run,
-            github_token,
             client,
         })
         .await;

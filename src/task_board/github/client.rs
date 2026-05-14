@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::path::Path;
 use std::sync::OnceLock;
 
 use async_trait::async_trait;
@@ -14,6 +15,9 @@ use super::config::{GitHubMergeMethod, GitHubProjectConfig};
 use super::evidence::{
     GitHubBranchProtectionEvidence, GitHubCheckConclusion, GitHubCheckEvidence, GitHubCheckStatus,
     GitHubMergeEvidence, GitHubPullRequestEvidence, GitHubReviewEvidence, GitHubReviewState,
+};
+use super::publication::{
+    GitHubBranchState, branch_state_async, publish_branch_from_worktree_async,
 };
 
 static RUSTLS_PROVIDER: OnceLock<()> = OnceLock::new();
@@ -63,6 +67,23 @@ impl GitHubApiAutomationClient {
 
 #[async_trait]
 impl GitHubAutomationClient for GitHubApiAutomationClient {
+    async fn get_branch_state(
+        &self,
+        config: &GitHubProjectConfig,
+        branch: &str,
+    ) -> Result<Option<GitHubBranchState>, CliError> {
+        branch_state_async(&self.client, config, branch).await
+    }
+
+    async fn publish_branch_from_worktree(
+        &self,
+        config: &GitHubProjectConfig,
+        worktree: &Path,
+        branch: &str,
+    ) -> Result<(), CliError> {
+        publish_branch_from_worktree_async(&self.client, config, worktree, branch).await
+    }
+
     async fn pull_request_merge_evidence(
         &self,
         config: &GitHubProjectConfig,
