@@ -9,7 +9,8 @@ use super::{
     TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDropRequest,
     TaskQueuePolicyRequest, TaskUpdateRequest, WsRequest, WsResponse,
     dispatch_mutation_prefer_async, dispatch_mutation_with_agent_prefer_async,
-    dispatch_mutation_with_task_prefer_async, service,
+    dispatch_mutation_with_task_prefer_async,
+    dispatch_mutation_with_task_preserving_actor_prefer_async, service,
 };
 
 mod improver_apply;
@@ -358,7 +359,7 @@ pub(super) async fn dispatch_task_submit_for_review(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    dispatch_mutation_with_task_prefer_async(
+    dispatch_mutation_with_task_preserving_actor_prefer_async(
         request,
         state,
         |session_id, task_id, params, db| {
@@ -379,7 +380,7 @@ pub(super) async fn dispatch_task_claim_review(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    dispatch_mutation_with_task_prefer_async(
+    dispatch_mutation_with_task_preserving_actor_prefer_async(
         request,
         state,
         |session_id, task_id, params, db| {
@@ -400,7 +401,7 @@ pub(super) async fn dispatch_task_submit_review(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    dispatch_mutation_with_task_prefer_async(
+    dispatch_mutation_with_task_preserving_actor_prefer_async(
         request,
         state,
         |session_id, task_id, params, db| {
@@ -421,7 +422,7 @@ pub(super) async fn dispatch_task_respond_review(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    dispatch_mutation_with_task_prefer_async(
+    dispatch_mutation_with_task_preserving_actor_prefer_async(
         request,
         state,
         |session_id, task_id, params, db| {
@@ -442,7 +443,7 @@ pub(super) async fn dispatch_task_arbitrate(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    dispatch_mutation_with_task_prefer_async(
+    dispatch_mutation_with_task_preserving_actor_prefer_async(
         request,
         state,
         |session_id, task_id, params, db| {

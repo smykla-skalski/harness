@@ -37,7 +37,7 @@ All state flows through `harness` commands. Do not read or write orchestration f
 
 ## session start
 
-You become the leader. You are a coordinator, not an executor.
+Create a leaderless swarm session. Join it as leader before coordinator actions.
 
 ### Hard constraints
 
@@ -55,7 +55,8 @@ If you catch yourself about to edit a file or run code to implement something: s
 | `--context` | required | Human-readable goal for the session |
 | `--session-id` | auto-generated | Explicit session ID |
 | `--title` | none | Short human-readable session name |
-| `--runtime` | auto-detect | Agent runtime |
+| `--project-dir` | cwd | Project directory |
+| `--policy-preset` | none | Session policy preset |
 
 ### Workflow
 
@@ -75,17 +76,17 @@ digraph session_start {
 ```
 
 1. Start the session: `harness session start --context "<goal>"` (or `--session-id <id>` for explicit ID)
-2. Note session ID and agent ID from output
+2. Note session ID from output
+3. Join as leader: `harness session join <session-id> --role leader --runtime <runtime>`
+4. Break goal into discrete tasks
+5. Create tasks: `harness session task create <session-id> --title "..." --context "..." --actor <agent-id>`
+6. Tell user to spawn workers: `/harness:harness session join <session-id> --role worker`
+7. Poll status until workers join: `harness session status <session-id> --json`
+8. Assign tasks: `harness session task assign <session-id> <task-id> <agent-id> --actor <agent-id>`
+9. Monitor: `harness session task list <session-id> --json`
+10. End when done: `harness session end <session-id> --actor <agent-id>`
 
 Read [references/signals.md](references/signals.md) for signal protocol when redirecting agents.
-3. Break goal into discrete tasks
-4. Create tasks: `harness session task create <session-id> --title "..." --context "..." --actor <agent-id>`
-5. Tell user to spawn workers: `/harness:harness session join <session-id> --role worker`
-6. Poll status until workers join: `harness session status <session-id> --json`
-7. Assign tasks: `harness session task assign <session-id> <task-id> <agent-id> --actor <agent-id>`
-8. Monitor: `harness session task list <session-id> --json`
-9. End when done: `harness session end <session-id> --actor <agent-id>`
-
 Read [references/session-commands.md](references/session-commands.md) for exact command syntax.
 
 ---

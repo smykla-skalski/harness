@@ -16,5 +16,5 @@ Use this skill to answer `harness` CLI questions from checked-in references back
 - `references/top-level-and-hidden.md` — visible top-level commands, hidden top-level commands, global `--delay`
 - `references/setup-create.md` — `setup` and `create` command surfaces, key flags, bootstrap/generate shortcuts
 - `references/run.md` — `run`, especially resume / status / doctor / repair recovery work.
-- `references/observe-session.md` — `observe`, `session`, and `session start` runtime/flag surfaces.
+- `references/observe-session.md` — `observe`, `session`, and `session start` flag surfaces.
 - `references/agents-daemon-bridge.md` — `agents`, `daemon`, `bridge`, and wrapper lifecycle command shapes.
