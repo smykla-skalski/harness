@@ -24,15 +24,37 @@ extension View {
 }
 
 public struct PolicyCanvasView: View {
-  @State private var viewModel: PolicyCanvasViewModel
-  @State private var isShowingPromoteConfirmation = false
-  @State private var pendingDeletionRequest: PolicyCanvasDeletionRequest?
-  @State private var statusLine: String = "No pending changes"
-  @FocusState private var focusedField: PolicyCanvasFocusedField?
-  @Environment(\.scenePhase) private var scenePhase
-  @Environment(\.undoManager) private var undoManager
-  private let store: HarnessMonitorStore?
-  private let dashboardUI: HarnessMonitorStore.ContentDashboardSlice?
+  /// Internal (not `private`) so helpers in companion files
+  /// (`PolicyCanvasView+SceneStorage.swift`, `PolicyCanvasView+Actions.swift`)
+  /// can read viewModel.pipelineIdentity / store / statusLine. The host
+  /// struct is `public` but its init signature is the only API surface; the
+  /// inner state is module-internal by design.
+  @State var viewModel: PolicyCanvasViewModel
+  @State var isShowingPromoteConfirmation = false
+  @State var pendingDeletionRequest: PolicyCanvasDeletionRequest?
+  @State var statusLine: String = "No pending changes"
+  @FocusState var focusedField: PolicyCanvasFocusedField?
+  @Environment(\.scenePhase) var scenePhase
+  @Environment(\.undoManager) var undoManager
+
+  /// Scene-scoped storage for viewport state (zoom, selection, scroll
+  /// position). Restored on first appear when the canvas's
+  /// `pipelineIdentity` matches the previously stored ID; otherwise the
+  /// scene is opening a different pipeline and we ignore prior state.
+  /// `pipelineIdentity == nil` (no document yet) skips restoration entirely
+  /// — two trace-less pipelines must not share viewport state through a
+  /// shared sentinel key.
+  ///
+  /// Module-internal access so `PolicyCanvasView+SceneStorage.swift` can
+  /// read/write the storage from its extension; the host view struct is
+  /// only constructable from the same module so this is not API surface.
+  @SceneStorage("policyCanvas.pipelineID") var storedPipelineID: String = ""
+  @SceneStorage("policyCanvas.zoom") var storedZoom: Double = 1.0
+  @SceneStorage("policyCanvas.selectionRaw") var storedSelectionRaw: String = ""
+  @SceneStorage("policyCanvas.scrollX") var storedScrollX: Double = 0
+  @SceneStorage("policyCanvas.scrollY") var storedScrollY: Double = 0
+  let store: HarnessMonitorStore?
+  let dashboardUI: HarnessMonitorStore.ContentDashboardSlice?
 
   public init() {
     _viewModel = State(initialValue: .sample())
@@ -128,6 +150,8 @@ public struct PolicyCanvasView: View {
     .task(id: viewModel.pipelineIdentity) {
       bindStatusLine()
       viewModel.attachUndoManager(undoManager)
+      bindAutosaveTrigger()
+      restoreSceneStorageIfNeeded()
       await loadPolicyPipeline()
     }
     .onChange(of: dashboardSnapshot) { _, _ in
@@ -139,6 +163,24 @@ public struct PolicyCanvasView: View {
     // against the live manager. Reads inside `.onChange` see the new value.
     .onChange(of: undoManager) { _, newValue in
       viewModel.attachUndoManager(newValue)
+    }
+    .onChange(of: viewModel.pipelineIdentity) { _, newIdentity in
+      // First time the pipeline identity becomes known, try to restore the
+      // scene storage. Subsequent same-id republishes leave the stored
+      // viewport alone — the user's in-window state always wins.
+      restoreSceneStorageIfNeeded()
+      // Also stamp the stored pipeline id so a subsequent identity-flip
+      // doesn't blindly restore a stale zoom/selection captured under a
+      // different pipeline.
+      if let newIdentity {
+        storedPipelineID = newIdentity
+      }
+    }
+    .onChange(of: viewModel.zoom) { _, newZoom in
+      persistSceneStorageIfNeeded(zoom: Double(newZoom))
+    }
+    .onChange(of: viewModel.selection) { _, newSelection in
+      persistSceneStorageIfNeeded(selection: newSelection)
     }
     // When the scene leaves .active (Mission Control, Cmd-Tab to another
     // app, modal sheet presentation, window minimize) the in-flight gesture
@@ -248,80 +290,6 @@ public struct PolicyCanvasView: View {
     )
   }
 
-  private func applyDashboardSnapshot() {
-    viewModel.load(
-      document: dashboardUI?.taskBoardPolicyPipeline,
-      simulation: dashboardUI?.taskBoardPolicySimulation,
-      audit: dashboardUI?.taskBoardPolicyAudit
-    )
-  }
-
-  private func saveDraft() {
-    // Local pre-flight runs before snapshot so the user gets fast feedback on
-    // cycles + orphans. Soft warning only — daemon is authoritative, and the
-    // snapshot/restore frame around exportDocument() handles rollback on
-    // daemon rejection.
-    _ = viewModel.runLocalPreflight()
-    let snapshot = viewModel.snapshotState()
-    let document = viewModel.exportDocument()
-    Task { @MainActor in
-      let saved = await store?.saveTaskBoardPolicyPipelineDraft(document: document) ?? false
-      if saved {
-        // Don't pre-clear documentDirty across the upcoming await. MainActor
-        // serializes turns, not the gap between awaits: a dashboard publish
-        // running between the clear and the refresh's return would take the
-        // clean branch and clobber edits the user made during the save. Let
-        // load() clear dirty when the post-save refresh applies the new
-        // backingDocument on its own clean-incoming branch.
-        await forceReloadPolicyPipeline()
-      } else {
-        // Daemon rejected the save; roll local state back to the pre-save
-        // snapshot so the chrome and graph reflect what the daemon still
-        // believes is the truth. restoreState funnels the status string
-        // through one notify call so the inspector line is not racing a
-        // second-write override that distorts the user-visible reason.
-        viewModel.restoreState(snapshot, reason: "Save rejected, restored previous canvas")
-      }
-    }
-  }
-
-  private func simulate() {
-    let snapshot = viewModel.snapshotState()
-    let document = viewModel.exportDocument()
-    Task { @MainActor in
-      let simulated = await store?.simulateTaskBoardPolicyPipeline(document: document) ?? false
-      if simulated {
-        await forceReloadPolicyPipeline()
-      } else {
-        viewModel.restoreState(snapshot, reason: "Simulation rejected, restored previous canvas")
-      }
-    }
-  }
-
-  private func requestPromote() {
-    guard viewModel.canPromote, let revision = viewModel.backingDocument?.revision else {
-      statusLine = "Promote requires a saved matching simulation"
-      return
-    }
-    statusLine = "Confirm promotion for revision \(revision)"
-    isShowingPromoteConfirmation = true
-  }
-
-  private func confirmPromote() {
-    guard viewModel.canPromote, let revision = viewModel.backingDocument?.revision else {
-      statusLine = "Promote requires a saved matching simulation"
-      return
-    }
-    Task { @MainActor in
-      let promoted = await store?.promoteTaskBoardPolicyPipeline(revision: revision) ?? false
-      if promoted {
-        await forceReloadPolicyPipeline()
-      } else {
-        statusLine = "Promotion blocked"
-      }
-    }
-  }
-
   private func requestDeleteSelectedComponent() {
     pendingDeletionRequest = viewModel.deleteSelectedComponent()
   }
@@ -339,20 +307,26 @@ public struct PolicyCanvasView: View {
     viewModel.clearSelection()
   }
 
-  private func forceReloadPolicyPipeline() async {
-    guard let store else {
-      return
-    }
-    await store.refreshTaskBoardPolicyPipeline()
-    applyDashboardSnapshot()
-  }
-
   /// Bind the view model's status callback to the local `@State` status line.
   /// Captured `_statusLine` is reference-backed by SwiftUI, so closure writes
   /// land in the same storage even though the view struct is a value.
   private func bindStatusLine() {
     viewModel.statusCallback = { @MainActor newStatus in
       statusLine = newStatus
+    }
+  }
+
+  /// Bind the view model's autosave trigger. The view-model fires it from
+  /// every dirty-flipping mutation site (via `markDocumentDirty()`); the
+  /// trigger schedules a debounced save through the same daemon path as
+  /// the foreground Save button. Suppression cases (no backing document,
+  /// foreground save in flight, rollback armed) are owned by
+  /// `scheduleAutosave` inside the view-model.
+  private func bindAutosaveTrigger() {
+    viewModel.autosaveTrigger = { @MainActor in
+      viewModel.scheduleAutosave {
+        performSave(reason: .autosave)
+      }
     }
   }
 }

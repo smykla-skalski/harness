@@ -56,7 +56,7 @@ extension PolicyCanvasViewModel {
       }
       manager.setActionName(change.actionName)
     }
-    documentDirty = true
+    markDocumentDirty()
     invalidateValidationCache()
     notifyStatus(statusMessage(for: change, inverse: inverse))
   }
