@@ -14,6 +14,7 @@ struct TaskBoardInboxTests {
         .ready,
         .running,
         .review,
+        .done,
         .blocked,
         .backlog,
       ])
@@ -81,6 +82,7 @@ struct TaskBoardInboxTests {
         "ready",
         "running",
         "review",
+        "done",
         "blocked",
         "backlog",
       ])
@@ -89,14 +91,16 @@ struct TaskBoardInboxTests {
         .ready,
         .running,
         .review,
+        .done,
         .blocked,
         .backlog,
       ])
     #expect(snapshot.needsYouItemCount == 0)
     #expect(snapshot.blockedItemCount == 1)
     #expect(snapshot.reviewItemCount == 1)
+    #expect(snapshot.completedItemCount == 1)
     #expect(snapshot.openItemCount == 5)
-    #expect(snapshot.visibleItemCount == 5)
+    #expect(snapshot.visibleItemCount == 6)
     #expect(snapshot.sections.map(\.lane) == TaskBoardInboxLane.allCases)
   }
 
@@ -107,7 +111,7 @@ struct TaskBoardInboxTests {
     #expect(TaskBoardInboxLane(status: TaskStatus.inReview) == .review)
     #expect(TaskBoardInboxLane(status: TaskStatus.inProgress) == .running)
     #expect(TaskBoardInboxLane(status: TaskStatus.open) == .backlog)
-    #expect(TaskBoardInboxLane(status: TaskStatus.done) == nil)
+    #expect(TaskBoardInboxLane(status: TaskStatus.done) == .done)
 
     #expect(
       TaskBoardInboxLane(
@@ -142,7 +146,7 @@ struct TaskBoardInboxTests {
     #expect(TaskBoardInboxLane(status: TaskBoardStatus.inReview) == .review)
     #expect(TaskBoardInboxLane(status: TaskBoardStatus.new) == .backlog)
     #expect(TaskBoardInboxLane(status: TaskBoardStatus.planning) == .backlog)
-    #expect(TaskBoardInboxLane(status: TaskBoardStatus.done) == nil)
+    #expect(TaskBoardInboxLane(status: TaskBoardStatus.done) == .done)
 
     #expect(
       TaskBoardInboxLane(taskBoardItem: makeTaskBoardItem(status: .planReview)) == .needsYou
@@ -182,6 +186,66 @@ struct TaskBoardInboxTests {
     #expect(snapshot.isFromCache)
     #expect(snapshot.items.map { $0.task.taskId } == ["cached-open"])
     #expect(snapshot.generatedAt == Date(timeIntervalSinceReferenceDate: 801_000_000))
+  }
+
+  @Test("Cache loader can aggregate only visible sessions")
+  func cacheLoaderAggregatesOnlyVisibleSessions() async throws {
+    let harness = try PersistenceIntegrationTestHarness()
+    let cacheService = SessionCacheService(modelContainer: harness.container)
+    let project = makeProject(totalSessionCount: 2, activeSessionCount: 2)
+    let visibleSession = makeTaskBoardSession()
+    let hiddenSession = makeSession(
+      SessionFixture(
+        sessionId: "sess-hidden-task-board-inbox",
+        title: "Hidden Task Board Inbox",
+        context: "Hidden task board inbox test",
+        status: .active,
+        leaderId: "leader-hidden-task-board",
+        openTaskCount: 1,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
+    let visibleDetail = SessionDetail(
+      session: visibleSession,
+      agents: [],
+      tasks: [
+        makeTask(
+          id: "visible-open",
+          status: .open,
+          severity: .high,
+          updatedAt: "2026-05-14T10:00:00Z"
+        )
+      ],
+      signals: [],
+      observer: nil,
+      agentActivity: []
+    )
+    let hiddenDetail = SessionDetail(
+      session: hiddenSession,
+      agents: [],
+      tasks: [
+        makeTask(
+          id: "hidden-open",
+          status: .open,
+          severity: .critical,
+          updatedAt: "2026-05-14T11:00:00Z"
+        )
+      ],
+      signals: [],
+      observer: nil,
+      agentActivity: []
+    )
+
+    _ = await cacheService.cacheSessionList([visibleSession, hiddenSession], projects: [project])
+    _ = await cacheService.cacheSessionDetail(visibleDetail, timeline: [])
+    _ = await cacheService.cacheSessionDetail(hiddenDetail, timeline: [])
+
+    let snapshot = await TaskBoardInboxCache(sessionCache: cacheService)
+      .loadSnapshot(sessions: [visibleSession])
+
+    #expect(snapshot.items.map { $0.task.taskId } == ["visible-open"])
+    #expect(snapshot.items.map { $0.session.sessionId } == [visibleSession.sessionId])
   }
 
   private func makeTaskBoardSession() -> SessionSummary {

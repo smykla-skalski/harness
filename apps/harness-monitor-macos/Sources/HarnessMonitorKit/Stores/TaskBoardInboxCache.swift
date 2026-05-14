@@ -22,6 +22,13 @@ public actor TaskBoardInboxCache {
 
     let normalizedSessionLimit = max(sessionLimit, 0)
     let sessions = Array(cachedList.sessions.prefix(normalizedSessionLimit))
+    return await loadSnapshot(sessions: sessions, limit: limit)
+  }
+
+  public func loadSnapshot(
+    sessions: [SessionSummary],
+    limit: Int = 80
+  ) async -> TaskBoardInboxSnapshot {
     let details = await sessionCache.loadSessionDetails(
       sessionIDs: sessions.map(\.sessionId)
     )
@@ -47,6 +54,19 @@ extension HarnessMonitorStore {
     return await TaskBoardInboxCache(sessionCache: cacheService).loadSnapshot(
       limit: limit,
       sessionLimit: sessionLimit
+    )
+  }
+
+  public func loadCachedTaskBoardInboxSnapshot(
+    sessions: [SessionSummary],
+    limit: Int = 80
+  ) async -> TaskBoardInboxSnapshot {
+    guard let cacheService, persistenceError == nil else {
+      return TaskBoardInboxSnapshot(generatedAt: Date.now, isFromCache: true)
+    }
+    return await TaskBoardInboxCache(sessionCache: cacheService).loadSnapshot(
+      sessions: sessions,
+      limit: limit
     )
   }
 }

@@ -6,11 +6,12 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
   case ready
   case running
   case review
+  case done
   case blocked
   case backlog
 
   public static var allCases: [Self] {
-    [.needsYou, .ready, .running, .review, .blocked, .backlog]
+    [.needsYou, .ready, .running, .review, .done, .blocked, .backlog]
   }
 
   public static var active: Self { .running }
@@ -28,6 +29,8 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
       "Running"
     case .review:
       "Review"
+    case .done:
+      "Done"
     case .blocked:
       "Blocked"
     case .backlog:
@@ -45,6 +48,8 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
       "arrow.triangle.2.circlepath"
     case .review:
       "checkmark.seal"
+    case .done:
+      "checkmark.circle"
     case .blocked:
       "exclamationmark.triangle"
     case .backlog:
@@ -63,7 +68,7 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
     case .open:
       self = task.assignedTo != nil || task.queuedAt != nil ? .ready : .backlog
     case .done:
-      return nil
+      self = .done
     }
   }
 
@@ -78,7 +83,7 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
     case .open:
       self = .backlog
     case .done:
-      return nil
+      self = .done
     }
   }
 
@@ -101,7 +106,7 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
     case .new, .planning:
       self = .backlog
     case .done:
-      return nil
+      self = .done
     }
   }
 }
@@ -197,7 +202,7 @@ public struct TaskBoardInboxSnapshot: Equatable, Sendable {
   }
 
   public var openItemCount: Int {
-    visibleItemCount
+    items.count { $0.lane != .done }
   }
 
   public var visibleItemCount: Int {
@@ -214,6 +219,10 @@ public struct TaskBoardInboxSnapshot: Equatable, Sendable {
 
   public var reviewItemCount: Int {
     items.count { $0.lane == .review }
+  }
+
+  public var completedItemCount: Int {
+    items.count { $0.lane == .done }
   }
 
   public var isEmpty: Bool {
@@ -256,10 +265,12 @@ public struct TaskBoardInboxSnapshot: Equatable, Sendable {
       2
     case .review:
       3
-    case .blocked:
+    case .done:
       4
-    case .backlog:
+    case .blocked:
       5
+    case .backlog:
+      6
     }
   }
 

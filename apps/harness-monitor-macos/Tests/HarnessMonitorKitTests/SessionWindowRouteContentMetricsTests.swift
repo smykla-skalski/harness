@@ -142,6 +142,9 @@ struct SessionWindowRouteContentMetricsTests {
     let boardSource = try sourceFile(named: "SessionsBoardView.swift")
 
     #expect(boardSource.contains("TaskBoardOverviewView("))
+    #expect(boardSource.contains("snapshot: taskBoardInboxSnapshot"))
+    #expect(boardSource.contains("store.loadCachedTaskBoardInboxSnapshot("))
+    #expect(boardSource.contains("sessions: visibleTaskBoardSessions"))
     #expect(boardSource.contains("dashboardUI.taskBoardItems"))
     #expect(boardSource.contains("dashboardUI.taskBoardEvaluationSummary"))
     #expect(boardSource.contains("onEvaluateTaskBoard: evaluateTaskBoard"))
@@ -201,6 +204,9 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(overviewSource.contains("snapshot.items.contains"))
     #expect(managementPanelSource.contains("Session Task"))
     #expect(managementPanelSource.contains("Board Only"))
+    #expect(managementPanelSource.contains("TaskBoardManagementFacts("))
+    #expect(managementPanelSource.contains("TaskBoardExternalLinks("))
+    #expect(managementPanelSource.contains("Link(destination: destination.url)"))
     #expect(managementPanelSource.contains("Evaluate Item"))
     #expect(!laneSource.contains(".disabled(!isOpenable)"))
     #expect(!laneSource.contains("private var isOpenable"))
@@ -241,15 +247,19 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(!overviewSource.contains("Open work pulled from active sessions."))
   }
 
-  @Test("Task board lanes expose overflow rows for capped columns")
-  func taskBoardLanesExposeOverflowRowsForCappedColumns() throws {
+  @Test("Task board lanes render every card instead of hiding overflow")
+  func taskBoardLanesRenderEveryCardInsteadOfHidingOverflow() throws {
     let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
     let laneSupportSource = try taskBoardSourceFile(named: "TaskBoardLaneSupport.swift")
     let needsYouSource = try taskBoardSourceFile(named: "TaskBoardNeedsYouLaneViews.swift")
 
-    #expect(laneSource.contains("TaskBoardLaneOverflowRow(hiddenCount: section.items.count - 5)"))
-    #expect(laneSupportSource.contains("Text(\"+\\(hiddenCount) more\")"))
-    #expect(needsYouSource.contains("TaskBoardLaneOverflowRow(hiddenCount: hiddenItemCount)"))
+    #expect(laneSource.contains("ForEach(section.items)"))
+    #expect(needsYouSource.contains("ForEach(decisions, id: \\.id)"))
+    #expect(!laneSource.contains(".prefix(5)"))
+    #expect(!needsYouSource.contains(".prefix(4)"))
+    #expect(!laneSource.contains("TaskBoardLaneOverflowRow("))
+    #expect(!laneSupportSource.contains("TaskBoardLaneOverflowRow"))
+    #expect(!needsYouSource.contains("hiddenItemCount"))
   }
 
   private func sourceFile(named relativePath: String) throws -> String {
