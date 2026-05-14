@@ -144,6 +144,48 @@ extension PolicyCanvasViewModel {
       }
   }
 
+  /// Maximum per-target Connect actions stamped onto a single node card. Six
+  /// is the VoiceOver rotor floor where the rotor stays usable — beyond that
+  /// the action list becomes a navigation problem instead of a shortcut. The
+  /// dropped tail is reachable through edge-drag or by selecting a different
+  /// source node, so this is a discoverability cap, not a feature cap.
+  static let accessibilityConnectableTargetActionCap: Int = 6
+
+  /// Display name plus endpoint pair for the per-target Connect actions on a
+  /// node card. The display name is `"<target node title> <target port title>"`
+  /// so VoiceOver announces "Connect to Risk score event" (not just "Connect")
+  /// when the user invokes the rotor entry. `id` is stable across renders
+  /// because it composes the target node + port id, both of which the data
+  /// model treats as document-stable strings.
+  struct AccessibilityConnectTarget: Identifiable, Hashable {
+    let endpoint: PolicyCanvasPortEndpoint
+    let displayName: String
+    var id: String { "\(endpoint.nodeID)|\(endpoint.portID)" }
+  }
+
+  /// Per-target reachable inputs, decorated with display names for the
+  /// accessibility action rotor. Capped at the configured action-cap above to
+  /// keep the per-node rotor entry list usable. Source ordering matches the
+  /// underlying reachable enumeration (visual-order ish), so a VoiceOver user
+  /// gets the same first-hit a sighted user would.
+  func accessibilityConnectableNamedTargets(
+    fromNodeID nodeID: String
+  ) -> [AccessibilityConnectTarget] {
+    accessibilityConnectableTargets(fromNodeID: nodeID)
+      .prefix(Self.accessibilityConnectableTargetActionCap)
+      .compactMap { endpoint -> AccessibilityConnectTarget? in
+        guard let target = node(endpoint.nodeID),
+          let port = target.inputPorts.first(where: { $0.id == endpoint.portID })
+        else {
+          return nil
+        }
+        return AccessibilityConnectTarget(
+          endpoint: endpoint,
+          displayName: "\(target.title) \(port.title)"
+        )
+      }
+  }
+
   /// Builds the wire payload for the first available output port on a node.
   /// Returns nil when the node has no outputs (e.g. terminal decisions). Used
   /// by `accessibilityConnect(fromNodeID:to:)` to mirror the `.draggable`

@@ -14,10 +14,24 @@ extension PolicyCanvasViewModel {
     clearTransientGestureState()
   }
 
-  // `clearTransientGestureState()` lives in PolicyCanvasViewModel+EdgeCreation
-  // (post Wave 2D+2F merge consolidation), so re-declaring it here breaks
-  // compile. Keep the call site in `clearSelection()` above but route through
-  // the unified helper that also clears `pendingEdgePreview`.
+  /// Drop every piece of in-flight gesture state in one call: the rubber-band
+  /// edge preview (via `clearPendingEdge()`), the highlighted input port
+  /// stroke, and the highlighted drop-target group. Use this from interruption
+  /// surfaces (scenePhase transitions, Escape keypress, document republish)
+  /// where the canvas needs to return to a resting state regardless of which
+  /// gesture was mid-flight.
+  ///
+  /// Routes the pending-edge clear through `clearPendingEdge()` so the
+  /// rubber-band presence-bit (`hasPendingEdge`) stays in sync — Wave 2F is
+  /// the only writer of that bit, and reaching past its single setter would
+  /// strand views that subscribe to the bit instead of the payload.
+  ///
+  /// Idempotent — every write is to optional storage that may already be nil.
+  func clearTransientGestureState() {
+    highlightedInput = nil
+    highlightedGroupID = nil
+    clearPendingEdge()
+  }
 
   func save() {
     notifyStatus("Draft saved")

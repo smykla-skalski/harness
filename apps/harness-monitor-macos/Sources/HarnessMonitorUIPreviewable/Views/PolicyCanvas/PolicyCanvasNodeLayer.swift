@@ -85,13 +85,17 @@ struct PolicyCanvasNodeCard: View {
           // P26 Dynamic Type: the fixed `nodeSize.height` is load-bearing for
           // edge routing (port anchors are derived from layout coords, not
           // measured frames). Letting text reflow inside via lineLimit(2) +
-          // minimumScaleFactor keeps AX5 legible without dragging the whole
-          // layout topology with it.
+          // minimumScaleFactor + allowsTightening keeps AX5 legible without
+          // dragging the whole layout topology with it. The 0.7 floor (vs.
+          // 0.85) trades a tighter title against the AX5 reality that an
+          // 0.85-scaled headline still overflows the fixed card height; the
+          // alternative (growing the card) would re-lay out every port anchor.
           Text(node.title)
             .scaledFont(.callout.weight(.semibold))
             .foregroundStyle(.white)
             .lineLimit(2)
-            .minimumScaleFactor(0.85)
+            .minimumScaleFactor(0.7)
+            .allowsTightening(true)
 
           Text(node.subtitle)
             .scaledFont(.caption)
@@ -99,14 +103,16 @@ struct PolicyCanvasNodeCard: View {
             // ~5.5:1 AA threshold on the node's `#191F29` surface (was ~4:1).
             .foregroundStyle(.white.opacity(0.78))
             .lineLimit(1)
-            .minimumScaleFactor(0.85)
+            .minimumScaleFactor(0.7)
+            .allowsTightening(true)
 
           if let groupID = node.groupID, let group = viewModel.group(groupID) {
             Text(group.title)
               .scaledFont(.caption2.weight(.medium))
               .foregroundStyle(group.tone.color.opacity(0.95))
               .lineLimit(1)
-              .minimumScaleFactor(0.85)
+              .minimumScaleFactor(0.7)
+              .allowsTightening(true)
           }
         }
 
@@ -212,16 +218,29 @@ struct PolicyCanvasNodeCard: View {
 }
 
 /// P28 per-node accessibility actions modifier. Stamps Delete / Duplicate /
-/// Open Inspector / Connect-to-first-reachable-input onto every node card so
+/// Open Inspector / per-target Connect actions onto every node card so
 /// VoiceOver users get the same commands the mouse drag/context-menu paths
 /// expose. Built as a `ViewModifier` instead of inline `.accessibilityAction`
 /// calls so the action closures don't allocate on every node card update.
+///
+/// The Connect surface enumerates up to
+/// `accessibilityConnectableTargetActionCap` reachable inputs as separately
+/// named rotor entries (e.g. "Connect to Risk score event") so the VoiceOver
+/// user knows which target an invocation wires before committing — the prior
+/// single "Connect" action silently picked the first reachable input.
+///
+/// Per-target Connect actions live in the `.accessibilityActions { ForEach }`
+/// block. The `ForEach` block accepts the ViewBuilder shape the per-target
+/// enumeration needs without falling back to `AnyView` type-erasure (which
+/// would re-erase the modifier chain on every node card update).
 private struct PolicyCanvasNodeAccessibilityActions: ViewModifier {
   let viewModel: PolicyCanvasViewModel
   let nodeID: String
 
   func body(content: Content) -> some View {
-    content
+    let connectTargets = viewModel.accessibilityConnectableNamedTargets(fromNodeID: nodeID)
+    return
+      content
       .accessibilityAction(named: Text("Delete")) {
         viewModel.select(.node(nodeID))
         viewModel.deleteNode(nodeID)
@@ -232,12 +251,12 @@ private struct PolicyCanvasNodeAccessibilityActions: ViewModifier {
       .accessibilityAction(named: Text("Open inspector")) {
         viewModel.accessibilityOpenInspector(forNodeID: nodeID)
       }
-      .accessibilityAction(named: Text("Connect")) {
-        let targets = viewModel.accessibilityConnectableTargets(fromNodeID: nodeID)
-        guard let first = targets.first else {
-          return
+      .accessibilityActions {
+        ForEach(connectTargets) { target in
+          Button("Connect to \(target.displayName)") {
+            _ = viewModel.accessibilityConnect(fromNodeID: nodeID, to: target.endpoint)
+          }
         }
-        _ = viewModel.accessibilityConnect(fromNodeID: nodeID, to: first)
       }
   }
 }

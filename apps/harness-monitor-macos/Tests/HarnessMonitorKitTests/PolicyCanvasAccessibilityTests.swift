@@ -147,6 +147,60 @@ struct PolicyCanvasAccessibilityTests {
     #expect(viewModel.edges.count == beforeEdges + 1)
   }
 
+  // Per-target Connect actions surface target node + port titles, capped at
+  // the configured action-cap so the VoiceOver rotor stays usable. The
+  // display name must let the user disambiguate between targets ("Risk score
+  // event" vs "Context map event") instead of the prior silent first-hit.
+  @Test("connect named targets carry node + port titles for the rotor")
+  func connectNamedTargetsCarryNodeAndPortTitles() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    let named = viewModel.accessibilityConnectableNamedTargets(
+      fromNodeID: "policy-source"
+    )
+    #expect(!named.isEmpty)
+    #expect(named.count <= PolicyCanvasViewModel.accessibilityConnectableTargetActionCap)
+
+    let displayNames = named.map(\.displayName)
+    for name in displayNames {
+      // "<node title> <port title>" - both pieces are present so VO announces
+      // both halves of the destination, not just the node.
+      #expect(name.split(separator: " ").count >= 2)
+    }
+
+    // The first reachable target's endpoint matches the legacy first-hit, so
+    // the rotor's first entry preserves the prior keyboard shortcut path.
+    let legacy = viewModel.accessibilityConnectableTargets(fromNodeID: "policy-source")
+    guard let firstLegacy = legacy.first, let firstNamed = named.first else {
+      Issue.record("expected first connect target to exist")
+      return
+    }
+    #expect(firstNamed.endpoint == firstLegacy)
+  }
+
+  // Cap enforcement: synthesize enough reachable inputs to exceed the cap and
+  // confirm the named-targets list does not exceed it. The accessibility
+  // rotor floor is sensitive to long lists; this is a discoverability cap,
+  // not a routing cap.
+  @Test("connect named targets respect the rotor cap")
+  func connectNamedTargetsRespectRotorCap() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    // Add enough fresh condition nodes (each contributes one `event` input
+    // port) to push reachable targets past the cap. Position them on a fresh
+    // row so the snap-to-grid de-collision doesn't merge into existing nodes.
+    let cap = PolicyCanvasViewModel.accessibilityConnectableTargetActionCap
+    let needed = cap + 2
+    for index in 0..<needed {
+      viewModel.createNode(
+        kind: .condition,
+        at: CGPoint(x: 1400 + CGFloat(index) * 220, y: 720)
+      )
+    }
+    let named = viewModel.accessibilityConnectableNamedTargets(
+      fromNodeID: "policy-source"
+    )
+    #expect(named.count == cap)
+  }
+
   // P28 open inspector: raises the draft tab + selects the node so the
   // inspector form is the active surface.
   @Test("accessibility open inspector selects node and raises draft tab")
@@ -156,5 +210,35 @@ struct PolicyCanvasAccessibilityTests {
     viewModel.accessibilityOpenInspector(forNodeID: "promote-release")
     #expect(viewModel.selectedTab == .draft)
     #expect(viewModel.selection == .node("promote-release"))
+  }
+
+  // Escape / scenePhase / republish: `clearTransientGestureState()` must drop
+  // every in-flight gesture slot (rubber-band preview, input highlight, group
+  // highlight) and keep the `hasPendingEdge` presence-bit in sync with the
+  // payload. Routing the rubber-band clear through `clearPendingEdge()`
+  // guarantees the bit re-flips on Escape mid-drag.
+  @Test("clear transient gesture state drops rubber-band, highlights, presence bit")
+  func clearTransientGestureStateDropsAllSlots() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.beginPendingEdge(
+      sourceNodeID: "policy-source",
+      sourcePortID: "output-event"
+    )
+    viewModel.highlightedInput = PolicyCanvasPortEndpoint(
+      nodeID: "risk-score",
+      portID: "input-event",
+      kind: .input
+    )
+    viewModel.highlightedGroupID = "group-evaluation"
+
+    #expect(viewModel.pendingEdgePreview != nil)
+    #expect(viewModel.hasPendingEdge)
+
+    viewModel.clearTransientGestureState()
+
+    #expect(viewModel.pendingEdgePreview == nil)
+    #expect(!viewModel.hasPendingEdge)
+    #expect(viewModel.highlightedInput == nil)
+    #expect(viewModel.highlightedGroupID == nil)
   }
 }
