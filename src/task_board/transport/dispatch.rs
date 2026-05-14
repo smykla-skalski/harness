@@ -82,6 +82,7 @@ impl TaskBoardDispatchArgs {
             board_item_id: plan.board_item_id.clone(),
             session_id,
             work_item_id: task.task_id,
+            lifecycle: plan.applied_lifecycle(),
             item,
         })
     }

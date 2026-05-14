@@ -1,15 +1,23 @@
+use crate::agents::runtime::runtime_for_name;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+use crate::daemon::index::ResolvedSession;
 use crate::daemon::protocol::{
     SessionDetail, TaskBoardEvaluateRequest, TaskBoardEvaluationResponse,
 };
 use crate::errors::CliError;
-use crate::session::types::WorkItem;
+use crate::session::service as session_service;
+use crate::session::storage as session_storage;
+use crate::session::types::{SessionSignalRecord, TaskStatus, WorkItem};
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::{
-    TaskBoardEvaluationRecord, TaskBoardEvaluationSummary, TaskBoardItem, TaskBoardStatus,
-    TaskBoardStore, default_board_root, evaluate_task_board_item, failed_workflow,
-    missing_session_record, missing_task_record, record_from_decision, skipped_unlinked_record,
+    TaskBoardEvaluationOutcome, TaskBoardEvaluationRecord, TaskBoardEvaluationSummary,
+    TaskBoardItem, TaskBoardStatus, TaskBoardStore, default_board_root, evaluate_task_board_item,
+    failed_workflow, missing_session_record, missing_task_record, record_from_decision,
+    skipped_unlinked_record,
 };
+use crate::workspace::utc_now;
+
+use super::{build_log_entry, effective_project_dir, index, session_not_found};
 
 /// Evaluate linked task-board items against their session work-item state.
 ///
@@ -29,6 +37,7 @@ pub fn evaluate_task_board(
             let detail = super::session_detail(session_id, db)?;
             Ok(task_from_detail(detail, work_item_id))
         },
+        |item, task, record| materialize_reviewer_signal(item, task, record, db),
     )
 }
 
@@ -74,7 +83,9 @@ pub(crate) async fn evaluate_task_board_async(
             summary.push(record);
             continue;
         };
-        summary.push(evaluate_linked_item(&board, item, &task, request.dry_run)?);
+        let record = evaluate_linked_item(&board, item, &task, request.dry_run)?;
+        materialize_reviewer_signal_async(item, &task, &record, async_db).await?;
+        summary.push(record);
     }
     Ok(summary)
 }
@@ -94,6 +105,11 @@ fn evaluate_items_with_loader<F>(
     items: &[TaskBoardItem],
     dry_run: bool,
     mut load_task: F,
+    mut schedule_reviewer: impl FnMut(
+        &TaskBoardItem,
+        &WorkItem,
+        &TaskBoardEvaluationRecord,
+    ) -> Result<(), CliError>,
 ) -> Result<TaskBoardEvaluationSummary, CliError>
 where
     F: FnMut(&str, &str) -> Result<Option<WorkItem>, CliError>,
@@ -127,7 +143,9 @@ where
             )?);
             continue;
         };
-        summary.push(evaluate_linked_item(board, item, &task, dry_run)?);
+        let record = evaluate_linked_item(board, item, &task, dry_run)?;
+        schedule_reviewer(item, &task, &record)?;
+        summary.push(record);
     }
     Ok(summary)
 }
@@ -170,6 +188,130 @@ fn evaluate_linked_item(
     ))
 }
 
+fn materialize_reviewer_signal(
+    item: &TaskBoardItem,
+    task: &WorkItem,
+    record: &TaskBoardEvaluationRecord,
+    db: Option<&DaemonDb>,
+) -> Result<(), CliError> {
+    if !should_materialize_reviewer_signal(task, record) {
+        return Ok(());
+    }
+    let Some(session_id) = item.session_id.as_deref() else {
+        return Ok(());
+    };
+    let resolved = resolve_session(session_id, db)?;
+    write_reviewer_signal(&resolved, task, db)
+}
+
+async fn materialize_reviewer_signal_async(
+    item: &TaskBoardItem,
+    task: &WorkItem,
+    record: &TaskBoardEvaluationRecord,
+    async_db: &AsyncDaemonDb,
+) -> Result<(), CliError> {
+    if !should_materialize_reviewer_signal(task, record) {
+        return Ok(());
+    }
+    let Some(session_id) = item.session_id.as_deref() else {
+        return Ok(());
+    };
+    let Some(resolved) = async_db.resolve_session(session_id).await? else {
+        return Err(session_not_found(session_id));
+    };
+    write_reviewer_signal_async(&resolved, task, async_db).await
+}
+
+fn should_materialize_reviewer_signal(task: &WorkItem, record: &TaskBoardEvaluationRecord) -> bool {
+    record.updated
+        && record.outcome == TaskBoardEvaluationOutcome::ReviewPending
+        && task.status == TaskStatus::AwaitingReview
+}
+
+fn resolve_session(session_id: &str, db: Option<&DaemonDb>) -> Result<ResolvedSession, CliError> {
+    if let Some(db) = db
+        && let Some(resolved) = db.resolve_session(session_id)?
+    {
+        return Ok(resolved);
+    }
+    index::resolve_session(session_id)
+}
+
+fn write_reviewer_signal(
+    resolved: &ResolvedSession,
+    task: &WorkItem,
+    db: Option<&DaemonDb>,
+) -> Result<(), CliError> {
+    let now = utc_now();
+    let Some(record) =
+        session_service::maybe_emit_spawn_reviewer(&resolved.state, &task.task_id, &now)
+    else {
+        return Ok(());
+    };
+    let Some(runtime) = runtime_for_name(&record.runtime) else {
+        return Ok(());
+    };
+    let project_dir = effective_project_dir(resolved).to_path_buf();
+    let target_session_id = signal_target_session_id(resolved, &record);
+    runtime.write_signal(&project_dir, &target_session_id, &record.signal)?;
+    let transition = session_service::log_signal_sent(
+        &record.signal.signal_id,
+        &record.agent_id,
+        &record.signal.command,
+    );
+    if let Some(db) = db {
+        return db.append_log_entry(&build_log_entry(
+            &resolved.state.session_id,
+            transition,
+            None,
+            None,
+        ));
+    }
+    let layout =
+        session_storage::layout_from_project_dir(&project_dir, &resolved.state.session_id)?;
+    session_storage::append_log_entry(&layout, transition, None, None)
+}
+
+async fn write_reviewer_signal_async(
+    resolved: &ResolvedSession,
+    task: &WorkItem,
+    async_db: &AsyncDaemonDb,
+) -> Result<(), CliError> {
+    let now = utc_now();
+    let Some(record) =
+        session_service::maybe_emit_spawn_reviewer(&resolved.state, &task.task_id, &now)
+    else {
+        return Ok(());
+    };
+    let Some(runtime) = runtime_for_name(&record.runtime) else {
+        return Ok(());
+    };
+    let project_dir = effective_project_dir(resolved).to_path_buf();
+    let target_session_id = signal_target_session_id(resolved, &record);
+    runtime.write_signal(&project_dir, &target_session_id, &record.signal)?;
+    async_db
+        .append_log_entry(&build_log_entry(
+            &resolved.state.session_id,
+            session_service::log_signal_sent(
+                &record.signal.signal_id,
+                &record.agent_id,
+                &record.signal.command,
+            ),
+            None,
+            None,
+        ))
+        .await
+}
+
+fn signal_target_session_id(resolved: &ResolvedSession, record: &SessionSignalRecord) -> String {
+    resolved
+        .state
+        .agents
+        .get(&record.agent_id)
+        .and_then(|agent| agent.agent_session_id.clone())
+        .unwrap_or_else(|| record.session_id.clone())
+}
+
 fn failure_record(
     board: &TaskBoardStore,
     item: &TaskBoardItem,
@@ -204,215 +346,5 @@ fn store() -> TaskBoardStore {
 }
 
 #[cfg(test)]
-mod tests {
-    use tempfile::tempdir;
-
-    use crate::errors::CliErrorKind;
-    use crate::session::types::{TaskQueuePolicy, TaskSeverity, TaskSource, TaskStatus};
-    use crate::task_board::{TaskBoardEvaluationOutcome, TaskBoardWorkflowStatus};
-
-    use super::*;
-
-    const NOW: &str = "2026-05-14T00:00:00Z";
-
-    fn create_linked_item(
-        store: &TaskBoardStore,
-        id: &str,
-        status: TaskBoardStatus,
-    ) -> TaskBoardItem {
-        let mut item = TaskBoardItem::new(
-            id.to_string(),
-            "Board item".to_string(),
-            "Body".to_string(),
-            NOW.to_string(),
-        );
-        item.status = status;
-        item.session_id = Some("session-1".to_string());
-        item.work_item_id = Some("work-1".to_string());
-        item.workflow.execution_id = Some("workflow-1".to_string());
-        item.workflow.status = TaskBoardWorkflowStatus::Running;
-        item.workflow.current_step_id = Some("dispatch".to_string());
-        item.workflow.attempts = 1;
-        store
-            .create("Board item", "Body", item)
-            .expect("create item")
-    }
-
-    fn work_item(status: TaskStatus) -> WorkItem {
-        WorkItem {
-            task_id: "work-1".to_string(),
-            title: "Session task".to_string(),
-            context: None,
-            severity: TaskSeverity::Medium,
-            status,
-            assigned_to: None,
-            queue_policy: TaskQueuePolicy::Locked,
-            queued_at: None,
-            created_at: NOW.to_string(),
-            updated_at: NOW.to_string(),
-            created_by: None,
-            notes: Vec::new(),
-            suggested_fix: None,
-            source: TaskSource::Manual,
-            observe_issue_id: None,
-            blocked_reason: None,
-            completed_at: None,
-            checkpoint_summary: None,
-            awaiting_review: None,
-            review_claim: None,
-            consensus: None,
-            review_history: Vec::new(),
-            review_round: 0,
-            arbitration: None,
-            suggested_persona: None,
-            deleted_at: None,
-        }
-    }
-
-    #[test]
-    fn linked_item_update_persists_task_decision() {
-        let temp = tempdir().expect("tempdir");
-        let store = TaskBoardStore::new(temp.path().join("task-board"));
-        let item = create_linked_item(&store, "board-1", TaskBoardStatus::InProgress);
-
-        let summary =
-            evaluate_items_with_loader(&store, &[item], false, |session_id, work_item_id| {
-                assert_eq!(session_id, "session-1");
-                assert_eq!(work_item_id, "work-1");
-                Ok(Some(work_item(TaskStatus::Done)))
-            })
-            .expect("evaluate item");
-
-        assert_eq!(summary.total, 1);
-        assert_eq!(summary.evaluated, 1);
-        assert_eq!(summary.completed, 1);
-        assert_eq!(summary.updated, 1);
-        let record = &summary.records[0];
-        assert_eq!(record.outcome, TaskBoardEvaluationOutcome::Completed);
-        assert!(record.updated);
-        assert_eq!(record.board_status, Some(TaskBoardStatus::Done));
-        assert_eq!(
-            record.workflow_status,
-            Some(TaskBoardWorkflowStatus::Completed)
-        );
-        assert_eq!(
-            record.item.as_ref().map(|updated| updated.status),
-            Some(TaskBoardStatus::Done)
-        );
-
-        let stored = store.get("board-1").expect("load updated item");
-        assert_eq!(stored.status, TaskBoardStatus::Done);
-        assert_eq!(stored.workflow.status, TaskBoardWorkflowStatus::Completed);
-        assert_eq!(
-            stored.workflow.current_step_id.as_deref(),
-            Some("completed")
-        );
-        assert_eq!(stored.workflow.execution_id.as_deref(), Some("workflow-1"));
-    }
-
-    #[test]
-    fn missing_session_marks_linked_item_blocked() {
-        let temp = tempdir().expect("tempdir");
-        let store = TaskBoardStore::new(temp.path().join("task-board"));
-        let item = create_linked_item(&store, "board-1", TaskBoardStatus::InProgress);
-
-        let summary = evaluate_items_with_loader(&store, &[item], false, |_, _| {
-            Err(CliErrorKind::workflow_io("session unavailable").into())
-        })
-        .expect("evaluate item");
-
-        assert_eq!(summary.total, 1);
-        assert_eq!(summary.failed, 1);
-        assert_eq!(summary.updated, 1);
-        let record = &summary.records[0];
-        assert_eq!(record.outcome, TaskBoardEvaluationOutcome::MissingSession);
-        assert!(record.updated);
-        assert_eq!(
-            record.reason.as_deref(),
-            Some("[WORKFLOW_IO] session unavailable")
-        );
-        assert_eq!(record.board_status, Some(TaskBoardStatus::Blocked));
-        assert_eq!(
-            record.workflow_status,
-            Some(TaskBoardWorkflowStatus::Failed)
-        );
-
-        let stored = store.get("board-1").expect("load failed item");
-        assert_eq!(stored.status, TaskBoardStatus::Blocked);
-        assert_eq!(stored.workflow.status, TaskBoardWorkflowStatus::Failed);
-        assert_eq!(
-            stored.workflow.current_step_id.as_deref(),
-            Some("missing_session")
-        );
-        assert_eq!(
-            stored.workflow.last_error.as_deref(),
-            Some("[WORKFLOW_IO] session unavailable")
-        );
-    }
-
-    #[test]
-    fn missing_task_marks_linked_item_blocked() {
-        let temp = tempdir().expect("tempdir");
-        let store = TaskBoardStore::new(temp.path().join("task-board"));
-        let item = create_linked_item(&store, "board-1", TaskBoardStatus::InProgress);
-
-        let summary = evaluate_items_with_loader(&store, &[item], false, |_, _| Ok(None))
-            .expect("evaluate item");
-
-        assert_eq!(summary.total, 1);
-        assert_eq!(summary.failed, 1);
-        assert_eq!(summary.updated, 1);
-        let record = &summary.records[0];
-        assert_eq!(record.outcome, TaskBoardEvaluationOutcome::MissingTask);
-        assert!(record.updated);
-        assert_eq!(
-            record.reason.as_deref(),
-            Some("session task 'work-1' was not found")
-        );
-        assert_eq!(record.board_status, Some(TaskBoardStatus::Blocked));
-        assert_eq!(
-            record.workflow_status,
-            Some(TaskBoardWorkflowStatus::Failed)
-        );
-
-        let stored = store.get("board-1").expect("load failed item");
-        assert_eq!(stored.status, TaskBoardStatus::Blocked);
-        assert_eq!(stored.workflow.status, TaskBoardWorkflowStatus::Failed);
-        assert_eq!(
-            stored.workflow.current_step_id.as_deref(),
-            Some("missing_task")
-        );
-        assert_eq!(
-            stored.workflow.last_error.as_deref(),
-            Some("session task 'work-1' was not found")
-        );
-    }
-
-    #[test]
-    fn dry_run_leaves_sync_item_unchanged() {
-        let temp = tempdir().expect("tempdir");
-        let store = TaskBoardStore::new(temp.path().join("task-board"));
-        let item = create_linked_item(&store, "board-1", TaskBoardStatus::InProgress);
-        let before = store.get("board-1").expect("load original item");
-
-        let summary = evaluate_items_with_loader(&store, &[item], true, |_, _| {
-            Ok(Some(work_item(TaskStatus::Done)))
-        })
-        .expect("evaluate item");
-
-        assert_eq!(summary.total, 1);
-        assert_eq!(summary.evaluated, 1);
-        assert_eq!(summary.completed, 1);
-        assert_eq!(summary.updated, 0);
-        let record = &summary.records[0];
-        assert_eq!(record.outcome, TaskBoardEvaluationOutcome::Completed);
-        assert!(!record.updated);
-        assert_eq!(record.board_status, Some(TaskBoardStatus::Done));
-        assert!(record.item.is_none());
-
-        let after = store.get("board-1").expect("load item after dry run");
-        assert_eq!(after.status, before.status);
-        assert_eq!(after.workflow, before.workflow);
-        assert_eq!(after.updated_at, before.updated_at);
-    }
-}
+#[path = "task_board_evaluation_tests.rs"]
+mod tests;

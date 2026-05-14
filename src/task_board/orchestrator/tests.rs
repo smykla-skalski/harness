@@ -3,7 +3,7 @@ use tempfile::tempdir;
 use super::*;
 use crate::task_board::{
     DispatchAppliedTask, TaskBoardEvaluationRecord, TaskBoardEvaluationSummary, TaskBoardItem,
-    TaskBoardStatus,
+    TaskBoardStatus, build_dispatch_plan,
 };
 
 #[test]
@@ -87,6 +87,7 @@ fn run_once_persists_summary_and_counts_workflow_statuses() {
                     board_item_id: "task-1".to_string(),
                     session_id: "session-1".to_string(),
                     work_item_id: "work-1".to_string(),
+                    lifecycle: build_dispatch_plan(&applied_item).applied_lifecycle(),
                     item: applied_item,
                 }],
             })
