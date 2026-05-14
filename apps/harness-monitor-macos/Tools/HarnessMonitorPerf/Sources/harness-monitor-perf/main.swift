@@ -10,6 +10,7 @@ struct HarnessMonitorPerf: ParsableCommand {
             EnforceBudgets.self,
             Audit.self,
             AuditFromRef.self,
+            AuditBisect.self,
             Compare.self,
             FieldTelemetryReportCommand.self,
             Summarize.self,

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE depends=["monitor:tools:build:perf"]
+#MISE description="Find the first Harness Monitor performance budget failure with git bisect in a temporary worktree"
+set -euo pipefail
+
+apps/harness-monitor-macos/Scripts/run-instruments-audit-bisect.sh "$@"
