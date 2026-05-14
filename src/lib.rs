@@ -27,6 +27,7 @@ pub mod sandbox;
 pub mod session;
 pub mod setup;
 pub(crate) mod suite_defaults;
+pub mod task_board;
 pub mod telemetry;
 pub mod workspace;
 
