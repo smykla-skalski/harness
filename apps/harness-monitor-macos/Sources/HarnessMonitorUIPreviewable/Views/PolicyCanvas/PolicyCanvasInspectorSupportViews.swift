@@ -41,12 +41,9 @@ struct PolicyCanvasInspectorField<Content: View>: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 5) {
-      // P29 contrast: white at 0.78 reads ~5.6:1 on the inspector `#14171F`
-      // background and clears WCAG AA for small body text; 0.70 (~4.4:1)
-      // was below the per-Wave-3G contrast bar.
       Text(label)
         .scaledFont(.caption)
-        .foregroundStyle(.white.opacity(0.78))
+        .foregroundStyle(.white.opacity(0.70))
       content
     }
   }
@@ -60,15 +57,12 @@ struct PolicyCanvasInspectorRow: View {
     HStack(alignment: .firstTextBaseline, spacing: 10) {
       Text(label)
         .scaledFont(.caption)
-        // P29 contrast bump (0.70 -> 0.78) matches the field-label rule above.
-        .foregroundStyle(.white.opacity(0.78))
+        .foregroundStyle(.white.opacity(0.70))
         .frame(width: 68, alignment: .leading)
 
       Text(value)
         .scaledFont(.caption.weight(.medium))
-        // Primary value text on the inspector card stays at 0.92 to keep
-        // emphasis between label and value while clearing the AA bar.
-        .foregroundStyle(.white.opacity(0.92))
+        .foregroundStyle(.white.opacity(0.86))
         .lineLimit(2)
         .frame(maxWidth: .infinity, alignment: .leading)
     }

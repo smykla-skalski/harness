@@ -32,6 +32,35 @@ existing_xctestrun_path() {
   printf '%s\n' "$newest"
 }
 
+ui_test_runner_products() {
+  local selector="${XCODE_ONLY_TESTING:-}"
+  local product_dir="$DERIVED_DATA_PATH/Build/Products/Debug"
+  case "$selector" in
+    *HarnessMonitorUITests*)
+      printf '%s\n' "$product_dir/HarnessMonitorUITests-Runner.app"
+      ;;
+  esac
+  case "$selector" in
+    *HarnessMonitorAgentsE2ETests*)
+      printf '%s\n' "$product_dir/HarnessMonitorAgentsE2ETests-Runner.app"
+      ;;
+  esac
+}
+
+ui_test_runners_are_valid() {
+  local runner saw_runner=0
+  while IFS= read -r runner; do
+    [[ -n "$runner" ]] || continue
+    saw_runner=1
+    [[ -d "$runner" ]] || return 1
+    /usr/bin/codesign --verify --deep --strict "$runner" >/dev/null 2>&1 || return 1
+  done < <(ui_test_runner_products)
+
+  # No UI runner expected for this selector.
+  (( saw_runner == 0 )) && return 0
+  return 0
+}
+
 # Skip the build-for-testing step when the existing .xctestrun is newer than
 # every Swift source, project descriptor, and SPM lockfile that could affect
 # the test bundle. Defaults ON because chained focused reruns rarely change
@@ -51,6 +80,10 @@ should_reuse_existing_build_for_testing() {
   local xctestrun_epoch
   xctestrun_epoch="$(/usr/bin/stat -f '%m' "$xctestrun_path" 2>/dev/null || printf '0')"
   if (( xctestrun_epoch == 0 )); then
+    return 1
+  fi
+
+  if ! ui_test_runners_are_valid; then
     return 1
   fi
 

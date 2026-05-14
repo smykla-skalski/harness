@@ -182,11 +182,12 @@ extension HarnessMonitorStore {
       return true
     } catch {
       await refreshTaskBoardDashboardSnapshot(using: client)
-      let failureDescription = if let failureMessagePrefix {
-        "\(failureMessagePrefix): \(error.localizedDescription)"
-      } else {
-        error.localizedDescription
-      }
+      let failureDescription =
+        if let failureMessagePrefix {
+          "\(failureMessagePrefix): \(error.localizedDescription)"
+        } else {
+          error.localizedDescription
+        }
       presentFailureFeedback(failureDescription)
       return false
     }
