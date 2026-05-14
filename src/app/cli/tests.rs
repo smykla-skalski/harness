@@ -15,7 +15,7 @@ use crate::run::{
 use crate::session::transport::{SessionCommand, SessionObserveArgs};
 use crate::setup::{CapabilitiesArgs, ClusterArgs, GatewayArgs, KumaSetupCommand};
 use crate::task_board::transport::{TaskBoardCommand, TaskBoardOrchestratorCommand};
-use crate::task_board::types::TaskBoardStatus;
+use crate::task_board::types::{ExternalRefProvider, TaskBoardStatus, TaskBoardWorkflowStatus};
 
 #[path = "tests/create.rs"]
 mod create;
@@ -194,6 +194,12 @@ fn parse_task_board_create() {
         "interactive",
         "--tag",
         "monitor",
+        "--external-ref",
+        "github:42=https://example.invalid/issues/42",
+        "--session-id",
+        "session-1",
+        "--work-item-id",
+        "work-1",
     ])
     .unwrap();
     match cli.command {
@@ -203,6 +209,11 @@ fn parse_task_board_create() {
             assert_eq!(args.title, "Add inbox");
             assert_eq!(args.body, "Track cross-project work");
             assert_eq!(args.tag, ["monitor"]);
+            let external_ref = args.fields.external_ref[0].as_external_ref();
+            assert_eq!(external_ref.provider, ExternalRefProvider::GitHub);
+            assert_eq!(external_ref.external_id, "42");
+            assert_eq!(args.fields.session_id.as_deref(), Some("session-1"));
+            assert_eq!(args.fields.work_item_id.as_deref(), Some("work-1"));
         }
         _ => panic!("expected TaskBoard Create"),
     }
@@ -221,6 +232,14 @@ fn parse_task_board_update_planning_fields() {
         "Implementation plan accepted.",
         "--approved-by",
         "lead",
+        "--workflow-status",
+        "running",
+        "--workflow-branch",
+        "feature/task-1",
+        "--workflow-policy-trace-id",
+        "trace-1",
+        "--clear-session",
+        "--clear-work-item",
     ])
     .unwrap();
     match cli.command {
@@ -230,12 +249,77 @@ fn parse_task_board_update_planning_fields() {
             assert_eq!(args.id, "task-1");
             assert_eq!(args.status, Some(TaskBoardStatus::Todo));
             assert_eq!(
-                args.planning_summary.as_deref(),
+                args.fields.planning_summary.as_deref(),
                 Some("Implementation plan accepted.")
             );
-            assert_eq!(args.approved_by.as_deref(), Some("lead"));
+            assert_eq!(args.fields.approved_by.as_deref(), Some("lead"));
+            assert_eq!(
+                args.fields.workflow_status,
+                Some(TaskBoardWorkflowStatus::Running)
+            );
+            assert!(args.clear_session);
+            assert!(args.clear_work_item);
         }
         _ => panic!("expected TaskBoard Update"),
+    }
+}
+
+#[test]
+fn parse_task_board_orchestrator_runtime_config_and_tokens() {
+    let runtime_config = Cli::try_parse_from([
+        "harness",
+        "task-board",
+        "orchestrator",
+        "runtime-config",
+        "--repository",
+        "owner/repo",
+        "--author-email",
+        "repo@example.com",
+        "--signing-mode",
+        "gpg",
+        "--gpg-key-id",
+        "ABC123",
+        "--json",
+    ])
+    .unwrap();
+    match runtime_config.command {
+        Command::TaskBoard {
+            command:
+                TaskBoardCommand::Orchestrator {
+                    command: TaskBoardOrchestratorCommand::RuntimeConfig(args),
+                },
+        } => {
+            assert_eq!(args.repository.as_deref(), Some("owner/repo"));
+            assert_eq!(args.author_email.as_deref(), Some("repo@example.com"));
+            assert!(args.signing_mode.is_some());
+            assert_eq!(args.gpg_key_id.as_deref(), Some("ABC123"));
+            assert!(args.json);
+        }
+        _ => panic!("expected TaskBoard Orchestrator RuntimeConfig"),
+    }
+
+    let tokens = Cli::try_parse_from([
+        "harness",
+        "task-board",
+        "orchestrator",
+        "github-tokens",
+        "--global-token-env",
+        "HARNESS_TOKEN",
+        "--repository-token-env",
+        "owner/repo=HARNESS_REPO_TOKEN",
+    ])
+    .unwrap();
+    match tokens.command {
+        Command::TaskBoard {
+            command:
+                TaskBoardCommand::Orchestrator {
+                    command: TaskBoardOrchestratorCommand::GithubTokens(args),
+                },
+        } => {
+            assert_eq!(args.global_token_env.as_deref(), Some("HARNESS_TOKEN"));
+            assert_eq!(args.repository_token_env, ["owner/repo=HARNESS_REPO_TOKEN"]);
+        }
+        _ => panic!("expected TaskBoard Orchestrator GithubTokens"),
     }
 }
 

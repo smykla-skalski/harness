@@ -13,18 +13,18 @@ use crate::task_board::store::{
     OptionalFieldPatch, TaskBoardItemPatch, TaskBoardStore, default_board_root,
 };
 use crate::task_board::summary::build_audit_summary;
-use crate::task_board::types::{
-    AgentMode, PlanningState, TaskBoardItem, TaskBoardPriority, TaskBoardStatus,
-};
+use crate::task_board::types::{AgentMode, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
 use crate::workspace::utc_now;
 
 mod catalog;
 mod dispatch;
 mod evaluate;
+mod item_args;
 mod orchestrator;
 mod sync;
 
 pub use evaluate::TaskBoardEvaluateArgs;
+use item_args::TaskBoardItemFieldArgs;
 pub use orchestrator::TaskBoardOrchestratorCommand;
 
 #[derive(Debug, Clone, Subcommand)]
@@ -73,6 +73,8 @@ pub struct TaskBoardCreateArgs {
     pub tag: Vec<String>,
     #[arg(long)]
     pub project_id: Option<String>,
+    #[command(flatten)]
+    pub fields: TaskBoardItemFieldArgs,
     #[arg(long)]
     pub id: Option<String>,
     #[arg(long)]
@@ -117,10 +119,18 @@ pub struct TaskBoardUpdateArgs {
     pub project_id: Option<String>,
     #[arg(long)]
     pub clear_project: bool,
+    #[command(flatten)]
+    pub fields: TaskBoardItemFieldArgs,
     #[arg(long)]
-    pub planning_summary: Option<String>,
+    pub clear_external_refs: bool,
     #[arg(long)]
-    pub approved_by: Option<String>,
+    pub clear_planning: bool,
+    #[arg(long)]
+    pub clear_workflow: bool,
+    #[arg(long)]
+    pub clear_session: bool,
+    #[arg(long)]
+    pub clear_work_item: bool,
     #[arg(long)]
     pub board_root: Option<PathBuf>,
 }
@@ -214,6 +224,15 @@ impl Execute for TaskBoardCreateArgs {
         item.agent_mode = self.agent_mode;
         item.tags.clone_from(&self.tag);
         item.project_id.clone_from(&self.project_id);
+        item.external_refs = self.fields.external_refs();
+        if let Some(planning) = self.fields.planning() {
+            item.planning = planning;
+        }
+        if let Some(workflow) = self.fields.workflow(None) {
+            item.workflow = workflow;
+        }
+        item.session_id.clone_from(&self.fields.session_id);
+        item.work_item_id.clone_from(&self.fields.work_item_id);
         let item = store(self.board_root.clone()).create(&self.title, &self.body, item)?;
         print_json(&item)?;
         Ok(0)
@@ -251,16 +270,21 @@ impl Execute for TaskBoardGetArgs {
 
 impl Execute for TaskBoardUpdateArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let patch = self.patch();
-        let item = store(self.board_root.clone()).update(&self.id, patch)?;
+        let board = store(self.board_root.clone());
+        let current = self
+            .fields
+            .has_workflow_update()
+            .then(|| board.get(&self.id))
+            .transpose()?;
+        let patch = self.patch(current.as_ref());
+        let item = board.update(&self.id, patch)?;
         print_json(&item)?;
         Ok(0)
     }
 }
 
 impl TaskBoardUpdateArgs {
-    fn patch(&self) -> TaskBoardItemPatch {
-        let planning = self.planning_patch();
+    fn patch(&self, current: Option<&TaskBoardItem>) -> TaskBoardItemPatch {
         TaskBoardItemPatch {
             title: self.title.clone(),
             body: self.body.clone(),
@@ -269,7 +293,13 @@ impl TaskBoardUpdateArgs {
             tags: (!self.tag.is_empty()).then(|| self.tag.clone()),
             project_id: self.project_patch(),
             agent_mode: self.agent_mode,
-            planning,
+            external_refs: self.external_refs_patch(),
+            planning: self.fields.planning(),
+            clear_planning: self.clear_planning,
+            workflow: self.fields.workflow(current.map(|item| &item.workflow)),
+            clear_workflow: self.clear_workflow,
+            session_id: self.session_patch(),
+            work_item_id: self.work_item_patch(),
             ..TaskBoardItemPatch::default()
         }
     }
@@ -283,15 +313,34 @@ impl TaskBoardUpdateArgs {
             .map_or(OptionalFieldPatch::Unchanged, OptionalFieldPatch::Set)
     }
 
-    fn planning_patch(&self) -> Option<PlanningState> {
-        if self.planning_summary.is_none() && self.approved_by.is_none() {
-            return None;
+    fn external_refs_patch(&self) -> Option<Vec<crate::task_board::types::ExternalRef>> {
+        if self.clear_external_refs {
+            Some(Vec::new())
+        } else {
+            self.fields
+                .has_external_refs()
+                .then(|| self.fields.external_refs())
         }
-        Some(PlanningState {
-            summary: self.planning_summary.clone(),
-            approved_by: self.approved_by.clone(),
-            approved_at: self.approved_by.as_ref().map(|_| utc_now()),
-        })
+    }
+
+    fn session_patch(&self) -> OptionalFieldPatch<String> {
+        if self.clear_session {
+            return OptionalFieldPatch::Clear;
+        }
+        self.fields
+            .session_id
+            .clone()
+            .map_or(OptionalFieldPatch::Unchanged, OptionalFieldPatch::Set)
+    }
+
+    fn work_item_patch(&self) -> OptionalFieldPatch<String> {
+        if self.clear_work_item {
+            return OptionalFieldPatch::Clear;
+        }
+        self.fields
+            .work_item_id
+            .clone()
+            .map_or(OptionalFieldPatch::Unchanged, OptionalFieldPatch::Set)
     }
 }
 
