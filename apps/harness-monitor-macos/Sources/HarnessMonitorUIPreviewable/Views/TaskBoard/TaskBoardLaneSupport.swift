@@ -15,7 +15,6 @@ struct TaskBoardLaneMetrics: Equatable {
   let countHorizontalPadding: CGFloat
   let countVerticalPadding: CGFloat
   let emptyLaneMinHeight: CGFloat
-  let overflowMinHeight: CGFloat
   let cardMinHeight: CGFloat
   let cardPadding: CGFloat
   let cardCornerRadius: CGFloat
@@ -44,7 +43,6 @@ struct TaskBoardLaneMetrics: Equatable {
     countHorizontalPadding = HarnessMonitorTheme.spacingSM * denseScale
     countVerticalPadding = HarnessMonitorTheme.spacingXS * min(scale, 1.2)
     emptyLaneMinHeight = 92 * heightScale
-    overflowMinHeight = 28 * denseScale
     cardMinHeight = 80 * heightScale
     cardPadding = HarnessMonitorTheme.spacingMD * denseScale
     cardCornerRadius = HarnessMonitorTheme.cornerRadiusSM
@@ -109,40 +107,6 @@ struct TaskBoardEmptyLane: View {
     .frame(maxWidth: .infinity, minHeight: metrics.emptyLaneMinHeight)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel("\(lane.title) lane empty")
-  }
-}
-
-struct TaskBoardLaneOverflowRow: View {
-  let hiddenCount: Int
-  @Environment(\.fontScale)
-  private var fontScale
-
-  private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
-
-  var body: some View {
-    if hiddenCount > 0 {
-      HStack(spacing: HarnessMonitorTheme.spacingXS) {
-        Image(systemName: "ellipsis")
-          .scaledFont(.caption.weight(.bold))
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .accessibilityHidden(true)
-        Text("+\(hiddenCount) more")
-          .scaledFont(.caption.weight(.semibold))
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        Spacer(minLength: 0)
-      }
-      .padding(.horizontal, HarnessMonitorTheme.spacingSM)
-      .frame(maxWidth: .infinity, minHeight: metrics.overflowMinHeight)
-      .background(
-        .background.opacity(0.32),
-        in: .rect(cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
-      )
-      .overlay {
-        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
-          .stroke(HarnessMonitorTheme.controlBorder.opacity(0.34), lineWidth: 1)
-      }
-      .accessibilityLabel("\(hiddenCount) more task board items")
-    }
   }
 }
 
@@ -387,6 +351,8 @@ func taskBoardLaneColor(for lane: TaskBoardInboxLane) -> Color {
     HarnessMonitorTheme.danger
   case .review:
     HarnessMonitorTheme.caution
+  case .done:
+    HarnessMonitorTheme.success
   case .running:
     HarnessMonitorTheme.success
   case .backlog:

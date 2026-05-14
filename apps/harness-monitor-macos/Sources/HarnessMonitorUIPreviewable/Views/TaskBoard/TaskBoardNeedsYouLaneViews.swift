@@ -27,13 +27,12 @@ struct TaskBoardNeedsYouLaneColumn: View {
           TaskBoardEmptyLane(lane: .needsYou)
         } else {
           VStack(spacing: metrics.laneSpacing) {
-            ForEach(decisions.prefix(4), id: \.id) { decision in
+            ForEach(decisions, id: \.id) { decision in
               TaskBoardDecisionRow(decision: decision, onOpenDecision: onOpenDecision)
             }
-            ForEach(section.items.prefix(5)) { item in
+            ForEach(section.items) { item in
               TaskBoardItemRow(item: item, onOpenItem: onOpenItem)
             }
-            TaskBoardLaneOverflowRow(hiddenCount: hiddenItemCount)
           }
         }
       }
@@ -55,10 +54,6 @@ struct TaskBoardNeedsYouLaneColumn: View {
       return false
     }
     return onMoveItem(payload.itemID, .needsYou)
-  }
-
-  private var hiddenItemCount: Int {
-    max(0, decisions.count - 4) + max(0, section.items.count - 5)
   }
 }
 
@@ -88,7 +83,7 @@ struct TaskBoardDecisionRow: View {
             tint: severityColor
           )
           .padding(.top, metrics.cardMarkerTopPadding)
-          VStack(alignment: .leading, spacing: 3) {
+          VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
             Text(decision.summary)
               .scaledFont(.subheadline.weight(.semibold))
               .foregroundStyle(HarnessMonitorTheme.ink)

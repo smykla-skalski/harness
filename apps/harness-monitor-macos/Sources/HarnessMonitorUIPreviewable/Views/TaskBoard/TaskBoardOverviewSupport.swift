@@ -13,6 +13,8 @@ struct TaskBoardOverviewMetrics: Equatable {
   let iconControlMinWidth: CGFloat
   let managementPanelMinHeight: CGFloat
   let managementPanelSpacing: CGFloat
+  let managementPanelCornerRadius: CGFloat
+  let managementPillVerticalPadding: CGFloat
 
   init(fontScale: CGFloat) {
     let scale = SessionWindowFontScale.metricsScale(for: fontScale)
@@ -20,6 +22,8 @@ struct TaskBoardOverviewMetrics: Equatable {
     iconControlMinWidth = max(32, 32 * min(scale, 1.35))
     managementPanelMinHeight = max(132, 132 * min(scale, 1.25))
     managementPanelSpacing = max(8, 8 * min(scale, 1.35))
+    managementPanelCornerRadius = HarnessMonitorTheme.cornerRadiusSM * min(scale, 1.2)
+    managementPillVerticalPadding = max(3, 3 * min(scale, 1.25))
   }
 }
 
@@ -98,6 +102,8 @@ extension TaskBoardInboxLane {
       .awaitingReview
     case .blocked:
       .blocked
+    case .done:
+      .done
     }
   }
 
@@ -113,6 +119,8 @@ extension TaskBoardInboxLane {
       .inReview
     case .blocked:
       .blocked
+    case .done:
+      .done
     case .backlog:
       .new
     }
@@ -141,12 +149,16 @@ extension TaskBoardOverviewView {
     taskBoardItems.count { TaskBoardInboxLane(status: $0.status) == .blocked }
   }
 
+  var taskBoardDoneCount: Int {
+    taskBoardItems.count { TaskBoardInboxLane(status: $0.status) == .done }
+  }
+
   var aggregateNeedsYouCount: Int {
     taskBoardNeedsYouCount + snapshot.needsYouItemCount + decisions.count
   }
 
   var aggregateOpenCount: Int {
-    taskBoardItems.count + snapshot.items.count + decisions.count
+    taskBoardItems.count { $0.status != .done } + snapshot.openItemCount + decisions.count
   }
 
   var aggregateReviewCount: Int {
@@ -157,9 +169,13 @@ extension TaskBoardOverviewView {
     taskBoardBlockedCount + snapshot.blockedItemCount
   }
 
+  var aggregateDoneCount: Int {
+    taskBoardDoneCount + snapshot.completedItemCount
+  }
+
   var hasAggregateSummary: Bool {
     aggregateNeedsYouCount != 0 || aggregateOpenCount != 0 || aggregateReviewCount != 0
-      || aggregateBlockedCount != 0
+      || aggregateBlockedCount != 0 || aggregateDoneCount != 0
   }
 
   @ViewBuilder var aggregateSummaryContent: some View {
@@ -193,6 +209,14 @@ extension TaskBoardOverviewView {
         label: "Blocked",
         systemImage: TaskBoardInboxLane.blocked.systemImage,
         tint: taskBoardLaneColor(for: .blocked)
+      )
+    }
+    if aggregateDoneCount != 0 {
+      TaskBoardSummaryPill(
+        value: "\(aggregateDoneCount)",
+        label: "Done",
+        systemImage: TaskBoardInboxLane.done.systemImage,
+        tint: taskBoardLaneColor(for: .done)
       )
     }
   }

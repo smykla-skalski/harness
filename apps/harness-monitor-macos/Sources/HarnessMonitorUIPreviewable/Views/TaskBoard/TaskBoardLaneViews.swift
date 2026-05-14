@@ -91,10 +91,9 @@ struct TaskBoardItemLaneColumn: View {
           TaskBoardEmptyLane(lane: section.lane)
         } else {
           VStack(spacing: metrics.laneSpacing) {
-            ForEach(section.items.prefix(5)) { item in
+            ForEach(section.items) { item in
               TaskBoardItemRow(item: item, onOpenItem: onOpenItem)
             }
-            TaskBoardLaneOverflowRow(hiddenCount: section.items.count - 5)
           }
         }
       }
@@ -136,13 +135,12 @@ struct TaskBoardInboxLaneColumn: View {
           TaskBoardEmptyLane(lane: section.lane)
         } else {
           VStack(spacing: metrics.laneSpacing) {
-            ForEach(section.items.prefix(5)) { item in
+            ForEach(section.items) { item in
               TaskBoardInboxItemRow(
                 item: item,
                 onOpenItem: onOpenItem
               )
             }
-            TaskBoardLaneOverflowRow(hiddenCount: section.items.count - 5)
           }
         }
       }
@@ -254,7 +252,7 @@ private struct TaskBoardItemDragPreviewCard: View {
     }
     .frame(width: metrics.dragPreviewWidth, alignment: .leading)
     .padding(metrics.cardPadding)
-    .background(.background.opacity(0.92), in: .rect(cornerRadius: 8))
+    .background(.background.opacity(0.92), in: .rect(cornerRadius: metrics.cardCornerRadius))
   }
 }
 
@@ -349,7 +347,7 @@ private struct TaskBoardInboxItemDragPreviewCard: View {
     }
     .frame(width: metrics.dragPreviewWidth, alignment: .leading)
     .padding(metrics.cardPadding)
-    .background(.background.opacity(0.92), in: .rect(cornerRadius: 8))
+    .background(.background.opacity(0.92), in: .rect(cornerRadius: metrics.cardCornerRadius))
   }
 }
 

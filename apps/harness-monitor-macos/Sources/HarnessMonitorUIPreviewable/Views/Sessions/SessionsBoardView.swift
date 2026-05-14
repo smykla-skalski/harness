@@ -6,6 +6,10 @@ struct SessionsBoardView: View {
   let sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   @State private var selectedSurface: SessionsBoardSurface = .taskBoard
+  @State private var taskBoardInboxSnapshot = TaskBoardInboxSnapshot(
+    generatedAt: nil,
+    isFromCache: true
+  )
 
   init(
     store: HarnessMonitorStore,
@@ -50,6 +54,27 @@ struct SessionsBoardView: View {
         ]
       )
     }
+    .task(id: taskBoardInboxSessionIDs) {
+      await refreshVisibleTaskBoardInboxSnapshot()
+    }
+  }
+
+  private var visibleTaskBoardSessions: [SessionSummary] {
+    let visible = store.visibleSessions
+    return visible.isEmpty ? sessionCatalog.recentSessions : visible
+  }
+
+  private var taskBoardInboxSessionIDs: [String] {
+    visibleTaskBoardSessions.map(\.sessionId)
+  }
+
+  private func refreshVisibleTaskBoardInboxSnapshot() async {
+    let snapshot = await store.loadCachedTaskBoardInboxSnapshot(
+      sessions: visibleTaskBoardSessions,
+      limit: 120
+    )
+    guard !Task.isCancelled else { return }
+    taskBoardInboxSnapshot = snapshot
   }
 
   private var taskBoardSurface: some View {
@@ -64,10 +89,7 @@ struct SessionsBoardView: View {
     ) {
       VStack(alignment: .leading, spacing: 24) {
         TaskBoardOverviewView(
-          snapshot: TaskBoardInboxSnapshot(
-            generatedAt: nil,
-            isFromCache: false
-          ),
+          snapshot: taskBoardInboxSnapshot,
           taskBoardItems: dashboardUI.taskBoardItems,
           orchestratorStatus: dashboardUI.taskBoardOrchestratorStatus,
           evaluationSummary: dashboardUI.taskBoardEvaluationSummary,
