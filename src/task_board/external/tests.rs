@@ -5,7 +5,6 @@ use temp_env::with_vars;
 use tempfile::tempdir;
 
 use super::*;
-use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::store::TaskBoardStore;
 use crate::task_board::{ExternalRefProvider, build_dispatch_plan};
 
@@ -241,6 +240,111 @@ async fn sync_external_tasks_dry_run_does_not_write_board() {
     );
 }
 
+#[tokio::test]
+async fn sync_external_tasks_reconciles_existing_provider_ref() {
+    let temp = tempdir().expect("tempdir");
+    let board = TaskBoardStore::new(temp.path().join("board"));
+    let mut local = TaskBoardItem::new(
+        "local-1".to_owned(),
+        "Old title".to_owned(),
+        "Old body".to_owned(),
+        "2026-05-14T00:00:00Z".to_owned(),
+    );
+    local.status = TaskBoardStatus::Todo;
+    local.external_refs.push(
+        ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1")
+            .with_url("https://example.test/old")
+            .into_core_ref(),
+    );
+    board
+        .create("Old title", "Old body", local)
+        .expect("create local task");
+    let remote = ExternalTask {
+        reference: ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1")
+            .with_url("https://example.test/new"),
+        title: "New title".to_owned(),
+        body: "New body".to_owned(),
+        status: TaskBoardStatus::Blocked,
+        project_id: Some("provider/project".to_owned()),
+        updated_at: Some("2026-05-14T03:00:00Z".to_string()),
+    };
+    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient {
+        provider: ExternalProvider::Todoist,
+        tasks: vec![remote],
+        pushed: Mutex::new(Vec::new()),
+    })];
+
+    let operations = sync_external_tasks(
+        &board,
+        ExternalSyncOptions {
+            provider: Some(ExternalProvider::Todoist),
+            direction: ExternalSyncDirection::Pull,
+            dry_run: false,
+            status: None,
+        },
+        &clients,
+    )
+    .await
+    .expect("sync external tasks");
+
+    assert_eq!(operations.len(), 1);
+    assert_eq!(operations[0].action, ExternalSyncAction::Pull);
+    assert_eq!(operations[0].board_item_id.as_deref(), Some("local-1"));
+    assert!(operations[0].applied);
+    let updated = board.get("local-1").expect("load reconciled task");
+    assert_eq!(updated.title, "New title");
+    assert_eq!(updated.body, "New body");
+    assert_eq!(updated.status, TaskBoardStatus::Blocked);
+    assert_eq!(updated.project_id.as_deref(), Some("provider/project"));
+    assert!(updated.external_refs.iter().any(|reference| {
+        reference.provider == ExternalRefProvider::Todoist
+            && reference.external_id == "remote-1"
+            && reference.url.as_deref() == Some("https://example.test/new")
+    }));
+}
+
+#[tokio::test]
+async fn sync_external_tasks_dry_run_reports_reconciliation_without_writing() {
+    let temp = tempdir().expect("tempdir");
+    let board = TaskBoardStore::new(temp.path().join("board"));
+    let mut local = TaskBoardItem::new(
+        "local-1".to_owned(),
+        "Old title".to_owned(),
+        String::new(),
+        "2026-05-14T00:00:00Z".to_owned(),
+    );
+    local.external_refs.push(
+        ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1").into_core_ref(),
+    );
+    board
+        .create("Old title", "", local)
+        .expect("create local task");
+    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient {
+        provider: ExternalProvider::Todoist,
+        tasks: vec![external_task("remote-1", "New title")],
+        pushed: Mutex::new(Vec::new()),
+    })];
+
+    let operations = sync_external_tasks(
+        &board,
+        ExternalSyncOptions {
+            provider: Some(ExternalProvider::Todoist),
+            direction: ExternalSyncDirection::Pull,
+            dry_run: true,
+            status: None,
+        },
+        &clients,
+    )
+    .await
+    .expect("sync external tasks");
+
+    assert_eq!(operations.len(), 1);
+    assert_eq!(operations[0].board_item_id.as_deref(), Some("local-1"));
+    assert!(operations[0].dry_run);
+    assert!(!operations[0].applied);
+    assert_eq!(board.get("local-1").expect("local task").title, "Old title");
+}
+
 #[test]
 fn provider_constructors_require_tokens_without_network() {
     let config = ExternalSyncConfig::default();
@@ -273,7 +377,7 @@ fn github_repository_fallback_is_used_only_when_env_is_missing() {
 }
 
 #[tokio::test]
-async fn sync_external_tasks_imports_github_tasks_as_dispatch_ready_items() {
+async fn sync_external_tasks_imports_github_tasks_with_plan_pending_approval() {
     let temp = tempdir().expect("tempdir");
     let board = TaskBoardStore::new(temp.path().join("board"));
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient {
@@ -298,11 +402,8 @@ async fn sync_external_tasks_imports_github_tasks_as_dispatch_ready_items() {
     assert_eq!(operations.len(), 1);
     let item = board.get("github-7").expect("load imported github task");
     assert_eq!(item.project_id.as_deref(), Some("owner/repo"));
-    assert_eq!(
-        item.planning.approved_by.as_deref(),
-        Some(CONTROL_PLANE_ACTOR_ID)
-    );
-    assert!(item.planning.approved_at.is_some());
+    assert!(item.planning.approved_by.is_none());
+    assert!(item.planning.approved_at.is_none());
     assert!(
         item.planning
             .summary
@@ -312,7 +413,7 @@ async fn sync_external_tasks_imports_github_tasks_as_dispatch_ready_items() {
     assert!(item.external_refs.iter().any(|reference| {
         reference.provider == ExternalRefProvider::GitHub && reference.external_id == "7"
     }));
-    assert!(build_dispatch_plan(&item).is_ready());
+    assert!(!build_dispatch_plan(&item).is_ready());
 }
 
 struct FakeSyncClient {

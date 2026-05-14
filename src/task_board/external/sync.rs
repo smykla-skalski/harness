@@ -2,8 +2,7 @@ use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::CliError;
-use crate::session::types::CONTROL_PLANE_ACTOR_ID;
-use crate::task_board::store::{TaskBoardItemPatch, TaskBoardStore};
+use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch, TaskBoardStore};
 use crate::task_board::types::{ExternalRef, PlanningState, TaskBoardItem, TaskBoardStatus};
 use crate::workspace::utc_now;
 
@@ -144,7 +143,8 @@ async fn pull_provider_tasks(
         if options.status.is_some_and(|status| task.status != status) {
             continue;
         }
-        if item_exists_for_ref(board, &task.reference)? {
+        if let Some(item) = item_for_ref(board, &task.reference)? {
+            reconcile_existing_item(board, options, client.provider(), &item, task, operations)?;
             continue;
         }
         if options.dry_run {
@@ -235,18 +235,97 @@ fn create_item_from_external(task: &ExternalTask) -> TaskBoardItem {
     item
 }
 
-fn item_exists_for_ref(
+fn item_for_ref(
     board: &TaskBoardStore,
     reference: &ExternalTaskRef,
-) -> Result<bool, CliError> {
+) -> Result<Option<TaskBoardItem>, CliError> {
     let provider = reference.provider.into();
-    Ok(board
-        .list(None)?
-        .iter()
-        .flat_map(|item| &item.external_refs)
-        .any(|candidate| {
+    Ok(board.list(None)?.into_iter().find(|item| {
+        item.external_refs.iter().any(|candidate| {
             candidate.provider == provider && candidate.external_id == reference.external_id
-        }))
+        })
+    }))
+}
+
+fn reconcile_existing_item(
+    board: &TaskBoardStore,
+    options: ExternalSyncOptions,
+    provider: ExternalProvider,
+    item: &TaskBoardItem,
+    task: ExternalTask,
+    operations: &mut Vec<ExternalSyncOperation>,
+) -> Result<(), CliError> {
+    let patch = reconciliation_patch(item, &task);
+    if !has_reconciliation_change(&patch) {
+        return Ok(());
+    }
+    operations.push(operation(
+        provider,
+        ExternalSyncAction::Pull,
+        Some(item.id.clone()),
+        task.reference,
+        options.dry_run,
+        !options.dry_run,
+    ));
+    if options.dry_run {
+        return Ok(());
+    }
+    board.update(&item.id, patch)?;
+    Ok(())
+}
+
+fn reconciliation_patch(item: &TaskBoardItem, task: &ExternalTask) -> TaskBoardItemPatch {
+    let mut patch = TaskBoardItemPatch::default();
+    if item.title != task.title {
+        patch.title = Some(task.title.clone());
+    }
+    if item.body != task.body {
+        patch.body = Some(task.body.clone());
+    }
+    if item.status != task.status {
+        patch.status = Some(task.status);
+    }
+    if item.project_id != task.project_id {
+        patch.project_id = task
+            .project_id
+            .clone()
+            .map_or(OptionalFieldPatch::Clear, OptionalFieldPatch::Set);
+    }
+    if let Some(refs) = reconciled_external_refs(item, &task.reference) {
+        patch.external_refs = Some(refs);
+    }
+    patch
+}
+
+fn has_reconciliation_change(patch: &TaskBoardItemPatch) -> bool {
+    patch.title.is_some()
+        || patch.body.is_some()
+        || patch.status.is_some()
+        || !matches!(patch.project_id, OptionalFieldPatch::Unchanged)
+        || patch.external_refs.is_some()
+}
+
+fn reconciled_external_refs(
+    item: &TaskBoardItem,
+    reference: &ExternalTaskRef,
+) -> Option<Vec<ExternalRef>> {
+    let provider = reference.provider.into();
+    let mut changed = false;
+    let refs = item
+        .external_refs
+        .iter()
+        .map(|candidate| {
+            if candidate.provider == provider
+                && candidate.external_id == reference.external_id
+                && candidate.url != reference.url
+            {
+                changed = true;
+                return reference.clone().into_core_ref();
+            }
+            candidate.clone()
+        })
+        .collect();
+    changed.then_some(refs)
 }
 
 fn has_provider_ref(item: &TaskBoardItem, provider: ExternalProvider) -> bool {
@@ -287,8 +366,8 @@ fn imported_external_planning(task: &ExternalTask) -> Option<PlanningState> {
     match task.reference.provider {
         ExternalProvider::GitHub => Some(PlanningState {
             summary: Some(github_import_summary(task)),
-            approved_by: Some(CONTROL_PLANE_ACTOR_ID.to_string()),
-            approved_at: Some(timestamp_or_now(task.updated_at.as_deref())),
+            approved_by: None,
+            approved_at: None,
         }),
         ExternalProvider::Todoist => None,
     }
@@ -312,13 +391,6 @@ fn github_import_summary(task: &ExternalTask) -> String {
             "Handle the linked GitHub issue and preserve scope from the issue body.".to_string()
         }
     }
-}
-
-fn timestamp_or_now(value: Option<&str>) -> String {
-    value
-        .map(str::trim)
-        .filter(|timestamp| !timestamp.is_empty())
-        .map_or_else(utc_now, ToOwned::to_owned)
 }
 
 fn safe_id_part(value: &str) -> String {
