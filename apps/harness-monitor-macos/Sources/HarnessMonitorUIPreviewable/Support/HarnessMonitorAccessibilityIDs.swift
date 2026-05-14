@@ -424,4 +424,8 @@ extension HarnessMonitorAccessibility {
     "harness.policy-canvas.autosave.recovery.button"
   public static let policyCanvasRecoveryDismissButton =
     "harness.policy-canvas.autosave.recovery.dismiss"
+  public static let policyCanvasShortcuts =
+    "harness.policy-canvas.shortcuts"
+  public static let policyCanvasShortcutsToggle =
+    "harness.policy-canvas.shortcuts.toggle"
 }

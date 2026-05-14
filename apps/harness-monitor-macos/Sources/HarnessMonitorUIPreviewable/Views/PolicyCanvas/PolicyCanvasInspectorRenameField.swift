@@ -22,7 +22,24 @@ struct PolicyCanvasInspectorRenameField: View {
   let nodeID: String
   let originalTitle: String
   @FocusState.Binding var focusedField: PolicyCanvasFocusedField?
-  @State private var draftTitle: String = ""
+  @State private var draftTitle: String
+
+  init(
+    viewModel: PolicyCanvasViewModel,
+    nodeID: String,
+    originalTitle: String,
+    focusedField: FocusState<PolicyCanvasFocusedField?>.Binding
+  ) {
+    self.viewModel = viewModel
+    self.nodeID = nodeID
+    self.originalTitle = originalTitle
+    self._focusedField = focusedField
+    // Seed the draft from the title at mount so the field never paints a
+    // blank cell on first appear. The `.onAppear` write was racing the
+    // first-frame layout: a fast Tab into the field could land on an
+    // empty buffer before the modifier closure fired.
+    self._draftTitle = State(initialValue: originalTitle)
+  }
 
   var body: some View {
     TextField("Node name", text: $draftTitle)
@@ -45,9 +62,6 @@ struct PolicyCanvasInspectorRenameField: View {
           commit()
         }
       }
-      .onAppear {
-        draftTitle = originalTitle
-      }
       .onChange(of: originalTitle) { _, newValue in
         // Re-sync the buffer if the title changes underneath us (e.g.
         // undo lands while the field is focused). Without this guard the
@@ -56,6 +70,15 @@ struct PolicyCanvasInspectorRenameField: View {
         if focusedField != .nodeTitle {
           draftTitle = newValue
         }
+      }
+      .onDisappear {
+        // The TextField identity is keyed on `nodeID` (see `.id(_:)` at
+        // the bottom), so a selection switch — including the shift-click
+        // multi-select that drops the inspector's single-node section —
+        // tears down this view. Without an `.onDisappear` commit the
+        // typed draft would never reach the model. Routes through the
+        // same gated commit so an unchanged buffer still no-ops.
+        commit()
       }
       .id(nodeID)
   }

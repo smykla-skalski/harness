@@ -43,8 +43,30 @@ enum PolicyCanvasChange {
   )
 
   /// Move a node's stored position. Registered on drag-end with `from = the
-  /// position at gesture start`; inverse moves the node back.
-  case moveNode(id: String, from: CGPoint, to: CGPoint)
+  /// position at gesture start`; inverse moves the node back. The `fromGroupID`
+  /// / `toGroupID` payload carries the node's group membership across the
+  /// move so the inverse restores the prior membership. Drag-end and
+  /// arrow-nudge both can auto-attach a node into a group it crosses into,
+  /// or detach when it leaves; replaying that side effect on undo keeps the
+  /// node's `groupID` consistent with the visible position after every step.
+  case moveNode(
+    id: String,
+    from: CGPoint,
+    to: CGPoint,
+    fromGroupID: String?,
+    toGroupID: String?
+  )
+
+  /// Bulk move: coalesced position writes across many nodes and groups in
+  /// one undo step. Registered by arrow-nudge so a 10-node selection with
+  /// shift+arrow held landed as a single Cmd+Z reversal instead of ten.
+  /// Each node/group entry carries its own from/to so the inverse can land
+  /// the displaced set back at its original positions; group entries also
+  /// carry their member offsets so member nodes ride the inverse correctly.
+  case bulkMove(
+    nodeMoves: [PolicyCanvasNodeMove],
+    groupMoves: [PolicyCanvasGroupMove]
+  )
 
   /// Add an edge created by the rubber-band gesture. Inverse drops the edge.
   case addEdge(PolicyCanvasEdge, restoreSelection: PolicyCanvasSelection?)
@@ -104,11 +126,15 @@ enum PolicyCanvasChange {
   /// paste and duplicate. Inverse is `bulkRemove` which removes by id in
   /// reverse order; the inverse-of-the-inverse re-applies this payload so
   /// Cmd+Z then Cmd+Shift+Z restores the same paste/duplicate result.
+  /// `restoreSecondaries` captures the secondary-selection set that was
+  /// active when the bulk add ran, so undoing a multi-select paste lands
+  /// the pre-paste multi-selection back instead of dropping to primary only.
   case bulkAdd(
     nodes: [PolicyCanvasNode],
     edges: [PolicyCanvasEdge],
     groups: [PolicyCanvasGroup],
     restoreSelection: PolicyCanvasSelection?,
+    restoreSecondaries: Set<PolicyCanvasSelection>,
     primarySelection: PolicyCanvasSelection?
   )
 
@@ -116,11 +142,14 @@ enum PolicyCanvasChange {
   /// captures the full payload before removal so the inverse can rehydrate
   /// the exact insertion. Inserts never cascade — bulk add only inserts
   /// fresh ids, so removing them never strands a foreign edge.
+  /// `restoreSecondaries` mirrors `.bulkAdd` so a redo of bulkRemove
+  /// preserves whatever multi-selection state the user expects on return.
   case bulkRemove(
     nodeIDs: [String],
     edgeIDs: [String],
     groupIDs: [String],
-    restoreSelection: PolicyCanvasSelection?
+    restoreSelection: PolicyCanvasSelection?,
+    restoreSecondaries: Set<PolicyCanvasSelection>
   )
 
   /// Human-readable label surfaced by the system menu's "Undo X" / "Redo X"
@@ -133,6 +162,8 @@ enum PolicyCanvasChange {
       return "Delete Node"
     case .moveNode:
       return "Move Node"
+    case .bulkMove:
+      return "Move Selection"
     case .addEdge, .restoreEdge:
       return "Add Connection"
     case .removeEdge:
@@ -151,4 +182,24 @@ enum PolicyCanvasChange {
       return "Remove Items"
     }
   }
+}
+
+/// One node entry in a `.bulkMove` payload. Position writes are absolute,
+/// not deltas, so the inverse can replay the exact origin even when the
+/// model has been mutated in between by some other path (e.g. a reconcile).
+struct PolicyCanvasNodeMove: Equatable {
+  let id: String
+  let from: CGPoint
+  let to: CGPoint
+}
+
+/// One group entry in a `.bulkMove` payload. Member offsets are carried
+/// explicitly so undo lands every member back at its origin instead of
+/// recomputing positions from the (possibly stale) live frame.
+struct PolicyCanvasGroupMove: Equatable {
+  let id: String
+  let fromOrigin: CGPoint
+  let toOrigin: CGPoint
+  let memberOrigins: [String: CGPoint]
+  let memberDestinations: [String: CGPoint]
 }

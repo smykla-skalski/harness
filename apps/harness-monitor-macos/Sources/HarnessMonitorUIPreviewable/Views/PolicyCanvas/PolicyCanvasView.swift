@@ -168,12 +168,13 @@ public struct PolicyCanvasView: View {
     .overlay(alignment: .topLeading) {
       searchShortcutButtons
     }
-    .overlay(alignment: .topLeading) {
-      PolicyCanvasPowerEditShortcuts(
-        viewModel: viewModel,
-        focusedField: $focusedField
-      )
-    }
+    // `.onKeyPress`-based handler attached as a modifier so the responder
+    // chain owns the chord matching directly — no hidden Buttons walking
+    // the responder list on every keypress.
+    .policyCanvasPowerEditShortcuts(
+      viewModel: viewModel,
+      focusedField: $focusedField
+    )
     .overlay(alignment: .topTrailing) {
       if searchPaletteVisible {
         PolicyCanvasSearchPalette(
@@ -346,7 +347,6 @@ public struct PolicyCanvasView: View {
   private func toggleSimulationOverlay() {
     simulationOverlayOverride = !simulationOverlayResolved
   }
-
 
   /// Bind the view model's status callback to the local `@State` status line.
   /// Captured `_statusLine` is reference-backed by SwiftUI, so closure writes

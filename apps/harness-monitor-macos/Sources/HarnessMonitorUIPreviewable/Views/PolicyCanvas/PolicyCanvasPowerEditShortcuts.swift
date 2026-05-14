@@ -1,114 +1,115 @@
 import SwiftUI
 
-/// Hidden, zero-frame buttons that own the canvas-level Cmd+A, Cmd+C, Cmd+V,
-/// Cmd+D, and arrow-key shortcuts for Wave 4J's power-edit operations.
-/// Mirrors the pattern the deletion + search shortcut groups already use:
-/// SwiftUI's `Button` + `.keyboardShortcut` makes the chord part of the
-/// responder chain without an AppKit `NSEvent` monitor, and gating each
-/// button on `focusedField != nil` hands the chord back to inline TextFields
-/// whenever the user is mid-edit (so Cmd+C in a rename field copies the
-/// selected characters rather than the canvas selection).
+/// Native SwiftUI key-press routing for the canvas-level power-edit
+/// shortcuts (Cmd+A, Cmd+C, Cmd+V, Cmd+D, arrow nudges). Replaces the
+/// previous 17-Button overlay pattern: the responder chain has one
+/// focused-view-aware key handler instead of seventeen invisible Buttons
+/// that each match per keypress.
+///
+/// `.onKeyPress` is a real SwiftUI API (macOS 13+) that hooks into the
+/// responder chain without an NSEvent monitor. When an inline TextField
+/// owns first responder, the field consumes the key and the canvas-level
+/// handler is suppressed automatically (and we double-gate on
+/// `focusedField` for defence in depth so a key chord routed from a
+/// non-text focusable child still falls back to the inspector field). The
+/// `phases: .down` filter keeps us off key-up; arrow nudges add `.repeat`
+/// so a held arrow auto-repeats at the OS-native rate without an internal
+/// timer.
 ///
 /// Composes alongside Wave 4K's broader inspector editing without conflict:
 /// the only shared seam is `focusedField`, which 4K already binds for its
 /// inspector text fields. New inspector fields opt in by binding to a
-/// `PolicyCanvasFocusedField` variant; the chord gating then handles their
-/// keyboard shadow automatically.
-struct PolicyCanvasPowerEditShortcuts: View {
+/// `PolicyCanvasFocusedField` variant; the chord gating then suppresses
+/// the canvas-level keys whenever a TextField owns first responder.
+struct PolicyCanvasPowerEditShortcuts: ViewModifier {
   let viewModel: PolicyCanvasViewModel
   @FocusState.Binding var focusedField: PolicyCanvasFocusedField?
 
-  var body: some View {
-    Group {
-      Button("Select all policy canvas components") {
-        viewModel.selectAll()
+  func body(content: Content) -> some View {
+    content
+      .onKeyPress(.upArrow, phases: [.down, .repeat]) { press in
+        handleArrow(dx: 0, dy: -1, modifiers: press.modifiers)
       }
-      .keyboardShortcut("a", modifiers: .command)
-      .disabled(focusedField != nil)
-
-      Button("Copy policy canvas selection") {
-        viewModel.copySelectionToClipboard()
+      .onKeyPress(.downArrow, phases: [.down, .repeat]) { press in
+        handleArrow(dx: 0, dy: 1, modifiers: press.modifiers)
       }
-      .keyboardShortcut("c", modifiers: .command)
-      .disabled(focusedField != nil)
-
-      Button("Paste policy canvas selection") {
-        viewModel.pasteFromClipboard()
+      .onKeyPress(.leftArrow, phases: [.down, .repeat]) { press in
+        handleArrow(dx: -1, dy: 0, modifiers: press.modifiers)
       }
-      .keyboardShortcut("v", modifiers: .command)
-      .disabled(focusedField != nil)
-
-      Button("Duplicate policy canvas selection") {
-        viewModel.duplicateSelection()
+      .onKeyPress(.rightArrow, phases: [.down, .repeat]) { press in
+        handleArrow(dx: 1, dy: 0, modifiers: press.modifiers)
       }
-      .keyboardShortcut("d", modifiers: .command)
-      .disabled(focusedField != nil)
-
-      arrowButtons
-    }
-    .opacity(0)
-    .frame(width: 0, height: 0)
-    .accessibilityHidden(true)
+      .onKeyPress(keys: ["a", "c", "v", "d"], phases: .down) { press in
+        handleChord(press: press)
+      }
   }
 
-  /// Twelve hidden buttons — four directions x three step sizes (1pt, 10pt,
-  /// grid step). SwiftUI's `.keyboardShortcut` overload accepts a single
-  /// modifier-set per button so each variant gets its own button; the body
-  /// stays readable because `arrowShortcut` does the grunt work.
-  private var arrowButtons: some View {
-    Group {
-      arrowShortcut("Up", key: .upArrow, modifiers: [], dx: 0, dy: -1)
-      arrowShortcut("Down", key: .downArrow, modifiers: [], dx: 0, dy: 1)
-      arrowShortcut("Left", key: .leftArrow, modifiers: [], dx: -1, dy: 0)
-      arrowShortcut("Right", key: .rightArrow, modifiers: [], dx: 1, dy: 0)
-
-      arrowShortcut("Up x10", key: .upArrow, modifiers: .shift, dx: 0, dy: -10)
-      arrowShortcut("Down x10", key: .downArrow, modifiers: .shift, dx: 0, dy: 10)
-      arrowShortcut("Left x10", key: .leftArrow, modifiers: .shift, dx: -10, dy: 0)
-      arrowShortcut("Right x10", key: .rightArrow, modifiers: .shift, dx: 10, dy: 0)
-
-      arrowShortcut(
-        "Up grid",
-        key: .upArrow,
-        modifiers: .command,
-        dx: 0,
-        dy: -PolicyCanvasLayout.gridSize
-      )
-      arrowShortcut(
-        "Down grid",
-        key: .downArrow,
-        modifiers: .command,
-        dx: 0,
-        dy: PolicyCanvasLayout.gridSize
-      )
-      arrowShortcut(
-        "Left grid",
-        key: .leftArrow,
-        modifiers: .command,
-        dx: -PolicyCanvasLayout.gridSize,
-        dy: 0
-      )
-      arrowShortcut(
-        "Right grid",
-        key: .rightArrow,
-        modifiers: .command,
-        dx: PolicyCanvasLayout.gridSize,
-        dy: 0
-      )
-    }
-  }
-
-  private func arrowShortcut(
-    _ label: String,
-    key: KeyEquivalent,
-    modifiers: EventModifiers,
+  /// Resolve modifier presses into the right nudge step and dispatch
+  /// through the view model. Returns `.handled` only when the nudge
+  /// actually moved something — otherwise the press falls through to the
+  /// next responder so a no-op press on an empty selection still lets the
+  /// scrollview / focus ring own arrow keys.
+  private func handleArrow(
     dx: CGFloat,
-    dy: CGFloat
-  ) -> some View {
-    Button("Nudge selection \(label)") {
-      _ = viewModel.nudgeSelection(by: CGSize(width: dx, height: dy))
+    dy: CGFloat,
+    modifiers: EventModifiers
+  ) -> KeyPress.Result {
+    guard focusedField == nil else {
+      return .ignored
     }
-    .keyboardShortcut(key, modifiers: modifiers)
-    .disabled(focusedField != nil)
+    let step: CGFloat
+    if modifiers.contains(.command) {
+      step = PolicyCanvasLayout.gridSize
+    } else if modifiers.contains(.shift) {
+      step = 10
+    } else {
+      step = PolicyCanvasViewModel.bareArrowNudgeStep
+    }
+    let moved = viewModel.nudgeSelection(
+      by: CGSize(width: dx * step, height: dy * step)
+    )
+    return moved ? .handled : .ignored
+  }
+
+  /// Cmd+A / Cmd+C / Cmd+V / Cmd+D dispatch. Non-Cmd presses of these
+  /// letters fall through; we only intercept the chord. Suppressed when an
+  /// inspector text field owns focus so paste in the rename field still
+  /// works against the system clipboard.
+  private func handleChord(press: KeyPress) -> KeyPress.Result {
+    guard focusedField == nil, press.modifiers.contains(.command) else {
+      return .ignored
+    }
+    switch press.characters {
+    case "a":
+      viewModel.selectAll()
+      return .handled
+    case "c":
+      _ = viewModel.copySelectionToClipboard()
+      return .handled
+    case "v":
+      _ = viewModel.pasteFromClipboard()
+      return .handled
+    case "d":
+      _ = viewModel.duplicateSelection()
+      return .handled
+    default:
+      return .ignored
+    }
+  }
+}
+
+extension View {
+  /// Wrap the canvas root with the power-edit key handler. Sugar so the
+  /// host view's `body` does not need to spell the modifier struct.
+  func policyCanvasPowerEditShortcuts(
+    viewModel: PolicyCanvasViewModel,
+    focusedField: FocusState<PolicyCanvasFocusedField?>.Binding
+  ) -> some View {
+    modifier(
+      PolicyCanvasPowerEditShortcuts(
+        viewModel: viewModel,
+        focusedField: focusedField
+      )
+    )
   }
 }

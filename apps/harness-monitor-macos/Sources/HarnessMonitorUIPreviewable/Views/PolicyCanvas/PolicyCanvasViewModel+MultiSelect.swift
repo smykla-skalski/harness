@@ -29,13 +29,13 @@ extension PolicyCanvasViewModel {
   /// is currently selection-less.
   func extendSelection(_ target: PolicyCanvasSelection) {
     if selection == target {
-      // Removing the primary; pick any secondary as the new primary so
-      // the inspector still has something to render. The set is unordered
-      // by design — the visible "primary" affordance after a remove is
-      // intentionally arbitrary, since macOS multi-select inspectors
-      // typically show a "Multiple selected" placeholder rather than a
-      // strict head element.
-      if let promoted = secondarySelections.first {
+      // Removing the primary; promote the first secondary in stable model
+      // order (nodes first, then edges, then groups, each in document
+      // order). The set itself is unordered, but a deterministic
+      // promotion keeps repeat shift-click-on-primary gestures landing on
+      // the same inspector contents regardless of insertion-order hash
+      // collisions.
+      if let promoted = stablePromotionCandidate() {
         secondarySelections.remove(promoted)
         selection = promoted
       } else {
@@ -54,12 +54,33 @@ extension PolicyCanvasViewModel {
     secondarySelections.insert(target)
   }
 
+  /// Stable head element of the secondary set, used by `extendSelection` to
+  /// promote when the user shift-clicks the current primary off. Walks the
+  /// model arrays so the chosen candidate is deterministic across runs even
+  /// though `Set<PolicyCanvasSelection>` does not preserve insertion order.
+  private func stablePromotionCandidate() -> PolicyCanvasSelection? {
+    for node in nodes where secondarySelections.contains(.node(node.id)) {
+      return .node(node.id)
+    }
+    for edge in edges where secondarySelections.contains(.edge(edge.id)) {
+      return .edge(edge.id)
+    }
+    for group in groups where secondarySelections.contains(.group(group.id)) {
+      return .group(group.id)
+    }
+    return nil
+  }
+
   /// Cmd+A selects every node, edge, and group currently on the canvas.
   /// Primary stays whatever it was if it is still on-canvas; otherwise the
   /// first node (or edge if no nodes, or group if neither) takes over.
-  /// Document state is untouched.
+  /// Document state is untouched. Writes the secondary set first and then
+  /// the primary so observers that depend on the combined set still see a
+  /// consistent value either way; `@Observable` already coalesces sequential
+  /// writes inside the same actor tick.
   func selectAll() {
     var collected: Set<PolicyCanvasSelection> = []
+    collected.reserveCapacity(nodes.count + edges.count + groups.count)
     for node in nodes {
       collected.insert(.node(node.id))
     }
@@ -70,13 +91,21 @@ extension PolicyCanvasViewModel {
       collected.insert(.group(group.id))
     }
     guard let head = preferredPrimaryAfterSelectAll() ?? collected.first else {
-      selection = nil
-      secondarySelections = []
+      if selection != nil {
+        selection = nil
+      }
+      if !secondarySelections.isEmpty {
+        secondarySelections = []
+      }
       return
     }
     collected.remove(head)
-    selection = head
+    // Write secondary first, then primary, so any observer that subscribes
+    // through `allSelections` (primary + secondary union) reads at most one
+    // intermediate state where the head element is in the secondary set
+    // instead of the primary slot — still a consistent superset.
     secondarySelections = collected
+    selection = head
   }
 
   /// Pick the next primary after a select-all: if the existing primary is

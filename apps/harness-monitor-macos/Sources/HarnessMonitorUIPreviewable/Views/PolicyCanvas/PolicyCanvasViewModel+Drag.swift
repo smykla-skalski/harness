@@ -54,7 +54,16 @@ extension PolicyCanvasViewModel {
       return
     }
     markNodeEdited(nodeID)
-    mutate(.moveNode(id: nodeID, from: origin, to: destination))
+    let fromGroupID = nodes[index].groupID
+    mutate(
+      .moveNode(
+        id: nodeID,
+        from: origin,
+        to: destination,
+        fromGroupID: fromGroupID,
+        toGroupID: nil
+      )
+    )
   }
 
   /// Tick-rate group drag. Like `dragNode`, writes directly per frame; the
