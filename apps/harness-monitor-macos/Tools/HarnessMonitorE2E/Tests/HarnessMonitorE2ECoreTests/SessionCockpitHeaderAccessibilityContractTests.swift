@@ -30,7 +30,7 @@ final class SessionCockpitHeaderAccessibilityContractTests: XCTestCase {
   private func cockpitHeaderSource() throws -> String {
     try String(
       contentsOf: repoRoot().appendingPathComponent(
-        "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/SessionCockpitHeaderCard.swift"
+        "apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Views/Sessions/SessionCockpitHeaderCard.swift"
       ),
       encoding: .utf8
     )

@@ -2,6 +2,24 @@ import Foundation
 import XCTest
 
 final class SwarmFullFlowContractTests: XCTestCase {
+  func testSwarmFullFlowXCUITestIsNotDisabledAtClassSetup() throws {
+    let source = try String(
+      contentsOf: repoRoot().appendingPathComponent(
+        "apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests/SwarmFullFlowTests.swift"
+      ),
+      encoding: .utf8
+    )
+
+    XCTAssertFalse(
+      source.contains("override func setUpWithError"),
+      "Swarm full-flow must rely on SwarmFixture's explicit-only env guard, not a class-level skip."
+    )
+    XCTAssertFalse(
+      source.contains("temporarily disabled"),
+      "Swarm full-flow must not carry a blanket disabled marker."
+    )
+  }
+
   func testBuildForTestingSchemeMatchesProjectAndXctestrunContract() throws {
     let repoRoot = repoRoot()
     let project = try String(

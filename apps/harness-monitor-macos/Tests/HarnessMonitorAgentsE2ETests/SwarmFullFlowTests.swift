@@ -5,11 +5,6 @@ import XCTest
 /// this runner asserts the corresponding Monitor surface and writes `<act>.ack`.
 @MainActor
 final class SwarmFullFlowTests: HarnessMonitorUITestCase {
-  override func setUpWithError() throws {
-    try super.setUpWithError()
-    throw XCTSkip("Swarm full-flow e2e is temporarily disabled.")
-  }
-
   func testSwarmFullFlow() throws {
     let fixture = try SwarmFixture(testCase: self)
     fixture.launch()
