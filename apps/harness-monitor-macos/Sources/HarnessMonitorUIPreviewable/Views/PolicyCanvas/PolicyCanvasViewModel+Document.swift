@@ -185,6 +185,13 @@ extension PolicyCanvasViewModel {
     selection = snapshot.selection
     latestSimulation = snapshot.latestSimulation
     reconcileGroupFrames()
+    // Write `documentDirty` directly (NOT through `markDocumentDirty`) and
+    // pre-arm the one-shot suppression so the autosave loop does not fire
+    // on the rollback's dirty flip. Without this guard, a daemon reject
+    // would auto-retry the same rejected payload every debounce window.
+    if markDirty {
+      autosaveSuppressed = true
+    }
     documentDirty = markDirty
     clearTransientGestureState()
     resetPaletteDropPlacement()

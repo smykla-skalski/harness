@@ -73,6 +73,13 @@ final class PolicyCanvasViewModel {
   /// route through the funnel.
   @ObservationIgnored weak var undoManager: UndoManager?
 
+  /// Fired by every mutation site that flips `documentDirty = true`. Set by
+  /// the host view to schedule an autosave through `scheduleAutosave`. Kept
+  /// off the @Observable graph so wiring it doesn't churn observers, and
+  /// optional so unit-test paths (which never bind it) skip autosave
+  /// entirely.
+  @ObservationIgnored var autosaveTrigger: (@MainActor () -> Void)?
+
   @ObservationIgnored var nextNodeNumber: Int
   @ObservationIgnored var loadedDocumentRevision: UInt64?
   @ObservationIgnored var centeredViewportGeneration: UInt64 = 0
@@ -101,6 +108,36 @@ final class PolicyCanvasViewModel {
   /// cached maps.
   @ObservationIgnored var validationInvalidationGeneration: UInt64 = 0
 
+  /// In-flight async-save state surfaced to the chrome so Save / Simulate /
+  /// Promote buttons can flip into a busy presentation (disabled +
+  /// `ProgressView`) without losing the toast-on-reject path. Reads from a
+  /// view body redraw on flip, so writes must be paired with a corresponding
+  /// false-write in `defer` blocks on every async exit.
+  var isSavingDraft: Bool
+  var isSimulating: Bool
+  var isPromoting: Bool
+
+  /// Coordinates autosave between the view-model and the host view. The
+  /// host triggers `scheduleAutosave(performSave:)` after each documentDirty
+  /// flip; the closure routes back to the same daemon save path as the
+  /// foreground Save button so snapshot/restore + reload-on-success behave
+  /// identically. `nonisolated(unsafe)` storage is not needed — the task is
+  /// MainActor-bound and cancel is synchronous.
+  @ObservationIgnored var autosaveTask: Task<Void, Never>?
+
+  /// Set when `restoreState(_:)` is rolling local state back from a reject.
+  /// Suppresses the next autosave trigger so the rollback's
+  /// `documentDirty = true` write does not re-fire the daemon save that
+  /// just failed; without this guard the autosave loop hammers the daemon
+  /// every debounce window with a payload it already rejected.
+  @ObservationIgnored var autosaveSuppressed: Bool
+
+  /// Outcome of the most recent autosave attempt. Observed-tracked so the
+  /// chrome can surface a "Autosave failed" status line when the daemon
+  /// rejects an autosave; the user-facing notify funnel mirrors the same
+  /// state into `statusLine`.
+  var lastAutosaveOutcome: PolicyCanvasAutosaveOutcome
+
   init(
     selectedTab: PolicyCanvasTab = .draft,
     nodes: [PolicyCanvasNode],
@@ -126,6 +163,11 @@ final class PolicyCanvasViewModel {
     self.pendingDocumentUpdate = nil
     self.pendingEdgePreview = nil
     self.hasPendingEdge = false
+    self.isSavingDraft = false
+    self.isSimulating = false
+    self.isPromoting = false
+    self.autosaveSuppressed = false
+    self.lastAutosaveOutcome = .idle
     self.nextNodeNumber = nextNodeNumber
     reconcileGroupFrames()
   }
@@ -320,6 +362,17 @@ final class PolicyCanvasViewModel {
   func resetCleanEphemeralComponents() {
     cleanEphemeralNodeIDs.removeAll()
     cleanEphemeralEdgeIDs.removeAll()
+  }
+
+  /// Single funnel that mutation sites use to mark the document dirty. Sets
+  /// `documentDirty = true` and fires the autosave trigger (no-op when the
+  /// host has not wired one, which keeps unit-test paths quiet). Funneling
+  /// through here keeps autosave scheduling in lock-step with dirty
+  /// transitions; before this funnel, autosave wiring had to grep through
+  /// 8+ mutation sites for `documentDirty = true` and audit each one.
+  func markDocumentDirty() {
+    documentDirty = true
+    autosaveTrigger?()
   }
 
 }

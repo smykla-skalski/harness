@@ -301,6 +301,19 @@ enum PolicyCanvasCoordinateSpaces {
   static let canvas = "policy-canvas.workspace"
 }
 
+/// Outcome of the most recent autosave round-trip. Surfaced to the chrome so
+/// the user knows the autosave subsystem is alive (`succeeded`), still
+/// flushing (`pending`), or has hit a reject the manual Save button must
+/// resolve (`failed`). `idle` is the cold-start state before any autosave
+/// has fired, and stays in place after a manual save reload (autosave isn't
+/// the most recent attempt anymore).
+enum PolicyCanvasAutosaveOutcome: Equatable {
+  case idle
+  case pending
+  case succeeded(at: Date)
+  case failed(at: Date)
+}
+
 enum PolicyCanvasLayout {
   static let gridSize: CGFloat = 20
   static let nodeSize = CGSize(width: 168, height: 96)

@@ -43,6 +43,7 @@ struct PolicyCanvasTopBar: View {
       PolicyCanvasActionButton(
         title: "Save",
         systemImage: "square.and.arrow.down",
+        isBusy: viewModel.isSavingDraft,
         accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasSaveButton,
         action: {
           viewModel.save()
@@ -53,6 +54,7 @@ struct PolicyCanvasTopBar: View {
       PolicyCanvasActionButton(
         title: "Simulate",
         systemImage: "play.circle",
+        isBusy: viewModel.isSimulating,
         accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasSimulateButton,
         action: {
           viewModel.simulate()
@@ -67,6 +69,7 @@ struct PolicyCanvasTopBar: View {
           tint: Color.green,
           isDisabled: !canPromote,
           disabledReason: viewModel.promoteDisabledReason,
+          isBusy: viewModel.isPromoting,
           accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasPromoteButton,
           action: {
             viewModel.promote()
@@ -106,20 +109,47 @@ private struct PolicyCanvasActionButton: View {
   var tint = Color.cyan
   var isDisabled = false
   var disabledReason: String?
+  var isBusy = false
   let accessibilityIdentifier: String
   let action: @MainActor () -> Void
 
   var body: some View {
     Button(action: action) {
-      Label(title, systemImage: systemImage)
-        .scaledFont(.callout.weight(.semibold))
-        .lineLimit(1)
+      HStack(spacing: 6) {
+        if isBusy {
+          // Replace the leading icon with a small spinner while a daemon
+          // round-trip is in flight. The label text stays — keyboard
+          // navigation and VoiceOver still announce the action — but the
+          // user sees the action is committed and pending.
+          ProgressView()
+            .controlSize(.mini)
+            .progressViewStyle(.circular)
+            .tint(.white.opacity(0.78))
+          Text(title)
+            .scaledFont(.callout.weight(.semibold))
+            .lineLimit(1)
+        } else {
+          Label(title, systemImage: systemImage)
+            .scaledFont(.callout.weight(.semibold))
+            .lineLimit(1)
+        }
+      }
     }
     .harnessActionButtonStyle(variant: .bordered, tint: tint.opacity(0.85))
     .controlSize(.small)
-    .disabled(isDisabled)
-    .help(isDisabled ? disabledReason ?? title : title)
+    .disabled(isDisabled || isBusy)
+    .help(helpText)
     .accessibilityIdentifier(accessibilityIdentifier)
+  }
+
+  private var helpText: String {
+    if isBusy {
+      return "\(title) in progress"
+    }
+    if isDisabled {
+      return disabledReason ?? title
+    }
+    return title
   }
 }
 
