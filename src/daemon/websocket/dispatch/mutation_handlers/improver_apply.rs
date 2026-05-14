@@ -1,6 +1,8 @@
-use super::{DaemonHttpState, WsRequest, WsResponse, service};
+use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::ImproverApplyRequest;
 use crate::daemon::protocol::bind_control_plane_actor_value;
+use crate::daemon::protocol::{WsRequest, WsResponse};
+use crate::daemon::service;
 use crate::daemon::websocket::frames::{error_response, ok_response};
 
 pub(crate) async fn dispatch_improver_apply(

@@ -13,6 +13,7 @@ mod relay;
 mod session_start_tests;
 #[cfg(test)]
 mod signal_tests;
+mod task_board;
 #[cfg(test)]
 mod telemetry_tests;
 #[cfg(test)]

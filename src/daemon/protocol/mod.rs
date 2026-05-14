@@ -4,6 +4,7 @@ mod codex;
 mod managed_agents;
 mod session_requests;
 mod summaries;
+mod task_board;
 #[cfg(test)]
 mod tests;
 mod voice;
@@ -15,5 +16,6 @@ pub use codex::*;
 pub use managed_agents::*;
 pub use session_requests::*;
 pub use summaries::*;
+pub use task_board::*;
 pub use voice::*;
 pub use websocket::*;
