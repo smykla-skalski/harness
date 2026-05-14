@@ -286,6 +286,7 @@ private struct AppSearchFieldSurface: View, Equatable {
             Text(verbatim: row.displayTitle)
               .searchCompletion(row.displayTitle)
           }
+          .searchSuggestions(.hidden, for: .content)
         }
         .searchFocused(isFocused)
         .harnessMinimizableSearchToolbar()
