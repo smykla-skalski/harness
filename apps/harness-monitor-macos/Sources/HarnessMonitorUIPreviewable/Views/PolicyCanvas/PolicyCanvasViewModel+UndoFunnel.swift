@@ -107,6 +107,31 @@ extension PolicyCanvasViewModel {
       return applyRemoveGroup(id: id, priorSelection: priorSelection)
     case .restoreGroup(let group, let memberIDs, let restoreSelection):
       return applyRestoreGroup(group, memberIDs: memberIDs, restoreSelection: restoreSelection)
+    case .renameNode(let id, let from, let to):
+      return applyRenameNode(id: id, from: from, to: to)
+    case .removeNodeFromGroup(let id, let fromGroupID, let toGroupID):
+      return applyRemoveNodeFromGroup(id: id, fromGroupID: fromGroupID, toGroupID: toGroupID)
+    case .bulkAdd(
+      let nodes,
+      let edges,
+      let groups,
+      let restoreSelection,
+      let primarySelection
+    ):
+      return applyBulkAdd(
+        nodes: nodes,
+        edges: edges,
+        groups: groups,
+        restoreSelection: restoreSelection,
+        primarySelection: primarySelection
+      )
+    case .bulkRemove(let nodeIDs, let edgeIDs, let groupIDs, let restoreSelection):
+      return applyBulkRemove(
+        nodeIDs: nodeIDs,
+        edgeIDs: edgeIDs,
+        groupIDs: groupIDs,
+        restoreSelection: restoreSelection
+      )
     }
   }
 
@@ -274,121 +299,4 @@ extension PolicyCanvasViewModel {
     return .removeEdge(id: edge.id, priorSelection: restoreSelection)
   }
 
-  // MARK: - Group lifecycle
-
-  private func applyMoveGroup(
-    id: String,
-    fromOrigin: CGPoint,
-    toOrigin: CGPoint,
-    memberOrigins: [String: CGPoint],
-    memberDestinations: [String: CGPoint]
-  ) -> PolicyCanvasChange {
-    if let index = groups.firstIndex(where: { $0.id == id }) {
-      groups[index].frame.origin = toOrigin
-    }
-    for nodeIndex in nodes.indices where nodes[nodeIndex].groupID == id {
-      if let destination = memberDestinations[nodes[nodeIndex].id] {
-        nodes[nodeIndex].position = destination
-      }
-    }
-    reconcileGroupFrames()
-    return .moveGroup(
-      id: id,
-      fromOrigin: toOrigin,
-      toOrigin: fromOrigin,
-      memberOrigins: memberDestinations,
-      memberDestinations: memberOrigins
-    )
-  }
-
-  private func applyRemoveGroup(
-    id: String,
-    priorSelection: PolicyCanvasSelection?
-  ) -> PolicyCanvasChange {
-    guard let removedGroup = groups.first(where: { $0.id == id }) else {
-      return .restoreGroup(
-        PolicyCanvasGroup(id: id, title: id, frame: .zero, tone: .intake),
-        memberIDs: [],
-        restoreSelection: priorSelection
-      )
-    }
-    let formerMemberIDs = nodes.filter { $0.groupID == id }.map(\.id)
-    groups.removeAll { $0.id == id }
-    for nodeIndex in nodes.indices where nodes[nodeIndex].groupID == id {
-      nodes[nodeIndex].groupID = nil
-    }
-    if selection == .group(id) {
-      selection = nil
-    }
-    reconcileGroupFrames()
-    clearTransientGestureState()
-    return .restoreGroup(
-      removedGroup,
-      memberIDs: formerMemberIDs,
-      restoreSelection: priorSelection
-    )
-  }
-
-  private func applyRestoreGroup(
-    _ group: PolicyCanvasGroup,
-    memberIDs: [String],
-    restoreSelection: PolicyCanvasSelection?
-  ) -> PolicyCanvasChange {
-    if !groups.contains(where: { $0.id == group.id }) {
-      groups.append(group)
-    }
-    let memberSet = Set(memberIDs)
-    for nodeIndex in nodes.indices where memberSet.contains(nodes[nodeIndex].id) {
-      nodes[nodeIndex].groupID = group.id
-    }
-    reconcileGroupFrames()
-    selection = restoreSelection
-    return .removeGroup(id: group.id, priorSelection: restoreSelection)
-  }
-
-  /// Choose the status line each change publishes. The strings match what the
-  /// non-funnelled paths used before the refactor so existing tests that
-  /// assert on status prefixes keep passing.
-  ///
-  /// `change` is the forward direction the user asked for; `inverse` is the
-  /// just-computed undo payload, which is the one carrying the displaced
-  /// node/edge/group payload for `remove*` operations (the forward change
-  /// only carries the id, since the entity has already been removed from
-  /// the live graph by the time we read it).
-  private func statusMessage(
-    for change: PolicyCanvasChange,
-    inverse: PolicyCanvasChange
-  ) -> String {
-    switch change {
-    case .addNode(let node, _):
-      return "\(node.kind.title) node added"
-    case .restoreNode(let node, _, _, _, _):
-      return "Restored \(node.title)"
-    case .removeNode:
-      if case .restoreNode(let node, _, _, _, _) = inverse {
-        return "Deleted \(node.title)"
-      }
-      return "Deleted node"
-    case .moveNode:
-      return "Node moved"
-    case .addEdge:
-      return "Edge created"
-    case .restoreEdge(let edge, _, _):
-      return "Restored \(edge.label) connection"
-    case .removeEdge:
-      if case .restoreEdge(let edge, _, _) = inverse {
-        return "Deleted \(edge.label) connection"
-      }
-      return "Deleted connection"
-    case .moveGroup:
-      return "Group moved"
-    case .restoreGroup(let group, _, _):
-      return "Restored \(group.title)"
-    case .removeGroup:
-      if case .restoreGroup(let group, _, _) = inverse {
-        return "Deleted \(group.title)"
-      }
-      return "Deleted group"
-    }
-  }
 }

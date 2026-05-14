@@ -86,6 +86,43 @@ enum PolicyCanvasChange {
     restoreSelection: PolicyCanvasSelection?
   )
 
+  /// Rename a node by writing a new title. Captures the from-string so the
+  /// inverse restores the original. The funnel is used (rather than direct
+  /// field write) so a Cmd+Z after a commit-on-Enter reverts the inline
+  /// rename. The TextField binds through a local @State buffer and only
+  /// fires this change on commit; per-keystroke writes do not flood the
+  /// undo stack.
+  case renameNode(id: String, from: String, to: String)
+
+  /// Detach a node from its group, leaving the node on the canvas with
+  /// `groupID = nil`. Inverse re-attaches the prior `groupID` (which may
+  /// itself be nil if the node was never grouped). Used by the "Remove from
+  /// group" right-click action and by Cmd+drag-out-of-group flows.
+  case removeNodeFromGroup(id: String, fromGroupID: String?, toGroupID: String?)
+
+  /// Bulk add of a previously-captured set of nodes/edges/groups. Used by
+  /// paste and duplicate. Inverse is `bulkRemove` which removes by id in
+  /// reverse order; the inverse-of-the-inverse re-applies this payload so
+  /// Cmd+Z then Cmd+Shift+Z restores the same paste/duplicate result.
+  case bulkAdd(
+    nodes: [PolicyCanvasNode],
+    edges: [PolicyCanvasEdge],
+    groups: [PolicyCanvasGroup],
+    restoreSelection: PolicyCanvasSelection?,
+    primarySelection: PolicyCanvasSelection?
+  )
+
+  /// Inverse of `bulkAdd`. Removes nodes/edges/groups by id; the apply path
+  /// captures the full payload before removal so the inverse can rehydrate
+  /// the exact insertion. Inserts never cascade — bulk add only inserts
+  /// fresh ids, so removing them never strands a foreign edge.
+  case bulkRemove(
+    nodeIDs: [String],
+    edgeIDs: [String],
+    groupIDs: [String],
+    restoreSelection: PolicyCanvasSelection?
+  )
+
   /// Human-readable label surfaced by the system menu's "Undo X" / "Redo X"
   /// affordance. Matches the casing of menu-bar action names on macOS.
   var actionName: String {
@@ -104,6 +141,14 @@ enum PolicyCanvasChange {
       return "Move Group"
     case .removeGroup, .restoreGroup:
       return "Delete Group"
+    case .renameNode:
+      return "Rename Node"
+    case .removeNodeFromGroup:
+      return "Remove from Group"
+    case .bulkAdd:
+      return "Paste"
+    case .bulkRemove:
+      return "Remove Items"
     }
   }
 }

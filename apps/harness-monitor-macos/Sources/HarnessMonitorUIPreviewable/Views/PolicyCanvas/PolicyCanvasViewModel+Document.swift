@@ -89,6 +89,7 @@ extension PolicyCanvasViewModel {
       return
     }
     backingDocument = document
+    secondarySelections = []
     latestSimulation = simulation ?? audit?.latestSimulation
     var loadedNodes = document.nodes.map {
       policyCanvasNode($0, layout: document.layout)
@@ -183,6 +184,7 @@ extension PolicyCanvasViewModel {
     groups = snapshot.groups
     edges = snapshot.edges
     selection = snapshot.selection
+    secondarySelections = []
     latestSimulation = snapshot.latestSimulation
     reconcileGroupFrames()
     // Write `documentDirty` directly (NOT through `markDocumentDirty`) and

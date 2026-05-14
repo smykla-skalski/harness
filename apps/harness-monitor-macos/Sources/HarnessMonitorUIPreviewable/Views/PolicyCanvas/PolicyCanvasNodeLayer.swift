@@ -25,7 +25,7 @@ struct PolicyCanvasNodeLayer: View {
     ForEach(orderedNodes) { node in
       PolicyCanvasNodeCard(
         node: node,
-        isSelected: viewModel.selection == .node(node.id),
+        isSelected: viewModel.isSelected(.node(node.id)),
         isFocused: focusedNodeID == node.id || accessibilityFocusedNodeID == node.id,
         severity: severityMap[node.id],
         viewModel: viewModel
@@ -44,9 +44,32 @@ struct PolicyCanvasNodeLayer: View {
             viewModel.endNodeDrag(node.id, translation: value.translation)
           }
       )
+      .simultaneousGesture(
+        TapGesture()
+          .modifiers(.shift)
+          .onEnded {
+            viewModel.extendSelection(.node(node.id))
+            focusedNodeID = node.id
+          }
+      )
       .onTapGesture {
         viewModel.select(.node(node.id))
         focusedNodeID = node.id
+      }
+      .contextMenu {
+        if let groupID = node.groupID, viewModel.group(groupID) != nil {
+          Button("Remove from group") {
+            viewModel.select(.node(node.id))
+            viewModel.removeNodeFromGroup(node.id)
+          }
+        }
+        Button("Duplicate") {
+          viewModel.select(.node(node.id))
+          viewModel.duplicateSelection()
+        }
+        Button("Delete", role: .destructive) {
+          viewModel.deleteNode(node.id)
+        }
       }
     }
   }
