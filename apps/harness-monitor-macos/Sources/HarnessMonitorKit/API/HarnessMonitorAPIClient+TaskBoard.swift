@@ -30,8 +30,12 @@ extension HarnessMonitorAPIClient {
     try await delete("/v1/task-board/items/\(id)")
   }
 
+  public func syncTaskBoard(request: TaskBoardSyncRequest) async throws -> TaskBoardSyncSummary {
+    try await post("/v1/task-board/sync", body: request)
+  }
+
   public func syncTaskBoard(status: TaskBoardStatus? = nil) async throws -> TaskBoardSyncSummary {
-    try await post("/v1/task-board/sync", body: TaskBoardStatusFilterRequest(status: status))
+    try await syncTaskBoard(request: TaskBoardSyncRequest(status: status))
   }
 
   public func dispatchTaskBoard(request: TaskBoardDispatchRequest) async throws

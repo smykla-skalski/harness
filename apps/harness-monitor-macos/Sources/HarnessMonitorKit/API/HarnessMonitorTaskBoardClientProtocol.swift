@@ -9,7 +9,7 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
     request: TaskBoardUpdateItemRequest
   ) async throws -> TaskBoardItem
   func deleteTaskBoardItem(id: String) async throws -> TaskBoardItem
-  func syncTaskBoard(status: TaskBoardStatus?) async throws -> TaskBoardSyncSummary
+  func syncTaskBoard(request: TaskBoardSyncRequest) async throws -> TaskBoardSyncSummary
   func dispatchTaskBoard(request: TaskBoardDispatchRequest) async throws -> TaskBoardDispatchSummary
   func evaluateTaskBoard(request: TaskBoardEvaluateRequest) async throws
     -> TaskBoardEvaluationSummary
@@ -65,8 +65,12 @@ extension HarnessMonitorTaskBoardClientProtocol {
     throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable.")
   }
 
-  public func syncTaskBoard(status _: TaskBoardStatus?) async throws -> TaskBoardSyncSummary {
+  public func syncTaskBoard(request _: TaskBoardSyncRequest) async throws -> TaskBoardSyncSummary {
     throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable.")
+  }
+
+  public func syncTaskBoard(status: TaskBoardStatus? = nil) async throws -> TaskBoardSyncSummary {
+    try await syncTaskBoard(request: TaskBoardSyncRequest(status: status))
   }
 
   public func dispatchTaskBoard(request _: TaskBoardDispatchRequest) async throws

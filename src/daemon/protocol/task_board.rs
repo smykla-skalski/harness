@@ -128,6 +128,8 @@ pub struct TaskBoardCatalogRequest {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TaskBoardDispatchRequest {
+    #[serde(default, alias = "id", skip_serializing_if = "Option::is_none")]
+    pub item_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status: Option<TaskBoardStatus>,
     #[serde(default)]
@@ -140,6 +142,8 @@ pub struct TaskBoardDispatchRequest {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TaskBoardEvaluateRequest {
+    #[serde(default, alias = "id", skip_serializing_if = "Option::is_none")]
+    pub item_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status: Option<TaskBoardStatus>,
     #[serde(default)]

@@ -96,6 +96,7 @@ impl TaskBoardOrchestratorJsonArgs {
 impl Execute for TaskBoardOrchestratorRunOnceArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let request = TaskBoardOrchestratorRunOnceRequest {
+            item_id: None,
             dry_run: dry_run_override(self.dry_run, self.apply),
             status: self.status,
             project_dir: self.project_dir.clone(),

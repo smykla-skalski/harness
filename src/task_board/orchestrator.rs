@@ -16,7 +16,7 @@ use super::store::TaskBoardStore;
 use super::summary::{
     TaskBoardAuditSummary, TaskBoardSyncSummary, build_audit_summary, build_sync_summary,
 };
-use super::types::TaskBoardWorkflowStatus;
+use super::types::{TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowStatus};
 
 mod types;
 
@@ -148,7 +148,7 @@ impl TaskBoardOrchestrator {
             input.dry_run,
             TaskBoardOrchestratorTickPhase::Dispatch,
         )?;
-        let items = self.board.list(input.status)?;
+        let items = run_items(&self.board, input.item_id.as_deref(), input.status)?;
         Ok(TaskBoardOrchestratorPreparedRun {
             run_id,
             started_at,
@@ -378,6 +378,7 @@ fn dispatch_input(
     settings: &TaskBoardOrchestratorSettings,
 ) -> TaskBoardOrchestratorDispatchInput {
     TaskBoardOrchestratorDispatchInput {
+        item_id: request.item_id.clone(),
         status: request.status.or(settings.dispatch_status_filter),
         dry_run: request.dry_run.unwrap_or(settings.dry_run_default),
         project_dir: request
@@ -386,6 +387,17 @@ fn dispatch_input(
             .or_else(|| settings.project_dir.clone()),
         actor: request.actor.clone(),
     }
+}
+
+fn run_items(
+    board: &TaskBoardStore,
+    item_id: Option<&str>,
+    status: Option<TaskBoardStatus>,
+) -> Result<Vec<TaskBoardItem>, CliError> {
+    item_id.map_or_else(
+        || board.list(status),
+        |id| board.get(id).map(|item| vec![item]),
+    )
 }
 
 struct RunRecordInput {

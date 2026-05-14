@@ -74,6 +74,7 @@ struct SessionsBoardView: View {
           decisions: store.supervisorOpenDecisions,
           isActionInFlight: dashboardUI.isBusy,
           onOpenTaskBoardItem: openTaskBoardItem,
+          onMoveTaskBoardItem: moveTaskBoardItem,
           onOpenDecision: openDecision,
           onEvaluateTaskBoard: evaluateTaskBoard,
           onRefreshTaskBoard: refreshTaskBoard,
@@ -97,6 +98,12 @@ struct SessionsBoardView: View {
       if let workItemID = item.workItemId {
         store.presentedSheet = .taskActions(sessionID: sessionID, taskID: workItemID)
       }
+    }
+  }
+
+  private func moveTaskBoardItem(_ itemID: String, status: TaskBoardStatus) {
+    Task { @MainActor in
+      await store.updateTaskBoardItemStatus(id: itemID, status: status)
     }
   }
 

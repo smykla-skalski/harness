@@ -10,6 +10,7 @@ public struct TaskBoardOverviewView: View {
   private let isActionInFlight: Bool
   private let onOpenItem: (TaskBoardInboxItem) -> Void
   private let onOpenTaskBoardItem: (TaskBoardItem) -> Void
+  private let onMoveTaskBoardItem: ((String, TaskBoardStatus) -> Void)?
   private let onOpenDecision: (Decision) -> Void
   private let onEvaluateTaskBoard: (() -> Void)?
   private let onRefreshTaskBoard: (() -> Void)?
@@ -33,6 +34,7 @@ public struct TaskBoardOverviewView: View {
     isActionInFlight: Bool = false,
     onOpenItem: @escaping (TaskBoardInboxItem) -> Void = { _ in },
     onOpenTaskBoardItem: @escaping (TaskBoardItem) -> Void = { _ in },
+    onMoveTaskBoardItem: ((String, TaskBoardStatus) -> Void)? = nil,
     onOpenDecision: @escaping (Decision) -> Void = { _ in },
     onEvaluateTaskBoard: (() -> Void)? = nil,
     onRefreshTaskBoard: (() -> Void)? = nil,
@@ -48,6 +50,7 @@ public struct TaskBoardOverviewView: View {
     self.isActionInFlight = isActionInFlight
     self.onOpenItem = onOpenItem
     self.onOpenTaskBoardItem = onOpenTaskBoardItem
+    self.onMoveTaskBoardItem = onMoveTaskBoardItem
     self.onOpenDecision = onOpenDecision
     self.onEvaluateTaskBoard = onEvaluateTaskBoard
     self.onRefreshTaskBoard = onRefreshTaskBoard
@@ -127,6 +130,7 @@ public struct TaskBoardOverviewView: View {
           onEvaluateTaskBoard()
         } label: {
           Label("Evaluate", systemImage: "checkmark.seal")
+            .scaledFont(.caption.weight(.semibold))
         }
         .frame(minHeight: metrics.controlMinHeight)
         .disabled(isActionInFlight)
@@ -171,32 +175,29 @@ public struct TaskBoardOverviewView: View {
   }
 
   private var taskBoard: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Text("Board Items")
-        .scaledFont(.subheadline.weight(.semibold))
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      ScrollView(.horizontal, showsIndicators: true) {
-        HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
-          ForEach(taskBoardSections) { section in
-            if section.lane == .needsYou {
-              TaskBoardNeedsYouLaneColumn(
-                section: section,
-                decisions: decisions,
-                onOpenItem: openTaskBoardItem,
-                onOpenDecision: onOpenDecision
-              )
-            } else {
-              TaskBoardItemLaneColumn(
-                section: section,
-                onOpenItem: openTaskBoardItem
-              )
-            }
+    ScrollView(.horizontal, showsIndicators: true) {
+      HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
+        ForEach(taskBoardSections) { section in
+          if section.lane == .needsYou {
+            TaskBoardNeedsYouLaneColumn(
+              section: section,
+              decisions: decisions,
+              onOpenItem: openTaskBoardItem,
+              onMoveItem: moveTaskBoardItem,
+              onOpenDecision: onOpenDecision
+            )
+          } else {
+            TaskBoardItemLaneColumn(
+              section: section,
+              onOpenItem: openTaskBoardItem,
+              onMoveItem: moveTaskBoardItem
+            )
           }
         }
-        .padding(.vertical, 2)
       }
-      .scrollClipDisabled()
+      .padding(.vertical, HarnessMonitorTheme.spacingXS)
     }
+    .scrollClipDisabled()
   }
 
   private var sessionTaskBoard: some View {
@@ -227,6 +228,7 @@ public struct TaskBoardOverviewView: View {
 
   private var emptyState: some View {
     ContentUnavailableView("No Open Tasks", systemImage: "tray")
+      .scaledFont(.body)
       .frame(maxWidth: .infinity, minHeight: 180)
       .background(
         .background.opacity(0.45), in: .rect(cornerRadius: HarnessMonitorTheme.cornerRadiusSM))
@@ -250,12 +252,22 @@ public struct TaskBoardOverviewView: View {
   }
 
   private func openTaskBoardItem(_ item: TaskBoardItem) {
-    if !item.hasLinkedSessionTask {
-      selectedTaskBoardItemID = item.id
+    if item.hasLinkedSessionTask {
+      selectedTaskBoardItemID = nil
+      onOpenTaskBoardItem(item)
     } else if selectedTaskBoardItemID == item.id {
       selectedTaskBoardItemID = nil
+    } else {
+      selectedTaskBoardItemID = item.id
     }
-    onOpenTaskBoardItem(item)
+  }
+
+  private func moveTaskBoardItem(_ itemID: String, to lane: TaskBoardInboxLane) -> Bool {
+    guard let onMoveTaskBoardItem else {
+      return false
+    }
+    onMoveTaskBoardItem(itemID, lane.taskBoardDropStatus)
+    return true
   }
 
   private func clearSelectedTaskBoardItem() {
@@ -268,7 +280,7 @@ public struct TaskBoardOverviewView: View {
 
   private func runOrchestratorOnceForItem(_ item: TaskBoardItem) {
     onRunTaskBoardOrchestratorOnce?(
-      TaskBoardOrchestratorRunOnceRequest(status: item.status)
+      TaskBoardOrchestratorRunOnceRequest(itemId: item.id, status: item.status)
     )
   }
 
@@ -365,8 +377,8 @@ struct TaskBoardOverviewMetrics: Equatable {
 
   init(fontScale: CGFloat) {
     let scale = SessionWindowFontScale.metricsScale(for: fontScale)
-    controlMinHeight = max(28, 28 * min(scale, 1.35))
-    iconControlMinWidth = max(30, 30 * min(scale, 1.35))
+    controlMinHeight = max(30, 30 * min(scale, 1.35))
+    iconControlMinWidth = max(32, 32 * min(scale, 1.35))
     managementPanelMinHeight = max(132, 132 * min(scale, 1.25))
     managementPanelSpacing = max(8, 8 * min(scale, 1.35))
   }
@@ -375,5 +387,24 @@ struct TaskBoardOverviewMetrics: Equatable {
 extension TaskBoardItem {
   var hasLinkedSessionTask: Bool {
     sessionId != nil && workItemId != nil
+  }
+}
+
+extension TaskBoardInboxLane {
+  fileprivate var taskBoardDropStatus: TaskBoardStatus {
+    switch self {
+    case .needsYou:
+      .planReview
+    case .ready:
+      .todo
+    case .running:
+      .inProgress
+    case .review:
+      .inReview
+    case .blocked:
+      .blocked
+    case .backlog:
+      .new
+    }
   }
 }

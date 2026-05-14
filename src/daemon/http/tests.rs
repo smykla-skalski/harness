@@ -36,6 +36,7 @@ mod session_archive_tests;
 mod shutdown;
 mod support;
 mod task_board;
+mod task_board_crud;
 mod task_review;
 mod telemetry;
 

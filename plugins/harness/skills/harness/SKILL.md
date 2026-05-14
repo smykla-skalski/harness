@@ -24,6 +24,7 @@ Parse `$ARGUMENTS`:
 | Command | Purpose |
 |---------|---------|
 | `session` | Multi-agent orchestration |
+| `task-board` | Cross-project task board, dispatch, evaluate, orchestrator, and policy routes |
 | `observe` | Session observation pipeline |
 
 Read [references/session-commands.md](references/session-commands.md) for `harness session` subcommands.
@@ -82,11 +83,12 @@ digraph session_start {
 4. Break goal into discrete board items
 5. Create items: `harness task-board create --title "..." --body "..." --priority medium`
 6. Add planning summary and approval before dispatch: `harness task-board update <task-id> --status todo --planning-summary "..." --approved-by <agent-id>`
-7. Tell user to spawn workers: `/harness:harness session join <session-id> --role worker`
-8. Poll status until workers join: `harness session status <session-id> --json`
-9. Check dispatch readiness: `harness task-board dispatch --json`
-10. Monitor overview: `harness task-board audit --json`
-11. End when done: `harness session end <session-id> --actor <agent-id>`
+7. Check dispatch readiness: `harness task-board dispatch --dry-run --json`
+8. Tell user to spawn workers, or launch managed capacity through `harness session agents start ...`
+9. Apply ready dispatch: `harness task-board dispatch --project-dir <project-dir> --actor <agent-id> --json`
+10. Reconcile linked work: `harness task-board evaluate --json`
+11. Monitor overview: `harness task-board audit --json`
+12. End when done: `harness session end <session-id> --actor <agent-id>`
 
 Read [references/signals.md](references/signals.md) for signal protocol when redirecting agents.
 Read [references/session-commands.md](references/session-commands.md) for exact command syntax.
@@ -136,7 +138,8 @@ Read [references/roles-and-permissions.md](references/roles-and-permissions.md) 
 4. Do the work following project conventions
 5. Update task body or tags if material context changes
 6. Submit for review: `harness task-board update <task-id> --status in_review`
-7. Respond to review feedback if requested, then check for more work or signals
+7. Let the leader/evaluator run `harness task-board evaluate --json` after linked session work changes
+8. Respond to review feedback if requested, then check for more work or signals
 
 ### Observer workflow
 
@@ -150,6 +153,26 @@ As observer you do not execute tasks. Monitor and triage only.
 
 Read [references/issue-taxonomy.md](references/issue-taxonomy.md) for category ownership and fix routing.
 
+### Managed agent dispatch
+
+Task-board dispatch records session/task links and the intended worker,
+reviewer, evaluator, and policy decision. It does not directly spawn agents.
+Use managed agent commands when the plan needs daemon-managed capacity:
+
+```bash
+harness session agents start terminal <session-id> --runtime <runtime> --role worker --prompt "..."
+harness session agents start codex <session-id> --mode <mode> --prompt "..."
+harness session agents start acp --session-id <session-id> --agent <descriptor> --role worker --prompt "..."
+harness session agents list <session-id>
+harness session agents show <agent-id>
+harness session agents steer <agent-id> --prompt "..."
+harness session agents interrupt <agent-id>
+harness session agents approve <agent-id> <approval-id> --decision <accept|reject>
+```
+
+Use capability tags, name, persona, model, effort, and project-dir flags when
+the runtime supports targeted routing.
+
 ### Reviewer / Improver workflow
 
 1. Check tasks needing review: `harness task-board list --status in_review --json`
@@ -157,6 +180,33 @@ Read [references/issue-taxonomy.md](references/issue-taxonomy.md) for category o
 3. Review changed files, run checks, verify acceptance criteria
 4. If needs fixes: `harness task-board update <task-id> --status in_progress`
 5. If approved: `harness task-board update <task-id> --status done`
+6. Prefer `harness task-board evaluate --json` when the board item is linked to session work
+
+---
+
+## task-board
+
+Use `task-board` for backlog state, session dispatch, linked-work evaluation,
+orchestrator ticks, and policy-pipeline visibility.
+
+Key routes:
+
+```bash
+harness task-board dispatch --dry-run --json
+harness task-board dispatch --project-dir <project-dir> --actor <agent-id> --json
+harness task-board evaluate --json
+harness task-board orchestrator status --json
+harness task-board orchestrator run-once --dry-run --json
+harness task-board orchestrator run-once --apply --status todo --json
+```
+
+Policy pipeline is exposed through daemon HTTP/WebSocket routes, not a direct
+CLI editing subcommand. Use it to load/save draft graphs, simulate, promote
+after a successful exact-revision simulation, and audit active policy state.
+
+Read [references/task-board-workflow.md](references/task-board-workflow.md) for
+the policy evidence predicates, orchestrator settings, dispatch plan shape, and
+evaluation state mapping.
 
 ---
 

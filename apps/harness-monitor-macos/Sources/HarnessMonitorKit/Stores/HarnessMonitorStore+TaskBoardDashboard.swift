@@ -42,6 +42,32 @@ extension HarnessMonitorStore {
   }
 
   @discardableResult
+  public func updateTaskBoardItemStatus(id: String, status: TaskBoardStatus) async -> Bool {
+    guard let client else {
+      return false
+    }
+    isDaemonActionInFlight = true
+    defer { isDaemonActionInFlight = false }
+
+    do {
+      let measuredItem = try await Self.measureOperation {
+        try await client.updateTaskBoardItem(
+          id: id,
+          request: TaskBoardUpdateItemRequest(status: status)
+        )
+      }
+      recordRequestSuccess()
+      mergeTaskBoardItem(measuredItem.value)
+      await refreshTaskBoardDashboardSnapshot(using: client)
+      presentSuccessFeedback("Moved task board item")
+      return true
+    } catch {
+      presentFailureFeedback(error.localizedDescription)
+      return false
+    }
+  }
+
+  @discardableResult
   public func startTaskBoardOrchestrator() async -> Bool {
     await mutateTaskBoardOrchestrator(actionName: "Started task board") { client in
       try await client.startTaskBoardOrchestrator()
@@ -130,6 +156,14 @@ extension HarnessMonitorStore {
       globalTaskBoardItems = measuredItems.value
       globalTaskBoardOrchestratorStatus = measuredStatus.value ?? fallbackStatus
     }
+  }
+
+  private func mergeTaskBoardItem(_ item: TaskBoardItem) {
+    guard let index = globalTaskBoardItems.firstIndex(where: { $0.id == item.id }) else {
+      globalTaskBoardItems.append(item)
+      return
+    }
+    globalTaskBoardItems[index] = item
   }
 
 }

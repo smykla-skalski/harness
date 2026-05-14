@@ -242,6 +242,31 @@ public struct TaskBoardStatusFilterRequest: Codable, Equatable, Sendable {
   }
 }
 
+public enum TaskBoardExternalSyncDirection: String, Codable, CaseIterable, Sendable {
+  case pull
+  case push
+  case both
+}
+
+public struct TaskBoardSyncRequest: Codable, Equatable, Sendable {
+  public let status: TaskBoardStatus?
+  public let provider: TaskBoardExternalProvider?
+  public let direction: TaskBoardExternalSyncDirection
+  public let dryRun: Bool
+
+  public init(
+    status: TaskBoardStatus? = nil,
+    provider: TaskBoardExternalProvider? = nil,
+    direction: TaskBoardExternalSyncDirection = .both,
+    dryRun: Bool = true
+  ) {
+    self.status = status
+    self.provider = provider
+    self.direction = direction
+    self.dryRun = dryRun
+  }
+}
+
 public struct TaskBoardDispatchRequest: Codable, Equatable, Sendable {
   public let status: TaskBoardStatus?
   public let dryRun: Bool

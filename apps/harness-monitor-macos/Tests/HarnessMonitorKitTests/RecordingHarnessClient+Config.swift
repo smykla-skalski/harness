@@ -136,6 +136,12 @@ extension RecordingHarnessClient {
     }
   }
 
+  func configureTaskBoardItems(_ items: [TaskBoardItem]) {
+    lock.withLock {
+      taskBoardItemsStorage = items
+    }
+  }
+
   func configureDetailDelay(_ delay: Duration?, for sessionID: String) {
     lock.withLock {
       if let delay {

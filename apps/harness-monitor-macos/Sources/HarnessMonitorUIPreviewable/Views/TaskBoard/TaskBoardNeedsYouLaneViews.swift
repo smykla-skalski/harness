@@ -6,7 +6,9 @@ struct TaskBoardNeedsYouLaneColumn: View {
   let section: TaskBoardItemSection
   let decisions: [Decision]
   let onOpenItem: (TaskBoardItem) -> Void
+  let onMoveItem: (String, TaskBoardInboxLane) -> Bool
   let onOpenDecision: (Decision) -> Void
+  @State private var isDropTargeted = false
 
   private var itemCount: Int {
     section.items.count + decisions.count
@@ -16,22 +18,35 @@ struct TaskBoardNeedsYouLaneColumn: View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       TaskBoardLaneHeader(lane: .needsYou, count: itemCount)
 
-      if section.items.isEmpty && decisions.isEmpty {
-        TaskBoardEmptyLane()
-      } else {
-        VStack(spacing: HarnessMonitorTheme.spacingSM) {
-          ForEach(decisions.prefix(4), id: \.id) { decision in
-            TaskBoardDecisionRow(decision: decision, onOpenDecision: onOpenDecision)
-          }
-          ForEach(section.items.prefix(5)) { item in
-            TaskBoardItemRow(item: item, onOpenItem: onOpenItem)
+      Group {
+        if section.items.isEmpty && decisions.isEmpty {
+          TaskBoardEmptyLane(lane: .needsYou)
+        } else {
+          VStack(spacing: HarnessMonitorTheme.spacingSM) {
+            ForEach(decisions.prefix(4), id: \.id) { decision in
+              TaskBoardDecisionRow(decision: decision, onOpenDecision: onOpenDecision)
+            }
+            ForEach(section.items.prefix(5)) { item in
+              TaskBoardItemRow(item: item, onOpenItem: onOpenItem)
+            }
           }
         }
       }
+      .taskBoardLaneBodyChrome(lane: .needsYou, isDropTargeted: isDropTargeted)
     }
-    .frame(width: 260, alignment: .topLeading)
+    .taskBoardLaneColumnChrome(lane: .needsYou)
+    .dropDestination(for: TaskBoardItemDragPayload.self, action: handleDrop) { targeted in
+      isDropTargeted = targeted
+    }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.needs-you-column")
+  }
+
+  private func handleDrop(_ payloads: [TaskBoardItemDragPayload], _: CGPoint) -> Bool {
+    guard let payload = payloads.first else {
+      return false
+    }
+    return onMoveItem(payload.itemID, .needsYou)
   }
 }
 
@@ -72,10 +87,17 @@ struct TaskBoardDecisionRow: View {
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(HarnessMonitorTheme.spacingSM)
+      .frame(minHeight: 86, alignment: .topLeading)
+      .padding(HarnessMonitorTheme.spacingMD)
     }
     .harnessInteractiveCardButtonStyle(cornerRadius: 8)
-    .background(.background.opacity(0.45), in: .rect(cornerRadius: 8))
+    .background(.background.opacity(0.56), in: .rect(cornerRadius: 8))
+    .overlay(alignment: .leading) {
+      Rectangle()
+        .fill(severityColor.opacity(0.82))
+        .frame(width: 3)
+        .clipShape(.rect(topLeadingRadius: 8, bottomLeadingRadius: 8))
+    }
     .overlay(
       RoundedRectangle(cornerRadius: 8)
         .stroke(HarnessMonitorTheme.danger.opacity(0.45), lineWidth: 1)
@@ -126,8 +148,8 @@ struct TaskBoardDecisionRow: View {
       .scaledFont(.caption2.weight(.bold))
       .foregroundStyle(color)
       .lineLimit(1)
-      .padding(.horizontal, HarnessMonitorTheme.spacingSM)
-      .padding(.vertical, 3)
-      .background(color.opacity(0.12), in: .capsule)
+      .padding(.horizontal, 9)
+      .padding(.vertical, 4)
+      .background(color.opacity(0.16), in: .capsule)
   }
 }

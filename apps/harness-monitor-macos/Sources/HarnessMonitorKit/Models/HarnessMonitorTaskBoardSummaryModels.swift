@@ -10,6 +10,11 @@ public enum TaskBoardExternalProvider: String, Codable, Sendable {
   case todoist
 }
 
+public enum TaskBoardExternalSyncAction: String, Codable, CaseIterable, Sendable {
+  case pull
+  case push
+}
+
 public struct TaskBoardProviderSyncSummary: Codable, Equatable, Sendable {
   public let provider: TaskBoardExternalProvider
   public let configured: Bool
@@ -22,6 +27,60 @@ public struct TaskBoardProviderSyncSummary: Codable, Equatable, Sendable {
 public struct TaskBoardSyncSummary: Codable, Equatable, Sendable {
   public let total: Int
   public let providers: [TaskBoardProviderSyncSummary]
+  public let operations: [TaskBoardExternalSyncOperation]
+
+  public init(
+    total: Int,
+    providers: [TaskBoardProviderSyncSummary],
+    operations: [TaskBoardExternalSyncOperation] = []
+  ) {
+    self.total = total
+    self.providers = providers
+    self.operations = operations
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case total
+    case providers
+    case operations
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    total = try container.decode(Int.self, forKey: .total)
+    providers = try container.decode([TaskBoardProviderSyncSummary].self, forKey: .providers)
+    operations =
+      try container.decodeIfPresent([TaskBoardExternalSyncOperation].self, forKey: .operations)
+      ?? []
+  }
+}
+
+public struct TaskBoardExternalSyncOperation: Codable, Equatable, Sendable {
+  public let provider: TaskBoardExternalProvider
+  public let action: TaskBoardExternalSyncAction
+  public let boardItemId: String?
+  public let externalId: String?
+  public let url: String?
+  public let dryRun: Bool
+  public let applied: Bool
+
+  public init(
+    provider: TaskBoardExternalProvider,
+    action: TaskBoardExternalSyncAction,
+    boardItemId: String? = nil,
+    externalId: String? = nil,
+    url: String? = nil,
+    dryRun: Bool,
+    applied: Bool
+  ) {
+    self.provider = provider
+    self.action = action
+    self.boardItemId = boardItemId
+    self.externalId = externalId
+    self.url = url
+    self.dryRun = dryRun
+    self.applied = applied
+  }
 }
 
 public struct TaskBoardAuditSummary: Codable, Equatable, Sendable {

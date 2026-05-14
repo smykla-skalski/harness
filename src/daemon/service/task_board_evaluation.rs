@@ -20,7 +20,7 @@ pub fn evaluate_task_board(
     db: Option<&DaemonDb>,
 ) -> Result<TaskBoardEvaluationResponse, CliError> {
     let board = store();
-    let items = board.list(request.status)?;
+    let items = selected_items(&board, request)?;
     evaluate_items_with_loader(
         &board,
         &items,
@@ -42,7 +42,7 @@ pub(crate) async fn evaluate_task_board_async(
     async_db: &AsyncDaemonDb,
 ) -> Result<TaskBoardEvaluationResponse, CliError> {
     let board = store();
-    let items = board.list(request.status)?;
+    let items = selected_items(&board, request)?;
     let mut summary = TaskBoardEvaluationSummary::default();
     for item in &items {
         let Some((session_id, work_item_id)) = linked_task(item) else {
@@ -77,6 +77,16 @@ pub(crate) async fn evaluate_task_board_async(
         summary.push(evaluate_linked_item(&board, item, &task, request.dry_run)?);
     }
     Ok(summary)
+}
+
+fn selected_items(
+    board: &TaskBoardStore,
+    request: &TaskBoardEvaluateRequest,
+) -> Result<Vec<TaskBoardItem>, CliError> {
+    request.item_id.as_deref().map_or_else(
+        || board.list(request.status),
+        |item_id| board.get(item_id).map(|item| vec![item]),
+    )
 }
 
 fn evaluate_items_with_loader<F>(

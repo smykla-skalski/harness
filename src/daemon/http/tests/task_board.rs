@@ -52,11 +52,13 @@ async fn run_task_board_http_flow(sandbox: &Path) {
     let client = reqwest::Client::new();
 
     seed_ready_board_item("board-http-dispatch", "HTTP dispatch item");
+    seed_ready_board_item("board-http-dispatch-other", "HTTP dispatch other item");
     let dispatch = post_json(
         &client,
         &base_url,
         http_paths::TASK_BOARD_DISPATCH,
         json!({
+            "item_id": "board-http-dispatch",
             "status": "todo",
             "dry_run": false,
             "project_dir": project_dir,
@@ -66,11 +68,16 @@ async fn run_task_board_http_flow(sandbox: &Path) {
     let applied = first_applied(&dispatch);
     let session_id = required_string(applied, "session_id");
     let work_item_id = required_string(applied, "work_item_id");
+    assert_eq!(
+        applied["board_item_id"].as_str(),
+        Some("board-http-dispatch")
+    );
     assert_eq!(applied["item"]["status"].as_str(), Some("in_progress"));
     assert_eq!(
         applied["item"]["workflow"]["status"].as_str(),
         Some("running")
     );
+    assert_board_item_unlinked("board-http-dispatch-other");
     join_leader(&state, &session_id, &project_dir).await;
 
     post_json(
@@ -102,11 +109,13 @@ async fn run_task_board_http_flow(sandbox: &Path) {
     );
 
     seed_ready_board_item("board-http-run-once", "HTTP run once item");
+    seed_ready_board_item("board-http-run-once-other", "HTTP run once other item");
     let run_once = post_json(
         &client,
         &base_url,
         http_paths::TASK_BOARD_ORCHESTRATOR_RUN_ONCE,
         json!({
+            "item_id": "board-http-run-once",
             "status": "todo",
             "dry_run": false,
             "project_dir": project_dir,
@@ -120,6 +129,10 @@ async fn run_task_board_http_flow(sandbox: &Path) {
             .map(Vec::len),
         Some(1)
     );
+    assert_eq!(
+        run_once["last_run"]["dispatch"]["applied"][0]["board_item_id"].as_str(),
+        Some("board-http-run-once")
+    );
     assert!(
         run_once["last_run"]["evaluation"]["evaluated"]
             .as_u64()
@@ -131,6 +144,7 @@ async fn run_task_board_http_flow(sandbox: &Path) {
             .as_array()
             .is_some_and(|trace_ids| !trace_ids.is_empty())
     );
+    assert_board_item_unlinked("board-http-run-once-other");
 
     server.abort();
     let _ = server.await;
@@ -399,6 +413,14 @@ fn first_applied(value: &Value) -> &Value {
         .as_array()
         .and_then(|applied| applied.first())
         .expect("first applied task")
+}
+
+fn assert_board_item_unlinked(id: &str) {
+    let item = TaskBoardStore::new(default_board_root())
+        .get(id)
+        .expect("load board item");
+    assert_eq!(item.status, TaskBoardStatus::Todo);
+    assert!(item.work_item_id.is_none());
 }
 
 fn required_string(value: &Value, key: &str) -> String {
