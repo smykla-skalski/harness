@@ -56,6 +56,24 @@
       }
     },
     {
+      "id": "policy-canvas",
+      "signpostName": "policy-canvas",
+      "defaultPreviewScenario": "policy-canvas",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": false,
+      "needsPreviewAcpPermissionBatch": false,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 8,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 40000,
+        "bodyUpdates": 4000,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0
+      }
+    },
+    {
       "id": "agent-detail-form",
       "signpostName": "agent-detail-form",
       "defaultPreviewScenario": "dashboard-landing",
@@ -278,6 +296,24 @@
       "initialSettingsSection": "general",
       "disablesVisualOptions": false,
       "needsPreviewAcpPermissionBatch": true,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 8,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 35000,
+        "bodyUpdates": 3500,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0
+      }
+    },
+    {
+      "id": "task-board-settings",
+      "signpostName": "task-board-settings",
+      "defaultPreviewScenario": "dashboard",
+      "initialSettingsSection": "taskBoard",
+      "disablesVisualOptions": false,
+      "needsPreviewAcpPermissionBatch": false,
       "includesBootstrapInMeasurement": false,
       "durationSeconds": 8,
       "templates": ["swiftui"],

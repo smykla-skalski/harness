@@ -61,6 +61,28 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     launched.terminate()
   }
 
+  func testPolicyCanvasScenarioState() {
+    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+    let launched = launchForPerf(app: app, scenario: "policy-canvas")
+    let sessionWindow = element(in: launched, identifier: Accessibility.sessionWindowShell)
+    let canvasRoot = element(in: launched, identifier: Accessibility.policyCanvasRoot)
+    let toolRail = element(in: launched, identifier: Accessibility.policyCanvasToolRail)
+
+    waitForScenarioCompletion(app: launched, scenario: "policy-canvas")
+
+    XCTAssertTrue(sessionWindow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(
+      waitForElement(canvasRoot, timeout: Self.uiTimeout),
+      "Policy Canvas perf scenario did not render the policy canvas surface"
+    )
+    XCTAssertTrue(
+      waitForElement(toolRail, timeout: Self.actionTimeout),
+      "Policy Canvas perf scenario did not render the policy canvas tool rail"
+    )
+
+    launched.terminate()
+  }
+
   func testAgentDetailFormScenarioState() {
     let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
     let launched = launchForPerf(app: app, scenario: "agent-detail-form")
@@ -211,6 +233,27 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
       "Permission perf scenario did not surface the routed ACP decision row"
     )
     XCTAssertFalse(legacyModal.exists)
+
+    launched.terminate()
+  }
+
+  func testTaskBoardSettingsScenarioState() {
+    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+    let launched = launchForPerf(app: app, scenario: "task-board-settings")
+    let settingsRoot = element(in: launched, identifier: Accessibility.settingsRoot)
+    let saveButton = element(in: launched, identifier: Accessibility.settingsTaskBoardSaveButton)
+    let ownerField = element(in: launched, identifier: Accessibility.settingsTaskBoardOwnerField)
+    let status = element(in: launched, identifier: Accessibility.settingsTaskBoardStatus)
+
+    waitForScenarioCompletion(app: launched, scenario: "task-board-settings")
+
+    XCTAssertTrue(waitForElement(settingsRoot, timeout: Self.uiTimeout))
+    XCTAssertTrue(waitForElement(saveButton, timeout: Self.actionTimeout))
+    XCTAssertTrue(
+      waitForElement(ownerField, timeout: Self.actionTimeout),
+      "Task Board settings perf scenario should load editable Task Board fields"
+    )
+    XCTAssertFalse(status.exists, "Task Board settings perf scenario should not settle on an error")
 
     launched.terminate()
   }
