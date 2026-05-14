@@ -59,6 +59,18 @@ pub(super) enum LocalCommitSignature {
     Unsupported,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum RestCommitSignatureBoundary {
+    RestSupported,
+    NativeGitTransportRequired(NativeGitTransportReason),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum NativeGitTransportReason {
+    ConfiguredSshSigning,
+    ExistingSshSignature,
+}
+
 #[derive(Serialize)]
 pub(super) struct GitHubCreateBlobRequest {
     pub(super) content: String,
