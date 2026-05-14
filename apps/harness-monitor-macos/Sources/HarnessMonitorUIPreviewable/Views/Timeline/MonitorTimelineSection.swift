@@ -150,7 +150,8 @@ struct SessionTimelineView: View {
         onSignalTap: handleSignalTap,
         fontScale: fontScale,
         horizontalContentInset: 0,
-        filters: $filters
+        filters: $filters,
+        onRequestLoadOlder: requestLoadOlderTimelineChunk
       )
       .frame(minHeight: 260, maxHeight: 470)
 
@@ -201,7 +202,8 @@ struct SessionTimelineView: View {
           onSignalTap: handleSignalTap,
           fontScale: fontScale,
           horizontalContentInset: routeMetrics.contentPadding,
-          filters: $filters
+          filters: $filters,
+          onRequestLoadOlder: requestLoadOlderTimelineChunk
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       }
@@ -271,6 +273,17 @@ struct SessionTimelineView: View {
   func handleSignalTap(_ signalID: String) {
     store.presentedSheet = .signalDetail(signalID: signalID)
   }
+
+  static let loadOlderChunkSize = 200
+
+  func requestLoadOlderTimelineChunk() {
+    Task { @MainActor in
+      await store.appendSelectedTimelineOlderChunk(
+        limit: Self.loadOlderChunkSize,
+        retainedLimit: nil
+      )
+    }
+  }
 }
 
 private struct SessionTimelineList: View {
@@ -280,6 +293,7 @@ private struct SessionTimelineList: View {
   let fontScale: CGFloat
   let horizontalContentInset: CGFloat
   let filters: Binding<SessionTimelineFilterState>
+  let onRequestLoadOlder: (() -> Void)?
 
   init(
     presentation: SessionTimelineSectionPresentation,
@@ -287,7 +301,8 @@ private struct SessionTimelineList: View {
     onSignalTap: ((String) -> Void)?,
     fontScale: CGFloat,
     horizontalContentInset: CGFloat,
-    filters: Binding<SessionTimelineFilterState>
+    filters: Binding<SessionTimelineFilterState>,
+    onRequestLoadOlder: (() -> Void)? = nil
   ) {
     self.presentation = presentation
     self.actionHandler = actionHandler
@@ -295,6 +310,7 @@ private struct SessionTimelineList: View {
     self.fontScale = fontScale
     self.horizontalContentInset = horizontalContentInset
     self.filters = filters
+    self.onRequestLoadOlder = onRequestLoadOlder
   }
 
   var body: some View {
@@ -323,6 +339,12 @@ private struct SessionTimelineList: View {
           .equatable()
           .id(row.id)
         }
+        if presentation.navigation.hasOlder {
+          SessionTimelineLoadOlderFooter(
+            isLoading: presentation.navigation.isLoading,
+            onAppear: onRequestLoadOlder
+          )
+        }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .coordinateSpace(.named(SessionTimelineRailCoordinateSpace.name))
@@ -335,6 +357,30 @@ private struct SessionTimelineList: View {
     }
     .scrollIndicators(.visible)
     .scrollBounceBehavior(.basedOnSize, axes: .vertical)
+  }
+}
+
+struct SessionTimelineLoadOlderFooter: View {
+  let isLoading: Bool
+  let onAppear: (() -> Void)?
+
+  var body: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      HarnessMonitorSpinner(size: 12)
+      Text(isLoading ? "Loading older events…" : "Loading more")
+        .scaledFont(.caption2)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      Spacer(minLength: 0)
+    }
+    .padding(.vertical, HarnessMonitorTheme.spacingMD)
+    .padding(.horizontal, HarnessMonitorTheme.spacingLG)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineLoadOlderFooter)
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("Loading older timeline events")
+    .onAppear {
+      onAppear?()
+    }
   }
 }
 
