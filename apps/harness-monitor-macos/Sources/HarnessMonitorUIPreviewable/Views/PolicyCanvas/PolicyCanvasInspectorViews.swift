@@ -32,7 +32,7 @@ struct PolicyCanvasInspector: View {
 
       Text(statusLine)
         .scaledFont(.caption)
-        .foregroundStyle(.white.opacity(0.62))
+        .foregroundStyle(.white.opacity(0.78))
         .lineLimit(1)
     }
   }

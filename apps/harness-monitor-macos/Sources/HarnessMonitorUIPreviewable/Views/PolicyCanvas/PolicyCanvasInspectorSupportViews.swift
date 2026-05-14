@@ -14,7 +14,7 @@ struct PolicyCanvasInspectorSection<Content: View>: View {
     VStack(alignment: .leading, spacing: 10) {
       Text(title)
         .scaledFont(.caption.weight(.bold))
-        .foregroundStyle(.white.opacity(0.54))
+        .foregroundStyle(.white.opacity(0.82))
         .textCase(.uppercase)
 
       VStack(alignment: .leading, spacing: 8) {
@@ -43,7 +43,7 @@ struct PolicyCanvasInspectorField<Content: View>: View {
     VStack(alignment: .leading, spacing: 5) {
       Text(label)
         .scaledFont(.caption)
-        .foregroundStyle(.white.opacity(0.48))
+        .foregroundStyle(.white.opacity(0.70))
       content
     }
   }
@@ -57,7 +57,7 @@ struct PolicyCanvasInspectorRow: View {
     HStack(alignment: .firstTextBaseline, spacing: 10) {
       Text(label)
         .scaledFont(.caption)
-        .foregroundStyle(.white.opacity(0.48))
+        .foregroundStyle(.white.opacity(0.70))
         .frame(width: 68, alignment: .leading)
 
       Text(value)

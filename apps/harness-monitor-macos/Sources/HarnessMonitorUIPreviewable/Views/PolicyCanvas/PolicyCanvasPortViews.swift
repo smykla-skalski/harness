@@ -89,6 +89,7 @@ private struct PolicyCanvasPortView: View {
         width: PolicyCanvasLayout.portDiameter,
         height: PolicyCanvasLayout.portDiameter
       )
+      .contentShape(Circle().inset(by: -PolicyCanvasLayout.portHitTestExtension))
       .help(port.title)
       .accessibilityLabel("\(node.title) \(port.title)")
       .accessibilityIdentifier(

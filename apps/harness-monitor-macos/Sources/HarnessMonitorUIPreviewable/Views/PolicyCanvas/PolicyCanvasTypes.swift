@@ -233,7 +233,8 @@ struct PolicyCanvasDeletionRequest: Identifiable, Equatable {
 enum PolicyCanvasLayout {
   static let gridSize: CGFloat = 20
   static let nodeSize = CGSize(width: 168, height: 96)
-  static let portDiameter: CGFloat = 12
+  static let portDiameter: CGFloat = 18
+  static let portHitTestExtension: CGFloat = 8
   static let groupCornerRadius: CGFloat = 8
   static let initialContentOrigin = CGPoint(x: 140, y: 160)
   static let groupHorizontalPadding: CGFloat = 44

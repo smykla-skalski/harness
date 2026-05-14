@@ -166,6 +166,7 @@ private struct PolicyCanvasEdgeLayer: View {
           }
           .harnessPlainButtonStyle()
           .position(route.labelPosition)
+          .accessibilityLabel(viewModel.accessibilityLabel(for: edge))
           .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEdge(edge.id))
         }
       }
@@ -313,8 +314,9 @@ private struct PolicyCanvasNodeCard: View {
       )
     }
     .frame(width: PolicyCanvasLayout.nodeSize.width, height: PolicyCanvasLayout.nodeSize.height)
-    .accessibilityElement(children: .contain)
-    .accessibilityLabel(node.title)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(viewModel.accessibilityLabel(for: node))
+    .accessibilityValue(viewModel.accessibilityValue(for: node))
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasNode(node.id))
   }
 }
