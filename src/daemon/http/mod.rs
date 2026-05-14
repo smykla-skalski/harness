@@ -42,6 +42,7 @@ mod sessions_mutations;
 mod signals;
 mod stream;
 mod task_board;
+mod task_board_orchestrator_run_once;
 mod tasks;
 #[cfg(test)]
 mod tests;

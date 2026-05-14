@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::task_board::{
-    TaskBoardGitHubTokensSyncRequest, TaskBoardGitHubTokensSyncResponse, TaskBoardGitRuntimeConfig,
-    normalize_repository_slug,
+    TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
+    TaskBoardGitHubTokensSyncResponse, TaskBoardGitRuntimeConfig, normalize_repository_slug,
 };
 
 use super::{append_event_best_effort, config_path, ensure_daemon_dirs};
@@ -85,6 +85,9 @@ pub fn persist_task_board_git_runtime_config(
 }
 
 /// Replace the daemon's in-memory GitHub token snapshot.
+///
+/// # Panics
+/// Panics when the in-memory token state lock is poisoned.
 #[must_use]
 pub fn replace_task_board_github_tokens(
     request: &TaskBoardGitHubTokensSyncRequest,
@@ -96,7 +99,7 @@ pub fn replace_task_board_github_tokens(
     state.repository_tokens = request
         .repository_tokens
         .iter()
-        .filter_map(|token| token.normalized())
+        .filter_map(TaskBoardGitHubRepositoryToken::normalized)
         .map(|token| (token.repository, token.token))
         .collect();
     TaskBoardGitHubTokensSyncResponse {
@@ -105,6 +108,8 @@ pub fn replace_task_board_github_tokens(
     }
 }
 
+/// # Panics
+/// Panics when the in-memory token state lock is poisoned.
 #[must_use]
 pub fn task_board_github_token(repository: Option<&str>) -> Option<String> {
     let state = TASK_BOARD_GITHUB_TOKENS
@@ -113,6 +118,17 @@ pub fn task_board_github_token(repository: Option<&str>) -> Option<String> {
     normalize_repository_slug(repository)
         .and_then(|repository| state.repository_tokens.get(&repository).cloned())
         .or_else(|| state.global_token.clone())
+}
+
+/// # Panics
+/// Panics when the in-memory token state lock is poisoned.
+#[must_use]
+pub fn task_board_github_repository_token(repository: &str) -> Option<String> {
+    let state = TASK_BOARD_GITHUB_TOKENS
+        .read()
+        .expect("task-board github token state lock poisoned");
+    normalize_repository_slug(Some(repository))
+        .and_then(|repository| state.repository_tokens.get(&repository).cloned())
 }
 
 /// Normalize and validate a daemon log level.

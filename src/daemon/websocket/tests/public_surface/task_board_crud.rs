@@ -146,6 +146,62 @@ fn websocket_task_board_crud_sync_audit_and_orchestrator_routes_use_real_state()
             )
             .await;
             assert_eq!(loaded_settings["dry_run_default"].as_bool(), Some(false));
+            let runtime_config = call(
+                &state,
+                &connection,
+                "req-orch-runtime-config",
+                ws_methods::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_UPDATE,
+                json!({
+                    "global": {
+                        "author_name": "Harness Bot",
+                        "author_email": "bot@example.com",
+                        "ssh_key_path": "/tmp/id_ed25519"
+                    },
+                    "repository_overrides": [
+                        {
+                            "repository": "owner/repo",
+                            "profile": {
+                                "author_email": "repo@example.com"
+                            }
+                        }
+                    ]
+                }),
+            )
+            .await;
+            assert_eq!(
+                runtime_config["global"]["author_name"].as_str(),
+                Some("Harness Bot")
+            );
+            let loaded_runtime_config = call(
+                &state,
+                &connection,
+                "req-orch-runtime-config-get",
+                ws_methods::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_GET,
+                json!({}),
+            )
+            .await;
+            assert_eq!(
+                loaded_runtime_config["repository_overrides"][0]["repository"].as_str(),
+                Some("owner/repo")
+            );
+            let tokens = call(
+                &state,
+                &connection,
+                "req-orch-github-tokens",
+                ws_methods::TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS_SYNC,
+                json!({
+                    "global_token": "global-token",
+                    "repository_tokens": [
+                        {
+                            "repository": "owner/repo",
+                            "token": "repo-token"
+                        }
+                    ]
+                }),
+            )
+            .await;
+            assert_eq!(tokens["global_token_configured"].as_bool(), Some(true));
+            assert_eq!(tokens["repository_token_count"].as_u64(), Some(1));
             assert_eq!(
                 call(
                     &state,

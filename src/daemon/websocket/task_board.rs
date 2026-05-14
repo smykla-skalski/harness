@@ -2,14 +2,18 @@ use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::{
     TaskBoardAuditRequest, TaskBoardCatalogRequest, TaskBoardCreateItemRequest,
     TaskBoardDeleteItemRequest, TaskBoardDispatchRequest, TaskBoardEvaluateRequest,
-    TaskBoardGetItemRequest, TaskBoardListItemsRequest, TaskBoardOrchestratorRunOnceRequest,
-    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardPolicyPipelinePromoteRequest,
-    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest,
-    TaskBoardSyncRequest, TaskBoardUpdateItemRequest, WsRequest, WsResponse, ws_methods,
+    TaskBoardGetItemRequest, TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
+    TaskBoardListItemsRequest, TaskBoardOrchestratorRunOnceRequest,
+    TaskBoardOrchestratorRunOnceResponse, TaskBoardOrchestratorSettingsUpdateRequest,
+    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
+    TaskBoardPolicyPipelineSimulateRequest, TaskBoardSyncRequest, TaskBoardUpdateItemRequest,
+    WsRequest, WsResponse, ws_methods,
 };
 use crate::daemon::service;
+use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use serde::de::DeserializeOwned;
+use tokio::task::spawn_blocking;
 
 use super::frames::error_response;
 use super::mutations::dispatch_query_result;
@@ -47,6 +51,15 @@ pub(crate) async fn dispatch_task_board_method(
         }
         ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_UPDATE => {
             Some(dispatch_task_board_orchestrator_settings_update(request))
+        }
+        ws_methods::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_GET => {
+            Some(dispatch_task_board_orchestrator_runtime_config_get(request))
+        }
+        ws_methods::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_UPDATE => Some(
+            dispatch_task_board_orchestrator_runtime_config_update(request),
+        ),
+        ws_methods::TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS_SYNC => {
+            Some(dispatch_task_board_orchestrator_github_tokens_sync(request))
         }
         ws_methods::TASK_BOARD_POLICY_PIPELINE_GET => {
             Some(dispatch_task_board_policy_pipeline_get(request))
@@ -204,9 +217,16 @@ async fn dispatch_task_board_orchestrator_run_once(
         return invalid_params(request);
     };
     body.actor = Some(CONTROL_PLANE_ACTOR_ID.to_string());
-    let result = if let Some(async_db) = state.async_db.get() {
-        let result =
-            service::run_task_board_orchestrator_once_async(&body, async_db.as_ref()).await;
+    let result = run_task_board_orchestrator_once_route(state, &body).await;
+    dispatch_query_result(&request.id, result)
+}
+
+async fn run_task_board_orchestrator_once_route(
+    state: &DaemonHttpState,
+    body: &TaskBoardOrchestratorRunOnceRequest,
+) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
+    if let Some(async_db) = state.async_db.get() {
+        let result = service::run_task_board_orchestrator_once_async(body, async_db.as_ref()).await;
         if result
             .as_ref()
             .is_ok_and(|status| status.last_run_applied_count() > 0)
@@ -217,17 +237,17 @@ async fn dispatch_task_board_orchestrator_run_once(
     } else {
         let db = state.db.get().cloned();
         let body_for_worker = body.clone();
-        let result = tokio::task::spawn_blocking(move || {
+        let result = spawn_blocking(move || {
             let db_guard = db.as_ref().map(|db| db.lock().expect("db lock"));
             let db_ref = db_guard.as_deref();
             service::run_task_board_orchestrator_once(&body_for_worker, db_ref)
         })
         .await
         .unwrap_or_else(|error| {
-            Err(crate::errors::CliErrorKind::workflow_io(format!(
-                "run task-board orchestrator fallback: {error}"
-            ))
-            .into())
+            Err(
+                CliErrorKind::workflow_io(format!("run task-board orchestrator fallback: {error}"))
+                    .into(),
+            )
         });
         if result
             .as_ref()
@@ -238,8 +258,7 @@ async fn dispatch_task_board_orchestrator_run_once(
             service::broadcast_sessions_updated(&state.sender, db_ref);
         }
         result
-    };
-    dispatch_query_result(&request.id, result)
+    }
 }
 
 fn dispatch_task_board_orchestrator_settings_get(request: &WsRequest) -> WsResponse {
@@ -254,6 +273,27 @@ fn dispatch_task_board_orchestrator_settings_update(request: &WsRequest) -> WsRe
         &request.id,
         service::update_task_board_orchestrator_settings(&body),
     )
+}
+
+fn dispatch_task_board_orchestrator_runtime_config_get(request: &WsRequest) -> WsResponse {
+    dispatch_query_result(&request.id, service::task_board_git_runtime_config())
+}
+
+fn dispatch_task_board_orchestrator_runtime_config_update(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardGitRuntimeConfig>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        service::update_task_board_git_runtime_config(&body),
+    )
+}
+
+fn dispatch_task_board_orchestrator_github_tokens_sync(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardGitHubTokensSyncRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(&request.id, service::sync_task_board_github_tokens(&body))
 }
 
 fn dispatch_task_board_policy_pipeline_get(request: &WsRequest) -> WsResponse {

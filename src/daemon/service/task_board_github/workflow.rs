@@ -11,77 +11,68 @@ use crate::task_board::{
     TaskBoardWorkflowState,
 };
 
+use super::AutomationRequest;
 use super::support::{
     STEP_BRANCH_PUSHED, STEP_EVIDENCE_FAILED, STEP_MERGED, STEP_MISSING_WORKTREE, STEP_PR_FAILED,
-    STEP_PR_OPENED, STEP_PUSH_FAILED, STEP_READY, STEP_REVIEW_FAILED, STEP_REVIEW_REQUESTED,
-    STEP_WAITING_FOR_CHECKS, STEP_WAITING_FOR_COMMITS, STEP_WAITING_FOR_CONSENSUS,
-    STEP_WAITING_FOR_HUMAN, STEP_WAITING_FOR_REVIEW, action_policy, branch_publication_async,
-    clear_error, failure, is_repo_scoped, managed_branch_name, new_policy_trace_id, policy_blocked,
-    pull_request_request, push_branch_async, resolve_worktree, step, sync_labels,
-    update_pull_request_metadata, waiting,
+    STEP_PUSH_FAILED, STEP_READY, STEP_WAITING_FOR_CHECKS, STEP_WAITING_FOR_COMMITS,
+    STEP_WAITING_FOR_CONSENSUS, STEP_WAITING_FOR_HUMAN, STEP_WAITING_FOR_REVIEW, action_policy,
+    branch_publication_async, clear_error, failure, is_repo_scoped, managed_branch_name,
+    new_policy_trace_id, policy_blocked, push_branch_async, resolve_worktree, step, sync_labels,
+    waiting,
 };
 
-pub(super) async fn automate_item(
-    board_root: &Path,
-    config: &GitHubProjectConfig,
-    project_dir: Option<&str>,
-    dry_run: bool,
-    item: &TaskBoardItem,
-    session_worktrees: &BTreeMap<String, String>,
-    github_token: Option<&str>,
-    client: &dyn GitHubAutomationClient,
-) -> TaskBoardWorkflowState {
+mod pull_request;
+
+use pull_request::prepare_pull_request_state;
+
+pub(super) async fn automate_item(request: AutomationRequest<'_>) -> TaskBoardWorkflowState {
     let context = AutomationContext {
-        board_root,
-        config,
-        item,
-        github_token,
-        client,
+        board_root: request.board_root,
+        config: request.config,
+        item: request.item,
+        github_token: request.github_token,
+        client: request.client,
     };
-    let mut prepared = match prepare_item(&context, project_dir, dry_run, session_worktrees) {
+    let mut prepared = match prepare_item(
+        &context,
+        request.project_dir,
+        request.dry_run,
+        request.session_worktrees,
+    ) {
         AutomationFlow::Continue(prepared) => prepared,
         AutomationFlow::Done(workflow) => return workflow,
     };
-    if let AutomationFlow::Done(workflow) = publish_branch(&context, &mut prepared).await {
+    continue_automation(&context, &mut prepared).await
+}
+
+async fn continue_automation(
+    context: &AutomationContext<'_>,
+    prepared: &mut PreparedItem,
+) -> TaskBoardWorkflowState {
+    if let AutomationFlow::Done(workflow) = publish_branch(context, prepared).await {
         return workflow;
     }
-    let pr_number = match ensure_pull_request(&context, &mut prepared).await {
-        AutomationFlow::Continue(Some(pr_number)) => pr_number,
-        AutomationFlow::Continue(None) => return prepared.workflow,
+    let pull_request_state = match prepare_pull_request_state(context, prepared).await {
+        AutomationFlow::Continue(Some(pull_request_state)) => pull_request_state,
+        AutomationFlow::Continue(None) => return prepared.workflow.clone(),
         AutomationFlow::Done(workflow) => return workflow,
     };
-    let mut desired_labels = BTreeSet::from([context.config.labels.managed.clone()]);
-    let mut pull_request = match load_pull_request(&context, &mut prepared, pr_number).await {
-        AutomationFlow::Continue(pull_request) => pull_request,
-        AutomationFlow::Done(workflow) => return workflow,
-    };
-    if pull_request.merged {
-        return waiting(&mut prepared.workflow, STEP_MERGED);
-    }
-    if context.item.status == TaskBoardStatus::InReview {
-        desired_labels.insert(context.config.labels.needs_human.clone());
-    }
-    if let AutomationFlow::Done(workflow) =
-        ready_pull_request(&context, &mut prepared, &mut pull_request, pr_number).await
-    {
-        return workflow;
-    }
     if context.item.status != TaskBoardStatus::Done {
         return sync_labels(
             context.config,
             context.client,
-            pr_number,
-            desired_labels,
+            pull_request_state.pr_number,
+            pull_request_state.desired_labels,
             &mut prepared.workflow,
         )
         .await;
     }
     finish_done_item(
-        &context,
-        &mut prepared,
-        pr_number,
-        &pull_request,
-        desired_labels,
+        context,
+        prepared,
+        pull_request_state.pr_number,
+        &pull_request_state.pull_request,
+        pull_request_state.desired_labels,
     )
     .await
 }
@@ -215,122 +206,6 @@ async fn publish_branch(
     AutomationFlow::Continue(())
 }
 
-async fn ensure_pull_request(
-    context: &AutomationContext<'_>,
-    prepared: &mut PreparedItem,
-) -> AutomationFlow<Option<u64>> {
-    if prepared.workflow.pr_number.is_some()
-        || !context
-            .config
-            .enabled_automations
-            .enables(GitHubAutomation::OpenPullRequest)
-    {
-        return AutomationFlow::Continue(prepared.workflow.pr_number);
-    }
-    let decision = action_policy(
-        context.board_root,
-        context.item,
-        PolicyAction::OpenPr,
-        Some(prepared.branch.as_str()),
-        None,
-        None,
-    );
-    if !decision.is_allow() {
-        return AutomationFlow::Done(policy_blocked(
-            &mut prepared.workflow,
-            PolicyAction::OpenPr,
-            &decision,
-        ));
-    }
-    match context
-        .client
-        .ensure_pull_request(
-            context.config,
-            &pull_request_request(context.item, context.config, &prepared.branch),
-        )
-        .await
-    {
-        Ok(pull_request) => {
-            update_pull_request_metadata(&mut prepared.workflow, &pull_request);
-            step(&mut prepared.workflow, STEP_PR_OPENED);
-            prepared
-                .workflow
-                .policy_trace_ids
-                .push(new_policy_trace_id());
-            AutomationFlow::Continue(prepared.workflow.pr_number)
-        }
-        Err(error) => AutomationFlow::Done(failure(&mut prepared.workflow, STEP_PR_FAILED, &error)),
-    }
-}
-
-async fn load_pull_request(
-    context: &AutomationContext<'_>,
-    prepared: &mut PreparedItem,
-    pr_number: u64,
-) -> AutomationFlow<GitHubPullRequestHandle> {
-    match context
-        .client
-        .get_pull_request(context.config, pr_number)
-        .await
-    {
-        Ok(pull_request) => {
-            update_pull_request_metadata(&mut prepared.workflow, &pull_request);
-            AutomationFlow::Continue(pull_request)
-        }
-        Err(error) => AutomationFlow::Done(failure(&mut prepared.workflow, STEP_PR_FAILED, &error)),
-    }
-}
-
-async fn ready_pull_request(
-    context: &AutomationContext<'_>,
-    prepared: &mut PreparedItem,
-    pull_request: &mut GitHubPullRequestHandle,
-    pr_number: u64,
-) -> AutomationFlow<()> {
-    if !pull_request.draft
-        || !context
-            .config
-            .enabled_automations
-            .enables(GitHubAutomation::RequestReview)
-    {
-        return AutomationFlow::Continue(());
-    }
-    let decision = action_policy(
-        context.board_root,
-        context.item,
-        PolicyAction::SubmitReview,
-        Some(prepared.branch.as_str()),
-        Some(pr_number),
-        None,
-    );
-    if !decision.is_allow() {
-        return AutomationFlow::Done(policy_blocked(
-            &mut prepared.workflow,
-            PolicyAction::SubmitReview,
-            &decision,
-        ));
-    }
-    match context
-        .client
-        .ready_pull_request_for_review(context.config, pr_number)
-        .await
-    {
-        Ok(updated_pull_request) => {
-            *pull_request = updated_pull_request;
-            update_pull_request_metadata(&mut prepared.workflow, pull_request);
-            step(&mut prepared.workflow, STEP_REVIEW_REQUESTED);
-            prepared
-                .workflow
-                .policy_trace_ids
-                .push(new_policy_trace_id());
-            AutomationFlow::Continue(())
-        }
-        Err(error) => {
-            AutomationFlow::Done(failure(&mut prepared.workflow, STEP_REVIEW_FAILED, &error))
-        }
-    }
-}
-
 async fn finish_done_item(
     context: &AutomationContext<'_>,
     prepared: &mut PreparedItem,
@@ -419,7 +294,7 @@ async fn auto_merge_item(
             prepared.workflow.clone()
         }
         decision => {
-            apply_merge_block_decision(context, prepared, &mut desired_labels, decision);
+            apply_merge_block_decision(context, prepared, &mut desired_labels, &decision);
             sync_labels(
                 context.config,
                 context.client,
@@ -436,10 +311,10 @@ fn apply_merge_block_decision(
     context: &AutomationContext<'_>,
     prepared: &mut PreparedItem,
     desired_labels: &mut BTreeSet<String>,
-    decision: PolicyDecision,
+    decision: &PolicyDecision,
 ) {
     match decision {
-        PolicyDecision::Deny { reason_code, .. } => match reason_code {
+        &PolicyDecision::Deny { reason_code, .. } => match reason_code {
             PolicyReasonCode::ReviewerNotApproved
             | PolicyReasonCode::UnresolvedRequestedChanges => {
                 desired_labels.insert(context.config.labels.needs_human.clone());
@@ -449,16 +324,16 @@ fn apply_merge_block_decision(
                 waiting(&mut prepared.workflow, STEP_WAITING_FOR_CHECKS);
             }
         },
-        PolicyDecision::RequireConsensus { .. } => {
+        &PolicyDecision::RequireConsensus { .. } => {
             desired_labels.insert(context.config.labels.needs_human.clone());
             desired_labels.insert(context.config.labels.protected_path.clone());
             waiting(&mut prepared.workflow, STEP_WAITING_FOR_CONSENSUS);
         }
-        PolicyDecision::RequireHuman { .. } | PolicyDecision::DryRunOnly { .. } => {
+        &PolicyDecision::RequireHuman { .. } | &PolicyDecision::DryRunOnly { .. } => {
             desired_labels.insert(context.config.labels.needs_human.clone());
             waiting(&mut prepared.workflow, STEP_WAITING_FOR_HUMAN);
         }
-        PolicyDecision::Allow { .. } => {}
+        &PolicyDecision::Allow { .. } => {}
     }
     prepared
         .workflow

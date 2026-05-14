@@ -10,8 +10,8 @@ use crate::task_board::github::{
 use crate::task_board::{TaskBoardItem, TaskBoardOrchestratorDispatchInput, TaskBoardStatus};
 use tempfile::tempdir;
 
-use super::automate_item;
 use super::support::{STEP_MERGED, STEP_WAITING_FOR_REVIEW};
+use super::{AutomationRequest, automate_item};
 
 struct FakeGitHubClient {
     pull_request: GitHubPullRequestHandle,
@@ -154,16 +154,16 @@ async fn automation_opens_reviews_and_merges_prs() {
         merge_calls: std::sync::Mutex::new(0),
     };
 
-    let workflow = automate_item(
-        temp.path(),
-        &config,
-        input.project_dir.as_deref(),
-        false,
-        &item,
-        &BTreeMap::new(),
-        None,
-        &client,
-    )
+    let workflow = automate_item(AutomationRequest {
+        board_root: temp.path(),
+        config: &config,
+        project_dir: input.project_dir.as_deref(),
+        dry_run: false,
+        item: &item,
+        session_worktrees: &BTreeMap::new(),
+        github_token: None,
+        client: &client,
+    })
     .await;
 
     assert_eq!(workflow.branch.as_deref(), Some("c/task-1"));
@@ -241,16 +241,16 @@ async fn automation_waits_for_review_when_merge_evidence_is_not_approved() {
         merge_calls: std::sync::Mutex::new(0),
     };
 
-    let workflow = automate_item(
-        temp.path(),
-        &config,
-        None,
-        false,
-        &item,
-        &BTreeMap::new(),
-        None,
-        &client,
-    )
+    let workflow = automate_item(AutomationRequest {
+        board_root: temp.path(),
+        config: &config,
+        project_dir: None,
+        dry_run: false,
+        item: &item,
+        session_worktrees: &BTreeMap::new(),
+        github_token: None,
+        client: &client,
+    })
     .await;
 
     assert_eq!(

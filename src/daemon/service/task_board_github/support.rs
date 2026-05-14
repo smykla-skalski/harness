@@ -13,10 +13,12 @@ use crate::task_board::github::{
     GitHubPullRequestHandle,
 };
 use crate::task_board::{
-    BuiltInPolicyGate, ExternalProvider, ExternalRefProvider, ExternalSyncConfig, GraphPolicyGate,
-    PolicyAction, PolicyDecision, PolicyGate, PolicyInput, PolicyPipelineMode, PolicyPipelineStore,
+    BuiltInPolicyGate, ExternalProvider, ExternalRefProvider, GraphPolicyGate, PolicyAction,
+    PolicyDecision, PolicyGate, PolicyInput, PolicyPipelineMode, PolicyPipelineStore,
     PolicySubject, TaskBoardItem, TaskBoardOrchestratorSettings, TaskBoardWorkflowState,
 };
+
+use super::super::task_board_runtime::external_sync_config_for_repository;
 
 #[path = "git_ops.rs"]
 mod git_ops;
@@ -160,7 +162,12 @@ pub(super) async fn load_session_worktrees_async(
 pub(super) fn automation_config(
     settings: &TaskBoardOrchestratorSettings,
 ) -> Option<(GitHubProjectConfig, String)> {
-    let external_sync_config = ExternalSyncConfig::from_env();
+    let settings_repository = {
+        let project = &settings.github_project;
+        (!project.owner.trim().is_empty() && !project.repo.trim().is_empty())
+            .then(|| project.repository_slug())
+    };
+    let external_sync_config = external_sync_config_for_repository(settings_repository.as_deref());
     let token = external_sync_config
         .token_for(ExternalProvider::GitHub)?
         .to_string();
@@ -261,7 +268,9 @@ pub(super) fn new_policy_trace_id() -> String {
     format!("policy-trace-{}", Uuid::new_v4().simple())
 }
 
-pub(super) fn run_blocking<T>(future: impl Future<Output = Result<T, CliError>>) -> Result<T, CliError> {
+pub(super) fn run_blocking<T>(
+    future: impl Future<Output = Result<T, CliError>>,
+) -> Result<T, CliError> {
     TokioRuntimeBuilder::new_current_thread()
         .enable_all()
         .build()
