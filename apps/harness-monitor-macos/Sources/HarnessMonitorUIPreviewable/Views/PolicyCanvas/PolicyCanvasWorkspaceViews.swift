@@ -196,6 +196,11 @@ private struct PolicyCanvasEdgeLabelLayer: View {
           .position(route.labelPosition)
           .accessibilityLabel(viewModel.accessibilityLabel(for: edge))
           .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEdge(edge.id))
+          .contextMenu {
+            Button("Delete edge", role: .destructive) {
+              viewModel.deleteEdge(edge.id)
+            }
+          }
         }
       }
     }

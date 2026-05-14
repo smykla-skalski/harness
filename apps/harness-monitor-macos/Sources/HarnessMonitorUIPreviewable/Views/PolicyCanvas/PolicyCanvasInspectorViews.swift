@@ -4,6 +4,7 @@ import SwiftUI
 struct PolicyCanvasInspector: View {
   let viewModel: PolicyCanvasViewModel
   let statusLine: String
+  @FocusState.Binding var focusedField: PolicyCanvasFocusedField?
 
   var body: some View {
     ScrollView {
@@ -67,6 +68,7 @@ struct PolicyCanvasInspector: View {
       TextField("Node name", text: selectedNodeTitleBinding)
         .textFieldStyle(.roundedBorder)
         .scaledFont(.callout)
+        .focused($focusedField, equals: .nodeTitle)
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.policyCanvasInspectorField("node-title")
         )
@@ -110,6 +112,7 @@ struct PolicyCanvasInspector: View {
         TextField("Group name", text: selectedGroupTitleBinding)
           .textFieldStyle(.roundedBorder)
           .scaledFont(.callout)
+          .focused($focusedField, equals: .groupTitle)
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.policyCanvasInspectorField("group-title")
           )
@@ -128,6 +131,7 @@ struct PolicyCanvasInspector: View {
         TextField("Edge label", text: selectedEdgeLabelBinding)
           .textFieldStyle(.roundedBorder)
           .scaledFont(.callout)
+          .focused($focusedField, equals: .edgeLabel)
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.policyCanvasInspectorField("edge-label")
           )
@@ -219,6 +223,7 @@ struct PolicyCanvasInspector: View {
       TextField("Reason code", text: selectedReasonCodeBinding(policyKind))
         .textFieldStyle(.roundedBorder)
         .scaledFont(.callout)
+        .focused($focusedField, equals: .reasonCode)
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.policyCanvasInspectorField("reason-code")
         )
@@ -233,6 +238,7 @@ struct PolicyCanvasInspector: View {
         TextField("Rule id", text: selectedRuleIDBinding(policyKind))
           .textFieldStyle(.roundedBorder)
           .scaledFont(.callout)
+          .focused($focusedField, equals: .ruleID)
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.policyCanvasInspectorField("rule-id")
           )

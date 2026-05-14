@@ -5,6 +5,26 @@ extension PolicyCanvasViewModel {
     selection = newSelection
   }
 
+  /// Drops the current selection and any in-flight gesture highlights. Wired
+  /// to the canvas-wide Escape shortcut so a misclicked drag or a stuck
+  /// drop-zone tint never leaves the canvas in a quiet "still hovering"
+  /// state. No document-side mutation, so `documentDirty` is untouched.
+  func clearSelection() {
+    selection = nil
+    clearTransientGestureState()
+  }
+
+  /// Clears transient gesture state without mutating the persisted graph.
+  /// `highlightedInput` is fed by `setInputTargeted(_:nodeID:portID:)` while
+  /// a port drag is over a drop target; `highlightedGroupID` is set by node
+  /// and group drags. Both are cleared on drag-end normally, but rejected
+  /// gestures (Escape, daemon-side reject, foreign delete) can leave them
+  /// stale — call this method on those paths to keep the canvas quiet.
+  func clearTransientGestureState() {
+    highlightedInput = nil
+    highlightedGroupID = nil
+  }
+
   func save() {
     notifyStatus("Draft saved")
   }

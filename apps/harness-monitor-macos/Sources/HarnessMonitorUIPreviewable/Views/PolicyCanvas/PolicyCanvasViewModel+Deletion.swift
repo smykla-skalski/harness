@@ -74,12 +74,12 @@ extension PolicyCanvasViewModel {
     case .group(let id):
       deleteGroup(id)
     }
-    self.selection = nil
-    reconcileGroupFrames()
-    documentDirty = true
   }
 
-  private func deleteNode(_ id: String) {
+  /// Removes the node and every edge incident on it. Clears the selection only
+  /// when the deleted node was selected — foreign selections survive so the
+  /// user's editing target persists across cascade deletes.
+  func deleteNode(_ id: String) {
     guard let nodeIndex = nodes.firstIndex(where: { $0.id == id }) else {
       return
     }
@@ -92,20 +92,36 @@ extension PolicyCanvasViewModel {
     cleanEphemeralEdgeIDs = cleanEphemeralEdgeIDs.filter { edgeID in
       edges.contains { $0.id == edgeID }
     }
+    if selection == .node(id) {
+      selection = nil
+    }
+    reconcileGroupFrames()
+    documentDirty = true
+    clearTransientGestureState()
     notifyStatus("Deleted \(title)")
   }
 
-  private func deleteEdge(_ id: String) {
+  /// Removes the edge by id. Connected nodes are left intact. Clears the
+  /// selection only when the deleted edge was the active selection.
+  func deleteEdge(_ id: String) {
     guard let edgeIndex = edges.firstIndex(where: { $0.id == id }) else {
       return
     }
     let label = edges[edgeIndex].label
     edges.remove(at: edgeIndex)
     cleanEphemeralEdgeIDs.remove(id)
+    if selection == .edge(id) {
+      selection = nil
+    }
+    documentDirty = true
+    clearTransientGestureState()
     notifyStatus("Deleted \(label) connection")
   }
 
-  private func deleteGroup(_ id: String) {
+  /// Removes the group container but keeps every member node on the canvas;
+  /// each affected node has its `groupID` cleared. Clears the selection only
+  /// when the deleted group was the active selection.
+  func deleteGroup(_ id: String) {
     guard let groupIndex = groups.firstIndex(where: { $0.id == id }) else {
       return
     }
@@ -114,6 +130,12 @@ extension PolicyCanvasViewModel {
     for index in nodes.indices where nodes[index].groupID == id {
       nodes[index].groupID = nil
     }
+    if selection == .group(id) {
+      selection = nil
+    }
+    reconcileGroupFrames()
+    documentDirty = true
+    clearTransientGestureState()
     notifyStatus("Deleted \(title)")
   }
 
