@@ -20,6 +20,7 @@ use crate::task_board::TaskBoardGitSigningMode;
 use super::GitHubProjectConfig;
 use signing::{
     commit_author, local_commit_signature, publication_signature, unsigned_commit_payload,
+    validate_rest_publication_signature_support,
 };
 use types::{
     BranchPublicationMode, GitHubCreateBlobRequest, GitHubCreateCommitRequest,
@@ -85,6 +86,10 @@ pub(crate) async fn publish_branch_from_worktree_async(
     branch: &str,
 ) -> Result<(), CliError> {
     let snapshot = load_local_branch_snapshot(worktree, config.repository_slug()).await?;
+    validate_rest_publication_signature_support(
+        &snapshot.profile,
+        snapshot.existing_signature.as_ref(),
+    )?;
     let Some(mode) = publication_mode(client, config, branch, &snapshot).await? else {
         return Ok(());
     };
