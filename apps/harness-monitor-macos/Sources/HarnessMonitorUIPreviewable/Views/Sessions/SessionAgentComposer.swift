@@ -65,7 +65,7 @@ struct SessionAgentComposer: View {
 
   private var keyPad: some View {
     VStack(spacing: metrics.keyStackSpacing) {
-      ForEach(SessionAgentComposerKeyLayout.rows, id: \.self) { row in
+      ForEach(Array(SessionAgentComposerKeyLayout.rows.enumerated()), id: \.offset) { _, row in
         HStack(spacing: metrics.keyStackSpacing) {
           ForEach(row) { key in
             keyButton(key)

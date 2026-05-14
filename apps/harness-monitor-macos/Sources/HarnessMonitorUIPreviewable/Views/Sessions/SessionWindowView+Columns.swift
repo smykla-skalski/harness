@@ -222,7 +222,7 @@ extension SessionWindowView {
     // Delay layout-driven writes until after SwiftUI finishes the current
     // geometry pass; synchronous updates here trigger the startup CGFloat fault.
     Task { @MainActor in
-      await Task.yield()
+      await SessionGeometryWritebackDeferral.nextMainActorTurn()
       updateDetailColumnWidth(
         width,
         visibleBinding: visibleBinding,

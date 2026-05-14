@@ -96,6 +96,9 @@ public enum Summarizer {
         "swiftui_update_group_p95_ms",
         "swiftui_top_group_label",
         "swiftui_top_cause_source",
+        MetricName.timeProfileSampleCount,
+        MetricName.timeProfileAppOwnedFrameCount,
+        MetricName.timeProfileFallbackSymbolicFrameCount,
         "hitches",
         "potential_hangs",
         "alloc_all_heap_and_vm_persistent_bytes",
@@ -118,6 +121,7 @@ public enum Summarizer {
         let swiftui = metrics["swiftui_updates"] ?? .object([:])
         let updateGroups = metrics["swiftui_update_groups"] ?? .object([:])
         let causes = metrics["swiftui_causes"] ?? .object([:])
+        let timeProfile = metrics["time_profile"] ?? .object([:])
         let allocations = metrics["allocations"]?["summary_rows"] ?? .object([:])
         let heapVM = allocations["All Heap & Anonymous VM"] ?? .object([:])
         let vmRegions = allocations["All VM Regions"] ?? .object([:])
@@ -147,6 +151,9 @@ public enum Summarizer {
             string(updateGroups["duration_ms_p95"]?.doubleValue),
             csvEscape(topGroupLabel),
             csvEscape(topCauseSource),
+            string(timeProfile["sample_count"]?.intValue),
+            string(timeProfile["app_owned_frame_count"]?.intValue),
+            string(timeProfile["fallback_symbolic_frame_count"]?.intValue),
             string(metrics["hitches"]?["count"]?.intValue),
             string(metrics["potential_hangs"]?["count"]?.intValue),
             string(heapVM["persistent_bytes"]?.intValue),

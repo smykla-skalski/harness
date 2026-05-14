@@ -38,6 +38,13 @@ enum SessionContentDetailSplitLayout {
   }
 }
 
+@MainActor
+enum SessionGeometryWritebackDeferral {
+  static func nextMainActorTurn() async {
+    await Task.yield()
+  }
+}
+
 struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
   @Binding private var contentWidth: Double
   @Binding private var perfOverrideContentWidth: Double?
@@ -109,7 +116,7 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
     // Re-clamp on the next main-actor turn so startup geometry changes do not
     // write width state back into the same frame.
     Task { @MainActor in
-      await Task.yield()
+      await SessionGeometryWritebackDeferral.nextMainActorTurn()
       reclampLiveWidth(availableWidth: availableWidth)
     }
   }

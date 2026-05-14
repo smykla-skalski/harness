@@ -38,8 +38,9 @@ mise run monitor:audit -- --label regression --debug-retention
 ```
 
 Audit runs now persist per-capture `launch_metrics` in the manifest/summary,
-surface `launch_app_init_to_ready_ms` in `summary.csv`, and render comparison
-markdown with separate hard-budget and investigative metric sections.
+surface `launch_app_init_to_ready_ms` plus time-profile sample counts in
+`summary.csv`, and render comparison markdown with separate hard-budget and
+investigative metric sections.
 
 The audit artifact contract is:
 
@@ -47,8 +48,8 @@ The audit artifact contract is:
 | --- | --- |
 | `manifest.json` | run provenance for the staged build, including `git`, `system`, `targets`, `build_provenance`, selected scenarios, default launch env, per-capture `preview_scenario`, `launched_process_path`, `daemon_data_home_probe`, and `app_trace_relpath` |
 | `summary.json` | `manifest.json` plus per-capture extracted `metrics`, `warnings`, `launch_metrics`, `metric_tiers`, parsed `app_trace`, and normalized `findings` |
-| `summary.csv` | flat regression sheet with launch, SwiftUI, hitch/hang, and allocation summary columns |
-| `comparison.json` / `comparison.md` | baseline/current diff, missing-capture reporting, missing-metric reporting, hard-vs-investigative metric grouping, first-class findings deltas, and an app-trace pair/diff section |
+| `summary.csv` | flat regression sheet with launch, SwiftUI, time-profile, hitch/hang, and allocation summary columns |
+| `comparison.json` / `comparison.md` | baseline/current diff, missing-capture reporting, missing-metric reporting, hard-vs-investigative metric grouping, time-profile sample deltas, first-class findings deltas, and an app-trace pair/diff section |
 | `debug-retention.json` | explicit sentinel that a regression/debug run preserved raw traces, exported XML, and extraction intermediates |
 
 Machine-readable schema snapshots for those JSON outputs live under

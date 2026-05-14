@@ -15,6 +15,10 @@ public enum MetricName {
     public static let updateGroupP95Ms = "update_group_p95_ms"
     public static let hitches = "hitches"
     public static let potentialHangs = "potential_hangs"
+    public static let timeProfileSampleCount = "time_profile_sample_count"
+    public static let timeProfileAppOwnedFrameCount = "time_profile_app_owned_frame_count"
+    public static let timeProfileFallbackSymbolicFrameCount =
+        "time_profile_fallback_symbolic_frame_count"
     public static let heapTotalBytes = "heap_total_bytes"
 }
 
@@ -79,6 +83,9 @@ enum MetricTierCatalog {
                     MetricName.p95UpdateMs,
                     MetricName.maxUpdateMs,
                     MetricName.updateGroupP95Ms,
+                    MetricName.timeProfileSampleCount,
+                    MetricName.timeProfileAppOwnedFrameCount,
+                    MetricName.timeProfileFallbackSymbolicFrameCount,
                     "top_group_label",
                     "top_cause_source",
                     "top_frames",

@@ -69,6 +69,7 @@ final class SummarizerTests: XCTestCase {
           "swiftui_updates": {"total_count": 1234, "body_update_count": 100, "duration_ms_p95": 12.5, "duration_ns_max": 25000000},
           "swiftui_update_groups": {"duration_ms_p95": 8.0, "label_counts": {"Dashboard": 50, "Sidebar": 10}},
           "swiftui_causes": {"source_node_counts": {"DashboardView": 30}},
+          "time_profile": {"sample_count": 42, "app_owned_frame_count": 37, "fallback_symbolic_frame_count": 5},
           "findings": [{"key": "cause:state:dashboardview:sidebarrow", "category": "swiftui-cause", "headline": "@State: DashboardView -> SidebarRow", "count": 30}],
           "hitches": {"count": 1},
           "potential_hangs": {"count": 0}
@@ -127,6 +128,7 @@ final class SummarizerTests: XCTestCase {
         XCTAssertTrue(summaryString.contains("\"total_count\" : 1234"))
         XCTAssertTrue(summaryString.contains("\"app_trace\""))
         XCTAssertTrue(summaryString.contains("\"findings\""))
+        XCTAssertTrue(summaryString.contains("\"time_profile\""))
 
         let csv = try String(contentsOf: csvURL, encoding: .utf8)
         let lines = csv.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
@@ -134,7 +136,7 @@ final class SummarizerTests: XCTestCase {
         XCTAssertEqual(lines[0], Summarizer.csvHeader.joined(separator: ","))
         XCTAssertTrue(
             lines[1].hasPrefix(
-                "open-recent-window,SwiftUI,4.5,0,completed,350,app_init,running,open-recent,true,1234,100,12.5,25,8,"
+                "open-recent-window,SwiftUI,4.5,0,completed,350,app_init,running,open-recent,true,1234,100,12.5,25,8,Dashboard,DashboardView,42,37,5,1,0,"
             )
         )
         XCTAssertTrue(lines[2].hasPrefix("offline-cached-open,Allocations,3,0,completed,"))
