@@ -18,6 +18,10 @@ public enum AuditRunner {
         "HARNESS_MONITOR_LAUNCH_MODE",
         "HARNESS_MONITOR_BACKDROP_MODE_OVERRIDE",
         "HARNESS_MONITOR_MENU_BAR_STATE_COLORS_OVERRIDE",
+        "HARNESS_MONITOR_PERF_DISABLE_SEARCH_HOST",
+        "HARNESS_MONITOR_PERF_DISABLE_SEARCH_SUGGESTIONS",
+        "HARNESS_MONITOR_PERF_ENABLE_SCENE_WRITES",
+        "HARNESS_MONITOR_PERF_STATIC_DETAIL",
         "HARNESS_MONITOR_SESSION_SHORTCUT_OVERLAYS_OVERRIDE",
         "HARNESS_MONITOR_SESSION_TITLE_BLUR_OVERRIDE",
     ]
@@ -57,6 +61,8 @@ public enum AuditRunner {
         public var forceClean: Bool
         public var buildShipping: Bool
         public var logOnly: Bool
+        public var enforceBudgets: Bool
+        public var environmentOverrides: [String: String]
 
         public init(
             label: String, compareTo: URL?, scenarioSelection: String, keepTraces: Bool,
@@ -66,7 +72,8 @@ public enum AuditRunner {
             runsRoot: URL, stagedHostStageRoot: URL, auditDaemonCargoTargetDir: URL,
             arch: String, destination: String,
             skipBuild: Bool, skipDaemonBundle: Bool, forceClean: Bool, buildShipping: Bool,
-            logOnly: Bool
+            logOnly: Bool, enforceBudgets: Bool = true,
+            environmentOverrides: [String: String] = [:]
         ) {
             self.label = label
             self.compareTo = compareTo
@@ -88,6 +95,8 @@ public enum AuditRunner {
             self.forceClean = forceClean
             self.buildShipping = buildShipping
             self.logOnly = logOnly
+            self.enforceBudgets = enforceBudgets
+            self.environmentOverrides = environmentOverrides
         }
     }
 
@@ -119,6 +128,7 @@ public enum AuditRunner {
             projectDir: inputs.appRoot
         )
         let defaultRuntimeEnv = defaultEnvironment()
+            .merging(inputs.environmentOverrides) { _, override in override }
         let allowExternalDaemonAudit = shouldAllowExternalDaemonAudit(
             defaultEnvironment: defaultRuntimeEnv
         )
@@ -350,7 +360,9 @@ public enum AuditRunner {
         }
         let summaryPath = runDir.appendingPathComponent("summary.json")
         let summaryData = try Data(contentsOf: summaryPath)
-        try BudgetEnforcer.enforce(summaryJSON: summaryData)
+        if inputs.enforceBudgets {
+            try BudgetEnforcer.enforce(summaryJSON: summaryData)
+        }
 
         var comparisonPath: URL?
         if let baseline = inputs.compareTo {

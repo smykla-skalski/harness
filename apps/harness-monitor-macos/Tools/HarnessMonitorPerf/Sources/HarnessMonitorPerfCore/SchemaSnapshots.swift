@@ -1,10 +1,10 @@
 import Foundation
 
-private typealias RawSchema = [String: Any]
+typealias RawSchema = [String: Any]
 
 public enum SchemaSnapshots {
-    private static let schemaDraft = "https://json-schema.org/draft/2020-12/schema"
-    private static let schemaBaseID =
+    static let schemaDraft = "https://json-schema.org/draft/2020-12/schema"
+    static let schemaBaseID =
         "https://github.com/smykla-skalski/harness/apps/harness-monitor-macos/Tools/HarnessMonitorPerf/Schemas/"
 
     public static func write(to outputDir: URL) throws {
@@ -265,6 +265,7 @@ public enum SchemaSnapshots {
             defs: [
                 "componentCount": componentCountSchema(),
                 "finding": findingSchema(),
+                "stepTiming": stepTimingSchema(),
             ]
         )
     }
@@ -332,210 +333,4 @@ public enum SchemaSnapshots {
         )
     }
 
-    private static func document(
-        fileName: String,
-        title: String,
-        required: [String],
-        properties: RawSchema,
-        additionalProperties: Any = false,
-        defs: RawSchema? = nil
-    ) -> RawSchema {
-        var schema = object(
-            required: required,
-            properties: properties,
-            additionalProperties: additionalProperties
-        )
-        schema["$schema"] = schemaDraft
-        schema["$id"] = schemaBaseID + fileName
-        schema["title"] = title
-        if let defs { schema["$defs"] = defs }
-        return schema
-    }
-
-    private static func object(
-        required: [String] = [],
-        properties: RawSchema = [:],
-        additionalProperties: Any = false,
-        nullable: Bool = false
-    ) -> RawSchema {
-        var schema: RawSchema = [
-            "type": nullable ? ["object", "null"] : "object",
-            "additionalProperties": additionalProperties,
-        ]
-        if !required.isEmpty { schema["required"] = required }
-        if !properties.isEmpty { schema["properties"] = properties }
-        return schema
-    }
-
-    private static func array(
-        items: Any,
-        nullable: Bool = false
-    ) -> RawSchema {
-        [
-            "type": nullable ? ["array", "null"] : "array",
-            "items": items,
-        ]
-    }
-
-    private static func scalar(
-        _ type: String,
-        nullable: Bool = false
-    ) -> RawSchema {
-        ["type": nullable ? [type, "null"] : type]
-    }
-
-    private static func ref(_ path: String) -> RawSchema {
-        ["$ref": path]
-    }
-
-    private static func oneOf(_ values: [Any]) -> RawSchema {
-        ["oneOf": values]
-    }
-
-    private static func metricTiersSchema(nullable: Bool = false) -> RawSchema {
-        object(
-            required: ["hard_budget", "investigative"],
-            properties: [
-                "hard_budget": array(items: scalar("string")),
-                "investigative": array(items: scalar("string")),
-            ],
-            nullable: nullable
-        )
-    }
-
-    private static func launchMetricsSchema(nullable: Bool = false) -> RawSchema {
-        object(
-            required: [
-                "app_init_to_ready_ms",
-                "measured_from",
-                "state_label",
-                "window_id",
-                "includes_bootstrap_in_scenario_measurement",
-            ],
-            properties: [
-                "app_init_to_ready_ms": scalar("number"),
-                "measured_from": scalar("string"),
-                "state_label": scalar("string"),
-                "window_id": scalar("string"),
-                "includes_bootstrap_in_scenario_measurement": scalar("boolean"),
-            ],
-            nullable: nullable
-        )
-    }
-
-    private static func daemonDataHomeProbeSchema() -> RawSchema {
-        object(
-            required: [
-                "data_home",
-                "exists",
-                "regular_file_count",
-                "total_bytes",
-                "contains_daemon_manifest",
-                "contains_sqlite_database",
-                "contains_sqlite_wal",
-                "contains_sqlite_shm",
-            ],
-            properties: [
-                "data_home": scalar("string"),
-                "exists": scalar("boolean"),
-                "regular_file_count": scalar("integer"),
-                "total_bytes": scalar("integer"),
-                "contains_daemon_manifest": scalar("boolean"),
-                "contains_sqlite_database": scalar("boolean"),
-                "contains_sqlite_wal": scalar("boolean"),
-                "contains_sqlite_shm": scalar("boolean"),
-            ]
-        )
-    }
-
-    private static func componentCountSchema() -> RawSchema {
-        object(
-            required: ["component", "count"],
-            properties: [
-                "component": scalar("string"),
-                "count": scalar("integer"),
-            ]
-        )
-    }
-
-    private static func findingSchema() -> RawSchema {
-        object(
-            required: ["key", "category", "headline"],
-            properties: [
-                "key": scalar("string"),
-                "category": scalar("string"),
-                "headline": scalar("string"),
-                "detail": scalar("string", nullable: true),
-                "count": scalar("integer", nullable: true),
-            ]
-        )
-    }
-
-    private static func summaryAppTraceSchema(nullable: Bool = false) -> RawSchema {
-        object(
-            required: ["relpath", "event_count", "components", "ordered_steps"],
-            properties: [
-                "relpath": scalar("string"),
-                "event_count": scalar("integer"),
-                "components": array(items: ref("#/$defs/componentCount")),
-                "ordered_steps": array(items: scalar("string")),
-            ],
-            nullable: nullable
-        )
-    }
-
-    private static func comparisonAppTraceSummarySchema() -> RawSchema {
-        object(
-            required: ["event_count", "components", "ordered_steps"],
-            properties: [
-                "event_count": scalar("integer"),
-                "components": array(items: ref("#/$defs/componentCount")),
-                "ordered_steps": array(items: scalar("string")),
-            ]
-        )
-    }
-
-    private static func appTraceComparisonSchema() -> RawSchema {
-        object(
-            required: ["new_steps", "resolved_steps"],
-            properties: [
-                "baseline": oneOf([ref("#/$defs/appTraceSummary"), scalar("null")]),
-                "current": oneOf([ref("#/$defs/appTraceSummary"), scalar("null")]),
-                "new_steps": array(items: scalar("string")),
-                "resolved_steps": array(items: scalar("string")),
-            ]
-        )
-    }
-
-    private static func missingCaptureSchema() -> RawSchema {
-        object(
-            required: ["scenario", "template"],
-            properties: [
-                "scenario": scalar("string"),
-                "template": scalar("string"),
-                "reason": scalar("string", nullable: true),
-            ]
-        )
-    }
-
-    private static func deltaBlockSchema() -> RawSchema {
-        object(
-            required: ["baseline", "current", "delta"],
-            properties: [
-                "baseline": scalar("number"),
-                "current": scalar("number"),
-                "delta": scalar("number"),
-            ]
-        )
-    }
-
-    private static func frameSchema() -> RawSchema {
-        object(
-            required: ["name", "samples"],
-            properties: [
-                "name": scalar("string"),
-                "samples": scalar("integer"),
-            ]
-        )
-    }
 }

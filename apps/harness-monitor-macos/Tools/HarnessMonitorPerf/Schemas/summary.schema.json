@@ -47,6 +47,30 @@
         "headline"
       ],
       "type" : "object"
+    },
+    "stepTiming" : {
+      "additionalProperties" : false,
+      "properties" : {
+        "duration_ms" : {
+          "type" : "number"
+        },
+        "end_timestamp" : {
+          "type" : "string"
+        },
+        "start_timestamp" : {
+          "type" : "string"
+        },
+        "step" : {
+          "type" : "string"
+        }
+      },
+      "required" : [
+        "step",
+        "start_timestamp",
+        "end_timestamp",
+        "duration_ms"
+      ],
+      "type" : "object"
     }
   },
   "$id" : "https:\/\/github.com\/smykla-skalski\/harness\/apps\/harness-monitor-macos\/Tools\/HarnessMonitorPerf\/Schemas\/summary.schema.json",
@@ -77,13 +101,20 @@
               },
               "relpath" : {
                 "type" : "string"
+              },
+              "step_timings" : {
+                "items" : {
+                  "$ref" : "#\/$defs\/stepTiming"
+                },
+                "type" : "array"
               }
             },
             "required" : [
               "relpath",
               "event_count",
               "components",
-              "ordered_steps"
+              "ordered_steps",
+              "step_timings"
             ],
             "type" : [
               "object",

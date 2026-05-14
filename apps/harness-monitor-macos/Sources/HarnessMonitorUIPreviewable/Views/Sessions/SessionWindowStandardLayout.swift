@@ -84,7 +84,12 @@ struct SessionWindowStandardLayout<Sidebar: View, Detail: View>: View {
       set: { newValue in
         let storedVisibility: NavigationSplitViewVisibility =
           newValue == .all ? .doubleColumn : newValue
-        if HarnessMonitorUITestEnvironment.isPerfScenarioActive {
+        HarnessMonitorPerfTrace.recordScenarioEvent(
+          component: "perf.sidebar",
+          event: "column-visibility.write",
+          details: ["visibility": SessionColumnVisibilityCodec.encode(storedVisibility)]
+        )
+        if !HarnessMonitorPerfIsolation.allowsSceneRestorationWrites {
           guard perfColumnVisibilityStorage != storedVisibility else { return }
           perfColumnVisibilityStorage = storedVisibility
           return

@@ -88,11 +88,12 @@ struct SessionWindowPerfScenarioScript: ViewModifier {
     case "timeline-burst", "timeline-filter-form":
       appliedScenarioRawValue = scenario
       recordScriptBegin(baseScenario: baseScenario, sessionID: sessionID)
-      stateCache.selectRoute(.timeline)
-      HarnessMonitorPerfTrace.recordStep(
+      await runMeasuredStep(
         "route.timeline",
         details: ["base_scenario": baseScenario]
-      )
+      ) {
+        stateCache.selectRoute(.timeline)
+      }
     default:
       return
     }
@@ -117,28 +118,33 @@ struct SessionWindowPerfScenarioScript: ViewModifier {
   }
 
   private func runFullSessionSearchScript() async {
-    stateCache.selectRoute(.agents)
-    HarnessMonitorPerfTrace.recordStep("route.agents")
-    stateCache.appSearchAutomation.present(query: "")
-    HarnessMonitorPerfTrace.recordStep("search.present")
-    await Task.yield()
-    try? await Task.sleep(for: .milliseconds(240))
-
-    for step in searchSteps {
-      stateCache.selectRoute(step.route)
-      HarnessMonitorPerfTrace.recordStep("route.\(step.route.rawValue)")
+    await runMeasuredStep("route.agents") {
+      stateCache.selectRoute(.agents)
+    }
+    await runMeasuredStep("search.present") {
+      stateCache.appSearchAutomation.present(query: "")
       await Task.yield()
-      try? await Task.sleep(for: .milliseconds(80))
-      stateCache.appSearchAutomation.present(query: step.query)
-      HarnessMonitorPerfTrace.recordStep(
-        "query.\(step.query)",
-        details: ["route": step.route.rawValue]
-      )
-      try? await Task.sleep(for: .milliseconds(260))
+      try? await Task.sleep(for: .milliseconds(240))
     }
 
-    stateCache.appSearchAutomation.dismiss()
-    HarnessMonitorPerfTrace.recordStep("search.dismiss")
+    for step in searchSteps {
+      await runMeasuredStep("route.\(step.route.rawValue)") {
+        stateCache.selectRoute(step.route)
+        await Task.yield()
+        try? await Task.sleep(for: .milliseconds(80))
+      }
+      await runMeasuredStep(
+        "query.\(step.query)",
+        details: ["route": step.route.rawValue]
+      ) {
+        stateCache.appSearchAutomation.present(query: step.query)
+        try? await Task.sleep(for: .milliseconds(260))
+      }
+    }
+
+    await runMeasuredStep("search.dismiss") {
+      stateCache.appSearchAutomation.dismiss()
+    }
   }
 
   private var searchSteps: [(query: String, route: SessionWindowRoute)] {
@@ -155,21 +161,25 @@ struct SessionWindowPerfScenarioScript: ViewModifier {
     targets: [SessionSidebarToggleTarget]
   ) async {
     defer { contentDetailDividerWidth = nil }
-    columnVisibility = .doubleColumn
-    HarnessMonitorPerfTrace.recordStep("column.double-column")
-    await Task.yield()
-    try? await Task.sleep(for: .milliseconds(180))
-
-    for target in targets {
-      selectSidebarToggleTarget(target)
-      HarnessMonitorPerfTrace.recordStep(target.selectionStep)
+    await runMeasuredStep("column.double-column") {
+      columnVisibility = .doubleColumn
       await Task.yield()
       try? await Task.sleep(for: .milliseconds(180))
-      columnVisibility = .detailOnly
-      HarnessMonitorPerfTrace.recordStep("column.detail-only")
-      try? await Task.sleep(for: .milliseconds(180))
-      columnVisibility = .doubleColumn
-      HarnessMonitorPerfTrace.recordStep("column.double-column")
+    }
+
+    for target in targets {
+      await runMeasuredStep(target.selectionStep) {
+        selectSidebarToggleTarget(target)
+        await Task.yield()
+        try? await Task.sleep(for: .milliseconds(180))
+      }
+      await runMeasuredStep("column.detail-only") {
+        columnVisibility = .detailOnly
+        try? await Task.sleep(for: .milliseconds(180))
+      }
+      await runMeasuredStep("column.double-column") {
+        columnVisibility = .doubleColumn
+      }
       if target.supportsContentDetailDivider {
         await driveContentDetailDividerSweep()
       }
@@ -191,16 +201,27 @@ struct SessionWindowPerfScenarioScript: ViewModifier {
     ]
 
     for (step, width) in widths {
-      contentDetailDividerWidth = width
-      HarnessMonitorPerfTrace.recordStep(
+      await runMeasuredStep(
         step,
         details: ["requested_width": String(Int(width.rounded()))]
-      )
-      await Task.yield()
-      try? await Task.sleep(for: .milliseconds(180))
+      ) {
+        contentDetailDividerWidth = width
+        await Task.yield()
+        try? await Task.sleep(for: .milliseconds(180))
+      }
     }
 
     contentDetailDividerWidth = nil
+  }
+
+  private func runMeasuredStep(
+    _ step: String,
+    details: [String: String] = [:],
+    operation: () async -> Void
+  ) async {
+    let interval = HarnessMonitorPerfTrace.beginStep(step, details: details)
+    await operation()
+    HarnessMonitorPerfTrace.endStep(interval, details: details)
   }
 
   private func selectSidebarToggleTarget(_ target: SessionSidebarToggleTarget) {

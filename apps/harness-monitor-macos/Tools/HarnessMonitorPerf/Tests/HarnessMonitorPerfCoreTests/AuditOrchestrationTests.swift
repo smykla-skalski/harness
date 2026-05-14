@@ -107,6 +107,35 @@ final class ScenarioCatalogTests: XCTestCase {
     }
 }
 
+final class AuditVariantTests: XCTestCase {
+    func testDefaultMatrixVariantsCoverCurrentIsolationAxes() throws {
+        let variants = try AuditVariant.resolve(nil)
+        XCTAssertEqual(
+            variants.map(\.id),
+            [
+                "baseline",
+                "no-search-host",
+                "no-search-suggestions",
+                "scene-writes-enabled",
+                "static-detail",
+            ]
+        )
+    }
+
+    func testVariantEnvironmentMapsToAppIsolationFlags() throws {
+        let variants = try AuditVariant.resolve(
+            "no-search-host,no-search-suggestions,scene-writes-enabled,static-detail"
+        )
+        let environment = variants.reduce(into: [String: String]()) {
+            $0.merge($1.environment) { _, new in new }
+        }
+        XCTAssertEqual(environment["HARNESS_MONITOR_PERF_DISABLE_SEARCH_HOST"], "1")
+        XCTAssertEqual(environment["HARNESS_MONITOR_PERF_DISABLE_SEARCH_SUGGESTIONS"], "1")
+        XCTAssertEqual(environment["HARNESS_MONITOR_PERF_ENABLE_SCENE_WRITES"], "1")
+        XCTAssertEqual(environment["HARNESS_MONITOR_PERF_STATIC_DETAIL"], "1")
+    }
+}
+
 final class RunPrunerTests: XCTestCase {
     func testRetainKeepsManifestAndSummary() {
         XCTAssertTrue(RunPruner.retain(relativePath: "manifest.json", keepTraces: false))
@@ -251,6 +280,10 @@ final class LogProbeRecorderTests: XCTestCase {
         Harness Monitor UI Testing Audit.app would like to access data from other apps.
         Class _TtC22HarnessMonitorRegistry is implemented in both A and B.
         Class _TtC22HarnessMonitorRegistry is implemented in both A and B.
+        Publishing changes from within view updates is not allowed.
+        Main Thread Checker: UI API called on a background thread.
+        Sandbox: Harness Monitor deny(1) file-read-data /private/tmp/nope
+        SQLite error 14
         """)
 
         XCTAssertEqual(summary.swiftUIFrameUpdateWarnings, 1)
@@ -259,6 +292,10 @@ final class LogProbeRecorderTests: XCTestCase {
         XCTAssertEqual(summary.databaseOpenWarnings, 1)
         XCTAssertEqual(summary.appDataPromptHints, 1)
         XCTAssertEqual(summary.duplicateRuntimeClassWarnings, 1)
+        XCTAssertEqual(summary.stateMutationWarnings, 1)
+        XCTAssertEqual(summary.mainThreadCheckerWarnings, 1)
+        XCTAssertEqual(summary.sandboxDenials, 1)
+        XCTAssertEqual(summary.sqliteWarnings, 1)
     }
 
     func testLogShowCommandFiltersKnownAppleCoreSpotlightNoise() {
@@ -271,5 +308,26 @@ final class LogProbeRecorderTests: XCTestCase {
             processID == 123 && !((subsystem == "com.apple.corespotlight") && (eventMessage CONTAINS[c] "MailCS"))
             """
         )
+    }
+}
+
+final class AppTraceParserTests: AuditTempDirectoryTestCase {
+    func testSummarizeRecordsOrderedStepsAndStepTimings() throws {
+        let traceURL = workDir.appendingPathComponent("app-trace.jsonl")
+        try Data(
+            """
+            {"component":"perf.scenario","details":{"step":"route.agents"},"event":"step.begin","timestamp":"2026-05-14T06:00:00.000Z"}
+            {"component":"perf.scenario","details":{"step":"route.agents"},"event":"step.end","timestamp":"2026-05-14T06:00:00.125Z"}
+            {"component":"perf.search","details":{"rows":"3"},"event":"suggestions.update","timestamp":"2026-05-14T06:00:00.200Z"}
+            """.utf8
+        ).write(to: traceURL)
+
+        let trace = try AppTraceParser.summarize(fileURL: traceURL, relpath: "app-trace.jsonl")
+
+        XCTAssertEqual(trace.eventCount, 3)
+        XCTAssertEqual(trace.orderedSteps, ["route.agents"])
+        XCTAssertEqual(trace.stepTimings.map { $0.step }, ["route.agents"])
+        XCTAssertEqual(trace.stepTimings.first?.durationMilliseconds, 125)
+        XCTAssertEqual(trace.components.first?.component, "perf.scenario")
     }
 }
