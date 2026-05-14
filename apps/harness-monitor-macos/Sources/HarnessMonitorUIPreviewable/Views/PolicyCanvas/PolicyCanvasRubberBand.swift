@@ -8,14 +8,24 @@ import SwiftUI
 /// of the surface".
 ///
 /// The path matches the resting edge style: same stroke width, same accent
-/// color sourced from the originating node's kind. Animations are skipped
-/// when `accessibilityReduceMotion` is on; otherwise the curve smoothly
-/// follows the cursor without a transition (the cursor itself drives the
-/// changing endpoint, not an implicit animation).
+/// color sourced from the originating node's kind. The curve is decorative
+/// — source and target ports carry their own VoiceOver labels, and the
+/// shape is `allowsHitTesting(false)` — so it is always hidden from AT.
+/// Reduce-motion goes through `policyCanvasReducedMotion` (with system
+/// fallback) for parity with the rest of the canvas; the layer reserves the
+/// gate for a future animated drop, even though the in-flight curve never
+/// animates implicitly.
 struct PolicyCanvasRubberBandLayer: View {
   let viewModel: PolicyCanvasViewModel
-  @Environment(\.accessibilityReduceMotion)
-  private var reduceMotion
+  @Environment(\.policyCanvasReducedMotion) private var canvasReducedMotion
+  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+
+  /// Resolved reduce-motion bit. Prefer the canvas-scoped override (set by
+  /// `PolicyCanvasView` from the system flag, or by tests via the
+  /// environment-override hook) and fall back to the system flag when nil.
+  private var reducedMotion: Bool {
+    canvasReducedMotion ?? systemReduceMotion
+  }
 
   var body: some View {
     if let preview = viewModel.pendingEdgePreview {
@@ -36,7 +46,13 @@ struct PolicyCanvasRubberBandLayer: View {
         // run when reduce-motion is on.
         transaction.animation = nil
       }
-      .accessibilityHidden(reduceMotion)
+      // Always hidden from AT. The rubber-band is a decorative in-flight
+      // affordance; the source/target ports already expose their own
+      // VoiceOver labels via their respective `PolicyCanvasPortColumn`
+      // rendering. The resolved `reducedMotion` flag stays available for the
+      // future animated-drop transition the `transaction.animation = nil`
+      // gate reserves.
+      .accessibilityHidden(true)
       .allowsHitTesting(false)
     }
   }
