@@ -54,7 +54,9 @@ struct SessionWindowOverview: View {
         }
         TaskBoardOverviewView(
           snapshot: taskBoardSnapshot,
-          onOpenItem: openTaskActions
+          taskBoardItems: linkedTaskBoardItems,
+          onOpenItem: openTaskActions,
+          onOpenTaskBoardItem: openTaskBoardItem
         )
       }
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -118,6 +120,22 @@ struct SessionWindowOverview: View {
     store.presentedSheet = .taskActions(
       sessionID: item.session.sessionId,
       taskID: item.task.taskId
+    )
+  }
+
+  private var linkedTaskBoardItems: [TaskBoardItem] {
+    (snapshot.taskBoardItems ?? []).filter { item in
+      item.sessionId == snapshot.summary.sessionId
+    }
+  }
+
+  private func openTaskBoardItem(_ item: TaskBoardItem) {
+    guard let workItemId = item.workItemId else {
+      return
+    }
+    store.presentedSheet = .taskActions(
+      sessionID: snapshot.summary.sessionId,
+      taskID: workItemId
     )
   }
 }

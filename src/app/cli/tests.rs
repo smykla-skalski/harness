@@ -15,6 +15,7 @@ use crate::run::{
 use crate::session::transport::{SessionCommand, SessionObserveArgs};
 use crate::setup::{CapabilitiesArgs, ClusterArgs, GatewayArgs, KumaSetupCommand};
 use crate::task_board::transport::TaskBoardCommand;
+use crate::task_board::types::TaskBoardStatus;
 
 #[path = "tests/create.rs"]
 mod create;
@@ -204,5 +205,82 @@ fn parse_task_board_create() {
             assert_eq!(args.tag, ["monitor"]);
         }
         _ => panic!("expected TaskBoard Create"),
+    }
+}
+
+#[test]
+fn parse_task_board_update_planning_fields() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "task-board",
+        "update",
+        "task-1",
+        "--status",
+        "todo",
+        "--planning-summary",
+        "Implementation plan accepted.",
+        "--approved-by",
+        "lead",
+    ])
+    .unwrap();
+    match cli.command {
+        Command::TaskBoard {
+            command: TaskBoardCommand::Update(args),
+        } => {
+            assert_eq!(args.id, "task-1");
+            assert_eq!(args.status, Some(TaskBoardStatus::Todo));
+            assert_eq!(
+                args.planning_summary.as_deref(),
+                Some("Implementation plan accepted.")
+            );
+            assert_eq!(args.approved_by.as_deref(), Some("lead"));
+        }
+        _ => panic!("expected TaskBoard Update"),
+    }
+}
+
+#[test]
+fn parse_task_board_operational_subcommands() {
+    for (argv, expected) in [
+        (["harness", "task-board", "sync", "--json"], "sync"),
+        (["harness", "task-board", "dispatch", "--json"], "dispatch"),
+        (["harness", "task-board", "audit", "--json"], "audit"),
+        (["harness", "task-board", "project", "--json"], "project"),
+        (["harness", "task-board", "machine", "--json"], "machine"),
+    ] {
+        let cli = Cli::try_parse_from(argv).unwrap();
+        match (cli.command, expected) {
+            (
+                Command::TaskBoard {
+                    command: TaskBoardCommand::Sync(args),
+                },
+                "sync",
+            ) => assert!(args.json),
+            (
+                Command::TaskBoard {
+                    command: TaskBoardCommand::Dispatch(args),
+                },
+                "dispatch",
+            ) => assert!(args.json),
+            (
+                Command::TaskBoard {
+                    command: TaskBoardCommand::Audit(args),
+                },
+                "audit",
+            ) => assert!(args.json),
+            (
+                Command::TaskBoard {
+                    command: TaskBoardCommand::Project(args),
+                },
+                "project",
+            ) => assert!(args.json),
+            (
+                Command::TaskBoard {
+                    command: TaskBoardCommand::Machine(args),
+                },
+                "machine",
+            ) => assert!(args.json),
+            _ => panic!("expected TaskBoard {expected}"),
+        }
     }
 }

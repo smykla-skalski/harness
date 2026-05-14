@@ -175,6 +175,9 @@ fn live_refresh_disconnects_joined_agent_when_child_process_exits() {
                     prompt: None,
                     project_dir: None,
                     persona: None,
+                    task_id: None,
+                    board_item_id: None,
+                    workflow_execution_id: None,
                     argv: vec![
                         "sh".into(),
                         "-c".into(),

@@ -1,102 +1,93 @@
 # Task-board Workflow
 
-Use this reference when coordinating Harness session work through
-`harness session task`.
+Use this reference when coordinating cross-project work through
+`harness task-board`.
 
 ## Contract
 
-- Use Harness commands only. Do not read or write session state files directly.
-- Use `harness session task list <session-id> --json` before assignment,
-  review, or closeout decisions.
-- Pass `--actor <agent-id>` on every mutating task command.
-- Keep task titles short. Put scope, constraints, acceptance criteria, and
-  verification in `--context`.
+- Use Harness commands only. Do not read or write board files directly.
+- Use `harness task-board list --json` before dispatch, review, or closeout
+  decisions.
+- Put scope, constraints, acceptance criteria, and verification in `--body`.
+- Use `--project-id`, `--tag`, and `--agent-mode` for routing hints.
+
+## Command Surface
+
+`harness task-board` exposes:
+
+`create`, `list`, `get`, `update`, `delete`, `sync`, `dispatch`, `audit`,
+`project`, and `machine`.
+
+Common read flags: `--json`, `--board-root <path>`.
 
 ## Statuses
 
-| Status | Meaning | Command path |
+| Status | Meaning | Normal command |
 | --- | --- | --- |
-| `open` | Available or queued work. | `create`, `assign`, `update` |
-| `in_progress` | Worker is executing the task. | task-start signal or `update` |
-| `awaiting_review` | Worker submitted finished work. | `submit-for-review` |
-| `in_review` | Reviewer claimed the task. | `claim-review` |
-| `blocked` | Cannot proceed without new input or arbitration. | `update`, `respond-review` |
-| `done` | Closed work. | review approval, arbitration approval, or `update` |
+| `new` | Captured but not planned. | `create` |
+| `planning` | Plan is being written. | `update --status planning` |
+| `plan_review` | Plan is waiting for approval. | `update --status plan_review --planning-summary "..."` |
+| `todo` | Approved and ready for dispatch. | `update --status todo --approved-by <id>` |
+| `in_progress` | Worker is executing the task. | `update --status in_progress` |
+| `in_review` | Finished work is being reviewed. | `update --status in_review` |
+| `done` | Closed work. | `update --status done` |
+| `blocked` | Cannot proceed without new input or decision. | `update --status blocked` |
 
-Do not use generic `update` to enter `awaiting_review` or `in_review`.
+Priorities are `low`, `medium`, `high`, and `critical`.
 
-## Leader Loop
+## Planning Gate
+
+Dispatch readiness requires `todo`, a non-empty planning summary, an approver,
+an approval timestamp, no tombstone, and no existing session work-item link.
+The CLI writes the approval timestamp when `--approved-by` is set.
 
 ```bash
-harness session task create <session-id> \
+harness task-board create \
   --title "Implement focused fix" \
-  --context "Scope, files, acceptance criteria, verification." \
-  --severity high \
-  --actor <leader-agent-id>
+  --body "Scope, files, acceptance criteria, verification." \
+  --priority high \
+  --project-id <project-id> \
+  --tag backend
 
-harness session task list <session-id> --status open --json
+harness task-board update <task-id> --status planning
 
-harness session task assign <session-id> <task-id> <worker-agent-id> \
-  --actor <leader-agent-id>
+harness task-board update <task-id> \
+  --status plan_review \
+  --planning-summary "Cause, fix shape, verification, and rollback notes."
+
+harness task-board update <task-id> \
+  --status todo \
+  --approved-by <reviewer-or-leader-id>
 ```
 
-Keep tasks small, assigned to one owner, and backed by a concrete close
-condition.
-
-## Worker Loop
+## Dispatch And Review Loop
 
 ```bash
-harness session task list <session-id> --json
-
-harness session task checkpoint <session-id> <task-id> \
-  --summary "Cause proven; patch underway" \
-  --progress 50 \
-  --actor <worker-agent-id>
-
-harness session task submit-for-review <session-id> <task-id> \
-  --summary "Implemented fix and ran focused verification" \
-  --actor <worker-agent-id>
+harness task-board list --status todo --json
+harness task-board dispatch --json
+harness task-board update <task-id> --status in_progress
+harness task-board update <task-id> --status in_review
+harness task-board update <task-id> --status done
 ```
 
-Use `blocked` with a note only when the next action depends on input outside the
-current agent.
+Use `blocked` only when the next action depends on input outside the current
+agent. If the plan changes materially, return to `planning` or `plan_review`
+before making the task `todo` again.
 
-## Review Loop
+## Overview Integration
+
+Use these commands for board overviews:
 
 ```bash
-harness session task list <session-id> --status awaiting_review --json
-
-harness session task claim-review <session-id> <task-id> \
-  --actor <reviewer-agent-id>
-
-harness session task submit-review <session-id> <task-id> \
-  --verdict approve \
-  --summary "Verified focused behavior and tests" \
-  --actor <reviewer-agent-id>
+harness task-board audit --json
+harness task-board project --json
+harness task-board machine --json
+harness task-board sync --json
+harness task-board dispatch --json
 ```
 
-Verdicts are `approve`, `request_changes`, and `reject`.
-
-For requested changes, include review points:
-
-```bash
-harness session task submit-review <session-id> <task-id> \
-  --verdict request_changes \
-  --summary "Needs one scoped correction" \
-  --points '[{"point_id":"p1","text":"Update the focused test."}]' \
-  --actor <reviewer-agent-id>
-
-harness session task respond-review <session-id> <task-id> \
-  --agreed p1 \
-  --note "Test updated" \
-  --actor <worker-agent-id>
-```
-
-If the task reaches arbitration, the leader resolves it:
-
-```bash
-harness session task arbitrate <session-id> <task-id> \
-  --verdict request_changes \
-  --summary "Return to worker for the listed fix" \
-  --actor <leader-agent-id>
-```
+- `audit` reports total, ready, blocked, and by-status counts.
+- `project` groups by `project_id`.
+- `machine` groups by `agent_mode`.
+- `sync` reports external-provider readiness.
+- `dispatch` reports session, worker, reviewer, evaluator, and block reasons.

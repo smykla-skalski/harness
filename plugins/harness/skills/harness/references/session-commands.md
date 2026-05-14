@@ -4,7 +4,7 @@
 
 - [Lifecycle](#lifecycle)
 - [Roles](#roles)
-- [Tasks](#tasks)
+- [Task board](#task-board)
 - [Signals](#signals)
 - [Observation](#observation)
 - [TUI](#tui)
@@ -34,26 +34,26 @@ harness session recover-leader <session-id>
 
 Roles: `leader`, `observer`, `worker`, `reviewer`, `improver`.
 
-## Tasks
+## Task board
 
 ```
-harness session task create <session-id> --title "..." --context "..." --severity <level> --actor <agent-id> [--suggested-fix "..."]
-harness session task assign <session-id> <task-id> <agent-id> --actor <agent-id>
-harness session task list <session-id> [--status <status>] [--json]
-harness session task update <session-id> <task-id> --status <status> [--note "..."] --actor <agent-id>
-harness session task checkpoint <session-id> <task-id> --summary "..." --progress <0-100> --actor <agent-id>
-harness session task submit-for-review <session-id> <task-id> --actor <agent-id> [--summary "..."] [--suggested-persona "..."]
-harness session task claim-review <session-id> <task-id> --actor <agent-id>
-harness session task submit-review <session-id> <task-id> --actor <agent-id> --verdict <verdict> --summary "..." [--points <json>]
-harness session task respond-review <session-id> <task-id> --actor <agent-id> [--agreed <id,id>] [--disputed <id,id>] [--note "..."]
-harness session task arbitrate <session-id> <task-id> --actor <agent-id> --verdict <verdict> --summary "..."
+harness task-board create --title "..." [--body "..."] [--priority <priority>] [--agent-mode <mode>] [--project-id <id>] [--tag <tag>] [--id <id>]
+harness task-board list [--status <status>] [--json]
+harness task-board get <task-id> [--json]
+harness task-board update <task-id> [--title "..."] [--body "..."] [--status <status>] [--priority <priority>] [--agent-mode <mode>] [--project-id <id>] [--clear-project] [--tag <tag>] [--planning-summary "..."] [--approved-by <id>]
+harness task-board delete <task-id>
+harness task-board sync [--json]
+harness task-board dispatch [--json]
+harness task-board audit [--json]
+harness task-board project [--json]
+harness task-board machine [--json]
 ```
 
-Task statuses: `open`, `in_progress`, `awaiting_review`, `in_review`, `blocked`, `done`.
-Task severities: `low`, `medium`, `high`, `critical`.
-Review verdicts: `approve`, `request_changes`, `reject`.
+Task statuses: `new`, `planning`, `plan_review`, `todo`, `in_progress`, `in_review`, `done`, `blocked`.
+Task priorities: `low`, `medium`, `high`, `critical`.
+Agent modes: `headless`, `interactive`, `planning`, `evaluate`.
 
-Read [task-board-workflow.md](task-board-workflow.md) for the task-board operating flow and review-state rules.
+Read [task-board-workflow.md](task-board-workflow.md) for planning gates, review gates, dispatch readiness, and overview commands.
 
 ## Signals
 

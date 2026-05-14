@@ -3,6 +3,9 @@ use serde::{Deserialize, Serialize};
 use crate::session::types::{TaskSeverity, TaskSource};
 
 use super::planning::{PlanApprovalBlockReason, PlanApprovalGate, approval_gate};
+use super::policy::{
+    BuiltInPolicyGate, PolicyAction, PolicyDecision, PolicyGate, PolicyInput, PolicySubject,
+};
 use super::types::{AgentMode, ExternalRef, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
 
 const REVIEWER_PERSONA: &str = "code-reviewer";
@@ -17,6 +20,21 @@ pub struct DispatchPlan {
     pub worker: WorkerIntent,
     pub reviewer: ReviewerIntent,
     pub evaluator: EvaluatorIntent,
+    pub policy: PolicyDecision,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DispatchExecutionSummary {
+    pub plans: Vec<DispatchPlan>,
+    pub applied: Vec<DispatchAppliedTask>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DispatchAppliedTask {
+    pub board_item_id: String,
+    pub session_id: String,
+    pub work_item_id: String,
+    pub item: TaskBoardItem,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -32,6 +50,7 @@ pub enum DispatchBlockReason {
     AlreadyLinked { work_item_id: String },
     Deleted,
     PlanApproval { reason: PlanApprovalBlockReason },
+    Policy { decision: PolicyDecision },
     Status { status: TaskBoardStatus },
 }
 
@@ -90,11 +109,22 @@ impl DispatchPlan {
     }
 }
 
+impl DispatchExecutionSummary {
+    #[must_use]
+    pub fn dry_run(plans: Vec<DispatchPlan>) -> Self {
+        Self {
+            plans,
+            applied: Vec::new(),
+        }
+    }
+}
+
 #[must_use]
 pub fn build_dispatch_plan(item: &TaskBoardItem) -> DispatchPlan {
+    let policy = dispatch_policy(item);
     DispatchPlan {
         board_item_id: item.id.clone(),
-        readiness: readiness(item),
+        readiness: readiness(item, &policy),
         session: session_intent(item),
         task: task_creation_intent(item),
         worker: WorkerIntent {
@@ -102,6 +132,7 @@ pub fn build_dispatch_plan(item: &TaskBoardItem) -> DispatchPlan {
         },
         reviewer: reviewer_intent(),
         evaluator: evaluator_intent(),
+        policy,
     }
 }
 
@@ -110,7 +141,7 @@ pub fn build_dispatch_plans(items: &[TaskBoardItem]) -> Vec<DispatchPlan> {
     items.iter().map(build_dispatch_plan).collect()
 }
 
-fn readiness(item: &TaskBoardItem) -> DispatchReadiness {
+fn readiness(item: &TaskBoardItem, policy: &PolicyDecision) -> DispatchReadiness {
     if item.is_deleted() {
         return blocked(DispatchBlockReason::Deleted);
     }
@@ -127,7 +158,23 @@ fn readiness(item: &TaskBoardItem) -> DispatchReadiness {
             status: item.status,
         });
     }
+    if !policy.is_allow() {
+        return blocked(DispatchBlockReason::Policy {
+            decision: policy.clone(),
+        });
+    }
     DispatchReadiness::Ready
+}
+
+fn dispatch_policy(item: &TaskBoardItem) -> PolicyDecision {
+    let mut input = PolicyInput::new(PolicyAction::SpawnAgent);
+    input.subject = PolicySubject {
+        task_board_item_id: Some(item.id.clone()),
+        session_id: item.session_id.clone(),
+        repository: item.project_id.clone(),
+        ..PolicySubject::default()
+    };
+    BuiltInPolicyGate::default().evaluate(&input)
 }
 
 fn session_intent(item: &TaskBoardItem) -> SessionIntent {
@@ -238,6 +285,7 @@ mod tests {
         assert_eq!(plan.worker.mode, AgentMode::Interactive);
         assert_eq!(plan.reviewer.suggested_persona, REVIEWER_PERSONA);
         assert_eq!(plan.evaluator.mode, AgentMode::Evaluate);
+        assert!(plan.policy.is_allow());
     }
 
     #[test]

@@ -250,6 +250,12 @@ pub struct AgentTuiStartRequest {
     /// Persona identifier to resolve and attach to the agent registration.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub persona: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub board_item_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workflow_execution_id: Option<String>,
     /// Optional model identifier validated against the runtime's catalog.
     /// `None` means use the runtime default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -429,6 +435,9 @@ mod model_selection_tests {
             rows: DEFAULT_ROWS,
             cols: DEFAULT_COLS,
             persona: None,
+            task_id: None,
+            board_item_id: None,
+            workflow_execution_id: None,
             model: None,
             effort: None,
             allow_custom_model: false,

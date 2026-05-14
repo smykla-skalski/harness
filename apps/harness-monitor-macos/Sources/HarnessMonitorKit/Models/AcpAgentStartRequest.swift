@@ -23,6 +23,9 @@ public struct AcpAgentStartRequest: Codable, Equatable, Sendable {
   public let prompt: String?
   public let projectDir: String?
   public let persona: String?
+  public let taskID: String?
+  public let boardItemID: String?
+  public let workflowExecutionID: String?
   public let model: String?
   public let effort: String?
   public let allowCustomModel: Bool
@@ -37,6 +40,9 @@ public struct AcpAgentStartRequest: Codable, Equatable, Sendable {
     prompt: String? = nil,
     projectDir: String? = nil,
     persona: String? = nil,
+    taskID: String? = nil,
+    boardItemID: String? = nil,
+    workflowExecutionID: String? = nil,
     model: String? = nil,
     effort: String? = nil,
     allowCustomModel: Bool = false,
@@ -50,6 +56,9 @@ public struct AcpAgentStartRequest: Codable, Equatable, Sendable {
     self.prompt = prompt
     self.projectDir = projectDir
     self.persona = persona
+    self.taskID = taskID
+    self.boardItemID = boardItemID
+    self.workflowExecutionID = workflowExecutionID
     self.model = model
     self.effort = effort
     self.allowCustomModel = allowCustomModel
@@ -65,6 +74,9 @@ public struct AcpAgentStartRequest: Codable, Equatable, Sendable {
     case prompt
     case projectDir
     case persona
+    case taskID = "taskId"
+    case boardItemID = "boardItemId"
+    case workflowExecutionID = "workflowExecutionId"
     case model
     case effort
     case allowCustomModel
@@ -81,6 +93,9 @@ public struct AcpAgentStartRequest: Codable, Equatable, Sendable {
     prompt = try container.decodeIfPresent(String.self, forKey: .prompt)
     projectDir = try container.decodeIfPresent(String.self, forKey: .projectDir)
     persona = try container.decodeIfPresent(String.self, forKey: .persona)
+    taskID = try container.decodeIfPresent(String.self, forKey: .taskID)
+    boardItemID = try container.decodeIfPresent(String.self, forKey: .boardItemID)
+    workflowExecutionID = try container.decodeIfPresent(String.self, forKey: .workflowExecutionID)
     model = try container.decodeIfPresent(String.self, forKey: .model)
     effort = try container.decodeIfPresent(String.self, forKey: .effort)
     allowCustomModel =
@@ -99,6 +114,9 @@ public struct AcpAgentStartRequest: Codable, Equatable, Sendable {
     try container.encodeIfPresent(prompt, forKey: .prompt)
     try container.encodeIfPresent(projectDir, forKey: .projectDir)
     try container.encodeIfPresent(persona, forKey: .persona)
+    try container.encodeIfPresent(taskID, forKey: .taskID)
+    try container.encodeIfPresent(boardItemID, forKey: .boardItemID)
+    try container.encodeIfPresent(workflowExecutionID, forKey: .workflowExecutionID)
     try container.encodeIfPresent(model, forKey: .model)
     try container.encodeIfPresent(effort, forKey: .effort)
     try container.encode(allowCustomModel, forKey: .allowCustomModel)

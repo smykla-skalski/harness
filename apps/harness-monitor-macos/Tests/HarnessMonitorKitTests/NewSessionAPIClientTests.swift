@@ -41,6 +41,9 @@ struct NewSessionAPIClientTests {
       name: "Codex Worker",
       persona: "reviewer",
       resumeThreadId: "thread-old",
+      taskID: "task-1",
+      boardItemID: "board-item-1",
+      workflowExecutionID: "workflow-1",
       model: "gpt-5.5",
       effort: "high",
       allowCustomModel: true
@@ -81,6 +84,9 @@ struct NewSessionAPIClientTests {
     #expect(startBody["name"] as? String == "Codex Worker")
     #expect(startBody["persona"] as? String == "reviewer")
     #expect(startBody["resume_thread_id"] as? String == "thread-old")
+    #expect(startBody["task_id"] as? String == "task-1")
+    #expect(startBody["board_item_id"] as? String == "board-item-1")
+    #expect(startBody["workflow_execution_id"] as? String == "workflow-1")
     #expect(startBody["model"] as? String == "gpt-5.5")
     #expect(startBody["effort"] as? String == "high")
     #expect(startBody["allow_custom_model"] as? Bool == true)

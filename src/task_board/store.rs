@@ -9,7 +9,7 @@ use crate::workspace::{harness_data_root, utc_now};
 
 use super::types::{
     AgentMode, CURRENT_TASK_BOARD_ITEM_VERSION, ExternalRef, PlanningState, TaskBoardItem,
-    TaskBoardPriority, TaskBoardStatus,
+    TaskBoardPriority, TaskBoardStatus, TaskBoardWorkflowState,
 };
 
 #[derive(Debug, Clone)]
@@ -28,6 +28,7 @@ pub struct TaskBoardItemPatch {
     pub agent_mode: Option<AgentMode>,
     pub external_refs: Option<Vec<ExternalRef>>,
     pub planning: Option<PlanningState>,
+    pub workflow: Option<TaskBoardWorkflowState>,
     pub session_id: OptionalFieldPatch<String>,
     pub work_item_id: OptionalFieldPatch<String>,
 }
@@ -56,6 +57,8 @@ struct TaskBoardFrontmatter {
     external_refs: Vec<ExternalRef>,
     #[serde(default)]
     planning: PlanningState,
+    #[serde(default, skip_serializing_if = "TaskBoardWorkflowState::is_default")]
+    workflow: TaskBoardWorkflowState,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     session_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -81,6 +84,7 @@ impl From<&TaskBoardItem> for TaskBoardFrontmatter {
             agent_mode: item.agent_mode,
             external_refs: item.external_refs.clone(),
             planning: item.planning.clone(),
+            workflow: item.workflow.clone(),
             session_id: item.session_id.clone(),
             work_item_id: item.work_item_id.clone(),
             usage: item.usage.clone(),
@@ -105,6 +109,7 @@ impl TaskBoardFrontmatter {
             agent_mode: self.agent_mode,
             external_refs: self.external_refs,
             planning: self.planning,
+            workflow: self.workflow,
             session_id: self.session_id,
             work_item_id: self.work_item_id,
             usage: self.usage,
@@ -259,6 +264,7 @@ fn apply_core_patch(item: &mut TaskBoardItem, patch: &TaskBoardItemPatch) {
     assign_if_some(&mut item.tags, patch.tags.as_ref());
     assign_if_some(&mut item.external_refs, patch.external_refs.as_ref());
     assign_if_some(&mut item.planning, patch.planning.as_ref());
+    assign_if_some(&mut item.workflow, patch.workflow.as_ref());
 }
 
 fn apply_link_patch(item: &mut TaskBoardItem, patch: TaskBoardItemPatch) {

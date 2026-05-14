@@ -17,6 +17,7 @@ public struct HarnessMonitorSessionWindowSnapshot: Equatable, Sendable {
   public let detail: SessionDetail?
   public let acpAgents: [AcpAgentSnapshot]
   public let acpInspectSample: AcpInspectSample?
+  public let taskBoardItems: [TaskBoardItem]?
   public let timeline: [TimelineEntry]
   public let timelineEntriesByAgentID: [String: [TimelineEntry]]
   public let transcript: [TimelineEntry]
@@ -30,6 +31,7 @@ public struct HarnessMonitorSessionWindowSnapshot: Equatable, Sendable {
     detail: SessionDetail?,
     acpAgents: [AcpAgentSnapshot] = [],
     acpInspectSample: AcpInspectSample? = nil,
+    taskBoardItems: [TaskBoardItem]? = nil,
     timeline: [TimelineEntry],
     transcript: [TimelineEntry] = [],
     transcriptSource: HarnessMonitorSessionWindowTranscriptSource = .derived,
@@ -40,6 +42,7 @@ public struct HarnessMonitorSessionWindowSnapshot: Equatable, Sendable {
     self.detail = detail
     self.acpAgents = acpAgents
     self.acpInspectSample = acpInspectSample
+    self.taskBoardItems = taskBoardItems
     self.timeline = timeline
     timelineEntriesByAgentID = timeline.partitionedByAgentID()
     self.transcript = transcript

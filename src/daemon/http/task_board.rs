@@ -8,8 +8,9 @@ use axum::{Json, Router};
 use serde::Deserialize;
 
 use crate::daemon::protocol::{
-    TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardGetItemRequest,
-    TaskBoardListItemsRequest, TaskBoardUpdateItemRequest, http_paths,
+    TaskBoardAuditRequest, TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest,
+    TaskBoardDispatchRequest, TaskBoardGetItemRequest, TaskBoardListItemsRequest,
+    TaskBoardSyncRequest, TaskBoardUpdateItemRequest, http_paths,
 };
 use crate::daemon::service;
 use crate::task_board::TaskBoardStatus;
@@ -146,59 +147,81 @@ pub(in crate::daemon::http) async fn delete_task_board_item(
 async fn post_task_board_sync(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
+    Json(request): Json<TaskBoardSyncRequest>,
 ) -> Response {
-    task_board_capability_response(
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    timed_json(
         "POST",
         http_paths::TASK_BOARD_SYNC,
-        "sync",
-        &headers,
-        &state,
+        &request_id,
+        start,
+        service::sync_task_board(&request),
     )
 }
 
 async fn post_task_board_dispatch(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
+    Json(mut request): Json<TaskBoardDispatchRequest>,
 ) -> Response {
-    task_board_capability_response(
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    request.actor = Some(crate::session::types::CONTROL_PLANE_ACTOR_ID.to_string());
+    let result = if let Some(async_db) = state.async_db.get() {
+        let result = service::dispatch_task_board_async(&request, async_db.as_ref()).await;
+        if result
+            .as_ref()
+            .is_ok_and(|response| !response.applied.is_empty())
+        {
+            service::broadcast_sessions_updated_async(&state.sender, Some(async_db.as_ref())).await;
+        }
+        result
+    } else {
+        let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+        let db_ref = db_guard.as_deref();
+        let result = service::dispatch_task_board(&request, db_ref);
+        if result
+            .as_ref()
+            .is_ok_and(|response| !response.applied.is_empty())
+        {
+            service::broadcast_sessions_updated(&state.sender, db_ref);
+        }
+        result
+    };
+    timed_json(
         "POST",
         http_paths::TASK_BOARD_DISPATCH,
-        "dispatch",
-        &headers,
-        &state,
+        &request_id,
+        start,
+        result,
     )
 }
 
 async fn get_task_board_audit(
+    Query(query): Query<TaskBoardListQuery>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
-    task_board_capability_response(
-        "GET",
-        http_paths::TASK_BOARD_AUDIT,
-        "audit",
-        &headers,
-        &state,
-    )
-}
-
-fn task_board_capability_response(
-    method: &'static str,
-    path: &'static str,
-    operation: &'static str,
-    headers: &HeaderMap,
-    state: &DaemonHttpState,
-) -> Response {
     let start = Instant::now();
-    let request_id = extract_request_id(headers);
-    if let Err(response) = require_auth(headers, state) {
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
+    let request = TaskBoardAuditRequest {
+        status: query.status,
+    };
     timed_json(
-        method,
-        path,
+        "GET",
+        http_paths::TASK_BOARD_AUDIT,
         &request_id,
         start,
-        Ok(service::task_board_not_configured(operation)),
+        service::audit_task_board(&request),
     )
 }
