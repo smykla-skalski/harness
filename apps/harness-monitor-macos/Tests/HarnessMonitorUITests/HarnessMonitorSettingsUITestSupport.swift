@@ -48,6 +48,14 @@ extension HarnessMonitorUITestCase {
     )
   }
 
+  func selectTaskBoardSection(in app: XCUIApplication) {
+    selectSettingsSection(
+      in: app,
+      identifier: HarnessMonitorUITestAccessibility.settingsTaskBoardSection,
+      expectedTitle: "Task Board"
+    )
+  }
+
   func selectSupervisorSection(in app: XCUIApplication) {
     selectSettingsSection(
       in: app,

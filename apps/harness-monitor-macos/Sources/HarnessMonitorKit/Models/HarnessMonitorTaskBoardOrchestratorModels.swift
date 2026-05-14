@@ -1,6 +1,8 @@
 import Foundation
 
-public enum TaskBoardOrchestratorWorkflow: String, Codable, CaseIterable, Identifiable, Sendable {
+public enum TaskBoardOrchestratorWorkflow: String, Codable, CaseIterable, Identifiable, Hashable,
+  Sendable
+{
   case defaultTask = "default_task"
   case prFix = "pr_fix"
   case prReview = "pr_review"

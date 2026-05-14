@@ -174,6 +174,11 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       clearProjectDir: Bool,
       clearDispatchStatusFilter: Bool
     )
+    case updateTaskBoardGitRuntimeConfig(overrideCount: Int)
+    case syncTaskBoardGitHubTokens(
+      globalTokenConfigured: Bool,
+      repositoryTokenCount: Int
+    )
     case saveTaskBoardPolicyPipelineDraft(revision: UInt64)
     case simulateTaskBoardPolicyPipeline
     case promoteTaskBoardPolicyPipeline(revision: UInt64)
@@ -206,6 +211,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     case codexTranscript(String)
     case taskBoardOrchestratorStatus
     case taskBoardOrchestratorSettings
+    case taskBoardGitRuntimeConfig
     case taskBoardPolicyPipeline
     case taskBoardPolicyPipelineAudit
   }

@@ -30,6 +30,7 @@ struct TaskBoardAPIClientTests {
 
     let status = try await client.taskBoardOrchestratorStatus()
     _ = try await client.taskBoardOrchestratorSettings()
+    let runtimeConfig = try await client.taskBoardGitRuntimeConfig()
     _ = try await client.startTaskBoardOrchestrator()
     _ = try await client.stopTaskBoardOrchestrator()
     let runOnce = try await client.runTaskBoardOrchestratorOnce(
@@ -46,12 +47,31 @@ struct TaskBoardAPIClientTests {
         policyVersion: "task-board-policy-v3"
       )
     )
+    let updatedRuntimeConfig = try await client.updateTaskBoardGitRuntimeConfig(
+      request: TaskBoardGitRuntimeConfig(
+        repositoryOverrides: [
+          TaskBoardGitRepositoryOverride(repository: "kong/harness")
+        ]
+      )
+    )
+    let tokenSync = try await client.syncTaskBoardGitHubTokens(
+      request: TaskBoardGitHubTokensSyncRequest(
+        globalToken: "ghu_global",
+        repositoryTokens: [
+          TaskBoardGitHubRepositoryToken(repository: "kong/harness", token: "ghu_repo")
+        ]
+      )
+    )
 
     #expect(status.settings.githubProject.owner == "kong")
     #expect(status.settings.githubProject.repo == "harness")
+    #expect(runtimeConfig.global.authorName == "Harness Bot")
     #expect(runOnce.lastRun?.sync.total == 1)
     #expect(runOnce.lastRun?.policyTraceIds == ["trace-1"])
     #expect(settings.policyVersion == "task-board-policy-v3")
+    #expect(updatedRuntimeConfig.repositoryOverrides.first?.repository == "kong/harness")
+    #expect(tokenSync.globalTokenConfigured == true)
+    #expect(tokenSync.repositoryTokenCount == 1)
     #expect(
       client.calls == [
         .startTaskBoardOrchestrator,
@@ -67,6 +87,8 @@ struct TaskBoardAPIClientTests {
           clearProjectDir: true,
           clearDispatchStatusFilter: true
         ),
+        .updateTaskBoardGitRuntimeConfig(overrideCount: 1),
+        .syncTaskBoardGitHubTokens(globalTokenConfigured: true, repositoryTokenCount: 1),
       ]
     )
   }

@@ -71,6 +71,39 @@ extension TaskBoardAPIClientTests {
         policyVersion: "task-board-policy-v3"
       )
     )
+    let runtimeConfig = try await transport.taskBoardGitRuntimeConfig()
+    let updatedRuntimeConfig = try await transport.updateTaskBoardGitRuntimeConfig(
+      request: TaskBoardGitRuntimeConfig(
+        global: TaskBoardGitRuntimeProfile(
+          authorName: "Harness Bot",
+          authorEmail: "bot@example.com",
+          sshKeyPath: "/Users/test/.ssh/id_ed25519",
+          signing: TaskBoardGitSigningConfig(
+            mode: .ssh,
+            sshKeyPath: "/Users/test/.ssh/id_signing"
+          )
+        ),
+        repositoryOverrides: [
+          TaskBoardGitRepositoryOverride(
+            repository: "kong/harness",
+            profile: TaskBoardGitRuntimeProfile(
+              authorName: "Repo Bot",
+              authorEmail: "repo@example.com",
+              sshKeyPath: "/Users/test/.ssh/id_repo",
+              signing: TaskBoardGitSigningConfig(mode: .gpg, gpgKeyId: "ABC123")
+            )
+          )
+        ]
+      )
+    )
+    let tokenSync = try await transport.syncTaskBoardGitHubTokens(
+      request: TaskBoardGitHubTokensSyncRequest(
+        globalToken: "ghu_global",
+        repositoryTokens: [
+          TaskBoardGitHubRepositoryToken(repository: "kong/harness", token: "ghu_repo")
+        ]
+      )
+    )
     _ = try await transport.taskBoardProjects(status: .todo)
     _ = try await transport.taskBoardMachines(status: .todo)
 
@@ -81,7 +114,10 @@ extension TaskBoardAPIClientTests {
       dispatch: dispatch,
       evaluation: evaluation,
       status: status,
-      runOnce: runOnce
+      runOnce: runOnce,
+      runtimeConfig: runtimeConfig,
+      updatedRuntimeConfig: updatedRuntimeConfig,
+      tokenSync: tokenSync
     )
   }
 
@@ -104,6 +140,9 @@ extension TaskBoardAPIClientTests {
           .taskBoardOrchestratorRunOnce,
           .taskBoardOrchestratorSettingsGet,
           .taskBoardOrchestratorSettingsUpdate,
+          .taskBoardOrchestratorRuntimeConfigGet,
+          .taskBoardOrchestratorRuntimeConfigUpdate,
+          .taskBoardOrchestratorGitHubTokensSync,
           .taskBoardProjects,
           .taskBoardMachines,
         ]
@@ -152,8 +191,21 @@ extension TaskBoardAPIClientTests {
       Issue.record("Expected github_project object in websocket settings update")
     }
     #expect(objectValue(calls[14].params, key: "policy_version") == .string("task-board-policy-v3"))
-    #expect(objectValue(calls[15].params, key: "status") == .string("todo"))
-    #expect(objectValue(calls[16].params, key: "status") == .string("todo"))
+    #expect(calls[15].params == nil)
+    #expect(objectValue(calls[16].params, key: "global") != nil)
+    #expect(objectValue(calls[17].params, key: "global_token") == .string("ghu_global"))
+    if case .array(let repositoryTokens)? = objectValue(calls[17].params, key: "repository_tokens") {
+      if case .object(let token)? = repositoryTokens.first {
+        #expect(token["repository"] == .string("kong/harness"))
+        #expect(token["token"] == .string("ghu_repo"))
+      } else {
+        Issue.record("Expected repository token object in websocket token sync payload")
+      }
+    } else {
+      Issue.record("Expected repository_tokens array in websocket token sync payload")
+    }
+    #expect(objectValue(calls[18].params, key: "status") == .string("todo"))
+    #expect(objectValue(calls[19].params, key: "status") == .string("todo"))
   }
 
   func assertWebSocketResults(_ result: TaskBoardWebSocketContractResult) {
@@ -168,6 +220,9 @@ extension TaskBoardAPIClientTests {
     #expect(result.status.currentTick?.phase == .evaluation)
     #expect(result.runOnce.lastRun?.evaluation?.updated == 1)
     #expect(result.runOnce.lastRun?.policyTraceIds == ["trace-1"])
+    #expect(result.runtimeConfig.global.authorEmail == "bot@example.com")
+    #expect(result.updatedRuntimeConfig.repositoryOverrides.first?.profile.signing.mode == .gpg)
+    #expect(result.tokenSync.repositoryTokenCount == 1)
   }
 
   private func objectValue(_ value: JSONValue?, key: String) -> JSONValue? {
@@ -185,4 +240,7 @@ struct TaskBoardWebSocketContractResult {
   let evaluation: TaskBoardEvaluationSummary
   let status: TaskBoardOrchestratorStatus
   let runOnce: TaskBoardOrchestratorRunOnceResponse
+  let runtimeConfig: TaskBoardGitRuntimeConfig
+  let updatedRuntimeConfig: TaskBoardGitRuntimeConfig
+  let tokenSync: TaskBoardGitHubTokensSyncResponse
 }

@@ -81,6 +81,39 @@ extension TaskBoardAPIClientTests {
         policyVersion: "task-board-policy-v3"
       )
     )
+    let runtimeConfig = try await client.taskBoardGitRuntimeConfig()
+    let updatedRuntimeConfig = try await client.updateTaskBoardGitRuntimeConfig(
+      request: TaskBoardGitRuntimeConfig(
+        global: TaskBoardGitRuntimeProfile(
+          authorName: "Harness Bot",
+          authorEmail: "bot@example.com",
+          sshKeyPath: "/Users/test/.ssh/id_ed25519",
+          signing: TaskBoardGitSigningConfig(
+            mode: .ssh,
+            sshKeyPath: "/Users/test/.ssh/id_signing"
+          )
+        ),
+        repositoryOverrides: [
+          TaskBoardGitRepositoryOverride(
+            repository: "kong/harness",
+            profile: TaskBoardGitRuntimeProfile(
+              authorName: "Repo Bot",
+              authorEmail: "repo@example.com",
+              sshKeyPath: "/Users/test/.ssh/id_repo",
+              signing: TaskBoardGitSigningConfig(mode: .gpg, gpgKeyId: "ABC123")
+            )
+          )
+        ]
+      )
+    )
+    let tokenSync = try await client.syncTaskBoardGitHubTokens(
+      request: TaskBoardGitHubTokensSyncRequest(
+        globalToken: "ghu_global",
+        repositoryTokens: [
+          TaskBoardGitHubRepositoryToken(repository: "kong/harness", token: "ghu_repo")
+        ]
+      )
+    )
     _ = try await client.taskBoardProjects(status: .todo)
     _ = try await client.taskBoardMachines(status: .todo)
 
@@ -90,7 +123,10 @@ extension TaskBoardAPIClientTests {
       evaluation: evaluation,
       status: status,
       runOnce: runOnce,
-      updatedSettings: updatedSettings
+      updatedSettings: updatedSettings,
+      runtimeConfig: runtimeConfig,
+      updatedRuntimeConfig: updatedRuntimeConfig,
+      tokenSync: tokenSync
     )
   }
 
@@ -99,7 +135,7 @@ extension TaskBoardAPIClientTests {
       records.map(\.method)
         == [
           "GET", "GET", "POST", "PUT", "DELETE", "POST", "POST", "POST", "GET", "GET", "POST",
-          "POST", "POST", "GET", "PUT", "GET", "GET",
+          "POST", "POST", "GET", "PUT", "GET", "PUT", "PUT", "GET", "GET",
         ]
     )
     #expect(
@@ -120,6 +156,9 @@ extension TaskBoardAPIClientTests {
           "/v1/task-board/orchestrator/run-once",
           "/v1/task-board/orchestrator/settings",
           "/v1/task-board/orchestrator/settings",
+          "/v1/task-board/orchestrator/runtime-config",
+          "/v1/task-board/orchestrator/runtime-config",
+          "/v1/task-board/orchestrator/github-tokens",
           "/v1/task-board/projects",
           "/v1/task-board/machines",
         ]
@@ -165,8 +204,19 @@ extension TaskBoardAPIClientTests {
     let enabledAutomations = githubProject?["enabled_automations"] as? [String: Any]
     #expect(enabledAutomations?["enabled"] as? [String] == ["sync_task_board", "auto_merge"])
     #expect(records[14].body?["policy_version"] as? String == "task-board-policy-v3")
-    #expect(records[15].query == "status=todo")
-    #expect(records[16].query == "status=todo")
+    #expect(records[15].body == nil)
+    let runtimeGlobal = records[16].body?["global"] as? [String: Any]
+    #expect(runtimeGlobal?["author_name"] as? String == "Harness Bot")
+    #expect(runtimeGlobal?["author_email"] as? String == "bot@example.com")
+    let runtimeSigning = runtimeGlobal?["signing"] as? [String: Any]
+    #expect(runtimeSigning?["mode"] as? String == "ssh")
+    #expect(runtimeSigning?["ssh_key_path"] as? String == "/Users/test/.ssh/id_signing")
+    #expect(records[17].body?["global_token"] as? String == "ghu_global")
+    let repositoryTokens = records[17].body?["repository_tokens"] as? [[String: Any]]
+    #expect(repositoryTokens?.first?["repository"] as? String == "kong/harness")
+    #expect(repositoryTokens?.first?["token"] as? String == "ghu_repo")
+    #expect(records[18].query == "status=todo")
+    #expect(records[19].query == "status=todo")
   }
 
   func assertHTTPClientResults(_ result: TaskBoardHTTPContractResult) {
@@ -188,6 +238,10 @@ extension TaskBoardAPIClientTests {
     #expect(result.runOnce.lastRun?.policyTraceIds == ["trace-1"])
     #expect(result.runOnce.lastRun?.dispatch?.applied.first?.workItemId == "task-1")
     #expect(result.updatedSettings.policyVersion == "task-board-policy-v2")
+    #expect(result.runtimeConfig.global.authorName == "Harness Bot")
+    #expect(result.updatedRuntimeConfig.repositoryOverrides.first?.repository == "kong/harness")
+    #expect(result.tokenSync.globalTokenConfigured == true)
+    #expect(result.tokenSync.repositoryTokenCount == 1)
   }
 
   private func makeClient() throws -> HarnessMonitorAPIClient {
@@ -211,4 +265,7 @@ struct TaskBoardHTTPContractResult {
   let status: TaskBoardOrchestratorStatus
   let runOnce: TaskBoardOrchestratorRunOnceResponse
   let updatedSettings: TaskBoardOrchestratorSettings
+  let runtimeConfig: TaskBoardGitRuntimeConfig
+  let updatedRuntimeConfig: TaskBoardGitRuntimeConfig
+  let tokenSync: TaskBoardGitHubTokensSyncResponse
 }
