@@ -17,18 +17,36 @@ extension PolicyCanvasViewModel {
       policyCanvasNode($0, layout: document.layout)
     }
     assignGroupMembership(from: document.groups, to: &loadedNodes)
-    nodes = loadedNodes
-    groups = document.groups.enumerated().map { offset, group in
+    let loadedGroups = document.groups.enumerated().map { offset, group in
       policyCanvasGroup(offset: offset, element: group, nodes: loadedNodes)
     }
+    let cleanLayout = policyCanvasCleanInitialLayout(nodes: loadedNodes, groups: loadedGroups)
+    nodes = cleanLayout.nodes
+    groups = cleanLayout.groups
     edges = document.edges.map(policyCanvasEdge)
     zoom = CGFloat(document.layout.zoom)
+    reconcileGroupFrames()
     resetNextNodeNumber()
+    markLoadedDocumentRevision(document.revision)
     isDirty = false
     lastActionSummary = "Loaded revision \(document.revision)"
   }
 
+  func loadIfChanged(
+    document: TaskBoardPolicyPipelineDocument?,
+    simulation: TaskBoardPolicyPipelineSimulationResult?,
+    audit: TaskBoardPolicyPipelineAuditSummary?,
+    force: Bool = false
+  ) {
+    guard force || shouldApplyExternalDocument(document) else {
+      latestSimulation = simulation ?? audit?.latestSimulation
+      return
+    }
+    load(document: document, simulation: simulation, audit: audit)
+  }
+
   func exportDocument() -> TaskBoardPolicyPipelineDocument {
+    reconcileGroupFrames()
     let originalNodeKinds =
       backingDocument.map { document in
         Dictionary(uniqueKeysWithValues: document.nodes.map { ($0.id, $0.kind) })

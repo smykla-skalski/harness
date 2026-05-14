@@ -1,3 +1,4 @@
+import HarnessMonitorKit
 import SwiftUI
 
 enum PolicyCanvasTab: String, CaseIterable, Identifiable {
@@ -137,6 +138,7 @@ struct PolicyCanvasNode: Identifiable {
   var kind: PolicyCanvasNodeKind
   var position: CGPoint
   var groupID: String?
+  var policyKind: TaskBoardPolicyPipelineNodeKind?
   var inputPorts: [PolicyCanvasPort]
   var outputPorts: [PolicyCanvasPort]
 
@@ -147,6 +149,7 @@ struct PolicyCanvasNode: Identifiable {
     self.kind = kind
     self.position = position
     self.groupID = nil
+    self.policyKind = nil
     self.inputPorts = kind.inputPortTitles.map { title in
       PolicyCanvasPort(
         id: "\(PolicyCanvasPortKind.input.rawValue)-\(title)",
@@ -223,6 +226,10 @@ enum PolicyCanvasLayout {
   static let nodeSize = CGSize(width: 168, height: 96)
   static let portDiameter: CGFloat = 12
   static let groupCornerRadius: CGFloat = 8
+  static let initialContentOrigin = CGPoint(x: 36, y: 72)
+  static let groupHorizontalPadding: CGFloat = 44
+  static let groupVerticalPadding: CGFloat = 52
+  static let minimumGroupSize = CGSize(width: 220, height: 180)
 
   static func portY(index: Int, count: Int) -> CGFloat {
     guard count > 1 else {

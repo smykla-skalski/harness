@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PolicyCanvasViewport: View {
   let viewModel: PolicyCanvasViewModel
+  @State private var magnifyStartZoom: CGFloat?
 
   var body: some View {
     GeometryReader { _ in
@@ -15,6 +16,7 @@ struct PolicyCanvasViewport: View {
         }
         .scaleEffect(viewModel.zoom, anchor: .topLeading)
       }
+      .clipShape(Rectangle())
       .contentShape(Rectangle())
       .dropDestination(for: String.self) { payloads, location in
         viewModel.dropPalettePayloads(
@@ -29,9 +31,24 @@ struct PolicyCanvasViewport: View {
       .onTapGesture {
         viewModel.select(nil)
       }
+      .simultaneousGesture(magnifyGesture)
     }
     .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasViewport)
+    .accessibilityFrameMarker(HarnessMonitorAccessibility.policyCanvasViewport)
+  }
+
+  private var magnifyGesture: some Gesture {
+    MagnifyGesture(minimumScaleDelta: 0.01)
+      .onChanged { value in
+        let baseZoom = magnifyStartZoom ?? viewModel.zoom
+        if magnifyStartZoom == nil {
+          magnifyStartZoom = baseZoom
+        }
+        viewModel.setZoom(baseZoom * value.magnification)
+      }
+      .onEnded { _ in
+        magnifyStartZoom = nil
+      }
   }
 }
 
@@ -103,11 +120,12 @@ private struct PolicyCanvasEdgeLayer: View {
 
   var body: some View {
     ZStack(alignment: .topLeading) {
-      ForEach(viewModel.edges) { edge in
+      ForEach(Array(viewModel.edges.enumerated()), id: \.element.id) { offset, edge in
         if let source = viewModel.portAnchor(for: edge.source),
           let target = viewModel.portAnchor(for: edge.target)
         {
-          PolicyCanvasEdgeShape(source: source, target: target)
+          let route = PolicyCanvasEdgeRoute(source: source, target: target, lane: offset)
+          PolicyCanvasEdgeShape(route: route)
             .stroke(
               edgeColor(for: edge).opacity(viewModel.selection == .edge(edge.id) ? 0.95 : 0.62),
               style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round)
@@ -118,7 +136,7 @@ private struct PolicyCanvasEdgeLayer: View {
             viewModel.select(.edge(edge.id))
           } label: {
             Text(edge.label)
-              .font(.caption2.weight(.semibold))
+              .scaledFont(.caption2.weight(.semibold))
               .foregroundStyle(.white.opacity(0.90))
               .lineLimit(1)
               .padding(.horizontal, 7)
@@ -130,18 +148,11 @@ private struct PolicyCanvasEdgeLayer: View {
               }
           }
           .harnessPlainButtonStyle()
-          .position(labelPosition(source: source, target: target))
+          .position(route.labelPosition)
           .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEdge(edge.id))
         }
       }
     }
-  }
-
-  private func labelPosition(source: CGPoint, target: CGPoint) -> CGPoint {
-    CGPoint(
-      x: (source.x + target.x) / 2,
-      y: (source.y + target.y) / 2 - 14
-    )
   }
 
   private func edgeColor(for edge: PolicyCanvasEdge) -> Color {
@@ -150,19 +161,60 @@ private struct PolicyCanvasEdgeLayer: View {
 }
 
 private struct PolicyCanvasEdgeShape: Shape {
-  let source: CGPoint
-  let target: CGPoint
+  let route: PolicyCanvasEdgeRoute
 
   func path(in rect: CGRect) -> Path {
     var path = Path()
-    let distance = max(72, abs(target.x - source.x) * 0.42)
-    path.move(to: source)
-    path.addCurve(
-      to: target,
-      control1: CGPoint(x: source.x + distance, y: source.y),
-      control2: CGPoint(x: target.x - distance, y: target.y)
-    )
+    guard let firstPoint = route.points.first else {
+      return path
+    }
+    path.move(to: firstPoint)
+    for point in route.points.dropFirst() {
+      path.addLine(to: point)
+    }
     return path
+  }
+}
+
+private struct PolicyCanvasEdgeRoute {
+  let points: [CGPoint]
+  let labelPosition: CGPoint
+
+  init(source: CGPoint, target: CGPoint, lane: Int) {
+    let laneOffset = CGFloat(lane % 5) * 14
+    let horizontalDistance = target.x - source.x
+    if horizontalDistance > 260, abs(source.y - target.y) < 96 {
+      let sourceRunX = source.x + 54 + laneOffset
+      let targetRunX = target.x - 54 - laneOffset
+      let topLaneY = max(
+        PolicyCanvasLayout.initialContentOrigin.y + 16,
+        min(source.y, target.y) - 52 - laneOffset
+      )
+      points = [
+        source,
+        CGPoint(x: sourceRunX, y: source.y),
+        CGPoint(x: sourceRunX, y: topLaneY),
+        CGPoint(x: targetRunX, y: topLaneY),
+        CGPoint(x: targetRunX, y: target.y),
+        target,
+      ]
+      labelPosition = CGPoint(x: (sourceRunX + targetRunX) / 2, y: topLaneY - 14)
+    } else {
+      let midX =
+        horizontalDistance >= 0
+        ? source.x + max(72, horizontalDistance * 0.46) + laneOffset
+        : max(source.x, target.x) + 84 + laneOffset
+      points = [
+        source,
+        CGPoint(x: midX, y: source.y),
+        CGPoint(x: midX, y: target.y),
+        target,
+      ]
+      labelPosition = CGPoint(
+        x: midX,
+        y: (source.y + target.y) / 2 - 14
+      )
+    }
   }
 }
 
@@ -184,7 +236,7 @@ private struct PolicyCanvasGroupRegion: View {
         }
 
       Text(group.title)
-        .font(.caption.weight(.semibold))
+        .scaledFont(.caption.weight(.semibold))
         .foregroundStyle(group.tone.color.opacity(0.95))
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
@@ -243,25 +295,25 @@ private struct PolicyCanvasNodeCard: View {
 
       HStack(alignment: .top, spacing: 10) {
         Image(systemName: node.kind.symbolName)
-          .font(.system(size: 16, weight: .semibold))
+          .scaledFont(.system(size: 16, weight: .semibold))
           .foregroundStyle(node.kind.accentColor)
           .frame(width: 24, height: 24)
           .background(node.kind.accentColor.opacity(0.16), in: RoundedRectangle(cornerRadius: 6))
 
         VStack(alignment: .leading, spacing: 5) {
           Text(node.title)
-            .font(.callout.weight(.semibold))
+            .scaledFont(.callout.weight(.semibold))
             .foregroundStyle(.white)
             .lineLimit(1)
 
           Text(node.subtitle)
-            .font(.caption)
+            .scaledFont(.caption)
             .foregroundStyle(.white.opacity(0.62))
             .lineLimit(1)
 
           if let groupID = node.groupID, let group = viewModel.group(groupID) {
             Text(group.title)
-              .font(.caption2.weight(.medium))
+              .scaledFont(.caption2.weight(.medium))
               .foregroundStyle(group.tone.color.opacity(0.95))
               .lineLimit(1)
           }
@@ -289,105 +341,5 @@ private struct PolicyCanvasNodeCard: View {
     .accessibilityElement(children: .contain)
     .accessibilityLabel(node.title)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasNode(node.id))
-  }
-}
-
-private enum PolicyCanvasPortColumnAlignment {
-  case leading
-  case trailing
-}
-
-private struct PolicyCanvasPortColumn: View {
-  let node: PolicyCanvasNode
-  let ports: [PolicyCanvasPort]
-  let alignment: PolicyCanvasPortColumnAlignment
-  let viewModel: PolicyCanvasViewModel
-
-  var body: some View {
-    ZStack(alignment: stackAlignment) {
-      ForEach(Array(ports.enumerated()), id: \.element.id) { index, port in
-        PolicyCanvasPortView(
-          node: node,
-          port: port,
-          viewModel: viewModel
-        )
-        .offset(
-          y: PolicyCanvasLayout.portY(index: index, count: ports.count)
-            - PolicyCanvasLayout.portDiameter / 2
-        )
-      }
-    }
-    .frame(
-      width: PolicyCanvasLayout.nodeSize.width,
-      height: PolicyCanvasLayout.nodeSize.height,
-      alignment: stackAlignment
-    )
-    .offset(
-      x: alignment == .leading
-        ? -PolicyCanvasLayout.portDiameter / 2
-        : PolicyCanvasLayout.portDiameter / 2,
-      y: 0
-    )
-  }
-
-  private var stackAlignment: Alignment {
-    alignment == .leading ? .topLeading : .topTrailing
-  }
-}
-
-private struct PolicyCanvasPortView: View {
-  let node: PolicyCanvasNode
-  let port: PolicyCanvasPort
-  let viewModel: PolicyCanvasViewModel
-
-  var body: some View {
-    if port.kind == .output {
-      portMarker
-        .draggable(viewModel.portDragPayload(nodeID: node.id, portID: port.id))
-    } else {
-      portMarker
-        .dropDestination(for: String.self) { payloads, _ in
-          viewModel.connectDroppedPortPayloads(
-            payloads,
-            targetNodeID: node.id,
-            targetPortID: port.id
-          )
-        } isTargeted: { targeted in
-          viewModel.setInputTargeted(
-            targeted,
-            nodeID: node.id,
-            portID: port.id
-          )
-        }
-    }
-  }
-
-  private var portMarker: some View {
-    let endpoint = PolicyCanvasPortEndpoint(
-      nodeID: node.id,
-      portID: port.id,
-      kind: port.kind
-    )
-    return Circle()
-      .fill(port.kind == .output ? node.kind.accentColor : Color.white.opacity(0.92))
-      .overlay {
-        Circle()
-          .stroke(
-            viewModel.highlightedInput == endpoint ? Color.yellow : Color.black.opacity(0.5),
-            lineWidth: viewModel.highlightedInput == endpoint ? 2 : 1
-          )
-      }
-      .frame(
-        width: PolicyCanvasLayout.portDiameter,
-        height: PolicyCanvasLayout.portDiameter
-      )
-      .help(port.title)
-      .accessibilityLabel("\(node.title) \(port.title)")
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.policyCanvasPort(
-          node.id,
-          port.id
-        )
-      )
   }
 }

@@ -48,7 +48,7 @@ extension PolicyCanvasViewModel {
       id: "promote-release",
       title: "Promote release",
       kind: .decision,
-      position: CGPoint(x: 840, y: 160)
+      position: CGPoint(x: 900, y: 160)
     )
     promote.groupID = "group-release"
 

@@ -283,6 +283,7 @@ extension SessionWindowView {
         )
       case .policyCanvas:
         PolicyCanvasView(
+          viewModel: policyCanvasViewModel,
           store: store,
           dashboardUI: store.contentUI.dashboard
         )

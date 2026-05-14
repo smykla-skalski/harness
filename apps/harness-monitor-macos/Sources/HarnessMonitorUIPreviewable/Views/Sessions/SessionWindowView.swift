@@ -44,6 +44,7 @@ public struct SessionWindowView: View {
   @State private var perfContentDividerWidthStorage: Double?
   @State private var decisionCacheStorage = SessionWindowDecisionCacheStorage()
   @State private var currentModifiers: EventModifiers = []
+  @State private var policyCanvasViewModelStorage: PolicyCanvasViewModel
   @State private var startupSearchParticipationEnabledStorage =
     HarnessMonitorUITestEnvironment.isEnabled
 
@@ -51,6 +52,7 @@ public struct SessionWindowView: View {
     self.store = store
     self.token = token
     _stateCacheStorage = State(wrappedValue: SessionWindowStateCache(sessionID: token.sessionID))
+    _policyCanvasViewModelStorage = State(wrappedValue: .sample())
   }
   var stateCache: SessionWindowStateCache {
     stateCacheStorage
@@ -150,6 +152,10 @@ public struct SessionWindowView: View {
 
   var presentedModifiers: EventModifiers {
     currentModifiers
+  }
+
+  var policyCanvasViewModel: PolicyCanvasViewModel {
+    policyCanvasViewModelStorage
   }
 
   var isStartupSearchParticipationEnabled: Bool {

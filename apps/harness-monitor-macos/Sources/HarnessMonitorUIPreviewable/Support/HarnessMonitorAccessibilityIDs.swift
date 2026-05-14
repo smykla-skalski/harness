@@ -325,6 +325,7 @@ public enum HarnessMonitorAccessibility {
     "harness.settings.authorized-folders.empty"
 
   public static let policyCanvasRoot = "harness.policy-canvas.root"
+  public static let policyCanvasTopBar = "harness.policy-canvas.top-bar"
   public static let policyCanvasViewport = "harness.policy-canvas.viewport"
   public static let policyCanvasTabs = "harness.policy-canvas.tabs"
   public static let policyCanvasToolRail = "harness.policy-canvas.tool-rail"
@@ -337,6 +338,10 @@ public enum HarnessMonitorAccessibility {
   public static let policyCanvasZoomResetButton = "harness.policy-canvas.zoom.reset"
   public static let policyCanvasZoomValue = "harness.policy-canvas.zoom.value"
   public static let policyCanvasInspector = "harness.policy-canvas.inspector"
+
+  public static func policyCanvasInspectorField(_ fieldID: String) -> String {
+    "harness.policy-canvas.inspector.\(slug(fieldID))"
+  }
 
   public static func policyCanvasNode(_ nodeID: String) -> String {
     "harness.policy-canvas.node.\(slug(nodeID))"

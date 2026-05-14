@@ -7,15 +7,50 @@ final class PolicyCanvasUITests: HarnessMonitorUITestCase {
   private static let previewSessionID = "sess1234"
   override nonisolated static var reuseLaunchedApp: Bool { true }
 
-  func testPolicyCanvasOpensFromDashboardWithPromoteGated() throws {
+  func testPolicyCanvasOpensFromSessionRouteWithPromoteGated() throws {
     let app = openPolicyCanvasSessionRoute()
 
     let root = element(in: app, identifier: Accessibility.policyCanvasRoot)
     XCTAssertTrue(root.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(element(in: app, identifier: Accessibility.policyCanvasViewport).exists)
+    XCTAssertTrue(
+      frameElement(in: app, identifier: Accessibility.policyCanvasViewport)
+        .waitForExistence(timeout: Self.actionTimeout)
+    )
     XCTAssertTrue(element(in: app, identifier: Accessibility.policyCanvasToolRail).exists)
     XCTAssertTrue(element(in: app, identifier: Accessibility.policyCanvasInspector).exists)
     XCTAssertFalse(button(in: app, identifier: Accessibility.policyCanvasPromoteButton).isEnabled)
+  }
+
+  func testPolicyCanvasInitialLayoutDoesNotOverlapChromeOrSections() throws {
+    let app = openPolicyCanvasSessionRoute()
+
+    let topBar = element(in: app, identifier: Accessibility.policyCanvasTopBar)
+    let viewport = frameElement(in: app, identifier: Accessibility.policyCanvasViewport)
+    let toolRail = element(in: app, identifier: Accessibility.policyCanvasToolRail)
+    let inspector = element(in: app, identifier: Accessibility.policyCanvasInspector)
+    let entry = element(in: app, identifier: Accessibility.policyCanvasGroup("entry"))
+    let merge = element(in: app, identifier: Accessibility.policyCanvasGroup("merge"))
+    let terminal = element(in: app, identifier: Accessibility.policyCanvasGroup("terminal"))
+
+    XCTAssertTrue(topBar.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(viewport.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(entry.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(merge.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(terminal.waitForExistence(timeout: Self.actionTimeout))
+
+    for group in [entry, merge, terminal] {
+      XCTAssertFalse(group.frame.intersects(topBar.frame), "Policy group overlaps top bar")
+      XCTAssertFalse(group.frame.intersects(toolRail.frame), "Policy group overlaps tool rail")
+      XCTAssertFalse(group.frame.intersects(inspector.frame), "Policy group overlaps inspector")
+      XCTAssertTrue(
+        viewport.frame.insetBy(dx: -1, dy: -1).contains(group.frame),
+        "Policy group should start fully inside the canvas viewport"
+      )
+    }
+
+    XCTAssertFalse(entry.frame.intersects(merge.frame), "Entry and merge groups overlap")
+    XCTAssertFalse(merge.frame.intersects(terminal.frame), "Merge and terminal groups overlap")
+    XCTAssertFalse(entry.frame.intersects(terminal.frame), "Entry and terminal groups overlap")
   }
 
   func testPolicyCanvasNodeDragMovesPreviewNode() throws {
@@ -34,6 +69,29 @@ final class PolicyCanvasUITests: HarnessMonitorUITestCase {
         node.frame.origin != originalFrame.origin
       },
       "Dragging a policy node should update its canvas position"
+    )
+  }
+
+  func testPolicyCanvasZoomControlsAndShortcutsUpdateScale() throws {
+    let app = openPolicyCanvasSessionRoute()
+    let zoomValue = element(in: app, identifier: Accessibility.policyCanvasZoomValue)
+    XCTAssertTrue(zoomValue.waitForExistence(timeout: Self.actionTimeout))
+    let originalValue = zoomValue.label
+
+    tapButton(in: app, identifier: Accessibility.policyCanvasZoomInButton)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        zoomValue.label != originalValue
+      },
+      "Zoom-in control should update the visible zoom value"
+    )
+
+    app.typeKey("0", modifierFlags: [.command])
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        zoomValue.label == "100%"
+      },
+      "Command-0 should reset the policy canvas zoom"
     )
   }
 

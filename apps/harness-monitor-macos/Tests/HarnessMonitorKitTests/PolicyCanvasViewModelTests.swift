@@ -66,6 +66,56 @@ struct PolicyCanvasViewModelTests {
     #expect(viewModel.edges.count == before + 1)
   }
 
+  @Test("zoom actions clamp and reset scale")
+  func zoomActionsClampAndResetScale() {
+    let viewModel = PolicyCanvasViewModel.sample()
+
+    viewModel.setZoom(2)
+    #expect(viewModel.zoom == 1.4)
+    viewModel.setZoom(0.1)
+    #expect(viewModel.zoom == 0.6)
+    viewModel.resetZoom()
+    #expect(viewModel.zoom == 1)
+  }
+
+  @Test("group frame follows dragged member node")
+  func groupFrameFollowsDraggedMemberNode() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    let groupID = "group-evaluation"
+    let beforeFrame = viewModel.group(groupID)?.frame ?? .zero
+
+    viewModel.dragNode("risk-score", translation: CGSize(width: 0, height: 420))
+    viewModel.endNodeDrag("risk-score", translation: CGSize(width: 0, height: 420))
+
+    let node = viewModel.node("risk-score")
+    let frame = viewModel.group(groupID)?.frame
+    #expect(frame?.height ?? 0 > beforeFrame.height)
+    #expect(
+      frame?.contains(CGRect(origin: node?.position ?? .zero, size: PolicyCanvasLayout.nodeSize))
+        == true
+    )
+  }
+
+  @Test("inspector edits selected node edge and policy binding")
+  func inspectorEditsSelectedNodeEdgeAndPolicyBinding() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(document: policyDocument(revision: 11), simulation: nil, audit: nil)
+
+    viewModel.select(.node("node-intake"))
+    viewModel.updateSelectedNodeTitle("Dispatch gate")
+    viewModel.updateSelectedPolicyAction(.mergePr)
+    viewModel.select(.edge("edge-intake-supervisor"))
+    viewModel.updateSelectedEdgeLabel("approved policy")
+
+    let exported = viewModel.exportDocument()
+    let node = exported.nodes.first { $0.id == "node-intake" }
+    let edge = exported.edges.first { $0.id == "edge-intake-supervisor" }
+
+    #expect(node?.title == "Dispatch gate")
+    #expect(node?.kind.actions == [.mergePr])
+    #expect(edge?.label == "approved policy")
+  }
+
   @Test("promote requires saved exact simulation")
   func promoteRequiresSavedExactSimulation() {
     let viewModel = PolicyCanvasViewModel.sample()
@@ -124,6 +174,30 @@ struct PolicyCanvasViewModelTests {
     #expect(failureCondition?.reasonCode == "checks_not_green")
   }
 
+  @Test("loaded default graph starts with clear non-overlapping layout")
+  func loadedDefaultGraphStartsWithClearNonOverlappingLayout() {
+    let document = overlappingDefaultPolicyDocument(revision: 14)
+    let viewModel = PolicyCanvasViewModel.sample()
+
+    viewModel.load(document: document, simulation: nil, audit: nil)
+
+    let groupFrames = Dictionary(uniqueKeysWithValues: viewModel.groups.map { ($0.id, $0.frame) })
+    #expect(groupFrames["entry"]?.minX == PolicyCanvasLayout.initialContentOrigin.x)
+    #expect(groupFrames["entry"]?.minY == PolicyCanvasLayout.initialContentOrigin.y)
+    #expect(!intersects(groupFrames["entry"], groupFrames["merge"]))
+    #expect(!intersects(groupFrames["merge"], groupFrames["terminal"]))
+    #expect(!intersects(groupFrames["entry"], groupFrames["terminal"]))
+    #expect(!viewModel.nodesContainOverlaps)
+    #expect(
+      viewModel.nodes.allSatisfy { node in
+        guard let groupID = node.groupID, let frame = groupFrames[groupID] else {
+          return true
+        }
+        return frame.contains(CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize))
+      }
+    )
+  }
+
   @Test("validation issues preserve daemon fields")
   func validationIssuesPreserveDaemonFields() throws {
     let payload = Data(
@@ -173,133 +247,5 @@ struct PolicyCanvasViewModelTests {
     #expect(validation.issues[3].id == "node-a")
     #expect(validation.issues[3].location == "nodes")
     #expect(validation.issues[4].action == .mergePr)
-  }
-
-  private func policyDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
-    TaskBoardPolicyPipelineDocument(
-      schemaVersion: 2,
-      revision: revision,
-      mode: .draft,
-      nodes: [
-        TaskBoardPolicyPipelineNode(
-          id: "node-intake",
-          title: "Ready for dispatch",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "action_gate", actions: [.spawnAgent]),
-          groupId: "group-dispatch",
-          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
-          outputs: [TaskBoardPolicyPipelinePort(id: "default", title: "default")]
-        ),
-        TaskBoardPolicyPipelineNode(
-          id: "node-supervisor",
-          title: "Stuck agent rule",
-          kind: TaskBoardPolicyPipelineNodeKind(
-            kind: "supervisor_rule",
-            ruleId: "stuck-agent",
-            reasonCodes: ["default_allow"],
-            decision: "allow"
-          ),
-          groupId: "group-dispatch",
-          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")]
-        ),
-      ],
-      edges: [
-        TaskBoardPolicyPipelineEdge(
-          id: "edge-intake-supervisor",
-          fromNodeId: "node-intake",
-          fromPort: "default",
-          toNodeId: "node-supervisor",
-          toPort: "in"
-        )
-      ],
-      groups: [
-        TaskBoardPolicyPipelineGroup(
-          id: "group-dispatch",
-          title: "Dispatch",
-          nodeIds: ["node-intake", "node-supervisor"]
-        )
-      ],
-      layout: TaskBoardPolicyPipelineLayout(
-        nodes: [
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "node-intake", x: 20, y: 40),
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "node-supervisor", x: 280, y: 40),
-        ]
-      ),
-      policyTraceIds: ["trace-policy-11"]
-    )
-  }
-
-  private func richPolicyDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
-    TaskBoardPolicyPipelineDocument(
-      schemaVersion: 2,
-      revision: revision,
-      mode: .draft,
-      nodes: [
-        TaskBoardPolicyPipelineNode(
-          id: "node-evidence",
-          title: "Check evidence",
-          kind: TaskBoardPolicyPipelineNodeKind(
-            kind: "evidence_check",
-            checks: [
-              TaskBoardPolicyEvidenceCheck(
-                field: .checksGreen,
-                pass: TaskBoardPolicyEvidencePredicate(predicate: "equals_true"),
-                failReasonCode: "checks_not_green",
-                missingReasonCode: "checks_missing"
-              )
-            ]
-          ),
-          groupId: "group-rich",
-          inputs: [TaskBoardPolicyPipelinePort(id: "input-event", title: "event")],
-          outputs: [
-            TaskBoardPolicyPipelinePort(id: "output-pass", title: "pass"),
-            TaskBoardPolicyPipelinePort(id: "output-fail", title: "fail"),
-          ]
-        ),
-        TaskBoardPolicyPipelineNode(
-          id: "node-risk",
-          title: "Risk score",
-          kind: TaskBoardPolicyPipelineNodeKind(
-            kind: "risk_classifier",
-            field: .riskScore,
-            threshold: 74,
-            highRiskReasonCode: "merge_risk_high",
-            missingReasonCode: "merge_risk_missing"
-          ),
-          groupId: "group-rich",
-          inputs: [TaskBoardPolicyPipelinePort(id: "input-event", title: "event")],
-          outputs: [
-            TaskBoardPolicyPipelinePort(id: "output-high", title: "high"),
-            TaskBoardPolicyPipelinePort(id: "output-low", title: "low"),
-          ]
-        ),
-      ],
-      edges: [
-        TaskBoardPolicyPipelineEdge(
-          id: "edge-evidence-risk-fail",
-          fromNodeId: "node-evidence",
-          fromPort: "output-fail",
-          toNodeId: "node-risk",
-          toPort: "input-event",
-          condition: TaskBoardPolicyPipelineEdgeCondition(
-            condition: "evidence_failure",
-            reasonCode: "checks_not_green"
-          )
-        )
-      ],
-      groups: [
-        TaskBoardPolicyPipelineGroup(
-          id: "group-rich",
-          title: "Rich policy",
-          nodeIds: ["node-evidence", "node-risk"]
-        )
-      ],
-      layout: TaskBoardPolicyPipelineLayout(
-        nodes: [
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "node-evidence", x: 20, y: 40),
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "node-risk", x: 300, y: 40),
-        ]
-      ),
-      policyTraceIds: ["trace-rich-policy"]
-    )
   }
 }
