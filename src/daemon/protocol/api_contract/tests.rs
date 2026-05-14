@@ -179,6 +179,24 @@ fn task_board_routes_have_complete_ws_parity() {
             ),
             (
                 HttpRouteMethod::Get,
+                http_paths::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG,
+                ws_methods::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_GET,
+                true,
+            ),
+            (
+                HttpRouteMethod::Put,
+                http_paths::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG,
+                ws_methods::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_UPDATE,
+                true,
+            ),
+            (
+                HttpRouteMethod::Put,
+                http_paths::TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS,
+                ws_methods::TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS_SYNC,
+                true,
+            ),
+            (
+                HttpRouteMethod::Get,
                 http_paths::TASK_BOARD_POLICY_PIPELINE,
                 ws_methods::TASK_BOARD_POLICY_PIPELINE_GET,
                 true,

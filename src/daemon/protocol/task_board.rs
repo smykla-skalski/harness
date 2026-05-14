@@ -11,7 +11,9 @@ use crate::task_board::{
 };
 
 pub use crate::task_board::{
-    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettings,
+    TaskBoardGitHubTokensSyncRequest,
+    TaskBoardGitHubTokensSyncResponse as TaskBoardGitHubTokensSyncOutcome,
+    TaskBoardGitRuntimeConfig, TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettings,
     TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorStatus,
 };
 
@@ -176,6 +178,8 @@ pub type TaskBoardAuditResponse = TaskBoardAuditSummary;
 pub type TaskBoardOrchestratorStatusResponse = TaskBoardOrchestratorStatus;
 pub type TaskBoardOrchestratorRunOnceResponse = TaskBoardOrchestratorStatus;
 pub type TaskBoardOrchestratorSettingsResponse = TaskBoardOrchestratorSettings;
+pub type TaskBoardGitRuntimeConfigResponse = TaskBoardGitRuntimeConfig;
+pub type TaskBoardGitHubTokensSyncResponse = TaskBoardGitHubTokensSyncOutcome;
 pub type TaskBoardPolicyPipelineResponse = PolicyPipelineDocument;
 pub type TaskBoardPolicyPipelineSaveDraftResponse = PolicyPipelineSaveResponse;
 pub type TaskBoardPolicyPipelineSimulationResponse = PolicyPipelineSimulationResult;

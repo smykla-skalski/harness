@@ -20,6 +20,17 @@ use self::support::{
 };
 use self::workflow::automate_item;
 
+pub(super) struct AutomationRequest<'a> {
+    pub board_root: &'a Path,
+    pub config: &'a GitHubProjectConfig,
+    pub project_dir: Option<&'a str>,
+    pub dry_run: bool,
+    pub item: &'a TaskBoardItem,
+    pub session_worktrees: &'a BTreeMap<String, String>,
+    pub github_token: Option<&'a str>,
+    pub client: &'a dyn GitHubAutomationClient,
+}
+
 pub(crate) fn run_task_board_github_automation(
     board_root: &Path,
     settings: &TaskBoardOrchestratorSettings,
@@ -78,16 +89,16 @@ async fn run_task_board_github_automation_with_client(
 ) -> Result<(), CliError> {
     let board = TaskBoardStore::new(board_root.to_path_buf());
     for item in items {
-        let workflow = automate_item(
+        let workflow = automate_item(AutomationRequest {
             board_root,
             config,
-            input.project_dir.as_deref(),
-            input.dry_run,
             item,
             session_worktrees,
+            project_dir: input.project_dir.as_deref(),
+            dry_run: input.dry_run,
             github_token,
             client,
-        )
+        })
         .await;
         if !input.dry_run && workflow != item.workflow {
             board.update(

@@ -138,7 +138,7 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
             .pulls(config.owner.as_str(), config.repo.as_str())
             .get(pull_request_number)
             .await
-            .map(handle_from_pull_request)
+            .map(|pull_request| handle_from_pull_request(&pull_request))
             .map_err(operation_error)
     }
 
@@ -165,7 +165,7 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
             .await
             .map_err(operation_error)?;
         if let Some(existing) = existing.into_iter().next() {
-            return Ok(handle_from_pull_request(existing));
+            return Ok(handle_from_pull_request(&existing));
         }
         let mut builder = pulls
             .create(
@@ -180,7 +180,7 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
         builder
             .send()
             .await
-            .map(handle_from_pull_request)
+            .map(|pull_request| handle_from_pull_request(&pull_request))
             .map_err(operation_error)
     }
 
@@ -281,7 +281,7 @@ fn ensure_rustls_provider() {
     });
 }
 
-fn handle_from_pull_request(pull_request: models::pulls::PullRequest) -> GitHubPullRequestHandle {
+fn handle_from_pull_request(pull_request: &models::pulls::PullRequest) -> GitHubPullRequestHandle {
     GitHubPullRequestHandle {
         number: pull_request.number,
         html_url: Some(pull_request.html_url.to_string()),
@@ -302,7 +302,6 @@ fn merge_checks(statuses: Vec<models::Status>) -> Vec<GitHubCheckEvidence> {
             GitHubCheckEvidence {
                 name,
                 status: match status.state {
-                    models::StatusState::Pending => GitHubCheckStatus::InProgress,
                     models::StatusState::Failure
                     | models::StatusState::Error
                     | models::StatusState::Success => GitHubCheckStatus::Completed,
@@ -310,7 +309,6 @@ fn merge_checks(statuses: Vec<models::Status>) -> Vec<GitHubCheckEvidence> {
                 },
                 conclusion: Some(match status.state {
                     models::StatusState::Success => GitHubCheckConclusion::Success,
-                    models::StatusState::Pending => GitHubCheckConclusion::ActionRequired,
                     models::StatusState::Failure | models::StatusState::Error => {
                         GitHubCheckConclusion::Failure
                     }
@@ -338,7 +336,6 @@ fn merge_reviews(reviews: Vec<models::pulls::Review>) -> Vec<GitHubReviewEvidenc
             }
             models::pulls::ReviewState::Commented => (GitHubReviewState::Commented, 0),
             models::pulls::ReviewState::Dismissed => (GitHubReviewState::Dismissed, 0),
-            models::pulls::ReviewState::Open | models::pulls::ReviewState::Pending => continue,
             _ => continue,
         };
         merged.insert(

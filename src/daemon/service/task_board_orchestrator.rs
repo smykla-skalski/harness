@@ -244,7 +244,7 @@ fn github_sync_config(
     {
         return Ok(None);
     }
-    let config = external_sync_config_for_repository(github_repository(&settings).as_deref())?;
+    let config = external_sync_config_for_repository(github_repository(&settings).as_deref());
     if config.token_for(ExternalProvider::GitHub).is_none() || config.github_repository().is_none()
     {
         return Ok(None);
@@ -321,7 +321,7 @@ mod tests {
                     .update_settings(&TaskBoardOrchestratorSettingsUpdateRequest {
                         github_project: Some(TaskBoardGitHubProjectConfig::new(
                             "owner",
-                            "repo",
+                            "sync-fallback-repo",
                             PathBuf::new(),
                         )),
                         ..TaskBoardOrchestratorSettingsUpdateRequest::default()
@@ -359,7 +359,7 @@ mod tests {
                 assert_eq!(request.status, Some(TaskBoardStatus::Todo));
                 assert!(request.dry_run);
                 assert_eq!(config.token_for(ExternalProvider::GitHub), Some("token"));
-                assert_eq!(config.github_repository(), Some("owner/repo"));
+                assert_eq!(config.github_repository(), Some("owner/sync-fallback-repo"));
                 assert_eq!(prepared.sync.operations.len(), 1);
                 assert_eq!(prepared.audit.total, 1);
             },

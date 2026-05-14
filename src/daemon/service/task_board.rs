@@ -3,30 +3,29 @@ use uuid::Uuid;
 
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::protocol::{
-    SessionDetail, SessionStartRequest, TaskBoardAuditRequest, TaskBoardAuditResponse,
-    TaskBoardCatalogRequest, TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest,
-    TaskBoardDispatchRequest, TaskBoardDispatchResponse, TaskBoardGetItemRequest,
-    TaskBoardListItemsRequest, TaskBoardListItemsResponse, TaskBoardMachinesResponse,
-    TaskBoardPolicyPipelineAuditResponse, TaskBoardPolicyPipelinePromoteRequest,
-    TaskBoardPolicyPipelinePromoteResponse, TaskBoardPolicyPipelineResponse,
-    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSaveDraftResponse,
-    TaskBoardPolicyPipelineSimulateRequest, TaskBoardPolicyPipelineSimulationResponse,
-    TaskBoardProjectsResponse, TaskBoardSyncRequest, TaskBoardSyncResponse,
-    TaskBoardUpdateItemRequest, TaskCreateRequest,
+    TaskBoardAuditRequest, TaskBoardAuditResponse, TaskBoardCatalogRequest,
+    TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardDispatchRequest,
+    TaskBoardDispatchResponse, TaskBoardGetItemRequest, TaskBoardListItemsRequest,
+    TaskBoardListItemsResponse, TaskBoardMachinesResponse, TaskBoardPolicyPipelineAuditResponse,
+    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelinePromoteResponse,
+    TaskBoardPolicyPipelineResponse, TaskBoardPolicyPipelineSaveDraftRequest,
+    TaskBoardPolicyPipelineSaveDraftResponse, TaskBoardPolicyPipelineSimulateRequest,
+    TaskBoardPolicyPipelineSimulationResponse, TaskBoardProjectsResponse, TaskBoardSyncRequest,
+    TaskBoardSyncResponse, TaskBoardUpdateItemRequest,
 };
 use crate::errors::{CliError, CliErrorKind};
-use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::{
-    DispatchAppliedTask, DispatchExecutionSummary, DispatchPlan, ExternalSyncConfig,
-    ExternalSyncOptions, PolicyPipelineStore, SessionIntent, TaskBoardItem, TaskBoardOrchestrator,
-    TaskBoardStatus, TaskBoardStore, TaskBoardWorkflowStatus, build_audit_summary,
-    build_dispatch_summary, build_machine_summaries, build_project_summaries, build_sync_summary,
-    configured_sync_clients, default_board_root, sync_external_tasks,
+    ExternalSyncConfig, ExternalSyncOptions, PolicyPipelineStore, TaskBoardItem,
+    TaskBoardOrchestrator, TaskBoardStore, build_audit_summary, build_machine_summaries,
+    build_project_summaries, build_sync_summary, configured_sync_clients, default_board_root,
+    sync_external_tasks,
 };
 use crate::workspace::utc_now;
 
 use super::task_board_runtime::external_sync_config_for_repository;
+
+mod dispatch;
 
 /// Create a persisted task-board item.
 ///
@@ -118,7 +117,7 @@ pub fn sync_task_board(request: &TaskBoardSyncRequest) -> Result<TaskBoardSyncRe
 pub async fn sync_task_board_async(
     request: &TaskBoardSyncRequest,
 ) -> Result<TaskBoardSyncResponse, CliError> {
-    sync_task_board_async_with_config(request, active_external_sync_config()?).await
+    sync_task_board_async_with_config(request, active_external_sync_config()).await
 }
 
 pub(crate) async fn sync_task_board_async_with_config(
@@ -165,16 +164,7 @@ pub fn dispatch_task_board(
     db: Option<&DaemonDb>,
 ) -> Result<TaskBoardDispatchResponse, CliError> {
     let board = store();
-    let items = selected_dispatch_items(&board, request)?;
-    let plans = build_dispatch_summary(&items);
-    if request.dry_run {
-        return Ok(DispatchExecutionSummary::dry_run(plans));
-    }
-    let mut applied = Vec::new();
-    for plan in plans.iter().filter(|plan| plan.is_ready()) {
-        applied.push(apply_dispatch_plan(request, db, &board, plan)?);
-    }
-    Ok(DispatchExecutionSummary { plans, applied })
+    dispatch::dispatch_task_board(request, db, &board)
 }
 
 /// Execute ready dispatch plans for task-board items through the async daemon DB.
@@ -187,196 +177,7 @@ pub(crate) async fn dispatch_task_board_async(
     async_db: &AsyncDaemonDb,
 ) -> Result<TaskBoardDispatchResponse, CliError> {
     let board = store();
-    let items = selected_dispatch_items(&board, request)?;
-    let plans = build_dispatch_summary(&items);
-    if request.dry_run {
-        return Ok(DispatchExecutionSummary::dry_run(plans));
-    }
-    let mut applied = Vec::new();
-    for plan in plans.iter().filter(|plan| plan.is_ready()) {
-        applied.push(apply_dispatch_plan_async(request, async_db, &board, plan).await?);
-    }
-    Ok(DispatchExecutionSummary { plans, applied })
-}
-
-fn selected_dispatch_items(
-    board: &TaskBoardStore,
-    request: &TaskBoardDispatchRequest,
-) -> Result<Vec<TaskBoardItem>, CliError> {
-    request.item_id.as_deref().map_or_else(
-        || board.list(request.status),
-        |item_id| board.get(item_id).map(|item| vec![item]),
-    )
-}
-
-fn apply_dispatch_plan(
-    request: &TaskBoardDispatchRequest,
-    db: Option<&DaemonDb>,
-    board: &TaskBoardStore,
-    plan: &DispatchPlan,
-) -> Result<DispatchAppliedTask, CliError> {
-    let actor = dispatch_actor(request);
-    let session_id = dispatch_session_id(request, db, plan)?;
-    let detail = super::create_task(
-        &session_id,
-        &TaskCreateRequest {
-            actor: actor.to_string(),
-            title: plan.task.title.clone(),
-            context: plan.task.context.clone(),
-            severity: plan.task.severity,
-            suggested_fix: plan.task.suggested_fix.clone(),
-        },
-        db,
-    )?;
-    let work_item_id = newest_task_id(detail)?;
-    let item = link_dispatched_item(board, plan, &session_id, &work_item_id)?;
-    Ok(DispatchAppliedTask {
-        board_item_id: plan.board_item_id.clone(),
-        session_id,
-        work_item_id,
-        item,
-    })
-}
-
-async fn apply_dispatch_plan_async(
-    request: &TaskBoardDispatchRequest,
-    async_db: &AsyncDaemonDb,
-    board: &TaskBoardStore,
-    plan: &DispatchPlan,
-) -> Result<DispatchAppliedTask, CliError> {
-    let actor = dispatch_actor(request);
-    let session_id = dispatch_session_id_async(request, async_db, plan).await?;
-    let detail = super::create_task_async(
-        &session_id,
-        &TaskCreateRequest {
-            actor: actor.to_string(),
-            title: plan.task.title.clone(),
-            context: plan.task.context.clone(),
-            severity: plan.task.severity,
-            suggested_fix: plan.task.suggested_fix.clone(),
-        },
-        async_db,
-    )
-    .await?;
-    let work_item_id = newest_task_id(detail)?;
-    let item = link_dispatched_item(board, plan, &session_id, &work_item_id)?;
-    Ok(DispatchAppliedTask {
-        board_item_id: plan.board_item_id.clone(),
-        session_id,
-        work_item_id,
-        item,
-    })
-}
-
-fn dispatch_session_id(
-    request: &TaskBoardDispatchRequest,
-    db: Option<&DaemonDb>,
-    plan: &DispatchPlan,
-) -> Result<String, CliError> {
-    match &plan.session {
-        SessionIntent::Existing { session_id } => Ok(session_id.clone()),
-        SessionIntent::Create {
-            title,
-            context,
-            project_id: _,
-        } => {
-            let state = super::start_session_direct(
-                &SessionStartRequest {
-                    title: title.clone(),
-                    context: context.clone().unwrap_or_else(|| title.clone()),
-                    session_id: None,
-                    project_dir: required_dispatch_project_dir(request)?,
-                    policy_preset: None,
-                    base_ref: None,
-                },
-                db,
-            )?;
-            Ok(state.session_id)
-        }
-    }
-}
-
-async fn dispatch_session_id_async(
-    request: &TaskBoardDispatchRequest,
-    async_db: &AsyncDaemonDb,
-    plan: &DispatchPlan,
-) -> Result<String, CliError> {
-    match &plan.session {
-        SessionIntent::Existing { session_id } => Ok(session_id.clone()),
-        SessionIntent::Create {
-            title,
-            context,
-            project_id: _,
-        } => {
-            let state = super::start_session_direct_async(
-                &SessionStartRequest {
-                    title: title.clone(),
-                    context: context.clone().unwrap_or_else(|| title.clone()),
-                    session_id: None,
-                    project_dir: required_dispatch_project_dir(request)?,
-                    policy_preset: None,
-                    base_ref: None,
-                },
-                async_db,
-            )
-            .await?;
-            Ok(state.session_id)
-        }
-    }
-}
-
-fn dispatch_actor(request: &TaskBoardDispatchRequest) -> &str {
-    request.actor.as_deref().unwrap_or(CONTROL_PLANE_ACTOR_ID)
-}
-
-fn required_dispatch_project_dir(request: &TaskBoardDispatchRequest) -> Result<String, CliError> {
-    request.project_dir.clone().ok_or_else(|| {
-        CliErrorKind::workflow_io(
-            "task-board dispatch requires project_dir when a session must be created",
-        )
-        .into()
-    })
-}
-
-fn newest_task_id(detail: SessionDetail) -> Result<String, CliError> {
-    detail
-        .tasks
-        .into_iter()
-        .max_by(|left, right| {
-            left.created_at
-                .cmp(&right.created_at)
-                .then_with(|| left.updated_at.cmp(&right.updated_at))
-                .then_with(|| left.task_id.cmp(&right.task_id))
-        })
-        .map(|task| task.task_id)
-        .ok_or_else(|| CliErrorKind::workflow_io("created empty session task list").into())
-}
-
-fn link_dispatched_item(
-    board: &TaskBoardStore,
-    plan: &DispatchPlan,
-    session_id: &str,
-    work_item_id: &str,
-) -> Result<TaskBoardItem, CliError> {
-    let current = board.get(&plan.board_item_id)?;
-    let mut workflow = current.workflow;
-    if workflow.execution_id.is_none() {
-        workflow.execution_id = Some(new_workflow_execution_id());
-    }
-    workflow.status = TaskBoardWorkflowStatus::Running;
-    workflow.current_step_id = Some("dispatch".to_string());
-    workflow.attempts = workflow.attempts.saturating_add(1);
-    workflow.policy_trace_ids.push(new_policy_trace_id());
-    board.update(
-        &plan.board_item_id,
-        TaskBoardItemPatch {
-            status: Some(TaskBoardStatus::InProgress),
-            workflow: Some(workflow),
-            session_id: OptionalFieldPatch::Set(session_id.to_string()),
-            work_item_id: OptionalFieldPatch::Set(work_item_id.to_string()),
-            ..TaskBoardItemPatch::default()
-        },
-    )
+    dispatch::dispatch_task_board_async(request, async_db, &board).await
 }
 
 /// Build task-board audit counts.
@@ -477,10 +278,10 @@ fn policy_store() -> PolicyPipelineStore {
 fn run_task_board_sync_blocking(
     request: &TaskBoardSyncRequest,
 ) -> Result<TaskBoardSyncResponse, CliError> {
-    run_task_board_sync_blocking_with_config(request, active_external_sync_config()?)
+    run_task_board_sync_blocking_with_config(request, active_external_sync_config())
 }
 
-fn active_external_sync_config() -> Result<ExternalSyncConfig, CliError> {
+fn active_external_sync_config() -> ExternalSyncConfig {
     let repository = TaskBoardOrchestrator::new(default_board_root())
         .settings()
         .ok()
@@ -516,12 +317,4 @@ fn sync_options(request: &TaskBoardSyncRequest) -> ExternalSyncOptions {
 
 fn new_task_id() -> String {
     format!("task-{}", Uuid::new_v4().simple())
-}
-
-fn new_workflow_execution_id() -> String {
-    format!("workflow-{}", Uuid::new_v4().simple())
-}
-
-fn new_policy_trace_id() -> String {
-    format!("policy-trace-{}", Uuid::new_v4().simple())
 }

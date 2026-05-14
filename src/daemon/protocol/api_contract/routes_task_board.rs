@@ -139,6 +139,30 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Get,
+        path: http_paths::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_GET,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Put,
+        path: http_paths::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_UPDATE,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Put,
+        path: http_paths::TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS_SYNC,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
         path: http_paths::TASK_BOARD_POLICY_PIPELINE,
         parity: HttpRouteParity::Rpc {
             ws_method: ws_methods::TASK_BOARD_POLICY_PIPELINE_GET,

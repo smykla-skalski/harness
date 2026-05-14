@@ -123,6 +123,11 @@ async fn run_websocket_task_board_run_once_flow(
         run_once_result,
         "board-ws-run-once"
     ));
+    assert!(
+        run_once_result["last_run"]["policy_trace_ids"]
+            .as_array()
+            .is_some_and(|trace_ids| !trace_ids.is_empty())
+    );
     assert_board_item_unlinked("board-ws-run-once-other");
 }
 

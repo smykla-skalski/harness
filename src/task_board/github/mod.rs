@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::policy::PolicyInput;
 
 mod client;
@@ -40,7 +40,7 @@ pub trait GitHubAutomationClient: Send + Sync {
         _config: &GitHubProjectConfig,
         _pull_request_number: u64,
     ) -> Result<GitHubPullRequestHandle, CliError> {
-        Err(CliError::from(crate::errors::CliErrorKind::workflow_io(
+        Err(CliError::from(CliErrorKind::workflow_io(
             "task-board github get_pull_request is unsupported",
         )))
     }
@@ -54,7 +54,7 @@ pub trait GitHubAutomationClient: Send + Sync {
         _config: &GitHubProjectConfig,
         _request: &GitHubCreatePullRequest,
     ) -> Result<GitHubPullRequestHandle, CliError> {
-        Err(CliError::from(crate::errors::CliErrorKind::workflow_io(
+        Err(CliError::from(CliErrorKind::workflow_io(
             "task-board github ensure_pull_request is unsupported",
         )))
     }
@@ -68,7 +68,7 @@ pub trait GitHubAutomationClient: Send + Sync {
         _config: &GitHubProjectConfig,
         _pull_request_number: u64,
     ) -> Result<GitHubPullRequestHandle, CliError> {
-        Err(CliError::from(crate::errors::CliErrorKind::workflow_io(
+        Err(CliError::from(CliErrorKind::workflow_io(
             "task-board github ready_pull_request_for_review is unsupported",
         )))
     }
@@ -84,7 +84,7 @@ pub trait GitHubAutomationClient: Send + Sync {
         _managed_labels: &[String],
         _desired_labels: &[String],
     ) -> Result<(), CliError> {
-        Err(CliError::from(crate::errors::CliErrorKind::workflow_io(
+        Err(CliError::from(CliErrorKind::workflow_io(
             "task-board github sync_pull_request_labels is unsupported",
         )))
     }
@@ -100,7 +100,7 @@ pub trait GitHubAutomationClient: Send + Sync {
         _method: GitHubMergeMethod,
         _head_sha: Option<&str>,
     ) -> Result<(), CliError> {
-        Err(CliError::from(crate::errors::CliErrorKind::workflow_io(
+        Err(CliError::from(CliErrorKind::workflow_io(
             "task-board github merge_pull_request is unsupported",
         )))
     }

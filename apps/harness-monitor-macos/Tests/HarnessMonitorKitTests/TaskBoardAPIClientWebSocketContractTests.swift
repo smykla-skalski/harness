@@ -216,6 +216,7 @@ extension TaskBoardAPIClientTests {
     #expect(result.dispatch.plans.first?.task.title == "Board item")
     #expect(result.dispatch.plans.first?.policy?.decision == "allow")
     #expect(result.dispatch.applied.first?.workItemId == "task-1")
+    #expect(result.dispatch.applied.first?.item.workflow?.prNumber == 42)
     #expect(result.evaluation.records.first?.outcome == .completed)
     #expect(result.status.currentTick?.phase == .evaluation)
     #expect(result.runOnce.lastRun?.evaluation?.updated == 1)

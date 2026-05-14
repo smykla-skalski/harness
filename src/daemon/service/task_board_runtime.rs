@@ -1,11 +1,12 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use crate::daemon::state;
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::{
-    ExternalSyncConfig, TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
-    TaskBoardGitHubTokensSyncResponse, TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig,
-    TaskBoardGitRuntimeProfile, normalize_repository_slug,
+    ExternalProvider, ExternalSyncConfig, TaskBoardGitHubRepositoryToken,
+    TaskBoardGitHubTokensSyncRequest, TaskBoardGitHubTokensSyncResponse,
+    TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig, TaskBoardGitRuntimeProfile,
+    normalize_repository_slug,
 };
 
 /// Load the persisted task-board git runtime config.
@@ -40,18 +41,26 @@ pub fn sync_task_board_github_tokens(
     Ok(state::replace_task_board_github_tokens(request))
 }
 
-pub(crate) fn external_sync_config_for_repository(
-    repository: Option<&str>,
-) -> Result<ExternalSyncConfig, CliError> {
+pub(crate) fn external_sync_config_for_repository(repository: Option<&str>) -> ExternalSyncConfig {
     let repository = normalize_repository_slug(repository);
     let mut config = ExternalSyncConfig::from_env();
-    if let Some(token) = state::task_board_github_token(repository.as_deref()) {
+    if let Some(token) = repository
+        .as_deref()
+        .and_then(state::task_board_github_repository_token)
+        .or_else(|| {
+            config
+                .token_for(ExternalProvider::GitHub)
+                .is_none()
+                .then(|| state::task_board_github_token(None))
+                .flatten()
+        })
+    {
         config = config.with_github_token_override(Some(token.as_str()));
     }
     if let Some(repository) = repository.as_deref() {
         config = config.with_github_repository_override(Some(repository));
     }
-    Ok(config)
+    config
 }
 
 pub(crate) fn git_runtime_profile_for_repository(
@@ -97,7 +106,7 @@ fn validate_unique_overrides(overrides: &[TaskBoardGitRepositoryOverride]) -> Re
 }
 
 fn validate_repository_tokens(tokens: &[TaskBoardGitHubRepositoryToken]) -> Result<(), CliError> {
-    let mut seen = BTreeMap::new();
+    let mut seen = BTreeSet::new();
     for token in tokens {
         let Some(repository) = normalize_repository_slug(Some(token.repository.as_str())) else {
             return Err(CliError::from(CliErrorKind::workflow_parse(format!(
@@ -107,14 +116,12 @@ fn validate_repository_tokens(tokens: &[TaskBoardGitHubRepositoryToken]) -> Resu
         };
         if token.token.trim().is_empty() {
             return Err(CliError::from(CliErrorKind::workflow_parse(format!(
-                "task-board repository token override '{}' cannot be empty",
-                repository
+                "task-board repository token override '{repository}' cannot be empty"
             ))));
         }
-        if seen.insert(repository.clone(), ()).is_some() {
+        if !seen.insert(repository.clone()) {
             return Err(CliError::from(CliErrorKind::workflow_parse(format!(
-                "duplicate task-board repository token override '{}'",
-                repository
+                "duplicate task-board repository token override '{repository}'"
             ))));
         }
     }
