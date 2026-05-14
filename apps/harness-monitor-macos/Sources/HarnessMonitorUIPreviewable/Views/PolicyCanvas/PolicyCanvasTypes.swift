@@ -236,7 +236,11 @@ enum PolicyCanvasLayout {
   static let portDiameter: CGFloat = 18
   static let portHitTestExtension: CGFloat = 8
   static let groupCornerRadius: CGFloat = 8
-  static let initialContentOrigin = CGPoint(x: 140, y: 160)
+  static let edgeLabelHeight: CGFloat = 28
+  static let edgeLabelMaxWidth: CGFloat = 260
+  static let edgeLabelLaneSpacing: CGFloat = 42
+  static let edgeLabelNodeClearance: CGFloat = 18
+  static let initialContentOrigin = CGPoint(x: 360, y: 260)
   static let groupHorizontalPadding: CGFloat = 44
   static let groupVerticalPadding: CGFloat = 52
   static let minimumGroupSize = CGSize(width: 220, height: 180)

@@ -9,8 +9,8 @@ struct PolicyCanvasRoutingTests {
   @Test("inter-group edge route avoids middle group")
   func interGroupEdgeRouteAvoidsMiddleGroup() {
     let route = PolicyCanvasEdgeRoute(
-      source: CGPoint(x: 352, y: 260),
-      target: CGPoint(x: 1_024, y: 260),
+      source: CGPoint(x: 572, y: 360),
+      target: CGPoint(x: 1_484, y: 360),
       lane: 0,
       groups: defaultGroups,
       sourceGroupID: "entry",
@@ -25,8 +25,8 @@ struct PolicyCanvasRoutingTests {
   func blockedRoutesReserveSeparateLabelLanes() {
     let labels = (0..<3).map { lane in
       PolicyCanvasEdgeRoute(
-        source: CGPoint(x: 352, y: 236 + CGFloat(lane * 24)),
-        target: CGPoint(x: 1_024, y: 260 + CGFloat(lane * 140)),
+        source: CGPoint(x: 572, y: 336 + CGFloat(lane * 24)),
+        target: CGPoint(x: 1_484, y: 360 + CGFloat(lane * 140)),
         lane: lane,
         groups: defaultGroups,
         sourceGroupID: "entry",
@@ -42,8 +42,8 @@ struct PolicyCanvasRoutingTests {
   @Test("adjacent group routes use gap corridor")
   func adjacentGroupRoutesUseGapCorridor() {
     let route = PolicyCanvasEdgeRoute(
-      source: CGPoint(x: 752, y: 260),
-      target: CGPoint(x: 1_024, y: 912),
+      source: CGPoint(x: 972, y: 360),
+      target: CGPoint(x: 1_484, y: 1_012),
       lane: 8,
       groups: [mergeGroup, terminalGroup],
       sourceGroupID: "merge",
@@ -59,8 +59,8 @@ struct PolicyCanvasRoutingTests {
   func adjacentGroupRoutesReserveBadgeClearance() {
     let labelYs = (0..<3).map { lane in
       PolicyCanvasEdgeRoute(
-        source: CGPoint(x: 752, y: 260),
-        target: CGPoint(x: 1_024, y: 912),
+        source: CGPoint(x: 972, y: 360),
+        target: CGPoint(x: 1_484, y: 1_012),
         lane: lane,
         groups: [mergeGroup, terminalGroup],
         sourceGroupID: "merge",
@@ -71,6 +71,24 @@ struct PolicyCanvasRoutingTests {
     #expect(labelsHaveBadgeClearance(labelYs))
   }
 
+  @Test("same group return routes keep labels outside nodes")
+  func sameGroupReturnRoutesKeepLabelsOutsideNodes() {
+    let sourceNode = CGRect(x: 804, y: 312, width: 168, height: 96)
+    let targetNode = CGRect(x: 804, y: 492, width: 168, height: 96)
+    let route = PolicyCanvasEdgeRoute(
+      source: CGPoint(x: sourceNode.maxX, y: sourceNode.midY),
+      target: CGPoint(x: targetNode.minX, y: targetNode.midY),
+      lane: 4,
+      groups: [mergeGroup],
+      sourceGroupID: "merge",
+      targetGroupID: "merge"
+    )
+
+    #expect(!edgeLabelFrame(route.labelPosition).intersects(sourceNode))
+    #expect(!edgeLabelFrame(route.labelPosition).intersects(targetNode))
+    #expect(route.labelPosition.x > sourceNode.maxX)
+  }
+
   private var defaultGroups: [PolicyCanvasGroup] {
     [entryGroup, mergeGroup, terminalGroup]
   }
@@ -79,7 +97,7 @@ struct PolicyCanvasRoutingTests {
     PolicyCanvasGroup(
       id: "entry",
       title: "Action routing",
-      frame: CGRect(x: 140, y: 160, width: 256, height: 220),
+      frame: CGRect(x: 360, y: 260, width: 256, height: 220),
       tone: .intake
     )
   }
@@ -88,7 +106,7 @@ struct PolicyCanvasRoutingTests {
     PolicyCanvasGroup(
       id: "merge",
       title: "Merge checks",
-      frame: CGRect(x: 540, y: 160, width: 256, height: 420),
+      frame: CGRect(x: 760, y: 260, width: 256, height: 420),
       tone: .evaluation
     )
   }
@@ -97,14 +115,23 @@ struct PolicyCanvasRoutingTests {
     PolicyCanvasGroup(
       id: "terminal",
       title: "Terminal decisions",
-      frame: CGRect(x: 980, y: 160, width: 256, height: 1_220),
+      frame: CGRect(x: 1_440, y: 260, width: 256, height: 1_220),
       tone: .release
     )
   }
 
   private func labelsHaveBadgeClearance(_ sortedYs: [CGFloat]) -> Bool {
     zip(sortedYs, sortedYs.dropFirst()).allSatisfy { previous, next in
-      next - previous >= 30
+      next - previous >= PolicyCanvasLayout.edgeLabelHeight + 6
     }
+  }
+
+  private func edgeLabelFrame(_ position: CGPoint) -> CGRect {
+    CGRect(
+      x: position.x - PolicyCanvasLayout.edgeLabelMaxWidth / 2,
+      y: position.y - PolicyCanvasLayout.edgeLabelHeight / 2,
+      width: PolicyCanvasLayout.edgeLabelMaxWidth,
+      height: PolicyCanvasLayout.edgeLabelHeight
+    )
   }
 }

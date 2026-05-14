@@ -14,6 +14,7 @@ struct PolicyCanvasViewport: View {
             PolicyCanvasGroupLayer(viewModel: viewModel)
             PolicyCanvasEdgeLayer(viewModel: viewModel)
             PolicyCanvasNodeLayer(viewModel: viewModel)
+            PolicyCanvasEdgeLabelLayer(viewModel: viewModel)
           }
           .scaleEffect(viewModel.zoom, anchor: .topLeading)
         }
@@ -147,24 +148,51 @@ private struct PolicyCanvasEdgeLayer: View {
               style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round)
             )
             .accessibilityHidden(true)
+        }
+      }
+    }
+  }
 
+  private func edgeColor(for edge: PolicyCanvasEdge) -> Color {
+    viewModel.node(edge.source.nodeID)?.kind.accentColor ?? Color.cyan
+  }
+}
+
+private struct PolicyCanvasEdgeLabelLayer: View {
+  let viewModel: PolicyCanvasViewModel
+
+  var body: some View {
+    ZStack(alignment: .topLeading) {
+      ForEach(Array(viewModel.edges.enumerated()), id: \.element.id) { offset, edge in
+        if let source = viewModel.portAnchor(for: edge.source),
+          let target = viewModel.portAnchor(for: edge.target)
+        {
+          let route = PolicyCanvasEdgeRoute(
+            source: source,
+            target: target,
+            lane: offset,
+            groups: viewModel.groups,
+            sourceGroupID: viewModel.node(edge.source.nodeID)?.groupID,
+            targetGroupID: viewModel.node(edge.target.nodeID)?.groupID
+          )
           Button {
             viewModel.select(.edge(edge.id))
           } label: {
             Text(edge.label)
               .scaledFont(.caption2.weight(.semibold))
-              .foregroundStyle(.white.opacity(0.90))
+              .foregroundStyle(.white.opacity(0.92))
               .lineLimit(1)
-              .frame(maxWidth: 138)
-              .padding(.horizontal, 7)
-              .padding(.vertical, 3)
-              .background(Color(red: 0.04, green: 0.05, blue: 0.08).opacity(0.92), in: Capsule())
+              .fixedSize(horizontal: true, vertical: false)
+              .padding(.horizontal, 10)
+              .frame(height: PolicyCanvasLayout.edgeLabelHeight)
+              .background(Color(red: 0.04, green: 0.05, blue: 0.08).opacity(0.96), in: Capsule())
               .overlay {
                 Capsule()
-                  .stroke(edgeColor(for: edge).opacity(0.62), lineWidth: 1)
+                  .stroke(edgeColor(for: edge).opacity(0.72), lineWidth: 1.2)
               }
           }
           .harnessPlainButtonStyle()
+          .frame(maxWidth: PolicyCanvasLayout.edgeLabelMaxWidth)
           .position(route.labelPosition)
           .accessibilityLabel(viewModel.accessibilityLabel(for: edge))
           .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEdge(edge.id))
