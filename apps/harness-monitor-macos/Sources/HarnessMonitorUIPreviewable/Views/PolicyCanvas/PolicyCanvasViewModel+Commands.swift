@@ -14,17 +14,10 @@ extension PolicyCanvasViewModel {
     clearTransientGestureState()
   }
 
-  /// Clears transient gesture state without mutating the persisted graph.
-  /// `highlightedInput` is fed by `setInputTargeted(_:nodeID:portID:)` while
-  /// a port drag is over a drop target; `highlightedGroupID` is set by node
-  /// and group drags. Both are cleared on drag-end normally, but rejected
-  /// gestures (Escape, daemon-side reject, foreign delete) can leave them
-  /// stale — call this method on those paths to keep the canvas quiet.
-  func clearTransientGestureState() {
-    highlightedInput = nil
-    highlightedGroupID = nil
-    clearPendingEdge()
-  }
+  // `clearTransientGestureState()` lives in PolicyCanvasViewModel+EdgeCreation
+  // (post Wave 2D+2F merge consolidation), so re-declaring it here breaks
+  // compile. Keep the call site in `clearSelection()` above but route through
+  // the unified helper that also clears `pendingEdgePreview`.
 
   func save() {
     notifyStatus("Draft saved")
