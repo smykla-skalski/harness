@@ -61,6 +61,17 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(routeContentSource.contains("onOpenItem: openTaskActions"))
   }
 
+  @Test("Dashboard starts from the global task board")
+  func dashboardStartsFromGlobalTaskBoard() throws {
+    let boardSource = try sourceFile(named: "SessionsBoardView.swift")
+
+    #expect(boardSource.contains("TaskBoardOverviewView("))
+    #expect(boardSource.contains("dashboardUI.taskBoardItems"))
+    #expect(boardSource.contains("dashboardUI.taskBoardEvaluationSummary"))
+    #expect(boardSource.contains("onEvaluateTaskBoard: evaluateTaskBoard"))
+    #expect(boardSource.contains("decisions: store.supervisorOpenDecisions"))
+  }
+
   private func sourceFile(named relativePath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =

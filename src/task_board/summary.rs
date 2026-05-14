@@ -4,7 +4,7 @@ use super::dispatch::{DispatchPlan, build_dispatch_plans};
 use super::external::{ExternalProvider, ExternalSyncConfig};
 use super::types::{AgentMode, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskBoardAuditSummary {
     pub total: usize,
     pub ready: usize,
@@ -13,19 +13,19 @@ pub struct TaskBoardAuditSummary {
     pub by_status: Vec<TaskBoardStatusCount>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskBoardStatusCount {
     pub status: TaskBoardStatus,
     pub count: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskBoardSyncSummary {
     pub total: usize,
     pub providers: Vec<TaskBoardProviderSyncSummary>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskBoardProviderSyncSummary {
     pub provider: ExternalProvider,
     pub configured: bool,
@@ -35,14 +35,14 @@ pub struct TaskBoardProviderSyncSummary {
     pub token_env: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskBoardProjectSummary {
     pub project_id: String,
     pub item_count: usize,
     pub ready_count: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskBoardMachineSummary {
     pub mode: AgentMode,
     pub item_count: usize,

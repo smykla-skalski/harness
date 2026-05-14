@@ -20,12 +20,16 @@ extension HarnessMonitorStore {
     let diagnostics: MeasuredOperation<DaemonDiagnosticsReport>
     let projects: MeasuredOperation<[ProjectSummary]>
     let sessions: MeasuredOperation<[SessionSummary]>
+    let taskBoardItems: MeasuredOperation<[TaskBoardItem]>
+    let taskBoardOrchestratorStatus: MeasuredOperation<TaskBoardOrchestratorStatus?>
   }
 
   private enum RefreshSnapshotPiece: Sendable {
     case diagnostics(MeasuredOperation<DaemonDiagnosticsReport>)
     case projects(MeasuredOperation<[ProjectSummary]>)
     case sessions(MeasuredOperation<[SessionSummary]>)
+    case taskBoardItems(MeasuredOperation<[TaskBoardItem]>)
+    case taskBoardOrchestratorStatus(MeasuredOperation<TaskBoardOrchestratorStatus?>)
   }
 
   func connect(using client: any HarnessMonitorClientProtocol) async {
@@ -95,29 +99,6 @@ extension HarnessMonitorStore {
     preserveSelection: Bool
   ) async throws {
     try await performPreviewRefresh(using: client, preserveSelection: preserveSelection)
-  }
-
-  private func connectedEventDetail(for transport: TransportKind) -> String {
-    "Connected via \(transport.title)"
-  }
-
-  func appendConnectionEvent(kind: ConnectionEventKind, detail: String) {
-    guard maintainsLiveDaemonObservation else {
-      return
-    }
-    let event = ConnectionEvent(kind: kind, detail: detail, transportKind: activeTransport)
-    connectionEvents.append(event)
-    if connectionEvents.count > 50 {
-      connectionEvents.removeFirst(connectionEvents.count - 50)
-    }
-    switch kind {
-    case .connected, .info:
-      HarnessMonitorLogger.store.info("\(detail, privacy: .public)")
-    case .disconnected, .error:
-      HarnessMonitorLogger.store.warning("\(detail, privacy: .public)")
-    case .reconnecting, .fallback:
-      HarnessMonitorLogger.store.debug("\(detail, privacy: .public)")
-    }
   }
 
   func refresh(
@@ -200,6 +181,8 @@ extension HarnessMonitorStore {
     let measuredDiagnostics = refreshSnapshot.diagnostics
     let measuredProjects = refreshSnapshot.projects
     let measuredSessions = refreshSnapshot.sessions
+    let measuredTaskBoardItems = refreshSnapshot.taskBoardItems
+    let measuredTaskBoardOrchestratorStatus = refreshSnapshot.taskBoardOrchestratorStatus
     let filteredSnapshot = sessionIndexSnapshotApplyingRemovedSessionSuppression(
       projects: measuredProjects.value,
       sessions: measuredSessions.value
@@ -218,6 +201,8 @@ extension HarnessMonitorStore {
         measuredDiagnostics.value.health?.logLevel
         ?? HarnessMonitorLogger.defaultDaemonLogLevel
       adoptManifestURL(from: measuredDiagnostics.value.workspace.manifestPath)
+      globalTaskBoardItems = measuredTaskBoardItems.value
+      globalTaskBoardOrchestratorStatus = measuredTaskBoardOrchestratorStatus.value
     }
     clearTransientHostBridgeIssues()
     if recordConnectionTelemetry {
@@ -311,10 +296,22 @@ extension HarnessMonitorStore {
           throw Self.refreshSnapshotLoadError(source: .sessions, underlying: error)
         }
       }
+      group.addTask {
+        RefreshSnapshotPiece.taskBoardItems(
+          await Self.loadTaskBoardItemsSnapshot(using: client)
+        )
+      }
+      group.addTask {
+        RefreshSnapshotPiece.taskBoardOrchestratorStatus(
+          await Self.loadTaskBoardOrchestratorStatusSnapshot(using: client)
+        )
+      }
 
       var diagnostics: MeasuredOperation<DaemonDiagnosticsReport>?
       var projects: MeasuredOperation<[ProjectSummary]>?
       var sessions: MeasuredOperation<[SessionSummary]>?
+      var taskBoardItems: MeasuredOperation<[TaskBoardItem]>?
+      var taskBoardOrchestratorStatus: MeasuredOperation<TaskBoardOrchestratorStatus?>?
 
       for try await piece in group {
         switch piece {
@@ -324,17 +321,29 @@ extension HarnessMonitorStore {
           projects = measuredProjects
         case .sessions(let measuredSessions):
           sessions = measuredSessions
+        case .taskBoardItems(let measuredTaskBoardItems):
+          taskBoardItems = measuredTaskBoardItems
+        case .taskBoardOrchestratorStatus(let measuredTaskBoardOrchestratorStatus):
+          taskBoardOrchestratorStatus = measuredTaskBoardOrchestratorStatus
         }
       }
 
-      guard let diagnostics, let projects, let sessions else {
+      guard
+        let diagnostics,
+        let projects,
+        let sessions,
+        let taskBoardItems,
+        let taskBoardOrchestratorStatus
+      else {
         throw CancellationError()
       }
 
       return RefreshSnapshot(
         diagnostics: diagnostics,
         projects: projects,
-        sessions: sessions
+        sessions: sessions,
+        taskBoardItems: taskBoardItems,
+        taskBoardOrchestratorStatus: taskBoardOrchestratorStatus
       )
     }
   }
@@ -345,7 +354,7 @@ extension HarnessMonitorStore {
   ) -> RefreshSnapshotLoadError {
     let wrapped = RefreshSnapshotLoadError(
       source: source,
-      failureDescription: describeUnderlyingRefreshSnapshotError(error)
+      failureDescription: RefreshSnapshotErrorFormatting.describeUnderlying(error)
     )
     HarnessMonitorLogger.store.warning(
       "\(wrapped.localizedDescription, privacy: .public)"
@@ -357,62 +366,7 @@ extension HarnessMonitorStore {
     if let wrapped = error as? RefreshSnapshotLoadError {
       return wrapped.localizedDescription
     }
-    return describeUnderlyingRefreshSnapshotError(error)
+    return RefreshSnapshotErrorFormatting.describeUnderlying(error)
   }
 
-  nonisolated private static func describeUnderlyingRefreshSnapshotError(
-    _ error: any Error
-  ) -> String {
-    if let decodingError = error as? DecodingError {
-      return describeDecodingError(decodingError)
-    }
-    return error.localizedDescription
-  }
-
-  nonisolated private static func describeDecodingError(
-    _ error: DecodingError
-  ) -> String {
-    switch error {
-    case .dataCorrupted(let context):
-      let path = describeCodingPath(context.codingPath)
-      let description = context.debugDescription
-      return
-        "decoding failed at \(path): \(description)"
-    case .keyNotFound(let key, let context):
-      let path = describeCodingPath(context.codingPath + [key])
-      let description = context.debugDescription
-      return
-        "missing key '\(key.stringValue)' at \(path): \(description)"
-    case .typeMismatch(let type, let context):
-      let path = describeCodingPath(context.codingPath)
-      let description = context.debugDescription
-      return
-        "type mismatch for \(String(describing: type)) at \(path): \(description)"
-    case .valueNotFound(let type, let context):
-      let path = describeCodingPath(context.codingPath)
-      let description = context.debugDescription
-      return
-        "missing \(String(describing: type)) at \(path): \(description)"
-    @unknown default:
-      return error.localizedDescription
-    }
-  }
-
-  nonisolated private static func describeCodingPath(_ codingPath: [CodingKey]) -> String {
-    guard !codingPath.isEmpty else {
-      return "root"
-    }
-
-    var rendered = ""
-    for key in codingPath {
-      if let index = key.intValue {
-        rendered += "[\(index)]"
-      } else if rendered.isEmpty {
-        rendered = key.stringValue
-      } else {
-        rendered += ".\(key.stringValue)"
-      }
-    }
-    return rendered
-  }
 }

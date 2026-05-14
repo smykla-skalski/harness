@@ -244,6 +244,7 @@ fn parse_task_board_operational_subcommands() {
     for (argv, expected) in [
         (["harness", "task-board", "sync", "--json"], "sync"),
         (["harness", "task-board", "dispatch", "--json"], "dispatch"),
+        (["harness", "task-board", "evaluate", "--json"], "evaluate"),
         (["harness", "task-board", "audit", "--json"], "audit"),
         (["harness", "task-board", "project", "--json"], "project"),
         (["harness", "task-board", "machine", "--json"], "machine"),
@@ -261,6 +262,12 @@ fn parse_task_board_operational_subcommands() {
                     command: TaskBoardCommand::Dispatch(args),
                 },
                 "dispatch",
+            ) => assert!(args.json),
+            (
+                Command::TaskBoard {
+                    command: TaskBoardCommand::Evaluate(args),
+                },
+                "evaluate",
             ) => assert!(args.json),
             (
                 Command::TaskBoard {

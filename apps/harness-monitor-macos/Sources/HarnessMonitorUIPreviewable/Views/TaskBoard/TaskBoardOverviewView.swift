@@ -4,28 +4,59 @@ import SwiftUI
 public struct TaskBoardOverviewView: View {
   private let snapshot: TaskBoardInboxSnapshot
   private let taskBoardItems: [TaskBoardItem]
+  private let orchestratorStatus: TaskBoardOrchestratorStatus?
+  private let evaluationSummary: TaskBoardEvaluationSummary?
+  private let decisions: [Decision]
+  private let isActionInFlight: Bool
   private let onOpenItem: (TaskBoardInboxItem) -> Void
   private let onOpenTaskBoardItem: (TaskBoardItem) -> Void
+  private let onOpenDecision: (Decision) -> Void
+  private let onEvaluateTaskBoard: () -> Void
+  private let onRefreshTaskBoard: () -> Void
 
   public init(
     snapshot: TaskBoardInboxSnapshot,
     taskBoardItems: [TaskBoardItem] = [],
+    orchestratorStatus: TaskBoardOrchestratorStatus? = nil,
+    evaluationSummary: TaskBoardEvaluationSummary? = nil,
+    decisions: [Decision] = [],
+    isActionInFlight: Bool = false,
     onOpenItem: @escaping (TaskBoardInboxItem) -> Void = { _ in },
-    onOpenTaskBoardItem: @escaping (TaskBoardItem) -> Void = { _ in }
+    onOpenTaskBoardItem: @escaping (TaskBoardItem) -> Void = { _ in },
+    onOpenDecision: @escaping (Decision) -> Void = { _ in },
+    onEvaluateTaskBoard: @escaping () -> Void = {},
+    onRefreshTaskBoard: @escaping () -> Void = {}
   ) {
     self.snapshot = snapshot
     self.taskBoardItems = Self.sortedTaskBoardItems(taskBoardItems)
+    self.orchestratorStatus = orchestratorStatus
+    self.evaluationSummary = evaluationSummary
+    self.decisions = Self.sortedDecisions(decisions)
+    self.isActionInFlight = isActionInFlight
     self.onOpenItem = onOpenItem
     self.onOpenTaskBoardItem = onOpenTaskBoardItem
+    self.onOpenDecision = onOpenDecision
+    self.onEvaluateTaskBoard = onEvaluateTaskBoard
+    self.onRefreshTaskBoard = onRefreshTaskBoard
   }
 
   public var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       header
-      if snapshot.isEmpty && taskBoardItems.isEmpty {
+      if snapshot.isEmpty && taskBoardItems.isEmpty && decisions.isEmpty
+        && orchestratorStatus == nil
+      {
         emptyState
       } else {
-        if !taskBoardItems.isEmpty {
+        if let orchestratorStatus {
+          TaskBoardOrchestratorSummaryView(
+            status: orchestratorStatus,
+            latestEvaluation: evaluationSummary
+          )
+        } else if let evaluationSummary {
+          evaluationSummaryRow(evaluationSummary)
+        }
+        if !taskBoardItems.isEmpty || !decisions.isEmpty {
           taskBoard
         }
         if !snapshot.isEmpty {
@@ -44,13 +75,46 @@ public struct TaskBoardOverviewView: View {
         .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
       Spacer(minLength: HarnessMonitorTheme.spacingMD)
       HStack(spacing: HarnessMonitorTheme.spacingSM) {
-        countPill("\(taskBoardNeedsYouCount + snapshot.needsYouItemCount)", label: "Needs You")
-        countPill("\(taskBoardItems.count + snapshot.items.count)", label: "Open")
+        Button {
+          onEvaluateTaskBoard()
+        } label: {
+          Label("Evaluate", systemImage: "checkmark.seal")
+        }
+        .disabled(isActionInFlight)
+        .help("Evaluate board state")
+
+        Button {
+          onRefreshTaskBoard()
+        } label: {
+          Image(systemName: "arrow.clockwise")
+        }
+        .disabled(isActionInFlight)
+        .help("Refresh task board")
+
+        countPill(
+          "\(taskBoardNeedsYouCount + snapshot.needsYouItemCount + decisions.count)",
+          label: "Needs You"
+        )
+        countPill("\(taskBoardItems.count + snapshot.items.count + decisions.count)", label: "Open")
         countPill("\(taskBoardReviewCount + snapshot.reviewItemCount)", label: "Review")
         countPill("\(taskBoardBlockedCount + snapshot.blockedItemCount)", label: "Blocked")
       }
     }
     .accessibilityAddTraits(.isHeader)
+  }
+
+  private func evaluationSummaryRow(_ summary: TaskBoardEvaluationSummary) -> some View {
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      countPill("\(summary.evaluated)/\(summary.total)", label: "Eval")
+      if summary.updated != 0 {
+        countPill("\(summary.updated)", label: "Updated")
+      }
+      if summary.failed + summary.blocked != 0 {
+        countPill("\(summary.failed + summary.blocked)", label: "Blocked")
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityIdentifier("harness.task-board.evaluation-summary")
   }
 
   private var taskBoard: some View {
@@ -61,10 +125,19 @@ public struct TaskBoardOverviewView: View {
       ScrollView(.horizontal, showsIndicators: true) {
         HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingMD) {
           ForEach(taskBoardSections) { section in
-            TaskBoardItemLaneColumn(
-              section: section,
-              onOpenItem: onOpenTaskBoardItem
-            )
+            if section.lane == .needsYou {
+              TaskBoardNeedsYouLaneColumn(
+                section: section,
+                decisions: decisions,
+                onOpenItem: onOpenTaskBoardItem,
+                onOpenDecision: onOpenDecision
+              )
+            } else {
+              TaskBoardItemLaneColumn(
+                section: section,
+                onOpenItem: onOpenTaskBoardItem
+              )
+            }
           }
         }
         .padding(.vertical, 2)
@@ -165,251 +238,35 @@ public struct TaskBoardOverviewView: View {
       0
     }
   }
+
+  private static func sortedDecisions(_ decisions: [Decision]) -> [Decision] {
+    decisions
+      .filter { $0.statusRaw == "open" }
+      .sorted { left, right in
+        if severityRank(left.severityRaw) != severityRank(right.severityRaw) {
+          return severityRank(left.severityRaw) > severityRank(right.severityRaw)
+        }
+        return left.createdAt < right.createdAt
+      }
+  }
+
+  private static func severityRank(_ severity: String) -> Int {
+    switch DecisionSeverity(rawValue: severity) {
+    case .critical:
+      3
+    case .needsUser:
+      2
+    case .warn:
+      1
+    case .info, nil:
+      0
+    }
+  }
 }
 
-private struct TaskBoardItemSection: Identifiable {
+struct TaskBoardItemSection: Identifiable {
   let lane: TaskBoardInboxLane
   let items: [TaskBoardItem]
 
   var id: TaskBoardInboxLane { lane }
-}
-
-private struct TaskBoardItemLaneColumn: View {
-  let section: TaskBoardItemSection
-  let onOpenItem: (TaskBoardItem) -> Void
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      TaskBoardLaneHeader(lane: section.lane, count: section.items.count)
-
-      if section.items.isEmpty {
-        TaskBoardEmptyLane()
-      } else {
-        VStack(spacing: HarnessMonitorTheme.spacingSM) {
-          ForEach(section.items.prefix(5)) { item in
-            TaskBoardItemRow(item: item, onOpenItem: onOpenItem)
-          }
-        }
-      }
-    }
-    .frame(width: 260, alignment: .topLeading)
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier("harness.task-board.api-column.\(section.lane.rawValue)")
-  }
-}
-
-private struct TaskBoardInboxLaneColumn: View {
-  let section: TaskBoardInboxSection
-  let onOpenItem: (TaskBoardInboxItem) -> Void
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      TaskBoardLaneHeader(lane: section.lane, count: section.items.count)
-
-      if section.items.isEmpty {
-        TaskBoardEmptyLane()
-      } else {
-        VStack(spacing: HarnessMonitorTheme.spacingSM) {
-          ForEach(section.items.prefix(5)) { item in
-            TaskBoardInboxItemRow(
-              item: item,
-              onOpenItem: onOpenItem
-            )
-          }
-        }
-      }
-    }
-    .frame(width: 260, alignment: .topLeading)
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier("harness.task-board.column.\(section.lane.rawValue)")
-  }
-}
-
-private struct TaskBoardLaneHeader: View {
-  let lane: TaskBoardInboxLane
-  let count: Int
-
-  var body: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      Image(systemName: lane.systemImage)
-        .foregroundStyle(laneColor)
-        .frame(width: 16)
-      Text(lane.title)
-        .scaledFont(.subheadline.weight(.semibold))
-      Spacer(minLength: HarnessMonitorTheme.spacingSM)
-      Text("\(count)")
-        .scaledFont(.caption.weight(.bold))
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-    }
-    .frame(height: 24)
-  }
-
-  private var laneColor: Color {
-    switch lane {
-    case .needsYou:
-      HarnessMonitorTheme.danger
-    case .ready:
-      HarnessMonitorTheme.accent
-    case .blocked:
-      HarnessMonitorTheme.danger
-    case .review:
-      HarnessMonitorTheme.caution
-    case .running:
-      HarnessMonitorTheme.warmAccent
-    case .backlog:
-      HarnessMonitorTheme.accent
-    }
-  }
-}
-
-private struct TaskBoardEmptyLane: View {
-  var body: some View {
-    Text("Clear")
-      .scaledFont(.caption.weight(.medium))
-      .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
-      .frame(maxWidth: .infinity, minHeight: 72, alignment: .center)
-  }
-}
-
-private struct TaskBoardItemRow: View {
-  let item: TaskBoardItem
-  let onOpenItem: (TaskBoardItem) -> Void
-
-  var body: some View {
-    Button {
-      onOpenItem(item)
-    } label: {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
-          Circle()
-            .fill(priorityColor(for: item.priority))
-            .frame(width: 8, height: 8)
-            .padding(.top, 6)
-          VStack(alignment: .leading, spacing: 3) {
-            Text(item.title)
-              .scaledFont(.subheadline.weight(.semibold))
-              .foregroundStyle(HarnessMonitorTheme.ink)
-              .lineLimit(2)
-              .multilineTextAlignment(.leading)
-            Text(item.projectId ?? item.agentMode.title)
-              .scaledFont(.caption)
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-              .lineLimit(1)
-              .truncationMode(.middle)
-          }
-          Spacer(minLength: 0)
-        }
-        HStack(spacing: HarnessMonitorTheme.spacingXS) {
-          taskPill(item.status.title, color: taskBoardStatusColor(for: item.status))
-          taskPill(item.priority.title, color: priorityColor(for: item.priority))
-          if let policyTraceCount = item.workflow?.policyTraceIds.count, policyTraceCount > 0 {
-            taskPill("\(policyTraceCount) policy", color: HarnessMonitorTheme.secondaryInk)
-          }
-        }
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(HarnessMonitorTheme.spacingSM)
-    }
-    .harnessInteractiveCardButtonStyle(cornerRadius: 8)
-    .background(.background.opacity(0.45), in: .rect(cornerRadius: 8))
-    .overlay(
-      RoundedRectangle(cornerRadius: 8)
-        .stroke(HarnessMonitorTheme.controlBorder.opacity(0.55), lineWidth: 1)
-    )
-    .accessibilityIdentifier("harness.task-board.api-item.\(item.id)")
-  }
-
-  private func taskPill(_ label: String, color: Color) -> some View {
-    Text(label)
-      .scaledFont(.caption2.weight(.bold))
-      .foregroundStyle(color)
-      .lineLimit(1)
-      .padding(.horizontal, HarnessMonitorTheme.spacingSM)
-      .padding(.vertical, 3)
-      .background(color.opacity(0.12), in: .capsule)
-  }
-}
-
-private struct TaskBoardInboxItemRow: View {
-  let item: TaskBoardInboxItem
-  let onOpenItem: (TaskBoardInboxItem) -> Void
-
-  var body: some View {
-    Button {
-      onOpenItem(item)
-    } label: {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
-          Circle()
-            .fill(severityColor(for: item.task.severity))
-            .frame(width: 8, height: 8)
-            .padding(.top, 6)
-          VStack(alignment: .leading, spacing: 3) {
-            Text(item.task.title)
-              .scaledFont(.subheadline.weight(.semibold))
-              .foregroundStyle(HarnessMonitorTheme.ink)
-              .lineLimit(2)
-              .multilineTextAlignment(.leading)
-            Text(item.subtitle)
-              .scaledFont(.caption)
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-              .lineLimit(1)
-              .truncationMode(.middle)
-          }
-          Spacer(minLength: 0)
-        }
-        HStack(spacing: HarnessMonitorTheme.spacingXS) {
-          taskPill(item.task.status.title, color: taskStatusColor(for: item.task.status))
-          taskPill(item.task.severity.title, color: severityColor(for: item.task.severity))
-        }
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(HarnessMonitorTheme.spacingSM)
-    }
-    .harnessInteractiveCardButtonStyle(cornerRadius: 8)
-    .background(.background.opacity(0.45), in: .rect(cornerRadius: 8))
-    .overlay(
-      RoundedRectangle(cornerRadius: 8)
-        .stroke(HarnessMonitorTheme.controlBorder.opacity(0.55), lineWidth: 1)
-    )
-    .accessibilityIdentifier("harness.task-board.item.\(item.task.taskId)")
-  }
-
-  private func taskPill(_ label: String, color: Color) -> some View {
-    Text(label)
-      .scaledFont(.caption2.weight(.bold))
-      .foregroundStyle(color)
-      .lineLimit(1)
-      .padding(.horizontal, HarnessMonitorTheme.spacingSM)
-      .padding(.vertical, 3)
-      .background(color.opacity(0.12), in: .capsule)
-  }
-}
-
-private func priorityColor(for priority: TaskBoardPriority) -> Color {
-  switch priority {
-  case .critical:
-    HarnessMonitorTheme.danger
-  case .high:
-    HarnessMonitorTheme.caution
-  case .medium:
-    HarnessMonitorTheme.accent
-  case .low:
-    HarnessMonitorTheme.secondaryInk
-  }
-}
-
-private func taskBoardStatusColor(for status: TaskBoardStatus) -> Color {
-  switch status {
-  case .blocked:
-    HarnessMonitorTheme.danger
-  case .planReview, .inReview:
-    HarnessMonitorTheme.caution
-  case .planning, .inProgress:
-    HarnessMonitorTheme.warmAccent
-  case .new, .todo:
-    HarnessMonitorTheme.accent
-  case .done:
-    HarnessMonitorTheme.secondaryInk
-  }
 }

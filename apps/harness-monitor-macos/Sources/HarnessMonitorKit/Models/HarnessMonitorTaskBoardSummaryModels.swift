@@ -86,6 +86,7 @@ public struct TaskBoardDispatchBlockReason: Codable, Equatable, Sendable {
   public let kind: String
   public let workItemId: String?
   public let reason: TaskBoardPlanApprovalBlockReason?
+  public let decision: TaskBoardPolicyDecision?
   public let status: TaskBoardStatus?
 }
 

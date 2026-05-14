@@ -38,6 +38,24 @@ public final class HarnessMonitorStore {
   public var supervisorDecisionRefreshTick: Int = 0
   public internal(set) var supervisorLiveTickRefreshTick: Int = 0
   public private(set) var supervisorRuntimeState: SupervisorRuntimeState = .stopped
+  public var globalTaskBoardItems: [TaskBoardItem] = [] {
+    didSet {
+      guard oldValue != globalTaskBoardItems else { return }
+      scheduleUISync([.contentDashboard])
+    }
+  }
+  public var globalTaskBoardOrchestratorStatus: TaskBoardOrchestratorStatus? {
+    didSet {
+      guard oldValue != globalTaskBoardOrchestratorStatus else { return }
+      scheduleUISync([.contentDashboard])
+    }
+  }
+  public var globalTaskBoardEvaluationSummary: TaskBoardEvaluationSummary? {
+    didSet {
+      guard oldValue != globalTaskBoardEvaluationSummary else { return }
+      scheduleUISync([.contentDashboard])
+    }
+  }
   public var supervisorObserverFocusTick: Int = 0
   public var supervisorPrimaryActionFocusDecisionID: String?
   public var supervisorPrimaryActionFocusRequestTick: Int = 0

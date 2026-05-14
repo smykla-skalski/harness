@@ -154,24 +154,34 @@ async fn stream_subscribe_broadcasts_async_index_without_sync_db() {
 
 #[tokio::test]
 async fn websocket_contract_mapped_methods_are_dispatchable() {
-    let state = test_http_state_with_db();
-    let connection = Arc::new(Mutex::new(ConnectionState::new()));
+    let sandbox = tempdir().expect("tempdir");
+    temp_env::async_with_vars(
+        [(
+            "XDG_DATA_HOME",
+            Some(sandbox.path().to_str().expect("utf8")),
+        )],
+        async {
+            let state = test_http_state_with_db();
+            let connection = Arc::new(Mutex::new(ConnectionState::new()));
 
-    for method in mapped_ws_methods() {
-        let request = WsRequest {
-            id: format!("req-{method}"),
-            method: method.into(),
-            params: serde_json::json!({}),
-            trace_context: None,
-        };
+            for method in mapped_ws_methods() {
+                let request = WsRequest {
+                    id: format!("req-{method}"),
+                    method: method.into(),
+                    params: serde_json::json!({}),
+                    trace_context: None,
+                };
 
-        let response = dispatch(&request, &state, &connection).await;
-        assert_ne!(
-            response.error.as_ref().map(|error| error.code.as_str()),
-            Some("UNKNOWN_METHOD"),
-            "{method} is present in the parity contract but not dispatchable"
-        );
-    }
+                let response = dispatch(&request, &state, &connection).await;
+                assert_ne!(
+                    response.error.as_ref().map(|error| error.code.as_str()),
+                    Some("UNKNOWN_METHOD"),
+                    "{method} is present in the parity contract but not dispatchable"
+                );
+            }
+        },
+    )
+    .await;
 }
 
 #[tokio::test]

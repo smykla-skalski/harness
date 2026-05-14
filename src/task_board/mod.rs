@@ -1,5 +1,8 @@
 pub mod dispatch;
+pub mod evaluation;
 pub mod external;
+pub mod github;
+pub mod orchestrator;
 pub mod planning;
 pub mod policy;
 pub mod store;
@@ -12,10 +15,23 @@ pub use dispatch::{
     DispatchReadiness, EvaluatorIntent, FollowUpPhase, ReviewerIntent, SessionIntent,
     TaskCreationIntent, WorkerIntent, build_dispatch_plan, build_dispatch_plans,
 };
+pub use evaluation::{
+    TaskBoardEvaluationDecision, TaskBoardEvaluationOutcome, TaskBoardEvaluationRecord,
+    TaskBoardEvaluationSummary, evaluate_task_board_item, failed_workflow, missing_session_record,
+    missing_task_record, record_from_decision, skipped_unlinked_record,
+};
 pub use external::{
     ExternalProvider, ExternalSyncClient, ExternalSyncConfig, ExternalTask, ExternalTaskRef,
     GH_TOKEN_ENV, GITHUB_REPOSITORY_ENV, GitHubSyncClient, HARNESS_GITHUB_REPOSITORY_ENV,
     HARNESS_GITHUB_TOKEN_ENV, HARNESS_TODOIST_TOKEN_ENV, TodoistSyncClient,
+};
+pub use orchestrator::{
+    TaskBoardGitHubProjectConfig, TaskBoardOrchestrator, TaskBoardOrchestratorDispatchInput,
+    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorRunStatus,
+    TaskBoardOrchestratorRunSummary, TaskBoardOrchestratorSettings,
+    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorState,
+    TaskBoardOrchestratorStatus, TaskBoardOrchestratorTickInfo, TaskBoardOrchestratorTickPhase,
+    TaskBoardOrchestratorWorkflow, TaskBoardWorkflowExecutionCount,
 };
 pub use planning::{
     PlanApprovalBlockReason, PlanApprovalGate, PlanningTransition, approval_gate, approve_plan,

@@ -152,6 +152,22 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       actor: String
     )
     case transferLeader(sessionID: String, newLeaderID: String, reason: String?, actor: String)
+    case startTaskBoardOrchestrator
+    case stopTaskBoardOrchestrator
+    case runTaskBoardOrchestratorOnce(
+      dryRun: Bool?,
+      status: TaskBoardStatus?,
+      projectDir: String?
+    )
+    case evaluateTaskBoard(
+      dryRun: Bool,
+      status: TaskBoardStatus?
+    )
+    case updateTaskBoardOrchestratorSettings(
+      policyVersion: String?,
+      clearProjectDir: Bool,
+      clearDispatchStatusFilter: Bool
+    )
     case updateTaskQueuePolicy(
       sessionID: String,
       taskID: String,
@@ -178,6 +194,8 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     case timelineWindow(String)
     case acpTranscript(String)
     case codexTranscript(String)
+    case taskBoardOrchestratorStatus
+    case taskBoardOrchestratorSettings
   }
 
   let lock = NSLock()
@@ -246,6 +264,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var recordedDiagnosticsCallCount = 0
   var recordedProjectsCallCount = 0
   var recordedSessionsCallCount = 0
+  var readCallCountsByKey: [String: Int] = [:]
   var acpInspectCallCountsBySessionID: [String: Int] = [:]
   var acpTranscriptCallCountsBySessionID: [String: Int] = [:]
   var codexTranscriptCallCountsBySessionID: [String: Int] = [:]

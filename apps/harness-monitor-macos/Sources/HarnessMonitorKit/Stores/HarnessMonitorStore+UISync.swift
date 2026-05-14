@@ -246,7 +246,10 @@ extension HarnessMonitorStore {
         connectionState: connectionState,
         isBusy: isBusy,
         isRefreshing: isRefreshing,
-        isLaunchAgentInstalled: daemonStatus?.launchAgent.installed == true
+        isLaunchAgentInstalled: daemonStatus?.launchAgent.installed == true,
+        taskBoardItems: globalTaskBoardItems,
+        taskBoardOrchestratorStatus: globalTaskBoardOrchestratorStatus,
+        taskBoardEvaluationSummary: globalTaskBoardEvaluationSummary
       )
     )
   }

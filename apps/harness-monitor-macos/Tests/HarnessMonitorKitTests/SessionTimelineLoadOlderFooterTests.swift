@@ -63,7 +63,7 @@ struct SessionTimelineLoadOlderTriggerTests {
 
   @Test("LazyVStack body has no conditional load-older child")
   func lazyVStackKeepsForEachOnlyContent() throws {
-    let sourceFile = try timelineSource(named: "MonitorTimelineSection.swift")
+    let sourceFile = try timelineSource(named: "SessionTimelineList.swift")
 
     #expect(sourceFile.contains("LazyVStack(alignment: .leading, spacing: 0) {"))
     #expect(sourceFile.contains("ForEach(presentation.rows)"))
@@ -72,24 +72,29 @@ struct SessionTimelineLoadOlderTriggerTests {
 
   @Test("Scroll-geometry trigger is wired to the older-chunk appender")
   func scrollGeometryWiredToStoreAppender() throws {
-    let sourceFile = try timelineSource(named: "MonitorTimelineSection.swift")
+    let listSource = try timelineSource(named: "SessionTimelineList.swift")
+    let sectionSource = try timelineSource(named: "MonitorTimelineSection.swift")
 
-    #expect(sourceFile.contains(".onScrollGeometryChange("))
-    #expect(sourceFile.contains("SessionTimelineLoadOlderTrigger.self"))
-    #expect(sourceFile.contains("SessionTimelineLoadOlderTrigger.init(geometry:)"))
-    #expect(sourceFile.contains("static let loadOlderChunkSize = 200"))
-    #expect(sourceFile.contains("await store.appendSelectedTimelineOlderChunk("))
-    #expect(sourceFile.contains("retainedLimit: nil"))
+    #expect(listSource.contains(".onScrollGeometryChange("))
+    #expect(listSource.contains("SessionTimelineLoadOlderTrigger.self"))
+    #expect(listSource.contains("SessionTimelineLoadOlderTrigger.init(geometry:)"))
+    #expect(sectionSource.contains("static let loadOlderChunkSize = 200"))
+    #expect(sectionSource.contains("await store.appendSelectedTimelineOlderChunk("))
+    #expect(sectionSource.contains("retainedLimit: nil"))
   }
 
   @Test("Trigger fires on first content render OR rising near-bottom edge")
   func triggerFiresOnFirstRenderOrRisingEdge() throws {
-    let sourceFile = try timelineSource(named: "MonitorTimelineSection.swift")
+    let sourceFile = try timelineSource(named: "SessionTimelineList.swift")
 
-    #expect(sourceFile.contains("let firstRender = !oldValue.contentRendered && newValue.contentRendered"))
-    #expect(sourceFile.contains("let risingNearBottom = !oldValue.isNearBottom && newValue.isNearBottom"))
+    #expect(
+      sourceFile.contains("let firstRender = !oldValue.contentRendered && newValue.contentRendered")
+    )
+    #expect(
+      sourceFile.contains("let risingNearBottom = !oldValue.isNearBottom && newValue.isNearBottom"))
     #expect(sourceFile.contains("guard firstRender || risingNearBottom else"))
-    #expect(sourceFile.contains("guard newValue.isNearBottom, presentation.navigation.hasOlder else"))
+    #expect(
+      sourceFile.contains("guard newValue.isNearBottom, presentation.navigation.hasOlder else"))
   }
 
   @Test("Trigger reports content not rendered when contentHeight is zero")

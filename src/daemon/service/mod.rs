@@ -238,6 +238,7 @@ mod signals_async_send;
 mod status;
 mod sync_support;
 mod task_board;
+mod task_board_evaluation;
 mod wake_route;
 
 pub use adopt::adopt_session_record;
@@ -289,11 +290,18 @@ pub use status::{
     diagnostics_report, get_log_level, health_response, record_telemetry, request_shutdown,
     set_log_level, status_report,
 };
-pub(crate) use task_board::dispatch_task_board_async;
 pub use task_board::{
     audit_task_board, create_task_board_item, delete_task_board_item, dispatch_task_board,
-    get_task_board_item, list_task_board_items, sync_task_board, update_task_board_item,
+    get_task_board_item, list_task_board_items, run_task_board_orchestrator_once,
+    start_task_board_orchestrator, stop_task_board_orchestrator, sync_task_board,
+    task_board_orchestrator_settings, task_board_orchestrator_status, update_task_board_item,
+    update_task_board_orchestrator_settings,
 };
+#[allow(unused_imports)]
+pub(crate) use task_board::{dispatch_task_board_async, run_task_board_orchestrator_once_async};
+pub use task_board_evaluation::evaluate_task_board;
+#[allow(unused_imports)]
+pub(crate) use task_board_evaluation::evaluate_task_board_async;
 pub use wake_route::WakeDispatch;
 pub(crate) use wake_route::{WakeEventLevel, record_wake_event};
 

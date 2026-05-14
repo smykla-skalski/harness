@@ -118,9 +118,51 @@ fn task_board_routes_have_complete_ws_parity() {
                 true,
             ),
             (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_EVALUATE,
+                ws_methods::TASK_BOARD_EVALUATE,
+                true,
+            ),
+            (
                 HttpRouteMethod::Get,
                 http_paths::TASK_BOARD_AUDIT,
                 ws_methods::TASK_BOARD_AUDIT,
+                true,
+            ),
+            (
+                HttpRouteMethod::Get,
+                http_paths::TASK_BOARD_ORCHESTRATOR_STATUS,
+                ws_methods::TASK_BOARD_ORCHESTRATOR_STATUS,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_ORCHESTRATOR_START,
+                ws_methods::TASK_BOARD_ORCHESTRATOR_START,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_ORCHESTRATOR_STOP,
+                ws_methods::TASK_BOARD_ORCHESTRATOR_STOP,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_ORCHESTRATOR_RUN_ONCE,
+                ws_methods::TASK_BOARD_ORCHESTRATOR_RUN_ONCE,
+                true,
+            ),
+            (
+                HttpRouteMethod::Get,
+                http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
+                ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_GET,
+                true,
+            ),
+            (
+                HttpRouteMethod::Put,
+                http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
+                ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_UPDATE,
                 true,
             ),
         ]
