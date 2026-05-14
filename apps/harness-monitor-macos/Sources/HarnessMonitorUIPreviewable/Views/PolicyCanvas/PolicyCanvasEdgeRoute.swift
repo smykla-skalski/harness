@@ -3,6 +3,7 @@ import SwiftUI
 struct PolicyCanvasEdgeRoute {
   let points: [CGPoint]
   let labelPosition: CGPoint
+  private static let labelLaneSpacing: CGFloat = 32
 
   init(
     source: CGPoint,
@@ -12,7 +13,7 @@ struct PolicyCanvasEdgeRoute {
     sourceGroupID: String? = nil,
     targetGroupID: String? = nil
   ) {
-    let laneOffset = CGFloat(lane % 12) * 16
+    let laneOffset = CGFloat(lane % 12) * Self.labelLaneSpacing
     let horizontalDistance = target.x - source.x
     let sourceGroupFrame = Self.groupFrame(sourceGroupID, in: groups)
     let targetGroupFrame = Self.groupFrame(targetGroupID, in: groups)
@@ -143,18 +144,27 @@ struct PolicyCanvasEdgeRoute {
     let gapMinX = sourceGroupFrame.maxX + 34
     let gapMaxX = targetGroupFrame.minX - 34
     let laneOffset = CGFloat((lane % 5) - 2) * 12
+    let laneYOffset = CGFloat((lane % 5) - 2) * Self.labelLaneSpacing
     let preferredBusX = ((gapMinX + gapMaxX) / 2) + laneOffset
     let busX =
       gapMinX < gapMaxX
       ? min(gapMaxX, max(gapMinX, preferredBusX))
       : source.x + max(72, (target.x - source.x) * 0.46)
+    let sourceExitX = min(busX, sourceGroupFrame.maxX + 18)
+    let routedSourceY = min(
+      sourceGroupFrame.maxY - 38,
+      max(sourceGroupFrame.minY + 38, source.y + laneYOffset)
+    )
     let points = [
       source,
-      CGPoint(x: busX, y: source.y),
+      CGPoint(x: sourceExitX, y: source.y),
+      CGPoint(x: sourceExitX, y: routedSourceY),
+      CGPoint(x: busX, y: routedSourceY),
       CGPoint(x: busX, y: target.y),
       target,
     ]
-    return (points, labelPosition(for: points, lane: lane))
+    let labelPosition = CGPoint(x: (sourceExitX + busX) / 2, y: routedSourceY)
+    return (points, labelPosition)
   }
 
   private static func wideRoute(
@@ -220,10 +230,10 @@ struct PolicyCanvasEdgeRoute {
     }
     let horizontal = abs(segment.1.x - segment.0.x) >= abs(segment.1.y - segment.0.y)
     let laneT = min(0.78, max(0.22, 0.38 + CGFloat(lane % 6) * 0.07))
-    let t = horizontal ? laneT : 0.5
+    let positionFraction = horizontal ? laneT : 0.5
     return CGPoint(
-      x: segment.0.x + ((segment.1.x - segment.0.x) * t),
-      y: segment.0.y + ((segment.1.y - segment.0.y) * t)
+      x: segment.0.x + ((segment.1.x - segment.0.x) * positionFraction),
+      y: segment.0.y + ((segment.1.y - segment.0.y) * positionFraction)
     )
   }
 
