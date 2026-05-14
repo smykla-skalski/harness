@@ -13,6 +13,7 @@ use crate::daemon::protocol::{
     TaskBoardSyncRequest, TaskBoardUpdateItemRequest, http_paths,
 };
 use crate::daemon::service;
+use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::TaskBoardStatus;
 
 use super::DaemonHttpState;
@@ -173,7 +174,7 @@ async fn post_task_board_dispatch(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    request.actor = Some(crate::session::types::CONTROL_PLANE_ACTOR_ID.to_string());
+    request.actor = Some(CONTROL_PLANE_ACTOR_ID.to_string());
     let result = if let Some(async_db) = state.async_db.get() {
         let result = service::dispatch_task_board_async(&request, async_db.as_ref()).await;
         if result

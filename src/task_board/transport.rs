@@ -1,3 +1,4 @@
+use std::env;
 use std::path::{Path, PathBuf};
 
 use clap::{Args, Subcommand};
@@ -448,7 +449,7 @@ impl TaskBoardDispatchArgs {
     fn dispatch_project_dir(&self) -> Result<PathBuf, CliError> {
         self.project_dir.as_deref().map_or_else(
             || {
-                std::env::current_dir()
+                env::current_dir()
                     .map_err(|error| CliErrorKind::workflow_io(error.to_string()).into())
             },
             |path| Ok(Path::new(path).to_path_buf()),

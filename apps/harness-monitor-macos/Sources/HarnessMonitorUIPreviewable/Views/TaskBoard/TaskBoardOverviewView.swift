@@ -102,7 +102,8 @@ public struct TaskBoardOverviewView: View {
   private var emptyState: some View {
     ContentUnavailableView("No Open Tasks", systemImage: "tray")
       .frame(maxWidth: .infinity, minHeight: 180)
-      .background(.regularMaterial, in: .rect(cornerRadius: HarnessMonitorTheme.cornerRadiusSM))
+      .background(
+        .background.opacity(0.45), in: .rect(cornerRadius: HarnessMonitorTheme.cornerRadiusSM))
   }
 
   private func countPill(_ value: String, label: String) -> some View {
@@ -113,9 +114,8 @@ public struct TaskBoardOverviewView: View {
         .scaledFont(.caption)
     }
     .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-    .padding(.horizontal, HarnessMonitorTheme.pillPaddingH)
-    .padding(.vertical, HarnessMonitorTheme.pillPaddingV)
-    .background(.thinMaterial, in: .capsule)
+    .harnessPillPadding()
+    .harnessControlPill(tint: HarnessMonitorTheme.secondaryInk)
   }
 
   private var taskBoardSections: [TaskBoardItemSection] {
@@ -302,15 +302,15 @@ private struct TaskBoardItemRow: View {
         HStack(spacing: HarnessMonitorTheme.spacingXS) {
           taskPill(item.status.title, color: taskBoardStatusColor(for: item.status))
           taskPill(item.priority.title, color: priorityColor(for: item.priority))
-          if !item.workflowPolicyTraceText.isEmpty {
-            taskPill(item.workflowPolicyTraceText, color: HarnessMonitorTheme.secondaryInk)
+          if let policyTraceCount = item.workflow?.policyTraceIds.count, policyTraceCount > 0 {
+            taskPill("\(policyTraceCount) policy", color: HarnessMonitorTheme.secondaryInk)
           }
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(HarnessMonitorTheme.spacingSM)
     }
-    .buttonStyle(.plain)
+    .harnessInteractiveCardButtonStyle(cornerRadius: 8)
     .background(.background.opacity(0.45), in: .rect(cornerRadius: 8))
     .overlay(
       RoundedRectangle(cornerRadius: 8)
@@ -327,15 +327,6 @@ private struct TaskBoardItemRow: View {
       .padding(.horizontal, HarnessMonitorTheme.spacingSM)
       .padding(.vertical, 3)
       .background(color.opacity(0.12), in: .capsule)
-  }
-}
-
-extension TaskBoardItem {
-  fileprivate var workflowPolicyTraceText: String {
-    guard let workflow, !workflow.policyTraceIds.isEmpty else {
-      return ""
-    }
-    return "\(workflow.policyTraceIds.count) policy"
   }
 }
 
@@ -375,7 +366,7 @@ private struct TaskBoardInboxItemRow: View {
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(HarnessMonitorTheme.spacingSM)
     }
-    .buttonStyle(.plain)
+    .harnessInteractiveCardButtonStyle(cornerRadius: 8)
     .background(.background.opacity(0.45), in: .rect(cornerRadius: 8))
     .overlay(
       RoundedRectangle(cornerRadius: 8)
