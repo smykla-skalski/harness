@@ -5,19 +5,30 @@ use axum::http::StatusCode;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as Base64Standard;
 use futures_util::future::BoxFuture;
-use gix::{Tree, actor::SignatureRef, object::tree::EntryKind};
+use gix::{Tree, object::tree::EntryKind};
 use octocrab::models;
 use octocrab::params::repos::Reference;
 use octocrab::{Error as OctocrabError, Octocrab};
-use serde::{Deserialize, Serialize};
 use tokio::task::spawn_blocking;
 
 use crate::daemon::service::git_runtime_profile_for_repository;
 use crate::errors::{CliError, CliErrorKind};
 use crate::git::GitRepository;
 use crate::sandbox;
+use crate::task_board::TaskBoardGitSigningMode;
 
 use super::GitHubProjectConfig;
+use signing::{
+    commit_author, local_commit_signature, publication_signature, unsigned_commit_payload,
+};
+use types::{
+    BranchPublicationMode, GitHubCreateBlobRequest, GitHubCreateCommitRequest,
+    GitHubCreateTreeRequest, GitHubObjectShaResponse, GitHubTreeEntryRequest,
+    GitHubUpdateRefRequest, LocalBranchSnapshot, LocalTreeEntry, LocalTreeSnapshot,
+};
+
+mod signing;
+mod types;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GitHubBranchState {
@@ -115,6 +126,7 @@ fn local_branch_snapshot(
         .tree()
         .map_err(|error| snapshot_error("read HEAD tree", error))?;
     let profile = git_runtime_profile_for_repository(Some(repository_slug))?;
+    let commit_signature = local_commit_signature(&head)?;
     Ok(LocalBranchSnapshot {
         head_tree_sha: head
             .tree_id()
@@ -133,13 +145,15 @@ fn local_branch_snapshot(
                 .map_err(|error| snapshot_error("read HEAD author", error))?,
             profile.author_name.as_deref(),
             profile.author_email.as_deref(),
-        ),
+        )?,
         committer: commit_author(
             head.committer()
                 .map_err(|error| snapshot_error("read HEAD committer", error))?,
             profile.author_name.as_deref(),
             profile.author_email.as_deref(),
-        ),
+        )?,
+        profile,
+        existing_signature: commit_signature,
         root_tree: collect_tree(&root_tree)?,
     })
 }
@@ -266,6 +280,12 @@ async fn create_commit(
         owner = config.owner,
         repo = config.repo,
     );
+    let payload = unsigned_commit_payload(snapshot, tree_sha, parent_sha);
+    let signature = publication_signature(
+        &snapshot.profile,
+        snapshot.existing_signature.as_ref(),
+        payload.as_bytes(),
+    )?;
     let commit: models::commits::GitCommitObject = client
         .post(
             route,
@@ -273,32 +293,22 @@ async fn create_commit(
                 message: snapshot.commit_message.clone(),
                 tree: tree_sha.to_string(),
                 parents: vec![parent_sha.to_string()],
-                author: Some(snapshot.author.clone()),
-                committer: Some(snapshot.committer.clone()),
+                author: Some(snapshot.author.request.clone()),
+                committer: Some(snapshot.committer.request.clone()),
+                signature,
             }),
         )
         .await
         .map_err(operation_error)?;
-    Ok(commit.sha)
-}
-
-fn commit_author(
-    signature: SignatureRef<'_>,
-    override_name: Option<&str>,
-    override_email: Option<&str>,
-) -> models::repos::CommitAuthor {
-    let signature = signature.trim();
-    models::repos::CommitAuthor {
-        name: override_name.map_or_else(
-            || String::from_utf8_lossy(signature.name.as_ref()).into_owned(),
-            ToOwned::to_owned,
-        ),
-        email: Some(override_email.map_or_else(
-            || String::from_utf8_lossy(signature.email.as_ref()).into_owned(),
-            ToOwned::to_owned,
-        )),
-        date: None,
+    if matches!(snapshot.profile.signing.mode, TaskBoardGitSigningMode::Gpg)
+        && !commit.verification.verified
+    {
+        return Err(CliError::from(CliErrorKind::workflow_io(format!(
+            "task-board github created commit signature was not verified: {}",
+            commit.verification.reason
+        ))));
     }
+    Ok(commit.sha)
 }
 
 fn github_not_found(error: &OctocrabError) -> bool {
@@ -389,89 +399,4 @@ async fn update_branch_ref(
         }
     }
     Ok(())
-}
-
-struct LocalBranchSnapshot {
-    head_tree_sha: String,
-    commit_message: String,
-    author: models::repos::CommitAuthor,
-    committer: models::repos::CommitAuthor,
-    root_tree: LocalTreeSnapshot,
-}
-
-struct LocalTreeSnapshot {
-    entries: Vec<LocalTreeEntry>,
-}
-
-enum LocalTreeEntry {
-    Blob {
-        path: String,
-        mode: String,
-        content: Vec<u8>,
-    },
-    Tree {
-        path: String,
-        mode: String,
-        tree: LocalTreeSnapshot,
-    },
-    Commit {
-        path: String,
-        mode: String,
-        sha: String,
-    },
-}
-
-enum BranchPublicationMode {
-    Create { parent_sha: String },
-    Update { parent_sha: String },
-}
-
-impl BranchPublicationMode {
-    fn parent_sha(&self) -> &str {
-        match self {
-            Self::Create { parent_sha } | Self::Update { parent_sha } => parent_sha.as_str(),
-        }
-    }
-}
-
-#[derive(Serialize)]
-struct GitHubCreateBlobRequest {
-    content: String,
-    encoding: &'static str,
-}
-
-#[derive(Serialize)]
-struct GitHubCreateTreeRequest {
-    tree: Vec<GitHubTreeEntryRequest>,
-}
-
-#[derive(Serialize)]
-struct GitHubTreeEntryRequest {
-    path: String,
-    mode: String,
-    #[serde(rename = "type")]
-    kind: String,
-    sha: Option<String>,
-}
-
-#[derive(Serialize)]
-struct GitHubCreateCommitRequest {
-    message: String,
-    tree: String,
-    parents: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    author: Option<models::repos::CommitAuthor>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    committer: Option<models::repos::CommitAuthor>,
-}
-
-#[derive(Serialize)]
-struct GitHubUpdateRefRequest<'a> {
-    sha: &'a str,
-    force: bool,
-}
-
-#[derive(Deserialize)]
-struct GitHubObjectShaResponse {
-    sha: String,
 }

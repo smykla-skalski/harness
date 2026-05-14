@@ -156,6 +156,8 @@ mod tests {
                         mode: TaskBoardGitSigningMode::Ssh,
                         ssh_key_path: Some(" /tmp/id_sign ".into()),
                         gpg_key_id: None,
+                        gpg_private_key_path: None,
+                        gpg_private_key_passphrase: None,
                     },
                 },
                 repository_overrides: vec![TaskBoardGitRepositoryOverride {
