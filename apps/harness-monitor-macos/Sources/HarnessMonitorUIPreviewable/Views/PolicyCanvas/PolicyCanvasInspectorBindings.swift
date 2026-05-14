@@ -12,28 +12,28 @@ extension PolicyCanvasInspector {
   var selectedNodeKindBinding: Binding<PolicyCanvasNodeKind> {
     Binding(
       get: { viewModel.selectedNode?.kind ?? .condition },
-      set: { viewModel.updateSelectedNodeKind($0) }
+      set: { viewModel.commitSelectedNodeKind($0) }
     )
   }
 
   var selectedNodeGroupBinding: Binding<String> {
     Binding(
       get: { viewModel.selectedNode?.groupID ?? Self.noneGroupTag },
-      set: { viewModel.updateSelectedNodeGroup($0 == Self.noneGroupTag ? nil : $0) }
+      set: { viewModel.commitSelectedNodeGroup($0 == Self.noneGroupTag ? nil : $0) }
     )
   }
 
   var selectedGroupTitleBinding: Binding<String> {
     Binding(
       get: { viewModel.selectedGroup?.title ?? "" },
-      set: { viewModel.updateSelectedGroupTitle($0) }
+      set: { viewModel.commitSelectedGroupTitle($0) }
     )
   }
 
   var selectedEdgeLabelBinding: Binding<String> {
     Binding(
       get: { viewModel.selectedEdge?.label ?? "" },
-      set: { viewModel.updateSelectedEdgeLabel($0) }
+      set: { viewModel.commitSelectedEdgeLabel($0) }
     )
   }
 
@@ -42,7 +42,7 @@ extension PolicyCanvasInspector {
   ) -> Binding<TaskBoardPolicyAction> {
     Binding(
       get: { policyKind.actions.first ?? policyKind.action ?? .spawnAgent },
-      set: { viewModel.updateSelectedPolicyAction($0) }
+      set: { viewModel.commitSelectedPolicyAction($0) }
     )
   }
 
@@ -51,7 +51,7 @@ extension PolicyCanvasInspector {
   ) -> Binding<TaskBoardPolicyEvidenceField> {
     Binding(
       get: { policyKind.checks.first?.field ?? policyKind.field ?? .checksGreen },
-      set: { viewModel.updateSelectedEvidenceField($0) }
+      set: { viewModel.commitSelectedEvidenceField($0) }
     )
   }
 
@@ -60,7 +60,7 @@ extension PolicyCanvasInspector {
   ) -> Binding<Int> {
     Binding(
       get: { Int(policyKind.threshold ?? 0) },
-      set: { viewModel.updateSelectedRiskThreshold($0) }
+      set: { viewModel.commitSelectedRiskThreshold($0) }
     )
   }
 
@@ -69,7 +69,7 @@ extension PolicyCanvasInspector {
   ) -> Binding<String> {
     Binding(
       get: { policyKind.reasonCode ?? policyKind.reasonCodes.first ?? "" },
-      set: { viewModel.updateSelectedReasonCode($0) }
+      set: { viewModel.commitSelectedReasonCode($0) }
     )
   }
 
@@ -78,7 +78,7 @@ extension PolicyCanvasInspector {
   ) -> Binding<String> {
     Binding(
       get: { policyKind.ruleId ?? "" },
-      set: { viewModel.updateSelectedRuleID($0) }
+      set: { viewModel.commitSelectedRuleID($0) }
     )
   }
 
@@ -87,7 +87,7 @@ extension PolicyCanvasInspector {
   ) -> Binding<String> {
     Binding(
       get: { policyKind.decision ?? "allow" },
-      set: { viewModel.updateSelectedDecision($0) }
+      set: { viewModel.commitSelectedDecision($0) }
     )
   }
 

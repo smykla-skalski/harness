@@ -12,6 +12,26 @@ extension PolicyCanvasViewModel {
     return true
   }
 
+  func createNode(kind: PolicyCanvasNodeKind, at point: CGPoint) {
+    let number = nextNodeNumber
+    nextNodeNumber += 1
+    var node = PolicyCanvasNode(
+      id: "\(kind.rawValue)-\(number)",
+      title: "\(kind.title) \(number)",
+      kind: kind,
+      position: snapped(
+        CGPoint(
+          x: point.x - PolicyCanvasLayout.nodeSize.width / 2,
+          y: point.y - PolicyCanvasLayout.nodeSize.height / 2
+        )
+      )
+    )
+    node.groupID = containingGroupID(for: nodeCenter(node))
+    node.policyKind = taskBoardPolicyNodeKind(for: kind)
+    let priorSelection = selection
+    mutate(.addNode(node, restoreSelection: priorSelection))
+  }
+
   func setInputTargeted(
     _ targeted: Bool,
     nodeID: String,

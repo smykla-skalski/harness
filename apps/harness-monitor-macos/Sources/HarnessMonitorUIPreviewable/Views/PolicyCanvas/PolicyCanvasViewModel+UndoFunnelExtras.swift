@@ -201,79 +201,9 @@ extension PolicyCanvasViewModel {
   }
 }
 
-// MARK: - Group lifecycle
+// MARK: - Status messages
 
 extension PolicyCanvasViewModel {
-  func applyMoveGroup(
-    id: String,
-    fromOrigin: CGPoint,
-    toOrigin: CGPoint,
-    memberOrigins: [String: CGPoint],
-    memberDestinations: [String: CGPoint]
-  ) -> PolicyCanvasChange {
-    if let index = groups.firstIndex(where: { $0.id == id }) {
-      groups[index].frame.origin = toOrigin
-    }
-    for nodeIndex in nodes.indices where nodes[nodeIndex].groupID == id {
-      if let destination = memberDestinations[nodes[nodeIndex].id] {
-        nodes[nodeIndex].position = destination
-      }
-    }
-    reconcileGroupFrames()
-    return .moveGroup(
-      id: id,
-      fromOrigin: toOrigin,
-      toOrigin: fromOrigin,
-      memberOrigins: memberDestinations,
-      memberDestinations: memberOrigins
-    )
-  }
-
-  func applyRemoveGroup(
-    id: String,
-    priorSelection: PolicyCanvasSelection?
-  ) -> PolicyCanvasChange {
-    guard let removedGroup = groups.first(where: { $0.id == id }) else {
-      return .restoreGroup(
-        PolicyCanvasGroup(id: id, title: id, frame: .zero, tone: .intake),
-        memberIDs: [],
-        restoreSelection: priorSelection
-      )
-    }
-    let formerMemberIDs = nodes.filter { $0.groupID == id }.map(\.id)
-    groups.removeAll { $0.id == id }
-    for nodeIndex in nodes.indices where nodes[nodeIndex].groupID == id {
-      nodes[nodeIndex].groupID = nil
-    }
-    if selection == .group(id) {
-      selection = nil
-    }
-    reconcileGroupFrames()
-    clearTransientGestureState()
-    return .restoreGroup(
-      removedGroup,
-      memberIDs: formerMemberIDs,
-      restoreSelection: priorSelection
-    )
-  }
-
-  func applyRestoreGroup(
-    _ group: PolicyCanvasGroup,
-    memberIDs: [String],
-    restoreSelection: PolicyCanvasSelection?
-  ) -> PolicyCanvasChange {
-    if !groups.contains(where: { $0.id == group.id }) {
-      groups.append(group)
-    }
-    let memberSet = Set(memberIDs)
-    for nodeIndex in nodes.indices where memberSet.contains(nodes[nodeIndex].id) {
-      nodes[nodeIndex].groupID = group.id
-    }
-    reconcileGroupFrames()
-    selection = restoreSelection
-    return .removeGroup(id: group.id, priorSelection: restoreSelection)
-  }
-
   /// Choose the status line each change publishes. The strings match what the
   /// non-funnelled paths used before the refactor so existing tests that
   /// assert on status prefixes keep passing.
@@ -346,6 +276,24 @@ extension PolicyCanvasViewModel {
         return "Removed \(nodes.count) item\(nodes.count == 1 ? "" : "s")"
       }
       return "Removed items"
+    case .setNodeTitle(_, _, let to):
+      return "Title set to \(to)"
+    case .setNodeKind(_, _, let to, _, _, _, _, _):
+      return "Kind set to \(to.title)"
+    case .setNodeGroup(_, _, let to):
+      return to == nil ? "Removed from group" : "Moved to group"
+    case .setNodeSubtitle(_, _, let to):
+      return "Subtitle set to \(to)"
+    case .setNodePolicyKind:
+      return "Node binding updated"
+    case .setEdgeCondition(_, _, let to):
+      return "Condition set to \(to)"
+    case .setEdgeLabel(_, _, let to):
+      return "Edge label set to \(to)"
+    case .setGroupTitle(_, _, let to):
+      return "Group renamed to \(to)"
+    case .setGroupTone(_, _, let to):
+      return "Group tone set to \(to.policyCanvasTitle)"
     }
   }
 

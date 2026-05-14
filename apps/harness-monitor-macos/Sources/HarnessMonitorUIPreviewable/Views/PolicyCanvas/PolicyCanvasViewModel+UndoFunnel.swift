@@ -35,9 +35,10 @@ extension PolicyCanvasViewModel {
   ///
   /// Callers must NOT bypass this method for any document-state mutation that
   /// belongs in the undo register; otherwise the user sees a step on screen
-  /// that Cmd+Z cannot reach. Per-keystroke editing-pane writes (title, label,
-  /// reason code) intentionally stay outside the funnel — flooding the stack
-  /// with one entry per character is worse than no undo for those fields.
+  /// that Cmd+Z cannot reach. Inspector commits (subtitle, title, kind,
+  /// group, picker properties) route through here on Enter/focus-loss so the
+  /// undo stack carries one entry per committed edit; per-keystroke writes
+  /// stay local to the inspector text fields.
   func mutate(_ change: PolicyCanvasChange) {
     let inverse = applyChange(change)
     if let manager = undoManager {
@@ -149,194 +150,43 @@ extension PolicyCanvasViewModel {
         restoreSelection: restoreSelection,
         restoreSecondaries: restoreSecondaries
       )
-    }
-  }
-
-  // MARK: - Node lifecycle
-
-  private func applyAddNode(
-    _ node: PolicyCanvasNode,
-    restoreSelection: PolicyCanvasSelection?
-  ) -> PolicyCanvasChange {
-    nodes.append(node)
-    cleanEphemeralNodeIDs.insert(node.id)
-    reconcileGroupFrames()
-    selection = .node(node.id)
-    return .removeNode(id: node.id, priorSelection: restoreSelection)
-  }
-
-  private func applyRemoveNode(
-    id: String,
-    priorSelection: PolicyCanvasSelection?
-  ) -> PolicyCanvasChange {
-    guard let removedNode = nodes.first(where: { $0.id == id }) else {
-      return .addNode(
-        PolicyCanvasNode(id: id, title: id, kind: .source, position: .zero),
-        restoreSelection: priorSelection
-      )
-    }
-    let incidentEdges = edges.filter { edge in
-      edge.source.nodeID == id || edge.target.nodeID == id
-    }
-    let cleanEphemeralNodeIncluded = cleanEphemeralNodeIDs.contains(id)
-    let cleanEphemeralEdgeIDsCaptured = cleanEphemeralEdgeIDs.intersection(
-      Set(incidentEdges.map(\.id))
-    )
-    nodes.removeAll { $0.id == id }
-    edges.removeAll { edge in
-      edge.source.nodeID == id || edge.target.nodeID == id
-    }
-    cleanEphemeralNodeIDs.remove(id)
-    for edge in incidentEdges {
-      cleanEphemeralEdgeIDs.remove(edge.id)
-    }
-    if selection == .node(id) {
-      selection = nil
-    }
-    reconcileGroupFrames()
-    clearTransientGestureState()
-    return .restoreNode(
-      removedNode,
-      incidentEdges: incidentEdges,
-      cleanEphemeralNodeIncluded: cleanEphemeralNodeIncluded,
-      cleanEphemeralEdgeIDs: cleanEphemeralEdgeIDsCaptured,
-      restoreSelection: priorSelection
-    )
-  }
-
-  private func applyRestoreNode(
-    _ node: PolicyCanvasNode,
-    incidentEdges: [PolicyCanvasEdge],
-    cleanEphemeralNodeIncluded: Bool,
-    cleanEphemeralEdgeIDs storedEdgeIDs: Set<String>,
-    restoreSelection: PolicyCanvasSelection?
-  ) -> PolicyCanvasChange {
-    nodes.append(node)
-    // If the daemon republished while this node was removed, an incident
-    // edge may now reference a node that no longer exists locally. Filter
-    // rather than crash — the user can replay the missing edge via remote
-    // re-load (load-seam dirty-protect lets them keep their other local
-    // edits). Live-node set is the freshly appended node id plus every
-    // other id currently in `nodes`.
-    let liveNodeIDs = Set(nodes.map(\.id))
-    for edge in incidentEdges where !edges.contains(where: { $0.id == edge.id }) {
-      guard
-        liveNodeIDs.contains(edge.source.nodeID),
-        liveNodeIDs.contains(edge.target.nodeID)
-      else {
-        continue
-      }
-      edges.append(edge)
-    }
-    if cleanEphemeralNodeIncluded {
-      cleanEphemeralNodeIDs.insert(node.id)
-    }
-    for edgeID in storedEdgeIDs {
-      cleanEphemeralEdgeIDs.insert(edgeID)
-    }
-    reconcileGroupFrames()
-    selection = restoreSelection
-    return .removeNode(id: node.id, priorSelection: restoreSelection)
-  }
-
-  private func applyMoveNode(
-    id: String,
-    from: CGPoint,
-    to: CGPoint,
-    fromGroupID: String?,
-    toGroupID: String?
-  ) -> PolicyCanvasChange {
-    guard let index = nodes.firstIndex(where: { $0.id == id }) else {
-      return .moveNode(
+    case .setNodeTitle(let id, let from, let to):
+      return applySetNodeTitle(id: id, from: from, to: to)
+    case .setNodeKind(
+      let id,
+      let from,
+      let to,
+      let fromSubtitle,
+      let toSubtitle,
+      let fromPolicyKind,
+      let toPolicyKind,
+      let removedEdges
+    ):
+      return applySetNodeKind(
         id: id,
-        from: to,
+        from: from,
         to: to,
-        fromGroupID: toGroupID,
-        toGroupID: fromGroupID
+        fromSubtitle: fromSubtitle,
+        toSubtitle: toSubtitle,
+        fromPolicyKind: fromPolicyKind,
+        toPolicyKind: toPolicyKind,
+        removedEdges: removedEdges
       )
+    case .setNodeGroup(let id, let from, let to):
+      return applySetNodeGroup(id: id, from: from, to: to)
+    case .setNodeSubtitle(let id, let from, let to):
+      return applySetNodeSubtitle(id: id, from: from, to: to)
+    case .setNodePolicyKind(let id, let from, let to):
+      return applySetNodePolicyKind(id: id, from: from, to: to)
+    case .setEdgeCondition(let id, let from, let to):
+      return applySetEdgeCondition(id: id, from: from, to: to)
+    case .setEdgeLabel(let id, let from, let to):
+      return applySetEdgeLabel(id: id, from: from, to: to)
+    case .setGroupTitle(let id, let from, let to):
+      return applySetGroupTitle(id: id, from: from, to: to)
+    case .setGroupTone(let id, let from, let to):
+      return applySetGroupTone(id: id, from: from, to: to)
     }
-    nodes[index].position = to
-    // Replay the caller-supplied group membership when present (undo path),
-    // otherwise compute auto-attach from the destination position the same
-    // way drag-end and arrow-nudge do. Capturing the prior membership lets
-    // the inverse restore it even when the destination is itself outside
-    // any group (which the original implementation could only express as
-    // an implicit clear).
-    let previousGroupID = nodes[index].groupID
-    if let toGroupID {
-      nodes[index].groupID = toGroupID
-    } else if let groupID = containingGroupID(
-      for: nodeCenter(nodes[index]),
-      excluding: nodes[index].groupID
-    ) {
-      nodes[index].groupID = groupID
-    } else if nodes[index].groupID == nil {
-      nodes[index].groupID = containingGroupID(for: nodeCenter(nodes[index]))
-    }
-    reconcileGroupFrames()
-    return .moveNode(
-      id: id,
-      from: to,
-      to: from,
-      fromGroupID: nodes[index].groupID,
-      toGroupID: fromGroupID ?? previousGroupID
-    )
-  }
-
-  // MARK: - Edge lifecycle
-
-  private func applyAddEdge(
-    _ edge: PolicyCanvasEdge,
-    restoreSelection: PolicyCanvasSelection?
-  ) -> PolicyCanvasChange {
-    edges.append(edge)
-    cleanEphemeralEdgeIDs.insert(edge.id)
-    selection = .edge(edge.id)
-    return .removeEdge(id: edge.id, priorSelection: restoreSelection)
-  }
-
-  private func applyRemoveEdge(
-    id: String,
-    priorSelection: PolicyCanvasSelection?
-  ) -> PolicyCanvasChange {
-    guard let removedEdge = edges.first(where: { $0.id == id }) else {
-      return .addEdge(
-        PolicyCanvasEdge(
-          id: id,
-          source: PolicyCanvasPortEndpoint(nodeID: "", portID: "", kind: .output),
-          target: PolicyCanvasPortEndpoint(nodeID: "", portID: "", kind: .input),
-          label: ""
-        ),
-        restoreSelection: priorSelection
-      )
-    }
-    let cleanEphemeralEdgeIncluded = cleanEphemeralEdgeIDs.contains(id)
-    edges.removeAll { $0.id == id }
-    cleanEphemeralEdgeIDs.remove(id)
-    if selection == .edge(id) {
-      selection = nil
-    }
-    clearTransientGestureState()
-    return .restoreEdge(
-      removedEdge,
-      cleanEphemeralEdgeIncluded: cleanEphemeralEdgeIncluded,
-      restoreSelection: priorSelection
-    )
-  }
-
-  private func applyRestoreEdge(
-    _ edge: PolicyCanvasEdge,
-    cleanEphemeralEdgeIncluded: Bool,
-    restoreSelection: PolicyCanvasSelection?
-  ) -> PolicyCanvasChange {
-    if !edges.contains(where: { $0.id == edge.id }) {
-      edges.append(edge)
-    }
-    if cleanEphemeralEdgeIncluded {
-      cleanEphemeralEdgeIDs.insert(edge.id)
-    }
-    selection = restoreSelection
-    return .removeEdge(id: edge.id, priorSelection: restoreSelection)
   }
 
 }

@@ -31,10 +31,15 @@ struct PolicyCanvasInspector: View {
         .scaledFont(.headline.weight(.semibold))
         .foregroundStyle(.white)
 
+      // Status line announces commit outcomes ("Node subtitle updated",
+      // "Restored Decision wall", etc.) plus group-acceptance drop
+      // signals — VoiceOver users only learn the edit landed via this
+      // line, so it ships as a polite live region per WCAG 4.1.3.
       Text(statusLine)
         .scaledFont(.caption)
         .foregroundStyle(.white.opacity(0.78))
         .lineLimit(1)
+        .accessibilityLiveRegion(.polite)
     }
   }
 
@@ -87,9 +92,11 @@ struct PolicyCanvasInspector: View {
 
   private func nodeSection(_ node: PolicyCanvasNode) -> some View {
     PolicyCanvasInspectorSection(title: "Node") {
-      nodeTitleField
-      nodeKindField
-      nodeGroupField
+      nodeTitleField(node)
+      nodeSubtitleField(node)
+      nodeKindField(node)
+      nodePolicyKindField(node)
+      nodeGroupField(node)
       PolicyCanvasInspectorRow(
         label: "Position",
         value: "\(Int(node.position.x)), \(Int(node.position.y))"
@@ -98,30 +105,69 @@ struct PolicyCanvasInspector: View {
     }
   }
 
-  @ViewBuilder
-  private var nodeTitleField: some View {
-    PolicyCanvasInspectorField(label: "Name") {
-      if let node = viewModel.selectedNode {
-        PolicyCanvasInspectorRenameField(
-          viewModel: viewModel,
-          nodeID: node.id,
-          originalTitle: node.title,
-          focusedField: $focusedField
-        )
-      } else {
-        // Selection is stale (node was deleted under us). Render a
-        // placeholder so the inspector row still renders something while
-        // the next selection change resolves the empty state.
-        Text("—")
-          .scaledFont(.callout)
-          .foregroundStyle(.white.opacity(0.5))
-      }
+  /// Wave 4K P08 subtitle field. Per-keystroke writes stay in the commit-
+  /// text-field's local @State; the funnel only sees the resulting string on
+  /// Enter or focus-loss so the undo stack carries one entry per committed
+  /// subtitle edit.
+  private func nodeSubtitleField(_ node: PolicyCanvasNode) -> some View {
+    PolicyCanvasInspectorField(label: "Subtitle") {
+      PolicyCanvasInspectorCommitTextField(
+        label: "Subtitle",
+        placeholder: "Subtitle",
+        value: node.subtitle,
+        focusField: .nodeSubtitle,
+        focusedField: $focusedField,
+        accessibilityIdentifier:
+          HarnessMonitorAccessibility.policyCanvasInspectorField("node-subtitle"),
+        commit: { viewModel.commitSelectedNodeSubtitle($0) }
+      )
     }
   }
 
-  private var nodeKindField: some View {
+  /// Wave 4K P08 policy-binding picker. Surfaces the kinds the daemon
+  /// understands as a discrete picker — the user can swap a node between
+  /// `action_gate`, `evidence_check`, `risk_classifier`, the gate variants
+  /// and `supervisor_rule` without re-typing the surrounding fields.
+  private func nodePolicyKindField(_ node: PolicyCanvasNode) -> some View {
+    PolicyCanvasInspectorField(label: "Binding") {
+      Picker("Policy binding", selection: selectedNodePolicyKindStringBinding(node)) {
+        ForEach(Self.policyKindOptions, id: \.self) { kindString in
+          Text(Self.policyKindTitle(for: kindString)).tag(kindString)
+        }
+      }
+      .labelsHidden()
+      .pickerStyle(.menu)
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.policyCanvasInspectorField("node-policy-kind")
+      )
+    }
+  }
+
+  /// Wave 4K P08 name field. Routes through the unified
+  /// PolicyCanvasInspectorCommitTextField wrapper so per-keystroke writes
+  /// stay in the wrapper's local @State and only the resulting string lands
+  /// through `mutate(_:)`.
+  private func nodeTitleField(_ node: PolicyCanvasNode) -> some View {
+    PolicyCanvasInspectorField(label: "Name") {
+      PolicyCanvasInspectorCommitTextField(
+        label: "Name",
+        placeholder: "Node name",
+        value: node.title,
+        focusField: .nodeTitle,
+        focusedField: $focusedField,
+        accessibilityIdentifier:
+          HarnessMonitorAccessibility.policyCanvasInspectorField("node-title"),
+        commit: { viewModel.commitSelectedNodeTitle($0) }
+      )
+    }
+  }
+
+  /// Wave 4K kind picker. Routes through `commitSelectedNodeKind` so the
+  /// undo funnel captures the prior kind plus every edge the kind switch
+  /// prunes — Cmd-Z restores both in one step.
+  private func nodeKindField(_ node: PolicyCanvasNode) -> some View {
     PolicyCanvasInspectorField(label: "Kind") {
-      Picker("Node kind", selection: selectedNodeKindBinding) {
+      Picker("Node kind", selection: selectedNodeKindBinding(node)) {
         ForEach(PolicyCanvasNodeKind.allCases) { kind in
           Text(kind.title).tag(kind)
         }
@@ -134,9 +180,9 @@ struct PolicyCanvasInspector: View {
     }
   }
 
-  private var nodeGroupField: some View {
+  private func nodeGroupField(_ node: PolicyCanvasNode) -> some View {
     PolicyCanvasInspectorField(label: "Group") {
-      Picker("Node group", selection: selectedNodeGroupBinding) {
+      Picker("Node group", selection: selectedNodeGroupBinding(node)) {
         Text("None").tag(Self.noneGroupTag)
         ForEach(viewModel.groups) { group in
           Text(group.title).tag(group.id)
@@ -153,14 +199,18 @@ struct PolicyCanvasInspector: View {
   private func groupSection(_ group: PolicyCanvasGroup) -> some View {
     PolicyCanvasInspectorSection(title: "Group") {
       PolicyCanvasInspectorField(label: "Name") {
-        TextField("Group name", text: selectedGroupTitleBinding)
-          .textFieldStyle(.roundedBorder)
-          .scaledFont(.callout)
-          .focused($focusedField, equals: .groupTitle)
-          .accessibilityIdentifier(
-            HarnessMonitorAccessibility.policyCanvasInspectorField("group-title")
-          )
+        PolicyCanvasInspectorCommitTextField(
+          label: "Group name",
+          placeholder: "Group name",
+          value: group.title,
+          focusField: .groupTitle,
+          focusedField: $focusedField,
+          accessibilityIdentifier:
+            HarnessMonitorAccessibility.policyCanvasInspectorField("group-title"),
+          commit: { viewModel.commitSelectedGroupTitle($0) }
+        )
       }
+      groupToneField(group)
       PolicyCanvasInspectorRow(label: "Nodes", value: "\(viewModel.nodes(in: group.id).count)")
       PolicyCanvasInspectorRow(
         label: "Frame",
@@ -169,16 +219,48 @@ struct PolicyCanvasInspector: View {
     }
   }
 
+  /// Wave 4K P08 group-tone picker. Swaps the group's `tone` (intake /
+  /// evaluation / release), routes through the commit funnel for undo.
+  private func groupToneField(_ group: PolicyCanvasGroup) -> some View {
+    PolicyCanvasInspectorField(label: "Tone") {
+      Picker("Group tone", selection: selectedGroupToneBinding(group)) {
+        ForEach(PolicyCanvasGroupTone.allCases, id: \.self) { tone in
+          Text(tone.policyCanvasTitle).tag(tone)
+        }
+      }
+      .labelsHidden()
+      .pickerStyle(.menu)
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.policyCanvasInspectorField("group-tone")
+      )
+    }
+  }
+
   private func edgeSection(_ edge: PolicyCanvasEdge) -> some View {
     PolicyCanvasInspectorSection(title: "Edge") {
       PolicyCanvasInspectorField(label: "Label") {
-        TextField("Edge label", text: selectedEdgeLabelBinding)
-          .textFieldStyle(.roundedBorder)
-          .scaledFont(.callout)
-          .focused($focusedField, equals: .edgeLabel)
-          .accessibilityIdentifier(
-            HarnessMonitorAccessibility.policyCanvasInspectorField("edge-label")
-          )
+        PolicyCanvasInspectorCommitTextField(
+          label: "Edge label",
+          placeholder: "Edge label",
+          value: edge.label,
+          focusField: .edgeLabel,
+          focusedField: $focusedField,
+          accessibilityIdentifier:
+            HarnessMonitorAccessibility.policyCanvasInspectorField("edge-label"),
+          commit: { viewModel.commitSelectedEdgeLabel($0) }
+        )
+      }
+      PolicyCanvasInspectorField(label: "Condition") {
+        PolicyCanvasInspectorCommitTextField(
+          label: "Edge condition",
+          placeholder: "Condition",
+          value: edge.condition,
+          focusField: .edgeCondition,
+          focusedField: $focusedField,
+          accessibilityIdentifier:
+            HarnessMonitorAccessibility.policyCanvasInspectorField("edge-condition"),
+          commit: { viewModel.commitSelectedEdgeCondition($0) }
+        )
       }
       PolicyCanvasInspectorRow(label: "Source", value: edge.source.nodeID)
       PolicyCanvasInspectorRow(label: "Target", value: edge.target.nodeID)
@@ -193,112 +275,117 @@ struct PolicyCanvasInspector: View {
   }
 
   @ViewBuilder
-  private func nodePolicyControls(_ node: PolicyCanvasNode) -> some View {
-    let policyKind = node.policyKind ?? taskBoardPolicyNodeKind(for: node.kind)
-    switch policyKind.kind {
+  fileprivate func nodePolicyControls(_ node: PolicyCanvasNode) -> some View {
+    PolicyCanvasInspectorNodePolicyControls(
+      viewModel: viewModel,
+      node: node,
+      focusedField: $focusedField
+    )
+  }
+
+  fileprivate static let noneGroupTag = "__none__"
+
+  /// Discrete policy-kind options surfaced by the picker. Order matches the
+  /// daemon's enum walk: trigger -> action gate -> evidence -> risk -> human
+  /// -> consensus -> dry-run -> supervisor. Tag identity is the kind string
+  /// so `Picker` does not require `Hashable` on the full
+  /// `TaskBoardPolicyPipelineNodeKind` struct (it carries non-Hashable
+  /// payloads). `defaultPolicyKind(for:)` rebuilds the full struct with
+  /// sensible defaults when the user picks a kind.
+  static let policyKindOptions: [String] = [
+    "trigger",
+    "action_gate",
+    "evidence_check",
+    "risk_classifier",
+    "human_gate",
+    "consensus_gate",
+    "dry_run_gate",
+    "supervisor_rule",
+  ]
+
+  static func policyKindTitle(for kind: String) -> String {
+    switch kind {
+    case "trigger":
+      return "Trigger"
     case "action_gate":
-      policyActionField(policyKind)
+      return "Action gate"
     case "evidence_check":
-      policyEvidenceField(policyKind)
+      return "Evidence check"
     case "risk_classifier":
-      riskThresholdField(policyKind)
-    case "human_gate", "consensus_gate", "dry_run_gate":
-      reasonCodeField(policyKind)
+      return "Risk classifier"
+    case "human_gate":
+      return "Human gate"
+    case "consensus_gate":
+      return "Consensus gate"
+    case "dry_run_gate":
+      return "Dry-run gate"
     case "supervisor_rule":
-      supervisorRuleFields(policyKind)
+      return "Supervisor rule"
     default:
-      PolicyCanvasInspectorRow(label: "Binding", value: policyKind.kind)
+      return kind.replacingOccurrences(of: "_", with: " ").capitalized
     }
   }
 
-  private func policyActionField(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> some View {
-    PolicyCanvasInspectorField(label: "Action") {
-      Picker("Action binding", selection: selectedPolicyActionBinding(policyKind)) {
-        ForEach(TaskBoardPolicyAction.allCases) { action in
-          Text(action.policyCanvasTitle).tag(action)
-        }
-      }
-      .labelsHidden()
-      .pickerStyle(.menu)
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.policyCanvasInspectorField("action-binding")
+  /// Build a `TaskBoardPolicyPipelineNodeKind` for the given kind string,
+  /// preserving as much existing payload as possible. When the user picks
+  /// the same kind back, the result is byte-equal to the source; otherwise
+  /// the result carries the minimal sensible defaults for the new kind so
+  /// the daemon round-trip succeeds without a follow-up edit.
+  static func defaultPolicyKind(
+    for kindString: String,
+    existing: TaskBoardPolicyPipelineNodeKind?
+  ) -> TaskBoardPolicyPipelineNodeKind {
+    if let existing, existing.kind == kindString {
+      return existing
+    }
+    switch kindString {
+    case "trigger":
+      return TaskBoardPolicyPipelineNodeKind(kind: "trigger", workflow: "default-task")
+    case "action_gate":
+      return TaskBoardPolicyPipelineNodeKind(kind: "action_gate", action: .spawnAgent)
+    case "evidence_check":
+      return TaskBoardPolicyPipelineNodeKind(kind: "evidence_check")
+    case "risk_classifier":
+      return TaskBoardPolicyPipelineNodeKind(kind: "risk_classifier", threshold: 50)
+    case "human_gate":
+      return TaskBoardPolicyPipelineNodeKind(kind: "human_gate")
+    case "consensus_gate":
+      return TaskBoardPolicyPipelineNodeKind(kind: "consensus_gate")
+    case "dry_run_gate":
+      return TaskBoardPolicyPipelineNodeKind(kind: "dry_run_gate")
+    case "supervisor_rule":
+      return TaskBoardPolicyPipelineNodeKind(
+        kind: "supervisor_rule",
+        ruleId: "stuck-agent"
       )
+    default:
+      return TaskBoardPolicyPipelineNodeKind(kind: kindString)
     }
   }
 
-  private func policyEvidenceField(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> some View {
-    PolicyCanvasInspectorField(label: "Evidence") {
-      Picker("Evidence field", selection: selectedEvidenceFieldBinding(policyKind)) {
-        ForEach(TaskBoardPolicyEvidenceField.allCases, id: \.self) { field in
-          Text(field.policyCanvasTitle).tag(field)
-        }
-      }
-      .labelsHidden()
-      .pickerStyle(.menu)
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.policyCanvasInspectorField("evidence-field")
-      )
-    }
-  }
-
-  private func riskThresholdField(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> some View {
-    PolicyCanvasInspectorField(label: "Risk") {
-      Stepper(value: selectedRiskThresholdBinding(policyKind), in: 0...100) {
-        Text("\(policyKind.threshold.map(Int.init) ?? 0)")
-          .scaledFont(.caption.monospacedDigit().weight(.semibold))
-          .foregroundStyle(.white.opacity(0.86))
-      }
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.policyCanvasInspectorField("risk-threshold")
-      )
-    }
-  }
-
-  private func reasonCodeField(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> some View {
-    PolicyCanvasInspectorField(label: "Reason") {
-      TextField("Reason code", text: selectedReasonCodeBinding(policyKind))
-        .textFieldStyle(.roundedBorder)
-        .scaledFont(.callout)
-        .focused($focusedField, equals: .reasonCode)
-        .accessibilityIdentifier(
-          HarnessMonitorAccessibility.policyCanvasInspectorField("reason-code")
+  private func selectedNodePolicyKindStringBinding(
+    _ node: PolicyCanvasNode
+  ) -> Binding<String> {
+    Binding(
+      get: {
+        node.policyKind?.kind ?? taskBoardPolicyNodeKind(for: node.kind).kind
+      },
+      set: { newKindString in
+        let newKind = Self.defaultPolicyKind(
+          for: newKindString,
+          existing: node.policyKind
         )
-    }
+        viewModel.commitSelectedNodePolicyKind(newKind)
+      }
+    )
   }
 
-  private func supervisorRuleFields(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-      PolicyCanvasInspectorField(label: "Rule") {
-        TextField("Rule id", text: selectedRuleIDBinding(policyKind))
-          .textFieldStyle(.roundedBorder)
-          .scaledFont(.callout)
-          .focused($focusedField, equals: .ruleID)
-          .accessibilityIdentifier(
-            HarnessMonitorAccessibility.policyCanvasInspectorField("rule-id")
-          )
-      }
-      PolicyCanvasInspectorField(label: "Decision") {
-        Picker("Gate behavior", selection: selectedDecisionBinding(policyKind)) {
-          Text("Allow").tag("allow")
-          Text("Deny").tag("deny")
-        }
-        .labelsHidden()
-        .pickerStyle(.segmented)
-        .accessibilityIdentifier(
-          HarnessMonitorAccessibility.policyCanvasInspectorField("gate-behavior")
-        )
-      }
-    }
+  private func selectedGroupToneBinding(
+    _ group: PolicyCanvasGroup
+  ) -> Binding<PolicyCanvasGroupTone> {
+    Binding(
+      get: { group.tone },
+      set: { viewModel.commitSelectedGroupTone($0) }
+    )
   }
-
 }
