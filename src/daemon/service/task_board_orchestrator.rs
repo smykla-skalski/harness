@@ -19,6 +19,10 @@ use super::task_board::{
     sync_task_board_async_with_config,
 };
 use super::task_board_evaluation::{evaluate_task_board, evaluate_task_board_async};
+use super::task_board_github::{
+    run_task_board_github_automation, run_task_board_github_automation_async,
+};
+use super::task_board_runtime::external_sync_config_for_repository;
 
 /// Load task-board orchestrator status from durable JSON state.
 ///
@@ -99,6 +103,18 @@ pub fn run_task_board_orchestrator_once(
             return Err(error);
         }
     };
+    let items = orchestrator.items_for_input(&prepared.input)?;
+    let board_root = default_board_root();
+    if let Err(error) = run_task_board_github_automation(
+        &board_root,
+        &orchestrator.settings()?,
+        &prepared.input,
+        &items,
+        db,
+    ) {
+        orchestrator.fail_run(&prepared, &error)?;
+        return Err(error);
+    }
     orchestrator.complete_run_with_evaluation(prepared, dispatch, Some(evaluation))
 }
 
@@ -141,6 +157,20 @@ pub(crate) async fn run_task_board_orchestrator_once_async(
             return Err(error);
         }
     };
+    let items = orchestrator.items_for_input(&prepared.input)?;
+    let board_root = default_board_root();
+    if let Err(error) = run_task_board_github_automation_async(
+        &board_root,
+        &orchestrator.settings()?,
+        &prepared.input,
+        &items,
+        async_db,
+    )
+    .await
+    {
+        orchestrator.fail_run(&prepared, &error)?;
+        return Err(error);
+    }
     orchestrator.complete_run_with_evaluation(prepared, dispatch, Some(evaluation))
 }
 
@@ -214,8 +244,7 @@ fn github_sync_config(
     {
         return Ok(None);
     }
-    let config = ExternalSyncConfig::from_env()
-        .with_github_repository_fallback(github_repository(&settings).as_deref());
+    let config = external_sync_config_for_repository(github_repository(&settings).as_deref())?;
     if config.token_for(ExternalProvider::GitHub).is_none() || config.github_repository().is_none()
     {
         return Ok(None);

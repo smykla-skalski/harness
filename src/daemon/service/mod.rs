@@ -239,7 +239,9 @@ mod status;
 mod sync_support;
 mod task_board;
 mod task_board_evaluation;
+mod task_board_github;
 mod task_board_orchestrator;
+mod task_board_runtime;
 mod wake_route;
 
 pub use adopt::adopt_session_record;
@@ -309,6 +311,10 @@ pub use task_board_orchestrator::{
     run_task_board_orchestrator_once, start_task_board_orchestrator, stop_task_board_orchestrator,
     task_board_orchestrator_settings, task_board_orchestrator_status,
     update_task_board_orchestrator_settings,
+};
+pub use task_board_runtime::{
+    sync_task_board_github_tokens, task_board_git_runtime_config,
+    update_task_board_git_runtime_config,
 };
 pub use wake_route::WakeDispatch;
 pub(crate) use wake_route::{WakeEventLevel, record_wake_event};

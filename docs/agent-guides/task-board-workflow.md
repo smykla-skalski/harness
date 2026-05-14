@@ -276,6 +276,14 @@ act as the repository fallback when `HARNESS_GITHUB_REPOSITORY` or
 tick. Failures persist a failed last-run summary instead of silently dropping
 tick state.
 
+When GitHub automations are enabled, the same tick also reuses the dispatched
+session worktree to manage the PR lifecycle for repo-scoped items. Harness
+publishes the managed branch, creates or reuses the configured draft PR, marks
+it ready for review when requested, syncs managed labels, reads checks and
+review evidence through GitHub, and auto-merges only when the merge policy
+allows it. Review-changes-requested items do not open fresh PRs until the
+underlying task becomes reviewable again.
+
 ## Policy Pipeline
 
 Dispatch policy is part of readiness. The built-in gate allows normal planning,

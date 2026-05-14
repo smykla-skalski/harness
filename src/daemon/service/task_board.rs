@@ -19,12 +19,14 @@ use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::{
     DispatchAppliedTask, DispatchExecutionSummary, DispatchPlan, ExternalSyncConfig,
-    ExternalSyncOptions, PolicyPipelineStore, SessionIntent, TaskBoardItem, TaskBoardStatus,
-    TaskBoardStore, TaskBoardWorkflowStatus, build_audit_summary, build_dispatch_summary,
-    build_machine_summaries, build_project_summaries, build_sync_summary, configured_sync_clients,
-    default_board_root, sync_external_tasks,
+    ExternalSyncOptions, PolicyPipelineStore, SessionIntent, TaskBoardItem, TaskBoardOrchestrator,
+    TaskBoardStatus, TaskBoardStore, TaskBoardWorkflowStatus, build_audit_summary,
+    build_dispatch_summary, build_machine_summaries, build_project_summaries, build_sync_summary,
+    configured_sync_clients, default_board_root, sync_external_tasks,
 };
 use crate::workspace::utc_now;
+
+use super::task_board_runtime::external_sync_config_for_repository;
 
 /// Create a persisted task-board item.
 ///
@@ -116,7 +118,7 @@ pub fn sync_task_board(request: &TaskBoardSyncRequest) -> Result<TaskBoardSyncRe
 pub async fn sync_task_board_async(
     request: &TaskBoardSyncRequest,
 ) -> Result<TaskBoardSyncResponse, CliError> {
-    sync_task_board_async_with_config(request, ExternalSyncConfig::from_env()).await
+    sync_task_board_async_with_config(request, active_external_sync_config()?).await
 }
 
 pub(crate) async fn sync_task_board_async_with_config(
@@ -475,7 +477,19 @@ fn policy_store() -> PolicyPipelineStore {
 fn run_task_board_sync_blocking(
     request: &TaskBoardSyncRequest,
 ) -> Result<TaskBoardSyncResponse, CliError> {
-    run_task_board_sync_blocking_with_config(request, ExternalSyncConfig::from_env())
+    run_task_board_sync_blocking_with_config(request, active_external_sync_config()?)
+}
+
+fn active_external_sync_config() -> Result<ExternalSyncConfig, CliError> {
+    let repository = TaskBoardOrchestrator::new(default_board_root())
+        .settings()
+        .ok()
+        .and_then(|settings| {
+            let project = settings.github_project;
+            (!project.owner.trim().is_empty() && !project.repo.trim().is_empty())
+                .then(|| project.repository_slug())
+        });
+    external_sync_config_for_repository(repository.as_deref())
 }
 
 pub(crate) fn run_task_board_sync_blocking_with_config(

@@ -1,16 +1,28 @@
+use std::collections::BTreeMap;
+use std::sync::{LazyLock, RwLock};
+
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty};
+use crate::task_board::{
+    TaskBoardGitHubTokensSyncRequest, TaskBoardGitHubTokensSyncResponse, TaskBoardGitRuntimeConfig,
+    normalize_repository_slug,
+};
 
 use super::{append_event_best_effort, config_path, ensure_daemon_dirs};
 
 pub const VALID_LOG_LEVELS: &[&str] = &["trace", "debug", "info", "warn", "error"];
 
+static TASK_BOARD_GITHUB_TOKENS: LazyLock<RwLock<TaskBoardGitHubTokenState>> =
+    LazyLock::new(|| RwLock::new(TaskBoardGitHubTokenState::default()));
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct DaemonRuntimeConfig {
     #[serde(default)]
     pub log_level: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task_board_git_runtime_config: Option<TaskBoardGitRuntimeConfig>,
 }
 
 /// Load the persisted daemon runtime config, if present.
@@ -46,6 +58,61 @@ pub fn persist_log_level(level: Option<&str>) -> Result<(), CliError> {
     let mut config = load_runtime_config_for_persist();
     config.log_level = normalized;
     write_json_pretty(&config_path(), &config)
+}
+
+/// Load the persisted task-board git runtime config, defaulting when absent.
+///
+/// # Errors
+/// Returns `CliError` when the daemon runtime config exists but cannot be parsed.
+pub fn load_task_board_git_runtime_config() -> Result<TaskBoardGitRuntimeConfig, CliError> {
+    Ok(load_runtime_config()?
+        .and_then(|config| config.task_board_git_runtime_config)
+        .unwrap_or_default())
+}
+
+/// Persist the task-board git runtime config inside the daemon runtime config file.
+///
+/// # Errors
+/// Returns `CliError` when the runtime config cannot be written.
+pub fn persist_task_board_git_runtime_config(
+    task_board_config: &TaskBoardGitRuntimeConfig,
+) -> Result<(), CliError> {
+    ensure_daemon_dirs()?;
+    let mut config = load_runtime_config_for_persist();
+    config.task_board_git_runtime_config =
+        (!task_board_config.is_empty()).then_some(task_board_config.clone());
+    write_json_pretty(&config_path(), &config)
+}
+
+/// Replace the daemon's in-memory GitHub token snapshot.
+#[must_use]
+pub fn replace_task_board_github_tokens(
+    request: &TaskBoardGitHubTokensSyncRequest,
+) -> TaskBoardGitHubTokensSyncResponse {
+    let mut state = TASK_BOARD_GITHUB_TOKENS
+        .write()
+        .expect("task-board github token state lock poisoned");
+    state.global_token = normalize_optional_value(request.global_token.as_deref());
+    state.repository_tokens = request
+        .repository_tokens
+        .iter()
+        .filter_map(|token| token.normalized())
+        .map(|token| (token.repository, token.token))
+        .collect();
+    TaskBoardGitHubTokensSyncResponse {
+        global_token_configured: state.global_token.is_some(),
+        repository_token_count: state.repository_tokens.len(),
+    }
+}
+
+#[must_use]
+pub fn task_board_github_token(repository: Option<&str>) -> Option<String> {
+    let state = TASK_BOARD_GITHUB_TOKENS
+        .read()
+        .expect("task-board github token state lock poisoned");
+    normalize_repository_slug(repository)
+        .and_then(|repository| state.repository_tokens.get(&repository).cloned())
+        .or_else(|| state.global_token.clone())
 }
 
 /// Normalize and validate a daemon log level.
@@ -89,4 +156,17 @@ fn load_runtime_config_for_persist() -> DaemonRuntimeConfig {
             DaemonRuntimeConfig::default()
         }
     }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct TaskBoardGitHubTokenState {
+    global_token: Option<String>,
+    repository_tokens: BTreeMap<String, String>,
+}
+
+fn normalize_optional_value(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
 }
