@@ -100,10 +100,10 @@ pub fn delete_task_board_item(
     store().delete(&request.id)
 }
 
-/// Summarize external sync readiness for local task-board items.
+/// Preview or apply external sync for local task-board items.
 ///
 /// # Errors
-/// Returns `CliError` when board items cannot be loaded.
+/// Returns `CliError` when board items cannot be loaded or sync execution fails.
 pub fn sync_task_board(request: &TaskBoardSyncRequest) -> Result<TaskBoardSyncResponse, CliError> {
     run_task_board_sync_blocking(request)
 }
@@ -116,8 +116,14 @@ pub fn sync_task_board(request: &TaskBoardSyncRequest) -> Result<TaskBoardSyncRe
 pub async fn sync_task_board_async(
     request: &TaskBoardSyncRequest,
 ) -> Result<TaskBoardSyncResponse, CliError> {
+    sync_task_board_async_with_config(request, ExternalSyncConfig::from_env()).await
+}
+
+pub(crate) async fn sync_task_board_async_with_config(
+    request: &TaskBoardSyncRequest,
+    config: ExternalSyncConfig,
+) -> Result<TaskBoardSyncResponse, CliError> {
     let board = store();
-    let config = ExternalSyncConfig::from_env();
     let clients = configured_sync_clients(&config, request.provider)?;
     let operations = sync_external_tasks(&board, sync_options(request), &clients).await?;
     let items = board.list(request.status)?;
@@ -469,13 +475,20 @@ fn policy_store() -> PolicyPipelineStore {
 fn run_task_board_sync_blocking(
     request: &TaskBoardSyncRequest,
 ) -> Result<TaskBoardSyncResponse, CliError> {
+    run_task_board_sync_blocking_with_config(request, ExternalSyncConfig::from_env())
+}
+
+pub(crate) fn run_task_board_sync_blocking_with_config(
+    request: &TaskBoardSyncRequest,
+    config: ExternalSyncConfig,
+) -> Result<TaskBoardSyncResponse, CliError> {
     TokioRuntimeBuilder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|error| {
             CliErrorKind::workflow_io(format!("create task-board sync runtime: {error}"))
         })?
-        .block_on(sync_task_board_async(request))
+        .block_on(sync_task_board_async_with_config(request, config))
 }
 
 fn sync_options(request: &TaskBoardSyncRequest) -> ExternalSyncOptions {

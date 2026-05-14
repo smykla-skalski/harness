@@ -19,6 +19,8 @@ Use this reference when coordinating cross-project work through
 `audit`, `project`, `machine`, and `orchestrator`.
 
 Common read flags: `--json`, `--board-root <path>`.
+`sync` can preview or apply external provider changes; use `--provider`,
+`--direction <pull|push|both>`, and `--apply` to narrow scope and persistence.
 
 ## Statuses
 
@@ -41,6 +43,9 @@ Dispatch readiness requires `todo`, a non-empty planning summary, an approver,
 an approval timestamp, no tombstone, no existing session work-item link, and an
 `allow` policy decision for `spawn_agent`.
 The CLI writes the approval timestamp when `--approved-by` is set.
+Applied GitHub pulls synthesize planning approval with the control-plane actor
+so imported issues land as repo-scoped `todo` items that can dispatch
+immediately. The full issue body stays in the task body.
 
 ```bash
 harness task-board create \
@@ -105,7 +110,9 @@ harness task-board orchestrator status --json
 - `project` groups by `project_id`; `--status` narrows the set.
 - `machine` groups by `agent_mode`; `--status` narrows the set.
 - `sync` reports external-provider readiness; `--provider`, `--direction`, and
-  `--apply` control provider scope and whether changes are persisted.
+  `--apply` control provider scope and whether changes are persisted. Responses
+  include previewed or applied operations. GitHub pull imports preserve
+  `owner/repo` in `project_id` and synthesize dispatch-ready planning approval.
 - `dispatch` reports session, worker, reviewer, evaluator, and block reasons
   for the selected status or item.
 - `evaluate` reports reconciled, updated, skipped, completed, reviewing,
@@ -158,8 +165,13 @@ harness task-board orchestrator settings --project-dir <project-dir> --json
 
 Defaults are `dry_run_default=true` and `dispatch_status_filter=todo`.
 `run-once` records dispatch, runs dispatch through the daemon service, records
-evaluation, evaluates linked work, and persists the last run. `--apply`
-overrides the dry-run default for one tick.
+evaluation, evaluates linked work, and persists the last run. When
+`github_project.enabled_automations` includes `sync_task_board`, `run-once`
+first performs GitHub pull preview/apply using the current dry-run mode.
+Persisted `github_project.owner`/`repo` settings act as the repository fallback
+when `HARNESS_GITHUB_REPOSITORY` or `GITHUB_REPOSITORY` is unset. `--apply`
+overrides the dry-run default for one tick. Failures persist a failed last-run
+summary instead of dropping tick state.
 
 ## Policy Pipeline
 

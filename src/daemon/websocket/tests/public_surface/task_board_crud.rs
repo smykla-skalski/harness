@@ -65,10 +65,35 @@ fn websocket_task_board_crud_sync_audit_and_orchestrator_routes_use_real_state()
                 &connection,
                 "req-crud-sync",
                 ws_methods::TASK_BOARD_SYNC,
-                json!({ "status": "todo", "dry_run": true }),
+                json!({
+                    "status": "todo",
+                    "direction": "push",
+                    "dry_run": true,
+                }),
             )
             .await;
             assert_eq!(sync["total"].as_u64(), Some(1));
+            let sync_error = dispatch(
+                &WsRequest {
+                    id: "req-crud-sync-error".to_string(),
+                    method: ws_methods::TASK_BOARD_SYNC.to_string(),
+                    params: json!({
+                        "provider": "todoist",
+                        "direction": "pull",
+                        "dry_run": true,
+                    }),
+                    trace_context: None,
+                },
+                &state,
+                &connection,
+            )
+            .await;
+            assert!(
+                sync_error
+                    .error
+                    .as_ref()
+                    .is_some_and(|error| error.message.contains("external sync token missing"))
+            );
             let audit = call(
                 &state,
                 &connection,
@@ -112,6 +137,15 @@ fn websocket_task_board_crud_sync_audit_and_orchestrator_routes_use_real_state()
             )
             .await;
             assert_eq!(settings["dry_run_default"].as_bool(), Some(false));
+            let loaded_settings = call(
+                &state,
+                &connection,
+                "req-orch-settings-get",
+                ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_GET,
+                json!({}),
+            )
+            .await;
+            assert_eq!(loaded_settings["dry_run_default"].as_bool(), Some(false));
             assert_eq!(
                 call(
                     &state,

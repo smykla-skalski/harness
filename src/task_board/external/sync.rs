@@ -2,8 +2,9 @@ use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::CliError;
+use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::store::{TaskBoardItemPatch, TaskBoardStore};
-use crate::task_board::types::{ExternalRef, TaskBoardItem, TaskBoardStatus};
+use crate::task_board::types::{ExternalRef, PlanningState, TaskBoardItem, TaskBoardStatus};
 use crate::workspace::utc_now;
 
 use super::{
@@ -138,15 +139,23 @@ async fn pull_provider_tasks(
     client: &dyn ExternalSyncClient,
     operations: &mut Vec<ExternalSyncOperation>,
 ) -> Result<(), CliError> {
-    if options.dry_run {
-        return Ok(());
-    }
     let tasks = client.pull_tasks().await?;
     for task in tasks {
         if options.status.is_some_and(|status| task.status != status) {
             continue;
         }
         if item_exists_for_ref(board, &task.reference)? {
+            continue;
+        }
+        if options.dry_run {
+            operations.push(operation(
+                client.provider(),
+                ExternalSyncAction::Pull,
+                Some(external_item_id(&task.reference)),
+                task.reference,
+                true,
+                false,
+            ));
             continue;
         }
         let item = create_item_from_external(&task);
@@ -218,7 +227,11 @@ fn create_item_from_external(task: &ExternalTask) -> TaskBoardItem {
         now,
     );
     item.status = task.status;
+    item.project_id.clone_from(&task.project_id);
     item.external_refs = vec![task.reference.clone().into_core_ref()];
+    if let Some(planning) = imported_external_planning(task) {
+        item.planning = planning;
+    }
     item
 }
 
@@ -268,6 +281,44 @@ fn external_item_id(reference: &ExternalTaskRef) -> String {
         reference.provider,
         safe_id_part(&reference.external_id)
     )
+}
+
+fn imported_external_planning(task: &ExternalTask) -> Option<PlanningState> {
+    match task.reference.provider {
+        ExternalProvider::GitHub => Some(PlanningState {
+            summary: Some(github_import_summary(task)),
+            approved_by: Some(CONTROL_PLANE_ACTOR_ID.to_string()),
+            approved_at: Some(timestamp_or_now(task.updated_at.as_deref())),
+        }),
+        ExternalProvider::Todoist => None,
+    }
+}
+
+fn github_import_summary(task: &ExternalTask) -> String {
+    let title = task.title.trim();
+    match (title.is_empty(), task.reference.url.as_deref()) {
+        (false, Some(url)) => {
+            format!("Handle the linked GitHub issue \"{title}\" and preserve scope from {url}.")
+        }
+        (false, None) => {
+            format!(
+                "Handle the linked GitHub issue \"{title}\" and preserve scope from the issue body."
+            )
+        }
+        (true, Some(url)) => {
+            format!("Handle the linked GitHub issue and preserve scope from {url}.")
+        }
+        (true, None) => {
+            "Handle the linked GitHub issue and preserve scope from the issue body.".to_string()
+        }
+    }
+}
+
+fn timestamp_or_now(value: Option<&str>) -> String {
+    value
+        .map(str::trim)
+        .filter(|timestamp| !timestamp.is_empty())
+        .map_or_else(utc_now, ToOwned::to_owned)
 }
 
 fn safe_id_part(value: &str) -> String {

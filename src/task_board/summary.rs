@@ -159,7 +159,7 @@ fn provider_sync_summary(
             .any(|reference| reference.provider == ref_provider)
         {
             linked += 1;
-        } else if can_push_to_provider(item, provider) {
+        } else if can_push_to_provider(item, provider, config) {
             pushable += 1;
         } else {
             blocked += 1;
@@ -179,9 +179,16 @@ fn provider_sync_summary(
     }
 }
 
-fn can_push_to_provider(item: &TaskBoardItem, provider: ExternalProvider) -> bool {
+fn can_push_to_provider(
+    item: &TaskBoardItem,
+    provider: ExternalProvider,
+    config: &ExternalSyncConfig,
+) -> bool {
     match provider {
-        ExternalProvider::GitHub => item.project_id.as_deref().is_some_and(is_github_repo),
+        ExternalProvider::GitHub => {
+            item.project_id.as_deref().is_some_and(is_github_repo)
+                || config.github_repository().is_some()
+        }
         ExternalProvider::Todoist => true,
     }
 }
@@ -264,6 +271,27 @@ mod tests {
         assert_eq!(github.pushable, 1);
         assert!(!todoist.configured);
         assert_eq!(todoist.linked, 1);
+    }
+
+    #[test]
+    fn sync_summary_counts_github_repository_fallback_as_pushable() {
+        let item = ready_item("task-1", "", AgentMode::Headless);
+        let config = ExternalSyncConfig {
+            github_token: Some("token".into()),
+            github_repository: Some("owner/repo".into()),
+            todoist_token: None,
+        };
+
+        let summary = build_sync_summary(&[item], &config);
+        let github = summary
+            .providers
+            .iter()
+            .find(|entry| entry.provider == ExternalProvider::GitHub)
+            .expect("github summary");
+
+        assert!(github.configured);
+        assert_eq!(github.pushable, 1);
+        assert_eq!(github.blocked, 0);
     }
 
     fn ready_item(id: &str, project_id: &str, mode: AgentMode) -> TaskBoardItem {

@@ -24,7 +24,7 @@ dispatch readiness, and overview reporting.
 | `get` | Show one board task. |
 | `update` | Change task fields, status, priority, project, tags, or planning state. |
 | `delete` | Tombstone one board task. |
-| `sync` | Print external synchronization readiness. |
+| `sync` | Preview or apply external synchronization. |
 | `dispatch` | Print session dispatch plans for board tasks, or apply ready plans. |
 | `evaluate` | Reconcile linked session work back into board workflow state. |
 | `audit` | Print task-board totals, ready count, blocked count, and status counts. |
@@ -76,6 +76,11 @@ Dispatch readiness requires:
 - the policy decision for `spawn_agent` is `allow`
 
 The CLI sets `approved_at` when `--approved-by` is provided.
+
+Applied GitHub pulls synthesize planning approval with the control-plane actor so
+imported issues land as repo-scoped `todo` items that are immediately eligible
+for dispatch. The full issue body remains in the task body; the synthesized plan
+summary only captures the automation intent.
 
 ## Intake And Planning
 
@@ -198,8 +203,10 @@ harness task-board orchestrator settings --json
 - `project` groups local items by `project_id` and ready count.
 - `machine` groups local items by `agent_mode` and ready count.
 - `sync` reports external-provider configuration, linked, pushable, and blocked
-  counts. `--provider` narrows the provider, `--direction` narrows pull/push
-  intent, and `--apply` persists external changes instead of previewing them.
+  counts plus previewed/applied operations. `--provider` narrows the provider,
+  `--direction` narrows pull/push intent, and `--apply` persists external
+  changes instead of previewing them. GitHub pull imports preserve `owner/repo`
+  in `project_id` and synthesize dispatch-ready planning approval.
 - `dispatch` reports the session, worker, reviewer, and evaluator intent for
   each selected board item, including readiness block reasons.
 - `evaluate` reports evaluated, updated, skipped, completed, running,
@@ -261,7 +268,11 @@ Defaults are conservative: workflows enabled for default tasks, PR fixes, PR
 reviews, and dependency updates; `dry_run_default=true`; and
 `dispatch_status_filter=todo`. `run-once` records a `dispatch` phase, executes
 task-board dispatch through the daemon service, records an `evaluation` phase,
-then evaluates linked work. `--apply` overrides the dry-run default for that
+then evaluates linked work. When `github_project.enabled_automations` includes
+`sync_task_board`, `run-once` first performs a GitHub pull preview/apply with
+the current dry-run mode. The persisted `github_project.owner`/`repo` settings
+act as the repository fallback when `HARNESS_GITHUB_REPOSITORY` or
+`GITHUB_REPOSITORY` is unset. `--apply` overrides the dry-run default for that
 tick. Failures persist a failed last-run summary instead of silently dropping
 tick state.
 
