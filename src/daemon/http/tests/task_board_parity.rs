@@ -61,6 +61,64 @@ async fn run_task_board_transport_parity() {
         normalized_item(&ws_item["result"])
     );
 
+    let http_list = get_json(
+        &client,
+        &base_url,
+        &format!("{}?status=todo", http_paths::TASK_BOARD_ITEMS),
+    )
+    .await;
+    let ws_list = ws_result(
+        &base_url,
+        "req-task-board-list",
+        ws_methods::TASK_BOARD_LIST,
+        json!({ "status": "todo" }),
+    )
+    .await;
+    assert_eq!(http_list, ws_list);
+
+    let http_loaded = get_json(&client, &base_url, "/v1/task-board/items/parity-http").await;
+    let ws_loaded = ws_result(
+        &base_url,
+        "req-task-board-get",
+        ws_methods::TASK_BOARD_GET,
+        json!({ "id": "parity-ws" }),
+    )
+    .await;
+    assert_eq!(normalized_item(&http_loaded), normalized_item(&ws_loaded));
+
+    let update_payload = json!({
+        "status": "in_progress",
+        "priority": "critical",
+        "tags": ["parity", "updated"],
+    });
+    let http_updated = put_json(
+        &client,
+        &base_url,
+        "/v1/task-board/items/parity-http",
+        update_payload.clone(),
+    )
+    .await;
+    let mut ws_update_payload = update_payload;
+    ws_update_payload["id"] = json!("parity-ws");
+    let ws_updated = ws_result(
+        &base_url,
+        "req-task-board-update",
+        ws_methods::TASK_BOARD_UPDATE,
+        ws_update_payload,
+    )
+    .await;
+    assert_eq!(normalized_item(&http_updated), normalized_item(&ws_updated));
+
+    let http_deleted = delete_json(&client, &base_url, "/v1/task-board/items/parity-http").await;
+    let ws_deleted = ws_result(
+        &base_url,
+        "req-task-board-delete",
+        ws_methods::TASK_BOARD_DELETE,
+        json!({ "id": "parity-ws" }),
+    )
+    .await;
+    assert_eq!(normalized_item(&http_deleted), normalized_item(&ws_deleted));
+
     let (http_status, http_error) =
         get_json_status(&client, &base_url, "/v1/task-board/items/parity-missing").await;
     let ws_error = ws_rpc(
@@ -98,6 +156,46 @@ async fn post_json(client: &reqwest::Client, base_url: &str, path: &str, body: V
         .post(format!("{base_url}{path}"))
         .bearer_auth("token")
         .json(&body)
+        .send()
+        .await
+        .expect("send request");
+    let status = response.status();
+    let value = response.json::<Value>().await.expect("json response");
+    assert_eq!(status, StatusCode::OK, "{path} returned {value}");
+    value
+}
+
+async fn put_json(client: &reqwest::Client, base_url: &str, path: &str, body: Value) -> Value {
+    let response = client
+        .put(format!("{base_url}{path}"))
+        .bearer_auth("token")
+        .json(&body)
+        .send()
+        .await
+        .expect("send request");
+    let status = response.status();
+    let value = response.json::<Value>().await.expect("json response");
+    assert_eq!(status, StatusCode::OK, "{path} returned {value}");
+    value
+}
+
+async fn delete_json(client: &reqwest::Client, base_url: &str, path: &str) -> Value {
+    let response = client
+        .delete(format!("{base_url}{path}"))
+        .bearer_auth("token")
+        .send()
+        .await
+        .expect("send request");
+    let status = response.status();
+    let value = response.json::<Value>().await.expect("json response");
+    assert_eq!(status, StatusCode::OK, "{path} returned {value}");
+    value
+}
+
+async fn get_json(client: &reqwest::Client, base_url: &str, path: &str) -> Value {
+    let response = client
+        .get(format!("{base_url}{path}"))
+        .bearer_auth("token")
         .send()
         .await
         .expect("send request");
@@ -157,10 +255,23 @@ async fn ws_rpc(base_url: &str, id: &str, method: &str, params: Value) -> Value 
     panic!("missing websocket response for {id}");
 }
 
+async fn ws_result(base_url: &str, id: &str, method: &str, params: Value) -> Value {
+    let response = ws_rpc(base_url, id, method, params).await;
+    assert_eq!(
+        response["error"],
+        Value::Null,
+        "{method} returned {response}"
+    );
+    response["result"].clone()
+}
+
 fn normalized_item(item: &Value) -> Value {
     let mut item = item.clone();
     item["id"] = json!("<id>");
     item["created_at"] = json!("<created_at>");
     item["updated_at"] = json!("<updated_at>");
+    if item.get("deleted_at").is_some() {
+        item["deleted_at"] = json!("<deleted_at>");
+    }
     item
 }
