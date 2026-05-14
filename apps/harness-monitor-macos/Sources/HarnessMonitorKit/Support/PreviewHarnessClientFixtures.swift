@@ -13,6 +13,8 @@ extension PreviewHarnessClient {
     let timelinesBySessionID: [String: [TimelineEntry]]
     let agentTuisBySessionID: [String: [AgentTuiSnapshot]]
     let codexRunsBySessionID: [String: [CodexRunSnapshot]]
+    let taskBoardOrchestratorSettings: TaskBoardOrchestratorSettings
+    let taskBoardGitRuntimeConfig: TaskBoardGitRuntimeConfig
 
     public init(
       health: HealthResponse,
@@ -25,7 +27,10 @@ extension PreviewHarnessClient {
       coreDetailsBySessionID: [String: SessionDetail],
       timelinesBySessionID: [String: [TimelineEntry]],
       agentTuisBySessionID: [String: [AgentTuiSnapshot]] = [:],
-      codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:]
+      codexRunsBySessionID: [String: [CodexRunSnapshot]] = [:],
+      taskBoardOrchestratorSettings: TaskBoardOrchestratorSettings = Self
+        .defaultTaskBoardOrchestratorSettings,
+      taskBoardGitRuntimeConfig: TaskBoardGitRuntimeConfig = Self.defaultTaskBoardGitRuntimeConfig
     ) {
       self.health = health
       self.projects = projects
@@ -38,7 +43,61 @@ extension PreviewHarnessClient {
       self.timelinesBySessionID = timelinesBySessionID
       self.agentTuisBySessionID = agentTuisBySessionID
       self.codexRunsBySessionID = codexRunsBySessionID
+      self.taskBoardOrchestratorSettings = taskBoardOrchestratorSettings
+      self.taskBoardGitRuntimeConfig = taskBoardGitRuntimeConfig
     }
+
+    public static let defaultTaskBoardOrchestratorSettings = TaskBoardOrchestratorSettings(
+      enabledWorkflows: [.defaultTask, .prFix, .prReview],
+      dryRunDefault: false,
+      dispatchStatusFilter: .todo,
+      projectDir: "/Users/example/Projects/harness",
+      githubProject: TaskBoardGitHubProjectConfig(
+        owner: "smykla-skalski",
+        repo: "harness",
+        checkoutPath: "/Users/example/Projects/harness",
+        defaultBranch: "main",
+        branchPrefix: "task-board/",
+        mergeMethod: .squash,
+        labels: TaskBoardGitHubAutomationLabels(
+          managed: "task-board:managed",
+          autoMerge: "task-board:auto-merge",
+          needsHuman: "task-board:needs-human",
+          protectedPath: "task-board:protected-path"
+        ),
+        protectedPaths: [TaskBoardProtectedPathRule(pattern: "docs/**")],
+        enabledAutomations: TaskBoardGitHubAutomationToggles(
+          enabled: [.syncTaskBoard, .createBranch, .openPullRequest, .requestReview]
+        )
+      ),
+      policyVersion: "preview-task-board-v1"
+    )
+
+    public static let defaultTaskBoardGitRuntimeConfig = TaskBoardGitRuntimeConfig(
+      global: TaskBoardGitRuntimeProfile(
+        authorName: "Harness Monitor",
+        authorEmail: "monitor-preview@example.com",
+        sshKeyPath: "/Users/example/.ssh/id_ed25519",
+        signing: TaskBoardGitSigningConfig(
+          mode: .gpg,
+          gpgKeyId: "ABCDEF1234567890"
+        )
+      ),
+      repositoryOverrides: [
+        TaskBoardGitRepositoryOverride(
+          repository: "smykla-skalski/harness",
+          profile: TaskBoardGitRuntimeProfile(
+            authorName: "Bart Smykla",
+            authorEmail: "bartek@smykla.com",
+            sshKeyPath: "/Users/example/.ssh/id_harness",
+            signing: TaskBoardGitSigningConfig(
+              mode: .ssh,
+              sshKeyPath: "/Users/example/.ssh/id_signing"
+            )
+          )
+        )
+      ]
+    )
 
     public static let populated = Self(
       health: HealthResponse(
