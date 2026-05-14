@@ -12,6 +12,13 @@ use super::policy::{
 use super::policy_graph::{GraphPolicyGate, PolicyPipelineMode, PolicyPipelineStore};
 use super::types::{AgentMode, ExternalRef, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
 
+#[path = "dispatch_lifecycle.rs"]
+mod lifecycle;
+pub use lifecycle::{
+    DispatchLifecycle, DispatchLifecyclePhase, DispatchLifecycleStatus, DispatchLifecycleStep,
+    DispatchNativeSignal,
+};
+
 const REVIEWER_PERSONA: &str = "code-reviewer";
 const REVIEWER_CONSENSUS: u8 = 2;
 
@@ -24,6 +31,7 @@ pub struct DispatchPlan {
     pub worker: WorkerIntent,
     pub reviewer: ReviewerIntent,
     pub evaluator: EvaluatorIntent,
+    pub lifecycle: DispatchLifecycle,
     pub policy: PolicyDecision,
 }
 
@@ -38,6 +46,7 @@ pub struct DispatchAppliedTask {
     pub board_item_id: String,
     pub session_id: String,
     pub work_item_id: String,
+    pub lifecycle: DispatchLifecycle,
     pub item: TaskBoardItem,
 }
 
@@ -111,6 +120,11 @@ impl DispatchPlan {
     pub const fn is_ready(&self) -> bool {
         matches!(self.readiness, DispatchReadiness::Ready)
     }
+
+    #[must_use]
+    pub fn applied_lifecycle(&self) -> DispatchLifecycle {
+        self.lifecycle.applied()
+    }
 }
 
 impl DispatchExecutionSummary {
@@ -134,16 +148,20 @@ pub fn build_dispatch_plan_with_policy_root(
     policy_root: &Path,
 ) -> DispatchPlan {
     let policy = dispatch_policy(item, policy_root);
+    let worker = WorkerIntent {
+        mode: item.agent_mode,
+    };
+    let reviewer = reviewer_intent();
+    let evaluator = evaluator_intent();
     DispatchPlan {
         board_item_id: item.id.clone(),
         readiness: readiness(item, &policy),
         session: session_intent(item),
         task: task_creation_intent(item),
-        worker: WorkerIntent {
-            mode: item.agent_mode,
-        },
-        reviewer: reviewer_intent(),
-        evaluator: evaluator_intent(),
+        lifecycle: DispatchLifecycle::planned(&worker, &reviewer, &evaluator),
+        worker,
+        reviewer,
+        evaluator,
         policy,
     }
 }
@@ -319,7 +337,39 @@ mod tests {
         assert_eq!(plan.worker.mode, AgentMode::Interactive);
         assert_eq!(plan.reviewer.suggested_persona, REVIEWER_PERSONA);
         assert_eq!(plan.evaluator.mode, AgentMode::Evaluate);
+        assert_eq!(
+            plan.lifecycle
+                .reviewer
+                .native_signal
+                .as_ref()
+                .map(|signal| (signal.command.as_str(), signal.trigger_step.as_str())),
+            Some(("spawn_reviewer", "submit_for_review"))
+        );
         assert!(plan.policy.is_allow());
+    }
+
+    #[test]
+    fn applied_lifecycle_preserves_follow_up_execution_order() {
+        let plan = build_dispatch_plan(&ready_item());
+
+        let lifecycle = plan.applied_lifecycle();
+
+        assert_eq!(
+            lifecycle.worker.status,
+            DispatchLifecycleStatus::SessionTaskLinked
+        );
+        assert_eq!(
+            lifecycle.reviewer.status,
+            DispatchLifecycleStatus::WaitingForWorkerReview
+        );
+        assert_eq!(
+            lifecycle.evaluator.status,
+            DispatchLifecycleStatus::WaitingForReviewCompletion
+        );
+        assert_eq!(
+            lifecycle.reviewer.required_consensus,
+            Some(REVIEWER_CONSENSUS)
+        );
     }
 
     #[test]

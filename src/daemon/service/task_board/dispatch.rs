@@ -94,6 +94,7 @@ fn apply_dispatch_plan(
         board_item_id: plan.board_item_id.clone(),
         session_id,
         work_item_id,
+        lifecycle: plan.applied_lifecycle(),
         item,
     })
 }
@@ -124,6 +125,7 @@ async fn apply_dispatch_plan_async(
         board_item_id: plan.board_item_id.clone(),
         session_id,
         work_item_id,
+        lifecycle: plan.applied_lifecycle(),
         item,
     })
 }
