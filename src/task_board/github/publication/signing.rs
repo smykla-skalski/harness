@@ -5,7 +5,7 @@ use chrono::{FixedOffset, TimeZone};
 use gix::actor::SignatureRef;
 use pgp::composed::{ArmorOptions, Deserializable, DetachedSignature, SignedSecretKey};
 use pgp::crypto::hash::HashAlgorithm;
-use pgp::types::Password;
+use pgp::types::{KeyDetails, Password};
 use rand::thread_rng;
 
 use crate::errors::{CliError, CliErrorKind};
@@ -172,6 +172,7 @@ fn configured_gpg_signature(
     })?;
     Ok(Some(pgp_detached_signature(
         private_key.as_str(),
+        profile.signing.gpg_key_id.as_deref(),
         profile.signing.gpg_private_key_passphrase.as_deref(),
         payload,
     )?))
@@ -179,6 +180,7 @@ fn configured_gpg_signature(
 
 fn pgp_detached_signature(
     armored_private_key: &str,
+    expected_key_id: Option<&str>,
     passphrase: Option<&str>,
     payload: &[u8],
 ) -> Result<String, CliError> {
@@ -187,6 +189,7 @@ fn pgp_detached_signature(
             "task-board github parse configured GPG private key: {error}"
         ))
     })?;
+    validate_configured_key_id(&private_key, expected_key_id)?;
     let password = passphrase.map_or_else(Password::empty, Password::from);
     let signature = DetachedSignature::sign_binary_data(
         thread_rng(),
@@ -208,9 +211,43 @@ fn pgp_detached_signature(
         })
 }
 
+fn validate_configured_key_id(
+    private_key: &SignedSecretKey,
+    expected_key_id: Option<&str>,
+) -> Result<(), CliError> {
+    let Some(expected_key_id) = normalize_gpg_key_id(expected_key_id) else {
+        return Ok(());
+    };
+    let legacy_key_id = format!("{}", private_key.primary_key.legacy_key_id());
+    let fingerprint = format!("{:x}", private_key.primary_key.fingerprint());
+    if expected_key_id == legacy_key_id || expected_key_id == fingerprint {
+        return Ok(());
+    }
+    Err(CliError::from(CliErrorKind::workflow_io(format!(
+        "task-board github configured GPG key id '{expected_key_id}' does not match private key '{legacy_key_id}' or fingerprint '{fingerprint}'"
+    ))))
+}
+
+fn normalize_gpg_key_id(key_id: Option<&str>) -> Option<String> {
+    key_id
+        .map(|key_id| {
+            key_id
+                .trim()
+                .strip_prefix("0x")
+                .or_else(|| key_id.trim().strip_prefix("0X"))
+                .unwrap_or_else(|| key_id.trim())
+                .chars()
+                .filter(|ch| !ch.is_ascii_whitespace())
+                .collect::<String>()
+                .to_ascii_lowercase()
+        })
+        .filter(|key_id| !key_id.is_empty())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pgp::composed::{KeyType, SecretKeyParamsBuilder};
 
     #[test]
     fn publication_preserves_existing_pgp_signature() {
@@ -264,5 +301,80 @@ mod tests {
                 .to_string()
                 .contains("SSH-signed commits require native Git transport")
         );
+    }
+
+    #[test]
+    fn configured_gpg_signature_validates_configured_key_id() {
+        let (private_key, key_id, fingerprint) = generated_private_key(None);
+
+        let signature = pgp_detached_signature(
+            private_key.as_str(),
+            Some(key_id.to_ascii_uppercase().as_str()),
+            None,
+            b"payload",
+        )
+        .expect("matching key id signs");
+        assert!(signature.contains("-----BEGIN PGP SIGNATURE-----"));
+
+        pgp_detached_signature(
+            private_key.as_str(),
+            Some(fingerprint.as_str()),
+            None,
+            b"payload",
+        )
+        .expect("matching fingerprint signs");
+
+        let error = pgp_detached_signature(
+            private_key.as_str(),
+            Some("0000000000000000"),
+            None,
+            b"payload",
+        )
+        .expect_err("mismatched key id should fail");
+        assert!(error.to_string().contains("does not match private key"));
+    }
+
+    #[test]
+    fn configured_gpg_signature_uses_private_key_passphrase() {
+        let (private_key, key_id, _fingerprint) = generated_private_key(Some("secret"));
+
+        let error = pgp_detached_signature(
+            private_key.as_str(),
+            Some(key_id.as_str()),
+            Some("wrong"),
+            b"payload",
+        )
+        .expect_err("wrong passphrase should fail");
+        assert!(error.to_string().contains("sign commit with GPG key"));
+
+        let signature = pgp_detached_signature(
+            private_key.as_str(),
+            Some(key_id.as_str()),
+            Some("secret"),
+            b"payload",
+        )
+        .expect("configured passphrase signs");
+        assert!(signature.contains("-----BEGIN PGP SIGNATURE-----"));
+    }
+
+    fn generated_private_key(passphrase: Option<&str>) -> (String, String, String) {
+        let mut builder = SecretKeyParamsBuilder::default();
+        builder
+            .key_type(KeyType::Ed25519Legacy)
+            .can_certify(false)
+            .can_sign(true)
+            .primary_user_id("Harness Bot <bot@example.com>".into())
+            .passphrase(passphrase.map(ToOwned::to_owned));
+        let key = builder
+            .build()
+            .expect("build secret key params")
+            .generate(thread_rng())
+            .expect("generate secret key");
+        let key_id = format!("{}", key.primary_key.legacy_key_id());
+        let fingerprint = format!("{:x}", key.primary_key.fingerprint());
+        let armored = key
+            .to_armored_string(ArmorOptions::default())
+            .expect("armor private key");
+        (armored, key_id, fingerprint)
     }
 }

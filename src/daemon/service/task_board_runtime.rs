@@ -26,8 +26,10 @@ pub fn update_task_board_git_runtime_config(
     request: &TaskBoardGitRuntimeConfig,
 ) -> Result<TaskBoardGitRuntimeConfig, CliError> {
     let normalized = normalized_runtime_config(request)?;
-    state::persist_task_board_git_runtime_config(&normalized)?;
-    Ok(normalized)
+    let persisted = normalized.without_secrets();
+    state::replace_task_board_git_runtime_secrets(&normalized);
+    state::persist_task_board_git_runtime_config(&persisted)?;
+    Ok(persisted)
 }
 
 /// Replace the in-memory GitHub token snapshot used by the daemon.
@@ -66,7 +68,7 @@ pub(crate) fn external_sync_config_for_repository(repository: Option<&str>) -> E
 pub(crate) fn git_runtime_profile_for_repository(
     repository: Option<&str>,
 ) -> Result<TaskBoardGitRuntimeProfile, CliError> {
-    Ok(state::load_task_board_git_runtime_config()?.resolved_profile(repository))
+    state::task_board_git_runtime_profile(repository)
 }
 
 fn normalized_runtime_config(
@@ -185,6 +187,48 @@ mod tests {
             assert_eq!(
                 state::load_task_board_git_runtime_config().expect("load runtime config"),
                 saved
+            );
+        });
+    }
+
+    #[test]
+    fn update_runtime_config_keeps_passphrases_process_local() {
+        let tmp = tempdir().expect("tempdir");
+        with_isolated_harness_env(tmp.path(), || {
+            let saved = update_task_board_git_runtime_config(&TaskBoardGitRuntimeConfig {
+                global: TaskBoardGitRuntimeProfile {
+                    signing: TaskBoardGitSigningConfig {
+                        mode: TaskBoardGitSigningMode::Gpg,
+                        gpg_key_id: Some("ABC123".into()),
+                        gpg_private_key_path: Some("/tmp/private.asc".into()),
+                        gpg_private_key_passphrase: Some("secret".into()),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                repository_overrides: vec![],
+            })
+            .expect("save runtime config");
+
+            assert!(saved.global.signing.gpg_private_key_passphrase.is_none());
+            let raw_config = fs_err::read_to_string(state::config_path()).expect("read raw config");
+            assert!(!raw_config.contains("secret"));
+            assert!(!raw_config.contains("gpg_private_key_passphrase"));
+            assert!(
+                state::load_task_board_git_runtime_config()
+                    .expect("load persisted runtime config")
+                    .global
+                    .signing
+                    .gpg_private_key_passphrase
+                    .is_none()
+            );
+            assert_eq!(
+                super::git_runtime_profile_for_repository(None)
+                    .expect("load signing profile")
+                    .signing
+                    .gpg_private_key_passphrase
+                    .as_deref(),
+                Some("secret")
             );
         });
     }

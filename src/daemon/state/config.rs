@@ -7,7 +7,8 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::task_board::{
     TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
-    TaskBoardGitHubTokensSyncResponse, TaskBoardGitRuntimeConfig, normalize_repository_slug,
+    TaskBoardGitHubTokensSyncResponse, TaskBoardGitRuntimeConfig, TaskBoardGitRuntimeProfile,
+    normalize_repository_slug,
 };
 
 use super::{append_event_best_effort, config_path, ensure_daemon_dirs};
@@ -16,6 +17,8 @@ pub const VALID_LOG_LEVELS: &[&str] = &["trace", "debug", "info", "warn", "error
 
 static TASK_BOARD_GITHUB_TOKENS: LazyLock<RwLock<TaskBoardGitHubTokenState>> =
     LazyLock::new(|| RwLock::new(TaskBoardGitHubTokenState::default()));
+static TASK_BOARD_GIT_RUNTIME_SECRETS: LazyLock<RwLock<TaskBoardGitRuntimeConfig>> =
+    LazyLock::new(|| RwLock::new(TaskBoardGitRuntimeConfig::default()));
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct DaemonRuntimeConfig {
@@ -23,6 +26,15 @@ pub struct DaemonRuntimeConfig {
     pub log_level: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub task_board_git_runtime_config: Option<TaskBoardGitRuntimeConfig>,
+}
+
+impl DaemonRuntimeConfig {
+    fn without_secrets(mut self) -> Self {
+        self.task_board_git_runtime_config = self
+            .task_board_git_runtime_config
+            .map(|config| config.without_secrets());
+        self
+    }
 }
 
 /// Load the persisted daemon runtime config, if present.
@@ -33,7 +45,9 @@ pub fn load_runtime_config() -> Result<Option<DaemonRuntimeConfig>, CliError> {
     if !config_path().is_file() {
         return Ok(None);
     }
-    read_json_typed(&config_path()).map(Some)
+    read_json_typed::<DaemonRuntimeConfig>(&config_path())
+        .map(DaemonRuntimeConfig::without_secrets)
+        .map(Some)
 }
 
 /// Return the persisted daemon log level, normalized for runtime use.
@@ -67,6 +81,7 @@ pub fn persist_log_level(level: Option<&str>) -> Result<(), CliError> {
 pub fn load_task_board_git_runtime_config() -> Result<TaskBoardGitRuntimeConfig, CliError> {
     Ok(load_runtime_config()?
         .and_then(|config| config.task_board_git_runtime_config)
+        .map(|config| config.without_secrets())
         .unwrap_or_default())
 }
 
@@ -79,9 +94,42 @@ pub fn persist_task_board_git_runtime_config(
 ) -> Result<(), CliError> {
     ensure_daemon_dirs()?;
     let mut config = load_runtime_config_for_persist();
+    let task_board_config = task_board_config.without_secrets();
     config.task_board_git_runtime_config =
-        (!task_board_config.is_empty()).then_some(task_board_config.clone());
+        (!task_board_config.is_empty()).then_some(task_board_config);
     write_json_pretty(&config_path(), &config)
+}
+
+/// Replace the daemon's in-memory task-board Git runtime secrets snapshot.
+///
+/// # Panics
+/// Panics when the in-memory secret state lock is poisoned.
+pub fn replace_task_board_git_runtime_secrets(task_board_config: &TaskBoardGitRuntimeConfig) {
+    let mut state = TASK_BOARD_GIT_RUNTIME_SECRETS
+        .write()
+        .expect("task-board git runtime secret state lock poisoned");
+    *state = task_board_config.clone();
+}
+
+/// Resolve a task-board Git runtime profile with current process-only secrets.
+///
+/// # Errors
+/// Returns `CliError` when the daemon runtime config exists but cannot be parsed.
+///
+/// # Panics
+/// Panics when the in-memory secret state lock is poisoned.
+pub fn task_board_git_runtime_profile(
+    repository: Option<&str>,
+) -> Result<TaskBoardGitRuntimeProfile, CliError> {
+    let mut profile = load_task_board_git_runtime_config()?.resolved_profile(repository);
+    let passphrase = TASK_BOARD_GIT_RUNTIME_SECRETS
+        .read()
+        .expect("task-board git runtime secret state lock poisoned")
+        .resolved_profile(repository)
+        .signing
+        .gpg_private_key_passphrase;
+    profile.signing.gpg_private_key_passphrase = passphrase;
+    Ok(profile)
 }
 
 /// Replace the daemon's in-memory GitHub token snapshot.

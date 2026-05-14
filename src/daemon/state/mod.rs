@@ -24,7 +24,8 @@ pub use audit::{
 pub use config::{
     DaemonRuntimeConfig, VALID_LOG_LEVELS, load_persisted_log_level, load_runtime_config,
     load_task_board_git_runtime_config, parse_log_level, persist_log_level,
-    persist_task_board_git_runtime_config, replace_task_board_github_tokens,
+    persist_task_board_git_runtime_config, replace_task_board_git_runtime_secrets,
+    replace_task_board_github_tokens, task_board_git_runtime_profile,
     task_board_github_repository_token, task_board_github_token,
 };
 pub use locks::{acquire_singleton_lock, daemon_lock_is_held, daemon_lock_is_held_at};
