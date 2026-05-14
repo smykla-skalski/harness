@@ -26,17 +26,21 @@ struct TaskBoardItemLaneColumn: View {
   let section: TaskBoardItemSection
   let onOpenItem: (TaskBoardItem) -> Void
   let onMoveItem: (String, TaskBoardInboxLane) -> Bool
+  @Environment(\.fontScale)
+  private var fontScale
   @State private var isDropTargeted = false
 
+  private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
+
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+    VStack(alignment: .leading, spacing: metrics.laneSpacing) {
       TaskBoardLaneHeader(lane: section.lane, count: section.items.count)
 
       Group {
         if section.items.isEmpty {
           TaskBoardEmptyLane(lane: section.lane)
         } else {
-          VStack(spacing: HarnessMonitorTheme.spacingSM) {
+          VStack(spacing: metrics.laneSpacing) {
             ForEach(section.items.prefix(5)) { item in
               TaskBoardItemRow(item: item, onOpenItem: onOpenItem)
             }
@@ -55,29 +59,31 @@ struct TaskBoardItemLaneColumn: View {
   }
 
   private func handleDrop(_ payloads: [TaskBoardItemDragPayload], _: CGPoint) -> Bool {
-    guard let payload = payloads.first else {
-      return false
-    }
-    guard payload.sourceLane != section.lane else {
-      return false
-    }
-    return onMoveItem(payload.itemID, section.lane)
+    TaskBoardLaneDropPolicy.moveFirstPayload(
+      payloads,
+      to: section.lane,
+      move: onMoveItem
+    )
   }
 }
 
 struct TaskBoardInboxLaneColumn: View {
   let section: TaskBoardInboxSection
   let onOpenItem: (TaskBoardInboxItem) -> Void
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+    VStack(alignment: .leading, spacing: metrics.laneSpacing) {
       TaskBoardLaneHeader(lane: section.lane, count: section.items.count)
 
       Group {
         if section.items.isEmpty {
           TaskBoardEmptyLane(lane: section.lane)
         } else {
-          VStack(spacing: HarnessMonitorTheme.spacingSM) {
+          VStack(spacing: metrics.laneSpacing) {
             ForEach(section.items.prefix(5)) { item in
               TaskBoardInboxItemRow(
                 item: item,
@@ -99,25 +105,29 @@ struct TaskBoardInboxLaneColumn: View {
 struct TaskBoardLaneHeader: View {
   let lane: TaskBoardInboxLane
   let count: Int
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
 
   var body: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+    HStack(spacing: metrics.laneSpacing) {
       Image(systemName: lane.systemImage)
         .foregroundStyle(taskBoardLaneColor(for: lane))
-        .frame(width: 18)
+        .frame(width: metrics.headerIconWidth)
       Text(lane.title)
         .scaledFont(.subheadline.weight(.semibold))
-      Spacer(minLength: HarnessMonitorTheme.spacingSM)
+      Spacer(minLength: metrics.laneSpacing)
       Text("\(count)")
         .scaledFont(.caption.weight(.bold))
         .foregroundStyle(taskBoardLaneColor(for: lane))
         .monospacedDigit()
-        .padding(.horizontal, HarnessMonitorTheme.spacingSM)
-        .padding(.vertical, 2)
+        .padding(.horizontal, metrics.countHorizontalPadding)
+        .padding(.vertical, metrics.countVerticalPadding)
         .background(taskBoardLaneColor(for: lane).opacity(0.14), in: .capsule)
     }
-    .padding(.horizontal, HarnessMonitorTheme.spacingSM)
-    .padding(.vertical, 6)
+    .padding(.horizontal, metrics.headerHorizontalPadding)
+    .padding(.vertical, metrics.headerVerticalPadding)
     .background(taskBoardLaneColor(for: lane).opacity(0.10), in: .rect(cornerRadius: 6))
     .overlay(
       RoundedRectangle(cornerRadius: 6)
@@ -128,13 +138,17 @@ struct TaskBoardLaneHeader: View {
 
 private struct TaskBoardLaneColumnChrome: ViewModifier {
   let lane: TaskBoardInboxLane
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
 
   func body(content: Content) -> some View {
     content
-      .padding(.horizontal, HarnessMonitorTheme.spacingSM)
-      .padding(.vertical, HarnessMonitorTheme.spacingSM)
-      .frame(width: 304, alignment: .topLeading)
-      .frame(minHeight: 400, alignment: .topLeading)
+      .padding(.horizontal, metrics.laneInnerPadding)
+      .padding(.vertical, metrics.laneInnerPadding)
+      .frame(width: metrics.laneWidth, alignment: .topLeading)
+      .frame(minHeight: metrics.laneMinHeight, alignment: .topLeading)
       .background(.background.opacity(0.18), in: .rect(cornerRadius: 8))
       .overlay(alignment: .top) {
         Rectangle()
@@ -154,11 +168,15 @@ extension View {
 private struct TaskBoardLaneBodyChrome: ViewModifier {
   let lane: TaskBoardInboxLane
   let isDropTargeted: Bool
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
 
   func body(content: Content) -> some View {
     content
-      .frame(maxWidth: .infinity, minHeight: 336, alignment: .top)
-      .padding(.top, HarnessMonitorTheme.spacingXS)
+      .frame(maxWidth: .infinity, minHeight: metrics.laneBodyMinHeight, alignment: .top)
+      .padding(.top, metrics.laneBodyTopPadding)
       .background(
         dropBackgroundColor,
         in: .rect(cornerRadius: 6)
@@ -188,67 +206,29 @@ extension View {
   }
 }
 
-struct TaskBoardEmptyLane: View {
-  let lane: TaskBoardInboxLane
-
-  var body: some View {
-    Color.clear
-      .frame(maxWidth: .infinity, minHeight: 96)
-      .accessibilityLabel("\(lane.title) lane empty")
-  }
-}
-
-struct TaskBoardLaneOverflowRow: View {
-  let hiddenCount: Int
-
-  var body: some View {
-    if hiddenCount > 0 {
-      Text("+\(hiddenCount) more")
-        .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .frame(maxWidth: .infinity, minHeight: 28)
-        .background(.background.opacity(0.36), in: .rect(cornerRadius: 6))
-        .accessibilityLabel("\(hiddenCount) more task board items")
-    }
-  }
-}
-
-func taskBoardLaneColor(for lane: TaskBoardInboxLane) -> Color {
-  switch lane {
-  case .needsYou:
-    HarnessMonitorTheme.danger
-  case .ready:
-    HarnessMonitorTheme.accent
-  case .blocked:
-    HarnessMonitorTheme.danger
-  case .review:
-    HarnessMonitorTheme.caution
-  case .running:
-    HarnessMonitorTheme.warmAccent
-  case .backlog:
-    HarnessMonitorTheme.accent
-  }
-}
-
 struct TaskBoardItemRow: View {
   let item: TaskBoardItem
   let onOpenItem: (TaskBoardItem) -> Void
+  @Environment(\.fontScale)
+  private var fontScale
 
   private var dragPayload: TaskBoardItemDragPayload {
     TaskBoardItemDragPayload(itemID: item.id, status: item.status)
   }
 
+  private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
+
   var body: some View {
     Button {
       onOpenItem(item)
     } label: {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
+      VStack(alignment: .leading, spacing: metrics.laneSpacing) {
+        HStack(alignment: .top, spacing: metrics.laneSpacing) {
           Circle()
             .fill(priorityColor(for: item.priority))
-            .frame(width: 9, height: 9)
-            .padding(.top, 6)
-          VStack(alignment: .leading, spacing: 3) {
+            .frame(width: metrics.cardMarkerSize, height: metrics.cardMarkerSize)
+            .padding(.top, metrics.cardMarkerTopPadding)
+          VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
             Text(item.title)
               .scaledFont(.subheadline.weight(.semibold))
               .foregroundStyle(HarnessMonitorTheme.ink)
@@ -262,7 +242,7 @@ struct TaskBoardItemRow: View {
           }
           Spacer(minLength: 0)
         }
-        HStack(spacing: HarnessMonitorTheme.spacingXS) {
+        HStack(spacing: metrics.laneBodyTopPadding) {
           taskPill(item.status.title, color: taskBoardStatusColor(for: item.status))
           taskPill(item.priority.title, color: priorityColor(for: item.priority))
           if let policyTraceCount = item.workflow?.policyTraceIds.count, policyTraceCount > 0 {
@@ -271,15 +251,15 @@ struct TaskBoardItemRow: View {
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .frame(minHeight: 86, alignment: .topLeading)
-      .padding(HarnessMonitorTheme.spacingMD)
+      .frame(minHeight: metrics.cardMinHeight, alignment: .topLeading)
+      .padding(metrics.cardPadding)
     }
     .harnessInteractiveCardButtonStyle(cornerRadius: 8)
     .background(.background.opacity(0.56), in: .rect(cornerRadius: 8))
     .overlay(alignment: .leading) {
       Rectangle()
         .fill(taskBoardStatusColor(for: item.status).opacity(0.82))
-        .frame(width: 3)
+        .frame(width: metrics.cardAccentWidth)
         .clipShape(.rect(topLeadingRadius: 8, bottomLeadingRadius: 8))
     }
     .overlay(
@@ -297,17 +277,21 @@ struct TaskBoardItemRow: View {
       .scaledFont(.caption2.weight(.bold))
       .foregroundStyle(color)
       .lineLimit(1)
-      .padding(.horizontal, 9)
-      .padding(.vertical, 4)
+      .padding(.horizontal, metrics.pillHorizontalPadding)
+      .padding(.vertical, metrics.pillVerticalPadding)
       .background(color.opacity(0.16), in: .capsule)
   }
 }
 
 private struct TaskBoardItemDragPreviewCard: View {
   let item: TaskBoardItem
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+    VStack(alignment: .leading, spacing: metrics.laneBodyTopPadding) {
       Text(item.title)
         .scaledFont(.subheadline.weight(.semibold))
         .lineLimit(2)
@@ -315,8 +299,8 @@ private struct TaskBoardItemDragPreviewCard: View {
         .scaledFont(.caption.weight(.semibold))
         .foregroundStyle(taskBoardStatusColor(for: item.status))
     }
-    .frame(width: 220, alignment: .leading)
-    .padding(HarnessMonitorTheme.spacingMD)
+    .frame(width: metrics.dragPreviewWidth, alignment: .leading)
+    .padding(metrics.cardPadding)
     .background(.background.opacity(0.92), in: .rect(cornerRadius: 8))
   }
 }
@@ -324,18 +308,22 @@ private struct TaskBoardItemDragPreviewCard: View {
 struct TaskBoardInboxItemRow: View {
   let item: TaskBoardInboxItem
   let onOpenItem: (TaskBoardInboxItem) -> Void
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
 
   var body: some View {
     Button {
       onOpenItem(item)
     } label: {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
+      VStack(alignment: .leading, spacing: metrics.laneSpacing) {
+        HStack(alignment: .top, spacing: metrics.laneSpacing) {
           Circle()
             .fill(severityColor(for: item.task.severity))
-            .frame(width: 9, height: 9)
-            .padding(.top, 6)
-          VStack(alignment: .leading, spacing: 3) {
+            .frame(width: metrics.cardMarkerSize, height: metrics.cardMarkerSize)
+            .padding(.top, metrics.cardMarkerTopPadding)
+          VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
             Text(item.task.title)
               .scaledFont(.subheadline.weight(.semibold))
               .foregroundStyle(HarnessMonitorTheme.ink)
@@ -349,21 +337,21 @@ struct TaskBoardInboxItemRow: View {
           }
           Spacer(minLength: 0)
         }
-        HStack(spacing: HarnessMonitorTheme.spacingXS) {
+        HStack(spacing: metrics.laneBodyTopPadding) {
           taskPill(item.task.status.title, color: taskStatusColor(for: item.task.status))
           taskPill(item.task.severity.title, color: severityColor(for: item.task.severity))
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .frame(minHeight: 86, alignment: .topLeading)
-      .padding(HarnessMonitorTheme.spacingMD)
+      .frame(minHeight: metrics.cardMinHeight, alignment: .topLeading)
+      .padding(metrics.cardPadding)
     }
     .harnessInteractiveCardButtonStyle(cornerRadius: 8)
     .background(.background.opacity(0.56), in: .rect(cornerRadius: 8))
     .overlay(alignment: .leading) {
       Rectangle()
         .fill(taskStatusColor(for: item.task.status).opacity(0.82))
-        .frame(width: 3)
+        .frame(width: metrics.cardAccentWidth)
         .clipShape(.rect(topLeadingRadius: 8, bottomLeadingRadius: 8))
     }
     .overlay(
@@ -378,8 +366,8 @@ struct TaskBoardInboxItemRow: View {
       .scaledFont(.caption2.weight(.bold))
       .foregroundStyle(color)
       .lineLimit(1)
-      .padding(.horizontal, 9)
-      .padding(.vertical, 4)
+      .padding(.horizontal, metrics.pillHorizontalPadding)
+      .padding(.vertical, metrics.pillVerticalPadding)
       .background(color.opacity(0.16), in: .capsule)
   }
 }
