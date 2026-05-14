@@ -14,6 +14,7 @@ struct SessionWindowStandardLayout<Sidebar: View, Detail: View>: View {
   private let detail: Detail
   @SceneStorage("session.columnVisibility")
   private var columnVisibilityRawStorage = "automatic"
+  @State private var perfColumnVisibilityStorage: NavigationSplitViewVisibility?
 
   init(
     stateCache: SessionWindowStateCache,
@@ -74,12 +75,20 @@ struct SessionWindowStandardLayout<Sidebar: View, Detail: View>: View {
   private var columnVisibilityBinding: Binding<NavigationSplitViewVisibility> {
     Binding(
       get: {
+        if let perfColumnVisibilityStorage {
+          return perfColumnVisibilityStorage
+        }
         let decodedVisibility = SessionColumnVisibilityCodec.decode(columnVisibilityRaw)
         return decodedVisibility == .all ? .doubleColumn : decodedVisibility
       },
       set: { newValue in
         let storedVisibility: NavigationSplitViewVisibility =
           newValue == .all ? .doubleColumn : newValue
+        if HarnessMonitorUITestEnvironment.isPerfScenarioActive {
+          guard perfColumnVisibilityStorage != storedVisibility else { return }
+          perfColumnVisibilityStorage = storedVisibility
+          return
+        }
         let encodedVisibility = SessionColumnVisibilityCodec.encode(storedVisibility)
         guard columnVisibilityRaw != encodedVisibility else { return }
         columnVisibilityRaw = encodedVisibility
