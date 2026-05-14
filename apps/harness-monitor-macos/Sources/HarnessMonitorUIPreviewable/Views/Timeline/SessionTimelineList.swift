@@ -54,11 +54,6 @@ struct SessionTimelineList: View {
           .equatable()
           .id(row.id)
         }
-        SessionTimelineLoadOlderMarker(
-          hasOlder: presentation.navigation.hasOlder,
-          onLoadOlder: onRequestLoadOlder
-        )
-        .id(SessionTimelineLoadOlderMarker.identity(for: presentation.navigation))
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .coordinateSpace(.named(SessionTimelineRailCoordinateSpace.name))
@@ -71,26 +66,54 @@ struct SessionTimelineList: View {
     }
     .scrollIndicators(.visible)
     .scrollBounceBehavior(.basedOnSize, axes: .vertical)
+    .onScrollGeometryChange(
+      for: SessionTimelineNearBottomState.self,
+      of: SessionTimelineNearBottomState.init(geometry:)
+    ) { _, newValue in
+      guard newValue.contentMeasured else { return }
+      guard newValue.distanceFromBottom <= SessionTimelineNearBottomState.threshold else { return }
+      guard presentation.navigation.hasOlder else { return }
+      onRequestLoadOlder?()
+    }
+    .task(id: SessionTimelineLoadOlderTaskKey(navigation: presentation.navigation)) {
+      guard presentation.navigation.hasOlder else { return }
+      try? await Task.sleep(for: .milliseconds(80))
+      guard !Task.isCancelled, presentation.navigation.hasOlder else { return }
+      onRequestLoadOlder?()
+    }
   }
 }
 
-struct SessionTimelineLoadOlderMarker: View {
-  let hasOlder: Bool
-  let onLoadOlder: (() -> Void)?
+struct SessionTimelineNearBottomState: Equatable {
+  static let threshold: CGFloat = 240
 
-  var body: some View {
-    Color.clear
-      .frame(maxWidth: .infinity)
-      .frame(height: 1)
-      .accessibilityHidden(true)
-      .onAppear {
-        guard hasOlder else { return }
-        onLoadOlder?()
-      }
+  let distanceFromBottom: CGFloat
+  let contentMeasured: Bool
+
+  init(geometry: ScrollGeometry) {
+    let measured = geometry.contentSize.height > 0
+    let distance = max(
+      0,
+      geometry.contentSize.height - geometry.contentOffset.y - geometry.visibleRect.height
+    )
+    self.init(distanceFromBottom: distance, contentMeasured: measured)
   }
 
-  static func identity(for navigation: SessionTimelineWindowNavigation) -> String {
-    "load-older-marker:\(navigation.windowEnd):\(navigation.totalCount):\(navigation.hasOlder ? 1 : 0)"
+  init(distanceFromBottom: CGFloat, contentMeasured: Bool) {
+    self.distanceFromBottom = distanceFromBottom
+    self.contentMeasured = contentMeasured
+  }
+}
+
+struct SessionTimelineLoadOlderTaskKey: Hashable {
+  let windowEnd: Int
+  let totalCount: Int
+  let hasOlder: Bool
+
+  init(navigation: SessionTimelineWindowNavigation) {
+    windowEnd = navigation.windowEnd
+    totalCount = navigation.totalCount
+    hasOlder = navigation.hasOlder
   }
 }
 
