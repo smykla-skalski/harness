@@ -166,6 +166,24 @@ impl ExternalSyncConfig {
     }
 
     #[must_use]
+    pub fn with_github_token_override(mut self, token: Option<&str>) -> Self {
+        self.github_token = token
+            .map(str::trim)
+            .filter(|token| !token.is_empty())
+            .map(ToOwned::to_owned);
+        self
+    }
+
+    #[must_use]
+    pub fn with_github_repository_override(mut self, repository: Option<&str>) -> Self {
+        self.github_repository = repository
+            .map(str::trim)
+            .filter(|repository| !repository.is_empty())
+            .map(ToOwned::to_owned);
+        self
+    }
+
+    #[must_use]
     pub fn with_github_repository_fallback(mut self, repository: Option<&str>) -> Self {
         if self.github_repository().is_none() {
             self.github_repository = repository

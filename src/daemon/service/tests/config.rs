@@ -148,6 +148,7 @@ fn set_log_level_repairs_malformed_runtime_config() {
             state::load_runtime_config().expect("load repaired runtime config"),
             Some(state::DaemonRuntimeConfig {
                 log_level: Some("debug".into()),
+                task_board_git_runtime_config: None,
             })
         );
 

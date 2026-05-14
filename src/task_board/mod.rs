@@ -6,6 +6,7 @@ pub mod orchestrator;
 pub mod planning;
 pub mod policy;
 pub mod policy_graph;
+pub mod runtime_config;
 pub mod store;
 pub mod summary;
 pub mod transport;
@@ -56,6 +57,12 @@ pub use policy_graph::{
     PolicyPipelinePromoteRequest, PolicyPipelinePromoteResponse, PolicyPipelineSaveResponse,
     PolicyPipelineSimulatedDecision, PolicyPipelineSimulationResult, PolicyPipelineStore,
     PolicyPipelineValidation, PolicyPipelineValidationCode, PolicyPipelineValidationIssue,
+};
+pub use runtime_config::{
+    TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
+    TaskBoardGitHubTokensSyncResponse, TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig,
+    TaskBoardGitRuntimeProfile, TaskBoardGitSigningConfig, TaskBoardGitSigningMode,
+    normalize_repository_slug,
 };
 pub use store::{TaskBoardStore, default_board_root};
 pub use summary::{

@@ -3,7 +3,12 @@ use tempfile::tempdir;
 
 use super::super::{
     DaemonRuntimeConfig, config_path, load_persisted_log_level, load_runtime_config,
-    persist_log_level, read_recent_events,
+    load_task_board_git_runtime_config, persist_log_level, persist_task_board_git_runtime_config,
+    read_recent_events, replace_task_board_github_tokens, task_board_github_token,
+};
+use crate::task_board::{
+    TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
+    TaskBoardGitRuntimeProfile, TaskBoardGitSigningConfig, TaskBoardGitSigningMode,
 };
 
 #[test]
@@ -16,6 +21,7 @@ fn runtime_config_round_trips_persisted_log_level() {
             load_runtime_config().expect("load runtime config"),
             Some(DaemonRuntimeConfig {
                 log_level: Some("debug".into()),
+                task_board_git_runtime_config: None,
             })
         );
     });
@@ -76,6 +82,7 @@ fn persist_log_level_replaces_malformed_runtime_config() {
             load_runtime_config().expect("load repaired runtime config"),
             Some(DaemonRuntimeConfig {
                 log_level: Some("debug".into()),
+                task_board_git_runtime_config: None,
             })
         );
 
@@ -88,6 +95,69 @@ fn persist_log_level_replaces_malformed_runtime_config() {
             event
                 .message
                 .contains("replacing invalid daemon runtime config")
+        );
+    });
+}
+
+#[test]
+fn runtime_config_round_trips_task_board_git_runtime_config() {
+    let tmp = tempdir().expect("tempdir");
+    with_isolated_harness_env(tmp.path(), || {
+        persist_task_board_git_runtime_config(&TaskBoardGitRuntimeConfig {
+            global: TaskBoardGitRuntimeProfile {
+                author_name: Some("Harness Bot".into()),
+                author_email: Some("bot@example.com".into()),
+                ssh_key_path: Some("/tmp/id_ed25519".into()),
+                signing: TaskBoardGitSigningConfig {
+                    mode: TaskBoardGitSigningMode::Gpg,
+                    ssh_key_path: None,
+                    gpg_key_id: Some("ABC123".into()),
+                },
+            },
+            repository_overrides: vec![],
+        })
+        .expect("persist task-board runtime config");
+
+        assert_eq!(
+            load_task_board_git_runtime_config().expect("load task-board runtime config"),
+            TaskBoardGitRuntimeConfig {
+                global: TaskBoardGitRuntimeProfile {
+                    author_name: Some("Harness Bot".into()),
+                    author_email: Some("bot@example.com".into()),
+                    ssh_key_path: Some("/tmp/id_ed25519".into()),
+                    signing: TaskBoardGitSigningConfig {
+                        mode: TaskBoardGitSigningMode::Gpg,
+                        ssh_key_path: None,
+                        gpg_key_id: Some("ABC123".into()),
+                    },
+                },
+                repository_overrides: vec![],
+            }
+        );
+    });
+}
+
+#[test]
+fn github_token_snapshot_prefers_repository_override() {
+    let tmp = tempdir().expect("tempdir");
+    with_isolated_harness_env(tmp.path(), || {
+        let response = replace_task_board_github_tokens(&TaskBoardGitHubTokensSyncRequest {
+            global_token: Some("global-token".into()),
+            repository_tokens: vec![TaskBoardGitHubRepositoryToken {
+                repository: "owner/repo".into(),
+                token: "repo-token".into(),
+            }],
+        });
+
+        assert!(response.global_token_configured);
+        assert_eq!(response.repository_token_count, 1);
+        assert_eq!(
+            task_board_github_token(Some("OWNER/REPO")).as_deref(),
+            Some("repo-token")
+        );
+        assert_eq!(
+            task_board_github_token(Some("other/repo")).as_deref(),
+            Some("global-token")
         );
     });
 }
