@@ -76,6 +76,51 @@ fn resolves_bookmark_from_shared_sandbox_store_and_bootstraps_helper_store() {
 
 #[cfg(target_os = "macos")]
 #[test]
+fn resolves_bookmark_when_input_matches_shared_bookmark_path() {
+    use crate::sandbox::bookmarks::{self, Kind, PersistedStore, Record};
+
+    let tmp = TempDir::new().expect("tempdir");
+    harness_testkit::with_isolated_harness_env(tmp.path(), || {
+        temp_env::with_var("HARNESS_SANDBOXED", Some("1"), || {
+            let project_dir = tmp.path().join("repo");
+            std::fs::create_dir_all(&project_dir).expect("create project dir");
+            let bookmark_id = "B-project-input-path";
+            let store_path = tmp.path().join("sandbox/bookmarks.json");
+            bookmarks::save(
+                &store_path,
+                &PersistedStore {
+                    schema_version: PersistedStore::CURRENT_SCHEMA_VERSION,
+                    bookmarks: vec![Record {
+                        id: bookmark_id.into(),
+                        kind: Kind::TaskBoardDirectory,
+                        display_name: "repo".into(),
+                        last_resolved_path: project_dir.display().to_string(),
+                        bookmark_data: synthesize_bookmark(&project_dir, true),
+                        handoff_bookmark_data: Some(synthesize_bookmark(&project_dir, false)),
+                        created_at: chrono::Utc::now(),
+                        last_accessed_at: chrono::Utc::now(),
+                        stale_count: 0,
+                    }],
+                },
+            )
+            .expect("save bookmarks");
+
+            let input = project_dir.display().to_string();
+            let scope = resolve_project_input(&input).expect("resolve bookmark by path");
+            assert_eq!(
+                scope.path().canonicalize().expect("canonicalize"),
+                project_dir.canonicalize().expect("canonicalize")
+            );
+            let helper_store =
+                bookmarks::load(&helper_bookmark_store_path()).expect("load helper store");
+            let helper_record = bookmarks::find(&helper_store, bookmark_id).expect("helper record");
+            assert_eq!(helper_record.kind, Kind::TaskBoardDirectory);
+        });
+    });
+}
+
+#[cfg(target_os = "macos")]
+#[test]
 fn resolves_bookmark_from_legacy_harness_store_path() {
     use crate::sandbox::bookmarks::{self, Kind, PersistedStore, Record};
 

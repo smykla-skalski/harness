@@ -15,6 +15,8 @@ use thiserror::Error;
 pub enum Kind {
     ProjectRoot,
     SessionDirectory,
+    TaskBoardDirectory,
+    TaskBoardKeyFile,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -122,6 +124,25 @@ pub fn save(path: &Path, store: &PersistedStore) -> Result<(), BookmarkError> {
 #[must_use]
 pub fn find<'a>(store: &'a PersistedStore, id: &str) -> Option<&'a Record> {
     store.bookmarks.iter().find(|r| r.id == id)
+}
+
+/// Find a bookmark by its last resolved path, returning `None` if not present.
+#[must_use]
+pub fn find_by_path<'a>(store: &'a PersistedStore, path: &str) -> Option<&'a Record> {
+    let normalized = normalized_path_key(path)?;
+    store.bookmarks.iter().find(|record| {
+        normalized_path_key(&record.last_resolved_path).as_deref() == Some(normalized.as_str())
+    })
+}
+
+fn normalized_path_key(path: &str) -> Option<String> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let candidate = Path::new(trimmed);
+    let normalized = fs::canonicalize(candidate).unwrap_or_else(|_| candidate.to_path_buf());
+    Some(normalized.to_string_lossy().into_owned())
 }
 
 mod base64_bytes {

@@ -8,4 +8,4 @@ pub mod migration;
 mod project_input;
 pub mod resolver; // macOS-only; resolver.rs is gated by #![cfg(target_os = "macos")]
 
-pub use project_input::{ProjectInputScope, resolve_project_input};
+pub use project_input::{ProjectInputScope, resolve_path_input, resolve_project_input};

@@ -106,6 +106,7 @@ public struct SettingsTaskBoardSection: View {
         title: "Project Directory",
         text: $draft.projectDir,
         accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardProjectDirField,
+        bookmarkKind: .taskBoardDirectory,
         allowsDirectories: true,
         allowsFiles: false
       )
@@ -117,6 +118,7 @@ public struct SettingsTaskBoardSection: View {
         title: "Checkout Path",
         text: $draft.checkoutPath,
         accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardCheckoutPathField,
+        bookmarkKind: .taskBoardDirectory,
         allowsDirectories: true,
         allowsFiles: false
       )
@@ -166,6 +168,7 @@ public struct SettingsTaskBoardSection: View {
         title: "SSH Key Path",
         text: $draft.sshKeyPath,
         accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardSSHKeyPathField,
+        bookmarkKind: .taskBoardKeyFile,
         allowsDirectories: false,
         allowsFiles: true
       )
@@ -180,6 +183,7 @@ public struct SettingsTaskBoardSection: View {
           title: "Signing SSH Key Path",
           text: $draft.signingSSHKeyPath,
           accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardSigningSSHKeyPathField,
+          bookmarkKind: .taskBoardKeyFile,
           allowsDirectories: false,
           allowsFiles: true
         )
@@ -238,6 +242,7 @@ public struct SettingsTaskBoardSection: View {
           text: $draft.repositoryOverrides[index].sshKeyPath,
           accessibilityIdentifier: HarnessMonitorAccessibility
             .settingsTaskBoardRepositoryOverrideSSHKeyField(index),
+          bookmarkKind: .taskBoardKeyFile,
           allowsDirectories: false,
           allowsFiles: true
         )
@@ -253,6 +258,7 @@ public struct SettingsTaskBoardSection: View {
             text: $draft.repositoryOverrides[index].signingSSHKeyPath,
             accessibilityIdentifier: HarnessMonitorAccessibility
               .settingsTaskBoardRepositoryOverrideSigningSSHKeyField(index),
+            bookmarkKind: .taskBoardKeyFile,
             allowsDirectories: false,
             allowsFiles: true
           )
@@ -281,6 +287,7 @@ public struct SettingsTaskBoardSection: View {
     title: String,
     text: Binding<String>,
     accessibilityIdentifier: String,
+    bookmarkKind: BookmarkStore.Record.Kind,
     allowsDirectories: Bool,
     allowsFiles: Bool
   ) -> some View {
@@ -290,12 +297,19 @@ public struct SettingsTaskBoardSection: View {
           .textFieldStyle(.roundedBorder)
           .accessibilityIdentifier(accessibilityIdentifier)
         Button("Choose...") {
-          if let path = selectPath(
+          guard let url = selectPath(
             prompt: title,
             allowsDirectories: allowsDirectories,
             allowsFiles: allowsFiles
-          ) {
-            text.wrappedValue = path
+          ) else { return }
+          Task { @MainActor in
+            do {
+              text.wrappedValue = try await store.authorizeTaskBoardPath(url, kind: bookmarkKind)
+            } catch {
+              store.presentFailureFeedback(
+                "Could not authorize \(title.lowercased()): \(error.localizedDescription)"
+              )
+            }
           }
         }
       }
@@ -359,7 +373,7 @@ public struct SettingsTaskBoardSection: View {
     prompt: String,
     allowsDirectories: Bool,
     allowsFiles: Bool
-  ) -> String? {
+  ) -> URL? {
     let panel = NSOpenPanel()
     panel.prompt = "Choose"
     panel.message = prompt
@@ -371,7 +385,7 @@ public struct SettingsTaskBoardSection: View {
     guard panel.runModal() == .OK else {
       return nil
     }
-    return panel.url?.path
+    return panel.url
   }
 }
 
