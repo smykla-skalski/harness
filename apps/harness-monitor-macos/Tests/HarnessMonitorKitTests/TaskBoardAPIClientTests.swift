@@ -7,15 +7,147 @@ import Testing
 struct TaskBoardAPIClientTests {
   @Test("Git runtime config decodes daemon default payload")
   func gitRuntimeConfigDecodesDaemonDefaultPayload() throws {
-    let decoder = JSONDecoder()
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
     let data = Data(#"{"global":{"signing":{"mode":"none"}}}"#.utf8)
 
-    let config = try decoder.decode(TaskBoardGitRuntimeConfig.self, from: data)
+    let config = try taskBoardDecoder().decode(TaskBoardGitRuntimeConfig.self, from: data)
 
     #expect(config.global.signing.mode == .none)
     #expect(config.global.authorName == nil)
     #expect(config.repositoryOverrides.isEmpty)
+  }
+
+  @Test("Task board item decodes omitted daemon default fields")
+  func taskBoardItemDecodesOmittedDaemonDefaultFields() throws {
+    let data = Data(
+      #"""
+      {
+        "schema_version": 1,
+        "id": "board-1",
+        "title": "Board item",
+        "body": "Body",
+        "status": "todo",
+        "priority": "high",
+        "agent_mode": "interactive",
+        "planning": {},
+        "workflow": {
+          "status": "running"
+        },
+        "usage": {},
+        "created_at": "2026-05-14T10:00:00Z",
+        "updated_at": "2026-05-14T10:01:00Z"
+      }
+      """#.utf8
+    )
+
+    let item = try taskBoardDecoder().decode(TaskBoardItem.self, from: data)
+
+    #expect(item.tags.isEmpty)
+    #expect(item.externalRefs.isEmpty)
+    #expect(item.workflow?.attempts == 0)
+    #expect(item.workflow?.policyTraceIds.isEmpty == true)
+  }
+
+  @Test("Task board item preserves present workflow and collection fields")
+  func taskBoardItemPreservesPresentWorkflowAndCollectionFields() throws {
+    let data = Data(
+      #"""
+      {
+        "schema_version": 1,
+        "id": "board-1",
+        "title": "Board item",
+        "body": "Body",
+        "status": "todo",
+        "priority": "high",
+        "tags": ["automation"],
+        "project_id": "owner/repo",
+        "agent_mode": "interactive",
+        "external_refs": [
+          {
+            "provider": "git_hub",
+            "external_id": "123",
+            "url": "https://example.invalid/issues/123"
+          }
+        ],
+        "planning": {},
+        "workflow": {
+          "status": "running",
+          "attempts": 2,
+          "policy_trace_ids": ["trace-1"]
+        },
+        "usage": {},
+        "created_at": "2026-05-14T10:00:00Z",
+        "updated_at": "2026-05-14T10:01:00Z"
+      }
+      """#.utf8
+    )
+
+    let item = try taskBoardDecoder().decode(TaskBoardItem.self, from: data)
+
+    #expect(item.tags == ["automation"])
+    #expect(item.externalRefs.first?.provider == .gitHub)
+    #expect(item.workflow?.attempts == 2)
+    #expect(item.workflow?.policyTraceIds == ["trace-1"])
+  }
+
+  @Test("Task board run summary decodes omitted policy trace IDs")
+  func taskBoardRunSummaryDecodesOmittedPolicyTraceIDs() throws {
+    let data = Data(
+      #"""
+      {
+        "run_id": "run-1",
+        "started_at": "2026-05-14T10:00:00Z",
+        "completed_at": "2026-05-14T10:01:00Z",
+        "status": "completed",
+        "dry_run": false,
+        "sync": {
+          "total": 1,
+          "providers": []
+        },
+        "audit": {
+          "total": 1,
+          "ready": 1,
+          "blocked": 0,
+          "deleted": 0,
+          "by_status": []
+        }
+      }
+      """#.utf8
+    )
+
+    let summary = try taskBoardDecoder().decode(TaskBoardOrchestratorRunSummary.self, from: data)
+
+    #expect(summary.policyTraceIds.isEmpty)
+  }
+
+  @Test("Task board run summary preserves present policy trace IDs")
+  func taskBoardRunSummaryPreservesPresentPolicyTraceIDs() throws {
+    let data = Data(
+      #"""
+      {
+        "run_id": "run-1",
+        "started_at": "2026-05-14T10:00:00Z",
+        "completed_at": "2026-05-14T10:01:00Z",
+        "status": "completed",
+        "dry_run": false,
+        "sync": {
+          "total": 1,
+          "providers": []
+        },
+        "audit": {
+          "total": 1,
+          "ready": 1,
+          "blocked": 0,
+          "deleted": 0,
+          "by_status": []
+        },
+        "policy_trace_ids": ["trace-1"]
+      }
+      """#.utf8
+    )
+
+    let summary = try taskBoardDecoder().decode(TaskBoardOrchestratorRunSummary.self, from: data)
+
+    #expect(summary.policyTraceIds == ["trace-1"])
   }
 
   @Test("HTTP client uses task-board route contract")
@@ -104,5 +236,11 @@ struct TaskBoardAPIClientTests {
         .syncTaskBoardGitHubTokens(globalTokenConfigured: true, repositoryTokenCount: 1),
       ]
     )
+  }
+
+  private func taskBoardDecoder() -> JSONDecoder {
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    return decoder
   }
 }
