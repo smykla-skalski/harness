@@ -19,6 +19,7 @@ Parse `$ARGUMENTS`:
 | `observe` | Session observation pipeline |
 
 Read [references/session-commands.md](references/session-commands.md) for `harness session` subcommands.
+Read [references/task-board-workflow.md](references/task-board-workflow.md) before coordinating session tasks across agents.
 Read [references/observe-commands.md](references/observe-commands.md) for `harness observe` subcommands.
 
 ## Contract
@@ -80,6 +81,7 @@ digraph session_start {
 
 Read [references/signals.md](references/signals.md) for signal protocol when redirecting agents.
 Read [references/session-commands.md](references/session-commands.md) for exact command syntax.
+Read [references/task-board-workflow.md](references/task-board-workflow.md) for task-board operating rules.
 
 ---
 
@@ -121,11 +123,11 @@ Read [references/roles-and-permissions.md](references/roles-and-permissions.md) 
 
 1. Join: `harness session join <session-id> --role worker --runtime <runtime>`
 2. Check assigned tasks: `harness session task list <session-id> --json`
-3. Claim task: `harness session task update <session-id> <task-id> --status in-progress --actor <agent-id>`
+3. Start task if needed: `harness session task update <session-id> <task-id> --status in_progress --actor <agent-id>`
 4. Do the work following project conventions
-5. Report progress: `harness session task checkpoint <session-id> --summary "..." --progress 50 --actor <agent-id>`
-6. Complete: `harness session task update <session-id> <task-id> --status done --note "..." --actor <agent-id>`
-7. Check for more work or signals
+5. Report progress: `harness session task checkpoint <session-id> <task-id> --summary "..." --progress 50 --actor <agent-id>`
+6. Submit for review: `harness session task submit-for-review <session-id> <task-id> --summary "..." --actor <agent-id>`
+7. Respond to review feedback if requested, then check for more work or signals
 
 ### Observer workflow
 
@@ -141,11 +143,11 @@ Read [references/issue-taxonomy.md](references/issue-taxonomy.md) for category o
 
 ### Reviewer / Improver workflow
 
-1. Check tasks needing review: `harness session task list <session-id> --json`
-2. Look for status `done` or `in-review`
+1. Check tasks needing review: `harness session task list <session-id> --status awaiting_review --json`
+2. Claim review: `harness session task claim-review <session-id> <task-id> --actor <agent-id>`
 3. Review changed files, run checks, verify acceptance criteria
-4. If needs fixes: reassign and set status to `open`
-5. If approved: `harness session task update <session-id> <task-id> --status done --note "reviewed" --actor <agent-id>`
+4. If needs fixes: `harness session task submit-review <session-id> <task-id> --verdict request_changes --summary "..." --actor <agent-id>`
+5. If approved: `harness session task submit-review <session-id> <task-id> --verdict approve --summary "..." --actor <agent-id>`
 
 ---
 
@@ -236,7 +238,7 @@ Read [agents/deep-analyst.md](agents/deep-analyst.md) for agent descriptor.
 - Pass `--actor <agent-id>` for mutating operations
 - Use `--json` for machine-readable output when parsing results
 - Leader cannot end session with in-progress tasks
-- Workers: update status to `in-progress` before starting, `blocked` if stuck, `done` when finished
+- Workers: update status to `in_progress` before starting, `blocked` if stuck, `submit-for-review` when finished
 - Workers: do not modify files another agent is actively working on
 - Observers: do not edit files or execute tasks
 - Add `--project-hint` only if KSRCLI085 error (ambiguous session)
