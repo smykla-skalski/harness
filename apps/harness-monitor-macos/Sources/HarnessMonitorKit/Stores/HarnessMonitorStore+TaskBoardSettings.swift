@@ -64,7 +64,12 @@ extension HarnessMonitorStore {
         )
       }
       recordRequestSuccess()
-      await refreshTaskBoardDashboard()
+      guard await syncAndRefreshTaskBoardDashboard(
+        using: client,
+        failureMessagePrefix: "Saved task board settings, but task board sync failed"
+      ) else {
+        return false
+      }
       presentSuccessFeedback("Saved task board settings")
       return true
     } catch {
