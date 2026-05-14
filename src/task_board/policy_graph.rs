@@ -151,6 +151,8 @@ pub struct PolicyGraphEdge {
     pub from_port: String,
     pub to_node: String,
     pub to_port: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
     #[serde(default)]
     pub condition: PolicyGraphEdgeCondition,
 }

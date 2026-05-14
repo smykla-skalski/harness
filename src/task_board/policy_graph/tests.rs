@@ -1,16 +1,21 @@
 use temp_env::with_vars;
 use tempfile::tempdir;
 
+use std::collections::HashMap;
+
 use crate::task_board::policy::{
     BuiltInPolicyGate, PolicyAction, PolicyDecision, PolicyEvidence, PolicyGate, PolicyInput,
     PolicyReasonCode,
 };
 
 use super::{
-    GraphPolicyGate, PORT_IN, PolicyGraph, PolicyGraphEdge, PolicyGraphEdgeCondition,
-    PolicyGraphMode, PolicyGraphNodeKind, PolicyGraphValidationIssue, PolicyPipelinePromoteRequest,
-    PolicyPipelineStore,
+    GraphPolicyGate, PORT_IN, PolicyCanvasRect, PolicyGraph, PolicyGraphEdge,
+    PolicyGraphEdgeCondition, PolicyGraphMode, PolicyGraphNodeKind, PolicyGraphNodeLayout,
+    PolicyGraphValidationIssue, PolicyPipelinePromoteRequest, PolicyPipelineStore,
 };
+
+const NODE_WIDTH: i32 = 168;
+const NODE_HEIGHT: i32 = 96;
 
 #[test]
 fn seeded_graph_serializes_as_v2_draft() {
@@ -25,6 +30,47 @@ fn seeded_graph_serializes_as_v2_draft() {
 }
 
 #[test]
+fn seeded_graph_layout_starts_clear_and_non_overlapping() {
+    let graph = PolicyGraph::seeded_v2();
+    let node_layouts: HashMap<_, _> = graph
+        .layout
+        .nodes
+        .iter()
+        .map(|layout| (layout.node_id.as_str(), layout))
+        .collect();
+
+    for group in &graph.groups {
+        assert!(group.frame.x >= 0, "group starts left of canvas: {group:?}");
+        assert!(group.frame.y >= 0, "group starts above canvas: {group:?}");
+        assert!(group.frame.width > 0, "group has empty width: {group:?}");
+        assert!(group.frame.height > 0, "group has empty height: {group:?}");
+        for node_id in &group.node_ids {
+            let layout = node_layouts
+                .get(node_id.as_str())
+                .unwrap_or_else(|| panic!("missing layout for {node_id}"));
+            assert!(
+                rect_contains_node(&group.frame, layout),
+                "node {node_id} is outside group {group:?}: {layout:?}"
+            );
+        }
+    }
+
+    for left_index in 0..graph.groups.len() {
+        for right_index in (left_index + 1)..graph.groups.len() {
+            assert!(
+                !rects_intersect(
+                    &graph.groups[left_index].frame,
+                    &graph.groups[right_index].frame
+                ),
+                "seeded groups overlap: {:?} and {:?}",
+                graph.groups[left_index],
+                graph.groups[right_index]
+            );
+        }
+    }
+}
+
+#[test]
 fn validation_reports_dangling_edges_invalid_ports_and_cycles() {
     let mut graph = PolicyGraph::seeded_v2();
     graph.edges.push(PolicyGraphEdge {
@@ -33,6 +79,7 @@ fn validation_reports_dangling_edges_invalid_ports_and_cycles() {
         from_port: "out".to_string(),
         to_node: "action:router".to_string(),
         to_port: PORT_IN.to_string(),
+        label: None,
         condition: PolicyGraphEdgeCondition::Always,
     });
     graph.edges.push(PolicyGraphEdge {
@@ -41,6 +88,7 @@ fn validation_reports_dangling_edges_invalid_ports_and_cycles() {
         from_port: "nope".to_string(),
         to_node: "supervisor:default-allow".to_string(),
         to_port: PORT_IN.to_string(),
+        label: None,
         condition: PolicyGraphEdgeCondition::Always,
     });
     graph.edges.push(PolicyGraphEdge {
@@ -49,6 +97,7 @@ fn validation_reports_dangling_edges_invalid_ports_and_cycles() {
         from_port: "out".to_string(),
         to_node: "action:router".to_string(),
         to_port: PORT_IN.to_string(),
+        label: None,
         condition: PolicyGraphEdgeCondition::Always,
     });
 
@@ -175,4 +224,18 @@ fn merge_evidence(green: bool, protected_path: bool, risk_score: u8) -> PolicyEv
         protected_path_touched: Some(protected_path),
         risk_score: Some(risk_score),
     }
+}
+
+fn rect_contains_node(frame: &PolicyCanvasRect, layout: &PolicyGraphNodeLayout) -> bool {
+    layout.x >= frame.x
+        && layout.y >= frame.y
+        && layout.x + NODE_WIDTH <= frame.x + frame.width
+        && layout.y + NODE_HEIGHT <= frame.y + frame.height
+}
+
+fn rects_intersect(left: &PolicyCanvasRect, right: &PolicyCanvasRect) -> bool {
+    left.x < right.x + right.width
+        && left.x + left.width > right.x
+        && left.y < right.y + right.height
+        && left.y + left.height > right.y
 }

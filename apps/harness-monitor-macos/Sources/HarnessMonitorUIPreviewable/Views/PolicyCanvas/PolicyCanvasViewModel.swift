@@ -17,8 +17,10 @@ final class PolicyCanvasViewModel {
   var backingDocument: TaskBoardPolicyPipelineDocument?
   var latestSimulation: TaskBoardPolicyPipelineSimulationResult?
   var isDirty: Bool
+  var hasRequestedInitialRemoteLoad: Bool
 
   @ObservationIgnored private var nextNodeNumber: Int
+  @ObservationIgnored private var loadedDocumentRevision: UInt64?
   @ObservationIgnored private var nodeDragOrigins: [String: CGPoint] = [:]
   @ObservationIgnored private var groupDragOrigins: [String: CGRect] = [:]
   @ObservationIgnored private var groupNodeDragOrigins: [String: [String: CGPoint]] = [:]
@@ -42,7 +44,9 @@ final class PolicyCanvasViewModel {
     self.backingDocument = nil
     self.latestSimulation = nil
     self.isDirty = false
+    self.hasRequestedInitialRemoteLoad = false
     self.nextNodeNumber = nextNodeNumber
+    reconcileGroupFrames()
   }
 
   var selectedNode: PolicyCanvasNode? {
@@ -106,53 +110,30 @@ final class PolicyCanvasViewModel {
     return nil
   }
 
-  func select(_ newSelection: PolicyCanvasSelection?) {
-    selection = newSelection
-  }
-
-  func save() {
-    lastActionSummary = "Draft saved"
-  }
-
-  func simulate() {
-    selectedTab = .simulation
-    lastActionSummary = "Simulation queued"
-  }
-
-  func promote() {
-    selectedTab = .promotion
-    lastActionSummary = "Promotion requested"
-  }
-
-  func zoomIn() {
-    zoom = min(1.4, zoom + 0.1)
-    isDirty = true
-  }
-
-  func zoomOut() {
-    zoom = max(0.6, zoom - 0.1)
-    isDirty = true
-  }
-
-  func resetZoom() {
-    zoom = 1
-    isDirty = true
-  }
-
   func resetNextNodeNumber() {
     nextNodeNumber = nodes.count + 1
   }
 
-  func palettePayload(for kind: PolicyCanvasNodeKind) -> String {
-    "policy-canvas-palette|\(kind.rawValue)"
+  func markInitialRemoteLoadRequested() -> Bool {
+    guard !hasRequestedInitialRemoteLoad else {
+      return false
+    }
+    hasRequestedInitialRemoteLoad = true
+    return true
   }
 
-  func portDragPayload(nodeID: String, portID: String) -> String {
-    "policy-canvas-port|\(nodeID)|\(portID)"
+  func shouldApplyExternalDocument(_ document: TaskBoardPolicyPipelineDocument?) -> Bool {
+    guard let document else {
+      return false
+    }
+    guard !isDirty else {
+      return false
+    }
+    return loadedDocumentRevision != document.revision || backingDocument?.mode != document.mode
   }
 
-  func canvasPoint(for viewportPoint: CGPoint) -> CGPoint {
-    CGPoint(x: viewportPoint.x / zoom, y: viewportPoint.y / zoom)
+  func markLoadedDocumentRevision(_ revision: UInt64?) {
+    loadedDocumentRevision = revision
   }
 
   func dropPalettePayloads(_ payloads: [String], at point: CGPoint) -> Bool {
@@ -181,7 +162,9 @@ final class PolicyCanvasViewModel {
       )
     )
     node.groupID = containingGroupID(for: nodeCenter(node))
+    node.policyKind = taskBoardPolicyNodeKind(for: kind)
     nodes.append(node)
+    reconcileGroupFrames()
     selection = .node(node.id)
     isDirty = true
     lastActionSummary = "\(kind.title) node added"
@@ -201,7 +184,10 @@ final class PolicyCanvasViewModel {
         y: origin.y + translation.height / zoom
       )
     )
-    highlightedGroupID = containingGroupID(for: nodeCenter(nodes[index]))
+    highlightedGroupID =
+      containingGroupID(for: nodeCenter(nodes[index]), excluding: nodes[index].groupID)
+      ?? nodes[index].groupID
+    reconcileGroupFrames()
     selection = .node(nodeID)
     isDirty = true
   }
@@ -209,8 +195,17 @@ final class PolicyCanvasViewModel {
   func endNodeDrag(_ nodeID: String, translation: CGSize) {
     dragNode(nodeID, translation: translation)
     if let index = nodes.firstIndex(where: { $0.id == nodeID }) {
-      nodes[index].groupID = containingGroupID(for: nodeCenter(nodes[index]))
+      let targetGroupID = containingGroupID(
+        for: nodeCenter(nodes[index]),
+        excluding: nodes[index].groupID
+      )
+      if let targetGroupID {
+        nodes[index].groupID = targetGroupID
+      } else if nodes[index].groupID == nil {
+        nodes[index].groupID = containingGroupID(for: nodeCenter(nodes[index]))
+      }
     }
+    reconcileGroupFrames()
     nodeDragOrigins[nodeID] = nil
     highlightedGroupID = nil
   }
@@ -233,6 +228,7 @@ final class PolicyCanvasViewModel {
     )
     groups[index].frame.origin = nextOrigin
     moveNodes(in: groupID, by: delta)
+    reconcileGroupFrames()
     highlightedGroupID = groupID
     selection = .group(groupID)
     isDirty = true
@@ -326,12 +322,21 @@ final class PolicyCanvasViewModel {
     nodes.filter { $0.groupID == groupID }
   }
 
+  func reconcileGroupFrames() {
+    for index in groups.indices {
+      let members = nodes(in: groups[index].id)
+      guard let frame = policyCanvasGroupFrame(containing: members) else {
+        continue
+      }
+      groups[index].frame = frame
+    }
+  }
+
   private func seedGroupDrag(groupID: String, group: PolicyCanvasGroup) {
     if groupDragOrigins[groupID] == nil {
       groupDragOrigins[groupID] = group.frame
-      groupNodeDragOrigins[groupID] = Dictionary(
-        uniqueKeysWithValues: nodes(in: groupID).map { ($0.id, $0.position) }
-      )
+      let origins = nodes(in: groupID).map { ($0.id, $0.position) }
+      groupNodeDragOrigins[groupID] = Dictionary(uniqueKeysWithValues: origins)
     }
   }
 
@@ -354,8 +359,13 @@ final class PolicyCanvasViewModel {
     )
   }
 
-  private func containingGroupID(for point: CGPoint) -> String? {
-    groups.first { $0.frame.contains(point) }?.id
+  private func containingGroupID(
+    for point: CGPoint,
+    excluding excludedID: String? = nil
+  ) -> String? {
+    groups.first { group in
+      group.id != excludedID && group.frame.contains(point)
+    }?.id
   }
 
   private func snapped(_ point: CGPoint) -> CGPoint {
@@ -391,4 +401,5 @@ final class PolicyCanvasViewModel {
       .compactMap { $0 }
       .joined(separator: " -> ")
   }
+
 }

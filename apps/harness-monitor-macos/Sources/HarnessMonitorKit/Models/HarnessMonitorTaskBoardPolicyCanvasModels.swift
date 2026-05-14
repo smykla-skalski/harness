@@ -47,6 +47,7 @@ public struct TaskBoardPolicyPipelineEdge: Codable, Equatable, Identifiable, Sen
     case toNode
     case toPort
     case condition
+    case label
   }
 
   public init(from decoder: Decoder) throws {
@@ -59,7 +60,7 @@ public struct TaskBoardPolicyPipelineEdge: Codable, Equatable, Identifiable, Sen
     condition =
       try container.decodeIfPresent(TaskBoardPolicyPipelineEdgeCondition.self, forKey: .condition)
       ?? .always
-    label = nil
+    label = try container.decodeIfPresent(String.self, forKey: .label)
   }
 }
 

@@ -28,6 +28,16 @@ public struct PolicyCanvasView: View {
     self.dashboardUI = nil
   }
 
+  init(
+    viewModel: PolicyCanvasViewModel,
+    store: HarnessMonitorStore,
+    dashboardUI: HarnessMonitorStore.ContentDashboardSlice
+  ) {
+    _viewModel = State(initialValue: viewModel)
+    self.store = store
+    self.dashboardUI = dashboardUI
+  }
+
   public var body: some View {
     VStack(spacing: 0) {
       PolicyCanvasTopBar(
@@ -56,14 +66,14 @@ public struct PolicyCanvasView: View {
       await loadPolicyPipeline()
     }
     .onChange(of: dashboardUI?.taskBoardPolicyPipeline) { _, newValue in
-      viewModel.load(
+      viewModel.loadIfChanged(
         document: newValue,
         simulation: dashboardUI?.taskBoardPolicySimulation,
         audit: dashboardUI?.taskBoardPolicyAudit
       )
     }
     .onChange(of: dashboardUI?.taskBoardPolicySimulation) { _, newValue in
-      viewModel.load(
+      viewModel.loadIfChanged(
         document: dashboardUI?.taskBoardPolicyPipeline,
         simulation: newValue,
         audit: dashboardUI?.taskBoardPolicyAudit
@@ -87,11 +97,23 @@ public struct PolicyCanvasView: View {
     guard let store else {
       return
     }
+    if let cachedDocument = dashboardUI?.taskBoardPolicyPipeline {
+      viewModel.loadIfChanged(
+        document: cachedDocument,
+        simulation: dashboardUI?.taskBoardPolicySimulation,
+        audit: dashboardUI?.taskBoardPolicyAudit
+      )
+      return
+    }
+    guard viewModel.markInitialRemoteLoadRequested() else {
+      return
+    }
     await store.refreshTaskBoardPolicyPipeline()
-    viewModel.load(
+    viewModel.loadIfChanged(
       document: dashboardUI?.taskBoardPolicyPipeline,
       simulation: dashboardUI?.taskBoardPolicySimulation,
-      audit: dashboardUI?.taskBoardPolicyAudit
+      audit: dashboardUI?.taskBoardPolicyAudit,
+      force: true
     )
   }
 
@@ -100,7 +122,7 @@ public struct PolicyCanvasView: View {
     Task { @MainActor in
       let saved = await store?.saveTaskBoardPolicyPipelineDraft(document: document) ?? false
       if saved {
-        await loadPolicyPipeline()
+        await forceReloadPolicyPipeline()
       } else {
         viewModel.lastActionSummary = "Save blocked by validation"
       }
@@ -112,7 +134,7 @@ public struct PolicyCanvasView: View {
     Task { @MainActor in
       let simulated = await store?.simulateTaskBoardPolicyPipeline(document: document) ?? false
       if simulated {
-        await loadPolicyPipeline()
+        await forceReloadPolicyPipeline()
       } else {
         viewModel.lastActionSummary = "Simulation failed"
       }
@@ -136,10 +158,23 @@ public struct PolicyCanvasView: View {
     Task { @MainActor in
       let promoted = await store?.promoteTaskBoardPolicyPipeline(revision: revision) ?? false
       if promoted {
-        await loadPolicyPipeline()
+        await forceReloadPolicyPipeline()
       } else {
         viewModel.lastActionSummary = "Promotion blocked"
       }
     }
+  }
+
+  private func forceReloadPolicyPipeline() async {
+    guard let store else {
+      return
+    }
+    await store.refreshTaskBoardPolicyPipeline()
+    viewModel.loadIfChanged(
+      document: dashboardUI?.taskBoardPolicyPipeline,
+      simulation: dashboardUI?.taskBoardPolicySimulation,
+      audit: dashboardUI?.taskBoardPolicyAudit,
+      force: true
+    )
   }
 }
