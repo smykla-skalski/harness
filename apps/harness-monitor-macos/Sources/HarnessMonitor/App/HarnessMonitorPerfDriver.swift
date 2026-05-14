@@ -109,7 +109,8 @@ enum HarnessMonitorPerfDriver {
       }
       await settle(.milliseconds(2_800))
       return .completed
-    case .agentDetailForm,
+    case .policyCanvas,
+      .agentDetailForm,
       .agentDetailFormVisualOptionsDisabled,
       .decisionDetailForm,
       .decisionDetailFormVisualOptionsDisabled,
@@ -120,6 +121,7 @@ enum HarnessMonitorPerfDriver {
       .timelineFilterForm,
       .timelineFilterFormVisualOptionsDisabled,
       .permissionModal,
+      .taskBoardSettings,
       .settingsBackdropCycle,
       .settingsBackgroundCycle,
       .timelineBurst,
@@ -134,6 +136,8 @@ enum HarnessMonitorPerfDriver {
     openWindow: OpenWindowAction
   ) async -> ScenarioResult? {
     switch scenario {
+    case .policyCanvas:
+      return await runPolicyCanvasScenario(store: store, openWindow: openWindow)
     case .agentDetailForm,
       .agentDetailFormVisualOptionsDisabled:
       return await routeAgentDetailFormScenario(store: store, openWindow: openWindow)
@@ -161,6 +165,7 @@ enum HarnessMonitorPerfDriver {
       .sidebarToggleRichDetailVisualsOff,
       .settingsBackdropCycle,
       .settingsBackgroundCycle,
+      .taskBoardSettings,
       .timelineBurst,
       .toastOverlayChurn,
       .offlineCachedOpen:
@@ -173,6 +178,8 @@ enum HarnessMonitorPerfDriver {
     openWindow: OpenWindowAction
   ) async -> ScenarioResult? {
     switch scenario {
+    case .taskBoardSettings:
+      return await runTaskBoardSettingsScenario(openWindow: openWindow)
     case .settingsBackdropCycle:
       return await runSettingsBackdropCycleScenario(openWindow: openWindow)
     case .settingsBackgroundCycle:
@@ -180,6 +187,7 @@ enum HarnessMonitorPerfDriver {
     case .openRecentWindow,
       .openSessionWindow,
       .openSessionWindowVisualOptionsDisabled,
+      .policyCanvas,
       .agentDetailForm,
       .agentDetailFormVisualOptionsDisabled,
       .decisionDetailForm,
@@ -213,6 +221,7 @@ enum HarnessMonitorPerfDriver {
     case .openRecentWindow,
       .openSessionWindow,
       .openSessionWindowVisualOptionsDisabled,
+      .policyCanvas,
       .agentDetailForm,
       .agentDetailFormVisualOptionsDisabled,
       .decisionDetailForm,
@@ -226,6 +235,7 @@ enum HarnessMonitorPerfDriver {
       .timelineFilterForm,
       .timelineFilterFormVisualOptionsDisabled,
       .permissionModal,
+      .taskBoardSettings,
       .settingsBackdropCycle,
       .settingsBackgroundCycle,
       .offlineCachedOpen:

@@ -17,6 +17,24 @@ extension HarnessMonitorPerfDriver {
     return .completed
   }
 
+  static func runPolicyCanvasScenario(
+    store: HarnessMonitorStore,
+    openWindow: OpenWindowAction
+  ) async -> ScenarioResult {
+    let sessionID = PreviewFixtures.summary.sessionId
+    guard
+      await ensureSessionWindow(
+        sessionID: sessionID,
+        store: store,
+        openWindow: openWindow
+      )
+    else {
+      return .failed("session-window-timeout")
+    }
+    await settle(.milliseconds(1_400))
+    return .completed
+  }
+
   static func runSettingsBackdropCycleScenario(
     openWindow: OpenWindowAction
   ) async -> ScenarioResult {
@@ -30,6 +48,13 @@ extension HarnessMonitorPerfDriver {
   ) async -> ScenarioResult {
     await openAppearanceSettings(openWindow: openWindow)
     await cycleBackgroundSelections()
+    return .completed
+  }
+
+  static func runTaskBoardSettingsScenario(
+    openWindow: OpenWindowAction
+  ) async -> ScenarioResult {
+    await openSettingsWindow(openWindow: openWindow)
     return .completed
   }
 
@@ -329,13 +354,17 @@ extension HarnessMonitorPerfDriver {
     return true
   }
 
+  static func openSettingsWindow(openWindow: OpenWindowAction) async {
+    openWindow(id: HarnessMonitorWindowID.settings)
+    await settle(.milliseconds(1_000))
+  }
+
   static func openAppearanceSettings(openWindow: OpenWindowAction) async {
     UserDefaults.standard.set(
       HarnessMonitorBackdropMode.window.rawValue,
       forKey: HarnessMonitorBackdropDefaults.modeKey
     )
-    openWindow(id: HarnessMonitorWindowID.settings)
-    await settle(.milliseconds(1_000))
+    await openSettingsWindow(openWindow: openWindow)
   }
 
   static func cycleBackdropModes() async {

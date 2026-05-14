@@ -85,6 +85,17 @@ struct SessionWindowPerfScenarioScript: ViewModifier {
       appliedScenarioRawValue = scenario
       recordScriptBegin(baseScenario: baseScenario, sessionID: sessionID)
       await runSidebarToggleRichDetailScript(targets: trigger.sidebarToggleTargets)
+    case "policy-canvas":
+      appliedScenarioRawValue = scenario
+      recordScriptBegin(baseScenario: baseScenario, sessionID: sessionID)
+      await runMeasuredStep(
+        "route.policy-canvas",
+        details: ["base_scenario": baseScenario]
+      ) {
+        stateCache.selectRoute(.policyCanvas)
+        await Task.yield()
+        try? await Task.sleep(for: .milliseconds(180))
+      }
     case "timeline-burst", "timeline-filter-form":
       appliedScenarioRawValue = scenario
       recordScriptBegin(baseScenario: baseScenario, sessionID: sessionID)

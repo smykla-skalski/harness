@@ -29,6 +29,10 @@ extension HarnessMonitorPerfTests {
     measureScenario("open-session-window")
   }
 
+  func testPolicyCanvasHitchRate() {
+    measureScenario("policy-canvas")
+  }
+
   func testAgentDetailFormHitchRate() {
     measureScenario("agent-detail-form")
   }
@@ -64,6 +68,10 @@ extension HarnessMonitorPerfTests {
 
   func testPermissionModalHitchRate() {
     measureScenario("permission-modal")
+  }
+
+  func testTaskBoardSettingsHitchRate() {
+    measureScenario("task-board-settings")
   }
 
   func testSettingsBackdropCycleHitchRate() {

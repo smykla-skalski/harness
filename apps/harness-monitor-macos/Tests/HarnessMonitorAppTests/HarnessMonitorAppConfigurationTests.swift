@@ -53,6 +53,39 @@ final class HarnessMonitorAppConfigurationTests: XCTestCase {
   }
 
   @MainActor
+  func testResolvePolicyCanvasPerfScenarioSeedsPreviewScenario() {
+    let testEnv = HarnessMonitorEnvironment(
+      values: [
+        HarnessMonitorPerfScenario.environmentKey: HarnessMonitorPerfScenario.policyCanvas
+          .rawValue,
+      ],
+      homeDirectory: FileManager.default.homeDirectoryForCurrentUser
+    )
+
+    let configuration = HarnessMonitorAppConfiguration.resolve(baseEnvironment: testEnv)
+
+    XCTAssertEqual(configuration.perfScenario, .policyCanvas)
+    XCTAssertEqual(configuration.environment.values["HARNESS_MONITOR_PREVIEW_SCENARIO"], "policy-canvas")
+  }
+
+  @MainActor
+  func testResolveTaskBoardSettingsPerfScenarioSeedsPreviewScenarioAndInitialSection() {
+    let testEnv = HarnessMonitorEnvironment(
+      values: [
+        HarnessMonitorPerfScenario.environmentKey: HarnessMonitorPerfScenario.taskBoardSettings
+          .rawValue,
+      ],
+      homeDirectory: FileManager.default.homeDirectoryForCurrentUser
+    )
+
+    let configuration = HarnessMonitorAppConfiguration.resolve(baseEnvironment: testEnv)
+
+    XCTAssertEqual(configuration.perfScenario, .taskBoardSettings)
+    XCTAssertEqual(configuration.environment.values["HARNESS_MONITOR_PREVIEW_SCENARIO"], "dashboard")
+    XCTAssertEqual(configuration.settingsInitialSection, .taskBoard)
+  }
+
+  @MainActor
   func testResolveAppliesPersistedDaemonOwnershipPreferenceBeforeStoreCreation() throws {
     let suiteName = "io.harnessmonitor.app-tests.daemon-ownership.\(UUID().uuidString)"
     let isolated = try XCTUnwrap(UserDefaults(suiteName: suiteName))
