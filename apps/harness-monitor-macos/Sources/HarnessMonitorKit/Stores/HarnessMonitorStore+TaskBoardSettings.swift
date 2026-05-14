@@ -39,7 +39,8 @@ extension HarnessMonitorStore {
       let client = try await taskBoardSettingsClient()
       let materializedSnapshot = try await materializeTaskBoardGitSettings(snapshot)
       async let updatedOrchestrator = client.updateTaskBoardOrchestratorSettings(
-        request: Self.orchestratorSettingsUpdateRequest(from: materializedSnapshot.orchestratorSettings)
+        request: Self.orchestratorSettingsUpdateRequest(
+          from: materializedSnapshot.orchestratorSettings)
       )
       async let updatedRuntime = client.updateTaskBoardGitRuntimeConfig(
         request: materializedSnapshot.runtimeConfig
@@ -176,24 +177,26 @@ extension HarnessMonitorStore {
     _ profile: TaskBoardGitRuntimeProfile
   ) async throws -> TaskBoardGitRuntimeProfile {
     let signing = profile.signing
-    let signingSSHKeyPath: String? = if signing.mode == .ssh {
-      try await materializeTaskBoardPath(
-        signing.sshKeyPath,
-        kind: .taskBoardKeyFile,
-        isDirectory: false
-      )
-    } else {
-      nil
-    }
-    let signingGPGPrivateKeyPath: String? = if signing.mode == .gpg {
-      try await materializeTaskBoardPath(
-        signing.gpgPrivateKeyPath,
-        kind: .taskBoardKeyFile,
-        isDirectory: false
-      )
-    } else {
-      nil
-    }
+    let signingSSHKeyPath: String? =
+      if signing.mode == .ssh {
+        try await materializeTaskBoardPath(
+          signing.sshKeyPath,
+          kind: .taskBoardKeyFile,
+          isDirectory: false
+        )
+      } else {
+        nil
+      }
+    let signingGPGPrivateKeyPath: String? =
+      if signing.mode == .gpg {
+        try await materializeTaskBoardPath(
+          signing.gpgPrivateKeyPath,
+          kind: .taskBoardKeyFile,
+          isDirectory: false
+        )
+      } else {
+        nil
+      }
 
     return TaskBoardGitRuntimeProfile(
       authorName: profile.authorName,

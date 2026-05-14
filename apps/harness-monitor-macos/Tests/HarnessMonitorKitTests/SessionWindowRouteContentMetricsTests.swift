@@ -168,6 +168,24 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(boardSource.contains("dashboardUI.taskBoardOrchestratorStatus"))
   }
 
+  @Test("Task board controls stay explicit after chrome cleanup")
+  func taskBoardControlsStayExplicitAfterChromeCleanup() throws {
+    let overviewSource = try taskBoardSourceFile(named: "TaskBoardOverviewView.swift")
+    let orchestratorSource = try taskBoardSourceFile(
+      named: "TaskBoardOrchestratorSummaryView.swift"
+    )
+    let managementPanelSource = try taskBoardSourceFile(named: "TaskBoardItemManagementPanel.swift")
+
+    #expect(overviewSource.contains("Label(\"Refresh\", systemImage: \"arrow.clockwise\")"))
+    #expect(
+      overviewSource.contains(
+        ".harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)"
+      )
+    )
+    #expect(orchestratorSource.contains(".harnessActionButtonStyle(variant: .prominent"))
+    #expect(managementPanelSource.contains("Label(\"Refresh\", systemImage: \"arrow.clockwise\")"))
+  }
+
   @Test("Board-only task board items have a management surface")
   func boardOnlyTaskBoardItemsHaveManagementSurface() throws {
     let overviewSource = try taskBoardSourceFile(named: "TaskBoardOverviewView.swift")
@@ -209,16 +227,16 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(needsYouSource.contains(".dropDestination(for: TaskBoardItemDragPayload.self"))
   }
 
-  @Test("Task board lanes use flat column chrome")
-  func taskBoardLanesUseFlatColumnChrome() throws {
+  @Test("Task board lanes keep card column chrome")
+  func taskBoardLanesKeepCardColumnChrome() throws {
     let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
     let laneSupportSource = try taskBoardSourceFile(named: "TaskBoardLaneSupport.swift")
     let overviewSource = try taskBoardSourceFile(named: "TaskBoardOverviewView.swift")
 
     #expect(laneSource.contains(".taskBoardLaneColumnChrome("))
     #expect(laneSupportSource.contains("private struct TaskBoardLaneColumnChrome"))
-    #expect(!laneSource.contains("private var laneAccentColor: Color"))
-    #expect(!laneSource.contains("strokeBorder(laneStrokeColor"))
+    #expect(laneSupportSource.contains("private var laneFill: AnyShapeStyle"))
+    #expect(laneSupportSource.contains("strokeBorder(laneStrokeColor"))
     #expect(!overviewSource.contains("Board-owned work awaiting progression."))
     #expect(!overviewSource.contains("Open work pulled from active sessions."))
   }

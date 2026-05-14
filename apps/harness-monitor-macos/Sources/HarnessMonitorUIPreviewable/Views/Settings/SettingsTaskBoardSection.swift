@@ -242,13 +242,14 @@ public struct SettingsTaskBoardSection: View {
         TextField("owner/repo", text: $draft.repositoryOverrides[index].repository)
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.settingsTaskBoardRepositoryOverrideField(index)
-        )
+          )
         TextField("Author Name", text: $draft.repositoryOverrides[index].authorName)
         TextField("Author Email", text: $draft.repositoryOverrides[index].authorEmail)
         pathField(
           .keyFile(
             title: "SSH Key Path",
-            accessibilityIdentifier: HarnessMonitorAccessibility
+            accessibilityIdentifier:
+              HarnessMonitorAccessibility
               .settingsTaskBoardRepositoryOverrideSSHKeyField(index)
           ),
           text: $draft.repositoryOverrides[index].sshKeyPath
@@ -263,7 +264,8 @@ public struct SettingsTaskBoardSection: View {
           pathField(
             .keyFile(
               title: "Signing SSH Key Path",
-              accessibilityIdentifier: HarnessMonitorAccessibility
+              accessibilityIdentifier:
+                HarnessMonitorAccessibility
                 .settingsTaskBoardRepositoryOverrideSigningSSHKeyField(index)
             ),
             text: $draft.repositoryOverrides[index].signingSSHKeyPath
@@ -274,7 +276,8 @@ public struct SettingsTaskBoardSection: View {
           pathField(
             .keyFile(
               title: "GPG Private Key Path",
-              accessibilityIdentifier: HarnessMonitorAccessibility
+              accessibilityIdentifier:
+                HarnessMonitorAccessibility
                 .settingsTaskBoardRepositoryOverrideGPGPrivateKeyField(index)
             ),
             text: $draft.repositoryOverrides[index].gpgPrivateKeyPath

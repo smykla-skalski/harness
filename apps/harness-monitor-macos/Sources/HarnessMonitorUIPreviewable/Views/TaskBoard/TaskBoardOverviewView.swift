@@ -141,33 +141,45 @@ extension TaskBoardOverviewView {
   }
 
   private var headerActions: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      if let onEvaluateTaskBoard {
-        Button {
-          onEvaluateTaskBoard()
-        } label: {
-          Label("Evaluate", systemImage: "checkmark.seal")
-            .scaledFont(.caption.weight(.semibold))
-        }
-        .frame(minHeight: metrics.controlMinHeight)
-        .disabled(isActionInFlight)
-        .help("Evaluate board state")
-        .accessibilityIdentifier("harness.task-board.evaluate")
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: HarnessMonitorTheme.spacingSM) {
+        headerActionButtons
       }
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+        headerActionButtons
+      }
+    }
+  }
 
-      if let onRefreshTaskBoard {
-        Button {
-          onRefreshTaskBoard()
-        } label: {
-          Image(systemName: "arrow.clockwise")
-            .accessibilityHidden(true)
-        }
-        .frame(minWidth: metrics.iconControlMinWidth, minHeight: metrics.controlMinHeight)
-        .disabled(isActionInFlight)
-        .help("Refresh task board")
-        .accessibilityLabel("Refresh board")
-        .accessibilityIdentifier("harness.task-board.refresh")
+  @ViewBuilder private var headerActionButtons: some View {
+    if let onEvaluateTaskBoard {
+      Button {
+        onEvaluateTaskBoard()
+      } label: {
+        Label("Evaluate", systemImage: "checkmark.seal")
+          .scaledFont(.caption.weight(.semibold))
       }
+      .frame(minHeight: metrics.controlMinHeight)
+      .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
+      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+      .disabled(isActionInFlight)
+      .help("Evaluate board state")
+      .accessibilityIdentifier("harness.task-board.evaluate")
+    }
+
+    if let onRefreshTaskBoard {
+      Button {
+        onRefreshTaskBoard()
+      } label: {
+        Label("Refresh", systemImage: "arrow.clockwise")
+          .scaledFont(.caption.weight(.semibold))
+      }
+      .frame(minHeight: metrics.controlMinHeight)
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+      .disabled(isActionInFlight)
+      .help("Refresh task board")
+      .accessibilityIdentifier("harness.task-board.refresh")
     }
   }
 

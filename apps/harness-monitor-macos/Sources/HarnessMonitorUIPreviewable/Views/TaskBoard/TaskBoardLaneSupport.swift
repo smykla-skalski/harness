@@ -278,6 +278,8 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
   let isDropTargeted: Bool
   @Environment(\.fontScale)
   private var fontScale
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
   @Environment(\.colorSchemeContrast)
   private var colorSchemeContrast
 
@@ -290,23 +292,42 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
       .frame(width: metrics.laneWidth, alignment: .topLeading)
       .frame(minHeight: metrics.laneMinHeight, alignment: .topLeading)
       .background {
-        if isDropTargeted {
-          RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
-            .fill(taskBoardLaneColor(for: lane).opacity(0.08))
-        }
+        RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
+          .fill(laneFill)
+      }
+      .overlay {
+        RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
+          .strokeBorder(laneStrokeColor, lineWidth: laneStrokeWidth)
       }
       .overlay(alignment: .top) {
         Rectangle()
           .fill(laneAccentColor)
-          .frame(height: laneStrokeWidth)
+          .padding(.horizontal, metrics.laneInnerPadding)
+          .frame(height: max(2, laneStrokeWidth + 1))
       }
+  }
+
+  private var laneFill: AnyShapeStyle {
+    if isDropTargeted {
+      return AnyShapeStyle(taskBoardLaneColor(for: lane).opacity(reduceTransparency ? 0.18 : 0.12))
+    }
+    return AnyShapeStyle(.background.opacity(reduceTransparency ? 0.72 : 0.6))
+  }
+
+  private var laneStrokeColor: Color {
+    if isDropTargeted {
+      return taskBoardLaneColor(for: lane).opacity(colorSchemeContrast == .increased ? 0.84 : 0.62)
+    }
+    return HarnessMonitorTheme.controlBorder.opacity(
+      colorSchemeContrast == .increased ? 0.78 : 0.54
+    )
   }
 
   private var laneAccentColor: Color {
     if isDropTargeted {
-      return taskBoardLaneColor(for: lane).opacity(colorSchemeContrast == .increased ? 0.82 : 0.58)
+      return taskBoardLaneColor(for: lane).opacity(colorSchemeContrast == .increased ? 0.88 : 0.64)
     }
-    return taskBoardLaneColor(for: lane).opacity(colorSchemeContrast == .increased ? 0.64 : 0.36)
+    return taskBoardLaneColor(for: lane).opacity(colorSchemeContrast == .increased ? 0.72 : 0.48)
   }
 
   private var laneStrokeWidth: CGFloat {

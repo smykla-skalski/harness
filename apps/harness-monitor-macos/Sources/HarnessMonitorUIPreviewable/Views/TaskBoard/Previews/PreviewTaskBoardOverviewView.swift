@@ -3,13 +3,41 @@ import SwiftUI
 
 #Preview("Task Board Overview") {
   TaskBoardOverviewView(
-    snapshot: TaskBoardPreviewFixtures.snapshot
+    snapshot: TaskBoardPreviewFixtures.snapshot,
+    orchestratorStatus: TaskBoardPreviewFixtures.orchestratorStatus,
+    evaluationSummary: TaskBoardPreviewFixtures.evaluationSummary,
+    onEvaluateTaskBoard: {},
+    onRefreshTaskBoard: {},
+    onStartTaskBoardOrchestrator: {},
+    onStopTaskBoardOrchestrator: {},
+    onRunTaskBoardOrchestratorOnce: { _ in }
   )
   .padding(24)
   .frame(width: 1_120)
 }
 
 private enum TaskBoardPreviewFixtures {
+  static let evaluationSummary = TaskBoardEvaluationSummary(
+    total: 12,
+    evaluated: 8,
+    updated: 3,
+    blocked: 1
+  )
+
+  static let orchestratorStatus = TaskBoardOrchestratorStatus(
+    enabled: true,
+    running: false,
+    workflowExecutionCounts: [
+      TaskBoardWorkflowExecutionCount(status: .running, count: 1),
+      TaskBoardWorkflowExecutionCount(status: .paused, count: 1),
+    ],
+    settings: TaskBoardOrchestratorSettings(
+      enabledWorkflows: [.defaultTask, .prReview],
+      dryRunDefault: false,
+      policyVersion: "preview"
+    )
+  )
+
   static let snapshot = TaskBoardInboxSnapshot(
     sessions: [PreviewFixtures.taskDropSummary, secondarySession],
     detailsBySessionID: [

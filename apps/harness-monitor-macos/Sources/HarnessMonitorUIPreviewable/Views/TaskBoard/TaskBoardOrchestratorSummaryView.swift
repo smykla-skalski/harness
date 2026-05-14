@@ -74,45 +74,60 @@ struct TaskBoardOrchestratorSummaryView: View {
   }
 
   private var controls: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      if status.running {
-        if let onStop {
-          Button {
-            onStop()
-          } label: {
-            Label("Stop", systemImage: "stop.circle")
-              .scaledFont(.caption.weight(.semibold))
-          }
-          .frame(minHeight: metrics.controlMinHeight)
-          .disabled(isActionInFlight)
-          .help("Stop task-board orchestrator")
-          .accessibilityIdentifier("harness.task-board.orchestrator.stop")
-        }
-      } else if let onStart {
-        Button {
-          onStart()
-        } label: {
-          Label("Start", systemImage: "play.circle")
-            .scaledFont(.caption.weight(.semibold))
-        }
-        .frame(minHeight: metrics.controlMinHeight)
-        .disabled(isActionInFlight)
-        .help("Start task-board orchestrator")
-        .accessibilityIdentifier("harness.task-board.orchestrator.start")
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: HarnessMonitorTheme.spacingSM) {
+        controlButtons
       }
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+        controlButtons
+      }
+    }
+  }
 
-      if let onRunOnce {
+  @ViewBuilder private var controlButtons: some View {
+    if status.running {
+      if let onStop {
         Button {
-          onRunOnce()
+          onStop()
         } label: {
-          Label("Run Once", systemImage: "playpause")
+          Label("Stop", systemImage: "stop.circle")
             .scaledFont(.caption.weight(.semibold))
         }
         .frame(minHeight: metrics.controlMinHeight)
+        .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.danger)
+        .controlSize(HarnessMonitorControlMetrics.compactControlSize)
         .disabled(isActionInFlight)
-        .help("Run one task-board orchestrator tick")
-        .accessibilityIdentifier("harness.task-board.orchestrator.run-once")
+        .help("Stop task-board orchestrator")
+        .accessibilityIdentifier("harness.task-board.orchestrator.stop")
       }
+    } else if let onStart {
+      Button {
+        onStart()
+      } label: {
+        Label("Start", systemImage: "play.circle")
+          .scaledFont(.caption.weight(.semibold))
+      }
+      .frame(minHeight: metrics.controlMinHeight)
+      .harnessActionButtonStyle(variant: .prominent, tint: HarnessMonitorTheme.accent)
+      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+      .disabled(isActionInFlight)
+      .help("Start task-board orchestrator")
+      .accessibilityIdentifier("harness.task-board.orchestrator.start")
+    }
+
+    if let onRunOnce {
+      Button {
+        onRunOnce()
+      } label: {
+        Label("Run Once", systemImage: "playpause")
+          .scaledFont(.caption.weight(.semibold))
+      }
+      .frame(minHeight: metrics.controlMinHeight)
+      .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
+      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+      .disabled(isActionInFlight)
+      .help("Run one task-board orchestrator tick")
+      .accessibilityIdentifier("harness.task-board.orchestrator.run-once")
     }
   }
 
