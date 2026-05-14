@@ -82,12 +82,40 @@ struct SessionTimelineLoadOlderTriggerTests {
     #expect(sourceFile.contains("retainedLimit: nil"))
   }
 
-  @Test("Trigger only fires on the rising edge of near-bottom")
-  func triggerOnlyFiresOnRisingEdge() throws {
+  @Test("Trigger uses task-id state to fire on (isNearBottom, hasOlder)")
+  func triggerFiresViaTaskComposite() throws {
     let sourceFile = try timelineSource(named: "MonitorTimelineSection.swift")
 
-    #expect(sourceFile.contains("guard !oldValue.isNearBottom, newValue.isNearBottom else"))
-    #expect(sourceFile.contains("guard presentation.navigation.hasOlder else"))
+    #expect(sourceFile.contains("@State private var isNearBottom"))
+    #expect(sourceFile.contains("if newValue.isNearBottom != isNearBottom"))
+    #expect(sourceFile.contains("isNearBottom = newValue.isNearBottom"))
+    #expect(sourceFile.contains(".task("))
+    #expect(sourceFile.contains("id: SessionTimelineLoadOlderState("))
+    #expect(sourceFile.contains("isNearBottom: isNearBottom"))
+    #expect(sourceFile.contains("hasOlder: presentation.navigation.hasOlder"))
+    #expect(sourceFile.contains("windowEnd: presentation.navigation.windowEnd"))
+    #expect(sourceFile.contains("guard isNearBottom, presentation.navigation.hasOlder else"))
+  }
+
+  @Test("Composite state struct is Equatable on (isNearBottom, hasOlder, windowEnd)")
+  func compositeStateEquatable() {
+    let baseline = SessionTimelineLoadOlderState(
+      isNearBottom: true,
+      hasOlder: true,
+      windowEnd: 100
+    )
+    #expect(
+      baseline
+        == SessionTimelineLoadOlderState(isNearBottom: true, hasOlder: true, windowEnd: 100))
+    #expect(
+      baseline
+        != SessionTimelineLoadOlderState(isNearBottom: false, hasOlder: true, windowEnd: 100))
+    #expect(
+      baseline
+        != SessionTimelineLoadOlderState(isNearBottom: true, hasOlder: false, windowEnd: 100))
+    #expect(
+      baseline
+        != SessionTimelineLoadOlderState(isNearBottom: true, hasOlder: true, windowEnd: 101))
   }
 
   private func timelineSource(named fileName: String) throws -> String {
