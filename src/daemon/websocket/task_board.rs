@@ -215,13 +215,26 @@ async fn dispatch_task_board_orchestrator_run_once(
         }
         result
     } else {
-        let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-        let db_ref = db_guard.as_deref();
-        let result = service::run_task_board_orchestrator_once(&body, db_ref);
+        let db = state.db.get().cloned();
+        let body_for_worker = body.clone();
+        let result = tokio::task::spawn_blocking(move || {
+            let db_guard = db.as_ref().map(|db| db.lock().expect("db lock"));
+            let db_ref = db_guard.as_deref();
+            service::run_task_board_orchestrator_once(&body_for_worker, db_ref)
+        })
+        .await
+        .unwrap_or_else(|error| {
+            Err(crate::errors::CliErrorKind::workflow_io(format!(
+                "run task-board orchestrator fallback: {error}"
+            ))
+            .into())
+        });
         if result
             .as_ref()
             .is_ok_and(|status| status.last_run_applied_count() > 0)
         {
+            let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+            let db_ref = db_guard.as_deref();
             service::broadcast_sessions_updated(&state.sender, db_ref);
         }
         result
