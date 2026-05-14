@@ -127,9 +127,7 @@ pub(super) fn publication_signature(
         }
         (TaskBoardGitSigningMode::Gpg, _) => unreachable!("GPG signing handled before match"),
         (TaskBoardGitSigningMode::Ssh, _) | (_, Some(LocalCommitSignature::Ssh)) => {
-            Err(CliError::from(CliErrorKind::workflow_io(
-                "task-board github SSH-signed commits require native Git transport; the GitHub REST commit API only supports PGP signatures",
-            )))
+            Err(unsupported_ssh_signing_error())
         }
         (_, Some(LocalCommitSignature::Unsupported)) => {
             Err(CliError::from(CliErrorKind::workflow_io(
@@ -137,6 +135,28 @@ pub(super) fn publication_signature(
             )))
         }
     }
+}
+
+pub(super) fn validate_rest_publication_signature_support(
+    profile: &TaskBoardGitRuntimeProfile,
+    signature: Option<&LocalCommitSignature>,
+) -> Result<(), CliError> {
+    match (profile.signing.mode, signature) {
+        (TaskBoardGitSigningMode::Ssh, _) => Err(unsupported_ssh_signing_error()),
+        (_, Some(LocalCommitSignature::Ssh)) => Err(unsupported_ssh_signing_error()),
+        (_, Some(LocalCommitSignature::Unsupported)) => {
+            Err(CliError::from(CliErrorKind::workflow_io(
+                "task-board github commit contains an unsupported signature type",
+            )))
+        }
+        _ => Ok(()),
+    }
+}
+
+fn unsupported_ssh_signing_error() -> CliError {
+    CliError::from(CliErrorKind::workflow_io(
+        "task-board github SSH commit signing is unsupported by REST publication; configure GPG signing with a runtime-config private key path or use native Git transport",
+    ))
 }
 
 fn validate_git_actor_field(label: &str, value: &str) -> Result<(), CliError> {
@@ -291,6 +311,56 @@ mod tests {
     }
 
     #[test]
+    fn publication_uses_configured_gpg_key_path_and_passphrase() {
+        let (private_key, key_id, _fingerprint) = generated_private_key(Some("secret"));
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        let key_path = tempdir.path().join("private.asc");
+        fs::write(&key_path, private_key).expect("write private key");
+        let profile = TaskBoardGitRuntimeProfile {
+            signing: crate::task_board::TaskBoardGitSigningConfig {
+                mode: TaskBoardGitSigningMode::Gpg,
+                gpg_key_id: Some(key_id),
+                gpg_private_key_path: Some(key_path.to_string_lossy().into_owned()),
+                gpg_private_key_passphrase: Some("secret".into()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let signature = publication_signature(&profile, None, b"payload")
+            .expect("configured key signs")
+            .expect("signature is present");
+
+        assert!(signature.contains("-----BEGIN PGP SIGNATURE-----"));
+    }
+
+    #[test]
+    fn publication_rejects_configured_ssh_mode_before_rest_publication() {
+        let profile = TaskBoardGitRuntimeProfile {
+            signing: crate::task_board::TaskBoardGitSigningConfig {
+                mode: TaskBoardGitSigningMode::Ssh,
+                ssh_key_path: Some("/tmp/id_sign.pub".into()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let error = validate_rest_publication_signature_support(&profile, None)
+            .expect_err("ssh signing mode error");
+
+        assert!(
+            error
+                .to_string()
+                .contains("SSH commit signing is unsupported")
+        );
+        assert!(
+            error
+                .to_string()
+                .contains("runtime-config private key path")
+        );
+    }
+
+    #[test]
     fn publication_rejects_ssh_signature_on_rest_path() {
         let profile = TaskBoardGitRuntimeProfile::default();
         let error = publication_signature(&profile, Some(&LocalCommitSignature::Ssh), b"payload")
@@ -299,7 +369,22 @@ mod tests {
         assert!(
             error
                 .to_string()
-                .contains("SSH-signed commits require native Git transport")
+                .contains("SSH commit signing is unsupported")
+        );
+    }
+
+    #[test]
+    fn publication_rejects_existing_ssh_signature_before_rest_publication() {
+        let profile = TaskBoardGitRuntimeProfile::default();
+
+        let error =
+            validate_rest_publication_signature_support(&profile, Some(&LocalCommitSignature::Ssh))
+                .expect_err("ssh signature error");
+
+        assert!(
+            error
+                .to_string()
+                .contains("SSH commit signing is unsupported")
         );
     }
 
