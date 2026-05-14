@@ -72,6 +72,17 @@ struct TaskActionsReviewWorkflowTests {
     )
   }
 
+  @Test("Review submit candidates require an existing claim")
+  func reviewSubmitCandidatesRequireClaim() {
+    let task = makeTask(status: .inReview)
+    let agents = [
+      makeAgent("reviewer-codex", runtime: "codex", role: .reviewer),
+      makeAgent("leader", runtime: "gemini", role: .leader),
+    ]
+
+    #expect(TaskActionsSheet.eligibleReviewSubmitAgents(task: task, agents: agents).isEmpty)
+  }
+
   @Test("Review actors resolve to worker and leader identities")
   func reviewActorsResolveToWorkerAndLeaderIdentities() {
     let agents = [
@@ -107,6 +118,29 @@ struct TaskActionsReviewWorkflowTests {
         agents: agents
       ) == "leader"
     )
+  }
+
+  @Test("Review response is available for consensus with no points")
+  func reviewResponseIsAvailableForConsensusWithNoPoints() {
+    let task = makeTask(
+      status: .inReview,
+      awaitingReview: AwaitingReview(
+        queuedAt: "2026-05-14T10:00:00Z",
+        submitterAgentId: "worker"
+      ),
+      consensus: ReviewConsensus(
+        verdict: .approve,
+        summary: "Consensus reached",
+        points: [],
+        closedAt: "2026-05-14T10:10:00Z"
+      )
+    )
+    let agents = [
+      makeAgent("worker", runtime: "codex", role: .worker, status: .awaitingReview)
+    ]
+
+    #expect(TaskActionsSheet.shouldShowReviewResponse(for: task))
+    #expect(TaskActionsSheet.respondReviewActorID(for: task, agents: agents) == "worker")
   }
 }
 
