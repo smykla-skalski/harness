@@ -5,31 +5,40 @@ struct PolicyCanvasViewport: View {
   @State private var magnifyStartZoom: CGFloat?
 
   var body: some View {
-    GeometryReader { _ in
-      ZStack(alignment: .topLeading) {
-        PolicyCanvasDottedGrid(spacing: PolicyCanvasLayout.gridSize * viewModel.zoom)
-
+    GeometryReader { proxy in
+      ScrollView([.horizontal, .vertical]) {
         ZStack(alignment: .topLeading) {
-          PolicyCanvasGroupLayer(viewModel: viewModel)
-          PolicyCanvasEdgeLayer(viewModel: viewModel)
-          PolicyCanvasNodeLayer(viewModel: viewModel)
+          PolicyCanvasDottedGrid(spacing: PolicyCanvasLayout.gridSize * viewModel.zoom)
+
+          ZStack(alignment: .topLeading) {
+            PolicyCanvasGroupLayer(viewModel: viewModel)
+            PolicyCanvasEdgeLayer(viewModel: viewModel)
+            PolicyCanvasNodeLayer(viewModel: viewModel)
+          }
+          .scaleEffect(viewModel.zoom, anchor: .topLeading)
         }
-        .scaleEffect(viewModel.zoom, anchor: .topLeading)
-      }
-      .clipShape(Rectangle())
-      .contentShape(Rectangle())
-      .dropDestination(for: String.self) { payloads, location in
-        viewModel.dropPalettePayloads(
-          payloads,
-          at: viewModel.canvasPoint(for: location)
+        .frame(
+          width: max(proxy.size.width, viewModel.canvasContentSize.width * viewModel.zoom),
+          height: max(proxy.size.height, viewModel.canvasContentSize.height * viewModel.zoom),
+          alignment: .topLeading
         )
+        .contentShape(Rectangle())
+        .dropDestination(for: String.self) { payloads, location in
+          viewModel.dropPalettePayloads(
+            payloads,
+            at: viewModel.canvasPoint(for: location)
+          )
+        }
+        .onTapGesture {
+          viewModel.select(nil)
+        }
       }
+      .scrollIndicators(.visible)
+      .background(Color(red: 0.03, green: 0.04, blue: 0.06))
+      .clipShape(Rectangle())
       .overlay(alignment: .bottomLeading) {
         PolicyCanvasZoomControls(viewModel: viewModel)
           .padding(14)
-      }
-      .onTapGesture {
-        viewModel.select(nil)
       }
       .simultaneousGesture(magnifyGesture)
     }
@@ -124,7 +133,14 @@ private struct PolicyCanvasEdgeLayer: View {
         if let source = viewModel.portAnchor(for: edge.source),
           let target = viewModel.portAnchor(for: edge.target)
         {
-          let route = PolicyCanvasEdgeRoute(source: source, target: target, lane: offset)
+          let route = PolicyCanvasEdgeRoute(
+            source: source,
+            target: target,
+            lane: offset,
+            groups: viewModel.groups,
+            sourceGroupID: viewModel.node(edge.source.nodeID)?.groupID,
+            targetGroupID: viewModel.node(edge.target.nodeID)?.groupID
+          )
           PolicyCanvasEdgeShape(route: route)
             .stroke(
               edgeColor(for: edge).opacity(viewModel.selection == .edge(edge.id) ? 0.95 : 0.62),
@@ -139,12 +155,13 @@ private struct PolicyCanvasEdgeLayer: View {
               .scaledFont(.caption2.weight(.semibold))
               .foregroundStyle(.white.opacity(0.90))
               .lineLimit(1)
+              .frame(maxWidth: 138)
               .padding(.horizontal, 7)
               .padding(.vertical, 3)
-              .background(.black.opacity(0.58), in: Capsule())
+              .background(Color(red: 0.04, green: 0.05, blue: 0.08).opacity(0.92), in: Capsule())
               .overlay {
                 Capsule()
-                  .stroke(edgeColor(for: edge).opacity(0.50), lineWidth: 1)
+                  .stroke(edgeColor(for: edge).opacity(0.62), lineWidth: 1)
               }
           }
           .harnessPlainButtonStyle()
@@ -173,48 +190,6 @@ private struct PolicyCanvasEdgeShape: Shape {
       path.addLine(to: point)
     }
     return path
-  }
-}
-
-private struct PolicyCanvasEdgeRoute {
-  let points: [CGPoint]
-  let labelPosition: CGPoint
-
-  init(source: CGPoint, target: CGPoint, lane: Int) {
-    let laneOffset = CGFloat(lane % 5) * 14
-    let horizontalDistance = target.x - source.x
-    if horizontalDistance > 260, abs(source.y - target.y) < 96 {
-      let sourceRunX = source.x + 54 + laneOffset
-      let targetRunX = target.x - 54 - laneOffset
-      let topLaneY = max(
-        PolicyCanvasLayout.initialContentOrigin.y + 16,
-        min(source.y, target.y) - 52 - laneOffset
-      )
-      points = [
-        source,
-        CGPoint(x: sourceRunX, y: source.y),
-        CGPoint(x: sourceRunX, y: topLaneY),
-        CGPoint(x: targetRunX, y: topLaneY),
-        CGPoint(x: targetRunX, y: target.y),
-        target,
-      ]
-      labelPosition = CGPoint(x: (sourceRunX + targetRunX) / 2, y: topLaneY - 14)
-    } else {
-      let midX =
-        horizontalDistance >= 0
-        ? source.x + max(72, horizontalDistance * 0.46) + laneOffset
-        : max(source.x, target.x) + 84 + laneOffset
-      points = [
-        source,
-        CGPoint(x: midX, y: source.y),
-        CGPoint(x: midX, y: target.y),
-        target,
-      ]
-      labelPosition = CGPoint(
-        x: midX,
-        y: (source.y + target.y) / 2 - 14
-      )
-    }
   }
 }
 

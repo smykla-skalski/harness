@@ -291,3 +291,31 @@ func intersects(_ left: CGRect?, _ right: CGRect?) -> Bool {
   }
   return left.intersects(right)
 }
+
+extension PolicyCanvasEdgeRoute {
+  func segmentsIntersect(rect: CGRect) -> Bool {
+    zip(points, points.dropFirst()).contains { start, end in
+      if start.x == end.x {
+        let yRange = min(start.y, end.y)...max(start.y, end.y)
+        return (rect.minX...rect.maxX).contains(start.x)
+          && rangesOverlap(yRange, rect.minY...rect.maxY)
+      }
+      if start.y == end.y {
+        let xRange = min(start.x, end.x)...max(start.x, end.x)
+        return (rect.minY...rect.maxY).contains(start.y)
+          && rangesOverlap(xRange, rect.minX...rect.maxX)
+      }
+      return CGRect(
+        x: min(start.x, end.x),
+        y: min(start.y, end.y),
+        width: abs(end.x - start.x),
+        height: abs(end.y - start.y)
+      )
+      .intersects(rect)
+    }
+  }
+}
+
+private func rangesOverlap<T: Comparable>(_ left: ClosedRange<T>, _ right: ClosedRange<T>) -> Bool {
+  left.lowerBound <= right.upperBound && right.lowerBound <= left.upperBound
+}

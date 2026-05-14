@@ -22,8 +22,10 @@ final class PolicyCanvasViewModel {
   @ObservationIgnored private var nextNodeNumber: Int
   @ObservationIgnored private var loadedDocumentRevision: UInt64?
   @ObservationIgnored private var nodeDragOrigins: [String: CGPoint] = [:]
-  @ObservationIgnored private var groupDragOrigins: [String: CGRect] = [:]
-  @ObservationIgnored private var groupNodeDragOrigins: [String: [String: CGPoint]] = [:]
+  @ObservationIgnored var groupDragOrigins: [String: CGRect] = [:]
+  @ObservationIgnored var groupNodeDragOrigins: [String: [String: CGPoint]] = [:]
+  @ObservationIgnored var cleanEphemeralNodeIDs: Set<String> = []
+  @ObservationIgnored var cleanEphemeralEdgeIDs: Set<String> = []
 
   init(
     selectedTab: PolicyCanvasTab = .draft,
@@ -164,6 +166,7 @@ final class PolicyCanvasViewModel {
     node.groupID = containingGroupID(for: nodeCenter(node))
     node.policyKind = taskBoardPolicyNodeKind(for: kind)
     nodes.append(node)
+    cleanEphemeralNodeIDs.insert(node.id)
     reconcileGroupFrames()
     selection = .node(node.id)
     isDirty = true
@@ -177,6 +180,7 @@ final class PolicyCanvasViewModel {
     if nodeDragOrigins[nodeID] == nil {
       nodeDragOrigins[nodeID] = nodes[index].position
     }
+    markNodeEdited(nodeID)
     let origin = nodeDragOrigins[nodeID] ?? nodes[index].position
     nodes[index].position = snapped(
       CGPoint(
@@ -285,94 +289,12 @@ final class PolicyCanvasViewModel {
       label: edgeLabel(source: source, target: target)
     )
     edges.append(edge)
+    cleanEphemeralEdgeIDs.insert(edge.id)
     selection = .edge(edge.id)
     highlightedInput = nil
     isDirty = true
     lastActionSummary = "Edge created"
     return true
-  }
-
-  func portAnchor(for endpoint: PolicyCanvasPortEndpoint) -> CGPoint? {
-    guard let node = node(endpoint.nodeID) else {
-      return nil
-    }
-    let ports = endpoint.kind == .input ? node.inputPorts : node.outputPorts
-    guard let index = ports.firstIndex(where: { $0.id == endpoint.portID }) else {
-      return nil
-    }
-    let x =
-      endpoint.kind == .input
-      ? node.position.x
-      : node.position.x + PolicyCanvasLayout.nodeSize.width
-    return CGPoint(
-      x: x,
-      y: node.position.y + PolicyCanvasLayout.portY(index: index, count: ports.count)
-    )
-  }
-
-  func node(_ id: String) -> PolicyCanvasNode? {
-    nodes.first { $0.id == id }
-  }
-
-  func group(_ id: String) -> PolicyCanvasGroup? {
-    groups.first { $0.id == id }
-  }
-
-  func nodes(in groupID: String) -> [PolicyCanvasNode] {
-    nodes.filter { $0.groupID == groupID }
-  }
-
-  func reconcileGroupFrames() {
-    for index in groups.indices {
-      let members = nodes(in: groups[index].id)
-      guard let frame = policyCanvasGroupFrame(containing: members) else {
-        continue
-      }
-      groups[index].frame = frame
-    }
-  }
-
-  private func seedGroupDrag(groupID: String, group: PolicyCanvasGroup) {
-    if groupDragOrigins[groupID] == nil {
-      groupDragOrigins[groupID] = group.frame
-      let origins = nodes(in: groupID).map { ($0.id, $0.position) }
-      groupNodeDragOrigins[groupID] = Dictionary(uniqueKeysWithValues: origins)
-    }
-  }
-
-  private func moveNodes(in groupID: String, by delta: CGSize) {
-    let origins = groupNodeDragOrigins[groupID] ?? [:]
-    for index in nodes.indices where nodes[index].groupID == groupID {
-      guard let origin = origins[nodes[index].id] else {
-        continue
-      }
-      nodes[index].position = snapped(
-        CGPoint(x: origin.x + delta.width, y: origin.y + delta.height)
-      )
-    }
-  }
-
-  private func nodeCenter(_ node: PolicyCanvasNode) -> CGPoint {
-    CGPoint(
-      x: node.position.x + PolicyCanvasLayout.nodeSize.width / 2,
-      y: node.position.y + PolicyCanvasLayout.nodeSize.height / 2
-    )
-  }
-
-  private func containingGroupID(
-    for point: CGPoint,
-    excluding excludedID: String? = nil
-  ) -> String? {
-    groups.first { group in
-      group.id != excludedID && group.frame.contains(point)
-    }?.id
-  }
-
-  private func snapped(_ point: CGPoint) -> CGPoint {
-    CGPoint(
-      x: (point.x / PolicyCanvasLayout.gridSize).rounded() * PolicyCanvasLayout.gridSize,
-      y: (point.y / PolicyCanvasLayout.gridSize).rounded() * PolicyCanvasLayout.gridSize
-    )
   }
 
   private func parsePalettePayload(_ payload: String) -> PolicyCanvasNodeKind? {
@@ -400,6 +322,19 @@ final class PolicyCanvasViewModel {
     return [sourcePort?.title, targetPort?.title]
       .compactMap { $0 }
       .joined(separator: " -> ")
+  }
+
+  func markNodeEdited(_ nodeID: String) {
+    cleanEphemeralNodeIDs.remove(nodeID)
+  }
+
+  func markEdgeEdited(_ edgeID: String) {
+    cleanEphemeralEdgeIDs.remove(edgeID)
+  }
+
+  func resetCleanEphemeralComponents() {
+    cleanEphemeralNodeIDs.removeAll()
+    cleanEphemeralEdgeIDs.removeAll()
   }
 
 }

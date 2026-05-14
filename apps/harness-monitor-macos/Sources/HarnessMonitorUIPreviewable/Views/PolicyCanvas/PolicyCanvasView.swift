@@ -4,6 +4,7 @@ import SwiftUI
 public struct PolicyCanvasView: View {
   @State private var viewModel: PolicyCanvasViewModel
   @State private var isShowingPromoteConfirmation = false
+  @State private var pendingDeletionRequest: PolicyCanvasDeletionRequest?
   private let store: HarnessMonitorStore?
   private let dashboardUI: HarnessMonitorStore.ContentDashboardSlice?
 
@@ -62,6 +63,9 @@ public struct PolicyCanvasView: View {
     .background(Color(red: 0.05, green: 0.06, blue: 0.08))
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasRoot)
+    .overlay(alignment: .topLeading) {
+      deletionShortcutButtons
+    }
     .task {
       await loadPolicyPipeline()
     }
@@ -91,6 +95,48 @@ public struct PolicyCanvasView: View {
     } message: {
       Text("The saved revision will become the enforced automation policy.")
     }
+    .confirmationDialog(
+      pendingDeletionRequest?.title ?? "Delete policy component?",
+      isPresented: deletionConfirmationPresented,
+      titleVisibility: .visible,
+      presenting: pendingDeletionRequest
+    ) { request in
+      Button(request.confirmationTitle, role: .destructive) {
+        viewModel.confirmDelete(request)
+        pendingDeletionRequest = nil
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: { request in
+      Text(request.message)
+    }
+  }
+
+  private var deletionShortcutButtons: some View {
+    Group {
+      Button("Delete selected policy component") {
+        requestDeleteSelectedComponent()
+      }
+      .keyboardShortcut(.delete, modifiers: [])
+
+      Button("Forward delete selected policy component") {
+        requestDeleteSelectedComponent()
+      }
+      .keyboardShortcut(.deleteForward, modifiers: [])
+    }
+    .opacity(0)
+    .frame(width: 0, height: 0)
+    .accessibilityHidden(true)
+  }
+
+  private var deletionConfirmationPresented: Binding<Bool> {
+    Binding(
+      get: { pendingDeletionRequest != nil },
+      set: { isPresented in
+        if !isPresented {
+          pendingDeletionRequest = nil
+        }
+      }
+    )
   }
 
   private func loadPolicyPipeline() async {
@@ -163,6 +209,10 @@ public struct PolicyCanvasView: View {
         viewModel.lastActionSummary = "Promotion blocked"
       }
     }
+  }
+
+  private func requestDeleteSelectedComponent() {
+    pendingDeletionRequest = viewModel.deleteSelectedComponent()
   }
 
   private func forceReloadPolicyPipeline() async {

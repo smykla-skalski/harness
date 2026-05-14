@@ -78,6 +78,73 @@ struct PolicyCanvasViewModelTests {
     #expect(viewModel.zoom == 1)
   }
 
+  @Test("clean empty palette node deletes without confirmation")
+  func cleanEmptyPaletteNodeDeletesWithoutConfirmation() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.createNode(kind: .condition, at: CGPoint(x: 120, y: 120))
+    guard case .node(let nodeID) = viewModel.selection else {
+      Issue.record("Expected created node selection")
+      return
+    }
+
+    let request = viewModel.deleteSelectedComponent()
+
+    #expect(request == nil)
+    #expect(viewModel.node(nodeID) == nil)
+  }
+
+  @Test("connected node delete requires confirmation")
+  func connectedNodeDeleteRequiresConfirmation() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.select(.node("policy-source"))
+
+    guard let request = viewModel.deleteSelectedComponent() else {
+      Issue.record("Expected connected node deletion to require confirmation")
+      return
+    }
+    #expect(viewModel.node("policy-source") != nil)
+    #expect(request.confirmationTitle == "Delete Node")
+
+    viewModel.confirmDelete(request)
+
+    #expect(viewModel.node("policy-source") == nil)
+    #expect(!viewModel.edges.contains { edge in edge.source.nodeID == "policy-source" })
+  }
+
+  @Test("inter-group edge route avoids middle group")
+  func interGroupEdgeRouteAvoidsMiddleGroup() {
+    let entry = PolicyCanvasGroup(
+      id: "entry",
+      title: "Action routing",
+      frame: CGRect(x: 36, y: 72, width: 256, height: 200),
+      tone: .intake
+    )
+    let merge = PolicyCanvasGroup(
+      id: "merge",
+      title: "Merge checks",
+      frame: CGRect(x: 316, y: 72, width: 256, height: 380),
+      tone: .evaluation
+    )
+    let terminal = PolicyCanvasGroup(
+      id: "terminal",
+      title: "Terminal decisions",
+      frame: CGRect(x: 676, y: 72, width: 476, height: 620),
+      tone: .release
+    )
+
+    let route = PolicyCanvasEdgeRoute(
+      source: CGPoint(x: 248, y: 172),
+      target: CGPoint(x: 720, y: 172),
+      lane: 0,
+      groups: [entry, merge, terminal],
+      sourceGroupID: "entry",
+      targetGroupID: "terminal"
+    )
+
+    #expect(!route.segmentsIntersect(rect: merge.frame))
+    #expect(route.labelPosition.y == route.points[2].y)
+  }
+
   @Test("group frame follows dragged member node")
   func groupFrameFollowsDraggedMemberNode() {
     let viewModel = PolicyCanvasViewModel.sample()
