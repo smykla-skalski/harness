@@ -277,54 +277,64 @@ struct TaskActionsSheet: View {
   @ViewBuilder
   private func claimReviewSection(for task: WorkItem) -> some View {
     let candidates = Self.eligibleReviewClaimAgents(task: task, agents: agents)
-    if matchesReviewQueueStatus(task), !candidates.isEmpty {
-      Picker("Claim As", selection: reviewActorSelection(candidates: candidates)) {
-        ForEach(candidates) { agent in
-          Text(agent.name).tag(agent.agentId)
+    if matchesReviewQueueStatus(task) {
+      if !candidates.isEmpty {
+        Picker("Claim As", selection: reviewActorSelection(candidates: candidates)) {
+          ForEach(candidates) { agent in
+            Text(agent.name).tag(agent.agentId)
+          }
         }
+        .harnessNativeFormControl()
+      } else {
+        Text("No eligible reviewer is available for this task.")
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
-      .harnessNativeFormControl()
       HarnessInlineActionButton(
         title: "Claim Review",
         actionID: .claimTaskReview(sessionID: sessionID, taskID: task.taskId),
         store: store,
         variant: .bordered,
         tint: .secondary,
-        isExternallyDisabled: !areSessionActionsAvailable,
+        isExternallyDisabled: !areSessionActionsAvailable || candidates.isEmpty,
         accessibilityIdentifier: HarnessMonitorAccessibility.claimTaskReviewButton,
+        help: candidates.isEmpty ? "No eligible reviewer is available for this task." : "",
         action: submitClaimReview
       )
-    } else if matchesReviewQueueStatus(task) {
-      Text("No eligible reviewer is available for this task.")
-        .scaledFont(.caption)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
   }
 
   @ViewBuilder
   private func submitReviewSection(for task: WorkItem) -> some View {
     let candidates = Self.eligibleReviewSubmitAgents(task: task, agents: agents)
-    if task.status == .inReview, !candidates.isEmpty {
-      Picker("Reviewing As", selection: reviewActorSelection(candidates: candidates)) {
-        ForEach(candidates) { agent in
-          Text(agent.name).tag(agent.agentId)
+    let summary = reviewSummary.trimmingCharacters(in: .whitespacesAndNewlines)
+    if task.status == .inReview {
+      if !candidates.isEmpty {
+        Picker("Reviewing As", selection: reviewActorSelection(candidates: candidates)) {
+          ForEach(candidates) { agent in
+            Text(agent.name).tag(agent.agentId)
+          }
         }
-      }
-      .harnessNativeFormControl()
-      Picker("Verdict", selection: $reviewVerdict) {
-        ForEach(ReviewVerdict.allCases, id: \.self) { verdict in
-          Text(verdict.title).tag(verdict)
+        .harnessNativeFormControl()
+        Picker("Verdict", selection: $reviewVerdict) {
+          ForEach(ReviewVerdict.allCases, id: \.self) { verdict in
+            Text(verdict.title).tag(verdict)
+          }
         }
+        .harnessNativeFormControl()
+        TextField("Review summary", text: $reviewSummary, axis: .vertical)
+          .harnessNativeFormControl()
+          .lineLimit(2, reservesSpace: true)
+          .submitLabel(.done)
+        TextField("Review point", text: $reviewPointText, axis: .vertical)
+          .harnessNativeFormControl()
+          .lineLimit(2, reservesSpace: true)
+          .submitLabel(.done)
+      } else {
+        Text("A claimed reviewer is required before submitting review.")
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
-      .harnessNativeFormControl()
-      TextField("Review summary", text: $reviewSummary, axis: .vertical)
-        .harnessNativeFormControl()
-        .lineLimit(2, reservesSpace: true)
-        .submitLabel(.done)
-      TextField("Review point", text: $reviewPointText, axis: .vertical)
-        .harnessNativeFormControl()
-        .lineLimit(2, reservesSpace: true)
-        .submitLabel(.done)
       HarnessInlineActionButton(
         title: "Submit Review",
         actionID: .submitTaskReview(sessionID: sessionID, taskID: task.taskId),
@@ -333,9 +343,10 @@ struct TaskActionsSheet: View {
         tint: nil,
         isExternallyDisabled:
           !areSessionActionsAvailable
-          || reviewSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+          || candidates.isEmpty
+          || summary.isEmpty,
         accessibilityIdentifier: HarnessMonitorAccessibility.submitTaskReviewButton,
-        help: "Review summary is required.",
+        help: submitReviewUnavailableMessage(candidates: candidates, summary: summary),
         action: submitSubmitReview
       )
     }
@@ -345,14 +356,20 @@ struct TaskActionsSheet: View {
   private func respondReviewSection(for task: WorkItem) -> some View {
     let points = task.consensus?.points ?? []
     let actorID = Self.respondReviewActorID(for: task, agents: agents)
-    if task.status == .inReview, !points.isEmpty {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-        ForEach(points) { point in
-          Toggle(isOn: disputeBinding(for: point.pointId)) {
-            Text(point.text)
-              .lineLimit(2)
+    if Self.shouldShowReviewResponse(for: task) {
+      if points.isEmpty {
+        Text("Consensus has no review points to dispute.")
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      } else {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+          ForEach(points) { point in
+            Toggle(isOn: disputeBinding(for: point.pointId)) {
+              Text(point.text)
+                .lineLimit(2)
+            }
+            .toggleStyle(.checkbox)
           }
-          .toggleStyle(.checkbox)
         }
       }
       TextField("Response note", text: $reviewResponseNote, axis: .vertical)
@@ -402,7 +419,7 @@ struct TaskActionsSheet: View {
           || actorID == nil
           || arbitrationSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
         accessibilityIdentifier: HarnessMonitorAccessibility.arbitrateTaskButton,
-        help: actorID == nil ? "Only the current leader can arbitrate this task." : "",
+        help: arbitrationUnavailableMessage(actorID: actorID),
         action: submitArbitrate
       )
     }
@@ -411,6 +428,10 @@ struct TaskActionsSheet: View {
   @ViewBuilder
   private func checkpointSection(for task: WorkItem) -> some View {
     let unavailableMessage = genericTaskMutationUnavailableMessage(for: task)
+    let checkpointSummaryValue = checkpointSummary.trimmingCharacters(in: .whitespacesAndNewlines)
+    let checkpointUnavailableMessage =
+      unavailableMessage
+      ?? (checkpointSummaryValue.isEmpty ? "Checkpoint summary is required." : nil)
     Text("Checkpoint")
       .scaledFont(.headline)
     TextField("Summary", text: $checkpointSummary, axis: .vertical)
@@ -435,14 +456,14 @@ struct TaskActionsSheet: View {
         variant: .prominent,
         tint: HarnessMonitorTheme.caution,
         isExternallyDisabled:
-          !areSessionActionsAvailable || unavailableMessage != nil,
+          !areSessionActionsAvailable || checkpointUnavailableMessage != nil,
         accessibilityIdentifier: HarnessMonitorAccessibility.checkpointTaskButton,
-        help: unavailableMessage ?? "",
+        help: checkpointUnavailableMessage ?? "",
         action: submitCheckpoint
       )
     }
-    if let unavailableMessage {
-      Text(unavailableMessage)
+    if let checkpointUnavailableMessage {
+      Text(checkpointUnavailableMessage)
         .scaledFont(.caption)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
@@ -518,6 +539,29 @@ struct TaskActionsSheet: View {
       return "This task is waiting for leader arbitration."
     }
     return nil
+  }
+
+  private func submitReviewUnavailableMessage(
+    candidates: [AgentRegistration],
+    summary: String
+  ) -> String {
+    if candidates.isEmpty {
+      return "A reviewer must claim this task before submitting review."
+    }
+    if summary.isEmpty {
+      return "Review summary is required."
+    }
+    return ""
+  }
+
+  private func arbitrationUnavailableMessage(actorID: String?) -> String {
+    if actorID == nil {
+      return "Only the current leader can arbitrate this task."
+    }
+    if arbitrationSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+      return "Arbitration summary is required."
+    }
+    return ""
   }
 
   private func syncDefaults() {
@@ -773,6 +817,10 @@ struct TaskActionsSheet: View {
       return nil
     }
     return submitterID
+  }
+
+  nonisolated static func shouldShowReviewResponse(for task: WorkItem) -> Bool {
+    task.status == .inReview && task.consensus != nil
   }
 
   nonisolated static func arbitrationActorID(
