@@ -122,9 +122,24 @@ struct SessionTimelineLoadOlderTriggerTests {
   func sectionWiresStoreAppender() throws {
     let sectionSource = try timelineSource(named: "MonitorTimelineSection.swift")
 
-    #expect(sectionSource.contains("static let loadOlderChunkSize = 200"))
+    #expect(sectionSource.contains("static let loadOlderChunkSize = 25"))
     #expect(sectionSource.contains("await store.appendSelectedTimelineOlderChunk("))
     #expect(sectionSource.contains("retainedLimit: nil"))
+  }
+
+  @Test("Section refresh uses paginated limit")
+  func sectionRefreshLimit() throws {
+    let supportSource = try timelineSource(named: "MonitorTimelineSection+Support.swift")
+    #expect(supportSource.contains("static let initialPageLimit = 25"))
+    #expect(supportSource.contains("TimelineWindowRequest.latest(limit: Self.initialPageLimit)"))
+  }
+
+  @Test("Section routes older-load through per-window snapshot when timelineLoading set")
+  func sectionRoutesOlderLoadViaSnapshot() throws {
+    let sectionSource = try timelineSource(named: "MonitorTimelineSection.swift")
+    #expect(sectionSource.contains("if let timelineLoading, let oldestCursor {"))
+    #expect(sectionSource.contains("await timelineLoading.loadWindow("))
+    #expect(sectionSource.contains("before: oldestCursor"))
   }
 
   private func timelineSource(named fileName: String) throws -> String {
