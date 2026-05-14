@@ -55,58 +55,32 @@ struct SessionTimelineLoadOlderTriggerTests {
     #expect(state.contentMeasured == false)
   }
 
-  @Test("Task key changes when window grows")
-  func taskKeyChangesAcrossWindowGrowth() {
-    let initialNavigation = SessionTimelineWindowNavigation(
-      timeline: timelineEntries(count: 10),
-      timelineWindow: timelineWindow(totalCount: 59, windowEnd: 10, hasOlder: true),
-      isLoading: false
+  @Test("Near-bottom state captures contentOffsetY for change-detection")
+  func nearBottomCapturesOffset() {
+    let state = SessionTimelineNearBottomState(
+      distanceFromBottom: 30,
+      contentMeasured: true,
+      contentOffsetY: 600
     )
-    let grownNavigation = SessionTimelineWindowNavigation(
-      timeline: timelineEntries(count: 59),
-      timelineWindow: timelineWindow(totalCount: 59, windowEnd: 59, hasOlder: false),
-      isLoading: false
-    )
-
-    let initialKey = SessionTimelineLoadOlderTaskKey(navigation: initialNavigation)
-    let grownKey = SessionTimelineLoadOlderTaskKey(navigation: grownNavigation)
-
-    #expect(initialKey != grownKey)
-    #expect(initialKey.hasOlder == true)
-    #expect(grownKey.hasOlder == false)
+    #expect(state.contentOffsetY == 600)
   }
 
-  @Test("Task key is stable across rebuilds with same window")
-  func taskKeyStableForSameWindow() {
-    let timeline = timelineEntries(count: 10)
-    let window = timelineWindow(totalCount: 59, windowEnd: 10, hasOlder: true)
-    let first = SessionTimelineWindowNavigation(
-      timeline: timeline,
-      timelineWindow: window,
-      isLoading: false
-    )
-    let second = SessionTimelineWindowNavigation(
-      timeline: timeline,
-      timelineWindow: window,
-      isLoading: false
-    )
-
-    #expect(
-      SessionTimelineLoadOlderTaskKey(navigation: first)
-        == SessionTimelineLoadOlderTaskKey(navigation: second)
-    )
-  }
-
-  @Test("Trigger wiring is present in SessionTimelineList: both task and onScrollGeometryChange")
+  @Test("Trigger wiring: scrollGeometry-only with offset-change gate")
   func triggerWiringPresent() throws {
     let listSource = try timelineSource(named: "SessionTimelineList.swift")
 
     #expect(listSource.contains(".onScrollGeometryChange("))
     #expect(listSource.contains("SessionTimelineNearBottomState.self"))
     #expect(listSource.contains("SessionTimelineNearBottomState.init(geometry:)"))
-    #expect(listSource.contains(".task(id: SessionTimelineLoadOlderTaskKey"))
-    #expect(listSource.contains("presentation.navigation.hasOlder"))
+    #expect(
+      listSource.contains("newValue.contentOffsetY != oldValue.contentOffsetY")
+    )
+    #expect(listSource.contains("nav.hasOlder"))
     #expect(listSource.contains("onRequestLoadOlder?()"))
+    // The .task(id:) auto-trigger must stay removed: it chain-fired on every
+    // navigation update and re-loaded all pages without user interaction.
+    #expect(!listSource.contains(".task(id: SessionTimelineLoadOlderTaskKey"))
+    #expect(!listSource.contains("SessionTimelineLoadOlderTaskKey"))
   }
 
   @Test("LazyVStack body has no conditional load-older child")
@@ -122,7 +96,7 @@ struct SessionTimelineLoadOlderTriggerTests {
   func sectionWiresStoreAppender() throws {
     let sectionSource = try timelineSource(named: "MonitorTimelineSection.swift")
 
-    #expect(sectionSource.contains("static let loadOlderChunkSize = 25"))
+    #expect(sectionSource.contains("static let loadOlderChunkSize = 10"))
     #expect(sectionSource.contains("await store.appendSelectedTimelineOlderChunk("))
     #expect(sectionSource.contains("retainedLimit: nil"))
   }
@@ -130,7 +104,7 @@ struct SessionTimelineLoadOlderTriggerTests {
   @Test("Section refresh uses paginated limit")
   func sectionRefreshLimit() throws {
     let supportSource = try timelineSource(named: "MonitorTimelineSection+Support.swift")
-    #expect(supportSource.contains("static let initialPageLimit = 25"))
+    #expect(supportSource.contains("static let initialPageLimit = 10"))
     #expect(supportSource.contains("TimelineWindowRequest.latest(limit: Self.initialPageLimit)"))
   }
 
