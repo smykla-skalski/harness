@@ -4,9 +4,14 @@ import UniformTypeIdentifiers
 
 struct TaskBoardItemDragPayload: Codable, Transferable {
   let itemID: String
+  let status: TaskBoardStatus
 
   static var transferRepresentation: some TransferRepresentation {
     CodableRepresentation(contentType: .harnessMonitorTaskBoardItem)
+  }
+
+  var sourceLane: TaskBoardInboxLane? {
+    TaskBoardInboxLane(status: status)
   }
 }
 
@@ -35,6 +40,7 @@ struct TaskBoardItemLaneColumn: View {
             ForEach(section.items.prefix(5)) { item in
               TaskBoardItemRow(item: item, onOpenItem: onOpenItem)
             }
+            TaskBoardLaneOverflowRow(hiddenCount: section.items.count - 5)
           }
         }
       }
@@ -50,6 +56,9 @@ struct TaskBoardItemLaneColumn: View {
 
   private func handleDrop(_ payloads: [TaskBoardItemDragPayload], _: CGPoint) -> Bool {
     guard let payload = payloads.first else {
+      return false
+    }
+    guard payload.sourceLane != section.lane else {
       return false
     }
     return onMoveItem(payload.itemID, section.lane)
@@ -75,6 +84,7 @@ struct TaskBoardInboxLaneColumn: View {
                 onOpenItem: onOpenItem
               )
             }
+            TaskBoardLaneOverflowRow(hiddenCount: section.items.count - 5)
           }
         }
       }
@@ -188,6 +198,21 @@ struct TaskBoardEmptyLane: View {
   }
 }
 
+struct TaskBoardLaneOverflowRow: View {
+  let hiddenCount: Int
+
+  var body: some View {
+    if hiddenCount > 0 {
+      Text("+\(hiddenCount) more")
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .frame(maxWidth: .infinity, minHeight: 28)
+        .background(.background.opacity(0.36), in: .rect(cornerRadius: 6))
+        .accessibilityLabel("\(hiddenCount) more task board items")
+    }
+  }
+}
+
 func taskBoardLaneColor(for lane: TaskBoardInboxLane) -> Color {
   switch lane {
   case .needsYou:
@@ -210,7 +235,7 @@ struct TaskBoardItemRow: View {
   let onOpenItem: (TaskBoardItem) -> Void
 
   private var dragPayload: TaskBoardItemDragPayload {
-    TaskBoardItemDragPayload(itemID: item.id)
+    TaskBoardItemDragPayload(itemID: item.id, status: item.status)
   }
 
   var body: some View {

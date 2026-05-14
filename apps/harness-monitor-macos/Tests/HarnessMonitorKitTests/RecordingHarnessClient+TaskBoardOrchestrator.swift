@@ -48,6 +48,7 @@ extension RecordingHarnessClient {
   ) async throws -> TaskBoardOrchestratorRunOnceResponse {
     calls.append(
       .runTaskBoardOrchestratorOnce(
+        itemID: request.itemId,
         dryRun: request.dryRun,
         status: request.status,
         projectDir: request.projectDir
@@ -59,7 +60,13 @@ extension RecordingHarnessClient {
   func evaluateTaskBoard(request: TaskBoardEvaluateRequest) async throws
     -> TaskBoardEvaluationSummary
   {
-    calls.append(.evaluateTaskBoard(dryRun: request.dryRun, status: request.status))
+    calls.append(
+      .evaluateTaskBoard(
+        dryRun: request.dryRun,
+        status: request.status,
+        itemID: request.itemId
+      )
+    )
     return TaskBoardEvaluationSummary(
       total: 1,
       evaluated: 1,

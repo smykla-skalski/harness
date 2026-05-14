@@ -21,6 +21,8 @@ pub struct TaskBoardEvaluateArgs {
     pub json: bool,
     #[arg(long)]
     pub dry_run: bool,
+    #[arg(long = "item-id", visible_alias = "id")]
+    pub item_id: Option<String>,
     #[arg(long, value_enum)]
     pub status: Option<TaskBoardStatus>,
     #[arg(long, env = "CLAUDE_PROJECT_DIR")]
@@ -32,7 +34,7 @@ pub struct TaskBoardEvaluateArgs {
 impl Execute for TaskBoardEvaluateArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let board = store(self.board_root.clone());
-        let items = board.list(self.status)?;
+        let items = self.selected_items(&board)?;
         let mut summary = TaskBoardEvaluationSummary::default();
         for item in &items {
             let Some((session_id, work_item_id)) = linked_task(item) else {
@@ -103,6 +105,13 @@ impl Execute for TaskBoardEvaluateArgs {
 }
 
 impl TaskBoardEvaluateArgs {
+    fn selected_items(&self, board: &TaskBoardStore) -> Result<Vec<TaskBoardItem>, CliError> {
+        self.item_id.as_deref().map_or_else(
+            || board.list(self.status),
+            |item_id| board.get(item_id).map(|item| vec![item]),
+        )
+    }
+
     fn failure_record(
         &self,
         board: &TaskBoardStore,
@@ -212,6 +221,7 @@ mod tests {
             let dry_run = TaskBoardEvaluateArgs {
                 json: true,
                 dry_run: true,
+                item_id: None,
                 status: Some(TaskBoardStatus::Todo),
                 project_dir: Some(project.to_string_lossy().to_string()),
                 board_root: Some(board_root.clone()),

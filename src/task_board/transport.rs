@@ -162,6 +162,10 @@ pub struct TaskBoardDispatchArgs {
     pub json: bool,
     #[arg(long)]
     pub dry_run: bool,
+    #[arg(long = "item-id", visible_alias = "id")]
+    pub item_id: Option<String>,
+    #[arg(long, value_enum)]
+    pub status: Option<TaskBoardStatus>,
     #[arg(long, env = "CLAUDE_PROJECT_DIR")]
     pub project_dir: Option<String>,
     #[arg(long)]

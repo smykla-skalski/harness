@@ -87,6 +87,7 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(boardSource.contains("dashboardUI.taskBoardItems"))
     #expect(boardSource.contains("dashboardUI.taskBoardEvaluationSummary"))
     #expect(boardSource.contains("onEvaluateTaskBoard: evaluateTaskBoard"))
+    #expect(boardSource.contains("onEvaluateTaskBoardItem: evaluateTaskBoardItem"))
     #expect(boardSource.contains("onMoveTaskBoardItem: moveTaskBoardItem"))
     #expect(boardSource.contains("decisions: store.supervisorOpenDecisions"))
   }
@@ -101,9 +102,11 @@ struct SessionWindowRouteContentMetricsTests {
       #expect(source.contains("onStopTaskBoardOrchestrator: stopTaskBoardOrchestrator"))
       #expect(source.contains("onRunTaskBoardOrchestratorOnce: runTaskBoardOrchestratorOnce"))
       #expect(source.contains("onMoveTaskBoardItem: moveTaskBoardItem"))
+      #expect(source.contains("onEvaluateTaskBoardItem: evaluateTaskBoardItem"))
     }
 
     #expect(routeContentSource.contains("store.contentUI.dashboard.taskBoardOrchestratorStatus"))
+    #expect(routeContentSource.contains("store.contentUI.dashboard.taskBoardItems"))
     #expect(boardSource.contains("dashboardUI.taskBoardOrchestratorStatus"))
   }
 
@@ -116,9 +119,11 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(overviewSource.contains("TaskBoardItemManagementPanel("))
     #expect(managementPanelSource.contains("harness.task-board.manage-item"))
     #expect(overviewSource.contains("TaskBoardOrchestratorRunOnceRequest(itemId: item.id"))
+    #expect(overviewSource.contains("onEvaluateTaskBoardItem(item)"))
     #expect(!overviewSource.contains("if !item.hasLinkedSessionTask"))
     #expect(managementPanelSource.contains("Session Task"))
     #expect(managementPanelSource.contains("Board Only"))
+    #expect(managementPanelSource.contains("Evaluate Item"))
     #expect(!laneSource.contains(".disabled(!isOpenable)"))
     #expect(!laneSource.contains("private var isOpenable"))
   }
@@ -131,9 +136,22 @@ struct SessionWindowRouteContentMetricsTests {
 
     #expect(overviewSource.contains("lane.taskBoardDropStatus"))
     #expect(laneSource.contains("TaskBoardItemDragPayload"))
+    #expect(laneSource.contains("let status: TaskBoardStatus"))
+    #expect(laneSource.contains("payload.sourceLane != section.lane"))
+    #expect(needsYouSource.contains("payload.sourceLane != .needsYou"))
     #expect(laneSource.contains(".draggable(dragPayload)"))
     #expect(laneSource.contains(".dropDestination(for: TaskBoardItemDragPayload.self"))
     #expect(needsYouSource.contains(".dropDestination(for: TaskBoardItemDragPayload.self"))
+  }
+
+  @Test("Task board lanes expose overflow rows for capped columns")
+  func taskBoardLanesExposeOverflowRowsForCappedColumns() throws {
+    let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
+    let needsYouSource = try taskBoardSourceFile(named: "TaskBoardNeedsYouLaneViews.swift")
+
+    #expect(laneSource.contains("TaskBoardLaneOverflowRow(hiddenCount: section.items.count - 5)"))
+    #expect(laneSource.contains("Text(\"+\\(hiddenCount) more\")"))
+    #expect(needsYouSource.contains("TaskBoardLaneOverflowRow(hiddenCount: hiddenItemCount)"))
   }
 
   private func sourceFile(named relativePath: String) throws -> String {

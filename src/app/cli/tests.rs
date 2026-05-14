@@ -293,6 +293,42 @@ fn parse_task_board_operational_subcommands() {
 }
 
 #[test]
+fn parse_task_board_item_scoped_operations() {
+    let dispatch = Cli::try_parse_from([
+        "harness",
+        "task-board",
+        "dispatch",
+        "--item-id",
+        "task-1",
+        "--status",
+        "todo",
+        "--json",
+    ])
+    .unwrap();
+    match dispatch.command {
+        Command::TaskBoard {
+            command: TaskBoardCommand::Dispatch(args),
+        } => {
+            assert_eq!(args.item_id.as_deref(), Some("task-1"));
+            assert_eq!(args.status, Some(TaskBoardStatus::Todo));
+            assert!(args.json);
+        }
+        _ => panic!("expected TaskBoard Dispatch"),
+    }
+
+    let evaluate =
+        Cli::try_parse_from(["harness", "task-board", "evaluate", "--id", "task-2"]).unwrap();
+    match evaluate.command {
+        Command::TaskBoard {
+            command: TaskBoardCommand::Evaluate(args),
+        } => {
+            assert_eq!(args.item_id.as_deref(), Some("task-2"));
+        }
+        _ => panic!("expected TaskBoard Evaluate"),
+    }
+}
+
+#[test]
 fn parse_task_board_orchestrator_controls() {
     let cli = Cli::try_parse_from([
         "harness",
@@ -300,6 +336,8 @@ fn parse_task_board_orchestrator_controls() {
         "orchestrator",
         "run-once",
         "--apply",
+        "--item-id",
+        "task-1",
         "--status",
         "todo",
         "--project-dir",
@@ -315,6 +353,7 @@ fn parse_task_board_orchestrator_controls() {
                 },
         } => {
             assert!(args.apply);
+            assert_eq!(args.item_id.as_deref(), Some("task-1"));
             assert_eq!(args.status, Some(TaskBoardStatus::Todo));
             assert_eq!(args.project_dir.as_deref(), Some("/tmp/project"));
             assert!(args.json);

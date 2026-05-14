@@ -41,11 +41,20 @@ extension TaskBoardAPIClientTests {
       )
     )
     let dispatch = try await client.dispatchTaskBoard(
-      status: .todo,
-      dryRun: false,
-      projectDir: "/tmp/harness"
+      request: TaskBoardDispatchRequest(
+        status: .todo,
+        itemId: "board-1",
+        dryRun: false,
+        projectDir: "/tmp/harness"
+      )
     )
-    let evaluation = try await client.evaluateTaskBoard(status: .inProgress, dryRun: false)
+    let evaluation = try await client.evaluateTaskBoard(
+      request: TaskBoardEvaluateRequest(
+        status: .inProgress,
+        itemId: "board-1",
+        dryRun: false
+      )
+    )
     _ = try await client.auditTaskBoard(status: .blocked)
     let status = try await client.taskBoardOrchestratorStatus()
     _ = try await client.startTaskBoardOrchestrator()
@@ -134,9 +143,11 @@ extension TaskBoardAPIClientTests {
     #expect(records[5].body?["direction"] as? String == "push")
     #expect(records[5].body?["dry_run"] as? Bool == false)
     #expect(records[6].body?["status"] as? String == "todo")
+    #expect(records[6].body?["item_id"] as? String == "board-1")
     #expect(records[6].body?["dry_run"] as? Bool == false)
     #expect(records[6].body?["project_dir"] as? String == "/tmp/harness")
     #expect(records[7].body?["status"] as? String == "in_progress")
+    #expect(records[7].body?["item_id"] as? String == "board-1")
     #expect(records[7].body?["dry_run"] as? Bool == false)
     #expect(records[8].query == "status=blocked")
     #expect(records[12].body?.isEmpty == true)

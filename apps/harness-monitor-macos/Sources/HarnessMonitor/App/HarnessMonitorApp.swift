@@ -388,38 +388,20 @@ struct HarnessMonitorApp: App {
   }
 
   @ViewBuilder private var openRecentWindowContent: some View {
-    Group {
-      if let container {
-        HarnessMonitorWindowRootView(
-          delegate: delegate,
-          store: store,
-          notifications: notificationController,
-          keyWindowObserver: keyWindowObserver,
-          acpAttentionState: acpAttentionState,
-          windowCommandRouting: windowCommandRouting,
-          mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
-          themeMode: $themeMode,
-          settingsSelectedSection: $settingsSelectedSection,
-          perfScenario: perfScenario,
-          defersInitialContentUntilBootstrap: defersInitialMainWindowUntilBootstrap
-        )
-        .modelContainer(container)
-      } else {
-        HarnessMonitorWindowRootView(
-          delegate: delegate,
-          store: store,
-          notifications: notificationController,
-          keyWindowObserver: keyWindowObserver,
-          acpAttentionState: acpAttentionState,
-          windowCommandRouting: windowCommandRouting,
-          mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
-          themeMode: $themeMode,
-          settingsSelectedSection: $settingsSelectedSection,
-          perfScenario: perfScenario,
-          defersInitialContentUntilBootstrap: defersInitialMainWindowUntilBootstrap
-        )
-      }
-    }
+    HarnessMonitorOpenRecentWindowContent(
+      delegate: delegate,
+      store: store,
+      notifications: notificationController,
+      keyWindowObserver: keyWindowObserver,
+      acpAttentionState: acpAttentionState,
+      windowCommandRouting: windowCommandRouting,
+      mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
+      themeMode: $themeMode,
+      settingsSelectedSection: $settingsSelectedSection,
+      perfScenario: perfScenario,
+      defersInitialContentUntilBootstrap: defersInitialMainWindowUntilBootstrap,
+      container: container
+    )
     .onChange(of: store.openFolderRequest) { _, _ in
       presentOpenFolder()
     }

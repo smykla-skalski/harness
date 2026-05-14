@@ -269,17 +269,20 @@ public struct TaskBoardSyncRequest: Codable, Equatable, Sendable {
 
 public struct TaskBoardDispatchRequest: Codable, Equatable, Sendable {
   public let status: TaskBoardStatus?
+  public let itemId: String?
   public let dryRun: Bool
   public let projectDir: String?
   public let actor: String?
 
   public init(
     status: TaskBoardStatus? = nil,
+    itemId: String? = nil,
     dryRun: Bool = true,
     projectDir: String? = nil,
     actor: String? = nil
   ) {
     self.status = status
+    self.itemId = itemId
     self.dryRun = dryRun
     self.projectDir = projectDir
     self.actor = actor

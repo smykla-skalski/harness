@@ -51,20 +51,22 @@ async fn run_task_board_http_flow(sandbox: &Path) {
     let (base_url, server) = serve_http(state.clone()).await;
     let client = reqwest::Client::new();
 
+    run_task_board_http_item_scope_flow(&client, &base_url, &state, &project_dir).await;
+    run_task_board_http_run_once_flow(&client, &base_url, &project_dir).await;
+
+    server.abort();
+    let _ = server.await;
+}
+
+async fn run_task_board_http_item_scope_flow(
+    client: &reqwest::Client,
+    base_url: &str,
+    state: &crate::daemon::http::DaemonHttpState,
+    project_dir: &Path,
+) {
     seed_ready_board_item("board-http-dispatch", "HTTP dispatch item");
     seed_ready_board_item("board-http-dispatch-other", "HTTP dispatch other item");
-    let dispatch = post_json(
-        &client,
-        &base_url,
-        http_paths::TASK_BOARD_DISPATCH,
-        json!({
-            "item_id": "board-http-dispatch",
-            "status": "todo",
-            "dry_run": false,
-            "project_dir": project_dir,
-        }),
-    )
-    .await;
+    let dispatch = dispatch_http_item(client, base_url, "board-http-dispatch", project_dir).await;
     let applied = first_applied(&dispatch);
     let session_id = required_string(applied, "session_id");
     let work_item_id = required_string(applied, "work_item_id");
@@ -78,24 +80,22 @@ async fn run_task_board_http_flow(sandbox: &Path) {
         Some("running")
     );
     assert_board_item_unlinked("board-http-dispatch-other");
-    join_leader(&state, &session_id, &project_dir).await;
+    let other_dispatch =
+        dispatch_http_item(client, base_url, "board-http-dispatch-other", project_dir).await;
+    let other_applied = first_applied(&other_dispatch);
+    let other_session_id = required_string(other_applied, "session_id");
+    let other_work_item_id = required_string(other_applied, "work_item_id");
+    join_leader(state, &session_id, project_dir).await;
+    join_leader(state, &other_session_id, project_dir).await;
 
-    post_json(
-        &client,
-        &base_url,
-        &format!("/v1/sessions/{session_id}/tasks/{work_item_id}/status"),
-        json!({
-            "actor": "spoofed-client",
-            "status": "done",
-            "note": "completed by test"
-        }),
-    )
-    .await;
+    mark_http_task_done(client, base_url, &session_id, &work_item_id).await;
+    mark_http_task_done(client, base_url, &other_session_id, &other_work_item_id).await;
     let evaluation = post_json(
-        &client,
-        &base_url,
+        client,
+        base_url,
         http_paths::TASK_BOARD_EVALUATE,
         json!({
+            "item_id": "board-http-dispatch",
             "status": "in_progress",
             "dry_run": false,
         }),
@@ -107,12 +107,24 @@ async fn run_task_board_http_flow(sandbox: &Path) {
         evaluation["records"][0]["item"]["workflow"]["status"].as_str(),
         Some("completed")
     );
+    assert_eq!(
+        evaluation["records"][0]["board_item_id"].as_str(),
+        Some("board-http-dispatch")
+    );
+    assert_board_item_status("board-http-dispatch", TaskBoardStatus::Done);
+    assert_board_item_status("board-http-dispatch-other", TaskBoardStatus::InProgress);
+}
 
+async fn run_task_board_http_run_once_flow(
+    client: &reqwest::Client,
+    base_url: &str,
+    project_dir: &Path,
+) {
     seed_ready_board_item("board-http-run-once", "HTTP run once item");
     seed_ready_board_item("board-http-run-once-other", "HTTP run once other item");
     let run_once = post_json(
-        &client,
-        &base_url,
+        client,
+        base_url,
         http_paths::TASK_BOARD_ORCHESTRATOR_RUN_ONCE,
         json!({
             "item_id": "board-http-run-once",
@@ -145,9 +157,45 @@ async fn run_task_board_http_flow(sandbox: &Path) {
             .is_some_and(|trace_ids| !trace_ids.is_empty())
     );
     assert_board_item_unlinked("board-http-run-once-other");
+}
 
-    server.abort();
-    let _ = server.await;
+async fn dispatch_http_item(
+    client: &reqwest::Client,
+    base_url: &str,
+    item_id: &str,
+    project_dir: &Path,
+) -> Value {
+    post_json(
+        client,
+        base_url,
+        http_paths::TASK_BOARD_DISPATCH,
+        json!({
+            "item_id": item_id,
+            "status": "todo",
+            "dry_run": false,
+            "project_dir": project_dir,
+        }),
+    )
+    .await
+}
+
+async fn mark_http_task_done(
+    client: &reqwest::Client,
+    base_url: &str,
+    session_id: &str,
+    work_item_id: &str,
+) {
+    post_json(
+        client,
+        base_url,
+        &format!("/v1/sessions/{session_id}/tasks/{work_item_id}/status"),
+        json!({
+            "actor": "spoofed-client",
+            "status": "done",
+            "note": "completed by test"
+        }),
+    )
+    .await;
 }
 
 async fn run_task_board_http_policy_pipeline_flow() {
@@ -421,6 +469,13 @@ fn assert_board_item_unlinked(id: &str) {
         .expect("load board item");
     assert_eq!(item.status, TaskBoardStatus::Todo);
     assert!(item.work_item_id.is_none());
+}
+
+fn assert_board_item_status(id: &str, status: TaskBoardStatus) {
+    let item = TaskBoardStore::new(default_board_root())
+        .get(id)
+        .expect("load board item");
+    assert_eq!(item.status, status);
 }
 
 fn required_string(value: &Value, key: &str) -> String {

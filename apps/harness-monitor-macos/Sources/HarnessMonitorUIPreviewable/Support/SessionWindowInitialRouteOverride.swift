@@ -25,7 +25,6 @@ public enum SessionWindowInitialRouteOverride {
         .filter { character in
           character.isLetter || character.isNumber
         }
-    )
-      .lowercased()
+    ).lowercased()
   }
 }
