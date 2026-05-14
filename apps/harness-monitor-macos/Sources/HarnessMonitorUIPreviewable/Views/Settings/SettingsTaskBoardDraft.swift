@@ -226,7 +226,8 @@ struct TaskBoardRepositoryOverrideDraft: Equatable {
   }
 
   var tokenOverride: TaskBoardGitHubRepositoryToken? {
-    guard let repository = normalized(repository)?.lowercased(), let token = normalized(token) else {
+    guard let repository = normalized(repository)?.lowercased(), let token = normalized(token)
+    else {
       return nil
     }
     return TaskBoardGitHubRepositoryToken(repository: repository, token: token)

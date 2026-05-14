@@ -45,36 +45,13 @@ struct TaskBoardItemManagementPanel: View {
         managementPill(item.hasLinkedSessionTask ? "Session Task" : "Board Only", tint: linkTint)
       }
 
-      HStack(spacing: HarnessMonitorTheme.spacingSM) {
-        Button {
-          onRunOnce?(item)
-        } label: {
-          Label("Run Once", systemImage: "play.circle")
-            .scaledFont(.caption.weight(.semibold))
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: HarnessMonitorTheme.spacingSM) {
+          actionButtons
         }
-        .frame(minHeight: metrics.controlMinHeight)
-        .disabled(isActionInFlight || onRunOnce == nil)
-
-        Button {
-          onEvaluate?(item)
-        } label: {
-          Label("Evaluate Item", systemImage: "checkmark.seal")
-            .scaledFont(.caption.weight(.semibold))
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+          actionButtons
         }
-        .frame(minHeight: metrics.controlMinHeight)
-        .disabled(isActionInFlight || onEvaluate == nil)
-        .help("Evaluate this board item")
-
-        Button {
-          onRefresh?()
-        } label: {
-          Image(systemName: "arrow.clockwise")
-            .accessibilityHidden(true)
-        }
-        .frame(minWidth: metrics.iconControlMinWidth, minHeight: metrics.controlMinHeight)
-        .disabled(isActionInFlight || onRefresh == nil)
-        .help("Refresh task board")
-        .accessibilityLabel("Refresh board")
       }
     }
     .padding(HarnessMonitorTheme.spacingMD)
@@ -86,6 +63,44 @@ struct TaskBoardItemManagementPanel: View {
     )
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.manage-item.\(item.id)")
+  }
+
+  @ViewBuilder private var actionButtons: some View {
+    Button {
+      onRunOnce?(item)
+    } label: {
+      Label("Run Once", systemImage: "play.circle")
+        .scaledFont(.caption.weight(.semibold))
+    }
+    .frame(minHeight: metrics.controlMinHeight)
+    .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
+    .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+    .disabled(isActionInFlight || onRunOnce == nil)
+
+    Button {
+      onEvaluate?(item)
+    } label: {
+      Label("Evaluate Item", systemImage: "checkmark.seal")
+        .scaledFont(.caption.weight(.semibold))
+    }
+    .frame(minHeight: metrics.controlMinHeight)
+    .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
+    .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+    .disabled(isActionInFlight || onEvaluate == nil)
+    .help("Evaluate this board item")
+
+    Button {
+      onRefresh?()
+    } label: {
+      Label("Refresh", systemImage: "arrow.clockwise")
+        .scaledFont(.caption.weight(.semibold))
+    }
+    .frame(minHeight: metrics.controlMinHeight)
+    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+    .disabled(isActionInFlight || onRefresh == nil)
+    .help("Refresh task board")
+    .accessibilityIdentifier("harness.task-board.manage-item.refresh")
   }
 
   private var linkTint: Color {
