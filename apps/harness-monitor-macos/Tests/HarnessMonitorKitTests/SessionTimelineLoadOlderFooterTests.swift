@@ -7,81 +7,87 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 @MainActor
-@Suite("Session timeline load-older footer")
-struct SessionTimelineLoadOlderFooterTests {
-  @Test("Footer invokes the load-older callback when it appears")
-  func footerInvokesCallbackOnAppear() async throws {
-    let probe = LoadOlderCallbackProbe()
-    let window = NSWindow(
-      contentRect: CGRect(x: 0, y: 0, width: 320, height: 80),
-      styleMask: [.titled, .closable],
-      backing: .buffered,
-      defer: false
+@Suite("Session timeline load-older trigger")
+struct SessionTimelineLoadOlderTriggerTests {
+  @Test("Trigger reports near-bottom once content is within the threshold")
+  func triggerReportsNearBottomWhenWithinThreshold() {
+    let viewportHeight: CGFloat = 800
+    let contentHeight: CGFloat = 4_000
+    let nearBottomOffset =
+      contentHeight - viewportHeight - SessionTimelineLoadOlderTrigger.nearBottomThreshold + 10
+
+    let trigger = SessionTimelineLoadOlderTrigger(
+      contentHeight: contentHeight,
+      contentOffsetY: nearBottomOffset,
+      viewportHeight: viewportHeight
     )
-    defer { window.close() }
 
-    let host = NSHostingView(
-      rootView: SessionTimelineLoadOlderFooter(
-        isLoading: false,
-        onAppear: { probe.markFired() }
-      )
-    )
-    host.frame = CGRect(x: 0, y: 0, width: 320, height: 80)
-    window.contentView = host
-    window.makeKeyAndOrderFront(nil)
-    host.layoutSubtreeIfNeeded()
-
-    try await waitFor(timeout: 1.0) { probe.fireCount > 0 }
-
-    #expect(probe.fireCount >= 1)
+    #expect(trigger.isNearBottom == true)
   }
 
-  @Test("Footer accepts both loading and idle isLoading states")
-  func footerAcceptsBothLoadingStates() {
-    let idleHost = NSHostingView(
-      rootView: SessionTimelineLoadOlderFooter(isLoading: false, onAppear: nil)
+  @Test("Trigger stays inert above the near-bottom threshold")
+  func triggerStaysInertAboveThreshold() {
+    let trigger = SessionTimelineLoadOlderTrigger(
+      contentHeight: 4_000,
+      contentOffsetY: 0,
+      viewportHeight: 800
     )
-    let loadingHost = NSHostingView(
-      rootView: SessionTimelineLoadOlderFooter(isLoading: true, onAppear: nil)
-    )
-    idleHost.frame = CGRect(x: 0, y: 0, width: 320, height: 60)
-    loadingHost.frame = CGRect(x: 0, y: 0, width: 320, height: 60)
-    idleHost.layoutSubtreeIfNeeded()
-    loadingHost.layoutSubtreeIfNeeded()
 
-    #expect(idleHost.fittingSize.height > 0)
-    #expect(loadingHost.fittingSize.height > 0)
+    #expect(trigger.isNearBottom == false)
   }
 
-  @Test("LazyVStack renders the footer when hasOlder is true")
-  func sessionTimelineListIncludesFooterWhenHasOlder() throws {
+  @Test("Trigger fires at the absolute bottom")
+  func triggerFiresAtAbsoluteBottom() {
+    let viewportHeight: CGFloat = 800
+    let contentHeight: CGFloat = 4_000
+
+    let trigger = SessionTimelineLoadOlderTrigger(
+      contentHeight: contentHeight,
+      contentOffsetY: contentHeight - viewportHeight,
+      viewportHeight: viewportHeight
+    )
+
+    #expect(trigger.isNearBottom == true)
+  }
+
+  @Test("Trigger handles short content where bottom is always visible")
+  func triggerHandlesShortContent() {
+    let trigger = SessionTimelineLoadOlderTrigger(
+      contentHeight: 200,
+      contentOffsetY: 0,
+      viewportHeight: 800
+    )
+
+    #expect(trigger.isNearBottom == true)
+  }
+
+  @Test("LazyVStack body has no conditional load-older child")
+  func lazyVStackKeepsForEachOnlyContent() throws {
     let sourceFile = try timelineSource(named: "MonitorTimelineSection.swift")
 
-    #expect(sourceFile.contains("if presentation.navigation.hasOlder {"))
-    #expect(sourceFile.contains("SessionTimelineLoadOlderFooter("))
-    #expect(sourceFile.contains("onRequestLoadOlder: requestLoadOlderTimelineChunk"))
+    #expect(sourceFile.contains("LazyVStack(alignment: .leading, spacing: 0) {"))
+    #expect(sourceFile.contains("ForEach(presentation.rows)"))
+    #expect(!sourceFile.contains("if presentation.navigation.hasOlder {"))
   }
 
-  @Test("Load-older trigger is routed to the store's older-chunk appender")
-  func loadOlderTriggerRoutesToStoreAppender() throws {
+  @Test("Scroll-geometry trigger is wired to the older-chunk appender")
+  func scrollGeometryWiredToStoreAppender() throws {
     let sourceFile = try timelineSource(named: "MonitorTimelineSection.swift")
 
+    #expect(sourceFile.contains(".onScrollGeometryChange("))
+    #expect(sourceFile.contains("SessionTimelineLoadOlderTrigger.self"))
+    #expect(sourceFile.contains("SessionTimelineLoadOlderTrigger.init(geometry:)"))
     #expect(sourceFile.contains("static let loadOlderChunkSize = 200"))
-    #expect(
-      sourceFile.contains("await store.appendSelectedTimelineOlderChunk(")
-    )
+    #expect(sourceFile.contains("await store.appendSelectedTimelineOlderChunk("))
     #expect(sourceFile.contains("retainedLimit: nil"))
   }
 
-  @Test("Footer is published with the load-older accessibility identifier")
-  func footerPublishesAccessibilityIdentifier() throws {
+  @Test("Trigger only fires on the rising edge of near-bottom")
+  func triggerOnlyFiresOnRisingEdge() throws {
     let sourceFile = try timelineSource(named: "MonitorTimelineSection.swift")
 
-    #expect(
-      sourceFile.contains(
-        "HarnessMonitorAccessibility.sessionTimelineLoadOlderFooter"
-      )
-    )
+    #expect(sourceFile.contains("guard !oldValue.isNearBottom, newValue.isNearBottom else"))
+    #expect(sourceFile.contains("guard presentation.navigation.hasOlder else"))
   }
 
   private func timelineSource(named fileName: String) throws -> String {
@@ -99,25 +105,5 @@ struct SessionTimelineLoadOlderFooterTests {
       )
       .appendingPathComponent(fileName)
     return try String(contentsOf: fileURL, encoding: .utf8)
-  }
-
-  private func waitFor(
-    timeout: TimeInterval,
-    condition: @escaping () -> Bool
-  ) async throws {
-    let deadline = Date().addingTimeInterval(timeout)
-    while Date() < deadline {
-      if condition() { return }
-      try await Task.sleep(for: .milliseconds(20))
-    }
-  }
-}
-
-@MainActor
-private final class LoadOlderCallbackProbe {
-  private(set) var fireCount = 0
-
-  func markFired() {
-    fireCount += 1
   }
 }

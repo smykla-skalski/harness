@@ -339,12 +339,6 @@ private struct SessionTimelineList: View {
           .equatable()
           .id(row.id)
         }
-        if presentation.navigation.hasOlder {
-          SessionTimelineLoadOlderFooter(
-            isLoading: presentation.navigation.isLoading,
-            onAppear: onRequestLoadOlder
-          )
-        }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .coordinateSpace(.named(SessionTimelineRailCoordinateSpace.name))
@@ -357,30 +351,37 @@ private struct SessionTimelineList: View {
     }
     .scrollIndicators(.visible)
     .scrollBounceBehavior(.basedOnSize, axes: .vertical)
+    .onScrollGeometryChange(
+      for: SessionTimelineLoadOlderTrigger.self,
+      of: SessionTimelineLoadOlderTrigger.init(geometry:)
+    ) { oldValue, newValue in
+      guard !oldValue.isNearBottom, newValue.isNearBottom else { return }
+      guard presentation.navigation.hasOlder else { return }
+      onRequestLoadOlder?()
+    }
   }
 }
 
-struct SessionTimelineLoadOlderFooter: View {
-  let isLoading: Bool
-  let onAppear: (() -> Void)?
+struct SessionTimelineLoadOlderTrigger: Equatable {
+  static let nearBottomThreshold: CGFloat = 320
 
-  var body: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      HarnessMonitorSpinner(size: 12)
-      Text(isLoading ? "Loading older events…" : "Loading more")
-        .scaledFont(.caption2)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      Spacer(minLength: 0)
-    }
-    .padding(.vertical, HarnessMonitorTheme.spacingMD)
-    .padding(.horizontal, HarnessMonitorTheme.spacingLG)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.sessionTimelineLoadOlderFooter)
-    .accessibilityElement(children: .combine)
-    .accessibilityLabel("Loading older timeline events")
-    .onAppear {
-      onAppear?()
-    }
+  let isNearBottom: Bool
+
+  init(isNearBottom: Bool) {
+    self.isNearBottom = isNearBottom
+  }
+
+  init(geometry: ScrollGeometry) {
+    self.init(
+      contentHeight: geometry.contentSize.height,
+      contentOffsetY: geometry.contentOffset.y,
+      viewportHeight: geometry.visibleRect.height
+    )
+  }
+
+  init(contentHeight: CGFloat, contentOffsetY: CGFloat, viewportHeight: CGFloat) {
+    let distanceFromBottom = max(0, contentHeight - contentOffsetY - viewportHeight)
+    self.init(isNearBottom: distanceFromBottom <= Self.nearBottomThreshold)
   }
 }
 
