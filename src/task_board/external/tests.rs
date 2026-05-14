@@ -2,8 +2,10 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use temp_env::with_vars;
+use tempfile::tempdir;
 
 use super::*;
+use crate::task_board::store::TaskBoardStore;
 
 #[test]
 fn env_config_prefers_harness_github_token() {
@@ -126,6 +128,103 @@ async fn fake_client_pushes_task_without_network() {
             .lock()
             .expect("push log should not be poisoned"),
         vec!["task-1"]
+    );
+}
+
+#[tokio::test]
+async fn sync_external_tasks_uses_injected_clients_without_network() {
+    let temp = tempdir().expect("tempdir");
+    let board = TaskBoardStore::new(temp.path().join("board"));
+    let mut local = TaskBoardItem::new(
+        "local-1".to_owned(),
+        "Local task".to_owned(),
+        "Body".to_owned(),
+        "2026-05-14T00:00:00Z".to_owned(),
+    );
+    local.status = TaskBoardStatus::Todo;
+    board
+        .create("Local task", "Body", local)
+        .expect("create local task");
+    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient {
+        provider: ExternalProvider::Todoist,
+        tasks: vec![external_task("remote-1", "Remote task")],
+        pushed: Mutex::new(Vec::new()),
+    })];
+
+    let operations = sync_external_tasks(
+        &board,
+        ExternalSyncOptions {
+            provider: Some(ExternalProvider::Todoist),
+            direction: ExternalSyncDirection::Both,
+            dry_run: false,
+            status: None,
+        },
+        &clients,
+    )
+    .await
+    .expect("sync external tasks");
+
+    assert_eq!(operations.len(), 2);
+    assert!(operations.iter().any(|operation| {
+        operation.action == ExternalSyncAction::Pull
+            && operation.board_item_id.as_deref() == Some("todoist-remote-1")
+            && operation.applied
+    }));
+    assert!(operations.iter().any(|operation| {
+        operation.action == ExternalSyncAction::Push
+            && operation.board_item_id.as_deref() == Some("local-1")
+            && operation.external_id.as_deref() == Some("local-1")
+            && operation.applied
+    }));
+    let pulled = board.get("todoist-remote-1").expect("load pulled task");
+    assert_eq!(pulled.title, "Remote task");
+    let pushed = board.get("local-1").expect("load pushed task");
+    assert!(pushed.external_refs.iter().any(|reference| {
+        reference.provider == ExternalRefProvider::Todoist && reference.external_id == "local-1"
+    }));
+}
+
+#[tokio::test]
+async fn sync_external_tasks_dry_run_does_not_write_board() {
+    let temp = tempdir().expect("tempdir");
+    let board = TaskBoardStore::new(temp.path().join("board"));
+    let local = TaskBoardItem::new(
+        "local-1".to_owned(),
+        "Local task".to_owned(),
+        String::new(),
+        "2026-05-14T00:00:00Z".to_owned(),
+    );
+    board
+        .create("Local task", "", local)
+        .expect("create local task");
+    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient {
+        provider: ExternalProvider::Todoist,
+        tasks: vec![external_task("remote-2", "Remote task")],
+        pushed: Mutex::new(Vec::new()),
+    })];
+
+    let operations = sync_external_tasks(
+        &board,
+        ExternalSyncOptions {
+            provider: Some(ExternalProvider::Todoist),
+            direction: ExternalSyncDirection::Both,
+            dry_run: true,
+            status: None,
+        },
+        &clients,
+    )
+    .await
+    .expect("sync external tasks");
+
+    assert_eq!(operations.len(), 1);
+    assert!(operations.iter().all(|operation| !operation.applied));
+    assert!(board.get("todoist-remote-2").is_err());
+    assert!(
+        board
+            .get("local-1")
+            .expect("local task")
+            .external_refs
+            .is_empty()
     );
 }
 

@@ -1,10 +1,11 @@
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::{
-    TaskBoardAuditRequest, TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest,
-    TaskBoardDispatchRequest, TaskBoardEvaluateRequest, TaskBoardGetItemRequest,
-    TaskBoardListItemsRequest, TaskBoardOrchestratorRunOnceRequest,
-    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardSyncRequest, TaskBoardUpdateItemRequest,
-    WsRequest, WsResponse, ws_methods,
+    TaskBoardAuditRequest, TaskBoardCatalogRequest, TaskBoardCreateItemRequest,
+    TaskBoardDeleteItemRequest, TaskBoardDispatchRequest, TaskBoardEvaluateRequest,
+    TaskBoardGetItemRequest, TaskBoardListItemsRequest, TaskBoardOrchestratorRunOnceRequest,
+    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardPolicyPipelinePromoteRequest,
+    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest,
+    TaskBoardSyncRequest, TaskBoardUpdateItemRequest, WsRequest, WsResponse, ws_methods,
 };
 use crate::daemon::service;
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
@@ -23,10 +24,12 @@ pub(crate) async fn dispatch_task_board_method(
         ws_methods::TASK_BOARD_GET => Some(dispatch_task_board_get(request)),
         ws_methods::TASK_BOARD_UPDATE => Some(dispatch_task_board_update(request)),
         ws_methods::TASK_BOARD_DELETE => Some(dispatch_task_board_delete(request)),
-        ws_methods::TASK_BOARD_SYNC => Some(dispatch_task_board_sync(request)),
+        ws_methods::TASK_BOARD_SYNC => Some(dispatch_task_board_sync(request).await),
         ws_methods::TASK_BOARD_DISPATCH => Some(dispatch_task_board_dispatch(request, state).await),
         ws_methods::TASK_BOARD_EVALUATE => Some(dispatch_task_board_evaluate(request, state).await),
         ws_methods::TASK_BOARD_AUDIT => Some(dispatch_task_board_audit(request)),
+        ws_methods::TASK_BOARD_PROJECTS => Some(dispatch_task_board_projects(request)),
+        ws_methods::TASK_BOARD_MACHINES => Some(dispatch_task_board_machines(request)),
         ws_methods::TASK_BOARD_ORCHESTRATOR_STATUS => {
             Some(dispatch_task_board_orchestrator_status(request))
         }
@@ -44,6 +47,21 @@ pub(crate) async fn dispatch_task_board_method(
         }
         ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_UPDATE => {
             Some(dispatch_task_board_orchestrator_settings_update(request))
+        }
+        ws_methods::TASK_BOARD_POLICY_PIPELINE_GET => {
+            Some(dispatch_task_board_policy_pipeline_get(request))
+        }
+        ws_methods::TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT => {
+            Some(dispatch_task_board_policy_pipeline_save_draft(request))
+        }
+        ws_methods::TASK_BOARD_POLICY_PIPELINE_SIMULATE => {
+            Some(dispatch_task_board_policy_pipeline_simulate(request))
+        }
+        ws_methods::TASK_BOARD_POLICY_PIPELINE_PROMOTE => {
+            Some(dispatch_task_board_policy_pipeline_promote(request))
+        }
+        ws_methods::TASK_BOARD_POLICY_PIPELINE_AUDIT => {
+            Some(dispatch_task_board_policy_pipeline_audit(request))
         }
         _ => None,
     }
@@ -87,11 +105,11 @@ fn dispatch_task_board_delete(request: &WsRequest) -> WsResponse {
     dispatch_query_result(&request.id, service::delete_task_board_item(&body))
 }
 
-fn dispatch_task_board_sync(request: &WsRequest) -> WsResponse {
-    let Ok(body) = parse_params::<TaskBoardSyncRequest>(request) else {
+async fn dispatch_task_board_sync(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params_or_default::<TaskBoardSyncRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(&request.id, service::sync_task_board(&body))
+    dispatch_query_result(&request.id, service::sync_task_board_async(&body).await)
 }
 
 async fn dispatch_task_board_dispatch(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
@@ -150,6 +168,20 @@ fn dispatch_task_board_audit(request: &WsRequest) -> WsResponse {
         return invalid_params(request);
     };
     dispatch_query_result(&request.id, service::audit_task_board(&body))
+}
+
+fn dispatch_task_board_projects(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params_or_default::<TaskBoardCatalogRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(&request.id, service::list_task_board_projects(&body))
+}
+
+fn dispatch_task_board_machines(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params_or_default::<TaskBoardCatalogRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(&request.id, service::list_task_board_machines(&body))
 }
 
 fn dispatch_task_board_orchestrator_status(request: &WsRequest) -> WsResponse {
@@ -211,8 +243,56 @@ fn dispatch_task_board_orchestrator_settings_update(request: &WsRequest) -> WsRe
     )
 }
 
+fn dispatch_task_board_policy_pipeline_get(request: &WsRequest) -> WsResponse {
+    dispatch_query_result(&request.id, service::task_board_policy_pipeline())
+}
+
+fn dispatch_task_board_policy_pipeline_save_draft(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPolicyPipelineSaveDraftRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        service::save_task_board_policy_pipeline_draft(&body),
+    )
+}
+
+fn dispatch_task_board_policy_pipeline_simulate(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPolicyPipelineSimulateRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        service::simulate_task_board_policy_pipeline(&body),
+    )
+}
+
+fn dispatch_task_board_policy_pipeline_promote(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPolicyPipelinePromoteRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        service::promote_task_board_policy_pipeline(&body),
+    )
+}
+
+fn dispatch_task_board_policy_pipeline_audit(request: &WsRequest) -> WsResponse {
+    dispatch_query_result(&request.id, service::audit_task_board_policy_pipeline())
+}
+
 fn parse_params<T: DeserializeOwned>(request: &WsRequest) -> serde_json::Result<T> {
     serde_json::from_value(request.params.clone())
+}
+
+fn parse_params_or_default<T>(request: &WsRequest) -> serde_json::Result<T>
+where
+    T: Default + DeserializeOwned,
+{
+    if request.params.is_null() {
+        return Ok(T::default());
+    }
+    parse_params(request)
 }
 
 fn invalid_params(request: &WsRequest) -> WsResponse {

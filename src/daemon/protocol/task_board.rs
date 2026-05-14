@@ -2,9 +2,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::task_board::types::TaskBoardWorkflowState;
 use crate::task_board::{
-    AgentMode, DispatchExecutionSummary, ExternalRef, PlanningState, TaskBoardAuditSummary,
-    TaskBoardEvaluationSummary, TaskBoardItem, TaskBoardPriority, TaskBoardStatus,
-    TaskBoardSyncSummary,
+    AgentMode, DispatchExecutionSummary, ExternalProvider, ExternalRef, ExternalSyncDirection,
+    PlanningState, PolicyPipelineAuditSummary, PolicyPipelineDocument,
+    PolicyPipelinePromoteRequest, PolicyPipelinePromoteResponse, PolicyPipelineSaveResponse,
+    PolicyPipelineSimulationResult, TaskBoardAuditSummary, TaskBoardEvaluationSummary,
+    TaskBoardItem, TaskBoardMachineSummary, TaskBoardPriority, TaskBoardProjectSummary,
+    TaskBoardStatus, TaskBoardSyncSummary,
 };
 
 pub use crate::task_board::{
@@ -94,8 +97,31 @@ pub struct TaskBoardListItemsResponse {
     pub items: Vec<TaskBoardItem>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskBoardSyncRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<TaskBoardStatus>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<ExternalProvider>,
+    #[serde(default)]
+    pub direction: ExternalSyncDirection,
+    #[serde(default = "default_sync_dry_run")]
+    pub dry_run: bool,
+}
+
+impl Default for TaskBoardSyncRequest {
+    fn default() -> Self {
+        Self {
+            status: None,
+            provider: None,
+            direction: ExternalSyncDirection::default(),
+            dry_run: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TaskBoardCatalogRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status: Option<TaskBoardStatus>,
 }
@@ -126,10 +152,33 @@ pub struct TaskBoardAuditRequest {
     pub status: Option<TaskBoardStatus>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardPolicyPipelineSaveDraftRequest {
+    pub document: PolicyPipelineDocument,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TaskBoardPolicyPipelineSimulateRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub document: Option<PolicyPipelineDocument>,
+}
+
 pub type TaskBoardSyncResponse = TaskBoardSyncSummary;
+pub type TaskBoardProjectsResponse = Vec<TaskBoardProjectSummary>;
+pub type TaskBoardMachinesResponse = Vec<TaskBoardMachineSummary>;
 pub type TaskBoardDispatchResponse = DispatchExecutionSummary;
 pub type TaskBoardEvaluationResponse = TaskBoardEvaluationSummary;
 pub type TaskBoardAuditResponse = TaskBoardAuditSummary;
 pub type TaskBoardOrchestratorStatusResponse = TaskBoardOrchestratorStatus;
 pub type TaskBoardOrchestratorRunOnceResponse = TaskBoardOrchestratorStatus;
 pub type TaskBoardOrchestratorSettingsResponse = TaskBoardOrchestratorSettings;
+pub type TaskBoardPolicyPipelineResponse = PolicyPipelineDocument;
+pub type TaskBoardPolicyPipelineSaveDraftResponse = PolicyPipelineSaveResponse;
+pub type TaskBoardPolicyPipelineSimulationResponse = PolicyPipelineSimulationResult;
+pub type TaskBoardPolicyPipelinePromoteResponse = PolicyPipelinePromoteResponse;
+pub type TaskBoardPolicyPipelineAuditResponse = PolicyPipelineAuditSummary;
+pub type TaskBoardPolicyPipelinePromoteRequest = PolicyPipelinePromoteRequest;
+
+const fn default_sync_dry_run() -> bool {
+    true
+}

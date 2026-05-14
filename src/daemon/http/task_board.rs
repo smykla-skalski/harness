@@ -8,11 +8,12 @@ use axum::{Json, Router};
 use serde::Deserialize;
 
 use crate::daemon::protocol::{
-    TaskBoardAuditRequest, TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest,
-    TaskBoardDispatchRequest, TaskBoardEvaluateRequest, TaskBoardGetItemRequest,
-    TaskBoardListItemsRequest, TaskBoardOrchestratorRunOnceRequest,
-    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardSyncRequest, TaskBoardUpdateItemRequest,
-    http_paths,
+    TaskBoardAuditRequest, TaskBoardCatalogRequest, TaskBoardCreateItemRequest,
+    TaskBoardDeleteItemRequest, TaskBoardDispatchRequest, TaskBoardEvaluateRequest,
+    TaskBoardGetItemRequest, TaskBoardListItemsRequest, TaskBoardOrchestratorRunOnceRequest,
+    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardPolicyPipelinePromoteRequest,
+    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest,
+    TaskBoardSyncRequest, TaskBoardUpdateItemRequest, http_paths,
 };
 use crate::daemon::service;
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
@@ -21,6 +22,17 @@ use crate::task_board::TaskBoardStatus;
 use super::DaemonHttpState;
 use super::auth::require_auth;
 use super::response::{extract_request_id, timed_json};
+
+macro_rules! authenticated_request {
+    ($headers:expr, $state:expr) => {{
+        let start = Instant::now();
+        let request_id = extract_request_id(&$headers);
+        if let Err(response) = require_auth(&$headers, &$state) {
+            return *response;
+        }
+        (start, request_id)
+    }};
+}
 
 pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
     Router::new()
@@ -45,6 +57,14 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
         )
         .route(http_paths::TASK_BOARD_AUDIT, get(get_task_board_audit))
         .route(
+            http_paths::TASK_BOARD_PROJECTS,
+            get(get_task_board_projects),
+        )
+        .route(
+            http_paths::TASK_BOARD_MACHINES,
+            get(get_task_board_machines),
+        )
+        .route(
             http_paths::TASK_BOARD_ORCHESTRATOR_STATUS,
             get(get_task_board_orchestrator_status),
         )
@@ -64,6 +84,22 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
             http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
             get(get_task_board_orchestrator_settings).put(put_task_board_orchestrator_settings),
         )
+        .route(
+            http_paths::TASK_BOARD_POLICY_PIPELINE,
+            get(get_task_board_policy_pipeline).put(put_task_board_policy_pipeline_draft),
+        )
+        .route(
+            http_paths::TASK_BOARD_POLICY_SIMULATE,
+            post(post_task_board_policy_simulate),
+        )
+        .route(
+            http_paths::TASK_BOARD_POLICY_PROMOTE,
+            post(post_task_board_policy_promote),
+        )
+        .route(
+            http_paths::TASK_BOARD_POLICY_AUDIT,
+            get(get_task_board_policy_audit),
+        )
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -76,11 +112,7 @@ pub(in crate::daemon::http) async fn post_task_board_item(
     State(state): State<DaemonHttpState>,
     Json(request): Json<TaskBoardCreateItemRequest>,
 ) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
+    let (start, request_id) = authenticated_request!(headers, state);
     timed_json(
         "POST",
         http_paths::TASK_BOARD_ITEMS,
@@ -95,11 +127,7 @@ pub(in crate::daemon::http) async fn get_task_board_items(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
+    let (start, request_id) = authenticated_request!(headers, state);
     let request = TaskBoardListItemsRequest {
         status: query.status,
     };
@@ -117,11 +145,7 @@ pub(in crate::daemon::http) async fn get_task_board_item(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
+    let (start, request_id) = authenticated_request!(headers, state);
     timed_json(
         "GET",
         http_paths::TASK_BOARD_ITEM,
@@ -137,11 +161,7 @@ pub(in crate::daemon::http) async fn put_task_board_item(
     State(state): State<DaemonHttpState>,
     Json(request): Json<TaskBoardUpdateItemRequest>,
 ) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
+    let (start, request_id) = authenticated_request!(headers, state);
     timed_json(
         "PUT",
         http_paths::TASK_BOARD_ITEM,
@@ -156,11 +176,7 @@ pub(in crate::daemon::http) async fn delete_task_board_item(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
+    let (start, request_id) = authenticated_request!(headers, state);
     let request = TaskBoardDeleteItemRequest { id: item_id };
     timed_json(
         "DELETE",
@@ -176,17 +192,13 @@ async fn post_task_board_sync(
     State(state): State<DaemonHttpState>,
     Json(request): Json<TaskBoardSyncRequest>,
 ) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
+    let (start, request_id) = authenticated_request!(headers, state);
     timed_json(
         "POST",
         http_paths::TASK_BOARD_SYNC,
         &request_id,
         start,
-        service::sync_task_board(&request),
+        service::sync_task_board_async(&request).await,
     )
 }
 
@@ -195,11 +207,7 @@ async fn post_task_board_dispatch(
     State(state): State<DaemonHttpState>,
     Json(mut request): Json<TaskBoardDispatchRequest>,
 ) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
+    let (start, request_id) = authenticated_request!(headers, state);
     request.actor = Some(CONTROL_PLANE_ACTOR_ID.to_string());
     let result = if let Some(async_db) = state.async_db.get() {
         let result = service::dispatch_task_board_async(&request, async_db.as_ref()).await;
@@ -236,11 +244,7 @@ async fn post_task_board_evaluate(
     State(state): State<DaemonHttpState>,
     Json(request): Json<TaskBoardEvaluateRequest>,
 ) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
+    let (start, request_id) = authenticated_request!(headers, state);
     let result = if let Some(async_db) = state.async_db.get() {
         let result = service::evaluate_task_board_async(&request, async_db.as_ref()).await;
         if result.as_ref().is_ok_and(|response| response.updated > 0) {
@@ -270,11 +274,7 @@ async fn get_task_board_audit(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
+    let (start, request_id) = authenticated_request!(headers, state);
     let request = TaskBoardAuditRequest {
         status: query.status,
     };
@@ -287,15 +287,47 @@ async fn get_task_board_audit(
     )
 }
 
+async fn get_task_board_projects(
+    Query(query): Query<TaskBoardListQuery>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    let request = TaskBoardCatalogRequest {
+        status: query.status,
+    };
+    timed_json(
+        "GET",
+        http_paths::TASK_BOARD_PROJECTS,
+        &request_id,
+        start,
+        service::list_task_board_projects(&request),
+    )
+}
+
+async fn get_task_board_machines(
+    Query(query): Query<TaskBoardListQuery>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    let request = TaskBoardCatalogRequest {
+        status: query.status,
+    };
+    timed_json(
+        "GET",
+        http_paths::TASK_BOARD_MACHINES,
+        &request_id,
+        start,
+        service::list_task_board_machines(&request),
+    )
+}
+
 async fn get_task_board_orchestrator_status(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
+    let (start, request_id) = authenticated_request!(headers, state);
     timed_json(
         "GET",
         http_paths::TASK_BOARD_ORCHESTRATOR_STATUS,
@@ -309,11 +341,7 @@ async fn post_task_board_orchestrator_start(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
+    let (start, request_id) = authenticated_request!(headers, state);
     timed_json(
         "POST",
         http_paths::TASK_BOARD_ORCHESTRATOR_START,
@@ -327,11 +355,7 @@ async fn post_task_board_orchestrator_stop(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
+    let (start, request_id) = authenticated_request!(headers, state);
     timed_json(
         "POST",
         http_paths::TASK_BOARD_ORCHESTRATOR_STOP,
@@ -346,11 +370,7 @@ async fn post_task_board_orchestrator_run_once(
     State(state): State<DaemonHttpState>,
     Json(mut request): Json<TaskBoardOrchestratorRunOnceRequest>,
 ) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
+    let (start, request_id) = authenticated_request!(headers, state);
     request.actor = Some(CONTROL_PLANE_ACTOR_ID.to_string());
     let result = if let Some(async_db) = state.async_db.get() {
         let result =
@@ -387,11 +407,7 @@ async fn get_task_board_orchestrator_settings(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
+    let (start, request_id) = authenticated_request!(headers, state);
     timed_json(
         "GET",
         http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
@@ -406,16 +422,85 @@ async fn put_task_board_orchestrator_settings(
     State(state): State<DaemonHttpState>,
     Json(request): Json<TaskBoardOrchestratorSettingsUpdateRequest>,
 ) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
+    let (start, request_id) = authenticated_request!(headers, state);
     timed_json(
         "PUT",
         http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
         &request_id,
         start,
         service::update_task_board_orchestrator_settings(&request),
+    )
+}
+
+async fn get_task_board_policy_pipeline(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    timed_json(
+        "GET",
+        http_paths::TASK_BOARD_POLICY_PIPELINE,
+        &request_id,
+        start,
+        service::task_board_policy_pipeline(),
+    )
+}
+
+async fn put_task_board_policy_pipeline_draft(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<TaskBoardPolicyPipelineSaveDraftRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    timed_json(
+        "PUT",
+        http_paths::TASK_BOARD_POLICY_PIPELINE,
+        &request_id,
+        start,
+        service::save_task_board_policy_pipeline_draft(&request),
+    )
+}
+
+async fn post_task_board_policy_simulate(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<TaskBoardPolicyPipelineSimulateRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_POLICY_SIMULATE,
+        &request_id,
+        start,
+        service::simulate_task_board_policy_pipeline(&request),
+    )
+}
+
+async fn post_task_board_policy_promote(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<TaskBoardPolicyPipelinePromoteRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_POLICY_PROMOTE,
+        &request_id,
+        start,
+        service::promote_task_board_policy_pipeline(&request),
+    )
+}
+
+async fn get_task_board_policy_audit(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    timed_json(
+        "GET",
+        http_paths::TASK_BOARD_POLICY_AUDIT,
+        &request_id,
+        start,
+        service::audit_task_board_policy_pipeline(),
     )
 }

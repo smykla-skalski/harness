@@ -3,25 +3,27 @@ use uuid::Uuid;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::protocol::{
     SessionDetail, SessionStartRequest, TaskBoardAuditRequest, TaskBoardAuditResponse,
-    TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardDispatchRequest,
-    TaskBoardDispatchResponse, TaskBoardEvaluateRequest, TaskBoardGetItemRequest,
-    TaskBoardListItemsRequest, TaskBoardListItemsResponse, TaskBoardOrchestratorRunOnceRequest,
-    TaskBoardOrchestratorRunOnceResponse, TaskBoardOrchestratorSettingsResponse,
-    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorStatusResponse,
-    TaskBoardSyncRequest, TaskBoardSyncResponse, TaskBoardUpdateItemRequest, TaskCreateRequest,
+    TaskBoardCatalogRequest, TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest,
+    TaskBoardDispatchRequest, TaskBoardDispatchResponse, TaskBoardGetItemRequest,
+    TaskBoardListItemsRequest, TaskBoardListItemsResponse, TaskBoardMachinesResponse,
+    TaskBoardPolicyPipelineAuditResponse, TaskBoardPolicyPipelinePromoteRequest,
+    TaskBoardPolicyPipelinePromoteResponse, TaskBoardPolicyPipelineResponse,
+    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSaveDraftResponse,
+    TaskBoardPolicyPipelineSimulateRequest, TaskBoardPolicyPipelineSimulationResponse,
+    TaskBoardProjectsResponse, TaskBoardSyncRequest, TaskBoardSyncResponse,
+    TaskBoardUpdateItemRequest, TaskCreateRequest,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::{
-    DispatchAppliedTask, DispatchExecutionSummary, DispatchPlan, ExternalSyncConfig, SessionIntent,
-    TaskBoardItem, TaskBoardOrchestrator, TaskBoardOrchestratorDispatchInput,
-    TaskBoardOrchestratorTickPhase, TaskBoardStatus, TaskBoardStore, TaskBoardWorkflowStatus,
-    build_audit_summary, build_dispatch_summary, build_sync_summary, default_board_root,
+    DispatchAppliedTask, DispatchExecutionSummary, DispatchPlan, ExternalSyncConfig,
+    ExternalSyncOptions, PolicyPipelineStore, SessionIntent, TaskBoardItem, TaskBoardStatus,
+    TaskBoardStore, TaskBoardWorkflowStatus, build_audit_summary, build_dispatch_summary,
+    build_machine_summaries, build_project_summaries, build_sync_summary, configured_sync_clients,
+    default_board_root, sync_external_tasks,
 };
 use crate::workspace::utc_now;
-
-use super::task_board_evaluation::{evaluate_task_board, evaluate_task_board_async};
 
 /// Create a persisted task-board item.
 ///
@@ -102,8 +104,47 @@ pub fn delete_task_board_item(
 /// # Errors
 /// Returns `CliError` when board items cannot be loaded.
 pub fn sync_task_board(request: &TaskBoardSyncRequest) -> Result<TaskBoardSyncResponse, CliError> {
+    run_task_board_sync_blocking(request)
+}
+
+/// Run external sync through configured provider clients.
+///
+/// # Errors
+/// Returns `CliError` when board items cannot be loaded, provider clients
+/// cannot be built, or an applied provider operation fails.
+pub async fn sync_task_board_async(
+    request: &TaskBoardSyncRequest,
+) -> Result<TaskBoardSyncResponse, CliError> {
+    let board = store();
+    let config = ExternalSyncConfig::from_env();
+    let clients = configured_sync_clients(&config, request.provider)?;
+    let operations = sync_external_tasks(&board, sync_options(request), &clients).await?;
+    let items = board.list(request.status)?;
+    let mut summary = build_sync_summary(&items, &config);
+    summary.operations = operations;
+    Ok(summary)
+}
+
+/// List project summaries for task-board items.
+///
+/// # Errors
+/// Returns `CliError` when board items cannot be loaded.
+pub fn list_task_board_projects(
+    request: &TaskBoardCatalogRequest,
+) -> Result<TaskBoardProjectsResponse, CliError> {
     let items = store().list(request.status)?;
-    Ok(build_sync_summary(&items, &ExternalSyncConfig::from_env()))
+    Ok(build_project_summaries(&items))
+}
+
+/// List machine summaries for task-board items.
+///
+/// # Errors
+/// Returns `CliError` when board items cannot be loaded.
+pub fn list_task_board_machines(
+    request: &TaskBoardCatalogRequest,
+) -> Result<TaskBoardMachinesResponse, CliError> {
+    let items = store().list(request.status)?;
+    Ok(build_machine_summaries(&items))
 }
 
 /// Build dispatch plans for task-board items.
@@ -330,118 +371,51 @@ pub fn audit_task_board(
     Ok(build_audit_summary(&items))
 }
 
-/// Load task-board orchestrator status from durable JSON state.
+/// Load the V2 task-board policy pipeline, seeding the default graph when absent.
 ///
 /// # Errors
-/// Returns `CliError` when state, settings, or board items cannot be read.
-pub fn task_board_orchestrator_status() -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
-    orchestrator().status()
+/// Returns `CliError` when durable policy state cannot be loaded.
+pub fn task_board_policy_pipeline() -> Result<TaskBoardPolicyPipelineResponse, CliError> {
+    policy_store().load_or_seed()
 }
 
-/// Persist task-board orchestrator start intent.
+/// Save a V2 policy pipeline draft.
 ///
 /// # Errors
-/// Returns `CliError` when durable state cannot be read or written.
-pub fn start_task_board_orchestrator() -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
-    orchestrator().start()
+/// Returns `CliError` when durable policy state cannot be written.
+pub fn save_task_board_policy_pipeline_draft(
+    request: &TaskBoardPolicyPipelineSaveDraftRequest,
+) -> Result<TaskBoardPolicyPipelineSaveDraftResponse, CliError> {
+    policy_store().save_draft(request.document.clone())
 }
 
-/// Persist task-board orchestrator stop intent.
+/// Simulate a V2 policy pipeline in dry-run mode.
 ///
 /// # Errors
-/// Returns `CliError` when durable state cannot be read or written.
-pub fn stop_task_board_orchestrator() -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
-    orchestrator().stop()
+/// Returns `CliError` when simulation state cannot be written.
+pub fn simulate_task_board_policy_pipeline(
+    request: &TaskBoardPolicyPipelineSimulateRequest,
+) -> Result<TaskBoardPolicyPipelineSimulationResponse, CliError> {
+    policy_store().simulate(request.document.clone())
 }
 
-/// Load task-board orchestrator settings.
+/// Promote a simulated V2 policy pipeline for enforcement.
 ///
 /// # Errors
-/// Returns `CliError` when settings cannot be read.
-pub fn task_board_orchestrator_settings() -> Result<TaskBoardOrchestratorSettingsResponse, CliError>
+/// Returns `CliError` when simulation is missing/stale or promotion cannot be persisted.
+pub fn promote_task_board_policy_pipeline(
+    request: &TaskBoardPolicyPipelinePromoteRequest,
+) -> Result<TaskBoardPolicyPipelinePromoteResponse, CliError> {
+    policy_store().promote(request)
+}
+
+/// Summarize V2 policy pipeline audit state.
+///
+/// # Errors
+/// Returns `CliError` when durable policy state cannot be loaded.
+pub fn audit_task_board_policy_pipeline() -> Result<TaskBoardPolicyPipelineAuditResponse, CliError>
 {
-    orchestrator().settings()
-}
-
-/// Persist task-board orchestrator settings.
-///
-/// # Errors
-/// Returns `CliError` when settings cannot be read or written.
-pub fn update_task_board_orchestrator_settings(
-    request: &TaskBoardOrchestratorSettingsUpdateRequest,
-) -> Result<TaskBoardOrchestratorSettingsResponse, CliError> {
-    orchestrator().update_settings(request)
-}
-
-/// Run one task-board orchestrator tick through the sync daemon DB path.
-///
-/// # Errors
-/// Returns `CliError` when summaries, dispatch, or state persistence fails.
-pub fn run_task_board_orchestrator_once(
-    request: &TaskBoardOrchestratorRunOnceRequest,
-    db: Option<&DaemonDb>,
-) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
-    let orchestrator = orchestrator();
-    let prepared = orchestrator.prepare_run(request)?;
-    let dispatch = match dispatch_task_board(&dispatch_request_from_input(&prepared.input), db) {
-        Ok(dispatch) => dispatch,
-        Err(error) => {
-            orchestrator.fail_run(&prepared, &error)?;
-            return Err(error);
-        }
-    };
-    orchestrator.record_run_phase(&prepared, TaskBoardOrchestratorTickPhase::Evaluation)?;
-    let evaluation = match evaluate_task_board(
-        &TaskBoardEvaluateRequest {
-            status: None,
-            dry_run: prepared.input.dry_run,
-        },
-        db,
-    ) {
-        Ok(evaluation) => evaluation,
-        Err(error) => {
-            orchestrator.fail_run(&prepared, &error)?;
-            return Err(error);
-        }
-    };
-    orchestrator.complete_run_with_evaluation(prepared, dispatch, Some(evaluation))
-}
-
-/// Run one task-board orchestrator tick through the async daemon DB path.
-///
-/// # Errors
-/// Returns `CliError` when summaries, dispatch, or state persistence fails.
-pub(crate) async fn run_task_board_orchestrator_once_async(
-    request: &TaskBoardOrchestratorRunOnceRequest,
-    async_db: &AsyncDaemonDb,
-) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
-    let orchestrator = orchestrator();
-    let prepared = orchestrator.prepare_run(request)?;
-    let dispatch_request = dispatch_request_from_input(&prepared.input);
-    let dispatch = match dispatch_task_board_async(&dispatch_request, async_db).await {
-        Ok(dispatch) => dispatch,
-        Err(error) => {
-            orchestrator.fail_run(&prepared, &error)?;
-            return Err(error);
-        }
-    };
-    orchestrator.record_run_phase(&prepared, TaskBoardOrchestratorTickPhase::Evaluation)?;
-    let evaluation = match evaluate_task_board_async(
-        &TaskBoardEvaluateRequest {
-            status: None,
-            dry_run: prepared.input.dry_run,
-        },
-        async_db,
-    )
-    .await
-    {
-        Ok(evaluation) => evaluation,
-        Err(error) => {
-            orchestrator.fail_run(&prepared, &error)?;
-            return Err(error);
-        }
-    };
-    orchestrator.complete_run_with_evaluation(prepared, dispatch, Some(evaluation))
+    policy_store().audit_summary()
 }
 
 fn patch_from_request(request: &TaskBoardUpdateItemRequest) -> TaskBoardItemPatch {
@@ -477,18 +451,28 @@ fn store() -> TaskBoardStore {
     TaskBoardStore::new(default_board_root())
 }
 
-fn orchestrator() -> TaskBoardOrchestrator {
-    TaskBoardOrchestrator::new(default_board_root())
+fn policy_store() -> PolicyPipelineStore {
+    PolicyPipelineStore::new(default_board_root())
 }
 
-fn dispatch_request_from_input(
-    input: &TaskBoardOrchestratorDispatchInput,
-) -> TaskBoardDispatchRequest {
-    TaskBoardDispatchRequest {
-        status: input.status,
-        dry_run: input.dry_run,
-        project_dir: input.project_dir.clone(),
-        actor: input.actor.clone(),
+fn run_task_board_sync_blocking(
+    request: &TaskBoardSyncRequest,
+) -> Result<TaskBoardSyncResponse, CliError> {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| {
+            CliErrorKind::workflow_io(format!("create task-board sync runtime: {error}"))
+        })?
+        .block_on(sync_task_board_async(request))
+}
+
+fn sync_options(request: &TaskBoardSyncRequest) -> ExternalSyncOptions {
+    ExternalSyncOptions {
+        status: request.status,
+        provider: request.provider,
+        direction: request.direction,
+        dry_run: request.dry_run,
     }
 }
 

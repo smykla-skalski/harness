@@ -2,10 +2,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::session::types::{TaskSeverity, TaskSource};
 
+use super::default_board_root;
 use super::planning::{PlanApprovalBlockReason, PlanApprovalGate, approval_gate};
 use super::policy::{
     BuiltInPolicyGate, PolicyAction, PolicyDecision, PolicyGate, PolicyInput, PolicySubject,
 };
+use super::policy_graph::{GraphPolicyGate, PolicyPipelineMode, PolicyPipelineStore};
 use super::types::{AgentMode, ExternalRef, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
 
 const REVIEWER_PERSONA: &str = "code-reviewer";
@@ -174,6 +176,11 @@ fn dispatch_policy(item: &TaskBoardItem) -> PolicyDecision {
         repository: item.project_id.clone(),
         ..PolicySubject::default()
     };
+    if let Ok(document) = PolicyPipelineStore::new(default_board_root()).load_or_seed()
+        && document.mode != PolicyPipelineMode::Draft
+    {
+        return GraphPolicyGate::new(document).evaluate(&input);
+    }
     BuiltInPolicyGate::default().evaluate(&input)
 }
 
