@@ -35,6 +35,14 @@ public struct PolicyCanvasView: View {
   @State var statusLine: String = "No pending changes"
   @State var searchPaletteVisible: Bool = false
   @FocusState var focusedField: PolicyCanvasFocusedField?
+  /// VoiceOver focus anchor for the canvas surface. The search palette writes
+  /// the just-selected component into this binding after dismiss so VO lands
+  /// on the destination node/edge/group instead of the empty space where the
+  /// palette used to be. Node/edge/group views downstream apply
+  /// `.accessibilityFocused($focusedComponent, equals: ...)` to receive the
+  /// shift; 3G's broader a11y focus plumbing will subsume this anchor at
+  /// integration time.
+  @AccessibilityFocusState var focusedComponent: PolicyCanvasSelection?
   @Environment(\.scenePhase) var scenePhase
   @Environment(\.undoManager) var undoManager
 
@@ -109,8 +117,11 @@ public struct PolicyCanvasView: View {
       HStack(spacing: 0) {
         PolicyCanvasToolRail(viewModel: viewModel)
 
-        PolicyCanvasViewport(viewModel: viewModel)
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
+        PolicyCanvasViewport(
+          viewModel: viewModel,
+          focusedComponent: $focusedComponent
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         PolicyCanvasInspector(
           viewModel: viewModel,
@@ -145,7 +156,8 @@ public struct PolicyCanvasView: View {
       if searchPaletteVisible {
         PolicyCanvasSearchPalette(
           viewModel: viewModel,
-          isVisible: $searchPaletteVisible
+          isVisible: $searchPaletteVisible,
+          postCommitFocus: $focusedComponent
         )
       }
     }

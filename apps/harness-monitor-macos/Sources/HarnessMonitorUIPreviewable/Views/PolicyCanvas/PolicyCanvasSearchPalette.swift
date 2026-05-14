@@ -11,12 +11,17 @@ import SwiftUI
 ///   because the palette never edits the document — it only navigates the
 ///   user's selection on an existing graph.
 /// - Search hits are recomputed on every keystroke through a debounced
-///   `.task(id: query)` so a fast typist gets one engine call per pause,
-///   not per character. Empty queries skip the engine entirely (the
+///   `.task(id: query)` so a fast typist gets one model call per pause,
+///   not per character. Empty queries skip the search entirely (the
 ///   "recent" path takes over).
+/// - `postCommitFocus` is the host view's `@AccessibilityFocusState` binding.
+///   The palette writes the just-committed selection into it after a brief
+///   yield so VoiceOver's focus lands on the selected node/edge/group once
+///   the dismiss animation has started.
 struct PolicyCanvasSearchPalette: View {
   let viewModel: PolicyCanvasViewModel
   @Binding var isVisible: Bool
+  let postCommitFocus: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
 
   @State private var query: String = ""
   @State private var hits: [PolicyCanvasSearchHit] = []
@@ -24,22 +29,27 @@ struct PolicyCanvasSearchPalette: View {
   @State private var recentHits: [PolicyCanvasSearchHit] = []
   @FocusState private var queryFieldFocused: Bool
 
-  private let engine = PolicyCanvasSearchEngine()
-
   /// Debounce window for keystroke-driven searches. 100ms balances responsive
-  /// feedback against engine churn during a fast typist's burst — at 80ms a
-  /// `qwerty`-rate typist (~5cps) still emits one engine call per pause; at
-  /// 120ms the perceived lag starts to read on the eye.
+  /// feedback against churn during a fast typist's burst — at 80ms a
+  /// `qwerty`-rate typist (~5cps) still emits one search per pause; at 120ms
+  /// the perceived lag starts to read on the eye.
   private static let debounceMillis: UInt64 = 100
+
+  /// Delay between the palette dismissing and the host view's accessibility
+  /// focus shifting onto the selected component. The 50ms gap gives the
+  /// dismiss animation a frame to start so VoiceOver's announcement lands
+  /// on the destination instead of being interrupted by the palette tearing
+  /// down underneath it.
+  private static let focusShiftMillis: UInt64 = 50
 
   /// Maximum number of recent hits surfaced when the query is empty. Three
   /// keeps the empty-state list short enough to scan at a glance without
   /// pushing the palette taller than the typical Cmd+F search bar.
   private static let recentLimit: Int = 3
 
-  /// Maximum number of hits rendered in the list. The engine returns every
-  /// hit; the palette caps the rendered count so a wildcard-like query on a
-  /// 200-node graph doesn't paint a 200-row list.
+  /// Maximum number of hits rendered in the list. The model returns up to its
+  /// own cap; the palette additionally caps the rendered count so a
+  /// wildcard-like query on a 200-node graph does not paint a 200-row list.
   private static let renderLimit: Int = 25
 
   var body: some View {
@@ -60,6 +70,9 @@ struct PolicyCanvasSearchPalette: View {
       RoundedRectangle(cornerRadius: 12)
         .stroke(Color.white.opacity(0.12), lineWidth: 1)
     }
+    .overlay(alignment: .top) {
+      liveRegion
+    }
     .shadow(color: .black.opacity(0.45), radius: 14, x: 0, y: 8)
     .padding(.top, 14)
     .padding(.trailing, 14)
@@ -69,6 +82,14 @@ struct PolicyCanvasSearchPalette: View {
     }
     .task(id: query) {
       await runDebouncedSearch()
+    }
+    // Post an explicit VO announcement on every hit-count change. The
+    // `.accessibilityLiveRegion(.polite)` modifier on `liveRegion` covers VO
+    // users who scrub onto the hidden text element; the explicit post here
+    // covers the common path where focus stays in the text field as the
+    // user types.
+    .onChange(of: hits.count) { _, _ in
+      AccessibilityNotification.Announcement(liveRegionLabel).post()
     }
   }
 
@@ -102,6 +123,41 @@ struct PolicyCanvasSearchPalette: View {
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 10)
+  }
+
+  /// Hidden live region that carries the current result count for VoiceOver.
+  /// The label is also pushed through `AccessibilityNotification.Announcement`
+  /// on every change so VO speaks the new count even when the user's focus
+  /// stays in the search field. Rendered with zero frame so it never overlaps
+  /// the list visually; the accessibility tree carries the text.
+  private var liveRegion: some View {
+    Text(liveRegionLabel)
+      .frame(width: 0, height: 0)
+      .opacity(0)
+      .accessibilityHidden(false)
+      .accessibilityLiveRegion(.polite)
+      .accessibilityLabel(liveRegionLabel)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasSearchLiveRegion)
+  }
+
+  /// Announcement text driving the live region. Returns the resting "type to
+  /// find" hint when the query is empty (so VO does not announce a misleading
+  /// "0 matches"), "No matches" when a non-empty query produces nothing, and
+  /// "{n} matches for '{query}'" otherwise. Singular "match" is used for the
+  /// one-result case so the spoken phrase reads naturally.
+  private var liveRegionLabel: String {
+    let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.isEmpty {
+      return "Type to find nodes, edges, or groups"
+    }
+    let count = hits.count
+    if count == 0 {
+      return "No matches for '\(trimmed)'"
+    }
+    if count == 1 {
+      return "1 match for '\(trimmed)'"
+    }
+    return "\(count) matches for '\(trimmed)'"
   }
 
   @ViewBuilder private var resultsList: some View {
@@ -185,14 +241,9 @@ struct PolicyCanvasSearchPalette: View {
       selectedHitIndex = 0
       return
     }
-    let next = engine.search(
-      query: trimmed,
-      nodes: searchableNodes(),
-      edges: searchableEdges(),
-      groups: searchableGroups()
-    )
+    let next = viewModel.searchHits(query: trimmed)
     hits = next
-    selectedHitIndex = next.isEmpty ? 0 : 0
+    selectedHitIndex = 0
   }
 
   private var currentHits: [PolicyCanvasSearchHit] {
@@ -211,18 +262,18 @@ struct PolicyCanvasSearchPalette: View {
   }
 
   private func commit(hit: PolicyCanvasSearchHit) {
-    let selection: PolicyCanvasSelection
-    switch hit {
-    case .node(let id, _, _, _):
-      selection = .node(id)
-    case .edge(let id, _, _, _):
-      selection = .edge(id)
-    case .group(let id, _, _, _):
-      selection = .group(id)
-    }
+    let selection = hit.selection
     viewModel.select(selection)
     recordRecent(hit)
     dismiss()
+    // Shift VoiceOver focus onto the just-selected component once the
+    // palette has started to tear down. Without the brief yield, the focus
+    // write races the dismiss animation and VO announces the palette
+    // disappearing instead of the destination.
+    Task { @MainActor in
+      try? await Task.sleep(nanoseconds: Self.focusShiftMillis * 1_000_000)
+      postCommitFocus.wrappedValue = selection
+    }
   }
 
   private func recordRecent(_ hit: PolicyCanvasSearchHit) {
@@ -236,30 +287,6 @@ struct PolicyCanvasSearchPalette: View {
 
   private func dismiss() {
     isVisible = false
-  }
-
-  // MARK: - Searchable projections
-
-  private func searchableNodes() -> [PolicyCanvasSearchableNode] {
-    viewModel.nodes.map { node in
-      PolicyCanvasSearchableNode(
-        id: node.id,
-        title: node.title,
-        kindName: node.kind.title
-      )
-    }
-  }
-
-  private func searchableEdges() -> [PolicyCanvasSearchableEdge] {
-    viewModel.edges.map { edge in
-      PolicyCanvasSearchableEdge(id: edge.id, label: edge.label)
-    }
-  }
-
-  private func searchableGroups() -> [PolicyCanvasSearchableGroup] {
-    viewModel.groups.map { group in
-      PolicyCanvasSearchableGroup(id: group.id, title: group.title)
-    }
   }
 }
 
@@ -323,15 +350,14 @@ private struct PolicyCanvasSearchPaletteRow: View {
       .lineLimit(1)
   }
 
-  /// Map the engine's match range (computed against the diacritic-folded
-  /// title) onto the original title for display. The folded copy preserves
-  /// UTF-16 indices for the alphabetic characters this engine targets, so
-  /// the same `Range<String.Index>` describes the same characters in both
-  /// strings as long as the folded copy and original have the same length —
-  /// which is the case for `.diacriticInsensitive` folding on Latin-script
-  /// titles. For titles that do change length under folding (rare in this
-  /// app's policy domain), the highlight is skipped rather than risking an
-  /// index mismatch.
+  /// Map the search range (computed against the diacritic-folded title) onto
+  /// the original title for display. The folded copy preserves UTF-16 indices
+  /// for the alphabetic characters this search targets, so the same
+  /// `Range<String.Index>` describes the same characters in both strings as
+  /// long as the folded copy and original have the same length — which is
+  /// the case for `.diacriticInsensitive` folding on Latin-script titles. For
+  /// titles that do change length under folding (rare in this app's policy
+  /// domain), the highlight is skipped rather than risking an index mismatch.
   private func matchedRange(in title: String) -> Range<String.Index>? {
     switch hit {
     case .node(_, _, let range, _),

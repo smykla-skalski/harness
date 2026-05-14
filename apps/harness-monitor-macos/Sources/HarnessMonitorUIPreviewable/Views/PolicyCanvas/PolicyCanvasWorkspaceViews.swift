@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PolicyCanvasViewport: View {
   let viewModel: PolicyCanvasViewModel
+  let focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
   @State private var magnifyStartZoom: CGFloat?
 
   var body: some View {
@@ -18,11 +19,11 @@ struct PolicyCanvasViewport: View {
               .accessibilityHidden(true)
 
             ZStack(alignment: .topLeading) {
-              PolicyCanvasGroupLayer(viewModel: viewModel)
+              PolicyCanvasGroupLayer(viewModel: viewModel, focusedComponent: focusedComponent)
               PolicyCanvasEdgeLayer(viewModel: viewModel)
               PolicyCanvasRubberBandLayer(viewModel: viewModel)
-              PolicyCanvasNodeLayer(viewModel: viewModel)
-              PolicyCanvasEdgeLabelLayer(viewModel: viewModel)
+              PolicyCanvasNodeLayer(viewModel: viewModel, focusedComponent: focusedComponent)
+              PolicyCanvasEdgeLabelLayer(viewModel: viewModel, focusedComponent: focusedComponent)
             }
             .scaleEffect(viewModel.zoom, anchor: .topLeading)
             .coordinateSpace(.named(PolicyCanvasCoordinateSpaces.canvas))
@@ -158,6 +159,7 @@ private struct PolicyCanvasDottedGrid: View {
 
 private struct PolicyCanvasGroupLayer: View {
   let viewModel: PolicyCanvasViewModel
+  let focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
 
   var body: some View {
     ForEach(viewModel.groups) { group in
@@ -167,6 +169,7 @@ private struct PolicyCanvasGroupLayer: View {
         isHighlighted: viewModel.highlightedGroupID == group.id
       )
       .offset(x: group.frame.minX, y: group.frame.minY)
+      .accessibilityFocused(focusedComponent, equals: .group(group.id))
       .gesture(
         DragGesture(minimumDistance: 3)
           .onChanged { value in
@@ -249,6 +252,7 @@ private struct PolicyCanvasEdgeLayer: View {
 
 private struct PolicyCanvasEdgeLabelLayer: View {
   let viewModel: PolicyCanvasViewModel
+  let focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
   @Environment(\.fontScale) private var fontScale
 
   var body: some View {
@@ -290,6 +294,7 @@ private struct PolicyCanvasEdgeLabelLayer: View {
           }
           .harnessPlainButtonStyle()
           .position(route.labelPosition)
+          .accessibilityFocused(focusedComponent, equals: .edge(edge.id))
           .accessibilityLabel(viewModel.accessibilityLabel(for: edge))
           .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEdge(edge.id))
           .contextMenu {
