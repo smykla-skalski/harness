@@ -2,117 +2,171 @@ import SwiftUI
 
 struct PolicyCanvasViewport: View {
   let viewModel: PolicyCanvasViewModel
-  let focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
-  /// View-only flag from the host. The host (`PolicyCanvasView`) auto-flips
-  /// this on when a simulation is available and the user is on the
-  /// simulation tab; the chrome toggle in the top bar lets the user hide
-  /// the overlay even when both conditions hold. Simulation visibility is
-  /// purely viewport state — never set `documentDirty` from this seam.
-  var showSimulationOverlay: Bool = false
   @State private var magnifyStartZoom: CGFloat?
+  @State private var scrollPosition = ScrollPosition()
+  @State private var currentModifiers: EventModifiers = []
+  @State private var hoveredViewportPoint: CGPoint?
+  @State private var isRestoringCommandScrollPosition = false
 
   var body: some View {
     GeometryReader { proxy in
-      ScrollViewReader { scrollProxy in
-        ScrollView([.horizontal, .vertical]) {
+      ScrollView([.horizontal, .vertical]) {
+        ZStack(alignment: .topLeading) {
+          PolicyCanvasDottedGrid(spacing: PolicyCanvasLayout.gridSize * viewModel.zoom)
+
           ZStack(alignment: .topLeading) {
-            PolicyCanvasDottedGrid(spacing: PolicyCanvasLayout.gridSize * viewModel.zoom)
-
-            Color.clear
-              .frame(width: 1, height: 1)
-              .position(viewModel.initialViewportAnchorPoint)
-              .id(PolicyCanvasLayout.initialViewportAnchorID)
-              .accessibilityHidden(true)
-
-            ZStack(alignment: .topLeading) {
-              PolicyCanvasGroupLayer(viewModel: viewModel, focusedComponent: focusedComponent)
-              PolicyCanvasEdgeLayer(viewModel: viewModel)
-              PolicyCanvasRubberBandLayer(viewModel: viewModel)
-              PolicyCanvasNodeLayer(viewModel: viewModel, focusedComponent: focusedComponent)
-              if showSimulationOverlay {
-                PolicyCanvasSimulationLayer(viewModel: viewModel)
-              }
-              PolicyCanvasEdgeLabelLayer(viewModel: viewModel, focusedComponent: focusedComponent)
-            }
-            .scaleEffect(viewModel.zoom, anchor: .topLeading)
-            .coordinateSpace(.named(PolicyCanvasCoordinateSpaces.canvas))
+            PolicyCanvasGroupLayer(viewModel: viewModel)
+            PolicyCanvasEdgeLayer(viewModel: viewModel)
+            PolicyCanvasRubberBandLayer(viewModel: viewModel)
+            PolicyCanvasNodeLayer(viewModel: viewModel)
+            PolicyCanvasEdgeLabelLayer(viewModel: viewModel)
           }
-          .frame(
-            width: max(proxy.size.width, viewModel.canvasContentSize.width * viewModel.zoom),
-            height: max(proxy.size.height, viewModel.canvasContentSize.height * viewModel.zoom),
-            alignment: .topLeading
-          )
-          .contentShape(Rectangle())
-          .dropDestination(for: String.self) { payloads, location in
-            viewModel.dropPalettePayloads(
-              payloads,
-              at: viewModel.canvasPoint(for: location)
-            )
-          }
-          .onTapGesture {
-            viewModel.select(nil)
-          }
-          .overlay {
-            PolicyCanvasEmptyStatePlaceholder(viewModel: viewModel)
-              .allowsHitTesting(false)
-          }
+          .scaleEffect(viewModel.zoom, anchor: .topLeading)
+          .coordinateSpace(.named(PolicyCanvasCoordinateSpaces.canvas))
         }
-        .scrollIndicators(.visible)
-        .background(Color(red: 0.03, green: 0.04, blue: 0.06))
-        .clipShape(Rectangle())
-        .overlay(alignment: .bottomLeading) {
-          PolicyCanvasZoomControls(viewModel: viewModel)
-            .padding(14)
-        }
-        .simultaneousGesture(magnifyGesture)
-        .onAppear {
-          centerViewportIfNeeded(scrollProxy)
-        }
-        .onChange(of: viewModel.viewportCenteringGeneration, initial: false) {
-          centerViewportIfNeeded(scrollProxy)
-        }
-      }
-    }
-    // P57: `.contain` is paired only with `.accessibilityIdentifier` here (no
-    // parent label) so the rotor + children stay exposed without the
-    // VoiceOver "stops on every child of a labelled element" footgun. Two
-    // rotors live below: "Nodes" walks the visual focus order so VO users
-    // can hop across the graph; "Edges" lists every wired connection.
-    .accessibilityElement(children: .contain)
-    .accessibilityRotor("Nodes") {
-      // P25: rotor entries built lazily from the focus-order id list; we map
-      // ids to labels per-iteration so the rotor content closure never
-      // captures live node values across frames. Anchoring the rotor entry
-      // on the node's identifier delegates ring focus to the
-      // `.accessibilityFocused` modifier on the matching node card.
-      ForEach(viewModel.accessibilityNodeFocusOrder(), id: \.self) { nodeID in
-        if let node = viewModel.node(nodeID) {
-          AccessibilityRotorEntry(
-            viewModel.accessibilityLabel(for: node),
-            id: nodeID
+        .frame(
+          width: max(proxy.size.width, viewModel.canvasContentSize.width * viewModel.zoom),
+          height: max(proxy.size.height, viewModel.canvasContentSize.height * viewModel.zoom),
+          alignment: .topLeading
+        )
+        .contentShape(Rectangle())
+        .dropDestination(for: String.self) { payloads, location in
+          viewModel.dropPalettePayloads(
+            payloads,
+            at: viewModel.canvasPoint(for: location)
           )
         }
+        .onTapGesture {
+          viewModel.select(nil)
+        }
+        .overlay {
+          PolicyCanvasEmptyStatePlaceholder(viewModel: viewModel)
+            .allowsHitTesting(false)
+        }
       }
-    }
-    .accessibilityRotor("Edges") {
-      ForEach(viewModel.edges, id: \.id) { edge in
-        AccessibilityRotorEntry(
-          viewModel.accessibilityLabel(for: edge),
-          id: edge.id
+      .scrollPosition($scrollPosition)
+      .scrollIndicators(.visible)
+      .background(Color(red: 0.03, green: 0.04, blue: 0.06))
+      .clipShape(Rectangle())
+      .overlay(alignment: .bottomLeading) {
+        PolicyCanvasZoomControls(viewModel: viewModel)
+          .padding(14)
+      }
+      .simultaneousGesture(magnifyGesture)
+      .onModifierKeysChanged(mask: .command, initial: true) { _, newModifiers in
+        currentModifiers = newModifiers
+      }
+      .onContinuousHover(coordinateSpace: .local) { phase in
+        switch phase {
+        case .active(let location):
+          hoveredViewportPoint = location
+        case .ended:
+          hoveredViewportPoint = nil
+        }
+      }
+      .onScrollGeometryChange(
+        for: CGPoint.self,
+        of: \.contentOffset
+      ) { oldOffset, newOffset in
+        handleScrollOffsetChange(
+          oldOffset: oldOffset,
+          newOffset: newOffset,
+          viewportSize: proxy.size
         )
       }
+      .onAppear {
+        restoreViewportPosition(for: proxy.size)
+      }
+      .onChange(of: viewModel.viewportCenteringGeneration, initial: false) {
+        restoreViewportPosition(for: proxy.size)
+      }
+      .onChange(of: scrollPosition, initial: false) { _, newPosition in
+        if let point = newPosition.point {
+          viewModel.viewportScrollPoint = point
+        }
+      }
+      .onChange(of: proxy.size, initial: false) { _, newSize in
+        if viewModel.consumeViewportCenteringRequest() {
+          centerViewport(for: newSize)
+        }
+      }
     }
+    .accessibilityElement(children: .contain)
     .accessibilityFrameMarker(HarnessMonitorAccessibility.policyCanvasViewport)
   }
 
-  private func centerViewportIfNeeded(_ scrollProxy: ScrollViewProxy) {
-    guard viewModel.consumeViewportCenteringRequest() else {
+  private func restoreViewportPosition(for viewportSize: CGSize) {
+    if viewModel.consumeViewportCenteringRequest() {
+      centerViewport(for: viewportSize)
       return
     }
-    Task { @MainActor in
-      await Task.yield()
-      scrollProxy.scrollTo(PolicyCanvasLayout.initialViewportAnchorID, anchor: .center)
+    if let point = viewModel.viewportScrollPoint {
+      scrollPosition = ScrollPosition(point: point)
     }
+  }
+
+  private func centerViewport(for viewportSize: CGSize) {
+    let point = viewModel.initialViewportScrollPoint(for: viewportSize)
+    viewModel.viewportScrollPoint = point
+    scrollPosition = ScrollPosition(point: point)
+  }
+
+  private func handleScrollOffsetChange(
+    oldOffset: CGPoint,
+    newOffset: CGPoint,
+    viewportSize: CGSize
+  ) {
+    if isRestoringCommandScrollPosition {
+      isRestoringCommandScrollPosition = false
+      return
+    }
+    guard
+      let deltaY = policyCanvasCommandScrollDeltaY(
+        isCommandModified: currentModifiers.contains(.command),
+        oldOffset: oldOffset,
+        newOffset: newOffset
+      )
+    else {
+      return
+    }
+    let location =
+      hoveredViewportPoint
+      ?? CGPoint(
+        x: viewportSize.width / 2,
+        y: viewportSize.height / 2
+      )
+    zoomByCommandScroll(
+      deltaY: deltaY,
+      location: location,
+      scrollPoint: oldOffset,
+      viewportSize: viewportSize
+    )
+  }
+
+  private func zoomByCommandScroll(
+    deltaY: CGFloat,
+    location: CGPoint,
+    scrollPoint: CGPoint? = nil,
+    viewportSize: CGSize
+  ) {
+    let oldZoom = viewModel.zoom
+    let currentScrollPoint =
+      scrollPoint ?? viewModel.viewportScrollPoint ?? scrollPosition.point ?? .zero
+    let canvasPoint = CGPoint(
+      x: (currentScrollPoint.x + location.x) / oldZoom,
+      y: (currentScrollPoint.y + location.y) / oldZoom
+    )
+    guard viewModel.zoomByCommandScroll(deltaY: deltaY) else {
+      return
+    }
+    let nextScrollPoint = viewModel.viewportScrollPoint(
+      keepingCanvasPoint: canvasPoint,
+      atViewportPoint: location,
+      viewportSize: viewportSize
+    )
+    viewModel.viewportScrollPoint = nextScrollPoint
+    isRestoringCommandScrollPosition = true
+    scrollPosition = ScrollPosition(point: nextScrollPoint)
   }
 
   private var magnifyGesture: some Gesture {
@@ -128,6 +182,25 @@ struct PolicyCanvasViewport: View {
         magnifyStartZoom = nil
       }
   }
+}
+
+func policyCanvasCommandScrollDeltaY(
+  isCommandModified: Bool,
+  oldOffset: CGPoint,
+  newOffset: CGPoint
+) -> CGFloat? {
+  guard isCommandModified else {
+    return nil
+  }
+  let deltaY = oldOffset.y - newOffset.y
+  if abs(deltaY) >= 0.1 {
+    return deltaY
+  }
+  let deltaX = oldOffset.x - newOffset.x
+  if abs(deltaX) >= 0.1 {
+    return deltaX
+  }
+  return nil
 }
 
 private struct PolicyCanvasDottedGrid: View {
@@ -168,7 +241,6 @@ private struct PolicyCanvasDottedGrid: View {
 
 private struct PolicyCanvasGroupLayer: View {
   let viewModel: PolicyCanvasViewModel
-  let focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
 
   var body: some View {
     ForEach(viewModel.groups) { group in
@@ -177,8 +249,7 @@ private struct PolicyCanvasGroupLayer: View {
         isSelected: viewModel.selection == .group(group.id),
         isHighlighted: viewModel.highlightedGroupID == group.id
       )
-      .offset(x: group.frame.minX, y: group.frame.minY)
-      .accessibilityFocused(focusedComponent, equals: .group(group.id))
+      .position(x: group.frame.midX, y: group.frame.midY)
       .gesture(
         DragGesture(minimumDistance: 3)
           .onChanged { value in
@@ -261,8 +332,8 @@ private struct PolicyCanvasEdgeLayer: View {
 
 private struct PolicyCanvasEdgeLabelLayer: View {
   let viewModel: PolicyCanvasViewModel
-  let focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
-  @Environment(\.fontScale) private var fontScale
+  @Environment(\.fontScale)
+  private var fontScale
 
   var body: some View {
     let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
@@ -303,7 +374,6 @@ private struct PolicyCanvasEdgeLabelLayer: View {
           }
           .harnessPlainButtonStyle()
           .position(route.labelPosition)
-          .accessibilityFocused(focusedComponent, equals: .edge(edge.id))
           .accessibilityLabel(viewModel.accessibilityLabel(for: edge))
           .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEdge(edge.id))
           .contextMenu {
@@ -319,69 +389,5 @@ private struct PolicyCanvasEdgeLabelLayer: View {
   private func edgeColor(for edge: PolicyCanvasEdge) -> Color {
     viewModel.node(edge.source.nodeID)?.kind.accentColor ?? Color.cyan
   }
-}
 
-private struct PolicyCanvasEdgeLabelMetrics {
-  let horizontalPadding: CGFloat
-  let minWidth: CGFloat
-  let height: CGFloat
-
-  init(fontScale: CGFloat) {
-    let scale = min(SessionWindowFontScale.metricsScale(for: fontScale), 1.45)
-    horizontalPadding = (12 * scale).rounded(.up)
-    minWidth = (88 * scale).rounded(.up)
-    height = max(
-      PolicyCanvasLayout.edgeLabelHeight,
-      (PolicyCanvasLayout.edgeLabelHeight * scale).rounded(.up)
-    )
-  }
-}
-
-private struct PolicyCanvasEdgeShape: Shape {
-  let route: PolicyCanvasEdgeRoute
-
-  func path(in rect: CGRect) -> Path {
-    var path = Path()
-    guard let firstPoint = route.points.first else {
-      return path
-    }
-    path.move(to: firstPoint)
-    for point in route.points.dropFirst() {
-      path.addLine(to: point)
-    }
-    return path
-  }
-}
-
-private struct PolicyCanvasGroupRegion: View {
-  let group: PolicyCanvasGroup
-  let isSelected: Bool
-  let isHighlighted: Bool
-
-  var body: some View {
-    ZStack(alignment: .topLeading) {
-      RoundedRectangle(cornerRadius: PolicyCanvasLayout.groupCornerRadius)
-        .fill(group.tone.color.opacity(isHighlighted ? 0.24 : 0.16))
-        .overlay {
-          RoundedRectangle(cornerRadius: PolicyCanvasLayout.groupCornerRadius)
-            .stroke(
-              group.tone.color.opacity(isSelected || isHighlighted ? 0.88 : 0.42),
-              style: StrokeStyle(lineWidth: isSelected ? 1.6 : 1, dash: [6, 5])
-            )
-        }
-
-      Text(group.title)
-        .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(group.tone.color.opacity(0.95))
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(.black.opacity(0.34), in: Capsule())
-        .padding(10)
-    }
-    .frame(width: group.frame.width, height: group.frame.height)
-    .contentShape(Rectangle())
-    .accessibilityElement(children: .combine)
-    .accessibilityLabel(group.title)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasGroup(group.id))
-  }
 }

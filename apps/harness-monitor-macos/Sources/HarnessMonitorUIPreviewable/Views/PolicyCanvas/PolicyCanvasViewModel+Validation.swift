@@ -20,7 +20,7 @@ enum PolicyCanvasIssueSeverity: Int, Comparable {
   case error = 0
   case warning = 1
 
-  static func < (lhs: PolicyCanvasIssueSeverity, rhs: PolicyCanvasIssueSeverity) -> Bool {
+  static func < (lhs: Self, rhs: Self) -> Bool {
     lhs.rawValue < rhs.rawValue
   }
 
@@ -34,7 +34,7 @@ enum PolicyCanvasIssueSeverity: Int, Comparable {
   /// Map a daemon-emitted code to a severity tier. Anything not explicitly
   /// classified falls back to `.warning` so unknown future codes still render
   /// in the panel and stay visible to the user.
-  static func from(code: String) -> PolicyCanvasIssueSeverity {
+  static func from(code: String) -> Self {
     switch code {
     case "cycle",
       "dangling_edge",
@@ -324,7 +324,8 @@ extension PolicyCanvasViewModel {
       hasEdge.insert(edge.source.nodeID)
       hasEdge.insert(edge.target.nodeID)
     }
-    return nodes
+    return
+      nodes
       .filter { node in
         node.groupID == nil && !hasEdge.contains(node.id)
       }

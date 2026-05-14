@@ -335,7 +335,6 @@ public enum HarnessMonitorAccessibility {
   public static let policyCanvasSimulateButton = "harness.policy-canvas.action.simulate"
   public static let policyCanvasPromoteButton = "harness.policy-canvas.action.promote"
   public static let policyCanvasReloadButton = "harness.policy-canvas.action.reload"
-  public static let policyCanvasSimulationToggle = "harness.policy-canvas.action.simulation-overlay"
   public static let policyCanvasZoomControls = "harness.policy-canvas.zoom"
   public static let policyCanvasZoomOutButton = "harness.policy-canvas.zoom.out"
   public static let policyCanvasZoomInButton = "harness.policy-canvas.zoom.in"
@@ -348,16 +347,6 @@ public enum HarnessMonitorAccessibility {
   public static let policyCanvasPromoteDisabledReason =
     "harness.policy-canvas.action.promote.reason"
   public static let policyCanvasEmptyState = "harness.policy-canvas.empty-state"
-  public static let policyCanvasSearchPalette = "harness.policy-canvas.search.palette"
-  public static let policyCanvasSearchField = "harness.policy-canvas.search.field"
-  public static let policyCanvasSearchDismissButton = "harness.policy-canvas.search.dismiss"
-  public static let policyCanvasSearchEmptyHint = "harness.policy-canvas.search.empty"
-  public static let policyCanvasSearchNoMatch = "harness.policy-canvas.search.no-match"
-  public static let policyCanvasSearchLiveRegion = "harness.policy-canvas.search.live-region"
-
-  public static func policyCanvasSearchResult(_ hitID: String) -> String {
-    "harness.policy-canvas.search.result.\(slug(hitID))"
-  }
 
   public static func policyCanvasInspectorField(_ fieldID: String) -> String {
     "harness.policy-canvas.inspector.\(slug(fieldID))"
@@ -391,10 +380,6 @@ public enum HarnessMonitorAccessibility {
     "harness.policy-canvas.palette.\(slug(kind))"
   }
 
-  public static func policyCanvasSimulationBadge(_ nodeID: String) -> String {
-    "harness.policy-canvas.simulation-badge.\(slug(nodeID))"
-  }
-
   public static func settingsAuthorizedFolderRow(_ id: String) -> String {
     "harness.settings.authorized-folders.row.\(id)"
   }
@@ -408,20 +393,4 @@ public enum HarnessMonitorAccessibility {
   public static let voiceInputFailureInstructions = "harness.voice-input.failure.instructions"
   public static let voiceInputFailureRetryButton = "harness.voice-input.failure.retry"
   public static let voiceInputFailureCloseButton = "harness.voice-input.failure.close"
-}
-
-/// Policy-canvas autosave decompensation + recovery affordances. Split out
-/// into an extension to keep the parent enum body within the
-/// `type_body_length` lint ceiling.
-extension HarnessMonitorAccessibility {
-  public static let policyCanvasAutosaveDisabledAffordance =
-    "harness.policy-canvas.autosave.disabled"
-  public static let policyCanvasAutosaveDisabledRetryButton =
-    "harness.policy-canvas.autosave.disabled.retry"
-  public static let policyCanvasRecoveryAffordance =
-    "harness.policy-canvas.autosave.recovery"
-  public static let policyCanvasRecoveryButton =
-    "harness.policy-canvas.autosave.recovery.button"
-  public static let policyCanvasRecoveryDismissButton =
-    "harness.policy-canvas.autosave.recovery.dismiss"
 }

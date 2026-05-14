@@ -76,41 +76,70 @@ extension PolicyCanvasViewModel {
     }
   }
 
-  /// Removes the node and every edge incident on it. Clears the selection
-  /// only when the deleted node was selected — foreign selections survive so
-  /// the user's editing target persists across cascade deletes. Routes
-  /// through the `mutate(_:)` funnel so the inverse (restoreNode with
-  /// incident edges) lands on the undo stack.
+  /// Removes the node and every edge incident on it. Clears the selection only
+  /// when the deleted node was selected — foreign selections survive so the
+  /// user's editing target persists across cascade deletes.
   func deleteNode(_ id: String) {
-    guard nodes.contains(where: { $0.id == id }) else {
+    guard let nodeIndex = nodes.firstIndex(where: { $0.id == id }) else {
       return
     }
-    let priorSelection = selection
-    mutate(.removeNode(id: id, priorSelection: priorSelection))
+    let title = nodes[nodeIndex].title
+    nodes.remove(at: nodeIndex)
+    edges.removeAll { edge in
+      edge.source.nodeID == id || edge.target.nodeID == id
+    }
+    cleanEphemeralNodeIDs.remove(id)
+    cleanEphemeralEdgeIDs = cleanEphemeralEdgeIDs.filter { edgeID in
+      edges.contains { $0.id == edgeID }
+    }
+    if selection == .node(id) {
+      selection = nil
+    }
+    reconcileGroupFrames()
+    documentDirty = true
+    clearTransientGestureState()
+    invalidateValidationCache()
+    notifyStatus("Deleted \(title)")
   }
 
   /// Removes the edge by id. Connected nodes are left intact. Clears the
-  /// selection only when the deleted edge was the active selection. Routes
-  /// through the `mutate(_:)` funnel so the inverse re-adds the edge.
+  /// selection only when the deleted edge was the active selection.
   func deleteEdge(_ id: String) {
-    guard edges.contains(where: { $0.id == id }) else {
+    guard let edgeIndex = edges.firstIndex(where: { $0.id == id }) else {
       return
     }
-    let priorSelection = selection
-    mutate(.removeEdge(id: id, priorSelection: priorSelection))
+    let label = edges[edgeIndex].label
+    edges.remove(at: edgeIndex)
+    cleanEphemeralEdgeIDs.remove(id)
+    if selection == .edge(id) {
+      selection = nil
+    }
+    documentDirty = true
+    clearTransientGestureState()
+    invalidateValidationCache()
+    notifyStatus("Deleted \(label) connection")
   }
 
   /// Removes the group container but keeps every member node on the canvas;
   /// each affected node has its `groupID` cleared. Clears the selection only
-  /// when the deleted group was the active selection. Routes through the
-  /// `mutate(_:)` funnel so the inverse (restoreGroup + re-attach members)
-  /// lands on the undo stack.
+  /// when the deleted group was the active selection.
   func deleteGroup(_ id: String) {
-    guard groups.contains(where: { $0.id == id }) else {
+    guard let groupIndex = groups.firstIndex(where: { $0.id == id }) else {
       return
     }
-    let priorSelection = selection
-    mutate(.removeGroup(id: id, priorSelection: priorSelection))
+    let title = groups[groupIndex].title
+    groups.remove(at: groupIndex)
+    for index in nodes.indices where nodes[index].groupID == id {
+      nodes[index].groupID = nil
+    }
+    if selection == .group(id) {
+      selection = nil
+    }
+    reconcileGroupFrames()
+    documentDirty = true
+    clearTransientGestureState()
+    invalidateValidationCache()
+    notifyStatus("Deleted \(title)")
   }
 
   private func incidentEdges(for nodeID: String) -> [PolicyCanvasEdge] {

@@ -38,7 +38,7 @@ extension PolicyCanvasViewModel {
       return
     }
     groups[index].title = title
-    markDocumentDirty()
+    documentDirty = true
     invalidateValidationCache()
     notifyStatus("Group title updated")
   }
@@ -51,7 +51,7 @@ extension PolicyCanvasViewModel {
     }
     edges[index].label = label
     markEdgeEdited(id)
-    markDocumentDirty()
+    documentDirty = true
     invalidateValidationCache()
     notifyStatus("Edge label updated")
   }
@@ -125,7 +125,7 @@ extension PolicyCanvasViewModel {
     }
     markNodeEdited(id)
     update(&nodes[index])
-    markDocumentDirty()
+    documentDirty = true
     invalidateValidationCache()
   }
 

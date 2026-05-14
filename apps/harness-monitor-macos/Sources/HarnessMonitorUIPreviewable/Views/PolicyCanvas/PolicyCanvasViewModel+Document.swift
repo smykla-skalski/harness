@@ -115,11 +115,6 @@ extension PolicyCanvasViewModel {
     setPendingUpdate(nil)
     invalidateValidationCache()
     requestViewportCentering()
-    // Cross-revision load replaces the editable graph wholesale. The undo
-    // stack from the previous revision references node/group/edge ids that
-    // may no longer exist; replaying an inverse against the freshly loaded
-    // graph would either crash on missing ids or restore stale state.
-    clearUndoStack()
     notifyStatus("Loaded revision \(document.revision)")
   }
 
@@ -185,25 +180,10 @@ extension PolicyCanvasViewModel {
     selection = snapshot.selection
     latestSimulation = snapshot.latestSimulation
     reconcileGroupFrames()
-    // Write `documentDirty` directly (NOT through `markDocumentDirty`) and
-    // pre-arm the one-shot suppression so the autosave loop does not fire
-    // on the rollback's dirty flip. Without this guard, a daemon reject
-    // would auto-retry the same rejected payload every debounce window.
-    if markDirty {
-      autosaveSuppressed = true
-    }
     documentDirty = markDirty
     clearTransientGestureState()
     resetPaletteDropPlacement()
     invalidateValidationCache()
-    // A rejected daemon round-trip is not a replayable user action — drop
-    // the undo stack so Cmd-Z doesn't replay the rejected payload (or
-    // worse, undo the rollback and re-arm the next autosave to fire the
-    // rejected payload back at the daemon). Foreign actions (text-field
-    // undo from outside the canvas) survive because `clearUndoStack`
-    // removes only target-keyed actions; the runloop tick that follows
-    // closes any in-flight event group automatically.
-    clearUndoStack()
     notifyStatus(reason)
   }
 

@@ -24,7 +24,9 @@ struct HarnessMonitorAppBundleMetadataTests {
     let infoPlistURL = monitorAppRoot()
       .appendingPathComponent("Resources/HarnessMonitor-Info.plist", isDirectory: false)
     let infoPlist = try loadDictionaryPlist(at: infoPlistURL)
-    let exportedTypeDeclarations = try #require(infoPlist["UTExportedTypeDeclarations"] as? [[String: Any]])
+    let exportedTypeDeclarations = try #require(
+      infoPlist["UTExportedTypeDeclarations"] as? [[String: Any]]
+    )
     let exportedTypeIdentifiers = Set(
       exportedTypeDeclarations.compactMap { $0["UTTypeIdentifier"] as? String }
     )
@@ -33,7 +35,7 @@ struct HarnessMonitorAppBundleMetadataTests {
       "io.harnessmonitor.task",
       "io.harnessmonitor.session-agent",
       "io.harnessmonitor.task-board-item",
-      "io.harnessmonitor.task-board-inbox-item"
+      "io.harnessmonitor.task-board-inbox-item",
     ] {
       #expect(exportedTypeIdentifiers.contains(identifier))
     }

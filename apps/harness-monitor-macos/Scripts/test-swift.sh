@@ -23,6 +23,7 @@ XCODE_ONLY_TESTING="${XCODE_ONLY_TESTING:-}"
 BUILD_FOR_TESTING_SCRIPT="${BUILD_FOR_TESTING_SCRIPT:-$ROOT/Scripts/build-for-testing.sh}"
 TEST_RETRY_ITERATIONS="${HARNESS_MONITOR_TEST_RETRY_ITERATIONS:-0}"
 TEST_LOCK_WAIT_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS:-15}"
+FOCUSED_UI_TEST_TIMEOUT_SECONDS="${HARNESS_MONITOR_FOCUSED_UI_TEST_TIMEOUT_SECONDS:-45}"
 CODE_SIGNING_ALLOWED_SETTING=""
 export XCODEBUILD_DERIVED_DATA_PATH="$DERIVED_DATA_PATH"
 
@@ -89,6 +90,16 @@ run_test_action() {
   done < <(test_lane_env)
 
   if [[ -n "$XCODE_ONLY_TESTING" ]]; then
+    if selector_requests_ui_tests; then
+      run_focused_ui_test_action_with_timeout \
+        env \
+          "${focused_env[@]}" \
+          HARNESS_SKIP_STALE_CHECK=1 \
+          HARNESS_MONITOR_DISABLE_XCBEAUTIFY=1 \
+          "$XCODEBUILD_RUNNER" "${TEST_ARGS[@]}"
+      return "$?"
+    fi
+
     exec env \
       "${focused_env[@]}" \
       HARNESS_SKIP_STALE_CHECK=1 \
@@ -97,6 +108,37 @@ run_test_action() {
   else
     exec env HARNESS_SKIP_STALE_CHECK=1 "$XCODEBUILD_RUNNER" "${TEST_ARGS[@]}"
   fi
+}
+
+selector_requests_ui_tests() {
+  case "$XCODE_ONLY_TESTING" in
+    *HarnessMonitorUITests*|*HarnessMonitorAgentsE2ETests*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+run_focused_ui_test_action_with_timeout() {
+  if (( FOCUSED_UI_TEST_TIMEOUT_SECONDS <= 0 )); then
+    exec "$@"
+  fi
+
+  "$@" &
+  local child_pid="$!"
+  local deadline=$((SECONDS + FOCUSED_UI_TEST_TIMEOUT_SECONDS))
+
+  while kill -0 "$child_pid" 2>/dev/null; do
+    if (( SECONDS >= deadline )); then
+      printf 'error: focused UI test action exceeded %ss; terminating xcodebuild runner\n' \
+        "$FOCUSED_UI_TEST_TIMEOUT_SECONDS" >&2
+      terminate_descendant_processes "$child_pid"
+      kill -TERM "$child_pid" 2>/dev/null || true
+      wait "$child_pid" 2>/dev/null || true
+      return 124
+    fi
+    sleep 1
+  done
+
+  wait "$child_pid"
 }
 
 run_only_testing_enumeration() {
