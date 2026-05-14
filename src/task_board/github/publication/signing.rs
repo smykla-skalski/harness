@@ -15,6 +15,7 @@ use crate::task_board::{TaskBoardGitRuntimeProfile, TaskBoardGitSigningMode};
 use super::snapshot_error;
 use super::types::{
     GitHubCommitAuthorRequest, LocalBranchSnapshot, LocalCommitAuthor, LocalCommitSignature,
+    NativeGitTransportReason, RestCommitSignatureBoundary,
 };
 
 pub(super) fn commit_author(
@@ -126,14 +127,41 @@ pub(super) fn publication_signature(
             Ok(Some(signature.clone()))
         }
         (TaskBoardGitSigningMode::Gpg, _) => unreachable!("GPG signing handled before match"),
-        (TaskBoardGitSigningMode::Ssh, _) | (_, Some(LocalCommitSignature::Ssh)) => {
-            Err(unsupported_ssh_signing_error())
+        (TaskBoardGitSigningMode::Ssh, _) => Err(native_git_transport_required_error(
+            NativeGitTransportReason::ConfiguredSshSigning,
+        )),
+        (_, Some(LocalCommitSignature::Ssh)) => Err(native_git_transport_required_error(
+            NativeGitTransportReason::ExistingSshSignature,
+        )),
+        (_, Some(LocalCommitSignature::Unsupported)) => {
+            Err(CliError::from(CliErrorKind::workflow_io(
+                "task-board github commit contains an unsupported signature type",
+            )))
+        }
+    }
+}
+
+pub(super) fn rest_commit_signature_boundary(
+    profile: &TaskBoardGitRuntimeProfile,
+    signature: Option<&LocalCommitSignature>,
+) -> Result<RestCommitSignatureBoundary, CliError> {
+    match (profile.signing.mode, signature) {
+        (TaskBoardGitSigningMode::Ssh, _) => {
+            Ok(RestCommitSignatureBoundary::NativeGitTransportRequired(
+                NativeGitTransportReason::ConfiguredSshSigning,
+            ))
+        }
+        (_, Some(LocalCommitSignature::Ssh)) => {
+            Ok(RestCommitSignatureBoundary::NativeGitTransportRequired(
+                NativeGitTransportReason::ExistingSshSignature,
+            ))
         }
         (_, Some(LocalCommitSignature::Unsupported)) => {
             Err(CliError::from(CliErrorKind::workflow_io(
                 "task-board github commit contains an unsupported signature type",
             )))
         }
+        _ => Ok(RestCommitSignatureBoundary::RestSupported),
     }
 }
 
@@ -141,23 +169,22 @@ pub(super) fn validate_rest_publication_signature_support(
     profile: &TaskBoardGitRuntimeProfile,
     signature: Option<&LocalCommitSignature>,
 ) -> Result<(), CliError> {
-    match (profile.signing.mode, signature) {
-        (TaskBoardGitSigningMode::Ssh, _) | (_, Some(LocalCommitSignature::Ssh)) => {
-            Err(unsupported_ssh_signing_error())
+    match rest_commit_signature_boundary(profile, signature)? {
+        RestCommitSignatureBoundary::RestSupported => Ok(()),
+        RestCommitSignatureBoundary::NativeGitTransportRequired(reason) => {
+            Err(native_git_transport_required_error(reason))
         }
-        (_, Some(LocalCommitSignature::Unsupported)) => {
-            Err(CliError::from(CliErrorKind::workflow_io(
-                "task-board github commit contains an unsupported signature type",
-            )))
-        }
-        _ => Ok(()),
     }
 }
 
-fn unsupported_ssh_signing_error() -> CliError {
-    CliError::from(CliErrorKind::workflow_io(
-        "task-board github SSH commit signing is unsupported by REST publication; configure GPG signing with a runtime-config private key path or use native Git transport",
-    ))
+fn native_git_transport_required_error(reason: NativeGitTransportReason) -> CliError {
+    let reason = match reason {
+        NativeGitTransportReason::ConfiguredSshSigning => "configured SSH commit signing",
+        NativeGitTransportReason::ExistingSshSignature => "an existing SSH commit signature",
+    };
+    CliError::from(CliErrorKind::workflow_io(format!(
+        "task-board github REST commit creation accepts only PGP signatures; {reason} requires native Git object creation and transport, which this publisher does not implement"
+    )))
 }
 
 fn validate_git_actor_field(label: &str, value: &str) -> Result<(), CliError> {
@@ -346,18 +373,27 @@ mod tests {
             ..Default::default()
         };
 
+        let boundary = rest_commit_signature_boundary(&profile, None)
+            .expect("configured ssh boundary is representable");
+        assert_eq!(
+            boundary,
+            RestCommitSignatureBoundary::NativeGitTransportRequired(
+                NativeGitTransportReason::ConfiguredSshSigning
+            )
+        );
+
         let error = validate_rest_publication_signature_support(&profile, None)
             .expect_err("ssh signing mode error");
 
         assert!(
             error
                 .to_string()
-                .contains("SSH commit signing is unsupported")
+                .contains("REST commit creation accepts only PGP signatures")
         );
         assert!(
             error
                 .to_string()
-                .contains("runtime-config private key path")
+                .contains("requires native Git object creation and transport")
         );
     }
 
@@ -370,7 +406,7 @@ mod tests {
         assert!(
             error
                 .to_string()
-                .contains("SSH commit signing is unsupported")
+                .contains("REST commit creation accepts only PGP signatures")
         );
     }
 
@@ -382,10 +418,18 @@ mod tests {
             validate_rest_publication_signature_support(&profile, Some(&LocalCommitSignature::Ssh))
                 .expect_err("ssh signature error");
 
+        assert_eq!(
+            rest_commit_signature_boundary(&profile, Some(&LocalCommitSignature::Ssh))
+                .expect("ssh boundary"),
+            RestCommitSignatureBoundary::NativeGitTransportRequired(
+                NativeGitTransportReason::ExistingSshSignature
+            )
+        );
+
         assert!(
             error
                 .to_string()
-                .contains("SSH commit signing is unsupported")
+                .contains("REST commit creation accepts only PGP signatures")
         );
     }
 

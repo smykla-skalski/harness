@@ -86,13 +86,13 @@ pub(crate) async fn publish_branch_from_worktree_async(
     branch: &str,
 ) -> Result<(), CliError> {
     let snapshot = load_local_branch_snapshot(worktree, config.repository_slug()).await?;
+    let Some(mode) = publication_mode(client, config, branch, &snapshot).await? else {
+        return Ok(());
+    };
     validate_rest_publication_signature_support(
         &snapshot.profile,
         snapshot.existing_signature.as_ref(),
     )?;
-    let Some(mode) = publication_mode(client, config, branch, &snapshot).await? else {
-        return Ok(());
-    };
     let root_tree_sha = upload_tree(client, config, &snapshot.root_tree).await?;
     let commit_sha =
         create_commit(client, config, &snapshot, &root_tree_sha, mode.parent_sha()).await?;
