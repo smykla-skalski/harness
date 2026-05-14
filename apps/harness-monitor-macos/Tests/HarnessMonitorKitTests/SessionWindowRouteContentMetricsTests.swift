@@ -179,6 +179,8 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(overviewSource.contains("TaskBoardOrchestratorRunOnceRequest(itemId: item.id"))
     #expect(overviewSource.contains("onEvaluateTaskBoardItem(item)"))
     #expect(!overviewSource.contains("if !item.hasLinkedSessionTask"))
+    #expect(overviewSource.contains("shouldOpenLinkedTask("))
+    #expect(overviewSource.contains("snapshot.items.contains"))
     #expect(managementPanelSource.contains("Session Task"))
     #expect(managementPanelSource.contains("Board Only"))
     #expect(managementPanelSource.contains("Evaluate Item"))
@@ -195,22 +197,40 @@ struct SessionWindowRouteContentMetricsTests {
 
     #expect(overviewSource.contains("lane.taskBoardDropStatus"))
     #expect(laneSource.contains("TaskBoardItemDragPayload"))
+    #expect(laneSource.contains("TaskBoardInboxItemDragPayload"))
     #expect(laneSource.contains("let status: TaskBoardStatus"))
     #expect(laneSource.contains("TaskBoardLaneDropPolicy.moveFirstPayload("))
+    #expect(laneSupportSource.contains("TaskBoardInboxDropPolicy"))
     #expect(laneSupportSource.contains("payload.sourceLane != destination"))
     #expect(needsYouSource.contains("payload.sourceLane != .needsYou"))
     #expect(laneSource.contains(".draggable(dragPayload)"))
     #expect(laneSource.contains(".dropDestination(for: TaskBoardItemDragPayload.self"))
+    #expect(laneSource.contains(".dropDestination(for: TaskBoardInboxItemDragPayload.self"))
     #expect(needsYouSource.contains(".dropDestination(for: TaskBoardItemDragPayload.self"))
+  }
+
+  @Test("Task board lanes use flat column chrome")
+  func taskBoardLanesUseFlatColumnChrome() throws {
+    let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
+    let laneSupportSource = try taskBoardSourceFile(named: "TaskBoardLaneSupport.swift")
+    let overviewSource = try taskBoardSourceFile(named: "TaskBoardOverviewView.swift")
+
+    #expect(laneSource.contains(".taskBoardLaneColumnChrome("))
+    #expect(laneSupportSource.contains("private struct TaskBoardLaneColumnChrome"))
+    #expect(!laneSource.contains("private var laneAccentColor: Color"))
+    #expect(!laneSource.contains("strokeBorder(laneStrokeColor"))
+    #expect(!overviewSource.contains("Board-owned work awaiting progression."))
+    #expect(!overviewSource.contains("Open work pulled from active sessions."))
   }
 
   @Test("Task board lanes expose overflow rows for capped columns")
   func taskBoardLanesExposeOverflowRowsForCappedColumns() throws {
     let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
+    let laneSupportSource = try taskBoardSourceFile(named: "TaskBoardLaneSupport.swift")
     let needsYouSource = try taskBoardSourceFile(named: "TaskBoardNeedsYouLaneViews.swift")
 
     #expect(laneSource.contains("TaskBoardLaneOverflowRow(hiddenCount: section.items.count - 5)"))
-    #expect(laneSource.contains("Text(\"+\\(hiddenCount) more\")"))
+    #expect(laneSupportSource.contains("Text(\"+\\(hiddenCount) more\")"))
     #expect(needsYouSource.contains("TaskBoardLaneOverflowRow(hiddenCount: hiddenItemCount)"))
   }
 

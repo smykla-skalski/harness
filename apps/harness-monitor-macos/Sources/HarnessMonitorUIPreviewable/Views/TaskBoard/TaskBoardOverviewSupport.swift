@@ -23,6 +23,62 @@ struct TaskBoardOverviewMetrics: Equatable {
   }
 }
 
+struct TaskBoardSummaryPill: View {
+  let value: String
+  let label: String
+  let systemImage: String?
+  let tint: Color
+
+  init(
+    value: String,
+    label: String,
+    systemImage: String? = nil,
+    tint: Color = HarnessMonitorTheme.secondaryInk
+  ) {
+    self.value = value
+    self.label = label
+    self.systemImage = systemImage
+    self.tint = tint
+  }
+
+  var body: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingXS) {
+      if let systemImage {
+        Image(systemName: systemImage)
+          .scaledFont(.caption.weight(.semibold))
+          .accessibilityHidden(true)
+      }
+      Text(label)
+        .scaledFont(.caption)
+      Text(value)
+        .scaledFont(.caption.weight(.bold))
+        .monospacedDigit()
+    }
+    .foregroundStyle(tint)
+    .harnessPillPadding()
+    .harnessContentPill(tint: tint)
+  }
+}
+
+struct TaskBoardSection<Content: View>: View {
+  let title: String
+  let content: Content
+
+  init(title: String, @ViewBuilder content: () -> Content) {
+    self.title = title
+    self.content = content()
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      Text(title)
+        .scaledFont(.headline.weight(.semibold))
+        .accessibilityAddTraits(.isHeader)
+      content
+    }
+  }
+}
+
 extension TaskBoardItem {
   var hasLinkedSessionTask: Bool {
     sessionId != nil && workItemId != nil
@@ -30,6 +86,21 @@ extension TaskBoardItem {
 }
 
 extension TaskBoardInboxLane {
+  var taskDropStatus: TaskStatus? {
+    switch self {
+    case .needsYou:
+      nil
+    case .ready, .backlog:
+      .open
+    case .running:
+      .inProgress
+    case .review:
+      .awaitingReview
+    case .blocked:
+      .blocked
+    }
+  }
+
   var taskBoardDropStatus: TaskBoardStatus {
     switch self {
     case .needsYou:
@@ -44,6 +115,164 @@ extension TaskBoardInboxLane {
       .blocked
     case .backlog:
       .new
+    }
+  }
+}
+
+extension TaskBoardOverviewView {
+  var taskBoardSections: [TaskBoardItemSection] {
+    TaskBoardInboxLane.allCases.map { lane in
+      TaskBoardItemSection(
+        lane: lane,
+        items: taskBoardItems.filter { TaskBoardInboxLane(status: $0.status) == lane }
+      )
+    }
+  }
+
+  var taskBoardReviewCount: Int {
+    taskBoardItems.count { TaskBoardInboxLane(status: $0.status) == .review }
+  }
+
+  var taskBoardNeedsYouCount: Int {
+    taskBoardItems.count { TaskBoardInboxLane(status: $0.status) == .needsYou }
+  }
+
+  var taskBoardBlockedCount: Int {
+    taskBoardItems.count { TaskBoardInboxLane(status: $0.status) == .blocked }
+  }
+
+  var aggregateNeedsYouCount: Int {
+    taskBoardNeedsYouCount + snapshot.needsYouItemCount + decisions.count
+  }
+
+  var aggregateOpenCount: Int {
+    taskBoardItems.count + snapshot.items.count + decisions.count
+  }
+
+  var aggregateReviewCount: Int {
+    taskBoardReviewCount + snapshot.reviewItemCount
+  }
+
+  var aggregateBlockedCount: Int {
+    taskBoardBlockedCount + snapshot.blockedItemCount
+  }
+
+  var hasAggregateSummary: Bool {
+    aggregateNeedsYouCount != 0 || aggregateOpenCount != 0 || aggregateReviewCount != 0
+      || aggregateBlockedCount != 0
+  }
+
+  @ViewBuilder var aggregateSummaryContent: some View {
+    if aggregateNeedsYouCount != 0 {
+      TaskBoardSummaryPill(
+        value: "\(aggregateNeedsYouCount)",
+        label: "Needs You",
+        systemImage: TaskBoardInboxLane.needsYou.systemImage,
+        tint: taskBoardLaneColor(for: .needsYou)
+      )
+    }
+    if aggregateOpenCount != 0 {
+      TaskBoardSummaryPill(
+        value: "\(aggregateOpenCount)",
+        label: "Open",
+        systemImage: "rectangle.stack",
+        tint: HarnessMonitorTheme.secondaryInk
+      )
+    }
+    if aggregateReviewCount != 0 {
+      TaskBoardSummaryPill(
+        value: "\(aggregateReviewCount)",
+        label: "Review",
+        systemImage: TaskBoardInboxLane.review.systemImage,
+        tint: taskBoardLaneColor(for: .review)
+      )
+    }
+    if aggregateBlockedCount != 0 {
+      TaskBoardSummaryPill(
+        value: "\(aggregateBlockedCount)",
+        label: "Blocked",
+        systemImage: TaskBoardInboxLane.blocked.systemImage,
+        tint: taskBoardLaneColor(for: .blocked)
+      )
+    }
+  }
+
+  @ViewBuilder
+  func evaluationSummaryContent(_ summary: TaskBoardEvaluationSummary) -> some View {
+    TaskBoardSummaryPill(
+      value: "\(summary.evaluated)/\(summary.total)",
+      label: "Evaluated",
+      systemImage: "checkmark.seal",
+      tint: HarnessMonitorTheme.secondaryInk
+    )
+    if summary.updated != 0 {
+      TaskBoardSummaryPill(
+        value: "\(summary.updated)",
+        label: "Updated",
+        systemImage: "arrow.triangle.2.circlepath",
+        tint: HarnessMonitorTheme.accent
+      )
+    }
+    if summary.failed + summary.blocked != 0 {
+      TaskBoardSummaryPill(
+        value: "\(summary.failed + summary.blocked)",
+        label: "Blocked",
+        systemImage: TaskBoardInboxLane.blocked.systemImage,
+        tint: HarnessMonitorTheme.danger
+      )
+    }
+  }
+
+  static func sortedTaskBoardItems(_ items: [TaskBoardItem]) -> [TaskBoardItem] {
+    items
+      .filter { TaskBoardInboxLane(status: $0.status) != nil && $0.deletedAt == nil }
+      .sorted { left, right in
+        if left.priority != right.priority {
+          return priorityRank(left.priority) > priorityRank(right.priority)
+        }
+        if left.updatedAt != right.updatedAt {
+          return left.updatedAt > right.updatedAt
+        }
+        return left.id < right.id
+      }
+  }
+
+  static func priorityRank(_ priority: TaskBoardPriority) -> Int {
+    switch priority {
+    case .critical:
+      3
+    case .high:
+      2
+    case .medium:
+      1
+    case .low:
+      0
+    }
+  }
+
+  static func sortedDecisions(_ decisions: [Decision]) -> [Decision] {
+    decisions
+      .filter { $0.statusRaw == "open" }
+      .sorted { left, right in
+        if severityRank(left.severityRaw) != severityRank(right.severityRaw) {
+          return severityRank(left.severityRaw) > severityRank(right.severityRaw)
+        }
+        return left.createdAt < right.createdAt
+      }
+  }
+
+  static func severityRank(_ severity: String) -> Int {
+    switch DecisionSeverity(rawValue: severity) {
+    case .critical:
+      3
+    case .needsUser:
+      2
+    case .warn:
+      1
+    case .info:
+      0
+    case .none:
+      0
     }
   }
 }

@@ -8,30 +8,37 @@ extension TaskBoardAPIClientTests {
     TaskBoardURLProtocol.reset()
     let client = try makeClient()
 
+    try await performHTTPItemCalls(client)
+    let workflow = try await performHTTPWorkflowCalls(client)
+    let orchestrator = try await performHTTPOrchestratorCalls(client)
+    let settings = try await performHTTPSettingsCalls(client)
+    let tokenSync = try await performHTTPGitHubTokenCalls(client)
+    try await performHTTPDiscoveryCalls(client)
+
+    return TaskBoardHTTPContractResult(
+      dispatch: workflow.dispatch,
+      sync: workflow.sync,
+      evaluation: workflow.evaluation,
+      status: orchestrator.status,
+      runOnce: orchestrator.runOnce,
+      updatedSettings: settings.updatedSettings,
+      runtimeConfig: settings.runtimeConfig,
+      updatedRuntimeConfig: settings.updatedRuntimeConfig,
+      tokenSync: tokenSync
+    )
+  }
+
+  private func performHTTPItemCalls(_ client: HarnessMonitorAPIClient) async throws {
     _ = try await client.taskBoardItems(status: .todo)
     _ = try await client.taskBoardItem(id: "board-1")
-    _ = try await client.createTaskBoardItem(
-      request: TaskBoardCreateItemRequest(
-        title: "Board item",
-        body: "Body",
-        priority: .high,
-        agentMode: .interactive,
-        tags: ["automation"],
-        projectId: "project-1",
-        sessionId: "sess-1",
-        workItemId: "task-1",
-        id: "board-1"
-      )
-    )
-    _ = try await client.updateTaskBoardItem(
-      id: "board-1",
-      request: TaskBoardUpdateItemRequest(
-        status: .inProgress,
-        clearSessionId: true,
-        clearWorkItemId: true
-      )
-    )
+    _ = try await client.createTaskBoardItem(request: httpCreateItemRequest())
+    _ = try await client.updateTaskBoardItem(id: "board-1", request: httpUpdateItemRequest())
     _ = try await client.deleteTaskBoardItem(id: "board-1")
+  }
+
+  private func performHTTPWorkflowCalls(
+    _ client: HarnessMonitorAPIClient
+  ) async throws -> TaskBoardHTTPWorkflowResult {
     let sync = try await client.syncTaskBoard(
       request: TaskBoardSyncRequest(
         status: .todo,
@@ -49,17 +56,25 @@ extension TaskBoardAPIClientTests {
       )
     )
     let evaluation = try await client.evaluateTaskBoard(
-      request: TaskBoardEvaluateRequest(
-        status: .inProgress,
-        itemId: "board-1",
-        dryRun: false
-      )
+      request: TaskBoardEvaluateRequest(status: .inProgress, itemId: "board-1", dryRun: false)
     )
     _ = try await client.auditTaskBoard(status: .blocked)
+    return TaskBoardHTTPWorkflowResult(sync: sync, dispatch: dispatch, evaluation: evaluation)
+  }
+
+  private func performHTTPOrchestratorCalls(
+    _ client: HarnessMonitorAPIClient
+  ) async throws -> TaskBoardHTTPOrchestratorResult {
     let status = try await client.taskBoardOrchestratorStatus()
     _ = try await client.startTaskBoardOrchestrator()
     _ = try await client.stopTaskBoardOrchestrator()
     let runOnce = try await client.runTaskBoardOrchestratorOnce()
+    return TaskBoardHTTPOrchestratorResult(status: status, runOnce: runOnce)
+  }
+
+  private func performHTTPSettingsCalls(
+    _ client: HarnessMonitorAPIClient
+  ) async throws -> TaskBoardHTTPSettingsResult {
     _ = try await client.taskBoardOrchestratorSettings()
     let updatedSettings = try await client.updateTaskBoardOrchestratorSettings(
       request: TaskBoardOrchestratorSettingsUpdateRequest(
@@ -83,30 +98,19 @@ extension TaskBoardAPIClientTests {
     )
     let runtimeConfig = try await client.taskBoardGitRuntimeConfig()
     let updatedRuntimeConfig = try await client.updateTaskBoardGitRuntimeConfig(
-      request: TaskBoardGitRuntimeConfig(
-        global: TaskBoardGitRuntimeProfile(
-          authorName: "Harness Bot",
-          authorEmail: "bot@example.com",
-          sshKeyPath: "/Users/test/.ssh/id_ed25519",
-          signing: TaskBoardGitSigningConfig(
-            mode: .ssh,
-            sshKeyPath: "/Users/test/.ssh/id_signing"
-          )
-        ),
-        repositoryOverrides: [
-          TaskBoardGitRepositoryOverride(
-            repository: "kong/harness",
-            profile: TaskBoardGitRuntimeProfile(
-              authorName: "Repo Bot",
-              authorEmail: "repo@example.com",
-              sshKeyPath: "/Users/test/.ssh/id_repo",
-              signing: TaskBoardGitSigningConfig(mode: .gpg, gpgKeyId: "ABC123")
-            )
-          )
-        ]
-      )
+      request: taskBoardRuntimeConfigUpdateRequest()
     )
-    let tokenSync = try await client.syncTaskBoardGitHubTokens(
+    return TaskBoardHTTPSettingsResult(
+      updatedSettings: updatedSettings,
+      runtimeConfig: runtimeConfig,
+      updatedRuntimeConfig: updatedRuntimeConfig
+    )
+  }
+
+  private func performHTTPGitHubTokenCalls(
+    _ client: HarnessMonitorAPIClient
+  ) async throws -> TaskBoardGitHubTokensSyncResponse {
+    try await client.syncTaskBoardGitHubTokens(
       request: TaskBoardGitHubTokensSyncRequest(
         globalToken: "ghu_global",
         repositoryTokens: [
@@ -114,19 +118,32 @@ extension TaskBoardAPIClientTests {
         ]
       )
     )
+  }
+
+  private func performHTTPDiscoveryCalls(_ client: HarnessMonitorAPIClient) async throws {
     _ = try await client.taskBoardProjects(status: .todo)
     _ = try await client.taskBoardMachines(status: .todo)
+  }
 
-    return TaskBoardHTTPContractResult(
-      dispatch: dispatch,
-      sync: sync,
-      evaluation: evaluation,
-      status: status,
-      runOnce: runOnce,
-      updatedSettings: updatedSettings,
-      runtimeConfig: runtimeConfig,
-      updatedRuntimeConfig: updatedRuntimeConfig,
-      tokenSync: tokenSync
+  private func httpCreateItemRequest() -> TaskBoardCreateItemRequest {
+    TaskBoardCreateItemRequest(
+      title: "Board item",
+      body: "Body",
+      priority: .high,
+      agentMode: .interactive,
+      tags: ["automation"],
+      projectId: "project-1",
+      sessionId: "sess-1",
+      workItemId: "task-1",
+      id: "board-1"
+    )
+  }
+
+  private func httpUpdateItemRequest() -> TaskBoardUpdateItemRequest {
+    TaskBoardUpdateItemRequest(
+      status: .inProgress,
+      clearSessionId: true,
+      clearWorkItemId: true
     )
   }
 
@@ -269,4 +286,21 @@ struct TaskBoardHTTPContractResult {
   let runtimeConfig: TaskBoardGitRuntimeConfig
   let updatedRuntimeConfig: TaskBoardGitRuntimeConfig
   let tokenSync: TaskBoardGitHubTokensSyncResponse
+}
+
+private struct TaskBoardHTTPWorkflowResult {
+  let sync: TaskBoardSyncSummary
+  let dispatch: TaskBoardDispatchSummary
+  let evaluation: TaskBoardEvaluationSummary
+}
+
+private struct TaskBoardHTTPOrchestratorResult {
+  let status: TaskBoardOrchestratorStatus
+  let runOnce: TaskBoardOrchestratorRunOnceResponse
+}
+
+private struct TaskBoardHTTPSettingsResult {
+  let updatedSettings: TaskBoardOrchestratorSettings
+  let runtimeConfig: TaskBoardGitRuntimeConfig
+  let updatedRuntimeConfig: TaskBoardGitRuntimeConfig
 }

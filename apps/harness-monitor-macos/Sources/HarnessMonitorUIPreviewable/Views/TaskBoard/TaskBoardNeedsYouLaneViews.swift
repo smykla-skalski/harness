@@ -8,21 +8,25 @@ struct TaskBoardNeedsYouLaneColumn: View {
   let onOpenItem: (TaskBoardItem) -> Void
   let onMoveItem: (String, TaskBoardInboxLane) -> Bool
   let onOpenDecision: (Decision) -> Void
+  @Environment(\.fontScale)
+  private var fontScale
   @State private var isDropTargeted = false
+
+  private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
 
   private var itemCount: Int {
     section.items.count + decisions.count
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+    VStack(alignment: .leading, spacing: metrics.laneSpacing) {
       TaskBoardLaneHeader(lane: .needsYou, count: itemCount)
 
       Group {
         if section.items.isEmpty && decisions.isEmpty {
           TaskBoardEmptyLane(lane: .needsYou)
         } else {
-          VStack(spacing: HarnessMonitorTheme.spacingSM) {
+          VStack(spacing: metrics.laneSpacing) {
             ForEach(decisions.prefix(4), id: \.id) { decision in
               TaskBoardDecisionRow(decision: decision, onOpenDecision: onOpenDecision)
             }
@@ -35,7 +39,7 @@ struct TaskBoardNeedsYouLaneColumn: View {
       }
       .taskBoardLaneBodyChrome(lane: .needsYou, isDropTargeted: isDropTargeted)
     }
-    .taskBoardLaneColumnChrome(lane: .needsYou)
+    .taskBoardLaneColumnChrome(lane: .needsYou, isDropTargeted: isDropTargeted)
     .dropDestination(for: TaskBoardItemDragPayload.self, action: handleDrop) { targeted in
       isDropTargeted = targeted
     }
@@ -61,17 +65,29 @@ struct TaskBoardNeedsYouLaneColumn: View {
 struct TaskBoardDecisionRow: View {
   let decision: Decision
   let onOpenDecision: (Decision) -> Void
+  private let primaryActionTitle: String
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
+
+  init(decision: Decision, onOpenDecision: @escaping (Decision) -> Void) {
+    self.decision = decision
+    self.onOpenDecision = onOpenDecision
+    primaryActionTitle = Self.resolvePrimaryActionTitle(for: decision)
+  }
 
   var body: some View {
     Button {
       onOpenDecision(decision)
     } label: {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
-          Image(systemName: "person.crop.circle.badge.exclamationmark")
-            .foregroundStyle(severityColor)
-            .frame(width: 16)
-            .padding(.top, 1)
+      VStack(alignment: .leading, spacing: metrics.laneSpacing) {
+        HStack(alignment: .top, spacing: metrics.laneSpacing) {
+          TaskBoardCardLeadingIcon(
+            systemImage: "person.crop.circle.badge.exclamationmark",
+            tint: severityColor
+          )
+          .padding(.top, metrics.cardMarkerTopPadding)
           VStack(alignment: .leading, spacing: 3) {
             Text(decision.summary)
               .scaledFont(.subheadline.weight(.semibold))
@@ -86,30 +102,20 @@ struct TaskBoardDecisionRow: View {
           }
           Spacer(minLength: 0)
         }
-        HStack(spacing: HarnessMonitorTheme.spacingXS) {
-          taskPill("Decision", color: severityColor)
-          if let scope = scopeLabel {
-            taskPill(scope, color: HarnessMonitorTheme.secondaryInk)
+        ViewThatFits(in: .horizontal) {
+          HStack(spacing: metrics.laneBodyTopPadding) {
+            badgeContent
           }
-          taskPill(primaryActionTitle, color: HarnessMonitorTheme.accent)
+          VStack(alignment: .leading, spacing: metrics.laneBodyTopPadding) {
+            badgeContent
+          }
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .frame(minHeight: 86, alignment: .topLeading)
-      .padding(HarnessMonitorTheme.spacingMD)
+      .frame(minHeight: metrics.cardMinHeight, alignment: .topLeading)
+      .padding(metrics.cardPadding)
     }
-    .harnessInteractiveCardButtonStyle(cornerRadius: 8)
-    .background(.background.opacity(0.56), in: .rect(cornerRadius: 8))
-    .overlay(alignment: .leading) {
-      Rectangle()
-        .fill(severityColor.opacity(0.82))
-        .frame(width: 3)
-        .clipShape(.rect(topLeadingRadius: 8, bottomLeadingRadius: 8))
-    }
-    .overlay(
-      RoundedRectangle(cornerRadius: 8)
-        .stroke(HarnessMonitorTheme.danger.opacity(0.45), lineWidth: 1)
-    )
+    .taskBoardCardChrome()
     .accessibilityIdentifier("harness.task-board.decision.\(decision.id)")
   }
 
@@ -139,7 +145,15 @@ struct TaskBoardDecisionRow: View {
     return nil
   }
 
-  private var primaryActionTitle: String {
+  @ViewBuilder private var badgeContent: some View {
+    TaskBoardCardPill(label: "Decision", tint: severityColor)
+    if let scopeLabel {
+      TaskBoardCardPill(label: scopeLabel, tint: HarnessMonitorTheme.secondaryInk)
+    }
+    TaskBoardCardPill(label: primaryActionTitle, tint: HarnessMonitorTheme.accent)
+  }
+
+  private static func resolvePrimaryActionTitle(for decision: Decision) -> String {
     guard
       let actions = try? JSONDecoder().decode(
         [SuggestedAction].self,
@@ -149,15 +163,5 @@ struct TaskBoardDecisionRow: View {
       return "Open"
     }
     return actions.first?.title ?? "Open"
-  }
-
-  private func taskPill(_ label: String, color: Color) -> some View {
-    Text(label)
-      .scaledFont(.caption2.weight(.bold))
-      .foregroundStyle(color)
-      .lineLimit(1)
-      .padding(.horizontal, 9)
-      .padding(.vertical, 4)
-      .background(color.opacity(0.16), in: .capsule)
   }
 }
