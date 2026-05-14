@@ -189,10 +189,13 @@ extension PolicyCanvasViewModel {
     clearTransientGestureState()
     resetPaletteDropPlacement()
     invalidateValidationCache()
-    // Discard the rejected attempt's history. The user's mental model on a
-    // daemon-reject restore is "throw away that try" — keeping the rejected
-    // mutations in the undo stack would let Cmd+Z replay edits the daemon
-    // already refused, which is more confusing than a clean break.
+    // A rejected daemon round-trip is not a replayable user action — drop
+    // the undo stack so Cmd-Z doesn't replay the rejected payload (or
+    // worse, undo the rollback and re-arm the next autosave to fire the
+    // rejected payload back at the daemon). Foreign actions (text-field
+    // undo from outside the canvas) survive because `clearUndoStack`
+    // removes only target-keyed actions; the runloop tick that follows
+    // closes any in-flight event group automatically.
     clearUndoStack()
     notifyStatus(reason)
   }
