@@ -23,6 +23,21 @@ extension HarnessMonitorStore {
     selectedTimelinePreferredWindowLimit = normalizedLimit
   }
 
+  /// Resolve the timeline window after a streaming push delivers a new timeline
+  /// snapshot. Preserves `hasOlder` / `totalCount` / `windowStart` from the
+  /// existing in-memory window so paged loads (`appendSelectedTimelineOlderChunk`)
+  /// keep working after live updates. Falls back to synthetic metadata only when
+  /// no prior window existed.
+  func mergedTimelineWindowAfterPush(
+    payloadTimeline: [TimelineEntry]?
+  ) -> TimelineWindowResponse? {
+    guard let payloadTimeline else {
+      return timelineWindow
+    }
+    return normalizedTimelineWindow(timelineWindow, loadedTimeline: payloadTimeline)
+      ?? TimelineWindowResponse.fallbackMetadata(for: payloadTimeline)
+  }
+
   func normalizedTimelineWindow(
     _ timelineWindow: TimelineWindowResponse?,
     loadedTimeline: [TimelineEntry]
