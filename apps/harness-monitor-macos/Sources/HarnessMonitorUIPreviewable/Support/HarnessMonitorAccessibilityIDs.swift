@@ -341,9 +341,22 @@ public enum HarnessMonitorAccessibility {
   public static let policyCanvasZoomResetButton = "harness.policy-canvas.zoom.reset"
   public static let policyCanvasZoomValue = "harness.policy-canvas.zoom.value"
   public static let policyCanvasInspector = "harness.policy-canvas.inspector"
+  public static let policyCanvasValidationPanel = "harness.policy-canvas.validation"
+  public static let policyCanvasValidationToggle = "harness.policy-canvas.validation.toggle"
+  public static let policyCanvasValidationEmpty = "harness.policy-canvas.validation.empty"
+  public static let policyCanvasPromoteDisabledReason =
+    "harness.policy-canvas.action.promote.reason"
 
   public static func policyCanvasInspectorField(_ fieldID: String) -> String {
     "harness.policy-canvas.inspector.\(slug(fieldID))"
+  }
+
+  public static func policyCanvasValidationRow(_ issueID: String) -> String {
+    "harness.policy-canvas.validation.row.\(slug(issueID))"
+  }
+
+  public static func policyCanvasValidationFocusButton(_ issueID: String) -> String {
+    "harness.policy-canvas.validation.focus.\(slug(issueID))"
   }
 
   public static func policyCanvasNode(_ nodeID: String) -> String {

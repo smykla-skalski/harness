@@ -73,6 +73,13 @@ public struct PolicyCanvasView: View {
         promote: requestPromote
       )
 
+      PolicyCanvasValidationPanel(
+        viewModel: viewModel,
+        focus: { resolved in
+          viewModel.focusIssue(resolved)
+        }
+      )
+
       HStack(spacing: 0) {
         PolicyCanvasToolRail(viewModel: viewModel)
 
@@ -218,6 +225,11 @@ public struct PolicyCanvasView: View {
   }
 
   private func saveDraft() {
+    // Local pre-flight runs before snapshot so the user gets fast feedback on
+    // cycles + orphans. Soft warning only — daemon is authoritative, and the
+    // snapshot/restore frame around exportDocument() handles rollback on
+    // daemon rejection.
+    _ = viewModel.runLocalPreflight()
     let snapshot = viewModel.snapshotState()
     let document = viewModel.exportDocument()
     Task { @MainActor in

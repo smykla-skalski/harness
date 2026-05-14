@@ -45,6 +45,20 @@ final class PolicyCanvasViewModel {
   @ObservationIgnored var cleanEphemeralNodeIDs: Set<String> = []
   @ObservationIgnored var cleanEphemeralEdgeIDs: Set<String> = []
 
+  /// Severity-map cache for the validator hot path. `@ObservationIgnored` is
+  /// load-bearing: if SwiftUI observed this slot, every body that reads
+  /// `nodeSeverityMap` / `edgeSeverityMap` would re-run on cache write
+  /// (which itself is triggered by the same body reading the map) and the
+  /// cache would defeat itself. Writes go through `cachedSeverityMaps()`.
+  @ObservationIgnored var validationCacheStorage: ValidationCacheEntry?
+
+  /// Bumped by `invalidateValidationCache()` from every mutation site that
+  /// can change validator output without touching the count-style token
+  /// fields (drag end, position adjustment, group reflow). Folded into
+  /// `ValidationCacheToken` so a drag-only frame still invalidates the
+  /// cached maps.
+  @ObservationIgnored var validationInvalidationGeneration: UInt64 = 0
+
   init(
     selectedTab: PolicyCanvasTab = .draft,
     nodes: [PolicyCanvasNode],
@@ -164,6 +178,7 @@ final class PolicyCanvasViewModel {
     reconcileGroupFrames()
     selection = .node(node.id)
     documentDirty = true
+    invalidateValidationCache()
     notifyStatus("\(kind.title) node added")
   }
 
@@ -206,6 +221,11 @@ final class PolicyCanvasViewModel {
     reconcileGroupFrames()
     nodeDragOrigins[nodeID] = nil
     highlightedGroupID = nil
+    // Drag-only mutation: token count fields don't change, but orphan
+    // grouping changes can flip the validator. Bump generation here, not
+    // in `dragNode` — pinging the cache 60 times during a drag would
+    // shadow the very rebuild we're trying to avoid.
+    invalidateValidationCache()
   }
 
   func dragGroup(_ groupID: String, translation: CGSize) {
@@ -237,6 +257,9 @@ final class PolicyCanvasViewModel {
     groupDragOrigins[groupID] = nil
     groupNodeDragOrigins[groupID] = nil
     highlightedGroupID = nil
+    // Group drag moves nodes inside the group; same rationale as
+    // `endNodeDrag` — bump on the end-of-gesture, not every tick.
+    invalidateValidationCache()
   }
 
   func setInputTargeted(
@@ -287,6 +310,7 @@ final class PolicyCanvasViewModel {
     selection = .edge(edge.id)
     highlightedInput = nil
     documentDirty = true
+    invalidateValidationCache()
     notifyStatus("Edge created")
     return true
   }

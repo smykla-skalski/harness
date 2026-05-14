@@ -65,6 +65,7 @@ extension PolicyCanvasViewModel {
     guard let document else {
       if let incoming = simulation ?? audit?.latestSimulation {
         latestSimulation = incoming
+        invalidateValidationCache()
       }
       return
     }
@@ -74,6 +75,7 @@ extension PolicyCanvasViewModel {
     if let backing = backingDocument, backing.revision == document.revision {
       if let incoming = simulation ?? audit?.latestSimulation {
         latestSimulation = incoming
+        invalidateValidationCache()
       }
       return
     }
@@ -98,6 +100,7 @@ extension PolicyCanvasViewModel {
     documentDirty = false
     viewportDirty = false
     setPendingUpdate(nil)
+    invalidateValidationCache()
     notifyStatus("Loaded revision \(document.revision)")
   }
 

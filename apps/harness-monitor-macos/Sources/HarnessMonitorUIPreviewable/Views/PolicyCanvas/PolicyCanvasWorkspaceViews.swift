@@ -129,6 +129,7 @@ private struct PolicyCanvasEdgeLayer: View {
   let viewModel: PolicyCanvasViewModel
 
   var body: some View {
+    let severityMap = viewModel.edgeSeverityMap
     ZStack(alignment: .topLeading) {
       ForEach(Array(viewModel.edges.enumerated()), id: \.element.id) { offset, edge in
         if let source = viewModel.portAnchor(for: edge.source),
@@ -142,10 +143,15 @@ private struct PolicyCanvasEdgeLayer: View {
             sourceGroupID: viewModel.node(edge.source.nodeID)?.groupID,
             targetGroupID: viewModel.node(edge.target.nodeID)?.groupID
           )
+          let severity = severityMap[edge.id]
           PolicyCanvasEdgeShape(route: route)
             .stroke(
-              edgeColor(for: edge).opacity(viewModel.selection == .edge(edge.id) ? 0.95 : 0.62),
-              style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round)
+              strokeColor(for: edge, severity: severity),
+              style: StrokeStyle(
+                lineWidth: severity == nil ? 2.2 : 3.0,
+                lineCap: .round,
+                lineJoin: .round
+              )
             )
             .accessibilityHidden(true)
         }
@@ -209,6 +215,22 @@ private struct PolicyCanvasEdgeLabelLayer: View {
   private func edgeColor(for edge: PolicyCanvasEdge) -> Color {
     viewModel.node(edge.source.nodeID)?.kind.accentColor ?? Color.cyan
   }
+
+  /// Severity-aware stroke color. When the edge has at least one resolved
+  /// validation issue the stroke flips to the issue's accent tone (red for
+  /// errors, yellow for warnings) so the inline mark stays in sync with the
+  /// panel. Selection still bumps opacity for affordance feedback. Pulls
+  /// severity from the body-local map so per-edge lookups stay O(1).
+  private func strokeColor(
+    for edge: PolicyCanvasEdge,
+    severity: PolicyCanvasIssueSeverity?
+  ) -> Color {
+    let selected = viewModel.selection == .edge(edge.id)
+    if let severity {
+      return severity.accentColor.opacity(selected ? 0.98 : 0.82)
+    }
+    return edgeColor(for: edge).opacity(selected ? 0.95 : 0.62)
+  }
 }
 
 private struct PolicyCanvasEdgeShape: Shape {
@@ -264,10 +286,12 @@ private struct PolicyCanvasNodeLayer: View {
   let viewModel: PolicyCanvasViewModel
 
   var body: some View {
+    let severityMap = viewModel.nodeSeverityMap
     ForEach(viewModel.nodes) { node in
       PolicyCanvasNodeCard(
         node: node,
         isSelected: viewModel.selection == .node(node.id),
+        severity: severityMap[node.id],
         viewModel: viewModel
       )
       .offset(x: node.position.x, y: node.position.y)
@@ -290,6 +314,7 @@ private struct PolicyCanvasNodeLayer: View {
 private struct PolicyCanvasNodeCard: View {
   let node: PolicyCanvasNode
   let isSelected: Bool
+  let severity: PolicyCanvasIssueSeverity?
   let viewModel: PolicyCanvasViewModel
 
   var body: some View {
@@ -298,7 +323,7 @@ private struct PolicyCanvasNodeCard: View {
         .fill(Color(red: 0.10, green: 0.12, blue: 0.16).opacity(0.95))
         .overlay {
           RoundedRectangle(cornerRadius: 8)
-            .stroke(node.kind.accentColor.opacity(isSelected ? 0.95 : 0.34), lineWidth: 1.2)
+            .stroke(strokeColor, lineWidth: severity == nil ? 1.2 : 1.8)
         }
         .shadow(color: .black.opacity(0.34), radius: 12, x: 0, y: 8)
 
@@ -345,11 +370,59 @@ private struct PolicyCanvasNodeCard: View {
         alignment: .trailing,
         viewModel: viewModel
       )
+
+      if let severity {
+        severityBadge(for: severity)
+      }
     }
     .frame(width: PolicyCanvasLayout.nodeSize.width, height: PolicyCanvasLayout.nodeSize.height)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(viewModel.accessibilityLabel(for: node))
-    .accessibilityValue(viewModel.accessibilityValue(for: node))
+    .accessibilityValue(accessibilityValue)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasNode(node.id))
+  }
+
+  private var strokeColor: Color {
+    if let severity {
+      return severity.accentColor.opacity(isSelected ? 0.98 : 0.82)
+    }
+    return node.kind.accentColor.opacity(isSelected ? 0.95 : 0.34)
+  }
+
+  private var accessibilityValue: String {
+    let base = viewModel.accessibilityValue(for: node)
+    guard let severity else {
+      return base
+    }
+    let issues = viewModel.allValidationIssues
+      .filter { resolved in
+        resolved.issue.nodeId == node.id || resolved.issue.nodeIds.contains(node.id)
+      }
+      .map { resolved in
+        resolved.issue.message
+      }
+      .joined(separator: "; ")
+    let prefix = "invalid: \(severity.displayLabel) - \(issues)"
+    return base.isEmpty ? prefix : "\(prefix). \(base)"
+  }
+
+  private func severityBadge(for severity: PolicyCanvasIssueSeverity) -> some View {
+    VStack {
+      HStack {
+        Spacer()
+        Image(systemName: severity.systemImage)
+          .scaledFont(.system(size: 13, weight: .semibold))
+          .foregroundStyle(severity.accentColor)
+          .padding(4)
+          .background(.black.opacity(0.68), in: Circle())
+          .overlay {
+            Circle()
+              .stroke(severity.accentColor.opacity(0.85), lineWidth: 1)
+          }
+          .offset(x: 8, y: -8)
+          .accessibilityHidden(true)
+      }
+      Spacer()
+    }
   }
 }

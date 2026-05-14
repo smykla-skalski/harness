@@ -41,10 +41,12 @@ struct PolicyCanvasInspector: View {
   @ViewBuilder private var selectionDetails: some View {
     if let node = viewModel.selectedNode {
       nodeSection(node)
+      PolicyCanvasInspectorIssuesSection(viewModel: viewModel, selection: .node(node.id))
     } else if let group = viewModel.selectedGroup {
       groupSection(group)
     } else if let edge = viewModel.selectedEdge {
       edgeSection(edge)
+      PolicyCanvasInspectorIssuesSection(viewModel: viewModel, selection: .edge(edge.id))
     } else {
       canvasSection
     }
@@ -359,12 +361,31 @@ struct PolicyCanvasInspector: View {
         label: "Promote",
         value: viewModel.promoteDisabledReason ?? "Ready"
       )
-      if let validation = viewModel.latestSimulation?.validation {
-        PolicyCanvasInspectorRow(
-          label: "Validation",
-          value: validation.issues.first?.code ?? "OK"
-        )
-      }
+      PolicyCanvasInspectorRow(
+        label: "Validation",
+        value: validationSummary
+      )
     }
+  }
+
+  /// Validation summary surfaced in the inspector footer. Reports the full
+  /// daemon + local issue count so the user sees how many issues exist
+  /// without expanding the chrome panel. Stays "OK" when both producers are
+  /// clean, distinct from "No data" before a simulation has been run.
+  private var validationSummary: String {
+    let issues = viewModel.allValidationIssues
+    if issues.isEmpty {
+      return viewModel.latestSimulation == nil ? "No data" : "OK"
+    }
+    let errors = issues.filter { $0.severity == .error }.count
+    let warnings = issues.filter { $0.severity == .warning }.count
+    var parts: [String] = []
+    if errors > 0 {
+      parts.append("\(errors) error\(errors == 1 ? "" : "s")")
+    }
+    if warnings > 0 {
+      parts.append("\(warnings) warning\(warnings == 1 ? "" : "s")")
+    }
+    return parts.joined(separator: ", ")
   }
 }

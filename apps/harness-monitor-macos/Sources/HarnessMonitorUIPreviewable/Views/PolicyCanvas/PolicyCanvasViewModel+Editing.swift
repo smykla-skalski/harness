@@ -39,6 +39,7 @@ extension PolicyCanvasViewModel {
     }
     groups[index].title = title
     documentDirty = true
+    invalidateValidationCache()
     notifyStatus("Group title updated")
   }
 
@@ -51,6 +52,7 @@ extension PolicyCanvasViewModel {
     edges[index].label = label
     markEdgeEdited(id)
     documentDirty = true
+    invalidateValidationCache()
     notifyStatus("Edge label updated")
   }
 
@@ -124,6 +126,7 @@ extension PolicyCanvasViewModel {
     markNodeEdited(id)
     update(&nodes[index])
     documentDirty = true
+    invalidateValidationCache()
   }
 
   private func updateSelectedPolicyKind(
