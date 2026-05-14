@@ -7,6 +7,7 @@ extension SessionWindowFlowTests {
 
     #expect(source.contains(".searchable("))
     #expect(source.contains(".searchSuggestions"))
+    #expect(source.contains(".searchSuggestions(.hidden, for: .content)"))
     #expect(source.contains(".searchCompletion(row.displayTitle)"))
     #expect(source.contains("public struct AppSearchHost: View"))
     #expect(source.contains("public struct AppSearchHostModifier: ViewModifier"))
