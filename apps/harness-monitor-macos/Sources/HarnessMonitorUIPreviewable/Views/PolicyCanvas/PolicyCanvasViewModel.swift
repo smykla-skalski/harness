@@ -18,6 +18,8 @@ final class PolicyCanvasViewModel {
   /// vast majority of the time and keeps the rest of the canvas untouched.
   var secondarySelections: Set<PolicyCanvasSelection>
   var zoom: CGFloat
+  /// Unit-space pinch anchor; see `setZoom(_:anchor:)` in `+Commands.swift`.
+  var pinchAnchorUnit: UnitPoint?
   var highlightedGroupID: String?
   /// Group id that just received a successful node drop. The workspace's
   /// group region reads this to render an "acceptance flash" — a brief
@@ -44,22 +46,11 @@ final class PolicyCanvasViewModel {
   var hasPendingDocumentUpdate: Bool
 
   /// In-flight rubber-band edge preview while the user drags from an output
-  /// port. The rubber-band layer reads this to render the Bézier curve from
-  /// source port to cursor — cursor writes happen at gesture rate
-  /// (~60-120Hz), so every observer that subscribes to this field pays an
-  /// invalidation per frame.
-  ///
-  /// Today the rubber-band layer is the lone in-body reader and it MUST
-  /// invalidate on cursor writes to redraw the curve, so the field stays
-  /// `@Observable`-tracked (a presence-bit-only pattern like
-  /// `pendingDocumentUpdate` / `hasPendingDocumentUpdate` would force the
-  /// rubber-band layer to subscribe through a separate version counter and
-  /// reach back into ignored storage, which is more machinery than the lone
-  /// consumer warrants). Other views (status chrome, accessibility surfaces,
-  /// menu enablement) must read the `hasPendingEdge` presence bit below
-  /// instead — never `pendingEdgePreview != nil` from inside a `body`.
-  ///
-  /// All writes still flow through `beginPendingEdge`/`updatePendingEdgeCursor`/
+  /// port. The rubber-band layer is the lone in-body reader and MUST
+  /// invalidate on cursor writes (~60-120Hz) to redraw the curve, so the
+  /// field stays `@Observable`-tracked. Every other reader (chrome, a11y,
+  /// menu enablement) must subscribe through `hasPendingEdge` below.
+  /// Writes flow through `beginPendingEdge` / `updatePendingEdgeCursor` /
   /// `clearPendingEdge`, which keep this and `hasPendingEdge` in sync.
   var pendingEdgePreview: PolicyCanvasPendingEdgePreview?
 
@@ -226,6 +217,7 @@ final class PolicyCanvasViewModel {
     self.selection = selection
     self.secondarySelections = []
     self.zoom = zoom
+    self.pinchAnchorUnit = nil
     self.backingDocument = nil
     self.latestSimulation = nil
     self.documentDirty = false

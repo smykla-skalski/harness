@@ -1,5 +1,10 @@
 import SwiftUI
 
+// Minimum platform target for the trackpad and gesture APIs below
+// (`MagnifyGesture`, `.scrollIndicators(.visible)`, `.dropDestination(for:)`):
+// macOS 14 / iOS 17. The Monitor app targets macOS 26, so the gestures
+// compile unconditionally; if the deployment target ever drops below 14,
+// these surfaces need an availability gate or AppKit fallback.
 struct PolicyCanvasViewport: View {
   let viewModel: PolicyCanvasViewModel
   let focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
@@ -10,11 +15,22 @@ struct PolicyCanvasViewport: View {
   /// purely viewport state — never set `documentDirty` from this seam.
   var showSimulationOverlay: Bool = false
   @State private var magnifyStartZoom: CGFloat?
+  @State private var zoomFocusDispatcher = PolicyCanvasZoomFocusDispatcher()
+  @State private var zoomFocus: PolicyCanvasZoomFocus?
+  @Environment(\.scenePhase) private var scenePhase
 
   var body: some View {
     GeometryReader { proxy in
       ScrollViewReader { scrollProxy in
         ScrollView([.horizontal, .vertical]) {
+          // Hoist the edges array and the bulk port-anchor map once per
+          // viewport body run, then pass both into the edge layers. Before
+          // this hoist, `PolicyCanvasEdgeLayer` and `PolicyCanvasEdgeLabelLayer`
+          // each rebuilt the same dictionary, doubling the cost per render
+          // cycle. Each layer's body also read `viewModel.edges` twice via
+          // the `@Observable` accessor.
+          let edges = viewModel.edges
+          let portAnchors = viewModel.portAnchors(for: edges)
           ZStack(alignment: .topLeading) {
             PolicyCanvasDottedGrid(spacing: PolicyCanvasLayout.gridSize * viewModel.zoom)
 
@@ -26,15 +42,29 @@ struct PolicyCanvasViewport: View {
 
             ZStack(alignment: .topLeading) {
               PolicyCanvasGroupLayer(viewModel: viewModel, focusedComponent: focusedComponent)
-              PolicyCanvasEdgeLayer(viewModel: viewModel)
+              PolicyCanvasEdgeLayer(
+                viewModel: viewModel,
+                edges: edges,
+                portAnchors: portAnchors
+              )
               PolicyCanvasRubberBandLayer(viewModel: viewModel)
               PolicyCanvasNodeLayer(viewModel: viewModel, focusedComponent: focusedComponent)
               if showSimulationOverlay {
                 PolicyCanvasSimulationLayer(viewModel: viewModel)
               }
-              PolicyCanvasEdgeLabelLayer(viewModel: viewModel, focusedComponent: focusedComponent)
+              PolicyCanvasEdgeLabelLayer(
+                viewModel: viewModel,
+                focusedComponent: focusedComponent,
+                edges: edges,
+                portAnchors: portAnchors
+              )
             }
-            .scaleEffect(viewModel.zoom, anchor: .topLeading)
+            // Pinch zoom uses the unit-space anchor captured on pinch start so
+            // the content under the user's fingers stays under their fingers
+            // as the scale changes. Chrome buttons (Cmd-+, Cmd-=, Cmd--,
+            // Cmd-0) leave `pinchAnchorUnit` nil and fall through to the
+            // canvas top-leading origin, matching the prior visual behavior.
+            .scaleEffect(viewModel.zoom, anchor: viewModel.pinchAnchorUnit ?? .topLeading)
             .coordinateSpace(.named(PolicyCanvasCoordinateSpaces.canvas))
           }
           .frame(
@@ -57,6 +87,10 @@ struct PolicyCanvasViewport: View {
               .allowsHitTesting(false)
           }
         }
+        // ScrollView pan respects the user's natural-scroll setting because
+        // it routes through AppKit's standard scroll machinery (which reads
+        // `NSEvent.isDirectionInvertedFromDevice`). No app-side direction
+        // adjustment needed.
         .scrollIndicators(.visible)
         .background(Color(red: 0.03, green: 0.04, blue: 0.06))
         .clipShape(Rectangle())
@@ -68,13 +102,32 @@ struct PolicyCanvasViewport: View {
           PolicyCanvasShortcutsDisclosure()
             .padding(14)
         }
-        .simultaneousGesture(magnifyGesture)
+        .simultaneousGesture(magnifyGesture(in: proxy.size))
         .onAppear {
           centerViewportIfNeeded(scrollProxy)
+          bindZoomFocusDispatcher()
         }
         .onChange(of: viewModel.viewportCenteringGeneration, initial: false) {
           centerViewportIfNeeded(scrollProxy)
         }
+        .onChange(of: scenePhase) { _, newPhase in
+          // When the scene leaves .active mid-pinch (Cmd-Tab, Mission
+          // Control, modal sheet, window minimize), MagnifyGesture's
+          // .onEnded does not always fire — `magnifyStartZoom` would
+          // otherwise stay non-nil and the next pinch would compute its
+          // baseline against a stale value. Clear the in-flight gesture
+          // state on every transition off .active.
+          if newPhase != .active {
+            magnifyStartZoom = nil
+            viewModel.clearPinchAnchor()
+          }
+        }
+        // Publish the zoom-focus dispatcher into the scene's FocusedValues so
+        // a scene-level CommandGroup can route View-menu items and keyboard
+        // chords (Cmd-+, Cmd-=, Cmd-0) at the live canvas. Identity-based
+        // equality on the dispatcher keeps this from re-publishing on every
+        // viewport body run.
+        .focusedSceneValue(\.harnessPolicyCanvasZoomFocus, zoomFocus)
       }
     }
     // P57: `.contain` is paired only with `.accessibilityIdentifier` here (no
@@ -119,59 +172,63 @@ struct PolicyCanvasViewport: View {
     }
   }
 
-  private var magnifyGesture: some Gesture {
+  /// Wire the in-viewport closures to the dispatcher and publish the focus
+  /// value. Runs once on appear — chrome buttons still mutate the same view
+  /// model methods directly, so a transient nil dispatcher binding is not
+  /// observable from the UI.
+  private func bindZoomFocusDispatcher() {
+    zoomFocusDispatcher.zoomIn = { @MainActor [viewModel] in
+      viewModel.clearPinchAnchor()
+      viewModel.zoomIn()
+    }
+    zoomFocusDispatcher.zoomOut = { @MainActor [viewModel] in
+      viewModel.clearPinchAnchor()
+      viewModel.zoomOut()
+    }
+    zoomFocusDispatcher.resetZoom = { @MainActor [viewModel] in
+      viewModel.clearPinchAnchor()
+      viewModel.resetZoom()
+    }
+    if zoomFocus == nil {
+      zoomFocus = PolicyCanvasZoomFocus(dispatcher: zoomFocusDispatcher)
+    }
+  }
+
+  /// Trackpad pinch gesture. `MagnifyGesture.Value.startAnchor` carries the
+  /// focal point as a unit-space `UnitPoint` over the gesture view's bounds,
+  /// which matches what `.scaleEffect(_:anchor:)` expects. Routing the same
+  /// `UnitPoint` into the view-model's `pinchAnchorUnit` keeps the content
+  /// under the user's fingers stationary in screen space across the pinch.
+  ///
+  /// `magnifyStartZoom` is captured on first `.onChanged` (the value is the
+  /// gesture's baseline zoom, not the running scale), so the per-tick math
+  /// is `baseZoom * value.magnification`. `value.magnification` is 1.0 at
+  /// pinch start and varies from there.
+  private func magnifyGesture(in viewportSize: CGSize) -> some Gesture {
     MagnifyGesture(minimumScaleDelta: 0.01)
       .onChanged { value in
         let baseZoom = magnifyStartZoom ?? viewModel.zoom
         if magnifyStartZoom == nil {
           magnifyStartZoom = baseZoom
         }
-        viewModel.setZoom(baseZoom * value.magnification)
+        viewModel.setZoom(baseZoom * value.magnification, anchor: value.startAnchor)
       }
       .onEnded { _ in
         magnifyStartZoom = nil
+        // Drop the anchor at end-of-gesture so subsequent chrome-button
+        // zooms render from the canvas top-leading origin (matching the
+        // visual contract of Cmd-+ / Cmd-= / Cmd-- / Cmd-0). The viewport
+        // size is captured here only as a future hook — anchors are unit
+        // space, so the dimension is not needed for the clear path.
+        _ = viewportSize
+        viewModel.clearPinchAnchor()
       }
   }
 }
 
-private struct PolicyCanvasDottedGrid: View {
-  let spacing: CGFloat
-
-  var body: some View {
-    Canvas { context, size in
-      let dot = Path(
-        ellipseIn: CGRect(
-          x: 0,
-          y: 0,
-          width: 1.5,
-          height: 1.5
-        )
-      )
-      let xValues = stride(from: CGFloat(0), through: size.width, by: max(8, spacing))
-      let yValues = stride(from: CGFloat(0), through: size.height, by: max(8, spacing))
-      for x in xValues {
-        for y in yValues {
-          context.translateBy(x: x, y: y)
-          context.fill(dot, with: .color(.white.opacity(0.13)))
-          context.translateBy(x: -x, y: -y)
-        }
-      }
-    }
-    .background(
-      LinearGradient(
-        colors: [
-          Color(red: 0.06, green: 0.07, blue: 0.10),
-          Color(red: 0.03, green: 0.04, blue: 0.06),
-        ],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-      )
-    )
-  }
-}
-
-// `PolicyCanvasGroupLayer` + `PolicyCanvasGroupRegion` live in
+// `PolicyCanvasDottedGrid` lives in `PolicyCanvasGridLayers.swift`;
+// `PolicyCanvasGroupLayer` + `PolicyCanvasGroupRegion` in
 // `PolicyCanvasGroupViews.swift`; `PolicyCanvasEdgeLayer`,
 // `PolicyCanvasEdgeLabelLayer`, `PolicyCanvasEdgeLabelMetrics`, and
-// `PolicyCanvasEdgeShape` live in `PolicyCanvasEdgeViews.swift`. Both
-// extractions keep this file under the 420-line cap.
+// `PolicyCanvasEdgeShape` in `PolicyCanvasEdgeLayers.swift`. All extractions
+// keep this file under the 420-line cap.
