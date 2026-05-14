@@ -131,6 +131,18 @@ fn task_board_routes_have_complete_ws_parity() {
             ),
             (
                 HttpRouteMethod::Get,
+                http_paths::TASK_BOARD_PROJECTS,
+                ws_methods::TASK_BOARD_PROJECTS,
+                true,
+            ),
+            (
+                HttpRouteMethod::Get,
+                http_paths::TASK_BOARD_MACHINES,
+                ws_methods::TASK_BOARD_MACHINES,
+                true,
+            ),
+            (
+                HttpRouteMethod::Get,
                 http_paths::TASK_BOARD_ORCHESTRATOR_STATUS,
                 ws_methods::TASK_BOARD_ORCHESTRATOR_STATUS,
                 true,
@@ -163,6 +175,36 @@ fn task_board_routes_have_complete_ws_parity() {
                 HttpRouteMethod::Put,
                 http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
                 ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_UPDATE,
+                true,
+            ),
+            (
+                HttpRouteMethod::Get,
+                http_paths::TASK_BOARD_POLICY_PIPELINE,
+                ws_methods::TASK_BOARD_POLICY_PIPELINE_GET,
+                true,
+            ),
+            (
+                HttpRouteMethod::Put,
+                http_paths::TASK_BOARD_POLICY_PIPELINE,
+                ws_methods::TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_POLICY_SIMULATE,
+                ws_methods::TASK_BOARD_POLICY_PIPELINE_SIMULATE,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_POLICY_PROMOTE,
+                ws_methods::TASK_BOARD_POLICY_PIPELINE_PROMOTE,
+                true,
+            ),
+            (
+                HttpRouteMethod::Get,
+                http_paths::TASK_BOARD_POLICY_AUDIT,
+                ws_methods::TASK_BOARD_POLICY_PIPELINE_AUDIT,
                 true,
             ),
         ]

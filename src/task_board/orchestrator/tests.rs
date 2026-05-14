@@ -29,6 +29,32 @@ fn restart_loads_persisted_settings_and_status() {
 }
 
 #[test]
+fn autonomous_tick_runs_only_when_started() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("board");
+    let orchestrator = TaskBoardOrchestrator::new(root);
+
+    let idle = orchestrator
+        .run_autonomous_once(|_| panic!("stopped orchestrator must not dispatch"))
+        .expect("idle status");
+    assert!(!idle.running);
+    assert!(idle.last_run.is_none());
+
+    orchestrator.start().expect("start orchestrator");
+    let running = orchestrator
+        .run_autonomous_once(|input| {
+            assert!(input.dry_run);
+            Ok(DispatchExecutionSummary::dry_run(Vec::new()))
+        })
+        .expect("autonomous tick");
+
+    assert_eq!(
+        running.last_run.as_ref().map(|run| run.status),
+        Some(TaskBoardOrchestratorRunStatus::Completed)
+    );
+}
+
+#[test]
 fn run_once_persists_summary_and_counts_workflow_statuses() {
     let temp = tempdir().expect("tempdir");
     let root = temp.path().join("board");

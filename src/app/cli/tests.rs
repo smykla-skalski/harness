@@ -14,7 +14,7 @@ use crate::run::{
 };
 use crate::session::transport::{SessionCommand, SessionObserveArgs};
 use crate::setup::{CapabilitiesArgs, ClusterArgs, GatewayArgs, KumaSetupCommand};
-use crate::task_board::transport::TaskBoardCommand;
+use crate::task_board::transport::{TaskBoardCommand, TaskBoardOrchestratorCommand};
 use crate::task_board::types::TaskBoardStatus;
 
 #[path = "tests/create.rs"]
@@ -289,5 +289,36 @@ fn parse_task_board_operational_subcommands() {
             ) => assert!(args.json),
             _ => panic!("expected TaskBoard {expected}"),
         }
+    }
+}
+
+#[test]
+fn parse_task_board_orchestrator_controls() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "task-board",
+        "orchestrator",
+        "run-once",
+        "--apply",
+        "--status",
+        "todo",
+        "--project-dir",
+        "/tmp/project",
+        "--json",
+    ])
+    .unwrap();
+    match cli.command {
+        Command::TaskBoard {
+            command:
+                TaskBoardCommand::Orchestrator {
+                    command: TaskBoardOrchestratorCommand::RunOnce(args),
+                },
+        } => {
+            assert!(args.apply);
+            assert_eq!(args.status, Some(TaskBoardStatus::Todo));
+            assert_eq!(args.project_dir.as_deref(), Some("/tmp/project"));
+            assert!(args.json);
+        }
+        _ => panic!("expected TaskBoard Orchestrator RunOnce"),
     }
 }

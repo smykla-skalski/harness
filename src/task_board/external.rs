@@ -2,6 +2,7 @@ use std::sync::OnceLock;
 use std::{env, fmt};
 
 use async_trait::async_trait;
+use clap::ValueEnum;
 use octocrab::params::State;
 use rustls::crypto::ring::default_provider;
 use serde::{Deserialize, Serialize};
@@ -10,8 +11,13 @@ use crate::errors::{CliError, CliErrorKind};
 
 use super::types::{ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 
+mod sync;
 mod todoist;
 
+pub use sync::{
+    ExternalSyncAction, ExternalSyncDirection, ExternalSyncOperation, ExternalSyncOptions,
+    configured_sync_clients, sync_external_tasks,
+};
 pub use todoist::TodoistSyncClient;
 
 pub const HARNESS_GITHUB_TOKEN_ENV: &str = "HARNESS_GITHUB_TOKEN";
@@ -21,7 +27,8 @@ pub const HARNESS_GITHUB_REPOSITORY_ENV: &str = "HARNESS_GITHUB_REPOSITORY";
 pub const GITHUB_REPOSITORY_ENV: &str = "GITHUB_REPOSITORY";
 static RUSTLS_PROVIDER: OnceLock<()> = OnceLock::new();
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
+#[value(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum ExternalProvider {
     GitHub,

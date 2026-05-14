@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::dispatch::{DispatchPlan, build_dispatch_plans};
-use super::external::{ExternalProvider, ExternalSyncConfig};
+use super::external::{ExternalProvider, ExternalSyncConfig, ExternalSyncOperation};
 use super::types::{AgentMode, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -23,6 +23,8 @@ pub struct TaskBoardStatusCount {
 pub struct TaskBoardSyncSummary {
     pub total: usize,
     pub providers: Vec<TaskBoardProviderSyncSummary>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub operations: Vec<ExternalSyncOperation>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -73,6 +75,7 @@ pub fn build_sync_summary(
     TaskBoardSyncSummary {
         total: items.len(),
         providers,
+        operations: Vec::new(),
     }
 }
 

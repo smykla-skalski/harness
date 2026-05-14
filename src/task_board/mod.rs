@@ -5,6 +5,7 @@ pub mod github;
 pub mod orchestrator;
 pub mod planning;
 pub mod policy;
+pub mod policy_graph;
 pub mod store;
 pub mod summary;
 pub mod transport;
@@ -21,9 +22,11 @@ pub use evaluation::{
     missing_task_record, record_from_decision, skipped_unlinked_record,
 };
 pub use external::{
-    ExternalProvider, ExternalSyncClient, ExternalSyncConfig, ExternalTask, ExternalTaskRef,
-    GH_TOKEN_ENV, GITHUB_REPOSITORY_ENV, GitHubSyncClient, HARNESS_GITHUB_REPOSITORY_ENV,
-    HARNESS_GITHUB_TOKEN_ENV, HARNESS_TODOIST_TOKEN_ENV, TodoistSyncClient,
+    ExternalProvider, ExternalSyncAction, ExternalSyncClient, ExternalSyncConfig,
+    ExternalSyncDirection, ExternalSyncOperation, ExternalSyncOptions, ExternalTask,
+    ExternalTaskRef, GH_TOKEN_ENV, GITHUB_REPOSITORY_ENV, GitHubSyncClient,
+    HARNESS_GITHUB_REPOSITORY_ENV, HARNESS_GITHUB_TOKEN_ENV, HARNESS_TODOIST_TOKEN_ENV,
+    TodoistSyncClient, configured_sync_clients, sync_external_tasks,
 };
 pub use orchestrator::{
     TaskBoardGitHubProjectConfig, TaskBoardOrchestrator, TaskBoardOrchestratorDispatchInput,
@@ -40,6 +43,19 @@ pub use planning::{
 pub use policy::{
     BuiltInPolicyGate, PolicyAction, PolicyDecision, PolicyEvidence, PolicyGate, PolicyInput,
     PolicyReasonCode, PolicySubject,
+};
+pub use policy_graph::{
+    GraphPolicyGate, POLICY_GRAPH_INITIAL_REVISION, POLICY_GRAPH_SCHEMA_VERSION, PolicyCanvasPoint,
+    PolicyCanvasRect, PolicyEvidenceCheck, PolicyEvidenceField, PolicyEvidencePredicate,
+    PolicyGraph, PolicyGraphDecision, PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphGroup,
+    PolicyGraphLayout, PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeKind,
+    PolicyGraphNodeLayout, PolicyGraphPortDirection, PolicyGraphSimulation,
+    PolicyGraphValidationIssue, PolicyGraphValidationReport, PolicyPipelineAuditSummary,
+    PolicyPipelineDocument, PolicyPipelineEdge, PolicyPipelineGroup, PolicyPipelineLayout,
+    PolicyPipelineMode, PolicyPipelineNode, PolicyPipelineNodeKind, PolicyPipelinePort,
+    PolicyPipelinePromoteRequest, PolicyPipelinePromoteResponse, PolicyPipelineSaveResponse,
+    PolicyPipelineSimulatedDecision, PolicyPipelineSimulationResult, PolicyPipelineStore,
+    PolicyPipelineValidation, PolicyPipelineValidationCode, PolicyPipelineValidationIssue,
 };
 pub use store::{TaskBoardStore, default_board_root};
 pub use summary::{

@@ -75,6 +75,22 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Get,
+        path: http_paths::TASK_BOARD_PROJECTS,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_PROJECTS,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
+        path: http_paths::TASK_BOARD_MACHINES,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_MACHINES,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
         path: http_paths::TASK_BOARD_ORCHESTRATOR_STATUS,
         parity: HttpRouteParity::Rpc {
             ws_method: ws_methods::TASK_BOARD_ORCHESTRATOR_STATUS,
@@ -118,6 +134,46 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         path: http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
         parity: HttpRouteParity::Rpc {
             ws_method: ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_UPDATE,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
+        path: http_paths::TASK_BOARD_POLICY_PIPELINE,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_POLICY_PIPELINE_GET,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Put,
+        path: http_paths::TASK_BOARD_POLICY_PIPELINE,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::TASK_BOARD_POLICY_SIMULATE,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_POLICY_PIPELINE_SIMULATE,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::TASK_BOARD_POLICY_PROMOTE,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_POLICY_PIPELINE_PROMOTE,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
+        path: http_paths::TASK_BOARD_POLICY_AUDIT,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_POLICY_PIPELINE_AUDIT,
         },
         swift_client_exposed: true,
     },

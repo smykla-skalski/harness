@@ -110,6 +110,26 @@ impl TaskBoardOrchestrator {
         }
     }
 
+    /// Execute one autonomous tick only when durable state is enabled/running.
+    ///
+    /// # Errors
+    /// Returns `CliError` when status loading or the delegated tick fails.
+    pub fn run_autonomous_once<F>(
+        &self,
+        dispatch: F,
+    ) -> Result<TaskBoardOrchestratorStatus, CliError>
+    where
+        F: FnOnce(
+            &TaskBoardOrchestratorDispatchInput,
+        ) -> Result<DispatchExecutionSummary, CliError>,
+    {
+        let state = self.state()?;
+        if !state.enabled || !state.running {
+            return self.status_from_state(state);
+        }
+        self.run_once(&TaskBoardOrchestratorRunOnceRequest::default(), dispatch)
+    }
+
     /// Prepare one tick and persist current tick metadata before dispatch.
     ///
     /// # Errors

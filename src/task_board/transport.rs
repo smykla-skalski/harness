@@ -1,5 +1,5 @@
-use std::env;
-use std::path::{Path, PathBuf};
+use std::future::Future;
+use std::path::PathBuf;
 
 use clap::{Args, Subcommand};
 use serde::Serialize;
@@ -7,29 +7,24 @@ use uuid::Uuid;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
-use crate::session::service as session_service;
-use crate::session::service::TaskSpec;
-use crate::session::types::CONTROL_PLANE_ACTOR_ID;
-use crate::task_board::dispatch::{
-    DispatchAppliedTask, DispatchExecutionSummary, DispatchPlan, DispatchReadiness, SessionIntent,
-};
-use crate::task_board::external::ExternalSyncConfig;
+use crate::task_board::external::{ExternalProvider, ExternalSyncDirection};
 use crate::task_board::store::{
     OptionalFieldPatch, TaskBoardItemPatch, TaskBoardStore, default_board_root,
 };
-use crate::task_board::summary::{
-    build_audit_summary, build_dispatch_summary, build_machine_summaries, build_project_summaries,
-    build_sync_summary,
-};
+use crate::task_board::summary::build_audit_summary;
 use crate::task_board::types::{
     AgentMode, PlanningState, TaskBoardItem, TaskBoardPriority, TaskBoardStatus,
-    TaskBoardWorkflowStatus,
 };
 use crate::workspace::utc_now;
 
+mod catalog;
+mod dispatch;
 mod evaluate;
+mod orchestrator;
+mod sync;
 
 pub use evaluate::TaskBoardEvaluateArgs;
+pub use orchestrator::TaskBoardOrchestratorCommand;
 
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]
@@ -56,6 +51,11 @@ pub enum TaskBoardCommand {
     Project(TaskBoardCatalogArgs),
     /// Manage known worker machines.
     Machine(TaskBoardCatalogArgs),
+    /// Manage autonomous task-board orchestration.
+    Orchestrator {
+        #[command(subcommand)]
+        command: TaskBoardOrchestratorCommand,
+    },
 }
 
 #[derive(Debug, Clone, Args)]
@@ -135,6 +135,12 @@ pub struct TaskBoardDeleteArgs {
 pub struct TaskBoardSyncArgs {
     #[arg(long)]
     pub json: bool,
+    #[arg(long, value_enum)]
+    pub provider: Option<ExternalProvider>,
+    #[arg(long, value_enum, default_value = "both")]
+    pub direction: ExternalSyncDirection,
+    #[arg(long)]
+    pub apply: bool,
     #[arg(long)]
     pub board_root: Option<PathBuf>,
 }
@@ -143,6 +149,8 @@ pub struct TaskBoardSyncArgs {
 pub struct TaskBoardCatalogArgs {
     #[arg(long)]
     pub json: bool,
+    #[arg(long, value_enum)]
+    pub status: Option<TaskBoardStatus>,
     #[arg(long)]
     pub board_root: Option<PathBuf>,
 }
@@ -183,6 +191,7 @@ impl Execute for TaskBoardCommand {
             Self::Audit(args) => args.execute(context),
             Self::Project(args) => args.execute_project(context),
             Self::Machine(args) => args.execute_machine(context),
+            Self::Orchestrator { command } => command.execute(context),
         }
     }
 }
@@ -289,181 +298,6 @@ impl Execute for TaskBoardDeleteArgs {
     }
 }
 
-impl Execute for TaskBoardSyncArgs {
-    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let items = store(self.board_root.clone()).list(None)?;
-        let payload = build_sync_summary(&items, &ExternalSyncConfig::from_env());
-        if self.json {
-            print_json(&payload)?;
-        } else {
-            println!("task-board sync: {} local items", payload.total);
-            for provider in payload.providers {
-                println!(
-                    "{:?}: configured={}, linked={}, pushable={}, blocked={}",
-                    provider.provider,
-                    provider.configured,
-                    provider.linked,
-                    provider.pushable,
-                    provider.blocked
-                );
-            }
-        }
-        Ok(0)
-    }
-}
-
-impl TaskBoardCatalogArgs {
-    fn execute_project(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let items = store(self.board_root.clone()).list(None)?;
-        let summaries = build_project_summaries(&items);
-        if self.json {
-            print_json(&summaries)?;
-        } else {
-            for summary in summaries {
-                println!(
-                    "{}: {} items, {} ready",
-                    summary.project_id, summary.item_count, summary.ready_count
-                );
-            }
-        }
-        Ok(0)
-    }
-
-    fn execute_machine(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let items = store(self.board_root.clone()).list(None)?;
-        let summaries = build_machine_summaries(&items);
-        if self.json {
-            print_json(&summaries)?;
-        } else {
-            for summary in summaries {
-                println!(
-                    "{:?}: {} items, {} ready",
-                    summary.mode, summary.item_count, summary.ready_count
-                );
-            }
-        }
-        Ok(0)
-    }
-}
-
-impl Execute for TaskBoardDispatchArgs {
-    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let board = store(self.board_root.clone());
-        let items = board.list(None)?;
-        let plans = build_dispatch_summary(&items);
-        let summary = if self.dry_run {
-            DispatchExecutionSummary::dry_run(plans)
-        } else {
-            let mut applied = Vec::new();
-            for plan in plans.iter().filter(|plan| plan.is_ready()) {
-                applied.push(self.apply_plan(&board, plan)?);
-            }
-            DispatchExecutionSummary { plans, applied }
-        };
-        if self.json {
-            print_json(&summary)?;
-        } else {
-            for plan in &summary.plans {
-                println!(
-                    "[{}] {}",
-                    dispatch_readiness_label(&plan.readiness),
-                    plan.board_item_id
-                );
-            }
-            if !summary.applied.is_empty() {
-                println!("applied {} task-board dispatches", summary.applied.len());
-            }
-        }
-        Ok(0)
-    }
-}
-
-impl TaskBoardDispatchArgs {
-    fn apply_plan(
-        &self,
-        board: &TaskBoardStore,
-        plan: &DispatchPlan,
-    ) -> Result<DispatchAppliedTask, CliError> {
-        let actor = self.actor.as_deref().unwrap_or(CONTROL_PLANE_ACTOR_ID);
-        let session_id = self.session_id_for_plan(plan)?;
-        let project = self.project_dir_for_session(&session_id)?;
-        let task = session_service::create_task_with_source(
-            &session_id,
-            &TaskSpec {
-                title: &plan.task.title,
-                context: plan.task.context.as_deref(),
-                severity: plan.task.severity,
-                suggested_fix: plan.task.suggested_fix.as_deref(),
-                source: plan.task.source,
-                observe_issue_id: None,
-            },
-            actor,
-            &project,
-        )?;
-        let current = board.get(&plan.board_item_id)?;
-        let mut workflow = current.workflow;
-        if workflow.execution_id.is_none() {
-            workflow.execution_id = Some(new_workflow_execution_id());
-        }
-        workflow.status = TaskBoardWorkflowStatus::Running;
-        workflow.current_step_id = Some("dispatch".to_string());
-        workflow.attempts = workflow.attempts.saturating_add(1);
-        workflow.policy_trace_ids.push(new_policy_trace_id());
-        let item = board.update(
-            &plan.board_item_id,
-            TaskBoardItemPatch {
-                status: Some(TaskBoardStatus::InProgress),
-                workflow: Some(workflow),
-                session_id: OptionalFieldPatch::Set(session_id.clone()),
-                work_item_id: OptionalFieldPatch::Set(task.task_id.clone()),
-                ..TaskBoardItemPatch::default()
-            },
-        )?;
-        Ok(DispatchAppliedTask {
-            board_item_id: plan.board_item_id.clone(),
-            session_id,
-            work_item_id: task.task_id,
-            item,
-        })
-    }
-
-    fn session_id_for_plan(&self, plan: &DispatchPlan) -> Result<String, CliError> {
-        match &plan.session {
-            SessionIntent::Existing { session_id } => Ok(session_id.clone()),
-            SessionIntent::Create {
-                title,
-                context,
-                project_id: _,
-            } => {
-                let project = self.dispatch_project_dir()?;
-                let state = session_service::start_session_with_policy(
-                    context.as_deref().unwrap_or(title),
-                    title,
-                    &project,
-                    None,
-                    None,
-                )?;
-                Ok(state.session_id)
-            }
-        }
-    }
-
-    fn project_dir_for_session(&self, session_id: &str) -> Result<PathBuf, CliError> {
-        let local_project = self.dispatch_project_dir()?;
-        session_service::resolve_session_project_dir(session_id, &local_project)
-    }
-
-    fn dispatch_project_dir(&self) -> Result<PathBuf, CliError> {
-        self.project_dir.as_deref().map_or_else(
-            || {
-                env::current_dir()
-                    .map_err(|error| CliErrorKind::workflow_io(error.to_string()).into())
-            },
-            |path| Ok(Path::new(path).to_path_buf()),
-        )
-    }
-}
-
 impl Execute for TaskBoardAuditArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let items = store(self.board_root.clone()).list(None)?;
@@ -480,7 +314,7 @@ impl Execute for TaskBoardAuditArgs {
     }
 }
 
-fn store(root: Option<PathBuf>) -> TaskBoardStore {
+pub(super) fn store(root: Option<PathBuf>) -> TaskBoardStore {
     TaskBoardStore::new(root.unwrap_or_else(default_board_root))
 }
 
@@ -488,24 +322,27 @@ fn new_task_id() -> String {
     format!("task-{}", Uuid::new_v4().simple())
 }
 
-fn new_workflow_execution_id() -> String {
+pub(super) fn new_workflow_execution_id() -> String {
     format!("workflow-{}", Uuid::new_v4().simple())
 }
 
-fn new_policy_trace_id() -> String {
+pub(super) fn new_policy_trace_id() -> String {
     format!("policy-trace-{}", Uuid::new_v4().simple())
 }
 
-fn print_json<T: Serialize>(value: &T) -> Result<(), CliError> {
+pub(super) fn print_json<T: Serialize>(value: &T) -> Result<(), CliError> {
     let json = serde_json::to_string_pretty(value)
         .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?;
     println!("{json}");
     Ok(())
 }
 
-fn dispatch_readiness_label(readiness: &DispatchReadiness) -> &'static str {
-    match readiness {
-        DispatchReadiness::Ready => "ready",
-        DispatchReadiness::Blocked { .. } => "blocked",
-    }
+pub(super) fn run_blocking<T>(
+    future: impl Future<Output = Result<T, CliError>>,
+) -> Result<T, CliError> {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| CliErrorKind::workflow_io(format!("create task-board runtime: {error}")))?
+        .block_on(future)
 }
