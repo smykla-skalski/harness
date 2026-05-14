@@ -26,6 +26,33 @@ final class PolicyCanvasViewModel {
   /// `setPendingUpdate(_:)` to keep this and `pendingDocumentUpdate` in sync.
   var hasPendingDocumentUpdate: Bool
 
+  /// In-flight rubber-band edge preview while the user drags from an output
+  /// port. The rubber-band layer reads this to render the Bézier curve from
+  /// source port to cursor — cursor writes happen at gesture rate
+  /// (~60-120Hz), so every observer that subscribes to this field pays an
+  /// invalidation per frame.
+  ///
+  /// Today the rubber-band layer is the lone in-body reader and it MUST
+  /// invalidate on cursor writes to redraw the curve, so the field stays
+  /// `@Observable`-tracked (a presence-bit-only pattern like
+  /// `pendingDocumentUpdate` / `hasPendingDocumentUpdate` would force the
+  /// rubber-band layer to subscribe through a separate version counter and
+  /// reach back into ignored storage, which is more machinery than the lone
+  /// consumer warrants). Other views (status chrome, accessibility surfaces,
+  /// menu enablement) must read the `hasPendingEdge` presence bit below
+  /// instead — never `pendingEdgePreview != nil` from inside a `body`.
+  ///
+  /// All writes still flow through `beginPendingEdge`/`updatePendingEdgeCursor`/
+  /// `clearPendingEdge`, which keep this and `hasPendingEdge` in sync.
+  var pendingEdgePreview: PolicyCanvasPendingEdgePreview?
+
+  /// Observed presence-bit mirror for `pendingEdgePreview`. Views that only
+  /// need to know whether a rubber-band drag is in flight (chrome state,
+  /// status surfaces, future tooltips) must subscribe through this flag to
+  /// avoid invalidating per cursor frame. Maintained by the same writers as
+  /// `pendingEdgePreview` so the two never drift.
+  var hasPendingEdge: Bool
+
   /// Staged dashboard payload deferred while the user has unsaved local edits.
   /// `@ObservationIgnored` so updates here don't churn observers; write only
   /// via `setPendingUpdate(_:)` to keep the observed presence bit in sync.
@@ -44,6 +71,11 @@ final class PolicyCanvasViewModel {
   @ObservationIgnored var groupNodeDragOrigins: [String: [String: CGPoint]] = [:]
   @ObservationIgnored var cleanEphemeralNodeIDs: Set<String> = []
   @ObservationIgnored var cleanEphemeralEdgeIDs: Set<String> = []
+  /// Diagonal cursor that advances each time the user clicks a palette button.
+  /// Kept off the @Observable graph because clicks read-then-write atomically
+  /// and the placement helper is the only consumer. Reset on `load(...)`.
+  @ObservationIgnored var nextPaletteDropAnchor: CGPoint =
+    PolicyCanvasLayout.initialPaletteDropAnchor
 
   /// Severity-map cache for the validator hot path. `@ObservationIgnored` is
   /// load-bearing: if SwiftUI observed this slot, every body that reads
@@ -81,6 +113,8 @@ final class PolicyCanvasViewModel {
     self.hasRequestedInitialRemoteLoad = false
     self.hasPendingDocumentUpdate = false
     self.pendingDocumentUpdate = nil
+    self.pendingEdgePreview = nil
+    self.hasPendingEdge = false
     self.nextNodeNumber = nextNodeNumber
     reconcileGroupFrames()
   }
@@ -284,10 +318,11 @@ final class PolicyCanvasViewModel {
     targetPortID: String
   ) -> Bool {
     guard let source = payloads.compactMap(parseOutputPortPayload).first else {
+      clearPendingEdge()
       return false
     }
     guard source.nodeID != targetNodeID else {
-      highlightedInput = nil
+      clearPendingEdge()
       return false
     }
     let target = PolicyCanvasPortEndpoint(
@@ -296,7 +331,7 @@ final class PolicyCanvasViewModel {
       kind: .input
     )
     guard !edges.contains(where: { $0.source == source && $0.target == target }) else {
-      highlightedInput = nil
+      clearPendingEdge()
       return true
     }
     let edge = PolicyCanvasEdge(
@@ -308,7 +343,7 @@ final class PolicyCanvasViewModel {
     edges.append(edge)
     cleanEphemeralEdgeIDs.insert(edge.id)
     selection = .edge(edge.id)
-    highlightedInput = nil
+    clearPendingEdge()
     documentDirty = true
     invalidateValidationCache()
     notifyStatus("Edge created")

@@ -129,28 +129,7 @@ struct PolicyCanvasToolRail: View {
   var body: some View {
     VStack(spacing: 10) {
       ForEach(PolicyCanvasNodeKind.allCases) { kind in
-        Button {
-          viewModel.createNode(kind: kind, at: CGPoint(x: 180, y: 180))
-        } label: {
-          VStack(spacing: 5) {
-            Image(systemName: kind.symbolName)
-              .scaledFont(.system(size: 15, weight: .semibold))
-            Text(kind.title)
-              .scaledFont(.caption2.weight(.semibold))
-              .lineLimit(1)
-          }
-          .foregroundStyle(kind.accentColor)
-          .frame(width: 64, height: 52)
-          .background(kind.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
-          .overlay {
-            RoundedRectangle(cornerRadius: 8)
-              .stroke(kind.accentColor.opacity(0.38), lineWidth: 1)
-          }
-        }
-        .harnessPlainButtonStyle()
-        .draggable(viewModel.palettePayload(for: kind))
-        .help("Add \(kind.title)")
-        .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasPaletteItem(kind.rawValue))
+        PolicyCanvasPaletteButton(viewModel: viewModel, kind: kind)
       }
 
       Spacer(minLength: 0)
@@ -166,6 +145,69 @@ struct PolicyCanvasToolRail: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasToolRail)
+  }
+}
+
+private struct PolicyCanvasPaletteButton: View {
+  let viewModel: PolicyCanvasViewModel
+  let kind: PolicyCanvasNodeKind
+
+  var body: some View {
+    Button {
+      viewModel.createNode(kind: kind, at: viewModel.nextPaletteDropCenter())
+    } label: {
+      VStack(spacing: 5) {
+        Image(systemName: kind.symbolName)
+          .scaledFont(.system(size: 15, weight: .semibold))
+        Text(kind.title)
+          .scaledFont(.caption2.weight(.semibold))
+          .lineLimit(1)
+      }
+      .foregroundStyle(kind.accentColor)
+      .frame(width: 64, height: 52)
+      .background(kind.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+      .overlay {
+        RoundedRectangle(cornerRadius: 8)
+          .stroke(kind.accentColor.opacity(0.38), lineWidth: 1)
+      }
+    }
+    .harnessPlainButtonStyle()
+    .draggable(viewModel.palettePayload(for: kind)) {
+      PolicyCanvasPaletteDragChip(kind: kind)
+    }
+    .help("Drag onto the canvas, or click to drop near the center.")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasPaletteItem(kind.rawValue))
+  }
+}
+
+/// Ghost chip rendered under the cursor while the user drags a palette item.
+/// Mirrors the kind's accent color and icon so the user has a positive system
+/// image of what the drop will create. Vanishes automatically when the drag
+/// ends (handled by `.draggable(preview:)`).
+private struct PolicyCanvasPaletteDragChip: View {
+  let kind: PolicyCanvasNodeKind
+
+  var body: some View {
+    HStack(spacing: 8) {
+      Image(systemName: kind.symbolName)
+        .scaledFont(.system(size: 14, weight: .semibold))
+        .foregroundStyle(kind.accentColor)
+        .frame(width: 22, height: 22)
+        .background(kind.accentColor.opacity(0.18), in: RoundedRectangle(cornerRadius: 5))
+
+      Text(kind.title)
+        .scaledFont(.callout.weight(.semibold))
+        .foregroundStyle(.white)
+        .lineLimit(1)
+    }
+    .padding(.horizontal, 10)
+    .padding(.vertical, 7)
+    .background(Color(red: 0.08, green: 0.09, blue: 0.13).opacity(0.94), in: Capsule())
+    .overlay {
+      Capsule()
+        .stroke(kind.accentColor.opacity(0.55), lineWidth: 1)
+    }
+    .shadow(color: .black.opacity(0.4), radius: 8, x: 0, y: 4)
   }
 }
 

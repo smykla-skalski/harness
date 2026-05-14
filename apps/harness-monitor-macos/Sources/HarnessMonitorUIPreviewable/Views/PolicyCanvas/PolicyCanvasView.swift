@@ -29,6 +29,7 @@ public struct PolicyCanvasView: View {
   @State private var pendingDeletionRequest: PolicyCanvasDeletionRequest?
   @State private var statusLine: String = "No pending changes"
   @FocusState private var focusedField: PolicyCanvasFocusedField?
+  @Environment(\.scenePhase) private var scenePhase
   private let store: HarnessMonitorStore?
   private let dashboardUI: HarnessMonitorStore.ContentDashboardSlice?
 
@@ -118,6 +119,17 @@ public struct PolicyCanvasView: View {
     }
     .onChange(of: dashboardSnapshot) { _, _ in
       applyDashboardSnapshot()
+    }
+    // When the scene leaves .active (Mission Control, Cmd-Tab to another
+    // app, modal sheet presentation, window minimize) the in-flight gesture
+    // never receives an .onEnded — AppKit cancels the drag silently and the
+    // rubber-band curve / port highlight / group highlight stay painted.
+    // Enumerating every interruption surface is brittle; clear eagerly on
+    // every transition off .active instead.
+    .onChange(of: scenePhase) { _, newPhase in
+      if newPhase != .active {
+        viewModel.clearTransientGestureState()
+      }
     }
     .confirmationDialog(
       "Promote policy pipeline?",

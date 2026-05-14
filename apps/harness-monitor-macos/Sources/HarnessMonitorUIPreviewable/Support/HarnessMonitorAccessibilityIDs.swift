@@ -346,6 +346,7 @@ public enum HarnessMonitorAccessibility {
   public static let policyCanvasValidationEmpty = "harness.policy-canvas.validation.empty"
   public static let policyCanvasPromoteDisabledReason =
     "harness.policy-canvas.action.promote.reason"
+  public static let policyCanvasEmptyState = "harness.policy-canvas.empty-state"
 
   public static func policyCanvasInspectorField(_ fieldID: String) -> String {
     "harness.policy-canvas.inspector.\(slug(fieldID))"
