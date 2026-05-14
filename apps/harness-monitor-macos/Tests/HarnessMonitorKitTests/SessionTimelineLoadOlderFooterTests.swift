@@ -82,40 +82,31 @@ struct SessionTimelineLoadOlderTriggerTests {
     #expect(sourceFile.contains("retainedLimit: nil"))
   }
 
-  @Test("Trigger uses task-id state to fire on (isNearBottom, hasOlder)")
-  func triggerFiresViaTaskComposite() throws {
+  @Test("Trigger fires on first content render OR rising near-bottom edge")
+  func triggerFiresOnFirstRenderOrRisingEdge() throws {
     let sourceFile = try timelineSource(named: "MonitorTimelineSection.swift")
 
-    #expect(sourceFile.contains("@State private var isNearBottom"))
-    #expect(sourceFile.contains("if newValue.isNearBottom != isNearBottom"))
-    #expect(sourceFile.contains("isNearBottom = newValue.isNearBottom"))
-    #expect(sourceFile.contains(".task("))
-    #expect(sourceFile.contains("id: SessionTimelineLoadOlderState("))
-    #expect(sourceFile.contains("isNearBottom: isNearBottom"))
-    #expect(sourceFile.contains("hasOlder: presentation.navigation.hasOlder"))
-    #expect(sourceFile.contains("windowEnd: presentation.navigation.windowEnd"))
-    #expect(sourceFile.contains("guard isNearBottom, presentation.navigation.hasOlder else"))
+    #expect(sourceFile.contains("let firstRender = !oldValue.contentRendered && newValue.contentRendered"))
+    #expect(sourceFile.contains("let risingNearBottom = !oldValue.isNearBottom && newValue.isNearBottom"))
+    #expect(sourceFile.contains("guard firstRender || risingNearBottom else"))
+    #expect(sourceFile.contains("guard newValue.isNearBottom, presentation.navigation.hasOlder else"))
   }
 
-  @Test("Composite state struct is Equatable on (isNearBottom, hasOlder, windowEnd)")
-  func compositeStateEquatable() {
-    let baseline = SessionTimelineLoadOlderState(
-      isNearBottom: true,
-      hasOlder: true,
-      windowEnd: 100
+  @Test("Trigger reports content not rendered when contentHeight is zero")
+  func triggerContentRenderedReflectsContentHeight() {
+    let pristine = SessionTimelineLoadOlderTrigger(
+      contentHeight: 0,
+      contentOffsetY: 0,
+      viewportHeight: 800
     )
-    #expect(
-      baseline
-        == SessionTimelineLoadOlderState(isNearBottom: true, hasOlder: true, windowEnd: 100))
-    #expect(
-      baseline
-        != SessionTimelineLoadOlderState(isNearBottom: false, hasOlder: true, windowEnd: 100))
-    #expect(
-      baseline
-        != SessionTimelineLoadOlderState(isNearBottom: true, hasOlder: false, windowEnd: 100))
-    #expect(
-      baseline
-        != SessionTimelineLoadOlderState(isNearBottom: true, hasOlder: true, windowEnd: 101))
+    #expect(pristine.contentRendered == false)
+
+    let measured = SessionTimelineLoadOlderTrigger(
+      contentHeight: 600,
+      contentOffsetY: 0,
+      viewportHeight: 800
+    )
+    #expect(measured.contentRendered == true)
   }
 
   private func timelineSource(named fileName: String) throws -> String {

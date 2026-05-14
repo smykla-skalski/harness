@@ -295,8 +295,6 @@ private struct SessionTimelineList: View {
   let filters: Binding<SessionTimelineFilterState>
   let onRequestLoadOlder: (() -> Void)?
 
-  @State private var isNearBottom = false
-
   init(
     presentation: SessionTimelineSectionPresentation,
     actionHandler: any DecisionActionHandler,
@@ -356,19 +354,11 @@ private struct SessionTimelineList: View {
     .onScrollGeometryChange(
       for: SessionTimelineLoadOlderTrigger.self,
       of: SessionTimelineLoadOlderTrigger.init(geometry:)
-    ) { _, newValue in
-      if newValue.isNearBottom != isNearBottom {
-        isNearBottom = newValue.isNearBottom
-      }
-    }
-    .task(
-      id: SessionTimelineLoadOlderState(
-        isNearBottom: isNearBottom,
-        hasOlder: presentation.navigation.hasOlder,
-        windowEnd: presentation.navigation.windowEnd
-      )
-    ) {
-      guard isNearBottom, presentation.navigation.hasOlder else { return }
+    ) { oldValue, newValue in
+      let firstRender = !oldValue.contentRendered && newValue.contentRendered
+      let risingNearBottom = !oldValue.isNearBottom && newValue.isNearBottom
+      guard firstRender || risingNearBottom else { return }
+      guard newValue.isNearBottom, presentation.navigation.hasOlder else { return }
       onRequestLoadOlder?()
     }
   }
@@ -378,9 +368,11 @@ struct SessionTimelineLoadOlderTrigger: Equatable {
   static let nearBottomThreshold: CGFloat = 320
 
   let isNearBottom: Bool
+  let contentRendered: Bool
 
-  init(isNearBottom: Bool) {
+  init(isNearBottom: Bool, contentRendered: Bool = true) {
     self.isNearBottom = isNearBottom
+    self.contentRendered = contentRendered
   }
 
   init(geometry: ScrollGeometry) {
@@ -393,14 +385,11 @@ struct SessionTimelineLoadOlderTrigger: Equatable {
 
   init(contentHeight: CGFloat, contentOffsetY: CGFloat, viewportHeight: CGFloat) {
     let distanceFromBottom = max(0, contentHeight - contentOffsetY - viewportHeight)
-    self.init(isNearBottom: distanceFromBottom <= Self.nearBottomThreshold)
+    self.init(
+      isNearBottom: distanceFromBottom <= Self.nearBottomThreshold,
+      contentRendered: contentHeight > 0
+    )
   }
-}
-
-struct SessionTimelineLoadOlderState: Equatable {
-  let isNearBottom: Bool
-  let hasOlder: Bool
-  let windowEnd: Int
 }
 
 struct SessionTimelineFilteredEmptyState: View {
