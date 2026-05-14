@@ -47,10 +47,18 @@ struct SessionWindowRouteContentMetricsTests {
 
   @Test("Task selection renders a real detail pane")
   func taskSelectionRendersARealDetailPane() throws {
-    let columnsSource = try sourceFile(named: "SessionWindowView+Columns.swift")
+    let detailFocusSource = try sourceFile(named: "SessionWindowView+DetailFocus.swift")
 
-    #expect(columnsSource.contains("SessionTaskDetailPane("))
-    #expect(!columnsSource.contains("Task detail lands in a later chunk."))
+    #expect(detailFocusSource.contains("SessionTaskDetailPane("))
+    #expect(!detailFocusSource.contains("Task detail lands in a later chunk."))
+  }
+
+  @Test("Overview route embeds the task board")
+  func overviewRouteEmbedsTaskBoard() throws {
+    let routeContentSource = try sourceFile(named: "SessionWindowRouteContent.swift")
+
+    #expect(routeContentSource.contains("TaskBoardOverviewView("))
+    #expect(routeContentSource.contains("onOpenItem: openTaskActions"))
   }
 
   private func sourceFile(named relativePath: String) throws -> String {

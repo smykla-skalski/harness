@@ -52,6 +52,10 @@ struct SessionWindowOverview: View {
           metric("Open tasks", "\(snapshot.summary.metrics.openTaskCount)")
           metric("Source", snapshot.source.rawValue)
         }
+        TaskBoardOverviewView(
+          snapshot: taskBoardSnapshot,
+          onOpenItem: openTaskActions
+        )
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -93,6 +97,28 @@ struct SessionWindowOverview: View {
       return "\(summary.activeCount) active"
     }
     return "\(summary.activeCount) active of \(summary.registeredCount)"
+  }
+
+  private var taskBoardSnapshot: TaskBoardInboxSnapshot {
+    guard let detail = snapshot.detail else {
+      return TaskBoardInboxSnapshot(
+        generatedAt: nil,
+        isFromCache: snapshot.source != .live
+      )
+    }
+    return TaskBoardInboxSnapshot(
+      sessions: [snapshot.summary],
+      detailsBySessionID: [snapshot.summary.sessionId: detail],
+      generatedAt: nil,
+      isFromCache: snapshot.source != .live
+    )
+  }
+
+  private func openTaskActions(_ item: TaskBoardInboxItem) {
+    store.presentedSheet = .taskActions(
+      sessionID: item.session.sessionId,
+      taskID: item.task.taskId
+    )
   }
 }
 
