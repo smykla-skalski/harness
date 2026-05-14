@@ -55,6 +55,8 @@ public struct SettingsView: View {
             reconnect: { await store.reconnect() },
             refreshDiagnostics: { await store.refreshDiagnostics() }
           )
+        case .taskBoard:
+          SettingsTaskBoardSection(store: store)
         case .codex:
           SettingsHostBridgeSection(store: store)
         case .mcp:

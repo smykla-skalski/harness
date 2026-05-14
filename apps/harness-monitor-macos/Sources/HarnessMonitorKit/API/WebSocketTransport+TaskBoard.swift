@@ -127,6 +127,27 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func taskBoardGitRuntimeConfig() async throws -> TaskBoardGitRuntimeConfig {
+    let value = try await rpc(method: .taskBoardOrchestratorRuntimeConfigGet)
+    return try decode(value)
+  }
+
+  public func updateTaskBoardGitRuntimeConfig(
+    request: TaskBoardGitRuntimeConfig
+  ) async throws -> TaskBoardGitRuntimeConfig {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .taskBoardOrchestratorRuntimeConfigUpdate, params: params)
+    return try decode(value)
+  }
+
+  public func syncTaskBoardGitHubTokens(
+    request: TaskBoardGitHubTokensSyncRequest
+  ) async throws -> TaskBoardGitHubTokensSyncResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .taskBoardOrchestratorGitHubTokensSync, params: params)
+    return try decode(value)
+  }
+
   public func taskBoardPolicyPipeline() async throws -> TaskBoardPolicyPipelineDocument {
     let value = try await rpc(method: .taskBoardPolicyPipelineGet)
     return try decode(value)

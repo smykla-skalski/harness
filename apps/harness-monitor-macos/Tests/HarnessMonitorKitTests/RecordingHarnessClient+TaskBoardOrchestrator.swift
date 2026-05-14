@@ -112,6 +112,33 @@ extension RecordingHarnessClient {
     )
   }
 
+  func taskBoardGitRuntimeConfig() async throws -> TaskBoardGitRuntimeConfig {
+    recordReadCall(.taskBoardGitRuntimeConfig)
+    return sampleTaskBoardGitRuntimeConfig()
+  }
+
+  func updateTaskBoardGitRuntimeConfig(
+    request: TaskBoardGitRuntimeConfig
+  ) async throws -> TaskBoardGitRuntimeConfig {
+    calls.append(.updateTaskBoardGitRuntimeConfig(overrideCount: request.repositoryOverrides.count))
+    return request
+  }
+
+  func syncTaskBoardGitHubTokens(
+    request: TaskBoardGitHubTokensSyncRequest
+  ) async throws -> TaskBoardGitHubTokensSyncResponse {
+    calls.append(
+      .syncTaskBoardGitHubTokens(
+        globalTokenConfigured: request.globalToken != nil,
+        repositoryTokenCount: request.repositoryTokens.count
+      )
+    )
+    return TaskBoardGitHubTokensSyncResponse(
+      globalTokenConfigured: request.globalToken != nil,
+      repositoryTokenCount: request.repositoryTokens.count
+    )
+  }
+
   private func sampleTaskBoardOrchestratorStatus(
     enabled: Bool = true,
     running: Bool = false
@@ -158,6 +185,31 @@ extension RecordingHarnessClient {
         enabledAutomations: TaskBoardGitHubAutomationToggles(enabled: [.syncTaskBoard, .autoMerge])
       ),
       policyVersion: "task-board-policy-v1"
+    )
+  }
+
+  private func sampleTaskBoardGitRuntimeConfig() -> TaskBoardGitRuntimeConfig {
+    TaskBoardGitRuntimeConfig(
+      global: TaskBoardGitRuntimeProfile(
+        authorName: "Harness Bot",
+        authorEmail: "bot@example.com",
+        sshKeyPath: "/Users/test/.ssh/id_ed25519",
+        signing: TaskBoardGitSigningConfig(
+          mode: .ssh,
+          sshKeyPath: "/Users/test/.ssh/id_signing"
+        )
+      ),
+      repositoryOverrides: [
+        TaskBoardGitRepositoryOverride(
+          repository: "kong/harness",
+          profile: TaskBoardGitRuntimeProfile(
+            authorName: "Repo Bot",
+            authorEmail: "repo@example.com",
+            sshKeyPath: "/Users/test/.ssh/id_repo",
+            signing: TaskBoardGitSigningConfig(mode: .gpg, gpgKeyId: "ABC123")
+          )
+        )
+      ]
     )
   }
 }

@@ -12,6 +12,18 @@ let sampleTaskBoardItemJSON: [String: JSONValue] = [
   "agent_mode": .string("interactive"),
   "external_refs": .array([]),
   "planning": .object([:]),
+  "workflow": .object([
+    "execution_id": .string("workflow-1"),
+    "status": .string("running"),
+    "current_step_id": .string("review"),
+    "attempts": .number(2),
+    "branch": .string("c/board-1"),
+    "worktree": .string("/tmp/harness"),
+    "pr_number": .number(42),
+    "pr_url": .string("https://github.com/kong/harness/pull/42"),
+    "last_error": .null,
+    "policy_trace_ids": .array([.string("trace-1")]),
+  ]),
   "session_id": .string("sess-1"),
   "work_item_id": .string("task-1"),
   "usage": .object([:]),
@@ -198,6 +210,39 @@ let sampleTaskBoardOrchestratorStatusJSON: [String: JSONValue] = [
 
 let sampleTaskBoardOrchestratorRunOnceJSON = sampleTaskBoardOrchestratorStatusJSON
 
+let sampleTaskBoardGitRuntimeConfigJSON: [String: JSONValue] = [
+  "global": .object([
+    "author_name": .string("Harness Bot"),
+    "author_email": .string("bot@example.com"),
+    "ssh_key_path": .string("/Users/test/.ssh/id_ed25519"),
+    "signing": .object([
+      "mode": .string("ssh"),
+      "ssh_key_path": .string("/Users/test/.ssh/id_signing"),
+      "gpg_key_id": .null,
+    ]),
+  ]),
+  "repository_overrides": .array([
+    .object([
+      "repository": .string("kong/harness"),
+      "profile": .object([
+        "author_name": .string("Repo Bot"),
+        "author_email": .string("repo@example.com"),
+        "ssh_key_path": .string("/Users/test/.ssh/id_repo"),
+        "signing": .object([
+          "mode": .string("gpg"),
+          "ssh_key_path": .null,
+          "gpg_key_id": .string("ABC123"),
+        ]),
+      ]),
+    ])
+  ]),
+]
+
+let sampleTaskBoardGitHubTokensSyncResponseJSON: [String: JSONValue] = [
+  "global_token_configured": .bool(true),
+  "repository_token_count": .number(1),
+]
+
 let sampleTaskBoardItemJSONString =
   """
   {
@@ -212,6 +257,18 @@ let sampleTaskBoardItemJSONString =
     "agent_mode": "interactive",
     "external_refs": [],
     "planning": {},
+    "workflow": {
+      "execution_id": "workflow-1",
+      "status": "running",
+      "current_step_id": "review",
+      "attempts": 2,
+      "branch": "c/board-1",
+      "worktree": "/tmp/harness",
+      "pr_number": 42,
+      "pr_url": "https://github.com/kong/harness/pull/42",
+      "last_error": null,
+      "policy_trace_ids": ["trace-1"]
+    },
     "session_id": "sess-1",
     "work_item_id": "task-1",
     "usage": {},
@@ -313,6 +370,45 @@ let sampleTaskBoardSyncSummaryText =
         "applied": true
       }
     ]
+  }
+  """
+
+let sampleTaskBoardGitRuntimeConfigText =
+  """
+  {
+    "global": {
+      "author_name": "Harness Bot",
+      "author_email": "bot@example.com",
+      "ssh_key_path": "/Users/test/.ssh/id_ed25519",
+      "signing": {
+        "mode": "ssh",
+        "ssh_key_path": "/Users/test/.ssh/id_signing",
+        "gpg_key_id": null
+      }
+    },
+    "repository_overrides": [
+      {
+        "repository": "kong/harness",
+        "profile": {
+          "author_name": "Repo Bot",
+          "author_email": "repo@example.com",
+          "ssh_key_path": "/Users/test/.ssh/id_repo",
+          "signing": {
+            "mode": "gpg",
+            "ssh_key_path": null,
+            "gpg_key_id": "ABC123"
+          }
+        }
+      }
+    ]
+  }
+  """
+
+let sampleTaskBoardGitHubTokensSyncResponseText =
+  """
+  {
+    "global_token_configured": true,
+    "repository_token_count": 1
   }
   """
 

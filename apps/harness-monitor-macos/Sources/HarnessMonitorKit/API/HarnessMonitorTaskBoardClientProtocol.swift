@@ -26,6 +26,13 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
   func updateTaskBoardOrchestratorSettings(
     request: TaskBoardOrchestratorSettingsUpdateRequest
   ) async throws -> TaskBoardOrchestratorSettings
+  func taskBoardGitRuntimeConfig() async throws -> TaskBoardGitRuntimeConfig
+  func updateTaskBoardGitRuntimeConfig(
+    request: TaskBoardGitRuntimeConfig
+  ) async throws -> TaskBoardGitRuntimeConfig
+  func syncTaskBoardGitHubTokens(
+    request: TaskBoardGitHubTokensSyncRequest
+  ) async throws -> TaskBoardGitHubTokensSyncResponse
   func taskBoardPolicyPipeline() async throws -> TaskBoardPolicyPipelineDocument
   func saveTaskBoardPolicyPipelineDraft(
     request: TaskBoardPolicyPipelineSaveDraftRequest
@@ -152,6 +159,22 @@ extension HarnessMonitorTaskBoardClientProtocol {
   public func updateTaskBoardOrchestratorSettings(
     request _: TaskBoardOrchestratorSettingsUpdateRequest
   ) async throws -> TaskBoardOrchestratorSettings {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable.")
+  }
+
+  public func taskBoardGitRuntimeConfig() async throws -> TaskBoardGitRuntimeConfig {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable.")
+  }
+
+  public func updateTaskBoardGitRuntimeConfig(
+    request _: TaskBoardGitRuntimeConfig
+  ) async throws -> TaskBoardGitRuntimeConfig {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable.")
+  }
+
+  public func syncTaskBoardGitHubTokens(
+    request _: TaskBoardGitHubTokensSyncRequest
+  ) async throws -> TaskBoardGitHubTokensSyncResponse {
     throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable.")
   }
 

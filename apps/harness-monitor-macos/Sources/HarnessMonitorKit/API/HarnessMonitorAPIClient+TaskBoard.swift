@@ -105,6 +105,22 @@ extension HarnessMonitorAPIClient {
     try await put("/v1/task-board/orchestrator/settings", body: request)
   }
 
+  public func taskBoardGitRuntimeConfig() async throws -> TaskBoardGitRuntimeConfig {
+    try await get("/v1/task-board/orchestrator/runtime-config")
+  }
+
+  public func updateTaskBoardGitRuntimeConfig(
+    request: TaskBoardGitRuntimeConfig
+  ) async throws -> TaskBoardGitRuntimeConfig {
+    try await put("/v1/task-board/orchestrator/runtime-config", body: request)
+  }
+
+  public func syncTaskBoardGitHubTokens(
+    request: TaskBoardGitHubTokensSyncRequest
+  ) async throws -> TaskBoardGitHubTokensSyncResponse {
+    try await put("/v1/task-board/orchestrator/github-tokens", body: request)
+  }
+
   public func taskBoardPolicyPipeline() async throws -> TaskBoardPolicyPipelineDocument {
     try await get("/v1/task-board/policy/pipeline")
   }

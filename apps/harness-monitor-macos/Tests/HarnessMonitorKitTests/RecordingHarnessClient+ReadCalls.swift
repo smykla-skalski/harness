@@ -113,6 +113,8 @@ extension RecordingHarnessClient.ReadCall {
       "task-board-orchestrator-status"
     case .taskBoardOrchestratorSettings:
       "task-board-orchestrator-settings"
+    case .taskBoardGitRuntimeConfig:
+      "task-board-git-runtime-config"
     case .taskBoardPolicyPipeline:
       "task-board-policy-pipeline"
     case .taskBoardPolicyPipelineAudit:

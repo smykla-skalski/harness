@@ -71,10 +71,14 @@ public struct TaskBoardGitHubProjectConfig: Codable, Equatable, Sendable {
   }
 }
 
-public enum TaskBoardGitHubMergeMethod: String, Codable, Sendable {
+public enum TaskBoardGitHubMergeMethod: String, Codable, CaseIterable, Identifiable, Hashable,
+  Sendable
+{
   case squash
   case merge
   case rebase
+
+  public var id: String { rawValue }
 }
 
 public struct TaskBoardGitHubAutomationLabels: Codable, Equatable, Sendable {
@@ -152,13 +156,17 @@ public struct TaskBoardGitHubAutomationToggles: Codable, Equatable, Sendable {
   }
 }
 
-public enum TaskBoardGitHubAutomation: String, Codable, Sendable {
+public enum TaskBoardGitHubAutomation: String, Codable, CaseIterable, Identifiable, Hashable,
+  Sendable
+{
   case syncTaskBoard = "sync_task_board"
   case createBranch = "create_branch"
   case openPullRequest = "open_pull_request"
   case watchChecks = "watch_checks"
   case requestReview = "request_review"
   case autoMerge = "auto_merge"
+
+  public var id: String { rawValue }
 }
 
 public struct TaskBoardProtectedPathRule: Codable, Equatable, Sendable {

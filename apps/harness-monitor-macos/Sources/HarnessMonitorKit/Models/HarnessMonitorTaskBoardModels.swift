@@ -1,6 +1,6 @@
 import Foundation
 
-public enum TaskBoardStatus: String, Codable, CaseIterable, Identifiable, Sendable {
+public enum TaskBoardStatus: String, Codable, CaseIterable, Identifiable, Hashable, Sendable {
   case new
   case planning
   case planReview = "plan_review"
@@ -123,6 +123,7 @@ public struct TaskBoardWorkflowState: Codable, Equatable, Sendable {
   public let attempts: UInt32
   public let branch: String?
   public let worktree: String?
+  public let prNumber: UInt64?
   public let prUrl: String?
   public let lastError: String?
   public let policyTraceIds: [String]
@@ -134,6 +135,7 @@ public struct TaskBoardWorkflowState: Codable, Equatable, Sendable {
     attempts: UInt32 = 0,
     branch: String? = nil,
     worktree: String? = nil,
+    prNumber: UInt64? = nil,
     prUrl: String? = nil,
     lastError: String? = nil,
     policyTraceIds: [String] = []
@@ -144,6 +146,7 @@ public struct TaskBoardWorkflowState: Codable, Equatable, Sendable {
     self.attempts = attempts
     self.branch = branch
     self.worktree = worktree
+    self.prNumber = prNumber
     self.prUrl = prUrl
     self.lastError = lastError
     self.policyTraceIds = policyTraceIds

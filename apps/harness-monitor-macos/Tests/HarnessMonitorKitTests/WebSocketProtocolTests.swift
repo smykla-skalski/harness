@@ -233,6 +233,18 @@ struct WebSocketProtocolTests {
         == "task_board.orchestrator_settings_update"
     )
     #expect(
+      WebSocketRPCMethod.taskBoardOrchestratorRuntimeConfigGet.rawValue
+        == "task_board.orchestrator_runtime_config_get"
+    )
+    #expect(
+      WebSocketRPCMethod.taskBoardOrchestratorRuntimeConfigUpdate.rawValue
+        == "task_board.orchestrator_runtime_config_update"
+    )
+    #expect(
+      WebSocketRPCMethod.taskBoardOrchestratorGitHubTokensSync.rawValue
+        == "task_board.orchestrator_github_tokens_sync"
+    )
+    #expect(
       WebSocketRPCMethod.taskBoardPolicyPipelineGet.rawValue
         == "task_board.policy_pipeline_get"
     )
