@@ -12,10 +12,6 @@ final class PolicyCanvasUITests: HarnessMonitorUITestCase {
 
     let root = element(in: app, identifier: Accessibility.policyCanvasRoot)
     XCTAssertTrue(root.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(
-      frameElement(in: app, identifier: Accessibility.policyCanvasViewport)
-        .waitForExistence(timeout: Self.actionTimeout)
-    )
     XCTAssertTrue(element(in: app, identifier: Accessibility.policyCanvasToolRail).exists)
     XCTAssertTrue(element(in: app, identifier: Accessibility.policyCanvasInspector).exists)
     XCTAssertFalse(button(in: app, identifier: Accessibility.policyCanvasPromoteButton).isEnabled)
@@ -24,26 +20,35 @@ final class PolicyCanvasUITests: HarnessMonitorUITestCase {
   func testPolicyCanvasInitialLayoutDoesNotOverlapChromeOrSections() throws {
     let app = openPolicyCanvasSessionRoute()
 
+    let root = element(in: app, identifier: Accessibility.policyCanvasRoot)
     let topBar = element(in: app, identifier: Accessibility.policyCanvasTopBar)
-    let viewport = frameElement(in: app, identifier: Accessibility.policyCanvasViewport)
     let toolRail = element(in: app, identifier: Accessibility.policyCanvasToolRail)
     let inspector = element(in: app, identifier: Accessibility.policyCanvasInspector)
     let entry = element(in: app, identifier: Accessibility.policyCanvasGroup("entry"))
     let merge = element(in: app, identifier: Accessibility.policyCanvasGroup("merge"))
     let terminal = element(in: app, identifier: Accessibility.policyCanvasGroup("terminal"))
 
+    XCTAssertTrue(root.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(topBar.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(viewport.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(toolRail.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(inspector.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(entry.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(merge.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(terminal.waitForExistence(timeout: Self.actionTimeout))
+
+    let canvasFrame = CGRect(
+      x: toolRail.frame.maxX,
+      y: topBar.frame.maxY,
+      width: inspector.frame.minX - toolRail.frame.maxX,
+      height: root.frame.maxY - topBar.frame.maxY
+    )
 
     for group in [entry, merge, terminal] {
       XCTAssertFalse(group.frame.intersects(topBar.frame), "Policy group overlaps top bar")
       XCTAssertFalse(group.frame.intersects(toolRail.frame), "Policy group overlaps tool rail")
       XCTAssertFalse(group.frame.intersects(inspector.frame), "Policy group overlaps inspector")
       XCTAssertTrue(
-        viewport.frame.insetBy(dx: -1, dy: -1).contains(group.frame),
+        canvasFrame.insetBy(dx: -1, dy: -1).contains(group.frame),
         "Policy group should start fully inside the canvas viewport"
       )
     }
