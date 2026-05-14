@@ -9,6 +9,7 @@ use tokio::task::spawn_blocking;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::git::GitRepository;
+use crate::sandbox;
 use crate::task_board::github::GitHubProjectConfig;
 use crate::task_board::{TaskBoardGitRuntimeProfile, TaskBoardGitSigningMode};
 
@@ -56,7 +57,8 @@ fn branch_publication(
     config: &GitHubProjectConfig,
     branch: &str,
 ) -> Result<BranchPublication, CliError> {
-    let repository = GitRepository::discover(Path::new(worktree))
+    let worktree_scope = sandbox::resolve_project_input(worktree)?;
+    let repository = GitRepository::discover(worktree_scope.path())
         .map_err(|error| CliErrorKind::workflow_io(error.to_string()))?;
     let remote = repository
         .current_branch_remote_name()
@@ -74,15 +76,15 @@ fn branch_publication(
                 .and_then(|mut remotes| remotes.pop())
         })
         .ok_or_else(|| CliErrorKind::workflow_io("task-board github remote missing"))?;
-    let repo = open_git2_repository(worktree)?;
+    let repo = open_git2_repository(worktree_scope.path())?;
     let remote_url = repo
         .find_remote(&remote)
         .ok()
         .and_then(|remote| remote.url().map(ToOwned::to_owned));
-    let git_profile = git_runtime_profile_for_repository(
+    let git_profile = resolve_git_runtime_profile(git_runtime_profile_for_repository(
         remote_url.as_deref().and_then(parse_github_remote_url),
-    )?;
-    apply_git_runtime_profile(&repo, &git_profile)?;
+    )?)?;
+    apply_git_runtime_profile(&repo, git_profile.profile())?;
     ensure_local_branch_checked_out(&repo, branch)?;
     let head_target = git2_head_target(&repo, "read HEAD commit for branch publication")?;
     let remote_branch_ref = format!("refs/remotes/{remote}/{branch}");
@@ -123,19 +125,21 @@ fn push_branch(
     branch: &str,
     github_token: Option<&str>,
 ) -> Result<(), CliError> {
-    let repo = open_git2_repository(worktree)?;
+    let worktree_scope = sandbox::resolve_project_input(worktree)?;
+    let repo = open_git2_repository(worktree_scope.path())?;
     let source_branch = current_branch_name(&repo)?;
     let mut remote_handle = repo
         .find_remote(remote)
         .map_err(|error| git_operation_error(&format!("resolve remote '{remote}'"), error))?;
-    let git_profile =
-        git_runtime_profile_for_repository(remote_handle.url().and_then(parse_github_remote_url))?;
-    apply_git_runtime_profile(&repo, &git_profile)?;
+    let git_profile = resolve_git_runtime_profile(git_runtime_profile_for_repository(
+        remote_handle.url().and_then(parse_github_remote_url),
+    )?)?;
+    apply_git_runtime_profile(&repo, git_profile.profile())?;
     let mut push_options = PushOptions::new();
     push_options.remote_callbacks(git2_remote_callbacks(
         &repo,
         github_token,
-        git_profile.ssh_key_path.as_deref(),
+        git_profile.profile().ssh_key_path.as_deref(),
     )?);
     let refspec = format!("refs/heads/{source_branch}:refs/heads/{branch}");
     remote_handle
@@ -153,9 +157,54 @@ fn git_operation_error(context: &str, error: impl Display) -> CliError {
     CliErrorKind::workflow_io(format!("task-board github {context}: {error}")).into()
 }
 
-fn open_git2_repository(worktree: &str) -> Result<Git2Repository, CliError> {
-    Git2Repository::open(worktree)
-        .map_err(|error| git_operation_error(&format!("open repository at {worktree}"), error))
+fn open_git2_repository(worktree: &Path) -> Result<Git2Repository, CliError> {
+    Git2Repository::open(worktree).map_err(|error| {
+        git_operation_error(&format!("open repository at {}", worktree.display()), error)
+    })
+}
+
+struct ResolvedGitRuntimeProfile {
+    profile: TaskBoardGitRuntimeProfile,
+    _ssh_key_scope: Option<sandbox::ProjectInputScope>,
+    _signing_ssh_key_scope: Option<sandbox::ProjectInputScope>,
+}
+
+impl ResolvedGitRuntimeProfile {
+    fn profile(&self) -> &TaskBoardGitRuntimeProfile {
+        &self.profile
+    }
+}
+
+fn resolve_git_runtime_profile(
+    mut profile: TaskBoardGitRuntimeProfile,
+) -> Result<ResolvedGitRuntimeProfile, CliError> {
+    let ssh_key_scope = resolve_optional_path_input(profile.ssh_key_path.as_deref())?;
+    if let Some(scope) = ssh_key_scope.as_ref() {
+        profile.ssh_key_path = Some(scope.path().to_string_lossy().into_owned());
+    }
+    let signing_ssh_key_scope = if profile.signing.mode == TaskBoardGitSigningMode::Ssh {
+        resolve_optional_path_input(profile.signing.ssh_key_path.as_deref())?
+    } else {
+        None
+    };
+    if let Some(scope) = signing_ssh_key_scope.as_ref() {
+        profile.signing.ssh_key_path = Some(scope.path().to_string_lossy().into_owned());
+    }
+    Ok(ResolvedGitRuntimeProfile {
+        profile,
+        _ssh_key_scope: ssh_key_scope,
+        _signing_ssh_key_scope: signing_ssh_key_scope,
+    })
+}
+
+fn resolve_optional_path_input(
+    input: Option<&str>,
+) -> Result<Option<sandbox::ProjectInputScope>, CliError> {
+    input
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .map(sandbox::resolve_project_input)
+        .transpose()
 }
 
 fn apply_git_runtime_profile(
