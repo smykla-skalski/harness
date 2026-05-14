@@ -54,6 +54,11 @@ struct SessionTimelineList: View {
           .equatable()
           .id(row.id)
         }
+        SessionTimelineLoadOlderMarker(
+          hasOlder: presentation.navigation.hasOlder,
+          onLoadOlder: onRequestLoadOlder
+        )
+        .id(SessionTimelineLoadOlderMarker.identity(for: presentation.navigation))
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .coordinateSpace(.named(SessionTimelineRailCoordinateSpace.name))
@@ -66,44 +71,26 @@ struct SessionTimelineList: View {
     }
     .scrollIndicators(.visible)
     .scrollBounceBehavior(.basedOnSize, axes: .vertical)
-    .onScrollGeometryChange(
-      for: SessionTimelineLoadOlderTrigger.self,
-      of: SessionTimelineLoadOlderTrigger.init(geometry:)
-    ) { oldValue, newValue in
-      let firstRender = !oldValue.contentRendered && newValue.contentRendered
-      let risingNearBottom = !oldValue.isNearBottom && newValue.isNearBottom
-      guard firstRender || risingNearBottom else { return }
-      guard newValue.isNearBottom, presentation.navigation.hasOlder else { return }
-      onRequestLoadOlder?()
-    }
   }
 }
 
-struct SessionTimelineLoadOlderTrigger: Equatable {
-  static let nearBottomThreshold: CGFloat = 320
+struct SessionTimelineLoadOlderMarker: View {
+  let hasOlder: Bool
+  let onLoadOlder: (() -> Void)?
 
-  let isNearBottom: Bool
-  let contentRendered: Bool
-
-  init(isNearBottom: Bool, contentRendered: Bool = true) {
-    self.isNearBottom = isNearBottom
-    self.contentRendered = contentRendered
+  var body: some View {
+    Color.clear
+      .frame(maxWidth: .infinity)
+      .frame(height: 1)
+      .accessibilityHidden(true)
+      .onAppear {
+        guard hasOlder else { return }
+        onLoadOlder?()
+      }
   }
 
-  init(geometry: ScrollGeometry) {
-    self.init(
-      contentHeight: geometry.contentSize.height,
-      contentOffsetY: geometry.contentOffset.y,
-      viewportHeight: geometry.visibleRect.height
-    )
-  }
-
-  init(contentHeight: CGFloat, contentOffsetY: CGFloat, viewportHeight: CGFloat) {
-    let distanceFromBottom = max(0, contentHeight - contentOffsetY - viewportHeight)
-    self.init(
-      isNearBottom: distanceFromBottom <= Self.nearBottomThreshold,
-      contentRendered: contentHeight > 0
-    )
+  static func identity(for navigation: SessionTimelineWindowNavigation) -> String {
+    "load-older-marker:\(navigation.windowEnd):\(navigation.totalCount):\(navigation.hasOlder ? 1 : 0)"
   }
 }
 
