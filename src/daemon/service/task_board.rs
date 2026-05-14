@@ -157,7 +157,7 @@ pub fn dispatch_task_board(
     db: Option<&DaemonDb>,
 ) -> Result<TaskBoardDispatchResponse, CliError> {
     let board = store();
-    let items = board.list(request.status)?;
+    let items = selected_dispatch_items(&board, request)?;
     let plans = build_dispatch_summary(&items);
     if request.dry_run {
         return Ok(DispatchExecutionSummary::dry_run(plans));
@@ -179,7 +179,7 @@ pub(crate) async fn dispatch_task_board_async(
     async_db: &AsyncDaemonDb,
 ) -> Result<TaskBoardDispatchResponse, CliError> {
     let board = store();
-    let items = board.list(request.status)?;
+    let items = selected_dispatch_items(&board, request)?;
     let plans = build_dispatch_summary(&items);
     if request.dry_run {
         return Ok(DispatchExecutionSummary::dry_run(plans));
@@ -189,6 +189,16 @@ pub(crate) async fn dispatch_task_board_async(
         applied.push(apply_dispatch_plan_async(request, async_db, &board, plan).await?);
     }
     Ok(DispatchExecutionSummary { plans, applied })
+}
+
+fn selected_dispatch_items(
+    board: &TaskBoardStore,
+    request: &TaskBoardDispatchRequest,
+) -> Result<Vec<TaskBoardItem>, CliError> {
+    request.item_id.as_deref().map_or_else(
+        || board.list(request.status),
+        |item_id| board.get(item_id).map(|item| vec![item]),
+    )
 }
 
 fn apply_dispatch_plan(

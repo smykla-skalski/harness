@@ -48,6 +48,7 @@ struct TaskBoardItemManagementPanel: View {
           onRunOnce?(item)
         } label: {
           Label("Run Once", systemImage: "play.circle")
+            .scaledFont(.caption.weight(.semibold))
         }
         .frame(minHeight: metrics.controlMinHeight)
         .disabled(isActionInFlight || onRunOnce == nil)
@@ -56,6 +57,7 @@ struct TaskBoardItemManagementPanel: View {
           onEvaluate?(item)
         } label: {
           Label("Evaluate", systemImage: "checkmark.seal")
+            .scaledFont(.caption.weight(.semibold))
         }
         .frame(minHeight: metrics.controlMinHeight)
         .disabled(isActionInFlight || onEvaluate == nil)

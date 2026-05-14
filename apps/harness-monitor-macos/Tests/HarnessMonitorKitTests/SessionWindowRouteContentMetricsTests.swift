@@ -87,6 +87,7 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(boardSource.contains("dashboardUI.taskBoardItems"))
     #expect(boardSource.contains("dashboardUI.taskBoardEvaluationSummary"))
     #expect(boardSource.contains("onEvaluateTaskBoard: evaluateTaskBoard"))
+    #expect(boardSource.contains("onMoveTaskBoardItem: moveTaskBoardItem"))
     #expect(boardSource.contains("decisions: store.supervisorOpenDecisions"))
   }
 
@@ -99,6 +100,7 @@ struct SessionWindowRouteContentMetricsTests {
       #expect(source.contains("onStartTaskBoardOrchestrator: startTaskBoardOrchestrator"))
       #expect(source.contains("onStopTaskBoardOrchestrator: stopTaskBoardOrchestrator"))
       #expect(source.contains("onRunTaskBoardOrchestratorOnce: runTaskBoardOrchestratorOnce"))
+      #expect(source.contains("onMoveTaskBoardItem: moveTaskBoardItem"))
     }
 
     #expect(routeContentSource.contains("store.contentUI.dashboard.taskBoardOrchestratorStatus"))
@@ -113,11 +115,25 @@ struct SessionWindowRouteContentMetricsTests {
 
     #expect(overviewSource.contains("TaskBoardItemManagementPanel("))
     #expect(managementPanelSource.contains("harness.task-board.manage-item"))
-    #expect(overviewSource.contains("TaskBoardOrchestratorRunOnceRequest(status: item.status)"))
+    #expect(overviewSource.contains("TaskBoardOrchestratorRunOnceRequest(itemId: item.id"))
+    #expect(!overviewSource.contains("if !item.hasLinkedSessionTask"))
     #expect(managementPanelSource.contains("Session Task"))
     #expect(managementPanelSource.contains("Board Only"))
     #expect(!laneSource.contains(".disabled(!isOpenable)"))
     #expect(!laneSource.contains("private var isOpenable"))
+  }
+
+  @Test("Task board lanes expose card drag and lane drop")
+  func taskBoardLanesExposeCardDragAndLaneDrop() throws {
+    let overviewSource = try taskBoardSourceFile(named: "TaskBoardOverviewView.swift")
+    let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
+    let needsYouSource = try taskBoardSourceFile(named: "TaskBoardNeedsYouLaneViews.swift")
+
+    #expect(overviewSource.contains("lane.taskBoardDropStatus"))
+    #expect(laneSource.contains("TaskBoardItemDragPayload"))
+    #expect(laneSource.contains(".draggable(dragPayload)"))
+    #expect(laneSource.contains(".dropDestination(for: TaskBoardItemDragPayload.self"))
+    #expect(needsYouSource.contains(".dropDestination(for: TaskBoardItemDragPayload.self"))
   }
 
   private func sourceFile(named relativePath: String) throws -> String {

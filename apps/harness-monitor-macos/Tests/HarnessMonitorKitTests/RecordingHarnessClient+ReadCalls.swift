@@ -97,6 +97,8 @@ extension RecordingHarnessClient.ReadCall {
       "projects"
     case .sessions:
       "sessions"
+    case .taskBoardItems(let status):
+      "task-board-items:\(status?.rawValue ?? "all")"
     case .sessionDetail(let sessionID):
       "session-detail:\(sessionID)"
     case .timeline(let sessionID):

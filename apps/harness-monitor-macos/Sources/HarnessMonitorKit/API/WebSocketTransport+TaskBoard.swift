@@ -41,10 +41,14 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
-  public func syncTaskBoard(status: TaskBoardStatus? = nil) async throws -> TaskBoardSyncSummary {
-    let params = try encodeParams(TaskBoardStatusFilterRequest(status: status), extra: [:])
+  public func syncTaskBoard(request: TaskBoardSyncRequest) async throws -> TaskBoardSyncSummary {
+    let params = try encodeParams(request, extra: [:])
     let value = try await rpc(method: .taskBoardSync, params: params)
     return try decode(value)
+  }
+
+  public func syncTaskBoard(status: TaskBoardStatus? = nil) async throws -> TaskBoardSyncSummary {
+    try await syncTaskBoard(request: TaskBoardSyncRequest(status: status))
   }
 
   public func dispatchTaskBoard(request: TaskBoardDispatchRequest) async throws

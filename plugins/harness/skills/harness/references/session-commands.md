@@ -43,17 +43,25 @@ harness task-board get <task-id> [--json]
 harness task-board update <task-id> [--title "..."] [--body "..."] [--status <status>] [--priority <priority>] [--agent-mode <mode>] [--project-id <id>] [--clear-project] [--tag <tag>] [--planning-summary "..."] [--approved-by <id>]
 harness task-board delete <task-id>
 harness task-board sync [--json]
-harness task-board dispatch [--json]
+harness task-board dispatch [--json] [--dry-run] [--project-dir <path>] [--actor <agent-id>]
+harness task-board evaluate [--json] [--dry-run] [--status <status>] [--project-dir <path>]
 harness task-board audit [--json]
 harness task-board project [--json]
 harness task-board machine [--json]
+harness task-board orchestrator status [--json]
+harness task-board orchestrator start [--json]
+harness task-board orchestrator stop [--json]
+harness task-board orchestrator run-once [--json] [--dry-run|--apply] [--status <status>] [--project-dir <path>] [--actor <agent-id>]
+harness task-board orchestrator settings [--json] [--dry-run-default <bool>] [--dispatch-status-filter <status>] [--clear-dispatch-status-filter] [--project-dir <path>] [--clear-project-dir]
 ```
 
 Task statuses: `new`, `planning`, `plan_review`, `todo`, `in_progress`, `in_review`, `done`, `blocked`.
 Task priorities: `low`, `medium`, `high`, `critical`.
 Agent modes: `headless`, `interactive`, `planning`, `evaluate`.
 
-Read [task-board-workflow.md](task-board-workflow.md) for planning gates, review gates, dispatch readiness, and overview commands.
+Read [task-board-workflow.md](task-board-workflow.md) for planning gates,
+dispatch/evaluate behavior, orchestrator routes, policy pipeline routes, and
+overview commands.
 
 ## Signals
 
@@ -77,18 +85,26 @@ Cross-agent observation within session. Combines with `--poll-interval` for cont
 Unified managed terminal and Codex thread operations.
 
 ```
-harness session agents start terminal <session-id> --runtime <runtime> [--agent-id <id>]
-harness session agents start codex <session-id> --mode <mode> --prompt "..."
-harness session agents attach <session-id> <agent-id>
+harness session agents start terminal <session-id> --runtime <runtime> [--role <role>] [--capability <tag>] [--name "..."] [--prompt "..."] [--persona <id>] [--model <model>] [--effort <level>]
+harness session agents start codex <session-id> --mode <mode> --prompt "..." [--role <role>] [--capability <tag>] [--name "..."] [--persona <id>] [--resume-thread-id <id>] [--model <model>] [--effort <level>]
+harness session agents start acp --session-id <session-id> --agent <descriptor> [--role <role>] [--capability <tag>] [--name "..."] [--prompt "..."] [--persona <id>] [--model <model>] [--effort <level>]
+harness session agents attach <agent-id>
 harness session agents list <session-id>
-harness session agents show <session-id> <agent-id>
-harness session agents input <session-id> <agent-id> --text "..."
-harness session agents resize <session-id> <agent-id> --cols <n> --rows <n>
-harness session agents stop <session-id> <agent-id>
-harness session agents steer <session-id> <agent-id> --prompt "..."
-harness session agents interrupt <session-id> <agent-id>
-harness session agents approve <session-id> <agent-id> <approval-id> --decision <accept|reject>
+harness session agents show <agent-id>
+harness session agents input <agent-id> (--text "..."|--paste "..."|--key <key>|--control <char>|--raw-base64 <data>)
+harness session agents resize <agent-id> --cols <n> --rows <n>
+harness session agents stop <agent-id>
+harness session agents steer <agent-id> --prompt "..."
+harness session agents interrupt <agent-id>
+harness session agents approve <agent-id> <approval-id> --decision <accept|reject>
+harness session agents acp inspect [--session-id <session-id>]
 ```
+
+Task-board dispatch creates session tasks and records worker/reviewer/evaluator
+intent, but managed agent capacity is launched through these `session agents`
+commands. Terminal, Codex, and ACP starts can carry role, fallback role,
+capabilities, display name, persona, model, effort, and project-directory
+context when supported by that runtime.
 
 ## Runtimes
 

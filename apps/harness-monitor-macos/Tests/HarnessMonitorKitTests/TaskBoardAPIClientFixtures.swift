@@ -97,6 +97,31 @@ let sampleTaskBoardEvaluationSummaryJSON: [String: JSONValue] = [
   ]),
 ]
 
+let sampleTaskBoardSyncSummaryJSON: [String: JSONValue] = [
+  "total": .number(1),
+  "providers": .array([
+    .object([
+      "provider": .string("git_hub"),
+      "configured": .bool(true),
+      "linked": .number(1),
+      "pushable": .number(0),
+      "blocked": .number(0),
+      "token_env": .array([.string("HARNESS_GITHUB_TOKEN"), .string("GH_TOKEN")]),
+    ])
+  ]),
+  "operations": .array([
+    .object([
+      "provider": .string("git_hub"),
+      "action": .string("push"),
+      "board_item_id": .string("board-1"),
+      "external_id": .string("123"),
+      "url": .string("https://example.invalid/issues/123"),
+      "dry_run": .bool(false),
+      "applied": .bool(true),
+    ])
+  ]),
+]
+
 let sampleTaskBoardOrchestratorSettingsJSON: [String: JSONValue] = [
   "enabled_workflows": .array([
     .string("default_task"),
@@ -151,10 +176,7 @@ let sampleTaskBoardOrchestratorStatusJSON: [String: JSONValue] = [
     "started_at": .string("2026-05-14T10:00:00Z"),
     "completed_at": .string("2026-05-14T10:01:00Z"),
     "dry_run": .bool(false),
-    "sync": .object([
-      "total": .number(1),
-      "providers": .array([]),
-    ]),
+    "sync": .object(sampleTaskBoardSyncSummaryJSON),
     "audit": .object([
       "total": .number(1),
       "ready": .number(1),
@@ -266,6 +288,34 @@ let sampleOrchestratorSettingsText =
   }
   """
 
+let sampleTaskBoardSyncSummaryText =
+  """
+  {
+    "total": 1,
+    "providers": [
+      {
+        "provider": "git_hub",
+        "configured": true,
+        "linked": 1,
+        "pushable": 0,
+        "blocked": 0,
+        "token_env": ["HARNESS_GITHUB_TOKEN", "GH_TOKEN"]
+      }
+    ],
+    "operations": [
+      {
+        "provider": "git_hub",
+        "action": "push",
+        "board_item_id": "board-1",
+        "external_id": "123",
+        "url": "https://example.invalid/issues/123",
+        "dry_run": false,
+        "applied": true
+      }
+    ]
+  }
+  """
+
 let sampleOrchestratorStatusText =
   """
   {
@@ -284,10 +334,7 @@ let sampleOrchestratorStatusText =
       "started_at": "2026-05-14T10:00:00Z",
       "completed_at": "2026-05-14T10:01:00Z",
       "dry_run": false,
-      "sync": {
-        "total": 1,
-        "providers": []
-      },
+      "sync": \(sampleTaskBoardSyncSummaryText),
       "audit": {
         "total": 1,
         "ready": 1,

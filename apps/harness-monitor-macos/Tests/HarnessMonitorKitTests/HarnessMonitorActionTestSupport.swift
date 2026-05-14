@@ -163,6 +163,10 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       dryRun: Bool,
       status: TaskBoardStatus?
     )
+    case updateTaskBoardItem(
+      id: String,
+      status: TaskBoardStatus?
+    )
     case updateTaskBoardOrchestratorSettings(
       policyVersion: String?,
       clearProjectDir: Bool,
@@ -192,6 +196,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     case diagnostics
     case projects
     case sessions
+    case taskBoardItems(TaskBoardStatus?)
     case sessionDetail(String)
     case timeline(String)
     case timelineWindow(String)
@@ -221,6 +226,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var archiveSessionError: (any Error)?
   var projectSummariesStorage: [ProjectSummary]?
   var sessionSummariesStorage: [SessionSummary]?
+  var taskBoardItemsStorage: [TaskBoardItem] = []
   var sessionDetailsByID: [String: SessionDetail] = [:]
   var detailDelaysBySessionID: [String: Duration] = [:]
   var sessionDetailErrorsByID: [String: any Error] = [:]

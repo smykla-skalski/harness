@@ -21,11 +21,13 @@ fn websocket_task_board_dispatch_evaluate_and_run_once_use_real_state() {
             let connection = Arc::new(Mutex::new(ConnectionState::new()));
 
             seed_ready_board_item("board-ws-dispatch", "WS dispatch item");
+            seed_ready_board_item("board-ws-dispatch-other", "WS dispatch other item");
             let dispatch_response = dispatch(
                 &request(
                     "req-task-board-dispatch",
                     ws_methods::TASK_BOARD_DISPATCH,
                     json!({
+                        "item_id": "board-ws-dispatch",
                         "status": "todo",
                         "dry_run": false,
                         "project_dir": project_dir,
@@ -39,7 +41,9 @@ fn websocket_task_board_dispatch_evaluate_and_run_once_use_real_state() {
             let applied = first_applied(dispatch_result);
             let session_id = required_string(applied, "session_id");
             let work_item_id = required_string(applied, "work_item_id");
+            assert_eq!(applied["board_item_id"].as_str(), Some("board-ws-dispatch"));
             assert_eq!(applied["item"]["status"].as_str(), Some("in_progress"));
+            assert_board_item_unlinked("board-ws-dispatch-other");
             join_leader(&state, &session_id, &project_dir).await;
 
             assert_ok(
@@ -78,11 +82,13 @@ fn websocket_task_board_dispatch_evaluate_and_run_once_use_real_state() {
             assert_eq!(evaluation_result["completed"].as_u64(), Some(1));
 
             seed_ready_board_item("board-ws-run-once", "WS run once item");
+            seed_ready_board_item("board-ws-run-once-other", "WS run once other item");
             let run_once_response = dispatch(
                 &request(
                     "req-task-board-run-once",
                     ws_methods::TASK_BOARD_ORCHESTRATOR_RUN_ONCE,
                     json!({
+                        "item_id": "board-ws-run-once",
                         "status": "todo",
                         "dry_run": false,
                         "project_dir": project_dir,
@@ -103,6 +109,10 @@ fn websocket_task_board_dispatch_evaluate_and_run_once_use_real_state() {
                     .map(Vec::len),
                 Some(1)
             );
+            assert_eq!(
+                run_once_result["last_run"]["dispatch"]["applied"][0]["board_item_id"].as_str(),
+                Some("board-ws-run-once")
+            );
             assert!(
                 run_once_result["last_run"]["evaluation"]["evaluated"]
                     .as_u64()
@@ -112,6 +122,7 @@ fn websocket_task_board_dispatch_evaluate_and_run_once_use_real_state() {
                 run_once_result,
                 "board-ws-run-once"
             ));
+            assert_board_item_unlinked("board-ws-run-once-other");
         });
     });
 }
@@ -412,6 +423,14 @@ fn first_applied(value: &Value) -> &Value {
         .as_array()
         .and_then(|applied| applied.first())
         .expect("first applied task")
+}
+
+fn assert_board_item_unlinked(id: &str) {
+    let item = TaskBoardStore::new(default_board_root())
+        .get(id)
+        .expect("load board item");
+    assert_eq!(item.status, TaskBoardStatus::Todo);
+    assert!(item.work_item_id.is_none());
 }
 
 fn required_string(value: &Value, key: &str) -> String {

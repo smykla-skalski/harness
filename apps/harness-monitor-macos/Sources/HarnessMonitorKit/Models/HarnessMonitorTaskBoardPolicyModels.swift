@@ -291,10 +291,16 @@ public struct TaskBoardPolicyPipelineNodeKind: Codable, Equatable, Sendable {
   }
 }
 
-public struct TaskBoardPolicyEvidencePredicate: Codable, Equatable, Sendable {
-  public var predicate: String
+public enum TaskBoardPolicyEvidencePredicateValue: String, Codable, CaseIterable, Sendable {
+  case isTrue = "is_true"
+  case isFalse = "is_false"
+  case isZero = "is_zero"
+}
 
-  public init(predicate: String) {
+public struct TaskBoardPolicyEvidencePredicate: Codable, Equatable, Sendable {
+  public var predicate: TaskBoardPolicyEvidencePredicateValue
+
+  public init(predicate: TaskBoardPolicyEvidencePredicateValue) {
     self.predicate = predicate
   }
 }

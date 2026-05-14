@@ -30,7 +30,7 @@ private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
   .taskBoardGet: .object(sampleTaskBoardItemJSON),
   .taskBoardUpdate: .object(sampleTaskBoardItemJSON),
   .taskBoardDelete: .object(sampleTaskBoardItemJSON),
-  .taskBoardSync: .object(["total": .number(1), "providers": .array([])]),
+  .taskBoardSync: .object(sampleTaskBoardSyncSummaryJSON),
   .taskBoardDispatch: .object(sampleTaskBoardDispatchSummaryJSON),
   .taskBoardEvaluate: .object(sampleTaskBoardEvaluationSummaryJSON),
   .taskBoardAudit: .object([
@@ -89,7 +89,7 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
   nonisolated(unsafe) private static var recordedRequests: [RecordedRequest] = []
   private static let responseBodies: [Route: String] = [
     Route("/v1/task-board/items", method: "GET"): #"{"items":[\#(sampleTaskBoardItemJSONString)]}"#,
-    Route("/v1/task-board/sync"): #"{"total":1,"providers":[]}"#,
+    Route("/v1/task-board/sync"): sampleTaskBoardSyncSummaryText,
     Route("/v1/task-board/dispatch"): sampleTaskBoardDispatchSummaryJSONString,
     Route("/v1/task-board/evaluate"): sampleTaskBoardEvaluationSummaryText,
     Route("/v1/task-board/audit"): #"{"total":1,"ready":1,"blocked":0,"deleted":0,"by_status":[]}"#,

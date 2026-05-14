@@ -81,6 +81,7 @@ struct TaskBoardOrchestratorSummaryView: View {
             onStop()
           } label: {
             Label("Stop", systemImage: "stop.circle")
+              .scaledFont(.caption.weight(.semibold))
           }
           .frame(minHeight: metrics.controlMinHeight)
           .disabled(isActionInFlight)
@@ -92,6 +93,7 @@ struct TaskBoardOrchestratorSummaryView: View {
           onStart()
         } label: {
           Label("Start", systemImage: "play.circle")
+            .scaledFont(.caption.weight(.semibold))
         }
         .frame(minHeight: metrics.controlMinHeight)
         .disabled(isActionInFlight)
@@ -104,6 +106,7 @@ struct TaskBoardOrchestratorSummaryView: View {
           onRunOnce()
         } label: {
           Label("Run Once", systemImage: "playpause")
+            .scaledFont(.caption.weight(.semibold))
         }
         .frame(minHeight: metrics.controlMinHeight)
         .disabled(isActionInFlight)

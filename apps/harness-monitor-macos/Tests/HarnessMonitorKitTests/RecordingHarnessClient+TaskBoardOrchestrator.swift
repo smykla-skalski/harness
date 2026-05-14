@@ -3,6 +3,31 @@ import Foundation
 @testable import HarnessMonitorKit
 
 extension RecordingHarnessClient {
+  func taskBoardItems(status: TaskBoardStatus?) async throws -> [TaskBoardItem] {
+    recordReadCall(.taskBoardItems(status))
+    let items = lock.withLock { taskBoardItemsStorage }
+    guard let status else {
+      return items
+    }
+    return items.filter { $0.status == status }
+  }
+
+  func updateTaskBoardItem(
+    id: String,
+    request: TaskBoardUpdateItemRequest
+  ) async throws -> TaskBoardItem {
+    calls.append(.updateTaskBoardItem(id: id, status: request.status))
+    return try lock.withLock {
+      guard let index = taskBoardItemsStorage.firstIndex(where: { $0.id == id }) else {
+        throw HarnessMonitorAPIError.server(code: 404, message: "Task board item unavailable.")
+      }
+      let current = taskBoardItemsStorage[index]
+      let updated = current.applying(request)
+      taskBoardItemsStorage[index] = updated
+      return updated
+    }
+  }
+
   func taskBoardOrchestratorStatus() async throws -> TaskBoardOrchestratorStatus {
     recordReadCall(.taskBoardOrchestratorStatus)
     return sampleTaskBoardOrchestratorStatus()
@@ -126,6 +151,31 @@ extension RecordingHarnessClient {
         enabledAutomations: TaskBoardGitHubAutomationToggles(enabled: [.syncTaskBoard, .autoMerge])
       ),
       policyVersion: "task-board-policy-v1"
+    )
+  }
+}
+
+extension TaskBoardItem {
+  fileprivate func applying(_ request: TaskBoardUpdateItemRequest) -> TaskBoardItem {
+    TaskBoardItem(
+      schemaVersion: schemaVersion,
+      id: id,
+      title: request.title ?? title,
+      body: request.body ?? body,
+      status: request.status ?? status,
+      priority: request.priority ?? priority,
+      tags: request.tags ?? tags,
+      projectId: request.clearProjectId ? nil : request.projectId ?? projectId,
+      agentMode: request.agentMode ?? agentMode,
+      externalRefs: request.externalRefs ?? externalRefs,
+      planning: request.planning ?? planning,
+      workflow: request.workflow ?? workflow,
+      sessionId: request.clearSessionId ? nil : request.sessionId ?? sessionId,
+      workItemId: request.clearWorkItemId ? nil : request.workItemId ?? workItemId,
+      usage: usage,
+      createdAt: createdAt,
+      updatedAt: "2026-05-14T10:05:00Z",
+      deletedAt: deletedAt
     )
   }
 }

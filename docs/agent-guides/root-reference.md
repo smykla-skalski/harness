@@ -48,6 +48,10 @@ hooks.
 - `commands/` - CLI command handlers.
 - `session/` - multi-agent orchestration types, roles, storage, service,
   transport, and observation.
+- `task_board/` - cross-project board state, planning gates, dispatch/evaluate
+  reconciliation, orchestrator state, external sync, and policy pipeline graph
+  evaluation. See `docs/agent-guides/task-board-workflow.md` for operator
+  behavior.
 - `agents/runtime/` - runtime adapters, conversation events, signal protocol,
   and liveness detection.
 
@@ -61,6 +65,9 @@ hooks.
   multi-agent session state.
 - `$XDG_DATA_HOME/harness/projects/project-{digest}/agents/signals/` -
   file-based agent signaling.
+- Task-board state uses the board root resolved by the CLI/daemon, normally
+  under the project Harness data area. Access it through `harness task-board`
+  commands or daemon task-board routes instead of reading JSON files directly.
 
 ## Testing details
 

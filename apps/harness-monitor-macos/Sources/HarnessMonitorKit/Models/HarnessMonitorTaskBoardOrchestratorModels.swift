@@ -66,17 +66,20 @@ public struct TaskBoardOrchestratorSettingsUpdateRequest: Codable, Equatable, Se
 }
 
 public struct TaskBoardOrchestratorRunOnceRequest: Codable, Equatable, Sendable {
+  public let itemId: String?
   public let dryRun: Bool?
   public let status: TaskBoardStatus?
   public let projectDir: String?
   public let actor: String?
 
   public init(
+    itemId: String? = nil,
     dryRun: Bool? = nil,
     status: TaskBoardStatus? = nil,
     projectDir: String? = nil,
     actor: String? = nil
   ) {
+    self.itemId = itemId
     self.dryRun = dryRun
     self.status = status
     self.projectDir = projectDir

@@ -76,6 +76,7 @@ pub fn run_task_board_orchestrator_once(
     orchestrator.record_run_phase(&prepared, TaskBoardOrchestratorTickPhase::Evaluation)?;
     let evaluation = match evaluate_task_board(
         &TaskBoardEvaluateRequest {
+            item_id: prepared.input.item_id.clone(),
             status: None,
             dry_run: prepared.input.dry_run,
         },
@@ -111,6 +112,7 @@ pub(crate) async fn run_task_board_orchestrator_once_async(
     orchestrator.record_run_phase(&prepared, TaskBoardOrchestratorTickPhase::Evaluation)?;
     let evaluation = match evaluate_task_board_async(
         &TaskBoardEvaluateRequest {
+            item_id: prepared.input.item_id.clone(),
             status: None,
             dry_run: prepared.input.dry_run,
         },
@@ -135,6 +137,7 @@ fn dispatch_request_from_input(
     input: &TaskBoardOrchestratorDispatchInput,
 ) -> TaskBoardDispatchRequest {
     TaskBoardDispatchRequest {
+        item_id: input.item_id.clone(),
         status: input.status,
         dry_run: input.dry_run,
         project_dir: input.project_dir.clone(),
