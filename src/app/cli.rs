@@ -152,7 +152,7 @@ pub enum Command {
     /// Cross-project task board.
     TaskBoard {
         #[command(subcommand)]
-        command: TaskBoardCommand,
+        command: Box<TaskBoardCommand>,
     },
 
     /// Local daemon for the Harness app.
