@@ -1,40 +1,25 @@
 import SwiftUI
 
-/// Bottom-left zoom chrome overlay rendered by `PolicyCanvasViewport`. Three
-/// buttons (zoom out, zoom in, reset) drive `PolicyCanvasViewModel.setZoom`
-/// through the chrome-only `withAnimation` path — live magnify on the
-/// trackpad bypasses this animation in `PolicyCanvasViewport.magnifyGesture`
-/// so the per-frame magnification write stays gesture-fresh.
+/// Bottom-leading viewport zoom HUD. The visible chrome owns one keyboard
+/// chord per Button — Cmd-- (zoom out), Cmd-+ (zoom in), Cmd-0 (reset) —
+/// and the alternate Cmd-= chord for zoom-in is registered at the scene
+/// level through `harnessPolicyCanvasZoomFocus` so the menu / Mac-standard
+/// keyboard convention works without a hidden Button anti-pattern.
 ///
-/// Extracted from `PolicyCanvasChromeViews.swift` on touch (Wave 4L) to
-/// keep the chrome file under the 420-line cap after the P18/P19 reduce-
-/// motion wiring landed.
+/// Trackpad pinch zoom lives on `PolicyCanvasViewport.magnifyGesture` and
+/// is the primary zoom gesture. The chrome buttons drive
+/// `PolicyCanvasViewModel.setZoom` through a `withAnimation(zoomTransition)`
+/// path so each click animates; live pinch bypasses the animation so the
+/// per-frame magnification stays gesture-fresh.
 struct PolicyCanvasZoomControls: View {
   let viewModel: PolicyCanvasViewModel
-  /// P19 reduce-motion handle for the P18 chrome-zoom transition. Live
-  /// magnify gesture in `PolicyCanvasViewport.magnifyGesture` deliberately
-  /// bypasses this animation because animating the per-frame magnification
-  /// write would feel laggy against the trackpad gesture. Nil fallback reads
-  /// the system `\.accessibilityReduceMotion` so callers outside the canvas
-  /// root still respect the system setting.
   @Environment(\.policyCanvasReducedMotion) private var canvasReducedMotion
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
 
-  /// Resolved reduce-motion bit. Prefer the canvas-scoped override (set by
-  /// `PolicyCanvasView` from the system flag, or by tests via the
-  /// environment-override hook) and fall back to the system flag when nil.
   private var reducedMotion: Bool {
     canvasReducedMotion ?? systemReduceMotion
   }
 
-  // The image-only buttons below carry icons that VoiceOver would otherwise
-  // read as their SF Symbol names ("minus magnifying glass, button"). The
-  // explicit `.accessibilityLabel` calls give the AT user the same intent
-  // the sighted user gets from the glyph. The `.keyboardShortcut`s map to
-  // legacy app shortcuts; the cross-wave plan tracked in 4M ports these
-  // chord-to-action mappings into a `CommandGroup` so the same shortcuts
-  // appear in the menu bar. Keep these buttons in lockstep with that
-  // migration so the chord wiring stays unique.
   var body: some View {
     HStack(spacing: 6) {
       Button {

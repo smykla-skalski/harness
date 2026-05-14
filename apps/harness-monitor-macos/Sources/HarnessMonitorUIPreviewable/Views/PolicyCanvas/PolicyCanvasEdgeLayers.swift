@@ -1,33 +1,26 @@
 import SwiftUI
 
-/// Edge-drawing layers extracted from `PolicyCanvasWorkspaceViews.swift` on
-/// touch (Wave 4L fix-up) so the workspace file stays under the 420-line
-/// cap after the reduce-motion env reads landed on every layer.
-///
-/// `PolicyCanvasEdgeLayer` renders the connection strokes; the matching
-/// label layer (`PolicyCanvasEdgeLabelLayer`) paints clickable capsules
-/// over each route's label midpoint so labels stay legible and selectable
-/// even when edges visually overlap at a route junction.
 struct PolicyCanvasEdgeLayer: View {
   let viewModel: PolicyCanvasViewModel
-  /// P19 reduce-motion handle for the P18 edge selection-mark transition.
-  /// Canvas-scoped override is optional with system fallback; see
-  /// `PolicyCanvasMotion`.
-  @Environment(\.policyCanvasReducedMotion) private var canvasReducedMotion
-  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
-
-  private var reducedMotion: Bool {
-    canvasReducedMotion ?? systemReduceMotion
-  }
+  /// Hoisted from the viewport parent's body. Iterating the parameter-bound
+  /// `edges` instead of `viewModel.edges` avoids a second `@Observable`
+  /// accessor invocation per render (the parent already read it once when
+  /// building the `portAnchors` map).
+  let edges: [PolicyCanvasEdge]
+  /// Bulk port-anchor map computed once in the viewport parent and shared
+  /// with `PolicyCanvasEdgeLabelLayer` so the two layers do not each rebuild
+  /// the same dictionary per render cycle.
+  let portAnchors: [PolicyCanvasPortEndpoint: CGPoint]
 
   var body: some View {
+    // Severity map and edge-lane assignments stay local to this layer:
+    // both are layer-specific and the label layer does not need them.
     let severityMap = viewModel.edgeSeverityMap
     let edgeLanes = viewModel.edgeRouteLanes
-    let selectedEdgeID = viewModel.selectedEdge?.id
     ZStack(alignment: .topLeading) {
-      ForEach(viewModel.edges) { edge in
-        if let source = viewModel.portAnchor(for: edge.source),
-          let target = viewModel.portAnchor(for: edge.target)
+      ForEach(edges) { edge in
+        if let source = portAnchors[edge.source],
+          let target = portAnchors[edge.target]
         {
           let route = PolicyCanvasEdgeRoute(
             source: source,
@@ -46,16 +39,6 @@ struct PolicyCanvasEdgeLayer: View {
                 lineCap: .round,
                 lineJoin: .round
               )
-            )
-            // P18 edge selection-mark: fade the stroke color when the
-            // selection landing on this edge flips. Keyed on the
-            // edge-vs-selected match bit so neighboring edges don't reanimate
-            // when an unrelated selection change repaints the layer. The
-            // wrapper hoists the `Animation?` value out of the body so the
-            // per-frame construction collapses to a `static let` lookup.
-            .policyCanvasSelectionMark(
-              value: selectedEdgeID == edge.id,
-              reducedMotion: reducedMotion
             )
             .accessibilityHidden(true)
         }
@@ -87,16 +70,23 @@ struct PolicyCanvasEdgeLayer: View {
 struct PolicyCanvasEdgeLabelLayer: View {
   let viewModel: PolicyCanvasViewModel
   let focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
+  /// Shared with `PolicyCanvasEdgeLayer` via the viewport parent so both
+  /// layers iterate the same hoisted array (one `@Observable` read instead
+  /// of one read per layer).
+  let edges: [PolicyCanvasEdge]
+  /// Shared bulk port-anchor map built once in the viewport parent — see
+  /// `PolicyCanvasEdgeLayer` for the dedup rationale.
+  let portAnchors: [PolicyCanvasPortEndpoint: CGPoint]
   @Environment(\.fontScale) private var fontScale
 
   var body: some View {
     let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
     let edgeLanes = viewModel.edgeRouteLanes
     ZStack(alignment: .topLeading) {
-      ForEach(viewModel.edges) { edge in
+      ForEach(edges) { edge in
         if !edge.label.isEmpty,
-          let source = viewModel.portAnchor(for: edge.source),
-          let target = viewModel.portAnchor(for: edge.target)
+          let source = portAnchors[edge.source],
+          let target = portAnchors[edge.target]
         {
           let route = PolicyCanvasEdgeRoute(
             source: source,

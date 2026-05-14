@@ -66,9 +66,49 @@ extension PolicyCanvasViewModel {
 
   /// Updates the canvas zoom and marks the viewport (not the document) dirty.
   /// Viewport state is window-scoped layout, not part of the saved pipeline.
+  ///
+  /// Equality damping is load-bearing on the pinch path: `MagnifyGesture`
+  /// writes per gesture tick (~60-120Hz), and `@Observable` does not diff
+  /// before notifying observers. A pinch pinned at the clamp (0.6 or 1.4)
+  /// would otherwise fire two notifications per frame for the duration of
+  /// the pinch — once for `zoom`, once for `viewportDirty`. Guarding both
+  /// writes against their current values drops the bottom-of-range and
+  /// top-of-range storms entirely.
   func setZoom(_ nextZoom: CGFloat) {
-    zoom = min(1.4, max(0.6, nextZoom))
-    viewportDirty = true
+    let clamped = min(1.4, max(0.6, nextZoom))
+    guard clamped != zoom else {
+      return
+    }
+    zoom = clamped
+    if !viewportDirty {
+      viewportDirty = true
+    }
+  }
+
+  /// Pinch-anchored zoom. Captures the gesture's focal point as a unit-space
+  /// anchor (x, y in [0, 1] over the content size) so the rendering scale
+  /// effect can apply the zoom around the point under the user's fingers.
+  /// Falls back to the plain `setZoom(_:)` when the anchor is nil so chrome
+  /// buttons (Cmd-+ / Cmd-= / Cmd--) keep their existing top-leading anchor.
+  ///
+  /// The anchor write is funneled through this entry point so the pinch
+  /// gesture handler can update both the scale value and the anchor in a
+  /// single observation-coherent turn.
+  func setZoom(_ nextZoom: CGFloat, anchor: UnitPoint?) {
+    if let anchor, anchor != pinchAnchorUnit {
+      pinchAnchorUnit = anchor
+    }
+    setZoom(nextZoom)
+  }
+
+  /// Drops the pinch anchor so subsequent chrome-button zooms render from the
+  /// canvas top-leading origin. Called from the magnify gesture's `.onEnded`
+  /// and from scene-phase interruption surfaces so a window-deactivation
+  /// mid-pinch does not strand a stale anchor.
+  func clearPinchAnchor() {
+    if pinchAnchorUnit != nil {
+      pinchAnchorUnit = nil
+    }
   }
 
   func palettePayload(for kind: PolicyCanvasNodeKind) -> String {

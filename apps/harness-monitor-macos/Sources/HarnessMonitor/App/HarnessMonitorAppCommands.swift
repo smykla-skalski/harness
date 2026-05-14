@@ -16,6 +16,8 @@ struct HarnessMonitorAppCommands: Commands {
   private var searchFocusAction
   @FocusedValue(\.harnessSessionSidebarSelection)
   private var sidebarSelectionFocus
+  @FocusedValue(\.harnessPolicyCanvasZoomFocus)
+  private var policyCanvasZoomFocus
   let store: HarnessMonitorStore
   let displayState: CommandsDisplayState
   let textSizeIndex: Int
@@ -40,6 +42,7 @@ struct HarnessMonitorAppCommands: Commands {
     systemCommands
     fileAndEditCommands
     viewCommands
+    policyCanvasZoomCommands
     helpCommands
   }
 
@@ -119,6 +122,23 @@ struct HarnessMonitorAppCommands: Commands {
 
       Button("Refresh", action: refreshStore)
         .keyboardShortcut("r", modifiers: [.command])
+    }
+  }
+
+  /// Scene-level keyboard shortcut for the Mac-standard Cmd-= zoom-in chord
+  /// when a policy canvas owns the active scene focus. Preview, Maps, Safari,
+  /// and Xcode IB bind both Cmd-+ and Cmd-= to zoom-in; the canvas chrome
+  /// already owns the Cmd-+ binding directly on its visible button, so this
+  /// menu entry adds the alternate chord without a hidden Button. The item
+  /// is gated on `policyCanvasZoomFocus != nil` so the chord only intercepts
+  /// when a canvas is focused; non-canvas scenes leave the chord unbound.
+  @CommandsBuilder private var policyCanvasZoomCommands: some Commands {
+    CommandGroup(after: .toolbar) {
+      Button("Zoom In") {
+        policyCanvasZoomFocus?.dispatcher.performZoomIn()
+      }
+      .keyboardShortcut("=", modifiers: .command)
+      .disabled(policyCanvasZoomFocus == nil)
     }
   }
 

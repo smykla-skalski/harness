@@ -70,6 +70,62 @@ extension PolicyCanvasViewModel {
     return portAnchor(for: node, side: side, index: index, count: ports.count)
   }
 
+  /// Bulk-resolve every endpoint referenced by `edges` into a single dictionary
+  /// the body-local site can hoist before iterating. Hot-path callers
+  /// (`PolicyCanvasEdgeLayer`, `PolicyCanvasEdgeLabelLayer`) used to call
+  /// `portAnchor(for:)` twice per edge per body run, each of which walked
+  /// `nodes` linearly and then walked the port list — quadratic in edge count
+  /// on the dense default fixture. This pre-rolls a `[Endpoint: CGPoint]` map
+  /// once per body so each per-edge lookup is O(1). Endpoints that fail to
+  /// resolve (deleted node, missing port id) are omitted from the dictionary
+  /// so callers still gate rendering on `dict[endpoint] != nil`, matching the
+  /// behavior of the per-edge `portAnchor(for:)` short-circuit.
+  ///
+  /// Allocation contract: builds one node-id index dictionary and one result
+  /// dictionary per call; callers must scope this to a body-local `let` so the
+  /// dictionary is dropped at end-of-body and not retained across renders.
+  func portAnchors(
+    for edges: [PolicyCanvasEdge]
+  ) -> [PolicyCanvasPortEndpoint: CGPoint] {
+    guard !edges.isEmpty else {
+      return [:]
+    }
+    // O(n) node index once. `nodes` is small (<200) but `first(where:)` on
+    // each endpoint lookup is O(n) per call; index up front so the per-edge
+    // path is O(1) for both endpoint resolutions.
+    var nodeIndex: [String: PolicyCanvasNode] = [:]
+    nodeIndex.reserveCapacity(nodes.count)
+    for node in nodes {
+      nodeIndex[node.id] = node
+    }
+    var anchors: [PolicyCanvasPortEndpoint: CGPoint] = [:]
+    anchors.reserveCapacity(edges.count * 2)
+    for edge in edges {
+      if let point = portAnchor(for: edge.source, nodeIndex: nodeIndex) {
+        anchors[edge.source] = point
+      }
+      if let point = portAnchor(for: edge.target, nodeIndex: nodeIndex) {
+        anchors[edge.target] = point
+      }
+    }
+    return anchors
+  }
+
+  private func portAnchor(
+    for endpoint: PolicyCanvasPortEndpoint,
+    nodeIndex: [String: PolicyCanvasNode]
+  ) -> CGPoint? {
+    guard let node = nodeIndex[endpoint.nodeID] else {
+      return nil
+    }
+    let ports = endpoint.kind == .input ? node.inputPorts : node.outputPorts
+    guard let index = ports.firstIndex(where: { $0.id == endpoint.portID }) else {
+      return nil
+    }
+    let side = endpoint.side ?? defaultPortSide(for: endpoint.kind)
+    return portAnchor(for: node, side: side, index: index, count: ports.count)
+  }
+
   func node(_ id: String) -> PolicyCanvasNode? {
     nodes.first { $0.id == id }
   }
