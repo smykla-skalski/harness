@@ -45,6 +45,7 @@ public enum HarnessMonitorPreviewStoreFactory {
     case dashboardLanding
     case dashboardLoaded
     case cockpitLoaded
+    case policyCanvas
     case emptyCockpit
     case toolbarCountRegression
     case codexApprovalUnification

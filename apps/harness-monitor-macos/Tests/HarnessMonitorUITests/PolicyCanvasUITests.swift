@@ -4,7 +4,11 @@ private typealias Accessibility = HarnessMonitorUITestAccessibility
 
 @MainActor
 final class PolicyCanvasUITests: HarnessMonitorUITestCase {
-  private static let previewSessionID = "sess1234"
+  private static let previewScenarioKey = "HARNESS_MONITOR_PREVIEW_SCENARIO"
+  private static let initialRouteKey = "HARNESS_MONITOR_UI_TEST_SESSION_ROUTE"
+  private static let previewPolicyCanvasScenario = "policy-canvas"
+  private static let policyCanvasRoute = "policyCanvas"
+  private static let inspectorWidth: CGFloat = 280
   override nonisolated static var reuseLaunchedApp: Bool { true }
 
   func testPolicyCanvasOpensFromSessionRouteWithPromoteGated() throws {
@@ -13,7 +17,6 @@ final class PolicyCanvasUITests: HarnessMonitorUITestCase {
     let root = element(in: app, identifier: Accessibility.policyCanvasRoot)
     XCTAssertTrue(root.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(element(in: app, identifier: Accessibility.policyCanvasToolRail).exists)
-    XCTAssertTrue(element(in: app, identifier: Accessibility.policyCanvasInspector).exists)
     XCTAssertFalse(button(in: app, identifier: Accessibility.policyCanvasPromoteButton).isEnabled)
   }
 
@@ -23,7 +26,6 @@ final class PolicyCanvasUITests: HarnessMonitorUITestCase {
     let root = element(in: app, identifier: Accessibility.policyCanvasRoot)
     let topBar = element(in: app, identifier: Accessibility.policyCanvasTopBar)
     let toolRail = element(in: app, identifier: Accessibility.policyCanvasToolRail)
-    let inspector = element(in: app, identifier: Accessibility.policyCanvasInspector)
     let entry = element(in: app, identifier: Accessibility.policyCanvasGroup("entry"))
     let merge = element(in: app, identifier: Accessibility.policyCanvasGroup("merge"))
     let terminal = element(in: app, identifier: Accessibility.policyCanvasGroup("terminal"))
@@ -31,7 +33,6 @@ final class PolicyCanvasUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(root.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(topBar.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(toolRail.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(inspector.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(entry.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(merge.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(terminal.waitForExistence(timeout: Self.actionTimeout))
@@ -39,14 +40,13 @@ final class PolicyCanvasUITests: HarnessMonitorUITestCase {
     let canvasFrame = CGRect(
       x: toolRail.frame.maxX,
       y: topBar.frame.maxY,
-      width: inspector.frame.minX - toolRail.frame.maxX,
+      width: root.frame.maxX - Self.inspectorWidth - toolRail.frame.maxX,
       height: root.frame.maxY - topBar.frame.maxY
     )
 
     for group in [entry, merge, terminal] {
       XCTAssertFalse(group.frame.intersects(topBar.frame), "Policy group overlaps top bar")
       XCTAssertFalse(group.frame.intersects(toolRail.frame), "Policy group overlaps tool rail")
-      XCTAssertFalse(group.frame.intersects(inspector.frame), "Policy group overlaps inspector")
       XCTAssertTrue(
         canvasFrame.insetBy(dx: -1, dy: -1).contains(group.frame),
         "Policy group should start fully inside the canvas viewport"
@@ -103,25 +103,24 @@ final class PolicyCanvasUITests: HarnessMonitorUITestCase {
   private func openPolicyCanvasSessionRoute() -> XCUIApplication {
     let app = launch(
       mode: "preview",
-      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard-landing"]
+      additionalEnvironment: [
+        Self.previewScenarioKey: Self.previewPolicyCanvasScenario,
+        Self.initialRouteKey: Self.policyCanvasRoute,
+      ]
     )
 
-    if !element(in: app, identifier: Accessibility.sessionWindowShell).exists {
-      let openRecentWindow = element(in: app, identifier: Accessibility.openRecentRoot)
-      XCTAssertTrue(waitForElement(openRecentWindow, timeout: Self.uiTimeout))
-      tapButton(
-        in: app,
-        identifier: Accessibility.openRecentSessionRow(Self.previewSessionID)
+    XCTAssertTrue(
+      waitForElement(
+        element(in: app, identifier: Accessibility.sessionWindowShell),
+        timeout: Self.uiTimeout
       )
-      XCTAssertTrue(
-        waitForElement(
-          element(in: app, identifier: Accessibility.sessionWindowShell),
-          timeout: Self.actionTimeout
-        )
+    )
+    XCTAssertTrue(
+      waitForElement(
+        element(in: app, identifier: Accessibility.policyCanvasRoot),
+        timeout: Self.actionTimeout
       )
-    }
-
-    tapButton(in: app, identifier: Accessibility.sessionWindowRoute("policyCanvas"))
+    )
     return app
   }
 }

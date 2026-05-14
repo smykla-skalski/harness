@@ -38,6 +38,7 @@ extension HarnessMonitorUITestCase {
     let mainContentIdentifiers = [
       HarnessMonitorUITestAccessibility.appChromeRoot,
       HarnessMonitorUITestAccessibility.openRecentRoot,
+      HarnessMonitorUITestAccessibility.sessionWindowShell,
     ]
     for identifier in mainContentIdentifiers {
       if let mainWindowIdentifier = windowIdentifier(

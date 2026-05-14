@@ -23,6 +23,7 @@ struct HarnessMonitorApp: App {
   private let acpAttentionState: AcpPermissionAttentionState
   private let pendingDecisionsDockBadgeController: PendingDecisionsDockBadgeController
   private let perfScenario: HarnessMonitorPerfScenario?
+  private let initialSessionWindowRoute: SessionWindowRoute?
   // App-internal access; helpers in HarnessMonitorApp+Helpers.swift use it.
   @State private var store: HarnessMonitorStore
   @State private var menuBarStatusController: HarnessMonitorMenuBarStatusController
@@ -114,6 +115,10 @@ struct HarnessMonitorApp: App {
     let menuBarStatusController = HarnessMonitorMenuBarStatusController()
     pendingDecisionsDockBadgeController = PendingDecisionsDockBadgeController()
     perfScenario = configuration.perfScenario
+    initialSessionWindowRoute = SessionWindowInitialRouteOverride.route(
+      values: configuration.environment.values,
+      isUITesting: configuration.isUITesting
+    )
     let store = configuration.store
     Self.bindSupervisorSurfaces(
       to: store,
@@ -180,6 +185,7 @@ struct HarnessMonitorApp: App {
         windowCommandRouting: windowCommandRouting,
         mcpWindowCommandRegistrar: mcpWindowCommandRegistrar,
         sessionWindowPresenceTracker: sessionWindowPresenceTracker,
+        initialRoute: initialSessionWindowRoute,
         themeMode: $themeMode
       )
       .harnessTrackMCPWindow()
@@ -262,7 +268,7 @@ struct HarnessMonitorApp: App {
   }
 
   private var shouldHandleInitialWindowRouting: Bool {
-    launchMode == .live && !isTestRun
+    (launchMode == .live && !isTestRun) || initialSessionWindowRoute != nil
   }
 
   private func scheduleInitialWindowRoutingIfNeeded() {
@@ -287,6 +293,20 @@ struct HarnessMonitorApp: App {
 
   @MainActor
   private func routeInitialWindows() async {
+    if let initialSessionWindowRoute {
+      let sessionID = store.selectedSessionID ?? store.sessions.first?.sessionId
+      HarnessMonitorUITestTrace.record(
+        component: "app.startup",
+        event: "preview-session-route",
+        details: [
+          "route": initialSessionWindowRoute.rawValue,
+          "has_session": String(sessionID != nil),
+        ]
+      )
+      openWindow.openHarnessSessionWindow(sessionID: sessionID)
+      return
+    }
+
     let tabbingPreference = SessionWindowTabbingPreference.resolved(
       rawValue: UserDefaults.standard.string(forKey: SessionWindowTabbingPreference.storageKey)
     )
