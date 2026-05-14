@@ -5,6 +5,14 @@ import SwiftUI
 struct PolicyCanvasTopBar: View {
   @Bindable var viewModel: PolicyCanvasViewModel
   let canPromote: Bool
+  /// True when there is a simulation payload to visualize. The toggle is
+  /// disabled when this is false so the user doesn't get a button that
+  /// does nothing.
+  let simulationOverlayAvailable: Bool
+  /// Resolved visibility (host's `@State` override OR auto-show on
+  /// simulation tab). The button checkmark mirrors this value.
+  let simulationOverlayVisible: Bool
+  let toggleSimulationOverlay: @MainActor () -> Void
   let save: @MainActor () -> Void
   let simulate: @MainActor () -> Void
   let promote: @MainActor () -> Void
@@ -45,6 +53,12 @@ struct PolicyCanvasTopBar: View {
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasTabs)
 
       Spacer(minLength: 16)
+
+      PolicyCanvasSimulationToggleButton(
+        available: simulationOverlayAvailable,
+        visible: simulationOverlayVisible,
+        toggle: toggleSimulationOverlay
+      )
 
       if viewModel.hasPendingDocumentUpdate {
         Button {
@@ -258,6 +272,37 @@ private struct PolicyCanvasActionButton: View {
       return disabledReason ?? title
     }
     return title
+  }
+}
+
+/// Topbar toggle for the simulation-result overlay. The icon flips between
+/// an empty waveform and a filled waveform to mirror "off"/"on" the same
+/// way the validation panel's filter chips do; disabled rendering kicks in
+/// when there's no simulation to visualize so the user doesn't get a
+/// button that does nothing.
+private struct PolicyCanvasSimulationToggleButton: View {
+  let available: Bool
+  let visible: Bool
+  let toggle: @MainActor () -> Void
+
+  var body: some View {
+    Button(action: toggle) {
+      Label(
+        visible ? "Hide simulation" : "Show simulation",
+        systemImage: visible ? "waveform.path.ecg" : "waveform"
+      )
+      .scaledFont(.callout.weight(.semibold))
+      .lineLimit(1)
+    }
+    .harnessActionButtonStyle(variant: .bordered, tint: Color.cyan.opacity(0.85))
+    .controlSize(.small)
+    .disabled(!available)
+    .help(
+      available
+        ? (visible ? "Hide simulation outcome badges" : "Show simulation outcome badges")
+        : "Run a simulation to see outcomes"
+    )
+    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasSimulationToggle)
   }
 }
 

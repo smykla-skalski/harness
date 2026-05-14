@@ -335,6 +335,7 @@ public enum HarnessMonitorAccessibility {
   public static let policyCanvasSimulateButton = "harness.policy-canvas.action.simulate"
   public static let policyCanvasPromoteButton = "harness.policy-canvas.action.promote"
   public static let policyCanvasReloadButton = "harness.policy-canvas.action.reload"
+  public static let policyCanvasSimulationToggle = "harness.policy-canvas.action.simulation-overlay"
   public static let policyCanvasZoomControls = "harness.policy-canvas.zoom"
   public static let policyCanvasZoomOutButton = "harness.policy-canvas.zoom.out"
   public static let policyCanvasZoomInButton = "harness.policy-canvas.zoom.in"
@@ -388,6 +389,10 @@ public enum HarnessMonitorAccessibility {
 
   public static func policyCanvasPaletteItem(_ kind: String) -> String {
     "harness.policy-canvas.palette.\(slug(kind))"
+  }
+
+  public static func policyCanvasSimulationBadge(_ nodeID: String) -> String {
+    "harness.policy-canvas.simulation-badge.\(slug(nodeID))"
   }
 
   public static func settingsAuthorizedFolderRow(_ id: String) -> String {
